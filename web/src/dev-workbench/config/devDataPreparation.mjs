@@ -141,7 +141,7 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
     prepareDescription:
       '在当前目标卡内先权威读回目标身份，再打开二次确认；demo 不接受主机、端口、DSN 或命令参数。',
     confirmationDescription:
-      '本地会通过正式配置 API 对齐跟踪配置；demo 必须同时绑定 release、migration、V8 客户配置、数据版本与新回滚点。两端都不清空历史。',
+      '本地会通过正式配置 API 对齐跟踪配置；demo 必须同时绑定 release、migration、当前客户配置、数据版本与新回滚点。两端都不清空历史。',
     successDescription:
       '业务场景演示数据已精确读回并长期保留；人工验收仍未完成，本结果不是完整验收。',
     cleanupBoundary: '只向前补齐，不支持批次清理或重置',
@@ -416,7 +416,6 @@ function validateAcceptancePlan(plan) {
     plan,
     [
       'catalogTargetCount',
-      'catalogVersion',
       'chainCount',
       'chainDataDigest',
       'chainVerificationDigest',
@@ -438,7 +437,6 @@ function validateAcceptancePlan(plan) {
   if (
     !isSafeText(plan.contract, 120) ||
     !isSafeText(plan.sourceContract, 120) ||
-    !isSafeText(plan.catalogVersion, 120) ||
     !HASH_PATTERN.test(String(plan.chainDataDigest || '')) ||
     !HASH_PATTERN.test(String(plan.chainVerificationDigest || '')) ||
     ![plan.chainCount, plan.stepCount, plan.scenarioCount, plan.dataStageCount]

@@ -10,12 +10,12 @@ const USAGE = `Customer source snapshot freeze checker
 Usage:
   node scripts/import/customerSourceSnapshotFreezeCheck.mjs \\
     --source scripts/import/fixtures/customers/yoyoosun/source-snapshot.freeze.sample.json \\
-    --existing scripts/import/fixtures/customers/yoyoosun/existing-v1.freeze.sample.json \\
+    --existing scripts/import/fixtures/customers/yoyoosun/existing-model.freeze.sample.json \\
     --out output/customers/yoyoosun/source-snapshot-freeze
 
 Options:
   --source <path>    Required. Source snapshot JSON.
-  --existing <path>  Required. Existing V1 / formal model snapshot JSON.
+  --existing <path>  Required. Existing formal model snapshot JSON.
   --out <path>       Required. Output directory for freeze evidence.
   --help             Print this help.
 
@@ -763,7 +763,7 @@ ${deferredRows}
 
 ## No real import
 
-No real import is executed by this freeze checker. The tool does not connect to a database, does not write formal V1 tables, does not create SQL, and does not modify schema, API, UI, seedData, or docs registry. \`canExecuteRealImport\` is always \`false\`.
+No real import is executed by this freeze checker. The tool does not connect to a database, does not write formal tables, does not create SQL, and does not modify schema, API, UI, seedData, or docs registry. \`canExecuteRealImport\` is always \`false\`.
 
 ## Manual Review Next Steps
 

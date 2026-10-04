@@ -367,7 +367,7 @@ function canOpenSourceDocument(record = {}) {
   return Boolean(businessSourceRouteFor(record.source_type, record.source_id))
 }
 
-export default function V1InventoryLedgerPage() {
+export default function InventoryLedgerPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -1931,7 +1931,7 @@ export default function V1InventoryLedgerPage() {
         Number(currentOperation.posted_by || 0) === currentAdminID))
 
   return (
-    <BusinessPageLayout className="erp-v1-inventory-ledger-page">
+    <BusinessPageLayout className="erp-inventory-ledger-page">
       <PageHeaderCard
         compact
         helpKey="inventory"

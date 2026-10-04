@@ -158,7 +158,7 @@ export default function DevUIDesignPage() {
         <div className="erp-dev-ui-design-toolbar">
           <span>
             <strong>{UI_DESIGN_ASSET.title}</strong>
-            <small>{UI_DESIGN_ASSET.version} · 唯一交互稿</small>
+            <small>唯一交互稿</small>
           </span>
           <Space wrap>
             <Segmented

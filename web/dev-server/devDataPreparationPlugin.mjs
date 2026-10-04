@@ -648,7 +648,6 @@ async function fullAcceptancePlanFingerprint(stdout, repository, runId) {
     acceptanceIdentity: {
       contract: MANUAL_ACCEPTANCE_REVIEW_PLAN.contract,
       sourceContract: MANUAL_ACCEPTANCE_REVIEW_PLAN.sourceContract,
-      catalogVersion: MANUAL_ACCEPTANCE_REVIEW_PLAN.catalogVersion,
       chainDataDigest: MANUAL_ACCEPTANCE_REVIEW_PLAN.chainDataDigest,
       chainVerificationDigest:
         MANUAL_ACCEPTANCE_REVIEW_PLAN.chainVerificationDigest,

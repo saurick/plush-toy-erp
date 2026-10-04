@@ -20,7 +20,7 @@ const salesOrderPageConfigSource = readFileSync(
   'utf8'
 )
 const salesOrderPageSource = readFileSync(
-  fileURLToPath(new URL('../pages/V1SalesOrdersPage.jsx', import.meta.url)),
+  fileURLToPath(new URL('../pages/SalesOrdersPage.jsx', import.meta.url)),
   'utf8'
 )
 
@@ -771,7 +771,7 @@ test('customerConfigApi: customer config transitions use strict shared payload b
   )
 })
 
-test('V1SalesOrdersPage: sales order submit action enters acceptance workflow', () => {
+test('SalesOrdersPage: sales order submit action enters acceptance workflow', () => {
   assert.match(salesOrderPageConfigSource, /submitSalesOrderAcceptanceProcess/)
   assert.match(
     salesOrderPageConfigSource,
@@ -784,7 +784,7 @@ test('V1SalesOrdersPage: sales order submit action enters acceptance workflow', 
   assert.match(salesOrderPageSource, /business_ref_no:\s*order\.order_no/)
 })
 
-test('V1SalesOrdersPage: process submit payload does not replace selected sales order', () => {
+test('SalesOrdersPage: process submit payload does not replace selected sales order', () => {
   assert.match(
     salesOrderPageSource,
     /action\.returnsRecord === false \? order : updated \|\| order/

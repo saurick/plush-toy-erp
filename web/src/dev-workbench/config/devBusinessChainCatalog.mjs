@@ -5,9 +5,6 @@ import {
   DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS,
 } from './devBusinessChainStepContracts.mjs'
 
-export const DEV_BUSINESS_CHAIN_CATALOG_VERSION =
-  'dev-business-chain-catalog/v3'
-
 export const DEV_BUSINESS_CHAIN_OVERVIEW_KEY = 'all'
 
 export const DEV_BUSINESS_CHAIN_KINDS = Object.freeze([
@@ -2300,7 +2297,6 @@ export function buildDevBusinessChainCatalog({
   }
 
   return Object.freeze({
-    version: DEV_BUSINESS_CHAIN_CATALOG_VERSION,
     readOnly: true,
     allowsActionExecution: false,
     runtimeAuthority: 'design_projection_only',

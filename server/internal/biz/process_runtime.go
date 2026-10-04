@@ -331,9 +331,8 @@ type ProcessDomainCommandResult struct {
 	// blocked without pretending that the business fact command succeeded.
 	BlockReason        string
 	LinkedBusinessRefs []ProcessBusinessRef
-	// Production handlers must declare applied or none. Unknown remains only as a
-	// fail-closed compatibility value for non-production adapters and must never
-	// be treated as proof that an effect can be compensated.
+	// Production handlers must declare applied or none. An unknown result from
+	// other adapters fails closed and cannot prove that an effect is compensable.
 	EffectState string
 	EffectRef   *ProcessBusinessRef
 }

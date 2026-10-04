@@ -1296,8 +1296,8 @@ func validateProductionReworkOriginForBatch(ctx context.Context, client *ent.Cli
 	return nil
 }
 
-// validateProductionWIPFinishedGoodsAvailability keeps legacy route-less
-// completions independent from WIP. Explicit routes reserve capacity on one
+// validateProductionWIPFinishedGoodsAvailability keeps route-less completions
+// independent from WIP. Explicit routes reserve capacity on one
 // accepted packaging batch; DRAFT and POSTED facts both consume that batch.
 func validateProductionWIPFinishedGoodsAvailability(
 	ctx context.Context,

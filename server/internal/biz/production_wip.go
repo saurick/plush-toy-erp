@@ -333,10 +333,9 @@ func ProductionWIPRequiredQualityGates(operationCode string, customerInspectionR
 	}
 }
 
-// ValidateProductionWIPInitialization preserves the legacy completion path:
-// only explicitly route-coded items participate and route_code is never
-// inferred for old items. The repository must call this under the released
-// production-order transaction before creating route snapshots.
+// ValidateProductionWIPInitialization selects explicitly routed items without
+// inferring a route for records that have no frozen route. The repository must
+// call this in the release transaction before creating route snapshots.
 func ValidateProductionWIPInitialization(order *ProductionOrder, items []*ProductionOrderItem) ([]*ProductionOrderItem, error) {
 	if order == nil || order.ID <= 0 {
 		return nil, ErrBadParam

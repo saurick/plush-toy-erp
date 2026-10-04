@@ -561,7 +561,7 @@ func adminMenusContainKey(menus []AdminMenu, key string) bool {
 	return false
 }
 
-func TestAdminVisibleMenusUsesFormalV1Entries(t *testing.T) {
+func TestAdminVisibleMenusUsesFormalEntries(t *testing.T) {
 	admin := &AdminUser{
 		ID:       2,
 		Username: "operator",

@@ -23,7 +23,7 @@ import {
 } from '../../api/operationalFactApi.mjs'
 import {
   formatUnixDate,
-  V1_ROUTE_PATHS,
+  BUSINESS_ROUTE_PATHS,
 } from '../../utils/masterDataOrderView.mjs'
 import { financeCancelAuditText as buildFinanceCancelAuditText } from '../../utils/financeCancellation.mjs'
 import {
@@ -809,20 +809,20 @@ export function buildOperationalFactRelatedMenuItems({
   if (
     ['shipments', 'reservations'].includes(activeKey) &&
     activeSelectedRow.sales_order_id &&
-    canOpenPath(V1_ROUTE_PATHS.salesOrders)
+    canOpenPath(BUSINESS_ROUTE_PATHS.salesOrders)
   ) {
     items.push({ key: 'sales-order', label: '销售订单' })
   }
   if (
     ['production', 'outsourcing', 'shipments'].includes(activeKey) &&
-    canOpenPath(V1_ROUTE_PATHS.inventory)
+    canOpenPath(BUSINESS_ROUTE_PATHS.inventory)
   ) {
     items.push({ key: 'inventory', label: '库存台账' })
   }
-  if (activeKey === 'shipments' && canOpenPath(V1_ROUTE_PATHS.receivables)) {
+  if (activeKey === 'shipments' && canOpenPath(BUSINESS_ROUTE_PATHS.receivables)) {
     items.push({ key: 'receivables', label: '应收管理' })
   }
-  if (activeKey === 'shipments' && canOpenPath(V1_ROUTE_PATHS.invoices)) {
+  if (activeKey === 'shipments' && canOpenPath(BUSINESS_ROUTE_PATHS.invoices)) {
     items.push({ key: 'invoices', label: '发票管理' })
   }
   const sourceRoute = businessSourceRouteFor(

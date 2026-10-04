@@ -288,19 +288,19 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(actionSource.includes("rbacAllowed && effectiveSessionAllowsAction"));
 
   const masterDataSource = readRelative(
-    "web/src/erp/pages/V1MasterDataPage.jsx",
+    "web/src/erp/pages/MasterDataPage.jsx",
   );
   assert(masterDataSource.includes("filterColumnsByEffectiveFieldPolicy"));
   assert(masterDataSource.includes("adminProfile"));
 
   const salesOrderSource = readRelative(
-    "web/src/erp/pages/V1SalesOrdersPage.jsx",
+    "web/src/erp/pages/SalesOrdersPage.jsx",
   );
   assert(salesOrderSource.includes("filterColumnsByEffectiveFieldPolicy"));
   assert(salesOrderSource.includes("'sales_orders.default'"));
 
   const purchaseOrderSource = readRelative(
-    "web/src/erp/pages/V1PurchaseOrdersPage.jsx",
+    "web/src/erp/pages/PurchaseOrdersPage.jsx",
   );
   assert(purchaseOrderSource.includes("getEffectivePrintTemplateDefaults"));
   assert(
@@ -313,7 +313,7 @@ test("formal frontend customer config boundary: page, action, and field projecti
   );
 
   const outsourcingOrderSource = readRelative(
-    "web/src/erp/pages/V1OutsourcingOrdersPage.jsx",
+    "web/src/erp/pages/OutsourcingOrdersPage.jsx",
   );
   const outsourcingEditor = readRelative(
     "web/src/erp/components/outsourcing-orders/useOutsourcingOrderEditor.mjs",

@@ -67,7 +67,7 @@ import {
 import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
-  V1_ROUTE_PATHS,
+  BUSINESS_ROUTE_PATHS,
   buildSequentialDraftCode,
   canRunPurchaseOrderLifecycleAction,
   formatUnixDate,
@@ -138,7 +138,7 @@ import {
   withLifecycleScopeSearchParam,
 } from '../utils/lifecycleScope.mjs'
 
-export default function V1PurchaseOrdersPage() {
+export default function PurchaseOrdersPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -1369,10 +1369,10 @@ export default function V1PurchaseOrdersPage() {
     () =>
       [
         { key: 'order-items', label: '采购订单明细' },
-        canOpenRelatedPath(V1_ROUTE_PATHS.purchaseReceipts)
+        canOpenRelatedPath(BUSINESS_ROUTE_PATHS.purchaseReceipts)
           ? { key: 'purchase-receipts', label: '采购入库' }
           : null,
-        canOpenRelatedPath(V1_ROUTE_PATHS.qualityInspections)
+        canOpenRelatedPath(BUSINESS_ROUTE_PATHS.qualityInspections)
           ? { key: 'quality-inspections', label: '来料质检' }
           : null,
       ].filter(Boolean),
@@ -1389,7 +1389,7 @@ export default function V1PurchaseOrdersPage() {
     if (key === 'purchase-receipts') {
       navigate(
         relatedDocumentRoute(
-          V1_ROUTE_PATHS.purchaseReceipts,
+          BUSINESS_ROUTE_PATHS.purchaseReceipts,
           { purchase_order_id: singleSelectedOrder.id },
           {
             keyword: singleSelectedOrder.purchase_order_no,
@@ -1403,7 +1403,7 @@ export default function V1PurchaseOrdersPage() {
     if (key === 'quality-inspections') {
       navigate(
         relatedDocumentRoute(
-          V1_ROUTE_PATHS.qualityInspections,
+          BUSINESS_ROUTE_PATHS.qualityInspections,
           { purchase_order_id: singleSelectedOrder.id },
           {
             keyword: singleSelectedOrder.purchase_order_no,
@@ -1452,7 +1452,7 @@ export default function V1PurchaseOrdersPage() {
   )
 
   return (
-    <BusinessPageLayout className="erp-v1-purchase-orders-page">
+    <BusinessPageLayout className="erp-purchase-orders-page">
       <PageHeaderCard
         viewSwitch={purchaseViewSwitch}
         helpKey="accessories-purchase"

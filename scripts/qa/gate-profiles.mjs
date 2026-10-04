@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 const COMMON_GATES = Object.freeze([
   "diff-check",
   "agents-size",
+  "implementation-naming",
   "db-guard",
   "error-codes",
   "domain-boundaries",
@@ -88,6 +89,7 @@ const FAST_REQUIRED_FILES = Object.freeze([
   "scripts/qa/affected.mjs",
   "scripts/qa/gate-profiles.mjs",
   "scripts/qa/fast.sh",
+  "scripts/qa/phase-label-boundaries.mjs",
   "scripts/qa/node-test-groups.mjs",
   "scripts/qa/run-node-tests.mjs",
   "scripts/qa/run-test-gate.mjs",

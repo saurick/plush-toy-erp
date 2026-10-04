@@ -5,18 +5,18 @@ import path from "node:path";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { runV1AcceptancePlan } from "./v1-acceptance-plan.mjs";
+import { runMainChainAcceptancePlan } from "./main-chain-acceptance-plan.mjs";
 
 const ROOT_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../..",
 );
 
-test("V1 acceptance plan writes plan-only evidence without runtime effects", () => {
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), "v1-acceptance-plan-"));
-  const result = runV1AcceptancePlan({ out });
+test("main-chain acceptance plan writes plan-only evidence without runtime effects", () => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "main-chain-acceptance-plan-"));
+  const result = runMainChainAcceptancePlan({ out });
 
-  assert.equal(result.report.scenario, "erp-v1-acceptance-plan");
+  assert.equal(result.report.scenario, "erp-acceptance-plan");
   assert.equal(result.report.mode, "plan-only");
   assert.equal(result.report.simulatedOnly, true);
   assert.equal(result.report.writesDatabase, false);
@@ -55,9 +55,9 @@ test("V1 acceptance plan writes plan-only evidence without runtime effects", () 
   assert.equal(persisted.noWriteToolRuns.length, 0);
 });
 
-test("V1 acceptance plan report tools stay no-write and print the retired operational apply contract", () => {
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), "v1-acceptance-tools-"));
-  const result = runV1AcceptancePlan({ out, runReportTools: true });
+test("main-chain acceptance plan report tools stay no-write and print the retired operational apply contract", () => {
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "main-chain-acceptance-tools-"));
+  const result = runMainChainAcceptancePlan({ out, runReportTools: true });
 
   assert.equal(result.report.mode, "report-with-no-write-tools");
   assert.equal(result.report.writesDatabase, false);
@@ -83,10 +83,10 @@ test("V1 acceptance plan report tools stay no-write and print the retired operat
   );
 });
 
-test("V1 acceptance plan CLI rejects apply mode", () => {
+test("main-chain acceptance plan CLI rejects apply mode", () => {
   const result = spawnSync(
     process.execPath,
-    ["scripts/qa/v1-acceptance-plan.mjs", "--apply"],
+    ["scripts/qa/main-chain-acceptance-plan.mjs", "--apply"],
     {
       cwd: ROOT_DIR,
       encoding: "utf8",
@@ -94,5 +94,5 @@ test("V1 acceptance plan CLI rejects apply mode", () => {
   );
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /not supported by v1-acceptance-plan/);
+  assert.match(result.stderr, /not supported by main-chain-acceptance-plan/);
 });

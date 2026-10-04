@@ -23,7 +23,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '客户档案',
     path: '/erp/master/partners/customers',
     shortLabel: '客户',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description: '客户档案用于维护客户交易主体；联系人请在客户详情中维护。',
     primaryEntity: 'customers',
     boundary:
@@ -36,7 +36,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '供应商与加工厂',
     path: '/erp/master/partners/suppliers',
     shortLabel: '供应商',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '在同一入口维护供应商与加工厂交易主体；类型、联系人和可加工工序在档案中统一维护。',
     primaryEntity: 'suppliers',
@@ -50,7 +50,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '产品档案',
     path: '/erp/master/products',
     shortLabel: '产品',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '维护产品规格（SKU）、颜色、尺码、条码、客户规格编号和包装版本。',
     primaryEntity: 'product_skus',
@@ -71,7 +71,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '材料档案',
     path: '/erp/master/materials',
     shortLabel: '材料',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '维护材料基础资料；采购、库存、质检和物料清单用量请到对应页面处理。',
     primaryEntity: 'materials',
@@ -92,7 +92,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '销售订单',
     path: '/erp/sales/project-orders/sales-orders',
     shortLabel: '销售订单',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '销售订单记录客户订单承诺；出货、库存和财务处理请到对应页面完成。',
     primaryEntity: 'sales_orders',
@@ -105,7 +105,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '物料清单（BOM）',
     path: '/erp/purchase/material-bom',
     shortLabel: '物料清单',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description: '物料清单（BOM）用于维护产品结构、材料用量、损耗和版本状态。',
     primaryEntity: 'bom_headers / bom_items',
     factSource: 'bom_headers, bom_items, materials',
@@ -125,7 +125,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '加工环节',
     path: '/erp/engineering/processes',
     shortLabel: '环节',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '加工环节维护委外合同与标准生产路线可引用的工序；质检参考仅供人工查阅。',
     primaryEntity: 'processes',
@@ -147,7 +147,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '采购订单',
     path: '/erp/purchase/accessories',
     shortLabel: '采购',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '采购订单维护供应商采购承诺和采购明细；入库、批次和财务处理请到对应页面完成。',
     primaryEntity: 'purchase_orders / purchase_order_items',
@@ -175,7 +175,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '采购入库',
     path: '/erp/warehouse/inbound',
     shortLabel: '入库',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '采购入库只接收从已审核采购订单生成的入库草稿，并继续办理收货、待检、退货、调整和入库确认；确认过账后系统更新库存。',
     primaryEntity: 'purchase_receipts / purchase_receipt_items',
@@ -204,7 +204,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '质量检验',
     path: '/erp/production/quality-inspections',
     shortLabel: '质检',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '质量检验汇总办理采购来料、委外回货、生产工序和出货前成品的检验判定；各类质检均从对应来源记录或在制批次发起，办理状态变化不会代替实际检验。',
     primaryEntity: 'quality_inspections',
@@ -236,7 +236,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '库存台账',
     path: '/erp/warehouse/inventory',
     shortLabel: '库存',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '库存台账统一查看库存余额、已预留、可用量、批次和变动记录；库存数量以已确认的入库、出库和调整记录为准。',
     primaryEntity:
@@ -270,7 +270,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '委外订单',
     path: '/erp/purchase/processing-contracts',
     shortLabel: '委外',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '委外订单维护加工合同、工序明细、加工厂承诺和打印内容；已确认合同可在本页按明细生成委外发料或回货草稿。',
     primaryEntity: 'outsourcing_orders / outsourcing_order_items',
@@ -306,7 +306,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '生产订单',
     path: '/erp/production/orders',
     shortLabel: '生产订单',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '生产订单维护生产计划与固定工序路线；发布后按布料加工、车缝、手工、包装依次办理 WIP、逐工序内外发决策、分段质检与包材确认，并可生成领料或完工入库草稿。',
     primaryEntity: 'production_orders / production_order_items',
@@ -354,7 +354,7 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '排程',
     sidebarVisible: false,
     sidebarParentPath: '/erp/production/orders',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '排产确认处理生产订单发布时生成的 PMC 待办；完成排产任务不会代写领料、完工或库存记录。',
     primaryEntity: 'workflow_tasks',
@@ -377,7 +377,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '生产记录',
     path: '/erp/production/progress',
     shortLabel: '记录',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '生产记录用于处理生产发料、返工和待入库完工报告；生产提交完工报告，仓库核对实收后确认成品入库。',
     primaryEntity: 'production_facts',
@@ -409,7 +409,7 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '异常',
     sidebarVisible: false,
     sidebarParentPath: '/erp/production/progress',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '异常处理用于办理报废、在制让步和超领申请；审批只记录决定，报废和让步由生产岗位显式执行或冲正，超领额度由正式领料消费。',
     primaryEntity:
@@ -441,7 +441,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '出货单',
     path: '/erp/warehouse/shipments',
     shortLabel: '出货',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '出货单维护出货信息和明细；确认出货后更新库存，取消已出货会保留原记录并恢复相应库存。',
     primaryEntity: 'shipments / shipment_items',
@@ -471,7 +471,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '出货放行',
     path: '/erp/warehouse/shipping-release',
     shortLabel: '放行',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '出货放行用于财务办理版本化出货审批；批准后仍须由仓库在出货单页面独立确认实际出货。',
     primaryEntity: 'process_instances / workflow_tasks / shipments',
@@ -492,7 +492,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '库存预留',
     path: '/erp/warehouse/outbound',
     shortLabel: '预留',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '库存预留用于核对销售订单占用的库存，并按权限释放预留；实际出货在出货单中确认。',
     primaryEntity: 'stock_reservations',
@@ -521,7 +521,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '应收管理',
     path: '/erp/finance/receivables',
     shortLabel: '应收',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '应收管理记录已出货业务产生的应收款项，可过账或取消；结清状态根据正式收款核销、红冲或冲正结果更新。',
     primaryEntity: 'finance_facts.RECEIVABLE',
@@ -544,7 +544,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '应付管理',
     path: '/erp/finance/payables',
     shortLabel: '应付',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '应付管理记录来源明确的应付款项，可过账或取消；结清状态根据正式付款核销、红冲或冲正结果更新。',
     primaryEntity: 'finance_facts.PAYABLE',
@@ -568,7 +568,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '收付款与核销',
     path: '/erp/finance/payments',
     shortLabel: '收付款',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '登记真实收款或付款，并按同一往来方和币种对多张应收或应付进行核销。',
     primaryEntity:
@@ -598,7 +598,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '对账管理',
     path: '/erp/finance/reconciliation',
     shortLabel: '对账',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '对账管理记录单笔业务核对结果；核对草稿只能从已过账应收、应付或发票生成。',
     primaryEntity: 'finance_facts.RECONCILIATION',
@@ -621,7 +621,7 @@ export const businessModuleDefinitions = Object.freeze([
     title: '发票管理',
     path: '/erp/finance/invoices',
     shortLabel: '发票',
-    pageKind: 'formal-v1',
+    pageKind: 'formal',
     description:
       '发票管理记录已出货业务的开票情况；系统中的发票记录不等于税控开票已经完成。',
     primaryEntity: 'finance_facts.INVOICE',

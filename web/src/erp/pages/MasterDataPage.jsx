@@ -111,7 +111,7 @@ import {
   withLifecycleScopeSearchParam,
 } from '../utils/lifecycleScope.mjs'
 
-export default function V1MasterDataPage({ type }) {
+export default function MasterDataPage({ type }) {
   const isProductCatalogPage = type === 'product_skus'
   const outletContext = useOutletContext()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -961,7 +961,7 @@ export default function V1MasterDataPage({ type }) {
     } / ${getRecordName(selectedRecord, effectiveType) || `未命名${entityLabel}`}`
   }, [effectiveType, entityLabel, selectedRecord])
   return (
-    <BusinessPageLayout className="erp-v1-master-data-page">
+    <BusinessPageLayout className="erp-master-data-page">
       <PageHeaderCard
         compact
         title={config.title}

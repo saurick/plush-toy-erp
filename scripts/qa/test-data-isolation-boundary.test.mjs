@@ -43,13 +43,13 @@ test("test-data-isolation-boundary: current repo keeps test data buckets isolate
   }
 });
 
-test("test-data-isolation-boundary: v6 target checks stay atomic and fail closed", () => {
+test("test-data-isolation-boundary: dataset target checks stay atomic and fail closed", () => {
   const ids = DEFAULT_TEST_DATA_ISOLATION_CHECKS.map((check) => check.id);
   assert.equal(new Set(ids).size, ids.length);
 
   const dataset = DEFAULT_TEST_DATA_ISOLATION_CHECKS.find(
     (check) =>
-      check.id === "manual-acceptance-dataset-keeps-one-current-v6-contract",
+      check.id === "manual-acceptance-dataset-keeps-one-current-contract",
   );
   assert(dataset);
   assert(

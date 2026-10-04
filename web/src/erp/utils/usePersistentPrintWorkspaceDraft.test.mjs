@@ -322,7 +322,7 @@ test('usePersistentPrintWorkspaceDraft: 三个正式工作台传入 scoped key �
   })
 
   const businessPrintSources = [
-    join(erpRootDir, 'pages/V1OutsourcingOrdersPage.jsx'),
+    join(erpRootDir, 'pages/OutsourcingOrdersPage.jsx'),
     join(erpRootDir, 'pages/BOMVersionsPage.jsx'),
     join(erpRootDir, 'pages/OperationalFactsPage.jsx'),
     join(
@@ -339,7 +339,7 @@ test('usePersistentPrintWorkspaceDraft: 三个正式工作台传入 scoped key �
   })
 
   const purchaseOrderPageSource = readFileSync(
-    join(erpRootDir, 'pages/V1PurchaseOrdersPage.jsx'),
+    join(erpRootDir, 'pages/PurchaseOrdersPage.jsx'),
     'utf8'
   )
   assert.match(

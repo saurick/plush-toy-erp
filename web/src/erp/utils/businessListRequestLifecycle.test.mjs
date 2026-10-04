@@ -24,14 +24,14 @@ function readSource(relativePath) {
 const pageCases = [
   {
     title: '销售订单',
-    path: '../pages/V1SalesOrdersPage.jsx',
+    path: '../pages/SalesOrdersPage.jsx',
     loader: 'loadOrders',
     requestKey: 'orders',
     listFunction: 'listSalesOrders',
   },
   {
     title: '采购订单',
-    path: '../pages/V1PurchaseOrdersPage.jsx',
+    path: '../pages/PurchaseOrdersPage.jsx',
     loader: 'loadOrders',
     requestKey: 'orders',
     listFunction: 'listPurchaseOrders',
@@ -45,7 +45,7 @@ const pageCases = [
   },
   {
     title: '采购入库',
-    path: '../pages/V1PurchaseReceiptsPage.jsx',
+    path: '../pages/PurchaseReceiptsPage.jsx',
     loader: 'loadRows',
     requestKey: 'rows',
     listFunction: 'listPurchaseReceipts',
@@ -59,7 +59,7 @@ const pageCases = [
   },
   {
     title: '来料质检',
-    path: '../pages/V1QualityInspectionsPage.jsx',
+    path: '../pages/QualityInspectionsPage.jsx',
     loader: 'loadRows',
     requestKey: 'rows',
     listFunction: 'loadQualityInspectionList',

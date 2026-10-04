@@ -40,13 +40,13 @@ const USAGE = `Customer import dry-run tooling
 Usage:
   node scripts/import/customerImportDryRun.mjs \\
     --source scripts/import/fixtures/customers/yoyoosun/source-snapshot.sample.json \\
-    --existing scripts/import/fixtures/customers/yoyoosun/existing-v1.sample.json \\
+    --existing scripts/import/fixtures/customers/yoyoosun/existing-model.sample.json \\
     --out output/customers/yoyoosun/import-dry-run \\
     --format json,md
 
 Options:
   --source <path>           Required. Source snapshot JSON.
-  --existing <path>         Required. Existing V1 / formal model snapshot JSON.
+  --existing <path>         Required. Existing formal model snapshot JSON.
   --out <path>              Required. Output directory for the dry-run package.
   --format <json|md|json,md>
                             Optional. Defaults to json,md.

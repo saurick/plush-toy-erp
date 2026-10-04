@@ -357,7 +357,7 @@ function demoProjectCard(dataSummary, deliverySummary, error) {
   } else if (!migrationAligned) {
     nextAction = '先对齐登记数据库与 migration'
   } else if (!configAligned) {
-    nextAction = '先激活当前 V8 客户配置并读回'
+    nextAction = '先激活当前客户配置并读回'
   } else if (!healthReady) {
     nextAction = '先修复 health / ready / 公网入口读回'
   } else if (!datasetReadBack) {

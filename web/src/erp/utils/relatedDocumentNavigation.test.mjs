@@ -98,7 +98,7 @@ test('related document path requires both menu and effective page projection', (
 
 test('quality type changes delegate source compatibility and outsourcing translation', () => {
   const source = readFileSync(
-    new URL('../pages/V1QualityInspectionsPage.jsx', import.meta.url),
+    new URL('../pages/QualityInspectionsPage.jsx', import.meta.url),
     'utf8'
   )
   assert.match(
@@ -118,7 +118,7 @@ test('quality type changes delegate source compatibility and outsourcing transla
 
 test('inventory source type changes clear and stop reusing an incompatible route source id', () => {
   const source = readFileSync(
-    new URL('../pages/V1InventoryLedgerPage.jsx', import.meta.url),
+    new URL('../pages/InventoryLedgerPage.jsx', import.meta.url),
     'utf8'
   )
   assert.match(source, /const routeSourceMatchesLocal =/u)

@@ -17,14 +17,14 @@ const read = (relativePath) =>
   readFileSync(path.join(repoRoot, relativePath), 'utf8')
 
 const targetPageSources = Object.freeze({
-  'sales-orders': 'web/src/erp/pages/V1SalesOrdersPage.jsx',
+  'sales-orders': 'web/src/erp/pages/SalesOrdersPage.jsx',
   'material-bom': 'web/src/erp/pages/BOMVersionsPage.jsx',
-  'accessories-purchase': 'web/src/erp/pages/V1PurchaseOrdersPage.jsx',
-  inbound: 'web/src/erp/pages/V1PurchaseReceiptsPage.jsx',
-  'quality-inspections': 'web/src/erp/pages/V1QualityInspectionsPage.jsx',
-  inventory: 'web/src/erp/pages/V1InventoryLedgerPage.jsx',
-  'processing-contracts': 'web/src/erp/pages/V1OutsourcingOrdersPage.jsx',
-  'production-orders': 'web/src/erp/pages/V1ProductionOrdersPage.jsx',
+  'accessories-purchase': 'web/src/erp/pages/PurchaseOrdersPage.jsx',
+  inbound: 'web/src/erp/pages/PurchaseReceiptsPage.jsx',
+  'quality-inspections': 'web/src/erp/pages/QualityInspectionsPage.jsx',
+  inventory: 'web/src/erp/pages/InventoryLedgerPage.jsx',
+  'processing-contracts': 'web/src/erp/pages/OutsourcingOrdersPage.jsx',
+  'production-orders': 'web/src/erp/pages/ProductionOrdersPage.jsx',
   shipments: 'web/src/erp/pages/ShipmentsPage.jsx',
   'finance-payments': 'web/src/erp/pages/FinancePaymentsPage.jsx',
 })
@@ -130,7 +130,7 @@ test('businessUsabilityCatalog: 专属与共享页面都接入同一页内帮助
   assert.match(layoutSource, /helpKey = ''/u)
   assert.match(layoutSource, /pageKey=\{helpKey\}/u)
   assert.match(
-    read('web/src/erp/pages/V1MasterDataPage.jsx'),
+    read('web/src/erp/pages/MasterDataPage.jsx'),
     /helpKey=\{isProductCatalogPage \? 'products' : moduleKey\}/u
   )
   assert.match(
@@ -186,7 +186,7 @@ test('businessUsabilityCatalog: 关键字段问号可悬停、聚焦和点击且
       'web/src/erp/components/quality-inspections/QualityInspectionForms.jsx',
       'defect-rate',
     ],
-    ['web/src/erp/pages/V1InventoryLedgerPage.jsx', 'available-quantity'],
+    ['web/src/erp/pages/InventoryLedgerPage.jsx', 'available-quantity'],
     [
       'web/src/erp/components/outsourcing-orders/OutsourcingOrderForm.jsx',
       'outsourcing-line-amount',

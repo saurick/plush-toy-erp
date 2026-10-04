@@ -733,7 +733,7 @@ export function createBusinessFormInteractionScenarios({
           buttonName: '新建采购订单',
           titleText: '新建采购订单',
           minFieldCount: 0,
-          screenshotName: 'business-v1-purchase-order-form-modal',
+          screenshotName: 'business-formal-purchase-order-form-modal',
           expectedTexts: [
             '合同订购方信息',
             '订购单位',
@@ -767,16 +767,16 @@ export function createBusinessFormInteractionScenarios({
               scenarioName: 'purchase-order-source-import-picker',
             })
             await assertLineItemsUnifiedHorizontalScroll(modal, {
-              scenarioName: 'business-v1-purchase-order-form-modal',
+              scenarioName: 'business-formal-purchase-order-form-modal',
               minRows: 2,
             })
             await assertLineQuantityUnitSuffix(modal, {
               label: '采购数量',
               expectedText: '个',
-              scenarioName: 'business-v1-purchase-order-form-modal',
+              scenarioName: 'business-formal-purchase-order-form-modal',
             })
             await assertLineItemAddActionScrollsToNewRow(modal, {
-              scenarioName: 'business-v1-purchase-order-form-modal',
+              scenarioName: 'business-formal-purchase-order-form-modal',
               addButtonName: '添加采购明细',
             })
           },
@@ -971,7 +971,7 @@ export function createBusinessFormInteractionScenarios({
           buttonName: '新建加工合同',
           titleText: '新建加工合同',
           minFieldCount: 6,
-          screenshotName: 'business-v1-outsourcing-order-title-form-modal',
+          screenshotName: 'business-formal-outsourcing-order-title-form-modal',
           expectedTexts: [
             '委托方',
             '委托单位',

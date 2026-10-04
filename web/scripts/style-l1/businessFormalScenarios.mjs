@@ -757,7 +757,7 @@ export function createBusinessFormalScenarios(deps) {
           contentType: 'application/json',
           body: JSON.stringify({
             jsonrpc: '2.0',
-            id: body.id || 'business-v1-shipment-source-error',
+            id: body.id || 'business-formal-shipment-source-error',
             result: {
               code: 50000,
               message: '加载销售订单来源失败',
@@ -964,40 +964,40 @@ export function createBusinessFormalScenarios(deps) {
     await expectButton(page, '新建订单')
     await expectText(page, '当前操作')
     await assertCurrentOperationBarCompact(page, {
-      scenarioName: 'business-v1-sales-orders',
+      scenarioName: 'business-formal-sales-orders',
     })
     await page.getByText('SO-STYLE-L1', { exact: true }).first().waitFor()
     await assertBusinessCollaborationPanelAbsent(
       page,
-      'business-v1-sales-orders'
+      'business-formal-sales-orders'
     )
     await assertNoListDeleteTrashToolbar(page)
     await assertBusinessMainTableInitialSelectionEmpty(page, {
-      scenarioName: 'business-v1-sales-orders',
+      scenarioName: 'business-formal-sales-orders',
     })
     await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
     await assertOrderLifecycleActionsConsolidated(page, {
-      scenarioName: 'business-v1-sales-orders',
+      scenarioName: 'business-formal-sales-orders',
       primaryActionLabel: '提交订单',
       menuActionLabels: ['取消'],
       absentButtonLabels: ['生效', '关闭', '取消'],
     })
     await assertBusinessPageRefreshEntrypoint(page, {
-      scenarioName: 'business-v1-sales-orders',
+      scenarioName: 'business-formal-sales-orders',
     })
     await assertBusinessHeaderHasNoSectionTitle(page, {
-      scenarioName: 'business-v1-sales-orders',
+      scenarioName: 'business-formal-sales-orders',
     })
     await assertBusinessModuleToolbarControlStyle(page, {
-      scenarioName: 'business-v1-sales-orders',
+      scenarioName: 'business-formal-sales-orders',
     })
     await assertBusinessMainTableSortableColumns(page, {
-      scenarioName: 'business-v1-sales-orders',
+      scenarioName: 'business-formal-sales-orders',
     })
     await assertBusinessFormModalKeyboardRecovery(page, {
       triggerName: '新建订单',
       titleText: '新建销售订单',
-      scenarioName: 'business-v1-sales-orders',
+      scenarioName: 'business-formal-sales-orders',
     })
     await page.getByRole('button', { name: '新建订单' }).click()
     const draftForm = page.locator('.erp-business-form-page:not([hidden])')
@@ -1023,7 +1023,7 @@ export function createBusinessFormalScenarios(deps) {
       buttonName: '新建订单',
       titleText: '新建销售订单',
       minFieldCount: 6,
-      screenshotName: 'business-v1-sales-order-form-modal',
+      screenshotName: 'business-formal-sales-order-form-modal',
       expectedTexts: ['订货明细', '添加订货明细', '暂无订货明细'],
       absentTexts: ['产品引用 ID', '单位引用 ID', '从已有规格添加'],
       afterOpen: async (modal) => {
@@ -1070,15 +1070,15 @@ export function createBusinessFormalScenarios(deps) {
           .scrollIntoViewIfNeeded()
         await assertNonItemTextareaFullRow(modal, {
           labels: ['报价备注', '备注'],
-          scenarioName: 'business-v1-sales-order-form-modal',
+          scenarioName: 'business-formal-sales-order-form-modal',
         })
         await assertLineQuantityUnitSuffix(modal, {
           label: '订单数量',
           expectedText: '个',
-          scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+          scenarioName: 'business-formal-sales-order-form-modal-empty-line',
         })
         await assertLineItemFieldLayout(modal, {
-          scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+          scenarioName: 'business-formal-sales-order-form-modal-empty-line',
           visibleThroughLabel: '单位',
           absentLabels: ['产品编号快照', '产品名称快照', '颜色快照'],
         })
@@ -1105,7 +1105,7 @@ export function createBusinessFormalScenarios(deps) {
           quantity: '123.11',
           unitPrice: '12.11',
           expectedErrorText: '当前单位只允许整数数量',
-          scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+          scenarioName: 'business-formal-sales-order-form-modal-empty-line',
         })
         await assertLineAmountCalculation(modal, {
           quantityLabel: '订单数量',
@@ -1114,7 +1114,7 @@ export function createBusinessFormalScenarios(deps) {
           quantity: '11',
           unitPrice: '12.11',
           expected: '133.21',
-          scenarioName: 'business-v1-sales-order-form-modal-empty-line',
+          scenarioName: 'business-formal-sales-order-form-modal-empty-line',
         })
         assert.equal(
           await modal
@@ -1220,12 +1220,12 @@ export function createBusinessFormalScenarios(deps) {
         await assertLineQuantityUnitSuffix(modal, {
           label: '订单数量',
           expectedText: '个',
-          scenarioName: 'business-v1-sales-order-form-modal',
+          scenarioName: 'business-formal-sales-order-form-modal',
         })
         await assertLineSourceSummaryReadableUnit(modal, {
           label: '已关联产品',
           expectedText: '个',
-          scenarioName: 'business-v1-sales-order-form-modal',
+          scenarioName: 'business-formal-sales-order-form-modal',
         })
         const skuField = linkedRow.locator(
           '.erp-line-item-field--source .ant-select'
@@ -1322,11 +1322,11 @@ export function createBusinessFormalScenarios(deps) {
         })
         await page.setViewportSize({ width: 1440, height: 900 })
         await assertLineItemDuplicateAction(modal, {
-          scenarioName: 'business-v1-sales-order-form-modal',
+          scenarioName: 'business-formal-sales-order-form-modal',
         })
         await assertLineItemAddActionScrollsToNewRow(modal, {
           addButtonName: '添加订货明细',
-          scenarioName: 'business-v1-sales-order-form-modal',
+          scenarioName: 'business-formal-sales-order-form-modal',
         })
         assert.equal(
           await modal
@@ -1352,7 +1352,7 @@ export function createBusinessFormalScenarios(deps) {
     await verifyBusinessRowDoubleClickModal(page, {
       rowText: 'SO-STYLE-L1',
       titleText: '编辑销售订单',
-      scenarioName: 'business-v1-sales-orders',
+      scenarioName: 'business-formal-sales-orders',
       afterModalOpen: async () => {
         await expectText(page, '订货明细')
         const editedRow = page
@@ -2381,7 +2381,7 @@ export function createBusinessFormalScenarios(deps) {
           rowText: '12.5',
           titleText: '库存余额详情',
           scenarioName: 'business-row-double-click-inventory',
-          screenshotName: 'business-v1-inventory-double-click-details',
+          screenshotName: 'business-formal-inventory-double-click-details',
           afterModalOpen: async () => {
             await expectText(page, '当前弹窗只用于库存查询和追溯')
             await expectText(page, 'SKU-STYLE-L1')
@@ -2397,7 +2397,7 @@ export function createBusinessFormalScenarios(deps) {
           rowText: 'QI-STYLE-L1',
           titleText: '质量检验详情',
           scenarioName: 'business-row-double-click-quality-inspection',
-          screenshotName: 'business-v1-quality-inspection-double-click-details',
+          screenshotName: 'business-formal-quality-inspection-double-click-details',
           afterModalOpen: async (modal) => {
             await modal
               .getByText('PR-STYLE-L1', { exact: false })
@@ -2423,7 +2423,7 @@ export function createBusinessFormalScenarios(deps) {
           rowText: 'SHIP-STYLE-L1',
           titleText: '查看出货明细',
           scenarioName: 'business-row-double-click-shipment',
-          screenshotName: 'business-v1-shipment-double-click-details',
+          screenshotName: 'business-formal-shipment-double-click-details',
           afterModalOpen: async () => {
             await expectText(page, '已保存出货明细')
           },
@@ -3186,29 +3186,29 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '新建供应商')
         await expectText(page, '当前操作')
         await assertCurrentOperationBarCompact(page, {
-          scenarioName: 'business-v1-suppliers',
+          scenarioName: 'business-formal-suppliers',
         })
         await assertBusinessCollaborationPanelAbsent(
           page,
-          'business-v1-suppliers'
+          'business-formal-suppliers'
         )
         await assertBusinessPageRefreshEntrypoint(page, {
-          scenarioName: 'business-v1-suppliers',
+          scenarioName: 'business-formal-suppliers',
         })
         await assertBusinessMainTableSortableColumns(page, {
-          scenarioName: 'business-v1-suppliers',
+          scenarioName: 'business-formal-suppliers',
         })
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '新建供应商',
           titleText: '新建供应商或加工厂',
-          scenarioName: 'business-v1-suppliers',
+          scenarioName: 'business-formal-suppliers',
         })
         await assertNoHorizontalOverflow(page, 'business-standard-suppliers')
         await verifyBusinessActionFormModal(page, {
           buttonName: '新建供应商',
           titleText: '新建供应商或加工厂',
           minFieldCount: 5,
-          screenshotName: 'business-v1-suppliers-form-modal',
+          screenshotName: 'business-formal-suppliers-form-modal',
           expectedTexts: [
             '供应商类型',
             '经营 / 加工地址',
@@ -3219,7 +3219,7 @@ export function createBusinessFormalScenarios(deps) {
           expectContactItemsLayout: true,
           afterOpen: async (modal) => {
             await assertLineItemAddActionScrollsToNewRow(modal, {
-              scenarioName: 'business-v1-suppliers-contact-form-modal',
+              scenarioName: 'business-formal-suppliers-contact-form-modal',
               targetRowCount: 5,
               addButtonName: '添加联系人',
               listSelector: '.erp-master-contact-list__items',
@@ -3230,7 +3230,7 @@ export function createBusinessFormalScenarios(deps) {
         await verifyBusinessRowDoubleClickModal(page, {
           rowText: '样式供应商',
           titleText: '编辑供应商',
-          scenarioName: 'business-v1-suppliers',
+          scenarioName: 'business-formal-suppliers',
           afterModalOpen: async () => {
             await expectText(page, '联系人')
             await page
@@ -3246,37 +3246,37 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '新建客户')
         await expectText(page, '当前操作')
         await assertCurrentOperationBarCompact(page, {
-          scenarioName: 'business-v1-customers',
+          scenarioName: 'business-formal-customers',
         })
         await expectText(page, '暗色客户')
         await assertBusinessCollaborationPanelAbsent(
           page,
-          'business-v1-customers'
+          'business-formal-customers'
         )
         await assertBusinessPageRefreshEntrypoint(page, {
-          scenarioName: 'business-v1-customers',
+          scenarioName: 'business-formal-customers',
         })
         await assertBusinessHeaderHasNoSectionTitle(page, {
-          scenarioName: 'business-v1-customers',
+          scenarioName: 'business-formal-customers',
         })
         await assertBusinessMainTableSortableColumns(page, {
-          scenarioName: 'business-v1-customers',
+          scenarioName: 'business-formal-customers',
         })
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '新建客户',
           titleText: '新建客户档案',
-          scenarioName: 'business-v1-customers',
+          scenarioName: 'business-formal-customers',
         })
         await verifyBusinessActionFormModal(page, {
           buttonName: '新建客户',
           titleText: '新建客户档案',
           minFieldCount: 5,
-          screenshotName: 'business-v1-customers-form-modal',
+          screenshotName: 'business-formal-customers-form-modal',
           expectedTexts: ['联系人', '添加联系人'],
           expectContactItemsLayout: true,
           afterOpen: async (modal) => {
             await assertLineItemAddActionScrollsToNewRow(modal, {
-              scenarioName: 'business-v1-customers-contact-form-modal',
+              scenarioName: 'business-formal-customers-contact-form-modal',
               targetRowCount: 5,
               addButtonName: '添加联系人',
               listSelector: '.erp-master-contact-list__items',
@@ -3288,7 +3288,7 @@ export function createBusinessFormalScenarios(deps) {
         await verifyBusinessRowDoubleClickModal(page, {
           rowText: '暗色客户',
           titleText: '编辑客户',
-          scenarioName: 'business-v1-customers',
+          scenarioName: 'business-formal-customers',
           afterModalOpen: async () => {
             await expectText(page, '联系人')
             await page
@@ -3556,7 +3556,7 @@ export function createBusinessFormalScenarios(deps) {
             '.erp-business-filter-popover .erp-business-operation-panel__filters'
           )
           const table = document.querySelector(
-            '.erp-v1-inventory-ledger-page .ant-table-content'
+            '.erp-inventory-ledger-page .ant-table-content'
           )
           const filterRect = filters?.getBoundingClientRect()
           const controls = Array.from(filters?.children || []).map((node) => {
@@ -3593,7 +3593,7 @@ export function createBusinessFormalScenarios(deps) {
           )}`
         )
         await page.screenshot({
-          path: path.join(outputDir, 'business-v1-inventory-sku-grain.png'),
+          path: path.join(outputDir, 'business-formal-inventory-sku-grain.png'),
           fullPage: true,
         })
         await page.getByRole('button', { name: '清空筛选' }).click()
@@ -3604,7 +3604,7 @@ export function createBusinessFormalScenarios(deps) {
             '.erp-business-filter-popover .erp-business-operation-panel__filters'
           )
           const table = document.querySelector(
-            '.erp-v1-inventory-ledger-page .ant-table-content'
+            '.erp-inventory-ledger-page .ant-table-content'
           )
           const filterRect = filters?.getBoundingClientRect()
           const controls = Array.from(filters?.children || []).map((node) => {
@@ -3645,7 +3645,7 @@ export function createBusinessFormalScenarios(deps) {
         await page.screenshot({
           path: path.join(
             outputDir,
-            'business-v1-inventory-sku-grain-narrow.png'
+            'business-formal-inventory-sku-grain-narrow.png'
           ),
           fullPage: true,
         })
@@ -3706,7 +3706,7 @@ export function createBusinessFormalScenarios(deps) {
           rowText: '12.5',
           titleText: '库存余额详情',
           scenarioName: 'business-standard-inventory-balances',
-          screenshotName: 'business-v1-inventory-double-click-details',
+          screenshotName: 'business-formal-inventory-double-click-details',
           afterModalOpen: async () => {
             await expectText(page, '当前弹窗只用于库存查询和追溯')
             await expectText(page, 'SKU-STYLE-L1')
@@ -3804,19 +3804,19 @@ export function createBusinessFormalScenarios(deps) {
           )}`
         )
         await assertBusinessPageRefreshEntrypoint(page, {
-          scenarioName: 'business-v1-quality-inspections',
+          scenarioName: 'business-formal-quality-inspections',
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
-          scenarioName: 'business-v1-quality-inspections',
+          scenarioName: 'business-formal-quality-inspections',
         })
         await assertBusinessMainTableSortableColumns(page, {
-          scenarioName: 'business-v1-quality-inspections',
+          scenarioName: 'business-formal-quality-inspections',
           unsortableHeaders: ['估算不良比例', '判定备注'],
         })
         await assertNoListDeleteTrashToolbar(page)
         let forceEmptyQualityInspections = false
         const qualityEmptySearchKeyword =
-          'NO-MATCH-business-v1-quality-inspections-empty-search'
+          'NO-MATCH-business-formal-quality-inspections-empty-search'
         await page.route('**/rpc/quality', async (route) => {
           const body = route.request().postDataJSON() || {}
           if (
@@ -3828,7 +3828,7 @@ export function createBusinessFormalScenarios(deps) {
               contentType: 'application/json',
               body: JSON.stringify({
                 jsonrpc: '2.0',
-                id: body.id || 'business-v1-quality-inspections-empty-search',
+                id: body.id || 'business-formal-quality-inspections-empty-search',
                 result: {
                   code: 0,
                   message: 'OK',
@@ -3852,7 +3852,7 @@ export function createBusinessFormalScenarios(deps) {
           .fill(qualityEmptySearchKeyword)
         await page.keyboard.press('Enter')
         await assertBusinessTableEmptyState(page, {
-          scenarioName: 'business-v1-quality-inspections-empty-search',
+          scenarioName: 'business-formal-quality-inspections-empty-search',
           emptyText: '暂无质量检验单',
           staleText: 'QI-STYLE-L1',
         })
@@ -3863,8 +3863,8 @@ export function createBusinessFormalScenarios(deps) {
         await verifyBusinessRowDoubleClickModal(page, {
           rowText: 'QI-STYLE-L1',
           titleText: '质量检验详情',
-          scenarioName: 'business-v1-quality-inspections',
-          screenshotName: 'business-v1-quality-inspection-double-click-details',
+          scenarioName: 'business-formal-quality-inspections',
+          screenshotName: 'business-formal-quality-inspection-double-click-details',
           afterModalOpen: async () => {
             await expectText(page, 'PR-STYLE-L1')
             await expectText(page, 'INV-LOT-001')
@@ -3878,7 +3878,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '补建来料质检',
           titleText: '生成来料质检草稿',
-          scenarioName: 'business-v1-quality-inspections',
+          scenarioName: 'business-formal-quality-inspections',
         })
         await page
           .getByRole('row')
@@ -3902,7 +3902,7 @@ export function createBusinessFormalScenarios(deps) {
           buttonName: '补建来料质检',
           titleText: '生成来料质检草稿',
           minFieldCount: 4,
-          screenshotName: 'business-v1-quality-inspection-create-form-modal',
+          screenshotName: 'business-formal-quality-inspection-create-form-modal',
           expectedTexts: [
             '质检单号（自动）',
             '采购入库单',
@@ -3920,13 +3920,13 @@ export function createBusinessFormalScenarios(deps) {
           afterOpen: async (modal) => {
             await assertNonItemTextareaFullRow(modal, {
               labels: ['备注'],
-              scenarioName: 'business-v1-quality-inspection-create-form-modal',
+              scenarioName: 'business-formal-quality-inspection-create-form-modal',
             })
           },
         })
         await assertNoHorizontalOverflow(
           page,
-          'business-v1-quality-inspections'
+          'business-formal-quality-inspections'
         )
 
         await gotoScenarioPath(page, '/erp/warehouse/shipments', {
@@ -3940,7 +3940,7 @@ export function createBusinessFormalScenarios(deps) {
         ]) {
           const header = page
             .locator(
-              '.erp-v1-shipments-page .erp-business-data-table-card .ant-table-thead th'
+              '.erp-shipments-page .erp-business-data-table-card .ant-table-thead th'
             )
             .filter({ hasText: headerText })
             .first()
@@ -3955,14 +3955,14 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '待确认')
         await expectText(page, 'SHIP-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-v1-shipments',
+          scenarioName: 'business-formal-shipments',
         })
         await assertBusinessPageRefreshEntrypoint(page, {
-          scenarioName: 'business-v1-shipments',
+          scenarioName: 'business-formal-shipments',
         })
         const shipmentDraftRow = page
           .locator(
-            '.erp-v1-shipments-page .erp-business-data-table-card .ant-table-tbody .ant-table-row'
+            '.erp-shipments-page .erp-business-data-table-card .ant-table-tbody .ant-table-row'
           )
           .filter({ hasText: 'SHIP-STYLE-L1' })
           .first()
@@ -3993,7 +3993,7 @@ export function createBusinessFormalScenarios(deps) {
               contentType: 'application/json',
               body: JSON.stringify({
                 jsonrpc: '2.0',
-                id: body.id || 'business-v1-shipments-empty-filter',
+                id: body.id || 'business-formal-shipments-empty-filter',
                 result: {
                   code: 0,
                   message: 'OK',
@@ -4016,7 +4016,7 @@ export function createBusinessFormalScenarios(deps) {
           .getByRole('button', { name: /^已取消，/u })
           .click()
         await assertBusinessTableEmptyState(page, {
-          scenarioName: 'business-v1-shipments-empty-status-filter',
+          scenarioName: 'business-formal-shipments-empty-status-filter',
           emptyText: '暂无出货单',
           staleText: 'SHIP-STYLE-L1',
         })
@@ -4027,8 +4027,8 @@ export function createBusinessFormalScenarios(deps) {
         await verifyBusinessRowDoubleClickModal(page, {
           rowText: 'SHIP-STYLE-L1',
           titleText: '查看出货明细',
-          scenarioName: 'business-v1-shipments',
-          screenshotName: 'business-v1-shipment-double-click-details',
+          scenarioName: 'business-formal-shipments',
+          screenshotName: 'business-formal-shipment-double-click-details',
           afterModalOpen: async () => {
             await expectText(page, '已保存出货明细')
           },
@@ -4036,7 +4036,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '新建草稿',
           titleText: '新建出货单',
-          scenarioName: 'business-v1-shipments',
+          scenarioName: 'business-formal-shipments',
         })
         const shipmentSourceContract =
           await installShipmentSourceCandidateContract(page)
@@ -4044,7 +4044,7 @@ export function createBusinessFormalScenarios(deps) {
           buttonName: '新建草稿',
           titleText: '新建出货单',
           minFieldCount: 12,
-          screenshotName: 'business-v1-shipment-create-form-modal',
+          screenshotName: 'business-formal-shipment-create-form-modal',
           expectedTexts: [
             '出货明细',
             '从销售订单导入',
@@ -4055,7 +4055,7 @@ export function createBusinessFormalScenarios(deps) {
           ],
           afterOpen: async (modal) => {
             await assertLineItemAddActionScrollsToNewRow(modal, {
-              scenarioName: 'business-v1-shipment-create-form-modal',
+              scenarioName: 'business-formal-shipment-create-form-modal',
               targetRowCount: 5,
               addButtonName: '添加出货明细',
             })
@@ -4067,7 +4067,7 @@ export function createBusinessFormalScenarios(deps) {
             await modal.screenshot({
               path: path.join(
                 outputDir,
-                'business-v1-shipment-create-predicted-weight.png'
+                'business-formal-shipment-create-predicted-weight.png'
               ),
             })
           },
@@ -4076,7 +4076,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '查看明细',
           titleText: '查看出货明细',
-          scenarioName: 'business-v1-shipment-readonly-detail',
+          scenarioName: 'business-formal-shipment-readonly-detail',
         })
         const shipmentDetailTrigger = page.getByRole('button', {
           name: '查看明细',
@@ -4123,7 +4123,7 @@ export function createBusinessFormalScenarios(deps) {
           '返回出货列表后焦点应回到查看明细按钮'
         )
         await assertBusinessMainTableHasNoOperationColumn(page, {
-          scenarioName: 'business-v1-shipments',
+          scenarioName: 'business-formal-shipments',
         })
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'shipments',
@@ -4131,7 +4131,7 @@ export function createBusinessFormalScenarios(deps) {
           headerMenuTargetLabel: '客户',
         })
         await assertBusinessMainTableSortableColumns(page, {
-          scenarioName: 'business-v1-shipments',
+          scenarioName: 'business-formal-shipments',
           unsortableHeaders: [
             '实际 / 最终总净重（克）',
             '包装 / 毛重 / 体积',
@@ -4140,7 +4140,7 @@ export function createBusinessFormalScenarios(deps) {
             '备注',
           ],
         })
-        await assertNoHorizontalOverflow(page, 'business-v1-shipments')
+        await assertNoHorizontalOverflow(page, 'business-formal-shipments')
 
         await gotoScenarioPath(page, '/erp/engineering/processes', {
           waitUntil: 'domcontentloaded',
@@ -4152,10 +4152,10 @@ export function createBusinessFormalScenarios(deps) {
         assert.equal(
           processOuterPageHeadCount,
           0,
-          'business-v1-processes 不应同时显示外层页头和内容区页头'
+          'business-formal-processes 不应同时显示外层页头和内容区页头'
         )
         await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-v1-processes',
+          scenarioName: 'business-formal-processes',
         })
         await expectText(page, '查货')
         await expectText(page, '手工')
@@ -4167,7 +4167,7 @@ export function createBusinessFormalScenarios(deps) {
           buttonName: '新建加工环节',
           titleText: '新建加工环节',
           minFieldCount: 8,
-          screenshotName: 'business-v1-process-create-form-modal',
+          screenshotName: 'business-formal-process-create-form-modal',
           expectedTexts: [
             '环节编号',
             '环节名称',
@@ -4180,7 +4180,7 @@ export function createBusinessFormalScenarios(deps) {
           ],
           afterOpen: async (modal) => {
             await assertProcessSuggestionOptions(page, modal, {
-              scenarioName: 'business-v1-processes',
+              scenarioName: 'business-formal-processes',
             })
           },
         })
@@ -4189,7 +4189,7 @@ export function createBusinessFormalScenarios(deps) {
           heading: '加工环节',
           headerMenuTargetLabel: '环节名称',
         })
-        await assertNoHorizontalOverflow(page, 'business-v1-processes')
+        await assertNoHorizontalOverflow(page, 'business-formal-processes')
 
         await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
           waitUntil: 'domcontentloaded',
@@ -4205,13 +4205,13 @@ export function createBusinessFormalScenarios(deps) {
         await assertTextAbsent(page, '判定结果回质检模块')
         await assertBusinessCollaborationPanelAbsent(
           page,
-          'business-v1-processing-contracts-unselected'
+          'business-formal-processing-contracts-unselected'
         )
         await assertCurrentOperationBarCompact(page, {
-          scenarioName: 'business-v1-processing-contracts',
+          scenarioName: 'business-formal-processing-contracts',
         })
         await assertBusinessHeaderStatsSingleLine(page, {
-          scenarioName: 'business-v1-processing-contracts',
+          scenarioName: 'business-formal-processing-contracts',
           expectedLabels: ['符合条件', '本页显示'],
           allowWrappedStats: true,
         })
@@ -4221,7 +4221,7 @@ export function createBusinessFormalScenarios(deps) {
           heading: '委外订单',
         })
         await assertBusinessMainTableSortableColumns(page, {
-          scenarioName: 'business-v1-processing-contracts',
+          scenarioName: 'business-formal-processing-contracts',
           unsortableHeaders: ['备注'],
         })
         await assertTextAbsent(page, '生成委外合同')
@@ -4246,7 +4246,7 @@ export function createBusinessFormalScenarios(deps) {
           .waitFor({ state: 'visible' })
         await assertBusinessCollaborationPanelAbsent(
           page,
-          'business-v1-processing-contracts-selected-without-tasks'
+          'business-formal-processing-contracts-selected-without-tasks'
         )
         assert.equal(
           await page
@@ -4288,7 +4288,7 @@ export function createBusinessFormalScenarios(deps) {
         )
         await page.keyboard.press('Escape')
         await assertOrderLifecycleActionsConsolidated(page, {
-          scenarioName: 'business-v1-processing-contracts',
+          scenarioName: 'business-formal-processing-contracts',
           primaryActionLabel: '提交合同',
           menuActionLabels: ['取消'],
           absentButtonLabels: ['确认下单', '关闭', '取消'],
@@ -4298,13 +4298,13 @@ export function createBusinessFormalScenarios(deps) {
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '新建加工合同',
           titleText: '新建加工合同',
-          scenarioName: 'business-v1-processing-contracts',
+          scenarioName: 'business-formal-processing-contracts',
         })
         await verifyBusinessActionFormModal(page, {
           buttonName: '新建加工合同',
           titleText: '新建加工合同',
           minFieldCount: 6,
-          screenshotName: 'business-v1-outsourcing-order-create-form-modal',
+          screenshotName: 'business-formal-outsourcing-order-create-form-modal',
           expectedTexts: [
             '加工合同号',
             '加工厂',
@@ -4318,17 +4318,17 @@ export function createBusinessFormalScenarios(deps) {
           afterOpen: async (modal) => {
             await assertNonItemTextareaFullRow(modal, {
               labels: ['备注'],
-              scenarioName: 'business-v1-processing-contracts-form-modal',
+              scenarioName: 'business-formal-processing-contracts-form-modal',
             })
             await assertOutsourcingProcessSelectOptions(page, modal, {
-              scenarioName: 'business-v1-processing-contracts',
+              scenarioName: 'business-formal-processing-contracts',
             })
             await assertLineItemSectionTitleBold(modal, {
-              scenarioName: 'business-v1-processing-contracts-form-modal',
+              scenarioName: 'business-formal-processing-contracts-form-modal',
               titleText: '加工明细',
             })
             await assertLineItemAddActionScrollsToNewRow(modal, {
-              scenarioName: 'business-v1-processing-contracts-form-modal',
+              scenarioName: 'business-formal-processing-contracts-form-modal',
               addButtonName: '添加加工明细',
             })
           },
@@ -4339,7 +4339,7 @@ export function createBusinessFormalScenarios(deps) {
         await verifyBusinessRowDoubleClickModal(page, {
           rowText: 'SIM-OUTSOURCE-CONTRACT-L1',
           titleText: '编辑加工合同',
-          scenarioName: 'business-v1-processing-contracts',
+          scenarioName: 'business-formal-processing-contracts',
           afterModalOpen: async () => {
             await expectText(page, '加工明细')
             await page
@@ -4349,10 +4349,10 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertNoHorizontalOverflow(
           page,
-          'business-v1-processing-contracts'
+          'business-formal-processing-contracts'
         )
 
-        const verifyWorkflowV1Page = async ({
+        const verifyWorkflowPage = async ({
           path,
           heading,
           absentTexts,
@@ -4414,7 +4414,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertNoHorizontalOverflow(page, 'business-production-orders')
         await closeBusinessFormModal(page, productionOrderModal)
 
-        await verifyWorkflowV1Page({
+        await verifyWorkflowPage({
           path: '/erp/production/scheduling',
           heading: '排产确认',
           absentTexts: ['发起排程协同', '新建排程单', '生成生产任务'],
@@ -4540,7 +4540,7 @@ export function createBusinessFormalScenarios(deps) {
           return response.json()
         })
 
-        await verifyWorkflowV1Page({
+        await verifyWorkflowPage({
           path: '/erp/warehouse/shipping-release',
           heading: '出货放行',
           absentTexts: [
@@ -4731,7 +4731,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '生产记录')
         await expectText(page, 'PROD-FACT-L1')
         await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-v1-production-progress',
+          scenarioName: 'business-formal-production-progress',
         })
         await assertTextAbsent(page, '生成生产进度')
         await assertTextAbsent(page, '登记生产事实')
@@ -4766,7 +4766,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '作废生产完工报告已完成')
         await assertNoHorizontalOverflow(
           page,
-          'business-v1-production-progress'
+          'business-formal-production-progress'
         )
 
         await page.getByRole('menuitem', { name: /财务管理/u }).click()
@@ -4777,13 +4777,13 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '对账管理')
         await expectText(page, 'REC-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-v1-production-to-reconciliation-navigation',
+          scenarioName: 'business-formal-production-to-reconciliation-navigation',
         })
         await assertTextAbsent(page, '登记对账事实')
         await assertTextAbsent(page, '生成对账')
         await assertNoHorizontalOverflow(
           page,
-          'business-v1-production-to-reconciliation-navigation'
+          'business-formal-production-to-reconciliation-navigation'
         )
 
         await gotoScenarioPath(page, '/erp/warehouse/outbound', {
@@ -4799,7 +4799,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, 'LOT-RESERVATION-STYLE-L1')
         await expectText(page, '件')
         await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-v1-outbound-reservations',
+          scenarioName: 'business-formal-outbound-reservations',
         })
         await assertTextAbsent(page, '登记库存预留')
         await assertTextAbsent(page, '新建出货单')
@@ -4816,7 +4816,7 @@ export function createBusinessFormalScenarios(deps) {
           await assertTextAbsent(page, technicalField)
         }
         await expectNoButton(page, '消耗')
-        await assertNoHorizontalOverflow(page, 'business-v1-outbound')
+        await assertNoHorizontalOverflow(page, 'business-formal-outbound')
 
         await gotoScenarioPath(page, '/erp/finance/receivables', {
           waitUntil: 'domcontentloaded',
@@ -4826,14 +4826,14 @@ export function createBusinessFormalScenarios(deps) {
         await assertTextAbsent(page, 'finance_facts')
         await assertTextAbsent(page, 'RECEIVABLE')
         await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-v1-receivables',
+          scenarioName: 'business-formal-receivables',
         })
         await assertTextAbsent(page, '登记应收事实')
         await assertTextAbsent(page, '生成应收')
         await assertBusinessPageRefreshEntrypoint(page, {
-          scenarioName: 'business-v1-receivables',
+          scenarioName: 'business-formal-receivables',
         })
-        await assertNoHorizontalOverflow(page, 'business-v1-receivables')
+        await assertNoHorizontalOverflow(page, 'business-formal-receivables')
 
         await gotoScenarioPath(page, '/erp/finance/payables', {
           waitUntil: 'domcontentloaded',
@@ -4841,11 +4841,11 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '应付管理')
         await expectText(page, 'AP-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-v1-payables',
+          scenarioName: 'business-formal-payables',
         })
         await assertTextAbsent(page, '登记应付事实')
         await assertTextAbsent(page, '生成应付')
-        await assertNoHorizontalOverflow(page, 'business-v1-payables')
+        await assertNoHorizontalOverflow(page, 'business-formal-payables')
 
         await gotoScenarioPath(page, '/erp/finance/invoices', {
           waitUntil: 'domcontentloaded',
@@ -4853,11 +4853,11 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '发票管理')
         await expectText(page, 'INV-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-v1-invoices',
+          scenarioName: 'business-formal-invoices',
         })
         await assertTextAbsent(page, '登记发票事实')
         await assertTextAbsent(page, '生成发票')
-        await assertNoHorizontalOverflow(page, 'business-v1-invoices')
+        await assertNoHorizontalOverflow(page, 'business-formal-invoices')
 
         await gotoScenarioPath(page, '/erp/finance/reconciliation', {
           waitUntil: 'domcontentloaded',
@@ -4865,11 +4865,11 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '对账管理')
         await expectText(page, 'REC-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
-          scenarioName: 'business-v1-reconciliation',
+          scenarioName: 'business-formal-reconciliation',
         })
         await assertTextAbsent(page, '登记对账事实')
         await assertTextAbsent(page, '生成对账')
-        await assertNoHorizontalOverflow(page, 'business-v1-reconciliation')
+        await assertNoHorizontalOverflow(page, 'business-formal-reconciliation')
 
         await page.evaluate(() => {
           window.localStorage.setItem('plush_erp_theme_mode', 'dark')
@@ -4878,14 +4878,14 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await assertERPThemeMode(page, {
-          scenarioName: 'business-v1-receivables-dark',
+          scenarioName: 'business-formal-receivables-dark',
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
         await expectHeading(page, '应收管理')
         await assertTextAbsent(page, '登记应收事实')
         await assertTextAbsent(page, '生成应收')
-        await assertNoHorizontalOverflow(page, 'business-v1-receivables-dark')
+        await assertNoHorizontalOverflow(page, 'business-formal-receivables-dark')
 
         await gotoScenarioPath(page, '/erp/production/exceptions', {
           waitUntil: 'domcontentloaded',
@@ -4964,13 +4964,13 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await assertERPThemeMode(page, {
-          scenarioName: 'business-v1-outsourcing-mobile',
+          scenarioName: 'business-formal-outsourcing-mobile',
           expectedMode: 'light',
           expectedEffectiveTheme: 'light',
         })
         await expectHeading(page, '委外订单')
         await assertBusinessHeaderStatsSingleLine(page, {
-          scenarioName: 'business-v1-outsourcing-mobile',
+          scenarioName: 'business-formal-outsourcing-mobile',
           expectedLabels: ['符合条件', '本页显示'],
           allowWrappedStats: true,
         })
@@ -4978,7 +4978,7 @@ export function createBusinessFormalScenarios(deps) {
           buttonName: '新建加工合同',
           titleText: '新建加工合同',
           minFieldCount: 6,
-          screenshotName: 'business-v1-outsourcing-mobile-modal',
+          screenshotName: 'business-formal-outsourcing-mobile-modal',
           expectedTexts: [
             '加工合同号',
             '加工厂',
@@ -4991,7 +4991,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertTextAbsent(page, '销售订单ID')
         await assertTextAbsent(page, '单位ID')
-        await assertNoHorizontalOverflow(page, 'business-v1-outsourcing-mobile')
+        await assertNoHorizontalOverflow(page, 'business-formal-outsourcing-mobile')
       },
     },
     {

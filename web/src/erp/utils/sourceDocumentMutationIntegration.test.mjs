@@ -6,7 +6,7 @@ const pageSources = [
   {
     name: 'sales order',
     source: readFileSync(
-      new URL('../pages/V1SalesOrdersPage.jsx', import.meta.url),
+      new URL('../pages/SalesOrdersPage.jsx', import.meta.url),
       'utf8'
     ),
     start: 'const saveOrder = async () => {',
@@ -31,7 +31,7 @@ const pageSources = [
   {
     name: 'purchase order',
     source: readFileSync(
-      new URL('../pages/V1PurchaseOrdersPage.jsx', import.meta.url),
+      new URL('../pages/PurchaseOrdersPage.jsx', import.meta.url),
       'utf8'
     ),
     start: 'const handleSave = async () => {',
@@ -63,7 +63,7 @@ const pageSources = [
       'utf8'
     ),
     source: readFileSync(
-      new URL('../pages/V1OutsourcingOrdersPage.jsx', import.meta.url),
+      new URL('../pages/OutsourcingOrdersPage.jsx', import.meta.url),
       'utf8'
     ),
     start: 'const submitForm = async () => {',
@@ -263,7 +263,7 @@ test('source-document read-only modals load complete line items', () => {
   }
 
   const receiptSource = readFileSync(
-    new URL('../pages/V1PurchaseReceiptsPage.jsx', import.meta.url),
+    new URL('../pages/PurchaseReceiptsPage.jsx', import.meta.url),
     'utf8'
   )
   const receiptDetailsModal = functionSlice(

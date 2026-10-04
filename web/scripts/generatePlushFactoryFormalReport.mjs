@@ -11,11 +11,11 @@ const tempDir = path.join(repoRoot, 'tmp', 'pdfs')
 const outputDir = path.join(repoRoot, 'output', 'pdf')
 const htmlPath = path.join(
   tempDir,
-  'plush_factory_formal_report_v4_mobile.html'
+  'plush_factory_formal_report_mobile.html'
 )
 const pdfPath = path.join(
   outputDir,
-  'plush_factory_formal_report_v4_mobile.pdf'
+  'plush_factory_formal_report_mobile.pdf'
 )
 
 const html = String.raw`<!doctype html>
@@ -23,7 +23,7 @@ const html = String.raw`<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>毛绒玩具工厂流程图 · 甲方确认修订版 V4</title>
+    <title>毛绒玩具工厂流程图 · 业务流程与岗位协作</title>
     <style>
       @page { size: A4 portrait; margin: 0; }
       * { box-sizing: border-box; }
@@ -248,7 +248,7 @@ const html = String.raw`<!doctype html>
     <section class="page">
       <div class="eyebrow">YONGSHEN · CONFIRMED BUSINESS FLOW</div>
       <h1>毛绒玩具工厂流程图</h1>
-      <p class="subtitle">甲方确认修订版 V4 · 固化“先车缝、后手工”，车缝与手工分别决定本厂或外发</p>
+      <p class="subtitle">业务流程与岗位协作 · 固化“先车缝、后手工”，车缝与手工分别决定本厂或外发</p>
       <div class="meta">
         <span>流程口径：高层主链已由甲方确认</span>
         <span>修订日期：2026-07-17</span>
@@ -276,7 +276,7 @@ const html = String.raw`<!doctype html>
         <div class="node warehouse"><strong>布料加工（固定整单外发）</strong><br />BOM 明确标记布料加工材料 → 同一有效加工合同逐材料分配 → 已过账委外发料 → 外发回仓 → 裁片检验（CUT_PIECE）</div>
         <div class="arrow"></div>
 
-        <div class="decision"><strong>生产经理决策 ①：车缝</strong>　同一批允许拆量；各子批分别选择本厂或外发</div>
+        <div class="decision"><strong>生产经理决策 ①：车缝</strong>&#12288;同一批允许拆量；各子批分别选择本厂或外发</div>
         <div class="split">
           <div class="branch internal">
             <div class="branch-title">本厂车缝</div>
@@ -292,7 +292,7 @@ const html = String.raw`<!doctype html>
         <div class="node quality"><strong>皮套检验（SHELL）</strong><br />未通过：退回明确目标工序返工；通过后才允许进入手工</div>
         <div class="arrow"></div>
 
-        <div class="decision"><strong>生产经理决策 ②：手工</strong>　重新独立决策，不继承车缝的本厂 / 外发方式</div>
+        <div class="decision"><strong>生产经理决策 ②：手工</strong>&#12288;重新独立决策，不继承车缝的本厂 / 外发方式</div>
         <div class="split">
           <div class="branch internal">
             <div class="branch-title">本厂手工</div>

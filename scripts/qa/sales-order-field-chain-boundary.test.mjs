@@ -35,7 +35,7 @@ function releaseReadyPackage(customerPackage) {
 }
 
 test("sales order field policy controls both visible columns and CSV export", () => {
-  const salesOrderPage = read("web/src/erp/pages/V1SalesOrdersPage.jsx");
+  const salesOrderPage = read("web/src/erp/pages/SalesOrdersPage.jsx");
   const columns = read(
     "web/src/erp/components/sales-orders/salesOrderColumns.jsx",
   );
@@ -44,23 +44,23 @@ test("sales order field policy controls both visible columns and CSV export", ()
   assertIncludes(
     salesOrderPage,
     "filterColumnsByEffectiveFieldPolicy(",
-    "V1SalesOrdersPage",
+    "SalesOrdersPage",
   );
-  assertIncludes(salesOrderPage, "'sales_orders.default'", "V1SalesOrdersPage");
+  assertIncludes(salesOrderPage, "'sales_orders.default'", "SalesOrdersPage");
   assertIncludes(
     salesOrderPage,
     "columns: visibleOrderDataColumns",
-    "V1SalesOrdersPage CSV export",
+    "SalesOrdersPage CSV export",
   );
   assertNotIncludes(
     salesOrderPage,
     "导出订单行",
-    "V1SalesOrdersPage must not restore selected line-item export",
+    "SalesOrdersPage must not restore selected line-item export",
   );
   assertNotIncludes(
     salesOrderPage,
     "buildSalesOrderItemColumns",
-    "V1SalesOrdersPage main CSV export must stay on order columns",
+    "SalesOrdersPage main CSV export must stay on order columns",
   );
 
   assertIncludes(
@@ -153,7 +153,7 @@ test("sales order line numeric display keeps explicit zero values", () => {
 });
 
 test("sales order form fields are saved through the shared mapper", () => {
-  const salesOrderPage = read("web/src/erp/pages/V1SalesOrdersPage.jsx");
+  const salesOrderPage = read("web/src/erp/pages/SalesOrdersPage.jsx");
   const salesOrderForm = read(
     "web/src/erp/components/sales-orders/SalesOrderForm.jsx",
   );
@@ -184,27 +184,27 @@ test("sales order form fields are saved through the shared mapper", () => {
   assertIncludes(
     salesOrderPage,
     "buildSalesOrderCustomerSourceValues(customer)",
-    "V1SalesOrdersPage save mapper",
+    "SalesOrdersPage save mapper",
   );
   assertIncludes(
     salesOrderPage,
     "contact_snapshot: buildOrderContactSnapshot(values)",
-    "V1SalesOrdersPage save mapper",
+    "SalesOrdersPage save mapper",
   );
   assertIncludes(
     salesOrderPage,
     "buildSalesOrderParams(",
-    "V1SalesOrdersPage save mapper",
+    "SalesOrdersPage save mapper",
   );
   assertIncludes(
     salesOrderPage,
     "order_no: buildSequentialDraftCode(orders,",
-    "V1SalesOrdersPage order no draft",
+    "SalesOrdersPage order no draft",
   );
   assertIncludes(
     salesOrderPage,
     "field: 'order_no'",
-    "V1SalesOrdersPage order no draft",
+    "SalesOrdersPage order no draft",
   );
   assertIncludes(
     partySource,

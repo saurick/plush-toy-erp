@@ -13,33 +13,33 @@ function readSource(relativePath) {
 const formalBusinessListCases = [
   {
     title: '主数据',
-    path: '../pages/V1MasterDataPage.jsx',
+    path: '../pages/MasterDataPage.jsx',
     completeList: /config\.listAll\(recordListParams,\s*\{ signal \}\)/u,
   },
   {
     title: '销售订单',
-    path: '../pages/V1SalesOrdersPage.jsx',
+    path: '../pages/SalesOrdersPage.jsx',
     completeList: /listAllSalesOrders\(orderListParams,\s*\{ signal \}\)/u,
   },
   {
     title: '采购订单',
-    path: '../pages/V1PurchaseOrdersPage.jsx',
+    path: '../pages/PurchaseOrdersPage.jsx',
     completeList: /listAllPurchaseOrders\(orderListParams,\s*\{ signal \}\)/u,
   },
   {
     title: '采购入库',
-    path: '../pages/V1PurchaseReceiptsPage.jsx',
+    path: '../pages/PurchaseReceiptsPage.jsx',
     completeList:
       /listAllPurchaseReceipts\(receiptListParams,\s*\{\s*signal,\s*\}\)/u,
   },
   {
     title: '质量检验',
-    path: '../pages/V1QualityInspectionsPage.jsx',
+    path: '../pages/QualityInspectionsPage.jsx',
     completeList: /loadQualityInspectionList\(\{ signal, all: true \}\)/u,
   },
   {
     title: '库存台账',
-    path: '../pages/V1InventoryLedgerPage.jsx',
+    path: '../pages/InventoryLedgerPage.jsx',
     completeList: /loadInventoryList\(\{ signal, all: true \}\)/u,
   },
   {
@@ -54,7 +54,7 @@ const formalBusinessListCases = [
   },
   {
     title: '委外订单',
-    path: '../pages/V1OutsourcingOrdersPage.jsx',
+    path: '../pages/OutsourcingOrdersPage.jsx',
     queryPath: '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs',
     completeList:
       /listAllOutsourcingOrders\(outsourcingListParams,\s*\{\s*signal,\s*\}\)/u,
@@ -67,7 +67,7 @@ const formalBusinessListCases = [
   },
   {
     title: '生产订单',
-    path: '../pages/V1ProductionOrdersPage.jsx',
+    path: '../pages/ProductionOrdersPage.jsx',
     completeList:
       /listAllProductionOrders\(productionOrderListParams,\s*\{\s*signal,\s*\}\)/u,
   },

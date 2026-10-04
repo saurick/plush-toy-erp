@@ -9,7 +9,7 @@ import { effectiveSessionAllowsAction } from './adminProfileSync.mjs'
 import { BUSINESS_CURRENCY_OPTIONS } from './businessCurrency.mjs'
 import { unixSecondsToBusinessDate } from './businessDate.mjs'
 
-export const V1_ROUTE_PATHS = Object.freeze({
+export const BUSINESS_ROUTE_PATHS = Object.freeze({
   customers: '/erp/master/partners/customers',
   suppliers: '/erp/master/partners/suppliers',
   materials: '/erp/master/materials',

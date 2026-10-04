@@ -16,7 +16,7 @@
       "description": "后台账号、RBAC、客户配置版本及其运行时投影。",
       "references": [
         "docs/product/配置与权限策略.md",
-        "docs/roles/角色权限矩阵第一版.md",
+        "docs/roles/角色权限矩阵.md",
         "docs/product/多甲方角色能力与流程编排.md"
       ]
     },
@@ -52,7 +52,7 @@
       "order": 4,
       "description": "采购收退货、库存作业、批次、余额、流水、预留与质量判定。",
       "references": [
-        "docs/warehouse/仓库与品质第一版.md",
+        "docs/warehouse/仓库与品质业务.md",
         "docs/architecture/主数据源单据事实边界评审.md",
         "docs/product/业务数据生命周期与页面动作规则.md"
       ]
@@ -76,7 +76,7 @@
       "order": 6,
       "description": "销售出货、财务事实、收付款、核销和红冲。",
       "references": [
-        "docs/finance/财务第一版.md",
+        "docs/finance/财务业务与核销.md",
         "docs/architecture/主数据源单据事实边界评审.md",
         "docs/product/业务数据生命周期与页面动作规则.md"
       ]
@@ -90,7 +90,7 @@
       "references": [
         "docs/architecture/状态工作流事实边界.md",
         "docs/workflow/业务与协同流程地图.md",
-        "docs/observability/日志链路追踪审计第一版.md",
+        "docs/observability/日志链路追踪与审计.md",
         "docs/architecture/业务附件证据边界评审.md"
       ]
     }

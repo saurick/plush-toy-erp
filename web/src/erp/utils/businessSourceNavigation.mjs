@@ -1,41 +1,41 @@
-import { V1_ROUTE_PATHS } from './masterDataOrderView.mjs'
+import { BUSINESS_ROUTE_PATHS } from './masterDataOrderView.mjs'
 import { relatedDocumentRoute } from './relatedDocumentNavigation.mjs'
 
 const DIRECT_SOURCE_ROUTES = Object.freeze({
   SALES_ORDER: Object.freeze({
-    path: V1_ROUTE_PATHS.salesOrders,
+    path: BUSINESS_ROUTE_PATHS.salesOrders,
     queryKey: 'sales_order_id',
   }),
   PRODUCTION_ORDER: Object.freeze({
-    path: V1_ROUTE_PATHS.productionOrders,
+    path: BUSINESS_ROUTE_PATHS.productionOrders,
     queryKey: 'production_order_id',
   }),
   PRODUCTION_FACT: Object.freeze({
-    path: V1_ROUTE_PATHS.productionProgress,
+    path: BUSINESS_ROUTE_PATHS.productionProgress,
     queryKey: 'fact_id',
   }),
   OUTSOURCING_ORDER: Object.freeze({
-    path: V1_ROUTE_PATHS.processingContracts,
+    path: BUSINESS_ROUTE_PATHS.processingContracts,
     queryKey: 'outsourcing_order_id',
   }),
   OUTSOURCING_FACT: Object.freeze({
-    path: V1_ROUTE_PATHS.processingContracts,
+    path: BUSINESS_ROUTE_PATHS.processingContracts,
     queryKey: 'outsourcing_fact_id',
   }),
   PURCHASE_ORDER: Object.freeze({
-    path: V1_ROUTE_PATHS.purchaseOrders,
+    path: BUSINESS_ROUTE_PATHS.purchaseOrders,
     queryKey: 'purchase_order_id',
   }),
   PURCHASE_RECEIPT: Object.freeze({
-    path: V1_ROUTE_PATHS.purchaseReceipts,
+    path: BUSINESS_ROUTE_PATHS.purchaseReceipts,
     queryKey: 'receipt_id',
   }),
   QUALITY_INSPECTION: Object.freeze({
-    path: V1_ROUTE_PATHS.qualityInspections,
+    path: BUSINESS_ROUTE_PATHS.qualityInspections,
     queryKey: 'quality_inspection_id',
   }),
   SHIPMENT: Object.freeze({
-    path: V1_ROUTE_PATHS.shipments,
+    path: BUSINESS_ROUTE_PATHS.shipments,
     queryKey: 'shipment_id',
   }),
 })
@@ -90,7 +90,7 @@ export function businessSourceInventoryRouteFor(
   const normalizedID = positiveSourceID(recordID)
   if (!sourceType || !normalizedID) return ''
   return relatedDocumentRoute(
-    V1_ROUTE_PATHS.inventory,
+    BUSINESS_ROUTE_PATHS.inventory,
     {
       source_type: sourceType,
       source_id: normalizedID,

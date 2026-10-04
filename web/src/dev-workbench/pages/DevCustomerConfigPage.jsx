@@ -431,7 +431,7 @@ function DryRunSummary({ dryRunState }) {
         type="info"
         showIcon
         message="试跑正在生成"
-        description="正在读取固定样本快照与现有 V1 样本，完成后会回显报告路径和阻塞数量。"
+        description="正在读取固定样本快照与现有数据模型样本，完成后会回显报告路径和阻塞数量。"
       />
     )
   }

@@ -11,11 +11,11 @@ const bomForm = readFileSync(
   'utf8'
 )
 const masterDataPage = readFileSync(
-  new URL('../pages/V1MasterDataPage.jsx', import.meta.url),
+  new URL('../pages/MasterDataPage.jsx', import.meta.url),
   'utf8'
 )
 const purchaseOrderPage = readFileSync(
-  new URL('../pages/V1PurchaseOrdersPage.jsx', import.meta.url),
+  new URL('../pages/PurchaseOrdersPage.jsx', import.meta.url),
   'utf8'
 )
 

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const page = readFileSync(
-  new URL('../../pages/V1PurchaseOrdersPage.jsx', import.meta.url),
+  new URL('../../pages/PurchaseOrdersPage.jsx', import.meta.url),
   'utf8'
 )
 const operationPanel = readFileSync(

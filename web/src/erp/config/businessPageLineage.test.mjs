@@ -13,7 +13,7 @@ import {
 import { businessModuleDefinitions } from './businessModules.mjs'
 
 const formalModuleKeys = businessModuleDefinitions
-  .filter((moduleItem) => moduleItem.pageKind === 'formal-v1')
+  .filter((moduleItem) => moduleItem.pageKind === 'formal')
   .map((moduleItem) => moduleItem.key)
 
 function serviceMethodActions(relativePaths) {
@@ -191,7 +191,7 @@ const NON_LINEAGE_BACKEND_ONLY_ACTIONS = Object.freeze([
   'recover_compensated_process_domain_command',
 ])
 
-test('business page lineage: exactly covers every formal-v1 business module once', () => {
+test('business page lineage: exactly covers every formal business module once', () => {
   const lineageKeys = businessPageLineageDefinitions.map(
     (definition) => definition.pageKey
   )
@@ -743,7 +743,7 @@ test('business page lineage: legacy process commands never claim current formal 
   }
 
   const purchaseReceiptPageSource = readFileSync(
-    new URL('../pages/V1PurchaseReceiptsPage.jsx', import.meta.url),
+    new URL('../pages/PurchaseReceiptsPage.jsx', import.meta.url),
     'utf8'
   )
   assert.doesNotMatch(
@@ -1151,7 +1151,7 @@ test('business page lineage: draft lot creation is visible without claiming inve
     'utf8'
   )
   const inventoryPageSource = readFileSync(
-    new URL('../pages/V1InventoryLedgerPage.jsx', import.meta.url),
+    new URL('../pages/InventoryLedgerPage.jsx', import.meta.url),
     'utf8'
   )
 

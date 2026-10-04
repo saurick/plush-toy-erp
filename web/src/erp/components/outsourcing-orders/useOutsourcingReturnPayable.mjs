@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { createPayableFromOutsourcingReturn } from '../../api/operationalFactApi.mjs'
-import { V1_ROUTE_PATHS } from '../../utils/masterDataOrderView.mjs'
+import { BUSINESS_ROUTE_PATHS } from '../../utils/masterDataOrderView.mjs'
 import { createSourceBusinessActionAttemptStore } from '../../utils/sourceBusinessAction.mjs'
 import {
   buildOutsourcingReturnPayablePayload,
@@ -137,7 +137,7 @@ export function useOutsourcingReturnPayable({
       if (!fact?.id || !canViewPayable) return
       navigate(
         relatedDocumentRoute(
-          V1_ROUTE_PATHS.payables,
+          BUSINESS_ROUTE_PATHS.payables,
           { source_type: 'OUTSOURCING_FACT', source_id: fact.id },
           {
             keyword: fact.fact_no,

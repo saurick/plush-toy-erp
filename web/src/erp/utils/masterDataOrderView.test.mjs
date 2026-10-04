@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 import {
   BUSINESS_CURRENCY_OPTIONS,
-  V1_ROUTE_PATHS,
+  BUSINESS_ROUTE_PATHS,
   buildMaterialDraftCode,
   formatProductUnitNetWeight,
   buildSequentialDraftCode,
@@ -250,12 +250,12 @@ test('masterDataOrderView: blank supplier item numbers clear without falling bac
 })
 
 test('masterDataOrderView: params trim optional values without adding facts', () => {
-  assert.equal(V1_ROUTE_PATHS.materials, '/erp/master/materials')
-  assert.equal(V1_ROUTE_PATHS.processes, '/erp/engineering/processes')
-  assert.equal(V1_ROUTE_PATHS.purchaseReceipts, '/erp/warehouse/inbound')
-  assert.equal(V1_ROUTE_PATHS.productionOrders, '/erp/production/orders')
+  assert.equal(BUSINESS_ROUTE_PATHS.materials, '/erp/master/materials')
+  assert.equal(BUSINESS_ROUTE_PATHS.processes, '/erp/engineering/processes')
+  assert.equal(BUSINESS_ROUTE_PATHS.purchaseReceipts, '/erp/warehouse/inbound')
+  assert.equal(BUSINESS_ROUTE_PATHS.productionOrders, '/erp/production/orders')
   assert.equal(
-    V1_ROUTE_PATHS.processingContracts,
+    BUSINESS_ROUTE_PATHS.processingContracts,
     '/erp/purchase/processing-contracts'
   )
 
@@ -2404,7 +2404,7 @@ test('FL_outsourcing_contract_party_b_snapshot__preserves_contract_override mast
 })
 
 test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_preserve_supplier_contacts masterDataOrderView: purchase save and outsourcing contract editing preserve supplier contact snapshots', () => {
-  const purchasePageSource = readERPSource('../pages/V1PurchaseOrdersPage.jsx')
+  const purchasePageSource = readERPSource('../pages/PurchaseOrdersPage.jsx')
   const outsourcingPageSource = readERPSource(
     '../components/outsourcing-orders/useOutsourcingOrderEditor.mjs'
   )
@@ -2448,7 +2448,7 @@ test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_preserv
 })
 
 test('FL_outsourcing_subject_form__wires_product_and_material_sources masterDataOrderView: 加工表单显式选择产品或材料', () => {
-  const pageSource = readERPSource('../pages/V1OutsourcingOrdersPage.jsx')
+  const pageSource = readERPSource('../pages/OutsourcingOrdersPage.jsx')
   const formSource = readERPSource(
     '../components/outsourcing-orders/OutsourcingOrderForm.jsx'
   )
@@ -2506,7 +2506,7 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
 })
 
 test('FL_supplier_processing_profile__wires_address_and_process_capabilities masterDataOrderView: 供应商资料显式维护地址与可加工工序', () => {
-  const pageSource = readERPSource('../pages/V1MasterDataPage.jsx')
+  const pageSource = readERPSource('../pages/MasterDataPage.jsx')
   const formSource = readERPSource(
     '../components/master-data/MasterDataForm.jsx'
   )
@@ -2526,7 +2526,7 @@ test('FL_supplier_processing_profile__wires_address_and_process_capabilities mas
 })
 
 test('FL_supplier_payment_term__wires_explicit_create_edit_list_and_export masterDataOrderView: 供应商付款周期完整回显并显式保存', () => {
-  const pageSource = readERPSource('../pages/V1MasterDataPage.jsx')
+  const pageSource = readERPSource('../pages/MasterDataPage.jsx')
   const formSource = readERPSource(
     '../components/master-data/MasterDataForm.jsx'
   )

@@ -175,14 +175,14 @@ func workflowTaskRuntimeOwnerPredicate(
 	); assigned != nil {
 		visible = append(visible, assigned)
 	}
-	legacyVisibility, legacyOK := workflowTaskOwnerOrAssigneePredicate(
+	directVisibility, directOK := workflowTaskOwnerOrAssigneePredicate(
 		ownerRoleKey,
 		revision.VisibleOwnerRoleKeys,
 		visibleAssigneeID,
 		false,
 	)
-	if legacyOK {
-		visible = append(visible, workflowtask.And(workflowTaskOwnerPoolAbsentPredicate(), legacyVisibility))
+	if directOK {
+		visible = append(visible, workflowtask.And(workflowTaskOwnerPoolAbsentPredicate(), directVisibility))
 	}
 	if len(visible) == 0 {
 		return nil, false
@@ -220,11 +220,11 @@ func workflowTaskRuntimeRoleViewOwnerPredicate(
 			workflowtask.OwnerRoleKey(roleKey),
 		))
 	}
-	legacyVisibility, legacyOK := workflowTaskRoleViewOwnerPredicate(
+	directVisibility, directOK := workflowTaskRoleViewOwnerPredicate(
 		roleKey, visibleAssigneeID, crossRoleRiskAllowed, roleAuthorized,
 	)
-	if legacyOK {
-		visible = append(visible, workflowtask.And(workflowTaskOwnerPoolAbsentPredicate(), legacyVisibility))
+	if directOK {
+		visible = append(visible, workflowtask.And(workflowTaskOwnerPoolAbsentPredicate(), directVisibility))
 	}
 	if len(visible) == 0 {
 		return nil, false

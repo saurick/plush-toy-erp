@@ -455,7 +455,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
       "trial-account-rbac",
       "real-login-smoke-shared",
       "trial-simulated-data",
-      "v1-local-acceptance-plan",
+      "main-chain-local-acceptance-plan",
       "mobile-workflow-smoke",
       "customer-config-dev-console",
       "dev-ui-design",
@@ -782,53 +782,53 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
     "不连接后端",
     "trial simulated data preset",
   );
-  const v1LocalAcceptancePlanPreset = DEV_TESTING_COPY_PRESETS.find(
-    (item) => item.key === "v1-local-acceptance-plan",
+  const mainChainAcceptancePlanPreset = DEV_TESTING_COPY_PRESETS.find(
+    (item) => item.key === "main-chain-local-acceptance-plan",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
-    "v1-acceptance-plan.test.mjs",
-    "V1 local acceptance plan preset",
+    buildDevTestingCopyPresetSource(mainChainAcceptancePlanPreset),
+    "main-chain-acceptance-plan.test.mjs",
+    "main-chain local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
+    buildDevTestingCopyPresetSource(mainChainAcceptancePlanPreset),
     "purchase-receipt-real-write-e2e.test.mjs",
-    "V1 local acceptance plan preset",
+    "main-chain local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
+    buildDevTestingCopyPresetSource(mainChainAcceptancePlanPreset),
     "purchase-receipt-real-write-e2e.mjs --print-input-template",
-    "V1 local acceptance plan preset",
+    "main-chain local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
+    buildDevTestingCopyPresetSource(mainChainAcceptancePlanPreset),
     "purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json",
-    "V1 local acceptance plan preset",
+    "main-chain local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
-    "v1-acceptance-plan.mjs --out output/customers/yoyoosun/v1-acceptance-plan",
-    "V1 local acceptance plan preset",
+    buildDevTestingCopyPresetSource(mainChainAcceptancePlanPreset),
+    "main-chain-acceptance-plan.mjs --out output/customers/yoyoosun/main-chain-acceptance-plan",
+    "main-chain local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
-    "v1-acceptance-plan.mjs --run-report-tools --out",
-    "V1 local acceptance plan preset",
+    buildDevTestingCopyPresetSource(mainChainAcceptancePlanPreset),
+    "main-chain-acceptance-plan.mjs --run-report-tools --out",
+    "main-chain local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
+    buildDevTestingCopyPresetSource(mainChainAcceptancePlanPreset),
     "no-write evidence",
-    "V1 local acceptance plan preset",
+    "main-chain local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
+    buildDevTestingCopyPresetSource(mainChainAcceptancePlanPreset),
     "真实写入输入模板",
-    "V1 local acceptance plan preset",
+    "main-chain local acceptance plan preset",
   );
   assertIncludes(
-    buildDevTestingCopyPresetSource(v1LocalAcceptancePlanPreset),
+    buildDevTestingCopyPresetSource(mainChainAcceptancePlanPreset),
     "本地完整技术验收",
-    "V1 local acceptance plan preset",
+    "main-chain local acceptance plan preset",
   );
   const customerConfigPreset = DEV_TESTING_COPY_PRESETS.find(
     (item) => item.key === "customer-config-dev-console",

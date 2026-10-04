@@ -141,7 +141,7 @@
 ## 2026-06-21 权限中心旧权限清理与权限项排版
 
 - 完成：权限中心权限项改为“中文名称 + 单独权限码”两行展示，并补齐 `outsourcing`、`shipment` 模块中文标题；L1 增加权限项不横向溢出、不显示旧权限码的浏览器断言。
-- 完成：`docs/roles/角色权限矩阵第一版.md` 同步权限中心只展示当前 RBAC 真源、旧内置权限由 seed 和列表接口收口的口径。
+- 完成：`docs/roles/角色权限矩阵.md` 同步权限中心只展示当前 RBAC 真源、旧内置权限由 seed 和列表接口收口的口径。
 - 验证：追加前 `progress.md` 为 139 行、20207 字节，未达到归档阈值；已执行 `go test ./internal/data -run 'TestSeedBuiltinRBACPrunesStaleBuiltinPermissions|TestListPermissionsHidesRowsOutsideRBACSource|TestLoadAdminRBAC'`、`go test ./internal/biz ./internal/data ./internal/service`、`pnpm --dir web lint`、`pnpm --dir web css`、`pnpm --dir web test`、`STYLE_L1_SCENARIOS=permission-center-loading-state,permission-center-desktop pnpm --dir web style:l1`、`git diff --check`，均通过。
 - 下一步：后续如继续调整角色模板，应优先保持后端 RBAC 真源、seed、列表 API 和权限中心展示一致，不在前端恢复旧权限码兼容。
 - 阻塞/风险：本轮未直接修改本地开发库数据；旧内置权限行会在新代码 seed 执行时被清理，即使尚未清理，列表接口也不会继续返回。当前工作区仍有本轮前已有的权限中心样式 / progress 改动，本轮未回退、未归并。

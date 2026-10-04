@@ -367,7 +367,7 @@ function assertCurrentCustomerTrialManifestIdentity(manifest) {
     manifest?.compiled_snapshot?.target !== CUSTOMER_TRIAL_133_TARGET
   ) {
     throw new ManualAcceptanceCustomerConfigError(
-      "customer-trial-133 manifest must match the current registered v6 identity",
+      "customer-trial-133 manifest must match the current registered dataset identity",
       2,
     );
   }

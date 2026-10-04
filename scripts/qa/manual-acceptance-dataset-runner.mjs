@@ -53,7 +53,9 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 import { resolveManualAcceptanceRoleCredential } from "./manual-acceptance-account-identities.mjs";
 
-export const MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION =
+// Persisted execution/receipt identity; implementation freshness is verified by
+// repository identity and stage logic fingerprints, not a module release counter.
+export const MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT =
   "manual-acceptance-dataset-runner-v10";
 export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT =
   "manual-acceptance-dataset-stage-logic-fingerprint-v1";
@@ -352,7 +354,7 @@ export class ManualAcceptanceDatasetRunnerError extends Error {
     return {
       code: this.code,
       stageKey,
-      runnerRevision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+      runnerRevision: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
       ...this.details,
     };
   }
@@ -704,7 +706,7 @@ function receipt(execution, component) {
     references: {
       ...component.references,
       runner: {
-        revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+        revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
         handlerId: execution.handlerId,
         logicFingerprintContract:
           MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
@@ -1120,7 +1122,7 @@ function assertBaselineCoreCodes(units, warehouses) {
   ) {
     throw new ManualAcceptanceDatasetRunnerError(
       "empty_baseline_core_code_mismatch",
-      "fresh baseline must contain only the exact V6 unit and warehouse codes",
+      "fresh baseline must contain only the exact current dataset unit and warehouse codes",
       {
         stageKey: "baseline",
         expectedUnitCodes,
@@ -2385,7 +2387,7 @@ export function createManualAcceptanceDatasetStageRunner(deps = {}) {
         },
       );
     }
-    const handlerId = `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${stageKey}`;
+    const handlerId = `${MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT}:${stageKey}`;
     const execution = {
       stageKey,
       handlerId,

@@ -3,7 +3,6 @@ export { DEV_UI_DESIGN_ROUTE } from './devRoutes.mjs'
 export const UI_DESIGN_DIRECTORY = 'docs/product/ui-design'
 export const UI_DESIGN_ASSET = Object.freeze({
   title: 'ERP 统一 UI 交互设计',
-  version: 'V8',
   path: `${UI_DESIGN_DIRECTORY}/index.html`,
   specificationPath: `${UI_DESIGN_DIRECTORY}/交互设计说明.md`,
   rationalePath: `${UI_DESIGN_DIRECTORY}/设计依据.md`,

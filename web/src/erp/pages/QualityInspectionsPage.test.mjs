@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const source = readFileSync(
-  new URL('./V1QualityInspectionsPage.jsx', import.meta.url),
+  new URL('./QualityInspectionsPage.jsx', import.meta.url),
   'utf8'
 )
 

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const source = readFileSync(
-  fileURLToPath(new URL('./V1OperationalFactPage.jsx', import.meta.url)),
+  fileURLToPath(new URL('./OperationalFactPage.jsx', import.meta.url)),
   'utf8'
 )
 

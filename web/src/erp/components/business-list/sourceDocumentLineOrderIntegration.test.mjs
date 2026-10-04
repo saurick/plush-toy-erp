@@ -37,8 +37,8 @@ const apiSource = readFileSync(
 const toolbarSources = [
   {
     name: 'sales order',
-    page: new URL('../../pages/V1SalesOrdersPage.jsx', import.meta.url),
-    action: new URL('../../pages/V1SalesOrdersPage.jsx', import.meta.url),
+    page: new URL('../../pages/SalesOrdersPage.jsx', import.meta.url),
+    action: new URL('../../pages/SalesOrdersPage.jsx', import.meta.url),
     button: '明细顺序',
     title: '调整明细顺序',
     apiFunction: 'reorderSalesOrderItems',
@@ -46,7 +46,7 @@ const toolbarSources = [
   },
   {
     name: 'purchase order',
-    page: new URL('../../pages/V1PurchaseOrdersPage.jsx', import.meta.url),
+    page: new URL('../../pages/PurchaseOrdersPage.jsx', import.meta.url),
     action: new URL(
       '../purchase-orders/PurchaseOrderOperationPanel.jsx',
       import.meta.url
@@ -58,8 +58,8 @@ const toolbarSources = [
   },
   {
     name: 'outsourcing order',
-    page: new URL('../../pages/V1OutsourcingOrdersPage.jsx', import.meta.url),
-    action: new URL('../../pages/V1OutsourcingOrdersPage.jsx', import.meta.url),
+    page: new URL('../../pages/OutsourcingOrdersPage.jsx', import.meta.url),
+    action: new URL('../../pages/OutsourcingOrdersPage.jsx', import.meta.url),
     button: '加工明细顺序',
     title: '调整加工明细顺序',
     apiFunction: 'reorderOutsourcingOrderItems',

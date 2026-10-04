@@ -33,6 +33,7 @@ description: 领域设计与生成（plush-toy-erp），不执行目标库迁移
 1. 写出 single domain outcome 和 owning layer。
 2. 找到 source-of-truth fields、states、identifiers、permissions、derived values。
 3. 检查现有 table/usecase/API/helper 是否已经拥有该行为。
+   涉及版本字段或模块版号时，按[版本边界](../../../docs/engineering/跨层公共契约与生成规范.md#版本边界--version-boundaries)核对独立读写需求及存量消费者，再决定删除、复用现有身份或保留必要格式版本。
 4. 按字段影响检查 defaults、edits、source switch/clear 和相关 list/detail/print/export/search；旧实验不构成兼容对象，已落库残留按正式 migration 清理。
 5. UI 不补造 backend facts；客户/模板特例不污染 generic core。
 6. 按影响面选择 unit、integration、contract、browser、migration validation。

@@ -1,5 +1,3 @@
-export const DEV_FACT_LEDGER_CATALOG_VERSION = 'dev-fact-ledger-catalog/v1'
-
 export const DEV_FACT_LEDGER_RUNTIME_QUERY = Object.freeze({
   availability: 'unavailable',
   label: '未提供运行凭证查询',
@@ -380,7 +378,6 @@ export function buildDevFactLedgerCatalog({ flows } = {}) {
   }
 
   return Object.freeze({
-    version: DEV_FACT_LEDGER_CATALOG_VERSION,
     readOnly: true,
     allowsActionExecution: false,
     runtimeQuery: DEV_FACT_LEDGER_RUNTIME_QUERY,

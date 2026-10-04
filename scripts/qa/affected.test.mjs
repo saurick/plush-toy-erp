@@ -185,7 +185,11 @@ test("affected: docs-only changes stay at T1", () => {
 
 test("affected: phase-label gate scans only this change set", () => {
   const plan = buildAffectedPlan(
-    ["docs/product/自动化测试策略.md", "web/src/App.jsx"],
+    [
+      "docs/product/ui-design/index.html",
+      "docs/product/自动化测试策略.md",
+      "web/src/App.jsx",
+    ],
     { root: ROOT },
   );
   const phaseLabels = plan.commands.find(
@@ -194,6 +198,7 @@ test("affected: phase-label gate scans only this change set", () => {
 
   assert.deepEqual(phaseLabels?.args, [
     "scripts/qa/phase-label-boundaries.mjs",
+    "docs/product/ui-design/index.html",
     "docs/product/自动化测试策略.md",
     "web/src/App.jsx",
   ]);
@@ -460,7 +465,7 @@ test("affected: entrypoints, styles and deleted modules cannot be narrowed by ne
 });
 
 test("affected: changing only a Web test does not require product lint or browser execution", () => {
-  const file = "web/src/erp/pages/V1SalesOrdersPage.test.mjs";
+  const file = "web/src/erp/pages/SalesOrdersPage.test.mjs";
   const plan = buildAffectedPlan([file], { root: ROOT });
   assert.deepEqual(selectedTests(plan), [file]);
   assert(!ids(plan).includes("web-lint"));
@@ -1081,7 +1086,7 @@ test("affected: unknown paths fail safe to full instead of silently skipping", (
 
 test("affected: full subsumes focused commands but keeps browser follow-up visible", () => {
   const plan = buildAffectedPlan(
-    ["web/src/erp/pages/V1SalesOrdersPage.jsx", "scripts/lib/pnpm.sh"],
+    ["web/src/erp/pages/SalesOrdersPage.jsx", "scripts/lib/pnpm.sh"],
     { root: ROOT },
   );
 
@@ -1113,7 +1118,7 @@ test("affected: focused plan selects an affected pre-push receipt", () => {
 });
 
 test("affected: unresolved follow-ups require explicit full pre-push", () => {
-  const plan = buildAffectedPlan(["web/src/erp/pages/V1SalesOrdersPage.jsx"], {
+  const plan = buildAffectedPlan(["web/src/erp/pages/SalesOrdersPage.jsx"], {
     root: ROOT,
   });
   const selection = selectPrePushProfile(plan);

@@ -13,11 +13,11 @@ const source = readFileSync(
   'utf8'
 )
 const salesOrderPageSource = readFileSync(
-  fileURLToPath(new URL('../pages/V1SalesOrdersPage.jsx', import.meta.url)),
+  fileURLToPath(new URL('../pages/SalesOrdersPage.jsx', import.meta.url)),
   'utf8'
 )
 const masterDataPageSource = readFileSync(
-  fileURLToPath(new URL('../pages/V1MasterDataPage.jsx', import.meta.url)),
+  fileURLToPath(new URL('../pages/MasterDataPage.jsx', import.meta.url)),
   'utf8'
 )
 const masterDataPageConfigSource = readFileSync(
@@ -159,7 +159,7 @@ test('masterDataOrderApi: masterdata methods cover customers suppliers materials
   }
 })
 
-test('V1MasterDataPage: owner and contacts save through backend aggregate API', () => {
+test('MasterDataPage: owner and contacts save through backend aggregate API', () => {
   assert.match(masterDataPageConfigSource, /saveCustomerWithContacts/)
   assert.match(masterDataPageConfigSource, /saveSupplierWithContacts/)
   assert.match(masterDataPageSource, /saveWithContacts\(\{/)
@@ -220,7 +220,7 @@ test('masterDataOrderApi: sales orders expose aggregate save, dedicated reorder,
   })
 })
 
-test('V1SalesOrdersPage: order form save uses single transaction API', () => {
+test('SalesOrdersPage: order form save uses single transaction API', () => {
   assert.match(salesOrderPageSource, /saveSalesOrderWithItems\(\{/)
   assert.match(
     salesOrderPageSource,

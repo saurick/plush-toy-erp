@@ -100,7 +100,7 @@ prepare 成功不表示数据库已经升级。133 上演示、验收和生产�
 
 `data.NewData(...)` 初始化 PostgreSQL 时对瞬时连接失败做有界重试，不能代替目标数据库迁移或就绪检查。HTTP 健康路由有定向回归；PDF 异步预热完成前 `/readyz` 保持未就绪。
 
-Compose 保留 PostgreSQL healthcheck，业务发布分别读回 health / ready 和业务 smoke。Jaeger 只绑定 loopback，远程查看通过 SSH tunnel；它不承担长期审计或业务事实存储。日志、Trace、控制面审计和已知盲区统一见 [日志、审计与 Trace](../../docs/observability/日志链路追踪审计第一版.md#服务端观测接入-server-instrumentation)。
+Compose 保留 PostgreSQL healthcheck，业务发布分别读回 health / ready 和业务 smoke。Jaeger 只绑定 loopback，远程查看通过 SSH tunnel；它不承担长期审计或业务事实存储。日志、Trace、控制面审计和已知盲区统一见 [日志、审计与 Trace](../../docs/observability/日志链路追踪与审计.md#服务端观测接入-server-instrumentation)。
 
 
 ## 来源任务修复

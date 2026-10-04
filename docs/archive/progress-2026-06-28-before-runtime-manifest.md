@@ -316,8 +316,8 @@
 
 ## 2026-06-28 流程建模边界文档跳转修正
 
-- 完成：将 `docs/architecture/各类流程建模边界评审.md` 中通知流落点的裸文件名改为指向 `../workflow/通知预警催办与升级第一版.md` 的相对链接，方便读者从架构评审直接跳转。
-- 验证：`test -f docs/workflow/通知预警催办与升级第一版.md`、`git diff --check -- docs/architecture/各类流程建模边界评审.md progress.md` 和 targeted `rg` 通过。
+- 完成：将 `docs/architecture/各类流程建模边界评审.md` 中通知流落点的裸文件名改为指向 `../workflow/通知预警催办与升级.md` 的相对链接，方便读者从架构评审直接跳转。
+- 验证：`test -f docs/workflow/通知预警催办与升级.md`、`git diff --check -- docs/architecture/各类流程建模边界评审.md progress.md` 和 targeted `rg` 通过。
 - 下一步：无。
 - 阻塞/风险：本轮只改正式文档跳转和过程记录，不改 runtime、schema、migration、RBAC、WorkflowUsecase、Fact usecase、页面代码、客户配置包、导入脚本或部署脚本；当前工作区仍有多组并行改动，本轮未回退、未提交。
 

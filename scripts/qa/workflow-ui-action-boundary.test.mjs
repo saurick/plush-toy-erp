@@ -919,8 +919,8 @@ test("business collaboration panel delegates mutation verification to action-own
 
 test("business collaboration panel is limited to selected purchase and outsourcing records", () => {
   const excludedPagePaths = [
-    "web/src/erp/pages/V1MasterDataPage.jsx",
-    "web/src/erp/pages/V1SalesOrdersPage.jsx",
+    "web/src/erp/pages/MasterDataPage.jsx",
+    "web/src/erp/pages/SalesOrdersPage.jsx",
     "web/src/erp/pages/BOMVersionsPage.jsx",
     "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
   ];
@@ -934,12 +934,12 @@ test("business collaboration panel is limited to selected purchase and outsourci
   }
 
   const contextualPagePaths = [
-    "web/src/erp/pages/V1PurchaseOrdersPage.jsx",
-    "web/src/erp/pages/V1OutsourcingOrdersPage.jsx",
+    "web/src/erp/pages/PurchaseOrdersPage.jsx",
+    "web/src/erp/pages/OutsourcingOrdersPage.jsx",
   ];
   for (const relativePath of contextualPagePaths) {
     const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
-    const taskSource = relativePath.endsWith("V1OutsourcingOrdersPage.jsx")
+    const taskSource = relativePath.endsWith("OutsourcingOrdersPage.jsx")
       ? readFileSync(
           path.join(
             erpSourceRoot,
@@ -1001,7 +1001,7 @@ test("business collaboration panel is limited to selected purchase and outsourci
 });
 
 test("sales order page keeps write buttons behind projected actions", () => {
-  const pagePath = path.join(erpSourceRoot, "pages/V1SalesOrdersPage.jsx");
+  const pagePath = path.join(erpSourceRoot, "pages/SalesOrdersPage.jsx");
   const modalPath = path.join(
     erpSourceRoot,
     "components/sales-orders/SalesOrderEditor.jsx",
@@ -1065,7 +1065,7 @@ test("sales order page keeps write buttons behind projected actions", () => {
 });
 
 test("purchase order page keeps write buttons behind projected actions", () => {
-  const pagePath = path.join(erpSourceRoot, "pages/V1PurchaseOrdersPage.jsx");
+  const pagePath = path.join(erpSourceRoot, "pages/PurchaseOrdersPage.jsx");
   const panelPath = path.join(
     erpSourceRoot,
     "components/purchase-orders/PurchaseOrderOperationPanel.jsx",
@@ -1143,7 +1143,7 @@ test("purchase order page keeps write buttons behind projected actions", () => {
 test("outsourcing order page keeps write buttons behind projected actions", () => {
   const pagePath = path.join(
     erpSourceRoot,
-    "pages/V1OutsourcingOrdersPage.jsx",
+    "pages/OutsourcingOrdersPage.jsx",
   );
   const pageSource = readFileSync(pagePath, "utf8");
   const editorSource = readFileSync(
@@ -1228,7 +1228,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
       forbiddenTokens: ["addShipmentItem", "mode: 'append'", "维护明细"],
     },
     {
-      relativePath: "web/src/erp/pages/V1PurchaseReceiptsPage.jsx",
+      relativePath: "web/src/erp/pages/PurchaseReceiptsPage.jsx",
       name: "purchase receipt page",
       tokens: [
         "const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')",
@@ -1259,7 +1259,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
       ],
     },
     {
-      relativePath: "web/src/erp/pages/V1QualityInspectionsPage.jsx",
+      relativePath: "web/src/erp/pages/QualityInspectionsPage.jsx",
       name: "quality inspection page",
       tokens: [
         "const canCreate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.create'\n  )",

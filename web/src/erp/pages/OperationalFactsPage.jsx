@@ -37,7 +37,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   hasActionPermission,
-  V1_ROUTE_PATHS,
+  BUSINESS_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
 
 import { createBusinessTablePagination } from '../utils/businessPagination.mjs'
@@ -473,10 +473,10 @@ export function OperationalFactWorkspace({
   })
 
   const viewOutsourcingPayable = (fact) => {
-    if (!fact?.id || !canOpenRelatedPath(V1_ROUTE_PATHS.payables)) return
+    if (!fact?.id || !canOpenRelatedPath(BUSINESS_ROUTE_PATHS.payables)) return
     navigate(
       relatedDocumentRoute(
-        V1_ROUTE_PATHS.payables,
+        BUSINESS_ROUTE_PATHS.payables,
         { source_type: 'OUTSOURCING_FACT', source_id: fact.id },
         {
           keyword: fact.fact_no,
@@ -548,7 +548,7 @@ export function OperationalFactWorkspace({
     !hasRequiredOperationalFactDraftSource(currentActiveKey, activeSelectedRow)
   const canViewOutsourcingPayable =
     hasActionPermission(adminProfile, 'finance.payable.read') &&
-    canOpenRelatedPath(V1_ROUTE_PATHS.payables)
+    canOpenRelatedPath(BUSINESS_ROUTE_PATHS.payables)
   const canCreateSingleReconciliation = hasActionPermission(
     adminProfile,
     'finance.reconciliation.confirm'
@@ -677,25 +677,25 @@ export function OperationalFactWorkspace({
       'sales-order',
       '销售订单',
       ['shipments', 'reservations'].includes(currentActiveKey) &&
-        canOpenRelatedPath(V1_ROUTE_PATHS.salesOrders)
+        canOpenRelatedPath(BUSINESS_ROUTE_PATHS.salesOrders)
     )
     addItem(
       'inventory',
       '库存台账',
       ['production', 'outsourcing', 'shipments'].includes(currentActiveKey) &&
-        canOpenRelatedPath(V1_ROUTE_PATHS.inventory)
+        canOpenRelatedPath(BUSINESS_ROUTE_PATHS.inventory)
     )
     addItem(
       'receivables',
       '应收管理',
       currentActiveKey === 'shipments' &&
-        canOpenRelatedPath(V1_ROUTE_PATHS.receivables)
+        canOpenRelatedPath(BUSINESS_ROUTE_PATHS.receivables)
     )
     addItem(
       'invoices',
       '发票管理',
       currentActiveKey === 'shipments' &&
-        canOpenRelatedPath(V1_ROUTE_PATHS.invoices)
+        canOpenRelatedPath(BUSINESS_ROUTE_PATHS.invoices)
     )
     addItem(
       'source',
@@ -751,7 +751,7 @@ export function OperationalFactWorkspace({
     if (!activeSelectedRow) return
     const pathByKey = {
       'sales-order': relatedDocumentRoute(
-        V1_ROUTE_PATHS.salesOrders,
+        BUSINESS_ROUTE_PATHS.salesOrders,
         { sales_order_id: activeSelectedRow.sales_order_id },
         {
           keyword: activeSelectedRow.sales_order_no,
@@ -769,7 +769,7 @@ export function OperationalFactWorkspace({
         }
       ),
       receivables: relatedDocumentRoute(
-        V1_ROUTE_PATHS.receivables,
+        BUSINESS_ROUTE_PATHS.receivables,
         { source_type: 'SHIPMENT', source_id: activeSelectedRow.id },
         {
           keyword: activeSelectedRow.shipment_no,
@@ -778,7 +778,7 @@ export function OperationalFactWorkspace({
         }
       ),
       invoices: relatedDocumentRoute(
-        V1_ROUTE_PATHS.invoices,
+        BUSINESS_ROUTE_PATHS.invoices,
         { source_type: 'SHIPMENT', source_id: activeSelectedRow.id },
         {
           keyword: activeSelectedRow.shipment_no,
@@ -906,7 +906,7 @@ export function OperationalFactWorkspace({
     : BusinessPageLayout
   const layoutProps = productionRecordsWorkspace
     ? {}
-    : { className: 'erp-v1-operational-fact-page' }
+    : { className: 'erp-operational-fact-page' }
 
   return (
     <LayoutRoot {...layoutProps}>
@@ -1746,7 +1746,7 @@ export function OperationalFactWorkspace({
             onSelectOrder={setSelectedProcessOrderID}
             onOpenOrder={(productionOrderID) =>
               navigate(
-                routeWithQuery(V1_ROUTE_PATHS.productionOrders, {
+                routeWithQuery(BUSINESS_ROUTE_PATHS.productionOrders, {
                   production_order_id: productionOrderID,
                 })
               )
@@ -1878,12 +1878,12 @@ export function OperationalFactWorkspace({
         loading={productionReworkProgressLoading}
         onCancel={closeProductionReworkProgress}
         onContinue={
-          canOpenRelatedPath(V1_ROUTE_PATHS.productionOrders)
+          canOpenRelatedPath(BUSINESS_ROUTE_PATHS.productionOrders)
             ? () => {
                 const orderID = productionReworkProgressContext?.order?.id
                 closeProductionReworkProgress()
                 navigate(
-                  routeWithQuery(V1_ROUTE_PATHS.productionOrders, {
+                  routeWithQuery(BUSINESS_ROUTE_PATHS.productionOrders, {
                     production_order_id: orderID,
                   })
                 )

@@ -447,19 +447,19 @@ test('businessCollaborationTasks: 抽屉随最新活动任务同步并在终态�
 test('businessCollaborationTasks: 局部入口只保留采购和加工合同当前记录', () => {
   const supportedPages = [
     {
-      page: readERPSource('../pages/V1PurchaseOrdersPage.jsx'),
-      tasks: readERPSource('../pages/V1PurchaseOrdersPage.jsx'),
+      page: readERPSource('../pages/PurchaseOrdersPage.jsx'),
+      tasks: readERPSource('../pages/PurchaseOrdersPage.jsx'),
     },
     {
-      page: readERPSource('../pages/V1OutsourcingOrdersPage.jsx'),
+      page: readERPSource('../pages/OutsourcingOrdersPage.jsx'),
       tasks: readERPSource(
         '../components/outsourcing-orders/useOutsourcingOrderTasks.mjs'
       ),
     },
   ]
   const unsupportedPages = [
-    readERPSource('../pages/V1MasterDataPage.jsx'),
-    readERPSource('../pages/V1SalesOrdersPage.jsx'),
+    readERPSource('../pages/MasterDataPage.jsx'),
+    readERPSource('../pages/SalesOrdersPage.jsx'),
     readERPSource('../pages/BOMVersionsPage.jsx'),
     readERPSource('../pages/WorkflowBusinessModulePage.jsx'),
   ]

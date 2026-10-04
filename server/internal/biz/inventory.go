@@ -510,9 +510,8 @@ type QualityInspectionRepo interface {
 	EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (*PurchaseReceiptQualityGate, error)
 }
 
-// InventoryRepo is the compatibility aggregate accepted at the composition
-// root. Usecases and new adapters can name the smaller domain contracts above
-// instead of repeating this cross-domain method list.
+// InventoryRepo groups the domain contracts implemented by the shared data
+// adapter. Usecases depend on the smaller contracts they actually consume.
 type InventoryRepo interface {
 	InventoryReferenceRepo
 	InventoryLedgerRepo

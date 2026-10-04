@@ -7,11 +7,11 @@ function read(relativePath) {
 }
 
 const router = read('../router.jsx')
-const inventoryPage = read('./V1InventoryLedgerPage.jsx')
+const inventoryPage = read('./InventoryLedgerPage.jsx')
 const inventoryModal = read(
   '../components/inventory/InventoryOperationModal.jsx'
 )
-const qualityPage = read('./V1QualityInspectionsPage.jsx')
+const qualityPage = read('./QualityInspectionsPage.jsx')
 const rejectionModal = read(
   '../components/quality-inspections/PurchaseRejectionDispositionModal.jsx'
 )

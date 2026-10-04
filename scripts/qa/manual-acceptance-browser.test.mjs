@@ -56,7 +56,7 @@ import {
 } from "./manual-acceptance-dataset.mjs";
 import {
   MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
-  MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   digestManualAcceptanceDatasetComponentReport,
@@ -405,8 +405,8 @@ async function datasetApplyEvidenceFixture({ remote = false } = {}) {
       summary: reports[stageKey].summary,
       references: {
         runner: {
-          revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
-          handlerId: `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${stageKey}`,
+          revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
+          handlerId: `${MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT}:${stageKey}`,
           logicFingerprintContract:
             MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
           logicFingerprint: "b".repeat(64),

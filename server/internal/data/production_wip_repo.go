@@ -112,8 +112,8 @@ func freezeProductionOrderWIPRoute(ctx context.Context, client *ent.Client, orde
 	if err := requireProductionWIPRouteEmpty(ctx, client, orderID); err != nil {
 		return err
 	}
-	// A nil route is the explicit legacy path. RELEASE remains unchanged and no
-	// WIP object is created for that order line.
+	// Lines without an explicit route do not create WIP objects. Their source
+	// and completion facts remain governed by the production-order contract.
 	if len(routedItems) == 0 {
 		return nil
 	}

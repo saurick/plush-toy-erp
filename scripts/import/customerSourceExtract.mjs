@@ -32,7 +32,7 @@ This tool extracts local Excel source files into import-prep evidence only. It n
 
 export const OUTPUT_FILES = [
   "source-snapshot.extracted.json",
-  "existing-v1.empty-preview.json",
+  "existing-model.empty-preview.json",
   "customer-import-config.candidate.json",
   "extraction-summary.json",
   "extraction-report.md",
@@ -226,7 +226,7 @@ export async function runExtraction(options = {}) {
     sourceSnapshot,
   );
   await writeJson(
-    path.join(outDir, "existing-v1.empty-preview.json"),
+    path.join(outDir, "existing-model.empty-preview.json"),
     existingPreview,
   );
   await writeJson(
@@ -1426,7 +1426,7 @@ function buildImportConfigCandidate({
     fieldMappings: extraction.mappings,
     blockers: [
       "customerSourceExtract 输出不是 import approval。",
-      "existing-v1.empty-preview.json 只是本地预览占位，不是当前数据库快照。",
+      "existing-model.empty-preview.json 只是本地预览占位，不是当前数据库快照。",
       "purchase_orders / outsourcing 当前为 deferred domain，不自动写入。",
       "联系人 owner_id 需在供应商唯一匹配后人工补齐。",
       "供应商—工序能力关系需在 supplier_id / process_id 两端唯一匹配后人工确认。",
@@ -1512,7 +1512,7 @@ function buildExtractionReport({
     "",
     "## 边界 / Boundary",
     "",
-    "- `existing-v1.empty-preview.json` 只是本地空快照，不能替代真实 V1 / formal model 现有数据快照。",
+    "- `existing-model.empty-preview.json` 只是本地空快照，不能替代真实现有数据快照。",
     "- PDF / 图片仍作为人工来源引用，本工具不做 OCR，不从图片生成结构化事实。",
     "- 采购订单、委外源单据、shipment、inventory、finance 相关内容只保留为 deferred / forbidden evidence。",
     "- `shipping_released != shipped`。",
@@ -1531,7 +1531,7 @@ function buildEmptyExistingPreview(generatedAt, customerKey) {
     previewOnly: true,
     noRealImport: true,
     canExecuteRealImport: false,
-    note: "Empty preview snapshot only. Replace with a reviewed existing V1/formal model snapshot before any real dry-run sign-off.",
+    note: "Empty preview snapshot only. Replace with a reviewed existing formal model snapshot before any real dry-run sign-off.",
     customers: [],
     suppliers: [],
     contacts: [],

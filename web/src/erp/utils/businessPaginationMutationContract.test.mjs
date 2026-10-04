@@ -50,9 +50,9 @@ function conditionalBranches(source, condition, fromIndex = 0) {
   }
 }
 
-const masterDataSource = readSource('../pages/V1MasterDataPage.jsx')
-const salesOrderSource = readSource('../pages/V1SalesOrdersPage.jsx')
-const purchaseOrderSource = readSource('../pages/V1PurchaseOrdersPage.jsx')
+const masterDataSource = readSource('../pages/MasterDataPage.jsx')
+const salesOrderSource = readSource('../pages/SalesOrdersPage.jsx')
+const purchaseOrderSource = readSource('../pages/PurchaseOrdersPage.jsx')
 const outsourcingOrderQuery = readSource(
   '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs'
 )
@@ -61,9 +61,9 @@ const outsourcingOrderEditor = readSource(
 )
 const bomSource = readSource('../pages/BOMVersionsPage.jsx')
 const shipmentSource = readSource('../pages/ShipmentsPage.jsx')
-const productionOrderSource = readSource('../pages/V1ProductionOrdersPage.jsx')
-const purchaseReceiptSource = readSource('../pages/V1PurchaseReceiptsPage.jsx')
-const qualitySource = readSource('../pages/V1QualityInspectionsPage.jsx')
+const productionOrderSource = readSource('../pages/ProductionOrdersPage.jsx')
+const purchaseReceiptSource = readSource('../pages/PurchaseReceiptsPage.jsx')
+const qualitySource = readSource('../pages/QualityInspectionsPage.jsx')
 const productionActions = readSource(
   '../components/production-orders/useProductionFactActions.mjs'
 )

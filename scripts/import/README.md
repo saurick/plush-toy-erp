@@ -79,7 +79,7 @@ checker 至少阻断：
 | 文件 | 说明 |
 | --- | --- |
 | `source-snapshot.extracted.json` | 只读提取的 source snapshot，继续交给 freeze / dry-run；可能含私密行，不得提交 |
-| `existing-v1.empty-preview.json` | 空 existing preview，只供本地预览，不是真实 V1 数据快照 |
+| `existing-model.empty-preview.json` | 空 existing preview，只供本地预览，不是真实数据快照 |
 | `customer-import-config.candidate.json` | 字段映射、顺序、阻断项和配置候选，不是 runtime 配置 |
 | `extraction-summary.json` | 脱敏统计，不复写真实文件名或绝对路径 |
 | `extraction-report.md` | 人工 review 报告，仍留在私有 ignored output |
@@ -97,12 +97,12 @@ checker 至少阻断：
 ```bash
 node scripts/import/customerSourceSnapshotFreezeCheck.mjs \
   --source scripts/import/fixtures/customers/yoyoosun/source-snapshot.freeze.sample.json \
-  --existing scripts/import/fixtures/customers/yoyoosun/existing-v1.freeze.sample.json \
+  --existing scripts/import/fixtures/customers/yoyoosun/existing-model.freeze.sample.json \
   --out output/customers/yoyoosun/source-snapshot-freeze
 
 node scripts/import/customerImportDryRun.mjs \
   --source scripts/import/fixtures/customers/yoyoosun/source-snapshot.freeze.sample.json \
-  --existing scripts/import/fixtures/customers/yoyoosun/existing-v1.freeze.sample.json \
+  --existing scripts/import/fixtures/customers/yoyoosun/existing-model.freeze.sample.json \
   --out output/customers/yoyoosun/import-dry-run \
   --format json,md
 ```

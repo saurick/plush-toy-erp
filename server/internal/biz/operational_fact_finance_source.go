@@ -42,8 +42,8 @@ type FinanceFactFromOutsourcingReturnCreate struct {
 	Note              *string
 }
 
-// FinanceReconciliationFromFactCreate is the deliberately small V1 single-
-// record reconciliation command. It does not model multi-document matching or
+// FinanceReconciliationFromFactCreate is the single-record reconciliation
+// command. It does not model multi-document matching or
 // bank-statement settlement.
 type FinanceReconciliationFromFactCreate struct {
 	FactNo              string

@@ -4,7 +4,7 @@ import test from 'node:test'
 
 const pageLevelAttachmentEntrypoints = [
   '../pages/WorkflowBusinessModulePage.jsx',
-  '../pages/V1PurchaseReceiptsPage.jsx',
+  '../pages/PurchaseReceiptsPage.jsx',
   '../pages/OperationalFactsPage.jsx',
   '../mobile/components/MobileTaskDetailScreen.jsx',
   '../components/workflow/WorkflowTaskActionDrawer.jsx',
@@ -12,9 +12,9 @@ const pageLevelAttachmentEntrypoints = [
 
 const formModalAttachmentEntrypoints = [
   '../pages/BOMVersionsPage.jsx',
-  '../pages/V1MasterDataPage.jsx',
-  '../pages/V1OutsourcingOrdersPage.jsx',
-  '../pages/V1QualityInspectionsPage.jsx',
+  '../pages/MasterDataPage.jsx',
+  '../pages/OutsourcingOrdersPage.jsx',
+  '../pages/QualityInspectionsPage.jsx',
   '../components/shipments/ShipmentEditor.jsx',
   '../components/purchase-orders/PurchaseOrderEditor.jsx',
   '../components/sales-orders/SalesOrderEditor.jsx',
@@ -93,7 +93,7 @@ test('outsourcing attachment panel exposes a typed contract-image upload without
     'utf8'
   )
   const pageSource = readFileSync(
-    new URL('../pages/V1OutsourcingOrdersPage.jsx', import.meta.url),
+    new URL('../pages/OutsourcingOrdersPage.jsx', import.meta.url),
     'utf8'
   )
 

@@ -9,7 +9,7 @@ const formSource = readFileSync(
   'utf8'
 )
 const pageSource = readFileSync(
-  new URL('../../pages/V1MasterDataPage.jsx', import.meta.url),
+  new URL('../../pages/MasterDataPage.jsx', import.meta.url),
   'utf8'
 )
 

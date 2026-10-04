@@ -8,8 +8,8 @@ const (
 	LifecycleScopeAll     = "all"
 )
 
-// NormalizeLifecycleScope keeps the empty value as the legacy, unscoped list
-// contract while validating the three explicit read-only lifecycle views.
+// NormalizeLifecycleScope leaves an omitted scope unfiltered while validating
+// the three explicit read-only lifecycle views.
 func NormalizeLifecycleScope(value string) (string, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(value))
 	switch normalized {

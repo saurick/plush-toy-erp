@@ -66,17 +66,17 @@ test('当前范围不污染 URL，历史与全部范围可稳定深链', () => {
 
 test('六类正式业务页面都把记录范围传给原列表 API', () => {
   const pageContracts = [
-    ['../pages/V1MasterDataPage.jsx'],
-    ['../pages/V1SalesOrdersPage.jsx'],
+    ['../pages/MasterDataPage.jsx'],
+    ['../pages/SalesOrdersPage.jsx'],
     [
-      '../pages/V1PurchaseOrdersPage.jsx',
+      '../pages/PurchaseOrdersPage.jsx',
       '../components/purchase-orders/PurchaseOrderOperationPanel.jsx',
     ],
     [
       '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs',
-      '../pages/V1OutsourcingOrdersPage.jsx',
+      '../pages/OutsourcingOrdersPage.jsx',
     ],
-    ['../pages/V1ProductionOrdersPage.jsx'],
+    ['../pages/ProductionOrdersPage.jsx'],
     ['../pages/BOMVersionsPage.jsx'],
   ]
   pageContracts.forEach(([pagePath, filterOwnerPath = pagePath]) => {

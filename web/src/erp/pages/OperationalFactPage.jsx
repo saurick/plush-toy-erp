@@ -75,7 +75,7 @@ const PAGE_CONFIGS = Object.freeze({
   },
 })
 
-export default function V1OperationalFactPage({ moduleKey }) {
+export default function OperationalFactPage({ moduleKey }) {
   const moduleItem = getBusinessModule(moduleKey)
   const config = PAGE_CONFIGS[moduleKey] || PAGE_CONFIGS['production-progress']
   return (

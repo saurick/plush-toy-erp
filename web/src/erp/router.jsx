@@ -53,28 +53,28 @@ const HistoryRecordsPage = lazyRoute(
   () => import('./pages/HistoryRecordsPage.jsx')
 )
 const HelpCenterPage = lazyRoute(() => import('./pages/HelpCenterPage.jsx'))
-const V1MasterDataPage = lazyRoute(() => import('./pages/V1MasterDataPage'))
-const V1SalesOrdersPage = lazyRoute(() => import('./pages/V1SalesOrdersPage'))
-const V1PurchaseOrdersPage = lazyRoute(
-  () => import('./pages/V1PurchaseOrdersPage.jsx')
+const MasterDataPage = lazyRoute(() => import('./pages/MasterDataPage'))
+const SalesOrdersPage = lazyRoute(() => import('./pages/SalesOrdersPage'))
+const PurchaseOrdersPage = lazyRoute(
+  () => import('./pages/PurchaseOrdersPage.jsx')
 )
-const V1OutsourcingOrdersPage = lazyRoute(
-  () => import('./pages/V1OutsourcingOrdersPage.jsx')
+const OutsourcingOrdersPage = lazyRoute(
+  () => import('./pages/OutsourcingOrdersPage.jsx')
 )
-const V1PurchaseReceiptsPage = lazyRoute(
-  () => import('./pages/V1PurchaseReceiptsPage.jsx')
+const PurchaseReceiptsPage = lazyRoute(
+  () => import('./pages/PurchaseReceiptsPage.jsx')
 )
-const V1QualityInspectionsPage = lazyRoute(
-  () => import('./pages/V1QualityInspectionsPage.jsx')
+const QualityInspectionsPage = lazyRoute(
+  () => import('./pages/QualityInspectionsPage.jsx')
 )
-const V1InventoryLedgerPage = lazyRoute(
-  () => import('./pages/V1InventoryLedgerPage.jsx')
+const InventoryLedgerPage = lazyRoute(
+  () => import('./pages/InventoryLedgerPage.jsx')
 )
-const V1OperationalFactPage = lazyRoute(
-  () => import('./pages/V1OperationalFactPage.jsx')
+const OperationalFactPage = lazyRoute(
+  () => import('./pages/OperationalFactPage.jsx')
 )
-const V1ProductionOrdersPage = lazyRoute(
-  () => import('./pages/V1ProductionOrdersPage.jsx')
+const ProductionOrdersPage = lazyRoute(
+  () => import('./pages/ProductionOrdersPage.jsx')
 )
 const WorkflowBusinessModulePage = lazyRoute(
   () => import('./pages/WorkflowBusinessModulePage.jsx')
@@ -321,61 +321,61 @@ export default function ERPRouter() {
             />
             <Route
               path="master/partners/customers"
-              element={<V1MasterDataPage key="customers" type="customers" />}
+              element={<MasterDataPage key="customers" type="customers" />}
             />
             <Route
               path="master/partners/suppliers"
-              element={<V1MasterDataPage key="suppliers" type="suppliers" />}
+              element={<MasterDataPage key="suppliers" type="suppliers" />}
             />
             <Route
               path="master/materials"
-              element={<V1MasterDataPage key="materials" type="materials" />}
+              element={<MasterDataPage key="materials" type="materials" />}
             />
             <Route
               path="master/products"
               element={
-                <V1MasterDataPage key="product_skus" type="product_skus" />
+                <MasterDataPage key="product_skus" type="product_skus" />
               }
             />
             <Route
               path="sales/project-orders/sales-orders"
-              element={<V1SalesOrdersPage />}
+              element={<SalesOrdersPage />}
             />
             <Route
               path="purchase/accessories"
-              element={<V1PurchaseOrdersPage />}
+              element={<PurchaseOrdersPage />}
             />
             <Route
               path="warehouse/inbound"
-              element={<V1PurchaseReceiptsPage />}
+              element={<PurchaseReceiptsPage />}
             />
             <Route
               path="production/quality-inspections"
-              element={<V1QualityInspectionsPage />}
+              element={<QualityInspectionsPage />}
             />
             <Route
               path="warehouse/inventory"
-              element={<V1InventoryLedgerPage />}
+              element={<InventoryLedgerPage />}
             />
             <Route path="purchase/material-bom" element={<BOMVersionsPage />} />
             <Route
               path="engineering/processes"
-              element={<V1MasterDataPage key="processes" type="processes" />}
+              element={<MasterDataPage key="processes" type="processes" />}
             />
             <Route path="warehouse/shipments" element={<ShipmentsPage />} />
             <Route
               path="purchase/processing-contracts"
-              element={<V1OutsourcingOrdersPage />}
+              element={<OutsourcingOrdersPage />}
             />
             <Route
               path="production/orders"
-              element={<V1ProductionOrdersPage />}
+              element={<ProductionOrdersPage />}
             />
             <Route element={<ProductionRecordsLayout />}>
               <Route
                 path="production/progress"
                 element={
-                  <V1OperationalFactPage moduleKey="production-progress" />
+                  <OperationalFactPage moduleKey="production-progress" />
                 }
               />
               <Route
@@ -402,24 +402,24 @@ export default function ERPRouter() {
             />
             <Route
               path="warehouse/outbound"
-              element={<V1OperationalFactPage moduleKey="outbound" />}
+              element={<OperationalFactPage moduleKey="outbound" />}
             />
             <Route
               path="finance/reconciliation"
-              element={<V1OperationalFactPage moduleKey="reconciliation" />}
+              element={<OperationalFactPage moduleKey="reconciliation" />}
             />
             <Route path="finance/payments" element={<FinancePaymentsPage />} />
             <Route
               path="finance/payables"
-              element={<V1OperationalFactPage moduleKey="payables" />}
+              element={<OperationalFactPage moduleKey="payables" />}
             />
             <Route
               path="finance/receivables"
-              element={<V1OperationalFactPage moduleKey="receivables" />}
+              element={<OperationalFactPage moduleKey="receivables" />}
             />
             <Route
               path="finance/invoices"
-              element={<V1OperationalFactPage moduleKey="invoices" />}
+              element={<OperationalFactPage moduleKey="invoices" />}
             />
             <Route path="print-center" element={<PrintCenterPage />} />
             <Route

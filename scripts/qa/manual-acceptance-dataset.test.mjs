@@ -31,7 +31,7 @@ import {
   runManualAcceptanceDatasetCli,
 } from "./manual-acceptance-dataset.mjs";
 import {
-  MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
   MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY,
@@ -587,8 +587,8 @@ function completedStageResult(
     references: {
       ...references,
       runner: {
-        revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
-        handlerId: `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${context.stage.key}`,
+        revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
+        handlerId: `${MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT}:${context.stage.key}`,
         logicFingerprintContract:
           MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
         logicFingerprint: "b".repeat(64),
@@ -1167,7 +1167,7 @@ test("semantic plan locks the nine narrow stage contracts", () => {
   assert.deepEqual(plan.runnerContract, {
     serial: true,
     failClosed: true,
-    revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+    revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
     handlerRegistry: "scripts/qa/manual-acceptance-dataset-runner.mjs",
     placeholders: {
       "${TARGET_POLICY_TARGET}": "target.policyTarget",
@@ -1300,7 +1300,7 @@ test("semantic plan locks the nine narrow stage contracts", () => {
   );
   assert.equal(
     taskStage.commands[0].execution,
-    MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+    MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
   );
   assert.equal(
     taskStage.commands[0].args[
@@ -1920,7 +1920,7 @@ test("an executable plan records strict stage receipts serially", async () => {
     report.stages.every(
       (stage) =>
         stage.references.runner.revision ===
-          MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION &&
+          MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT &&
         /^[0-9a-f]{64}$/u.test(stage.references.runner.componentDigest) &&
         Boolean(stage.references.runner.reportPath),
     ),

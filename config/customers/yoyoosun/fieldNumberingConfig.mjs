@@ -23,7 +23,7 @@ export const yoyoosunFieldNumberingConfig = Object.freeze({
           label: "客户编码",
           decision: "review_required",
           source: "导入字段分类.md",
-          note: "只能作为已有 V1 字段或导入候选口径复核，不能自动变成 Product Core 必填。",
+          note: "只能作为已有业务字段或导入候选口径复核，不能自动变成 Product Core 必填。",
         },
         {
           key: "display_name",
@@ -157,9 +157,9 @@ export const yoyoosunFieldNumberingConfig = Object.freeze({
       domain: "purchase",
       key: "purchase_order_no",
       label: "采购订单号",
-      currentDecision: "deferred",
+      currentDecision: "review_required",
       unresolvedQuestion:
-        "purchase_orders 仍为 V2 candidate，当前不创建编号 runtime。",
+        "采购订单已有 purchase_order_no；客户专属编号规则待确认，不自动改写现有编号。",
     },
   ]),
 });

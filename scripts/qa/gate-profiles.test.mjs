@@ -37,6 +37,12 @@ test("gate profiles prove coverage hierarchy without duplicate executions", () =
   assert(GATE_PROFILES.full.length > GATE_PROFILES.fast.length);
   assert(GATE_PROFILES.strict.length > GATE_PROFILES.full.length);
   assert(GATE_PROFILES.strict.includes("yamllint-strict"));
+  for (const profile of ["fast", "full", "strict"]) {
+    assert(GATE_PROFILES[profile].includes("implementation-naming"));
+    assert(
+      PROFILE_REQUIRED_FILES[profile].includes("scripts/qa/phase-label-boundaries.mjs"),
+    );
+  }
   assert(GATE_PROFILES.full.includes("scripts-node-tests-release"));
   assert(!GATE_PROFILES.full.includes("web-contracts"));
   assert(!GATE_PROFILES.full.includes("server-quick"));

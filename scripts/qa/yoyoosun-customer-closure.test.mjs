@@ -1864,7 +1864,7 @@ test("yoyoosun contract print source pages expose every business-owned print fie
     "utf8",
   );
   const outsourcingPage = readFileSync(
-    "web/src/erp/pages/V1OutsourcingOrdersPage.jsx",
+    "web/src/erp/pages/OutsourcingOrdersPage.jsx",
     "utf8",
   );
 

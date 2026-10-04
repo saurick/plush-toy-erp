@@ -65,7 +65,7 @@ import { getProductionWip } from '../api/productionWipApi.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   hasActionPermission,
-  V1_ROUTE_PATHS,
+  BUSINESS_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
 import {
   buildProductionCompletionPayload,
@@ -256,7 +256,7 @@ function draftParams(values) {
   }
 }
 
-export default function V1ProductionOrdersPage() {
+export default function ProductionOrdersPage() {
   const outletContext = useOutletContext()
   const adminProfile = outletContext?.adminProfile || {}
   const allowedMenuPaths = outletContext?.allowedMenuPaths || []
@@ -457,7 +457,7 @@ export default function V1ProductionOrdersPage() {
       busyReason: '当前资料加载完成后可查看返工进度',
     })
   const canOpenProductionScheduling = canOpenRelatedDocumentPath({
-    path: V1_ROUTE_PATHS.productionScheduling,
+    path: BUSINESS_ROUTE_PATHS.productionScheduling,
     adminProfile,
     allowedMenuPaths,
   })
@@ -695,7 +695,7 @@ export default function V1ProductionOrdersPage() {
   const viewProductionFacts = (order = selected) => {
     if (!order?.id) return
     navigate(
-      routeWithQuery(V1_ROUTE_PATHS.productionProgress, {
+      routeWithQuery(BUSINESS_ROUTE_PATHS.productionProgress, {
         source_type: 'PRODUCTION_ORDER',
         source_id: order.id,
       })
@@ -705,7 +705,7 @@ export default function V1ProductionOrdersPage() {
   const viewProductionProcess = (order = selected) => {
     if (!order?.id) return
     navigate(
-      routeWithQuery(V1_ROUTE_PATHS.productionProgress, {
+      routeWithQuery(BUSINESS_ROUTE_PATHS.productionProgress, {
         source_type: 'PRODUCTION_ORDER',
         source_id: order.id,
         display: 'process',
@@ -716,7 +716,7 @@ export default function V1ProductionOrdersPage() {
   const openProductionScheduling = (order = selected) => {
     if (!order?.id || !canOpenProductionScheduling) return
     navigate(
-      routeWithQuery(V1_ROUTE_PATHS.productionScheduling, {
+      routeWithQuery(BUSINESS_ROUTE_PATHS.productionScheduling, {
         source_type: 'production-orders',
         source_id: order.id,
       })

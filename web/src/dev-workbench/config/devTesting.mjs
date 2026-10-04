@@ -283,17 +283,17 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     ],
   },
   {
-    key: 'v1-local-acceptance-plan',
-    label: 'V1 本地验收计划 / V1 Local Acceptance Plan',
+    key: 'main-chain-local-acceptance-plan',
+    label: '主链本地验收计划 / Main Chain Local Acceptance Plan',
     description:
-      'V1 主链验收口径或采购入库服务层真实写入 e2e 前置改动时复制；先打印真实写入输入模板，V1 acceptance plan 只生成本地 plan-only / no-write evidence，不替代领域测试、浏览器回归、本地完整技术验收、目标发布或客户 UAT。',
+      '主链验收口径或采购入库服务层真实写入 e2e 前置改动时复制；先打印真实写入输入模板，main-chain acceptance plan 只生成本地 plan-only / no-write evidence，不替代领域测试、浏览器回归、本地完整技术验收、目标发布或客户 UAT。',
     commands: [
       CURRENT_CHECKOUT_ROOT_COMMAND,
-      'node --test scripts/qa/v1-acceptance-plan.test.mjs scripts/qa/purchase-receipt-real-write-e2e.test.mjs',
+      'node --test scripts/qa/main-chain-acceptance-plan.test.mjs scripts/qa/purchase-receipt-real-write-e2e.test.mjs',
       'node scripts/qa/purchase-receipt-real-write-e2e.mjs --print-input-template',
       'node scripts/qa/purchase-receipt-real-write-e2e.mjs --preflight-report output/qa/purchase-receipt-real-write-e2e/preflight.json',
-      'node scripts/qa/v1-acceptance-plan.mjs --out output/customers/yoyoosun/v1-acceptance-plan',
-      'node scripts/qa/v1-acceptance-plan.mjs --run-report-tools --out output/customers/yoyoosun/v1-acceptance-plan',
+      'node scripts/qa/main-chain-acceptance-plan.mjs --out output/customers/yoyoosun/main-chain-acceptance-plan',
+      'node scripts/qa/main-chain-acceptance-plan.mjs --run-report-tools --out output/customers/yoyoosun/main-chain-acceptance-plan',
     ],
   },
   {

@@ -45,19 +45,19 @@ test('business modules: 正式入口不再登记预览壳页', () => {
   assert(businessModuleDefinitions.length > 0)
   assert(
     businessModuleDefinitions.every(
-      (moduleItem) => moduleItem.pageKind === 'formal-v1'
+      (moduleItem) => moduleItem.pageKind === 'formal'
     )
   )
   assert.equal(
     getBusinessModule('production-scheduling')?.pageKind,
-    'formal-v1'
+    'formal'
   )
-  assert.equal(getBusinessModule('production-orders')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('production-orders')?.pageKind, 'formal')
   assert.equal(
     getBusinessModule('production-exceptions')?.pageKind,
-    'formal-v1'
+    'formal'
   )
-  assert.equal(getBusinessModule('shipping-release')?.pageKind, 'formal-v1')
+  assert.equal(getBusinessModule('shipping-release')?.pageKind, 'formal')
 })
 
 test('production-orders module declares WIP route truth without claiming inventory facts', () => {
@@ -108,7 +108,7 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     assert.equal(
       source.includes(text),
       false,
-      `workflow V1 page should not expose misleading copy: ${text}`
+      `workflow page should not expose misleading copy: ${text}`
     )
   }
 
@@ -130,7 +130,7 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     assert.equal(
       source.includes(text),
       true,
-      `workflow V1 page should expose real workflow scope: ${text}`
+      `workflow page should expose real workflow scope: ${text}`
     )
   }
   assert.equal(
@@ -147,7 +147,7 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     assert.equal(
       source.includes(text),
       false,
-      `workflow V1 page should not keep retired source navigation without a visible consumer: ${text}`
+      `workflow page should not keep retired source navigation without a visible consumer: ${text}`
     )
   }
 
@@ -168,7 +168,7 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     assert.equal(
       source.includes(text),
       false,
-      `workflow V1 page should not submit retired payload field: ${text}`
+      `workflow page should not submit retired payload field: ${text}`
     )
   }
 
@@ -176,7 +176,7 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     assert.equal(
       source.includes(text),
       false,
-      `workflow V1 page should not keep placeholder delete/trash copy: ${text}`
+      `workflow page should not keep placeholder delete/trash copy: ${text}`
     )
   }
 
@@ -244,7 +244,7 @@ test('print template business entries: 工程资料和委外打印入口归属�
     'utf8'
   )
   const outsourcingPageSource = readFileSync(
-    new URL('../pages/V1OutsourcingOrdersPage.jsx', import.meta.url),
+    new URL('../pages/OutsourcingOrdersPage.jsx', import.meta.url),
     'utf8'
   )
 

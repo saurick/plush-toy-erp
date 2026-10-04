@@ -16,15 +16,15 @@ const expectedBusinessDataTablePages = [
   'BOMVersionsPage.jsx',
   'FinancePaymentsPage.jsx',
   'HistoryRecordsPage.jsx',
+  'MasterDataPage.jsx',
   'OperationalFactsPage.jsx',
+  'OutsourcingOrdersPage.jsx',
+  'ProductionOrdersPage.jsx',
+  'PurchaseOrdersPage.jsx',
+  'PurchaseReceiptsPage.jsx',
+  'QualityInspectionsPage.jsx',
+  'SalesOrdersPage.jsx',
   'ShipmentsPage.jsx',
-  'V1MasterDataPage.jsx',
-  'V1OutsourcingOrdersPage.jsx',
-  'V1ProductionOrdersPage.jsx',
-  'V1PurchaseOrdersPage.jsx',
-  'V1PurchaseReceiptsPage.jsx',
-  'V1QualityInspectionsPage.jsx',
-  'V1SalesOrdersPage.jsx',
   'WorkflowBusinessModulePage.jsx',
 ]
 
@@ -194,7 +194,7 @@ test('当前正式 BusinessDataTable 主表都声明双击打开合同', () => {
 })
 
 test('库存台账主表双击打开当前记录主操作面', () => {
-  const filePath = resolve(pagesRoot, 'V1InventoryLedgerPage.jsx')
+  const filePath = resolve(pagesRoot, 'InventoryLedgerPage.jsx')
   const source = readFileSync(filePath, 'utf8')
   const tags = extractSelfClosingTags(source, 'Table')
 

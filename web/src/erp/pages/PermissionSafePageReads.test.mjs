@@ -6,12 +6,12 @@ function read(relativePath) {
   return readFileSync(new URL(relativePath, import.meta.url), 'utf8')
 }
 
-const masterDataPage = read('./V1MasterDataPage.jsx')
+const masterDataPage = read('./MasterDataPage.jsx')
 const masterDataConfig = read(
   '../components/master-data/masterDataPageConfig.mjs'
 )
 const masterDataForm = read('../components/master-data/MasterDataForm.jsx')
-const inventoryPage = read('./V1InventoryLedgerPage.jsx')
+const inventoryPage = read('./InventoryLedgerPage.jsx')
 
 test('master data main reads and optional dictionaries use separate exact permission guards', () => {
   for (const permission of [

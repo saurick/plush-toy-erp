@@ -6,7 +6,7 @@ const readSource = (relativePath) =>
   readFileSync(new URL(relativePath, import.meta.url), 'utf8')
 
 const bomPageSource = readSource('../pages/BOMVersionsPage.jsx')
-const outsourcingPageSource = readSource('../pages/V1OutsourcingOrdersPage.jsx')
+const outsourcingPageSource = readSource('../pages/OutsourcingOrdersPage.jsx')
 const workspaceSource = readSource('../pages/EngineeringPrintWorkspacePage.jsx')
 const templateSource = readSource('../data/engineeringPrintTemplates.mjs')
 const printStyleSource = readSource('../styles/app/engineering-print.css')

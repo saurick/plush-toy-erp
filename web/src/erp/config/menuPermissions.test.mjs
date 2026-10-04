@@ -144,7 +144,7 @@ test('menuPermissions: 只保留正式权限并拒绝已取消的旧入口', () 
   )
 })
 
-test('menuPermissions: 已取消的重叠入口不映射到正式 V1', () => {
+test('menuPermissions: 已取消的重叠入口不映射到正式业务入口', () => {
   assert.deepEqual(
     normalizeMenuPermissions([
       '/erp/master/partners',

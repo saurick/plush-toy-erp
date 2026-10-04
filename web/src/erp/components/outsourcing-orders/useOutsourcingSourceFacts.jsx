@@ -28,7 +28,7 @@ import {
   OUTSOURCING_ORDER_ITEM_STATUS_LABELS,
   SOURCE_DOCUMENT_ITEM_STATUS_TONES,
   formatUnixDate,
-  V1_ROUTE_PATHS,
+  BUSINESS_ROUTE_PATHS,
   statusText,
 } from '../../utils/masterDataOrderView.mjs'
 import { OUTSOURCING_ORDER_SUBJECT_TYPES } from '../../utils/sourceOrderLineValues.mjs'
@@ -551,7 +551,7 @@ export function useOutsourcingSourceFacts({
       if (!inspection?.id || !canOpenQualityInspection) return
       navigate(
         relatedDocumentRoute(
-          V1_ROUTE_PATHS.qualityInspections,
+          BUSINESS_ROUTE_PATHS.qualityInspections,
           { quality_inspection_id: inspection.id },
           {
             keyword: inspection.inspection_no,

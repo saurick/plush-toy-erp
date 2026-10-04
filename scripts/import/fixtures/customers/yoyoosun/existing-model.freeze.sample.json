@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Synthetic sanitized existing V1/formal model snapshot for yoyoosun freeze evidence. Not real customer data. Not import approval.",
+  "description": "Synthetic sanitized existing formal model snapshot for yoyoosun freeze evidence. Not real customer data. Not import approval.",
   "customers": [
     {
       "id": "customer-1",

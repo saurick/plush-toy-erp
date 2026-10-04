@@ -29,7 +29,7 @@ Jaeger 只发布 `jaeger-v2.yml` 实际启用的 OTLP、Jaeger、Zipkin 与查�
 
 ## Trace 保留与资源 / Trace Retention
 
-业务请求默认使用 `TRACE_RATIO=0.1`；`ParentBased` 保留已有父链路的采样决定。后台 ProcessRuntime 对账根 Trace 至多采样 10%，无父上下文的 health / ready / runtime identity 探针不导出，SQL 仅跟随有效操作上下文。比例采样不保证所有失败都有 Trace，完成日志、错误指标与数据库审计保持各自合同。开发业务请求默认全采样，配置真源和接入范围见[服务端观测说明](../../../../docs/observability/日志链路追踪审计第一版.md)。
+业务请求默认使用 `TRACE_RATIO=0.1`；`ParentBased` 保留已有父链路的采样决定。后台 ProcessRuntime 对账根 Trace 至多采样 10%，无父上下文的 health / ready / runtime identity 探针不导出，SQL 仅跟随有效操作上下文。比例采样不保证所有失败都有 Trace，完成日志、错误指标与数据库审计保持各自合同。开发业务请求默认全采样，配置真源和接入范围见[服务端观测说明](../../../../docs/observability/日志链路追踪与审计.md)。
 
 Jaeger 使用每个 Compose project 独立的 `jaeger-data` named volume，挂载到镜像的可写 `/tmp`，Badger key / value 数据位于 `/tmp/badger/`，以镜像非 root 用户运行。Trace TTL 为 `168h`，重建容器和普通停止保留历史；不得在停用、升级或回滚时删除 volume。TTL 限制可查询跨度，实际磁盘回收由存储清理完成，磁盘容量仍需主机监控。
 

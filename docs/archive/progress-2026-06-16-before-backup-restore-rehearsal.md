@@ -61,7 +61,7 @@
 ## 2026-06-16 19:54 CST
 
 - 完成：补齐生产 bootstrap 最小审计闭环守卫，`runtime_audit_events` 和 `runtime_markers` 通过 Ent hook 拒绝普通 update / delete，保持启动审计事件和一次性 marker 只能创建 / 追加。
-- 完成：新增 `runtime_audit_schema_test.go`，覆盖 runtime audit event append-only 和 runtime marker immutable；同步 `server/docs/observability.md` 与 `docs/observability/日志链路追踪审计第一版.md`，明确这组表只服务服务启动安全审计，不是全业务通用 `audit_events`。
+- 完成：新增 `runtime_audit_schema_test.go`，覆盖 runtime audit event append-only 和 runtime marker immutable；同步 `server/docs/observability.md` 与 `docs/observability/日志链路追踪与审计.md`，明确这组表只服务服务启动安全审计，不是全业务通用 `audit_events`。
 - 验证：`make data` 通过且 Atlas 未生成新 migration；`go test ./internal/data -run 'TestRuntime|TestInitAdminUsersIfNeeded'`、`go test ./cmd/server -run 'TestValidateProductionBootstrapConfig'`、`go test ./cmd/server ./internal/data`、`bash scripts/deploy/production-preflight.sh --example`、`bash deployments/yoyoosun/scripts/verify-env.sh --example`、`bash -n scripts/deploy/production-preflight.sh deployments/yoyoosun/scripts/verify-env.sh` 和 `git diff --check` 均通过。
 - 下一步：后续若要做角色权限变更、账号启停或业务动作审计，应单独设计系统管理审计或领域审计任务，不把本轮 runtime 表直接扩成采购 / 库存 / 出货 / 财务全量审计。
 - 阻塞/风险：本轮未执行真实库 migration apply、未构建镜像、未部署目标环境；当前工作区仍有多轮并行未提交改动，本轮只收口 bootstrap runtime audit 守卫与文档。
@@ -381,7 +381,7 @@
 
 - 完成：做完系统管理审计最小闭环，复用 append-only `runtime_audit_events` 记录管理员创建、角色绑定、账号启停、重置密码和角色权限变更；payload 只保存 actor、target、before / after 非敏感摘要，不保存密码、token 或密码 hash。
 - 完成：新增 `system.audit.read` 权限、后端 `admin.audit_logs` 只读接口、系统管理侧栏 `审计日志` 入口和 `/erp/system/audit-logs` 页面；系统管理员内置角色默认拥有审计读取权限，业务角色不默认拥有。
-- 完成：同步 `docs/当前真源与交接顺序.md`、`docs/observability/日志链路追踪审计第一版.md`、`server/docs/observability.md`、`server/README.md` 和 `web/README.md`，明确 `runtime_audit_events` 只承接启动初始化与系统控制面审计，不替代采购、库存、质检、出货或财务业务事实流水。
+- 完成：同步 `docs/当前真源与交接顺序.md`、`docs/observability/日志链路追踪与审计.md`、`server/docs/observability.md`、`server/README.md` 和 `web/README.md`，明确 `runtime_audit_events` 只承接启动初始化与系统控制面审计，不替代采购、库存、质检、出货或财务业务事实流水。
 - 下一步：如要继续扩展，应单独评审配置变更审计、打印带值留痕或各领域事实审计；不要把业务事实统一复制进通用 audit event。
 - 阻塞/风险：本轮不做通用 CRUD before / after 全量审计，不新增业务审计专表，不改 schema / migration，不部署目标环境；前端审计页是只读列表，未做复杂报表或导出中心。
 

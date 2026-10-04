@@ -95,7 +95,7 @@ import {
 } from '../components/sales-orders/salesOrderPageConfig.mjs'
 import { useSalesOrderPaymentReview } from '../components/sales-orders/useSalesOrderPaymentReview.mjs'
 import {
-  V1_ROUTE_PATHS,
+  BUSINESS_ROUTE_PATHS,
   buildSequentialDraftCode,
   canRunSalesOrderLifecycleAction,
   formatUnixDate,
@@ -231,7 +231,7 @@ async function loadReservationStockForItem(item = {}) {
   }
 }
 
-export default function V1SalesOrdersPage() {
+export default function SalesOrdersPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -1535,10 +1535,10 @@ export default function V1SalesOrdersPage() {
   const relatedMenuItems = useMemo(
     () =>
       [
-        canOpenRelatedPath(V1_ROUTE_PATHS.shipments)
+        canOpenRelatedPath(BUSINESS_ROUTE_PATHS.shipments)
           ? { key: 'shipments', label: '出货单' }
           : null,
-        canOpenRelatedPath(V1_ROUTE_PATHS.outbound)
+        canOpenRelatedPath(BUSINESS_ROUTE_PATHS.outbound)
           ? { key: 'outbound', label: '出库 / 预留' }
           : null,
       ].filter(Boolean),
@@ -1556,7 +1556,7 @@ export default function V1SalesOrdersPage() {
     const salesOrderID = selectedOrder.id
     const pathByKey = {
       shipments: relatedDocumentRoute(
-        V1_ROUTE_PATHS.shipments,
+        BUSINESS_ROUTE_PATHS.shipments,
         { sales_order_id: salesOrderID },
         {
           keyword: selectedOrder.order_no,
@@ -1565,7 +1565,7 @@ export default function V1SalesOrdersPage() {
         }
       ),
       outbound: relatedDocumentRoute(
-        V1_ROUTE_PATHS.outbound,
+        BUSINESS_ROUTE_PATHS.outbound,
         { sales_order_id: salesOrderID },
         {
           keyword: selectedOrder.order_no,
@@ -1591,7 +1591,7 @@ export default function V1SalesOrdersPage() {
   )
 
   return (
-    <BusinessPageLayout className="erp-v1-sales-orders-page">
+    <BusinessPageLayout className="erp-sales-orders-page">
       <PageHeaderCard
         compact
         helpKey="sales-orders"

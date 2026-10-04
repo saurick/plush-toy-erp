@@ -21,14 +21,14 @@ const FORMAL_SELECTION_PAGE_CONSUMERS = Object.freeze({
   'HistoryRecordsPage.jsx': 'HistoryRecordsPage.jsx',
   'OperationalFactsPage.jsx': 'OperationalFactsPage.jsx',
   'ShipmentsPage.jsx': 'ShipmentsPage.jsx',
-  'V1InventoryLedgerPage.jsx': 'V1InventoryLedgerPage.jsx',
-  'V1MasterDataPage.jsx': 'V1MasterDataPage.jsx',
-  'V1OutsourcingOrdersPage.jsx': 'V1OutsourcingOrdersPage.jsx',
-  'V1ProductionOrdersPage.jsx': 'V1ProductionOrdersPage.jsx',
-  'V1PurchaseOrdersPage.jsx': purchasePanelPath,
-  'V1PurchaseReceiptsPage.jsx': 'V1PurchaseReceiptsPage.jsx',
-  'V1QualityInspectionsPage.jsx': 'V1QualityInspectionsPage.jsx',
-  'V1SalesOrdersPage.jsx': 'V1SalesOrdersPage.jsx',
+  'InventoryLedgerPage.jsx': 'InventoryLedgerPage.jsx',
+  'MasterDataPage.jsx': 'MasterDataPage.jsx',
+  'OutsourcingOrdersPage.jsx': 'OutsourcingOrdersPage.jsx',
+  'ProductionOrdersPage.jsx': 'ProductionOrdersPage.jsx',
+  'PurchaseOrdersPage.jsx': purchasePanelPath,
+  'PurchaseReceiptsPage.jsx': 'PurchaseReceiptsPage.jsx',
+  'QualityInspectionsPage.jsx': 'QualityInspectionsPage.jsx',
+  'SalesOrdersPage.jsx': 'SalesOrdersPage.jsx',
   'WorkflowBusinessModulePage.jsx': 'WorkflowBusinessModulePage.jsx',
 })
 
@@ -39,15 +39,15 @@ const FORMAL_SELECTION_STABLE_ACTION_EVIDENCE = Object.freeze({
   'OperationalFactsPage.jsx':
     /data-business-action-key="operational-fact-post"/u,
   'ShipmentsPage.jsx': /data-business-action-key="shipment-ship"/u,
-  'V1InventoryLedgerPage.jsx': /data-business-action-key="related-records"/u,
-  'V1MasterDataPage.jsx': /\{canUpdate \? \([\s\S]*?\{canDisable \? \(/u,
-  'V1OutsourcingOrdersPage.jsx':
+  'InventoryLedgerPage.jsx': /data-business-action-key="related-records"/u,
+  'MasterDataPage.jsx': /\{canUpdate \? \([\s\S]*?\{canDisable \? \(/u,
+  'OutsourcingOrdersPage.jsx':
     /disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u,
-  'V1ProductionOrdersPage.jsx': /data-business-action-key="release"/u,
-  'V1PurchaseOrdersPage.jsx': /data-business-action-key="generate-inbound"/u,
-  'V1PurchaseReceiptsPage.jsx': /data-business-action-key="post"/u,
-  'V1QualityInspectionsPage.jsx': /data-business-action-key="submit"/u,
-  'V1SalesOrdersPage.jsx':
+  'ProductionOrdersPage.jsx': /data-business-action-key="release"/u,
+  'PurchaseOrdersPage.jsx': /data-business-action-key="generate-inbound"/u,
+  'PurchaseReceiptsPage.jsx': /data-business-action-key="post"/u,
+  'QualityInspectionsPage.jsx': /data-business-action-key="submit"/u,
+  'SalesOrdersPage.jsx':
     /disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u,
   'WorkflowBusinessModulePage.jsx':
     /data-business-action-key="workflow-task-complete"/u,
@@ -55,15 +55,15 @@ const FORMAL_SELECTION_STABLE_ACTION_EVIDENCE = Object.freeze({
 
 const CONTEXTUAL_ACTION_EVIDENCE = Object.freeze({
   'OperationalFactsPage.jsx': /relatedActionAvailability\.visible/u,
-  'V1OutsourcingOrdersPage.jsx':
+  'OutsourcingOrdersPage.jsx':
     /relatedOutsourcingFactsAvailability\.visible/u,
-  'V1ProductionOrdersPage.jsx':
+  'ProductionOrdersPage.jsx':
     /productionReworkProgressAvailability\.visible/u,
-  'V1PurchaseOrdersPage.jsx': /relatedActionAvailability\.visible/u,
-  'V1PurchaseReceiptsPage.jsx': /payableViewAvailability\.visible/u,
-  'V1QualityInspectionsPage.jsx':
+  'PurchaseOrdersPage.jsx': /relatedActionAvailability\.visible/u,
+  'PurchaseReceiptsPage.jsx': /payableViewAvailability\.visible/u,
+  'QualityInspectionsPage.jsx':
     /outsourcingDispositionViewAvailability\.visible/u,
-  'V1SalesOrdersPage.jsx': /relatedActionAvailability\.visible/u,
+  'SalesOrdersPage.jsx': /relatedActionAvailability\.visible/u,
 })
 
 function pageSource(fileName) {
@@ -169,7 +169,7 @@ test('生产异常子面板也纳入稳定动作合同', () => {
 })
 
 test('采购订单页通过唯一操作面板消费共享动作合同', () => {
-  const purchasePage = pageSource('V1PurchaseOrdersPage.jsx')
+  const purchasePage = pageSource('PurchaseOrdersPage.jsx')
   const purchasePanel = readFileSync(purchasePanelPath, 'utf8')
 
   assert.match(purchasePage, /<PurchaseOrderOperationPanel/u)
@@ -209,7 +209,7 @@ test('采购和加工合同补齐详情入口，任务页不展示未实现的�
     /data-business-action-key="purchase-details"/u
   )
   assert.match(
-    pageSource('V1OutsourcingOrdersPage.jsx'),
+    pageSource('OutsourcingOrdersPage.jsx'),
     /data-business-action-key="outsourcing-details"/u
   )
   assert.match(
@@ -217,8 +217,8 @@ test('采购和加工合同补齐详情入口，任务页不展示未实现的�
     /showExport=\{false\}/u
   )
   for (const source of [
-    pageSource('V1SalesOrdersPage.jsx'),
-    pageSource('V1OutsourcingOrdersPage.jsx'),
+    pageSource('SalesOrdersPage.jsx'),
+    pageSource('OutsourcingOrdersPage.jsx'),
     readFileSync(purchasePanelPath, 'utf8'),
   ]) {
     const toolbar = source.slice(

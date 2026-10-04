@@ -26,7 +26,7 @@ import {
 } from "./manual-acceptance-dataset.mjs";
 import {
   MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
-  MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   assertManualAcceptanceDatasetReadinessBoundary,
@@ -2509,7 +2509,7 @@ export function assertManualAcceptanceBrowserReadinessBinding(
   }
   return {
     ...substrate,
-    datasetRunnerRevision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+    datasetRunnerRevision: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
     sourcePrefix: printInput.sourcePrefix,
     taskRunId: taskInput.runId,
     taskPrefix: taskInput.prefix,
@@ -2855,7 +2855,7 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
         stage?.dataVersion !== printInput.dataVersion ||
         stage?.semanticDigest !== datasetSemanticDigest ||
         stage?.references?.runner?.revision !==
-          MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION ||
+          MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT ||
         stage?.references?.runner?.logicFingerprintContract !==
           MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT ||
         !/^[0-9a-f]{64}$/u.test(

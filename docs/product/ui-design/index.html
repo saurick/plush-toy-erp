@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>毛绒玩具 ERP · 统一界面交互评审稿 V8</title>
+  <title>毛绒玩具 ERP · 统一界面交互评审稿</title>
   <style>
     :root {
       color-scheme: light;
@@ -3808,9 +3808,9 @@
       page: window.__ERP_UI_DESIGN_ENTRY__ === 'workbench' ? 'dev-workbench' : window.__ERP_UI_DESIGN_ENTRY__ === 'help' ? 'help' : 'dashboard', status: 'all', search: '', selected: new Set(), sortKey: 'date', sortDir: 'asc', pageNo: 1,
       devArea: 'overview', devViews: { overview: 'evidence', quality: 'plan', delivery: 'versions' }, devSearch: {}, devFilter: {}, devPinned: [], devState: 'data', devEvidence: 'missing', devOperation: null, devPrepared: null,
       devQualityChecked: false, devPressurePreview: null,
-      density: localStorage.getItem('erp-prototype-v8-density') || 'standard',
-      mode: localStorage.getItem('erp-prototype-v8-mode') || 'system',
-      accent: localStorage.getItem('erp-prototype-v8-accent') || 'blue',
+      density: localStorage.getItem('erp-prototype-density') || 'standard',
+      mode: localStorage.getItem('erp-prototype-mode') || 'system',
+      accent: localStorage.getItem('erp-prototype-accent') || 'blue',
       visibleColumns: new Set(['no', 'party', 'status', 'date', 'metric', 'owner', 'risk']),
       columnDraft: null,
       columnOrder: ['no', 'party', 'status', 'date', 'metric', 'owner', 'progress', 'risk'],
@@ -4046,7 +4046,7 @@
       document.body.dataset.page = state.page;
       if (!accents[state.accent]) {
         state.accent = accentAliases[state.accent] || 'blue';
-        localStorage.setItem('erp-prototype-v8-accent', state.accent);
+        localStorage.setItem('erp-prototype-accent', state.accent);
       }
       const a = accents[state.accent];
       const interactiveAccent = effectiveMode === 'dark' ? a[6] : a[0];
@@ -10502,7 +10502,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if (!state.authenticated && ['set-accent','set-mode'].includes(action)) {
         const key = action === 'set-accent' ? 'accent' : 'mode';
         state[key] = target.dataset.value;
-        localStorage.setItem(`erp-prototype-v8-${key}`, state[key]);
+        localStorage.setItem(`erp-prototype-${key}`, state[key]);
         applyTheme(); renderFloating(); // Keep form nodes / autofill / return-focus intact.
         return true;
       }
@@ -11204,7 +11204,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'account-entry') { state.overlay = null; navigate('tasks'); toast('已切换到桌面工作入口'); }
       else if (action === 'account-password') { state.infoModal = { title: '修改密码', html: '<div class="field"><label>当前密码</label><input type="password" /></div><div class="field" style="margin-top:10px"><label>新密码</label><input type="password" /></div><div class="field" style="margin-top:10px"><label>确认新密码</label><input type="password" /></div>' }; state.overlay='info'; renderFloating(); }
       else if (action === 'account-legal') { state.infoModal = { title: '隐私与使用规则', body: '系统仅按岗位授权处理业务资料；请勿共享账号、导出无关客户数据或绕过正式单据写入业务事实。' }; state.overlay='info'; renderFloating(); }
-      else if (action === 'account-system') { state.infoModal = { title: '系统信息', html: '<dl class="detail-grid"><dt>版本</dt><dd>2026.09</dd><dt>构建</dt><dd>统一界面交互评审稿 V8</dd><dt>当前入口</dt><dd>电脑端</dd><dt>登录岗位</dt><dd>超级管理员</dd></dl>' }; state.overlay='info'; renderFloating(); }
+      else if (action === 'account-system') { state.infoModal = { title: '系统信息', html: '<dl class="detail-grid"><dt>版本</dt><dd>2026.09</dd><dt>构建</dt><dd>统一界面交互评审稿</dd><dt>当前入口</dt><dd>电脑端</dd><dt>登录岗位</dt><dd>超级管理员</dd></dl>' }; state.overlay='info'; renderFloating(); }
       else if (action === 'mobile-main') {
         state.mobileMain = target.dataset.value;
         state.mobileScreen = 'list'; state.mobileTaskId = null; state.mobileProgressId = null; state.mobileOptionsOpen = false;
@@ -11246,7 +11246,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'mobile-open-linked-task') {
         state.mobileTaskId = target.dataset.id; state.mobileScreen = 'detail'; state.mobileAction = getMobileTask()?.actions?.[0] || 'done'; state.mobileReason = ''; state.mobileError = ''; state.mobileReceipt = null; renderView();
       }
-      else if (action === 'mobile-theme-mode') { state.mode = target.dataset.value; localStorage.setItem('erp-prototype-v8-mode', state.mode); applyTheme(); renderAll(); }
+      else if (action === 'mobile-theme-mode') { state.mode = target.dataset.value; localStorage.setItem('erp-prototype-mode', state.mode); applyTheme(); renderAll(); }
       else if (action === 'mobile-password') { state.infoModal = { title: '修改密码', html: '<div class="field"><label>当前密码</label><input type="password" /></div><div class="field" style="margin-top:12px"><label>新密码</label><input type="password" /></div><div class="field" style="margin-top:12px"><label>确认新密码</label><input type="password" /></div><p class="data-note">保存后其他登录会话按系统安全规则处理。</p>' }; state.overlay = 'info'; renderFloating(); }
       else if (action === 'mobile-legal') { state.infoModal = { title: '隐私与使用规则', body: '系统仅按岗位授权处理业务资料；请勿共享账号、导出无关客户数据或绕过正式业务单据写入事实。' }; state.overlay = 'info'; renderFloating(); }
       else if (action === 'mobile-version-retry') { state.mobileProfileVersionStatus = '刚刚核对：当前版本可用'; renderView(); toast('版本状态已更新'); }
@@ -11390,10 +11390,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'reset-columns') { state.columnDraft={visible:new Set(['no','party','status','date','metric','owner','risk']),order:['no','party','status','date','metric','owner','progress','risk']};renderFloating(); }
       else if (action === 'save-columns') { state.visibleColumns=new Set(state.columnDraft.visible);state.columnOrder=[...state.columnDraft.order];state.columnDraft=null;state.overlay=null;renderAll();toast('列设置已保存'); }
       else if (action === 'column-up' || action === 'column-down') { const key=target.dataset.key;const draft=state.columnDraft;const from=draft.order.indexOf(key);const delta=action==='column-up'?-1:1;const to=Math.max(0,Math.min(draft.order.length-1,from+delta));if(from>=0&&to!==from){const next=[...draft.order];[next[from],next[to]]=[next[to],next[from]];draft.order=next;renderFloating();} }
-      else if (action === 'set-accent') { state.accent = target.dataset.value; localStorage.setItem('erp-prototype-v8-accent',state.accent); applyTheme(); renderAll(); }
-      else if (action === 'set-mode') { state.mode = target.dataset.value; localStorage.setItem('erp-prototype-v8-mode',state.mode); applyTheme(); renderAll(); }
-      else if (action === 'set-density') { state.density = target.dataset.value; localStorage.setItem('erp-prototype-v8-density',state.density); applyTheme(); renderAll(); }
-      else if (action === 'toggle-density') { state.density = state.density === 'compact' ? 'standard' : 'compact'; localStorage.setItem('erp-prototype-v8-density',state.density); applyTheme(); renderView(); }
+      else if (action === 'set-accent') { state.accent = target.dataset.value; localStorage.setItem('erp-prototype-accent',state.accent); applyTheme(); renderAll(); }
+      else if (action === 'set-mode') { state.mode = target.dataset.value; localStorage.setItem('erp-prototype-mode',state.mode); applyTheme(); renderAll(); }
+      else if (action === 'set-density') { state.density = target.dataset.value; localStorage.setItem('erp-prototype-density',state.density); applyTheme(); renderAll(); }
+      else if (action === 'toggle-density') { state.density = state.density === 'compact' ? 'standard' : 'compact'; localStorage.setItem('erp-prototype-density',state.density); applyTheme(); renderView(); }
       else if (action === 'new-record') openEntityForm(currentPageConfig()?.key,'create');
       else if (action === 'back-list') navigate(state.formReturnPage || state.formSourcePage);
       else if (action === 'confirm-nav') { const next = state.pendingNav || state.formReturnPage || state.formSourcePage; state.formDirty = false; state.pendingNav = null; state.overlay = null; navigate(next); }

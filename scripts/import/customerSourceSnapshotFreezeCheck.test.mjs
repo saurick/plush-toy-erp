@@ -12,7 +12,7 @@ const testDir = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(testDir, '../..')
 const cliPath = path.join(testDir, 'customerSourceSnapshotFreezeCheck.mjs')
 const sourceFixture = path.join(testDir, 'fixtures/customers/yoyoosun/source-snapshot.freeze.sample.json')
-const existingFixture = path.join(testDir, 'fixtures/customers/yoyoosun/existing-v1.freeze.sample.json')
+const existingFixture = path.join(testDir, 'fixtures/customers/yoyoosun/existing-model.freeze.sample.json')
 
 test('help 输出可运行', () => {
   const result = runCli(['--help'])

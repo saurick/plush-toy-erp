@@ -1984,7 +1984,7 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesUsecaseProductUnitGuard(t 
 	}
 }
 
-func TestJsonrpcDispatcher_RBACIncludesV1MasterDataAndOrderPermissions(t *testing.T) {
+func TestJsonrpcDispatcher_RBACIncludesMasterDataAndOrderPermissions(t *testing.T) {
 	salesPermissions := jsonrpcBuiltinRolePermissionSet(t, biz.SalesRoleKey)
 	jsonrpcAssertPermissionSetContains(t, salesPermissions,
 		biz.PermissionCustomerRead,

@@ -20,7 +20,7 @@ export const yoyoosunFlowOrchestrationCoverage = Object.freeze({
   uiEntrypoints: Object.freeze([
     'desktop_task_board',
     'desktop_approval_inbox',
-    'workflow_v1_page',
+    'workflow_page',
     'business_collaboration_drawer',
     'mobile_role_tasks',
     'customer_config_preview',

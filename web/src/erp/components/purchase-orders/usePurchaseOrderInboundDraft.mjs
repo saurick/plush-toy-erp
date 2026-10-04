@@ -9,7 +9,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { getPurchaseOrderReceiptProgress } from '../../api/masterDataOrderApi.mjs'
 import { createPurchaseReceiptFromPurchaseOrder } from '../../api/purchaseApi.mjs'
-import { V1_ROUTE_PATHS } from '../../utils/masterDataOrderView.mjs'
+import { BUSINESS_ROUTE_PATHS } from '../../utils/masterDataOrderView.mjs'
 import {
   createPurchaseReceiptMutationAttemptStore,
   isPurchaseReceiptMutationResultUnknown,
@@ -147,7 +147,7 @@ export function usePurchaseOrderInboundDraft({
       closeInboundDraftModal()
       message.success('到货已登记，已生成待检记录；检验通过后由仓库确认入库')
       navigate(
-        routeWithQuery(V1_ROUTE_PATHS.purchaseReceipts, {
+        routeWithQuery(BUSINESS_ROUTE_PATHS.purchaseReceipts, {
           receipt_id: receipt?.id,
           purchase_order_id: selectedOrder.id,
         })

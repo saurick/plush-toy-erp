@@ -1,7 +1,7 @@
 import { fulfillmentTaskEntryPath, isFulfillmentTask } from './fulfillmentTask.mjs'
 import { businessModuleDefinitions } from '../config/businessModules.mjs'
 import { dashboardModules } from '../config/dashboardModules.mjs'
-import { V1_ROUTE_PATHS } from './masterDataOrderView.mjs'
+import { BUSINESS_ROUTE_PATHS } from './masterDataOrderView.mjs'
 import { routeWithQuery } from './routeQuery.mjs'
 import { engineeringMaterialTaskEntryPath } from './engineeringMaterialTask.mjs'
 import {
@@ -44,11 +44,11 @@ const TASK_SOURCE_TITLE_MAP = new Map([
   ['finance_payment', '收付款与核销'],
   ['shipments', '出货单'],
 ])
-const FORMAL_V1_TASK_ENTRY_MODULES = businessModuleDefinitions.filter(
-  (moduleItem) => moduleItem.pageKind === 'formal-v1'
+const FORMAL_TASK_ENTRY_MODULES = businessModuleDefinitions.filter(
+  (moduleItem) => moduleItem.pageKind === 'formal'
 )
 const TASK_SOURCE_PATH_MAP = new Map([
-  ...FORMAL_V1_TASK_ENTRY_MODULES.map((moduleItem) => [
+  ...FORMAL_TASK_ENTRY_MODULES.map((moduleItem) => [
     moduleItem.key,
     moduleItem.path,
   ]),
@@ -62,50 +62,50 @@ const WORKFLOW_INBOX_SOURCE_TYPES = new Set([
 ])
 const ACTIVE_TASK_ENTRY_PATHS = new Set([
   '/erp/business-dashboard',
-  ...FORMAL_V1_TASK_ENTRY_MODULES.map((moduleItem) => moduleItem.path),
+  ...FORMAL_TASK_ENTRY_MODULES.map((moduleItem) => moduleItem.path),
   ...dashboardModules.map((moduleItem) => moduleItem.path),
 ])
 const DIRECT_TASK_SOURCE_TARGETS = new Map([
-  ['project-orders', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
-  ['sales-orders', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
-  ['sales_order', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
+  ['project-orders', [BUSINESS_ROUTE_PATHS.salesOrders, 'sales_order_id']],
+  ['sales-orders', [BUSINESS_ROUTE_PATHS.salesOrders, 'sales_order_id']],
+  ['sales_order', [BUSINESS_ROUTE_PATHS.salesOrders, 'sales_order_id']],
   [
     'accessories-purchase',
-    [V1_ROUTE_PATHS.purchaseOrders, 'purchase_order_id'],
+    [BUSINESS_ROUTE_PATHS.purchaseOrders, 'purchase_order_id'],
   ],
-  ['purchase-order', [V1_ROUTE_PATHS.purchaseOrders, 'purchase_order_id']],
-  ['purchase_order', [V1_ROUTE_PATHS.purchaseOrders, 'purchase_order_id']],
-  ['inbound', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
-  ['purchase-receipt', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
-  ['purchase_receipt', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
-  ['inventory_operation', [V1_ROUTE_PATHS.inventory, 'inventory_operation_id']],
+  ['purchase-order', [BUSINESS_ROUTE_PATHS.purchaseOrders, 'purchase_order_id']],
+  ['purchase_order', [BUSINESS_ROUTE_PATHS.purchaseOrders, 'purchase_order_id']],
+  ['inbound', [BUSINESS_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
+  ['purchase-receipt', [BUSINESS_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
+  ['purchase_receipt', [BUSINESS_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
+  ['inventory_operation', [BUSINESS_ROUTE_PATHS.inventory, 'inventory_operation_id']],
   [
     'processing-contracts',
-    [V1_ROUTE_PATHS.processingContracts, 'outsourcing_order_id'],
+    [BUSINESS_ROUTE_PATHS.processingContracts, 'outsourcing_order_id'],
   ],
   [
     'outsourcing-order',
-    [V1_ROUTE_PATHS.processingContracts, 'outsourcing_order_id'],
+    [BUSINESS_ROUTE_PATHS.processingContracts, 'outsourcing_order_id'],
   ],
   [
     'outsourcing_order',
-    [V1_ROUTE_PATHS.processingContracts, 'outsourcing_order_id'],
+    [BUSINESS_ROUTE_PATHS.processingContracts, 'outsourcing_order_id'],
   ],
   [
     'production-orders',
-    [V1_ROUTE_PATHS.productionOrders, 'production_order_id'],
+    [BUSINESS_ROUTE_PATHS.productionOrders, 'production_order_id'],
   ],
   [
     'production-order',
-    [V1_ROUTE_PATHS.productionOrders, 'production_order_id'],
+    [BUSINESS_ROUTE_PATHS.productionOrders, 'production_order_id'],
   ],
   [
     'production_order',
-    [V1_ROUTE_PATHS.productionOrders, 'production_order_id'],
+    [BUSINESS_ROUTE_PATHS.productionOrders, 'production_order_id'],
   ],
-  ['production-progress', [V1_ROUTE_PATHS.productionProgress, 'fact_id']],
-  ['production-fact', [V1_ROUTE_PATHS.productionProgress, 'fact_id']],
-  ['production_fact', [V1_ROUTE_PATHS.productionProgress, 'fact_id']],
+  ['production-progress', [BUSINESS_ROUTE_PATHS.productionProgress, 'fact_id']],
+  ['production-fact', [BUSINESS_ROUTE_PATHS.productionProgress, 'fact_id']],
+  ['production_fact', [BUSINESS_ROUTE_PATHS.productionProgress, 'fact_id']],
   [
     'production_exception_decision',
     [
@@ -115,19 +115,19 @@ const DIRECT_TASK_SOURCE_TARGETS = new Map([
   ],
   [
     'quality-inspections',
-    [V1_ROUTE_PATHS.qualityInspections, 'quality_inspection_id'],
+    [BUSINESS_ROUTE_PATHS.qualityInspections, 'quality_inspection_id'],
   ],
   [
     'quality-inspection',
-    [V1_ROUTE_PATHS.qualityInspections, 'quality_inspection_id'],
+    [BUSINESS_ROUTE_PATHS.qualityInspections, 'quality_inspection_id'],
   ],
   [
     'quality_inspection',
-    [V1_ROUTE_PATHS.qualityInspections, 'quality_inspection_id'],
+    [BUSINESS_ROUTE_PATHS.qualityInspections, 'quality_inspection_id'],
   ],
-  ['shipments', [V1_ROUTE_PATHS.shipments, 'shipment_id']],
-  ['shipment', [V1_ROUTE_PATHS.shipments, 'shipment_id']],
-  ['finance_payment', [V1_ROUTE_PATHS.financePayments, 'finance_payment_id']],
+  ['shipments', [BUSINESS_ROUTE_PATHS.shipments, 'shipment_id']],
+  ['shipment', [BUSINESS_ROUTE_PATHS.shipments, 'shipment_id']],
+  ['finance_payment', [BUSINESS_ROUTE_PATHS.financePayments, 'finance_payment_id']],
 ])
 const SOURCE_TASK_CONTRACT = 'workflow.source-task/v1'
 const SOURCE_TASK_INTENT_HASH_PATTERN = /^[0-9a-f]{64}$/

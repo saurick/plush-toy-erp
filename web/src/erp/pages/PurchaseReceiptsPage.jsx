@@ -63,7 +63,7 @@ import {
   formatUnixDate,
   formatUnixDateTime,
   hasActionPermission,
-  V1_ROUTE_PATHS,
+  BUSINESS_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
 import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
@@ -165,7 +165,7 @@ function receiptQuantityTotal(receipt = {}) {
   return sumPurchaseReceiptQuantities(receipt.items)
 }
 
-export default function V1PurchaseReceiptsPage() {
+export default function PurchaseReceiptsPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -305,14 +305,14 @@ export default function V1PurchaseReceiptsPage() {
   const canViewPayable =
     (canCreatePayable ||
       hasActionPermission(adminProfile, 'finance.payable.read')) &&
-    canOpenRelatedPath(V1_ROUTE_PATHS.payables)
+    canOpenRelatedPath(BUSINESS_ROUTE_PATHS.payables)
   const canOpenPurchaseOrders = canOpenRelatedPath(
-    V1_ROUTE_PATHS.purchaseOrders
+    BUSINESS_ROUTE_PATHS.purchaseOrders
   )
   const canOpenQualityInspections = canOpenRelatedPath(
-    V1_ROUTE_PATHS.qualityInspections
+    BUSINESS_ROUTE_PATHS.qualityInspections
   )
-  const canOpenInventory = canOpenRelatedPath(V1_ROUTE_PATHS.inventory)
+  const canOpenInventory = canOpenRelatedPath(BUSINESS_ROUTE_PATHS.inventory)
   const hasRelatedCapability =
     canOpenPurchaseOrders || canOpenQualityInspections || canOpenInventory
   const relatedMenuItems = useMemo(() => {
@@ -453,7 +453,7 @@ export default function V1PurchaseReceiptsPage() {
     if (!selectedRow) return
     const pathByKey = {
       'purchase-orders': relatedDocumentRoute(
-        V1_ROUTE_PATHS.purchaseOrders,
+        BUSINESS_ROUTE_PATHS.purchaseOrders,
         { purchase_order_id: selectedRow.purchase_order_id },
         {
           keyword: selectedRow.purchase_order_no,
@@ -462,7 +462,7 @@ export default function V1PurchaseReceiptsPage() {
         }
       ),
       'quality-inspections': relatedDocumentRoute(
-        V1_ROUTE_PATHS.qualityInspections,
+        BUSINESS_ROUTE_PATHS.qualityInspections,
         { purchase_receipt_id: selectedRow.id },
         {
           keyword: selectedRow.receipt_no,
@@ -471,7 +471,7 @@ export default function V1PurchaseReceiptsPage() {
         }
       ),
       inventory: relatedDocumentRoute(
-        V1_ROUTE_PATHS.inventory,
+        BUSINESS_ROUTE_PATHS.inventory,
         {
           source_type: 'PURCHASE_RECEIPT',
           source_id: selectedRow.id,
@@ -859,7 +859,7 @@ export default function V1PurchaseReceiptsPage() {
       if (!receipt?.id) return
       navigate(
         relatedDocumentRoute(
-          V1_ROUTE_PATHS.payables,
+          BUSINESS_ROUTE_PATHS.payables,
           { source_type: 'PURCHASE_RECEIPT', source_id: receipt.id },
           {
             keyword: receipt.receipt_no,
@@ -1050,7 +1050,7 @@ export default function V1PurchaseReceiptsPage() {
   ])
 
   return (
-    <BusinessPageLayout className="erp-v1-purchase-receipts-page">
+    <BusinessPageLayout className="erp-purchase-receipts-page">
       <PageHeaderCard
         compact
         helpKey="inbound"

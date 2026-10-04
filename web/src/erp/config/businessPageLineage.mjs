@@ -1292,7 +1292,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
 })
 
 const formalBusinessPageKeys = businessModuleDefinitions
-  .filter((moduleItem) => moduleItem.pageKind === 'formal-v1')
+  .filter((moduleItem) => moduleItem.pageKind === 'formal')
   .map((moduleItem) => moduleItem.key)
 const registeredBusinessPageKeys = Object.keys(LINEAGE_BY_PAGE_KEY)
 const formalBusinessPageKeySet = new Set(formalBusinessPageKeys)

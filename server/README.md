@@ -143,7 +143,7 @@ make dev_restart_yoyoosun
 | 环境配置与账号初始化 | [配置说明](docs/config.md) |
 | JSON-RPC 领域方法、状态、权限和幂等 | [API 合同](docs/api.md) |
 | Ent / Atlas 与共享开发库迁移 | [模型与迁移](docs/ent.md)、[生成的数据字典](docs/database/README.md) |
-| 日志、Trace 与审计 | [可观测性](../docs/observability/日志链路追踪审计第一版.md) |
+| 日志、Trace 与审计 | [可观测性](../docs/observability/日志链路追踪与审计.md) |
 | PostgreSQL 事务与定向验证 | [QA 脚本](../scripts/qa/README.md#postgresql-领域事务验证) |
 | 目标机发布、附件存储、备份与恢复 | [部署总览](deploy/README.md)、[prod Compose](deploy/compose/prod/README.md) |
 

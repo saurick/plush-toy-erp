@@ -473,7 +473,7 @@ test("v1 customer-trial identity is rejected instead of retained as an alias", a
         throw new Error("network must not run");
       },
     }),
-    /current registered v6 identity/u,
+    /current registered dataset identity/u,
   );
   assert.equal(calls, 0);
 });

@@ -98,28 +98,28 @@ test('direct source route keys are consumed by their target pages', () => {
     )
 
   const contracts = [
-    ['V1SalesOrdersPage.jsx', 'sales_order_id', 'getSalesOrder'],
-    ['V1ProductionOrdersPage.jsx', 'production_order_id', 'getProductionOrder'],
+    ['SalesOrdersPage.jsx', 'sales_order_id', 'getSalesOrder'],
+    ['ProductionOrdersPage.jsx', 'production_order_id', 'getProductionOrder'],
     [
-      'V1OutsourcingOrdersPage.jsx',
+      'OutsourcingOrdersPage.jsx',
       'outsourcing_order_id',
       'getOutsourcingOrder',
     ],
     [
-      'V1OutsourcingOrdersPage.jsx',
+      'OutsourcingOrdersPage.jsx',
       'outsourcing_fact_id',
       'listAllOutsourcingFacts',
     ],
-    ['V1PurchaseOrdersPage.jsx', 'purchase_order_id', 'getPurchaseOrder'],
+    ['PurchaseOrdersPage.jsx', 'purchase_order_id', 'getPurchaseOrder'],
     [
-      'V1QualityInspectionsPage.jsx',
+      'QualityInspectionsPage.jsx',
       'quality_inspection_id',
       'getQualityInspection',
     ],
   ]
   for (const [page, queryKey, loader] of contracts) {
     const source =
-      page === 'V1OutsourcingOrdersPage.jsx'
+      page === 'OutsourcingOrdersPage.jsx'
         ? readFileSync(
             new URL(
               '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs',
@@ -146,7 +146,7 @@ test('direct source route keys are consumed by their target pages', () => {
     /Number\(item\?\.id \|\| 0\) === exactProductionFactID/u
   )
 
-  const purchaseReceipts = pageSource('V1PurchaseReceiptsPage.jsx')
+  const purchaseReceipts = pageSource('PurchaseReceiptsPage.jsx')
   assert.match(purchaseReceipts, /'receipt_id'/u)
   assert.match(purchaseReceipts, /\bgetPurchaseReceipt\b/u)
   assert.match(pageSource('ShipmentsPage.jsx'), /'shipment_id'/u)

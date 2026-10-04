@@ -4,7 +4,7 @@ import test from 'node:test'
 import { getBusinessUsabilityEntry } from '../config/businessUsabilityCatalog.mjs'
 
 const page = readFileSync(
-  new URL('./V1ProductionOrdersPage.jsx', import.meta.url),
+  new URL('./ProductionOrdersPage.jsx', import.meta.url),
   'utf8'
 )
 const form = readFileSync(
@@ -54,7 +54,7 @@ const router = readFileSync(new URL('../router.jsx', import.meta.url), 'utf8')
 
 test('production order page is an independent Source Document route', () => {
   assert.match(router, /path="production\/orders"/u)
-  assert.match(router, /V1ProductionOrdersPage/u)
+  assert.match(router, /ProductionOrdersPage/u)
   assert.match(page, /生产计划单/u)
   assert.doesNotMatch(
     page,
@@ -148,7 +148,7 @@ test('production order core actions stay stable while record-specific readers us
 
 test('production order release explains the atomic scheduling handoff', () => {
   assert.match(page, /生产订单已发布，排产确认已进入 PMC 待办/u)
-  assert.match(page, /V1_ROUTE_PATHS\.productionScheduling/u)
+  assert.match(page, /BUSINESS_ROUTE_PATHS\.productionScheduling/u)
   assert.match(page, /source_type: 'production-orders'/u)
   assert.match(page, /source_id: order\.id/u)
 })
@@ -325,7 +325,7 @@ test('production completion keeps unknown attempts and links to filtered records
     page,
     /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
   )
-  assert.match(page, /V1_ROUTE_PATHS\.productionProgress/u)
+  assert.match(page, /BUSINESS_ROUTE_PATHS\.productionProgress/u)
   assert.match(page, /source_id: order\.id/u)
   assert.match(completionModal, /disabled=\{loading\}/u)
 })

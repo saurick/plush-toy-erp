@@ -185,7 +185,7 @@
 
 - 完成：按 `plush-page-design-governance` 和 `plush-docs-governance` 评估永绅截图，将收款分类、币种、收款账期和发票类别作为通用财务维度进入 `finance_facts`；字段落在 Product Core 事实层，不写客户专属名称，也不引入 AR/AP、税控、总账或多账簿专表。
 - 完成：`finance_facts` 增加 `collection_type`、`payment_term`、`payment_term_days`、`invoice_category`，保留 `USD/CNY/HKD` 币种与手续费；biz / repo / JSON-RPC / Ent 生成代码 / Atlas migration / 前端表单 / 列表列同步接入，`CASH_ON_SHIPMENT` 自动保留 0 天账期。
-- 完成：同步财务第一版、当前真源、能力证据等正式文档；原型只校验当前 To Implement / reader boundary 口径，不提升状态，不新增文档清单条目。
+- 完成：同步财务业务与核销、当前真源、能力证据等正式文档；原型只校验当前 To Implement / reader boundary 口径，不提升状态，不新增文档清单条目。
 - 验证：追加前 `progress.md` 为 201 行、43990 字节，未达到归档阈值；`cd server && make data` 生成 migration；`cd server && make migrate_status` 返回 pending 2 个 migration；`cd server && go test ./internal/biz ./internal/data ./internal/service -count=1` 通过；`cd web && pnpm lint`、`cd web && pnpm css`、`cd web && pnpm test` 通过，前端 360 项；`STYLE_L1_PORT=4193 pnpm --dir web style:l1` 通过，67 个场景；`git diff --check` 通过。
 - 下一步：若后续要做真实收款核销、付款核销、发票查验、税控开票、总账凭证、账龄报表或完整 AR/AP 台账，必须单独评审 usecase、schema、RBAC、审计、迁移和 L2/L3 回归，不从当前字段直接外推。
 - 阻塞/风险：当前目标库尚未应用新 migration；本轮没有执行 `atlas migrate apply`，也没有改 WorkflowUsecase、RBAC 码位、客户配置、部署脚本或客户专属资料目录。

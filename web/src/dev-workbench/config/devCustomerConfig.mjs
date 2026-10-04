@@ -1450,14 +1450,14 @@ export function buildImportToolingSummary(
       {
         key: 'freeze',
         title: '来源快照冻结检查',
-        command: `node scripts/import/customerSourceSnapshotFreezeCheck.mjs --source ${fixtureBasePath}/source-snapshot.freeze.sample.json --existing ${fixtureBasePath}/existing-v1.freeze.sample.json --out ${outputBasePath}/source-snapshot-freeze`,
+        command: `node scripts/import/customerSourceSnapshotFreezeCheck.mjs --source ${fixtureBasePath}/source-snapshot.freeze.sample.json --existing ${fixtureBasePath}/existing-model.freeze.sample.json --out ${outputBasePath}/source-snapshot-freeze`,
         status: 'evidence_only',
         note: '只读冻结来源快照，不连接后端、不写数据库、不代表真实导入批准。',
       },
       {
         key: 'dry-run',
         title: '客户导入试跑',
-        command: `node scripts/import/customerImportDryRun.mjs --source ${fixtureBasePath}/source-snapshot.sample.json --existing ${fixtureBasePath}/existing-v1.sample.json --out ${outputBasePath}/import-dry-run`,
+        command: `node scripts/import/customerImportDryRun.mjs --source ${fixtureBasePath}/source-snapshot.sample.json --existing ${fixtureBasePath}/existing-model.sample.json --out ${outputBasePath}/import-dry-run`,
         status: 'preview_only',
         note: '只生成候选、冲突和未决队列预览，不写客户业务表。',
       },
@@ -2044,7 +2044,7 @@ export function buildCustomerPackageConsoleSummary({
       {
         key: 'field-numbering',
         type: '字段显示',
-        current: 'V1 字段真源',
+        current: '当前业务字段',
         incoming: `${fieldReviewCount} 个字段 / 编号候选`,
         impact: '需要人工确认，不自动变成产品核心必填。',
         status: 'draft_only',

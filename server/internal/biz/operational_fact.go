@@ -1400,7 +1400,7 @@ var financeCurrencies = map[string]struct{}{
 	FinanceCurrencyHKD: {},
 }
 
-// NormalizeFinanceCurrency keeps the deliberately small V1 currency set
+// NormalizeFinanceCurrency keeps the supported currency set
 // consistent across source documents, finance facts and payments. Callers
 // that own a create-only default must apply it before this validation.
 func NormalizeFinanceCurrency(raw string) (string, bool) {

@@ -231,7 +231,7 @@ test('UI design keeps persistent page headings concise like the formal ERP', () 
   assert.doesNotMatch(html, /hub[.]note/u)
   assert.doesNotMatch(
     html,
-    /统一界面评审稿 V8|V8 · 本地交互样例|固定样例 · 不连接真实环境/u
+    /统一界面(?:交互)?评审稿 V[1-9]\d*|V[1-9]\d* · 本地交互样例|固定样例 · 不连接真实环境/u
   )
 })
 

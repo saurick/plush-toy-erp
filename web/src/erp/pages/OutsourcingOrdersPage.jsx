@@ -71,7 +71,7 @@ import {
   OUTSOURCING_ORDER_STATUS_LABELS,
   canRunOutsourcingOrderLifecycleAction,
   hasActionPermission,
-  V1_ROUTE_PATHS,
+  BUSINESS_ROUTE_PATHS,
   statusText,
 } from '../utils/masterDataOrderView.mjs'
 
@@ -125,7 +125,7 @@ import {
   withLifecycleScopeSearchParam,
 } from '../utils/lifecycleScope.mjs'
 
-export default function V1OutsourcingOrdersPage() {
+export default function OutsourcingOrdersPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
 
@@ -296,7 +296,7 @@ export default function V1OutsourcingOrdersPage() {
   )
   const canOpenQualityInspection =
     canReadQualityInspection &&
-    canOpenRelatedPath(V1_ROUTE_PATHS.qualityInspections)
+    canOpenRelatedPath(BUSINESS_ROUTE_PATHS.qualityInspections)
   const canCreatePayable = hasActionPermission(
     adminProfile,
     'finance.payable.confirm'
@@ -304,7 +304,7 @@ export default function V1OutsourcingOrdersPage() {
   const canViewPayable =
     (canCreatePayable ||
       hasActionPermission(adminProfile, 'finance.payable.read')) &&
-    canOpenRelatedPath(V1_ROUTE_PATHS.payables)
+    canOpenRelatedPath(BUSINESS_ROUTE_PATHS.payables)
 
   const canUpdateWorkflowTasks = hasActionPermission(
     adminProfile,
@@ -676,7 +676,7 @@ export default function V1OutsourcingOrdersPage() {
     })
 
   return (
-    <BusinessPageLayout className="erp-v1-outsourcing-orders-page">
+    <BusinessPageLayout className="erp-outsourcing-orders-page">
       <div className="erp-business-page-navigation">
         <Tabs
           activeKey={searchParams.get('view') === 'items' ? 'items' : 'contracts'}

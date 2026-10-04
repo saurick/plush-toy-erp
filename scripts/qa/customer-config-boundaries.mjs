@@ -843,8 +843,8 @@ function validateYoyoosunImportConfig(config) {
     "sourcePolicy.usesExtractedEvidenceOnly must stay true",
   );
   assert(
-    sourcePolicy.requiresExistingV1SnapshotBeforeApproval === true,
-    "sourcePolicy.requiresExistingV1SnapshotBeforeApproval must stay true",
+    sourcePolicy.requiresExistingModelSnapshotBeforeApproval === true,
+    "sourcePolicy.requiresExistingModelSnapshotBeforeApproval must stay true",
   );
   assert(
     sourcePolicy.requiresHumanApprovalForRealImport === true,
@@ -1011,7 +1011,7 @@ function validateYoyoosunImportConfig(config) {
     "contact_owner_match",
     "bom_product_material_unit_match",
     "sensitive_contact_bank_fields",
-    "existing_v1_snapshot",
+    "existing_model_snapshot",
   ]) {
     assert(reviewQueueKeys.has(key), `reviewQueues must include ${key}`);
   }

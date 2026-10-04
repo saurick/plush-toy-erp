@@ -94,7 +94,7 @@ node scripts/import/customerSourceExtract.mjs \\
 
 \`\`\`text
 source-snapshot.extracted.json
-existing-v1.empty-preview.json
+existing-model.empty-preview.json
 \`\`\`
 `
 
@@ -211,7 +211,7 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
       'trial-account-rbac',
       'real-login-smoke-shared',
       'trial-simulated-data',
-      'v1-local-acceptance-plan',
+      'main-chain-local-acceptance-plan',
       'mobile-workflow-smoke',
       'customer-config-dev-console',
       'dev-ui-design',
@@ -454,39 +454,39 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   assert.match(getPreset('trial-simulated-data').description, /退回和催办/)
   assert.match(getPreset('trial-simulated-data').description, /不连接后端/)
   assert.match(
-    getPresetCopyText('v1-local-acceptance-plan'),
-    /v1-acceptance-plan\.test\.mjs/
+    getPresetCopyText('main-chain-local-acceptance-plan'),
+    /main-chain-acceptance-plan\.test\.mjs/
   )
   assert.match(
-    getPresetCopyText('v1-local-acceptance-plan'),
+    getPresetCopyText('main-chain-local-acceptance-plan'),
     /purchase-receipt-real-write-e2e\.test\.mjs/
   )
   assert.match(
-    getPresetCopyText('v1-local-acceptance-plan'),
+    getPresetCopyText('main-chain-local-acceptance-plan'),
     /purchase-receipt-real-write-e2e\.mjs --print-input-template/
   )
   assert.match(
-    getPresetCopyText('v1-local-acceptance-plan'),
+    getPresetCopyText('main-chain-local-acceptance-plan'),
     /purchase-receipt-real-write-e2e\.mjs --preflight-report output\/qa\/purchase-receipt-real-write-e2e\/preflight\.json/
   )
   assert.match(
-    getPresetCopyText('v1-local-acceptance-plan'),
-    /v1-acceptance-plan\.mjs --out output\/customers\/yoyoosun\/v1-acceptance-plan/
+    getPresetCopyText('main-chain-local-acceptance-plan'),
+    /main-chain-acceptance-plan\.mjs --out output\/customers\/yoyoosun\/main-chain-acceptance-plan/
   )
   assert.match(
-    getPresetCopyText('v1-local-acceptance-plan'),
-    /v1-acceptance-plan\.mjs --run-report-tools --out/
+    getPresetCopyText('main-chain-local-acceptance-plan'),
+    /main-chain-acceptance-plan\.mjs --run-report-tools --out/
   )
   assert.match(
-    getPreset('v1-local-acceptance-plan').description,
+    getPreset('main-chain-local-acceptance-plan').description,
     /真实写入输入模板/
   )
   assert.match(
-    getPreset('v1-local-acceptance-plan').description,
+    getPreset('main-chain-local-acceptance-plan').description,
     /plan-only \/ no-write evidence/
   )
   assert.match(
-    getPreset('v1-local-acceptance-plan').description,
+    getPreset('main-chain-local-acceptance-plan').description,
     /本地完整技术验收/
   )
   assert.match(

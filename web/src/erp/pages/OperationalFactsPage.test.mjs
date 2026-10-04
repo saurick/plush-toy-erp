@@ -253,7 +253,7 @@ test('posted rework records open authoritative progress and link back to the pro
   assert.match(productionActions, /origin_rework_fact_id/u)
   assert.match(productionActions, /focusReworkFactID:\s*source\.id/u)
   assert.match(source, />\s*查看返工进度\s*</u)
-  assert.match(source, /V1_ROUTE_PATHS\.productionOrders/u)
+  assert.match(source, /BUSINESS_ROUTE_PATHS\.productionOrders/u)
   assert.match(source, /production_order_id:\s*orderID/u)
   assert.match(productionActions, /该返工记录尚未关联可核对的成品返工补制批次/u)
 })

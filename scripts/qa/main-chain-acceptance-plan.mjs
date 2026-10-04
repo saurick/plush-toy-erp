@@ -6,13 +6,13 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const DEFAULT_OUT_DIR = "output/customers/yoyoosun/v1-acceptance-plan";
+const DEFAULT_OUT_DIR = "output/customers/yoyoosun/main-chain-acceptance-plan";
 
 const REQUIRED_PATHS = [
   "docs/当前真源与交接顺序.md",
   "docs/product/产品能力进度台账.md",
   "docs/product/自动化测试策略.md",
-  "docs/product/ERP-V1主链验收计划与证据边界.md",
+  "docs/product/主链验收计划与证据边界.md",
   "scripts/qa/trial-simulated-data.mjs",
   "scripts/qa/operational-fact-simulated-closure.mjs",
   "scripts/qa/mobile-workflow-simulated-closure.mjs",
@@ -31,7 +31,7 @@ const FORBIDDEN_RUNTIME_EFFECTS = [
   "不把 workflow task done 当成 fact posted",
 ];
 
-const V1_ACCEPTANCE_PHASES = [
+const MAIN_CHAIN_ACCEPTANCE_PHASES = [
   {
     key: "preflight",
     title: "环境和真源预检",
@@ -63,13 +63,13 @@ const V1_ACCEPTANCE_PHASES = [
   },
   {
     key: "source-document",
-    title: "V1 源单据试用数据",
+    title: "源单据试用数据",
     commands: [
       "node scripts/qa/trial-simulated-data.mjs --out output/customers/yoyoosun/trial-simulated-data",
       "TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA TRIAL_SIM_PASSWORD='replace-with-demo-password' node scripts/qa/trial-simulated-data.mjs --apply --backend-url http://127.0.0.1:8300 --product-id <product_id> --unit-id <unit_id> --out output/customers/yoyoosun/trial-simulated-data",
     ],
     acceptance: [
-      "客户、供应商、联系人、销售订单和订单行只作为 V1 模拟数据。",
+      "客户、供应商、联系人、销售订单和订单行只作为模拟数据。",
       "销售订单仍是 Source Document / Business Commitment。",
       "该阶段不生成出货、库存、财务、发票或收付款事实。",
     ],
@@ -174,7 +174,7 @@ function parseArgs(argv) {
     }
     if (arg === "--apply" || arg === "--execute") {
       throw new Error(
-        `${arg} is not supported by v1-acceptance-plan. Run the specific simulated tool with its explicit confirmation instead.`,
+        `${arg} is not supported by main-chain-acceptance-plan. Run the specific simulated tool with its explicit confirmation instead.`,
       );
     }
     throw new Error(`Unsupported argument: ${arg}`);
@@ -192,11 +192,11 @@ function parsePositiveInt(value, flag) {
 
 function printHelp() {
   console.log(`Usage:
-  node scripts/qa/v1-acceptance-plan.mjs [--out <dir>]
-  node scripts/qa/v1-acceptance-plan.mjs --run-report-tools [--product-id <id>] [--unit-id <id>] [--warehouse-id <id>]
+  node scripts/qa/main-chain-acceptance-plan.mjs [--out <dir>]
+  node scripts/qa/main-chain-acceptance-plan.mjs --run-report-tools [--product-id <id>] [--unit-id <id>] [--warehouse-id <id>]
 
 Purpose:
-  Generate the ERP V1 acceptance plan and, optionally, run no-write report-only tools.
+  Generate the ERP acceptance plan and, optionally, run no-write report-only tools.
 
 Boundaries:
   - default mode writes local plan evidence only
@@ -223,7 +223,7 @@ function createReport(options, rootDir, toolRuns = []) {
   return {
     generatedAt: new Date().toISOString(),
     host: os.hostname(),
-    scenario: "erp-v1-acceptance-plan",
+    scenario: "erp-acceptance-plan",
     mode: options.runReportTools ? "report-with-no-write-tools" : "plan-only",
     simulatedOnly: true,
     realCustomerImport: false,
@@ -239,7 +239,7 @@ function createReport(options, rootDir, toolRuns = []) {
     requiredPaths,
     missingRequiredPaths,
     forbiddenRuntimeEffects: FORBIDDEN_RUNTIME_EFFECTS,
-    phases: V1_ACCEPTANCE_PHASES,
+    phases: MAIN_CHAIN_ACCEPTANCE_PHASES,
     noWriteToolRuns: toolRuns,
     finalDecision: {
       canReplaceDomainTests: false,
@@ -283,7 +283,7 @@ ${phase.acceptance.map((item) => `- ${item}`).join("\n")}
           )
           .join("\n");
 
-  return `# ERP V1 主链验收计划报告 / ERP V1 Acceptance Plan Report
+  return `# ERP 主链验收计划报告 / ERP Acceptance Plan Report
 
 ## 摘要
 
@@ -392,14 +392,14 @@ function runNoWriteToolReports(options, rootDir, outDir) {
 
 function writeReport(report, outDir) {
   fs.mkdirSync(outDir, { recursive: true });
-  const jsonPath = path.join(outDir, "v1-acceptance-plan-report.json");
-  const mdPath = path.join(outDir, "v1-acceptance-plan-report.md");
+  const jsonPath = path.join(outDir, "main-chain-acceptance-plan-report.json");
+  const mdPath = path.join(outDir, "main-chain-acceptance-plan-report.md");
   fs.writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
   fs.writeFileSync(mdPath, renderMarkdown(report));
   return { jsonPath, mdPath };
 }
 
-export function runV1AcceptancePlan(options = {}) {
+export function runMainChainAcceptancePlan(options = {}) {
   const rootDir =
     options.rootDir ||
     path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -422,7 +422,7 @@ export function runV1AcceptancePlan(options = {}) {
 
   if (report.missingRequiredPaths.length > 0) {
     const error = new Error(
-      `missing required V1 acceptance plan paths: ${report.missingRequiredPaths.join(", ")}`,
+      `missing required main-chain acceptance plan paths: ${report.missingRequiredPaths.join(", ")}`,
     );
     error.report = report;
     error.output = output;
@@ -445,13 +445,13 @@ if (isCli) {
       printHelp();
       process.exit(0);
     }
-    const result = runV1AcceptancePlan(options);
+    const result = runMainChainAcceptancePlan(options);
     console.log(
-      `[qa:v1-acceptance-plan] ${result.report.mode} complete. json=${result.jsonPath} md=${result.mdPath}`,
+      `[qa:main-chain-acceptance-plan] ${result.report.mode} complete. json=${result.jsonPath} md=${result.mdPath}`,
     );
   } catch (error) {
     console.error(
-      `[qa:v1-acceptance-plan][fatal] ${error?.stack || error?.message || error}`,
+      `[qa:main-chain-acceptance-plan][fatal] ${error?.stack || error?.message || error}`,
     );
     process.exit(1);
   }

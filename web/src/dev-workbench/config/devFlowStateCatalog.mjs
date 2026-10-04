@@ -8,8 +8,6 @@ import { buildDevBusinessChainCatalog } from './devBusinessChainCatalog.mjs'
 import { buildDevFactLedgerCatalog } from './devFactLedgerCatalog.mjs'
 
 export const DEV_FLOW_STATE_ROUTE = DEV_STATUS_FLOWS_ROUTE
-export const DEV_FLOW_STATE_CATALOG_VERSION = 'dev-flow-state-catalog/v2'
-
 const STATUS_BOUNDARY_DOC = 'docs/architecture/状态工作流事实边界.md'
 const STATUS_INDEX_DOC = 'docs/architecture/状态字典与生命周期索引.md'
 export const DEV_FLOW_PATH_KINDS = Object.freeze([
@@ -3604,7 +3602,6 @@ export function buildDevFlowStateCatalog({
   })
 
   return Object.freeze({
-    version: DEV_FLOW_STATE_CATALOG_VERSION,
     route: DEV_FLOW_STATE_ROUTE,
     readOnly: true,
     runtimeAuthority: 'read_only_observation',
@@ -3616,12 +3613,10 @@ export function buildDevFlowStateCatalog({
     scopes,
     flowLayers,
     processDefinitions,
-    factLedgerCatalogVersion: factLedgerCatalog.version,
     factDefinitionGroups: factLedgerCatalog.displayGroups,
     factDefinitions: factLedgerCatalog.definitions,
     factRuntimeQuery: factLedgerCatalog.runtimeQuery,
     factLedgerCoverage: factLedgerCatalog.coverage,
-    businessChainCatalogVersion: businessChainCatalog.version,
     businessChains: businessChainCatalog.chains,
     businessChainOverview: businessChainCatalog.overview,
     businessChainCoverage: businessChainCatalog.coverage,

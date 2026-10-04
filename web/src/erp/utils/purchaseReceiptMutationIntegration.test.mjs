@@ -10,7 +10,7 @@ const inboundDraftHook = readFileSync(
   'utf8'
 )
 const purchaseReceiptPage = readFileSync(
-  new URL('../pages/V1PurchaseReceiptsPage.jsx', import.meta.url),
+  new URL('../pages/PurchaseReceiptsPage.jsx', import.meta.url),
   'utf8'
 )
 

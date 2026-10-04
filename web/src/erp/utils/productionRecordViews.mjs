@@ -1,4 +1,4 @@
-import { hasActionPermission, V1_ROUTE_PATHS } from './masterDataOrderView.mjs'
+import { hasActionPermission, BUSINESS_ROUTE_PATHS } from './masterDataOrderView.mjs'
 import { canOpenRelatedDocumentPath } from './relatedDocumentNavigation.mjs'
 import { routeWithQuery } from './routeQuery.mjs'
 
@@ -28,8 +28,8 @@ export function canReadProductionProcess(adminProfile) {
 export function availableProductionRecordViews(adminProfile, allowedMenuPaths) {
   const canOpen = (path) =>
     canOpenRelatedDocumentPath({ path, adminProfile, allowedMenuPaths })
-  const records = canOpen(V1_ROUTE_PATHS.productionProgress)
-  const exceptions = canOpen(V1_ROUTE_PATHS.productionExceptions)
+  const records = canOpen(BUSINESS_ROUTE_PATHS.productionProgress)
+  const exceptions = canOpen(BUSINESS_ROUTE_PATHS.productionExceptions)
   return [
     ...(records ? [PRODUCTION_RECORD_VIEW_KEYS.RECORDS] : []),
     ...(records && canReadProductionProcess(adminProfile)
@@ -64,7 +64,7 @@ export function resolveProductionRecordView(
   searchParams,
   availableKeys
 ) {
-  if (pathname === V1_ROUTE_PATHS.productionProgress) {
+  if (pathname === BUSINESS_ROUTE_PATHS.productionProgress) {
     return searchParams.get('display') === 'process' &&
       availableKeys.includes(PRODUCTION_RECORD_VIEW_KEYS.PROCESS)
       ? PRODUCTION_RECORD_VIEW_KEYS.PROCESS
@@ -85,11 +85,11 @@ export function resolveProductionRecordView(
 
 export function productionRecordViewPath(pathname, searchParams, nextView) {
   const { RECORDS, PROCESS, DECISIONS, TASKS } = PRODUCTION_RECORD_VIEW_KEYS
-  const fromRecords = pathname === V1_ROUTE_PATHS.productionProgress
+  const fromRecords = pathname === BUSINESS_ROUTE_PATHS.productionProgress
   const toRecords = nextView === RECORDS || nextView === PROCESS
   const targetPath = toRecords
-    ? V1_ROUTE_PATHS.productionProgress
-    : V1_ROUTE_PATHS.productionExceptions
+    ? BUSINESS_ROUTE_PATHS.productionProgress
+    : BUSINESS_ROUTE_PATHS.productionExceptions
   if (fromRecords === toRecords) {
     const params = new URLSearchParams(searchParams)
     if (toRecords) {

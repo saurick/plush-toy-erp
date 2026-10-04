@@ -74,12 +74,12 @@ test('formal business main tables register useful text columns explicitly', () =
       'components/operational-facts/operationalFactPageConfig.mjs',
       "copyable: { label: '单号' }",
     ],
-    ['pages/V1PurchaseReceiptsPage.jsx', "dataIndex: 'receipt_no'"],
+    ['pages/PurchaseReceiptsPage.jsx', "dataIndex: 'receipt_no'"],
     ['pages/FinancePaymentsPage.jsx', "dataIndex: 'payment_no'"],
     ['pages/WorkflowBusinessModulePage.jsx', "dataIndex: 'task_code'"],
-    ['pages/V1ProductionOrdersPage.jsx', "dataIndex: 'order_no'"],
+    ['pages/ProductionOrdersPage.jsx', "dataIndex: 'order_no'"],
     ['pages/HistoryRecordsPage.jsx', "dataIndex: 'primary'"],
-    ['pages/V1InventoryLedgerPage.jsx', "dataIndex: 'lot_no'"],
+    ['pages/InventoryLedgerPage.jsx', "dataIndex: 'lot_no'"],
   ]
 
   expectations.forEach(([relativePath, marker, sectionMarker]) =>
@@ -102,7 +102,7 @@ test('copy whitelist avoids routine dates, amounts, quantities and statuses', ()
     'components/purchase-orders/purchaseOrderColumns.jsx',
     'components/quality-inspections/qualityInspectionColumns.jsx',
     'components/shipments/shipmentColumns.jsx',
-    'pages/V1InventoryLedgerPage.jsx',
+    'pages/InventoryLedgerPage.jsx',
   ].map(readSource)
   const forbiddenFields = [
     'amount',

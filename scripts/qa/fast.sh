@@ -111,6 +111,9 @@ qa_fast_repository_guards() {
   git --no-optional-locks -c diff.autoRefreshIndex=false diff --check
   git --no-optional-locks -c diff.autoRefreshIndex=false diff --cached --check
 
+  echo "[qa:fast] 检查阶段与模块版本命名"
+  node "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs"
+
   bash "$ROOT_DIR/scripts/qa/db-guard.sh"
 
   bash "$ROOT_DIR/scripts/qa/error-code-sync.sh"

@@ -383,7 +383,6 @@ export function buildManualAcceptanceBusinessChainContract({
   const verificationDigestInput = buildVerificationDigestInput(chainPlans);
   return Object.freeze({
     contract: MANUAL_ACCEPTANCE_BUSINESS_CHAIN_CONTRACT_VERSION,
-    catalogVersion: catalog.version,
     chainDataDigest: digest(dataDigestInput),
     chainVerificationDigest: digest(verificationDigestInput),
     chainCount: chainPlans.length,
@@ -451,7 +450,6 @@ export function buildManualAcceptanceBusinessChainReviewPlan({
   return Object.freeze({
     contract: MANUAL_ACCEPTANCE_BUSINESS_CHAIN_REVIEW_PLAN_VERSION,
     sourceContract: contract.contract,
-    catalogVersion: contract.catalogVersion,
     chainDataDigest: contract.chainDataDigest,
     chainVerificationDigest: contract.chainVerificationDigest,
     chainCount: contract.chainCount,
@@ -506,7 +504,6 @@ export function selectManualAcceptanceBusinessChainPlan(contract, chainKey) {
   const scenarioKeys = new Set(chain.scenarios.map((scenario) => scenario.key));
   return Object.freeze({
     contract: contract.contract,
-    catalogVersion: contract.catalogVersion,
     chainDataDigest: contract.chainDataDigest,
     chainVerificationDigest: contract.chainVerificationDigest,
     chain,

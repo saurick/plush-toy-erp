@@ -25,7 +25,7 @@ Report-only mode:
   node scripts/qa/trial-simulated-data.mjs \\
     --out output/customers/yoyoosun/trial-simulated-data
 
-Apply simulated data through V1 JSON-RPC:
+Apply simulated data through JSON-RPC:
   TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA \\
   TRIAL_SIM_PASSWORD='replace-with-password' \\
     node scripts/qa/trial-simulated-data.mjs \\
@@ -36,7 +36,7 @@ Apply simulated data through V1 JSON-RPC:
 
 Options:
   --print-input-template          Print local input checklist only; no report/backend/database writes.
-  --apply                         Create missing simulated V1 records through JSON-RPC.
+  --apply                         Create missing simulated records through JSON-RPC.
   --backend-url <url>             Backend base URL. Default ${DEFAULT_BACKEND_URL}.
   --out <dir>                     Output report directory. Default ${DEFAULT_OUT_DIR}.
   --product-id <id>               Active product ID used for the simulated sales order item.
@@ -58,7 +58,7 @@ Apply credentials:
   TRIAL_SIM_SALES_USERNAME / TRIAL_SIM_SALES_PASSWORD
 
   TRIAL_SIM_ADMIN_TOKEN or TRIAL_SIM_ADMIN_USERNAME/PASSWORD may be used only
-  when that account really has all required V1 customer, supplier, contact, sales
+  when that account really has all required customer, supplier, contact, sales
   order, and sales order item permissions.
 
 This script is trial simulated/demo tooling only. It never executes real customer import,

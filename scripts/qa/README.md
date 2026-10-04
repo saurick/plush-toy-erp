@@ -55,7 +55,7 @@
 | `node scripts/qa/customer-package-lint.mjs --all` | 从构建期客户索引校验 demo、reference-customer 和 yoyoosun raw package；不 publish/activate | 调整客户包、catalog 或 schema 后 |
 | `node scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview` | 以 preview 模式编译并验证全部登记 draft 客户包的不可发布 manifest；不调用后端或写事实 | 调整 manifest compiler/effective-session 输入后 |
 | `node scripts/qa/private-deployment-boundaries.mjs` | 检查客户 README 的差异 / 验收章节、三份配置和最小部署参数边界，并禁止 reference 部署目录 | 调整私有化模板或 reference 文档后 |
-| `node scripts/qa/phase-label-boundaries.mjs` + `node --test scripts/qa/phase-label-boundaries.test.mjs` | 全仓扫描活跃代码、脚本和正式文档中的编号阶段命名，并验证完整 Phase 编号、P 子阶段编号和 P 编号发布目标会被拒绝；P0/P1 风险等级、p95 百分位和产品编码不受影响 | 改脚本、API、命名或治理文档后 |
+| `node scripts/qa/phase-label-boundaries.mjs` + `node --test scripts/qa/phase-label-boundaries.test.mjs` | fast 仓库检查扫描活跃代码、脚本和正式文档（含 HTML）；affected 只扫描本次文件。阻断阶段编号、内部目录计数及明确的模块版号前缀 / 后缀 / 路径；保留风险等级、业务修订、格式标识和外部协议。格式版本的必要性仍按[版本边界](../../docs/engineering/跨层公共契约与生成规范.md#版本边界--version-boundaries)核实 | 改脚本、API、命名或治理文档后；已进入 fast / full / strict 和 affected |
 | `node scripts/qa/experimental/canonical-runtime-audit.mjs` | 非阻断实验审计；宽泛 keyword 命中只作只读复核线索，不进入 fast / affected，不代表产品缺陷或发布证据；恢复阻断前必须改成逐域 status key / API field / function / runtime branch 精确合同 | 需要人工盘点历史词命中时 |
 | `node scripts/qa/test-data-isolation-boundary.mjs --json` | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备边界，并锁住 dry-run 不具备执行能力 | 改 seed、fixture、模拟数据或导入准备工具后 |
 | `node scripts/qa/manual-acceptance-catalog.mjs` | 生成只读页面验收目录，默认只输出；范围与步骤见下文全页面试用验收数据。 | 准备全页面试用验收范围时 |
@@ -336,11 +336,11 @@ node scripts/qa/manual-acceptance-dataset.mjs \
 
 首次执行前，该目标的规范总回执必须不存在。若某阶段失败，或完整成功后需要证明同批幂等重放，保留原回执，并在相同目标范围、版本、批次和后端后追加 `--resume-report output/qa/manual-acceptance/datasets/2026.09.27-v8/<target>/dataset/apply-report.json`。禁止删除回执后重新冒充 fresh apply；resume 始终实时重验 core、客户配置、数据库和当前 release / migration，并校验连续阶段与各组件 digest。
 
-每个阶段回执同时记录由登记入口、阶段实现及显式依赖文件计算出的逻辑指纹。逻辑指纹未变时，数据写阶段直接复用原组件回执；某阶段指纹变化时，只重跑该阶段及依赖它的后续阶段。仅 release SHA 变化不会重造业务数据，core 和只读 readiness 仍会实时重验；migration 变化会刷新 baseline 及全部后续阶段。当前 V10 的旧回执没有阶段指纹，无法证明数据来自当前逻辑，因此首次 resume 必须一次性刷新完整阶段链并写入指纹；后续才按变化阶段与依赖闭包增量刷新。指纹伪造、依赖未登记或目标范围漂移仍失败关闭。常规部署不得因为“发布过一次”无条件重跑九阶段造数。
+每个阶段回执同时记录由登记入口、阶段实现及显式依赖文件计算出的逻辑指纹。逻辑指纹未变时，数据写阶段直接复用原组件回执；某阶段指纹变化时，只重跑该阶段及依赖它的后续阶段。仅 release SHA 变化不会重造业务数据，core 和只读 readiness 仍会实时重验；migration 变化会刷新 baseline 及全部后续阶段。当前执行回执合同 `manual-acceptance-dataset-runner-v10` 只标识已保存回执的读写约定，不表示模块的代码版本。该合同下缺少阶段指纹的回执无法证明数据来自当前逻辑，因此首次 resume 必须一次性刷新完整阶段链并写入指纹；后续才按变化阶段与依赖闭包增量刷新。指纹伪造、依赖未登记或目标范围漂移仍失败关闭。常规部署不得因为“发布过一次”无条件重跑九阶段造数。
 
 fresh apply 会在开始时捕获一次岗位任务时间锚点并写入总回执；同批 resume 必须校验并复用该锚点，不能按当前时间重排到期日。业务数据版本中的日期只用于来源单业务日期，不再充当任务到期锚点。本地和 133 共享同一时间策略与语义 digest，但分别在自己的 fresh 回执中绑定执行锚点。浏览器必须在回执记录的有效期内同时看到出货放行的“即将到期”和“已超时”；锚点过期后不得继续沿用旧报告宣称通过，应换新数据版本并从 fresh 空库重放。
 
-role 阶段只有正式账号场景 API 一个写入口；V5 计划不登记 `seed-role-demo-admins.sh --reset-password`，避免宽泛 dev DSN 或 override 绕过 exact V5 验收库绑定。
+role 阶段只有正式账号场景 API 一个写入口；计划不登记 `seed-role-demo-admins.sh --reset-password`，避免宽泛 dev DSN 或 override 绕过当前数据集的精确验收库绑定。
 
 fresh 和 resume 都会原子占用同目录的 `dataset/.apply.lock`，同一目标同一版本的第二个进程会在任何 RPC 前停止。若进程异常退出并留下锁，不得直接删除；先确认锁内 PID 已退出，再按错误提示把原锁重命名为带 owner 标识的 .stale-\* 归档，随后重跑完全相同的命令。
 

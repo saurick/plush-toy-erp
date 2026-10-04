@@ -82,6 +82,7 @@ const PHASE_LABEL_TEXT_EXTENSIONS = new Set([
   "",
   ".css",
   ".go",
+  ".html",
   ".js",
   ".json",
   ".jsx",
@@ -514,7 +515,7 @@ function addAffectedPhaseLabelCheck(state, files) {
   const id = "phase-labels:affected";
   state.commands.set(
     id,
-    command(id, "T0", "检查本次变更文件的阶段编号命名边界", "node", [
+    command(id, "T0", "检查本次变更文件的阶段与模块版本命名", "node", [
       "scripts/qa/phase-label-boundaries.mjs",
       ...files,
     ]),

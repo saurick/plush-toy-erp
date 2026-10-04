@@ -1875,7 +1875,7 @@
   overflow-wrap: normal;
 }
 
-.erp-v1-sales-orders-page
+.erp-sales-orders-page
   .erp-business-module-table-card
   :where(th, td).ant-table-selection-column {
   width: 38px;

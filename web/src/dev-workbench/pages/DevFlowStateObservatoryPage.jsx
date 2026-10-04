@@ -710,7 +710,6 @@ export default function DevFlowStateObservatoryPage() {
   const customerReviewScopeKey = customerReview
     ? [
         customerScope.customerKey,
-        customerReview.version,
         customerReview.releaseVersion,
         overviewSelected ? catalog.businessChainOverview.key : chain?.key,
       ].join(':')

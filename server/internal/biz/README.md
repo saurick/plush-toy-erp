@@ -30,7 +30,7 @@
 
 - [当前真源与交接顺序](../../../docs/当前真源与交接顺序.md)
 - [后端 API 说明](../../docs/api.md)
-- [可观测性与健康检查](../../../docs/observability/日志链路追踪审计第一版.md)
+- [可观测性与健康检查](../../../docs/observability/日志链路追踪与审计.md)
 - [Workflow / Fact 边界](../../../docs/architecture/状态工作流事实边界.md)
 - [服务层说明](../service/README.md)
 - [数据层说明](../data/README.md)

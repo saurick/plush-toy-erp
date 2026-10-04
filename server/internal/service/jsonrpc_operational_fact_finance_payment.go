@@ -7,7 +7,7 @@ import (
 	"server/internal/biz"
 )
 
-func (d *jsonrpcDispatcher) handleFinancePaymentV1(ctx context.Context, method, id string, pm map[string]any, actorID int) (string, *v1.JsonrpcResult, error) {
+func (d *jsonrpcDispatcher) handleFinancePayment(ctx context.Context, method, id string, pm map[string]any, actorID int) (string, *v1.JsonrpcResult, error) {
 	permission := map[string]string{"create_finance_payment": biz.PermissionFinancePaymentCreate, "cancel_finance_payment": biz.PermissionFinancePaymentCreate, "reverse_finance_payment": biz.PermissionFinancePaymentReverse, "get_finance_payment": biz.PermissionFinancePaymentRead, "list_finance_payments": biz.PermissionFinancePaymentRead, "get_finance_credit_note": biz.PermissionFinancePaymentRead, "list_finance_credit_notes": biz.PermissionFinancePaymentRead, "create_finance_credit_note": biz.PermissionFinanceCreditNoteCreate, "reverse_finance_credit_note": biz.PermissionFinanceCreditNoteReverse}[method]
 	if permission == "" {
 		return id, unknownOperationalFactResult(method), nil

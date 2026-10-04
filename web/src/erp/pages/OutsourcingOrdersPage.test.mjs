@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const source = readFileSync(
-  new URL('./V1OutsourcingOrdersPage.jsx', import.meta.url),
+  new URL('./OutsourcingOrdersPage.jsx', import.meta.url),
   'utf8'
 )
 const formSource = readFileSync(

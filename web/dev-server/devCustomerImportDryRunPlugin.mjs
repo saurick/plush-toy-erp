@@ -82,7 +82,7 @@ function buildDryRunPaths(projectRoot, customerKey, operationId) {
   )
   return {
     sourcePath: path.join(fixtureBasePath, 'source-snapshot.sample.json'),
-    existingPath: path.join(fixtureBasePath, 'existing-v1.sample.json'),
+    existingPath: path.join(fixtureBasePath, 'existing-model.sample.json'),
     outputPath,
     validationSummaryPath: path.join(outputPath, 'validation-summary.json'),
     reportPath: path.join(outputPath, 'dry-run-report.md'),

@@ -1,9 +1,6 @@
 import { getPermissionCenterRoleName } from '../../erp/utils/permissionCenterAccess.mjs'
 import { buildDevBusinessChainProjection } from './devBusinessChainProjection.mjs'
 
-export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_VERSION =
-  'dev-business-chain-customer-review/v2'
-
 export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED = '当前正式合同未定义'
 
 export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_COMPLETION_BOUNDARY =
@@ -574,7 +571,6 @@ export function buildDevBusinessChainCustomerReview({
   const reviewScope = resolveCustomerReviewScope(customerOverlay)
 
   return Object.freeze({
-    version: DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_VERSION,
     documentTitle: `业务链甲方校对版｜${subjectName}`,
     ...reviewScope,
     generatedAt: formatGeneratedAt(generatedAt),

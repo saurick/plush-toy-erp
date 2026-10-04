@@ -20,4 +20,4 @@ BOM、采购和质检的持久化约束错误在 repo 返回边界统一转换�
 
 - `server/docs/ent.md`
 - `server/docs/config.md`
-- `docs/observability/日志链路追踪审计第一版.md`
+- `docs/observability/日志链路追踪与审计.md`

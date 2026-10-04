@@ -158,7 +158,7 @@ test("trial apply requires explicit simulated confirmation", async () => {
   }
 });
 
-test("trial apply uses only V1 masterdata and sales_order RPC methods", async () => {
+test("trial apply uses only masterdata and sales_order RPC methods", async () => {
   const out = await mkdtemp(path.join(tmpdir(), "trial-sim-"));
   const previousConfirm = process.env.TRIAL_SIM_CONFIRM;
   const previousToken = process.env.TRIAL_SIM_ADMIN_TOKEN;

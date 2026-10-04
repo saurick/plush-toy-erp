@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 const page = readFileSync(
-  new URL('./V1SalesOrdersPage.jsx', import.meta.url),
+  new URL('./SalesOrdersPage.jsx', import.meta.url),
   'utf8'
 )
 const modal = readFileSync(
@@ -138,7 +138,7 @@ test('reservation submit owns its number and safe retry identity', () => {
     page,
     /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
   )
-  assert.match(page, /V1_ROUTE_PATHS\.outbound/u)
+  assert.match(page, /BUSINESS_ROUTE_PATHS\.outbound/u)
   assert.doesNotMatch(page, /consumeStockReservation|shipShipment/u)
 })
 

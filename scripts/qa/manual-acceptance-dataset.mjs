@@ -49,7 +49,7 @@ import {
   MANUAL_ACCEPTANCE_CORE_WAREHOUSES,
 } from "./manual-acceptance-core-contract.mjs";
 import {
-  MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
   MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
@@ -729,7 +729,7 @@ function command(entrypoint, args, extra = {}) {
     kind: "registered-entrypoint",
     entrypoint,
     args,
-    execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+    execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
     ...extra,
   };
 }
@@ -833,7 +833,7 @@ function buildStages(identity, businessChainContract) {
         ),
         {
           kind: "registered-read-only-verification",
-          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
           supportedTargets: [...REGISTERED_DATASET_TARGETS],
           operation: "verify-or-reuse",
           seedAllowed: false,
@@ -861,7 +861,7 @@ function buildStages(identity, businessChainContract) {
       commands: [
         {
           kind: "registered-read-only-verification",
-          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
           supportedTargets: [...REGISTERED_DATASET_TARGETS],
           operation: "verify-target-lifecycle-baseline",
           databaseIdentityRequired: true,
@@ -899,6 +899,8 @@ function buildStages(identity, businessChainContract) {
     {
       key: "role",
       applyCapability: capabilityForStage("role"),
+      // This frozen receipt field participates in semanticDigest; the current
+      // contract and target policy, not this descriptive label, select the database.
       purpose:
         "两端只通过正式账号场景 API 调和十个岗位账号和三类模拟场景账号，不保留可绕过 exact V7 数据库绑定的本地 seed 写入口。",
       writesBusinessData: true,
@@ -1041,7 +1043,7 @@ function buildStages(identity, businessChainContract) {
         {
           kind: "delegated-fact-stage-contract",
           contract: "source-driven-operational-facts-v1",
-          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
           delegatedTo: "facts",
           entrypoint: "scripts/qa/manual-acceptance-fact-data.mjs",
           genericWriterAllowed: false,
@@ -1097,7 +1099,7 @@ function buildStages(identity, businessChainContract) {
         {
           kind: "source-driven-fact-contract",
           contract: "source-driven-operational-facts-v1",
-          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
           applyEntrypoint: "scripts/qa/manual-acceptance-fact-data.mjs",
           helperEntrypoint:
             "scripts/qa/manual-acceptance-source-driven-facts.mjs",
@@ -1270,7 +1272,7 @@ function buildManualAcceptanceSemanticPlanWithContract(
     runnerContract: {
       serial: true,
       failClosed: true,
-      revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+      revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
       handlerRegistry: "scripts/qa/manual-acceptance-dataset-runner.mjs",
       placeholders: {
         "${TARGET_POLICY_TARGET}": "target.policyTarget",
@@ -1990,11 +1992,11 @@ async function prepareManualAcceptanceResume({
         }
       } else if (
         stage.references.runner.revision ===
-          MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION &&
+          MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT &&
         stage.references.runner.handlerId ===
-          `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${stage.key}`
+          `${MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT}:${stage.key}`
       ) {
-        // v10 receipts predate stage fingerprints, so they cannot prove that
+        // Receipts without stage fingerprints cannot prove that
         // their data was produced by the current stage logic. Refresh them
         // once and persist fingerprints; later resumes can safely reuse
         // unchanged stages and refresh only the registered dependency closure.
@@ -2178,14 +2180,14 @@ export function normalizeManualAcceptanceStageResult(result, stage, plan) {
       `${stage.key} runner references.runner must be an explicit object`,
     );
   }
-  if (runner.revision !== MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION) {
+  if (runner.revision !== MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT) {
     throw new ManualAcceptanceDatasetError(
       `${stage.key} runner receipt has an unexpected runner revision`,
     );
   }
   if (
     runner.handlerId !==
-    `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${stage.key}`
+    `${MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT}:${stage.key}`
   ) {
     throw new ManualAcceptanceDatasetError(
       `${stage.key} runner receipt has an unexpected handler identity`,
@@ -2467,7 +2469,7 @@ export async function applyManualAcceptanceDataset(
           stageReport.blockedReason = {
             code: String(error.code),
             stageKey: stage.key,
-            runnerRevision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+            runnerRevision: MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
           };
         }
         report.failedStage = stage.key;
@@ -2645,7 +2647,7 @@ function helpText() {
     "  node scripts/qa/manual-acceptance-dataset.mjs --chain delivery_to_settlement",
     "--chain 只读展开一条业务链的步骤、绑定、合法场景和现有阶段，不创建第二个局部造数入口。",
     "",
-    `CLI --apply 固定使用 ${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}，并要求显式目标。`,
+    `CLI --apply 固定使用 ${MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT}，并要求显式目标。`,
     `--run-id 可用于 plan 与 apply，但必须精确等于当前 dataVersion 唯一派生的 ${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}。`,
     "完整 apply 会 fail-closed：每个阶段只允许走唯一注册 handler 与严格组件回执。",
     "core 两端都只走正式 RPC 稳定码核对；默认 runner 不执行任何数据库 seed 脚本。",

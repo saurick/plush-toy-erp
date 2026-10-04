@@ -186,7 +186,7 @@ test('product image snapshot sizing keeps print images inside the browser storag
 
 test('product page integrates dedicated slots without changing SKU attachment semantics', () => {
   const pageSource = readFileSync(
-    new URL('../pages/V1MasterDataPage.jsx', import.meta.url),
+    new URL('../pages/MasterDataPage.jsx', import.meta.url),
     'utf8'
   )
   const componentSource = readFileSync(

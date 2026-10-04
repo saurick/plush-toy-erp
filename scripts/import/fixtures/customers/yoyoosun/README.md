@@ -13,9 +13,9 @@ evidence preparation flow.
 | file | purpose |
 |---|---|
 | `source-snapshot.sample.json` | Minimal source snapshot with customer update/create, duplicate, supplier review, contact owner block, sales order candidate, sales order item unit block, SKU/purchase deferred, shipment/inventory/finance forbidden, workflow done forbidden, and demo/debug skip rows. |
-| `existing-v1.sample.json` | Minimal existing V1/formal model snapshot used for matching customers, products, units, warehouses, and duplicate customer detection. |
+| `existing-model.sample.json` | Minimal existing formal model snapshot used for matching customers, products, units, warehouses, and duplicate customer detection. |
 | `source-snapshot.freeze.sample.json` | Larger sanitized freeze source snapshot covering customer update/create, supplier review, contact with owner, contact missing owner, sales order and item candidates, unknown unit, product/material/unit/warehouse references, BOM candidate, product_skus and purchase_orders deferred rows, shipment/inventory/finance forbidden rows, shipping boundary, workflow/fact boundary, and sensitive field-name warning. |
-| `existing-v1.freeze.sample.json` | Sanitized existing V1/formal model snapshot for freeze evidence and real dry-run evidence generation. |
+| `existing-model.freeze.sample.json` | Sanitized existing formal model snapshot for freeze evidence and real dry-run evidence generation. |
 
 ## 来源快照格式 / Source Snapshot Format
 
@@ -76,7 +76,7 @@ The existing snapshot is read-only matching input. The CLI never reads from or w
 
 ## 冻结 fixture 边界 / Freeze Fixture Boundary
 
-`source-snapshot.freeze.sample.json` and `existing-v1.freeze.sample.json` are
+`source-snapshot.freeze.sample.json` and `existing-model.freeze.sample.json` are
 safe fixtures for repeatable evidence generation:
 
 - Synthetic / sanitized only.

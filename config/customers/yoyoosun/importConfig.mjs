@@ -26,7 +26,7 @@ export const yoyoosunImportConfig = Object.freeze({
     productCiRequiresPrivateSources: false,
     noRawRowsInConfig: true,
     usesExtractedEvidenceOnly: true,
-    requiresExistingV1SnapshotBeforeApproval: true,
+    requiresExistingModelSnapshotBeforeApproval: true,
     requiresHumanApprovalForRealImport: true,
     pdfImageOcrEnabled: false,
   }),
@@ -437,7 +437,7 @@ export const yoyoosunImportConfig = Object.freeze({
       note: "地址、联系电话、银行卡号、请求人电话等敏感字段只能进入人工 review，不能进入公开配置或日志。",
     },
     {
-      key: "existing_v1_snapshot",
+      key: "existing_model_snapshot",
       severity: "block",
       domains: Object.freeze([
         "customers",
@@ -448,7 +448,7 @@ export const yoyoosunImportConfig = Object.freeze({
       evidenceRequired: true,
       decision: "review_required",
       owner: "data_governance",
-      note: "当前 existing-v1.empty-preview.json 只是预览占位；真实 sign-off 前必须替换为已 review 的 existing V1 snapshot。",
+      note: "当前 existing-model.empty-preview.json 只是预览占位；真实 sign-off 前必须替换为已 review 的现有数据模型快照。",
     },
   ]),
   forbiddenAutoImportTargets: Object.freeze([

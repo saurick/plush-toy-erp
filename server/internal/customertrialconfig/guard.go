@@ -28,7 +28,7 @@ var (
 	DatasetVersion = biz.CustomerConfigTrialDatasetVersion
 	Revision       = contract.CustomerTrial133.ConfigRevision
 	// PreviousActiveRevision is admitted only by startup readback during the
-	// V6-to-V8 activation window. Publish and transition classifiers still
+	// registered config activation window. Publish and transition classifiers still
 	// accept Revision only, so this exact previous tuple cannot become a write alias.
 	PreviousActiveRevision       = contract.CustomerTrial133.PreviousConfigRevision
 	PreviousActiveProductVersion = contract.CustomerTrial133.PreviousConfigProductVersion
@@ -79,7 +79,7 @@ func ClassifyManifest(customerKey, revision, productVersion string, compiledSnap
 }
 
 // ClassifyActiveManifest admits the exact previous active revision only long
-// enough for the V7 server to start and activate Revision through the formal
+// enough for the server to start and activate Revision through the formal
 // API. It must not be used by publish or transition operations.
 func ClassifyActiveManifest(customerKey, revision, productVersion string, compiledSnapshot map[string]any) (bool, error) {
 	trial, err := ClassifyManifest(customerKey, revision, productVersion, compiledSnapshot)

@@ -81,7 +81,7 @@ import {
 import {
   buildSequentialDraftCode,
   hasActionPermission,
-  V1_ROUTE_PATHS,
+  BUSINESS_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
 import {
   buildDeliverySnapshot,
@@ -390,16 +390,16 @@ export default function ShipmentsPage() {
     'finance.invoice.read'
   )
   const canOpenSalesOrders =
-    canViewSalesOrders && canOpenRelatedPath(V1_ROUTE_PATHS.salesOrders)
+    canViewSalesOrders && canOpenRelatedPath(BUSINESS_ROUTE_PATHS.salesOrders)
   const canOpenInventory =
-    canViewInventory && canOpenRelatedPath(V1_ROUTE_PATHS.inventory)
+    canViewInventory && canOpenRelatedPath(BUSINESS_ROUTE_PATHS.inventory)
   const canOpenReceivables =
-    canViewReceivables && canOpenRelatedPath(V1_ROUTE_PATHS.receivables)
+    canViewReceivables && canOpenRelatedPath(BUSINESS_ROUTE_PATHS.receivables)
   const canOpenInvoices =
-    canViewInvoices && canOpenRelatedPath(V1_ROUTE_PATHS.invoices)
+    canViewInvoices && canOpenRelatedPath(BUSINESS_ROUTE_PATHS.invoices)
   const canOpenQualityInspections =
     canViewQualityInspections &&
-    canOpenRelatedPath(V1_ROUTE_PATHS.qualityInspections)
+    canOpenRelatedPath(BUSINESS_ROUTE_PATHS.qualityInspections)
   const hasRelatedCapability =
     canOpenSalesOrders ||
     canOpenInventory ||
@@ -438,7 +438,7 @@ export default function ShipmentsPage() {
       if (!selectedRow?.id) return
       const paths = {
         'sales-order': relatedDocumentRoute(
-          V1_ROUTE_PATHS.salesOrders,
+          BUSINESS_ROUTE_PATHS.salesOrders,
           { sales_order_id: selectedRow.sales_order_id },
           {
             keyword: selectedRow.sales_order_no,
@@ -452,7 +452,7 @@ export default function ShipmentsPage() {
           { keyword: selectedRow.shipment_no, source: 'shipment' }
         ),
         receivables: relatedDocumentRoute(
-          V1_ROUTE_PATHS.receivables,
+          BUSINESS_ROUTE_PATHS.receivables,
           { source_type: 'SHIPMENT', source_id: selectedRow.id },
           {
             keyword: selectedRow.shipment_no,
@@ -461,7 +461,7 @@ export default function ShipmentsPage() {
           }
         ),
         invoices: relatedDocumentRoute(
-          V1_ROUTE_PATHS.invoices,
+          BUSINESS_ROUTE_PATHS.invoices,
           { source_type: 'SHIPMENT', source_id: selectedRow.id },
           {
             keyword: selectedRow.shipment_no,
@@ -470,7 +470,7 @@ export default function ShipmentsPage() {
           }
         ),
         'quality-inspections': relatedDocumentRoute(
-          V1_ROUTE_PATHS.qualityInspections,
+          BUSINESS_ROUTE_PATHS.qualityInspections,
           {
             source_type: 'SHIPMENT',
             source_id: selectedRow.id,
@@ -1325,7 +1325,7 @@ export default function ShipmentsPage() {
       message.success('已生成出货前成品检验草稿')
       navigate(
         relatedDocumentRoute(
-          V1_ROUTE_PATHS.qualityInspections,
+          BUSINESS_ROUTE_PATHS.qualityInspections,
           { quality_inspection_id: result.id },
           {
             keyword: result.inspection_no,
@@ -1549,7 +1549,7 @@ export default function ShipmentsPage() {
   }
 
   return (
-    <BusinessPageLayout className="erp-v1-shipments-page">
+    <BusinessPageLayout className="erp-shipments-page">
       <PageHeaderCard
         compact
         helpKey="shipments"

@@ -22,10 +22,10 @@ const businessDateUsageCases = [
   ],
   ['../data/processingContractTemplate.mjs', 'unixSecondsToBusinessDate'],
   ['../pages/OperationalFactsPage.jsx', 'currentBusinessDate'],
-  ['../pages/V1OutsourcingOrdersPage.jsx', 'currentBusinessDate'],
-  ['../pages/V1ProductionOrdersPage.jsx', 'currentBusinessDate'],
-  ['../pages/V1PurchaseOrdersPage.jsx', 'currentBusinessDate'],
-  ['../pages/V1SalesOrdersPage.jsx', 'currentBusinessDate'],
+  ['../pages/OutsourcingOrdersPage.jsx', 'currentBusinessDate'],
+  ['../pages/ProductionOrdersPage.jsx', 'currentBusinessDate'],
+  ['../pages/PurchaseOrdersPage.jsx', 'currentBusinessDate'],
+  ['../pages/SalesOrdersPage.jsx', 'currentBusinessDate'],
 ]
 
 function listPageFiles(rootDir) {

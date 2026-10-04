@@ -116,7 +116,7 @@ import {
   buildSequentialDraftCode,
   hasActionPermission,
   statusText,
-  V1_ROUTE_PATHS,
+  BUSINESS_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
 import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
@@ -265,7 +265,7 @@ function buildDecisionSourceSummary({
   }
 }
 
-export default function V1QualityInspectionsPage() {
+export default function QualityInspectionsPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -436,12 +436,12 @@ export default function V1QualityInspectionsPage() {
     selectedRow?.source_type || ''
   ).toUpperCase()
   const canOpenInventory =
-    canReadInventory && canOpenRelatedPath(V1_ROUTE_PATHS.inventory)
+    canReadInventory && canOpenRelatedPath(BUSINESS_ROUTE_PATHS.inventory)
   const canOpenPurchaseReceipts =
     canReadPurchaseReceipt &&
-    canOpenRelatedPath(V1_ROUTE_PATHS.purchaseReceipts)
+    canOpenRelatedPath(BUSINESS_ROUTE_PATHS.purchaseReceipts)
   const canOpenShipments =
-    canReadShipment && canOpenRelatedPath(V1_ROUTE_PATHS.shipments)
+    canReadShipment && canOpenRelatedPath(BUSINESS_ROUTE_PATHS.shipments)
   const hasRelatedCapability =
     canOpenInventory || canOpenPurchaseReceipts || canOpenShipments
   const relatedMenuItems = useMemo(() => {
@@ -697,7 +697,7 @@ export default function V1QualityInspectionsPage() {
     if (!selectedRow) return
     const pathByKey = {
       'purchase-receipts': relatedDocumentRoute(
-        V1_ROUTE_PATHS.purchaseReceipts,
+        BUSINESS_ROUTE_PATHS.purchaseReceipts,
         { receipt_id: selectedRow.purchase_receipt_id },
         {
           keyword: selectedRow.source_no,
@@ -706,7 +706,7 @@ export default function V1QualityInspectionsPage() {
         }
       ),
       shipments: relatedDocumentRoute(
-        V1_ROUTE_PATHS.shipments,
+        BUSINESS_ROUTE_PATHS.shipments,
         { shipment_id: selectedRow.source_id },
         {
           keyword: selectedRow.source_no,
@@ -715,7 +715,7 @@ export default function V1QualityInspectionsPage() {
         }
       ),
       inventory: relatedDocumentRoute(
-        V1_ROUTE_PATHS.inventory,
+        BUSINESS_ROUTE_PATHS.inventory,
         {
           source_type: selectedRow.source_type,
           source_id: selectedRow.source_id,
@@ -1566,7 +1566,7 @@ export default function V1QualityInspectionsPage() {
   }, [clearRouteContext])
 
   return (
-    <BusinessPageLayout className="erp-v1-quality-inspections-page">
+    <BusinessPageLayout className="erp-quality-inspections-page">
       <PageHeaderCard
         compact
         helpKey="quality-inspections"

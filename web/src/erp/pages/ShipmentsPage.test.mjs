@@ -81,8 +81,8 @@ test('shipment page exposes exact upstream and downstream record routes', () => 
   assert.match(source, /sales_order_id:\s*selectedRow\.sales_order_id/u)
   assert.match(source, /source_type:\s*'SHIPMENT'/u)
   assert.match(source, /source_id:\s*selectedRow\.id/u)
-  assert.match(source, /V1_ROUTE_PATHS\.receivables/u)
-  assert.match(source, /V1_ROUTE_PATHS\.invoices/u)
+  assert.match(source, /BUSINESS_ROUTE_PATHS\.receivables/u)
+  assert.match(source, /BUSINESS_ROUTE_PATHS\.invoices/u)
 })
 
 test('shipment related records are permission-filtered and fail closed without a selection', () => {
@@ -310,7 +310,7 @@ test('shipment finished-goods inspection keeps exact lineage and unknown-result 
   assert.match(source, /shipment_id: shipment\.id/u)
   assert.match(source, /source_type: 'SHIPMENT'/u)
   assert.match(source, /source_id: selectedRow\.id/u)
-  assert.match(source, /V1_ROUTE_PATHS\.qualityInspections/u)
+  assert.match(source, /BUSINESS_ROUTE_PATHS\.qualityInspections/u)
   assert.match(source, /isSourceBusinessActionResultUnknown/u)
   assert.match(source, /error\.isInvalidResponse = true/u)
   assert.match(source, /当前检验单号和送检批次已保留，请原样重试/u)
