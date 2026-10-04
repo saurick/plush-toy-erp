@@ -5,6 +5,8 @@ import {
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { createMockAdminToken } from './adminRpcMocks.mjs'
 import { createMobileAdminReviewScenarios } from './mobileAdminReviewScenarios.mjs'
+import { expectAdminLoginHeading } from './loginAssertions.mjs'
+import { readStyleL1BuildExpectation } from './systemRpcMocks.mjs'
 
 export function createAuthenticationEntryScenarios({
   expectHeading,
@@ -69,7 +71,12 @@ export function createAuthenticationEntryScenarios({
     },
   })
   return [
-    ...createMobileAdminReviewScenarios({ assert, expectText, waitForPath, customerRuntimeEffectiveSession }),
+    ...createMobileAdminReviewScenarios({
+      assert,
+      expectText,
+      waitForPath,
+      customerRuntimeEffectiveSession,
+    }),
     {
       name: 'admin-login-small-screen-disabled-entries',
       path: '/admin-login',
@@ -384,7 +391,7 @@ export function createAuthenticationEntryScenarios({
       mockAdminRpc: true,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '毛绒玩具管理系统')
+        await expectAdminLoginHeading(page)
         await expectButton(page, /^登\s*录$/)
         await assertAdminLoginLayout(page, { minCardWidth: 456 })
       },
@@ -395,7 +402,7 @@ export function createAuthenticationEntryScenarios({
       mockAdminRpc: true,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectHeading(page, '毛绒玩具管理系统')
+        await expectAdminLoginHeading(page)
         await expectButton(page, /^登\s*录$/)
         await assertAdminLoginLayout(page, { minCardWidth: 320 })
       },
@@ -406,7 +413,7 @@ export function createAuthenticationEntryScenarios({
       mockAdminRpc: true,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectHeading(page, '毛绒玩具管理系统')
+        await expectAdminLoginHeading(page)
         await expectButton(page, /^登\s*录$/)
         await assertAdminLoginLayout(page, { minCardWidth: 320 })
       },
@@ -464,7 +471,7 @@ export function createAuthenticationEntryScenarios({
         })
       },
       verify: async (page) => {
-        await expectHeading(page, '毛绒玩具管理系统')
+        await expectAdminLoginHeading(page)
         const username = page.getByLabel('账号')
         const password = page.getByLabel('密码', { exact: true })
         const submit = page.locator('.erp-login-card button[type="submit"]')
@@ -494,7 +501,7 @@ export function createAuthenticationEntryScenarios({
       mockAdminRpc: true,
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectHeading(page, '毛绒玩具管理系统')
+        await expectAdminLoginHeading(page)
         await assertERPThemeMode(page, {
           scenarioName: 'admin-login-theme-modes-desktop',
           expectedMode: 'system',
@@ -605,7 +612,7 @@ export function createAuthenticationEntryScenarios({
         })
         await clickERPThemeOption(page, '暗色')
         await page.reload({ waitUntil: 'domcontentloaded' })
-        await expectHeading(page, '毛绒玩具管理系统')
+        await expectAdminLoginHeading(page)
         await assertERPThemeMode(page, {
           scenarioName: 'admin-login-theme-modes-desktop',
           expectedMode: 'dark',
@@ -675,7 +682,7 @@ export function createAuthenticationEntryScenarios({
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectHeading(page, '毛绒玩具管理系统')
+        await expectAdminLoginHeading(page)
         await page.getByText('电脑版', { exact: true }).click()
         await page.getByLabel('账号').fill('style-l1-admin')
         await page.locator('#password').fill('style-l1-password')
@@ -944,7 +951,12 @@ export function createAuthenticationEntryScenarios({
           await systemVersionDialogHandle.dispose()
         }
         await expectText(page, 'yoyoosun-20260810-20c96d38-amd64')
-        await expectText(page, '前后台版本一致')
+        const buildExpectation = await readStyleL1BuildExpectation(page)
+        await expectText(page, buildExpectation.status.label)
+        assert.equal(
+          await page.getByTestId('system-version-value').textContent(),
+          buildExpectation.status.systemVersion
+        )
         const versionModalMetrics = await systemVersionDialog.evaluate(
           (node) => {
             const rect = node.getBoundingClientRect()
@@ -1080,7 +1092,10 @@ export function createAuthenticationEntryScenarios({
         await expectText(page, '全部岗位')
         await expectText(page, '管理员视角')
         await page.locator('.mobile-admin-review .ant-select-selector').click()
-        await page.locator('.ant-select-item-option').filter({ hasText: '仓库' }).click()
+        await page
+          .locator('.ant-select-item-option')
+          .filter({ hasText: '仓库' })
+          .click()
         await waitForPath(page, '/m/warehouse/tasks')
         await expectText(page, '管理员视角')
         await page.reload()
@@ -1099,7 +1114,10 @@ export function createAuthenticationEntryScenarios({
         await expectText(page, '管理员视角')
         await waitForPath(page, '/m/boss/tasks')
         await page.locator('.mobile-admin-review .ant-select-selector').click()
-        await page.locator('.ant-select-item-option').filter({ hasText: '全部岗位' }).click()
+        await page
+          .locator('.ant-select-item-option')
+          .filter({ hasText: '全部岗位' })
+          .click()
         await waitForPath(page, '/m/all/tasks')
       },
     },
@@ -1107,8 +1125,16 @@ export function createAuthenticationEntryScenarios({
       name: 'ordinary-admin-mobile-global-review-denied',
       path: '/m/all/tasks',
       auth: 'admin',
-      adminProfile: { ...adminOnlySuperProfile, is_super_admin: false, permissions: ['system.user.read'] },
-      effectiveSession: { ...customerRuntimeEffectiveSession, roles: ['admin'], actions: ['system.user.read'] },
+      adminProfile: {
+        ...adminOnlySuperProfile,
+        is_super_admin: false,
+        permissions: ['system.user.read'],
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        roles: ['admin'],
+        actions: ['system.user.read'],
+      },
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await page.waitForURL(
@@ -1227,7 +1253,7 @@ export function createAuthenticationEntryScenarios({
       mockAdminRpc: true,
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectHeading(page, '毛绒玩具管理系统')
+        await expectAdminLoginHeading(page)
         const focusOrigin = page
           .getByRole('button', { name: /^登\s*录$/ })
           .first()
@@ -1324,7 +1350,7 @@ export function createAuthenticationEntryScenarios({
         })
         await page.getByRole('button', { name: '重新登录' }).click()
         await waitForPath(page, '/admin-login')
-        await expectHeading(page, '毛绒玩具管理系统')
+        await expectAdminLoginHeading(page)
       },
     },
     {
@@ -1344,7 +1370,7 @@ export function createAuthenticationEntryScenarios({
         await assertTextAbsent(page, '待我处理')
         await page.getByRole('button', { name: '重新登录' }).click()
         await waitForPath(page, '/admin-login')
-        await expectHeading(page, '毛绒玩具管理系统')
+        await expectAdminLoginHeading(page)
       },
     },
     {
@@ -1372,7 +1398,7 @@ export function createAuthenticationEntryScenarios({
         await assertTextAbsent(page, '待我处理')
         await page.getByRole('button', { name: '重新登录' }).click()
         await waitForPath(page, '/admin-login')
-        await expectHeading(page, '毛绒玩具管理系统')
+        await expectAdminLoginHeading(page)
       },
     },
   ]

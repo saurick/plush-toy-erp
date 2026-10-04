@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { assertFilterAffordance } from './controlAffordanceAssertions.mjs'
 import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
+import { readStyleL1BuildExpectation } from './systemRpcMocks.mjs'
 
 export function createMobileTaskAssertions(deps) {
   const {
@@ -251,7 +252,7 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 退出登录不应出现在待办分区: ${JSON.stringify(todoMetrics)}`
     )
     assert(
-        !todoMetrics.sectionHeadings.includes('当前岗位任务状态') &&
+      !todoMetrics.sectionHeadings.includes('当前岗位任务状态') &&
         !todoMetrics.sectionHeadings.includes('已加载任务进度') &&
         !todoMetrics.sectionHeadings.includes('超时') &&
         !todoMetrics.sectionHeadings.includes('风险') &&
@@ -543,6 +544,7 @@ export function createMobileTaskAssertions(deps) {
   }
 
   async function assertMobileMinePanelLayout(page, { scenarioName }) {
+    const buildExpectation = await readStyleL1BuildExpectation(page)
     const metrics = await page.evaluate(() => {
       const scroll = document.querySelector(
         '[data-testid="mobile-role-scroll"]'
@@ -615,12 +617,12 @@ export function createMobileTaskAssertions(deps) {
         metrics.cards.some(
           (card) =>
             card.text.includes('系统信息') &&
-            card.text.includes('yoyoosun-20260810-20c96d38-amd64') &&
-            card.text.includes('20c96d38') &&
-            card.text.includes('前后台版本一致')
+            card.text.includes(buildExpectation.status.systemVersion) &&
+            card.text.includes(buildExpectation.buildCode) &&
+            card.text.includes(buildExpectation.status.label)
         ) &&
         metrics.cards.every((card) => !card.text.includes('任务端')),
-      `${scenarioName} 我的页应展示账号身份、入口安全和一致的系统版本且不重复岗位与入口说明: ${JSON.stringify(metrics)}`
+      `${scenarioName} 我的页应展示账号身份、入口安全和当前构建的核对结果且不重复岗位与入口说明: ${JSON.stringify(metrics)}`
     )
     metrics.cards.forEach((card) => {
       assert(
@@ -1171,8 +1173,7 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 风险可读性断言必须在暗色模式执行: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.sections.length === 1 &&
-        metrics.sections[0].heading === '风险',
+      metrics.sections.length === 1 && metrics.sections[0].heading === '风险',
       `${scenarioName} 风险页默认应只渲染当前全局风险区块: ${JSON.stringify(metrics)}`
     )
     assert(
@@ -1336,8 +1337,9 @@ export function createMobileTaskAssertions(deps) {
             ?.textContent?.replace(/\s+/g, ' ')
             .trim() || '',
         timingText:
-          document.querySelector('[data-testid="mobile-task-detail-screen"] [aria-label="业务信息"]')
-            ?.textContent || '',
+          document.querySelector(
+            '[data-testid="mobile-task-detail-screen"] [aria-label="业务信息"]'
+          )?.textContent || '',
         redundantCopy: Array.from(
           shell.querySelectorAll('h1, h2, h3, h4, [role="heading"]')
         )
@@ -1540,7 +1542,9 @@ export function createMobileTaskAssertions(deps) {
     await actionScreen.waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(page, '选择处理方式')
     const actionLabels = (
-      await actionScreen.locator('label[data-action-key] strong').allTextContents()
+      await actionScreen
+        .locator('label[data-action-key] strong')
+        .allTextContents()
     ).map((label) => label.replace(/\s+/g, ' ').trim())
     assert.deepEqual(
       actionLabels,
@@ -1601,7 +1605,12 @@ export function createMobileTaskAssertions(deps) {
       true,
       `${scenarioName} 多动作选择应支持原生方向键切换`
     )
-    await assertMobileFlowReferenceLayout(page, actionScreen, 'action', scenarioName)
+    await assertMobileFlowReferenceLayout(
+      page,
+      actionScreen,
+      'action',
+      scenarioName
+    )
     await doneRadio.check()
     await page.getByRole('button', { name: '确认完成本岗' }).click()
     const completionFeedbackInput = page.getByLabel('完成反馈')
@@ -1693,7 +1702,11 @@ export function createMobileTaskAssertions(deps) {
         const style = window.getComputedStyle(choice)
         const inputStyle = input ? window.getComputedStyle(input) : null
         return {
-          text: choice.querySelector('strong')?.textContent?.replace(/\s+/g, ' ').trim() || '',
+          text:
+            choice
+              .querySelector('strong')
+              ?.textContent?.replace(/\s+/g, ' ')
+              .trim() || '',
           width: rect.width,
           height: rect.height,
           disabled: input?.disabled ?? true,
@@ -1842,7 +1855,11 @@ export function createMobileTaskAssertions(deps) {
           '[data-testid="mobile-task-action-screen"] label[data-action-key]'
         )
       ).map((choice) => ({
-        text: choice.querySelector('strong')?.textContent?.replace(/\s+/g, ' ').trim() || '',
+        text:
+          choice
+            .querySelector('strong')
+            ?.textContent?.replace(/\s+/g, ' ')
+            .trim() || '',
         disabled: choice.querySelector('input[type="radio"]')?.disabled ?? true,
       })),
       documentScrollWidth: document.documentElement.scrollWidth,
@@ -1869,7 +1886,9 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 路径切换后任务详情造成横向溢出: ${JSON.stringify(crossRoleMetrics)}`
     )
     await page.getByLabel('完成反馈').fill('暗色任务已完成并核对')
-    await page.getByRole('button', { name: '确认完成本岗', exact: true }).click()
+    await page
+      .getByRole('button', { name: '确认完成本岗', exact: true })
+      .click()
     const receiptScreen = page.getByTestId('mobile-task-receipt-screen')
     await receiptScreen.waitFor({ state: 'visible', timeout: 10_000 })
     await expectText(page, '任务办理已确认')
@@ -1924,7 +1943,12 @@ export function createMobileTaskAssertions(deps) {
     await receiptScreen.screenshot({
       path: path.join(outputDir, `${scenarioName}-receipt-copy-cleanup.png`),
     })
-    await assertMobileFlowReferenceLayout(page, receiptScreen, 'receipt', scenarioName)
+    await assertMobileFlowReferenceLayout(
+      page,
+      receiptScreen,
+      'receipt',
+      scenarioName
+    )
     await receiptScreen
       .locator('.mobile-role-action-bar')
       .getByRole('button', { name: '返回任务列表', exact: true })

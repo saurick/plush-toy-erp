@@ -1,5 +1,20 @@
 import assert from 'node:assert/strict'
 import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
+import { expectHeading } from './pageAssertions.mjs'
+import { ERP_COMPANY_NAME } from '../../src/common/consts/brand.js'
+
+export async function expectAdminLoginHeading(page) {
+  await page.locator('.erp-login-logo__title').waitFor({ state: 'visible' })
+  const companyName = await page.evaluate((fallback) => {
+    const configured = window.__PLUSH_ERP_CUSTOMER_CONFIG__?.brand?.companyName
+    return typeof configured === 'string' && configured.trim()
+      ? configured.trim()
+      : fallback
+  }, ERP_COMPANY_NAME)
+  await expectHeading(page, companyName)
+  assert.equal(await page.locator('.erp-login-page h1').count(), 1)
+  assert.equal(await page.title(), companyName)
+}
 
 async function assertAdminLoginLayout(page, { minCardWidth }) {
   const metrics = await page.evaluate(() => {

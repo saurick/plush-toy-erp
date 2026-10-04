@@ -1,8 +1,32 @@
 import { setTimeout as delay } from 'node:timers/promises'
 import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
+import {
+  compareBuildIdentities,
+  formatBuildCode,
+  parseServerBuildIdentity,
+} from '../../src/common/runtime/buildIdentity.mjs'
 
 const STYLE_L1_RELEASE_VERSION = 'yoyoosun-20260810-20c96d38-amd64'
 const STYLE_L1_GIT_SHA = '20c96d3819429361a35d2551b63b211f055de37e'
+
+export async function readStyleL1BuildExpectation(page) {
+  const web = await page.evaluate(async () => {
+    const sourceURL = new URL(
+      '/src/common/runtime/buildIdentity.mjs',
+      window.location.origin
+    ).href
+    const { readEmbeddedBuildIdentity } = await import(sourceURL)
+    return readEmbeddedBuildIdentity()
+  })
+  const server = parseServerBuildIdentity({
+    release_version: STYLE_L1_RELEASE_VERSION,
+    git_sha: STYLE_L1_GIT_SHA,
+  })
+  return {
+    status: compareBuildIdentities({ web, server }),
+    buildCode: formatBuildCode(web),
+  }
+}
 
 export async function installSystemRpcMocks(page, context) {
   const {
@@ -269,7 +293,9 @@ export async function installSystemRpcMocks(page, context) {
             if (params.hidden_columns.length === 0) {
               delete adminProfile.erp_preferences.hidden_columns[moduleKey]
             } else {
-              adminProfile.erp_preferences.hidden_columns[moduleKey] = [...params.hidden_columns]
+              adminProfile.erp_preferences.hidden_columns[moduleKey] = [
+                ...params.hidden_columns,
+              ]
             }
           }
         }
