@@ -676,7 +676,9 @@ func (uc *InventoryUsecase) CreateInventoryTxnForAccess(ctx context.Context, in 
 	return uc.repo.CreateInventoryTxn(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) ApplyInventoryTxnAndUpdateBalance(ctx context.Context, in *InventoryTxnCreate) (*InventoryTxnApplyResult, error) {
+func (uc *InventoryUsecase) ApplyInventoryTxnAndUpdateBalance(ctx context.Context, in *InventoryTxnCreate) (_ *InventoryTxnApplyResult, err error) {
+	ctx, finish := startBusinessTrace(ctx, "inventory.apply_transaction")
+	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
@@ -687,7 +689,9 @@ func (uc *InventoryUsecase) ApplyInventoryTxnAndUpdateBalance(ctx context.Contex
 	return uc.repo.ApplyInventoryTxnAndUpdateBalance(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) ApplyInventoryTxnAndUpdateBalanceForAccess(ctx context.Context, in *InventoryTxnCreate, scope WarehouseDataScope) (*InventoryTxnApplyResult, error) {
+func (uc *InventoryUsecase) ApplyInventoryTxnAndUpdateBalanceForAccess(ctx context.Context, in *InventoryTxnCreate, scope WarehouseDataScope) (_ *InventoryTxnApplyResult, err error) {
+	ctx, finish := startBusinessTrace(ctx, "inventory.apply_transaction")
+	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}

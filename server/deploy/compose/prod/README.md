@@ -3,7 +3,7 @@
 本目录是仓库内唯一的单宿主机 Compose 部署真源：
 
 - `compose.yml`：PostgreSQL、SeaweedFS 私有对象存储、Jaeger、业务服务与单一 Web 入口。
-- `jaeger-v2.yml`：Jaeger v2 的 OTLP / Jaeger / Zipkin 接收、内存 trace store、查询 UI、健康端点与外部 Prometheus 查询配置。
+- `jaeger-v2.yml`：Jaeger v2 的 OTLP / Jaeger / Zipkin 接收、Badger 持久 Trace 存储、查询 UI、健康端点与外部 Prometheus 查询配置。
 - `compose.demo-133.yml`：`demo-133` 的固定 Compose project 覆盖。
 - `compose.customer-test-133.yml`：`customer-test-133` 的固定 Compose project 覆盖。
 - `.env.example`：运行环境变量示例，不保存真实凭据。
@@ -26,6 +26,16 @@
 Jaeger 只发布 `jaeger-v2.yml` 实际启用的 OTLP、Jaeger、Zipkin 与查询 UI 端口，不保留 v1 的 `5775` agent 端口，也不发布当前未配置 remote-sampling extension 的 `5778`。发布、回滚和首次初始化在私有 `umask` 解包后仅把该配置文件归一化为容器只读的 `0444`；其余 release 文件继续保持私有权限。
 
 `customer-trial-133` 仍是 demo 内部模拟数据合同的 target key，不是第三个部署环境。它只能在 `demo-133` 的受控数据准备链中使用。
+
+## Trace 保留与资源 / Trace Retention
+
+业务请求默认使用 `TRACE_RATIO=0.1`；`ParentBased` 保留已有父链路的采样决定。后台 ProcessRuntime 对账根 Trace 至多采样 10%，无父上下文的 health / ready / runtime identity 探针不导出，SQL 仅跟随有效操作上下文。比例采样不保证所有失败都有 Trace，完成日志、错误指标与数据库审计保持各自合同。开发业务请求默认全采样，配置真源和接入范围见[服务端观测说明](../../../../docs/observability/日志链路追踪审计第一版.md)。
+
+Jaeger 使用每个 Compose project 独立的 `jaeger-data` named volume，挂载到镜像的可写 `/tmp`，Badger key / value 数据位于 `/tmp/badger/`，以镜像非 root 用户运行。Trace TTL 为 `168h`，重建容器和普通停止保留历史；不得在停用、升级或回滚时删除 volume。TTL 限制可查询跨度，实际磁盘回收由存储清理完成，磁盘容量仍需主机监控。
+
+默认容器预算保持 `192m`，Go 内存目标为 `128MiB`；接收端在 `160 MiB` 限制和 `32 MiB` spike 预算下反压，使用 `256 / 512` 的有界批次。内存限制可能导致拒收或丢弃，应用 exporter 的有限队列也不提供无损保证；资源预算、单次启动或少量 Trace 验证不代表高负载容量。
+
+这组存储与业务埋点变更通过固定版本的正式 promotion 加载，日志工作台接入不会更新业务 release。由旧内存存储切换时，容器重建会丢失旧内存 Trace，新 volume 仅保存切换后的数据；数据库和业务审计沿用现有恢复合同。回滚含持久化配置的版本时保留 volume，不自动转换或删除其数据。切换后须验证 OTLP 接收、按 Trace ID 查询和重启后读回。
 
 ## 快速开始（仅本地或新建隔离环境）
 

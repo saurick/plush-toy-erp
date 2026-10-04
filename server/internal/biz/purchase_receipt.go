@@ -207,7 +207,9 @@ func (uc *InventoryUsecase) AddPurchaseReceiptItem(ctx context.Context, in *Purc
 	return uc.repo.AddPurchaseReceiptItem(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) PostPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error) {
+func (uc *InventoryUsecase) PostPurchaseReceipt(ctx context.Context, receiptID int) (_ *PurchaseReceipt, err error) {
+	ctx, finish := startBusinessTrace(ctx, "inventory.post_purchase_receipt")
+	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || receiptID <= 0 {
 		return nil, ErrBadParam
 	}

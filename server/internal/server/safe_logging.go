@@ -6,7 +6,6 @@ import (
 	"time"
 
 	v1 "server/api/jsonrpc/v1"
-	"server/internal/errcode"
 
 	kratoserrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
@@ -28,7 +27,8 @@ func safeServerLogging(logger log.Logger) middleware.Middleware {
 			}
 
 			reply, err = handler(ctx, req)
-			sharedRuntimeMetricCounters.observeRPC(time.Since(start), err != nil)
+			outcome := requestOutcome(req, reply, err)
+			sharedRuntimeMetricCounters.observeRPC(time.Since(start), outcome == "error")
 			var code int32
 			reason := ""
 			if serviceErr := kratoserrors.FromError(err); serviceErr != nil {
@@ -51,11 +51,11 @@ func safeServerLogging(logger log.Logger) middleware.Middleware {
 			}
 			if _, ok := req.(*v1.PostJsonrpcRequest); ok {
 				response, _ := reply.(*v1.PostJsonrpcReply)
-				outcome := "success"
-				if err != nil || response == nil || response.GetResult() == nil || response.GetError() != "" || response.GetResult().GetCode() >= errcode.Internal.Code {
-					outcome, level = "error", log.LevelError
-				} else if response.GetResult().GetCode() != errcode.OK.Code {
-					outcome, level = "rejected", log.LevelWarn
+				switch outcome {
+				case "error":
+					level = log.LevelError
+				case "rejected":
+					level = log.LevelWarn
 				}
 				fields = append(fields, "outcome", outcome)
 				if result := response.GetResult(); result != nil {

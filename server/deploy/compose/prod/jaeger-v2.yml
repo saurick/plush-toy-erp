@@ -1,12 +1,10 @@
-# Jaeger v2 uses the OpenTelemetry Collector configuration model. This keeps
-# the existing single-node, in-memory trace boundary while preserving the
-# OTLP, Jaeger, Zipkin, query UI and external Prometheus query endpoints.
+# Single-node persistent tracing; technical traces are independent of business audit.
 service:
   extensions: [jaeger_storage, jaeger_query, healthcheckv2]
   pipelines:
     traces:
       receivers: [otlp, jaeger, zipkin]
-      processors: [batch]
+      processors: [memory_limiter, batch]
       exporters: [jaeger_storage_exporter]
   telemetry:
     resource:
@@ -30,14 +28,20 @@ extensions:
     http:
       endpoint: 0.0.0.0:13133
   jaeger_query:
+    enable_tracing: false
     storage:
       traces: trace_store
       metrics: metrics_store
   jaeger_storage:
     backends:
       trace_store:
-        memory:
-          max_traces: 100000
+        badger:
+          directories:
+            keys: /tmp/badger/key
+            values: /tmp/badger/data
+          ephemeral: false
+          ttl:
+            spans: 168h
     metric_backends:
       metrics_store:
         prometheus:
@@ -66,7 +70,14 @@ receivers:
     endpoint: 0.0.0.0:9411
 
 processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 160
+    spike_limit_mib: 32
   batch:
+    send_batch_size: 256
+    send_batch_max_size: 512
+    timeout: 1s
 
 exporters:
   jaeger_storage_exporter:

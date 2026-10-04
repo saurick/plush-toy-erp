@@ -114,8 +114,10 @@ services:
     command: ["--config", "/etc/jaeger/config.yml"]
     environment:
       PROMETHEUS_SERVER_URL: "${PROMETHEUS_SERVER_URL:-http://host.docker.internal:3004}"
+      GOMEMLIMIT: 128MiB
     volumes:
       - "./jaeger-v2.yml:/etc/jaeger/config.yml:ro"
+      - "jaeger-data:/tmp"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     mem_limit: "${JAEGER_MEM_LIMIT:-192m}"
@@ -211,6 +213,9 @@ services:
       <<: *web-app-environment
       APP_ID: desktop
       PORT: "5175"
+
+volumes:
+  jaeger-data: {}
 
 networks:
   default: {}

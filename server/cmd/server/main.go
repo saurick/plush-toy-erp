@@ -30,6 +30,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
@@ -553,7 +554,31 @@ func normalizeTraceRatio(ratio float64) float64 {
 
 // 统一走 ParentBased，既保留上游采样决策，也允许当前服务按比例控制根 span。
 func buildTraceSampler(ratio float64) tracesdk.Sampler {
-	return tracesdk.ParentBased(tracesdk.TraceIDRatioBased(normalizeTraceRatio(ratio)))
+	ratio = normalizeTraceRatio(ratio)
+	return tracesdk.ParentBased(operationRootSampler{
+		business:   tracesdk.TraceIDRatioBased(ratio),
+		background: tracesdk.TraceIDRatioBased(math.Min(ratio, 0.1)),
+	})
+}
+
+type operationRootSampler struct {
+	business   tracesdk.Sampler
+	background tracesdk.Sampler
+}
+
+func (s operationRootSampler) ShouldSample(p tracesdk.SamplingParameters) tracesdk.SamplingResult {
+	switch p.Name {
+	case "server.http.healthz", "server.http.readyz", "server.http.runtime_identity":
+		return tracesdk.SamplingResult{Decision: tracesdk.Drop}
+	}
+	if strings.HasPrefix(p.Name, "background.process_runtime.") {
+		return s.background.ShouldSample(p)
+	}
+	return s.business.ShouldSample(p)
+}
+
+func (s operationRootSampler) Description() string {
+	return "OperationRoot(" + s.business.Description() + ",background=" + s.background.Description() + ")"
 }
 
 func resolveTraceEnvOverrides(traceEndpoint string, traceRatio float64, getenv func(string) string) (string, float64, error) {
@@ -625,7 +650,10 @@ func initTracerProvider(traceName, traceEndpoint string, traceRatio float64, bas
 		)
 	}
 
-	otel.SetTracerProvider(tp) // 设置全局tp
+	otel.SetTracerProvider(tp)
+	// Custom HTTP handlers and clients share W3C trace propagation. Baggage is
+	// deliberately excluded so caller-supplied business fields are not forwarded.
+	otel.SetTextMapPropagator(propagation.TraceContext{})
 	return tp
 }
 

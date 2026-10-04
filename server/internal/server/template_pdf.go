@@ -32,6 +32,7 @@ import (
 	"github.com/chromedp/chromedp"
 	"github.com/go-kratos/kratos/v2/log"
 	httpx "github.com/go-kratos/kratos/v2/transport/http"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -617,7 +618,12 @@ func registerTemplatePDFHandler(
 
 		queueCtx, queueCancel := context.WithTimeout(ctx, templatePDFQueueWaitTimeout)
 		defer queueCancel()
+		queueCtx, queueSpan := otel.Tracer("server.template_pdf").Start(queueCtx, "pdf.queue")
 		releaseRenderSlot, queueWait, err := sharedTemplatePDFRenderGate.Acquire(queueCtx)
+		if err != nil {
+			queueSpan.SetStatus(codes.Error, "render queue unavailable")
+		}
+		queueSpan.End()
 		if err != nil {
 			sharedRuntimeMetricCounters.pdfQueueTimeouts.Add(1)
 			span.RecordError(err)
@@ -832,7 +838,14 @@ func resolveTemplatePDFScale(templateKey string) float64 {
 	return 1
 }
 
-func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, printScale float64) ([]byte, error) {
+func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, printScale float64) (_ []byte, err error) {
+	ctx, renderSpan := otel.Tracer("server.template_pdf").Start(ctx, "pdf.render")
+	defer func() {
+		if err != nil {
+			renderSpan.SetStatus(codes.Error, "pdf rendering failed")
+		}
+		renderSpan.End()
+	}()
 	chromeExecPath, err := resolveTemplatePDFChromeExecPath(os.Getenv("ERP_PDF_CHROME_PATH"), exec.LookPath)
 	if err != nil {
 		return nil, err

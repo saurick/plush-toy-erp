@@ -25,6 +25,10 @@ import (
 	"github.com/aws/smithy-go"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -114,14 +118,16 @@ func objectContentType(content []byte) string {
 	}
 }
 
-func (s *S3) Put(ctx context.Context, key string, content []byte) error {
+func (s *S3) Put(ctx context.Context, key string, content []byte) (err error) {
+	ctx, finish := startObjectTrace(ctx, "attachment.s3.put")
+	defer func() { finish(err) }()
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	if !ValidKey(key) || len(content) == 0 {
 		return ErrIntegrity
 	}
 	sum := sha256.Sum256(content)
-	_, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucket), Key: aws.String(key), Body: bytes.NewReader(content),
 		ContentLength: aws.Int64(int64(len(content))), ContentType: aws.String(objectContentType(content)),
 		ChecksumAlgorithm: types.ChecksumAlgorithmSha256, ChecksumSHA256: aws.String(base64.StdEncoding.EncodeToString(sum[:])),
@@ -139,7 +145,9 @@ func (s *S3) Put(ctx context.Context, key string, content []byte) error {
 	return ErrUnavailable
 }
 
-func (s *S3) Get(ctx context.Context, key string, maximum int64) ([]byte, error) {
+func (s *S3) Get(ctx context.Context, key string, maximum int64) (_ []byte, err error) {
+	ctx, finish := startObjectTrace(ctx, "attachment.s3.get")
+	defer func() { finish(err) }()
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	if !ValidKey(key) || maximum <= 0 {
@@ -165,6 +173,19 @@ func (s *S3) Get(ctx context.Context, key string, maximum int64) ([]byte, error)
 		return nil, ErrIntegrity
 	}
 	return content, nil
+}
+
+func startObjectTrace(ctx context.Context, operation string) (context.Context, func(error)) {
+	ctx, span := otel.Tracer("attachmentstore.s3").Start(ctx, operation, trace.WithSpanKind(trace.SpanKindClient))
+	span.SetAttributes(attribute.String("rpc.system", "aws-api"), attribute.String("rpc.service", "S3"))
+	return ctx, func(err error) {
+		if err != nil {
+			span.SetStatus(codes.Error, "object storage operation failed")
+		} else {
+			span.SetStatus(codes.Ok, "")
+		}
+		span.End()
+	}
 }
 
 func (s *S3) Check(ctx context.Context) error {

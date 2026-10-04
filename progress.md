@@ -4,6 +4,16 @@
 
 ## 当前活跃事项
 
+### 服务端追踪补强与 7 天保留（2026-10-04）
+
+- RPC Span 已按领域 / 方法命名，日志、指标和 Trace 共用成功 / 拒绝 / 系统失败分类；HTTP 200 内的系统失败进入 Trace 错误状态。库存、采购收退货、生产 / 外发事实、出货、财务和质检关键动作补业务 Span，PDF 排队 / 渲染、附件 S3 与后台对账保留父子关系，SQL 仅跟随有效操作上下文。
+- 开发业务根 Trace 保持 100%，部署默认 10%；后台根 Trace 至多 10%，健康探针和独立 SQL 降噪。正式 Compose 改为独立 Badger volume、`168h` TTL，在原 192 MiB 容器预算内设置 Go 目标、反压与有界批次；技术 Trace 不改变业务事实、审计和备份保留合同。
+- 固定 Jaeger 2.21 镜像在本轮独立容器通过 OTLP 写入 / 查询、重启后读回和临时 2 秒 TTL 到期检查，临时容器 / volume 已清理。少量样本内存约 14 MiB，只证明低负载启动，未做持续容量验证。本机 Grafana 已加载原生 v3 查询开关，local / demo / test 三个数据源健康与按 Trace ID 查询通过；插件条件搜索仍需使用 Jaeger 原生 UI。
+- 本地通过正式 `make dev_restart ARGS=--background` 加载候选 `local-c5bea655-a90f-4001-b3d5-1a052b18fd33`，migration `20260927100348`、health / ready / business 通过；实测成功 / 拒绝 RPC、RPC → 业务 → SQL 父子关系、W3C 上游父标识与日志跳转一致，未采样请求不导出 Trace 且跳转字段为空。未 apply migration。demo / test 只读版本查询仍为 `2a744f10a589530c6f5960e437da926ef50511fe`，新增埋点和持久化配置待固定版本正式发布。
+- 定向追踪验证及受影响 server / biz / attachmentstore 测试通过。共享 root 的 inotify 配额导致原 cmd/server 配置 watcher 测试失败；同一候选测试二进制在独立系统用户下 59 项（含子测试）通过，未修改宿主机配额。真实 Chromium opt-in 集成未执行，7 天 TTL 尚无长周期运行证据。证据位于本轮临时目录 `/root/.cache/tmp/plush-tracing-baseline-rlqbyecd/`，其中凭据备份不得对外输出。
+- 实现收尾时，共享工作区曾因其他日志任务的 `golang.org/x/time/rate` 依赖尚未补齐而阻断编译；本次 Git 收口时该依赖已补齐。本次提交使用当前 HEAD 加追踪精确增量的一次性独立 Git 副本验证：server、biz、attachmentstore、SQL trace 测试及 cmd/server 候选二进制通过，部署与文档 57 项检查通过；这些证据不代表全部共享工作区改动或目标发布已验证。
+- Git 收口范围为后端追踪语义、关键链路、采样与 Badger 七天保留的精确增量。Grafana 查询开关、数据源健康检查及集中日志文档依赖另一任务的未提交日志接入基础，随该基础一并收口；工作区文档改名和其他日志改动保留。本轮仅获 commit 授权，push 与产品发布未授权。
+
 ### 个人内网开发工作台访问与 HTTPS（2026-10-02）
 
 - 已允许个人受控内网直接访问工作台，默认独立运维身份模式保留；配置与唯一网络 / 代理合同见 [开发服务 Bridge](web/dev-server/README.md#边界)。当前 ignored 本地配置为 `private-network`，HTTPS origin 为 `https://erp-lan.saurick.me`。

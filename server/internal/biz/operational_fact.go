@@ -926,7 +926,9 @@ func normalizeOperationalFactStatusMutation(in *OperationalFactStatusMutation, r
 	return &normalized, nil
 }
 
-func (uc *OperationalFactUsecase) PostProductionFact(ctx context.Context, in *OperationalFactStatusMutation) (*ProductionFact, error) {
+func (uc *OperationalFactUsecase) PostProductionFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *ProductionFact, err error) {
+	ctx, finish := startBusinessTrace(ctx, "production.post_fact")
+	defer func() { finish(err) }()
 	normalized, err := normalizeOperationalFactStatusMutation(in, false)
 	if uc == nil || uc.repo == nil || err != nil {
 		return nil, ErrBadParam
@@ -1039,7 +1041,9 @@ func (uc *OperationalFactUsecase) saveOutsourcingFactDraft(ctx context.Context, 
 	return repo.SaveOutsourcingFactDraft(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) PostOutsourcingFact(ctx context.Context, in *OperationalFactStatusMutation) (*OutsourcingFact, error) {
+func (uc *OperationalFactUsecase) PostOutsourcingFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *OutsourcingFact, err error) {
+	ctx, finish := startBusinessTrace(ctx, "outsourcing.post_fact")
+	defer func() { finish(err) }()
 	normalized, err := normalizeOperationalFactStatusMutation(in, false)
 	if uc == nil || uc.repo == nil || err != nil {
 		return nil, ErrBadParam
@@ -1162,14 +1166,18 @@ func (uc *OperationalFactUsecase) ValidateShipmentReleaseForShipping(ctx context
 	return repo.ValidateShipmentReleaseForShipping(ctx, id)
 }
 
-func (uc *OperationalFactUsecase) ShipShipment(ctx context.Context, id int) (*Shipment, error) {
+func (uc *OperationalFactUsecase) ShipShipment(ctx context.Context, id int) (_ *Shipment, err error) {
+	ctx, finish := startBusinessTrace(ctx, "shipment.ship")
+	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.ShipShipment(ctx, id)
 }
 
-func (uc *OperationalFactUsecase) ShipShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error) {
+func (uc *OperationalFactUsecase) ShipShipmentWithActor(ctx context.Context, id int, actorID int) (_ *Shipment, err error) {
+	ctx, finish := startBusinessTrace(ctx, "shipment.ship")
+	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -1321,7 +1329,9 @@ func (uc *OperationalFactUsecase) shipmentFinancePaymentTermSnapshot(ctx context
 	return FinancePaymentTermSnapshotFromDays(days)
 }
 
-func (uc *OperationalFactUsecase) PostFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error) {
+func (uc *OperationalFactUsecase) PostFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *FinanceFact, err error) {
+	ctx, finish := startBusinessTrace(ctx, "finance.post_fact")
+	defer func() { finish(err) }()
 	normalized, err := normalizeOperationalFactStatusMutation(in, false)
 	if uc == nil || uc.repo == nil || err != nil {
 		return nil, ErrBadParam
@@ -1329,7 +1339,9 @@ func (uc *OperationalFactUsecase) PostFinanceFact(ctx context.Context, in *Opera
 	return uc.repo.PostFinanceFact(ctx, normalized)
 }
 
-func (uc *OperationalFactUsecase) SettleFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (*FinanceFact, error) {
+func (uc *OperationalFactUsecase) SettleFinanceFact(ctx context.Context, in *OperationalFactStatusMutation) (_ *FinanceFact, err error) {
+	ctx, finish := startBusinessTrace(ctx, "finance.settle_fact")
+	defer func() { finish(err) }()
 	normalized, err := normalizeOperationalFactStatusMutation(in, false)
 	if uc == nil || uc.repo == nil || err != nil {
 		return nil, ErrBadParam

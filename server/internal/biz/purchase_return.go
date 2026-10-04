@@ -240,7 +240,9 @@ func (uc *InventoryUsecase) AddPurchaseReturnItem(ctx context.Context, in *Purch
 	return uc.repo.AddPurchaseReturnItem(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) PostPurchaseReturn(ctx context.Context, returnID int) (*PurchaseReturn, error) {
+func (uc *InventoryUsecase) PostPurchaseReturn(ctx context.Context, returnID int) (_ *PurchaseReturn, err error) {
+	ctx, finish := startBusinessTrace(ctx, "inventory.post_purchase_return")
+	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || returnID <= 0 {
 		return nil, ErrBadParam
 	}

@@ -9,6 +9,9 @@ import (
 	"server/internal/biz"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 const (
@@ -127,12 +130,26 @@ func (r *processRuntimeWorkflowReconciler) runOnce(ctx context.Context) {
 }
 
 func (r *processRuntimeWorkflowReconciler) runWorkflowOnce(ctx context.Context) {
+	ctx, span := otel.Tracer("background.process_runtime").Start(ctx, "background.process_runtime.reconcile_workflow")
+	defer span.End()
 	runCtx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
+	l := r.log.WithContext(runCtx)
 	afterWorkflowTaskID := r.afterWorkflowTaskID
 	result, err := r.runner.ReconcilePendingLinkedWorkflowTasks(runCtx, afterWorkflowTaskID, r.batch)
+	if err != nil || result == nil || (result.Scanned > 0 && result.LastScannedWorkflowTaskID <= afterWorkflowTaskID) || len(result.Failures) > 0 {
+		span.SetStatus(codes.Error, "reconciliation failed")
+		span.SetAttributes(attribute.String("outcome", "error"))
+	} else {
+		span.SetStatus(codes.Ok, "")
+		span.SetAttributes(attribute.String("outcome", "success"))
+	}
+	if result != nil {
+		span.SetAttributes(attribute.Int("reconcile.scanned", result.Scanned), attribute.Int("reconcile.completed", result.Reconciled), attribute.Int("reconcile.failed", len(result.Failures)))
+	}
+
 	if err != nil {
-		r.log.Errorw(
+		l.Errorw(
 			"msg", "process runtime workflow reconciliation failed",
 			"component", "process_runtime_workflow_reconciler",
 			"err", err,
@@ -140,7 +157,7 @@ func (r *processRuntimeWorkflowReconciler) runWorkflowOnce(ctx context.Context) 
 		return
 	}
 	if result == nil {
-		r.log.Errorw(
+		l.Errorw(
 			"msg", "process runtime workflow reconciliation returned no result",
 			"component", "process_runtime_workflow_reconciler",
 		)
@@ -153,7 +170,7 @@ func (r *processRuntimeWorkflowReconciler) runWorkflowOnce(ctx context.Context) 
 		return
 	}
 	if result.LastScannedWorkflowTaskID <= afterWorkflowTaskID {
-		r.log.Errorw(
+		l.Errorw(
 			"msg", "process runtime workflow reconciliation returned an invalid cursor",
 			"component", "process_runtime_workflow_reconciler",
 			"after_workflow_task_id", afterWorkflowTaskID,
@@ -163,7 +180,7 @@ func (r *processRuntimeWorkflowReconciler) runWorkflowOnce(ctx context.Context) 
 	}
 	r.afterWorkflowTaskID = result.LastScannedWorkflowTaskID
 	for _, failure := range result.Failures {
-		r.log.Errorw(
+		l.Errorw(
 			"msg", "process runtime workflow settlement failed",
 			"component", "process_runtime_workflow_reconciler",
 			"workflow_task_id", failure.WorkflowTaskID,
@@ -181,19 +198,33 @@ func (r *processRuntimeWorkflowReconciler) runWorkflowOnce(ctx context.Context) 
 		"last_scanned_workflow_task_id", result.LastScannedWorkflowTaskID,
 	}
 	if len(result.Failures) > 0 {
-		r.log.Warnw(fields...)
+		l.Warnw(fields...)
 		return
 	}
-	r.log.Infow(fields...)
+	l.Infow(fields...)
 }
 
 func (r *processRuntimeWorkflowReconciler) runProcessRuntimeOnce(ctx context.Context) {
+	ctx, span := otel.Tracer("background.process_runtime").Start(ctx, "background.process_runtime.reconcile_nodes")
+	defer span.End()
 	runCtx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
+	l := r.log.WithContext(runCtx)
 	afterProcessNodeID := r.afterProcessNodeID
 	result, err := r.runner.ReconcilePendingProcessRuntimeNodes(runCtx, afterProcessNodeID, r.batch)
+	if err != nil || result == nil || (result.Scanned > 0 && result.LastScannedProcessNodeID <= afterProcessNodeID) || len(result.Failures) > 0 {
+		span.SetStatus(codes.Error, "reconciliation failed")
+		span.SetAttributes(attribute.String("outcome", "error"))
+	} else {
+		span.SetStatus(codes.Ok, "")
+		span.SetAttributes(attribute.String("outcome", "success"))
+	}
+	if result != nil {
+		span.SetAttributes(attribute.Int("reconcile.scanned", result.Scanned), attribute.Int("reconcile.completed", result.Reconciled), attribute.Int("reconcile.failed", len(result.Failures)))
+	}
+
 	if err != nil {
-		r.log.Errorw(
+		l.Errorw(
 			"msg", "process runtime node reconciliation failed",
 			"component", "process_runtime_workflow_reconciler",
 			"err", err,
@@ -201,7 +232,7 @@ func (r *processRuntimeWorkflowReconciler) runProcessRuntimeOnce(ctx context.Con
 		return
 	}
 	if result == nil {
-		r.log.Errorw(
+		l.Errorw(
 			"msg", "process runtime node reconciliation returned no result",
 			"component", "process_runtime_workflow_reconciler",
 		)
@@ -214,7 +245,7 @@ func (r *processRuntimeWorkflowReconciler) runProcessRuntimeOnce(ctx context.Con
 		return
 	}
 	if result.LastScannedProcessNodeID <= afterProcessNodeID {
-		r.log.Errorw(
+		l.Errorw(
 			"msg", "process runtime node reconciliation returned an invalid cursor",
 			"component", "process_runtime_workflow_reconciler",
 			"after_process_node_id", afterProcessNodeID,
@@ -224,7 +255,7 @@ func (r *processRuntimeWorkflowReconciler) runProcessRuntimeOnce(ctx context.Con
 	}
 	r.afterProcessNodeID = result.LastScannedProcessNodeID
 	for _, failure := range result.Failures {
-		r.log.Errorw(
+		l.Errorw(
 			"msg", "process runtime node settlement failed",
 			"component", "process_runtime_workflow_reconciler",
 			"process_instance_id", failure.ProcessInstanceID,
@@ -241,8 +272,8 @@ func (r *processRuntimeWorkflowReconciler) runProcessRuntimeOnce(ctx context.Con
 		"last_scanned_process_node_id", result.LastScannedProcessNodeID,
 	}
 	if len(result.Failures) > 0 {
-		r.log.Warnw(fields...)
+		l.Warnw(fields...)
 		return
 	}
-	r.log.Infow(fields...)
+	l.Infow(fields...)
 }

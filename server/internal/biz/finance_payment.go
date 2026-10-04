@@ -190,7 +190,9 @@ func (uc *OperationalFactUsecase) CancelFinancePayment(ctx context.Context, in *
 	}
 	return repo.CancelFinancePayment(ctx, in, actorID)
 }
-func (uc *OperationalFactUsecase) PostFinancePayment(ctx context.Context, in *FinancePaymentPost, actorID int) (*FinancePayment, error) {
+func (uc *OperationalFactUsecase) PostFinancePayment(ctx context.Context, in *FinancePaymentPost, actorID int) (_ *FinancePayment, err error) {
+	_, finish := startBusinessTrace(ctx, "finance.post_payment")
+	defer func() { finish(err) }()
 	_, ok := uc.financePaymentRepo()
 	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 || len(in.Allocations) == 0 {
 		return nil, ErrBadParam
@@ -208,7 +210,9 @@ func (uc *OperationalFactUsecase) PostFinancePayment(ctx context.Context, in *Fi
 	}
 	return nil, ErrProcessRuntimeRequired
 }
-func (uc *OperationalFactUsecase) ReverseFinancePayment(ctx context.Context, in *FinancePaymentReverse, actorID int) (*FinancePayment, error) {
+func (uc *OperationalFactUsecase) ReverseFinancePayment(ctx context.Context, in *FinancePaymentReverse, actorID int) (_ *FinancePayment, err error) {
+	ctx, finish := startBusinessTrace(ctx, "finance.reverse_payment")
+	defer func() { finish(err) }()
 	repo, ok := uc.financePaymentRepo()
 	if !ok || in == nil || in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 || strings.TrimSpace(in.Reason) == "" {
 		return nil, ErrBadParam

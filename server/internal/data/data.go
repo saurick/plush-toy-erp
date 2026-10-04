@@ -4,6 +4,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
 	"errors"
 	"fmt"
 	"net"
@@ -27,6 +28,7 @@ import (
 	"github.com/google/wire"
 	"github.com/jackc/pgx/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 // ProviderSet 是 data 层对外暴露的依赖注入集合。
@@ -148,6 +150,11 @@ func postgresSQLSpanOptions() otelsql.SpanOptions {
 		OmitConnQuery:        false,
 		OmitRows:             true,
 		OmitConnectorConnect: true,
+		// Background scans and startup checks have no operation context; avoid
+		// exporting an unrelated root trace for every SQL statement.
+		SpanFilter: func(ctx context.Context, _ otelsql.Method, _ string, _ []driver.NamedValue) bool {
+			return oteltrace.SpanContextFromContext(ctx).IsValid()
+		},
 	}
 }
 
