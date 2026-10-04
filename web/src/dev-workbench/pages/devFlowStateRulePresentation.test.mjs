@@ -270,7 +270,6 @@ test('related-view projection only creates exact catalog-backed destinations', (
   )
 })
 
-
 test('focused state diagrams use the same transitions as the list and preserve complete access', () => {
   const source = flow('source.sales_order')
   const standard = filterDevFlowStateTransitions(source, '', DEV_FLOW_STATE_TRANSITION_FILTERS.standard)
@@ -281,7 +280,7 @@ test('focused state diagrams use the same transitions as the list and preserve c
     const visible = filterDevFlowStateTransitions(source, selected, filter)
     const graph = buildDevFlowStateRuleMermaid(source, { filter, stateKey: selected })
     assert.equal((graph.match(/ -->\|/gu) || []).length, visible.length)
-    const ids = new Set([...graph.matchAll(/^  (S\d+)\[/gmu)].map((match) => match[1]))
+    const ids = new Set([...graph.matchAll(/^ {2}(S\d+)\[/gmu)].map((match) => match[1]))
     for (const edge of graph.matchAll(/(S\d+) -->\|[^\n]+\| (S\d+)/gu)) {
       assert(ids.has(edge[1]) && ids.has(edge[2]), 'every visible transition retains both endpoints')
     }

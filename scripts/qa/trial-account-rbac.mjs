@@ -4,6 +4,7 @@ import process from "node:process";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { resolvePublicContractSource } from "../../web/scripts/test/publicContractSource.mjs";
 
 const defaultBackendURL = "http://127.0.0.1:8300";
 const authRPCPath = "/rpc/auth";
@@ -391,11 +392,14 @@ const buildSourceMap = (readText) =>
   Object.fromEntries(
     Object.entries(staticProjectionSourcePaths).map(([key, relativePath]) => {
       try {
+        const text = readText(relativePath);
         return [
           key,
           {
             path: relativePath,
-            text: readText(relativePath),
+            text: /\.(?:js|jsx|mjs)$/u.test(relativePath)
+              ? resolvePublicContractSource(text, path.join(repoRoot, relativePath))
+              : text,
             error: "",
           },
         ];

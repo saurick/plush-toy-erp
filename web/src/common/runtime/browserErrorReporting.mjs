@@ -41,21 +41,21 @@ export function safeBrowserPath(path) {
     .split(/[?#]/u)[0]
     .split('/')
   if (segments.length > 12) return '/unknown'
-  return (
-    '/' +
-    segments
-      .filter(Boolean)
-      .map((segment) => (pathSegments.has(segment) ? segment : '{page}'))
-      .join('/')
-  )
+  return `/${segments
+    .filter(Boolean)
+    .map((segment) => (pathSegments.has(segment) ? segment : '{page}'))
+    .join('/')}`
 }
 
 function fingerprint(text) {
   let value = 2166136261
   for (const char of text.slice(0, 4000)) {
+    // FNV-1a deliberately hashes code units with 32-bit integer operations.
+    // eslint-disable-next-line no-bitwise
     value ^= char.charCodeAt(0)
     value = Math.imul(value, 16777619)
   }
+  // eslint-disable-next-line no-bitwise
   return (value >>> 0).toString(16).padStart(8, '0')
 }
 
@@ -79,8 +79,8 @@ export function createBrowserErrorReporter({
   build = 'unknown',
   now = Date.now,
 }) {
-  let windowStart = now(),
-    sent = 0
+  let windowStart = now()
+  let sent = 0
   const seen = new Set()
   return (error, kind = 'runtime') => {
     try {
@@ -131,10 +131,10 @@ export function createBrowserErrorReporter({
 
 export function installBrowserErrorListeners(target, report) {
   const onError = (event) => {
-    if (event.error) void report(event.error, 'runtime')
+    if (event.error) report(event.error, 'runtime')
   }
   const onRejection = (event) => {
-    void report(event.reason, 'unhandled_rejection')
+    report(event.reason, 'unhandled_rejection')
   }
   target.addEventListener('error', onError)
   target.addEventListener('unhandledrejection', onRejection)

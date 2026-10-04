@@ -37,8 +37,8 @@ test('browser reports retain code locations while dropping messages, origins, qu
 })
 
 test('browser reporting is bounded, drops repeat faults and survives failed delivery and hostile rejection values', async () => {
-  let time = 0,
-    sends = 0
+  let time = 0
+  let sends = 0
   const report = createBrowserErrorReporter({
     send: () => {
       sends++
@@ -69,8 +69,8 @@ test('browser reporting is bounded, drops repeat faults and survives failed deli
 })
 
 test('browser listeners cover runtime errors and unhandled rejections and can be removed', async () => {
-  const target = new EventTarget(),
-    calls = []
+  const target = new EventTarget()
+  const calls = []
   const stop = installBrowserErrorListeners(target, (error, kind) => {
     calls.push([error, kind])
   })

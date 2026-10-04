@@ -370,6 +370,26 @@ test("trial account RBAC static projection covers current seed, RBAC, mobile ent
   assert.doesNotMatch(serialized, /\/m\/[a-z]+\/tasks/);
 });
 
+test("trial account RBAC generated permission drift remains a blocker", () => {
+  const report = buildStaticProjectionReport({
+    readText(relativePath) {
+      const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
+      return relativePath === "web/src/erp/utils/mobileRolePermissions.mjs"
+        ? source.replace(
+            "boss: PermissionCode.MOBILE_BOSS_ACCESS",
+            "boss: PermissionCode.MOBILE_SALES_ACCESS",
+          )
+        : source;
+    },
+  });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.summary.failedRows, 1);
+  assert.deepEqual(report.blockers, [
+    "static-role-projection-drift:demo_boss:frontendMobilePermission",
+  ]);
+});
+
 test("trial account RBAC docs keep preflight and real evidence boundary", () => {
   const docs = [
     [
