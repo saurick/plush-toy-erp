@@ -40,6 +40,7 @@ func TestSafeServerLoggingRecordsBusinessOutcomeWithoutPayloads(t *testing.T) {
 			payload, _ := structpb.NewStruct(map[string]any{"password": "private-password", "note": "private-note"})
 			response := &v1.PostJsonrpcReply{Result: &v1.JsonrpcResult{Code: tc.code, Message: "private-message", Data: payload}, Error: tc.replyError}
 			handler := safeServerLogging(logger)(func(context.Context, any) (any, error) { return response, tc.err })
+			before := sharedRuntimeMetricCounters.rpcErrors.Load()
 			got, err := handler(pkglogger.WithRequestID(context.Background(), "req-outcome"), &v1.PostJsonrpcRequest{Url: "system", Method: "ping", Id: "rpc-outcome", Params: payload})
 			if got != response || !errors.Is(err, tc.err) {
 				t.Fatalf("logging changed the response or error")
@@ -52,6 +53,13 @@ func TestSafeServerLoggingRecordsBusinessOutcomeWithoutPayloads(t *testing.T) {
 			}
 			if strings.Count(text, "request completed") != 1 || strings.Contains(text, "private-") {
 				t.Fatalf("duplicated or unsafe completion log: %s", text)
+			}
+			wantErrors := uint64(0)
+			if tc.outcome == "error" {
+				wantErrors = 1
+			}
+			if gotErrors := sharedRuntimeMetricCounters.rpcErrors.Load() - before; gotErrors != wantErrors {
+				t.Fatalf("error counter disagrees with outcome %q: got %d want %d", tc.outcome, gotErrors, wantErrors)
 			}
 		})
 	}
@@ -111,6 +119,40 @@ func TestSafeRequestSummaryDoesNotStringifyUnknownRequests(t *testing.T) {
 	}
 	if summary != "type=struct { Password string }" {
 		t.Fatalf("unexpected summary: %s", summary)
+	}
+}
+
+func TestSafeCompletionGetsTrustedIdentitiesFromChildContext(t *testing.T) {
+	var output bytes.Buffer
+	ctx := pkglogger.WithRequestID(context.Background(), "req-identity")
+	handler := safeServerLogging(log.NewStdLogger(&output))(func(ctx context.Context, _ any) (any, error) {
+		child, cancel := context.WithCancel(ctx)
+		defer cancel()
+		pkglogger.SetRequestActor(child, 7)
+		pkglogger.SetRequestObject(child, "finance_fact", 42)
+		pkglogger.WithTaskID(child, 51)
+		return &v1.PostJsonrpcReply{Result: &v1.JsonrpcResult{Code: errcode.OK.Code}}, nil
+	})
+	params, _ := structpb.NewStruct(map[string]any{"actor_id": 999, "password": "private-password"})
+	_, _ = handler(ctx, &v1.PostJsonrpcRequest{Url: "operational_fact", Method: "post_finance_fact", Params: params})
+	text := output.String()
+	for _, want := range []string{"actor_id=7", "business_object_kind=finance_fact", "business_object_id=42", "task.id=51"} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("missing %q", want)
+		}
+	}
+	if strings.Contains(text, "999") || strings.Contains(text, "private-password") {
+		t.Fatal("untrusted identities or payload were logged")
+	}
+	if pkglogger.TaskID()(ctx) != int64(51) {
+		t.Fatal("task ID did not flow back to the completion logger")
+	}
+	other := pkglogger.WithRequestID(pkglogger.WithTaskID(ctx, 51), "req-other")
+	if fields := pkglogger.RequestObservationFields(other); len(fields) != 0 {
+		t.Fatal("identities leaked into another request")
+	}
+	if pkglogger.TaskID()(other) != "" {
+		t.Fatal("task ID leaked into another request")
 	}
 }
 

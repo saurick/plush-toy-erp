@@ -32,6 +32,7 @@ import {
 } from './localPort.mjs'
 import { prepareWebInstance, stopWebInstance, webInstanceSignature } from './devWebInstance.mjs'
 import { writeTerminalMessage } from '../../scripts/terminal-log.mjs'
+import { attachDevLogFile } from './devLogFile.mjs'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const devPorts = loadDevPorts(repoRoot)
@@ -383,9 +384,12 @@ export function runManagedVite(
     {
       env: childEnvironment,
       cwd: path.join(repoRoot, 'web'),
-      stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
+      stdio: ['inherit', 'pipe', 'pipe', 'ipc'],
     }
   )
+  const portIndex = viteArgs.indexOf('--port')
+  const port = (portIndex >= 0 ? viteArgs[portIndex + 1] : '') || env.ERP_VITE_PORT || env.PORT || String(devPorts.web)
+  attachDevLogFile(child, repoRoot, port)
   return new Promise((resolve, reject) => {
     let stoppingSignal = ''
     const handlers = new Map(

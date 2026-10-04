@@ -36,6 +36,14 @@ func NewDefaultLoggerForTest() log.Logger {
 // 自动输出任务ID
 func TaskID() log.Valuer {
 	return func(ctx context.Context) interface{} {
+		if state, exists := ctx.Value(requestObservationKey{}).(*requestObservation); exists {
+			state.mu.Lock()
+			defer state.mu.Unlock()
+			if state.taskID > 0 {
+				return state.taskID
+			}
+			return ""
+		}
 		v, ok := ctx.Value(TaskIDKey{}).(int64)
 		if !ok {
 			return ""
@@ -45,6 +53,11 @@ func TaskID() log.Valuer {
 }
 
 func WithTaskID(ctx context.Context, taskId int64) context.Context {
+	if state, ok := ctx.Value(requestObservationKey{}).(*requestObservation); ok && taskId > 0 {
+		state.mu.Lock()
+		state.taskID = taskId
+		state.mu.Unlock()
+	}
 	return context.WithValue(ctx, TaskIDKey{}, taskId)
 }
 
@@ -67,6 +80,7 @@ func RequestIDFromContext(ctx context.Context) string {
 }
 
 func WithRequestID(ctx context.Context, requestID string) context.Context {
+	ctx = context.WithValue(ctx, requestObservationKey{}, &requestObservation{})
 	return context.WithValue(ctx, RequestIDKey{}, requestID)
 }
 

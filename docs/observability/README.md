@@ -7,6 +7,7 @@
 | 任务 | 先读 | 再核对 |
 | --- | --- | --- |
 | 看日志 / 审计 / Trace 口径 | `日志链路追踪与审计.md` | `server/README.md`、server docs 和当前代码 |
+| 接入本地与部署环境集中日志 | `集中日志接入与运维.md` | `scripts/observability.mjs`、`server/deploy/compose/prod/compose.observability.yml` |
 | 改系统审计页或审计 API | `server/README.md` | `docs/当前真源与交接顺序.md`、RBAC、service / biz / data tests |
 | 改部署健康检查或 tracing | `docs/部署约定.md` | `server/deploy/README.md`、`docs/observability/日志链路追踪与审计.md` |
 

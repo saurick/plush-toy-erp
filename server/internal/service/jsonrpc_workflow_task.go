@@ -14,6 +14,7 @@ import (
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
+	pkglogger "server/pkg/logger"
 )
 
 const workflowBreakGlassMaxDuration = 2 * time.Hour
@@ -594,6 +595,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if !workflowAdminCanViewTask(admin, currentTask, visibleOwnerRoleKeys) {
 			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 		}
+		ctx = pkglogger.WithTaskID(ctx, int64(taskID))
 		if replayedTask, replayed, replayErr := d.workflowUC.ResolveTaskUrgeMutationReplay(ctx, urge, actorID); replayErr != nil {
 			return id, d.mapWorkflowError(ctx, replayErr), nil
 		} else if replayed {
@@ -1011,6 +1013,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 			return id, d.mapWorkflowError(ctx, err), nil
 		}
 	}
+	ctx = pkglogger.WithTaskID(ctx, int64(taskID))
 	if replayedTask, replayed, replayErr := d.workflowUC.ResolveTaskStatusMutationReplay(ctx, statusUpdate, actorID); replayErr != nil {
 		return id, d.mapWorkflowError(ctx, replayErr), nil
 	} else if replayed {

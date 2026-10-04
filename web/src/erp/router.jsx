@@ -10,6 +10,7 @@ import AuthGuard from '@/common/auth/AuthGuard'
 import { getStoredAdminProfile } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
 import LegalNoticeGate from '@/common/legal/LegalNoticeGate'
+import { reportBrowserError } from '@/common/runtime/browserErrors.js'
 import {
   isDynamicImportLoadError,
   lazyWithDynamicImportRetry,
@@ -198,6 +199,10 @@ class RouteRuntimeErrorBoundary extends React.Component {
     if (prevProps.resetKey !== resetKey && error) {
       this.setState({ error: null })
     }
+  }
+
+  componentDidCatch(error) {
+    reportBrowserError(error, 'react_render')
   }
 
   render() {

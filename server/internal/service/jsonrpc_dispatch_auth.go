@@ -26,6 +26,8 @@ func (d *jsonrpcDispatcher) handleAuth(
 	}
 
 	switch method {
+	case "report_client_error":
+		return d.reportClientError(ctx, id, pm)
 	case "capabilities":
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,

@@ -327,3 +327,43 @@ test(
     assert.equal(timedOut.body, 'Gateway Timeout')
   }
 )
+
+test('proxy failure logs one redacted result with a correlated request ID', { timeout: 10_000 }, async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'serve-static-log-'))
+  const port = await reservePort()
+  const closedBackendPort = await reservePort()
+  await writeFile(path.join(root, 'index.html'), '<!doctype html><title>ok</title>')
+  const child = spawn(process.execPath, [scriptPath], {
+    env: { ...process.env, API_ORIGIN: `http://127.0.0.1:${closedBackendPort}`, HOST: '127.0.0.1', PORT: String(port), STATIC_ROOT: root },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  let stderr = ''
+  child.stderr.on('data', (chunk) => { stderr += chunk.toString('utf8') })
+  const completion = new Promise((resolve, reject) => {
+    child.once('error', reject)
+    child.once('close', (code, signal) => resolve({ code, signal }))
+  })
+  t.after(async () => {
+    if (child.exitCode === null && child.signalCode === null) { child.kill('SIGTERM'); await completion }
+    await rm(root, { recursive: true, force: true })
+  })
+  await waitForHealth(port)
+  const response = await requestServer({
+    port, pathname: '/rpc/auth?access_token=private-query-token&password=private-query-password',
+    headers: { 'x-request-id': 'req-web-redacted', authorization: 'Bearer private-header-token' },
+  })
+  assert.equal(response.statusCode, 502)
+  assert.equal(response.headers['x-request-id'], 'req-web-redacted')
+  child.kill('SIGTERM')
+  await completion
+  const events = stderr.trim().split('\n').map((line) => JSON.parse(line))
+  assert.equal(events.length, 1)
+  assert.equal(events[0].request_id, 'req-web-redacted')
+  assert.equal(events[0].status, 502)
+  assert.equal(events[0].outcome, 'error')
+  assert.equal(events[0].reason, 'dependency_connection_refused')
+  assert.equal(events[0].path, '/rpc/auth')
+  assert.equal(typeof events[0].latency, 'number')
+  assert(!stderr.includes('private-'))
+  assert(!stderr.includes(`:${closedBackendPort}`))
+})

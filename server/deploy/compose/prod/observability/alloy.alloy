@@ -1,0 +1,103 @@
+logging {
+  level = "warn"
+  format = "json"
+}
+
+discovery.docker "erp" {
+  host = "tcp://docker-api:2375"
+  refresh_interval = "10s"
+  filter {
+    name = "status"
+    values = ["running"]
+  }
+  filter {
+    name = "name"
+    values = [@@CONTAINER_FILTERS@@]
+  }
+}
+
+discovery.relabel "erp" {
+  targets = discovery.docker.erp.targets
+@@TARGET_RULES@@
+  rule {
+    source_labels = ["environment"]
+    regex = ".+"
+    action = "keep"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label = "service"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex = "/.+-web-public-[0-9a-f]{8}"
+    target_label = "service"
+    replacement = "web-public"
+  }
+@@SUPPLEMENTAL_SERVICES@@
+}
+
+loki.source.docker "erp" {
+  host = "tcp://docker-api:2375"
+  targets = discovery.relabel.erp.output
+  refresh_interval = "10s"
+  labels = { host = sys.env("OBS_HOST") }
+  forward_to = [loki.process.erp.receiver]
+}
+
+loki.source.file "local_backend" {
+  targets = [{ __path__ = "/logs/backend/????????-????-????-????-????????????.log", environment = "local-dev", service = "app-server", host = sys.env("OBS_HOST") }]
+  file_match {
+    enabled = true
+    sync_period = "5s"
+    ignore_older_than = "168h"
+  }
+  forward_to = [loki.process.erp.receiver]
+}
+
+loki.source.file "local_web" {
+  targets = [{ __path__ = "/logs/web/vite-*.log", environment = "local-dev", service = "vite", host = sys.env("OBS_HOST") }]
+  file_match {
+    enabled = true
+    sync_period = "5s"
+    ignore_older_than = "168h"
+  }
+  forward_to = [loki.process.erp.receiver]
+}
+
+loki.process "erp" {
+  stage.decolorize {}
+  stage.multiline {
+    firstline = "^(\\{|[0-9]{4}-[0-9]{2}-[0-9]{2}|[A-Z]+ |panic:|fatal error:|ts=|time=)"
+    max_wait_time = "2s"
+    max_lines = 128
+  }
+  stage.drop {
+    older_than = "168h"
+    drop_counter_reason = "outside_retention"
+  }
+  stage.json {
+    expressions = { level = "level" }
+  }
+  stage.labels {
+    values = { level = "" }
+  }
+  stage.label_keep {
+    values = ["environment", "service", "host", "level", "stream"]
+  }
+  forward_to = [loki.write.erp.receiver]
+}
+
+loki.write "erp" {
+  wal {
+    max_segment_age = "30m"
+  }
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+    batch_size = "256KiB"
+    batch_wait = "1s"
+    min_backoff_period = "500ms"
+    max_backoff_period = "5s"
+    max_backoff_retries = 24
+  }
+}

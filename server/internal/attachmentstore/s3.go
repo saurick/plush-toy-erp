@@ -10,12 +10,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	pkglogger "server/pkg/logger"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
@@ -60,6 +63,7 @@ func NewFromEnv(logger log.Logger) (Store, error) {
 	if err != nil {
 		return nil, err
 	}
+	store.log = log.NewHelper(log.With(logger, "logger.name", "attachmentstore.s3"))
 	log.NewHelper(logger).Infow("msg", "attachment storage configured",
 		"endpoint", strings.TrimRight(cfg.Endpoint, "/"), "bucket", cfg.Bucket,
 		"region", store.client.Options().Region)
@@ -69,6 +73,7 @@ func NewFromEnv(logger log.Logger) (Store, error) {
 type S3 struct {
 	client *s3.Client
 	bucket string
+	log    *log.Helper
 }
 
 func New(c Config) (*S3, error) {
@@ -120,7 +125,8 @@ func objectContentType(content []byte) string {
 
 func (s *S3) Put(ctx context.Context, key string, content []byte) (err error) {
 	ctx, finish := startObjectTrace(ctx, "attachment.s3.put")
-	defer func() { finish(err) }()
+	start := time.Now()
+	defer func() { finish(err); s.observeFailure(ctx, "put", start, err) }()
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	if !ValidKey(key) || len(content) == 0 {
@@ -142,12 +148,13 @@ func (s *S3) Put(ctx context.Context, key string, content []byte) (err error) {
 	if readErr == nil && bytes.Equal(stored, content) {
 		return nil
 	}
-	return ErrUnavailable
+	return objectUnavailable(err)
 }
 
 func (s *S3) Get(ctx context.Context, key string, maximum int64) (_ []byte, err error) {
 	ctx, finish := startObjectTrace(ctx, "attachment.s3.get")
-	defer func() { finish(err) }()
+	start := time.Now()
+	defer func() { finish(err); s.observeFailure(ctx, "get", start, err) }()
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	if !ValidKey(key) || maximum <= 0 {
@@ -159,7 +166,7 @@ func (s *S3) Get(ctx context.Context, key string, maximum int64) (_ []byte, err 
 		if errors.As(err, &api) && (api.ErrorCode() == "NoSuchKey" || api.ErrorCode() == "NotFound") {
 			return nil, ErrNotFound
 		}
-		return nil, ErrUnavailable
+		return nil, objectUnavailable(err)
 	}
 	defer func() { _ = out.Body.Close() }()
 	if out.ContentLength != nil && *out.ContentLength > maximum {
@@ -167,7 +174,7 @@ func (s *S3) Get(ctx context.Context, key string, maximum int64) (_ []byte, err 
 	}
 	content, err := io.ReadAll(io.LimitReader(out.Body, maximum+1))
 	if err != nil {
-		return nil, ErrUnavailable
+		return nil, objectUnavailable(err)
 	}
 	if int64(len(content)) > maximum {
 		return nil, ErrIntegrity
@@ -188,10 +195,57 @@ func startObjectTrace(ctx context.Context, operation string) (context.Context, f
 	}
 }
 
-func (s *S3) Check(ctx context.Context) error {
-	_, err := s.client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(s.bucket)})
+func (s *S3) Check(ctx context.Context) (err error) {
+	start := time.Now()
+	defer func() { s.observeFailure(ctx, "check", start, err) }()
+	_, err = s.client.HeadBucket(ctx, &s3.HeadBucketInput{Bucket: aws.String(s.bucket)})
 	if err != nil {
-		return ErrUnavailable
+		return objectUnavailable(err)
 	}
 	return nil
+}
+
+type objectUnavailableError struct{ reason string }
+
+func (e *objectUnavailableError) Error() string { return ErrUnavailable.Error() + ": " + e.reason }
+func (*objectUnavailableError) Unwrap() error   { return ErrUnavailable }
+
+func objectUnavailable(err error) error {
+	reason := "upstream_error"
+	var networkError net.Error
+	var api smithy.APIError
+	switch {
+	case errors.Is(err, context.Canceled):
+		reason = "canceled"
+	case errors.Is(err, context.DeadlineExceeded), errors.As(err, &networkError) && networkError.Timeout():
+		reason = "timeout"
+	case errors.As(err, &api):
+		switch api.ErrorCode() {
+		case "AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch":
+			reason = "access_denied"
+		case "NoSuchBucket":
+			reason = "bucket_missing"
+		case "SlowDown", "Throttling":
+			reason = "throttled"
+		case "RequestTimeout":
+			reason = "timeout"
+		}
+	case errors.As(err, &networkError):
+		reason = "network_error"
+	}
+	return &objectUnavailableError{reason: reason}
+}
+
+func (s *S3) observeFailure(ctx context.Context, operation string, start time.Time, err error) {
+	var unavailable *objectUnavailableError
+	if s.log == nil || !errors.As(err, &unavailable) {
+		return
+	}
+	// The RPC completion owns the request result. Dependency diagnostics have
+	// their own signal so one failed request is not counted for every layer.
+	s.log.WithContext(ctx).Warnw("msg", "attachment dependency failed",
+		"dependency", "attachment_s3", "operation", operation,
+		"dependency_outcome", "error", "reason", unavailable.reason,
+		"latency", time.Since(start).Seconds(),
+		"request_id", pkglogger.RequestIDFromContext(ctx))
 }

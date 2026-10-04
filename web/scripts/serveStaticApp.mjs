@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 import fs from 'node:fs'
 import fsp from 'node:fs/promises'
+import { randomUUID } from 'node:crypto'
 import http from 'node:http'
 import https from 'node:https'
 import path from 'node:path'
 import process from 'node:process'
+import { performance } from 'node:perf_hooks'
 import { fileURLToPath } from 'node:url'
 
 const appRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -93,8 +95,9 @@ if (!fs.existsSync(path.join(staticRoot, 'index.html'))) {
 }
 
 const server = http.createServer((request, response) => {
-  handleRequest(request, response).catch((error) => {
-    console.error(`[web-static] ${request.method} ${request.url}`, error)
+  observeRequest(request, response)
+  handleRequest(request, response).catch(() => {
+    request.observation.reason = 'handler_failed'
     if (!response.headersSent) {
       sendText(response, 500, 'Internal Server Error')
     } else {
@@ -102,6 +105,51 @@ const server = http.createServer((request, response) => {
     }
   })
 })
+
+function safeRequestPath(rawUrl) {
+  let pathname
+  try { pathname = new URL(rawUrl, 'http://localhost').pathname } catch { return '/unknown' }
+  if (/^\/rpc\/[a-z][a-z0-9_]{0,95}$/u.test(pathname)) return pathname
+  if (pathname.startsWith('/rpc')) return '/rpc/unknown'
+  if (pathname === '/templates/render-pdf') return pathname
+  if (pathname.startsWith('/templates')) return '/templates/{path}'
+  if (['/healthz', '/readyz', '/readyz/runtime-identity'].includes(pathname)) return pathname
+  return '/static/{path}'
+}
+
+function observeRequest(request, response) {
+  const suppliedId = request.headers['x-request-id']
+  const requestId = typeof suppliedId === 'string' && /^[A-Za-z0-9._:-]{1,128}$/u.test(suppliedId)
+    ? suppliedId : randomUUID()
+  request.headers['x-request-id'] = requestId
+  response.setHeader('x-request-id', requestId)
+  const state = { requestId, start: performance.now(), reason: '', recorded: false }
+  request.observation = state
+  const record = (aborted = false) => {
+    if (state.recorded || (!aborted && response.statusCode < 400)) return
+    state.recorded = true
+    const outcome = response.statusCode >= 500 || (aborted && state.reason !== 'client_aborted') ? 'error' : 'rejected'
+    console.error(JSON.stringify({
+      ts: new Date().toISOString(), level: outcome === 'error' ? 'ERROR' : 'WARN',
+      msg: 'web request failed', 'service.name': 'web-static', request_id: requestId,
+      method: request.method, path: safeRequestPath(request.url), status: response.statusCode,
+      outcome, reason: state.reason || (aborted ? 'response_aborted' : `http_${response.statusCode}`),
+      latency: (performance.now() - state.start) / 1000,
+    }))
+  }
+  response.once('finish', () => record())
+  response.once('close', () => { if (!response.writableFinished) record(true) })
+}
+
+function upstreamFailureReason(error, timedOut) {
+  if (timedOut) return 'dependency_timeout'
+  const reasons = {
+    ECONNREFUSED: 'dependency_connection_refused', ENOTFOUND: 'dependency_dns_failure',
+    ETIMEDOUT: 'dependency_timeout', ECONNRESET: 'dependency_connection_reset',
+    EHOSTUNREACH: 'dependency_unreachable',
+  }
+  return reasons[error.code] || 'dependency_unavailable'
+}
 
 server.headersTimeout = 15_000
 server.requestTimeout = proxyTimeoutMs + 5_000
@@ -342,6 +390,7 @@ function proxyBodyLimit(pathname) {
 
 function proxyRequest(request, response, requestUrl) {
   if (!apiOrigin) {
+    request.observation.reason = 'dependency_not_configured'
     sendText(response, 502, 'API_ORIGIN is not configured')
     return
   }
@@ -359,6 +408,7 @@ function proxyRequest(request, response, requestUrl) {
     .join(', ')
   const headers = {
     ...stripHopByHopHeaders(request.headers),
+    'x-request-id': request.observation.requestId,
     host: targetUrl.host,
     'x-forwarded-host': request.headers.host || '',
     'x-forwarded-proto': request.socket.encrypted ? 'https' : 'http',
@@ -407,10 +457,9 @@ function proxyRequest(request, response, requestUrl) {
     if (bodyTooLarge) {
       return
     }
-    console.error(
-      `[web-static] proxy ${request.method} ${targetUrl.href}`,
-      error
-    )
+    if (request.observation.reason !== 'client_aborted') {
+      request.observation.reason = upstreamFailureReason(error, timedOut)
+    }
     if (!response.headersSent) {
       sendText(
         response,
@@ -422,7 +471,10 @@ function proxyRequest(request, response, requestUrl) {
     }
   })
 
-  request.on('aborted', () => proxy.destroy(new Error('client aborted')))
+  request.on('aborted', () => {
+    request.observation.reason = 'client_aborted'
+    proxy.destroy(new Error('client aborted'))
+  })
   let receivedBytes = 0
   request.on('data', (chunk) => {
     receivedBytes += chunk.length

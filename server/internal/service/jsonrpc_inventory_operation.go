@@ -7,6 +7,7 @@ import (
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
+	pkglogger "server/pkg/logger"
 )
 
 func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method, id string, pm map[string]any, actorID int) (string, *v1.JsonrpcResult, error) {
@@ -68,6 +69,7 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 		if current.OperationType == biz.InventoryOperationManualAdjustment {
 			return id, inventoryAdjustmentProcessRequiredResult(), nil
 		}
+		pkglogger.SetRequestObject(ctx, "inventory_operation", operationID)
 		item, err := d.inventoryUC.PostInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: operationID, ExpectedVersion: expectedVersion, ActorID: actorID})
 		return id, inventoryOperationResult(ctx, d, item, err), nil
 	case "cancel_inventory_operation":

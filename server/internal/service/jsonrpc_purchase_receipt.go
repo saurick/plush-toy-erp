@@ -6,6 +6,7 @@ import (
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
+	pkglogger "server/pkg/logger"
 )
 
 func (d *jsonrpcDispatcher) handlePurchaseReceipt(
@@ -81,6 +82,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		if res != nil {
 			return id, res, nil
 		}
+		pkglogger.SetRequestObject(ctx, "purchase_receipt", getInt(pm, "id", 0))
 		item, err := d.inventoryUC.PostPurchaseReceiptForAccess(ctx, getInt(pm, "id", 0), scope)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
 	case "cancel_purchase_receipt_draft":

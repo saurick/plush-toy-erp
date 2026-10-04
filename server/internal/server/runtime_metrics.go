@@ -98,7 +98,7 @@ func renderRuntimeMetrics(db *sql.DB, pdfGate *templatePDFRenderGate, pdfWarmup 
 	writeMetric(&out, "plush_erp_go_stack_inuse_bytes", "Current in-use stack bytes.", float64(mem.StackInuse))
 	writeCounter(&out, "plush_erp_go_gc_cycles_total", "Completed garbage collection cycles.", float64(mem.NumGC))
 	writeCounter(&out, "plush_erp_rpc_requests_total", "Completed JSON-RPC requests.", float64(sharedRuntimeMetricCounters.rpcRequests.Load()))
-	writeCounter(&out, "plush_erp_rpc_errors_total", "JSON-RPC requests completed with an application or transport error.", float64(sharedRuntimeMetricCounters.rpcErrors.Load()))
+	writeCounter(&out, "plush_erp_rpc_errors_total", "Requests completed with a system or transport error; business rejections are excluded.", float64(sharedRuntimeMetricCounters.rpcErrors.Load()))
 	writeCounter(&out, "plush_erp_rpc_duration_seconds_total", "Cumulative JSON-RPC request duration.", time.Duration(sharedRuntimeMetricCounters.rpcDurationNanos.Load()).Seconds())
 
 	if db != nil {

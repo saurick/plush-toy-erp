@@ -1,0 +1,139 @@
+name: plush-erp-observability
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  docker-api:
+    image: tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      CONTAINERS: "1"
+      PING: "1"
+      VERSION: "1"
+      POST: "0"
+      EVENTS: "0"
+      INFO: "0"
+      NETWORKS: "1"
+      ALLOW_RESTARTS: "0"
+      ALLOW_START: "0"
+      ALLOW_STOP: "0"
+      ALLOW_PAUSE: "0"
+      ALLOW_UNPAUSE: "0"
+      LOG_LEVEL: warning
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [docker-private]
+    mem_limit: 64m
+    cpus: 0.25
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  loki:
+    image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
+    restart: unless-stopped
+    logging: *logging
+    command: [-config.file=/etc/loki/config.yml, -config.expand-env=true]
+    environment:
+      LOKI_RETENTION: "${LOKI_RETENTION:-168h}"
+    volumes:
+      - ./observability/loki.yml:/etc/loki/config.yml:ro
+      - loki-data:/loki
+    ports:
+      - "127.0.0.1:${LOKI_PORT:-3110}:3100"
+    mem_limit: 512m
+    cpus: 1
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  alloy:
+    image: grafana/alloy:v1.20.1@sha256:2aa2099af76c0098d4af7a4d6e48f86cb66dc1a000222ad927a1c67c6542d13f
+    restart: unless-stopped
+    # 原始开发日志保持 owner 私有；镜像状态目录使用 vendor 的 473 group。
+    user: "${ALLOY_UID:?ALLOY_UID is required}:473"
+    init: true
+    logging: *logging
+    command: [run, /etc/alloy/config.alloy, --storage.path=/var/lib/alloy, --server.http.listen-addr=0.0.0.0:12345, --disable-reporting]
+    environment:
+      OBS_HOST: "${OBS_HOST:?OBS_HOST is required}"
+    volumes:
+      - "${OBS_RUNTIME_DIR:?OBS_RUNTIME_DIR is required}/alloy.alloy:/etc/alloy/config.alloy:ro"
+      - "${OBS_RUNTIME_DIR:?OBS_RUNTIME_DIR is required}/alloy-healthcheck.sh:/etc/alloy/healthcheck.sh:ro"
+      - "${LOCAL_BACKEND_LOG_DIR:?LOCAL_BACKEND_LOG_DIR is required}:/logs/backend:ro"
+      - "${LOCAL_WEB_LOG_DIR:?LOCAL_WEB_LOG_DIR is required}:/logs/web:ro"
+      - alloy-data:/var/lib/alloy
+    networks: [default, docker-private]
+    depends_on: [loki, docker-api]
+    ports:
+      - "127.0.0.1:${ALLOY_PORT:-12346}:12345"
+    healthcheck:
+      test: [CMD, /usr/bin/bash, /etc/alloy/healthcheck.sh]
+      interval: 20s
+      timeout: 8s
+      retries: 3
+      start_period: 30s
+    mem_limit: 256m
+    cpus: 0.5
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  grafana:
+    image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
+    restart: unless-stopped
+    init: true
+    logging: *logging
+    environment:
+      GF_SECURITY_ADMIN_USER: "${GRAFANA_ADMIN_USER:-admin}"
+      GF_SECURITY_ADMIN_PASSWORD: "${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}"
+      GF_SECURITY_COOKIE_SECURE: "${GRAFANA_COOKIE_SECURE:-false}"
+      GF_SERVER_ROOT_URL: "${GRAFANA_ROOT_URL:-http://localhost:3000/}"
+      GF_LIVE_ALLOWED_ORIGINS: "${GRAFANA_ALLOWED_ORIGINS:-}"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_ALERTING_ENABLED: "false"
+      GF_UNIFIED_ALERTING_ENABLED: "true"
+      GF_SMTP_ENABLED: "false"
+      GF_FEATURE_TOGGLES_ENABLE: jaegerEnableGrpcEndpoint
+      GOMEMLIMIT: 256MiB
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - "${OBS_RUNTIME_DIR:?OBS_RUNTIME_DIR is required}/provisioning:/etc/grafana/provisioning:ro"
+      - "${OBS_RUNTIME_DIR:?OBS_RUNTIME_DIR is required}/dashboards:/var/lib/grafana/dashboards:ro"
+    ports:
+      - "${GRAFANA_BIND_ADDR:-127.0.0.1}:${GRAFANA_PORT:-3130}:3000"
+    depends_on: [loki]
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    mem_limit: 512m
+    cpus: 0.5
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD-SHELL, wget -q -O /dev/null http://127.0.0.1:3000/api/health]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  loki-data: {}
+  alloy-data: {}
+  grafana-data: {}
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: "${OBS_NETWORK_SUBNET:-10.254.240.0/28}"
+  docker-private:
+    internal: true
+    ipam:
+      config:
+        - subnet: "${OBS_DOCKER_SUBNET:-10.254.240.16/28}"

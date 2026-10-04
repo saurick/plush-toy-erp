@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -61,12 +60,9 @@ func (l *stdColorLogger) Log(level log.Level, keyvals ...interface{}) error {
 		keyvals = append(keyvals, "KEYVALS UNPAIRED")
 	}
 
-	// wirter 不支持颜色输出(线上环境)，直接输出 json
+	// 非终端输出使用 JSON，开发日志文件与容器日志遵循同一格式。
 	if w, ok := l.w.(*os.File); !ok || supportscolor.SupportsColor(w.Fd()).Level == gchalk.LevelNone {
-		testMode := flag.Lookup("test.v") != nil // 是否是单元测试环境
-		if !testMode {                           // 特殊的，单元测试环境下，不输出 json 格式
-			return l.jsonOutput(level, keyvals...)
-		}
+		return l.jsonOutput(level, keyvals...)
 	}
 
 	buf := l.pool.Get().(*bytes.Buffer)
@@ -95,7 +91,7 @@ func (l *stdColorLogger) Log(level log.Level, keyvals ...interface{}) error {
 
 	for i := 0; i < len(keyvals); i += 2 {
 		k := fmt.Sprintf("%s", keyvals[i])
-		v := fmt.Sprintf("%v", keyvals[i+1])
+		v := fmt.Sprintf("%v", diagnosticLogValue(keyvals[i+1]))
 
 		// 跳过空值不输出
 		if l.skipN && v == "" {
@@ -122,22 +118,21 @@ func (l *stdColorLogger) jsonOutput(level log.Level, keyvals ...interface{}) err
 	param := map[string]interface{}{"level": level.String()}
 	for i := 0; i < len(keyvals); i += 2 {
 		k := fmt.Sprintf("%v", keyvals[i])
-		v := keyvals[i+1]
+		v := diagnosticLogValue(keyvals[i+1])
 		param[k] = v
 	}
 	data, err := json.Marshal(&param)
 	if err != nil {
 		return err
 	}
-	_, err = l.w.Write(data)
-	if err != nil {
-		return err
+	data = append(data, '\n')
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	n, err := l.w.Write(data)
+	if err == nil && n != len(data) {
+		return io.ErrShortWrite
 	}
-	_, err = l.w.Write([]byte("\n"))
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
 
 func (l *stdColorLogger) Close() error {

@@ -1,0 +1,269 @@
+{
+  "id": null,
+  "uid": "plush-erp-logs",
+  "title": "ERP 日志排查",
+  "tags": [
+    "plush",
+    "logs"
+  ],
+  "timezone": "Asia/Shanghai",
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "editable": false,
+  "templating": {
+    "list": [
+      {
+        "name": "environment",
+        "label": "环境",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "plush-logs-local-dev"
+        },
+        "query": {
+          "type": 1,
+          "label": "environment",
+          "stream": "",
+          "refId": "LokiVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "current": {
+          "text": "local-dev",
+          "value": "local-dev"
+        },
+        "multi": false,
+        "includeAll": false
+      },
+      {
+        "name": "logs",
+        "type": "datasource",
+        "query": "loki",
+        "regex": "/^ERP logs ${environment}$/",
+        "refresh": 1,
+        "hide": 2,
+        "current": {
+          "text": "ERP logs local-dev",
+          "value": "plush-logs-local-dev"
+        }
+      },
+      {
+        "name": "service",
+        "label": "服务",
+        "type": "query",
+        "datasource": {
+          "type": "loki",
+          "uid": "${logs}"
+        },
+        "query": {
+          "type": 1,
+          "label": "service",
+          "stream": "{environment=\"$environment\"}",
+          "refId": "LokiVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".+",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "request",
+        "label": "请求编号或关键字",
+        "type": "textbox",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "五分钟内系统错误",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${logs}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${logs}"
+          },
+          "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | outcome=\"error\" [5m]))",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 2,
+      "title": "五分钟内业务拒绝",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${logs}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${logs}"
+          },
+          "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | outcome=\"rejected\" [5m]))",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 3,
+      "title": "请求与服务日志",
+      "type": "logs",
+      "gridPos": {
+        "h": 16,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${logs}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "loki",
+            "uid": "${logs}"
+          },
+          "expr": "{environment=~\"${environment:regex}\",service=~\"${service:regex}\"} |= ${request:doublequote}",
+          "queryType": "range"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 4,
+      "title": "查询说明",
+      "type": "text",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 3
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "按环境、服务、时间和请求编号定位。展开日志可查看原始字段；Trace 跳转只提供给已采样且仍保留的链路。本地历史文件按采集时间进入查询，原始 `ts` 字段保留。业务结果以单据和事实记录为准。"
+      }
+    },
+    {
+      "id": 5,
+      "title": "五分钟内依赖调用失败",
+      "description": "依赖诊断与请求结果分别统计，避免同一失败在多个层重复计数。",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "${logs}" },
+      "targets": [{
+        "refId": "A",
+        "datasource": { "type": "loki", "uid": "${logs}" },
+        "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | dependency_outcome=\"error\" [5m]))",
+        "queryType": "range"
+      }],
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "palette-classic" } }, "overrides": [] }
+    },
+    {
+      "id": 6,
+      "title": "五分钟内未归类 ERROR 日志",
+      "description": "用于定位尚无统一结果字段的诊断日志，数值表示日志条数。Panic 堆栈由请求失败记录计数。",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
+      "datasource": { "type": "loki", "uid": "${logs}" },
+      "targets": [{
+        "refId": "A",
+        "datasource": { "type": "loki", "uid": "${logs}" },
+        "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | level=~\"(?i)error|fatal\" | outcome=\"\" | dependency_outcome=\"\" | msg!=\"request panic recovered\" [5m]))",
+        "queryType": "range"
+      }],
+      "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "palette-classic" } }, "overrides": [] }
+    }
+  ]
+}

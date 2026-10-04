@@ -7,6 +7,7 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
+	pkglogger "server/pkg/logger"
 )
 
 func (d *jsonrpcDispatcher) handleOperationalFactShipment(
@@ -103,6 +104,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 			return id, res, nil
 		}
 		shipmentID := getInt(pm, "id", 0)
+		pkglogger.SetRequestObject(ctx, "shipment", shipmentID)
 		item, err := d.operationalFactUC.ShipShipmentWithActor(ctx, shipmentID, actorID)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "cancel_shipment":

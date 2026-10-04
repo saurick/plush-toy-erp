@@ -6,6 +6,7 @@ import (
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
+	pkglogger "server/pkg/logger"
 )
 
 func (d *jsonrpcDispatcher) handleOperationalFactFinance(
@@ -144,6 +145,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if res := d.requireFinanceFactAccess(ctx, factID, scope); res != nil {
 			return id, res, nil
 		}
+		pkglogger.SetRequestObject(ctx, "finance_fact", mutation.ID)
 		item, err := d.operationalFactUC.PostFinanceFact(ctx, mutation)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "settle_finance_fact":
@@ -165,6 +167,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if res := d.requireFinanceFactAccess(ctx, factID, scope); res != nil {
 			return id, res, nil
 		}
+		pkglogger.SetRequestObject(ctx, "finance_fact", mutation.ID)
 		item, err := d.operationalFactUC.SettleFinanceFact(ctx, mutation)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "cancel_finance_fact":
@@ -186,6 +189,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if res := d.requireFinanceFactAccess(ctx, factID, scope); res != nil {
 			return id, res, nil
 		}
+		pkglogger.SetRequestObject(ctx, "finance_fact", mutation.ID)
 		item, err := d.operationalFactUC.CancelPostedFinanceFact(ctx, mutation)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
 	case "list_finance_facts":

@@ -9,6 +9,7 @@ import './erp/styles/app.css'
 import App from './App'
 import { AppAlertProvider } from '@/common/components/modal/AppAlertProvider'
 import { redirectToCanonicalLocalDevHost } from '@/common/theme/localDevThemeOrigin.mjs'
+import { startBrowserErrorReporting } from '@/common/runtime/browserErrors.js'
 
 // 只在开发环境 & 打开开关时启用 mock
 const rpcMockEnabled =
@@ -26,6 +27,7 @@ const redirectedLocalDevHost =
   import.meta.env.DEV && redirectToCanonicalLocalDevHost(window)
 
 if (!redirectedLocalDevHost) {
+  if (!rpcMockEnabled) startBrowserErrorReporting(window)
   const rootElement = document.getElementById('root')
   if (!rootElement) {
     throw new Error('Root element #root not found')

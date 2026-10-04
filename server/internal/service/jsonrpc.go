@@ -7,6 +7,7 @@ import (
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/conf"
+	pkglogger "server/pkg/logger"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -69,6 +70,9 @@ func NewJsonrpcService(
 
 // PostJsonrpc 对应 POST /rpc/{url}
 func (s *JsonrpcService) PostJsonrpc(ctx context.Context, req *v1.PostJsonrpcRequest) (*v1.PostJsonrpcReply, error) {
+	if claims, ok := biz.GetClaimsFromContext(ctx); ok && claims != nil {
+		pkglogger.SetRequestActor(ctx, claims.UserID)
+	}
 	s.log.WithContext(ctx).Debugf(
 		"PostJsonrpc: url=%s jsonrpc=%s method=%s id=%s",
 		req.GetUrl(), req.GetJsonrpc(), req.GetMethod(), req.GetId(),

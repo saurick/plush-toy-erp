@@ -73,6 +73,8 @@ make dev_restart ARGS='--log-match="request_id=req-42"'
 
 开发配置默认关闭 `data.postgres.debug`，避免后台查询持续输出整条 SQL；普通 debug 仍写入原始文件。排查数据库时可在 `config.local.yaml` 的现有 `data.postgres` 下显式设置 `debug: true`，执行重启后用 `--log-level=DEBUG` 查看。SQL DEBUG 保留语句但移除绑定参数，无法解析的 SQL 诊断不透传原文。数据库等待只在首次失败、错误变化或每 10 秒记录重试，最终超时仍报告失败。
 
+可使用[集中日志工作台](../docs/observability/集中日志接入与运维.md)按 `local-dev` 环境查询同一批原始日志，并关联请求和已采样 Trace；后端仍使用现有日志路径，工作台不自动重启服务。Vite 启动入口同时在 `output/dev-workbench/web-logs/` 保存有上限的终端日志副本。
+
 首次使用先执行 `make dev_database_roles`；有待执行迁移时通过迁移页或 `make migrate` 完成检查、恢复演练及确认，启动入口不自动 apply。
 
 人工终端的启动、重启成功后在当前 tab 持续显示后端日志，并显示 PID、启动时间、启动来源、运行版本和日志文件；已有同工作区日志查看进程时，先核对命令和启动时间，再请求其正常退出，原 tab 返回命令行。后端仍独立常驻，日志接管不停止服务；日志查看器无法退出时当前 tab 仍显示日志并提示原因。按 `Ctrl+C` 只退出日志查看，随后可在同一终端执行 `make dev_restart` 或 `make dev_stop`；单独查看已有服务使用 `make dev_logs`，它不构建、不启动、不迁移数据库。Codex、前端冷启动和迁移恢复等非交互入口在 macOS 打开可见的日志终端，优先使用已安装的 iTerm2，否则使用系统 Terminal；已有同工作区日志终端时复用，服务重启后自动切换到新日志。日志查看在重启锁释放后进行，不占用迁移锁；关闭日志终端不停止后端。CI、SSH 和非 macOS 的非交互入口只输出查看指引；需要明确返回且不打开终端时使用 `make dev_restart ARGS=--background`。日志终端打开失败会提示 `make dev_logs`，不改变已经完成的服务验证结果。

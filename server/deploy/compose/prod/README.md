@@ -6,6 +6,7 @@
 - `jaeger-v2.yml`：Jaeger v2 的 OTLP / Jaeger / Zipkin 接收、Badger 持久 Trace 存储、查询 UI、健康端点与外部 Prometheus 查询配置。
 - `compose.demo-133.yml`：`demo-133` 的固定 Compose project 覆盖。
 - `compose.customer-test-133.yml`：`customer-test-133` 的固定 Compose project 覆盖。
+- `compose.observability.yml` 与 `observability/`：独立的 Alloy / Loki / Grafana 日志工作台；启动、范围、保留和恢复见[集中日志接入与运维](../../../../docs/observability/集中日志接入与运维.md)。业务 Compose 不自动启动这套服务。
 - `.env.example`：运行环境变量示例，不保存真实凭据。
 - `migrate_online.sh`：按登记目标执行受控 Atlas migration，并在附件外置维护窗口完成导出与校验。
 - `attachment_raid_preflight.sh`：只读检查附件目录实际使用指定本机 RAID5 挂载。

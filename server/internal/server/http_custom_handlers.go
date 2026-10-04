@@ -53,8 +53,19 @@ type statusCapturingResponseWriter struct {
 }
 
 func (w *statusCapturingResponseWriter) WriteHeader(status int) {
+	if status >= 100 && status < 200 {
+		w.ResponseWriter.WriteHeader(status)
+		return
+	}
+	if w.status != 0 {
+		return
+	}
 	w.status = status
 	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *statusCapturingResponseWriter) Unwrap() stdhttp.ResponseWriter {
+	return w.ResponseWriter
 }
 
 func (w *statusCapturingResponseWriter) Write(p []byte) (int, error) {
@@ -197,6 +208,7 @@ func newObservedHTTPHandler(
 				span.SetStatus(codes.Error, panicErr.Error())
 				helper.WithContext(ctx).Errorw(
 					"msg", "custom http handler panic",
+					"outcome", "error",
 					"operation", operation,
 					"method", req.Method,
 					"path", req.URL.Path,
@@ -216,8 +228,20 @@ func newObservedHTTPHandler(
 				span.SetStatus(codes.Ok, "OK")
 			}
 
-			helper.WithContext(ctx).Debugw(
+			level, outcome := log.LevelDebug, "success"
+			if status >= stdhttp.StatusInternalServerError {
+				level, outcome = log.LevelError, "error"
+			} else if status >= stdhttp.StatusBadRequest {
+				level, outcome = log.LevelWarn, "rejected"
+			}
+			// Readiness state changes already have a dedicated record; polls must
+			// not inflate error counts while the same dependency stays down.
+			if operation == "server.http.healthz" || operation == "server.http.readyz" {
+				level = log.LevelDebug
+			}
+			helper.WithContext(ctx).Log(level,
 				"msg", "custom http handler completed",
+				"outcome", outcome,
 				"operation", operation,
 				"method", req.Method,
 				"path", req.URL.Path,
@@ -231,7 +255,8 @@ func newObservedHTTPHandler(
 
 		defer func() {
 			if recovered := recover(); recovered != nil {
-				panicErr = fmt.Errorf("panic recovered: %v", recovered)
+				logRecoveredPanic(ctx, logger, recovered)
+				panicErr = fmt.Errorf("panic recovered (%T)", recovered)
 				if recorder.status == 0 {
 					writePlainText(recorder, stdhttp.StatusInternalServerError, stdhttp.StatusText(stdhttp.StatusInternalServerError))
 				}
@@ -312,6 +337,7 @@ func registerHealthRoutes(
 				if _, changed := shouldLogReadinessState("postgres_not_ready"); changed {
 					healthLogger.WithContext(ctx).Warnw(
 						"msg", "dependency not ready",
+						"outcome", "error",
 						"operation", "server.http.readyz",
 						"component", "postgres",
 						"status", stdhttp.StatusServiceUnavailable,
@@ -333,6 +359,7 @@ func registerHealthRoutes(
 				}
 				logFields := []interface{}{
 					"msg", "dependency not ready",
+					"outcome", "error",
 					"operation", "server.http.readyz",
 					"component", "template_pdf_warmup",
 					"status", stdhttp.StatusServiceUnavailable,

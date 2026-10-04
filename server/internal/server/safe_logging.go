@@ -6,6 +6,7 @@ import (
 	"time"
 
 	v1 "server/api/jsonrpc/v1"
+	pkglogger "server/pkg/logger"
 
 	kratoserrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
@@ -18,6 +19,9 @@ import (
 func safeServerLogging(logger log.Logger) middleware.Middleware {
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req any) (reply any, err error) {
+			if _, ok := req.(*v1.PostJsonrpcRequest); !ok {
+				return handler(ctx, req)
+			}
 			start := time.Now()
 			kind := ""
 			operation := ""
@@ -27,8 +31,6 @@ func safeServerLogging(logger log.Logger) middleware.Middleware {
 			}
 
 			reply, err = handler(ctx, req)
-			outcome := requestOutcome(req, reply, err)
-			sharedRuntimeMetricCounters.observeRPC(time.Since(start), outcome == "error")
 			var code int32
 			reason := ""
 			if serviceErr := kratoserrors.FromError(err); serviceErr != nil {
@@ -49,8 +51,10 @@ func safeServerLogging(logger log.Logger) middleware.Middleware {
 				"reason", reason,
 				"latency", time.Since(start).Seconds(),
 			}
+			failed := err != nil
 			if _, ok := req.(*v1.PostJsonrpcRequest); ok {
 				response, _ := reply.(*v1.PostJsonrpcReply)
+				outcome := requestOutcome(req, reply, err)
 				switch outcome {
 				case "error":
 					level = log.LevelError
@@ -58,11 +62,17 @@ func safeServerLogging(logger log.Logger) middleware.Middleware {
 					level = log.LevelWarn
 				}
 				fields = append(fields, "outcome", outcome)
+				failed = outcome == "error"
 				if result := response.GetResult(); result != nil {
 					fields = append(fields, "rpc_result_code", result.GetCode())
 				}
 			}
+			sharedRuntimeMetricCounters.observeRPC(time.Since(start), failed)
+			fields = append(fields, pkglogger.RequestObservationFields(ctx)...)
 			log.NewHelper(log.WithContext(ctx, logger)).Log(level, fields...)
+			if state, ok := ctx.Value(rpcCompletionKey{}).(*rpcCompletionState); ok {
+				state.recorded = true
+			}
 			return reply, err
 		}
 	}

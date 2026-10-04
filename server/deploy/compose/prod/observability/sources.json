@@ -1,0 +1,10 @@
+{
+  "host": "r740xd",
+  "containers": [
+    { "name": "development-postgres-133", "environment": "local-dev", "service": "postgres" },
+    { "name": "development-jaeger-133", "environment": "local-dev", "service": "jaeger" },
+    { "name": "seaweedfs", "environment": "shared-infra", "service": "attachment-storage" },
+    { "name": "frpc-core-plush-web-demo", "environment": "demo-133", "service": "web-tunnel" },
+    { "name": "frpc-core-plush-web-test", "environment": "customer-test-133", "service": "web-tunnel" }
+  ]
+}

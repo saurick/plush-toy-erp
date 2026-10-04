@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/ratelimit"
-	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -29,12 +28,12 @@ func NewHTTPServer(
 	dc *conf.Data,
 ) *httpx.Server {
 	var opts = []httpx.ServerOption{
-		httpx.Filter(SecurityHeadersFilter(), RequestIDFilter(), JSONRPCBodyLimitFilter()),
+		httpx.Filter(SecurityHeadersFilter(), RequestIDFilter(), JSONRPCFailureLoggingFilter(logger), JSONRPCBodyLimitFilter()),
 		httpx.RequestDecoder(BoundedRequestDecoder),
 		httpx.Middleware(
-			recovery.Recovery(),
 			safeServerTracing(tp),
 			safeServerLogging(log.With(logger, "logger.name", "server.http")),
+			safeServerRecovery(logger),
 			// 默认 bbr limiter
 			ratelimit.Server(),
 			// 统一从请求头解析 JWT，并把 AuthClaims 写入请求上下文。

@@ -151,6 +151,7 @@ func (r *processRuntimeWorkflowReconciler) runWorkflowOnce(ctx context.Context) 
 	if err != nil {
 		l.Errorw(
 			"msg", "process runtime workflow reconciliation failed",
+			"outcome", "error",
 			"component", "process_runtime_workflow_reconciler",
 			"err", err,
 		)
@@ -159,6 +160,7 @@ func (r *processRuntimeWorkflowReconciler) runWorkflowOnce(ctx context.Context) 
 	if result == nil {
 		l.Errorw(
 			"msg", "process runtime workflow reconciliation returned no result",
+			"outcome", "error",
 			"component", "process_runtime_workflow_reconciler",
 		)
 		return
@@ -172,6 +174,7 @@ func (r *processRuntimeWorkflowReconciler) runWorkflowOnce(ctx context.Context) 
 	if result.LastScannedWorkflowTaskID <= afterWorkflowTaskID {
 		l.Errorw(
 			"msg", "process runtime workflow reconciliation returned an invalid cursor",
+			"outcome", "error",
 			"component", "process_runtime_workflow_reconciler",
 			"after_workflow_task_id", afterWorkflowTaskID,
 			"last_scanned_workflow_task_id", result.LastScannedWorkflowTaskID,
@@ -182,6 +185,7 @@ func (r *processRuntimeWorkflowReconciler) runWorkflowOnce(ctx context.Context) 
 	for _, failure := range result.Failures {
 		l.Errorw(
 			"msg", "process runtime workflow settlement failed",
+			"outcome", "error",
 			"component", "process_runtime_workflow_reconciler",
 			"workflow_task_id", failure.WorkflowTaskID,
 			"process_instance_id", failure.ProcessInstanceID,
@@ -226,6 +230,7 @@ func (r *processRuntimeWorkflowReconciler) runProcessRuntimeOnce(ctx context.Con
 	if err != nil {
 		l.Errorw(
 			"msg", "process runtime node reconciliation failed",
+			"outcome", "error",
 			"component", "process_runtime_workflow_reconciler",
 			"err", err,
 		)
@@ -234,6 +239,7 @@ func (r *processRuntimeWorkflowReconciler) runProcessRuntimeOnce(ctx context.Con
 	if result == nil {
 		l.Errorw(
 			"msg", "process runtime node reconciliation returned no result",
+			"outcome", "error",
 			"component", "process_runtime_workflow_reconciler",
 		)
 		return
@@ -247,6 +253,7 @@ func (r *processRuntimeWorkflowReconciler) runProcessRuntimeOnce(ctx context.Con
 	if result.LastScannedProcessNodeID <= afterProcessNodeID {
 		l.Errorw(
 			"msg", "process runtime node reconciliation returned an invalid cursor",
+			"outcome", "error",
 			"component", "process_runtime_workflow_reconciler",
 			"after_process_node_id", afterProcessNodeID,
 			"last_scanned_process_node_id", result.LastScannedProcessNodeID,
@@ -257,6 +264,7 @@ func (r *processRuntimeWorkflowReconciler) runProcessRuntimeOnce(ctx context.Con
 	for _, failure := range result.Failures {
 		l.Errorw(
 			"msg", "process runtime node settlement failed",
+			"outcome", "error",
 			"component", "process_runtime_workflow_reconciler",
 			"process_instance_id", failure.ProcessInstanceID,
 			"process_node_instance_id", failure.ProcessNodeInstanceID,

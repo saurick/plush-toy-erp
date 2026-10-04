@@ -195,6 +195,7 @@ trap cleanup_candidate EXIT
 
 docker run -d \
   --name "$candidate" \
+  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
   --network "$network" \
   --memory 96m \
   --restart no \
@@ -222,6 +223,7 @@ rollback_old() {
 
 if ! docker run -d \
   --name "$next_container" \
+  --log-driver json-file --log-opt max-size=10m --log-opt max-file=3 \
   --network "$network" \
   --memory 96m \
   --restart always \
