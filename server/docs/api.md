@@ -521,16 +521,6 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 
 成功后在同一事务覆盖该普通管理员的 `password_hash`、递增 `auth_version`、注销该账号全部 active admin session，并追加不含密码、密码哈希或 session key 的控制面审计。旧密码和旧 token 立即失效；接口不返回明文密码，也不允许非超级管理员维护受保护的系统账号。
 
-## 当前未纳入主干的业务能力
-
-以下旧项目或泛平台能力当前不在主干里，不应再假定存在：
-
-- 积分
-- 订阅
-- 邀请码
-
-如果后续需要这些能力，应按真实需求重新定义 schema、错误码、接口和前端消费层，而不是把历史逻辑直接加回主干。
-
 ## 接单、工程打样与用料审批 / Order Engineering Material Review
 
 销售订单行可先填写 `requested_product_name`、`customer_product_no`、`order_category`、`process_requirement`、数量、单位及 `pre_shipment_sample_quantity`，此时 `product_id` / `product_sku_id` 可空。产品和 BOM 由 `sales_order.save_sales_order_engineering` 单独关联，要求 `expected_version`，关联 BOM 时还要求 `expected_bom_version`。工程状态为 `PREPARING / SAMPLING / CONFIRMED`；确认与退回说明均由服务端验证，返单 `reuse_confirmed_sample` 只复用同客户相同资料的已确认样品。工程动作不能修改商务价格。
