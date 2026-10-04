@@ -7,13 +7,11 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
     chart: `flowchart TD
       A["本地提交与推送前检查"] --> B["推送 GitLab main"]
       B --> C["plan：确定范围与身份"]
-      C --> D["prepare：准备依赖与缓存"]
-      D --> E["按依赖运行并行质量检查"]
-      E --> F["汇总回执与清理证据"]
-      F --> G["CI Gate：固定同一提交的证据"]
+      C --> E["准备依赖并运行质量检查"]
+      E --> G["汇总同一提交的证据与 CI Gate"]
       G --> H["显式发布不可变制品"]
       H --> I["准备并确认目标部署"]
-      I --> J["加载制品、迁移、启动与运行检查"]
+      I --> J["执行部署并读回目标证据"]
       B -. "单向镜像" .-> K["GitHub：只读审查"]`,
     points: [
       '推送触发 CI；制品发布和目标部署各有独立入口与确认。',
@@ -27,24 +25,15 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
     description:
       '按领域展示 main push 的分组机制；具体 Job 和依赖展开本次流水线的真实 DAG 核对。',
     chart: `flowchart TD
-      P["plan → prepare"] --> N["Node 多路检查"]
-      P --> R["资源合同与运行检查"]
-      P --> W["Web 检查与构建并行"]
-      P --> S["Server 多路检查"]
-      P --> X["静态与安全检查"]
-      N --> NF["Node 汇总"]
-      R --> RF["资源汇总"]
-      W --> WF["Web 汇总"]
-      S --> SF["Server 汇总"]
-      W -->|"Web 构建制品"| B["浏览器执行"]
-      S -->|"升级与关键 PostgreSQL 清理完成"| B
-      B --> BF["浏览器汇总"]
-      NF --> A["七个领域回执总聚合"]
-      RF --> A
-      WF --> A
-      SF --> A
-      X --> A
-      BF --> A
+      P["plan → prepare"] --> N["Node、资源<br/>静态与安全"]
+      P --> W["Web 检查<br/>构建与汇总"]
+      P --> S["Server 检查<br/>分片与汇总"]
+      W -->|"Web 制品"| B["浏览器执行与汇总"]
+      S -->|"两个库任务清理"| B
+      N --> A["七个领域回执总聚合"]
+      W --> A
+      S --> A
+      B --> A
       A --> G["CI Gate"]`,
     points: [
       '前置依赖满足后进入就绪队列，实际启动还取决于 Runner 空槽和资源锁。领域完成即可汇总，不要求同阶段所有 Job 一起结束。',
@@ -61,9 +50,9 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
       A["多条 Pipeline"] --> B["共用 Runner 就绪队列"]
       B --> C["Job 槽位：concurrent / limit"]
       C --> D["单个 Job 内部执行"]
-      D --> E["Go 运行并发：GOMAXPROCS"]
-      D --> F["Go 包构建并发：GOFLAGS -p"]
-      D --> G["Node 测试文件并发"]
+      D --> E["Go 运行并发<br/>GOMAXPROCS"]
+      D --> F["Go 包构建并发<br/>GOFLAGS -p"]
+      D --> G["Node 测试文件<br/>并发"]
       H["资源锁、隔离与清理"] -. "约束执行资格和顺序" .-> D`,
     points: [
       '流水线之间共用总槽位；新提交可取消旧流水线中可中断的任务，清理仍须完成。',

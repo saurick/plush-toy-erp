@@ -748,7 +748,6 @@
 
 .erp-dev-docs-markdown .erp-markdown-mermaid__canvas {
   display: flex;
-  width: calc(var(--mermaid-zoom, 1) * 100%);
   min-width: 0;
   margin: 0 auto;
   justify-content: center;

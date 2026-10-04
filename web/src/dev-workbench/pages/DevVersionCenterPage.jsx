@@ -126,7 +126,7 @@ const OPERATION_HISTORY_TARGET_OPTIONS = [
 ]
 
 const GIT_INDEX_LOCK_RECOVERY_FLOW = `flowchart TD
-  A["准备暂存或提交"] --> B{"index.lock 是否存在"}
+  B{"准备暂存或提交：index.lock 是否存在"}
   B -->|否| C["按精确文件或 hunk 写入 index<br/>启用 PID 旁车"]
   B -->|是| D["只读检查 HEAD、当前 index、锁与 PID 旁车"]
   D --> E{"有活动 owner、仓库 Git 进程<br/>或打开句柄吗"}

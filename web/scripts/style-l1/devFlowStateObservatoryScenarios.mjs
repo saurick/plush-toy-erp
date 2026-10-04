@@ -48,6 +48,26 @@ export function createDevFlowStateObservatoryScenarios({
           'dev-flow-state-observatory-desktop-light'
         )
         await assertInactivePrintStylesDoNotHideApp(page)
+        await page.goto(new URL('/__dev/status-flows?view=states&flow=source.sales_order', page.url()).href)
+        const filters = page.getByRole('group', { name: '状态转换筛选' })
+        const graph = page.locator('.erp-dev-flow-state-graph')
+        await graph.locator('[data-mermaid-status="rendered"]').waitFor()
+        assert.equal(await filters.getByRole('button', { name: /^正常推进 /u }).getAttribute('aria-pressed'), 'true')
+        assert(!(await graph.locator('.erp-markdown-mermaid__canvas > svg').textContent()).includes('取消'))
+        await filters.getByRole('button', { name: /^全部 /u }).click()
+        await graph.locator('[data-mermaid-status="rendered"]').waitFor()
+        assert((await graph.locator('.erp-markdown-mermaid__canvas > svg').textContent()).includes('取消'))
+        await filters.getByRole('button', { name: /^异常与纠正 /u }).click()
+        await graph.locator('[data-mermaid-status="rendered"]').waitFor()
+        assert((await graph.locator('.erp-markdown-mermaid__canvas > svg').textContent()).includes('取消'))
+        await page.getByRole('button', { name: /^草稿，/u }).click()
+        await filters.getByRole('button', { name: /^当前状态 /u, pressed: true }).waitFor()
+        await graph.locator('[data-mermaid-status="rendered"]').waitFor()
+        assert.equal(await filters.getByRole('button', { name: /^当前状态 /u }).getAttribute('aria-pressed'), 'true')
+        await filters.getByRole('button', { name: /^正常推进 /u }).click()
+        await graph.locator('[data-mermaid-status="rendered"]').waitFor()
+        await assertNoHorizontalOverflow(page, 'focused-state-rules')
+
         assert.deepEqual(
           writeRequestsByPage.get(page) || [],
           [],

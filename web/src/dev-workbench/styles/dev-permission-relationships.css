@@ -466,7 +466,6 @@
 
 .erp-permission-relationship .erp-markdown-mermaid__canvas {
   display: flex;
-  width: calc(var(--mermaid-zoom, 1) * 100%);
   min-width: 0;
   min-height: 360px;
   align-items: center;

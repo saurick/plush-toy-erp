@@ -269,3 +269,29 @@ test('related-view projection only creates exact catalog-backed destinations', (
     ['runtime']
   )
 })
+
+
+test('focused state diagrams use the same transitions as the list and preserve complete access', () => {
+  const source = flow('source.sales_order')
+  const standard = filterDevFlowStateTransitions(source, '', DEV_FLOW_STATE_TRANSITION_FILTERS.standard)
+  const exceptional = filterDevFlowStateTransitions(source, '', DEV_FLOW_STATE_TRANSITION_FILTERS.exceptional)
+  assert.equal(standard.length + exceptional.length, source.transitions.length)
+  const selected = source.transitions[0].from
+  for (const filter of Object.values(DEV_FLOW_STATE_TRANSITION_FILTERS)) {
+    const visible = filterDevFlowStateTransitions(source, selected, filter)
+    const graph = buildDevFlowStateRuleMermaid(source, { filter, stateKey: selected })
+    assert.equal((graph.match(/ -->\|/gu) || []).length, visible.length)
+    const ids = new Set([...graph.matchAll(/^  (S\d+)\[/gmu)].map((match) => match[1]))
+    for (const edge of graph.matchAll(/(S\d+) -->\|[^\n]+\| (S\d+)/gu)) {
+      assert(ids.has(edge[1]) && ids.has(edge[2]), 'every visible transition retains both endpoints')
+    }
+  }
+  assert.equal((buildDevFlowStateRuleMermaid(source).match(/ -->\|/gu) || []).length, source.transitions.length)
+})
+
+test('state focus does not invent start or end markers for a nonterminal subset', () => {
+  const source = { states: [{ key: 'draft', label: '草稿' }, { key: 'active', label: '生效' }, { key: 'done', label: '结束' }], initialStates: ['draft'], terminalStates: ['done'], transitions: [] }
+  const graph = buildDevFlowStateRuleMermaid(source, { filter: 'related', stateKey: 'active' })
+  assert.match(graph, /生效/u)
+  assert.doesNotMatch(graph, /草稿|结束|STATE_START|STATE_END/u)
+})

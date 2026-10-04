@@ -4,8 +4,6 @@ import { MermaidDiagram } from '@/common/components/markdown'
 import { CI_WORKFLOW_SECTIONS } from '../config/devCiWorkflow.mjs'
 import './dev-ci-workflow.css'
 
-const INITIAL_ZOOM = { parallel: 2, resources: 1.6 }
-
 export default function DevCiWorkflowGuide({ initialSection = 'overview' }) {
   return (
     <section className="erp-dev-ci-guide" aria-label="CI/CD 流程与原理">
@@ -33,7 +31,6 @@ export default function DevCiWorkflowGuide({ initialSection = 'overview' }) {
                   label={`${section.label}原理图`}
                   showSourceOnError={false}
                   flowchartHtmlLabels={false}
-                  initialZoom={INITIAL_ZOOM[section.key] ?? 1}
                 />
               </div>
               <ol>

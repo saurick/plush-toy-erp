@@ -22,7 +22,7 @@ test('Mermaid viewer owns its shared interaction styles', () => {
 test('Mermaid viewer applies zoom and fullscreen geometry without a page wrapper', () => {
   assert.match(
     css,
-    /\.erp-markdown-mermaid__canvas[\s\S]*?width:\s*calc\(var\(--mermaid-zoom, 1\) \* 100%\)/u
+    /\.erp-markdown-mermaid__canvas[\s\S]*?width:\s*calc\(\s*var\(--mermaid-zoom, 1\) \* min\(100%, var\(--mermaid-intrinsic-width, 100%\)\)\s*\)/u
   )
   assert.match(
     css,

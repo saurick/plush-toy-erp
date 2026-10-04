@@ -28,9 +28,9 @@ export const DEV_DATA_PREPARATION_INCREMENTAL_FLOW = String.raw`flowchart TD
   F --> H
   G --> H
   H --> I["始终执行只读 readiness"]
-  I --> J["回执列出复用、直接变化、依赖刷新与最终刷新阶段"]
+  I --> J["回执列出复用、直接变化、依赖刷新与最终刷新阶段"]`
 
-  subgraph Modules["当前阶段依赖；实际 registry 为真源"]
+export const DEV_DATA_PREPARATION_MODULE_FLOW = String.raw`flowchart LR
     Core["core 身份与基础"] --> Baseline["baseline 基线"]
     Core --> Source["source 来源单"]
     Role["role 岗位与责任"] --> Source
@@ -38,8 +38,7 @@ export const DEV_DATA_PREPARATION_INCREMENTAL_FLOW = String.raw`flowchart TD
     Source --> Facts["facts 正式业务结果"]
     Task --> Attachments["attachments 附件"]
     Facts --> Quality["purchase-quality 采购质检"]
-    Facts --> Attachments
-  end`
+    Facts --> Attachments`
 
 export const DEV_DATA_PREPARATION_PROFILE_KEYS = Object.freeze({
   coreDemo: 'core-demo',

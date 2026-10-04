@@ -653,6 +653,44 @@ export function createDevWorkbenchDesktopScenarios({
         await commands.first().waitFor()
         await assertNoHorizontalOverflow(page, '专项检查命令分页与空结果恢复')
       }
+      if (item.route === DEV_DOCS_ROUTE) {
+        const source = 'docs/product/配置与权限策略.md'
+        await page.setViewportSize({ width: 3840, height: 2160 })
+        await page.goto(new URL(`${DEV_DOCS_ROUTE}?path=${encodeURIComponent(source)}`, page.url()).href)
+        const diagram = page
+          .locator('.erp-dev-docs-markdown [data-mermaid-status="rendered"]')
+          .first()
+        await diagram.waitFor()
+        const svg = diagram.locator('.erp-markdown-mermaid__canvas > svg')
+        const defaultGeometry = await svg.evaluate((node) => ({
+          width: node.getBoundingClientRect().width,
+          intrinsicWidth: node.viewBox.baseVal.width,
+        }))
+        assert(defaultGeometry.width > 0)
+        assert(
+          defaultGeometry.width <= defaultGeometry.intrinsicWidth + 1,
+          `短图不能被宽屏强制放大：${JSON.stringify(defaultGeometry)}`
+        )
+        await diagram.getByRole('button', { name: '放大Mermaid 图表', exact: true }).click()
+        assert(
+          (await svg.boundingBox()).width > defaultGeometry.width * 1.1,
+          '图表仍可主动放大'
+        )
+        await diagram.getByRole('button', { name: '重置Mermaid 图表为 100%', exact: true }).click()
+        assert(Math.abs((await svg.boundingBox()).width - defaultGeometry.width) < 1)
+        const fullscreen = diagram.getByRole('button', { name: '全屏查看Mermaid 图表', exact: true })
+        await fullscreen.click()
+        await diagram.locator('[data-mermaid-fullscreen-action="close"]').waitFor()
+        assert((await svg.boundingBox()).width <= defaultGeometry.intrinsicWidth + 1)
+        await diagram.locator('[data-mermaid-fullscreen-action="close"]').press('Escape')
+        await fullscreen.waitFor()
+        await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '全屏查看Mermaid 图表')
+        await page.setViewportSize({ width: 1440, height: 900 })
+        assert(
+          await diagram.locator('.erp-markdown-mermaid__viewport').evaluate((node) => node.scrollWidth <= node.clientWidth),
+          '缩回普通桌面宽度后仍能看到完整概览'
+        )
+      }
       if (item.route === DEV_PRODUCT_ENGINEERING_ROUTE) {
         assert.equal(
           await page.locator('.erp-dev-tool-table tbody tr').count(),

@@ -49,6 +49,7 @@
 | `.gitlab-ci.yml` | canonical `plan → prepare → 七类外部证据 DAG → aggregate → CI Gate`；Node 与 resource-sensitive 分别在内部按真实资源边界 fan-in，并保留每条 lane 的时间窗，对外仍只有七类规范回执；MR 保留 affected，main 普通 CI 签发可复用 exact-SHA 证据，受保护 release 不重跑 strict，同 SHA 只构建一次候选制品并冻结演练回执后登记 GitLab Package/Release | GitLab main、merge request、受保护 release |
 | `node --test scripts/qa/github-write-boundary.test.mjs` | 锁住 GitHub 只读镜像边界：仓库没有 Actions workflow 和发布 writer，历史 Release adapter 在调用 `gh` 前拒绝写入 | GitHub 镜像、发布 Provider 或 release 目录变化时 |
 | `node --test scripts/qa/gitlab-storage.test.mjs scripts/qa/gitlab-backup-governance.test.mjs` | 校验 GitLab 控制主机、RAID/异机挂载、加密副本、状态新鲜度、systemd timer 与 HTTPS 失败通知的 fail-closed 合同；不执行真实备份或发出网络通知 | GitLab backup、offsite、systemd 或告警入口变化时 |
+| `node --test scripts/qa/visualization.test.mjs` | 解析正式文档与工作台静态说明图，限制单张流程图为 12 个节点、18 条关系；不改写归档 | 新增或修改 Mermaid、CI 原理或造数说明图后 |
 | `node scripts/qa/docs-inventory.test.mjs` | 检查长期文档与最近归档索引登记、当前文档及 `progress.md` / 归档 README 的本地链接和真实查看器锚点合同；冻结归档正文不按当前链接规则重写 | 新增、删除、重命名 README 或长期文档，或调整标题、章节链接与归档入口后 |
 | `node --test scripts/qa/schema-docs.test.mjs` | 校验 Ent generated migration descriptor、业务语义 catalog 与 8 份生成数据字典零漂移；不连接数据库 | 调整 schema、catalog、生成器或数据库文档后 |
 | `node scripts/gen-public-contracts.mjs --check`、`node --test scripts/gen-public-contracts.test.mjs` | 校验权限、状态、附件、RPC 和数值生成物及前端引用；只读，见[公共契约规范](../../docs/engineering/跨层公共契约与生成规范.md) | 修改公共契约真源、提取器或消费者后；已进入 fast |

@@ -52,7 +52,7 @@ GitLab HTTP 只绑定 GitLab 宿主 `127.0.0.1:8929`，由 FRP 到阿里云 `182
 `.gitlab-ci.yml` 是唯一 canonical 编排：
 
 1. `plan` 根据 MR base、push before SHA 或手工范围建立可信 diff，先做 diff/log 检查和可信基线 gitleaks，再生成带 digest 的 `ci-plan` / range / trust。
-2. MR 保留 plan-driven affected/full 单 job。main push 先由唯一 `prepare` cache writer 预热 locked pnpm/Playwright/Go 依赖，再由 Runner 已登记容量调度 static、Node contracts、Web、Server/PostgreSQL、resource-sensitive、browser 和 security 七个固定外部分片。Server 内部把 schema 零漂移、存量升级、普通测试/构建和关键 PostgreSQL 合同拆为四条独立 lane；只有升级与关键合同持有受管 PostgreSQL，只有普通测试/构建消费 Chromium。browser 只等待同 SHA Web build，其他分片不建人工依赖。
+2. MR 保留 plan-driven affected/full 单 job。main push 先由唯一 `prepare` cache writer 预热 locked pnpm/Playwright/Go 依赖，再由 Runner 已登记容量调度 static、Node contracts、Web、Server/PostgreSQL、resource-sensitive、browser 和 security 七个固定外部分片。Server 内部把 schema 零漂移、存量升级、普通测试/构建和关键 PostgreSQL 合同拆为四条独立 lane；只有升级与关键合同持有受管 PostgreSQL，只有普通测试/构建消费 Chromium。browser 等待同 SHA Web build，以及升级和关键 PostgreSQL Job 清理完成；其余依赖以当前 CI 编排为准。
 3. `quality_aggregate` 要求七个回执、阶段并集、分类执行数、source archive、依赖审计、`make data`、Web build digest、PostgreSQL/Chromium/browser 清理全部同 SHA 且通过，再签发标准 v3 strict terminal。
 4. `CI Gate` 只在对应 main aggregate 或 MR quality 成功时通过；main push 还会把 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 `plush-ci-evidence` Package，作为 protected main 的稳定 required job 和后续 release 唯一可复用证据。
 
@@ -377,6 +377,8 @@ demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；
 
 造数采用“先判断、再局部执行、最后实时读回”的模块化路径。图中的实线表示阶段刷新依赖，阶段是否写入由各自合同决定；readiness 是每次续跑都执行的只读汇总，不属于依赖闭包：
 
+先判断是否复用，再单独查看刷新涉及的模块。以下两图与工作台使用的静态说明保持一致，具体计划和结果仍读取本次回执。
+
 ```mermaid
 flowchart TD
   A["读取目标、当前合同与上一批回执"] --> B{"目标身份与组件回执有效"}
@@ -392,8 +394,12 @@ flowchart TD
   G --> H
   H --> I["始终执行只读 readiness"]
   I --> J["回执列出复用、直接变化、依赖刷新与最终刷新阶段"]
+```
 
-  subgraph Modules["当前阶段依赖；实际 registry 为真源"]
+阶段依赖只说明刷新关系：
+
+```mermaid
+flowchart LR
     Core["core 身份与基础"] --> Baseline["baseline 基线"]
     Core --> Source["source 来源单"]
     Role["role 岗位与责任"] --> Source
@@ -402,7 +408,6 @@ flowchart TD
     Task --> Attachments["attachments 附件"]
     Facts --> Quality["purchase-quality 采购质检"]
     Facts --> Attachments
-  end
 ```
 
 未来新增或修改造数 helper、常量或合同文件时，必须把它登记到负责阶段的逻辑指纹，并在阶段输出被其他模块消费时维护依赖图；纯 UI、样式、文案、性能或 release SHA 变化继续复用业务数据。业务数据摘要变化但无法证明局部影响时，先在隔离批次刷新完整业务阶段，不能为了节省时间复用不确定数据。

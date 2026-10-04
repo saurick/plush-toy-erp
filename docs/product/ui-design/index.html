@@ -2859,6 +2859,8 @@
   }
 }
 
+    .dev-rule-preview-edge { display:grid; grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr); align-items:center; gap:8px; margin-block:8px; text-align:center; }
+    [data-dev-rule-preview] button[aria-pressed="true"] { border-color:var(--brand); color:var(--brand-strong); background:var(--brand-soft); }
   </style>
 </head>
 <body data-mode="light" data-density="standard">
@@ -4079,6 +4081,19 @@
       {key:'migration', area:'delivery', title:'数据库迁移', source:'迁移计划、备份与恢复验证', status:'待核对', detail:'计划准备就绪后才允许确认；失败保留恢复入口，不自动执行或重试迁移。', path:'/__dev/database-migration'},
       {key:'recovery', area:'delivery', title:'安全与恢复', source:'安全合同、恢复点与演练回执', status:'未核验', detail:'只读核对应用、入口身份、异常监测及备份隔离；数据库恢复不能代替完整抗勒索核验。', path:'/__dev/drill-recovery'}
     ];
+    function renderDevVisualizationPreview(key) {
+      const steps=(label,nodes)=>`<div class="dev-git-lock-flow" role="img" aria-label="${label}">${nodes.map((node,index)=>`${index?'<span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span>':''}<div class="dev-git-lock-flow__node">${escapeHTML(node)}</div>`).join('')}</div>`;
+      if(key==='gates') return `<section><h3>阶段依赖总览 · 样例</h3>${steps('样例阶段依赖',['计划 · 1 个 Job','质量检查 · 3 个 Job','CI Gate · 1 个 Job'])}<p class="data-note">总览按阶段聚合，阶段内关系在完整图和明细核对。</p><details><summary>查看完整 Job 依赖图（5 个节点）</summary><div class="dev-git-lock-flow" role="img" aria-label="样例完整 Job 关系"><div class="dev-git-lock-flow__node">plan</div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__branches"><article>web</article><article>server</article></div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">browser：等待 web 与 server</div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">gate</div></div></details></section>`;
+      if(key==='data') return `<details><summary>复用判断与模块依赖</summary><h3>是否复用已有数据</h3>${steps('样例复用判断',['核对目标与旧回执','比较数据合同及逻辑指纹','按变化复用、重验或刷新','只读 readiness 与回执读回'])}<h3>哪些模块一起刷新</h3><div class="dev-git-lock-flow" role="img" aria-label="样例模块依赖"><div class="dev-git-lock-flow__node">来源单</div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__branches"><article>协同任务 → 附件</article><article>业务结果 → 采购质检与附件</article></div></div><p class="data-note">这里只演示分图阅读；实际范围由当前登记依赖和本次回执确定。</p></details>`;
+      if(key!=='flows') return '';
+      const transitions=[
+        {from:'草稿',to:'待审批',kind:'standard',condition:'资料完整并提交'},
+        {from:'待审批',to:'已批准',kind:'standard',condition:'审批通过'},
+        {from:'待审批',to:'草稿',kind:'exceptional',condition:'退回后补齐资料'},
+      ];
+      const modes=[['standard','正常推进'],['all','全部'],['exceptional','异常与纠正']];
+      return `<section data-dev-rule-preview><h3>状态规则 · 筛选示例</h3><div class="dev-design-toolbar" role="group" aria-label="状态转换筛选示例">${modes.map(([mode,label])=>`<button class="btn" data-action="dev-rule-view" data-value="${mode}" aria-pressed="${mode==='standard'}">${label}</button>`).join('')}</div>${modes.map(([mode,label])=>{const visible=transitions.filter(item=>mode==='all'||item.kind===mode);return `<div data-rule-panel="${mode}"${mode==='standard'?'':' hidden'}><p>当前显示 ${visible.length} / ${transitions.length} 条；图与条件清单同步。</p><div role="img" aria-label="${label}状态图示">${visible.map(item=>`<div class="dev-rule-preview-edge"><span class="dev-git-lock-flow__node">${item.from}</span><span aria-hidden="true">→</span><span class="dev-git-lock-flow__node">${item.to}</span></div>`).join('')}</div><ul>${visible.map(item=>`<li>${item.from} → ${item.to}：${item.condition}</li>`).join('')}</ul></div>`;}).join('')}</section>`;
+    }
     function renderDevCiGuidePreview(initialSection='overview') {
       const flow=(label,nodes)=>`<div class="dev-git-lock-flow" role="img" aria-label="${label}">${nodes.map((node,index)=>`${index?'<span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span>':''}<div class="dev-git-lock-flow__node">${node}</div>`).join('')}</div>`;
       const sections=[
@@ -4213,6 +4228,13 @@
       return `<section class="surface dev-design-section"><div class="dev-design-toolbar"><strong>${label}</strong><button class="btn primary" data-action="dev-prepare" ${state.devEvidence !== 'ready' || state.devOperation?.status === 'running' ? 'disabled' : ''}>核对并准备${label}</button></div><table class="dev-tool-table" aria-label="交付条件"><tbody><tr><th>候选版本</th><td>DEMO-a1b2c3d</td><td>${state.devEvidence === 'ready' ? '样例固定版本 CI 已核对' : '待核对固定版本 CI'}</td></tr><tr><th>目标环境</th><td>隔离演示环境</td><td>配置与迁移计划分别核对</td></tr><tr><th>恢复点</th><td>DEMO-r1</td><td>保留备份与恢复验证</td></tr></tbody></table><div class="dev-design-toolbar"><span class="data-note">${state.devEvidence === 'ready' ? '样例条件已齐备；确认计划后执行，执行后读回。' : state.devQualityChecked ? '验证样例已完成，请核对交付条件。' : '先在质量验证完成验证样例，再核对交付条件。'}</span>${!state.devQualityChecked ? '<button class="btn" data-action="dev-area" data-value="quality">去质量验证</button>' : `<button class="btn" data-action="dev-preflight" ${state.devOperation?.status === 'running' ? 'disabled' : ''}>核对交付条件</button>`}<button class="btn" data-action="dev-evidence" data-value="${view}">查看${label}依据</button></div>${view === 'versions' ? '<details class="dev-design-settings"><summary>其他操作说明</summary><button class="btn" data-action="dev-automation-flow">查看自动续办交接流程</button><button class="btn" data-action="dev-lock-flow">查看 Git 索引锁流程</button></details>' : ''}<details class="dev-design-settings"><summary>正式页面的任务标签</summary>${renderDevDeliveryTaskMap(view)}</details></section>`;
     }
     function handleDevDesignAction(action,target) {
+      if(action==='dev-rule-view') {
+        const scope=target.closest('[data-dev-rule-preview]');
+        for(const button of scope.querySelectorAll('[data-action="dev-rule-view"]')) button.setAttribute('aria-pressed',String(button.dataset.value===target.dataset.value));
+        for(const panel of scope.querySelectorAll('[data-rule-panel]')) panel.hidden=panel.dataset.rulePanel!==target.dataset.value;
+        return true;
+      }
+
       if (!action.startsWith('dev-')) return false;
       if (action==='dev-pin') {
         const key=target.dataset.value;
@@ -4247,7 +4269,7 @@
       } else if (action==='dev-evidence') {
         const source=devDesignRecords.find(item=>item.key===target.dataset.value);if(!source)return true;
         const row=devDesignRecordState(source);
-        state.infoModal={title:`${row.title} · 证据详情`,html:`<dl class="dev-design-evidence"><dt>来源</dt><dd>${row.source}</dd><dt>样例状态</dt><dd>${row.status}</dd><dt>核对入口</dt><dd>${row.path}</dd><dt>判断边界</dt><dd>${row.detail}</dd><dt>版本 / 时间</dt><dd>DEMO-a1b2c3d / 2026-09-26 10:30 +08:00</dd></dl>${row.key==='gates'||row.key==='versions'?renderDevCiGuidePreview(row.key==='versions'?'delivery':'overview'):''}<p class="data-note">这是固定样例，不证明当前代码、真实部署或客户验收。</p>`,confirmAction:'dev-close',confirmLabel:'返回工作台'};state.overlay='info';renderFloating();
+        state.infoModal={title:`${row.title} · 证据详情`,html:`<dl class="dev-design-evidence"><dt>来源</dt><dd>${row.source}</dd><dt>样例状态</dt><dd>${row.status}</dd><dt>核对入口</dt><dd>${row.path}</dd><dt>判断边界</dt><dd>${row.detail}</dd><dt>版本 / 时间</dt><dd>DEMO-a1b2c3d / 2026-09-26 10:30 +08:00</dd></dl>${renderDevVisualizationPreview(row.key)}${row.key==='gates'||row.key==='versions'?renderDevCiGuidePreview(row.key==='versions'?'delivery':'overview'):''}<p class="data-note">这是固定样例，不证明当前代码、真实部署或客户验收。</p>`,confirmAction:'dev-close',confirmLabel:'返回工作台'};state.overlay='info';renderFloating();
       } else if (action==='dev-automation-flow') {
         state.infoModal={title:'自动续办交接流程',html:`<div class="dev-git-lock-flow" role="img" aria-label="等待心跳移除与执行阶段交接流程"><div class="dev-git-lock-flow__node">等待其他项目会话结束</div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">全部会话结束且后台 writer 已停止？</div><div class="dev-git-lock-flow__branches"><article><strong>尚未满足</strong><span>每 10 分钟只读重查，不改共享文件、不操作 Git、不造数或部署。</span></article><article><strong>条件满足</strong><span>先删除本次等待心跳，并读回删除结果。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__decision">删除结果为 deleted？</div><div class="dev-git-lock-flow__branches"><article><strong>删除失败</strong><span>执行阶段保持未开始，报告自动化生命周期阻塞。</span></article><article><strong>删除成功</strong><span>同一次续办进入实现、验证、造数、Git 与部署。</span></article></div><span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span><div class="dev-git-lock-flow__node">执行期间不重建同目的心跳；只有用户后来再次要求等待，才创建新的心跳。</div></div><p class="data-note">实际版本中心使用可缩放、可全屏的 Mermaid；本设计样例只说明生命周期，不调度 Codex 会话或自动化。</p>`,confirmAction:'dev-close',confirmLabel:'返回版本发布'};state.overlay='info';renderFloating();
       } else if (action==='dev-lock-flow') {

@@ -34,6 +34,7 @@ import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import {
   DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
+  DEV_DATA_PREPARATION_MODULE_FLOW,
   DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
   DEV_DATA_PREPARATION_PROFILE_QUERY_KEY,
@@ -129,6 +130,7 @@ function formatDuration(durationMs) {
 }
 
 function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
+  const [reuseRulesOpen, setReuseRulesOpen] = useState(false)
   const selectedChain = plan.chains.find(
     (chain) => chain.key === selectedChainKey
   )
@@ -269,7 +271,7 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
           )}
         />
       )}
-      <details className="erp-dev-data-reuse-rules">
+      <details className="erp-dev-data-reuse-rules" onToggle={(event) => setReuseRulesOpen(event.currentTarget.open)}>
         <summary>代码变化后，旧数据怎么处理</summary>
         <div className="erp-dev-data-table-wrap">
           <table>
@@ -293,16 +295,22 @@ function AcceptancePlanReview({ plan, selectedChainKey, onSelectChain }) {
         </div>
         <div className="erp-dev-data-reuse-diagram">
           <div className="erp-dev-data-reuse-diagram__heading">
-            <Text strong>增量造数判断与模块依赖</Text>
+            <Text strong>增量造数判断</Text>
             <Text type="secondary">
               这是固定规则说明；本次实际复用和刷新范围仍以当前合同、阶段指纹与
               operation 回执为准。
             </Text>
           </div>
-          <MermaidDiagram
-            chart={DEV_DATA_PREPARATION_INCREMENTAL_FLOW}
-            label="增量造数判断与模块依赖图"
-          />
+          {reuseRulesOpen ? (
+            <MermaidDiagram chart={DEV_DATA_PREPARATION_INCREMENTAL_FLOW} label="增量造数判断图" />
+          ) : null}
+          <Text strong>模块依赖与刷新范围</Text>
+          <Text type="secondary">
+            依赖用于计算刷新范围；当前 registry 与本次回执决定实际执行内容。
+          </Text>
+          {reuseRulesOpen ? (
+            <MermaidDiagram chart={DEV_DATA_PREPARATION_MODULE_FLOW} label="造数模块依赖图" />
+          ) : null}
         </div>
       </details>
     </div>

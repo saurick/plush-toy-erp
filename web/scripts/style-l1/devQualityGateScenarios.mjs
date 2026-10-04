@@ -886,7 +886,7 @@ export function createDevQualityGateScenarios({
           0
         )
         const pipelineDag = serverPanel.locator(
-          '.erp-dev-quality-server-pipeline__dag .erp-markdown-mermaid'
+          '.erp-dev-quality-server-pipeline__dag > .erp-markdown-mermaid'
         )
         await pipelineDag
           .locator('.erp-markdown-mermaid__canvas > svg')
@@ -899,6 +899,14 @@ export function createDevQualityGateScenarios({
           await pipelineDag.getAttribute('data-mermaid-html-labels'),
           'false'
         )
+        const fullGraph = serverPanel.locator('.erp-dev-quality-server-pipeline__dag details')
+        assert.equal(await fullGraph.locator('.erp-markdown-mermaid').count(), 0)
+        assert((await pipelineDag.locator('svg .node').count()) <= 12)
+        await fullGraph.locator('summary').click()
+        await fullGraph.locator('[data-mermaid-status="rendered"]').waitFor()
+        assert((await fullGraph.locator('svg .node').count()) > 12)
+        await fullGraph.locator('summary').click()
+        await fullGraph.locator('.erp-markdown-mermaid').waitFor({ state: 'detached' })
         assert.deepEqual(
           await serverPanel
             .locator('.erp-dev-quality-server-pipeline__relationship .ant-tag')
@@ -1121,13 +1129,13 @@ export function createDevQualityGateScenarios({
               svg.viewBox.baseVal.width,
           }
         })
-        assert(parallelGeometry.localScroll, JSON.stringify(parallelGeometry))
+        assert.equal(parallelGeometry.localScroll, false, JSON.stringify(parallelGeometry))
         assert(
           parallelGeometry.renderedFont >= 12,
           JSON.stringify(parallelGeometry)
         )
         const parallelCanvas = parallelDiagram.locator('.erp-markdown-mermaid__canvas')
-        assert.equal(await parallelCanvas.getAttribute('data-mermaid-zoom'), '200')
+        assert.equal(await parallelCanvas.getAttribute('data-mermaid-zoom'), '100')
         await parallelDiagram.getByRole('button', {
           name: '适配Job 并行、汇总与等待原理图宽度',
           exact: true,

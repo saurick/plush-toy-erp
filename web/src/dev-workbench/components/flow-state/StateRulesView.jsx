@@ -282,7 +282,7 @@ function StateRulesView({
   const flows = projection ? projection.flows : catalog.flows
   const scopedCatalog = useMemo(() => ({ ...catalog, flows }), [catalog, flows])
   const [transitionFilter, setTransitionFilter] = useState(
-    DEV_FLOW_STATE_TRANSITION_FILTERS.all
+    DEV_FLOW_STATE_TRANSITION_FILTERS.standard
   )
   const searchProps = useDefinitionSelectSearch()
   const options = useMemo(
@@ -335,6 +335,11 @@ function StateRulesView({
     : 0
   const filterOptions = [
     {
+      key: DEV_FLOW_STATE_TRANSITION_FILTERS.standard,
+      label: '正常推进',
+      count: summary.transitionCount - summary.exceptionalTransitionCount,
+    },
+    {
       key: DEV_FLOW_STATE_TRANSITION_FILTERS.all,
       label: '全部',
       count: summary.transitionCount,
@@ -358,13 +363,16 @@ function StateRulesView({
         ]
       : []),
   ]
-  const mermaid = useMemo(() => buildDevFlowStateRuleMermaid(flow), [flow])
+  const mermaid = useMemo(
+    () => buildDevFlowStateRuleMermaid(flow, { filter: transitionFilter, stateKey: state?.key }),
+    [flow, transitionFilter, state?.key]
+  )
 
   useEffect(() => {
     setTransitionFilter(
       state
         ? DEV_FLOW_STATE_TRANSITION_FILTERS.related
-        : DEV_FLOW_STATE_TRANSITION_FILTERS.all
+        : DEV_FLOW_STATE_TRANSITION_FILTERS.standard
     )
   }, [flow.key, state])
 
@@ -441,6 +449,40 @@ function StateRulesView({
             {scope?.guardrail ? <small>{scope.guardrail}</small> : null}
           </div>
         </section>
+        <div className="erp-dev-flow-transition-toolbar">
+          <div>
+            <Text strong>允许的状态转换</Text>
+            <Text type="secondary">
+              图与清单使用同一筛选；条件、结果和内部证据在图下核对。
+            </Text>
+          </div>
+          <div
+            className="erp-dev-flow-transition-filters"
+            role="group"
+            aria-label="状态转换筛选"
+          >
+            {filterOptions.map((option) => (
+              <Button
+                key={option.key}
+                size="small"
+                type={transitionFilter === option.key ? 'primary' : 'default'}
+                aria-pressed={transitionFilter === option.key}
+                onClick={() => setTransitionFilter(option.key)}
+              >
+                {option.label} {option.count}
+              </Button>
+            ))}
+          </div>
+          <Text
+            className="erp-dev-flow-transition-result-count"
+            type="secondary"
+            role="status"
+            aria-live="polite"
+          >
+            当前显示 {visibleTransitions.length} / {summary.transitionCount}{' '}
+            条
+          </Text>
+        </div>
         <StatePathLegend groups={pathGroups} />
         <div className="erp-dev-flow-state-layout">
           <div
@@ -448,7 +490,11 @@ function StateRulesView({
             role="region"
             aria-label={`${flow.label}状态转换图`}
           >
-            <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
+            {visibleTransitions.length > 0 || state ? (
+              <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
+            ) : (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前筛选没有登记的转换" />
+            )}
           </div>
           <div className="erp-dev-flow-state-list">
             <div className="erp-dev-flow-state-list__heading">
@@ -534,40 +580,7 @@ function StateRulesView({
           onOpenView={onOpenView}
         />
         <section className="erp-dev-flow-transitions">
-          <div className="erp-dev-flow-transition-toolbar">
-            <div>
-              <Text strong>允许的状态转换</Text>
-              <Text type="secondary">
-                先看条件、结果和影响边界；内部 action、权限与代码证据按需展开。
-              </Text>
-            </div>
-            <div
-              className="erp-dev-flow-transition-filters"
-              role="group"
-              aria-label="状态转换筛选"
-            >
-              {filterOptions.map((option) => (
-                <Button
-                  key={option.key}
-                  size="small"
-                  type={transitionFilter === option.key ? 'primary' : 'default'}
-                  aria-pressed={transitionFilter === option.key}
-                  onClick={() => setTransitionFilter(option.key)}
-                >
-                  {option.label} {option.count}
-                </Button>
-              ))}
-            </div>
-            <Text
-              className="erp-dev-flow-transition-result-count"
-              type="secondary"
-              role="status"
-              aria-live="polite"
-            >
-              当前显示 {visibleTransitions.length} / {summary.transitionCount}{' '}
-              条
-            </Text>
-          </div>
+          <h3>转换条件与影响</h3>
           {visibleTransitions.length > 0 ? (
             <ol>
               {visibleTransitions.map((transition) => (

@@ -217,7 +217,14 @@ export function MermaidDiagram({
           return mermaid.render(renderId, source)
         })
         if (!cancelled) {
-          setRenderState({ status: 'rendered', svg, error: '' })
+          const svgElement = new DOMParser().parseFromString(
+            svg,
+            'image/svg+xml'
+          ).documentElement
+          const intrinsicWidth = Number(
+            svgElement.getAttribute('viewBox')?.trim().split(/\s+/u)[2]
+          )
+          setRenderState({ status: 'rendered', svg, intrinsicWidth, error: '' })
         }
       } catch (_error) {
         if (!cancelled) {
@@ -414,7 +421,14 @@ export function MermaidDiagram({
               ref={canvasRef}
               className="erp-markdown-mermaid__canvas"
               data-mermaid-zoom={zoomPercent}
-              style={{ '--mermaid-zoom': activeZoom }}
+              style={{
+                '--mermaid-zoom': activeZoom,
+                '--mermaid-intrinsic-width':
+                  Number.isFinite(renderState.intrinsicWidth) &&
+                  renderState.intrinsicWidth > 0
+                    ? `${renderState.intrinsicWidth}px`
+                    : undefined,
+              }}
               // Mermaid returns the rendered SVG; securityLevel=strict is set above.
               dangerouslySetInnerHTML={{ __html: renderState.svg }}
             />

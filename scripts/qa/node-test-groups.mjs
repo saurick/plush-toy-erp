@@ -106,6 +106,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/verify-go-test-json.test.mjs",
     "scripts/qa/verify-node-test-summary.test.mjs",
     "scripts/qa/visualization-demo-data.test.mjs",
+    "scripts/qa/visualization.test.mjs",
     "scripts/qa/workflow-fact-boundary.test.mjs",
     "scripts/qa/workflow-ui-action-boundary.test.mjs",
     "scripts/qa/yoyoosun-role-business-action-projection.test.mjs",

@@ -781,6 +781,34 @@ test('quality gates config: GitLab CI DAG is derived from exact needs and actual
   )
 })
 
+test('pipeline overview aggregates actual stage dependencies without fabricating a linear sequence', () => {
+  const evidence = {
+    topology: {
+      status: 'available',
+      jobs: [
+        { name: 'plan', stage: 'plan', needs: [] },
+        { name: 'web', stage: 'quality', needs: ['plan'] },
+        { name: 'server', stage: 'quality', needs: ['plan'] },
+        { name: 'browser', stage: 'quality', needs: ['web', 'server'] },
+        { name: 'gate', stage: 'gate', needs: ['web', 'browser'] },
+        { name: 'independent', stage: 'audit', needs: [] },
+      ],
+    },
+    jobs: [],
+  }
+  const result = buildQualityGateServerDag(evidence)
+  assert.equal(result.nodeCount, 6)
+  assert.equal(result.edgeCount, 6)
+  assert.equal(result.stageCount, 4)
+  assert.equal((result.overviewChart.match(/G0 --> G1/gu) || []).length, 1)
+  assert.equal((result.overviewChart.match(/G1 --> G2/gu) || []).length, 1)
+  assert.doesNotMatch(result.overviewChart, /G1 --> G1|G2 --> G3|classDef passed/u)
+  assert.match(result.overviewChart, /3 个 Job/u)
+  assert.match(result.chart, /J1 --> J3/u)
+  assert.match(result.chart, /J2 --> J3/u)
+  assert.equal(buildQualityGateServerDag({ topology: { status: 'unavailable' } }).chart, '')
+})
+
 test('quality gates config: GitLab CI timing ranks bottlenecks without summing parallel jobs', () => {
   const timing = buildQualityGateServerTiming({
     status: 'running',
@@ -1195,7 +1223,9 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(pageSource, /getQualityGateFlowSegments/u)
   assert.match(pageSource, /<ol/u)
   assert.match(pageSource, /aria-current=/u)
-  assert.equal((pageSource.match(/<MermaidDiagram/gu) || []).length, 2)
+  assert.match(pageSource, /chart=\{dag\.overviewChart\}/u)
+  assert.match(pageSource, /fullDagOpen \? \(/u)
+  assert.match(pageSource, /查看完整 Job 依赖图/u)
   assert.match(pageSource, /静态工作原理，不代表当前运行状态/u)
   assert.match(pageSource, /buildQualityGateStageDurationComposition/u)
   assert.match(pageSource, /buildQualityGateHistoryTrend/u)

@@ -1366,8 +1366,16 @@ export function buildQualityGateServerDag(evidence) {
   }
   const lines = ['flowchart LR']
   const statusIds = new Map()
+  const stageIds = new Map(stages.map((stage, index) => [stage, `G${index}`]))
+  const stageByJob = new Map(topology.jobs.map((job) => [job.name, job.stage]))
+  const overview = ['flowchart LR']
+  const overviewEdges = new Set()
   for (const [stageIndex, stage] of stages.entries()) {
     const stageLabel = SERVER_DAG_STAGE_LABELS[stage] || stage
+    const count = topology.jobs.filter((job) => job.stage === stage).length
+    overview.push(
+      `  ${stageIds.get(stage)}["${escapeServerDagText(stageLabel)} · ${count} 个 Job"]`
+    )
     lines.push(
       `  subgraph S${String(stageIndex)}["${escapeServerDagText(stageLabel)}"]`
     )
@@ -1395,6 +1403,10 @@ export function buildQualityGateServerDag(evidence) {
     for (const dependency of job.needs) {
       lines.push(`  ${nodeIds.get(dependency)} --> ${nodeIds.get(job.name)}`)
       edgeCount += 1
+      const sourceStage = stageByJob.get(dependency)
+      if (sourceStage !== job.stage && stageIds.has(sourceStage)) {
+        overviewEdges.add(`  ${stageIds.get(sourceStage)} --> ${stageIds.get(job.stage)}`)
+      }
     }
   }
   for (const [status, ids] of statusIds) {
@@ -1412,6 +1424,8 @@ export function buildQualityGateServerDag(evidence) {
   return {
     status: 'available',
     chart: lines.join('\n'),
+    overviewChart: [...overview, ...overviewEdges].join('\n'),
+    stageCount: stages.length,
     nodeCount: topology.jobs.length,
     edgeCount,
     message: topology.message,

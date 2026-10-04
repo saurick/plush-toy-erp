@@ -1225,6 +1225,7 @@ function ServerJobGuideDrawer({
 }
 
 function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
+  const [fullDagOpen, setFullDagOpen] = useState(false)
   const dag = buildQualityGateServerDag(evidence)
   const visibleStatuses = new Set(timing.flowJobs.map((job) => job.status))
   const guideByName = new Map(
@@ -1268,11 +1269,28 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
       {dag.chart ? (
         <div className="erp-dev-quality-server-pipeline__dag">
           <MermaidDiagram
-            chart={dag.chart}
-            label="当前 GitLab Pipeline Job 依赖图"
+            chart={dag.overviewChart}
+            label="当前 GitLab Pipeline 阶段依赖总览"
             showSourceOnError={false}
             flowchartHtmlLabels={false}
           />
+          <Text type="secondary">
+            按真实阶段汇总 {dag.nodeCount} 个 Job；阶段内依赖与单个 Job 状态在完整图及下方明细中查看。
+          </Text>
+          <details
+            className="erp-dev-static-guidance"
+            onToggle={(event) => setFullDagOpen(event.currentTarget.open)}
+          >
+            <summary>查看完整 Job 依赖图（{dag.nodeCount} 个节点）</summary>
+            {fullDagOpen ? (
+              <MermaidDiagram
+                chart={dag.chart}
+                label="当前 GitLab Pipeline Job 依赖图"
+                showSourceOnError={false}
+                flowchartHtmlLabels={false}
+              />
+            ) : null}
+          </details>
         </div>
       ) : (
         <Empty

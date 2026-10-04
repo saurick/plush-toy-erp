@@ -10,6 +10,7 @@ import {
   DEV_DATA_PREPARATION_ACTION_API_PATH,
   DEV_DATA_PREPARATION_API_PREFIX,
   DEV_DATA_PREPARATION_INCREMENTAL_FLOW,
+  DEV_DATA_PREPARATION_MODULE_FLOW,
   DEV_DATA_PREPARATION_OPERATION_API_PREFIX,
   DEV_DATA_PREPARATION_PROFILE_COPY,
   DEV_DATA_PREPARATION_PROFILE_KEYS,
@@ -1034,7 +1035,8 @@ test('page defaults to the latest business-chain regression while retaining dail
   assert.match(pageSource, /代码变化后，旧数据怎么处理/u)
   assert.match(pageSource, /MermaidDiagram/u)
   assert.match(pageSource, /DEV_DATA_PREPARATION_INCREMENTAL_FLOW/u)
-  assert.match(pageSource, /增量造数判断与模块依赖/u)
+  assert.match(pageSource, /增量造数判断/u)
+  assert.match(pageSource, /模块依赖与刷新范围/u)
   assert.match(pageSource, /实际执行：/u)
   assert.match(pageSource, /stageTimings/u)
   assert.match(pageSource, /PROFILE_QUERY_KEY/u)
@@ -1137,6 +1139,9 @@ test('incremental data flow stays reviewable and synchronized with the workbench
     diagrams.includes(DEV_DATA_PREPARATION_INCREMENTAL_FLOW.trim()),
     'the data preparation page and design document must use the same Mermaid source'
   )
+  assert.ok(diagrams.includes(DEV_DATA_PREPARATION_MODULE_FLOW.trim()))
+  assert.doesNotMatch(DEV_DATA_PREPARATION_INCREMENTAL_FLOW, /subgraph Modules/u)
+  assert.match(DEV_DATA_PREPARATION_MODULE_FLOW, /Core --> Source/u)
 })
 
 test('data preparation route stays outside formal menu, seedData and RBAC projection', () => {

@@ -138,6 +138,7 @@ const TERMINAL_POLICY_LABELS = Object.freeze({
 
 export const DEV_FLOW_STATE_TRANSITION_FILTERS = Object.freeze({
   all: 'all',
+  standard: 'standard',
   exceptional: 'exceptional',
   related: 'related',
 })
@@ -302,10 +303,17 @@ export function getDevFlowStateTransitionDiagramLabel(transition) {
   return unique(labels).join(' · ')
 }
 
-export function buildDevFlowStateRuleMermaid(flow) {
+export function buildDevFlowStateRuleMermaid(
+  flow,
+  { filter = DEV_FLOW_STATE_TRANSITION_FILTERS.all, stateKey = '' } = {}
+) {
   if (!flow) return ''
 
-  const states = asArray(flow.states)
+  const transitions = filterDevFlowStateTransitions(flow, stateKey, filter)
+  const scoped = filter !== DEV_FLOW_STATE_TRANSITION_FILTERS.all
+  const included = new Set(transitions.flatMap((item) => [item.from, item.to]))
+  if (stateKey) included.add(stateKey)
+  const states = asArray(flow.states).filter((item) => !scoped || included.has(item.key))
   const stateIDs = new Map()
   states.forEach((state, index) => {
     const stateKey = cleanText(state?.key)
@@ -317,8 +325,8 @@ export function buildDevFlowStateRuleMermaid(flow) {
     stateIDs.set(stateKey, `S${index}`)
   })
 
-  const initialStates = asArray(flow.initialStates)
-  const terminalStates = asArray(flow.terminalStates)
+  const initialStates = asArray(flow.initialStates).filter((key) => !scoped || included.has(key))
+  const terminalStates = asArray(flow.terminalStates).filter((key) => !scoped || included.has(key))
   const lines = ['flowchart LR']
   if (initialStates.length > 0) lines.push('  STATE_START(["开始"])')
   states.forEach((state) => {
@@ -346,7 +354,7 @@ export function buildDevFlowStateRuleMermaid(flow) {
     appendEdge(`  STATE_START --> ${targetID}`)
   })
 
-  asArray(flow.transitions).forEach((transition, index) => {
+  transitions.forEach((transition, index) => {
     const sourceID = getRequiredStateID(
       stateIDs,
       transition?.from,
@@ -454,6 +462,9 @@ export function filterDevFlowStateTransitions(
   filterKey = DEV_FLOW_STATE_TRANSITION_FILTERS.all
 ) {
   const transitions = asArray(flow?.transitions)
+  if (filterKey === DEV_FLOW_STATE_TRANSITION_FILTERS.standard) {
+    return transitions.filter((item) => asArray(item.pathKinds).length === 0)
+  }
   if (filterKey === DEV_FLOW_STATE_TRANSITION_FILTERS.exceptional) {
     return transitions.filter((item) => asArray(item.pathKinds).length > 0)
   }
