@@ -15,6 +15,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { orderSubmissionSuccessMessage } from '../utils/approvalCondition.mjs'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
@@ -366,15 +367,15 @@ export default function SalesOrdersPage() {
     [beginLatestRequest]
   )
 
-  const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')
-  const canUpdateOrder = hasActionPermission(adminProfile, 'sales_order.update')
+  const canCreateOrder = hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_CREATE)
+  const canUpdateOrder = hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_UPDATE)
   const canReadOrderItems = hasActionPermission(
     adminProfile,
-    'sales_order_item.read'
+    PermissionCode.SALES_ORDER_ITEM_READ
   )
   const canCreateReservation = hasActionPermission(
     adminProfile,
-    'stock.reservation.create'
+    PermissionCode.STOCK_RESERVATION_CREATE
   )
 
   useEffect(() => {
@@ -1786,7 +1787,7 @@ export default function SalesOrdersPage() {
           ) : null}
           {hasActionPermission(
             adminProfile,
-            'sales_order.engineering.update'
+            PermissionCode.SALES_ORDER_ENGINEERING_UPDATE
           ) ? (
             <BusinessActionTooltip
               visible={
@@ -1820,22 +1821,22 @@ export default function SalesOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {hasActionPermission(adminProfile, 'engineering.material.read') ? (
+          {hasActionPermission(adminProfile, PermissionCode.ENGINEERING_MATERIAL_READ) ? (
             <Button
               data-business-action-key="engineering-material"
               size="small"
               disabled={!selectedOrder || saving}
               onClick={() => setMaterialRequestOrderID(selectedOrder.id)}
             >
-              {hasActionPermission(adminProfile, 'engineering.material.submit')
+              {hasActionPermission(adminProfile, PermissionCode.ENGINEERING_MATERIAL_SUBMIT)
                 ? '提交用料汇总'
                 : hasActionPermission(
                       adminProfile,
-                      'engineering.material.boss_approve'
+                      PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE
                     ) ||
                     hasActionPermission(
                       adminProfile,
-                      'engineering.material.finance_approve'
+                      PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE
                     )
                   ? '审核用料汇总'
                   : '查看用料汇总'}

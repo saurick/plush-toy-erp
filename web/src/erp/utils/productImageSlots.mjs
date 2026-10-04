@@ -1,3 +1,5 @@
+import { AttachmentPolicy } from '../../common/consts/attachments.generated.mjs'
+
 export const PRODUCT_IMAGE_SNAPSHOT_MAX_BYTES = 1024 * 1024
 export const PRODUCT_IMAGE_SNAPSHOT_MAX_EDGE = 2560
 export const PRODUCT_IMAGE_SNAPSHOT_MAX_PIXELS = 4_000_000
@@ -11,18 +13,16 @@ const PRODUCT_IMAGE_SLOT_KEYS = new Set(
   PRODUCT_IMAGE_SLOT_DEFINITIONS.map((slot) => slot.key)
 )
 
-const PRODUCT_IMAGE_MIME_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-])
-
-const PRODUCT_IMAGE_EXTENSION_MIME_TYPES = new Map([
-  ['.jpeg', 'image/jpeg'],
-  ['.jpg', 'image/jpeg'],
-  ['.png', 'image/png'],
-  ['.webp', 'image/webp'],
-])
+export const PRODUCT_IMAGE_ACCEPT = [
+  ...Object.keys(AttachmentPolicy.productImageFileTypes),
+  ...new Set(Object.values(AttachmentPolicy.productImageFileTypes).flat()),
+].join(',')
+const PRODUCT_IMAGE_MIME_TYPES = new Set(
+  Object.values(AttachmentPolicy.productImageFileTypes).flat()
+)
+const PRODUCT_IMAGE_EXTENSION_MIME_TYPES = new Map(
+  Object.entries(AttachmentPolicy.productImageFileTypes).map(([extension, types]) => [extension, types[0]])
+)
 
 export function inferProductImageMimeType(file = {}) {
   const fileName = String(file?.name || '').toLowerCase()

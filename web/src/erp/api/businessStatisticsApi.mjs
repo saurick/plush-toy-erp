@@ -1,3 +1,4 @@
+import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
@@ -7,7 +8,7 @@ import {
 } from '../utils/businessStatistics.mjs'
 
 const rpc = new JsonRpc({
-  url: 'business',
+  url: RpcDomain.BUSINESS,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })

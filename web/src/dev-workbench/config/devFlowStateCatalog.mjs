@@ -1,3 +1,4 @@
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import {
   getCustomerPackage,
   listCustomerPackageKeys,
@@ -768,31 +769,31 @@ const FLOW_DEFINITIONS = [
       transition('PREPARING', 'SAMPLING', {
         guard: '产品主图与 BOM 齐备。',
         action: 'save_sales_order_engineering',
-        permission: ['sales_order.engineering.update'],
+        permission: [PermissionCode.SALES_ORDER_ENGINEERING_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('SAMPLING', 'CONFIRMED', {
         guard: '当前资料与打样资料一致，记录确认结果。',
         action: 'save_sales_order_engineering',
-        permission: ['sales_order.engineering.update'],
+        permission: [PermissionCode.SALES_ORDER_ENGINEERING_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('PREPARING', 'CONFIRMED', {
         guard: '同客户返单复用已确认且内容一致的样品。',
         action: 'save_sales_order_engineering',
-        permission: ['sales_order.engineering.update'],
+        permission: [PermissionCode.SALES_ORDER_ENGINEERING_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('SAMPLING', 'PREPARING', {
         guard: '填写重做原因，且没有用料审批及下游单据。',
         action: 'save_sales_order_engineering',
-        permission: ['sales_order.engineering.update'],
+        permission: [PermissionCode.SALES_ORDER_ENGINEERING_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('CONFIRMED', 'PREPARING', {
         guard: '填写重做原因，且没有用料审批及下游单据。',
         action: 'save_sales_order_engineering',
-        permission: ['sales_order.engineering.update'],
+        permission: [PermissionCode.SALES_ORDER_ENGINEERING_UPDATE],
         factBoundary: 'source_document_only',
       }),
     ],
@@ -828,26 +829,26 @@ const FLOW_DEFINITIONS = [
       transition('SUBMITTED', 'BOSS_APPROVED', {
         guard: '当前样品和材料与提交资料一致。',
         action: 'boss_review_engineering_material_request',
-        permission: ['engineering.material.boss_approve'],
+        permission: [PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE],
         factBoundary: 'source_document_only',
       }),
       transition('SUBMITTED', 'REJECTED', {
         guard: '老板填写退回原因。',
         action: 'boss_review_engineering_material_request',
-        permission: ['engineering.material.boss_approve'],
+        permission: [PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE],
         factBoundary: 'source_document_only',
       }),
       transition('BOSS_APPROVED', 'APPROVED', {
         guard:
           '另一位财务审批人核对冻结的订单、BOM、材料、厂商与应需数量；不可改量，批准后按厂商生成采购单。',
         action: 'finance_review_engineering_material_request',
-        permission: ['engineering.material.finance_approve'],
+        permission: [PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE],
         factBoundary: 'source_document_only',
       }),
       transition('BOSS_APPROVED', 'REJECTED', {
         guard: '财务填写退回原因。',
         action: 'finance_review_engineering_material_request',
-        permission: ['engineering.material.finance_approve'],
+        permission: [PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE],
         factBoundary: 'source_document_only',
       }),
     ],
@@ -884,37 +885,37 @@ const FLOW_DEFINITIONS = [
       transition('draft', 'submitted', {
         guard: '草稿提交必须由正式销售订单受理流程发起。',
         action: 'start_sales_order_acceptance_process',
-        permission: ['sales_order.submit'],
+        permission: [PermissionCode.SALES_ORDER_SUBMIT],
         factBoundary: 'source_document_only',
       }),
       transition('submitted', 'active', {
         guard: '销售审批节点完成后，由 ProcessRuntime 白名单命令生效。',
         action: 'SalesOrderUsecase.ActivateSalesOrderForProcessCommand',
-        permission: ['sales_order.activate', 'workflow.task.approve'],
+        permission: [PermissionCode.SALES_ORDER_ACTIVATE, PermissionCode.WORKFLOW_TASK_APPROVE],
         factBoundary: 'source_document_only',
       }),
       transition('draft', 'canceled', {
         guard: '仅允许通过销售订单取消 usecase。',
         action: 'cancel_sales_order',
-        permission: ['sales_order.cancel'],
+        permission: [PermissionCode.SALES_ORDER_CANCEL],
         factBoundary: 'source_document_only',
       }),
       transition('submitted', 'canceled', {
         guard: '仅允许通过销售订单取消 usecase。',
         action: 'cancel_sales_order',
-        permission: ['sales_order.cancel'],
+        permission: [PermissionCode.SALES_ORDER_CANCEL],
         factBoundary: 'source_document_only',
       }),
       transition('active', 'closed', {
         guard: '关闭条件由销售订单领域 usecase 校验。',
         action: 'close_sales_order',
-        permission: ['sales_order.close'],
+        permission: [PermissionCode.SALES_ORDER_CLOSE],
         factBoundary: 'source_document_only',
       }),
       transition('active', 'canceled', {
         guard: '取消条件由销售订单领域 usecase 校验。',
         action: 'cancel_sales_order',
-        permission: ['sales_order.cancel'],
+        permission: [PermissionCode.SALES_ORDER_CANCEL],
         factBoundary: 'source_document_only',
       }),
     ],
@@ -953,37 +954,37 @@ const FLOW_DEFINITIONS = [
       transition('draft', 'submitted', {
         guard: '采购草稿经正式提交动作冻结。',
         action: 'submit_purchase_order',
-        permission: ['purchase.order.update'],
+        permission: [PermissionCode.PURCHASE_ORDER_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('submitted', 'approved', {
         guard: '采购审批节点完成后执行唯一批准命令。',
         action: 'PurchaseOrderUsecase.ApprovePurchaseOrderForProcessCommand',
-        permission: ['workflow.task.approve'],
+        permission: [PermissionCode.WORKFLOW_TASK_APPROVE],
         factBoundary: 'source_document_only',
       }),
       transition('draft', 'canceled', {
         guard: '取消条件由采购订单领域 usecase 校验。',
         action: 'cancel_purchase_order',
-        permission: ['purchase.order.update'],
+        permission: [PermissionCode.PURCHASE_ORDER_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('submitted', 'canceled', {
         guard: '取消条件由采购订单领域 usecase 校验。',
         action: 'cancel_purchase_order',
-        permission: ['purchase.order.update'],
+        permission: [PermissionCode.PURCHASE_ORDER_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('approved', 'closed', {
         guard: '关闭条件由采购订单领域 usecase 校验。',
         action: 'close_purchase_order',
-        permission: ['purchase.order.update'],
+        permission: [PermissionCode.PURCHASE_ORDER_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('approved', 'canceled', {
         guard: '取消条件由采购订单领域 usecase 校验。',
         action: 'cancel_purchase_order',
-        permission: ['purchase.order.update'],
+        permission: [PermissionCode.PURCHASE_ORDER_UPDATE],
         factBoundary: 'source_document_only',
       }),
     ],
@@ -1022,37 +1023,37 @@ const FLOW_DEFINITIONS = [
       transition('draft', 'submitted', {
         guard: '仅正式委外提交动作可推进。',
         action: 'submit_outsourcing_order',
-        permission: ['outsourcing.order.update'],
+        permission: [PermissionCode.OUTSOURCING_ORDER_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('submitted', 'confirmed', {
         guard: '仅正式委外确认动作可推进。',
         action: 'confirm_outsourcing_order',
-        permission: ['outsourcing.order.confirm'],
+        permission: [PermissionCode.OUTSOURCING_ORDER_CONFIRM],
         factBoundary: 'source_document_only',
       }),
       transition('draft', 'canceled', {
         guard: '取消条件由委外订单 usecase 校验。',
         action: 'cancel_outsourcing_order',
-        permission: ['outsourcing.order.update'],
+        permission: [PermissionCode.OUTSOURCING_ORDER_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('submitted', 'canceled', {
         guard: '取消条件由委外订单 usecase 校验。',
         action: 'cancel_outsourcing_order',
-        permission: ['outsourcing.order.update'],
+        permission: [PermissionCode.OUTSOURCING_ORDER_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('confirmed', 'closed', {
         guard: '关闭条件由委外订单 usecase 校验。',
         action: 'close_outsourcing_order',
-        permission: ['outsourcing.order.update'],
+        permission: [PermissionCode.OUTSOURCING_ORDER_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('confirmed', 'canceled', {
         guard: '取消条件由委外订单 usecase 校验。',
         action: 'cancel_outsourcing_order',
-        permission: ['outsourcing.order.update'],
+        permission: [PermissionCode.OUTSOURCING_ORDER_UPDATE],
         factBoundary: 'source_document_only',
       }),
     ],
@@ -1089,25 +1090,25 @@ const FLOW_DEFINITIONS = [
       transition('DRAFT', 'RELEASED', {
         guard: '发布会冻结正式生产需求并校验当前版本。',
         action: 'release_production_order',
-        permission: ['pmc.plan.update'],
+        permission: [PermissionCode.PMC_PLAN_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('RELEASED', 'CLOSED', {
         guard: '关闭前校验 WIP、事实和关联任务门禁。',
         action: 'close_production_order',
-        permission: ['pmc.plan.update'],
+        permission: [PermissionCode.PMC_PLAN_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('DRAFT', 'CANCELLED', {
         guard: '取消必须提供正式原因并走生产订单 receipt。',
         action: 'cancel_production_order',
-        permission: ['pmc.plan.update'],
+        permission: [PermissionCode.PMC_PLAN_UPDATE],
         factBoundary: 'source_document_only',
       }),
       transition('RELEASED', 'CANCELLED', {
         guard: '存在生效事实、WIP 或关联任务时失败关闭。',
         action: 'cancel_production_order',
-        permission: ['pmc.plan.update'],
+        permission: [PermissionCode.PMC_PLAN_UPDATE],
         factBoundary: 'source_document_only',
       }),
     ],
@@ -1186,25 +1187,25 @@ const FLOW_DEFINITIONS = [
       transition('DRAFT', 'ACTIVE', {
         guard: '激活前校验 BOM 头、明细和引用完整性。',
         action: 'activate_bom_version',
-        permission: ['bom.activate'],
+        permission: [PermissionCode.BOM_ACTIVATE],
         factBoundary: 'master_data_only',
       }),
       transition('DRAFT', 'ARCHIVED', {
         guard: '归档只改变版本生命周期，不删除引用。',
         action: 'archive_bom_version',
-        permission: ['bom.update'],
+        permission: [PermissionCode.BOM_UPDATE],
         factBoundary: 'master_data_only',
       }),
       transition('ACTIVE', 'ARCHIVED', {
         guard: '归档只改变版本生命周期，不删除引用。',
         action: 'archive_bom_version',
-        permission: ['bom.update'],
+        permission: [PermissionCode.BOM_UPDATE],
         factBoundary: 'master_data_only',
       }),
       transition('ARCHIVED', 'ACTIVE', {
         guard: '重新激活仍需通过 BOM 领域校验。',
         action: 'activate_bom_version',
-        permission: ['bom.activate'],
+        permission: [PermissionCode.BOM_ACTIVATE],
         factBoundary: 'master_data_only',
       }),
     ],
@@ -1270,25 +1271,25 @@ const FLOW_DEFINITIONS = [
       transition('ready', 'blocked', {
         guard: '必须提供非空阻塞原因、version 和幂等键。',
         action: 'block_task_action',
-        permission: ['workflow.task.update'],
+        permission: [PermissionCode.WORKFLOW_TASK_UPDATE],
         factBoundary: 'workflow_only',
       }),
       transition('ready', 'done', {
         guard: '同时校验任务类型、责任池、owner/assignee、version 和幂等。',
         action: 'complete_task_action',
-        permission: ['workflow.task.complete', 'workflow.task.approve'],
+        permission: [PermissionCode.WORKFLOW_TASK_COMPLETE, PermissionCode.WORKFLOW_TASK_APPROVE],
         factBoundary: 'workflow_only',
       }),
       transition('ready', 'rejected', {
         guard: '必须提供非空退回原因、version 和幂等键。',
         action: 'reject_task_action',
-        permission: ['workflow.task.reject'],
+        permission: [PermissionCode.WORKFLOW_TASK_REJECT],
         factBoundary: 'workflow_only',
       }),
       transition('blocked', 'ready', {
         guard: '必须提供新的解除说明并清理旧阻塞原因。',
         action: 'resume_task_action',
-        permission: ['workflow.task.update'],
+        permission: [PermissionCode.WORKFLOW_TASK_UPDATE],
         factBoundary: 'workflow_only',
       }),
     ],
@@ -1487,10 +1488,10 @@ const FLOW_DEFINITIONS = [
       schemaPath: 'server/internal/data/model/schema/purchase_receipt.go',
       postAction: 'post_purchase_receipt',
       cancelAction: 'cancel_purchase_receipt',
-      postPermission: ['warehouse.inbound.confirm'],
-      cancelPermission: ['warehouse.inbound.confirm'],
+      postPermission: [PermissionCode.WAREHOUSE_INBOUND_CONFIRM],
+      cancelPermission: [PermissionCode.WAREHOUSE_INBOUND_CONFIRM],
       draftCancelAction: 'cancel_purchase_receipt_draft',
-      draftCancelPermission: ['purchase.receipt.cancel_draft'],
+      draftCancelPermission: [PermissionCode.PURCHASE_RECEIPT_CANCEL_DRAFT],
     },
     {
       key: 'fact.purchase_return',
@@ -1498,8 +1499,8 @@ const FLOW_DEFINITIONS = [
       schemaPath: 'server/internal/data/model/schema/purchase_return.go',
       postAction: 'post_purchase_return',
       cancelAction: 'cancel_purchase_return',
-      postPermission: ['purchase.return.post'],
-      cancelPermission: ['purchase.return.cancel'],
+      postPermission: [PermissionCode.PURCHASE_RETURN_POST],
+      cancelPermission: [PermissionCode.PURCHASE_RETURN_CANCEL],
     },
     {
       key: 'fact.purchase_receipt_adjustment',
@@ -1508,8 +1509,8 @@ const FLOW_DEFINITIONS = [
         'server/internal/data/model/schema/purchase_receipt_adjustment.go',
       postAction: 'post_purchase_receipt_adjustment',
       cancelAction: 'cancel_purchase_receipt_adjustment',
-      postPermission: ['purchase.receipt.adjustment.post'],
-      cancelPermission: ['purchase.receipt.adjustment.cancel'],
+      postPermission: [PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_POST],
+      cancelPermission: [PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_CANCEL],
     },
   ].map((item) => ({
     key: item.key,
@@ -1586,32 +1587,32 @@ const FLOW_DEFINITIONS = [
       transition('DRAFT', 'SUBMITTED', {
         guard: '提交前校验正式检验来源和必填数据。',
         action: 'submit_quality_inspection',
-        permission: ['quality.inspection.update'],
+        permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
         factBoundary: 'fact_ledger',
       }),
       transition('DRAFT', 'CANCELLED', {
         guard: '草稿质检只能通过正式取消动作终止。',
         action: 'cancel_quality_inspection',
-        permission: ['quality.inspection.update'],
+        permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
         factBoundary: 'fact_ledger',
       }),
       transition('SUBMITTED', 'PASSED', {
         guard:
           '来料必须保留实际检查项目；未检不能通过，异常项只允许拒收或有理由的让步接收。',
         action: 'pass_quality_inspection',
-        permission: ['quality.inspection.update'],
+        permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
         factBoundary: 'fact_ledger',
       }),
       transition('SUBMITTED', 'REJECTED', {
         guard: '判定结果由正式质检 usecase 写入。',
         action: 'reject_quality_inspection',
-        permission: ['quality.inspection.update'],
+        permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
         factBoundary: 'fact_ledger',
       }),
       transition('SUBMITTED', 'CANCELLED', {
         guard: '已提交质检取消条件由领域 usecase 校验。',
         action: 'cancel_quality_inspection',
-        permission: ['quality.inspection.update'],
+        permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
         factBoundary: 'fact_ledger',
       }),
     ],
@@ -1653,19 +1654,19 @@ const FLOW_DEFINITIONS = [
       transition('DRAFT', 'SHIPPED', {
         guard: '重新校验财务放行、质检、来源数量、预留和可用库存。',
         action: 'ship_shipment',
-        permission: ['shipment.ship'],
+        permission: [PermissionCode.SHIPMENT_SHIP],
         factBoundary: 'fact_ledger',
       }),
       transition('DRAFT', 'CANCELLED', {
         guard: '草稿出货取消必须走正式领域动作。',
         action: 'cancel_shipment',
-        permission: ['shipment.cancel'],
+        permission: [PermissionCode.SHIPMENT_CANCEL],
         factBoundary: 'fact_ledger',
       }),
       transition('SHIPPED', 'CANCELLED', {
         guard: '取消已出货单必须在同一事务写库存 REVERSAL。',
         action: 'cancel_shipment',
-        permission: ['shipment.cancel'],
+        permission: [PermissionCode.SHIPMENT_CANCEL],
         factBoundary: 'fact_ledger',
       }),
     ],
@@ -1699,16 +1700,16 @@ const FLOW_DEFINITIONS = [
       label: '生产事实',
       postAction: 'post_production_fact',
       cancelAction: 'cancel_production_fact',
-      postPermission: ['production.fact.post'],
-      cancelPermission: ['production.fact.cancel'],
+      postPermission: [PermissionCode.PRODUCTION_FACT_POST],
+      cancelPermission: [PermissionCode.PRODUCTION_FACT_CANCEL],
     },
     {
       key: 'fact.outsourcing',
       label: '委外事实',
       postAction: 'post_outsourcing_fact',
       cancelAction: 'cancel_outsourcing_fact',
-      postPermission: ['outsourcing.fact.post'],
-      cancelPermission: ['outsourcing.fact.cancel'],
+      postPermission: [PermissionCode.OUTSOURCING_FACT_POST],
+      cancelPermission: [PermissionCode.OUTSOURCING_FACT_CANCEL],
     },
   ].map((item) => ({
     key: item.key,
@@ -1770,13 +1771,13 @@ const FLOW_DEFINITIONS = [
       transition('ACTIVE', 'RELEASED', {
         guard: '释放必须走预留领域 usecase。',
         action: 'release_stock_reservation',
-        permission: ['stock.reservation.release'],
+        permission: [PermissionCode.STOCK_RESERVATION_RELEASE],
         factBoundary: 'fact_ledger',
       }),
       transition('ACTIVE', 'CONSUMED', {
         guard: '仅正式出货事务可以消费匹配的 ACTIVE 预留。',
         action: 'OperationalFactUsecase.ConsumeStockReservationForShipment',
-        permission: ['shipment.ship'],
+        permission: [PermissionCode.SHIPMENT_SHIP],
         factBoundary: 'fact_ledger',
       }),
       transition('ACTIVE', 'CANCELLED', {
@@ -1822,10 +1823,10 @@ const FLOW_DEFINITIONS = [
         guard: '来源、往来方、币种和金额由后端事实 usecase 校验。',
         action: 'post_finance_fact',
         permission: [
-          'finance.receivable.confirm',
-          'finance.payable.confirm',
-          'finance.invoice.confirm',
-          'finance.reconciliation.confirm',
+          PermissionCode.FINANCE_RECEIVABLE_CONFIRM,
+          PermissionCode.FINANCE_PAYABLE_CONFIRM,
+          PermissionCode.FINANCE_INVOICE_CONFIRM,
+          PermissionCode.FINANCE_RECONCILIATION_CONFIRM,
         ],
         factBoundary: 'fact_ledger',
       }),
@@ -1835,9 +1836,9 @@ const FLOW_DEFINITIONS = [
         action:
           'settle_finance_fact / execute_finance_payment_post / create_finance_credit_note',
         permission: [
-          'finance.reconciliation.confirm',
-          'finance.payment.post',
-          'finance.credit_note.create',
+          PermissionCode.FINANCE_RECONCILIATION_CONFIRM,
+          PermissionCode.FINANCE_PAYMENT_POST,
+          PermissionCode.FINANCE_CREDIT_NOTE_CREATE,
         ],
         factBoundary: 'fact_ledger',
       }),
@@ -1845,17 +1846,17 @@ const FLOW_DEFINITIONS = [
         guard:
           '仅 RECEIVABLE / PAYABLE 在收付款冲正或反向红冲后重新出现未结余额时，由同一领域事务清空 settled_at / settled_by；不开放通用重开按钮。',
         action: 'reverse_finance_payment / reverse_finance_credit_note',
-        permission: ['finance.payment.reverse', 'finance.credit_note.reverse'],
+        permission: [PermissionCode.FINANCE_PAYMENT_REVERSE, PermissionCode.FINANCE_CREDIT_NOTE_REVERSE],
         factBoundary: 'fact_ledger',
       }),
       transition('POSTED', 'CANCELLED', {
         guard: '必须保留 actor、非空原因和原 posted_at。',
         action: 'cancel_finance_fact',
         permission: [
-          'finance.receivable.confirm',
-          'finance.payable.confirm',
-          'finance.invoice.confirm',
-          'finance.reconciliation.confirm',
+          PermissionCode.FINANCE_RECEIVABLE_CONFIRM,
+          PermissionCode.FINANCE_PAYABLE_CONFIRM,
+          PermissionCode.FINANCE_INVOICE_CONFIRM,
+          PermissionCode.FINANCE_RECONCILIATION_CONFIRM,
         ],
         factBoundary: 'fact_ledger',
       }),
@@ -1976,25 +1977,25 @@ const FLOW_DEFINITIONS = [
       transition('PLANNED', 'SPLIT', {
         guard: '拆分数量、来源批次和幂等 receipt 必须通过领域校验。',
         action: 'execute_production_wip_action:SPLIT_BATCH',
-        permission: ['production.wip.assign'],
+        permission: [PermissionCode.PRODUCTION_WIP_ASSIGN],
         factBoundary: 'production_wip',
       }),
       transition('PLANNED', 'IN_PROGRESS', {
         guard: '执行模式必须为 IN_HOUSE，包材和工序前置条件均满足。',
         action: 'execute_production_wip_action:START_OPERATION',
-        permission: ['production.wip.execute'],
+        permission: [PermissionCode.PRODUCTION_WIP_EXECUTE],
         factBoundary: 'production_wip',
       }),
       transition('PLANNED', 'OUTSOURCED', {
         guard: '执行模式必须为 OUTSOURCED 且存在合法委外分配。',
         action: 'execute_production_wip_action:START_OPERATION',
-        permission: ['production.wip.execute'],
+        permission: [PermissionCode.PRODUCTION_WIP_EXECUTE],
         factBoundary: 'production_wip',
       }),
       transition('PLANNED', 'CANCELLED', {
         guard: '仅未开始批次可由命名取消动作终止。',
         action: 'execute_production_wip_action:CANCEL_BATCH',
-        permission: ['production.wip.assign'],
+        permission: [PermissionCode.PRODUCTION_WIP_ASSIGN],
         factBoundary: 'production_wip',
       }),
       ...['IN_PROGRESS', 'OUTSOURCED'].flatMap((from) => [
@@ -2004,7 +2005,7 @@ const FLOW_DEFINITIONS = [
             from === 'IN_PROGRESS'
               ? 'execute_production_wip_action:COMPLETE_OPERATION'
               : 'execute_production_wip_action:RECEIVE_OUTSOURCING_RETURN',
-          permission: ['production.wip.execute'],
+          permission: [PermissionCode.PRODUCTION_WIP_EXECUTE],
           factBoundary: 'production_wip',
         }),
         transition(from, 'ACCEPTED', {
@@ -2013,20 +2014,20 @@ const FLOW_DEFINITIONS = [
             from === 'IN_PROGRESS'
               ? 'execute_production_wip_action:COMPLETE_OPERATION'
               : 'execute_production_wip_action:RECEIVE_OUTSOURCING_RETURN',
-          permission: ['production.wip.execute'],
+          permission: [PermissionCode.PRODUCTION_WIP_EXECUTE],
           factBoundary: 'production_wip',
         }),
       ]),
       transition('WAITING_QUALITY', 'ACCEPTED', {
         guard: '所有冻结质量关口均已正式 PASS。',
         action: 'updateProductionWIPBatchQualityStatus',
-        permission: ['quality.inspection.update'],
+        permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
         factBoundary: 'quality_fact_updates_wip',
       }),
       transition('WAITING_QUALITY', 'REJECTED', {
         guard: '当前冻结质量关口已正式 REJECT。',
         action: 'updateProductionWIPBatchQualityStatus',
-        permission: ['quality.inspection.update'],
+        permission: [PermissionCode.QUALITY_INSPECTION_UPDATE],
         factBoundary: 'quality_fact_updates_wip',
       }),
     ],
@@ -2065,7 +2066,7 @@ const FLOW_DEFINITIONS = [
       transition('PENDING', 'CONFIRMED', {
         guard: '包材版本快照、生产订单行、version 和 receipt 必须匹配。',
         action: 'execute_production_wip_action:CONFIRM_PACKAGING_MATERIAL',
-        permission: ['production.packaging_material.confirm'],
+        permission: [PermissionCode.PRODUCTION_PACKAGING_MATERIAL_CONFIRM],
         factBoundary: 'production_confirmation',
       }),
     ],
@@ -2105,7 +2106,7 @@ const FLOW_DEFINITIONS = [
           '审批人不得为申请人；批准数量、当前 version、流程节点和原因必须合法。',
         action:
           'OperationalFactUsecase.ApproveProductionExceptionForProcessCommand',
-        permission: ['production.exception.approve', 'workflow.task.approve'],
+        permission: [PermissionCode.PRODUCTION_EXCEPTION_APPROVE, PermissionCode.WORKFLOW_TASK_APPROVE],
         factBoundary: 'source_document_decision_only',
       }),
       transition('SUBMITTED', 'REJECTED', {
@@ -2113,13 +2114,13 @@ const FLOW_DEFINITIONS = [
           '审批人不得为申请人；拒绝必须提供正式原因并匹配当前 version 和流程节点。',
         action:
           'OperationalFactUsecase.RejectProductionExceptionForProcessCommand',
-        permission: ['production.exception.approve', 'workflow.task.reject'],
+        permission: [PermissionCode.PRODUCTION_EXCEPTION_APPROVE, PermissionCode.WORKFLOW_TASK_REJECT],
         factBoundary: 'source_document_decision_only',
       }),
       transition('SUBMITTED', 'CANCELLED', {
         guard: '取消必须提供正式原因并匹配当前 version。',
         action: 'cancel_production_exception',
-        permission: ['production.exception.submit'],
+        permission: [PermissionCode.PRODUCTION_EXCEPTION_SUBMIT],
         factBoundary: 'source_document_decision_only',
       }),
     ],
@@ -2159,21 +2160,21 @@ const FLOW_DEFINITIONS = [
           '决策必须 APPROVED；仅报废或在制让步可经执行任务办理，超领额度不得走执行命令。',
         action:
           'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
-        permission: ['workflow.task.complete', 'production.fact.post'],
+        permission: [PermissionCode.WORKFLOW_TASK_COMPLETE, PermissionCode.PRODUCTION_FACT_POST],
         factBoundary: 'source_document_execution_status_and_wip_effect',
       }),
       transition('PENDING', 'REVERSED', {
         guard:
           '仅未被正常领料消费的超领额度可直接撤销；必须匹配当前 version、actor 和非空原因。',
         action: 'reverse_production_exception',
-        permission: ['production.fact.post'],
+        permission: [PermissionCode.PRODUCTION_FACT_POST],
         factBoundary: 'source_document_allowance_reversal_only',
       }),
       transition('APPLIED', 'REVERSED', {
         guard:
           '仅已执行的报废或在制让步可冲正；必须匹配原在制影响、当前 version、actor 和非空原因。',
         action: 'reverse_production_exception',
-        permission: ['production.fact.post'],
+        permission: [PermissionCode.PRODUCTION_FACT_POST],
         factBoundary: 'source_document_execution_status_and_wip_reversal',
       }),
     ],
@@ -2204,8 +2205,8 @@ const FLOW_DEFINITIONS = [
     ],
     postAction: 'post_purchase_rejection_disposition',
     cancelAction: 'cancel_purchase_rejection_disposition',
-    postPermission: 'purchase.return.post',
-    cancelPermission: 'purchase.return.cancel',
+    postPermission: PermissionCode.PURCHASE_RETURN_POST,
+    cancelPermission: PermissionCode.PURCHASE_RETURN_CANCEL,
   }),
   draftPostedCancelledDefinition({
     key: 'fact.outsourcing_return_disposition',
@@ -2217,8 +2218,8 @@ const FLOW_DEFINITIONS = [
     ],
     postAction: 'post_outsourcing_return_disposition',
     cancelAction: 'cancel_outsourcing_return_disposition',
-    postPermission: 'outsourcing.fact.post',
-    cancelPermission: 'outsourcing.fact.cancel',
+    postPermission: PermissionCode.OUTSOURCING_FACT_POST,
+    cancelPermission: PermissionCode.OUTSOURCING_FACT_CANCEL,
   }),
   {
     key: 'fact.finance_payment',
@@ -2240,33 +2241,33 @@ const FLOW_DEFINITIONS = [
       transition('DRAFT', 'APPROVED', {
         guard: '审批人不得为创建人，流程节点、原因和 version 必须匹配。',
         action: 'approve_finance_payment',
-        permission: ['finance.payment.approve', 'workflow.task.approve'],
+        permission: [PermissionCode.FINANCE_PAYMENT_APPROVE, PermissionCode.WORKFLOW_TASK_APPROVE],
         factBoundary: 'source_document_only',
       }),
       transition('DRAFT', 'REJECTED', {
         guard: '审批人不得为创建人，必须提供退回原因并匹配当前 version。',
         action: 'reject_finance_payment',
-        permission: ['finance.payment.approve', 'workflow.task.reject'],
+        permission: [PermissionCode.FINANCE_PAYMENT_APPROVE, PermissionCode.WORKFLOW_TASK_REJECT],
         factBoundary: 'source_document_only',
       }),
       transition('APPROVED', 'POSTED', {
         guard: '往来方、币种、金额、核销目标和 version 必须一致。',
         action: 'post_finance_payment',
-        permission: ['finance.payment.post'],
+        permission: [PermissionCode.FINANCE_PAYMENT_POST],
         factBoundary: 'finance_fact',
       }),
       ...['DRAFT', 'APPROVED'].map((from) =>
         transition(from, 'CANCELLED', {
           guard: '仅草稿或已批准且尚未过账的收付款单可取消，必须提供原因。',
           action: 'cancel_finance_payment',
-          permission: ['finance.payment.create'],
+          permission: [PermissionCode.FINANCE_PAYMENT_CREATE],
           factBoundary: 'source_document_only',
         })
       ),
       transition('POSTED', 'REVERSED', {
         guard: '冲正必须提供原因并创建匹配的反向核销记录。',
         action: 'reverse_finance_payment',
-        permission: ['finance.payment.reverse'],
+        permission: [PermissionCode.FINANCE_PAYMENT_REVERSE],
         factBoundary: 'finance_fact',
       }),
     ],
@@ -2362,48 +2363,48 @@ const FLOW_DEFINITIONS = [
         guard:
           '仅 MANUAL_ADJUSTMENT 可提交，且创建人、version 与流程节点必须匹配。',
         action: 'submit_inventory_adjustment',
-        permission: ['warehouse.adjustment.create'],
+        permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE],
         factBoundary: 'source_document_only',
       }),
       transition('SUBMITTED', 'APPROVED', {
         guard:
           '仅 MANUAL_ADJUSTMENT 可批准，审批人不得为创建人并必须匹配 version。',
         action: 'approve_inventory_adjustment',
-        permission: ['warehouse.adjustment.approve', 'workflow.task.approve'],
+        permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE, PermissionCode.WORKFLOW_TASK_APPROVE],
         factBoundary: 'source_document_only',
       }),
       transition('SUBMITTED', 'REJECTED', {
         guard:
           '仅 MANUAL_ADJUSTMENT 可退回，必须提供原因且审批人不得为创建人。',
         action: 'reject_inventory_adjustment',
-        permission: ['warehouse.adjustment.approve', 'workflow.task.reject'],
+        permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE, PermissionCode.WORKFLOW_TASK_REJECT],
         factBoundary: 'source_document_only',
       }),
       transition('DRAFT', 'POSTED', {
         guard:
           '仅非 MANUAL_ADJUSTMENT 从草稿直接过账，并原子写库存交易与余额。',
         action: 'post_inventory_operation',
-        permission: ['warehouse.adjustment.create'],
+        permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE],
         factBoundary: 'inventory_fact',
       }),
       transition('APPROVED', 'POSTED', {
         guard: '仅已批准 MANUAL_ADJUSTMENT 可过账，并原子写库存交易与余额。',
         action: 'post_inventory_adjustment',
-        permission: ['warehouse.adjustment.create'],
+        permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE],
         factBoundary: 'inventory_fact',
       }),
       ...['DRAFT', 'SUBMITTED', 'APPROVED'].map((from) =>
         transition(from, 'CANCELLED', {
           guard: '未过账单由创建人提供原因并匹配 version 后取消。',
           action: 'cancel_inventory_operation',
-          permission: ['warehouse.adjustment.create'],
+          permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE],
           factBoundary: 'source_document_only',
         })
       ),
       transition('POSTED', 'CANCELLED', {
         guard: '已过账单只允许原过账人提供原因后取消，并原子写反向库存交易。',
         action: 'cancel_inventory_operation',
-        permission: ['warehouse.adjustment.create'],
+        permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE],
         factBoundary: 'inventory_fact',
       }),
     ],
@@ -2750,37 +2751,37 @@ function normalizeProcessDefinition(definition) {
 const salesProcessNodes = (includeEngineering) => [
   processNode('submit_sales_order', 'domain_command', '提交销售订单', {
     action: 'SalesOrderUsecase.SubmitSalesOrder',
-    permission: ['sales_order.submit'],
+    permission: [PermissionCode.SALES_ORDER_SUBMIT],
     factBoundary: 'source_document_only',
   }),
   processNode('order_approval', 'approval', '订单审批', {
     ownerPool: 'boss',
-    permission: ['workflow.task.approve'],
+    permission: [PermissionCode.WORKFLOW_TASK_APPROVE],
     factBoundary: 'orchestration_only',
   }),
   processNode('activate_sales_order', 'domain_command', '生效销售订单', {
     action: 'SalesOrderUsecase.ActivateSalesOrderForProcessCommand',
-    permission: ['workflow.task.approve'],
+    permission: [PermissionCode.WORKFLOW_TASK_APPROVE],
     factBoundary: 'source_document_only',
   }),
   ...(includeEngineering
     ? [
         processNode('engineering_data', 'human_task', '工程资料', {
           ownerPool: 'engineering_data',
-          permission: ['workflow.task.complete'],
+          permission: [PermissionCode.WORKFLOW_TASK_COMPLETE],
           factBoundary: 'orchestration_only',
         }),
       ]
     : []),
   processNode('order_review', 'human_task', '订单评审', {
     ownerPool: 'order_review',
-    permission: ['workflow.task.complete'],
+    permission: [PermissionCode.WORKFLOW_TASK_COMPLETE],
     factBoundary: 'orchestration_only',
   }),
   processNode('end', 'end', '结束'),
   processNode('reject_sales_order', 'domain_command', '驳回销售订单', {
     action: 'SalesOrderUsecase.RejectSalesOrderForProcessCommand',
-    permission: ['workflow.task.reject'],
+    permission: [PermissionCode.WORKFLOW_TASK_REJECT],
     factBoundary: 'source_document_only',
   }),
   processNode('sales_order_rejected_end', 'end', '销售订单审批驳回结束'),
@@ -2847,12 +2848,12 @@ export const processDefinitions = Object.freeze(
       nodes: [
         processNode('submit_purchase_order', 'domain_command', '提交采购订单', {
           action: 'PurchaseOrderUsecase.SubmitPurchaseOrderForProcessCommand',
-          permission: ['purchase.order.submit'],
+          permission: [PermissionCode.PURCHASE_ORDER_SUBMIT],
           factBoundary: 'source_document_only',
         }),
         processNode('purchase_order_approval', 'approval', '采购订单审批', {
           ownerPool: 'boss',
-          permission: ['workflow.task.approve'],
+          permission: [PermissionCode.WORKFLOW_TASK_APPROVE],
           factBoundary: 'orchestration_only',
         }),
         processNode(
@@ -2861,14 +2862,14 @@ export const processDefinitions = Object.freeze(
           '批准采购订单',
           {
             action: 'PurchaseOrderUsecase.ApprovePurchaseOrder',
-            permission: ['workflow.task.approve'],
+            permission: [PermissionCode.WORKFLOW_TASK_APPROVE],
             factBoundary: 'source_document_only',
           }
         ),
         processNode('end', 'end', '结束'),
         processNode('reject_purchase_order', 'domain_command', '驳回采购订单', {
           action: 'PurchaseOrderUsecase.RejectPurchaseOrderForProcessCommand',
-          permission: ['workflow.task.reject'],
+          permission: [PermissionCode.WORKFLOW_TASK_REJECT],
           factBoundary: 'source_document_only',
         }),
         processNode(
@@ -2905,7 +2906,7 @@ export const processDefinitions = Object.freeze(
       nodes: [
         processNode('shipment_finance_approval', 'approval', '出货财务审批', {
           ownerPool: 'finance',
-          permission: ['workflow.task.approve'],
+          permission: [PermissionCode.WORKFLOW_TASK_APPROVE],
           factBoundary: 'orchestration_only',
         }),
         processNode(
@@ -2915,7 +2916,7 @@ export const processDefinitions = Object.freeze(
           {
             ownerPool: 'shipment_finance_release',
             action: 'OperationalFactUsecase.RecordShipmentFinanceRelease',
-            permission: ['finance.receivable.confirm'],
+            permission: [PermissionCode.FINANCE_RECEIVABLE_CONFIRM],
             factBoundary: 'shipment_release_via_domain_usecase',
           }
         ),
@@ -2926,7 +2927,7 @@ export const processDefinitions = Object.freeze(
           '记录财务驳回',
           {
             action: 'OperationalFactUsecase.RecordShipmentFinanceRejection',
-            permission: ['workflow.task.reject'],
+            permission: [PermissionCode.WORKFLOW_TASK_REJECT],
             factBoundary: 'shipment_rejection_via_domain_usecase',
           }
         ),
@@ -2959,18 +2960,18 @@ export const processDefinitions = Object.freeze(
       nodes: [
         processNode('finance_payment_approval', 'approval', '收付款审批', {
           ownerPool: 'boss',
-          permission: ['finance.payment.approve'],
+          permission: [PermissionCode.FINANCE_PAYMENT_APPROVE],
           factBoundary: 'orchestration_only',
         }),
         processNode('approve_finance_payment', 'domain_command', '批准收付款', {
           action:
             'OperationalFactUsecase.ApproveFinancePaymentForProcessCommand',
-          permission: ['workflow.task.approve'],
+          permission: [PermissionCode.WORKFLOW_TASK_APPROVE],
           factBoundary: 'source_document_only',
         }),
         processNode('finance_payment_execution', 'human_task', '收付款执行', {
           ownerPool: 'finance',
-          permission: ['workflow.task.complete'],
+          permission: [PermissionCode.WORKFLOW_TASK_COMPLETE],
           factBoundary: 'orchestration_only',
         }),
         processNode(
@@ -2981,7 +2982,7 @@ export const processDefinitions = Object.freeze(
             ownerPool: 'finance',
             action:
               'OperationalFactUsecase.PostFinancePaymentForProcessCommand',
-            permission: ['finance.payment.post'],
+            permission: [PermissionCode.FINANCE_PAYMENT_POST],
             factBoundary: 'finance_payment_post_via_domain_usecase',
           }
         ),
@@ -2989,7 +2990,7 @@ export const processDefinitions = Object.freeze(
         processNode('reject_finance_payment', 'domain_command', '驳回收付款', {
           action:
             'OperationalFactUsecase.RejectFinancePaymentForProcessCommand',
-          permission: ['workflow.task.reject'],
+          permission: [PermissionCode.WORKFLOW_TASK_REJECT],
           factBoundary: 'source_document_only',
         }),
         processNode('rejected_end', 'end', '驳回结束'),
@@ -3028,7 +3029,7 @@ export const processDefinitions = Object.freeze(
           {
             action:
               'InventoryUsecase.SubmitInventoryOperationForProcessCommand',
-            permission: ['warehouse.adjustment.create'],
+            permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE],
             factBoundary: 'source_document_only',
           }
         ),
@@ -3038,7 +3039,7 @@ export const processDefinitions = Object.freeze(
           '人工库存调整审批',
           {
             ownerPool: 'boss',
-            permission: ['warehouse.adjustment.approve'],
+            permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE],
             factBoundary: 'orchestration_only',
           }
         ),
@@ -3049,7 +3050,7 @@ export const processDefinitions = Object.freeze(
           {
             action:
               'InventoryUsecase.ApproveInventoryOperationForProcessCommand',
-            permission: ['workflow.task.approve'],
+            permission: [PermissionCode.WORKFLOW_TASK_APPROVE],
             factBoundary: 'source_document_only',
           }
         ),
@@ -3059,7 +3060,7 @@ export const processDefinitions = Object.freeze(
           '人工库存调整执行',
           {
             ownerPool: 'warehouse',
-            permission: ['workflow.task.complete'],
+            permission: [PermissionCode.WORKFLOW_TASK_COMPLETE],
             factBoundary: 'orchestration_only',
           }
         ),
@@ -3070,7 +3071,7 @@ export const processDefinitions = Object.freeze(
           {
             ownerPool: 'warehouse',
             action: 'InventoryUsecase.PostInventoryOperationForProcessCommand',
-            permission: ['warehouse.adjustment.create'],
+            permission: [PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE],
             factBoundary: 'inventory_adjustment_post_via_domain_usecase',
           }
         ),
@@ -3082,7 +3083,7 @@ export const processDefinitions = Object.freeze(
           {
             action:
               'InventoryUsecase.RejectInventoryOperationForProcessCommand',
-            permission: ['workflow.task.reject'],
+            permission: [PermissionCode.WORKFLOW_TASK_REJECT],
             factBoundary: 'source_document_only',
           }
         ),
@@ -3131,7 +3132,7 @@ export const processDefinitions = Object.freeze(
           '生产异常决策审批',
           {
             ownerPool: 'boss',
-            permission: ['production.exception.approve'],
+            permission: [PermissionCode.PRODUCTION_EXCEPTION_APPROVE],
             factBoundary: 'orchestration_only',
           }
         ),
@@ -3142,7 +3143,7 @@ export const processDefinitions = Object.freeze(
           {
             action:
               'OperationalFactUsecase.ApproveProductionExceptionForProcessCommand',
-            permission: ['workflow.task.approve'],
+            permission: [PermissionCode.WORKFLOW_TASK_APPROVE],
             factBoundary: 'source_document_only',
           }
         ),
@@ -3152,7 +3153,7 @@ export const processDefinitions = Object.freeze(
           '报废或在制让步执行',
           {
             ownerPool: 'production',
-            permission: ['workflow.task.complete'],
+            permission: [PermissionCode.WORKFLOW_TASK_COMPLETE],
             factBoundary: 'orchestration_only',
           }
         ),
@@ -3164,7 +3165,7 @@ export const processDefinitions = Object.freeze(
             ownerPool: 'production',
             action:
               'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
-            permission: ['production.fact.post'],
+            permission: [PermissionCode.PRODUCTION_FACT_POST],
             factBoundary: 'production_wip_via_domain_usecase',
           }
         ),
@@ -3176,7 +3177,7 @@ export const processDefinitions = Object.freeze(
           {
             action:
               'OperationalFactUsecase.RejectProductionExceptionForProcessCommand',
-            permission: ['workflow.task.reject'],
+            permission: [PermissionCode.WORKFLOW_TASK_REJECT],
             factBoundary: 'source_document_only',
           }
         ),

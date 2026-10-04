@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { RpcDomain } from '../consts/rpcMethods.generated.mjs'
 import { JsonRpc, isRpcAbortError } from '@/common/utils/jsonRpc'
 import {
   buildIdentitySupportText,
@@ -12,7 +13,7 @@ export default function useRuntimeBuildIdentity() {
   const rpc = useMemo(
     () =>
       new JsonRpc({
-        url: 'system',
+        url: RpcDomain.SYSTEM,
         basePath: '/rpc',
         withAuth: false,
       }),

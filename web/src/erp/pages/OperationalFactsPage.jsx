@@ -15,6 +15,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import Tabs from '@/common/components/navigation/SlidingTabs'
@@ -269,13 +270,13 @@ export function OperationalFactWorkspace({
       : hasAnyPermission(adminProfile, activeConfig.writePermissions)
   const canCreateProductionRework = hasActionPermission(
     adminProfile,
-    'production.rework.create'
+    PermissionCode.PRODUCTION_REWORK_CREATE
   )
   const canEditAnyProductionDraft = [
-    'production.material_issue.create',
-    'production.completion.create',
-    'production.rework.create',
-    'warehouse.inbound.confirm',
+    PermissionCode.PRODUCTION_MATERIAL_ISSUE_CREATE,
+    PermissionCode.PRODUCTION_COMPLETION_CREATE,
+    PermissionCode.PRODUCTION_REWORK_CREATE,
+    PermissionCode.WAREHOUSE_INBOUND_CONFIRM,
   ].some((permission) => hasActionPermission(adminProfile, permission))
   const canViewProductionReworkProgress = canReadProductionProcess(adminProfile)
   const isProductionRecordsPage =
@@ -547,11 +548,11 @@ export function OperationalFactWorkspace({
     activeSelectedRow?.status === 'DRAFT' &&
     !hasRequiredOperationalFactDraftSource(currentActiveKey, activeSelectedRow)
   const canViewOutsourcingPayable =
-    hasActionPermission(adminProfile, 'finance.payable.read') &&
+    hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYABLE_READ) &&
     canOpenRelatedPath(BUSINESS_ROUTE_PATHS.payables)
   const canCreateSingleReconciliation = hasActionPermission(
     adminProfile,
-    'finance.reconciliation.confirm'
+    PermissionCode.FINANCE_RECONCILIATION_CONFIRM
   )
   const selectedIsPostedOutsourcingReturn =
     currentActiveKey === 'outsourcing' &&

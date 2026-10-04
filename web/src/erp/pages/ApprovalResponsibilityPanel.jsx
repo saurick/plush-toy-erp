@@ -21,6 +21,7 @@ import {
   Tooltip,
   Typography,
 } from 'antd'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import { message, modal } from '@/common/utils/antdApp'
@@ -411,7 +412,7 @@ export default function ApprovalResponsibilityPanel({
         validationMessage = '当前岗位已停用，请重新选择'
       } else if (
         !Array.isArray(role.permissions) ||
-        !role.permissions.includes('workflow.task.approve')
+        !role.permissions.includes(PermissionCode.WORKFLOW_TASK_APPROVE)
       ) {
         reason = '未开启审批功能'
         validationMessage = '当前岗位未开启审批功能，请先在岗位设置中开启'

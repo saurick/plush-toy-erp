@@ -1,6 +1,9 @@
 import standardUnits from '../../../../server/internal/unitpolicy/units.json' with { type: 'json' }
 
-const MAX_PRECISION = 6
+import { NumericContract } from '../../common/consts/numeric.generated.mjs'
+
+const MAX_PRECISION = NumericContract.scale
+const UNIT_QUANTITY_PATTERN = new RegExp(`^-?(\\d{1,${NumericContract.integerDigits}})(?:\\.(\\d{1,${MAX_PRECISION}}))?$`, 'u')
 
 export function normalizeUnitPrecision(value) {
   if (value === null || value === undefined || value === '') return undefined
@@ -26,7 +29,7 @@ export function isQuantityTextWithinUnitPrecision(value, precision) {
   const text = String(value ?? '').trim()
   if (!text) return true
   if (normalizeUnitPrecision(precision) === undefined) return false
-  const match = /^-?(\d{1,14})(?:\.(\d{1,6}))?$/u.exec(text)
+  const match = UNIT_QUANTITY_PATTERN.exec(text)
   if (!match) return false
   return (match[2] || '').replace(/0+$/u, '').length <= precision
 }

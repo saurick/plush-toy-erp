@@ -1,3 +1,4 @@
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import {
@@ -8,14 +9,14 @@ import {
 import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 
 const inventoryRpc = new JsonRpc({
-  url: 'inventory',
+  url: RpcDomain.INVENTORY,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
 
 export async function listInventoryBalances(params = {}, options = {}) {
   const result = await inventoryRpc.call(
-    'list_inventory_balances',
+    RpcMethod.inventory.LIST_INVENTORY_BALANCES,
     params,
     options
   )
@@ -39,7 +40,7 @@ export async function listAllInventoryBalances(params = {}, options = {}) {
 }
 
 export async function listInventoryLots(params = {}, options = {}) {
-  const result = await inventoryRpc.call('list_inventory_lots', params, options)
+  const result = await inventoryRpc.call(RpcMethod.inventory.LIST_INVENTORY_LOTS, params, options)
   return requireRpcPage(
     result,
     'inventory_lots',
@@ -60,7 +61,7 @@ export async function listAllInventoryLots(params = {}, options = {}) {
 }
 
 export async function listInventoryTxns(params = {}, options = {}) {
-  const result = await inventoryRpc.call('list_inventory_txns', params, options)
+  const result = await inventoryRpc.call(RpcMethod.inventory.LIST_INVENTORY_TXNS, params, options)
   return requireRpcPage(
     result,
     'inventory_txns',
@@ -81,7 +82,7 @@ export async function listAllInventoryTxns(params = {}, options = {}) {
 }
 
 export async function createInventoryOperation(params = {}) {
-  const result = await inventoryRpc.call('create_inventory_operation', params)
+  const result = await inventoryRpc.call(RpcMethod.inventory.CREATE_INVENTORY_OPERATION, params)
   return requireRpcEntity(
     result,
     'inventory_operation',
@@ -91,7 +92,7 @@ export async function createInventoryOperation(params = {}) {
 
 export async function saveInventoryOperationDraft(params = {}) {
   const result = await inventoryRpc.call(
-    'save_inventory_operation_draft',
+    RpcMethod.inventory.SAVE_INVENTORY_OPERATION_DRAFT,
     params
   )
   return requireRpcEntity(
@@ -102,7 +103,7 @@ export async function saveInventoryOperationDraft(params = {}) {
 }
 
 export async function postInventoryOperation(params = {}) {
-  const result = await inventoryRpc.call('post_inventory_operation', params)
+  const result = await inventoryRpc.call(RpcMethod.inventory.POST_INVENTORY_OPERATION, params)
   return requireRpcEntity(
     result,
     'inventory_operation',
@@ -111,7 +112,7 @@ export async function postInventoryOperation(params = {}) {
 }
 
 export async function cancelInventoryOperation(params = {}) {
-  const result = await inventoryRpc.call('cancel_inventory_operation', params)
+  const result = await inventoryRpc.call(RpcMethod.inventory.CANCEL_INVENTORY_OPERATION, params)
   return requireRpcEntity(
     result,
     'inventory_operation',
@@ -121,7 +122,7 @@ export async function cancelInventoryOperation(params = {}) {
 
 export async function getInventoryOperation(params = {}, options = {}) {
   const result = await inventoryRpc.call(
-    'get_inventory_operation',
+    RpcMethod.inventory.GET_INVENTORY_OPERATION,
     params,
     options
   )
@@ -134,7 +135,7 @@ export async function getInventoryOperation(params = {}, options = {}) {
 
 export async function listInventoryOperations(params = {}, options = {}) {
   const result = await inventoryRpc.call(
-    'list_inventory_operations',
+    RpcMethod.inventory.LIST_INVENTORY_OPERATIONS,
     params,
     options
   )

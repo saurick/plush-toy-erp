@@ -5,6 +5,7 @@ import {
   ZoomInOutlined,
 } from '@ant-design/icons'
 import { useOutletContext } from 'react-router-dom'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { downloadBusinessAttachment } from '../../api/attachmentApi.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
@@ -161,7 +162,7 @@ export default function WorkflowTaskProductImage({
     item.kind === 'material' ||
     !item.productID ||
     !item.imageAttachmentID ||
-    !hasActionPermission(adminProfile, 'product.read')
+    !hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
   ) {
     return (
       <span

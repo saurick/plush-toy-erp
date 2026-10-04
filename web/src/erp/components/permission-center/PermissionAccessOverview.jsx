@@ -9,6 +9,7 @@ import {
   Tag,
 } from 'antd'
 import React, { useState } from 'react'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { normalizeStringList } from '../../utils/permissionCenterAccess.mjs'
@@ -521,15 +522,15 @@ function DataScopeOverview({
 function SensitiveFieldOverview({ permissionKeys = [] }) {
   const selected = new Set(normalizeStringList(permissionKeys))
   const groups = [
-    ['field.party_private.read', '客商隐私', '电话、地址、税号和账户'],
-    ['field.sales_commercial.read', '销售商业', '销售单价、折扣和金额'],
+    [PermissionCode.FIELD_PARTY_PRIVATE_READ, '客商隐私', '电话、地址、税号和账户'],
+    [PermissionCode.FIELD_SALES_COMMERCIAL_READ, '销售商业', '销售单价、折扣和金额'],
     [
-      'field.procurement_commercial.read',
+      PermissionCode.FIELD_PROCUREMENT_COMMERCIAL_READ,
       '采购商业',
       '采购与委外单价、折扣和金额',
     ],
     [
-      'field.finance_settlement.read',
+      PermissionCode.FIELD_FINANCE_SETTLEMENT_READ,
       '财务结算',
       '应收、应付、发票、核销和结算账户',
     ],

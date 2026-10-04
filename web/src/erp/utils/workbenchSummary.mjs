@@ -1,17 +1,18 @@
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 import { canListEngineeringMaterial } from './engineeringMaterialTask.mjs'
 
 export function getWorkbenchSummaryOptions(profile) {
   if (
     !profile?.effective_session?.pages?.includes('global-dashboard') ||
-    !hasActionPermission(profile, 'erp.workbench.read')
+    !hasActionPermission(profile, PermissionCode.ERP_WORKBENCH_READ)
   ) {
     return []
   }
   const options = []
   if (
-    hasActionPermission(profile, 'sales_order.read') &&
-    hasActionPermission(profile, 'sales_order_item.read')
+    hasActionPermission(profile, PermissionCode.SALES_ORDER_READ) &&
+    hasActionPermission(profile, PermissionCode.SALES_ORDER_ITEM_READ)
   ) {
     options.push({ value: 'sales-orders', label: '销售订单汇总' })
   }

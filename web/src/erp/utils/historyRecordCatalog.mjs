@@ -1,3 +1,5 @@
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+
 const MASTER_HISTORY_STATUS = Object.freeze({
   false: '已停用',
   true: '已启用',
@@ -130,28 +132,28 @@ export const HISTORY_RECORD_SOURCES = Object.freeze([
     label: '客户档案',
     menuPath: '/erp/master/partners/customers',
     responseKey: 'customers',
-    readPermissions: ['customer.read'],
+    readPermissions: [PermissionCode.CUSTOMER_READ],
   }),
   masterSource({
     key: 'suppliers',
     label: '供应商与加工厂',
     menuPath: '/erp/master/partners/suppliers',
     responseKey: 'suppliers',
-    readPermissions: ['supplier.read'],
+    readPermissions: [PermissionCode.SUPPLIER_READ],
   }),
   masterSource({
     key: 'materials',
     label: '材料档案',
     menuPath: '/erp/master/materials',
     responseKey: 'materials',
-    readPermissions: ['material.read'],
+    readPermissions: [PermissionCode.MATERIAL_READ],
   }),
   masterSource({
     key: 'products',
     label: '产品档案',
     menuPath: '/erp/master/products',
     responseKey: 'products',
-    readPermissions: ['product.read'],
+    readPermissions: [PermissionCode.PRODUCT_READ],
     catalog: 'products',
   }),
   masterSource({
@@ -159,7 +161,7 @@ export const HISTORY_RECORD_SOURCES = Object.freeze([
     label: '产品规格',
     menuPath: '/erp/master/products',
     responseKey: 'product_skus',
-    readPermissions: ['product_sku.read'],
+    readPermissions: [PermissionCode.PRODUCT_SKU_READ],
     catalog: 'product_skus',
     recordConfig: { codeKey: 'sku_code', nameKey: 'sku_name' },
   }),
@@ -168,14 +170,14 @@ export const HISTORY_RECORD_SOURCES = Object.freeze([
     label: '加工环节',
     menuPath: '/erp/engineering/processes',
     responseKey: 'processes',
-    readPermissions: ['process.read'],
+    readPermissions: [PermissionCode.PROCESS_READ],
   }),
   orderSource({
     key: 'sales_orders',
     label: '销售订单',
     menuPath: '/erp/sales/project-orders/sales-orders',
     responseKey: 'sales_orders',
-    readPermissions: ['sales_order.read'],
+    readPermissions: [PermissionCode.SALES_ORDER_READ],
     statusParam: 'lifecycle_status',
     historyStatusOptions: [
       { value: '', label: '全部历史状态' },
@@ -197,7 +199,7 @@ export const HISTORY_RECORD_SOURCES = Object.freeze([
     label: '采购订单',
     menuPath: '/erp/purchase/accessories',
     responseKey: 'purchase_orders',
-    readPermissions: ['purchase.order.read'],
+    readPermissions: [PermissionCode.PURCHASE_ORDER_READ],
     statusParam: 'lifecycle_status',
     historyStatusOptions: [
       { value: '', label: '全部历史状态' },
@@ -220,7 +222,7 @@ export const HISTORY_RECORD_SOURCES = Object.freeze([
     label: '委外订单',
     menuPath: '/erp/purchase/processing-contracts',
     responseKey: 'outsourcing_orders',
-    readPermissions: ['outsourcing.order.read'],
+    readPermissions: [PermissionCode.OUTSOURCING_ORDER_READ],
     statusParam: 'lifecycle_status',
     historyStatusOptions: [
       { value: '', label: '全部历史状态' },
@@ -241,7 +243,7 @@ export const HISTORY_RECORD_SOURCES = Object.freeze([
     label: '生产订单',
     menuPath: '/erp/production/orders',
     responseKey: 'production_orders',
-    readPermissions: ['pmc.plan.read', 'production.wip.read'],
+    readPermissions: [PermissionCode.PMC_PLAN_READ, PermissionCode.PRODUCTION_WIP_READ],
     permissionMode: 'any',
     statusParam: 'status',
     historyStatusOptions: [
@@ -263,7 +265,7 @@ export const HISTORY_RECORD_SOURCES = Object.freeze([
     label: 'BOM 版本',
     menuPath: '/erp/purchase/material-bom',
     responseKey: 'bom_versions',
-    readPermissions: ['bom.read'],
+    readPermissions: [PermissionCode.BOM_READ],
     statusParam: 'status',
     historyStatusOptions: [
       { value: '', label: '全部历史状态' },

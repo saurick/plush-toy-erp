@@ -1,0 +1,43 @@
+// 由 `node scripts/gen-public-contracts.mjs` 生成；请勿手改。
+// 真源：server/internal/biz/business_attachment.go。
+export const AttachmentPolicy = Object.freeze({
+  fileTypes: Object.freeze({
+    '.csv': Object.freeze(['text/csv']),
+    '.doc': Object.freeze(['application/msword']),
+    '.docx': Object.freeze(['application/vnd.openxmlformats-officedocument.wordprocessingml.document']),
+    '.dps': Object.freeze(['application/x-wps-presentation']),
+    '.eml': Object.freeze(['message/rfc822']),
+    '.et': Object.freeze(['application/x-wps-spreadsheet']),
+    '.gif': Object.freeze(['image/gif']),
+    '.heic': Object.freeze(['image/heic']),
+    '.heif': Object.freeze(['image/heif']),
+    '.jpeg': Object.freeze(['image/jpeg']),
+    '.jpg': Object.freeze(['image/jpeg']),
+    '.msg': Object.freeze(['application/vnd.ms-outlook']),
+    '.pdf': Object.freeze(['application/pdf']),
+    '.png': Object.freeze(['image/png']),
+    '.txt': Object.freeze(['text/plain']),
+    '.webp': Object.freeze(['image/webp']),
+    '.wps': Object.freeze(['application/x-wps-writer']),
+    '.xls': Object.freeze(['application/vnd.ms-excel']),
+    '.xlsx': Object.freeze(['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']),
+    '.zip': Object.freeze(['application/zip', 'application/x-zip-compressed']),
+  }),
+  maxBytes: 104857600,
+  printAppendixFileTypes: Object.freeze({
+    '.gif': Object.freeze(['image/gif']),
+    '.jpeg': Object.freeze(['image/jpeg']),
+    '.jpg': Object.freeze(['image/jpeg']),
+    '.png': Object.freeze(['image/png']),
+    '.webp': Object.freeze(['image/webp']),
+  }),
+  productImageFileTypes: Object.freeze({
+    '.jpeg': Object.freeze(['image/jpeg']),
+    '.jpg': Object.freeze(['image/jpeg']),
+    '.png': Object.freeze(['image/png']),
+    '.webp': Object.freeze(['image/webp']),
+  }),
+  productImageMaxBytes: 5242880,
+  productImageMaxHeight: 8192,
+  productImageMaxWidth: 8192,
+})

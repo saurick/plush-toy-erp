@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+
 import test from 'node:test'
+import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
 
 const source = readFileSync(
   new URL('./productionWipApi.mjs', import.meta.url),

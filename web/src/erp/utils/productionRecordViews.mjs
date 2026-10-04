@@ -1,3 +1,4 @@
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { hasActionPermission, BUSINESS_ROUTE_PATHS } from './masterDataOrderView.mjs'
 import { canOpenRelatedDocumentPath } from './relatedDocumentNavigation.mjs'
 import { routeWithQuery } from './routeQuery.mjs'
@@ -11,17 +12,17 @@ export const PRODUCTION_RECORD_VIEW_KEYS = Object.freeze({
 
 export function canReadProductionExceptionDecisions(adminProfile) {
   return [
-    'pmc.risk.read',
-    'production.fact.read',
-    'production.exception.submit',
-    'production.exception.approve',
+    PermissionCode.PMC_RISK_READ,
+    PermissionCode.PRODUCTION_FACT_READ,
+    PermissionCode.PRODUCTION_EXCEPTION_SUBMIT,
+    PermissionCode.PRODUCTION_EXCEPTION_APPROVE,
   ].some((permission) => hasActionPermission(adminProfile, permission))
 }
 
 export function canReadProductionProcess(adminProfile) {
   return (
-    hasActionPermission(adminProfile, 'production.fact.read') &&
-    hasActionPermission(adminProfile, 'production.wip.read')
+    hasActionPermission(adminProfile, PermissionCode.PRODUCTION_FACT_READ) &&
+    hasActionPermission(adminProfile, PermissionCode.PRODUCTION_WIP_READ)
   )
 }
 
@@ -38,7 +39,7 @@ export function availableProductionRecordViews(adminProfile, allowedMenuPaths) {
     ...(exceptions && canReadProductionExceptionDecisions(adminProfile)
       ? [PRODUCTION_RECORD_VIEW_KEYS.DECISIONS]
       : []),
-    ...(exceptions && hasActionPermission(adminProfile, 'workflow.task.read')
+    ...(exceptions && hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ)
       ? [PRODUCTION_RECORD_VIEW_KEYS.TASKS]
       : []),
   ]

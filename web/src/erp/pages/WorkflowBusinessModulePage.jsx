@@ -9,6 +9,7 @@ import {
 import { Alert, Button, Input, Space, Tag } from 'antd'
 import dayjs from 'dayjs'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -230,31 +231,31 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const [urgingTaskID, setUrgingTaskID] = useState(0)
   const canReadWorkflowTasks = hasActionPermission(
     adminProfile,
-    'workflow.task.read'
+    PermissionCode.WORKFLOW_TASK_READ
   )
   const canUpdateWorkflowTasks = hasActionPermission(
     adminProfile,
-    'workflow.task.update'
+    PermissionCode.WORKFLOW_TASK_UPDATE
   )
   const canCompleteWorkflowTasks = hasActionPermission(
     adminProfile,
-    'workflow.task.complete'
+    PermissionCode.WORKFLOW_TASK_COMPLETE
   )
   const canApproveWorkflowTasks = hasActionPermission(
     adminProfile,
-    'workflow.task.approve'
+    PermissionCode.WORKFLOW_TASK_APPROVE
   )
   const canCompleteOrApproveWorkflowTasks =
     canCompleteWorkflowTasks ||
     canApproveWorkflowTasks ||
     [
-      'finance.payment.approve',
-      'warehouse.adjustment.approve',
-      'production.exception.approve',
+      PermissionCode.FINANCE_PAYMENT_APPROVE,
+      PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE,
+      PermissionCode.PRODUCTION_EXCEPTION_APPROVE,
     ].some((permission) => hasActionPermission(adminProfile, permission))
   const canRejectWorkflowTasks = hasActionPermission(
     adminProfile,
-    'workflow.task.reject'
+    PermissionCode.WORKFLOW_TASK_REJECT
   )
   const isProductionExceptionPage = moduleKey === 'production-exceptions'
   const canReadProductionExceptionRecords =

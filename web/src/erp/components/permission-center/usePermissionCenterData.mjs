@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { RpcDomain } from '../../../common/consts/rpcMethods.generated.mjs'
 import {
   READ_USER_PERMISSION,
   READ_ROLE_PERMISSION,
@@ -18,7 +19,7 @@ export function usePermissionCenterData() {
   const adminRpc = useMemo(
     () =>
       new JsonRpc({
-        url: 'admin',
+        url: RpcDomain.ADMIN,
         basePath: ADMIN_BASE_PATH,
         authScope: AUTH_SCOPE.ADMIN,
       }),

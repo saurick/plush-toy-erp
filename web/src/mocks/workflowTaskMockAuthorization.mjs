@@ -1,3 +1,4 @@
+import { PermissionCode } from '../common/consts/permissions.generated.mjs'
 import {
   canWorkflowTaskStatusRunAction,
   getWorkflowTaskActionPermission,
@@ -95,7 +96,7 @@ export function workflowMockCanCreateTask(adminProfile, effectiveSession) {
   return workflowMockPermissionAllowed(
     adminProfile,
     effectiveSession,
-    'workflow.task.create'
+    PermissionCode.WORKFLOW_TASK_CREATE
   )
 }
 
@@ -104,7 +105,7 @@ export function workflowMockCanViewTask(adminProfile, effectiveSession, task) {
     adminProfile,
     effectiveSession,
     task,
-    'workflow.task.read'
+    PermissionCode.WORKFLOW_TASK_READ
   )
 }
 

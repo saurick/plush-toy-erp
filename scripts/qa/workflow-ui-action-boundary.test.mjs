@@ -1,5 +1,6 @@
+import { readContractSource as readFileSync } from "../../web/scripts/test/publicContractSource.mjs";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 

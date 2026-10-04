@@ -1,3 +1,4 @@
+import { PermissionCode } from '../common/consts/permissions.generated.mjs'
 // src/mocks/jsonRpcMockServer.js
 
 import {
@@ -32,7 +33,7 @@ function workflowMockRoleTaskReadAllowed(
     !workflowMockPermissionAllowed(
       adminProfile,
       effectiveSession,
-      'workflow.task.read'
+      PermissionCode.WORKFLOW_TASK_READ
     )
   ) {
     return false
@@ -42,7 +43,7 @@ function workflowMockRoleTaskReadAllowed(
     workflowMockPermissionAllowed(
       adminProfile,
       effectiveSession,
-      'erp.workbench.read'
+      PermissionCode.ERP_WORKBENCH_READ
     )
   )
 }
@@ -136,88 +137,88 @@ function mockProductionMaterialRequirementProjection() {
 }
 
 const mockPermissions = [
-  { permission_key: 'system.user.read', name: '查看管理员', module: 'system' },
+  { permission_key: PermissionCode.SYSTEM_USER_READ, name: '查看管理员', module: 'system' },
   {
-    permission_key: 'system.user.create',
+    permission_key: PermissionCode.SYSTEM_USER_CREATE,
     name: '创建管理员',
     module: 'system',
   },
   {
-    permission_key: 'system.user.update',
+    permission_key: PermissionCode.SYSTEM_USER_UPDATE,
     name: '更新管理员',
     module: 'system',
   },
   {
-    permission_key: 'system.user.disable',
+    permission_key: PermissionCode.SYSTEM_USER_DISABLE,
     name: '启停管理员',
     module: 'system',
   },
-  { permission_key: 'system.role.read', name: '查看角色', module: 'system' },
+  { permission_key: PermissionCode.SYSTEM_ROLE_READ, name: '查看角色', module: 'system' },
   {
-    permission_key: 'system.role.permission.manage',
+    permission_key: PermissionCode.SYSTEM_ROLE_PERMISSION_MANAGE,
     name: '管理角色权限',
     module: 'system',
   },
   {
-    permission_key: 'erp.workbench.read',
+    permission_key: PermissionCode.ERP_WORKBENCH_READ,
     name: '查看岗位工作台',
     module: 'erp',
   },
   {
-    permission_key: 'erp.business_dashboard.read',
+    permission_key: PermissionCode.ERP_BUSINESS_DASHBOARD_READ,
     name: '查看进度看板',
     module: 'erp',
   },
   {
-    permission_key: 'workflow.task.read',
+    permission_key: PermissionCode.WORKFLOW_TASK_READ,
     name: '查看协同任务',
     module: 'workflow',
   },
   {
-    permission_key: 'workflow.task.create',
+    permission_key: PermissionCode.WORKFLOW_TASK_CREATE,
     name: '创建协同任务',
     module: 'workflow',
   },
   {
-    permission_key: 'workflow.task.update',
+    permission_key: PermissionCode.WORKFLOW_TASK_UPDATE,
     name: '更新协同任务',
     module: 'workflow',
   },
   {
-    permission_key: 'workflow.task.complete',
+    permission_key: PermissionCode.WORKFLOW_TASK_COMPLETE,
     name: '完成协同任务',
     module: 'workflow',
   },
   {
-    permission_key: 'workflow.task.reject',
+    permission_key: PermissionCode.WORKFLOW_TASK_REJECT,
     name: '退回协同任务',
     module: 'workflow',
   },
   {
-    permission_key: 'workflow.task.approve',
+    permission_key: PermissionCode.WORKFLOW_TASK_APPROVE,
     name: '审批协同任务',
     module: 'workflow',
   },
   {
-    permission_key: 'mobile.sales.access',
+    permission_key: PermissionCode.MOBILE_SALES_ACCESS,
     name: '进入业务岗位任务端',
     module: 'mobile',
   },
-  { permission_key: 'pmc.plan.read', name: '查看生产计划', module: 'pmc' },
-  { permission_key: 'pmc.plan.create', name: '新建生产计划', module: 'pmc' },
-  { permission_key: 'pmc.plan.update', name: '更新生产计划', module: 'pmc' },
+  { permission_key: PermissionCode.PMC_PLAN_READ, name: '查看生产计划', module: 'pmc' },
+  { permission_key: PermissionCode.PMC_PLAN_CREATE, name: '新建生产计划', module: 'pmc' },
+  { permission_key: PermissionCode.PMC_PLAN_UPDATE, name: '更新生产计划', module: 'pmc' },
   {
-    permission_key: 'mobile.purchase.access',
+    permission_key: PermissionCode.MOBILE_PURCHASE_ACCESS,
     name: '进入采购岗位任务端',
     module: 'mobile',
   },
   {
-    permission_key: 'debug.business_chain.run',
+    permission_key: PermissionCode.DEBUG_BUSINESS_CHAIN_RUN,
     name: '执行业务链路调试',
     module: 'debug',
   },
   {
-    permission_key: 'debug.business.clear',
+    permission_key: PermissionCode.DEBUG_BUSINESS_CLEAR,
     name: '清空业务数据',
     module: 'debug',
   },
@@ -253,9 +254,9 @@ const mockRoles = [
       { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
     ],
     permissions: [
-      'erp.workbench.read',
-      'workflow.task.read',
-      'mobile.sales.access',
+      PermissionCode.ERP_WORKBENCH_READ,
+      PermissionCode.WORKFLOW_TASK_READ,
+      PermissionCode.MOBILE_SALES_ACCESS,
     ],
   },
   {
@@ -272,9 +273,9 @@ const mockRoles = [
       { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
     ],
     permissions: [
-      'erp.workbench.read',
-      'workflow.task.read',
-      'mobile.purchase.access',
+      PermissionCode.ERP_WORKBENCH_READ,
+      PermissionCode.WORKFLOW_TASK_READ,
+      PermissionCode.MOBILE_PURCHASE_ACCESS,
     ],
   },
   {
@@ -291,10 +292,10 @@ const mockRoles = [
       { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
     ],
     permissions: [
-      'erp.workbench.read',
-      'workflow.task.read',
-      'workflow.task.complete',
-      'mobile.engineering.access',
+      PermissionCode.ERP_WORKBENCH_READ,
+      PermissionCode.WORKFLOW_TASK_READ,
+      PermissionCode.WORKFLOW_TASK_COMPLETE,
+      PermissionCode.MOBILE_ENGINEERING_ACCESS,
     ],
   },
 ]
@@ -304,21 +305,21 @@ const mockMenus = [
     key: 'global-dashboard',
     label: '任务看板',
     path: '/erp/dashboard',
-    required_any: ['erp.workbench.read'],
+    required_any: [PermissionCode.ERP_WORKBENCH_READ],
     required_all: [],
   },
   {
     key: 'production-orders',
     label: '生产订单',
     path: '/erp/production/orders',
-    required_any: ['pmc.plan.read'],
+    required_any: [PermissionCode.PMC_PLAN_READ],
     required_all: [],
   },
   {
     key: 'permission-center',
     label: '权限管理',
     path: '/erp/system/permissions',
-    required_any: ['system.user.read', 'system.role.read'],
+    required_any: [PermissionCode.SYSTEM_USER_READ, PermissionCode.SYSTEM_ROLE_READ],
     required_all: [],
   },
 ]
@@ -339,24 +340,24 @@ const mockSuperAdminProfile = {
     config_hash: 'mock-workflow-hash',
     roles: ['sales'],
     actions: [
-      'erp.workbench.read',
-      'workflow.task.read',
-      'workflow.task.create',
-      'workflow.task.update',
-      'workflow.task.complete',
-      'workflow.task.reject',
-      'workflow.task.approve',
-      'pmc.plan.read',
-      'pmc.plan.create',
-      'pmc.plan.update',
+      PermissionCode.ERP_WORKBENCH_READ,
+      PermissionCode.WORKFLOW_TASK_READ,
+      PermissionCode.WORKFLOW_TASK_CREATE,
+      PermissionCode.WORKFLOW_TASK_UPDATE,
+      PermissionCode.WORKFLOW_TASK_COMPLETE,
+      PermissionCode.WORKFLOW_TASK_REJECT,
+      PermissionCode.WORKFLOW_TASK_APPROVE,
+      PermissionCode.PMC_PLAN_READ,
+      PermissionCode.PMC_PLAN_CREATE,
+      PermissionCode.PMC_PLAN_UPDATE,
     ],
     workflow_visible_owner_role_keys_by_capability: {
-      'workflow.task.read': ['sales'],
-      'workflow.task.create': ['sales'],
-      'workflow.task.update': ['sales'],
-      'workflow.task.complete': ['sales'],
-      'workflow.task.reject': ['sales'],
-      'workflow.task.approve': ['sales'],
+      [PermissionCode.WORKFLOW_TASK_READ]: ['sales'],
+      [PermissionCode.WORKFLOW_TASK_CREATE]: ['sales'],
+      [PermissionCode.WORKFLOW_TASK_UPDATE]: ['sales'],
+      [PermissionCode.WORKFLOW_TASK_COMPLETE]: ['sales'],
+      [PermissionCode.WORKFLOW_TASK_REJECT]: ['sales'],
+      [PermissionCode.WORKFLOW_TASK_APPROVE]: ['sales'],
     },
   },
   menus: mockMenus,
@@ -1423,7 +1424,7 @@ export function setupJsonRpcMockServer() {
           !workflowMockPermissionAllowed(
             mockSuperAdminProfile,
             mockSuperAdminProfile.effective_session,
-            'workflow.task.read'
+            PermissionCode.WORKFLOW_TASK_READ
           )
         ) {
           responseBody = makeJsonRpcBizError(
@@ -1588,7 +1589,7 @@ export function setupJsonRpcMockServer() {
                     workflowMockPermissionAllowed(
                       mockSuperAdminProfile,
                       mockSuperAdminProfile.effective_session,
-                      'workflow.task.supervise'
+                      PermissionCode.WORKFLOW_TASK_SUPERVISE
                     ),
                   includeCounts: method === 'list_role_tasks' && !params.cursor,
                 })
@@ -1608,7 +1609,7 @@ export function setupJsonRpcMockServer() {
           !workflowMockPermissionAllowed(
             mockSuperAdminProfile,
             mockSuperAdminProfile.effective_session,
-            'workflow.task.read'
+            PermissionCode.WORKFLOW_TASK_READ
           )
         ) {
           responseBody = makeJsonRpcBizError(
@@ -2117,7 +2118,7 @@ export function setupJsonRpcMockServer() {
           !workflowMockPermissionAllowed(
             mockSuperAdminProfile,
             mockSuperAdminProfile.effective_session,
-            'workflow.task.read'
+            PermissionCode.WORKFLOW_TASK_READ
           )
         ) {
           responseBody = makeJsonRpcBizError(

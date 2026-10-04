@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import { Alert, Button, Form, Input, Select, Space, Spin, Tag, Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import Table from '@/common/components/table/AppTable.jsx'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -47,8 +48,8 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
   const taskRequestRef = useRef(null)
   const roleKey = Form.useWatch('owner_role_key', form)
   const selectedRole = options?.roles.find((role) => role.role_key === roleKey)
-  const canRead = hasActionPermission(adminProfile, 'workflow.task.read')
-  const canCreate = hasActionPermission(adminProfile, 'workflow.task.create')
+  const canRead = hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ)
+  const canCreate = hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_CREATE)
   const source = followupSource(sourceType, record)
   const sourceID = context?.source_id
   const contextType = context?.source_type
@@ -258,7 +259,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
         {view === 'receipt' && receipt ? <><Typography.Paragraph>已发给{getWorkflowTaskOwnerRoleLabel(receipt)}，可在相关任务中查看进度和催办。</Typography.Paragraph><Typography.Title level={5}>{receipt.task_name}</Typography.Title><WorkflowFollowupDetails task={receipt} /></> : null}
         {view === 'related' ? <Table size="small" rowKey="id" loading={loading} dataSource={tasks} columns={taskColumns} scroll={{ x: 580 }} pagination={{ current: page, pageSize: 10, total, showSizeChanger: false, onChange: setPage }} locale={{ emptyText: '当前单据暂无可见任务' }} /> : null}
       </BusinessFormModal>
-      <WorkflowTaskActionDrawer task={task} profile={adminProfile} actionMode={actionMode} actionReason={actionReason} actionSaving={actionSaving} actionReceipt={actionReceipt} allowedActionModes={allowedModes} actionAvailabilityLoading={access.loading} readonlyReason={access.readonlyReason} onActionModeChange={setActionMode} onActionReasonChange={setActionReason} onClose={closeTask} onSubmit={submitTask} canViewAttachments={canRead} canManageAttachments={access.canHandle && hasActionPermission(adminProfile, 'workflow.task.update')} />
+      <WorkflowTaskActionDrawer task={task} profile={adminProfile} actionMode={actionMode} actionReason={actionReason} actionSaving={actionSaving} actionReceipt={actionReceipt} allowedActionModes={allowedModes} actionAvailabilityLoading={access.loading} readonlyReason={access.readonlyReason} onActionModeChange={setActionMode} onActionReasonChange={setActionReason} onClose={closeTask} onSubmit={submitTask} canViewAttachments={canRead} canManageAttachments={access.canHandle && hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_UPDATE)} />
     </>
   )
 }

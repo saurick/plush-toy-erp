@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Select } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { Outlet, useNavigate } from 'react-router-dom'
+import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import {
   AUTH_SCOPE,
   getLoginPath,
@@ -173,7 +174,7 @@ export default function MobileAppLayout({ legalNotice }) {
   const authRpc = useMemo(
     () =>
       new JsonRpc({
-        url: 'auth',
+        url: RpcDomain.AUTH,
         basePath: ADMIN_BASE_PATH,
         authScope: AUTH_SCOPE.ADMIN,
       }),
@@ -182,7 +183,7 @@ export default function MobileAppLayout({ legalNotice }) {
   const adminRpc = useMemo(
     () =>
       new JsonRpc({
-        url: 'admin',
+        url: RpcDomain.ADMIN,
         basePath: ADMIN_BASE_PATH,
         authScope: AUTH_SCOPE.ADMIN,
       }),

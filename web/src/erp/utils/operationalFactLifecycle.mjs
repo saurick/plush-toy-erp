@@ -1,7 +1,9 @@
+import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
+
 const LIFECYCLE_AUDIT_FIELDS = Object.freeze({
-  POSTED: Object.freeze({ at: 'posted_at', by: 'posted_by' }),
-  SETTLED: Object.freeze({ at: 'settled_at', by: 'settled_by' }),
-  CANCELLED: Object.freeze({ at: 'cancelled_at', by: 'cancelled_by' }),
+  [OperationalFactStatus.POSTED]: Object.freeze({ at: 'posted_at', by: 'posted_by' }),
+  [OperationalFactStatus.SETTLED]: Object.freeze({ at: 'settled_at', by: 'settled_by' }),
+  [OperationalFactStatus.CANCELLED]: Object.freeze({ at: 'cancelled_at', by: 'cancelled_by' }),
 })
 
 function positiveSafeInteger(value) {
@@ -67,7 +69,7 @@ export function matchesOperationalFactLifecycleResult(
     return false
   }
   return (
-    targetStatus !== 'CANCELLED' ||
+    targetStatus !== OperationalFactStatus.CANCELLED ||
     (typeof record.cancel_reason === 'string' &&
       record.cancel_reason.trim() === request.reason)
   )

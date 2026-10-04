@@ -1,3 +1,4 @@
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { canMountCustomerRuntime } from '../../utils/adminProfileSync.mjs'
 import { progressQueryFromURL } from '../../utils/businessProgress.mjs'
@@ -5,12 +6,12 @@ import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentati
 
 export function mobileProgressAccess(profile) {
   const allowed = (key) => hasActionPermission(profile, key)
-  const sales = allowed('sales_order.read') && allowed('sales_order_item.read')
-  const production = allowed('pmc.plan.read') || allowed('production.wip.read')
+  const sales = allowed(PermissionCode.SALES_ORDER_READ) && allowed(PermissionCode.SALES_ORDER_ITEM_READ)
+  const production = allowed(PermissionCode.PMC_PLAN_READ) || allowed(PermissionCode.PRODUCTION_WIP_READ)
   return {
     enabled:
       canMountCustomerRuntime(profile) &&
-      allowed('erp.business_dashboard.read') &&
+      allowed(PermissionCode.ERP_BUSINESS_DASHBOARD_READ) &&
       (sales || production),
     sales,
     production,

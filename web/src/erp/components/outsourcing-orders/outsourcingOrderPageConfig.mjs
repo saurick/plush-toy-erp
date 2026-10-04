@@ -1,3 +1,4 @@
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import {
   cancelOutsourcingOrder,
   closeOutsourcingOrder,
@@ -33,7 +34,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'submit',
     label: '提交合同',
-    permission: 'outsourcing.order.submit',
+    permission: PermissionCode.OUTSOURCING_ORDER_SUBMIT,
     nextStatus: 'submitted',
     sourceLifecycle: true,
     sourceType: 'outsourcing_order',
@@ -43,7 +44,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'confirm',
     label: '确认下单',
-    permission: 'outsourcing.order.confirm',
+    permission: PermissionCode.OUTSOURCING_ORDER_CONFIRM,
     nextStatus: 'confirmed',
     sourceLifecycle: true,
     sourceType: 'outsourcing_order',
@@ -53,7 +54,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'normal_close',
     label: '正常关闭',
-    permission: 'outsourcing.order.close',
+    permission: PermissionCode.OUTSOURCING_ORDER_CLOSE,
     nextStatus: 'closed',
     sourceLifecycle: true,
     sourceType: 'outsourcing_order',
@@ -68,7 +69,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'short_close',
     label: '提前关闭',
-    permission: 'outsourcing.order.close',
+    permission: PermissionCode.OUTSOURCING_ORDER_CLOSE,
     nextStatus: 'closed',
     sourceLifecycle: true,
     sourceType: 'outsourcing_order',
@@ -85,7 +86,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'cancel',
     label: '取消',
-    permission: 'outsourcing.order.cancel',
+    permission: PermissionCode.OUTSOURCING_ORDER_CANCEL,
     nextStatus: 'canceled',
     sourceLifecycle: true,
     sourceType: 'outsourcing_order',

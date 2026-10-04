@@ -1,3 +1,4 @@
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { getWorkflowTaskDueStatus } from './workflowDashboardStats.mjs'
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 import {
@@ -297,13 +298,13 @@ export function getWorkflowTaskReadonlyReason(admin = {}, task = {}) {
 
   const ownerRoleKey = getTaskOwnerRoleKey(task)
   const hasAnyWorkflowActionPermission = [
-    'workflow.task.complete',
-    'workflow.task.update',
-    'workflow.task.reject',
-    'workflow.task.approve',
-    'finance.payment.approve',
-    'warehouse.adjustment.approve',
-    'production.exception.approve',
+    PermissionCode.WORKFLOW_TASK_COMPLETE,
+    PermissionCode.WORKFLOW_TASK_UPDATE,
+    PermissionCode.WORKFLOW_TASK_REJECT,
+    PermissionCode.WORKFLOW_TASK_APPROVE,
+    PermissionCode.FINANCE_PAYMENT_APPROVE,
+    PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE,
+    PermissionCode.PRODUCTION_EXCEPTION_APPROVE,
   ].some((permissionKey) => hasActionPermission(admin, permissionKey))
   if (!hasAnyWorkflowActionPermission) {
     return '当前账号只有查看任务权限，没有完成、阻塞或催办权限。'

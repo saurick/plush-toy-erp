@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
+
 import * as contract from '../utils/businessProgress.mjs'
 import { progressFixtureData } from '../../../scripts/style-l1/businessProgressFixtures.mjs'
 
@@ -24,7 +25,7 @@ async function load(call) {
       'class JsonRpc { call(...args) { return globalThis.__progressApiCall(...args) } }'
     )
     .replace(
-      /import \{[\s\S]*?\} from '\.\.\/utils\/businessProgress\.mjs'/u,
+      /import \{[^}]*\} from '\.\.\/utils\/businessProgress\.mjs'/u,
       'const {requireProgressBoard,requireProgressDetail}=globalThis.__progressApiContract'
     )
   return import(

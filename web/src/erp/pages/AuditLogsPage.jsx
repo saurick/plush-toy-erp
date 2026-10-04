@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Alert, Button, Drawer, Grid, Tag, Typography } from 'antd'
+import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
@@ -416,7 +417,7 @@ export default function AuditLogsPage() {
   const adminRpc = useMemo(
     () =>
       new JsonRpc({
-        url: 'admin',
+        url: RpcDomain.ADMIN,
         basePath: ADMIN_BASE_PATH,
         authScope: AUTH_SCOPE.ADMIN,
       }),

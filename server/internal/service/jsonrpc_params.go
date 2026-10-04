@@ -4,13 +4,15 @@ import (
 	"strings"
 	"time"
 
+	corevalue "server/internal/core/value"
+
 	"github.com/shopspring/decimal"
 )
 
 const (
-	jsonRPCNumeric20Scale6MaxIntegerDigits  = 14
-	jsonRPCNumeric20Scale6MaxFractionDigits = 6
-	jsonRPCNumeric20Scale6MaxTextBytes      = 1 + jsonRPCNumeric20Scale6MaxIntegerDigits + 1 + jsonRPCNumeric20Scale6MaxFractionDigits
+	jsonRPCNumeric20Scale6MaxIntegerDigits  = corevalue.NumericIntegerDigits
+	jsonRPCNumeric20Scale6MaxFractionDigits = corevalue.NumericScale
+	jsonRPCNumeric20Scale6MaxTextBytes      = corevalue.NumericMaxTextBytes
 )
 
 func getMap(pm map[string]any, key string) map[string]any {

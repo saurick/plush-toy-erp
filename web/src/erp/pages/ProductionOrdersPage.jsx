@@ -6,6 +6,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
@@ -349,25 +350,25 @@ export default function ProductionOrdersPage() {
 
   const canReadProductionWip = hasActionPermission(
     adminProfile,
-    'production.wip.read'
+    PermissionCode.PRODUCTION_WIP_READ
   )
   const canReadProductionPlan = hasActionPermission(
     adminProfile,
-    'pmc.plan.read'
+    PermissionCode.PMC_PLAN_READ
   )
   const canRead = canReadProductionPlan || canReadProductionWip
   const canCreate =
     canReadProductionPlan &&
-    hasActionPermission(adminProfile, 'pmc.plan.create')
+    hasActionPermission(adminProfile, PermissionCode.PMC_PLAN_CREATE)
   const canUpdate =
     canReadProductionPlan &&
-    hasActionPermission(adminProfile, 'pmc.plan.update')
+    hasActionPermission(adminProfile, PermissionCode.PMC_PLAN_UPDATE)
   const canReadSalesOrderReferences =
     canReadProductionPlan &&
-    hasActionPermission(adminProfile, 'sales_order.read') &&
-    hasActionPermission(adminProfile, 'sales_order_item.read')
+    hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_READ) &&
+    hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_ITEM_READ)
   const canReadBOMReferences =
-    canReadProductionPlan && hasActionPermission(adminProfile, 'bom.read')
+    canReadProductionPlan && hasActionPermission(adminProfile, PermissionCode.BOM_READ)
   const productionReferenceAccess = useMemo(
     () => ({
       product: canReadProductionPlan,
@@ -380,43 +381,43 @@ export default function ProductionOrdersPage() {
   )
   const canCreateCompletion = hasActionPermission(
     adminProfile,
-    'production.completion.create'
+    PermissionCode.PRODUCTION_COMPLETION_CREATE
   )
   const canReadProductionFacts = hasActionPermission(
     adminProfile,
-    'production.fact.read'
+    PermissionCode.PRODUCTION_FACT_READ
   )
   const canCreateMaterialIssue = hasActionPermission(
     adminProfile,
-    'production.material_issue.create'
+    PermissionCode.PRODUCTION_MATERIAL_ISSUE_CREATE
   )
   const canSubmitProductionException = hasActionPermission(
     adminProfile,
-    'production.exception.submit'
+    PermissionCode.PRODUCTION_EXCEPTION_SUBMIT
   )
   const canAssignProductionWip = hasActionPermission(
     adminProfile,
-    'production.wip.assign'
+    PermissionCode.PRODUCTION_WIP_ASSIGN
   )
   const canExecuteProductionWip = hasActionPermission(
     adminProfile,
-    'production.wip.execute'
+    PermissionCode.PRODUCTION_WIP_EXECUTE
   )
   const canReceiveProductionReturn = hasActionPermission(
     adminProfile,
-    'outsourcing.return_receipt.create'
+    PermissionCode.OUTSOURCING_RETURN_RECEIPT_CREATE
   )
   const canReworkProductionWip = hasActionPermission(
     adminProfile,
-    'production.wip.rework'
+    PermissionCode.PRODUCTION_WIP_REWORK
   )
   const canConfirmPackagingMaterial = hasActionPermission(
     adminProfile,
-    'production.packaging_material.confirm'
+    PermissionCode.PRODUCTION_PACKAGING_MATERIAL_CONFIRM
   )
   const canReadOutsourcingContracts = hasActionPermission(
     adminProfile,
-    'outsourcing.order.read'
+    PermissionCode.OUTSOURCING_ORDER_READ
   )
   const canManageProductionWip =
     canAssignProductionWip ||

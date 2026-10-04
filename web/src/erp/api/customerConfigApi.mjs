@@ -1,22 +1,23 @@
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '../../common/auth/auth.js'
 import { ADMIN_BASE_PATH } from '../../common/utils/adminRpc.js'
 import { JsonRpc, requireRpcData as dataOf } from '../../common/utils/jsonRpc.js'
 import { buildCustomerConfigMutationPayload } from './customerConfigTransition.mjs'
 
 const customerConfigRpc = new JsonRpc({
-  url: 'customer_config',
+  url: RpcDomain.CUSTOMER_CONFIG,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
 
 export async function getEffectiveSession(params = {}) {
-  const result = await customerConfigRpc.call('get_effective_session', params)
+  const result = await customerConfigRpc.call(RpcMethod.customer_config.GET_EFFECTIVE_SESSION, params)
   return dataOf(result)?.session || null
 }
 
 export async function validateCustomerConfig(manifest) {
   const result = await customerConfigRpc.call(
-    'validate_customer_config',
+    RpcMethod.customer_config.VALIDATE_CUSTOMER_CONFIG,
     manifest
   )
   return dataOf(result)?.validation || null
@@ -24,7 +25,7 @@ export async function validateCustomerConfig(manifest) {
 
 export async function publishCustomerConfig(manifest) {
   const result = await customerConfigRpc.call(
-    'publish_customer_config',
+    RpcMethod.customer_config.PUBLISH_CUSTOMER_CONFIG,
     manifest
   )
   return dataOf(result)?.revision || null
@@ -32,7 +33,7 @@ export async function publishCustomerConfig(manifest) {
 
 export async function checkCustomerConfigTransition(params = {}) {
   const result = await customerConfigRpc.call(
-    'check_customer_config_transition',
+    RpcMethod.customer_config.CHECK_CUSTOMER_CONFIG_TRANSITION,
     params
   )
   return dataOf(result)?.transition || null
@@ -40,7 +41,7 @@ export async function checkCustomerConfigTransition(params = {}) {
 
 export async function activateCustomerConfig(params = {}) {
   const result = await customerConfigRpc.call(
-    'activate_customer_config',
+    RpcMethod.customer_config.ACTIVATE_CUSTOMER_CONFIG,
     buildCustomerConfigMutationPayload('activate', params)
   )
   return dataOf(result)?.revision || null
@@ -48,7 +49,7 @@ export async function activateCustomerConfig(params = {}) {
 
 export async function rollbackCustomerConfig(params = {}) {
   const result = await customerConfigRpc.call(
-    'rollback_customer_config',
+    RpcMethod.customer_config.ROLLBACK_CUSTOMER_CONFIG,
     buildCustomerConfigMutationPayload('rollback', params)
   )
   return dataOf(result)?.revision || null
@@ -56,7 +57,7 @@ export async function rollbackCustomerConfig(params = {}) {
 
 export async function startSalesOrderAcceptanceProcess(params = {}) {
   const result = await customerConfigRpc.call(
-    'start_sales_order_acceptance_process',
+    RpcMethod.customer_config.START_SALES_ORDER_ACCEPTANCE_PROCESS,
     params
   )
   return dataOf(result)
@@ -64,7 +65,7 @@ export async function startSalesOrderAcceptanceProcess(params = {}) {
 
 export async function getSalesOrderAcceptanceProcess(params = {}) {
   const result = await customerConfigRpc.call(
-    'get_sales_order_acceptance_process',
+    RpcMethod.customer_config.GET_SALES_ORDER_ACCEPTANCE_PROCESS,
     params
   )
   return dataOf(result)
@@ -72,7 +73,7 @@ export async function getSalesOrderAcceptanceProcess(params = {}) {
 
 export async function executeSalesOrderAcceptanceSubmit(params = {}) {
   const result = await customerConfigRpc.call(
-    'execute_sales_order_acceptance_submit',
+    RpcMethod.customer_config.EXECUTE_SALES_ORDER_ACCEPTANCE_SUBMIT,
     params
   )
   return dataOf(result)
@@ -282,7 +283,7 @@ export async function submitSalesOrderAcceptanceProcess(params = {}) {
 
 export async function startPurchaseOrderApprovalProcess(params = {}) {
   const result = await customerConfigRpc.call(
-    'start_material_supply_purchase_order_process',
+    RpcMethod.customer_config.START_MATERIAL_SUPPLY_PURCHASE_ORDER_PROCESS,
     params
   )
   return dataOf(result)
@@ -290,7 +291,7 @@ export async function startPurchaseOrderApprovalProcess(params = {}) {
 
 export async function executeMaterialSupplyPurchaseOrderSubmit(params = {}) {
   const result = await customerConfigRpc.call(
-    'execute_material_supply_purchase_order_submit',
+    RpcMethod.customer_config.EXECUTE_MATERIAL_SUPPLY_PURCHASE_ORDER_SUBMIT,
     params
   )
   return dataOf(result)
@@ -438,7 +439,7 @@ export async function submitPurchaseOrderApprovalProcess(params = {}) {
 
 export async function startFinishedGoodsDeliveryProcess(params = {}) {
   const result = await customerConfigRpc.call(
-    'start_finished_goods_delivery_process',
+    RpcMethod.customer_config.START_FINISHED_GOODS_DELIVERY_PROCESS,
     params
   )
   return dataOf(result)
@@ -724,7 +725,7 @@ export async function getProcessRecoveryContext(params = {}) {
   ) {
     throw exceptionProcessResultInvalid()
   }
-  const result = await customerConfigRpc.call('get_process_recovery_context', {
+  const result = await customerConfigRpc.call(RpcMethod.customer_config.GET_PROCESS_RECOVERY_CONTEXT, {
     process_instance_id: processInstanceID,
   })
   const data = dataOf(result)
@@ -830,7 +831,7 @@ export async function recoverCompensatedProcessDomainCommand(params = {}) {
     expected_compensation_hash: expectedCompensationHash,
   }
   const result = await customerConfigRpc.call(
-    'recover_compensated_process_domain_command',
+    RpcMethod.customer_config.RECOVER_COMPENSATED_PROCESS_DOMAIN_COMMAND,
     payload
   )
   const recoveredNode = requireExceptionProcessNode(

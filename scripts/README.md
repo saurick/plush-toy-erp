@@ -78,3 +78,7 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 ## `-h/--help`
 
 参数以对应脚本帮助为准，例如 `bash scripts/qa/strict.sh --help`。帮助、dry-run、准备、真实执行和目标验收是不同结果，不能相互替代。
+
+## 公共契约生成 / Public Contracts
+
+`node scripts/gen-public-contracts.mjs` 从后端正式声明生成 Web 权限、状态、附件约束、RPC 标识和数值边界；`--check` 只读检查漂移。维护步骤与边界见[跨层公共契约与生成规范](../docs/engineering/跨层公共契约与生成规范.md)，错误码继续使用 `gen-error-codes.mjs`。

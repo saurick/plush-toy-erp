@@ -1,102 +1,104 @@
+import { WorkflowBusinessStatus } from '../../common/consts/statuses.generated.mjs'
+
 export const BUSINESS_STATUS_OPTIONS = Object.freeze([
   {
-    key: 'project_pending',
+    key: WorkflowBusinessStatus.PROJECT_PENDING,
     label: '立项待确认',
     summary: '客户、编号、交期和所需资料正在确认。',
   },
   {
-    key: 'project_approved',
+    key: WorkflowBusinessStatus.PROJECT_APPROVED,
     label: '立项已放行',
     summary: '已通过老板或管理层审批，允许进入资料与采购准备。',
   },
   {
-    key: 'engineering_preparing',
+    key: WorkflowBusinessStatus.ENGINEERING_PREPARING,
     label: '资料准备中',
     summary: '物料清单（BOM）、色卡、作业指导书和包装要求正在补齐。',
   },
   {
-    key: 'material_preparing',
+    key: WorkflowBusinessStatus.MATERIAL_PREPARING,
     label: '齐套准备中',
     summary: '主料、辅包材、委外和关键资料仍在确认或催办。',
   },
   {
-    key: 'production_ready',
+    key: WorkflowBusinessStatus.PRODUCTION_READY,
     label: '待排产',
     summary: '生产订单已下达，等待 PMC 排产；物料是否齐套须另行核对。',
   },
   {
-    key: 'production_processing',
+    key: WorkflowBusinessStatus.PRODUCTION_PROCESSING,
     label: '生产中',
     summary: '已进入裁切、车缝、手工、组装或外发执行。',
   },
   {
-    key: 'qc_pending',
+    key: WorkflowBusinessStatus.QC_PENDING,
     label: '待检验',
     summary: '待做 IQC、过程检验、返工复检或出货前质量确认。',
   },
   {
-    key: 'iqc_pending',
+    key: WorkflowBusinessStatus.IQC_PENDING,
     label: '来料检验（IQC）待处理',
     summary: '采购到货或入库通知已形成，等待品质人员检验。',
   },
   {
-    key: 'qc_failed',
+    key: WorkflowBusinessStatus.QC_FAILED,
     label: '质检不合格',
     summary:
       '来料、回货或成品检验未通过，等待负责岗位处理退货、返工、补做或让步接收。',
   },
   {
-    key: 'warehouse_processing',
+    key: WorkflowBusinessStatus.WAREHOUSE_PROCESSING,
     label: '待入库 / 待出货',
     summary: '仓库正在做回仓、入库、备货和待出货准备。',
   },
   {
-    key: 'warehouse_inbound_pending',
+    key: WorkflowBusinessStatus.WAREHOUSE_INBOUND_PENDING,
     label: '待确认入库',
     summary: '来料检验已通过，等待仓库确认入库数量、库位和经手人。',
   },
   {
-    key: 'inbound_done',
+    key: WorkflowBusinessStatus.INBOUND_DONE,
     label: '入库跟进已完成',
     summary: '相关交接任务已经完成；实际库存以入库单过账结果为准。',
   },
   {
-    key: 'shipment_pending',
+    key: WorkflowBusinessStatus.SHIPMENT_PENDING,
     label: '待出货',
     summary: '成品已入库或放行，等待出货准备、装箱、唛头和出库确认。',
   },
   {
-    key: 'shipping_released',
+    key: WorkflowBusinessStatus.SHIPPING_RELEASED,
     label: '已放行待出库',
     summary: '业务确认和财务放行已完成，等待仓库出库执行。',
   },
   {
-    key: 'shipped',
+    key: WorkflowBusinessStatus.SHIPPED,
     label: '出货跟进已完成',
     summary: '出货流程已完成；实际出货数量和库存扣减以出货单为准。',
   },
   {
-    key: 'reconciling',
+    key: WorkflowBusinessStatus.RECONCILING,
     label: '对账中',
     summary: '加工费、辅包材费用和异常费用正在核对。',
   },
   {
-    key: 'settled',
+    key: WorkflowBusinessStatus.SETTLED,
     label: '结算跟进已完成',
     summary: '对账交接已经完成；实际应收应付和收付款以业务财务记录为准。',
   },
   {
-    key: 'blocked',
+    key: WorkflowBusinessStatus.BLOCKED,
     label: '业务阻塞',
     summary: '业务流程因缺料、延期、未放行、数量差异或异常问题暂停。',
   },
   {
-    key: 'cancelled',
+    key: WorkflowBusinessStatus.CANCELLED,
     label: '业务取消',
     summary: '订单或批次被整体取消，不再继续推进。',
   },
   {
-    key: 'closed',
+    key: WorkflowBusinessStatus.CLOSED,
     label: '业务归档',
     summary: '业务流程已完成并归档，保留历史记录供查询和追溯。',
   },

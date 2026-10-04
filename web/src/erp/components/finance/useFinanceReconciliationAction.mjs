@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
@@ -43,7 +44,7 @@ export function useFinanceReconciliationAction({
   const openFinanceSourceAction = (action, source) => {
     const canRun =
       action === FINANCE_BUSINESS_SOURCE_ACTIONS.SINGLE_FACT_RECONCILIATION &&
-      hasActionPermission(adminProfile, 'finance.reconciliation.confirm') &&
+      hasActionPermission(adminProfile, PermissionCode.FINANCE_RECONCILIATION_CONFIRM) &&
       isSingleFactReconciliationSource(source)
     if (!canRun) {
       message.warning('当前记录状态或权限已变化，请刷新后重试')

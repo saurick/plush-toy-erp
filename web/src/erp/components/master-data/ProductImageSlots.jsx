@@ -30,6 +30,7 @@ import {
 } from '../../api/attachmentApi.mjs'
 import {
   PRODUCT_IMAGE_SNAPSHOT_MAX_BYTES,
+  PRODUCT_IMAGE_ACCEPT,
   PRODUCT_IMAGE_SLOT_DEFINITIONS,
   buildOptimizedProductImageFileName,
   buildProductImageMutationPlan,
@@ -44,8 +45,6 @@ import {
   validateProductImageFile,
 } from '../../utils/productImageSlots.mjs'
 
-const PRODUCT_IMAGE_ACCEPT =
-  '.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp'
 const PRODUCT_IMAGE_SNAPSHOT_QUALITY_STEPS = [0.9, 0.78, 0.66, 0.56]
 const PRODUCT_IMAGE_SNAPSHOT_SCALE_STEP = 0.78
 const PRODUCT_IMAGE_SNAPSHOT_MAX_ATTEMPTS = 7

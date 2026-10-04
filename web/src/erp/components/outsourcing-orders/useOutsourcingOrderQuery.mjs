@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -99,7 +100,7 @@ export function useOutsourcingOrderQuery({ adminProfile }) {
 
   const canReadOutsourcingFacts = hasActionPermission(
     adminProfile,
-    'outsourcing.fact.read'
+    PermissionCode.OUTSOURCING_FACT_READ
   )
 
   const beginLatestRequest = useLatestRequestCoordinator()

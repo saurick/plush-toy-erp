@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useOutletContext } from 'react-router-dom'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { listProductImageReferences } from '../../api/attachmentApi.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { workflowTaskAdminAccessRequestIdentity } from '../../utils/workflowTaskActionAccess.mjs'
@@ -97,7 +98,7 @@ export function ProductThumbnail({ productId, name, code, preview = true }) {
   const allowed =
     Number.isSafeInteger(productID) &&
     productID > 0 &&
-    hasActionPermission(adminProfile, 'product.read')
+    hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
   const accessKey = allowed
     ? workflowTaskAdminAccessRequestIdentity(adminProfile)
     : ''

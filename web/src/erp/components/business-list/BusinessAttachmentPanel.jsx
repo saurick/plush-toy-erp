@@ -31,6 +31,7 @@ import {
   UpOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
+import { AttachmentPolicy } from '../../../common/consts/attachments.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented.jsx'
 import BusinessAttachmentThumbnail from './BusinessAttachmentThumbnail.jsx'
@@ -61,83 +62,15 @@ import { PRINT_APPENDIX_ATTACHMENT_TYPE } from '../../utils/businessAttachmentPr
 import { isMutationResultUnknown } from '../../utils/sourceDocumentMutation.mjs'
 import { BusinessFormPendingAttachmentsContext } from './BusinessFormPageContext.js'
 
-const MAX_ATTACHMENT_SIZE = 100 * 1024 * 1024
-const MAX_ATTACHMENT_SIZE_LABEL = '100MB'
-
-const ACCEPTED_ATTACHMENT_MIME_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-  'image/gif',
-  'image/heic',
-  'image/heif',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/zip',
-  'application/x-zip-compressed',
-  'application/vnd.ms-outlook',
-  'message/rfc822',
-  'application/x-wps-writer',
-  'application/x-wps-spreadsheet',
-  'application/x-wps-presentation',
-  'text/csv',
-  'text/plain',
-])
-
-const ACCEPTED_ATTACHMENT_EXTENSIONS = [
-  '.csv',
-  '.doc',
-  '.docx',
-  '.dps',
-  '.eml',
-  '.et',
-  '.gif',
-  '.heic',
-  '.heif',
-  '.jpeg',
-  '.jpg',
-  '.msg',
-  '.pdf',
-  '.png',
-  '.txt',
-  '.webp',
-  '.wps',
-  '.xls',
-  '.xlsx',
-  '.zip',
-]
-
-const ATTACHMENT_EXTENSION_MIME_TYPES = new Map([
-  ['.csv', 'text/csv'],
-  ['.doc', 'application/msword'],
-  [
-    '.docx',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  ],
-  ['.dps', 'application/x-wps-presentation'],
-  ['.eml', 'message/rfc822'],
-  ['.et', 'application/x-wps-spreadsheet'],
-  ['.gif', 'image/gif'],
-  ['.heic', 'image/heic'],
-  ['.heif', 'image/heif'],
-  ['.jpeg', 'image/jpeg'],
-  ['.jpg', 'image/jpeg'],
-  ['.msg', 'application/vnd.ms-outlook'],
-  ['.pdf', 'application/pdf'],
-  ['.png', 'image/png'],
-  ['.txt', 'text/plain'],
-  ['.webp', 'image/webp'],
-  ['.wps', 'application/x-wps-writer'],
-  ['.xls', 'application/vnd.ms-excel'],
-  [
-    '.xlsx',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  ],
-  ['.zip', 'application/zip'],
-])
+const MAX_ATTACHMENT_SIZE = AttachmentPolicy.maxBytes
+const MAX_ATTACHMENT_SIZE_LABEL = `${MAX_ATTACHMENT_SIZE / (1024 * 1024)}MB`
+const ACCEPTED_ATTACHMENT_MIME_TYPES = new Set(
+  Object.values(AttachmentPolicy.fileTypes).flat()
+)
+const ACCEPTED_ATTACHMENT_EXTENSIONS = Object.keys(AttachmentPolicy.fileTypes)
+const ATTACHMENT_EXTENSION_MIME_TYPES = new Map(
+  Object.entries(AttachmentPolicy.fileTypes).map(([extension, types]) => [extension, types[0]])
+)
 
 const PREVIEWABLE_ATTACHMENT_MIME_TYPES = new Set([
   'application/pdf',

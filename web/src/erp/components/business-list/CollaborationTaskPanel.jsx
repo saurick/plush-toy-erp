@@ -6,6 +6,7 @@ import {
   UpOutlined,
 } from '@ant-design/icons'
 import { Button, Card, Empty, Space, Tag, Typography } from 'antd'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -196,11 +197,11 @@ export function CollaborationTaskPanel({
     : actionDrawerAccess.readonlyReason
   const actionDrawerCanViewAttachments = hasActionPermission(
     adminProfile,
-    'workflow.task.read'
+    PermissionCode.WORKFLOW_TASK_READ
   )
   const actionDrawerCanManageAttachments =
     actionDrawerAccess.canHandle &&
-    hasActionPermission(adminProfile, 'workflow.task.update')
+    hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_UPDATE)
   const taskPanelModel = React.useMemo(
     () => buildBusinessCollaborationTaskPanelModel({ tasks }),
     [tasks]

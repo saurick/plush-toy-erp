@@ -1,3 +1,4 @@
+import { RpcMethod, RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import { normalizeApprovalCondition } from '../utils/approvalCondition.mjs'
 import { AUTH_SCOPE } from '../../common/auth/auth.js'
 import { ADMIN_BASE_PATH } from '../../common/utils/adminRpc.js'
@@ -7,7 +8,7 @@ import {
 } from '../../common/utils/jsonRpc.js'
 
 const customerConfigRpc = new JsonRpc({
-  url: 'customer_config',
+  url: RpcDomain.CUSTOMER_CONFIG,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
@@ -110,7 +111,7 @@ export function buildApprovalSettingsRevisionPayload(input = {}) {
 }
 
 export async function getApprovalSettings(params = {}) {
-  const result = await customerConfigRpc.call('get_approval_settings', params)
+  const result = await customerConfigRpc.call(RpcMethod.customer_config.GET_APPROVAL_SETTINGS, params)
   return requireApprovalSettings(
     dataOf(result, '审批责任数据不完整，请刷新后重试').approval_settings
   )
@@ -118,7 +119,7 @@ export async function getApprovalSettings(params = {}) {
 
 export async function previewApprovalSettings(input = {}) {
   const result = await customerConfigRpc.call(
-    'preview_approval_settings',
+    RpcMethod.customer_config.PREVIEW_APPROVAL_SETTINGS,
     buildApprovalSettingsRevisionPayload(input)
   )
   return requireApprovalSettings(
@@ -128,7 +129,7 @@ export async function previewApprovalSettings(input = {}) {
 
 export async function publishApprovalSettings(input = {}) {
   const result = await customerConfigRpc.call(
-    'publish_approval_settings',
+    RpcMethod.customer_config.PUBLISH_APPROVAL_SETTINGS,
     buildApprovalSettingsRevisionPayload(input)
   )
   return requirePublishedRevision(
@@ -138,7 +139,7 @@ export async function publishApprovalSettings(input = {}) {
 
 export async function applyApprovalSettings(input = {}) {
   const result = await customerConfigRpc.call(
-    'apply_approval_settings',
+    RpcMethod.customer_config.APPLY_APPROVAL_SETTINGS,
     buildApprovalSettingsRevisionPayload(input)
   )
   return requireAppliedRevision(

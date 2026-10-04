@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Empty, Popover, Select, Tag } from 'antd'
 import { ArrowLeftOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import SearchInput from '@/common/components/SearchInput'
 import Table from '@/common/components/table/AppTable'
@@ -151,11 +152,11 @@ export default function useBusinessStatistics({
   navigate,
 }) {
   const canSales =
-    hasActionPermission(adminProfile, 'sales_order.read') &&
-    hasActionPermission(adminProfile, 'sales_order_item.read')
+    hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_READ) &&
+    hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_ITEM_READ)
   const canFinance =
-    hasActionPermission(adminProfile, 'finance.receivable.read') &&
-    hasActionPermission(adminProfile, 'field.finance_settlement.read')
+    hasActionPermission(adminProfile, PermissionCode.FINANCE_RECEIVABLE_READ) &&
+    hasActionPermission(adminProfile, PermissionCode.FIELD_FINANCE_SETTLEMENT_READ)
   const queryKey = JSON.stringify(statisticsQueryFromURL(params))
   const query = useMemo(() => JSON.parse(queryKey), [queryKey])
   const groupKey = params.get('group_key') || ''

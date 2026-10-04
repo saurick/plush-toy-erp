@@ -1,5 +1,6 @@
 import React from 'react'
 import { Tag } from 'antd'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { formatOperationalFactDecimal } from './operationalFactDecimal.mjs'
@@ -71,16 +72,16 @@ export const FINANCE_INVOICE_CATEGORY_LABELS = Object.freeze(
 )
 
 export const ACTION_PERMISSIONS = Object.freeze({
-  productionRead: ['production.fact.read'],
-  productionPost: ['production.fact.post', 'warehouse.inbound.confirm'],
-  productionCancel: ['production.fact.cancel', 'warehouse.inbound.confirm'],
-  outsourcingRead: ['outsourcing.fact.read'],
-  outsourcingPost: ['outsourcing.fact.post'],
-  outsourcingCancel: ['outsourcing.fact.cancel'],
-  shipmentWrite: ['shipment.create'],
-  shipmentPost: ['shipment.ship'],
-  shipmentCancel: ['shipment.cancel'],
-  reservationRelease: ['stock.reservation.release'],
+  productionRead: [PermissionCode.PRODUCTION_FACT_READ],
+  productionPost: [PermissionCode.PRODUCTION_FACT_POST, PermissionCode.WAREHOUSE_INBOUND_CONFIRM],
+  productionCancel: [PermissionCode.PRODUCTION_FACT_CANCEL, PermissionCode.WAREHOUSE_INBOUND_CONFIRM],
+  outsourcingRead: [PermissionCode.OUTSOURCING_FACT_READ],
+  outsourcingPost: [PermissionCode.OUTSOURCING_FACT_POST],
+  outsourcingCancel: [PermissionCode.OUTSOURCING_FACT_CANCEL],
+  shipmentWrite: [PermissionCode.SHIPMENT_CREATE],
+  shipmentPost: [PermissionCode.SHIPMENT_SHIP],
+  shipmentCancel: [PermissionCode.SHIPMENT_CANCEL],
+  reservationRelease: [PermissionCode.STOCK_RESERVATION_RELEASE],
 })
 
 export function hasAnyPermission(adminProfile, permissions = []) {
@@ -100,8 +101,8 @@ export function isFinishedGoodsReceipt(record = {}) {
 export function productionFactPostPermissions(record) {
   if (!record) return ACTION_PERMISSIONS.productionPost
   return isFinishedGoodsReceipt(record)
-    ? ['warehouse.inbound.confirm']
-    : ['production.fact.post']
+    ? [PermissionCode.WAREHOUSE_INBOUND_CONFIRM]
+    : [PermissionCode.PRODUCTION_FACT_POST]
 }
 
 export function productionFactCancelPermissions(record) {
@@ -110,8 +111,8 @@ export function productionFactCancelPermissions(record) {
     .trim()
     .toUpperCase()
   return isFinishedGoodsReceipt(record) && status === 'POSTED'
-    ? ['warehouse.inbound.confirm']
-    : ['production.fact.cancel']
+    ? [PermissionCode.WAREHOUSE_INBOUND_CONFIRM]
+    : [PermissionCode.PRODUCTION_FACT_CANCEL]
 }
 
 export function statusTag(status) {

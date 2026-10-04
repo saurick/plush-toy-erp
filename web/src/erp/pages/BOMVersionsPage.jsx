@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import { Alert, Button, Form, Popconfirm, Select, Space } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -274,11 +275,11 @@ export default function BOMVersionsPage() {
     loaded: false,
   })
 
-  const canRead = hasActionPermission(adminProfile, 'bom.read')
-  const canCreate = hasActionPermission(adminProfile, 'bom.create')
-  const canUpdate = hasActionPermission(adminProfile, 'bom.update')
-  const canActivate = hasActionPermission(adminProfile, 'bom.activate')
-  const canPrint = hasActionPermission(adminProfile, 'erp.print_template.read')
+  const canRead = hasActionPermission(adminProfile, PermissionCode.BOM_READ)
+  const canCreate = hasActionPermission(adminProfile, PermissionCode.BOM_CREATE)
+  const canUpdate = hasActionPermission(adminProfile, PermissionCode.BOM_UPDATE)
+  const canActivate = hasActionPermission(adminProfile, PermissionCode.BOM_ACTIVATE)
+  const canPrint = hasActionPermission(adminProfile, PermissionCode.ERP_PRINT_TEMPLATE_READ)
   const printPermissionHint = canPrint
     ? undefined
     : '当前账号没有打印模板的权限。'
@@ -1505,7 +1506,7 @@ export default function BOMVersionsPage() {
                   materialByID={materialByID}
                   canCreateMaterial={hasActionPermission(
                     adminProfile,
-                    'material.create'
+                    PermissionCode.MATERIAL_CREATE
                   )}
                   onMaterialCreated={(material) =>
                     setMaterials((current) => [material, ...current])

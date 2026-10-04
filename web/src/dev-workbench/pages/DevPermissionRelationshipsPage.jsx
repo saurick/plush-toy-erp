@@ -17,6 +17,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import Tabs from '@/common/components/navigation/SlidingTabs'
@@ -46,7 +47,7 @@ import '../styles/dev-permission-relationships.css'
 const { Paragraph, Text, Title } = Typography
 
 const adminRpc = new JsonRpc({
-  url: 'admin',
+  url: RpcDomain.ADMIN,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
@@ -210,8 +211,8 @@ export default function DevPermissionRelationshipsPage() {
           error: getActionErrorMessage(error, '加载审批责任'),
         }))
       const [listResult, optionsResult, approvalResult] = await Promise.all([
-        adminRpc.call('list', {}),
-        adminRpc.call('rbac_options', {}),
+        adminRpc.call(RpcMethod.admin.LIST, {}),
+        adminRpc.call(RpcMethod.admin.RBAC_OPTIONS, {}),
         approvalPromise,
       ])
       if (baseRequestRef.current !== requestID) {
@@ -343,7 +344,7 @@ export default function DevPermissionRelationshipsPage() {
     setAccessError('')
     Promise.allSettled(
       missingRoleKeys.map(async (roleKey) => {
-        const result = await adminRpc.call('effective_role_access', {
+        const result = await adminRpc.call(RpcMethod.admin.EFFECTIVE_ROLE_ACCESS, {
           role_key: roleKey,
         })
         return [roleKey, result?.data?.effective_access || null]

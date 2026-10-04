@@ -10,6 +10,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Space } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import Tabs from '@/common/components/navigation/SlidingTabs'
@@ -248,11 +249,11 @@ export default function OutsourcingOrdersPage() {
 
   const canPostOutsourcingFact = hasActionPermission(
     adminProfile,
-    'outsourcing.fact.post'
+    PermissionCode.OUTSOURCING_FACT_POST
   )
   const canCancelOutsourcingFact = hasActionPermission(
     adminProfile,
-    'outsourcing.fact.cancel'
+    PermissionCode.OUTSOURCING_FACT_CANCEL
   )
   const allowedMenuPaths = useMemo(
     () => outletContext?.allowedMenuPaths || [],
@@ -270,9 +271,9 @@ export default function OutsourcingOrdersPage() {
 
   const canCreate = hasActionPermission(
     adminProfile,
-    'outsourcing.order.create'
+    PermissionCode.OUTSOURCING_ORDER_CREATE
   )
-  const canRead = hasActionPermission(adminProfile, 'outsourcing.order.read')
+  const canRead = hasActionPermission(adminProfile, PermissionCode.OUTSOURCING_ORDER_READ)
   const summaryVisible = searchParams.get('view') === 'items' && canRead
 
   const selectedOrderCanReorder = Boolean(
@@ -280,39 +281,39 @@ export default function OutsourcingOrdersPage() {
   )
   const canCreateMaterialIssue = hasActionPermission(
     adminProfile,
-    'outsourcing.material_issue.create'
+    PermissionCode.OUTSOURCING_MATERIAL_ISSUE_CREATE
   )
   const canCreateReturnReceipt = hasActionPermission(
     adminProfile,
-    'outsourcing.return_receipt.create'
+    PermissionCode.OUTSOURCING_RETURN_RECEIPT_CREATE
   )
   const canCreateQualityInspection = hasActionPermission(
     adminProfile,
-    'quality.inspection.create'
+    PermissionCode.QUALITY_INSPECTION_CREATE
   )
   const canReadQualityInspection = hasActionPermission(
     adminProfile,
-    'quality.inspection.read'
+    PermissionCode.QUALITY_INSPECTION_READ
   )
   const canOpenQualityInspection =
     canReadQualityInspection &&
     canOpenRelatedPath(BUSINESS_ROUTE_PATHS.qualityInspections)
   const canCreatePayable = hasActionPermission(
     adminProfile,
-    'finance.payable.confirm'
+    PermissionCode.FINANCE_PAYABLE_CONFIRM
   )
   const canViewPayable =
     (canCreatePayable ||
-      hasActionPermission(adminProfile, 'finance.payable.read')) &&
+      hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYABLE_READ)) &&
     canOpenRelatedPath(BUSINESS_ROUTE_PATHS.payables)
 
   const canUpdateWorkflowTasks = hasActionPermission(
     adminProfile,
-    'workflow.task.update'
+    PermissionCode.WORKFLOW_TASK_UPDATE
   )
   const canCompleteWorkflowTasks = hasActionPermission(
     adminProfile,
-    'workflow.task.complete'
+    PermissionCode.WORKFLOW_TASK_COMPLETE
   )
 
   const {

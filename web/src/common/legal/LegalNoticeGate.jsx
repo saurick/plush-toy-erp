@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Modal, Space, Typography } from 'antd'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { RpcDomain } from '../consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE, getStoredAdminProfile, logout } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
@@ -32,7 +33,7 @@ export default function LegalNoticeGate({ children }) {
   const authRpc = useMemo(
     () =>
       new JsonRpc({
-        url: 'auth',
+        url: RpcDomain.AUTH,
         basePath: ADMIN_BASE_PATH,
         authScope: AUTH_SCOPE.ADMIN,
       }),

@@ -14,6 +14,8 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+import { ShipmentStatus, OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
@@ -351,43 +353,43 @@ export default function ShipmentsPage() {
 
   const beginLatestRequest = useLatestRequestCoordinator()
 
-  const canRead = hasActionPermission(adminProfile, 'shipment.read')
-  const canCreate = hasActionPermission(adminProfile, 'shipment.create')
-  const canUpdate = hasActionPermission(adminProfile, 'shipment.update')
+  const canRead = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_READ)
+  const canCreate = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_CREATE)
+  const canUpdate = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_UPDATE)
   const canSubmitShipmentRelease = canRead && canCreate
-  const canShip = hasActionPermission(adminProfile, 'shipment.ship')
-  const canCancel = hasActionPermission(adminProfile, 'shipment.cancel')
+  const canShip = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_SHIP)
+  const canCancel = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_CANCEL)
   const canCreateReceivable = canConfirmFinanceFact(adminProfile, 'RECEIVABLE')
   const canCreateInvoice = canConfirmFinanceFact(adminProfile, 'INVOICE')
   const canViewQualityInspections = hasActionPermission(
     adminProfile,
-    'quality.inspection.read'
+    PermissionCode.QUALITY_INSPECTION_READ
   )
   const canCreateFinishedGoodsQualityInspection =
     canRead &&
     canViewQualityInspections &&
-    hasActionPermission(adminProfile, 'quality.inspection.create')
+    hasActionPermission(adminProfile, PermissionCode.QUALITY_INSPECTION_CREATE)
   const canViewSalesOrders = hasActionPermission(
     adminProfile,
-    'sales_order.read'
+    PermissionCode.SALES_ORDER_READ
   )
   const canViewSalesOrderItems = hasActionPermission(
     adminProfile,
-    'sales_order_item.read'
+    PermissionCode.SALES_ORDER_ITEM_READ
   )
   const canImportSalesOrderSource =
     (canCreate || canUpdate) && canViewSalesOrders && canViewSalesOrderItems
   const canViewInventory = hasActionPermission(
     adminProfile,
-    'warehouse.inventory.read'
+    PermissionCode.WAREHOUSE_INVENTORY_READ
   )
   const canViewReceivables = hasActionPermission(
     adminProfile,
-    'finance.receivable.read'
+    PermissionCode.FINANCE_RECEIVABLE_READ
   )
   const canViewInvoices = hasActionPermission(
     adminProfile,
-    'finance.invoice.read'
+    PermissionCode.FINANCE_INVOICE_READ
   )
   const canOpenSalesOrders =
     canViewSalesOrders && canOpenRelatedPath(BUSINESS_ROUTE_PATHS.salesOrders)
@@ -1208,7 +1210,7 @@ export default function ShipmentsPage() {
     if (
       !canSubmitShipmentRelease ||
       !selectedRow?.id ||
-      selectedRow.status !== 'DRAFT'
+      selectedRow.status !== ShipmentStatus.DRAFT
     ) {
       message.warning('请先选择待出货草稿，并确认当前岗位有提交放行权限')
       return
@@ -1236,7 +1238,7 @@ export default function ShipmentsPage() {
     if (
       !canCreateFinishedGoodsQualityInspection ||
       !selectedRow?.id ||
-      selectedRow.status !== 'DRAFT'
+      selectedRow.status !== ShipmentStatus.DRAFT
     ) {
       message.warning('请先选择待出货草稿，并确认当前岗位有出货前检验权限')
       return
@@ -1351,7 +1353,7 @@ export default function ShipmentsPage() {
   const openShipmentFinanceSource = (action) => {
     const allowed =
       action === 'receivable' ? canCreateReceivable : canCreateInvoice
-    if (!allowed || !selectedRow || selectedRow.status !== 'SHIPPED') {
+    if (!allowed || !selectedRow || selectedRow.status !== ShipmentStatus.SHIPPED) {
       message.warning('请先选择已确认出货的出货单')
       return
     }
@@ -1405,7 +1407,7 @@ export default function ShipmentsPage() {
       const result = await execute(params)
       if (
         !result ||
-        result.status !== 'DRAFT' ||
+        result.status !== OperationalFactStatus.DRAFT ||
         result.fact_type !== config.factType
       ) {
         const error = new Error('财务记录返回结果无法确认')
@@ -1728,14 +1730,14 @@ export default function ShipmentsPage() {
             <BusinessActionTooltip
               visible={!selectedRow || canEditShipmentDraft(selectedRow)}
               disabled={
-                !selectedRow || saving || selectedRow?.status !== 'DRAFT'
+                !selectedRow || saving || selectedRow?.status !== ShipmentStatus.DRAFT
               }
               disabledReason={
                 saving
                   ? '当前操作完成后可编辑'
                   : !selectedRow
                     ? '请先选择一张出货单'
-                    : selectedRow?.status !== 'DRAFT'
+                    : selectedRow?.status !== ShipmentStatus.DRAFT
                       ? '只有尚未确认出货的草稿可以编辑'
                       : ''
               }
@@ -1745,7 +1747,7 @@ export default function ShipmentsPage() {
                 icon={<EditOutlined />}
                 data-business-action-key="shipment-edit"
                 disabled={
-                  !selectedRow || saving || selectedRow?.status !== 'DRAFT'
+                  !selectedRow || saving || selectedRow?.status !== ShipmentStatus.DRAFT
                 }
                 onClick={() => openEdit(selectedRow)}
               >
@@ -1850,7 +1852,7 @@ export default function ShipmentsPage() {
             >
               <Popconfirm
                 title={
-                  selectedRow?.status === 'DRAFT'
+                  selectedRow?.status === ShipmentStatus.DRAFT
                     ? '确认作废这张出货草稿？草稿作废不会扣减或恢复库存；如已提交放行，需先完成或退回放行待办。'
                     : '确认撤销已出货并恢复相应库存？'
                 }
@@ -1858,7 +1860,7 @@ export default function ShipmentsPage() {
                   runShipmentAction(
                     selectedRow,
                     cancelShipment,
-                    selectedRow?.status === 'DRAFT'
+                    selectedRow?.status === ShipmentStatus.DRAFT
                       ? '作废出货草稿'
                       : '撤销已出货'
                   )
@@ -1874,7 +1876,7 @@ export default function ShipmentsPage() {
                   data-business-action-key="shipment-cancel"
                   disabled={shipmentActionAvailability.cancel.disabled}
                 >
-                  {selectedRow?.status === 'DRAFT' ? '作废草稿' : '撤销已出货'}
+                  {selectedRow?.status === ShipmentStatus.DRAFT ? '作废草稿' : '撤销已出货'}
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>

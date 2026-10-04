@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import fs from 'node:fs'
 import test from 'node:test'
+import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
 
-const source = fs.readFileSync(
+const source = readFileSync(
   new URL('./legalNoticeApi.mjs', import.meta.url),
   'utf8'
 )

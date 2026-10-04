@@ -51,6 +51,7 @@
 | `node --test scripts/qa/gitlab-storage.test.mjs scripts/qa/gitlab-backup-governance.test.mjs` | 校验 GitLab 控制主机、RAID/异机挂载、加密副本、状态新鲜度、systemd timer 与 HTTPS 失败通知的 fail-closed 合同；不执行真实备份或发出网络通知 | GitLab backup、offsite、systemd 或告警入口变化时 |
 | `node scripts/qa/docs-inventory.test.mjs` | 检查长期文档与最近归档索引登记、当前文档及 `progress.md` / 归档 README 的本地链接和真实查看器锚点合同；冻结归档正文不按当前链接规则重写 | 新增、删除、重命名 README 或长期文档，或调整标题、章节链接与归档入口后 |
 | `node --test scripts/qa/schema-docs.test.mjs` | 校验 Ent generated migration descriptor、业务语义 catalog 与 8 份生成数据字典零漂移；不连接数据库 | 调整 schema、catalog、生成器或数据库文档后 |
+| `node scripts/gen-public-contracts.mjs --check`、`node --test scripts/gen-public-contracts.test.mjs` | 校验权限、状态、附件、RPC 和数值生成物及前端引用；只读，见[公共契约规范](../../docs/engineering/跨层公共契约与生成规范.md) | 修改公共契约真源、提取器或消费者后；已进入 fast |
 | `node --test scripts/qa/dev-entry-boundary.test.mjs` | 锁住 `make dev_restart`先预检再停服、启动预检只读，以及 Product Core / 客户开发入口共用同一 web preflight | 调整本地启动命令、Vite 代理或 migration 预检后 |
 | `node scripts/qa/customer-package-lint.mjs --all` | 从构建期客户索引校验 demo、reference-customer 和 yoyoosun raw package；不 publish/activate | 调整客户包、catalog 或 schema 后 |
 | `node scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview` | 以 preview 模式编译并验证全部登记 draft 客户包的不可发布 manifest；不调用后端或写事实 | 调整 manifest compiler/effective-session 输入后 |

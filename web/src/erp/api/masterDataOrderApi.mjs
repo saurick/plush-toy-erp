@@ -1,3 +1,4 @@
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
@@ -13,13 +14,13 @@ import {
 import { validatePurchaseOrderReceiptProgress } from '../utils/purchaseOrderInboundPreview.mjs'
 
 const masterDataRpc = new JsonRpc({
-  url: 'masterdata',
+  url: RpcDomain.MASTERDATA,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
 
 const salesOrderRpc = new JsonRpc({
-  url: 'sales_order',
+  url: RpcDomain.SALES_ORDER,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
@@ -27,7 +28,7 @@ const salesOrderRpc = new JsonRpc({
 export async function getEngineeringMaterialRequest(params, options = {}) {
   return dataOf(
     await salesOrderRpc.call(
-      'get_engineering_material_request',
+      RpcMethod.sales_order.GET_ENGINEERING_MATERIAL_REQUEST,
       params,
       options
     )
@@ -36,7 +37,7 @@ export async function getEngineeringMaterialRequest(params, options = {}) {
 export async function listEngineeringMaterialRequests(params, options = {}) {
   return dataOf(
     await salesOrderRpc.call(
-      'list_engineering_material_requests',
+      RpcMethod.sales_order.LIST_ENGINEERING_MATERIAL_REQUESTS,
       params,
       options
     )
@@ -44,7 +45,7 @@ export async function listEngineeringMaterialRequests(params, options = {}) {
 }
 export async function submitEngineeringMaterialRequest(params) {
   return dataOf(
-    await salesOrderRpc.call('submit_engineering_material_request', params)
+    await salesOrderRpc.call(RpcMethod.sales_order.SUBMIT_ENGINEERING_MATERIAL_REQUEST, params)
   )
 }
 export async function reviewEngineeringMaterialRequest(params, stage) {
@@ -56,13 +57,13 @@ export async function reviewEngineeringMaterialRequest(params, stage) {
 }
 
 const purchaseOrderRpc = new JsonRpc({
-  url: 'purchase_order',
+  url: RpcDomain.PURCHASE_ORDER,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
 
 const outsourcingOrderRpc = new JsonRpc({
-  url: 'outsourcing_order',
+  url: RpcDomain.OUTSOURCING_ORDER,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
@@ -145,7 +146,7 @@ function validateSourceDocumentReorderResult(
 }
 
 export async function listCustomers(params = {}, options = {}) {
-  const result = await masterDataRpc.call('list_customers', params, options)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.LIST_CUSTOMERS, params, options)
   return dataOf(result)
 }
 
@@ -154,32 +155,32 @@ export async function listAllCustomers(params = {}, options = {}) {
 }
 
 export async function createCustomer(params = {}) {
-  const result = await masterDataRpc.call('create_customer', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_CUSTOMER, params)
   return dataOf(result)?.customer || null
 }
 
 export async function updateCustomer(params = {}) {
-  const result = await masterDataRpc.call('update_customer', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_CUSTOMER, params)
   return dataOf(result)?.customer || null
 }
 
 export async function saveCustomerWithContacts(params = {}) {
-  const result = await masterDataRpc.call('save_customer_with_contacts', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.SAVE_CUSTOMER_WITH_CONTACTS, params)
   return dataOf(result)
 }
 
 export async function getCustomer(params = {}) {
-  const result = await masterDataRpc.call('get_customer', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.GET_CUSTOMER, params)
   return dataOf(result)?.customer || null
 }
 
 export async function setCustomerActive(params = {}) {
-  const result = await masterDataRpc.call('set_customer_active', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.SET_CUSTOMER_ACTIVE, params)
   return dataOf(result)?.customer || null
 }
 
 export async function listSuppliers(params = {}, options = {}) {
-  const result = await masterDataRpc.call('list_suppliers', params, options)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.LIST_SUPPLIERS, params, options)
   return dataOf(result)
 }
 
@@ -188,32 +189,32 @@ export async function listAllSuppliers(params = {}, options = {}) {
 }
 
 export async function createSupplier(params = {}) {
-  const result = await masterDataRpc.call('create_supplier', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_SUPPLIER, params)
   return dataOf(result)?.supplier || null
 }
 
 export async function updateSupplier(params = {}) {
-  const result = await masterDataRpc.call('update_supplier', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_SUPPLIER, params)
   return dataOf(result)?.supplier || null
 }
 
 export async function saveSupplierWithContacts(params = {}) {
-  const result = await masterDataRpc.call('save_supplier_with_contacts', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.SAVE_SUPPLIER_WITH_CONTACTS, params)
   return dataOf(result)
 }
 
 export async function getSupplier(params = {}) {
-  const result = await masterDataRpc.call('get_supplier', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.GET_SUPPLIER, params)
   return dataOf(result)?.supplier || null
 }
 
 export async function setSupplierActive(params = {}) {
-  const result = await masterDataRpc.call('set_supplier_active', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.SET_SUPPLIER_ACTIVE, params)
   return dataOf(result)?.supplier || null
 }
 
 export async function listMaterials(params = {}, options = {}) {
-  const result = await masterDataRpc.call('list_materials', params, options)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.LIST_MATERIALS, params, options)
   return dataOf(result)
 }
 
@@ -222,7 +223,7 @@ export async function listAllMaterials(params = {}, options = {}) {
 }
 
 export async function listUnits(params = {}, options = {}) {
-  const result = await masterDataRpc.call('list_units', params, options)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.LIST_UNITS, params, options)
   return dataOf(result)
 }
 
@@ -231,7 +232,7 @@ export async function listAllUnits(params = {}, options = {}) {
 }
 
 export async function listWarehouses(params = {}, options = {}) {
-  const result = await masterDataRpc.call('list_warehouses', params, options)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.LIST_WAREHOUSES, params, options)
   return dataOf(result)
 }
 
@@ -244,7 +245,7 @@ export async function listAllMaterialWarehouses(params = {}, options = {}) {
     async (page, requestOptions) =>
       dataOf(
         await masterDataRpc.call(
-          'list_material_warehouses',
+          RpcMethod.masterdata.LIST_MATERIAL_WAREHOUSES,
           page,
           requestOptions
         )
@@ -256,35 +257,35 @@ export async function listAllMaterialWarehouses(params = {}, options = {}) {
 }
 
 export async function createWarehouse(params) {
-  return dataOf(await masterDataRpc.call('create_warehouse', params))?.warehouse
+  return dataOf(await masterDataRpc.call(RpcMethod.masterdata.CREATE_WAREHOUSE, params))?.warehouse
 }
 
 export async function updateWarehouse(params) {
-  return dataOf(await masterDataRpc.call('update_warehouse', params))?.warehouse
+  return dataOf(await masterDataRpc.call(RpcMethod.masterdata.UPDATE_WAREHOUSE, params))?.warehouse
 }
 
 export async function createMaterial(params = {}) {
-  const result = await masterDataRpc.call('create_material', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_MATERIAL, params)
   return dataOf(result)?.material || null
 }
 
 export async function updateMaterial(params = {}) {
-  const result = await masterDataRpc.call('update_material', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_MATERIAL, params)
   return dataOf(result)?.material || null
 }
 
 export async function getMaterial(params = {}) {
-  const result = await masterDataRpc.call('get_material', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.GET_MATERIAL, params)
   return dataOf(result)?.material || null
 }
 
 export async function setMaterialActive(params = {}) {
-  const result = await masterDataRpc.call('set_material_active', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.SET_MATERIAL_ACTIVE, params)
   return dataOf(result)?.material || null
 }
 
 export async function listProcesses(params = {}, options = {}) {
-  const result = await masterDataRpc.call('list_processes', params, options)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.LIST_PROCESSES, params, options)
   return dataOf(result)
 }
 
@@ -293,27 +294,27 @@ export async function listAllProcesses(params = {}, options = {}) {
 }
 
 export async function createProcess(params = {}) {
-  const result = await masterDataRpc.call('create_process', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_PROCESS, params)
   return dataOf(result)?.process || null
 }
 
 export async function updateProcess(params = {}) {
-  const result = await masterDataRpc.call('update_process', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_PROCESS, params)
   return dataOf(result)?.process || null
 }
 
 export async function getProcess(params = {}) {
-  const result = await masterDataRpc.call('get_process', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.GET_PROCESS, params)
   return dataOf(result)?.process || null
 }
 
 export async function setProcessActive(params = {}) {
-  const result = await masterDataRpc.call('set_process_active', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.SET_PROCESS_ACTIVE, params)
   return dataOf(result)?.process || null
 }
 
 export async function listProducts(params = {}, options = {}) {
-  const result = await masterDataRpc.call('list_products', params, options)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.LIST_PRODUCTS, params, options)
   return dataOf(result)
 }
 
@@ -322,27 +323,27 @@ export async function listAllProducts(params = {}, options = {}) {
 }
 
 export async function createProduct(params = {}) {
-  const result = await masterDataRpc.call('create_product', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_PRODUCT, params)
   return dataOf(result)?.product || null
 }
 
 export async function updateProduct(params = {}) {
-  const result = await masterDataRpc.call('update_product', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_PRODUCT, params)
   return dataOf(result)?.product || null
 }
 
 export async function getProduct(params = {}) {
-  const result = await masterDataRpc.call('get_product', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.GET_PRODUCT, params)
   return dataOf(result)?.product || null
 }
 
 export async function setProductActive(params = {}) {
-  const result = await masterDataRpc.call('set_product_active', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.SET_PRODUCT_ACTIVE, params)
   return dataOf(result)?.product || null
 }
 
 export async function listProductSKUs(params = {}, options = {}) {
-  const result = await masterDataRpc.call('list_product_skus', params, options)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.LIST_PRODUCT_SKUS, params, options)
   return dataOf(result)
 }
 
@@ -356,28 +357,28 @@ export async function listAllProductSKUs(params = {}, options = {}) {
 }
 
 export async function createProductSKU(params = {}) {
-  const result = await masterDataRpc.call('create_product_sku', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_PRODUCT_SKU, params)
   return dataOf(result)?.product_sku || null
 }
 
 export async function updateProductSKU(params = {}) {
-  const result = await masterDataRpc.call('update_product_sku', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_PRODUCT_SKU, params)
   return dataOf(result)?.product_sku || null
 }
 
 export async function getProductSKU(params = {}) {
-  const result = await masterDataRpc.call('get_product_sku', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.GET_PRODUCT_SKU, params)
   return dataOf(result)?.product_sku || null
 }
 
 export async function setProductSKUActive(params = {}) {
-  const result = await masterDataRpc.call('set_product_sku_active', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.SET_PRODUCT_SKU_ACTIVE, params)
   return dataOf(result)?.product_sku || null
 }
 
 export async function listContactsByOwner(params = {}, options = {}) {
   const result = await masterDataRpc.call(
-    'list_contacts_by_owner',
+    RpcMethod.masterdata.LIST_CONTACTS_BY_OWNER,
     params,
     options
   )
@@ -394,32 +395,32 @@ export async function listAllContactsByOwner(params = {}, options = {}) {
 }
 
 export async function createContact(params = {}) {
-  const result = await masterDataRpc.call('create_contact', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.CREATE_CONTACT, params)
   return dataOf(result)?.contact || null
 }
 
 export async function updateContact(params = {}) {
-  const result = await masterDataRpc.call('update_contact', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.UPDATE_CONTACT, params)
   return dataOf(result)?.contact || null
 }
 
 export async function setPrimaryContact(params = {}) {
-  const result = await masterDataRpc.call('set_primary_contact', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.SET_PRIMARY_CONTACT, params)
   return dataOf(result)?.contact || null
 }
 
 export async function disableContact(params = {}) {
-  const result = await masterDataRpc.call('disable_contact', params)
+  const result = await masterDataRpc.call(RpcMethod.masterdata.DISABLE_CONTACT, params)
   return dataOf(result)?.contact || null
 }
 
 export async function listSalesOrders(params = {}, options = {}) {
-  const result = await salesOrderRpc.call('list_sales_orders', params, options)
+  const result = await salesOrderRpc.call(RpcMethod.sales_order.LIST_SALES_ORDERS, params, options)
   return dataOf(result)
 }
 
 export async function listSalesOrderSummary(params = {}, options = {}) {
-  const result = await salesOrderRpc.call('list_sales_order_summary', params, options)
+  const result = await salesOrderRpc.call(RpcMethod.sales_order.LIST_SALES_ORDER_SUMMARY, params, options)
   return dataOf(result)
 }
 
@@ -442,7 +443,7 @@ export async function listAllSalesOrders(params = {}, options = {}) {
 }
 
 export async function saveSalesOrderWithItems(params = {}) {
-  const result = await salesOrderRpc.call('save_sales_order_with_items', params)
+  const result = await salesOrderRpc.call(RpcMethod.sales_order.SAVE_SALES_ORDER_WITH_ITEMS, params)
   return validateSourceDocumentMutationResult(
     result,
     params,
@@ -452,7 +453,7 @@ export async function saveSalesOrderWithItems(params = {}) {
 }
 
 export async function reorderSalesOrderItems(params = {}) {
-  const result = await salesOrderRpc.call('reorder_sales_order_items', params)
+  const result = await salesOrderRpc.call(RpcMethod.sales_order.REORDER_SALES_ORDER_ITEMS, params)
   return validateSourceDocumentReorderResult(
     result,
     params,
@@ -462,31 +463,31 @@ export async function reorderSalesOrderItems(params = {}) {
 }
 
 export async function getSalesOrder(params = {}, options = {}) {
-  const result = await salesOrderRpc.call('get_sales_order', params, options)
+  const result = await salesOrderRpc.call(RpcMethod.sales_order.GET_SALES_ORDER, params, options)
   return dataOf(result)?.sales_order || null
 }
 
 export async function saveSalesOrderEngineering(params = {}) {
   const result = await salesOrderRpc.call(
-    'save_sales_order_engineering',
+    RpcMethod.sales_order.SAVE_SALES_ORDER_ENGINEERING,
     params
   )
   return dataOf(result)
 }
 
 export async function closeSalesOrder(params = {}) {
-  const result = await salesOrderRpc.call('close_sales_order', params)
+  const result = await salesOrderRpc.call(RpcMethod.sales_order.CLOSE_SALES_ORDER, params)
   return dataOf(result)?.sales_order || null
 }
 
 export async function cancelSalesOrder(params = {}) {
-  const result = await salesOrderRpc.call('cancel_sales_order', params)
+  const result = await salesOrderRpc.call(RpcMethod.sales_order.CANCEL_SALES_ORDER, params)
   return dataOf(result)?.sales_order || null
 }
 
 export async function listSalesOrderItems(params = {}, options = {}) {
   const result = await salesOrderRpc.call(
-    'list_sales_order_items',
+    RpcMethod.sales_order.LIST_SALES_ORDER_ITEMS,
     params,
     options
   )
@@ -514,7 +515,7 @@ export async function listAllSalesOrderItems(params = {}, options = {}) {
 
 export async function listPurchaseOrders(params = {}, options = {}) {
   const result = await purchaseOrderRpc.call(
-    'list_purchase_orders',
+    RpcMethod.purchase_order.LIST_PURCHASE_ORDERS,
     params,
     options
   )
@@ -535,7 +536,7 @@ export async function listAllPurchaseOrders(params = {}, options = {}) {
 
 export async function savePurchaseOrderWithItems(params = {}) {
   const result = await purchaseOrderRpc.call(
-    'save_purchase_order_with_items',
+    RpcMethod.purchase_order.SAVE_PURCHASE_ORDER_WITH_ITEMS,
     params
   )
   return validateSourceDocumentMutationResult(
@@ -548,7 +549,7 @@ export async function savePurchaseOrderWithItems(params = {}) {
 
 export async function reorderPurchaseOrderItems(params = {}) {
   const result = await purchaseOrderRpc.call(
-    'reorder_purchase_order_items',
+    RpcMethod.purchase_order.REORDER_PURCHASE_ORDER_ITEMS,
     params
   )
   return validateSourceDocumentReorderResult(
@@ -561,7 +562,7 @@ export async function reorderPurchaseOrderItems(params = {}) {
 
 export async function getPurchaseOrder(params = {}, options = {}) {
   const result = await purchaseOrderRpc.call(
-    'get_purchase_order',
+    RpcMethod.purchase_order.GET_PURCHASE_ORDER,
     params,
     options
   )
@@ -573,7 +574,7 @@ export async function getPurchaseOrderReceiptProgress(
   options = {}
 ) {
   const result = await purchaseOrderRpc.call(
-    'get_purchase_order_receipt_progress',
+    RpcMethod.purchase_order.GET_PURCHASE_ORDER_RECEIPT_PROGRESS,
     params,
     options
   )
@@ -584,18 +585,18 @@ export async function getPurchaseOrderReceiptProgress(
 }
 
 export async function closePurchaseOrder(params = {}) {
-  const result = await purchaseOrderRpc.call('close_purchase_order', params)
+  const result = await purchaseOrderRpc.call(RpcMethod.purchase_order.CLOSE_PURCHASE_ORDER, params)
   return dataOf(result)?.purchase_order || null
 }
 
 export async function cancelPurchaseOrder(params = {}) {
-  const result = await purchaseOrderRpc.call('cancel_purchase_order', params)
+  const result = await purchaseOrderRpc.call(RpcMethod.purchase_order.CANCEL_PURCHASE_ORDER, params)
   return dataOf(result)?.purchase_order || null
 }
 
 export async function listPurchaseOrderItems(params = {}, options = {}) {
   const result = await purchaseOrderRpc.call(
-    'list_purchase_order_items',
+    RpcMethod.purchase_order.LIST_PURCHASE_ORDER_ITEMS,
     params,
     options
   )
@@ -624,7 +625,7 @@ export async function listAllPurchaseOrderItems(params = {}, options = {}) {
 
 export async function listOutsourcingOrders(params = {}, options = {}) {
   const result = await outsourcingOrderRpc.call(
-    'list_outsourcing_orders',
+    RpcMethod.outsourcing_order.LIST_OUTSOURCING_ORDERS,
     params,
     options
   )
@@ -632,7 +633,7 @@ export async function listOutsourcingOrders(params = {}, options = {}) {
 }
 
 export async function listOutsourcingOrderSummary(params = {}, options = {}) {
-  const result = await outsourcingOrderRpc.call('list_outsourcing_order_summary', params, options)
+  const result = await outsourcingOrderRpc.call(RpcMethod.outsourcing_order.LIST_OUTSOURCING_ORDER_SUMMARY, params, options)
   return dataOf(result)
 }
 
@@ -654,7 +655,7 @@ export async function listAllOutsourcingOrders(params = {}, options = {}) {
 
 export async function getOutsourcingOrder(params = {}, options = {}) {
   const result = await outsourcingOrderRpc.call(
-    'get_outsourcing_order',
+    RpcMethod.outsourcing_order.GET_OUTSOURCING_ORDER,
     params,
     options
   )
@@ -663,7 +664,7 @@ export async function getOutsourcingOrder(params = {}, options = {}) {
 
 export async function saveOutsourcingOrderWithItems(params = {}) {
   const result = await outsourcingOrderRpc.call(
-    'save_outsourcing_order_with_items',
+    RpcMethod.outsourcing_order.SAVE_OUTSOURCING_ORDER_WITH_ITEMS,
     params
   )
   return validateSourceDocumentMutationResult(
@@ -676,7 +677,7 @@ export async function saveOutsourcingOrderWithItems(params = {}) {
 
 export async function reorderOutsourcingOrderItems(params = {}) {
   const result = await outsourcingOrderRpc.call(
-    'reorder_outsourcing_order_items',
+    RpcMethod.outsourcing_order.REORDER_OUTSOURCING_ORDER_ITEMS,
     params
   )
   return validateSourceDocumentReorderResult(
@@ -689,7 +690,7 @@ export async function reorderOutsourcingOrderItems(params = {}) {
 
 export async function submitOutsourcingOrder(params = {}) {
   const result = await outsourcingOrderRpc.call(
-    'submit_outsourcing_order',
+    RpcMethod.outsourcing_order.SUBMIT_OUTSOURCING_ORDER,
     params
   )
   return dataOf(result)?.outsourcing_order || null
@@ -697,7 +698,7 @@ export async function submitOutsourcingOrder(params = {}) {
 
 export async function confirmOutsourcingOrder(params = {}) {
   const result = await outsourcingOrderRpc.call(
-    'confirm_outsourcing_order',
+    RpcMethod.outsourcing_order.CONFIRM_OUTSOURCING_ORDER,
     params
   )
   return dataOf(result)?.outsourcing_order || null
@@ -705,7 +706,7 @@ export async function confirmOutsourcingOrder(params = {}) {
 
 export async function closeOutsourcingOrder(params = {}) {
   const result = await outsourcingOrderRpc.call(
-    'close_outsourcing_order',
+    RpcMethod.outsourcing_order.CLOSE_OUTSOURCING_ORDER,
     params
   )
   return dataOf(result)?.outsourcing_order || null
@@ -713,7 +714,7 @@ export async function closeOutsourcingOrder(params = {}) {
 
 export async function cancelOutsourcingOrder(params = {}) {
   const result = await outsourcingOrderRpc.call(
-    'cancel_outsourcing_order',
+    RpcMethod.outsourcing_order.CANCEL_OUTSOURCING_ORDER,
     params
   )
   return dataOf(result)?.outsourcing_order || null
@@ -721,7 +722,7 @@ export async function cancelOutsourcingOrder(params = {}) {
 
 export async function listOutsourcingOrderItems(params = {}, options = {}) {
   const result = await outsourcingOrderRpc.call(
-    'list_outsourcing_order_items',
+    RpcMethod.outsourcing_order.LIST_OUTSOURCING_ORDER_ITEMS,
     params,
     options
   )

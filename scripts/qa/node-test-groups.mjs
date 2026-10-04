@@ -17,6 +17,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/dev-ports.test.mjs",
     "scripts/dev-process-inspection.test.mjs",
     "scripts/gen-error-codes.test.mjs",
+    "scripts/gen-public-contracts.test.mjs",
     "scripts/git-hooks/commit-msg.test.mjs",
     "scripts/git-hooks/pre-commit.test.mjs",
     "scripts/git-hooks/pre-push.test.mjs",

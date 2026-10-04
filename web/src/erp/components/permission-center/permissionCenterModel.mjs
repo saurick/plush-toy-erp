@@ -1,3 +1,4 @@
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import {
   getPermissionCenterRoleKey as getRoleKey,
   normalizePermissionUsage,
@@ -22,29 +23,29 @@ const TABLE_PAGE_SIZE_OPTIONS = [8, 10, 20, 50, 100]
 
 const IS_PRODUCTION_BUILD = import.meta.env.PROD === true
 
-const READ_USER_PERMISSION = 'system.user.read'
+const READ_USER_PERMISSION = PermissionCode.SYSTEM_USER_READ
 
-const READ_ROLE_PERMISSION = 'system.role.read'
+const READ_ROLE_PERMISSION = PermissionCode.SYSTEM_ROLE_READ
 
-const READ_PERMISSION_PERMISSION = 'system.permission.read'
+const READ_PERMISSION_PERMISSION = PermissionCode.SYSTEM_PERMISSION_READ
 
-const READ_CUSTOMER_CONFIG_PERMISSION = 'customer_config.read'
+const READ_CUSTOMER_CONFIG_PERMISSION = PermissionCode.CUSTOMER_CONFIG_READ
 
-const PUBLISH_CUSTOMER_CONFIG_PERMISSION = 'customer_config.publish'
+const PUBLISH_CUSTOMER_CONFIG_PERMISSION = PermissionCode.CUSTOMER_CONFIG_PUBLISH
 
-const ACTIVATE_CUSTOMER_CONFIG_PERMISSION = 'customer_config.activate'
+const ACTIVATE_CUSTOMER_CONFIG_PERMISSION = PermissionCode.CUSTOMER_CONFIG_ACTIVATE
 
-const MANAGE_ROLE_PERMISSION = 'system.role.permission.manage'
+const MANAGE_ROLE_PERMISSION = PermissionCode.SYSTEM_ROLE_PERMISSION_MANAGE
 
-const UPDATE_USER_PERMISSION = 'system.user.update'
+const UPDATE_USER_PERMISSION = PermissionCode.SYSTEM_USER_UPDATE
 
-const ASSIGN_USER_ROLE_PERMISSION = 'system.user.role.assign'
+const ASSIGN_USER_ROLE_PERMISSION = PermissionCode.SYSTEM_USER_ROLE_ASSIGN
 
-const CREATE_USER_PERMISSION = 'system.user.create'
+const CREATE_USER_PERMISSION = PermissionCode.SYSTEM_USER_CREATE
 
-const DISABLE_USER_PERMISSION = 'system.user.disable'
+const DISABLE_USER_PERMISSION = PermissionCode.SYSTEM_USER_DISABLE
 
-const REVOKE_USER_PERMISSION = 'system.user.revoke'
+const REVOKE_USER_PERMISSION = PermissionCode.SYSTEM_USER_REVOKE
 
 const PERMISSION_CENTER_TAB_KEYS = {
   ROLES: 'roles',

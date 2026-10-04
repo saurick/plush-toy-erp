@@ -1,9 +1,10 @@
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 
-const RECEIVABLE_CONFIRM = 'finance.receivable.confirm'
-const PAYABLE_CONFIRM = 'finance.payable.confirm'
-const INVOICE_CONFIRM = 'finance.invoice.confirm'
-const RECONCILIATION_CONFIRM = 'finance.reconciliation.confirm'
+const RECEIVABLE_CONFIRM = PermissionCode.FINANCE_RECEIVABLE_CONFIRM
+const PAYABLE_CONFIRM = PermissionCode.FINANCE_PAYABLE_CONFIRM
+const INVOICE_CONFIRM = PermissionCode.FINANCE_INVOICE_CONFIRM
+const RECONCILIATION_CONFIRM = PermissionCode.FINANCE_RECONCILIATION_CONFIRM
 
 export function financeFactConfirmPermissions(factType) {
   switch (

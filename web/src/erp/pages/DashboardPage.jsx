@@ -22,6 +22,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { getWorkflowTaskDisplayName } from '../utils/processRuntimePresentation.mjs'
 import { getWorkbenchSummaryOptions } from '../utils/workbenchSummary.mjs'
 import Table from '@/common/components/table/AppTable'
@@ -1238,11 +1239,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   )
   const actionDrawerCanViewAttachments = hasActionPermission(
     adminProfile,
-    'workflow.task.read'
+    PermissionCode.WORKFLOW_TASK_READ
   )
   const actionDrawerCanManageAttachments =
     actionDrawerAccess.canHandle &&
-    hasActionPermission(adminProfile, 'workflow.task.update')
+    hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_UPDATE)
   const assignmentAccess = useWorkflowTaskAssignmentAccess({
     adminProfile,
     task: selectedTask,

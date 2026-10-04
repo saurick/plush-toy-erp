@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Form } from 'antd'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import {
   buildUnitSelectOptions,
   buildSequentialDraftCode,
@@ -220,7 +221,7 @@ export function useOutsourcingOrderEditor({
 
   const canUpdate = hasActionPermission(
     adminProfile,
-    'outsourcing.order.update'
+    PermissionCode.OUTSOURCING_ORDER_UPDATE
   )
 
   const processingPrintTemplateDefaults = useMemo(

@@ -5,6 +5,7 @@ import {
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import WorkflowFollowupDetails from '../../components/workflow/WorkflowFollowupDetails.jsx'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
@@ -92,15 +93,15 @@ export default function MobileTaskDetailScreen({
   )
   const canReadProductionWip = hasActionPermission(
     adminProfile,
-    'production.wip.read'
+    PermissionCode.PRODUCTION_WIP_READ
   )
   const canAssignProductionWip = hasActionPermission(
     adminProfile,
-    'production.wip.assign'
+    PermissionCode.PRODUCTION_WIP_ASSIGN
   )
   const canReadOutsourcingContracts = hasActionPermission(
     adminProfile,
-    'outsourcing.order.read'
+    PermissionCode.OUTSOURCING_ORDER_READ
   )
   const canOpenProductionArrangement = Boolean(
     productionArrangementContext &&

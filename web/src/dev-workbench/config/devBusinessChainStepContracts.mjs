@@ -1,3 +1,5 @@
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+
 export const DEV_BUSINESS_CHAIN_SCENARIO_KINDS = Object.freeze([
   'happy_path',
   'interruption_recovery',
@@ -204,7 +206,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       'purchase_approval:creates_fact_draft:purchase_receipt': step({
         responsibilityMode: 'human',
         ownerPoolKeys: ['quality'],
-        capabilityKeys: ['purchase.receipt.create'],
+        capabilityKeys: [PermissionCode.PURCHASE_RECEIPT_CREATE],
         stateRefs: [
           state('source.purchase_order', 'approved', 'precondition'),
           state('fact.purchase_receipt', 'DRAFT', 'result'),
@@ -221,8 +223,8 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         responsibilityMode: 'human',
         ownerPoolKeys: ['quality', 'warehouse'],
         capabilityKeys: [
-          'quality.inspection.update',
-          'warehouse.inbound.confirm',
+          PermissionCode.QUALITY_INSPECTION_UPDATE,
+          PermissionCode.WAREHOUSE_INBOUND_CONFIRM,
         ],
         stateTransitionRefs: [
           transition('fact.quality_inspection', 'SUBMITTED->PASSED'),
@@ -361,7 +363,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'outsourcing_issue:returns:outsourcing_return': step({
         responsibilityMode: 'human',
-        capabilityKeys: ['outsourcing.return_receipt.create'],
+        capabilityKeys: [PermissionCode.OUTSOURCING_RETURN_RECEIPT_CREATE],
         stateRefs: [
           state('source.outsourcing_order', 'confirmed', 'precondition'),
           state('fact.outsourcing', 'DRAFT', 'result'),
@@ -369,7 +371,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'outsourcing_return:creates_fact_draft:outsourcing_quality': step({
         responsibilityMode: 'human',
-        capabilityKeys: ['quality.inspection.create'],
+        capabilityKeys: [PermissionCode.QUALITY_INSPECTION_CREATE],
         stateRefs: [state('fact.quality_inspection', 'DRAFT', 'result')],
       }),
       'outsourcing_quality:posts_fact:outsourcing_lot': step({
@@ -532,7 +534,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'open_finance_fact:creates_fact_draft:finance_credit_note': step({
         responsibilityMode: 'human',
-        capabilityKeys: ['finance.credit_note.create'],
+        capabilityKeys: [PermissionCode.FINANCE_CREDIT_NOTE_CREATE],
         stateRefs: [state('fact.finance', 'POSTED', 'precondition')],
       }),
       'finance_credit_note:posts_fact:settled_finance_fact': step({
@@ -788,7 +790,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         }),
       'production_exception_execution:reworks:affected_wip': step({
         responsibilityMode: 'human',
-        capabilityKeys: ['production.fact.post'],
+        capabilityKeys: [PermissionCode.PRODUCTION_FACT_POST],
         stateRefs: [
           state(
             'source.production_exception_execution',

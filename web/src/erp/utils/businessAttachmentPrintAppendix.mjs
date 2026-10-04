@@ -1,14 +1,12 @@
+import { AttachmentPolicy } from '../../common/consts/attachments.generated.mjs'
 import { createPrintAppendixImageSnapshot } from './printAppendixImages.mjs'
 
 export const OUTSOURCING_ORDER_ATTACHMENT_OWNER_TYPE = 'outsourcing_order'
 export const PRINT_APPENDIX_ATTACHMENT_TYPE = 'print_appendix'
 
-const PRINTABLE_IMAGE_MIME_TYPES = new Set([
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-  'image/gif',
-])
+const PRINTABLE_IMAGE_MIME_TYPES = new Set(
+  Object.values(AttachmentPolicy.printAppendixFileTypes).flat()
+)
 
 const positiveInteger = (value) => {
   const number = Number(value || 0)

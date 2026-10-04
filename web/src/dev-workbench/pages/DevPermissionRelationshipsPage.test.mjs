@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { transformWithEsbuild } from 'vite'
+import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
 
 const source = readFileSync(
   fileURLToPath(

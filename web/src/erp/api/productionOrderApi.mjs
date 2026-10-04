@@ -1,3 +1,4 @@
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
@@ -11,7 +12,7 @@ import {
 import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 
 const rpc = new JsonRpc({
-  url: 'production_order',
+  url: RpcDomain.PRODUCTION_ORDER,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
@@ -36,7 +37,7 @@ async function aggregateMutation(method, params, expected) {
 }
 
 export async function listProductionOrders(params = {}, options = {}) {
-  const result = await rpc.call('list_production_orders', params, options)
+  const result = await rpc.call(RpcMethod.production_order.LIST_PRODUCTION_ORDERS, params, options)
   return validateProductionOrderList(dataOf(result))
 }
 
@@ -57,7 +58,7 @@ export async function getProductionOrder(productionOrderID, options = {}) {
     throw new Error('请选择有效的生产订单')
   }
   const result = await rpc.call(
-    'get_production_order',
+    RpcMethod.production_order.GET_PRODUCTION_ORDER,
     { production_order_id: productionOrderID },
     options
   )
@@ -105,7 +106,7 @@ export async function listProductionOrderReferenceOptions(
   options = {}
 ) {
   const result = await rpc.call(
-    'list_production_order_reference_options',
+    RpcMethod.production_order.LIST_PRODUCTION_ORDER_REFERENCE_OPTIONS,
     { ...params, reference_type: referenceType },
     options
   )

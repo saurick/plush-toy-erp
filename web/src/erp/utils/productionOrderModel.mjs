@@ -1,3 +1,4 @@
+import { ProductionOrderStatus } from '../../common/consts/statuses.generated.mjs'
 import { PRODUCTION_WIP_ROUTE_CODE } from './productionWipModel.mjs'
 import {
   addNumeric20Scale6Units,
@@ -6,18 +7,13 @@ import {
 } from './numeric20Scale6.mjs'
 import { unixSecondsToBusinessDate } from './businessDate.mjs'
 
-export const PRODUCTION_ORDER_STATUS = Object.freeze({
-  DRAFT: 'DRAFT',
-  RELEASED: 'RELEASED',
-  CLOSED: 'CLOSED',
-  CANCELLED: 'CANCELLED',
-})
+export const PRODUCTION_ORDER_STATUS = ProductionOrderStatus
 
 export const PRODUCTION_ORDER_STATUS_META = Object.freeze({
-  DRAFT: Object.freeze({ label: '草稿', color: 'default' }),
-  RELEASED: Object.freeze({ label: '已发布', color: 'blue' }),
-  CLOSED: Object.freeze({ label: '已关闭', color: 'green' }),
-  CANCELLED: Object.freeze({ label: '已取消', color: 'red' }),
+  [ProductionOrderStatus.DRAFT]: Object.freeze({ label: '草稿', color: 'default' }),
+  [ProductionOrderStatus.RELEASED]: Object.freeze({ label: '已发布', color: 'blue' }),
+  [ProductionOrderStatus.CLOSED]: Object.freeze({ label: '已关闭', color: 'green' }),
+  [ProductionOrderStatus.CANCELLED]: Object.freeze({ label: '已取消', color: 'red' }),
 })
 
 export const PRODUCTION_MATERIAL_REQUIREMENTS_STATE = Object.freeze({

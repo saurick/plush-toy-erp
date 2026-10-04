@@ -1,3 +1,5 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
@@ -9,25 +11,19 @@ import { isWorkflowApprovalTask } from '../utils/workflowTaskActionContract.mjs'
 import { requireFollowupCreateParams, requireFollowupOptions, requireFollowupReceipt } from '../utils/workflowFollowup.mjs'
 
 const workflowRpc = new JsonRpc({
-  url: 'workflow',
+  url: RpcDomain.WORKFLOW,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
 
-const WORKFLOW_TASK_STATUS_KEYS = new Set([
-  'ready',
-  'blocked',
-  'done',
-  'rejected',
-  'withdrawn',
-])
+const WORKFLOW_TASK_STATUS_KEYS = new Set(Object.values(WorkflowTaskStatus))
 const WORKFLOW_TASK_MUTATION_STATUS_BY_OPERATION = Object.freeze({
-  complete: 'done',
-  block: 'blocked',
-  reject: 'rejected',
-  resume: 'ready',
+  complete: WorkflowTaskStatus.DONE,
+  block: WorkflowTaskStatus.BLOCKED,
+  reject: WorkflowTaskStatus.REJECTED,
+  resume: WorkflowTaskStatus.READY,
 })
-const WORKFLOW_TASK_URGE_STATUS_KEYS = new Set(['ready', 'blocked'])
+const WORKFLOW_TASK_URGE_STATUS_KEYS = new Set([WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED])
 const WORKFLOW_TASK_ESCALATION_TARGET_BY_ACTION = Object.freeze({
   escalate_to_pmc: 'pmc',
   escalate_to_boss: 'boss',
@@ -48,23 +44,23 @@ const WORKFLOW_ROLE_TASK_QUERY_KEYS = new Set([
   'status_key',
 ])
 const WORKFLOW_ROLE_TASK_STATUS_KEYS_BY_VIEW = Object.freeze({
-  todo: new Set(['ready', 'blocked']),
-  history: new Set(['done', 'rejected', 'withdrawn']),
-  risk: new Set(['ready', 'blocked']),
-  approval: new Set(['ready', 'blocked']),
+  todo: new Set([WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED]),
+  history: new Set([WorkflowTaskStatus.DONE, WorkflowTaskStatus.REJECTED, WorkflowTaskStatus.WITHDRAWN]),
+  risk: new Set([WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED]),
+  approval: new Set([WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED]),
 })
 const WORKFLOW_ROLE_TASK_COUNT_KEYS = Object.freeze([
   'approval',
-  'blocked',
-  'done',
+  WorkflowTaskStatus.BLOCKED,
+  WorkflowTaskStatus.DONE,
   'history',
   'overdue',
-  'ready',
-  'rejected',
+  WorkflowTaskStatus.READY,
+  WorkflowTaskStatus.REJECTED,
   'risk',
   'todo',
   'total',
-  'withdrawn',
+  WorkflowTaskStatus.WITHDRAWN,
 ])
 const WORKFLOW_ROLE_TASK_RESPONSE_KEYS = Object.freeze([
   'has_more',
@@ -127,7 +123,7 @@ function requireWorkflowRoleTaskQuery(params = {}) {
     (params.sort_key !== undefined &&
       !['newest', 'oldest', 'due'].includes(params.sort_key)) ||
     (params.status_key !== undefined &&
-      (!['ready', 'blocked'].includes(params.status_key) ||
+      (![WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(params.status_key) ||
         viewKey === 'history')) ||
     (params.keyword !== undefined &&
       (typeof params.keyword !== 'string' ||
@@ -337,9 +333,9 @@ function requireWorkflowWorkbenchResponse(result, query) {
         task.id <= 0 ||
         !Number.isSafeInteger(task.version) ||
         task.version <= 0 ||
-        !['ready', 'blocked'].includes(task.task_status_key) ||
+        ![WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(task.task_status_key) ||
         (query.queue_key === 'actionable' &&
-          task.task_status_key !== 'ready') ||
+          task.task_status_key !== WorkflowTaskStatus.READY) ||
         (query.queue_key === 'approval' && !isWorkflowApprovalTask(task))
     )
   ) {
@@ -495,7 +491,7 @@ function requireWorkflowTaskAssignmentOptionsResponse(result, taskID) {
 }
 
 export async function listWorkflowTasks(params = {}, options = {}) {
-  const result = await workflowRpc.call('list_tasks', params, options)
+  const result = await workflowRpc.call(RpcMethod.workflow.LIST_TASKS, params, options)
   return dataOf(result)
 }
 
@@ -504,7 +500,7 @@ export async function getWorkflowTask(taskID, options = {}) {
     throw new TypeError('任务参数无效')
   }
   const result = await workflowRpc.call(
-    'get_task',
+    RpcMethod.workflow.GET_TASK,
     { task_id: taskID },
     options
   )
@@ -537,7 +533,7 @@ export async function listWorkflowTaskEvents(taskId, options = {}) {
     throw new Error('任务轨迹参数无效')
   }
   const result = await workflowRpc.call(
-    'list_task_events',
+    RpcMethod.workflow.LIST_TASK_EVENTS,
     { task_id: normalizedTaskId, limit: normalizedLimit },
     requestOptions
   )
@@ -557,7 +553,7 @@ export async function getWorkflowTaskProcessContext(taskId, options = {}) {
     throw new Error('任务流程参数无效')
   }
   const result = await workflowRpc.call(
-    'get_task_process_context',
+    RpcMethod.workflow.GET_TASK_PROCESS_CONTEXT,
     { task_id: normalizedTaskId },
     options
   )
@@ -631,12 +627,12 @@ export async function listAllWorkflowWorkbenchRoleTasks(params = {}) {
 
 export async function getWorkflowWorkbench(params = {}, options = {}) {
   const query = requireWorkflowWorkbenchQuery(params)
-  const result = await workflowRpc.call('get_workbench', query, options)
+  const result = await workflowRpc.call(RpcMethod.workflow.GET_WORKBENCH, query, options)
   return requireWorkflowWorkbenchResponse(result, query)
 }
 
 export async function getWorkflowTaskBoard(params = {}, options = {}) {
-  const result = await workflowRpc.call('get_task_board', params, options)
+  const result = await workflowRpc.call(RpcMethod.workflow.GET_TASK_BOARD, params, options)
   return requireWorkflowTaskBoardResponse(dataOf(result), params)
 }
 
@@ -655,7 +651,7 @@ export async function getWorkflowTaskAssignmentOptions(
     throw new TypeError('任务转交参数无效')
   }
   const result = await workflowRpc.call(
-    'get_task_assignment_options',
+    RpcMethod.workflow.GET_TASK_ASSIGNMENT_OPTIONS,
     { task_id: params.task_id },
     options
   )
@@ -664,43 +660,43 @@ export async function getWorkflowTaskAssignmentOptions(
 
 export async function completeWorkflowTaskAction(params = {}) {
   const mutationParams = requireWorkflowMutationParams('complete', params)
-  const result = await workflowRpc.call('complete_task_action', mutationParams)
+  const result = await workflowRpc.call(RpcMethod.workflow.COMPLETE_TASK_ACTION, mutationParams)
   return requireWorkflowTaskMutationResult('complete', mutationParams, result)
 }
 
 export async function blockWorkflowTaskAction(params = {}) {
   const mutationParams = requireWorkflowMutationParams('block', params)
-  const result = await workflowRpc.call('block_task_action', mutationParams)
+  const result = await workflowRpc.call(RpcMethod.workflow.BLOCK_TASK_ACTION, mutationParams)
   return requireWorkflowTaskMutationResult('block', mutationParams, result)
 }
 
 export async function rejectWorkflowTaskAction(params = {}) {
   const mutationParams = requireWorkflowMutationParams('reject', params)
-  const result = await workflowRpc.call('reject_task_action', mutationParams)
+  const result = await workflowRpc.call(RpcMethod.workflow.REJECT_TASK_ACTION, mutationParams)
   return requireWorkflowTaskMutationResult('reject', mutationParams, result)
 }
 
 export async function resumeWorkflowTaskAction(params = {}) {
   const mutationParams = requireWorkflowMutationParams('resume', params)
-  const result = await workflowRpc.call('resume_task_action', mutationParams)
+  const result = await workflowRpc.call(RpcMethod.workflow.RESUME_TASK_ACTION, mutationParams)
   return requireWorkflowTaskMutationResult('resume', mutationParams, result)
 }
 
 export async function urgeWorkflowTask(params = {}) {
   const mutationParams = requireWorkflowMutationParams('urge', params)
-  const result = await workflowRpc.call('urge_task', mutationParams)
+  const result = await workflowRpc.call(RpcMethod.workflow.URGE_TASK, mutationParams)
   return requireWorkflowTaskMutationResult('urge', mutationParams, result)
 }
 
 export async function reassignWorkflowTask(params = {}) {
   const mutationParams = requireWorkflowMutationParams('assign', params)
-  const result = await workflowRpc.call('reassign_task', mutationParams)
+  const result = await workflowRpc.call(RpcMethod.workflow.REASSIGN_TASK, mutationParams)
   return requireWorkflowTaskMutationResult('assign', mutationParams, result)
 }
 
 export async function explainWorkflowActionAccess(params = {}, options = {}) {
   const result = await workflowRpc.call(
-    'explain_action_access',
+    RpcMethod.workflow.EXPLAIN_ACTION_ACCESS,
     params,
     options
   )
@@ -709,7 +705,7 @@ export async function explainWorkflowActionAccess(params = {}, options = {}) {
 
 export async function explainWorkflowTaskAssignment(params = {}, options = {}) {
   const result = await workflowRpc.call(
-    'explain_task_assignment',
+    RpcMethod.workflow.EXPLAIN_TASK_ASSIGNMENT,
     params,
     options
   )
@@ -717,17 +713,17 @@ export async function explainWorkflowTaskAssignment(params = {}, options = {}) {
 }
 
 export async function listWorkflowBusinessStates(params = {}) {
-  const result = await workflowRpc.call('list_business_states', params)
+  const result = await workflowRpc.call(RpcMethod.workflow.LIST_BUSINESS_STATES, params)
   return dataOf(result)
 }
 
 export async function getWorkflowTaskCreateOptions(source, options = {}) {
-  const result = await workflowRpc.call('get_task_create_options', source, options)
+  const result = await workflowRpc.call(RpcMethod.workflow.GET_TASK_CREATE_OPTIONS, source, options)
   return requireFollowupOptions(dataOf(result), source)
 }
 
 export async function createWorkflowFollowupTask(params) {
   const input = requireFollowupCreateParams(params)
-  const result = await workflowRpc.call('create_followup_task', input)
+  const result = await workflowRpc.call(RpcMethod.workflow.CREATE_FOLLOWUP_TASK, input)
   return requireFollowupReceipt(dataOf(result), input)
 }

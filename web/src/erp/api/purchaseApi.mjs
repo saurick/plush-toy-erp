@@ -1,3 +1,4 @@
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
@@ -9,14 +10,14 @@ import {
 import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 
 const purchaseRpc = new JsonRpc({
-  url: 'purchase',
+  url: RpcDomain.PURCHASE,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
 
 export async function listPurchaseReceipts(params = {}, options = {}) {
   const result = await purchaseRpc.call(
-    'list_purchase_receipts',
+    RpcMethod.purchase.LIST_PURCHASE_RECEIPTS,
     params,
     options
   )
@@ -38,7 +39,7 @@ export async function listAllPurchaseReceipts(params = {}, options = {}) {
 export async function createPurchaseReceiptFromPurchaseOrder(params = {}) {
   requirePurchaseReceiptIdempotencyKey(params.idempotency_key)
   const result = await purchaseRpc.call(
-    'create_purchase_receipt_from_purchase_order',
+    RpcMethod.purchase.CREATE_PURCHASE_RECEIPT_FROM_PURCHASE_ORDER,
     params
   )
   return validatePurchaseReceiptDraft(dataOf(result)?.purchase_receipt, {
@@ -48,7 +49,7 @@ export async function createPurchaseReceiptFromPurchaseOrder(params = {}) {
 
 export async function addPurchaseReceiptItem(params = {}) {
   requirePurchaseReceiptIdempotencyKey(params.idempotency_key)
-  const result = await purchaseRpc.call('add_purchase_receipt_item', params)
+  const result = await purchaseRpc.call(RpcMethod.purchase.ADD_PURCHASE_RECEIPT_ITEM, params)
   return validatePurchaseReceiptItem(dataOf(result)?.purchase_receipt_item, {
     receiptID: Number(params.receipt_id || 0),
     materialID: Number(params.material_id || 0),
@@ -58,29 +59,29 @@ export async function addPurchaseReceiptItem(params = {}) {
 }
 
 export async function getPurchaseReceipt(params = {}, options = {}) {
-  const result = await purchaseRpc.call('get_purchase_receipt', params, options)
+  const result = await purchaseRpc.call(RpcMethod.purchase.GET_PURCHASE_RECEIPT, params, options)
   return dataOf(result)?.purchase_receipt || null
 }
 
 export async function postPurchaseReceipt(params = {}) {
-  const result = await purchaseRpc.call('post_purchase_receipt', params)
+  const result = await purchaseRpc.call(RpcMethod.purchase.POST_PURCHASE_RECEIPT, params)
   return dataOf(result)?.purchase_receipt || null
 }
 
 export async function cancelPurchaseReceiptDraft(params = {}) {
-  const result = await purchaseRpc.call('cancel_purchase_receipt_draft', params)
+  const result = await purchaseRpc.call(RpcMethod.purchase.CANCEL_PURCHASE_RECEIPT_DRAFT, params)
   return dataOf(result)?.purchase_receipt || null
 }
 
 export async function cancelPurchaseReceipt(params = {}) {
-  const result = await purchaseRpc.call('cancel_purchase_receipt', params)
+  const result = await purchaseRpc.call(RpcMethod.purchase.CANCEL_PURCHASE_RECEIPT, params)
   return dataOf(result)?.purchase_receipt || null
 }
 
 export async function createPurchaseReturnFromReceipt(params = {}) {
   requirePurchaseReceiptIdempotencyKey(params.idempotency_key)
   const result = await purchaseRpc.call(
-    'create_purchase_return_from_receipt',
+    RpcMethod.purchase.CREATE_PURCHASE_RETURN_FROM_RECEIPT,
     params
   )
   return dataOf(result)?.purchase_return || null
@@ -89,20 +90,20 @@ export async function createPurchaseReturnFromReceipt(params = {}) {
 export async function createPurchaseReturnFromQualityInspection(params = {}) {
   requirePurchaseReceiptIdempotencyKey(params.idempotency_key)
   const result = await purchaseRpc.call(
-    'create_purchase_return_from_quality_inspection',
+    RpcMethod.purchase.CREATE_PURCHASE_RETURN_FROM_QUALITY_INSPECTION,
     params
   )
   return dataOf(result)?.purchase_return || null
 }
 
 export async function getPurchaseReturn(params = {}) {
-  const result = await purchaseRpc.call('get_purchase_return', params)
+  const result = await purchaseRpc.call(RpcMethod.purchase.GET_PURCHASE_RETURN, params)
   return dataOf(result)?.purchase_return || null
 }
 
 export async function listPurchaseReturns(params = {}, options = {}) {
   const result = await purchaseRpc.call(
-    'list_purchase_returns',
+    RpcMethod.purchase.LIST_PURCHASE_RETURNS,
     params,
     options
   )
@@ -122,19 +123,19 @@ export async function listAllPurchaseReturns(params = {}, options = {}) {
 }
 
 export async function postPurchaseReturn(params = {}) {
-  const result = await purchaseRpc.call('post_purchase_return', params)
+  const result = await purchaseRpc.call(RpcMethod.purchase.POST_PURCHASE_RETURN, params)
   return dataOf(result)?.purchase_return || null
 }
 
 export async function cancelPurchaseReturn(params = {}) {
-  const result = await purchaseRpc.call('cancel_purchase_return', params)
+  const result = await purchaseRpc.call(RpcMethod.purchase.CANCEL_PURCHASE_RETURN, params)
   return dataOf(result)?.purchase_return || null
 }
 
 export async function createPurchaseReceiptAdjustmentFromReceipt(params = {}) {
   requirePurchaseReceiptIdempotencyKey(params.idempotency_key)
   const result = await purchaseRpc.call(
-    'create_purchase_receipt_adjustment_from_receipt',
+    RpcMethod.purchase.CREATE_PURCHASE_RECEIPT_ADJUSTMENT_FROM_RECEIPT,
     params
   )
   return dataOf(result)?.purchase_receipt_adjustment || null
@@ -142,7 +143,7 @@ export async function createPurchaseReceiptAdjustmentFromReceipt(params = {}) {
 
 export async function getPurchaseReceiptAdjustment(params = {}) {
   const result = await purchaseRpc.call(
-    'get_purchase_receipt_adjustment',
+    RpcMethod.purchase.GET_PURCHASE_RECEIPT_ADJUSTMENT,
     params
   )
   return dataOf(result)?.purchase_receipt_adjustment || null
@@ -153,7 +154,7 @@ export async function listPurchaseReceiptAdjustments(
   options = {}
 ) {
   const result = await purchaseRpc.call(
-    'list_purchase_receipt_adjustments',
+    RpcMethod.purchase.LIST_PURCHASE_RECEIPT_ADJUSTMENTS,
     params,
     options
   )
@@ -178,7 +179,7 @@ export async function listAllPurchaseReceiptAdjustments(
 
 export async function postPurchaseReceiptAdjustment(params = {}) {
   const result = await purchaseRpc.call(
-    'post_purchase_receipt_adjustment',
+    RpcMethod.purchase.POST_PURCHASE_RECEIPT_ADJUSTMENT,
     params
   )
   return dataOf(result)?.purchase_receipt_adjustment || null
@@ -186,7 +187,7 @@ export async function postPurchaseReceiptAdjustment(params = {}) {
 
 export async function cancelPurchaseReceiptAdjustment(params = {}) {
   const result = await purchaseRpc.call(
-    'cancel_purchase_receipt_adjustment',
+    RpcMethod.purchase.CANCEL_PURCHASE_RECEIPT_ADJUSTMENT,
     params
   )
   return dataOf(result)?.purchase_receipt_adjustment || null
@@ -195,7 +196,7 @@ export async function cancelPurchaseReceiptAdjustment(params = {}) {
 export async function createPurchaseRejectionDisposition(params = {}) {
   requirePurchaseReceiptIdempotencyKey(params.idempotency_key)
   const result = await purchaseRpc.call(
-    'create_purchase_rejection_disposition',
+    RpcMethod.purchase.CREATE_PURCHASE_REJECTION_DISPOSITION,
     params
   )
   return dataOf(result)?.purchase_rejection_disposition || null
@@ -203,7 +204,7 @@ export async function createPurchaseRejectionDisposition(params = {}) {
 
 export async function postPurchaseRejectionDisposition(params = {}) {
   const result = await purchaseRpc.call(
-    'post_purchase_rejection_disposition',
+    RpcMethod.purchase.POST_PURCHASE_REJECTION_DISPOSITION,
     params
   )
   return dataOf(result)?.purchase_rejection_disposition || null
@@ -211,7 +212,7 @@ export async function postPurchaseRejectionDisposition(params = {}) {
 
 export async function cancelPurchaseRejectionDisposition(params = {}) {
   const result = await purchaseRpc.call(
-    'cancel_purchase_rejection_disposition',
+    RpcMethod.purchase.CANCEL_PURCHASE_REJECTION_DISPOSITION,
     params
   )
   return dataOf(result)?.purchase_rejection_disposition || null
@@ -222,7 +223,7 @@ export async function getPurchaseRejectionDisposition(
   options = {}
 ) {
   const result = await purchaseRpc.call(
-    'get_purchase_rejection_disposition',
+    RpcMethod.purchase.GET_PURCHASE_REJECTION_DISPOSITION,
     params,
     options
   )
@@ -234,7 +235,7 @@ export async function listPurchaseRejectionDispositions(
   options = {}
 ) {
   const result = await purchaseRpc.call(
-    'list_purchase_rejection_dispositions',
+    RpcMethod.purchase.LIST_PURCHASE_REJECTION_DISPOSITIONS,
     params,
     options
   )

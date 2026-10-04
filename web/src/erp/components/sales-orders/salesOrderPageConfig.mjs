@@ -1,3 +1,4 @@
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import {
   cancelSalesOrder,
   closeSalesOrder,
@@ -31,7 +32,7 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'submit',
     label: '提交订单',
-    permission: 'sales_order.submit',
+    permission: PermissionCode.SALES_ORDER_SUBMIT,
     nextStatus: 'submitted',
     run: submitSalesOrderAcceptanceProcess,
     returnsRecord: false,
@@ -40,7 +41,7 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'normal_close',
     label: '正常关闭',
-    permission: 'sales_order.close',
+    permission: PermissionCode.SALES_ORDER_CLOSE,
     nextStatus: 'closed',
     sourceLifecycle: true,
     sourceType: 'sales_order',
@@ -55,7 +56,7 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'short_close',
     label: '提前关闭',
-    permission: 'sales_order.close',
+    permission: PermissionCode.SALES_ORDER_CLOSE,
     nextStatus: 'closed',
     sourceLifecycle: true,
     sourceType: 'sales_order',
@@ -72,7 +73,7 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
   {
     key: 'cancel',
     label: '取消',
-    permission: 'sales_order.cancel',
+    permission: PermissionCode.SALES_ORDER_CANCEL,
     nextStatus: 'canceled',
     sourceLifecycle: true,
     sourceType: 'sales_order',

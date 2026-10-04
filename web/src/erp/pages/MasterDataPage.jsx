@@ -17,6 +17,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Form, Popconfirm, Space } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../utils/warehouseClassification.mjs'
@@ -119,14 +120,14 @@ export default function MasterDataPage({ type }) {
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
-  const canReadProducts = hasActionPermission(adminProfile, 'product.read')
+  const canReadProducts = hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
   const canReadProductSKUs = hasActionPermission(
     adminProfile,
-    'product_sku.read'
+    PermissionCode.PRODUCT_SKU_READ
   )
-  const canReadMaterials = hasActionPermission(adminProfile, 'material.read')
-  const canReadProcesses = hasActionPermission(adminProfile, 'process.read')
-  const canReadContacts = hasActionPermission(adminProfile, 'contact.read')
+  const canReadMaterials = hasActionPermission(adminProfile, PermissionCode.MATERIAL_READ)
+  const canReadProcesses = hasActionPermission(adminProfile, PermissionCode.PROCESS_READ)
+  const canReadContacts = hasActionPermission(adminProfile, PermissionCode.CONTACT_READ)
   const requestedProductCatalogType = searchParams.get('catalog')
   const initialProductCatalogType =
     requestedProductCatalogType === 'product_skus' && canReadProductSKUs

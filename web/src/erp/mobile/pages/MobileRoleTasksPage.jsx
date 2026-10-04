@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import '../mobileRoleTasks.css'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -2210,7 +2211,7 @@ export default function MobileRoleTasksPage() {
           receiptSnapshotOnly
             ? false
             : selectedCanOperate &&
-              hasActionPermission(adminProfile, 'workflow.task.update')
+              hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_UPDATE)
         }
         selectedHasActionCapability={
           receiptSnapshotOnly ? false : selectedHasActionCapability

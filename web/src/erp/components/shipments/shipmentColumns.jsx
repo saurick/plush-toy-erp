@@ -1,5 +1,6 @@
 import React from 'react'
 import { Tag } from 'antd'
+import { ShipmentStatus } from '../../../common/consts/statuses.generated.mjs'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
@@ -10,9 +11,9 @@ export const SHIPMENTS_MODULE_KEY = 'shipments'
 
 export const SHIPMENT_STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
-  { label: '草稿', value: 'DRAFT' },
-  { label: '已出货', value: 'SHIPPED' },
-  { label: '已取消', value: 'CANCELLED' },
+  { label: '草稿', value: ShipmentStatus.DRAFT },
+  { label: '已出货', value: ShipmentStatus.SHIPPED },
+  { label: '已取消', value: ShipmentStatus.CANCELLED },
 ]
 
 export const SHIPMENT_DATE_FILTER_OPTIONS = [
@@ -21,15 +22,15 @@ export const SHIPMENT_DATE_FILTER_OPTIONS = [
 ]
 
 export const SHIPMENT_STATUS_LABELS = Object.freeze({
-  DRAFT: '草稿',
-  SHIPPED: '已出货',
-  CANCELLED: '已取消',
+  [ShipmentStatus.DRAFT]: '草稿',
+  [ShipmentStatus.SHIPPED]: '已出货',
+  [ShipmentStatus.CANCELLED]: '已取消',
 })
 
 const SHIPMENT_STATUS_COLORS = Object.freeze({
-  DRAFT: 'default',
-  SHIPPED: 'blue',
-  CANCELLED: 'red',
+  [ShipmentStatus.DRAFT]: 'default',
+  [ShipmentStatus.SHIPPED]: 'blue',
+  [ShipmentStatus.CANCELLED]: 'red',
 })
 
 export function shipmentStatusText(status) {
@@ -173,12 +174,12 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       render: (value, record) => {
         const weight = String(value ?? '').trim()
         if (!weight) {
-          if (record?.status === 'DRAFT') return '待确认'
+          if (record?.status === ShipmentStatus.DRAFT) return '待确认'
           if (hasFinalShipmentWeight(record?.status)) return '未记录'
           return '-'
         }
         if (hasFinalShipmentWeight(record?.status)) return `最终 ${weight} 克`
-        if (record?.status === 'DRAFT') return `实际 ${weight} 克`
+        if (record?.status === ShipmentStatus.DRAFT) return `实际 ${weight} 克`
         return `${weight} 克`
       },
       exportValue: (record) => String(record?.total_net_weight_g ?? '').trim(),

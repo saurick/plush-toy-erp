@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+
 import test from 'node:test'
+import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
 
 import {
   PRODUCT_IMAGE_SNAPSHOT_MAX_BYTES,

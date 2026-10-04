@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Form, Input } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { AUTH_SCOPE, getLoginPath, getToken, logout } from '@/common/auth/auth'
 import { RpcErrorCode } from '@/common/consts/errorCodes'
@@ -10,7 +11,7 @@ import { JsonRpc } from '@/common/utils/jsonRpc'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { adminPasswordPolicyRule } from '../utils/adminPasswordPolicy.mjs'
 
-const accountRpc = new JsonRpc({ url: 'admin', basePath: ADMIN_BASE_PATH })
+const accountRpc = new JsonRpc({ url: RpcDomain.ADMIN, basePath: ADMIN_BASE_PATH })
 
 export default function AccountPasswordModal({ onClose }) {
   const [form] = Form.useForm()
@@ -34,7 +35,7 @@ export default function AccountPasswordModal({ onClose }) {
     setSaving(true)
     setFailure('')
     try {
-      await accountRpc.call('change_password', { old_password, new_password })
+      await accountRpc.call(RpcMethod.admin.CHANGE_PASSWORD, { old_password, new_password })
       if (!mountedRef.current || getToken(AUTH_SCOPE.ADMIN) !== requestToken) {
         return
       }

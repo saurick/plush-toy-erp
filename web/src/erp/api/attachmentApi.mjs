@@ -1,3 +1,4 @@
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import {
@@ -10,13 +11,13 @@ import { assertBusinessAttachmentUploadParams } from '../utils/businessAttachmen
 import { notifyProductImagesChanged } from '../utils/productImageReferences.mjs'
 
 const attachmentRpc = new JsonRpc({
-  url: 'attachment',
+  url: RpcDomain.ATTACHMENT,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
 
 export async function listBusinessAttachments(params = {}) {
-  const result = await attachmentRpc.call('list_attachments', params)
+  const result = await attachmentRpc.call(RpcMethod.attachment.LIST_ATTACHMENTS, params)
   return requireRpcArray(
     result,
     'attachments',
@@ -26,7 +27,7 @@ export async function listBusinessAttachments(params = {}) {
 
 export async function uploadBusinessAttachment(params = {}) {
   assertBusinessAttachmentUploadParams(params)
-  const result = await attachmentRpc.call('upload_attachment', params)
+  const result = await attachmentRpc.call(RpcMethod.attachment.UPLOAD_ATTACHMENT, params)
   return requireRpcEntity(
     result,
     'attachment',
@@ -35,12 +36,12 @@ export async function uploadBusinessAttachment(params = {}) {
 }
 
 export async function downloadBusinessAttachment(params = {}) {
-  const result = await attachmentRpc.call('download_attachment', params)
+  const result = await attachmentRpc.call(RpcMethod.attachment.DOWNLOAD_ATTACHMENT, params)
   return requireRpcEntity(result, 'attachment', '附件下载结果不完整，请重试')
 }
 
 export async function withdrawBusinessAttachment(params = {}) {
-  const result = await attachmentRpc.call('withdraw_attachment', params)
+  const result = await attachmentRpc.call(RpcMethod.attachment.WITHDRAW_ATTACHMENT, params)
   return requireRpcEntity(
     result,
     'attachment',
@@ -59,7 +60,7 @@ export async function listProductImages(params = {}) {
 
 export async function listProductImageReferences(params = {}) {
   const result = await attachmentRpc.call(
-    'list_product_image_references',
+    RpcMethod.attachment.LIST_PRODUCT_IMAGE_REFERENCES,
     params
   )
   return requireRpcArray(result, 'images', '产品图片数据不完整，请重新读取')
@@ -79,7 +80,7 @@ export async function uploadProductImage(params = {}) {
 
 export async function clearProductImage(params = {}) {
   const { product_id: productID, ...rest } = params
-  const result = await attachmentRpc.call('clear_product_image', {
+  const result = await attachmentRpc.call(RpcMethod.attachment.CLEAR_PRODUCT_IMAGE, {
     ...rest,
     owner_id: productID,
   })

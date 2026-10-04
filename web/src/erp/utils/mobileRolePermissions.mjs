@@ -1,18 +1,19 @@
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { normalizeRoleKey } from './roleKeys.mjs'
 
 // Viewing scope only; this is never assigned as a business role.
 export const MOBILE_ALL_ROLES_KEY = 'all'
 
 export const MOBILE_ROLE_PERMISSION_MAP = Object.freeze({
-  boss: 'mobile.boss.access',
-  sales: 'mobile.sales.access',
-  purchase: 'mobile.purchase.access',
-  production: 'mobile.production.access',
-  warehouse: 'mobile.warehouse.access',
-  quality: 'mobile.quality.access',
-  finance: 'mobile.finance.access',
-  pmc: 'mobile.pmc.access',
-  engineering: 'mobile.engineering.access',
+  boss: PermissionCode.MOBILE_BOSS_ACCESS,
+  sales: PermissionCode.MOBILE_SALES_ACCESS,
+  purchase: PermissionCode.MOBILE_PURCHASE_ACCESS,
+  production: PermissionCode.MOBILE_PRODUCTION_ACCESS,
+  warehouse: PermissionCode.MOBILE_WAREHOUSE_ACCESS,
+  quality: PermissionCode.MOBILE_QUALITY_ACCESS,
+  finance: PermissionCode.MOBILE_FINANCE_ACCESS,
+  pmc: PermissionCode.MOBILE_PMC_ACCESS,
+  engineering: PermissionCode.MOBILE_ENGINEERING_ACCESS,
 })
 
 function normalizeStringList(values = []) {

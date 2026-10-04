@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -24,7 +25,7 @@ export function useOutsourcingOrderTasks({
 
   const canReadWorkflowTasks = hasActionPermission(
     adminProfile,
-    'workflow.task.read'
+    PermissionCode.WORKFLOW_TASK_READ
   )
 
   const loadWorkflowTasks = useCallback(

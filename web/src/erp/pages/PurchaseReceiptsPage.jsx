@@ -12,6 +12,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { formatUnitQuantitySummary } from '../utils/sourceOrderAmounts.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState'
 import { arrivalDifference } from '../utils/incomingAcceptance.mjs'
@@ -260,51 +261,51 @@ export default function PurchaseReceiptsPage() {
 
   const beginLatestRequest = useLatestRequestCoordinator()
 
-  const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')
-  const canPost = hasActionPermission(adminProfile, 'warehouse.inbound.confirm')
+  const canCreate = hasActionPermission(adminProfile, PermissionCode.PURCHASE_RECEIPT_CREATE)
+  const canPost = hasActionPermission(adminProfile, PermissionCode.WAREHOUSE_INBOUND_CONFIRM)
   const canCancelDraft = hasActionPermission(
     adminProfile,
-    'purchase.receipt.cancel_draft'
+    PermissionCode.PURCHASE_RECEIPT_CANCEL_DRAFT
   )
   const canCreateReturn = hasActionPermission(
     adminProfile,
-    'purchase.return.create'
+    PermissionCode.PURCHASE_RETURN_CREATE
   )
   const canPostReturn = hasActionPermission(
     adminProfile,
-    'purchase.return.post'
+    PermissionCode.PURCHASE_RETURN_POST
   )
   const canCancelReturn = hasActionPermission(
     adminProfile,
-    'purchase.return.cancel'
+    PermissionCode.PURCHASE_RETURN_CANCEL
   )
   const canReadReturn = hasActionPermission(
     adminProfile,
-    'purchase.return.read'
+    PermissionCode.PURCHASE_RETURN_READ
   )
   const canReadAdjustment = hasActionPermission(
     adminProfile,
-    'purchase.receipt.adjustment.read'
+    PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_READ
   )
   const canCreateAdjustment = hasActionPermission(
     adminProfile,
-    'purchase.receipt.adjustment.create'
+    PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_CREATE
   )
   const canPostAdjustment = hasActionPermission(
     adminProfile,
-    'purchase.receipt.adjustment.post'
+    PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_POST
   )
   const canCancelAdjustment = hasActionPermission(
     adminProfile,
-    'purchase.receipt.adjustment.cancel'
+    PermissionCode.PURCHASE_RECEIPT_ADJUSTMENT_CANCEL
   )
   const canCreatePayable = hasActionPermission(
     adminProfile,
-    'finance.payable.confirm'
+    PermissionCode.FINANCE_PAYABLE_CONFIRM
   )
   const canViewPayable =
     (canCreatePayable ||
-      hasActionPermission(adminProfile, 'finance.payable.read')) &&
+      hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYABLE_READ)) &&
     canOpenRelatedPath(BUSINESS_ROUTE_PATHS.payables)
   const canOpenPurchaseOrders = canOpenRelatedPath(
     BUSINESS_ROUTE_PATHS.purchaseOrders

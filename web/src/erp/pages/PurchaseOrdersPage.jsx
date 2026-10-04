@@ -5,6 +5,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { orderSubmissionSuccessMessage } from '../utils/approvalCondition.mjs'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState.js'
@@ -152,24 +153,24 @@ export default function PurchaseOrdersPage() {
   )
   const [form] = Form.useForm()
   const [inboundDraftForm] = Form.useForm()
-  const canRead = hasActionPermission(adminProfile, 'purchase.order.read')
-  const canCreate = hasActionPermission(adminProfile, 'purchase.order.create')
-  const canUpdate = hasActionPermission(adminProfile, 'purchase.order.update')
+  const canRead = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_READ)
+  const canCreate = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_CREATE)
+  const canUpdate = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_UPDATE)
   const canCreatePurchaseReceipt = hasActionPermission(
     adminProfile,
-    'purchase.receipt.create'
+    PermissionCode.PURCHASE_RECEIPT_CREATE
   )
   const canReadWorkflowTasks = hasActionPermission(
     adminProfile,
-    'workflow.task.read'
+    PermissionCode.WORKFLOW_TASK_READ
   )
   const canUpdateWorkflowTasks = hasActionPermission(
     adminProfile,
-    'workflow.task.update'
+    PermissionCode.WORKFLOW_TASK_UPDATE
   )
   const canCompleteWorkflowTasks = hasActionPermission(
     adminProfile,
-    'workflow.task.complete'
+    PermissionCode.WORKFLOW_TASK_COMPLETE
   )
 
   const [loading, setLoading] = useState(false)

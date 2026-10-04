@@ -2,6 +2,9 @@ import {
   numeric20Scale6Units,
   numeric20Scale6TextFromUnits,
 } from "../../../web/src/erp/utils/numeric20Scale6.mjs";
+import { NumericContract } from "../../../web/src/common/consts/numeric.generated.mjs";
+
+const DECIMAL_FACTOR = 10n ** BigInt(NumericContract.scale);
 
 // Acceptance plans follow the production requirement rule before any write.
 // Keep all three factors exact and ceil once at the persisted unit precision.
@@ -11,9 +14,9 @@ export function roundRequiredMaterialQuantity(
   lossRate,
   precision,
 ) {
-  if (!Number.isInteger(precision) || precision < 0 || precision > 6) {
+  if (!Number.isInteger(precision) || precision < 0 || precision > NumericContract.scale) {
     throw new Error(
-      "material requirement needs a unit precision between 0 and 6",
+      `material requirement needs a unit precision between 0 and ${NumericContract.scale}`,
     );
   }
   const factors = [quantity, planned, lossRate ?? "0"].map(
@@ -28,10 +31,10 @@ export function roundRequiredMaterialQuantity(
   if (coefficient <= 0n || plannedQuantity <= 0n) {
     throw new Error("material requirement quantities must be positive");
   }
-  const numerator = coefficient * plannedQuantity * (1000000n + loss);
-  const divisor = 10n ** BigInt(18 - precision);
+  const numerator = coefficient * plannedQuantity * (DECIMAL_FACTOR + loss);
+  const divisor = 10n ** BigInt(NumericContract.scale * 3 - precision);
   const rounded =
-    ((numerator + divisor - 1n) / divisor) * 10n ** BigInt(6 - precision);
+    ((numerator + divisor - 1n) / divisor) * 10n ** BigInt(NumericContract.scale - precision);
   const result = numeric20Scale6TextFromUnits(rounded.toString());
   if (numeric20Scale6Units(result) === null) {
     throw new Error("material requirement exceeds numeric(20,6)");

@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import vectors from '../../../../server/internal/core/value/testdata/numeric20scale6.json' with { type: 'json' }
 
 import {
   addNumeric20Scale6Units,
@@ -15,6 +16,13 @@ import {
   subtractNumeric20Scale6Units,
   sumNumeric20Scale6Values,
 } from './numeric20Scale6.mjs'
+
+test('numeric20Scale6: shared vectors distinguish UI normalization from strict wire input', () => {
+  assert(vectors.length > 0)
+  for (const item of vectors) {
+    assert.equal(normalizeNumeric20Scale6(item.input), item.uiNormalized, item.input)
+  }
+})
 
 test('numeric(20,6) helper preserves the smallest and largest values exactly', () => {
   assert.equal(numeric20Scale6Units('0.000001'), '1')

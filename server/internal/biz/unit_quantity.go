@@ -3,6 +3,8 @@ package biz
 import (
 	"fmt"
 
+	corevalue "server/internal/core/value"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -27,10 +29,10 @@ func (e *UnitQuantityError) Unwrap() error { return ErrBadParam }
 // ValidateUnitQuantity checks the value without rounding it. Signs and zero are
 // governed by the owning operation (e.g. a stock adjustment may be negative).
 func ValidateUnitQuantity(quantity decimal.Decimal, precision int) error {
-	if precision < 0 || precision > 6 || !quantity.Equal(quantity.Truncate(int32(precision))) {
+	if precision < 0 || precision > corevalue.NumericScale || !quantity.Equal(quantity.Truncate(int32(precision))) {
 		return &UnitQuantityError{Precision: precision}
 	}
-	if quantity.Abs().GreaterThan(decimal.RequireFromString("99999999999999.999999")) {
+	if quantity.Abs().GreaterThan(decimal.RequireFromString(corevalue.NumericMaximum)) {
 		return ErrBadParam
 	}
 	return nil
@@ -40,7 +42,7 @@ func ValidateUnitQuantity(quantity decimal.Decimal, precision int) error {
 // a BOM coefficient into an executable purchase/issue quantity. Entered facts
 // must use ValidateUnitQuantity instead so user input is never silently changed.
 func RoundRequiredUnitQuantity(quantity decimal.Decimal, precision int) (decimal.Decimal, error) {
-	if precision < 0 || precision > 6 {
+	if precision < 0 || precision > corevalue.NumericScale {
 		return decimal.Zero, &UnitQuantityError{Precision: precision}
 	}
 	if !quantity.IsPositive() {

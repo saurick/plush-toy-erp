@@ -3,6 +3,8 @@ package biz
 import (
 	"strings"
 
+	corevalue "server/internal/core/value"
+
 	"github.com/shopspring/decimal"
 )
 
@@ -18,7 +20,7 @@ func parsePositiveNumeric20Scale6Contract(value string) (decimal.Decimal, bool) 
 		integerDigits++
 		index++
 	}
-	if integerDigits == 0 || integerDigits > 14 {
+	if integerDigits == 0 || integerDigits > corevalue.NumericIntegerDigits {
 		return decimal.Zero, false
 	}
 	if index < len(value) {
@@ -31,7 +33,7 @@ func parsePositiveNumeric20Scale6Contract(value string) (decimal.Decimal, bool) 
 			fractionDigits++
 			index++
 		}
-		if fractionDigits == 0 || fractionDigits > 6 {
+		if fractionDigits == 0 || fractionDigits > corevalue.NumericScale {
 			return decimal.Zero, false
 		}
 	}

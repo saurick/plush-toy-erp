@@ -1,17 +1,18 @@
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
 import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 
 const qualityRpc = new JsonRpc({
-  url: 'quality',
+  url: RpcDomain.QUALITY,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
 
 export async function listQualityInspections(params = {}, options = {}) {
   const result = await qualityRpc.call(
-    'list_quality_inspections',
+    RpcMethod.quality.LIST_QUALITY_INSPECTIONS,
     params,
     options
   )
@@ -35,7 +36,7 @@ export async function listFinishedGoodsQualityInspections(
   options = {}
 ) {
   const result = await qualityRpc.call(
-    'list_finished_goods_quality_inspections',
+    RpcMethod.quality.LIST_FINISHED_GOODS_QUALITY_INSPECTIONS,
     params,
     options
   )
@@ -62,7 +63,7 @@ export async function listProductionStageQualityInspections(
   options = {}
 ) {
   const result = await qualityRpc.call(
-    'list_production_stage_quality_inspections',
+    RpcMethod.quality.LIST_PRODUCTION_STAGE_QUALITY_INSPECTIONS,
     params,
     options
   )
@@ -87,7 +88,7 @@ export async function listAllProductionStageQualityInspections(
 
 export async function createFinishedGoodsQualityInspectionDraft(params = {}) {
   const result = await qualityRpc.call(
-    'create_finished_goods_quality_inspection_draft',
+    RpcMethod.quality.CREATE_FINISHED_GOODS_QUALITY_INSPECTION_DRAFT,
     params
   )
   return dataOf(result)?.quality_inspection || null
@@ -95,7 +96,7 @@ export async function createFinishedGoodsQualityInspectionDraft(params = {}) {
 
 export async function createQualityInspectionDraft(params = {}) {
   const result = await qualityRpc.call(
-    'create_quality_inspection_draft',
+    RpcMethod.quality.CREATE_QUALITY_INSPECTION_DRAFT,
     params
   )
   return dataOf(result)?.quality_inspection || null
@@ -105,7 +106,7 @@ export async function createQualityInspectionFromOutsourcingReturn(
   params = {}
 ) {
   const result = await qualityRpc.call(
-    'create_quality_inspection_from_outsourcing_return',
+    RpcMethod.quality.CREATE_QUALITY_INSPECTION_FROM_OUTSOURCING_RETURN,
     params
   )
   return dataOf(result)?.quality_inspection || null
@@ -116,7 +117,7 @@ export async function listOutsourcingReturnQualityInspections(
   options = {}
 ) {
   const result = await qualityRpc.call(
-    'list_outsourcing_return_quality_inspections',
+    RpcMethod.quality.LIST_OUTSOURCING_RETURN_QUALITY_INSPECTIONS,
     params,
     options
   )
@@ -140,26 +141,26 @@ export async function listAllOutsourcingReturnQualityInspections(
 }
 
 export async function submitQualityInspection(params = {}) {
-  const result = await qualityRpc.call('submit_quality_inspection', params)
+  const result = await qualityRpc.call(RpcMethod.quality.SUBMIT_QUALITY_INSPECTION, params)
   return dataOf(result)?.quality_inspection || null
 }
 
 export async function passQualityInspection(params = {}) {
-  const result = await qualityRpc.call('pass_quality_inspection', params)
+  const result = await qualityRpc.call(RpcMethod.quality.PASS_QUALITY_INSPECTION, params)
   return dataOf(result)?.quality_inspection || null
 }
 
 export async function rejectQualityInspection(params = {}) {
-  const result = await qualityRpc.call('reject_quality_inspection', params)
+  const result = await qualityRpc.call(RpcMethod.quality.REJECT_QUALITY_INSPECTION, params)
   return dataOf(result)?.quality_inspection || null
 }
 
 export async function cancelQualityInspection(params = {}) {
-  const result = await qualityRpc.call('cancel_quality_inspection', params)
+  const result = await qualityRpc.call(RpcMethod.quality.CANCEL_QUALITY_INSPECTION, params)
   return dataOf(result)?.quality_inspection || null
 }
 
 export async function getQualityInspection(params = {}) {
-  const result = await qualityRpc.call('get_quality_inspection', params)
+  const result = await qualityRpc.call(RpcMethod.quality.GET_QUALITY_INSPECTION, params)
   return dataOf(result)?.quality_inspection || null
 }

@@ -7,6 +7,7 @@ import {
   MobileOutlined,
 } from '@ant-design/icons'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import {
@@ -143,7 +144,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   const authRpc = useMemo(
     () =>
       new JsonRpc({
-        url: 'auth',
+        url: RpcDomain.AUTH,
         basePath: ADMIN_BASE_PATH,
         authScope: AUTH_SCOPE.ADMIN,
         withAuth: false,

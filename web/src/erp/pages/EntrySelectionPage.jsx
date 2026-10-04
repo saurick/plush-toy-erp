@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Space, Typography } from 'antd'
 import { DesktopOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE, getStoredAdminProfile, logout } from '@/common/auth/auth'
 import { getActiveERPBrand } from '@/common/consts/brand'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
@@ -47,7 +48,7 @@ export default function EntrySelectionPage({ legalNotice }) {
   const authRpc = useMemo(
     () =>
       new JsonRpc({
-        url: 'auth',
+        url: RpcDomain.AUTH,
         basePath: ADMIN_BASE_PATH,
         authScope: AUTH_SCOPE.ADMIN,
       }),

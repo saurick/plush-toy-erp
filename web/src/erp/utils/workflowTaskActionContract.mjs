@@ -1,13 +1,14 @@
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { isFulfillmentTask } from './fulfillmentTask.mjs'
 import { isEngineeringMaterialTask } from './engineeringMaterialTask.mjs'
 
 export const WORKFLOW_APPROVAL_CAPABILITY_KEYS = Object.freeze([
-  'workflow.task.approve',
-  'finance.payment.approve',
-  'warehouse.adjustment.approve',
-  'production.exception.approve',
-  'engineering.material.boss_approve',
-  'engineering.material.finance_approve',
+  PermissionCode.WORKFLOW_TASK_APPROVE,
+  PermissionCode.FINANCE_PAYMENT_APPROVE,
+  PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE,
+  PermissionCode.PRODUCTION_EXCEPTION_APPROVE,
+  PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE,
+  PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE,
 ])
 
 const WORKFLOW_APPROVAL_CAPABILITY_KEY_SET = new Set(
@@ -15,9 +16,9 @@ const WORKFLOW_APPROVAL_CAPABILITY_KEY_SET = new Set(
 )
 
 const WORKFLOW_PROCESS_DECISION_PROFILE_BY_CAPABILITY = Object.freeze({
-  'finance.payment.approve': 'finance_payment_approval',
-  'warehouse.adjustment.approve': 'inventory_adjustment_approval',
-  'production.exception.approve': 'production_exception_approval',
+  [PermissionCode.FINANCE_PAYMENT_APPROVE]: 'finance_payment_approval',
+  [PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE]: 'inventory_adjustment_approval',
+  [PermissionCode.PRODUCTION_EXCEPTION_APPROVE]: 'production_exception_approval',
 })
 
 export function isWorkflowApprovalTask(task = {}) {
@@ -42,7 +43,7 @@ export function getWorkflowProcessDecisionApprovalProfile(task = {}) {
 export function workflowTaskAllowsApprovedQuantity(task = {}) {
   return (
     String(task?.required_capability_key || '').trim() ===
-    'production.exception.approve'
+    PermissionCode.PRODUCTION_EXCEPTION_APPROVE
   )
 }
 
@@ -52,15 +53,15 @@ export function getWorkflowTaskActionPermission(actionMode = '', task = {}) {
   if (actionMode === 'complete') {
     return isWorkflowApprovalTask(task)
       ? String(task?.required_capability_key || '').trim()
-      : 'workflow.task.complete'
+      : PermissionCode.WORKFLOW_TASK_COMPLETE
   }
-  if (actionMode === 'reject') return 'workflow.task.reject'
+  if (actionMode === 'reject') return PermissionCode.WORKFLOW_TASK_REJECT
   if (
     actionMode === 'block' ||
     actionMode === 'resume' ||
     actionMode === 'urge'
   ) {
-    return 'workflow.task.update'
+    return PermissionCode.WORKFLOW_TASK_UPDATE
   }
   return ''
 }

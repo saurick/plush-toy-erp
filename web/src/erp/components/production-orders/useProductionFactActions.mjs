@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -59,12 +60,12 @@ function productionDraftEditPermissions(action) {
   if (
     action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_MATERIAL_ISSUE
   ) {
-    return ['production.material_issue.create']
+    return [PermissionCode.PRODUCTION_MATERIAL_ISSUE_CREATE]
   }
   if (action === OPERATIONAL_FACT_DRAFT_SAVE_ACTIONS.PRODUCTION_COMPLETION) {
-    return ['production.completion.create', 'warehouse.inbound.confirm']
+    return [PermissionCode.PRODUCTION_COMPLETION_CREATE, PermissionCode.WAREHOUSE_INBOUND_CONFIRM]
   }
-  return ['production.rework.create']
+  return [PermissionCode.PRODUCTION_REWORK_CREATE]
 }
 
 export function useProductionFactActions({

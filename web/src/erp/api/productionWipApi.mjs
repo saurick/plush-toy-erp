@@ -1,3 +1,4 @@
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
@@ -9,14 +10,14 @@ import {
 } from '../utils/productionWipModel.mjs'
 
 const rpc = new JsonRpc({
-  url: 'production_wip',
+  url: RpcDomain.PRODUCTION_WIP,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
 
 export async function prepareProductionOutsourcingOrder(params) {
   const value = dataOf(
-    await rpc.call('prepare_production_outsourcing_order', params)
+    await rpc.call(RpcMethod.production_wip.PREPARE_PRODUCTION_OUTSOURCING_ORDER, params)
   )
   if (
     !positiveSafeInteger(value.outsourcing_order_id) ||
@@ -37,7 +38,7 @@ function requireProductionOrderID(value) {
 export async function getProductionWip(productionOrderID, options = {}) {
   const normalizedOrderID = requireProductionOrderID(productionOrderID)
   const result = await rpc.call(
-    'get_production_wip',
+    RpcMethod.production_wip.GET_PRODUCTION_WIP,
     { production_order_id: normalizedOrderID },
     options
   )
@@ -48,7 +49,7 @@ export async function getProductionWip(productionOrderID, options = {}) {
 
 export async function executeProductionWipAction(action, values = {}) {
   const params = buildProductionWipActionParams(action, values)
-  const result = await rpc.call('execute_production_wip_action', params)
+  const result = await rpc.call(RpcMethod.production_wip.EXECUTE_PRODUCTION_WIP_ACTION, params)
   return validateProductionWipAggregate(dataOf(result), {
     productionOrderID: params.production_order_id,
   })

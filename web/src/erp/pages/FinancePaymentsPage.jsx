@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Form, Input, Select, Tag } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
 } from '../components/business-list/BusinessCompactFieldTable.jsx'
@@ -245,28 +246,28 @@ export default function FinancePaymentsPage() {
 
   const canCreatePayment = hasActionPermission(
     adminProfile,
-    'finance.payment.create'
+    PermissionCode.FINANCE_PAYMENT_CREATE
   )
   const canPostPayment = hasActionPermission(
     adminProfile,
-    'finance.payment.post'
+    PermissionCode.FINANCE_PAYMENT_POST
   )
   const canCancelPayment = canCreatePayment
   const canReversePayment = hasActionPermission(
     adminProfile,
-    'finance.payment.reverse'
+    PermissionCode.FINANCE_PAYMENT_REVERSE
   )
   const canCreateCredit = hasActionPermission(
     adminProfile,
-    'finance.credit_note.create'
+    PermissionCode.FINANCE_CREDIT_NOTE_CREATE
   )
   const canReverseCredit = hasActionPermission(
     adminProfile,
-    'finance.credit_note.reverse'
+    PermissionCode.FINANCE_CREDIT_NOTE_REVERSE
   )
   const canRecoverProcess = hasActionPermission(
     adminProfile,
-    'process_runtime.recover'
+    PermissionCode.PROCESS_RUNTIME_RECOVER
   )
 
   const rememberPayment = useCallback(

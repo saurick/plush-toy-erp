@@ -2,6 +2,7 @@ import { AuditOutlined, RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Input, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
@@ -134,16 +135,16 @@ export default function ProductionExceptionDecisionPanel({
   const canRead = canReadProductionExceptionDecisions(adminProfile)
   const canDecide = hasActionPermission(
     adminProfile,
-    'production.exception.approve'
+    PermissionCode.PRODUCTION_EXCEPTION_APPROVE
   )
   const canCancel = hasActionPermission(
     adminProfile,
-    'production.exception.submit'
+    PermissionCode.PRODUCTION_EXCEPTION_SUBMIT
   )
-  const canExecute = hasActionPermission(adminProfile, 'production.fact.post')
+  const canExecute = hasActionPermission(adminProfile, PermissionCode.PRODUCTION_FACT_POST)
   const canRecoverProcess = hasActionPermission(
     adminProfile,
-    'process_runtime.recover'
+    PermissionCode.PROCESS_RUNTIME_RECOVER
   )
   const adminID = Number(adminProfile?.id || 0)
   const customerKey =

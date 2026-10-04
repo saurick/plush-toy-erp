@@ -27,6 +27,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import { IncomingCheckItemsDetails } from '../components/quality-inspections/IncomingCheckItems.jsx'
@@ -376,47 +377,47 @@ export default function QualityInspectionsPage() {
 
   const canCreate = hasActionPermission(
     adminProfile,
-    'quality.inspection.create'
+    PermissionCode.QUALITY_INSPECTION_CREATE
   )
   const canUpdate = hasActionPermission(
     adminProfile,
-    'quality.inspection.update'
+    PermissionCode.QUALITY_INSPECTION_UPDATE
   )
   const canCreatePurchaseReturn = hasActionPermission(
     adminProfile,
-    'purchase.return.create'
+    PermissionCode.PURCHASE_RETURN_CREATE
   )
   const canReadPurchaseReturn = hasActionPermission(
     adminProfile,
-    'purchase.return.read'
+    PermissionCode.PURCHASE_RETURN_READ
   )
   const canPostPurchaseReturn = hasActionPermission(
     adminProfile,
-    'purchase.return.post'
+    PermissionCode.PURCHASE_RETURN_POST
   )
   const canCancelPurchaseReturn = hasActionPermission(
     adminProfile,
-    'purchase.return.cancel'
+    PermissionCode.PURCHASE_RETURN_CANCEL
   )
   const canPostOutsourcingDisposition = hasActionPermission(
     adminProfile,
-    'outsourcing.fact.post'
+    PermissionCode.OUTSOURCING_FACT_POST
   )
   const canCancelOutsourcingDisposition = hasActionPermission(
     adminProfile,
-    'outsourcing.fact.cancel'
+    PermissionCode.OUTSOURCING_FACT_CANCEL
   )
   const canReadOutsourcingDisposition = hasActionPermission(
     adminProfile,
-    'outsourcing.fact.read'
+    PermissionCode.OUTSOURCING_FACT_READ
   )
   const canHandleQualityException = hasActionPermission(
     adminProfile,
-    'quality.exception.handle'
+    PermissionCode.QUALITY_EXCEPTION_HANDLE
   )
   const canSubmitProductionException = hasActionPermission(
     adminProfile,
-    'production.exception.submit'
+    PermissionCode.PRODUCTION_EXCEPTION_SUBMIT
   )
   const canManageOutsourcingDisposition =
     canHandleQualityException ||
@@ -424,13 +425,13 @@ export default function QualityInspectionsPage() {
     canCancelOutsourcingDisposition
   const canReadPurchaseReceipt = hasActionPermission(
     adminProfile,
-    'purchase.receipt.read'
+    PermissionCode.PURCHASE_RECEIPT_READ
   )
   const canReadInventory = hasActionPermission(
     adminProfile,
-    'warehouse.inventory.read'
+    PermissionCode.WAREHOUSE_INVENTORY_READ
   )
-  const canReadShipment = hasActionPermission(adminProfile, 'shipment.read')
+  const canReadShipment = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_READ)
   const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const selectedSourceType = String(
     selectedRow?.source_type || ''

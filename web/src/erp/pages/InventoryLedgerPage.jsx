@@ -25,6 +25,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
@@ -458,15 +459,15 @@ export default function InventoryLedgerPage() {
   }, [adminProfile])
   const canCreateInventoryOperation = hasActionPermission(
     adminProfile,
-    'warehouse.adjustment.create'
+    PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE
   )
   const canApproveInventoryOperation = hasActionPermission(
     adminProfile,
-    'warehouse.adjustment.approve'
+    PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE
   )
   const canRecoverProcess = hasActionPermission(
     adminProfile,
-    'process_runtime.recover'
+    PermissionCode.PROCESS_RUNTIME_RECOVER
   )
   const customerKey = String(
     adminProfile?.effective_session?.customer?.key || ''
@@ -474,13 +475,13 @@ export default function InventoryLedgerPage() {
   const currentAdminID = Number(adminProfile?.id || 0)
   const canReadInventory = hasActionPermission(
     adminProfile,
-    'warehouse.inventory.read'
+    PermissionCode.WAREHOUSE_INVENTORY_READ
   )
-  const canReadMaterials = hasActionPermission(adminProfile, 'material.read')
-  const canReadProducts = hasActionPermission(adminProfile, 'product.read')
+  const canReadMaterials = hasActionPermission(adminProfile, PermissionCode.MATERIAL_READ)
+  const canReadProducts = hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
   const canReadProductSKUs = hasActionPermission(
     adminProfile,
-    'product_sku.read'
+    PermissionCode.PRODUCT_SKU_READ
   )
   const canOpenRelatedPath = useCallback(
     (path) =>
@@ -2290,7 +2291,7 @@ export default function InventoryLedgerPage() {
         }
         actions={
           <Space size={8} wrap>
-            {hasActionPermission(adminProfile, 'warehouse.manage') ? (
+            {hasActionPermission(adminProfile, PermissionCode.WAREHOUSE_MANAGE) ? (
               <Button onClick={() => setWarehouseSettingsOpen(true)}>
                 仓库设置
               </Button>

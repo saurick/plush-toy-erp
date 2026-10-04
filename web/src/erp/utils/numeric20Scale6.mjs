@@ -1,5 +1,8 @@
-const SCALE_DIGITS = 6
-const MAX_UNITS = '99999999999999999999'
+import { NumericContract } from '../../common/consts/numeric.generated.mjs'
+
+const SCALE_DIGITS = NumericContract.scale
+const MAX_UNITS = NumericContract.maxUnits
+const NUMERIC_PATTERN = new RegExp(`^(\\d+)(?:\\.(\\d{1,${SCALE_DIGITS}}))?$`, 'u')
 const ZERO_UNITS = '0'
 
 function numericText(value) {
@@ -12,11 +15,11 @@ function numericText(value) {
 
 export function numeric20Scale6Units(value) {
   const text = numericText(value)
-  const match = /^(\d+)(?:\.(\d{1,6}))?$/u.exec(text)
+  const match = NUMERIC_PATTERN.exec(text)
   if (!match) return null
 
   const integerText = match[1].replace(/^0+(?=\d)/u, '')
-  if (integerText.length > 14) return null
+  if (integerText.length > NumericContract.integerDigits) return null
 
   const units =
     `${integerText}${(match[2] || '').padEnd(SCALE_DIGITS, '0')}`.replace(

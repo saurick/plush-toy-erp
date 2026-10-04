@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+
 import { fileURLToPath } from 'node:url'
 import test, { after } from 'node:test'
+import { readContractSource as readFileSync } from '../../../scripts/test/publicContractSource.mjs'
 
 import * as customerConfigApi from './customerConfigApi.mjs'
 import { installRpcCallHarness } from '../../../scripts/test/rpcApiTestHarness.mjs'

@@ -1,3 +1,5 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
+
 export const WORKFLOW_TASK_BOARD_LANE_KEYS = Object.freeze([
   'actionable',
   'exception',
@@ -6,10 +8,10 @@ export const WORKFLOW_TASK_BOARD_LANE_KEYS = Object.freeze([
 ])
 
 const WORKFLOW_TASK_BOARD_STATUS_KEYS_BY_LANE = Object.freeze({
-  actionable: new Set(['ready']),
-  exception: new Set(['blocked']),
-  due: new Set(['ready']),
-  finished: new Set(['done', 'rejected', 'withdrawn']),
+  actionable: new Set([WorkflowTaskStatus.READY]),
+  exception: new Set([WorkflowTaskStatus.BLOCKED]),
+  due: new Set([WorkflowTaskStatus.READY]),
+  finished: new Set([WorkflowTaskStatus.DONE, WorkflowTaskStatus.REJECTED, WorkflowTaskStatus.WITHDRAWN]),
 })
 
 function isNonNegativeSafeInteger(value) {

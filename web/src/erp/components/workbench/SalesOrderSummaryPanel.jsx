@@ -6,6 +6,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
 import {
@@ -208,7 +209,7 @@ export default function SalesOrderSummaryPanel({
         exportValue: (row) =>
           row.order_category === 'REPEAT' ? '返单' : '新单',
       },
-      ...(hasActionPermission(adminProfile, 'field.sales_commercial.read')
+      ...(hasActionPermission(adminProfile, PermissionCode.FIELD_SALES_COMMERCIAL_READ)
         ? [
             {
               title: '单价',
@@ -219,7 +220,7 @@ export default function SalesOrderSummaryPanel({
             },
             ...(hasActionPermission(
               adminProfile,
-              'field.finance_settlement.read'
+              PermissionCode.FIELD_FINANCE_SETTLEMENT_READ
             )
               ? [{ title: '币种', dataIndex: 'currency', width: 85 }]
               : []),

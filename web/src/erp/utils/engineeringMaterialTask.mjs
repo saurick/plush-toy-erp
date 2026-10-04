@@ -1,3 +1,4 @@
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 
 export const ENGINEERING_MATERIAL_STATUS = Object.freeze({
@@ -10,15 +11,15 @@ export const ENGINEERING_MATERIAL_STATUS = Object.freeze({
 
 export function canReadEngineeringMaterial(profile) {
   return (
-    hasActionPermission(profile, 'engineering.material.read') &&
-    hasActionPermission(profile, 'sales_order.read')
+    hasActionPermission(profile, PermissionCode.ENGINEERING_MATERIAL_READ) &&
+    hasActionPermission(profile, PermissionCode.SALES_ORDER_READ)
   )
 }
 
 export function canListEngineeringMaterial(profile) {
   return (
     canReadEngineeringMaterial(profile) &&
-    hasActionPermission(profile, 'erp.workbench.read') &&
+    hasActionPermission(profile, PermissionCode.ERP_WORKBENCH_READ) &&
     profile?.effective_session?.pages?.includes('global-dashboard') === true
   )
 }
@@ -50,17 +51,17 @@ export function canProcessEngineeringMaterialTask(profile, task) {
 const STAGES = Object.freeze({
   engineering_material_boss_review: [
     'boss',
-    'engineering.material.boss_approve',
+    PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE,
     'boss',
   ],
   engineering_material_finance_review: [
     'finance',
-    'engineering.material.finance_approve',
+    PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE,
     'finance',
   ],
   engineering_material_revision: [
     'engineering',
-    'engineering.material.submit',
+    PermissionCode.ENGINEERING_MATERIAL_SUBMIT,
     'revision',
   ],
 })
@@ -109,16 +110,16 @@ export function getEngineeringMaterialPermissions(profile, task = null) {
         hasActionPermission(profile, permission)
     )
   return {
-    submit: can('engineering.material.submit', 'engineering_material_revision'),
+    submit: can(PermissionCode.ENGINEERING_MATERIAL_SUBMIT, 'engineering_material_revision'),
     boss: can(
-      'engineering.material.boss_approve',
+      PermissionCode.ENGINEERING_MATERIAL_BOSS_APPROVE,
       'engineering_material_boss_review'
     ),
     finance: can(
-      'engineering.material.finance_approve',
+      PermissionCode.ENGINEERING_MATERIAL_FINANCE_APPROVE,
       'engineering_material_finance_review'
     ),
-    purchaseRead: hasActionPermission(profile, 'purchase.order.read'),
+    purchaseRead: hasActionPermission(profile, PermissionCode.PURCHASE_ORDER_READ),
   }
 }
 

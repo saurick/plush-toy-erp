@@ -10,6 +10,7 @@ import React, {
 import { Alert, Button, Space, Tag } from 'antd'
 import { DownloadOutlined, SettingOutlined } from '@ant-design/icons'
 import { useSearchParams } from 'react-router-dom'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
 import {
@@ -161,7 +162,7 @@ export default forwardRef((
         width: 80,
         render: valueOrDash,
       },
-      ...(hasActionPermission(adminProfile, 'field.procurement_commercial.read')
+      ...(hasActionPermission(adminProfile, PermissionCode.FIELD_PROCUREMENT_COMMERCIAL_READ)
         ? [
             {
               title: '单价',
@@ -179,7 +180,7 @@ export default forwardRef((
         align: 'right',
         render: valueOrDash,
       },
-      ...(hasActionPermission(adminProfile, 'field.procurement_commercial.read')
+      ...(hasActionPermission(adminProfile, PermissionCode.FIELD_PROCUREMENT_COMMERCIAL_READ)
         ? [
             {
               title: '加工金额',
@@ -190,7 +191,7 @@ export default forwardRef((
             },
           ]
         : []),
-      ...(hasActionPermission(adminProfile, 'field.finance_settlement.read')
+      ...(hasActionPermission(adminProfile, PermissionCode.FIELD_FINANCE_SETTLEMENT_READ)
         ? [{ title: '币种', dataIndex: 'currency', width: 80 }]
         : []),
       {
@@ -208,7 +209,7 @@ export default forwardRef((
         width: 120,
         render: valueOrDash,
       },
-      ...(hasActionPermission(adminProfile, 'field.party_private.read')
+      ...(hasActionPermission(adminProfile, PermissionCode.FIELD_PARTY_PRIVATE_READ)
         ? [
             {
               title: '委托方电话',

@@ -1,3 +1,4 @@
+import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
@@ -46,14 +47,14 @@ import {
 } from '../utils/operationalFactDraftEdit.mjs'
 
 const operationalFactRpc = new JsonRpc({
-  url: 'operational_fact',
+  url: RpcDomain.OPERATIONAL_FACT,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
 
 export async function listProductionFacts(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'list_production_facts',
+    RpcMethod.operational_fact.LIST_PRODUCTION_FACTS,
     params,
     options
   )
@@ -78,7 +79,7 @@ export async function listProductionOrderMaterialRequirements(
 ) {
   const request = normalizeProductionMaterialRequirementsListRequest(params)
   const result = await operationalFactRpc.call(
-    'list_production_order_material_requirements',
+    RpcMethod.operational_fact.LIST_PRODUCTION_ORDER_MATERIAL_REQUIREMENTS,
     request,
     options
   )
@@ -90,7 +91,7 @@ export async function listProductionOrderMaterialRequirements(
 export async function createProductionCompletionFromOrder(params = {}) {
   const request = normalizeProductionCompletionCreateRequest(params)
   const result = await operationalFactRpc.call(
-    'create_production_completion_from_order',
+    RpcMethod.operational_fact.CREATE_PRODUCTION_COMPLETION_FROM_ORDER,
     request
   )
   return validateProductionCompletionResult(
@@ -102,7 +103,7 @@ export async function createProductionCompletionFromOrder(params = {}) {
 export async function createProductionMaterialIssueFromOrder(params = {}) {
   const request = normalizeProductionMaterialIssueCreateRequest(params)
   const result = await operationalFactRpc.call(
-    'create_production_material_issue_from_order',
+    RpcMethod.operational_fact.CREATE_PRODUCTION_MATERIAL_ISSUE_FROM_ORDER,
     request
   )
   return validateProductionMaterialIssueResult(
@@ -114,7 +115,7 @@ export async function createProductionMaterialIssueFromOrder(params = {}) {
 export async function createProductionReworkFromCompletion(params = {}) {
   const request = normalizeProductionReworkRequest(params)
   const result = await operationalFactRpc.call(
-    'create_production_rework_from_completion',
+    RpcMethod.operational_fact.CREATE_PRODUCTION_REWORK_FROM_COMPLETION,
     request
   )
   return validateProductionReworkResult(
@@ -188,7 +189,7 @@ export async function cancelProductionFact(params = {}) {
 
 export async function listOutsourcingFacts(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'list_outsourcing_facts',
+    RpcMethod.operational_fact.LIST_OUTSOURCING_FACTS,
     params,
     options
   )
@@ -214,7 +215,7 @@ export async function createOutsourcingMaterialIssueFromOrder(params = {}) {
     params
   )
   const result = await operationalFactRpc.call(
-    'create_outsourcing_material_issue_from_order',
+    RpcMethod.operational_fact.CREATE_OUTSOURCING_MATERIAL_ISSUE_FROM_ORDER,
     request
   )
   return validateOutsourcingSourceFactResult(
@@ -233,7 +234,7 @@ export async function createOutsourcingReturnReceiptFromOrder(params = {}) {
     params
   )
   const result = await operationalFactRpc.call(
-    'create_outsourcing_return_receipt_from_order',
+    RpcMethod.operational_fact.CREATE_OUTSOURCING_RETURN_RECEIPT_FROM_ORDER,
     request
   )
   return validateOutsourcingSourceFactResult(
@@ -302,7 +303,7 @@ export async function listOutsourcingReturnDispositions(
   options = {}
 ) {
   const result = await operationalFactRpc.call(
-    'list_outsourcing_return_dispositions',
+    RpcMethod.operational_fact.LIST_OUTSOURCING_RETURN_DISPOSITIONS,
     params,
     options
   )
@@ -311,7 +312,7 @@ export async function listOutsourcingReturnDispositions(
 
 export async function createOutsourcingReturnDisposition(params = {}) {
   const result = await operationalFactRpc.call(
-    'create_outsourcing_return_disposition',
+    RpcMethod.operational_fact.CREATE_OUTSOURCING_RETURN_DISPOSITION,
     params
   )
   return dataOf(result)?.outsourcing_return_disposition || null
@@ -319,7 +320,7 @@ export async function createOutsourcingReturnDisposition(params = {}) {
 
 export async function postOutsourcingReturnDisposition(params = {}) {
   const result = await operationalFactRpc.call(
-    'post_outsourcing_return_disposition',
+    RpcMethod.operational_fact.POST_OUTSOURCING_RETURN_DISPOSITION,
     params
   )
   return dataOf(result)?.outsourcing_return_disposition || null
@@ -327,7 +328,7 @@ export async function postOutsourcingReturnDisposition(params = {}) {
 
 export async function cancelOutsourcingReturnDisposition(params = {}) {
   const result = await operationalFactRpc.call(
-    'cancel_outsourcing_return_disposition',
+    RpcMethod.operational_fact.CANCEL_OUTSOURCING_RETURN_DISPOSITION,
     params
   )
   return dataOf(result)?.outsourcing_return_disposition || null
@@ -335,7 +336,7 @@ export async function cancelOutsourcingReturnDisposition(params = {}) {
 
 export async function listProductionExceptions(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'list_production_exceptions',
+    RpcMethod.operational_fact.LIST_PRODUCTION_EXCEPTIONS,
     params,
     options
   )
@@ -344,7 +345,7 @@ export async function listProductionExceptions(params = {}, options = {}) {
 
 export async function getProductionException(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'get_production_exception',
+    RpcMethod.operational_fact.GET_PRODUCTION_EXCEPTION,
     params,
     options
   )
@@ -353,7 +354,7 @@ export async function getProductionException(params = {}, options = {}) {
 
 export async function submitProductionException(params = {}) {
   const result = await operationalFactRpc.call(
-    'submit_production_exception',
+    RpcMethod.operational_fact.SUBMIT_PRODUCTION_EXCEPTION,
     params
   )
   return dataOf(result)?.production_exception || null
@@ -366,21 +367,21 @@ async function productionExceptionResult(method, params) {
 export async function cancelProductionException(params = {}) {
   return productionExceptionResult(
     (request) =>
-      operationalFactRpc.call('cancel_production_exception', request),
+      operationalFactRpc.call(RpcMethod.operational_fact.CANCEL_PRODUCTION_EXCEPTION, request),
     params
   )
 }
 export async function reverseProductionException(params = {}) {
   return productionExceptionResult(
     (request) =>
-      operationalFactRpc.call('reverse_production_exception', request),
+      operationalFactRpc.call(RpcMethod.operational_fact.REVERSE_PRODUCTION_EXCEPTION, request),
     params
   )
 }
 
 export async function listShipments(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'list_shipments',
+    RpcMethod.operational_fact.LIST_SHIPMENTS,
     params,
     options
   )
@@ -388,7 +389,7 @@ export async function listShipments(params = {}, options = {}) {
 }
 
 export async function getShipment(params = {}, options = {}) {
-  const result = await operationalFactRpc.call('get_shipment', params, options)
+  const result = await operationalFactRpc.call(RpcMethod.operational_fact.GET_SHIPMENT, params, options)
   return dataOf(result)?.shipment || null
 }
 
@@ -401,7 +402,7 @@ export async function listAllShipments(params = {}, options = {}) {
 export async function listShipmentSourceCandidates(params = {}, options = {}) {
   const request = { limit: 50, offset: 0, ...params }
   const result = await operationalFactRpc.call(
-    'list_shipment_source_candidates',
+    RpcMethod.operational_fact.LIST_SHIPMENT_SOURCE_CANDIDATES,
     request,
     options
   )
@@ -410,30 +411,30 @@ export async function listShipmentSourceCandidates(params = {}, options = {}) {
 
 export async function createShipmentWithItems(params = {}) {
   const result = await operationalFactRpc.call(
-    'create_shipment_with_items',
+    RpcMethod.operational_fact.CREATE_SHIPMENT_WITH_ITEMS,
     params
   )
   return dataOf(result)?.shipment || null
 }
 
 export async function saveShipmentDraft(params = {}) {
-  const result = await operationalFactRpc.call('save_shipment_draft', params)
+  const result = await operationalFactRpc.call(RpcMethod.operational_fact.SAVE_SHIPMENT_DRAFT, params)
   return dataOf(result)?.shipment || null
 }
 
 export async function shipShipment(params = {}) {
-  const result = await operationalFactRpc.call('ship_shipment', params)
+  const result = await operationalFactRpc.call(RpcMethod.operational_fact.SHIP_SHIPMENT, params)
   return dataOf(result)?.shipment || null
 }
 
 export async function cancelShipment(params = {}) {
-  const result = await operationalFactRpc.call('cancel_shipment', params)
+  const result = await operationalFactRpc.call(RpcMethod.operational_fact.CANCEL_SHIPMENT, params)
   return dataOf(result)?.shipment || null
 }
 
 export async function listStockReservations(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'list_stock_reservations',
+    RpcMethod.operational_fact.LIST_STOCK_RESERVATIONS,
     params,
     options
   )
@@ -454,7 +455,7 @@ export async function listAllStockReservations(params = {}, options = {}) {
 
 export async function createStockReservationFromSalesOrder(params = {}) {
   const result = await operationalFactRpc.call(
-    'create_stock_reservation_from_sales_order',
+    RpcMethod.operational_fact.CREATE_STOCK_RESERVATION_FROM_SALES_ORDER,
     params
   )
   return dataOf(result)?.stock_reservation || null
@@ -462,7 +463,7 @@ export async function createStockReservationFromSalesOrder(params = {}) {
 
 export async function releaseStockReservation(params = {}) {
   const result = await operationalFactRpc.call(
-    'release_stock_reservation',
+    RpcMethod.operational_fact.RELEASE_STOCK_RESERVATION,
     params
   )
   return dataOf(result)?.stock_reservation || null
@@ -470,7 +471,7 @@ export async function releaseStockReservation(params = {}) {
 
 export async function listFinanceFacts(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'list_finance_facts',
+    RpcMethod.operational_fact.LIST_FINANCE_FACTS,
     params,
     options
   )
@@ -491,7 +492,7 @@ export async function listAllFinanceFacts(params = {}, options = {}) {
 
 export async function createReceivableFromShipment(params = {}) {
   const result = await operationalFactRpc.call(
-    'create_receivable_from_shipment',
+    RpcMethod.operational_fact.CREATE_RECEIVABLE_FROM_SHIPMENT,
     params
   )
   return dataOf(result)?.finance_fact || null
@@ -499,7 +500,7 @@ export async function createReceivableFromShipment(params = {}) {
 
 export async function createInvoiceFromShipment(params = {}) {
   const result = await operationalFactRpc.call(
-    'create_invoice_from_shipment',
+    RpcMethod.operational_fact.CREATE_INVOICE_FROM_SHIPMENT,
     params
   )
   return dataOf(result)?.finance_fact || null
@@ -508,7 +509,7 @@ export async function createInvoiceFromShipment(params = {}) {
 export async function createPayableFromPurchaseReceipt(params = {}) {
   const request = normalizePurchaseReceiptPayableRequest(params)
   const result = await operationalFactRpc.call(
-    'create_payable_from_purchase_receipt',
+    RpcMethod.operational_fact.CREATE_PAYABLE_FROM_PURCHASE_RECEIPT,
     request
   )
   return validatePurchaseReceiptPayableResult(
@@ -520,7 +521,7 @@ export async function createPayableFromPurchaseReceipt(params = {}) {
 export async function createPayableFromOutsourcingReturn(params = {}) {
   const request = normalizeOutsourcingReturnPayableRequest(params)
   const result = await operationalFactRpc.call(
-    'create_payable_from_outsourcing_return',
+    RpcMethod.operational_fact.CREATE_PAYABLE_FROM_OUTSOURCING_RETURN,
     request
   )
   return validateOutsourcingReturnPayableResult(
@@ -532,7 +533,7 @@ export async function createPayableFromOutsourcingReturn(params = {}) {
 export async function createReconciliationFromFinanceFact(params = {}) {
   const request = normalizeSingleFactReconciliationRequest(params)
   const result = await operationalFactRpc.call(
-    'create_reconciliation_from_finance_fact',
+    RpcMethod.operational_fact.CREATE_RECONCILIATION_FROM_FINANCE_FACT,
     request
   )
   return validateSingleFactReconciliationResult(
@@ -551,18 +552,18 @@ export async function postFinanceFact(params = {}) {
 }
 
 export async function createFinancePayment(params = {}) {
-  const result = await operationalFactRpc.call('create_finance_payment', params)
+  const result = await operationalFactRpc.call(RpcMethod.operational_fact.CREATE_FINANCE_PAYMENT, params)
   return dataOf(result)?.payment || null
 }
 
 export async function cancelFinancePayment(params = {}) {
-  const result = await operationalFactRpc.call('cancel_finance_payment', params)
+  const result = await operationalFactRpc.call(RpcMethod.operational_fact.CANCEL_FINANCE_PAYMENT, params)
   return dataOf(result)?.payment || null
 }
 
 export async function reverseFinancePayment(params = {}) {
   const result = await operationalFactRpc.call(
-    'reverse_finance_payment',
+    RpcMethod.operational_fact.REVERSE_FINANCE_PAYMENT,
     params
   )
   return dataOf(result)?.payment || null
@@ -570,7 +571,7 @@ export async function reverseFinancePayment(params = {}) {
 
 export async function getFinancePayment(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'get_finance_payment',
+    RpcMethod.operational_fact.GET_FINANCE_PAYMENT,
     params,
     options
   )
@@ -579,7 +580,7 @@ export async function getFinancePayment(params = {}, options = {}) {
 
 export async function listFinancePayments(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'list_finance_payments',
+    RpcMethod.operational_fact.LIST_FINANCE_PAYMENTS,
     params,
     options
   )
@@ -600,7 +601,7 @@ export async function listAllFinancePayments(params = {}, options = {}) {
 
 export async function createFinanceCreditNote(params = {}) {
   const result = await operationalFactRpc.call(
-    'create_finance_credit_note',
+    RpcMethod.operational_fact.CREATE_FINANCE_CREDIT_NOTE,
     params
   )
   return dataOf(result)?.credit_note || null
@@ -608,7 +609,7 @@ export async function createFinanceCreditNote(params = {}) {
 
 export async function getFinanceCreditNote(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'get_finance_credit_note',
+    RpcMethod.operational_fact.GET_FINANCE_CREDIT_NOTE,
     params,
     options
   )
@@ -617,7 +618,7 @@ export async function getFinanceCreditNote(params = {}, options = {}) {
 
 export async function listFinanceCreditNotes(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
-    'list_finance_credit_notes',
+    RpcMethod.operational_fact.LIST_FINANCE_CREDIT_NOTES,
     params,
     options
   )
@@ -638,7 +639,7 @@ export async function listAllFinanceCreditNotes(params = {}, options = {}) {
 
 export async function reverseFinanceCreditNote(params = {}) {
   const result = await operationalFactRpc.call(
-    'reverse_finance_credit_note',
+    RpcMethod.operational_fact.REVERSE_FINANCE_CREDIT_NOTE,
     params
   )
   return dataOf(result)?.credit_note || null
@@ -655,7 +656,7 @@ export async function settleFinanceFact(params = {}) {
 
 export async function cancelFinanceFact(params = {}) {
   const request = normalizeFinanceCancellationRequest(params)
-  const result = await operationalFactRpc.call('cancel_finance_fact', request)
+  const result = await operationalFactRpc.call(RpcMethod.operational_fact.CANCEL_FINANCE_FACT, request)
   return validateFinanceCancellationResult(
     dataOf(result)?.finance_fact,
     request

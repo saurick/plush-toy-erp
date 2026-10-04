@@ -1,5 +1,6 @@
 import React from 'react'
 import { Button } from 'antd'
+import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { getEngineeringMaterialRequest } from '../../api/masterDataOrderApi.mjs'
 import {
   canReadEngineeringMaterial,
@@ -133,7 +134,7 @@ export default function WorkflowTaskHandlingChain({
       {state === 'ready' && current?.model ? (
         <EngineeringMaterialPurchaseOrders
           request={current.request}
-          canOpen={variant !== 'mobile' && hasActionPermission(profile, 'purchase.order.read')}
+          canOpen={variant !== 'mobile' && hasActionPermission(profile, PermissionCode.PURCHASE_ORDER_READ)}
         />
       ) : null}
       {materialTask && !processLinked && (!source || !canRead) ? (
