@@ -22,7 +22,7 @@
 | `node --test scripts/qa/ci-job-guide.test.mjs` | 校验每个正式 push-CI Job 都有一份简短用途说明；说明源不保存依赖、状态、耗时、等待或历史，未知 Job 只标记“说明待登记”并继续投影 | 新增、删除、改名或拆分 GitLab CI Job 时 |
 | `bash scripts/qa/fast.sh` | 跨模块基础检查集合，运行显式 `fast` Node 测试组，并覆盖文档清单、客户配置、菜单、Web 静态检查和 server quick；阶段编号只由 affected 扫描本次变更文件 | 需要跨模块基础验证时；小改优先 affected / 定向测试 |
 | `node scripts/qa/yoyoosun-role-jsonrpc-access.mjs --report output/qa/yoyoosun-role-jsonrpc-access/report.json` | 使用九岗位演示账号真实登录，逐岗验证允许读取、越权写入被拒绝和前后任务总量不串权；凭据只从服务端进程环境读取，预期业务写入为零，不等于完整角色协同闭环 | 本地后端与演示账号凭据就绪后 |
-| `bash scripts/qa/prepare-push.sh` | 默认仅对单一 `origin/main` 签发 30 分钟 `server-ci` 回执：复算 affected 风险，但本地只运行 remote/ref/range、git-log、严格 secrets 与源码完整性短门禁；高成本测试/构建由 GitLab exact-SHA CI 执行。非标准目标保持 affected/full 保守合同 | commit 后、立即 push 前 |
+| `bash scripts/qa/prepare-push.sh` | 默认对单一 `origin/main` 执行 remote/ref/range、git-log、严格 secrets、源码完整性和 affected 定向 Node 检查，通过后签发 30 分钟 `server-ci` 回执；高成本测试/构建由 GitLab exact-SHA CI 执行。非标准目标保持 affected/full 保守合同 | commit 后、立即 push 前 |
 | `bash scripts/qa/prepare-push.sh --full` | 经明确授权的本地完整诊断；完整执行 full，并在前后身份和容器清理读回一致后签发短期回执，不作为默认 `origin/main` 的前置步骤 | full 已明确确认、需要独立本地诊断时 |
 | `node scripts/qa/skill-health.mjs` | 检查项目 Skill frontmatter、目录名、metadata、README 索引和相对引用；`affected` 对 Skill 变更会直接执行，不再只提示 follow-up | 修改 `.agents/skills/**` 后 |
 | `node scripts/qa/test-code-governance.mjs` | 盘点测试文件、行数、测试文件直接读取，以及仓库 JS / TS 中的源码改写执行；大文件只报告不按行数阻断，既有源码改写执行使用 shrink-only 清单，新增或清单已失效都会失败 | 新增测试基础设施、源码沙箱或治理测试债务后 |
@@ -121,7 +121,9 @@ GitLab CI 的 Playwright 运行包固定为 `playwright 1.63.0 / Chromium 153.0.
 
 `populated-upgrade-preflight.sh` 只接受 `populated-upgrade`、`customer-config-cutover` 和 `database-constraints` 三个 audit key，并把 DSN 仅从调用方指定的环境变量传给 `psql`。第一项检查 20260714055504 的状态、生命周期、取消审计束、流程锚点、版本和待删除时间字段，同时检查 WIP `20260717035245 -> 20260717043625` 委外关联切换：旧列仍有链接时阻断删除，切换后活动外发批次缺少 durable allocation 时也阻断；第二项检查 20260714055825 前必须显式治理的流程运行态与任务配置锚点；第三项在关键数据库约束收紧前只读核对现有约束和存量数据，任何不满足项都 fail closed。三项都使用 read-only 事务，不能修复或清理生产数据；出现 blocker 后必须停止 apply，由单独评审的治理动作处理，完成后重跑审计。
 
-直接运行 full / strict 时，任何 `SKIP_*`、`STRICT_SKIP_*` 或调用者提供的旧 coverage 变量都会得到 `incomplete` 并失败；full 始终真实执行 secrets 与 govulncheck，不接受普通调用者自签 JSON 作为前序成功证明。默认单一 `origin/main` 的普通 `prepare-push` 只签发 `server-ci` 回执：保留聚合范围风险计划、数据库 guard、remote URL、live checks 和 gate-tree 指纹，但只执行 git-log 与严格 secrets；pre-push hook 在连接后按真实 stdin 重算并再执行同一短门禁。其他 remote/ref、多 ref 与显式 `--full` 保持 affected/full 保守合同。普通新 remote ref 的聚合范围固定为 `empty-tree..HEAD`，仍实际进入 affected / DB guard，不能消费 `server-ci` 回执。
+直接运行 full / strict 时，任何 `SKIP_*`、`STRICT_SKIP_*` 或调用者提供的旧 coverage 变量都会得到 `incomplete` 并失败；full 始终真实执行 secrets 与 govulncheck，不接受普通调用者自签 JSON 作为前序成功证明。默认单一 `origin/main` 的普通 `prepare-push` 签发 `server-ci` 回执：保留聚合范围风险计划、数据库 guard、remote URL、live checks 和 gate-tree 指纹，执行 git-log、严格 secrets 和下述定向 Node 检查。pre-push hook 在连接后按真实 stdin 重算回执身份与检查清单，再执行 git-log / secrets；同一有效回执覆盖的定向测试不重复运行。其他 remote/ref、多 ref 与显式 `--full` 保持 affected/full 保守合同。普通新 remote ref 的聚合范围固定为 `empty-tree..HEAD`，仍实际进入 affected / DB guard，不能消费 `server-ci` 回执。
+
+定向检查由 affected 在同一计划中选择：复用现有 fast Node 分组，仅运行受影响的 fast 测试、改动或同名 `web/src/**` 测试；前端源码或 Vite 配置变化时补 DEV 隔离合同，CI 实现、分组、门禁入口或 Runner 配置变化时补 GitLab / Job 说明合同。即使开发期计划升级为 full，短检查清单也保留。此入口不执行数据库、浏览器、发布或资源敏感分组，不扩大到全部 Web 测试、构建或业务浏览器。检查固定最多 4 个文件并发、整批 120 秒截止；超时中止本次检查进程组并失败，不自动重试或放行。缺 summary、零执行、失败、skip 或前后源码 / 环境 / 远端范围漂移均不签发回执。清单、并发和截止时间绑定计划、签名与 gate-tree 合同，旧合同回执不能覆盖新增检查。
 
 同一次 `prepare-push` 的远端 ref 读回每次尝试都受 20 秒硬超时约束，只对明确的超时、断连、拒绝连接、网络不可达和临时 DNS 失败做最多两次短间隔重试；权限、仓库、ref、响应合同及其他错误立即失败。三次尝试仍不可读时形成该次调用的终态失败，不补跑同一 SHA 的 affected/full，也不得绕过 pre-push hook。
 
@@ -860,7 +862,7 @@ make purchase_return_pg_test
 - 只有选定 profile 的门禁成功，且前后 HEAD/tree、worktree、remote/ref、gate contract 和关键工具/依赖环境均未变化时，才在 `git rev-parse --git-common-dir` 下按 worktree 隔离签发 HMAC 回执；采用并发锁、私有权限、同目录临时文件和原子 rename。
 - 环境指纹只归一化 Git 启动 hook 时自动添加在 `PATH` 首部的 `git --exec-path`；其他 `PATH`、工具版本、依赖元数据、数据库 / 浏览器门禁参数或代理环境变化仍会使回执失效。
 - 并发 owner 仍存活、owner 信息不可读或 PID 状态不确定时锁保持 fail closed；只有带脚本 token 且 owner PID 已确认不存在的中断残留锁会被原子隔离并清理。
-- hook 必须读取真实 push stdin，重算 refs/aggregate range、签名内数据库守卫及 live-check 合同，复核 local SHA 等于 HEAD、clean 状态、回执签名/profile/version/environment/TTL，并实时执行 `git log --check` 和严格 secrets。精确的首次同名镜像只把已验证 upstream..HEAD 用于提交空白检查，严格 secrets 仍扫描新 ref 暴露的完整历史；其他 ref 继续使用原 push range。纯删除/空 stdin 是 no-op，混合删除与更新 fail closed；调用者不能通过 `QA_BASE_RANGE`、`QA_DB_GUARD_RANGE` 或自定义 live range 覆盖准备合同。
+- hook 必须读取真实 push stdin，重算 refs/aggregate range、签名内数据库守卫、live-check 合同及定向检查清单、并发和截止时间，复核 local SHA 等于 HEAD、clean 状态、回执签名/profile/version/environment/TTL，并实时执行 `git log --check` 和严格 secrets。精确的首次同名镜像只把已验证 upstream..HEAD 用于提交空白检查，严格 secrets 仍扫描新 ref 暴露的完整历史；其他 ref 继续使用原 push range。纯删除/空 stdin 是 no-op，混合删除与更新 fail closed；调用者不能通过 `QA_BASE_RANGE`、`QA_DB_GUARD_RANGE` 或自定义 live range 覆盖准备合同。
 - 缺失、过期、远端漂移或任何代码/依赖/migration/测试/门禁/环境变化都会拒绝复用；hook 不回退到 full，因此不会在已经打开的 SSH 连接上长时间等待。`SKIP_PRE_PUSH`、`--no-verify`、调用者指定的 range、回执路径/token/TTL 都不是常规接口。
 
 

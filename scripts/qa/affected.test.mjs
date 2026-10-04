@@ -42,6 +42,64 @@ async function withSourceFixture(files, callback) {
   }
 }
 
+test("affected: short push checks select named web tests without reader expansion", async () => {
+  await withSourceFixture(
+    {
+      "web/src/amount.mjs": "export const amount = 1;",
+      "web/src/amount.test.mjs": "import './amount.mjs';",
+      "web/src/order.mjs": "import './amount.mjs';",
+      "web/src/order.test.mjs": "import './order.mjs';",
+      "web/src/scanner.test.mjs": "import fs from 'node:fs';",
+    },
+    (root) => {
+      const plan = buildAffectedPlan(["web/src/amount.mjs"], { root });
+      assert.deepEqual(plan.prePushNodeTests, [
+        "scripts/qa/dev-workbench-boundary.test.mjs",
+        "web/src/amount.test.mjs",
+      ]);
+      assert(selectedTests(plan).includes("web/src/scanner.test.mjs"));
+      assert(selectedTests(plan).includes("web/src/order.test.mjs"));
+      const explicit = buildAffectedPlan(["web/src/order.test.mjs"], { root });
+      assert(explicit.prePushNodeTests.includes("web/src/order.test.mjs"));
+      const deleted = buildAffectedPlan(["web/src/removed.test.mjs"], { root });
+      assert.deepEqual(deleted.prePushNodeTests, [
+        "scripts/qa/dev-workbench-boundary.test.mjs",
+      ]);
+    },
+  );
+});
+
+test("affected: short push checks retain CI contracts when full subsumes the plan", () => {
+  const plan = buildAffectedPlan(
+    [".gitlab-ci.yml", "deployments/yoyoosun/compose.yml", "scripts/qa/ci-quality-shard.mjs"],
+    { root: ROOT },
+  );
+  assert.equal(plan.localGate, "full");
+  assert.deepEqual(plan.prePushNodeTests, [
+    "scripts/qa/ci-job-guide.test.mjs",
+    "scripts/qa/ci-quality-shard.test.mjs",
+    "scripts/qa/gitlab-ci.test.mjs",
+  ]);
+  assert(ids(plan).includes("full"));
+  assert(!ids(plan).some((id) => id.startsWith("node-tests:")));
+});
+
+test("affected: short push checks reuse fast classification and exclude costly groups", () => {
+  for (const file of [
+    "scripts/qa/critical-postgres-gate.test.mjs",
+    "scripts/qa/manual-acceptance-browser.test.mjs",
+    "scripts/deploy/bootstrap-production-admin.runtime.test.mjs",
+    "scripts/qa/pre-push-receipt.test.mjs",
+    "docs/product/自动化测试策略.md",
+  ]) {
+    assert.deepEqual(buildAffectedPlan([file], { root: ROOT }).prePushNodeTests, [], file);
+  }
+  const file = "scripts/qa/run-test-gate.test.mjs";
+  assert.deepEqual(buildAffectedPlan([file], { root: ROOT }).prePushNodeTests, [file]);
+  const ciTest = "scripts/qa/gitlab-ci.test.mjs";
+  assert.deepEqual(buildAffectedPlan([ciTest], { root: ROOT }).prePushNodeTests, [ciTest]);
+});
+
 test("affected: help explains the server-CI trust boundary", () => {
   const output = execFileSync(
     process.execPath,

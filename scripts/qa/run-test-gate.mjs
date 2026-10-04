@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -72,6 +72,7 @@ export function parseArgs(argv) {
     label: "",
     excludedSkipPattern: "",
     outputMode: "full",
+    timeoutMs: 0,
   };
   let excludedSkipPatternSeen = false;
   let outputModeSeen = false;
@@ -105,6 +106,16 @@ export function parseArgs(argv) {
       }
       options.outputMode = value;
       outputModeSeen = true;
+      continue;
+    }
+    if (arg === "--timeout-ms") {
+      if (options.timeoutMs) throw new Error("--timeout-ms may be provided only once");
+      const value = argv[++index];
+      const timeoutMs = Number(value);
+      if (!/^[1-9]\d*$/u.test(value || "") || !Number.isSafeInteger(timeoutMs) || timeoutMs > 3_600_000 || index >= separator) {
+        throw new Error("--timeout-ms must be an integer from 1 to 3600000");
+      }
+      options.timeoutMs = timeoutMs;
       continue;
     }
     throw new Error(`unsupported argument: ${arg}`);
@@ -148,9 +159,59 @@ export async function emitCapturedOutput(
   if (stderr) await write(process.stderr, stderr);
 }
 
+function runWithDeadline(options) {
+  return new Promise((resolve) => {
+    const child = spawn(options.command, options.args, {
+      cwd: process.cwd(),
+      env: process.env,
+      detached: process.platform !== "win32",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const output = { stdout: [], stderr: [] };
+    const sizes = { stdout: 0, stderr: 0 };
+    let error;
+    const stop = (reason) => {
+      error ||= new Error(reason);
+      if (!child.pid) return;
+      try {
+        if (process.platform === "win32") child.kill("SIGKILL");
+        else process.kill(-child.pid, "SIGKILL");
+      } catch (killError) {
+        if (killError.code !== "ESRCH") error = killError;
+      }
+    };
+    const interrupted = () => stop("test command interrupted");
+    process.once("SIGINT", interrupted);
+    process.once("SIGTERM", interrupted);
+    const timer = setTimeout(
+      () => stop(`test command timed out after ${options.timeoutMs}ms`),
+      options.timeoutMs,
+    );
+    for (const stream of ["stdout", "stderr"]) {
+      child[stream].on("data", (chunk) => {
+        sizes[stream] += chunk.length;
+        if (sizes[stream] > 256 * 1024 * 1024) stop("test output exceeded maxBuffer");
+        else output[stream].push(chunk);
+      });
+    }
+    child.on("error", (cause) => { error = cause; });
+    child.on("close", (status) => {
+      clearTimeout(timer);
+      process.removeListener("SIGINT", interrupted);
+      process.removeListener("SIGTERM", interrupted);
+      resolve({
+        status,
+        error,
+        stdout: Buffer.concat(output.stdout).toString("utf8"),
+        stderr: Buffer.concat(output.stderr).toString("utf8"),
+      });
+    });
+  });
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  const child = spawnSync(options.command, options.args, {
+  const child = options.timeoutMs ? await runWithDeadline(options) : spawnSync(options.command, options.args, {
     cwd: process.cwd(),
     encoding: "utf8",
     env: process.env,

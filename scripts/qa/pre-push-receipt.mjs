@@ -42,13 +42,14 @@ import { collectGitChangedFiles } from "./lib/git-range.mjs";
 export const PRE_PUSH_RECEIPT_CONTRACT = "plush.pre-push-receipt/v6";
 export const PRE_PUSH_RECEIPT_TTL_MS = 30 * 60 * 1000;
 export const PRE_PUSH_ENVIRONMENT_CONTRACT = "plush.pre-push-environment/v2";
-export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v5";
+export const PRE_PUSH_GATE_CONTRACT = "plush.pre-push-gate-tree/v6";
 export const PRE_PUSH_SIGNATURE_CONTRACT = "hmac-sha256/v1";
 export const REMOTE_REF_QUERY_TIMEOUT_MS = 20_000;
 
 const ZERO_SHA = "0000000000000000000000000000000000000000";
 const LIVE_PUSH_CHECKS_CONTRACT = "plush.live-push-checks/v1";
 const SERVER_CI_REQUIRED_CONTRACT = "plush.server-ci-required/v1";
+const LOCAL_NODE_CHECKS_CONTRACT = "plush.pre-push-local-node-checks/v1";
 const CANONICAL_GITLAB_REMOTE = "origin";
 const CANONICAL_GITLAB_REF = "refs/heads/main";
 const CLOCK_SKEW_MS = 30_000;
@@ -637,6 +638,7 @@ function resolvePreparationPlan(root, options) {
 function affectedPlanEvidence(plan) {
   return {
     changedFiles: plan.changedFiles,
+    prePushNodeTests: plan.prePushNodeTests,
     affectedScopes: plan.affectedScopes,
     maxAffectedScope: plan.maxAffectedScope,
     localGate: plan.localGate,
@@ -704,6 +706,14 @@ export function resolvePrePushGateDecision(
     pushPlan,
     allowServerCi && !forceFull,
   );
+  const localNodeChecks = serverCiRequired
+    ? Object.freeze({
+        contract: LOCAL_NODE_CHECKS_CONTRACT,
+        tests: Object.freeze([...affectedPlan.prePushNodeTests]),
+        concurrency: 4,
+        timeoutMs: 120_000,
+      })
+    : null;
   const selectedGate = serverCiRequired
     ? {
         ...selection,
@@ -717,6 +727,7 @@ export function resolvePrePushGateDecision(
     databaseGuard,
     liveChecks,
     serverCiRequired,
+    localNodeChecks,
     changedFileCount: changedFiles.length,
     planSha256: sha256(
       stableStringify({
@@ -724,6 +735,7 @@ export function resolvePrePushGateDecision(
         databaseGuard,
         liveChecks,
         serverCiRequired,
+        localNodeChecks,
       }),
     ),
   });
@@ -940,6 +952,7 @@ export function gateContractFingerprint(root, head, gateDecision) {
     databaseGuard: gateDecision.databaseGuard,
     liveChecks: gateDecision.liveChecks,
     serverCiRequired: gateDecision.serverCiRequired,
+    localNodeChecks: gateDecision.localNodeChecks,
     gates:
       gateDecision.profile === "full"
         ? GATE_PROFILES.full
@@ -948,6 +961,7 @@ export function gateContractFingerprint(root, head, gateDecision) {
               "server-ci-required",
               "exact-sha-ci-gate",
               "source-integrity",
+              "local-node-checks",
               "git-log-check",
               "live-range-secrets",
             ]
@@ -1231,6 +1245,8 @@ function validateReceipt({
       stableStringify(gateDecision.liveChecks) ||
     stableStringify(receipt?.gate?.serverCiRequired) !==
       stableStringify(gateDecision.serverCiRequired) ||
+    stableStringify(receipt?.gate?.localNodeChecks) !==
+      stableStringify(gateDecision.localNodeChecks) ||
     receipt?.gate?.deliveryEligible !== true
   ) {
     throw new ReceiptError("receipt_profile_mismatch");
@@ -1299,6 +1315,7 @@ function makeReceipt({
       databaseGuard: gateDecision.databaseGuard,
       liveChecks: gateDecision.liveChecks,
       serverCiRequired: gateDecision.serverCiRequired,
+      localNodeChecks: gateDecision.localNodeChecks,
       deliveryEligible: true,
       contract: PRE_PUSH_GATE_CONTRACT,
       sha256:
@@ -1472,6 +1489,7 @@ export function preparePush(root, options, { env = process.env } = {}) {
         label,
         gateDecision: initialGateDecision,
       });
+      runLocalNodeChecks(root, initialGateDecision.localNodeChecks, env);
     } else if (initialGateDecision.profile === "full") {
       runCommand(
         "node",
@@ -1570,6 +1588,42 @@ export function preparePush(root, options, { env = process.env } = {}) {
     }
     releaseLock();
   }
+}
+
+function runLocalNodeChecks(root, checks, env) {
+  if (checks.tests.length === 0) {
+    console.log("[qa:prepare-push] local_node_checks=not_applicable files=0");
+    return;
+  }
+  console.log(
+    `[qa:prepare-push] 定向 Node 检查 files=${checks.tests.length} concurrency=${checks.concurrency} timeout_ms=${checks.timeoutMs}`,
+  );
+  runCommand(
+    "node",
+    [
+      path.join(root, "scripts/qa/run-test-gate.mjs"),
+      "--kind",
+      "node",
+      "--label",
+      "pre-push-local",
+      "--output-mode",
+      "summary",
+      "--timeout-ms",
+      String(checks.timeoutMs),
+      "--",
+      "node",
+      "--test",
+      "--test-reporter=tap",
+      `--test-concurrency=${checks.concurrency}`,
+      ...checks.tests,
+    ],
+    {
+      cwd: root,
+      env: { ...env, GIT_OPTIONAL_LOCKS: "0" },
+      inherit: true,
+      reason: "local_node_checks_failed",
+    },
+  );
 }
 
 function runLivePushChecks(
@@ -1710,7 +1764,8 @@ function printHelp() {
 
 说明:
   默认 origin refs/heads/main -> refs/heads/main 普通推送会在连接前校验 clean HEAD/tree、
-  真实 remote/ref/range、git log、strict secrets 与 source-integrity，并签发 server-ci
+  真实 remote/ref/range、git log、strict secrets、source-integrity 与 affected 定向 Node 检查，
+  通过后签发 server-ci
   回执；高成本门禁交由 GitLab exact-SHA CI。回执只授权普通非强制 push；
   release、package promotion 或 protected deploy 必须等待同一 exact SHA 的
   terminal-success CI Gate。显式 --full 与任何非规范目标仍保守处理。

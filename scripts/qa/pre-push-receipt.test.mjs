@@ -90,6 +90,9 @@ function installRealReceiptFiles(root) {
     "scripts/qa/pre-push-receipt.mjs",
     "scripts/qa/prepare-push.sh",
     "scripts/qa/run-gate-with-receipt.mjs",
+    "scripts/qa/run-test-gate.mjs",
+    "scripts/qa/verify-go-test-json.mjs",
+    "scripts/qa/verify-node-test-summary.mjs",
     "scripts/qa/lib/git-range.mjs",
     "scripts/qa/lib/repository-identity.mjs",
     "scripts/git-hooks/pre-push.sh",
@@ -108,7 +111,7 @@ function installGateStubs(root) {
     path.join(root, "scripts/qa/affected.mjs"),
     `#!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { appendFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -117,6 +120,9 @@ export function buildAffectedPlan(files) {
   const focused = changedFiles.length > 0 && changedFiles.every((file) => file.endsWith(".md"));
   return {
     changedFiles,
+    prePushNodeTests: changedFiles
+      .flatMap((file) => file.endsWith(".test.mjs") ? [file] : file.startsWith("web/src/") && file.endsWith(".mjs") ? [file.replace(/\\.mjs$/u, ".test.mjs")] : [])
+      .filter((file) => existsSync(file)),
     affectedScopes: focused ? ["T0", "T1"] : ["T0"],
     maxAffectedScope: focused ? "T1" : "T0",
     commands: focused
@@ -216,6 +222,7 @@ function cleanEnvironment(overrides = {}) {
     "MUTATE_REMOTE",
     "FAIL_RANGE",
     "QA_BROWSER_SCENARIOS",
+    "NODE_TEST_CONTEXT",
   ]) {
     if (!(key in overrides)) delete env[key];
   }
@@ -564,6 +571,105 @@ test("canonical high-risk changes keep the full recommendation but run on server
       existsSync(gitStateFile(fixture.root, "affected-ranges.txt")),
       false,
     );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+const LOCAL_TEST_PATH = "web/src/local-check.test.mjs";
+const LOCAL_TEST_SOURCE = `import assert from "node:assert/strict";
+import { appendFileSync, writeFileSync } from "node:fs";
+import test from "node:test";
+
+test("local push candidate", { skip: process.env.LOCAL_SKIP === "1" }, () => {
+  appendFileSync(".git/local-node-runs.txt", "executed\\n");
+  if (process.env.LOCAL_DIRTY === "1") writeFileSync("local-dirty.txt", "dirty\\n");
+  assert.notEqual(process.env.LOCAL_FAIL, "1", "candidate failed");
+});
+`;
+
+test("canonical prepare runs real local tests once and signs their selection", () => {
+  const fixture = createFixture({
+    changePath: LOCAL_TEST_PATH,
+    baseContent: LOCAL_TEST_SOURCE,
+    headContent: `${LOCAL_TEST_SOURCE}\n// candidate\n`,
+  });
+  try {
+    const env = cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" });
+    const prepared = runPrepare(fixture.root, [], env);
+    assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
+    assert.match(prepared.stdout, /label=pre-push-local status=complete tests=1 pass=1 fail=0 skipped=0/u);
+    const receipt = JSON.parse(readFileSync(resolveReceiptState(fixture.root).receiptPath, "utf8"));
+    assert.deepEqual(receipt.gate.localNodeChecks, {
+      contract: "plush.pre-push-local-node-checks/v1",
+      tests: [LOCAL_TEST_PATH],
+      concurrency: 4,
+      timeoutMs: 120_000,
+    });
+    assert.equal(receipt.gate.recommendedProfile, "full");
+    assert.equal(existsSync(gitStateFile(fixture.root, "full-ranges.txt")), false);
+    assert.equal(existsSync(gitStateFile(fixture.root, "affected-ranges.txt")), false);
+
+    const reused = runPrepare(fixture.root, [], env);
+    assert.equal(reused.status, 0, reused.stderr || reused.stdout);
+    assert.match(reused.stdout, /status=reused/u);
+    const pushed = runHook(fixture, { env });
+    assert.equal(pushed.status, 0, pushed.stderr || pushed.stdout);
+    assert.deepEqual(readLines(gitStateFile(fixture.root, "local-node-runs.txt")), ["executed"]);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("local failure, skip, zero execution and source drift never sign a receipt", () => {
+  for (const [source, overrides, reason, diagnostic] of [
+    [LOCAL_TEST_SOURCE, { LOCAL_FAIL: "1" }, "local_node_checks_failed", /failedTests=\["local push candidate"\]/u],
+    [LOCAL_TEST_SOURCE, { LOCAL_SKIP: "1" }, "local_node_checks_failed", /skipped=1/u],
+    ["import { describe } from 'node:test'; describe('empty suite', () => {});\n", {}, "local_node_checks_failed", /tests=0/u],
+    [LOCAL_TEST_SOURCE, { LOCAL_DIRTY: "1" }, "worktree_changed_during_gate", /tests=1 pass=1/u],
+  ]) {
+    const fixture = createFixture({
+      changePath: LOCAL_TEST_PATH,
+      baseContent: source,
+      headContent: `${source}\n// candidate\n`,
+    });
+    try {
+      const result = runPrepare(fixture.root, [], cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "", ...overrides }));
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, new RegExp(`reason=${reason}`, "u"));
+      assert.match(`${result.stdout}\n${result.stderr}`, diagnostic);
+      assert.equal(existsSync(resolveReceiptState(fixture.root).receiptPath), false);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+});
+
+test("the hook refuses modified local coverage and the previous gate contract", () => {
+  const fixture = createFixture({
+    changePath: LOCAL_TEST_PATH,
+    baseContent: LOCAL_TEST_SOURCE,
+    headContent: `${LOCAL_TEST_SOURCE}\n// candidate\n`,
+  });
+  try {
+    const env = cleanEnvironment({ DISPOSABLE_DATABASE_BASE_URL: "" });
+    const prepared = runPrepare(fixture.root, [], env);
+    assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
+    const state = resolveReceiptState(fixture.root);
+    const validReceipt = readFileSync(state.receiptPath, "utf8");
+    for (const [mutate, reason] of [
+      [(receipt) => { receipt.gate.localNodeChecks.tests = []; }, "receipt_profile_mismatch"],
+      [(receipt) => { receipt.gate.localNodeChecks.timeoutMs = 0; }, "receipt_profile_mismatch"],
+      [(receipt) => { delete receipt.gate.localNodeChecks; }, "receipt_profile_mismatch"],
+      [(receipt) => { receipt.gate.contract = "plush.pre-push-gate-tree/v5"; }, "receipt_gate_contract_mismatch"],
+    ]) {
+      writeFileSync(state.receiptPath, validReceipt);
+      resignReceipt(state, mutate);
+      const pushed = runHook(fixture, { env });
+      assert.equal(pushed.status, 2, pushed.stderr || pushed.stdout);
+      assert.match(pushed.stderr, new RegExp(`reason=${reason}`, "u"));
+    }
+    assert.deepEqual(readLines(gitStateFile(fixture.root, "local-node-runs.txt")), ["executed"]);
   } finally {
     fixture.cleanup();
   }

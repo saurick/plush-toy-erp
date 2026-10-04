@@ -46,6 +46,7 @@ const DEV_WORKBENCH_PLUGINS_TEST =
   "web/dev-server/devWorkbenchPlugins.test.mjs";
 const DEV_QUALITY_GATE_PROVIDER_BOUNDARY_TEST =
   "scripts/qa/dev-quality-gate-provider-boundary.test.mjs";
+const GITLAB_CI_TEST = "scripts/qa/gitlab-ci.test.mjs";
 const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-business-usability-desktop-light",
   "dev-drill-recovery-desktop-light",
@@ -443,6 +444,53 @@ function addNodeTests(state, files, reason, scope) {
   state.affectedScopes.add(commandScope);
 }
 
+function selectPrePushNodeTests(changedFiles, commands, directTests) {
+  const fastTests = new Set(NODE_TEST_GROUPS.fast);
+  const namedTests = new Set(
+    changedFiles.flatMap((file) => [file, ...siblingTestCandidates(file)]),
+  );
+  const candidates = new Set([
+    ...directTests,
+    ...[...commands.values()]
+      .filter((selected) => selected.id.startsWith("node-tests:"))
+      .flatMap((selected) =>
+        selected.args.filter((arg) => arg.endsWith(".test.mjs")),
+      ),
+  ]);
+  // The GitLab contract only reads repository files, despite its release group.
+  const selected = new Set(
+    [...candidates].filter(
+      (file) =>
+        fastTests.has(file) ||
+        file === GITLAB_CI_TEST ||
+        (file.startsWith("web/src/") && namedTests.has(file)),
+    ),
+  );
+  if (
+    changedFiles.some(
+      (file) =>
+        /^web\/src\/.*\.(?:js|jsx|mjs|css)$/u.test(file) ||
+        /^web\/vite.*\.mjs$/u.test(file),
+    )
+  ) {
+    selected.add("scripts/qa/dev-workbench-boundary.test.mjs");
+  }
+  if (
+    changedFiles.some(
+      (file) =>
+        file === ".gitlab-ci.yml" ||
+        /^scripts\/qa\/ci-.*\.mjs$/u.test(file) ||
+        /^scripts\/qa\/(?:node-test-groups|gate-profiles)\.mjs$/u.test(file) ||
+        /^scripts\/qa\/(?:fast|full|strict)\.sh$/u.test(file) ||
+        (file.startsWith("server/deploy/gitlab/") && !file.endsWith(".md")),
+    )
+  ) {
+    selected.add(GITLAB_CI_TEST);
+    selected.add("scripts/qa/ci-job-guide.test.mjs");
+  }
+  return uniqueSorted([...selected]);
+}
+
 function addSyntaxCheck(state, file) {
   const id = `node-check:${file}`;
   state.commands.set(
@@ -732,7 +780,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     }
 
     if (file === ".gitlab-ci.yml") {
-      directTests.add("scripts/qa/gitlab-ci.test.mjs");
+      directTests.add(GITLAB_CI_TEST);
       addFollowUp(
         state,
         "remote-ci-enforcement",
@@ -1086,6 +1134,13 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     addReason(state, "full", file);
   }
 
+  // Keep the short selection before full subsumes the development commands.
+  const prePushNodeTests = selectPrePushNodeTests(
+    changedFiles,
+    state.commands,
+    directTests,
+  );
+
   if (state.localGate === "full") {
     const fullReasons = [...(state.reasons.get("full") || [])];
     const retainedCommands = [...state.commands].filter(
@@ -1147,6 +1202,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
 
   return {
     changedFiles,
+    prePushNodeTests,
     affectedScopes,
     maxAffectedScope: affectedScopes.at(-1) || "T0",
     commands,
@@ -1213,6 +1269,9 @@ export function formatPlan(plan, { root = DEFAULT_ROOT } = {}) {
       lines.push(`  - [${item.scope}] ${item.text}`),
     );
   }
+  lines.push(
+    `[qa:affected] origin/main 推送前定向 Node 检查：${plan.prePushNodeTests.length} 个文件；数据库、浏览器和构建证据仍由 GitLab exact-SHA CI 提供。`,
+  );
   lines.push(
     prePush.recommendedProfile === "affected"
       ? `[qa:affected] 本计划用于开发期快速反馈；非 origin/main 可由 ${plan.prePushGate} 签发 affected 回执，正式 origin/main 默认签发 server-ci 回执并由 GitLab exact-SHA CI 执行高成本门禁。`
@@ -1345,10 +1404,10 @@ function printHelp() {
 
 边界:
   最终 clean HEAD 仍由 prepare-push 复算同一 affected 计划。默认 origin
-  refs/heads/main -> refs/heads/main 仅运行签名的本地 git-log、strict-secrets 与
-  source-integrity 检查，高成本门禁交由 GitLab exact-SHA CI；回执只授权普通
+  refs/heads/main -> refs/heads/main 运行本地 git-log、strict-secrets、source-integrity
+  和定向 Node 检查，通过后签发回执；高成本门禁交由 GitLab exact-SHA CI。回执只授权普通
   非强制 push，同一 exact SHA 的 terminal-success CI Gate 是 release、package
-  promotion 与 protected deploy 的前置条件。显式 --full、review 与任何非规范目标
+  promotion 与 protected deploy 的前置条件。显式 --full 与任何非规范目标
   仍保守处理；本地回执也不替代目标环境 migration、smoke 或发布证据。`);
 }
 

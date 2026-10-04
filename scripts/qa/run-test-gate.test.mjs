@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
@@ -209,6 +212,68 @@ test("test gate accepts only one declared output mode", () => {
       ]),
     /must be full or summary/u,
   );
+});
+
+test("test gate accepts one bounded deadline and rejects invalid values", () => {
+  const args = ["--kind", "node", "--label", "local"];
+  assert.equal(parseArgs([...args, "--", "node"]).timeoutMs, 0);
+  assert.equal(parseArgs([...args, "--timeout-ms", "120000", "--", "node"]).timeoutMs, 120000);
+  for (const value of ["0", "-1", "1.5", "Infinity", "3600001", "01"]) {
+    assert.throws(() => parseArgs([...args, "--timeout-ms", value, "--", "node"]), /must be an integer/u);
+  }
+  assert.throws(
+    () => parseArgs([...args, "--timeout-ms", "1", "--timeout-ms", "2", "--", "node"]),
+    /provided only once/u,
+  );
+});
+
+test("test gate deadline terminates a blocked command and its owned descendant", () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-test-deadline-"));
+  const pidFile = path.join(root, "owned-pids.json");
+  try {
+    const childFile = path.join(root, "child.mjs");
+    writeFileSync(childFile, `import {spawn} from 'node:child_process';
+import {writeFileSync} from 'node:fs';
+const descendant = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {stdio: 'inherit'});
+writeFileSync(process.argv[2], JSON.stringify([process.pid, descendant.pid]));
+while (true) {}
+`);
+    const result = spawnSync(process.execPath, [
+      new URL("./run-test-gate.mjs", import.meta.url).pathname,
+      "--kind", "node", "--label", "blocked", "--output-mode", "summary", "--timeout-ms", "500", "--",
+      process.execPath, childFile, pidFile,
+    ], { encoding: "utf8", timeout: 5000 });
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /test command timed out after 500ms/u);
+    assert.doesNotMatch(result.stdout + result.stderr, /status=complete/u);
+    const pids = JSON.parse(readFileSync(pidFile, "utf8"));
+    for (const pid of pids) {
+      const state = spawnSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8" });
+      assert(state.status === 1 || /^Z/u.test(state.stdout.trim()), `owned process ${pid} still running: ${state.stdout}`);
+    }
+  } finally {
+    if (existsSync(pidFile)) {
+      const [pid] = JSON.parse(readFileSync(pidFile, "utf8"));
+      try { process.kill(-pid, "SIGKILL"); } catch (error) { if (error.code !== "ESRCH") throw error; }
+    }
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("test gate deadline preserves normal summary validation and launch errors", () => {
+  const args = [
+    new URL("./run-test-gate.mjs", import.meta.url).pathname,
+    "--kind", "node", "--label", "local", "--output-mode", "summary", "--timeout-ms", "2000", "--",
+  ];
+  const passed = spawnSync(process.execPath, [
+    ...args, process.execPath, "-e", `console.log(${JSON.stringify(passingNodeSummary)})`,
+  ], { encoding: "utf8" });
+  assert.equal(passed.status, 0, passed.stderr);
+  assert.match(passed.stdout, /status=complete tests=1 pass=1 fail=0 skipped=0/u);
+  const failed = spawnSync(process.execPath, [...args, "/plush-missing-test-command"], { encoding: "utf8" });
+  assert.equal(failed.status, 1);
+  assert.match(failed.stderr, /ENOENT/u);
 });
 
 test("test gate awaits captured stdout before emitting stderr", async () => {
