@@ -13,14 +13,15 @@ import { mobileRoleDefinitions } from '../src/erp/config/appRegistry.mjs'
 import { getRoleWorkbench } from '../src/erp/config/seedData.mjs'
 import { MOBILE_ROLE_TASK_PAGE_LIMIT } from '../src/erp/utils/mobileTaskQueries.mjs'
 import { createMockAdminSessionToken } from './mockAdminSessionToken.mjs'
+import { expectAdminLoginHeading } from './style-l1/loginAssertions.mjs'
+import { installAdminRpcMocks } from './style-l1/adminRpcMocks.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webDir, '..')
 const devPorts = loadDevPorts(repoRoot)
 const INPUT_TEMPLATE_SCOPE = 'mobile-auth-login-route-smoke-input-template'
 const PREFLIGHT_SCOPE = 'mobile-auth-login-route-smoke-preflight-report'
-const suggestedMockSmokeCommand =
-  'pnpm --dir web smoke:mobile-auth-login-route'
+const suggestedMockSmokeCommand = 'pnpm --dir web smoke:mobile-auth-login-route'
 const preflightNotProven = [
   'real backend RBAC',
   'real demo account login',
@@ -335,6 +336,23 @@ async function runMobileAuthScenario(
   let workflowCalls = 0
   let authedWorkflowCalls = 0
   let passwordLoginCalls = 0
+  const unexpectedRpcCalls = []
+
+  await page.route('**/rpc/**', async (route) => {
+    const request = route.request().postDataJSON() || {}
+    unexpectedRpcCalls.push({
+      path: new URL(route.request().url()).pathname,
+      method: request.method,
+    })
+    await route.fulfill({
+      json: {
+        jsonrpc: '2.0',
+        id: request.id,
+        result: { code: RpcErrorCode.INTERNAL, message: 'Unmocked RPC' },
+      },
+    })
+  })
+  await installAdminRpcMocks(page, { baseURL: roleBaseURL })
 
   await page.addInitScript(() => {
     window.__PLUSH_ERP_CUSTOMER_CONFIG__ = {
@@ -592,7 +610,13 @@ async function runMobileAuthScenario(
       role.roleKey,
       `${role.roleKey} workflow 请求应携带当前角色 role_key`
     )
-    assert.equal(params.limit, MOBILE_ROLE_TASK_PAGE_LIMIT)
+    if (params.limit === 1) {
+      assert.equal(params.view_key, 'todo')
+      assert.equal(params.keyword, undefined)
+      assert.equal(params.status_key, undefined)
+    } else {
+      assert.equal(params.limit, MOBILE_ROLE_TASK_PAGE_LIMIT)
+    }
     assert.equal(params.cursor, undefined)
     assert(
       ['todo', 'history', 'risk'].includes(params.view_key),
@@ -692,9 +716,9 @@ async function runMobileAuthScenario(
           code: 0,
           message: 'OK',
           data: {
-            items,
-            next_cursor: '',
-            has_more: false,
+            items: items.slice(0, params.limit),
+            next_cursor: items.length > params.limit ? 'navigation-counts' : '',
+            has_more: items.length > params.limit,
             server_time: serverTime,
             counts: {
               approval: 0,
@@ -707,6 +731,7 @@ async function runMobileAuthScenario(
               risk: 1,
               todo: 2,
               total: 3,
+              withdrawn: 0,
             },
             risk_scope: 'role',
           },
@@ -735,7 +760,7 @@ async function runMobileAuthScenario(
     }
   )
   await waitForPath(page, '/admin-login')
-  await expectText(page, '毛绒玩具管理系统')
+  await expectAdminLoginHeading(page)
   assert.equal(
     workflowCalls,
     0,
@@ -780,7 +805,7 @@ async function runMobileAuthScenario(
   )
 
   await waitForPath(page, '/admin-login')
-  await expectText(page, '毛绒玩具管理系统')
+  await expectAdminLoginHeading(page)
   assert.equal(
     workflowCalls,
     0,
@@ -797,6 +822,7 @@ async function runMobileAuthScenario(
   await page.getByRole('button', { name: /登\s*录/ }).click()
 
   await waitForPath(page, tasksPath)
+  await page.getByTestId('mobile-role-task-list').waitFor({ state: 'visible' })
   assert.equal(
     passwordLoginCalls,
     1,
@@ -814,14 +840,20 @@ async function runMobileAuthScenario(
     '1'
   )
   assert.equal(await overdueFilter.getAttribute('aria-label'), '超时，共 1 条')
-  await expectText(page, '当前岗位任务状态')
+  await expectNoText(page, '当前岗位任务状态')
   await expectNoText(page, '任务按页加载')
   await expectNoText(page, '不代表岗位全量')
-  await expectText(page, '状态 / 截止')
   await expectNoText(page, '当前优先事项')
   await expectNoText(page, '已加载任务优先事项')
-  await expectText(page, '数据时间')
-  await expectText(page, '任务最近更新')
+  await page.getByTestId('mobile-task-list-range').waitFor({ state: 'visible' })
+  assert.equal(
+    await page.getByTestId('mobile-nav-todo-count').textContent(),
+    '2'
+  )
+  assert.equal(
+    await page.getByTestId('mobile-nav-risk-count').textContent(),
+    '1'
+  )
   await expectText(page, 'STYLE-001')
   await expectText(page, 'OUT-001')
   await expectText(page, '登录回跳验证任务')
@@ -914,8 +946,8 @@ async function runMobileAuthScenario(
   assert(metrics.nav, `移动端底部导航未渲染: ${JSON.stringify(metrics)}`)
   assert.equal(
     metrics.navButtonCount,
-    4,
-    `移动端底部导航应固定为四项: ${JSON.stringify(metrics)}`
+    3,
+    `没有进度读取权限的账号应显示任务、风险、我的: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.shell.bottom <= metrics.viewport.height + 1,
@@ -1027,6 +1059,12 @@ async function runMobileAuthScenario(
       !secondBackLeak.includes('今日工作台'),
     `${role.roleKey} 岗位任务端登录后，浏览器返回不应短暂渲染后台页面：${secondBackLeak}`
   )
+  await page.getByTestId('mobile-role-task-list').waitFor({ state: 'visible' })
+  assert.deepEqual(
+    unexpectedRpcCalls,
+    [],
+    `${role.roleKey} 登录回归不应把未模拟的请求发送到真实服务`
+  )
 }
 
 async function expectText(page, text) {
@@ -1045,6 +1083,15 @@ async function expectText(page, text) {
 }
 
 async function clickMobileMainTab(page, tabKey, expectedText) {
+  if (tabKey === 'todo' || tabKey === 'done') {
+    await page.getByTestId('mobile-role-nav-tasks').click()
+    await page
+      .getByRole('radiogroup', { name: '任务状态', exact: true })
+      .getByText(tabKey === 'done' ? '已办' : '待办', { exact: true })
+      .click()
+    await expectText(page, expectedText)
+    return
+  }
   const tab = page.getByTestId(`mobile-role-nav-${tabKey}`)
   let lastBodyText = ''
   for (let attempt = 1; attempt <= 3; attempt += 1) {
