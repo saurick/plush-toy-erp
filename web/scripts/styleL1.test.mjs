@@ -36,22 +36,39 @@ test('phone regressions enable mobile layout and touch while preserving explicit
   )
 })
 
-test('Style L1 preserves screenshot density and restricts operator credentials to DEV scenes', () => {
+test('Style L1 preserves screenshot density and restricts operator credentials to scenes visiting DEV', () => {
   const viewport = { width: 1920, height: 1080 }
   const env = {
     PLUSH_DEV_OPERATOR_USERNAME: 'operator-test',
     PLUSH_DEV_OPERATOR_PASSWORD: 'placeholder',
   }
-  const options = getStyleL1ContextOptions({
-    path: '/__dev/testing?view=pressure',
-    viewport,
-    deviceScaleFactor: 2,
-  }, env)
+  const options = getStyleL1ContextOptions(
+    {
+      path: '/__dev/testing?view=pressure',
+      viewport,
+      deviceScaleFactor: 2,
+    },
+    env
+  )
   assert.equal(options.deviceScaleFactor, 2)
   assert.deepEqual(options.httpCredentials, {
     username: env.PLUSH_DEV_OPERATOR_USERNAME,
     password: env.PLUSH_DEV_OPERATOR_PASSWORD,
   })
-  assert.equal(getStyleL1ContextOptions({ path: '/erp', viewport }, env).httpCredentials, undefined)
-  assert.equal(getStyleL1ContextOptions({ path: '/__dev/testing', viewport }, {}).httpCredentials, undefined)
+  assert.deepEqual(
+    getStyleL1ContextOptions(
+      { path: '/m/boss/tasks', viewport, visitsDevWorkbench: true },
+      env
+    ).httpCredentials,
+    options.httpCredentials
+  )
+  assert.equal(
+    getStyleL1ContextOptions({ path: '/erp', viewport }, env).httpCredentials,
+    undefined
+  )
+  assert.equal(
+    getStyleL1ContextOptions({ path: '/__dev/testing', viewport }, {})
+      .httpCredentials,
+    undefined
+  )
 })

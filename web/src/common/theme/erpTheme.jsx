@@ -124,6 +124,7 @@ export function ERPThemeProvider({ children }) {
     const accent = ERP_ACCENTS[appearance.accent]
     root.dataset.erpAccent = appearance.accent
     root.dataset.erpDensity = appearance.density
+    root.dataset.erpTableLines = appearance.tableLines
     root.style.setProperty('--erp-accent', accent.primary)
     root.style.setProperty('--erp-accent-strong', accent.strong)
     root.style.setProperty('--erp-accent-hover', accent.hover)

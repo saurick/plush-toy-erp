@@ -81,19 +81,34 @@ export default function ERPThemeToggle({
       </fieldset>
       {variant !== 'settings' ? modeControl : null}
       {variant !== 'settings' && showDensity ? (
-        <fieldset>
-          <legend>表格密度</legend>
-          <Segmented
-            block
-            aria-label="表格密度"
-            value={appearance.density}
-            options={[
-              { value: 'standard', label: '标准' },
-              { value: 'compact', label: '紧凑' },
-            ]}
-            onChange={(density) => setAppearance({ density })}
-          />
-        </fieldset>
+        <>
+          <fieldset>
+            <legend>表格密度</legend>
+            <Segmented
+              block
+              aria-label="表格密度"
+              value={appearance.density}
+              options={[
+                { value: 'standard', label: '标准' },
+                { value: 'compact', label: '紧凑' },
+              ]}
+              onChange={(density) => setAppearance({ density })}
+            />
+          </fieldset>
+          <fieldset>
+            <legend>表格线条</legend>
+            <Segmented
+              block
+              aria-label="表格线条"
+              value={appearance.tableLines}
+              options={[
+                { value: 'simple', label: '简洁' },
+                { value: 'grid', label: '网格' },
+              ]}
+              onChange={(tableLines) => setAppearance({ tableLines })}
+            />
+          </fieldset>
+        </>
       ) : null}
     </div>
   )

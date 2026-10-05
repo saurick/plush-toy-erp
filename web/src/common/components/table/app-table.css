@@ -7,6 +7,23 @@
   height: var(--erp-row-height);
 }
 
+@media screen {
+  [data-erp-table-lines='grid']
+    .app-table.ant-table-wrapper
+    .ant-table:not(.ant-table-bordered)
+    .ant-table-summary
+    > tr
+    > .ant-table-cell:not(:last-child),
+  [data-erp-table-lines='grid']
+    .app-table.ant-table-wrapper
+    .ant-table:not(.ant-table-bordered)
+    .ant-table-tbody
+    > .ant-table-row
+    > .ant-table-cell:not(:last-child) {
+    border-inline-end: 1px solid var(--erp-border);
+  }
+}
+
 /* 测量副本保留布局尺寸，但不能让内部按钮进入键盘焦点。 */
 .app-table.ant-table-wrapper .ant-table-measure-cell-content {
   visibility: hidden;

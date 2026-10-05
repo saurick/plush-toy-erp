@@ -1,7 +1,10 @@
 import React, { useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { MemoryRouter } from 'react-router-dom'
 import { Button, ConfigProvider, Form, Input, Space, Tag, theme } from 'antd'
 import AppTable from '../../src/common/components/table/AppTable'
+import ERPThemeToggle from '../../src/common/components/theme/ERPThemeToggle'
+import { ERPThemeProvider, useERPTheme } from '../../src/common/theme/erpTheme'
 import { BusinessDataTable } from '../../src/erp/components/business-list/BusinessListLayout'
 import { ColumnOrderModal } from '../../src/erp/components/business-list/ColumnOrderModal'
 import BusinessLineItemsTable, {
@@ -108,7 +111,7 @@ const request = {
 }
 
 function Fixture() {
-  const [dark, setDark] = useState(false)
+  const { isDark: dark, setThemeMode } = useERPTheme()
   const [mobile, setMobile] = useState(false)
   const [empty, setEmpty] = useState(false)
   const [order, setOrder] = useState(columns.map((column) => column.key))
@@ -137,13 +140,7 @@ function Fixture() {
         <Space wrap>
           <Button
             id="toggle-theme"
-            onClick={() => {
-              document.documentElement.dataset.erpTheme = dark
-                ? 'light'
-                : 'dark'
-              document.body.style.background = dark ? '#fff' : '#0e1726'
-              setDark(!dark)
-            }}
+            onClick={() => setThemeMode(dark ? 'light' : 'dark')}
           >
             切换主题
           </Button>
@@ -154,6 +151,7 @@ function Fixture() {
             切换空表
           </Button>
           <Button onClick={() => setColumnPanelOpen(true)}>列设置</Button>
+          <ERPThemeToggle />
           <output id="selection-count">{selected.length}</output>
           <output id="opened-record">{opened}</output>
         </Space>
@@ -186,12 +184,17 @@ function Fixture() {
             columns={[
               {
                 title: '材料资料',
-                children: columns.slice(0, 3).map((column) => ({ ...column, fixed: undefined })),
+                children: columns
+                  .slice(0, 3)
+                  .map((column) => ({ ...column, fixed: undefined })),
               },
               columns[3],
               {
                 ...columns[4],
-                filters: [{ text: '待审核', value: '待审核' }, { text: '已批准', value: '已批准' }],
+                filters: [
+                  { text: '待审核', value: '待审核' },
+                  { text: '已批准', value: '已批准' },
+                ],
                 onFilter: (value, row) => row.status === value,
               },
               { ...columns[5], title: '备注 / 需要核对的详细说明' },
@@ -200,6 +203,21 @@ function Fixture() {
             pagination={false}
             scroll={{ x: 1150 }}
             expandable={{ expandedRowRender: renderExpandedNote }}
+            summary={() => (
+              <AppTable.Summary>
+                <AppTable.Summary.Row>
+                  <AppTable.Summary.Cell index={0} colSpan={4}>
+                    合计
+                  </AppTable.Summary.Cell>
+                  <AppTable.Summary.Cell index={4} align="right">
+                    10678.36
+                  </AppTable.Summary.Cell>
+                  <AppTable.Summary.Cell index={5} colSpan={2}>
+                    两项材料
+                  </AppTable.Summary.Cell>
+                </AppTable.Summary.Row>
+              </AppTable.Summary>
+            )}
           />
         </section>
         <section
@@ -245,4 +263,10 @@ function Fixture() {
   )
 }
 
-createRoot(document.getElementById('root')).render(<Fixture />)
+createRoot(document.getElementById('root')).render(
+  <MemoryRouter>
+    <ERPThemeProvider>
+      <Fixture />
+    </ERPThemeProvider>
+  </MemoryRouter>
+)

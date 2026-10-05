@@ -59,6 +59,7 @@ import { createDeliveryAddressScenarios } from './deliveryAddressScenarios.mjs'
 import { createContactEditorScenarios } from './contactEditorScenarios.mjs'
 import { createFormDensityScenarios } from './formDensityScenarios.mjs'
 import { createTableDensityScenarios } from './tableDensityScenarios.mjs'
+import { createTableLinesScenarios } from './tableLinesScenarios.mjs'
 import { createBusinessColumnSettingsScenarios } from './businessColumnSettingsScenarios.mjs'
 
 export function createStyleL1Scenarios(deps) {
@@ -348,6 +349,7 @@ export function createStyleL1Scenarios(deps) {
     ...createContactEditorScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createFormDensityScenarios(deps),
     ...createTableDensityScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createTableLinesScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createBusinessModuleNavigationScenarios({
       customerRuntimeEffectiveSession,
       assertNoHorizontalOverflow,

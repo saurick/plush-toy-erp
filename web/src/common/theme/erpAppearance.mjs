@@ -55,6 +55,7 @@ export function normalizeERPAppearance(value) {
   return {
     accent: Object.hasOwn(ERP_ACCENTS, value?.accent) ? value.accent : 'blue',
     density: value?.density === 'compact' ? 'compact' : 'standard',
+    tableLines: value?.tableLines === 'grid' ? 'grid' : 'simple',
   }
 }
 

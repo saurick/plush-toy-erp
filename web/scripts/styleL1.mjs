@@ -127,7 +127,11 @@ export function getStyleL1ContextOptions(scenario, env = process.env) {
     isMobile: scenario.isMobile ?? phoneViewport,
     hasTouch: scenario.hasTouch ?? phoneViewport,
   }
-  if (scenario.path?.startsWith('/__dev') && env.PLUSH_DEV_OPERATOR_USERNAME && env.PLUSH_DEV_OPERATOR_PASSWORD) {
+  if (
+    (scenario.path?.startsWith('/__dev') || scenario.visitsDevWorkbench === true) &&
+    env.PLUSH_DEV_OPERATOR_USERNAME &&
+    env.PLUSH_DEV_OPERATOR_PASSWORD
+  ) {
     options.httpCredentials = {
       username: env.PLUSH_DEV_OPERATOR_USERNAME,
       password: env.PLUSH_DEV_OPERATOR_PASSWORD,

@@ -13,6 +13,7 @@ export function mobileAppearanceScenario({
     path: '/m/boss/tasks',
     auth: 'admin',
     effectiveSession,
+    visitsDevWorkbench: true,
     hasTouch: true,
     viewport: { width: 390, height: 844 },
     verify: async (page) => {
@@ -24,6 +25,10 @@ export function mobileAppearanceScenario({
         0
       )
       assert.equal(await settings.getByRole('radiogroup').count(), 1)
+      assert.equal(
+        await settings.getByText('表格线条', { exact: true }).count(),
+        0
+      )
       assert.equal(
         await settings.getByRole('button').count(),
         6,
@@ -191,6 +196,11 @@ export function mobileAppearanceScenario({
         await dialog.waitFor()
         await waitForFiniteAnimations(page)
         await dialog.getByText('紧凑', { exact: true }).click()
+        await dialog.getByText('网格', { exact: true }).click()
+        assert.equal(
+          await page.locator('html').getAttribute('data-erp-table-lines'),
+          'grid'
+        )
         assert.equal(
           await page.locator('html').getAttribute('data-erp-density'),
           'compact',
@@ -230,6 +240,15 @@ export function mobileAppearanceScenario({
         '手机切换主题和刷新不覆盖桌面密度偏好'
       )
       assert.equal(await settings.getByRole('radiogroup').count(), 1)
+      assert.equal(
+        await settings.getByText('表格线条', { exact: true }).count(),
+        0
+      )
+      assert.equal(
+        await page.locator('html').getAttribute('data-erp-table-lines'),
+        'grid',
+        '手机修改主题和刷新不覆盖桌面网格偏好'
+      )
       await waitForFiniteAnimations(page)
       await page.screenshot({
         path: path.join(outputDir, 'mobile-display-settings.png'),

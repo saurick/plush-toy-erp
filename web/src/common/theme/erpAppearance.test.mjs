@@ -12,11 +12,12 @@ test('appearance recovers from stale or unavailable storage without losing valid
     null,
     false,
     'old-theme',
-    { accent: '__proto__', density: 'wide' },
+    { accent: '__proto__', density: 'wide', tableLines: 'bordered' },
   ]) {
     assert.deepEqual(normalizeERPAppearance(value), {
       accent: 'blue',
       density: 'standard',
+      tableLines: 'simple',
     })
   }
   for (const storage of [
@@ -31,13 +32,25 @@ test('appearance recovers from stale or unavailable storage without losing valid
     assert.deepEqual(readERPAppearance(storage), {
       accent: 'blue',
       density: 'standard',
+      tableLines: 'simple',
     })
   }
   assert.deepEqual(
     readERPAppearance({
       getItem: () => '{"accent":"purple","density":"compact"}',
     }),
-    { accent: 'purple', density: 'compact' }
+    { accent: 'purple', density: 'compact', tableLines: 'simple' }
+  )
+  assert.deepEqual(
+    readERPAppearance({
+      getItem: () =>
+        '{"accent":"pink","density":"compact","tableLines":"grid"}',
+    }),
+    { accent: 'pink', density: 'compact', tableLines: 'grid' }
+  )
+  assert.deepEqual(
+    normalizeERPAppearance({ accent: 'green', tableLines: false }),
+    { accent: 'green', density: 'standard', tableLines: 'simple' }
   )
 })
 
