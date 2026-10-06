@@ -11,7 +11,7 @@
   "version": 1,
   "refresh": "10s",
   "time": {
-    "from": "now-15m",
+    "from": "now-24h",
     "to": "now"
   },
   "editable": false,
@@ -95,7 +95,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 3
       },
       "datasource": {
         "type": "loki",
@@ -108,7 +108,7 @@
             "type": "loki",
             "uid": "${logs}"
           },
-          "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | outcome=\"error\" [5m]))",
+          "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | outcome=\"error\" [5m])) or on (service) (sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} [5m])) * 0)",
           "queryType": "range"
         }
       ],
@@ -139,7 +139,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 3
       },
       "datasource": {
         "type": "loki",
@@ -152,7 +152,7 @@
             "type": "loki",
             "uid": "${logs}"
           },
-          "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | outcome=\"rejected\" [5m]))",
+          "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | outcome=\"rejected\" [5m])) or on (service) (sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} [5m])) * 0)",
           "queryType": "range"
         }
       ],
@@ -183,7 +183,7 @@
         "h": 16,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 11
       },
       "datasource": {
         "type": "loki",
@@ -225,14 +225,14 @@
       "title": "查询说明",
       "type": "text",
       "gridPos": {
-        "x": 0,
-        "y": 32,
-        "w": 24,
+        "x": 6,
+        "y": 0,
+        "w": 18,
         "h": 3
       },
       "options": {
         "mode": "markdown",
-        "content": "按环境、服务、时间和请求编号定位。展开日志可查看原始字段；Trace 跳转只提供给已采样且仍保留的链路。本地历史文件按采集时间进入查询，原始 `ts` 字段保留。业务结果以单据和事实记录为准。"
+        "content": "默认查看最近二十四小时。日志数为 0 表示所选环境、服务在该时段没有日志，可扩大时间范围；不代表采集故障或健康。错误图中的 0 表示该服务有日志，但没有匹配错误；查询失败会单独显示。请求编号或关键字只筛选下方日志明细。展开日志可查看字段与已采样 Trace，业务结果以单据和事实记录为准。"
       }
     },
     {
@@ -240,12 +240,12 @@
       "title": "五分钟内依赖调用失败",
       "description": "依赖诊断与请求结果分别统计，避免同一失败在多个层重复计数。",
       "type": "timeseries",
-      "gridPos": { "x": 0, "y": 24, "w": 12, "h": 8 },
+      "gridPos": { "x": 0, "y": 27, "w": 12, "h": 8 },
       "datasource": { "type": "loki", "uid": "${logs}" },
       "targets": [{
         "refId": "A",
         "datasource": { "type": "loki", "uid": "${logs}" },
-        "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | dependency_outcome=\"error\" [5m]))",
+        "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | dependency_outcome=\"error\" [5m])) or on (service) (sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} [5m])) * 0)",
         "queryType": "range"
       }],
       "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "palette-classic" } }, "overrides": [] }
@@ -255,15 +255,37 @@
       "title": "五分钟内未归类 ERROR 日志",
       "description": "用于定位尚无统一结果字段的诊断日志，数值表示日志条数。Panic 堆栈由请求失败记录计数。",
       "type": "timeseries",
-      "gridPos": { "x": 12, "y": 24, "w": 12, "h": 8 },
+      "gridPos": { "x": 12, "y": 27, "w": 12, "h": 8 },
       "datasource": { "type": "loki", "uid": "${logs}" },
       "targets": [{
         "refId": "A",
         "datasource": { "type": "loki", "uid": "${logs}" },
-        "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | level=~\"(?i)error|fatal\" | outcome=\"\" | dependency_outcome=\"\" | msg!=\"request panic recovered\" [5m]))",
+        "expr": "sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} | json | __error__=\"\" | level=~\"(?i)error|fatal\" | outcome=\"\" | dependency_outcome=\"\" | msg!=\"request panic recovered\" [5m])) or on (service) (sum by (service) (count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} [5m])) * 0)",
         "queryType": "range"
       }],
       "fieldConfig": { "defaults": { "unit": "short", "color": { "mode": "palette-classic" } }, "overrides": [] }
+    },
+    {
+      "id": 7,
+      "title": "所选时段日志数",
+      "description": "按所选环境、服务和时间统计原始日志条数，不受下方关键字筛选影响。0 表示该时段没有日志，不能用它判断采集健康。",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 3 },
+      "datasource": { "type": "loki", "uid": "${logs}" },
+      "targets": [{
+        "refId": "A",
+        "datasource": { "type": "loki", "uid": "${logs}" },
+        "expr": "sum(count_over_time({environment=~\"${environment:regex}\",service=~\"${service:regex}\"} [$__range])) or vector(0)",
+        "queryType": "instant"
+      }],
+      "options": {
+        "reduceOptions": { "values": false, "calcs": ["lastNotNull"], "fields": "" },
+        "colorMode": "none",
+        "graphMode": "none",
+        "textMode": "value",
+        "orientation": "auto"
+      },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [] }
     }
   ]
 }
