@@ -670,6 +670,18 @@ func normalizeSalesOrderMutation(in SalesOrderMutation, create bool) (SalesOrder
 	if err := validateOptionalDateNotBefore(in.OrderDate, in.PlannedDeliveryDate); err != nil {
 		return SalesOrderMutation{}, err
 	}
+	missingFields := make([]string, 0, 3)
+	if in.TaxMode == nil {
+		missingFields = append(missingFields, "tax_mode")
+	}
+	if in.FreightTerms == nil {
+		missingFields = append(missingFields, "freight_terms")
+	} else if *in.FreightTerms == SalesOrderFreightTermsExcluded && in.QuotedFreightAmount == nil {
+		missingFields = append(missingFields, "quoted_freight_amount")
+	}
+	if len(missingFields) > 0 {
+		return SalesOrderMutation{}, &SalesOrderReadinessError{MissingFields: missingFields, SaveRequired: true}
+	}
 	return in, nil
 }
 

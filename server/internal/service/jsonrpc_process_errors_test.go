@@ -24,6 +24,7 @@ func TestProcessEntryBusinessErrorsKeepActionableGuidance(t *testing.T) {
 		text string
 	}{
 		{"sales terms", &biz.SalesOrderReadinessError{MissingFields: []string{"tax_mode", "freight_terms"}}, errcode.InvalidParam.Code, "提交前请补齐：计税方式、报价是否含运费"},
+		{"save terms", &biz.SalesOrderReadinessError{MissingFields: []string{"tax_mode", "freight_terms"}, SaveRequired: true}, errcode.InvalidParam.Code, "保存前请补齐：计税方式、报价是否含运费"},
 		{"tax rate", &biz.SalesOrderReadinessError{MissingFields: []string{"tax_rate"}}, errcode.InvalidParam.Code, "提交前请补齐：税率"},
 		{"freight quote", &biz.SalesOrderReadinessError{MissingFields: []string{"quoted_freight_amount"}}, errcode.InvalidParam.Code, "提交前请补齐：报价运费"},
 		{"no items", &biz.SalesOrderReadinessError{MissingFields: []string{"items"}}, errcode.InvalidParam.Code, "提交前请补齐：订货明细"},

@@ -21,6 +21,8 @@ const makeEntries = () =>
       order_no: `SO-IMPORT-${number}`,
       customer_id: 1,
       currency: 'CNY',
+      tax_mode: 'NONE',
+      freight_terms: 'INCLUDED',
       order_date: '2026-09-01',
       items: [1, 2].map((line) => ({
         requested_product_name: `模拟产品${line}`,
@@ -38,6 +40,30 @@ const defaults = {
   listAttachments: async () => [],
   reconcileOrder: async () => null,
 }
+
+test('batch review blocks incomplete pricing and invalid prices before saving', async () => {
+  const entries = makeEntries()
+  entries[0].values.tax_mode = undefined
+  entries[0].values.freight_terms = undefined
+  entries[1].values.tax_mode = 'INCLUSIVE'
+  entries[1].values.freight_terms = 'EXCLUDED'
+  entries[1].values.items[0].unit_price = '-1'
+  const reviewed = reviewSalesOrderImportEntries(entries, { customers, units })
+  assert.deepEqual(reviewed[0].issues.map(({ name }) => name), [
+    ['tax_mode'], ['freight_terms'],
+  ])
+  assert.deepEqual(reviewed[1].issues.map(({ name }) => name), [
+    ['tax_rate'], ['quoted_freight_amount'], ['items', 0, 'unit_price'],
+  ])
+  await saveSalesOrderImportBatch(reviewed, {
+    ...defaults,
+    saveOrder: async () => assert.fail('invalid import must not save'),
+  })
+  entries[0].values.tax_mode = 'NONE'
+  entries[0].values.freight_terms = 'EXCLUDED'
+  entries[0].values.quoted_freight_amount = '0'
+  assert.deepEqual(salesOrderImportIssues(entries[0].values, { customers, units }), [])
+})
 
 test('batch quantity validation requires configured precision and preserves valid yard/kg values', () => {
   const { values } = makeEntries()[0]

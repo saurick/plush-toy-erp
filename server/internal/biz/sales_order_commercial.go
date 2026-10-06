@@ -6,10 +6,11 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-// SalesOrderReadinessError identifies missing submission fields without making
-// them mandatory for saving a draft or exposing stored business values.
+// SalesOrderReadinessError identifies missing fields without exposing stored
+// business values. SaveRequired distinguishes save validation from transitions.
 type SalesOrderReadinessError struct {
 	MissingFields []string
+	SaveRequired  bool
 }
 
 func (e *SalesOrderReadinessError) Error() string {

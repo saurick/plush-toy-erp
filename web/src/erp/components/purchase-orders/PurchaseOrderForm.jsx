@@ -16,8 +16,6 @@ import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
 import FieldWithUnitSuffix, {
-  isQuantityTextWithinUnitPrecision,
-  unitPrecisionErrorMessage,
   unitPrecisionFromOptions,
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
@@ -47,6 +45,8 @@ import {
   buildCatalogFillRowsPlan,
 } from '../../utils/catalogFillRows.mjs'
 import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
+import { optionalMoneyRule } from '../../utils/sourceOrderValidation.mjs'
+import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import { BusinessLineItemRow } from '../business-list/BusinessLineItemsTable.jsx'
 
 const PURCHASE_ORDER_COLUMNS = [
@@ -99,15 +99,14 @@ function sourceDefaultUnitText(unitOptions, unitID) {
 }
 
 function quantityPrecisionRule({ form, fieldName, unitOptions }) {
-  return {
-    validator: async (_, value) => {
-      const line = form.getFieldValue(['items', fieldName]) || {}
-      const precision = unitPrecisionFromOptions(unitOptions, line.unit_id)
-      if (!isQuantityTextWithinUnitPrecision(value, precision)) {
-        throw new Error(unitPrecisionErrorMessage(precision))
-      }
-    },
-  }
+  return unitQuantityRule(
+    () =>
+      unitPrecisionFromOptions(
+        unitOptions,
+        form.getFieldValue(['items', fieldName, 'unit_id'])
+      ),
+    { positive: true }
+  )
 }
 
 export function createBlankPurchaseLine(lineNo = 1) {
@@ -563,6 +562,7 @@ export function PurchaseOrderFormFields({
                   className="erp-line-item-field erp-line-item-field--money"
                   name={[field.name, 'unit_price']}
                   label="单价"
+                  rules={[optionalMoneyRule('单价')]}
                 >
                   <Input />
                 </Form.Item>,
@@ -601,6 +601,7 @@ export function PurchaseOrderFormFields({
                   className="erp-line-item-field erp-line-item-field--money"
                   name={[field.name, 'amount']}
                   label="金额"
+                  rules={[optionalMoneyRule('金额')]}
                 >
                   <Input placeholder="留空时根据数量和单价自动计算" />
                 </Form.Item>,

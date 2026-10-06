@@ -121,6 +121,7 @@ export default function ProductionExceptionRequestModal({
       />
       <Form
         form={form}
+        name="production-exception-request"
         layout="vertical"
         disabled={loading}
         style={{ marginTop: 12 }}
@@ -148,7 +149,7 @@ export default function ProductionExceptionRequestModal({
           name="requested_quantity"
           label="申请数量"
           rules={[
-            unitQuantityRule(inspection?.unit_precision),
+            unitQuantityRule(inspection?.unit_precision, { positive: true }),
             { required: true },
           ]}
         >

@@ -1453,6 +1453,8 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb
 	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
 	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderCreate))
 	params := mustJSONRPCStruct(t, map[string]any{
+		"tax_mode":             biz.SalesOrderTaxModeNone,
+		"freight_terms":        biz.SalesOrderFreightTermsIncluded,
 		"order_no":             "SO001",
 		"customer_id":          float64(1),
 		"currency":             "USD",
@@ -1535,12 +1537,17 @@ func TestJsonrpcDispatcher_SalesOrderAggregateRejectsUnknownOrMalformedFields(t 
 				biz.PermissionSalesOrderCreate,
 			))
 			params := map[string]any{
-				"order_no":    "SO-PARSER-CONTRACT",
-				"customer_id": float64(1),
-				"currency":    biz.FinanceCurrencyCNY,
-				"order_date":  "2026-08-12",
+				"tax_mode":      biz.SalesOrderTaxModeNone,
+				"freight_terms": biz.SalesOrderFreightTermsIncluded,
+				"order_no":      "SO-PARSER-CONTRACT",
+				"customer_id":   float64(1),
+				"currency":      biz.FinanceCurrencyCNY,
+				"order_date":    "2026-08-12",
 			}
 			params[tc.key] = tc.value
+			if tc.key == "quoted_freight_amount" {
+				params["freight_terms"] = biz.SalesOrderFreightTermsExcluded
+			}
 
 			_, res, err := j.handleSalesOrder(
 				workflowJSONRPCAdminContext(),
@@ -1550,6 +1557,31 @@ func TestJsonrpcDispatcher_SalesOrderAggregateRejectsUnknownOrMalformedFields(t 
 			)
 			if err != nil || res == nil || res.Code != errcode.InvalidParam.Code || repo.savedOrder != nil || len(repo.savedItems) != 0 {
 				t.Fatalf("invalid aggregate input must fail before save: res=%#v err=%v saved=%#v items=%#v", res, err, repo.savedOrder, repo.savedItems)
+			}
+		})
+	}
+}
+
+func TestJsonrpcDispatcher_SalesOrderSaveRequiresPricingChoices(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		fields map[string]any
+		want   string
+	}{
+		{name: "missing choices", fields: map[string]any{}, want: "保存前请补齐：计税方式、报价是否含运费"},
+		{name: "missing rate", fields: map[string]any{"tax_mode": "INCLUSIVE", "freight_terms": "INCLUDED"}, want: "选择含税或未税计价后，请同时填写税率"},
+		{name: "missing freight", fields: map[string]any{"tax_mode": "NONE", "freight_terms": "EXCLUDED"}, want: "保存前请补齐：报价运费"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
+			j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderCreate))
+			params := map[string]any{"order_no": "SO-REQUIRED-PRICING", "customer_id": float64(1), "currency": "CNY", "order_date": "2026-10-06"}
+			for key, value := range tc.fields {
+				params[key] = value
+			}
+			_, res, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "save_sales_order_with_items", tc.name, mustJSONRPCStruct(t, params))
+			if err != nil || res == nil || res.Code != errcode.InvalidParam.Code || res.Message != tc.want || repo.savedOrder != nil {
+				t.Fatalf("missing pricing must return a field error before saving: res=%#v err=%v saved=%#v", res, err, repo.savedOrder)
 			}
 		})
 	}
@@ -1646,9 +1678,11 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
 	))
 	ctx := workflowJSONRPCAdminContext()
 	saveParams := mustJSONRPCStruct(t, map[string]any{
-		"order_no":    "SO-MODULE-GATE-SAVE",
-		"customer_id": float64(1),
-		"order_date":  "2026-06-15",
+		"tax_mode":      biz.SalesOrderTaxModeNone,
+		"freight_terms": biz.SalesOrderFreightTermsIncluded,
+		"order_no":      "SO-MODULE-GATE-SAVE",
+		"customer_id":   float64(1),
+		"order_date":    "2026-06-15",
 		"items": []any{
 			map[string]any{
 				"line_no":          float64(1),
@@ -1839,6 +1873,8 @@ func TestJsonrpcDispatcher_SaveExistingSalesOrderDoesNotRequireRemovedItemWriteP
 		biz.PermissionSalesOrderUpdate,
 	))
 	params := mustJSONRPCStruct(t, map[string]any{
+		"tax_mode":         biz.SalesOrderTaxModeNone,
+		"freight_terms":    biz.SalesOrderFreightTermsIncluded,
 		"id":               float64(1),
 		"expected_version": float64(1),
 		"order_no":         "SO-TX-JSONRPC-UPDATE",
@@ -1902,10 +1938,12 @@ func TestJsonrpcDispatcher_SalesOrderDraftVersionContract(t *testing.T) {
 	ctx := workflowJSONRPCAdminContext()
 	paramsForAttempt := func() map[string]any {
 		return map[string]any{
-			"order_no":    "SO-VERSION-CONTRACT",
-			"customer_id": float64(1),
-			"currency":    "HKD",
-			"order_date":  "2026-07-14",
+			"tax_mode":      biz.SalesOrderTaxModeNone,
+			"freight_terms": biz.SalesOrderFreightTermsIncluded,
+			"order_no":      "SO-VERSION-CONTRACT",
+			"customer_id":   float64(1),
+			"currency":      "HKD",
+			"order_date":    "2026-07-14",
 			"items": []any{map[string]any{
 				"id":               float64(1),
 				"line_no":          float64(1),
@@ -1961,9 +1999,11 @@ func TestJsonrpcDispatcher_SaveSalesOrderWithItemsUsesUsecaseProductUnitGuard(t 
 	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: false, unitActive: true}
 	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionSalesOrderCreate))
 	params := mustJSONRPCStruct(t, map[string]any{
-		"order_no":    "SO-MISSING-PRODUCT",
-		"customer_id": float64(1),
-		"order_date":  "2026-06-15",
+		"tax_mode":      biz.SalesOrderTaxModeNone,
+		"freight_terms": biz.SalesOrderFreightTermsIncluded,
+		"order_no":      "SO-MISSING-PRODUCT",
+		"customer_id":   float64(1),
+		"order_date":    "2026-06-15",
 		"items": []any{map[string]any{
 			"line_no":          float64(1),
 			"product_id":       float64(404),

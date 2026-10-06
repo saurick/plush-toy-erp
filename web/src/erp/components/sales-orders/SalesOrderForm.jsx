@@ -73,6 +73,11 @@ import BusinessLineItemsTable, {
   BusinessLineItemRow,
 } from '../business-list/BusinessLineItemsTable.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import {
+  optionalMoneyRule,
+  salesOrderCommercialRule,
+} from '../../utils/sourceOrderValidation.mjs'
+import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 
 const SALES_ORDER_COLUMNS = [
   { label: '订货产品 / 客户款号', width: 240, flexible: true },
@@ -219,16 +224,14 @@ function paymentConditionRule({ form, methodField, termDaysField, field }) {
 }
 
 function quantityPrecisionRule({ form, fieldName, unitOptions }) {
-  return {
-    validator: async (_, value) => {
-      const line = form.getFieldValue(['items', fieldName]) || {}
-      if (!line.unit_id) return
-      const precision = unitPrecisionFromOptions(unitOptions, line.unit_id)
-      if (!isQuantityTextWithinUnitPrecision(value, precision)) {
-        throw new Error(unitPrecisionErrorMessage(precision))
-      }
-    },
-  }
+  return unitQuantityRule(
+    () =>
+      unitPrecisionFromOptions(
+        unitOptions,
+        form.getFieldValue(['items', fieldName, 'unit_id'])
+      ),
+    { positive: true }
+  )
 }
 
 function isOrderLineQuantityValidForUnit(line, quantityField, unitOptions) {
@@ -236,17 +239,6 @@ function isOrderLineQuantityValidForUnit(line, quantityField, unitOptions) {
     line?.[quantityField],
     unitPrecisionFromOptions(unitOptions, line?.unit_id)
   )
-}
-
-function optionalMoneyRule(label) {
-  return {
-    validator: async (_, value) => {
-      if (value === undefined || value === null || value === '') return
-      if (numeric20Scale6Units(value) === null) {
-        throw new Error(`${label}必须为非负数，且最多保留 6 位小数`)
-      }
-    },
-  }
 }
 
 export function SalesOrderFormFields({
@@ -504,12 +496,13 @@ export function SalesOrderFormFields({
           className="erp-business-action-form__field"
           label="计税方式"
           name="tax_mode"
-          extra="提交前必填"
+          required
+          rules={[salesOrderCommercialRule(form, 'tax_mode')]}
         >
           <Select
             allowClear
             options={SALES_ORDER_TAX_MODE_OPTIONS}
-            placeholder="草稿可暂缺，提交前补齐"
+            placeholder="请选择计税方式"
             onChange={(value) => {
               if (!value || value === 'NONE') {
                 form.setFieldsValue({ tax_rate: undefined })
@@ -523,26 +516,7 @@ export function SalesOrderFormFields({
           label="税率"
           name="tax_rate"
           required={Boolean(taxMode && taxMode !== 'NONE')}
-          rules={[
-            {
-              validator: async (_, value) => {
-                if (!taxMode || taxMode === 'NONE') return
-                if (value === undefined || value === null || value === '') {
-                  throw new Error('选择含税或未税计价后，请填写税率')
-                }
-                const units = numeric20Scale6Units(value)
-                if (
-                  units === null ||
-                  BigInt(units) <= BigInt(0) ||
-                  BigInt(units) > BigInt(100_000_000)
-                ) {
-                  throw new Error(
-                    '税率必须大于 0 且不超过 100%，最多保留 6 位小数'
-                  )
-                }
-              },
-            },
-          ]}
+          rules={[salesOrderCommercialRule(form, 'tax_rate')]}
         >
           <FieldWithUnitSuffix
             control={
@@ -558,12 +532,13 @@ export function SalesOrderFormFields({
           className="erp-business-action-form__field"
           label="报价是否含运费"
           name="freight_terms"
-          extra="提交前必填"
+          required
+          rules={[salesOrderCommercialRule(form, 'freight_terms')]}
         >
           <Select
             allowClear
             options={SALES_ORDER_FREIGHT_TERMS_OPTIONS}
-            placeholder="草稿可暂缺，提交前补齐"
+            placeholder="请选择运费口径"
             onChange={(value) => {
               if (value !== 'EXCLUDED') {
                 form.setFieldsValue({ quoted_freight_amount: undefined })
@@ -577,11 +552,12 @@ export function SalesOrderFormFields({
           extra={
             freightTerms === 'INCLUDED'
               ? '已包含在产品单价中，不重复计入订单总额'
-              : '报价不含运费时填写另行向客户收取的金额；提交前需补齐'
+              : '填写另行向客户收取的金额；无另计运费时填写 0'
           }
           label="报价运费"
           name="quoted_freight_amount"
-          rules={[optionalMoneyRule('报价运费')]}
+          required={freightTerms === 'EXCLUDED'}
+          rules={[salesOrderCommercialRule(form, 'quoted_freight_amount')]}
         >
           <FieldWithUnitSuffix
             control={

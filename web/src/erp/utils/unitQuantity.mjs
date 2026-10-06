@@ -1,6 +1,7 @@
 import standardUnits from '../../../../server/internal/unitpolicy/units.json' with { type: 'json' }
 
 import { NumericContract } from '../../common/consts/numeric.generated.mjs'
+import { numeric20Scale6Units } from './numeric20Scale6.mjs'
 
 const MAX_PRECISION = NumericContract.scale
 const UNIT_QUANTITY_PATTERN = new RegExp(`^-?(\\d{1,${NumericContract.integerDigits}})(?:\\.(\\d{1,${MAX_PRECISION}}))?$`, 'u')
@@ -43,9 +44,15 @@ export function unitPrecisionErrorMessage(precision) {
     : `当前单位最多允许 ${precision} 位小数`
 }
 
-export function unitQuantityRule(precisionOrGetter) {
+export function unitQuantityRule(precisionOrGetter, { positive = false } = {}) {
   return {
     async validator(_, value) {
+      if (positive && value != null && value !== '') {
+        const quantity = numeric20Scale6Units(value)
+        if (quantity === null || BigInt(quantity) <= BigInt(0)) {
+          throw new Error('数量必须大于 0，且最多保留 6 位小数')
+        }
+      }
       const precision =
         typeof precisionOrGetter === 'function'
           ? precisionOrGetter()

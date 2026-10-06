@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   isQuantityTextWithinUnitPrecision as valid,
+  unitQuantityRule,
   unitQuantityRuleFromOptions,
   unitPrecisionFromOptions,
 } from './unitQuantity.mjs'
@@ -26,6 +27,20 @@ test('quantity precision is exact and never rounds user input', () => {
   ]) {
     assert.equal(valid(value, precision), expected, `${value}/${precision}`)
   }
+})
+
+test('positive business quantities reject zero and negatives without changing signed adjustments', async () => {
+  const positive = unitQuantityRule(3, { positive: true })
+  for (const value of ['0', '0.000', '-1', 'abc', '0.0000001', ' ']) {
+    await assert.rejects(positive.validator(null, value), /数量必须大于 0/u)
+  }
+  await assert.rejects(positive.validator(null, '0.0001'), /最多允许 3 位/u)
+  await positive.validator(null, '0.001')
+  await positive.validator(null, '1')
+  // Required fields own the empty check; counts and adjustments still allow zero/signs.
+  await positive.validator(null, '')
+  await unitQuantityRule(3).validator(null, '0')
+  await unitQuantityRule(3).validator(null, '-1.25')
 })
 
 test('changing or clearing the unit revalidates existing quantity', async () => {

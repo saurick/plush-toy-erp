@@ -195,7 +195,7 @@ func (d *jsonrpcDispatcher) salesOrderErrorResult(ctx context.Context, err error
 	case errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete):
 		return salesOrderReadinessErrorResult(err)
 	case errors.Is(err, biz.ErrSalesOrderTaxRateRequired):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "选择含税或未税计价后，请同时填写税率；暂不确定时可清空计税方式后保存草稿"}
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "选择含税或未税计价后，请同时填写税率"}
 	case errors.Is(err, biz.ErrSalesOrderItemPriceMissing):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "订单仍有未填写单价的产品明细，请补齐后再提交"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
@@ -246,6 +246,9 @@ func salesOrderReadinessErrorResult(err error) *v1.JsonrpcResult {
 		}
 		if len(missing) > 0 {
 			message = "提交前请补齐：" + strings.Join(missing, "、") + "；保存草稿后重新提交"
+			if readiness.SaveRequired {
+				message = "保存前请补齐：" + strings.Join(missing, "、")
+			}
 		}
 	}
 	return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: message}

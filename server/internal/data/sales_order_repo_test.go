@@ -44,6 +44,29 @@ func TestSalesOrderDraftSaveAndSubmissionRequirements(t *testing.T) {
 			customer := createSalesOrderTestCustomer(t, ctx, client, "C-REQUIRED", true)
 			in := &biz.SalesOrderMutation{OrderNo: "SO-REQUIRED", CustomerID: customer.ID, Currency: biz.FinanceCurrencyCNY, OrderDate: time.Now(), TaxMode: tc.taxMode, FreightTerms: tc.freightTerms}
 			draft, err := uc.SaveSalesOrderWithItems(ctx, 0, in, nil)
+			if tc.name != "items" {
+				var missing *biz.SalesOrderReadinessError
+				if !errors.As(err, &missing) || !missing.SaveRequired || !reflect.DeepEqual(missing.MissingFields, tc.want) || client.SalesOrder.Query().CountX(ctx) != 0 {
+					t.Fatalf("missing pricing terms must reject creation: err=%v missing=%#v", err, missing)
+				}
+				valid := *in
+				valid.TaxMode = stringPtr(biz.SalesOrderTaxModeNone)
+				valid.FreightTerms = stringPtr(biz.SalesOrderFreightTermsIncluded)
+				draft, err = uc.SaveSalesOrderWithItems(ctx, 0, &valid, nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				in.ExpectedVersion = draft.Order.Version
+				_, err = uc.SaveSalesOrderWithItems(ctx, draft.Order.ID, in, nil)
+				if !errors.As(err, &missing) || !missing.SaveRequired || !reflect.DeepEqual(missing.MissingFields, tc.want) {
+					t.Fatalf("missing pricing terms must reject editing: %v", err)
+				}
+				stored := client.SalesOrder.GetX(ctx, draft.Order.ID)
+				if stored.Version != draft.Order.Version || stored.TaxMode == nil || stored.FreightTerms == nil || *stored.FreightTerms != biz.SalesOrderFreightTermsIncluded {
+					t.Fatalf("rejected edit changed the stored order: %#v", stored)
+				}
+				return
+			}
 			if err != nil {
 				t.Fatalf("incomplete draft must remain saveable: %v", err)
 			}
@@ -71,7 +94,7 @@ func TestSalesOrderDraftTaxRateValidation(t *testing.T) {
 			uc, client := openSalesOrderRepoTest(t, "sales_draft_tax_rate")
 			defer mustCloseEntClient(t, client)
 			customer := createSalesOrderTestCustomer(t, ctx, client, "C-TAX-RATE", true)
-			in := &biz.SalesOrderMutation{OrderNo: "SO-TAX-RATE", CustomerID: customer.ID, Currency: biz.FinanceCurrencyCNY, OrderDate: time.Now(), TaxMode: &mode}
+			in := &biz.SalesOrderMutation{OrderNo: "SO-TAX-RATE", CustomerID: customer.ID, Currency: biz.FinanceCurrencyCNY, OrderDate: time.Now(), TaxMode: &mode, FreightTerms: stringPtr(biz.SalesOrderFreightTermsIncluded)}
 			if _, err := uc.SaveSalesOrderWithItems(ctx, 0, in, nil); !errors.Is(err, biz.ErrSalesOrderTaxRateRequired) || client.SalesOrder.Query().CountX(ctx) != 0 {
 				t.Fatalf("taxable pricing without a rate must be rejected before persistence: %v", err)
 			}
@@ -90,16 +113,19 @@ func TestSalesOrderDraftTaxRateValidation(t *testing.T) {
 			if stored.Version != draft.Order.Version || stored.TaxRate == nil || !stored.TaxRate.Equal(rate) {
 				t.Fatalf("rejected edit changed the persisted tax rate or version: %#v", stored)
 			}
-			// Clearing the pricing choice deliberately returns the draft to incomplete terms.
 			in.TaxMode = nil
 			in.TaxRate = &rate
+			if _, err := uc.SaveSalesOrderWithItems(ctx, draft.Order.ID, in, nil); !errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete) {
+				t.Fatalf("clearing the required tax choice must reject saving: %v", err)
+			}
+			in.TaxMode = stringPtr(biz.SalesOrderTaxModeNone)
 			cleared, err := uc.SaveSalesOrderWithItems(ctx, draft.Order.ID, in, nil)
 			if err != nil {
-				t.Fatalf("clearing the tax choice must remain saveable: %v", err)
+				t.Fatalf("choosing no tax must remain saveable: %v", err)
 			}
 			stored = client.SalesOrder.GetX(ctx, cleared.Order.ID)
-			if stored.TaxMode != nil || stored.TaxRate != nil {
-				t.Fatalf("clearing the tax choice left stale values: %#v", stored)
+			if stored.TaxMode == nil || *stored.TaxMode != biz.SalesOrderTaxModeNone || stored.TaxRate != nil {
+				t.Fatalf("choosing no tax left stale values: %#v", stored)
 			}
 		})
 	}
@@ -267,7 +293,7 @@ func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {
 	if closed.LifecycleStatus != biz.SalesOrderStatusClosed {
 		t.Fatalf("expected closed order, got %#v", closed)
 	}
-	if _, err := uc.UpdateSalesOrder(ctx, order.ID, &biz.SalesOrderMutation{OrderNo: "SO-001-B", CustomerID: customer.ID, OrderDate: orderDate}); !errors.Is(err, biz.ErrBadParam) {
+	if _, err := uc.UpdateSalesOrder(ctx, order.ID, &biz.SalesOrderMutation{TaxMode: new(biz.SalesOrderTaxModeNone), FreightTerms: new(biz.SalesOrderFreightTermsIncluded), OrderNo: "SO-001-B", CustomerID: customer.ID, OrderDate: orderDate}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected closed sales order update rejected, got %v", err)
 	}
 }
@@ -285,9 +311,11 @@ func TestSalesOrderRepoItemGuardsAndCancel(t *testing.T) {
 	inactiveUnit := createSalesOrderTestUnit(t, ctx, client, "BOX-SO", false)
 	orderDate := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
 	order, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo:    "SO-ITEM-001",
-		CustomerID: customer.ID,
-		OrderDate:  orderDate,
+		TaxMode:      new(biz.SalesOrderTaxModeNone),
+		FreightTerms: new(biz.SalesOrderFreightTermsIncluded),
+		OrderNo:      "SO-ITEM-001",
+		CustomerID:   customer.ID,
+		OrderDate:    orderDate,
 	})
 	if err != nil {
 		t.Fatalf("create sales order failed: %v", err)
@@ -394,10 +422,12 @@ func TestSalesOrderRepoSaveWithItemsRollsBackOnItemFailure(t *testing.T) {
 	qty := decimal.NewFromInt(10)
 
 	_, err := repo.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
-		OrderNo:    "SO-TX-ROLLBACK",
-		CustomerID: customer.ID,
-		Currency:   biz.FinanceCurrencyCNY,
-		OrderDate:  orderDate,
+		TaxMode:      new(biz.SalesOrderTaxModeNone),
+		FreightTerms: new(biz.SalesOrderFreightTermsIncluded),
+		OrderNo:      "SO-TX-ROLLBACK",
+		CustomerID:   customer.ID,
+		Currency:     biz.FinanceCurrencyCNY,
+		OrderDate:    orderDate,
 	}, []*biz.SalesOrderItemSaveMutation{
 		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
 		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 2, ProductID: product.ID + 1000000, UnitID: unit.ID, OrderedQuantity: qty}},
@@ -427,9 +457,11 @@ func TestSalesOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testing.
 	orderDate := time.Date(2026, 8, 22, 0, 0, 0, 0, time.UTC)
 	qty := decimal.NewFromInt(10)
 	created, err := uc.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
-		OrderNo:    "SO-DISPLAY-ORDER",
-		CustomerID: customer.ID,
-		OrderDate:  orderDate,
+		TaxMode:      new(biz.SalesOrderTaxModeNone),
+		FreightTerms: new(biz.SalesOrderFreightTermsIncluded),
+		OrderNo:      "SO-DISPLAY-ORDER",
+		CustomerID:   customer.ID,
+		OrderDate:    orderDate,
 	}, []*biz.SalesOrderItemSaveMutation{
 		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
 		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 2, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
@@ -470,6 +502,8 @@ func TestSalesOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testing.
 	}
 
 	withReplacement, err := uc.SaveSalesOrderWithItems(ctx, created.Order.ID, &biz.SalesOrderMutation{
+		TaxMode:         new(biz.SalesOrderTaxModeNone),
+		FreightTerms:    new(biz.SalesOrderFreightTermsIncluded),
 		OrderNo:         created.Order.OrderNo,
 		CustomerID:      customer.ID,
 		Currency:        created.Order.Currency,
@@ -497,6 +531,8 @@ func TestSalesOrderRepoSaveWithItemsKeepsLineIdentityWhileReordering(t *testing.
 
 	replacedID := openItems[1].ID
 	_, err = uc.SaveSalesOrderWithItems(ctx, created.Order.ID, &biz.SalesOrderMutation{
+		TaxMode:         new(biz.SalesOrderTaxModeNone),
+		FreightTerms:    new(biz.SalesOrderFreightTermsIncluded),
 		OrderNo:         created.Order.OrderNo,
 		CustomerID:      customer.ID,
 		Currency:        created.Order.Currency,
@@ -560,9 +596,11 @@ func TestSalesOrderRepoSaveWithItemsUpdatesAndCancelsMissingOpenLines(t *testing
 	orderDate := time.Date(2026, 6, 15, 0, 0, 0, 0, time.UTC)
 	qty := decimal.NewFromInt(10)
 	order, err := uc.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
-		OrderNo:    "SO-TX-UPDATE",
-		CustomerID: customer.ID,
-		OrderDate:  orderDate,
+		TaxMode:      new(biz.SalesOrderTaxModeNone),
+		FreightTerms: new(biz.SalesOrderFreightTermsIncluded),
+		OrderNo:      "SO-TX-UPDATE",
+		CustomerID:   customer.ID,
+		OrderDate:    orderDate,
 	}, []*biz.SalesOrderItemSaveMutation{
 		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
 		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 2, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: qty}},
@@ -576,6 +614,8 @@ func TestSalesOrderRepoSaveWithItemsUpdatesAndCancelsMissingOpenLines(t *testing
 
 	updatedQty := decimal.NewFromInt(12)
 	result, err := uc.SaveSalesOrderWithItems(ctx, order.Order.ID, &biz.SalesOrderMutation{
+		TaxMode:         new(biz.SalesOrderTaxModeNone),
+		FreightTerms:    new(biz.SalesOrderFreightTermsIncluded),
 		OrderNo:         "SO-TX-UPDATE-A",
 		CustomerID:      customer.ID,
 		Currency:        biz.FinanceCurrencyUSD,
@@ -612,9 +652,8 @@ func TestSalesOrderRepoSubmitRequiresCommercialClosure(t *testing.T) {
 	orderDate := time.Date(2026, 8, 24, 0, 0, 0, 0, time.UTC)
 	unitPrice := decimal.NewFromInt(50)
 
-	missingTerms, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo: "SO-COMMERCIAL-MISSING-TERMS", CustomerID: customer.ID, OrderDate: orderDate,
-	})
+	// Existing incomplete rows must still be rejected by the submission gate.
+	missingTerms, err := client.SalesOrder.Create().SetOrderNo("SO-COMMERCIAL-MISSING-TERMS").SetCustomerID(customer.ID).SetOrderDate(orderDate).Save(ctx)
 	if err != nil {
 		t.Fatalf("create missing-terms order: %v", err)
 	}
@@ -657,10 +696,7 @@ func TestSalesOrderRepoSubmitRequiresCommercialClosure(t *testing.T) {
 		t.Fatalf("missing lines error=%v, want ErrSalesOrderCommercialTermsIncomplete", err)
 	}
 
-	missingQuotedFreight, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo: "SO-COMMERCIAL-MISSING-QUOTED-FREIGHT", CustomerID: customer.ID, OrderDate: orderDate,
-		TaxMode: stringPtr(biz.SalesOrderTaxModeNone), FreightTerms: stringPtr(biz.SalesOrderFreightTermsExcluded),
-	})
+	missingQuotedFreight, err := client.SalesOrder.Create().SetOrderNo("SO-COMMERCIAL-MISSING-QUOTED-FREIGHT").SetCustomerID(customer.ID).SetOrderDate(orderDate).SetTaxMode(biz.SalesOrderTaxModeNone).SetFreightTerms(biz.SalesOrderFreightTermsExcluded).Save(ctx)
 	if err != nil {
 		t.Fatalf("create missing-quoted-freight order: %v", err)
 	}
@@ -709,10 +745,10 @@ func TestSalesOrderRepoCustomerGuard(t *testing.T) {
 
 	inactiveCustomer := createSalesOrderTestCustomer(t, ctx, client, "C-SO-OFF", false)
 	orderDate := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
-	if _, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{OrderNo: "SO-MISSING-CUSTOMER", CustomerID: 999999, OrderDate: orderDate}); !errors.Is(err, biz.ErrCustomerNotFound) {
+	if _, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{TaxMode: new(biz.SalesOrderTaxModeNone), FreightTerms: new(biz.SalesOrderFreightTermsIncluded), OrderNo: "SO-MISSING-CUSTOMER", CustomerID: 999999, OrderDate: orderDate}); !errors.Is(err, biz.ErrCustomerNotFound) {
 		t.Fatalf("expected missing customer rejected, got %v", err)
 	}
-	if _, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{OrderNo: "SO-INACTIVE-CUSTOMER", CustomerID: inactiveCustomer.ID, OrderDate: orderDate}); !errors.Is(err, biz.ErrCustomerInactive) {
+	if _, err := uc.CreateSalesOrder(ctx, &biz.SalesOrderMutation{TaxMode: new(biz.SalesOrderTaxModeNone), FreightTerms: new(biz.SalesOrderFreightTermsIncluded), OrderNo: "SO-INACTIVE-CUSTOMER", CustomerID: inactiveCustomer.ID, OrderDate: orderDate}); !errors.Is(err, biz.ErrCustomerInactive) {
 		t.Fatalf("expected inactive customer rejected, got %v", err)
 	}
 }

@@ -66,6 +66,123 @@ export function createQualitySourceActionScenarios(deps) {
   }
 
   return [
+    ...['production', 'outsourcing'].map((kind) => {
+      let writes
+      const production = kind === 'production'
+      const inspection = {
+        id: 710,
+        inspection_no: `QI-REQUIRED-${kind}`,
+        inspection_type: production ? 'PRODUCTION_STAGE' : 'OUTSOURCING_RETURN',
+        source_type: production ? 'PRODUCTION_WIP' : 'OUTSOURCING_FACT',
+        source_id: 711,
+        production_wip_batch_id: production ? 711 : null,
+        unit_precision: 0,
+        status: 'REJECTED',
+        result: 'REJECT',
+      }
+      return {
+        name: `quality-${kind}-positive-quantity`,
+        path: '/erp/production/quality-inspections',
+        auth: 'admin',
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport: { width: 3840, height: 2160 },
+        beforeNavigate: async (page) => {
+          writes = []
+          page.on('request', (request) => {
+            if (!request.url().endsWith('/rpc/operational_fact')) return
+            const body = request.postDataJSON()
+            if (
+              [
+                'submit_production_exception',
+                'create_outsourcing_return_disposition',
+              ].includes(body?.method)
+            ) {
+              writes.push(body.params)
+            }
+          })
+          await page.route('**/rpc/quality', async (route) => {
+            const { id, method, params = {} } = route.request().postDataJSON()
+            if (method !== 'list_quality_inspections') return route.fallback()
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: stylePaginatedRpcData(
+                    [inspection],
+                    'quality_inspections',
+                    params
+                  ),
+                },
+              }),
+            })
+          })
+          await page.route('**/rpc/operational_fact', async (route) => {
+            const { id, method, params = {} } = route.request().postDataJSON()
+            if (method !== 'list_outsourcing_return_dispositions') {
+              return route.fallback()
+            }
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: stylePaginatedRpcData(
+                    [],
+                    'outsourcing_return_dispositions',
+                    params
+                  ),
+                },
+              }),
+            })
+          })
+        },
+        verify: async (page) => {
+          await selectRow(page, inspection.inspection_no)
+          await clickSelectionAction(page, '不合格处置')
+          const modal = page.getByRole('dialog', {
+            name: production ? '提交生产异常申请' : '委外不合格返厂 / 返工',
+          })
+          const input = modal.getByLabel(production ? '申请数量' : '处置数量', {
+            exact: true,
+          })
+          const action = modal.getByRole('button', {
+            name: production ? /提交申请$/u : /生成处置草稿$/u,
+          })
+          for (const quantity of ['0', '-1', '0.1']) {
+            await input.fill(quantity)
+            await action.click()
+            await modal
+              .getByText(
+                quantity === '0.1'
+                  ? '当前单位只允许整数数量'
+                  : '数量必须大于 0，且最多保留 6 位小数',
+                { exact: true }
+              )
+              .waitFor()
+            assert.equal(writes.length, 0, '无效数量必须在页面阻断')
+          }
+          await input.fill('1')
+          await modal
+            .getByText('数量必须大于 0，且最多保留 6 位小数', { exact: true })
+            .waitFor({ state: 'hidden' })
+          await modal
+            .getByText('当前单位只允许整数数量', { exact: true })
+            .waitFor({ state: 'hidden' })
+          await page.screenshot({
+            path: `${outputDir}/quality-${kind}-quantity-4k.png`,
+          })
+        },
+      }
+    }),
     (() => {
       const productionInspection = {
         id: 908700101,

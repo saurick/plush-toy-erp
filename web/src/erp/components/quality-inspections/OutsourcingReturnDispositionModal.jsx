@@ -94,12 +94,18 @@ export default function OutsourcingReturnDispositionModal({
 
   const create = async () => {
     if (!canCreate || !sourceInspectionID) return
-    const values = await form.validateFields([
-      'disposition_no',
-      'disposition_type',
-      'quantity',
-      'reason',
-    ])
+    let values
+    try {
+      values = await form.validateFields([
+        'disposition_no',
+        'disposition_type',
+        'quantity',
+        'reason',
+      ])
+    } catch (error) {
+      if (!Array.isArray(error?.errorFields)) throw error
+      return
+    }
     const payload = {
       disposition_no: values.disposition_no.trim(),
       quality_inspection_id: sourceInspectionID,
@@ -246,6 +252,7 @@ export default function OutsourcingReturnDispositionModal({
       ) : null}
       <Form
         form={form}
+        name="outsourcing-return-disposition"
         layout="vertical"
         disabled={loading || readOnly}
         style={{ marginTop: 12 }}
@@ -282,7 +289,8 @@ export default function OutsourcingReturnDispositionModal({
                       unitPrecisionFromOptions(
                         quantityUnitOptions,
                         fact?.unit_id
-                      )
+                      ),
+                    { positive: true }
                   ),
                   { required: true },
                 ]}

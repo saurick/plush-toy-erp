@@ -10,6 +10,10 @@ import {
   buildOrderContactSnapshot,
 } from './sourcePartySnapshots.mjs'
 import { isMutationResultUnknown } from './sourceDocumentMutation.mjs'
+import {
+  salesOrderCommercialIssues,
+  optionalMoneyError,
+} from './sourceOrderValidation.mjs'
 
 const text = (value) => String(value ?? '').trim()
 
@@ -38,6 +42,9 @@ export function salesOrderImportIssues(
     add(['order_date'], '请填写下单日期')
   }
   if (!values.items?.length) add(['items'], '至少保留一条订货明细')
+  for (const issue of salesOrderCommercialIssues(values)) {
+    add(issue.name, issue.errors[0])
+  }
   for (const [index, item] of (values.items || []).entries()) {
     const unit = units.find(
       (candidate) =>
@@ -47,6 +54,8 @@ export function salesOrderImportIssues(
       add(['items', index, 'requested_product_name'], '请填写产品名称')
     }
     if (!unit) add(['items', index, 'unit_id'], '请选择单位')
+    const priceError = optionalMoneyError(item.unit_price, '单价')
+    if (priceError) add(['items', index, 'unit_price'], priceError)
     for (const [key, label, positive] of [
       ['ordered_quantity', '订单数量', true],
       ['pre_shipment_sample_quantity', '船头版数量', false],

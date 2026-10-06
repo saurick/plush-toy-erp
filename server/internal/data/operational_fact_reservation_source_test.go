@@ -118,9 +118,11 @@ func TestOperationalFactRepoCreateStockReservationFromSalesOrderRejectsInvalidSo
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-RSV-SOURCE-STATE", true)
 	draftOrder, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo:    "SO-RSV-SOURCE-DRAFT",
-		CustomerID: customer.ID,
-		OrderDate:  time.Date(2026, 7, 14, 0, 0, 0, 0, time.UTC),
+		TaxMode:      new(biz.SalesOrderTaxModeNone),
+		FreightTerms: new(biz.SalesOrderFreightTermsIncluded),
+		OrderNo:      "SO-RSV-SOURCE-DRAFT",
+		CustomerID:   customer.ID,
+		OrderDate:    time.Date(2026, 7, 14, 0, 0, 0, 0, time.UTC),
 	})
 	if err != nil {
 		t.Fatalf("create draft source order failed: %v", err)

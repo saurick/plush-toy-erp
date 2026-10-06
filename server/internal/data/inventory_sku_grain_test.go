@@ -278,7 +278,9 @@ func TestProductSKUProductOwnershipCannotDrift(t *testing.T) {
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SKU-OWNERSHIP", true)
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo: "SO-SKU-OWNERSHIP", CustomerID: customer.ID, OrderDate: row.CreatedAt,
+		TaxMode:      new(biz.SalesOrderTaxModeNone),
+		FreightTerms: new(biz.SalesOrderFreightTermsIncluded),
+		OrderNo:      "SO-SKU-OWNERSHIP", CustomerID: customer.ID, OrderDate: row.CreatedAt,
 	})
 	if err != nil {
 		t.Fatalf("create sales order: %v", err)

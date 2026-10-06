@@ -192,6 +192,8 @@ func TestSalesOrderUsecaseCreateGuardsCustomer(t *testing.T) {
 	plannedDeliveryDate := orderDate.AddDate(0, 0, 1)
 
 	order, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{
+		TaxMode:             new(SalesOrderTaxModeNone),
+		FreightTerms:        new(SalesOrderFreightTermsIncluded),
 		OrderNo:             " SO-001 ",
 		CustomerID:          10,
 		CustomerOrderNo:     &customerOrderNo,
@@ -221,30 +223,30 @@ func TestSalesOrderUsecaseCreateGuardsCustomer(t *testing.T) {
 		t.Fatalf("expected contact snapshot normalized, got %#v", repo.createdOrder.ContactSnapshot)
 	}
 	negativeTermDays := -1
-	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-BAD-PAYMENT", CustomerID: 10, PaymentTermDays: &negativeTermDays, OrderDate: orderDate}); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-BAD-PAYMENT", CustomerID: 10, PaymentTermDays: &negativeTermDays, OrderDate: orderDate}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected negative payment term rejected, got %v", err)
 	}
-	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-BAD-EMAIL", CustomerID: 10, ContactSnapshot: map[string]any{"email": "buyer@example"}, OrderDate: orderDate}); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-BAD-EMAIL", CustomerID: 10, ContactSnapshot: map[string]any{"email": "buyer@example"}, OrderDate: orderDate}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected invalid contact snapshot email rejected, got %v", err)
 	}
-	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-BAD-PHONE", CustomerID: 10, ContactSnapshot: map[string]any{"phone": "12345"}, OrderDate: orderDate}); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-BAD-PHONE", CustomerID: 10, ContactSnapshot: map[string]any{"phone": "12345"}, OrderDate: orderDate}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected invalid contact snapshot phone rejected, got %v", err)
 	}
 	beforeOrderDate := orderDate.AddDate(0, 0, -1)
-	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-BAD-DATE", CustomerID: 10, OrderDate: orderDate, PlannedDeliveryDate: &beforeOrderDate}); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-BAD-DATE", CustomerID: 10, OrderDate: orderDate, PlannedDeliveryDate: &beforeOrderDate}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected planned delivery before order date rejected, got %v", err)
 	}
 
-	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-002", CustomerID: 999, OrderDate: orderDate}); !errors.Is(err, ErrCustomerNotFound) {
+	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-002", CustomerID: 999, OrderDate: orderDate}); !errors.Is(err, ErrCustomerNotFound) {
 		t.Fatalf("expected missing customer rejected, got %v", err)
 	}
-	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{OrderNo: "SO-003", CustomerID: 11, OrderDate: orderDate}); !errors.Is(err, ErrCustomerInactive) {
+	if _, err := uc.CreateSalesOrder(ctx, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-003", CustomerID: 11, OrderDate: orderDate}); !errors.Is(err, ErrCustomerInactive) {
 		t.Fatalf("expected inactive customer rejected, got %v", err)
 	}
 }
 
 func TestSalesOrderCurrencyDefaultsOnlyOnCreate(t *testing.T) {
-	base := SalesOrderMutation{OrderNo: "SO-CURRENCY", CustomerID: 1, OrderDate: time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)}
+	base := SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-CURRENCY", CustomerID: 1, OrderDate: time.Date(2026, 8, 12, 0, 0, 0, 0, time.UTC)}
 	created, err := normalizeSalesOrderMutation(base, true)
 	if err != nil || created.Currency != FinanceCurrencyCNY {
 		t.Fatalf("expected create to default CNY, got mutation=%#v err=%v", created, err)
@@ -638,6 +640,8 @@ func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 	qty := decimal.NewFromInt(6)
 
 	result, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{
+		TaxMode:         new(SalesOrderTaxModeNone),
+		FreightTerms:    new(SalesOrderFreightTermsIncluded),
 		OrderNo:         " SO-TX-001 ",
 		CustomerID:      1000,
 		Currency:        FinanceCurrencyUSD,
@@ -659,27 +663,27 @@ func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 		t.Fatalf("expected item bound to order 1, got %#v", repo.savedItems)
 	}
 
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{OrderNo: "SO-NO-VERSION", CustomerID: 1000, OrderDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-NO-VERSION", CustomerID: 1000, OrderDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected missing version rejected, got %v", err)
 	}
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 2, &SalesOrderMutation{OrderNo: "SO-CLOSED", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 2, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-CLOSED", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected closed order save rejected, got %v", err)
 	}
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 3, &SalesOrderMutation{OrderNo: "SO-SUBMITTED", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 3, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-SUBMITTED", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected submitted sales order to be frozen, got %v", err)
 	}
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{OrderNo: "SO-WRONG-ITEM", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, []*SalesOrderItemSaveMutation{
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-WRONG-ITEM", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, []*SalesOrderItemSaveMutation{
 		{ID: 20, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty}},
 	}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected foreign order item rejected, got %v", err)
 	}
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 0, &SalesOrderMutation{OrderNo: "SO-NEW", CustomerID: 1000, OrderDate: orderDate}, []*SalesOrderItemSaveMutation{
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 0, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-NEW", CustomerID: 1000, OrderDate: orderDate}, []*SalesOrderItemSaveMutation{
 		{ID: 10, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty}},
 	}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected existing item on new order rejected, got %v", err)
 	}
 	beforeOrderDate := orderDate.AddDate(0, 0, -1)
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{OrderNo: "SO-BAD-LINE-DATE", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, []*SalesOrderItemSaveMutation{
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{TaxMode: new(SalesOrderTaxModeNone), FreightTerms: new(SalesOrderFreightTermsIncluded), OrderNo: "SO-BAD-LINE-DATE", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, []*SalesOrderItemSaveMutation{
 		{ID: 10, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty, PlannedDeliveryDate: &beforeOrderDate}},
 	}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected line planned delivery before order date rejected, got %v", err)

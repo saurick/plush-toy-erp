@@ -18,7 +18,7 @@ func TestSalesOrderImportedLinesPersistEvidenceWithoutWritingFacts(t *testing.T)
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-IMPORT", true)
 	unit := createSalesOrderTestUnit(t, ctx, client, "PCS-IMPORT", true)
 	name := "模拟订货产品"
-	order := &biz.SalesOrderMutation{OrderNo: "SO-IMPORT-PERSIST", CustomerID: customer.ID, Currency: "CNY", OrderDate: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)}
+	order := &biz.SalesOrderMutation{TaxMode: new(biz.SalesOrderTaxModeNone), FreightTerms: new(biz.SalesOrderFreightTermsIncluded), OrderNo: "SO-IMPORT-PERSIST", CustomerID: customer.ID, Currency: "CNY", OrderDate: time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)}
 	line := biz.SalesOrderItemMutation{LineNo: 1, UnitID: unit.ID, RequestedProductName: &name, OrderedQuantity: decimal.NewFromInt(1000), PreShipmentSampleQuantity: decimal.NewFromInt(12), ImportSource: map[string]any{
 		"file_name": "订单.xlsx", "file_sha256": strings.Repeat("a", 64), "sheet_name": "订单", "row_number": 5,
 		"cells": []any{

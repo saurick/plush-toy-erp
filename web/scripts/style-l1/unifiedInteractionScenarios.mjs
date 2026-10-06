@@ -275,9 +275,30 @@ export function createUnifiedInteractionScenarios({
         await editor
           .getByRole('heading', { name: '编辑采购订单', exact: true })
           .waitFor()
+        const saves = []
+        page.on('request', (request) => {
+          if (request.url().endsWith('/rpc/purchase_order') &&
+              request.postDataJSON()?.method === 'save_purchase_order_with_items') {
+            saves.push(request.postDataJSON().params)
+          }
+        })
         await editor.getByLabel('付款周期（天）', { exact: true }).fill('30')
         const lines = editor.locator('.erp-sales-order-lines-form__row')
         const firstLine = lines.first()
+        for (const [label, invalid, message] of [
+          ['采购数量', '0', '数量必须大于 0，且最多保留 6 位小数'],
+          ['采购数量', '-1', '数量必须大于 0，且最多保留 6 位小数'],
+          ['单价', '-1', '单价必须为非负数，且最多保留 6 位小数'],
+          ['金额', '0.0000001', '金额必须为非负数，且最多保留 6 位小数'],
+        ]) {
+          const input = firstLine.getByLabel(label, { exact: true })
+          const original = await input.inputValue()
+          await input.fill(invalid)
+          await editor.getByRole('button', { name: /保存草稿$/u }).click()
+          await firstLine.getByText(message, { exact: true }).waitFor()
+          assert.equal(saves.length, 0, `${label}无效时不得发出保存请求`)
+          await input.fill(original)
+        }
         await firstLine.locator('summary').click()
         await firstLine
           .getByLabel('产品名称', { exact: true })
@@ -298,8 +319,8 @@ export function createUnifiedInteractionScenarios({
             request.url().endsWith('/rpc/purchase_order') &&
             request.postDataJSON()?.method === 'save_purchase_order_with_items'
         )
-        await editor.getByRole('button', { name: /^保\s*存$/u }).click()
-        const params = (await requestPromise).postDataJSON().params
+        await editor.getByRole('button', { name: /保存草稿$/u }).click()
+        const { params } = (await requestPromise).postDataJSON()
         assert.deepEqual(
           params.items.map((item) => item.line_no),
           [1, 2]
@@ -321,19 +342,19 @@ export function createUnifiedInteractionScenarios({
         await page.route('**/rpc/sales_order', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
           if (method === 'list_sales_order_summary')
-            return respond(
+            { return respond(
               route,
               id,
               stylePaginatedRpcData(rows, 'items', params)
-            )
+            ) }
           if (method === 'get_sales_order')
-            return respond(route, id, {
+            { return respond(route, id, {
               sales_order: {
                 ...rows.find((row) => row.id === params.id),
                 customer_snapshot: { name: '交互验证客户' },
                 version: 1,
               },
-            })
+            }) }
           return route.fallback()
         })
       },

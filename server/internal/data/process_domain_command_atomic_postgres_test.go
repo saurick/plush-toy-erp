@@ -304,12 +304,14 @@ func TestSalesProcessCommandPostgresMissingTermsCanBeRepairedAndRetried(t *testi
 	unit := createTestUnit(t, ctx, client, "SUBMIT-U-"+suffix)
 	product := createTestProduct(t, ctx, client, unit.ID, "SUBMIT-P-"+suffix)
 	price := decimal.NewFromInt(30)
-	in := &biz.SalesOrderMutation{OrderNo: "SO-SUBMIT-" + suffix, CustomerID: customer.ID, OrderDate: time.Now().UTC(), Currency: biz.FinanceCurrencyCNY}
+	in := &biz.SalesOrderMutation{OrderNo: "SO-SUBMIT-" + suffix, CustomerID: customer.ID, OrderDate: time.Now().UTC(), Currency: biz.FinanceCurrencyCNY, TaxMode: new(biz.SalesOrderTaxModeNone), FreightTerms: new(biz.SalesOrderFreightTermsIncluded)}
 	items := []*biz.SalesOrderItemSaveMutation{{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: decimal.NewFromInt(100), UnitPrice: &price}}}
 	draft, err := uc.SaveSalesOrderWithItems(ctx, 0, in, items)
 	if err != nil {
-		t.Fatalf("save incomplete draft: %v", err)
+		t.Fatalf("save draft fixture: %v", err)
 	}
+	// Represent a stored incomplete draft without bypassing line normalization.
+	client.SalesOrder.UpdateOneID(draft.Order.ID).ClearTaxMode().ClearFreightTerms().ClearTaxAmount().ClearOrderTotal().SaveX(ctx)
 	command := claimedPostgresProcessCommandForBusinessRef(t, ctx, processRepo, biz.ProcessDomainCommandSalesOrderSubmit, "sales-submit/"+suffix, map[string]any{"sales_order_id": draft.Order.ID}, "sales_order", draft.Order.ID)
 	result := &biz.ProcessDomainCommandResult{Outcome: biz.SalesOrderProcessCommandOutcomeSubmitted, EffectState: biz.ProcessDomainCommandEffectStateApplied, EffectRef: &biz.ProcessBusinessRef{RefType: "sales_order", RefID: draft.Order.ID}}
 	if _, err := salesRepo.SubmitSalesOrderForProcessCommand(ctx, draft.Order.ID, command, result, 7); !errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete) {

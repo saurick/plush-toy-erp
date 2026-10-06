@@ -31,9 +31,11 @@ func TestSourceDocumentPostgresDraftVersionCAS(t *testing.T) {
 		customer := createSalesOrderTestCustomer(t, ctx, client, "SO-CAS-C-"+suffix, true)
 		uc := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
 		created, err := uc.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
-			OrderNo:    "SO-CAS-BASE-" + suffix,
-			CustomerID: customer.ID,
-			OrderDate:  orderDate,
+			TaxMode:      new(biz.SalesOrderTaxModeNone),
+			FreightTerms: new(biz.SalesOrderFreightTermsIncluded),
+			OrderNo:      "SO-CAS-BASE-" + suffix,
+			CustomerID:   customer.ID,
+			OrderDate:    orderDate,
 		}, []*biz.SalesOrderItemSaveMutation{{
 			SalesOrderItemMutation: biz.SalesOrderItemMutation{
 				LineNo:          1,
@@ -56,6 +58,8 @@ func TestSourceDocumentPostgresDraftVersionCAS(t *testing.T) {
 			go func() {
 				<-start
 				row, saveErr := uc.SaveSalesOrderWithItems(ctx, created.Order.ID, &biz.SalesOrderMutation{
+					TaxMode:         new(biz.SalesOrderTaxModeNone),
+					FreightTerms:    new(biz.SalesOrderFreightTermsIncluded),
 					OrderNo:         fmt.Sprintf("SO-CAS-%s-%s", attempt, suffix),
 					CustomerID:      customer.ID,
 					OrderDate:       orderDate,

@@ -1,9 +1,9 @@
 package data
 
 import (
-	"server/internal/attachmentstore"
 	"context"
 	"errors"
+	"server/internal/attachmentstore"
 	"strings"
 	"testing"
 	"time"
@@ -115,7 +115,7 @@ func TestSalesOrderDemandReplaceAndClear(t *testing.T) {
 	unit := createSalesOrderTestUnit(t, ctx, client, "REPLACE-U", true)
 	product := createSalesOrderTestProduct(t, ctx, client, unit.ID, "REPLACE-P", true)
 	name, code, requirement := "原始需求", "款号", "原始工艺"
-	in := &biz.SalesOrderMutation{OrderNo: "REPLACE-ORDER", CustomerID: customer.ID, Currency: "CNY", OrderDate: time.Now()}
+	in := &biz.SalesOrderMutation{TaxMode: new(biz.SalesOrderTaxModeNone), FreightTerms: new(biz.SalesOrderFreightTermsIncluded), OrderNo: "REPLACE-ORDER", CustomerID: customer.ID, Currency: "CNY", OrderDate: time.Now()}
 	line := &biz.SalesOrderItemSaveMutation{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: decimal.NewFromInt(5), RequestedProductName: &name, CustomerProductNo: &code, ProcessRequirement: &requirement, OrderCategory: "REPEAT", PreShipmentSampleQuantity: decimal.NewFromInt(2)}}
 	saved, err := uc.SaveSalesOrderWithItems(ctx, 0, in, []*biz.SalesOrderItemSaveMutation{line})
 	if err != nil {

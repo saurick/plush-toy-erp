@@ -1,6 +1,7 @@
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { currentBusinessDate } from '../../src/erp/utils/businessDate.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.js'
+import { closeBusinessFormPage } from './businessFormPageAssertions.mjs'
 
 async function respond(route, id, data, message = 'OK', code = 0) {
   await route.fulfill({
@@ -75,20 +76,23 @@ export function createSalesOrderSubmissionScenarios({
         }
         await page.route('**/rpc/sales_order', async (route) => {
           const { id, method, params = {} } = route.request().postDataJSON()
-          if (method === 'list_sales_orders')
+          if (method === 'list_sales_orders') {
             return respond(
               route,
               id,
               stylePaginatedRpcData([state.order], 'sales_orders', params)
             )
-          if (method === 'get_sales_order')
+          }
+          if (method === 'get_sales_order') {
             return respond(route, id, { sales_order: state.order })
-          if (method === 'list_sales_order_items')
+          }
+          if (method === 'list_sales_order_items') {
             return respond(
               route,
               id,
               stylePaginatedRpcData(state.items, 'sales_order_items', params)
             )
+          }
           if (method === 'save_sales_order_with_items') {
             state.saves.push(params)
             state.order = {
@@ -190,10 +194,23 @@ export function createSalesOrderSubmissionScenarios({
             .waitFor()
           return editor
         }
-        let editor = await editOrder()
-        await editor.getByRole('button', { name: /保存草稿$/ }).click()
-        await editor.waitFor({ state: 'hidden' })
-        assert.equal(state.saves.length, 1)
+        await page.getByRole('button', { name: /新建订单$/u }).click()
+        const createEditor = page.locator(
+          '.erp-business-form-page:not([hidden])'
+        )
+        await createEditor
+          .getByRole('heading', { name: '新建销售订单', exact: true })
+          .waitFor()
+        await createEditor.getByRole('button', { name: /保存草稿$/ }).click()
+        await createEditor
+          .getByText('请选择计税方式', { exact: true })
+          .last()
+          .waitFor()
+        await createEditor
+          .getByText('请选择报价是否含运费', { exact: true })
+          .waitFor()
+        assert.equal(state.saves.length, 0, '新建时必须显示报价口径的阻断错误')
+        await closeBusinessFormPage(page, createEditor)
         await selectOrder()
         await page
           .getByRole('button', { name: '提交订单', exact: true })
@@ -205,13 +222,26 @@ export function createSalesOrderSubmissionScenarios({
           )
           .waitFor()
         assert.equal(state.order.lifecycle_status, 'draft')
-        editor = await editOrder()
+        const editor = await editOrder()
+        await editor.getByRole('button', { name: /保存草稿$/ }).click()
+        await editor
+          .getByText('请选择计税方式', { exact: true })
+          .last()
+          .waitFor()
+        await editor
+          .getByText('请选择报价是否含运费', { exact: true })
+          .waitFor()
+        assert.equal(
+          state.saves.length,
+          0,
+          '缺少必要报价口径时，编辑保存也必须被阻止'
+        )
         await selectValue(editor, '计税方式', '含税价')
         await editor.getByRole('button', { name: /保存草稿$/ }).click()
         await editor
           .getByText('选择含税或未税计价后，请填写税率', { exact: true })
           .waitFor()
-        assert.equal(state.saves.length, 1, '条件必填未完成时不能发出保存请求')
+        assert.equal(state.saves.length, 0, '条件必填未完成时不能发出保存请求')
         await editor.getByLabel('税率', { exact: true }).fill('13')
         await selectValue(editor, '计税方式', '不计税')
         assert.equal(
@@ -225,18 +255,36 @@ export function createSalesOrderSubmissionScenarios({
         await selectValue(editor, '计税方式', '含税价')
         await editor.getByLabel('税率', { exact: true }).fill('13')
         await selectValue(editor, '报价是否含运费', '报价不含运费（另计）')
+        await editor.getByRole('button', { name: /保存草稿$/ }).click()
+        await editor
+          .getByText('请填写报价运费，无另计运费时填写 0', { exact: true })
+          .waitFor()
+        assert.equal(state.saves.length, 0)
         await editor.getByLabel('报价运费', { exact: true }).fill('25')
         await selectValue(editor, '报价是否含运费', '报价含运费')
         assert.equal(
           await editor.getByLabel('报价运费', { exact: true }).inputValue(),
           ''
         )
+        const quantity = editor.getByLabel('订单数量', { exact: true })
+        for (const invalid of ['0', '-1', ' ']) {
+          await quantity.fill(invalid)
+          await editor.getByRole('button', { name: /保存草稿$/ }).click()
+          await editor
+            .getByText('数量必须大于 0，且最多保留 6 位小数', { exact: true })
+            .waitFor()
+          assert.equal(state.saves.length, 0)
+        }
+        await quantity.fill('100')
+        await editor
+          .getByText('数量必须大于 0，且最多保留 6 位小数', { exact: true })
+          .waitFor({ state: 'hidden' })
         await page.screenshot({
           path: `${outputDir}/sales-order-submission-fields-4k.png`,
         })
         await editor.getByRole('button', { name: /保存草稿$/ }).click()
         await editor.waitFor({ state: 'hidden' })
-        assert.equal(state.saves.length, 2)
+        assert.equal(state.saves.length, 1)
         await selectOrder()
         await page
           .getByRole('button', { name: '提交订单', exact: true })
@@ -247,11 +295,11 @@ export function createSalesOrderSubmissionScenarios({
         assert.equal(state.order.lifecycle_status, 'submitted')
         assert.equal(state.starts, 1, '修正后须复用已存在的接单流程')
         assert.equal(state.executions, 2)
-        assert.equal(state.saves[1].tax_mode, 'INCLUSIVE')
-        assert.equal(String(state.saves[1].tax_rate), '13')
-        assert.equal(state.saves[1].quoted_freight_amount, undefined)
-        assert.equal(String(state.saves[1].items[0].ordered_quantity), '100')
-        assert.equal(String(state.saves[1].items[0].unit_price), '30')
+        assert.equal(state.saves[0].tax_mode, 'INCLUSIVE')
+        assert.equal(String(state.saves[0].tax_rate), '13')
+        assert.equal(state.saves[0].quoted_freight_amount, undefined)
+        assert.equal(String(state.saves[0].items[0].ordered_quantity), '100')
+        assert.equal(String(state.saves[0].items[0].unit_price), '30')
       },
     },
   ]

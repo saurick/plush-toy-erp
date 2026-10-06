@@ -44,7 +44,9 @@ func TestSalesOrderSummaryRowsFiltersAndSourceDisplay(t *testing.T) {
 	headerDate, lineDate := date.AddDate(0, 0, 8), date.AddDate(0, 0, 11)
 	owner, name, number, process := "模拟跟单员", "模拟小熊", "CUSTOM-01", "刺绣"
 	older, err := uc.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
-		OrderNo: "SO-SUM-OLD", CustomerID: customer.ID, CustomerSnapshot: map[string]any{"name": customer.Name}, OrderDate: date, SalesOwner: &owner, PlannedDeliveryDate: &headerDate,
+		TaxMode:      new(biz.SalesOrderTaxModeNone),
+		FreightTerms: new(biz.SalesOrderFreightTermsIncluded),
+		OrderNo:      "SO-SUM-OLD", CustomerID: customer.ID, CustomerSnapshot: map[string]any{"name": customer.Name}, OrderDate: date, SalesOwner: &owner, PlannedDeliveryDate: &headerDate,
 	}, []*biz.SalesOrderItemSaveMutation{
 		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, UnitID: unit.ID, RequestedProductName: &name, CustomerProductNo: &number, OrderedQuantity: decimal.NewFromInt(10), PreShipmentSampleQuantity: decimal.NewFromInt(2), ProcessRequirement: &process}},
 		{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 2, UnitID: unit.ID, RequestedProductName: &name, OrderedQuantity: decimal.NewFromInt(20), PlannedDeliveryDate: &lineDate}},
@@ -53,7 +55,9 @@ func TestSalesOrderSummaryRowsFiltersAndSourceDisplay(t *testing.T) {
 		t.Fatal(err)
 	}
 	newer, err := uc.SaveSalesOrderWithItems(ctx, 0, &biz.SalesOrderMutation{
-		OrderNo: "SO-SUM-NEW", CustomerID: customer.ID, CustomerSnapshot: map[string]any{"name": customer.Name}, OrderDate: date.AddDate(0, 0, 1),
+		TaxMode:      new(biz.SalesOrderTaxModeNone),
+		FreightTerms: new(biz.SalesOrderFreightTermsIncluded),
+		OrderNo:      "SO-SUM-NEW", CustomerID: customer.ID, CustomerSnapshot: map[string]any{"name": customer.Name}, OrderDate: date.AddDate(0, 0, 1),
 	}, []*biz.SalesOrderItemSaveMutation{{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, UnitID: unit.ID, RequestedProductName: &name, OrderedQuantity: decimal.NewFromInt(30)}}})
 	if err != nil {
 		t.Fatal(err)
