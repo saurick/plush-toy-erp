@@ -6,16 +6,24 @@
 
 ### 最新代码统一收口与部署（2026-10-06）
 
-- 安全快照更新 `27984cb8` 的 [CI #267](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/267) 在汇总时失败：浏览器 Job 的 `print-workspace-all-empty-fields` 等待工程材料明细打印页就绪超时，内部重试后报成功，但汇总门禁拒绝其 `retries=1`。Runner Docker 事件确认同一等待窗口内 Schema 检查的 Atlas 开发库发生网络连接与断开，浏览器 DAG 原先只等待升级与关键数据库检查。补齐 Schema 依赖，并将浏览器执行、场景解析与回执统一为零重试，失败在所属 Job 直接暴露；没有放宽等待时间或最终门禁。新回归在修复前分别检出缺依赖、接受重试结果和接受重试回执。
+- 本轮等待中的会话结束后，已将账号外观持久化、表格网格线、保存提示布局、草稿提交校验和日志看板等 69 个文件按目标分组提交推送；效能工作台 CI 指引此前已以 `eae457ee` 收口。正式应用版本最终固定为 `2026.10.06-1 / a952f155b999a1ed9591acfb1d8614426def7f4a`，包含本轮三项 CI / 镜像修复。
+- 该 SHA 的 [CI #268](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/268) 首次 28/28 通过，无失败 Job 或 Job 重试；6 个浏览器场景均为 `attempts=1`、`retries=0`，Schema、升级和关键数据库检查均早于浏览器启动。CI Gate #4344 的固定 Package 已通过正式 exact-SHA 证据复用校验。
+- 同 SHA 的 [发布 #269](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/269) 首次通过：正式 Server / Web 镜像、5 份真实业务 PDF、安全门禁、同制品隔离部署及备份恢复演练通过，v2 七资产与同 SHA 源码包完成发布和读回。Debian 已提供修复版本的 HIGH / CRITICAL OS findings 为 0；原始扫描仍保留其他 findings，不表示所有漏洞为 0。
+- `demo-133` 与 `customer-test-133` 已分别通过 operation `128736b0-a850-4161-9ba4-6c3b69327759`、`06af9a63-584a-4b7b-ae57-81eef711c3ed` 部署该版本。独立部署后预检确认前端、后端和公网入口同 SHA，health / ready、数据库、客户配置、公共入口与迁移锁正常；migration 仍为 `20260927100348`。demo 保持 trial package v10，test 保持 customer package v7；现有数据库、附件、账号 / RBAC 和配置均保留，未重建或 seed，外部附件服务不在本次升级范围。
+- 两目标均在维护窗口前完成新鲜备份与恢复检查，固定回滚版本为 `2026.10.03-1 / 2a744f10a589530c6f5960e437da926ef50511fe`；未执行目标回滚或 down migration。公网真实管理员登录、外观偏好响应、表格线条选项和销售订单保存草稿入口通过，页面未捕获异常为 0；未保存业务事实或修改账号偏好，smoke 会话已撤销。原生 `3840×2160 / DPR 1` 截图保存在 ignored `output/playwright/latest-deploy-20261006/`。首次临时浏览器脚本误用不含图标的完整按钮名称，DOM 证实实际为 `plus 新建订单`；修正定位后两目标通过，首次失败证据保留。
 
-- 镜像输入修复 `45c7c0a9` 的 [CI #265](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/265) 首次 28/28 通过；[发布 #266](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/266) 的完整镜像与 5 份业务 PDF 验证通过，随后被镜像扫描阻断：旧 Debian 快照中的 `perl-base` 与 `libpcre2-8-0` 有 8 条已提供修复的 HIGH/CRITICAL 漏洞。核对官方快照后，将固定快照推进到 `20261006T030000Z`，分别提供 `5.36.0-7+deb12u4` 与 `10.42-1+deb12u2`；Chromium 固定版本不变，安全门禁不放宽。同 Runner 诊断镜像已通过原漏洞、版本和体积门禁，19 项相关测试通过；正式制品仍须绑定新 SHA 验证，目标环境未切换。
+本轮失败与修复按实际阶段区分，不能将前几次失败写成整轮零报错：
 
-- 69 个已完成会话文件已分组提交推送到 `a8bcb5a35ea05e72326ba68df366c697008b6f55`；普通 [CI #263](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/263) 首次 28/28 通过，无失败或重试。正式 [发布 #264](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/264) 首次遭遇 Docker Hub 元数据 EOF；同 Runner 复测恢复后重试，暴露出生产 Web 镜像遗漏账号外观 JSON 契约。已在同一 Docker 构建阶段复现；修复两种镜像构建入口，并增加从生产导入提取共享 JSON 的回归检查。新增检查在修复前失败、修复后 13/13 通过；同 Runner 两个前端 Docker 构建阶段均已通过。目标环境尚未切换，后续发布须绑定修复后的新提交与新 CI。
+| 阶段 | 已核对原因 | 本轮修复与验证 |
+| --- | --- | --- |
+| 发布 #264 的镜像构建 | 新外观模块导入共享 JSON，两个 Docker 构建入口漏复制该文件；普通 Web 构建成功不能证明镜像输入完整 | 补齐 COPY；回归从生产 imports 提取共享 JSON 并核对两个 Dockerfile。新增检查修复前失败、修复后 13/13 通过，同 Runner 两个前端构建阶段通过 |
+| 发布 #266 的安全门禁 | 固定 Debian 快照内 `perl-base`、`libpcre2-8-0` 存在 8 条已提供修复的 HIGH / CRITICAL findings | 固定快照推进到 `20261006T030000Z`，Chromium pin 不变；19 项相关测试及同 Runner 诊断镜像通过，正式发布 #269 再次验证通过，安全门禁未放宽 |
+| CI #267 的浏览器汇总 | 打印场景等待就绪超时，内部第 2 次成功使浏览器 Job 变绿，但 aggregate 拒绝 `retries=1`；同窗有 Atlas 开发库 Docker 网络变化，浏览器遗漏 Schema 依赖 | 补齐依赖隔离已知网络干扰；执行、解析和回执统一为一次尝试，具体场景失败由所属 Job 报出。3 个新回归先失败后通过，相关 41 项检查通过；#268 完整首次通过。同期网络事件支持此干扰判断，未保留的失败截图不能补作唯一因果证明 |
+| 发布 #264 首次取基础镜像 | Docker Hub 元数据请求返回 EOF；后续诊断亦曾遇到 TLS handshake timeout | 同 Runner 只读复测后按原版本重试；未改代理或增加泛化重试。当前 #269 首次通过，外部网络仍不属于代码可保证永不失败的范围 |
 
-- 本轮 14 个文件已提交为 `eae457ee610b684219972f42c7ea4e012a1f0928` 并推送 `origin/main`，GitHub 镜像同 SHA。共享交互稿仅纳入 CI 指引段落，账号外观与其他任务改动保留。独立候选 64 项检查、定向 lint、提交 hook、推送前 75 项检查和实际 pre-push hook 通过。
-- GitLab [CI #262](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/262) 首次执行 28 个 Job 全部成功、无失败或重试；`CI Gate` #4229 的固定 Package 已通过正式 exact-SHA 证据复用校验。本地绿色与远端证据分别保存于 ignored `output/qa/ci-guide-closeout-20261006/`。
-- 用户要求等待在跑会话完成后，统一提交、检查 CI 并部署本地最新代码。账号外观持久化、网格线整合、保存提示布局、日志看板及草稿提交校验会话均已结束；本次按各自交接记录分组，固定完整候选后重新取得 exact-SHA CI，不复用上述旧 SHA 的绿色。
-- 发布前 demo / test 仍运行 `2026.10.03-1 / 2a744f10a589530c6f5960e437da926ef50511fe`，migration 为 `20260927100348`；旧版本控制文件和源码回滚输入已核对可读取。新候选沿用固定 Release / promotion 入口，保留两目标数据与客户配置；运行读回、备份、回滚点及临时访问身份回收结果保存在 ignored `output/qa/latest-deploy-20261006/`，本段准备记录不表示新版本已部署。
+- 初始 [CI #262](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/262)、[CI #263](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/263) 和镜像输入修复后的 [CI #265](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/265) 均首次 28/28 通过；后续发布失败不能反向等同为这些 CI 失败。各次证据分别绑定各自 SHA，不用于替代最终版本。
+- 本轮回执、脱敏日志、扫描与失败现场位于 ignored `output/qa/latest-deploy-20261006/`，旧尝试按 SHA 分目录保留。临时 GitLab 发布 token 均已撤销，目标取件凭据清理已有正式回执；临时 SSH key 已移除、旧 authorized_keys 摘要恢复、原身份拒绝验证通过，私钥目录已删除。同 Runner 诊断镜像与临时目录已按精确归属删除。
+- 已有提交、推送和两目标发布授权持续有效；本次应用部署以上述固定 SHA 为准，发布后记录单独按文档提交收尾。本轮未执行完整岗位矩阵、目标全套业务 PDF、客户 UAT / 签收或目标回滚演练，不以 CI / 技术 smoke 代替这些结论。
 
 ### 服务端追踪补强与 7 天保留（2026-10-04）
 
