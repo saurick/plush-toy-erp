@@ -298,7 +298,7 @@ test("CI PostgreSQL lanes require bounded tmpfs storage around the image PGDATA"
   );
 });
 
-test("Browser scenario evidence is exact, bounded-retry and duplicate closed", () => {
+test("Browser scenario evidence requires one attempt and rejects duplicate results", () => {
   const output = [
     "[style:l1:scenario] id=root-redirect-desktop status=passed durationMs=12 attempts=1",
     "[style:l1:scenario] id=root-redirect-mobile status=passed durationMs=9 attempts=1",
@@ -350,13 +350,14 @@ test("Browser scenario evidence is exact, bounded-retry and duplicate closed", (
       ),
     /ambiguous/u,
   );
-  assert.deepEqual(
-    parseCiBrowserScenarioTimings(
+  assert.throws(
+    () => parseCiBrowserScenarioTimings(
       "[style:l1:scenario] id=root-redirect-desktop status=passed durationMs=12 attempts=2",
       ["root-redirect-desktop"],
-    ).map(({ id, attempts }) => ({ id, attempts })),
-    [{ id: "root-redirect-desktop", attempts: 2 }],
+    ),
+    /root-redirect-desktop required 2 attempts; CI requires one attempt/u,
   );
+  assert.match(laneSource, /STYLE_L1_SCENARIO_MAX_ATTEMPTS: "1"/u);
 });
 
 test("Browser scenario retry includes Chromium network-change transients", () => {
@@ -488,13 +489,13 @@ test("lane receipts reject skipped, drifted and incomplete cleanup evidence", ()
   const browser = receipt("browser", "boundary_entry_print", 2);
   browser.browser.scenarioTimings[0].attempts = 2;
   browser.browser.retries = 1;
-  assert.equal(
-    validateCiQualityStageLaneReceipt(browser, {
+  assert.throws(
+    () => validateCiQualityStageLaneReceipt(browser, {
       shard: "browser",
       lane: "boundary_entry_print",
       expected,
     }),
-    browser,
+    /invalid/u,
   );
   browser.browser.retries = 0;
   assert.throws(

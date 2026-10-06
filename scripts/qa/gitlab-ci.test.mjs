@@ -107,6 +107,23 @@ function yamlJobBlock(name) {
   )?.[0];
 }
 
+test("browser lanes wait for every server check that changes Docker networking", () => {
+  for (const { job } of Object.values(CI_BROWSER_QUALITY_LANES)) {
+    const block = yamlJobBlock(job);
+    for (const dependency of [
+      "quality_server_schema",
+      "quality_server_upgrade",
+      "quality_server_critical_postgres",
+    ]) {
+      assert.match(
+        block,
+        new RegExp(`job: ${dependency}\\n      artifacts: false`, "u"),
+        `${job} must wait for ${dependency} to release its Docker resources`,
+      );
+    }
+  }
+});
+
 test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", () => {
   assert.match(workflow, /auto_cancel:\n    on_new_commit: interruptible/u);
   assert.doesNotMatch(workflow, /CI_PIPELINE_SOURCE == "web"/u);

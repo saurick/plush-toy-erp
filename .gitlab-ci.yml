@@ -590,7 +590,10 @@ quality_node:
       artifacts: false
     - job: quality_web_build
       artifacts: true
-    # Docker bridge teardown invalidates Chromium's in-flight loopback requests.
+    # Atlas schema checks also start and stop a Docker dev database. Finish all
+    # server network changes before Chromium opens its loopback connections.
+    - job: quality_server_schema
+      artifacts: false
     - job: quality_server_upgrade
       artifacts: false
     - job: quality_server_critical_postgres

@@ -6,6 +6,8 @@
 
 ### 最新代码统一收口与部署（2026-10-06）
 
+- 安全快照更新 `27984cb8` 的 [CI #267](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/267) 在汇总时失败：浏览器 Job 的 `print-workspace-all-empty-fields` 等待工程材料明细打印页就绪超时，内部重试后报成功，但汇总门禁拒绝其 `retries=1`。Runner Docker 事件确认同一等待窗口内 Schema 检查的 Atlas 开发库发生网络连接与断开，浏览器 DAG 原先只等待升级与关键数据库检查。补齐 Schema 依赖，并将浏览器执行、场景解析与回执统一为零重试，失败在所属 Job 直接暴露；没有放宽等待时间或最终门禁。新回归在修复前分别检出缺依赖、接受重试结果和接受重试回执。
+
 - 镜像输入修复 `45c7c0a9` 的 [CI #265](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/265) 首次 28/28 通过；[发布 #266](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/266) 的完整镜像与 5 份业务 PDF 验证通过，随后被镜像扫描阻断：旧 Debian 快照中的 `perl-base` 与 `libpcre2-8-0` 有 8 条已提供修复的 HIGH/CRITICAL 漏洞。核对官方快照后，将固定快照推进到 `20261006T030000Z`，分别提供 `5.36.0-7+deb12u4` 与 `10.42-1+deb12u2`；Chromium 固定版本不变，安全门禁不放宽。同 Runner 诊断镜像已通过原漏洞、版本和体积门禁，19 项相关测试通过；正式制品仍须绑定新 SHA 验证，目标环境未切换。
 
 - 69 个已完成会话文件已分组提交推送到 `a8bcb5a35ea05e72326ba68df366c697008b6f55`；普通 [CI #263](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/263) 首次 28/28 通过，无失败或重试。正式 [发布 #264](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/264) 首次遭遇 Docker Hub 元数据 EOF；同 Runner 复测恢复后重试，暴露出生产 Web 镜像遗漏账号外观 JSON 契约。已在同一 Docker 构建阶段复现；修复两种镜像构建入口，并增加从生产导入提取共享 JSON 的回归检查。新增检查在修复前失败、修复后 13/13 通过；同 Runner 两个前端 Docker 构建阶段均已通过。目标环境尚未切换，后续发布须绑定修复后的新提交与新 CI。

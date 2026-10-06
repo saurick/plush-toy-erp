@@ -635,6 +635,11 @@ export function parseCiBrowserScenarioTimings(output, expectedScenarios) {
     ) {
       throw new Error("browser quality scenario timing is ambiguous");
     }
+    if (attempts !== 1) {
+      throw new Error(
+        `browser quality scenario ${id} required ${attempts} attempts; CI requires one attempt`,
+      );
+    }
     timings.set(id, Object.freeze({ id, status: "passed", durationMs, attempts }));
   }
   if (
@@ -678,7 +683,7 @@ async function runBrowserQualityLane({
     STYLE_L1_OUTPUT_DIR: runtimePaths.outputDirectory,
     STYLE_L1_PORT: String(port),
     STYLE_L1_SCENARIOS: definition.browserScenarios.join(","),
-    STYLE_L1_SCENARIO_MAX_ATTEMPTS: "2",
+    STYLE_L1_SCENARIO_MAX_ATTEMPTS: "1",
     TMP: runtimePaths.temporaryDirectory,
     TEMP: runtimePaths.temporaryDirectory,
     TMPDIR: runtimePaths.temporaryDirectory,
@@ -945,8 +950,7 @@ export function validateCiQualityStageLaneReceipt(
           (timing) =>
             timing.status !== "passed" ||
             !Number.isSafeInteger(timing.attempts) ||
-            timing.attempts < 1 ||
-            timing.attempts > 2 ||
+            timing.attempts !== 1 ||
             !Number.isSafeInteger(timing.durationMs) ||
             timing.durationMs < 0,
         ) ||
