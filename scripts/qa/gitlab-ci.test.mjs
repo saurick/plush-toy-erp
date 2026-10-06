@@ -13,6 +13,7 @@ import {
 } from "./ci-quality-stage-lane.mjs";
 import { CI_NODE_TEST_LANES } from "./ci-node-test-lane.mjs";
 import { CI_RESOURCE_TEST_LANES } from "./ci-resource-test-lane.mjs";
+import { CI_FULL_CHANGE_PATTERNS } from "./ci-plan.mjs";
 
 const repositoryRoot = new URL("../../", import.meta.url);
 const trackedFiles = execFileSync("git", ["ls-files", "-z"], {
@@ -107,6 +108,25 @@ function yamlJobBlock(name) {
   )?.[0];
 }
 
+test("documentation routing is guarded by the shared complete non-Markdown path set", () => {
+  const rules = workflow.split("\nstages:")[0];
+  const paths = [...rules.matchAll(/^          - "([^"]+)"$/gmu)].map((match) => match[1]);
+  assert.deepEqual(paths, [...CI_FULL_CHANGE_PATTERNS]);
+  assert.match(rules, /CI_PIPELINE_SOURCE == "web" && \$QA_MODE == "full"/u);
+  assert.match(rules, /CI_COMMIT_BEFORE_SHA == "0{40}"/u);
+  assert.match(yamlJobBlock("plan"), /mode="\$CI_QUALITY_SCOPE"/u);
+  const docs = yamlJobBlock("quality_docs");
+  assert.match(docs, /\$CI_QUALITY_SCOPE == "docs"/u);
+  assert.match(docs, /bash scripts\/qa\/affected.sh --base "\$range" --run/u);
+  assert.match(docs, /pnpm --dir web install --frozen-lockfile --prefer-offline/u);
+  assert.match(docs, /\.flags.needsWeb/u);
+  assert.doesNotMatch(docs, /docker|atlas|ci-playwright-runtime/u);
+  const gate = yamlJobBlock("CI Gate");
+  assert.match(gate, /job: quality_docs/u);
+  assert.match(gate, /release_evidence=not_produced/u);
+  assert.match(gate, /test "\$effective_mode" = full/u);
+});
+
 test("browser lanes wait for every server check that changes Docker networking", () => {
   for (const { job } of Object.values(CI_BROWSER_QUALITY_LANES)) {
     const block = yamlJobBlock(job);
@@ -126,7 +146,7 @@ test("browser lanes wait for every server check that changes Docker networking",
 
 test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", () => {
   assert.match(workflow, /auto_cancel:\n    on_new_commit: interruptible/u);
-  assert.doesNotMatch(workflow, /CI_PIPELINE_SOURCE == "web"/u);
+  assert.match(workflow, /CI_PIPELINE_SOURCE == "web" && \$QA_MODE == "full"/u);
   assert.match(workflow, /CI_PIPELINE_SOURCE == "merge_request_event"/u);
   assert.match(
     workflow,
@@ -395,15 +415,15 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     workflow.match(
       /pnpm --dir web install --frozen-lockfile --prefer-offline --registry="\$PNPM_INSTALL_REGISTRY"/gu,
     )?.length ?? 0,
-    3,
+    4,
   );
   assert.equal(
     workflow.match(/-u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY/gu)?.length ?? 0,
-    3,
+    4,
   );
   assert.equal(
     workflow.match(/npm_config_proxy= npm_config_https_proxy=/gu)?.length ?? 0,
-    3,
+    4,
   );
   assert.match(
     workflow,

@@ -7,7 +7,24 @@ import { pathToFileURL } from "node:url";
 
 import { buildAffectedPlan, collectChangedFiles } from "./affected.mjs";
 
-const MODES = new Set(["affected", "full"]);
+const MODES = new Set(["affected", "docs", "full"]);
+// GitLab rules:changes uses Ruby fnmatch: these five cases cover every basename
+// without the lowercase .md suffix, including dotfiles and one/two-letter names.
+// gitlab-ci.test.mjs guards the matching workflow list against drift.
+export const CI_FULL_CHANGE_PATTERNS = Object.freeze([
+  "**/*[^d]",
+  "**/*[^m]d",
+  "**/*[^.]md",
+  "**/md",
+  "**/d",
+  "server/docs/database/**",
+]);
+
+export function isDocumentationOnlyCIChange(files) {
+  return files.every(
+    (file) => file.endsWith(".md") && !file.startsWith("server/docs/database/"),
+  );
+}
 const SCHEMA_OR_MIGRATION_PATH =
   /^(?:server\/internal\/data\/model\/(?:schema|ent|migrate)\/|server\/atlas\.hcl$)/u;
 
@@ -16,12 +33,22 @@ function commandText(command) {
 }
 
 export function buildCIPlan({ files, mode, root = process.cwd() }) {
-  if (!MODES.has(mode)) throw new Error("mode must be affected or full");
+  if (!MODES.has(mode)) throw new Error("mode must be affected, docs or full");
   const affected = buildAffectedPlan(files, { root });
+  if (
+    mode === "docs" &&
+    (!isDocumentationOnlyCIChange(affected.changedFiles) || affected.localGate === "full")
+  ) {
+    throw new Error(
+      "docs CI cannot cover code, configuration or generated database documentation",
+    );
+  }
   const commandTexts = affected.commands.map(commandText);
   const full = mode === "full" || affected.localGate === "full";
-  const changedWeb = affected.changedFiles.some((file) => file.startsWith("web/"));
-  const changedServer = affected.changedFiles.some((file) => file.startsWith("server/"));
+  const changedWeb =
+    mode !== "docs" && affected.changedFiles.some((file) => file.startsWith("web/"));
+  const changedServer =
+    mode !== "docs" && affected.changedFiles.some((file) => file.startsWith("server/"));
   const needsGo =
     full ||
     changedServer ||
@@ -29,7 +56,8 @@ export function buildCIPlan({ files, mode, root = process.cwd() }) {
   const needsWeb =
     full ||
     changedWeb ||
-    affected.commands.some((command) => command.bin === "pnpm");
+    // The existing docs gate parses Mermaid with the locked Web DOM dependencies.
+    affected.commands.some((command) => command.id === "docs-inventory" || command.bin === "pnpm");
   const makeData =
     full || affected.changedFiles.some((file) => SCHEMA_OR_MIGRATION_PATH.test(file));
   const needsAtlas =
@@ -44,7 +72,7 @@ export function buildCIPlan({ files, mode, root = process.cwd() }) {
   return Object.freeze({
     schemaVersion: "plush.ci-plan/v2",
     requestedMode: mode,
-    effectiveMode: full ? "full" : "affected",
+    effectiveMode: full ? "full" : mode,
     changedFiles: affected.changedFiles,
     affectedScopes: affected.affectedScopes,
     maxAffectedScope: affected.maxAffectedScope,
@@ -84,7 +112,7 @@ function parseArgs(argv) {
     throw new Error(`unknown argument: ${arg}`);
   }
   if (!options.range) throw new Error("--range is required");
-  if (!MODES.has(options.mode)) throw new Error("--mode must be affected or full");
+  if (!MODES.has(options.mode)) throw new Error("--mode must be affected, docs or full");
   return options;
 }
 

@@ -6,6 +6,8 @@ import { Readable } from 'node:stream'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { loadConfigFromFile } from 'vite'
+import { CI_STRICT_JOB_NAMES } from '../../scripts/qa/ci-quality-shard.mjs'
+import { normalizeDevQualityGateSummary } from '../src/dev-workbench/config/devQualityGates.mjs'
 
 import {
   DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
@@ -303,6 +305,57 @@ test('quality gate distinguishes a readable GitLab response from a missing exact
   assert.equal(evidence.history[0].failureJob, 'quality_web')
   assert.match(evidence.message, /GitLab 凭据与 API 读取正常/u)
   assert.match(evidence.message, /尚无绑定当前已提交 SHA/u)
+})
+
+test('documentation success is visible without granting strict proof or release eligibility', async (t) => {
+  const repository = { ...REPOSITORY, dirty: false }
+  const run = {
+    id: 92,
+    attempt: 1,
+    workflow: 'ci',
+    event: 'push',
+    gitSha: repository.commit,
+    status: 'completed',
+    conclusion: 'success',
+    createdAt: '2026-10-06T00:00:00.000Z',
+    finishedAt: '2026-10-06T00:00:05.000Z',
+    durationMs: 5000,
+    queueMs: 0,
+    url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/92',
+    jobs: ['plan', 'quality_docs', 'CI Gate'].map((name, index) => ({
+      id: index + 100,
+      name,
+      status: 'completed',
+      conclusion: 'success',
+      durationMs: 1000,
+      queueMs: 0,
+    })),
+  }
+  const projectEvidence = (value) => projectDevQualityGateServerEvidence({ schemaVersion: 'plush.delivery-pipeline-timings/v1', runs: [value] }, repository)
+  const evidence = projectEvidence(run)
+  assert.equal(evidence.status, 'docs_passed')
+  assert.equal(evidence.coversWorkingTree, false)
+  assert.equal(evidence.history[0].result, 'docs_passed')
+  assert.match(evidence.message, /QA_MODE=full/u)
+  assert(evidence.jobGuides.every((guide) => guide.registered))
+  assert.equal(projectEvidence({ ...run, jobs: run.jobs.filter((job) => job.name !== 'quality_docs') }).status, 'failed')
+  assert.equal(projectEvidence({ ...run, jobs: run.jobs.map((job) => job.name === 'quality_docs' ? { ...job, conclusion: 'failure' } : job) }).status, 'failed')
+  const fullRun = { ...run, event: 'web', jobs: CI_STRICT_JOB_NAMES.map((name, index) => ({ id: index + 200, name, status: 'completed', conclusion: 'success' })) }
+  assert.equal(projectEvidence(fullRun).status, 'passed')
+  assert.equal(projectEvidence({ ...fullRun, event: 'api' }).status, 'missing')
+  const root = await project(t)
+  const service = createDevQualityGateService({
+    projectRoot: root,
+    env: DATABASE_ENV,
+    readRepositoryState: async () => repository,
+    readReceipt: () => null,
+    loadServerEvidence: () => evidence,
+  })
+  const summary = normalizeDevQualityGateSummary(await service.summary())
+  assert.equal(summary.status.releaseEligible, false)
+  assert.equal(summary.proofs.strict.releaseEligible, false)
+  assert.equal(summary.serverEvidence.status, 'docs_passed')
+  assert.match(summary.status.title, /文档检查已通过/u)
 })
 
 test('quality gate command uses only fixed formal runners', () => {

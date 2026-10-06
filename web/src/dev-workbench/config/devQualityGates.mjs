@@ -99,6 +99,7 @@ const OPERATION_STATUSES = Object.freeze([
 const STAGE_STATUSES = Object.freeze(['pending', 'running', 'passed', 'failed'])
 const SERVER_EVIDENCE_STATUSES = Object.freeze([
   'passed',
+  'docs_passed',
   'running',
   'failed',
   'missing',
@@ -123,6 +124,7 @@ const SERVER_HISTORY_RESULTS = Object.freeze([
   'queued',
   'running',
   'passed',
+  'docs_passed',
   'failed',
   'cancelled',
   'skipped',
@@ -842,7 +844,7 @@ function normalizeServerEvidence(evidence) {
   const jobs = evidence.jobs.map(normalizeServerEvidenceJob)
   const jobGuides = evidence.jobGuides.map(normalizeServerEvidenceJobGuide)
   if (
-    (['passed', 'running', 'failed'].includes(evidence.status) && !pipeline) ||
+    (['passed', 'docs_passed', 'running', 'failed'].includes(evidence.status) && !pipeline) ||
     (['missing', 'unavailable'].includes(evidence.status) && pipeline) ||
     (evidence.coversWorkingTree && evidence.status !== 'passed') ||
     (topology.status === 'available' &&

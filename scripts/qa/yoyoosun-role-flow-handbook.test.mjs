@@ -40,8 +40,10 @@ test("customer confirmation separates enforced finance gate, published baseline 
   assert.match(financeGateRow, /当前为强制门禁，未批准不能出货/u);
   assert.doesNotMatch(financeGateRow, /不是强制门禁/u);
   assert.match(financeApprovalRow, /真实岗位办理和 C05 业务选择仍待确认/u);
-  assert.match(customerDeliveryMatrix, /最近已保存的目标证据/u);
-  assert.match(customerDeliveryMatrix, /未实时复核目标/u);
+  const baseline = sectionBetween(customerDeliveryMatrix, "## 当前环境基线", "## 状态口径");
+  assert.match(baseline, /目标证据[\s\S]*[0-9a-f]{40}/u);
+  assert.match(baseline, /工作区改动或本地绿色不能自动归入已部署版本/u);
+  assert.match(baseline, /客户 UAT \/ 签收仍未完成/u);
   const statusAppendix = customerConfirmation.split("### 6.2 乙方状态附表")[1];
   assert.ok(statusAppendix);
   for (const id of ["P03", "P07", "P08", "P09"]) {

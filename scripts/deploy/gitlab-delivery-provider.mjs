@@ -992,7 +992,9 @@ export function createGitlabDeliveryProvider({
       }
       const query = new URLSearchParams({
         content_ref: sha,
-        dry_run: "true",
+        // Read the exact-SHA job definitions, then let the workbench intersect
+        // them with the observed run. A simulated new push has a different range.
+        dry_run: "false",
         dry_run_ref: "main",
         include_jobs: "true",
       });

@@ -195,7 +195,7 @@ function assertEnvironment(env) {
     env.CI_DEFAULT_BRANCH !== "main" ||
     env.CI_COMMIT_BRANCH !== "main" ||
     env.CI_COMMIT_REF_PROTECTED !== "true" ||
-    env.CI_PIPELINE_SOURCE !== "push" ||
+    !(env.CI_PIPELINE_SOURCE === "push" || (env.CI_PIPELINE_SOURCE === "web" && env.QA_MODE === "full")) ||
     env.CI_JOB_NAME !== "prepare"
   ) {
     throw new Error("Runner capacity CI identity is invalid");

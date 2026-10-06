@@ -18,19 +18,15 @@ import {
 } from "../qa/exact-sha-gate.mjs";
 import { evaluateStrictReceiptReuse } from "../qa/strict-receipt-identity.mjs";
 import { CI_EVIDENCE_MANIFEST_SCHEMA } from "../qa/ci-quality-aggregate.mjs";
-import { CI_QUALITY_SHARDS } from "../qa/ci-quality-shard.mjs";
+import {
+  CI_STRICT_JOB_NAMES,
+  CI_STRICT_PIPELINE_SOURCES,
+} from "../qa/ci-quality-shard.mjs";
 
 export const GITLAB_CI_EVIDENCE_PACKAGE = "plush-ci-evidence";
 const REPOSITORY = "saurick/plush-toy-erp";
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
-const EXPECTED_JOB_NAMES = Object.freeze([
-  "plan",
-  "prepare",
-  ...Object.values(CI_QUALITY_SHARDS).map((value) => value.job),
-  "quality_aggregate",
-  "CI Gate",
-]);
 const EVIDENCE_FILES = Object.freeze([
   "evidence-manifest.json",
   "receipt.json",
@@ -75,7 +71,7 @@ function latestSuccessfulJobs(jobs) {
     const current = latest.get(job.name);
     if (!current || job.id > current.id) latest.set(job.name, job);
   }
-  for (const name of EXPECTED_JOB_NAMES) {
+  for (const name of CI_STRICT_JOB_NAMES) {
     const job = latest.get(name);
     if (
       !job ||
@@ -110,11 +106,11 @@ export function assertReusableGitlabPipeline({
     pipeline.iid < 1 ||
     pipeline?.sha !== sha ||
     pipeline?.ref !== "main" ||
-    pipeline?.source !== "push" ||
+    !CI_STRICT_PIPELINE_SOURCES.includes(pipeline?.source) ||
     pipeline?.status !== "success" ||
     pipeline?.tag === true
   ) {
-    throw new Error("GitLab evidence pipeline is not a protected main push");
+    throw new Error("GitLab evidence pipeline is not a protected main push or full web run");
   }
   const latest = latestSuccessfulJobs(jobs);
   for (const job of latest.values()) {
@@ -138,7 +134,8 @@ export function validateGitlabEvidenceManifest(
     manifest?.protectedDefaultBranch !== true ||
     manifest?.pipeline?.id !== String(pipeline.id) ||
     manifest?.pipeline?.iid !== String(pipeline.iid) ||
-    manifest?.pipeline?.source !== "push" ||
+    !CI_STRICT_PIPELINE_SOURCES.includes(pipeline?.source) ||
+    manifest?.pipeline?.source !== pipeline.source ||
     manifest?.aggregateJob?.id !== String(aggregateJob.id) ||
     manifest?.aggregateJob?.name !== "quality_aggregate" ||
     !SHA256_PATTERN.test(String(manifest?.terminalFingerprint || "")) ||
@@ -231,7 +228,7 @@ export async function recoverGitlabStrictTerminal(
     requestJson(request, `${baseUrl}/projects/${projectId}/repository/branches/main`, token),
     requestJson(
       request,
-      `${baseUrl}/projects/${projectId}/pipelines?sha=${sha}&ref=main&status=success&source=push&order_by=id&sort=desc&per_page=20`,
+      `${baseUrl}/projects/${projectId}/pipelines?sha=${sha}&ref=main&status=success&order_by=id&sort=desc&per_page=20`,
       token,
     ),
   ]);
@@ -240,6 +237,7 @@ export async function recoverGitlabStrictTerminal(
   }
   const failures = [];
   for (const candidate of pipelines) {
+    if (!CI_STRICT_PIPELINE_SOURCES.includes(candidate.source)) continue;
     try {
       const [pipeline, jobs] = await Promise.all([
         requestJson(request, `${baseUrl}/projects/${projectId}/pipelines/${candidate.id}`, token),
@@ -306,7 +304,7 @@ export async function recoverGitlabStrictTerminal(
         terminalJson?.provenance?.runId !== String(pipeline.id) ||
         terminalJson?.provenance?.runAttempt !== String(pipeline.iid) ||
         terminalJson?.provenance?.job !== "quality_aggregate" ||
-        terminalJson?.provenance?.eventName !== "push" ||
+        terminalJson?.provenance?.eventName !== pipeline.source ||
         terminalJson?.provenance?.ref !== "refs/heads/main" ||
         terminalJson?.provenance?.refName !== "main" ||
         terminalJson?.provenance?.headRepository !== REPOSITORY ||
@@ -364,7 +362,7 @@ export async function recoverGitlabStrictTerminal(
   throw new Error(
     failures.length > 0
       ? `no reusable protected-main GitLab evidence package: ${failures[0]}`
-      : "no successful protected-main push pipeline exists for exact SHA",
+      : "no successful protected-main full CI pipeline exists for exact SHA",
   );
 }
 

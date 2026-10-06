@@ -152,6 +152,7 @@ const PIPELINE_LABELS = Object.freeze({
   ci: '持续集成流水线',
   release: '正式发布流水线',
   plan: '可信提交范围与影响计划',
+  quality_docs: '文档检查（不授予发布资格）',
   quality: '仓库质量检查',
   strict: 'Exact-SHA 严格质量检查',
   publish_release: '发布不可变制品集',

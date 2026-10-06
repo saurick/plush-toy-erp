@@ -540,7 +540,7 @@ test("GitLab provider reads exact-SHA CI needs without copying the DAG", async (
   ]);
   assert.equal(topologyUrl.pathname.endsWith("/ci/lint"), true);
   assert.equal(topologyUrl.searchParams.get("content_ref"), SHA);
-  assert.equal(topologyUrl.searchParams.get("dry_run"), "true");
+  assert.equal(topologyUrl.searchParams.get("dry_run"), "false");
   assert.equal(topologyUrl.searchParams.get("dry_run_ref"), "main");
   assert.equal(topologyUrl.searchParams.get("include_jobs"), "true");
   await assert.rejects(

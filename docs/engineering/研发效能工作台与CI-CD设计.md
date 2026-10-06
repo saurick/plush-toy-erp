@@ -52,9 +52,11 @@ GitLab HTTP 只绑定 GitLab 宿主 `127.0.0.1:8929`，由 FRP 到阿里云 `182
 `.gitlab-ci.yml` 是唯一 canonical 编排：
 
 1. `plan` 根据 MR base、push before SHA 或手工范围建立可信 diff，先做 diff/log 检查和可信基线 gitleaks，再生成带 digest 的 `ci-plan` / range / trust。
-2. MR 保留 plan-driven affected/full 单 job。main push 先由唯一 `prepare` cache writer 预热 locked pnpm/Playwright/Go 依赖，再由 Runner 已登记容量调度 static、Node contracts、Web、Server/PostgreSQL、resource-sensitive、browser 和 security 七个固定外部分片。Server 内部把 schema 零漂移、存量升级、普通测试/构建和关键 PostgreSQL 合同拆为四条独立 lane；只有升级与关键合同持有受管 PostgreSQL，只有普通测试/构建消费 Chromium。browser 等待同 SHA Web build，以及升级和关键 PostgreSQL Job 清理完成；其余依赖以当前 CI 编排为准。
+2. MR 保留 plan-driven affected/full 单 job。main 完整 CI 先由唯一 `prepare` cache writer 预热 locked pnpm/Playwright/Go 依赖，再由 Runner 已登记容量调度 static、Node contracts、Web、Server/PostgreSQL、resource-sensitive、browser 和 security 七个固定外部分片。Server 内部把 schema 零漂移、存量升级、普通测试/构建和关键 PostgreSQL 合同拆为四条独立 lane；只有升级与关键合同持有受管 PostgreSQL，只有普通测试/构建消费 Chromium。browser 等待同 SHA Web build，以及升级和关键 PostgreSQL Job 清理完成；其余依赖以当前 CI 编排为准。
 3. `quality_aggregate` 要求七个回执、阶段并集、分类执行数、source archive、依赖审计、`make data`、Web build digest、PostgreSQL/Chromium/browser 清理全部同 SHA 且通过，再签发标准 v3 strict terminal。
-4. `CI Gate` 只在对应 main aggregate 或 MR quality 成功时通过；main push 还会把 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 `plush-ci-evidence` Package，作为 protected main 的稳定 required job 和后续 release 唯一可复用证据。
+4. `CI Gate` 按 plan 范围分别等待文档检查、main aggregate 或 MR quality；main 完整 CI 才会把 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 `plush-ci-evidence` Package，作为 protected main 的稳定 required job 和后续 release 唯一可复用证据。
+
+普通 Markdown main push 使用 `plan → quality_docs → CI Gate` 三个 Job；任意非 Markdown、混合改动、首次推送与生成数据字典走完整 CI。文档绿色只证明文档检查，不产生 strict Package，也不授予发布资格。需要发布该 SHA 时，在 GitLab 新建受保护 main 流水线并设 `QA_MODE=full`，保留真实 `web` provenance；完整 Job 集合由工作台与发布复用共享，具体范围和入口见 [QA 合同](../../scripts/qa/README.md#门禁完整性与-ci-边界)。
 
 默认 `origin/main` 推送前，本地 `prepare-push` 执行并签名 clean HEAD/tree、remote/ref/range、git-log、严格 secrets、源码完整性及 affected 选择的短 Node 检查，不重复 Runner 的 affected/full、数据库、浏览器或构建。短检查范围、并发、截止时间和回执合同见 [QA 入口](../../scripts/qa/README.md#门禁完整性与-ci-边界)。该回执只允许普通非强制 push，不表示 CI 已成功；Release、Package 显式版本提升（Explicit Promotion）和任何受保护部署必须读回同一 40 位 SHA 的不可变终态成功 `CI Gate`。生产目标只加载 CI 构建的不可变制品或镜像并执行正式 migration、health/ready 与 smoke，禁止现场重建。
 
@@ -69,10 +71,10 @@ release 只能从受保护 main 的 web/API/trigger pipeline 发起，且满足�
 - `RELEASE_SHA == CI_COMMIT_SHA`；
 - customer 固定 `yoyoosun`；
 - 版本号由 Bridge 服务端以 `Asia/Shanghai` 日历日和当前 Release catalog 唯一推导为 `YYYY.MM.DD-N`，浏览器只读且不得手工改写；
-- 可回读同 SHA 的 protected-main push pipeline、全部分片、`quality_aggregate`、`CI Gate` 与 exact evidence Package；
+- 可回读同 SHA 的 protected-main 完整 push / web pipeline、全部分片、`quality_aggregate`、`CI Gate` 与 exact evidence Package；
 - protected environment `release` 与 masked/protected secrets 可用。
 
-`publish_release` 从 `plush-ci-evidence` 恢复普通 push CI 的 v3 terminal，其 provenance job 固定为 `quality_aggregate`，不重跑 strict。`plush-release-candidate/artifact-<sha>/candidate.tar` 不存在时才构建一次 Server/Web bundle；后续重试只恢复同一 archive。同一候选包完成 migration、health/ready、smoke、备份恢复、重启恢复和零残留演练，回执在 `plush-release-rehearsal/artifact-<sha>` 冻结。只有这三层 exact 身份通过后，registry publisher 才把候选包内的同一镜像推到 `ghcr.io/saurick/plush-toy-erp-{server,web}` 取得 digest，并生成带演练 digest 的 `plush.release-manifest/v2` 与固定七资产：
+`publish_release` 从 `plush-ci-evidence` 恢复完整 push / web CI 的 v3 terminal，其 provenance job 固定为 `quality_aggregate`，不重跑 strict。`plush-release-candidate/artifact-<sha>/candidate.tar` 不存在时才构建一次 Server/Web bundle；后续重试只恢复同一 archive。同一候选包完成 migration、health/ready、smoke、备份恢复、重启恢复和零残留演练，回执在 `plush-release-rehearsal/artifact-<sha>` 冻结。只有这三层 exact 身份通过后，registry publisher 才把候选包内的同一镜像推到 `ghcr.io/saurick/plush-toy-erp-{server,web}` 取得 digest，并生成带演练 digest 的 `plush.release-manifest/v2` 与固定七资产：
 
 创建 pipeline 时 Bridge 同时传入带时区的版本参考时刻；GitLab 在首次候选构建前重新读取 catalog，只接受与 pipeline 创建时刻相差不超过 10 分钟的同一下一版本。已冻结候选的显式重试保持原版本，不再发号；无候选且 catalog 已前进时必须新建发布，不得占用旧序号。
 
@@ -94,7 +96,7 @@ Generic Package version 与 Release tag 固定为 `artifact-<40sha>`。重试时
 
 `scripts/deploy/github-delivery-provider.mjs` 继续读取 GitHub 历史 Release，并把 v1 六资产投影为只读、可回滚但不可用于显式版本提升（Explicit Promotion）。仓库不保留 GitHub Actions workflow、发布 publisher 或 strict 复用 writer；adapter 的发布方法在调用 `gh` 前固定拒绝。恢复 GitHub 写路径必须重新专项评审 canonical v2 七资产、同一演练回执、Provider 并发与凭据边界。浏览器不知道 token，也不能选择 Provider。
 
-GitLab Jobs API 的 job `duration` 和 `queued_duration` 是运行与等待真源。工作台读取当前流水线与最近 20 次普通 push CI 的全部 job，同名重试保留最新 attempt 并单列重试次数；页面只派生中位数、近似 P95、失败与排队趋势，不另存一份 CI 历史库。GitLab 未提供 step timing 时继续返回空 steps，不推算或伪造 GitHub 式 step timing。显式选择历史 GitHub Provider 时只展示既有 release / Actions 运行，不提供发布动作，也不把历史审查 CI 当作当前流水线证据。
+GitLab Jobs API 的 job `duration` 和 `queued_duration` 是运行与等待真源。工作台读取当前流水线与最近 20 次 push / 手动完整 CI 的全部 job，同名重试保留最新 attempt 并单列重试次数；页面只派生中位数、近似 P95、失败与排队趋势，不另存一份 CI 历史库。GitLab 未提供 step timing 时继续返回空 steps，不推算或伪造 GitHub 式 step timing。显式选择历史 GitHub Provider 时只展示既有 release / Actions 运行，不提供发布动作，也不把历史审查 CI 当作当前流水线证据。
 
 ## GitHub 单向镜像与 GPT Review
 
@@ -116,7 +118,7 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 
 工作台不把本地绿色、GitLab pipeline、GitLab Release、目标 smoke、备份恢复、岗位矩阵或客户 UAT 合成一个“全部完成”。每层单独显示来源与时间；缺失或非法时间显示“未证明”。
 
-`/__dev/quality-gates` 另外读取当前 committed SHA 的 GitLab 普通 push CI，动态展示 GitLab 实际返回的全部 Job，不在前端复制 Job 目录或 DAG。“本次流水线”用同一 exact SHA 的 GitLab CI Lint `needs` 生成有向图，再与实际 Pipeline Job 取交集；依赖不可读或两者不一致时只保留可靠耗时并让 DAG 失败关闭，不画推测连线。服务器门禁内部只保留“本次流水线、Job 性能、CI 历史”三个轻量切换视图，顶部同 SHA 证据摘要始终可见。Job 只按“编排、执行、汇总、终态”和领域分组投影；默认突出异常与最慢执行 Job，其余以可展开明细保留。
+`/__dev/quality-gates` 另外读取当前 committed SHA 的 GitLab push / 手动完整 CI，动态展示 GitLab 实际返回的全部 Job，不在前端复制 Job 目录或 DAG。“本次流水线”用同一 exact SHA 的 GitLab CI Lint `needs` 生成有向图，再与实际 Pipeline Job 取交集；依赖不可读或两者不一致时只保留可靠耗时并让 DAG 失败关闭，不画推测连线。服务器门禁内部只保留“本次流水线、Job 性能、CI 历史”三个轻量切换视图，顶部同 SHA 证据摘要始终可见。Job 只按“编排、执行、汇总、终态”和领域分组投影；默认突出异常与最慢执行 Job，其余以可展开明细保留。
 
 `scripts/qa/ci-job-guide.mjs` 登记 Job 的名称、用途、包含检查、执行步骤、环境要求、证据路径和失败排查顺序；lane 名称及执行入口从既有 CI runner 目录投影，不保存 `needs`、状态、耗时、等待或历史。服务端按当前 GitLab 实际 Job 名单投影这份说明；新增但未登记的 Job 继续展示，并明确标记“说明待登记”。页面通过“流程与原理”“Job 说明”和 Job 卡片上的按需说明按钮复用同一抽屉，不增加第四个子视图，也不在主页面常驻长文。说明属于当前工作区，历史 CI 必须核对对应 SHA 的配置；CI 专用入口只供定位，不提示用户伪造 CI 身份在本机执行。依赖仍来自 exact-SHA CI Lint，运行数据与历史仍来自 GitLab。本次流水线的 Job 明细按领域支持收起与展开。
 
@@ -128,7 +130,7 @@ CI 阅读顺序覆盖 workflow / Job rules、Runner 排队、每个 Job 的 befo
 
 “Job 性能”提供默认收起的本次 Job 运行时间轴。Bridge 保留 GitLab 返回的 `startedAt`、`finishedAt`；时间轴仅绘制已结束且具有有效完整起止时间的当前 Job，重试使用现有投影选定的最新尝试。相接区间和零时长记录不增加最大重叠；缺失或尚未结束的记录明确计数，不用 `durationMs` 倒推区间。最大重叠只描述可见记录中的同时运行 Job，不代表 Runner 宿主 CPU 峰值。排队耗时单列，依赖与资源锁等待不推算为排队区间；缺少时间时保留等待实际记录的空状态。
 
-同一 development-only API 同时返回最近 20 次普通 push CI 的 pipeline 与逐 Job 数据，便于页面和 Codex 直接读取后定位慢 Job、排队、重试和回归；GitLab 仍是唯一历史真源。该服务器证据不覆盖 Local dirty 状态或本地 full/strict 回执；只有当前干净 SHA 的 GitLab 普通 CI 完整通过，质量工程与版本中心才把 `releaseEligible` 提升为真。本地 strict 即使通过也只保留为 Local 回执，不能替代 protected main 证据；未登记只读 token、API 不可达或 SHA 无 push 记录时只显示不可读/缺失，不制造绿色证据。
+同一 development-only API 同时返回最近 20 次 push / 手动完整 CI 的 pipeline 与逐 Job 数据，便于页面和 Codex 直接读取后定位慢 Job、排队、重试和回归；GitLab 仍是唯一历史真源。该服务器证据不覆盖 Local dirty 状态或本地 full/strict 回执；只有当前干净 SHA 的 GitLab 普通 CI 完整通过，质量工程与版本中心才把 `releaseEligible` 提升为真。本地 strict 即使通过也只保留为 Local 回执，不能替代 protected main 证据；未登记只读 token、API 不可达或 SHA 无合格 CI 记录时只显示不可读/缺失，不制造绿色证据。
 
 ### 本地数据库恢复启动
 
@@ -357,7 +359,7 @@ demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；
 ### 质量门禁 `/__dev/quality-gates`
 
 - 一级“质量验证”入口 `/__dev/quality` 保留为任务首页，先让使用者在“判断本轮改动、运行正式门禁、准备测试数据”之间选择；它不读取或复制服务器门禁结果。需要核对正式轨道时再进入 `/__dev/quality-gates?view=server`。
-- 页面首屏优先读取当前 committed SHA 的 GitLab 普通 push CI，始终按正式合同展示 `plan → prepare → 质量检查 → aggregate → CI Gate` 执行轨道；质量检查最终汇入七个固定分片，其中 Node 核心 / 发布测试先行汇合，浏览器分片等待 Web 构建。服务器门禁在轨道前使用一张七行对照表，集中展示本机 strict 步骤、检查名称与对应 CI Job；本机诊断不重复显示 CI 标签。阶段编号按当前 runner 顺序动态计算，映射由 CI shard 合同测试守住。取得当前流水线证据后，再把真实状态与耗时填入十一个主路径节点，并展示墙钟时间、排队耗时、最长主路径 job 和相对耗时条。耗时条以最长主路径 job 为基准，不把可重叠的并行 job 相加成墙钟时间。该服务器证据只覆盖对应提交，不覆盖 Local dirty。未登记只读 token 或 API 不可达时明确标记“GitLab 读取失败”；凭据与 API 已读通但当前 SHA 尚无普通 push CI 时，分别显示“GitLab 读取正常”和“当前提交未产生 CI 记录”；流水线已形成但对应 job 尚未启动时标记“等待运行”。三者均保留完整轨道，且不使用本机回执或静态结构补造绿色结果与耗时。当前证据之后只读列出同一次 GitLab 查询中最近取得的最多 8 条 `main` 普通 push CI，展示结果、short SHA、真实事件时间、墙钟耗时、失败环节和 GitLab 详情链接；历史行不写本地缓存、不触发或重跑 CI，也不升级为当前 SHA 的通过证据。
+- 页面首屏优先读取当前 committed SHA 的 GitLab push / 手动完整 CI，始终按正式合同展示 `plan → prepare → 质量检查 → aggregate → CI Gate` 执行轨道；质量检查最终汇入七个固定分片，其中 Node 核心 / 发布测试先行汇合，浏览器分片等待 Web 构建。服务器门禁在轨道前使用一张七行对照表，集中展示本机 strict 步骤、检查名称与对应 CI Job；本机诊断不重复显示 CI 标签。阶段编号按当前 runner 顺序动态计算，映射由 CI shard 合同测试守住。取得当前流水线证据后，再把真实状态与耗时填入十一个主路径节点，并展示墙钟时间、排队耗时、最长主路径 job 和相对耗时条。耗时条以最长主路径 job 为基准，不把可重叠的并行 job 相加成墙钟时间。该服务器证据只覆盖对应提交，不覆盖 Local dirty。未登记只读 token 或 API 不可达时明确标记“GitLab 读取失败”；凭据与 API 已读通但当前 SHA 尚无普通 push CI 时，分别显示“GitLab 读取正常”和“当前提交未产生 CI 记录”；流水线已形成但对应 job 尚未启动时标记“等待运行”。三者均保留完整轨道，且不使用本机回执或静态结构补造绿色结果与耗时。当前证据之后只读列出同一次 GitLab 查询中最近取得的最多 8 条 `main` 普通 push CI，展示结果、short SHA、真实事件时间、墙钟耗时、失败环节和 GitLab 详情链接；历史行不写本地缓存、不触发或重跑 CI，也不升级为当前 SHA 的通过证据。
 - 页面内部只保留 `server / run / governance / gaps` 四个 URL-backed 一级视图，对外分别命名为“服务器门禁 / 本机诊断 / 门禁治理 / 覆盖缺口”；默认进入服务器门禁，服务器证据和本机操作不再同时铺开，也不叠加第二组 Tab。四视图复用 `DevTaskNav` 的 roving tabIndex、方向键、Home / End、焦点与主题合同。每个视图只接受固定 query；未知、重复、过期或跨视图参数 fail closed。切换视图会清理无关 query，不启动、不取消或清空 operation；公共仓库身份与当前 operation 摘要由页面级唯一状态源读取，只有活动 operation 启用一个 polling，治理与缺口请求在切换时取消并以请求序号防止旧结果覆盖。
 - “本机诊断”只在定位工作区问题时，通过固定 `full / strict + idempotencyKey` 动作异步调用正式 runner，不替代 GitLab exact-SHA CI。显式 loopback database base 仍受支持，没有显式 base 时自动使用本机已有的固定 `postgres:18.6` 创建本次专用容器、随机凭据和动态 loopback 端口，正式回执、内部临时数据库、容器与进程组清理全部读回后才可通过。浏览器不能提交 DSN、凭据、镜像、命令或路径，也不会清理外部容器。本机历史与 GitLab 流水线分开记录；页面支持刷新恢复、精确取消、有界超时、中文阶段、正式回执、可比环境耗时和最近 20 次脱敏本机记录。当前版本回执优先于旧本机历史，dirty 结果不会升级成发布证明，样本不足时不估算剩余时间，终态不再显示“预计剩余”。诊断执行轨道直接消费服务端 `profiles` 阶段序列与 operation `stageTimings`，自动分出 strict 附加检查和 full 共用主路径；运行前、运行中和终态原位展示阶段状态、第一失败、最长阶段、正式回执与清理读回，回执和清理不计入 runner 阶段。共享基础检查与 Web 阶段的固定子步骤也只从 runner 登记表投影，不在页面复制命令或推测子步骤实时状态；已记录阶段耗时按阶段耗时之和归一化，并明确标注可并行阶段不能相加推算墙钟时间。只有至少 3 个 profile、环境指纹和 dirty / clean 状态相同的正式通过回执才绘制零基线耗时趋势，精确历史表始终保留。技术 ID、完整 SHA、指纹和原始 stage key 默认折叠。
 - 本机托管数据库只提供一张默认折叠、展开后才加载的静态 Mermaid 生命周期图，并同步提供有序文字说明；它解释“登记环境或创建本次专用环境—运行正式门禁—精确清理—回执与清理读回”的固定边界，不承担实时运行状态。实时状态仍只读取当前 environment、operation 和正式回执，页面不为每种门禁重复绘制 Mermaid。

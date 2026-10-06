@@ -24,6 +24,7 @@ test("CI Job guide covers registered quality and PDF monitor jobs exactly once",
   const expected = [
     "plan",
     "prepare",
+    "quality_docs",
     ...jobNames(CI_NODE_TEST_LANES),
     ...jobNames(CI_RESOURCE_TEST_LANES),
     ...jobNames(CI_WEB_QUALITY_LANES),

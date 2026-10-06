@@ -4,6 +4,8 @@
 
 当前物理宿主型号和操作系统短主机名均为 `r740xd`；安装、Runner provisioning 与备份脚本都以该短主机名作为 fail-closed 身份。历史 Runner 显示名不参与宿主身份判断，也不能拿来恢复旧主机名门禁。
 
+普通 main push 按真实改动选择文档或完整 CI：普通 Markdown 只运行 `plan → quality_docs → CI Gate`；代码、配置、混合改动和生成数据字典继续运行完整 DAG。文档绿色不产生发布证据。需要发布纯文档 SHA 时，在 GitLab 新建 main 流水线并设置 `QA_MODE=full`；详细边界与排查入口见 [QA 合同](../../../scripts/qa/README.md#门禁完整性与-ci-边界)。
+
 ## 存储与隔离结论
 
 | 资源 | 放置 | 原因 | 恢复边界 |

@@ -22,6 +22,10 @@ import {
   releaseDevQaExecutionLock,
 } from '../../scripts/qa/dev-qa-execution-lock.mjs'
 import { projectCiJobGuides } from '../../scripts/qa/ci-job-guide.mjs'
+import {
+  CI_STRICT_JOB_NAMES,
+  CI_STRICT_PIPELINE_SOURCES,
+} from '../../scripts/qa/ci-quality-shard.mjs'
 import { validateDevWorkbenchReceipt } from '../../scripts/qa/dev-workbench-receipt.mjs'
 import {
   readRepositoryIdentity,
@@ -580,6 +584,16 @@ function statusProjection({
       notProven: ['当前版本 GitLab CI 严格门禁', '目标环境发布', '客户 UAT'],
     }
   }
+  if (serverEvidence?.status === 'docs_passed') {
+    return {
+      tone: 'info',
+      title: '文档检查已通过，完整发布验证未运行',
+      description: serverEvidence.message,
+      releaseEligible: false,
+      recommendation: '如需发布此 SHA，在 GitLab 新建 main 流水线并设置 QA_MODE=full，等待完整 CI 通过。',
+      notProven: ['当前版本 GitLab CI 严格门禁', '目标环境发布', '客户 UAT'],
+    }
+  }
   if (serverEvidence?.status === 'failed') {
     return {
       tone: 'error',
@@ -820,39 +834,46 @@ export function projectDevQualityGateServerEvidence(
         return projectServerJob(sorted.at(-1), sorted.length)
       })
       .sort((left, right) => left.id - right.id)
-    const passed =
+    const succeeded =
       run.status === 'completed' &&
       run.conclusion === 'success' &&
       jobs.length > 0 &&
       jobs.every(
         (job) => job.status === 'completed' && job.conclusion === 'success'
       )
-    return { run, jobs, passed }
+    const names = new Set(jobs.map((job) => job.name))
+    const passed = succeeded && CI_STRICT_JOB_NAMES.every((name) => names.has(name))
+    const docsPassed =
+      succeeded && jobs.length === 3 &&
+      ['plan', 'quality_docs', 'CI Gate'].every((name) => names.has(name))
+    return { run, jobs, passed, docsPassed }
   }
   const candidates = timings.runs
     .filter(
       (run) =>
         run?.workflow === 'ci' &&
-        run?.event === 'push' &&
+        CI_STRICT_PIPELINE_SOURCES.includes(run?.event) &&
         /^[0-9a-f]{40}$/u.test(String(run?.gitSha || ''))
     )
     .map(projectRun)
     .sort((left, right) => right.run.id - left.run.id)
   const history = candidates
     .slice(0, SERVER_CI_HISTORY_LIMIT)
-    .map(({ run, jobs, passed }) => {
+    .map(({ run, jobs, passed, docsPassed }) => {
       const active = run.status !== 'completed'
       const result = passed
         ? 'passed'
-        : active
-          ? run.status === 'in_progress'
-            ? 'running'
-            : 'queued'
-          : run.conclusion === 'cancelled'
-            ? 'cancelled'
-            : run.conclusion === 'skipped'
-              ? 'skipped'
-              : 'failed'
+        : docsPassed
+          ? 'docs_passed'
+          : active
+            ? run.status === 'in_progress'
+              ? 'running'
+              : 'queued'
+            : run.conclusion === 'cancelled'
+              ? 'cancelled'
+              : run.conclusion === 'skipped'
+                ? 'skipped'
+                : 'failed'
       return {
         id: run.id,
         result,
@@ -883,14 +904,18 @@ export function projectDevQualityGateServerEvidence(
       topology: projectServerTopology(topology, repository, []),
       history,
       message:
-        'GitLab 凭据与 API 读取正常；GitLab CI 尚无绑定当前已提交 SHA 的普通 push CI 记录。',
-      notProven: ['当前 exact SHA 的 GitLab 普通 push CI'],
+        'GitLab 凭据与 API 读取正常；GitLab CI 尚无绑定当前已提交 SHA 的 push 或手动完整 CI 记录。',
+      notProven: ['当前 exact SHA 的 GitLab CI'],
     }
   }
   const selected =
     exactRuns.find((candidate) => candidate.passed) || exactRuns[0]
   const active = selected.run.status !== 'completed'
-  const status = selected.passed ? 'passed' : active ? 'running' : 'failed'
+  const status = selected.passed
+    ? 'passed'
+    : selected.docsPassed
+      ? 'docs_passed'
+      : active ? 'running' : 'failed'
   return {
     schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
     status,
@@ -915,12 +940,18 @@ export function projectDevQualityGateServerEvidence(
       ? repository.dirty
         ? 'GitLab CI 已证明当前提交 SHA；该证据不覆盖本机未提交改动。'
         : 'GitLab CI 已通过当前 exact SHA 的完整分片、聚合与 CI Gate。'
-      : active
-        ? 'GitLab CI 正在验证当前 exact SHA。'
-        : 'GitLab 当前 exact SHA 的普通 push CI 未形成完整通过证据。',
-    notProven: repository.dirty
-      ? ['本机未提交改动', '不可变 Release', '目标部署', '客户 UAT']
-      : ['不可变 Release', '目标部署', '客户 UAT'],
+      : selected.docsPassed
+        ? '当前 exact SHA 的文档检查已通过；只运行范围、敏感信息与文档检查，未产生完整 strict 或发布证据。需要发布时，在 GitLab 新建 main 流水线并设置 QA_MODE=full。'
+        : active
+          ? 'GitLab CI 正在验证当前 exact SHA。'
+          : 'GitLab 当前 exact SHA 的 CI 未形成完整通过证据。',
+    notProven: [
+      ...(repository.dirty ? ['本机未提交改动'] : []),
+      ...(selected.passed ? [] : ['当前 exact SHA 的完整 CI 严格门禁']),
+      '不可变 Release',
+      '目标部署',
+      '客户 UAT',
+    ],
   }
 }
 
@@ -1040,13 +1071,11 @@ export function createDevQualityGateService({
         })
         let timings = await provider.listPipelineTimings({
           limit: SERVER_CI_HISTORY_LIMIT,
-          source: 'push',
         })
         if (!timings.runs.some((run) => run.gitSha === repository.commit)) {
           const exactTimings = await provider.listPipelineTimings({
             limit: SERVER_CI_HISTORY_LIMIT,
             sha: repository.commit,
-            source: 'push',
           })
           const knownRunIds = new Set(timings.runs.map((run) => run.id))
           timings = {

@@ -99,6 +99,17 @@ export const CI_QUALITY_SHARDS = Object.freeze({
   }),
 });
 
+// Final jobs certify their own lanes; both release reuse and the workbench must
+// require this same set before describing a pipeline as complete strict CI.
+export const CI_STRICT_JOB_NAMES = Object.freeze([
+  "plan",
+  "prepare",
+  ...Object.values(CI_QUALITY_SHARDS).map((value) => value.job),
+  "quality_aggregate",
+  "CI Gate",
+]);
+export const CI_STRICT_PIPELINE_SOURCES = Object.freeze(["push", "web"]);
+
 const SHA_PATTERN = /^[0-9a-f]{40}$/u;
 const TAGGED_SHA256_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const RANGE_PATTERN = /^(?:[0-9a-f]{40}|HEAD\^)\.\.\.?HEAD$/u;

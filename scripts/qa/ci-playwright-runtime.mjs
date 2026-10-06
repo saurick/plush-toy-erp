@@ -255,7 +255,7 @@ export function canBootstrapRuntimePackage(env) {
   return (
     env.GITLAB_CI === "true" &&
     env.CI_PROJECT_PATH === EXPECTED_PROJECT &&
-    env.CI_PIPELINE_SOURCE === "push" &&
+    (env.CI_PIPELINE_SOURCE === "push" || (env.CI_PIPELINE_SOURCE === "web" && env.QA_MODE === "full")) &&
     env.CI_COMMIT_BRANCH === "main" &&
     env.CI_DEFAULT_BRANCH === "main" &&
     env.CI_COMMIT_REF_PROTECTED === "true" &&

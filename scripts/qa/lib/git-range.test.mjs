@@ -53,6 +53,13 @@ test("git range rejects missing and unsafe revisions", async () => {
   });
 });
 
+test("renaming a non-document to Markdown retains the deleted code path", async () => {
+  await withRepository(async (root) => {
+    git(root, ["mv", "base.txt", "README.md"]);
+    assert.deepEqual(collectGitChangedFiles({ root }), ["base.txt", "README.md"]);
+  });
+});
+
 test("git range is NUL-safe for spaces and keeps staged/worktree changes", async () => {
   await withRepository(async (root) => {
     await mkdir(path.join(root, "dir with spaces"));

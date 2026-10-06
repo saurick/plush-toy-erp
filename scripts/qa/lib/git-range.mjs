@@ -113,7 +113,8 @@ export function readNullDelimited(value) {
 
 export function gitDiffFiles(root, args) {
   return readNullDelimited(
-    runGit(root, ["diff", "--name-only", "-z", ...args, "--"], {
+    // Renames affect both paths: moving code to a .md file is still a code deletion.
+    runGit(root, ["diff", "--no-renames", "--name-only", "-z", ...args, "--"], {
       encoding: null,
     }),
   );

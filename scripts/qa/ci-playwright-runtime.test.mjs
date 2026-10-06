@@ -167,8 +167,9 @@ test("installed Playwright metadata must match the pinned runtime", () => {
   );
 });
 
-test("only the protected main push prepare job may seed an absent package", () => {
+test("only protected main full CI prepare jobs may seed an absent package", () => {
   assert.equal(canBootstrapRuntimePackage(protectedPrepareEnv), true);
+  assert.equal(canBootstrapRuntimePackage({ ...protectedPrepareEnv, CI_PIPELINE_SOURCE: "web", QA_MODE: "full" }), true);
   for (const [key, value] of [
     ["CI_PIPELINE_SOURCE", "web"],
     ["CI_COMMIT_BRANCH", "feature"],

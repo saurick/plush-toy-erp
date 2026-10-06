@@ -2,9 +2,42 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
 
-import { buildCIPlan } from "./ci-plan.mjs";
+import { buildCIPlan, CI_FULL_CHANGE_PATTERNS, isDocumentationOnlyCIChange } from "./ci-plan.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
+
+test("docs CI prepares locked Mermaid dependencies without database or browser tooling", () => {
+  const plan = buildCIPlan({
+    files: ["progress.md", "docs/customers/yoyoosun/客户交付矩阵.md", "web/README.md", "server/README.md"],
+    mode: "docs", root: ROOT,
+  });
+  assert.equal(plan.effectiveMode, "docs");
+  assert.equal(plan.flags.needsWeb, true);
+  assert(Object.entries(plan.flags).every(([key, flag]) => key === "needsWeb" || flag === false));
+  assert(plan.affected.commands.some((command) => command.id === "docs-inventory"));
+});
+
+test("docs CI rejects mixed, unknown, executable skill and generated-schema changes", () => {
+  for (const file of ["new-tool", ".gitlab-ci.yml", "web/src/app.ts", "docs/example.json", ".agents/skills/example/script.py", "server/docs/database/README.md"]) {
+    assert.throws(() => buildCIPlan({ files: ["README.md", file], mode: "docs", root: ROOT }), /docs CI cannot cover/u, file);
+  }
+});
+
+test("GitLab full-path patterns match the conservative documentation classifier", () => {
+  const paths = ["README.md", ".md", "dir/.md", "docs/中文 空格.md", "d", "md", "amd", ".MD", "docs/a.md/script", "server/docs/database/README.md", "unknown/file.json"];
+  // Enumerate suffix boundaries rather than sampling only familiar extensions.
+  let names = [""];
+  for (let length = 1; length <= 5; length += 1) {
+    names = names.flatMap((prefix) => [...".mdax"].map((suffix) => prefix + suffix));
+    paths.push(...names.flatMap((name) => [name, `nested/${name}`]));
+  }
+  for (const file of paths.filter((value) => ![".", "..", "nested/.", "nested/.."].includes(value))) {
+    // Node's glob hides dotfiles; Ruby/GitLab enables FNM_DOTMATCH. Prefix hidden
+    // segments here without altering the extension or database-docs prefix.
+    const visiblePath = file.replace(/(^|\/)\./gu, "$1x.");
+    assert.equal(CI_FULL_CHANGE_PATTERNS.some((pattern) => path.matchesGlob(visiblePath, pattern)), !isDocumentationOnlyCIChange([file]), file);
+  }
+});
 
 test("CI plan keeps a documentation pull request lightweight", () => {
   const plan = buildCIPlan({
@@ -25,7 +58,7 @@ test("CI plan keeps a documentation pull request lightweight", () => {
     needsGo: false,
     needsPostgres: false,
     needsSystemTools: false,
-    needsWeb: false,
+    needsWeb: true,
     sourceArchive: false,
   });
 });

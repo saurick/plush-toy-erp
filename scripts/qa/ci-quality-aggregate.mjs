@@ -33,6 +33,7 @@ import {
 import {
   CI_QUALITY_SHARDS,
   CI_QUALITY_SHARD_SCHEMA,
+  CI_STRICT_PIPELINE_SOURCES,
 } from "./ci-quality-shard.mjs";
 import {
   CI_NODE_TEST_LANES,
@@ -355,7 +356,8 @@ function assertAggregateEnvironment(env) {
     env.CI_DEFAULT_BRANCH !== "main" ||
     env.CI_COMMIT_BRANCH !== "main" ||
     env.CI_COMMIT_REF_PROTECTED !== "true" ||
-    env.CI_PIPELINE_SOURCE !== "push" ||
+    !CI_STRICT_PIPELINE_SOURCES.includes(env.CI_PIPELINE_SOURCE) ||
+    (env.CI_PIPELINE_SOURCE === "web" && env.QA_MODE !== "full") ||
     env.CI_JOB_NAME !== "quality_aggregate" ||
     !SHA_PATTERN.test(String(env.CI_COMMIT_SHA || "")) ||
     !/^\d+$/u.test(String(env.CI_PIPELINE_ID || "")) ||
@@ -875,7 +877,7 @@ export async function aggregateCiQuality({
     status: "passed",
     summary,
     invariants: [
-      "protected main trust bootstrap and real push range passed",
+      "protected main trust bootstrap and committed range passed",
       "all seven fixed GitLab quality shards passed for one exact SHA",
       "internal Node, resource, Web, Server and Browser lanes covered each registered contract exactly once",
       "source archive, dependency audit and make data integrity passed",

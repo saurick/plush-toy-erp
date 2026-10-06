@@ -72,8 +72,8 @@ test("DEV quality gate projects provider jobs without a synchronized frontend ca
   const timing = buildQualityGateServerTiming(evidence);
   const dag = buildQualityGateServerDag(evidence);
 
-  assert.equal(evidence.status, "passed");
-  assert.equal(evidence.coversWorkingTree, true);
+  assert.equal(evidence.status, "failed");
+  assert.equal(evidence.coversWorkingTree, false);
   assert.deepEqual(
     evidence.jobs.map((job) => job.name),
     jobNames,
@@ -136,8 +136,10 @@ test("DEV quality gate has no second CI job topology source", () => {
   );
   assert.match(
     plugin,
-    /listPipelineTimings\(\{[\s\S]*?limit: SERVER_CI_HISTORY_LIMIT,[\s\S]*?source: 'push'/u,
+    /listPipelineTimings\(\{\s*limit: SERVER_CI_HISTORY_LIMIT,\s*\}\)/u,
   );
+  assert.match(plugin, /CI_STRICT_PIPELINE_SOURCES\.includes\(run\?\.event\)/u);
+  assert.match(plugin, /CI_STRICT_JOB_NAMES\.every/u);
   assert.match(
     plugin,
     /timings\.runs\.some\(\(run\) => run\.gitSha === repository\.commit\)[\s\S]*?sha: repository\.commit/u,
@@ -146,6 +148,7 @@ test("DEV quality gate has no second CI job topology source", () => {
   assert.match(provider, /content_ref: sha/u);
   assert.match(provider, /\/ci\/lint\?/u);
   assert.match(provider, /include_jobs/u);
+  assert.match(provider, /dry_run: "false"/u);
   assert.doesNotMatch(
     config,
     /SERVER_CI_JOB_CATALOG|localStageIds|devQualityGateServerPipeline/u,

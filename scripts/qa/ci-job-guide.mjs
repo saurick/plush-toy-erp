@@ -128,7 +128,7 @@ function diagnosticsFor(guide) {
     plan: {
       entry: ".gitlab-ci.yml → plan.script → node scripts/qa/ci-plan.mjs",
       environment:
-        "Runner 工具链版本检查通过，before/base SHA 可读；main push 使用 full，MR 按可信 base 选择 affected。",
+        "Node / gitleaks 版本与仓库身份正确，before/base SHA 可读；main 按实际路径选择 docs/full，MR 使用 affected。",
       steps: [
         "依据 source / before SHA / MR base 计算 diff 与历史范围。",
         "检查 diff/log，并用可信基线的 gitleaks 配置扫描历史。",
@@ -153,6 +153,17 @@ function diagnosticsFor(guide) {
       evidence: ["output/ci/runner-capacity-observation.json"],
       source: "scripts/qa/ci-playwright-runtime.mjs",
     },
+    quality_docs: {
+      entry: ".gitlab-ci.yml → quality_docs.script → affected.sh",
+      environment: "同 SHA 的 docs 计划与 locked pnpm 文档解析依赖；无需 Docker、Atlas 或 Chromium。",
+      steps: [
+        "确认计划只包含普通 Markdown；数据库生成文档和任何非 Markdown 改动走 full。",
+        "从只读缓存安装锁定的 Mermaid / DOM 依赖，再按真实范围检查文档登记、链接、命名和相关边界。",
+        "核对工作区零漂移；通过只表示文档检查成功，不产生 strict 证据。",
+      ],
+      evidence: ["output/ci/plan.json", "output/ci/range.txt", "GitLab quality_docs Job 日志"],
+      source: "scripts/qa/affected.mjs",
+    },
     quality_aggregate: {
       entry: "node scripts/qa/ci-quality-aggregate.mjs",
       environment:
@@ -172,9 +183,9 @@ function diagnosticsFor(guide) {
     "CI Gate": {
       entry: ".gitlab-ci.yml → CI Gate.script",
       environment:
-        "main push 要求 protected main 与 aggregate 成功；MR 依赖 quality_affected。Package 上传使用 Job token，凭据不进入页面。",
+        "full 要求 protected main 与 aggregate 成功；docs 依赖 quality_docs，MR 依赖 quality_affected。Package 上传使用 Job token，凭据不进入页面。",
       steps: [
-        "main push 核对三个证据文件及当前分支保护身份。",
+        "按 plan.effectiveMode 核对分支：docs 仅完成文档门禁；full 核对三个证据文件及当前分支保护身份。",
         "上传到 plush-ci-evidence 的 pipeline-<id>-job-<id>-<sha> 版本，失败仍阻断。",
         "清理临时凭据文件；发布链另行读回同 SHA 的不可变证据。",
       ],
@@ -209,6 +220,13 @@ function diagnosticsFor(guide) {
 }
 
 const RAW_CI_JOB_GUIDES = [
+  {
+    name: "quality_docs",
+    label: "文档检查",
+    summary: "按变更范围检查文档登记、链接和相关边界。",
+    checks: ["文档登记与链接", "命名与相关边界", "工作区零漂移"],
+    outcome: "文档 CI 通过；未运行完整 strict，不授予发布资格。",
+  },
   {
     name: "plan",
     label: "确定验证范围",

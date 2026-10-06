@@ -97,6 +97,14 @@ test("Runner capacity observation binds dynamic resources and configured slots",
   );
 });
 
+test("manual full CI retains real source and rejects an unqualified web run", () => {
+  const options = { env: { ...env, CI_PIPELINE_SOURCE: "web", QA_MODE: "full" }, receipt, resources, live, policy, observedAt: "2026-09-01T02:01:00Z" };
+  const observation = buildRunnerCapacityObservation(options);
+  assert.equal(observation.pipeline.source, "web");
+  assert.equal(validateRunnerCapacityObservation(observation, { ...expected, pipelineSource: "web" }), observation);
+  assert.throws(() => buildRunnerCapacityObservation({ ...options, env: { ...options.env, QA_MODE: "docs" } }), /identity is invalid/u);
+});
+
 test("Runner capacity evidence rejects extra keys and slot drift", () => {
   assert.throws(
     () => validateRunnerCapacityReceipt({ ...receipt, extra: true }),

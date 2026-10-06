@@ -1266,7 +1266,7 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(pageSource, /GitLab CI 正在读取服务器证据/u)
   assert.match(pageSource, /最近 CI/u)
   assert.match(pageSource, /历史结果不代表当前提交已通过/u)
-  assert.match(pageSource, /最近普通 push CI 历史/u)
+  assert.match(pageSource, /最近 GitLab CI 历史/u)
   assert.match(pageSource, /serverHistoryFailureLabel/u)
   assert.doesNotMatch(pageSource, /missing: '暂无当前 CI'/u)
   assert.doesNotMatch(pageSource, /unavailable: '待读取'/u)

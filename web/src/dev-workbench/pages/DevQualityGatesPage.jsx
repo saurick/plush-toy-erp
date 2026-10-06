@@ -476,6 +476,11 @@ function ContextStrip({ summary, view, summaryError, onReturnLocal }) {
 }
 
 const SERVER_EVIDENCE_STATUS = Object.freeze({
+  docs_passed: Object.freeze({
+    label: '文档检查已通过',
+    color: 'blue',
+    alert: 'info',
+  }),
   loading: Object.freeze({
     label: '正在读取',
     color: 'processing',
@@ -541,6 +546,7 @@ const SERVER_PIPELINE_JOB_LEGEND = Object.freeze([
   'unavailable',
 ])
 const SERVER_HISTORY_STATUS = Object.freeze({
+  docs_passed: Object.freeze({ label: '文档已通过', color: 'blue' }),
   queued: Object.freeze({ label: '等待运行', color: 'processing' }),
   running: Object.freeze({ label: '运行中', color: 'processing' }),
   passed: Object.freeze({ label: '已通过', color: 'success' }),
@@ -601,7 +607,7 @@ const SERVER_VIEW_OPTIONS = Object.freeze([
 const SERVER_VIEW_HELP = Object.freeze({
   pipeline: '核对本次提交的真实 needs、并行关系、Job 状态与耗时。',
   performance: '比较近 20 次同名 Job 的中位数、P95、等待与重试。',
-  history: '按流水线回看近 20 次普通 push CI 的结果与失败环节。',
+  history: '按流水线回看近 20 次 push 与手动完整 CI 的结果与失败环节。',
 })
 
 function qualityGateViewStatus(summary, view, summaryError) {
@@ -634,6 +640,8 @@ function qualityGateViewStatus(summary, view, summaryError) {
     recommendation:
       evidence?.status === 'passed'
         ? '优先查看排队耗时、最长执行 Job 与历史退化；未提交改动请切换到“本机诊断”定位。'
+        : evidence?.status === 'docs_passed'
+          ? '文档检查已经完成；需要发布此 SHA 时，在 GitLab 新建 main 流水线并设置 QA_MODE=full。'
         : evidence?.status === 'running'
           ? '等待当前服务器流水线结束；页面不会用本机回执替代服务器结果。'
           : evidence?.status === 'missing'
@@ -923,7 +931,7 @@ function ServerCiHistory({ evidence, currentCommit }) {
             最近 CI
           </Title>
           <Text type="secondary">
-            GitLab 最近读取到的普通 push CI；历史结果不代表当前提交已通过。
+            GitLab 最近读取到的 push 与手动完整 CI；文档通过与完整通过分别标示，历史结果不代表当前提交已通过。
           </Text>
         </div>
         <Tag>{history.length} 条</Tag>
@@ -932,7 +940,7 @@ function ServerCiHistory({ evidence, currentCommit }) {
         <div className="erp-dev-quality-server-history__table-wrap">
           <table
             className="erp-dev-quality-server-history__table"
-            aria-label="最近普通 push CI 历史"
+            aria-label="最近 GitLab CI 历史"
           >
             <thead>
               <tr>
@@ -1524,7 +1532,7 @@ function ServerCiEvidencePanel({ summary, serverView, onServerViewChange }) {
         <div className="erp-dev-quality-server-evidence__heading-copy">
           <Title level={2}>GitLab CI 门禁</Title>
           <Text type="secondary">
-            正式主路径 · 当前提交的普通 push CI、实际 Job、聚合回执与 CI Gate
+            正式主路径 · 当前提交的验证范围、实际 Job、聚合回执与 CI Gate
           </Text>
         </div>
         <Space wrap size={6}>

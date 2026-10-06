@@ -8,13 +8,14 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
       A["本地提交与推送前检查"] --> B["推送 GitLab main"]
       B --> C["plan：确定范围与身份"]
       C --> E["准备依赖并运行质量检查"]
+      C -->|"仅文档"| D["文档检查与文档 CI Gate"]
       E --> G["汇总同一提交的证据与 CI Gate"]
       G --> H["显式发布不可变制品"]
       H --> I["准备并确认目标部署"]
       I --> J["执行部署并读回目标证据"]
       B -. "单向镜像" .-> K["GitHub：只读审查"]`,
     points: [
-      '推送触发 CI；制品发布和目标部署各有独立入口与确认。',
+      '推送按真实路径选择文档或完整 CI；文档 CI 通过只证明文档检查，发布前须另取得同 SHA 完整 CI 证据。',
       'CI 证据绑定同一提交；缓存用于准备依赖，发布制品用于固定已验证版本。',
       '目标环境直接加载制品，运行检查、备份和回滚点分别保留证据。',
     ],
@@ -71,7 +72,7 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
       '测试数量只说明本次实际执行规模。缺 summary、零执行或意外 skip 不能变成成功；计划新增检查后旧回执不能继续覆盖。',
     ],
     table: {
-      headers: ['检查项', '提交 hook', '默认推送准备', 'GitLab main CI'],
+      headers: ['检查项', '提交 hook', '默认推送准备', 'GitLab main 完整 CI'],
       rows: [
         ['范围 / 源码完整性', '暂存 diff、index 快照与 required 文件', 'clean HEAD/tree、remote/ref/range、gate 指纹', '可信 diff、source archive、同 SHA / plan 身份'],
         ['敏感信息', '严格扫描暂存内容', '严格扫描真实推送历史；hook 再读回', 'plan 可信基线扫描 + Node 领域收口'],
@@ -115,30 +116,34 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
   {
     key: 'ci-entry',
     label: '进入 CI：触发、准备与执行',
-    description: '普通 protected main push 的路径。MR 使用 plan-driven affected/full；release 和定时打印监测是独立触发分支，不要拿它们的绿色替代普通 push CI。',
+    description: 'protected main 按实际路径选择：普通 Markdown 只运行 3 个 Job；混合、代码、配置和数据库生成文档运行完整 CI。MR 使用 affected/full，release 与定时打印监测另走各自入口。',
     chart: `flowchart TD
       A["GitLab 收到提交"] --> B["workflow 与 Job rules"]
-      B --> C["Runner 标签、槽位与资源锁"]
-      C --> D["检出源码与 before_script"]
-      D --> E["plan：范围、信任与计划"]
-      E --> F["prepare：工具条件、依赖与缓存"]
+      B --> C["Runner 领取并检出源码"]
+      C --> E["plan：范围、信任与计划"]
+      E --> S{"验证范围"}
+      S -->|"docs"| K["quality_docs：文档检查"]
+      K --> L["CI Gate：仅文档通过"]
+      S -->|"full"| F["prepare：工具条件、依赖与缓存"]
       F --> G["按真实 needs 运行各领域"]
-      G --> H["领域回执与清理读回"]
-      H --> I["quality_aggregate"]
+      G --> I["quality_aggregate：回执与清理核验"]
       I --> J["CI Gate 固化证据包"]`,
     points: [
       '找不到流水线时先核对 remote、ref、SHA 和 pipeline source，再看 workflow.rules；有流水线但没有某 Job 时看该 Job rules。不要直接按测试失败处理。',
       'pending 先看 Runner online、plush / isolated / amd64 标签、protected 资格、空槽与 resource_group。排队时长和执行时长分开判断。',
-      '每个 Job 的 before_script 都会核对仓库、默认分支及 Node / Go / pnpm / Docker / Atlas / gitleaks 版本；在 script 前退出属于工具链或环境前置失败。',
-      'plan：main push 根据 before SHA 建范围，首次推送用 empty-tree；运行 diff/log 和可信基线 secrets，产出 plan.json、range.txt、trust.json。main 使用 full，MR 按可信 base 使用 affected。',
+      'plan 与 CI Gate 只检查 Node / gitleaks 和仓库身份；文档 Job 另外安装锁定的 Mermaid / DOM 解析依赖。完整执行 Job 继续核对 Go / pnpm / Docker / Atlas 等固定版本。在 script 前退出属于环境前置失败。',
+      'plan：main push 根据 before SHA 建范围，首次推送用 empty-tree 并走 full；运行 diff/log 和可信基线 secrets，产出 plan.json、range.txt、trust.json。docs 会再次核对实际路径，混入非文档即阻断。MR 按可信 base 使用 affected。',
+      '文档路径：plan → quality_docs → CI Gate。保留文档登记、链接、命名及命中的 Skill / 客户资料边界检查；不运行数据库、浏览器、构建或漏洞分片，不上传 strict 证据包。代码改名为 Markdown 仍按代码删除处理。',
+      '需要发布纯文档 SHA 时，在 GitLab 新建 main 流水线并设置 QA_MODE=full；它运行完整 DAG，保留真实 web 来源。也可在第一次推送时使用 git push -o ci.variable=QA_MODE=full origin main。',
       'prepare：读 Runner 容量，核对 Chromium sandbox helper 与 sudo policy；锁定 pnpm 依赖、准备受校验 Playwright ZIP、下载 Go 依赖。它是缓存唯一写入者，不代表任何测试通过。',
       '质量执行：各 Job 先核对 exact SHA、计划和所需制品，再执行自己的 lane；分片只读缓存。数据库、端口、浏览器沙箱和输出必须按任务隔离，成功与失败都要清理。',
       '领域汇总核对所有必要分片；quality_aggregate 汇总七类证据、实际执行数、零 skip、构建身份和清理，不靠“某几个 Job 绿了”推断完整覆盖。',
-      'CI Gate 将 terminal.json、receipt.json、evidence-manifest.json 固化到 pipeline / job / SHA 对应的 plush-ci-evidence Package。上传失败仍是失败；发布链还要重新读回验证。',
+      '完整 CI 的 CI Gate 将 terminal.json、receipt.json、evidence-manifest.json 固化到 pipeline / job / SHA 对应的 plush-ci-evidence Package。工作台和发布读取同一份完整 Job 清单，文档绿色不授予发布资格。',
     ],
     table: {
       headers: ['卡住的位置', '应看到的证据', '优先排查'],
       rows: [
+        ['quality_docs', 'plan.effectiveMode=docs、affected 实际输出', '改名旧路径、混合改动、文档链接与登记；成功不表示完整 CI'],
         ['未创建 / skipped', '准确的 source、ref、protected 资格及匹配 rules', '.gitlab-ci.yml 的 workflow 与 Job rules；是否误查 release / MR'],
         ['pending / 等待', 'Runner、排队时长、前置 needs、资源锁', 'Runner 标签、protected 限制、空槽；上游失败引起的下游未运行'],
         ['before_script', '工具版本检查逐项通过', '首次失败命令、PATH、工具版本、checkout；测试可能尚未开始'],
@@ -148,13 +153,13 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
         ['CI Gate', '同 pipeline/job/SHA 的三个证据资产', 'aggregate 是否完整、Package 权限和上传响应；不可跳过证据上传'],
       ],
     },
-    sources: ['.gitlab-ci.yml', 'scripts/qa/ci-plan.mjs', 'scripts/qa/ci-quality-aggregate.mjs'],
+    sources: ['.gitlab-ci.yml', 'scripts/qa/ci-plan.mjs', 'scripts/qa/ci-quality-shard.mjs', 'scripts/qa/ci-quality-aggregate.mjs'],
   },
   {
     key: 'parallel',
     label: 'Job 并行、汇总与等待',
     description:
-      '按领域展示 main push 的分组机制；具体 Job 和依赖展开本次流水线的真实 DAG 核对。',
+      '按领域展示完整 CI 的分组机制；文档 CI 不运行这些分片。具体 Job 和依赖展开本次流水线的真实 DAG 核对。',
     chart: `flowchart TD
       P["plan → prepare"] --> N["Node、静态与安全"]
       P --> W["Web 检查<br/>构建与汇总"]
@@ -240,7 +245,7 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
     description:
       '发布和部署的操作顺序说明；本图不表示任一目标已完成发布或运行核验。',
     chart: `flowchart TD
-      A["核对同一提交的 CI Gate"] --> B["显式发布：构建一次并冻结制品"]
+      A["核对同一提交的完整 CI 证据"] --> B["显式发布：构建一次并冻结制品"]
       B --> C["迁移、运行与备份恢复演练"]
       C --> D["登记不可变 Release"]
       D --> E["选择固定版本与目标"]

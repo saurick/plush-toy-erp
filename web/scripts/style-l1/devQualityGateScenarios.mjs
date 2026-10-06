@@ -98,7 +98,7 @@ function serverCiTopologyJob(name) {
     }
   }
   if (name === 'CI Gate') {
-    return { name, stage: 'gate', needs: ['quality_aggregate'] }
+    return { name, stage: 'gate', needs: ['plan', 'quality_aggregate'] }
   }
   if (Object.hasOwn(SERVER_CI_AGGREGATE_NEEDS, name)) {
     return {
@@ -406,6 +406,33 @@ function historicalQualityOperation(id, durationMs, createdAt, finishedAt) {
 }
 
 function createServerEvidence(status = 'passed') {
+  if (status === 'docs_passed') {
+    const full = createServerEvidence()
+    const names = ['plan', 'quality_docs', 'CI Gate']
+    const jobs = full.jobs.slice(0, 3).map((job, index) => ({
+      ...job,
+      name: names[index],
+      role: ['orchestration', 'execution', 'terminal'][index],
+      group: 'pipeline',
+    }))
+    return {
+      ...full,
+      status,
+      jobs,
+      jobGuides: projectCiJobGuides(names),
+      topology: {
+        ...full.topology,
+        jobs: names.map((name, index) => ({
+          name,
+          stage: ['plan', 'quality', 'gate'][index],
+          needs: names.slice(0, index),
+        })),
+      },
+      history: [],
+      message: '文档检查已通过；完整发布验证未运行。需要发布此 SHA 时，在 GitLab 新建 main 流水线并设置 QA_MODE=full。',
+      notProven: ['当前 exact SHA 的完整 CI 严格门禁', '不可变 Release', '目标部署', '客户 UAT'],
+    }
+  }
   if (status === 'unavailable') {
     return {
       schemaVersion: 'plush.dev-quality-gate-server-evidence/v5',
@@ -515,7 +542,7 @@ export function createQualityGateStyleSummary(
   return {
     schemaVersion: 'plush.dev-quality-gates-summary/v1',
     generatedAt: NOW,
-    repository,
+    repository: serverStatus === 'docs_passed' ? { ...repository, dirty: false } : repository,
     environment: {
       disposableDatabaseReady: true,
       message: '一次性数据库环境已就绪',
@@ -1327,6 +1354,40 @@ export function createDevQualityGateScenarios({
           page,
           'dev-quality-gates-desktop-light'
         )
+
+        await panel.getByText('本次流水线', { exact: true }).click()
+        await page.waitForFunction(() =>
+          new URL(window.location.href).searchParams.get('serverView') === 'pipeline'
+        )
+        await page.unroute('**/__dev/api/qa/quality-gates**')
+        await installQualityRoutes(
+          page,
+          'idle',
+          { summary: 0, governance: 0, gaps: 0 },
+          { serverStatus: 'docs_passed' }
+        )
+        await page.reload()
+        await expectHeading(page, '质量门禁')
+        await page.getByText('GitLab 文档检查已通过', { exact: true }).waitFor()
+        assert.equal(
+          await page.getByText('先恢复 GitLab 读取链路', { exact: false }).count(),
+          0
+        )
+        await panel.getByText('QA_MODE=full', { exact: false }).waitFor()
+        const docsDiagram = panel.locator('[data-mermaid-status="rendered"]')
+        await docsDiagram.waitFor()
+        assert.equal(await docsDiagram.locator('svg g.node').count(), 3)
+        assert.equal(
+          await panel.getByText('GitLab 普通 CI 已通过', { exact: true }).count(),
+          0
+        )
+        await trigger.click()
+        await drawer.getByText('进入 CI：触发、准备与执行', { exact: true }).click()
+        await guide
+          .locator('[data-section="ci-entry"] [data-mermaid-status="rendered"]')
+          .waitFor()
+        await drawer.getByText('3 个 Job', { exact: false }).first().waitFor()
+        await assertNoHorizontalOverflow(page, 'dev-quality-gates-desktop-light')
       },
     },
   ]
