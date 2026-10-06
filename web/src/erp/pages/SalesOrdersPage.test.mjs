@@ -65,7 +65,7 @@ test('sales order commercial fields preserve their contracts with demand before 
   assert.match(form, /unitText="%"/u)
   assert.match(form, /name="quoted_freight_amount"/u)
   assert.match(form, /value !== 'EXCLUDED'/u)
-  assert.match(form, /setFieldValue\('quoted_freight_amount', undefined\)/u)
+  assert.match(form, /setFieldsValue\(\{ quoted_freight_amount: undefined \}\)/u)
   assert.match(form, /unitText=\{currency \|\| '币种'\}/u)
   assert.match(columns, /title: '报价运费'/u)
   assert.match(columns, /dataIndex: 'quoted_freight_amount'/u)

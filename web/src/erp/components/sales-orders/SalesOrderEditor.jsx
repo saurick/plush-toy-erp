@@ -72,6 +72,11 @@ export default function SalesOrderEditor({
     <BusinessFormPage
       form={form}
       title={editingOrder?.id ? '编辑销售订单' : '新建销售订单'}
+      okText={
+        !editingOrder || editingOrder.lifecycle_status === 'draft'
+          ? '保存草稿'
+          : '保存'
+      }
       open={open}
       onOk={onOk}
       onCancel={onCancel}

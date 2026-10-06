@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 import process from 'node:process'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { createBusinessFormPagesScenarios } from './businessFormPagesScenarios.mjs'
+import { createSalesOrderSubmissionScenarios } from './salesOrderSubmissionScenarios.mjs'
 import { createWarehouseClassificationScenarios } from './warehouseClassificationScenarios.mjs'
 import { createOrderEngineeringScenarios } from './orderEngineeringScenarios.mjs'
 import {
@@ -1398,6 +1399,7 @@ export function createBusinessFormalScenarios(deps) {
       },
     },
     ...createSalesOrderSkuGrainScenarios(deps),
+    ...createSalesOrderSubmissionScenarios(deps),
     ...createBOMMaterialGroupsScenarios(deps),
     ...createBusinessFormPagesScenarios(deps),
     ...createWarehouseClassificationScenarios(deps),

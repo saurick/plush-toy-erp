@@ -46,6 +46,7 @@ var (
 	ErrCustomerInactive                            = errors.New("customer inactive")
 	ErrSalesOrderCommercialTermsIncomplete         = errors.New("sales order commercial terms incomplete")
 	ErrSalesOrderItemPriceMissing                  = errors.New("sales order item price missing")
+	ErrSalesOrderTaxRateRequired                   = errors.New("sales order tax rate required for taxable pricing")
 )
 
 type SalesOrder struct {

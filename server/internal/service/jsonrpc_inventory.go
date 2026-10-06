@@ -165,6 +165,14 @@ func inventoryTxnFilterFromParams(pm map[string]any) (biz.InventoryTxnFilter, bo
 }
 
 func (d *jsonrpcDispatcher) mapInventoryError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := d.inventoryErrorResult(ctx, err); result != nil {
+		return result
+	}
+	d.log.WithContext(ctx).Errorf("[inventory] internal err=%v", err)
+	return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+}
+
+func (d *jsonrpcDispatcher) inventoryErrorResult(ctx context.Context, err error) *v1.JsonrpcResult {
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
@@ -201,8 +209,7 @@ func (d *jsonrpcDispatcher) mapInventoryError(ctx context.Context, err error) *v
 		l.Warnf("[inventory] invalid param err=%v", err)
 		return invalidParamResult()
 	default:
-		l.Errorf("[inventory] internal err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+		return nil
 	}
 }
 

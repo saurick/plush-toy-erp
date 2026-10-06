@@ -375,6 +375,7 @@ func (r *serviceProcessRuntimeRepo) RecoverProcessDomainCommandCompensation(_ co
 type serviceSalesOrderRepo struct {
 	orders     map[int]*biz.SalesOrder
 	nextStatus string
+	submitErr  error
 }
 
 type servicePurchaseOrderSourceRepo struct {
@@ -1382,6 +1383,9 @@ func (r *serviceSalesOrderRepo) UpdateSalesOrderLifecycle(_ context.Context, id 
 }
 
 func (r *serviceSalesOrderRepo) SubmitSalesOrderForProcessCommand(ctx context.Context, id int, _ *biz.ProcessDomainCommandInput, _ *biz.ProcessDomainCommandResult, _ int) (*biz.SalesOrder, error) {
+	if r.submitErr != nil {
+		return nil, r.submitErr
+	}
 	return r.UpdateSalesOrderLifecycle(ctx, id, biz.SalesOrderStatusSubmitted)
 }
 
@@ -3977,6 +3981,29 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 		"sales_order_id":           float64(42),
 		"idempotency_key":          "sales-order-acceptance/SO-42/submit",
 	})
+	salesOrderRepo.submitErr = &biz.SalesOrderReadinessError{MissingFields: []string{"tax_mode", "freight_terms"}}
+	_, rejected, rejectErr := dispatcher.handleCustomerConfig(ctx, "execute_sales_order_acceptance_submit", "missing-terms", executeParams)
+	if rejectErr != nil || rejected.Code != errcode.InvalidParam.Code || rejected.Message != "提交前请补齐：计税方式、报价是否含运费；保存草稿后重新提交" {
+		t.Fatalf("missing terms must return business guidance: result=%v err=%v", rejected, rejectErr)
+	}
+	if salesOrderRepo.orders[42].LifecycleStatus != biz.SalesOrderStatusDraft || salesOrderRepo.nextStatus != "" {
+		t.Fatal("failed submission must preserve the draft")
+	}
+	retryNodes, retryReadErr := dispatcher.processRuntimeUC.ListProcessNodeInstances(ctx, int(instance["id"].(float64)))
+	if retryReadErr != nil {
+		t.Fatalf("read failed submission: %v", retryReadErr)
+	}
+	for _, node := range retryNodes {
+		if node.ID == int(startedNode["id"].(float64)) {
+			if node.Status != biz.ProcessNodeStatusActive || node.DomainCommandResultHash != nil {
+				t.Fatalf("failed submission advanced the node: %#v", node)
+			}
+			executeParams.Fields["expected_version"] = structpb.NewNumberValue(float64(node.Version))
+		} else if node.Status != biz.ProcessNodeStatusWaiting {
+			t.Fatalf("failed submission started a downstream node: %#v", node)
+		}
+	}
+	salesOrderRepo.submitErr = nil
 	_, executeRes, err := dispatcher.handleCustomerConfig(ctx, "execute_sales_order_acceptance_submit", "execute", executeParams)
 	if err != nil {
 		t.Fatalf("execute err = %v", err)

@@ -129,6 +129,14 @@ func purchaseOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.Purchas
 }
 
 func (d *jsonrpcDispatcher) mapPurchaseOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := d.purchaseOrderErrorResult(ctx, err); result != nil {
+		return result
+	}
+	d.log.WithContext(ctx).Errorf("[purchase_order] internal err=%v", err)
+	return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+}
+
+func (d *jsonrpcDispatcher) purchaseOrderErrorResult(ctx context.Context, err error) *v1.JsonrpcResult {
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
@@ -160,8 +168,7 @@ func (d *jsonrpcDispatcher) mapPurchaseOrderError(ctx context.Context, err error
 	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "单位不存在或已停用"}
 	default:
-		l.Errorf("[purchase_order] internal err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+		return nil
 	}
 }
 

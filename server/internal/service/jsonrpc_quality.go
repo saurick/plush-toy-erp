@@ -504,6 +504,14 @@ func qualityInspectionResult(ctx context.Context, d *jsonrpcDispatcher, item *bi
 }
 
 func (d *jsonrpcDispatcher) mapQualityError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := d.qualityErrorResult(ctx, err); result != nil {
+		return result
+	}
+	d.log.WithContext(ctx).Errorf("[quality] internal err=%v", err)
+	return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+}
+
+func (d *jsonrpcDispatcher) qualityErrorResult(ctx context.Context, err error) *v1.JsonrpcResult {
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
@@ -545,8 +553,7 @@ func (d *jsonrpcDispatcher) mapQualityError(ctx context.Context, err error) *v1.
 	case errors.Is(err, biz.ErrQualityInspectionRecordConflict):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "质检单号或待检批次已存在"}
 	default:
-		l.Errorf("[quality] internal err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+		return nil
 	}
 }
 

@@ -1641,14 +1641,19 @@ func validateSalesOrderCommercialReadinessWithClient(ctx context.Context, client
 		}
 		return err
 	}
-	if order.TaxMode == nil || order.FreightTerms == nil {
-		return biz.ErrSalesOrderCommercialTermsIncomplete
+	missingFields := make([]string, 0, 4)
+	if order.TaxMode == nil {
+		missingFields = append(missingFields, "tax_mode")
+	} else if *order.TaxMode != biz.SalesOrderTaxModeNone && order.TaxRate == nil {
+		missingFields = append(missingFields, "tax_rate")
 	}
-	if *order.TaxMode != biz.SalesOrderTaxModeNone && order.TaxRate == nil {
-		return biz.ErrSalesOrderCommercialTermsIncomplete
+	if order.FreightTerms == nil {
+		missingFields = append(missingFields, "freight_terms")
+	} else if *order.FreightTerms == biz.SalesOrderFreightTermsExcluded && order.QuotedFreightAmount == nil {
+		missingFields = append(missingFields, "quoted_freight_amount")
 	}
-	if *order.FreightTerms == biz.SalesOrderFreightTermsExcluded && order.QuotedFreightAmount == nil {
-		return biz.ErrSalesOrderCommercialTermsIncomplete
+	if len(missingFields) > 0 {
+		return &biz.SalesOrderReadinessError{MissingFields: missingFields}
 	}
 	items, err := client.SalesOrderItem.Query().Where(
 		salesorderitem.SalesOrderID(id),
@@ -1658,7 +1663,7 @@ func validateSalesOrderCommercialReadinessWithClient(ctx context.Context, client
 		return err
 	}
 	if len(items) == 0 {
-		return biz.ErrSalesOrderCommercialTermsIncomplete
+		return &biz.SalesOrderReadinessError{MissingFields: []string{"items"}}
 	}
 	for _, item := range items {
 		if item.UnitPrice == nil || item.Amount == nil {
@@ -1666,7 +1671,7 @@ func validateSalesOrderCommercialReadinessWithClient(ctx context.Context, client
 		}
 	}
 	if order.GoodsAmount == nil || order.TaxAmount == nil || order.OrderTotal == nil {
-		return biz.ErrSalesOrderCommercialTermsIncomplete
+		return &biz.SalesOrderReadinessError{MissingFields: []string{"amounts"}}
 	}
 	return nil
 }

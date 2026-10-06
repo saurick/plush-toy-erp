@@ -312,7 +312,7 @@ export default function OutsourcingOrderForm({
           dependencies={['order_date']}
           name="expected_return_date"
           label="预计回货日期"
-          extra="作为各行默认日期；个别行可单独调整。"
+          extra="提交前必填，作为各行默认日期；个别行可单独调整。"
           rules={[
             dateInputNotBeforeRule({
               getStartValue: () => form.getFieldValue('order_date'),
@@ -577,6 +577,7 @@ export default function OutsourcingOrderForm({
                   className="erp-line-item-field erp-line-item-field--source"
                   name={[field.name, 'processing_item']}
                   label="加工项目"
+                  tooltip="提交前必填"
                 >
                   <BusinessTextArea
                     allowClear
@@ -881,7 +882,7 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['supplier_snapshot', 'contact_name']}
               label="乙方联系人"
-              extra="可从加工厂联系人中选择，也可按本合同直接填写。"
+              extra="提交前必填，可选择加工厂联系人或直接填写。"
             >
               <AutoComplete
                 allowClear
@@ -910,6 +911,7 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['supplier_snapshot', 'contact_phone']}
               label="乙方联系电话"
+              tooltip="提交前须填写联系电话或已选联系人的手机"
             >
               <Input maxLength={64} placeholder="座机或手机" />
             </Form.Item>
@@ -917,6 +919,7 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['supplier_snapshot', 'address']}
               label="乙方地址"
+              tooltip="提交前必填"
             >
               <Input maxLength={512} />
             </Form.Item>
@@ -934,6 +937,7 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['contract_party_snapshot', 'buyerCompany']}
               label="委托单位"
+              tooltip="提交前必填"
             >
               <Input maxLength={128} />
             </Form.Item>
@@ -941,6 +945,7 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['contract_party_snapshot', 'buyerContact']}
               label="委托人"
+              tooltip="提交前必填"
             >
               <Input maxLength={64} />
             </Form.Item>
@@ -948,6 +953,7 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['contract_party_snapshot', 'buyerPhone']}
               label="委托方电话"
+              tooltip="提交前必填"
             >
               <Input maxLength={64} />
             </Form.Item>
@@ -955,6 +961,7 @@ export default function OutsourcingOrderForm({
               className="erp-business-action-form__field"
               name={['contract_party_snapshot', 'buyerAddress']}
               label="公司地址"
+              tooltip="提交前必填"
             >
               <Input maxLength={255} />
             </Form.Item>

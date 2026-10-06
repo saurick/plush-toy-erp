@@ -504,6 +504,7 @@ export function SalesOrderFormFields({
           className="erp-business-action-form__field"
           label="计税方式"
           name="tax_mode"
+          extra="提交前必填"
         >
           <Select
             allowClear
@@ -511,7 +512,7 @@ export function SalesOrderFormFields({
             placeholder="草稿可暂缺，提交前补齐"
             onChange={(value) => {
               if (!value || value === 'NONE') {
-                form.setFieldValue('tax_rate', undefined)
+                form.setFieldsValue({ tax_rate: undefined })
               }
             }}
           />
@@ -521,12 +522,13 @@ export function SalesOrderFormFields({
           dependencies={['tax_mode']}
           label="税率"
           name="tax_rate"
+          required={Boolean(taxMode && taxMode !== 'NONE')}
           rules={[
             {
               validator: async (_, value) => {
                 if (!taxMode || taxMode === 'NONE') return
                 if (value === undefined || value === null || value === '') {
-                  return
+                  throw new Error('选择含税或未税计价后，请填写税率')
                 }
                 const units = numeric20Scale6Units(value)
                 if (
@@ -556,6 +558,7 @@ export function SalesOrderFormFields({
           className="erp-business-action-form__field"
           label="报价是否含运费"
           name="freight_terms"
+          extra="提交前必填"
         >
           <Select
             allowClear
@@ -563,7 +566,7 @@ export function SalesOrderFormFields({
             placeholder="草稿可暂缺，提交前补齐"
             onChange={(value) => {
               if (value !== 'EXCLUDED') {
-                form.setFieldValue('quoted_freight_amount', undefined)
+                form.setFieldsValue({ quoted_freight_amount: undefined })
               }
             }}
           />

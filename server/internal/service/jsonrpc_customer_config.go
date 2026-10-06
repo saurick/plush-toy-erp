@@ -652,6 +652,9 @@ func runtimeCustomerConfigRequiresActiveRevision() bool {
 }
 
 func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := unitQuantityErrorResult(err); result != nil {
+		return result
+	}
 	l := d.log.WithContext(ctx)
 	switch {
 	case errors.Is(err, biz.ErrWorkflowTaskSourceGeneratedOnly):
@@ -739,6 +742,9 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 		l.Warnf("[customer_config] shipment quality gate rejected err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单的出货前成品检验不合格，请先完成质量处置"}
 	default:
+		if result := d.processBusinessErrorResult(ctx, err); result != nil {
+			return result
+		}
 		l.Errorf("[customer_config] internal err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 	}

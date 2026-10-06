@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -162,6 +163,14 @@ func salesOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.SalesOrder
 }
 
 func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := d.salesOrderErrorResult(ctx, err); result != nil {
+		return result
+	}
+	d.log.WithContext(ctx).Errorf("[sales_order] internal err=%v", err)
+	return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+}
+
+func (d *jsonrpcDispatcher) salesOrderErrorResult(ctx context.Context, err error) *v1.JsonrpcResult {
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
@@ -184,7 +193,9 @@ func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *
 	case errors.Is(err, biz.ErrSalesOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
 	case errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先补齐计税方式、税率和运费条件；报价不含运费时还需填写报价运费，再提交订单"}
+		return salesOrderReadinessErrorResult(err)
+	case errors.Is(err, biz.ErrSalesOrderTaxRateRequired):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "选择含税或未税计价后，请同时填写税率；暂不确定时可清空计税方式后保存草稿"}
 	case errors.Is(err, biz.ErrSalesOrderItemPriceMissing):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "订单仍有未填写单价的产品明细，请补齐后再提交"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
@@ -213,9 +224,31 @@ func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *
 	case errors.Is(err, biz.ErrUnitNotFound), errors.Is(err, biz.ErrUnitInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "单位不存在或已停用"}
 	default:
-		l.Errorf("[sales_order] internal err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+		return nil
 	}
+}
+
+func salesOrderReadinessErrorResult(err error) *v1.JsonrpcResult {
+	message := "请先补齐计税方式、税率和运费条件；报价不含运费时还需填写报价运费，再提交订单"
+	var readiness *biz.SalesOrderReadinessError
+	if errors.As(err, &readiness) {
+		labels := map[string]string{
+			"tax_mode": "计税方式", "tax_rate": "税率", "freight_terms": "报价是否含运费",
+			"quoted_freight_amount": "报价运费", "items": "订货明细",
+		}
+		missing := make([]string, 0, len(readiness.MissingFields))
+		for _, field := range readiness.MissingFields {
+			if label := labels[field]; label != "" {
+				missing = append(missing, label)
+			} else if field == "amounts" {
+				message = "订单金额尚未完整计算，请核对明细单价、税费和运费条件并重新保存后再提交"
+			}
+		}
+		if len(missing) > 0 {
+			message = "提交前请补齐：" + strings.Join(missing, "、") + "；保存草稿后重新提交"
+		}
+	}
+	return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: message}
 }
 
 func salesOrderMutationResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.SalesOrder, err error) *v1.JsonrpcResult {

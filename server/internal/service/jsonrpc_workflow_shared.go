@@ -70,6 +70,9 @@ func (d *jsonrpcDispatcher) mapWorkflowError(ctx context.Context, err error) *v1
 		l.Warnf("[workflow] business state exists err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "业务状态快照已存在"}
 	default:
+		if result := d.processBusinessErrorResult(ctx, err); result != nil {
+			return result
+		}
 		l.Errorf("[workflow] internal err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 	}

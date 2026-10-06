@@ -27,7 +27,11 @@ export default function PurchaseOrderEditor({
       form={form}
       open={open}
       title={editingOrder ? '编辑采购订单' : '新建采购订单'}
-      okText="保存"
+      okText={
+        !editingOrder || editingOrder.lifecycle_status === 'draft'
+          ? '保存草稿'
+          : '保存'
+      }
       confirmLoading={saving}
       loading={itemsLoading || !referenceDataReady}
       okButtonProps={{ disabled: !referenceDataReady }}

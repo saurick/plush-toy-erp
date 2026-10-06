@@ -1225,6 +1225,7 @@ export default function OutsourcingOrdersPage() {
       <BusinessFormPage
         form={form}
         title={editingRow ? '编辑加工合同' : '新建加工合同'}
+        okText={!editingRow || editingRow.lifecycle_status === 'draft' ? '保存草稿' : '保存'}
         open={modalOpen}
         onCancel={closeModal}
         onOk={submitForm}

@@ -164,6 +164,14 @@ func purchaseReceiptItemResult(ctx context.Context, d *jsonrpcDispatcher, item *
 }
 
 func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := d.purchaseErrorResult(ctx, err); result != nil {
+		return result
+	}
+	d.log.WithContext(ctx).Errorf("[purchase] internal err=%v", err)
+	return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+}
+
+func (d *jsonrpcDispatcher) purchaseErrorResult(ctx context.Context, err error) *v1.JsonrpcResult {
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
@@ -232,8 +240,7 @@ func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1
 	case errors.Is(err, biz.ErrPurchaseRecordConflict):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库、退货或调整单号及行号已存在"}
 	default:
-		l.Errorf("[purchase] internal err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+		return nil
 	}
 }
 

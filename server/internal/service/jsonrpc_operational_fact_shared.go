@@ -150,6 +150,14 @@ func unknownOperationalFactResult(method string) *v1.JsonrpcResult {
 }
 
 func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := d.operationalFactErrorResult(ctx, err); result != nil {
+		return result
+	}
+	d.log.WithContext(ctx).Errorf("[operational_fact] internal err=%v", err)
+	return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+}
+
+func (d *jsonrpcDispatcher) operationalFactErrorResult(ctx context.Context, err error) *v1.JsonrpcResult {
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
@@ -335,8 +343,7 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 	case errors.Is(err, biz.ErrFinanceFactSettlementNotAllowed):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该类财务记录不支持结清操作"}
 	default:
-		l.Errorf("[operational_fact] internal err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+		return nil
 	}
 }
 

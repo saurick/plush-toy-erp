@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"reflect"
 	"testing"
 	"time"
 
@@ -24,6 +25,84 @@ func openSalesOrderRepoTest(t *testing.T, name string) (*biz.SalesOrderUsecase, 
 	client := enttest.Open(t, dialect.SQLite, "file:"+name+"?mode=memory&cache=shared&_fk=1")
 	repo := NewSalesOrderRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
 	return biz.NewSalesOrderUsecase(repo), client
+}
+
+func TestSalesOrderDraftSaveAndSubmissionRequirements(t *testing.T) {
+	for _, tc := range []struct {
+		name                  string
+		taxMode, freightTerms *string
+		want                  []string
+	}{
+		{"terms", nil, nil, []string{"tax_mode", "freight_terms"}},
+		{"freight", stringPtr(biz.SalesOrderTaxModeNone), stringPtr(biz.SalesOrderFreightTermsExcluded), []string{"quoted_freight_amount"}},
+		{"items", stringPtr(biz.SalesOrderTaxModeNone), stringPtr(biz.SalesOrderFreightTermsIncluded), []string{"items"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			uc, client := openSalesOrderRepoTest(t, "sales_submission_requirements")
+			defer mustCloseEntClient(t, client)
+			customer := createSalesOrderTestCustomer(t, ctx, client, "C-REQUIRED", true)
+			in := &biz.SalesOrderMutation{OrderNo: "SO-REQUIRED", CustomerID: customer.ID, Currency: biz.FinanceCurrencyCNY, OrderDate: time.Now(), TaxMode: tc.taxMode, FreightTerms: tc.freightTerms}
+			draft, err := uc.SaveSalesOrderWithItems(ctx, 0, in, nil)
+			if err != nil {
+				t.Fatalf("incomplete draft must remain saveable: %v", err)
+			}
+			in.ExpectedVersion = draft.Order.Version
+			if _, err := uc.SaveSalesOrderWithItems(ctx, draft.Order.ID, in, nil); err != nil {
+				t.Fatalf("editing an incomplete draft must remain saveable: %v", err)
+			}
+			_, err = uc.SubmitSalesOrder(ctx, draft.Order.ID)
+			var readiness *biz.SalesOrderReadinessError
+			if !errors.As(err, &readiness) || !errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete) || !reflect.DeepEqual(readiness.MissingFields, tc.want) {
+				t.Fatalf("readiness=%#v err=%v, want fields %v", readiness, err, tc.want)
+			}
+			stored := client.SalesOrder.GetX(ctx, draft.Order.ID)
+			if stored.LifecycleStatus != biz.SalesOrderStatusDraft {
+				t.Fatalf("incomplete submission advanced status to %s", stored.LifecycleStatus)
+			}
+		})
+	}
+}
+
+func TestSalesOrderDraftTaxRateValidation(t *testing.T) {
+	for _, mode := range []string{biz.SalesOrderTaxModeInclusive, biz.SalesOrderTaxModeExclusive} {
+		t.Run(mode, func(t *testing.T) {
+			ctx := context.Background()
+			uc, client := openSalesOrderRepoTest(t, "sales_draft_tax_rate")
+			defer mustCloseEntClient(t, client)
+			customer := createSalesOrderTestCustomer(t, ctx, client, "C-TAX-RATE", true)
+			in := &biz.SalesOrderMutation{OrderNo: "SO-TAX-RATE", CustomerID: customer.ID, Currency: biz.FinanceCurrencyCNY, OrderDate: time.Now(), TaxMode: &mode}
+			if _, err := uc.SaveSalesOrderWithItems(ctx, 0, in, nil); !errors.Is(err, biz.ErrSalesOrderTaxRateRequired) || client.SalesOrder.Query().CountX(ctx) != 0 {
+				t.Fatalf("taxable pricing without a rate must be rejected before persistence: %v", err)
+			}
+			rate := decimal.NewFromInt(13)
+			in.TaxRate = &rate
+			draft, err := uc.SaveSalesOrderWithItems(ctx, 0, in, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			in.ExpectedVersion = draft.Order.Version
+			in.TaxRate = nil
+			if _, err := uc.SaveSalesOrderWithItems(ctx, draft.Order.ID, in, nil); !errors.Is(err, biz.ErrSalesOrderTaxRateRequired) {
+				t.Fatalf("editing taxable pricing without a rate must be rejected: %v", err)
+			}
+			stored := client.SalesOrder.GetX(ctx, draft.Order.ID)
+			if stored.Version != draft.Order.Version || stored.TaxRate == nil || !stored.TaxRate.Equal(rate) {
+				t.Fatalf("rejected edit changed the persisted tax rate or version: %#v", stored)
+			}
+			// Clearing the pricing choice deliberately returns the draft to incomplete terms.
+			in.TaxMode = nil
+			in.TaxRate = &rate
+			cleared, err := uc.SaveSalesOrderWithItems(ctx, draft.Order.ID, in, nil)
+			if err != nil {
+				t.Fatalf("clearing the tax choice must remain saveable: %v", err)
+			}
+			stored = client.SalesOrder.GetX(ctx, cleared.Order.ID)
+			if stored.TaxMode != nil || stored.TaxRate != nil {
+				t.Fatalf("clearing the tax choice left stale values: %#v", stored)
+			}
+		})
+	}
 }
 
 func TestSalesOrderRepoOrderLifecycleAndList(t *testing.T) {

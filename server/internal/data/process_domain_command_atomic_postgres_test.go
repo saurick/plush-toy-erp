@@ -292,6 +292,55 @@ func TestSalesProcessCommandPostgresRollsBackOnResultConflictAndFailsClosedForLe
 	}
 }
 
+func TestSalesProcessCommandPostgresMissingTermsCanBeRepairedAndRetried(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	logger := log.NewStdLogger(io.Discard)
+	processRepo := NewProcessRuntimeRepo(data, logger)
+	salesRepo := NewSalesOrderRepo(data, logger)
+	uc := biz.NewSalesOrderUsecase(salesRepo)
+	suffix := postgresTestSuffix()
+	customer := createSalesOrderTestCustomer(t, ctx, client, "SUBMIT-C-"+suffix, true)
+	unit := createTestUnit(t, ctx, client, "SUBMIT-U-"+suffix)
+	product := createTestProduct(t, ctx, client, unit.ID, "SUBMIT-P-"+suffix)
+	price := decimal.NewFromInt(30)
+	in := &biz.SalesOrderMutation{OrderNo: "SO-SUBMIT-" + suffix, CustomerID: customer.ID, OrderDate: time.Now().UTC(), Currency: biz.FinanceCurrencyCNY}
+	items := []*biz.SalesOrderItemSaveMutation{{SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: decimal.NewFromInt(100), UnitPrice: &price}}}
+	draft, err := uc.SaveSalesOrderWithItems(ctx, 0, in, items)
+	if err != nil {
+		t.Fatalf("save incomplete draft: %v", err)
+	}
+	command := claimedPostgresProcessCommandForBusinessRef(t, ctx, processRepo, biz.ProcessDomainCommandSalesOrderSubmit, "sales-submit/"+suffix, map[string]any{"sales_order_id": draft.Order.ID}, "sales_order", draft.Order.ID)
+	result := &biz.ProcessDomainCommandResult{Outcome: biz.SalesOrderProcessCommandOutcomeSubmitted, EffectState: biz.ProcessDomainCommandEffectStateApplied, EffectRef: &biz.ProcessBusinessRef{RefType: "sales_order", RefID: draft.Order.ID}}
+	if _, err := salesRepo.SubmitSalesOrderForProcessCommand(ctx, draft.Order.ID, command, result, 7); !errors.Is(err, biz.ErrSalesOrderCommercialTermsIncomplete) {
+		t.Fatalf("missing terms must reject the command: %v", err)
+	}
+	failedNode, err := processRepo.GetProcessNodeInstance(ctx, command.Node.ID)
+	if err != nil || failedNode.DomainCommandResultHash != nil || failedNode.DomainCommandEffectState != nil || failedNode.Status != biz.ProcessNodeStatusActive {
+		t.Fatalf("failed command recorded a success: node=%#v err=%v", failedNode, err)
+	}
+	stored := client.SalesOrder.GetX(ctx, draft.Order.ID)
+	if stored.LifecycleStatus != biz.SalesOrderStatusDraft || stored.Version != draft.Order.Version || stored.OrderTotal != nil {
+		t.Fatalf("failed command changed the draft: %#v", stored)
+	}
+	in.ExpectedVersion = draft.Order.Version
+	in.TaxMode = stringPtr(biz.SalesOrderTaxModeNone)
+	in.FreightTerms = stringPtr(biz.SalesOrderFreightTermsExcluded)
+	in.QuotedFreightAmount = &decimal.Zero
+	items[0].ID = draft.Items[0].ID
+	repaired, err := uc.SaveSalesOrderWithItems(ctx, draft.Order.ID, in, items)
+	if err != nil || repaired.Order.OrderTotal == nil || !repaired.Order.OrderTotal.Equal(decimal.NewFromInt(3000)) {
+		t.Fatalf("repair draft through normal save: order=%#v err=%v", repaired, err)
+	}
+	for attempt := 0; attempt < 2; attempt++ {
+		submitted, err := salesRepo.SubmitSalesOrderForProcessCommand(ctx, draft.Order.ID, command, result, 7)
+		if err != nil || submitted.LifecycleStatus != biz.SalesOrderStatusSubmitted {
+			t.Fatalf("retry %d after correction: order=%#v err=%v", attempt, submitted, err)
+		}
+	}
+	assertPostgresProcessEffect(t, ctx, processRepo, command.Node.ID, biz.ProcessDomainCommandEffectStateApplied, "sales_order", draft.Order.ID)
+}
+
 func TestInventoryPostgresShipmentProcessCommandRollsBackSKUInventoryOnResultConflict(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryPostgresTestData(t)

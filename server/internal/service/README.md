@@ -23,6 +23,8 @@ JSON-RPC dispatcher 继续按职责拆文件维护：
 
 `jsonrpc_customer_config.go` 保留客户配置统一入口与 method 分发；销售受理、材料供应和成品流转分别在同名前缀的 `_sales_acceptance.go`、`_material_supply.go`、`_finished_goods.go` 中解析协议并调用业务入口。流程实例的固定 revision 与领域命令边界由既有 usecase 校验。
 
+流程和任务入口通过 `jsonrpc_process_errors.go` 复用各业务域的已知错误映射。缺少提交资料、状态冲突、库存不足与权限拒绝必须保留业务提示，未知异常才记录并返回系统错误；不得因请求经过流程入口而丢失领域错误语义。草稿保存与提交校验仍分别由原业务 usecase / repository 决定。
+
 如果后续新增 HTTP DTO 转换逻辑，也建议继续把协议细节留在 `service` 层，不要回灌到 `biz`。
 
 补充说明见：

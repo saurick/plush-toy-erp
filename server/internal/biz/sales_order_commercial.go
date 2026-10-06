@@ -6,6 +6,20 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// SalesOrderReadinessError identifies missing submission fields without making
+// them mandatory for saving a draft or exposing stored business values.
+type SalesOrderReadinessError struct {
+	MissingFields []string
+}
+
+func (e *SalesOrderReadinessError) Error() string {
+	return ErrSalesOrderCommercialTermsIncomplete.Error()
+}
+
+func (e *SalesOrderReadinessError) Unwrap() error {
+	return ErrSalesOrderCommercialTermsIncomplete
+}
+
 var salesOrderTaxModes = map[string]struct{}{
 	SalesOrderTaxModeInclusive: {},
 	SalesOrderTaxModeExclusive: {},
@@ -36,7 +50,10 @@ func normalizeSalesOrderCommercialTerms(
 	}
 	if taxMode == nil || *taxMode == SalesOrderTaxModeNone {
 		taxRate = nil
-	} else if taxRate != nil {
+	} else {
+		if taxRate == nil {
+			return nil, nil, nil, ErrSalesOrderTaxRateRequired
+		}
 		normalizedRate := taxRate.Truncate(lineAmountScale)
 		if !taxRate.Equal(normalizedRate) || !normalizedRate.IsPositive() || normalizedRate.GreaterThan(decimal.NewFromInt(100)) {
 			return nil, nil, nil, ErrBadParam
