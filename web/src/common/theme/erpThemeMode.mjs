@@ -1,15 +1,17 @@
-export const ERP_THEME_MODE = {
-  SYSTEM: 'system',
-  LIGHT: 'light',
-  DARK: 'dark',
-}
+import appearanceContract from '../../../../server/internal/biz/admin_erp_appearance.json' with { type: 'json' }
+
+export const ERP_THEME_MODE = Object.freeze(
+  Object.fromEntries(
+    appearanceContract.theme_modes.map((mode) => [mode.toUpperCase(), mode])
+  )
+)
 
 export const ERP_THEME_STORAGE_KEY = 'plush_erp_theme_mode'
 
 const themeModes = new Set(Object.values(ERP_THEME_MODE))
 
 export function normalizeERPThemeMode(mode) {
-  return themeModes.has(mode) ? mode : ERP_THEME_MODE.SYSTEM
+  return themeModes.has(mode) ? mode : appearanceContract.defaults.theme_mode
 }
 
 export function resolveEffectiveERPTheme(mode, prefersDark) {

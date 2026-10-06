@@ -30,6 +30,25 @@
   font-size: 13px;
 }
 
+.erp-appearance-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.erp-appearance-save-status {
+  min-height: 20px;
+  color: var(--erp-text-muted);
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+}
+
+.erp-appearance-save-status[aria-hidden='true'] {
+  visibility: hidden;
+}
+
 .erp-appearance-swatches {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

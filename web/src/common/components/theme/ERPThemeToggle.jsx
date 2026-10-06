@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { DesktopOutlined, MoonOutlined, SunOutlined } from '@ant-design/icons'
-import { Button, Modal } from 'antd'
+import { Alert, Button, Modal } from 'antd'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import { ERP_THEME_MODE, useERPTheme } from '@/common/theme/erpTheme'
 import { ERP_ACCENTS } from '@/common/theme/erpAppearance.mjs'
@@ -35,6 +35,14 @@ const themeOptions = [
   },
 ]
 
+// 明暗切换只改变颜色，弹窗各区域保持相同间距。
+const appearanceModalStyles = {
+  content: { padding: '20px 24px', border: 0 },
+  header: { padding: 0, margin: '0 0 8px', borderBottom: 0 },
+  body: { padding: 0 },
+  footer: { padding: 0, margin: '12px 0 0', borderTop: 0 },
+}
+
 export default function ERPThemeToggle({
   className = '',
   size = 'middle',
@@ -42,9 +50,26 @@ export default function ERPThemeToggle({
   showLabel = false,
   showDensity = true,
 }) {
-  const { themeMode, setThemeMode, appearance, setAppearance } = useERPTheme()
+  const {
+    themeMode,
+    setThemeMode,
+    appearance,
+    setAppearance,
+    appearanceSaving,
+    appearanceSaveError,
+    retryAppearanceSave,
+  } = useERPTheme()
   const [appearanceOpen, setAppearanceOpen] = useState(false)
   const appearanceTitle = showDensity ? '外观与密度' : '外观设置'
+  const saveStatus = (
+    <span
+      className="erp-appearance-save-status"
+      role="status"
+      aria-hidden={!appearanceSaving}
+    >
+      {appearanceSaving ? '正在保存外观设置…' : null}
+    </span>
+  )
   const modeControl = (
     <fieldset>
       <legend>明暗模式</legend>
@@ -110,6 +135,18 @@ export default function ERPThemeToggle({
           </fieldset>
         </>
       ) : null}
+      {variant === 'settings' ? saveStatus : null}
+      {appearanceSaveError ? (
+        <Alert
+          type="error"
+          message={appearanceSaveError}
+          action={
+            <Button size="small" onClick={retryAppearanceSave}>
+              重试
+            </Button>
+          }
+        />
+      ) : null}
     </div>
   )
   const appearanceDialog = (
@@ -117,11 +154,19 @@ export default function ERPThemeToggle({
       open={appearanceOpen}
       title={appearanceTitle}
       width={470}
+      styles={appearanceModalStyles}
       onCancel={() => setAppearanceOpen(false)}
       footer={
-        <Button type="primary" onClick={() => setAppearanceOpen(false)}>
-          完成
-        </Button>
+        <div className="erp-appearance-footer">
+          {saveStatus}
+          <Button
+            type="primary"
+            disabled={appearanceSaving}
+            onClick={() => setAppearanceOpen(false)}
+          >
+            完成
+          </Button>
+        </div>
       }
     >
       {settings}

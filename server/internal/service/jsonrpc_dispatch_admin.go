@@ -353,11 +353,34 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
-				"erp_preferences": map[string]any{
-					"column_orders":  toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
-					"hidden_columns": toAnyMapStringSlice(admin.ERPPreferences.HiddenColumns),
-				},
+				"erp_preferences": adminERPPreferencesToMap(admin.ERPPreferences),
 			}),
+		}, nil
+
+	case "set_erp_appearance":
+		if res := rejectUnknownAdminParams(pm, "theme_mode", "accent", "density", "tableLines"); res != nil {
+			return id, res, nil
+		}
+		patch := biz.AdminERPAppearancePatch{}
+		for key, target := range map[string]**string{
+			"theme_mode": &patch.ThemeMode, "accent": &patch.Accent, "density": &patch.Density,
+			"tableLines": &patch.TableLines,
+		} {
+			if raw, exists := pm[key]; exists {
+				value, ok := raw.(string)
+				if !ok {
+					return id, invalidAdminParamResult(), nil
+				}
+				*target = &value
+			}
+		}
+		admin, err := d.adminManageUC.SetCurrentERPAppearance(ctx, patch)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code: errcode.OK.Code, Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{"erp_preferences": adminERPPreferencesToMap(admin.ERPPreferences)}),
 		}, nil
 
 	case "legal_notice_status":

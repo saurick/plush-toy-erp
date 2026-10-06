@@ -1,6 +1,9 @@
 package biz
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestNormalizeAdminERPPreferences(t *testing.T) {
 	got := NormalizeAdminERPPreferences(AdminERPPreferences{
@@ -32,5 +35,38 @@ func TestNormalizeAdminERPPreferencesDropsEmptyOrders(t *testing.T) {
 
 	if got.ColumnOrders != nil {
 		t.Fatalf("expected nil column orders, got %#v", got.ColumnOrders)
+	}
+}
+
+func TestAdminERPAppearancePatchPreservesUnchangedFields(t *testing.T) {
+	current := AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: "compact", TableLines: "grid"}
+	green := "green"
+	patch := AdminERPAppearancePatch{Accent: &green}
+	if err := patch.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if got := patch.Apply(current); got != (AdminERPAppearance{ThemeMode: "dark", Accent: "green", Density: "compact", TableLines: "grid"}) {
+		t.Fatalf("mobile color update lost desktop preferences: %+v", got)
+	}
+	if got := NormalizeAdminERPPreferences(AdminERPPreferences{}).Appearance; got != adminERPAppearanceContract.Defaults {
+		t.Fatalf("account without appearance must receive defaults: %+v", got)
+	}
+	simple := "simple"
+	linesPatch := AdminERPAppearancePatch{TableLines: &simple}
+	if err := linesPatch.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if got := linesPatch.Apply(current); got != (AdminERPAppearance{ThemeMode: "dark", Accent: "purple", Density: "compact", TableLines: "simple"}) {
+		t.Fatalf("table line update lost other preferences: %+v", got)
+	}
+	for _, invalid := range []string{"", "Dark", " dark ", "__proto__", "unknown"} {
+		for _, patch := range []AdminERPAppearancePatch{{ThemeMode: &invalid}, {Accent: &invalid}, {Density: &invalid}, {TableLines: &invalid}} {
+			if !errors.Is(patch.Validate(), ErrBadParam) {
+				t.Fatalf("invalid appearance accepted: %+v", patch)
+			}
+		}
+	}
+	if !errors.Is((AdminERPAppearancePatch{}).Validate(), ErrBadParam) {
+		t.Fatal("empty patch accepted")
 	}
 }

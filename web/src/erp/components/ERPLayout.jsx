@@ -66,12 +66,16 @@ import { notifyProductImagesChanged } from '../utils/productImageReferences.mjs'
 import { isAuthFailureCode } from '@/common/consts/errorCodes'
 import {
   AUTH_SCOPE,
+  getAuthMeta,
   getCurrentUser,
   getLoginPath,
   getStoredAdminProfile,
   getToken,
   logout,
   persistAuthMeta,
+  persistAdminERPPreferences,
+  mergeAdminERPPreferencesRead,
+  subscribeAdminERPPreferences,
 } from '@/common/auth/auth'
 import { authBus } from '@/common/auth/authBus'
 import { getActiveERPBrand } from '@/common/consts/brand'
@@ -366,6 +370,20 @@ export default function ERPLayout({ legalNotice }) {
   const [adminProfile, setAdminProfile] = useState(() =>
     getStoredAdminProfile()
   )
+  useEffect(
+    () =>
+      subscribeAdminERPPreferences((profile) => {
+        setAdminProfile((current) =>
+          current &&
+          current.id === profile.id &&
+          JSON.stringify(current.erp_preferences) !==
+            JSON.stringify(profile.erp_preferences)
+            ? { ...current, erp_preferences: profile.erp_preferences }
+            : current
+        )
+      }),
+    []
+  )
   const [profileSyncCompleted, setProfileSyncCompleted] = useState(false)
   const [profileSyncFailure, setProfileSyncFailure] = useState(null)
   const [profileSyncing, setProfileSyncing] = useState(false)
@@ -509,6 +527,10 @@ export default function ERPLayout({ legalNotice }) {
 
       const syncGeneration = profileSyncGenerationRef.current
       const syncToken = getToken(AUTH_SCOPE.ADMIN)
+      const preferencesBeforeRead = getAuthMeta(
+        AUTH_SCOPE.ADMIN,
+        'erp_preferences'
+      )
       const isCurrentGeneration = () =>
         profileSyncActiveRef.current &&
         profileSyncGenerationRef.current === syncGeneration
@@ -584,6 +606,13 @@ export default function ERPLayout({ legalNotice }) {
             return
           }
           if (nextProfile) {
+            nextProfile = {
+              ...nextProfile,
+              erp_preferences: mergeAdminERPPreferencesRead(
+                nextProfile.erp_preferences,
+                preferencesBeforeRead
+              ),
+            }
             persistAuthMeta(
               {
                 user_id: nextProfile.id,
@@ -1061,35 +1090,15 @@ export default function ERPLayout({ legalNotice }) {
   }, [])
 
   const updateAdminERPPreferences = useCallback((erpPreferences) => {
-    const normalizedERPPreferences =
-      erpPreferences && typeof erpPreferences === 'object'
-        ? erpPreferences
-        : { column_orders: {} }
-
-    setAdminProfile((current) => {
-      if (!current) {
-        return current
-      }
-      const nextProfile = {
-        ...current,
-        erp_preferences: normalizedERPPreferences,
-      }
-      persistAuthMeta(
-        {
-          user_id: nextProfile.id,
-          username: nextProfile.username,
-          display_name: nextProfile.display_name,
-          phone: nextProfile.phone,
-          is_super_admin: nextProfile.is_super_admin === true,
-          roles: nextProfile.roles || [],
-          permissions: nextProfile.permissions || [],
-          menus: nextProfile.menus || [],
-          erp_preferences: nextProfile.erp_preferences,
-        },
-        AUTH_SCOPE.ADMIN
-      )
-      return nextProfile
-    })
+    const current = getStoredAdminProfile()
+    if (!current) return
+    persistAdminERPPreferences(
+      {
+        column_orders: erpPreferences?.column_orders || {},
+        hidden_columns: erpPreferences?.hidden_columns || {},
+      },
+      { userID: current.id, token: getToken(AUTH_SCOPE.ADMIN) }
+    )
   }, [])
 
   const pageUIState = useMemo(

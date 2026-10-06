@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"server/internal/data/model/ent/runtimeauditevent"
 
 	"entgo.io/ent/dialect"
+	"github.com/go-kratos/kratos/v2/log"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -379,6 +381,82 @@ func TestAdminManageRepoERPColumnOrdersPreserveOtherModules(t *testing.T) {
 	reset := decodeAdminERPPreferences(fx.client.AdminUser.GetX(fx.ctx, fx.target.ID).ErpPreferences)
 	if len(reset.ColumnOrders["customers"]) != 0 || len(reset.HiddenColumns["customers"]) != 0 || len(reset.HiddenColumns["suppliers"]) != 1 {
 		t.Fatalf("reset must preserve other lists: %#v", reset)
+	}
+}
+
+func TestAdminManageRepoERPAppearancePreservesColumnsAndAccountIsolation(t *testing.T) {
+	fx := newAdminManageAtomicFixture(t)
+	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "customers", []string{"name", "status"}, []string{"status"}); err != nil {
+		t.Fatal(err)
+	}
+	mode, color, density, tableLines := "dark", "purple", "compact", "grid"
+	if err := fx.repo.UpdateAdminERPAppearance(fx.ctx, fx.target.ID, biz.AdminERPAppearancePatch{ThemeMode: &mode, Accent: &color, Density: &density, TableLines: &tableLines}); err != nil {
+		t.Fatal(err)
+	}
+	color = "green"
+	if err := fx.repo.UpdateAdminERPAppearance(fx.ctx, fx.target.ID, biz.AdminERPAppearancePatch{Accent: &color}); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.repo.UpdateAdminERPColumnOrder(fx.ctx, fx.target.ID, "suppliers", []string{"code"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	stored := decodeAdminERPPreferences(fx.client.AdminUser.GetX(fx.ctx, fx.target.ID).ErpPreferences)
+	if stored.Appearance != (biz.AdminERPAppearance{ThemeMode: "dark", Accent: "green", Density: "compact", TableLines: "grid"}) ||
+		len(stored.ColumnOrders["customers"]) != 2 || len(stored.HiddenColumns["customers"]) != 1 ||
+		len(stored.ColumnOrders["suppliers"]) != 1 {
+		t.Fatalf("preference groups overwrote each other: %+v", stored)
+	}
+	other := decodeAdminERPPreferences(fx.client.AdminUser.GetX(fx.ctx, fx.operator.ID).ErpPreferences)
+	if other.Appearance != biz.NormalizeAdminERPAppearance(biz.AdminERPAppearance{}) || len(other.ColumnOrders) != 0 {
+		t.Fatalf("another account changed: %+v", other)
+	}
+	if _, err := fx.client.AdminUser.UpdateOneID(fx.target.ID).SetDisabled(true).Save(fx.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := fx.repo.UpdateAdminERPAppearance(fx.ctx, fx.target.ID, biz.AdminERPAppearancePatch{Accent: &color}); !errors.Is(err, biz.ErrUserDisabled) {
+		t.Fatalf("disabled account accepted preference save: %v", err)
+	}
+}
+
+func TestAdminManagePostgresERPPreferencesConcurrentGroups(t *testing.T) {
+	data, client := openInventoryPostgresTestData(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	account, err := client.AdminUser.Create().SetUsername("pg_appearance_" + postgresTestSuffix()).SetPasswordHash("fixture-hash").Save(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := NewAdminManageRepo(data, log.NewStdLogger(io.Discard))
+	color, density := "purple", "compact"
+	start := make(chan struct{})
+	results := make(chan error, 4)
+	for _, update := range []func() error{
+		func() error {
+			return repo.UpdateAdminERPAppearance(ctx, account.ID, biz.AdminERPAppearancePatch{Accent: &color})
+		},
+		func() error {
+			return repo.UpdateAdminERPAppearance(ctx, account.ID, biz.AdminERPAppearancePatch{Density: &density})
+		},
+		func() error {
+			return repo.UpdateAdminERPColumnOrder(ctx, account.ID, "customers", []string{"name"}, []string{"status"})
+		},
+		func() error {
+			return repo.UpdateAdminERPColumnOrder(ctx, account.ID, "suppliers", []string{"code"}, []string{"phone"})
+		},
+	} {
+		go func() { <-start; results <- update() }()
+	}
+	close(start)
+	for range 4 {
+		if err := <-results; err != nil {
+			t.Fatal(err)
+		}
+	}
+	stored := decodeAdminERPPreferences(client.AdminUser.GetX(ctx, account.ID).ErpPreferences)
+	if stored.Appearance != (biz.AdminERPAppearance{ThemeMode: "system", Accent: "purple", Density: "compact", TableLines: "simple"}) ||
+		len(stored.ColumnOrders["customers"]) != 1 || len(stored.ColumnOrders["suppliers"]) != 1 ||
+		len(stored.HiddenColumns["customers"]) != 1 || len(stored.HiddenColumns["suppliers"]) != 1 {
+		t.Fatalf("concurrent preference writes lost a group or field: %+v", stored)
 	}
 }
 

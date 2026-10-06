@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { normalizeERPAccountAppearance } from '../../src/common/theme/erpAppearance.mjs'
 
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
@@ -111,6 +112,7 @@ export async function installAdminRpcMocks(
   {
     baseURL = '',
     adminProfileOverride = null,
+    themeMode = null,
     effectiveSessionOverride = null,
     workflowTaskFixtures = [],
     workflowProcessContextFixtures = [],
@@ -608,6 +610,15 @@ export async function installAdminRpcMocks(
       ? profileOverride.erp_preferences
       : defaultAdminProfile.erp_preferences,
   }
+  adminProfile.erp_preferences = {
+    column_orders: {},
+    hidden_columns: {},
+    ...adminProfile.erp_preferences,
+    appearance: normalizeERPAccountAppearance({
+      ...adminProfile.erp_preferences?.appearance,
+      ...(themeMode ? { theme_mode: themeMode } : {}),
+    }),
+  }
   const mockContext = {
     adminProfile,
     effectiveSession: buildWorkflowMockEffectiveSession(
@@ -724,7 +735,11 @@ export async function installAdminRpcMocks(
         configurable: true,
         configured: itemConfigured,
         enabled: source.enabled === true,
-        condition: source.condition || { mode: 'all', amount: '', currency: '' },
+        condition: source.condition || {
+          mode: 'all',
+          amount: '',
+          currency: '',
+        },
         members,
         effective_role_keys: effective ? [effective.role_key] : [],
         effective_strategy: effective?.strategy || '',

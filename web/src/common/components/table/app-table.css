@@ -20,7 +20,7 @@
     .ant-table-tbody
     > .ant-table-row
     > .ant-table-cell:not(:last-child) {
-    border-inline-end: 1px solid var(--erp-border);
+    box-shadow: inset -1px 0 0 var(--erp-border);
   }
 }
 

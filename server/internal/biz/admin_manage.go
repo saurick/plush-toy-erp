@@ -120,6 +120,7 @@ type AdminManageRepo interface {
 	ListPermissions(ctx context.Context) ([]AdminPermission, error)
 	GetRoleByKey(ctx context.Context, roleKey string) (*AdminRole, error)
 	UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order, hiddenColumns []string) error
+	UpdateAdminERPAppearance(ctx context.Context, id int, patch AdminERPAppearancePatch) error
 	SetAdminProfileWithAudit(ctx context.Context, change *AdminProfileChange) (*AdminUser, error)
 	ChangeAdminLifecycle(ctx context.Context, change *AdminLifecycleChange) (updated *AdminUser, releasedTaskCount int, err error)
 	ResetAdminPasswordWithAudit(ctx context.Context, reset *AdminPasswordReset) (*AdminUser, error)
@@ -1125,6 +1126,23 @@ func (uc *AdminManageUsecase) SetCurrentERPColumnOrder(
 	span.SetAttributes(attribute.Int("admin.id", admin.ID))
 	span.SetStatus(codes.Ok, "OK")
 	return admin, nil
+}
+
+func (uc *AdminManageUsecase) SetCurrentERPAppearance(ctx context.Context, patch AdminERPAppearancePatch) (*AdminUser, error) {
+	if err := patch.Validate(); err != nil {
+		return nil, err
+	}
+	currentAdmin, err := uc.getCurrentAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !currentAdmin.IsActive() {
+		return nil, ErrUserDisabled
+	}
+	if err := uc.repo.UpdateAdminERPAppearance(ctx, currentAdmin.ID, patch); err != nil {
+		return nil, err
+	}
+	return uc.repo.GetAdminByID(ctx, currentAdmin.ID)
 }
 
 func (uc *AdminManageUsecase) SetDisabled(

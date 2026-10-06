@@ -427,6 +427,15 @@ func (r *stubAdminManageRepo) UpdateAdminERPColumnOrder(_ context.Context, id in
 	return nil
 }
 
+func (r *stubAdminManageRepo) UpdateAdminERPAppearance(_ context.Context, id int, patch AdminERPAppearancePatch) error {
+	admin, ok := r.adminsByID[id]
+	if !ok {
+		return ErrAdminNotFound
+	}
+	admin.ERPPreferences.Appearance = patch.Apply(admin.ERPPreferences.Appearance)
+	return nil
+}
+
 func (r *stubAdminManageRepo) ChangeAdminLifecycle(ctx context.Context, change *AdminLifecycleChange) (*AdminUser, int, error) {
 	if change == nil {
 		return nil, 0, ErrBadParam

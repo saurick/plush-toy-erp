@@ -3,6 +3,16 @@ import { isValidAdminSessionClaims } from './adminTokenContract.mjs'
 import { clearRetiredPrintWindowState } from './printWindowStorageCleanup.mjs'
 
 export const AUTH_SESSION_CHANGED_EVENT = 'plush:auth-session-changed'
+export const AUTH_META_CHANGED_EVENT = 'plush:auth-meta-changed'
+
+function notifyMetaChanged() {
+  if (
+    typeof window !== 'undefined' &&
+    typeof window.dispatchEvent === 'function'
+  ) {
+    window.dispatchEvent(new Event(AUTH_META_CHANGED_EVENT))
+  }
+}
 
 function notifySessionChanged() {
   if (
@@ -115,10 +125,66 @@ export function persistAuth(data, scope = AUTH_SCOPE.ADMIN) {
   const normalizedScope = normalizeScope(scope)
   setToken(String(token), normalizedScope)
   setScopedMeta(normalizedScope, data || {})
+  notifyMetaChanged()
 }
 
 export function persistAuthMeta(data, scope = AUTH_SCOPE.ADMIN) {
   setScopedMeta(normalizeScope(scope), data || {})
+  notifyMetaChanged()
+}
+
+export function persistAdminERPPreferences(groups, { token, userID }) {
+  if (
+    !token ||
+    getToken(AUTH_SCOPE.ADMIN) !== token ||
+    String(getAuthMeta(AUTH_SCOPE.ADMIN, 'user_id')) !== String(userID)
+  ) {
+    return null
+  }
+  const preferences = {
+    ...getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences'),
+    ...groups,
+  }
+  setStorageItem(
+    localStorage,
+    getScopedMetaKey(AUTH_SCOPE.ADMIN, 'erp_preferences'),
+    JSON.stringify(preferences)
+  )
+  notifyMetaChanged()
+  return preferences
+}
+
+// 保留本次账号读取期间已保存的偏好组，防止较早的 me 响应覆盖新设置。
+export function mergeAdminERPPreferencesRead(incoming, before) {
+  const current = getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences') || {}
+  const preferences = { ...(incoming || {}) }
+  for (const key of ['appearance', 'column_orders', 'hidden_columns']) {
+    if (JSON.stringify(current[key]) !== JSON.stringify(before?.[key])) {
+      preferences[key] = current[key]
+    }
+  }
+  return preferences
+}
+
+export function subscribeAdminERPPreferences(listener) {
+  const onChange = () => {
+    const profile = getStoredAdminProfile()
+    if (
+      profile &&
+      String(getAuthMeta(AUTH_SCOPE.ADMIN, 'user_id')) === String(profile.id)
+    ) {
+      listener(profile)
+    }
+  }
+  const onStorage = (event) => {
+    if (event.key === null || event.key === 'admin_erp_preferences') onChange()
+  }
+  window.addEventListener(AUTH_META_CHANGED_EVENT, onChange)
+  window.addEventListener('storage', onStorage)
+  return () => {
+    window.removeEventListener(AUTH_META_CHANGED_EVENT, onChange)
+    window.removeEventListener('storage', onStorage)
+  }
 }
 
 export function getAuthMeta(scope, key) {

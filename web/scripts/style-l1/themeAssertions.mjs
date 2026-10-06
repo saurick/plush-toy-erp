@@ -17,11 +17,23 @@ async function assertERPThemeMode(
   page,
   { scenarioName, expectedMode, expectedEffectiveTheme }
 ) {
+  await page.waitForFunction((mode) => {
+    const accountPreferences = JSON.parse(
+      localStorage.getItem('admin_erp_preferences') || '{}'
+    )
+    const storedMode = localStorage.getItem('admin_access_token')
+      ? accountPreferences.appearance?.theme_mode
+      : localStorage.getItem('plush_erp_theme_mode')
+    return storedMode === mode
+  }, expectedMode)
   const metrics = await page.evaluate(() => ({
     mode: document.documentElement.dataset.erpThemeMode || '',
     effectiveTheme: document.documentElement.dataset.erpTheme || '',
     colorScheme: document.documentElement.style.colorScheme || '',
-    storedMode: window.localStorage.getItem('plush_erp_theme_mode') || '',
+    storedMode: window.localStorage.getItem('admin_access_token')
+      ? JSON.parse(localStorage.getItem('admin_erp_preferences') || '{}')
+          .appearance?.theme_mode
+      : window.localStorage.getItem('plush_erp_theme_mode') || '',
     palette: {
       page: getComputedStyle(document.documentElement)
         .getPropertyValue('--erp-page-bg')

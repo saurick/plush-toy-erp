@@ -1,4 +1,5 @@
 import { setTimeout as delay } from 'node:timers/promises'
+import { normalizeERPAccountAppearance } from '../../src/common/theme/erpAppearance.mjs'
 import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
 import {
   compareBuildIdentities,
@@ -53,6 +54,14 @@ export async function installSystemRpcMocks(page, context) {
     pmcRole,
     adminRole,
   ].filter(Boolean)
+  adminProfile.erp_preferences = {
+    column_orders: {},
+    hidden_columns: {},
+    ...adminProfile.erp_preferences,
+    appearance: normalizeERPAccountAppearance(
+      adminProfile.erp_preferences?.appearance
+    ),
+  }
   const roleByKey = new Map(availableRoles.map((role) => [role.role_key, role]))
   const roleForParams = (params = {}) =>
     roleByKey.get(String(params?.role_key || '').trim()) || salesRole
@@ -195,6 +204,17 @@ export async function installSystemRpcMocks(page, context) {
       case 'me':
         data = adminProfile
         break
+      case 'set_erp_appearance':
+        adminProfile.erp_preferences.appearance = normalizeERPAccountAppearance(
+          {
+            ...adminProfile.erp_preferences.appearance,
+            ...params,
+          }
+        )
+        data = {
+          erp_preferences: structuredClone(adminProfile.erp_preferences),
+        }
+        break
       case 'list':
         data = {
           admins: [
@@ -301,6 +321,7 @@ export async function installSystemRpcMocks(page, context) {
         }
         data = {
           erp_preferences: {
+            appearance: { ...adminProfile.erp_preferences.appearance },
             column_orders: {
               ...adminProfile.erp_preferences.column_orders,
             },

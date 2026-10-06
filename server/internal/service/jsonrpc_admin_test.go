@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 
+	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
 
@@ -345,6 +347,15 @@ func (r *memAdminManageRepoForData) UpdateAdminERPColumnOrder(_ context.Context,
 		}
 	}
 	admin.ERPPreferences = biz.NormalizeAdminERPPreferences(preferences)
+	return nil
+}
+
+func (r *memAdminManageRepoForData) UpdateAdminERPAppearance(_ context.Context, id int, patch biz.AdminERPAppearancePatch) error {
+	admin, ok := r.admins[id]
+	if !ok {
+		return biz.ErrAdminNotFound
+	}
+	admin.ERPPreferences.Appearance = patch.Apply(admin.ERPPreferences.Appearance)
 	return nil
 }
 
@@ -1358,6 +1369,63 @@ func TestJsonrpcDispatcher_AdminSetERPColumnOrder(t *testing.T) {
 		if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
 			t.Fatalf("invalid preference update accepted: %#v, result=%#v, err=%v", invalid, result, err)
 		}
+	}
+}
+
+func TestJsonrpcDispatcher_AdminSetERPAppearance(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	repo.admins[1] = &biz.AdminUser{ID: 1, Username: "employee", ERPPreferences: biz.AdminERPPreferences{
+		ColumnOrders:  map[string][]string{"customers": {"name"}},
+		HiddenColumns: map[string][]string{"customers": {"status"}},
+		Appearance:    biz.AdminERPAppearance{ThemeMode: "system", Accent: "blue", Density: "compact"},
+	}}
+	repo.admins[2] = &biz.AdminUser{ID: 2, Username: "other"}
+	logger := log.NewStdLogger(io.Discard)
+	j := &jsonrpcDispatcher{log: log.NewHelper(logger), adminReader: repo,
+		adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider())}
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 1, Role: biz.RoleAdmin})
+	call := func(ctx context.Context, params map[string]any) *v1.JsonrpcResult {
+		t.Helper()
+		pm, _ := structpb.NewStruct(params)
+		_, result, err := j.handleAdmin(ctx, "set_erp_appearance", "1", pm)
+		if err != nil || result == nil {
+			t.Fatalf("unexpected response: %v %+v", err, result)
+		}
+		return result
+	}
+	result := call(ctx, map[string]any{"accent": "purple", "theme_mode": "dark", "tableLines": "grid"})
+	if result.Code != errcode.OK.Code {
+		t.Fatalf("ordinary account cannot save its own preference: %+v", result)
+	}
+	prefs := result.Data.AsMap()["erp_preferences"].(map[string]any)
+	appearance := prefs["appearance"].(map[string]any)
+	if appearance["density"] != "compact" || appearance["accent"] != "purple" ||
+		appearance["theme_mode"] != "dark" || appearance["tableLines"] != "grid" || len(prefs["column_orders"].(map[string]any)) != 1 ||
+		repo.admins[2].ERPPreferences.Appearance.Accent != "" {
+		t.Fatalf("preference scope or preserved fields incorrect: %+v", prefs)
+	}
+	_, me, _ := j.handleAdmin(ctx, "me", "1", nil)
+	if got := me.Data.AsMap()["erp_preferences"].(map[string]any)["appearance"]; !reflect.DeepEqual(got, appearance) {
+		t.Fatalf("next login/profile read loses saved appearance: %+v", got)
+	}
+	if got := call(ctx, map[string]any{"accent": "green"}).Data.AsMap()["erp_preferences"].(map[string]any)["appearance"]; got.(map[string]any)["tableLines"] != "grid" {
+		t.Fatalf("color update lost table lines: %+v", got)
+	}
+	for _, invalid := range []map[string]any{
+		{}, {"id": 2, "accent": "blue"}, {"accent": "unknown"}, {"theme_mode": true},
+		{"density": nil}, {"accent": []any{"blue"}}, {"theme_mode": " dark "},
+		{"tableLines": nil}, {"tableLines": "bordered"}, {"tableLines": true},
+	} {
+		if got := call(ctx, invalid); got.Code != errcode.InvalidParam.Code {
+			t.Fatalf("invalid update accepted: %+v result=%+v", invalid, got)
+		}
+	}
+	if got := call(context.Background(), map[string]any{"accent": "blue"}); got.Code == errcode.OK.Code {
+		t.Fatal("unauthenticated update accepted")
+	}
+	repo.admins[1].Disabled = true
+	if got := call(ctx, map[string]any{"accent": "blue"}); got.Code == errcode.OK.Code {
+		t.Fatal("disabled account update accepted")
 	}
 }
 

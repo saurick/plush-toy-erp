@@ -1,3 +1,6 @@
+import appearanceContract from '../../../../server/internal/biz/admin_erp_appearance.json' with { type: 'json' }
+import { normalizeERPThemeMode } from './erpThemeMode.mjs'
+
 export const ERP_APPEARANCE_STORAGE_KEY = 'plush_erp_appearance'
 
 export const ERP_ACCENTS = Object.freeze({
@@ -53,10 +56,33 @@ export const ERP_ACCENTS = Object.freeze({
 
 export function normalizeERPAppearance(value) {
   return {
-    accent: Object.hasOwn(ERP_ACCENTS, value?.accent) ? value.accent : 'blue',
-    density: value?.density === 'compact' ? 'compact' : 'standard',
-    tableLines: value?.tableLines === 'grid' ? 'grid' : 'simple',
+    accent: Object.hasOwn(ERP_ACCENTS, value?.accent)
+      ? value.accent
+      : appearanceContract.defaults.accent,
+    density: appearanceContract.densities.includes(value?.density)
+      ? value.density
+      : appearanceContract.defaults.density,
+    tableLines: appearanceContract.table_lines.includes(value?.tableLines)
+      ? value.tableLines
+      : appearanceContract.defaults.tableLines,
   }
+}
+
+export function normalizeERPAccountAppearance(value) {
+  return {
+    theme_mode: normalizeERPThemeMode(value?.theme_mode),
+    ...normalizeERPAppearance(value),
+  }
+}
+
+export function isERPAccountAppearance(value) {
+  return Boolean(
+    value &&
+    appearanceContract.theme_modes.includes(value.theme_mode) &&
+    appearanceContract.accents.includes(value.accent) &&
+    appearanceContract.densities.includes(value.density) &&
+    appearanceContract.table_lines.includes(value.tableLines)
+  )
 }
 
 export function readERPAppearance(storage) {

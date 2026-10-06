@@ -60,6 +60,7 @@ import { createContactEditorScenarios } from './contactEditorScenarios.mjs'
 import { createFormDensityScenarios } from './formDensityScenarios.mjs'
 import { createTableDensityScenarios } from './tableDensityScenarios.mjs'
 import { createTableLinesScenarios } from './tableLinesScenarios.mjs'
+import { createAccountAppearanceScenarios } from './accountAppearanceScenarios.mjs'
 import { createBusinessColumnSettingsScenarios } from './businessColumnSettingsScenarios.mjs'
 
 export function createStyleL1Scenarios(deps) {
@@ -343,22 +344,47 @@ export function createStyleL1Scenarios(deps) {
   }
 
   return [
-    ...createBusinessFollowupScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createBusinessFollowupScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
     ...createEmptyStateScenarios({ ...deps, customerRuntimeEffectiveSession }),
-    ...createDeliveryAddressScenarios({ ...deps, customerRuntimeEffectiveSession }),
-    ...createContactEditorScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createDeliveryAddressScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
+    ...createContactEditorScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
     ...createFormDensityScenarios(deps),
-    ...createTableDensityScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createTableDensityScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
     ...createTableLinesScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createAccountAppearanceScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
     ...createBusinessModuleNavigationScenarios({
       customerRuntimeEffectiveSession,
       assertNoHorizontalOverflow,
       outputDir,
       path,
     }),
-    ...createBusinessColumnSettingsScenarios({ ...deps, customerRuntimeEffectiveSession }),
-    ...createBusinessStatusCountsScenarios({ ...deps, customerRuntimeEffectiveSession }),
-    ...createHighFidelityScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createBusinessColumnSettingsScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
+    ...createBusinessStatusCountsScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
+    ...createHighFidelityScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
     ...createUnifiedInteractionScenarios({
       ...deps,
       customerRuntimeEffectiveSession,
@@ -414,7 +440,11 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
-    ...createDevDeliveryWorkspaceScenarios({ assert, assertNoHorizontalOverflow, expectHeading }),
+    ...createDevDeliveryWorkspaceScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+      expectHeading,
+    }),
     ...createDevDrillRecoveryScenarios({
       assert,
       assertNoHorizontalOverflow,
@@ -491,7 +521,12 @@ export function createStyleL1Scenarios(deps) {
       assertTextAbsent,
       assertAppAlertDialogLayout,
     }),
-    ...createHelpCenterScenarios({ ...deps, customerRoleAdminProfile, customerRoleRuntimeSession, customerRuntimeEffectiveSession }),
+    ...createHelpCenterScenarios({
+      ...deps,
+      customerRoleAdminProfile,
+      customerRoleRuntimeSession,
+      customerRuntimeEffectiveSession,
+    }),
     ...createCustomerSessionScenarios({
       expectHeading,
       expectButton,
@@ -603,7 +638,10 @@ export function createStyleL1Scenarios(deps) {
       openControlledAntSelectDropdown,
       selectVirtualizedAntOption,
     }),
-    ...createHistoryRecordScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createHistoryRecordScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
     ...createAuditLogScenarios({
       expectHeading,
       expectText,
@@ -737,7 +775,12 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       path,
     }),
-    ...createBusinessAttachmentScenarios({ assert, customerRuntimeEffectiveSession, outputDir, path }),
+    ...createBusinessAttachmentScenarios({
+      assert,
+      customerRuntimeEffectiveSession,
+      outputDir,
+      path,
+    }),
     ...createBusinessFormalScenarios({
       assert,
       assertAntdModalCentered,

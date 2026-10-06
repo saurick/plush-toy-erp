@@ -88,6 +88,9 @@ export function mobileAppearanceScenario({
           })
         }
       }
+      await page
+        .locator('.erp-appearance-save-status')
+        .waitFor({ state: 'hidden' })
       await page.reload()
       await settings.waitFor()
       assert.equal(

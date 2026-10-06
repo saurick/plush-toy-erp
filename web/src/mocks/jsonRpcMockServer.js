@@ -1,4 +1,5 @@
 import { PermissionCode } from '../common/consts/permissions.generated.mjs'
+import { normalizeERPAccountAppearance } from '../common/theme/erpAppearance.mjs'
 // src/mocks/jsonRpcMockServer.js
 
 import {
@@ -361,7 +362,11 @@ const mockSuperAdminProfile = {
     },
   },
   menus: mockMenus,
-  erp_preferences: { column_orders: {} },
+  erp_preferences: {
+    column_orders: {},
+    hidden_columns: {},
+    appearance: normalizeERPAccountAppearance(null),
+  },
 }
 
 const mockTaskStates = [
@@ -1153,6 +1158,22 @@ export function setupJsonRpcMockServer() {
           jsonrpc: '2.0',
           id,
           result: makeBizResult(mockSuperAdminProfile),
+          error: '',
+        }
+      } else if (method === 'set_erp_appearance') {
+        mockSuperAdminProfile.erp_preferences.appearance =
+          normalizeERPAccountAppearance({
+            ...mockSuperAdminProfile.erp_preferences.appearance,
+            ...params,
+          })
+        responseBody = {
+          jsonrpc: '2.0',
+          id,
+          result: makeBizResult({
+            erp_preferences: structuredClone(
+              mockSuperAdminProfile.erp_preferences
+            ),
+          }),
           error: '',
         }
       } else if (method === 'legal_notice_status') {

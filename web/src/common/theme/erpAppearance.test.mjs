@@ -6,6 +6,11 @@ import {
   readERPAppearance,
 } from './erpAppearance.mjs'
 import { ERP_DARK_PALETTE } from './erpThemePalette.mjs'
+import appearanceContract from '../../../../server/internal/biz/admin_erp_appearance.json' with { type: 'json' }
+
+test('appearance palette covers every allowed account accent', () => {
+  assert.deepEqual(Object.keys(ERP_ACCENTS), appearanceContract.accents)
+})
 
 test('appearance recovers from stale or unavailable storage without losing valid preferences', () => {
   for (const value of [

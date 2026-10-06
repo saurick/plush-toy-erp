@@ -250,6 +250,20 @@ func adminMenusToAny(admin *biz.AdminUser) []any {
 	return out
 }
 
+func adminERPPreferencesToMap(input biz.AdminERPPreferences) map[string]any {
+	preferences := biz.NormalizeAdminERPPreferences(input)
+	return map[string]any{
+		"column_orders":  toAnyMapStringSlice(preferences.ColumnOrders),
+		"hidden_columns": toAnyMapStringSlice(preferences.HiddenColumns),
+		"appearance": map[string]any{
+			"theme_mode": preferences.Appearance.ThemeMode,
+			"accent":     preferences.Appearance.Accent,
+			"density":    preferences.Appearance.Density,
+			"tableLines": preferences.Appearance.TableLines,
+		},
+	}
+}
+
 func adminProfileToMap(admin *biz.AdminUser, includeTokenMeta map[string]any) map[string]any {
 	lastLogin := int64(0)
 	if admin != nil && admin.LastLoginAt != nil {
@@ -275,10 +289,7 @@ func adminProfileToMap(admin *biz.AdminUser, includeTokenMeta map[string]any) ma
 		"last_login_at":     lastLogin,
 		"created_at":        admin.CreatedAt.Unix(),
 		"updated_at":        admin.UpdatedAt.Unix(),
-		"erp_preferences": map[string]any{
-			"column_orders":  toAnyMapStringSlice(admin.ERPPreferences.ColumnOrders),
-			"hidden_columns": toAnyMapStringSlice(admin.ERPPreferences.HiddenColumns),
-		},
+		"erp_preferences":   adminERPPreferencesToMap(admin.ERPPreferences),
 	}
 	for key, value := range includeTokenMeta {
 		out[key] = value

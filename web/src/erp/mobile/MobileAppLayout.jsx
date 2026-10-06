@@ -5,10 +5,14 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
 import {
   AUTH_SCOPE,
+  getAuthMeta,
   getLoginPath,
   getStoredAdminProfile,
+  getToken,
   logout,
   persistAuthMeta,
+  mergeAdminERPPreferencesRead,
+  subscribeAdminERPPreferences,
 } from '@/common/auth/auth'
 import { authBus } from '@/common/auth/authBus'
 import AppShell from '@/common/components/layout/AppShell'
@@ -136,6 +140,20 @@ export default function MobileAppLayout({ legalNotice }) {
   const [adminProfile, setAdminProfile] = useState(() =>
     getStoredAdminProfile()
   )
+  useEffect(
+    () =>
+      subscribeAdminERPPreferences((profile) => {
+        setAdminProfile((current) =>
+          current &&
+          current.id === profile.id &&
+          JSON.stringify(current.erp_preferences) !==
+            JSON.stringify(profile.erp_preferences)
+            ? { ...current, erp_preferences: profile.erp_preferences }
+            : current
+        )
+      }),
+    []
+  )
   const [profileSyncCompleted, setProfileSyncCompleted] = useState(false)
   const [profileSyncing, setProfileSyncing] = useState(false)
   const [profileSyncIssue, setProfileSyncIssue] = useState(false)
@@ -196,7 +214,13 @@ export default function MobileAppLayout({ legalNotice }) {
         return profileSyncInFlightRef.current
       }
 
-      const isCurrentSync = () => profileSyncActiveRef.current
+      const syncToken = getToken(AUTH_SCOPE.ADMIN)
+      const preferencesBeforeRead = getAuthMeta(
+        AUTH_SCOPE.ADMIN,
+        'erp_preferences'
+      )
+      const isCurrentSync = () =>
+        profileSyncActiveRef.current && getToken(AUTH_SCOPE.ADMIN) === syncToken
       const loadCurrentSyncRead = (load, retryDelaysMs) =>
         loadProfileSyncReadWithRetry(
           () => {
@@ -285,6 +309,13 @@ export default function MobileAppLayout({ legalNotice }) {
             setAdminProfile(unavailableProfile)
             setProfileSyncIssue(true)
             return
+          }
+          nextProfile = {
+            ...nextProfile,
+            erp_preferences: mergeAdminERPPreferencesRead(
+              nextProfile.erp_preferences,
+              preferencesBeforeRead
+            ),
           }
           persistMobileAdminProfile(nextProfile)
           adminProfileRef.current = nextProfile

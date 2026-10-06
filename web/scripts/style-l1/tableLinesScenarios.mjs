@@ -25,6 +25,16 @@ async function setTableLines(page, label) {
 
 async function measure(table) {
   return table.evaluate((node) => {
+    const lineMetrics = (cell) => {
+      const style = getComputedStyle(cell)
+      const insetLine = style.boxShadow.match(
+        /^(.*?) -1px 0px 0px 0px inset$/u
+      )
+      return {
+        width: insetLine ? '1px' : style.borderInlineEndWidth,
+        color: insetLine ? insetLine[1] : style.borderInlineEndColor,
+      }
+    }
     const cells = [
       ...node.querySelectorAll('.ant-table-tbody > .ant-table-row > td'),
     ]
@@ -33,13 +43,13 @@ async function measure(table) {
       cells: cells.map((cell) => ({
         width: cell.getBoundingClientRect().width,
         height: cell.getBoundingClientRect().height,
-        verticalLine: getComputedStyle(cell).borderInlineEndWidth,
-        lineColor: getComputedStyle(cell).borderInlineEndColor,
+        verticalLine: lineMetrics(cell).width,
+        lineColor: lineMetrics(cell).color,
         isLast: cell === cell.parentElement.lastElementChild,
       })),
       summary: [...node.querySelectorAll('.ant-table-summary > tr > td')].map(
         (cell) => ({
-          line: getComputedStyle(cell).borderInlineEndWidth,
+          line: lineMetrics(cell).width,
           isLast: cell === cell.parentElement.lastElementChild,
         })
       ),

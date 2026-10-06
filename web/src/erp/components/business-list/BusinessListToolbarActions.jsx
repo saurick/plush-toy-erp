@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { DownloadOutlined, SettingOutlined } from '@ant-design/icons'
 import { Space, Tooltip } from 'antd'
 import { message } from '@/common/utils/antdApp'
+import { AUTH_SCOPE, getToken } from '@/common/auth/auth'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { setERPColumnOrder } from '../../api/erpPreferenceApi.mjs'
 import { applyEffectiveFieldPolicyFlags } from '../../utils/adminProfileSync.mjs'
@@ -125,13 +126,14 @@ export function useBusinessColumnOrder({
       )
       savingRef.current = true
       setSaving(true)
+      const saveToken = getToken(AUTH_SCOPE.ADMIN)
       try {
         const erpPreferences = await setERPColumnOrder({
           module_key: moduleKey,
           order,
           hidden_columns: hidden,
         })
-        if (currentScopeRef.current !== scopeKey) return false
+        if (currentScopeRef.current !== scopeKey || getToken(AUTH_SCOPE.ADMIN) !== saveToken) return false
         setSavedSettings({ scopeKey, preferences: erpPreferences })
         outletContext?.updateAdminERPPreferences?.(erpPreferences)
         message.success(

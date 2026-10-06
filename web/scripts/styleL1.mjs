@@ -888,6 +888,7 @@ async function runScenarioOnce(browser, scenario) {
     await installAdminRpcMocks(page, {
       baseURL,
       adminProfileOverride: scenario.adminProfile,
+      themeMode: scenario.themeMode,
       effectiveSessionOverride: scenario.effectiveSession,
       workflowTaskFixtures: scenario.workflowTaskFixtures,
       workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
@@ -910,6 +911,7 @@ async function runScenarioOnce(browser, scenario) {
       await installAdminRpcMocks(page, {
         baseURL,
         adminProfileOverride: scenario.adminProfile,
+        themeMode: scenario.themeMode,
         effectiveSessionOverride: scenario.effectiveSession,
         workflowTaskFixtures: scenario.workflowTaskFixtures,
         workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
@@ -923,6 +925,7 @@ async function runScenarioOnce(browser, scenario) {
       await installAdminRpcMocks(page, {
         baseURL,
         adminProfileOverride: scenario.adminProfile,
+        themeMode: scenario.themeMode,
         effectiveSessionOverride: scenario.effectiveSession,
         workflowTaskFixtures: scenario.workflowTaskFixtures,
         workflowProcessContextFixtures: scenario.workflowProcessContextFixtures,
@@ -961,7 +964,10 @@ async function runScenarioOnce(browser, scenario) {
             ? { ...fallbackProfile, ...profileOverride }
             : fallbackProfile
         try {
+          const storedPreferences = localStorage.getItem('admin_user_id') === String(profile.id || 1)
+            ? localStorage.getItem('admin_erp_preferences') : null
           localStorage.setItem('admin_access_token', mockToken)
+          localStorage.setItem('admin_user_id', String(profile.id || 1))
           localStorage.setItem(
             'admin_is_super_admin',
             profile.is_super_admin === true ? 'true' : 'false'
@@ -985,7 +991,7 @@ async function runScenarioOnce(browser, scenario) {
           }
           localStorage.setItem(
             'admin_erp_preferences',
-            JSON.stringify(profile.erp_preferences || { column_orders: {} })
+            storedPreferences || JSON.stringify(profile.erp_preferences || { column_orders: {} })
           )
         } catch (error) {
           if (error?.name !== 'SecurityError') throw error
@@ -1005,6 +1011,19 @@ async function runScenarioOnce(browser, scenario) {
     await page.addInitScript((themeMode) => {
       try {
         localStorage.setItem('plush_erp_theme_mode', themeMode)
+        if (localStorage.getItem('admin_access_token')) {
+          const preferences = JSON.parse(
+            localStorage.getItem('admin_erp_preferences') || '{}'
+          )
+          preferences.appearance = {
+            ...preferences.appearance,
+            theme_mode: themeMode,
+          }
+          localStorage.setItem(
+            'admin_erp_preferences',
+            JSON.stringify(preferences)
+          )
+        }
       } catch (error) {
         if (error?.name !== 'SecurityError') throw error
       }

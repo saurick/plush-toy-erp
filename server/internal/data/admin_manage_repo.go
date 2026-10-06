@@ -1135,6 +1135,44 @@ func (r *adminManageRepo) UpdateAdminERPColumnOrder(ctx context.Context, id int,
 	if id <= 0 || moduleKey == "" {
 		return biz.ErrBadParam
 	}
+	return r.updateAdminERPPreferences(ctx, id, func(preferences *biz.AdminERPPreferences) {
+		if preferences.ColumnOrders == nil {
+			preferences.ColumnOrders = map[string][]string{}
+		}
+		normalizedOrder := biz.NormalizeAdminERPColumnOrder(order)
+		if len(normalizedOrder) == 0 {
+			delete(preferences.ColumnOrders, moduleKey)
+		} else {
+			preferences.ColumnOrders[moduleKey] = normalizedOrder
+		}
+		if hiddenColumns != nil {
+			if preferences.HiddenColumns == nil {
+				preferences.HiddenColumns = map[string][]string{}
+			}
+			normalizedHidden := biz.NormalizeAdminERPColumnOrder(hiddenColumns)
+			if len(normalizedHidden) == 0 {
+				delete(preferences.HiddenColumns, moduleKey)
+			} else {
+				preferences.HiddenColumns[moduleKey] = normalizedHidden
+			}
+		}
+	})
+}
+
+func (r *adminManageRepo) UpdateAdminERPAppearance(ctx context.Context, id int, patch biz.AdminERPAppearancePatch) error {
+	if id <= 0 {
+		return biz.ErrBadParam
+	}
+	if err := patch.Validate(); err != nil {
+		return err
+	}
+	return r.updateAdminERPPreferences(ctx, id, func(preferences *biz.AdminERPPreferences) {
+		preferences.Appearance = patch.Apply(preferences.Appearance)
+	})
+}
+
+// 各组偏好在同一账号行锁下合并，避免外观、列排列与显隐互相覆盖。
+func (r *adminManageRepo) updateAdminERPPreferences(ctx context.Context, id int, apply func(*biz.AdminERPPreferences)) error {
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return err
@@ -1149,28 +1187,11 @@ func (r *adminManageRepo) UpdateAdminERPColumnOrder(ctx context.Context, id int,
 	if !ok {
 		return biz.ErrAdminNotFound
 	}
+	if row.Disabled || row.RevokedAt != nil {
+		return biz.ErrUserDisabled
+	}
 	preferences := decodeAdminERPPreferences(row.ErpPreferences)
-	if preferences.ColumnOrders == nil {
-		preferences.ColumnOrders = map[string][]string{}
-	}
-	normalizedOrder := biz.NormalizeAdminERPColumnOrder(order)
-	if len(normalizedOrder) == 0 {
-		delete(preferences.ColumnOrders, moduleKey)
-	} else {
-		preferences.ColumnOrders[moduleKey] = normalizedOrder
-	}
-	// 排列与显隐在同一账号行锁下保存；仅调整排列时保留现有显隐。
-	if hiddenColumns != nil {
-		if preferences.HiddenColumns == nil {
-			preferences.HiddenColumns = map[string][]string{}
-		}
-		normalizedHidden := biz.NormalizeAdminERPColumnOrder(hiddenColumns)
-		if len(normalizedHidden) == 0 {
-			delete(preferences.HiddenColumns, moduleKey)
-		} else {
-			preferences.HiddenColumns[moduleKey] = normalizedHidden
-		}
-	}
+	apply(&preferences)
 	encoded := encodeAdminERPPreferences(preferences)
 	if encoded == row.ErpPreferences {
 		if err := tx.Commit(); err != nil {
@@ -1752,35 +1773,20 @@ func decodeRoleMenuPaths(raw string) []string {
 }
 
 func decodeAdminERPPreferences(raw string) biz.AdminERPPreferences {
-	if strings.TrimSpace(raw) == "" {
-		return biz.AdminERPPreferences{}
-	}
-	var decoded struct {
-		ColumnOrders  map[string][]string `json:"column_orders"`
-		HiddenColumns map[string][]string `json:"hidden_columns"`
-	}
+	var decoded biz.AdminERPPreferences
 	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
-		return biz.AdminERPPreferences{}
+		return biz.NormalizeAdminERPPreferences(biz.AdminERPPreferences{})
 	}
-	return biz.NormalizeAdminERPPreferences(biz.AdminERPPreferences{
-		ColumnOrders:  decoded.ColumnOrders,
-		HiddenColumns: decoded.HiddenColumns,
-	})
+	return biz.NormalizeAdminERPPreferences(decoded)
 }
 
 func encodeAdminERPPreferences(preferences biz.AdminERPPreferences) string {
 	normalized := biz.NormalizeAdminERPPreferences(preferences)
-	if len(normalized.ColumnOrders) == 0 && len(normalized.HiddenColumns) == 0 {
+	if len(normalized.ColumnOrders) == 0 && len(normalized.HiddenColumns) == 0 &&
+		normalized.Appearance == biz.NormalizeAdminERPAppearance(biz.AdminERPAppearance{}) {
 		return "{}"
 	}
-	payload := struct {
-		ColumnOrders  map[string][]string `json:"column_orders"`
-		HiddenColumns map[string][]string `json:"hidden_columns,omitempty"`
-	}{
-		ColumnOrders:  normalized.ColumnOrders,
-		HiddenColumns: normalized.HiddenColumns,
-	}
-	encoded, err := json.Marshal(payload)
+	encoded, err := json.Marshal(normalized)
 	if err != nil {
 		return "{}"
 	}

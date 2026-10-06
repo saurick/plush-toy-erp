@@ -38,6 +38,7 @@ export const RpcMethod = Object.freeze({
     RESET_PASSWORD: 'reset_password',
     REVOKE: 'revoke',
     SET_DISABLED: 'set_disabled',
+    SET_ERP_APPEARANCE: 'set_erp_appearance',
     SET_ERP_COLUMN_ORDER: 'set_erp_column_order',
     SET_PROFILE: 'set_profile',
     SET_ROLE_SETTINGS: 'set_role_settings',

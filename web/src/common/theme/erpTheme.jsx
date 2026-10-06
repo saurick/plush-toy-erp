@@ -5,8 +5,19 @@ import React, {
   useEffect,
   useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
+import {
+  AUTH_SCOPE,
+  AUTH_SESSION_CHANGED_EVENT,
+  AUTH_META_CHANGED_EVENT,
+  getAuthMeta,
+  getCurrentUser,
+  getToken,
+  persistAdminERPPreferences,
+} from '@/common/auth/auth'
+import { setERPAppearance } from '@/erp/api/erpPreferenceApi.mjs'
 import {
   ERP_THEME_MODE,
   ERP_THEME_STORAGE_KEY,
@@ -17,6 +28,7 @@ import {
   ERP_ACCENTS,
   ERP_APPEARANCE_STORAGE_KEY,
   normalizeERPAppearance,
+  normalizeERPAccountAppearance,
   readERPAppearance,
 } from './erpAppearance.mjs'
 import { ERP_DARK_PALETTE } from './erpThemePalette.mjs'
@@ -58,12 +70,84 @@ function getInitialPrefersDark() {
   return window.matchMedia('(prefers-color-scheme: dark)').matches
 }
 
+function getAppearanceSession() {
+  const admin = getCurrentUser(AUTH_SCOPE.ADMIN)
+  return admin ? { userID: admin.id, token: getToken(AUTH_SCOPE.ADMIN) } : null
+}
+
+function sameAppearanceSession(left, right) {
+  return left?.userID === right?.userID && left?.token === right?.token
+}
+
+function readBrowserAppearance() {
+  return {
+    theme_mode: getInitialThemeMode(),
+    ...readERPAppearance(getBrowserStorage()),
+  }
+}
+
+function accountAppearanceStorageKey(userID) {
+  return `${ERP_APPEARANCE_STORAGE_KEY}:admin:${userID}`
+}
+
+function readSessionAppearance(session) {
+  if (!session) return readBrowserAppearance()
+  if (
+    String(getAuthMeta(AUTH_SCOPE.ADMIN, 'user_id')) === String(session.userID)
+  ) {
+    return normalizeERPAccountAppearance(
+      getAuthMeta(AUTH_SCOPE.ADMIN, 'erp_preferences')?.appearance
+    )
+  }
+  try {
+    return normalizeERPAccountAppearance(
+      JSON.parse(
+        getBrowserStorage()?.getItem(
+          accountAppearanceStorageKey(session.userID)
+        ) || '{}'
+      )
+    )
+  } catch {
+    return normalizeERPAccountAppearance(null)
+  }
+}
+
+function cacheAccountAppearance(session, value) {
+  try {
+    getBrowserStorage()?.setItem(
+      accountAppearanceStorageKey(session.userID),
+      JSON.stringify(value)
+    )
+  } catch {
+    /* 账号偏好仍以服务器保存结果为准。 */
+  }
+}
+
 export function ERPThemeProvider({ children }) {
-  const [themeMode, setThemeModeState] = useState(getInitialThemeMode)
-  const [appearance, setAppearanceState] = useState(() =>
-    readERPAppearance(getBrowserStorage())
+  const [displayPreferences, setDisplayPreferences] = useState(() =>
+    readSessionAppearance(getAppearanceSession())
   )
+  const themeMode = displayPreferences.theme_mode
+  const appearance = useMemo(
+    () => normalizeERPAppearance(displayPreferences),
+    [displayPreferences]
+  )
+  const preferencesRef = useRef(displayPreferences)
+  const sessionRef = useRef(getAppearanceSession())
+  const pendingPatchRef = useRef({})
+  const retryPatchRef = useRef({})
+  const savingSessionRef = useRef(null)
+  const mountedRef = useRef(true)
+  const [appearanceSaving, setAppearanceSaving] = useState(false)
+  const [appearanceSaveError, setAppearanceSaveError] = useState('')
   const [prefersDark, setPrefersDark] = useState(getInitialPrefersDark)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   useEffect(() => {
     if (!window.matchMedia) {
@@ -82,18 +166,37 @@ export function ERPThemeProvider({ children }) {
 
   useEffect(() => {
     const syncStoredThemeMode = () => {
-      const nextMode = getInitialThemeMode()
-      setThemeModeState((currentMode) =>
-        currentMode === nextMode ? currentMode : nextMode
-      )
-      setAppearanceState(readERPAppearance(getBrowserStorage()))
+      const session = getAppearanceSession()
+      if (!sameAppearanceSession(session, sessionRef.current)) {
+        sessionRef.current = session
+        pendingPatchRef.current = {}
+        retryPatchRef.current = {}
+        savingSessionRef.current = null
+        setAppearanceSaving(false)
+        setAppearanceSaveError('')
+      } else if (
+        savingSessionRef.current ||
+        Object.keys(retryPatchRef.current).length
+      ) {
+        return
+      }
+      const next = readSessionAppearance(session)
+      preferencesRef.current = next
+      setDisplayPreferences(next)
+      if (session) cacheAccountAppearance(session, next)
     }
     const handleStorage = (event) => {
-      if (event.key === ERP_THEME_STORAGE_KEY || event.key === null) {
-        setThemeModeState(normalizeERPThemeMode(event.newValue))
-      }
-      if (event.key === ERP_APPEARANCE_STORAGE_KEY || event.key === null) {
-        setAppearanceState(readERPAppearance(getBrowserStorage()))
+      if (
+        event.key === null ||
+        [
+          ERP_THEME_STORAGE_KEY,
+          ERP_APPEARANCE_STORAGE_KEY,
+          'admin_access_token',
+          'admin_erp_preferences',
+          'admin_user_id',
+        ].includes(event.key)
+      ) {
+        syncStoredThemeMode()
       }
     }
     const handleVisibilityChange = () => {
@@ -103,11 +206,18 @@ export function ERPThemeProvider({ children }) {
     }
 
     window.addEventListener('storage', handleStorage)
+    window.addEventListener(AUTH_SESSION_CHANGED_EVENT, syncStoredThemeMode)
+    window.addEventListener(AUTH_META_CHANGED_EVENT, syncStoredThemeMode)
     window.addEventListener('focus', syncStoredThemeMode)
     document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
       window.removeEventListener('storage', handleStorage)
+      window.removeEventListener(
+        AUTH_SESSION_CHANGED_EVENT,
+        syncStoredThemeMode
+      )
+      window.removeEventListener(AUTH_META_CHANGED_EVENT, syncStoredThemeMode)
       window.removeEventListener('focus', syncStoredThemeMode)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
@@ -137,30 +247,101 @@ export function ERPThemeProvider({ children }) {
     )
   }, [appearance, effectiveTheme, themeMode])
 
-  const setAppearance = useCallback((next) => {
-    setAppearanceState((current) => {
-      const normalized = normalizeERPAppearance({ ...current, ...next })
+  const savePendingAppearance = useCallback(async () => {
+    const session = sessionRef.current
+    if (!session || savingSessionRef.current) return
+    savingSessionRef.current = session
+    setAppearanceSaving(true)
+    setAppearanceSaveError('')
+    const isCurrent = () =>
+      mountedRef.current &&
+      savingSessionRef.current === session &&
+      sameAppearanceSession(session, getAppearanceSession())
+    while (Object.keys(pendingPatchRef.current).length && isCurrent()) {
+      const patch = pendingPatchRef.current
+      pendingPatchRef.current = {}
       try {
-        window.localStorage.setItem(
-          ERP_APPEARANCE_STORAGE_KEY,
-          JSON.stringify(normalized)
-        )
+        const saved = await setERPAppearance(patch)
+        if (!isCurrent()) return
+        const next = normalizeERPAccountAppearance({
+          ...saved.appearance,
+          ...pendingPatchRef.current,
+        })
+        preferencesRef.current = next
+        setDisplayPreferences(next)
+        // 仅接收本次保存的外观组，较早的响应不覆盖其他列设置。
+        persistAdminERPPreferences({ appearance: saved.appearance }, session)
+        cacheAccountAppearance(session, saved.appearance)
+        retryPatchRef.current = {}
       } catch {
-        /* Display preferences remain usable when storage is unavailable. */
+        if (!isCurrent()) return
+        retryPatchRef.current = { ...patch, ...pendingPatchRef.current }
+        pendingPatchRef.current = {}
+        setAppearanceSaveError('外观设置未保存到账号，请重试。')
+        break
       }
-      return normalized
-    })
-  }, [])
-
-  const setThemeMode = useCallback((nextMode) => {
-    const normalizedMode = normalizeERPThemeMode(nextMode)
-    setThemeModeState(normalizedMode)
-    try {
-      getBrowserStorage()?.setItem(ERP_THEME_STORAGE_KEY, normalizedMode)
-    } catch {
-      /* The current theme still works when browser storage is unavailable. */
+    }
+    if (isCurrent()) {
+      savingSessionRef.current = null
+      setAppearanceSaving(false)
     }
   }, [])
+
+  const updateAppearance = useCallback(
+    (patch) => {
+      const session = getAppearanceSession()
+      if (!sameAppearanceSession(session, sessionRef.current)) {
+        sessionRef.current = session
+        preferencesRef.current = readSessionAppearance(session)
+        pendingPatchRef.current = {}
+        retryPatchRef.current = {}
+        savingSessionRef.current = null
+      }
+      const next = normalizeERPAccountAppearance({
+        ...preferencesRef.current,
+        ...patch,
+      })
+      preferencesRef.current = next
+      setDisplayPreferences(next)
+      if (session) {
+        pendingPatchRef.current = {
+          ...retryPatchRef.current,
+          ...pendingPatchRef.current,
+          ...patch,
+        }
+        retryPatchRef.current = {}
+        savePendingAppearance()
+        return
+      }
+      try {
+        getBrowserStorage()?.setItem(ERP_THEME_STORAGE_KEY, next.theme_mode)
+        getBrowserStorage()?.setItem(
+          ERP_APPEARANCE_STORAGE_KEY,
+          JSON.stringify(normalizeERPAppearance(next))
+        )
+      } catch {
+        /* 未登录时仍可即时调整外观。 */
+      }
+    },
+    [savePendingAppearance]
+  )
+
+  const setAppearance = useCallback(
+    (patch) => updateAppearance(patch),
+    [updateAppearance]
+  )
+  const setThemeMode = useCallback(
+    (mode) => updateAppearance({ theme_mode: normalizeERPThemeMode(mode) }),
+    [updateAppearance]
+  )
+  const retryAppearanceSave = useCallback(() => {
+    pendingPatchRef.current = {
+      ...retryPatchRef.current,
+      ...pendingPatchRef.current,
+    }
+    retryPatchRef.current = {}
+    savePendingAppearance()
+  }, [savePendingAppearance])
 
   const value = useMemo(
     () => ({
@@ -170,9 +351,21 @@ export function ERPThemeProvider({ children }) {
       setThemeMode,
       appearance,
       setAppearance,
+      appearanceSaving,
+      appearanceSaveError,
+      retryAppearanceSave,
       accent: ERP_ACCENTS[appearance.accent],
     }),
-    [appearance, effectiveTheme, setAppearance, setThemeMode, themeMode]
+    [
+      appearance,
+      effectiveTheme,
+      setAppearance,
+      setThemeMode,
+      themeMode,
+      appearanceSaving,
+      appearanceSaveError,
+      retryAppearanceSave,
+    ]
   )
 
   return (
