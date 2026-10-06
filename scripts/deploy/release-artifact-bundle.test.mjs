@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   rmSync,
   statSync,
@@ -400,6 +401,48 @@ test("release image builders consume the committed generated projection without 
       /pnpm build:all|pnpm run build(?:\s|&&)|gen-error-codes/u,
     );
     assert.doesNotMatch(dockerfile, /COPY server\/internal\/errcode/u);
+  }
+});
+
+test("production Web JSON imports outside web are present in both image builders", () => {
+  const sourceRoot = path.join(repoRoot, "web/src");
+  const contracts = new Set();
+  const entries = readdirSync(sourceRoot, { recursive: true, withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isFile() || !/\.(?:js|jsx|mjs)$/u.test(entry.name) || /\.test\./u.test(entry.name)) {
+      continue;
+    }
+    const filename = path.join(entry.parentPath, entry.name);
+    const relative = path.relative(sourceRoot, filename).split(path.sep).join("/");
+    if (relative.startsWith("dev-workbench/") || relative.startsWith("mocks/")) continue;
+    const source = readFileSync(filename, "utf8");
+    for (const match of source.matchAll(/\bfrom\s+["'](\.[^"']+\.json)["']/gu)) {
+      const resolved = path.resolve(path.dirname(filename), match[1]);
+      const imported = path.relative(repoRoot, resolved).split(path.sep).join("/");
+      if (imported.startsWith("server/")) contracts.add(imported);
+    }
+  }
+  assert.ok(contracts.size > 0, "the production shared-data import inventory must not be empty");
+  for (const [dockerfile, workdir, repositoryMount] of [
+    ["server/Dockerfile", "/web", "/"],
+    ["web/Dockerfile", "/app", "/app"],
+  ]) {
+    // Only copies before the first Web build can satisfy its imports; a later
+    // Go stage or runtime copy must not make a missing build input appear valid.
+    const builder = readFileSync(path.join(repoRoot, dockerfile), "utf8")
+      .split(/^RUN pnpm (?:run )?build:committed/mu)[0];
+    const copiedFiles = new Map(
+      [...builder.matchAll(/^COPY\s+(server\/\S+\.json)\s+(\S+)\s*$/gmu)]
+        .map((match) => [match[1], path.posix.resolve(workdir, match[2])]),
+    );
+    for (const contract of contracts) {
+      assert.ok(existsSync(path.join(repoRoot, contract)), `${contract} is missing from the source tree`);
+      assert.equal(
+        copiedFiles.get(contract),
+        path.posix.join(repositoryMount, contract),
+        `${dockerfile} must copy the production Web dependency ${contract} before building`,
+      );
+    }
   }
 });
 

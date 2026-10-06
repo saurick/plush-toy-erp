@@ -40,8 +40,9 @@ COPY web/*.mjs ./
 COPY web/tailwind.config.js ./
 COPY web/postcss.config.js ./
 COPY config /config
-# Browser quantity rules consume the same canonical unit contract as Go.
+# Production Web imports these server-owned JSON contracts directly.
 COPY server/internal/unitpolicy/units.json /server/internal/unitpolicy/units.json
+COPY server/internal/biz/admin_erp_appearance.json /server/internal/biz/admin_erp_appearance.json
 # CI 已生成并校验 committed error-code projection；Node-only builder 不安装 Go。
 # 生产 Vite 配置只读取端口/API 规范；客户配置叠加只需要一个构建脚本。
 COPY scripts/dev-ports.mjs scripts/local-runtime-preflight-core.mjs /scripts/

@@ -23,6 +23,7 @@ COPY web ./web
 COPY config ./config
 COPY scripts ./scripts
 COPY server/internal/unitpolicy/units.json ./server/internal/unitpolicy/units.json
+COPY server/internal/biz/admin_erp_appearance.json ./server/internal/biz/admin_erp_appearance.json
 
 WORKDIR /app/web
 

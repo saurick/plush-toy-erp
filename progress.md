@@ -6,6 +6,8 @@
 
 ### 最新代码统一收口与部署（2026-10-06）
 
+- 69 个已完成会话文件已分组提交推送到 `a8bcb5a35ea05e72326ba68df366c697008b6f55`；普通 [CI #263](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/263) 首次 28/28 通过，无失败或重试。正式 [发布 #264](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/264) 首次遭遇 Docker Hub 元数据 EOF；同 Runner 复测恢复后重试，暴露出生产 Web 镜像遗漏账号外观 JSON 契约。已在同一 Docker 构建阶段复现；修复两种镜像构建入口，并增加从生产导入提取共享 JSON 的回归检查。新增检查在修复前失败、修复后 13/13 通过；同 Runner 两个前端 Docker 构建阶段均已通过。目标环境尚未切换，后续发布须绑定修复后的新提交与新 CI。
+
 - 本轮 14 个文件已提交为 `eae457ee610b684219972f42c7ea4e012a1f0928` 并推送 `origin/main`，GitHub 镜像同 SHA。共享交互稿仅纳入 CI 指引段落，账号外观与其他任务改动保留。独立候选 64 项检查、定向 lint、提交 hook、推送前 75 项检查和实际 pre-push hook 通过。
 - GitLab [CI #262](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/262) 首次执行 28 个 Job 全部成功、无失败或重试；`CI Gate` #4229 的固定 Package 已通过正式 exact-SHA 证据复用校验。本地绿色与远端证据分别保存于 ignored `output/qa/ci-guide-closeout-20261006/`。
 - 用户要求等待在跑会话完成后，统一提交、检查 CI 并部署本地最新代码。账号外观持久化、网格线整合、保存提示布局、日志看板及草稿提交校验会话均已结束；本次按各自交接记录分组，固定完整候选后重新取得 exact-SHA CI，不复用上述旧 SHA 的绿色。
