@@ -353,7 +353,7 @@ const RAW_CI_JOB_GUIDES = [
   {
     name: "quality_server_test_build",
     label: "Server 测试与构建",
-    summary: "运行 Go 测试与构建，并覆盖需要 Chromium 的 PDF 集成路径。",
+    summary: "等待三个数据库检查清理完成后运行 Go 测试与构建，覆盖 Chromium PDF 集成；此时浏览器可独立就绪。",
     checks: ["Go 测试", "PDF Chromium 集成", "Server 构建"],
     outcome: "生成 Server test/build 分片回执。",
   },
@@ -367,7 +367,7 @@ const RAW_CI_JOB_GUIDES = [
   {
     name: "quality_browser 1/2",
     label: "浏览器主路径检查",
-    summary: "复用同一 SHA 的 Web 构建；等待升级与关键 PostgreSQL Job 清理，避免 Docker 网络拆除干扰本机请求，再验证入口、响应式边界和打印主路径。",
+    summary: "复用同一 SHA 的 Web 构建；等待 Schema、升级与关键 PostgreSQL Job 清理，避免 Docker 网络拆除干扰本机请求，再验证入口、响应式边界和打印主路径。",
     checks: ["桌面与移动入口", "打印中心预览", "浏览器与端口清理"],
     outcome: "生成 Browser 场景分片回执。",
   },

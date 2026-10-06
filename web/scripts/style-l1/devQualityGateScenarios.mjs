@@ -107,14 +107,15 @@ function serverCiTopologyJob(name) {
       needs: SERVER_CI_AGGREGATE_NEEDS[name],
     }
   }
-  if (name === 'quality_browser 1/2') {
+  if (name === 'quality_server_test_build' || name === 'quality_browser 1/2') {
     return {
       name,
       stage: 'quality',
       needs: [
         'plan',
         'prepare',
-        'quality_web_build',
+        ...(name === 'quality_browser 1/2' ? ['quality_web_build'] : []),
+        'quality_server_schema',
         'quality_server_upgrade',
         'quality_server_critical_postgres',
       ],

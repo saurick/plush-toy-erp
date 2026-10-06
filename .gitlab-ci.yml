@@ -68,6 +68,12 @@ variables:
   PNPM_INSTALL_REGISTRY: "https://registry.npmmirror.com"
   GIT_STRATEGY: fetch
   GIT_DEPTH: "0"
+  # Preserve only verified dependency archives; every job recreates runtime and evidence.
+  GIT_CLEAN_FLAGS: "-ffdx -e output/cache/gitlab/pnpm-store/ -e output/cache/gitlab/playwright-runtime/"
+  FF_USE_FASTZIP: "true"
+  CACHE_COMPRESSION_LEVEL: "fast"
+  FASTZIP_ARCHIVER_CONCURRENCY: "2"
+  FASTZIP_EXTRACTOR_CONCURRENCY: "2"
   # Shell jobs share the VM; bound both Go runtime and package compilation.
   GOMAXPROCS: "4"
   GOFLAGS: "-p=4"
@@ -490,6 +496,13 @@ quality_server_test_build:
     - job: plan
       artifacts: true
     - job: prepare
+      artifacts: false
+    # Finish Docker network changes first so Browser can overlap test/build.
+    - job: quality_server_schema
+      artifacts: false
+    - job: quality_server_upgrade
+      artifacts: false
+    - job: quality_server_critical_postgres
       artifacts: false
   script:
     - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane test_build

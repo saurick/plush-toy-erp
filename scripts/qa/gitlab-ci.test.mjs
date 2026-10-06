@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
@@ -141,6 +150,102 @@ test("browser lanes wait for every server check that changes Docker networking",
         `${job} must wait for ${dependency} to release its Docker resources`,
       );
     }
+  }
+});
+
+test("database checks release Browser before server test/build takes the heavy slot", () => {
+  const testBuild = yamlJobBlock("quality_server_test_build");
+  for (const databaseJob of [
+    "quality_server_schema",
+    "quality_server_upgrade",
+    "quality_server_critical_postgres",
+  ]) {
+    assert.match(
+      testBuild,
+      new RegExp(`job: ${databaseJob}\\n      artifacts: false`, "u"),
+    );
+    assert.doesNotMatch(
+      yamlJobBlock(databaseJob),
+      /job: (?:quality_server_test_build|"?quality_browser)/u,
+      "A database job must not wait on a job that needs its cleanup",
+    );
+  }
+  assert.doesNotMatch(testBuild, /job: "?quality_browser/u);
+  for (const { job } of Object.values(CI_BROWSER_QUALITY_LANES)) {
+    assert.doesNotMatch(
+      yamlJobBlock(job),
+      /job: quality_server(?:_test_build)?\n/u,
+      "Browser and server test/build remain independently schedulable after database cleanup",
+    );
+  }
+});
+
+test("Runner checkout retains only dependency caches and clears stale runtime evidence", () => {
+  const flags = workflow.match(/^  GIT_CLEAN_FLAGS: "([^"]+)"$/mu)?.[1];
+  assert.ok(flags, "Runner cleanup must remain explicit");
+  const env = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
+  const localEnvKeys = execFileSync("git", ["rev-parse", "--local-env-vars"], {
+    cwd: repositoryRoot,
+    encoding: "utf8",
+  });
+  for (const key of localEnvKeys.trim().split("\n")) {
+    delete env[key];
+  }
+  const root = mkdtempSync(path.join(os.tmpdir(), "plush-ci-clean-cache-"));
+  const git = (...args) =>
+    execFileSync("git", args, {
+      cwd: root,
+      env,
+      stdio: "pipe",
+    });
+  const keep = [
+    "output/cache/gitlab/pnpm-store/v10/files/package",
+    "output/cache/gitlab/playwright-runtime/chrome-linux64.zip",
+  ];
+  const discard = [
+    "output/cache/gitlab/pnpm-store-stale/package",
+    "output/cache/gitlab/playwright-runtime-stale/archive.zip",
+    "output/cache/gitlab/.playwright-runtime-123-staging/archive.zip",
+    "output/ci/plan.json",
+    "output/ci/server-lanes/test_build.json",
+    "output/qa/old-result.json",
+    "output/runtime/gitlab/playwright-123/chrome",
+    "web/node_modules/.modules.yaml",
+    "web/build/index.html",
+    "untracked.txt",
+  ];
+  try {
+    git("init", "--quiet");
+    writeFileSync(
+      path.join(root, ".gitignore"),
+      "output/\nweb/node_modules/\nweb/build/\n",
+    );
+    writeFileSync(path.join(root, "source.txt"), "current source\n");
+    git("add", ".gitignore", "source.txt");
+    for (const relative of [...keep, ...discard]) {
+      const file = path.join(root, relative);
+      mkdirSync(path.dirname(file), { recursive: true });
+      writeFileSync(file, relative);
+    }
+    git("clean", ...flags.split(" "));
+    for (const relative of keep) {
+      assert.equal(readFileSync(path.join(root, relative), "utf8"), relative);
+    }
+    for (const relative of discard) {
+      assert.equal(existsSync(path.join(root, relative)), false, relative);
+    }
+    assert.equal(
+      readFileSync(path.join(root, "source.txt"), "utf8"),
+      "current source\n",
+    );
+    assert.equal(
+      git("status", "--porcelain", "--untracked-files=all")
+        .toString()
+        .includes("??"),
+      false,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
