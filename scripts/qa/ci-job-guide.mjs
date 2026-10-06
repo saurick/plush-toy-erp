@@ -346,7 +346,7 @@ const RAW_CI_JOB_GUIDES = [
   {
     name: "quality_server_upgrade",
     label: "Server 存量升级",
-    summary: "使用独立 PostgreSQL 验证已有数据库升级到当前版本的路径。",
+    summary: "使用独立 PostgreSQL 验证存量升级、单位迁移与附件恢复；独占升级资源锁，可与另一条 Server lane 并行。",
     checks: ["环境配置", "存量数据库升级", "数据库清理"],
     outcome: "生成 Server upgrade 分片回执。",
   },

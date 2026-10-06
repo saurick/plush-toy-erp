@@ -475,7 +475,8 @@ quality_server_schema:
 
 quality_server_upgrade:
   <<: *quality_shard
-  resource_group: quality-server-heavy
+  # Keep upgrade serial across pipelines while allowing one other server lane.
+  resource_group: quality-server-upgrade
   needs:
     - job: plan
       artifacts: true

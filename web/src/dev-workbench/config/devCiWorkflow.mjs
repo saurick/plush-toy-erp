@@ -163,10 +163,13 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
     chart: `flowchart TD
       P["plan → prepare"] --> N["Node、静态与安全"]
       P --> W["Web 检查<br/>构建与汇总"]
-      P --> D["Schema、升级与关键库检查<br/>共享资源锁串行执行"]
+      P --> D["Schema 与关键库检查<br/>共享资源锁串行执行"]
+      P --> U["存量升级与附件恢复<br/>独立资源锁"]
       D --> S["Go 测试与构建<br/>Server 汇总"]
+      U --> S
       W -->|"Web 制品"| B["浏览器执行与汇总"]
-      D -->|"三个 Job 清理完成"| B
+      D -->|"数据库 Job 清理完成"| B
+      U -->|"升级 Job 清理完成"| B
       W --> R["资源合同与运行检查"]
       S --> R
       N --> A["七个领域回执总聚合"]
@@ -178,7 +181,7 @@ export const CI_WORKFLOW_SECTIONS = Object.freeze([
     points: [
       '前置依赖满足后进入就绪队列，实际启动还取决于 Runner 空槽和资源锁。领域完成即可汇总，不要求同阶段所有 Job 一起结束。',
       '浏览器需要同一提交的 Web 构建制品，并等待 Schema、升级与关键 PostgreSQL Job 清理结束，避免 Docker 网络拆除干扰本机请求。',
-      '四条 Server lane 共用 quality-server-heavy 资源组。Go 测试与构建显式排在三个数据库检查之后，随后可与浏览器重叠；资源敏感 lane 仍等待 Web 与 Server 领域汇总。',
+      'Schema、关键 PostgreSQL 和 Go 测试/构建共用 quality-server-heavy；升级独占 quality-server-upgrade，Server 重任务最多并行两路。Go 测试/构建仍等待三个数据库检查，随后可与浏览器重叠；资源敏感 lane 仍等待 Web 与 Server 领域汇总。',
       '汇总核对各分片回执、身份和清理结果。并行任务耗时不能相加成流水线总耗时。',
     ],
   },

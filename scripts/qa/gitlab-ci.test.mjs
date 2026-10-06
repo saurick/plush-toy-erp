@@ -336,10 +336,13 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     for (const lane of lanes) {
       assert.match(workflow, new RegExp(`^quality_${shard}_${lane}:`, "mu"));
       if (shard === "server") {
+        const resourceGroup = lane === "upgrade"
+          ? "quality-server-upgrade"
+          : "quality-server-heavy";
         assert.match(
           yamlJobBlock(`quality_${shard}_${lane}`),
-          /resource_group: quality-server-heavy/u,
-          "Server generation, compilation and PostgreSQL jobs share a bounded Runner memory budget",
+          new RegExp(`^  resource_group: ${resourceGroup}$`, "mu"),
+          "Upgrade has one exclusive slot; all other server lanes share the second slot",
         );
       }
       assert.match(
