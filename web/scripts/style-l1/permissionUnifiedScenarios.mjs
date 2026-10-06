@@ -102,7 +102,10 @@ export function createPermissionUnifiedScenarios({
           await frame.locator('body').getAttribute('data-mode'),
           themeMode
         )
-        await frame.getByRole('button', { name: '完成', exact: true }).click()
+        await frame
+          .locator('.modal-foot')
+          .getByRole('button', { name: '关闭', exact: true })
+          .click()
         if (themeMode === 'dark') {
           await frame.locator('[data-action="open-nav"]').click()
         }

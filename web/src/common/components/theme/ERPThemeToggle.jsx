@@ -164,7 +164,7 @@ export default function ERPThemeToggle({
             disabled={appearanceSaving}
             onClick={() => setAppearanceOpen(false)}
           >
-            完成
+            关闭
           </Button>
         </div>
       }

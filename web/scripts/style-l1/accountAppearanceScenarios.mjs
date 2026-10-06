@@ -166,7 +166,10 @@ export function createAccountAppearanceScenarios({
             })),
           })
         }
-        await dialog.getByRole('button', { name: '完成', exact: true }).click()
+        await dialog
+          .locator('.ant-modal-footer')
+          .getByRole('button', { name: '关闭', exact: true })
+          .click()
         await dialog.waitFor({ state: 'hidden' })
         await waitForFiniteAnimations(page)
       },
@@ -243,7 +246,10 @@ export function createAccountAppearanceScenarios({
           `${outputDir}/account-appearance-desktop-metrics.json`,
           JSON.stringify(metrics, null, 2)
         )
-        await dialog.getByRole('button', { name: '完成', exact: true }).click()
+        await dialog
+          .locator('.ant-modal-footer')
+          .getByRole('button', { name: '关闭', exact: true })
+          .click()
         await dialog.waitFor({ state: 'hidden' })
         await waitForFiniteAnimations(page)
         await page.evaluate(() => {
@@ -276,7 +282,10 @@ export function createAccountAppearanceScenarios({
             colorScheme
           )
         }
-        await dialog.getByRole('button', { name: '完成', exact: true }).click()
+        await dialog
+          .locator('.ant-modal-footer')
+          .getByRole('button', { name: '关闭', exact: true })
+          .click()
         await dialog.waitFor({ state: 'hidden' })
         await waitForFiniteAnimations(page)
       },
@@ -320,7 +329,8 @@ export function createAccountAppearanceScenarios({
         )
         assert.equal(
           await dialog
-            .getByRole('button', { name: '完成', exact: true })
+            .locator('.ant-modal-footer')
+            .getByRole('button', { name: '关闭', exact: true })
             .isEnabled(),
           true
         )
@@ -334,7 +344,10 @@ export function createAccountAppearanceScenarios({
         )
         await dialog.getByRole('button', { name: '蓝色', exact: true }).click()
         await waitForSavedAppearance(page, { accent: 'blue' })
-        await dialog.getByRole('button', { name: '完成', exact: true }).click()
+        await dialog
+          .locator('.ant-modal-footer')
+          .getByRole('button', { name: '关闭', exact: true })
+          .click()
         await dialog.waitFor({ state: 'hidden' })
         await waitForFiniteAnimations(page)
       },

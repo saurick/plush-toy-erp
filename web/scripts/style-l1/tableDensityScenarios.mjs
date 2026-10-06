@@ -11,7 +11,10 @@ async function setDensity(page, label) {
   const dialog = page.getByRole('dialog', { name: '外观与密度' })
   await dialog.getByText('表格密度', { exact: true }).waitFor()
   await dialog.getByText(label, { exact: true }).click()
-  await dialog.getByRole('button', { name: '完成', exact: true }).click()
+  await dialog
+    .locator('.ant-modal-footer')
+    .getByRole('button', { name: '关闭', exact: true })
+    .click()
   await dialog.waitFor({ state: 'hidden' })
   await waitForFiniteAnimations(page)
 }

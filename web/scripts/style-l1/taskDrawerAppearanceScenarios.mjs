@@ -101,7 +101,8 @@ export function createTaskDrawerAppearanceScenarios({
           key
         )
         await appearance
-          .getByRole('button', { name: '完成', exact: true })
+          .locator('.ant-modal-footer')
+          .getByRole('button', { name: '关闭', exact: true })
           .click()
         await appearance.waitFor({ state: 'hidden' })
         await trigger.click()

@@ -223,7 +223,10 @@ export function mobileAppearanceScenario({
               : 'desktop-purple-appearance.png'
           ),
         })
-        await dialog.getByRole('button', { name: '完成', exact: true }).click()
+        await dialog
+          .locator('.ant-modal-footer')
+          .getByRole('button', { name: '关闭', exact: true })
+          .click()
       }
 
       await page.setViewportSize({ width: 390, height: 844 })

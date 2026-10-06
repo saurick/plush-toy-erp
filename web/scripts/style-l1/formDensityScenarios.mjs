@@ -58,7 +58,10 @@ export function createFormDensityScenarios({ outputDir }) {
         await frame
           .locator('[data-action="set-mode"][data-value="dark"]')
           .click()
-        await frame.getByRole('button', { name: '完成', exact: true }).click()
+        await frame
+          .locator('.modal-foot')
+          .getByRole('button', { name: '关闭', exact: true })
+          .click()
       }
       const navigate = async (title) => {
         if (size === 'narrow') {

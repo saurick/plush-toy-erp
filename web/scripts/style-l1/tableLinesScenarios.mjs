@@ -17,7 +17,10 @@ async function setTableLines(page, label) {
   await trigger.click()
   const dialog = page.getByRole('dialog', { name: '外观与密度' })
   await selectSegment(dialog, '表格线条', label)
-  await dialog.getByRole('button', { name: /^完\s*成$/u }).click()
+  await dialog
+    .locator('.ant-modal-footer')
+    .getByRole('button', { name: /^关\s*闭$/u })
+    .click()
   await dialog.waitFor({ state: 'hidden' })
   await waitForFiniteAnimations(page)
   assert(await trigger.evaluate((node) => node === document.activeElement))
@@ -255,7 +258,10 @@ export function createTableLinesScenarios(deps) {
         .getByRole('button', { name: '外观与密度', exact: true })
         .click()
       await assertLineSwitchMotion(dialog, true)
-      await dialog.getByRole('button', { name: /^完\s*成$/u }).click()
+      await dialog
+        .locator('.ant-modal-footer')
+        .getByRole('button', { name: /^关\s*闭$/u })
+        .click()
       await writeFile(
         path.join(outputDir, `table-lines-${themeMode}-metrics.json`),
         JSON.stringify({ before, grid }, null, 2)
@@ -288,7 +294,10 @@ export function createTableLinesScenarios(deps) {
           await dialog
             .getByRole('button', { name: '粉色', exact: true })
             .click()
-          await dialog.getByRole('button', { name: /^完\s*成$/u }).click()
+          await dialog
+            .locator('.ant-modal-footer')
+            .getByRole('button', { name: /^关\s*闭$/u })
+            .click()
           await dialog.waitFor({ state: 'hidden' })
           await waitForFiniteAnimations(page)
           assertGrid(await measure(table))
@@ -304,7 +313,10 @@ export function createTableLinesScenarios(deps) {
           .click()
         const dialog = page.getByRole('dialog', { name: '外观与密度' })
         await selectSegment(dialog, '表格密度', '紧凑')
-        await dialog.getByRole('button', { name: /^完\s*成$/u }).click()
+        await dialog
+          .locator('.ant-modal-footer')
+          .getByRole('button', { name: /^关\s*闭$/u })
+          .click()
         await page.reload()
         await table.locator('.ant-table-row').first().waitFor()
         assertGrid(await measure(table))
@@ -335,7 +347,10 @@ export function createTableLinesScenarios(deps) {
         await selectSegment(dialog, '表格密度', '标准')
         await selectSegment(dialog, '表格线条', '简洁')
         await dialog.getByRole('button', { name: '蓝色', exact: true }).click()
-        await dialog.getByRole('button', { name: /^完\s*成$/u }).click()
+        await dialog
+          .locator('.ant-modal-footer')
+          .getByRole('button', { name: /^关\s*闭$/u })
+          .click()
         await dialog.waitFor({ state: 'hidden' })
         await waitForFiniteAnimations(page)
         assert(

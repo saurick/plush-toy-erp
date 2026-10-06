@@ -185,7 +185,10 @@ async function clickERPThemeOption(page, label) {
     const dialog = page.getByRole('dialog', { name: /^外观(?:与密度|设置)$/ })
     await dialog.waitFor({ state: 'visible', timeout: 10_000 })
     await dialog.getByText(label, { exact: true }).click()
-    await dialog.getByRole('button', { name: '完成', exact: true }).click()
+    await dialog
+      .locator('.ant-modal-footer')
+      .getByRole('button', { name: '关闭', exact: true })
+      .click()
     await dialog.waitFor({ state: 'hidden', timeout: 10_000 })
   }
   if (expectedMode) {
