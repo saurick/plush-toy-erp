@@ -5,6 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 import { projectDevQualityGateServerEvidence } from "../../web/dev-server/devQualityGatePlugin.mjs";
+import { CI_JOB_GUIDES } from "./ci-job-guide.mjs";
 import {
   buildQualityGateServerDag,
   buildQualityGateServerTiming,
@@ -154,5 +155,12 @@ test("DEV quality gate has no second CI job topology source", () => {
     /SERVER_CI_JOB_CATALOG|localStageIds|CI 7 分片|七个固定分片/u,
   );
   assert.match(guide, /projectCiJobGuides/u);
-  assert.doesNotMatch(guide, /needs|durationMs|queueMs|history/u);
+  const assertNoRuntimeFields = (value) => {
+    if (!value || typeof value !== "object") return;
+    for (const [key, child] of Object.entries(value)) {
+      assert(!["needs", "status", "durationMs", "queueMs", "history"].includes(key), `static guide contains runtime field: ${key}`);
+      assertNoRuntimeFields(child);
+    }
+  };
+  assertNoRuntimeFields(CI_JOB_GUIDES);
 });

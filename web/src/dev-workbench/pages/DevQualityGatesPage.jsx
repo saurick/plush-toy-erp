@@ -32,6 +32,7 @@ import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import DevCiWorkflowGuide from '../components/DevCiWorkflowGuide.jsx'
 import DevCiJobTimeline from '../components/DevCiJobTimeline.jsx'
+import { buildCiDiagnosticText } from '../config/devCiWorkflow.mjs'
 import { DEV_DOCS_ROUTE } from '../config/devDocs.mjs'
 import {
   DEFAULT_SERVER_VIEW,
@@ -1014,6 +1015,7 @@ function serverJobFlowGroup(job) {
 }
 
 function ServerJobGuideDrawer({
+  repository,
   evidence,
   timing,
   open,
@@ -1063,7 +1065,7 @@ function ServerJobGuideDrawer({
     <Drawer
       title={selectedGuide?.label || 'Job 说明'}
       open={open}
-      width="min(560px, calc(100vw - 16px))"
+      width="min(1000px, calc(100vw - 16px))"
       rootClassName="erp-dev-quality-job-guide-drawer"
       onClose={onClose}
       afterOpenChange={onAfterOpenChange}
@@ -1164,6 +1166,22 @@ function ServerJobGuideDrawer({
               查看全部 Job 说明
             </Button>
           </Space>
+          <Paragraph type="secondary">
+            以下说明来自当前工作区，历史运行按对应 SHA 的配置核对。CI 专用入口只用于定位，不在本机伪造环境执行。
+          </Paragraph>
+          {selectedGuide.diagnostics ? <Descriptions
+            size="small"
+            column={1}
+            bordered
+            items={[
+              { key: 'entry', label: '定义入口', children: <Text code copyable>{selectedGuide.diagnostics.entry}</Text> },
+              { key: 'environment', label: '环境要求', children: selectedGuide.diagnostics.environment },
+              { key: 'steps', label: '执行步骤', children: <ol>{selectedGuide.diagnostics.steps.map((step) => <li key={step}>{step}</li>)}</ol> },
+              { key: 'evidence', label: '证据位置', children: <ul>{selectedGuide.diagnostics.evidence.map((file) => <li key={file}><Text code>{file}</Text></li>)}</ul> },
+              { key: 'triage', label: '失败排查', children: <ol>{selectedGuide.diagnostics.triage.map((step) => <li key={step}>{step}</li>)}</ol> },
+              { key: 'sources', label: '说明来源', children: selectedGuide.diagnostics.sources.join('、') },
+            ]}
+          /> : <Paragraph type="secondary">详细排查说明尚未登记，请查看该 Job 的完整日志。</Paragraph>}
         </div>
       ) : (
         <div className="erp-dev-quality-job-guide-drawer__catalog">
@@ -1220,6 +1238,15 @@ function ServerJobGuideDrawer({
           ))}
         </div>
       )}
+      <details className="erp-dev-ci-diagnostic">
+        <summary>查看与复制{selectedJob ? '本 Job' : '本次流水线'}排查信息</summary>
+        <Paragraph
+          className="erp-dev-ci-diagnostic__text"
+          copyable={{ text: buildCiDiagnosticText({ repository, evidence, job: selectedJob }) }}
+        >
+          {buildCiDiagnosticText({ repository, evidence, job: selectedJob })}
+        </Paragraph>
+      </details>
     </Drawer>
   )
 }
@@ -1624,6 +1651,7 @@ function ServerCiEvidencePanel({ summary, serverView, onServerViewChange }) {
         </div>
       ) : null}
       <ServerJobGuideDrawer
+        repository={summary.repository}
         evidence={evidence}
         timing={timing}
         open={jobGuideOpen}

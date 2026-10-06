@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { projectCiJobGuides } from '../../../../scripts/qa/ci-job-guide.mjs'
 
 import {
   DEFAULT_SERVER_VIEW,
@@ -151,16 +152,7 @@ function summary(overrides = {}) {
           url: 'https://gitlab.saurick.me/saurick/plush-toy-erp/-/jobs/390',
         },
       ],
-      jobGuides: [
-        {
-          name: 'CI Gate',
-          label: 'CI 最终门禁',
-          summary: '核对最终证据并固定到当前 Pipeline。',
-          checks: ['最终证据完整性'],
-          outcome: '形成 exact-SHA CI Gate 证据。',
-          registered: true,
-        },
-      ],
+      jobGuides: projectCiJobGuides(['CI Gate']),
       topology: {
         status: 'available',
         gitSha: 'a'.repeat(40),
@@ -602,6 +594,7 @@ test('quality gates config: summary preserves one shared operation truth', () =>
   assert.equal(normalized.serverEvidence.pipeline.id, 39)
   assert.equal(normalized.serverEvidence.jobs[0].name, 'CI Gate')
   assert.equal(normalized.serverEvidence.jobGuides[0].label, 'CI 最终门禁')
+  assert.match(normalized.serverEvidence.jobGuides[0].diagnostics.entry, /CI Gate/u)
   assert.equal(normalized.serverEvidence.topology.status, 'available')
   assert.equal(normalized.serverEvidence.history.length, 2)
   assert.equal(normalized.serverEvidence.history[1].failureJob, 'quality_web')
@@ -696,6 +689,19 @@ test('quality gates config: summary preserves one shared operation truth', () =>
       ),
     /state is inconsistent/u
   )
+})
+
+test('quality job diagnostics rejects unknown fields and unbounded copied content', () => {
+  const original = summary()
+  const guide = original.serverEvidence.jobGuides[0]
+  for (const diagnostics of [
+    { ...guide.diagnostics, token: 'must-not-be-published' },
+    { ...guide.diagnostics, steps: Array(9).fill('step') },
+    { ...guide.diagnostics, entry: 'x'.repeat(241) },
+    { ...guide.diagnostics, triage: ['line\ncontrol'] },
+  ]) {
+    assert.throws(() => normalizeDevQualityGateSummary({ ...original, serverEvidence: { ...original.serverEvidence, jobGuides: [{ ...guide, diagnostics }] } }))
+  }
 })
 
 test('quality gates config: GitLab CI DAG is derived from exact needs and actual Job states', () => {

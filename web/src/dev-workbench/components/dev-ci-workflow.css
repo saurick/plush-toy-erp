@@ -23,6 +23,60 @@
   margin-top: 8px;
 }
 
+.erp-dev-ci-guide__table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  margin-top: 16px;
+}
+
+.erp-dev-ci-guide__table-scroll table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.erp-dev-ci-guide__table-scroll th,
+.erp-dev-ci-guide__table-scroll td {
+  padding: 10px;
+  border: 1px solid var(--erp-border);
+  vertical-align: top;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-ci-guide__table-scroll caption {
+  padding: 8px 0;
+  caption-side: top;
+  text-align: left;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-ci-guide__commands,
+.erp-dev-ci-guide__sources {
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-ci-guide__commands > .ant-typography {
+  margin-top: 8px;
+}
+
+.erp-dev-ci-diagnostic {
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-ci-diagnostic > summary {
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.erp-dev-ci-diagnostic__text {
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+
 .erp-dev-ci-timeline {
   margin: 16px 0;
   min-width: 0;

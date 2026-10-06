@@ -541,10 +541,38 @@ function normalizeServerEvidenceJob(job) {
   }
 }
 
+function normalizeJobDiagnostics(diagnostics) {
+  if (diagnostics === null) return null
+  assertExactKeys(
+    diagnostics,
+    ['entry', 'environment', 'steps', 'evidence', 'sources', 'triage'],
+    'quality job diagnostics'
+  )
+  const result = {
+    entry: safeText(diagnostics.entry, 'quality job entry', { max: 240 }),
+    environment: safeText(diagnostics.environment, 'quality job environment', {
+      max: 500
+    })
+  }
+  for (const field of ['steps', 'evidence', 'sources', 'triage']) {
+    if (
+      !Array.isArray(diagnostics[field]) ||
+      diagnostics[field].length < 1 ||
+      diagnostics[field].length > 8
+    ) {
+      throw new Error('quality job diagnostics is invalid')
+    }
+    result[field] = diagnostics[field].map((value) =>
+      safeText(value, `quality job ${field}`, { max: 500 })
+    )
+  }
+  return result
+}
+
 function normalizeServerEvidenceJobGuide(guide) {
   assertExactKeys(
     guide,
-    ['checks', 'label', 'name', 'outcome', 'registered', 'summary'],
+    ['checks', 'diagnostics', 'label', 'name', 'outcome', 'registered', 'summary'],
     'quality server evidence job guide'
   )
   if (
@@ -576,6 +604,7 @@ function normalizeServerEvidenceJobGuide(guide) {
       { max: 240 }
     ),
     registered: guide.registered,
+    diagnostics: normalizeJobDiagnostics(guide.diagnostics),
   }
 }
 

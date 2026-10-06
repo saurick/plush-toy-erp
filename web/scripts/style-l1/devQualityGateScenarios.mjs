@@ -1,4 +1,5 @@
 import { projectCiJobGuides } from '../../../scripts/qa/ci-job-guide.mjs'
+import { CI_WORKFLOW_SECTIONS } from '../../src/dev-workbench/config/devCiWorkflow.mjs'
 
 const NOW = '2026-08-09T08:00:00.000Z'
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
@@ -1167,6 +1168,20 @@ export function createDevQualityGateScenarios({
           })
           .click()
         await parallelDiagram.waitFor({ state: 'hidden' })
+        for (const key of ['commit', 'coverage', 'push', 'ci-entry', 'diagnosis']) {
+          const section = CI_WORKFLOW_SECTIONS.find((item) => item.key === key)
+          const header = workflowGuide.getByRole('button', { name: `collapsed ${section.label}`, exact: true })
+          await header.click()
+          if (section.chart) await workflowGuide.locator(`[data-section="${key}"] [data-mermaid-status="rendered"]`).waitFor()
+          if (section.table) {
+            const table = workflowGuide.getByRole('region', { name: `${section.label}明细表` })
+            await table.waitFor()
+            const geometry = await table.evaluate((node) => ({ width: node.clientWidth, scroll: node.scrollWidth, overflow: getComputedStyle(node).overflowX, right: node.getBoundingClientRect().right, viewport: innerWidth }))
+            assert.equal(geometry.overflow, 'auto')
+            assert(geometry.right <= geometry.viewport, JSON.stringify(geometry))
+          }
+          await workflowGuide.getByRole('button', { name: `expanded ${section.label}`, exact: true }).click()
+        }
         assert.deepEqual(
           await jobGuideDrawer
             .locator('.erp-dev-quality-job-guide-drawer__group-heading strong')
@@ -1200,7 +1215,7 @@ export function createDevQualityGateScenarios({
           .first()
           .waitFor()
         await jobGuideDrawer
-          .getByText('不会重跑分片测试', { exact: false })
+          .getByText('不会重跑分片测试', { exact: false }).first()
           .waitFor()
         await jobGuideDrawer
           .getByText(
@@ -1212,6 +1227,16 @@ export function createDevQualityGateScenarios({
         await jobGuideDrawer
           .getByText('quality_node_core', { exact: true })
           .waitFor()
+        await jobGuideDrawer.getByText('定义入口', { exact: true }).waitFor()
+        await jobGuideDrawer.getByText('失败排查', { exact: true }).waitFor()
+        const diagnostic = jobGuideDrawer.locator('.erp-dev-ci-diagnostic')
+        await diagnostic.locator('summary').click()
+        await diagnostic.getByText('首个失败子步骤', { exact: false }).waitFor()
+        await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+        await diagnostic.locator('.ant-typography-copy').click()
+        const copied = await page.evaluate(() => navigator.clipboard.readText())
+        assert(copied.includes('quality_node') && copied.includes('CI SHA：') && copied.includes('待补证据：'), copied)
+        assert(!copied.includes('undefined'), copied)
         await jobGuideDrawer.locator('.ant-drawer-close').click()
         await jobGuideDrawer.waitFor({ state: 'hidden' })
         await page.waitForFunction(() =>
@@ -1279,7 +1304,9 @@ export function createDevQualityGateScenarios({
         await guide
           .locator('[data-section="overview"] [data-mermaid-status="rendered"]')
           .waitFor()
-        assert.equal(await guide.locator('.ant-collapse-header').count(), 4)
+        assert.deepEqual(await guide.locator('.ant-collapse-header-text').allTextContents(), CI_WORKFLOW_SECTIONS.map(({ label }) => label))
+        await drawer.locator('.erp-dev-ci-diagnostic > summary').click()
+        await drawer.locator('.erp-dev-ci-diagnostic').getByText('无可读记录', { exact: false }).waitFor()
         await drawer
           .getByText('实际执行结果请查看本次流水线和目标回执。', {
             exact: false,

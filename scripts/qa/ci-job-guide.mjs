@@ -1,4 +1,212 @@
+import { CI_NODE_TEST_LANES } from "./ci-node-test-lane.mjs";
+import { CI_RESOURCE_TEST_LANES } from "./ci-resource-test-lane.mjs";
+import {
+  CI_BROWSER_QUALITY_LANES,
+  CI_SERVER_QUALITY_LANES,
+  CI_WEB_QUALITY_LANES,
+} from "./ci-quality-stage-lane.mjs";
+import { CI_QUALITY_SHARDS } from "./ci-quality-shard.mjs";
+
 export const CI_JOB_GUIDE_SCHEMA = "plush.ci-job-guide/v1";
+
+const QUALITY_LANE_REGISTRIES = {
+  web: CI_WEB_QUALITY_LANES,
+  server: CI_SERVER_QUALITY_LANES,
+  browser: CI_BROWSER_QUALITY_LANES,
+};
+
+function diagnosticsFor(guide) {
+  const identityStep =
+    "核对当前 Job 的 protected main、exact SHA、plan / range 与输入制品身份。";
+  const resultStep =
+    "保存本 lane 回执；成功或失败均读回本次资源清理，缺结果或零执行不能算通过。";
+  const defaultTriage = [
+    "从 Job 完整日志定位第一个失败子步骤、退出码和错误上下文；下游 skipped 不代表新的失败。",
+    "核对本机与 CI 的 SHA、工具版本、文件范围和环境；本机复现用正式同名测试或 affected，不伪造 GitLab 身份。",
+    "修复后补相关反例与选测关系，再核对新候选证据；保留原 attempt，重试通过不证明根因已修复。",
+  ];
+  const make = (
+    entry,
+    environment,
+    steps,
+    evidence,
+    source,
+    triage = defaultTriage,
+  ) =>
+    Object.freeze({
+      entry,
+      environment,
+      steps: Object.freeze(steps),
+      evidence: Object.freeze(evidence),
+      sources: Object.freeze([".gitlab-ci.yml", source]),
+      triage: Object.freeze(triage),
+    });
+  for (const [lane, definition] of Object.entries(CI_NODE_TEST_LANES)) {
+    if (guide.name !== definition.job) continue;
+    return make(
+      `node scripts/qa/ci-node-test-lane.mjs --lane ${lane}`,
+      "CI 专用入口；锁定 Node 与 pnpm 依赖。分组名 database / browser 在这里指 Node 合同测试，不等于真实数据库或浏览器验收。",
+      [
+        identityStep,
+        `按正式目录选择 ${definition.profiles.join(" / ")} 分组${definition.testPartition ? `的 ${definition.testPartition} 分区` : ""}，运行测试并解析 TAP，要求实际执行、零失败与零 skip。`,
+        "核对前后源码与环境身份，输出该 lane 的摘要和指纹。",
+      ],
+      [`output/ci/node-lanes/${lane}.json`],
+      "scripts/qa/ci-node-test-lane.mjs",
+    );
+  }
+  for (const [lane, definition] of Object.entries(CI_RESOURCE_TEST_LANES)) {
+    if (guide.name !== definition.job) continue;
+    return make(
+      `node scripts/qa/ci-resource-test-lane.mjs --lane ${lane}`,
+      "CI 专用入口；等待 Web / Server 汇总，使用精确分区的资源敏感合同与模拟运行场景。",
+      [
+        identityStep,
+        `执行登记测试 ${definition.testFile}，核对 case 清单、实际执行数与 TAP。`,
+        "比较运行前后受管临时资源清单，核对进程 / 端口 / 文件清理与零残留。",
+      ],
+      [`output/ci/resource-lanes/${lane}.json`],
+      "scripts/qa/ci-resource-test-lane.mjs",
+    );
+  }
+  for (const [shard, registry] of Object.entries(QUALITY_LANE_REGISTRIES)) {
+    for (const [lane, definition] of Object.entries(registry)) {
+      if (guide.name !== definition.job) continue;
+      const requirements = [
+        definition.pnpm ? "锁定 pnpm 依赖" : "无需恢复 pnpm 缓存",
+        definition.postgres
+          ? "本 Job 独立 PostgreSQL、随机端口与正式迁移"
+          : "不持有 PostgreSQL",
+        definition.chromium
+          ? "校验运行包后解压本 Job 的 Chromium 与 sandbox"
+          : "不解压 Chromium",
+      ];
+      return make(
+        `node scripts/qa/ci-quality-stage-lane.mjs --shard ${shard} --lane ${lane}`,
+        `CI 专用入口；${requirements.join("；")}。`,
+        [
+          identityStep,
+          `正式子入口：${definition.command.join(" ")}`,
+          `检查内容：${guide.checks.join("；")}。${definition.substeps?.length ? `子步骤：${definition.substeps.join(" → ")}。` : ""}`,
+          resultStep,
+        ],
+        [
+          `output/ci/${shard}-lanes/${lane}.json`,
+          ...(definition.webBuild ? ["web/build/"] : []),
+        ],
+        "scripts/qa/ci-quality-stage-lane.mjs",
+        [
+          shard === "web"
+            ? "lint 先查文件与行号、使用的配置及测试文件是否也在范围内；构建失败看首个编译错误和 DEV 残留。"
+            : shard === "server"
+              ? "区分生成漂移、迁移 blocker、事务断言和 PDF 初始化失败；先查相应子步骤，不把容器启动成功当成验证完成。"
+              : "先查同 SHA 的 Web 制品、Chromium 初始化和端口就绪，再查页面断言；日志缺失先补证据。",
+          ...defaultTriage.slice(1),
+        ],
+      );
+    }
+  }
+  for (const [shard, definition] of Object.entries(CI_QUALITY_SHARDS)) {
+    if (guide.name !== definition.job) continue;
+    return make(
+      `node scripts/qa/ci-quality-shard.mjs --shard ${shard}`,
+      "CI 专用入口；依赖以对应 SHA 的真实 needs 为准。汇总读取上游回执，静态、安全及 Node shared 收口仍有自身检查。",
+      [
+        identityStep,
+        `领域职责：${guide.summary}`,
+        `核对 ${guide.checks.join("；")}，确认同 SHA、plan、执行数量与必要清理证据。`,
+      ],
+      [`output/ci/shards/${shard}.json`],
+      "scripts/qa/ci-quality-shard.mjs",
+      [
+        "先判断失败来自自身命令还是上游回执校验；缺失、旧 SHA、摘要不完整和清理失败分别定位，不能手工补绿色 JSON。",
+        ...defaultTriage.slice(1),
+      ],
+    );
+  }
+  const special = {
+    plan: {
+      entry: ".gitlab-ci.yml → plan.script → node scripts/qa/ci-plan.mjs",
+      environment:
+        "Runner 工具链版本检查通过，before/base SHA 可读；main push 使用 full，MR 按可信 base 选择 affected。",
+      steps: [
+        "依据 source / before SHA / MR base 计算 diff 与历史范围。",
+        "检查 diff/log，并用可信基线的 gitleaks 配置扫描历史。",
+        "生成计划、范围与信任回执；后续 Job 必须匹配它们的 digest。",
+      ],
+      evidence: [
+        "output/ci/plan.json",
+        "output/ci/range.txt",
+        "output/ci/trust.json",
+      ],
+      source: "scripts/qa/ci-plan.mjs",
+    },
+    prepare: {
+      entry: ".gitlab-ci.yml → prepare.script",
+      environment:
+        "唯一 cache writer；Runner 容量、root-owned sandbox helper、精确 sudo policy、包源与受校验 Playwright Package。",
+      steps: [
+        "读取容量证据并执行 sandbox preflight，失败则停止准备。",
+        "pnpm frozen-lockfile 安装；准备受校验的 Playwright ZIP；Go mod download。",
+        "验证缓存目录存在，运行时解压目录尚未创建；输出 cache=prepared。",
+      ],
+      evidence: ["output/ci/runner-capacity-observation.json"],
+      source: "scripts/qa/ci-playwright-runtime.mjs",
+    },
+    quality_aggregate: {
+      entry: "node scripts/qa/ci-quality-aggregate.mjs",
+      environment:
+        "同 Pipeline / SHA 的七领域回执、source archive、构建 digest、清理与零 skip 证据齐全。",
+      steps: [
+        "逐领域校验身份、计划、回执完整性与执行数量。",
+        "校验 schema 生成、构建及数据库 / 浏览器清理，不重跑上游测试。",
+        "形成 terminal、receipt、evidence manifest，交给 CI Gate 固化。",
+      ],
+      evidence: [
+        "output/ci/evidence/terminal.json",
+        "output/ci/evidence/receipt.json",
+        "output/ci/evidence/evidence-manifest.json",
+      ],
+      source: "scripts/qa/ci-quality-aggregate.mjs",
+    },
+    "CI Gate": {
+      entry: ".gitlab-ci.yml → CI Gate.script",
+      environment:
+        "main push 要求 protected main 与 aggregate 成功；MR 依赖 quality_affected。Package 上传使用 Job token，凭据不进入页面。",
+      steps: [
+        "main push 核对三个证据文件及当前分支保护身份。",
+        "上传到 plush-ci-evidence 的 pipeline-<id>-job-<id>-<sha> 版本，失败仍阻断。",
+        "清理临时凭据文件；发布链另行读回同 SHA 的不可变证据。",
+      ],
+      evidence: [
+        "output/ci/evidence/",
+        "GitLab Generic Package：plush-ci-evidence",
+      ],
+      source: "scripts/qa/ci-quality-aggregate.mjs",
+    },
+    pdf_runtime_monitor: {
+      entry: ".gitlab-ci.yml → pdf_runtime_monitor.script",
+      environment:
+        "仅受保护默认分支的指定 schedule；不属于普通 main push 质量检查。",
+      steps: [
+        "核对固定打印镜像、实际 Chromium 与系统包。",
+        "检查上游稳定版本、可修复漏洞及体积预算。",
+        "报告升级候选；真实 PDF 验证与镜像更新另走正式流程。",
+      ],
+      evidence: ["GitLab pdf_runtime_monitor Job 日志与 artifacts"],
+      source: "scripts/qa/README.md",
+    },
+  }[guide.name];
+  return special
+    ? make(
+        special.entry,
+        special.environment,
+        special.steps,
+        special.evidence,
+        special.source,
+      )
+    : null;
+}
 
 const RAW_CI_JOB_GUIDES = [
   {
@@ -252,6 +460,7 @@ function freezeGuide(guide) {
   return Object.freeze({
     ...guide,
     checks: Object.freeze([...guide.checks]),
+    diagnostics: diagnosticsFor(guide),
     registered: true,
   });
 }
@@ -270,6 +479,7 @@ function fallbackGuide(name) {
     summary: "当前流水线包含该 Job，但仓库尚未登记用途说明。",
     checks: Object.freeze(["当前检查清单尚未登记"]),
     outcome: "页面继续展示实际状态；执行细节以 GitLab Job 日志为准。",
+    diagnostics: null,
     registered: false,
   });
 }

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { existsSync, readFileSync } from "node:fs";
 
 import { CI_NODE_TEST_LANES } from "./ci-node-test-lane.mjs";
 import {
@@ -35,7 +36,6 @@ test("CI Job guide covers registered quality and PDF monitor jobs exactly once",
   ];
 
   assert.equal(CI_JOB_GUIDE_SCHEMA, "plush.ci-job-guide/v1");
-  assert.equal(expected.length, 29);
   assert.equal(new Set(expected).size, expected.length);
   assert.deepEqual(
     CI_JOB_GUIDES.map(({ name }) => name).sort(),
@@ -61,6 +61,23 @@ test("CI Job guide covers registered quality and PDF monitor jobs exactly once",
       assert.equal(Object.hasOwn(guide, runtimeField), false);
     }
   }
+});
+
+test("diagnostic entries and artifact paths stay connected to the executable CI definitions", () => {
+  const workflow = readFileSync(new URL("../../.gitlab-ci.yml", import.meta.url), "utf8");
+  const artifactPaths = [...workflow.matchAll(/^      - ((?:output|web)\/[^\n]+)$/gmu)].map((match) => match[1]);
+  for (const guide of CI_JOB_GUIDES) {
+    const detail = guide.diagnostics;
+    assert(detail, `${guide.name}: missing diagnostics`);
+    if (detail.entry.startsWith("node ")) assert(workflow.includes(detail.entry), `${guide.name}: command drift`);
+    for (const source of detail.sources) assert(existsSync(new URL(`../../${source}`, import.meta.url)), source);
+    for (const artifact of detail.evidence.filter((item) => item.startsWith("output/") || item.startsWith("web/"))) {
+      assert(artifactPaths.some((configured) => configured === artifact || (configured.endsWith("/") && artifact.startsWith(configured))), `${guide.name}: artifact drift: ${artifact}`);
+    }
+    assert(detail.steps.length > 0 && detail.triage.length > 0);
+    assert(Object.isFrozen(detail) && Object.isFrozen(detail.steps));
+  }
+  assert.equal(projectCiJobGuides(["unregistered_job"])[0].diagnostics, null);
 });
 
 test("CI Job guide projection follows actual Job order and fails open only for copy", () => {

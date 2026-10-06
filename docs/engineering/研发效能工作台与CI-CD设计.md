@@ -56,7 +56,7 @@ GitLab HTTP 只绑定 GitLab 宿主 `127.0.0.1:8929`，由 FRP 到阿里云 `182
 3. `quality_aggregate` 要求七个回执、阶段并集、分类执行数、source archive、依赖审计、`make data`、Web build digest、PostgreSQL/Chromium/browser 清理全部同 SHA 且通过，再签发标准 v3 strict terminal。
 4. `CI Gate` 只在对应 main aggregate 或 MR quality 成功时通过；main push 还会把 terminal、receipt 和 manifest 固化到 exact pipeline/job/SHA 的 `plush-ci-evidence` Package，作为 protected main 的稳定 required job 和后续 release 唯一可复用证据。
 
-默认 `origin/main` 推送前，本地 `prepare-push` 只执行并签名 clean HEAD/tree、remote/ref/range、git-log、严格 secrets 与源码完整性短门禁，不重复 Runner 的 affected/full、数据库、浏览器、测试或构建。该回执只允许普通非强制 push，不表示 CI 已成功；Release、Package 显式版本提升（Explicit Promotion）和任何受保护部署必须读回同一 40 位 SHA 的不可变终态成功 `CI Gate`。生产目标只加载 CI 构建的不可变制品或镜像并执行正式 migration、health/ready 与 smoke，禁止现场重建。
+默认 `origin/main` 推送前，本地 `prepare-push` 执行并签名 clean HEAD/tree、remote/ref/range、git-log、严格 secrets、源码完整性及 affected 选择的短 Node 检查，不重复 Runner 的 affected/full、数据库、浏览器或构建。短检查范围、并发、截止时间和回执合同见 [QA 入口](../../scripts/qa/README.md#门禁完整性与-ci-边界)。该回执只允许普通非强制 push，不表示 CI 已成功；Release、Package 显式版本提升（Explicit Promotion）和任何受保护部署必须读回同一 40 位 SHA 的不可变终态成功 `CI Gate`。生产目标只加载 CI 构建的不可变制品或镜像并执行正式 migration、health/ready 与 smoke，禁止现场重建。
 
 缓存只缩短依赖和浏览器准备时间，不能跳过 checksum、locked/offline install、门禁、source archive 或 clean-tree 读回。分片只 pull cache，不并发回写同一 key。pipeline artifacts 是本次运行内证据；只有 `CI Gate` 上传且经 release 服务器端重新校验的 exact Package 才能跨 pipeline 复用，仍不等于不可变 Release。
 
@@ -118,9 +118,13 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 
 `/__dev/quality-gates` 另外读取当前 committed SHA 的 GitLab 普通 push CI，动态展示 GitLab 实际返回的全部 Job，不在前端复制 Job 目录或 DAG。“本次流水线”用同一 exact SHA 的 GitLab CI Lint `needs` 生成有向图，再与实际 Pipeline Job 取交集；依赖不可读或两者不一致时只保留可靠耗时并让 DAG 失败关闭，不画推测连线。服务器门禁内部只保留“本次流水线、Job 性能、CI 历史”三个轻量切换视图，顶部同 SHA 证据摘要始终可见。Job 只按“编排、执行、汇总、终态”和领域分组投影；默认突出异常与最慢执行 Job，其余以可展开明细保留。
 
-`scripts/qa/ci-job-guide.mjs` 只登记 Job 的岗位化名称、用途、包含检查和结果用途，不保存 `needs`、状态、耗时、等待或历史。服务端按当前 GitLab 实际 Job 名单投影这份说明；新增但未登记的 Job 继续展示，并明确标记“说明待登记”。页面通过“流程与原理”“Job 说明”和 Job 卡片上的按需说明按钮复用同一抽屉，不增加第四个子视图，也不在主页面常驻长文。抽屉把阶段职责、Job 说明、本次运行等待和 GitLab 日志放在同一上下文中；依赖仍来自 exact-SHA CI Lint，运行数据与历史仍来自 GitLab。本次流水线的 Job 明细按领域支持收起与展开。
+`scripts/qa/ci-job-guide.mjs` 登记 Job 的名称、用途、包含检查、执行步骤、环境要求、证据路径和失败排查顺序；lane 名称及执行入口从既有 CI runner 目录投影，不保存 `needs`、状态、耗时、等待或历史。服务端按当前 GitLab 实际 Job 名单投影这份说明；新增但未登记的 Job 继续展示，并明确标记“说明待登记”。页面通过“流程与原理”“Job 说明”和 Job 卡片上的按需说明按钮复用同一抽屉，不增加第四个子视图，也不在主页面常驻长文。说明属于当前工作区，历史 CI 必须核对对应 SHA 的配置；CI 专用入口只供定位，不提示用户伪造 CI 身份在本机执行。依赖仍来自 exact-SHA CI Lint，运行数据与历史仍来自 GitLab。本次流水线的 Job 明细按领域支持收起与展开。
 
-“流程与原理”在缺少 GitLab 证据时仍可打开，按需展开从提交到部署、Job 并行与汇总、四层并发与共享资源、制品发布与恢复四组机制图。机制图解释依赖就绪、Runner 空槽、Job 内部并发与资源锁的区别，不复制当前 Job DAG、槽位或分片数量；具体参数回到 CI 与 Runner 配置核对。浏览器执行等待同提交的 Web 构建制品，以及升级与关键 PostgreSQL Job 的清理，避免 Docker 网络拆除干扰本机请求。图沿用 Mermaid 的缩放与全屏工具，宽图和长图只在自身视口内滚动。版本中心的“手动操作指引”复用同一组件，默认展开发布、部署与恢复。
+“流程与原理”在缺少 GitLab 证据时仍可打开。保留提交到部署总览、Job 并行、共享资源与发布恢复，另按需展开提交检查、提交前与 CI 覆盖对照、推送回执、CI 触发与执行、失败排查。每节提供有序步骤、所需明细表、当前来源及可复制指引；规则图和覆盖表不显示运行成功，不把未启用 hook、未选中、未运行或过期证据当成通过。当前 hook 和默认推送准备未包含 Web lint，页面如实说明边界；hooks 是否启用需要读取当前 checkout 配置，不能根据仓库文件存在推断。
+
+CI 阅读顺序覆盖 workflow / Job rules、Runner 排队、每个 Job 的 before_script、plan、prepare、各领域执行、清理、聚合及 CI Gate 证据上传；区分未创建、未运行、执行失败和证据不完整。资源敏感 lane 等待 Web / Server 汇总，四条 Server lane 共用 `quality-server-heavy` 资源组；浏览器等待同 SHA Web 构建及升级、关键 PostgreSQL Job 清理。机制图不复制实时 DAG 或运行状态，具体依赖仍从当前提交配置读取。图沿用 Mermaid 缩放与全屏，表格和图形只在自身区域滚动。版本中心复用同一组件并默认展开发布部分。
+
+抽屉可展开并复制当前流水线或单 Job 的排查信息：本机 HEAD/dirty、CI SHA、Pipeline / Job URL、状态、实际执行次数、运行与排队时长、已读取的依赖、定义入口、证据路径及待补材料。仅格式化现有公开结构化投影，不读取原始日志、凭据或任意对象字段；缺少 CI 时仍保留未读取说明。完整错误上下文、退出码与历史 attempt 需要从 GitLab 取得并脱敏。最终成功不能代替首轮成功；修复后的新 SHA 与同 SHA 重试分别判断，尚未读取完整首轮记录时不计算首次通过率。
 
 “Job 性能”提供默认收起的本次 Job 运行时间轴。Bridge 保留 GitLab 返回的 `startedAt`、`finishedAt`；时间轴仅绘制已结束且具有有效完整起止时间的当前 Job，重试使用现有投影选定的最新尝试。相接区间和零时长记录不增加最大重叠；缺失或尚未结束的记录明确计数，不用 `durationMs` 倒推区间。最大重叠只描述可见记录中的同时运行 Job，不代表 Runner 宿主 CPU 峰值。排队耗时单列，依赖与资源锁等待不推算为排队区间；缺少时间时保留等待实际记录的空状态。
 
