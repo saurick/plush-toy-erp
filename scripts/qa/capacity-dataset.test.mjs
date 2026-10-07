@@ -7,6 +7,7 @@ import {
   CAPACITY_DATASET_VERSION,
   buildCapacityDatasetSQL,
   capacityDatasetConfirmation,
+  capacityDatasetTargets,
   runCapacityDataset,
 } from "./capacity-dataset.mjs";
 
@@ -118,4 +119,12 @@ test("capacity dataset rejects long-lived, remote, unconfirmed, and invalid sour
     () => buildCapacityDatasetSQL({ taskSourceID: 0 }),
     /positive integer/u,
   );
+});
+
+test("data volume is allowlisted independently of load and verifies the selected scale", () => {
+  assert.equal(capacityDatasetTargets("growth").workflowTasks, 15000);
+  assert.match(buildCapacityDatasetSQL({ taskSourceID: 1, dataScale: "volume" }), /50000/u);
+  assert.throws(() => buildCapacityDatasetSQL({ taskSourceID: 1, dataScale: "unbounded" }));
+  assert.throws(() => runCapacityDataset({ confirmation: capacityDatasetConfirmation(databaseName), databaseName, databaseURL,
+    dataScale: "growth", runtime: { execute: () => {}, attachments: () => {}, counts: () => ({ ...CAPACITY_DATASET_TARGETS }) } }), /15000/u);
 });

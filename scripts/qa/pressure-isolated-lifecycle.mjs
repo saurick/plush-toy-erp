@@ -8,7 +8,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 import { createDatabaseRunID, databaseNameForRun, assertDisposableDatabaseTarget } from "./database-target.mjs";
-import { capacityDatasetConfirmation, runCapacityDataset } from "./capacity-dataset.mjs";
+import { pressureDataScale } from "../../web/src/dev-workbench/config/devPressureData.mjs";
+import { capacityDatasetConfirmation, runCapacityDataset, capacityDatasetTargets } from "./capacity-dataset.mjs";
 import { applyCapacityCustomerConfig, capacityConfigConfirmation } from "./capacity-customer-config.mjs";
 import { runIsolatedPressure, CONFIRM_PHRASE } from "./manual-acceptance-capacity-pressure.mjs";
 import { prepareEngineeringPressureData, ENGINEERING_DATA_FILES } from "./pressure-engineering-data.mjs";
@@ -18,14 +19,22 @@ import { pressureRPC, verifyPressureRuntime, pressureLogicFingerprint } from "./
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const execFileAsync = promisify(execFile);
 const DEFAULT_S3_IMAGE = "chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882";
-export function pressureLifecyclePlan(profile = "capacity") {
-  return { profile, poolSize: engineeringPressurePoolSize(profile), simulatedOnly: true,
+export function pressureLifecyclePlan(profile = "capacity", dataScale = "baseline") {
+  const scale = pressureDataScale(dataScale);
+  return { profile, dataScale, historyOrders: scale.historyOrders, readTargets: capacityDatasetTargets(dataScale), poolSize: engineeringPressurePoolSize(profile), simulatedOnly: true,
     databaseProfile: "capacity", environment: "owned loopback PostgreSQL + S3 + backend",
     steps: ["source snapshot and build", "owned PostgreSQL/S3", "Atlas migrate/readback", "backend identity",
       "role/core seed", "read dataset/config activation", "read pressure", "engineering preparation",
       "competition/unknown outcome", "mixed business pressure/recovery", "authoritative readback", "dispose owned resources"],
     mainDurationMs: profile === "capacity" ? 600000 : null,
     excludes: ["shared development database", "production deployment", "commit/push"] };
+}
+export function pressureNetworkConfig(subnet = "") {
+  if (!subnet) return [];
+  const match = /^(10\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+|192\.168\.\d+)\.(\d+)\/28$/u.exec(subnet);
+  if (!match || subnet.split('/')[0].split('.').some((part) => Number(part) > 255) || Number(match[2]) % 16 !== 0)
+    throw new Error("pressure network subnet must be an aligned private IPv4 /28");
+  return ["networks:", "  default:", "    ipam:", "      config:", "        - subnet: " + subnet];
 }
 function includesPressureBuildSource(directory, file) {
   const relative = path.relative(directory, file);
@@ -50,7 +59,7 @@ export function pressureBuildSourceFingerprint(directory) {
   visit(directory); return hash.digest("hex");
 }
 export const PRESSURE_LIFECYCLE_FILES = Object.freeze([
-  "scripts/qa/pressure-isolated-lifecycle.mjs", "scripts/qa/manual-acceptance-capacity-pressure.mjs",
+  "scripts/qa/pressure-isolated-lifecycle.mjs", "web/src/dev-workbench/config/devPressureData.mjs", "scripts/qa/manual-acceptance-capacity-pressure.mjs",
   "scripts/qa/capacity-dataset.mjs", "scripts/qa/capacity-customer-config.mjs",
 ]);
 const LIFECYCLE_STEPS = Object.freeze([
@@ -62,7 +71,7 @@ export function updatePressureProgress(current, event, now = new Date().toISOStr
   const phase = LIFECYCLE_STEPS.includes(event.step) ? event.step : current?.phase;
   if (!phase) return current;
   return { schemaVersion: "plush-pressure-progress/v1", phase, updatedAt: now,
-    stage: ["ramp", "capacity", "recovery", "competition", "orders", "samples"].includes(event.step) ? event.step : null,
+    stage: ["ramp", "capacity", "recovery", "competition", "orders", "samples", "history"].includes(event.step) ? event.step : null,
     status: event.status === "failed" || event.passed === false ? "failed" : event.status === "completed" && event.step === "cleanup" ? "completed" : "running",
     completedSteps: event.status === "completed" && LIFECYCLE_STEPS.includes(event.step)
       ? [...new Set([...steps, event.step])] : steps,
@@ -70,8 +79,9 @@ export function updatePressureProgress(current, event, now = new Date().toISOStr
     total: Number.isSafeInteger(event.total) && event.total >= 0 ? event.total : null,
     targetDurationMs: Number.isFinite(event.targetDurationMs) && event.targetDurationMs >= 0 ? event.targetDurationMs : null };
 }
-export async function runPressureLifecycle({ profile = "capacity", out, onProgress = () => {}, signal }) {
-  const plan = pressureLifecyclePlan(profile), runID = createDatabaseRunID();
+export async function runPressureLifecycle({ profile = "capacity", dataScale = "baseline", out, onProgress = () => {}, signal }) {
+  const networkConfig = pressureNetworkConfig(process.env.PRESSURE_NETWORK_SUBNET || "");
+  const plan = pressureLifecyclePlan(profile, dataScale), runID = createDatabaseRunID();
   const databaseName = databaseNameForRun("capacity", runID);
   const directory = mkdtempSync(path.join(process.platform === "linux" && process.getuid?.() === 0 ? "/tmp" : os.tmpdir(), "plush-pressure-"));
   const project = "plush-pressure-" + randomBytes(6).toString("hex"), secret = () => randomBytes(24).toString("hex");
@@ -79,7 +89,7 @@ export async function runPressureLifecycle({ profile = "capacity", out, onProgre
     adminPassword: randomBytes(10).toString("hex"), rolePassword: randomBytes(10).toString("hex"), jwtSecret: secret() };
   const redact = (value) => Object.values(secrets).reduce((text, value) => text.replaceAll(value, "<redacted>"), String(value || ""))
     .replace(/postgres(?:ql)?:\/\/[^\s]+/gu, "postgres://<redacted>");
-  const report = { schemaVersion: "plush-pressure-lifecycle/v1", profile, runID, databaseName, project,
+  const report = { schemaVersion: "plush-pressure-lifecycle/v1", profile, dataScale, runID, databaseName, project,
     startedAt: new Date().toISOString(), passed: false, steps: [], cleanup: { passed: false }, evidenceDirectory: directory,
     lifecycleSourceFingerprint: pressureLogicFingerprint(PRESSURE_LIFECYCLE_FILES) };
   let backend, logStream, composeCreated = false, stage = "preflight";
@@ -130,11 +140,13 @@ export async function runPressureLifecycle({ profile = "capacity", out, onProgre
       "    environment:", "      AWS_ACCESS_KEY_ID: ${PRESSURE_S3_ACCESS_KEY}",
       "      AWS_SECRET_ACCESS_KEY: ${PRESSURE_S3_SECRET}", "      S3_BUCKET: plush-pressure",
       "    ports: ['127.0.0.1::8333']", "    volumes: [s3-data:/data]", "    restart: 'no'",
-      "    mem_limit: 768m", "    cpus: 2", "volumes:", "  pg-data: {}", "  s3-data: {}",
+      "    mem_limit: 768m", "    cpus: 2", ...networkConfig, "volumes:", "  pg-data: {}", "  s3-data: {}",
     ].join("\n") + "\n", { mode: 0o600 });
     await step("containers", async () => { composeCreated = true; await compose(["up", "-d", "--wait"], { timeout: 180000 }); });
     const containerIDs = (await compose(["ps", "-q"])).split(/\s+/u).filter(Boolean);
-    report.environment = { containers: [], backend: { gomaxprocs: 4, maxOpenConnections: 20, maxIdleConnections: 5, cpuAndMemoryLimit: "host-managed" } };
+    report.environment = { hostFingerprint: createHash("sha256").update(JSON.stringify({ host: os.hostname(),
+      platform: os.platform(), arch: os.arch(), cpus: os.cpus().map(({ model }) => model), memory: os.totalmem() })).digest("hex"),
+      containers: [], backend: { gomaxprocs: 4, maxOpenConnections: 20, maxIdleConnections: 5, cpuAndMemoryLimit: "host-managed" } };
     for (const id of containerIDs) {
       const info = JSON.parse(await command("docker", ["inspect", "--format",
         '{"id":{{json .Id}},"imageID":{{json .Image}},"requestedImage":{{json .Config.Image}},"memoryLimitBytes":{{json .HostConfig.Memory}},"nanoCPUs":{{json .HostConfig.NanoCpus}},"project":{{json (index .Config.Labels "com.docker.compose.project")}},"service":{{json (index .Config.Labels "com.docker.compose.service")}}}', id]));
@@ -220,12 +232,14 @@ export async function runPressureLifecycle({ profile = "capacity", out, onProgre
     await step("read-dataset-config", async () => {
       const saved = {};
       for (const [key, value] of Object.entries(s3Env)) { saved[key] = process.env[key]; process.env[key] = value; }
-      try { dataset = runCapacityDataset({ confirmation: capacityDatasetConfirmation(databaseName), databaseName, databaseURL }); }
+      try { dataset = runCapacityDataset({ confirmation: capacityDatasetConfirmation(databaseName), databaseName, databaseURL, dataScale }); }
       finally { for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } }
       writePressureReport(path.join(path.dirname(out), "read-dataset.json"), dataset);
       const config = await applyCapacityCustomerConfig({ adminUsername: "pressure_admin", adminPassword: secrets.adminPassword,
         backendURL: baseURL, databaseName, databaseURL, datasetReceipt: dataset, commit, migration: report.migration,
         confirmation: capacityConfigConfirmation(databaseName, dataset.datasetHash) });
+      report.readDataset = { dataScale, target: dataset.targetCounts, actual: dataset.after };
+      await command("psql", [databaseURL, "-X", "-v", "ON_ERROR_STOP=1", "-c", "ANALYZE"]);
       report.customerConfig = { revision: config.revision, status: config.status };
     });
     await step("read-pressure", async () => {
@@ -249,9 +263,10 @@ export async function runPressureLifecycle({ profile = "capacity", out, onProgre
     if (report.businessSourceFingerprint !== pressureLogicFingerprint(ENGINEERING_DATA_FILES.filter((file) => file.startsWith("server/"))))
       throw new Error("business source changed after candidate build; restart required");
     const receipt = await step("engineering-data", () => prepareEngineeringPressureData({
-      baseURL, databaseName, databaseURL, tokens, runID, poolSize: plan.poolSize, runtimeIdentity: report.runtimeIdentity, onProgress,
+      baseURL, databaseName, databaseURL, tokens, runID, poolSize: plan.poolSize, runtimeIdentity: report.runtimeIdentity, dataScale, signal: activeSignal, onProgress,
     }));
     writePressureReport(path.join(path.dirname(out), "engineering-dataset.json"), receipt);
+    await command("psql", [databaseURL, "-X", "-v", "ON_ERROR_STOP=1", "-c", "ANALYZE"]);
     await step("engineering-pressure", async () => {
       const business = await runEngineeringPressure({ baseURL, databaseName, databaseURL, tokens, receipt,
         expectedCommit: commit, expectedMigration: report.migration, profile, signal: activeSignal, onProgress });
@@ -278,9 +293,10 @@ export async function runPressureLifecycle({ profile = "capacity", out, onProgre
         await command("docker", [...composeArgs, "down", "--volumes", "--timeout", "5"], { signal: undefined, timeout: 30000 });
         const containers = await command("docker", ["ps", "-aq", "--filter", "label=com.docker.compose.project=" + project], { signal: undefined });
         const volumes = await command("docker", ["volume", "ls", "-q", "--filter", "label=com.docker.compose.project=" + project], { signal: undefined });
-        if (containers || volumes) throw new Error("owned fixture resources still exist");
+        const networks = await command("docker", ["network", "ls", "-q", "--filter", "label=com.docker.compose.project=" + project], { signal: undefined });
+        if (containers || volumes || networks) throw new Error("owned fixture resources still exist");
       }
-      report.cleanup = { passed: true, backendStopped: true, containersRemoved: true, ownedVolumesRemoved: true };
+      report.cleanup = { passed: true, backendStopped: true, containersRemoved: true, ownedVolumesRemoved: true, ownedNetworksRemoved: true };
       if (report.passed) { rmSync(directory, { recursive: true, force: true }); delete report.evidenceDirectory; }
     } catch { report.cleanup = { passed: false, preservedDirectory: directory }; report.passed = false; }
     report.steps.push({ key: "cleanup", durationMs: performance.now() - cleanupStarted, passed: report.cleanup.passed });
@@ -291,14 +307,14 @@ export async function runPressureLifecycle({ profile = "capacity", out, onProgre
 }
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
   const argv = process.argv.slice(2), arg = (name) => { const index = argv.indexOf(name); return index >= 0 ? argv[index + 1] : undefined; };
-  const profile = arg("--profile") || "capacity";
-  if (!argv.includes("--run") || argv.includes("--help")) process.stdout.write(JSON.stringify(pressureLifecyclePlan(profile), null, 2) + "\n");
+  const profile = arg("--profile") || "capacity", dataScale = arg("--data-scale") || "baseline";
+  if (!argv.includes("--run") || argv.includes("--help")) process.stdout.write(JSON.stringify(pressureLifecyclePlan(profile, dataScale), null, 2) + "\n");
   else {
     const out = path.resolve(arg("--out") || "output/qa/pressure/" + createDatabaseRunID() + "/lifecycle.json");
     const controller = new AbortController(), stop = () => controller.abort();
     process.once("SIGINT", stop); process.once("SIGTERM", stop);
     let progress;
-    const result = await runPressureLifecycle({ profile, out, signal: controller.signal,
+    const result = await runPressureLifecycle({ profile, dataScale, out, signal: controller.signal,
       onProgress: (value) => {
         progress = updatePressureProgress(progress, value);
         // Progress publication must never prevent owned resource cleanup.

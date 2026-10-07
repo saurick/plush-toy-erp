@@ -14,6 +14,7 @@ import {
 } from "node:fs";
 import path from "node:path";
 import process from "node:process";
+import { pressureDataScale } from "../../web/src/dev-workbench/config/devPressureData.mjs";
 
 export const DEV_TESTING_OPERATION_SCHEMA =
   "plush.dev-qa-testing-operation/v1";
@@ -123,6 +124,7 @@ export function validateDevTestingOperation(operation) {
     operation,
     [
       "action",
+      ...(Object.hasOwn(operation, "dataScale") ? ["dataScale"] : []),
       "createdAt",
       "exitCode",
       "finishedAt",
@@ -155,6 +157,10 @@ export function validateDevTestingOperation(operation) {
     Number.isNaN(Date.parse(operation.updatedAt))
   ) {
     throw new Error("testing operation is invalid");
+  }
+  if (Object.hasOwn(operation, "dataScale")) {
+    if (!operation.action.startsWith("pressure-")) throw new Error("data scale only applies to pressure actions");
+    pressureDataScale(operation.dataScale);
   }
   validateRepository(operation.repository);
   assertSafeText(operation.message, "testing operation message");
@@ -282,6 +288,7 @@ export function createOrReuseDevTestingOperation(
   {
     action,
     idempotencyKey,
+    dataScale,
     repository,
     operationId = randomUUID(),
     now = new Date().toISOString(),
@@ -290,16 +297,19 @@ export function createOrReuseDevTestingOperation(
   if (!DEV_TESTING_ACTIONS.includes(action) || IDEMPOTENCY_PATTERN.exec(String(idempotencyKey || ""))?.[1] !== action) {
     throw new Error("testing operation intent is invalid");
   }
-  const existing = readDevTestingOperationByIdempotencyKey(
-    store,
-    idempotencyKey,
-  );
-  if (existing) return { operation: existing, reused: true };
+  if (action.startsWith("pressure-")) pressureDataScale(dataScale);
+  else if (dataScale !== undefined) throw new Error("data scale only applies to pressure actions");
+  const existing = readDevTestingOperationByIdempotencyKey(store, idempotencyKey);
+  if (existing) {
+    if (existing.action !== action || existing.dataScale !== dataScale) throw new Error("testing idempotency intent mismatch");
+    return { operation: existing, reused: true };
+  }
   const operation = validateDevTestingOperation({
     schemaVersion: DEV_TESTING_OPERATION_SCHEMA,
     id: operationId,
     idempotencyKey,
     action,
+    ...(action.startsWith("pressure-") ? { dataScale } : {}),
     repository,
     status: "queued",
     stage: "queued",

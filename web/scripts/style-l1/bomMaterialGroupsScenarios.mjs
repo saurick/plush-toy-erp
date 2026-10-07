@@ -904,7 +904,18 @@ export function createBOMMaterialGroupsScenarios(deps) {
           .last()
         await create.waitFor({ state: 'visible' })
         await dropdown.waitFor({ state: 'hidden' })
+        await create.getByRole('button', { name: '新建并使用', exact: true }).click()
+        await create.getByText('请填写名称', { exact: true }).waitFor()
+        await page.waitForFunction(() => document.activeElement?.id === 'name')
+        deps.assert.equal(await page.locator('.erp-feedback-message').count(), 0)
+        await create.getByLabel('名称', { exact: true }).fill('尚未保存的样例物料')
         await create.locator('.ant-modal-footer .ant-btn-default').click()
+        const discard = page.locator('.ant-modal-confirm:visible')
+        await discard.getByRole('button', { name: '继续编辑', exact: true }).click()
+        await discard.waitFor({ state: 'hidden' })
+        deps.assert.equal(await create.getByLabel('名称', { exact: true }).inputValue(), '尚未保存的样例物料')
+        await create.locator('.ant-modal-footer .ant-btn-default').click()
+        await discard.getByRole('button', { name: '放弃修改', exact: true }).click()
         await create.waitFor({ state: 'hidden' })
         await page.waitForFunction(
           () =>

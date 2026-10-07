@@ -5,8 +5,44 @@ import { yoyoosunRoleFlowMatrix } from '../../../../config/customers/yoyoosun/ro
 import {
   buildDevBusinessChainProjection,
   projectDevBusinessChainRoles,
+  describeDevBusinessChainNode,
+  describeDevBusinessChainResponsibility,
 } from './devBusinessChainProjection.mjs'
 import { DEV_FLOW_STATE_CATALOG } from './devFlowStateCatalog.mjs'
+
+test('responsibility labels preserve formal roles and explain unresolved pools without a generic role name', () => {
+  const text = describeDevBusinessChainResponsibility({
+    modes: ['human', 'system'],
+    ownerPoolKeys: ['boss', 'finance', 'unregistered-pool'],
+    capabilityKeys: [],
+  })
+  assert.equal(text, '老板、财务、具有对应业务权限的岗位、系统自动处理')
+  assert.equal(
+    describeDevBusinessChainResponsibility({
+      mode: 'derived',
+      ownerPoolKeys: [],
+      capabilityKeys: [],
+    }),
+    '系统按已生效结果计算'
+  )
+})
+
+test('node completion describes actions separately and does not turn incoming ready state into completion', () => {
+  const chain = DEV_FLOW_STATE_CATALOG.businessChains.find(
+    (item) => item.key === 'sales_to_production'
+  )
+  const node = chain.nodes.find((item) => item.key === 'sales_tasks')
+  const actions = describeDevBusinessChainNode(
+    DEV_FLOW_STATE_CATALOG,
+    chain,
+    node
+  )
+  assert.equal(actions.length, 2)
+  const rejection = actions.find((action) => action.condition.includes('拒绝'))
+  assert(rejection.results.some((value) => value.includes('已退回')))
+  assert(!rejection.results.some((value) => value.includes('已生效')))
+  assert(!actions.some((action) => action.label === '按业务分支创建岗位任务'))
+})
 
 test('business chain projection classifies responsibility, runtime, Fact, and state views from shared steps', () => {
   for (const chain of DEV_FLOW_STATE_CATALOG.businessChains) {
@@ -63,6 +99,7 @@ test('business chain node projection keeps only adjacent registered steps and sc
     [
       'shipment_release_task:calls_domain_command:shipment_release',
       'shipment_release:posts_fact:shipped',
+      'shipment_release_task:returns:shipment_release',
     ]
   )
   assert(

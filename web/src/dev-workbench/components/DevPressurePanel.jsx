@@ -17,6 +17,8 @@ import {
   FileTextOutlined,
 } from '@ant-design/icons'
 import DevTimestamp from './DevTimestamp.jsx'
+import DevPressureDataset from './DevPressureDataset.jsx'
+import { PRESSURE_DATA_SCALES } from '../config/devPressureData.mjs'
 import {
   DEV_PRESSURE_ACTIONS,
   getDevTestingOperationPresentation,
@@ -32,6 +34,7 @@ import {
   DEV_PRESSURE_STATUS,
   formatPressureNumber as format,
   pressureMainLevel,
+  pressureScaleLabel,
   isDevPressureReportID,
   readDevPressureReports,
 } from '../config/devPressure.mjs'
@@ -231,7 +234,7 @@ function MethodLatency({ level }) {
     </section>
   )
 }
-function PressureReport({ report }) {
+function PressureReport({ report, reports }) {
   const main = pressureMainLevel(report)
   const readMain = pressureMainLevel(report, 'reads')
   const p95Values =
@@ -359,6 +362,7 @@ function PressureReport({ report }) {
           note={`最高 p99 ${format(maxP99)} ms；门限针对单次 API`}
         />
       </div>
+      <DevPressureDataset report={report} reports={reports} />
       {report.engineering?.levels.length ? (
         <StageChart levels={report.engineering.levels} />
       ) : (
@@ -414,7 +418,7 @@ function PressureReport({ report }) {
             {format(report.database.deadlocks)}，冲突{' '}
             {format(report.database.conflicts)}，最大连接{' '}
             {format(report.database.maxConnections)}，最大等待锁{' '}
-            {format(report.database.maxLockWaiters)}。
+            {format(report.database.maxLockWaiters)}；临时文件 {format(report.database.tempFiles)} 个 / {format(report.database.tempBytes)} 字节。
           </p>
           <p>
             运行采样 {format(report.runtime.samples)} 次，采样错误{' '}
@@ -465,6 +469,12 @@ export default function DevPressurePanel({
   const [state, setState] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams()
   const reportQuery = searchParams.get('report') || ''
+  const dataScale = Object.hasOwn(PRESSURE_DATA_SCALES, searchParams.get('scale')) ? searchParams.get('scale') : 'baseline'
+  const selectDataScale = (value) => setSearchParams((current) => {
+    const next = new URLSearchParams(current)
+    next.set('scale', value)
+    return next
+  })
   const selected = isDevPressureReportID(reportQuery) ? reportQuery : ''
   const selectReport = useCallback(
     (id) => {
@@ -554,7 +564,7 @@ export default function DevPressurePanel({
   }
   const options = (state?.reports || []).map((item) => ({
     value: item.id,
-    label: `${formatDevTimestamp(item.completedAt)} · ${item.profile === 'capacity' ? '容量' : '短档'} · ${DEV_PRESSURE_STATUS[item.status].label} · ${item.id}`,
+    label: `${formatDevTimestamp(item.completedAt)} · ${item.profile === 'capacity' ? '容量' : '短档'} · ${pressureScaleLabel(item.dataScale)} · ${DEV_PRESSURE_STATUS[item.status].label} · ${item.id}`,
   }))
   if (
     activeReportID &&
@@ -580,6 +590,16 @@ export default function DevPressurePanel({
       </header>
       <div className="erp-dev-pressure-actions">
         <Space wrap>
+          <label htmlFor="dev-pressure-scale">数据规模</label>
+          <Select
+            id="dev-pressure-scale"
+            aria-label="数据规模"
+            value={dataScale}
+            disabled={disabled}
+            onChange={selectDataScale}
+            options={Object.entries(PRESSURE_DATA_SCALES).map(([value, scale]) =>
+              ({ value, label: `${scale.label} · ${scale.historyOrders} 张历史单` }))}
+          />
           {DEV_PRESSURE_ACTIONS.map((action) => (
             <Button
               key={action.key}
@@ -589,7 +609,7 @@ export default function DevPressurePanel({
               loading={
                 actionStarting === action.key || active?.action === action.key
               }
-              onClick={() => onRun(action.key)}
+              onClick={() => onRun(action.key, dataScale)}
             >
               {action.label}
             </Button>
@@ -632,6 +652,7 @@ export default function DevPressurePanel({
               {presentation.label}
             </Tag>
             <span>{latest.message}</span>
+            {latest.dataScale ? <Tag>{pressureScaleLabel(latest.dataScale)}规模</Tag> : null}
             <DevTimestamp
               value={latest.finishedAt || latest.updatedAt}
               action="更新于"
@@ -661,7 +682,7 @@ export default function DevPressurePanel({
         <summary>档位、指标与维护规则</summary>
         <ol>
           <li>
-            逻辑改动后先跑短档回归；源码稳定后按需要跑容量档，主段持续 10 分钟。
+            数据规模与负载档位独立选择。逻辑改动后先跑基础规模短档；比较规模时保持负载不变，源码稳定后按需要跑 10 分钟容量档。
           </li>
           <li>
             主段采用等待上次操作完成后再发起的 worker 模型，约 90% 查询 / 10%
@@ -677,7 +698,7 @@ export default function DevPressurePanel({
             秒，并要求零操作失败、对账、采样、恢复和清理通过。
           </li>
           <li>
-            数据、断言、负载和生命周期分别登记依赖摘要。改业务规则时维护对应配方、断言和依赖清单；审批订单池每次新建。
+            三档是有界模拟回归数据，不代表客户年业务量。历史背景与当轮订单池分别对账，并核对背景内容未变化。数据、断言、负载和生命周期分别登记依赖摘要。改业务规则时维护对应配方、断言和依赖清单；审批订单池每次新建。
           </li>
           <li>
             当前范围不含库存抵扣、打印、生产硬件容量、固定到达率、数小时稳定性和客户验收。
@@ -716,7 +737,7 @@ export default function DevPressurePanel({
       {loading && !state ? (
         <Skeleton active paragraph={{ rows: 6 }} />
       ) : report ? (
-        <PressureReport report={report} />
+        <PressureReport report={report} reports={state.reports} />
       ) : (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}

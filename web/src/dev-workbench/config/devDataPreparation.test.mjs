@@ -24,6 +24,8 @@ import {
   buildDevDataPreparationSearch,
   createDataPreparationIdempotencyKey,
   createDevDataPreparationClient,
+  projectDataPreparationAcceptancePlan,
+  resolveDataPreparationAvailability,
   resolveDataPreparationExecutionConfirmation,
   resolveDataPreparationPrepareIntent,
   selectRecoverableDataPreparationOperation,
@@ -248,7 +250,7 @@ function summaryFixture() {
       dirty: false,
       fingerprint: REPOSITORY_FINGERPRINT,
     },
-    acceptancePlan: ACCEPTANCE_PLAN,
+    acceptancePlan: projectDataPreparationAcceptancePlan(ACCEPTANCE_PLAN),
     datasetContract: {
       schemaVersion: 'plush.dev-data-environment-contract/v1',
       datasetKey: 'yoyoosun-manual-acceptance',
@@ -1017,13 +1019,11 @@ test('page defaults to the latest business-chain regression while retaining dail
   )
   assert.match(pageSource, /DEV_DATA_PREPARATION_PROFILE_COPY/u)
   assert.match(pageSource, /profiles\.map/u)
-  assert.match(pageSource, /生成业务场景测试数据/u)
   assert.match(pageSource, /确认生成业务场景测试数据/u)
   assert.match(pageSource, /测试数据/u)
-  assert.match(pageSource, /确认完整回归能否开始/u)
-  assert.match(pageSource, /核对最新业务链与数据范围/u)
-  assert.match(pageSource, /准备并确认新批次/u)
-  assert.match(pageSource, /查看回执与耗时/u)
+  assert.match(pageSource, /选择要准备的数据/u)
+  assert.match(pageSource, /当前批次/u)
+  assert.match(pageSource, /执行记录/u)
   assert.match(pageSource, /AcceptancePlanReview/u)
   assert.match(pageSource, /DatasetEnvironmentContract/u)
   assert.match(pageSource, /统一数据合同/u)
@@ -1056,8 +1056,7 @@ test('page defaults to the latest business-chain regression while retaining dail
   assert.match(pageSource, /targetSummary\.targetKey/u)
   assert.match(pageSource, /erp-dev-data-operation-technical/u)
   assert.match(pageSource, /erp-dev-data-history/u)
-  assert.match(pageSource, /展开历史回执/u)
-  assert.match(pageSource, /compact && operation\.status === 'ready'/u)
+  assert.match(pageSource, /本次准备需要处理的条件/u)
   assert.match(pageSource, /open=\{technicalOpen\}/u)
   assert.match(pageSource, /onToggle=\{\(event\) =>/u)
   assert.match(pageSource, /READBACK_PRESENTATIONS/u)
@@ -1167,4 +1166,88 @@ test('data preparation route stays outside formal menu, seedData and RBAC projec
   formalSources.forEach((source) => {
     assert.doesNotMatch(source, /data-preparation|测试数据准备中心/u)
   })
+})
+
+test('review API projects the runner plan and still rejects unregistered or incomplete public fields', () => {
+  const plan = projectDataPreparationAcceptancePlan(ACCEPTANCE_PLAN)
+  assert.ok(ACCEPTANCE_PLAN.definitionSnapshot)
+  assert.equal(Object.hasOwn(plan, 'definitionSnapshot'), false)
+  assert.equal(plan.chainDataDigest, ACCEPTANCE_PLAN.chainDataDigest)
+  assert.equal(
+    plan.chainVerificationDigest,
+    ACCEPTANCE_PLAN.chainVerificationDigest
+  )
+  assert.equal(plan.chains, ACCEPTANCE_PLAN.chains)
+  assert.doesNotThrow(() =>
+    validateDevDataPreparationSummary({
+      ...summaryFixture(),
+      acceptancePlan: plan,
+    })
+  )
+  assert.throws(
+    () =>
+      validateDevDataPreparationSummary({
+        ...summaryFixture(),
+        acceptancePlan: { ...plan, arbitrary: true },
+      }),
+    /unsupported fields/u
+  )
+  assert.throws(
+    () =>
+      projectDataPreparationAcceptancePlan({ ...ACCEPTANCE_PLAN, chains: [] }),
+    /totals/u
+  )
+})
+
+test('preparation availability scopes dirty commits and unavailable targets to their own profile', () => {
+  const summary = summaryFixture()
+  summary.repository.dirty = true
+  summary.target.fullAcceptance.status = 'blocked'
+  summary.issues = [
+    {
+      code: 'full_acceptance_target_unavailable',
+      severity: 'blocked',
+      message: '缺少隔离库配置',
+    },
+  ]
+  const core = resolveDataPreparationAvailability(
+    summary,
+    'core-demo',
+    'local-development'
+  )
+  assert.equal(core.status, 'available')
+  assert.deepEqual(core.blockers, [])
+  const full = resolveDataPreparationAvailability(
+    summary,
+    'full-acceptance',
+    'isolated-local'
+  )
+  assert.equal(full.status, 'blocked')
+  assert.equal(full.blockers.length, 2)
+  assert.equal(full.blockers[1].message, '缺少隔离库配置')
+  summary.target.scenarioDemo.status = 'blocked'
+  assert.equal(
+    resolveDataPreparationAvailability(
+      summary,
+      'scenario-demo',
+      'local-development'
+    ).status,
+    'blocked'
+  )
+  const demo = resolveDataPreparationAvailability(
+    summary,
+    'scenario-demo',
+    'customer-trial-133'
+  )
+  assert.equal(demo.status, 'not_proven')
+  assert.deepEqual(demo.blockers, [])
+  summary.repository = null
+  assert.equal(
+    resolveDataPreparationAvailability(
+      summary,
+      'core-demo',
+      'local-development'
+    ).status,
+    'blocked'
+  )
 })

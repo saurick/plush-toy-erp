@@ -23,8 +23,11 @@ import {
   getProcessLabel,
   isDisplayOnlyWorkflowTask,
 } from '@/erp/utils/processRuntimePresentation.mjs'
-import { getPermissionCenterRoleName } from '../../../erp/utils/permissionCenterAccess.mjs'
-import { buildDevBusinessChainProjection } from '../../config/devBusinessChainProjection.mjs'
+import {
+  buildDevBusinessChainProjection,
+  describeDevBusinessChainNode,
+  describeDevBusinessChainResponsibility,
+} from '../../config/devBusinessChainProjection.mjs'
 import { getDevFlowStateTaskRuntimeAssociation } from '../../pages/devFlowStateTaskLookup.mjs'
 import {
   createDevFlowDefinitionOptionFilter,
@@ -606,64 +609,15 @@ function BusinessChainView({
       }),
     [catalog, chain.key, node.key]
   )
-  const factByKey = useMemo(
-    () =>
-      new Map(
-        catalog.factDefinitions.map((definition) => [
-          definition.factKey,
-          definition,
-        ])
-      ),
-    [catalog.factDefinitions]
-  )
   const layer = CHAIN_LAYER_PRESENTATION[node.layer]
   const nodePurpose =
     outgoingRelations.map((edge) => edge.label).join('；') ||
     node.summary ||
     '这个步骤负责承接当前业务结果，详细规则以对应业务对象为准。'
-  const nextStepLabels = outgoingRelations
-    .map((edge) => chain.nodes.find((item) => item.key === edge.to)?.label)
-    .filter(Boolean)
-  const resultStateLabels = uniqueStrings(
-    nodeProjection.steps.flatMap((step) =>
-      step.resultStateRefs.map((ref) => {
-        const flow = flowByKey.get(ref.machineKey)
-        const stateDefinition = flow?.states.find(
-          (candidate) => candidate.key === ref.stateKey
-        )
-        return stateDefinition
-          ? `${flow.label}进入“${stateDefinition.label}”`
-          : ''
-      })
-    )
-  )
-  const resultFactLabels = uniqueStrings(
-    nodeProjection.factKeys.map((key) => factByKey.get(key)?.label || '')
-  )
-  const completionParts = [
-    ...resultStateLabels,
-    ...(resultFactLabels.length > 0
-      ? [`关联 ${resultFactLabels.join('、')}`]
-      : []),
-    ...(nextStepLabels.length > 0
-      ? [`接下来衔接 ${nextStepLabels.join('、')}`]
-      : []),
-  ]
-  const completionCopy = completionParts.length
-    ? `${completionParts.join('；')}。`
-    : layer.completion
-  const ownerPoolLabels = uniqueStrings(
-    nodeProjection.responsibility.ownerPoolKeys.map((key) =>
-      getPermissionCenterRoleName(key)
-    )
-  )
-  const responsibilityCopy = ownerPoolLabels.length
-    ? `${ownerPoolLabels.join('、')}；系统动作仍由正式领域服务执行。`
-    : nodeProjection.responsibility.modes.includes('human')
-      ? '由当前客户配置中具备本步骤正式权限的岗位办理。'
-      : nodeProjection.responsibility.modes.includes('derived')
-        ? '由系统根据已生效事实自动计算，不设置人工办理岗位。'
-        : '由系统按正式业务合同自动处理。'
+  const actionOutcomes = describeDevBusinessChainNode(catalog, chain, node)
+  const responsibilityCopy =
+    describeDevBusinessChainResponsibility(nodeProjection.responsibility) ||
+    '当前正式合同未定义'
   const exceptionCopy = uniqueStrings(
     nodeProjection.scenarios
       .filter((scenario) => scenario.kind !== 'happy_path')
@@ -878,7 +832,20 @@ function BusinessChainView({
             </section>
             <section>
               <h3>怎样算完成</h3>
-              <p>{completionCopy}</p>
+              <p>按所选动作分别核对；拒绝与冲正是独立分支。</p>
+              <ul>
+                {actionOutcomes.map((outcome) => (
+                  <li key={outcome.key}>
+                    <strong>{outcome.label}</strong>
+                    {outcome.condition ? `（${outcome.condition}）` : ''}：
+                    {outcome.preconditions.length
+                      ? `前提：${outcome.preconditions.join('；')}；结果：`
+                      : ''}
+                    {outcome.results.join('；') ||
+                      '核对对应领域结果，本动作不直接改变业务状态。'}
+                  </li>
+                ))}
+              </ul>
             </section>
             <section>
               <h3>异常时怎么办</h3>

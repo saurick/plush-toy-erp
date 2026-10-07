@@ -100,8 +100,10 @@ test("a logic mismatch or wrong target blocks reuse of old data", () => {
   const target = { databaseName: "plush_erp_capacity_test", targetFingerprint: "b".repeat(64) };
   const receipt = { status: "passed", simulatedOnly: true, databaseName: target.databaseName,
     databaseTargetFingerprint: target.targetFingerprint, dataLogicFingerprint: engineeringDataFingerprint(),
-    orders: Array.from({ length: 10 }, (_, id) => ({ id })) };
+    dataScale: "baseline", totalOrders: 30, historyOrders: Array.from({ length: 20 }, (_, i) => ({ id: 100 + i })),
+    orders: Array.from({ length: 10 }, (_, i) => ({ id: i + 1 })) };
   assert.doesNotThrow(() => assertEngineeringPressureReceipt(receipt, target));
+  assert.throws(() => assertEngineeringPressureReceipt({ ...receipt, historyOrders: [...receipt.historyOrders.slice(0, 19), receipt.orders[0]] }, target), /overlap/u);
   assert.throws(() => assertEngineeringPressureReceipt({ ...receipt, dataLogicFingerprint: "old" }, target), /reseed/u);
   assert.throws(() => assertEngineeringPressureReceipt({ ...receipt, databaseName: "plush_erp" }, target));
 });

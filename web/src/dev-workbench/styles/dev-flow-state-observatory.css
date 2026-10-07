@@ -972,14 +972,6 @@
   overscroll-behavior-inline: contain;
 }
 
-.erp-dev-flow-chain-graph .erp-markdown-mermaid__canvas > svg {
-  min-width: 760px;
-}
-
-.erp-dev-flow-overview-graph .erp-markdown-mermaid__canvas > svg {
-  min-width: 980px;
-}
-
 .erp-dev-flow-chain-steps {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1997,8 +1989,6 @@
     display: flex;
     justify-content: center;
     width: 100%;
-    /* stylelint-disable-next-line declaration-no-important -- 打印时覆盖缩放交互写入的内联 transform。 */
-    transform: none !important;
   }
 
   .erp-dev-flow-customer-review__diagram .erp-markdown-mermaid__canvas > svg {

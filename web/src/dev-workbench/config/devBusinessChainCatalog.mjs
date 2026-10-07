@@ -115,6 +115,7 @@ const chainEdge = (from, to, label, kind, options = {}) => ({
   label,
   kind,
   action: options.action || '',
+  condition: options.condition || '',
   factBoundary: options.factBoundary || '',
   sourceRefs: options.sourceRefs || [],
 })
@@ -242,11 +243,23 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           sourceRefs: ['server/internal/biz/production_order.go'],
         }
       ),
+      chainEdge(
+        'sales_tasks',
+        'sales_order',
+        '审批拒绝后结束本次办理',
+        'returns',
+        {
+          action: 'SalesOrderUsecase.RejectSalesOrderForProcessCommand',
+          condition: '审批决定为拒绝',
+          factBoundary: 'rejection_without_fact_posting',
+          sourceRefs: ['server/internal/biz/customer_process_contracts.go'],
+        }
+      ),
     ]
   ),
   chain(
     'purchase_to_inventory',
-    '采购下单到合格入库',
+    '采购下单到入库应付',
     'primary',
     '采购订单经审批后，由仓库所属 IQC 登记本次实点数量和通用验收项目；质量允许接收后，再由仓库确认入库。',
     [
@@ -272,6 +285,14 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainNode('purchase_lot', '合格库存批次', 'fact_ledger', {
         machineKeys: ['fact.inventory_lot'],
         sourceRefs: ['server/internal/biz/inventory.go'],
+      }),
+      chainNode('purchase_payable_draft', '采购应付草稿', 'fact_ledger', {
+        machineKeys: ['fact.finance'],
+        sourceRefs: ['server/internal/biz/operational_fact_finance_source.go'],
+      }),
+      chainNode('purchase_payable', '已过账采购应付', 'fact_ledger', {
+        machineKeys: ['fact.finance'],
+        sourceRefs: ['server/internal/biz/operational_fact.go'],
       }),
     ],
     [
@@ -346,6 +367,42 @@ const BUSINESS_CHAIN_DEFINITIONS = [
             'server/internal/biz/quality_inspection.go',
             'server/internal/biz/purchase_receipt.go',
           ],
+        }
+      ),
+      chainEdge(
+        'purchase_lot',
+        'purchase_payable_draft',
+        '按已过账来源生成应付草稿',
+        'creates_fact_draft',
+        {
+          action: 'OperationalFactUsecase.CreatePayableFromPurchaseReceipt',
+          factBoundary: 'finance_fact_draft_from_posted_source',
+          sourceRefs: [
+            'server/internal/biz/operational_fact_finance_source.go',
+          ],
+        }
+      ),
+      chainEdge(
+        'purchase_payable_draft',
+        'purchase_payable',
+        '财务确认并过账应付',
+        'posts_fact',
+        {
+          action: 'OperationalFactUsecase.PostFinanceFact',
+          factBoundary: 'finance_fact_posted',
+          sourceRefs: ['server/internal/biz/operational_fact.go'],
+        }
+      ),
+      chainEdge(
+        'purchase_task',
+        'purchase_order',
+        '审批拒绝后结束本次办理',
+        'returns',
+        {
+          action: 'PurchaseOrderUsecase.RejectPurchaseOrderForProcessCommand',
+          condition: '审批决定为拒绝',
+          factBoundary: 'rejection_without_fact_posting',
+          sourceRefs: ['server/internal/biz/customer_process_contracts.go'],
         }
       ),
     ]
@@ -439,9 +496,9 @@ const BUSINESS_CHAIN_DEFINITIONS = [
   ),
   chain(
     'outsourcing_to_inventory',
-    '委外发料到合格回货',
+    '委外发料到回货应付',
     'supporting',
-    '委外订单确认后记录发料与回货事实，回货经质检通过后进入可用库存。',
+    '委外订单确认后记录发料与回货事实，回货经质检通过后进入可用库存，再按已过账来源生成应付并确认。',
     [
       chainNode('outsourcing_order', '委外订单', 'source_document', {
         machineKeys: ['source.outsourcing_order'],
@@ -462,6 +519,14 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainNode('outsourcing_lot', '合格库存批次', 'fact_ledger', {
         machineKeys: ['fact.inventory_lot'],
         sourceRefs: ['server/internal/biz/inventory.go'],
+      }),
+      chainNode('outsourcing_payable_draft', '委外应付草稿', 'fact_ledger', {
+        machineKeys: ['fact.finance'],
+        sourceRefs: ['server/internal/biz/operational_fact_finance_source.go'],
+      }),
+      chainNode('outsourcing_payable', '已过账委外应付', 'fact_ledger', {
+        machineKeys: ['fact.finance'],
+        sourceRefs: ['server/internal/biz/operational_fact.go'],
       }),
     ],
     [
@@ -518,6 +583,30 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           ],
         }
       ),
+      chainEdge(
+        'outsourcing_lot',
+        'outsourcing_payable_draft',
+        '按已过账来源生成应付草稿',
+        'creates_fact_draft',
+        {
+          action: 'OperationalFactUsecase.CreatePayableFromOutsourcingReturn',
+          factBoundary: 'finance_fact_draft_from_posted_source',
+          sourceRefs: [
+            'server/internal/biz/operational_fact_finance_source.go',
+          ],
+        }
+      ),
+      chainEdge(
+        'outsourcing_payable_draft',
+        'outsourcing_payable',
+        '财务确认并过账应付',
+        'posts_fact',
+        {
+          action: 'OperationalFactUsecase.PostFinanceFact',
+          factBoundary: 'finance_fact_posted',
+          sourceRefs: ['server/internal/biz/operational_fact.go'],
+        }
+      ),
     ]
   ),
   chain(
@@ -553,7 +642,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         machineKeys: ['fact.shipment'],
         sourceRefs: ['server/internal/biz/operational_fact.go'],
       }),
-      chainNode('receivable', '应收与发票事实', 'fact_ledger', {
+      chainNode('receivable_draft', '应收或发票草稿', 'fact_ledger', {
+        machineKeys: ['fact.finance'],
+        sourceRefs: ['server/internal/biz/operational_fact.go'],
+      }),
+      chainNode('receivable', '已过账应收或发票', 'fact_ledger', {
         machineKeys: ['fact.finance'],
         sourceRefs: ['server/internal/biz/operational_fact.go'],
       }),
@@ -594,8 +687,8 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         '审批结果写入放行',
         'calls_domain_command',
         {
-          action:
-            'OperationalFactUsecase.RecordShipmentFinanceRelease / Rejection',
+          action: 'OperationalFactUsecase.RecordShipmentFinanceRelease',
+          condition: '审批决定为通过',
           factBoundary: 'shipment_release_via_domain_usecase',
           sourceRefs: ['server/internal/biz/shipment_process_command.go'],
         }
@@ -605,12 +698,29 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         factBoundary: 'shipment_and_inventory',
         sourceRefs: ['server/internal/biz/operational_fact.go'],
       }),
-      chainEdge('shipped', 'receivable', '真实出货后生成应收', 'posts_fact', {
-        action:
-          'OperationalFactUsecase.CreateReceivableFromShipment / CreateInvoiceFromShipment',
-        factBoundary: 'finance_fact_after_shipped',
-        sourceRefs: ['server/internal/biz/operational_fact.go'],
-      }),
+      chainEdge(
+        'shipped',
+        'receivable_draft',
+        '真实出货后生成应收或发票草稿',
+        'creates_fact_draft',
+        {
+          action:
+            'OperationalFactUsecase.CreateReceivableFromShipment / CreateInvoiceFromShipment',
+          factBoundary: 'finance_draft_after_shipped',
+          sourceRefs: ['server/internal/biz/operational_fact.go'],
+        }
+      ),
+      chainEdge(
+        'receivable_draft',
+        'receivable',
+        '财务确认应收或发票过账',
+        'posts_fact',
+        {
+          action: 'OperationalFactUsecase.PostFinanceFact',
+          factBoundary: 'finance_fact_after_shipped',
+          sourceRefs: ['server/internal/biz/operational_fact.go'],
+        }
+      ),
       chainEdge(
         'shipped',
         'shipment_cancelled',
@@ -620,6 +730,21 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           action: 'OperationalFactUsecase.CancelShippedShipmentWithActor',
           factBoundary: 'shipment_and_inventory_correction',
           sourceRefs: ['server/internal/biz/operational_fact.go'],
+        }
+      ),
+      chainEdge(
+        'shipment_release_task',
+        'shipment_release',
+        '审批拒绝后结束本次办理',
+        'returns',
+        {
+          action: 'OperationalFactUsecase.RecordShipmentFinanceRejection',
+          condition: '审批决定为拒绝',
+          factBoundary: 'rejection_without_fact_posting',
+          sourceRefs: [
+            'server/internal/biz/customer_process_contracts.go',
+            'server/internal/biz/shipment_process_command.go',
+          ],
         }
       ),
     ],
@@ -652,7 +777,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         machineKeys: ['fact.finance_allocation'],
         sourceRefs: ['server/internal/biz/finance_payment.go'],
       }),
-      chainNode('settled_finance_fact', '结清或重开结果', 'derived_result', {
+      chainNode('settled_finance_fact', '余额结清结果', 'derived_result', {
         machineKeys: ['fact.finance'],
         sourceRefs: ['server/internal/biz/finance_payment.go'],
       }),
@@ -700,10 +825,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'finance_allocation',
         'settled_finance_fact',
-        '余额为零派生结清',
+        '核销后余额为零才结清',
         'derives',
         {
-          action: 'settle finance fact from allocations',
+          action: 'setFinanceFactSettlement',
+          condition: '核销后剩余未结金额为零',
           factBoundary: 'finance_fact_projection',
           sourceRefs: ['server/internal/biz/finance_payment.go'],
         }
@@ -722,8 +848,8 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'open_finance_fact',
         'finance_credit_note',
-        '创建红冲单',
-        'creates_fact_draft',
+        '创建已过账红冲记录',
+        'posts_fact',
         {
           action: 'OperationalFactUsecase.CreateFinanceCreditNote',
           factBoundary: 'finance_credit_note',
@@ -733,10 +859,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'finance_credit_note',
         'settled_finance_fact',
-        '红冲调整未结余额',
+        '红冲后余额为零才结清',
         'posts_fact',
         {
           action: 'OperationalFactUsecase.CreateFinanceCreditNote',
+          condition: '红冲后剩余未结金额为零',
           factBoundary: 'credit_note_and_fact_balance',
           sourceRefs: ['server/internal/biz/finance_payment.go'],
         }
@@ -750,6 +877,34 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           action: 'OperationalFactUsecase.ReverseFinanceCreditNote',
           factBoundary: 'reverse_credit_note_and_reopen_fact',
           sourceRefs: ['server/internal/biz/finance_payment.go'],
+        }
+      ),
+      chainEdge(
+        'finance_allocation',
+        'open_finance_fact',
+        '部分核销后保留未结余额',
+        'derives',
+        {
+          action: 'PostFinancePaymentForProcessCommand',
+          condition: '核销后剩余未结金额大于零',
+          factBoundary: 'finance_fact_remains_posted',
+          sourceRefs: [
+            'server/internal/data/operational_fact_finance_payment_repo.go',
+          ],
+        }
+      ),
+      chainEdge(
+        'finance_credit_note',
+        'open_finance_fact',
+        '部分红冲后保留未结余额',
+        'derives',
+        {
+          action: 'OperationalFactUsecase.CreateFinanceCreditNote',
+          condition: '红冲后剩余未结金额大于零',
+          factBoundary: 'finance_fact_remains_posted',
+          sourceRefs: [
+            'server/internal/data/operational_fact_finance_payment_repo.go',
+          ],
         }
       ),
     ]
@@ -828,7 +983,9 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         {
           action: 'InventoryUsecase.ApproveInventoryOperationForProcessCommand',
           factBoundary: 'inventory_operation_approval_only',
-          sourceRefs: ['server/internal/biz/inventory_process_command.go'],
+          sourceRefs: [
+            'server/internal/biz/inventory_adjustment_process_command.go',
+          ],
         }
       ),
       chainEdge(
@@ -840,8 +997,23 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           action: 'InventoryUsecase.PostInventoryOperationForProcessCommand',
           factBoundary: 'inventory_txn_and_lot',
           sourceRefs: [
-            'server/internal/biz/inventory_process_command.go',
+            'server/internal/biz/inventory_adjustment_process_command.go',
             'server/internal/biz/inventory.go',
+          ],
+        }
+      ),
+      chainEdge(
+        'inventory_adjustment_task',
+        'inventory_operation',
+        '审批拒绝后结束本次办理',
+        'returns',
+        {
+          action: 'InventoryUsecase.RejectInventoryOperationForProcessCommand',
+          condition: '审批决定为拒绝',
+          factBoundary: 'rejection_without_fact_posting',
+          sourceRefs: [
+            'server/internal/biz/customer_process_contracts.go',
+            'server/internal/biz/inventory_adjustment_process_command.go',
           ],
         }
       ),
@@ -1077,88 +1249,91 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'purchase_quality_disposition',
     '采购拒收处置',
     'exception',
-    '采购质检拒绝后必须登记处置，退供应商、返工、让步接收或报废分别进入受控事实路径。',
+    '未入库的拒收来料可退供应商或要求补换。处置不扣减已入库库存；补换生成新的待收记录，再进入收货与检验。',
     [
-      chainNode('rejected_purchase_quality', '采购质检拒绝', 'fact_ledger', {
-        machineKeys: ['fact.quality_inspection'],
-        sourceRefs: ['server/internal/biz/quality_inspection.go'],
-      }),
+      chainNode(
+        'rejected_purchase_quality',
+        '未入库来料质检拒收',
+        'fact_ledger',
+        {
+          machineKeys: ['fact.quality_inspection'],
+          sourceRefs: ['server/internal/biz/quality_inspection.go'],
+        }
+      ),
       chainNode('purchase_disposition', '采购拒收处置单', 'fact_ledger', {
         machineKeys: ['fact.purchase_rejection_disposition'],
         sourceRefs: ['server/internal/biz/purchase_rejection_disposition.go'],
       }),
-      chainNode('purchase_return', '采购退货单', 'fact_ledger', {
-        machineKeys: ['fact.purchase_return'],
-        sourceRefs: ['server/internal/biz/purchase_return.go'],
+      chainNode('vendor_return_result', '退供应商处置记录', 'derived_result', {
+        machineKeys: ['fact.purchase_rejection_disposition'],
+        sourceRefs: [
+          'server/internal/data/purchase_rejection_disposition_repo.go',
+        ],
       }),
-      chainNode('purchase_adjustment', '采购入库调整单', 'fact_ledger', {
-        machineKeys: ['fact.purchase_receipt_adjustment'],
-        sourceRefs: ['server/internal/biz/purchase_receipt_adjustment.go'],
+      chainNode('replacement_receipt', '补换待收记录', 'fact_ledger', {
+        machineKeys: ['fact.purchase_receipt'],
+        sourceRefs: [
+          'server/internal/data/purchase_rejection_disposition_repo.go',
+        ],
       }),
-      chainNode('disposed_purchase_lot', '隔离或调整后库存', 'fact_ledger', {
-        machineKeys: ['fact.inventory_lot'],
-        sourceRefs: ['server/internal/biz/inventory.go'],
+      chainNode('replacement_quality', '补换来料待检 IQC', 'fact_ledger', {
+        machineKeys: ['fact.quality_inspection'],
+        sourceRefs: [
+          'server/internal/data/purchase_rejection_disposition_repo.go',
+        ],
       }),
     ],
     [
       chainEdge(
         'rejected_purchase_quality',
         'purchase_disposition',
-        '创建拒收处置',
+        '按拒收质检创建处置',
         'creates_fact_draft',
         {
           action: 'InventoryUsecase.CreatePurchaseRejectionDisposition',
-          factBoundary: 'purchase_rejection_disposition',
+          factBoundary: 'purchase_rejection_disposition_draft_only',
           sourceRefs: ['server/internal/biz/purchase_rejection_disposition.go'],
         }
       ),
       chainEdge(
         'purchase_disposition',
-        'purchase_return',
-        '退供应商形成退货单',
+        'vendor_return_result',
+        '过账退供应商处置，不扣减库存',
         'returns',
         {
-          action: 'InventoryUsecase.CreatePurchaseReturnFromQualityInspection',
-          factBoundary: 'purchase_return_fact',
-          sourceRefs: ['server/internal/biz/purchase_return.go'],
-        }
-      ),
-      chainEdge(
-        'purchase_disposition',
-        'purchase_adjustment',
-        '让步或报废形成调整',
-        'creates_fact_draft',
-        {
-          action: 'InventoryUsecase.CreatePurchaseReceiptAdjustmentFromReceipt',
-          factBoundary: 'purchase_receipt_adjustment_fact',
-          sourceRefs: ['server/internal/biz/purchase_receipt_adjustment.go'],
-        }
-      ),
-      chainEdge(
-        'purchase_return',
-        'disposed_purchase_lot',
-        '退货过账扣减库存',
-        'posts_fact',
-        {
-          action: 'InventoryUsecase.PostPurchaseReturn',
-          factBoundary: 'inventory_txn_and_lot',
+          action: 'InventoryUsecase.PostPurchaseRejectionDisposition',
+          condition: '选择退供应商，原收货尚未入库',
+          factBoundary: 'unposted_receipt_disposition_only',
           sourceRefs: [
-            'server/internal/biz/purchase_return.go',
-            'server/internal/biz/inventory.go',
+            'server/internal/data/purchase_rejection_disposition_repo.go',
           ],
         }
       ),
       chainEdge(
-        'purchase_adjustment',
-        'disposed_purchase_lot',
-        '调整过账修正库存',
-        'posts_fact',
+        'purchase_disposition',
+        'replacement_receipt',
+        '过账补换处置并生成新待收',
+        'creates_fact_draft',
         {
-          action: 'InventoryUsecase.PostPurchaseReceiptAdjustment',
-          factBoundary: 'inventory_txn_and_lot',
+          action: 'InventoryUsecase.PostPurchaseRejectionDisposition',
+          condition: '选择供应商补换，原收货尚未入库',
+          factBoundary: 'replacement_receipt_draft_only',
           sourceRefs: [
-            'server/internal/biz/purchase_receipt_adjustment.go',
-            'server/internal/biz/inventory.go',
+            'server/internal/data/purchase_rejection_disposition_repo.go',
+          ],
+        }
+      ),
+      chainEdge(
+        'replacement_receipt',
+        'replacement_quality',
+        '补换待收自动建立逐行 IQC',
+        'creates_fact_draft',
+        {
+          action:
+            'createPurchaseReplacementReceipt / createPreparedPurchaseReceiptItem',
+          factBoundary: 'replacement_quality_pending_receipt_not_posted',
+          sourceRefs: [
+            'server/internal/data/purchase_rejection_disposition_repo.go',
           ],
         }
       ),
@@ -1490,8 +1665,26 @@ const BUSINESS_CHAIN_OVERVIEW_DEFINITION = {
     {
       fromChainKey: 'delivery_to_settlement',
       toChainKey: 'finance_payment_and_reversal',
-      label: '应收 / 应付进入收付款、核销与冲正',
+      label: '应收进入收款、核销与冲正',
       kind: 'continues',
+    },
+    {
+      fromChainKey: 'purchase_to_inventory',
+      toChainKey: 'finance_payment_and_reversal',
+      label: '采购应付进入付款与核销',
+      kind: 'continues',
+    },
+    {
+      fromChainKey: 'outsourcing_to_inventory',
+      toChainKey: 'finance_payment_and_reversal',
+      label: '委外应付进入付款与核销',
+      kind: 'continues',
+    },
+    {
+      fromChainKey: 'purchase_quality_disposition',
+      toChainKey: 'purchase_to_inventory',
+      label: '补换待收重新进入收货与检验',
+      kind: 'returns_to',
     },
   ],
   sourceRefs: [ARCHITECTURE_REF, WORKFLOW_MAP_REF, PRODUCT_FLOW_REF],
@@ -1854,6 +2047,7 @@ function normalizeStepContract({
     fromNodeKey: edge.from,
     toNodeKey: edge.to,
     label: edge.label,
+    condition: edge.condition,
     responsibility: Object.freeze({
       mode: rawStep.responsibilityMode,
       ownerPoolKeys,

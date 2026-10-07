@@ -1,6 +1,8 @@
 import { setTimeout as delay } from "node:timers/promises";
 import { RpcErrorCode } from "../../web/src/common/consts/errorCodes.generated.js";
 import { pressureRPC, pressureLogicFingerprint } from "./pressure-runtime.mjs";
+import { pressureOrderIDs } from "./pressure-engineering-ledger.mjs";
+import { pressureDataScale } from "../../web/src/dev-workbench/config/devPressureData.mjs";
 import { ENGINEERING_RECIPES, engineeringDataFingerprint } from "./pressure-engineering-data.mjs";
 
 export const ENGINEERING_API = Object.freeze({
@@ -16,6 +18,7 @@ export const ENGINEERING_API = Object.freeze({
 });
 export const ENGINEERING_STATUS = Object.freeze({ salesOrderActive: "active", purchaseOrderApproved: "approved", bomActive: "ACTIVE" });
 export const ENGINEERING_VERIFICATION_FILES = Object.freeze([
+  "scripts/qa/pressure-engineering-ledger.mjs",
   "scripts/qa/pressure-engineering-scenario.mjs", "web/src/common/consts/errorCodes.generated.js",
   "server/internal/core/status/sales_order.go", "server/internal/core/status/purchase_order.go",
   "server/internal/service/jsonrpc_purchase_order_shared.go", "server/internal/service/jsonrpc_purchase_order_document.go",
@@ -30,6 +33,12 @@ export function assertEngineeringPressureReceipt(receipt, target) {
       receipt.databaseName !== target.databaseName || receipt.databaseTargetFingerprint !== target.targetFingerprint ||
       !Array.isArray(receipt.orders) || receipt.orders.length < 10)
     throw new Error("engineering pressure receipt does not match its disposable target");
+  pressureOrderIDs(receipt.orders);
+  pressureOrderIDs(receipt.historyOrders);
+  const scale = pressureDataScale(receipt.dataScale);
+  if (receipt.historyOrders.length !== scale.historyOrders || receipt.totalOrders !== receipt.orders.length + receipt.historyOrders.length ||
+      new Set([...receipt.orders, ...receipt.historyOrders].map(({ id }) => id)).size !== receipt.totalOrders)
+    throw new Error("engineering pressure history and working pool overlap or have invalid counts");
   if (receipt.dataLogicFingerprint !== engineeringDataFingerprint()) throw new Error("engineering data logic changed; reseed required");
   if (importedVerificationFingerprint !== engineeringVerificationFingerprint()) throw new Error("engineering verification changed after loading; restart required");
 }
@@ -141,6 +150,27 @@ export async function readEngineeringPurchaseResult({ client, order, receipt, op
   checkEngineeringPurchases(request, purchases, order, receipt);
   return { request, purchases };
 }
+export async function prepareEngineeringHistoryOrder({ client, order, receipt, signal }) {
+  const options = { signal };
+  let request = await client.requireCall("preview", { sales_order_id: order.id }, {
+    ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "PREVIEW"),
+  });
+  if (order.status === "PREVIEW") return;
+  request = await client.requireCall("submit", submitParams(order, request), {
+    ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "SUBMITTED"),
+  });
+  if (order.status === "SUBMITTED") return;
+  request = await client.requireCall("boss", reviewParams(request), {
+    ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "BOSS_APPROVED"),
+  });
+  if (order.status === "BOSS_APPROVED") return;
+  if (order.status !== "APPROVED") throw new Error("unknown pressure history status");
+  await client.requireCall("finance", reviewParams(request), {
+    ...options, validate: (data) => checkEngineeringDemand(data, order, receipt, "APPROVED"),
+  });
+  await readEngineeringPurchaseResult({ client, order, receipt, options });
+}
+
 export async function runEngineeringBusinessFlow({ client, order, receipt, observe, signal }) {
   const options = { observe, signal };
   let request = await client.requireCall("preview", { sales_order_id: order.id }, {

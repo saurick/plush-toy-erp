@@ -69,5 +69,5 @@ test('AlertDialog: exposes labelled alertdialog semantics and an explicit initia
   assert.match(source, /const confirmingRef = React\.useRef\(false\)/u)
   assert.match(source, /if \(confirmingRef\.current\) return/u)
   assert.match(source, /confirmingRef\.current = true/u)
-  assert.match(source, /if \(open\) confirmingRef\.current = false/u)
+  assert.match(source, /if \(open\) \{\s*confirmingRef\.current = false/u)
 })

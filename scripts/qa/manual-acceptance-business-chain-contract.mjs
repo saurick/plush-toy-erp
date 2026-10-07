@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
 
-import { getPermissionCenterRoleName } from "../../web/src/erp/utils/permissionCenterAccess.mjs";
 import { DEV_FLOW_STATE_CATALOG } from "../../web/src/dev-workbench/config/devFlowStateCatalog.mjs";
+import {
+  describeDevBusinessChainStep,
+  describeDevBusinessChainResponsibility,
+} from "../../web/src/dev-workbench/config/devBusinessChainProjection.mjs";
 import {
   DEV_BUSINESS_CHAIN_DATA_STAGE_KEYS,
   DEV_BUSINESS_CHAIN_SCENARIO_KINDS,
@@ -81,16 +84,6 @@ function uniqueStrings(values) {
   return [...new Set(asArray(values).map(String).filter(Boolean))];
 }
 
-function describeStateRef(catalog, ref) {
-  const flow = asArray(catalog?.flows).find(
-    (candidate) => candidate.key === ref.machineKey,
-  );
-  const state = asArray(flow?.states).find(
-    (candidate) => candidate.key === ref.stateKey,
-  );
-  return flow && state ? `${flow.label}为“${state.label}”` : "";
-}
-
 function describeFact(catalog, factKey) {
   return (
     asArray(catalog?.factDefinitions).find(
@@ -99,30 +92,16 @@ function describeFact(catalog, factKey) {
   );
 }
 
-function describeResponsibility(responsibility) {
-  const ownerPoolKeys = uniqueStrings(responsibility.ownerPoolKeys);
-  const knownLabels = uniqueStrings(
-    ownerPoolKeys
-      .map((roleKey) => getPermissionCenterRoleName({ role_key: roleKey }))
-      .filter((label) => label !== "已配置岗位"),
-  );
-  const labels = [...knownLabels];
-  if (
-    responsibility.mode === "human" &&
-    (knownLabels.length !== ownerPoolKeys.length ||
-      responsibility.capabilityKeys.length > 0)
-  ) {
-    labels.push("具有对应业务权限的岗位");
-  }
-  if (responsibility.mode === "system") labels.push("系统自动处理");
-  if (responsibility.mode === "derived") {
-    labels.push("系统按已生效结果计算");
-  }
-  return uniqueStrings(labels).join("、") || "当前正式合同未定义";
-}
-
 function buildReviewStep(catalog, rawChain, chainPlan, step) {
   const nodeByKey = new Map(rawChain.nodes.map((node) => [node.key, node]));
+  const action = rawChain.steps.find(
+    (candidate) => candidate.key === step.key,
+  );
+  const description = describeDevBusinessChainStep(catalog, action);
+  const preconditions = uniqueStrings([
+    description.condition,
+    ...description.preconditions,
+  ]);
   const scenarioKinds = uniqueStrings(
     chainPlan.scenarios
       .filter((scenario) => scenario.stepKeys.includes(step.key))
@@ -130,34 +109,19 @@ function buildReviewStep(catalog, rawChain, chainPlan, step) {
   );
   return Object.freeze({
     key: step.key,
-    label:
-      rawChain.steps.find((candidate) => candidate.key === step.key)?.label ||
-      step.key,
+    label: action.label,
     fromLabel: nodeByKey.get(step.fromNodeKey)?.label || "上一步",
     toLabel: nodeByKey.get(step.toNodeKey)?.label || "下一步",
-    responsibleRole: describeResponsibility(step.responsibility),
-    preconditions:
-      uniqueStrings(
-        step.preconditionStateRefs.map((ref) => describeStateRef(catalog, ref)),
-      ).length > 0
-        ? uniqueStrings(
-            step.preconditionStateRefs.map((ref) =>
-              describeStateRef(catalog, ref),
-            ),
-          )
-        : ["无额外前置状态"],
-    actions: [
-      rawChain.steps.find((candidate) => candidate.key === step.key)?.label ||
-        "按已登记动作办理",
-    ],
-    results:
-      uniqueStrings(
-        step.resultStateRefs.map((ref) => describeStateRef(catalog, ref)),
-      ).length > 0
-        ? uniqueStrings(
-            step.resultStateRefs.map((ref) => describeStateRef(catalog, ref)),
-          )
-        : ["本步骤不直接改变业务状态"],
+    responsibleRole:
+      describeDevBusinessChainResponsibility(step.responsibility) ||
+      "当前正式合同未定义",
+    preconditions: preconditions.length
+      ? preconditions
+      : ["无额外前置状态；状态起点见结果转换"],
+    actions: [action.label],
+    results: description.results.length
+      ? description.results
+      : ["本步骤不直接改变业务状态"],
     facts:
       uniqueStrings(
         step.factKeys.map((factKey) => describeFact(catalog, factKey)),
@@ -228,6 +192,7 @@ function buildChainPlan(chain) {
     }
     return {
       key: step.key,
+      condition: step.condition || "",
       fromNodeKey: step.fromNodeKey,
       toNodeKey: step.toNodeKey,
       edgeKind: edge.kind,
@@ -381,7 +346,7 @@ export function buildManualAcceptanceBusinessChainContract({
   const stageScenarioKeys = buildStageScenarioKeys(chainPlans);
   const dataDigestInput = buildDataDigestInput(chainPlans);
   const verificationDigestInput = buildVerificationDigestInput(chainPlans);
-  return Object.freeze({
+  const contract = {
     contract: MANUAL_ACCEPTANCE_BUSINESS_CHAIN_CONTRACT_VERSION,
     chainDataDigest: digest(dataDigestInput),
     chainVerificationDigest: digest(verificationDigestInput),
@@ -398,6 +363,54 @@ export function buildManualAcceptanceBusinessChainContract({
     chains: chainPlans,
     dataPlan: dataDigestInput,
     verificationPlan: verificationDigestInput,
+  };
+  const definition = {
+    chainDataDigest: contract.chainDataDigest,
+    chainVerificationDigest: contract.chainVerificationDigest,
+    chains: chainPlans.map((plan) => {
+      const chain = catalog.businessChains.find(
+        (item) => item.key === plan.chainKey,
+      );
+      return {
+        key: plan.chainKey,
+        label: chain.label,
+        nodes: chain.nodes.map(
+          ({
+            key,
+            label,
+            layer,
+            machineKeys,
+            factKeys,
+            processDefinitionKeys,
+          }) => ({
+            key,
+            label,
+            layer,
+            machineKeys,
+            factKeys,
+            processDefinitionKeys,
+          }),
+        ),
+        steps: plan.steps.map((step) => ({
+          ...step,
+          label: chain.steps.find((item) => item.key === step.key).label,
+        })),
+        scenarios: plan.scenarios,
+      };
+    }),
+    relations: catalog.businessChainOverview.relations.map(
+      ({ key, fromChainKey, toChainKey, kind, label }) => ({
+        key,
+        fromChainKey,
+        toChainKey,
+        kind,
+        label,
+      }),
+    ),
+  };
+  return Object.freeze({
+    ...contract,
+    definitionSnapshot: { ...definition, digest: digest(definition) },
   });
 }
 
@@ -452,6 +465,7 @@ export function buildManualAcceptanceBusinessChainReviewPlan({
     sourceContract: contract.contract,
     chainDataDigest: contract.chainDataDigest,
     chainVerificationDigest: contract.chainVerificationDigest,
+    definitionSnapshot: contract.definitionSnapshot,
     chainCount: contract.chainCount,
     stepCount: contract.stepCount,
     scenarioCount: contract.scenarioCount,
@@ -489,6 +503,233 @@ export function buildManualAcceptanceBusinessChainReviewPlan({
     ]),
     chains: Object.freeze(chains),
   });
+}
+
+export function validateBusinessChainDefinitionSnapshot(
+  snapshot,
+  reportChains = [],
+) {
+  const fail = () => {
+    throw new Error("业务链定义快照不完整或摘要不匹配");
+  };
+  if (
+    !snapshot ||
+    !Array.isArray(snapshot.chains) ||
+    snapshot.chains.length === 0 ||
+    snapshot.chains.length > 100 ||
+    !Array.isArray(snapshot.relations) ||
+    snapshot.relations.length > 500 ||
+    !/^[a-f0-9]{64}$/u.test(snapshot.chainDataDigest || "") ||
+    !/^[a-f0-9]{64}$/u.test(snapshot.chainVerificationDigest || "")
+  )
+    fail();
+  const { digest: recordedDigest, ...definition } = snapshot;
+  if (recordedDigest !== digest(definition)) fail();
+  const keys = new Set();
+  for (const chain of snapshot.chains) {
+    if (
+      !chain?.key ||
+      typeof chain.label !== "string" ||
+      keys.has(chain.key) ||
+      !Array.isArray(chain.nodes) ||
+      !chain.nodes.length ||
+      !Array.isArray(chain.steps) ||
+      !chain.steps.length ||
+      chain.steps.length > 2000 ||
+      !Array.isArray(chain.scenarios)
+    )
+      fail();
+    keys.add(chain.key);
+    const nodeKeys = new Set(chain.nodes.map((node) => node.key));
+    const stepKeys = new Set(chain.steps.map((step) => step.key));
+    if (
+      nodeKeys.size !== chain.nodes.length ||
+      stepKeys.size !== chain.steps.length
+    )
+      fail();
+    for (const step of chain.steps) {
+      if (
+        !step.key ||
+        typeof step.label !== "string" ||
+        typeof step.condition !== "string" ||
+        !nodeKeys.has(step.fromNodeKey) ||
+        !nodeKeys.has(step.toNodeKey) ||
+        !step.responsibility ||
+        !Array.isArray(step.actionRefs) ||
+        !step.actionRefs.length ||
+        !Array.isArray(step.preconditionStateRefs) ||
+        !Array.isArray(step.resultStateRefs) ||
+        !Array.isArray(step.stateTransitionRefs) ||
+        !Array.isArray(step.processNodeRefs) ||
+        !Array.isArray(step.factKeys)
+      )
+        fail();
+    }
+    if (
+      new Set(chain.scenarios.map((scenario) => scenario.key)).size !==
+        chain.scenarios.length ||
+      chain.scenarios.some(
+        (scenario) =>
+          !Array.isArray(scenario.stepKeys) ||
+          scenario.stepKeys.some((key) => !stepKeys.has(key)),
+      )
+    )
+      fail();
+  }
+  if (
+    new Set(snapshot.relations.map((relation) => relation.key)).size !==
+      snapshot.relations.length ||
+    snapshot.relations.some(
+      (relation) =>
+        !keys.has(relation.fromChainKey) || !keys.has(relation.toChainKey),
+    )
+  )
+    fail();
+  const plans = snapshot.chains.map((chain) => ({
+    chainKey: chain.key,
+    steps: chain.steps.map(({ label: _label, ...step }) => step),
+    scenarios: chain.scenarios,
+  }));
+  if (
+    snapshot.chainDataDigest !== digest(buildDataDigestInput(plans)) ||
+    snapshot.chainVerificationDigest !==
+      digest(buildVerificationDigestInput(plans))
+  )
+    fail();
+  for (const chain of reportChains) {
+    const frozen = snapshot.chains.find((item) => item.key === chain.key);
+    if (
+      !frozen ||
+      chain.steps.some(
+        (step) => !frozen.steps.some((item) => item.key === step.key),
+      ) ||
+      chain.scenarios?.some(
+        (scenario) =>
+          !frozen.scenarios.some((item) => item.key === scenario.key),
+      )
+    )
+      fail();
+  }
+  return snapshot;
+}
+
+export function compareBusinessChainReportDefinition(
+  report,
+  currentSnapshot,
+) {
+  validateBusinessChainDefinitionSnapshot(currentSnapshot);
+  const frozen = report.definitionSnapshot;
+  if (Object.hasOwn(report, "definitionSnapshot"))
+    validateBusinessChainDefinitionSnapshot(frozen, report.chains);
+  const relationsFor = (snapshot, key) =>
+    snapshot.relations.filter(
+      (item) => item.fromChainKey === key || item.toChainKey === key,
+    );
+  const keys = uniqueStrings([
+    ...currentSnapshot.chains.map((item) => item.key),
+    ...(frozen?.chains || report.chains).map((item) => item.key),
+  ]);
+  const chains = keys.map((key) => {
+    const current = currentSnapshot.chains.find((item) => item.key === key);
+    const previous = frozen?.chains.find((item) => item.key === key);
+    const observed = report.chains.find((item) => item.key === key);
+    const stepChanges = [];
+    if (frozen) {
+      for (const stepKey of uniqueStrings([
+        ...(current?.steps || []).map((item) => item.key),
+        ...(previous?.steps || []).map((item) => item.key),
+      ])) {
+        const before = previous?.steps.find((item) => item.key === stepKey);
+        const after = current?.steps.find((item) => item.key === stepKey);
+        const status = !before
+          ? "added"
+          : !after
+            ? "removed"
+            : digest(before) !== digest(after)
+              ? "changed"
+              : "unchanged";
+        if (status !== "unchanged")
+          stepChanges.push({
+            key: stepKey,
+            label: (after || before).label,
+            status,
+          });
+      }
+    }
+    const unrecordedSteps = (current?.steps || [])
+      .filter(
+        (step) => !observed?.steps.some((item) => item.key === step.key),
+      )
+      .map(({ key, label }) => ({ key, label }));
+    const status = !current
+      ? "removed"
+      : !frozen
+        ? "unverified"
+        : !previous
+          ? "added"
+          : digest(previous) !== digest(current) ||
+              digest(relationsFor(frozen, key)) !==
+                digest(relationsFor(currentSnapshot, key))
+            ? "changed"
+            : "unchanged";
+    return {
+      key,
+      label: current?.label || previous?.label || observed.label,
+      status,
+      currentExists: Boolean(current),
+      recorded: Boolean(observed),
+      stepChanges,
+      unrecordedSteps,
+    };
+  });
+  return {
+    status: !frozen
+      ? "unverified"
+      : frozen.digest === currentSnapshot.digest
+        ? "unchanged"
+        : "changed",
+    currentDigest: currentSnapshot.digest,
+    recordedDigest: frozen?.digest || null,
+    chains,
+  };
+}
+
+export function buildBusinessChainReportDiagram(report) {
+  if (!Object.hasOwn(report, "definitionSnapshot")) return null;
+  const snapshot = validateBusinessChainDefinitionSnapshot(
+    report.definitionSnapshot,
+    report.chains,
+  );
+  return {
+    nodes: snapshot.chains.map((chain) => {
+      const observed = report.chains.find((item) => item.key === chain.key);
+      const complete = chain.steps.every((step) =>
+        observed?.steps.some(
+          (item) => item.key === step.key && item.status === "passed",
+        ),
+      );
+      return {
+        id: chain.key,
+        label: chain.label,
+        detail: !observed
+          ? "本批次无记录"
+          : complete
+            ? "登记步骤通过"
+            : "未全部通过或未覆盖",
+        kind:
+          observed?.status === "failed"
+            ? "danger"
+            : complete
+              ? "success"
+              : "",
+      };
+    }),
+    edges: snapshot.relations.map((relation) => [
+      relation.fromChainKey,
+      relation.toChainKey,
+      relation.label,
+    ]),
+  };
 }
 
 export function selectManualAcceptanceBusinessChainPlan(contract, chainKey) {

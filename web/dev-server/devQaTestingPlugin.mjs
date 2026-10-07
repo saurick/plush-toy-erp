@@ -30,6 +30,7 @@ import {
   isDevWorkbenchRequest,
 } from './devServerSecurity.mjs'
 import { resolveProjectNodeRuntime } from './devQaCoveragePlugin.mjs'
+import { pressureDataScale } from '../src/dev-workbench/config/devPressureData.mjs'
 import { readCurrentPressureSource, readDevPressureReports } from './devQaPressureReports.mjs'
 
 export const DEV_QA_TESTING_API_PATH = '/__dev/api/qa/testing'
@@ -182,7 +183,8 @@ export function validateDevQaTestingAction(value) {
   if (!DEV_TESTING_ACTIONS.includes(value.action)) {
     throw new Error('testing action is not allowlisted')
   }
-  assertExactKeys(value.payload, ['idempotencyKey'], 'testing action payload')
+  assertExactKeys(value.payload, value.action.startsWith('pressure-') ? ['idempotencyKey', 'dataScale'] : ['idempotencyKey'], 'testing action payload')
+  if (value.action.startsWith('pressure-')) pressureDataScale(value.payload.dataScale)
   const match = IDEMPOTENCY_PATTERN.exec(
     String(value.payload.idempotencyKey || '')
   )
@@ -227,7 +229,9 @@ export function buildDevQaTestingCommand({
   nodeRuntime,
   operationId,
   projectRoot,
+  dataScale,
 }) {
+  if (action.startsWith('pressure-')) pressureDataScale(dataScale)
   const commands = {
     fast: [
       'scripts/qa/run-gate-with-receipt.mjs',
@@ -242,9 +246,9 @@ export function buildDevQaTestingCommand({
       'output/qa/yoyoosun-role-jsonrpc-access/report.json',
     ],
     'field-linkage': ['scripts/qa/erp-field-linkage.mjs'],
-    'pressure-quick': ['scripts/qa/pressure-isolated-lifecycle.mjs', '--run', '--profile', 'quick', '--out',
+    'pressure-quick': ['scripts/qa/pressure-isolated-lifecycle.mjs', '--run', '--profile', 'quick', '--data-scale', dataScale, '--out',
       `output/qa/pressure/workbench-${operationId}/lifecycle.json`],
-    'pressure-capacity': ['scripts/qa/pressure-isolated-lifecycle.mjs', '--run', '--profile', 'capacity', '--out',
+    'pressure-capacity': ['scripts/qa/pressure-isolated-lifecycle.mjs', '--run', '--profile', 'capacity', '--data-scale', dataScale, '--out',
       `output/qa/pressure/workbench-${operationId}/lifecycle.json`],
   }
   if (!DEV_TESTING_ACTIONS.includes(action)) {
@@ -269,6 +273,7 @@ function publicOperation(operation) {
     schemaVersion: DEV_QA_TESTING_PUBLIC_OPERATION_SCHEMA,
     id: operation.id,
     action: operation.action,
+    ...(operation.dataScale ? { dataScale: operation.dataScale } : {}),
     repository: operation.repository,
     status: operation.status,
     stage: operation.stage,
@@ -442,7 +447,8 @@ export function createDevQaTestingService({
       if (code === 0 && operation.action.startsWith('pressure-')) {
         const evidence = readPressureReports(root, { id: `workbench-${operation.id}` })
         if (evidence.report?.status !== 'passed' ||
-          evidence.report?.profile !== operation.action.slice('pressure-'.length)) {
+          evidence.report?.profile !== operation.action.slice('pressure-'.length) ||
+          evidence.report?.dataset?.dataScale !== operation.dataScale) {
           code = 1
         }
       }
@@ -491,6 +497,7 @@ export function createDevQaTestingService({
       const nodeRuntime = resolveNodeRuntime(root)
       const spec = buildDevQaTestingCommand({
         action: operation.action,
+        dataScale: operation.dataScale,
         nodeRuntime,
         operationId: operation.id,
         projectRoot: root,
@@ -540,6 +547,7 @@ export function createDevQaTestingService({
       payload.idempotencyKey
     )
     if (existing) {
+      if (existing.action !== action || existing.dataScale !== payload.dataScale) throw new Error('testing idempotency intent mismatch')
       return {
         schemaVersion: 'plush.dev-qa-testing-action-result/v1',
         action,
@@ -566,6 +574,7 @@ export function createDevQaTestingService({
       operation = createOrReuseDevTestingOperation(store, {
         action,
         idempotencyKey: payload.idempotencyKey,
+        dataScale: payload.dataScale,
         repository,
         operationId,
         now: now().toISOString(),

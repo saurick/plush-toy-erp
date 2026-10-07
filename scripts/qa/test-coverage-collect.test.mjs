@@ -396,8 +396,21 @@ test("Go business coverage uses only registered package and test prefixes", () =
     { status: "failed" },
     registry,
   );
-  assert.equal(failedGlobal.workflow.status, "failed");
-  assert.match(failedGlobal.workflow.note, /不能标记为通过/u);
+  assert.equal(failedGlobal.workflow.status, "blocked");
+  assert.equal(failedGlobal.workflow.passed, 1);
+  assert.equal(failedGlobal.workflow.failed, 0);
+  assert.equal(failedGlobal.workflow.scenarios[0].status, "passed");
+  assert.match(failedGlobal.workflow.note, /本域已登记场景全部通过/u);
+  assert.equal(failedGlobal.print.status, "missing");
+
+  const failedLocal = classifyGoBusinessDomains(
+    content.replaceAll('"Action":"pass"', '"Action":"fail"'),
+    { status: "failed" },
+    registry,
+  );
+  assert.equal(failedLocal.workflow.status, "failed");
+  assert.equal(failedLocal.workflow.failed, 1);
+  assert.equal(failedLocal.workflow.scenarios[0].status, "failed");
 });
 
 test("registered Go and field-linkage scenarios remain anchored to source", () => {
@@ -641,6 +654,84 @@ test("coverage evidence freezes affected scopes and leaves unexecuted gates open
   );
   assert.equal(frontend.total, 1);
   assert.match(frontend.note, /field linkage/u);
+
+  stageExecutions.go = { ...stageExecutions.go, status: "failed", passed: 0, failed: 1 };
+  const blocked = buildCoverageEvidence({
+    generatedAt: evidence.generatedAt,
+    repository: REPOSITORY,
+    stageExecutions,
+    goDomains: Object.fromEntries(Object.keys(GO_BUSINESS_SCENARIOS).map((key) => [
+      key, { ...explicitDomain, status: "blocked" },
+    ])),
+    fieldLinkage: { frontend: explicitDomain, print: explicitDomain },
+    receiptAdapter: { acceptance: evidence.acceptance, gates: {}, sourceReceipts: [] },
+    affectedPlan: { affectedScopes: ["T3", "T4"] },
+  });
+  const print = blocked.businessCoverage.domains.find((domain) => domain.key === "print");
+  assert.equal(print.status, "blocked");
+  assert.equal(print.failed, 0);
+  assert.equal(print.passed, 2);
+  assert.equal(blocked.collector.status, "failed");
+  assert.equal(blocked.gates.T3.status, "failed");
+  assert.equal(blocked.gates.T4.status, "failed");
+
+  stageExecutions.go = { ...stageExecutions.go, status: "missing" };
+  const incomplete = buildCoverageEvidence({
+    generatedAt: evidence.generatedAt,
+    repository: REPOSITORY,
+    stageExecutions,
+    goDomains,
+    fieldLinkage: { frontend: explicitDomain, print: explicitDomain },
+    receiptAdapter: { acceptance: evidence.acceptance, gates: {}, sourceReceipts: [] },
+    affectedPlan: { affectedScopes: ["T3"] },
+  });
+  assert.equal(incomplete.gates.T3.status, "missing");
+  assert.equal(incomplete.gates.T3.executed, 0);
+  assert.equal(incomplete.gates.T3.missing, 1);
+});
+
+test("Go execution counts and failure details deduplicate parents without hiding independent failures", () => {
+  const Package = "server/cmd/server";
+  const run = (Test) => ({ Action: "run", Package, Test });
+  const end = (Test, Action) => ({ Action, Package, Test });
+  const result = (events, status = 1) => goCommandExecution({
+    error: "", status, stdout: goEvents(events), stderr: "",
+  });
+  const failed = result([
+    run("TestConfig"), run("TestConfig/dev"), end("TestConfig/dev", "fail"),
+    run("TestConfig/prod"), end("TestConfig/prod", "fail"), end("TestConfig", "fail"),
+  ]);
+  assert.equal(failed.executed, 2);
+  assert.equal(failed.failed, 2);
+  assert.equal(failed.scenarios.length, 2);
+
+  const independentParent = result([
+    run("TestConfig"), run("TestConfig/dev"), end("TestConfig/dev", "pass"),
+    end("TestConfig", "fail"),
+  ]);
+  assert.equal(independentParent.failed, 1);
+  assert.equal(independentParent.passed, 1);
+  assert.equal(independentParent.scenarios[0].testPrefix, "TestConfig");
+
+  const passed = result([
+    run("TestConfig"), run("TestConfig/dev"), end("TestConfig/dev", "pass"),
+    end("TestConfig", "pass"),
+  ], 0);
+  assert.equal(passed.status, "passed");
+  assert.equal(passed.executed, 1);
+  assert.equal(passed.passed, 1);
+
+  const incomplete = result([
+    run("TestConfig"), run("TestConfig/dev"), end("TestConfig/dev", "pass"),
+  ], 0);
+  assert.equal(incomplete.status, "partial");
+  assert.equal(incomplete.executed, 2);
+
+  const packageFailed = result([
+    run("TestConfig"), end("TestConfig", "pass"), { Action: "fail", Package },
+  ]);
+  assert.equal(packageFailed.status, "failed");
+  assert.equal(packageFailed.failed, 1);
 });
 
 test("Go failure details retain leaf failures and restrict diagnostics", () => {

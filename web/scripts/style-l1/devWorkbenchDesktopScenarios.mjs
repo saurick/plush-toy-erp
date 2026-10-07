@@ -1,3 +1,4 @@
+import { fitMermaidDiagram, verifyMermaidViewer } from './mermaidViewerAssertions.mjs'
 import {
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_CUSTOMER_CONFIG_ROUTE,
@@ -356,7 +357,17 @@ export function createDevWorkbenchDesktopScenarios({
           .click()
         const coverage = page.locator('.erp-dev-testing-coverage-view')
         await coverage
-          .getByText('正在查看最近一次隔离验证', { exact: true })
+          .getByText('当前工作区尚未验证', { exact: true })
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await coverage.locator('.erp-dev-testing-coverage-card').count(),
+          0,
+          '当前报告缺失时不能自动展示历史失败',
+        )
+        const source = coverage.locator('.erp-dev-testing-coverage-source')
+        await source.getByText('历史隔离验证', { exact: true }).click()
+        await coverage
+          .getByText('正在查看历史隔离验证', { exact: true })
           .waitFor({ state: 'visible' })
         await coverage
           .getByText('文件监听资源不足', { exact: true })
@@ -382,7 +393,6 @@ export function createDevWorkbenchDesktopScenarios({
           await coverage.locator('.erp-dev-testing-coverage-section').count(),
           1
         )
-        const source = coverage.locator('.erp-dev-testing-coverage-source')
         const initialBox = await source.boundingBox()
         await verifySlidingMotion(
           page,
@@ -391,7 +401,7 @@ export function createDevWorkbenchDesktopScenarios({
           0
         )
         await coverage
-          .getByText('尚未生成覆盖报告', { exact: true })
+          .getByText('当前工作区尚未验证', { exact: true })
           .waitFor({ state: 'visible' })
         assert.equal(
           await coverage.locator('.erp-dev-testing-coverage-card').count(),
@@ -494,6 +504,8 @@ export function createDevWorkbenchDesktopScenarios({
           .click()
         await domainTable.waitFor()
         await page.reload()
+        await coverage.getByText('当前工作区尚未验证', { exact: true }).waitFor()
+        await source.getByText('历史隔离验证', { exact: true }).click()
         await coverage.getByText('隔离源码快照', { exact: true }).waitFor()
         await domainTable.waitFor()
         assert.equal(
@@ -540,6 +552,13 @@ export function createDevWorkbenchDesktopScenarios({
         await coverage
           .getByText('隔离源码快照', { exact: true })
           .waitFor({ state: 'visible' })
+        snapshotStatus = 'missing'
+        await coverage.getByRole('button', { name: '重新读取', exact: true }).click()
+        await coverage.getByText('尚未归档隔离验证', { exact: true }).waitFor()
+        assert.equal(await coverage.getByText('当前工作区尚未验证', { exact: true }).count(), 0)
+        snapshotStatus = 'snapshot'
+        await coverage.getByRole('button', { name: '重新读取', exact: true }).click()
+        await coverage.getByText('隔离源码快照', { exact: true }).waitFor()
         workspaceStatus = 'network-error'
         await Promise.all([
           page.waitForResponse((response) =>
@@ -561,9 +580,9 @@ export function createDevWorkbenchDesktopScenarios({
           .getByRole('button', { name: '重新读取', exact: true })
           .click()
         await coverage
-          .getByText('尚未生成覆盖报告', { exact: true })
+          .getByText('当前工作区尚未验证', { exact: true })
           .waitFor({ state: 'visible' })
-        await source.getByText('最近隔离验证', { exact: true }).click()
+        await source.getByText('历史隔离验证', { exact: true }).click()
         await coverage
           .getByText('隔离源码快照', { exact: true })
           .waitFor({ state: 'visible' })
@@ -582,6 +601,8 @@ export function createDevWorkbenchDesktopScenarios({
           .waitFor({ state: 'visible' })
         postponeSnapshot = false
         await mainViews.getByText('证据与覆盖', { exact: true }).click()
+        await coverage.getByText('当前工作区尚未验证', { exact: true }).waitFor()
+        await source.getByText('历史隔离验证', { exact: true }).click()
         await coverage
           .getByText('隔离源码快照', { exact: true })
           .waitFor({ state: 'visible' })
@@ -654,41 +675,39 @@ export function createDevWorkbenchDesktopScenarios({
         await assertNoHorizontalOverflow(page, '专项检查命令分页与空结果恢复')
       }
       if (item.route === DEV_DOCS_ROUTE) {
-        const source = 'docs/product/配置与权限策略.md'
-        await page.setViewportSize({ width: 3840, height: 2160 })
-        await page.goto(new URL(`${DEV_DOCS_ROUTE}?path=${encodeURIComponent(source)}`, page.url()).href)
-        const diagram = page
-          .locator('.erp-dev-docs-markdown [data-mermaid-status="rendered"]')
-          .first()
-        await diagram.waitFor()
-        const svg = diagram.locator('.erp-markdown-mermaid__canvas > svg')
-        const defaultGeometry = await svg.evaluate((node) => ({
-          width: node.getBoundingClientRect().width,
-          intrinsicWidth: node.viewBox.baseVal.width,
-        }))
-        assert(defaultGeometry.width > 0)
-        assert(
-          defaultGeometry.width <= defaultGeometry.intrinsicWidth + 1,
-          `短图不能被宽屏强制放大：${JSON.stringify(defaultGeometry)}`
+        const source = 'docs/engineering/跨层公共契约与生成规范.md'
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await page.goto(
+          new URL(
+            `${DEV_DOCS_ROUTE}?path=${encodeURIComponent(source)}`,
+            page.url()
+          ).href
         )
-        await diagram.getByRole('button', { name: '放大Mermaid 图表', exact: true }).click()
-        assert(
-          (await svg.boundingBox()).width > defaultGeometry.width * 1.1,
-          '图表仍可主动放大'
+        const diagrams = page.locator(
+          '.erp-dev-docs-markdown .erp-markdown-mermaid'
         )
-        await diagram.getByRole('button', { name: '重置Mermaid 图表为 100%', exact: true }).click()
-        assert(Math.abs((await svg.boundingBox()).width - defaultGeometry.width) < 1)
-        const fullscreen = diagram.getByRole('button', { name: '全屏查看Mermaid 图表', exact: true })
-        await fullscreen.click()
-        await diagram.locator('[data-mermaid-fullscreen-action="close"]').waitFor()
-        assert((await svg.boundingBox()).width <= defaultGeometry.intrinsicWidth + 1)
-        await diagram.locator('[data-mermaid-fullscreen-action="close"]').press('Escape')
-        await fullscreen.waitFor()
-        await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '全屏查看Mermaid 图表')
+        await verifyMermaidViewer(page, diagrams.first(), assert)
+        // The second diagram is much taller; its preview stays bounded without losing content.
+        const tallViewport = diagrams
+          .nth(1)
+          .locator('.erp-markdown-mermaid__viewport')
+        await tallViewport.waitFor()
+        assert((await tallViewport.boundingBox()).height <= 520)
+        await fitMermaidDiagram(diagrams.nth(1), assert)
         await page.setViewportSize({ width: 1440, height: 900 })
         assert(
-          await diagram.locator('.erp-markdown-mermaid__viewport').evaluate((node) => node.scrollWidth <= node.clientWidth),
-          '缩回普通桌面宽度后仍能看到完整概览'
+          await diagrams
+            .first()
+            .locator('.erp-markdown-mermaid__viewport')
+            .evaluate((node) => node.scrollWidth <= node.clientWidth + 2)
+        )
+      }
+      if (item.route === DEV_PERMISSION_RELATIONSHIPS_ROUTE) {
+        await page.getByRole('tab', { name: '关系图', exact: true }).click()
+        await verifyMermaidViewer(
+          page,
+          page.locator('.erp-permission-relationship .erp-markdown-mermaid'),
+          assert
         )
       }
       if (item.route === DEV_PRODUCT_ENGINEERING_ROUTE) {

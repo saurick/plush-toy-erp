@@ -724,13 +724,13 @@ function GitCloseoutView({ hooks, loading, error, onReload }) {
   )
 }
 
-function coverageReportAlert(state) {
+function coverageReportAlert(state, source) {
   if (state?.status === 'snapshot') {
     return {
       type: 'info',
-      title: '正在查看最近一次隔离验证',
+      title: '正在查看历史隔离验证',
       description:
-        '结果仅对应下方记录的源码快照；当前工作区、提交后 CI 和目标环境仍需各自核验。',
+        '这里的通过与失败仅对应下方记录的源码快照，不代表当前工作区状态；提交后 CI 和目标环境仍需各自核验。',
     }
   }
   if (state?.status === 'current') {
@@ -760,9 +760,16 @@ function coverageReportAlert(state) {
           : '请检查本地只读报告接口；空值表示未采集，不是 0%。',
     }
   }
+  if (source === 'snapshot') {
+    return {
+      type: 'info',
+      title: '尚未归档隔离验证',
+      description: state?.message || '当前没有可展示的历史隔离验证报告。',
+    }
+  }
   return {
     type: 'info',
-    title: '尚未生成覆盖报告',
+    title: '当前工作区尚未验证',
     description: `${
       state?.message || '当前还没有可展示的覆盖证据'
     }；空值表示未采集，不是 0%。请在代码基本稳定的检查点采集本地覆盖基线；“重新读取”仍只读取本地报告。`,
@@ -1145,20 +1152,10 @@ function CoverageReportView({
   onCollect,
   onReload,
 }) {
-  const [requestedSource, setRequestedSource] = useState('')
+  const [source, setSource] = useState('workspace')
   const [requestedDomain, setRequestedDomain] = useState('')
-  const source =
-    requestedSource ||
-    (!state?.report && snapshotState?.report ? 'snapshot' : 'workspace')
-  React.useEffect(() => {
-    if (requestedSource || loading || (!state && !snapshotState)) return
-    // 自动选择只用于首次读取；刷新失败时留在原来源，保证错误仍可见。
-    setRequestedSource(
-      !state?.report && snapshotState?.report ? 'snapshot' : 'workspace'
-    )
-  }, [loading, requestedSource, snapshotState, state])
   const activeState = source === 'snapshot' ? snapshotState : state
-  const alert = coverageReportAlert(activeState)
+  const alert = coverageReportAlert(activeState, source)
   const report = activeState?.report || null
   const sections = buildDevTestingCoverageSectionSummaries(report)
   const domains = report?.businessCoverage.domains || []
@@ -1191,10 +1188,10 @@ function CoverageReportView({
             aria-label="覆盖报告来源"
             className="erp-dev-testing-coverage-source"
             value={source}
-            onChange={setRequestedSource}
+            onChange={setSource}
             options={[
               { label: '当前工作区', value: 'workspace' },
-              { label: '最近隔离验证', value: 'snapshot' },
+              { label: '历史隔离验证', value: 'snapshot' },
             ]}
           />
           <div className="erp-dev-testing-coverage-actions">
@@ -1206,7 +1203,7 @@ function CoverageReportView({
                 operationPresentation.active || qaBusy?.active || !qaReady
               }
               onClick={() => {
-                setRequestedSource('workspace')
+                setSource('workspace')
                 onCollect()
               }}
             >
@@ -2033,7 +2030,7 @@ export default function DevTestingPage() {
     }
   }
 
-  const runTestingAction = async (action) => {
+  const runTestingAction = async (action, dataScale) => {
     if (
       (action === 'role-access' && !customerReady) ||
       testingActionStarting ||
@@ -2049,11 +2046,12 @@ export default function DevTestingPage() {
     try {
       if (!testingIdempotencyKeys.current[action]) {
         testingIdempotencyKeys.current[action] =
-          createDevTestingIdempotencyKey(action)
+          { key: createDevTestingIdempotencyKey(action), dataScale }
       }
       const operation = await testingOperationClient.start(
         action,
-        testingIdempotencyKeys.current[action]
+        testingIdempotencyKeys.current[action].key,
+        { dataScale: testingIdempotencyKeys.current[action].dataScale }
       )
       setTestingSummary((current) => ({
         ...(current || {

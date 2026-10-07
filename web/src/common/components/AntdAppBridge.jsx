@@ -3,14 +3,14 @@ import { App as AntdApp } from 'antd'
 import { registerAntdAppApis } from '@/common/utils/antdApp'
 
 const AntdAppBridge = () => {
-  const { message, modal } = AntdApp.useApp()
+  const { message, modal, notification } = AntdApp.useApp()
 
   useEffect(() => {
-    registerAntdAppApis({ message, modal })
+    registerAntdAppApis({ message, modal, notification })
     return () => {
       registerAntdAppApis()
     }
-  }, [message, modal])
+  }, [message, modal, notification])
 
   return null
 }

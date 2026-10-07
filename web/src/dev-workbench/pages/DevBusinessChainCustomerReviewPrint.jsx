@@ -171,6 +171,13 @@ function ChainContent({ chain }) {
                 </td>
                 <td>
                   <p>{step.completion}</p>
+                  {step.actionOutcomes.map((action) => (
+                    <p key={action.key}>
+                      <strong>{action.label}</strong>
+                      {action.condition ? `条件：${action.condition}；` : ''}
+                      {action.results.join('；') || '本动作不直接改变业务状态。'}
+                    </p>
+                  ))}
                   <p>
                     <strong>下一步</strong>
                     {step.next}

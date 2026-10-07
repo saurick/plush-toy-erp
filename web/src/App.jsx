@@ -9,6 +9,8 @@ import { Helmet } from 'react-helmet-async'
 import { authBus } from '@/common/auth/authBus'
 import { appAlert } from '@/common/components/modal/alertBridge'
 import AntdAppBridge from '@/common/components/AntdAppBridge'
+import { MESSAGE_CONFIG, NOTIFICATION_CONFIG } from '@/common/utils/feedbackConfig.mjs'
+import '@/common/components/feedback/feedback.css'
 import { getActiveERPBrand } from '@/common/consts/brand'
 import { applyERPFavicon } from '@/common/consts/favicon.mjs'
 import { getUserFacingErrorMessage } from '@/common/utils/errorMessage'
@@ -17,7 +19,7 @@ import {
   useERPWorkspace,
 } from '@/erp/context/ERPWorkspaceProvider'
 import { ERPThemeProvider, useERPTheme } from '@/common/theme/erpTheme'
-import { ERP_DARK_PALETTE } from '@/common/theme/erpThemePalette.mjs'
+import { ERP_DARK_PALETTE, getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import '@/common/components/empty/empty-state.css'
 
@@ -144,18 +146,11 @@ function ThemedApp() {
           controlHeightSM: 28,
           fontFamily:
             '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
-          colorBgBase: isDark ? ERP_DARK_PALETTE.page : '#ffffff',
-          colorBgLayout: isDark ? ERP_DARK_PALETTE.page : '#f2f5f3',
-          colorBgContainer: isDark ? ERP_DARK_PALETTE.surface : '#ffffff',
-          colorBgElevated: isDark ? ERP_DARK_PALETTE.surfaceRaised : '#ffffff',
-          colorBorder: isDark ? ERP_DARK_PALETTE.border : '#dce4df',
-          colorBorderSecondary: isDark ? ERP_DARK_PALETTE.border : '#dce4df',
-          colorText: isDark ? ERP_DARK_PALETTE.text : '#1f2a24',
-          colorTextSecondary: isDark ? ERP_DARK_PALETTE.textMuted : '#4d5d53',
+          ...getERPSurfaceTokens(isDark),
         },
       }}
     >
-      <AntdApp>
+      <AntdApp message={MESSAGE_CONFIG} notification={NOTIFICATION_CONFIG}>
         <AntdAppBridge />
         <AppContent />
       </AntdApp>

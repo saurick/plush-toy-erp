@@ -72,9 +72,63 @@ const BUSINESS_NO_CODES = new Set([
   "CGDZ",
   "SK",
   "FK",
+  "KCTZ",
+  "CGCZ",
+  "WWCZ",
 ]);
 
 export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
+  "inventory.create_inventory_operation": Object.freeze([
+    "operation_no",
+    "operation_type",
+    "reason",
+    "idempotency_key",
+    "items",
+  ]),
+  "inventory.get_inventory_operation": Object.freeze(["id"]),
+  "inventory.list_inventory_operations": Object.freeze([
+    "operation_type",
+    "status",
+    "created_by",
+    "limit",
+    "offset",
+  ]),
+  "inventory.cancel_inventory_operation": Object.freeze([
+    "id",
+    "expected_version",
+    "reason",
+  ]),
+  "purchase.create_purchase_rejection_disposition": Object.freeze([
+    "disposition_no",
+    "quality_inspection_id",
+    "disposition_type",
+    "quantity",
+    "reason",
+    "idempotency_key",
+  ]),
+  "purchase.post_purchase_rejection_disposition": Object.freeze([
+    "id",
+    "expected_version",
+  ]),
+  "purchase.cancel_purchase_rejection_disposition": Object.freeze([
+    "id",
+    "expected_version",
+    "reason",
+  ]),
+  "purchase.list_purchase_rejection_dispositions": Object.freeze([
+    "quality_inspection_id",
+    "purchase_receipt_id",
+    "status",
+    "limit",
+    "offset",
+  ]),
+  "production_wip.prepare_production_outsourcing_order": Object.freeze([
+    "production_wip_batch_id",
+    "expected_version",
+    "supplier_id",
+    "requirement_ids",
+    "expected_return_date",
+  ]),
   "inventory.list_inventory_balances": Object.freeze([
     "customer_key",
     "subject_type",
@@ -161,6 +215,8 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "production_order_id",
     "production_order_item_id",
     "production_material_requirement_id",
+    "production_wip_batch_id",
+    "quality_inspection_id",
     "requested_quantity",
     "reason",
     "idempotency_key",

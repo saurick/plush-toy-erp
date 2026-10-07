@@ -1,3 +1,4 @@
+import { PRESSURE_DATA_SCALES } from './devPressureData.mjs'
 import { DEV_PRESSURE_REPORTS_API_PATH } from './devTestingOperation.mjs'
 
 export const DEV_PRESSURE_PHASES = Object.freeze({
@@ -41,7 +42,8 @@ export const DEV_PRESSURE_CHECKS = Object.freeze({
   unauthorizedRejected: '越权被拒绝',
   singleSupplierResult: '每供应商仅一份采购结果',
   replyReplay: '丢失回复后重放一致',
-  databaseConsistency: '数据库权威对账',
+  databaseConsistency: '本轮数据库权威对账',
+  backgroundUnchanged: '历史背景内容未变化',
   recovery: '降载恢复',
   cleanup: '隔离资源清理',
 })
@@ -81,6 +83,13 @@ function summary(value) {
   ) {
     invalid()
   }
+  if (value.dataScale !== undefined && value.dataScale !== null && !Object.hasOwn(PRESSURE_DATA_SCALES, value.dataScale)) invalid()
+  if (value.comparisonKey !== undefined && value.comparisonKey !== null && !HASH.test(value.comparisonKey)) invalid()
+  if (value.main) {
+    metrics(value.main.operations)
+    if (!Array.isArray(value.main.methods) || value.main.methods.length > 40) invalid()
+    value.main.methods.forEach((method) => { if (!/^[a-z_]+\.[a-z_]+$/u.test(method.name)) invalid(); metrics(method) })
+  }
   return value
 }
 function metrics(value) {
@@ -111,6 +120,11 @@ export function normalizeDevPressureReports(value) {
   value.reports.forEach(summary)
   if (value.report !== null) {
     const report = summary(value.report)
+    if (report.dataset) {
+      const data = report.dataset
+      if (!Object.hasOwn(PRESSURE_DATA_SCALES, data.dataScale) || !data.history || !data.working || !data.reads || !data.complexity || !data.storage ||
+          ![data.history.states, data.reads.target, data.reads.actual, data.complexity.ordinary, data.complexity.complex].every((record) => record && Object.values(record).every(isNumber))) invalid()
+    }
     if (
       !report.candidate ||
       !report.checks ||
@@ -213,4 +227,44 @@ export function pressureMainLevel(report, kind = 'engineering') {
   return (
     report?.[kind]?.levels?.find((level) => level.key === 'capacity') || null
   )
+}
+
+export function comparePressureScale(report, baseline) {
+  if (!report?.dataset || !baseline?.dataScale || !report.comparisonKey || !baseline.comparisonKey) {
+    return { reason: '缺少数据规模或环境身份，无法计算变化。' }
+  }
+  if (report.status !== 'passed' || baseline.status !== 'passed') {
+    return { reason: '两次运行均须完整通过，再比较性能变化。' }
+  }
+  if (report.comparisonKey !== baseline.comparisonKey) {
+    return { reason: '源码、负载或运行环境不同，不能归因于数据规模。' }
+  }
+  if (report.id === baseline.id || report.dataset.dataScale === baseline.dataScale) {
+    return { reason: '请选择另一数据规模的报告。' }
+  }
+  const main = pressureMainLevel(report)
+  const previous = baseline.main
+  if (!main || !previous) return { reason: '缺少主段读数，无法计算变化。' }
+  const delta = (value, reference) =>
+    Number.isFinite(value) && Number.isFinite(reference) && reference > 0
+      ? (value / reference - 1) * 100 : null
+  return {
+    reason: null,
+    throughput: delta(main.operations.successfulRps, previous.operations.successfulRps),
+    methods: main.methods.map((method) => {
+      const other = previous.methods.find(({ name }) => name === method.name)
+      return {
+        name: method.name,
+        beforeP95: other?.p95Ms ?? null,
+        afterP95: method.p95Ms,
+        beforeP99: other?.p99Ms ?? null,
+        afterP99: method.p99Ms,
+        p95: delta(method.p95Ms, other?.p95Ms),
+        p99: delta(method.p99Ms, other?.p99Ms),
+      }
+    }),
+  }
+}
+export function pressureScaleLabel(key) {
+  return PRESSURE_DATA_SCALES[key]?.label || '规模未记录'
 }

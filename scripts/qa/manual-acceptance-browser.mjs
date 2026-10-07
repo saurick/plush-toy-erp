@@ -20,6 +20,7 @@ import {
 } from "./manual-acceptance-page-data-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 import { formatUnixDate } from "../../web/src/erp/utils/masterDataOrderView.mjs";
+import { BUSINESS_SEARCH_SCOPES } from "../../web/src/erp/utils/businessSearchScopes.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
@@ -665,7 +666,7 @@ async function waitForReadablePage(page) {
 }
 
 async function selectLoginEntry(page, entryTarget) {
-  const label = entryTarget === "mobile" ? "手机端待办" : "电脑端业务管理";
+  const label = entryTarget === "mobile" ? "手机版" : "电脑版";
   const entry = page
     .locator(".ant-segmented-item")
     .filter({ hasText: label })
@@ -919,6 +920,7 @@ export function evaluatePrintSourceMinimumEvidence({
   visibleRows,
   matchingCurrentBatchRows,
   paginationTexts = [],
+  filteredTotal = null,
   minimumRecords,
 }) {
   const renderedRows = Number(visibleRows) || 0;
@@ -926,8 +928,10 @@ export function evaluatePrintSourceMinimumEvidence({
   const currentBatchRowsOnly =
     renderedRows > 0 && matchingRows === renderedRows;
   const paginationTotal = largestTotalFromTexts(paginationTexts);
-  const observedTotal = currentBatchRowsOnly
-    ? Math.max(renderedRows, paginationTotal)
+  const hasFilteredTotal = Number.isSafeInteger(filteredTotal) && filteredTotal >= 0;
+  const totalsAgree = !hasFilteredTotal || paginationTotal === 0 || filteredTotal === paginationTotal;
+  const observedTotal = currentBatchRowsOnly && totalsAgree
+    ? Math.max(renderedRows, hasFilteredTotal ? filteredTotal : paginationTotal)
     : 0;
   const minimumSatisfied =
     currentBatchRowsOnly && observedTotal >= Number(minimumRecords);
@@ -938,12 +942,14 @@ export function evaluatePrintSourceMinimumEvidence({
         ? "page_has_data_minimum_not_proven"
         : "not_proven",
     evidenceSource:
-      "current batch source-prefix search and visible table/pagination DOM",
+      "current batch source-prefix search and visible table/filtered-total DOM",
     sourcePrefix,
     visibleRows: renderedRows,
     matchingCurrentBatchRows: matchingRows,
     currentBatchRowsOnly,
     paginationTotal,
+    filteredTotal,
+    totalsAgree,
     observedTotal,
     minimumRecords,
     minimumSatisfied,
@@ -1009,7 +1015,7 @@ export function readBusinessSummaryTotal(targetKey, bodyText = "") {
     products: [/总产品\s*(\d+)/u],
     "production-orders": [/符合条件\s*(\d+)/u],
     "accessories-purchase": [/总订单\s*(\d+)/u],
-    shipments: [/总出货单\s*(\d+)/u],
+    shipments: [/符合条件\s*(\d+)/u],
     "permission-center": [/员工账号\s*(\d+)/u, /共\s*(\d+)\s*个员工账号/u],
   };
   const values = (patterns[targetKey] || []).flatMap((pattern) => {
@@ -1034,7 +1040,7 @@ export function readBusinessSummaryTotal(targetKey, bodyText = "") {
 
 export function shipmentListReady(expectedCount) {
   const bodyText = document.body?.innerText || "";
-  const match = String(bodyText).match(/总出货单\s*(\d+)/u);
+  const match = String(bodyText).match(/符合条件\s*(\d+)/u);
   const total = match ? Number(match[1]) : 0;
   const rows = [
     ...document.querySelectorAll(".ant-table-tbody > tr.ant-table-row"),
@@ -1194,7 +1200,7 @@ async function readDashboardEvidence(page, target, datasetBinding) {
         }, 0);
         return (
           total > 0 &&
-          document.querySelector(".erp-workbench-task-row--openable")
+          document.querySelector(".erp-workbench-queue-panel .erp-task-table-row")
         );
       },
       null,
@@ -1217,7 +1223,7 @@ async function readDashboardEvidence(page, target, datasetBinding) {
           .map((node) => node.getAttribute("data-task-code") || "");
         const visibleCurrentBatchRow = [
           ...document.querySelectorAll(
-            ".erp-workbench-task-row--openable[data-task-code]",
+            ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]",
           ),
         ].some((node) => {
           const rect = node.getBoundingClientRect();
@@ -1250,14 +1256,14 @@ async function readDashboardEvidence(page, target, datasetBinding) {
           ),
         ].map((node) => node.getAttribute("aria-label") || ""),
         visibleRows: [
-          ...document.querySelectorAll(".erp-workbench-task-row--openable"),
+          ...document.querySelectorAll(".erp-workbench-queue-panel .erp-task-table-row"),
         ].filter((node) => {
           const rect = node.getBoundingClientRect();
           return rect.width > 0 && rect.height > 0;
         }).length,
         visibleTaskCodes: [
           ...document.querySelectorAll(
-            ".erp-workbench-task-row--openable[data-task-code]",
+            ".erp-workbench-queue-panel .erp-task-table-row[data-task-code]",
           ),
         ]
           .filter((node) => {
@@ -1300,14 +1306,15 @@ async function readDashboardEvidence(page, target, datasetBinding) {
     await page.goto(url.toString());
     await page.locator(".erp-progress-order").first().waitFor({state:"visible",timeout:PAGE_TIMEOUT_MS});
     const metrics = await page.locator(".erp-progress-board").evaluate(root => ({
-      total: Number(root.querySelector(".erp-progress-metric strong")?.textContent.replaceAll(",","")),
+      total: Number(root.querySelector(".erp-progress-metric .erp-filter-chip__count")?.textContent.replaceAll(",","")),
       ids: [...root.querySelectorAll("[data-progress-order-id]")].map(node => Number(node.dataset.progressOrderId)),
     }));
     const evidence = evaluateBusinessDashboardCurrentBatchEvidence({
       evidence: evaluateBusinessDashboardEvidence(metrics,target.dataEvidenceRequirements),currentBatch,
       baselineProven: datasetBinding?.dataset?.baseline?.exactEmptyBusinessBaseline === true,
     });
-    await page.locator(".erp-progress-order").first().click();
+    await page.locator("button[data-progress-order-id]").first().click();
+    await page.getByLabel("当前订单阶段摘要", { exact: true }).getByRole("button", { name: "查看完整进度", exact: true }).click();
     const drawer = page.getByRole("dialog");
     await drawer.getByRole("tab",{name:"产品明细",exact:true}).waitFor();
     const expectedPath = "/erp/sales/project-orders/sales-orders";
@@ -1405,6 +1412,11 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
     state: "visible",
     timeout: PAGE_TIMEOUT_MS,
   });
+  await page.getByTestId("mobile-role-nav-tasks").click();
+  await page
+    .getByLabel("任务状态", { exact: true })
+    .getByText("待办", { exact: true })
+    .click();
   const waitForActiveViewLoaded = () =>
     page.waitForFunction(
       () =>
@@ -1415,6 +1427,20 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
       { timeout: PAGE_TIMEOUT_MS },
     );
   await waitForActiveViewLoaded();
+  const taskSearch = page.getByLabel("搜索订单、产品、物料或款号", { exact: true });
+  await taskSearch.fill(taskCodePrefix);
+  await taskSearch.press("Enter");
+  await page.waitForFunction(
+    (prefix) => {
+      const root = document.querySelector('[data-testid="mobile-role-scroll"]');
+      return root?.getAttribute("data-refreshing") === "false" &&
+        [...root.querySelectorAll(".erp-mobile-list-item[data-task-code]")].some(
+          (node) => (node.getAttribute("data-task-code") || "").startsWith(`${prefix}-`),
+        );
+    },
+    taskCodePrefix,
+    { timeout: PAGE_TIMEOUT_MS },
+  );
   const visibleCurrentBatchTaskCount = async () =>
     page
       .locator(`.erp-mobile-list-item[data-task-code^="${taskCodePrefix}-"]`)
@@ -1441,15 +1467,11 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
   };
   const todoCount = await readCurrentTotal("todo");
   const visibleTodoCurrentBatchTaskCount = await visibleCurrentBatchTaskCount();
-  await page.getByTestId("mobile-role-nav-done").click();
-  await page.waitForFunction(
-    () =>
-      document
-        .querySelector(".mobile-role-tasks-page h1")
-        ?.textContent?.trim() === "已办",
-    null,
-    { timeout: PAGE_TIMEOUT_MS },
-  );
+  await page
+    .getByLabel("任务状态", { exact: true })
+    .getByText("已办", { exact: true })
+    .click();
+  await page.getByTestId("mobile-role-done-count").waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
   await waitForActiveViewLoaded();
   await page.waitForFunction(
     ({ todoTotal, requiredMinimum }) => {
@@ -1468,7 +1490,10 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
   );
   const doneCount = await readCurrentTotal("done");
   const visibleDoneCurrentBatchTaskCount = await visibleCurrentBatchTaskCount();
-  await page.getByTestId("mobile-role-nav-todo").click();
+  await page
+    .getByLabel("任务状态", { exact: true })
+    .getByText("待办", { exact: true })
+    .click();
   return evaluateMobileCurrentBatchEvidence({
     roleKey: target.roleKey,
     todoCount,
@@ -1479,6 +1504,17 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
     currentBatch,
     taskCodePrefix,
   });
+}
+
+export function sourceDocumentSearchPrefix(sourcePrefix, recordQuery) {
+  const prefix = requiredText(sourcePrefix, "当前批次来源前缀");
+  const record = requiredText(recordQuery, "当前批次来源单号");
+  if (!record.startsWith(`${prefix}-`)) {
+    throw new BrowserAcceptanceError("来源单号不属于当前批次");
+  }
+  const category = record.slice(prefix.length + 1).match(/^([A-Z]+)-/u)?.[1];
+  if (!category) throw new BrowserAcceptanceError("来源单号缺少业务类别");
+  return `${prefix}-${category}-`;
 }
 
 export function resolveCurrentBatchListFilter(
@@ -1521,7 +1557,18 @@ export function resolveCurrentBatchListFilter(
     (probe) => probe.batchEvidence === "prefix_filtered" && probe.batchPrefix,
   );
   if (sourceProbe) {
-    return { mode: "source_prefix", identifier: sourceProbe.batchPrefix };
+    const printRecordKey = {
+      "accessories-purchase": "purchaseOrder",
+      "processing-contracts": "outsourcingOrder",
+      "material-bom": "bomVersion",
+    }[target.key];
+    const identifier = printRecordKey
+      ? sourceDocumentSearchPrefix(
+          sourceProbe.batchPrefix,
+          datasetBinding?.printRecords?.[printRecordKey]?.recordQuery,
+        )
+      : sourceProbe.batchPrefix;
+    return { mode: "source_prefix", identifier };
   }
   const factIdentifier = String(
     datasetBinding?.dataset?.currentBatchIdentifiers?.[target.key] || "",
@@ -1543,14 +1590,16 @@ async function filterVisibleListToCurrentBatch(page, target, filter) {
   if (filter.mode !== "visible_exact_business_number") {
     let search = null;
     if (target.key === "task-board") {
-      search = page.getByPlaceholder("搜索任务", { exact: true });
+      search = page.getByPlaceholder("订单 / 产品 / 物料 / 款号", {
+        exact: true,
+      });
       await search.waitFor({
         state: "visible",
         timeout: PAGE_TIMEOUT_MS,
       });
     } else {
       const candidates = page.locator(
-        'input[placeholder*="搜索"],input[placeholder^="操作人"]',
+        'input[aria-label^="可搜索："],input[placeholder*="搜"],input[placeholder^="操作人"]',
       );
       for (let index = 0; index < (await candidates.count()); index += 1) {
         const candidate = candidates.nth(index);
@@ -1842,7 +1891,7 @@ async function readListEvidence(page, target, datasetBinding) {
   }
   if (target.key === "inventory") {
     await page.getByRole("tab", { name: "库存批次", exact: true }).click();
-    await page.getByPlaceholder("搜索批次").waitFor({
+    await page.getByPlaceholder(BUSINESS_SEARCH_SCOPES.lots.placeholder, { exact: true }).waitFor({
       state: "visible",
       timeout: PAGE_TIMEOUT_MS,
     });
@@ -1941,7 +1990,7 @@ async function readListEvidence(page, target, datasetBinding) {
         `出货页面必须精确显示 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单，当前为 ${pageReportedTotal}`,
       );
     }
-    const search = page.getByPlaceholder("搜索出货");
+    const search = page.getByPlaceholder(BUSINESS_SEARCH_SCOPES.shipment.placeholder, { exact: true });
     await search.fill(expected.longShipmentNo);
     await page.keyboard.press("Enter");
     const row = page
@@ -1951,7 +2000,7 @@ async function readListEvidence(page, target, datasetBinding) {
     await row.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     await row.click();
     await page.getByRole("button", { name: /查看明细/u }).click();
-    const modal = page.getByRole("dialog", { name: "查看出货明细" });
+    const modal = page.getByRole("region", { name: "查看出货明细", exact: true });
     await modal.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     const lineTag = modal.getByText(
       `${MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT} 行`,
@@ -1971,7 +2020,7 @@ async function readListEvidence(page, target, datasetBinding) {
       matchingCurrentBatchItems: 1,
       currentBatchVisible: true,
     };
-    await modal.locator(".ant-modal-close").click();
+    await modal.getByRole("button", { name: "返回列表", exact: true }).click();
   }
   if (FINANCE_BROWSER_PAGE_CONTRACT[target.key]) {
     specializedEvidence = evaluateFinanceFieldBrowserEvidence({
@@ -3200,6 +3249,7 @@ export async function verifyManualAcceptanceBrowserDatasetBinding({
     configRevision: printInput.configRevision,
     dataset,
     readiness,
+    printRecords: printInput.printRecords,
     runtimeIdentity: {
       databaseName: runtimeIdentity.databaseName,
       release: runtimeIdentity.release ?? null,
@@ -3318,6 +3368,13 @@ async function readPrintSourceMinimumEvidence(
           ".ant-pagination-total-text,.ant-pagination",
         ),
       ].map((node) => node.textContent || ""),
+      filteredTotal: (() => {
+        const label = document.querySelector(
+          '.erp-business-page-header-card__stat[aria-label^="符合条件 "],.erp-business-page-header-card__stat[aria-label^="物料清单总数 "]',
+        )?.getAttribute("aria-label") || "";
+        const match = label.match(/^(?:符合条件|物料清单总数) (\d+)，只读摘要$/u);
+        return match ? Number(match[1]) : null;
+      })(),
     };
   }, sourcePrefix);
   const evidence = evaluatePrintSourceMinimumEvidence({
@@ -3360,7 +3417,9 @@ async function verifyBusinessPrintTemplate(browser, options) {
   let workspace;
   let preview;
   try {
-    await page.goto(new URL(sourceRoute, `${baseURL}/`).toString(), {
+    const sourceURL = new URL(sourceRoute, `${baseURL}/`);
+    sourceURL.searchParams.set("scope", "all");
+    await page.goto(sourceURL.toString(), {
       waitUntil: "domcontentloaded",
       timeout: PAGE_TIMEOUT_MS,
     });
@@ -3395,14 +3454,13 @@ async function verifyBusinessPrintTemplate(browser, options) {
       )
       .first();
     const action = page
-      .locator("button")
+      .locator("button:visible")
       .filter({ has: page.getByText(actionLabel, { exact: true }) })
       .first();
-    await action.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     let selectionStable = false;
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       await search.fill(recordQuery);
-      const filteredRowsReady = await page
+          const filteredRowsReady = await page
         .waitForFunction(
           (query) => {
             const rows = [
@@ -3445,6 +3503,10 @@ async function verifyBusinessPrintTemplate(browser, options) {
       if (!(await selectionInput.isChecked())) {
         await selectionControl.click();
       }
+      if (!(await action.isVisible())) {
+        await page.getByRole("button", { name: /^更多操作，共/u }).click();
+      }
+      await action.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
       const actionReady = await page
         .waitForFunction(
           ({ label, query }) => {
@@ -3454,6 +3516,8 @@ async function verifyBusinessPrintTemplate(browser, options) {
             const enabledAction = [...document.querySelectorAll("button")].some(
               (button) =>
                 button.innerText.replace(/\s+/gu, " ").trim() === label &&
+                button.getBoundingClientRect().width > 0 &&
+                window.getComputedStyle(button).visibility !== "hidden" &&
                 !button.disabled,
             );
             return selected && enabledAction;
@@ -3661,7 +3725,7 @@ async function verifyBusinessPrintEvidence(
       "/erp/purchase/accessories",
       "打印合同",
       "material-purchase-contract",
-      "搜索采购单",
+      BUSINESS_SEARCH_SCOPES.purchase.placeholder,
       printInput.printRecords.purchaseOrder.recordQuery,
       printInput.printRecords.purchaseOrder.lineCount,
     ],
@@ -3670,7 +3734,7 @@ async function verifyBusinessPrintEvidence(
       "/erp/purchase/processing-contracts",
       "加工合同打印",
       "processing-contract",
-      "搜索合同",
+      BUSINESS_SEARCH_SCOPES.outsourcing.placeholder,
       printInput.printRecords.outsourcingOrder.recordQuery,
       printInput.printRecords.outsourcingOrder.lineCount,
     ],
@@ -3679,7 +3743,7 @@ async function verifyBusinessPrintEvidence(
       "/erp/purchase/material-bom",
       "打印物料明细",
       "engineering-material-detail",
-      "搜索 BOM 版本",
+      BUSINESS_SEARCH_SCOPES.bom.placeholder,
       printInput.printRecords.bomVersion.recordQuery,
       printInput.printRecords.bomVersion.lineCount,
     ],
@@ -3688,7 +3752,7 @@ async function verifyBusinessPrintEvidence(
       "/erp/purchase/material-bom",
       "打印色卡",
       "engineering-color-card",
-      "搜索 BOM 版本",
+      BUSINESS_SEARCH_SCOPES.bom.placeholder,
       printInput.printRecords.bomVersion.recordQuery,
       printInput.printRecords.bomVersion.lineCount,
     ],
@@ -3697,7 +3761,7 @@ async function verifyBusinessPrintEvidence(
       "/erp/purchase/material-bom",
       "打印作业指导书",
       "engineering-work-instruction",
-      "搜索 BOM 版本",
+      BUSINESS_SEARCH_SCOPES.bom.placeholder,
       printInput.printRecords.bomVersion.recordQuery,
       printInput.printRecords.bomVersion.lineCount,
     ],
@@ -3732,7 +3796,7 @@ async function verifyBusinessPrintEvidence(
         await verifyBusinessPrintTemplate(browser, {
           baseURL,
           storageState: login.storageState,
-          sourcePrefix: printInput.sourcePrefix,
+          sourcePrefix: sourceDocumentSearchPrefix(printInput.sourcePrefix, recordQuery),
           sourceRoute,
           actionLabel,
           templateKey,
@@ -3909,9 +3973,12 @@ async function verifyTarget(
       throw new BrowserAcceptanceError(`${target.title} 缺少可识别的页面内容`);
     }
     if (["admin-login", "entry"].includes(target.key)) {
-      if (!visible.companyVisible || !visible.systemNameVisible) {
+      if (
+        !visible.companyVisible ||
+        (target.key === "entry" && !visible.systemNameVisible)
+      ) {
         throw new BrowserAcceptanceError(
-          `${target.title} 未显示甲方公司和系统名称`,
+          `${target.title} 未显示当前入口所需的客户品牌`,
         );
       }
     }

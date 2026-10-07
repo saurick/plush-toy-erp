@@ -1,5 +1,7 @@
+import { CONFIRM_MODAL_WIDTH } from '../../common/utils/feedbackConfig.mjs'
+
 export const ERP_MODAL_WIDTHS = Object.freeze({
-  confirm: 480,
+  confirm: CONFIRM_MODAL_WIDTH,
   localAction: 'min(860px, calc(100vw - 32px))',
   recordDetails: 'min(1120px, calc(100vw - 32px))',
   lineItems: 'min(1800px, 94vw, calc(100vw - 32px))',

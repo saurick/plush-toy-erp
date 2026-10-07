@@ -638,12 +638,13 @@ export function createDevVersionCenterScenarios({
         const lockCanvas = lockSection.locator(
           '.erp-markdown-mermaid__canvas'
         )
+        const previewZoom = Number(await lockCanvas.getAttribute('data-mermaid-zoom'))
         await lockSection
           .getByRole('button', {
             name: '放大Git index.lock 检查与恢复流程',
           })
           .click()
-        assert.equal(await lockCanvas.getAttribute('data-mermaid-zoom'), '120')
+        assert(Number(await lockCanvas.getAttribute('data-mermaid-zoom')) > previewZoom)
         await lockSection
           .getByRole('button', {
             name: '重置Git index.lock 检查与恢复流程为 100%',
@@ -663,9 +664,9 @@ export function createDevVersionCenterScenarios({
         assert.equal(
           await lockSection
             .locator('.erp-markdown-mermaid__viewport')
-            .evaluate((node) => node.scrollWidth > node.clientWidth),
+            .evaluate((node) => node.scrollWidth <= node.clientWidth + 2),
           true,
-          '窄屏流程图应在自身视口内横向滚动'
+          '窄屏流程图应适配自身视口，不再被固定最小宽度撑开'
         )
         await takeoverDialog.getByRole('button', { name: '我知道了' }).click()
         await takeoverDialog.waitFor({ state: 'hidden' })

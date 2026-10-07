@@ -4,11 +4,12 @@ import { createBusinessFollowupScenarios } from './businessFollowupScenarios.mjs
 import { createHighFidelityScenarios } from './highFidelityScenarios.mjs'
 import { createUnifiedInteractionScenarios } from './unifiedInteractionScenarios.mjs'
 import { createDevUIDesignDetailScenarios } from './devUIDesignDetailScenarios.mjs'
+import { createDevUIFeedbackScenarios } from './devUIFeedbackScenarios.mjs'
 import { createDevUIDesignWorkflowScenarios } from './devUIDesignWorkflowScenarios.mjs'
 import { createMobileProgressScenarios } from './mobileProgressScenarios.mjs'
 import { createMobileNavigationBadgeScenarios } from './mobileNavigationBadgeScenarios.mjs'
-import { createBusinessFormInteractionScenarios } from './businessFormInteractionScenarios.mjs'
 import { createDesktopNavigationBadgeScenarios } from './desktopNavigationBadgeScenarios.mjs'
+import { createBusinessFormInteractionScenarios } from './businessFormInteractionScenarios.mjs'
 import { createBusinessPageContractScenarios } from './businessPageContractScenarios.mjs'
 import { createAuditLogScenarios } from './auditLogScenarios.mjs'
 import { createHistoryRecordScenarios } from './historyRecordScenarios.mjs'
@@ -42,6 +43,7 @@ import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
 import { createDevWorkbenchDesktopScenarios } from './devWorkbenchDesktopScenarios.mjs'
 import { createDevPressureScenarios } from './devPressureScenarios.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
+import { createDevDataPreparationScenarios } from './devDataPreparationScenarios.mjs'
 import { createDevDeliveryWorkspaceScenarios } from './devDeliveryWorkspaceScenarios.mjs'
 import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
 import { createBusinessModuleNavigationScenarios } from './businessModuleNavigationScenarios.mjs'
@@ -425,6 +427,7 @@ export function createStyleL1Scenarios(deps) {
     }),
     ...createDevPressureScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevUIDesignDetailScenarios(deps),
+    ...createDevUIFeedbackScenarios(deps),
     ...createDevUIDesignWorkflowScenarios(deps),
     ...createDevQualityGateScenarios({
       assert,
@@ -440,6 +443,11 @@ export function createStyleL1Scenarios(deps) {
       expectHeading,
       outputDir,
       path,
+    }),
+    ...createDevDataPreparationScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+      expectHeading,
     }),
     ...createDevDeliveryWorkspaceScenarios({
       assert,
@@ -590,6 +598,7 @@ export function createStyleL1Scenarios(deps) {
       ...deps,
       customerRuntimeEffectiveSession,
     }),
+    ...createDesktopNavigationBadgeScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileTaskScenarios({
       expectText,
       assertTextAbsent,
@@ -598,7 +607,6 @@ export function createStyleL1Scenarios(deps) {
       gotoScenarioPath,
       waitForPath,
       path,
-    ...createDesktopNavigationBadgeScenarios({ ...deps, customerRuntimeEffectiveSession }),
       outputDir,
       assertThemeReadable,
       assertDarkThemeContrast,

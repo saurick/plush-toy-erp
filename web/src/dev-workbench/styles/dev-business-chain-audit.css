@@ -1,0 +1,139 @@
+.erp-dev-chain-audit {
+  row-gap: 16px;
+  min-width: 0;
+}
+
+.erp-dev-chain-audit__header,
+.erp-dev-chain-audit__toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.erp-dev-chain-audit__header {
+  justify-content: space-between;
+}
+
+.erp-dev-chain-audit__header h1 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.erp-dev-chain-audit__batch-select {
+  width: 320px;
+  max-width: 100%;
+}
+
+.erp-dev-chain-audit__chain-select {
+  width: 255px;
+}
+
+.erp-dev-chain-audit__status-select {
+  width: 130px;
+}
+
+.erp-dev-chain-audit__toolbar .erp-search-input {
+  width: 310px;
+  max-width: 100%;
+}
+
+.erp-dev-chain-audit__summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.erp-dev-chain-audit__summary > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--erp-control-border);
+  border-radius: 8px;
+  background: var(--erp-control-surface);
+}
+
+.erp-dev-chain-audit__summary strong {
+  font-size: 24px;
+}
+
+.erp-dev-chain-audit__stack {
+  display: grid;
+  gap: 16px;
+}
+
+.erp-dev-chain-audit__section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--erp-control-border);
+  border-radius: 8px;
+  background: var(--erp-control-surface);
+}
+
+.erp-dev-chain-audit__section h2 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.erp-dev-chain-audit__content,
+.erp-dev-chain-audit__diagram {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.erp-dev-chain-audit__diagram {
+  overflow: auto;
+}
+
+.erp-dev-chain-audit__details {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.erp-dev-chain-audit__details dt {
+  font-weight: 600;
+}
+
+.erp-dev-chain-audit__details dd {
+  margin: 0;
+}
+
+.erp-dev-chain-audit__evidence-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.erp-dev-chain-audit code,
+.erp-dev-chain-audit td,
+.erp-dev-chain-audit dd,
+.erp-dev-chain-audit a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.erp-dev-chain-audit__chain-link {
+  height: auto;
+  padding: 0;
+  white-space: normal;
+  text-align: left;
+}
+
+.erp-dev-chain-audit__limits li {
+  margin-block: 8px;
+}
+
+.erp-dev-chain-audit summary {
+  cursor: pointer;
+}
+
+.erp-dev-chain-audit__verdict {
+  margin: 0;
+}

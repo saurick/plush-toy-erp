@@ -1,4 +1,5 @@
 import {
+  DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_CUSTOMER_CONFIG_ROUTE,
   DEV_DATABASE_MIGRATION_ROUTE,
@@ -124,6 +125,23 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description: '生成本轮验证建议，运行固定检查并核对独立证据。',
+  }),
+  Object.freeze({
+    key: 'business-chain-audit',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.quality,
+    title: '链路实测 / Business Chain Audit',
+    group: '验证治理 / QA',
+    route: DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
+    source: 'docs/engineering/研发效能工作台与CI-CD设计.md',
+    truthSource: '本地实跑批次、逐步观察、问题与原始证据清单',
+    status: '只读批次报告 / Read-only reports',
+    guardrails: Object.freeze([
+      '历史证据独立呈现 / Historical evidence stays distinct',
+      '不替代当前业务链定义 / Reuse current chain definitions',
+      '不执行复跑或修改结论 / No execution or manual verdict writes',
+      '不进生产构建 / No prod build',
+    ]),
+    description: '查看创建编辑、岗位协同、异常恢复到财务终点的实跑结果和逐步证据。',
   }),
   Object.freeze({
     key: 'quality-gates',

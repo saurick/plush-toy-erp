@@ -38,6 +38,7 @@ const devPageSources = [
   'DevBusinessUsabilityPage.jsx',
   'DevDocsPage.jsx',
   'DevTestingPage.jsx',
+  'DevBusinessChainAuditPage.jsx',
   'DevQualityGatesPage.jsx',
   'DevDataPreparationPage.jsx',
   'DevUIDesignPage.jsx',
@@ -171,6 +172,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
       ['product-engineering', '开发文档'],
       ['product-engineering', 'UI 交互设计'],
       ['quality', '改动验证'],
+      ['quality', '链路实测'],
       ['quality', '质量门禁'],
       ['quality', '测试数据'],
       ['delivery', '客户配置'],
@@ -223,7 +225,9 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
     '页面说明检查保留登记和深链，通过改动验证按需进入'
   )
   assert.equal(getDevSecondaryNavItems('product-engineering').length, 5)
-  assert.equal(getDevSecondaryNavItems('quality').length, 3)
+  assert.equal(getDevSecondaryNavItems('quality').length, 4)
+  assert.equal(resolveDevWorkbenchAreaKey('/__dev/business-chain-audit'), 'quality')
+  assert.equal(resolveDevPageTitle('/__dev/business-chain-audit', 'ERP'), '链路实测 · ERP')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/testing'), 'quality')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/quality-gates'), 'quality')
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/data-preparation'), 'quality')
@@ -325,8 +329,8 @@ test('devHub: tools share one area registry without duplicate overview stage inv
   )
 })
 
-test('devHub: fourteen dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 14)
+test('devHub: dev pages share the backend-style workspace shell', () => {
+  assert.equal(devPageSources.length, 15)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
@@ -394,6 +398,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/business-usability',
       '/__dev/docs',
       '/__dev/testing',
+      '/__dev/business-chain-audit',
       '/__dev/quality-gates',
       '/__dev/data-preparation',
       '/__dev/ui-design',
@@ -548,7 +553,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 13)
+  assert.equal(summary.entryCount, 14)
   assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)

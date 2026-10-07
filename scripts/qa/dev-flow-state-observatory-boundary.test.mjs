@@ -88,7 +88,7 @@ test("dev flow state observatory: route and all catalogs stay DEV-only and read-
   assert.equal(catalog.factRuntimeQuery.availability, "unavailable");
   assert.equal(catalog.businessChainOverview.key, "all");
   assert.equal(catalog.businessChainOverview.readOnly, true);
-  assert.equal(catalog.businessChainOverview.relations.length, 13);
+  assert.equal(catalog.businessChainOverview.relations.length, 16);
   assert.equal(catalog.businessChains.length, 11);
   assert.equal(
     catalog.businessChains.some((chain) => chain.key === "all"),

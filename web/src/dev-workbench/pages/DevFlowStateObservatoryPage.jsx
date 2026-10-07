@@ -4,7 +4,7 @@ import {
   PartitionOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Empty, Popover, Space, Tag } from 'antd'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { StateRulesView } from '../components/flow-state/StateRulesView.jsx'
 import { FactsView } from '../components/flow-state/FactsView.jsx'
 import { RuntimeView } from '../components/flow-state/RuntimeView.jsx'
@@ -29,6 +29,7 @@ import SearchInput from '@/common/components/SearchInput'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
+import { DEV_BUSINESS_CHAIN_AUDIT_ROUTE } from '../config/devRoutes.mjs'
 import { buildDevBusinessChainProjection } from '../config/devBusinessChainProjection.mjs'
 import { buildDevBusinessChainCustomerReview } from '../config/devBusinessChainCustomerReview.mjs'
 import { DEV_CUSTOMER_QUERY_KEY } from '../config/devCustomerScope.mjs'
@@ -978,6 +979,7 @@ export default function DevFlowStateObservatoryPage() {
         <Space align="center">
           <PartitionOutlined className="erp-dev-flow-header__icon" />
           <Title level={1}>业务链观察</Title>
+          <Link to={`${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?${new URLSearchParams({ chain: chain?.key || 'all' })}`}>查看链路实测</Link>
         </Space>
         <details className="erp-dev-flow-concepts">
           <summary>

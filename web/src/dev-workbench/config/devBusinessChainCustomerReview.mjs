@@ -1,5 +1,8 @@
-import { getPermissionCenterRoleName } from '../../erp/utils/permissionCenterAccess.mjs'
-import { buildDevBusinessChainProjection } from './devBusinessChainProjection.mjs'
+import {
+  buildDevBusinessChainProjection,
+  describeDevBusinessChainNode,
+  describeDevBusinessChainResponsibility,
+} from './devBusinessChainProjection.mjs'
 
 export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED = '当前正式合同未定义'
 
@@ -125,31 +128,6 @@ function resolveCustomerReviewScope(customerOverlay) {
   })
 }
 
-function formalRoleLabel(roleKey) {
-  const label = getPermissionCenterRoleName({ role_key: roleKey })
-  return label === '已配置岗位' ? '' : label
-}
-
-function resolveResponsibleRole(projection) {
-  const ownerPools = uniqueStrings(projection.responsibility.ownerPoolKeys)
-  const knownLabels = uniqueStrings(ownerPools.map(formalRoleLabel))
-  const unknownCount = ownerPools.length - knownLabels.length
-  const modes = new Set(projection.responsibility.modes)
-  const labels = [...knownLabels]
-  if (
-    modes.has('human') &&
-    (projection.responsibility.capabilityKeys.length > 0 || unknownCount > 0)
-  ) {
-    labels.push('具有对应业务权限的岗位')
-  }
-  if (modes.has('system')) labels.push('系统自动处理')
-  if (modes.has('derived')) labels.push('系统按已生效结果计算')
-  return (
-    uniqueStrings(labels).join('、') ||
-    DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED
-  )
-}
-
 function nodeAction(chain, node) {
   const adjacentSteps = chain.steps.filter(
     (step) => step.fromNodeKey === node.key
@@ -167,60 +145,18 @@ function nodeAction(chain, node) {
     : `核对“${node.label}”的已登记结果。`
 }
 
-function describeStateRef(catalog, ref) {
-  const flow = asArray(catalog.flows).find(
-    (candidate) => candidate.key === ref.machineKey
-  )
-  const stateDefinition = asArray(flow?.states).find(
-    (candidate) => candidate.key === ref.stateKey
-  )
-  return flow && stateDefinition
-    ? `${flow.label}为“${stateDefinition.label}”`
-    : ''
+function nodeTrigger(catalog, chain, node) {
+  return describeDevBusinessChainNode(catalog, chain, node)
+    .map(
+      (action) =>
+        `${action.label}：${[action.condition, ...action.preconditions].filter(Boolean).join('；') || '按下列状态转换的起点核对'}`
+    )
+    .join('；')
 }
 
-function nodeTrigger(catalog, chain, node, projection) {
-  const nodeByKey = new Map(
-    chain.nodes.map((candidate) => [candidate.key, candidate])
-  )
-  const incoming = chain.edges.filter((edge) => edge.to === node.key)
-  const stateConditions = uniqueStrings(
-    projection.steps.flatMap((step) =>
-      step.preconditionStateRefs.map((ref) => describeStateRef(catalog, ref))
-    )
-  )
-  const incomingConditions = uniqueStrings(
-    incoming.map((edge) => {
-      const source = nodeByKey.get(edge.from)
-      return `${source?.label || '上一步'}：${edge.label}`
-    })
-  )
-  const conditions = [...incomingConditions, ...stateConditions]
-  if (conditions.length === 0) {
-    return `“${node.label}”满足进入条件；其他统一条件${DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED}。`
-  }
-  return uniqueStrings(conditions).join('；')
-}
-
-function nodeCompletion(catalog, projection, layer) {
-  const stateResults = uniqueStrings(
-    projection.steps.flatMap((step) =>
-      step.resultStateRefs.map((ref) => describeStateRef(catalog, ref))
-    )
-  )
-  const factResults = uniqueStrings(
-    projection.factKeys.map((factKey) => {
-      const fact = asArray(catalog.factDefinitions).find(
-        (candidate) => candidate.factKey === factKey
-      )
-      return fact ? `形成“${fact.label}”` : ''
-    })
-  )
-  const results = [...stateResults, ...factResults]
-  const visibleResults = results.slice(0, 3)
-  return results.length > 0
-    ? `${visibleResults.join('、')}${results.length > visibleResults.length ? '等已登记结果' : ''}；${layer.completion}`
-    : layer.completion
+function nodeCompletion(catalog, chain, node, layer) {
+  const outcomes = describeDevBusinessChainNode(catalog, chain, node)
+  return `${outcomes.length > 1 ? '按所选动作分别核对，分支结果不合并。' : '核对本动作的状态转换和结果。'}${layer.completion}`
 }
 
 function nodeNext(chain, node) {
@@ -476,11 +412,21 @@ function buildChainReview(catalog, chain) {
       number: index + 1,
       name: node.label,
       action: nodeAction(chain, node),
-      responsibleRole: resolveResponsibleRole(projection),
-      trigger: nodeTrigger(catalog, chain, node, projection),
+      responsibleRole:
+        describeDevBusinessChainResponsibility(projection.responsibility) ||
+        DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED,
+      trigger: nodeTrigger(catalog, chain, node),
       systemAction: layer.systemAction,
       personAction: layer.personAction,
-      completion: nodeCompletion(catalog, projection, layer),
+      completion: nodeCompletion(catalog, chain, node, layer),
+      actionOutcomes: describeDevBusinessChainNode(catalog, chain, node).map(
+        ({ key, label, condition, results }) => ({
+          key,
+          label,
+          condition,
+          results,
+        })
+      ),
       next: nodeNext(chain, node),
       exceptionPaths: exceptionPathsForNode(catalog, chain, node),
     }

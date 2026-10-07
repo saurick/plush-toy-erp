@@ -61,6 +61,7 @@ export default function AppModal({
   ariaLabelledBy = '',
   ariaDescribedBy = '',
   initialFocusSelector = '',
+  busy = false,
 }) {
   const dialogRef = React.useRef(null)
   const openRef = React.useRef(open)
@@ -118,7 +119,7 @@ export default function AppModal({
   return (
     <Modal
       open={open}
-      onCancel={onClose}
+      onCancel={busy ? undefined : onClose}
       afterOpenChange={handleAfterOpenChange}
       panelRef={handlePanelRef}
       className="app-modal"
@@ -127,12 +128,12 @@ export default function AppModal({
       footer={null}
       closable={false}
       centered
-      keyboard
-      maskClosable
+      keyboard={!busy}
+      maskClosable={!busy}
       focusTriggerAfterClose
       destroyOnHidden
       styles={{
-        body: { padding: 0 },
+        body: { padding: 0, maxHeight: 'calc(100dvh - 32px)', overflowY: 'auto' },
         content: {
           padding: 0,
           overflow: 'visible',

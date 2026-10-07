@@ -112,24 +112,6 @@
   font-size: 12px;
 }
 
-.erp-dev-task-nav {
-  gap: 4px;
-}
-
-.erp-dev-task-nav--compact {
-  display: flex;
-  width: fit-content;
-  max-width: 100%;
-  overflow-x: auto;
-}
-
-.erp-dev-task-nav--compact .erp-dev-task-nav__item {
-  min-width: max-content;
-  min-height: 34px;
-  padding: 6px 14px;
-  font-size: 13px;
-}
-
 .erp-dev-workspace-page :is(.erp-dev-hub-shell, .erp-dev-testing-shell) {
   box-shadow: none;
 }

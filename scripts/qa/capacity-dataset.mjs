@@ -13,21 +13,21 @@ import process from "node:process";
 import { pathToFileURL } from "node:url";
 
 import { assertDisposableDatabaseTarget } from "./database-target.mjs";
+import { pressureDataScale } from "../../web/src/dev-workbench/config/devPressureData.mjs";
 import { pressureLogicFingerprint } from "./pressure-runtime.mjs";
 
 export function capacityDatasetLogicFingerprint() {
-  return pressureLogicFingerprint(["scripts/qa/capacity-dataset.mjs", "server/cmd/seed-capacity-attachments/main.go", "server/internal/data/model/schema/finance_fact.go", "server/internal/data/model/schema/production_fact.go"]);
+  return pressureLogicFingerprint(["scripts/qa/capacity-dataset.mjs", "web/src/dev-workbench/config/devPressureData.mjs", "server/cmd/seed-capacity-attachments/main.go", "server/internal/data/model/schema/finance_fact.go", "server/internal/data/model/schema/production_fact.go"]);
 }
 
 export const CAPACITY_DATASET_SCHEMA = "plush-capacity-dataset/v1";
 export const CAPACITY_DATASET_VERSION = "capacity-read-model-v1";
 export const CAPACITY_DATABASE_URL_ENV = "CAPACITY_DATABASE_URL";
-export const CAPACITY_DATASET_TARGETS = Object.freeze({
-  workflowTasks: 5000,
-  productionFacts: 2000,
-  financeFacts: 2000,
-  attachments: 1000,
-});
+export function capacityDatasetTargets(dataScale = "baseline") {
+  const { workflowTasks, productionFacts, financeFacts, attachments } = pressureDataScale(dataScale);
+  return { workflowTasks, productionFacts, financeFacts, attachments };
+}
+export const CAPACITY_DATASET_TARGETS = Object.freeze(capacityDatasetTargets());
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -83,6 +83,7 @@ export function capacityDatasetConfirmation(databaseName) {
 export function buildCapacityDatasetSQL({
   taskSourceID,
   taskSourceType = "capacity_fixture",
+  dataScale = "baseline",
 } = {}) {
   const sourceID = Number(taskSourceID);
   if (!Number.isSafeInteger(sourceID) || sourceID <= 0) {
@@ -91,7 +92,7 @@ export function buildCapacityDatasetSQL({
   if (!/^[a-z][a-z0-9_]{2,31}$/u.test(taskSourceType)) {
     throw new Error("capacity task source type is invalid");
   }
-  const targets = CAPACITY_DATASET_TARGETS;
+  const targets = capacityDatasetTargets(dataScale);
   return `
 BEGIN;
 
@@ -369,6 +370,7 @@ export function runCapacityDataset({
   runtime = {},
   taskSourceID = 1,
   taskSourceType = "capacity_fixture",
+  dataScale = "baseline",
 }) {
   const target = assertDisposableDatabaseTarget({
     databaseName,
@@ -378,7 +380,7 @@ export function runCapacityDataset({
   if (confirmation !== capacityDatasetConfirmation(databaseName)) {
     throw new Error("capacity dataset confirmation does not match the exact database");
   }
-  const sql = buildCapacityDatasetSQL({ taskSourceID, taskSourceType });
+  const sql = buildCapacityDatasetSQL({ taskSourceID, taskSourceType, dataScale });
   const execute = runtime.execute || ((statement) => psql(databaseURL, statement));
   const readCounts = runtime.counts || (() => datasetCounts(databaseURL));
   const before = readCounts();
@@ -394,7 +396,7 @@ export function runCapacityDataset({
   });
   uploadAttachments();
   const after = readCounts();
-  for (const [key, minimum] of Object.entries(CAPACITY_DATASET_TARGETS)) {
+  for (const [key, minimum] of Object.entries(capacityDatasetTargets(dataScale))) {
     if (!Number.isSafeInteger(Number(after[key])) || Number(after[key]) < minimum) {
       throw new Error(`capacity dataset did not reach ${key}=${minimum}`);
     }
@@ -414,6 +416,7 @@ export function runCapacityDataset({
     generatedAt: new Date(generatedAt).toISOString(),
     datasetVersion: CAPACITY_DATASET_VERSION,
     datasetHash: sha256(sql),
+    dataScale, targetCounts: capacityDatasetTargets(dataScale),
     logicFingerprint: capacityDatasetLogicFingerprint(),
     databaseName,
     databaseRunIdentity: target.databaseRunIdentity,

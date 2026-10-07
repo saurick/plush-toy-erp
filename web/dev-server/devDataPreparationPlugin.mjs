@@ -27,6 +27,7 @@ import {
   resolveDataPreparationOperationStore,
   transitionDataPreparationOperation,
 } from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
+import { projectDataPreparationAcceptancePlan } from '../src/dev-workbench/config/devDataPreparation.mjs'
 import { readRepositoryIdentity } from '../../scripts/qa/lib/repository-identity.mjs'
 import { createCustomerTrial133DataBackup } from '../../scripts/qa/customer-trial-133-data.mjs'
 import { buildManualAcceptanceBusinessChainReviewPlan } from '../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
@@ -1664,7 +1665,7 @@ export function createDevDataPreparationService({
       repository: repositoryResult,
       datasetContract: MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT,
       target,
-      acceptancePlan: MANUAL_ACCEPTANCE_REVIEW_PLAN,
+      acceptancePlan: projectDataPreparationAcceptancePlan(MANUAL_ACCEPTANCE_REVIEW_PLAN),
       profiles: DEV_DATA_PREPARATION_PROFILES,
       currentOperations: currentOperations.slice(0, 50).map(publicOperation),
       historicalOperations: historicalOperations

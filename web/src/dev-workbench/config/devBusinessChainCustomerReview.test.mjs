@@ -56,6 +56,11 @@ function visibleReviewText(review) {
       step.systemAction,
       step.personAction,
       step.completion,
+      ...step.actionOutcomes.flatMap((action) => [
+        action.label,
+        action.condition,
+        ...action.results,
+      ]),
       step.next,
       ...step.exceptionPaths,
     ]),
@@ -139,6 +144,25 @@ test('customer review exports only the selected business chain with complete bus
     ),
     '每个链路步骤必须从责任池、权限或系统责任得到业务语言投影'
   )
+})
+
+test('customer review retains separate partial and settled outcomes instead of only a generic completion claim', () => {
+  const review = buildDevBusinessChainCustomerReview({
+    catalog: DEV_FLOW_STATE_CATALOG,
+    chainKey: 'finance_payment_and_reversal',
+    generatedAt,
+  })
+  const allocation = review.chain.steps.find((step) => step.name === '核销记录')
+  assert.equal(allocation.actionOutcomes.length, 2)
+  const partial = allocation.actionOutcomes.find((action) =>
+    action.condition.includes('大于零')
+  )
+  const settled = allocation.actionOutcomes.find((action) =>
+    action.condition.includes('金额为零')
+  )
+  assert(partial.results.length > 0)
+  assert(!partial.results.some((value) => value.includes('结清')))
+  assert(settled.results.some((value) => value.includes('结清')))
 })
 
 test('customer review binds a registered preview without claiming release or acceptance', () => {

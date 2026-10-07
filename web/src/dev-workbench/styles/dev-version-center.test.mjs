@@ -45,14 +45,6 @@ test('manual takeover keeps the Git index lock diagram readable in its bounded m
     css,
     /[.]erp-dev-version-takeover-lock-flow [.]erp-markdown-mermaid,[\s\S]*?[.]erp-dev-version-takeover-lock-flow [.]erp-markdown-mermaid__viewport \{[\s\S]*?width:\s*100%;[\s\S]*?max-width:\s*100%/u
   )
-  assert.match(
-    css,
-    /[.]erp-dev-version-takeover-lock-flow [.]erp-markdown-mermaid__viewport[\s\S]*?max-height:\s*440px/u
-  )
-  assert.match(
-    css,
-    /[.]erp-dev-version-takeover-lock-flow [.]erp-markdown-mermaid__canvas[\s\S]*?min-width:\s*620px/u
-  )
 })
 
 test('CI/CD timing separates event timestamps from default and deep detail levels', () => {

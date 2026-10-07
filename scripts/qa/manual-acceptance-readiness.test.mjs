@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { exceptionChainFixture } from "./test-fixtures/manual-acceptance-exception-chains.mjs";
 
 import { progressFixtureData } from "../../web/scripts/style-l1/businessProgressFixtures.mjs";
 import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catalog.mjs";
@@ -519,6 +520,7 @@ function factReport({ referenceCounts = {}, ...overrides } = {}) {
     },
     financeFieldContract,
     referenceRecords,
+    exceptionChains: exceptionChainFixture(),
     ...overrides,
   };
 }

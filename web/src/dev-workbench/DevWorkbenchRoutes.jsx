@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Loading } from '@/common/components/loading'
 import {
+  DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_CUSTOMER_CONFIG_ROUTE,
   DEV_DATABASE_MIGRATION_ROUTE,
@@ -94,6 +95,10 @@ const DevTestingPage = createDevLazyRoute(
 const DevQualityGatesPage = createDevLazyRoute(
   DEV_QUALITY_GATES_ROUTE,
   () => import('./pages/DevQualityGatesPage.jsx')
+)
+const DevBusinessChainAuditPage = createDevLazyRoute(
+  DEV_BUSINESS_CHAIN_AUDIT_ROUTE,
+  () => import('./pages/DevBusinessChainAuditPage.jsx')
 )
 const DevDataPreparationPage = createDevLazyRoute(
   DEV_DATA_PREPARATION_ROUTE,
@@ -201,6 +206,7 @@ export default function DevWorkbenchRoutes() {
           />
           <Route path="docs" element={<DevDocsPage />} />
           <Route path="testing" element={<DevTestingPage />} />
+          <Route path="business-chain-audit" element={<DevBusinessChainAuditPage />} />
           <Route path="quality-gates" element={<DevQualityGatesPage />} />
           <Route path="data-preparation" element={<DevDataPreparationPage />} />
           <Route path="ui-design" element={<DevUIDesignPage />} />

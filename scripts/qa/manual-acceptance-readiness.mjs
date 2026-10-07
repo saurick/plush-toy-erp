@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { assertManualAcceptanceExceptionChainCoverage } from "./manual-acceptance-exception-chain-data.mjs";
 
 import { requireProgressBoard } from "../../web/src/erp/utils/businessProgress.mjs";
 import {
@@ -1021,6 +1022,11 @@ function validateFactReport(report) {
       `业务记录报告必须恰好包含 ${MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT} 张 ${MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT} 行出货单`,
       2,
     );
+  }
+  try {
+    assertManualAcceptanceExceptionChainCoverage(report.exceptionChains);
+  } catch (error) {
+    throw new CliError(`业务记录报告缺少完整的异常业务链读回：${error.message}`, 2);
   }
   return {
     ...report,

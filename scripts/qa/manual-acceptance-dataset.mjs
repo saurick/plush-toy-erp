@@ -2253,6 +2253,9 @@ function baseApplyReport(
     taskSchedule: structuredClone(taskSchedule),
     semanticDigest: plan.semanticDigest,
     businessChainContract: plan.businessChainContract.contract,
+    definitionSnapshot: structuredClone(
+      plan.businessChainContract.definitionSnapshot,
+    ),
     chainDataDigest: plan.chainDataDigest,
     chainVerificationDigest: plan.chainVerificationDigest,
     applyReportPath,

@@ -1,4 +1,6 @@
 import React from 'react'
+import { App } from 'antd'
+import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
 import BusinessModal from './BusinessModal.jsx'
 
 function joinClassNames(...parts) {
@@ -106,8 +108,32 @@ export default function BusinessFormModal({
   maskClosable = true,
   children,
   open,
+  dirty = false,
+  onCancel,
+  okText = '保存',
   ...modalProps
 }) {
+  const { modal } = App.useApp()
+  const discardRef = React.useRef(null)
+  React.useEffect(() => () => discardRef.current?.destroy(), [])
+  const close = (event) => {
+    if (!dirty) return onCancel?.(event)
+    if (discardRef.current) return undefined
+    discardRef.current = modal.confirm({
+      width: ERP_MODAL_WIDTHS.confirm,
+      title: '放弃未保存的修改？',
+      content: '当前填写的内容尚未保存，放弃后无法恢复。',
+      okText: '放弃修改',
+      cancelText: '继续编辑',
+      okButtonProps: { danger: true },
+      autoFocusButton: 'cancel',
+      centered: true,
+      maskClosable: true,
+      onOk: () => onCancel?.(event),
+      afterClose: () => { discardRef.current = null },
+    })
+    return undefined
+  }
   const userAfterOpenChange = modalProps.afterOpenChange
   const triggerElementRef = React.useRef(null)
   const previousOpenRef = React.useRef(false)
@@ -158,6 +184,8 @@ export default function BusinessFormModal({
     <BusinessModal
       {...modalProps}
       open={open}
+      onCancel={close}
+      okText={okText}
       afterOpenChange={handleAfterOpenChange}
       className={joinClassNames(
         'erp-business-action-modal',

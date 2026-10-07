@@ -13,6 +13,12 @@ import {
   UI_DESIGN_DIRECTORY,
   prepareUIDesignSandboxSource,
 } from './devUIDesign.mjs'
+import {
+  filterUIDesignEntries,
+  findUIDesignChapter,
+  getUIDesignTopics,
+  readUIDesignChapters,
+} from './devUIDesignReading.mjs'
 
 const root = path.resolve(import.meta.dirname, '../../../..')
 const read = (file) => readFileSync(path.join(root, file), 'utf8')
@@ -23,6 +29,99 @@ const helpDefinition = (name) => {
   assert.ok(match, `岗位帮助缺少 ${name} 定义`)
   return JSON.parse(match[1])
 }
+
+test('design chapters retain full content and resolve aliases without splitting fenced headings', () => {
+  const source = [
+    '# 设计说明',
+    '',
+    '阅读入口。',
+    '',
+    '<a id="layout"></a>',
+    '## 布局 / Layout',
+    '',
+    '布局说明。',
+    '```text',
+    '## 代码里的标题',
+    '```',
+    '',
+    '<a id="alignment"></a>',
+    '### 对齐',
+    '',
+    '子章节说明。',
+    '',
+    '## 恢复 / Recovery',
+    '',
+    '```mermaid',
+    'flowchart LR',
+    '  A[失败] --> B[重试]',
+    '```',
+  ].join('\n')
+  const chapters = readUIDesignChapters(source)
+  assert.deepEqual(
+    chapters.map(({ title }) => title),
+    ['阅读入口', '布局', '恢复']
+  )
+  assert.equal(chapters.map(({ content }) => content).join('\n\n'), source)
+  for (const anchor of ['layout', 'alignment', '对齐']) {
+    assert.equal(findUIDesignChapter(chapters, anchor), chapters[1])
+  }
+  assert.equal(findUIDesignChapter(chapters, '代码里的标题'), undefined)
+  assert.deepEqual(chapters[2].diagrams, [
+    'flowchart LR\n  A[失败] --> B[重试]',
+  ])
+  assert.deepEqual(readUIDesignChapters(''), [])
+})
+
+test('every design topic has a formal chapter and mechanisms read diagrams from that specification', () => {
+  const specification = readUIDesignChapters(
+    read(UI_DESIGN_ASSET.specificationPath)
+  )
+  const rationale = readUIDesignChapters(read(UI_DESIGN_ASSET.rationalePath))
+  for (const [view, chapters] of [
+    ['specification', specification],
+    ['rationale', rationale],
+  ]) {
+    const topics = getUIDesignTopics(view, chapters)
+    assert.equal(new Set(topics.map(({ key }) => key)).size, topics.length)
+    for (const topic of topics) {
+      assert(
+        topic.references.length > 0,
+        `${view} / ${topic.title} 必须能查阅原规则`
+      )
+      for (const reference of topic.references) {
+        assert.equal(findUIDesignChapter(chapters, reference.id), reference)
+      }
+    }
+  }
+  for (const [title, count] of [
+    ['页面结构', 2],
+    ['状态与恢复', 1],
+    ['业务汇总口径', 1],
+    ['响应式与动效', 1],
+  ]) {
+    assert.equal(
+      specification.find((chapter) => chapter.title === title)?.diagrams.length,
+      count,
+      title
+    )
+  }
+})
+
+test('design directory searches titles, explanations and formal rules with all query terms', () => {
+  const entries = [
+    {
+      key: 'layout',
+      title: '页面骨架',
+      description: '区域与对齐',
+      references: [{ content: 'CSS 像素 · 12px 留白' }],
+    },
+    { id: 'state', title: '状态与恢复', content: '失败后保留输入，再重试' },
+  ]
+  assert.deepEqual(filterUIDesignEntries(entries, '   '), entries)
+  assert.deepEqual(filterUIDesignEntries(entries, 'css 留白'), [entries[0]])
+  assert.deepEqual(filterUIDesignEntries(entries, '失败 输入'), [entries[1]])
+  assert.deepEqual(filterUIDesignEntries(entries, '状态 对齐'), [])
+})
 
 test('quantity design snapshot follows the canonical unit labels and precision', () => {
   const saved = helpDefinition('quantityUnits')

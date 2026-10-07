@@ -1,3 +1,4 @@
+import { pressureDataScale } from './devPressureData.mjs'
 import { createDevOperationUUID } from './devOperationIdentity.mjs'
 
 export const DEV_TESTING_OPERATION_API_PATH = '/__dev/api/qa/testing'
@@ -40,7 +41,7 @@ export const DEV_PRESSURE_ACTIONS = Object.freeze([
   Object.freeze({ key: 'pressure-quick',
 label: '运行短档回归',
 profile: 'quick',
-    description: '42 张模拟订单，验证负载、竞争、对账和清理。' }),
+    description: '42 张当轮订单，配合所选规模的历史背景，验证负载、竞争、对账和清理。' }),
   Object.freeze({ key: 'pressure-capacity',
 label: '运行 10 分钟容量',
 profile: 'capacity',
@@ -241,6 +242,7 @@ export function normalizeDevTestingOperation(operation) {
     operation,
     [
       'action',
+      ...(Object.hasOwn(operation, 'dataScale') ? ['dataScale'] : []),
       'createdAt',
       'exitCode',
       'finishedAt',
@@ -270,6 +272,10 @@ export function normalizeDevTestingOperation(operation) {
     !isIsoDate(operation.updatedAt)
   ) {
     throw new Error('testing operation is invalid')
+  }
+  if (Object.hasOwn(operation, 'dataScale')) {
+    if (!operation.action.startsWith('pressure-')) throw new Error('data scale only applies to pressure actions')
+    pressureDataScale(operation.dataScale)
   }
   const terminal = DEV_TESTING_OPERATION_TERMINAL_STATUSES.includes(
     operation.status
@@ -582,11 +588,13 @@ export function createDevTestingOperationClient({
       return normalizeDevTestingPlan(await readJsonResponse(response))
     },
 
-    async start(action, idempotencyKey, { signal } = {}) {
+    async start(action, idempotencyKey, { signal, dataScale } = {}) {
       const match = IDEMPOTENCY_PATTERN.exec(String(idempotencyKey || ''))
       if (!ACTION_KEYS.includes(action) || match?.[1] !== action) {
         throw new Error('固定验证请求标识无效')
       }
+      if (action.startsWith('pressure-')) pressureDataScale(dataScale)
+      else if (dataScale !== undefined) throw new Error('data scale only applies to pressure actions')
       const csrfToken = await readSession(signal)
       const response = await fetchImpl(DEV_TESTING_OPERATION_ACTION_API_PATH, {
         method: 'POST',
@@ -597,7 +605,7 @@ export function createDevTestingOperationClient({
         },
         body: JSON.stringify({
           action,
-          payload: { idempotencyKey },
+          payload: { idempotencyKey, ...(action.startsWith('pressure-') ? { dataScale } : {}) },
         }),
         cache: 'no-store',
         credentials: 'same-origin',

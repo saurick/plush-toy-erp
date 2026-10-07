@@ -1163,17 +1163,30 @@ export function createDevQualityGateScenarios({
           parallelGeometry.renderedFont >= 12,
           JSON.stringify(parallelGeometry)
         )
-        const parallelCanvas = parallelDiagram.locator('.erp-markdown-mermaid__canvas')
-        assert.equal(await parallelCanvas.getAttribute('data-mermaid-zoom'), '100')
-        await parallelDiagram.getByRole('button', {
-          name: '适配Job 并行、汇总与等待原理图宽度',
-          exact: true,
-        }).click()
-        assert.equal(await parallelCanvas.getAttribute('data-mermaid-zoom'), '100')
+        const parallelCanvas = parallelDiagram.locator(
+          '.erp-markdown-mermaid__canvas'
+        )
+        const previewZoom = Number(
+          await parallelCanvas.getAttribute('data-mermaid-zoom')
+        )
+        assert(
+          previewZoom >= 75 && previewZoom <= 90,
+          '初始缩放按可见高度适配，且保留可读文字'
+        )
+        await parallelDiagram
+          .getByRole('button', {
+            name: '适配Job 并行、汇总与等待原理图宽度',
+            exact: true,
+          })
+          .click()
         assert.equal(
-          await parallelDiagram.locator('.erp-markdown-mermaid__viewport').evaluate(
-            (node) => node.scrollWidth <= node.clientWidth
-          ),
+          await parallelCanvas.getAttribute('data-mermaid-zoom'),
+          '100'
+        )
+        assert.equal(
+          await parallelDiagram
+            .locator('.erp-markdown-mermaid__viewport')
+            .evaluate((node) => node.scrollWidth <= node.clientWidth),
           true,
           '适配宽度应恢复完整图的概览'
         )

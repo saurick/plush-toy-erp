@@ -1,5 +1,7 @@
 import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
+import { createHash } from 'node:crypto'
+import { PRESSURE_DATA_SCALES } from '../src/dev-workbench/config/devPressureData.mjs'
 import {
   pressureBuildSourceFingerprint,
   PRESSURE_LIFECYCLE_FILES,
@@ -43,7 +45,7 @@ function reportRoot(root) {
     if (!existsSync(directory)) return null
     const stats = lstatSync(directory)
     if (!stats.isDirectory() || stats.isSymbolicLink())
-      throw new Error('pressure report directory is invalid')
+      { throw new Error('pressure report directory is invalid') }
   }
   return directory
 }
@@ -53,7 +55,7 @@ function readJson(directory, name) {
   if (!existsSync(file)) return null
   const stats = lstatSync(file)
   if (!stats.isFile() || stats.isSymbolicLink() || stats.size > 1024 * 1024)
-    throw new Error('pressure report file is invalid')
+    { throw new Error('pressure report file is invalid') }
   return JSON.parse(readFileSync(file, 'utf8'))
 }
 
@@ -127,7 +129,7 @@ function pressureDetail(report, lifecycle, scope) {
   }
   const levels = report.levels.map(projectLevel)
   if (new Set(levels.map(({ key }) => key)).size !== levels.length)
-    throw new Error('pressure report levels are duplicated')
+    { throw new Error('pressure report levels are duplicated') }
   const complete =
     levels.length === 3 &&
     levels.every(
@@ -156,6 +158,56 @@ function pressureDetail(report, lifecycle, scope) {
   return { passed: report.passed && complete && identityMatches, levels }
 }
 
+function projectDataset(lifecycle, engineering) {
+  const raw = engineering?.dataset
+  if (!Object.hasOwn(PRESSURE_DATA_SCALES, raw?.dataScale) || lifecycle.dataScale !== raw.dataScale) return null
+  const counts = (value, keys) => Object.fromEntries(keys.map((key) => [key, count(value?.[key])]))
+  const orderKeys = ['orders', 'ordinaryOrders', 'complexOrders', 'orderItems', 'demandSources']
+  const readKeys = ['workflowTasks', 'productionFacts', 'financeFacts', 'attachments']
+  const dataset = {
+    dataScale: raw.dataScale,
+totalOrders: count(raw.totalOrders),
+    working: counts(raw.counts, orderKeys),
+    history: { ...counts(raw.history, [...orderKeys, 'requests', 'approvedRequests', 'purchaseOrders', 'purchaseItems']),
+      states: counts(raw.history?.states, ['PREVIEW', 'SUBMITTED', 'BOSS_APPROVED', 'APPROVED']) },
+    reads: { target: counts(lifecycle.readDataset?.target, readKeys), actual: counts(lifecycle.readDataset?.actual, readKeys) },
+    complexity: Object.fromEntries(['ordinary', 'complex'].map((key) => [key, counts(raw.complexity?.[key], ['lines', 'bomParts', 'sources'])])),
+    storage: counts(engineering?.database?.before?.storage, ['databaseBytes', 'businessTableBytes']),
+  }
+  const nonnegativeCounts = (values) => Object.values(values).every((value) => Number.isSafeInteger(value) && value >= 0)
+  if (!nonnegativeCounts(dataset.working) || !nonnegativeCounts(counts(raw.history, [...orderKeys, 'requests', 'approvedRequests', 'purchaseOrders', 'purchaseItems'])) ||
+      !nonnegativeCounts(dataset.history.states) || !nonnegativeCounts(dataset.reads.actual) || !nonnegativeCounts(dataset.reads.target) ||
+      !Object.values(dataset.complexity).every(nonnegativeCounts) ||
+      dataset.history.orders < 1 || dataset.working.orders < 10 ||
+      dataset.totalOrders !== dataset.history.orders + dataset.working.orders ||
+      dataset.history.ordinaryOrders + dataset.history.complexOrders !== dataset.history.orders ||
+      dataset.working.ordinaryOrders + dataset.working.complexOrders !== dataset.working.orders ||
+      Object.values(dataset.history.states).reduce((sum, value) => sum + value, 0) !== dataset.history.orders ||
+      dataset.history.requests !== dataset.history.orders - dataset.history.states.PREVIEW ||
+      dataset.history.approvedRequests !== dataset.history.states.APPROVED ||
+      !['history', 'working'].every((key) => dataset[key].orderItems === dataset[key].ordinaryOrders * dataset.complexity.ordinary.lines + dataset[key].complexOrders * dataset.complexity.complex.lines &&
+        dataset[key].demandSources === dataset[key].ordinaryOrders * dataset.complexity.ordinary.sources + dataset[key].complexOrders * dataset.complexity.complex.sources) ||
+      !readKeys.every((key) => dataset.reads.target[key] > 0 && dataset.reads.actual[key] >= dataset.reads.target[key])) return null
+  return dataset
+}
+function comparisonKey(lifecycle, engineering, candidate, dataset) {
+  if (!dataset || !hash(lifecycle.environment?.hostFingerprint) || !hash(engineering?.execution?.hardwareFingerprint) || !candidate.commit || !candidate.migration ||
+      Object.values(candidate.fingerprints).some((value) => !value) ||
+      !engineering?.levels?.length || !lifecycle.environment?.containers?.length) return null
+  const containers = lifecycle.environment.containers
+    .map(({ service, imageID, memoryLimitBytes, nanoCPUs }) => ({ service, imageID, memoryLimitBytes, nanoCPUs }))
+    .sort((a, b) => a.service.localeCompare(b.service))
+  if (!['postgres', 'storage'].every((name) => containers.some((item) => item.service === name && /^sha256:[a-f0-9]{64}$/u.test(item.imageID) && item.memoryLimitBytes > 0 && item.nanoCPUs > 0))) return null
+  const inputs = { candidate: { commit: candidate.commit, migration: candidate.migration, fingerprints: candidate.fingerprints },
+    environment: { host: lifecycle.environment.hostFingerprint, loadRuntime: engineering.execution.hardwareFingerprint, containers, backend: lifecycle.environment.backend },
+    profile: lifecycle.profile,
+working: dataset.working,
+complexity: dataset.complexity,
+    load: engineering.levels.map(({ key, concurrency, pacingMs, targetDurationMs, requests, limits }) =>
+      ({ key, concurrency, pacingMs, targetDurationMs, requestBudget: targetDurationMs ? null : requests, limits })) }
+  return createHash('sha256').update(JSON.stringify(inputs)).digest('hex')
+}
+
 export function projectDevPressureReport(
   id,
   lifecycle,
@@ -171,7 +223,7 @@ export function projectDevPressureReport(
     !date(lifecycle.startedAt) ||
     !date(lifecycle.completedAt)
   )
-    throw new Error('pressure lifecycle is invalid')
+    { throw new Error('pressure lifecycle is invalid') }
   const candidate = {
     commit: COMMIT.test(String(lifecycle.commit || ''))
       ? lifecycle.commit
@@ -207,7 +259,7 @@ export function projectDevPressureReport(
     currentSource?.commit &&
     candidate.commit !== currentSource.commit
   )
-    changed.push('commit')
+    { changed.push('commit') }
   const business = pressureDetail(
     engineering,
     lifecycle,
@@ -218,9 +270,11 @@ export function projectDevPressureReport(
     lifecycle,
     'manual-acceptance-isolated-capacity-pressure'
   )
+  const dataset = projectDataset(lifecycle, engineering)
   const cleanup = lifecycle.cleanup?.passed === true
   const passed =
     lifecycle.passed &&
+    (!lifecycle.dataScale || (dataset !== null && engineering?.database?.backgroundUnchanged === true)) &&
     business?.passed === true &&
     read?.passed === true &&
     cleanup &&
@@ -253,6 +307,8 @@ export function projectDevPressureReport(
   const runtime = engineering?.runtime?.sampling
   return {
     id,
+    dataset,
+    comparisonKey: comparisonKey(lifecycle, engineering, candidate, dataset),
     profile: lifecycle.profile,
     startedAt: date(lifecycle.startedAt),
     completedAt: date(lifecycle.completedAt),
@@ -289,6 +345,7 @@ export function projectDevPressureReport(
       replyReplay: boolean(
         competition?.unknownOutcome?.replaySameVersionAndPurchases
       ),
+      backgroundUnchanged: boolean(engineering?.database?.backgroundUnchanged),
       databaseConsistency: boolean(engineering?.database?.consistency),
       recovery: boolean(engineering?.recovery?.accepted),
       cleanup: boolean(lifecycle.cleanup?.passed),
@@ -302,6 +359,8 @@ export function projectDevPressureReport(
       conflicts: count(db?.maxConflicts),
       maxConnections: count(db?.maxBackends),
       maxLockWaiters: count(db?.maxLockWaiters),
+      tempBytes: count(Number(db?.last?.temp_bytes) - Number(db?.first?.temp_bytes)),
+      tempFiles: count(Number(db?.last?.temp_files) - Number(db?.first?.temp_files)),
     },
     runtime: {
       samples: count(runtime?.sampleCount),
@@ -339,7 +398,7 @@ function publicProgress(value) {
     !date(value.updatedAt) ||
     !['running', 'completed', 'failed'].includes(value.status)
   )
-    throw new Error('pressure progress is invalid')
+    { throw new Error('pressure progress is invalid') }
   return {
     phase: value.phase,
     status: value.status,
@@ -351,6 +410,7 @@ function publicProgress(value) {
       'competition',
       'orders',
       'samples',
+      'history',
     ].includes(value.stage)
       ? value.stage
       : null,
@@ -368,7 +428,7 @@ export function readDevPressureReports(
   { id = '', currentSource = null } = {}
 ) {
   if (id && !PRESSURE_REPORT_ID_PATTERN.test(id))
-    throw new Error('pressure report id is invalid')
+    { throw new Error('pressure report id is invalid') }
   const directory = reportRoot(path.resolve(root))
   const empty = {
     schemaVersion: DEV_PRESSURE_REPORT_SCHEMA,
@@ -391,10 +451,10 @@ export function readDevPressureReports(
     .sort((a, b) => b.modified - a.modified)
     .slice(0, 60)
   if (id && !entries.some((entry) => entry.id === id))
-    entries.push({ id, modified: 0 })
+    { entries.push({ id, modified: 0 }) }
   const valid = []
-  let progress = null,
-    invalidCount = 0
+  let progress = null
+    let invalidCount = 0
   for (const entry of entries) {
     const child = path.join(directory, entry.id)
     if (!existsSync(child)) continue
@@ -405,7 +465,7 @@ export function readDevPressureReports(
     }
     try {
       if (entry.id === id)
-        progress = publicProgress(readJson(child, 'progress.json'))
+        { progress = publicProgress(readJson(child, 'progress.json')) }
       const lifecycle = readJson(child, 'lifecycle.json')
       if (!lifecycle) continue
       valid.push(
@@ -434,6 +494,9 @@ export function readDevPressureReports(
         completedAt,
         status,
         freshness,
+        dataset,
+        comparisonKey,
+        engineering,
       }) => ({
         id: reportId,
         profile,
@@ -441,6 +504,10 @@ export function readDevPressureReports(
         completedAt,
         status,
         freshness,
+        dataScale: dataset?.dataScale || null,
+        historyOrders: dataset?.history.orders ?? null,
+        comparisonKey,
+        main: engineering?.levels.find((level) => level.key === 'capacity') || null,
       })
     ),
     report: id

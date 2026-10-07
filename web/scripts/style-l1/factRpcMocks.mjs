@@ -2644,7 +2644,7 @@ export async function installFactRpcMocks(page, context) {
           fail('协同概览暂不可用')
           break
         }
-        if (Number(params.limit) === 1 && Number(params.offset || 0) === 0) {
+        if (params.todo_only !== true && Number(params.limit) === 1 && Number(params.offset || 0) === 0) {
           const counts = {
             actionable: 55,
             exception: 27,

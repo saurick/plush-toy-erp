@@ -11,3 +11,17 @@ export const ERP_DARK_PALETTE = Object.freeze({
   textSubtle: '#7f8993',
   onAccent: '#050607',
 })
+
+// Surface tokens must follow the selected theme even inside an isolated preview.
+export function getERPSurfaceTokens(isDark) {
+  return {
+    colorBgBase: isDark ? ERP_DARK_PALETTE.page : '#ffffff',
+    colorBgLayout: isDark ? ERP_DARK_PALETTE.page : '#f2f5f3',
+    colorBgContainer: isDark ? ERP_DARK_PALETTE.surface : '#ffffff',
+    colorBgElevated: isDark ? ERP_DARK_PALETTE.surfaceRaised : '#ffffff',
+    colorBorder: isDark ? ERP_DARK_PALETTE.border : '#dce4df',
+    colorBorderSecondary: isDark ? ERP_DARK_PALETTE.border : '#dce4df',
+    colorText: isDark ? ERP_DARK_PALETTE.text : '#1f2a24',
+    colorTextSecondary: isDark ? ERP_DARK_PALETTE.textMuted : '#4d5d53',
+  }
+}

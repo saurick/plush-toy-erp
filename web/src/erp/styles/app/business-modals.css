@@ -125,13 +125,13 @@
 }
 
 .erp-business-action-modal__title span {
-  color: #172033;
+  color: var(--erp-business-action-modal-title, #172033);
   font-size: 19px;
   font-weight: 750;
 }
 
 .erp-business-action-modal__title small {
-  color: #6b7788;
+  color: var(--erp-business-action-modal-muted, #6b7788);
   font-size: 13px;
   font-weight: 650;
   line-height: 1.45;

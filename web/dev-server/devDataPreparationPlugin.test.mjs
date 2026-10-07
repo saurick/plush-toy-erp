@@ -20,6 +20,7 @@ import {
   readDataPreparationOperation,
   transitionDataPreparationOperation,
 } from '../../scripts/qa/dev-data-preparation-operation-store.mjs'
+import { validateDevDataPreparationSummary } from '../src/dev-workbench/config/devDataPreparation.mjs'
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../scripts/qa/manual-acceptance-core-contract.mjs'
 import {
   buildManualAcceptanceSemanticPlan,
@@ -1263,8 +1264,10 @@ test('full acceptance prepare freezes the fixed lifecycle plan without executing
       stages: summary.acceptancePlan.dataStageCount,
       targets: summary.acceptancePlan.catalogTargetCount,
     },
-    { chains: 11, steps: 62, scenarios: 66, stages: 9, targets: 51 }
+    { chains: 11, steps: 72, scenarios: 66, stages: 9, targets: 51 }
   )
+  assert.doesNotThrow(() => validateDevDataPreparationSummary(summary))
+  assert.equal(Object.hasOwn(summary.acceptancePlan, 'definitionSnapshot'), false)
   assert.equal(summary.acceptancePlan.selectorAffectsExecution, false)
   assert.equal(summary.acceptancePlan.freshBatchPerRun, true)
   assert.deepEqual(

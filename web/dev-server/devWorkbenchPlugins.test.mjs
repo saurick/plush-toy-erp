@@ -41,7 +41,8 @@ test('Vite loads personal-network access from the local development env, with en
     let passed = false
     const response = { statusCode: 200, setHeader() {}, end() {} }
     middleware({
-      url: '/__dev/api/delivery/session', method: 'GET',
+      url: '/__dev/api/delivery/session',
+method: 'GET',
       headers: { host: '192.168.0.133:15200' },
       socket: { remoteAddress: '192.168.0.66', localAddress: '192.168.0.133', localPort: 15200 },
     }, response, () => { passed = true })
@@ -103,6 +104,7 @@ test('development serve registry is exact with and without a customer, and absen
     'plush-dev-qa-testing',
     'plush-dev-quality-gates',
     'plush-dev-qa-coverage',
+    'plush-dev-business-chain-audit',
     'plush-dev-delivery-bridge',
   ])
   assert.deepEqual(
@@ -151,6 +153,7 @@ test('development serve registry is exact with and without a customer, and absen
       'plush-dev-qa-testing',
       'plush-dev-quality-gates',
       'plush-dev-qa-coverage',
+      'plush-dev-business-chain-audit',
       'plush-dev-delivery-bridge',
     ])
     for (const config of [developmentBuild, productionBuild]) {

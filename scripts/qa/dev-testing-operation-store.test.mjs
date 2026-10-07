@@ -74,9 +74,11 @@ test("testing operation persists, transitions and reuses one intent", async (t) 
 
 test("pressure intents persist in the same store and cannot reuse a key for a different profile", async (t) => {
   const target = await store(t), key = `testing:pressure-quick:${ID}`;
-  const operation = createOrReuseDevTestingOperation(target, { action: "pressure-quick", idempotencyKey: key,
+  const operation = createOrReuseDevTestingOperation(target, { action: "pressure-quick", idempotencyKey: key, dataScale: "baseline",
     repository: REPOSITORY, operationId: ID }).operation;
   assert.equal(readDevTestingOperation(target, operation.id).action, "pressure-quick");
+  assert.equal(readDevTestingOperation(target, operation.id).dataScale, "baseline");
+  assert.throws(() => createOrReuseDevTestingOperation(target, { action: "pressure-quick", idempotencyKey: key, dataScale: "growth", repository: REPOSITORY }), /intent mismatch/u);
   assert.throws(() => createOrReuseDevTestingOperation(target, { action: "pressure-capacity",
     idempotencyKey: key, repository: REPOSITORY }), /invalid/u);
 });

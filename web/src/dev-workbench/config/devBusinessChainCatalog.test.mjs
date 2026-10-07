@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -40,6 +40,158 @@ const EXPECTED_CHAIN_KEYS = [
   'purchase_posting_corrections',
 ]
 
+test('unposted rejected purchases have vendor-return and replacement paths, never posted-stock corrections', () => {
+  const chain = DEV_FLOW_STATE_CATALOG.businessChains.find(
+    (item) => item.key === 'purchase_quality_disposition'
+  )
+  assert(
+    !chain.nodes.some(
+      (node) =>
+        node.machineKeys.includes('fact.purchase_return') ||
+        node.machineKeys.includes('fact.purchase_receipt_adjustment')
+    )
+  )
+  const branches = chain.edges.filter(
+    (edge) => edge.from === 'purchase_disposition'
+  )
+  assert.deepEqual(
+    branches.map((edge) => edge.to),
+    ['vendor_return_result', 'replacement_receipt']
+  )
+  assert(
+    branches.every(
+      (edge) =>
+        edge.action === 'InventoryUsecase.PostPurchaseRejectionDisposition' &&
+        edge.condition
+    )
+  )
+  const source = readFileSync(
+    resolve(repoRoot, 'server/internal/biz/purchase_rejection_disposition.go'),
+    'utf8'
+  )
+  assert.match(
+    source,
+    /PurchaseRejectionReturnToVendor\s*=\s*"RETURN_TO_VENDOR"/u
+  )
+  assert.match(source, /PurchaseRejectionReplace\s*=\s*"REPLACE"/u)
+  const repository = readFileSync(
+    resolve(
+      repoRoot,
+      'server/internal/data/purchase_rejection_disposition_repo.go'
+    ),
+    'utf8'
+  )
+  assert.match(
+    repository,
+    /receipt\.Status != biz\.PurchaseReceiptStatusDraft/u
+  )
+  assert.match(repository, /createPurchaseReplacementReceipt/u)
+  assert(
+    !chain.steps.some((step) => step.factKeys.includes('fact.inventory_lot'))
+  )
+})
+
+test('normal purchase and outsourcing sources reach posted payables before payment allocation', () => {
+  for (const prefix of ['purchase', 'outsourcing']) {
+    const chain = DEV_FLOW_STATE_CATALOG.businessChains.find(
+      (item) => item.key === `${prefix}_to_inventory`
+    )
+    const draft = chain.steps.find(
+      (step) => step.toNodeKey === `${prefix}_payable_draft`
+    )
+    const posted = chain.steps.find(
+      (step) => step.toNodeKey === `${prefix}_payable`
+    )
+    assert(draft.preconditionStateRefs.some((ref) => ref.stateKey === 'POSTED'))
+    assert(
+      draft.resultStateRefs.some(
+        (ref) => ref.machineKey === 'fact.finance' && ref.stateKey === 'DRAFT'
+      )
+    )
+    assert(
+      posted.resultStateRefs.some(
+        (ref) => ref.machineKey === 'fact.finance' && ref.stateKey === 'POSTED'
+      )
+    )
+    assert(
+      DEV_FLOW_STATE_CATALOG.businessChainOverview.relations.some(
+        (edge) =>
+          edge.fromChainKey === chain.key &&
+          edge.toChainKey === 'finance_payment_and_reversal'
+      )
+    )
+  }
+})
+
+test('allocation and credit have distinct partial and zero-balance outcomes', () => {
+  const chain = DEV_FLOW_STATE_CATALOG.businessChains.find(
+    (item) => item.key === 'finance_payment_and_reversal'
+  )
+  const allocation = chain.steps.find(
+    (step) => step.toNodeKey === 'finance_allocation'
+  )
+  assert(!allocation.resultStateRefs.some((ref) => ref.stateKey === 'SETTLED'))
+  for (const from of ['finance_allocation', 'finance_credit_note']) {
+    const settled = chain.steps.find(
+      (step) =>
+        step.fromNodeKey === from && step.toNodeKey === 'settled_finance_fact'
+    )
+    const partial = chain.steps.find(
+      (step) =>
+        step.fromNodeKey === from &&
+        step.key.includes(':derives:open_finance_fact')
+    )
+    assert.match(settled.condition, /金额为零/u)
+    assert.match(partial.condition, /金额大于零/u)
+    assert(partial.resultStateRefs.some((ref) => ref.stateKey === 'POSTED'))
+  }
+  const backend = readFileSync(
+    resolve(
+      repoRoot,
+      'server/internal/data/operational_fact_finance_payment_repo.go'
+    ),
+    'utf8'
+  )
+  assert.match(backend, /if a\.Amount\.Equal\(outstanding\)/u)
+  assert.match(
+    backend,
+    /settledAfterCredit := in\.Amount\.Equal\(outstanding\)/u
+  )
+})
+
+test('approval and rejection have separate outcomes in source, inventory and shipment chains', () => {
+  for (const key of [
+    'sales_to_production',
+    'purchase_to_inventory',
+    'inventory_adjustment',
+    'delivery_to_settlement',
+  ]) {
+    const chain = DEV_FLOW_STATE_CATALOG.businessChains.find(
+      (item) => item.key === key
+    )
+    const rejected = chain.steps.filter((step) =>
+      step.stateTransitionRefs.some(
+        (ref) => ref.machineKey === 'workflow.task' && ref.to === 'rejected'
+      )
+    )
+    assert.equal(rejected.length, 1, key)
+    assert(
+      !rejected[0].resultStateRefs.some((ref) =>
+        ['active', 'approved', 'APPROVED', 'POSTED', 'SHIPPED'].includes(
+          ref.stateKey
+        )
+      ),
+      key
+    )
+    assert.match(rejected[0].condition, /拒绝/u)
+    const edge = chain.edges.find((item) => item.key === rejected[0].edgeKey)
+    assert(
+      rejected[0].processNodeRefs.every((ref) => ref.actionKey === edge.action),
+      key
+    )
+  }
+})
+
 test('business chain catalog covers every business machine and process variant', () => {
   const catalog = DEV_FLOW_STATE_CATALOG
   assert.deepEqual(
@@ -51,7 +203,7 @@ test('business chain catalog covers every business machine and process variant',
   assert.equal(catalog.businessChainCoverage.overviewComplete, true)
   assert.equal(catalog.businessChainCoverage.overviewKey, 'all')
   assert.equal(catalog.businessChainCoverage.overviewLaneCount, 4)
-  assert.equal(catalog.businessChainCoverage.overviewRelationCount, 13)
+  assert.equal(catalog.businessChainCoverage.overviewRelationCount, 16)
   assert.deepEqual(
     new Set(catalog.businessChainCoverage.overviewChainKeys),
     new Set(EXPECTED_CHAIN_KEYS)
@@ -225,10 +377,31 @@ test('delivery creates receivable facts but leaves payment and reversal to the f
       'shipment_release_task',
       'shipment_release',
       'shipped',
+      'receivable_draft',
       'receivable',
       'shipment_cancelled',
     ]
   )
+  const draft = delivery.steps.find(
+    (step) => step.toNodeKey === 'receivable_draft'
+  )
+  const posted = delivery.steps.find((step) => step.toNodeKey === 'receivable')
+  assert(
+    draft.resultStateRefs.some(
+      (ref) => ref.machineKey === 'fact.finance' && ref.stateKey === 'DRAFT'
+    )
+  )
+  assert(!draft.resultStateRefs.some((ref) => ref.stateKey === 'POSTED'))
+  assert(
+    posted.resultStateRefs.some(
+      (ref) => ref.machineKey === 'fact.finance' && ref.stateKey === 'POSTED'
+    )
+  )
+  const source = readFileSync(
+    resolve(repoRoot, 'server/internal/biz/operational_fact.go'),
+    'utf8'
+  )
+  assert.match(source, /return repo\.CreateFinanceFactDraftFromShipment/u)
   assert.equal(
     delivery.nodes.some((node) =>
       ['payment', 'allocation', 'credit_note'].some((key) =>
@@ -261,7 +434,7 @@ test('business chain steps bind formal responsibility, state, action, process, F
   )
   const roleProfiles = yoyoosunRoleFlowMatrix.roles
 
-  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 62)
+  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 72)
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.scenarioCount, 66)
   assert.equal(
     DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepContractComplete,

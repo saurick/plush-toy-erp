@@ -35,6 +35,10 @@ import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-c
 import { approvePurchaseOrderThroughProcess } from "./purchase-order-approval-process.mjs";
 import { prepareManualAcceptanceEngineering } from "./manual-acceptance-engineering-data.mjs";
 import {
+  assertManualAcceptanceExceptionChainCoverage,
+  runManualAcceptanceExceptionChains,
+} from "./manual-acceptance-exception-chain-data.mjs";
+import {
   LOCAL_DEMO_ACCOUNT_SET,
   manualAcceptanceAccountSetForTarget,
   resolveManualAcceptanceRoleCredential,
@@ -4832,6 +4836,13 @@ export async function runSourceDrivenFactStage(
     );
   }
 
+  const exceptionChains = await runManualAcceptanceExceptionChains({
+    rpc,
+    plan,
+    purchase: purchaseStage,
+    production: productionReadback,
+    apply,
+  });
   const outsourcingPlans = [];
   const outsourcingReadback = [];
   for (let offset = 0; offset < FACT_RUN_COUNT; offset += 1) {
@@ -4984,6 +4995,7 @@ export async function runSourceDrivenFactStage(
       apply,
     });
   return {
+    exceptionChains,
     plans: {
       production: productionPlans,
       outsourcing: outsourcingPlans,
@@ -5376,6 +5388,7 @@ function buildFactReport({
   finalInventory,
   fulfillmentHandoffs,
 }) {
+  assertManualAcceptanceExceptionChainCoverage(facts.exceptionChains);
   const referenceRecords = assertReferenceRecords(plan, {
     productionOrders: dedupeByID(facts.productionOrders),
     productionFacts: dedupeByID(facts.productionFacts),
@@ -5450,6 +5463,7 @@ function buildFactReport({
       financeFieldCoverage: financeFieldContract.coveragePercent,
     },
     financeFieldContract,
+    exceptionChains: facts.exceptionChains,
     fulfillmentHandoffs,
     statusCounts: {
       purchaseReceipts: countBy(referenceRecords.purchaseReceipts, "status"),

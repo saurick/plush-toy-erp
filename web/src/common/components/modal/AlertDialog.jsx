@@ -1,5 +1,7 @@
 import React from 'react'
 import AppModal from '@/common/components/modal/AppModal'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
 export default function AlertDialog({
   open,
@@ -13,16 +15,24 @@ export default function AlertDialog({
   const titleId = React.useId()
   const messageId = React.useId()
   const confirmingRef = React.useRef(false)
+  const [confirming, setConfirming] = React.useState(false)
+  const [failure, setFailure] = React.useState('')
 
   React.useEffect(() => {
-    if (open) confirmingRef.current = false
+    if (open) {
+      confirmingRef.current = false
+      setConfirming(false)
+      setFailure('')
+    }
   }, [open])
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (confirmingRef.current) return
     confirmingRef.current = true
+    setConfirming(true)
+    setFailure('')
     try {
-      onConfirm?.()
+      await onConfirm?.()
       if (typeof onClose === 'function') {
         onClose()
       } else {
@@ -30,7 +40,11 @@ export default function AlertDialog({
       }
     } catch (error) {
       confirmingRef.current = false
-      throw error
+      if (!isRpcAbortError(error)) {
+        setFailure(getActionErrorMessage(error, '处理提示'))
+      }
+    } finally {
+      setConfirming(false)
     }
   }
 
@@ -38,6 +52,7 @@ export default function AlertDialog({
     <AppModal
       open={open}
       onClose={onClose}
+      busy={confirming}
       className={`app-alert-dialog ${className}`.trim()}
       role="alertdialog"
       ariaLabel={title ? '' : '提示'}
@@ -59,20 +74,23 @@ export default function AlertDialog({
         {message ? (
           <div
             id={messageId}
-            className="whitespace-pre-line text-sm leading-7 text-slate-600 sm:text-base"
+            className="whitespace-pre-line break-words text-sm leading-7 text-slate-600 sm:text-base"
             data-app-alert-message
           >
             {message}
           </div>
         ) : null}
 
+        {failure ? <p role="alert">{failure}</p> : null}
         <button
           type="button"
           onClick={handleConfirm}
+          disabled={confirming}
+          aria-busy={confirming}
           className="min-w-[152px] rounded-full bg-cyan-300 px-6 py-2.5 text-sm font-semibold text-slate-950 shadow-[0_10px_24px_rgba(8,145,178,0.18)] transition hover:bg-cyan-200 active:bg-cyan-400"
           data-app-alert-confirm
         >
-          {confirmText}
+          {confirming ? '正在处理…' : confirmText}
         </button>
       </div>
     </AppModal>

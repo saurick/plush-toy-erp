@@ -1,6 +1,8 @@
 import { pressureLogicFingerprint, pressureRPC, verifyPressureRuntime, normalizePressureURL } from "./pressure-runtime.mjs";
 import { prepareManualAcceptanceEngineering } from "./manual-acceptance-engineering-data.mjs";
 import { advanceSalesOrderLifecycleThroughProcess } from "./manual-acceptance-source-data.mjs";
+import { pressureDataScale, PRESSURE_HISTORY_STATES } from "../../web/src/dev-workbench/config/devPressureData.mjs";
+import { readEngineeringPressureLedger } from "./pressure-engineering-ledger.mjs";
 import { assertDisposableDatabaseTarget } from "./database-target.mjs";
 
 export const ENGINEERING_DATA_VERSION = "engineering-pressure-v1";
@@ -8,6 +10,9 @@ export const ENGINEERING_DATA_VERSION = "engineering-pressure-v1";
 // fingerprinted separately by the scenario/runner and do not alter this recipe.
 export const ENGINEERING_DATA_FILES = Object.freeze([
   "scripts/qa/pressure-engineering-data.mjs",
+  "scripts/qa/pressure-engineering-scenario.mjs",
+  "scripts/qa/pressure-engineering-ledger.mjs",
+  "web/src/dev-workbench/config/devPressureData.mjs",
   "scripts/qa/manual-acceptance-engineering-data.mjs",
   "scripts/qa/manual-acceptance-attachment-data.mjs",
   "scripts/qa/manual-acceptance-source-data.mjs",
@@ -53,18 +58,20 @@ export const ENGINEERING_RECIPES = Object.freeze({
 });
 
 export async function prepareEngineeringPressureData({
-  baseURL, databaseName, databaseURL, tokens, runID, poolSize, runtimeIdentity, onProgress = () => {},
+  baseURL, databaseName, databaseURL, tokens, runID, poolSize, runtimeIdentity, dataScale = "baseline", signal, onProgress = () => {},
 }) {
   const target = assertDisposableDatabaseTarget({ databaseName, databaseURL, profile: "capacity" });
   if (!Number.isSafeInteger(poolSize) || poolSize < 10 || poolSize > 1000) throw new Error("engineering pressure pool must contain 10-1000 orders");
+  const scale = pressureDataScale(dataScale);
   baseURL = normalizePressureURL(baseURL);
   const fingerprint = engineeringDataFingerprint();
   if (fingerprint !== importedDataFingerprint) throw new Error("engineering data module changed after loading; restart and reseed required");
-  await verifyPressureRuntime({ baseURL, databaseName, commit: runtimeIdentity?.commit, migration: runtimeIdentity?.migration });
+  await verifyPressureRuntime({ baseURL, databaseName, commit: runtimeIdentity?.commit, migration: runtimeIdentity?.migration, signal });
   const prefix = "SIM-PS-" + runID.replaceAll("_", "").slice(-12).toUpperCase();
   const startedAt = new Date().toISOString();
   async function rpc({ actor, domain, method, params = {} }) {
-    const result = await pressureRPC({ baseURL, domain, method, params: { customer_key: "yoyoosun", ...params }, token: tokens[actor] });
+    signal?.throwIfAborted();
+    const result = await pressureRPC({ signal, baseURL, domain, method, params: { customer_key: "yoyoosun", ...params }, token: tokens[actor] });
     if (!result.ok) throw new Error(result.error);
     return result.data;
   }
@@ -109,14 +116,16 @@ export async function prepareEngineeringPressureData({
     refs.products.push({ id: product.id, code: product.code });
     refs.bomVersions.push({ id: bom.id, productId: product.id, version: bom.version, status: bom.status });
   }
-  const orders = [];
-  for (let index = 0; index < poolSize; index++) {
-    const kind = index % 3 === 0 ? "complex" : "ordinary", recipe = ENGINEERING_RECIPES[kind], product = products[kind];
-    const orderNo = prefix + "-SO-" + String(index + 1).padStart(4, "0");
+  const allOrders = [], totalOrders = poolSize + scale.historyOrders;
+  for (let index = 0; index < totalOrders; index++) {
+    const historical = index < scale.historyOrders;
+    const ordinal = historical ? index : index - scale.historyOrders;
+    const kind = ordinal % 3 === 0 ? "complex" : "ordinary", recipe = ENGINEERING_RECIPES[kind], product = products[kind];
+    const orderNo = prefix + (historical ? "-H-" : "-W-") + String(ordinal + 1).padStart(4, "0");
     const item = (await rpc({ actor: "sales", domain: "sales_order", method: "save_sales_order_with_items", params: {
       order_no: orderNo, customer_id: customer.id, customer_snapshot: { name: customer.name },
       currency: "CNY", payment_method: "银行转账", payment_term_days: 0, tax_mode: "INCLUSIVE", tax_rate: "13",
-      freight_terms: "INCLUDED", price_condition_note: "模拟含税含运费", order_date: Math.floor(Date.now() / 1000), note: "隔离压测模拟订单",
+      freight_terms: "INCLUDED", price_condition_note: "模拟含税含运费", order_date: Math.floor(Date.now() / 86400000) * 86400 - (historical ? (1 + ordinal % 20) * 36 * 86400 : 0), note: "隔离压测模拟订单",
       items: Array.from({ length: recipe.lines }, (_, line) => ({
         line_no: line + 1, product_id: product.id, product_sku_id: product.skuId, unit_id: productUnit.id,
         requested_product_name: product.name, customer_product_no: "SIM-STYLE-" + kind,
@@ -127,30 +136,55 @@ export async function prepareEngineeringPressureData({
     } })).sales_order;
     await advanceSalesOrderLifecycleThroughProcess({
       plan: { backendURL: baseURL, runId: runID }, record: { order_no: orderNo, targetStatus: "ACTIVE" },
-      item, token: tokens.sales, roleTokens: tokens, fetchImpl: fetch, report: { steps: [] },
+      item, token: tokens.sales, roleTokens: tokens, fetchImpl: (url, options) => fetch(url, { ...options, signal: signal ? AbortSignal.any([signal, ...(options?.signal ? [options.signal] : [])]) : options?.signal }), report: { steps: [] },
     });
-    orders.push({ id: item.id, orderNo, kind });
-    if ((index + 1) % 20 === 0) onProgress({ step: "orders", completed: index + 1, total: poolSize });
+    allOrders.push({ id: item.id, orderNo, kind, ...(historical ? { status: PRESSURE_HISTORY_STATES[ordinal % PRESSURE_HISTORY_STATES.length] } : {}) });
+    if ((index + 1) % 20 === 0) onProgress({ step: "orders", completed: index + 1, total: totalOrders });
   }
   let confirmed = 0;
   // Reuse the preparation helper in chunks; each product image and BOM remains
   // unique and existing sources are read back on subsequent chunks.
-  for (let offset = 0; offset < orders.length; offset += 20) {
-    const chunk = orders.slice(offset, offset + 20);
+  for (let offset = 0; offset < allOrders.length; offset += 20) {
+    signal?.throwIfAborted();
+    const chunk = allOrders.slice(offset, offset + 20);
     await prepareManualAcceptanceEngineering({
       plan: { prefix, productionCandidates: chunk.map((order) => ({ salesOrder: { id: order.id, orderNo: order.orderNo } })) },
       sourceReport: { referenceRecords: refs }, rpc, materialMode: "preview",
     });
-    confirmed += chunk.length; onProgress({ step: "samples", completed: confirmed, total: poolSize });
+    confirmed += chunk.length; onProgress({ step: "samples", completed: confirmed, total: totalOrders });
   }
+  const historyOrders = allOrders.slice(0, scale.historyOrders), orders = allOrders.slice(scale.historyOrders);
+  // Use the same adapter and independent checker as the timed scenario. Data
+  // preparation deliberately ends at each requested real business state.
+  const { createEngineeringPressureClient, prepareEngineeringHistoryOrder } = await import("./pressure-engineering-scenario.mjs");
+  const client = createEngineeringPressureClient({ baseURL, tokens });
+  const context = { references: refs, products };
+  for (const [index, order] of historyOrders.entries()) {
+    await prepareEngineeringHistoryOrder({ client, order, receipt: context, signal });
+    if ((index + 1) % 20 === 0) onProgress({ step: "history", completed: index + 1, total: historyOrders.length });
+  }
+  const historyLedger = await readEngineeringPressureLedger(databaseURL, historyOrders);
+  const expectedApproved = historyOrders.filter((order) => order.status === "APPROVED").length;
+  if (historyLedger.orders !== historyOrders.length || historyLedger.requests !== historyOrders.filter((order) => order.status !== "PREVIEW").length ||
+      historyLedger.approvedRequests !== expectedApproved || historyLedger.purchaseOrders !== expectedApproved * 2 ||
+      historyLedger.purchaseItems !== expectedApproved * 3 || historyLedger.partialSupplierResults || historyLedger.invalidPurchaseLines || historyLedger.duplicateSupplierResults)
+    throw new Error("engineering background data readback failed");
+  const countOrders = (items) => ({ orders: items.length, ordinaryOrders: items.filter((item) => item.kind === "ordinary").length,
+    complexOrders: items.filter((item) => item.kind === "complex").length,
+    orderItems: items.reduce((sum, item) => sum + ENGINEERING_RECIPES[item.kind].lines, 0),
+    demandSources: items.reduce((sum, item) => sum + ENGINEERING_RECIPES[item.kind].sources, 0) });
   if (fingerprint !== engineeringDataFingerprint()) throw new Error("engineering data logic changed during preparation; reseed required");
   return {
     schemaVersion: "plush-pressure-engineering-data/v1", datasetVersion: ENGINEERING_DATA_VERSION,
     status: "passed", simulatedOnly: true, databaseName, databaseRunIdentity: target.databaseRunIdentity,
     databaseTargetFingerprint: target.targetFingerprint, runtimeIdentity, dataLogicFingerprint: fingerprint,
-    prefix, orders, references: refs, products, startedAt, completedAt: new Date().toISOString(),
-    counts: { orders: orders.length, ordinaryOrders: orders.filter((item) => item.kind === "ordinary").length,
-      complexOrders: orders.filter((item) => item.kind === "complex").length, products: 2, materials: 3, suppliers: 2 },
+    prefix, orders, historyOrders, dataScale, references: refs, products, startedAt, completedAt: new Date().toISOString(),
+    counts: { ...countOrders(orders), products: 2, materials: 3, suppliers: 2 },
+    history: { ...countOrders(historyOrders), requests: historyLedger.requests, purchaseOrders: historyLedger.purchaseOrders,
+      purchaseItems: historyLedger.purchaseItems, approvedRequests: historyLedger.approvedRequests,
+      states: Object.fromEntries([...new Set(PRESSURE_HISTORY_STATES)].map((status) => [status, historyOrders.filter((order) => order.status === status).length])) },
+    totalOrders, complexity: Object.fromEntries(Object.entries(ENGINEERING_RECIPES).map(([key, recipe]) =>
+      [key, { lines: recipe.lines, bomParts: recipe.parts.length, sources: recipe.sources }])),
     cleanup: "dispose owned database and attachment storage",
   };
 }

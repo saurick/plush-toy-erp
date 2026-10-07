@@ -448,3 +448,111 @@
     transition: none;
   }
 }
+
+.erp-dev-data-context,
+.erp-dev-data-section__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+
+.erp-dev-data-workspace,
+.erp-dev-data-section,
+.erp-dev-data-result {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.erp-dev-data-section {
+  padding: 18px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 10px;
+  background: var(--dev-data-surface);
+}
+
+.erp-dev-data-section__head h2.ant-typography {
+  margin: 0;
+  font-size: 18px;
+}
+
+.erp-dev-data-section__head p.ant-typography {
+  margin: 4px 0 0;
+  color: var(--dev-data-muted);
+}
+
+.erp-dev-data-profile-table th:first-child {
+  width: 23%;
+}
+
+.erp-dev-data-profile-table th:nth-child(2) {
+  width: 32%;
+}
+
+.erp-dev-data-profile-table th:nth-child(3) {
+  width: 33%;
+}
+
+.erp-dev-data-profile-table td > .ant-typography,
+.erp-dev-data-profile-table small {
+  display: block;
+}
+
+.erp-dev-data-profile-table small {
+  margin-top: 4px;
+  color: var(--dev-data-muted);
+  font-size: 12px;
+}
+
+.erp-dev-data-selection {
+  padding: 0 16px 12px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 8px;
+}
+
+.erp-dev-data-selection .erp-dev-data-prepare-actions {
+  margin: 0;
+  padding: 14px 0;
+  border: 0;
+}
+
+.erp-dev-data-blockers {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: var(--dev-data-warning-bg);
+}
+
+.erp-dev-data-blockers > div {
+  display: grid;
+  gap: 3px;
+}
+
+.erp-dev-data-disclosure {
+  min-width: 0;
+  border-top: 1px solid var(--dev-data-border);
+}
+
+.erp-dev-data-disclosure > summary {
+  padding: 12px 0;
+  color: var(--dev-data-muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.erp-dev-data-disclosure[open] > summary {
+  margin-bottom: 8px;
+}
+
+
+.erp-dev-data-profile-row.is-selected {
+  background: var(--dev-data-selected);
+}
+
+.erp-dev-data-profile-row.is-selected > th {
+  box-shadow: inset 3px 0 0 var(--dev-data-primary);
+}

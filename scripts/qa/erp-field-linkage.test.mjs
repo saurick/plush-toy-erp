@@ -40,6 +40,10 @@ function successfulExecutor() {
   return async ({ args }) => {
     call += 1
     if (call === 1) {
+      assert(args.includes('src/erp/utils/printDraftStorage.test.mjs'))
+      assert(args.includes('src/erp/utils/printWorkspace.test.mjs'))
+      assert(args.includes('../scripts/qa/sales-order-field-chain-boundary.test.mjs'))
+      assert.equal(new Set(args).size, args.length)
       return {
         stdout: 'TAP version 13\nok 1 - FL_TEST_SAMPLE\n  duration_ms: 1.5\n',
         stderr: '',

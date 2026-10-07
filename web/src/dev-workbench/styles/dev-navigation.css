@@ -396,20 +396,17 @@
   line-height: 1.2;
 }
 
-.erp-dev-task-nav--compact {
-  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-}
-
-.erp-dev-area-page .erp-dev-task-nav--compact,
-.erp-dev-database-migration-page .erp-dev-task-nav--compact {
-  width: max-content;
+.erp-dev-task-nav.erp-dev-task-nav--compact {
+  display: flex;
+  gap: 0;
+  width: fit-content;
   max-width: 100%;
-  grid-template-columns: repeat(2, minmax(140px, max-content));
+  overflow-x: auto;
 }
 
 .erp-dev-task-nav--compact .erp-dev-task-nav__item {
-  min-height: 50px;
-  padding: 7px 10px;
+  flex: 0 0 auto;
+  min-width: max-content;
 }
 
 .erp-dev-customer-section-nav {

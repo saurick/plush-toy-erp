@@ -5,15 +5,17 @@ import { createDevDatabaseMigrationRecoveryController } from './devDatabaseMigra
 import { createDevDataPreparationPlugin } from './devDataPreparationPlugin.mjs'
 import { createDevDeliveryBridgePlugin } from './devDeliveryBridgePlugin.mjs'
 import { createDevQaCoveragePlugin } from './devQaCoveragePlugin.mjs'
+import { createDevBusinessChainAuditPlugin } from './devBusinessChainAuditPlugin.mjs'
 import { createDevQaTestingPlugin } from './devQaTestingPlugin.mjs'
 import { createDevQualityGatePlugin } from './devQualityGatePlugin.mjs'
 import { createDevWebInstancePlugin } from './devWebInstancePlugin.mjs'
 import { createDevOperatorAuthPlugin } from './devOperatorAuthPlugin.mjs'
-export { normalizeDevHttpsOrigin } from './devServerSecurity.mjs'
 import {
   LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
   runWebRuntimePreflight,
 } from '../../scripts/local-runtime-preflight.mjs'
+
+export { normalizeDevHttpsOrigin } from './devServerSecurity.mjs'
 
 export const DEV_WORKBENCH_SERVE_PLUGIN_NAMES = Object.freeze([
   'plush-dev-operator-auth',
@@ -25,6 +27,7 @@ export const DEV_WORKBENCH_SERVE_PLUGIN_NAMES = Object.freeze([
   'plush-dev-qa-testing',
   'plush-dev-quality-gates',
   'plush-dev-qa-coverage',
+  'plush-dev-business-chain-audit',
   'plush-dev-delivery-bridge',
 ])
 
@@ -78,6 +81,7 @@ export function createDevWorkbenchServePlugins({
     createDevQaTestingPlugin({ projectRoot }),
     createDevQualityGatePlugin({ projectRoot }),
     createDevQaCoveragePlugin({ projectRoot }),
+    createDevBusinessChainAuditPlugin({ projectRoot }),
     createDevDeliveryBridgePlugin({ projectRoot }),
   ].filter(Boolean)
 }

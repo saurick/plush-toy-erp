@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { copyPressureBuildSource, pressureBuildSourceFingerprint, pressureLifecyclePlan, runPressureLifecycle, updatePressureProgress } from "./pressure-isolated-lifecycle.mjs";
+import { copyPressureBuildSource, pressureBuildSourceFingerprint, pressureLifecyclePlan, pressureNetworkConfig, runPressureLifecycle, updatePressureProgress } from "./pressure-isolated-lifecycle.mjs";
 
 test("lifecycle defaults to a read-only plan without credentials or resource creation", () => {
   const stdout = execFileSync(process.execPath, ["scripts/qa/pressure-isolated-lifecycle.mjs"], { encoding: "utf8" });
@@ -62,4 +62,20 @@ test("public progress keeps fixed phases, bounded counts and cleanup separate fr
   assert.deepEqual(progress.completedSteps, ["build"]); assert.equal(progress.secret, undefined);
   progress = updatePressureProgress(progress, { step: "cleanup", status: "completed", passed: false });
   assert.equal(progress.status, "failed");
+});
+
+test("data scale changes background volume without changing the working pool or timing", () => {
+  const baseline = pressureLifecyclePlan("quick", "baseline"), growth = pressureLifecyclePlan("quick", "growth");
+  assert.equal(growth.poolSize, baseline.poolSize);
+  assert.equal(growth.mainDurationMs, baseline.mainDurationMs);
+  assert.ok(growth.historyOrders > baseline.historyOrders);
+  assert.ok(growth.readTargets.workflowTasks > baseline.readTargets.workflowTasks);
+  assert.throws(() => pressureLifecyclePlan("quick", "arbitrary"));
+});
+
+test("an explicit fixture subnet is limited to a small aligned private network", () => {
+  assert.deepEqual(pressureNetworkConfig(), []);
+  assert.ok(pressureNetworkConfig("10.254.241.0/28").includes("        - subnet: 10.254.241.0/28"));
+  for (const value of ["0.0.0.0/0", "10.0.0.0/8", "10.0.0.1/28", "10.999.0.0/28", "8.8.8.0/28", "10.0.0.0/28\nsecret: value"])
+    assert.throws(() => pressureNetworkConfig(value));
 });

@@ -693,16 +693,18 @@ export function nodeCommandExecution(result, note = "") {
 
 export function goCommandExecution(result, note = "") {
   let summary;
+  let tests;
   try {
     summary = verifyGoTestJson(result.stdout);
+    tests = parseGoTestTerminals(result.stdout);
   } catch {
     return commandFailureRecord(note);
   }
   const parsed = {
-    passed: summary.pass,
-    failed: summary.fail,
-    skipped: summary.skip,
-    executed: summary.run,
+    passed: tests.filter((entry) => entry.terminal === "pass").length,
+    failed: tests.filter((entry) => entry.terminal === "fail").length,
+    skipped: tests.filter((entry) => entry.terminal === "skip").length,
+    executed: tests.length,
   };
   if (result.error || result.status !== 0) {
     if (parsed.failed === 0) {
@@ -737,7 +739,9 @@ function commandGateRecord(executions, note, required = true) {
     missing: 0,
   };
   for (const execution of executions) {
-    counts.executed += 1;
+    if (["passed", "failed", "skipped"].includes(execution.status)) {
+      counts.executed += 1;
+    }
     if (execution.status === "passed") counts.passed += 1;
     else if (execution.status === "failed") counts.failed += 1;
     else if (execution.status === "blocked") counts.blocked += 1;
@@ -767,7 +771,11 @@ function combineExecutionRecords(records, note = "") {
     }
     return output;
   }, emptyCounts());
-  return normalizeExecutionCounts({ ...combined, note });
+  return normalizeExecutionCounts({
+    ...combined,
+    status: collectionStatus(records),
+    note,
+  });
 }
 
 function parseGoTestTerminals(content) {
@@ -795,14 +803,19 @@ function parseGoTestTerminals(content) {
     tests.set(key, current);
   }
   const values = [...tests.values()].filter((entry) => entry.ran);
-  return values.filter(
-    (entry) =>
-      !values.some(
-        (candidate) =>
-          candidate.package === entry.package &&
-          candidate.test.startsWith(`${entry.test}/`),
-      ),
-  );
+  return values.filter((entry) => {
+    const children = values.filter(
+      (candidate) =>
+        candidate.package === entry.package &&
+        candidate.test.startsWith(`${entry.test}/`),
+    );
+    if (children.length === 0 || !entry.terminal) return true;
+    // A parent may fail or skip in setup/cleanup even when its children pass.
+    return (
+      ["fail", "skip"].includes(entry.terminal) &&
+      !children.some((child) => child.terminal === entry.terminal)
+    );
+  });
 }
 
 export function goFailureScenarios(content) {
@@ -894,16 +907,15 @@ export function classifyGoBusinessDomains(
         note: "只统计 baseline 显式场景注册表及其 leaf subtests；不按文件名、包名或测试名关键词推断业务覆盖。",
       });
       const output = { ...record, scenarios: scenarioResults };
-      if (globalExecution.status === "passed") return [key, output];
+      if (globalExecution.status === "passed" || output.status !== "passed") {
+        return [key, output];
+      }
       return [
         key,
         {
           ...output,
-          status:
-            globalExecution.status === "missing"
-              ? "missing"
-              : globalExecution.status,
-          note: "Go baseline 未完整通过，相关业务域不能标记为通过。",
+          status: "blocked",
+          note: "本域已登记场景全部通过；整体 Go 基线未通过，业务域结论受阻。失败原因见代码覆盖中的 Go 执行记录。",
         },
       ];
     }),
@@ -1344,7 +1356,7 @@ export function buildCoverageEvidence({
         ...codeCoverageRecord(
           goCoverage,
           stageExecutions.go,
-          "Go baseline 统计 go test ./... 非 PostgreSQL测试的语句覆盖；Go 原生 coverprofile 不提供分支覆盖。",
+          "Go baseline 统计 go test ./... 非 PostgreSQL 测试的语句覆盖；Go 原生 coverprofile 不提供分支覆盖。执行数按最末级用例计数，父用例独立失败、跳过或未结束时单列。",
         ),
         scenarios: stageExecutions.go.scenarios || [],
       },

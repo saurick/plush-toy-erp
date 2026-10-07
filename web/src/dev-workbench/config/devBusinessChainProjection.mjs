@@ -1,3 +1,5 @@
+import { getPermissionCenterRoleName } from '../../erp/utils/permissionCenterAccess.mjs'
+
 function asArray(value) {
   return Array.isArray(value) ? value : []
 }
@@ -126,4 +128,77 @@ export function projectDevBusinessChainRoles(projection, roles) {
         })
       )
   )
+}
+
+// Describe each action independently. Adjacent actions include rejection and reversal,
+// so their states must never become one combined completion requirement.
+export function describeDevBusinessChainStep(catalog, step) {
+  const stateLabel = (machineKey, stateKey) => {
+    const flow = catalog.flows.find((item) => item.key === machineKey)
+    const value = flow?.states.find((item) => item.key === stateKey)
+    if (!value) {
+      throw new Error(`unknown chain state: ${machineKey}/${stateKey}`)
+    }
+    return `${flow.label}为“${value.label}”`
+  }
+  const transitions = step.stateTransitionRefs.map(
+    (ref) =>
+      `${stateLabel(ref.machineKey, ref.from)} → ${stateLabel(ref.machineKey, ref.to)}`
+  )
+  const results = step.resultStateRefs
+    .filter(
+      (ref) =>
+        !step.stateTransitionRefs.some(
+          (transition) =>
+            transition.machineKey === ref.machineKey &&
+            transition.to === ref.stateKey
+        )
+    )
+    .map((ref) => stateLabel(ref.machineKey, ref.stateKey))
+  const preconditions = step.preconditionStateRefs
+    .filter(
+      (ref) =>
+        !step.stateTransitionRefs.some(
+          (transition) =>
+            transition.machineKey === ref.machineKey &&
+            transition.from === ref.stateKey
+        )
+    )
+    .map((ref) => stateLabel(ref.machineKey, ref.stateKey))
+  return {
+    key: step.key,
+    label: step.label,
+    condition: step.condition || '',
+    preconditions,
+    results: [...transitions, ...results],
+  }
+}
+
+export function describeDevBusinessChainNode(catalog, chain, node) {
+  const outgoing = chain.steps.filter((step) => step.fromNodeKey === node.key)
+  const steps = outgoing.length
+    ? outgoing
+    : chain.steps.filter((step) => step.toNodeKey === node.key)
+  return steps.map((step) => describeDevBusinessChainStep(catalog, step))
+}
+
+export function describeDevBusinessChainResponsibility(responsibility) {
+  const ownerPools = uniqueStrings(responsibility.ownerPoolKeys)
+  const labels = ownerPools.map((key) =>
+    getPermissionCenterRoleName({ role_key: key })
+  )
+  const knownLabels = labels.filter((label) => label !== '已配置岗位')
+  const modes = new Set(responsibility.modes || [responsibility.mode])
+  const result = [...knownLabels]
+  if (
+    modes.has('human') &&
+    (knownLabels.length !== ownerPools.length ||
+      asArray(responsibility.capabilityKeys).length > 0 ||
+      ownerPools.length === 0)
+  ) {
+    result.push('具有对应业务权限的岗位')
+  }
+  if (modes.has('system')) result.push('系统自动处理')
+  if (modes.has('derived')) result.push('系统按已生效结果计算')
+  return uniqueStrings(result).join('、')
 }

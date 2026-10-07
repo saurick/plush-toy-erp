@@ -43,7 +43,7 @@ export default function DevTaskNav({
       className={[
         'erp-dev-task-nav',
         level === 'primary' ? 'erp-dev-task-nav--primary' : '',
-        compact ? 'erp-dev-task-nav--compact' : '',
+        compact ? 'erp-navigation-tabs erp-dev-task-nav--compact' : '',
         className,
       ]
         .filter(Boolean)

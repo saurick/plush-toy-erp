@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { exceptionChainFixture } from "./test-fixtures/manual-acceptance-exception-chains.mjs";
 
 import {
   MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES,
@@ -516,6 +517,7 @@ function factStage() {
     });
   }
   return {
+    exceptionChains: exceptionChainFixture(),
     productionOrders: fakeRecords(48, 8000).map((item, offset) => ({
       ...item,
       order_no: `MO-${offset}`,

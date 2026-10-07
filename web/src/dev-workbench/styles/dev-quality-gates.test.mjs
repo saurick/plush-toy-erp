@@ -56,10 +56,7 @@ test('quality gates styles: GitLab CI evidence stays compact and source-backed',
     css,
     /\.erp-dev-quality-server-history__table-wrap[\s\S]*?overflow-x:\s*auto/u
   )
-  assert.match(
-    css,
-    /\.erp-dev-quality-server-pipeline__dag \.erp-markdown-mermaid__canvas[\s\S]*?min-width:\s*880px/u
-  )
+
   assert.match(
     css,
     /\.erp-dev-quality-server-pipeline__phase\[data-phase='shards'\]/u

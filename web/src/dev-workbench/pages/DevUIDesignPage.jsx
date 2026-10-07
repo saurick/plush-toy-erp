@@ -4,17 +4,14 @@ import {
   FullscreenOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { Button, Drawer, Space, Typography } from 'antd'
+import { Button, Space, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
-import { Markdown } from '@/common/components/markdown'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevControlStandards from '../components/DevControlStandards.jsx'
-import {
-  UI_DESIGN_ASSET,
-  prepareUIDesignSandboxSource,
-} from '../config/devUIDesign.mjs'
+import DevUIDesignDocument from '../components/DevUIDesignDocument.jsx'
+import { prepareUIDesignSandboxSource } from '../config/devUIDesign.mjs'
 import designHTML from '../../../../docs/product/ui-design/index.html?raw'
 import specification from '../../../../docs/product/ui-design/交互设计说明.md?raw'
 import rationale from '../../../../docs/product/ui-design/设计依据.md?raw'
@@ -33,21 +30,30 @@ export default function DevUIDesignPage() {
     : 'preview'
   const [fullscreen, setFullscreen] = useState(false)
   const [previewRevision, setPreviewRevision] = useState(0)
+  const [controlRevision, setControlRevision] = useState(0)
   const pageRef = useRef(null)
   const frameRef = useRef(null)
   const readerRef = useRef(null)
   const fullscreenButtonRef = useRef(null)
   const requestedPage = searchParams.get('page')
-  const previewPage = ['login', 'help', 'workbench'].includes(requestedPage)
+  const previewPage = ['login', 'help', 'workbench', 'controls'].includes(
+    requestedPage
+  )
     ? requestedPage
     : 'workspace'
+  const controlsVisible = previewPage === 'controls'
+  const lastHTMLPage = useRef(controlsVisible ? 'workspace' : previewPage)
+  const htmlPage = controlsVisible ? lastHTMLPage.current : previewPage
+  useEffect(() => {
+    if (!controlsVisible) lastHTMLPage.current = previewPage
+  }, [controlsVisible, previewPage])
   const source = useMemo(
-    () => prepareUIDesignSandboxSource(designHTML, { page: previewPage }),
-    [previewPage]
+    () => prepareUIDesignSandboxSource(designHTML, { page: htmlPage }),
+    [htmlPage]
   )
 
   const updateQuery = (key, value) => {
-    const next = new URLSearchParams(searchParams)
+    const next = new URLSearchParams(window.location.search)
     if (value) next.set(key, value)
     else next.delete(key)
     setSearchParams(next)
@@ -131,16 +137,10 @@ export default function DevUIDesignPage() {
   }
 
   return (
-    <div
-      ref={pageRef}
-      className="erp-dev-ui-design-page erp-dev-workspace-page"
-    >
+    <div ref={pageRef} className="erp-dev-ui-design-page erp-dev-workspace-page">
       <DevPageNav sourcePath="docs/product/ui-design/README.md" />
       <header className="erp-dev-ui-design-header">
         <Typography.Title level={1}>UI 交互设计</Typography.Title>
-        <Button onClick={() => updateQuery('controls', '1')}>
-          交互控件规范
-        </Button>
       </header>
       <Tabs
         activeKey={view}
@@ -156,50 +156,60 @@ export default function DevUIDesignPage() {
         aria-label={fullscreen ? 'UI 交互设计全屏预览' : '最新可交互设计'}
       >
         <div className="erp-dev-ui-design-toolbar">
-          <span>
-            <strong>{UI_DESIGN_ASSET.title}</strong>
-            <small>唯一交互稿</small>
-          </span>
+          <Segmented
+            aria-label="设计预览入口"
+            value={previewPage}
+            options={[
+              { value: 'workspace', label: '业务界面' },
+              { value: 'workbench', label: '效能工作台' },
+              { value: 'login', label: '登录页' },
+              { value: 'help', label: '岗位帮助' },
+              { value: 'controls', label: '控件设计' },
+            ]}
+            onChange={(value) => {
+              if (value === 'controls') setFullscreen(false)
+              updateQuery('page', value === 'workspace' ? '' : value)
+            }}
+          />
           <Space wrap>
-            <Segmented
-              aria-label="设计预览入口"
-              value={previewPage}
-              options={[
-                { value: 'workspace', label: '业务界面' },
-                { value: 'workbench', label: '效能工作台' },
-                { value: 'login', label: '登录页' },
-                { value: 'help', label: '岗位帮助' },
-              ]}
-              onChange={(value) =>
-                updateQuery('page', value === 'workspace' ? '' : value)
-              }
-            />
             <Button
               icon={<ReloadOutlined />}
-              onClick={() => setPreviewRevision((value) => value + 1)}
+              onClick={() =>
+                controlsVisible
+                  ? setControlRevision((value) => value + 1)
+                  : setPreviewRevision((value) => value + 1)
+              }
             >
               重置演示
             </Button>
-            <Button icon={<DownloadOutlined />} onClick={download}>
-              下载 HTML
-            </Button>
-            <Button
-              ref={fullscreenButtonRef}
-              icon={<FullscreenOutlined />}
-              onClick={() => setFullscreen((value) => !value)}
-            >
-              {fullscreen ? '退出全屏' : '全屏预览'}
-            </Button>
+            {!controlsVisible && (
+              <Button icon={<DownloadOutlined />} onClick={download}>
+                下载 HTML
+              </Button>
+            )}
+            {!controlsVisible && (
+              <Button
+                ref={fullscreenButtonRef}
+                icon={<FullscreenOutlined />}
+                onClick={() => setFullscreen((value) => !value)}
+              >
+                {fullscreen ? '退出全屏' : '全屏预览'}
+              </Button>
+            )}
           </Space>
         </div>
         <iframe
           ref={frameRef}
-          key={previewRevision}
+          key={`html-${previewRevision}`}
           title="ERP 最新可交互设计"
           sandbox="allow-scripts allow-downloads"
           srcDoc={source}
           className="erp-dev-ui-design-frame"
+          hidden={controlsVisible}
         />
+        {view === 'preview' && controlsVisible ? (
+          <DevControlStandards key={`controls-${controlRevision}`} />
+        ) : null}
         {fullscreen ? (
           <button
             type="button"
@@ -211,24 +221,13 @@ export default function DevUIDesignPage() {
         ) : null}
       </section>
       {view !== 'preview' ? (
-        <section
-          className="erp-dev-ui-design-document"
-          aria-label={view === 'specification' ? '设计说明' : '设计依据'}
-        >
-          <Markdown
-            source={view === 'specification' ? specification : rationale}
-          />
-        </section>
+        <DevUIDesignDocument
+          key={view}
+          view={view}
+          specification={specification}
+          source={view === 'specification' ? specification : rationale}
+        />
       ) : null}
-      <Drawer
-        title="交互控件规范 · 当前共享组件"
-        width={880}
-        open={searchParams.get('controls') === '1'}
-        destroyOnHidden
-        onClose={() => updateQuery('controls', '')}
-      >
-        <DevControlStandards />
-      </Drawer>
     </div>
   )
 }

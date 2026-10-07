@@ -33,6 +33,7 @@ import {
   readBusinessSummaryTotal,
   readMobileTaskTotal,
   resolveCurrentBatchListFilter,
+  sourceDocumentSearchPrefix,
   shipmentListReady,
   evaluateBusinessDashboardEvidence,
   evaluateBusinessDashboardCurrentBatchEvidence,
@@ -1708,20 +1709,20 @@ test("business summary totals use the visible client-facing counters", () => {
     readBusinessSummaryTotal("production-orders", "符合条件 47 当前页 20"),
     47,
   );
-  assert.equal(readBusinessSummaryTotal("shipments", "总出货单 47"), 47);
+  assert.equal(readBusinessSummaryTotal("shipments", "符合条件 47"), 47);
 });
 
 test("shipment list readiness waits for both the exact total and rendered rows", () => {
   const originalDocument = globalThis.document;
   try {
     globalThis.document = {
-      body: { innerText: "总出货单 47 本页显示 20" },
+      body: { innerText: "符合条件 47 本页显示 20" },
       querySelectorAll: () => [{ classList: { contains: () => false } }],
     };
     assert.equal(shipmentListReady(47), true);
     assert.equal(shipmentListReady(46), false);
     globalThis.document = {
-      body: { innerText: "总出货单 47 本页显示 0" },
+      body: { innerText: "符合条件 47 本页显示 0" },
       querySelectorAll: () => [],
     };
     assert.equal(shipmentListReady(47), false);
@@ -1902,6 +1903,19 @@ test("no-search current-batch pages use only their exact visible business number
   );
 });
 
+test("source document searches exclude related generated orders and reject another batch", () => {
+  assert.equal(sourceDocumentSearchPrefix("YS8", "YS8-CG-013"), "YS8-CG-");
+  assert.equal(sourceDocumentSearchPrefix("YS8", "YS8-BOM-005-3"), "YS8-BOM-");
+  assert.throws(() => sourceDocumentSearchPrefix("YS8", "YS7-CG-013"), /当前批次/u);
+  assert.throws(() => sourceDocumentSearchPrefix("YS8", "YS8-013"), /业务类别/u);
+  const result = resolveCurrentBatchListFilter(
+    { key: "accessories-purchase" },
+    { probes: [{ batchEvidence: "prefix_filtered", batchPrefix: "YS8" }] },
+    { printRecords: { purchaseOrder: { recordQuery: "YS8-CG-013" } } },
+  );
+  assert.deepEqual(result, { mode: "source_prefix", identifier: "YS8-CG-" });
+});
+
 test("task board binds task-code metadata to the exact current-batch total", () => {
   const taskBoard = buildManualAcceptanceBrowserPlan({}).targets.find(
     (target) => target.key === "task-board",
@@ -1959,7 +1973,7 @@ test("task board waits for its loaded search control before current-batch filter
   const filterSource = source.slice(filterStart, filterEnd);
   const taskBoardIndex = filterSource.indexOf('target.key === "task-board"');
   const exactSearchIndex = filterSource.indexOf(
-    'getByPlaceholder("搜索任务", { exact: true })',
+    'getByPlaceholder("订单 / 产品 / 物料 / 款号", {',
   );
   const visibleWaitIndex = filterSource.indexOf(
     'state: "visible"',
@@ -1976,7 +1990,7 @@ test("task board waits for its loaded search control before current-batch filter
   assert.ok(fillIndex > visibleWaitIndex);
   assert.match(
     filterSource,
-    /else \{[\s\S]*?input\[placeholder\*="搜索"\],input\[placeholder\^="操作人"\]/u,
+    /else \{[\s\S]*?input\[placeholder\*="搜"\],input\[placeholder\^="操作人"\]/u,
   );
   assert.match(filterSource, /没有可用于当前批次核对的搜索框/u);
 });
@@ -2338,6 +2352,14 @@ test("print preview and current-batch source minimum evidence fail closed", () =
   assert.equal(sourceEvidence.status, "minimum_proven");
   assert.equal(sourceEvidence.observedTotal, 45);
   assert.equal(sourceEvidence.minimumSatisfied, true);
+  assert.equal(evaluatePrintSourceMinimumEvidence({
+    sourcePrefix: "YS8", visibleRows: 20, matchingCurrentBatchRows: 20,
+    filteredTotal: 45, minimumRecords: 45,
+  }).minimumSatisfied, true);
+  assert.equal(evaluatePrintSourceMinimumEvidence({
+    sourcePrefix: "YS8", visibleRows: 20, matchingCurrentBatchRows: 20,
+    filteredTotal: 45, paginationTexts: ["共 46 条"], minimumRecords: 45,
+  }).minimumSatisfied, false);
   assert.equal(
     evaluatePrintSourceMinimumEvidence({
       sourcePrefix: "YS8",
@@ -2395,7 +2417,7 @@ test("mobile task evidence waits for each lazy-loaded tab before reading zero", 
   assert.match(source, /mobile-role-scroll/u);
   assert.match(source, /getAttribute\("aria-busy"\) === "false"/u);
   const doneNavigationIndex = source.indexOf(
-    'getByTestId("mobile-role-nav-done")',
+    '.getByText("已办", { exact: true })',
   );
   const doneLoadedIndex = source.indexOf(
     "await waitForActiveViewLoaded();",
@@ -2585,7 +2607,7 @@ test("business print proof searches canonical current-batch records before exact
   );
   assert.match(
     source,
-    /locator\("button"\)[\s\S]{0,180}getByText\(actionLabel,\s*\{\s*exact:\s*true\s*\}\)/u,
+    /locator\("button:visible"\)[\s\S]{0,180}getByText\(actionLabel,\s*\{\s*exact:\s*true\s*\}\)/u,
   );
   assert.match(
     source,
@@ -2610,7 +2632,7 @@ test("inventory current-batch evidence switches to the lot-number view", async (
     source,
     /getByRole\("tab", \{ name: "库存批次", exact: true \}\)/u,
   );
-  assert.match(source, /getByPlaceholder\("搜索批次"\)/u);
+  assert.match(source, /getByPlaceholder\(BUSINESS_SEARCH_SCOPES\.lots\.placeholder/u);
 });
 
 test("mobile role totals cannot overwrite a task board DOM minimum failure", () => {

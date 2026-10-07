@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { FIELD_LINKAGE_CASE_CATALOG } from '../../web/src/erp/qa/fieldLinkageCatalog.mjs'
 
 import {
   assertRepositoryIdentityEqual,
@@ -33,15 +34,15 @@ const builderPath = path.join(
 )
 
 const testFiles = [
-  'src/erp/qa/fieldLinkageCatalog.test.mjs',
-  'src/erp/data/processingContractTemplate.test.mjs',
-  'src/erp/utils/materialPurchaseContractEditor.test.mjs',
-  'src/erp/utils/masterDataOrderView.test.mjs',
-  'src/erp/utils/processingContractEditor.test.mjs',
-  'src/erp/utils/printWorkspace.test.mjs',
-  'src/erp/utils/workflowTaskBoard.test.mjs',
-  'src/erp/config/printTemplates.test.mjs',
-  '../scripts/qa/sales-order-field-chain-boundary.test.mjs',
+  ...new Set(
+    [
+      ...FIELD_LINKAGE_CASE_CATALOG.map(({ testFile }) =>
+        path.relative(path.join(rootDir, 'web'), path.join(rootDir, testFile))
+      ),
+      // Shared draft/serialization contracts also guard the registered print cases.
+      'src/erp/utils/printWorkspace.test.mjs',
+    ]
+  ),
 ]
 
 const usage = `用法:

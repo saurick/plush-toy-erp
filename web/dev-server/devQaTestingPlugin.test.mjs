@@ -304,25 +304,37 @@ test('testing service rejects overlap with coverage global lock', async (t) => {
 
 test('pressure actions map to the isolated lifecycle and cannot supply target or command overrides', () => {
   for (const [action, profile] of [['pressure-quick', 'quick'], ['pressure-capacity', 'capacity']]) {
-    const spec = buildDevQaTestingCommand({ action, nodeRuntime: '/runtime/node', operationId: ID, projectRoot: '/project' })
-    assert.deepEqual(spec.args, ['scripts/qa/pressure-isolated-lifecycle.mjs', '--run', '--profile', profile, '--out', `output/qa/pressure/workbench-${ID}/lifecycle.json`])
-    assert.equal(validateDevQaTestingAction({ action, payload: { idempotencyKey: `testing:${action}:${ID}` } }).action, action)
+    const spec = buildDevQaTestingCommand({ action, dataScale: 'growth', nodeRuntime: '/runtime/node', operationId: ID, projectRoot: '/project' })
+    assert.deepEqual(spec.args, ['scripts/qa/pressure-isolated-lifecycle.mjs', '--run', '--profile', profile, '--data-scale', 'growth', '--out', `output/qa/pressure/workbench-${ID}/lifecycle.json`])
+    assert.equal(validateDevQaTestingAction({ action, payload: { idempotencyKey: `testing:${action}:${ID}`, dataScale: 'growth' } }).action, action)
     assert.throws(() => validateDevQaTestingAction({ action, payload: { idempotencyKey: `testing:${action}:${ID}`, databaseURL: 'shared' } }), /unsupported/u)
   }
 })
 
+test('data scale must be an allowlisted value and cannot become arbitrary command arguments', () => {
+  for (const dataScale of [undefined, null, '', 10, '__proto__', 'baseline --out /tmp/other']) {
+    assert.throws(() => validateDevQaTestingAction({ action: 'pressure-quick', payload: { idempotencyKey: `testing:pressure-quick:${ID}`, dataScale } }))
+    assert.throws(() => buildDevQaTestingCommand({ action: 'pressure-quick', dataScale, nodeRuntime: '/runtime/node', operationId: ID, projectRoot: '/project' }))
+  }
+})
+
 test('pressure process exit zero needs a complete report and cleanup before the operation can pass', async (t) => {
-  for (const status of ['passed', 'incomplete']) {
-    const root = await project(t), completion = deferred()
-    const service = createDevQaTestingService({ projectRoot: root, randomOperationId: () => ID,
-      readRepositoryState: async () => REPOSITORY, resolveNodeRuntime: () => '/runtime/node',
-      readPressureReports: () => ({ report: { status, profile: 'quick' } }),
+  for (const [status, dataScale, expectedStatus] of [['passed', 'baseline', 'completed'], ['incomplete', 'baseline', 'failed'], ['passed', 'growth', 'failed']]) {
+    const root = await project(t); const
+completion = deferred()
+    const service = createDevQaTestingService({ projectRoot: root,
+randomOperationId: () => ID,
+      readRepositoryState: async () => REPOSITORY,
+resolveNodeRuntime: () => '/runtime/node',
+      readPressureReports: () => ({ report: { status, profile: 'quick', dataset: { dataScale } } }),
       launchProcess: () => ({ pid: process.pid, completion: completion.promise }) })
-    const intent = { action: 'pressure-quick', payload: { idempotencyKey: `testing:pressure-quick:${ID}` } }
-    const first = await service.act(intent), repeated = await service.act(intent)
+    const intent = { action: 'pressure-quick', payload: { idempotencyKey: `testing:pressure-quick:${ID}`, dataScale: 'baseline' } }
+    const first = await service.act(intent); const
+repeated = await service.act(intent)
+    await assert.rejects(service.act({ ...intent, payload: { ...intent.payload, dataScale: 'growth' } }), /intent mismatch/u)
     assert.equal(first.operation.status, 'running'); assert.equal(repeated.reused, true)
     completion.resolve({ code: 0 }); await new Promise((resolve) => setImmediate(resolve))
-    assert.equal(service.readOperation(ID).status, status === 'passed' ? 'completed' : 'failed')
+    assert.equal(service.readOperation(ID).status, expectedStatus)
     assert.equal(service.summary().busy.active, false)
   }
 })

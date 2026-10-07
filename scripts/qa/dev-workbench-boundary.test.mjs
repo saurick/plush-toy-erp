@@ -218,7 +218,7 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
       { key: "delivery", route: "/__dev/delivery" },
     ],
   );
-  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 13);
+  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 14);
   assert(
     DEV_SECONDARY_NAV_ITEMS.every(
       (item) =>
@@ -245,6 +245,18 @@ const allowedERPImports = new Set([
   "config/roleHelpContent.mjs",
 ]);
 const allowedERPImportsByFile = new Map([
+  [
+    "web/src/dev-workbench/components/DevUIFeedbackExamples.jsx",
+    new Set([
+      "components/business-list/BusinessFormModal",
+      "components/business-list/BusinessModal",
+      "utils/modalSizes.mjs",
+    ]),
+  ],
+  [
+    "web/src/dev-workbench/components/DevUIFeedbackGuide.jsx",
+    new Set(["utils/modalSizes.mjs"]),
+  ],
   [
     "web/src/dev-workbench/config/devUIDesign.test.mjs",
     new Set(["config/helpScenarios.mjs", "config/helpManualCatalog.mjs"]),
@@ -289,7 +301,7 @@ function isAllowedERPImport(file, specifier) {
   );
 }
 
-test("dev workbench boundary: imports from ERP stay on explicit read/API adapters", () => {
+test("dev workbench boundary: ERP imports stay on explicit adapters and presentation samples", () => {
   const workbenchSources = listFiles("web/src/dev-workbench")
     .filter((file) => /\.(?:js|jsx|mjs)$/u.test(file))
     .map((file) => ({ file, source: read(file) }));
@@ -303,8 +315,45 @@ test("dev workbench boundary: imports from ERP stay on explicit read/API adapter
         `${file} imports non-approved ERP internals: ${match[1]}`,
       );
     }
-    assert.doesNotMatch(source, /@\/erp\/(?:pages|components|styles)\//u);
   }
+});
+
+test("feedback sample modal dependencies remain presentation-only", () => {
+  const allowed = new Set([
+    "react",
+    "antd",
+    "../../utils/modalSizes.mjs",
+    "./BusinessModal.jsx",
+    "../../common/utils/feedbackConfig.mjs",
+  ]);
+  for (const file of [
+    "web/src/erp/components/business-list/BusinessFormModal.jsx",
+    "web/src/erp/components/business-list/BusinessModal.jsx",
+    "web/src/erp/utils/modalSizes.mjs",
+    "web/src/common/utils/feedbackConfig.mjs",
+  ]) {
+    const source = read(file);
+    for (const match of source.matchAll(
+      /(?:from\s+|import\()['"]([^'"]+)['"]/gu,
+    )) {
+      assert(allowed.has(match[1]), `${file} imports a non-presentation dependency`);
+    }
+    assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b/u);
+  }
+  assert.equal(
+    isAllowedERPImport(
+      "web/src/dev-workbench/pages/DevTestingPage.jsx",
+      "@/erp/components/business-list/BusinessModal",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedERPImport(
+      "web/src/dev-workbench/components/DevUIFeedbackExamples.jsx",
+      "@/erp/pages/PurchaseOrdersPage.jsx",
+    ),
+    false,
+  );
 });
 
 test("dev workbench boundary: resolved imports preserve module and file scope", () => {

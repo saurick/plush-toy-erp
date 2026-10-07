@@ -790,6 +790,8 @@ test("every allowlisted method is present in the current formal JSON-RPC dispatc
   const files = await Promise.all(
     [
       "../../server/internal/service/jsonrpc_inventory.go",
+      "../../server/internal/service/jsonrpc_inventory_operation.go",
+      "../../server/internal/service/jsonrpc_purchase_rejection_disposition.go",
       "../../server/internal/service/jsonrpc_production_order.go",
       "../../server/internal/service/jsonrpc_production_wip.go",
       "../../server/internal/service/jsonrpc_operational_fact_production.go",

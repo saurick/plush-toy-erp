@@ -177,10 +177,6 @@
   margin: 0;
 }
 
-.erp-dev-quality-server-pipeline__dag .erp-markdown-mermaid__canvas {
-  min-width: 880px;
-}
-
 .erp-dev-quality-server-pipeline__mapping {
   display: grid;
   gap: 8px;
@@ -781,26 +777,6 @@
   border: 1px solid var(--erp-border);
   border-radius: var(--erp-business-card-radius);
   background: var(--erp-surface-bg);
-}
-
-.erp-dev-quality-tabs.erp-dev-task-nav,
-.erp-dev-quality-tabs.erp-dev-task-nav--compact {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  overflow: visible;
-}
-
-.erp-dev-quality-tabs .erp-dev-task-nav__item,
-.erp-dev-quality-tabs.erp-dev-task-nav--compact .erp-dev-task-nav__item {
-  min-width: 0;
-  min-height: 42px;
-  padding: 7px 10px;
-  text-align: center;
-}
-
-.erp-dev-quality-tabs .erp-dev-task-nav__item > span {
-  overflow-wrap: normal;
 }
 
 .erp-dev-quality-view-description {

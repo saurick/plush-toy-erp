@@ -47,20 +47,8 @@
 }
 
 .erp-dev-delivery-workspace .erp-dev-delivery-taskbar {
-  --erp-slider-radius: 6px;
-  --erp-slider-shadow: inset 0 0 0 1px var(--erp-primary);
-  width: 100%;
   min-width: 0;
   margin: 0;
-  padding: 8px 10px;
-  border: 1px solid var(--erp-border);
-  border-radius: 8px;
-  background: var(--erp-surface-bg);
-}
-
-.erp-dev-delivery-taskbar .erp-dev-task-nav__item {
-  border: 0;
-  border-radius: 6px;
 }
 
 .erp-dev-delivery-workspace [hidden] {

@@ -56,3 +56,10 @@ test('report client only reads the fixed API with a bounded report id and forwar
     readDevPressureReports({ fetchImpl: async () => ({ ok: false }) })
   )
 })
+
+test('malformed comparison metadata is rejected before rendering the report selector', () => {
+  const report = { id: 'one', profile: 'quick', startedAt: '2026-10-06T00:00:00Z', completedAt: '2026-10-06T01:00:00Z', status: 'passed', freshness: 'matched' }
+  for (const change of [{ dataScale: 'production' }, { comparisonKey: 'not-a-hash' }, { main: { operations: {} } }]) {
+    assert.throws(() => normalizeDevPressureReports({ ...empty(), reports: [{ ...report, ...change }] }))
+  }
+})

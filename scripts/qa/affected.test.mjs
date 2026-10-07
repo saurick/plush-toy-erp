@@ -574,6 +574,14 @@ test("affected: DEV 页面改动只选择聚焦合同与受影响桌面 smoke", 
       "dev-pressure-desktop",
     ],
     [
+      "web/src/dev-workbench/components/DevPressureDataset.jsx",
+      "dev-pressure-desktop",
+    ],
+    [
+      "web/src/dev-workbench/config/devPressureData.mjs",
+      "dev-pressure-desktop",
+    ],
+    [
       "web/src/dev-workbench/config/devPressure.mjs",
       "dev-pressure-desktop",
     ],

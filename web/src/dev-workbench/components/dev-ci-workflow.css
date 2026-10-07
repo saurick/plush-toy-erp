@@ -8,12 +8,6 @@
   max-width: 100%;
 }
 
-.erp-dev-ci-guide__diagram
-  .erp-markdown-mermaid:not(.erp-markdown-mermaid--fullscreen)
-  .erp-markdown-mermaid__viewport {
-  max-height: 440px;
-}
-
 .erp-dev-ci-guide__section ol {
   margin: 12px 0 0;
   padding-left: 22px;

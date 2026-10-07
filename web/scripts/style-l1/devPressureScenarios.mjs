@@ -48,6 +48,14 @@ function pressureFixture() {
   return {
     id: 'history-capacity',
     profile: 'capacity',
+    comparisonKey: 'd'.repeat(64),
+    dataset: { dataScale: 'growth',
+totalOrders: 362,
+      working: { orders: 262, ordinaryOrders: 174, complexOrders: 88, orderItems: 878, demandSources: 17592 },
+      history: { orders: 100, ordinaryOrders: 66, complexOrders: 34, orderItems: 338, demandSources: 6792, purchaseOrders: 80, purchaseItems: 120, states: { PREVIEW: 20, SUBMITTED: 20, BOSS_APPROVED: 20, APPROVED: 40 } },
+      reads: { target: { workflowTasks: 15000, productionFacts: 6000, financeFacts: 6000, attachments: 1000 }, actual: { workflowTasks: 15000, productionFacts: 6000, financeFacts: 6000, attachments: 1000 } },
+      complexity: { ordinary: { lines: 1, bomParts: 4, sources: 4 }, complex: { lines: 8, bomParts: 24, sources: 192 } },
+      storage: { databaseBytes: 345678901, businessTableBytes: 12345678 } },
     status: 'passed',
     freshness: 'changed',
     startedAt: '2026-10-02T10:00:00Z',
@@ -91,16 +99,18 @@ export function createDevPressureScenarios({
   assert,
   assertNoHorizontalOverflow,
 }) {
-  let mode = 'history',
-    operation = null,
-    actionRequests = [],
-    reportReads = 0,
-    deferredRead = null,
-    releaseDeferred = null
+  let mode = 'history'
+    let operation = null
+    let actionRequests = []
+    let reportReads = 0
+    let deferredRead = null
+    let releaseDeferred = null
   const report = pressureFixture()
+  const baseline = { ...report, id: 'history-baseline', dataScale: 'baseline', historyOrders: 20, main: report.engineering.levels[1] }
+  const different = { ...baseline, id: 'different-host', comparisonKey: 'e'.repeat(64) }
   const envelope = () => ({
     schemaVersion: 'plush.dev-pressure-reports/v1',
-    reports: mode === 'empty' ? [] : [report],
+    reports: mode === 'empty' ? [] : [report, baseline, different],
     report:
       mode === 'empty' || mode === 'running'
         ? null
@@ -199,6 +209,7 @@ export function createDevPressureScenarios({
             schemaVersion: 'plush.dev-qa-testing-operation-public/v1',
             id: ID,
             action: 'pressure-quick',
+            dataScale: 'growth',
             repository: {
               commit: 'a'.repeat(40),
               dirty: true,
@@ -235,9 +246,18 @@ export function createDevPressureScenarios({
           .waitFor()
         assert.equal(await panel.locator('.erp-dev-pressure-metric').count(), 4)
         await panel.getByRole('table', { name: '每方法延迟与样本' }).waitFor()
+        await panel.getByRole('table', { name: '历史背景与当轮订单池' }).waitFor()
+        await panel.getByRole('combobox', { name: '比较基准报告' }).press('ArrowDown')
+        await page.locator('.ant-select-dropdown:visible').getByText('基础 · 容量 · history-baseline', { exact: true }).click()
+        await panel.getByRole('table', { name: '不同数据规模的 API 延迟变化' }).waitFor()
+        await assertNoHorizontalOverflow(page, '压力报告长方法与规模比较')
+        await panel.getByRole('combobox', { name: '比较基准报告' }).press('ArrowDown')
+        await page.locator('.ant-select-dropdown:visible').getByText('基础 · 容量 · different-host', { exact: true }).click()
+        await panel.getByText('源码、负载或运行环境不同，不能归因于数据规模。', { exact: true }).waitFor()
+        assert.equal(await panel.getByRole('table', { name: '不同数据规模的 API 延迟变化' }).count(), 0)
         await assertNoHorizontalOverflow(page, '压力报告长方法与摘要')
-        const nav = page.locator('.erp-dev-testing-primary-nav'),
-          before = await nav.boundingBox()
+        const nav = page.locator('.erp-dev-testing-primary-nav')
+          const before = await nav.boundingBox()
         const reload = () =>
           panel
             .getByRole('button', { name: '重新读取报告', exact: true })
@@ -275,6 +295,8 @@ export function createDevPressureScenarios({
         await panel
           .getByText('历史候选 · 源码已变化', { exact: true })
           .waitFor()
+        await panel.getByRole('combobox', { name: '数据规模', exact: true }).press('ArrowDown')
+        await page.locator('.ant-select-dropdown:visible').getByText('增长 · 100 张历史单', { exact: true }).click()
         await panel
           .getByRole('button', { name: '运行短档回归', exact: true })
           .click()
@@ -282,8 +304,9 @@ export function createDevPressureScenarios({
         assert.equal(actionRequests.length, 1)
         assert.equal(actionRequests[0].action, 'pressure-quick')
         assert.deepEqual(Object.keys(actionRequests[0].payload), [
-          'idempotencyKey',
+          'idempotencyKey', 'dataScale',
         ])
+        assert.equal(actionRequests[0].payload.dataScale, 'growth')
         assert.equal(
           await panel
             .getByRole('button', { name: '运行 10 分钟容量', exact: true })
@@ -299,8 +322,8 @@ export function createDevPressureScenarios({
           const read = () =>
             new DOMMatrixReadOnly(getComputedStyle(group, '::before').transform)
               .m41
-          const initial = read(),
-            samples = []
+          const initial = read()
+            const samples = []
           group.querySelector('.ant-segmented-item').click()
           for (let index = 0; index < 30; index++) {
             await new Promise((resolve) => requestAnimationFrame(resolve))

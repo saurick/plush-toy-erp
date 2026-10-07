@@ -55,6 +55,69 @@ export const DEV_DATA_PREPARATION_TARGET_KEYS = Object.freeze({
 export const DEV_DATA_PREPARATION_PROFILE_QUERY_KEY = 'dataProfile'
 export const DEV_DATA_PREPARATION_TARGET_QUERY_KEY = 'dataTarget'
 
+export function resolveDataPreparationAvailability(
+  summary,
+  profileKey,
+  targetKey
+) {
+  const profile = summary?.profiles?.find((item) => item.key === profileKey)
+  const targetName =
+    profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo
+      ? 'coreDemo'
+      : profileKey === DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance
+        ? 'fullAcceptance'
+        : targetKey === DEV_DATA_PREPARATION_TARGET_KEYS.customerTrial133
+          ? 'scenarioDemo133'
+          : 'scenarioDemo'
+  const target = summary?.target?.[targetName]
+  const blockers = []
+  if (!profile || !summary.repository) {
+    blockers.push({
+      code: 'repository_identity_unavailable',
+      title: '代码身份未确认',
+      message: '尚未读到当前代码身份，请重新检查。',
+    })
+  } else if (profile.exactCleanCommitRequired && summary.repository.dirty) {
+    blockers.push({
+      code: 'full_acceptance_requires_clean_repository',
+      title: '有未提交改动',
+      message:
+        '当前有未提交改动。完整回归需要固定的干净提交；日常联调可选择基础数据或业务场景。',
+    })
+  }
+  const requiresTargetReadback =
+    targetName === 'scenarioDemo133' && target?.status === 'not_proven'
+  if (target?.status !== 'available' && !requiresTargetReadback) {
+    const code = `${profileKey.replaceAll('-', '_')}_target_unavailable`
+    blockers.push({
+      code,
+      title: targetName === 'fullAcceptance' ? '隔离库未就绪' : '目标预检未通过',
+      message:
+        summary?.issues?.find((issue) => issue.code === code)?.message ||
+        '目标预检尚未通过，请重新检查。',
+      nextAction:
+        targetName === 'fullAcceptance'
+          ? '检查开发服务的隔离验收库配置，然后重新检查。'
+          : '先在数据库迁移页核对开发库、迁移和运行状态，处理后重新检查。',
+      migration: targetName !== 'fullAcceptance',
+    })
+  }
+  return {
+    target,
+    blockers,
+    status: blockers.length
+      ? 'blocked'
+      : requiresTargetReadback
+        ? 'not_proven'
+        : 'available',
+    label: blockers.length
+      ? '待处理'
+      : requiresTargetReadback
+        ? '准备时核对目标'
+        : '可准备',
+  }
+}
+
 const PROFILE_TARGET_KEYS = Object.freeze({
   [DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo]: Object.freeze([
     DEV_DATA_PREPARATION_TARGET_KEYS.localDevelopment,
@@ -160,7 +223,7 @@ export const DEV_DATA_PREPARATION_PROFILE_COPY = Object.freeze({
       '全部已登记业务链、现有 9 个造数阶段、正式 Source / Fact API、页面回归与受控负向场景。',
     targetKey: 'fullAcceptance',
     targetTitle: '完整验收目标',
-    badgeLabel: '推荐 · 自动清理',
+    badgeLabel: '自动清理',
     badgeColor: 'green',
     prepareButtonLabel: '准备新批次',
     prepareDescription:
@@ -410,29 +473,36 @@ function validateStringList(values, field) {
   return values
 }
 
-function validateAcceptancePlan(plan) {
-  assertExactKeys(
-    plan,
-    [
-      'catalogTargetCount',
-      'chainCount',
-      'chainDataDigest',
-      'chainVerificationDigest',
-      'chains',
-      'contract',
-      'dataStageCount',
-      'dataStages',
-      'executionScope',
-      'freshBatchPerRun',
-      'reuseRules',
-      'scenarioCount',
-      'scenarioKinds',
-      'selectorAffectsExecution',
-      'sourceContract',
-      'stepCount',
-    ],
-    'data preparation acceptance plan'
+const ACCEPTANCE_PLAN_FIELDS = Object.freeze([
+  'catalogTargetCount',
+  'chainCount',
+  'chainDataDigest',
+  'chainVerificationDigest',
+  'chains',
+  'contract',
+  'dataStageCount',
+  'dataStages',
+  'executionScope',
+  'freshBatchPerRun',
+  'reuseRules',
+  'scenarioCount',
+  'scenarioKinds',
+  'selectorAffectsExecution',
+  'sourceContract',
+  'stepCount',
+])
+
+// The data workspace consumes the review projection, not the runner's frozen definition snapshot.
+export function projectDataPreparationAcceptancePlan(plan) {
+  return validateAcceptancePlan(
+    Object.fromEntries(
+      ACCEPTANCE_PLAN_FIELDS.map((field) => [field, plan[field]])
+    )
   )
+}
+
+function validateAcceptancePlan(plan) {
+  assertExactKeys(plan, ACCEPTANCE_PLAN_FIELDS, 'data preparation acceptance plan')
   if (
     !isSafeText(plan.contract, 120) ||
     !isSafeText(plan.sourceContract, 120) ||
