@@ -7,6 +7,7 @@ import {
   databaseMigrationDataScopeText,
   databaseMigrationExecutionText,
   databaseMigrationPreparationAvailable,
+  databaseMigrationRecoveryComplete,
   databaseMigrationUpgradePresentation,
   databaseMigrationStatusPresentation,
   selectActiveDatabaseMigrationOperation,
@@ -16,6 +17,34 @@ import {
 } from './devDatabaseMigration.mjs'
 
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
+
+test('an older healthy bundle cannot complete recovery while workspace migrations are pending', () => {
+  const value = summary()
+  value.runtime = { available: true, bundleId: 'previous-runtime' }
+  assert.equal(databaseMigrationRecoveryComplete(value), false)
+  value.target.pendingFiles = 0
+  assert.equal(databaseMigrationRecoveryComplete(value), true)
+  value.status = 'blocked'
+  assert.equal(databaseMigrationRecoveryComplete(value), false)
+  value.status = 'success'
+  value.runtime.available = false
+  assert.equal(databaseMigrationRecoveryComplete(value), false)
+})
+
+test('execution text preserves proven zero writes without inferring them from an error code', () => {
+  const stopped = {
+    ...operation('blocked'),
+    events: [{ status: 'applying' }],
+    issues: [{ code: 'migration_source_changed' }],
+  }
+  assert.match(databaseMigrationExecutionText(stopped), /尚未完成核对/u)
+  stopped.readback = { noWritesProven: true, applyStarted: false }
+  assert.match(databaseMigrationExecutionText(stopped), /迁移前停止，未写入原库/u)
+  stopped.readback.applyStarted = true
+  assert.match(databaseMigrationExecutionText(stopped), /已确认本次未写入原库/u)
+  stopped.status = 'not_proven'
+  assert.match(databaseMigrationExecutionText(stopped), /结果未知/u)
+})
 
 test('preparation is available only for known pending migrations and a ready idle target', () => {
   const value = summary()

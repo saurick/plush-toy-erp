@@ -146,17 +146,13 @@ function operationFailureReceipt(operation, stage) {
         nextAction: "run_make_dev_restart",
       };
     }
-    const stoppedBeforeApply = [
-      "backup_restore_failed",
-      "database_clients_active",
-      "database_state_changed",
-      "migration_source_changed",
-      "migration_tool_unavailable",
-    ].includes(code);
+    const noWritesProven = operation?.readback?.noWritesProven === true;
+    const stoppedBeforeApply =
+      noWritesProven && operation.readback.applyStarted === false;
     return {
       phase: stoppedBeforeApply ? "preflight" : "apply",
       result: operation?.status === "blocked" ? "blocked" : "failed",
-      writes: stoppedBeforeApply ? "0" : "unknown",
+      writes: noWritesProven ? "0" : "unknown",
       apply: stoppedBeforeApply ? "not_started" : "attempted_once",
       errorCode: code,
       nextAction: nextActionForIssue(code),

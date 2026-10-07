@@ -19,6 +19,15 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
+// This contract exercises Kratos loading and scanning without subscribing to file changes.
+type committedConfigSource struct{ config.Source }
+
+func (s committedConfigSource) Watch() (config.Watcher, error) { return s, nil }
+func (committedConfigSource) Next() ([]*config.KeyValue, error) {
+	return nil, context.Canceled
+}
+func (committedConfigSource) Stop() error { return nil }
+
 func TestCommittedBootstrapConfigsUseProtobufDurations(t *testing.T) {
 	t.Parallel()
 
@@ -30,7 +39,7 @@ func TestCommittedBootstrapConfigsUseProtobufDurations(t *testing.T) {
 		t.Run(path, func(t *testing.T) {
 			t.Parallel()
 
-			cfg := config.New(config.WithSource(file.NewSource(path)))
+			cfg := config.New(config.WithSource(committedConfigSource{file.NewSource(path)}))
 			t.Cleanup(func() { _ = cfg.Close() })
 			if err := cfg.Load(); err != nil {
 				t.Fatalf("load %s: %v", path, err)

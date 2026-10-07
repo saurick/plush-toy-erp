@@ -48,13 +48,28 @@ const COMMAND_TIMEOUT_MS = 15 * 60 * 1000
 const RUNTIME_WAIT_TIMEOUT_MS = 90 * 1000
 export const SHARED_DEV_BACKUP_SOURCE_POLICY = 'shared-dev-dedicated-backup'
 export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
+  'scripts/local-database-roles.mjs',
   'scripts/local-migration.mjs',
   'scripts/local-migration-workflow.mjs',
+  'scripts/local-runtime-bundle.mjs',
+  'scripts/local-runtime-build-inputs.mjs',
+  'scripts/local-runtime-control.mjs',
+  'scripts/local-runtime-start.mjs',
+  'scripts/local-runtime-rehearsal.mjs',
   'scripts/local-runtime-preflight-core.mjs',
   'scripts/local-runtime-preflight.mjs',
   'scripts/local-runtime-console.mjs',
+  'scripts/dev-ports.mjs',
+  'scripts/dev-process-inspection.mjs',
+  'scripts/dev-listener-stop.sh',
   'scripts/terminal-log.mjs',
   'scripts/qa/migration-contracts.mjs',
+  'scripts/qa/run-node-tests.mjs',
+  'scripts/qa/node-test-groups.mjs',
+  'scripts/qa/verify-node-test-summary.mjs',
+  'scripts/qa/db-guard.sh',
+  'scripts/qa/db-guard.mjs',
+  'scripts/qa/lib/git-range.mjs',
   'scripts/qa/database-programmability.mjs',
   'scripts/qa/populated-upgrade-preflight.sh',
   'scripts/qa/populated-upgrade-20260714055504.sql',
@@ -67,6 +82,7 @@ export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'web/dev-server/devDatabaseMigrationRecoveryPlugin.mjs',
   'web/dev-server/devDatabaseMigrationRuntime.mjs',
   'web/dev-server/devServerSecurity.mjs',
+  'web/src/dev-workbench/config/devRuntimeRecovery.mjs',
 ])
 
 const MIGRATION_TOOL_CHECKS = Object.freeze([
@@ -456,7 +472,9 @@ export async function readMigrationSourceIdentity(projectRoot) {
     ),
   ].sort()
   const hash = createHash('sha256')
-  hash.update((await readRuntimeSource(root)).fingerprint)
+  // The migration switches the backend. Vite keeps serving the live workspace;
+  // its independent edits do not invalidate the fixed recovery candidate.
+  hash.update((await readRuntimeSource(root)).backendFingerprint)
   for (const relativePath of files) {
     const absolutePath = path.join(root, relativePath)
     if (!existsSync(absolutePath)) {
@@ -752,7 +770,8 @@ export function createDevDatabaseMigrationRuntime(
           root,
           operationId,
           executeCommand,
-          onProgress
+          onProgress,
+          { workspaceVerification: 'backend' }
         )
       }
       if (!/^postgres(?:ql)?:\/\//u.test(sourceDsn)) {

@@ -25,6 +25,7 @@ import {
   createDevDatabaseMigrationRuntime,
   executeCommand,
   readDatabaseMigrationToolReadiness,
+  readMigrationSourceIdentity,
   redactDatabaseMigrationDiagnostic,
   waitForRuntime,
   readRuntimeStartupDiagnostic,
@@ -338,6 +339,85 @@ function createRoot(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }))
   return root
 }
+
+test('migration identity ignores independent Vite edits but binds backend, configuration and recovery inputs', async (t) => {
+  const root = createRoot(t)
+  const write = (file, content) => {
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
+    writeFileSync(path.join(root, file), content, { mode: 0o600 })
+  }
+  for (const file of DEV_DATABASE_MIGRATION_SOURCE_FILES) write(file, 'fixture')
+  const migration =
+    'server/internal/data/model/migrate/20261001000000_fixture.sql'
+  const audit = 'scripts/qa/fixture-preflight.sql'
+  write(migration, `-- preflight: ${audit}\nSELECT 1;\n`)
+  const boundFiles = [
+    'server/internal/data/model/schema/fixture.go',
+    'server/internal/biz/fixture.go',
+    'server/.env',
+    'config/dev-ports.local.env',
+    'scripts/local-runtime-rehearsal.mjs',
+    'scripts/local-runtime-build-inputs.mjs',
+    'scripts/local-database-roles.mjs',
+    'web/dev-server/devDatabaseMigrationPlugin.mjs',
+    audit,
+  ]
+  for (const file of boundFiles) write(file, 'FIXTURE=original\n')
+  const gitOptions = {
+    cwd: root,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
+  }
+  execFileSync('git', ['init', '--quiet'], gitOptions)
+  execFileSync(
+    'git',
+    [
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.test',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '--quiet',
+      '--allow-empty',
+      '-m',
+      'fixture',
+    ],
+    gitOptions
+  )
+  const initial = await readMigrationSourceIdentity(root)
+  for (const file of [
+    'web/src/dev-workbench/pages/DevDataPreparationPage.jsx',
+    'web/dev-server/devDataPreparationPlugin.mjs',
+    'web/src/erp/pages/fixture.jsx',
+    'scripts/qa/unrelated-pressure.test.mjs',
+  ]) {
+    write(file, 'independent change')
+    assert.equal(
+      (await readMigrationSourceIdentity(root)).fingerprint,
+      initial.fingerprint,
+      file
+    )
+  }
+  for (const file of [...boundFiles, migration]) {
+    const original = readFileSync(path.join(root, file), 'utf8')
+    write(file, `${original}\nchanged`)
+    assert.notEqual(
+      (await readMigrationSourceIdentity(root)).fingerprint,
+      initial.fingerprint,
+      file
+    )
+    write(file, original)
+  }
+  write(
+    'server/internal/data/model/migrate/20261002000000_fixture.sql',
+    'SELECT 2;'
+  )
+  assert.notEqual(
+    (await readMigrationSourceIdentity(root)).fingerprint,
+    initial.fingerprint
+  )
+})
 
 test('database migration runtime invokes the read-only audit command and retains its typed failure', async (t) => {
   const root = createRoot(t)

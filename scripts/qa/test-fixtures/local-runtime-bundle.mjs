@@ -24,6 +24,7 @@ export function fixtureBundle(root, id = randomUUID()) {
     platform: process.platform,
     arch: process.arch,
     sourceFingerprint: "a".repeat(64),
+    backendSourceFingerprint: "b".repeat(64),
     artifactHash: hash.digest("hex"),
     files,
     migrationVersion: "20260927072615",

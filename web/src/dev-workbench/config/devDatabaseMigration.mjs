@@ -400,6 +400,15 @@ export function databaseMigrationPreparationAvailable(summary) {
   )
 }
 
+export function databaseMigrationRecoveryComplete(summary) {
+  return (
+    summary?.status === 'success' &&
+    summary.target?.key === 'shared-dev' &&
+    summary.target.pendingFiles === 0 &&
+    summary.runtime?.available === true
+  )
+}
+
 export function selectDatabaseMigrationPathOperation(summary) {
   const target = summary?.target
   const candidates = (summary?.operations || []).filter(
@@ -430,6 +439,11 @@ export function databaseMigrationExecutionText(operation) {
   }
   if (operation?.status === 'not_proven') {
     return '原库执行结果未知，请先刷新核对；不要重复执行'
+  }
+  if (operation?.readback?.noWritesProven === true) {
+    return operation.readback.applyStarted
+      ? '迁移执行已停止，已确认本次未写入原库'
+      : '本次在原库迁移前停止，未写入原库；处理阻断原因后可重新准备'
   }
   if (operation?.events?.some((event) => event.status === 'applying')) {
     return '已进入执行阶段，原库结果尚未完成核对'

@@ -60,7 +60,7 @@ export async function readRuntimeBuildInputs(
   root,
   source,
   execute = exec,
-  { scope = "backend" } = {},
+  { scope = "backend", webDependencyRoot = root } = {},
 ) {
   root = fs.realpathSync(root);
   const options = {
@@ -165,12 +165,17 @@ export async function readRuntimeBuildInputs(
         file.startsWith("scripts/build/"),
     ))
       addFile(hash, path.join(root, file), file);
+    const dependencies = createHash("sha256");
     for (const file of [
       "web/node_modules/.modules.yaml",
       "web/node_modules/.pnpm/lock.yaml",
-    ])
-      if (fs.existsSync(path.join(root, file)))
-        addFile(hash, path.join(root, file), file);
+    ]) {
+      if (fs.existsSync(path.join(webDependencyRoot, file))) {
+        addFile(hash, path.join(webDependencyRoot, file), file);
+        addFile(dependencies, path.join(webDependencyRoot, file), file);
+      }
+    }
+    result.webDependencies = dependencies.digest("hex");
     result.web = hash.digest("hex");
   }
   return result;

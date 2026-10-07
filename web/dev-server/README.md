@@ -38,6 +38,9 @@
 - `devDatabaseMigrationRuntime.mjs` 的 source identity 包含迁移 Bridge、高层 CLI 与安全真源；路径或内容变化后，既有迁移 plan 必须失效并重新准备，不保留旧路径兼容。execute 在 apply 前还必须重新验证 operation 绑定的备份文件身份。
 - 数据库迁移准备先检查能力而非绑定操作系统或桌面产品：固定需要兼容 `docker` CLI/socket 的容器运行环境、Atlas v1.3.0、PostgreSQL 18 客户端及备份恢复基础命令。Docker Engine、Docker Desktop、Colima、Rancher Desktop、OrbStack 或提供兼容入口的 Podman 均可；环境不完整时不得先停止后端。
 
+- 待迁移时，旧后端的健康状态只证明旧版本可用，不阻断重新准备，也不解除恢复模式。工具检查失败直接显示在升级页；核对 Vite 进程实际使用的 `atlas version`，不能以另一个终端临时修改的 PATH 代替。修改开发服务模块后须重新启动对应前端进程，再核对接口返回。
+- 执行阶段包含停写、备份与正式迁移。失败回执保存 `readback.applyStarted` 和 `readback.noWritesProven`，页面和 CLI 据此区分未写库与结果未知；不能仅凭 `applying` 状态或错误码推断原库已写入。结果未知保留阻断，不自动重试。
+- 本地迁移指纹绑定后端、运行配置及明确列出的迁移、审计、恢复执行文件；独立 Vite 页面与无关开发插件不参与计划失效判断。候选仍保留完整快照和制品校验，准备构建与执行前检查使用同一后端边界；恢复页和迁移服务本身的执行文件变化仍使旧计划失效。
 调整本目录后至少运行同目录 Node 测试、工作台源码边界测试、production build、制品零残留扫描和 production `/__dev` 浏览器 smoke。
 
 DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有界 JSON 请求解析。各插件显式提供请求大小上限，继续独立维护令牌、动作允许列表和状态机。

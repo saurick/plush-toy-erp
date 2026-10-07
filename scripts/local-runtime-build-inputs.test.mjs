@@ -247,3 +247,113 @@ test("platform and compilation flags invalidate reuse before replacing a process
     /当前平台/u,
   );
 });
+
+test("migration snapshots allow subsequent Vite edits while backend and dependency changes still block", async (t) => {
+  for (const [file, allowed, verification = "backend"] of [
+    ["web/src/page.jsx", true],
+    ["web/dev-server/devDataPreparationPlugin.mjs", true],
+    ["server/internal/shared/value.go", false],
+    ["server/internal/data/model/migrate/20261007000000_added.sql", false],
+    ["server/.env", false],
+    ["web/node_modules/.modules.yaml", false],
+    ["web/src/page.jsx", false, "full"],
+  ]) {
+    await t.test(`${verification}: ${file}`, async (t) => {
+      const root = await fixture(t);
+      const before = await readRuntimeSource(root);
+      let changed = false;
+      const building = buildRuntimeBundle(
+        root,
+        randomUUID(),
+        executor([]),
+        (message) => {
+          if (message !== "正在核对候选制品与当前工作区" || changed) return;
+          changed = true;
+          fs.mkdirSync(path.dirname(path.join(root, file)), {
+            recursive: true,
+          });
+          fs.appendFileSync(path.join(root, file), "\n// concurrent edit\n");
+        },
+        { workspaceVerification: verification },
+      );
+      if (!allowed) {
+        await assert.rejects(building, {
+          code: "WORKSPACE_RUNTIME_SOURCE_CHANGED",
+        });
+        return;
+      }
+      const bundle = await building;
+      assert.equal(bundle.scope, "full");
+      assert(bundle.files.includes("runtime/attachment-storage"));
+      assert(bundle.files.includes("runtime/web/index.html"));
+      assert.equal(bundle.sourceFingerprint, before.fingerprint);
+      assert.notEqual(
+        (await readRuntimeSource(root)).fingerprint,
+        before.fingerprint,
+      );
+      assert.equal(
+        fs.readFileSync(
+          path.join(bundle.directory, "source/web/src/page.jsx"),
+          "utf8",
+        ),
+        "original page",
+      );
+      assert.equal(
+        readRuntimeBundle(root, bundle.id).artifactHash,
+        bundle.artifactHash,
+      );
+    });
+  }
+});
+
+test("migration candidates bind frontend edits before the copy to the captured snapshot", async (t) => {
+  const root = await fixture(t);
+  const before = await readRuntimeSource(root);
+  let changed = false;
+  const execute = async (command, args, options) => {
+    const result = await executor([])(command, args, options);
+    if (command === "go" && args[0] === "env" && !changed) {
+      changed = true;
+      fs.writeFileSync(
+        path.join(root, "web/src/page.jsx"),
+        "changed before copy",
+      );
+    }
+    return result;
+  };
+  const bundle = await buildRuntimeBundle(
+    root,
+    randomUUID(),
+    execute,
+    () => {},
+    { workspaceVerification: "backend" },
+  );
+  assert.notEqual(bundle.sourceFingerprint, before.fingerprint);
+  assert.equal(
+    bundle.sourceFingerprint,
+    (await readRuntimeSource(root)).fingerprint,
+  );
+  assert.equal(
+    fs.readFileSync(
+      path.join(bundle.directory, "source/web/src/page.jsx"),
+      "utf8",
+    ),
+    "changed before copy",
+  );
+});
+
+test("migration candidates reject inconsistent snapshot copies", async (t) => {
+  const root = await fixture(t);
+  const copy = fs.copyFileSync;
+  t.mock.method(fs, "copyFileSync", (from, to, flags) => {
+    if (from === path.join(root, "web/src/page.jsx"))
+      fs.writeFileSync(from, "changed during copy");
+    return copy(from, to, flags);
+  });
+  await assert.rejects(
+    buildRuntimeBundle(root, randomUUID(), executor([]), () => {}, {
+      workspaceVerification: "backend",
+    }),
+    { code: "WORKSPACE_RUNTIME_SOURCE_CHANGED" },
+  );
+});

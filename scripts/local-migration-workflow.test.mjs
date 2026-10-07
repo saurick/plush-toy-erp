@@ -534,6 +534,32 @@ test("local migration workflow: an uncertain apply is reported as not-proven and
   assert.match(receipt, /next_action=run_status_no_auto_retry/u);
 });
 
+test("local migration workflow: write outcomes come from execution evidence, not the issue label", async () => {
+  for (const readback of [
+    { noWritesProven: true, applyStarted: false },
+    { noWritesProven: true, applyStarted: true },
+    null,
+  ]) {
+    const service = createService({ executeStatus: "blocked" });
+    const read = service.readOperation;
+    service.readOperation = (...args) => ({ ...read(...args), readback });
+    const buffer = outputBuffer();
+    await assert.rejects(runLocalMigrationWorkflow({
+      service,
+      mode: "execute",
+      environment: {
+        LOCAL_MIGRATION_OPERATION_ID: OPERATION_ID,
+        LOCAL_MIGRATION_OPERATION_CONFIRM: CONFIRMATION,
+      },
+      output: buffer.output,
+      waitOptions,
+    }));
+    const receipt = receiptLines(buffer.read());
+    assert.match(receipt, new RegExp(`writes=${readback ? "0" : "unknown"} apply=${readback?.applyStarted === false ? "not_started" : "attempted_once"}`));
+    assert.equal(service.calls.filter((call) => call === "execute").length, 1);
+  }
+});
+
 test("local migration workflow: replaying a passed operation reports already-applied without another apply", async () => {
   const service = createService({ startingOperation: passedOperation() });
   const buffer = outputBuffer();

@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import path from 'node:path'
 import { LocalRuntimePreflightError } from '../../scripts/local-runtime-preflight.mjs'
+import { WORKSPACE_RUNTIME_SOURCE_CHANGED_CODE } from '../../scripts/local-runtime-bundle.mjs'
 
 import {
   isLoopbackAPIOrigin,
@@ -257,6 +258,21 @@ function publicIssue(error, fallbackCode = 'operation_blocked') {
       message: '迁移写入或读回结果尚未证明；请刷新状态核对，系统不会自动重试',
     }
   }
+  // A typed source failure can mention the backup stage without invalidating
+  // the backup itself. Keep its meaning ahead of diagnostic-text fallbacks.
+  if (
+    error?.code === 'migration_source_changed' ||
+    error?.code === WORKSPACE_RUNTIME_SOURCE_CHANGED_CODE ||
+    /\berror_code=(?:workspace_guard_failed|migration_source_changed)\b|checksum.*(?:mismatch|error)|migration source.*(?:changed|missing|invalid)|schema\/migration.*(?:失败|不一致|未收口)/iu.test(
+      diagnostic
+    )
+  ) {
+    return {
+      code: 'migration_source_changed',
+      severity: 'blocked',
+      message: '代码、配置或迁移文件未通过检查，或在操作期间发生变化；请处理检查错误并待相关修改结束后重新准备',
+    }
+  }
   if (error?.code === 'migration_command_timeout') {
     return {
       code: 'migration_command_timeout',
@@ -326,18 +342,6 @@ function publicIssue(error, fallbackCode = 'operation_blocked') {
       message: migrationToolIssueMessage(),
     }
   }
-  if (
-    error?.code === 'migration_source_changed' ||
-    /\berror_code=(?:workspace_guard_failed|migration_source_changed)\b|checksum.*(?:mismatch|error)|migration source.*(?:changed|missing|invalid)|schema\/migration.*(?:失败|不一致|未收口)/iu.test(
-      diagnostic
-    )
-  ) {
-    return {
-      code: 'migration_source_changed',
-      severity: 'blocked',
-      message: 'migration 或 schema 真源未收口或在操作期间发生变化，请重新准备',
-    }
-  }
   if (/\berror_code=migration_preflight_failed\b/u.test(diagnostic)) {
     const workflowRows = diagnostic.match(
       /workflow_tasks has (\d+) incompatible status or anchor rows/u
@@ -401,7 +405,7 @@ export function createDevDatabaseMigrationService({
   const reportRuntimeReady = async (target, runtimeReadback) => {
     if (
       target?.key !== 'shared-dev' ||
-      (target?.pendingFiles !== 0 && !runtimeReadback?.bundleId) ||
+      target?.pendingFiles !== 0 ||
       runtimeReadback?.available !== true
     ) {
       return
@@ -418,7 +422,8 @@ export function createDevDatabaseMigrationService({
     operationId,
     error,
     fallbackStatus = 'blocked',
-    fallbackCode = 'operation_blocked'
+    fallbackCode = 'operation_blocked',
+    executionReadback = null
   ) => {
     logFailure(operationId, error)
     const issue = publicIssue(error, fallbackCode)
@@ -439,7 +444,12 @@ export function createDevDatabaseMigrationService({
               ? '数据库升级已完成，后端恢复未完成；修正启动问题后只需重启后端'
               : previous.status === 'preparing'
                 ? `${previous.message.replace(/^正在/u, '')}未完成，操作已停止`
+                : executionReadback?.noWritesProven
+                  ? '升级已停止，已确认本次未写入原库'
                 : '操作被安全停止',
+      readback: executionReadback
+        ? { ...previous.readback, ...executionReadback }
+        : previous.readback,
       issues: [issue],
       now: now().toISOString(),
     })
@@ -472,7 +482,7 @@ export function createDevDatabaseMigrationService({
       const source = await runtime.sourceIdentity()
       if (source.fingerprint !== checkedSource.fingerprint) {
         throw new DatabaseMigrationActionError(
-          '迁移文件在代码检查期间发生变化，请重新准备',
+          '后端、配置或迁移执行文件在代码检查期间发生变化，请重新准备',
           { code: 'migration_source_changed' }
         )
       }
@@ -525,7 +535,7 @@ export function createDevDatabaseMigrationService({
       await runtime.audit()
       if ((await runtime.sourceIdentity()).fingerprint !== source.fingerprint) {
         throw new DatabaseMigrationActionError(
-          '迁移文件在存量数据检查期间发生变化，请重新准备',
+          '后端、配置或迁移执行文件在存量数据检查期间发生变化，请重新准备',
           { code: 'migration_source_changed' }
         )
       }
@@ -740,7 +750,12 @@ export function createDevDatabaseMigrationService({
       transitionFailure(
         operationId,
         error,
-        current.status === 'restarting' ? 'failed' : 'blocked'
+        current.status === 'restarting' ? 'failed' : 'blocked',
+        'operation_blocked',
+        {
+          applyStarted,
+          noWritesProven: !applyStarted || noWritesProven,
+        }
       )
     } finally {
       if (maintenanceEntered) {

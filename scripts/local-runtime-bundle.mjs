@@ -105,6 +105,13 @@ function hashFiles(root, files) {
   return hash.digest("hex");
 }
 
+function runtimeSourceFingerprint(contentFingerprint, environment) {
+  return createHash("sha256")
+    .update(contentFingerprint)
+    .update(JSON.stringify(environment))
+    .digest("hex");
+}
+
 export async function readRuntimeSource(root) {
   const { stdout } = await exec(
     "git",
@@ -148,16 +155,13 @@ export async function readRuntimeSource(root) {
   const backendContentFingerprint = hashFiles(root, backendFiles);
   return {
     files,
-    fingerprint: createHash("sha256")
-      .update(contentFingerprint)
-      .update(JSON.stringify(environment))
-      .digest("hex"),
+    fingerprint: runtimeSourceFingerprint(contentFingerprint, environment),
     contentFingerprint,
     backendFiles,
-    backendFingerprint: createHash("sha256")
-      .update(backendContentFingerprint)
-      .update(JSON.stringify(environment))
-      .digest("hex"),
+    backendFingerprint: runtimeSourceFingerprint(
+      backendContentFingerprint,
+      environment,
+    ),
     backendContentFingerprint,
     environment,
   };
@@ -420,7 +424,7 @@ export async function buildRuntimeBundle(
   }
   const source = await readRuntimeSource(root);
   assertRuntimeEnvironment(source.environment);
-  const inputs = await readRuntimeBuildInputs(root, source, execute, { scope });
+  let inputs = await readRuntimeBuildInputs(root, source, execute, { scope });
   let previous;
   try {
     previous = readActiveRuntimeBundle(root);
@@ -466,10 +470,45 @@ export async function buildRuntimeBundle(
       fs.constants.COPYFILE_EXCL,
     );
   }
-  if (hashFiles(sourceRoot, snapshotFiles) !== snapshotHash)
+  if (
+    hashFiles(sourceRoot, snapshotFiles) !== snapshotHash ||
+    (scope === "full" &&
+      (workspaceVerification === "full"
+        ? hashFiles(sourceRoot, source.files) !== source.contentFingerprint
+        : hashFiles(sourceRoot, source.backendFiles) !==
+          source.backendContentFingerprint))
+  )
     throw workspaceRuntimeSourceChanged(
       "工作区在固定版本期间发生变化，请重新准备",
     );
+  const capturedSourceFingerprint =
+    scope === "full"
+      ? runtimeSourceFingerprint(
+          hashFiles(sourceRoot, source.files),
+          source.environment,
+        )
+      : source.fingerprint;
+  if (scope === "full" && workspaceVerification === "backend") {
+    const capturedInputs = await readRuntimeBuildInputs(
+      sourceRoot,
+      source,
+      execute,
+      {
+        scope,
+        webDependencyRoot: root,
+      },
+    );
+    if (
+      capturedInputs.backend !== inputs.backend ||
+      capturedInputs.attachment !== inputs.attachment
+    )
+      throw workspaceRuntimeSourceChanged(
+        "后端构建输入在固定版本期间发生变化，请重新准备",
+      );
+    // Frontend edits before the copy belong to the captured candidate; later
+    // Vite edits cannot rewrite its provenance or invalidate backend recovery.
+    inputs = capturedInputs;
+  }
   const env = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
   fs.mkdirSync(path.join(directory, "runtime"), { mode: 0o700 });
   fs.writeFileSync(
@@ -575,15 +614,17 @@ export async function buildRuntimeBundle(
     sourceRoot,
     source,
     execute,
-    { scope },
+    { scope, webDependencyRoot: root },
   );
   // Installed web dependencies belong to the checkout, outside the snapshot.
   if (
     snapshotInputs.backend !== inputs.backend ||
-    (scope === "full" && snapshotInputs.attachment !== inputs.attachment)
+    (scope === "full" &&
+      (snapshotInputs.attachment !== inputs.attachment ||
+        snapshotInputs.web !== inputs.web))
   )
     throw workspaceRuntimeSourceChanged(
-      "Go 构建输入在固定版本期间发生变化，请重新准备",
+      "候选快照的构建输入发生变化，请重新准备",
     );
   progress("正在核对候选制品与当前工作区");
   const after = await readRuntimeSource(root);
@@ -594,7 +635,9 @@ export async function buildRuntimeBundle(
     currentInputs.backend !== inputs.backend ||
     (scope === "full" &&
       (currentInputs.attachment !== inputs.attachment ||
-        currentInputs.web !== inputs.web))
+        currentInputs.webDependencies !== inputs.webDependencies ||
+        (workspaceVerification === "full" &&
+          currentInputs.web !== inputs.web)))
   )
     throw workspaceRuntimeSourceChanged(
       "构建期间编译输入或工具链发生变化，请重新准备",
@@ -615,7 +658,7 @@ export async function buildRuntimeBundle(
     id,
     scope,
     components,
-    sourceFingerprint: source.fingerprint,
+    sourceFingerprint: capturedSourceFingerprint,
     backendSourceFingerprint: source.backendFingerprint,
     artifactHash: hashFiles(directory, files),
     files,

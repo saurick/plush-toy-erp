@@ -38,6 +38,7 @@ import {
   databaseMigrationDataScopeText,
   databaseMigrationExecutionText,
   databaseMigrationPreparationAvailable,
+  databaseMigrationRecoveryComplete,
   databaseMigrationUpgradePresentation,
   databaseMigrationStatusPresentation,
   isDatabaseMigrationOperationPolling,
@@ -531,9 +532,7 @@ export default function DevDatabaseMigrationPage() {
       <main className="erp-dev-hub-shell erp-dev-database-migration-shell">
         {recoveryActive ? (
           summaryFresh &&
-          summary?.status === 'success' &&
-          (isLatest || runtime?.bundleId) &&
-          runtime?.available ? (
+          databaseMigrationRecoveryComplete(summary) ? (
             <Alert
               type="success"
               showIcon
@@ -583,6 +582,21 @@ export default function DevDatabaseMigrationPage() {
             showIcon
             message="候选版本检查未通过"
             description={issueText(summary.issues)}
+          />
+        ) : null}
+        {tools?.status === 'blocked' && !isLatest ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="迁移准备环境未就绪"
+            description={issueText(
+              tools.checks.filter((check) => check.status === 'blocked')
+            )}
+            action={
+              <Button onClick={() => selectView('runtime')}>
+                查看运行检查
+              </Button>
+            }
           />
         ) : null}
         <section className="erp-dev-delivery-context" aria-label="数据库迁移范围">

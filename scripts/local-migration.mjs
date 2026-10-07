@@ -1448,8 +1448,11 @@ export async function requireSharedDevOperationEvidence(
     );
   process.kill(lock.pid, 0);
   const bundle = readRuntimeBundle(root, operation.backup.bundleId);
-  if ((await source(root)).fingerprint !== bundle.sourceFingerprint)
-    throw new Error("已验证的运行代码或配置已变化，不能执行共享库迁移");
+  if (
+    !bundle.backendSourceFingerprint ||
+    (await source(root)).backendFingerprint !== bundle.backendSourceFingerprint
+  )
+    throw new Error("已验证的后端代码或配置已变化，不能执行共享库迁移");
   return operation;
 }
 

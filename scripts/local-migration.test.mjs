@@ -563,7 +563,10 @@ test("apply evidence requires the confirmed operation, owned lock, matching cont
   });
   acquireDatabaseMigrationExecutionLock(store, id);
   const checks = {
-    source: async () => ({ fingerprint: bundle.sourceFingerprint }),
+    source: async () => ({
+      fingerprint: "independent-vite-edit",
+      backendFingerprint: bundle.backendSourceFingerprint,
+    }),
     verify: async () => true,
   };
   await assert.rejects(
@@ -590,7 +593,16 @@ test("apply evidence requires the confirmed operation, owned lock, matching cont
   await assert.rejects(
     requireSharedDevOperationEvidence(root, id, "exact", {
       ...checks,
-      source: async () => ({ fingerprint: "changed" }),
+      source: async () => ({
+        fingerprint: bundle.sourceFingerprint,
+        backendFingerprint: "changed",
+      }),
+    }),
+  );
+  await assert.rejects(
+    requireSharedDevOperationEvidence(root, id, "exact", {
+      ...checks,
+      source: async () => ({ fingerprint: bundle.sourceFingerprint }),
     }),
   );
   releaseDatabaseMigrationExecutionLock(store, id);
