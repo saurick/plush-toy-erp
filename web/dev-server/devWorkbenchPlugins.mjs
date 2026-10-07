@@ -1,3 +1,4 @@
+import { createDevPermissionRelationshipsPlugin } from './devPermissionRelationshipsPlugin.mjs'
 import { createDevCustomerConfigPlugin } from './devCustomerConfigPlugin.mjs'
 import { createDevCustomerImportDryRunPlugin } from './devCustomerImportDryRunPlugin.mjs'
 import { createDevDatabaseMigrationPlugin } from './devDatabaseMigrationPlugin.mjs'
@@ -28,6 +29,7 @@ export const DEV_WORKBENCH_SERVE_PLUGIN_NAMES = Object.freeze([
   'plush-dev-quality-gates',
   'plush-dev-qa-coverage',
   'plush-dev-business-chain-audit',
+  'plush-dev-permission-relationships',
   'plush-dev-delivery-bridge',
 ])
 
@@ -82,6 +84,7 @@ export function createDevWorkbenchServePlugins({
     createDevQualityGatePlugin({ projectRoot }),
     createDevQaCoveragePlugin({ projectRoot }),
     createDevBusinessChainAuditPlugin({ projectRoot }),
+    createDevPermissionRelationshipsPlugin({ projectRoot }),
     createDevDeliveryBridgePlugin({ projectRoot }),
   ].filter(Boolean)
 }

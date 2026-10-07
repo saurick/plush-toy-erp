@@ -14,6 +14,7 @@
 | `devQaPressureReports.mjs` | 从固定报告目录读取有界、无符号链接的生命周期与业务证据，输出脱敏指标和源码匹配状态 |
 | `devQaCoveragePlugin.mjs`                | 执行固定覆盖率采集并提供脱敏 operation 状态                                                                                                                             |
 | `devBusinessChainAuditPlugin.mjs` | 只读列举本地链路实跑批次、读取结构化报告、按证据清单校验摘要并下载文件；不执行业务写入或复跑 |
+| `devPermissionRelationshipsPlugin.mjs` | 在独立工作台访问边界内，只读查询登记开发库的账号、岗位、权限和审批关系；复用正式 Go repository、权限解释与 DTO，不使用 ERP 登录身份 |
 | `devQualityGatePlugin.mjs`               | 复用正式 full / strict runner 与回执，自动选择显式 loopback base 或本机托管 PostgreSQL，提供异步运行、取消、超时、清理读回和只读治理                                    |
 | `devDataPreparationPlugin.mjs`           | 提供单一数据准备 operation 真源；同一 Scenario profile 显式绑定本地或 133，冻结当前数据合同、release、数据库、migration、客户配置与回滚点，长期数据与隔离验收不互相替代 |
 | `devDatabaseMigrationPlugin.mjs`         | 提供本地共享开发库迁移的受控 operation service 和 HTTP 层，供页面与高层 CLI 复用                                                                                        |
@@ -56,6 +57,8 @@ DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有
 `operator` 使用独立于 ERP 业务账号的 HTTP Basic 运维身份。服务进程必须配置 `PLUSH_DEV_OPERATOR_USERNAME`（1～64 位字母、数字及 `_.@-`）和 `PLUSH_DEV_OPERATOR_PASSWORD`（24～1024 字符的独立随机口令）；使用当前服务用户的受控 secret 注入，禁止提交仓库、加入 `VITE_*` 或写入前端配置。未配置或配置无效返回 503，凭据缺失 / 错误返回统一 401。浏览器使用标准认证对话框，API 客户端使用同一 Authorization 合同；ERP Bearer token 不授予运维权限。远程明文 HTTP 不返回认证挑战。撤回或轮换身份后重启开发进程，浏览器再次使用新凭据认证。
 
 个人开发可在 ignored 的 `web/.env.development.local` 中设置 `PLUSH_DEV_WORKBENCH_ACCESS=private-network`，重新加载对应 Vite 开发进程后直接打开 `http://<服务器内网 IPv4>:<前端端口>/__dev`。这是显式授权符合网络限制的设备使用开发工具，仅适用于自己控制的内网；ERP 业务登录与后端权限仍按原合同执行。删除该配置或设置为 `operator` 可恢复独立认证。环境变量优先于本地文件，此值不使用 `VITE_*`，不进入浏览器配置。
+
+权限关系使用固定 `GET /__dev/api/permission-relationships`，不接受查询参数、请求体或写方法。插件复用本地运行配置的客户选择，以及 `local-database-roles.mjs` 的登记目标、只读审计账号和实际权限核验；缺失或失效时返回读取失败，不借用应用或管理员凭据。固定 Go 命令 `server/cmd/dev-permission-relationships` 核验开发库集群身份，使用强制只读连接，不执行启动初始化。返回账号识别、岗位及权限关系所需字段，排除手机号、口令、token 和连接信息。未登录、普通 ERP 岗位和切换岗位均不影响工作台读取；正式权限配置仍通过业务接口授权。该接口仅反映当前工作区逻辑与登记开发库，不证明其他环境或旧运行制品的实际权限。
 
 两种模式均要求本机真实 loopback 连接和 loopback Host，或私网来源、数字 Host 与实际监听 IPv4 地址和端口一致。内网 HTTPS 域名使用下述显式代理配置；其他 DNS 别名、公网、伪造 Host 和跨站元数据均拒绝。POST 继续要求精确同源 Origin、CSRF、固定动作、原有确认、状态和资源预检；直接访问不取消这些控制。
 

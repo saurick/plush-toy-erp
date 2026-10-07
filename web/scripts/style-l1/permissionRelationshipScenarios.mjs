@@ -1,3 +1,5 @@
+import { DEV_PERMISSION_RELATIONSHIPS_API } from '../../src/dev-workbench/config/devPermissionRelationshipApi.mjs'
+
 const roles = [
   {
     role_key: 'sales',
@@ -23,6 +25,36 @@ const permission = {
   usage: { pages: [{ key: 'sales-orders', name: '销售订单' }] },
 }
 
+export function permissionRelationshipFixture({ preview = false } = {}) {
+  return {
+    source: 'local_development_read_only',
+    customer_key: 'style-customer',
+    read_at: new Date().toISOString(),
+    accounts: [{ id: 2, username: 'audit-disabled', account_status: 'suspended', roles: [roles[0]] }],
+    roles,
+    permissions: [permission],
+    warehouse_options: [],
+    approval_settings: { items: [], partial: true },
+    access_by_role_key: Object.fromEntries(roles.map((role) => [role.role_key, {
+      role_key: role.role_key,
+      role_version: 1,
+      is_final: !preview,
+      source: preview ? 'builtin_rbac_fallback' : 'active_customer_config_revision',
+      permissions: [{ permission_key: 'sales.order.read', rbac_granted: true, effective: true }],
+      pages: [
+        { key: 'sales-orders', label: '销售订单', path: '/erp/sales/project-orders/sales-orders', rbac_granted: true, effective: true },
+        { key: 'inventory', label: '库存台账', path: '/erp/warehouse/inventory', rbac_granted: false, effective: false },
+      ],
+    }])),
+  }
+}
+
+export async function installPermissionRelationshipMock(page) {
+  await page.route(`**${DEV_PERMISSION_RELATIONSHIPS_API}`, (route) =>
+    route.fulfill({ json: permissionRelationshipFixture() })
+  )
+}
+
 export function createPermissionRelationshipScenarios({
   assert,
   assertNoHorizontalOverflow,
@@ -32,78 +64,13 @@ export function createPermissionRelationshipScenarios({
     {
       name: 'permission-relationship-consistency-desktop',
       path: '/__dev/permission-relationships?target=sales&tab=details',
-      mockAdminRpc: true,
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       beforeNavigate: async (page) => {
         readCount = 0
-        await page.route('**/rpc/admin', async (route) => {
-          const { id, method, params = {} } = route.request().postDataJSON()
-          let data
-          if (method === 'list') {
-            data = {
-              admins: [
-                {
-                  id: 2,
-                  username: 'audit-disabled',
-                  account_status: 'suspended',
-                  roles: [roles[0]],
-                },
-              ],
-            }
-          } else if (method === 'rbac_options') {
-            data = {
-              roles,
-              permissions: [permission],
-              warehouse_scope_options: [],
-            }
-          } else if (method === 'effective_role_access') {
-            readCount += 1
-            data = {
-              effective_access: {
-                role_key: params.role_key,
-                role_version: 1,
-                is_final: readCount !== 2,
-                source:
-                  readCount === 2
-                    ? 'builtin_rbac_fallback'
-                    : 'active_customer_config_revision',
-                permissions: [
-                  {
-                    permission_key: 'sales.order.read',
-                    rbac_granted: true,
-                    effective: true,
-                  },
-                ],
-                pages: [
-                  {
-                    key: 'sales-orders',
-                    label: '销售订单',
-                    path: '/erp/sales/project-orders/sales-orders',
-                    rbac_granted: true,
-                    effective: true,
-                  },
-                  {
-                    key: 'inventory',
-                    label: '库存台账',
-                    path: '/erp/warehouse/inventory',
-                    rbac_granted: false,
-                    effective: false,
-                  },
-                ],
-              },
-            }
-          } else {
-            await route.fallback()
-            return
-          }
-          await route.fulfill({
-            json: {
-              jsonrpc: '2.0',
-              id,
-              result: { code: 0, message: 'OK', data },
-            },
-          })
+        await page.route(`**${DEV_PERMISSION_RELATIONSHIPS_API}`, async (route) => {
+          readCount += 1
+          await route.fulfill({ json: permissionRelationshipFixture({ preview: readCount === 2 }) })
         })
       },
       verify: async (page) => {
@@ -168,6 +135,46 @@ export function createPermissionRelationshipScenarios({
         )
         await assertNoHorizontalOverflow(page, '权限关系读取、恢复与停用边界')
       },
+    },
+    {
+      name: 'permission-relationship-independent-access-desktop',
+      path: '/__dev/permission-relationships?target=sales',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      expectedConsoleErrorPatterns: [/503.*Service Unavailable|Failed to load resource.*503/u],
+      verify: async (page) => {
+        let failed = false
+        let businessReads = 0
+        await page.route('**/rpc/admin', async (route) => {
+          businessReads += 1
+          const { id } = route.request().postDataJSON()
+          await route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 40301, message: '权限不足' } } })
+        })
+        await page.route(`**${DEV_PERMISSION_RELATIONSHIPS_API}`, async (route) => {
+          assert.equal(route.request().headers().authorization, undefined)
+          await route.fulfill(failed ? { status: 503, json: { message: 'unavailable' } } : { json: permissionRelationshipFixture() })
+        })
+        for (const token of ['', 'ordinary-sales-role', 'ordinary-warehouse-role']) {
+          await page.evaluate((value) => {
+            if (value) localStorage.setItem('admin_access_token', value)
+            else localStorage.removeItem('admin_access_token')
+          }, token)
+          await page.reload()
+          await page.getByRole('region', { name: '当前权限证据版本' }).getByText('最终生效结果', { exact: true }).waitFor()
+          await page.locator('.erp-permission-navigation__items').getByText('销售管理', { exact: true }).waitFor()
+          assert.equal(await page.getByRole('link', { name: '打开后台登录' }).count(), 0)
+        }
+        failed = true
+        await page.getByRole('button', { name: /刷新结果/u }).click()
+        await page.getByText('本地开发权限数据暂不可用，请检查开发服务与数据库后重试', { exact: true }).waitFor()
+        assert.equal(await page.locator('.erp-permission-navigation__items').count(), 0)
+        failed = false
+        await page.getByRole('button', { name: '重试', exact: true }).click()
+        await page.getByRole('region', { name: '当前权限证据版本' }).getByText('最终生效结果', { exact: true }).waitFor()
+        assert.equal(businessReads, 0, '开发权限查看不得调用 ERP 管理接口')
+        await assertNoHorizontalOverflow(page, '开发访问独立于 ERP 登录与岗位')
+      },
+      beforeNavigate: installPermissionRelationshipMock,
     },
     {
       name: 'permission-center-switch-pending-desktop',

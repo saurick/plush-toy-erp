@@ -87,6 +87,8 @@ make dev_restart ARGS='--log-match="request_id=req-42"'
 
 终端与迁移页共用忽略 Git 的 `server/.env`（权限 `0600`），固定版本按白名单读取附件、认证及客户运行配置，仅读取文本，不执行 shell。开发附件必须使用独立桶，配置和恢复边界见 [附件存储](deploy/compose/prod/README.md#附件存储与raid5)。数据库角色凭据保存在同样受保护的 `configs/dev/database-roles.local.json`；应用、迁移、审计分别使用 `plush_dev_app`、`plush_dev_migrator`、`plush_dev_backup`。审计账号无表所有权、写入或角色切换权限，不能以超级用户加默认只读参数替代。角色配置中断后使用 `make dev_database_roles ARGS=--reconcile` 恢复已有凭据对应的权限，不生成新密码。
 
+工作台的权限关系只读入口复用上述审计账号，通过 `cmd/dev-permission-relationships` 调用正式 repository 和权限解释，并额外开启数据库只读模式；不执行 `NewData` 的账号 / RBAC 初始化。它仅接受开发服务注入的登记数据库和本地客户配置，不开 HTTP 端口，不调用 ERP 登录，也不提供写命令。入口、访问模式和验证边界见 [开发服务 Bridge](../web/dev-server/README.md)。
+
 主端口不自动顺延。`make dev_stop` / `make dev_restart` 虽按登记端口查找 listener，但停止前会逐个校验进程 cwd 位于本仓库；端口被其他项目占用时会报告 PID、cwd 和命令并拒绝 kill。前后端共用有超时的进程检查；macOS 通过系统端口表定位 PID，再逐个读取 cwd，避免全机 `lsof` 扫描阻塞启动。检查失败或超时时保留服务并退出。整组本机覆盖必须写入 ignored 的 `config/dev-ports.local.env`，且包含完整端口组。
 
 启动提示区分固定版本不可用与候选升级未完成；候选数据冲突不会把仍与数据库匹配的日常版本停掉。数据库、固定制品或 health / ready 核对失败时，保留迁移恢复入口。

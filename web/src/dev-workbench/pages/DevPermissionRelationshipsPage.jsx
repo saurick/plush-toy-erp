@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   ApartmentOutlined,
-  LoginOutlined,
   ReloadOutlined,
   SafetyCertificateOutlined,
   SettingOutlined,
@@ -17,17 +16,13 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import Tabs from '@/common/components/navigation/SlidingTabs'
-import { AUTH_SCOPE } from '@/common/auth/auth'
 import { Loading } from '@/common/components/loading'
 import { MermaidDiagram } from '@/common/components/markdown'
-import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { JsonRpc } from '@/common/utils/jsonRpc'
-import { getApprovalSettings } from '../../erp/api/approvalSettingsApi.mjs'
+import { readPermissionRelationshipSnapshot } from '../config/devPermissionRelationshipApi.mjs'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevPermissionNavigationOverview from '../components/DevPermissionNavigationOverview.jsx'
 import { buildPermissionRelationshipNavigationModel } from '../config/devPermissionNavigation.mjs'
@@ -45,12 +40,6 @@ import {
 import '../styles/dev-permission-relationships.css'
 
 const { Paragraph, Text, Title } = Typography
-
-const adminRpc = new JsonRpc({
-  url: RpcDomain.ADMIN,
-  basePath: ADMIN_BASE_PATH,
-  authScope: AUTH_SCOPE.ADMIN,
-})
 
 const EMPTY_BASE_STATE = Object.freeze({
   accounts: [],
@@ -74,10 +63,6 @@ const RELATIONSHIP_KIND_LABELS = Object.freeze({
   permission: '功能',
   page: '页面',
 })
-
-function hasOwn(object, key) {
-  return Object.prototype.hasOwnProperty.call(object, key)
-}
 
 function preferredTargetKey(options) {
   if (options.length === 0) return ''
@@ -152,10 +137,10 @@ export default function DevPermissionRelationshipsPage() {
   const [baseReadAt, setBaseReadAt] = useState('')
   const [accessByRoleKey, setAccessByRoleKey] = useState({})
   const [accessReadAtByRoleKey, setAccessReadAtByRoleKey] = useState({})
-  const [accessLoading, setAccessLoading] = useState(false)
+  const accessLoading = baseLoading
   const [accessError, setAccessError] = useState('')
   const baseRequestRef = useRef(0)
-  const accessRequestRef = useRef(0)
+  const baseAbortRef = useRef(null)
 
   const targetOptions = useMemo(
     () =>
@@ -196,7 +181,9 @@ export default function DevPermissionRelationshipsPage() {
   const loadBaseData = useCallback(async () => {
     const requestID = baseRequestRef.current + 1
     baseRequestRef.current = requestID
-    accessRequestRef.current += 1
+    baseAbortRef.current?.abort()
+    const controller = new AbortController()
+    baseAbortRef.current = controller
     setBaseLoading(true)
     setBaseError('')
     setBaseReadAt('')
@@ -204,46 +191,38 @@ export default function DevPermissionRelationshipsPage() {
     setAccessByRoleKey({})
     setAccessReadAtByRoleKey({})
     try {
-      const approvalPromise = getApprovalSettings({})
-        .then((value) => ({ value, error: '' }))
-        .catch((error) => ({
-          value: { items: [], partial: true },
-          error: getActionErrorMessage(error, '加载审批责任'),
-        }))
-      const [listResult, optionsResult, approvalResult] = await Promise.all([
-        adminRpc.call(RpcMethod.admin.LIST, {}),
-        adminRpc.call(RpcMethod.admin.RBAC_OPTIONS, {}),
-        approvalPromise,
-      ])
+      const snapshot = await readPermissionRelationshipSnapshot({
+        signal: controller.signal,
+      })
       if (baseRequestRef.current !== requestID) {
         return
       }
-      const nextState = {
-        accounts: Array.isArray(listResult?.data?.admins)
-          ? listResult.data.admins
-          : [],
-        roles: Array.isArray(optionsResult?.data?.roles)
-          ? optionsResult.data.roles
-          : [],
-        permissions: Array.isArray(optionsResult?.data?.permissions)
-          ? optionsResult.data.permissions
-          : [],
-        warehouseOptions: Array.isArray(
-          optionsResult?.data?.warehouse_scope_options
+      setBaseState({
+        accounts: snapshot.accounts,
+        roles: snapshot.roles,
+        permissions: snapshot.permissions,
+        warehouseOptions: snapshot.warehouse_options,
+        approvalSettings: snapshot.approval_settings,
+      })
+      setBaseReadAt(snapshot.read_at)
+      setAccessByRoleKey(snapshot.access_by_role_key)
+      setAccessReadAtByRoleKey(
+        Object.fromEntries(
+          Object.keys(snapshot.access_by_role_key).map((key) => [
+            key,
+            snapshot.read_at,
+          ])
         )
-          ? optionsResult.data.warehouse_scope_options
-          : [],
-        approvalSettings: approvalResult.value,
-      }
-      setBaseState(nextState)
-      setBaseReadAt(new Date().toISOString())
-      if (approvalResult.error) {
+      )
+      if (snapshot.approval_settings.partial) {
         setAccessError('审批责任暂未汇入；账号、岗位、功能和数据范围仍可查看。')
       }
     } catch (error) {
       if (baseRequestRef.current === requestID) {
         setBaseState(EMPTY_BASE_STATE)
-        setBaseError(getActionErrorMessage(error, '加载权限关系图'))
+        setBaseError(
+          error.userMessage || getActionErrorMessage(error, '加载权限关系图')
+        )
       }
     } finally {
       if (baseRequestRef.current === requestID) {
@@ -256,7 +235,7 @@ export default function DevPermissionRelationshipsPage() {
     loadBaseData()
     return () => {
       baseRequestRef.current += 1
-      accessRequestRef.current += 1
+      baseAbortRef.current?.abort()
     }
   }, [loadBaseData])
 
@@ -325,62 +304,6 @@ export default function DevPermissionRelationshipsPage() {
       }),
     [baseState.accounts, targetKey, viewMode]
   )
-  useEffect(() => {
-    if (baseLoading || baseError) {
-      setAccessLoading(false)
-      return undefined
-    }
-    const missingRoleKeys = requiredRoleKeys.filter(
-      (roleKey) => !hasOwn(accessByRoleKey, roleKey)
-    )
-    if (missingRoleKeys.length === 0) {
-      setAccessLoading(false)
-      return undefined
-    }
-
-    const requestID = accessRequestRef.current + 1
-    accessRequestRef.current = requestID
-    setAccessLoading(true)
-    setAccessError('')
-    Promise.allSettled(
-      missingRoleKeys.map(async (roleKey) => {
-        const result = await adminRpc.call(RpcMethod.admin.EFFECTIVE_ROLE_ACCESS, {
-          role_key: roleKey,
-        })
-        return [roleKey, result?.data?.effective_access || null]
-      })
-    ).then((results) => {
-      if (accessRequestRef.current !== requestID) return
-      const fulfilled = results
-        .filter((result) => result.status === 'fulfilled')
-        .map((result) => result.value)
-      if (fulfilled.length > 0) {
-        const readAt = new Date().toISOString()
-        setAccessByRoleKey((current) => ({
-          ...current,
-          ...Object.fromEntries(fulfilled),
-        }))
-        setAccessReadAtByRoleKey((current) => ({
-          ...current,
-          ...Object.fromEntries(
-            fulfilled.map(([roleKey]) => [roleKey, readAt])
-          ),
-        }))
-      }
-      const failed = results.find((result) => result.status === 'rejected')
-      if (failed) {
-        setAccessError(getActionErrorMessage(failed.reason, '加载岗位最终权限'))
-      }
-      setAccessLoading(false)
-    })
-
-    return () => {
-      if (accessRequestRef.current === requestID) {
-        accessRequestRef.current += 1
-      }
-    }
-  }, [accessByRoleKey, baseError, baseLoading, requiredRoleKeys])
-
   const globalModel = useMemo(
     () =>
       buildPermissionRelationshipModel({
@@ -608,7 +531,7 @@ export default function DevPermissionRelationshipsPage() {
             role="note"
           >
             <Text type="secondary">
-              关系图是只读结果，不是新的权限配置入口；本页核对“岗位权限 ×
+              本地开发只读查询，无需登录 ERP；修改授权请进入正式权限配置。本页核对“岗位权限 ×
               当前启用配置”的只读结果；不代表某张单据在当前状态一定可操作，也不在这里保存权限配置。
             </Text>
           </div>
@@ -623,13 +546,6 @@ export default function DevPermissionRelationshipsPage() {
                 <Space wrap>
                   <Button size="small" onClick={loadBaseData}>
                     重试
-                  </Button>
-                  <Button
-                    size="small"
-                    icon={<LoginOutlined />}
-                    href="/admin-login"
-                  >
-                    打开后台登录
                   </Button>
                 </Space>
               }

@@ -50,10 +50,8 @@ test('dev permission relationship page remains valid JSX', async () => {
 
 test('dev permission relationship page reads existing truth sources without writing RBAC', () => {
   assert.match(source, /useSearchParams/u)
-  assert.match(source, /adminRpc\.call\('list', \{\}\)/u)
-  assert.match(source, /adminRpc\.call\('rbac_options', \{\}\)/u)
-  assert.match(source, /adminRpc\.call\('effective_role_access'/u)
-  assert.match(source, /getApprovalSettings\(\{\}\)/u)
+  assert.match(source, /readPermissionRelationshipSnapshot/u)
+  assert.doesNotMatch(source, /adminRpc|JsonRpc|AUTH_SCOPE|admin-login|getApprovalSettings/u)
   assert.match(source, /buildPermissionRelationshipNavigationModel/u)
   assert.match(source, /buildPermissionRelationshipEvidence/u)
   assert.match(navigationSource, /getNavigationSections/u)

@@ -1,3 +1,4 @@
+import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
 import { fitMermaidDiagram, verifyMermaidViewer } from './mermaidViewerAssertions.mjs'
 import {
   DEV_BUSINESS_USABILITY_ROUTE,
@@ -56,7 +57,9 @@ export function createDevWorkbenchDesktopScenarios({
   return ORDINARY_DEV_ROUTES.map((item) => ({
     name: `dev-page-${item.key}-desktop-light`,
     path: item.route,
-    mockAdminRpc: item.route === DEV_PERMISSION_RELATIONSHIPS_ROUTE,
+    ...(item.route === DEV_PERMISSION_RELATIONSHIPS_ROUTE
+      ? { beforeNavigate: installPermissionRelationshipMock }
+      : {}),
     viewport: { width: 1440, height: 900 },
     ...(item.route === DEV_TESTING_ROUTE
       ? {
