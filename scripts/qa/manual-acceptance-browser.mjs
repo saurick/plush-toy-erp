@@ -358,6 +358,18 @@ function currentBatchProbeEvidence(probe = {}) {
     exactTaskCodePrefix: String(probe.exactTaskCodePrefix || "") || null,
     exactOwnerRoleKey: String(probe.exactOwnerRoleKey || "") || null,
     exactTaskGroup: String(probe.exactTaskGroup || "") || null,
+    progressCounts:
+      probe.progressCounts && typeof probe.progressCounts === "object"
+        ? Object.fromEntries(
+            Object.entries(probe.progressCounts).map(([key, value]) => [
+              key,
+              Number(value),
+            ]),
+          )
+        : null,
+    sampleOrderIDs: Array.isArray(probe.sampleOrderIDs)
+      ? probe.sampleOrderIDs.filter((id) => Number.isSafeInteger(id) && id > 0)
+      : [],
     moduleTotals:
       probe.moduleTotals && typeof probe.moduleTotals === "object"
         ? Object.fromEntries(
@@ -1598,16 +1610,10 @@ async function filterVisibleListToCurrentBatch(page, target, filter) {
         timeout: PAGE_TIMEOUT_MS,
       });
     } else {
-      const candidates = page.locator(
+      search = page.locator(
         'input[aria-label^="可搜索："],input[placeholder*="搜"],input[placeholder^="操作人"]',
-      );
-      for (let index = 0; index < (await candidates.count()); index += 1) {
-        const candidate = candidates.nth(index);
-        if (await candidate.isVisible()) {
-          search = candidate;
-          break;
-        }
-      }
+      ).filter({ visible: true }).first();
+      await search.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     }
     if (!search) {
       throw new BrowserAcceptanceError(

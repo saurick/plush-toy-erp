@@ -2255,8 +2255,8 @@ test("progress evidence binds counts and exact visible orders to current-batch s
       },
     ],
   );
-  const currentBatch = {
-    dataStatus: "pass",
+  const currentBatch = buildManualAcceptanceCurrentBatchReadiness({
+    targets: [{ id: "desktopPages:business-dashboard", dataStatus: "pass", actual: 45 }],
     probes: [
       {
         id: "sales-orders",
@@ -2272,7 +2272,7 @@ test("progress evidence binds counts and exact visible orders to current-batch s
         sampleOrderIDs: [1, 2, 3],
       },
     ],
-  };
+  })["desktopPages:business-dashboard"];
   assert.equal(
     evaluateBusinessDashboardCurrentBatchEvidence({
       evidence,
