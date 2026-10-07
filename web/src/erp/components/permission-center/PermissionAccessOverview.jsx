@@ -138,7 +138,8 @@ function PermissionImpactMap({ permissions = [], permissionKeys = [] }) {
 function EffectiveRoleAccessOverview({ access = null, loading = false }) {
   const [pageFilter, setPageFilter] = useState(ROLE_PAGE_ACCESS_FILTERS.ALL)
   const [moduleFilter, setModuleFilter] = useState('all')
-  const pages = Array.isArray(access?.pages) ? access.pages : []
+  const verified = !loading && access?.is_final === true
+  const pages = verified && Array.isArray(access?.pages) ? access.pages : []
   const groups = groupPermissionPages(pages)
   const selectedModule = groups.some((group) => group.key === moduleFilter)
     ? moduleFilter
@@ -214,12 +215,12 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
           </Popover>
         ) : null}
       </div>
-      {access?.is_final !== true ? (
+      {!verified ? (
         <Alert
           type="warning"
           showIcon
-          message="页面访问结果尚未完成核对"
-          description="请先核对公司启用配置；当前结果不能作为正式访问范围。"
+          message={loading ? '正在核对页面访问结果' : '页面访问结果尚未完成核对'}
+          description="当前不展示未经公司启用配置核对的可进入页面；读取完成后再确认访问范围。"
         />
       ) : null}
       <div className="erp-role-effective-access__toolbar">

@@ -505,7 +505,10 @@ export default function DevPermissionRelationshipsPage() {
     { key: 'roles', label: '关联岗位', value: globalModel.summary.roles },
     {
       key: 'effective',
-      label: '最终可用功能',
+      label:
+        globalModel.resultState === 'projection'
+          ? '岗位合并可用功能'
+          : '最终可用功能',
       value: globalModel.summary.effectivePermissions,
     },
     {
@@ -513,7 +516,11 @@ export default function DevPermissionRelationshipsPage() {
       label: '岗位已选但受限',
       value: globalModel.summary.blockedPermissions,
     },
-    { key: 'pages', label: '可进入页面', value: globalModel.summary.pages },
+    {
+      key: 'pages',
+      label: globalModel.resultState === 'projection' ? '岗位合并页面' : '可进入页面',
+      value: globalModel.summary.pages,
+    },
     {
       key: 'approvals',
       label: '审批责任',
@@ -725,7 +732,7 @@ export default function DevPermissionRelationshipsPage() {
                   <Statistic
                     key={item.key}
                     title={item.label}
-                    value={item.value}
+                    value={item.value ?? '—'}
                   />
                 ))}
               </div>
@@ -737,9 +744,12 @@ export default function DevPermissionRelationshipsPage() {
                 <div>
                   <Text type="secondary">结果性质</Text>
                   <Text strong>
-                    {relationshipEvidence.allFinal
-                      ? '最终生效结果'
-                      : '预览或读取不完整'}
+                    {{
+                      ready: '最终生效结果',
+                      blocked: '当前不可使用',
+                      projection: '多岗位合并参考',
+                      special: '系统保留账号，未读取独立会话',
+                    }[globalModel.resultState] || '预览或读取不完整'}
                   </Text>
                 </div>
                 <div>

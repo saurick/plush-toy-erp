@@ -117,7 +117,8 @@ test('permission graph exposes only permission-adjacent relationships', () => {
     assert.match(source + modelSource, new RegExp(label, 'u'))
   }
   assert.match(source, /不代表某张单据在当前状态一定可操作/u)
-  assert.match(navigationSource, /is_final !== true/u)
+  assert.match(navigationSource, /getPermissionRelationshipContext/u)
+  assert.match(modelSource, /access\.is_final !== true/u)
   assert.match(navigationSource, /不推导可能失真的完整菜单/u)
   assert.doesNotMatch(modelSource, /\.phone\b/u)
   const pageMarkup = source.slice(source.lastIndexOf('\n  return ('))

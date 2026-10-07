@@ -86,6 +86,7 @@ function describePermission({
   permissionKeys,
   permissionDetailMap,
   accessPageByKey,
+  accessVerified,
   placementByPath,
 }) {
   const entryMenu = getPermissionEntryMenu(item)
@@ -102,14 +103,13 @@ function describePermission({
     const locallyVisible = menuRequirementsSatisfied(entryMenu, permissionKeys)
     const accessPage = accessPageByKey.get(entryMenu.key)
     const effective =
-      locallyVisible &&
-      (accessPage ? accessPage.effective === true : locallyVisible)
+      accessVerified && locallyVisible && accessPage?.effective === true
     const placement = effective
       ? placementByPath.get(entryMenu.path) || '可从导航进入'
       : ''
     summary = [
       '菜单入口',
-      entryMenu.label + (effective ? '显示' : '不显示'),
+      entryMenu.label + (!accessVerified ? '待核对' : effective ? '显示' : '不显示'),
       placement,
     ]
       .filter(Boolean)
@@ -222,6 +222,7 @@ function PermissionChecklist({
       permissionKeys: normalizedValue,
       permissionDetailMap,
       accessPageByKey,
+      accessVerified: !accessLoading && access?.is_final === true,
       placementByPath,
     })
     return (

@@ -192,7 +192,7 @@ test('role menu projection preserves a saved custom layout and appends remaining
   )
 })
 
-test('employee menu projection merges multiple roles once and marks an inactive account', () => {
+test('employee menu projection merges multiple active roles once', () => {
   const model = buildPermissionRelationshipNavigationModel({
     viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT,
     targetKey: '20',
@@ -201,7 +201,7 @@ test('employee menu projection merges multiple roles once and marks an inactive 
         id: 20,
         username: 'warehouse01',
         display_name: '小吴',
-        account_status: 'suspended',
+        account_status: 'active',
         roles: [
           { role_key: 'sales', name: '业务' },
           { role_key: 'finance', name: '财务' },
@@ -213,10 +213,10 @@ test('employee menu projection merges multiple roles once and marks an inactive 
     navigationSections,
   })
 
-  assert.equal(model.state, PERMISSION_NAVIGATION_STATE.BLOCKED)
+  assert.equal(model.state, PERMISSION_NAVIGATION_STATE.READY)
   assert.equal(model.contextLabel, '小吴（warehouse01）')
   assert.equal(model.modeLabel, '多岗位合并（2）')
-  assert.match(model.notice, /临时停用/u)
+  assert.match(model.notice, /合并参考/u)
   assert.equal(model.effectivePageCount, 7)
   assert.deepEqual(
     model.primaryItems.map((item) => item.label),
@@ -284,4 +284,40 @@ test('super administrator menu is not fabricated from ordinary role settings', (
   assert.equal(model.contextLabel, '系统管理员（root-admin）')
   assert.equal(model.modeLabel, '系统保留账号')
   assert.match(model.message, /不推导可能失真的完整菜单/u)
+})
+
+test('inactive account has no usable menu even if its roles are still granted', () => {
+  const model = buildPermissionRelationshipNavigationModel({ viewMode: 'account',
+targetKey: '2',
+    accounts: [{ id: 2, account_status: 'suspended', roles }],
+roles,
+accessByRoleKey,
+navigationSections,
+  })
+  assert.equal(model.state, PERMISSION_NAVIGATION_STATE.BLOCKED)
+  assert.equal(model.effectivePageCount, 0)
+  assert.equal(model.totalItemCount, 0)
+})
+
+test('disabled role cannot contribute menus or block an enabled peer with a non-final explanation', () => {
+  const model = buildPermissionRelationshipNavigationModel({ viewMode: 'account',
+targetKey: '2',
+    accounts: [{ id: 2, account_status: 'active', roles }],
+    roles: [roles[0], { ...roles[1], disabled: true }],
+    accessByRoleKey: { ...accessByRoleKey, finance: { ...accessByRoleKey.finance, is_final: false } },
+navigationSections,
+  })
+  assert.equal(model.state, PERMISSION_NAVIGATION_STATE.READY)
+  assert.equal(model.effectivePageCount, 5)
+  assert.ok(!model.primaryItems.some((item) => item.label === '财务管理'))
+})
+
+test('a role version mismatch prevents a saved layout from being paired with stale access', () => {
+  const model = buildPermissionRelationshipNavigationModel({ targetKey: 'sales',
+    roles: [{ ...roles[0], version: 2 }],
+accessByRoleKey: { sales: { ...accessByRoleKey.sales, role_version: 1 } },
+navigationSections,
+  })
+  assert.equal(model.state, PERMISSION_NAVIGATION_STATE.UNAVAILABLE)
+  assert.equal(model.totalItemCount, 0)
 })

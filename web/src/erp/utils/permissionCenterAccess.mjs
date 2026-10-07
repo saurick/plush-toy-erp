@@ -48,6 +48,23 @@ export function getPermissionCenterRoleVersion(role = {}) {
   return Number.isSafeInteger(version) && version > 0 ? version : 0
 }
 
+// A response belongs to one saved role revision, even when its payload is a draft preview.
+export function getMatchingRoleAccess(role, access) {
+  if (!role || !access) return null
+  if (getPermissionCenterRoleKey(role) !== getPermissionCenterRoleKey(access)) {
+    return null
+  }
+  const version = getPermissionCenterRoleVersion(role)
+  if (version && Number(access.role_version) !== version) return null
+  if (
+    typeof access.role_disabled === 'boolean' &&
+    access.role_disabled !== (role.disabled === true)
+  ) {
+    return null
+  }
+  return access
+}
+
 export function isSystemRole(role = {}) {
   return normalizeString(role?.role_type) === ROLE_TYPE.SYSTEM
 }

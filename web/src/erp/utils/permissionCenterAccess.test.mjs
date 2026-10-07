@@ -7,6 +7,7 @@ import {
   getAdminControlTargetBlockReason,
   getAdminProfileTargetBlockReason,
   getPermissionCenterRoleVersion,
+  getMatchingRoleAccess,
   getRoleAssignmentBlockReason,
   getRolePermissionReadOnlyReason,
   getRoleTypeLabel,
@@ -404,4 +405,15 @@ test('permissionCenterAccess: 非合同权限映射字段不会进入当前投�
   assert.equal(usage.defaultActionLabel, '')
   assert.equal(usage.outcome, '')
   assert.deepEqual(usage.restrictions, [])
+})
+
+test('role access must belong to the selected role revision and disabled state', () => {
+  const role = { role_key: 'sales', version: 3, disabled: false }
+  const access = { role_key: 'sales', role_version: 3, role_disabled: false }
+  assert.equal(getMatchingRoleAccess(role, access), access)
+  for (const mismatch of [null, { ...access, role_key: 'finance' },
+    { ...access, role_version: 2 }, { ...access, role_disabled: true }]) {
+    assert.equal(getMatchingRoleAccess(role, mismatch), null)
+  }
+  assert.equal(getMatchingRoleAccess(null, access), null)
 })

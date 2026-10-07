@@ -97,6 +97,12 @@ export function usePermissionCenterData() {
       if (isRpcAbortError(err) || !request.isCurrent()) {
         return false
       }
+      setCurrentAdmin(null)
+      setAdmins([])
+      setRoles([])
+      setPermissions([])
+      setPermissionMenuOptions([])
+      setWarehouseScopeOptions([])
       message.error(getActionErrorMessage(err, '加载岗位设置'))
       return false
     } finally {

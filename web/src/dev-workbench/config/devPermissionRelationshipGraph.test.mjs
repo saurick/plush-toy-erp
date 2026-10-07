@@ -374,13 +374,13 @@ test('account view preserves multiple role paths and marks an inactive account a
 
   assert.equal(model.summary.accounts, 1)
   assert.equal(model.summary.roles, 2)
-  assert.equal(model.summary.effectivePermissions, 2)
-  assert.equal(model.summary.blockedPermissions, 1)
+  assert.equal(model.summary.effectivePermissions, 0)
+  assert.equal(model.summary.blockedPermissions, 3)
   assert.match(model.chart, /账号：小吴（warehouse01）｜临时停用/u)
   assert.match(model.chart, /岗位：业务员/u)
   assert.match(model.chart, /岗位：仓管员/u)
-  assert.match(model.chart, /功能汇总：1 个模块｜可用 1 \/ 已选 2/u)
-  assert.match(model.chart, /功能汇总：1 个模块｜可用 1 \/ 已选 1/u)
+  assert.match(model.chart, /功能汇总：1 个模块｜可用 0 \/ 已选 2/u)
+  assert.match(model.chart, /功能汇总：1 个模块｜可用 0 \/ 已选 1/u)
   assert.ok(
     model.rows.some((row) => row.target === '销售管理') &&
       model.rows.some((row) => row.target === '仓储')
@@ -483,4 +483,126 @@ test('target and module helpers keep stable human-readable choices', () => {
       (option) => option.label === '系统管理员（root-admin） · 超级管理员'
     )
   )
+})
+
+for (const [label, override] of [
+  ['missing', null],
+  ['preview', { ...accessByRoleKey.sales, is_final: false }],
+  ['unsaved draft', { ...accessByRoleKey.sales, is_preview: true }],
+  ['wrong role', { ...accessByRoleKey.sales, role_key: 'warehouse' }],
+]) {
+  test(`unverified ${label} access cannot appear as final permissions, pages or ungranted details`, () => {
+    const input = { targetKey: 'sales', accounts, roles, permissions, accessByRoleKey: { sales: override } }
+    const model = buildPermissionRelationshipModel(input)
+    assert.equal(model.resultState, 'unavailable')
+    assert.equal(model.summary.effectivePermissions, null)
+    assert.equal(model.summary.pages, null)
+    assert.doesNotMatch(model.chart, /最终可用|可进入/u)
+    assert.deepEqual(buildPermissionRelationshipDetailRows({ ...input, detailScope: 'all' }), [])
+  })
+}
+
+test('partial multi-role and mixed customer revisions do not produce a final union', () => {
+  for (const access of [null, { ...accessByRoleKey.warehouse, config_revision: 'new' }]) {
+    const model = buildPermissionRelationshipModel({
+      viewMode: 'account',
+targetKey: '20',
+      accounts: accounts.map((item) => ({ ...item, account_status: 'active' })),
+      roles,
+permissions,
+      accessByRoleKey: { sales: { ...accessByRoleKey.sales, config_revision: 'old' }, warehouse: access },
+    })
+    assert.equal(model.resultState, 'unavailable')
+    assert.equal(model.summary.pages, null)
+    assert.ok(model.warnings.length > 0)
+  }
+})
+
+test('disabled roles and accounts never advertise usable permissions or pages', () => {
+  for (const input of [
+    { targetKey: 'sales', roles: roles.map((role) => ({ ...role, disabled: true })) },
+    { viewMode: 'account', targetKey: '12', roles },
+  ]) {
+    const data = { accounts, permissions, accessByRoleKey, ...input }
+    const model = buildPermissionRelationshipModel(data)
+    assert.equal(model.resultState, 'blocked')
+    assert.equal(model.summary.effectivePermissions, 0)
+    assert.equal(model.summary.pages, 0)
+    assert.ok(buildPermissionRelationshipDetailRows(data).every((row) => row.status !== '已生效'))
+  }
+})
+
+test('ungranted backend page decisions only appear in all-details and keep the correct label', () => {
+  const input = { targetKey: 'sales',
+accounts,
+roles,
+permissions,
+accessByRoleKey: {
+    sales: { ...accessByRoleKey.sales,
+pages: [...accessByRoleKey.sales.pages,
+      { key: 'inventory', label: '库存查询', rbac_granted: false, effective: false }] },
+  } }
+  assert.ok(!buildPermissionRelationshipDetailRows(input).some((row) => row.target === '库存查询'))
+  const row = buildPermissionRelationshipDetailRows({ ...input, detailScope: 'all' }).find((row) => row.target === '库存查询')
+  assert.equal(row.status, '未授予')
+})
+
+test('multi-role totals deduplicate a permission granted by one role and blocked by another', () => {
+  const model = buildPermissionRelationshipModel({ viewMode: 'account',
+targetKey: '20',
+    accounts: accounts.map((item) => ({ ...item, account_status: 'active' })),
+roles,
+permissions,
+    accessByRoleKey: { ...accessByRoleKey,
+warehouse: { ...accessByRoleKey.warehouse,
+      permissions: [{ permission_key: 'sales.order.read', effective: false }] } },
+  })
+  assert.equal(model.resultState, 'projection')
+  assert.equal(model.summary.permissions, 2)
+  assert.equal(model.summary.effectivePermissions, 1)
+  assert.equal(model.summary.blockedPermissions, 1)
+})
+
+test('approval revision drift and partial reads do not advertise a complete responsibility count', () => {
+  for (const approval of [
+    { ...approvalSettings, partial: true },
+    { ...approvalSettings, config_revision: 'other' },
+  ]) {
+    const model = buildPermissionRelationshipModel({ targetKey: 'sales',
+accounts,
+roles,
+permissions,
+      accessByRoleKey: { sales: { ...accessByRoleKey.sales, config_revision: 'current' } },
+      approvalSettings: approval,
+    })
+    assert.equal(model.summary.approvals, null)
+    assert.ok(model.warnings.some((warning) => warning.includes('审批责任')))
+    assert.equal(model.summary.effectivePermissions, 1)
+  }
+})
+
+test('warehouse names retain an explicit gap and empty assignment grants no warehouse', () => {
+  const base = { targetKey: 'sales', accounts, permissions, accessByRoleKey, warehouseOptions: [{ id: 8, name: '成品仓' }] }
+  const partial = buildPermissionRelationshipModel({ ...base,
+    roles: [{ ...roles[0], data_scopes: [{ resource_type: 'warehouse', mode: 'ASSIGNED', resource_ids: [8, 9] }] }],
+  })
+  assert.match(partial.chart, /另有 1 个仓库名称待刷新/u)
+  const empty = buildPermissionRelationshipModel({ ...base,
+    roles: [{ ...roles[0], data_scopes: [{ resource_type: 'warehouse', mode: 'ASSIGNED', resource_ids: [] }] }],
+  })
+  assert.match(empty.chart, /无仓库范围/u)
+})
+
+test('super admin assigned roles remain countable without fabricating zero effective rights', () => {
+  const model = buildPermissionRelationshipModel({ viewMode: 'account',
+targetKey: '1',
+    accounts: [{ id: 1, is_super_admin: true, roles: [roles[0]] }],
+roles,
+permissions,
+accessByRoleKey,
+  })
+  assert.equal(model.summary.roles, 1)
+  assert.equal(model.summary.effectivePermissions, null)
+  assert.equal(model.summary.pages, null)
+  assert.equal(model.summary.approvals, null)
 })

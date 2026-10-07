@@ -43,6 +43,7 @@ import {
   getPermissionCenterRoleName as getRoleVisibleName,
   filterAssignableBusinessPermissions,
   getPermissionCenterRoleVersion,
+  getMatchingRoleAccess,
   getRolePermissionReadOnlyReason,
   getRoleTypeLabel,
   normalizeStringList,
@@ -284,24 +285,28 @@ export function usePermissionRoleSettings({
   const matchingPermissionDraftAccess =
     permissionDraftAccess?.roleKey === selectedRoleKey &&
     permissionDraftAccess?.signature === selectedRolePermissionSignature
-      ? permissionDraftAccess.access
+      ? getMatchingRoleAccess(selectedRole, permissionDraftAccess.access)
       : null
 
   const roleAccessForCurrentDraft = rolePermissionsDirty
     ? matchingPermissionDraftAccess || localPermissionDraftAccess
-    : effectiveRoleAccess
+    : getMatchingRoleAccess(selectedRole, effectiveRoleAccess)
 
   const roleAccessForCurrentDraftLoading = rolePermissionsDirty
     ? permissionDraftAccessLoading && !matchingPermissionDraftAccess
     : effectiveRoleAccessLoading
 
   const effectiveRolePageCount = useMemo(
-    () =>
-      (Array.isArray(roleAccessForCurrentDraft?.pages)
+    () => {
+      if (roleAccessForCurrentDraft?.is_final !== true || roleAccessForCurrentDraftLoading) {
+        return null
+      }
+      return (Array.isArray(roleAccessForCurrentDraft?.pages)
         ? roleAccessForCurrentDraft.pages
         : []
-      ).filter((page) => page?.effective === true).length,
-    [roleAccessForCurrentDraft]
+      ).filter((page) => page?.effective === true).length
+    },
+    [roleAccessForCurrentDraft, roleAccessForCurrentDraftLoading]
   )
 
   const effectiveRoleNavigationPathSet = useMemo(
@@ -511,6 +516,7 @@ export function usePermissionRoleSettings({
         return false
       }
       setEffectiveRoleAccessLoading(true)
+      setEffectiveRoleAccess(null)
       try {
         const result = await adminRpc.call(
           'effective_role_access',
@@ -756,7 +762,7 @@ export function usePermissionRoleSettings({
 
   useEffect(() => {
     loadEffectiveRoleAccess(selectedRoleKey)
-  }, [loadEffectiveRoleAccess, selectedRoleKey])
+  }, [loadEffectiveRoleAccess, selectedRoleKey, selectedRoleVersion])
 
   useEffect(() => {
     const requestID = permissionDraftAccessRequestRef.current + 1
@@ -813,6 +819,7 @@ export function usePermissionRoleSettings({
     canReadEffectiveRoleAccess,
     rolePermissionsDirty,
     selectedRoleKey,
+    selectedRoleVersion,
     selectedRolePermissionKeys,
     selectedRolePermissionSignature,
   ])
@@ -1247,7 +1254,9 @@ export function usePermissionRoleSettings({
                           onOpenNavigation?.()
                         }}
                       >
-                        可访问 {effectiveRolePageCount} 页
+                        {effectiveRolePageCount === null
+                          ? '页面访问待核对'
+                          : `可访问 ${effectiveRolePageCount} 页`}
                       </Button>
                       <Button
                         type="link"

@@ -135,3 +135,24 @@ test('permission data aborts pending reads on unmount without starting follow-up
   await resolveIdentity(pending)
   assert.equal(view.requests.length, 1)
 })
+
+for (const failedStage of ['identity', 'options']) {
+  test(`permission refresh failure at ${failedStage} clears stale privileges and account data`, async (t) => {
+    const view = await mountData(t)
+    const { message } = await import('../../../common/utils/antdApp.js')
+    t.mock.method(message, 'error', () => {})
+    await resolveIdentity(view.requests[0])
+    await resolveOptions(view.requests, 'previous')
+    assert.equal(view.state.currentAdmin.is_super_admin, true)
+    let refresh
+    await act(async () => { refresh = view.state.loadData() })
+    if (failedStage === 'options') await resolveIdentity(view.requests.at(-1))
+    await act(async () => view.requests.at(-1).reject(new Error('read failed')))
+    assert.equal(await refresh, false)
+    assert.equal(view.state.currentAdmin, null)
+    assert.equal(view.state.loading, false)
+    for (const field of ['admins', 'roles', 'permissions', 'permissionMenuOptions', 'warehouseScopeOptions']) {
+      assert.deepEqual(view.state[field], [])
+    }
+  })
+}

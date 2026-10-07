@@ -9,16 +9,12 @@ import {
   normalizeRoleNavigationSettings,
 } from '../../erp/config/roleGuidedNavigation.mjs'
 import {
-  ADMIN_ACCOUNT_STATUS,
-  getAdminAccountStatus,
-} from '../../erp/utils/permissionCenterSearch.mjs'
-import {
   getPermissionCenterRoleKey,
   getPermissionCenterRoleName,
 } from '../../erp/utils/permissionCenterAccess.mjs'
 import {
   PERMISSION_RELATIONSHIP_VIEW_MODE,
-  getPermissionRelationshipRoleKeys,
+  getPermissionRelationshipContext,
 } from './devPermissionRelationshipGraph.mjs'
 import { formatAdminIdentity } from '../../erp/utils/adminIdentity.mjs'
 import { projectRoleGuidedModuleNavigation } from '../../erp/utils/businessModuleGroups.mjs'
@@ -29,22 +25,12 @@ export const PERMISSION_NAVIGATION_STATE = Object.freeze({
   UNAVAILABLE: 'unavailable',
 })
 
-const ACCOUNT_STATUS_LABELS = Object.freeze({
-  [ADMIN_ACCOUNT_STATUS.ACTIVE]: '启用',
-  [ADMIN_ACCOUNT_STATUS.SUSPENDED]: '临时停用',
-  [ADMIN_ACCOUNT_STATUS.REVOKED]: '已注销',
-})
-
 function normalizeText(value = '') {
   return String(value || '').trim()
 }
 
 function normalizeList(value = []) {
   return Array.isArray(value) ? value : []
-}
-
-function accountKey(account = {}) {
-  return normalizeText(account?.id)
 }
 
 function accountName(account = {}) {
@@ -160,6 +146,7 @@ function readyModel({
   notice = '',
   effectivePageCount = 0,
   blocked = false,
+  projectionOnly = false,
 }) {
   return {
     state: blocked
@@ -171,19 +158,13 @@ function readyModel({
     message: '',
     notice,
     effectivePageCount,
+    projectionOnly,
     ...normalizePlacement(placement),
   }
 }
 
-function buildRoleNavigationModel({
-  targetKey,
-  roles,
-  accessByRoleKey,
-  navigationSections,
-}) {
-  const role = normalizeList(roles).find(
-    (item) => getPermissionCenterRoleKey(item) === normalizeText(targetKey)
-  )
+function buildRoleNavigationModel({ accessByRoleKey, navigationSections, context }) {
+  const role = context.roles[0]
   if (!role) {
     return unavailableModel({ message: '请选择要查看的岗位。' })
   }
@@ -191,10 +172,21 @@ function buildRoleNavigationModel({
   const roleKey = getPermissionCenterRoleKey(role)
   const roleName = getPermissionCenterRoleName(role)
   const access = accessForRole(accessByRoleKey, roleKey)
-  if (!access || access?.is_final !== true) {
+  if (context.blocked) {
+    return readyModel({
+      placement: {},
+      contextLabel: roleName,
+      blocked: true,
+      modeLabel: '岗位已停用',
+      notice: '岗位已停用，当前没有可用菜单。',
+    })
+  }
+  if (!context.ready) {
     return unavailableModel({
       contextLabel: roleName,
-      message: '该岗位的最终页面结果尚未完整读取，当前不生成可能失真的菜单。',
+      message:
+        context.issues.join('；') ||
+        '该岗位的最终页面结果尚未完整读取，当前不生成可能失真的菜单。',
     })
   }
 
@@ -208,7 +200,6 @@ function buildRoleNavigationModel({
     primaryMenuPaths: settings.primaryMenuPaths,
     secondaryMenuPaths: settings.secondaryMenuPaths,
   })
-  const blocked = role?.disabled === true
   return readyModel({
     placement,
     contextLabel: roleName,
@@ -217,24 +208,13 @@ function buildRoleNavigationModel({
       settings.mode === ROLE_NAVIGATION_MODES.CUSTOM
         ? '自定义布局'
         : '系统推荐',
-    notice: blocked
-      ? '岗位已停用；以下仅用于核对保存的菜单位置，当前不可实际使用。'
-      : '',
     effectivePageCount: effectivePaths.size,
-    blocked,
+    projectionOnly: context.projectionOnly,
   })
 }
 
-function buildAccountNavigationModel({
-  targetKey,
-  accounts,
-  roles,
-  accessByRoleKey,
-  navigationSections,
-}) {
-  const account = normalizeList(accounts).find(
-    (item) => accountKey(item) === normalizeText(targetKey)
-  )
+function buildAccountNavigationModel({ accessByRoleKey, navigationSections, context }) {
+  const { account } = context
   if (!account) {
     return unavailableModel({ message: '请选择要查看的员工账号。' })
   }
@@ -249,11 +229,24 @@ function buildAccountNavigationModel({
     })
   }
 
-  const roleKeys = getPermissionRelationshipRoleKeys({
-    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT,
-    targetKey,
-    accounts,
-  })
+  if (context.blocked) {
+    return readyModel({
+      placement: {},
+      contextLabel,
+      blocked: true,
+      modeLabel: '当前不可使用',
+      notice: `${context.blockedReason}；岗位分配仍保留，当前没有可用菜单。`,
+    })
+  }
+  if (context.issues.length > 0) {
+    return unavailableModel({
+      contextLabel,
+      message: context.issues.join('；'),
+    })
+  }
+
+  const selectedRoles = context.roles.filter((role) => role.disabled !== true)
+  const roleKeys = selectedRoles.map(getPermissionCenterRoleKey)
   if (roleKeys.length === 0) {
     return unavailableModel({
       contextLabel,
@@ -262,35 +255,9 @@ function buildAccountNavigationModel({
     })
   }
 
-  const roleByKey = new Map(
-    normalizeList(roles)
-      .filter((role) => getPermissionCenterRoleKey(role))
-      .map((role) => [getPermissionCenterRoleKey(role), role])
-  )
-  const selectedRoles = roleKeys.map((roleKey) => roleByKey.get(roleKey))
-  const missingRoleKeys = roleKeys.filter((_, index) => !selectedRoles[index])
-  if (missingRoleKeys.length > 0) {
-    return unavailableModel({
-      contextLabel,
-      modeLabel: '岗位读取不完整',
-      message: '该账号的岗位资料未完整读取，当前不生成菜单。',
-    })
-  }
-
   const accesses = roleKeys.map((roleKey) =>
     accessForRole(accessByRoleKey, roleKey)
   )
-  const incompleteRoleNames = selectedRoles
-    .filter((_, index) => accesses[index]?.is_final !== true)
-    .map(getPermissionCenterRoleName)
-  if (incompleteRoleNames.length > 0) {
-    return unavailableModel({
-      contextLabel,
-      modeLabel: '最终结果不完整',
-      message: `${incompleteRoleNames.join('、')}的最终页面结果尚未完整读取，当前不生成部分菜单。`,
-    })
-  }
-
   const effectivePaths = getEffectivePathSet(accesses)
   const visibleSections = filterNavigationSections(
     navigationSections,
@@ -306,8 +273,6 @@ function buildAccountNavigationModel({
       },
     })
   )
-  const accountStatus = getAdminAccountStatus(account)
-  const blocked = accountStatus !== ADMIN_ACCOUNT_STATUS.ACTIVE
   const singleRoleSettings =
     selectedRoles.length === 1
       ? normalizeRoleNavigationSettings(selectedRoles[0])
@@ -322,11 +287,11 @@ function buildAccountNavigationModel({
         : singleRoleSettings?.mode === ROLE_NAVIGATION_MODES.CUSTOM
           ? '自定义布局'
           : '系统推荐',
-    notice: blocked
-      ? `账号当前${ACCOUNT_STATUS_LABELS[accountStatus] || '不可用'}；以下仅用于核对岗位菜单投影，当前不能登录使用。`
+    notice: context.projectionOnly
+      ? '以下是各岗位菜单的合并参考；跨岗位组合后的实际菜单须以该账号登录会话为准。'
       : '',
     effectivePageCount: effectivePaths.size,
-    blocked,
+    projectionOnly: context.projectionOnly,
   })
 }
 
@@ -340,19 +305,23 @@ export function buildPermissionRelationshipNavigationModel({
 } = {}) {
   const currentNavigationSections =
     getCurrentNavigationSections(navigationSections)
+  const context = getPermissionRelationshipContext({
+    viewMode,
+    targetKey,
+    accounts,
+    roles,
+    accessByRoleKey,
+  })
   if (viewMode === PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT) {
     return buildAccountNavigationModel({
-      targetKey,
-      accounts,
-      roles,
       accessByRoleKey,
       navigationSections: currentNavigationSections,
+      context,
     })
   }
   return buildRoleNavigationModel({
-    targetKey,
-    roles,
     accessByRoleKey,
     navigationSections: currentNavigationSections,
+    context,
   })
 }

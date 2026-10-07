@@ -60,13 +60,19 @@ export default function DevPermissionNavigationOverview({
             实际侧栏 / 可用菜单
           </Title>
           <Text type="secondary">
-            完整展示当前选择登录后如何找到页面；不会随“功能范围”筛选缩小。
+            {blocked
+              ? '账号或岗位当前不可使用；已保存的分配关系可在关系图和明细中核对。'
+              : model?.projectionOnly
+                ? '按各岗位生成菜单合并参考，实际菜单以账号登录结果为准。'
+                : '完整展示当前选择登录后如何找到页面；不会随“功能范围”筛选缩小。'}
           </Text>
         </div>
         <Space wrap size={[6, 6]}>
-          <Tag color="blue">完整导航</Tag>
+          <Tag color={unavailable || blocked ? 'orange' : 'blue'}>
+            {unavailable ? '待核对' : blocked ? '访问受限' : model?.projectionOnly ? '岗位参考' : '完整导航'}
+          </Tag>
           {model?.modeLabel ? (
-            <Tag color={unavailable ? 'orange' : modeTagColor(model?.mode)}>
+            <Tag color={unavailable || blocked ? 'orange' : modeTagColor(model?.mode)}>
               {model.modeLabel}
             </Tag>
           ) : null}
@@ -88,7 +94,7 @@ export default function DevPermissionNavigationOverview({
             <div>
               <Text strong>{model?.contextLabel}</Text>
               <Text type="secondary">
-                {model?.effectivePageCount || 0} 个最终可进入页面
+                {model?.effectivePageCount || 0} 个{model?.projectionOnly ? '岗位合并参考页面' : '最终可进入页面'}
               </Text>
             </div>
             <Text type="secondary">
@@ -96,11 +102,11 @@ export default function DevPermissionNavigationOverview({
             </Text>
           </div>
 
-          {blocked ? (
+          {model?.notice ? (
             <Alert
               type="warning"
               showIcon
-              message="当前不可实际使用"
+              message={blocked ? '当前不可实际使用' : '岗位合并参考'}
               description={model?.notice}
             />
           ) : null}

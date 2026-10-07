@@ -3,6 +3,7 @@ import {
   closeBusinessFormPage,
 } from './businessFormPageAssertions.mjs'
 import { createPermissionUnifiedScenarios } from './permissionUnifiedScenarios.mjs'
+import { createPermissionRelationshipScenarios } from './permissionRelationshipScenarios.mjs'
 
 export function createPermissionCenterScenarios({
   expectText,
@@ -75,6 +76,7 @@ export function createPermissionCenterScenarios({
     await tooltip.waitFor({ state: 'hidden', timeout: 10_000 })
   }
   return [
+    ...createPermissionRelationshipScenarios({ assert, assertNoHorizontalOverflow }),
     ...createPermissionUnifiedScenarios({ assert, assertNoHorizontalOverflow }),
     ...['light', 'dark'].map((themeMode) => ({
       name: `permission-center-approval-design-${themeMode}`,
@@ -941,9 +943,9 @@ export function createPermissionCenterScenarios({
         )
         assert.match(
           await receivablesMenuRow.getAttribute('title'),
-          /应收管理显示/u
+          /应收管理待核对/u
         )
-        assert.match(
+        assert.doesNotMatch(
           await receivablesMenuRow.getAttribute('title'),
           /常用工作/u
         )
@@ -968,6 +970,10 @@ export function createPermissionCenterScenarios({
         assert.match(
           await receivablesMenuRow.getAttribute('title'),
           /应收管理显示/u
+        )
+        assert.match(
+          await receivablesMenuRow.getAttribute('title'),
+          /常用工作/u
         )
         await assertTextAbsent(page, '预计显示')
         const settledStatusBox = await receivablesMenuRow
