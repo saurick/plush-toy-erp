@@ -1,6 +1,6 @@
 ---
 name: plush-test-governance
-description: 按改动选择最小充分验证（plush-toy-erp）。Use when validation scope needs judgment, especially for browser, database, migration or CI evidence.
+description: 按改动选择最小充分验证（plush-toy-erp）。Use when validation scope needs judgment, especially for browser, database, migration, CI scheduling/cache changes or CI evidence.
 ---
 
 # Plush Test Governance
@@ -13,6 +13,7 @@ description: 按改动选择最小充分验证（plush-toy-erp）。Use when val
 
 - 需要判断覆盖层级或证据边界时读 `docs/product/自动化测试策略.md`。
 - 需要运行命令、解释当前 CI/push 证据或修改 QA 脚本时，才读 `scripts/qa/README.md`、相关脚本 `--help` 与测试。
+- 修改 CI 依赖、分片、缓存或 Runner 并发时，读 [CI 变更与提速](../../../scripts/qa/README.md#ci-变更与提速--ci-change-safety)，据此选择合同检查、真实 CI 证据和停止条件。
 - 代码行为：当前代码、schema/migration 和对应测试；历史报告或聊天不能覆盖当前树。
 
 ## 工作流
@@ -22,7 +23,7 @@ description: 按改动选择最小充分验证（plush-toy-erp）。Use when val
 3. 按实际风险选择验证：文档/Skill 做链接与合同检查；schema/migration 做生成、迁移和数据测试；领域/API/RBAC 做正常、边界、异常和权限；页面做 Web 与真实浏览器；发布做目标环境证据。
 4. 改动适合现有 affected 路由时，用 `bash scripts/qa/affected.sh --plan` 选计划再按需 `--run`；否则直接运行同名或专项检查，不为普通改动机械运行全站。
 5. `full.sh`、`strict.sh`、Full Acceptance、全量页面或 PDF 回归只在目标和风险需要时执行。明显超出任务范围或资源预算时，一次说明新增范围、预计开销和停止条件；名称或覆盖数量本身不构成额外门禁。
-6. 任务涉及已授权的 commit/push、远端 exact-SHA CI、发布或 GPT 镜像审查时，按 `scripts/qa/README.md` 的当前合同收口；本 skill 不复制 remote、Runner、机器型号或镜像拓扑。失败修复后只重跑受影响证据，无新改动不重复门禁。
+6. 任务涉及已授权的 commit/push、远端 exact-SHA CI、发布或 GPT 镜像审查时，按 `scripts/qa/README.md` 的当前合同收口；本 skill 不复制 remote、Runner、机器型号或镜像拓扑。失败修复后按受影响范围复验；CI 编排或缓存实验的同 SHA 复验按专项规则判断，不机械重复全量门禁。
 7. 对 `affected` 无法选择的生成命令、真实数据库、浏览器、migration 或发布检查显式补充；环境不具备时报告 `blocked` 或 `missing`，不要用另一类测试绿色代替。
 8. 记录实际命令、执行数、pass/fail/skip、证据环境和相关未覆盖项。缺 summary、`0 tests executed` 或意外 skip 一律不能写成通过。
 

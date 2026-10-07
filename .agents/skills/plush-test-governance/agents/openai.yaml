@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Test Governance"
-  short_description: "按改动影响面选择最小充分测试并准确说明验证与证据边界"
-  default_prompt: "Use $plush-test-governance 按用户目标和改动影响面选择最小充分验证，并准确报告实际证据与相关盲区。"
+  short_description: "选择最小充分验证，核对 CI 编排与缓存变更的覆盖、隔离和证据"
+  default_prompt: "Use $plush-test-governance 按目标和改动选择最小充分验证，CI 编排或缓存调整同时核对覆盖、隔离、实际收益与停止条件。"

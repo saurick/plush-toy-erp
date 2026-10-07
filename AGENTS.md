@@ -103,7 +103,7 @@
 
 ## 测试与验收
 
-验证范围本身需要判断，或涉及浏览器、数据库、migration、CI 证据时使用 `$plush-test-governance`；T0-T8 定义见 `docs/product/自动化测试策略.md`。
+验证范围本身需要判断，或涉及浏览器、数据库、migration、CI 编排、缓存或证据时使用 `$plush-test-governance`；T0-T8 定义见 `docs/product/自动化测试策略.md`。
 
 - 实现授权包括目标所需的最小充分验证和修复后的相关复验；明显超出范围或资源预算时才说明影响并确认。共享环境配置、真实数据、Git 和发布仍各自授权。push 与 exact-SHA CI 的当前合同只在相关任务中读取 `scripts/qa/README.md`；非标准目标和显式本地 `--full` 不得静默升级。
 
