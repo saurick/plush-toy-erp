@@ -593,7 +593,8 @@ async function actOnTaskInBrowser(
       .filter({ hasText: sourceNo })
       .first();
     await card.waitFor({ state: "visible" });
-    await card.locator("button.erp-task-card__open").click();
+    // 卡片上的复制按钮是独立操作，通过键盘激活明确的详情入口。
+    await card.locator("button.erp-task-card__open").press("Enter");
     const drawer = session.page.locator(".erp-task-action-drawer:visible");
     await drawer.waitFor({ state: "visible" });
     await drawer
