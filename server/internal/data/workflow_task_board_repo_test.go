@@ -167,6 +167,64 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 	}
 }
 
+func TestWorkflowRepo_GetWorkflowTaskBoardTodoCountsUnsettledResponsibilitiesOnce(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_todo?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	actorID := 7
+	snapshotAt := time.Date(2026, 7, 13, 12, 0, 0, 0, time.UTC)
+	dueAt := snapshotAt.Add(time.Hour)
+	fixtures := []struct {
+		status, role string
+		assignee     *int
+		due          *time.Time
+	}{
+		{status: "ready", role: biz.SalesRoleKey, assignee: &actorID},
+		{status: "ready", role: biz.SalesRoleKey},
+		{status: "blocked", role: biz.QualityRoleKey, assignee: &actorID},
+		{status: "ready", role: biz.QualityRoleKey, assignee: &actorID, due: &dueAt},
+		{status: "ready", role: biz.QualityRoleKey},
+		{status: "done", role: biz.SalesRoleKey},
+		{status: "rejected", role: biz.SalesRoleKey},
+		{status: "withdrawn", role: biz.SalesRoleKey},
+	}
+	for index, fixture := range fixtures {
+		_, err := client.WorkflowTask.Create().
+			SetTaskCode(fmt.Sprintf("TODO-%d", index)).SetTaskGroup("board-todo-test").
+			SetTaskName("待办范围验证").SetSourceType("board-todo-test").SetSourceID(index + 1).
+			SetTaskStatusKey(fixture.status).SetOwnerRoleKey(fixture.role).
+			SetNillableAssigneeID(fixture.assignee).SetNillableDueAt(fixture.due).
+			SetPayload(map[string]any{}).Save(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	query := biz.WorkflowTaskBoardQuery{
+		TodoOnly: true, Limit: 1, SnapshotAt: snapshotAt,
+		VisibilityScope: &biz.WorkflowTaskVisibilityScope{
+			StandaloneVisibleOwnerRoleKeys: []string{biz.SalesRoleKey}, VisibleAssigneeID: &actorID,
+		},
+	}
+	board, err := repo.GetWorkflowTaskBoard(ctx, query)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if board.Total != 4 || board.Counts != (biz.WorkflowTaskBoardCounts{Actionable: 2, Exception: 1, Due: 1}) {
+		t.Fatalf("todo total must include role or assignee once, excluding finished and invisible tasks: %#v", board)
+	}
+	for _, lane := range board.Lanes {
+		if len(lane.Tasks) > 1 {
+			t.Fatalf("limit must bound rows, not counts: %#v", lane)
+		}
+	}
+	query.TodoOnly = false
+	all, err := repo.GetWorkflowTaskBoard(ctx, query)
+	if err != nil || all.Total != 7 || all.Counts.Finished != 3 {
+		t.Fatalf("all view must keep finished history: %#v err=%v", all, err)
+	}
+}
+
 func TestWorkflowRepo_GetWorkflowTaskBoardAppliesFocusedLaneSortContract(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_sort?mode=memory&cache=shared&_fk=1")

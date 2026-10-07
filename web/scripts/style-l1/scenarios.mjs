@@ -8,6 +8,7 @@ import { createDevUIDesignWorkflowScenarios } from './devUIDesignWorkflowScenari
 import { createMobileProgressScenarios } from './mobileProgressScenarios.mjs'
 import { createMobileNavigationBadgeScenarios } from './mobileNavigationBadgeScenarios.mjs'
 import { createBusinessFormInteractionScenarios } from './businessFormInteractionScenarios.mjs'
+import { createDesktopNavigationBadgeScenarios } from './desktopNavigationBadgeScenarios.mjs'
 import { createBusinessPageContractScenarios } from './businessPageContractScenarios.mjs'
 import { createAuditLogScenarios } from './auditLogScenarios.mjs'
 import { createHistoryRecordScenarios } from './historyRecordScenarios.mjs'
@@ -597,6 +598,7 @@ export function createStyleL1Scenarios(deps) {
       gotoScenarioPath,
       waitForPath,
       path,
+    ...createDesktopNavigationBadgeScenarios({ ...deps, customerRuntimeEffectiveSession }),
       outputDir,
       assertThemeReadable,
       assertDarkThemeContrast,

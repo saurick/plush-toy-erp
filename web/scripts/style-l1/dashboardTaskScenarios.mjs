@@ -748,6 +748,7 @@ export function createDashboardTaskScenarios({
                       process_key: 'finished_goods_delivery',
                       process_version: 'v1',
                       status: 'completed',
+                      resolution_kind: 'succeeded',
                       started_at: 1_800_000_000,
                       completed_at: 1_800_000_300,
                     },
@@ -794,7 +795,7 @@ export function createDashboardTaskScenarios({
           await approvalReceipt.waitFor({ state: 'visible', timeout: 10_000 })
           await expectText(approvalReceipt, '办理结果已确认')
           await expectText(approvalReceipt, '流程交接结果')
-          await expectText(approvalReceipt, '流程已结束。')
+          await expectText(approvalReceipt, '流程正常结束。')
           await expectText(approvalDrawer, '本次责任岗位')
           await expectText(approvalDrawer, '财务')
           const approvalReceiptMetrics = await approvalDrawer.evaluate(

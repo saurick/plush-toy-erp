@@ -32,6 +32,32 @@ import {
 
 const now = Math.floor(Date.now() / 1000)
 
+test('workflowTaskBoard: 待我处理保留网址范围，清除结束状态并使用专属查询', () => {
+  const filters = readWorkflowTaskBoardFiltersFromSearch('mode=todo&lane=finished&status=done&q=包装')
+  assert.equal(filters.mode, 'todo')
+  assert.equal(filters.lane, 'all')
+  assert.equal(filters.status, 'all')
+  assert.deepEqual(buildWorkflowTaskBoardRequest(filters), { todo_only: true, keyword: '包装', limit: TASK_BOARD_OVERVIEW_LIMIT, offset: 0 })
+  assert.deepEqual(readWorkflowTaskBoardFiltersFromSearch(writeWorkflowTaskBoardFiltersToSearch('', filters)), filters)
+  assert.equal(buildWorkflowTaskBoardRequest({ mode: 'approval' }).todo_only, undefined)
+  assert.equal(buildWorkflowTaskBoardRequest({ mode: 'todo' }).approval_only, undefined)
+  assert.deepEqual(getWorkflowTaskBoardStatusOptions('all', 'todo').map((item) => item.value), ['all', 'ready', 'blocked', 'overdue', 'dueSoon'])
+  const response = {
+    snapshot_at: now,
+total: 6,
+    counts: { actionable: 3, exception: 2, due: 1, finished: 0 },
+    lanes: ['actionable', 'exception', 'due', 'finished'].map((key) => ({ key, total: ({ actionable: 3, exception: 2, due: 1, finished: 0 })[key], limit: TASK_BOARD_OVERVIEW_LIMIT, offset: 0, tasks: [] })),
+    source_types: [],
+owner_role_keys: [],
+  }
+  const model = buildWorkflowTaskBoardModel(response, { mode: 'todo' })
+  assert.deepEqual(model.visibleLanes.map((lane) => lane.key), ['actionable', 'exception', 'due'])
+  response.total += 1
+  response.counts.finished = 1
+  response.lanes[3].total = 1
+  assert.throws(() => buildWorkflowTaskBoardModel(response, { mode: 'todo' }), /暂时无法显示/)
+})
+
 test('workflowTaskBoard: 分类只提供可以匹配的状态和日期条件', () => {
   assert.deepEqual(
     getWorkflowTaskBoardStatusOptions('finished').map((option) => option.value),

@@ -1,0 +1,39 @@
+.erp-menu-task-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-menu-task-icon {
+  position: relative;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+}
+
+.erp-menu-task-glyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.erp-menu-task-icon > .navigation-count-badge {
+  display: none;
+}
+
+.ant-menu-inline-collapsed .erp-menu-task-icon > .navigation-count-badge {
+  position: absolute;
+  top: -8px;
+  left: 6px;
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  padding-inline: 4px;
+  font-size: 10px;
+  line-height: 18px;
+}

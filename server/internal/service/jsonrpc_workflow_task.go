@@ -325,6 +325,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			"lane_key",
 			"sort",
 			"approval_only",
+			"todo_only",
 			"limit",
 			"offset",
 		); res != nil {
@@ -338,7 +339,14 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if adminRes != nil {
 			return id, adminRes, nil
 		}
-		if query.ApprovalOnly {
+		if query.TodoOnly {
+			// Personal reminders use responsibility scope, not supervisory or creator visibility.
+			visibilityScope, visibilityErr := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
+			if visibilityErr != nil {
+				return id, d.mapCustomerConfigError(ctx, visibilityErr), nil
+			}
+			query.VisibilityScope = visibilityScope
+		} else if query.ApprovalOnly {
 			approvalVisibilityScopes, approvalRes := d.workflowApprovalTaskVisibilityScopes(ctx, admin)
 			if approvalRes != nil {
 				return id, approvalRes, nil
@@ -668,6 +676,14 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 		}
 		approvalOnly = value
 	}
+	todoOnly := false
+	if raw, exists := pm["todo_only"]; exists {
+		value, ok := raw.(bool)
+		if !ok {
+			return biz.WorkflowTaskBoardQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "todo_only 必须是布尔值"}
+		}
+		todoOnly = value
+	}
 	limit, ok := getOptionalWorkflowTaskBoardInteger(pm, "limit", 5, 1)
 	if !ok {
 		return biz.WorkflowTaskBoardQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "limit 必须是正整数"}
@@ -688,6 +704,7 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 		LaneKey:      laneKey,
 		Sort:         sortKey,
 		ApprovalOnly: approvalOnly,
+		TodoOnly:     todoOnly,
 		Limit:        limit,
 		Offset:       offset,
 	}, nil

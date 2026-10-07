@@ -1,0 +1,28 @@
+.navigation-count-badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 22px;
+  height: 20px;
+  padding-inline: 5px;
+  border-radius: 10px;
+  background: var(--navigation-count-bg);
+  color: var(--navigation-count-color);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 20px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.navigation-count-badge--stale {
+  outline: 1px dashed currentcolor;
+  outline-offset: -1px;
+}
+
+.navigation-count-badge small {
+  font-size: 11px;
+}

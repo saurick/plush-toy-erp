@@ -168,6 +168,11 @@
   border-bottom: 1px solid var(--erp-border);
 }
 
+.erp-admin-sider .erp-admin-brand {
+  /* 侧栏动画只裁切品牌区，避免公司名称随容器宽度反复换行。 */
+  width: calc(var(--erp-sidebar-width) - 1px);
+}
+
 .erp-admin-brand__home {
   appearance: none;
   display: block;
@@ -252,6 +257,7 @@
 }
 
 .erp-admin-sider[data-sidebar-collapsed='true'] .erp-admin-brand {
+  width: 100%;
   justify-content: center;
   padding-inline: 8px;
 }

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -165,6 +166,9 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardRejectsInvalidContract(t *testing
 		params map[string]any
 	}{
 		{name: "unknown field", params: map[string]any{"unexpected": true}},
+		{name: "non boolean todo", params: map[string]any{"todo_only": "true"}},
+		{name: "numeric todo", params: map[string]any{"todo_only": float64(1)}},
+		{name: "conflicting modes", params: map[string]any{"todo_only": true, "approval_only": true}},
 		{name: "non string keyword", params: map[string]any{"keyword": float64(1)}},
 		{name: "oversized keyword", params: map[string]any{"keyword": strings.Repeat("长", 201)}},
 		{name: "invalid status", params: map[string]any{"status": "unknown"}},
@@ -205,6 +209,36 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardRejectsInvalidContract(t *testing
 	}
 }
 
+func TestJsonrpcDispatcher_WorkflowGetTaskBoardTodoUsesResponsibilityScope(t *testing.T) {
+	for _, todoOnly := range []bool{true, false} {
+		t.Run(fmt.Sprintf("todo_only=%t", todoOnly), func(t *testing.T) {
+			repo := &recordingWorkflowTaskBoardJSONRPCRepo{}
+			dispatcher := &jsonrpcDispatcher{
+				log: log.NewHelper(log.NewStdLogger(io.Discard)),
+				adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+					[]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskRead, biz.PermissionWorkflowTaskSupervise,
+				)},
+				workflowUC: biz.NewWorkflowUsecase(repo),
+			}
+			_, res, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_board", "todo", mustJSONRPCStruct(t, map[string]any{"todo_only": todoOnly, "limit": float64(1)}))
+			if err != nil || res == nil || res.Code != errcode.OK.Code {
+				t.Fatalf("todo board response=%#v err=%v", res, err)
+			}
+			scope := repo.query.VisibilityScope
+			if repo.query.TodoOnly != todoOnly || scope == nil {
+				t.Fatalf("unexpected query %#v", repo.query)
+			}
+			if todoOnly {
+				if scope.StandaloneAllowAllOwnerRoles || scope.FollowupCreatorID != nil || scope.VisibleAssigneeID == nil || *scope.VisibleAssigneeID != 7 || fmt.Sprint(scope.StandaloneVisibleOwnerRoleKeys) != "[sales]" {
+					t.Fatalf("todo must exclude supervision and creator visibility: %#v", scope)
+				}
+			} else if !scope.StandaloneAllowAllOwnerRoles || scope.FollowupCreatorID == nil {
+				t.Fatalf("all view must retain supervision and creator visibility: %#v", scope)
+			}
+		})
+	}
+}
+
 func TestJsonrpcDispatcher_WorkflowGetTaskBoardRequiresReadPermission(t *testing.T) {
 	repo := &recordingWorkflowTaskBoardJSONRPCRepo{}
 	dispatcher := &jsonrpcDispatcher{
@@ -212,7 +246,7 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardRequiresReadPermission(t *testing
 		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey})},
 		workflowUC:  biz.NewWorkflowUsecase(repo),
 	}
-	_, res, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_board", "denied", nil)
+	_, res, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "get_task_board", "denied", mustJSONRPCStruct(t, map[string]any{"todo_only": true}))
 	if err != nil {
 		t.Fatalf("unexpected transport error: %v", err)
 	}

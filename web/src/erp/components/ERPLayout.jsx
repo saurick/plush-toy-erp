@@ -63,6 +63,9 @@ import {
   resolveBusinessModuleMenuTarget,
 } from '../utils/businessModuleGroups.mjs'
 import { notifyProductImagesChanged } from '../utils/productImageReferences.mjs'
+import useDesktopTaskCount from '../hooks/useDesktopTaskCount'
+import NavigationCountBadge, { navigationCountDescription } from '@/common/components/navigation/NavigationCountBadge'
+import './desktop-task-badge.css'
 import { isAuthFailureCode } from '@/common/consts/errorCodes'
 import {
   AUTH_SCOPE,
@@ -997,15 +1000,34 @@ export default function ERPLayout({ legalNotice }) {
     visibleSections,
   ])
 
+  const taskCount = useDesktopTaskCount({
+    adminProfile,
+    enabled: customerRuntimeGate === CUSTOMER_RUNTIME_GATE.READY &&
+      !shouldUseProductCoreNavigation &&
+      moduleSidebarSections.some((section) => section.items.some((item) => item.path === '/erp/task-board')),
+    pathname: location.pathname,
+  })
+
   const menuItems = useMemo(() => {
-    const buildMenuLeaf = (item) => ({
-      key: item.sidebarKey || item.path,
-      icon: navIconRegistry[item.sidebarKey || item.key] || (
-        <AppstoreOutlined aria-hidden />
-      ),
-      label: item.label,
-      title: item.label,
-    })
+    const buildMenuLeaf = (item) => {
+      const taskEntry = item.path === '/erp/task-board' && taskCount.enabled
+      const icon = navIconRegistry[item.sidebarKey || item.key] || <AppstoreOutlined aria-hidden />
+      return {
+        key: item.sidebarKey || item.path,
+        icon: taskEntry ? (
+          <span className="erp-menu-task-icon">
+            <span className="erp-menu-task-glyph">{icon}</span>
+            <NavigationCountBadge {...taskCount} />
+          </span>
+        ) : icon,
+        label: taskEntry ? (
+          <span className="erp-menu-task-label"><span>{item.label}</span><NavigationCountBadge {...taskCount} /></span>
+        ) : item.label,
+        title: taskEntry ? `${item.label} · ${navigationCountDescription(taskCount)}` : item.label,
+        'aria-label': item.label,
+        'aria-description': taskEntry ? navigationCountDescription(taskCount) : undefined,
+      }
+    }
     const buildMenuGroup = (section) => ({
       type: 'group',
       key: `group-${section.key || section.title}`,
@@ -1048,6 +1070,7 @@ export default function ERPLayout({ legalNotice }) {
     moduleSidebarSections,
     useRoleGuidedNavigation,
     shouldUseProductCoreNavigation,
+    taskCount,
   ])
 
   const currentSidebarPath = getBusinessModuleSidebarKey(
@@ -1174,6 +1197,7 @@ export default function ERPLayout({ legalNotice }) {
       const refreshed = await pageRefreshHandler()
       if (refreshed !== false) {
         notifyProductImagesChanged()
+        taskCount.refresh()
         message.success('当前页面数据已刷新')
       }
     } catch (error) {
@@ -1189,7 +1213,7 @@ export default function ERPLayout({ legalNotice }) {
       setMobileNavOpen(false)
       return
     }
-    if (nextPath === location.pathname) {
+    if (nextPath === location.pathname || nextPath === `${location.pathname}${location.search}${location.hash}`) {
       setMobileNavOpen(false)
       return
     }
@@ -1212,6 +1236,11 @@ export default function ERPLayout({ legalNotice }) {
       : moduleSidebarSections.flatMap((section) => section.items)
     const item = items.find((entry) => (entry.sidebarKey || entry.path) === key)
     if (item) {
+      if (item.path === '/erp/task-board' && taskCount.enabled) {
+        if (taskCount.error) taskCount.refresh()
+        handleNavigate('/erp/task-board?mode=todo')
+        return
+      }
       handleNavigate(
         resolveBusinessModuleMenuTarget(
           item, location, pageUIState.values, visibleMenuPaths

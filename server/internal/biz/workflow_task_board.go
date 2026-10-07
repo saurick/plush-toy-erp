@@ -91,6 +91,9 @@ func (uc *WorkflowUsecase) GetTaskBoard(ctx context.Context, query WorkflowTaskB
 }
 
 func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTaskBoardQuery, error) {
+	if query.TodoOnly && query.ApprovalOnly {
+		return WorkflowTaskBoardQuery{}, ErrBadParam
+	}
 	query.Keyword = strings.TrimSpace(query.Keyword)
 	query.Status = strings.TrimSpace(query.Status)
 	query.OwnerRoleKey = strings.ToLower(NormalizeRoleKey(query.OwnerRoleKey))

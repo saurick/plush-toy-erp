@@ -99,6 +99,7 @@ type WorkflowTaskBoardQuery struct {
 	LaneKey                  string
 	Sort                     string
 	ApprovalOnly             bool
+	TodoOnly                 bool
 	Limit                    int
 	Offset                   int
 	VisibleOwnerRoleKeys     []string

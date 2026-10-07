@@ -254,6 +254,9 @@ func applyWorkflowTaskBoardVisibility(query *ent.WorkflowTaskQuery, filter biz.W
 }
 
 func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.WorkflowTaskBoardQuery) (*ent.WorkflowTaskQuery, error) {
+	if filter.TodoOnly {
+		query = query.Where(workflowTaskBoardUnsettledStatusPredicate())
+	}
 	if filter.ApprovalOnly {
 		query = query.Where(
 			workflowtask.TaskStatusKeyIn("ready", "blocked"),

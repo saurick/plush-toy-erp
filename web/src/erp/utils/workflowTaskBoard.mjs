@@ -64,7 +64,7 @@ export const TASK_BOARD_DUE_OPTIONS = Object.freeze([
   { value: 'noDue', label: '未设置到期' },
 ])
 
-export function getWorkflowTaskBoardStatusOptions(lane = 'all') {
+export function getWorkflowTaskBoardStatusOptions(lane = 'all', mode = 'all') {
   const values = {
     actionable: ['all', 'ready'],
     exception: ['all', 'blocked', 'overdue', 'dueSoon'],
@@ -72,7 +72,9 @@ export function getWorkflowTaskBoardStatusOptions(lane = 'all') {
     finished: ['all', 'done', 'rejected', 'withdrawn'],
   }[lane]
   return TASK_BOARD_STATUS_OPTIONS.filter(
-    (option) => !values || values.includes(option.value)
+    (option) =>
+      (!values || values.includes(option.value)) &&
+      (mode !== 'todo' || !['done', 'rejected', 'withdrawn'].includes(option.value))
   )
 }
 
@@ -377,12 +379,15 @@ function normalizePositiveInteger(value, fallback = 1) {
 }
 
 export function normalizeWorkflowTaskBoardFilters(filters = {}) {
-  const lane = normalizeKnownFilterValue(filters.lane, LANE_FILTER_VALUES)
+  const mode = ['todo', 'approval'].includes(filters.mode) ? filters.mode : 'all'
+  const lane = mode === 'todo' && filters.lane === 'finished'
+    ? 'all'
+    : normalizeKnownFilterValue(filters.lane, LANE_FILTER_VALUES)
   const status = normalizeKnownFilterValue(filters.status, STATUS_FILTER_VALUES)
   const due = normalizeKnownFilterValue(filters.due, DUE_FILTER_VALUES)
   return {
     keyword: String(filters.keyword || '').trim(),
-    status: getWorkflowTaskBoardStatusOptions(lane).some(
+    status: getWorkflowTaskBoardStatusOptions(lane, mode).some(
       (option) => option.value === status
     )
       ? status
@@ -399,7 +404,7 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
       lane === DEFAULT_TASK_BOARD_FILTERS.lane
         ? DEFAULT_TASK_BOARD_FILTERS.sort
         : normalizeKnownFilterValue(filters.sort, SORT_VALUES, 'smart'),
-    mode: filters.mode === 'approval' ? 'approval' : 'all',
+    mode,
     page: normalizePositiveInteger(filters.page),
     pageSize: normalizeWorkflowTaskPageSize(filters.pageSize),
   }
@@ -506,6 +511,7 @@ export function buildWorkflowTaskBoardRequest(filters = {}) {
     params.sort = normalized.sort
   }
   if (normalized.mode === 'approval') params.approval_only = true
+  if (normalized.mode === 'todo') params.todo_only = true
   return params
 }
 
@@ -608,7 +614,9 @@ export function buildWorkflowTaskBoardModel(response = {}, filters = {}) {
     total: normalizeNonNegativeInteger(normalizedResponse.total),
     counts,
     lanes,
-    visibleLanes: selectedLaneModel ? [selectedLaneModel] : lanes,
+    visibleLanes: selectedLaneModel
+      ? [selectedLaneModel]
+      : lanes.filter((lane) => normalizedFilters.mode !== 'todo' || lane.key !== 'finished'),
     selectedLane,
     focused,
     requestedPage: normalizedFilters.page,

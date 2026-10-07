@@ -6,6 +6,7 @@ import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
 import { requireWorkflowProcessContext } from '../utils/processRuntimePresentation.mjs'
 import { requireWorkflowTaskMutationParams } from '../utils/workflowTaskMutation.mjs'
 import { requireWorkflowTaskBoardResponse } from '../utils/workflowTaskBoardContract.mjs'
+import { notifyWorkflowTasksChanged } from '../utils/workflowTaskChanges.mjs'
 import { isWorkflowApprovalTask } from '../utils/workflowTaskActionContract.mjs'
 
 import { requireFollowupCreateParams, requireFollowupOptions, requireFollowupReceipt } from '../utils/workflowFollowup.mjs'
@@ -408,6 +409,7 @@ function requireWorkflowTaskMutationResult(operation, params, result) {
       isInvalidResponse: true,
     })
   }
+  notifyWorkflowTasksChanged()
   return task
 }
 
@@ -725,5 +727,7 @@ export async function getWorkflowTaskCreateOptions(source, options = {}) {
 export async function createWorkflowFollowupTask(params) {
   const input = requireFollowupCreateParams(params)
   const result = await workflowRpc.call(RpcMethod.workflow.CREATE_FOLLOWUP_TASK, input)
-  return requireFollowupReceipt(dataOf(result), input)
+  const receipt = requireFollowupReceipt(dataOf(result), input)
+  notifyWorkflowTasksChanged()
+  return receipt
 }

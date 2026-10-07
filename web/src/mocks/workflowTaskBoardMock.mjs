@@ -200,6 +200,7 @@ export function buildWorkflowTaskBoardMock({
   const filteredTasks = visibleTasks
     .filter(
       (task) =>
+        (params.todo_only !== true || UNSETTLED_TASK_STATUS_KEYS.has(taskStatus(task))) &&
         matchesKeyword(task, params.keyword) &&
         matchesStatus(task, status, normalizedSnapshotAt) &&
         matchesDue(task, due, normalizedSnapshotAt) &&

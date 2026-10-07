@@ -61,7 +61,9 @@ async function loadWorkflowApi(call) {
       "import { isWorkflowApprovalTask } from '../utils/workflowTaskActionContract.mjs'",
       'const isWorkflowApprovalTask = globalThis.__workflowApiTestIsApprovalTask'
     )
-  const resolved = transformed.replace('../utils/workflowFollowup.mjs', new URL('../utils/workflowFollowup.mjs', import.meta.url).href)
+  const resolved = transformed
+    .replace('../utils/workflowFollowup.mjs', new URL('../utils/workflowFollowup.mjs', import.meta.url).href)
+    .replace('../utils/workflowTaskChanges.mjs', new URL('../utils/workflowTaskChanges.mjs', import.meta.url).href)
   const encoded = Buffer.from(resolved).toString('base64')
   return import(`data:text/javascript;base64,${encoded}#${Date.now()}`)
 }
@@ -1366,5 +1368,26 @@ test('workflow mocks enforce the formal task mutation contract', () => {
     assert.doesNotMatch(source, /params\.task_id\s*\|\|\s*params\.id/u)
     assert.doesNotMatch(source, /params\.action_key\s*\|\|\s*params\.action/u)
     assert.doesNotMatch(source, /params\.action\s*\|\|\s*['"]urge_task/u)
+  }
+})
+
+test('workflowApi: only validated mutation receipts invalidate menu counts', async () => {
+  const previousWindow = globalThis.window
+  const target = new EventTarget()
+  globalThis.window = target
+  let changed = 0
+  target.addEventListener('erp-workflow-tasks-changed', () => { changed += 1 })
+  try {
+    let task = { id: 42, version: 8, task_status_key: 'done' }
+    const api = await loadWorkflowApi(async () => ({ data: { task } }))
+    const params = { task_id: 42, expected_version: 7, idempotency_key: 'navigation-count-confirmed', action_key: 'complete' }
+    await api.completeWorkflowTaskAction(params)
+    assert.equal(changed, 1)
+    task = { ...task, version: 7 }
+    await assert.rejects(() => api.completeWorkflowTaskAction(params), /暂时无法确认/)
+    assert.equal(changed, 1, 'an unconfirmed receipt cannot change the displayed workload')
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window
+    else globalThis.window = previousWindow
   }
 })

@@ -238,6 +238,10 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 16px;
   }
+
+  .erp-task-board-lanes--todo:not(.erp-task-board-lanes--focused) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .erp-task-board-lanes--focused {

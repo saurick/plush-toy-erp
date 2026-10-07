@@ -127,6 +127,10 @@ const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
 
 const TASK_BOARD_SCOPE_OPTIONS = Object.freeze([
   {
+    label: '待我处理',
+    value: 'todo',
+  },
+  {
     label: '全部任务',
     value: 'all',
   },
@@ -139,7 +143,7 @@ const TASK_BOARD_SCOPE_OPTIONS = Object.freeze([
 const WORKBENCH_QUEUE_PAGE_SIZE = TASK_BOARD_FOCUS_PAGE_SIZE
 const TASK_BOARD_PAGE_SCROLL_GAP = 12
 
-function TaskBoardProgressRail({ activeLane, counts, ready, onSelectLane }) {
+function TaskBoardProgressRail({ activeLane, counts, ready, onSelectLane, mode }) {
   return (
     <nav className="erp-task-progress-rail" aria-label="任务分类">
       <FilterChip
@@ -150,7 +154,7 @@ function TaskBoardProgressRail({ activeLane, counts, ready, onSelectLane }) {
       >
         <span className="erp-task-progress-rail__label">概览</span>
       </FilterChip>
-      {TASK_BOARD_LANE_DEFINITIONS.map((lane) => (
+      {TASK_BOARD_LANE_DEFINITIONS.filter((lane) => mode !== 'todo' || lane.key !== 'finished').map((lane) => (
         <FilterChip
           key={lane.key}
           data-lane={lane.key}
@@ -1027,7 +1031,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ),
     [taskBoardModel.ownerRoleKeys, taskBoardSummaryResponse?.owner_role_keys]
   )
-  const statusOptions = getWorkflowTaskBoardStatusOptions(filters.lane)
+  const statusOptions = getWorkflowTaskBoardStatusOptions(filters.lane, filters.mode)
   const dueOptions = getWorkflowTaskBoardDueOptions(filters.lane)
   const activeExtraFilters = [
     { key: 'status', label: '状态', options: TASK_BOARD_STATUS_OPTIONS },
@@ -1853,6 +1857,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         >
           <div className="erp-dashboard-block">
             <TaskBoardProgressRail
+              mode={filters.mode}
               activeLane={filters.lane}
               counts={taskBoardCounts}
               ready={taskBoardMetricsReady}
@@ -1861,16 +1866,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
             <div className="erp-task-board-controls">
               <div className="erp-task-board-filters">
-                {canViewApprovalInbox ? (
-                  <div className="erp-task-board-scope-filter">
-                    <Segmented
-                      aria-label="任务范围"
-                      value={filters.mode}
-                      options={TASK_BOARD_SCOPE_OPTIONS}
-                      onChange={(value) => updateFilter('mode', value)}
-                    />
-                  </div>
-                ) : null}
+                <div className="erp-task-board-scope-filter">
+                  <Segmented
+                    aria-label="任务范围"
+                    value={filters.mode}
+                    options={TASK_BOARD_SCOPE_OPTIONS.filter((option) => canViewApprovalInbox || option.value !== 'approval')}
+                    onChange={(value) => updateFilter('mode', value)}
+                  />
+                </div>
                 <SearchInput
                   placeholder="订单 / 产品 / 物料 / 款号"
                   searchHint="可搜索：任务、单号、产品、款号、物料、处理原因"
@@ -1988,7 +1991,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 ref={taskBoardLanesRef}
                 className={`erp-task-board-lanes${
                   taskBoardModel.focused ? ' erp-task-board-lanes--focused' : ''
-                }`}
+                }${filters.mode === 'todo' ? ' erp-task-board-lanes--todo' : ''}`}
                 aria-label="任务看板分类"
                 aria-busy={taskBoardUpdating}
               >
