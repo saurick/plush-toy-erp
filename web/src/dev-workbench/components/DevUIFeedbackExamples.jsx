@@ -393,13 +393,13 @@ function OverlayExample() {
           onClick={() => {
             if (confirmation.current) return
             confirmation.current = modal.confirm({
+              maskClosable: true,
               title: '作废样例草稿 PO-DEMO？',
               content:
                 '仅终止这份尚未生效的样例草稿，不改变库存。作废后不能恢复；可重新新建。',
               width: ERP_MODAL_WIDTHS.confirm,
               centered: true,
               autoFocusButton: 'cancel',
-              maskClosable: true,
               okText: '作废草稿',
               cancelText: '保留草稿',
               okButtonProps: { danger: true },

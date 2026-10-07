@@ -61,6 +61,7 @@ export const DEV_TOOL_USAGE = Object.freeze({
   docs: '查正式依据',
   'ui-design': '实现前走操作',
   testing: '验证当前改动',
+  'business-chain-audit': '核对链路实跑与逐步证据',
   'quality-gates': '核对正式门禁',
   'business-usability': '检查页面说明',
   'data-preparation': '用例缺少数据时',

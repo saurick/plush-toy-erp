@@ -58,10 +58,14 @@ test('business confirmation locks immediately, waits for the result, then allows
     assert.equal(document.querySelector('.ant-modal-close'), null)
     await act(async () => button('取消').click())
     assert.equal(closes, 0)
+    await act(async () => document.querySelector('.ant-modal-wrap').click())
+    assert.equal(closes, 0)
     await act(async () => finish())
     assert.equal(button('取消').disabled, false)
-    await act(async () => button('取消').click())
+    await act(async () => document.querySelector('.ant-modal-wrap').click())
     assert.equal(closes, 1)
+    await act(async () => button('取消').click())
+    assert.equal(closes, 2)
   } finally {
     await unmount()
   }

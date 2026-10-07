@@ -19,6 +19,7 @@ function listSourceFiles(directory = SOURCE_ROOT) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const absolutePath = resolve(directory, entry.name)
     if (entry.isDirectory()) return listSourceFiles(absolutePath)
+    if (/\.test\.[cm]?[jt]sx?$/u.test(entry.name)) return []
     return SOURCE_EXTENSIONS.test(entry.name) ? [absolutePath] : []
   })
 }
@@ -72,8 +73,9 @@ test('business modals allow backdrop dismissal unless an operation is busy', () 
   )
 
   assert.match(businessModal, /maskClosable = true/u)
-  assert.match(businessModal, /maskClosable=\{maskClosable\}/u)
+  assert.match(businessModal, /maskClosable=\{!busy && maskClosable\}/u)
   assert.match(businessFormModal, /maskClosable = true/u)
+  assert.match(businessFormModal, /maskClosable=\{maskClosable\}/u)
 })
 
 test('only the legal notice gate hard-disables Ant Design backdrop dismissal', () => {
@@ -124,7 +126,7 @@ test('Ant Design modal method calls explicitly enable backdrop dismissal', () =>
   assert.deepEqual(violations, [])
 })
 
-test('busy-aware modal components explicitly protect backdrop dismissal', () => {
+test('busy-aware modals protect backdrop dismissal directly or through the shared submission guard', () => {
   const violations = []
 
   for (const absolutePath of listSourceFiles()) {
@@ -133,7 +135,14 @@ test('busy-aware modal components explicitly protect backdrop dismissal', () => 
     for (const element of listModalOpeningElements(source)) {
       const hasBusyCloseContract =
         /\b(?:confirmLoading|closable|keyboard)\s*=/u.test(element.source)
-      if (hasBusyCloseContract && !/\bmaskClosable\b/u.test(element.source)) {
+      const usesSharedSubmissionGuard =
+        /^<(?:BusinessFormModal|BusinessModal)\b/u.test(element.source) &&
+        /\bconfirmLoading\s*=/u.test(element.source)
+      if (
+        hasBusyCloseContract &&
+        !usesSharedSubmissionGuard &&
+        !/\bmaskClosable\b/u.test(element.source)
+      ) {
         violations.push(`${sourcePath}:${lineNumberAt(source, element.index)}`)
       }
     }

@@ -120,6 +120,7 @@ export default function BusinessFormModal({
     if (!dirty) return onCancel?.(event)
     if (discardRef.current) return undefined
     discardRef.current = modal.confirm({
+      maskClosable: true,
       width: ERP_MODAL_WIDTHS.confirm,
       title: '放弃未保存的修改？',
       content: '当前填写的内容尚未保存，放弃后无法恢复。',
@@ -128,7 +129,6 @@ export default function BusinessFormModal({
       okButtonProps: { danger: true },
       autoFocusButton: 'cancel',
       centered: true,
-      maskClosable: true,
       onOk: () => onCancel?.(event),
       afterClose: () => { discardRef.current = null },
     })
