@@ -20,10 +20,16 @@ func TestReadOnlyDataInvalidConfigDoesNotDiscloseCredentials(t *testing.T) {
 	}
 }
 
-func TestReadOnlyDataPostgresRejectsWrites(t *testing.T) {
-	dsn := os.Getenv("PERMISSION_READ_ONLY_TEST_DSN")
+func TestDatabaseGovernancePostgresReadOnlyDataRejectsWrites(t *testing.T) {
+	if os.Getenv("PURCHASE_RECEIPT_PG_TEST") != "1" {
+		t.Skip("set PURCHASE_RECEIPT_PG_TEST=1 and PURCHASE_RECEIPT_PG_TEST_DB_URL to run PostgreSQL integration tests")
+	}
+	dsn := os.Getenv("PURCHASE_RECEIPT_PG_TEST_DB_URL")
 	if dsn == "" {
-		t.Skip("PERMISSION_READ_ONLY_TEST_DSN is required for PostgreSQL read-only enforcement")
+		dsn = os.Getenv("PURCHASE_RECEIPT_PG_DB_URL")
+	}
+	if dsn == "" {
+		t.Fatal("PURCHASE_RECEIPT_PG_TEST_DB_URL or PURCHASE_RECEIPT_PG_DB_URL is required")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

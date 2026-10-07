@@ -1442,7 +1442,7 @@ async function runProductionExceptionFlow(browser, options, report) {
       session.page,
       options.baseURL,
       `/erp/production/progress?source_type=PRODUCTION_ORDER&source_id=${decision.production_order_id}&fact_id=${draft.id}`,
-      "生产进度",
+      "生产记录",
     );
     await selectRow(session.page, draft.fact_no);
     await session.page
