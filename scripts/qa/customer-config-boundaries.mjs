@@ -306,14 +306,18 @@ function validateWorkflowTaskRevisionVisibilityContract() {
   const visibilityPath =
     "server/internal/service/jsonrpc_workflow_task_revision_visibility.go";
   const visibilitySource = readFileSync(repoPath(visibilityPath), "utf8");
+  const taskBoardSource = serviceSource.split('case "get_task_board":')[1]
+    ?.split('case "list_task_events":')[0] || "";
   assert(
     (serviceSource.match(/workflowTaskQueryVisibilityScope\(/g) || [])
-      .length === 2 &&
+      .length === 3 &&
       (serviceSource.match(/workflowTaskReadVisibilityScope\(/g) || [])
         .length === 5 &&
       serviceSource.includes(
         "d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)",
       ) &&
+      /if query\.TodoOnly \{[\s\S]*?d\.workflowTaskQueryVisibilityScope\(ctx, admin, biz\.PermissionWorkflowTaskRead\)[\s\S]*?query\.VisibilityScope = visibilityScope[\s\S]*?\} else if query\.ApprovalOnly \{/u.test(taskBoardSource) &&
+      /\} else \{[\s\S]*?d\.workflowTaskReadVisibilityScope\(ctx, admin\)[\s\S]*?query\.VisibilityScope = visibilityScope/u.test(taskBoardSource) &&
       (
         serviceSource.match(
           /workflowApprovalTaskVisibilityScopes\(ctx, admin\)/g,
@@ -331,7 +335,7 @@ function validateWorkflowTaskRevisionVisibilityContract() {
       visibilitySource.includes(
         "d.workflowTaskQueryVisibilityScope(ctx, admin, capabilityKey)",
       ),
-    `${servicePath} list_tasks and get_workbench must remain the two supervised query-scope entry points; workbench role, ordinary board, event and process-context reads must use supervised read scope while mobile role-view and every registered approval capability use permission-filtered revision-aware scope`,
+    `${servicePath} mobile role-view, workbench and personal todo board must use revision-aware responsibility scope; ordinary task lists, workbench role, ordinary board, event and process-context reads must use supervised read scope while every registered approval capability remains permission-filtered`,
   );
   assert(
     visibilitySource.includes(
