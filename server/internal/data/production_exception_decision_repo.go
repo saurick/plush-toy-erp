@@ -86,7 +86,7 @@ func (r *operationalFactRepo) SubmitProductionException(ctx context.Context, in 
 				return replay, replayErr
 			}
 		}
-		return nil, err
+		return nil, mapInventoryPersistenceError(err, biz.ErrProductionExceptionConflict)
 	}
 	return commitProductionException(ctx, tx, row.ID)
 }

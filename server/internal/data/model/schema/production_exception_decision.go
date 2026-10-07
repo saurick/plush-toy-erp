@@ -61,6 +61,7 @@ func (ProductionExceptionDecision) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("decision_no").Unique(), index.Fields("requested_by", "idempotency_key").Unique(),
 		index.Fields("decision_type", "status", "execution_status", "requested_at"), index.Fields("production_order_id", "production_order_item_id"),
-		index.Fields("quality_inspection_id").Unique().Annotations(entsql.IndexWhere("((decision_type = 'SCRAP' OR decision_type = 'WIP_CONCESSION') AND (status = 'SUBMITTED' OR status = 'APPROVED'))")),
+		// Reversed executions retain their audit history but release the inspection for a new decision.
+		index.Fields("quality_inspection_id").Unique().Annotations(entsql.IndexWhere("((decision_type = 'SCRAP' OR decision_type = 'WIP_CONCESSION') AND (status = 'SUBMITTED' OR status = 'APPROVED') AND execution_status <> 'REVERSED')")),
 	}
 }

@@ -299,7 +299,7 @@ test("builds a stable, explicit trial manifest without mutating preview input", 
   );
   assert.equal(
     CUSTOMER_CONFIG_REVISION,
-    "yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1",
+    "yoyoosun-customer-trial-133-package-v11.runtime-manifest-v1",
   );
 });
 

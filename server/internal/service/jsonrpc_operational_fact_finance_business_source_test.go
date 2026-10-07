@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"server/internal/biz"
@@ -165,6 +166,34 @@ func (r *financeModuleGateOperationalFactRepo) CreatePayableFromPurchaseReceipt(
 		CounterpartyID: &supplierID, Amount: decimal.NewFromInt(50), Currency: biz.FinanceCurrencyCNY,
 		SourceType: &sourceType, SourceID: &sourceID, IdempotencyKey: in.IdempotencyKey,
 	})
+}
+
+type missingPurchaseReceiptPayableRepo struct {
+	financeModuleGateOperationalFactRepo
+}
+
+func (r *missingPurchaseReceiptPayableRepo) CreatePayableFromPurchaseReceipt(context.Context, *biz.FinanceFactFromPurchaseReceiptCreate) (*biz.FinanceFact, error) {
+	return nil, fmt.Errorf("payable source: %w", biz.ErrPurchaseReceiptNotFound)
+}
+
+func TestFinanceBusinessSourceRPCMissingPurchaseReceipt(t *testing.T) {
+	repo := &missingPurchaseReceiptPayableRepo{}
+	dispatcher := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin(
+		[]string{biz.FinanceRoleKey},
+		biz.PermissionFinancePayableConfirm,
+		biz.PermissionPurchaseReceiptRead,
+		biz.PermissionPurchaseReturnRead,
+		biz.PermissionPurchaseReceiptAdjustmentRead,
+	), repo)
+	_, result, err := dispatcher.handleOperationalFact(workflowJSONRPCAdminContext(), "create_payable_from_purchase_receipt", "missing-source", mustJSONRPCStruct(t, map[string]any{
+		"customer_key": biz.DefaultCustomerKey, "fact_no": "AP-MISSING", "purchase_receipt_id": float64(2147483647), "idempotency_key": "AP-MISSING",
+	}))
+	if err != nil || result == nil || result.Code != errcode.InvalidParam.Code || result.Message != "采购入库单不存在" {
+		t.Fatalf("missing purchase source result=%#v err=%v", result, err)
+	}
+	if repo.createFinanceFactCalls != 0 {
+		t.Fatalf("missing purchase source created %d finance facts", repo.createFinanceFactCalls)
+	}
 }
 
 func (r *financeModuleGateOperationalFactRepo) CreatePayableFromOutsourcingReturn(_ context.Context, in *biz.FinanceFactFromOutsourcingReturnCreate) (*biz.FinanceFact, error) {

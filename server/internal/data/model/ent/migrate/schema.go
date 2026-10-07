@@ -2163,7 +2163,7 @@ var (
 				Unique:  true,
 				Columns: []*schema.Column{ProductionExceptionDecisionsColumns[9]},
 				Annotation: &entsql.IndexAnnotation{
-					Where: "((decision_type = 'SCRAP' OR decision_type = 'WIP_CONCESSION') AND (status = 'SUBMITTED' OR status = 'APPROVED'))",
+					Where: "((decision_type = 'SCRAP' OR decision_type = 'WIP_CONCESSION') AND (status = 'SUBMITTED' OR status = 'APPROVED') AND execution_status <> 'REVERSED')",
 				},
 			},
 		},

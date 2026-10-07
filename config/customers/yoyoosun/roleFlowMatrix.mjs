@@ -533,6 +533,8 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "outsourcing.order.read",
         "outsourcing.fact.read",
         "purchase.receipt.read",
+        "purchase.return.read",
+        "purchase.receipt.adjustment.read",
         "quality.inspection.read",
         "sales_order.read",
         "sales_order_item.read",

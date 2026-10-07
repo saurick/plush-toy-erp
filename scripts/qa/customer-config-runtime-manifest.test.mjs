@@ -603,12 +603,27 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
   assert(pages.finance.includes("inbound"));
   assert(finance.has("purchase.receipt.read"));
   assert(!finance.has("purchase.receipt.create"));
-  assert(!finance.has("purchase.receipt.adjustment.read"));
+  assert(finance.has("purchase.receipt.adjustment.read"));
   assert(!finance.has("purchase.receipt.adjustment.create"));
   assert(!finance.has("warehouse.inbound.read"));
   assert(!finance.has("warehouse.inbound.confirm"));
-  assert(!finance.has("purchase.return.read"));
+  assert(finance.has("purchase.return.read"));
   assert(!finance.has("purchase.return.create"));
+});
+
+test("customer-config-runtime-manifest: finance can derive purchase payables without changing purchase facts", () => {
+  for (const config of [demoCustomerPackage, referenceCustomerPackage, yoyoosunCustomerPackage, yoyoosunReleasePackage]) {
+    const finance = new Set(buildRuntimeManifest(config).access_entitlements
+      .filter((entry) => entry.role_key === "finance" && entry.enabled)
+      .map((entry) => entry.capability_key));
+    for (const family of ["purchase.receipt", "purchase.return", "purchase.receipt.adjustment"]) {
+      assert(finance.has(`${family}.read`), `${config.customerKey}: finance must read ${family}`);
+      for (const action of ["create", "post", "cancel"]) {
+        assert(!finance.has(`${family}.${action}`), `${config.customerKey}: finance must not ${action} ${family}`);
+      }
+    }
+    assert(finance.has("finance.payable.confirm"));
+  }
 });
 
 test("customer-config-runtime-manifest: production orders use PMC-read or WIP-read page access", () => {
