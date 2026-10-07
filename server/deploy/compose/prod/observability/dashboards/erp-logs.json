@@ -15,6 +15,26 @@
     "to": "now"
   },
   "editable": false,
+  "links": [
+    {
+      "title": "查看最近 24 小时",
+      "type": "link",
+      "icon": "clock",
+      "url": "/d/plush-erp-logs?from=now-24h&to=now",
+      "includeVars": true,
+      "keepTime": false,
+      "targetBlank": false
+    },
+    {
+      "title": "查看最近 15 分钟",
+      "type": "link",
+      "icon": "clock",
+      "url": "/d/plush-erp-logs?from=now-15m&to=now",
+      "includeVars": true,
+      "keepTime": false,
+      "targetBlank": false
+    }
+  ],
   "templating": {
     "list": [
       {
@@ -232,7 +252,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "默认查看最近二十四小时。日志数为 0 表示所选环境、服务在该时段没有日志，可扩大时间范围；不代表采集故障或健康。错误图中的 0 表示该服务有日志，但没有匹配错误；查询失败会单独显示。请求编号或关键字只筛选下方日志明细。展开日志可查看字段与已采样 Trace，业务结果以单据和事实记录为准。"
+        "content": "以右上角时间为准，旧链接可能保留 15 分钟。无日志时点上方“查看最近 24 小时”。本地调试选 `local-dev`，演示选 `demo-133`，客户测试选 `customer-test-133`。日志数为 0 表示所选时段无记录，不能判断采集健康；错误图中的 0 表示有日志但没有匹配错误。关键字只筛选日志明细，查询失败另行显示。"
       }
     },
     {
