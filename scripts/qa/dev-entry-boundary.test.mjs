@@ -216,8 +216,13 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   );
   assertIncludes(
     devPermissionRelationshipsPageSource,
-    "关系图是只读结果，不是新的权限配置入口",
+    "本地开发只读查询，无需登录 ERP；修改授权请进入正式权限配置",
     "permission relationship page read-only boundary",
+  );
+  assertIncludes(
+    devPermissionRelationshipsPageSource,
+    "也不在这里保存权限配置",
+    "permission relationship page must not provide permission writes",
   );
   assertIncludes(
     devPermissionRelationshipsPageSource,
