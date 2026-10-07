@@ -1,6 +1,7 @@
 import { validateDevDeliverySummary } from '../../src/dev-workbench/config/devDelivery.mjs'
 import { createQualityGateStyleSummary } from './devQualityGateScenarios.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
+import { switchMermaidLayout } from './mermaidViewerAssertions.mjs'
 
 const ASSETS = [
   'checksums.sha256',
@@ -651,6 +652,8 @@ export function createDevVersionCenterScenarios({
           })
           .click()
         assert.equal(await lockCanvas.getAttribute('data-mermaid-zoom'), '100')
+        await switchMermaidLayout(page, lockSection.locator('.erp-markdown-mermaid'), assert)
+        await switchMermaidLayout(page, lockSection.locator('.erp-markdown-mermaid'), assert)
 
         await page.setViewportSize({ width: 480, height: 850 })
         const takeoverBody = takeoverDialog.locator('.ant-modal-body')

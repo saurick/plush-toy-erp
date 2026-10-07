@@ -1,5 +1,6 @@
 import { projectCiJobGuides } from '../../../scripts/qa/ci-job-guide.mjs'
 import { CI_WORKFLOW_SECTIONS } from '../../src/dev-workbench/config/devCiWorkflow.mjs'
+import { switchMermaidLayout } from './mermaidViewerAssertions.mjs'
 
 const NOW = '2026-08-09T08:00:00.000Z'
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
@@ -1194,6 +1195,8 @@ export function createDevQualityGateScenarios({
           name: '全屏查看Job 并行、汇总与等待原理图',
           exact: true,
         })
+        await switchMermaidLayout(page, parallelDiagram.locator('.erp-markdown-mermaid'), assert)
+        await switchMermaidLayout(page, parallelDiagram.locator('.erp-markdown-mermaid'), assert)
         await fullscreenButton.click()
         await parallelDiagram.locator('.erp-markdown-mermaid--fullscreen').waitFor()
         await parallelDiagram.getByRole('button', {

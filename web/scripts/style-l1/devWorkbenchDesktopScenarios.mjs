@@ -1,5 +1,5 @@
 import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
-import { fitMermaidDiagram, verifyMermaidViewer } from './mermaidViewerAssertions.mjs'
+import { fitMermaidDiagram, switchMermaidLayout, verifyMermaidViewer } from './mermaidViewerAssertions.mjs'
 import {
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_CUSTOMER_CONFIG_ROUTE,
@@ -696,6 +696,8 @@ export function createDevWorkbenchDesktopScenarios({
           .locator('.erp-markdown-mermaid__viewport')
         await tallViewport.waitFor()
         assert((await tallViewport.boundingBox()).height <= 520)
+        await switchMermaidLayout(page, diagrams.nth(1), assert)
+        await switchMermaidLayout(page, diagrams.nth(1), assert)
         await fitMermaidDiagram(diagrams.nth(1), assert)
         await page.setViewportSize({ width: 1440, height: 900 })
         assert(

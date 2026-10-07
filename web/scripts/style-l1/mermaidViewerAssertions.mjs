@@ -1,6 +1,99 @@
-export async function fitMermaidDiagram(diagram, assert) {
+async function verifyStableMermaidScroll(page, diagram, assert, action) {
+  const watcher = await diagram.evaluateHandle((root) => {
+    const scrollers = new Set([document.scrollingElement])
+    for (let node = root.parentElement; node; node = node.parentElement) {
+      if (/auto|scroll|hidden/u.test(getComputedStyle(node).overflowY)) {
+        scrollers.add(node)
+      }
+    }
+    const positions = [...scrollers].map((node) => ({
+      node,
+      top: node.scrollTop,
+      left: node.scrollLeft,
+    }))
+    const toolbar = root.querySelector('.erp-markdown-mermaid__toolbar')
+    let maxScrollDelta = 0
+    let toolbarDetached = false
+    const sample = () => {
+      for (const { node, top, left } of positions) {
+        maxScrollDelta = Math.max(
+          maxScrollDelta,
+          Math.abs(node.scrollTop - top),
+          Math.abs(node.scrollLeft - left)
+        )
+      }
+      toolbarDetached ||= !toolbar.isConnected
+    }
+    const observer = new MutationObserver(sample)
+    observer.observe(root, { attributes: true, childList: true, subtree: true })
+    document.addEventListener('scroll', sample, true)
+    let frame
+    const tick = () => {
+      sample()
+      frame = requestAnimationFrame(tick)
+    }
+    tick()
+    return {
+      finish() {
+        sample()
+        cancelAnimationFrame(frame)
+        observer.disconnect()
+        document.removeEventListener('scroll', sample, true)
+        return { maxScrollDelta, toolbarDetached }
+      },
+    }
+  })
+  let result
+  try {
+    await action()
+    await page.evaluate(
+      () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+    )
+  } finally {
+    result = await watcher.evaluate((watch) => watch.finish())
+    await watcher.dispose()
+  }
+  assert(result.maxScrollDelta <= 1, `图表操作不得移动外层滚动位置：${JSON.stringify(result)}`)
+  assert.equal(result.toolbarDetached, false, '重渲染不得卸载工具栏或丢失焦点')
+}
+
+export async function switchMermaidLayout(
+  page,
+  diagram,
+  assert,
+  { rapid = false, advanceFocus = false } = {}
+) {
+  const button = diagram.locator('[data-mermaid-layout-action="toggle"]')
+  await button.scrollIntoViewIfNeeded()
+  const svg = diagram.locator('.erp-markdown-mermaid__canvas > svg')
+  const previous = await svg.getAttribute('id')
+  const direction = await diagram.getAttribute('data-mermaid-direction')
+  await verifyStableMermaidScroll(page, diagram, assert, async () => {
+    if (rapid) await button.dblclick()
+    else await button.click()
+    if (advanceFocus) await page.keyboard.press('Tab')
+    await page.waitForFunction(
+      ({ root, previousID }) =>
+        root.dataset.mermaidStatus === 'rendered' &&
+        root.querySelector('.erp-markdown-mermaid__canvas > svg')?.id !== previousID,
+      { root: await diagram.elementHandle(), previousID: previous }
+    )
+  })
+  if (rapid) {
+    assert.equal(await diagram.getAttribute('data-mermaid-direction'), direction === 'TD' ? 'TB' : direction)
+  }
+  if (advanceFocus) {
+    assert(
+      await diagram.locator('[data-mermaid-zoom-action="fit-all"]')
+        .evaluate((node) => node === document.activeElement),
+      '渲染完成后不得抢回用户已移走的焦点'
+    )
+  }
+  await assertMermaidFits(diagram, assert)
+}
+
+async function assertMermaidFits(diagram, assert) {
   const viewport = diagram.locator('.erp-markdown-mermaid__viewport')
-  await diagram.locator('[data-mermaid-zoom-action="fit-all"]').click()
   const bounds = await viewport.evaluate((node) => ({
     width: node.clientWidth,
     height: node.clientHeight,
@@ -12,6 +105,11 @@ export async function fitMermaidDiagram(diagram, assert) {
       bounds.scrollHeight <= bounds.height + 2,
     `适应全图后不能裁切：${JSON.stringify(bounds)}`
   )
+}
+
+export async function fitMermaidDiagram(diagram, assert) {
+  await diagram.locator('[data-mermaid-zoom-action="fit-all"]').click()
+  await assertMermaidFits(diagram, assert)
 }
 
 export async function verifyMermaidViewer(page, diagram, assert) {
@@ -48,17 +146,7 @@ export async function verifyMermaidViewer(page, diagram, assert) {
   const direction = await diagram.getAttribute('data-mermaid-direction')
   if (direction) {
     for (let i = 0; i < 2; i += 1) {
-      const previousID = await svg.getAttribute('id')
-      await diagram.locator('[data-mermaid-layout-action="toggle"]').click()
-      await page.waitForFunction(
-        ({ root, previous }) => {
-          const next = root.querySelector('.erp-markdown-mermaid__canvas > svg')
-          return (
-            root.dataset.mermaidStatus === 'rendered' && next?.id !== previous
-          )
-        },
-        { root: await diagram.elementHandle(), previous: previousID }
-      )
+      await switchMermaidLayout(page, diagram, assert)
       assert.deepEqual(
         await svg
           .locator('.node')
@@ -78,16 +166,26 @@ export async function verifyMermaidViewer(page, diagram, assert) {
       await diagram.getAttribute('data-mermaid-direction'),
       direction === 'TD' ? 'TB' : direction
     )
+    await switchMermaidLayout(page, diagram, assert, { rapid: true })
+    await switchMermaidLayout(page, diagram, assert, { advanceFocus: true })
+    await switchMermaidLayout(page, diagram, assert)
   }
 
   const inlineZoom = await canvas.getAttribute('data-mermaid-zoom')
-  await diagram.locator('[data-mermaid-fullscreen-action="open"]').click()
-  await diagram.locator('[data-mermaid-fullscreen-action="close"]').waitFor()
-  await fit()
-  await diagram
-    .locator('[data-mermaid-fullscreen-action="close"]')
-    .press('Escape')
-  await diagram.locator('[data-mermaid-fullscreen-action="open"]').waitFor()
+  await diagram.locator('[data-mermaid-fullscreen-action="open"]').scrollIntoViewIfNeeded()
+  await verifyStableMermaidScroll(page, diagram, assert, async () => {
+    await diagram.locator('[data-mermaid-fullscreen-action="open"]').click()
+    await diagram.locator('[data-mermaid-fullscreen-action="close"]').waitFor()
+    await fit()
+    if (direction) {
+      await switchMermaidLayout(page, diagram, assert)
+      await switchMermaidLayout(page, diagram, assert)
+    }
+    await diagram
+      .locator('[data-mermaid-fullscreen-action="close"]')
+      .press('Escape')
+    await diagram.locator('[data-mermaid-fullscreen-action="open"]').waitFor()
+  })
   assert.equal(await canvas.getAttribute('data-mermaid-zoom'), inlineZoom)
   await page.waitForFunction(
     (root) =>
@@ -133,6 +231,10 @@ export async function verifyMermaidViewer(page, diagram, assert) {
   assert.equal(
     await viewport.evaluate((node) => getComputedStyle(node).maxHeight),
     'none'
+  )
+  assert(
+    await viewport.evaluate((node) => node.scrollHeight <= node.clientHeight + 2),
+    '打印必须展开完整图，不能沿用切换布局时保留的屏幕高度'
   )
   assert.equal(
     await diagram.locator('.erp-markdown-mermaid__toolbar').isVisible(),

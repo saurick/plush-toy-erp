@@ -1,4 +1,5 @@
 import { assertInactivePrintStylesDoNotHideApp } from './styleIsolationAssertions.mjs'
+import { switchMermaidLayout, verifyMermaidViewer } from './mermaidViewerAssertions.mjs'
 
 const DEV_FLOW_STATE_OBSERVATORY_PATH =
   '/__dev/status-flows?view=chain&chain=all'
@@ -48,10 +49,13 @@ export function createDevFlowStateObservatoryScenarios({
           'dev-flow-state-observatory-desktop-light'
         )
         await assertInactivePrintStylesDoNotHideApp(page)
+        await verifyMermaidViewer(page, root.locator('.erp-markdown-mermaid').first(), assert)
         await page.goto(new URL('/__dev/status-flows?view=states&flow=source.sales_order', page.url()).href)
         const filters = page.getByRole('group', { name: '状态转换筛选' })
         const graph = page.locator('.erp-dev-flow-state-graph')
         await graph.locator('[data-mermaid-status="rendered"]').waitFor()
+        await switchMermaidLayout(page, graph.locator('.erp-markdown-mermaid'), assert)
+        await switchMermaidLayout(page, graph.locator('.erp-markdown-mermaid'), assert)
         assert.equal(await filters.getByRole('button', { name: /^正常推进 /u }).getAttribute('aria-pressed'), 'true')
         assert(!(await graph.locator('.erp-markdown-mermaid__canvas > svg').textContent()).includes('取消'))
         await filters.getByRole('button', { name: /^全部 /u }).click()

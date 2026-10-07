@@ -138,14 +138,15 @@ export function MermaidDiagram({
     MERMAID_ZOOM.defaultValue
   )
   const [fullscreenOpen, setFullscreenOpen] = useState(false)
+  const [fullscreenPlaceholder, setFullscreenPlaceholder] = useState(null)
+  const [inlineViewportHeight, setInlineViewportHeight] = useState()
   const [direction, setDirection] = useState('')
   const activeDirection = direction || getMermaidDirection(chart)
   const nextDirection = toggleMermaidDirection(activeDirection)
   const renderedChart = withMermaidDirection(chart, direction)
-  const layoutButtonRef = useRef(null)
+  const diagramRef = useRef(null)
   const fitOnRenderRef = useRef(false)
   const previewOnRenderRef = useRef(autoPreview)
-  const restoreLayoutFocusRef = useRef(false)
   const dragRef = useRef(null)
   const [panning, setPanning] = useState(false)
   const fullscreenOpenRef = useRef(null)
@@ -162,7 +163,7 @@ export function MermaidDiagram({
     window.setTimeout(() => {
       const focusTarget = fullscreenOpenRef.current || returnFocusElement
       if (focusTarget?.isConnected && typeof focusTarget.focus === 'function') {
-        focusTarget.focus()
+        focusTarget.focus({ preventScroll: true })
       }
     }, 0)
   }, [])
@@ -191,7 +192,10 @@ export function MermaidDiagram({
       const heightLimit = Number.parseFloat(
         window.getComputedStyle(viewport).maxHeight
       )
-      const height = fullscreenOpen ? viewport.clientHeight : heightLimit
+      const height =
+        fullscreenOpen || inlineViewportHeight
+          ? viewport.clientHeight
+          : heightLimit
       const fittedZoom = fitMermaidZoom({
         width: renderState.intrinsicWidth,
         height: renderState.intrinsicHeight,
@@ -210,6 +214,7 @@ export function MermaidDiagram({
     },
     [
       fullscreenOpen,
+      inlineViewportHeight,
       renderState.intrinsicWidth,
       renderState.intrinsicHeight,
       setNextZoom,
@@ -217,26 +222,33 @@ export function MermaidDiagram({
   )
 
   useLayoutEffect(() => {
-    if (renderState.status !== 'rendered') return
+    if (
+      renderState.status !== 'rendered' ||
+      renderState.source !== renderedChart
+    ) {
+      return
+    }
     if (!fitOnRenderRef.current && !previewOnRenderRef.current) return
     const preview = !fitOnRenderRef.current && previewOnRenderRef.current
     fitOnRenderRef.current = false
     previewOnRenderRef.current = false
     fitToView({ preview })
-    if (restoreLayoutFocusRef.current) {
-      restoreLayoutFocusRef.current = false
-      layoutButtonRef.current?.focus({ preventScroll: true })
-    }
-  }, [renderState.status, renderState.svg, fitToView])
+  }, [
+    renderState.status,
+    renderState.svg,
+    renderState.source,
+    renderedChart,
+    fitToView,
+  ])
 
   useEffect(() => {
     setZoom(startingZoom)
     setFullscreenZoom(MERMAID_ZOOM.defaultValue)
     setFullscreenOpen(false)
+    setInlineViewportHeight(undefined)
     setDirection('')
     fitOnRenderRef.current = false
     previewOnRenderRef.current = autoPreview
-    restoreLayoutFocusRef.current = false
     dragRef.current = null
     setPanning(false)
   }, [chart, startingZoom, autoPreview])
@@ -257,9 +269,13 @@ export function MermaidDiagram({
       }
     }
     document.addEventListener('keydown', closeOnEscape, true)
-    window.setTimeout(() => fullscreenExitRef.current?.focus(), 0)
+    const focusTimer = window.setTimeout(
+      () => fullscreenExitRef.current?.focus({ preventScroll: true }),
+      0
+    )
 
     return () => {
+      window.clearTimeout(focusTimer)
       document.body.style.overflow = previousOverflow
       document.removeEventListener('keydown', closeOnEscape, true)
       restoreFullscreenFocus(returnFocusElement)
@@ -276,7 +292,13 @@ export function MermaidDiagram({
     }
 
     async function renderMermaid() {
-      setRenderState({ status: 'loading', svg: '', error: '' })
+      // Keep the current diagram mounted while changing its presentation.
+      // A different chart must not display the previous chart's content.
+      setRenderState((previous) => ({
+        ...(previous.chart === chart ? previous : { svg: '' }),
+        status: 'loading',
+        error: '',
+      }))
       try {
         const mermaidModule = await import('mermaid')
         const mermaid = mermaidModule.default || mermaidModule
@@ -309,6 +331,8 @@ export function MermaidDiagram({
           const intrinsicHeight = Number(viewBox?.[3])
           setRenderState({
             status: 'rendered',
+            chart,
+            source: renderedChart,
             svg,
             intrinsicWidth,
             intrinsicHeight,
@@ -330,16 +354,20 @@ export function MermaidDiagram({
     return () => {
       cancelled = true
     }
-  }, [renderedChart, diagramId, theme, useFlowchartHtmlLabels])
+  }, [chart, renderedChart, diagramId, theme, useFlowchartHtmlLabels])
 
   if (renderState.status === 'empty') {
     return null
   }
 
   const switchLayout = () => {
+    if (!fullscreenOpen) {
+      setInlineViewportHeight(viewportRef.current?.clientHeight)
+    }
     fitOnRenderRef.current = true
-    restoreLayoutFocusRef.current = true
-    setDirection(nextDirection)
+    setDirection((previous) =>
+      toggleMermaidDirection(previous || getMermaidDirection(chart))
+    )
   }
 
   const startPan = (event) => {
@@ -385,11 +413,18 @@ export function MermaidDiagram({
     fullscreenReturnFocusRef.current =
       typeof document === 'undefined' ? null : document.activeElement
     fitOnRenderRef.current = true
+    const root = diagramRef.current
+    setFullscreenPlaceholder({
+      height: root.getBoundingClientRect().height,
+      margin: window.getComputedStyle(root).margin,
+    })
+    setInlineViewportHeight(viewportRef.current?.clientHeight)
     setFullscreenOpen(true)
   }
 
-  return (
+  const diagram = (
     <div
+      ref={diagramRef}
       className={[
         'erp-markdown-mermaid',
         renderState.status === 'error' ? 'erp-markdown-mermaid--error' : '',
@@ -402,16 +437,20 @@ export function MermaidDiagram({
       data-mermaid-html-labels={useFlowchartHtmlLabels ? 'true' : 'false'}
       data-mermaid-direction={activeDirection || undefined}
       data-mermaid-fullscreen={fullscreenOpen ? 'true' : 'false'}
+      aria-busy={renderState.status === 'loading'}
       role={fullscreenOpen ? 'dialog' : undefined}
       aria-modal={fullscreenOpen ? 'true' : undefined}
       aria-label={fullscreenOpen ? `${displayLabel}全屏查看` : undefined}
     >
       {renderState.status === 'loading' ? (
-        <div className="erp-markdown-mermaid__loading">
+        <div
+          className={`erp-markdown-mermaid__loading${renderState.svg ? ' erp-markdown-mermaid__loading--overlay' : ''}`}
+          role="status"
+        >
           {`正在渲染 ${displayLabel}...`}
         </div>
       ) : null}
-      {renderState.status === 'rendered' ? (
+      {renderState.svg ? (
         <>
           <div
             className="erp-markdown-mermaid__toolbar"
@@ -419,7 +458,6 @@ export function MermaidDiagram({
           >
             {nextDirection ? (
               <button
-                ref={layoutButtonRef}
                 type="button"
                 className="erp-markdown-mermaid__tool erp-markdown-mermaid__tool--layout"
                 data-mermaid-layout-action="toggle"
@@ -523,6 +561,11 @@ export function MermaidDiagram({
             aria-label={`${displayLabel}画布`}
             tabIndex={0}
             data-mermaid-panning={panning ? 'true' : undefined}
+            style={{
+              '--mermaid-viewport-height': inlineViewportHeight
+                ? `${inlineViewportHeight}px`
+                : undefined,
+            }}
             onPointerDown={startPan}
             onPointerMove={movePan}
             onPointerUp={stopPan}
@@ -562,6 +605,19 @@ export function MermaidDiagram({
         </>
       ) : null}
     </div>
+  )
+
+  return (
+    <>
+      {fullscreenOpen ? (
+        <div
+          className="erp-markdown-mermaid-placeholder"
+          style={fullscreenPlaceholder}
+          aria-hidden="true"
+        />
+      ) : null}
+      {diagram}
+    </>
   )
 }
 /* eslint-enable react/no-danger */
