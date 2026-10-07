@@ -334,6 +334,7 @@ export function staleRetryReceipt(response, service, method) {
 }
 
 export function assertExceptionFlowEvidenceContract(report) {
+  assert.deepEqual(report?.failures, [], "exception flows must have no failures");
   assert.equal(report?.flows?.length, 3, "three exception flows must execute");
   for (const flow of report.flows) {
     assert.equal(flow?.passed, true, `${String(flow?.key)} must pass`);
@@ -918,7 +919,7 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
                 ? { from_lot_id: negativeSource.lot_id }
                 : {}),
               unit_id: negativeSource.unit_id,
-              adjustment_quantity: "0.100000",
+              adjustment_quantity: "1",
               note: "结构有效的无权请求",
             },
           ],
@@ -955,7 +956,8 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
     await modal.getByLabel("业务原因").fill("真实浏览器异常流验收");
     await modal
       .getByLabel("调整数量（增加填正数，扣减填负数）")
-      .fill("0.100000");
+      .fill("1");
+    await modal.locator("summary").filter({ hasText: "明细备注" }).click();
     await modal.getByLabel("明细备注").fill("真实浏览器创建与审批");
     const createResponse = waitForRpcResponse(
       session.page,
@@ -1328,8 +1330,12 @@ async function runProductionExceptionFlow(browser, options, report) {
       .filter({ hasText: /^\s*查看\s*$/u })
       .first()
       .click();
-    const orderModal = await visibleModal(session.page, "查看生产订单");
-    const requirementRow = orderModal
+    const orderPage = session.page.getByRole("region", {
+      name: "查看生产订单",
+      exact: true,
+    });
+    await orderPage.waitFor({ state: "visible" });
+    const requirementRow = orderPage
       .locator("tbody tr.ant-table-row")
       .filter({ hasText: requirement.material_code_snapshot })
       .first();
@@ -1382,7 +1388,9 @@ async function runProductionExceptionFlow(browser, options, report) {
     await issueModal
       .getByLabel("本次领料数量")
       .fill(String(requirement.remaining_quantity));
-    await issueModal.locator("textarea").fill("真实浏览器消费已批准超领额度");
+    await issueModal
+      .getByLabel("备注", { exact: true })
+      .fill("真实浏览器消费已批准超领额度");
     const lost = await installLostMutationResponse(
       session.page,
       "operational_fact",
@@ -1668,7 +1676,6 @@ export async function runExceptionFlowRealWriteBrowser(options) {
           runner: runner.name,
           message: String(error?.message || error),
         });
-        throw error;
       }
     }
     report.summary.passedFlowCount = report.flows.filter(
@@ -1676,6 +1683,13 @@ export async function runExceptionFlowRealWriteBrowser(options) {
     ).length;
     report.summary.failedFlowCount =
       report.summary.flowCount - report.summary.passedFlowCount;
+    if (report.failures.length) {
+      throw new AcceptanceError(
+        report.failures
+          .map(({ runner, message }) => `${runner}: ${message}`)
+          .join("\n"),
+      );
+    }
     assertExceptionFlowEvidenceContract(report);
     report.summary.passed = true;
     assert.equal(report.summary.passed, true);

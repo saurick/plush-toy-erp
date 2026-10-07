@@ -480,6 +480,8 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 
 三条异常流真实写浏览器验收必须单独使用名称和归属明确、可回收的全新本地隔离库。数据库名必须由 `database-target.mjs` 的 `browser-actions` 生命周期生成并匹配 `plush_erp_acceptance_<run-id>_browser_actions_dev`，后端必须是 loopback 且不能使用共享端口 `8300`，显式确认串必须同时绑定数据库名与后端 origin；runner 启动后还会用 `/readyz/runtime-identity` 复核同一数据库身份。禁止指向日常共享开发库、133 上其他实例、客户试用或生产数据库。
 
+三条流程使用独立业务来源；单条失败会保留诊断并继续核对其余流程，最终必须三条全部通过且失败列表为空。运行身份预检失败仍立即停止，不执行业务动作。
+
 ```bash
 MANUAL_ACCEPTANCE_DEMO_PASSWORD='<local-demo-password>' \
 EXCEPTION_FLOW_BROWSER_CONFIRM='RUN_ISOLATED_EXCEPTION_FLOW_BROWSER_ACTIONS:plush_erp_acceptance_exception_example_browser_actions_dev:http://127.0.0.1:8323' \

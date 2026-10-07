@@ -196,6 +196,7 @@ test("exception-flow browser runner fails closed on incomplete or unsupported ar
 
 function validEvidenceReport() {
   return {
+    failures: [],
     flows: Array.from({ length: 3 }, (_, index) => ({
       key: `flow-${index + 1}`,
       passed: true,
@@ -251,6 +252,9 @@ test("exception-flow browser report contract fails closed on incomplete evidence
   );
 
   for (const mutate of [
+    (report) => {
+      report.failures.push({ runner: "runFinancePaymentFlow", message: "failed" });
+    },
     (report) => report.flows.pop(),
     (report) => {
       report.flows[0].retry.code = 40910;

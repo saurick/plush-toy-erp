@@ -1741,6 +1741,7 @@ export default function FinancePaymentsPage() {
       >
         <Form
           form={paymentForm}
+          name="finance-payment-create"
           className="erp-business-action-form"
           layout="vertical"
           preserve={false}
@@ -1857,6 +1858,7 @@ export default function FinancePaymentsPage() {
         ) : null}
         <Form
           form={allocationForm}
+          name="finance-payment-allocation"
           className="erp-business-action-form"
           layout="vertical"
           disabled={loading}
@@ -1953,6 +1955,7 @@ export default function FinancePaymentsPage() {
         />
         <Form
           form={cancelForm}
+          name="finance-payment-cancel"
           className="erp-business-action-form"
           layout="vertical"
           preserve={false}
@@ -1985,6 +1988,7 @@ export default function FinancePaymentsPage() {
       >
         <Form
           form={reverseForm}
+          name="finance-payment-reverse"
           className="erp-business-action-form"
           layout="vertical"
           preserve={false}
@@ -2018,6 +2022,7 @@ export default function FinancePaymentsPage() {
       >
         <Form
           form={creditForm}
+          name="finance-credit-note"
           className="erp-business-action-form"
           layout="vertical"
           preserve={false}

@@ -205,6 +205,7 @@ export default function ProductionMaterialIssueModal({
       <Form
         className={editing ? 'erp-business-action-form' : undefined}
         form={form}
+        name="production-material-issue"
         layout="vertical"
         preserve={false}
         disabled={loading}
