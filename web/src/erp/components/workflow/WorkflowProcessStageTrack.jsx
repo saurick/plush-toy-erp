@@ -1,5 +1,6 @@
 import React from 'react'
 import { buildWorkflowProcessStageModel } from '../../utils/processRuntimePresentation.mjs'
+import WorkflowResponsibilities from './WorkflowResponsibilities.jsx'
 import './workflowProcessStageTrack.css'
 
 const STAGE_MARKERS = Object.freeze({
@@ -59,7 +60,7 @@ export default function WorkflowProcessStageTrack({
               </span>
               {item.detail ? (
                 <span className="workflow-process-stage__meta">
-                  {item.detail}
+                  {item.responsibilities?.length ? <WorkflowResponsibilities items={item.responsibilities} /> : item.detail}
                 </span>
               ) : null}
             </span>
@@ -67,7 +68,7 @@ export default function WorkflowProcessStageTrack({
         ))}
       </ol>
 
-      <p className="workflow-process-stage__handoff">{model.handoffLabel}</p>
+      {model.handoffLabel ? <p className="workflow-process-stage__handoff">{model.handoffLabel}</p> : null}
     </div>
   )
 }

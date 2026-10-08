@@ -658,12 +658,12 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
 
     assert(
       metrics.boardCard && metrics.lanes && metrics.filters,
-      `${scenarioName} 缺少任务看板布局关键节点: ${JSON.stringify(metrics)}`
+      `${scenarioName} 缺少任务管理布局关键节点: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       metrics.currentTaskPanelCount,
       0,
-      `${scenarioName} 任务看板不应保留重复的当前选中任务侧栏`
+      `${scenarioName} 任务管理不应保留重复的当前选中任务侧栏`
     )
     assert(
       metrics.boardContent &&
@@ -672,11 +672,11 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     )
     assert(
       metrics.laneRects.length === 4,
-      `${scenarioName} 任务看板应渲染四个泳道: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理应渲染四个泳道: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.laneRects.every((lane) => lane.width >= 180 && lane.height > 0),
-      `${scenarioName} 任务看板泳道尺寸异常: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理泳道尺寸异常: ${JSON.stringify(metrics)}`
     )
     const expectedColumns =
       metrics.lanes.width >= 1200 ? 4 : metrics.lanes.width >= 600 ? 2 : 1
@@ -693,7 +693,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     assert.deepEqual(
       metrics.laneVisuals.map(({ tone }) => tone).sort(),
       ['actionable', 'due', 'exception', 'finished'],
-      `${scenarioName} 任务看板四个泳道应保留稳定语义色调: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理四个泳道应保留稳定语义色调: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       new Set(
@@ -702,13 +702,13 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
         )
       ).size,
       4,
-      `${scenarioName} 任务看板四个泳道标题背景应可区分: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理四个泳道标题背景应可区分: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.laneVisuals.every(
         ({ headBoxShadow }) => headBoxShadow && headBoxShadow !== 'none'
       ),
-      `${scenarioName} 任务看板泳道标题应保留轻量语义色条: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理泳道标题应保留轻量语义色条: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.laneVisuals.every(
@@ -716,29 +716,29 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           Number.parseFloat(cardBorderRadius || '0') === 10 &&
           cardOverflow === 'hidden'
       ),
-      `${scenarioName} 任务看板泳道内容应按卡片外圆角裁切: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理泳道内容应按卡片外圆角裁切: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.overlappingLanePairs.length === 0,
-      `${scenarioName} 任务看板泳道之间发生重叠: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理泳道之间发生重叠: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.filters.right <= metrics.boardCard.right + 2,
-      `${scenarioName} 任务看板筛选区溢出卡片: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理筛选区溢出卡片: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       metrics.visiblePageHeads,
       0,
-      `${scenarioName} 任务看板不应再渲染独立页面说明卡: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理不应再渲染独立页面说明卡: ${JSON.stringify(metrics)}`
     )
     assert.equal(
       metrics.tableCard,
       null,
-      `${scenarioName} 任务看板不应再重复渲染明细表: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理不应再重复渲染明细表: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.viewport.documentScrollWidth <= metrics.viewport.clientWidth + 2,
-      `${scenarioName} 任务看板产生页面级横向滚动: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理产生页面级横向滚动: ${JSON.stringify(metrics)}`
     )
   }
 

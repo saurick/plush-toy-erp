@@ -54,6 +54,6 @@ test('mobile task filter cold load scopes busy state and feedback to the task li
   assert.match(listScreenSource, /正在加载\{activeFilterLabel\}任务/u)
   assert.match(
     listScreenSource,
-    /data-testid="mobile-role-scroll"[\s\S]*?aria-busy=\{initialLoading \? 'true' : 'false'\}/u
+    /data-testid="mobile-role-scroll"[\s\S]*?aria-busy=\{!isTracking && initialLoading \? 'true' : 'false'\}/u
   )
 })

@@ -74,6 +74,7 @@ export default function WorkflowTaskIdentity({
   compact = false,
   copyable = true,
   showTaskName = false,
+  showStyleNo = false,
   renderCompactTitle,
 }) {
   const identity = getWorkflowTaskIdentityPresentation(task)
@@ -124,6 +125,11 @@ export default function WorkflowTaskIdentity({
           {first.name || renderTitle ? (
             <span className="erp-task-identity__code">
               <IdentityCode item={first} copyable={copyable} />
+            </span>
+          ) : null}
+          {showStyleNo && first.kind === 'product' && first.styleNo && first.styleNo !== first.code ? (
+            <span className="erp-task-identity__code">
+              {copyable ? <TaskCopyField value={first.styleNo} label="内部款号">内部款号 {first.styleNo}</TaskCopyField> : `内部款号 ${first.styleNo}`}
             </span>
           ) : null}
           {first.orderNo && first.orderNo !== identity.sourceNo ? (

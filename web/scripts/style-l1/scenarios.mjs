@@ -6,6 +6,7 @@ import { createUnifiedInteractionScenarios } from './unifiedInteractionScenarios
 import { createDevUIDesignDetailScenarios } from './devUIDesignDetailScenarios.mjs'
 import { createDevUIFeedbackScenarios } from './devUIFeedbackScenarios.mjs'
 import { createDevUIDesignWorkflowScenarios } from './devUIDesignWorkflowScenarios.mjs'
+import { createDevUIDesignMobileTrackingScenario } from './devUIDesignMobileTrackingScenario.mjs'
 import { createMobileProgressScenarios } from './mobileProgressScenarios.mjs'
 import { createMobileNavigationBadgeScenarios } from './mobileNavigationBadgeScenarios.mjs'
 import { createDesktopNavigationBadgeScenarios } from './desktopNavigationBadgeScenarios.mjs'
@@ -17,6 +18,7 @@ import { createTabMotionScenarios } from './tabMotionScenarios.mjs'
 import { createTableAlignmentScenarios } from './tableAlignmentScenarios.mjs'
 import { createBusinessTableScrollScenarios } from './businessTableScrollScenarios.mjs'
 import { createMobileTaskScenarios } from './mobileTaskScenarios.mjs'
+import { createMobileWorkflowTrackingScenarios } from './mobileWorkflowTrackingScenarios.mjs'
 import { createMobileInputScenarios } from './mobileInputScenarios.mjs'
 import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
 import { createTaskImagePreviewScenarios } from './taskImagePreviewScenarios.mjs'
@@ -429,6 +431,7 @@ export function createStyleL1Scenarios(deps) {
     ...createDevUIDesignDetailScenarios(deps),
     ...createDevUIFeedbackScenarios(deps),
     ...createDevUIDesignWorkflowScenarios(deps),
+    createDevUIDesignMobileTrackingScenario(deps),
     ...createDevQualityGateScenarios({
       assert,
       assertNoHorizontalOverflow,
@@ -594,6 +597,7 @@ export function createStyleL1Scenarios(deps) {
       ...deps,
       customerRuntimeEffectiveSession,
     }),
+    ...createMobileWorkflowTrackingScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileNavigationBadgeScenarios({
       ...deps,
       customerRuntimeEffectiveSession,

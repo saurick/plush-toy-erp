@@ -363,7 +363,7 @@ var builtinPermissions = withBuiltinPermissionMetadata([]PermissionDefinition{
 	{Key: PermissionWorkflowTaskSupervise, Name: "监督跨岗位协同任务", Description: "只读查看其他责任岗位的协同任务；不授予代办、转派或完成权限。", Module: "workflow", Action: "supervise", Resource: "task", Builtin: true},
 	{Key: PermissionWorkflowTaskCreate, Name: "创建协同任务", Module: "workflow", Action: "create", Resource: "task", Builtin: true},
 	{Key: PermissionWorkflowTaskUpdate, Name: "更新协同任务", Module: "workflow", Action: "update", Resource: "task", Builtin: true},
-	{Key: PermissionWorkflowTaskAssign, Name: "转交协同任务", Description: "将未结束的协同任务转给同一负责岗位的合格人员，或取消个人指派并退回岗位待办池。", Module: "workflow", Action: "assign", Resource: "task", Builtin: true},
+	{Key: PermissionWorkflowTaskAssign, Name: "转交协同任务", Description: "将未结束的协同任务转给同岗位有处理权限的人员，或取消个人指派，交回岗位处理。", Module: "workflow", Action: "assign", Resource: "task", Builtin: true},
 	{Key: PermissionWorkflowTaskApprove, Name: "审批协同任务", Module: "workflow", Action: "approve", Resource: "task", Builtin: true},
 	{Key: PermissionWorkflowTaskReject, Name: "驳回协同任务", Module: "workflow", Action: "reject", Resource: "task", Builtin: true},
 	{Key: PermissionWorkflowTaskComplete, Name: "完成协同任务", Module: "workflow", Action: "complete", Resource: "task", Builtin: true},
@@ -861,7 +861,7 @@ func AdminCanAccessMobileRole(admin *AdminUser, roleKey string) bool {
 
 var builtinAdminMenus = []AdminMenu{
 	{Key: "global-dashboard", Label: "工作台", Path: "/erp/dashboard", RequiredAny: []string{PermissionERPWorkbenchRead}},
-	{Key: "task-board", Label: "任务看板", Path: "/erp/task-board", RequiredAny: []string{PermissionWorkflowTaskRead}},
+	{Key: "task-board", Label: "任务管理", Path: "/erp/task-board", RequiredAny: []string{PermissionWorkflowTaskRead}},
 	{Key: "business-dashboard", Label: "进度看板", Path: "/erp/business-dashboard", RequiredAny: []string{PermissionERPBusinessDashboardRead}},
 	{Key: "customers", Label: "客户档案", Path: "/erp/master/partners/customers", RequiredAny: []string{PermissionCustomerRead}},
 	{Key: "suppliers", Label: "供应商与加工厂", Path: "/erp/master/partners/suppliers", RequiredAny: []string{PermissionSupplierRead}},

@@ -11,10 +11,8 @@ import React, {
 import {
   ArrowRightOutlined,
   ClockCircleOutlined,
-  CloseOutlined,
   ExclamationCircleOutlined,
   FileTextOutlined,
-  FilterOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Card, Empty, Space, Tag, Typography } from 'antd'
 import {
@@ -24,6 +22,7 @@ import {
 } from 'react-router-dom'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { getWorkflowTaskDisplayName } from '../utils/processRuntimePresentation.mjs'
+import { buildWorkflowTaskResponsibilityItems } from '../utils/workflowTaskEventPresentation.mjs'
 import { getWorkbenchSummaryOptions } from '../utils/workbenchSummary.mjs'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
@@ -41,11 +40,13 @@ import WorkflowTaskCard from '../components/workflow/WorkflowTaskCard.jsx'
 import { WorkflowTaskSource } from '../components/workflow/WorkflowTaskCopy.jsx'
 import WorkflowTaskTiming from '../components/workflow/WorkflowTaskTiming.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
+import WorkflowTrackingPanel from '../components/workflow/WorkflowTrackingPanel.jsx'
+import { openWorkflowTaskRow } from '../utils/workflowTaskEntry.mjs'
 import { retainWorkflowTaskIdentity } from '../utils/workflowTaskIdentity.mjs'
 import {
+  BusinessOperationPanel,
   SearchInput,
   SelectFilter,
-  ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   blockWorkflowTaskAction,
@@ -75,11 +76,9 @@ import {
   verifyNewWorkflowTaskMutationAttempt,
 } from '../utils/workflowTaskMutation.mjs'
 import {
-  TASK_BOARD_DUE_OPTIONS,
   TASK_BOARD_FOCUS_PAGE_SIZE,
   TASK_BOARD_LANE_DEFINITIONS,
   TASK_BOARD_SORT_OPTIONS,
-  TASK_BOARD_STATUS_OPTIONS,
   buildWorkflowTaskBoardRoleOptions,
   buildWorkflowTaskBoardModel,
   buildWorkflowTaskBoardRequest,
@@ -131,17 +130,31 @@ const TASK_BOARD_SCOPE_OPTIONS = Object.freeze([
     value: 'todo',
   },
   {
-    label: '全部任务',
-    value: 'all',
-  },
-  {
     label: '待我审批',
     value: 'approval',
   },
+  { label: '全部任务', value: 'all' },
+  { label: '流程跟踪', value: 'tracking' },
 ])
 
 const WORKBENCH_QUEUE_PAGE_SIZE = TASK_BOARD_FOCUS_PAGE_SIZE
 const TASK_BOARD_PAGE_SCROLL_GAP = 12
+
+function TaskBoardSearch({ value, onSearch }) {
+  const search = useLiveSearch({ value, onSearch })
+  return (
+    <SearchInput
+      placeholder="订单 / 产品 / 物料 / 款号"
+      searchHint="可搜索：任务、单号、产品、款号、物料、处理原因"
+      showSearchScope
+      value={search.value}
+      onChange={search.onChange}
+      onCompositionStart={search.onCompositionStart}
+      onCompositionEnd={search.onCompositionEnd}
+      onPressEnter={search.onPressEnter}
+    />
+  )
+}
 
 function TaskBoardProgressRail({ activeLane, counts, ready, onSelectLane, mode }) {
   return (
@@ -380,6 +393,7 @@ function TaskTitleEntry({ task, onOpenTask, children, compact = false }) {
       className={`erp-task-title-entry${compact ? ' erp-task-title-entry--compact' : ''}`}
       aria-label={`查看${name}详情`}
       aria-haspopup="dialog"
+      data-task-entry
       onClick={(event) => {
         event.stopPropagation()
         event.currentTarget.focus({ preventScroll: true })
@@ -399,25 +413,7 @@ function TaskTitleEntry({ task, onOpenTask, children, compact = false }) {
 }
 
 function openTaskTableRow(event, task, onOpenTask) {
-  if (
-    event.target.closest(
-      'button, a, input, textarea, select, label, summary, [role="button"], [role="link"], [role="combobox"]'
-    )
-  ) {
-    return
-  }
-  const selection = event.currentTarget.ownerDocument.getSelection()
-  if (
-    selection &&
-    !selection.isCollapsed &&
-    event.currentTarget.contains(selection.anchorNode)
-  ) {
-    return
-  }
-  event.currentTarget
-    .querySelector('.erp-task-title-entry')
-    ?.focus({ preventScroll: true })
-  onOpenTask(task)
+  openWorkflowTaskRow(event, () => onOpenTask(task))
 }
 
 function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
@@ -472,8 +468,8 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
               align: 'left',
               title:
                 lane.key === 'exception'
-                  ? '阻塞原因 / 负责'
-                  : '状态与说明 / 负责',
+                  ? '阻塞原因'
+                  : '状态与说明',
               key: 'reason',
               render: (_, task) => (
                 <div className="erp-workbench-task-cell">
@@ -495,10 +491,19 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
                       {getWorkflowTaskReason(task)}
                     </Text>
                   ) : null}
-                  <Text type="secondary">
-                    {getWorkflowTaskOwnerRoleLabel(task)}
-                  </Text>
                 </div>
+              ),
+            },
+            {
+              title: '负责岗位 / 处理人',
+              key: 'responsibility',
+              width: 180,
+              render: (_, task) => (
+                <Space direction="vertical" size={4}>
+                  {buildWorkflowTaskResponsibilityItems(task).slice(0, 2).map((item) => (
+                    <Text key={item.key} type={item.key === 'assignee' ? 'secondary' : undefined}>{item.value}</Text>
+                  ))}
+                </Space>
               ),
             },
           ]}
@@ -669,8 +674,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [workbenchCountsState, setWorkbenchCountsState] = useState(null)
   const [taskBoardResponseState, setTaskBoardResponseState] = useState(null)
   const [taskBoardSummaryState, setTaskBoardSummaryState] = useState(null)
-  const [taskBoardFiltersOpen, setTaskBoardFiltersOpen] = useState(false)
-  const taskBoardFilterButtonRef = useRef(null)
+  const taskViewsRef = useRef(null)
   const [selectedTask, setSelectedTask] = useState(null)
   const [materialSaving, setMaterialSaving] = useState(false)
   const materialLeaveGuardRef = useRef(null)
@@ -752,6 +756,12 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [canViewApprovalInbox, requestedFilters]
   )
   const isTaskBoardView = initialView === 'task-board'
+  const trackingScope = isTaskBoardView && ['started', 'participated', 'visible'].includes(searchParams.get('tracking'))
+    ? searchParams.get('tracking') : ''
+  const trackingSourceID = Number(searchParams.get('track_source_id'))
+  const hasTrackingSource = Boolean(searchParams.get('track_source_type'))
+    && Number.isSafeInteger(trackingSourceID) && trackingSourceID > 0
+  const [trackingRefresh, setTrackingRefresh] = useState(0)
   const taskBoardRequest = useMemo(
     () => buildWorkflowTaskBoardRequest(filters),
     [filters]
@@ -801,7 +811,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       request.finish()
       return true
     }
-    if (summaryOpen) {
+    if (summaryOpen || trackingScope) {
       setLoading(false)
       request.finish()
       return true
@@ -879,7 +889,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         request.isCurrent() &&
         workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
       ) {
-        const fallback = isTaskBoardView ? '加载任务看板失败' : '加载工作台失败'
+        const fallback = isTaskBoardView ? '加载任务管理失败' : '加载工作台失败'
         const errorMessage = getActionErrorMessage(error, fallback)
         if (isTaskBoardView) {
           setTaskBoardResponseState({
@@ -914,6 +924,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     preserveTaskBoardTransitionHeight,
     shouldShowProductCoreDashboard,
     summaryOpen,
+    trackingScope,
     taskBoardRequest,
     taskBoardRequestKey,
     taskBoardSummaryRequestKey,
@@ -933,9 +944,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(() => {
       if (summaryOpen) setSummaryRefreshRevision((value) => value + 1)
+      if (trackingScope) setTrackingRefresh((value) => value + 1)
       return loadDashboardStats()
     })
-  }, [loadDashboardStats, outletContext, summaryOpen])
+  }, [loadDashboardStats, outletContext, summaryOpen, trackingScope])
 
   useEffect(() => {
     setActiveView(initialView)
@@ -1033,18 +1045,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   )
   const statusOptions = getWorkflowTaskBoardStatusOptions(filters.lane, filters.mode)
   const dueOptions = getWorkflowTaskBoardDueOptions(filters.lane)
-  const activeExtraFilters = [
-    { key: 'status', label: '状态', options: TASK_BOARD_STATUS_OPTIONS },
-    { key: 'due', label: '截止', options: TASK_BOARD_DUE_OPTIONS },
-    { key: 'sourceType', label: '业务', options: sourceOptions },
-  ]
-    .filter((filter) => filters[filter.key] !== 'all')
-    .map((filter) => ({
-      ...filter,
-      valueLabel: filter.options.find(
-        (option) => option.value === filters[filter.key]
-      )?.label,
-    }))
   const actionMeta = actionMode
     ? getWorkflowTaskActionMeta(selectedTask, actionMode)
     : null
@@ -1293,13 +1293,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       { replace: true }
     )
   }
-  const taskBoardSearch = useLiveSearch({
-    value: filters.keyword,
-    onSearch: (keyword) => updateFilter('keyword', keyword),
-  })
 
   const clearFilters = () => {
-    taskBoardFilterButtonRef.current?.focus({ preventScroll: true })
     pendingTaskBoardPageScrollRef.current = null
     const nextFilters = {
       lane: filters.lane,
@@ -1316,6 +1311,37 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         replace: true,
       }
     )
+  }
+
+  const selectTaskView = (view) => {
+    if (taskViewsRef.current?.session !== workflowWorkbenchScopeKey) {
+      taskViewsRef.current = {
+        session: workflowWorkbenchScopeKey,
+        filters: {},
+        tracking: 'started',
+      }
+    }
+    const views = taskViewsRef.current
+    if (trackingScope) views.tracking = trackingScope
+    else views.filters[filters.mode] = filters
+    const next = view === 'tracking'
+      ? new URLSearchParams(searchParams)
+      : writeWorkflowTaskBoardFiltersToSearch(searchParams, views.filters[view] || { mode: view })
+    if (view === 'tracking') next.set('tracking', views.tracking)
+    else next.delete('tracking')
+    next.delete('track_kind')
+    next.delete('track_id')
+    setSearchParams(next)
+  }
+
+  const selectTrackingScope = (scope) => {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.set('tracking', scope)
+      next.delete('track_kind')
+      next.delete('track_id')
+      return next
+    })
   }
 
   const selectTaskBoardLane = (lane) => {
@@ -1682,11 +1708,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   return (
     <section
       ref={taskFocusScopeRef}
-      aria-label={activeView === 'task-board' ? '任务看板' : '工作台'}
+      aria-label={activeView === 'task-board' ? '任务管理' : '工作台'}
       className="erp-dashboard-page erp-command-center-page"
     >
       <Title level={1} className="erp-sr-only">
-        {activeView === 'task-board' ? '任务看板' : '工作台'}
+        {activeView === 'task-board' ? '任务管理' : '工作台'}
       </Title>
       <div
         hidden
@@ -1845,154 +1871,128 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ) : null}
 
       {activeView === 'task-board' ? (
-        <Card
-          className="erp-dashboard-card erp-dashboard-task-board-card"
-          variant="borderless"
-          loading={taskBoardInitialLoading}
-          style={
-            taskBoardTransitionMinHeight > 0
+        <>
+          <div className="erp-task-management-scope erp-task-board-scope-filter">
+            <Segmented
+              aria-label="任务范围"
+              value={trackingScope ? 'tracking' : filters.mode}
+              options={TASK_BOARD_SCOPE_OPTIONS.filter((option) => canViewApprovalInbox || option.value !== 'approval')}
+              onChange={selectTaskView}
+            />
+          </div>
+          <Card
+            className="erp-dashboard-card erp-dashboard-task-board-card"
+            variant="borderless"
+            loading={!trackingScope && taskBoardInitialLoading}
+            style={
+            !trackingScope && taskBoardTransitionMinHeight > 0
               ? { minHeight: taskBoardTransitionMinHeight }
               : undefined
           }
-        >
-          <div className="erp-dashboard-block">
-            <TaskBoardProgressRail
-              mode={filters.mode}
-              activeLane={filters.lane}
-              counts={taskBoardCounts}
-              ready={taskBoardMetricsReady}
-              onSelectLane={selectTaskBoardLane}
-            />
-
-            <div className="erp-task-board-controls">
-              <div className="erp-task-board-filters">
-                <div className="erp-task-board-scope-filter">
-                  <Segmented
-                    aria-label="任务范围"
-                    value={filters.mode}
-                    options={TASK_BOARD_SCOPE_OPTIONS.filter((option) => canViewApprovalInbox || option.value !== 'approval')}
-                    onChange={(value) => updateFilter('mode', value)}
-                  />
-                </div>
-                <SearchInput
-                  placeholder="订单 / 产品 / 物料 / 款号"
-                  searchHint="可搜索：任务、单号、产品、款号、物料、处理原因"
-                  showSearchScope
-                  value={taskBoardSearch.value}
-                  onChange={taskBoardSearch.onChange}
-                  onCompositionStart={taskBoardSearch.onCompositionStart}
-                  onCompositionEnd={taskBoardSearch.onCompositionEnd}
-                  onPressEnter={taskBoardSearch.onPressEnter}
+          >
+            {trackingScope ? (
+              <div className="erp-dashboard-block">
+                <Segmented
+                  className="erp-task-tracking-scope"
+                  aria-label="跟踪范围"
+                  value={trackingScope}
+                  options={[
+                    { label: '我发起的', value: 'started' },
+                    { label: '我参与的', value: 'participated' },
+                    ...(trackingScope === 'visible' || hasTrackingSource
+                      ? [{ label: '相关流程', value: 'visible' }] : []),
+                  ]}
+                  onChange={selectTrackingScope}
                 />
-                {roleOptions.length > 1 ? (
-                  <SelectFilter
-                    aria-label="负责岗位"
-                    value={filters.role}
-                    options={roleOptions}
-                    onChange={(value) => updateFilter('role', value)}
-                  />
-                ) : null}
-                <Button
-                  ref={taskBoardFilterButtonRef}
-                  icon={<FilterOutlined aria-hidden="true" />}
-                  aria-expanded={taskBoardFiltersOpen}
-                  aria-controls="task-board-extra-filters"
-                  onClick={() => setTaskBoardFiltersOpen((open) => !open)}
-                >
-                  筛选
-                  {activeExtraFilters.length
-                    ? ` · ${activeExtraFilters.length}`
-                    : ''}
-                </Button>
-                {taskBoardModel.focused ? (
-                  <SelectFilter
-                    aria-label="任务排序"
-                    value={filters.sort}
-                    options={TASK_BOARD_SORT_OPTIONS}
-                    onChange={(value) => updateFilter('sort', value)}
-                  />
-                ) : null}
+                <WorkflowTrackingPanel
+                  key={`${trackingScope}:${workflowWorkbenchScopeKey}`}
+                  scope={trackingScope}
+                  sessionKey={workflowWorkbenchScopeKey}
+                  refreshKey={trackingRefresh}
+                  onOpenTask={openTaskDrawer}
+                  taskHandlingOpen={Boolean(selectedTask)}
+                />
               </div>
-              {taskBoardFiltersOpen ? (
-                <div
-                  id="task-board-extra-filters"
-                  className="erp-task-board-extra-filters"
-                  role="group"
-                  aria-label="更多筛选条件"
-                >
-                  {filters.lane === 'all' || filters.lane === 'finished' ? (
-                    <label>
-                      <span>任务状态</span>
-                      <SelectFilter
-                        aria-label="任务状态"
-                        value={filters.status}
-                        options={statusOptions}
-                        onChange={(value) => updateFilter('status', value)}
-                      />
-                    </label>
-                  ) : null}
-                  <label>
-                    <span>截止时间</span>
-                    <SelectFilter
-                      aria-label="截止时间"
-                      value={filters.due}
-                      options={dueOptions}
-                      onChange={(value) => updateFilter('due', value)}
+            ) : (
+              <div className="erp-dashboard-block">
+                <TaskBoardProgressRail
+                  mode={filters.mode}
+                  activeLane={filters.lane}
+                  counts={taskBoardCounts}
+                  ready={taskBoardMetricsReady}
+                  onSelectLane={selectTaskBoardLane}
+                />
+
+                <div className="erp-task-board-controls">
+                  <div className="erp-task-board-filters">
+                    <BusinessOperationPanel
+                      key={`${filters.mode}:${workflowWorkbenchScopeKey}`}
+                      compact
+                      onClearFilters={clearFilters}
+                      clearFiltersDisabled={!hasActiveFilters}
+                      filters={(
+                        <>
+                          <TaskBoardSearch
+                            primarySearch
+                            value={filters.keyword}
+                            onSearch={(keyword) => updateFilter('keyword', keyword)}
+                          />
+                          {roleOptions.length > 1 ? (
+                            <SelectFilter
+                              aria-label="负责岗位"
+                              value={filters.role}
+                              options={roleOptions}
+                              onChange={(value) => updateFilter('role', value)}
+                            />
+                          ) : null}
+                          {filters.lane === 'all' || filters.lane === 'finished' ? (
+                            <SelectFilter
+                              aria-label="任务状态"
+                              value={filters.status}
+                              options={statusOptions}
+                              onChange={(value) => updateFilter('status', value)}
+                            />
+                          ) : null}
+                          <SelectFilter
+                            aria-label="截止时间"
+                            value={filters.due}
+                            options={dueOptions}
+                            onChange={(value) => updateFilter('due', value)}
+                          />
+                          <SelectFilter
+                            aria-label="业务来源"
+                            value={filters.sourceType}
+                            options={sourceOptions}
+                            onChange={(value) => updateFilter('sourceType', value)}
+                          />
+                        </>
+                      )}
+                      actions={taskBoardModel.focused ? (
+                        <SelectFilter
+                          aria-label="任务排序"
+                          value={filters.sort}
+                          options={TASK_BOARD_SORT_OPTIONS}
+                          onChange={(value) => updateFilter('sort', value)}
+                        />
+                      ) : null}
                     />
-                  </label>
-                  <label>
-                    <span>业务来源</span>
-                    <SelectFilter
-                      aria-label="业务来源"
-                      value={filters.sourceType}
-                      options={sourceOptions}
-                      onChange={(value) => updateFilter('sourceType', value)}
-                    />
-                  </label>
+                  </div>
                 </div>
-              ) : null}
-              {hasActiveFilters ? (
-                <div
-                  className="erp-task-board-active-filters"
-                  aria-label="已选筛选条件"
-                >
-                  {activeExtraFilters.map((filter) => (
-                    <Button
-                      key={filter.key}
-                      size="small"
-                      className="erp-task-board-filter-chip"
-                      aria-label={`清除${filter.label}：${filter.valueLabel}`}
-                      icon={<CloseOutlined aria-hidden="true" />}
-                      iconPosition="end"
-                      onClick={() => {
-                        taskBoardFilterButtonRef.current?.focus({
-                          preventScroll: true,
-                        })
-                        updateFilter(filter.key, 'all')
-                      }}
-                    >
-                      {filter.label}：{filter.valueLabel}
-                    </Button>
-                  ))}
-                  <ToolbarButton onClick={clearFilters}>清空筛选</ToolbarButton>
-                </div>
-              ) : null}
-            </div>
-            {taskBoardLoadError ? (
-              <Alert
-                type="error"
-                showIcon
-                message="任务看板加载失败"
-                description={taskBoardLoadError}
-                action={<Button onClick={loadDashboardStats}>重新加载</Button>}
-              />
+                {taskBoardLoadError ? (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message="任务管理加载失败"
+                    description={taskBoardLoadError}
+                    action={<Button onClick={loadDashboardStats}>重新加载</Button>}
+                  />
             ) : (
               <div
                 ref={taskBoardLanesRef}
                 className={`erp-task-board-lanes${
                   taskBoardModel.focused ? ' erp-task-board-lanes--focused' : ''
                 }${filters.mode === 'todo' ? ' erp-task-board-lanes--todo' : ''}`}
-                aria-label="任务看板分类"
+                aria-label="任务管理分类"
                 aria-busy={taskBoardUpdating}
               >
                 {taskLanes.map((lane) => (
@@ -2007,18 +2007,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 ))}
               </div>
             )}
-            {taskBoardModel.focused ? (
-              <WorkflowTaskPagination
-                total={taskBoardCounts[filters.lane] || 0}
-                current={taskBoardReady ? taskBoardModel.page : filters.page}
-                pageSize={filters.pageSize}
-                loading={taskBoardUpdating}
-                error={Boolean(taskBoardLoadError)}
-                onChange={selectTaskBoardPage}
-              />
+                {taskBoardModel.focused ? (
+                  <WorkflowTaskPagination
+                    total={taskBoardCounts[filters.lane] || 0}
+                    current={taskBoardReady ? taskBoardModel.page : filters.page}
+                    pageSize={filters.pageSize}
+                    loading={taskBoardUpdating}
+                    error={Boolean(taskBoardLoadError)}
+                    onChange={selectTaskBoardPage}
+                  />
             ) : null}
-          </div>
-        </Card>
+              </div>
+            )}
+          </Card>
+        </>
       ) : null}
 
       <WorkflowTaskActionDrawer
@@ -2085,6 +2087,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         onActionReasonChange={setActionReason}
         onAssignmentTargetChange={setAssignmentTarget}
         onClose={closeTaskDrawer}
+        onReturnToTracking={trackingScope && searchParams.has('track_id') ? closeTaskDrawer : undefined}
         onOpenEntry={(task) => openTaskEntry(task, actionDrawerAccess)}
         onSubmit={submitTaskAction}
       />

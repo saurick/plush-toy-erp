@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Form, Input, Select } from 'antd'
+import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
@@ -73,6 +74,7 @@ function draftItemValues(item = {}, operationType = '') {
 
 export default function InventoryOperationModal({
   open,
+  customerKey,
   mode = 'create',
   operation,
   operationType,
@@ -137,6 +139,9 @@ export default function InventoryOperationModal({
       onOk={submit}
     >
       <Alert type="info" showIcon message={meta.notice} />
+      {effectiveType === 'MANUAL_ADJUSTMENT' && !isEdit ? (
+        <ProcessSubmissionRoute processKey="inventory_adjustment_approval" customerKey={customerKey} open={open} />
+      ) : null}
       <Form
         form={form}
         layout="vertical"

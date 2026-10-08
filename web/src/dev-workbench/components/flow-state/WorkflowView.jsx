@@ -187,7 +187,7 @@ function WorkflowView({
                   {selectedTask?.assignee_id
                     ? '已指定处理人'
                     : selectedTask
-                      ? '岗位共同待办'
+                      ? '由岗位人员处理'
                       : '从可见任务结果确认'}
                 </dd>
               </div>

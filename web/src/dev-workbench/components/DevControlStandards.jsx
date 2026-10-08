@@ -145,17 +145,17 @@ const TOPICS = [
     guide: 'states',
     description: '菜单数字帮助发现待办；办理后更新，打开页面不会清零。',
     rules: [
-      ['任务看板', '低强调数字', '统计本人责任范围内未结束任务；同一任务只计一次。'],
+      ['任务管理', '低强调数字', '统计本人责任范围内未结束任务；同一任务只计一次。'],
       ['专门的异常入口', '风险色数字', '仅用于定义清楚的异常，不给所有模块总菜单挂红点。'],
       ['零 / 大数量', '隐藏 / 99+', '减少无效提示；悬停和读屏保留完整数量。'],
       ['读取中 / 失败', '省略号 / 待更新', '失败保留上次数量并标记；未知不能显示成零。'],
     ],
     checks: [
-      '打开任务看板样例：清单与数字一致，浏览不清零。',
+      '打开任务管理样例：清单与数字一致，浏览不清零。',
       '办理一项：清单和数字一起减少，归零后隐藏。',
       '切换大数量、读取中和失败，核对显示及重试。',
     ],
-    source: 'NavigationCountBadge · 服务端任务看板总数',
+    source: 'NavigationCountBadge · 服务端任务管理总数',
   },
 ]
 
@@ -218,7 +218,7 @@ function CountExample() {
         ]}
       />
       <Button className="erp-control-count-entry" onClick={() => setOpened(true)}>
-        任务看板
+        任务管理
         <NavigationCountBadge count={state === 'loading' ? null : count} loading={state === 'loading'} error={state === 'error'} />
       </Button>
       {state === 'error' && <Button onClick={() => setState('ready')}>重新读取数量</Button>}

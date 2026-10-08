@@ -241,13 +241,13 @@ export function createPermissionCenterScenarios({
     },
     {
       name: 'permission-center-approval-responsibility',
-      path: '/erp/system/permissions',
+      path: '/erp/system/permissions?tab=approvals',
       auth: 'admin',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '权限管理')
-        await waitForApprovalResponsibilityInputs(page)
-        await page.getByRole('tab', { name: /审批责任/ }).click()
+        await expectText(page.getByRole('tab', { name: /员工账号/u }), '7')
+        assert.equal(await page.getByRole('tab', { name: /审批责任/ }).getAttribute('aria-selected'), 'true', '审批责任深链应直接进入对应页签')
         await expectText(page, '设置审批条件，以及主办、备用和升级责任')
         await expectText(page, '销售订单审批')
         await expectText(page, '采购订单审批')
@@ -1048,7 +1048,7 @@ export function createPermissionCenterScenarios({
         await expectText(page, '系统与帮助')
         await assertTextAbsent(page, '更多功能')
         await expectText(page, '工作台')
-        await expectText(page, '任务看板')
+        await expectText(page, '任务管理')
         await expectText(page, '基础资料')
         await expectText(page, '销售管理')
         await expectText(page, '库存管理')

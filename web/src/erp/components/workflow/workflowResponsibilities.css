@@ -1,0 +1,17 @@
+.erp-workflow-responsibilities {
+  overflow-wrap: anywhere;
+}
+
+.erp-workflow-responsibilities__role {
+  display: inline-block;
+  max-width: 100%;
+  padding: 1px 6px;
+  border: 1px solid var(--erp-border);
+  border-radius: 4px;
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text);
+  font-size: inherit;
+  font-weight: 600;
+  line-height: 1.5;
+  vertical-align: baseline;
+}

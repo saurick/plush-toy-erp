@@ -704,7 +704,7 @@ func TestWorkflowPostgresTaskBoardCounts478AndKeepsCompletionReasonOnlyInEvent(t
 				SetTaskStatusKey(fixture.status).
 				SetOwnerRoleKey(biz.DebugOperatorRoleKey).
 				SetNillableDueAt(fixture.dueAt).
-				SetPayload(map[string]any{"record_title": "PostgreSQL 任务看板容量"}))
+				SetPayload(map[string]any{"record_title": "PostgreSQL 任务管理容量"}))
 		}
 	}
 	if _, err := client.WorkflowTask.CreateBulk(builders...).Save(ctx); err != nil {

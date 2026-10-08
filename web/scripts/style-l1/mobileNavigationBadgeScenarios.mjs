@@ -153,12 +153,12 @@ export function createMobileNavigationBadgeScenarios({
               nodes.map((node) => node.getAttribute('aria-label'))
             ),
           withProgress
-            ? ['进度', '任务', '风险', '我的']
-            : ['任务', '风险', '我的']
+            ? ['进度', '任务管理', '风险', '我的']
+            : ['任务管理', '风险', '我的']
         )
         assert.equal(
           await nav
-            .getByRole('tab', { name: '任务', exact: true })
+            .getByRole('tab', { name: '任务管理', exact: true })
             .evaluate(
               (node) =>
                 document.getElementById(node.getAttribute('aria-describedby'))
@@ -339,7 +339,7 @@ export function createMobileNavigationBadgeScenarios({
         await expectCounts('22', '99+')
         assert.equal(
           await nav
-            .getByRole('tab', { name: '任务', exact: true })
+            .getByRole('tab', { name: '任务管理', exact: true })
             .evaluate(
               (node) =>
                 document.getElementById(node.getAttribute('aria-describedby'))
@@ -362,7 +362,7 @@ export function createMobileNavigationBadgeScenarios({
         await risk.waitFor({ state: 'hidden' })
         assert.equal(
           await nav
-            .getByRole('tab', { name: '任务', exact: true })
+            .getByRole('tab', { name: '任务管理', exact: true })
             .evaluate(
               (node) =>
                 document.getElementById(node.getAttribute('aria-describedby'))

@@ -11,7 +11,7 @@ export const commandCenterGroups = Object.freeze([
       },
       {
         key: 'task-board',
-        label: '任务看板',
+        label: '任务管理',
         shortLabel: '任务',
         path: '/erp/task-board',
         description: '按办理状态、负责岗位、截止时间和相关业务查看任务。',

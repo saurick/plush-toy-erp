@@ -243,7 +243,7 @@ export function createMobileTaskAssertions(deps) {
     })
     assert.equal(
       todoMetrics.heading,
-      '任务',
+      '任务管理',
       `${scenarioName} 默认分区应为待办: ${JSON.stringify(todoMetrics)}`
     )
     assert.equal(
@@ -309,7 +309,7 @@ export function createMobileTaskAssertions(deps) {
         .querySelector('[data-testid="mobile-role-done-count"]')
         ?.textContent?.trim()
       return (
-        heading?.textContent?.trim() === '任务' && /^\d+$/u.test(count || '')
+        heading?.textContent?.trim() === '任务管理' && /^\d+$/u.test(count || '')
       )
     })
     const doneMetrics = await readMobileTaskLayoutMetrics(page)
@@ -369,7 +369,7 @@ export function createMobileTaskAssertions(deps) {
       .click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
-      return heading?.textContent?.trim() === '任务'
+      return heading?.textContent?.trim() === '任务管理'
     })
     const restoredMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(restoredMetrics, scenarioName)
@@ -497,7 +497,7 @@ export function createMobileTaskAssertions(deps) {
       .click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
-      return heading?.textContent?.trim() === '任务'
+      return heading?.textContent?.trim() === '任务管理'
     })
     await page
       .locator('.erp-mobile-list-item')
@@ -1378,7 +1378,8 @@ export function createMobileTaskAssertions(deps) {
     assert(
       detailMetrics.summaryText.includes('负责岗位业务') &&
         detailMetrics.summaryText.includes('截止时间') &&
-        detailMetrics.timingText.includes('进入本岗') &&
+        detailMetrics.timingText.includes('进入岗位') &&
+        detailMetrics.timingText.includes('业务 · ') &&
         detailMetrics.redundantCopy.length === 0,
       `${scenarioName} 详情页摘要缺失或仍有重复区块: ${JSON.stringify(detailMetrics)}`
     )
@@ -1797,7 +1798,7 @@ export function createMobileTaskAssertions(deps) {
     await page.getByLabel('返回任务列表').click()
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
-      return heading?.textContent?.trim() === '任务'
+      return heading?.textContent?.trim() === '任务管理'
     })
 
     await gotoScenarioPath(page, '/m/all/tasks', {

@@ -119,6 +119,9 @@ func createProcessInstanceRowsInTx(
 	if err != nil {
 		return nil, nil, err
 	}
+	if err := recordProcessInitiatorInTx(ctx, tx, row, actorID); err != nil {
+		return nil, nil, err
+	}
 
 	nodes := make([]*biz.ProcessNodeInstance, 0, len(in.Nodes))
 	for _, nodeIn := range in.Nodes {

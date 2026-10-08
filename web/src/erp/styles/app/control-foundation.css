@@ -85,6 +85,11 @@ body
 
 /* 手机输入与组合外壳保持同一字号，防止 iPhone 聚焦时缩放页面。 */
 @media (max-width: 640px) {
+  body
+    :is(.erp-task-action-drawer, .erp-business-filter-popover)
+    .ant-select
+    .ant-select-selector
+    .ant-select-selection-search-input,
   #root
     :is(
       .ant-input,
@@ -103,11 +108,15 @@ body
       select
     ),
   body
-    :is(.erp-business-modal, .app-modal)
+    :is(.erp-business-modal, .app-modal, .erp-task-action-drawer, .erp-business-filter-popover)
     :is(
+      .ant-select,
+      .ant-select-selector,
       .ant-input,
       .ant-input-affix-wrapper,
       .ant-input-number-input,
+      input[type='text'],
+      input[type='search'],
       textarea,
       select
     ) {

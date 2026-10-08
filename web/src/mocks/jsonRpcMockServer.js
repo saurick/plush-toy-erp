@@ -304,7 +304,7 @@ const mockRoles = [
 const mockMenus = [
   {
     key: 'global-dashboard',
-    label: '任务看板',
+    label: '任务管理',
     path: '/erp/dashboard',
     required_any: [PermissionCode.ERP_WORKBENCH_READ],
     required_all: [],

@@ -54,6 +54,7 @@ export function createFinishedGoodsDeliveryScenarios({
           exact: true,
         })
         await confirmButton.waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '提交后：岗位：财务 · 待审批')
         await confirmButton.click()
         await expectText(page, '财务审批已提交；成品质检仍由品质检验单独判定')
         await page.screenshot({

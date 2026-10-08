@@ -201,6 +201,10 @@ function mobileTaskHistoryChoice(value, choices, fallback) {
   return choices.includes(value) ? value : fallback
 }
 
+function isLinkedTaskTab(tab) {
+  return [MOBILE_MAIN_TAB_KEYS.PROGRESS, MOBILE_MAIN_TAB_KEYS.TRACKING].includes(tab)
+}
+
 function mobileTaskQueryPageKey(mainTabKey) {
   return mainTabKey === MOBILE_MAIN_TAB_KEYS.MESSAGES
     ? MOBILE_TASK_QUERY_PAGE_KEYS.RISKS
@@ -277,6 +281,7 @@ export default function MobileRoleTasksPage() {
   const runtimeBuildIdentity = useRuntimeBuildIdentity()
   const canMountCustomerTasks = canMountCustomerRuntime(adminProfile)
   const canViewApprovalInbox = canViewWorkflowApprovalInbox(adminProfile)
+  const canViewTracking = hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ)
   const taskAccessIdentity =
     workflowTaskAdminAccessRequestIdentity(adminProfile)
   const taskAccessScopeKey = `${activeRoleKey}|access:${taskAccessIdentity}|${canMountCustomerTasks ? 'ready' : 'blocked'}`
@@ -303,8 +308,8 @@ export default function MobileRoleTasksPage() {
     : defaultMainTabKey
   const [requestedMainTabKey, setActiveMainTabKey] = useState(initialMainTabKey)
   const activeMainTabKey =
-    requestedMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS &&
-    !progressAccess.enabled
+    (requestedMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS && !progressAccess.enabled)
+    || (requestedMainTabKey === MOBILE_MAIN_TAB_KEYS.TRACKING && !canViewTracking)
       ? MOBILE_MAIN_TAB_KEYS.TODO
       : requestedMainTabKey
   const activeTaskQueryPageKey = mobileTaskQueryPageKey(activeMainTabKey)
@@ -668,13 +673,13 @@ export default function MobileRoleTasksPage() {
       ? linkedTaskState
       : null
   useEffect(() => {
-    if (!selectedTaskID || activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.PROGRESS) {
+    if (!selectedTaskID || !isLinkedTaskTab(activeMainTabKey)) {
       setLinkedTaskState(null)
     }
   }, [activeMainTabKey, selectedTaskID])
   useEffect(() => {
     if (
-      activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS &&
+      isLinkedTaskTab(activeMainTabKey) &&
       selectedTaskID &&
       !linkedTask
     ) {
@@ -689,7 +694,7 @@ export default function MobileRoleTasksPage() {
     [beginLinkedTask, taskAccessScopeKey, selectedTaskID]
   )
   const selectedTask =
-    activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
+    isLinkedTaskTab(activeMainTabKey)
       ? linkedTask?.task || null
       : activeTaskViewState.selectedTask
   const receiptDetailTask = useMemo(
@@ -705,7 +710,7 @@ export default function MobileRoleTasksPage() {
   const selectedTaskActionsEnabled =
     canMountCustomerTasks &&
     (activeTaskViewState.actionsEnabled ||
-      (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS &&
+      (isLinkedTaskTab(activeMainTabKey) &&
         Boolean(selectedTask) &&
         !TERMINAL_TASK_STATUS_KEYS.has(selectedTask.task_status_key)))
   const selectedTaskActionAccess = useWorkflowTaskActionAccess({
@@ -959,7 +964,7 @@ export default function MobileRoleTasksPage() {
   useEffect(() => {
     if (
       canMountCustomerTasks &&
-      activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.PROGRESS &&
+      !isLinkedTaskTab(activeMainTabKey) &&
       !activeTaskSlot.loaded &&
       !activeTaskSlot.loading &&
       !activeTaskSlot.error
@@ -995,7 +1000,7 @@ export default function MobileRoleTasksPage() {
   const refreshTasksAfterMutation = useCallback(
     async (options = {}) => {
       if (
-        activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS &&
+        isLinkedTaskTab(activeMainTabKey) &&
         selectedTaskID
       ) {
         return loadLinkedTask(selectedTaskID)
@@ -1368,7 +1373,7 @@ export default function MobileRoleTasksPage() {
 
   useEffect(() => {
     if (
-      activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS ||
+      isLinkedTaskTab(activeMainTabKey) ||
       selectedTaskID === null ||
       !activeTaskSlot.loaded
     ) {
@@ -2042,14 +2047,16 @@ export default function MobileRoleTasksPage() {
   ])
 
   const taskDetailBackLabel =
-    activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
+    activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TRACKING
+      ? '返回流程跟踪'
+      : activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
       ? window.history.state?.mobileProgress?.selection
         ? '返回进度详情'
         : '返回进度'
       : '返回任务列表'
 
   if (
-    activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS &&
+    isLinkedTaskTab(activeMainTabKey) &&
     selectedTaskID &&
     !selectedTask &&
     !actionReceipt
@@ -2082,7 +2089,7 @@ export default function MobileRoleTasksPage() {
       <MobileTaskReceiptScreen
         action={actionReceipt.action}
         backLabel={
-          activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
+          isLinkedTaskTab(activeMainTabKey)
             ? taskDetailBackLabel
             : null
         }
@@ -2230,7 +2237,7 @@ export default function MobileRoleTasksPage() {
       progressAccess={progressAccess}
       accessScopeKey={taskAccessScopeKey}
       activeRoleKey={activeRoleKey}
-      onOpenProgressTask={handleSelectTaskID}
+      onOpenLinkedTask={handleSelectTaskID}
       activeFilterKey={visibleActiveFilterKey}
       activeMainTabKey={activeMainTabKey}
       activeMessageTabKey={activeMessageTabKey}
@@ -2241,6 +2248,7 @@ export default function MobileRoleTasksPage() {
       approvalTasks={approvalTasks}
       authoritativeTaskCounts={authoritativeTaskCounts}
       canViewApprovalInbox={canViewApprovalInbox}
+      canViewTracking={canViewTracking}
       canEnterDesktop={canEnterDesktop === true}
       doneTasks={doneTasks}
       filterItems={filterItems}

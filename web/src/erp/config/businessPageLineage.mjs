@@ -1176,7 +1176,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.IMPLEMENTED,
     availabilityNote:
-      '报废、超领和在制让步由正式处置申请生成老板审批任务；审批不代替库存或在制办理，批准后仍须由对应生产入口确认执行。返工来源提醒由任务看板和岗位任务端独立承接。',
+      '报废、超领和在制让步由正式处置申请生成老板审批任务；审批不代替库存或在制办理，批准后仍须由对应生产入口确认执行。返工来源提醒由任务管理和岗位任务端独立承接。',
   },
   'shipping-release': {
     pageRole: BUSINESS_PAGE_ROLES.WORKFLOW_INBOX,

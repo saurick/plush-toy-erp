@@ -11,6 +11,7 @@ import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
 import WorkflowTaskActionDrawer, { getWorkflowTaskActionMeta } from './WorkflowTaskActionDrawer.jsx'
 import WorkflowFollowupDetails from './WorkflowFollowupDetails.jsx'
+import WorkflowSourceProgressButton from './WorkflowSourceProgressButton.jsx'
 import useWorkflowTaskActionAccess from '../../hooks/useWorkflowTaskActionAccess.js'
 import { useSourceOrderWorkflowActions } from './useSourceOrderWorkflowActions.mjs'
 import { getWorkflowTaskCreateOptions, createWorkflowFollowupTask, listWorkflowTasks } from '../../api/workflowApi.mjs'
@@ -212,7 +213,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
 
   if (!canRead) return null
   const taskColumns = [
-    { title: '任务事项', key: 'name', render: (_, item) => <Button type="link" onClick={() => openTask(item)}>{item.task_name}{item.task_group !== 'business_followup' ? '（任务看板）' : ''}</Button> },
+    { title: '任务事项', key: 'name', render: (_, item) => <Button type="link" onClick={() => openTask(item)}>{item.task_name}{item.task_group !== 'business_followup' ? '（任务管理）' : ''}</Button> },
     { title: '责任岗位', key: 'role', render: (_, item) => getWorkflowTaskOwnerRoleLabel(item) },
     { title: '状态', key: 'state', render: (_, item) => <Tag>{getWorkflowTaskStatusMeta(item).label}</Tag> },
     { title: '截止时间', dataIndex: 'due_at', render: (value) => value ? formatUnixDate(value) : '未设置' },
@@ -222,6 +223,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
       <Space size={4}>
         {canCreate ? <Button size="small" icon={<CalendarOutlined />} data-business-action-key="create-followup" disabled={disabled || (!pending && !canCreateFollowupFromRecord(sourceType, record))} title={!source ? '请先选择一张单据' : !canCreateFollowupFromRecord(sourceType, record) ? '当前单据已结束，可查看已有任务' : undefined} onClick={() => openView('create')}>{pending ? '确认创建结果' : '新建跟进任务'}</Button> : null}
         <Button size="small" icon={<UnorderedListOutlined />} data-business-action-key="related-tasks" disabled={disabled || !source} onClick={() => openView('related')}>相关任务</Button>
+        <WorkflowSourceProgressButton sourceType={sourceType} sourceID={record?.id} profile={adminProfile} disabled={disabled} />
       </Space>
       <BusinessFormModal
         open={open}
@@ -237,7 +239,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
             <Button disabled={saving} onClick={closeModal}>关闭</Button>
             {view === 'create' ? <Button type="primary" loading={saving} disabled={!pending && (loading || !options?.can_create)} onClick={submit}>{pending ? '重试并确认结果' : '新建跟进任务'}</Button> : null}
             {view === 'receipt' ? <Button type="primary" onClick={() => setView('related')}>查看相关任务</Button> : null}
-            {view === 'related' ? <Button onClick={() => openTaskBoard()}>打开任务看板</Button> : null}
+            {view === 'related' ? <Button onClick={() => openTaskBoard()}>打开任务管理</Button> : null}
           </Space>
       }
       >
@@ -249,7 +251,7 @@ export default function BusinessTaskActions({ sourceType, record, adminProfile, 
             <Form form={form} layout="vertical" initialValues={{ assignee_id: 'pool', priority: 0 }} disabled={saving || pending || loading || !options?.can_create} className="erp-business-task-form">
               <Form.Item name="task_name" label="任务事项" className="erp-business-task-form__wide" rules={[{ required: true, whitespace: true, message: '请填写任务事项' }]}><Input maxLength={128} placeholder="例如：补充包装稿、确认交期变化" /></Form.Item>
               <Form.Item name="owner_role_key" label="责任岗位" rules={[{ required: true, message: '请选择责任岗位' }]}><Select placeholder="请选择责任岗位" options={(options?.roles || []).map((role) => ({ value: role.role_key, label: role.label }))} onChange={() => form.setFieldsValue({ assignee_id: 'pool' })} /></Form.Item>
-              <Form.Item name="assignee_id" label="办理人"><Select options={[{ value: 'pool', label: '由岗位共同办理' }, ...(selectedRole?.assignees || []).map((person) => ({ value: person.admin_id, label: person.display_name }))]} /></Form.Item>
+              <Form.Item name="assignee_id" label="办理人"><Select options={[{ value: 'pool', label: '由岗位人员处理' }, ...(selectedRole?.assignees || []).map((person) => ({ value: person.admin_id, label: person.display_name }))]} /></Form.Item>
               <Form.Item name="deadline" label="截止时间" rules={[{ required: true, message: '请选择截止时间' }]}><DateTimeInput quickOptions={WORKFLOW_DEADLINE_QUICK_OPTIONS} quickOptionsLabel="快捷截止" showNow={false} /></Form.Item>
               <Form.Item name="priority" label="优先级"><Select options={[{ value: 0, label: '普通' }, { value: 10, label: '紧急' }]} /></Form.Item>
               <Form.Item name="description" label="需要对方完成什么" className="erp-business-task-form__wide" rules={[{ required: true, whitespace: true, message: '请写清任务要求和期望结果' }]}><Input.TextArea maxLength={2000} showCount autoSize={{ minRows: 3, maxRows: 7 }} /></Form.Item>

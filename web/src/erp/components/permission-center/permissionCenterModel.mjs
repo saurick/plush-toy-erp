@@ -200,6 +200,11 @@ function hasPermission(admin = {}, permissionKey = '') {
   return normalizeStringList(admin?.permissions || []).includes(permissionKey)
 }
 
+export function canReadApprovalResponsibilities(admin) {
+  return [READ_USER_PERMISSION, READ_ROLE_PERMISSION, READ_PERMISSION_PERMISSION, READ_CUSTOMER_CONFIG_PERMISSION]
+    .every((permission) => hasPermission(admin, permission))
+}
+
 function buildPermissionGroups(permissions = [], menuOptions = []) {
   const groups = new Map()
   const sourcePermissions = Array.isArray(permissions) ? permissions : []

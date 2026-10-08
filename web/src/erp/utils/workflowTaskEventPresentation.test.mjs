@@ -75,7 +75,7 @@ test('workflow task event presentation distinguishes exception recovery and resp
   assert.equal(escalated.actorLabel, 'warehouse01（仓库）')
   assert.equal(escalated.actorName, 'warehouse01')
   assert.equal(escalated.actorRoleLabel, '仓库')
-  assert.equal(returnedToPool.label, '已退回负责岗位共同待办')
+  assert.equal(returnedToPool.label, '已交回负责岗位处理')
 })
 
 test('workflow task event presentation keeps unknown event keys out of user copy', () => {
@@ -127,7 +127,7 @@ test('workflow task responsibility summary avoids exposing assignee ids', () => 
   const copy = items.map((item) => `${item.label}:${item.value}`).join('|')
 
   assert.match(copy, /当前负责岗位:品质/u)
-  assert.match(copy, /当前承接方式:已指定处理人/u)
+  assert.match(copy, /处理人:已指定处理人/u)
   assert.match(copy, /催办情况:已催办 2 次/u)
   assert.match(copy, /当前升级责任:老板/u)
   assert.match(copy, /当前阻塞原因:等待复检/u)

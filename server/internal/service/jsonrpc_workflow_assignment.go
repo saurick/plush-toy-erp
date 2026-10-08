@@ -178,7 +178,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskReassignment(
 	if !assigneeIDExists {
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.InvalidParam.Code,
-			Message: "必须明确选择接收人或退回岗位待办池",
+			Message: "请选择接收人，或选择由岗位人员处理",
 		}, nil
 	}
 	releaseToPool := rawAssigneeID == nil
@@ -328,7 +328,7 @@ func workflowTaskReassignmentAccessDecision(
 	if !workflowAdminCanViewTask(admin, task, visibleOwnerRoleKeys) {
 		return false, "task_not_visible", "当前账号不能查看该任务。"
 	}
-	return true, "allowed", "可转给同一负责岗位的合格在职人员，或退回岗位待办池。"
+	return true, "allowed", "可转给同岗位有处理权限的在职人员，或交回岗位处理。"
 }
 
 func (d *jsonrpcDispatcher) workflowTaskAssignmentCandidateEligible(

@@ -312,7 +312,11 @@ func (uc *CustomerConfigUsecase) ApplyApprovalSettingsRevision(
 	if preview.PublishInput == nil {
 		return nil, ErrBadParam
 	}
-	validation, err := uc.ValidateCustomerConfig(ctx, *preview.PublishInput)
+	normalized, err := normalizeCustomerConfigPublishInput(*preview.PublishInput)
+	if err != nil {
+		return nil, err
+	}
+	configHash, err := hashNormalizedCustomerConfigPublishInput(normalized)
 	if err != nil {
 		return nil, err
 	}
@@ -322,8 +326,8 @@ func (uc *CustomerConfigUsecase) ApplyApprovalSettingsRevision(
 	}
 	return repo.ApplyApprovalSettingsRevision(
 		ctx,
-		*preview.PublishInput,
-		validation.ConfigHash,
+		normalized,
+		configHash,
 		strings.TrimSpace(in.ExpectedActiveRevision),
 		strings.TrimSpace(in.ExpectedActiveHash),
 		actorID,

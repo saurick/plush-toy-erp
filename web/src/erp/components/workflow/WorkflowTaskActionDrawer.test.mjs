@@ -150,13 +150,13 @@ test('task transfer is an explicit scoped action with person and pool destinatio
   assert.match(source, /assignmentAccess = \{\}/u)
   assert.match(source, /onAssignmentTargetChange/u)
   assert.match(source, /id="erp-task-assignment-target"/u)
-  assert.match(source, /选择接收人，或退回负责岗位共同待办/u)
-  assert.match(source, /暂不指定个人并退回该岗位共同待办/u)
+  assert.match(source, /选择接收人，或由岗位人员处理/u)
+  assert.match(source, /交回岗位，由有权限的人员处理/u)
   assert.doesNotMatch(source, /取消个人指派，回到/u)
   assert.doesNotMatch(source, /待办池（状态不变）/u)
   assert.doesNotMatch(source, /岗位待办池/u)
   assert.match(source, /assignmentTargetValid/u)
-  assert.match(source, /如果暂时不确定由谁接手，可退回该岗位共同待办/u)
+  assert.match(source, /请选择同岗位的接收人，或选择由岗位人员处理/u)
   assert.match(source, /assignmentAccess\.stale/u)
   assert.match(
     source,

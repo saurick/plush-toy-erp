@@ -32,6 +32,22 @@ async function loadCustomerConfigApiForTest(call) {
   return customerConfigApi
 }
 
+test('customerConfigApi: submission route requires matching process and valid amount condition', async () => {
+  const valid = { config_revision: 'config-a', process_key: 'sales_order_acceptance', node_key: 'order_approval', owner_role_key: 'boss', approval_key: 'sales_order', condition: { mode: 'all' } }
+  const params = { process_key: 'sales_order_acceptance' }
+  const api = await loadCustomerConfigApiForTest(async (method, input, options) => {
+    assert.equal(method, 'get_process_submission_route')
+    assert.deepEqual(input, params)
+    assert.ok(options.init.signal)
+    return { data: { route: valid } }
+  })
+  assert.equal((await api.getProcessSubmissionRoute(params, { signal: new AbortController().signal })).owner_role_key, 'boss')
+  for (const patch of [{ config_revision: '' }, { owner_role_key: '' }, { process_key: 'material_supply' }, { condition: { mode: 'amount', amount: 'bad', currency: 'CNY' } }]) {
+    await loadCustomerConfigApiForTest(async () => ({ data: { route: { ...valid, ...patch } } }))
+    await assert.rejects(() => api.getProcessSubmissionRoute(params))
+  }
+})
+
 function processStartData({
   salesOrderID = 81,
   status = 'active',

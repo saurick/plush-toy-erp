@@ -25,6 +25,8 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
+import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
@@ -1059,6 +1061,7 @@ export default function InventoryLedgerPage() {
           })
         }
         let operation = created
+        let submittedProcess
         if (operationType === 'MANUAL_ADJUSTMENT') {
           let processData
           try {
@@ -1075,6 +1078,7 @@ export default function InventoryLedgerPage() {
             })
             if (!processData?.process_context) throw error
           }
+          submittedProcess = processData
           if (processData.source_readback?.status === 'DRAFT') {
             const node = findExceptionProcessActiveNode(
               processData,
@@ -1107,11 +1111,11 @@ export default function InventoryLedgerPage() {
         operationAttemptsRef.current.settle(scope, attempt, null)
         rememberInventoryOperation(operation)
         setOperationType('')
-        message.success(
-          operationType === 'MANUAL_ADJUSTMENT'
-            ? '人工库存调整已提交审批'
-            : '库存作业草稿已生成，请核对后过账'
-        )
+        if (operationType === 'MANUAL_ADJUSTMENT') {
+          showProcessSubmissionReceipt({ result: submittedProcess, title: '人工库存调整已提交审批' })
+        } else {
+          message.success('库存作业草稿已生成，请核对后过账')
+        }
       } catch (error) {
         const retained = operationAttemptsRef.current.settle(
           scope,
@@ -1259,15 +1263,17 @@ export default function InventoryLedgerPage() {
         setOperationCancelOpen(false)
         setOperationCancelReason('')
         await loadRows()
-        message.success(
-          result.recovered
-            ? '已重新读取库存作业结果'
-            : {
-                submit: '人工库存调整已提交审批',
-                post: '库存作业已过账',
-                cancel: '库存作业已取消',
-              }[action]
-        )
+        if (action === 'submit') {
+          showProcessSubmissionReceipt({
+            title: '人工库存调整已提交审批',
+            loadProcess: () => getInventoryAdjustmentApprovalProcess({
+              ...(customerKey ? { customer_key: customerKey } : {}),
+              inventory_operation_id: operation.id,
+            }),
+          })
+        } else {
+          message.success(result.recovered ? '已重新读取库存作业结果' : { post: '库存作业已过账', cancel: '库存作业已取消' }[action])
+        }
       } catch (error) {
         message.error(getActionErrorMessage(error, '处理库存作业'))
       } finally {
@@ -2059,6 +2065,7 @@ export default function InventoryLedgerPage() {
                     核对并取消
                   </Button>
                 ) : null}
+                {currentOperation.operation_type === 'MANUAL_ADJUSTMENT' ? <WorkflowSourceProgressButton sourceType="inventory_operation" sourceID={currentOperation.id} profile={adminProfile} disabled={operationLoading} /> : null}
                 <ExceptionProcessRecoveryButton
                   canRecover={
                     canRecoverProcess &&
@@ -2498,6 +2505,7 @@ export default function InventoryLedgerPage() {
         onEdit={openInventoryOperationEdit}
       />
       <InventoryOperationModal
+        customerKey={customerKey}
         open={Boolean(operationType || editingOperation)}
         mode={editingOperation ? 'edit' : 'create'}
         operation={editingOperation}

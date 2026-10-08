@@ -1507,6 +1507,8 @@ export function createBusinessListAssertions({ outputDir }) {
       .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
       .locator(`.ant-picker-cell[title="${startDateTitle}"]`)
       .click()
+    assert.equal(await dateInputs.first().locator('input').inputValue(), startDateTitle.replaceAll('-', '/'), `${scenarioName} 日期选择应立即回填`)
+    await page.locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)').waitFor({ state: 'hidden' })
     await dateInputs.nth(1).click({ position: { x: 16, y: 16 } })
     const earlierEndCell = page
       .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')

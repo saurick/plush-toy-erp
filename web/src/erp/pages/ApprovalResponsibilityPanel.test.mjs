@@ -55,7 +55,7 @@ test('approval responsibility panel exposes only the three configurable approval
   assert.match(source, /确认并生效/)
   assert.match(source, /审批责任加载失败/)
   assert.match(source, /重试/)
-  assert.match(source, /同一岗位池或同一指定员工不能重复承担多个责任层级/)
+  assert.match(source, /同一岗位的“岗位内任一员工”选项或同一指定员工不能重复承担多个责任层级/)
   assert.match(source, /当前只有一个可承接岗位/)
   assert.match(source, /备用和升级可以留空/)
   assert.match(source, /已用于.*责任/)

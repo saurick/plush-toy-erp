@@ -150,6 +150,7 @@ const NON_LINEAGE_CUSTOMER_CONFIG_ACTIONS = Object.freeze([
   'activate_customer_config',
   'check_customer_config_transition',
   'get_effective_session',
+  'get_process_submission_route',
   'publish_customer_config',
   'rollback_customer_config',
   'validate_customer_config',

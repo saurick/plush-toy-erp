@@ -67,7 +67,7 @@ actions: permissions,
       },
       verify: async (page) => {
         const nav = page.locator('.erp-admin-sider')
-        const menu = nav.getByRole('menuitem', { name: '任务看板', exact: true })
+        const menu = nav.getByRole('menuitem', { name: '任务管理', exact: true })
         const badge = menu.locator('.erp-menu-task-label .navigation-count-badge')
         await badge.waitFor()
         assert.equal(await badge.textContent(), '…')
@@ -157,7 +157,7 @@ deviceScaleFactor: 2,
     verify: async (page) => {
       const stage = page.locator('.erp-control-library-stage')
       await page.getByRole('heading', { name: '数字提醒', exact: true }).waitFor()
-      await stage.getByRole('button', { name: /任务看板/ }).click()
+      await stage.getByRole('button', { name: /任务管理/ }).click()
       await stage.getByRole('heading', { name: '待我处理 · 3 项' }).waitFor()
       await stage.getByRole('button', { name: '办理一项' }).click()
       await stage.getByRole('heading', { name: '待我处理 · 2 项' }).waitFor()

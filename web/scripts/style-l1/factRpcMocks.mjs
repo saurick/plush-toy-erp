@@ -2809,7 +2809,7 @@ export async function installFactRpcMocks(page, context) {
         const reason = terminal
           ? '该任务已结束，不能再转交。'
           : permissionAllowed
-            ? '可转给同一负责岗位的合格在职人员，或退回岗位待办池。'
+            ? '可转给同岗位有处理权限的在职人员，或交回岗位处理。'
             : '当前账号没有任务转交权限。'
         data = {
           assignment: {

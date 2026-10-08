@@ -120,6 +120,9 @@ func ensureSourceWorkflowTaskRecordWithClient(ctx context.Context, client *ent.C
 	if actorID > 0 {
 		eventBuilder.SetActorID(actorID)
 	}
+	if role := biz.WorkflowInitiatorRoleKey(ctx, actorID); role != "" {
+		eventBuilder.SetActorRoleKey(role)
+	}
 	if _, err := eventBuilder.Save(ctx); err != nil {
 		return nil, false, err
 	}

@@ -11,7 +11,7 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  DateInput,
+  DateRangeFilter,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -739,20 +739,16 @@ export default function AuditLogsPage() {
                 setDetailDrawerOpen(false)
               }}
             />
-            <DateInput
-              aria-label="开始日期"
-              value={createdFrom}
-              placeholder="开始日期"
-              onChange={(value) => {
+            <DateRangeFilter
+              options={[{ value: 'created_at', label: '操作时间' }]}
+              value="created_at"
+              startValue={createdFrom}
+              endValue={createdTo}
+              onStartChange={(value) => {
                 setCreatedFrom(value)
                 resetPage()
               }}
-            />
-            <DateInput
-              aria-label="结束日期"
-              value={createdTo}
-              placeholder="结束日期"
-              onChange={(value) => {
+              onEndChange={(value) => {
                 setCreatedTo(value)
                 resetPage()
               }}

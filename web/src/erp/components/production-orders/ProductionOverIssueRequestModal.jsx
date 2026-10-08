@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
+import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
+import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
@@ -103,7 +105,7 @@ export default function ProductionOverIssueRequestModal({
       }
       const next = processData.source_readback
       attempts.current.settle(scope, attempt, null)
-      message.success('超领申请已提交；批准额度须在正式领料时使用')
+      showProcessSubmissionReceipt({ result: processData, title: '超领申请已提交；批准额度须在正式领料时使用' })
       onChanged?.(next)
       onClose?.()
     } catch (error) {
@@ -136,6 +138,7 @@ export default function ProductionOverIssueRequestModal({
         showIcon
         message="批准只增加该物料需求的可领额度，不会自动出库；实际库存变化仍须走正式领料并过账。"
       />
+      <ProcessSubmissionRoute processKey="production_exception_approval" customerKey={customerKey} open={open} />
       <Descriptions
         size="small"
         column={{ xs: 1, sm: 2 }}

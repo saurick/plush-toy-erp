@@ -246,7 +246,7 @@ function TaskFinder({
           maxLength={200}
           value={draft}
           placeholder="粘贴完整任务名称、任务编号、来源单号或数字 task_id"
-          searchHint="从电脑端后台「任务看板」复制完整任务名称；也支持任务编号、来源单号，数字 task_id 仅用于开发排障"
+          searchHint="从电脑端后台「任务管理」复制完整任务名称；也支持任务编号、来源单号，数字 task_id 仅用于开发排障"
           onChange={(event) => {
             controllerRef.current?.abort()
             setLookup((current) => ({
@@ -268,7 +268,7 @@ function TaskFinder({
         {taskId ? <Button onClick={onClearTask}>清除当前任务</Button> : null}
       </form>
       <Text type="secondary">
-        从后台「任务看板」复制完整任务名称、任务编号或来源单号；数字 task_id
+        从后台「任务管理」复制完整任务名称、任务编号或来源单号；数字 task_id
         仅用于开发排障，查询结果受当前账号可见范围限制。
       </Text>
       <TaskLookupResults lookup={lookup} onSelectTask={selectTask} />

@@ -15,6 +15,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { orderSubmissionSuccessMessage } from '../utils/approvalCondition.mjs'
@@ -1337,11 +1338,11 @@ export default function SalesOrdersPage() {
           null
         )
       }
-      message.success(
-        action.key === 'submit'
-          ? orderSubmissionSuccessMessage('sales_order', updated)
-          : action.successMessage || `销售订单已${action.label}`
-      )
+      if (action.key === 'submit') {
+        showProcessSubmissionReceipt({ result: updated, title: orderSubmissionSuccessMessage('sales_order', updated) })
+      } else {
+        message.success(action.successMessage || `销售订单已${action.label}`)
+      }
       const nextSelectedOrder =
         action.returnsRecord === false ? order : updated || order
       setSelectedOrder(nextSelectedOrder)
@@ -1390,6 +1391,8 @@ export default function SalesOrdersPage() {
       content: (
         <SourceOrderLifecycleConfirmContent
           action={action}
+          processKey="sales_order_acceptance"
+          customerKey={activeCustomerKey}
           onReasonChange={(value) => {
             reason = value
           }}

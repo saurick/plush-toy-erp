@@ -36,11 +36,21 @@
   width: 100%;
 }
 
+.erp-task-action-drawer__footer-return {
+  flex-shrink: 0;
+  margin-inline-end: auto;
+}
+
 .erp-task-action-drawer__footer-nav,
 .erp-task-action-drawer__footer-primary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.erp-task-action-drawer__footer-nav:empty,
+.erp-task-action-drawer__footer-primary:empty {
+  display: none;
 }
 
 @media (max-width: 1280px) {

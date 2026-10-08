@@ -681,22 +681,17 @@ test("customer-config-runtime-manifest: responsibility pools map through roles a
   );
   assert.equal(demoOrderReview?.role_key, "sales");
   assert.equal(yoyoosunOrderReview?.role_key, "pmc");
-  assert(
-    salesApprovalMembers.some(
-      (item) =>
-        item.role_key === "sales" &&
-        item.strategy === "primary" &&
-        item.priority === 100,
-    ),
+  assert.deepEqual(
+    salesApprovalMembers.map(({ role_key, strategy, priority }) => ({ role_key, strategy, priority })),
+    [{ role_key: "boss", strategy: "primary", priority: 100 }],
   );
-  assert(
-    salesApprovalMembers.some(
-      (item) =>
-        item.role_key === "boss" &&
-        item.strategy === "escalation" &&
-        item.priority === 300,
-    ),
-  );
+  for (const manifest of [demoManifest, yoyoosunManifest]) {
+    for (const [pool, role] of [["approval.sales_order", "boss"], ["approval.purchase_order", "boss"], ["approval.shipment_finance", "finance"]]) {
+      const members = manifest.work_pool_memberships.filter((item) => item.pool_key === pool);
+      assert.ok(members.length > 0, `${manifest.customer_key}: missing ${pool}`);
+      assert.equal(members.find((item) => item.strategy === "primary")?.role_key, role);
+    }
+  }
   assert(
     demoManifest.access_entitlements.some(
       (item) =>

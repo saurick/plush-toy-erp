@@ -8,12 +8,14 @@ import {
   LinkOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Form, Popconfirm, Tag, Typography } from 'antd'
+import { Button, Dropdown, Form, Popconfirm, Space, Tag, Typography } from 'antd'
 import {
   useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
+import ProcessSubmissionRoute from '../components/workflow/ProcessSubmissionRoute.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { ShipmentStatus, OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
@@ -292,6 +294,7 @@ export default function ShipmentsPage() {
   })
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [releaseConfirmOpen, setReleaseConfirmOpen] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
   const [financeSourceAction, setFinanceSourceAction] = useState(null)
   const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
@@ -1221,11 +1224,7 @@ export default function ShipmentsPage() {
         id: selectedRow.id,
         shipment_no: selectedRow.shipment_no,
       })
-      message.success(
-        result.process_instance?.id
-          ? '财务审批已提交；成品质检仍由品质检验单独判定'
-          : '财务审批流程已存在，本次未重复启动'
-      )
+      showProcessSubmissionReceipt({ result, title: '财务审批已提交；成品质检仍由品质检验单独判定' })
       await loadRows()
     } catch (error) {
       message.error(getActionErrorMessage(error, '提交出货放行'))
@@ -1803,7 +1802,14 @@ export default function ShipmentsPage() {
               disabledReason={shipmentActionAvailability.release.disabledReason}
             >
               <Popconfirm
-                title="提交后将启动版本化财务审批；品质检验仍由质检单独判定，审批通过也不等于已出货。是否继续？"
+                title="确认提交出货审批？"
+                description={
+                  <Space direction="vertical" size={8}>
+                    <ProcessSubmissionRoute processKey="finished_goods_delivery" customerKey={activeCustomerKey} open={releaseConfirmOpen} />
+                    <span>品质检验仍由质检单独判定；审批通过也不等于已出货，还需办理实际出货。</span>
+                  </Space>
+                }
+                onOpenChange={setReleaseConfirmOpen}
                 onConfirm={submitSelectedShipmentRelease}
                 okText="提交放行"
                 cancelText="取消"

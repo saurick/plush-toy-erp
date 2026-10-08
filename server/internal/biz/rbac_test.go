@@ -356,7 +356,7 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 		},
 		{
 			key:         "task-board",
-			label:       "任务看板",
+			label:       "任务管理",
 			path:        "/erp/task-board",
 			permissions: []string{PermissionWorkflowTaskRead},
 		},

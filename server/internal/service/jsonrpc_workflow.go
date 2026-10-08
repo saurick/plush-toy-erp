@@ -40,6 +40,8 @@ func (d *jsonrpcDispatcher) handleWorkflow(
 	}
 
 	switch method {
+	case "list_tracking", "get_tracking":
+		return d.handleWorkflowTracking(ctx, method, id, pm)
 	case "get_task_create_options", "create_followup_task":
 		return d.handleWorkflowFollowup(ctx, method, id, pm, claims.UserID)
 	case "metadata":

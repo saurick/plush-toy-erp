@@ -82,7 +82,7 @@ func displayInt(value *int) int {
 	return *value
 }
 
-// Only already-visible tasks with a persisted source binding may read source
+// Only already-visible tasks or processes with a persisted binding may read source
 // identities. This projection grants no access to prices, parties or documents.
 // Source-time name/code snapshots are preserved; product style and supplier item
 // numbers come from their distinct master fields, never from internal codes.

@@ -1,6 +1,6 @@
 import { Typography, Alert } from 'antd'
 import React, { useCallback, useEffect, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { usePermissionRoleSettings } from '../components/permission-center/usePermissionRoleSettings.jsx'
@@ -9,7 +9,7 @@ import { usePermissionCenterData } from '../components/permission-center/usePerm
 import {
   READ_ROLE_PERMISSION,
   READ_PERMISSION_PERMISSION,
-  READ_CUSTOMER_CONFIG_PERMISSION,
+  canReadApprovalResponsibilities as canReadApprovalSettings,
   PUBLISH_CUSTOMER_CONFIG_PERMISSION,
   ACTIVATE_CUSTOMER_CONFIG_PERMISSION,
   UPDATE_USER_PERMISSION,
@@ -30,6 +30,7 @@ import { modal } from '@/common/utils/antdApp'
 import ApprovalResponsibilityPanel from './ApprovalResponsibilityPanel.jsx'
 
 export default function PermissionCenterPage() {
+  const [searchParams] = useSearchParams()
   const [editorContainer, setEditorContainer] = useState(null)
   const [toolbarContainer, setToolbarContainer] = useState(null)
   const [permissionSearch, setPermissionSearch] = useState('')
@@ -55,7 +56,9 @@ export default function PermissionCenterPage() {
   const [saving, setSaving] = useState(false)
 
   const [activeTabKey, setActiveTabKey] = useState(
-    PERMISSION_CENTER_TAB_KEYS.ROLES
+    () => Object.values(PERMISSION_CENTER_TAB_KEYS).includes(searchParams.get('tab'))
+      ? searchParams.get('tab')
+      : PERMISSION_CENTER_TAB_KEYS.ROLES
   )
 
   const [approvalResponsibilityDirty, setApprovalResponsibilityDirty] =
@@ -154,10 +157,7 @@ export default function PermissionCenterPage() {
   const canDisableUsers = hasPermission(currentAdmin, DISABLE_USER_PERMISSION)
   const canRevokeUsers = hasPermission(currentAdmin, REVOKE_USER_PERMISSION)
 
-  const canReadApprovalResponsibilities =
-    canReadUsers &&
-    canReadRoleTemplates &&
-    hasPermission(currentAdmin, READ_CUSTOMER_CONFIG_PERMISSION)
+  const canReadApprovalResponsibilities = canReadApprovalSettings(currentAdmin)
   const canManageApprovalResponsibilities =
     canReadApprovalResponsibilities &&
     hasPermission(currentAdmin, PUBLISH_CUSTOMER_CONFIG_PERMISSION) &&
@@ -287,13 +287,13 @@ export default function PermissionCenterPage() {
   useEffect(() => {
     if (
       activeTabKey === PERMISSION_CENTER_TAB_KEYS.APPROVALS &&
-      !canReadApprovalResponsibilities
+      currentAdmin && !loading && !canReadApprovalResponsibilities
     ) {
       setApprovalDiscardVersion((current) => current + 1)
       setApprovalResponsibilityDirty(false)
       setActiveTabKey(PERMISSION_CENTER_TAB_KEYS.ROLES)
     }
-  }, [activeTabKey, canReadApprovalResponsibilities])
+  }, [activeTabKey, canReadApprovalResponsibilities, currentAdmin, loading])
 
   if (loading && admins.length === 0 && !currentAdmin) {
     return (

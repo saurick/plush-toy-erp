@@ -100,6 +100,7 @@ export const MOBILE_MAIN_TAB_KEYS = Object.freeze({
   PROGRESS: 'progress',
   TODO: 'todo',
   DONE: 'done',
+  TRACKING: 'tracking',
   MESSAGES: 'messages',
   MINE: 'mine',
 })

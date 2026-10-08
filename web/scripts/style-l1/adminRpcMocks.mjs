@@ -799,6 +799,24 @@ export async function installAdminRpcMocks(
     let data
     if (method === 'get_effective_session') {
       data = { session: mockContext.effectiveSession }
+    } else if (method === 'get_process_submission_route') {
+      const routes = {
+        sales_order_acceptance: ['order_approval', 'boss', 'sales_order'],
+        material_supply: ['purchase_order_approval', 'boss', 'purchase_order'],
+        finished_goods_delivery: ['shipment_finance_approval', 'finance', 'shipment_finance'],
+        finance_payment_approval: ['finance_payment_approval', 'boss', ''],
+        inventory_adjustment_approval: ['inventory_adjustment_approval', 'boss', ''],
+        production_exception_approval: ['production_exception_decision_approval', 'boss', ''],
+      }
+      const selected = routes[params.process_key]
+      data = selected ? {
+        route: {
+          config_revision: 'style-l1-submission-routing',
+          process_key: params.process_key,
+          node_key: selected[0], owner_role_key: selected[1], approval_key: selected[2],
+          assignee_display_name: '', condition: { mode: 'all', amount: '', currency: '' },
+        },
+      } : unsupportedRpcMethod('customer_config', method)
     } else if (method === 'get_approval_settings') {
       if (
         approvalSettingsMode === 'confirmation_recovery' &&

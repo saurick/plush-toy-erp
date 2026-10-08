@@ -83,7 +83,7 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await page.getByTitle('品质人员', { exact: true }).click()
         await dialog.locator('.ant-form-item').filter({ hasText: '责任岗位' }).locator('.ant-select-selector').click()
         await page.getByTitle('业务', { exact: true }).click()
-        assert.match(await dialog.innerText(), /由岗位共同办理/)
+        assert.match(await dialog.innerText(), /由岗位人员处理/)
         const deadlineInput = dialog.getByLabel('截止时间')
         const deadlinePicker = dialog.locator('.erp-business-date-time-input')
         await deadlinePicker.click({ position: { x: 16, y: 16 } })
@@ -91,6 +91,15 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
           .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
           .last()
         await pickerPopup.waitFor()
+        assert.equal(await pickerPopup.locator('.ant-picker-ok').count(), 0, '日期时间不需要额外确认')
+        const dateCell = pickerPopup.locator('.ant-picker-cell-in-view:not(.ant-picker-cell-disabled)[title]').nth(10)
+        const selectedDay = await dateCell.getAttribute('title')
+        await dateCell.click()
+        await page.waitForFunction(({ expected }) => document.querySelector('.erp-business-date-time-input input')?.value.startsWith(expected), { expected: selectedDay.replaceAll('-', '/') })
+        const timeColumn = pickerPopup.locator('.ant-picker-time-panel-column').last()
+        await timeColumn.locator('.ant-picker-time-panel-cell').filter({ hasText: /^37$/ }).click()
+        await page.mouse.move(0, 0)
+        await page.waitForFunction(() => document.querySelector('.erp-business-date-time-input input')?.value.endsWith(':37'))
         assert.equal(
           await deadlineInput.getAttribute('readonly'),
           null,
@@ -200,7 +209,7 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await drawer.waitFor({ state: 'hidden' })
         await related.getByRole('button', { name: '确认包装尺寸' }).waitFor()
         await page.screenshot({ path: path.join(outputDir, `business-followup-related-${page.viewportSize().width}.png`), animations: 'disabled' })
-        await related.getByRole('button', { name: '销售订单审批（任务看板）', exact: true }).click()
+        await related.getByRole('button', { name: '销售订单审批（任务管理）', exact: true }).click()
         await page.waitForURL('**/erp/task-board?*')
         assert.equal(new URL(page.url()).searchParams.get('q'), 'SO-APPROVAL-100')
         await assertNoHorizontalOverflow(page, 'business-followup-create-retry-and-track')

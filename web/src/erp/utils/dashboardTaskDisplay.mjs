@@ -31,6 +31,8 @@ const TASK_SOURCE_TITLE_MAP = new Map([
   ['shipping-release', '出货放行'],
   ['outbound', '出库任务'],
   ['production-orders', '生产订单'],
+  ['production_order', '生产订单'],
+  ['bom_header', '工程资料'],
   ['production-scheduling', '排产确认'],
   ['production-progress', '生产记录'],
   ['production-exceptions', '异常处理'],

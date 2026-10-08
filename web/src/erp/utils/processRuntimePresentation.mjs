@@ -297,7 +297,7 @@ export function getProcessStatusLabel(instance = {}) {
   return PROCESS_STATUS_LABELS[instance.status] || '状态待确认'
 }
 
-function getProcessNodeTone(node = {}) {
+export function getProcessNodeTone(node = {}) {
   if (node.status === 'withdrawn') return 'withdrawn'
   if (node.outcome === 'rejected') return 'rejected'
   if (node.status === 'completed') return 'completed'

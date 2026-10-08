@@ -65,6 +65,9 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 	}
 
 	switch method {
+	case "get_process_submission_route":
+		return id, d.getProcessSubmissionRoute(ctx, pm), nil
+
 	case "start_finance_payment_approval_process",
 		"get_finance_payment_approval_process",
 		"execute_finance_payment_post",

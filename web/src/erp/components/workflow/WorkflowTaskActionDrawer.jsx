@@ -173,7 +173,7 @@ const TASK_ACTION_DESCRIPTIONS = Object.freeze({
   reject: '信息或处理结果不符合要求，退回上一责任方补充。',
   resume: '阻塞事项已经解决，恢复为可继续办理。',
   urge: '提醒当前负责人尽快处理，不代替对方完成任务。',
-  assign: '转给同一负责岗位的其他人员，或暂不指定个人并退回该岗位共同待办。',
+  assign: '转给同岗位的其他人员，或交回岗位，由有权限的人员处理。',
 })
 
 export function getTaskActionDescription(actionMode = '') {
@@ -193,7 +193,7 @@ export function getTaskActionDescription(actionMode = '') {
     return '请写清催办接收人和需要补齐的事项，便于对方了解原因。'
   }
   if (actionMode === 'assign') {
-    return '请选择同一负责岗位的合格在职人员；如果暂时不确定由谁接手，可退回该岗位共同待办。这一步只改处理人，不会把任务标为完成，也不会直接办理对应业务。'
+    return '请选择同岗位的接收人，或选择由岗位人员处理。转交只调整任务由谁处理，不会完成任务或办理对应业务。'
   }
   return '先选择处理方式；任务详情只用于核对，不会直接生成或修改业务记录。'
 }
@@ -229,6 +229,7 @@ export default function WorkflowTaskActionDrawer({
   onActionReasonChange,
   onAssignmentTargetChange,
   onClose,
+  onReturnToTracking,
   onOpenEntry,
   onSubmit,
 }) {
@@ -243,7 +244,7 @@ export default function WorkflowTaskActionDrawer({
   const currentAssigneeLabel =
     (assignmentAccess.current_assignee
       ? formatAdminIdentity(assignmentAccess.current_assignee)
-      : '') || (task?.assignee_id ? '已指定处理人' : '共同待办')
+      : '') || (task?.assignee_id ? '已指定处理人' : '由岗位人员处理')
   const taskDisplayName = task ? getWorkflowTaskDisplayName(task) : ''
   const exceptionContact = task
     ? getWorkflowTaskExceptionContactPresentation(task)
@@ -384,6 +385,7 @@ export default function WorkflowTaskActionDrawer({
     setTaskEventsError('')
     listWorkflowTaskEvents(task.id, { limit: 100, signal: controller.signal })
       .then(({ items, truncated }) => {
+        if (controller.signal.aborted) return
         setTaskEvents(items)
         setTaskEventsTruncated(truncated)
         setTaskEventsState('ready')
@@ -550,7 +552,8 @@ export default function WorkflowTaskActionDrawer({
 
   const showFooter = Boolean(
     task &&
-      (hasActionReceipt ||
+      (onReturnToTracking ||
+        hasActionReceipt ||
         activeStepKey !== 'context' ||
         canOpenRelatedEntry ||
         canViewAttachments ||
@@ -586,10 +589,19 @@ export default function WorkflowTaskActionDrawer({
       onClose={() => {
         if (!actionSaving) onClose?.()
       }}
-      className="erp-task-action-drawer"
+      className="erp-workflow-drawer erp-task-action-drawer"
       footer={
         showFooter ? (
           <div className="erp-task-action-drawer__footer">
+            {onReturnToTracking ? (
+              <Button
+                className="erp-task-action-drawer__footer-return"
+                disabled={actionSaving}
+                onClick={onReturnToTracking}
+              >
+                返回流程
+              </Button>
+            ) : null}
             <div
               ref={setSourceFooter}
               className="erp-material-task-action__footer-host"
@@ -870,6 +882,7 @@ export default function WorkflowTaskActionDrawer({
 
           {(hasActionReceipt && isEngineeringMaterialTask(task)) || activeStepKey === 'context' ? (
             <WorkflowTaskHandlingChain
+              onOpenTracking={onReturnToTracking}
               task={task}
               profile={profile}
               processContext={processContext}
@@ -1035,7 +1048,7 @@ export default function WorkflowTaskActionDrawer({
                           placeholder={
                             assignmentAccess.loading
                               ? '正在加载可选接收人'
-                              : '选择接收人，或退回负责岗位共同待办'
+                              : '选择接收人，或由岗位人员处理'
                           }
                           notFoundContent={
                             assignmentAccess.stale
@@ -1277,7 +1290,7 @@ export default function WorkflowTaskActionDrawer({
                             : '') ||
                             (task.assignee_id
                               ? '已指定处理人'
-                              : '负责岗位共同待办')}
+                              : '由岗位人员处理')}
                         </dd>
                       </div>
                       <div>

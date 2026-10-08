@@ -475,8 +475,8 @@ test("dev flow state observatory: task-name lookup and unlinked runtime boundary
   for (const copy of [
     "查找后台任务",
     "粘贴完整任务名称、任务编号、来源单号或数字 task_id",
-    "电脑端后台「任务看板」",
-    "从电脑端后台「任务看板」复制完整任务名称",
+    "电脑端后台「任务管理」",
+    "从电脑端后台「任务管理」复制完整任务名称",
     "数字 task_id 仅用于开发排障",
     "名称可能重复",
     "已找到任务，但它是模拟展示数据",

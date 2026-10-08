@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Form, Input, Select } from 'antd'
+import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
+import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { message } from '@/common/utils/antdApp'
@@ -84,7 +86,7 @@ export default function ProductionExceptionRequestModal({
         attempt,
         null
       )
-      message.success('生产异常申请已提交，请到任务中心审批')
+      showProcessSubmissionReceipt({ result: processData, title: '生产异常申请已提交' })
       onChanged?.(next)
       onClose?.()
     } catch (error) {
@@ -119,6 +121,7 @@ export default function ProductionExceptionRequestModal({
         showIcon
         message="这里只提交报废或让步申请；审批完成后仍须由生产岗位确认执行。"
       />
+      <ProcessSubmissionRoute processKey="production_exception_approval" customerKey={customerKey} open={open} />
       <Form
         form={form}
         name="production-exception-request"

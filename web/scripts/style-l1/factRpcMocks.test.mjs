@@ -1886,7 +1886,7 @@ test('style-l1 workflow mock serves the dedicated task board projection', async 
     const created = await call('create_task', {
       task_code: `STYLE-L1-BOARD-${index}`,
       task_group: 'trial_warehouse_work',
-      task_name: `任务看板分页 ${index}`,
+      task_name: `任务管理分页 ${index}`,
       source_type: 'shipping-release',
       source_id: index,
       task_status_key: 'ready',

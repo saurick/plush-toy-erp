@@ -58,7 +58,7 @@ export function prepareUIDesignSandboxSource(
 ) {
   const html = String(source || '')
   if (!html) return ''
-  const entry = ['workspace', 'login', 'help', 'workbench'].includes(page)
+  const entry = ['workspace', 'login', 'help', 'workbench', 'mobile-tasks'].includes(page)
     ? page
     : 'workspace'
   const bootstrap = `${SANDBOX_STORAGE_SHIM}\n<script>window.__ERP_UI_DESIGN_ENTRY__ = ${JSON.stringify(entry)};</script>`

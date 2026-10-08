@@ -36,7 +36,7 @@ export default function DevUIDesignPage() {
   const readerRef = useRef(null)
   const fullscreenButtonRef = useRef(null)
   const requestedPage = searchParams.get('page')
-  const previewPage = ['login', 'help', 'workbench', 'controls'].includes(
+  const previewPage = ['login', 'help', 'workbench', 'controls', 'mobile-tasks'].includes(
     requestedPage
   )
     ? requestedPage
@@ -161,6 +161,7 @@ export default function DevUIDesignPage() {
             value={previewPage}
             options={[
               { value: 'workspace', label: '业务界面' },
+              { value: 'mobile-tasks', label: '移动端任务' },
               { value: 'workbench', label: '效能工作台' },
               { value: 'login', label: '登录页' },
               { value: 'help', label: '岗位帮助' },

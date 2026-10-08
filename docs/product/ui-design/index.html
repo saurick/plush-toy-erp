@@ -822,6 +822,9 @@
     .lane-more { margin: 0 8px 8px; }
     .task-object { margin-top: 8px; color: var(--text-2); line-height: 1.45; }
     .task-reason { margin-top: 7px; color: var(--danger); font-size: 12px; line-height: 1.45; }
+    .task-initiator { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; max-width: 100%; overflow-wrap: anywhere; }
+    .task-initiator > small { max-width: 100%; font-size: 12px; }
+    .task-responsibility-role { display: inline-block; max-width: 100%; padding: 1px 6px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-muted); color: var(--text); font-size: inherit; font-weight: 600; line-height: 1.5; vertical-align: baseline; }
     .task-meta { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--line); display: flex; align-items: center; gap: 6px; color: var(--text-3); font-size: 11px; }
 
     .form-view { height: 100%; min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); overflow: hidden; box-shadow: var(--shadow); }
@@ -1001,11 +1004,42 @@
     }
     .rm-filter-button.active { color: var(--brand-strong); border-color: var(--brand); background: var(--brand-softer); }
     .rm-filter-count { min-width: 18px; height: 18px; padding: 0 4px; display: inline-grid; place-items: center; border-radius: 999px; color: var(--on-brand); background: var(--brand); font-size: 10px; font-weight: 750; }
+    .rm-preview-content { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .rm-preview-content > .role-mobile-screen { flex: 1; min-height: 0; }
+    .rm-tracking { display: grid; gap: 12px; padding: 8px 12px 16px; }
+    .rm-tracking .rm-query { margin: 0; padding: 0; }
+    .rm-tracking .rm-tracking-scope { display: grid; grid-template-columns: 1fr 1fr; }
+    .rm-tracking-status { display: flex; gap: 6px; align-items: center; }
+    .rm-tracking-card { position: relative; display: grid; gap: 9px; padding: 12px 13px; border: 1px solid var(--line-strong); border-radius: 16px; background: var(--surface); }
+    .rm-tracking-open { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: inherit; background: transparent; }
+    .rm-tracking-card > :not(.rm-tracking-open) { pointer-events: none; }
+    .rm-tracking-card .product-thumb { position: relative; pointer-events: auto; }
+    .rm-tracking-card .rm-card-head { justify-content: space-between; }
+    .rm-tracking-card .product-cell > div,.rm-tracking-layer .product-cell > div { min-width: 0; display: grid; gap: 4px; }
+    .rm-tracking-card .product-cell small,.rm-tracking-layer .product-cell small { color: var(--text-3); overflow-wrap: anywhere; }
+    .rm-tracking-owner { padding-top: 9px; border-top: 1px solid var(--line); font-size: 13px; }
+    .rm-tracking-origin { display: flex; justify-content: space-between; align-items: start; gap: 8px; color: var(--text-3); font-size: 11px; }
+    .rm-tracking-end { text-align: center; }
+    .rm-tracking-filters { top: 152px; max-height: calc(100% - 168px); }
+    .rm-tracking-filters .rm-sheet-group { display: grid; gap: 8px; text-align: center; }
+    .rm-tracking-filters select { width: 100%; min-height: 38px; }
+    .rm-tracking-layer { position: absolute; inset: 0; z-index: 35; }
+    .rm-tracking-layer .drawer { width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+    .rm-tracking-layer .drawer-head,.rm-tracking-layer .drawer-body,.rm-tracking-layer .drawer-foot { padding: 12px; }
+    .rm-tracking-layer .drawer-foot { flex-wrap: wrap; }
+    .rm-tracking-layer .drawer-foot .data-note { flex: 1; font-size: 11px; }
+    .workflow-tracking-current { display: flex; align-items: baseline; gap: 4px; margin: 10px 0 12px; font-size: 13px; line-height: 1.7; }
+    .workflow-tracking-current > span { flex-shrink: 0; color: var(--text-3); }
+    .workflow-tracking-current > div { min-width: 0; overflow-wrap: anywhere; }
+    .drawer-foot.workflow-tracking-foot { flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+    .workflow-tracking-foot > .btn { flex-shrink: 0; }
+    .workflow-tracking-foot-controls { display: flex; flex: 1; min-width: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+    .workflow-tracking-foot-controls .btn { max-width: 100%; white-space: normal; }
     .rm-view-tabs {
       margin: 5px 12px 0;
       padding: 3px;
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       border: 1px solid var(--line);
       border-radius: 12px;
       background: var(--surface-muted);
@@ -2151,7 +2185,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: .01ms !important; transition-delay: 0s !important; scroll-behavior: auto !important; }
+      *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0s !important; transition-duration: 0s !important; transition-delay: 0s !important; scroll-behavior: auto !important; }
     }
     .visual-controls { padding: 8px 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 9px 16px; }
     .visual-chips { min-width: 0; display: flex; flex-wrap: wrap; gap: 5px; }
@@ -2525,10 +2559,10 @@
   --erp-tab-motion-easing: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-    .progress-navigation-tabs,.statistics-display-tabs {position:relative;isolation:isolate;}
-    .progress-navigation-tabs::before,.statistics-display-tabs::before {position:absolute;content:'';z-index:0;top:0;left:0;width:var(--erp-slider-width,0px);height:var(--erp-slider-height,0px);transform:translate(var(--erp-slider-x,0px),var(--erp-slider-y,0px));background:var(--brand-soft);border-radius:6px;box-shadow:inset 0 0 0 1px var(--line);pointer-events:none;}
-    .progress-navigation-tabs[data-sliding-ready=true]::before,.statistics-display-tabs[data-sliding-ready=true]::before {transition:transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),width var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);}
-    .segment.progress-navigation-tabs button,.segment.statistics-display-tabs button {position:relative;z-index:1;background:transparent;box-shadow:none;}
+    .progress-navigation-tabs,.statistics-display-tabs,.task-tracking-tabs,.rm-view-tabs {position:relative;isolation:isolate;}
+    .progress-navigation-tabs::before,.statistics-display-tabs::before,.task-tracking-tabs::before,.rm-view-tabs::before {position:absolute;content:'';z-index:0;top:0;left:0;width:var(--erp-slider-width,0px);height:var(--erp-slider-height,0px);transform:translate(var(--erp-slider-x,0px),var(--erp-slider-y,0px));background:var(--brand-soft);border-radius:6px;box-shadow:inset 0 0 0 1px var(--line);pointer-events:none;}
+    .progress-navigation-tabs[data-sliding-ready=true]::before,.statistics-display-tabs[data-sliding-ready=true]::before,.task-tracking-tabs[data-sliding-ready=true]::before,.rm-view-tabs[data-sliding-ready=true]::before {transition:transform var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),width var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);}
+    .segment.progress-navigation-tabs button,.segment.statistics-display-tabs button,.segment.task-tracking-tabs button,.rm-view-tabs button,.rm-view-tabs button.active {position:relative;z-index:1;background:transparent;box-shadow:none;}
     @media(prefers-reduced-motion:reduce){:root{--erp-tab-motion-duration:0ms;}}
 
     .statistics-design {--erp-primary:var(--brand);--erp-primary-strong:var(--brand-strong);--erp-text:var(--text);--erp-text-muted:var(--text-2);--erp-text-subtle:var(--text-3);--erp-border:var(--line);--erp-border-strong:var(--line-strong);--erp-surface-bg:var(--surface);--erp-surface-bg-muted:var(--surface-muted);--erp-danger:var(--danger);font-size:13px;}
@@ -2966,8 +3000,8 @@
     const tasks = [
       { id: 'T01', approval: true, sourcePage: 'sales', sourceRecordId: 'S01', actions: ['complete','reject','block','urge','assign'], candidates: [['engineer-peer','周敏 · 产品工程']], lane: 'normal', title: '审批工程用料申请', object: 'SO-20260925-001 · 节庆毛绒礼盒', role: '产品工程', time: '今天 10:20', state: '可执行', badge: 'info', reason: '' },
       { id: 'T02', sourcePage: 'purchase', sourceRecordId: 'P02', sourceAction: '查看采购订单并登记到货', actions: [], lane: 'normal', title: '登记采购订单到货', object: 'PO-20260924-013 · 塑料眼 12mm', role: '采购', time: '今天 11:40', state: '可执行', badge: 'info', reason: '' },
-      { id: 'T03', sourcePage: 'sales', sourceRecordId: 'S04', actions: ['resume','urge','assign'], candidates: [['sales-peer','林晓 · 销售']], lane: 'blocked', title: '处理客供图确认阻塞', object: 'SO-20260922-003 · 品牌吉祥物 30cm', role: '销售', time: '进入本岗 2 天', state: '阻塞', badge: 'danger', reason: '客户尚未确认最新绣花图稿，排产无法继续。' },
-      { id: 'T04', approval: true, sourcePage: 'quality', sourceRecordId: 'quality-1', actions: ['resume','urge'], lane: 'blocked', title: '复核质检异常处置', object: 'QI-20260924-019 · 海洋系列抱枕', role: '质量', time: '进入本岗 6 小时', state: '阻塞', badge: 'danger', reason: '抽检色差超出标准，需要质量负责人判定。' },
+      { id: 'T03', sourcePage: 'sales', sourceRecordId: 'S04', actions: ['resume','urge','assign'], candidates: [['sales-peer','林晓 · 销售']], lane: 'blocked', title: '处理客供图确认阻塞', object: 'SO-20260922-003 · 品牌吉祥物 30cm', role: '销售', time: '进入岗位：销售 · 2 天', state: '阻塞', badge: 'danger', reason: '客户尚未确认最新绣花图稿，排产无法继续。' },
+      { id: 'T04', approval: true, sourcePage: 'quality', sourceRecordId: 'quality-1', actions: ['resume','urge'], lane: 'blocked', title: '复核质检异常处置', object: 'QI-20260924-019 · 海洋系列抱枕', role: '质量', time: '进入岗位：质量 · 6 小时', state: '阻塞', badge: 'danger', reason: '抽检色差超出标准，需要质量负责人判定。' },
       { id: 'T05', sourcePage: 'production', sourceRecordId: 'production-1', sourceAction: '打开生产订单安排排产', actions: [], lane: 'due', title: '安排生产订单排产', object: 'MO-20260922-026 · IP 联名公仔', role: 'PMC', time: '截止 今天 16:00', state: '到期提醒', badge: 'warning', reason: '' },
       { id: 'T06', sourcePage: 'shipments', sourceRecordId: 'shipments-1', actions: ['complete','block','urge','assign'], candidates: [['warehouse-peer','王宁 · 仓库']], lane: 'due', title: '完成出货放行复核', object: 'SR-20260925-006 · 冬日动物系列', role: '仓库', time: '截止 明天 10:00', state: '到期提醒', badge: 'warning', reason: '' },
       { id: 'T07', approval: true, sourcePage: 'purchase', sourceRecordId: 'P04', actions: [], lane: 'done', title: '采购订单审批完成', object: 'PO-20260920-016 · 数码印花布', role: '采购主管', time: '今天 09:18', state: '已完成', badge: 'success', reason: '' },
@@ -2981,7 +3015,7 @@
         history: [['任务进入仓库岗位','今天 09:36'],['质量复核已完成','今天 09:18 · 质量']]
       },
       {
-        id: 'M02', sourcePage: 'purchase', sourceRecordId: 'P02', status: 'todo', order: 2, title: '确认采购到货差异', source: 'PO-20260924-013', object: '塑料眼 12mm / 黑', role: '仓库', deadline: '进入本岗 3 小时', state: '阻塞', badge: 'danger', risk: true, overdue: false, approval: false, access: 'actionable', actions: ['resume','urge'], attachments: 3,
+        id: 'M02', sourcePage: 'purchase', sourceRecordId: 'P02', status: 'todo', order: 2, title: '确认采购到货差异', source: 'PO-20260924-013', object: '塑料眼 12mm / 黑', role: '仓库', deadline: '进入岗位：仓库 · 3 小时', state: '阻塞', badge: 'danger', risk: true, overdue: false, approval: false, access: 'actionable', actions: ['resume','urge'], attachments: 3,
         reason: '实收 19,600 个，送货单为 20,000 个，等待采购确认差异。',
         facts: [['供应商','宏达辅料有限公司'],['计划数量','20,000 个'],['实收数量','19,600 个'],['差异','短少 400 个']],
         history: [['仓库登记到货差异','今天 08:42'],['采购订单已审批','昨天 15:20 · 采购主管']]
@@ -3294,7 +3328,7 @@
 
     const desktopPageCatalog = [
       { key: 'dashboard', group: '工作中心', title: '工作台', kind: '工作台', description: '今日待办、风险与业务摘要' },
-      { key: 'tasks', group: '工作中心', title: '任务看板', kind: '任务看板', description: '按任务状态和岗位办理协同任务' },
+      { key: 'tasks', group: '工作中心', title: '任务管理', kind: '任务管理', description: '按任务状态和岗位办理协同任务' },
       { key: 'progress', group: '工作中心', title: '进度看板', kind: '管理看板', description: '订单交付与生产执行进度' },
       ...['customers','suppliers','products','materials','sales','bom','processes','purchase','inbound','quality','inventory','outsourcing'].map(key => ({
         key, group: listConfig[key].group, title: listConfig[key].title, kind: listConfig[key].kind, description: listConfig[key].description
@@ -3798,8 +3832,8 @@
       {name:'陈强',account:'purchase01',phone:'',roles:['purchase'],status:'暂停'}
     ];
     const approvalRules = [
-      ['销售订单审批','业务','PMC','老板 / 管理层',{mode:'all',amount:'',currency:''}],
-      ['采购订单审批','采购','财务','老板 / 管理层',{mode:'all',amount:'',currency:''}],
+      ['销售订单审批','老板 / 管理层','未设置','未设置',{mode:'all',amount:'',currency:''}],
+      ['采购订单审批','老板 / 管理层','未设置','未设置',{mode:'all',amount:'',currency:''}],
       ['出货财务确认','财务','PMC','老板 / 管理层',{mode:'all',amount:'',currency:''}]
     ];
 
@@ -3829,7 +3863,7 @@
       loginMethod: localStorage.getItem('erp-login-method') === 'sms' && LOGIN_OPTIONS.sms ? 'sms' : 'password', loginValues: {account:'',password:'',phone:'',code:''},
       loginBusy: false, loginInvalid: [], loginCapsLock: false, loginDialog: null,
       loginSmsSending: false, loginSmsPhone: '', loginSmsDeadline: 0, loginSmsExpires: 0, loginSmsHint: '',
-      page: window.__ERP_UI_DESIGN_ENTRY__ === 'workbench' ? 'dev-workbench' : window.__ERP_UI_DESIGN_ENTRY__ === 'help' ? 'help' : 'dashboard', status: 'all', search: '', selected: new Set(), sortKey: 'date', sortDir: 'asc', pageNo: 1,
+      page: window.__ERP_UI_DESIGN_ENTRY__ === 'mobile-tasks' ? 'mobile-tasks' : window.__ERP_UI_DESIGN_ENTRY__ === 'workbench' ? 'dev-workbench' : window.__ERP_UI_DESIGN_ENTRY__ === 'help' ? 'help' : 'dashboard', status: 'all', search: '', selected: new Set(), sortKey: 'date', sortDir: 'asc', pageNo: 1,
       devArea: 'overview', devViews: { overview: 'evidence', quality: 'plan', delivery: 'versions' }, devSearch: {}, devFilter: {}, devPinned: [], devState: 'data', devEvidence: 'missing', devOperation: null, devPrepared: null,
       devQualityChecked: false, devPressurePreview: null,
       density: initialAppearance.density,
@@ -3840,7 +3874,7 @@
       columnDraft: null,
       columnOrder: ['no', 'party', 'status', 'date', 'metric', 'owner', 'progress', 'risk'],
       filterParty: '', filterOwner: 'all', filterRisk: 'all', filterIncludeEnded: true, filterDateFrom: '', filterDateTo: '',
-      overlay: null, drawer: null, taskStep: 1, taskMaxStep: 1, taskAction: 'complete', boardStatus: 'all', boardMode: 'all', boardSearch: '', boardRole: 'all',
+      overlay: null, drawer: null, taskStep: 1, taskMaxStep: 1, taskAction: 'complete', boardStatus: 'all', boardMode: 'all', boardSearch: '', boardRole: 'all', trackingFilters: {}, trackingPageSizes: {},
       previewState: 'data', catalogSearch: '', detailTab: 'basic', businessAction: 'primary', businessActionLabel: '', batchAction: '', summaryOpen: false, permissionRole: 'warehouse', permissionTab: 'roles', permissionDirty: false,
       permissionNavigationView: 'layout', permissionSelectedOnly: false, permissionAccountStatus: '全部', permissionAccountSearch: '', permissionAccountEditor: null, permissionAccountDirty: false, permissionApprovalDirty: false, permissionSaved: null, permissionSearch: '', permissionOpenGroups: new Set(permissionGroupsData.map(([key])=>key)),
       permissionValues: {}, approvalRuleStatus: {}, permissionScopeType: {warehouse:'warehouses'}, permissionScopeValue: {warehouse:['finished','raw']}, permissionMenus: {},
@@ -3865,6 +3899,7 @@
       permissionMenuRole: 'warehouse',
       progressView: 'orders', progressRisk: 'all', progressSearch: '', progressSelected: 'MP01',
       mobileMain: 'tasks', mobileTab: 'todo', mobileQuick: 'all', mobileSearch: '', mobileSort: 'newest', mobileStatus: '',
+      mobileTrackingScope: 'started', mobileTrackingQueries: { started: {}, participated: {} }, mobileTrackingOpen: false, mobileTrackingReturn: false,
       mobileReviewRole: 'all',
       mobileOptionsOpen: false, mobileScreen: 'list', mobileTaskId: null, mobileAction: 'done', mobileReason: '', mobileError: '',
       mobileVisibleCount: 4, mobileScrollTop: 0, mobileReceipt: null, mobileCanProgress: true,
@@ -3915,6 +3950,23 @@
 
     function copyValue(value) {
       return `<span class="copy-value"><span>${escapeHTML(value)}</span><button data-action="copy-value" data-value="${escapeHTML(value)}" aria-label="复制 ${escapeHTML(value)}">${icon('copy')}</button></span>`;
+    }
+
+    async function copyPrototypeValue(value) {
+      try {
+        const policy = document.permissionsPolicy || document.featurePolicy;
+        if (policy?.allowsFeature('clipboard-write') !== false && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(value);
+        } else {
+          const field = document.createElement('textarea');
+          field.value = value;
+          field.style.cssText = 'position:fixed;left:-9999px';
+          document.body.appendChild(field);
+          try { field.select(); if (!document.execCommand('copy')) throw new Error('copy unavailable'); }
+          finally { field.remove(); }
+        }
+        toast(`已复制：${value}`);
+      } catch { toast('复制失败，请选中文字复制'); }
     }
 
     function getRecordAction(config, row) {
@@ -4042,7 +4094,7 @@
       }
       const itemHTML=(item,index,items,isPrimary)=>`<div class="permission-nav-item" data-navigation-module="${item.key}"><div class="permission-nav-identity"><strong>${item.title}</strong>${item.pages.length>1?`<label class="permission-nav-default">默认页面<select aria-label="${item.title}默认页面" data-permission-menu-default="${item.key}" ${readOnly?'disabled':''}>${item.pages.map(page=>`<option value="${page.key}" ${menu.defaults[item.key]===page.key?'selected':''}>${page.title}</option>`).join('')}</select></label>`:`<span class="data-note">${item.pages[0].title}</span>`}</div><div class="record-actions"><button class="btn" aria-label="上移 ${item.title}" data-action="permission-menu-move" data-key="${item.key}" data-value="up" ${readOnly||index===0?'disabled':''}>上移</button><button class="btn" aria-label="下移 ${item.title}" data-action="permission-menu-move" data-key="${item.key}" data-value="down" ${readOnly||index===items.length-1?'disabled':''}>下移</button><button class="btn" aria-label="移到${isPrimary?'其他':'常用'} ${item.title}" data-action="permission-menu-placement" data-key="${item.key}" ${readOnly||(isPrimary?primary.length<=1:primary.length>=5)?'disabled':''}>移到${isPrimary?'其他':'常用'}</button></div></div>`;
       const preview=(items)=>items.map(item=>`<span class="badge info">${item.title}</span>`).join('')||'<span class="data-note">当前没有可显示入口</span>';
-      return `<div class="permission-editor">${tabs}<section class="permission-block"><div class="permission-toolbar"><strong>设置岗位导航</strong><select aria-label="岗位导航排列方式" id="permission-menu-mode" ${readOnly?'disabled':''}><option value="recommended" ${menu.layout==='recommended'?'selected':''}>系统推荐</option><option value="custom" ${menu.layout==='custom'?'selected':''}>自定义布局</option></select></div><p class="data-note">所有获准入口在侧栏直接显示，每个业务模块只占一个入口；默认页面从已获准页面中选择，再次进入仍会恢复最近访问页。</p>${menu.layout==='recommended'?'<p class="data-note">系统按岗位推荐常用模块；工作中心固定在最前。</p>':`<p class="data-note">常用工作需保留 1–5 个入口；调整位置与默认页面不会增加权限。</p><div class="permission-nav-columns"><section class="permission-block"><h3>常用工作 · ${primary.length} 个入口</h3><div class="permission-nav-list">${primary.map((item,index)=>itemHTML(item,index,primary,true)).join('')}</div></section><section class="permission-block"><h3>其他入口 · ${secondary.length} 个入口</h3><div class="permission-nav-list">${secondaryGroups.map(group=>`<strong class="data-note">${group.title}</strong>${group.items.map((item,index)=>itemHTML(item,index,group.items,false)).join('')}`).join('')||'<p class="data-note">当前没有可排列入口</p>'}</div></section></div>`}</section><section><h3>导航位置预览</h3><p class="data-note">工作中心固定在最前，常用工作优先排列，其余入口按业务分组直接显示；模块内保留该岗位获准的页面。</p><div class="permission-nav-preview"><section class="permission-block"><h3>工作中心</h3><div class="permission-nav-tags">${['工作台','任务看板','进度看板'].map(label=>`<span class="badge info">${label}</span>`).join('')}</div></section><section class="permission-block"><h3>常用工作</h3><div class="permission-nav-tags">${preview(primary)}</div></section>${['业务模块','工具与查询','系统与帮助'].map(title=>({title,items:[...secondary.filter(item=>item.area===title),...(title==='工具与查询'?[{title:'历史记录中心'}]:title==='系统与帮助'?[{title:'帮助中心'}]:[])]})).filter(group=>group.items.length).map(group=>`<section class="permission-block"><h3>${group.title}</h3><div class="permission-nav-tags">${preview(group.items)}</div></section>`).join('')}</div></section></div>`;
+      return `<div class="permission-editor">${tabs}<section class="permission-block"><div class="permission-toolbar"><strong>设置岗位导航</strong><select aria-label="岗位导航排列方式" id="permission-menu-mode" ${readOnly?'disabled':''}><option value="recommended" ${menu.layout==='recommended'?'selected':''}>系统推荐</option><option value="custom" ${menu.layout==='custom'?'selected':''}>自定义布局</option></select></div><p class="data-note">所有获准入口在侧栏直接显示，每个业务模块只占一个入口；默认页面从已获准页面中选择，再次进入仍会恢复最近访问页。</p>${menu.layout==='recommended'?'<p class="data-note">系统按岗位推荐常用模块；工作中心固定在最前。</p>':`<p class="data-note">常用工作需保留 1–5 个入口；调整位置与默认页面不会增加权限。</p><div class="permission-nav-columns"><section class="permission-block"><h3>常用工作 · ${primary.length} 个入口</h3><div class="permission-nav-list">${primary.map((item,index)=>itemHTML(item,index,primary,true)).join('')}</div></section><section class="permission-block"><h3>其他入口 · ${secondary.length} 个入口</h3><div class="permission-nav-list">${secondaryGroups.map(group=>`<strong class="data-note">${group.title}</strong>${group.items.map((item,index)=>itemHTML(item,index,group.items,false)).join('')}`).join('')||'<p class="data-note">当前没有可排列入口</p>'}</div></section></div>`}</section><section><h3>导航位置预览</h3><p class="data-note">工作中心固定在最前，常用工作优先排列，其余入口按业务分组直接显示；模块内保留该岗位获准的页面。</p><div class="permission-nav-preview"><section class="permission-block"><h3>工作中心</h3><div class="permission-nav-tags">${['工作台','任务管理','进度看板'].map(label=>`<span class="badge info">${label}</span>`).join('')}</div></section><section class="permission-block"><h3>常用工作</h3><div class="permission-nav-tags">${preview(primary)}</div></section>${['业务模块','工具与查询','系统与帮助'].map(title=>({title,items:[...secondary.filter(item=>item.area===title),...(title==='工具与查询'?[{title:'历史记录中心'}]:title==='系统与帮助'?[{title:'帮助中心'}]:[])]})).filter(group=>group.items.length).map(group=>`<section class="permission-block"><h3>${group.title}</h3><div class="permission-nav-tags">${preview(group.items)}</div></section>`).join('')}</div></section></div>`;
     }
 
     function supportsBatchPrint(config) {
@@ -4347,7 +4399,7 @@
       if (state.page === 'dev-workbench') { renderDevSidebar(); return; }
       devDesignTabObserver.disconnect();
       const nav = [
-        ['工作中心', [['dashboard','home','工作台', ''], ['tasks','task','任务看板', tasks.filter(task=>task.lane!=='done').length], ['progress','chart','进度看板', '']]],
+        ['工作中心', [['dashboard','home','工作台', ''], ['tasks','task','任务管理', tasks.filter(task=>task.lane!=='done').length], ['progress','chart','进度看板', '']]],
         ['业务模块', [['master-hub','database','基础资料',''], ['sales','shopping','销售管理',''], ['engineering-hub','engineering','产品工程',''], ['purchase','purchase','采购管理',''], ['outsourcing','outsourcing','委外管理',''], ['production-hub','production','生产管理',''], ['warehouse-hub','warehouse','库存管理',''], ['quality','shield','质检管理',''], ['shipping-hub','shipping','出货管理',''], ['finance-hub','finance','财务管理','']]],
         ['工具与查询', [['print','printer','模板打印中心',''], ['history','history','历史记录中心','']]],
         ['系统与帮助', [['permissions','setting','权限管理',''], ['audit','audit','系统操作记录',''], ['help','help','帮助中心','']]]
@@ -4370,7 +4422,7 @@
     function titleForPage() {
       if (state.page === 'dev-workbench') return devDesignAreas[state.devArea].label;
       if (state.page === 'dashboard') return '工作台';
-      if (state.page === 'tasks') return '任务看板';
+      if (state.page === 'tasks') return '任务管理';
       if (state.page === 'progress') return '进度看板';
       if (state.page === 'mobile-tasks') return '移动待办预览';
       if (state.page === 'entity-form') {
@@ -4423,9 +4475,9 @@
         const ownerOk = state.filterOwner === 'all' || row.owner === state.filterOwner || row.role === state.filterOwner;
         const riskOk = state.filterRisk === 'all' || (state.filterRisk === 'near' ? row.risk === '临近交付' : state.filterRisk === 'blocked' ? ['阻塞','已阻塞'].includes(row.risk) || row.status === 'blocked' : row.risk === state.filterRisk);
         const endedOk = state.filterIncludeEnded || !endedStatuses.has(row.status);
-        const date = String(rowDate(row)).replaceAll('/', '-');
-        const fromOk = !state.filterDateFrom || date >= state.filterDateFrom;
-        const toOk = !state.filterDateTo || date <= state.filterDateTo;
+        const date = isoDay(rowDate(row));
+        const fromOk = !state.filterDateFrom || (date && date >= state.filterDateFrom);
+        const toOk = !state.filterDateTo || (date && date <= state.filterDateTo);
         return statusOk && (!q || hay.includes(q)) && partyOk && ownerOk && riskOk && endedOk && fromOk && toOk;
       });
       rows = rows.slice().sort((a, b) => {
@@ -5024,7 +5076,7 @@
     function renderDashboard() {
       const config = { title: '工作台' };
       const isSummary = state.dashboardView === 'summary';
-      const operation = `<section class="page-navigation"><div class="navigation-row"><div class="segment" aria-label="工作台内容">${[['tasks','待办'],['summary','业务汇总']].map(([key,label])=>`<button class="${state.dashboardView===key?'active':''}" data-action="dashboard-view" data-value="${key}">${label}</button>`).join('')}</div>${isSummary?`<div class="segment" aria-label="汇总类型">${[['materials','工程用料'],['sales','销售订单'],['outsourcing','委外合同明细']].map(([key,label])=>`<button class="${state.dashboardSummaryType===key?'active':''}" data-action="dashboard-summary-type" data-value="${key}">${label}</button>`).join('')}</div><label class="search">${icon('search')}<input id="dashboard-summary-search" value="${escapeHTML(state.dashboardSummarySearch)}" placeholder="搜索订单、产品、材料、供应商" /></label>`:''}<div class="command-actions"><button class="btn" data-action="nav" data-page="${isSummary?'progress':'tasks'}">${isSummary?'进度看板':'任务看板'}</button></div></div></section>`;
+      const operation = `<section class="page-navigation"><div class="navigation-row"><div class="segment" aria-label="工作台内容">${[['tasks','待办'],['summary','业务汇总']].map(([key,label])=>`<button class="${state.dashboardView===key?'active':''}" data-action="dashboard-view" data-value="${key}">${label}</button>`).join('')}</div>${isSummary?`<div class="segment" aria-label="汇总类型">${[['materials','工程用料'],['sales','销售订单'],['outsourcing','委外合同明细']].map(([key,label])=>`<button class="${state.dashboardSummaryType===key?'active':''}" data-action="dashboard-summary-type" data-value="${key}">${label}</button>`).join('')}</div><label class="search">${icon('search')}<input id="dashboard-summary-search" value="${escapeHTML(state.dashboardSummarySearch)}" placeholder="搜索订单、产品、材料、供应商" /></label>`:''}<div class="command-actions"><button class="btn" data-action="nav" data-page="${isSummary?'progress':'tasks'}">${isSummary?'进度看板':'任务管理'}</button></div></div></section>`;
       if (state.previewState !== 'data') return `${operation}${renderDataState(config)}`;
       if (isSummary) return `${operation}${renderDashboardSummary()}`;
       const activeTasks = tasks.filter(task=>task.lane!=='done');
@@ -5317,7 +5369,7 @@ return {orders,financeCustomers};})();
           "title": "办理审批和退回",
           "description": "先核对来源、金额、交期和附件，再选择通过或退回。",
           "path": "/erp/task-board",
-          "actionLabel": "打开任务看板",
+          "actionLabel": "打开任务管理",
           "steps": [
             {
               "title": "核对事项与来源",
@@ -5325,7 +5377,7 @@ return {orders,financeCustomers};})();
               "roles": [
                 "boss"
               ],
-              "description": "从任务看板打开待审批事项，并进入对应来源记录。"
+              "description": "从任务管理打开待审批事项，并进入对应来源记录。"
             },
             {
               "title": "核对办理依据",
@@ -6779,7 +6831,7 @@ return {orders,financeCustomers};})();
           "title": "查看任务和风险",
           "description": "先定位缺料、阻塞、逾期和需要跨岗协调的事项。",
           "path": "/erp/task-board",
-          "actionLabel": "打开任务看板",
+          "actionLabel": "打开任务管理",
           "steps": [
             {
               "title": "找到需要处理的事项",
@@ -9669,14 +9721,43 @@ return {orders,financeCustomers};})();
       return roleHelpPreview.html();
     }
 
+    function renderTaskFilterPopover() {
+      const tracking = ['started','participated'].includes(state.boardMode);
+      const f = state.trackingFilters[state.boardMode] || {};
+      const select = (key, label, options) => `<label class="control"><span>${label}</span><select data-tracking-filter="${key}" aria-label="${label}">${options.map(([value,text])=>`<option value="${value}" ${f[key]===value?'selected':''}>${text}</option>`).join('')}</select></label>`;
+      const fields = tracking ? `
+          ${select('status','流转状态',[['','全部状态'],['active','进行中'],['completed','已结束']])}
+          ${select('role','当前岗位',[['','全部当前岗位'],['老板','老板'],['业务','业务'],['采购','采购'],['工程','工程'],['生产','生产'],['仓库','仓库'],['财务','财务'],['PMC','PMC'],['品质','品质']])}
+          ${select('source','单据类型',[['','全部单据类型'],['sales_order','销售订单'],['purchase_order','采购订单'],['production_order','生产订单'],['outsourcing_order','加工合同'],['shipment','出货单'],['purchase_receipt','采购收货单'],['finance_payment','收付款与核销'],['inventory_operation','库存调整'],['production_exception_decision','生产异常处置'],['production_fact','生产记录'],['quality_inspection','质量检验'],['bom_header','工程资料'],['engineering_material_request','工程用料审批']])}
+          ${select('attention','关注事项',[['','全部情况'],['overdue','只看逾期'],['blocked','只看受阻']])}
+          <label class="control"><span>发起时间</span><input data-tracking-filter="from" type="date" aria-label="开始日期" value="${f.from || ''}" max="${f.to || ''}"/><span>至</span><input data-tracking-filter="to" type="date" aria-label="结束日期" value="${f.to || ''}" min="${f.from || ''}"/></label>` : `<label class="control"><span>负责岗位</span><select id="board-role" aria-label="负责岗位"><option value="all">全部岗位</option>${[...new Set(tasks.map(task=>task.role))].map(role=>`<option value="${role}" ${state.boardRole===role?'selected':''}>${role}</option>`).join('')}</select></label>`;
+      const trigger = document.querySelector('[data-action="open-task-filter"]')?.getBoundingClientRect();
+      const top = Math.min((trigger?.bottom || 130) + 8, Math.max(12, innerHeight - 360));
+      const right = Math.max(12, innerWidth - (trigger?.right || innerWidth - 12));
+      const active = tracking ? Object.values(f).some(Boolean) : Boolean(state.boardSearch || state.boardRole !== 'all');
+      return `<section class="popover" id="task-filter-popover" role="dialog" aria-label="筛选条件" style="top:${top}px;right:${right}px;width:min(560px,calc(100vw - 24px))"><div class="popover-head"><strong>筛选条件</strong><button class="btn" data-action="task-filter-clear" ${active?'':'disabled'}>清空筛选</button></div><div class="filter-grid">${fields}</div><div class="popover-foot"><button class="btn primary" data-action="close-overlay">完成</button></div></section>`;
+    }
+
     function renderTaskBoard() {
+      const tracking = ['started','participated'].includes(state.boardMode);
+      const scope = `<div class="segment" aria-label="任务范围">${[['todo','待我处理'],['approval','待我审批'],['all','全部任务'],['tracking','流程跟踪']].map(([key,label])=>`<button data-action="board-mode" data-value="${key}" class="${(tracking?'tracking':state.boardMode)===key?'active':''}" aria-pressed="${(tracking?'tracking':state.boardMode)===key}">${label}</button>`).join('')}</div>`;
+      if (tracking) {
+        const f = state.trackingFilters[state.boardMode] || {};
+        const trackingScope = `<div class="segment task-tracking-tabs" aria-label="跟踪范围">${[['started','我发起的'],['participated','我参与的']].map(([value,label])=>`<button data-action="tracking-scope" data-value="${value}" class="${state.boardMode===value?'active':''}" aria-pressed="${state.boardMode===value}">${label}</button>`).join('')}</div>`;
+        const filters = `<label class="search">${icon('search')}<input data-tracking-filter="keyword" aria-label="搜索流转记录" value="${escapeHTML(f.keyword || '')}" placeholder="单号 / 任务 / 产品 / 款号" /></label>
+          <button class="control ${Object.values(f).some(Boolean)?'filter-active':''}" data-action="open-task-filter">${icon('filter')}筛选${Object.values(f).some(Boolean)?' · 已应用':''}</button>`;
+        const matches = (!f.status || f.status==='active') && (!f.role || f.role==='工程') && (!f.source || f.source==='sales_order') && !f.attention && (!f.from || f.from<=DEMO_TODAY) && (!f.to || f.to>=DEMO_TODAY) && (!f.keyword || '销售订单受理 SO-20260925-001 浅棕小熊 P-BEAR-01 BEAR-01'.toLowerCase().includes(f.keyword.toLowerCase()));
+        const pageSize = state.trackingPageSizes[state.boardMode] || 20;
+        const pager = `<nav class="statistics-pagination erp-task-pagination" aria-label="流转记录分页"><div class="erp-task-pagination__summary"><span role="status">第 ${matches?'1–1':'0–0'} 条，共 ${matches?1:0} 条</span><select data-tracking-page-size aria-label="每页流转记录数">${[8,20,50].map(value=>`<option value="${value}" ${value===pageSize?'selected':''}>${value} 条 / 页</option>`).join('')}</select></div><div class="statistics-pager"><button class="btn" aria-label="上一页" disabled>← 上一页</button><button class="btn is-current" aria-current="page" disabled>1</button><button class="btn" aria-label="下一页" disabled>下一页 →</button></div></nav>`;
+        return `<section class="surface operation-surface"><div class="command-row">${scope}</div><div class="command-row">${trackingScope}</div><div class="command-row">${filters}</div></section><section class="surface board-surface"><table class="task-board-table"><thead><tr><th>事项 / 来源单号</th><th>关联产品 / 物料</th><th>当前状态</th><th>当前去向 / 办理人</th><th>发起人</th><th></th></tr></thead><tbody>${matches?`<tr data-action="open-tracking"><td><strong>销售订单受理</strong>${copyValue("SO-20260925-001")}</td><td><div class="product-cell">${renderProductThumb(0,"浅棕小熊")}<div><strong>浅棕小熊（共 2 项关联内容）</strong><small>产品编号 P-BEAR-01 · 内部款号 BEAR-01</small></div></div></td><td><span class="badge info">办理中</span></td><td><strong class="task-responsibility-role">岗位：工程</strong> · 待处理</td><td><div class="task-initiator"><strong>业务小李</strong><small><strong class="task-responsibility-role">发起岗位：业务</strong></small></div></td><td><button class="btn ghost icon-btn" data-action="open-tracking" aria-haspopup="dialog" aria-label="查看销售订单受理流转进度">${icon("right")}</button></td></tr>`:'<tr><td colspan="6"><div class="empty">当前筛选下没有记录</div></td></tr>'}</tbody></table>${pager}</section>`;
+      }
       const q = state.boardSearch.trim().toLowerCase();
-      const filtered = tasks.filter(t => (state.boardMode !== 'todo' || t.lane !== 'done') && (state.boardStatus === 'all' || t.lane === state.boardStatus) && (state.boardRole === 'all' || t.role === state.boardRole) && (!q || Object.values(t).join(' ').toLowerCase().includes(q)));
+      const filtered = tasks.filter(t => (!['todo','approval'].includes(state.boardMode) || t.lane !== 'done') && (state.boardMode !== 'approval' || t.approval) && (state.boardStatus === 'all' || t.lane === state.boardStatus) && (state.boardRole === 'all' || t.role === state.boardRole) && (!q || Object.values(t).join(' ').toLowerCase().includes(q)));
       const lanes = [
         ['normal','常规待办',''], ['blocked','阻塞','blocked'], ['due','到期提醒','due'], ['done','已结束','']
       ].filter(([key])=>state.boardMode!=='todo'||key!=='done');
       const content = state.boardStatus !== 'all'
-        ? `<table class="task-board-table"><thead><tr><th>任务与关联内容</th><th>关联单据 / 时间</th><th>状态与说明 / 负责</th></tr></thead><tbody>${filtered.length ? filtered.map(renderTaskBoardRow).join('') : '<tr><td colspan="3"><div class="empty">当前分类暂无匹配任务</div></td></tr>'}</tbody></table>`
+        ? `<table class="task-board-table"><thead><tr><th>任务与关联内容</th><th>关联单据 / 时间</th><th>状态与说明</th><th>负责岗位 / 承接方式</th></tr></thead><tbody>${filtered.length ? filtered.map(renderTaskBoardRow).join('') : '<tr><td colspan="4"><div class="empty">当前分类暂无匹配任务</div></td></tr>'}</tbody></table>`
         : `<div class="lanes${state.boardMode==='todo'?' lanes--todo':''}">${lanes.map(([key,label,cls]) => {
           const rows = filtered.filter(t => t.lane === key);
           const shownCount = rows.length;
@@ -9685,17 +9766,17 @@ return {orders,financeCustomers};})();
       return `
         <section class="surface operation-surface">
           <div class="command-row">
-            <div class="segment" aria-label="任务范围">${[['todo','待我处理'],['all','全部任务']].map(([key,label])=>`<button data-action="board-mode" data-value="${key}" class="${state.boardMode===key?'active':''}" aria-pressed="${state.boardMode===key}">${label}</button>`).join('')}</div>
+            ${scope}
             <div class="segment" aria-label="任务分类">${[['all','概览'],...lanes].map(([key,label]) => { const count=filtered.filter(t=>key==='all'||t.lane===key).length; return `<button class="${state.boardStatus === key ? 'active' : ''}" data-action="board-status" data-value="${key}" aria-pressed="${state.boardStatus === key}">${label}<b>${count}</b></button>`; }).join('')}</div>
             <label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="搜索订单、产品、任务" /></label>
-            <div class="command-actions"><label class="control">${icon('filter')}<span>岗位</span><select id="board-role"><option value="all">全部</option>${[...new Set(tasks.map(task=>task.role))].map(role=>`<option value="${role}" ${state.boardRole===role?'selected':''}>${role}</option>`).join('')}</select></label></div>
+            <button class="control ${state.boardRole!=='all'||state.boardSearch?'filter-active':''}" data-action="open-task-filter">${icon('filter')}筛选${state.boardRole!=='all'||state.boardSearch?' · 已应用':''}</button>
           </div>
         </section>
         <section class="surface board-surface">${content}</section>`;
     }
 
     function renderTaskBoardRow(task) {
-      return `<tr data-action="open-task" data-id="${task.id}"><td><button class="workbench-task-entry" data-action="open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}详情">${renderTaskHeading(task)}</button></td><td>${escapeHTML(getTaskListSource(task)?.no || task.object)}<small>${escapeHTML(task.time)}</small></td><td><span class="badge ${task.badge}">${escapeHTML(task.state)}</span>${task.reason ? `<div class="task-reason">${escapeHTML(task.reason)}</div>` : ''}<small>${escapeHTML(task.role)}</small></td></tr>`;
+      return `<tr data-action="open-task" data-id="${task.id}"><td><button class="workbench-task-entry" data-action="open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}详情">${renderTaskHeading(task)}</button></td><td>${escapeHTML(getTaskListSource(task)?.no || task.object)}<small>${escapeHTML(task.time)}</small></td><td><span class="badge ${task.badge}">${escapeHTML(task.state)}</span>${task.reason ? `<div class="task-reason">${escapeHTML(task.reason)}</div>` : ''}</td><td>${escapeHTML(task.role)}<small>由岗位人员处理</small></td></tr>`;
     }
 
     function renderTaskCard(task) {
@@ -9967,7 +10048,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     const mobileActionLabels = { done: '完成本岗', blocked: '标记阻塞', rejected: '退回上游', resume: '解除阻塞', urge: '催办' };
 
     function getMobileTask() {
-      return mobileTasks.find(task => task.id === state.mobileTaskId) || null;
+      return state.mobileTaskId === mobileTrackingTask.id ? mobileTrackingTask : mobileTasks.find(task => task.id === state.mobileTaskId) || null;
     }
 
     function getMobileReceipt(task) {
@@ -9993,7 +10074,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function renderMobileBottomNav() {
       const items = [
         ...(state.mobileCanProgress ? [['progress','chart','进度',0]] : []),
-        ['tasks','task','任务',mobileQuickCounts.all],
+        ['tasks','task','任务管理',mobileQuickCounts.all],
         ['risk','bell','风险',mobileQuickCounts.risk],
         ['mine','user','我的',0]
       ];
@@ -10009,32 +10090,64 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       </button>`;
     }
 
+    const mobileTrackingTask = {
+      id: 'M-TRACK', status: 'todo', title: '工程资料', source: 'SO-20260925-001', object: '浅棕小熊 · P-BEAR-01', role: '工程', deadline: '进入岗位：工程', state: '待处理', badge: 'info', access: 'actionable', actions: ['done','blocked','urge'], attachments: 0,
+      facts: [['内部款号','BEAR-01'],['当前岗位','工程'],['发起人','业务小李']],
+      history: [['订单审批已通过','今天 09:20 · 审批负责人（老板）'],['销售订单已提交','今天 09:00 · 业务小李']]
+    };
+
+    function mobileTrackingQuery() { return state.mobileTrackingQueries[state.mobileTrackingScope]; }
+    function saveMobileTrackingScroll() { mobileTrackingQuery().scrollTop = document.querySelector('#mobile-task-scroll')?.scrollTop || 0; }
+    function changeMobileTrackingQuery(changes) { Object.assign(mobileTrackingQuery(), changes, {scrollTop:0}); renderView(); }
+
+    function renderMobileTracking() {
+      const f = mobileTrackingQuery();
+      const matches = (!f.status || f.status==='active') && (!f.role || f.role==='工程') && (!f.source || f.source==='sales_order') && !f.attention && (!f.keyword || '销售订单受理 SO-20260925-001 浅棕小熊 P-BEAR-01 BEAR-01'.toLowerCase().includes(f.keyword.toLowerCase()));
+      const count = ['role','source','attention'].filter(key=>f[key]).length;
+      const handled = mobileTrackingTask.status === 'done';
+      return `<section class="rm-tracking" aria-label="流程跟踪">
+        <div class="segment task-tracking-tabs rm-tracking-scope" aria-label="跟踪范围">${[['started','我发起的'],['participated','我参与的']].map(([key,label])=>`<button data-action="mobile-tracking-scope" data-value="${key}" class="${state.mobileTrackingScope===key?'active':''}" aria-pressed="${state.mobileTrackingScope===key}">${label}</button>`).join('')}</div>
+        <div class="rm-query"><label class="rm-search">${icon('search')}<input id="mobile-tracking-search" aria-label="搜索流转记录" placeholder="单号/任务/产品/款号" value="${escapeHTML(f.keyword||'')}" /></label><button class="rm-filter-button ${count?'active':''}" data-action="mobile-options" aria-expanded="${state.mobileOptionsOpen}">${icon('filter')}筛选${count?`<span class="rm-filter-count">${count}</span>`:''}</button></div>
+        <div class="rm-tracking-status">${[['','全部状态'],['active','进行中'],['completed','已结束']].map(([key,label])=>`<button class="rm-chip ${!f.status&&!key||f.status===key?'active':''}" data-action="mobile-tracking-status" data-value="${key}">${label}</button>`).join('')}</div>
+        <p class="data-note" role="status">共 ${matches?1:0} 条流转记录</p>
+        ${matches?`<article class="rm-tracking-card"><button class="rm-tracking-open" data-action="mobile-tracking-open" aria-label="查看销售订单受理流转进度"></button><div class="rm-card-head"><strong>销售订单受理</strong><span class="badge info">办理中</span></div><div class="data-note">SO-20260925-001</div><div class="product-cell">${renderProductThumb(0,'浅棕小熊')}<div><strong>浅棕小熊（共 2 项关联内容）</strong><small>产品编号 P-BEAR-01</small><small>内部款号 BEAR-01</small></div></div><div class="rm-tracking-owner">${handled?'等待后续业务处理':'<strong class="task-responsibility-role">岗位：工程</strong> · 待处理'}</div><div class="rm-tracking-origin"><div class="task-initiator"><strong>业务小李</strong><small><strong class="task-responsibility-role">发起岗位：业务</strong></small></div><span>今天 09:00</span></div></article><p class="data-note rm-tracking-end">已显示全部流转记录</p>`:'<div class="rm-empty">当前筛选下没有匹配记录</div>'}
+      </section>`;
+    }
+
+    function renderMobileTrackingFilters() {
+      const f=mobileTrackingQuery();
+      const select=(key,label,options)=>`<label class="rm-sheet-group"><span>${label}</span><select aria-label="${label}" data-mobile-tracking-field="${key}">${options.map(([value,text])=>`<option value="${value}" ${(f[key]||'')===value?'selected':''}>${text}</option>`).join('')}</select></label>`;
+      return `<div class="rm-popover-layer" data-action="mobile-options-bg"><section class="rm-filter-popover rm-tracking-filters" role="dialog" aria-label="流转筛选"><div class="rm-sheet-head"><strong>流转筛选</strong><button class="rm-icon-button" data-action="mobile-options-close" aria-label="关闭筛选">${icon('close')}</button></div>
+        ${select('role','当前岗位',[['','全部当前岗位'],['业务','业务'],['老板','老板'],['工程','工程'],['PMC','PMC'],['采购','采购'],['仓库','仓库'],['质量','质量'],['财务','财务']])}
+        ${select('source','单据类型',[['','全部单据类型'],['sales_order','销售订单'],['purchase_order','采购订单'],['production_order','生产订单'],['shipment','出货单']])}
+        <div class="rm-sheet-group"><span>关注事项</span><div class="rm-sheet-options">${[['','全部情况'],['overdue','只看逾期'],['blocked','只看受阻']].map(([key,label])=>`<button class="${(f.attention||'')===key?'active':''}" data-action="mobile-tracking-attention" data-value="${key}">${label}</button>`).join('')}</div></div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-tracking-reset">重置筛选</button></div></section></div>`;
+    }
+
     function renderMobileTaskList() {
       const rows = getMobileFilteredTasks();
       const visibleRows = rows.slice(0, state.mobileVisibleCount);
       const isTasks = state.mobileMain === 'tasks';
+      const isTracking = isTasks && state.mobileTab === 'tracking';
       const optionCount = Number(state.mobileSort !== 'newest') + Number(Boolean(state.mobileStatus));
       const quickItems = state.mobileMain === 'risk'
         ? [['risk','风险',mobileQuickCounts.risk],['overdue','超时',mobileQuickCounts.overdue]]
         : [['all','全部',mobileQuickCounts.all],['approval','审批',mobileQuickCounts.approval],['risk','风险',mobileQuickCounts.risk],['overdue','超时',mobileQuickCounts.overdue]];
       return `<div class="role-mobile-screen">
         <div class="rm-scroll" id="mobile-task-scroll">
+          ${isTasks ? `<div class="rm-view-tabs" role="tablist" aria-label="任务状态">${[['todo','待办',mobileQuickCounts.all],['done','已办',getMobileReviewTasks().filter(task=>task.status==='done').length],['tracking','流程跟踪',null]].map(([key,label,count])=>`<button role="tab" aria-selected="${state.mobileTab===key}" class="${state.mobileTab===key?'active':''}" data-action="mobile-tab" data-value="${key}">${label}${count===null?'':` <b>${count}</b>`}</button>`).join('')}</div>` : ''}
+          ${isTracking ? renderMobileTracking() : `
           <div class="rm-query">
             <label class="rm-search">${icon('search')}<input id="mobile-task-search" value="${escapeHTML(state.mobileSearch)}" placeholder="订单/产品/物料/款号" aria-label="搜索任务" /></label>
             <button class="rm-filter-button ${optionCount ? 'active' : ''}" data-action="mobile-options" aria-expanded="${state.mobileOptionsOpen}">${icon('filter')}筛选${optionCount ? `<span class="rm-filter-count">${optionCount}</span>` : ''}</button>
           </div>
-          ${isTasks ? `<div class="rm-view-tabs" role="tablist" aria-label="任务状态">
-            <button class="${state.mobileTab === 'todo' ? 'active' : ''}" data-action="mobile-tab" data-value="todo">待办 <b>${mobileQuickCounts.all}</b></button>
-            <button class="${state.mobileTab === 'done' ? 'active' : ''}" data-action="mobile-tab" data-value="done">已办 <b>${getMobileReviewTasks().filter(task => task.status === 'done').length}</b></button>
-          </div>` : ''}
           ${(state.mobileMain === 'risk' || state.mobileTab === 'todo') ? `<div class="rm-quick-filters" role="group" aria-label="${state.mobileMain === 'risk' ? '风险类别' : '任务快捷筛选'}">${quickItems.map(([key,label,count]) => `<button class="rm-chip ${state.mobileQuick === key ? 'active' : ''}" data-action="mobile-quick" data-value="${key}">${label}${count===null?'':`<b>${count}</b>`}</button>`).join('')}</div>` : ''}
           <section class="rm-task-list" aria-label="${state.mobileMain === 'risk' ? '风险任务' : state.mobileTab === 'done' ? '已办任务' : '待办任务'}">
             ${visibleRows.length ? visibleRows.map(renderMobileTaskCard).join('') : '<div class="rm-empty"><div><strong>当前筛选下暂无任务</strong><span>调整搜索或筛选条件后重试</span></div></div>'}
             ${visibleRows.length < rows.length ? `<button class="rm-more" data-action="mobile-more">再显示 ${Math.min(4, rows.length - visibleRows.length)} 条任务</button>` : ''}
-          </section>
+          </section>`}
         </div>
         ${renderMobileBottomNav()}
-        ${state.mobileOptionsOpen ? renderMobileOptionsSheet() : ''}
+        ${state.mobileOptionsOpen ? isTracking ? renderMobileTrackingFilters() : renderMobileOptionsSheet() : ''}
       </div>`;
     }
 
@@ -10254,7 +10367,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else content = state.mobileMain === 'mine' ? renderMobileProfile() : renderMobileTaskList();
       const reviewOptions = [['all','全部岗位'], ...[...new Set(mobileTasks.map(item => item.role))].map(role => [role,role])];
       const reviewHeader = `<div class="rm-admin-review"><label for="mobile-review-scope">查看岗位</label><select id="mobile-review-scope">${reviewOptions.map(([value,label]) => `<option value="${escapeHTML(value)}" ${state.mobileReviewRole === value ? 'selected' : ''}>${escapeHTML(label)}</option>`).join('')}</select><span>管理员视角</span></div>`;
-      return `<section class="mobile-preview-stage"><div class="role-mobile-device" aria-label="390 像素移动端待办预览">${reviewHeader}${content}</div></section>`;
+      return `<section class="mobile-preview-stage"><div class="role-mobile-device" aria-label="390 像素移动端待办预览">${reviewHeader}<div class="rm-preview-content">${content}${state.mobileTrackingOpen?renderTrackingDrawer(true):''}</div></div></section>`;
     }
 
     function updateFormSectionNavigation() {
@@ -10284,6 +10397,9 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       roleHelpPreview.unmount();
       const view = document.querySelector('#view');
       const progressTabs=state.page==='progress'?['.progress-navigation-tabs','.statistics-display-tabs'].map(selector=>[selector,view.querySelector(selector)]):[];
+      const taskScope = state.page==='tasks' ? view.querySelector('[aria-label="任务范围"]') : null;
+      const trackingScope = state.page==='tasks' ? view.querySelector('.task-tracking-tabs') : null;
+      const mobileTabs = state.page==='mobile-tasks' ? ['.rm-view-tabs','.rm-tracking-scope'].map(selector=>[selector,view.querySelector(selector)]) : [];
       if (state.page === 'dev-workbench') { renderDevWorkbench(view); return; }
       if (moduleHubs[state.page]) view.innerHTML = renderModuleHub(state.page);
       else if (state.page === 'audit') view.innerHTML = renderAuditLog();
@@ -10310,6 +10426,33 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else view.innerHTML = renderDataState({title:titleForPage()});
       view.querySelectorAll('[data-permission-mixed]').forEach(input=>{input.indeterminate=input.dataset.permissionMixed==='true';});
       if(state.page==='progress'){preserveProgressDesignTabs(view,progressTabs);bindStatisticsDesignInputs();}
+      if(state.page==='tasks' && taskScope){
+        const active=['started','participated'].includes(state.boardMode)?'tracking':state.boardMode;
+        taskScope.querySelectorAll('[data-action="board-mode"]').forEach(button=>{const selected=button.dataset.value===active;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
+        view.querySelector('[aria-label="任务范围"]')?.replaceWith(taskScope);
+      }
+      if(state.page==='tasks'){
+        const next=view.querySelector('.task-tracking-tabs');
+        if(next&&trackingScope){
+          trackingScope.querySelectorAll('button').forEach(button=>{const selected=button.dataset.value===state.boardMode;button.classList.toggle('active',selected);button.setAttribute('aria-pressed',String(selected));});
+          next.replaceWith(trackingScope);
+        }
+        const tabs=view.querySelector('.task-tracking-tabs'), selected=tabs?.querySelector('.active');
+        if(selected){tabs.style.setProperty('--erp-slider-x',`${selected.offsetLeft}px`);tabs.style.setProperty('--erp-slider-y',`${selected.offsetTop}px`);tabs.style.setProperty('--erp-slider-width',`${selected.offsetWidth}px`);tabs.style.setProperty('--erp-slider-height',`${selected.offsetHeight}px`);requestAnimationFrame(()=>{tabs.dataset.slidingReady='true';});}
+      }
+      if(state.page==='mobile-tasks'){
+        for(const [selector,previous] of mobileTabs){
+          const next=view.querySelector(selector);
+          if(next&&previous){
+            const value=selector==='.rm-view-tabs'?state.mobileTab:state.mobileTrackingScope;
+            previous.querySelectorAll('button').forEach(button=>{const active=button.dataset.value===value;button.classList.toggle('active',active);button.setAttribute(selector==='.rm-view-tabs'?'aria-selected':'aria-pressed',String(active));});
+            next.replaceWith(previous);
+          }
+          const tabs=view.querySelector(selector),selected=tabs?.querySelector('.active');
+          if(selected){tabs.style.setProperty('--erp-slider-x',`${selected.offsetLeft}px`);tabs.style.setProperty('--erp-slider-y',`${selected.offsetTop}px`);tabs.style.setProperty('--erp-slider-width',`${selected.offsetWidth}px`);tabs.style.setProperty('--erp-slider-height',`${selected.offsetHeight}px`);requestAnimationFrame(()=>{tabs.dataset.slidingReady='true';});}
+        }
+        if(state.mobileTab==='tracking') requestAnimationFrame(()=>{const scroll=document.querySelector('#mobile-task-scroll');if(scroll)scroll.scrollTop=mobileTrackingQuery().scrollTop||0;});
+      }
       restoreFormValues();
       updateFormSectionNavigation();
       updateLineComputedValues();
@@ -10702,7 +10845,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       });
       document.querySelector('#list-search')?.addEventListener('input', e => { state.search = e.target.value; state.pageNo = 1; renderView(); document.querySelector('#list-search')?.focus(); setCaretEnd(document.querySelector('#list-search')); });
       document.querySelector('#board-search')?.addEventListener('input', e => { state.boardSearch = e.target.value; renderView(); document.querySelector('#board-search')?.focus(); setCaretEnd(document.querySelector('#board-search')); });
-      document.querySelector('#board-role')?.addEventListener('change', e => { state.boardRole = e.target.value; renderView(); });
+      document.querySelector('[data-tracking-page-size]')?.addEventListener('change',event=>{state.trackingPageSizes[state.boardMode]=Number(event.target.value);renderView();});
+      document.querySelectorAll('#view [data-tracking-filter]').forEach(input=>input.addEventListener(input.dataset.trackingFilter==='keyword'?'input':'change',event=>{
+        const key=input.dataset.trackingFilter;
+        state.trackingFilters[state.boardMode]={...state.trackingFilters[state.boardMode],[key]:event.target.value};
+        renderView();const next=document.querySelector(`[data-tracking-filter="${key}"]`);next?.focus();if(key==='keyword')setCaretEnd(next);
+      }));
       document.querySelector('#progress-search')?.addEventListener('input', e => { state.progressSearch = e.target.value; renderView(); document.querySelector('#progress-search')?.focus(); setCaretEnd(document.querySelector('#progress-search')); });
       document.querySelector('#production-route-order')?.addEventListener('change', e => { state.productionRouteOrder = e.target.value; refreshVisual(); });
       document.querySelector('#production-route-search')?.addEventListener('input', e => { state.productionRouteSearch = e.target.value; renderView(); document.querySelector('#production-route-search')?.focus(); setCaretEnd(document.querySelector('#production-route-search')); });
@@ -10713,6 +10861,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       document.querySelector('#audit-search')?.addEventListener('input', e => { state.auditSearch = e.target.value; renderView(); document.querySelector('#audit-search')?.focus(); setCaretEnd(document.querySelector('#audit-search')); });
       document.querySelector('#audit-result')?.addEventListener('change', e => { state.auditResult = e.target.value; renderView(); });
       document.querySelector('#audit-date')?.addEventListener('change', e => { state.auditDate = e.target.value; renderView(); });
+      document.querySelector('#mobile-tracking-search')?.addEventListener('input', event=>{changeMobileTrackingQuery({keyword:event.target.value});const input=document.querySelector('#mobile-tracking-search');input?.focus();setCaretEnd(input);});
+      document.querySelectorAll('[data-mobile-tracking-field]').forEach(input=>input.addEventListener('change',()=>changeMobileTrackingQuery({[input.dataset.mobileTrackingField]:input.value})));
       document.querySelector('#mobile-task-search')?.addEventListener('input', e => { state.mobileSearch = e.target.value; state.mobileVisibleCount = 4; renderView(); document.querySelector('#mobile-task-search')?.focus(); setCaretEnd(document.querySelector('#mobile-task-search')); });
       document.querySelector('#mobile-progress-search')?.addEventListener('input', e => { state.mobileProgressSearch = e.target.value; renderView(); document.querySelector('#mobile-progress-search')?.focus(); setCaretEnd(document.querySelector('#mobile-progress-search')); });
       document.querySelector('#permission-search')?.addEventListener('input', e => { state.permissionSearch = e.target.value; state.permissionOpenGroups=new Set(permissionGroupsData.map(([key])=>key)); renderView(); document.querySelector('#permission-search')?.focus(); setCaretEnd(document.querySelector('#permission-search')); });
@@ -10749,6 +10899,16 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       document.querySelector('[data-delivery-region]')?.addEventListener('change', () => { captureFormDraft(); state.formDirty=true; renderView(); });
     }
     function bindFloatingInputs() {
+      document.querySelector('#task-filter-popover #board-role')?.addEventListener('change', event => { state.boardRole=event.target.value; renderView(); renderFloating(); document.querySelector('#board-role')?.focus(); });
+      document.querySelectorAll('#task-filter-popover [data-tracking-filter]').forEach(input=>input.addEventListener('change',event=>{
+        const key=input.dataset.trackingFilter;
+        state.trackingFilters[state.boardMode]={...state.trackingFilters[state.boardMode],[key]:event.target.value};
+        renderView();renderFloating();document.querySelector(`#task-filter-popover [data-tracking-filter="${key}"]`)?.focus();
+      }));
+      document.querySelectorAll('#filter-popover input, #filter-popover select').forEach(input=>input.addEventListener(input.id==='filter-party'?'input':'change',()=>{
+        state.filterParty=(document.querySelector('#filter-party')?.value||'').trim();state.filterOwner=document.querySelector('#filter-owner')?.value||'all';state.filterRisk=document.querySelector('#filter-risk')?.value||'all';state.filterIncludeEnded=document.querySelector('#filter-ended')?.value==='yes';state.filterDateFrom=document.querySelector('#filter-date-from')?.value||'';state.filterDateTo=document.querySelector('#filter-date-to')?.value||'';state.pageNo=1;state.selected.clear();
+        document.querySelector('#filter-date-from').max=state.filterDateTo;document.querySelector('#filter-date-to').min=state.filterDateFrom;renderView();
+      }));
       document.querySelectorAll('[data-approval-mode]').forEach(input=>input.addEventListener('change',event=>{document.querySelector('[data-approval-condition-fields]').hidden=event.target.value!=='amount';}));
       document.querySelector('#catalog-search')?.addEventListener('input', e => { state.catalogSearch = e.target.value; renderFloating(); document.querySelector('#catalog-search')?.focus(); setCaretEnd(document.querySelector('#catalog-search')); });
       document.querySelector('#attachment-input')?.addEventListener('change', e => queueAttachmentFiles(e.target.files));
@@ -10771,6 +10931,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const previousFocus = root.contains(document.activeElement) ? document.activeElement : null;
       let html = '';
       if (state.overlay === 'filter') html += renderFilterPopover();
+      if (state.overlay === 'task-filter') html += renderTaskFilterPopover();
       if (state.overlay === 'columns') html += renderColumnsModal();
       if (state.overlay === 'theme') html += renderThemeModal();
       if (state.overlay === 'login-dialog') html += renderLoginDialog();
@@ -10791,6 +10952,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if (state.overlay === 'account') html += renderAccountPopover();
       if (state.drawer?.type === 'detail') html += renderDetailModal(state.drawer.row);
       if (state.drawer?.type === 'task') html += renderTaskDrawer(state.drawer.task);
+      if (state.drawer?.type === 'tracking') html += renderTrackingDrawer();
       if (state.drawer?.type === 'materials') html += renderMaterialSummary(state.drawer.row);
       if (state.drawer?.type === 'audit') html += renderAuditDrawer(state.drawer.row);
       if (html && !root.childElementCount) floatingReturnFocus = document.activeElement;
@@ -10826,7 +10988,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const config = currentPageConfig();
       const party = config?.party || '业务对象';
       const dateLabel = config?.dateLabel || '业务日期';
-      return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>更多筛选</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid"><div class="field"><label>${party}</label><input id="filter-party" value="${escapeHTML(state.filterParty)}" placeholder="输入${party}或${config?.item||'明细'}" /></div><div class="field"><label>负责人 / 岗位</label><select id="filter-owner"><option value="all">全部</option>${['何敏','林晓','李倩','王宁','仓库主管'].map(owner=>`<option value="${owner}" ${state.filterOwner===owner?'selected':''}>${owner}</option>`).join('')}</select></div><div class="field"><label>业务提醒</label><select id="filter-risk"><option value="all">全部</option><option value="正常" ${state.filterRisk==='正常'?'selected':''}>正常</option><option value="near" ${state.filterRisk==='near'?'selected':''}>临近日期</option><option value="已逾期" ${state.filterRisk==='已逾期'?'selected':''}>已逾期</option><option value="blocked" ${state.filterRisk==='blocked'?'selected':''}>阻塞</option></select></div><div class="field"><label>包含结束记录</label><select id="filter-ended"><option value="no" ${!state.filterIncludeEnded?'selected':''}>否</option><option value="yes" ${state.filterIncludeEnded?'selected':''}>是</option></select></div><div class="field span-2"><label>${dateLabel}范围</label><div class="date-range-control" role="group" aria-label="${dateLabel}范围"><input id="filter-date-from" aria-label="开始日期" type="date" value="${state.filterDateFrom}"/><span aria-hidden="true">至</span><input id="filter-date-to" aria-label="结束日期" type="date" value="${state.filterDateTo}"/></div></div></div><div class="popover-foot"><button class="btn" data-action="clear-filter">重置</button><button class="btn primary" data-action="apply-filter">应用筛选</button></div></div>`;
+      return `<div class="popover" id="filter-popover" style="top:58px;right:146px"><div class="popover-head"><strong>更多筛选</strong><button class="btn ghost icon-btn" data-action="close-overlay" aria-label="关闭">${icon('close')}</button></div><div class="filter-grid"><div class="field"><label>${party}</label><input id="filter-party" value="${escapeHTML(state.filterParty)}" placeholder="输入${party}或${config?.item||'明细'}" /></div><div class="field"><label>负责人 / 岗位</label><select id="filter-owner"><option value="all">全部</option>${['何敏','林晓','李倩','王宁','仓库主管'].map(owner=>`<option value="${owner}" ${state.filterOwner===owner?'selected':''}>${owner}</option>`).join('')}</select></div><div class="field"><label>业务提醒</label><select id="filter-risk"><option value="all">全部</option><option value="正常" ${state.filterRisk==='正常'?'selected':''}>正常</option><option value="near" ${state.filterRisk==='near'?'selected':''}>临近日期</option><option value="已逾期" ${state.filterRisk==='已逾期'?'selected':''}>已逾期</option><option value="blocked" ${state.filterRisk==='blocked'?'selected':''}>阻塞</option></select></div><div class="field"><label>包含结束记录</label><select id="filter-ended"><option value="no" ${!state.filterIncludeEnded?'selected':''}>否</option><option value="yes" ${state.filterIncludeEnded?'selected':''}>是</option></select></div><div class="field span-2"><label>${dateLabel}范围</label><div class="date-range-control" role="group" aria-label="${dateLabel}范围"><input id="filter-date-from" aria-label="开始日期" type="date" value="${state.filterDateFrom}" max="${state.filterDateTo}"/><span aria-hidden="true">至</span><input id="filter-date-to" aria-label="结束日期" type="date" value="${state.filterDateTo}" min="${state.filterDateFrom}"/></div></div></div><div class="popover-foot"><button class="btn" data-action="clear-filter">重置</button><button class="btn" data-action="close-overlay">关闭</button></div></div>`;
     }
 
     function renderColumnsModal() {
@@ -10963,7 +11125,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
           <div class="form-grid" style="margin-top:13px">
             <div class="field span-2 ${error==='type'?'error':''}"><label for="task-create-name">任务事项 *</label><input id="task-create-name" data-task-create="type" maxlength="128" value="${escapeHTML(values.type||'')}" placeholder="例如：补充包装稿、确认交期变化" />${fieldError('type','请填写任务事项')}</div>
             <div class="field ${error==='role'?'error':''}"><label for="task-create-role">责任岗位 *</label><select id="task-create-role" data-task-create="role"><option value="">请选择责任岗位</option>${Object.keys(taskCreatePeople).map(role=>`<option value="${role}" ${values.role===role?'selected':''}>${role}</option>`).join('')}</select>${fieldError('role','请选择责任岗位')}</div>
-            <div class="field"><label for="task-create-assignee">办理人</label><select id="task-create-assignee" data-task-create="assignee"><option value="unassigned">由岗位共同办理</option>${(taskCreatePeople[values.role]||[]).map(name=>`<option ${values.assignee===name?'selected':''}>${name}</option>`).join('')}</select></div>
+            <div class="field"><label for="task-create-assignee">办理人</label><select id="task-create-assignee" data-task-create="assignee"><option value="unassigned">由岗位人员处理</option>${(taskCreatePeople[values.role]||[]).map(name=>`<option ${values.assignee===name?'selected':''}>${name}</option>`).join('')}</select></div>
             <div class="field ${error==='deadline'?'error':''}"><label for="task-create-deadline">截止时间 *</label><input id="task-create-deadline" data-task-create="deadline" type="datetime-local" value="${escapeHTML(values.deadline||'')}" /><div class="task-deadline-quick" role="group" aria-label="快捷截止"><span>快捷截止</span>${deadlineQuickOptions.map(([key,label])=>`<button class="btn" type="button" data-action="task-deadline-quick" data-value="${key}" ${key==='today-end'&&todayDeadlineUnavailable?'disabled':''}>${label}</button>`).join('')}</div>${fieldError('deadline','请选择晚于当前时间的截止时间')}</div>
             <div class="field"><label for="task-create-priority">优先级</label><select id="task-create-priority" data-task-create="priority"><option value="normal" ${values.priority!=='urgent'?'selected':''}>普通</option><option value="urgent" ${values.priority==='urgent'?'selected':''}>紧急</option></select></div>
             <div class="field span-2 ${error==='note'?'error':''}"><label for="task-create-note">需要对方完成什么 *</label><textarea id="task-create-note" data-task-create="note" maxlength="2000" placeholder="写清任务要求和期望结果">${escapeHTML(values.note||'')}</textarea>${fieldError('note','请填写任务要求')}</div>
@@ -11079,14 +11241,21 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     // These examples describe presentation only; they never query or advance a business process.
+    function renderTrackingDrawer(mobile = false) {
+      const closeAction=mobile?'mobile-tracking-close':'close-drawer';
+      const handled=mobile && mobileTrackingTask.status==='done';
+      return `<div class="drawer-layer ${mobile?'rm-tracking-layer':''}" data-action="${mobile?'mobile-tracking-bg':'drawer-bg'}"><aside class="drawer" role="dialog" aria-modal="true" aria-label="任务流转进度"><header class="drawer-head"><strong>任务流转进度</strong><button class="btn ghost icon-btn close" data-action="${closeAction}" aria-label="关闭">${icon('close')}</button></header><div class="drawer-body"><section class="detail-section"><h3>销售订单受理 <span class="badge info">办理中</span></h3>${copyValue("SO-20260925-001")}<div class="workflow-tracking-current" role="group" aria-label="当前进度"><span>当前：</span><div>${handled?'等待后续业务处理':'<strong>工程资料</strong> · <strong class="task-responsibility-role">岗位：工程</strong> · 待处理'}</div></div><div class="task-initiator"><strong>业务小李</strong><small><strong class="task-responsibility-role">发起岗位：业务</strong></small></div><p class="data-note">发起于 今天 09:00</p><div class="product-cell">${renderProductThumb(0,"浅棕小熊")}<div><strong>浅棕小熊</strong><small>产品编号 P-BEAR-01 · 内部款号 BEAR-01</small></div></div><details><summary>展开其余 1 项关联内容</summary><div class="product-cell">${renderProductThumb(1,"长耳兔")}<div><strong>长耳兔</strong><small>产品编号 P-RABBIT-01</small></div></div></details></section><section class="detail-section"><h3>流转步骤</h3><div class="rm-timeline"><div class="rm-timeline-item"><strong>✓ 提交销售订单</strong><small>已完成 · 业务小李 · 09:00</small></div><div class="rm-timeline-item"><strong>✓ 订单审批</strong><small>已完成 · 审批负责人（老板）· 09:20</small></div><div class="rm-timeline-item" aria-current="step"><strong>工程资料</strong><small>${handled?'已完成 · 当前账号':'办理中 · <strong class="task-responsibility-role">岗位：工程</strong> · 待处理'}</small></div></div></section><section class="detail-section"><h3>全部节点处理记录</h3><div class="rm-timeline"><div class="rm-timeline-item"><strong>审批已通过</strong><small>审批负责人（老板）· 09:20</small><p>交期和资料已核对</p></div><div class="rm-timeline-item"><strong>审批已发起</strong><small>业务小李（业务）· 09:00</small></div></div></section></div><footer class="drawer-foot workflow-tracking-foot"><button class="btn" data-action="${closeAction}">返回列表</button><div class="workflow-tracking-foot-controls"><button class="btn" data-action="refresh">${icon('refresh')}刷新进度</button>${handled?'':'<button class="btn primary" data-action="open-tracking-task">去处理工程资料 →</button>'}</div></footer></aside></div>`;
+    }
+
     function renderTaskDrawer(task) {
+      const returnToTracking = state.floatingStack.at(-1)?.drawer?.type === 'tracking' ? '<button class="btn" data-action="close-drawer">返回流程</button>' : '';
       if (task.lane === 'done') {
         const receipt = task.receipt || { action:'完成本岗', feedback:'该任务已完成并保留办理记录。', status:task.state };
-        return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true"><header class="drawer-head"><strong>任务结果</strong><span class="badge ${task.badge}">${receipt.status}</span><button class="btn ghost icon-btn close" data-action="close-drawer" aria-label="关闭">${icon('close')}</button></header><div class="drawer-body"><section class="detail-section"><h3>${escapeHTML(task.title)}</h3><dl class="detail-grid"><dt>业务对象</dt><dd>${task.object}</dd><dt>责任岗位</dt><dd>${task.role}</dd><dt>办理动作</dt><dd>${receipt.action}</dd><dt>完成时间</dt><dd>${task.time}</dd></dl><div class="rm-callout" style="margin-top:12px"><strong>办理说明</strong><div style="margin-top:5px">${escapeHTML(receipt.feedback)}</div></div></section>${task.manualFollowup?`<section class="detail-section"><h3>任务要求</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.description)}</p>${task.receipt&&task.lane==='done'?`<h3>处理结果</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.receipt.feedback)}</p>`:''}</section>`:''}${renderTaskSourceSummary(task)}<section class="detail-section"><h3>结果与业务边界</h3><p style="margin:0;color:var(--text-2);line-height:1.65">任务结果只证明当前岗位已完成责任；对应库存、生产、出货或财务事实仍从业务单据查看。</p></section></div><footer class="drawer-foot"><button class="btn" data-action="detail-attachments" data-value="任务附件">${icon('paperclip')}查看附件</button><button class="btn primary" data-action="close-drawer">完成</button></footer></aside></div>`;
+        return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true"><header class="drawer-head"><strong>任务结果</strong><span class="badge ${task.badge}">${receipt.status}</span><button class="btn ghost icon-btn close" data-action="close-drawer" aria-label="关闭">${icon('close')}</button></header><div class="drawer-body"><section class="detail-section"><h3>${escapeHTML(task.title)}</h3><dl class="detail-grid"><dt>业务对象</dt><dd>${task.object}</dd><dt>责任岗位</dt><dd>${task.role}</dd><dt>办理动作</dt><dd>${receipt.action}</dd><dt>完成时间</dt><dd>${task.time}</dd></dl><div class="rm-callout" style="margin-top:12px"><strong>办理说明</strong><div style="margin-top:5px">${escapeHTML(receipt.feedback)}</div></div></section>${task.manualFollowup?`<section class="detail-section"><h3>任务要求</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.description)}</p>${task.receipt&&task.lane==='done'?`<h3>处理结果</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.receipt.feedback)}</p>`:''}</section>`:''}${renderTaskSourceSummary(task)}<section class="detail-section"><h3>结果与业务边界</h3><p style="margin:0;color:var(--text-2);line-height:1.65">任务结果只证明当前岗位已完成责任；对应库存、生产、出货或财务事实仍从业务单据查看。</p></section></div><footer class="drawer-foot">${returnToTracking}<button class="btn" data-action="detail-attachments" data-value="任务附件">${icon('paperclip')}查看附件</button><button class="btn primary" data-action="close-drawer">完成</button></footer></aside></div>`;
       }
-      if(task.sourceAction)return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true" aria-label="任务办理"><header class="drawer-head"><strong>任务办理</strong><button class="btn close" data-action="close-drawer">关闭</button></header><div class="drawer-body">${renderTaskStep(task)}</div><footer class="drawer-foot"><button class="btn primary" data-action="task-context-open" data-page="${task.sourcePage}" data-id="${task.sourceRecordId}">${task.sourceAction}</button></footer></aside></div>`;
+      if(task.sourceAction)return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true" aria-label="任务办理"><header class="drawer-head"><strong>任务办理</strong><button class="btn close" data-action="close-drawer">关闭</button></header><div class="drawer-body">${renderTaskStep(task)}</div><footer class="drawer-foot">${returnToTracking}<button class="btn primary" data-action="task-context-open" data-page="${task.sourcePage}" data-id="${task.sourceRecordId}">${task.sourceAction}</button></footer></aside></div>`;
       const step = state.taskStep;
-      return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true"><header class="drawer-head"><strong>任务办理</strong><span class="badge ${task.badge}">${task.state}</span><button class="btn ghost icon-btn close" data-action="close-drawer" aria-label="关闭">${icon('close')}</button></header><div class="task-steps">${[['1','核对任务'],['2','选择处理'],['3','确认与结果']].map(([n,label]) => { const number=Number(n); const enabled=number<=state.taskMaxStep||number===step+1; return `<button type="button" class="task-step ${step===number?'active':''} ${number<=state.taskMaxStep?'visited':''}" data-action="task-step" data-value="${number}" ${step===number?'aria-current="step"':''} ${enabled?'':'disabled'}><i>${n}</i><span>${label}</span></button>`; }).join('')}</div><div class="drawer-body">${renderTaskStep(task)}</div><footer class="drawer-foot"><button class="btn" data-action="detail-attachments" data-value="任务附件">${icon('paperclip')}查看附件</button>${step>1?'<button class="btn" data-action="task-prev">上一步</button>':''}<button class="btn primary" data-action="task-next">${step===3?'确认办理':'下一步'}</button></footer></aside></div>`;
+      return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true"><header class="drawer-head"><strong>任务办理</strong><span class="badge ${task.badge}">${task.state}</span><button class="btn ghost icon-btn close" data-action="close-drawer" aria-label="关闭">${icon('close')}</button></header><div class="task-steps">${[['1','核对任务'],['2','选择处理'],['3','确认与结果']].map(([n,label]) => { const number=Number(n); const enabled=number<=state.taskMaxStep||number===step+1; return `<button type="button" class="task-step ${step===number?'active':''} ${number<=state.taskMaxStep?'visited':''}" data-action="task-step" data-value="${number}" ${step===number?'aria-current="step"':''} ${enabled?'':'disabled'}><i>${n}</i><span>${label}</span></button>`; }).join('')}</div><div class="drawer-body">${renderTaskStep(task)}</div><footer class="drawer-foot">${returnToTracking}<button class="btn" data-action="detail-attachments" data-value="任务附件">${icon('paperclip')}查看附件</button>${step>1?'<button class="btn" data-action="task-prev">上一步</button>':''}<button class="btn primary" data-action="task-next">${step===3?'确认办理':'下一步'}</button></footer></aside></div>`;
     }
 
     function taskActions(task) {
@@ -11149,12 +11318,12 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       }
       if (state.taskStep === 2) {
         const actions = taskActions(task);
-        const choice = key => `<button class="action-choice ${state.taskAction===key?'active':''}" aria-pressed="${state.taskAction===key}" data-action="task-choice" data-value="${key}"><strong>${taskActionLabel(task,key)}</strong><span>${{complete:'记录本岗处理结果。',block:'说明当前卡点。',reject:'说明退回原因及需要补充的内容。',resume:'说明卡点如何解除。',assign:'转给同一负责岗位的接收人或退回共同待办。',urge:'记录催办原因，不改变任务状态。'}[key]}</span></button>`;
+        const choice = key => `<button class="action-choice ${state.taskAction===key?'active':''}" aria-pressed="${state.taskAction===key}" data-action="task-choice" data-value="${key}"><strong>${taskActionLabel(task,key)}</strong><span>${{complete:'记录本岗处理结果。',block:'说明当前卡点。',reject:'说明退回原因及需要补充的内容。',resume:'说明卡点如何解除。',assign:'转给同岗位的接收人，或交回岗位处理。',urge:'记录催办原因，不改变任务状态。'}[key]}</span></button>`;
         return `<section class="detail-section"><h3>选择处理方式</h3><div class="action-choice-grid">${actions.map(choice).join('')}</div></section>`;
       }
       const required = taskActionRequiresReason(task,state.taskAction);
       const fieldLabel = state.taskAction==='complete'?(task.approval?'审批意见':task.manualFollowup?'处理结果':'办理说明'):'处理原因';
-      return `<section class="detail-section"><h3>确认办理结果</h3><dl class="detail-grid"><dt>任务</dt><dd>${escapeHTML(task.title)}</dd><dt>处理方式</dt><dd>${taskActionLabel(task,state.taskAction)}</dd></dl>${state.taskAction==='assign'?`<div class="field task-result-field ${state.taskError==='target'?'error':''}"><label for="task-target">同岗位接收人 *</label><select id="task-target"><option value="">请选择接收人</option><option value="pool" ${state.taskTarget==='pool'?'selected':''}>${task.role}共同待办</option>${(task.candidates||[]).map(([id,name])=>`<option value="${id}" ${state.taskTarget===id?'selected':''}>${name}</option>`).join('')}</select>${state.taskError==='target'?'<span class="error-text">请选择同岗位接收人或共同待办</span>':''}</div>`:''}<div class="field task-result-field ${state.taskError==='note'?'error':''}"><label for="task-note">${fieldLabel}${required?' *':'（可选）'}</label><textarea id="task-note" placeholder="填写本次处理的依据、结果或注意事项">${escapeHTML(state.taskNote)}</textarea>${state.taskError==='note'?`<span class="error-text">请填写${fieldLabel}</span>`:''}</div><p class="source-summary-note">${state.taskAction==='urge'?'本次只记录催办，不改变任务状态，也不表示已送达站外通知。':'本次只更新协同任务；库存、出货和财务事实仍需在所属单据确认。'}</p></section>`;
+      return `<section class="detail-section"><h3>确认办理结果</h3><dl class="detail-grid"><dt>任务</dt><dd>${escapeHTML(task.title)}</dd><dt>处理方式</dt><dd>${taskActionLabel(task,state.taskAction)}</dd></dl>${state.taskAction==='assign'?`<div class="field task-result-field ${state.taskError==='target'?'error':''}"><label for="task-target">同岗位接收人 *</label><select id="task-target"><option value="">请选择接收人</option><option value="pool" ${state.taskTarget==='pool'?'selected':''}>交回${task.role}，由岗位人员处理</option>${(task.candidates||[]).map(([id,name])=>`<option value="${id}" ${state.taskTarget===id?'selected':''}>${name}</option>`).join('')}</select>${state.taskError==='target'?'<span class="error-text">请选择同岗位接收人，或由岗位人员处理</span>':''}</div>`:''}<div class="field task-result-field ${state.taskError==='note'?'error':''}"><label for="task-note">${fieldLabel}${required?' *':'（可选）'}</label><textarea id="task-note" placeholder="填写本次处理的依据、结果或注意事项">${escapeHTML(state.taskNote)}</textarea>${state.taskError==='note'?`<span class="error-text">请填写${fieldLabel}</span>`:''}</div><p class="source-summary-note">${state.taskAction==='urge'?'本次只记录催办，不改变任务状态，也不表示已送达站外通知。':'本次只更新协同任务；库存、出货和财务事实仍需在所属单据确认。'}</p></section>`;
     }
 
     function toast(message, { key = '', duration = 3000, type = 'info' } = {}) {
@@ -11229,6 +11398,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       state.mobileReason = '';
       state.mobileError = '';
       state.mobileReceipt = null;
+      if (state.mobileTrackingReturn) { state.mobileTrackingOpen=true; state.mobileTrackingReturn=false; }
       renderView();
       requestAnimationFrame(() => {
         const scroll = document.querySelector('#mobile-task-scroll');
@@ -11285,6 +11455,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'account-legal') { state.infoModal = { title: '隐私与使用规则', body: '系统仅按岗位授权处理业务资料；请勿共享账号、导出无关客户数据或绕过正式单据写入业务事实。' }; state.overlay='info'; renderFloating(); }
       else if (action === 'account-system') { state.infoModal = { title: '系统信息', html: '<dl class="detail-grid"><dt>版本</dt><dd>2026.09</dd><dt>构建</dt><dd>统一界面交互评审稿</dd><dt>当前入口</dt><dd>电脑端</dd><dt>登录岗位</dt><dd>超级管理员</dd></dl>' }; state.overlay='info'; renderFloating(); }
       else if (action === 'mobile-main') {
+        if(state.mobileMain==='tasks' && state.mobileTab==='tracking')saveMobileTrackingScroll();
+        state.mobileTrackingOpen=false;state.mobileTrackingReturn=false;
         state.mobileMain = target.dataset.value;
         state.mobileScreen = 'list'; state.mobileTaskId = null; state.mobileProgressId = null; state.mobileOptionsOpen = false;
         state.mobileSearch = ''; state.mobileVisibleCount = 4;
@@ -11292,7 +11464,15 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         else if (state.mobileMain === 'tasks') state.mobileQuick = 'all';
         renderView();
       }
-      else if (action === 'mobile-tab') { state.mobileTab = target.dataset.value; state.mobileQuick = 'all'; state.mobileStatus = ''; state.mobileVisibleCount = 4; renderView(); }
+      else if (action === 'mobile-tab') { if(state.mobileTab==='tracking')saveMobileTrackingScroll();state.mobileTab = target.dataset.value; state.mobileOptionsOpen=false;state.mobileQuick = 'all'; state.mobileVisibleCount = 4; renderView(); }
+      else if (action === 'mobile-tracking-scope') {saveMobileTrackingScroll();state.mobileTrackingScope=target.dataset.value;state.mobileOptionsOpen=false;renderView();}
+      else if (action === 'mobile-tracking-status') changeMobileTrackingQuery({status:target.dataset.value});
+      else if (action === 'mobile-tracking-attention') changeMobileTrackingQuery({attention:target.dataset.value});
+      else if (action === 'mobile-tracking-reset') changeMobileTrackingQuery({role:'',source:'',attention:''});
+      else if (action === 'mobile-tracking-open') {saveMobileTrackingScroll();state.mobileTrackingOpen=true;renderView();requestAnimationFrame(()=>document.querySelector('.rm-tracking-layer .close')?.focus());}
+      else if (action === 'mobile-tracking-close' || action === 'mobile-tracking-bg' && event.target===target) {state.mobileTrackingOpen=false;renderView();requestAnimationFrame(()=>document.querySelector('.rm-tracking-open')?.focus({preventScroll:true}));}
+      else if (action === 'open-tracking-task' && state.page==='mobile-tasks') {state.mobileTrackingOpen=false;state.mobileTrackingReturn=true;state.mobileTaskId=mobileTrackingTask.id;state.mobileScreen='detail';state.mobileAction='done';state.mobileReason='';state.mobileError='';renderView();}
+
       else if (action === 'mobile-quick') { state.mobileQuick = target.dataset.value; state.mobileVisibleCount = 4; renderView(); }
       else if (action === 'mobile-more') { state.mobileVisibleCount += 4; renderView(); }
       else if (action === 'mobile-refresh') toast('岗位任务已刷新');
@@ -11382,7 +11562,10 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'finance-due-view') switchBusinessView('financeDueView',target.dataset.value);
       else if (action === 'finance-due-filter') { state.financeDueFilter=target.dataset.value;refreshVisual(); }
       else if (action === 'status') { state.status = target.dataset.value; state.pageNo = 1; state.selected.clear(); renderView(); }
-      else if (action === 'board-mode') { state.boardMode=target.dataset.value; state.boardStatus='all'; renderView(); }
+      else if (action === 'board-mode') { state.boardMode=target.dataset.value==='tracking'?(state.trackingLastScope||'started'):target.dataset.value; state.boardStatus='all'; state.overlay=null; renderView(); renderFloating(); }
+      else if (action === 'tracking-scope') { state.boardMode=target.dataset.value; state.trackingLastScope=target.dataset.value; state.overlay=null; renderView(); renderFloating(); }
+      else if (action === 'open-task-filter') { state.overlay='task-filter'; renderFloating(); }
+      else if (action === 'task-filter-clear') { if(['started','participated'].includes(state.boardMode)) state.trackingFilters[state.boardMode]={}; else {state.boardRole='all';state.boardSearch='';} renderView(); renderFloating(); }
       else if (action === 'board-status') { state.boardStatus = target.dataset.value; renderView(); }
       else if (action === 'progress-view') { state.progressView = target.dataset.value; state.progressRisk='all'; state.progressSelected=''; renderView(); }
       else if (action === 'statistics-filter') { statisticsDesignState.status=target.dataset.value; statisticsDesignState.selected=''; statisticsDesignState.page=1; statisticsDesignState.sourcePage=1; statisticsDesignState.scroll=0; renderView(); }
@@ -11452,7 +11635,6 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'sort') { const key = target.dataset.key; if (state.sortKey === key) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc'; else { state.sortKey = key; state.sortDir = 'asc'; } state.pageNo = 1; renderView(); }
       else if (action === 'open-filter') { state.overlay = 'filter'; renderFloating(); }
       else if (action === 'toggle-summary') { state.summaryOpen = !state.summaryOpen; renderView(); }
-      else if (action === 'apply-filter') { state.filterParty=(document.querySelector('#filter-party')?.value||'').trim();state.filterOwner=document.querySelector('#filter-owner')?.value||'all';state.filterRisk=document.querySelector('#filter-risk')?.value||'all';state.filterIncludeEnded=document.querySelector('#filter-ended')?.value==='yes';state.filterDateFrom=document.querySelector('#filter-date-from')?.value||'';state.filterDateTo=document.querySelector('#filter-date-to')?.value||'';state.pageNo=1;state.selected.clear();state.overlay=null;renderAll();toast(`已应用 ${activeFilterCount()} 项筛选`); }
       else if (action === 'clear-filter') { resetListFilters(); state.overlay=null; state.selected.clear(); renderAll(); toast('附加筛选已重置'); }
       else if (action === 'page-prev') { state.pageNo=Math.max(1,state.pageNo-1);renderView(); }
       else if (action === 'page-number') { state.pageNo=Number(target.dataset.value)||1;renderView(); }
@@ -11519,7 +11701,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'attachment-remove') { const file = state.attachmentFiles.find(item=>item.id===target.dataset.id); if (file?.url) URL.revokeObjectURL(file.url); state.attachmentFiles = state.attachmentFiles.filter(item=>item.id!==target.dataset.id); state.attachmentExpanded.delete(target.dataset.id); if (state.attachmentPrimary===target.dataset.id) state.attachmentPrimary = state.attachmentFiles.find(item=>item.kind==='image')?.id || ''; renderFloating(); }
       else if (action === 'attachment-retry') { const file = state.attachmentFiles.find(item=>item.id===target.dataset.id); if (file) { file.status='pending'; file.progress=0; file.error=''; } renderFloating(); }
       else if (action === 'attachment-upload') { state.attachmentFiles.filter(file=>['pending','failed'].includes(file.status)).forEach(file=>{ file.status='uploading'; file.progress=42; file.error=''; }); renderFloating(); setTimeout(()=>{ state.attachmentFiles.filter(file=>file.status==='uploading').forEach(file=>{ file.status='done'; file.progress=100; file.time='刚刚'; }); if(state.overlay==='attachments') renderFloating(); toast('附件已上传（本地交互演示）'); },650); }
-      else if (action === 'copy-value') { const value = target.dataset.value || ''; const write = navigator.clipboard?.writeText(value); if (write) write.then(()=>toast(`已复制：${value}`)).catch(()=>toast(`已复制字段值：${value}`)); else toast(`已复制字段值：${value}`); }
+      else if (action === 'copy-value') { copyPrototypeValue(target.dataset.value || ''); }
       else if (action === 'media-set-main') { state.productMediaPrimary=target.dataset.value||'正面图';if(state.page==='entity-form')renderView();renderFloating();toast(`${state.productMediaPrimary}已设为主图`); }
       else if (action === 'media-sort') { state.overlay='media-sort';renderFloating(); }
       else if (action === 'media-move') { const from=Number(target.dataset.index);const delta=target.dataset.value==='up'?-1:1;const to=Math.max(0,Math.min(state.productMediaOrder.length-1,from+delta));if(from!==to){const next=[...state.productMediaOrder];[next[from],next[to]]=[next[to],next[from]];state.productMediaOrder=next;renderFloating();} }
@@ -11570,7 +11752,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         const invalid=!(values.type||'').trim()?'type':!taskCreatePeople[values.role]?'role':!(new Date(values.deadline).getTime()>Date.now())?'deadline':!(values.note||'').trim()?'note':'';
         if(invalid){state.taskCreateError=invalid;renderFloating();requestAnimationFrame(()=>document.querySelector(`#task-create-${invalid==='type'?'name':invalid}`)?.focus());return;}
         if(values.assignee!=='unassigned'&&!taskCreatePeople[values.role].includes(values.assignee))return;
-        const task={id:`T${String(tasks.length+1).padStart(2,'0')}`,manualFollowup:true,description:values.note.trim(),assignee:values.assignee==='unassigned'?`${values.role}共同待办`:values.assignee,lane:values.priority==='urgent'?'due':'normal',title:values.type.trim(),object:`${row.no} · ${rowItem(row,config)}`,source:row.no,sourcePage:config.key,sourceRecordId:row.id,actions:['complete','block','urge'],role:values.role,time:`截止 ${values.deadline.replace('T',' ')}`,state:'可执行',badge:'info',reason:'',history:[['跟进任务已创建','刚刚 · 当前账号']]};
+        const task={id:`T${String(tasks.length+1).padStart(2,'0')}`,manualFollowup:true,description:values.note.trim(),assignee:values.assignee==='unassigned'?`由${values.role}处理`:values.assignee,lane:values.priority==='urgent'?'due':'normal',title:values.type.trim(),object:`${row.no} · ${rowItem(row,config)}`,source:row.no,sourcePage:config.key,sourceRecordId:row.id,actions:['complete','block','urge'],role:values.role,time:`截止 ${values.deadline.replace('T',' ')}`,state:'可执行',badge:'info',reason:'',history:[['跟进任务已创建','刚刚 · 当前账号']]};
         tasks.unshift(task);state.boardRole='all';state.taskCreateError='';
         state.infoModal={title:'跟进任务已创建',html:`<section class="task-receipt"><div class="task-receipt-row"><strong>来源单据</strong><span>${row.no}</span></div><div class="task-receipt-row"><strong>任务事项</strong><span>${escapeHTML(task.title)}</span></div><div class="task-receipt-row"><strong>责任岗位 / 办理人</strong><span>${values.role} · ${escapeHTML(task.assignee)}</span></div><div class="task-receipt-row"><strong>截止时间</strong><span>${values.deadline.replace('T',' ')}</span></div><div class="task-receipt-row"><strong>任务要求</strong><span>${escapeHTML(task.description)}</span></div></section><p>可在相关任务中查看进度、处理结果和催办。</p><button class="btn primary" data-action="open-related-tasks" data-page="${config.key}" data-id="${row.id}">查看相关任务</button>`};state.overlay='info';renderSidebar();renderView();renderFloating();
       }
@@ -11579,7 +11761,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'detail-primary') { state.actionContext={page:state.drawer.page,recordId:state.drawer.row.id};state.businessAction=(listConfig[state.drawer.page]?.workflow?'submit':'more');state.drawer=null;state.overlay='business-action';renderFloating(); }
       else if (action === 'confirm-business-action') { const config=listConfig[state.actionContext?.page]||currentPageConfig()||listConfig.sales;const row=config.rows.find(item=>item.id===state.actionContext?.recordId)||config.rows.find(item=>state.selected.has(item.id));const label=state.businessAction==='more'?'业务操作':(state.businessActionLabel||'业务动作');state.infoModal={title:`${label}回执`,html:`<section class="task-receipt"><div class="task-receipt-row"><strong>业务对象</strong><span>${row?.no||'当前记录'}</span></div><div class="task-receipt-row"><strong>操作</strong><span>${label}</span></div><div class="task-receipt-row"><strong>结果</strong><span>已完成本次交互校验；正式系统将按当前状态与权限提交。</span></div><div class="task-receipt-row"><strong>业务边界</strong><span>${config.boundary}</span></div></section>`};state.selected.clear();state.overlay='info';renderView();renderFloating(); }
       else if (action === 'action-choice-info' || action === 'related-open') toast(`${target.dataset.value || '相关内容'}已打开（交互示意）`);
-      else if (action === 'open-task') { const task = tasks.find(item=>item.id===target.dataset.id); if (!task) return; state.overlay=null; state.drawer = {type:'task',task}; state.taskStep=1; state.taskMaxStep=1; state.taskAction=taskActions(task)[0]||''; state.taskNote=''; state.taskTarget=''; state.taskError=''; renderFloating(); }
+      else if (action === 'open-tracking') { state.overlay=null; state.drawer={type:'tracking'}; renderFloating(); }
+      else if (action === 'open-task' || action === 'open-tracking-task') { const task = action==='open-tracking-task'?{...tasks[0],approval:false,title:'工程资料',role:'工程',actions:['complete','block','urge']}:tasks.find(item=>item.id===target.dataset.id); if (!task) return; if(action==='open-tracking-task')state.floatingStack.push({overlay:null,drawer:state.drawer,returnFocus:{action:'open-tracking-task'}}); state.overlay=null; state.drawer = {type:'task',task}; state.taskStep=1; state.taskMaxStep=1; state.taskAction=taskActions(task)[0]||''; state.taskNote=''; state.taskTarget=''; state.taskError=''; renderFloating(); }
       else if (action === 'task-context-open') { const page=target.dataset.page; const row=listConfig[page]?.rows.find(item=>item.id===target.dataset.id); if(row)openLinkedRecord(page,row); }
       else if (action === 'task-prev') { state.taskStep = Math.max(1,state.taskStep-1); state.taskError=''; renderFloating(); }
       else if (action === 'task-step') {
@@ -11601,7 +11784,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
           if(action==='complete'||action==='reject'){task.lane='done';task.state=action==='complete'?'已完成':'已退回';task.badge=action==='complete'?'success':'danger';task.actions=[];}
           if(action==='block'){task.readyActions=[...task.actions];task.lane='blocked';task.state='阻塞';task.badge='danger';task.reason=note;task.actions=['resume','urge',...(task.candidates?['assign']:[])];}
           if(action==='resume'){task.lane='normal';task.state='可执行';task.badge='info';task.reason='';task.actions=task.readyActions||['complete','block',...(task.approval?['reject']:[]),'urge',...(task.candidates?['assign']:[])];}
-          if(action==='assign')task.assignee=recipient==='pool'?`${task.role}共同待办`:task.candidates.find(([id])=>id===recipient)[1];
+          if(action==='assign')task.assignee=recipient==='pool'?`由${task.role}处理`:task.candidates.find(([id])=>id===recipient)[1];
           task.history=task.history||[];task.history.unshift([`${label}${action==='assign'?' · '+task.assignee:''}`,'刚刚 · 当前账号']);
           task.receipt={outcome:'confirmed',action:label,feedback:note||'已核对并确认',status:task.state};
           state.drawer=null;state.taskStep=1;state.taskMaxStep=1;state.infoModal={title:'任务办理回执',html:`<dl class="detail-grid"><dt>任务</dt><dd>${escapeHTML(task.title)}</dd><dt>办理动作</dt><dd>${label}</dd><dt>当前状态</dt><dd>${task.state}</dd><dt>处理说明</dt><dd>${escapeHTML(note)||'已核对并确认'}</dd>${action==='assign'?`<dt>接收人</dt><dd>${task.assignee}</dd>`:''}</dl><p class="source-summary-note">${action==='urge'?'催办已记录，任务状态保持不变。':'协同记录已更新，业务事实仍从所属单据核对。'}</p>`};state.overlay='info';renderSidebar();renderView();renderFloating();
@@ -11617,7 +11800,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'dashboard-period') { state.dashboardPeriod = target.dataset.value; renderView(); }
       else if (action === 'dashboard-date') { state.dashboardSelectedDate = target.dataset.value; renderView(); toast(`已聚焦 ${target.dataset.value} 到期订单`); }
       else if (action === 'dashboard-stage') { state.dashboardSelectedStage = target.dataset.value; renderView(); }
-      else if (action === 'dashboard-role') { state.infoModal={title:`${target.dataset.value}岗位待办`,body:'展示该岗位未结束任务、到期分布和阻塞原因；正式实现从任务看板带入相同筛选。'}; state.overlay='info'; renderFloating(); }
+      else if (action === 'dashboard-role') { state.infoModal={title:`${target.dataset.value}岗位待办`,body:'展示该岗位未结束任务、到期分布和阻塞原因；正式实现从任务管理带入相同筛选。'}; state.overlay='info'; renderFloating(); }
       else if (action === 'audit-category') { state.auditCategory=target.dataset.value; renderView(); }
       else if (action === 'audit-open') { const row=auditRows.find(item=>item.id===target.dataset.id); if(row){state.drawer={type:'audit',row};renderFloating();} }
       else if (action === 'permission-tab' || action === 'permission-role') { if(target.dataset.value===(action==='permission-tab'?state.permissionTab:state.permissionRole))return;const next=()=>{if(action==='permission-tab')state.permissionTab=target.dataset.value;else state.permissionRole=target.dataset.value;renderView();};if(action==='permission-tab'&&['roles','menus'].includes(state.permissionTab)&&['roles','menus'].includes(target.dataset.value))next();else requestPermissionNavigation(next); }
@@ -11712,6 +11895,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if (event.key === 'Escape') {
         if (state.overlay) dismissOverlay();
         else if (state.drawer) closeLinkedDrawer();
+        else if (state.page==='mobile-tasks' && state.mobileTrackingOpen) {state.mobileTrackingOpen=false;renderView();requestAnimationFrame(()=>document.querySelector('.rm-tracking-open')?.focus());}
         else if (state.page === 'mobile-tasks' && state.mobileOptionsOpen) { state.mobileOptionsOpen = false; renderView(); }
         else if (state.page === 'mobile-tasks' && state.mobileScreen === 'progress-detail') { state.mobileScreen = 'list'; state.mobileProgressId = null; renderView(); }
         else if (state.page === 'mobile-tasks' && state.mobileScreen === 'process') { state.mobileScreen = 'detail'; renderView(); }
@@ -11721,7 +11905,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
         if (state.page === 'mobile-tasks') {
-          const search = document.querySelector('#mobile-task-search, #mobile-progress-search'); search?.focus();
+          const search = document.querySelector('#mobile-task-search, #mobile-tracking-search, #mobile-progress-search'); search?.focus();
         } else {
           state.overlay = 'catalog'; state.catalogSearch = ''; renderFloating(); requestAnimationFrame(()=>document.querySelector('#catalog-search')?.focus());
         }

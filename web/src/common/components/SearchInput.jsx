@@ -27,7 +27,7 @@ export default function SearchInput({
       open={showHint}
       trigger={[]}
       placement="bottomLeft"
-      styles={{ root: { maxWidth: 'min(384px, calc(100vw - 64px))' } }}
+      styles={{ root: { maxWidth: 'min(384px, calc(100vw - 64px))', pointerEvents: 'none' } }}
       content={
         <div id={hintID} style={{ overflowWrap: 'anywhere' }}>
           {searchHint}

@@ -1,0 +1,84 @@
+.mobile-workflow-tracking {
+  display: grid;
+  gap: 12px;
+  margin: 8px 12px 0;
+  padding-bottom: 16px;
+  color: var(--erp-text);
+}
+
+.mobile-workflow-tracking-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-workflow-tracking-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.mobile-workflow-tracking-count,
+.mobile-workflow-tracking-more {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.mobile-workflow-tracking-list {
+  display: grid;
+  gap: 12px;
+}
+
+.mobile-workflow-tracking-card {
+  min-width: 0;
+  padding: 12px 13px;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 16px;
+  background: var(--erp-surface-bg);
+}
+
+.mobile-workflow-tracking-card .erp-task-card__content {
+  display: grid;
+  gap: 9px;
+}
+
+.mobile-workflow-tracking-heading,
+.mobile-workflow-tracking-origin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.mobile-workflow-tracking-heading strong {
+  min-width: 0;
+  flex: 1;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.mobile-workflow-tracking-heading .ant-tag {
+  margin: 0;
+}
+
+.mobile-workflow-tracking-owner {
+  padding-top: 9px;
+  border-top: 1px solid var(--erp-border);
+  font-size: 13px;
+}
+
+.mobile-workflow-tracking-origin {
+  color: var(--erp-text-muted);
+  font-size: 11px;
+}
+
+.mobile-workflow-tracking-more {
+  text-align: center;
+}
+
+.mobile-filter-panel[data-filter-context='流程'] .ant-select {
+  width: 100%;
+}

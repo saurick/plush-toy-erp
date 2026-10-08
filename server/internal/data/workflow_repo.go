@@ -409,6 +409,9 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 	if actorID > 0 {
 		eventBuilder.SetActorID(actorID)
 	}
+	if role := biz.WorkflowInitiatorRoleKey(ctx, actorID); role != "" {
+		eventBuilder.SetActorRoleKey(role)
+	}
 	if publicCreate {
 		mutationResult, resultErr := workflowTaskMutationResultMap(entWorkflowTaskToBiz(row))
 		if resultErr != nil {

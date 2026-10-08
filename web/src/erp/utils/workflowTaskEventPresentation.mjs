@@ -52,7 +52,7 @@ const EVENT_PRESENTATIONS = Object.freeze({
   },
   unassigned: {
     categoryLabel: '责任流转',
-    label: '已退回负责岗位共同待办',
+    label: '已交回负责岗位处理',
     tone: 'info',
   },
   recovery_withdrawn: {
@@ -226,10 +226,10 @@ export function buildWorkflowTaskResponsibilityItems(task = {}) {
     },
     {
       key: 'assignee',
-      label: '当前承接方式',
+      label: '处理人',
       value: positiveInteger(task.assignee_id)
         ? '已指定处理人'
-        : '岗位共同待办',
+        : '由岗位人员处理',
     },
     {
       key: 'status',

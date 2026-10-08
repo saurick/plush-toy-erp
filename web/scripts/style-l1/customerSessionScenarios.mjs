@@ -108,7 +108,7 @@ export function createCustomerSessionScenarios({
   }
   const salesRoleItems = [
     '工作台',
-    '任务看板',
+    '任务管理',
     '基础资料',
     '销售管理',
     '出货管理',
@@ -120,7 +120,7 @@ export function createCustomerSessionScenarios({
   ]
   const financeRoleItems = [
     '工作台',
-    '任务看板',
+    '任务管理',
     '财务管理',
     '基础资料',
     '销售管理',
@@ -484,7 +484,7 @@ export function createCustomerSessionScenarios({
           },
           {
             key: 'task-board',
-            label: '任务看板',
+            label: '任务管理',
             path: '/erp/task-board',
             required_any: ['workflow.task.read'],
             required_all: [],
@@ -1355,7 +1355,7 @@ export function createCustomerSessionScenarios({
         await expectText(page, '工作台 功能预览')
         await expectText(page, '本地功能预览')
         await expectText(page, '当前尚未启用客户业务设置')
-        await expectText(page, '工作台、任务看板和业务数据暂时不能使用')
+        await expectText(page, '工作台、任务管理和业务数据暂时不能使用')
         await assertTextAbsent(page, '暂时无法进入工作台')
         await assertTextAbsent(page, '优先处理队列')
 
@@ -2266,7 +2266,7 @@ export function createCustomerSessionScenarios({
         const menu = page.locator('.erp-admin-menu')
         const expectedItems = [
           '工作台',
-          '任务看板',
+          '任务管理',
           '进度看板',
           '销售管理',
           '采购管理',
@@ -2387,7 +2387,7 @@ export function createCustomerSessionScenarios({
         const metrics = await assertDirectRoleNavigation(menu)
         assert.deepEqual(
           metrics.items.slice(0, 3),
-          ['工作台', '任务看板', '财务管理'],
+          ['工作台', '任务管理', '财务管理'],
           '自定义常用模块应优先排列'
         )
         assert.deepEqual(

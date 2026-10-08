@@ -1887,7 +1887,8 @@ export function createBusinessFormInteractionScenarios({
         await page
           .locator('.erp-business-inline-help-popover')
           .waitFor({ state: 'visible' })
-        await allocationDialog.locator('.ant-modal-title').click()
+        await allocationDialog.locator('.ant-modal-footer').click({ position: { x: 10, y: 10 } })
+        await page.locator('.erp-business-inline-help-popover').waitFor({ state: 'hidden' })
         await page.screenshot({
           path: `${outputDir}/finance-allocation-narrow-help.png`,
           fullPage: true,

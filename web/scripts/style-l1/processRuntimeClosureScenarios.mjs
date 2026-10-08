@@ -111,7 +111,7 @@ export function createProcessRuntimeClosureScenarios({
         menus: [
           {
             key: 'task-board',
-            label: '任务看板',
+            label: '任务管理',
             path: '/erp/task-board',
             required_any: ['workflow.task.read'],
             required_all: [],

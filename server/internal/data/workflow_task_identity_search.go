@@ -5,6 +5,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/workflowtask"
 
 	entsql "entgo.io/ent/dialect/sql"
@@ -91,6 +92,16 @@ func workflowTaskHasIdentitySourceBinding() predicate.WorkflowTask {
 // Search the same source identities as the read projection before count and
 // pagination. The caller still applies task visibility and permission filters.
 func workflowTaskSourceIdentityKeywordPredicate(keyword string) predicate.WorkflowTask {
+	return workflowSourceIdentityKeywordPredicate(keyword, workflowtask.FieldSourceID, workflowIdentitySourceBinding)
+}
+
+func workflowProcessSourceIdentityKeywordPredicate(keyword string) predicate.ProcessInstance {
+	return workflowSourceIdentityKeywordPredicate(keyword, processinstance.FieldBusinessRefID, func(selector *entsql.Selector, source workflowIdentitySearchSource) *entsql.Predicate {
+		return entsql.In(selector.C(processinstance.FieldBusinessRefType), source.types...)
+	})
+}
+
+func workflowSourceIdentityKeywordPredicate(keyword, sourceIDColumn string, binding func(*entsql.Selector, workflowIdentitySearchSource) *entsql.Predicate) func(*entsql.Selector) {
 	return func(selector *entsql.Selector) {
 		matches := []*entsql.Predicate{}
 		for _, source := range workflowIdentitySearchSources {
@@ -145,7 +156,7 @@ func workflowTaskSourceIdentityKeywordPredicate(keyword string) predicate.Workfl
 				fields = append(fields, entsql.ContainsFold(decision.C("decision_no"), keyword))
 			}
 			query.Where(entsql.Or(fields...))
-			matches = append(matches, entsql.And(workflowIdentitySourceBinding(selector, source), entsql.In(selector.C(workflowtask.FieldSourceID), query)))
+			matches = append(matches, entsql.And(binding(selector, source), entsql.In(selector.C(sourceIDColumn), query)))
 		}
 		selector.Where(entsql.Or(matches...))
 	}

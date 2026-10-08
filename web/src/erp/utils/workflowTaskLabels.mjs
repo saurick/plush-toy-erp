@@ -1,3 +1,5 @@
+import { getRoleDisplayName } from './roleKeys.mjs'
+
 const WORKFLOW_TASK_GROUP_LABELS = Object.freeze({
   engineering_material_boss_review: '用料老板审核',
   engineering_material_finance_review: '用料财务审核',
@@ -38,4 +40,17 @@ const WORKFLOW_TASK_GROUP_LABELS = Object.freeze({
 export function getWorkflowTaskGroupLabel(taskGroupKey, fallback = '业务任务') {
   const normalized = String(taskGroupKey || '').trim()
   return WORKFLOW_TASK_GROUP_LABELS[normalized] || fallback
+}
+
+export function getWorkflowResponsibilityParts({ roleKey, assigneeName = '', pending = false, approval = false } = {}) {
+  const role = getRoleDisplayName(roleKey, '待确认')
+  const name = String(assigneeName || '').trim()
+  const parts = [`岗位：${role}`]
+  if (name) parts.push(`处理人：${name}`)
+  if (pending && (role !== '待确认' || name)) parts.push(approval ? '待审批' : '待处理')
+  return parts
+}
+
+export function formatWorkflowResponsibility(options) {
+  return getWorkflowResponsibilityParts(options).join(' · ')
 }

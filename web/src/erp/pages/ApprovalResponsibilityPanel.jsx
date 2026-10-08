@@ -563,7 +563,7 @@ export default function ApprovalResponsibilityPanel({
       selectableRoleOptions.length === 0
         ? '当前没有具备审批资格的岗位。请先在“岗位设置”中启用岗位、开启审批功能，并至少保留一名启用员工。'
         : selectableRoleOptions.length === 1
-          ? `当前只有“${onlyOption.displayLabel}”具备审批资格。备用和升级可以留空；同一岗位池或同一指定员工不能重复设置，如需将该岗位池改为主办，请先清空现有的备用或升级责任。`
+          ? `当前只有“${onlyOption.displayLabel}”具备审批资格。备用和升级可以留空；同一岗位的“岗位内任一员工”选项或同一指定员工不能重复设置，如需调整主办，请先清空与其重复的备用或升级责任。`
           : ''
     if (selectedUnavailableRoles.length > 0) {
       return {
@@ -677,7 +677,7 @@ export default function ApprovalResponsibilityPanel({
     for (const member of members) {
       const identity = `${member.role_key}:${member.user_id}`
       if (memberIdentities.has(identity)) {
-        message.warning('同一岗位池或同一指定员工不能重复承担多个责任层级')
+        message.warning('同一岗位的“岗位内任一员工”选项或同一指定员工不能重复承担多个责任层级')
         return
       }
       memberIdentities.add(identity)
@@ -1212,7 +1212,7 @@ export default function ApprovalResponsibilityPanel({
                         if (occupiedBy) {
                           return Promise.reject(
                             new Error(
-                              `该岗位池已用于${strategyShortLabel(
+                              `该岗位的“岗位内任一员工”选项已用于${strategyShortLabel(
                                 occupiedBy
                               )}责任`
                             )

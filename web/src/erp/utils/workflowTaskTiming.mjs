@@ -1,5 +1,6 @@
 import { getWorkflowTaskDueStatus } from './workflowDashboardStats.mjs'
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
+import { getRoleDisplayName } from './roleKeys.mjs'
 
 function readWorkflowDeadlineNow(now) {
   const value = typeof now === 'function' ? now() : now
@@ -124,7 +125,7 @@ export function getWorkflowTaskTiming(
     key,
     label,
     value,
-    { missing = '未记录', tone = 'neutral', suffix = '' } = {}
+    { missing = '未记录', tone = 'neutral', prefix = '', suffix = '' } = {}
   ) => {
     const date = taskDate(value)
     if (!date && !detail) return
@@ -132,10 +133,10 @@ export function getWorkflowTaskTiming(
     rows.push({
       key,
       label,
-      value: date ? `${formatted}${suffix}` : missing,
+      value: `${prefix}${date ? `${formatted}${suffix}` : missing}`,
       dateTime: date?.toISOString() || '',
       title: date
-        ? `${label} ${formatWorkflowTaskTime(value, { exact: true })}${suffix}`
+        ? `${label} ${prefix}${formatWorkflowTaskTime(value, { exact: true })}${suffix}`
         : '',
       tone,
     })
@@ -143,7 +144,12 @@ export function getWorkflowTaskTiming(
 
   // Tasks are created in their owner role; mutations only reassign within that role.
   // Never substitute updated_at, an order date, or a process start for this timestamp.
-  if (!ended || detail) add('arrived', '进入本岗', task.created_at)
+  if (!ended || detail) {
+    const role = getRoleDisplayName(task.owner_role_key)
+    add('arrived', role ? '进入岗位' : '任务生成', task.created_at, {
+      prefix: role ? `${role} · ` : '',
+    })
+  }
   if (!ended || detail) {
     const status = getWorkflowTaskDueStatus(task, nowMs)
     add('due', detail ? '处理截止' : '截止', task.due_at, {

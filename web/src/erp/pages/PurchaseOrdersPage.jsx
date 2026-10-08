@@ -5,6 +5,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { orderSubmissionSuccessMessage } from '../utils/approvalCondition.mjs'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
@@ -960,11 +961,11 @@ export default function PurchaseOrdersPage() {
           null
         )
       }
-      message.success(
-        action.key === 'submit'
-          ? orderSubmissionSuccessMessage('purchase_order', updated)
-          : action.successMessage || `采购订单已${action.label}`
-      )
+      if (action.key === 'submit') {
+        showProcessSubmissionReceipt({ result: updated, title: orderSubmissionSuccessMessage('purchase_order', updated) })
+      } else {
+        message.success(action.successMessage || `采购订单已${action.label}`)
+      }
       if (updated && action.returnsRecord !== false) {
         setSelectedOrder(updated)
         applySelectedRowKeys([updated.id])
@@ -1027,6 +1028,8 @@ export default function PurchaseOrdersPage() {
       content: (
         <SourceOrderLifecycleConfirmContent
           action={action}
+          processKey="material_supply"
+          customerKey={activeCustomerKey}
           onReasonChange={(value) => {
             reason = value
           }}

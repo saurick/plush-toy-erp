@@ -3,6 +3,8 @@ import {
   closeBusinessFormPage,
 } from './businessFormPageAssertions.mjs'
 import { createBusinessColumnPriorityScenarios } from './businessColumnPriorityScenarios.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+
 export function createBusinessPageContractScenarios({
   customerRuntimeEffectiveSession,
   expectHeading,
@@ -435,7 +437,7 @@ export function createBusinessPageContractScenarios({
       ],
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '任务看板')
+        await expectHeading(page, '任务管理')
         const assignmentTaskCard = page
           .locator('.erp-task-board-card')
           .filter({ hasText: '下拉分类只读验收任务' })
@@ -444,6 +446,7 @@ export function createBusinessPageContractScenarios({
         await assignmentTaskCard.click()
         const assignmentDrawer = page.locator('.erp-task-action-drawer')
         await assignmentDrawer.waitFor({ state: 'visible', timeout: 10_000 })
+        await waitForFiniteAnimations(page)
         await assignmentDrawer.getByRole('tab', { name: /选择处理/u }).click()
         await assignmentDrawer.getByRole('radio', { name: /转交任务/u }).click()
         const assignmentSelect = assignmentDrawer.getByRole('combobox', {
@@ -452,16 +455,17 @@ export function createBusinessPageContractScenarios({
         await assignmentSelect.click()
         const assignmentDropdown = page.locator('.ant-select-dropdown:visible')
         await assignmentDropdown.waitFor({ state: 'visible', timeout: 10_000 })
+        await assignmentDropdown.locator('.ant-select-item-group').first().waitFor({ state: 'visible', timeout: 10_000 })
         assert.deepEqual(
           await assignmentDropdown
             .locator('.ant-select-item-group')
             .allTextContents(),
-          ['岗位共同待办', '指定员工']
+          ['由岗位人员处理', '指定员工']
         )
         assert.equal(
           await assignmentDropdown.locator('.ant-select-item-option').count(),
           2,
-          '转交去向必须同时展示岗位共同待办和合格员工'
+          '转交去向必须同时展示由岗位人员处理和合格员工'
         )
         await assignmentSelect.press('Escape')
         await assignmentDropdown.waitFor({ state: 'hidden', timeout: 10_000 })
@@ -528,7 +532,7 @@ export function createBusinessPageContractScenarios({
         await moduleCatalog.waitFor({ state: 'visible', timeout: 10_000 })
         for (const entry of [
           '工作台',
-          '任务看板',
+          '任务管理',
           '进度看板',
           '客户档案',
           '供应商与加工厂',
@@ -571,7 +575,7 @@ export function createBusinessPageContractScenarios({
         assert.equal(
           await menu.getByText('异常处理', { exact: true }).count(),
           0,
-          '侧栏不应再显示已并入工作台和任务看板的“异常处理”入口'
+          '侧栏不应再显示已并入工作台和任务管理的“异常处理”入口'
         )
         assert.equal(
           await menu.getByText('客户/供应商', { exact: true }).count(),

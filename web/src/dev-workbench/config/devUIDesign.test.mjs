@@ -407,9 +407,9 @@ test('empty or headless design inputs keep sandbox initialization deterministic'
   assert.ok(html.indexOf('createMemoryStorage') < html.indexOf('<title>'))
 })
 
-test('business, help, login and workbench use the same isolated design asset', () => {
+test('business, mobile, help, login and workbench use the same isolated design asset', () => {
   const source = '<html><head></head><body></body></html>'
-  for (const entry of ['workspace', 'login', 'help', 'workbench']) {
+  for (const entry of ['workspace', 'mobile-tasks', 'login', 'help', 'workbench']) {
     const prepared = prepareUIDesignSandboxSource(source, { page: entry })
     assert.ok(prepared.includes(`window.__ERP_UI_DESIGN_ENTRY__ = "${entry}"`))
     assert.match(prepared, /connect-src 'none'/)

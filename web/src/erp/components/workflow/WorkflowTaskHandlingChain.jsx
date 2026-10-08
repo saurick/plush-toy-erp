@@ -19,8 +19,10 @@ import {
 import WorkflowProcessStageTrack from './WorkflowProcessStageTrack.jsx'
 import EngineeringMaterialPurchaseOrders from '../sales-orders/EngineeringMaterialPurchaseOrders.jsx'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
+import WorkflowTrackingDrawer from './WorkflowTrackingDrawer.jsx'
 
 export default function WorkflowTaskHandlingChain({
+  onOpenTracking,
   task,
   profile,
   processContext,
@@ -37,6 +39,8 @@ export default function WorkflowTaskHandlingChain({
   const requestID = source?.requestID
   const [result, setResult] = React.useState(null)
   const [reload, setReload] = React.useState(0)
+  const [trackingOpen, setTrackingOpen] = React.useState(false)
+  React.useEffect(() => setTrackingOpen(false), [task?.id])
   React.useEffect(() => {
     if (processLinked || !orderID || !requestID || !canRead) return undefined
     const controller = new AbortController()
@@ -127,6 +131,8 @@ export default function WorkflowTaskHandlingChain({
             context={processContext}
             variant={variant}
           />
+          <Button size="small" onClick={onOpenTracking || (() => setTrackingOpen(true))}>查看全部节点处理记录</Button>
+          {!onOpenTracking ? <WorkflowTrackingDrawer trackingRef={trackingOpen ? { kind: 'process', id: task.process_instance_id } : null} onClose={() => setTrackingOpen(false)} refreshKey={task.version} closeLabel="返回任务" /> : null}
         </>
       ) : model ? (
         <WorkflowProcessStageTrack model={model} variant={variant} />

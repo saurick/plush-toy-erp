@@ -1,12 +1,22 @@
 import React from 'react'
 import { Input, Space } from 'antd'
+import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
 
 export default function SourceOrderLifecycleConfirmContent({
   action,
   onReasonChange,
+  processKey,
+  customerKey,
 }) {
   if (!action?.requiresReason) {
-    return <span>{action?.confirmContent}</span>
+    return (
+      <Space direction="vertical" size={12}>
+        <span>{action?.confirmContent}</span>
+        {action?.key === 'submit' && processKey ? (
+          <ProcessSubmissionRoute processKey={processKey} customerKey={customerKey} />
+        ) : null}
+      </Space>
+    )
   }
 
   return (

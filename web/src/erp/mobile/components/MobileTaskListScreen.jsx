@@ -21,6 +21,7 @@ import FilterChip from '@/common/components/navigation/FilterChip'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import MobileProgressPanel from './MobileProgressPanel'
+import MobileWorkflowTrackingPanel from './MobileWorkflowTrackingPanel.jsx'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
 import AccountPasswordModal from '../../components/AccountPasswordModal.jsx'
@@ -50,7 +51,7 @@ import {
 } from '../utils/mobileRoleTaskModel.mjs'
 
 const MOBILE_MAIN_TAB_ITEMS = [
-  { key: 'tasks', label: '任务', Icon: InboxOutlined },
+  { key: 'tasks', label: '任务管理', Icon: InboxOutlined },
   { key: MOBILE_MAIN_TAB_KEYS.MESSAGES, label: '风险', Icon: BellOutlined },
   { key: MOBILE_MAIN_TAB_KEYS.MINE, label: '我的', Icon: UserOutlined },
 ]
@@ -60,7 +61,7 @@ export default function MobileTaskListScreen({
   progressAccess,
   accessScopeKey,
   activeRoleKey,
-  onOpenProgressTask,
+  onOpenLinkedTask,
   activeMainTabKey,
   activeMessageTabKey,
   activeViewHasData,
@@ -69,6 +70,7 @@ export default function MobileTaskListScreen({
   authoritativeTaskCounts,
   canEnterDesktop,
   canViewApprovalInbox,
+  canViewTracking,
   doneTasks,
   filterItems,
   filteredTasks,
@@ -114,9 +116,11 @@ export default function MobileTaskListScreen({
     refreshRevision: authoritativeTaskCounts,
   })
   const isProgress = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
+  const isTracking = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TRACKING
   const isTasks = [
     MOBILE_MAIN_TAB_KEYS.TODO,
     MOBILE_MAIN_TAB_KEYS.DONE,
+    MOBILE_MAIN_TAB_KEYS.TRACKING,
   ].includes(activeMainTabKey)
   const canFilterTaskList = [
     MOBILE_MAIN_TAB_KEYS.TODO,
@@ -152,7 +156,6 @@ export default function MobileTaskListScreen({
   useEffect(() => () => clearTimeout(searchTimerRef.current), [])
 
   useEffect(() => {
-    if (activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE) return
     clearTimeout(searchTimerRef.current)
     composingSearchRef.current = false
     setKeywordDraft(taskKeyword || '')
@@ -900,6 +903,9 @@ export default function MobileTaskListScreen({
   }
 
   const renderActiveTabPanel = () => {
+    if (isTracking) {
+      return <MobileWorkflowTrackingPanel accessScope={accessScopeKey} scrollContainerRef={scrollContainerRef} onOpenTask={onOpenLinkedTask} />
+    }
     if (activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE) {
       return renderDonePanel()
     }
@@ -984,8 +990,8 @@ export default function MobileTaskListScreen({
             : ''
         }`}
         data-testid="mobile-role-scroll"
-        aria-busy={initialLoading ? 'true' : 'false'}
-        data-refreshing={loading || loadingMore ? 'true' : 'false'}
+        aria-busy={!isTracking && initialLoading ? 'true' : 'false'}
+        data-refreshing={!isTracking && (loading || loadingMore) ? 'true' : 'false'}
         onScroll={handleMainScroll}
       >
         <header className="erp-sr-only" data-testid="mobile-task-list-header">
@@ -1006,7 +1012,41 @@ export default function MobileTaskListScreen({
           </div>
         </header>
 
-        {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE ? (
+        <div hidden={!isTasks} className="mobile-workspace-task-views">
+          <SlidingSegmented
+            block
+            aria-label="任务状态"
+            value={isTasks ? activeMainTabKey : lastTaskTab.current}
+            options={[
+              {
+                value: MOBILE_MAIN_TAB_KEYS.TODO,
+                label: (
+                  <>
+                    <span>待办</span>{' '}
+                    <span>{authoritativeTaskCounts?.todo ?? ''}</span>
+                  </>
+                ),
+              },
+              {
+                value: MOBILE_MAIN_TAB_KEYS.DONE,
+                label: (
+                  <>
+                    <span>已办</span>{' '}
+                    <span>{authoritativeTaskCounts?.history ?? ''}</span>
+                  </>
+                ),
+              },
+              ...(canViewTracking ? [{ value: MOBILE_MAIN_TAB_KEYS.TRACKING, label: '流程跟踪' }] : []),
+            ]}
+            onChange={(key) =>
+              openTaskBucket({
+                mainTabKey: key,
+                filterKey: activeFilterKey,
+              })
+            }
+          />
+        </div>
+        {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE && !isTracking ? (
           <div className="mobile-role-task-query">
             <form
               className="mobile-role-task-search"
@@ -1075,39 +1115,6 @@ export default function MobileTaskListScreen({
             ) : null}
           </div>
         ) : null}
-        <div hidden={!isTasks} className="mobile-workspace-task-views">
-          <SlidingSegmented
-            block
-            aria-label="任务状态"
-            value={isTasks ? activeMainTabKey : lastTaskTab.current}
-            options={[
-              {
-                value: MOBILE_MAIN_TAB_KEYS.TODO,
-                label: (
-                  <>
-                    <span>待办</span>{' '}
-                    <span>{authoritativeTaskCounts?.todo ?? ''}</span>
-                  </>
-                ),
-              },
-              {
-                value: MOBILE_MAIN_TAB_KEYS.DONE,
-                label: (
-                  <>
-                    <span>已办</span>{' '}
-                    <span>{authoritativeTaskCounts?.history ?? ''}</span>
-                  </>
-                ),
-              },
-            ]}
-            onChange={(key) =>
-              openTaskBucket({
-                mainTabKey: key,
-                filterKey: activeFilterKey,
-              })
-            }
-          />
-        </div>
         {renderActiveTabPanel()}
       </div>
 
@@ -1118,7 +1125,7 @@ export default function MobileTaskListScreen({
           scopeKey={accessScopeKey}
           roleKey={activeRoleKey}
           adminProfile={adminProfile}
-          onOpenTask={onOpenProgressTask}
+          onOpenTask={onOpenLinkedTask}
           canEnterDesktop={canEnterDesktop}
         />
       )}

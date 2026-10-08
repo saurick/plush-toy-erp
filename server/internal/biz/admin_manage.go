@@ -513,6 +513,9 @@ func auditPayloadTargetValue(payload map[string]any, key string) string {
 }
 
 func runtimeAuditActionLabelAndRisk(eventKey string) (string, string) {
+	if strings.HasPrefix(strings.TrimSpace(eventKey), ProcessInitiationAuditEventPrefix) {
+		return "发起流程", "normal"
+	}
 	if strings.HasPrefix(strings.TrimSpace(eventKey), legalNoticeReceiptEventPrefix) {
 		return "隐私与使用规则知悉", "normal"
 	}

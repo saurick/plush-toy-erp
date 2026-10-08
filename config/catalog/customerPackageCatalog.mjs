@@ -55,7 +55,7 @@ export const customerPackageCatalog = Object.freeze({
     },
     {
       key: "task-board",
-      label: "任务看板",
+      label: "任务管理",
       requiredCapabilityKeys: ["workflow.task.read"],
     },
     {

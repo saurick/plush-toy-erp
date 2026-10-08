@@ -3,12 +3,34 @@ import { AUTH_SCOPE } from '../../common/auth/auth.js'
 import { ADMIN_BASE_PATH } from '../../common/utils/adminRpc.js'
 import { JsonRpc, requireRpcData as dataOf } from '../../common/utils/jsonRpc.js'
 import { buildCustomerConfigMutationPayload } from './customerConfigTransition.mjs'
+import { normalizeApprovalCondition } from '../utils/approvalCondition.mjs'
 
 const customerConfigRpc = new JsonRpc({
   url: RpcDomain.CUSTOMER_CONFIG,
   basePath: ADMIN_BASE_PATH,
   authScope: AUTH_SCOPE.ADMIN,
 })
+
+export async function getProcessSubmissionRoute(params, options) {
+  const result = await customerConfigRpc.call(
+    RpcMethod.customer_config.GET_PROCESS_SUBMISSION_ROUTE,
+    params,
+    options
+  )
+  const route = dataOf(result)?.route
+  if (
+    !route?.config_revision ||
+    route.process_key !== params.process_key ||
+    !route.node_key ||
+    !route.owner_role_key ||
+    !['all', 'amount'].includes(route.condition?.mode)
+  ) {
+    throw Object.assign(new Error('接手岗位信息不完整，请重新读取'), {
+      isInvalidResponse: true,
+    })
+  }
+  return { ...route, condition: normalizeApprovalCondition(route.approval_key, route.condition) }
+}
 
 export async function getEffectiveSession(params = {}) {
   const result = await customerConfigRpc.call(RpcMethod.customer_config.GET_EFFECTIVE_SESSION, params)

@@ -157,22 +157,22 @@
   overflow-wrap: anywhere;
 }
 
-.workflow-process-stage--mobile .workflow-process-stage__head {
+:is(.workflow-process-stage--mobile, .workflow-process-stage--vertical) .workflow-process-stage__head {
   display: grid;
   gap: 4px;
 }
 
-.workflow-process-stage--mobile .workflow-process-stage__summary {
+:is(.workflow-process-stage--mobile, .workflow-process-stage--vertical) .workflow-process-stage__summary {
   text-align: left;
 }
 
-.workflow-process-stage--mobile .workflow-process-stage__list {
+:is(.workflow-process-stage--mobile, .workflow-process-stage--vertical) .workflow-process-stage__list {
   display: grid;
   overflow: visible;
   padding: 0;
 }
 
-.workflow-process-stage--mobile .workflow-process-stage__item {
+:is(.workflow-process-stage--mobile, .workflow-process-stage--vertical) .workflow-process-stage__item {
   min-width: 0;
   min-height: 58px;
   grid-template-areas: 'marker content';
@@ -182,7 +182,7 @@
   padding: 0 0 12px;
 }
 
-.workflow-process-stage--mobile .workflow-process-stage__item::after {
+:is(.workflow-process-stage--mobile, .workflow-process-stage--vertical) .workflow-process-stage__item::after {
   top: 24px;
   bottom: -1px;
   left: 12px;

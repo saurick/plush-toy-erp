@@ -585,7 +585,7 @@ async function actOnTaskInBrowser(
 ) {
   const session = await login(browser, { ...options, roleKey });
   try {
-    await goto(session.page, options.baseURL, "/erp/task-board", "任务看板");
+    await goto(session.page, options.baseURL, "/erp/task-board", "任务管理");
     const search = session.page.getByPlaceholder("订单 / 产品 / 物料 / 款号", { exact: true });
     await search.fill(sourceNo);
     await search.press("Enter");

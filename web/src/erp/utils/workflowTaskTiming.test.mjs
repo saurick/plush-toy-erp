@@ -53,8 +53,8 @@ test('pending tasks separate role arrival from deadline without adding other tim
     [
       {
         key: 'arrived',
-        label: '进入本岗',
-        value: '昨天 15:20',
+        label: '进入岗位',
+        value: '工程 · 昨天 15:20',
         tone: 'neutral',
       },
       {
@@ -66,7 +66,22 @@ test('pending tasks separate role arrival from deadline without adding other tim
     ]
   )
   assert.equal(rows[0].dateTime, new Date(task.created_at * 1000).toISOString())
-  assert.equal(rows[0].title, '进入本岗 2026年9月7日 15:20')
+  assert.equal(rows[0].title, '进入岗位 工程 · 2026年9月7日 15:20')
+  assert.equal(
+    timing({ ...task, owner_role_key: 'sales' })[0].value,
+    '业务 · 昨天 15:20'
+  )
+  assert.equal(
+    timing({ ...task, owner_role_key: 'boss' })[0].value,
+    '老板 · 昨天 15:20'
+  )
+  const unassigned = timing({
+    ...task,
+    owner_role_key: '',
+    payload: { owner_role_key: 'sales' },
+  })[0]
+  assert.equal(unassigned.label, '任务生成')
+  assert.equal(unassigned.value, '昨天 15:20')
 })
 
 test('urge, attachment refresh, same-role assignment and resume never reset arrival', () => {
@@ -88,7 +103,7 @@ test('urge, attachment refresh, same-role assignment and resume never reset arri
       owner_role_key: 'purchase',
       created_at: nowMs / 1000,
     })[0].value,
-    '今天 10:00'
+    '采购 · 今天 10:00'
   )
 })
 
@@ -116,7 +131,7 @@ test('absent or invalid timestamps never borrow updated_at, payload dates or the
     assert.deepEqual(timing(value), [])
     assert.deepEqual(
       timing(value, { detail: true }).map(({ value }) => value),
-      ['未记录', '未设置截止']
+      ['工程 · 未记录', '未设置截止']
     )
   }
   assert.deepEqual(

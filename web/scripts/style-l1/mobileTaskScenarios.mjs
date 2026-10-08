@@ -30,9 +30,6 @@ export function createMobileTaskScenarios({
   assertMobileTaskRefreshFeedback,
   assertMobileTaskDarkDetailReadable,
   assertMobileTaskBossDoneList,
-  assertNoDuplicatedAdminPageTitle,
-  assertDashboardMetricInteractionSemantics,
-  assertNoDashboardCenterLocalRefreshButton,
 }) {
   return [
     mobileTaskListOptionsScenario({ assert, path, outputDir }),
@@ -326,8 +323,9 @@ export function createMobileTaskScenarios({
         assert.equal(await rows.count(), 1)
         const taskTime = rows.first().locator('.erp-task-timing')
         assert.deepEqual(await taskTime.locator('dt').allTextContents(), [
-          '进入本岗',
+          '进入岗位',
         ])
+        assert.match(await taskTime.locator('time').innerText(), /^工程 · /u)
         assert.equal(
           await taskTime.locator('time').getAttribute('datetime'),
           new Date(1_788_840_000_000).toISOString(),
@@ -463,7 +461,7 @@ export function createMobileTaskScenarios({
         await assertTaskCopy(
           page,
           copyDetail.getByRole('button', { name: '复制任务信息', exact: true }),
-          ['任务：确认兔子样品', 'SO-IMAGE-0', '进入本岗：2026年']
+          ['任务：确认兔子样品', 'SO-IMAGE-0', '进入岗位：工程 · 2026年']
         )
         await page
           .getByRole('button', { name: '查看图片识别模拟产品大图' })
@@ -531,7 +529,7 @@ export function createMobileTaskScenarios({
         )
         assert.doesNotMatch(
           await endedCard.innerText(),
-          /更新时间|已超时|进入本岗/u
+          /更新时间|已超时|进入岗位/u
         )
         await page.screenshot({
           path: path.join(outputDir, 'mobile-task-ended-time.png'),
@@ -2890,7 +2888,7 @@ export function createMobileTaskScenarios({
           .click()
         await page.waitForFunction(() => {
           const heading = document.querySelector('.mobile-role-tasks-page h1')
-          return heading?.textContent?.trim() === '任务'
+          return heading?.textContent?.trim() === '任务管理'
         })
         await page.waitForFunction(
           () =>
@@ -3294,7 +3292,7 @@ export function createMobileTaskScenarios({
         await page.getByLabel('返回任务列表').click()
         await page.waitForFunction(() => {
           const heading = document.querySelector('.mobile-role-tasks-page h1')
-          return heading?.textContent?.trim() === '任务'
+          return heading?.textContent?.trim() === '任务管理'
         })
         await assertERPThemeMode(page, {
           scenarioName: 'mobile-tasks-dark',
@@ -3469,7 +3467,7 @@ export function createMobileTaskScenarios({
               document.querySelectorAll('.erp-mobile-list-item')
             )
             return (
-              heading?.textContent?.trim() === '任务' &&
+              heading?.textContent?.trim() === '任务管理' &&
               rows.some((row) => row.textContent?.includes(name)) &&
               !document.querySelector('.mobile-role-tasks-page--detail') &&
               !document.querySelector('.erp-admin-sider')
@@ -3494,7 +3492,7 @@ export function createMobileTaskScenarios({
         }))
         assert(
           listMetrics.path === '/m/sales/tasks' &&
-            listMetrics.heading === '任务' &&
+            listMetrics.heading === '任务管理' &&
             !listMetrics.hasDesktopShell &&
             listMetrics.hasMobileShell &&
             !listMetrics.hasDetail,
@@ -3544,7 +3542,7 @@ export function createMobileTaskScenarios({
           (name) => {
             const heading = document.querySelector('.mobile-role-tasks-page h1')
             return (
-              heading?.textContent?.trim() === '任务' &&
+              heading?.textContent?.trim() === '任务管理' &&
               !document.querySelector('.mobile-role-tasks-page--detail') &&
               !document.body.textContent?.includes(name)
             )

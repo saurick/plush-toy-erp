@@ -602,6 +602,8 @@ const BusinessDatePicker = React.forwardRef(
       onClick,
       onMouseDown,
       onOpenChange,
+      onCalendarChange,
+      showTime,
       quickOptions = [],
       quickOptionsLabel = '快捷选择',
       renderExtraFooter,
@@ -725,6 +727,8 @@ const BusinessDatePicker = React.forwardRef(
       <DatePicker
         {...restProps}
         ref={ref}
+        needConfirm={false}
+        showTime={showTime}
         allowClear={allowClear}
         className={joinClassNames('erp-business-date-input', className)}
         disabled={disabled}
@@ -735,6 +739,11 @@ const BusinessDatePicker = React.forwardRef(
         suffixIcon={<CalendarOutlined />}
         value={pickerValue}
         onChange={handleChange}
+        onCalendarChange={(nextValue, ...args) => {
+          // Date-time pickers otherwise defer onChange until the panel closes.
+          if (showTime && nextValue?.isValid()) handleChange(nextValue)
+          onCalendarChange?.(nextValue, ...args)
+        }}
         onClick={handleClick}
         onMouseDown={handleMouseDown}
         onOpenChange={handleOpenChange}

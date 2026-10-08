@@ -336,14 +336,14 @@ const APPROVAL_SETTINGS_SCHEMA_VERSION = "approval-settings/v1";
 const APPROVAL_SETTING_POOLS = Object.freeze({
   sales_order: Object.freeze({
     pool_key: "approval.sales_order",
-    source_pool_key: "sales",
+    source_pool_key: "boss",
     module_key: "sales_orders",
     display_name: "销售订单审批责任池",
     description: "fixed approval setting for sales order acceptance",
   }),
   purchase_order: Object.freeze({
     pool_key: "approval.purchase_order",
-    source_pool_key: "purchase",
+    source_pool_key: "boss",
     module_key: "purchase_orders",
     display_name: "采购订单审批责任池",
     description: "fixed approval setting for purchase order approval",

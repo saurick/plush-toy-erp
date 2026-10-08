@@ -1569,7 +1569,7 @@ export default function ERPLayout({ legalNotice }) {
                 showIcon
                 data-local-customer-desktop-preview="true"
                 message="本地功能预览"
-                description="当前尚未启用客户业务设置，只能查看页面和功能；工作台、任务看板和业务数据暂时不能使用。"
+                description="当前尚未启用客户业务设置，只能查看页面和功能；工作台、任务管理和业务数据暂时不能使用。"
               />
             ) : null}
 

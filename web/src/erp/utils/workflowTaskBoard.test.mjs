@@ -389,7 +389,7 @@ test('workflowTaskBoard: 使用服务端互斥计数构建四个运营泳道', (
   assert.deepEqual(model.ownerRoleKeys, ['warehouse', 'finance'])
 })
 
-test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', () => {
+test('workflowTaskBoard: 从 URL 读取任务管理筛选并过滤非法值', () => {
   const filters = readWorkflowTaskBoardFiltersFromSearch(
     '?q=%E5%BA%93%E4%BD%8D&status=blocked&role=warehouse&due=overdue&source=inbound&unknown=1'
   )
@@ -697,7 +697,7 @@ test('workflowTaskBoard: 聚焦页保留服务端总数并把越界展示页收�
   assert.equal(model.page, 2)
 })
 
-test('workflowTaskBoard: 可判断任务看板是否存在活跃筛选', () => {
+test('workflowTaskBoard: 可判断任务管理是否存在活跃筛选', () => {
   assert.equal(hasActiveWorkflowTaskBoardFilters({}), false)
   assert.equal(
     hasActiveWorkflowTaskBoardFilters({

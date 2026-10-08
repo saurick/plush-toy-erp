@@ -2,6 +2,8 @@ import { AuditOutlined, RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Input, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import WorkflowSourceProgressButton from '../workflow/WorkflowSourceProgressButton.jsx'
+import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
@@ -358,11 +360,7 @@ export default function ProductionExceptionDecisionPanel({
         })
       }
       await load()
-      message[alreadyStarted ? 'info' : 'success'](
-        alreadyStarted
-          ? '生产异常审批流已存在，请到任务中心继续办理'
-          : '生产异常审批流已恢复发起'
-      )
+      showProcessSubmissionReceipt({ result: processData, title: alreadyStarted ? '生产异常审批流已存在' : '生产异常审批流已恢复发起' })
     } catch (error) {
       message.error(getActionErrorMessage(error, '核对生产异常审批流'))
     } finally {
@@ -629,6 +627,7 @@ export default function ProductionExceptionDecisionPanel({
             selectionLabel="生产异常处置申请"
             onClear={() => setSelectedID(null)}
           />
+          <WorkflowSourceProgressButton sourceType="production_exception_decision" sourceID={selectedRecord?.id} profile={adminProfile} disabled={loading} />
           {actionAvailability.approval.visible ? (
             <BusinessActionTooltip
               disabled={actionAvailability.approval.disabled}

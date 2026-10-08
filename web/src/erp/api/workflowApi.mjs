@@ -8,6 +8,7 @@ import { requireWorkflowTaskMutationParams } from '../utils/workflowTaskMutation
 import { requireWorkflowTaskBoardResponse } from '../utils/workflowTaskBoardContract.mjs'
 import { notifyWorkflowTasksChanged } from '../utils/workflowTaskChanges.mjs'
 import { isWorkflowApprovalTask } from '../utils/workflowTaskActionContract.mjs'
+import { requireTrackingDetail, requireTrackingPage } from '../utils/workflowTracking.mjs'
 
 import { requireFollowupCreateParams, requireFollowupOptions, requireFollowupReceipt } from '../utils/workflowFollowup.mjs'
 
@@ -495,6 +496,16 @@ function requireWorkflowTaskAssignmentOptionsResponse(result, taskID) {
 export async function listWorkflowTasks(params = {}, options = {}) {
   const result = await workflowRpc.call(RpcMethod.workflow.LIST_TASKS, params, options)
   return dataOf(result)
+}
+
+export async function listWorkflowTracking(params = {}, options = {}) {
+  const result = await workflowRpc.call(RpcMethod.workflow.LIST_TRACKING, params, options)
+  return requireTrackingPage(dataOf(result), params)
+}
+
+export async function getWorkflowTracking(ref, options = {}) {
+  const result = await workflowRpc.call(RpcMethod.workflow.GET_TRACKING, ref, options)
+  return requireTrackingDetail(dataOf(result).tracking, ref)
 }
 
 export async function getWorkflowTask(taskID, options = {}) {

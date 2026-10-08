@@ -16,7 +16,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         title: '办理审批和退回',
         description: '先核对来源、金额、交期和附件，再选择通过或退回。',
         path: '/erp/task-board',
-        actionLabel: '打开任务看板',
+        actionLabel: '打开任务管理',
       },
       {
         title: '查看今日重点',
@@ -32,7 +32,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
       },
     ],
     workflow: [
-      '从任务看板打开待审批事项，并进入对应来源记录。',
+      '从任务管理打开待审批事项，并进入对应来源记录。',
       '核对客户或供应商、金额、交期、明细和补充说明。',
       '资料完整时通过；资料不足时退回并写清要补什么。',
       '确认审批结论已保存、下一岗位已收到事项，再查看其他风险。',
@@ -329,7 +329,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         title: '查看任务和风险',
         description: '先定位缺料、阻塞、逾期和需要跨岗协调的事项。',
         path: '/erp/task-board',
-        actionLabel: '打开任务看板',
+        actionLabel: '打开任务管理',
       },
       {
         title: '安排生产计划',

@@ -62,6 +62,7 @@ async function loadWorkflowApi(call) {
       'const isWorkflowApprovalTask = globalThis.__workflowApiTestIsApprovalTask'
     )
   const resolved = transformed
+    .replace('../utils/workflowTracking.mjs', new URL('../utils/workflowTracking.mjs', import.meta.url).href)
     .replace('../utils/workflowFollowup.mjs', new URL('../utils/workflowFollowup.mjs', import.meta.url).href)
     .replace('../utils/workflowTaskChanges.mjs', new URL('../utils/workflowTaskChanges.mjs', import.meta.url).href)
   const encoded = Buffer.from(resolved).toString('base64')
@@ -83,6 +84,33 @@ function validTask(overrides = {}) {
     ...overrides,
   }
 }
+
+test('workflowApi: tracking reads preserve cancellation and reject mismatched receipts', async () => {
+  const { signal } = new AbortController()
+  let wrongID = false
+  const api = await loadWorkflowApi(async (method, params, options) => {
+    assert.equal(options.signal, signal)
+    if (method === 'list_tracking') {
+      assert.equal(params.scope, 'started')
+      return { data: { items: [], total: 0, limit: 20, offset: 0 } }
+    }
+    assert.equal(method, 'get_tracking')
+    const now = 1791367200
+    return { data: { tracking: {
+      summary: { kind: 'process', id: wrongID ? 11 : 10, process_key: 'sales_order_acceptance', title: '', source_type: 'sales_order', source_id: 1, source_no: 'SO-TRACK', display_context: null, status: 'completed', resolution_kind: 'succeeded', started_at: now, updated_at: now, completed_at: now, initiator_name: '业务', initiator_role_key: 'sales', current_tasks: [] },
+      tasks: [],
+      current_task_access: [],
+      nodes: [],
+      events: [],
+      events_truncated: false,
+      next_event_id: 0,
+    } } }
+  })
+  assert.deepEqual(await api.listWorkflowTracking({ scope: 'started' }, { signal }), { items: [], total: 0, limit: 20, offset: 0 })
+  assert.equal((await api.getWorkflowTracking({ kind: 'process', id: 10 }, { signal })).summary.id, 10)
+  wrongID = true
+  await assert.rejects(api.getWorkflowTracking({ kind: 'process', id: 10 }, { signal }), { isInvalidResponse: true })
+})
 
 test('workflowApi: 单据发起使用受控接口并校验来源和完整回执', async () => {
   const params = { source_type: 'sales_order', source_id: 42, task_name: '核实交期', description: '请反馈交期', owner_role_key: 'sales', assignee_id: null, due_at: 1_900_000_000, priority: 0, idempotency_key: 'followup:api' }

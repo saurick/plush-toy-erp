@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Form, Input, Select, Tag } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
+import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
+import ProcessSubmissionRoute from '../components/workflow/ProcessSubmissionRoute.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessCompactFieldTable, {
   BusinessCompactFieldRow,
@@ -583,7 +586,7 @@ export default function FinancePaymentsPage() {
       rememberPayment(payment)
       setPaymentOpen(false)
       await loadReferences()
-      message.success('收付款记录已创建，审批通过后可选择应收或应付核销')
+      showProcessSubmissionReceipt({ result: processData, title: '收付款记录已创建，审批通过后可选择应收或应付核销' })
     } catch (error) {
       const retained = attemptsRef.current.settle(scope, attempt, error)
       message[retained ? 'warning' : 'error'](
@@ -628,11 +631,7 @@ export default function FinancePaymentsPage() {
       }
       rememberPayment(processData.source_readback)
       await loadReferences()
-      message[alreadyStarted ? 'info' : 'success'](
-        alreadyStarted
-          ? '收付款审批流已存在，请到任务中心继续办理'
-          : '收付款审批流已恢复发起'
-      )
+      showProcessSubmissionReceipt({ result: processData, title: alreadyStarted ? '收付款审批流已存在' : '收付款审批流已恢复发起' })
     } catch (error) {
       message.error(getActionErrorMessage(error, '核对收付款审批流'))
     } finally {
@@ -1426,6 +1425,7 @@ export default function FinancePaymentsPage() {
                   查看详情
                 </Button>
               </BusinessActionTooltip>
+              <WorkflowSourceProgressButton sourceType="finance_payment" sourceID={currentPayment?.id} profile={adminProfile} disabled={loading} />
               {canPostPayment ? (
                 <BusinessActionTooltip
                   visible={paymentActionAvailability.allocation.visible}
@@ -1747,6 +1747,9 @@ export default function FinancePaymentsPage() {
           preserve={false}
           disabled={loading}
         >
+          <Form.Item>
+            <ProcessSubmissionRoute processKey="finance_payment_approval" customerKey={customerKey} open={paymentOpen} />
+          </Form.Item>
           <BusinessFormSectionTitle>往来与金额</BusinessFormSectionTitle>
           <Form.Item
             name="direction"

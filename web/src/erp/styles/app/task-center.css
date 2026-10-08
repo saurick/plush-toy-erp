@@ -20,6 +20,10 @@
   min-width: 0;
 }
 
+.erp-task-tracking-scope {
+  justify-self: start;
+}
+
 .erp-task-center-summary {
   display: flex;
   align-items: center;
@@ -108,81 +112,16 @@
 }
 
 .erp-task-board-filters {
-  --erp-business-control-height: var(--erp-form-control-height);
-  --erp-business-control-radius: var(--erp-control-radius);
-  --erp-business-control-border: var(--erp-border-strong, #d8e2dc);
-  --erp-business-control-hover: var(--erp-interactive-border-hover, #abc5b3);
-  --erp-business-control-focus: var(--erp-control-focus-border);
-  --erp-business-control-focus-shadow: var(--erp-control-focus-ring);
-
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
   min-width: 0;
 }
 
-.erp-task-board-filters
-  > .erp-business-filter-control--search.ant-input-affix-wrapper {
-  flex: 1 1 240px;
-  width: auto;
-  min-width: 200px;
-  max-width: none;
+.erp-dashboard-task-board-card .erp-business-operation-panel.ant-card {
+  border: 0;
+  box-shadow: none;
 }
 
-.erp-task-board-filters > .ant-select {
-  flex: 0 0 148px;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.erp-task-board-filters > .ant-btn {
-  flex: 0 0 auto;
-  height: var(--erp-form-control-height);
-}
-
-.erp-task-board-extra-filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  border: 1px solid var(--erp-border, #e6ece8);
-  border-radius: 10px;
-  background: var(--erp-surface-bg-soft, #f4f7f5);
-  padding: 12px;
-}
-
-.erp-task-board-extra-filters > label {
-  display: grid;
-  gap: 6px;
-  min-width: 0;
-  color: var(--erp-text-muted, #667085);
-  font-size: 12px;
-}
-
-.erp-task-board-extra-filters .ant-select {
-  width: 100%;
-  min-width: 0;
-}
-
-.erp-task-board-active-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  min-width: 0;
-}
-
-.erp-task-board-filter-chip.ant-btn {
-  height: auto;
-  min-height: 28px;
-  max-width: 100%;
-  color: var(--erp-text-muted, #667085);
-  white-space: normal;
-}
-
-.erp-task-board-filter-chip > :where(span:not(.ant-btn-icon)) {
-  min-width: 0;
-  overflow-wrap: anywhere;
+.erp-dashboard-task-board-card .erp-business-operation-panel__command {
+  padding: 0;
 }
 
 @container task-board (max-width: 640px) {
@@ -190,19 +129,13 @@
     min-height: 42px;
   }
 
-  .erp-task-board-filters
-    > .erp-business-filter-control--search.ant-input-affix-wrapper {
-    flex-basis: 100%;
-    min-width: 0;
+  .erp-dashboard-task-board-card .erp-task-tracking-scope.ant-segmented .ant-segmented-item-label {
+    min-height: 44px;
+    padding-inline: 8px;
   }
 
-  .erp-task-board-filters > .ant-select {
-    flex: 1 1 128px;
-  }
-
-  .erp-task-board-filters > .ant-btn,
   .erp-task-center-summary > .ant-btn,
-  .erp-task-board-filter-chip.ant-btn {
+  .erp-dashboard-task-board-card .erp-business-operation-panel__command > .ant-btn {
     min-height: 44px;
   }
 }
@@ -399,19 +332,19 @@
   background: #fffaf0;
 }
 
-.erp-task-action-drawer .ant-drawer-header {
+.erp-workflow-drawer .ant-drawer-header {
   min-height: 52px;
   padding: 9px 14px;
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
 }
 
-.erp-task-action-drawer .ant-drawer-header-title {
+.erp-workflow-drawer .ant-drawer-header-title {
   flex-direction: row-reverse;
   gap: 8px;
 }
 
-.erp-task-action-drawer .ant-drawer-close {
+.erp-workflow-drawer .ant-drawer-close {
   margin: 0;
 }
 
@@ -428,12 +361,12 @@
   font-weight: 400;
 }
 
-.erp-task-action-drawer .ant-drawer-body {
+.erp-workflow-drawer .ant-drawer-body {
   background: var(--erp-page-bg);
   padding: 0;
 }
 
-.erp-task-action-drawer .ant-drawer-footer {
+.erp-workflow-drawer .ant-drawer-footer {
   min-height: 56px;
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);

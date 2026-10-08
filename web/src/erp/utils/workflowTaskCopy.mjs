@@ -8,7 +8,10 @@ import {
   getWorkflowTaskReasonMeta,
   getWorkflowTaskStatusMeta,
 } from './workflowTaskBoard.mjs'
-import { formatWorkflowTaskTime } from './workflowTaskTiming.mjs'
+import {
+  formatWorkflowTaskTime,
+  getWorkflowTaskTiming,
+} from './workflowTaskTiming.mjs'
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 
 const text = (value) => (typeof value === 'string' ? value.trim() : '')
@@ -39,7 +42,9 @@ export function formatWorkflowProductCopy(items = []) {
 export function formatWorkflowTaskCopy(task = {}, { assigneeLabel = '' } = {}) {
   const identity = getWorkflowTaskIdentity(task)
   const reason = getWorkflowTaskReasonMeta(task)
-  const arrived = formatWorkflowTaskTime(task.created_at, { exact: true })
+  const arrived = getWorkflowTaskTiming(task, { detail: true }).find(
+    (row) => row.key === 'arrived'
+  )
   const due = formatWorkflowTaskTime(task.due_at, { exact: true })
   const ended = isTerminalWorkflowTask(task)
     ? formatWorkflowTaskTime(task.completed_at, { exact: true })
@@ -56,7 +61,7 @@ export function formatWorkflowTaskCopy(task = {}, { assigneeLabel = '' } = {}) {
     task.task_status_key && `状态：${getWorkflowTaskStatusMeta(task).label}`,
     reason.value && `${reason.label}：${reason.value}`,
     responsibility && `负责：${responsibility}`,
-    arrived && `进入本岗：${arrived}`,
+    arrived?.dateTime && `${arrived.label}：${arrived.value}`,
     due && `处理截止：${due}`,
     ended && `结束时间：${ended}`,
   ]

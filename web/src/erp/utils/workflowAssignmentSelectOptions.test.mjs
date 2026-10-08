@@ -28,7 +28,7 @@ test('workflow assignment select separates the role pool from named employees', 
 
   assert.deepEqual(
     groups.map((group) => group.label),
-    ['岗位共同待办', '指定员工']
+    ['由岗位人员处理', '指定员工']
   )
   assert.deepEqual(
     flattenWorkflowAssignmentSelectOptions(groups).map(

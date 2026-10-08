@@ -47,7 +47,7 @@ const navItemRegistry = {
   'task-board': {
     key: 'task-board',
     sidebarArea: 'work',
-    label: '任务看板',
+    label: '任务管理',
     path: '/erp/task-board',
     shortLabel: '任务',
     description: '按办理状态查看待处理、处理中、阻塞、退回和超时任务。',

@@ -10,8 +10,8 @@ export function buildWorkflowAssignmentSelectOptions({
         {
           value: 'pool',
           label: ownerRoleLabel
-            ? `暂不指定个人，退回共同待办（负责岗位：${ownerRoleLabel}）`
-            : '暂不指定个人，退回负责岗位共同待办',
+            ? `交回${ownerRoleLabel}，由岗位人员处理`
+            : '交回负责岗位，由岗位人员处理',
         },
       ]
     : []
@@ -23,7 +23,7 @@ export function buildWorkflowAssignmentSelectOptions({
   )
 
   return [
-    { label: '岗位共同待办', options: poolOptions },
+    { label: '由岗位人员处理', options: poolOptions },
     { label: '指定员工', options: candidateOptions },
   ].filter((group) => group.options.length > 0)
 }

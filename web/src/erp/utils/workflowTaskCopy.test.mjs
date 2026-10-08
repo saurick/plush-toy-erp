@@ -145,7 +145,7 @@ test('copied dates are complete local dates and do not change meaning when forwa
     due_at: new Date(2026, 8, 9, 15, 30).getTime() / 1000,
     updated_at: new Date(2026, 8, 10, 18, 0).getTime() / 1000,
   })
-  assert.match(result, /进入本岗：2026年9月8日 09:00/)
+  assert.match(result, /进入岗位：工程 · 2026年9月8日 09:00/)
   assert.match(result, /处理截止：2026年9月9日 15:30/)
   assert.doesNotMatch(result, /今天|明天|昨天|18:00/)
 })
@@ -157,7 +157,7 @@ test('completed tasks retain the recorded end time and missing dates do not beco
     completed_at: new Date(2026, 8, 8, 11, 0).getTime() / 1000,
   })
   assert.match(result, /结束时间：2026年9月8日 11:00/)
-  assert.doesNotMatch(result, /进入本岗|处理截止|未设置|未记录/)
+  assert.doesNotMatch(result, /进入岗位|任务生成|处理截止|未设置|未记录/)
   assert.equal(formatWorkflowTaskCopy({}), '')
 })
 
