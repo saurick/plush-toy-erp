@@ -413,7 +413,7 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
     '材料档案',
     '加工环节',
     '物料清单（BOM）',
-    '任务看板',
+    '任务管理',
     '模板打印中心',
   ])
   assert.match(

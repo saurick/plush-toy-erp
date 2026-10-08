@@ -11,7 +11,7 @@ const source = readFileSync(
 test('task board keeps the summary visible while only its lanes update', () => {
   assert.match(source, /const \[taskBoardSummaryState,/u)
   assert.match(source, /getWorkflowTaskBoardSummaryRequestKey/u)
-  assert.match(source, /loading=\{taskBoardInitialLoading\}/u)
+  assert.match(source, /loading=\{!trackingScope && taskBoardInitialLoading\}/u)
   assert.match(source, /taskBoardMetricsReady[\s\S]*taskBoardCounts/u)
   assert.match(
     source,
