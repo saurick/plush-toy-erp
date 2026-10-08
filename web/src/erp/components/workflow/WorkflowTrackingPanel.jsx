@@ -128,8 +128,8 @@ render: (_, entry) => (
     data-task-entry
     data-tracking-entry={`${entry.kind}:${entry.id}`}
     aria-haspopup="dialog"
-    aria-label={`查看${trackingTitle(entry)}流转进度`}
-    title="查看流转进度"
+    aria-label={`流程跟踪：${trackingTitle(entry)}`}
+    title="流程跟踪"
     onClick={(event) => {
           event.stopPropagation()
           event.currentTarget.focus({ preventScroll: true })

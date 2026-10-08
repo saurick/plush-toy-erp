@@ -131,7 +131,7 @@ export default function WorkflowTaskHandlingChain({
             context={processContext}
             variant={variant}
           />
-          <Button size="small" onClick={onOpenTracking || (() => setTrackingOpen(true))}>查看全部节点处理记录</Button>
+          <Button size="small" onClick={onOpenTracking || (() => setTrackingOpen(true))}>流程跟踪</Button>
           {!onOpenTracking ? <WorkflowTrackingDrawer trackingRef={trackingOpen ? { kind: 'process', id: task.process_instance_id } : null} onClose={() => setTrackingOpen(false)} refreshKey={task.version} closeLabel="返回任务" /> : null}
         </>
       ) : model ? (

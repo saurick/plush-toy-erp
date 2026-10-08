@@ -8,12 +8,12 @@ export default function WorkflowInitiator({ summary }) {
     : getRoleDisplayName(summary.initiator_role_key)
   return (
     <span className="erp-workflow-initiator">
-      <strong>{summary.initiator_name || '未记录'}</strong>
-      <small>
-        {roleName
-          ? <WorkflowResponsibilities items={[[`发起岗位：${roleName}`]]} />
-          : '发起岗位未记录'}
-      </small>
+      <strong title={roleName ? undefined : '发起时岗位未留存'}>{summary.initiator_name || '未记录'}</strong>
+      {roleName && (
+        <small>
+          <WorkflowResponsibilities items={[[`发起岗位：${roleName}`]]} />
+        </small>
+      )}
     </span>
   )
 }

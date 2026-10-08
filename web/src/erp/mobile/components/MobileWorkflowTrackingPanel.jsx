@@ -213,7 +213,7 @@ export default function MobileWorkflowTrackingPanel({ accessScope, scrollContain
             <div className="mobile-workflow-tracking-count" role="status">共 {current.total} 条流转记录</div>
             <div className="mobile-workflow-tracking-list">
               {current.items.map((entry) => (
-                <WorkflowTaskCard key={`${entry.kind}:${entry.id}`} className="mobile-workflow-tracking-card" label={`查看${trackingTitle(entry)}流转进度`} data-mobile-tracking-entry={`${entry.kind}:${entry.id}`} onOpen={() => select(entry)}>
+                <WorkflowTaskCard key={`${entry.kind}:${entry.id}`} className="mobile-workflow-tracking-card" label={`流程跟踪：${trackingTitle(entry)}`} data-mobile-tracking-entry={`${entry.kind}:${entry.id}`} onOpen={() => select(entry)}>
                   <div className="mobile-workflow-tracking-heading"><strong>{trackingTitle(entry)}</strong><Tag color={trackingStatusColor(entry)}>{trackingStatus(entry)}</Tag></div>
                   <WorkflowTaskSource task={entry} copyable={false} />
                   {entry.display_context && <WorkflowTaskIdentity task={entry} compact copyable={false} showStyleNo />}

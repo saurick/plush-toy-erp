@@ -130,7 +130,10 @@ approval_form: null,
         const panel = page.locator('.erp-workflow-tracking-panel')
         const pager = panel.getByRole('navigation', { name: '流转记录分页' })
         await panel.getByText('任务分页记录 1', { exact: true }).waitFor()
-        assert.match(await panel.locator('.ant-table-row').nth(0).innerText(), /发起岗位未记录/)
+        const historicalInitiator = panel.locator('.ant-table-row').nth(0).locator('.erp-workflow-initiator')
+        assert.equal(await historicalInitiator.innerText(), '业务小李')
+        assert.equal(await historicalInitiator.locator('small').count(), 0)
+        assert.equal(await historicalInitiator.locator('strong').getAttribute('title'), '发起时岗位未留存')
         assert.match(await panel.locator('.ant-table-row').nth(1).innerText(), /发起岗位：管理员/)
         assert.match(await pager.innerText(), /第 1–20 条，共 161 条/)
         assert.equal(await panel.getByRole('button', { name: '加载更多', exact: true }).count(), 0)
@@ -334,7 +337,7 @@ approval_form: null,
         })
       },
       verify: async (page) => {
-        const drawer = page.getByRole('dialog', { name: '任务流转进度', exact: true })
+        const drawer = page.getByRole('dialog', { name: '流程跟踪', exact: true })
         await drawer.getByRole('region', { name: '流程概况', exact: true }).getByRole('group', { name: '当前进度', exact: true }).waitFor()
         const footer = drawer.locator('.ant-drawer-footer')
         assert.equal(await drawer.locator('.ant-drawer-header').getByRole('button', { name: /刷新进度/ }).count(), 0, 'refresh must not return to the drawer header')

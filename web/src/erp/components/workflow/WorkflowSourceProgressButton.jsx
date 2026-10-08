@@ -15,7 +15,7 @@ export default function WorkflowSourceProgressButton({ sourceType, sourceID, pro
       data-business-action-key="workflow-progress"
       onClick={() => navigate(trackingURL(null, { type: sourceType, id: sourceID }))}
     >
-      流转进度
+      流程跟踪
     </Button>
   )
 }

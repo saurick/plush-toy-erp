@@ -46,7 +46,7 @@ function ReceiptContent({ result, loadProcess, noticeKey }) {
       <span role="status">{!state ? '正在读取实际去向…' : state.failed ? '提交已成功，流转进度暂时无法读取。' : <>当前去向：{state.summary.current_tasks.length ? <WorkflowResponsibilities items={state.summary.current_tasks.map(trackingResponsibilityParts)} /> : trackingHandoff(state.summary)}</>}</span>
       <Space>
         {state?.failed ? <Button size="small" onClick={() => setReload((value) => value + 1)}>重新读取进度</Button> : null}
-        <Button size="small" href={trackingURL(ref)}>查看流转记录</Button>
+        <Button size="small" href={trackingURL(ref)}>流程跟踪</Button>
       </Space>
     </Space>
   )

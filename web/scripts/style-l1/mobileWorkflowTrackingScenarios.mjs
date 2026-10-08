@@ -58,7 +58,7 @@ export function createMobileWorkflowTrackingScenarios(deps) {
         await waitForFiniteAnimations(page)
         await page.screenshot({ path: path.join(outputDir, `mobile-workflow-tracking-${base.themeMode}-list.png`) })
         await card.locator('.erp-task-card__open').click()
-        const drawer = page.getByRole('dialog', { name: '任务流转进度', exact: true })
+        const drawer = page.getByRole('dialog', { name: '流程跟踪', exact: true })
         await drawer.getByText('全部节点处理记录', { exact: true }).waitFor()
         assert.match(await drawer.innerText(), /订单审批.*工程资料/s)
         await assertTaskCopy(page, drawer.getByRole('button', { name: '复制单据编号', exact: true }), 'SO-TRACK-001')
