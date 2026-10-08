@@ -534,20 +534,20 @@ test("local release rehearsal binds approval eligibility only inside the exact i
     runCommand(input) {
       calls.push(input);
       if (input.label === "preflight isolated approval eligibility") {
-        return `${database}\t${systemIdentifier}\t1\t4\t4\n`;
+        return `${database}\t${systemIdentifier}\t1\t2\t2\n`;
       }
       if (input.label === "bind isolated approval eligibility") {
-        return `${database}\t${systemIdentifier}\t4\n`;
+        return `${database}\t${systemIdentifier}\t2\n`;
       }
       throw new Error(`unexpected command: ${input.label}`);
     },
   };
 
   const result = bootstrapRehearsalApprovalEligibility(context);
-  assert.deepEqual(result.roleKeys, ["boss", "finance", "purchase", "sales"]);
+  assert.deepEqual(result.roleKeys, ["boss", "finance"]);
   assert.equal(result.status, "passed");
   assert.equal(result.mode, "isolated-super-admin-role-binding");
-  assert.equal(result.bindingCount, 4);
+  assert.equal(result.bindingCount, 2);
   assert.equal(result.writesBusinessFacts, false);
   assert.equal(result.retainedAfterCleanup, false);
   assert.equal(calls.length, 2);
@@ -563,7 +563,7 @@ test("local release rehearsal binds approval eligibility only inside the exact i
   assert.doesNotMatch(calls[0].input, /INSERT INTO admin_user_roles/u);
   assert.match(calls[1].input, /INSERT INTO admin_user_roles/u);
   assert.match(calls[1].input, /ON CONFLICT \(admin_user_id, role_id\)/u);
-  assert.match(calls[1].input, /'boss', 'finance', 'purchase', 'sales'/u);
+  assert.match(calls[1].input, /'boss', 'finance'/u);
   assert.throws(
     () =>
       bootstrapRehearsalApprovalEligibility({
