@@ -28,7 +28,7 @@ test('confirmed submission retains success when progress read fails and retry ne
     const now = 1791367200
     return { data: { tracking: {
       summary: { kind: 'process', id: 10, process_key: 'sales_order_acceptance', title: '', source_type: 'sales_order', source_id: 1, source_no: 'SO-TRACK', display_context: null, status: 'completed', resolution_kind: 'succeeded', started_at: now, updated_at: now, completed_at: now, initiator_name: '业务小李', initiator_role_key: 'sales', current_tasks: [] },
-      tasks: [], nodes: [], events: [], events_truncated: false, next_event_id: 0,
+      tasks: [], current_task_access: [], nodes: [], events: [], events_truncated: false, next_event_id: 0,
     } } }
   }
   t.after(async () => {

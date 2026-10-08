@@ -280,7 +280,7 @@ test('draft shipment starts the versioned finance approval process', () => {
     /action: 'release',[\s\S]{0,120}authorized: canSubmitShipmentRelease/u
   )
   assert.match(source, /action: 'ship',[\s\S]{0,120}authorized: canShip/u)
-  assert.match(source, /result\.process_instance\?\.id/u)
+  assert.match(source, /showProcessSubmissionReceipt\(\{ result, title: '财务审批已提交/u)
   assert.match(source, /成品质检仍由品质检验单独判定/u)
   assert.match(source, /审批通过也不等于已出货/u)
 })
