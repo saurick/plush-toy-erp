@@ -339,6 +339,11 @@
   flex: 0 0 auto;
 }
 
+.erp-business-operation-panel.ant-card {
+  /* 控件自行绘制圆角与焦点边框，贴边布局不能由面板再次裁切。 */
+  overflow: visible;
+}
+
 .erp-business-page-navigation {
   flex: 0 0 auto;
   min-width: 0;
@@ -510,6 +515,8 @@
 
 .erp-business-operation-panel__selection {
   border-top: 1px solid var(--erp-border);
+  border-end-start-radius: calc(var(--erp-business-card-radius) - 1px);
+  border-end-end-radius: calc(var(--erp-business-card-radius) - 1px);
   padding: 4px 8px 4px 12px;
   background: var(--erp-surface-bg-muted);
 }
