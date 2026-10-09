@@ -115,7 +115,7 @@ func TestValidateActiveCustomerTrialConfigAllowsExactEnabledRuntime(t *testing.T
 	}
 }
 
-func TestValidateActiveCustomerTrialConfigAllowsExactPreviousIdentityDuringV8Activation(t *testing.T) {
+func TestValidateActiveCustomerTrialConfigAllowsPublishedV10Runtime(t *testing.T) {
 	db, mock := expectActiveCustomerConfigVersion(t, "yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1", "customer-trial-133-test-2026.09.27-v8", map[string]string{
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": "2026.09.27-v8",

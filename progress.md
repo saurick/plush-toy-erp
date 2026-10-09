@@ -11,6 +11,13 @@
 - 同日复查后补齐冻结配置的审阅证据、回滚、读回与密码轮换边界，凭据回执与实际目标 smoke 对照；新发布和登记数据合同仍保持严格校验。DEV 计划、状态、操作 / 报告投影及门禁目录去除剩余计数，守卫登记持久化格式并拒绝未登记类型。修复后的定向回归、再次审查及既存 lint 差异见 ignored `output/version-governance-followup-20261009/`。
 - 本轮只完成本地实现与验证，未执行数据库 apply、配置激活、推送或部署。精确文件归属、继承改动与验证见 ignored `output/version-governance-20261009/`；父任务部署现场另行保留。
 
+### 两套环境续部署与试用配置启动阻断（2026-10-09）
+
+- 正式版本 `2026.10.09-1 / 49eb6eb8609aba4cc2f697cabf74e8c0ff3d8781` 已由 GitLab CI #286（28/28）和发布 #287 固定并发布；复用已有、不设到期日且仅含 `read_package_registry` 的 Deploy Token，未创建凭据。Mac CPU 依赖修复已另行本地提交为 `c92b2069`，未纳入该 Linux 制品。
+- `demo-133` operation `d5cc3947-02af-4ee6-9a6f-6c0fda9b2f40` 已通过目标直接取件、逐项校验、镜像载入、新鲜备份与隔离恢复、迁移 apply/readback；迁移现为 `20261006155051 / pending=0`。Compose 启动失败后正式回执为 `not_proven`，未重试、未回写终态、未执行 down migration 或恢复业务库。既有 v10 active 配置仍在，公网前端尚未切换；`customer-test-133` 尚未执行本次 promotion。
+- 只读日志与 active 配置证实根因：候选要求 v11，但上一启动身份仍是 v9/V7，实际目标为 v10/V8。原临时修复已由 `69317d5d` 的配置治理替代：revision 按 manifest 内容生成，启动校验已激活快照的目标、用途、数据配对与环境开关，不再依赖手工上一配置窗口。本轮合并重复启动用例并按当前代码复验 Go 合同、标记守卫和启动检查；模块校验通过。
+- 本次迁移前备份 `pre-migration-49eb6eb8609a-d5cc3947-02af-4ee6-9a6f-6c0fda9b2f40`（996748 bytes，SHA-256 `fd92de233b01931bc145192f5348ef4bc395938ab81e4dbc23e4af22d5261362`）已实际隔离恢复校验。因 migration 已执行，不能仅回滚旧镜像。用户本轮授权本地提交，尚未授权推送；后续固定制品 forward-fix、demo 配置读回及 test 部署待完成。现场与回执位于 ignored `output/deploy-test-20261009/`；当前不代表目标部署或客户验收已完成。
+
 ### 全链路模拟数据与统一收口（2026-10-07）
 
 - 范围经确认：本地与 `demo-133` 准备全链路模拟数据；demo、test 均走正式 CI/CD 部署，`customer-test-133` 保留现有数据，不 seed、不重建。本聊天无绑定定时任务，未改动其他聊天的自动化。
