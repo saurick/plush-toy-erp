@@ -104,6 +104,39 @@ test("test-data-isolation-boundary: dataset target checks stay atomic and fail c
   );
 });
 
+test("test-data-isolation-boundary: trial identity rejects a pinned product or dataset version", () => {
+  const dataset = DEFAULT_TEST_DATA_ISOLATION_CHECKS.find(
+    (check) => check.id === "manual-acceptance-dataset-keeps-one-current-contract",
+  );
+  const backend = dataset.required.find(
+    (rule) => rule.path === "server/internal/biz/customer_config.go",
+  );
+  const runtime = dataset.required.find(
+    (rule) => rule.path === "server/internal/customertrialconfig/guard.go",
+  );
+  const canonical = `manualAcceptanceContract = manualacceptance.Current()
+CustomerConfigTrialDatasetVersion = manualAcceptanceContract.DataVersion
+CustomerConfigTrialProductVersion = manualAcceptanceContract.CustomerTrial133.Target + "-test-" + manualAcceptanceContract.DataVersion`;
+
+  assert.equal(backend.pattern.test(canonical), true);
+  assert.equal(
+    backend.pattern.test(canonical.replace(
+      'manualAcceptanceContract.CustomerTrial133.Target + "-test-" + manualAcceptanceContract.DataVersion',
+      '"customer-trial-133-test-2026.09.27-v8"',
+    )),
+    false,
+  );
+  assert.equal(
+    backend.pattern.test(canonical.replace(
+      "CustomerConfigTrialDatasetVersion = manualAcceptanceContract.DataVersion",
+      'CustomerConfigTrialDatasetVersion = "2026.09.27-v8"',
+    )),
+    false,
+  );
+  assert.equal(runtime.pattern.test("DatasetVersion   = biz.CustomerConfigTrialDatasetVersion"), true);
+  assert.equal(runtime.pattern.test('DatasetVersion = "2026.09.27-v8"'), false);
+});
+
 test("test-data-isolation-boundary: trial fixture coverage follows behavior, not record IDs", () => {
   assert.deepEqual(trialFixtureCoverageViolations(), []);
 

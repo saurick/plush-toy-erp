@@ -396,13 +396,13 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "server/internal/biz/customer_config.go",
         pattern:
-          /manualAcceptanceContract\s*=\s*manualacceptance\.Current\(\)[\s\S]{0,180}CustomerConfigTrialDatasetVersion\s*=\s*manualAcceptanceContract\.DataVersion[\s\S]{0,180}CustomerConfigTrialProductVersion\s*=\s*manualAcceptanceContract\.CustomerTrial133\.ConfigProductVersion/u,
+          /manualAcceptanceContract\s*=\s*manualacceptance\.Current\(\)[\s\S]{0,180}CustomerConfigTrialDatasetVersion\s*=\s*manualAcceptanceContract\.DataVersion[\s\S]{0,180}CustomerConfigTrialProductVersion\s*=\s*manualAcceptanceContract\.CustomerTrial133\.Target\s*\+\s*"-test-"\s*\+\s*manualAcceptanceContract\.DataVersion/u,
         message:
           "backend trial identity must derive the current dataset and product version from the canonical contract",
       },
       {
         path: "server/internal/customertrialconfig/guard.go",
-        pattern: /DatasetVersion = biz\.CustomerConfigTrialDatasetVersion/u,
+        pattern: /DatasetVersion\s*=\s*biz\.CustomerConfigTrialDatasetVersion/u,
         message:
           "runtime trial gate must consume the backend dataset identity instead of duplicating a stale version",
       },
