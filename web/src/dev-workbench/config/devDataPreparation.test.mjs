@@ -2,6 +2,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
+import { CUSTOMER_TRIAL_133_CONFIG_REVISION, CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION } from '../../../../scripts/qa/manual-acceptance-target-policy.mjs'
+
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../../../scripts/qa/manual-acceptance-core-contract.mjs'
 
 import { buildManualAcceptanceBusinessChainReviewPlan } from '../../../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
@@ -97,7 +99,7 @@ function operationFixture(overrides = {}) {
     planHash: PLAN_HASH,
     runId: RUN_ID,
     contract: {
-      schemaVersion: 'plush.dev-data-preparation-operation-contract/v1',
+      kind: 'plush.dev-data-preparation-operation-contract',
       classification: 'current',
       dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
       datasetRunId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
@@ -242,7 +244,7 @@ function fullOperationFixture(overrides = {}) {
 
 function summaryFixture() {
   return {
-    schemaVersion: 'plush.dev-data-preparation-summary/v2',
+    kind: 'plush.dev-data-preparation-summary',
     status: 'success',
     generatedAt: CREATED_AT,
     repository: {
@@ -252,7 +254,7 @@ function summaryFixture() {
     },
     acceptancePlan: projectDataPreparationAcceptancePlan(ACCEPTANCE_PLAN),
     datasetContract: {
-      schemaVersion: 'plush.dev-data-environment-contract/v1',
+      kind: 'plush.dev-data-environment-contract',
       datasetKey: 'yoyoosun-manual-acceptance',
       dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
       runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
@@ -269,9 +271,9 @@ function summaryFixture() {
         minimumMigration:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         configRevision:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+          CUSTOMER_TRIAL_133_CONFIG_REVISION,
         configProductVersion:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
+          CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
       },
     },
     target: {
@@ -303,9 +305,9 @@ function summaryFixture() {
         migrationVersion:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         customerConfigRevision:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+          CUSTOMER_TRIAL_133_CONFIG_REVISION,
         customerConfigProductVersion:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
+          CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
         targetFingerprint: '7'.repeat(64),
       },
       fullAcceptance: {
@@ -633,7 +635,7 @@ test('scenario demo readback binds the fixed batch and rejects half batches or d
     migrationVersion:
       MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
     customerConfigRevision:
-      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+      CUSTOMER_TRIAL_133_CONFIG_REVISION,
     datasetVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
     datasetRunId: SCENARIO_DATASET_RUN_ID,
     semanticDigest: '6'.repeat(64),
@@ -896,7 +898,7 @@ test('client reuses one CSRF session and only posts prepare or execute envelopes
       requests.push({ url, options })
       if (url === DEV_DATA_PREPARATION_SESSION_API_PATH) {
         return response({
-          schemaVersion: 'plush.dev-data-preparation-session/v1',
+          kind: 'plush.dev-data-preparation-session',
           csrfToken: 's'.repeat(43),
           apiPrefix: DEV_DATA_PREPARATION_API_PREFIX,
         })
@@ -909,13 +911,13 @@ test('client reuses one CSRF session and only posts prepare or execute envelopes
       }
       if (url.startsWith(DEV_DATA_PREPARATION_OPERATION_API_PREFIX)) {
         return response({
-          schemaVersion: 'plush.dev-data-preparation-operation-result/v1',
+          kind: 'plush.dev-data-preparation-operation-result',
           operation: runningOperation,
         })
       }
       const body = JSON.parse(options.body)
       return response({
-        schemaVersion: 'plush.dev-data-preparation-action-result/v1',
+        kind: 'plush.dev-data-preparation-action-result',
         action: body.action,
         operation:
           body.action === 'prepare' ? readyOperation : runningOperation,

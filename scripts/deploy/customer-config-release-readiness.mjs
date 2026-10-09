@@ -282,7 +282,7 @@ function buildManifestReadbackSummary(manifest, blockers) {
     };
   }
   try {
-    validateRuntimeManifest(manifest);
+    validateRuntimeManifest(manifest, { publishedRevision: true });
   } catch (error) {
     blockers.push("invalid-runtime-manifest");
     return {
@@ -842,11 +842,13 @@ export async function validateCustomerConfigReleaseReadiness(
     throw new CliError(`manifest not found: ${options.manifest}`);
   }
   const manifest = await readJson(manifestPath, "manifest");
-  validateRuntimeManifest(manifest);
+  const publishedRevision = Boolean(options.requireRollback || options.requireActivated);
+  validateRuntimeManifest(manifest, { publishedRevision });
 
   let activationGate = null;
   try {
     activationGate = validateCustomerConfigActivationGate({
+      publishedRevision,
       customer: options.customer,
       deploymentTarget: options.deploymentTarget,
       manifest: options.manifest,

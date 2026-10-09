@@ -58,14 +58,6 @@ function parseDatasetVersion(value) {
   };
 }
 
-function parseConfigPackage(value) {
-  const match =
-    /^yoyoosun-customer-trial-133-package-v([1-9]\d*)\.runtime-manifest-v1$/u.exec(
-      String(value || ""),
-    );
-  return match ? Number(match[1]) : null;
-}
-
 export function validateManualAcceptanceCoreContract(contract) {
   const schemaMatch = /^plush\.manual-acceptance-contract\/v([1-9]\d*)$/u.exec(
     String(contract?.schemaVersion || ""),
@@ -123,27 +115,15 @@ export function validateManualAcceptanceCoreContract(contract) {
     throw new Error("manual acceptance unit or warehouse contract is invalid");
   }
   const target = contract.customerTrial133;
-  const previousDataset = parseDatasetVersion(target?.previousDatasetVersion);
-  const configPackage = parseConfigPackage(target?.configRevision);
-  const previousConfigPackage = parseConfigPackage(
-    target?.previousConfigRevision,
-  );
   if (
     target?.target !== "customer-trial-133" ||
     target?.deploymentTarget !== "demo-133" ||
     target?.databaseName !== "plush_erp_demo_v1" ||
     target?.databaseLifecycle !== "long-lived-registered-target" ||
     !/^[0-9]{14}$/u.test(String(target?.minimumMigration || "")) ||
-    configPackage === null ||
-    previousConfigPackage === null ||
-    configPackage <= previousConfigPackage ||
-    target?.configProductVersion !==
-      `customer-trial-133-test-${contract.dataVersion}` ||
-    !previousDataset ||
-    previousDataset.sequence >= dataset.sequence ||
-    previousDataset.isoDate > dataset.isoDate ||
-    target?.previousConfigProductVersion !==
-      `customer-trial-133-test-${target.previousDatasetVersion}`
+    Object.keys(target).some((key) => ![
+      "target", "deploymentTarget", "databaseName", "databaseLifecycle", "minimumMigration",
+    ].includes(key))
   ) {
     throw new Error("manual acceptance customer-trial target is invalid");
   }

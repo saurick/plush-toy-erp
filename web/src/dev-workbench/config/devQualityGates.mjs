@@ -9,10 +9,10 @@ export const DEV_QUALITY_GATE_ACTION_API_PATH = `${DEV_QUALITY_GATE_API_PATH}/ac
 export const DEV_QUALITY_GATE_GOVERNANCE_API_PATH = `${DEV_QUALITY_GATE_API_PATH}/governance`
 export const DEV_QUALITY_GATE_GAPS_API_PATH = `${DEV_QUALITY_GATE_API_PATH}/gaps`
 export const DEV_QUALITY_GATE_OPERATION_API_PREFIX = `${DEV_QUALITY_GATE_API_PATH}/operations`
-export const DEV_QUALITY_GATE_OPERATION_SCHEMA =
-  'plush.dev-quality-gate-operation-public/v1'
-export const DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA =
-  'plush.dev-quality-gate-server-evidence/v5'
+export const DEV_QUALITY_GATE_OPERATION_KIND =
+  'plush.dev-quality-gate-operation-public'
+export const DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND =
+  'plush.dev-quality-gate-server-evidence'
 
 export const QUERY_KEYS = Object.freeze({
   view: 'view',
@@ -297,7 +297,7 @@ export function normalizeDevQualityGateOperation(operation) {
       'receipt',
       'repository',
       'revision',
-      'schemaVersion',
+      'kind',
       'stage',
       'stageTimings',
       'status',
@@ -306,7 +306,7 @@ export function normalizeDevQualityGateOperation(operation) {
     'quality gate operation'
   )
   if (
-    operation.schemaVersion !== DEV_QUALITY_GATE_OPERATION_SCHEMA ||
+    operation.kind !== DEV_QUALITY_GATE_OPERATION_KIND ||
     !UUID_PATTERN.test(operation.id) ||
     !DEV_QUALITY_GATE_PROFILES.includes(operation.profile) ||
     !OPERATION_STATUSES.includes(operation.status) ||
@@ -817,14 +817,14 @@ function normalizeServerEvidence(evidence) {
       'message',
       'notProven',
       'pipeline',
-      'schemaVersion',
+      'kind',
       'status',
       'topology',
     ],
     'quality server evidence'
   )
   if (
-    evidence.schemaVersion !== DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA ||
+    evidence.kind !== DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND ||
     !SERVER_EVIDENCE_STATUSES.includes(evidence.status) ||
     typeof evidence.current !== 'boolean' ||
     typeof evidence.coversWorkingTree !== 'boolean' ||
@@ -889,14 +889,14 @@ export function normalizeDevQualityGateSummary(summary) {
       'profiles',
       'proofs',
       'repository',
-      'schemaVersion',
+      'kind',
       'serverEvidence',
       'status',
     ],
     'quality gate summary'
   )
   if (
-    summary.schemaVersion !== 'plush.dev-quality-gates-summary/v1' ||
+    summary.kind !== 'plush.dev-quality-gates-summary' ||
     !isIsoDate(summary.generatedAt) ||
     !Array.isArray(summary.operations)
   ) {
@@ -995,19 +995,17 @@ export function normalizeDevQualityGateGovernance(value) {
   assertExactKeys(
     value,
     [
-      'catalogSchemaVersion',
       'changedCount',
       'complexity',
       'filter',
       'q',
       'rows',
-      'schemaVersion',
+      'kind',
     ],
     'quality governance'
   )
   if (
-    value.schemaVersion !== 'plush.quality-gate-governance/v1' ||
-    value.catalogSchemaVersion !== 'plush.quality-gate-catalog/v1' ||
+    value.kind !== 'plush.quality-gate-governance' ||
     !DEV_QUALITY_GATE_GOVERNANCE_FILTERS.includes(value.filter) ||
     !Number.isSafeInteger(value.changedCount) ||
     value.changedCount < 0 ||
@@ -1054,12 +1052,12 @@ export function normalizeDevQualityGateGaps(value) {
       'maxAffectedScope',
       'range',
       'risk',
-      'schemaVersion',
+      'kind',
     ],
     'quality gaps'
   )
   if (
-    value.schemaVersion !== 'plush.quality-gate-gap-analysis/v2' ||
+    value.kind !== 'plush.quality-gate-gap-analysis' ||
     !DEV_QUALITY_GATE_GAP_RANGES.includes(value.range) ||
     !DEV_QUALITY_GATE_GAP_RISKS.includes(value.risk) ||
     !Array.isArray(value.affectedScopes) ||
@@ -1819,7 +1817,7 @@ export function projectCurrentQualityGateProof(summary, profile) {
     (stage) => stage.status === 'failed'
   )
   return {
-    schemaVersion: DEV_QUALITY_GATE_OPERATION_SCHEMA,
+    kind: DEV_QUALITY_GATE_OPERATION_KIND,
     id: `current-proof-${profile}`,
     profile,
     repository: summary.repository,
@@ -1914,11 +1912,11 @@ export function createDevQualityGateClient({
     const payload = await readJsonResponse(response)
     assertExactKeys(
       payload,
-      ['apiPath', 'csrfToken', 'schemaVersion'],
+      ['apiPath', 'csrfToken', 'kind'],
       'quality gate session'
     )
     if (
-      payload.schemaVersion !== 'plush.dev-quality-gate-session/v1' ||
+      payload.kind !== 'plush.dev-quality-gate-session' ||
       payload.apiPath !== DEV_QUALITY_GATE_API_PATH ||
       typeof payload.csrfToken !== 'string' ||
       payload.csrfToken.length < 32 ||
@@ -1996,11 +1994,11 @@ export function createDevQualityGateClient({
       const payload = await readJsonResponse(response)
       assertExactKeys(
         payload,
-        ['operation', 'profile', 'reused', 'schemaVersion'],
+        ['operation', 'profile', 'reused', 'kind'],
         'quality gate action result'
       )
       if (
-        payload.schemaVersion !== 'plush.dev-quality-gate-action-result/v1' ||
+        payload.kind !== 'plush.dev-quality-gate-action-result' ||
         payload.profile !== profile ||
         typeof payload.reused !== 'boolean'
       ) {
@@ -2034,10 +2032,10 @@ export function createDevQualityGateClient({
       const payload = await readJsonResponse(response)
       assertExactKeys(
         payload,
-        ['operation', 'schemaVersion'],
+        ['operation', 'kind'],
         'quality gate cancel result'
       )
-      if (payload.schemaVersion !== 'plush.dev-quality-gate-cancel-result/v1') {
+      if (payload.kind !== 'plush.dev-quality-gate-cancel-result') {
         throw requestError()
       }
       return normalizeDevQualityGateOperation(payload.operation)

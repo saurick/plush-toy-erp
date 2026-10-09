@@ -199,7 +199,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfigLifecycle(
 		if res := localTestCustomerConfigBoundaryResult(in.ExpectedProductVersion, nil, d.localTestConfigEnabled); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerTrialConfigRevisionProductVersion(in.CustomerKey, in.TargetRevision, in.ExpectedProductVersion); res != nil {
+		if res := d.requireCustomerTrialConfigRevisionProductVersion(ctx, in.CustomerKey, in.TargetRevision, in.ExpectedProductVersion); res != nil {
 			return id, res, nil
 		}
 		resolvedCustomerKey, err := runtimeCustomerKey(in.CustomerKey)
@@ -228,7 +228,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfigLifecycle(
 		if res := localTestCustomerConfigBoundaryResult(identity.ExpectedProductVersion, nil, d.localTestConfigEnabled); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerTrialConfigRevisionProductVersion(identity.CustomerKey, identity.TargetRevision, identity.ExpectedProductVersion); res != nil {
+		if res := d.requireCustomerTrialConfigRevisionProductVersion(ctx, identity.CustomerKey, identity.TargetRevision, identity.ExpectedProductVersion); res != nil {
 			return id, res, nil
 		}
 		admin, res := d.CurrentAdmin(ctx)
@@ -268,7 +268,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfigLifecycle(
 		if res := localTestCustomerConfigBoundaryResult(identity.ExpectedProductVersion, nil, d.localTestConfigEnabled); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerTrialConfigRevisionProductVersion(identity.CustomerKey, identity.TargetRevision, identity.ExpectedProductVersion); res != nil {
+		if res := d.requireCustomerTrialConfigRevisionProductVersion(ctx, identity.CustomerKey, identity.TargetRevision, identity.ExpectedProductVersion); res != nil {
 			return id, res, nil
 		}
 		admin, res := d.CurrentAdmin(ctx)

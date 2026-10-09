@@ -71,7 +71,7 @@ test('shared DEV data preparation route enters contract failure without live dat
   assert.equal(response.status, 200)
   assert.equal(response.contentType, 'application/json')
   assert.deepEqual(JSON.parse(response.body), {
-    schemaVersion: 'plush.dev-data-preparation-summary/v1',
+    kind: 'plush.dev-data-preparation-summary',
   })
 })
 

@@ -39,6 +39,8 @@ import {
 } from '../../scripts/qa/manual-acceptance-dataset.mjs'
 import { buildManualAcceptancePageDataContract } from '../../scripts/qa/manual-acceptance-page-data-contract.mjs'
 import {
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
   CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_DEPLOYMENT_TARGET,
   CUSTOMER_TRIAL_133_ORIGIN,
@@ -76,8 +78,8 @@ const SCENARIO_DEMO_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID
 const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 51
 const SCENARIO_DEMO_CATALOG_READY_COUNT = 41
 const SCENARIO_DEMO_BROWSER_CHECKS_PENDING = 10
-const DATA_PREPARATION_OPERATION_CONTRACT =
-  'plush.dev-data-preparation-operation-contract/v1'
+const DATA_PREPARATION_OPERATION_CONTRACT_KIND =
+  'plush.dev-data-preparation-operation-contract'
 const INTERRUPTED_OPERATION_RECOVERY_GRACE_MS = 30_000
 const LOCAL_DEVELOPMENT_TARGET = 'local-development'
 const ISOLATED_LOCAL_TARGET = 'isolated-local'
@@ -108,7 +110,7 @@ const MANUAL_ACCEPTANCE_REVIEW_PLAN =
   })
 
 const MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT = Object.freeze({
-  schemaVersion: 'plush.dev-data-environment-contract/v1',
+  kind: 'plush.dev-data-environment-contract',
   datasetKey: MANUAL_ACCEPTANCE_CORE_CONTRACT.datasetKey,
   dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
   runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
@@ -129,9 +131,9 @@ const MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT = Object.freeze({
     minimumMigration:
       MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
     configRevision:
-      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+      CUSTOMER_TRIAL_133_CONFIG_REVISION,
     configProductVersion:
-      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
+      CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
   }),
 })
 
@@ -595,7 +597,7 @@ function corePreflightEvidence(stdout) {
     throw new Error('core demo migration preflight contract did not match')
   }
   const evidence = {
-    schemaVersion: 'plush.dev-data-preparation-core-preflight/v1',
+    kind: 'plush.dev-data-preparation-core-preflight',
     migrationVersion: migration[1],
     appliedFiles: Number(migration[2]),
     availableFiles: Number(migration[3]),
@@ -644,7 +646,7 @@ async function fullAcceptancePlanFingerprint(stdout, repository, runId) {
     throw new Error('full acceptance lifecycle plan identity is invalid')
   }
   return hashDataPreparationPlan({
-    schemaVersion: 'plush.dev-data-preparation-full-plan/v2',
+    kind: 'plush.dev-data-preparation-full-plan',
     plan,
     acceptanceIdentity: {
       contract: MANUAL_ACCEPTANCE_REVIEW_PLAN.contract,
@@ -890,7 +892,7 @@ function operationContract(operation) {
     }
   }
   return Object.freeze({
-    schemaVersion: DATA_PREPARATION_OPERATION_CONTRACT,
+    kind: DATA_PREPARATION_OPERATION_CONTRACT_KIND,
     classification,
     dataVersion,
     datasetRunId,
@@ -1343,9 +1345,9 @@ export function createDevDataPreparationService({
       runtime.migrationVersion <
         MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration ||
       config?.revision !==
-        MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision ||
+        CUSTOMER_TRIAL_133_CONFIG_REVISION ||
       config?.productVersion !==
-        MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion ||
+        CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION ||
       config?.datasetVersion !== CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION ||
       runtime?.serverHealth !== 'passed' ||
       runtime?.serverReady !== 'passed' ||
@@ -1544,9 +1546,9 @@ export function createDevDataPreparationService({
         migrationVersion:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         customerConfigRevision:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+          CUSTOMER_TRIAL_133_CONFIG_REVISION,
         customerConfigProductVersion:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
+          CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
         targetFingerprint: hashDataPreparationPlan({
           target: CUSTOMER_TRIAL_133_TARGET,
           databaseName: CUSTOMER_TRIAL_133_DATABASE,
@@ -1655,7 +1657,7 @@ export function createDevDataPreparationService({
       })
     }
     return {
-      schemaVersion: 'plush.dev-data-preparation-summary/v2',
+      kind: 'plush.dev-data-preparation-summary',
       status: issues.some((issue) => issue.severity === 'blocked')
         ? 'blocked'
         : issues.length
@@ -1725,7 +1727,7 @@ export function createDevDataPreparationService({
         )
       }
       return {
-        schemaVersion: 'plush.dev-data-preparation-action-result/v1',
+        kind: 'plush.dev-data-preparation-action-result',
         action: 'prepare',
         operation: publicOperation(existing),
         reused: true,
@@ -1757,7 +1759,7 @@ export function createDevDataPreparationService({
             )
           }
           return {
-            schemaVersion: 'plush.dev-data-preparation-action-result/v1',
+            kind: 'plush.dev-data-preparation-action-result',
             action: 'prepare',
             operation: publicOperation(completed),
             reused: true,
@@ -1794,7 +1796,7 @@ export function createDevDataPreparationService({
           )
         }
         return {
-          schemaVersion: 'plush.dev-data-preparation-action-result/v1',
+          kind: 'plush.dev-data-preparation-action-result',
           action: 'prepare',
           operation: publicOperation(completed),
           reused: true,
@@ -1837,7 +1839,7 @@ export function createDevDataPreparationService({
       })
       invalidateSummary()
       return {
-        schemaVersion: 'plush.dev-data-preparation-action-result/v1',
+        kind: 'plush.dev-data-preparation-action-result',
         action: 'prepare',
         operation: publicOperation(created.operation),
         reused: created.reused,
@@ -2160,7 +2162,7 @@ export function createDevDataPreparationService({
       }
     })
     return {
-      schemaVersion: 'plush.dev-data-preparation-action-result/v1',
+      kind: 'plush.dev-data-preparation-action-result',
       action: 'execute',
       operation: publicOperation(operation),
     }
@@ -2226,7 +2228,7 @@ export function createDevDataPreparationMiddleware({
         requestPath === DEV_DATA_PREPARATION_SESSION_API_PATH
       ) {
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-data-preparation-session/v1',
+          kind: 'plush.dev-data-preparation-session',
           csrfToken,
           apiPrefix: DEV_DATA_PREPARATION_API_PREFIX,
         })
@@ -2255,7 +2257,7 @@ export function createDevDataPreparationMiddleware({
       const operationMatch = OPERATION_PATH_PATTERN.exec(requestPath)
       if (request.method === 'GET' && operationMatch) {
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-data-preparation-operation-result/v1',
+          kind: 'plush.dev-data-preparation-operation-result',
           operation: dataService.readOperation(operationMatch[1]),
         })
         return

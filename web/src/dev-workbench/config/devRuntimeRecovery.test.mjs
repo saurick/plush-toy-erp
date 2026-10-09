@@ -6,7 +6,7 @@ import {
   DEV_RUNTIME_RECOVERY_EVENT,
   DEV_RUNTIME_RECOVERY_HEADER,
   DEV_RUNTIME_STATUS_API_PATH,
-  DEV_RUNTIME_STATUS_SCHEMA,
+  DEV_RUNTIME_STATUS_KIND,
   activateDevRuntimeRecovery,
   installDevRuntimeRecoveryFetch,
   isDevDatabaseMigrationRecoveryActive,
@@ -129,7 +129,7 @@ test('仅轮询只读状态，完整就绪证明解除提示并停止检查，�
   scope.fetch = async (url, options) => {
     calls.push({ url, options })
     return Response.json({
-      schemaVersion: DEV_RUNTIME_STATUS_SCHEMA,
+      kind: DEV_RUNTIME_STATUS_KIND,
       status: statuses.shift(),
     })
   }
@@ -164,7 +164,7 @@ test('状态读取断网、拒绝或证明无效时继续等待，不把普通�
     new Response('{}', { status: 403 }),
     Response.json({ status: 'ready' }),
     Response.json({
-      schemaVersion: DEV_RUNTIME_STATUS_SCHEMA,
+      kind: DEV_RUNTIME_STATUS_KIND,
       status: 'blocked',
     }),
   ]
@@ -209,7 +209,7 @@ test('离开等待页会取消未完成检查并忽略旧响应，再次停服�
   stop()
   assert.equal(signal.aborted, true)
   resolveResponse(
-    Response.json({ schemaVersion: DEV_RUNTIME_STATUS_SCHEMA, status: 'ready' })
+    Response.json({ kind: DEV_RUNTIME_STATUS_KIND, status: 'ready' })
   )
   await flush()
   assert.equal(isDevDatabaseMigrationRecoveryActive(scope), true)

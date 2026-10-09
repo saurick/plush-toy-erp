@@ -147,6 +147,6 @@
 ## 项目设计边界
 
 - 本项目是新系统，以当前正式设计、代码和测试为准；未采用的草稿、实验、schema、API、状态、字段、别名、mock / fixture 不产生兼容义务。
-- 普通模块不独立维护版本号；代码、页面和文档按职责命名，修订由 Git / 发布身份追踪。必要的格式与业务版本按[版本边界](docs/engineering/跨层公共契约与生成规范.md#版本边界--version-boundaries)核实；已有编号或持久化引用不构成保留理由。
+- 普通模块不独立编号，修订由 Git / 发布身份追踪。配置内容身份、启动边界及必要格式与业务版本按[版本边界](docs/engineering/跨层公共契约与生成规范.md#版本边界--version-boundaries)核实，并通过 `phase-label-boundaries`；已有编号或持久化引用不构成保留理由。
 - 未进入正式目标设计的旧路径必须从代码、目标 Schema、seed/fixture、API、UI、文档和测试全链删除；已落库的 schema 或数据残留通过新的正式 migration 一次性清理，不改写已执行 migration。禁止保留 alias、fallback、双写、兼容读取、退出路径或仅为旧测试继续通过的分支。
 - 一次性 migration / 清理、正式事实与审计留存、网络重试和幂等 receipt replay 属于正确性要求；禁止兼容不豁免数据完整性、事务、迁移追溯和审计边界。

@@ -4,7 +4,7 @@ import test from 'node:test'
 import {
   DEV_COVERAGE_ACTION_API_PATH,
   DEV_COVERAGE_OPERATION_API_PREFIX,
-  DEV_COVERAGE_OPERATION_SCHEMA,
+  DEV_COVERAGE_OPERATION_KIND,
   DEV_COVERAGE_SESSION_API_PATH,
   createDevCoverageIdempotencyKey,
   createDevCoverageOperationClient,
@@ -22,7 +22,7 @@ function operation(overrides = {}) {
   const terminal = ['completed', 'failed', 'not_proven'].includes(status)
   const message = overrides.message || '正在采集 Go 测试与代码覆盖'
   return {
-    schemaVersion: DEV_COVERAGE_OPERATION_SCHEMA,
+    kind: DEV_COVERAGE_OPERATION_KIND,
     id: ID,
     profile: 'baseline',
     repository: {
@@ -104,21 +104,21 @@ test('coverage client posts only the fixed intent and polls only its operation i
       calls.push({ url, options })
       if (url === DEV_COVERAGE_SESSION_API_PATH) {
         return jsonResponse({
-          schemaVersion: 'plush.dev-qa-coverage-session/v1',
+          kind: 'plush.dev-qa-coverage-session',
           apiPath: '/__dev/api/qa/coverage',
           csrfToken: 's'.repeat(43),
         })
       }
       if (url === DEV_COVERAGE_ACTION_API_PATH) {
         return jsonResponse({
-          schemaVersion: 'plush.dev-qa-coverage-action-result/v1',
+          kind: 'plush.dev-qa-coverage-action-result',
           action: 'collect',
           reused: false,
           operation: operation(),
         })
       }
       return jsonResponse({
-        schemaVersion: 'plush.dev-qa-coverage-operation-result/v1',
+        kind: 'plush.dev-qa-coverage-operation-result',
         operation: operation({ stage: 'web' }),
       })
     },
@@ -148,7 +148,7 @@ test('coverage client rejects invalid ids and malformed response contracts', asy
   const client = createDevCoverageOperationClient({
     fetchImpl: async () =>
       jsonResponse({
-        schemaVersion: 'plush.dev-qa-coverage-operation-result/v1',
+        kind: 'plush.dev-qa-coverage-operation-result',
         operation: { ...operation(), args: ['--strict'] },
       }),
   })

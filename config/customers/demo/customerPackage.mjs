@@ -1,6 +1,6 @@
 export const demoCustomerPackage = Object.freeze({
   customerKey: "demo",
-  packageKey: "demo-customer-package-v1",
+  packageKey: "demo-customer-package",
   label: "中性 demo 客户配置包",
   status: "draft",
   runtimeEnabled: false,

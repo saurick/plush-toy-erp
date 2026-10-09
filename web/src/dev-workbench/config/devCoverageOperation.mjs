@@ -5,8 +5,8 @@ export const DEV_COVERAGE_SESSION_API_PATH = `${DEV_COVERAGE_API_PATH}/session`
 export const DEV_COVERAGE_ACTION_API_PATH = `${DEV_COVERAGE_API_PATH}/actions`
 export const DEV_COVERAGE_OPERATION_API_PREFIX = `${DEV_COVERAGE_API_PATH}/operations`
 
-export const DEV_COVERAGE_OPERATION_SCHEMA =
-  'plush.dev-qa-coverage-operation-public/v1'
+export const DEV_COVERAGE_OPERATION_KIND =
+  'plush.dev-qa-coverage-operation-public'
 export const DEV_COVERAGE_OPERATION_ACTIVE_STATUSES = Object.freeze([
   'queued',
   'running',
@@ -148,7 +148,7 @@ export function normalizeDevCoverageOperation(operation) {
       'profile',
       'repository',
       'revision',
-      'schemaVersion',
+      'kind',
       'stage',
       'status',
       'updatedAt',
@@ -156,7 +156,7 @@ export function normalizeDevCoverageOperation(operation) {
     'coverage operation'
   )
   if (
-    operation.schemaVersion !== DEV_COVERAGE_OPERATION_SCHEMA ||
+    operation.kind !== DEV_COVERAGE_OPERATION_KIND ||
     !UUID_PATTERN.test(operation.id) ||
     operation.profile !== 'baseline' ||
     !Object.hasOwn(STATUS_META, operation.status) ||
@@ -190,7 +190,7 @@ export function normalizeDevCoverageOperation(operation) {
     throw new Error('coverage operation state is inconsistent')
   }
   return {
-    schemaVersion: operation.schemaVersion,
+    kind: operation.kind,
     id: operation.id,
     profile: operation.profile,
     repository: normalizeRepository(operation.repository),
@@ -300,11 +300,11 @@ export function createDevCoverageOperationClient({
     const payload = await readJsonResponse(response)
     assertExactKeys(
       payload,
-      ['apiPath', 'csrfToken', 'schemaVersion'],
+      ['apiPath', 'csrfToken', 'kind'],
       'coverage session'
     )
     if (
-      payload.schemaVersion !== 'plush.dev-qa-coverage-session/v1' ||
+      payload.kind !== 'plush.dev-qa-coverage-session' ||
       payload.apiPath !== DEV_COVERAGE_API_PATH ||
       typeof payload.csrfToken !== 'string' ||
       payload.csrfToken.length < 32 ||
@@ -339,11 +339,11 @@ export function createDevCoverageOperationClient({
       const payload = await readJsonResponse(response)
       assertExactKeys(
         payload,
-        ['action', 'operation', 'reused', 'schemaVersion'],
+        ['action', 'operation', 'reused', 'kind'],
         'coverage action result'
       )
       if (
-        payload.schemaVersion !== 'plush.dev-qa-coverage-action-result/v1' ||
+        payload.kind !== 'plush.dev-qa-coverage-action-result' ||
         payload.action !== 'collect' ||
         typeof payload.reused !== 'boolean'
       ) {
@@ -369,11 +369,11 @@ export function createDevCoverageOperationClient({
       const payload = await readJsonResponse(response)
       assertExactKeys(
         payload,
-        ['operation', 'schemaVersion'],
+        ['operation', 'kind'],
         'coverage operation result'
       )
       if (
-        payload.schemaVersion !== 'plush.dev-qa-coverage-operation-result/v1'
+        payload.kind !== 'plush.dev-qa-coverage-operation-result'
       ) {
         throw createRequestError()
       }

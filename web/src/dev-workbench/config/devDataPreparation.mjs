@@ -374,14 +374,14 @@ function validateOperationContract(contract, expectedClassification = '') {
       'classification',
       'dataVersion',
       'datasetRunId',
-      'schemaVersion',
+      'kind',
       'semanticDigest',
     ],
     'data preparation operation contract'
   )
   if (
-    contract.schemaVersion !==
-      'plush.dev-data-preparation-operation-contract/v1' ||
+    contract.kind !==
+      'plush.dev-data-preparation-operation-contract' ||
     !OPERATION_CONTRACT_CLASSIFICATIONS.has(contract.classification) ||
     (expectedClassification &&
       contract.classification !== expectedClassification) ||
@@ -653,7 +653,7 @@ function validateDatasetEnvironmentContract(contract) {
       'dataVersion',
       'realCustomerImport',
       'runId',
-      'schemaVersion',
+      'kind',
       'semanticDigest',
       'simulatedOnly',
       'unitCount',
@@ -675,7 +675,7 @@ function validateDatasetEnvironmentContract(contract) {
     'customer-trial data environment contract'
   )
   if (
-    contract.schemaVersion !== 'plush.dev-data-environment-contract/v1' ||
+    contract.kind !== 'plush.dev-data-environment-contract' ||
     contract.datasetKey !== SCENARIO_DEMO_DATASET_KEY ||
     contract.dataVersion !== SCENARIO_DEMO_DATA_VERSION ||
     contract.runId !== SCENARIO_DEMO_RUN_ID ||
@@ -1202,7 +1202,7 @@ export function validateDevDataPreparationSummary(summary) {
       'currentOperations',
       'profiles',
       'repository',
-      'schemaVersion',
+      'kind',
       'status',
       'target',
       'unresolvedOperations',
@@ -1229,7 +1229,7 @@ export function validateDevDataPreparationSummary(summary) {
     'data preparation boundaries'
   )
   if (
-    summary.schemaVersion !== 'plush.dev-data-preparation-summary/v2' ||
+    summary.kind !== 'plush.dev-data-preparation-summary' ||
     !SUMMARY_STATUSES.has(summary.status) ||
     !Array.isArray(summary.profiles) ||
     !Array.isArray(summary.currentOperations) ||
@@ -1346,12 +1346,12 @@ function validateActionResult(payload, expectedAction) {
   assertExactKeys(
     payload,
     payload?.reused === undefined
-      ? ['action', 'operation', 'schemaVersion']
-      : ['action', 'operation', 'reused', 'schemaVersion'],
+      ? ['action', 'operation', 'kind']
+      : ['action', 'operation', 'reused', 'kind'],
     'data preparation action result'
   )
   if (
-    payload.schemaVersion !== 'plush.dev-data-preparation-action-result/v1' ||
+    payload.kind !== 'plush.dev-data-preparation-action-result' ||
     payload.action !== expectedAction ||
     (payload.reused !== undefined && typeof payload.reused !== 'boolean')
   ) {
@@ -1384,11 +1384,11 @@ export function createDevDataPreparationClient({
     )
     assertExactKeys(
       payload,
-      ['apiPrefix', 'csrfToken', 'schemaVersion'],
+      ['apiPrefix', 'csrfToken', 'kind'],
       'data preparation session'
     )
     if (
-      payload?.schemaVersion !== 'plush.dev-data-preparation-session/v1' ||
+      payload?.kind !== 'plush.dev-data-preparation-session' ||
       typeof payload.csrfToken !== 'string' ||
       payload.csrfToken.length < 32 ||
       payload.apiPrefix !== DEV_DATA_PREPARATION_API_PREFIX
@@ -1457,12 +1457,12 @@ export function createDevDataPreparationClient({
       )
       assertExactKeys(
         payload,
-        ['operation', 'schemaVersion'],
+        ['operation', 'kind'],
         'data preparation operation result'
       )
       if (
-        payload?.schemaVersion !==
-        'plush.dev-data-preparation-operation-result/v1'
+        payload?.kind !==
+        'plush.dev-data-preparation-operation-result'
       ) {
         throw new Error('数据准备 operation 响应校验失败')
       }

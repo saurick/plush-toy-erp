@@ -1,3 +1,4 @@
+import { CUSTOMER_TRIAL_133_CONFIG_REVISION, CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION, LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION } from '../../../scripts/qa/manual-acceptance-target-policy.mjs'
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../../scripts/qa/manual-acceptance-core-contract.mjs'
 import { buildManualAcceptanceBusinessChainReviewPlan } from '../../../scripts/qa/manual-acceptance-business-chain-contract.mjs'
 import { MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS } from '../../../scripts/qa/manual-acceptance-dataset.mjs'
@@ -30,7 +31,7 @@ function operationFixture(overrides = {}) {
     planHash: PLAN_HASH,
     runId: RUN_ID,
     contract: {
-      schemaVersion: 'plush.dev-data-preparation-operation-contract/v1',
+      kind: 'plush.dev-data-preparation-operation-contract',
       classification: 'current',
       dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
       datasetRunId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
@@ -74,7 +75,7 @@ function operationFixture(overrides = {}) {
 
 function createSummary() {
   return {
-    schemaVersion: 'plush.dev-data-preparation-summary/v2',
+    kind: 'plush.dev-data-preparation-summary',
     status: 'success',
     generatedAt: CREATED_AT,
     repository: {
@@ -84,7 +85,7 @@ function createSummary() {
     },
     acceptancePlan: projectDataPreparationAcceptancePlan(ACCEPTANCE_PLAN),
     datasetContract: {
-      schemaVersion: 'plush.dev-data-environment-contract/v1',
+      kind: 'plush.dev-data-environment-contract',
       datasetKey: 'yoyoosun-manual-acceptance',
       dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
       runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
@@ -101,9 +102,9 @@ function createSummary() {
         minimumMigration:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         configRevision:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+          CUSTOMER_TRIAL_133_CONFIG_REVISION,
         configProductVersion:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
+          CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
       },
     },
     target: {
@@ -124,7 +125,7 @@ function createSummary() {
         migrationVersion:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         customerConfigRevision:
-          'yoyoosun-customer-package-v7.local-bfd51004a4c35b47.runtime-v1',
+          LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
         customerConfigProductVersion: 'local-customer-package-test-apply',
         targetFingerprint: '9'.repeat(64),
       },
@@ -135,9 +136,9 @@ function createSummary() {
         migrationVersion:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         customerConfigRevision:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+          CUSTOMER_TRIAL_133_CONFIG_REVISION,
         customerConfigProductVersion:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
+          CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
         targetFingerprint: '7'.repeat(64),
       },
       fullAcceptance: {
@@ -250,7 +251,7 @@ export async function installDataPreparationBrowserRoutes(page, fixture) {
     }
     if (url.pathname.endsWith('/session')) {
       return json({
-        schemaVersion: 'plush.dev-data-preparation-session/v1',
+        kind: 'plush.dev-data-preparation-session',
         csrfToken: 'data-preparation-browser-csrf-token-fixture',
         apiPrefix: '/__dev/api/data-preparation',
       })
@@ -264,14 +265,14 @@ export async function installDataPreparationBrowserRoutes(page, fixture) {
       fixture.summary.currentOperations = [fixture.operation]
       if (fixture.prepareWait) await fixture.prepareWait
       return json({
-        schemaVersion: 'plush.dev-data-preparation-action-result/v1',
+        kind: 'plush.dev-data-preparation-action-result',
         action: 'prepare',
         operation: fixture.operation,
       })
     }
     if (url.pathname.endsWith(`/operations/${OPERATION_ID}`)) {
       return json({
-        schemaVersion: 'plush.dev-data-preparation-operation-result/v1',
+        kind: 'plush.dev-data-preparation-operation-result',
         operation: fixture.operation,
       })
     }

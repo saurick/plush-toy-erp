@@ -42,13 +42,13 @@ confirmationPrompt: `升级共享开发库:${target.latestVersion}:${OPERATION_I
 events: [{ at: '2026-07-29T08:01:00.000Z', status: 'ready', message: '准备完成，等待确认' }],
   }
   const summary = {
-    schemaVersion: 'plush.dev-database-migration-summary/v1',
+    kind: 'plush.dev-database-migration-summary',
 status: 'success',
 target,
     readOnly: false,
 runtime: { available: true, health: { status: 'passed', httpCode: 200 }, ready: { status: 'passed', httpCode: 200 } },
     tools: {
-      schemaVersion: 'plush.dev-database-migration-tools/v1',
+      kind: 'plush.dev-database-migration-tools',
 status: 'ready',
       checks: [
         { key: 'container_runtime', label: '容器运行环境', status: 'passed', message: '已就绪' },
@@ -70,7 +70,7 @@ async function installMigrationRoutes(page, fixture) {
     const { pathname } = new URL(route.request().url())
     const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
     if (pathname.endsWith('/summary')) return fixture.failReads ? json({ message: '状态读取失败' }, 503) : json(fixture.summary)
-    if (pathname.endsWith('/session')) return json({ schemaVersion: 'plush.dev-database-migration-session/v1', target: 'shared-dev', csrfToken: 'browser-migration-csrf-token-fixture' })
+    if (pathname.endsWith('/session')) return json({ kind: 'plush.dev-database-migration-session', target: 'shared-dev', csrfToken: 'browser-migration-csrf-token-fixture' })
     if (pathname.endsWith('/actions')) {
       const action = route.request().postDataJSON()
       fixture.actions.push(action)
@@ -117,7 +117,7 @@ viewport: { width: 1440, height: 900 },
         dryRunRequests = 0
         await page.route('**/__dev/api/customer-config/**', async (route) => {
           const { pathname } = new URL(route.request().url())
-          const body = pathname.endsWith('/session') ? { schemaVersion: 'plush.dev-customer-config-session/v1', csrfToken: 'browser-config-csrf-token-fixture-32' }
+          const body = pathname.endsWith('/session') ? { kind: 'plush.dev-customer-config-session', csrfToken: 'browser-config-csrf-token-fixture-32' }
             : pathname.endsWith('/release-batches') ? { batches: [] } : { operations: [] }
           await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) })
         })

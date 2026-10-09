@@ -3,6 +3,7 @@ package customertrialconfig
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"server/internal/biz"
 	"server/internal/manualacceptance"
 	"strings"
@@ -22,18 +23,12 @@ const (
 )
 
 var (
-	contract       = manualacceptance.Current()
-	ProductVersion = biz.CustomerConfigTrialProductVersion
-	ApplyPurpose   = biz.CustomerConfigTrialApplyPurpose
-	DatasetVersion = biz.CustomerConfigTrialDatasetVersion
-	Revision       = contract.CustomerTrial133.ConfigRevision
-	// PreviousActiveRevision is admitted only by startup readback during the
-	// registered config activation window. Publish and transition classifiers still
-	// accept Revision only, so this exact previous tuple cannot become a write alias.
-	PreviousActiveRevision       = contract.CustomerTrial133.PreviousConfigRevision
-	PreviousActiveProductVersion = contract.CustomerTrial133.PreviousConfigProductVersion
-	PreviousActiveDatasetVersion = contract.CustomerTrial133.PreviousDatasetVersion
-	expectedDatabase             = contract.CustomerTrial133.DatabaseName
+	contract         = manualacceptance.Current()
+	ProductVersion   = biz.CustomerConfigTrialProductVersion
+	ApplyPurpose     = biz.CustomerConfigTrialApplyPurpose
+	DatasetVersion   = biz.CustomerConfigTrialDatasetVersion
+	expectedDatabase = contract.CustomerTrial133.DatabaseName
+	revisionPattern  = regexp.MustCompile(`^yoyoosun-customer-trial-133\.[a-f0-9]{24}$`)
 )
 
 // ResolveGate validates the complete runtime boundary and reports whether the
@@ -64,44 +59,25 @@ func ResolveGate(dsn string, getenv func(string) string) (bool, error) {
 	return true, nil
 }
 
-// ClassifyManifest reserves the trial marker fields as one atomic identity.
-// A payload carrying any reserved marker must carry every exact marker value.
+// ClassifyManifest validates new trial writes. Revision is content-addressed;
+// the publish usecase verifies the canonical config hash and immutable identity.
 func ClassifyManifest(customerKey, revision, productVersion string, compiledSnapshot map[string]any) (bool, error) {
-	return classifyManifestForIdentity(
-		customerKey,
-		revision,
-		productVersion,
-		compiledSnapshot,
-		Revision,
-		ProductVersion,
-		DatasetVersion,
-	)
-}
-
-// ClassifyActiveManifest admits the exact previous active revision only long
-// enough for the server to start and activate Revision through the formal
-// API. It must not be used by publish or transition operations.
-func ClassifyActiveManifest(customerKey, revision, productVersion string, compiledSnapshot map[string]any) (bool, error) {
-	trial, err := ClassifyManifest(customerKey, revision, productVersion, compiledSnapshot)
-	if err == nil || strings.TrimSpace(revision) != PreviousActiveRevision {
+	trial, err := ClassifyActiveManifest(customerKey, revision, productVersion, compiledSnapshot)
+	if err != nil || !trial {
 		return trial, err
 	}
-	return classifyManifestForIdentity(
-		customerKey,
-		revision,
-		productVersion,
-		compiledSnapshot,
-		PreviousActiveRevision,
-		PreviousActiveProductVersion,
-		PreviousActiveDatasetVersion,
-	)
+	if !revisionPattern.MatchString(strings.TrimSpace(revision)) ||
+		strings.TrimSpace(productVersion) != ProductVersion ||
+		!exactSnapshotString(compiledSnapshot, "datasetVersion", DatasetVersion) {
+		return false, fmt.Errorf("customer trial config must use a content revision and the registered dataset")
+	}
+	return true, nil
 }
 
-func classifyManifestForIdentity(
-	customerKey, revision, productVersion string,
-	compiledSnapshot map[string]any,
-	expectedRevision, expectedProductVersion, expectedDatasetVersion string,
-) (bool, error) {
+// ClassifyActiveManifest validates a persisted active record's runtime boundary.
+// Its immutable revision is opaque: startup must not depend on which config was
+// compiled most recently. This readback does not authorize publish or transition.
+func ClassifyActiveManifest(customerKey, revision, productVersion string, compiledSnapshot map[string]any) (bool, error) {
 	customerKey = strings.TrimSpace(customerKey)
 	revision = strings.TrimSpace(revision)
 	productVersion = strings.TrimSpace(productVersion)
@@ -114,19 +90,21 @@ func classifyManifestForIdentity(
 	if !candidate {
 		return false, nil
 	}
-	if customerKey != ExpectedCustomerKey ||
-		revision != expectedRevision ||
-		productVersion != expectedProductVersion ||
+	dataset, _ := compiledSnapshot["datasetVersion"].(string)
+	if customerKey != ExpectedCustomerKey || revision == "" || len(revision) > 64 ||
+		!manualacceptance.ValidDatasetVersion(dataset) ||
+		productVersion != ExpectedTarget+"-test-"+dataset ||
 		!exactSnapshotString(compiledSnapshot, "applyPurpose", ApplyPurpose) ||
-		!exactSnapshotString(compiledSnapshot, "datasetVersion", expectedDatasetVersion) ||
 		!exactSnapshotString(compiledSnapshot, "target", ExpectedTarget) {
 		return false, fmt.Errorf("customer trial config marker is incomplete or invalid")
 	}
 	return true, nil
 }
 
-// ClassifyProductVersion applies the transition-operation subset of the
-// marker contract. Transition CAS still verifies the stored product version.
+// ClassifyRevisionProductVersion reserves the trial namespace at the transition
+// boundary. A transition reads the frozen record; the service checks its full
+// marker and the usecase verifies the stored hash, status and CAS. The trial
+// dataset contract still limits transitions independently of config revisions.
 func ClassifyRevisionProductVersion(customerKey, revision, productVersion string) (bool, error) {
 	customerKey = strings.TrimSpace(customerKey)
 	revision = strings.TrimSpace(revision)
@@ -135,7 +113,7 @@ func ClassifyRevisionProductVersion(customerKey, revision, productVersion string
 		!strings.HasPrefix(productVersion, "customer-trial-") {
 		return false, nil
 	}
-	if customerKey != ExpectedCustomerKey || revision != Revision || productVersion != ProductVersion {
+	if customerKey != ExpectedCustomerKey || revision == "" || len(revision) > 64 || productVersion != ProductVersion {
 		return false, fmt.Errorf("customer trial config revision or product version is invalid")
 	}
 	return true, nil

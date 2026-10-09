@@ -1,7 +1,5 @@
 import { buildAffectedPlan } from "./affected.mjs";
 
-export const QUALITY_GATE_CATALOG_SCHEMA = "plush.quality-gate-catalog/v1";
-
 export const QUALITY_GATE_CATALOG = Object.freeze([
   Object.freeze({
     key: "full",
@@ -388,7 +386,7 @@ export function buildQualityGateGapAnalysis({
     categories = categories.filter((category) => category.highRisk);
   }
   return Object.freeze({
-    schemaVersion: "plush.quality-gate-gap-analysis/v2",
+    kind: "plush.quality-gate-gap-analysis",
     range,
     risk,
     changedCount: changedFiles.length,
@@ -542,8 +540,8 @@ export function buildQualityGateGovernance({
     };
   });
   return Object.freeze({
-    schemaVersion: "plush.quality-gate-governance/v1",
-    catalogSchemaVersion: QUALITY_GATE_CATALOG_SCHEMA,
+    kind: "plush.quality-gate-governance",
+
     filter,
     q: String(q || ""),
     changedCount: changedFiles.length,

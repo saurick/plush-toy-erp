@@ -109,7 +109,7 @@ export function createDevPressureScenarios({
   const baseline = { ...report, id: 'history-baseline', dataScale: 'baseline', historyOrders: 20, main: report.engineering.levels[1] }
   const different = { ...baseline, id: 'different-host', comparisonKey: 'e'.repeat(64) }
   const envelope = () => ({
-    schemaVersion: 'plush.dev-pressure-reports/v1',
+    kind: 'plush.dev-pressure-reports',
     reports: mode === 'empty' ? [] : [report, baseline, different],
     report:
       mode === 'empty' || mode === 'running'
@@ -171,7 +171,7 @@ export function createDevPressureScenarios({
         )
         await page.route('**/__dev/api/qa/testing', (route) =>
           reply(route, {
-            schemaVersion: 'plush.dev-qa-testing-summary/v2',
+            kind: 'plush.dev-qa-testing-summary',
             busy: {
               active: Boolean(operation),
               kind: operation ? 'testing' : '',
@@ -197,7 +197,7 @@ export function createDevPressureScenarios({
         )
         await page.route('**/__dev/api/qa/testing/session', (route) =>
           reply(route, {
-            schemaVersion: 'plush.dev-qa-testing-session/v1',
+            kind: 'plush.dev-qa-testing-session',
             apiPath: '/__dev/api/qa/testing',
             csrfToken: 'c'.repeat(48),
           })
@@ -206,7 +206,7 @@ export function createDevPressureScenarios({
           actionRequests.push(route.request().postDataJSON())
           mode = 'running'
           operation = {
-            schemaVersion: 'plush.dev-qa-testing-operation-public/v1',
+            kind: 'plush.dev-qa-testing-operation-public',
             id: ID,
             action: 'pressure-quick',
             dataScale: 'growth',
@@ -226,7 +226,7 @@ export function createDevPressureScenarios({
             message: '正在运行短档压力测试',
           }
           return reply(route, {
-            schemaVersion: 'plush.dev-qa-testing-action-result/v1',
+            kind: 'plush.dev-qa-testing-action-result',
             action: 'pressure-quick',
             reused: false,
             operation,
@@ -234,7 +234,7 @@ export function createDevPressureScenarios({
         })
         await page.route('**/__dev/api/qa/testing/operations/*', (route) =>
           reply(route, {
-            schemaVersion: 'plush.dev-qa-testing-operation-result/v1',
+            kind: 'plush.dev-qa-testing-operation-result',
             operation,
           })
         )

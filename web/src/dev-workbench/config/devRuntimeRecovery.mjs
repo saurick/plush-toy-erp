@@ -5,7 +5,7 @@ export const DEV_DATABASE_MIGRATION_RECOVERY_GLOBAL =
 export const DEV_RUNTIME_RECOVERY_HEADER = 'x-plush-dev-recovery-route'
 export const DEV_RUNTIME_RECOVERY_EVENT = 'plush:dev-runtime-recovery'
 export const DEV_RUNTIME_STATUS_API_PATH = '/__dev/api/runtime-status'
-export const DEV_RUNTIME_STATUS_SCHEMA = 'plush.dev-runtime-status/v1'
+export const DEV_RUNTIME_STATUS_KIND = 'plush.dev-runtime-status'
 
 export function normalizeDevRuntimeRecoveryMode(value = '') {
   const normalized = String(value || '').trim()
@@ -71,7 +71,7 @@ export function startDevRuntimeRecoveryMonitor(
       const result = response.ok ? await response.json() : null
       if (
         !stopped &&
-        result?.schemaVersion === DEV_RUNTIME_STATUS_SCHEMA &&
+        result?.kind === DEV_RUNTIME_STATUS_KIND &&
         result.status === 'ready'
       ) {
         stopped = true

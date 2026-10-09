@@ -39,8 +39,8 @@ export const DEV_QA_TESTING_PLAN_API_PATH = `${DEV_QA_TESTING_API_PATH}/plan`
 export const DEV_QA_TESTING_ACTION_API_PATH = `${DEV_QA_TESTING_API_PATH}/actions`
 export const DEV_QA_TESTING_OPERATION_API_PREFIX = `${DEV_QA_TESTING_API_PATH}/operations`
 export const DEV_QA_PRESSURE_REPORTS_API_PATH = `${DEV_QA_TESTING_API_PATH}/pressure-reports`
-export const DEV_QA_TESTING_PUBLIC_OPERATION_SCHEMA =
-  'plush.dev-qa-testing-operation-public/v1'
+export const DEV_QA_TESTING_PUBLIC_OPERATION_KIND =
+  'plush.dev-qa-testing-operation-public'
 export const MAX_QA_TESTING_REQUEST_BYTES = 4 * 1024
 
 const OPERATION_PATH_PATTERN = new RegExp(
@@ -270,7 +270,7 @@ export function buildDevQaTestingCommand({
 function publicOperation(operation) {
   if (!operation) return null
   return {
-    schemaVersion: DEV_QA_TESTING_PUBLIC_OPERATION_SCHEMA,
+    kind: DEV_QA_TESTING_PUBLIC_OPERATION_KIND,
     id: operation.id,
     action: operation.action,
     ...(operation.dataScale ? { dataScale: operation.dataScale } : {}),
@@ -549,7 +549,7 @@ export function createDevQaTestingService({
     if (existing) {
       if (existing.action !== action || existing.dataScale !== payload.dataScale) throw new Error('testing idempotency intent mismatch')
       return {
-        schemaVersion: 'plush.dev-qa-testing-action-result/v1',
+        kind: 'plush.dev-qa-testing-action-result',
         action,
         reused: true,
         operation: publicOperation(existing),
@@ -593,7 +593,7 @@ export function createDevQaTestingService({
       throw error
     }
     return {
-      schemaVersion: 'plush.dev-qa-testing-action-result/v1',
+      kind: 'plush.dev-qa-testing-action-result',
       action,
       reused: false,
       operation: publicOperation(operation),
@@ -611,7 +611,7 @@ export function createDevQaTestingService({
         throw error
       }
       return {
-        schemaVersion: 'plush.dev-qa-testing-plan/v2',
+        kind: 'plush.dev-qa-testing-plan',
         generatedAt: now().toISOString(),
         repository,
         changedCount: affected.changedFiles.length,
@@ -630,7 +630,7 @@ export function createDevQaTestingService({
       recoverInterruptedOperation()
       const operations = listDevTestingOperations(store, { limit: 1000 })
       return {
-        schemaVersion: 'plush.dev-qa-testing-summary/v2',
+        kind: 'plush.dev-qa-testing-summary',
         busy: busyProjection(readDevQaExecutionLock(store)),
         hooks: readHookGovernance(root),
         operations: Object.fromEntries(
@@ -713,7 +713,7 @@ export function createDevQaTestingMiddleware({
         requestPath === DEV_QA_TESTING_SESSION_API_PATH
       ) {
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-qa-testing-session/v1',
+          kind: 'plush.dev-qa-testing-session',
           apiPath: DEV_QA_TESTING_API_PATH,
           csrfToken,
         })
@@ -739,7 +739,7 @@ export function createDevQaTestingMiddleware({
       }
       if (request.method === 'GET' && operationMatch) {
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-qa-testing-operation-result/v1',
+          kind: 'plush.dev-qa-testing-operation-result',
           operation: testingService.readOperation(operationMatch[1]),
         })
         return

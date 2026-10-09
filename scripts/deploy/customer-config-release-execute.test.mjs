@@ -53,7 +53,7 @@ function runCustomerConfigRelease(options, runtime = {}) {
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const releaseCli = path.join(testDir, "customer-config-release-execute.mjs");
 
-function writeRuntimeManifest(root) {
+function writeRuntimeManifest(root, revision) {
   const manifestPath = path.join(
     root,
     "output/customers/yoyoosun/customer-config-runtime-manifest.json",
@@ -62,7 +62,7 @@ function writeRuntimeManifest(root) {
   fs.writeFileSync(
     manifestPath,
     JSON.stringify(
-      buildRuntimeManifest(releaseReadyYoyoosunCustomerPackage),
+      {...buildRuntimeManifest(releaseReadyYoyoosunCustomerPackage), ...(revision ? {revision} : {})},
       null,
       2,
     ),
@@ -153,7 +153,7 @@ function writeManifestEvidence(root, evidenceDir, manifest) {
     JSON.stringify(
       {
         customerKey: "yoyoosun",
-        revision: releaseReadyYoyoosunRevision,
+        revision: JSON.parse(fs.readFileSync(path.join(root, manifest), "utf8")).revision,
         manifestSha256: `sha256:${manifestSha256(root, manifest)}`,
         reviewStatus: "approved",
         redaction: {
@@ -729,7 +729,7 @@ test("execute rollback 先 validate 和 transition check 再调用 rollback", as
   const root = await mkdtemp(
     path.join(os.tmpdir(), "customer-config-release-"),
   );
-  const manifest = writeRuntimeManifest(root);
+  const manifest = writeRuntimeManifest(root, "yoyoosun-customer-package-v7.runtime-manifest-v1");
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
   writeManifestEvidence(root, evidenceDir, manifest);
@@ -823,7 +823,7 @@ test("execute activate-only 先 validate 和 transition check 再调用 activate
   const root = await mkdtemp(
     path.join(os.tmpdir(), "customer-config-release-"),
   );
-  const manifest = writeRuntimeManifest(root);
+  const manifest = writeRuntimeManifest(root, "yoyoosun-customer-package-v7.runtime-manifest-v1");
   const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
   writeReleaseEvidence(path.join(root, evidenceDir));
   writeManifestEvidence(root, evidenceDir, manifest);
@@ -1308,4 +1308,13 @@ test("executor 对 malformed transition、mutation 和 effective response fail c
       }
     });
   }
+});
+
+
+test("frozen identity cannot enter publish even with matching saved evidence", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-publish-"));
+  try {
+    const manifest = writeRuntimeManifest(root, "yoyoosun-customer-package-v7.runtime-manifest-v1");
+    await assert.rejects(() => runCustomerConfigRelease({manifest, out: path.join(root, "out")}, {repoRoot: root}), /complete manifest content/u);
+  } finally { await rm(root, {recursive: true, force: true}); }
 });

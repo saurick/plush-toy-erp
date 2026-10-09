@@ -1,3 +1,4 @@
+import { CUSTOMER_TRIAL_133_CONFIG_REVISION } from "../qa/manual-acceptance-target-policy.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -14,7 +15,6 @@ import {
   loadYoyoosunCredentialContract,
   selectYoyoosunCredentialTarget,
 } from "../../deployments/yoyoosun/scripts/credential-contract.mjs";
-import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../qa/manual-acceptance-core-contract.mjs";
 import { RELEASE_EVIDENCE_PROFILES } from "./release-evidence-contract.mjs";
 import {
   PRODUCTION_PREFLIGHT_CHECKS,
@@ -39,7 +39,7 @@ const credentialTarget = selectYoyoosunCredentialTarget(
 );
 const releaseGitCommit = "abc1234000000000000000000000000000000000";
 const currentDemoCustomerRevision =
-  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision;
+  CUSTOMER_TRIAL_133_CONFIG_REVISION;
 const scriptPath = path.join(
   repoRoot,
   "scripts/deploy/release-evidence-status.mjs",

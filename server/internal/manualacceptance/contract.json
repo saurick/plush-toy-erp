@@ -114,11 +114,6 @@
     "deploymentTarget": "demo-133",
     "databaseName": "plush_erp_demo_v1",
     "databaseLifecycle": "long-lived-registered-target",
-    "minimumMigration": "20260927100348",
-    "configRevision": "yoyoosun-customer-trial-133-package-v11.runtime-manifest-v1",
-    "configProductVersion": "customer-trial-133-test-2026.09.27-v8",
-    "previousConfigRevision": "yoyoosun-customer-trial-133-package-v9.runtime-manifest-v1",
-    "previousConfigProductVersion": "customer-trial-133-test-2026.09.16-v7",
-    "previousDatasetVersion": "2026.09.16-v7"
+    "minimumMigration": "20260927100348"
   }
 }

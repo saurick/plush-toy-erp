@@ -2055,7 +2055,7 @@ export default function DevTestingPage() {
       )
       setTestingSummary((current) => ({
         ...(current || {
-          schemaVersion: 'plush.dev-qa-testing-summary/v2',
+          kind: 'plush.dev-qa-testing-summary',
           operations: { ...EMPTY_TESTING_OPERATIONS },
         }),
         busy: isDevTestingOperationActive(operation)

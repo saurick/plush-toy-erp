@@ -962,7 +962,7 @@ export function validateDevDeliverySummary(summary) {
   assertObject(summary, 'delivery summary')
   validatePipelineTimestamp(summary.generatedAt, 'delivery summary generation')
   if (
-    summary.schemaVersion !== 'plush.dev-delivery-summary/v1' ||
+    summary.kind !== 'plush.dev-delivery-summary' ||
     !['success', 'partial'].includes(summary.status) ||
     !Array.isArray(summary.versions) ||
     !Array.isArray(summary.targets) ||
@@ -1153,7 +1153,7 @@ export function createDevDeliveryClient({ fetchImpl = globalThis.fetch } = {}) {
       })
     )
     if (
-      payload?.schemaVersion !== 'plush.dev-delivery-session/v1' ||
+      payload?.kind !== 'plush.dev-delivery-session' ||
       typeof payload.csrfToken !== 'string' ||
       payload.csrfToken.length < 32 ||
       payload.target !== 'demo-133' ||
@@ -1191,7 +1191,7 @@ export function createDevDeliveryClient({ fetchImpl = globalThis.fetch } = {}) {
           headers: { accept: 'application/json' },
         })
       )
-      if (payload?.schemaVersion !== 'plush.dev-delivery-operation-result/v1') {
+      if (payload?.kind !== 'plush.dev-delivery-operation-result') {
         throw new Error('版本中心 operation 响应无效')
       }
       return validateOperation(payload.operation)

@@ -50,8 +50,8 @@ export const DEV_QA_COVERAGE_SESSION_API_PATH = `${DEV_QA_COVERAGE_API_PATH}/ses
 export const DEV_QA_COVERAGE_ACTION_API_PATH = `${DEV_QA_COVERAGE_API_PATH}/actions`
 export const DEV_QA_COVERAGE_OPERATION_API_PREFIX = `${DEV_QA_COVERAGE_API_PATH}/operations`
 export { QA_COVERAGE_REPORT_SCHEMA, validateQaCoverageReport }
-export const QA_COVERAGE_PUBLIC_OPERATION_SCHEMA =
-  'plush.dev-qa-coverage-operation-public/v1'
+export const QA_COVERAGE_PUBLIC_OPERATION_KIND =
+  'plush.dev-qa-coverage-operation-public'
 export const MAX_QA_COVERAGE_REPORT_BYTES = 2 * 1024 * 1024
 export const MAX_QA_COVERAGE_REQUEST_BYTES = 4 * 1024
 
@@ -211,7 +211,7 @@ export function validateDevQaCoverageAction(value) {
 function publicCoverageOperation(operation) {
   if (!operation) return null
   return {
-    schemaVersion: QA_COVERAGE_PUBLIC_OPERATION_SCHEMA,
+    kind: QA_COVERAGE_PUBLIC_OPERATION_KIND,
     id: operation.id,
     profile: operation.profile,
     repository: operation.repository,
@@ -571,7 +571,7 @@ export function createDevQaCoverageService({
     )
     if (existing) {
       return {
-        schemaVersion: 'plush.dev-qa-coverage-action-result/v1',
+        kind: 'plush.dev-qa-coverage-action-result',
         action: 'collect',
         reused: true,
         operation: publicCoverageOperation(existing),
@@ -582,7 +582,7 @@ export function createDevQaCoverageService({
     if (liveLock) {
       const running = readCoverageOperation(store, liveLock.operationId)
       return {
-        schemaVersion: 'plush.dev-qa-coverage-action-result/v1',
+        kind: 'plush.dev-qa-coverage-action-result',
         action: 'collect',
         reused: true,
         operation: publicCoverageOperation(running),
@@ -615,7 +615,7 @@ export function createDevQaCoverageService({
       if (racedExisting) {
         releaseExecutionLocks(operationId)
         return {
-          schemaVersion: 'plush.dev-qa-coverage-action-result/v1',
+          kind: 'plush.dev-qa-coverage-action-result',
           action: 'collect',
           reused: true,
           operation: publicCoverageOperation(racedExisting),
@@ -634,7 +634,7 @@ export function createDevQaCoverageService({
       throw error
     }
     return {
-      schemaVersion: 'plush.dev-qa-coverage-action-result/v1',
+      kind: 'plush.dev-qa-coverage-action-result',
       action: 'collect',
       reused: false,
       operation: publicCoverageOperation(operation),
@@ -703,7 +703,7 @@ export function createDevQaCoverageMiddleware({
         requestPath === DEV_QA_COVERAGE_SESSION_API_PATH
       ) {
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-qa-coverage-session/v1',
+          kind: 'plush.dev-qa-coverage-session',
           apiPath: DEV_QA_COVERAGE_API_PATH,
           csrfToken,
         })
@@ -713,7 +713,7 @@ export function createDevQaCoverageMiddleware({
       const operationMatch = COVERAGE_OPERATION_PATH_PATTERN.exec(requestPath)
       if (request.method === 'GET' && operationMatch) {
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-qa-coverage-operation-result/v1',
+          kind: 'plush.dev-qa-coverage-operation-result',
           operation: coverageService.readOperation(operationMatch[1]),
         })
         return

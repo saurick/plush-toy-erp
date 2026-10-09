@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { isCustomerConfigRevision } from "../qa/customer-config-runtime-manifest.mjs";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -744,7 +745,7 @@ function parseJsonEvidence(fileName, content, errors) {
   }
 }
 
-function loadDemoCustomerRevision(credentialTarget, errors) {
+function validateDemoTargetContract(credentialTarget, errors) {
   const contract = MANUAL_ACCEPTANCE_CORE_CONTRACT;
   const target = contract?.customerTrial133;
   assert(
@@ -755,12 +756,6 @@ function loadDemoCustomerRevision(credentialTarget, errors) {
     "manual acceptance contract demo target identity must match credential.contract.json",
     errors,
   );
-  assert(
-    isMeaningful(target?.configRevision),
-    "manual acceptance contract demo configRevision is missing",
-    errors,
-  );
-  return String(target?.configRevision ?? "").trim();
 }
 
 function parseMigrationStatus(content) {
@@ -888,7 +883,6 @@ function validateEvidenceConsistency(
     repoRoot,
     absoluteDir,
     credentialTarget,
-    demoCustomerRevision,
     profile,
   },
   errors,
@@ -976,12 +970,17 @@ function validateEvidenceConsistency(
     );
     if (credentialTarget.deploymentTarget === "demo-133") {
       assert(
-        credentialRotationReport.customerRevision === demoCustomerRevision,
-        `${REQUIRED_FILES.credentialRotation} customerRevision must match the current manual acceptance configRevision`,
+        isCustomerConfigRevision(credentialRotationReport.customerRevision),
+        `${REQUIRED_FILES.credentialRotation} customerRevision must identify the persisted active configuration`,
         errors,
       );
       const customerConfigSmokeCheck =
         findCustomerConfigEffectiveSessionCheck(smokeReport);
+      assert(
+        Boolean(customerConfigSmokeCheck),
+        `${REQUIRED_FILES.credentialRotation} requires customer-config-effective-session smoke readback`,
+        errors,
+      );
       if (customerConfigSmokeCheck) {
         assert(
           credentialRotationReport.customerRevision ===
@@ -1756,7 +1755,6 @@ function validateCredentialRotationReport(
   content,
   errors,
   credentialTarget,
-  demoCustomerRevision,
 ) {
   const report = parseJsonEvidence(
     REQUIRED_FILES.credentialRotation,
@@ -1823,8 +1821,8 @@ function validateCredentialRotationReport(
   );
   if (demo) {
     assert(
-      report.customerRevision === demoCustomerRevision,
-      `${REQUIRED_FILES.credentialRotation} customerRevision must match the current manual acceptance configRevision`,
+      isCustomerConfigRevision(report.customerRevision),
+      `${REQUIRED_FILES.credentialRotation} customerRevision must identify the persisted active configuration`,
       errors,
     );
   }
@@ -2121,7 +2119,6 @@ export function validateReleaseEvidenceGate({
   const errors = [];
   let normalizedProfile = RELEASE_EVIDENCE_PROFILES.BASE_RELEASE;
   let targetContext;
-  let demoCustomerRevision = "";
   let runtimeIdentity = null;
 
   try {
@@ -2160,7 +2157,7 @@ export function validateReleaseEvidenceGate({
         RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE &&
       deploymentTarget === "demo-133"
     ) {
-      demoCustomerRevision = loadDemoCustomerRevision(targetContext, errors);
+      validateDemoTargetContract(targetContext, errors);
     }
   }
 
@@ -2286,7 +2283,6 @@ export function validateReleaseEvidenceGate({
         credentialRotationContent,
         errors,
         targetContext,
-        demoCustomerRevision,
       );
     }
     validateRollbackPlan(rollbackPlanContent, errors);
@@ -2307,7 +2303,6 @@ export function validateReleaseEvidenceGate({
         repoRoot,
         absoluteDir,
         credentialTarget: targetContext,
-        demoCustomerRevision,
         profile: normalizedProfile,
       },
       errors,

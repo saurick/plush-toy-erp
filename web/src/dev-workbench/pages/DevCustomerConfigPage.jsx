@@ -1995,7 +1995,7 @@ export default function DevCustomerConfigPage() {
           const payload = await response.json()
           if (
             !response.ok ||
-            payload.schemaVersion !== 'plush.dev-customer-config-session/v1' ||
+            payload.kind !== 'plush.dev-customer-config-session' ||
             typeof payload.csrfToken !== 'string' ||
             payload.csrfToken.length < 32
           ) {

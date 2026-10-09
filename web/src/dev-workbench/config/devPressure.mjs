@@ -109,7 +109,8 @@ function metrics(value) {
 }
 export function normalizeDevPressureReports(value) {
   if (
-    value?.schemaVersion !== 'plush.dev-pressure-reports/v1' ||
+    value?.kind !== 'plush.dev-pressure-reports' ||
+    Object.keys(value).some((key) => !['kind', 'reports', 'report', 'progress', 'invalidCount'].includes(key)) ||
     !Array.isArray(value.reports) ||
     value.reports.length > 61 ||
     !Number.isSafeInteger(value.invalidCount) ||

@@ -1,5 +1,5 @@
 export const customerPackageCatalog = Object.freeze({
-  catalogKey: "customer-package-catalog-v1",
+  catalogKey: "customer-package-catalog",
   status: "draft_catalog",
   runtimeEnabled: false,
   boundaries: Object.freeze({

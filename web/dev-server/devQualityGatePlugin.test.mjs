@@ -10,7 +10,7 @@ import { CI_STRICT_JOB_NAMES } from '../../scripts/qa/ci-quality-shard.mjs'
 import { normalizeDevQualityGateSummary } from '../src/dev-workbench/config/devQualityGates.mjs'
 
 import {
-  DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+  DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND,
   QUALITY_GATE_TIMEOUT_MS,
   buildDevQualityGateCommand,
   captureDevQualityGateServerEnvironment,
@@ -226,7 +226,7 @@ test('quality gate projects GitLab exact-SHA CI separately from local dirty stat
       })),
     }
   )
-  assert.equal(evidence.schemaVersion, DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA)
+  assert.equal(evidence.kind, DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND)
   assert.equal(evidence.status, 'passed')
   assert.equal(evidence.current, true)
   assert.equal(evidence.coversWorkingTree, false)
@@ -1005,7 +1005,7 @@ test('quality gate summary reuses only a passed receipt for the current clean SH
     readRepositoryState: async () => cleanRepository,
     readReceipt: (profile) => (profile === 'strict' ? passedReceipt : null),
     loadServerEvidence: () => ({
-      schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+      kind: DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND,
       status: 'passed',
       current: true,
       coversWorkingTree: true,
@@ -1042,7 +1042,7 @@ test('quality gate never promotes a local receipt without GitLab CI exact-SHA ev
         ? { ...formalReceipt('strict'), treeState: 'clean' }
         : null,
     loadServerEvidence: () => ({
-      schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+      kind: DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND,
       status: 'missing',
       current: false,
       coversWorkingTree: false,
@@ -1083,7 +1083,7 @@ test('quality gate summary keeps current proof authoritative when rerun environm
     readRepositoryState: async () => cleanRepository,
     readReceipt: (profile) => (profile === 'strict' ? passedReceipt : null),
     loadServerEvidence: () => ({
-      schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+      kind: DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND,
       status: 'passed',
       current: true,
       coversWorkingTree: true,

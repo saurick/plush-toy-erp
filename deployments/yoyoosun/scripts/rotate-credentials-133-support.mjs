@@ -11,6 +11,7 @@ import {
   selectYoyoosunCredentialTarget,
 } from "./credential-contract.mjs";
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../../../scripts/qa/manual-acceptance-core-contract.mjs";
+import { isCustomerConfigRevision } from "../../../scripts/qa/customer-config-runtime-manifest.mjs";
 
 const command = process.argv[2];
 const rotationAccountKeys = Object.freeze([
@@ -230,7 +231,7 @@ function validateReport(
         manualAcceptanceTarget?.deploymentTarget === target.deploymentTarget &&
         manualAcceptanceTarget?.databaseName === target.database &&
         MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion === target.datasetVersion &&
-        report.customerRevision === manualAcceptanceTarget.configRevision
+        isCustomerConfigRevision(report.customerRevision)
       : !("datasetVersion" in report) &&
         !("customerRevision" in report)) &&
     report.authVersionIncremented === true &&

@@ -174,7 +174,7 @@ test("rejects implementation counters in config keys, maturity labels and test d
       'export const reviewQueue = "existing_model_snapshot";',
       'export const uiEntry = "workflow_page";',
       'export const maturity = "runtime_available";',
-      'export const runtimeSchema = "plush.dev-runtime-status/v1";',
+      'export const runtimeKind = "plush.dev-runtime-status";',
       'export const workflowReceipt = "workflow.task-mutation-result/v1";',
       'export const configRevision = "yoyoosun-customer-package-v8.local-0123456789abcdef.runtime-v1";',
     ].join("\n"),
@@ -281,4 +281,58 @@ test("affected mode rejects paths outside the repository", () => {
   const result = runFixture({ "changed.md": "safe" }, ["../outside.md"]);
   assert.equal(result.status, 2);
   assert.match(result.stderr, /must stay inside the repository/u);
+});
+
+test("rejects hand-maintained package identities and startup predecessor windows", () => {
+  for (const [file, source] of [
+    ["config/customers/example/customerPackage.mjs", 'export const config = { packageKey: "example-customer-package-v12" };'],
+    ["config/catalog/customerPackageCatalog.mjs", 'export const catalog = { catalogKey: "customer-package-catalog-v2" };'],
+    ["server/internal/manualacceptance/contract.json", '{ "previousConfigRevision": "hand-maintained" }'],
+    ["server/internal/customertrialconfig/guard.go", 'var PreviousActiveRevision = "hand-maintained"'],
+  ]) {
+    const result = runFixture({ [file]: source });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+  }
+  const allowed = runFixture({
+    "config/customers/example/customerPackage.mjs": 'export const config = { packageKey: "example-customer-package" };',
+    "receipt.json": '{ "schemaVersion": "plush.release-manifest/v2", "revision": "historical-package-v12" }',
+  });
+  assert.equal(allowed.status, 0, allowed.stderr);
+});
+
+test("rejects transient DEV response counters while preserving persisted formats", () => {
+  for (const surface of ["qa-testing-summary", "data-preparation-action-result", "delivery-session", "customer-config-session"]) {
+    const result = runFixture({
+      "web/dev-server/plugin.mjs": `export const response = { schemaVersion: 'plush.dev-${surface}/` + "v2' };",
+    });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+  }
+  const allowed = runFixture({
+    "response.mjs": "export const response = { kind: 'plush.dev-qa-testing-summary' };",
+    "operation.json": '{ "schemaVersion": "plush.dev-qa-testing-operation/v1" }',
+    "receipt.json": '{ "schemaVersion": "plush.remote-promotion-receipt/v5" }',
+  });
+  assert.equal(allowed.status, 0, allowed.stderr);
+});
+
+
+test("rejects unregistered DEV formats including new response names while preserving stored contracts", () => {
+  for (const name of ["qa-testing-plan", "database-migration-tools", "pressure-reports", "qa-testing-operation-public", "data-environment-contract", "runtime-status", "future-response"]) {
+    const result = runFixture({"response.mjs": `export const schema = "plush.dev-${name}/v${2}";`});
+    assert.equal(result.status, 1, name);
+  }
+  const accepted = runFixture({"stored.mjs": [
+    'export const operation = "plush.dev-qa-testing-operation/v1";',
+    'export const readback = "plush.dev-data-preparation-readback/v1";',
+    'export const kind = "plush.dev-qa-testing-plan";',
+  ].join("\n")});
+  assert.equal(accepted.status, 0, accepted.stderr);
+});
+
+
+test("rejects DEV governance counters outside the dev namespace", () => {
+  for (const name of ["catalog", "governance", "gap-analysis"]) {
+    const result = runFixture({"governance.mjs": `export const schema = "plush.quality-gate-${name}/v${2}";`});
+    assert.equal(result.status, 1, name);
+  }
 });

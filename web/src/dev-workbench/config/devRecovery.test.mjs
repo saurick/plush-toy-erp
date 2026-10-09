@@ -97,7 +97,7 @@ function summary({
     ],
     operations,
     recovery: {
-      schemaVersion: 'plush.dev-recovery-summary/v1',
+      kind: 'plush.dev-recovery-summary',
       backupRestore: recoveryReceipt,
     },
   }

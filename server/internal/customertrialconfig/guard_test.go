@@ -6,6 +6,8 @@ import (
 	"testing"
 )
 
+const Revision = "yoyoosun-customer-trial-133.0123456789abcdef01234567"
+
 const validDSN = "postgres://postgres:runtime-password@postgres:5432/plush_erp_demo_v1?sslmode=disable"
 
 func env(values map[string]string) func(string) string {
@@ -136,82 +138,72 @@ func TestClassifyManifestRequiresAtomicExactMarker(t *testing.T) {
 	}
 }
 
-func TestClassifyActiveManifestAllowsOnlyExactPreviousStartupIdentity(t *testing.T) {
-	currentMarker := map[string]any{
-		"applyPurpose":   ApplyPurpose,
-		"datasetVersion": DatasetVersion,
-		"target":         ExpectedTarget,
-	}
-	previousMarker := map[string]any{
-		"applyPurpose":   ApplyPurpose,
-		"datasetVersion": PreviousActiveDatasetVersion,
-		"target":         ExpectedTarget,
-	}
-	trial, err := ClassifyActiveManifest(
-		ExpectedCustomerKey,
-		PreviousActiveRevision,
-		PreviousActiveProductVersion,
-		previousMarker,
-	)
-	if err != nil || !trial {
-		t.Fatalf("ClassifyActiveManifest() = (%v, %v), want exact previous active revision", trial, err)
-	}
-	if trial, err := ClassifyManifest(
-		ExpectedCustomerKey,
-		PreviousActiveRevision,
-		PreviousActiveProductVersion,
-		previousMarker,
-	); err == nil || trial {
-		t.Fatalf("ClassifyManifest() = (%v, %v), previous revision must remain rejected for writes", trial, err)
-	}
-	for _, identity := range []struct {
-		productVersion string
-		marker         map[string]any
-	}{
-		{productVersion: ProductVersion, marker: currentMarker},
-		{productVersion: PreviousActiveProductVersion, marker: currentMarker},
-		{productVersion: ProductVersion, marker: previousMarker},
+func TestClassifyActiveManifestUsesPersistedIdentityWithoutVersionWindow(t *testing.T) {
+	for _, revision := range []string{
+		Revision,
+		"yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1",
+		"yoyoosun-customer-trial-133-package-v9.runtime-manifest-v1",
+		"published-content-before-this-build",
 	} {
-		if trial, err := ClassifyActiveManifest(
-			ExpectedCustomerKey,
-			PreviousActiveRevision,
-			identity.productVersion,
-			identity.marker,
-		); err == nil || trial {
-			t.Fatalf("ClassifyActiveManifest() = (%v, %v), want exact previous product and dataset", trial, err)
+		for _, dataset := range []string{DatasetVersion, "2026.09.16-v7"} {
+			marker := map[string]any{"applyPurpose": ApplyPurpose, "datasetVersion": dataset, "target": ExpectedTarget}
+			product := ExpectedTarget + "-test-" + dataset
+			if trial, err := ClassifyActiveManifest(ExpectedCustomerKey, revision, product, marker); err != nil || !trial {
+				t.Fatalf("active %s/%s rejected: %v", revision, dataset, err)
+			}
+			if revision != Revision || dataset != DatasetVersion {
+				if trial, err := ClassifyManifest(ExpectedCustomerKey, revision, product, marker); err == nil || trial {
+					t.Fatalf("readback identity became a new-write alias: %s/%s", revision, dataset)
+				}
+			}
 		}
 	}
-	for _, revision := range []string{
-		"yoyoosun-customer-trial-133-package-v3.runtime-manifest-v1",
-		PreviousActiveRevision + ".other",
+}
+
+func TestClassifyActiveManifestRejectsIncompleteBoundary(t *testing.T) {
+	for _, mutate := range []func(map[string]any){
+		func(m map[string]any) { delete(m, "datasetVersion") },
+		func(m map[string]any) { m["datasetVersion"] = "2026.02.30-v8" },
+		func(m map[string]any) { m["datasetVersion"] = "2026.09.16-v7" },
+		func(m map[string]any) { m["target"] = "customer-trial-other" },
+		func(m map[string]any) { m["applyPurpose"] = "local_test_apply" },
 	} {
-		if trial, err := ClassifyActiveManifest(
-			ExpectedCustomerKey,
-			revision,
-			PreviousActiveProductVersion,
-			previousMarker,
-		); err == nil || trial {
-			t.Fatalf("ClassifyActiveManifest(%q) = (%v, %v), want rejection", revision, trial, err)
+		marker := map[string]any{"applyPurpose": ApplyPurpose, "datasetVersion": DatasetVersion, "target": ExpectedTarget}
+		mutate(marker)
+		if trial, err := ClassifyActiveManifest(ExpectedCustomerKey, Revision, ProductVersion, marker); err == nil || trial {
+			t.Fatalf("incomplete active boundary accepted: %v", marker)
+		}
+	}
+	for _, revision := range []string{"", strings.Repeat("a", 65)} {
+		marker := map[string]any{"applyPurpose": ApplyPurpose, "datasetVersion": DatasetVersion, "target": ExpectedTarget}
+		if _, err := ClassifyActiveManifest(ExpectedCustomerKey, revision, ProductVersion, marker); err == nil {
+			t.Fatal("invalid immutable identity accepted")
 		}
 	}
 }
 
 func TestClassifyRevisionProductVersionReservesTrialNamespace(t *testing.T) {
-	if trial, err := ClassifyRevisionProductVersion(ExpectedCustomerKey, Revision, ProductVersion); err != nil || !trial {
-		t.Fatalf("ClassifyRevisionProductVersion() = (%v, %v), want trial", trial, err)
+	for _, revision := range []string{Revision, "yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1", "published-content-before-this-build"} {
+		for _, dataset := range []string{DatasetVersion} {
+			if trial, err := ClassifyRevisionProductVersion(ExpectedCustomerKey, revision, ExpectedTarget+"-test-"+dataset); err != nil || !trial {
+				t.Fatalf("persisted transition identity %s/%s rejected: %v", revision, dataset, err)
+			}
+		}
 	}
 	if trial, err := ClassifyRevisionProductVersion(ExpectedCustomerKey, "formal-revision", "formal-product-version"); err != nil || trial {
-		t.Fatalf("ClassifyRevisionProductVersion() changed formal input: (%v, %v)", trial, err)
+		t.Fatalf("formal identity changed: (%v, %v)", trial, err)
 	}
 	for _, identity := range [][3]string{
-		{ExpectedCustomerKey, "wrong-revision", ProductVersion},
-		{ExpectedCustomerKey, PreviousActiveRevision, ProductVersion},
-		{ExpectedCustomerKey, Revision, "customer-trial-133-test-2026.07.15-v3"},
+		{ExpectedCustomerKey, "", ProductVersion},
+		{ExpectedCustomerKey, strings.Repeat("x", 65), ProductVersion},
+		{ExpectedCustomerKey, Revision, "customer-trial-other-test-2026.09.16-v7"},
+		{ExpectedCustomerKey, Revision, "customer-trial-133-test-2026.09.16-v7"},
+		{ExpectedCustomerKey, Revision, "customer-trial-133-test-2026.02.30-v8"},
 		{"other", Revision, ProductVersion},
 		{ExpectedCustomerKey, Revision, "formal-product-version"},
 	} {
 		if trial, err := ClassifyRevisionProductVersion(identity[0], identity[1], identity[2]); err == nil || trial {
-			t.Fatalf("ClassifyRevisionProductVersion() = (%v, %v), want reserved namespace rejection", trial, err)
+			t.Fatalf("invalid transition identity accepted: %#v", identity)
 		}
 	}
 }

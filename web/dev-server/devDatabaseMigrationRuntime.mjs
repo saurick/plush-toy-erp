@@ -179,7 +179,7 @@ export async function readDatabaseMigrationToolReadiness({
     message: passed[index] ? '已就绪' : definition.blockedMessage,
   }))
   return {
-    schemaVersion: 'plush.dev-database-migration-tools/v1',
+    kind: 'plush.dev-database-migration-tools',
     status: checks.every((check) => check.status === 'passed')
       ? 'ready'
       : 'blocked',

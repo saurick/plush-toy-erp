@@ -1,3 +1,4 @@
+import { CUSTOMER_TRIAL_133_CONFIG_REVISION, CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION } from "../../scripts/qa/manual-acceptance-target-policy.mjs";
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { EventEmitter } from 'node:events'
@@ -638,8 +639,8 @@ test('133 scenario creates and verifies a fresh target-bound backup before canon
   const migrationVersion =
     MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration
   const databaseName = 'plush_erp_demo_v1'
-  const { configRevision, configProductVersion } =
-    MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133
+  const configRevision = CUSTOMER_TRIAL_133_CONFIG_REVISION
+  const configProductVersion = CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION
   const targetFingerprint = hashDataPreparationPlan({
     targetAlias: 'customer-trial-133',
     databaseName,
@@ -1850,7 +1851,7 @@ test('middleware enforces loopback, same-origin CSRF, strict JSON, and request s
   const service = {
     async summary(options) {
       summaryOptions.push(options)
-      return { schemaVersion: 'plush.dev-data-preparation-summary/v1' }
+      return { kind: 'plush.dev-data-preparation-summary' }
     },
     readOperation() {
       return {}
@@ -1858,7 +1859,7 @@ test('middleware enforces loopback, same-origin CSRF, strict JSON, and request s
     async act() {
       actions += 1
       return {
-        schemaVersion: 'plush.dev-data-preparation-action-result/v1',
+        kind: 'plush.dev-data-preparation-action-result',
         action: 'prepare',
         operation: {},
       }

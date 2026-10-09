@@ -64,6 +64,26 @@ const PRESENTATION_VERSION =
   /(?:统一\s*UI|统一界面(?:交互)?评审稿)\s+V[1-9]\d*\b|\bV[1-9]\d*\s+(?:字段真源|字段|客户配置|candidate|purchase order|currency set|single-)|(?:existing|现有)\s+V[1-9]\d*\s+(?:snapshot|样本)|\berp-prototype-v[1-9]\d*-/u;
 const INTERNAL_CATALOG_VERSION =
   /\bdev-(?:business-chain-catalog|flow-state-catalog|fact-ledger-catalog|business-chain-customer-review)\/v[1-9]\d*\b/u;
+// Only reviewed on-disk formats cross DEV builds. New response names must not
+// evade governance just because they were absent from a suffix list.
+const DEV_FORMAT_VERSION = /\bplush\.(?:dev-[a-z0-9-]+|quality-gate-(?:catalog|governance|gap-analysis))\/v[0-9]+\b/gu;
+const PERSISTED_DEV_FORMATS = new Set([
+  "plush.dev-customer-config-operation/v1",
+  "plush.dev-data-preparation-execution-lock/v1",
+  "plush.dev-data-preparation-idempotency/v1",
+  "plush.dev-data-preparation-operation/v1",
+  "plush.dev-data-preparation-prepare-lock/v1",
+  "plush.dev-data-preparation-readback/v1",
+  "plush.dev-database-migration-idempotency/v1",
+  "plush.dev-database-migration-lock/v1",
+  "plush.dev-database-migration-operation/v1",
+  "plush.dev-qa-coverage-execution-lock/v1",
+  "plush.dev-qa-coverage-idempotency/v1",
+  "plush.dev-qa-coverage-operation/v1",
+  "plush.dev-qa-execution-lock/v1",
+  "plush.dev-qa-testing-operation/v1",
+  "plush.dev-quality-gate-operation/v1",
+]);
 const INTERNAL_IMPLEMENTATION_VERSION =
   /\b(?:existing[_-]v[0-9]+[_-]snapshot|workflow[_-]v[0-9]+[_-]page|runtime_v[0-9]+)\b|\b(?:[Ww]orkflow\s+V[0-9]+\s+page|V[0-9]+\s+masterdata)\b/u;
 const IMPLEMENTATION_KIND =
@@ -104,9 +124,25 @@ function hasForbiddenStageLabel(value) {
     PROJECT_ORIGIN_COPY.test(value) ||
     PRESENTATION_VERSION.test(value) ||
     INTERNAL_CATALOG_VERSION.test(value) ||
+    [...value.matchAll(DEV_FORMAT_VERSION)].some(([format]) => !PERSISTED_DEV_FORMATS.has(format)) ||
     INTERNAL_IMPLEMENTATION_VERSION.test(value) ||
     MODULE_IMPLEMENTATION_VERSION.test(value)
   );
+}
+
+function hasConfigurationCounter(relativeFile, line) {
+  if (relativeFile.startsWith("config/") && !relativeFile.endsWith(".test.mjs")) {
+    return /\b(?:packageKey|catalogKey)\s*:\s*["'][^"']+-(?:package|catalog)-v[0-9]+["']/u.test(line);
+  }
+  if ([
+    "server/internal/manualacceptance/contract.json",
+    "server/internal/manualacceptance/contract.go",
+    "server/internal/customertrialconfig/guard.go",
+    "scripts/qa/manual-acceptance-core-contract.mjs",
+  ].includes(relativeFile)) {
+    return /\b(?:[Pp]reviousConfigRevision|[Pp]reviousConfigProductVersion|[Pp]reviousDatasetVersion|PreviousActiveRevision)\b/u.test(line);
+  }
+  return false;
 }
 
 function normalizeScanRoot(value) {
@@ -195,7 +231,7 @@ for (const relativeFile of scanFiles) {
     .toString("utf8")
     .split(/\r?\n/u)
     .forEach((line, index) => {
-      if (hasForbiddenStageLabel(line)) {
+      if (hasForbiddenStageLabel(line) || hasConfigurationCounter(relativeFile, line)) {
         hits.push(`${relativeFile}:${index + 1}: ${line.trim()}`);
       }
     });

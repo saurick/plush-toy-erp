@@ -1048,7 +1048,7 @@ export function createDevDeliveryService({
       }
     }
     return {
-      schemaVersion: 'plush.dev-delivery-summary/v1',
+      kind: 'plush.dev-delivery-summary',
       status: issues.length === 0 ? 'success' : 'partial',
       generatedAt,
       repository:
@@ -1076,7 +1076,7 @@ export function createDevDeliveryService({
         )
       })(),
       recovery: {
-        schemaVersion: 'plush.dev-recovery-summary/v1',
+        kind: 'plush.dev-recovery-summary',
         backupRestore: backupRestoreEvidence,
       },
       issues,
@@ -1964,55 +1964,55 @@ export function createDevDeliveryService({
       const validated = validateDevDeliveryAction(request)
       if (validated.action === 'dispatch-release') {
         return {
-          schemaVersion: 'plush.dev-delivery-action-result/v1',
+          kind: 'plush.dev-delivery-action-result',
           action: validated.action,
           operation: await dispatchRelease(validated.payload),
         }
       }
       if (validated.action === 'prepare-promotion') {
         return {
-          schemaVersion: 'plush.dev-delivery-action-result/v1',
+          kind: 'plush.dev-delivery-action-result',
           action: validated.action,
           ...(await prepareFixedPromotion(validated.payload)),
         }
       }
       if (validated.action === 'prepare-rollback') {
         return {
-          schemaVersion: 'plush.dev-delivery-action-result/v1',
+          kind: 'plush.dev-delivery-action-result',
           action: validated.action,
           ...(await prepareFixedRollback(validated.payload)),
         }
       }
       if (validated.action === 'prepare-database-rebuild') {
         return {
-          schemaVersion: 'plush.dev-delivery-action-result/v1',
+          kind: 'plush.dev-delivery-action-result',
           action: validated.action,
           ...(await prepareFixedDatabaseRebuild(validated.payload)),
         }
       }
       if (validated.action === 'retry-operation') {
         return {
-          schemaVersion: 'plush.dev-delivery-action-result/v1',
+          kind: 'plush.dev-delivery-action-result',
           action: validated.action,
           ...(await retryOperation(validated.payload)),
         }
       }
       if (validated.action === 'execute-rollback') {
         return {
-          schemaVersion: 'plush.dev-delivery-action-result/v1',
+          kind: 'plush.dev-delivery-action-result',
           action: validated.action,
           ...(await executeFixedRollback(validated.payload)),
         }
       }
       if (validated.action === 'execute-database-rebuild') {
         return {
-          schemaVersion: 'plush.dev-delivery-action-result/v1',
+          kind: 'plush.dev-delivery-action-result',
           action: validated.action,
           ...(await executeFixedDatabaseRebuild(validated.payload)),
         }
       }
       return {
-        schemaVersion: 'plush.dev-delivery-action-result/v1',
+        kind: 'plush.dev-delivery-action-result',
         action: validated.action,
         ...(await executeFixedPromotion(validated.payload)),
       }
@@ -2065,7 +2065,7 @@ export function createDevDeliveryMiddleware({
         requestPath === DEV_DELIVERY_SESSION_API_PATH
       ) {
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-delivery-session/v1',
+          kind: 'plush.dev-delivery-session',
           csrfToken,
           target: 'demo-133',
           targets: DELIVERY_TARGET_KEYS,
@@ -2085,7 +2085,7 @@ export function createDevDeliveryMiddleware({
           throw new Error('operation id is invalid')
         }
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-delivery-operation-result/v1',
+          kind: 'plush.dev-delivery-operation-result',
           operation: deliveryService.readOperation(operationMatch[1]),
         })
         return

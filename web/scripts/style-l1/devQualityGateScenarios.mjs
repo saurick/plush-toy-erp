@@ -349,7 +349,7 @@ function qualityOperation(
         ]
   const receiptStatus = ['failed', 'passed'].includes(status) ? status : null
   return {
-    schemaVersion: 'plush.dev-quality-gate-operation-public/v1',
+    kind: 'plush.dev-quality-gate-operation-public',
     id: OPERATION_ID,
     profile: 'strict',
     repository: operationRepository,
@@ -437,7 +437,7 @@ function createServerEvidence(status = 'passed') {
   }
   if (status === 'unavailable') {
     return {
-      schemaVersion: 'plush.dev-quality-gate-server-evidence/v5',
+      kind: 'plush.dev-quality-gate-server-evidence',
       status: 'unavailable',
       current: false,
       coversWorkingTree: false,
@@ -458,7 +458,7 @@ function createServerEvidence(status = 'passed') {
   }
   if (status === 'missing') {
     return {
-      schemaVersion: 'plush.dev-quality-gate-server-evidence/v5',
+      kind: 'plush.dev-quality-gate-server-evidence',
       status: 'missing',
       current: false,
       coversWorkingTree: false,
@@ -479,7 +479,7 @@ function createServerEvidence(status = 'passed') {
     }
   }
   return {
-    schemaVersion: 'plush.dev-quality-gate-server-evidence/v5',
+    kind: 'plush.dev-quality-gate-server-evidence',
     status: 'passed',
     current: true,
     coversWorkingTree: false,
@@ -542,7 +542,7 @@ export function createQualityGateStyleSummary(
   const operation = operations[0] || null
   const active = mode === 'running'
   return {
-    schemaVersion: 'plush.dev-quality-gates-summary/v1',
+    kind: 'plush.dev-quality-gates-summary',
     generatedAt: NOW,
     repository: serverStatus === 'docs_passed' ? { ...repository, dirty: false } : repository,
     environment: {
@@ -700,8 +700,8 @@ function governance() {
     treeState: 'dirty',
   }
   return {
-    schemaVersion: 'plush.quality-gate-governance/v1',
-    catalogSchemaVersion: 'plush.quality-gate-catalog/v1',
+    kind: 'plush.quality-gate-governance',
+
     filter: 'relevant',
     q: '',
     changedCount: 18,
@@ -766,7 +766,7 @@ function governance() {
 
 function gaps() {
   return {
-    schemaVersion: 'plush.quality-gate-gap-analysis/v2',
+    kind: 'plush.quality-gate-gap-analysis',
     range: 'current',
     risk: 'all',
     changedCount: 18,

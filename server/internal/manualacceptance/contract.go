@@ -19,9 +19,6 @@ var (
 	datasetVersionPattern = regexp.MustCompile(
 		`^([0-9]{4})\.([0-9]{2})\.([0-9]{2})-v([1-9][0-9]*)$`,
 	)
-	configRevisionPattern = regexp.MustCompile(
-		`^yoyoosun-customer-trial-133-package-v([1-9][0-9]*)\.runtime-manifest-v1$`,
-	)
 	migrationVersionPattern = regexp.MustCompile(`^[0-9]{14}$`)
 	current                 = mustParseContract(contractJSON)
 )
@@ -55,16 +52,11 @@ type Warehouse struct {
 }
 
 type CustomerTrial133 struct {
-	Target                       string `json:"target"`
-	DeploymentTarget             string `json:"deploymentTarget"`
-	DatabaseName                 string `json:"databaseName"`
-	DatabaseLifecycle            string `json:"databaseLifecycle"`
-	MinimumMigration             string `json:"minimumMigration"`
-	ConfigRevision               string `json:"configRevision"`
-	ConfigProductVersion         string `json:"configProductVersion"`
-	PreviousConfigRevision       string `json:"previousConfigRevision"`
-	PreviousConfigProductVersion string `json:"previousConfigProductVersion"`
-	PreviousDatasetVersion       string `json:"previousDatasetVersion"`
+	Target            string `json:"target"`
+	DeploymentTarget  string `json:"deploymentTarget"`
+	DatabaseName      string `json:"databaseName"`
+	DatabaseLifecycle string `json:"databaseLifecycle"`
+	MinimumMigration  string `json:"minimumMigration"`
 }
 
 type Contract struct {
@@ -123,13 +115,11 @@ func parseDatasetVersion(value string) (datasetIdentity, bool) {
 	}, true
 }
 
-func parseConfigPackage(value string) (int, bool) {
-	match := configRevisionPattern.FindStringSubmatch(value)
-	if match == nil {
-		return 0, false
-	}
-	sequence, err := strconv.Atoi(match[1])
-	return sequence, err == nil
+// ValidDatasetVersion validates a persisted dataset identity without coupling it
+// to the batch selected by the current build.
+func ValidDatasetVersion(value string) bool {
+	_, ok := parseDatasetVersion(value)
+	return ok
 }
 
 func Validate(contract Contract) error {
@@ -203,20 +193,11 @@ func Validate(contract Contract) error {
 		warehouseCodes[warehouse.Code] = struct{}{}
 	}
 	target := contract.CustomerTrial133
-	previousDataset, previousDatasetOK := parseDatasetVersion(target.PreviousDatasetVersion)
-	configPackage, configPackageOK := parseConfigPackage(target.ConfigRevision)
-	previousConfigPackage, previousConfigPackageOK := parseConfigPackage(target.PreviousConfigRevision)
 	if target.Target != "customer-trial-133" ||
 		target.DeploymentTarget != "demo-133" ||
 		target.DatabaseName != "plush_erp_demo_v1" ||
 		target.DatabaseLifecycle != "long-lived-registered-target" ||
-		!migrationVersionPattern.MatchString(target.MinimumMigration) ||
-		!configPackageOK || !previousConfigPackageOK ||
-		configPackage <= previousConfigPackage ||
-		target.ConfigProductVersion != "customer-trial-133-test-"+contract.DataVersion ||
-		!previousDatasetOK || previousDataset.sequence >= dataset.sequence ||
-		previousDataset.isoDate > dataset.isoDate ||
-		target.PreviousConfigProductVersion != "customer-trial-133-test-"+target.PreviousDatasetVersion {
+		!migrationVersionPattern.MatchString(target.MinimumMigration) {
 		return fmt.Errorf("customer-trial-133 identity is incomplete")
 	}
 	return nil

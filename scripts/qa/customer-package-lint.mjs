@@ -28,7 +28,7 @@ function assertNonEmptyString(value, key) {
 function isNamespacedPackageKey(customerKey, packageKey) {
   return (
     packageKey.startsWith(`${customerKey}-`) &&
-    /^[a-z0-9]+(?:-[a-z0-9]+)*-package-v[1-9][0-9]*$/u.test(packageKey)
+    /^[a-z0-9]+(?:-[a-z0-9]+)*-package$/u.test(packageKey)
   );
 }
 
@@ -301,7 +301,7 @@ function assertProcessPolicyRules(rules, policyPath, schema = customerPackageSch
 }
 
 function validateCatalog(catalog) {
-  assert(catalog.catalogKey === "customer-package-catalog-v1", "catalogKey must stay customer-package-catalog-v1");
+  assert(catalog.catalogKey === "customer-package-catalog", "catalogKey must stay customer-package-catalog");
   assert(catalog.status === "draft_catalog", "catalog status must stay draft_catalog");
   assert(catalog.runtimeEnabled === false, "catalog must not be runtime-enabled");
   for (const key of [
@@ -455,7 +455,7 @@ function validatePackage(
   assertNonEmptyString(config.packageKey, "packageKey");
   assert(
     isNamespacedPackageKey(config.customerKey, config.packageKey),
-    "packageKey must be namespaced by customerKey and end with package-v<positive integer>",
+    "packageKey must be namespaced by customerKey and end with package",
   );
   assert(schema.allowedStatuses.includes(config.status), `status must be one of ${schema.allowedStatuses.join(", ")}`);
   const releaseReady = config.status === "release_ready";

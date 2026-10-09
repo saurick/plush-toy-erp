@@ -125,7 +125,7 @@ function normalizeTarget(status) {
 
 function blockedToolReadiness() {
   return {
-    schemaVersion: 'plush.dev-database-migration-tools/v1',
+    kind: 'plush.dev-database-migration-tools',
     status: 'blocked',
     checks: [
       {
@@ -140,7 +140,7 @@ function blockedToolReadiness() {
 
 function normalizeToolReadiness(value) {
   if (
-    value?.schemaVersion !== 'plush.dev-database-migration-tools/v1' ||
+    value?.kind !== 'plush.dev-database-migration-tools' ||
     !['ready', 'blocked'].includes(value.status) ||
     !Array.isArray(value.checks) ||
     value.checks.length < 1 ||
@@ -849,7 +849,7 @@ export function createDevDatabaseMigrationService({
         issues.push(publicIssue(error, 'local_runtime_preflight_failed'))
       }
       return {
-        schemaVersion: 'plush.dev-database-migration-summary/v1',
+        kind: 'plush.dev-database-migration-summary',
         status: issues.length > 0 ? 'blocked' : 'success',
         target,
         runtime: runtimeReadback,
@@ -907,7 +907,7 @@ export function createDevDatabaseMigrationService({
           }
         }
         return {
-          schemaVersion: 'plush.dev-database-migration-action-result/v1',
+          kind: 'plush.dev-database-migration-action-result',
           accepted: !created.reused,
           operation: publicDatabaseMigrationOperation(
             readDatabaseMigrationOperation(store, created.operation.id)
@@ -944,7 +944,7 @@ export function createDevDatabaseMigrationService({
           logFailure('execute-background', error)
         )
         return {
-          schemaVersion: 'plush.dev-database-migration-action-result/v1',
+          kind: 'plush.dev-database-migration-action-result',
           accepted: true,
           operation: publicDatabaseMigrationOperation(applying),
         }
@@ -969,7 +969,7 @@ export function createDevDatabaseMigrationService({
         }
       }
       return {
-        schemaVersion: 'plush.dev-database-migration-action-result/v1',
+        kind: 'plush.dev-database-migration-action-result',
         accepted: !created.reused,
         operation: publicDatabaseMigrationOperation(
           readDatabaseMigrationOperation(store, created.operation.id)
@@ -1031,7 +1031,7 @@ export function createDevDatabaseMigrationMiddleware({
         requestPath === DEV_DATABASE_MIGRATION_SESSION_API_PATH
       ) {
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-database-migration-session/v1',
+          kind: 'plush.dev-database-migration-session',
           csrfToken,
           target: 'shared-dev',
         })
@@ -1052,7 +1052,7 @@ export function createDevDatabaseMigrationMiddleware({
           throw new Error('operation id is invalid')
         }
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-database-migration-operation-result/v1',
+          kind: 'plush.dev-database-migration-operation-result',
           operation: migrationService.readOperation(operationMatch[1]),
         })
         return

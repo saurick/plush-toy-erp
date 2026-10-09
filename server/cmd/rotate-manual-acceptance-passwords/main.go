@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"server/internal/biz"
+	"server/internal/customertrialconfig"
 	"server/internal/data"
 	"server/internal/manualacceptance"
 
@@ -54,8 +55,7 @@ var (
 	manualAcceptanceContract       = manualacceptance.Current()
 	customerTrial133DB             = manualAcceptanceContract.CustomerTrial133.DatabaseName
 	currentDatasetVersion          = manualAcceptanceContract.DataVersion
-	customerTrial133Revision       = manualAcceptanceContract.CustomerTrial133.ConfigRevision
-	customerTrial133ProductVersion = manualAcceptanceContract.CustomerTrial133.ConfigProductVersion
+	customerTrial133ProductVersion = biz.CustomerConfigTrialProductVersion
 )
 
 var immutableReleasePattern = regexp.MustCompile(`^[a-f0-9]{40}$`)
@@ -63,8 +63,8 @@ var operationIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{
 var sha256Pattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var localAcceptanceDatabasePattern = regexp.MustCompile(`^plush_erp_acceptance_([a-z0-9][a-z0-9_]{2,39})_dev$`)
 
-var localCustomerConfigRevisionPattern = regexp.MustCompile(
-	`^yoyoosun-customer-package-v[1-9][0-9]*\.local-[a-f0-9]{16}\.runtime-v1$`,
+var storedCustomerConfigRevisionPattern = regexp.MustCompile(
+	`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`,
 )
 
 var localDemoAcceptanceUsernames = []string{
@@ -373,7 +373,7 @@ LIMIT 1`).Scan(&identity.revision, &identity.productVersion, &snapshotRaw)
 }
 
 func validateActiveCustomerConfigIdentity(target string, identity activeCustomerConfigIdentity) error {
-	if identity.revision == "" || identity.productVersion == "" || len(identity.compiledSnapshot) == 0 {
+	if !storedCustomerConfigRevisionPattern.MatchString(identity.revision) || identity.productVersion == "" || len(identity.compiledSnapshot) == 0 {
 		return errors.New("active yoyoosun customer configuration identity is incomplete")
 	}
 	snapshotString := func(key, expected string) bool {
@@ -383,9 +383,6 @@ func validateActiveCustomerConfigIdentity(target string, identity activeCustomer
 
 	switch target {
 	case targetLocalDev:
-		if !localCustomerConfigRevisionPattern.MatchString(identity.revision) {
-			return errors.New("local-dev active customer configuration revision is not a registered local-test revision")
-		}
 		if identity.productVersion != localCustomerConfigProductVersion {
 			return errors.New("local-dev active customer configuration product version does not match the local-test contract")
 		}
@@ -399,7 +396,7 @@ func validateActiveCustomerConfigIdentity(target string, identity activeCustomer
 			return errors.New("local-dev active customer configuration contains a remote-trial marker")
 		}
 	case targetCustomerTrial133:
-		if identity.revision != customerTrial133Revision {
+		if trial, err := customertrialconfig.ClassifyActiveManifest("yoyoosun", identity.revision, identity.productVersion, identity.compiledSnapshot); err != nil || !trial {
 			return errors.New("customer-trial-133 active customer configuration revision does not match the registered trial revision")
 		}
 		if identity.productVersion != customerTrial133ProductVersion {

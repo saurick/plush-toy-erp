@@ -7,7 +7,7 @@ import {
 } from './devPressure.mjs'
 
 const empty = () => ({
-  schemaVersion: 'plush.dev-pressure-reports/v1',
+  kind: 'plush.dev-pressure-reports',
   reports: [],
   report: null,
   progress: null,

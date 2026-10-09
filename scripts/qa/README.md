@@ -173,6 +173,8 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 
 V8 采用统一的 8 个标准单位和按单位校验的数量精度；保留 V7 的来源字段与责任分工。V8 使用 `YS8` 来源编号与 `YS-V8` 任务编号，补齐材料厂商料号、采购双方信息、付款 / 发票条件、确认到货日期和收货地址。加工合同由独立的 `demo_finance_purchase / uat_finance_purchase` 双岗位模拟账号办理，纯财务账号保持原有权限；收货与工序回货由仓库、工序执行由生产、包装版本确认由业务账号办理。整批事实报告额外读回材料和成品入库的来源待办，核对关联、仓库责任、状态与跳转入口。旧 V7 来源单、已过账事实及审计保留；标准路线绑定只通过既有受控替换流程从精确登记的上一批次转移。
 
+客户配置 revision 从完整 manifest 内容生成，独立于模拟数据批次；`customerTrial133` 只登记目标和最低 migration，配置身份由 `manual-acceptance-target-policy.mjs` 从当前受控配置包生成。启动核对已激活记录的用途、目标、product / dataset 配对及环境开关，不维护人工“当前 / 上一版”窗口。新发布仍要求内容 revision、当前登记数据集和正式配置接口；历史不可变记录只作为原始事实保留，不改写成新身份。详见[版本边界](../../docs/engineering/跨层公共契约与生成规范.md#版本边界--version-boundaries)。
+
 造数读回的“已验证流程实例”按任务阶段正式流程证据中的实例 ID 去重统计；覆盖岗位数和展示用任务数不计入该值。同批续跑仍从已校验摘要的原始组件回执重新计算，不能把岗位分布当成流程运行证据。
 
 生产准备由 `manual-acceptance-engineering-data.mjs` 沿用正式接口办理：先为相关订单的全部开放明细绑定模拟样品图与本产品的有效 BOM，再由工程确认样品、提交用料，老板及财务各自审核。原有 45 个 BOM 状态样本保留，未覆盖的 3 个订单产品补充独立样品 BOM；图片只是统一模拟示意，不是客户样品。报告记录 18 个产品图片、45 条已确认明细和 8 张已审批用料单；重复执行校验已有来源，遇到人工修改或未通过的审批即停止。未下达且未生成用料需求的同批生产草稿可继续下达，使用实时单据版本，不复用创建时的旧版本。
@@ -183,7 +185,7 @@ V8 采用统一的 8 个标准单位和按单位校验的数量精度；保留 V
 
 `dataVersion` 表示一轮可重复、可验收的冻结模拟数据基线，不是 Git commit、代码版本或 operation 版本。纯样式、重构、性能优化及不改变数据结果的修复继续使用当前 V8；每次开发反馈仍以新的 operation / batch、隔离库和 exact commit 留证。只有单位含义、记录结构、生命周期 / 状态、业务链映射、稳定编码或数量合同发生不兼容变化，才集中升级 `dataVersion`。已持久落到本地或 demo 的冻结版本不得静默改写；旧基线保留用于说明当时测试内容。
 
-`server/internal/manualacceptance/contract.json` 是这些版本值的唯一真源。`schemaVersion` 只表示合同结构，不随数据批次自动递增；`dataVersion / runId / visiblePrefix` 必须彼此一致。同一天可以冻结不同批次，明确登记的上一批次及客户配置版本只须早于当前版本，不强制相邻编号，也不要求 schema、数据和客户配置的数字相同。Go / JS 共同校验结构、模拟数据限制、单位 / 仓库与固定目标身份。
+`server/internal/manualacceptance/contract.json` 是这些版本值的唯一真源。`schemaVersion` 只表示合同结构，不随数据批次自动递增；`dataVersion / runId / visiblePrefix` 必须彼此一致。同一天可以冻结不同批次；合同不再登记配置修订或上一批次白名单，配置身份由受控 manifest 的完整内容推导。Go / JS 共同校验结构、模拟数据限制、单位 / 仓库与固定目标身份。
 
 `demo-133` 使用独立 Compose project `plush-toy-erp-demo-v1`、数据库 `plush_erp_demo_v1`、根目录 `/root/deploy/plush-toy-erp-demo-v1`，PostgreSQL / API / Web 端口为 `55436 / 8325 / 5195`。所有精确路径、锁、Jaeger 端口和公网入口以 `scripts/deploy/deployment-targets.json` 为真源；正常整批造数只走后端 API。
 
@@ -347,7 +349,7 @@ node scripts/qa/manual-acceptance-dataset.mjs \
   --database-rebuild-receipt output/dev-workbench/delivery-operations/receipts/<database-rebuild-operation-id>.database-rebuild.json
 ```
 
-133 模拟配置使用 `yoyoosun-customer-trial-133-package-v11.runtime-manifest-v1`，包含财务核对采购退货与入库调整所需的只读权限。它通过正式配置协议发布、检查切换、激活并读回，不覆盖已发布的 v10；数据仍沿用 `2026.09.27-v8 / 20260927-V8`，配置修订不代表重置业务数据。
+133 模拟配置使用 `yoyoosun-customer-trial-133.<内容摘要>`，包含财务核对采购退货与入库调整所需的只读权限。它通过正式配置协议发布、检查切换、激活并读回；当前 revision 从生成的 manifest 或目标 policy 读取，不复制固定值。已发布配置保持不变，数据仍沿用 `2026.09.27-v8 / 20260927-V8`，配置修订不代表重置业务数据。
 
 登录输入只从受控进程环境或凭据合同进入，不写进命令示例、仓库或回执。历史回执、错误 SHA、相同 system identifier 或当前非空都会停止。长期 scenario-demo 可按其既有长期库语义保留历史，但不能冒充 fresh full acceptance。
 

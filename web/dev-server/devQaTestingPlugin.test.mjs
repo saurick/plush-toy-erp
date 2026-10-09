@@ -11,6 +11,7 @@ import {
   releaseDevQaExecutionLock,
 } from '../../scripts/qa/dev-qa-execution-lock.mjs'
 import { resolveDevTestingOperationStore } from '../../scripts/qa/dev-testing-operation-store.mjs'
+import { normalizeDevTestingPlan, normalizeDevTestingSummary } from '../src/dev-workbench/config/devTestingOperation.mjs'
 import {
   buildDevQaTestingCommand,
   DEV_QA_PRESSURE_REPORTS_API_PATH,
@@ -189,7 +190,8 @@ test('testing plan is read-only, relative and fails closed on identity drift', a
     now: () => new Date('2026-07-30T10:00:00.000Z'),
   })
   const plan = await service.plan()
-  assert.equal(plan.schemaVersion, 'plush.dev-qa-testing-plan/v2')
+  assert.equal(plan.kind, 'plush.dev-qa-testing-plan')
+  assert.deepEqual(normalizeDevTestingPlan(plan), plan)
   assert.equal(plan.changedCount, 1)
   assert.deepEqual(plan.affectedScopes, ['T0', 'T3'])
   assert.equal(plan.maxAffectedScope, 'T3')
@@ -199,6 +201,12 @@ test('testing plan is read-only, relative and fails closed on identity drift', a
     { scope: 'T5', text: '运行真实浏览器回归' },
   ])
   assert.deepEqual(service.summary().hooks, READY_HOOKS)
+  const normalizedSummary = normalizeDevTestingSummary(service.summary())
+  assert.equal(normalizedSummary.kind, 'plush.dev-qa-testing-summary')
+  assert.deepEqual(
+    normalizedSummary.hooks.checks.map(({ key, status }) => ({ key, status })),
+    READY_HOOKS.checks
+  )
 
   let reads = 0
   const drifting = createDevQaTestingService({
@@ -373,7 +381,7 @@ test('testing middleware is loopback-only and plugin is serve-only', async () =>
   const middleware = createDevQaTestingMiddleware({
     service: {
       summary: () => ({
-        schemaVersion: 'plush.dev-qa-testing-summary/v2',
+        kind: 'plush.dev-qa-testing-summary',
         busy: { active: false, kind: '', profile: '' },
         hooks: {
           status: 'blocked',

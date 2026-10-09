@@ -1,3 +1,4 @@
+import { CUSTOMER_TRIAL_133_CONFIG_REVISION } from "../qa/manual-acceptance-target-policy.mjs";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import crypto from "node:crypto";
@@ -45,7 +46,7 @@ const credentialTarget = selectYoyoosunCredentialTarget(
   "demo-133",
 );
 const currentDemoCustomerRevision =
-  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision;
+  CUSTOMER_TRIAL_133_CONFIG_REVISION;
 const releaseGitCommit = "a".repeat(40);
 const migrationAfter = "20260616000000";
 const credentialOperationId = "00000000-0000-4000-8000-000000000001";
@@ -1710,8 +1711,8 @@ for (const [name, mutate, expectedError] of [
     "stale customer revision",
     (report) =>
       (report.customerRevision =
-        MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.previousConfigRevision),
-    /customerRevision must match the current manual acceptance configRevision/,
+        "yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1"),
+    /customerRevision must match smoke-test-report\.json customer-config-effective-session expectedRevision/,
   ],
   [
     "absolute path",
@@ -3096,7 +3097,7 @@ test("release evidence gate requires rollback rehearsal effective session when s
   );
 
   const previousRevision =
-    MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.previousConfigRevision;
+    "yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1";
   const driftedSmoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
   const effectiveSession = driftedSmoke.checks.find(
     (check) => check.name === "customer-config-effective-session",
@@ -3117,4 +3118,12 @@ test("release evidence gate requires rollback rehearsal effective session when s
       }),
     /credential-rotation-report\.json customerRevision must match smoke-test-report\.json customer-config-effective-session expectedRevision/,
   );
+  const credentialPath = path.join(evidenceDir, "credential-rotation-report.json");
+  const frozenCredential = JSON.parse(fs.readFileSync(credentialPath, "utf8"));
+  frozenCredential.customerRevision = previousRevision;
+  fs.writeFileSync(credentialPath, JSON.stringify(frozenCredential));
+  assert.doesNotThrow(() => validateReleaseEvidenceGate({
+    repoRoot: root,
+    evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+  }));
 });

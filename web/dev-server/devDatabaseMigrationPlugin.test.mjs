@@ -78,7 +78,7 @@ function dependencies(calls) {
     async toolReadiness() {
       calls.push('tools')
       return {
-        schemaVersion: 'plush.dev-database-migration-tools/v1',
+        kind: 'plush.dev-database-migration-tools',
         status: 'ready',
         checks: [
           {
@@ -527,7 +527,7 @@ test('database migration service checks tools before stopping the backend', asyn
   const calls = []
   const runtime = dependencies(calls)
   runtime.toolReadiness = async () => ({
-    schemaVersion: 'plush.dev-database-migration-tools/v1',
+    kind: 'plush.dev-database-migration-tools',
     status: 'blocked',
     checks: [
       {

@@ -235,3 +235,23 @@ test("release report hash 不匹配时拒绝", async () => {
 
   await rm(root, { recursive: true, force: true });
 });
+
+test("冻结配置可生成原始摘要证据，但不能据此绕过新发布规则", async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "customer-config-frozen-evidence-"));
+  try {
+    const manifest = writeRuntimeManifest(root);
+    const manifestPath = path.join(root, manifest);
+    const payload = JSON.parse(await readFile(manifestPath, "utf8"));
+    payload.revision = "yoyoosun-customer-package-v7.runtime-manifest-v1";
+    const frozenBytes = JSON.stringify(payload);
+    await writeFile(manifestPath, frozenBytes);
+    const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
+    writeReleaseEvidence(path.join(root, evidenceDir));
+    const result = await writeCustomerConfigManifestEvidence({manifest, evidenceDir, reviewStatus: "approved", reviewer: "ops-reviewer"}, {repoRoot: root});
+    assert.equal(result.evidence.revision, payload.revision);
+    assert.equal(await readFile(manifestPath, "utf8"), frozenBytes);
+    const options = {deploymentTarget: "demo-133", manifest, evidenceDir, repoRoot: root};
+    assert.doesNotThrow(() => validateCustomerConfigActivationGate({...options, publishedRevision: true}));
+    assert.throws(() => validateCustomerConfigActivationGate(options), /complete manifest content/u);
+  } finally { await rm(root, {recursive: true, force: true}); }
+});

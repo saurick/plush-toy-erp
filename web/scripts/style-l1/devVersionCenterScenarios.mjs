@@ -270,7 +270,7 @@ export function createVersionCenterSummary() {
   })
 
   return validateDevDeliverySummary({
-    schemaVersion: 'plush.dev-delivery-summary/v1',
+    kind: 'plush.dev-delivery-summary',
     status: 'success',
     generatedAt: '2026-08-09T02:00:00.000Z',
     releaseVersionPolicy: {
@@ -409,7 +409,7 @@ export async function installDataPreparationContractFailureRoute(page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        schemaVersion: 'plush.dev-data-preparation-summary/v1',
+        kind: 'plush.dev-data-preparation-summary',
       }),
     })
   })
@@ -459,7 +459,7 @@ export async function installSummaryRoute(page, onRequest = () => {}) {
       body: JSON.stringify(
         operation
           ? {
-              schemaVersion: 'plush.dev-delivery-operation-result/v1',
+              kind: 'plush.dev-delivery-operation-result',
               operation,
             }
           : { message: 'Operation 不存在' }

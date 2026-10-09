@@ -17,7 +17,7 @@ import {
   DEV_DATABASE_MIGRATION_RECOVERY_ROUTE,
   DEV_RUNTIME_RECOVERY_HEADER,
   DEV_RUNTIME_STATUS_API_PATH,
-  DEV_RUNTIME_STATUS_SCHEMA,
+  DEV_RUNTIME_STATUS_KIND,
 } from '../src/dev-workbench/config/devRuntimeRecovery.mjs'
 
 test('Vite loads personal-network access from the local development env, with environment override', async (t) => {
@@ -416,7 +416,7 @@ test('只读状态等待完整启动证明，健康恢复不能跳过数据库�
     assert.equal(result.headers['cache-control'], 'no-store')
     assert.doesNotMatch(result.body, /private|diagnostic/u)
     const data = JSON.parse(result.body)
-    assert.equal(data.schemaVersion, DEV_RUNTIME_STATUS_SCHEMA)
+    assert.equal(data.kind, DEV_RUNTIME_STATUS_KIND)
     return data.status
   }
   assert.equal(await status(), 'blocked')

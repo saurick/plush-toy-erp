@@ -1,6 +1,6 @@
 export const referenceCustomerPackage = Object.freeze({
   customerKey: "reference-customer",
-  packageKey: "reference-customer-package-v1",
+  packageKey: "reference-customer-package",
   label: "标准样例毛绒制造有限公司（工程参考）",
   status: "draft",
   runtimeEnabled: false,

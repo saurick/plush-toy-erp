@@ -255,7 +255,7 @@ function operation(status = 'ready') {
 
 function summary() {
   return {
-    schemaVersion: 'plush.dev-database-migration-summary/v1',
+    kind: 'plush.dev-database-migration-summary',
     status: 'success',
     target: operation().target,
     runtime: {
@@ -264,7 +264,7 @@ function summary() {
       ready: { status: 'passed', httpCode: 200 },
     },
     tools: {
-      schemaVersion: 'plush.dev-database-migration-tools/v1',
+      kind: 'plush.dev-database-migration-tools',
       status: 'ready',
       checks: [
         {
@@ -530,7 +530,7 @@ test('database migration client sends only fixed action intent with CSRF', async
     if (url.endsWith('/session')) {
       return new Response(
         JSON.stringify({
-          schemaVersion: 'plush.dev-database-migration-session/v1',
+          kind: 'plush.dev-database-migration-session',
           csrfToken: 'x'.repeat(32),
           target: 'shared-dev',
         }),
@@ -566,7 +566,7 @@ test('database migration client refreshes an expired session on the next explici
       if (url.endsWith('/session')) {
         sessions += 1
         return Response.json({
-          schemaVersion: 'plush.dev-database-migration-session/v1',
+          kind: 'plush.dev-database-migration-session',
           target: 'shared-dev',
           csrfToken: String(sessions).repeat(32),
         })

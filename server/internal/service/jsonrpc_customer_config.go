@@ -176,13 +176,25 @@ func (d *jsonrpcDispatcher) requireCustomerTrialConfigManifest(in biz.CustomerCo
 	return nil
 }
 
-func (d *jsonrpcDispatcher) requireCustomerTrialConfigRevisionProductVersion(customerKey, revision, productVersion string) *v1.JsonrpcResult {
+func (d *jsonrpcDispatcher) requireCustomerTrialConfigRevisionProductVersion(ctx context.Context, customerKey, revision, productVersion string) *v1.JsonrpcResult {
 	trial, err := customertrialconfig.ClassifyRevisionProductVersion(customerKey, revision, productVersion)
 	if err != nil {
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	}
 	if trial && (d == nil || !d.trialConfigEnabled) {
 		return customerTrialConfigDisabledResult()
+	}
+	if trial {
+		stored, err := d.customerConfigUC.GetCustomerConfigRevision(ctx, customerKey, revision)
+		if err != nil {
+			return d.mapCustomerConfigError(ctx, err)
+		}
+		if stored == nil || stored.CustomerKey != customerKey || stored.Revision != revision || stored.ProductVersion != productVersion {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+		}
+		if valid, err := customertrialconfig.ClassifyActiveManifest(stored.CustomerKey, stored.Revision, stored.ProductVersion, stored.CompiledSnapshot); err != nil || !valid {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+		}
 	}
 	return nil
 }

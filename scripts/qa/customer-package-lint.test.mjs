@@ -130,7 +130,7 @@ test("customer-package-lint: reference package stays minimal and declarative", (
     mode: "compile",
     out: "",
   });
-  assert.equal(result.preview.identity.packageKey, "reference-customer-package-v1");
+  assert.equal(result.preview.identity.packageKey, "reference-customer-package");
   assert.equal(result.preview.workflows.length, 1);
   assert.equal(result.preview.businessFlows.length, 0);
   assert.equal(result.preview.stateMachines.length, 0);
@@ -224,7 +224,7 @@ test("customer-package-lint: package key must be namespaced by customer key", ()
   assert.throws(
     () => validatePackage({
       ...demoCustomerPackage,
-      packageKey: "yoyoosun-customer-package-v1",
+      packageKey: "yoyoosun-customer-package",
     }),
     /packageKey must be namespaced by customerKey/,
   );
@@ -234,7 +234,7 @@ test("customer-package-lint: package key must be namespaced by customer key", ()
         ...demoCustomerPackage,
         packageKey: "demo-package-v0",
       }),
-    /end with package-v<positive integer>/,
+    /end with package/,
   );
 });
 

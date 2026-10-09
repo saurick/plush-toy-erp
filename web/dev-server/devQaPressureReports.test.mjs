@@ -15,7 +15,7 @@ import {
 } from './devQaPressureReports.mjs'
 
 import { PRESSURE_DATA_SCALES } from '../src/dev-workbench/config/devPressureData.mjs'
-import { comparePressureScale } from '../src/dev-workbench/config/devPressure.mjs'
+import { comparePressureScale, normalizeDevPressureReports } from '../src/dev-workbench/config/devPressure.mjs'
 
 const commit = 'a'.repeat(40)
   const fingerprint = 'b'.repeat(64)
@@ -360,4 +360,13 @@ test('scale comparisons require the same candidate, load, working pool and measu
   assert.equal(projectScale(missing).comparisonKey, null)
   assert.match(comparePressureScale({ ...growth, status: 'failed' }, baseline).reason, /完整通过/u)
   assert.match(comparePressureScale(reference, baseline).reason, /另一数据规模/u)
+})
+
+test('pressure report list producer matches the browser contract without rewriting report files', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'plush-pressure-contract-'))
+  try {
+    const response = readDevPressureReports(root)
+    assert.deepEqual(normalizeDevPressureReports(response), response)
+    assert.equal(response.kind, 'plush.dev-pressure-reports')
+  } finally { rmSync(root, { recursive: true, force: true }) }
 })

@@ -266,7 +266,7 @@ func expectDatabasePreflight(
 	if err != nil {
 		t.Fatalf("resolveTargetPolicy() error = %v", err)
 	}
-	revision := customertrialconfig.Revision
+	revision := "yoyoosun-customer-trial-133.0123456789abcdef01234567"
 	productVersion := customertrialconfig.ProductVersion
 	if policy.target == customerTestTarget {
 		revision = "yoyoosun-customer-package-v7.runtime-manifest-v1"

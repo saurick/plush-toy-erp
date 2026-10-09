@@ -153,6 +153,7 @@ export function validateCustomerConfigActivationGate({
   manifest,
   evidenceDir,
   repoRoot = process.cwd(),
+  publishedRevision = false,
 } = {}) {
   const errors = [];
   assert(
@@ -184,7 +185,7 @@ export function validateCustomerConfigActivationGate({
 
   if (manifestPayload) {
     try {
-      validateRuntimeManifest(manifestPayload);
+      validateRuntimeManifest(manifestPayload, { publishedRevision });
     } catch (error) {
       errors.push(error.message);
     }
@@ -194,10 +195,10 @@ export function validateCustomerConfigActivationGate({
       errors,
     );
     assert(
-      /^yoyoosun-customer-package-v\d+\.runtime-manifest-v1$/u.test(
+      publishedRevision || /^yoyoosun-config\.[a-f0-9]{24}$/u.test(
         manifestPayload.revision,
       ),
-      "manifest revision must use the versioned yoyoosun customer package runtime manifest format",
+      "manifest revision must use the content-addressed yoyoosun configuration identity",
       errors,
     );
   }

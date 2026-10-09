@@ -180,7 +180,9 @@ export async function buildCustomerConfigManifestEvidence(options, runtime = {})
     throw new CliError(`manifest not found: ${options.manifest}`);
   }
   const manifest = await readJson(manifestPath);
-  validateRuntimeManifest(manifest);
+  // Review evidence binds the original bytes, including a frozen rollback
+  // manifest. New publication still enforces content identity in the executor.
+  validateRuntimeManifest(manifest, { publishedRevision: true });
   const manifestSha256 = `sha256:${sha256File(manifestPath)}`;
 
   let releaseReportPath = "";

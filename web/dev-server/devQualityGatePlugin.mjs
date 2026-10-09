@@ -44,8 +44,8 @@ export const DEV_QUALITY_GATE_ACTION_API_PATH = `${DEV_QUALITY_GATE_API_PATH}/ac
 export const DEV_QUALITY_GATE_GOVERNANCE_API_PATH = `${DEV_QUALITY_GATE_API_PATH}/governance`
 export const DEV_QUALITY_GATE_GAPS_API_PATH = `${DEV_QUALITY_GATE_API_PATH}/gaps`
 export const DEV_QUALITY_GATE_OPERATION_API_PREFIX = `${DEV_QUALITY_GATE_API_PATH}/operations`
-export const DEV_QUALITY_GATE_PUBLIC_OPERATION_SCHEMA =
-  'plush.dev-quality-gate-operation-public/v1'
+export const DEV_QUALITY_GATE_PUBLIC_OPERATION_KIND =
+  'plush.dev-quality-gate-operation-public'
 export const MAX_QUALITY_GATE_REQUEST_BYTES = 4 * 1024
 export const QUALITY_GATE_TIMEOUT_MS = Object.freeze({
   full: 90 * 60 * 1000,
@@ -299,7 +299,7 @@ export function projectQualityGateReceipt(receipt) {
 function publicOperation(operation) {
   if (!operation) return null
   return {
-    schemaVersion: DEV_QUALITY_GATE_PUBLIC_OPERATION_SCHEMA,
+    kind: DEV_QUALITY_GATE_PUBLIC_OPERATION_KIND,
     id: operation.id,
     profile: operation.profile,
     repository: operation.repository,
@@ -662,8 +662,8 @@ function statusProjection({
   }
 }
 
-export const DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA =
-  'plush.dev-quality-gate-server-evidence/v5'
+export const DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND =
+  'plush.dev-quality-gate-server-evidence'
 
 const SERVER_CI_HISTORY_LIMIT = 20
 const SERVER_JOB_FAN_IN_GROUPS = Object.freeze({
@@ -739,7 +739,7 @@ export function captureDevQualityGateServerEnvironment(env = process.env) {
 
 function unavailableServerEvidence(message) {
   return {
-    schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+    kind: DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND,
     status: 'unavailable',
     current: false,
     coversWorkingTree: false,
@@ -893,7 +893,7 @@ export function projectDevQualityGateServerEvidence(
   )
   if (exactRuns.length === 0) {
     return {
-      schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+      kind: DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND,
       status: 'missing',
       current: false,
       coversWorkingTree: false,
@@ -917,7 +917,7 @@ export function projectDevQualityGateServerEvidence(
       ? 'docs_passed'
       : active ? 'running' : 'failed'
   return {
-    schemaVersion: DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA,
+    kind: DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND,
     status,
     current: true,
     coversWorkingTree: selected.passed && !repository.dirty,
@@ -1100,7 +1100,7 @@ export function createDevQualityGateService({
           topology
         )
       }
-      if (value?.schemaVersion !== DEV_QUALITY_GATE_SERVER_EVIDENCE_SCHEMA) {
+      if (value?.kind !== DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND) {
         throw new Error('server CI evidence projection is invalid')
       }
     } catch {
@@ -1582,7 +1582,7 @@ export function createDevQualityGateService({
     )
     if (existing) {
       return {
-        schemaVersion: 'plush.dev-quality-gate-action-result/v1',
+        kind: 'plush.dev-quality-gate-action-result',
         profile,
         reused: true,
         operation: publicOperation(existing),
@@ -1618,7 +1618,7 @@ export function createDevQualityGateService({
         now: now().toISOString(),
       })
       return {
-        schemaVersion: 'plush.dev-quality-gate-action-result/v1',
+        kind: 'plush.dev-quality-gate-action-result',
         profile,
         reused: false,
         operation: publicOperation(
@@ -1726,7 +1726,7 @@ export function createDevQualityGateService({
       web: receiptGateModule.RECEIPT_GATE_WEB_SUBSTEP_LABELS,
     }
     return {
-      schemaVersion: 'plush.dev-quality-gates-summary/v1',
+      kind: 'plush.dev-quality-gates-summary',
       generatedAt: now().toISOString(),
       repository,
       environment: publicEnvironment(environment),
@@ -1831,7 +1831,7 @@ export function createDevQualityGateService({
     async cancel(operationId, value) {
       validateDevQualityGateCancel(value)
       return {
-        schemaVersion: 'plush.dev-quality-gate-cancel-result/v1',
+        kind: 'plush.dev-quality-gate-cancel-result',
         operation: await requestStop(operationId, 'cancel'),
       }
     },
@@ -1918,7 +1918,7 @@ export function createDevQualityGateMiddleware({
       ) {
         if (requestUrl.search) throw new Error('session query is unsupported')
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-quality-gate-session/v1',
+          kind: 'plush.dev-quality-gate-session',
           apiPath: DEV_QUALITY_GATE_API_PATH,
           csrfToken,
         })
@@ -1952,7 +1952,7 @@ export function createDevQualityGateMiddleware({
       if (request.method === 'GET' && operationMatch) {
         if (requestUrl.search) throw new Error('operation query is unsupported')
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-quality-gate-operation-result/v1',
+          kind: 'plush.dev-quality-gate-operation-result',
           operation: qualityService.readOperation(operationMatch[1]),
         })
         return

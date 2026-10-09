@@ -1,3 +1,4 @@
+import { CUSTOMER_TRIAL_133_CONFIG_REVISION } from "../qa/manual-acceptance-target-policy.mjs";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -6,7 +7,6 @@ import {
   loadYoyoosunCredentialContract,
   selectYoyoosunCredentialTarget,
 } from "../../deployments/yoyoosun/scripts/credential-contract.mjs";
-import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../qa/manual-acceptance-core-contract.mjs";
 import {
   RELEASE_EVIDENCE_CONTRACT,
   RELEASE_EVIDENCE_PROFILES,
@@ -15,7 +15,7 @@ import {
 const fixtureRelease = "abc1234000000000000000000000000000000000";
 const credentialOperationId = "00000000-0000-4000-8000-000000000001";
 const currentDemoCustomerRevision =
-  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision;
+  CUSTOMER_TRIAL_133_CONFIG_REVISION;
 
 function markdownField(content, name) {
   return content

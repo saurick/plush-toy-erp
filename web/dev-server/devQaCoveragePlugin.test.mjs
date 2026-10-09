@@ -202,7 +202,7 @@ test('coverage action contract accepts only a fixed baseline idempotency intent'
 test('coverage action middleware requires same-origin CSRF and exact JSON', async () => {
   const csrfToken = 's'.repeat(43)
   const operation = {
-    schemaVersion: 'plush.dev-qa-coverage-operation-public/v1',
+    kind: 'plush.dev-qa-coverage-operation-public',
     id: '123e4567-e89b-42d3-a456-426614174000',
     status: 'queued',
   }
@@ -213,7 +213,7 @@ test('coverage action middleware requires same-origin CSRF and exact JSON', asyn
     async act(value) {
       calls.push(value)
       return {
-        schemaVersion: 'plush.dev-qa-coverage-action-result/v1',
+        kind: 'plush.dev-qa-coverage-action-result',
         action: 'collect',
         reused: false,
         operation,
@@ -303,7 +303,7 @@ test('coverage action middleware requires same-origin CSRF and exact JSON', asyn
 
 test('operation GET reads only the fixed persisted operation projection', async () => {
   const operation = {
-    schemaVersion: 'plush.dev-qa-coverage-operation-public/v1',
+    kind: 'plush.dev-qa-coverage-operation-public',
     id: '123e4567-e89b-42d3-a456-426614174000',
     status: 'running',
   }

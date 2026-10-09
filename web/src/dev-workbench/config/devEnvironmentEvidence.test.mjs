@@ -1,3 +1,4 @@
+import { CUSTOMER_TRIAL_133_CONFIG_REVISION, CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION } from "../../../../scripts/qa/manual-acceptance-target-policy.mjs";
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -50,9 +51,9 @@ function dataSummaryFixture() {
         minimumMigration:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         configRevision:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+          CUSTOMER_TRIAL_133_CONFIG_REVISION,
         configProductVersion:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
+          CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
       },
     },
     target: {
@@ -109,7 +110,7 @@ function addTrialReadback(summary) {
         migrationVersion:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         customerConfigRevision:
-          MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+          CUSTOMER_TRIAL_133_CONFIG_REVISION,
         dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
         runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
         semanticDigest: DIGEST,
@@ -141,10 +142,9 @@ function deliverySummaryFixture() {
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         activeCustomerConfig: {
           revision:
-            MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+            CUSTOMER_TRIAL_133_CONFIG_REVISION,
           productVersion:
-            MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133
-              .configProductVersion,
+            CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
           datasetVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
         },
         serverHealth: 'passed',

@@ -4,7 +4,7 @@ import { yoyoosunCustomerPackage } from "./yoyoosun/customerPackage.mjs";
 import { yoyoosunReleasePackage } from "./yoyoosun/releasePackage.mjs";
 
 const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
-const PACKAGE_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*-package-v[1-9][0-9]*$/u;
+const PACKAGE_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*-package$/u;
 
 const customerPackageEntries = Object.freeze([
   Object.freeze(["demo", demoCustomerPackage]),

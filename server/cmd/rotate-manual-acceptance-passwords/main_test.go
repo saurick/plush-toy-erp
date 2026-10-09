@@ -553,7 +553,7 @@ func TestValidateTargetDSNRejectsUnknown133DatasetVersion(t *testing.T) {
 
 func localActiveCustomerConfigIdentity() activeCustomerConfigIdentity {
 	return activeCustomerConfigIdentity{
-		revision:       "yoyoosun-customer-package-v7.local-57b75a53ba779a6f.runtime-v1",
+		revision:       "yoyoosun-local-config.0123456789abcdef01234567",
 		productVersion: localCustomerConfigProductVersion,
 		compiledSnapshot: map[string]any{
 			"applyPurpose": localCustomerConfigApplyPurpose,
@@ -564,7 +564,7 @@ func localActiveCustomerConfigIdentity() activeCustomerConfigIdentity {
 
 func customerTrial133ActiveConfigIdentity() activeCustomerConfigIdentity {
 	return activeCustomerConfigIdentity{
-		revision:       customerTrial133Revision,
+		revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
 		productVersion: customerTrial133ProductVersion,
 		compiledSnapshot: map[string]any{
 			"applyPurpose":   customerTrial133ApplyPurpose,
@@ -593,14 +593,14 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrongLocalIdentity(t *testin
 			name: "formal revision",
 			identity: activeCustomerConfigIdentity{
 				revision:         "yoyoosun-customer-package-v7.runtime-manifest-v1",
-				productVersion:   localCustomerConfigProductVersion,
+				productVersion:   "local-customer-package",
 				compiledSnapshot: map[string]any{"applyPurpose": localCustomerConfigApplyPurpose},
 			},
 		},
 		{
-			name: "wrong fingerprint length",
+			name: "invalid revision length",
 			identity: activeCustomerConfigIdentity{
-				revision:         "yoyoosun-customer-package-v7.local-deadbeef.runtime-v1",
+				revision:         strings.Repeat("a", 65),
 				productVersion:   localCustomerConfigProductVersion,
 				compiledSnapshot: map[string]any{"applyPurpose": localCustomerConfigApplyPurpose},
 			},
@@ -608,7 +608,7 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrongLocalIdentity(t *testin
 		{
 			name: "wrong product version",
 			identity: activeCustomerConfigIdentity{
-				revision:         "yoyoosun-customer-package-v7.local-57b75a53ba779a6f.runtime-v1",
+				revision:         "yoyoosun-local-config.0123456789abcdef01234567",
 				productVersion:   "local-customer-package",
 				compiledSnapshot: map[string]any{"applyPurpose": localCustomerConfigApplyPurpose},
 			},
@@ -616,7 +616,7 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrongLocalIdentity(t *testin
 		{
 			name: "missing marker",
 			identity: activeCustomerConfigIdentity{
-				revision:         "yoyoosun-customer-package-v7.local-57b75a53ba779a6f.runtime-v1",
+				revision:         "yoyoosun-local-config.0123456789abcdef01234567",
 				productVersion:   localCustomerConfigProductVersion,
 				compiledSnapshot: map[string]any{"pages": []any{"global-dashboard"}},
 			},
@@ -624,7 +624,7 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrongLocalIdentity(t *testin
 		{
 			name: "wrong marker",
 			identity: activeCustomerConfigIdentity{
-				revision:         "yoyoosun-customer-package-v7.local-57b75a53ba779a6f.runtime-v1",
+				revision:         "yoyoosun-local-config.0123456789abcdef01234567",
 				productVersion:   localCustomerConfigProductVersion,
 				compiledSnapshot: map[string]any{"applyPurpose": customerTrial133ApplyPurpose},
 			},
@@ -632,7 +632,7 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrongLocalIdentity(t *testin
 		{
 			name: "marker wrong type",
 			identity: activeCustomerConfigIdentity{
-				revision:         "yoyoosun-customer-package-v7.local-57b75a53ba779a6f.runtime-v1",
+				revision:         "yoyoosun-local-config.0123456789abcdef01234567",
 				productVersion:   localCustomerConfigProductVersion,
 				compiledSnapshot: map[string]any{"applyPurpose": true},
 			},
@@ -640,7 +640,7 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrongLocalIdentity(t *testin
 		{
 			name: "mixed remote marker",
 			identity: activeCustomerConfigIdentity{
-				revision:       "yoyoosun-customer-package-v7.local-57b75a53ba779a6f.runtime-v1",
+				revision:       "yoyoosun-local-config.0123456789abcdef01234567",
 				productVersion: localCustomerConfigProductVersion,
 				compiledSnapshot: map[string]any{
 					"applyPurpose":   localCustomerConfigApplyPurpose,
@@ -664,9 +664,9 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrong133Identity(t *testing.
 		identity activeCustomerConfigIdentity
 	}{
 		{
-			name: "wrong revision",
+			name: "empty revision",
 			identity: activeCustomerConfigIdentity{
-				revision:       "yoyoosun-customer-trial-133-package-v1.runtime-manifest-v1",
+				revision:       "",
 				productVersion: customerTrial133ProductVersion,
 				compiledSnapshot: map[string]any{
 					"applyPurpose": customerTrial133ApplyPurpose, "datasetVersion": currentDatasetVersion, "target": targetCustomerTrial133,
@@ -676,7 +676,7 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrong133Identity(t *testing.
 		{
 			name: "wrong product version",
 			identity: activeCustomerConfigIdentity{
-				revision:       customerTrial133Revision,
+				revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
 				productVersion: "customer-trial-133-test-2026.07.15-v1",
 				compiledSnapshot: map[string]any{
 					"applyPurpose": customerTrial133ApplyPurpose, "datasetVersion": currentDatasetVersion, "target": targetCustomerTrial133,
@@ -686,7 +686,7 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrong133Identity(t *testing.
 		{
 			name: "missing purpose",
 			identity: activeCustomerConfigIdentity{
-				revision:       customerTrial133Revision,
+				revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
 				productVersion: customerTrial133ProductVersion,
 				compiledSnapshot: map[string]any{
 					"datasetVersion": currentDatasetVersion, "target": targetCustomerTrial133,
@@ -696,7 +696,7 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrong133Identity(t *testing.
 		{
 			name: "wrong dataset version",
 			identity: activeCustomerConfigIdentity{
-				revision:       customerTrial133Revision,
+				revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
 				productVersion: customerTrial133ProductVersion,
 				compiledSnapshot: map[string]any{
 					"applyPurpose": customerTrial133ApplyPurpose, "datasetVersion": "2026.07.15-v1", "target": targetCustomerTrial133,
@@ -706,7 +706,7 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrong133Identity(t *testing.
 		{
 			name: "wrong target",
 			identity: activeCustomerConfigIdentity{
-				revision:       customerTrial133Revision,
+				revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
 				productVersion: customerTrial133ProductVersion,
 				compiledSnapshot: map[string]any{
 					"applyPurpose": customerTrial133ApplyPurpose, "datasetVersion": currentDatasetVersion, "target": targetLocalDev,
@@ -716,7 +716,7 @@ func TestValidateActiveCustomerConfigIdentityRejectsWrong133Identity(t *testing.
 		{
 			name: "marker wrong type",
 			identity: activeCustomerConfigIdentity{
-				revision:       customerTrial133Revision,
+				revision:       "yoyoosun-customer-trial-133.0123456789abcdef01234567",
 				productVersion: customerTrial133ProductVersion,
 				compiledSnapshot: map[string]any{
 					"applyPurpose": customerTrial133ApplyPurpose, "datasetVersion": currentDatasetVersion, "target": []any{targetCustomerTrial133},
@@ -742,7 +742,7 @@ func TestActiveCustomerConfigReadsCompiledSnapshotIdentity(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT revision, product_version, compiled_snapshot`).WillReturnRows(
 		sqlmock.NewRows([]string{"revision", "product_version", "compiled_snapshot"}).AddRow(
-			customerTrial133Revision,
+			"yoyoosun-customer-trial-133.0123456789abcdef01234567",
 			customerTrial133ProductVersion,
 			[]byte(`{"applyPurpose":"customer_trial_test_apply","datasetVersion":"`+currentDatasetVersion+`","target":"customer-trial-133"}`),
 		),
@@ -768,7 +768,7 @@ func TestActiveCustomerConfigRejectsUnreadableSnapshot(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT revision, product_version, compiled_snapshot`).WillReturnRows(
 		sqlmock.NewRows([]string{"revision", "product_version", "compiled_snapshot"}).AddRow(
-			customerTrial133Revision,
+			"yoyoosun-customer-trial-133.0123456789abcdef01234567",
 			customerTrial133ProductVersion,
 			[]byte(`{"applyPurpose":`),
 		),
@@ -778,5 +778,20 @@ func TestActiveCustomerConfigRejectsUnreadableSnapshot(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("ExpectationsWereMet(): %v", err)
+	}
+}
+
+func TestValidateActiveCustomerConfigIdentityPreservesFrozenRevision(t *testing.T) {
+	for _, item := range []struct {
+		target, revision string
+		identity         activeCustomerConfigIdentity
+	}{
+		{targetLocalDev, "yoyoosun-customer-package-v7.local-0123456789abcdef.runtime-v1", localActiveCustomerConfigIdentity()},
+		{targetCustomerTrial133, "yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1", customerTrial133ActiveConfigIdentity()},
+	} {
+		item.identity.revision = item.revision
+		if err := validateActiveCustomerConfigIdentity(item.target, item.identity); err != nil {
+			t.Fatalf("persisted %s identity rejected: %v", item.target, err)
+		}
 	}
 }

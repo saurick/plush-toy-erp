@@ -37,7 +37,7 @@ const HOOKS = {
 
 function operation(overrides = {}) {
   return {
-    schemaVersion: 'plush.dev-qa-testing-operation-public/v1',
+    kind: 'plush.dev-qa-testing-operation-public',
     id: ID,
     action: 'fast',
     repository: REPOSITORY,
@@ -65,7 +65,7 @@ function jsonResponse(payload, { ok = true } = {}) {
 
 test('testing summary keeps fixed results and Git Hook wiring independent', () => {
   const summary = normalizeDevTestingSummary({
-    schemaVersion: 'plush.dev-qa-testing-summary/v2',
+    kind: 'plush.dev-qa-testing-summary',
     busy: { active: true, kind: 'testing', profile: 'fast' },
     hooks: HOOKS,
     operations: {
@@ -101,7 +101,7 @@ test('testing summary keeps fixed results and Git Hook wiring independent', () =
 
 test('testing summary recognizes a quality gate holding the shared QA lock', () => {
   const summary = normalizeDevTestingSummary({
-    schemaVersion: 'plush.dev-qa-testing-summary/v2',
+    kind: 'plush.dev-qa-testing-summary',
     busy: { active: true, kind: 'quality', profile: 'strict' },
     hooks: HOOKS,
     operations: {
@@ -141,7 +141,7 @@ test('testing Git closeout copy stays fixed and explains the four boundaries', (
 
 test('testing plan accepts only relative commands and frozen identity', () => {
   const plan = normalizeDevTestingPlan({
-    schemaVersion: 'plush.dev-qa-testing-plan/v2',
+    kind: 'plush.dev-qa-testing-plan',
     generatedAt: '2026-07-30T10:00:00.000Z',
     repository: REPOSITORY,
     changedCount: 2,
@@ -165,7 +165,7 @@ test('testing plan accepts only relative commands and frozen identity', () => {
     () =>
       normalizeDevTestingPlan({
         ...plan,
-        schemaVersion: 'plush.dev-qa-testing-plan/v1',
+        kind: 'invalid-plan',
       }),
     /testing plan is invalid/u
   )
@@ -199,14 +199,14 @@ test('testing client posts only action and idempotency key', async () => {
       calls.push({ url, options })
       if (url === DEV_TESTING_OPERATION_SESSION_API_PATH) {
         return jsonResponse({
-          schemaVersion: 'plush.dev-qa-testing-session/v1',
+          kind: 'plush.dev-qa-testing-session',
           apiPath: DEV_TESTING_OPERATION_API_PATH,
           csrfToken: 's'.repeat(43),
         })
       }
       if (url === DEV_TESTING_OPERATION_ACTION_API_PATH) {
         return jsonResponse({
-          schemaVersion: 'plush.dev-qa-testing-action-result/v1',
+          kind: 'plush.dev-qa-testing-action-result',
           action: 'fast',
           reused: false,
           operation: operation(),
@@ -214,7 +214,7 @@ test('testing client posts only action and idempotency key', async () => {
       }
       if (url === DEV_TESTING_OPERATION_API_PATH) {
         return jsonResponse({
-          schemaVersion: 'plush.dev-qa-testing-summary/v2',
+          kind: 'plush.dev-qa-testing-summary',
           busy: { active: false, kind: '', profile: '' },
           hooks: HOOKS,
           operations: {
@@ -228,7 +228,7 @@ test('testing client posts only action and idempotency key', async () => {
       }
       if (url === DEV_TESTING_OPERATION_PLAN_API_PATH) {
         return jsonResponse({
-          schemaVersion: 'plush.dev-qa-testing-plan/v2',
+          kind: 'plush.dev-qa-testing-plan',
           generatedAt: '2026-07-30T10:00:00.000Z',
           repository: REPOSITORY,
           changedCount: 0,
@@ -241,7 +241,7 @@ test('testing client posts only action and idempotency key', async () => {
         })
       }
       return jsonResponse({
-        schemaVersion: 'plush.dev-qa-testing-operation-result/v1',
+        kind: 'plush.dev-qa-testing-operation-result',
         operation: operation(),
       })
     },

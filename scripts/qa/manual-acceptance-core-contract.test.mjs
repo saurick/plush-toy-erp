@@ -14,10 +14,6 @@ test("canonical units merge spelling aliases and preserve physical units", () =>
   assert.equal(MANUAL_ACCEPTANCE_CORE_CONTRACT.runId, "20260927-V8");
   assert.equal(MANUAL_ACCEPTANCE_CORE_CONTRACT.simulatedOnly, true);
   assert.equal(MANUAL_ACCEPTANCE_CORE_CONTRACT.realCustomerImport, false);
-  assert.equal(
-    MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.previousDatasetVersion,
-    "2026.09.16-v7",
-  );
   assert.equal(MANUAL_ACCEPTANCE_CORE_UNITS.length, 8);
   assert.equal(MANUAL_ACCEPTANCE_PRIMARY_UNIT.name, "个");
   assert.deepEqual(
@@ -43,15 +39,9 @@ test("core contract rejects merged source labels and target drift", () => {
     /customer-trial target/u,
   );
 
-  const wrongPreviousIdentity = structuredClone(
-    MANUAL_ACCEPTANCE_CORE_CONTRACT,
-  );
-  wrongPreviousIdentity.customerTrial133.previousDatasetVersion =
-    "2026.09.27-v8";
-  assert.throws(
-    () => validateManualAcceptanceCoreContract(wrongPreviousIdentity),
-    /customer-trial target/u,
-  );
+  const copiedCounter = structuredClone(MANUAL_ACCEPTANCE_CORE_CONTRACT);
+  copiedCounter.customerTrial133["previous" + "ConfigRevision"] = "hand-maintained";
+  assert.throws(() => validateManualAcceptanceCoreContract(copiedCounter), /customer-trial target/u);
 });
 
 test("core contract accepts a coherent next version without code changes", () => {
@@ -66,15 +56,6 @@ test("core contract accepts a coherent next version without code changes", () =>
   next.warehouses.forEach((warehouse) => {
     warehouse.code = warehouse.code.replace(/^YS7-/u, "YS8-");
   });
-  next.customerTrial133.configRevision =
-    "yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1";
-  next.customerTrial133.configProductVersion =
-    "customer-trial-133-test-2026.10.01-v8";
-  next.customerTrial133.previousConfigRevision =
-    "yoyoosun-customer-trial-133-package-v9.runtime-manifest-v1";
-  next.customerTrial133.previousConfigProductVersion =
-    "customer-trial-133-test-2026.09.16-v7";
-  next.customerTrial133.previousDatasetVersion = "2026.09.16-v7";
 
   assert.equal(validateManualAcceptanceCoreContract(next), next);
   assert.equal(
@@ -84,14 +65,7 @@ test("core contract accepts a coherent next version without code changes", () =>
   next.dataVersion = "2026.09.16-v8";
   next.runId = "20260916-V8";
   next.anchorDateUtc = "2026-09-16T12:00:00.000Z";
-  next.customerTrial133.configProductVersion =
-    "customer-trial-133-test-2026.09.16-v8";
-  next.customerTrial133.configRevision =
-    "yoyoosun-customer-trial-133-package-v12.runtime-manifest-v1";
   assert.equal(validateManualAcceptanceCoreContract(next), next);
-  next.customerTrial133.previousDatasetVersion = "2026.08.15-v6";
-  next.customerTrial133.previousConfigProductVersion =
-    "customer-trial-133-test-2026.08.15-v6";
   assert.equal(validateManualAcceptanceCoreContract(next), next);
   next.runId = "20261001-V7";
   assert.throws(

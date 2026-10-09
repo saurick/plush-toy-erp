@@ -1,3 +1,4 @@
+import { normalizeDevQualityGateGovernance, normalizeDevQualityGateGaps } from "../../web/src/dev-workbench/config/devQualityGates.mjs";
 import assert from "node:assert/strict";
 import path from "node:path";
 import test from "node:test";
@@ -112,7 +113,8 @@ test("gap analysis distinguishes current proof, stale result and release or UAT 
     risk: "all",
     root,
   });
-  assert.equal(analysis.schemaVersion, "plush.quality-gate-gap-analysis/v2");
+  assert.equal(analysis.kind, "plush.quality-gate-gap-analysis");
+  assert.deepEqual(normalizeDevQualityGateGaps(analysis), analysis);
   assert(analysis.affectedScopes.includes("T5"));
   assert.equal(analysis.maxAffectedScope, "T5");
   assert.equal(analysis.localGate, "focused");
@@ -184,6 +186,7 @@ test("governance defaults to gates related to the current change", () => {
     q: "",
     root,
   });
+  assert.deepEqual(normalizeDevQualityGateGovernance(governance), governance);
   assert(governance.rows.some((row) => row.key === "browser-experience"));
   assert(governance.rows.some((row) => row.key === "full"));
   assert(governance.rows.every((row) => row.sources.length > 0));

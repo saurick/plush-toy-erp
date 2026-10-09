@@ -503,20 +503,19 @@ function uniqueSorted(values) {
   return [...new Set(values.filter(Boolean))].sort();
 }
 
-function packageRevision(config) {
-  return `${config.packageKey}.runtime-manifest-v1`;
-}
-
-function localTestApplyRevision(config, manifest) {
-  const fingerprintSource = {
-    ...manifest,
-    revision: "",
-  };
+// Revision identifies immutable content. Object key order is not configuration;
+// array order is retained because projections and work-pool ordering can matter.
+export function customerConfigRevision(manifest, namespace) {
+  const stable = (value) => Array.isArray(value)
+    ? value.map(stable)
+    : value && typeof value === "object"
+      ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]))
+      : value;
   const fingerprint = createHash("sha256")
-    .update(JSON.stringify(fingerprintSource))
+    .update(JSON.stringify(stable({ ...manifest, revision: "" })))
     .digest("hex")
-    .slice(0, 16);
-  return `${config.packageKey}.local-${fingerprint}.runtime-v1`;
+    .slice(0, 24);
+  return `${namespace}.${fingerprint}`;
 }
 
 function moduleStateOverridesFromPackage(config, catalog) {
@@ -1038,7 +1037,7 @@ function createManifestProjection(
     runtime_enabled: publishable,
     publishable,
     customer_key: config.customerKey,
-    revision: packageRevision(config),
+    revision: "",
     product_version: productVersion,
     compiled_snapshot: compiledSnapshotFromPackage(
       config,
@@ -1060,6 +1059,7 @@ function createManifestProjection(
 
 function buildManifestProjection(config, catalog, { publishable }) {
   const manifest = createManifestProjection(config, catalog, { publishable });
+  manifest.revision = customerConfigRevision(manifest, `${config.customerKey}-config`);
   validateRuntimeManifest(manifest, { publishable, purpose: "formal" });
   return manifest;
 }
@@ -1103,7 +1103,7 @@ function buildLocalTestApplyRuntimeManifest(
     productVersion: LOCAL_TEST_PRODUCT_VERSION,
     applyPurpose: LOCAL_TEST_APPLY_PURPOSE,
   });
-  manifest.revision = localTestApplyRevision(config, manifest);
+  manifest.revision = customerConfigRevision(manifest, `${config.customerKey}-local-config`);
   validateRuntimeManifest(manifest, {
     publishable: true,
     purpose: LOCAL_TEST_APPLY_PURPOSE,
@@ -1328,8 +1328,9 @@ function assertNoLegacyRuntimeGraphMetadata(
 
 function validateRuntimeManifest(
   manifest,
-  { publishable = true, purpose = "formal" } = {},
+  { publishable = true, purpose = "formal", publishedRevision = false } = {},
 ) {
+  assert(typeof publishedRevision === "boolean", "publishedRevision must be a boolean");
   assert(
     purpose === "formal" || purpose === LOCAL_TEST_APPLY_PURPOSE,
     "runtime manifest validation purpose is unsupported",
@@ -1351,21 +1352,12 @@ function validateRuntimeManifest(
   );
   assert(typeof manifest.customer_key === "string" && manifest.customer_key.trim() !== "", "customer_key must be set");
   assert(typeof manifest.revision === "string" && manifest.revision.trim() !== "", "revision must be set");
-  const formalRevisionPattern =
-    /^[a-z0-9]+(?:-[a-z0-9]+)*-package-v[1-9][0-9]*\.runtime-manifest-v1$/u;
-  const localTestRevisionPattern =
-    /^[a-z0-9]+(?:-[a-z0-9]+)*-package-v[1-9][0-9]*\.local-[a-f0-9]{16}\.runtime-v1$/u;
+  const revisionNamespace = `${manifest.customer_key}-${purpose === LOCAL_TEST_APPLY_PURPOSE ? "local-config" : "config"}`;
   assert(
     manifest.revision.length <= 64,
     "revision must fit the customer_config_revisions schema limit",
   );
-  assert(
-    manifest.revision.startsWith(`${manifest.customer_key}-`) &&
-      (purpose === LOCAL_TEST_APPLY_PURPOSE
-        ? localTestRevisionPattern.test(manifest.revision)
-        : formalRevisionPattern.test(manifest.revision)),
-    "revision must be namespaced by customer_key and derive from the expected versioned package identity",
-  );
+
   assert(
     manifest.product_version ===
       (purpose === LOCAL_TEST_APPLY_PURPOSE
@@ -1553,6 +1545,18 @@ function validateRuntimeManifest(
   }
   assertNoForbiddenKeys(manifest);
   assertNoLegacyRuntimeGraphMetadata(manifest);
+  // A transition must retain the frozen identity. Its saved manifest digest and
+  // the backend's stored hash/status/CAS checks prove the already-published record.
+  assert(
+    publishedRevision
+      ? isCustomerConfigRevision(manifest.revision) && manifest.revision.startsWith(`${manifest.customer_key}-`)
+      : manifest.revision === customerConfigRevision(manifest, revisionNamespace),
+    "revision must be namespaced by customer_key and derive from the complete manifest content",
+  );
+}
+
+export function isCustomerConfigRevision(value) {
+  return typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/u.test(value);
 }
 
 function writeManifest(outPath, manifest) {

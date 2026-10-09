@@ -18,6 +18,8 @@ import {
   manualAcceptanceDatasetApplyReportPath,
 } from "./manual-acceptance-dataset.mjs";
 import {
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
   CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
@@ -258,9 +260,9 @@ function runtimeContract(targetAlias) {
   return Object.freeze({
     customerKey: CUSTOMER_KEY,
     configRevision:
-      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision,
+      CUSTOMER_TRIAL_133_CONFIG_REVISION,
     configProductVersion:
-      MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion,
+      CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
     configApplyPurpose: "customer_trial_test_apply",
     configDatasetVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     configTarget: CUSTOMER_TRIAL_133_TARGET,

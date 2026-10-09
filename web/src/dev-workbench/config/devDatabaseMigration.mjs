@@ -153,7 +153,7 @@ function validateRuntime(runtime) {
 function validateToolReadiness(tools) {
   assertObject(tools, '迁移准备环境')
   if (
-    tools.schemaVersion !== 'plush.dev-database-migration-tools/v1' ||
+    tools.kind !== 'plush.dev-database-migration-tools' ||
     !['ready', 'blocked'].includes(tools.status) ||
     !Array.isArray(tools.checks) ||
     tools.checks.length < 1 ||
@@ -188,7 +188,7 @@ function validateToolReadiness(tools) {
 export function validateDatabaseMigrationSummary(summary) {
   assertObject(summary, '数据库迁移摘要')
   if (
-    summary.schemaVersion !== 'plush.dev-database-migration-summary/v1' ||
+    summary.kind !== 'plush.dev-database-migration-summary' ||
     !['success', 'blocked'].includes(summary.status) ||
     (Object.hasOwn(summary, 'readOnly') &&
       typeof summary.readOnly !== 'boolean') ||
@@ -229,7 +229,7 @@ export function validateDatabaseMigrationSummary(summary) {
 function validateSession(session) {
   assertObject(session, '数据库迁移会话')
   if (
-    session.schemaVersion !== 'plush.dev-database-migration-session/v1' ||
+    session.kind !== 'plush.dev-database-migration-session' ||
     session.target !== 'shared-dev' ||
     typeof session.csrfToken !== 'string' ||
     session.csrfToken.length < 20

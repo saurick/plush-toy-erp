@@ -113,7 +113,7 @@ test('read-only release status does not claim unread versions or pipeline eviden
 
 function summaryFixture() {
   return {
-    schemaVersion: 'plush.dev-delivery-summary/v1',
+    kind: 'plush.dev-delivery-summary',
     status: 'success',
     generatedAt: '2026-07-29T01:00:00.000Z',
     releaseVersionPolicy: {
@@ -674,7 +674,7 @@ test('delivery client reuses one CSRF session and posts only the fixed action en
       requests.push({ url, options })
       if (url === DEV_DELIVERY_SESSION_API_PATH) {
         return response({
-          schemaVersion: 'plush.dev-delivery-session/v1',
+          kind: 'plush.dev-delivery-session',
           csrfToken: 'c'.repeat(43),
           target: 'demo-133',
           targets: ['demo-133', 'customer-test-133'],
@@ -685,12 +685,12 @@ test('delivery client reuses one CSRF session and posts only the fixed action en
       }
       if (url.startsWith(DEV_DELIVERY_OPERATION_API_PREFIX)) {
         return response({
-          schemaVersion: 'plush.dev-delivery-operation-result/v1',
+          kind: 'plush.dev-delivery-operation-result',
           operation: summaryFixture().operations[0],
         })
       }
       return response({
-        schemaVersion: 'plush.dev-delivery-action-result/v1',
+        kind: 'plush.dev-delivery-action-result',
         action: 'dispatch-release',
       })
     },

@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
-import { buildLocalTestApplyRuntimeManifest } from "./customer-config-runtime-manifest.mjs";
+import {
+  buildLocalTestApplyRuntimeManifest,
+  buildRuntimePreviewManifest,
+  customerConfigRevision,
+} from "./customer-config-runtime-manifest.mjs";
 
 import {
   LONG_LIVED_DATABASE_NAMES,
@@ -35,8 +39,8 @@ export const CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION =
   MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion;
 export const CURRENT_MANUAL_ACCEPTANCE_RUN_ID =
   MANUAL_ACCEPTANCE_CORE_CONTRACT.runId;
-// Local acceptance follows the content-addressed tracked package. Remote
-// acceptance remains pinned to its separately registered deployment identity.
+// Both targets derive immutable revisions from their complete tracked payload;
+// placement and dataset markers remain part of the remote configuration identity.
 const localConfigManifest = buildLocalTestApplyRuntimeManifest(
   yoyoosunCustomerPackage,
 );
@@ -49,11 +53,24 @@ export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE =
 export const CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION =
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
 export const CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION =
-  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configProductVersion;
-export const CUSTOMER_TRIAL_133_CONFIG_REVISION =
-  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision;
+  `${CUSTOMER_TRIAL_133_TARGET}-test-${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}`;
 export const CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE =
   "customer_trial_test_apply";
+export function buildCustomerTrial133ConfigManifest() {
+  const manifest = buildRuntimePreviewManifest(yoyoosunCustomerPackage);
+  manifest.manifest_status = "runtime_compile_ready";
+  manifest.runtime_enabled = true;
+  manifest.publishable = true;
+  manifest.product_version = CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION;
+  Object.assign(manifest.compiled_snapshot, {
+    applyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+    datasetVersion: CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+    target: CUSTOMER_TRIAL_133_TARGET,
+  });
+  manifest.revision = customerConfigRevision(manifest, `yoyoosun-${CUSTOMER_TRIAL_133_TARGET}`);
+  return manifest;
+}
+export const CUSTOMER_TRIAL_133_CONFIG_REVISION = buildCustomerTrial133ConfigManifest().revision;
 export const MANUAL_ACCEPTANCE_DATASET_KEY =
   MANUAL_ACCEPTANCE_CORE_CONTRACT.datasetKey;
 

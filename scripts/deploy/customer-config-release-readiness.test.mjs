@@ -1265,7 +1265,7 @@ test("require-rollback 拒绝 effective session revision 不匹配", async () =>
   }
 });
 
-test("接受已回滚报告", async () => {
+test("接受冻结旧配置的已回滚报告并保持原身份", async () => {
   const { root, manifest, evidenceDir } = await setupReadyRoot();
   try {
     const reportPath = await writeReleaseReport(
@@ -1289,6 +1289,24 @@ test("接受已回滚报告", async () => {
         },
       }),
     );
+    const originalHash = manifestSha256(root, manifest);
+    const frozenRevision = "yoyoosun-customer-package-v7.runtime-manifest-v1";
+    const files = fs.readdirSync(root, {recursive: true})
+      .filter((name) => name.endsWith(".json"))
+      .map((name) => path.join(root, name));
+    for (const file of files) {
+      fs.writeFileSync(file, fs.readFileSync(file, "utf8").replaceAll(releaseReadyYoyoosunRevision, frozenRevision));
+    }
+    const frozenHash = manifestSha256(root, manifest);
+    for (const file of files) {
+      if (file === path.join(root, manifest)) continue;
+      fs.writeFileSync(file, fs.readFileSync(file, "utf8").replaceAll(originalHash, frozenHash));
+    }
+    const readback = await buildCustomerConfigReadbackPreflightReport({
+      customer: "yoyoosun", deploymentTarget: "demo-133", manifest, evidenceDir, releaseReport: reportPath,
+    }, {repoRoot: root});
+    assert.equal(readback.manifest.valid, true);
+    assert.deepEqual(readback.blockers, []);
     const result = await validateCustomerConfigReleaseReadiness(
       {
         manifest,

@@ -7,8 +7,8 @@ export const DEV_TESTING_OPERATION_PLAN_API_PATH = `${DEV_TESTING_OPERATION_API_
 export const DEV_TESTING_OPERATION_ACTION_API_PATH = `${DEV_TESTING_OPERATION_API_PATH}/actions`
 export const DEV_TESTING_OPERATION_API_PREFIX = `${DEV_TESTING_OPERATION_API_PATH}/operations`
 export const DEV_PRESSURE_REPORTS_API_PATH = `${DEV_TESTING_OPERATION_API_PATH}/pressure-reports`
-export const DEV_TESTING_OPERATION_SCHEMA =
-  'plush.dev-qa-testing-operation-public/v1'
+export const DEV_TESTING_OPERATION_KIND =
+  'plush.dev-qa-testing-operation-public'
 
 export const DEV_TESTING_FIXED_ACTIONS = Object.freeze([
   Object.freeze({
@@ -251,7 +251,7 @@ export function normalizeDevTestingOperation(operation) {
       'outcome',
       'repository',
       'revision',
-      'schemaVersion',
+      'kind',
       'stage',
       'status',
       'updatedAt',
@@ -259,7 +259,7 @@ export function normalizeDevTestingOperation(operation) {
     'testing operation'
   )
   if (
-    operation.schemaVersion !== DEV_TESTING_OPERATION_SCHEMA ||
+    operation.kind !== DEV_TESTING_OPERATION_KIND ||
     !UUID_PATTERN.test(operation.id) ||
     !ACTION_KEYS.includes(operation.action) ||
     !Object.hasOwn(STATUS_META, operation.status) ||
@@ -376,15 +376,15 @@ function normalizeGitHookGovernance(hooks) {
 export function normalizeDevTestingSummary(summary) {
   assertExactKeys(
     summary,
-    ['busy', 'hooks', 'operations', 'schemaVersion'],
+    ['busy', 'hooks', 'operations', 'kind'],
     'testing summary'
   )
-  if (summary.schemaVersion !== 'plush.dev-qa-testing-summary/v2') {
+  if (summary.kind !== 'plush.dev-qa-testing-summary') {
     throw new Error('testing summary is invalid')
   }
   assertExactKeys(summary.operations, ACTION_KEYS, 'testing operations')
   return {
-    schemaVersion: summary.schemaVersion,
+    kind: summary.kind,
     busy: normalizeBusy(summary.busy),
     hooks: normalizeGitHookGovernance(summary.hooks),
     operations: Object.fromEntries(
@@ -453,12 +453,12 @@ export function normalizeDevTestingPlan(plan) {
       'maxAffectedScope',
       'prePushGate',
       'repository',
-      'schemaVersion',
+      'kind',
     ],
     'testing plan'
   )
   if (
-    plan.schemaVersion !== 'plush.dev-qa-testing-plan/v2' ||
+    plan.kind !== 'plush.dev-qa-testing-plan' ||
     !isIsoDate(plan.generatedAt) ||
     !Number.isSafeInteger(plan.changedCount) ||
     plan.changedCount < 0 ||
@@ -550,11 +550,11 @@ export function createDevTestingOperationClient({
     const payload = await readJsonResponse(response)
     assertExactKeys(
       payload,
-      ['apiPath', 'csrfToken', 'schemaVersion'],
+      ['apiPath', 'csrfToken', 'kind'],
       'testing session'
     )
     if (
-      payload.schemaVersion !== 'plush.dev-qa-testing-session/v1' ||
+      payload.kind !== 'plush.dev-qa-testing-session' ||
       payload.apiPath !== DEV_TESTING_OPERATION_API_PATH ||
       typeof payload.csrfToken !== 'string' ||
       payload.csrfToken.length < 32 ||
@@ -614,11 +614,11 @@ export function createDevTestingOperationClient({
       const payload = await readJsonResponse(response)
       assertExactKeys(
         payload,
-        ['action', 'operation', 'reused', 'schemaVersion'],
+        ['action', 'operation', 'reused', 'kind'],
         'testing action result'
       )
       if (
-        payload.schemaVersion !== 'plush.dev-qa-testing-action-result/v1' ||
+        payload.kind !== 'plush.dev-qa-testing-action-result' ||
         payload.action !== action ||
         typeof payload.reused !== 'boolean'
       ) {
@@ -644,11 +644,11 @@ export function createDevTestingOperationClient({
       const payload = await readJsonResponse(response)
       assertExactKeys(
         payload,
-        ['operation', 'schemaVersion'],
+        ['operation', 'kind'],
         'testing operation result'
       )
       if (
-        payload.schemaVersion !== 'plush.dev-qa-testing-operation-result/v1'
+        payload.kind !== 'plush.dev-qa-testing-operation-result'
       ) {
         throw requestError()
       }

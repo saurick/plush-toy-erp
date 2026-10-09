@@ -35,7 +35,7 @@
   - 打印默认值只覆盖采购合同、加工合同的买方 / 委托方抬头，供应商 / 加工方和明细继续来自业务快照。
   - Dry Run 不写数据库；本地测试应用只写共享开发库的客户配置控制面，并要求管理员显式确认。正式发布仍需 release readiness，rollback 只回滚配置 revision，不回滚业务数据或数据库备份。
 
-- `releasePackage.mjs`：显式评审后的正式 manifest 输入，只把同一受控包切换为 `release_ready / runtimeEnabled / publishEnabled`，并关闭本地测试应用标记。raw 包仍保持草案，正式编译只从该独立登记入口读取；修改可发布内容（包括编译器生成的快照结构与目录元数据）后必须先递增 `packageKey`，避免复用已发布 revision。已发布版本及其快照保持不变，不用当前编译器重建后覆盖旧版本。
+- `releasePackage.mjs`：显式评审后的正式 manifest 输入，只把同一受控包切换为 `release_ready / runtimeEnabled / publishEnabled`，并关闭本地测试应用标记。raw 包仍保持草案，正式编译只从该独立登记入口读取；`packageKey` 保持稳定；修改可发布内容（包括编译器生成的快照结构与目录元数据）后，编译器从完整内容自动生成新 revision，无需人工递增包名。已发布版本及其快照保持不变，不用当前编译器重建后覆盖旧版本。
 
 未来可继续放：
 

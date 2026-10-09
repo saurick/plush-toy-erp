@@ -905,7 +905,8 @@ async function loadAndValidateInputs(options, repoRoot) {
 
   const manifestPath = path.resolve(repoRoot, options.manifest);
   const manifest = await readJson(manifestPath);
-  validateRuntimeManifest(manifest);
+  const publishedRevision = Boolean(options.rollback || options.activateOnly);
+  validateRuntimeManifest(manifest, { publishedRevision });
   if (manifest.customer_key !== options.customer) {
     throw new CliError(
       `manifest customer_key ${manifest.customer_key} does not match ${options.customer}`,
@@ -915,6 +916,7 @@ async function loadAndValidateInputs(options, repoRoot) {
   let activationGate = null;
   if (options.evidenceDir) {
     activationGate = validateCustomerConfigActivationGate({
+      publishedRevision,
       customer: options.customer,
       deploymentTarget: options.deploymentTarget,
       manifest: options.manifest,

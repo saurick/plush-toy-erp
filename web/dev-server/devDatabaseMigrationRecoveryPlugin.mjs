@@ -4,7 +4,7 @@ import {
   DEV_DATABASE_MIGRATION_RECOVERY_ROUTE,
   DEV_RUNTIME_RECOVERY_HEADER,
   DEV_RUNTIME_STATUS_API_PATH,
-  DEV_RUNTIME_STATUS_SCHEMA,
+  DEV_RUNTIME_STATUS_KIND,
   normalizeDevRuntimeRecoveryMode,
 } from '../src/dev-workbench/config/devRuntimeRecovery.mjs'
 import {
@@ -146,7 +146,7 @@ export function createDevDatabaseMigrationRecoveryController({
             response.statusCode = 200
             response.end(
               JSON.stringify({
-                schemaVersion: DEV_RUNTIME_STATUS_SCHEMA,
+                kind: DEV_RUNTIME_STATUS_KIND,
                 status: active ? 'blocked' : 'ready',
               })
             )

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"server/internal/manualacceptance"
+	"strings"
 	"time"
 )
 
@@ -32,7 +33,7 @@ const (
 var (
 	manualAcceptanceContract                = manualacceptance.Current()
 	CustomerConfigTrialDatasetVersion       = manualAcceptanceContract.DataVersion
-	CustomerConfigTrialProductVersion       = manualAcceptanceContract.CustomerTrial133.ConfigProductVersion
+	CustomerConfigTrialProductVersion       = manualAcceptanceContract.CustomerTrial133.Target + "-test-" + manualAcceptanceContract.DataVersion
 	ErrCustomerConfigNotFound               = errors.New("customer config not found")
 	ErrCustomerConfigRevisionImmutable      = errors.New("customer config revision is immutable")
 	ErrCustomerConfigHashMismatch           = errors.New("customer config hash mismatch")
@@ -262,6 +263,17 @@ func NewCustomerConfigUsecaseForWire(
 	adminDirectory AdminDirectoryReader,
 ) *CustomerConfigUsecase {
 	return &CustomerConfigUsecase{repo: repo, adminDirectory: adminDirectory}
+}
+
+// GetCustomerConfigRevision reads a frozen record for runtime boundary checks;
+// it does not authorize a transition or reinterpret it as a new publication.
+func (uc *CustomerConfigUsecase) GetCustomerConfigRevision(ctx context.Context, customerKey, revision string) (*CustomerConfigRevision, error) {
+	customerKey = NormalizeCustomerKey(customerKey)
+	revision = strings.TrimSpace(revision)
+	if uc == nil || uc.repo == nil || customerKey == "" || revision == "" || len(revision) > 64 {
+		return nil, ErrBadParam
+	}
+	return uc.repo.GetCustomerConfigRevision(ctx, customerKey, revision)
 }
 
 func (uc *CustomerConfigUsecase) ValidateCustomerConfig(_ context.Context, in CustomerConfigPublishInput) (*CustomerConfigValidationResult, error) {

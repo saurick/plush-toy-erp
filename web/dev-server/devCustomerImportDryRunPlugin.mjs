@@ -643,7 +643,7 @@ export function createDevCustomerConfigMiddleware({
         requestURL.pathname === SESSION_API_PATH
       ) {
         sendJson(response, 200, {
-          schemaVersion: 'plush.dev-customer-config-session/v1',
+          kind: 'plush.dev-customer-config-session',
           csrfToken,
           apiPrefix: CUSTOMER_CONFIG_API_PREFIX,
         })

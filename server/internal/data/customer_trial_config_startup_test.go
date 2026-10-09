@@ -80,8 +80,8 @@ func TestValidateActiveCustomerTrialConfigRequiresExactRuntimeOptIn(t *testing.T
 		productVersion string
 		datasetVersion string
 	}{
-		{customertrialconfig.Revision, customertrialconfig.ProductVersion, customertrialconfig.DatasetVersion},
-		{customertrialconfig.PreviousActiveRevision, customertrialconfig.PreviousActiveProductVersion, customertrialconfig.PreviousActiveDatasetVersion},
+		{"yoyoosun-customer-trial-133.0123456789abcdef01234567", customertrialconfig.ProductVersion, customertrialconfig.DatasetVersion},
+		{"yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1", "customer-trial-133-test-2026.09.27-v8", "2026.09.27-v8"},
 	} {
 		t.Run(identity.revision, func(t *testing.T) {
 			db, mock := expectActiveCustomerConfigVersion(t, identity.revision, identity.productVersion, map[string]string{
@@ -101,7 +101,7 @@ func TestValidateActiveCustomerTrialConfigRequiresExactRuntimeOptIn(t *testing.T
 }
 
 func TestValidateActiveCustomerTrialConfigAllowsExactEnabledRuntime(t *testing.T) {
-	db, mock := expectActiveCustomerConfigVersion(t, customertrialconfig.Revision, customertrialconfig.ProductVersion, map[string]string{
+	db, mock := expectActiveCustomerConfigVersion(t, "yoyoosun-customer-trial-133.0123456789abcdef01234567", customertrialconfig.ProductVersion, map[string]string{
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": customertrialconfig.DatasetVersion,
 		"target":         customertrialconfig.ExpectedTarget,
@@ -116,9 +116,9 @@ func TestValidateActiveCustomerTrialConfigAllowsExactEnabledRuntime(t *testing.T
 }
 
 func TestValidateActiveCustomerTrialConfigAllowsExactPreviousIdentityDuringV8Activation(t *testing.T) {
-	db, mock := expectActiveCustomerConfigVersion(t, customertrialconfig.PreviousActiveRevision, customertrialconfig.PreviousActiveProductVersion, map[string]string{
+	db, mock := expectActiveCustomerConfigVersion(t, "yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1", "customer-trial-133-test-2026.09.27-v8", map[string]string{
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
-		"datasetVersion": customertrialconfig.PreviousActiveDatasetVersion,
+		"datasetVersion": "2026.09.27-v8",
 		"target":         customertrialconfig.ExpectedTarget,
 	}, "plush_erp_demo_v1", "trial-system", nil)
 	defer func() { _ = db.Close() }()
@@ -130,15 +130,15 @@ func TestValidateActiveCustomerTrialConfigAllowsExactPreviousIdentityDuringV8Act
 	}
 }
 
-func TestValidateActiveCustomerTrialConfigRejectsReservedVersionDrift(t *testing.T) {
+func TestValidateActiveCustomerTrialConfigRejectsProductDatasetMismatch(t *testing.T) {
 	db, mock := expectActiveCustomerConfigVersion(t, "old-trial-revision", "customer-trial-133-test-2026.07.15-v1", map[string]string{
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
-		"datasetVersion": "2026.07.15-v1",
+		"datasetVersion": "2026.07.15-v2",
 		"target":         customertrialconfig.ExpectedTarget,
 	}, "plush_erp_demo_v1", "trial-system", nil)
 	defer func() { _ = db.Close() }()
 	if err := validateActiveCustomerTrialConfig(context.Background(), db, true, ""); err == nil {
-		t.Fatal("expected reserved customer-trial version drift to be rejected")
+		t.Fatal("expected inconsistent product and dataset identity to be rejected")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)

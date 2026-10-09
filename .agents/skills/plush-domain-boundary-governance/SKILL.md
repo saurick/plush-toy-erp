@@ -34,9 +34,11 @@ description: 领域设计与生成（plush-toy-erp），不执行目标库迁移
 2. 找到 source-of-truth fields、states、identifiers、permissions、derived values。
 3. 检查现有 table/usecase/API/helper 是否已经拥有该行为。
    涉及版本字段或模块版号时，按[版本边界](../../../docs/engineering/跨层公共契约与生成规范.md#版本边界--version-boundaries)核对独立读写需求及存量消费者，再决定删除、复用现有身份或保留必要格式版本。
+   配置启动失败时先区分运行边界错误与人工版号漂移，不用递增包名或维护“当前 / 上一版”白名单解堵。配置内容身份复用现有内容 revision 生成器；同次构建的临时响应同步生产者、消费者和结构校验。新增或保留格式版本须说明真实跨发布读写者及不兼容差异；已有持久化字段不自动产生保留理由。
 4. 按字段影响检查 defaults、edits、source switch/clear 和相关 list/detail/print/export/search；旧实验不构成兼容对象，已落库残留按正式 migration 清理。
 5. UI 不补造 backend facts；客户/模板特例不污染 generic core。
 6. 按影响面选择 unit、integration、contract、browser、migration validation。
+   版本治理至少运行现有命名门禁及相关回归：内容变化 / 不变、跨配置启动、冻结身份的回滚 / 完成检查 / 密码轮换、错误环境和标记拒绝。沿生产者、消费者及回执链复查，区分落盘原件与同次构建的展示投影；新写入校验不能误用于历史读取。涉及冻结快照、哈希、回执或 Schema 的删除时，补齐存量转换与回放证据，不用放宽测试代替治理。
 
 客户配置任务若进入 validate / publish / transition check / activate / readback、目标环境 migration 或 rollback，由本 skill 先确认 Product Core 与字段真源，再切 `$plush-operations-governance` 执行运行态步骤；不要另造页面私有配置真源或直接改库。
 

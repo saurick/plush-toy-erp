@@ -11,7 +11,7 @@ import { ENGINEERING_VERIFICATION_FILES } from '../../scripts/qa/pressure-engine
 import { LOAD_LOGIC_FILES } from '../../scripts/qa/engineering-pressure.mjs'
 import { pressureLogicFingerprint } from '../../scripts/qa/pressure-runtime.mjs'
 
-export const DEV_PRESSURE_REPORT_SCHEMA = 'plush.dev-pressure-reports/v1'
+export const DEV_PRESSURE_REPORT_KIND = 'plush.dev-pressure-reports'
 export const PRESSURE_REPORT_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/u
 const HASH = /^[0-9a-f]{64}$/u
 const COMMIT = /^[0-9a-f]{40,64}$/u
@@ -431,7 +431,7 @@ export function readDevPressureReports(
     { throw new Error('pressure report id is invalid') }
   const directory = reportRoot(path.resolve(root))
   const empty = {
-    schemaVersion: DEV_PRESSURE_REPORT_SCHEMA,
+    kind: DEV_PRESSURE_REPORT_KIND,
     reports: [],
     report: null,
     progress: null,

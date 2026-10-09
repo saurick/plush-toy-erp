@@ -15,6 +15,7 @@ import {
   LOCAL_TEST_APPLY_PURPOSE,
   RUNTIME_PAGE_KEYS,
   buildLocalTestApplyRuntimeManifest,
+  customerConfigRevision,
   buildRuntimeManifest as compileRuntimeManifest,
   buildRuntimePreviewManifest,
   runCustomerConfigRuntimeManifest,
@@ -26,6 +27,30 @@ const runtimeManifestSource = readFileSync(
   new URL("./customer-config-runtime-manifest.mjs", import.meta.url),
   "utf8",
 );
+
+test("configuration revisions follow content, not package counters or object key order", () => {
+  for (const config of [yoyoosunReleasePackage, demoCustomerPackage, referenceCustomerPackage]) {
+    const manifest = buildRuntimeManifest(config);
+    const namespace = `${config.customerKey}-config`;
+    assert.equal(buildRuntimeManifest(config).revision, manifest.revision);
+    assert.equal(customerConfigRevision(manifest, namespace), manifest.revision);
+    assert.ok(manifest.revision.length <= 64);
+    const reordered = (value) => Array.isArray(value)
+      ? value.map(reordered)
+      : value && typeof value === "object"
+        ? Object.fromEntries(Object.entries(value).reverse().map(([key, item]) => [key, reordered(item)]))
+        : value;
+    assert.equal(customerConfigRevision(reordered(manifest), namespace), manifest.revision);
+    assert.notEqual(customerConfigRevision(manifest, `${config.customerKey}-local-config`), manifest.revision);
+
+    const changed = structuredClone(manifest);
+    changed.module_states[0].reason = "reviewed configuration content";
+    assert.notEqual(customerConfigRevision(changed, namespace), manifest.revision);
+    assert.throws(() => validateRuntimeManifest(changed), /complete manifest content/u);
+    changed.revision = customerConfigRevision(changed, namespace);
+    validateRuntimeManifest(changed);
+  }
+});
 
 function releaseReadyPackage(config) {
   return {
@@ -129,7 +154,7 @@ test("customer-config-runtime-manifest: formal CLI uses only the registered yoyo
     out: "",
   });
   assert.equal(result.manifest.publishable, true);
-  assert.equal(result.manifest.revision, "yoyoosun-customer-package-v8.runtime-manifest-v1");
+  assert.equal(result.manifest.revision, customerConfigRevision(result.manifest, "yoyoosun-config"));
 
   assert.throws(
     () =>
@@ -171,7 +196,7 @@ test("customer-config-runtime-manifest: local test apply is content-addressed an
   assert.equal(first.compiled_snapshot.package.publishEnabled, false);
   assert.match(
     first.revision,
-    /^yoyoosun-customer-package-v8\.local-[a-f0-9]{16}\.runtime-v1$/u,
+    /^yoyoosun-local-config\.[a-f0-9]{24}$/u,
   );
   assert.equal(second.revision, first.revision);
   assert(first.revision.length <= 64);
@@ -211,7 +236,7 @@ test("customer-config-runtime-manifest: formal payload publishes versions and se
   assert.equal(manifest.customer_key, "yoyoosun");
   assert.equal(
     manifest.revision,
-    "yoyoosun-customer-package-v8.runtime-manifest-v1",
+    customerConfigRevision(manifest, "yoyoosun-config"),
   );
   assert.equal(manifest.product_version, "local-customer-package");
   assert.equal(manifest.compiled_snapshot.package.status, "release_ready");
@@ -346,10 +371,12 @@ test("customer-config-runtime-manifest: accepts registered subsets and rejects u
 
   const missing = structuredClone(manifest);
   missing.compiled_snapshot.runtimeProcessSelections.pop();
+  missing.revision = customerConfigRevision(missing, "yoyoosun-config");
   validateRuntimeManifest(missing);
 
   const selectionFree = structuredClone(manifest);
   selectionFree.compiled_snapshot.runtimeProcessSelections = [];
+  selectionFree.revision = customerConfigRevision(selectionFree, "yoyoosun-config");
   validateRuntimeManifest(selectionFree);
 });
 
@@ -918,4 +945,15 @@ test("customer-config-runtime-manifest: multi-customer preview output is rejecte
       }),
     /--out only supports one customer runtime manifest/,
   );
+});
+
+
+test("published transitions preserve frozen revision without weakening new publications or shape checks", () => {
+  const frozen = {...buildRuntimeManifest(), revision: "yoyoosun-customer-package-v7.runtime-manifest-v1"};
+  const original = JSON.stringify(frozen);
+  validateRuntimeManifest(frozen, {publishedRevision: true});
+  assert.equal(JSON.stringify(frozen), original);
+  assert.throws(() => validateRuntimeManifest(frozen), /complete manifest content/u);
+  assert.throws(() => validateRuntimeManifest({...frozen, revision: "other-customer"}, {publishedRevision: true}), /revision/u);
+  assert.throws(() => validateRuntimeManifest({...frozen, module_states: []}, {publishedRevision: true}));
 });

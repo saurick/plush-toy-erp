@@ -41,7 +41,7 @@ const NOW = '2026-08-09T08:00:00.000Z'
 
 function operation(overrides = {}) {
   return {
-    schemaVersion: 'plush.dev-quality-gate-operation-public/v1',
+    kind: 'plush.dev-quality-gate-operation-public',
     id: OPERATION_ID,
     profile: 'strict',
     repository: {
@@ -68,7 +68,7 @@ function operation(overrides = {}) {
 function summary(overrides = {}) {
   const currentOperation = operation()
   return {
-    schemaVersion: 'plush.dev-quality-gates-summary/v1',
+    kind: 'plush.dev-quality-gates-summary',
     generatedAt: NOW,
     repository: currentOperation.repository,
     environment: {
@@ -121,7 +121,7 @@ function summary(overrides = {}) {
       },
     },
     serverEvidence: {
-      schemaVersion: 'plush.dev-quality-gate-server-evidence/v5',
+      kind: 'plush.dev-quality-gate-server-evidence',
       status: 'passed',
       current: true,
       coversWorkingTree: true,
@@ -232,7 +232,7 @@ function summary(overrides = {}) {
 
 test('quality gap protocol separates affected scopes from the local gate', () => {
   const gaps = normalizeDevQualityGateGaps({
-    schemaVersion: 'plush.quality-gate-gap-analysis/v2',
+    kind: 'plush.quality-gate-gap-analysis',
     range: 'current',
     risk: 'all',
     changedCount: 1,
@@ -249,7 +249,7 @@ test('quality gap protocol separates affected scopes from the local gate', () =>
     () =>
       normalizeDevQualityGateGaps({
         ...gaps,
-        schemaVersion: 'plush.quality-gate-gap-analysis/v1',
+        kind: 'invalid-quality-gap-analysis',
       }),
     /quality gaps are invalid/u
   )
@@ -1170,7 +1170,7 @@ test('quality gates config: client uses fixed endpoints, CSRF and exact action p
         ok: true,
         async json() {
           return {
-            schemaVersion: 'plush.dev-quality-gate-session/v1',
+            kind: 'plush.dev-quality-gate-session',
             apiPath: DEV_QUALITY_GATE_API_PATH,
             csrfToken: 'c'.repeat(48),
           }
@@ -1182,7 +1182,7 @@ test('quality gates config: client uses fixed endpoints, CSRF and exact action p
         ok: true,
         async json() {
           return {
-            schemaVersion: 'plush.dev-quality-gate-action-result/v1',
+            kind: 'plush.dev-quality-gate-action-result',
             profile: 'strict',
             reused: false,
             operation: operation(),

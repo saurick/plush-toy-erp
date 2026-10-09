@@ -24,6 +24,7 @@ import {
   assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceTargetAttestation,
+  buildCustomerTrial133ConfigManifest,
   manualAcceptanceTargetConfirmation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
@@ -320,19 +321,7 @@ export function buildCustomerTrial133Manifest(
   requireExact(dataVersion, CUSTOMER_CONFIG_DATA_VERSION, "dataVersion");
   requireExact(runId, CUSTOMER_CONFIG_RUN_ID, "runId");
   assertPreviewManifest(preview);
-  const manifest = structuredClone(preview);
-  manifest.manifest_status = "runtime_compile_ready";
-  manifest.runtime_enabled = true;
-  manifest.publishable = true;
-  manifest.revision = CUSTOMER_CONFIG_REVISION;
-  manifest.product_version = CUSTOMER_CONFIG_PRODUCT_VERSION;
-  manifest.compiled_snapshot = {
-    ...manifest.compiled_snapshot,
-    applyPurpose: CUSTOMER_CONFIG_APPLY_PURPOSE,
-    datasetVersion: CUSTOMER_CONFIG_DATA_VERSION,
-    target: CUSTOMER_TRIAL_133_TARGET,
-  };
-  return manifest;
+  return buildCustomerTrial133ConfigManifest();
 }
 
 export function buildLocalManualAcceptanceManifest(preview) {

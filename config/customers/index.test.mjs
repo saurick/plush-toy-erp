@@ -40,7 +40,7 @@ test("customer package index: registered keys match package identity", () => {
       customerPackage.packageKey.startsWith(`${customerKey}-`),
       true,
     );
-    assert.match(customerPackage.packageKey, /-package-v[1-9][0-9]*$/u);
+    assert.match(customerPackage.packageKey, /-package$/u);
     assert.equal(packageKeys.has(customerPackage.packageKey), false);
     packageKeys.add(customerPackage.packageKey);
   }
