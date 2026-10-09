@@ -9,14 +9,15 @@
 - 用户在侧对话授权治理。本轮以完整 manifest 内容生成配置 revision，稳定 package / catalog key，移除手工当前 / 上一配置窗口；启动按已激活记录的目标、用途、数据配对和环境开关校验。此设计替代临时推进上一版标记的修复；旧已发布快照及 V8 业务数据合同保持不变。
 - DEV 临时响应改用稳定类型，落盘 operation / 发布回执保持原合同；领域 Skill、版本边界文档及既有命名门禁同步防复发。977 项 Node、7 个 Go 包定向检查和正式 / DEV 构建通过；精确证据见本轮交接。
 - 同日复查后补齐冻结配置的审阅证据、回滚、读回与密码轮换边界，凭据回执与实际目标 smoke 对照；新发布和登记数据合同仍保持严格校验。DEV 计划、状态、操作 / 报告投影及门禁目录去除剩余计数，守卫登记持久化格式并拒绝未登记类型。修复后的定向回归、再次审查及既存 lint 差异见 ignored `output/version-governance-followup-20261009/`。
-- 本轮只完成本地实现与验证，未执行数据库 apply、配置激活、推送或部署。精确文件归属、继承改动与验证见 ignored `output/version-governance-20261009/`；父任务部署现场另行保留。
+- 原治理会话只完成本地实现与验证，精确归属与验证见 ignored `output/version-governance-20261009/`；代码已纳入下述固定版本发布，目标部署以新回执为准。
 
-### 两套环境续部署与试用配置启动阻断（2026-10-09）
+### 两套测试环境发布与本地启动恢复（2026-10-09）
 
-- 正式版本 `2026.10.09-1 / 49eb6eb8609aba4cc2f697cabf74e8c0ff3d8781` 已由 GitLab CI #286（28/28）和发布 #287 固定并发布；复用已有、不设到期日且仅含 `read_package_registry` 的 Deploy Token，未创建凭据。Mac CPU 依赖修复已另行本地提交为 `c92b2069`，未纳入该 Linux 制品。
-- `demo-133` operation `d5cc3947-02af-4ee6-9a6f-6c0fda9b2f40` 已通过目标直接取件、逐项校验、镜像载入、新鲜备份与隔离恢复、迁移 apply/readback；迁移现为 `20261006155051 / pending=0`。Compose 启动失败后正式回执为 `not_proven`，未重试、未回写终态、未执行 down migration 或恢复业务库。既有 v10 active 配置仍在，公网前端尚未切换；`customer-test-133` 尚未执行本次 promotion。
-- 只读日志与 active 配置证实根因：候选要求 v11，但上一启动身份仍是 v9/V7，实际目标为 v10/V8。原临时修复已由 `69317d5d` 的配置治理替代：revision 按 manifest 内容生成，启动校验已激活快照的目标、用途、数据配对与环境开关，不再依赖手工上一配置窗口。本轮合并重复启动用例并按当前代码复验 Go 合同、标记守卫和启动检查；模块校验通过。
-- 本次迁移前备份 `pre-migration-49eb6eb8609a-d5cc3947-02af-4ee6-9a6f-6c0fda9b2f40`（996748 bytes，SHA-256 `fd92de233b01931bc145192f5348ef4bc395938ab81e4dbc23e4af22d5261362`）已实际隔离恢复校验。因 migration 已执行，不能仅回滚旧镜像。用户本轮授权本地提交，尚未授权推送；后续固定制品 forward-fix、demo 配置读回及 test 部署待完成。现场与回执位于 ignored `output/deploy-test-20261009/`；当前不代表目标部署或客户验收已完成。
+- 用户已授权全部代码提交、推送及两目标部署。发布代码固定为 `2026.10.09-2 / eeeaec28e36b2ee9d30877f62344cd26c84623fa`，包含配置身份治理、Mac CPU 依赖修复及安全更新；[CI #291](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/291) 28/28 与 [发布 #292](https://gitlab.saurick.me/saurick/plush-toy-erp/-/pipelines/292) 均通过，七资产及源码包完成发布读回。复用既有永久 `read_package_registry` Deploy Token，未新建凭据。
+- demo 的人工 forward-fix incident `0337cdce-2bea-4105-b2c3-998ed09d9a19` 为 `passed`：新鲜备份实际隔离恢复，后端、前端、公网及 current-source 同 SHA；已执行的 migration 保持 `20261006155051 / 147 / pending=0`，未再次 apply。既有 trial v10/V8 配置保持，销售单 / 采购入库 / 出货 / 库存流水数量仍为 46/54/47/496。旧 operation `d5cc3947-02af-4ee6-9a6f-6c0fda9b2f40` 的 `not_proven` 回执与迁移前备份保留；恢复单独留痕，不回写旧终态，不能仅以旧镜像回滚已升级数据库。
+- customer-test 的正式 operation `043e42db-51b7-4a25-a28e-3bdccb8a2aa8` 为 `passed`：迁移由 `20260927100348` 升至 `20261006155051 / 147 / pending=0`，现有 customer package v7 配置保留，不 seed、不重建。部署前从实际测试库备份恢复 16 条业务记录并隔离升级，存量、配置切换、约束、权限及回滚事务审计通过；部署时另取新鲜备份并实际恢复校验。
+- 两目标完整部署后预检及 base-release smoke 各 5/5 通过，管理员登录、有效配置、产品与销售列表读取通过；demo 的管理员及 11 个试用账号均可认证，但 `uat_admin` 的有效 ERP 权限为空，业务读取仍按合同拒绝，未改权限。当前证据不代表完整岗位 / PDF 验收、真实客户导入或甲方签收。回执与历史失败保留于 ignored `output/deploy-test-20261009/`。
+- 本地后端已编译当前源码并切换，migration 147/147、health / ready / business 均通过；前端主入口 5175 与辅助入口 15200 已用仓库锁定的 Node 24.21.0 经 `pnpm start` 重启，业务及 DEV 页面 HTTP 200，运维身份缺配置错误已解除。当前使用登记共享开发库，两套测试库各自独立；未覆盖目标业务数据或激活新客户配置。
 
 ### 全链路模拟数据与统一收口（2026-10-07）
 
