@@ -276,7 +276,7 @@ test("release artifact derives migration sequence and customer source identity f
     [migrationPaths[0]]: "CREATE TABLE one(id int);\n",
     [migrationPaths[1]]: "CREATE TABLE two(id int);\n",
     "config/customers/yoyoosun/customerPackage.mjs":
-      'export const value = { customerKey: "yoyoosun", packageKey: "yoyoosun-customer-package-v9", status: "draft", runtimeEnabled: false };\n',
+      'export const value = { customerKey: "yoyoosun", packageKey: "yoyoosun-customer-package", status: "draft", runtimeEnabled: false };\n',
     "config/customers/yoyoosun/roleFlowMatrix.mjs":
       "export const roles = [];\n",
   };
@@ -294,13 +294,33 @@ test("release artifact derives migration sequence and customer source identity f
     commit,
     runCommand,
   });
-  assert.equal(config.packageKey, "yoyoosun-customer-package-v9");
-  assert.equal(
-    config.expectedRuntimeRevision,
-    "yoyoosun-customer-package-v9.runtime-manifest-v1",
-  );
+  assert.equal(config.packageKey, "yoyoosun-customer-package");
+  assert.equal(Object.hasOwn(config, "expectedRuntimeRevision"), false);
   assert.equal(config.sourceRuntimeEnabled, false);
   assert.match(config.sourceSha256, /^[a-f0-9]{64}$/u);
+});
+
+test("release customer source identity accepts the current package and rejects versioned or foreign keys", () => {
+  const packagePath = "config/customers/yoyoosun/customerPackage.mjs";
+  const rolePath = "config/customers/yoyoosun/roleFlowMatrix.mjs";
+  const files = {
+    [packagePath]: readFileSync(path.join(repoRoot, packagePath), "utf8"),
+    [rolePath]: readFileSync(path.join(repoRoot, rolePath), "utf8"),
+  };
+  const build = (source) => buildCustomerConfigEvidence({
+    repoRoot: "/fixture",
+    commit,
+    runCommand: fixtureCommand({ ...files, [packagePath]: source }),
+  });
+  const current = build(files[packagePath]);
+  assert.equal(current.packageKey, "yoyoosun-customer-package");
+  assert.equal(Object.hasOwn(current, "expectedRuntimeRevision"), false);
+  for (const packageKey of ["yoyoosun-customer-package-v9", "foreign-customer-package", "yoyoosun-customer-package-test", ""]) {
+    assert.throws(
+      () => build(`export const value = { packageKey: "${packageKey}" };`),
+      /committed customer package key is missing or invalid/u,
+    );
+  }
 });
 
 test("release artifact builds a non-empty CycloneDX dependency inventory", () => {
@@ -562,7 +582,7 @@ test("release artifact builder normalizes the source hash and writes complete ch
   const files = {
     [migrationPath]: "CREATE TABLE release_fixture(id int);\n",
     "config/customers/yoyoosun/customerPackage.mjs":
-      'export const value = { packageKey: "yoyoosun-customer-package-v9", status: "active", runtimeEnabled: true };\n',
+      'export const value = { packageKey: "yoyoosun-customer-package", status: "active", runtimeEnabled: true };\n',
     "config/customers/yoyoosun/roleFlowMatrix.mjs":
       "export const roles = [];\n",
     "server/go.sum": "example.com/module v1.2.3 h1:one\n",

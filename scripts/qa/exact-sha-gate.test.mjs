@@ -109,7 +109,7 @@ function createFixture() {
       file === "web/package.json"
         ? '{"scripts":{"test":"node --test"}}\n'
         : file.endsWith("/customerPackage.mjs")
-          ? 'export default { packageKey: "yoyoosun-customer-package-test", status: "active", runtimeEnabled: true };\n'
+          ? 'export default { packageKey: "yoyoosun-customer-package", status: "active", runtimeEnabled: true };\n'
           : `${file}\n`;
     writeFileSync(target, content, "utf8");
     if (executables.has(file)) chmodSync(target, 0o755);

@@ -23,6 +23,7 @@ import { fileURLToPath } from "node:url";
 import { sha256File } from "../lib/file-digest.mjs";
 import { runSourceArchiveReleaseCheck } from "./source-archive-release-check.mjs";
 import { printTemplateCatalog } from "../../web/src/erp/config/printTemplates.mjs";
+import { isNamespacedPackageKey } from "../qa/customer-package-lint.mjs";
 
 const SCHEMA_VERSION = "plush-release-artifact/v1";
 const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
@@ -530,7 +531,7 @@ export function buildCustomerConfigEvidence({
   const packageKey = customerPackageSource.match(
     /\bpackageKey:\s*"([^"]+)"/u,
   )?.[1];
-  if (!packageKey || !packageKey.startsWith(`${customer}-customer-package-`)) {
+  if (!packageKey || !isNamespacedPackageKey(customer, packageKey)) {
     throw new ReleaseArtifactError(
       "committed customer package key is missing or invalid",
     );
@@ -543,7 +544,6 @@ export function buildCustomerConfigEvidence({
   return {
     customer,
     packageKey,
-    expectedRuntimeRevision: `${packageKey}.runtime-manifest-v1`,
     sourceStatus: status,
     sourceRuntimeEnabled: runtimeEnabled,
     sourceInputCount: inputs.length,

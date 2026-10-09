@@ -25,7 +25,7 @@ function assertNonEmptyString(value, key) {
   assert(typeof value === "string" && value.trim() !== "", `${key} must be a non-empty string`);
 }
 
-function isNamespacedPackageKey(customerKey, packageKey) {
+export function isNamespacedPackageKey(customerKey, packageKey) {
   return (
     packageKey.startsWith(`${customerKey}-`) &&
     /^[a-z0-9]+(?:-[a-z0-9]+)*-package$/u.test(packageKey)
