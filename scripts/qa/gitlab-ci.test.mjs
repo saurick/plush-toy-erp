@@ -117,6 +117,24 @@ function yamlJobBlock(name) {
   )?.[0];
 }
 
+test("CI uses the module toolchain and keeps release and Runner pins aligned", () => {
+  const module = readFileSync(new URL("../../server/go.mod", import.meta.url), "utf8");
+  const toolchain = module.match(/^toolchain (go\d+\.\d+\.\d+)$/mu)?.[1];
+  assert(toolchain);
+  const version = toolchain.slice(2);
+  const dockerfile = readFileSync(new URL("../../server/Dockerfile", import.meta.url), "utf8");
+  assert.match(workflow, /export GOTOOLCHAIN="\$\(awk '\$1 == "toolchain" \{ print \$2 \}' server\/go\.mod\)"/u);
+  assert.match(workflow, /test "\$\(go env GOVERSION\)" = "\$GOTOOLCHAIN"/u);
+  assert(dockerfile.includes(`ARG GO_BUILDER_IMAGE=golang:${version}\n`));
+  assert(runnerCloudInit.includes(`go_version=${version}\n`));
+  assert.equal(
+    runnerCloudInit.match(/test "\$\(go env GOVERSION\)" = go\d+\.\d+\.\d+/gu)?.every(
+      (line) => line.endsWith(toolchain),
+    ),
+    true,
+  );
+});
+
 test("documentation routing is guarded by the shared complete non-Markdown path set", () => {
   const rules = workflow.split("\nstages:")[0];
   const paths = [...rules.matchAll(/^          - "([^"]+)"$/gmu)].map((match) => match[1]);
