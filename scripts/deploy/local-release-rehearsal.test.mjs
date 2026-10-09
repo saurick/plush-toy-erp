@@ -13,6 +13,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import { customerConfigRevision } from "../qa/customer-config-runtime-manifest.mjs";
 
 import {
   activateRehearsalCustomerConfig,
@@ -675,12 +676,9 @@ test("local release rehearsal activates only the content-addressed local-test cu
     appliedManifest.compiled_snapshot.applyPurpose,
     "local_test_apply",
   );
-  assert.match(
+  assert.equal(
     appliedManifest.revision,
-    new RegExp(
-      `^${RegExp.escape(yoyoosunCustomerPackage.packageKey)}\\.local-[a-f0-9]{16}\\.runtime-v1$`,
-      "u",
-    ),
+    customerConfigRevision(appliedManifest, "yoyoosun-local-config"),
   );
   assert.equal(result.status, "passed");
   assert.equal(result.writesBusinessFacts, false);

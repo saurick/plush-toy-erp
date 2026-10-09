@@ -5,6 +5,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { CUSTOMER_TRIAL_133_CONFIG_REVISION } from "../qa/manual-acceptance-target-policy.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const scriptPath = path.join(
@@ -276,9 +277,9 @@ test("run smoke input template is no-write and does not require endpoint", () =>
       item.includes("HTTP 200 with application/pdf"),
     ),
   );
-  assert.match(
-    template.commands.join("\n"),
-    /--customer-config-revision yoyoosun-customer-trial-133-package-v11\.runtime-manifest-v1/,
+  assert.equal(
+    template.commands.join("\n").match(/--customer-config-revision (\S+)/u)?.[1],
+    CUSTOMER_TRIAL_133_CONFIG_REVISION,
   );
   assert.match(
     template.commands.join("\n"),

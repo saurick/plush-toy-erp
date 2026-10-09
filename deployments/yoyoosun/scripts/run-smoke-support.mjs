@@ -8,11 +8,9 @@ import {
   selectYoyoosunCredentialTarget,
 } from "./credential-contract.mjs";
 import { getDeploymentTarget } from "../../../scripts/deploy/deployment-targets.mjs";
-import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../../../scripts/qa/manual-acceptance-core-contract.mjs";
+import { CUSTOMER_TRIAL_133_CONFIG_REVISION as CUSTOMER_TRIAL_CONFIG_REVISION } from "../../../scripts/qa/manual-acceptance-target-policy.mjs";
 
 const command = process.argv[2];
-const CUSTOMER_TRIAL_CONFIG_REVISION =
-  MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.configRevision;
 
 function printHelp() {
   process.stdout.write(

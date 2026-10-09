@@ -1,8 +1,11 @@
-import { CUSTOMER_TRIAL_133_CONFIG_REVISION, CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION } from "../../../../scripts/qa/manual-acceptance-target-policy.mjs";
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from '../../../../scripts/qa/manual-acceptance-core-contract.mjs'
+import {
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+} from '../../../../scripts/qa/manual-acceptance-target-policy.mjs'
 
 import {
   buildDevDeliveryOperationOverview,
