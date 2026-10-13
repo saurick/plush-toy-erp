@@ -124,6 +124,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/local-runtime-preflight.test.mjs",
     "scripts/local-runtime-rehearsal.test.mjs",
     "scripts/local-runtime-start.test.mjs",
+    "scripts/qa/attachment-console-integration.test.mjs",
     "scripts/qa/critical-postgres-gate.test.mjs",
     "scripts/qa/database-archive.test.mjs",
     "scripts/qa/database-base-preflight.test.mjs",

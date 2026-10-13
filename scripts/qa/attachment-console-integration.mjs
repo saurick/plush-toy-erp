@@ -12,7 +12,43 @@ const root = path.resolve(
   "../..",
 );
 
+export function consoleFixtureNetworks(subnet = "") {
+  if (!subnet) return { "console-fixture": {} };
+  const match =
+    /^(10\.\d+\.\d+|172\.(?:1[6-9]|2\d|3[01])\.\d+|192\.168\.\d+)\.(\d+)\/27$/u.exec(
+      subnet,
+    );
+  if (
+    !match ||
+    match[0] !== subnet ||
+    subnet
+      .split("/")[0]
+      .split(".")
+      .some((part) => Number(part) > 255) ||
+    Number(match[2]) % 32 !== 0
+  ) {
+    throw new Error(
+      "console fixture subnet must be an aligned private IPv4 /27",
+    );
+  }
+  return Object.fromEntries(
+    ["attachment-private", "console-fixture"].map((name, index) => [
+      name,
+      {
+        ipam: {
+          config: [
+            { subnet: `${match[1]}.${Number(match[2]) + index * 16}/28` },
+          ],
+        },
+      },
+    ]),
+  );
+}
+
 export async function createConsoleFixture() {
+  const networks = consoleFixtureNetworks(
+    process.env.ATTACHMENT_CONSOLE_FIXTURE_SUBNET || "",
+  );
   const directory = mkdtempSync(path.join(os.tmpdir(), "plush-console-drill-"));
   const project = `plush-console-drill-${randomBytes(6).toString("hex")}`;
   const secret = () => randomBytes(24).toString("hex");
@@ -42,7 +78,20 @@ export async function createConsoleFixture() {
   // network and loopback port exist only in the disposable browser fixture.
   writeFileSync(
     path.join(directory, "compose.fixture.yml"),
-    "services:\n  attachment-store:\n    ports:\n      - '127.0.0.1::23646'\n    networks: [attachment-private, console-fixture]\n    volumes:\n      - type: volume\n        source: console-data\n        target: /data\n    restart: 'no'\nnetworks:\n  console-fixture: {}\nvolumes:\n  console-data: {}\n",
+    JSON.stringify({
+      services: {
+        "attachment-store": {
+          ports: ["127.0.0.1::23646"],
+          networks: ["attachment-private", "console-fixture"],
+          volumes: [
+            { type: "volume", source: "console-data", target: "/data" },
+          ],
+          restart: "no",
+        },
+      },
+      networks,
+      volumes: { "console-data": {} },
+    }),
   );
   const composeArgs = [
     "compose",
@@ -66,18 +115,20 @@ export async function createConsoleFixture() {
   const compose = (...args) => docker([...composeArgs, ...args]);
   const cleanup = () => {
     compose("down", "--volumes", "--timeout", "5");
-    assert.equal(
-      docker([
-        "volume",
-        "ls",
-        "--filter",
-        `label=com.docker.compose.project=${project}`,
-        "--format",
-        "{{.Name}}",
-      ]).trim(),
-      "",
-      "disposable console volumes must be removed",
-    );
+    for (const resource of ["volume", "network"]) {
+      assert.equal(
+        docker([
+          resource,
+          "ls",
+          "--filter",
+          `label=com.docker.compose.project=${project}`,
+          "--format",
+          "{{.Name}}",
+        ]).trim(),
+        "",
+        `disposable console ${resource}s must be removed`,
+      );
+    }
     rmSync(directory, { recursive: true, force: true });
   };
   try {

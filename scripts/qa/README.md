@@ -6,6 +6,8 @@
 
 该演练也包含管理界面验证；单独运行 `node scripts/qa/attachment-console-integration.mjs` 可验证正式 Compose 的原生登录、只读浏览、服务端写入拒绝和退出登录。只在一次性测试覆盖中开放随机本机端口，结束后精确清理测试容器、网络和目录。
 
+主机 Docker 默认地址池耗尽时，可为该夹具设置 `ATTACHMENT_CONSOLE_FIXTURE_SUBNET`，值须为已核对不冲突、地址对齐的私有 IPv4 `/27`；夹具拆为两个 `/28`，分别用于内部附件网络和本机浏览器入口，结束后检查网络与卷均已清理。该配置只影响一次性测试，不改变正式 Compose 或主机 Docker 配置。
+
 ## 目录职责
 
 `scripts/qa/` 只放本地验收、静态守卫、边界扫描和测试编排脚本。它可以读取代码、配置、文档和本地输出，必要时生成 ignored evidence；它不负责生产发布、不直接导入真实客户数据、不替代后端 RBAC / Workflow / Fact usecase。
