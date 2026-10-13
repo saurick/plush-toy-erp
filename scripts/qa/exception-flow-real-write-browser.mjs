@@ -971,7 +971,12 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
       await createResponse,
     ).inventory_operation;
     assert.ok(operation?.id);
-    await waitMessage(session.page, "人工库存调整已提交审批");
+    const submissionReceipt = session.page
+      .locator(".ant-notification-notice")
+      .filter({ hasText: "人工库存调整已提交审批" });
+    await submissionReceipt.waitFor({ state: "visible" });
+    await submissionReceipt.getByRole("status").filter({ hasText: "当前去向：" }).waitFor({ state: "visible" });
+    await submissionReceipt.getByRole("link", { name: "流程跟踪", exact: true }).waitFor({ state: "visible" });
     const submitted = (
       await browserRpc(session.page, "inventory", "get_inventory_operation", {
         id: operation.id,
@@ -1516,10 +1521,13 @@ async function runProductionExceptionFlow(browser, options, report) {
     }
 
     await selectRow(session.page, draft.fact_no);
-    await session.page
-      .locator("button.erp-business-module-status-action")
-      .filter({ hasText: /^\s*取消\s*$/u })
-      .click();
+    const cancelAction = session.page
+      .locator('[data-business-action-key="operational-fact-cancel"]')
+      .filter({ visible: true });
+    if (!(await cancelAction.count())) {
+      await session.page.getByRole("button", { name: /^更多操作，共/u }).click();
+    }
+    await cancelAction.click();
     const cancelModal = await visibleModal(session.page, "取消已过账业务记录");
     await cancelModal
       .getByPlaceholder("请填写作废或取消的业务原因")
