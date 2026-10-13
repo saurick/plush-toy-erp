@@ -765,6 +765,10 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
   }
   if (domain === "quality") return "quality";
   if (domain === "inventory") return "warehouse";
+  if (
+    domain === "operational_fact" &&
+    ["create_shipment_with_items", "get_shipment", "ship_shipment"].includes(method)
+  ) return "sales";
   if (domain === "production_wip") {
     if (params.action === "CONFIRM_PACKAGING_MATERIAL") return "sales";
     if (params.action === "RECEIVE_OUTSOURCING_RETURN") return "warehouse";
@@ -775,6 +779,10 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
     const surfaceKey = String(
       params?.task_group || params?.payload?.surface_key || "",
     ).toLowerCase();
+    if (
+      surfaceKey.includes("shipment_release") ||
+      surfaceKey.includes("shipment-release")
+    ) return "sales";
     if (
       surfaceKey.includes("shipment_finance_approval") ||
       surfaceKey.includes("shipment-finance-approval")
@@ -804,7 +812,7 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
   }
   if (domain === "customer_config") {
     if (method === "start_finished_goods_delivery_process") {
-      return "warehouse";
+      return "sales";
     }
   }
   // This runner prepares one cross-domain acceptance dataset. Production orders

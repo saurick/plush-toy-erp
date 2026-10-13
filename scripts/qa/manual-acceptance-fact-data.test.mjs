@@ -894,7 +894,7 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
     manualAcceptanceFactRole("workflow", "complete_task_action", {
       payload: { surface_key: "shipment-release" },
     }),
-    "warehouse",
+    "sales",
   );
   assert.equal(
     manualAcceptanceFactRole("workflow", "complete_task_action", {
@@ -913,8 +913,11 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
       "customer_config",
       "start_finished_goods_delivery_process",
     ),
-    "warehouse",
+    "sales",
   );
+  for (const method of ["create_shipment_with_items", "get_shipment", "ship_shipment"]) {
+    assert.equal(manualAcceptanceFactRole("operational_fact", method), "sales");
+  }
   assert.equal(
     manualAcceptanceFactRole("workflow", "get_task_process_context", {
       task_id: 42,
