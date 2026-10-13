@@ -13,7 +13,7 @@ description: 项目页面治理（plush-toy-erp）。Use to assess or change ERP
 
 - 每个可见元素都应支持岗位判断、动作或反馈；重复入口和装饰信息按任务价值合并、降级或删除。
 - 页面不能补造业务事实、掩盖后端或权限缺口，也不能以局部字段映射替代共享真源。
-- 减少密度依靠任务分组、优先级、可读标签和交互，保留必要状态、错误及关键约束。
+- 任务详情、流程/异常追踪及 ERP 桌面与手机一致性，按 [任务聚焦与两端一致](references/page-semantics.md#task-focus-and-cross-device-parity) 核对信息层级、入口和实际结果。
 - 复用设计系统和共享业务组件。布局或交互变化必须以真实浏览器证据和 DOM / box metrics 验证，覆盖受影响的默认、交互、恢复、边界与相邻区域；主题、移动端和共享组件按实际影响扩大范围。
 - 新增或修改 Tab、分段切换和自定义页签时，使用项目共享导航组件并让页签条在视图切换期间保持挂载；只替换下方内容，不在各内容分支内重复创建页签。具体组件和动效验证见 [Page Implementation](references/page-implementation.md)。
 - 纸面模板及 PDF 保真使用 `$plush-print-template-source-governance`。需要改变 API / RBAC / schema / Workflow / Fact 时转入领域技能继续已授权工作，新增范围才询问。
