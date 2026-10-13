@@ -76,6 +76,7 @@
 | `docs/archive/progress-2026-09-16-before-ci-migration-closeout.md` | CI 与共享开发库收口前的报价运费和双目标发布原文归档 |
 | `docs/archive/progress-2026-09-17-before-cd-closeout.md` | CD 收口前已完成的共享开发库迁移记录原文归档 |
 | `docs/archive/progress-2026-09-19-before-iqc-acceptance-closeout.md` | 来料验收收口前业务列表列顺序与全筛选导出原文归档 / Progress Archive Before IQC Acceptance Closeout |
+| `docs/archive/progress-2026-10-10-before-task-governance.md` | 全端任务治理前的完整过程快照，保留原活跃事项、最近完成、运行证据与未决风险 |
 | `docs/archive/progress-2026-09-25-before-document-governance.md` | 文档治理前 `progress.md` 的 337 行完整快照，保留当时活跃事项、验证、Git 交接与未决风险 |
 
 同日进度快照：[备份恢复演练前记录](progress-2026-06-16-before-backup-restore-rehearsal.md)。原名称 progress-2026-06-16-before-audit-log-readable.md 与该文件全文相同，现共用此原文；其他归档中的旧名称保留历史语境。

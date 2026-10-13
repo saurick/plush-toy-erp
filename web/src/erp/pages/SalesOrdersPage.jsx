@@ -11,10 +11,11 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Form, Space } from 'antd'
 import {
-  useNavigate,
   useOutletContext,
+  useLocation,
   useSearchParams,
 } from 'react-router-dom'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
@@ -79,6 +80,7 @@ import {
 } from '../components/sales-orders/SalesOrderForm.jsx'
 import WorkflowTaskProductImage from '../components/workflow/WorkflowTaskProductImage.jsx'
 import SalesOrderEngineeringModal from '../components/sales-orders/SalesOrderEngineeringModal.jsx'
+import { readEngineeringBOMReturn } from '../utils/bomPreparationNavigation.mjs'
 import EngineeringMaterialRequestModal from '../components/sales-orders/EngineeringMaterialRequestModal.jsx'
 import { getEngineeringMaterialPermissions } from '../utils/engineeringMaterialTask.mjs'
 import {
@@ -144,6 +146,7 @@ import {
   filterLifecycleStatusOptions,
   lifecycleScopeFromSearchParams,
   lifecycleScopeIncludesStatus,
+  normalizeLifecycleStatus,
   withLifecycleScopeSearchParam,
 } from '../utils/lifecycleScope.mjs'
 import {
@@ -235,7 +238,8 @@ async function loadReservationStockForItem(item = {}) {
 
 export default function SalesOrdersPage() {
   const outletContext = useOutletContext()
-  const navigate = useNavigate()
+  const location = useLocation()
+  const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -253,10 +257,18 @@ export default function SalesOrdersPage() {
   const [lifecycleScope, setLifecycleScope] = useState(() =>
     lifecycleScopeFromSearchParams(searchParams)
   )
-  const [statusFilter, setStatusFilter] = useBusinessPageState(
+  const [savedStatusFilter, setStatusFilter] = useBusinessPageState(
     'statusFilter',
     ''
   )
+  const statusFilter = normalizeLifecycleStatus(
+    lifecycleScope,
+    savedStatusFilter,
+    ['closed', 'canceled']
+  )
+  useEffect(() => {
+    if (savedStatusFilter !== statusFilter) setStatusFilter(statusFilter)
+  }, [savedStatusFilter, setStatusFilter, statusFilter])
   const [customerFilter, setCustomerFilter] = useBusinessPageState(
     'customerFilter',
     ''
@@ -297,6 +309,19 @@ export default function SalesOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const [engineeringOrderID, setEngineeringOrderID] = useState(null)
+  const [returnedEngineeringBOM, setReturnedEngineeringBOM] = useState(null)
+  const consumedEngineeringReturn = useRef(null)
+  useEffect(() => {
+    if (consumedEngineeringReturn.current === location.key) return
+    const returned = readEngineeringBOMReturn(location.state, adminProfile?.id)
+    if (!returned || !hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_ENGINEERING_UPDATE)) return
+    consumedEngineeringReturn.current = location.key
+    setReturnedEngineeringBOM(returned)
+    setEngineeringOrderID(returned.orderID)
+    const history = window.history.state || {}
+    const { engineeringBOMReturn: _consumed, ...usr } = history.usr || {}
+    window.history.replaceState({ ...history, usr }, '')
+  }, [location.key, location.state, adminProfile])
   const [materialRequestOrderID, setMaterialRequestOrderID] = useState(null)
   const [editingOrder, setEditingOrder] = useState(null)
   const [detailOrder, setDetailOrder] = useState(null)
@@ -2069,10 +2094,13 @@ export default function SalesOrdersPage() {
       />
 
       <SalesOrderEngineeringModal
+        key={`${engineeringOrderID}:${returnedEngineeringBOM?.bomID || ''}`}
         orderID={engineeringOrderID}
-        onCancel={() => setEngineeringOrderID(null)}
+        returnedBOM={returnedEngineeringBOM}
+        onCancel={() => { setEngineeringOrderID(null); setReturnedEngineeringBOM(null) }}
         onSaved={() => {
           setEngineeringOrderID(null)
+          setReturnedEngineeringBOM(null)
           loadOrders()
         }}
       />

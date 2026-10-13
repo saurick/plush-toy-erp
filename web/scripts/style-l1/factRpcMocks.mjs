@@ -651,7 +651,7 @@ export async function installFactRpcMocks(page, context) {
             requiredValues.some((value) => !String(value ?? '').trim()) ||
             Number(params.production_order_id) !== 71 ||
             Number(params.production_order_item_id) !== 7100 ||
-            Number(params.production_wip_batch_id) !== 91_004 ||
+            Number(params.production_wip_batch_id) !== 91_003 ||
             !Number.isFinite(Number(params.quantity)) ||
             Number(params.quantity) <= 0 ||
             !validInboundLotIntent(params, { allowNew: true })
@@ -2325,6 +2325,15 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       }
+      case 'get_task_handling_chain': {
+        const task = workflowTasks.find((item) => Number(item.id) === Number(params.task_id))
+        if (!task || !workflowMockCanViewTask(adminProfile, effectiveSession, task)) {
+          fail('当前账号不能查看该任务链')
+          break
+        }
+        data = { items: workflowTasks.filter((item) => item.source_type === task.source_type && item.source_id === task.source_id && workflowMockCanViewTask(adminProfile, effectiveSession, item)).map((item) => ({ id: item.id, task_name: item.task_name, task_group: item.task_group, task_status_key: item.task_status_key, owner_role_key: item.owner_role_key, source_type: item.source_type, source_no: item.source_no || '', process_instance_id: item.process_instance_id || 0, operation_code: '', batch_no: '', exception_id: 0 })), truncated: false }
+        break
+      }
       case 'get_task_process_context': {
         const taskID = Number(params.task_id || 0)
         const task = workflowTasks.find((item) => Number(item.id) === taskID)
@@ -2473,12 +2482,19 @@ export async function installFactRpcMocks(page, context) {
         const statusKey = params.status_key || ''
         const limit = Math.min(Math.max(Number(params.limit || 50), 1), 100)
         const cursor = String(params.cursor || '').trim()
-        const cursorSnapshotKey = `${viewKey}|${roleKey}|${keyword}|${sortKey}|${statusKey}|${cursor}`
+        const historyDatesKey = `${params.period || ''}|${params.date_from || ''}|${params.date_to || ''}`
+        const cursorSnapshotKey = `${viewKey}|${roleKey}|${keyword}|${sortKey}|${statusKey}|${historyDatesKey}|${cursor}`
         const snapshotAt = cursor
           ? workflowRoleTaskSnapshotByCursor.get(cursorSnapshotKey) ||
             Number(nowUnix())
           : Number(nowUnix())
         const beforeID = cursor ? Number(cursor) : 0
+        const businessDayStart = Math.floor((snapshotAt + 8 * 3600) / 86400) * 86400 - 8 * 3600
+        const periodDays = { today: 1, '7d': 7, '30d': 30 }[params.period]
+        const completedFrom = periodDays ? businessDayStart - (periodDays - 1) * 86400
+          : params.period === 'custom' ? Date.parse(`${params.date_from}T00:00:00+08:00`) / 1000 : null
+        const completedBefore = periodDays ? businessDayStart + 86400
+          : params.period === 'custom' ? Date.parse(`${params.date_to}T00:00:00+08:00`) / 1000 + 86400 : null
         const terminalStatuses = new Set(['done', 'rejected', 'withdrawn'])
         const isRiskTask = (task) =>
           task.task_status_key === 'blocked' ||
@@ -2497,6 +2513,7 @@ export async function installFactRpcMocks(page, context) {
           )
         const matchesView = (task, targetViewKey) => {
           if (statusKey && task.task_status_key !== statusKey) return false
+          if (completedFrom !== null && (!task.completed_at || task.completed_at < completedFrom || task.completed_at >= completedBefore)) return false
           if (
             keyword &&
             ![
@@ -2542,7 +2559,10 @@ export async function installFactRpcMocks(page, context) {
         const matchingTasks = workflowTasks
           .filter((task) => matchesView(task, viewKey))
           .sort((left, right) => {
-            if (sortKey === 'due') {
+            if (viewKey === 'history') {
+              const delta = Number(right.completed_at || 0) - Number(left.completed_at || 0)
+              if (delta) return delta
+            } else if (sortKey === 'due') {
               const delta = (left.due_at || Infinity) - (right.due_at || Infinity)
               if (delta) return delta
             } else if (sortKey === 'newest' || sortKey === 'oldest') {
@@ -2558,7 +2578,7 @@ export async function installFactRpcMocks(page, context) {
           hasMore && items.length > 0 ? String(items[items.length - 1].id) : ''
         if (nextCursor) {
           workflowRoleTaskSnapshotByCursor.set(
-            `${viewKey}|${roleKey}|${keyword}|${sortKey}|${statusKey}|${nextCursor}`,
+            `${viewKey}|${roleKey}|${keyword}|${sortKey}|${statusKey}|${historyDatesKey}|${nextCursor}`,
             snapshotAt
           )
         }

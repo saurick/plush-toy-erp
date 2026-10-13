@@ -54,6 +54,7 @@ import {
 } from '../../utils/businessTableCopy.mjs'
 
 const { Text } = Typography
+export const SelectionActionOverlayContext = React.createContext(null)
 
 export {
   CollaborationPanelResizeHandle,
@@ -257,6 +258,7 @@ function ResponsiveSelectionActions({ children }) {
   )
   const screens = Grid.useBreakpoint(true, initialScreens)
   const [moreActionsOpen, setMoreActionsOpen] = React.useState(false)
+  const [actionOverlayOpen, setActionOverlayOpen] = React.useState(false)
   const moreActionsListRef = React.useRef(null)
   const moreActionsTriggerRef = React.useRef(null)
   const moreActionsId = React.useId()
@@ -265,9 +267,14 @@ function ResponsiveSelectionActions({ children }) {
     : screens.md
       ? TABLET_SELECTION_ACTION_LIMIT
       : PHONE_SELECTION_ACTION_LIMIT
+  // Moving a stateful action between the toolbar and menu unmounts its dialog.
+  // Let the dialog adapt to the viewport before regrouping its trigger on close.
+  const partitionLimitRef = React.useRef(visibleLimit)
+  if (!actionOverlayOpen) partitionLimitRef.current = visibleLimit
+  const partitionLimit = partitionLimitRef.current
   const { context, visible, overflow } = React.useMemo(
-    () => partitionSelectionActions(children, visibleLimit),
-    [children, visibleLimit]
+    () => partitionSelectionActions(children, partitionLimit),
+    [children, partitionLimit]
   )
   const overflowRenderKey = React.useMemo(
     () => overflow.map(selectionActionRenderState).join('|'),
@@ -378,59 +385,63 @@ function ResponsiveSelectionActions({ children }) {
 
   if (overflow.length === 0) {
     return (
-      <Space
-        wrap
-        className="erp-business-selection-action-bar__actions erp-business-module-selection-actions"
-      >
-        {children}
-      </Space>
+      <SelectionActionOverlayContext.Provider value={setActionOverlayOpen}>
+        <Space
+          wrap
+          className="erp-business-selection-action-bar__actions erp-business-module-selection-actions"
+        >
+          {children}
+        </Space>
+      </SelectionActionOverlayContext.Provider>
     )
   }
 
   return (
-    <div
-      className={joinClassNames(
-        'erp-business-selection-action-bar__actions erp-business-module-selection-actions',
-        screens.lg
-          ? 'erp-business-selection-action-bar__actions--overflow'
-          : 'erp-business-selection-action-bar__actions--compact'
-      )}
-    >
-      {context.length > 0 ? (
-        <div className="erp-business-selection-action-bar__compact-context">
-          {context}
-        </div>
-      ) : null}
-      <div className="erp-business-selection-action-bar__compact-visible">
-        {visible}
-      </div>
-      <Dropdown
-        key={overflowRenderKey}
-        trigger={['click']}
-        placement="bottomRight"
-        open={moreActionsOpen}
-        onOpenChange={setMoreActionsOpen}
-        autoFocus
-        autoAdjustOverflow
-        // Stateful actions own dialogs and drawers that must outlive the menu.
-        // The render key still rebuilds them when external action state changes.
-        forceRender
-        destroyOnHidden={false}
-        overlayClassName="erp-business-selection-action-dropdown"
-        popupRender={renderMoreActions}
+    <SelectionActionOverlayContext.Provider value={setActionOverlayOpen}>
+      <div
+        className={joinClassNames(
+          'erp-business-selection-action-bar__actions erp-business-module-selection-actions',
+          screens.lg
+            ? 'erp-business-selection-action-bar__actions--overflow'
+            : 'erp-business-selection-action-bar__actions--compact'
+        )}
       >
-        <Button
-          ref={moreActionsTriggerRef}
-          className="erp-business-selection-action-bar__compact-more erp-action-button"
-          size="small"
-          aria-label={`更多操作，共 ${overflow.length} 项`}
-          aria-expanded={moreActionsOpen}
-          aria-controls={moreActionsId}
+        {context.length > 0 ? (
+          <div className="erp-business-selection-action-bar__compact-context">
+            {context}
+          </div>
+        ) : null}
+        <div className="erp-business-selection-action-bar__compact-visible">
+          {visible}
+        </div>
+        <Dropdown
+          key={overflowRenderKey}
+          trigger={['click']}
+          placement="bottomRight"
+          open={moreActionsOpen}
+          onOpenChange={setMoreActionsOpen}
+          autoFocus
+          autoAdjustOverflow
+          // Stateful actions own dialogs and drawers that must outlive the menu.
+          // The render key still rebuilds them when external action state changes.
+          forceRender
+          destroyOnHidden={false}
+          overlayClassName="erp-business-selection-action-dropdown"
+          popupRender={renderMoreActions}
         >
-          更多操作 <DownOutlined />
-        </Button>
-      </Dropdown>
-    </div>
+          <Button
+            ref={moreActionsTriggerRef}
+            className="erp-business-selection-action-bar__compact-more erp-action-button"
+            size="small"
+            aria-label={`更多操作，共 ${overflow.length} 项`}
+            aria-expanded={moreActionsOpen}
+            aria-controls={moreActionsId}
+          >
+            更多操作 <DownOutlined />
+          </Button>
+        </Dropdown>
+      </div>
+    </SelectionActionOverlayContext.Provider>
   )
 }
 

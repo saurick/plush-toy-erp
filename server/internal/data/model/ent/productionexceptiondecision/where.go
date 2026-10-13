@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/shopspring/decimal"
 )
 
@@ -98,6 +99,16 @@ func ProductionWipBatchID(v int) predicate.ProductionExceptionDecision {
 // QualityInspectionID applies equality check predicate on the "quality_inspection_id" field. It's identical to QualityInspectionIDEQ.
 func QualityInspectionID(v int) predicate.ProductionExceptionDecision {
 	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldQualityInspectionID, v))
+}
+
+// TargetSupplierID applies equality check predicate on the "target_supplier_id" field. It's identical to TargetSupplierIDEQ.
+func TargetSupplierID(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldTargetSupplierID, v))
+}
+
+// TargetOperationID applies equality check predicate on the "target_operation_id" field. It's identical to TargetOperationIDEQ.
+func TargetOperationID(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldTargetOperationID, v))
 }
 
 // RequestedQuantity applies equality check predicate on the "requested_quantity" field. It's identical to RequestedQuantityEQ.
@@ -673,6 +684,106 @@ func QualityInspectionIDIsNil() predicate.ProductionExceptionDecision {
 // QualityInspectionIDNotNil applies the NotNil predicate on the "quality_inspection_id" field.
 func QualityInspectionIDNotNil() predicate.ProductionExceptionDecision {
 	return predicate.ProductionExceptionDecision(sql.FieldNotNull(FieldQualityInspectionID))
+}
+
+// TargetSupplierIDEQ applies the EQ predicate on the "target_supplier_id" field.
+func TargetSupplierIDEQ(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldTargetSupplierID, v))
+}
+
+// TargetSupplierIDNEQ applies the NEQ predicate on the "target_supplier_id" field.
+func TargetSupplierIDNEQ(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNEQ(FieldTargetSupplierID, v))
+}
+
+// TargetSupplierIDIn applies the In predicate on the "target_supplier_id" field.
+func TargetSupplierIDIn(vs ...int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIn(FieldTargetSupplierID, vs...))
+}
+
+// TargetSupplierIDNotIn applies the NotIn predicate on the "target_supplier_id" field.
+func TargetSupplierIDNotIn(vs ...int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotIn(FieldTargetSupplierID, vs...))
+}
+
+// TargetSupplierIDGT applies the GT predicate on the "target_supplier_id" field.
+func TargetSupplierIDGT(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGT(FieldTargetSupplierID, v))
+}
+
+// TargetSupplierIDGTE applies the GTE predicate on the "target_supplier_id" field.
+func TargetSupplierIDGTE(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGTE(FieldTargetSupplierID, v))
+}
+
+// TargetSupplierIDLT applies the LT predicate on the "target_supplier_id" field.
+func TargetSupplierIDLT(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLT(FieldTargetSupplierID, v))
+}
+
+// TargetSupplierIDLTE applies the LTE predicate on the "target_supplier_id" field.
+func TargetSupplierIDLTE(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLTE(FieldTargetSupplierID, v))
+}
+
+// TargetSupplierIDIsNil applies the IsNil predicate on the "target_supplier_id" field.
+func TargetSupplierIDIsNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIsNull(FieldTargetSupplierID))
+}
+
+// TargetSupplierIDNotNil applies the NotNil predicate on the "target_supplier_id" field.
+func TargetSupplierIDNotNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotNull(FieldTargetSupplierID))
+}
+
+// TargetOperationIDEQ applies the EQ predicate on the "target_operation_id" field.
+func TargetOperationIDEQ(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldTargetOperationID, v))
+}
+
+// TargetOperationIDNEQ applies the NEQ predicate on the "target_operation_id" field.
+func TargetOperationIDNEQ(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNEQ(FieldTargetOperationID, v))
+}
+
+// TargetOperationIDIn applies the In predicate on the "target_operation_id" field.
+func TargetOperationIDIn(vs ...int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIn(FieldTargetOperationID, vs...))
+}
+
+// TargetOperationIDNotIn applies the NotIn predicate on the "target_operation_id" field.
+func TargetOperationIDNotIn(vs ...int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotIn(FieldTargetOperationID, vs...))
+}
+
+// TargetOperationIDGT applies the GT predicate on the "target_operation_id" field.
+func TargetOperationIDGT(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGT(FieldTargetOperationID, v))
+}
+
+// TargetOperationIDGTE applies the GTE predicate on the "target_operation_id" field.
+func TargetOperationIDGTE(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGTE(FieldTargetOperationID, v))
+}
+
+// TargetOperationIDLT applies the LT predicate on the "target_operation_id" field.
+func TargetOperationIDLT(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLT(FieldTargetOperationID, v))
+}
+
+// TargetOperationIDLTE applies the LTE predicate on the "target_operation_id" field.
+func TargetOperationIDLTE(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLTE(FieldTargetOperationID, v))
+}
+
+// TargetOperationIDIsNil applies the IsNil predicate on the "target_operation_id" field.
+func TargetOperationIDIsNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIsNull(FieldTargetOperationID))
+}
+
+// TargetOperationIDNotNil applies the NotNil predicate on the "target_operation_id" field.
+func TargetOperationIDNotNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotNull(FieldTargetOperationID))
 }
 
 // RequestedQuantityEQ applies the EQ predicate on the "requested_quantity" field.
@@ -1603,6 +1714,29 @@ func ReverseReasonEqualFold(v string) predicate.ProductionExceptionDecision {
 // ReverseReasonContainsFold applies the ContainsFold predicate on the "reverse_reason" field.
 func ReverseReasonContainsFold(v string) predicate.ProductionExceptionDecision {
 	return predicate.ProductionExceptionDecision(sql.FieldContainsFold(FieldReverseReason, v))
+}
+
+// HasExecutionBatches applies the HasEdge predicate on the "execution_batches" edge.
+func HasExecutionBatches() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ExecutionBatchesTable, ExecutionBatchesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasExecutionBatchesWith applies the HasEdge predicate on the "execution_batches" edge with a given conditions (other predicates).
+func HasExecutionBatchesWith(preds ...predicate.ProductionWIPBatch) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(func(s *sql.Selector) {
+		step := newExecutionBatchesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

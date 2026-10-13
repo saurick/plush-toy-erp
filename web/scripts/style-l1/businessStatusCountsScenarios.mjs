@@ -99,7 +99,7 @@ export function createBusinessStatusCountsScenarios({
     page.getByRole('group', { name: '销售订单状态', exact: true })
   const ready = async (page, total) => {
     const button = group(page).getByRole('button', {
-      name: `全部，共 ${total} 条`,
+      name: `不限状态，共 ${total} 条`,
       exact: true,
     })
     await button.waitFor()
@@ -146,8 +146,9 @@ export function createBusinessStatusCountsScenarios({
         await filter.getByRole('button', { name: /^草稿/u }).click()
         assert.deepEqual(await filter.locator('b').allTextContents(), counts)
         await frame.locator('#list-search').fill('SO-20260925-001')
-        await filter.getByRole('button', { name: /^全部1$/u }).waitFor()
-        await filter.getByRole('button', { name: /^已生效0$/u }).waitFor()
+        await filter.getByRole('button', { name: /^不限状态1$/u }).waitFor()
+        await filter.getByRole('button', { name: /^已生效1$/u }).waitFor()
+        await filter.getByRole('button', { name: /^草稿0$/u }).waitFor()
         await assertNoHorizontalOverflow(page, 'business-status-counts-design')
       },
     },
@@ -215,7 +216,7 @@ export function createBusinessStatusCountsScenarios({
           .waitFor()
         await search.fill('慢查询')
         await group(page)
-          .getByRole('button', { name: '全部，数量暂不可用' })
+          .getByRole('button', { name: '不限状态，数量暂不可用' })
           .waitFor()
         await search.fill('指定')
         await ready(page, 2)
@@ -224,7 +225,7 @@ export function createBusinessStatusCountsScenarios({
         await search.fill('读取失败')
         await page.locator('.ant-message-error').waitFor()
         await group(page)
-          .getByRole('button', { name: '全部，数量暂不可用' })
+          .getByRole('button', { name: '不限状态，数量暂不可用' })
           .waitFor()
         await search.fill('')
         await ready(page, 45)
@@ -289,7 +290,7 @@ export function createBusinessStatusCountsScenarios({
         for (const [url, label, method] of cases) {
           await gotoScenarioPath(page, url, { waitUntil: 'domcontentloaded' })
           const filter = page.getByRole('group', { name: label, exact: true })
-          await filter.getByRole('button', { name: '全部，共 0 条' }).waitFor()
+          await filter.getByRole('button', { name: '不限状态，共 0 条' }).waitFor()
           assert(
             await filter
               .locator('..')
@@ -342,7 +343,7 @@ export function createBusinessStatusCountsScenarios({
                 .click()
               await response
               await filter
-                .getByRole('button', { name: '全部，共 0 条' })
+                .getByRole('button', { name: '不限状态，共 0 条' })
                 .waitFor()
               if (type !== '生产分段质检') {
                 await panel
@@ -359,7 +360,7 @@ export function createBusinessStatusCountsScenarios({
               .click()
             await page
               .getByRole('group', { name: '红冲状态', exact: true })
-              .getByRole('button', { name: '全部，共 0 条' })
+              .getByRole('button', { name: '不限状态，共 0 条' })
               .waitFor()
           }
           await assertNoHorizontalOverflow(page, url)

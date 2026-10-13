@@ -94,13 +94,6 @@ func TestSourceDocumentAndFactQuantityParamsUseStringNumeric20Scale6(t *testing.
 			}, biz.ProductionWIPActionTransferToNextOperation, 1)
 			return ok
 		}},
-		{name: "production-wip-rework", parse: func(value any) bool {
-			_, ok := productionWIPActionFromParams(map[string]any{
-				"production_order_id": 1, "production_wip_batch_id": 1, "target_operation_id": 2,
-				"quantity": value, "reason": "返工", "expected_version": 1, "idempotency_key": "wip-rework-1",
-			}, biz.ProductionWIPActionRework, 1)
-			return ok
-		}},
 		{name: "production-wip-split", parse: func(value any) bool {
 			_, ok := productionWIPSplitsFromParams([]any{
 				map[string]any{"quantity": value}, map[string]any{"quantity": "1"},

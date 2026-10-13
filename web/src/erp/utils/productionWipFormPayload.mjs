@@ -50,6 +50,8 @@ export function buildProductionWipFormPayload({
     reason: values.reason,
   }
   switch (action) {
+    case PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN:
+      return { ...payload, quantity: values.quantity }
     case PRODUCTION_WIP_ACTION.SPLIT_BATCH:
       return {
         ...payload,
@@ -71,14 +73,11 @@ export function buildProductionWipFormPayload({
     case PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION:
       return {
         ...payload,
-        quantity: batch.quantity,
-        target_operation_id: nextOperation?.id,
-      }
-    case PRODUCTION_WIP_ACTION.REWORK:
-      return {
-        ...payload,
         quantity: values.quantity,
-        target_operation_id: values.target_operation_id,
+        target_operation_id: nextOperation?.id,
+        ...(nextOperation?.operation_code === 'PACKAGING'
+          ? { finished_goods_receipt_id: values.finished_goods_receipt_id }
+          : {}),
       }
     default:
       return payload

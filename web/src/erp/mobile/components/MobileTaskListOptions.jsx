@@ -1,6 +1,8 @@
 import React, { useState } from 'react'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import MobileFilterPopover from './MobileFilterPopover'
+import WorkflowTaskDiscoveryFilters from '../../components/workflow/WorkflowTaskDiscoveryFilters.jsx'
+import { taskDiscoveryFilterLabels } from '../../utils/workflowTaskDiscovery.mjs'
 import {
   MOBILE_TASK_SORT_OPTIONS,
   MOBILE_TASK_STATUS_OPTIONS,
@@ -10,6 +12,9 @@ export default function MobileTaskListOptions({
   contextLabel = '任务',
   sortKey,
   statusKey,
+  options = {},
+  profile,
+  roleKey,
   onChange,
 }) {
   const [open, setOpen] = useState(false)
@@ -19,8 +24,8 @@ export default function MobileTaskListOptions({
       title="筛选与排序"
       open={open}
       onOpenChange={setOpen}
-      count={Number(sortKey !== 'newest') + Number(Boolean(statusKey))}
-      onReset={() => onChange({ sortKey: 'newest', statusKey: '' })}
+      count={Number(sortKey !== 'newest') + Number(Boolean(statusKey)) + taskDiscoveryFilterLabels(options).length}
+      onReset={() => onChange({ sortKey: 'newest', statusKey: '', moduleKey: '', chainKey: '', stageKey: '', assignee: '' })}
       testId="mobile-task-list-filter-trigger"
     >
       <fieldset>
@@ -43,6 +48,13 @@ export default function MobileTaskListOptions({
           onChange={(value) => onChange({ sortKey, statusKey: value })}
         />
       </fieldset>
+      <WorkflowTaskDiscoveryFilters
+        compact
+        value={options}
+        onChange={onChange}
+        profile={profile}
+        roleKey={roleKey}
+      />
     </MobileFilterPopover>
   )
 }

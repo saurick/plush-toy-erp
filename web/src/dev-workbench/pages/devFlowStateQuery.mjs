@@ -7,12 +7,17 @@ export const DEV_FLOW_STATE_QUERY_KEYS = Object.freeze({
   process: 'process',
   fact: 'fact',
   taskId: 'task_id',
+  role: 'flow_role',
 })
 
 export const DEV_FLOW_STATE_DEFAULT_VIEW = 'chain'
 export const DEV_FLOW_STATE_OVERVIEW_CHAIN_KEY = 'all'
 
 export const DEV_FLOW_STATE_VIEW_SELECTION_QUERY_KEYS = Object.freeze({
+  tracking: Object.freeze([
+    DEV_FLOW_STATE_QUERY_KEYS.chain,
+    DEV_FLOW_STATE_QUERY_KEYS.node,
+  ]),
   chain: Object.freeze([
     DEV_FLOW_STATE_QUERY_KEYS.chain,
     DEV_FLOW_STATE_QUERY_KEYS.node,

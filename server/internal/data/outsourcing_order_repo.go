@@ -1248,6 +1248,7 @@ func entOutsourcingOrderToBiz(row *ent.OutsourcingOrder) *biz.OutsourcingOrder {
 		SupplierSnapshot:      row.SupplierSnapshot,
 		ContractPartySnapshot: row.ContractPartySnapshot,
 		SourceOrderNo:         row.SourceOrderNo,
+		SourceWIPBatchID:      row.SourceWipBatchID,
 		OrderDate:             row.OrderDate,
 		ExpectedReturnDate:    row.ExpectedReturnDate,
 		LifecycleStatus:       row.LifecycleStatus,

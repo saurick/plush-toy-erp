@@ -54823,6 +54823,10 @@ type ProductionExceptionDecisionMutation struct {
 	addproduction_wip_batch_id            *int
 	quality_inspection_id                 *int
 	addquality_inspection_id              *int
+	target_supplier_id                    *int
+	addtarget_supplier_id                 *int
+	target_operation_id                   *int
+	addtarget_operation_id                *int
 	requested_quantity                    *decimal.Decimal
 	approved_quantity                     *decimal.Decimal
 	reason                                *string
@@ -54846,6 +54850,9 @@ type ProductionExceptionDecisionMutation struct {
 	reversed_at                           *time.Time
 	reverse_reason                        *string
 	clearedFields                         map[string]struct{}
+	execution_batches                     map[int]struct{}
+	removedexecution_batches              map[int]struct{}
+	clearedexecution_batches              bool
 	done                                  bool
 	oldValue                              func(context.Context) (*ProductionExceptionDecision, error)
 	predicates                            []predicate.ProductionExceptionDecision
@@ -55413,6 +55420,146 @@ func (m *ProductionExceptionDecisionMutation) ResetQualityInspectionID() {
 	m.quality_inspection_id = nil
 	m.addquality_inspection_id = nil
 	delete(m.clearedFields, productionexceptiondecision.FieldQualityInspectionID)
+}
+
+// SetTargetSupplierID sets the "target_supplier_id" field.
+func (m *ProductionExceptionDecisionMutation) SetTargetSupplierID(i int) {
+	m.target_supplier_id = &i
+	m.addtarget_supplier_id = nil
+}
+
+// TargetSupplierID returns the value of the "target_supplier_id" field in the mutation.
+func (m *ProductionExceptionDecisionMutation) TargetSupplierID() (r int, exists bool) {
+	v := m.target_supplier_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTargetSupplierID returns the old "target_supplier_id" field's value of the ProductionExceptionDecision entity.
+// If the ProductionExceptionDecision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionExceptionDecisionMutation) OldTargetSupplierID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTargetSupplierID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTargetSupplierID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTargetSupplierID: %w", err)
+	}
+	return oldValue.TargetSupplierID, nil
+}
+
+// AddTargetSupplierID adds i to the "target_supplier_id" field.
+func (m *ProductionExceptionDecisionMutation) AddTargetSupplierID(i int) {
+	if m.addtarget_supplier_id != nil {
+		*m.addtarget_supplier_id += i
+	} else {
+		m.addtarget_supplier_id = &i
+	}
+}
+
+// AddedTargetSupplierID returns the value that was added to the "target_supplier_id" field in this mutation.
+func (m *ProductionExceptionDecisionMutation) AddedTargetSupplierID() (r int, exists bool) {
+	v := m.addtarget_supplier_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearTargetSupplierID clears the value of the "target_supplier_id" field.
+func (m *ProductionExceptionDecisionMutation) ClearTargetSupplierID() {
+	m.target_supplier_id = nil
+	m.addtarget_supplier_id = nil
+	m.clearedFields[productionexceptiondecision.FieldTargetSupplierID] = struct{}{}
+}
+
+// TargetSupplierIDCleared returns if the "target_supplier_id" field was cleared in this mutation.
+func (m *ProductionExceptionDecisionMutation) TargetSupplierIDCleared() bool {
+	_, ok := m.clearedFields[productionexceptiondecision.FieldTargetSupplierID]
+	return ok
+}
+
+// ResetTargetSupplierID resets all changes to the "target_supplier_id" field.
+func (m *ProductionExceptionDecisionMutation) ResetTargetSupplierID() {
+	m.target_supplier_id = nil
+	m.addtarget_supplier_id = nil
+	delete(m.clearedFields, productionexceptiondecision.FieldTargetSupplierID)
+}
+
+// SetTargetOperationID sets the "target_operation_id" field.
+func (m *ProductionExceptionDecisionMutation) SetTargetOperationID(i int) {
+	m.target_operation_id = &i
+	m.addtarget_operation_id = nil
+}
+
+// TargetOperationID returns the value of the "target_operation_id" field in the mutation.
+func (m *ProductionExceptionDecisionMutation) TargetOperationID() (r int, exists bool) {
+	v := m.target_operation_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTargetOperationID returns the old "target_operation_id" field's value of the ProductionExceptionDecision entity.
+// If the ProductionExceptionDecision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionExceptionDecisionMutation) OldTargetOperationID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTargetOperationID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTargetOperationID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTargetOperationID: %w", err)
+	}
+	return oldValue.TargetOperationID, nil
+}
+
+// AddTargetOperationID adds i to the "target_operation_id" field.
+func (m *ProductionExceptionDecisionMutation) AddTargetOperationID(i int) {
+	if m.addtarget_operation_id != nil {
+		*m.addtarget_operation_id += i
+	} else {
+		m.addtarget_operation_id = &i
+	}
+}
+
+// AddedTargetOperationID returns the value that was added to the "target_operation_id" field in this mutation.
+func (m *ProductionExceptionDecisionMutation) AddedTargetOperationID() (r int, exists bool) {
+	v := m.addtarget_operation_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearTargetOperationID clears the value of the "target_operation_id" field.
+func (m *ProductionExceptionDecisionMutation) ClearTargetOperationID() {
+	m.target_operation_id = nil
+	m.addtarget_operation_id = nil
+	m.clearedFields[productionexceptiondecision.FieldTargetOperationID] = struct{}{}
+}
+
+// TargetOperationIDCleared returns if the "target_operation_id" field was cleared in this mutation.
+func (m *ProductionExceptionDecisionMutation) TargetOperationIDCleared() bool {
+	_, ok := m.clearedFields[productionexceptiondecision.FieldTargetOperationID]
+	return ok
+}
+
+// ResetTargetOperationID resets all changes to the "target_operation_id" field.
+func (m *ProductionExceptionDecisionMutation) ResetTargetOperationID() {
+	m.target_operation_id = nil
+	m.addtarget_operation_id = nil
+	delete(m.clearedFields, productionexceptiondecision.FieldTargetOperationID)
 }
 
 // SetRequestedQuantity sets the "requested_quantity" field.
@@ -56260,6 +56407,60 @@ func (m *ProductionExceptionDecisionMutation) ResetReverseReason() {
 	delete(m.clearedFields, productionexceptiondecision.FieldReverseReason)
 }
 
+// AddExecutionBatchIDs adds the "execution_batches" edge to the ProductionWIPBatch entity by ids.
+func (m *ProductionExceptionDecisionMutation) AddExecutionBatchIDs(ids ...int) {
+	if m.execution_batches == nil {
+		m.execution_batches = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.execution_batches[ids[i]] = struct{}{}
+	}
+}
+
+// ClearExecutionBatches clears the "execution_batches" edge to the ProductionWIPBatch entity.
+func (m *ProductionExceptionDecisionMutation) ClearExecutionBatches() {
+	m.clearedexecution_batches = true
+}
+
+// ExecutionBatchesCleared reports if the "execution_batches" edge to the ProductionWIPBatch entity was cleared.
+func (m *ProductionExceptionDecisionMutation) ExecutionBatchesCleared() bool {
+	return m.clearedexecution_batches
+}
+
+// RemoveExecutionBatchIDs removes the "execution_batches" edge to the ProductionWIPBatch entity by IDs.
+func (m *ProductionExceptionDecisionMutation) RemoveExecutionBatchIDs(ids ...int) {
+	if m.removedexecution_batches == nil {
+		m.removedexecution_batches = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.execution_batches, ids[i])
+		m.removedexecution_batches[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedExecutionBatches returns the removed IDs of the "execution_batches" edge to the ProductionWIPBatch entity.
+func (m *ProductionExceptionDecisionMutation) RemovedExecutionBatchesIDs() (ids []int) {
+	for id := range m.removedexecution_batches {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ExecutionBatchesIDs returns the "execution_batches" edge IDs in the mutation.
+func (m *ProductionExceptionDecisionMutation) ExecutionBatchesIDs() (ids []int) {
+	for id := range m.execution_batches {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetExecutionBatches resets all changes to the "execution_batches" edge.
+func (m *ProductionExceptionDecisionMutation) ResetExecutionBatches() {
+	m.execution_batches = nil
+	m.clearedexecution_batches = false
+	m.removedexecution_batches = nil
+}
+
 // Where appends a list predicates to the ProductionExceptionDecisionMutation builder.
 func (m *ProductionExceptionDecisionMutation) Where(ps ...predicate.ProductionExceptionDecision) {
 	m.predicates = append(m.predicates, ps...)
@@ -56294,7 +56495,7 @@ func (m *ProductionExceptionDecisionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductionExceptionDecisionMutation) Fields() []string {
-	fields := make([]string, 0, 26)
+	fields := make([]string, 0, 28)
 	if m.decision_no != nil {
 		fields = append(fields, productionexceptiondecision.FieldDecisionNo)
 	}
@@ -56321,6 +56522,12 @@ func (m *ProductionExceptionDecisionMutation) Fields() []string {
 	}
 	if m.quality_inspection_id != nil {
 		fields = append(fields, productionexceptiondecision.FieldQualityInspectionID)
+	}
+	if m.target_supplier_id != nil {
+		fields = append(fields, productionexceptiondecision.FieldTargetSupplierID)
+	}
+	if m.target_operation_id != nil {
+		fields = append(fields, productionexceptiondecision.FieldTargetOperationID)
 	}
 	if m.requested_quantity != nil {
 		fields = append(fields, productionexceptiondecision.FieldRequestedQuantity)
@@ -56399,6 +56606,10 @@ func (m *ProductionExceptionDecisionMutation) Field(name string) (ent.Value, boo
 		return m.ProductionWipBatchID()
 	case productionexceptiondecision.FieldQualityInspectionID:
 		return m.QualityInspectionID()
+	case productionexceptiondecision.FieldTargetSupplierID:
+		return m.TargetSupplierID()
+	case productionexceptiondecision.FieldTargetOperationID:
+		return m.TargetOperationID()
 	case productionexceptiondecision.FieldRequestedQuantity:
 		return m.RequestedQuantity()
 	case productionexceptiondecision.FieldApprovedQuantity:
@@ -56460,6 +56671,10 @@ func (m *ProductionExceptionDecisionMutation) OldField(ctx context.Context, name
 		return m.OldProductionWipBatchID(ctx)
 	case productionexceptiondecision.FieldQualityInspectionID:
 		return m.OldQualityInspectionID(ctx)
+	case productionexceptiondecision.FieldTargetSupplierID:
+		return m.OldTargetSupplierID(ctx)
+	case productionexceptiondecision.FieldTargetOperationID:
+		return m.OldTargetOperationID(ctx)
 	case productionexceptiondecision.FieldRequestedQuantity:
 		return m.OldRequestedQuantity(ctx)
 	case productionexceptiondecision.FieldApprovedQuantity:
@@ -56565,6 +56780,20 @@ func (m *ProductionExceptionDecisionMutation) SetField(name string, value ent.Va
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetQualityInspectionID(v)
+		return nil
+	case productionexceptiondecision.FieldTargetSupplierID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTargetSupplierID(v)
+		return nil
+	case productionexceptiondecision.FieldTargetOperationID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTargetOperationID(v)
 		return nil
 	case productionexceptiondecision.FieldRequestedQuantity:
 		v, ok := value.(decimal.Decimal)
@@ -56708,6 +56937,12 @@ func (m *ProductionExceptionDecisionMutation) AddedFields() []string {
 	if m.addquality_inspection_id != nil {
 		fields = append(fields, productionexceptiondecision.FieldQualityInspectionID)
 	}
+	if m.addtarget_supplier_id != nil {
+		fields = append(fields, productionexceptiondecision.FieldTargetSupplierID)
+	}
+	if m.addtarget_operation_id != nil {
+		fields = append(fields, productionexceptiondecision.FieldTargetOperationID)
+	}
 	if m.addversion != nil {
 		fields = append(fields, productionexceptiondecision.FieldVersion)
 	}
@@ -56741,6 +56976,10 @@ func (m *ProductionExceptionDecisionMutation) AddedField(name string) (ent.Value
 		return m.AddedProductionWipBatchID()
 	case productionexceptiondecision.FieldQualityInspectionID:
 		return m.AddedQualityInspectionID()
+	case productionexceptiondecision.FieldTargetSupplierID:
+		return m.AddedTargetSupplierID()
+	case productionexceptiondecision.FieldTargetOperationID:
+		return m.AddedTargetOperationID()
 	case productionexceptiondecision.FieldVersion:
 		return m.AddedVersion()
 	case productionexceptiondecision.FieldRequestedBy:
@@ -56795,6 +57034,20 @@ func (m *ProductionExceptionDecisionMutation) AddField(name string, value ent.Va
 		}
 		m.AddQualityInspectionID(v)
 		return nil
+	case productionexceptiondecision.FieldTargetSupplierID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddTargetSupplierID(v)
+		return nil
+	case productionexceptiondecision.FieldTargetOperationID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddTargetOperationID(v)
+		return nil
 	case productionexceptiondecision.FieldVersion:
 		v, ok := value.(int)
 		if !ok {
@@ -56846,6 +57099,12 @@ func (m *ProductionExceptionDecisionMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(productionexceptiondecision.FieldQualityInspectionID) {
 		fields = append(fields, productionexceptiondecision.FieldQualityInspectionID)
+	}
+	if m.FieldCleared(productionexceptiondecision.FieldTargetSupplierID) {
+		fields = append(fields, productionexceptiondecision.FieldTargetSupplierID)
+	}
+	if m.FieldCleared(productionexceptiondecision.FieldTargetOperationID) {
+		fields = append(fields, productionexceptiondecision.FieldTargetOperationID)
 	}
 	if m.FieldCleared(productionexceptiondecision.FieldApprovedQuantity) {
 		fields = append(fields, productionexceptiondecision.FieldApprovedQuantity)
@@ -56899,6 +57158,12 @@ func (m *ProductionExceptionDecisionMutation) ClearField(name string) error {
 		return nil
 	case productionexceptiondecision.FieldQualityInspectionID:
 		m.ClearQualityInspectionID()
+		return nil
+	case productionexceptiondecision.FieldTargetSupplierID:
+		m.ClearTargetSupplierID()
+		return nil
+	case productionexceptiondecision.FieldTargetOperationID:
+		m.ClearTargetOperationID()
 		return nil
 	case productionexceptiondecision.FieldApprovedQuantity:
 		m.ClearApprovedQuantity()
@@ -56965,6 +57230,12 @@ func (m *ProductionExceptionDecisionMutation) ResetField(name string) error {
 	case productionexceptiondecision.FieldQualityInspectionID:
 		m.ResetQualityInspectionID()
 		return nil
+	case productionexceptiondecision.FieldTargetSupplierID:
+		m.ResetTargetSupplierID()
+		return nil
+	case productionexceptiondecision.FieldTargetOperationID:
+		m.ResetTargetOperationID()
+		return nil
 	case productionexceptiondecision.FieldRequestedQuantity:
 		m.ResetRequestedQuantity()
 		return nil
@@ -57022,49 +57293,85 @@ func (m *ProductionExceptionDecisionMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProductionExceptionDecisionMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.execution_batches != nil {
+		edges = append(edges, productionexceptiondecision.EdgeExecutionBatches)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *ProductionExceptionDecisionMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case productionexceptiondecision.EdgeExecutionBatches:
+		ids := make([]ent.Value, 0, len(m.execution_batches))
+		for id := range m.execution_batches {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProductionExceptionDecisionMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.removedexecution_batches != nil {
+		edges = append(edges, productionexceptiondecision.EdgeExecutionBatches)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *ProductionExceptionDecisionMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case productionexceptiondecision.EdgeExecutionBatches:
+		ids := make([]ent.Value, 0, len(m.removedexecution_batches))
+		for id := range m.removedexecution_batches {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProductionExceptionDecisionMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.clearedexecution_batches {
+		edges = append(edges, productionexceptiondecision.EdgeExecutionBatches)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *ProductionExceptionDecisionMutation) EdgeCleared(name string) bool {
+	switch name {
+	case productionexceptiondecision.EdgeExecutionBatches:
+		return m.clearedexecution_batches
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *ProductionExceptionDecisionMutation) ClearEdge(name string) error {
+	switch name {
+	}
 	return fmt.Errorf("unknown ProductionExceptionDecision unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *ProductionExceptionDecisionMutation) ResetEdge(name string) error {
+	switch name {
+	case productionexceptiondecision.EdgeExecutionBatches:
+		m.ResetExecutionBatches()
+		return nil
+	}
 	return fmt.Errorf("unknown ProductionExceptionDecision edge %s", name)
 }
 
@@ -57111,6 +57418,9 @@ type ProductionFactMutation struct {
 	origin_rework_batches        map[int]struct{}
 	removedorigin_rework_batches map[int]struct{}
 	clearedorigin_rework_batches bool
+	packaging_batches            map[int]struct{}
+	removedpackaging_batches     map[int]struct{}
+	clearedpackaging_batches     bool
 	poster                       *int
 	clearedposter                bool
 	canceller                    *int
@@ -58594,6 +58904,60 @@ func (m *ProductionFactMutation) ResetOriginReworkBatches() {
 	m.removedorigin_rework_batches = nil
 }
 
+// AddPackagingBatchIDs adds the "packaging_batches" edge to the ProductionWIPBatch entity by ids.
+func (m *ProductionFactMutation) AddPackagingBatchIDs(ids ...int) {
+	if m.packaging_batches == nil {
+		m.packaging_batches = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.packaging_batches[ids[i]] = struct{}{}
+	}
+}
+
+// ClearPackagingBatches clears the "packaging_batches" edge to the ProductionWIPBatch entity.
+func (m *ProductionFactMutation) ClearPackagingBatches() {
+	m.clearedpackaging_batches = true
+}
+
+// PackagingBatchesCleared reports if the "packaging_batches" edge to the ProductionWIPBatch entity was cleared.
+func (m *ProductionFactMutation) PackagingBatchesCleared() bool {
+	return m.clearedpackaging_batches
+}
+
+// RemovePackagingBatchIDs removes the "packaging_batches" edge to the ProductionWIPBatch entity by IDs.
+func (m *ProductionFactMutation) RemovePackagingBatchIDs(ids ...int) {
+	if m.removedpackaging_batches == nil {
+		m.removedpackaging_batches = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.packaging_batches, ids[i])
+		m.removedpackaging_batches[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedPackagingBatches returns the removed IDs of the "packaging_batches" edge to the ProductionWIPBatch entity.
+func (m *ProductionFactMutation) RemovedPackagingBatchesIDs() (ids []int) {
+	for id := range m.removedpackaging_batches {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// PackagingBatchesIDs returns the "packaging_batches" edge IDs in the mutation.
+func (m *ProductionFactMutation) PackagingBatchesIDs() (ids []int) {
+	for id := range m.packaging_batches {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetPackagingBatches resets all changes to the "packaging_batches" edge.
+func (m *ProductionFactMutation) ResetPackagingBatches() {
+	m.packaging_batches = nil
+	m.clearedpackaging_batches = false
+	m.removedpackaging_batches = nil
+}
+
 // SetPosterID sets the "poster" edge to the AdminUser entity by id.
 func (m *ProductionFactMutation) SetPosterID(id int) {
 	m.poster = &id
@@ -59358,7 +59722,7 @@ func (m *ProductionFactMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProductionFactMutation) AddedEdges() []string {
-	edges := make([]string, 0, 8)
+	edges := make([]string, 0, 9)
 	if m.warehouse != nil {
 		edges = append(edges, productionfact.EdgeWarehouse)
 	}
@@ -59376,6 +59740,9 @@ func (m *ProductionFactMutation) AddedEdges() []string {
 	}
 	if m.origin_rework_batches != nil {
 		edges = append(edges, productionfact.EdgeOriginReworkBatches)
+	}
+	if m.packaging_batches != nil {
+		edges = append(edges, productionfact.EdgePackagingBatches)
 	}
 	if m.poster != nil {
 		edges = append(edges, productionfact.EdgePoster)
@@ -59416,6 +59783,12 @@ func (m *ProductionFactMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case productionfact.EdgePackagingBatches:
+		ids := make([]ent.Value, 0, len(m.packaging_batches))
+		for id := range m.packaging_batches {
+			ids = append(ids, id)
+		}
+		return ids
 	case productionfact.EdgePoster:
 		if id := m.poster; id != nil {
 			return []ent.Value{*id}
@@ -59430,9 +59803,12 @@ func (m *ProductionFactMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProductionFactMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 8)
+	edges := make([]string, 0, 9)
 	if m.removedorigin_rework_batches != nil {
 		edges = append(edges, productionfact.EdgeOriginReworkBatches)
+	}
+	if m.removedpackaging_batches != nil {
+		edges = append(edges, productionfact.EdgePackagingBatches)
 	}
 	return edges
 }
@@ -59447,13 +59823,19 @@ func (m *ProductionFactMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case productionfact.EdgePackagingBatches:
+		ids := make([]ent.Value, 0, len(m.removedpackaging_batches))
+		for id := range m.removedpackaging_batches {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProductionFactMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 8)
+	edges := make([]string, 0, 9)
 	if m.clearedwarehouse {
 		edges = append(edges, productionfact.EdgeWarehouse)
 	}
@@ -59471,6 +59853,9 @@ func (m *ProductionFactMutation) ClearedEdges() []string {
 	}
 	if m.clearedorigin_rework_batches {
 		edges = append(edges, productionfact.EdgeOriginReworkBatches)
+	}
+	if m.clearedpackaging_batches {
+		edges = append(edges, productionfact.EdgePackagingBatches)
 	}
 	if m.clearedposter {
 		edges = append(edges, productionfact.EdgePoster)
@@ -59497,6 +59882,8 @@ func (m *ProductionFactMutation) EdgeCleared(name string) bool {
 		return m.clearedproduction_wip_batch
 	case productionfact.EdgeOriginReworkBatches:
 		return m.clearedorigin_rework_batches
+	case productionfact.EdgePackagingBatches:
+		return m.clearedpackaging_batches
 	case productionfact.EdgePoster:
 		return m.clearedposter
 	case productionfact.EdgeCanceller:
@@ -59555,6 +59942,9 @@ func (m *ProductionFactMutation) ResetEdge(name string) error {
 		return nil
 	case productionfact.EdgeOriginReworkBatches:
 		m.ResetOriginReworkBatches()
+		return nil
+	case productionfact.EdgePackagingBatches:
+		m.ResetPackagingBatches()
 		return nil
 	case productionfact.EdgePoster:
 		m.ResetPoster()
@@ -69107,6 +69497,10 @@ type ProductionWIPBatchMutation struct {
 	completion_facts                  map[int]struct{}
 	removedcompletion_facts           map[int]struct{}
 	clearedcompletion_facts           bool
+	origin_exception_decision         *int
+	clearedorigin_exception_decision  bool
+	finished_goods_receipt            *int
+	clearedfinished_goods_receipt     bool
 	events                            map[int]struct{}
 	removedevents                     map[int]struct{}
 	clearedevents                     bool
@@ -69425,6 +69819,104 @@ func (m *ProductionWIPBatchMutation) OriginReworkFactIDCleared() bool {
 func (m *ProductionWIPBatchMutation) ResetOriginReworkFactID() {
 	m.origin_rework_fact = nil
 	delete(m.clearedFields, productionwipbatch.FieldOriginReworkFactID)
+}
+
+// SetOriginExceptionDecisionID sets the "origin_exception_decision_id" field.
+func (m *ProductionWIPBatchMutation) SetOriginExceptionDecisionID(i int) {
+	m.origin_exception_decision = &i
+}
+
+// OriginExceptionDecisionID returns the value of the "origin_exception_decision_id" field in the mutation.
+func (m *ProductionWIPBatchMutation) OriginExceptionDecisionID() (r int, exists bool) {
+	v := m.origin_exception_decision
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOriginExceptionDecisionID returns the old "origin_exception_decision_id" field's value of the ProductionWIPBatch entity.
+// If the ProductionWIPBatch object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionWIPBatchMutation) OldOriginExceptionDecisionID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOriginExceptionDecisionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOriginExceptionDecisionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOriginExceptionDecisionID: %w", err)
+	}
+	return oldValue.OriginExceptionDecisionID, nil
+}
+
+// ClearOriginExceptionDecisionID clears the value of the "origin_exception_decision_id" field.
+func (m *ProductionWIPBatchMutation) ClearOriginExceptionDecisionID() {
+	m.origin_exception_decision = nil
+	m.clearedFields[productionwipbatch.FieldOriginExceptionDecisionID] = struct{}{}
+}
+
+// OriginExceptionDecisionIDCleared returns if the "origin_exception_decision_id" field was cleared in this mutation.
+func (m *ProductionWIPBatchMutation) OriginExceptionDecisionIDCleared() bool {
+	_, ok := m.clearedFields[productionwipbatch.FieldOriginExceptionDecisionID]
+	return ok
+}
+
+// ResetOriginExceptionDecisionID resets all changes to the "origin_exception_decision_id" field.
+func (m *ProductionWIPBatchMutation) ResetOriginExceptionDecisionID() {
+	m.origin_exception_decision = nil
+	delete(m.clearedFields, productionwipbatch.FieldOriginExceptionDecisionID)
+}
+
+// SetFinishedGoodsReceiptID sets the "finished_goods_receipt_id" field.
+func (m *ProductionWIPBatchMutation) SetFinishedGoodsReceiptID(i int) {
+	m.finished_goods_receipt = &i
+}
+
+// FinishedGoodsReceiptID returns the value of the "finished_goods_receipt_id" field in the mutation.
+func (m *ProductionWIPBatchMutation) FinishedGoodsReceiptID() (r int, exists bool) {
+	v := m.finished_goods_receipt
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinishedGoodsReceiptID returns the old "finished_goods_receipt_id" field's value of the ProductionWIPBatch entity.
+// If the ProductionWIPBatch object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionWIPBatchMutation) OldFinishedGoodsReceiptID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinishedGoodsReceiptID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinishedGoodsReceiptID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinishedGoodsReceiptID: %w", err)
+	}
+	return oldValue.FinishedGoodsReceiptID, nil
+}
+
+// ClearFinishedGoodsReceiptID clears the value of the "finished_goods_receipt_id" field.
+func (m *ProductionWIPBatchMutation) ClearFinishedGoodsReceiptID() {
+	m.finished_goods_receipt = nil
+	m.clearedFields[productionwipbatch.FieldFinishedGoodsReceiptID] = struct{}{}
+}
+
+// FinishedGoodsReceiptIDCleared returns if the "finished_goods_receipt_id" field was cleared in this mutation.
+func (m *ProductionWIPBatchMutation) FinishedGoodsReceiptIDCleared() bool {
+	_, ok := m.clearedFields[productionwipbatch.FieldFinishedGoodsReceiptID]
+	return ok
+}
+
+// ResetFinishedGoodsReceiptID resets all changes to the "finished_goods_receipt_id" field.
+func (m *ProductionWIPBatchMutation) ResetFinishedGoodsReceiptID() {
+	m.finished_goods_receipt = nil
+	delete(m.clearedFields, productionwipbatch.FieldFinishedGoodsReceiptID)
 }
 
 // SetBatchNo sets the "batch_no" field.
@@ -70174,6 +70666,60 @@ func (m *ProductionWIPBatchMutation) ResetCompletionFacts() {
 	m.removedcompletion_facts = nil
 }
 
+// ClearOriginExceptionDecision clears the "origin_exception_decision" edge to the ProductionExceptionDecision entity.
+func (m *ProductionWIPBatchMutation) ClearOriginExceptionDecision() {
+	m.clearedorigin_exception_decision = true
+	m.clearedFields[productionwipbatch.FieldOriginExceptionDecisionID] = struct{}{}
+}
+
+// OriginExceptionDecisionCleared reports if the "origin_exception_decision" edge to the ProductionExceptionDecision entity was cleared.
+func (m *ProductionWIPBatchMutation) OriginExceptionDecisionCleared() bool {
+	return m.OriginExceptionDecisionIDCleared() || m.clearedorigin_exception_decision
+}
+
+// OriginExceptionDecisionIDs returns the "origin_exception_decision" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// OriginExceptionDecisionID instead. It exists only for internal usage by the builders.
+func (m *ProductionWIPBatchMutation) OriginExceptionDecisionIDs() (ids []int) {
+	if id := m.origin_exception_decision; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetOriginExceptionDecision resets all changes to the "origin_exception_decision" edge.
+func (m *ProductionWIPBatchMutation) ResetOriginExceptionDecision() {
+	m.origin_exception_decision = nil
+	m.clearedorigin_exception_decision = false
+}
+
+// ClearFinishedGoodsReceipt clears the "finished_goods_receipt" edge to the ProductionFact entity.
+func (m *ProductionWIPBatchMutation) ClearFinishedGoodsReceipt() {
+	m.clearedfinished_goods_receipt = true
+	m.clearedFields[productionwipbatch.FieldFinishedGoodsReceiptID] = struct{}{}
+}
+
+// FinishedGoodsReceiptCleared reports if the "finished_goods_receipt" edge to the ProductionFact entity was cleared.
+func (m *ProductionWIPBatchMutation) FinishedGoodsReceiptCleared() bool {
+	return m.FinishedGoodsReceiptIDCleared() || m.clearedfinished_goods_receipt
+}
+
+// FinishedGoodsReceiptIDs returns the "finished_goods_receipt" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// FinishedGoodsReceiptID instead. It exists only for internal usage by the builders.
+func (m *ProductionWIPBatchMutation) FinishedGoodsReceiptIDs() (ids []int) {
+	if id := m.finished_goods_receipt; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetFinishedGoodsReceipt resets all changes to the "finished_goods_receipt" edge.
+func (m *ProductionWIPBatchMutation) ResetFinishedGoodsReceipt() {
+	m.finished_goods_receipt = nil
+	m.clearedfinished_goods_receipt = false
+}
+
 // AddEventIDs adds the "events" edge to the ProductionWIPEvent entity by ids.
 func (m *ProductionWIPBatchMutation) AddEventIDs(ids ...int) {
 	if m.events == nil {
@@ -70410,7 +70956,7 @@ func (m *ProductionWIPBatchMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductionWIPBatchMutation) Fields() []string {
-	fields := make([]string, 0, 17)
+	fields := make([]string, 0, 19)
 	if m.production_order != nil {
 		fields = append(fields, productionwipbatch.FieldProductionOrderID)
 	}
@@ -70425,6 +70971,12 @@ func (m *ProductionWIPBatchMutation) Fields() []string {
 	}
 	if m.origin_rework_fact != nil {
 		fields = append(fields, productionwipbatch.FieldOriginReworkFactID)
+	}
+	if m.origin_exception_decision != nil {
+		fields = append(fields, productionwipbatch.FieldOriginExceptionDecisionID)
+	}
+	if m.finished_goods_receipt != nil {
+		fields = append(fields, productionwipbatch.FieldFinishedGoodsReceiptID)
 	}
 	if m.batch_no != nil {
 		fields = append(fields, productionwipbatch.FieldBatchNo)
@@ -70480,6 +71032,10 @@ func (m *ProductionWIPBatchMutation) Field(name string) (ent.Value, bool) {
 		return m.SourceBatchID()
 	case productionwipbatch.FieldOriginReworkFactID:
 		return m.OriginReworkFactID()
+	case productionwipbatch.FieldOriginExceptionDecisionID:
+		return m.OriginExceptionDecisionID()
+	case productionwipbatch.FieldFinishedGoodsReceiptID:
+		return m.FinishedGoodsReceiptID()
 	case productionwipbatch.FieldBatchNo:
 		return m.BatchNo()
 	case productionwipbatch.FieldFlowType:
@@ -70523,6 +71079,10 @@ func (m *ProductionWIPBatchMutation) OldField(ctx context.Context, name string) 
 		return m.OldSourceBatchID(ctx)
 	case productionwipbatch.FieldOriginReworkFactID:
 		return m.OldOriginReworkFactID(ctx)
+	case productionwipbatch.FieldOriginExceptionDecisionID:
+		return m.OldOriginExceptionDecisionID(ctx)
+	case productionwipbatch.FieldFinishedGoodsReceiptID:
+		return m.OldFinishedGoodsReceiptID(ctx)
 	case productionwipbatch.FieldBatchNo:
 		return m.OldBatchNo(ctx)
 	case productionwipbatch.FieldFlowType:
@@ -70590,6 +71150,20 @@ func (m *ProductionWIPBatchMutation) SetField(name string, value ent.Value) erro
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOriginReworkFactID(v)
+		return nil
+	case productionwipbatch.FieldOriginExceptionDecisionID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOriginExceptionDecisionID(v)
+		return nil
+	case productionwipbatch.FieldFinishedGoodsReceiptID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinishedGoodsReceiptID(v)
 		return nil
 	case productionwipbatch.FieldBatchNo:
 		v, ok := value.(string)
@@ -70726,6 +71300,12 @@ func (m *ProductionWIPBatchMutation) ClearedFields() []string {
 	if m.FieldCleared(productionwipbatch.FieldOriginReworkFactID) {
 		fields = append(fields, productionwipbatch.FieldOriginReworkFactID)
 	}
+	if m.FieldCleared(productionwipbatch.FieldOriginExceptionDecisionID) {
+		fields = append(fields, productionwipbatch.FieldOriginExceptionDecisionID)
+	}
+	if m.FieldCleared(productionwipbatch.FieldFinishedGoodsReceiptID) {
+		fields = append(fields, productionwipbatch.FieldFinishedGoodsReceiptID)
+	}
 	if m.FieldCleared(productionwipbatch.FieldExecutionMode) {
 		fields = append(fields, productionwipbatch.FieldExecutionMode)
 	}
@@ -70757,6 +71337,12 @@ func (m *ProductionWIPBatchMutation) ClearField(name string) error {
 		return nil
 	case productionwipbatch.FieldOriginReworkFactID:
 		m.ClearOriginReworkFactID()
+		return nil
+	case productionwipbatch.FieldOriginExceptionDecisionID:
+		m.ClearOriginExceptionDecisionID()
+		return nil
+	case productionwipbatch.FieldFinishedGoodsReceiptID:
+		m.ClearFinishedGoodsReceiptID()
 		return nil
 	case productionwipbatch.FieldExecutionMode:
 		m.ClearExecutionMode()
@@ -70792,6 +71378,12 @@ func (m *ProductionWIPBatchMutation) ResetField(name string) error {
 		return nil
 	case productionwipbatch.FieldOriginReworkFactID:
 		m.ResetOriginReworkFactID()
+		return nil
+	case productionwipbatch.FieldOriginExceptionDecisionID:
+		m.ResetOriginExceptionDecisionID()
+		return nil
+	case productionwipbatch.FieldFinishedGoodsReceiptID:
+		m.ResetFinishedGoodsReceiptID()
 		return nil
 	case productionwipbatch.FieldBatchNo:
 		m.ResetBatchNo()
@@ -70835,7 +71427,7 @@ func (m *ProductionWIPBatchMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProductionWIPBatchMutation) AddedEdges() []string {
-	edges := make([]string, 0, 11)
+	edges := make([]string, 0, 13)
 	if m.production_order != nil {
 		edges = append(edges, productionwipbatch.EdgeProductionOrder)
 	}
@@ -70856,6 +71448,12 @@ func (m *ProductionWIPBatchMutation) AddedEdges() []string {
 	}
 	if m.completion_facts != nil {
 		edges = append(edges, productionwipbatch.EdgeCompletionFacts)
+	}
+	if m.origin_exception_decision != nil {
+		edges = append(edges, productionwipbatch.EdgeOriginExceptionDecision)
+	}
+	if m.finished_goods_receipt != nil {
+		edges = append(edges, productionwipbatch.EdgeFinishedGoodsReceipt)
 	}
 	if m.events != nil {
 		edges = append(edges, productionwipbatch.EdgeEvents)
@@ -70908,6 +71506,14 @@ func (m *ProductionWIPBatchMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case productionwipbatch.EdgeOriginExceptionDecision:
+		if id := m.origin_exception_decision; id != nil {
+			return []ent.Value{*id}
+		}
+	case productionwipbatch.EdgeFinishedGoodsReceipt:
+		if id := m.finished_goods_receipt; id != nil {
+			return []ent.Value{*id}
+		}
 	case productionwipbatch.EdgeEvents:
 		ids := make([]ent.Value, 0, len(m.events))
 		for id := range m.events {
@@ -70936,7 +71542,7 @@ func (m *ProductionWIPBatchMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProductionWIPBatchMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 11)
+	edges := make([]string, 0, 13)
 	if m.removedchild_batches != nil {
 		edges = append(edges, productionwipbatch.EdgeChildBatches)
 	}
@@ -70995,7 +71601,7 @@ func (m *ProductionWIPBatchMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProductionWIPBatchMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 11)
+	edges := make([]string, 0, 13)
 	if m.clearedproduction_order {
 		edges = append(edges, productionwipbatch.EdgeProductionOrder)
 	}
@@ -71016,6 +71622,12 @@ func (m *ProductionWIPBatchMutation) ClearedEdges() []string {
 	}
 	if m.clearedcompletion_facts {
 		edges = append(edges, productionwipbatch.EdgeCompletionFacts)
+	}
+	if m.clearedorigin_exception_decision {
+		edges = append(edges, productionwipbatch.EdgeOriginExceptionDecision)
+	}
+	if m.clearedfinished_goods_receipt {
+		edges = append(edges, productionwipbatch.EdgeFinishedGoodsReceipt)
 	}
 	if m.clearedevents {
 		edges = append(edges, productionwipbatch.EdgeEvents)
@@ -71050,6 +71662,10 @@ func (m *ProductionWIPBatchMutation) EdgeCleared(name string) bool {
 		return m.clearedorigin_rework_fact
 	case productionwipbatch.EdgeCompletionFacts:
 		return m.clearedcompletion_facts
+	case productionwipbatch.EdgeOriginExceptionDecision:
+		return m.clearedorigin_exception_decision
+	case productionwipbatch.EdgeFinishedGoodsReceipt:
+		return m.clearedfinished_goods_receipt
 	case productionwipbatch.EdgeEvents:
 		return m.clearedevents
 	case productionwipbatch.EdgeQualityInspections:
@@ -71080,6 +71696,12 @@ func (m *ProductionWIPBatchMutation) ClearEdge(name string) error {
 		return nil
 	case productionwipbatch.EdgeOriginReworkFact:
 		m.ClearOriginReworkFact()
+		return nil
+	case productionwipbatch.EdgeOriginExceptionDecision:
+		m.ClearOriginExceptionDecision()
+		return nil
+	case productionwipbatch.EdgeFinishedGoodsReceipt:
+		m.ClearFinishedGoodsReceipt()
 		return nil
 	case productionwipbatch.EdgeCreator:
 		m.ClearCreator()
@@ -71112,6 +71734,12 @@ func (m *ProductionWIPBatchMutation) ResetEdge(name string) error {
 		return nil
 	case productionwipbatch.EdgeCompletionFacts:
 		m.ResetCompletionFacts()
+		return nil
+	case productionwipbatch.EdgeOriginExceptionDecision:
+		m.ResetOriginExceptionDecision()
+		return nil
+	case productionwipbatch.EdgeFinishedGoodsReceipt:
+		m.ResetFinishedGoodsReceipt()
 		return nil
 	case productionwipbatch.EdgeEvents:
 		m.ResetEvents()

@@ -109,12 +109,9 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskApprove,
 				PermissionWorkflowTaskReject,
 				PermissionShipmentRead,
-				PermissionShipmentUpdate,
-				PermissionShipmentShip,
-				PermissionShipmentCancel,
 				PermissionMobileWarehouseAccess,
 			},
-			omits: []string{PermissionDebugBusinessClear},
+			omits: []string{PermissionDebugBusinessClear, PermissionShipmentCreate, PermissionShipmentUpdate, PermissionShipmentShip, PermissionShipmentCancel},
 		},
 		{
 			roleKey: ProductionRoleKey,
@@ -219,6 +216,8 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionShipmentRead,
 				PermissionShipmentCreate,
 				PermissionShipmentUpdate,
+				PermissionShipmentShip,
+				PermissionShipmentCancel,
 				PermissionMobileSalesAccess,
 			},
 			omits: []string{PermissionDebugBusinessClear},
@@ -265,24 +264,26 @@ func TestBuiltinRoleOperationalFactPermissionProjection(t *testing.T) {
 		PermissionProductionWIPRead,
 		PermissionProductionWIPAssign,
 		PermissionProductionWIPExecute,
-		PermissionProductionWIPRework,
-		PermissionProductionCompletionCreate,
 		PermissionProductionMaterialIssueCreate,
 		PermissionProductionFactPost,
 		PermissionProductionFactCancel,
 	)
 
+	assertPermissionSetContains(t, builtinRolePermissionSet(t, WarehouseRoleKey), PermissionProductionCompletionCreate, PermissionWarehousePackagingExecute, PermissionPurchaseReceiptCreate)
+	assertPermissionSetOmits(t, production, PermissionProductionCompletionCreate, PermissionWarehousePackagingExecute)
+	assertPermissionSetOmits(t, builtinRolePermissionSet(t, QualityRoleKey), PermissionPurchaseReceiptCreate)
+
 	pmc := builtinRolePermissionSet(t, PMCRoleKey)
 	assertPermissionSetContains(t, pmc, PermissionProductionFactRead, PermissionProductionWIPRead)
-	assertPermissionSetOmits(t, pmc, PermissionProductionWIPAssign, PermissionProductionWIPExecute, PermissionProductionWIPRework, PermissionPackagingMaterialConfirm, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
+	assertPermissionSetOmits(t, pmc, PermissionProductionWIPAssign, PermissionProductionWIPExecute, PermissionPackagingMaterialConfirm, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
 
 	sales := builtinRolePermissionSet(t, SalesRoleKey)
 	assertPermissionSetContains(t, sales, PermissionStockReservationCreate, PermissionStockReservationRelease, PermissionProductionWIPRead, PermissionPackagingMaterialConfirm)
-	assertPermissionSetOmits(t, sales, PermissionProductionWIPAssign, PermissionProductionWIPExecute, PermissionProductionWIPRework)
+	assertPermissionSetOmits(t, sales, PermissionProductionWIPAssign, PermissionProductionWIPExecute)
 
 	warehouse := builtinRolePermissionSet(t, WarehouseRoleKey)
 	assertPermissionSetContains(t, warehouse, PermissionStockReservationCreate, PermissionStockReservationRelease, PermissionProductionFactRead, PermissionProductionWIPRead, PermissionWarehouseInboundConfirm)
-	assertPermissionSetOmits(t, warehouse, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
+	assertPermissionSetOmits(t, warehouse, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
 
 	quality := builtinRolePermissionSet(t, QualityRoleKey)
 	assertPermissionSetContains(t, quality, PermissionCustomerRead, PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionShipmentRead, PermissionProductionWIPRead, PermissionQualityInspectionRead, PermissionQualityInspectionCreate)

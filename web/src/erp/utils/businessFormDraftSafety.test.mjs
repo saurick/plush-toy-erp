@@ -34,7 +34,7 @@ test('BOM edit fails closed until complete line details are loaded', () => {
     'const openCopy ='
   )
 
-  assert.match(openEdit, /const detail = await loadDetail\(record\.id\)/u)
+  assert.match(openEdit, /const detail = prepared \? record : await loadDetail\(record\.id\)/u)
   assert.match(openEdit, /!Array\.isArray\(detail\.items\)[\s\S]*?return/u)
   assert.doesNotMatch(openEdit, /\|\| record/u)
   assert.ok(

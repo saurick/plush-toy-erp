@@ -119,9 +119,21 @@ go run ./cmd/backfill-workflow-source-tasks \
   --confirm-database=<精确数据库名>
 ```
 
-该命令只扫描当前仍为 `RELEASED` 的生产订单和当前仍为 `POSTED REWORK` 的返工事实，补齐缺失的 task / `created` event / business state 包；确定性编号被占用、已有包不完整或来源不合法时整批失败。新建任务保持 `ready`，由真实责任岗位处理，不推断历史 `done / rejected`。它不扫描 `DRAFT` 出货单，也不猜测历史上是否点过提交；出货放行仍必须从出货页显式提交。命令可执行不表示任何共享库、目标环境或客户数据库已经 dry-run / apply。
+该命令扫描当前 `RELEASED` 生产订单、`POSTED REWORK` 返工事实及 `DRAFT` 出货单，补齐缺失的 task / `created` event / business state 包；确定性编号被占用、已有包不完整或来源不合法时整批失败。新建任务保持 `ready`，由真实责任岗位处理，不推断历史 `done / rejected`。它重算已发布生产订单的来源待办，并扫描有明细的 `DRAFT` 出货单生成业务准备任务，不推断曾经提交或审批通过；出货放行仍必须从出货页显式提交。命令可执行不表示任何共享库、目标环境或客户数据库已经 dry-run / apply。
+
+来源任务的时间参与幂等校验时统一按 UTC 计算。修复命令可以转换旧记录仅因时区表示不同产生的校验差异：逐项核对来源与原始创建事件，更新任务和业务状态的校验值，追加 `source_time_normalized` 事件，保留原始事件、办理结果和事实。报告中的 `source_time_intents_normalized` 单列转换数；同一时刻以外的日期或内容变化仍阻断。历史时区匹配仅用于这条显式修复路径，正常业务命令不保留宽松读取。重跑必须不再产生转换事件；已有出货放行任务会被核对，未提交的出货单不会因此生成放行审批。
 
 
 ## 实现命名写入边界
 
 自动生成的 Workflow 任务名称 / payload、核心演示 seed 和试用 MasterData seed 复用 `internal/biz/implementation_naming.go`，避免自动化重新写入编号阶段标签。普通 MasterData 和客户业务数据不套用开发阶段命名规则；风险等级（内部优先级 P0/P1/P2）、p50/p95/p99 百分位、产品编码和部署技术步骤按原业务 / 技术语义保留。历史数据库残值按需使用只读 SQL 专项盘点，不建立常驻全表扫描流程。
+
+### 任务治理升级边界 / Task Fulfillment Upgrade
+
+本轮成品收仓改由已完成手工批次提供数量上限，包装通过 `finished_goods_receipt_id` 绑定已过账成品收仓。先记录正式库存，质量或查货包装未完成时禁止发货及普通负向挪用。旧已完成包装来源的过账收仓保持历史事实，并占用手工容量。
+
+迁移与来源任务重算分别留痕：正式迁移前先运行只读升级审计，在真实备份的隔离恢复库升级并验证来源任务命令的 dry-run / apply / 重跑；登记共享库需对具体候选确认后才能 apply，随后运行同一候选的 `backfill-workflow-source-tasks`。修复命令不改变库存、质量判定或出货审批。客户岗位配置仍通过发布、转换检查与激活生效，不能仅凭角色 migration 宣称所有岗位菜单已更新。
+
+`workflow.get_task_handling_chain` 仅接受正整数 `task_id`，复用任务可见性和业务进度的来源关联。最多返回 100 项，优先本任务及未完成任务，并显式返回 `truncated`；关联摘要不返回 source payload、财务金额或扩大其他岗位动作权限。异常子批通过正式异常来源归入同一分支。
+
+`RECEIVE_OUTSOURCING_RETURN` 要求字符串 `quantity` 为仓库实际点数，与不可变批量一致后才整批送检。缺失、零、超精度、少收或多收失败关闭；分批回货 / 部分不良拆分尚未提供。公开直接 `REWORK` 命令已移除，质量不合格须由业务提交异常方案审批。

@@ -155,7 +155,10 @@ export default function TableScrollControls({
         left: Math.max(0, Math.min(maxLeft, scroller.scrollLeft)),
         maxLeft,
         width: scroller.clientWidth,
-        step: Math.max(80, (scroller.clientWidth - fixedWidth) * 0.8),
+        step: Math.min(
+          240,
+          Math.max(80, (scroller.clientWidth - fixedWidth) * 0.8)
+        ),
         thumb: Math.max(32, scroller.clientWidth ** 2 / scroller.scrollWidth),
         dockOffset: Math.min(
           0,

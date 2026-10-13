@@ -21,6 +21,9 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       productCoreRole: "sales",
       ownerPools: Object.freeze(["sales"]),
       menuSurfaces: Object.freeze([
+        "quality-inspections",
+        "production-exceptions",
+        "suppliers",
         "global-dashboard",
         "customers",
         "sales-orders",
@@ -32,6 +35,14 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "print-center",
       ]),
       capabilityKeys: Object.freeze([
+        "purchase.receipt.read",
+        "production.exception.submit",
+        "quality.inspection.read",
+        "supplier.read",
+        "shipment.create",
+        "shipment.update",
+        "shipment.ship",
+        "shipment.cancel",
         "engineering.material.read",
         "erp.workbench.read",
         "erp.print_template.read",
@@ -71,9 +82,10 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "sales_order_approval.sales_submit",
         "sales_to_production.source_review",
         "production_to_inventory.packaging_material_confirmation",
+        "finished_goods_delivery.shipment_execution",
       ]),
       guardrail:
-        "销售可只读核对生产路线并确认包材版面 / 包装版本；不能安排、执行或返工 WIP，库存、质检、出货、应收和发票事实仍由对应领域 usecase 处理。",
+        "业务负责选择质量异常方案、确认包材版本及正式发货。异常审批、生产执行、仓库库存处置和品质复检各自留痕；发货必须通过质量、查货包装和财务放行检查。",
     }),
     Object.freeze({
       roleKey: "boss",
@@ -354,6 +366,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       productCoreRole: "warehouse",
       ownerPools: Object.freeze(["warehouse"]),
       menuSurfaces: Object.freeze([
+        "production-exceptions",
         "production-orders",
         "processing-contracts",
         "accessories-purchase",
@@ -369,6 +382,10 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "task-board",
       ]),
       capabilityKeys: Object.freeze([
+        "production.exception.execute",
+        "production.completion.create",
+        "warehouse.packaging.execute",
+        "purchase.receipt.cancel_draft",
         "process.read",
         "contact.read",
         "outsourcing.fact.cancel",
@@ -407,9 +424,6 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "warehouse.adjustment.create",
         "quality.inspection.read",
         "shipment.read",
-        "shipment.create",
-        "shipment.ship",
-        "shipment.cancel",
         "workflow.task.read",
         "workflow.task.update",
         "workflow.task.complete",
@@ -419,11 +433,10 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       ]),
       flowResponsibilities: Object.freeze([
         "purchase_order_approval.warehouse_prepare",
-        "finished_goods_delivery.shipment_execution",
         "purchase_to_inventory.warehouse_inbound",
       ]),
       guardrail:
-        "仓库执行采购入库、成品入库、退货、入库调整与出货时必须走对应业务 usecase，不通过任务完成动作直接增减库存。仓库只核对待入库完工报告并确认实收，不能安排或执行 WIP，也不能代替生产提交完工报告。",
+        "仓库负责采购和加工回货点数、外发裁片发料、成品正式入库、查货包装，以及已入库异常货的库存处置。入库先计库存，待检和待包装数量不得发货；任务完成不代替库存事实。",
     }),
     Object.freeze({
       roleKey: "quality",
@@ -459,8 +472,6 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "outsourcing.order.read",
         "outsourcing.fact.read",
         "purchase.order.read",
-        "purchase.receipt.create",
-        "purchase.receipt.cancel_draft",
         "purchase.receipt.read",
         "purchase.return.read",
         "purchase.return.create",
@@ -486,7 +497,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "production_to_inventory.stage_quality_gate",
       ]),
       guardrail:
-        "来料由仓库所属 IQC 清点并检验，可登记到货和取消未入库登记，库存过账仍由仓库办理。品质可查看 WIP 来源并分别办理生产分段质检；不能安排或执行 WIP，也不能把质检任务完成自动写成库存、出货或财务事实。",
+        "仓库清点到货后，IQC 检查颜色、尺寸规格等质量要求；裁片、皮套、成品、针检、抽检和条件客户验货分别留痕。不合格批次交业务选择异常方案，品质负责复检。",
     }),
     Object.freeze({
       roleKey: "finance",
@@ -592,6 +603,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "print-center",
       ]),
       capabilityKeys: Object.freeze([
+        "production.exception.execute",
         "erp.workbench.read",
         "erp.print_template.read",
         "field.party_private.read",
@@ -610,8 +622,6 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "production.wip.read",
         "production.wip.assign",
         "production.wip.execute",
-        "production.wip.rework",
-        "production.completion.create",
         "production.material_issue.create",
         "production.rework.create",
         "production.fact.post",
@@ -635,7 +645,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       ]),
       printTemplates: Object.freeze(["processing-contract"]),
       guardrail:
-        "生产 / 委外负责加工合同源单和 WIP 安排、执行、移交、返工及提交完工报告；完工报告只生成待入库草稿，不能代替品质判定、包材业务确认、仓库成品入库、结算或付款事实。",
+        "生产经理安排车缝和手工的本厂或委外执行，按已批准异常方案安排返工和补做。手工完成后交仓库收仓，查货包装完成前不能发货。",
     }),
   ]),
 });

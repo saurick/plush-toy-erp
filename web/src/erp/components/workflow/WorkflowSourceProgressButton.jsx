@@ -1,12 +1,12 @@
 import React from 'react'
 import { Button } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { trackingURL } from '../../utils/workflowTracking.mjs'
 
 export default function WorkflowSourceProgressButton({ sourceType, sourceID, profile, disabled = false }) {
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
   if (!hasActionPermission(profile, PermissionCode.WORKFLOW_TASK_READ)) return null
   return (
     <Button

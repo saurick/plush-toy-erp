@@ -1,3 +1,4 @@
+import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -351,7 +352,7 @@ export function createMobileProgressScenarios({
                 (item) => item.getAttribute('aria-label')?.split('，')[0]
               )
             ),
-          allowed ? ['进度', '任务', '风险', '我的'] : ['任务', '风险', '我的']
+          allowed ? ['进度', '任务管理', '风险', '我的'] : ['任务', '风险', '我的']
         )
         if (!allowed) {
           assert.equal(calls.length, 0)
@@ -364,7 +365,7 @@ export function createMobileProgressScenarios({
             .getByLabel('任务状态', { exact: true })
             .getByText('已办', { exact: true })
             .click()
-          await page.getByText('已办任务', { exact: true }).waitFor()
+          await page.getByRole('region', { name: '已办任务', exact: true }).waitFor()
           await page
             .getByLabel('任务状态', { exact: true })
             .getByText('待办', { exact: true })
@@ -509,6 +510,7 @@ export function createMobileProgressScenarios({
         await page.screenshot({
           path: path.join(outputDir, `mobile-progress-${role}-overview.png`),
         })
+        assert(await assertMobileBackToTop(page, panel.locator('.mobile-progress-scroll')), '长进度列表支持回到顶部')
         const taskEntries = panel.locator('.mobile-progress-task-entry')
         assert.equal(
           await taskEntries.nth(0).locator('strong').textContent(),
@@ -715,7 +717,7 @@ export function createMobileProgressScenarios({
         hideTaskAccess = false
         await pullToRefresh(page, panel.locator('.mobile-progress-scroll'))
         await singleEntry.waitFor()
-        await panel.getByRole('button', { name: /全部/ }).click()
+        await panel.getByRole('button', { name: /在执行/ }).click()
         await panel
           .getByRole('button', { name: '清除搜索', exact: true })
           .click()
@@ -950,7 +952,7 @@ export function createMobileProgressScenarios({
           taskLayout.attachmentWidth < taskLayout.heroWidth / 2,
           JSON.stringify(taskLayout)
         )
-        assert.deepEqual(taskLayout.steps, ['任务信息', '任务办理', '结果回执'])
+        assert.deepEqual(taskLayout.steps, [], '任务详情先展示当前任务，办理后再显示步骤')
         await writeFile(
           path.join(outputDir, `mobile-progress-${role}-detail-geometry.json`),
           JSON.stringify(
@@ -1029,6 +1031,7 @@ export function createMobileProgressScenarios({
           await drawer
             .getByRole('button', { name: '查看业务明细', exact: true })
             .click()
+          assert(await assertMobileBackToTop(page, drawer.locator('.ant-drawer-body'), { screenshotPath: path.join(outputDir, `mobile-back-top-${role}-detail-${width}.png`), keyboard: true }), '长进度详情支持回到顶部')
           const narrowGroupGeometry = await drawer
             .locator('.mobile-progress-detail-groups')
             .evaluate((root) => {
@@ -1239,7 +1242,7 @@ export function createMobileProgressScenarios({
           .getByLabel('任务状态', { exact: true })
           .getByText('已办', { exact: true })
           .click()
-        await page.getByText('已办任务', { exact: true }).waitFor()
+        await page.getByRole('region', { name: '已办任务', exact: true }).waitFor()
         await page.getByTestId('mobile-role-nav-progress').click()
         assert.equal(
           await panel.getByLabel('搜索进度').inputValue(),
@@ -1320,12 +1323,16 @@ export function createMobileProgressScenarios({
             `mobile-progress-${role}-filter-dropdown-320.png`
           ),
         })
-        await filterPanel.getByText('全部', { exact: true }).click()
-        await panel.getByText('全部记录', { exact: true }).waitFor()
+        await filterPanel.getByText('全部记录', { exact: true }).click()
         const appliedFilter = panel.locator('.mobile-filter-trigger')
         assert.equal(
           await appliedFilter.getAttribute('aria-label'),
           '筛选进度，已应用 1 项'
+        )
+        assert.equal(
+          await panel.locator('.mobile-progress-applied').count(),
+          0,
+          '全部范围不单独显示提示或保留空白占位'
         )
         await filterPanel.getByText('在执行', { exact: true }).click()
         await page.setViewportSize({ width: 390, height: 844 })

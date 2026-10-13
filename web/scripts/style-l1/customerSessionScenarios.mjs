@@ -1155,9 +1155,9 @@ export function createCustomerSessionScenarios({
         await expectText(page, '出货单')
         await expectText(page, 'SHIP-STYLE-L1')
         await assertTextAbsent(page, '产品核心评审不读取客户业务数据')
-        await expectButton(page, '新建草稿')
+        await expectButton(page, '新建出货单')
         assert.equal(
-          await page.getByRole('button', { name: '新建草稿' }).isDisabled(),
+          await page.getByRole('button', { name: '新建出货单' }).isDisabled(),
           false,
           'super admin 客户运行态应保留业务页动作入口'
         )
@@ -2544,7 +2544,7 @@ export function createCustomerSessionScenarios({
         await assertEffectiveSessionMenuProjection()
         await expectHeading(page, '出货单')
         await expectText(page, 'SHIP-STYLE-L1')
-        await expectNoButton(page, '新建草稿')
+        await expectNoButton(page, '新建出货单')
         await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
         const shipmentDetailButton = page
           .getByRole('button', { name: '查看明细' })

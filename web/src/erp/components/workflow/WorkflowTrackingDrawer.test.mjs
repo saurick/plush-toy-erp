@@ -24,6 +24,7 @@ test('tracking hides unauthorized entries, keeps footer actions separate and can
   const original = JsonRpc.prototype.call
   const calls = []
   const opened = []
+  let closed = 0
   let outcome = 'denied'
   let pending
   JsonRpc.prototype.call = async (method, params, options) => {
@@ -38,7 +39,7 @@ test('tracking hides unauthorized entries, keeps footer actions separate and can
   const node = document.createElement('div')
   document.body.appendChild(node)
   const root = createRoot(node)
-  const render = (ref, refreshKey = 'session-one') => act(async () => root.render(createElement(Drawer, { trackingRef: ref, refreshKey, onClose() {}, onOpenTask: (value) => opened.push(value) })))
+  const render = (ref, refreshKey = 'session-one', closeLabel = '返回列表') => act(async () => root.render(createElement(Drawer, { trackingRef: ref, refreshKey, closeLabel, onClose() { closed += 1 }, onOpenTask: (value) => opened.push(value) })))
   const taskButton = () => document.querySelector('.erp-workflow-tracking-footer .erp-workflow-tracking-open-task')
   const refreshButton = () => [...document.querySelectorAll('.ant-drawer-footer button')].find((button) => button.textContent.trim() === '刷新进度')
   const clickTask = () => act(async () => taskButton().click())
@@ -49,6 +50,13 @@ test('tracking hides unauthorized entries, keeps footer actions separate and can
   const ref = { kind: 'process', id: 10 }
   await render(ref)
   assert.equal(taskButton(), null)
+  const backButton = document.querySelector('.ant-drawer-header button')
+  assert.equal(backButton.getAttribute('aria-label'), '返回列表')
+  assert.ok(backButton.querySelector('.anticon-left'))
+  assert.equal(document.querySelector('.anticon-close'), null)
+  assert.doesNotMatch(document.querySelector('.ant-drawer-footer').textContent, /返回列表/)
+  await act(async () => backButton.click())
+  assert.equal(closed, 1, 'header back returns to the caller')
   assert.doesNotMatch(document.querySelector('.ant-drawer-header').textContent, /刷新进度/)
   assert.ok(refreshButton(), 'tracking refresh remains in the fixed footer even without task access')
   assert.match(document.querySelector('[aria-label="流程概况"] [aria-label="当前进度"]').textContent, /当前：订单审批.*岗位：老板.*待审批/)
@@ -84,8 +92,69 @@ test('tracking hides unauthorized entries, keeps footer actions separate and can
   await clickTask()
   assert.deepEqual(opened, [{ id: 30, version: 7, task_status_key: 'ready' }])
   detail.current_task_access[0] = { task_id: 30, can_read: false, can_handle: false }
-  await render(ref, 'permission-revoked')
+  await render(ref, 'permission-revoked', '返回任务')
+  assert.equal(document.querySelector('.ant-drawer-header button').getAttribute('aria-label'), '返回任务')
   assert.equal(taskButton(), null, 'permission refresh must remove an earlier task action')
   assert.equal(document.querySelector('.erp-workflow-tracking-footer [role="alert"]'), null)
   assert.ok(calls.every((method) => ['get_tracking', 'get_task'].includes(method)))
+})
+
+test('tracking exceptions load only when expanded, keep exact scope and cancel stale reads', async (t) => {
+  const dom = installTestDOM()
+  registerJSXTestLoader()
+  const [{ createRoot }, { default: Drawer }, { JsonRpc }] = await Promise.all([
+    import('react-dom/client'), import('./WorkflowTrackingDrawer.jsx'), import('../../../common/utils/jsonRpc.js'),
+  ])
+  const original = JsonRpc.prototype.call
+  const calls = []
+  let mode = 'failure'
+  let pending
+  JsonRpc.prototype.call = async (method, params, options) => {
+    calls.push({ method, params, options })
+    if (method === 'get_tracking') return { data: { tracking: { ...detail, summary: { ...detail.summary, id: params.id }, nodes: detail.nodes.map((node) => ({ ...node, process_instance_id: params.id })) } } }
+    assert.equal(method, 'list_exceptions')
+    if (mode === 'failure') throw new Error('unavailable')
+    const data = { items: mode === 'empty' ? [] : [{ key: 'quality:1', number: 'EX-CONTEXT', state: 'open', tasks: [], task_ids: [], orders: [] }], tasks: [], orders: [], total: mode === 'empty' ? 0 : 1, view_total: mode === 'empty' ? 0 : 1, pending_tasks: 0, affected_orders: 0, open: 1, closed: 0 }
+    if (mode === 'pending') return new Promise((resolve) => { pending = { signal: options.signal, resolve: () => resolve({ data }) } })
+    return { data }
+  }
+  const node = document.createElement('div')
+  document.body.appendChild(node)
+  const root = createRoot(node)
+  t.after(async () => { await act(async () => root.unmount()); node.remove(); JsonRpc.prototype.call = original; dom.restore() })
+  const render = (ref) => act(async () => root.render(createElement(Drawer, { trackingRef: ref, onClose() {} })))
+  const expand = async () => act(async () => {
+    const details = document.querySelector('.erp-workflow-tracking-exceptions')
+    details.open = true
+    details.dispatchEvent(new Event('toggle'))
+  })
+  const ref = { kind: 'process', id: 10 }
+  await render(ref)
+  assert.equal(document.querySelector('.erp-workflow-tracking-exceptions').open, false)
+  assert.equal(calls.filter(({ method }) => method === 'list_exceptions').length, 0)
+  await expand()
+  const panel = () => document.querySelector('.erp-workflow-tracking-exceptions .workflow-exceptions')
+  assert.ok(panel().querySelector('[role="alert"]'), 'load failure must not look like no incidents')
+  assert.deepEqual(calls.at(-1).params, { tracking_kind: 'process', tracking_id: 10, limit: 20, offset: 0 })
+  assert.equal(panel().querySelector('.workflow-exceptions__query'), null)
+  assert.equal(panel().querySelector('.workflow-exceptions__states'), null)
+  assert.equal(panel().querySelector('.workflow-exceptions__views'), null)
+  mode = 'success'
+  await act(async () => [...panel().querySelectorAll('button')].find((button) => /重\s*试/u.test(button.textContent)).click())
+  assert.match(panel().textContent, /EX-CONTEXT/u)
+  await render({ kind: 'process', id: 11 })
+  assert.equal(document.querySelector('.erp-workflow-tracking-exceptions').open, false)
+  assert.doesNotMatch(document.querySelector('.erp-workflow-tracking-detail').textContent, /EX-CONTEXT/u)
+  mode = 'empty'
+  await expand()
+  assert.equal(calls.at(-1).params.tracking_id, 11)
+  assert.match(panel().textContent, /本流程暂无可见异常记录/u)
+  await render(ref)
+  mode = 'pending'
+  await expand()
+  await render(null)
+  assert.equal(pending.signal.aborted, true)
+  await act(async () => pending.resolve())
+  await render(ref)
+  assert.equal(panel(), null)
 })

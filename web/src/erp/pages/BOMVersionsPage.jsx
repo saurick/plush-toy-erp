@@ -8,12 +8,16 @@ import {
   PlusOutlined,
   PrinterOutlined,
   SettingOutlined,
+  UnorderedListOutlined,
   UploadOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Form, Popconfirm, Select, Space } from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { useLocation, useOutletContext, useSearchParams } from 'react-router-dom'
+import BusinessModal from '../components/business-list/BusinessModal.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
+import { engineeringBOMReturnState, readBOMPreparation } from '../utils/bomPreparationNavigation.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -58,6 +62,8 @@ import { invalidateBOMUsageSnapshots } from '../utils/bomMaterialGroups.mjs'
 import { loadBOMPrintSnapshot } from '../utils/bomPrintSnapshot.mjs'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import BOMMaterialGroupsForm from '../components/bom/BOMMaterialGroupsForm.jsx'
+import BOMTaskPanel from '../components/bom/BOMTaskPanel.jsx'
+import BOMRevisionAction from '../components/bom/BOMRevisionAction.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import { useLineItemAppendScroll } from '../components/business-list/useLineItemAppendScroll.mjs'
 import {
@@ -65,6 +71,7 @@ import {
   filterLifecycleStatusOptions,
   lifecycleScopeFromSearchParams,
   lifecycleScopeIncludesStatus,
+  normalizeLifecycleStatus,
   withLifecycleScopeSearchParam,
 } from '../utils/lifecycleScope.mjs'
 import {
@@ -208,6 +215,8 @@ function BOMImportReviewSummary({ form, review, productOptions }) {
 
 export default function BOMVersionsPage() {
   const outletContext = useOutletContext()
+  const location = useLocation()
+  const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const beginLatestRequest = useLatestRequestCoordinator()
   const adminProfile = useMemo(
@@ -218,6 +227,11 @@ export default function BOMVersionsPage() {
     () => adminProfile?.effective_session?.customer?.key || '',
     [adminProfile]
   )
+  const preparation = useMemo(() => readBOMPreparation(location.state, adminProfile?.id), [location.state, adminProfile?.id])
+  const preparedEntry = useRef(null)
+  const [preparedBOMID, setPreparedBOMID] = useState(null)
+  const [preparationError, setPreparationError] = useState('')
+  const [preparationRetry, setPreparationRetry] = useState(0)
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -230,10 +244,32 @@ export default function BOMVersionsPage() {
     `lifecycleScope:${searchParams.get('scope') || ''}`,
     () => lifecycleScopeFromSearchParams(searchParams)
   )
-  const [status, setStatus] = useBusinessPageState(
+  const [savedStatus, setStatus] = useBusinessPageState(
     `status:${searchParams.get('status') || ''}`,
     () => searchParams.get('status') || ''
   )
+  const status = normalizeLifecycleStatus(lifecycleScope, savedStatus, [
+    'ARCHIVED',
+  ])
+  useEffect(() => {
+    if (savedStatus !== status) setStatus(status)
+    if (
+      !lifecycleScopeIncludesStatus(lifecycleScope, searchParams.get('status'), [
+        'ARCHIVED',
+      ])
+    ) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('status')
+      setSearchParams(next, { replace: true })
+    }
+  }, [
+    lifecycleScope,
+    savedStatus,
+    searchParams,
+    setSearchParams,
+    setStatus,
+    status,
+  ])
   const [productID, setProductID] = useBusinessPageState(
     `productID:${searchParams.get('product_id') || ''}`,
     () => {
@@ -248,12 +284,15 @@ export default function BOMVersionsPage() {
     pageSize: 20,
   })
   const [selectedVersion, setSelectedVersion] = useState(null)
+  const [taskContext, setTaskContext] = useBusinessPageState('bomTaskContext', null)
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
   const headerAttachmentRef = useRef(null)
   const importFileInputRef = useRef(null)
   const [headerModalOpen, setHeaderModalOpen] = useState(false)
   const [headerMode, setHeaderMode] = useState('create')
+  const [revisionEditing, setRevisionEditing] = useState(false)
+  const [savedRevision, setSavedRevision] = useState(null)
   const [importing, setImporting] = useState(false)
   const [importReview, setImportReview] = useState(null)
   const [products, setProducts] = useState([])
@@ -276,6 +315,7 @@ export default function BOMVersionsPage() {
   })
 
   const canRead = hasActionPermission(adminProfile, PermissionCode.BOM_READ)
+  const canReadTasks = hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ)
   const canCreate = hasActionPermission(adminProfile, PermissionCode.BOM_CREATE)
   const canUpdate = hasActionPermission(adminProfile, PermissionCode.BOM_UPDATE)
   const canActivate = hasActionPermission(adminProfile, PermissionCode.BOM_ACTIVATE)
@@ -675,7 +715,7 @@ export default function BOMVersionsPage() {
     if (file) openImportedDraft(file)
   }
 
-  const openCreate = () => {
+  const openCreate = useCallback((prefill = {}) => {
     headerAttachmentRef.current?.clearPendingAttachments()
     setImportReview(null)
     setHeaderMode('create')
@@ -692,12 +732,14 @@ export default function BOMVersionsPage() {
       auditor: '',
       hair_direction: '',
       items: [],
+      product_id: prefill.productID,
+      ...(prefill.orderNo ? { source_order_no: prefill.orderNo, quantity_text: prefill.quantityText } : {}),
     })
-    setHeaderProductIDForSuggestion(undefined)
+    setHeaderProductIDForSuggestion(prefill.productID)
     setHeaderModalOpen(true)
-  }
+  }, [headerForm])
 
-  const fillHeaderForm = (record) => {
+  const fillHeaderForm = useCallback((record) => {
     headerForm.resetFields()
     headerForm.setFieldsValue({
       product_id: record.product_id,
@@ -715,6 +757,52 @@ export default function BOMVersionsPage() {
       note: record.note || '',
       items: normalizeBOMLinesForForm(record.id, record.items),
     })
+  }, [headerForm])
+
+  useEffect(() => {
+    if (!preparation || preparedEntry.current === location.key || !canRead || loading || !referenceOptionsState.loaded) return undefined
+    const controller = new AbortController()
+    setPreparationError('')
+    setPreparedBOMID(null)
+    setRevisionEditing(false)
+    if (preparation.mode === 'create') {
+      if (!canCreate) {
+        setPreparationError('当前账号没有新建 BOM 的权限，请返回工程资料核对。')
+      } else {
+        preparedEntry.current = location.key
+        openCreate(preparation)
+      }
+      return undefined
+    }
+    setDetailLoading(true)
+    getBOMVersion({ id: preparation.bomID }, { signal: controller.signal }).then((detail) => {
+      if (controller.signal.aborted) return
+      if (detail.product_id !== preparation.productID || !Array.isArray(detail.items)) {
+        setPreparationError('此 BOM 与所选产品不一致，请返回工程资料重新选择。')
+        return
+      }
+      preparedEntry.current = location.key
+      setPreparedBOMID(detail.id)
+      setSelectedVersion(detail)
+      applySelectedRowKeys([detail.id])
+      setHeaderMode(preparation.mode === 'edit' && canUpdate && canEditBOM(detail) ? 'edit' : 'view')
+      fillHeaderForm(detail)
+      setHeaderProductIDForSuggestion(undefined)
+      setHeaderModalOpen(true)
+    }).catch((error) => {
+      if (!controller.signal.aborted) setPreparationError(getActionErrorMessage(error, '打开订单关联 BOM'))
+    }).finally(() => {
+      if (!controller.signal.aborted) setDetailLoading(false)
+    })
+    return () => controller.abort()
+  }, [preparation, location.key, canRead, canCreate, canUpdate, openCreate, fillHeaderForm, applySelectedRowKeys, preparationRetry, loading, referenceOptionsState.loaded])
+
+  const returnToEngineering = () => {
+    if (saving || !preparation) return
+    navigate(preparation.returnPath, {
+      replace: true,
+      state: engineeringBOMReturnState(preparation, preparedBOMID || preparation.bomID),
+    })
   }
 
   const openView = async (record = selectedVersion) => {
@@ -729,15 +817,21 @@ export default function BOMVersionsPage() {
     setHeaderModalOpen(true)
   }
 
-  const openEdit = async (record = selectedVersion) => {
+  const openEdit = async (record = selectedVersion, revision = false, prepared = false) => {
     if (!record?.id || !canEditBOM(record)) return
     headerAttachmentRef.current?.clearPendingAttachments()
     setImportReview(null)
     applySelectedRowKeys([record.id])
-    const detail = await loadDetail(record.id)
+    const detail = prepared ? record : await loadDetail(record.id)
     if (!detail?.id || !Array.isArray(detail.items)) {
       return
     }
+    if (!canEditBOM(detail)) {
+      message.warning('此版本已不能直接编辑，请刷新后选择可修改的版本')
+      return
+    }
+    setSelectedVersion(detail)
+    setRevisionEditing(revision)
     setHeaderMode('edit')
     fillHeaderForm(detail)
     setHeaderProductIDForSuggestion(undefined)
@@ -851,7 +945,7 @@ export default function BOMVersionsPage() {
           ? headerMode === 'copy'
             ? 'BOM 新版本已复制为草稿'
             : headerMode === 'edit'
-              ? 'BOM 草稿已更新'
+              ? 'BOM 草稿已保存，尚未启用'
               : headerMode === 'import'
                 ? 'BOM 导入草稿已创建'
                 : 'BOM 草稿已创建'
@@ -860,6 +954,14 @@ export default function BOMVersionsPage() {
       headerAttachmentRef.current?.clearPendingAttachments()
       setImportReview(null)
       setHeaderModalOpen(false)
+      if (preparation && savedVersion?.product_id === preparation.productID) {
+        setPreparedBOMID(savedVersion.id)
+        setSelectedVersion(savedVersion)
+        applySelectedRowKeys([savedVersion.id])
+      }
+      if (headerMode === 'edit' && revisionEditing && savedVersion?.id) {
+        setSavedRevision(savedVersion)
+      }
       if (isCreatingVersion) {
         resetBusinessPaginationCurrent(setPagination)
       } else {
@@ -872,22 +974,24 @@ export default function BOMVersionsPage() {
     }
   }
 
-  const activateSelected = async () => {
+  const activateSelected = async (record = activeActionVersion) => {
     if (
-      !activeActionVersion?.id ||
-      selectedRowKeys.length !== 1 ||
-      !canActivateBOM(activeActionVersion)
+      !record?.id ||
+      !canActivate ||
+      saving ||
+      !canActivateBOM(record)
     ) {
       return
     }
     setSaving(true)
     try {
-      const next = await activateBOMVersion({ id: activeActionVersion.id })
-      message.success('BOM 版本已激活，旧激活版本已设为历史版本')
-      setSelectedVersion(next || activeActionVersion)
+      const next = await activateBOMVersion({ id: record.id })
+      message.success('BOM 新版本已启用，原版本及已有订单引用已保留')
+      setSelectedVersion(next || record)
+      setSavedRevision(null)
       await loadVersions()
     } catch (error) {
-      message.error(getActionErrorMessage(error, '激活 BOM 版本'))
+      message.error(getActionErrorMessage(error, '启用 BOM 版本'))
     } finally {
       setSaving(false)
     }
@@ -976,6 +1080,12 @@ export default function BOMVersionsPage() {
     resetBusinessPaginationCurrent(setPagination)
   }, [setKeyword, setLifecycleScope, setPagination, setProductID, setSearchParams, setStatus])
 
+  const preparationLoadError = preparationError || (
+    preparation && !referenceOptionsState.loading && !referenceOptionsState.loaded
+      ? 'BOM 相关资料未读取成功，请重新读取后继续编制。'
+      : ''
+  )
+
   return (
     <BusinessPageLayout>
       <PageHeaderCard
@@ -992,6 +1102,31 @@ export default function BOMVersionsPage() {
           },
         ]}
       />
+
+      {preparation ? (
+        <Space wrap className="erp-business-inline-note">
+          <span>工程与打样 · {preparation.orderNo}</span>
+          <Button size="small" disabled={saving} onClick={returnToEngineering}>返回工程与打样</Button>
+        </Space>
+      ) : null}
+      {preparationLoadError ? (
+        <Alert
+          type="error"
+          showIcon
+          message={preparationLoadError}
+          action={
+            <Button
+              size="small"
+              onClick={() => {
+                if (!referenceOptionsState.loaded) loadReferenceOptions()
+                setPreparationRetry((value) => value + 1)
+              }}
+            >
+              重新读取
+            </Button>
+          }
+        />
+      ) : null}
 
       <BusinessOperationPanel
         compact
@@ -1104,7 +1239,7 @@ export default function BOMVersionsPage() {
               icon={<PlusOutlined />}
               onClick={openCreate}
             >
-              新建草稿
+              新建 BOM
             </ToolbarButton>
           ) : null
         }
@@ -1114,7 +1249,7 @@ export default function BOMVersionsPage() {
           selectedCount={selectedRowKeys.length}
           selectedLabel={selectedLabel}
           selectedItems={selectedItems}
-          boundaryText="已激活版本需复制为新草稿后修改；历史版本可以重新激活。"
+          boundaryText="已启用版本只读；改版请创建修订草稿或选择同产品已有草稿，保存后需另行启用。"
         >
           <SelectionClearAction
             selectedCount={selectedRowKeys.length}
@@ -1159,6 +1294,7 @@ export default function BOMVersionsPage() {
             >
               <Button
                 data-business-action-key="edit"
+                type="primary"
                 size="small"
                 icon={<EditOutlined />}
                 disabled={
@@ -1169,11 +1305,31 @@ export default function BOMVersionsPage() {
                 }
                 onClick={() => openEdit(activeActionVersion)}
               >
-                编辑草稿
+                编辑 BOM
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {canCreate ? (
+          {canUpdate && activeActionVersion?.status === 'ACTIVE' ? (
+            <BOMRevisionAction
+              key={`list:${adminProfile?.id}`}
+              record={activeActionVersion}
+              canCreate={canCreate}
+              disabled={selectedRowKeys.length !== 1 || detailLoading || saving}
+              onEdit={(detail) => openEdit(detail, true, true)}
+            />
+          ) : null}
+          {canReadTasks ? (
+            <Button
+              size="small"
+              icon={<UnorderedListOutlined />}
+              data-business-action-key="related-tasks"
+              disabled={selectedRowKeys.length !== 1 || !activeActionVersion || saving}
+              onClick={() => setTaskContext({ bomID: activeActionVersion.id, page: 1 })}
+            >
+              相关任务
+            </Button>
+          ) : null}
+          {canCreate && (!canUpdate || activeActionVersion?.status !== 'ACTIVE') ? (
             <BusinessActionTooltip
               disabled={
                 selectedRowKeys.length !== 1 ||
@@ -1259,17 +1415,17 @@ export default function BOMVersionsPage() {
                 selectedRowKeys.length !== 1
                   ? '请先选择一个 BOM 版本'
                   : !canActivateBOM(activeActionVersion)
-                    ? '当前 BOM 版本不能激活'
+                    ? '当前 BOM 版本不能启用'
                     : saving
-                      ? '当前操作完成后可激活'
+                      ? '当前操作完成后可启用'
                       : ''
               }
             >
               <Popconfirm
-                title="激活该 BOM 版本？同产品当前生效版本会设为历史版本。"
-                okText="激活"
+                title="启用该 BOM 版本？同产品当前生效版本会设为历史版本，已有订单引用保持不变。"
+                okText="启用"
                 cancelText="取消"
-                onConfirm={activateSelected}
+                onConfirm={() => activateSelected()}
               >
                 <Button
                   data-business-action-key="activate"
@@ -1281,7 +1437,7 @@ export default function BOMVersionsPage() {
                     saving
                   }
                 >
-                  激活
+                  启用
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>
@@ -1310,7 +1466,7 @@ export default function BOMVersionsPage() {
               }
             >
               <Popconfirm
-                title="将该 BOM 版本设为历史版本？后续仍可重新激活。"
+                title="将该 BOM 版本设为历史版本？后续仍可重新启用。"
                 okText="设为历史版本"
                 cancelText="取消"
                 onConfirm={archiveSelected}
@@ -1391,6 +1547,36 @@ export default function BOMVersionsPage() {
         }}
       />
 
+      <BOMTaskPanel context={taskContext} onContextChange={setTaskContext} adminProfile={adminProfile} />
+
+      <BusinessModal
+        title="BOM 草稿已保存"
+        open={Boolean(savedRevision)}
+        closable={!saving}
+        maskClosable={!saving}
+        keyboard={!saving}
+        onCancel={() => { if (!saving) setSavedRevision(null) }}
+        footer={
+          <Space wrap>
+            <Button disabled={saving} onClick={() => setSavedRevision(null)}>返回列表</Button>
+            <Button disabled={saving} onClick={() => { const draft = savedRevision; setSavedRevision(null); openEdit(draft, true) }}>继续编辑草稿</Button>
+            {canActivate ? (
+              <Popconfirm
+                title="启用新版本？原版本会设为历史版本，已有订单引用保持不变。"
+                okText="启用"
+                cancelText="取消"
+                onConfirm={() => activateSelected(savedRevision)}
+              >
+                <Button type="primary" loading={saving}>启用此版本</Button>
+              </Popconfirm>
+            ) : null}
+          </Space>
+        }
+      >
+        <p>{savedRevision?.version} 已保存，尚未启用。当前启用版本继续使用。</p>
+        {!canActivate ? <p>请有启用权限的同事确认并启用新版本。</p> : null}
+      </BusinessModal>
+
       <BusinessFormPage
         open={headerModalOpen}
         form={headerForm}
@@ -1401,9 +1587,9 @@ export default function BOMVersionsPage() {
           headerMode === 'copy'
             ? '复制 BOM 新版本'
             : headerMode === 'edit'
-              ? '编辑 BOM 草稿'
+              ? '编辑 BOM 草稿 · 未生效'
               : headerMode === 'view'
-                ? '查看 BOM 版本'
+                ? `查看 BOM 版本 · ${bomStatusText(modalActionVersion?.status)} · 只读`
                 : headerMode === 'import'
                   ? '检查并保存导入草稿'
                   : '新建 BOM 草稿'
@@ -1416,8 +1602,15 @@ export default function BOMVersionsPage() {
           headerAttachmentRef.current?.clearPendingAttachments()
           setImportReview(null)
           setHeaderModalOpen(false)
+          if (headerMode === 'edit' && revisionEditing) loadVersions()
         }}
       >
+        {preparation ? (
+          <Space wrap className="erp-business-inline-note">
+            <span>{preparation.orderNo} · 保存草稿后返回工程资料关联，启用与任务提交仍需分别办理。</span>
+            <Button size="small" disabled={saving} onClick={returnToEngineering}>返回工程与打样</Button>
+          </Space>
+        ) : null}
         <Form
           form={headerForm}
           layout="vertical"
@@ -1449,6 +1642,26 @@ export default function BOMVersionsPage() {
             }
           }}
         >
+          {headerMode === 'edit' ? (
+            <p className="erp-business-source-summary erp-business-inline-note">正在修改草稿，尚未生效。保存后需启用，已有订单仍使用原 BOM。</p>
+          ) : null}
+          {headerMode === 'view' && canUpdate ? (
+            <BOMRevisionAction
+              key={`detail:${adminProfile?.id}`}
+              record={modalActionVersion}
+              canCreate={canCreate}
+              disabled={detailLoading || saving}
+              onEdit={(detail) => openEdit(detail, true, true)}
+            />
+          ) : null}
+          {headerMode === 'view' && canReadTasks ? (
+            <Button
+              icon={<UnorderedListOutlined />}
+              onClick={() => setTaskContext({ bomID: modalActionVersion.id, page: 1 })}
+            >
+              相关任务
+            </Button>
+          ) : null}
           <BOMHeaderFormFields
             form={headerForm}
             includeProduct

@@ -76,6 +76,9 @@
 }
 
 .mobile-workflow-tracking-more {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
   text-align: center;
 }
 

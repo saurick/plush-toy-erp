@@ -1,0 +1,114 @@
+.workflow-exceptions {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.workflow-exceptions__query {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.workflow-exceptions__query > .ant-input-search,
+.workflow-exceptions__query > .erp-mobile-search {
+  min-width: 0;
+  flex: 1;
+}
+.workflow-exceptions__heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+.workflow-exceptions__heading > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.workflow-exceptions p {
+  margin: 4px 0;
+  color: var(--erp-text-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.workflow-exceptions__states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.workflow-exceptions__views .ant-segmented-item {
+  min-width: 0;
+}
+.workflow-exceptions__views .ant-segmented-item-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 6px 8px;
+  white-space: normal;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.workflow-exceptions__views strong {
+  font-variant-numeric: tabular-nums;
+}
+.workflow-exceptions__more {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.workflow-exceptions__item {
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  padding: 14px;
+  background: var(--erp-surface-bg);
+}
+.workflow-exceptions__loading {
+  min-height: 180px;
+}
+.workflow-exceptions__tasks > summary {
+  cursor: pointer;
+  padding: 12px 0;
+  min-height: 44px;
+}
+.workflow-exceptions__pending {
+  margin-top: 10px;
+}
+.workflow-exceptions__pending > span {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.workflow-exceptions__task {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid var(--erp-border);
+  padding: 8px 0;
+}
+.workflow-exceptions__pending .workflow-exceptions__task {
+  border-top: 0;
+  padding-block: 0 4px;
+}
+.workflow-exceptions__task > .ant-btn {
+  justify-self: start;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  height: auto;
+  min-height: 40px;
+  text-align: left;
+  padding-left: 0;
+}
+.workflow-exceptions__task small,
+.workflow-exceptions__task > span {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 767px) {
+  .workflow-exceptions__query > .ant-btn {
+    min-height: 44px;
+  }
+}

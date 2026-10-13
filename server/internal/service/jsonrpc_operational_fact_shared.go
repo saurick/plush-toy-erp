@@ -294,6 +294,8 @@ func (d *jsonrpcDispatcher) operationalFactErrorResult(ctx context.Context, err 
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"}
 	case errors.Is(err, biz.ErrShipmentQualityRejected):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单的出货前成品检验不合格，请先完成质量处置"}
+	case errors.Is(err, biz.ErrShipmentPackingPending):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货超过可发数量，请先完成对应成品的检验、查货和包装"}
 	case errors.Is(err, biz.ErrShipmentFinanceReleaseRequired):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货财务审批尚未通过，不能确认出货"}
 	case errors.Is(err, biz.ErrShipmentFinanceReleaseConflict):

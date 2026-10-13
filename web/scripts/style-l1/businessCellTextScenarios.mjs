@@ -95,7 +95,7 @@ export function createBusinessCellTextScenarios(deps) {
     {
       key: 'shipment',
       path: '/erp/warehouse/shipments',
-      open: '新建草稿',
+      open: '新建出货单',
       fields: ['包装说明', '备注'],
     },
   ]

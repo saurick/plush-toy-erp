@@ -10,7 +10,7 @@ const source = readFileSync(
 test('production completion edit keeps source line and WIP batch locked', () => {
   assert.match(source, /mode = 'create'/u)
   assert.match(source, /excludeFactID/u)
-  assert.match(source, /核对待入库完工报告/u)
+  assert.match(source, /核对成品收仓草稿/u)
   assert.ok((source.match(/disabled=\{editing\}/gu)?.length || 0) >= 2)
   assert.match(source, /initialValues\?\.production_order_item_id/u)
   assert.match(source, /initialValues\?\.production_wip_batch_id/u)
@@ -80,7 +80,7 @@ test('production completion defaults and validates against the current completio
   assert.match(source, /已入库/u)
   assert.match(source, /待入库/u)
   assert.match(source, /compareProductionCompletionQuantity/u)
-  assert.match(source, /不能超过所选包装验收批次/u)
+  assert.match(source, /不能超过所选手工成品批次/u)
   assert.doesNotMatch(source, /包装已合格/u)
   assert.match(source, /maxLength=\{21\}/u)
   assert.doesNotMatch(source, /const quantity = Number\(value\)/u)
@@ -93,8 +93,8 @@ test('closed production orders expose only finished-goods rework completion word
     /buildProductionCompletionChoices\(items,\s*facts,\s*wipAggregate,\s*\{\s*excludeFactID,\s*\}\s*\)/u
   )
   assert.match(source, /order\?\.status === 'CLOSED'/u)
-  assert.match(source, /登记返工补完工/u)
-  assert.match(source, /成品返工补制批次/u)
+  assert.match(source, /登记返工成品收仓/u)
+  assert.match(source, /返工补制批次/u)
   assert.doesNotMatch(source, />production_wip_batch_id</u)
   assert.doesNotMatch(source, />origin_rework_fact_id</u)
 })

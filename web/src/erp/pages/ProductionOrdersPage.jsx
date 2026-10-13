@@ -2,10 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Button, Form, Input, Tag, Typography } from 'antd'
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import {
-  useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
@@ -69,6 +69,7 @@ import {
   BUSINESS_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
 import {
+  buildProductionCompletionChoices,
   buildProductionCompletionPayload,
   findProductionCompletionResult,
   validateProductionCompletionResult,
@@ -126,6 +127,7 @@ import {
   filterLifecycleStatusOptions,
   lifecycleScopeFromSearchParams,
   lifecycleScopeIncludesStatus,
+  normalizeLifecycleStatus,
 } from '../utils/lifecycleScope.mjs'
 
 const { Text } = Typography
@@ -172,10 +174,14 @@ function positiveQuery(value, fallback) {
 }
 
 function queryFromSearchParams(params) {
+  const scope = lifecycleScopeFromSearchParams(params)
   return {
     keyword: params.get('keyword') || '',
-    scope: lifecycleScopeFromSearchParams(params),
-    status: params.get('status') || '',
+    scope,
+    status: normalizeLifecycleStatus(scope, params.get('status'), [
+      'CLOSED',
+      'CANCELLED',
+    ]),
     date_field: params.get('date_field') || DEFAULT_QUERY.date_field,
     date_from: params.get('date_from') || '',
     date_to: params.get('date_to') || '',
@@ -261,7 +267,7 @@ export default function ProductionOrdersPage() {
   const outletContext = useOutletContext()
   const adminProfile = outletContext?.adminProfile || {}
   const allowedMenuPaths = outletContext?.allowedMenuPaths || []
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const routeProductionOrderID = searchParamPositiveInt(
     searchParams,
@@ -395,6 +401,8 @@ export default function ProductionOrdersPage() {
     adminProfile,
     PermissionCode.PRODUCTION_EXCEPTION_SUBMIT
   )
+  const canWarehousePackaging = hasActionPermission(adminProfile, PermissionCode.WAREHOUSE_PACKAGING_EXECUTE)
+  const canIssueCutting = hasActionPermission(adminProfile, PermissionCode.OUTSOURCING_MATERIAL_ISSUE_CREATE)
   const canAssignProductionWip = hasActionPermission(
     adminProfile,
     PermissionCode.PRODUCTION_WIP_ASSIGN
@@ -407,10 +415,6 @@ export default function ProductionOrdersPage() {
     adminProfile,
     PermissionCode.OUTSOURCING_RETURN_RECEIPT_CREATE
   )
-  const canReworkProductionWip = hasActionPermission(
-    adminProfile,
-    PermissionCode.PRODUCTION_WIP_REWORK
-  )
   const canConfirmPackagingMaterial = hasActionPermission(
     adminProfile,
     PermissionCode.PRODUCTION_PACKAGING_MATERIAL_CONFIRM
@@ -420,10 +424,11 @@ export default function ProductionOrdersPage() {
     PermissionCode.OUTSOURCING_ORDER_READ
   )
   const canManageProductionWip =
+    canWarehousePackaging ||
+    canIssueCutting ||
     canAssignProductionWip ||
     canExecuteProductionWip ||
     canReceiveProductionReturn ||
-    canReworkProductionWip ||
     canConfirmPackagingMaterial
   const productionRouteReadOnly =
     canReadProductionWip && !canManageProductionWip
@@ -1142,7 +1147,7 @@ export default function ProductionOrdersPage() {
     }
   }
 
-  const openProductionCompletion = async () => {
+  const openProductionCompletion = async (sourceBatch = null) => {
     const orderID = Number(selected?.id || 0)
     if (
       !orderID ||
@@ -1184,9 +1189,9 @@ export default function ProductionOrdersPage() {
       if (hasRoutedItem && !canReadProductionWip) {
         modal.warning({
           maskClosable: true,
-          title: '暂不能核对生产完工条件',
+          title: '暂不能核对成品收仓条件',
           content:
-            '当前账号没有查看生产工序的权限，无法核对路线明细是否完成包装并确认包材，请联系管理员调整岗位权限。',
+            '当前账号没有查看生产工序的权限，无法核对路线明细是否完成手工或回货，请联系管理员调整岗位权限。',
         })
         return
       }
@@ -1213,20 +1218,42 @@ export default function ProductionOrdersPage() {
       if (eligibleItems.length === 0) {
         modal.warning({
           maskClosable: true,
-          title: '暂不能登记生产完工',
+          title: '暂不能登记成品收仓',
           content:
             productionCompletionBlockerText(blockedItems) ||
-            '当前没有可登记生产完工的生产明细。',
+            '当前没有可登记成品收仓的生产明细。',
         })
         return
+      }
+      const facts = Array.isArray(factData?.production_facts)
+        ? factData.production_facts
+        : []
+      let initialValues = null
+      if (sourceBatch) {
+        const choice = buildProductionCompletionChoices(
+          eligibleItems,
+          facts,
+          wipAggregate
+        ).find((item) => item.value === sourceBatch.production_order_item_id)
+        const batchChoice = choice?.batchChoices.find(
+          (batch) => batch.value === sourceBatch.id
+        )
+        if (!batchChoice || batchChoice.disabled) {
+          message.warning('当前批次没有待登记的收仓数量，请核对已有收仓草稿或入库记录')
+          return
+        }
+        initialValues = {
+          production_order_item_id: choice.value,
+          production_wip_batch_id: batchChoice.value,
+          quantity: batchChoice.remaining,
+        }
       }
       setCompletionContext({
         order: nextAggregate.order,
         items: eligibleItems,
         blockedItems,
-        facts: Array.isArray(factData?.production_facts)
-          ? factData.production_facts
-          : [],
+        facts,
+        initialValues,
         wipAggregate,
         warehouseOptions: uniqueReferenceOptions(
           warehouseData?.warehouses,
@@ -1236,10 +1263,11 @@ export default function ProductionOrdersPage() {
           ? lotData.inventory_lots
           : [],
       })
+      setProductionRouteOpen(false)
       setCompletionOpen(true)
     } catch (error) {
       if (completionContextRequestRef.current === requestID) {
-        message.error(getActionErrorMessage(error, '加载生产完工详情'))
+        message.error(getActionErrorMessage(error, '加载成品收仓详情'))
       }
     } finally {
       if (completionContextRequestRef.current === requestID) {
@@ -1330,7 +1358,7 @@ export default function ProductionOrdersPage() {
       } catch (error) {
         if (!isSourceBusinessActionResultUnknown(error)) {
           completionAttemptsRef.current.settle(scope, attempt, error)
-          message.error(getActionErrorMessage(error, '生成完工记录草稿'))
+          message.error(getActionErrorMessage(error, '生成成品收仓草稿'))
           return
         }
         try {
@@ -1359,15 +1387,15 @@ export default function ProductionOrdersPage() {
       try {
         await refreshProductionSources(completionContext.order.id)
       } catch (error) {
-        message.warning(getActionErrorMessage(error, '刷新生产完工结果'))
+        message.warning(getActionErrorMessage(error, '刷新成品收仓结果'))
       }
       completionContextRequestRef.current += 1
       setCompletionOpen(false)
       setCompletionContext(EMPTY_COMPLETION_CONTEXT)
       message.success(
         confirmedByReread
-          ? `已重新读取并确认${completionContext.order.status === PRODUCTION_ORDER_STATUS.CLOSED ? '返工补完工' : '生产完工'}报告草稿，请由仓库核对并确认成品入库`
-          : `${completionContext.order.status === PRODUCTION_ORDER_STATUS.CLOSED ? '返工补完工' : '生产完工'}报告草稿已生成，请由仓库核对并确认成品入库`
+          ? '已重新读取并确认成品收仓草稿，请核对并确认成品入库'
+          : '成品收仓草稿已生成，请核对并确认成品入库'
       )
     } finally {
       completionInFlightRef.current = false
@@ -1780,9 +1808,9 @@ export default function ProductionOrdersPage() {
                         PRODUCTION_ORDER_STATUS.RELEASED,
                         PRODUCTION_ORDER_STATUS.CLOSED,
                       ].includes(selected.status)
-                    ? '生产订单发布后可登记完工'
+                    ? '生产订单发布后可登记成品收仓'
                     : detailLoading || completionLoading
-                      ? '当前资料处理完成后可登记完工'
+                      ? '当前资料处理完成后可登记成品收仓'
                       : ''
               }
             >
@@ -1802,11 +1830,11 @@ export default function ProductionOrdersPage() {
                   detailLoading ||
                   completionLoading
                 }
-                onClick={openProductionCompletion}
+                onClick={() => openProductionCompletion()}
               >
                 {selected?.status === PRODUCTION_ORDER_STATUS.CLOSED
-                  ? '登记返工补完工'
-                  : '登记生产完工'}
+                  ? '登记返工成品收仓'
+                  : '登记成品收仓'}
               </Button>
             </BusinessActionTooltip>
           ) : null}
@@ -2131,6 +2159,7 @@ export default function ProductionOrdersPage() {
 
       <ProductionCompletionModal
         open={completionOpen}
+        initialValues={completionContext.initialValues}
         order={completionContext.order}
         items={completionContext.items}
         blockedItems={completionContext.blockedItems}
@@ -2159,12 +2188,16 @@ export default function ProductionOrdersPage() {
       <ProductionRouteExecutionModal
         open={productionRouteOpen}
         productionOrder={selected}
+        canWarehousePackaging={canWarehousePackaging}
+        canIssueCutting={canIssueCutting}
         canAssign={canAssignProductionWip}
         canExecute={canExecuteProductionWip}
         canReceiveReturn={canReceiveProductionReturn}
+        canCreateCompletion={canCreateCompletion && canReadProductionFacts}
+        completionLoading={completionLoading}
+        onCreateCompletion={openProductionCompletion}
         initialBatchID={linkedWipBatchID}
         initialItemID={linkedProductionItemID}
-        canRework={canReworkProductionWip}
         canConfirmPackaging={canConfirmPackagingMaterial}
         canReadOutsourcingContracts={canReadOutsourcingContracts}
         onCancel={() => setProductionRouteOpen(false)}

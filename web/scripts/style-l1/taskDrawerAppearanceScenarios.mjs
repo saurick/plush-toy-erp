@@ -64,13 +64,16 @@ export function createTaskDrawerAppearanceScenarios({
         },
       },
     ],
-    viewport: { width: 1440, height: 900 },
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 2,
     verify: async (page) => {
       const trigger = page.getByRole('button', {
         name: `查看${taskName}详情`,
         exact: true,
       })
       await trigger.waitFor()
+      const card = page.locator('.erp-task-card').filter({ has: trigger })
+      const openDrawer = () => clickTaskCardContent(card, card.getByText(taskName, { exact: true }))
       const drawer = page.locator('.erp-task-action-drawer')
       const tabs = '.erp-task-action-drawer__guide-steps'
       const shot = (suffix) =>
@@ -105,7 +108,7 @@ export function createTaskDrawerAppearanceScenarios({
           .getByRole('button', { name: '关闭', exact: true })
           .click()
         await appearance.waitFor({ state: 'hidden' })
-        await trigger.click()
+        await openDrawer()
         await drawer.getByRole('region', { name: '本任务处理记录' }).waitFor()
         await waitForFiniteAnimations(page)
         const geometry = await drawer.evaluate((root) => {
@@ -129,7 +132,8 @@ export function createTaskDrawerAppearanceScenarios({
             recordRadius: style('.workflow-task-event-trail').borderRadius,
             titleSize: style('.erp-task-action-drawer__task-title').fontSize,
             closeRight: rect('.ant-drawer-close').right,
-            titleRight: rect('.erp-task-action-drawer__heading').right,
+            closeWidth: rect('.ant-drawer-close').width,
+            titleLeft: rect('.erp-task-action-drawer__heading').left,
             metaTopDelta:
               meta[0].getBoundingClientRect().y -
               meta[1].getBoundingClientRect().y,
@@ -154,7 +158,7 @@ export function createTaskDrawerAppearanceScenarios({
         assert.equal(geometry.cardRadius, '10px', context)
         assert.equal(geometry.recordRadius, '10px', context)
         assert.equal(geometry.titleSize, '16px', context)
-        assert(geometry.closeRight > geometry.titleRight, context)
+        assert(geometry.closeRight < geometry.titleLeft && geometry.closeWidth >= 44, context)
         assert(Math.abs(geometry.metaTopDelta) < 1, context)
         assert.equal(
           geometry.markerBackground,
@@ -177,7 +181,7 @@ export function createTaskDrawerAppearanceScenarios({
         assert(geometry.stageHeight < 80 && geometry.bodyOverflow <= 1, context)
         if (key === 'pink' || key === 'yellow') await shot(`${key}-context`)
 
-        await verifyMobileNavigationMotion(page, assert, tabs, 1)
+        await drawer.getByRole('button', { name: '选择处理方式', exact: true }).click()
         const options = drawer.getByRole('radio')
         await options.first().click()
         await waitForFiniteAnimations(page)
@@ -224,7 +228,8 @@ export function createTaskDrawerAppearanceScenarios({
           assert.equal(await drawer.getByRole('tab', { name: /确认与结果/ }).isDisabled(), true)
           await drawer.getByRole('radio', { name: /处理完成/ }).click()
         }
-        await verifyMobileNavigationMotion(page, assert, tabs, 0, true)
+        await verifyMobileNavigationMotion(page, assert, tabs, 2)
+        await verifyMobileNavigationMotion(page, assert, tabs, 1, true)
         await drawer.locator('.ant-drawer-close').click()
         await drawer.waitFor({ state: 'hidden' })
         await page.waitForFunction(
@@ -238,13 +243,14 @@ export function createTaskDrawerAppearanceScenarios({
         )
       }
 
-      await trigger.click()
+      await openDrawer()
+      await waitForFiniteAnimations(page)
       await assertTaskActionDrawerLayout(page, {
         scenarioName: `task-drawer-appearance-${themeMode}-context`,
         expectedTaskText: taskName,
         expectReasonInput: false,
       })
-      await drawer.getByRole('tab', { name: /选择处理/ }).click()
+      await drawer.getByRole('button', { name: '选择处理方式', exact: true }).click()
       await drawer.getByRole('radio', { name: /标记阻塞/ }).click()
       assert(
         await drawer.getByRole('tab', { name: /确认与结果/ }).isDisabled(),

@@ -70,6 +70,9 @@ func ClassifyWorkflowTaskBoardLane(task *WorkflowTask, snapshotAt time.Time) (st
 	case "done", "rejected", "withdrawn":
 		return WorkflowTaskBoardLaneFinished, nil
 	case "ready":
+		if IsWorkflowExceptionTask(task) {
+			return WorkflowTaskBoardLaneException, nil
+		}
 		if task.DueAt != nil && !task.DueAt.After(snapshotAt.Add(WorkflowTaskBoardDueWindow)) {
 			return WorkflowTaskBoardLaneDue, nil
 		}
@@ -77,6 +80,31 @@ func ClassifyWorkflowTaskBoardLane(task *WorkflowTask, snapshotAt time.Time) (st
 	default:
 		return "", ErrWorkflowTaskBoardStatus
 	}
+}
+
+func WorkflowExceptionTaskGroups() []string {
+	return []string{"handoff_production_exception", "handoff_receipt_exception"}
+}
+
+func WorkflowExceptionSourceTypes() []string {
+	return []string{"production_exception_decision", "outsourcing_return_disposition", "purchase_rejection_disposition"}
+}
+
+func IsWorkflowExceptionTask(task *WorkflowTask) bool {
+	if task == nil {
+		return false
+	}
+	for _, group := range WorkflowExceptionTaskGroups() {
+		if task.TaskGroup == group {
+			return true
+		}
+	}
+	for _, source := range WorkflowExceptionSourceTypes() {
+		if task.SourceType == source {
+			return true
+		}
+	}
+	return false
 }
 
 func (uc *WorkflowUsecase) GetTaskBoard(ctx context.Context, query WorkflowTaskBoardQuery) (*WorkflowTaskBoard, error) {
@@ -92,6 +120,9 @@ func (uc *WorkflowUsecase) GetTaskBoard(ctx context.Context, query WorkflowTaskB
 
 func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTaskBoardQuery, error) {
 	if query.TodoOnly && query.ApprovalOnly {
+		return WorkflowTaskBoardQuery{}, ErrBadParam
+	}
+	if !ValidWorkflowTaskDiscoveryFilter(query.WorkflowTaskDiscoveryFilter) {
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
 	query.Keyword = strings.TrimSpace(query.Keyword)

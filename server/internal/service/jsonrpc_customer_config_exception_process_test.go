@@ -666,7 +666,7 @@ func TestCustomerConfigExceptionProcessesStartReadAndReplay(t *testing.T) {
 		wantNodeCount   int
 	}{
 		{"finance payment", biz.ProcessKeyFinancePaymentApproval, biz.CustomerProcessVariantFinancePaymentApprovalPost, "finance_payment", "start_finance_payment_approval_process", "get_finance_payment_approval_process", "finance_payment_id", 102, 7},
-		{"production exception", biz.ProcessKeyProductionExceptionApproval, biz.CustomerProcessVariantProductionExceptionApproval, "production_exception_decision", "start_production_exception_approval_process", "get_production_exception_approval_process", "production_exception_id", 103, 8},
+		{"production exception", biz.ProcessKeyProductionExceptionApproval, biz.CustomerProcessVariantProductionExceptionApproval, "production_exception_decision", "start_production_exception_approval_process", "get_production_exception_approval_process", "production_exception_id", 103, 11},
 	}
 	for index, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

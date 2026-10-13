@@ -1265,7 +1265,7 @@ test('full acceptance prepare freezes the fixed lifecycle plan without executing
       stages: summary.acceptancePlan.dataStageCount,
       targets: summary.acceptancePlan.catalogTargetCount,
     },
-    { chains: 11, steps: 72, scenarios: 66, stages: 9, targets: 51 }
+    { chains: 11, steps: 74, scenarios: 66, stages: 9, targets: 51 }
   )
   assert.doesNotThrow(() => validateDevDataPreparationSummary(summary))
   assert.equal(Object.hasOwn(summary.acceptancePlan, 'definitionSnapshot'), false)

@@ -1217,6 +1217,7 @@ export async function installOrderRpcMocks(page, context) {
     outsourcing_allocations: productionWipOutsourcingAllocations,
     packaging_confirmations: productionPackagingConfirmations,
     quality_inspections: productionWipQualityInspections,
+    finished_goods_receipts: [],
   })
 
   await page.route('**/rpc/production_wip', async (route) => {

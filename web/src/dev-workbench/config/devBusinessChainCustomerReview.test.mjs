@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import { DEV_FLOW_STATE_CATALOG } from './devFlowStateCatalog.mjs'
+import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 import {
   DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_COMPLETION_BOUNDARY,
   DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_FOOTER,
@@ -73,11 +74,6 @@ function customerDiagramSources(review) {
     .filter(Boolean)
     .map((diagram) => diagram.mermaidSource)
 }
-
-const chainViewsSource = readFileSync(
-  new URL('../components/flow-state/BusinessChainViews.jsx', import.meta.url),
-  'utf8'
-)
 
 test('customer review exports only the selected business chain with complete business questions', () => {
   const review = buildDevBusinessChainCustomerReview({
@@ -165,6 +161,18 @@ test('customer review retains separate partial and settled outcomes instead of o
   assert(settled.results.some((value) => value.includes('结清')))
 })
 
+test('printed exception summary prioritizes business outcomes and omits QA-only checks', () => {
+  const review = buildDevBusinessChainCustomerReview({
+    catalog: DEV_FLOW_STATE_CATALOG,
+    chainKey: 'production_to_inventory',
+    generatedAt,
+  })
+  const text = review.chain.displayExceptionPaths.join('\n')
+  assert.doesNotMatch(text, /无权限|错误状态|幂等/u)
+  assert.match(text, /不通过|拒绝|取消|冲正|退回/u)
+  assert.doesNotMatch(text, /已登记业务分支/u, '顺序主链不得因登记了负向测试而标成业务分支')
+})
+
 test('customer review binds a registered preview without claiming release or acceptance', () => {
   const customerOverlay = DEV_FLOW_STATE_CATALOG.overlays.find(
     (overlay) => overlay.customerKey === 'yoyoosun'
@@ -194,7 +202,7 @@ test('customer review binds a registered preview without claiming release or acc
   )
 })
 
-test('customer review overview stays one-level and never expands all chain internals', () => {
+test('customer review overview shares the order flow and keeps technical chain internals compact', () => {
   const review = buildDevBusinessChainCustomerReview({
     catalog: DEV_FLOW_STATE_CATALOG,
     chainKey: 'all',
@@ -202,6 +210,10 @@ test('customer review overview stays one-level and never expands all chain inter
   })
 
   assert.equal(review.overview.compactOnly, true)
+  assert.equal(review.documentTitle, '业务链甲方校对版｜订单全流程')
+  assert.deepEqual(review.overview.fulfillmentFlow, taskCatalog.fulfillment_flow)
+  assert.deepEqual(review.overview.exceptionFlow, taskCatalog.exception_flow)
+  assert.deepEqual(review.overview.exceptionApproval, taskCatalog.exception_approval)
   assert.equal(Object.hasOwn(review, 'chain'), false)
   assert.equal(review.overview.lanes.length, 4)
   assert.equal(review.overview.lanes.flatMap((lane) => lane.chains).length, 11)
@@ -322,10 +334,9 @@ test('customer review does not hardcode a customer and fails closed for an unkno
   assert.match(moduleSource, /buildDevBusinessChainProjection/u)
   assert.match(pageSource, /DevCustomerScopeSelector/u)
   assert.match(pageSource, /DEV_CUSTOMER_QUERY_KEY/u)
-  assert.match(pageSource, /normalize: view === 'chain'/u)
+  assert.match(pageSource, /normalize: customerExportOpen/u)
   assert.match(pageSource, /catalog\.overlays\.find/u)
-  assert.match(chainViewsSource, /disabled=\{!customerReviewReady\}/u)
-  assert.match(pageSource, /通用业务链与运行观察仍可使用/u)
+  assert.match(pageSource, /disabled: !customerReviewReady \|\| !customerReview/u)
   assert.match(pageSource, /customerOverlay/u)
   assert.match(pageSource, /customerReviewPrintSnapshot/u)
   assert.match(

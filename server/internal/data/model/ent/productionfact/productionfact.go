@@ -79,6 +79,8 @@ const (
 	EdgeProductionWipBatch = "production_wip_batch"
 	// EdgeOriginReworkBatches holds the string denoting the origin_rework_batches edge name in mutations.
 	EdgeOriginReworkBatches = "origin_rework_batches"
+	// EdgePackagingBatches holds the string denoting the packaging_batches edge name in mutations.
+	EdgePackagingBatches = "packaging_batches"
 	// EdgePoster holds the string denoting the poster edge name in mutations.
 	EdgePoster = "poster"
 	// EdgeCanceller holds the string denoting the canceller edge name in mutations.
@@ -127,6 +129,13 @@ const (
 	OriginReworkBatchesInverseTable = "production_wip_batches"
 	// OriginReworkBatchesColumn is the table column denoting the origin_rework_batches relation/edge.
 	OriginReworkBatchesColumn = "origin_rework_fact_id"
+	// PackagingBatchesTable is the table that holds the packaging_batches relation/edge.
+	PackagingBatchesTable = "production_wip_batches"
+	// PackagingBatchesInverseTable is the table name for the ProductionWIPBatch entity.
+	// It exists in this package in order to avoid circular dependency with the "productionwipbatch" package.
+	PackagingBatchesInverseTable = "production_wip_batches"
+	// PackagingBatchesColumn is the table column denoting the packaging_batches relation/edge.
+	PackagingBatchesColumn = "finished_goods_receipt_id"
 	// PosterTable is the table that holds the poster relation/edge.
 	PosterTable = "production_facts"
 	// PosterInverseTable is the table name for the AdminUser entity.
@@ -432,6 +441,20 @@ func ByOriginReworkBatches(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOpti
 	}
 }
 
+// ByPackagingBatchesCount orders the results by packaging_batches count.
+func ByPackagingBatchesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPackagingBatchesStep(), opts...)
+	}
+}
+
+// ByPackagingBatches orders the results by packaging_batches terms.
+func ByPackagingBatches(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPackagingBatchesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByPosterField orders the results by poster field.
 func ByPosterField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -485,6 +508,13 @@ func newOriginReworkBatchesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(OriginReworkBatchesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, OriginReworkBatchesTable, OriginReworkBatchesColumn),
+	)
+}
+func newPackagingBatchesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PackagingBatchesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, PackagingBatchesTable, PackagingBatchesColumn),
 	)
 }
 func newPosterStep() *sqlgraph.Step {

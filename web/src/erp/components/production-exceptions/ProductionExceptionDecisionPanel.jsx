@@ -2,6 +2,7 @@ import { AuditOutlined, RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Input, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import WorkflowSourceProgressButton from '../workflow/WorkflowSourceProgressButton.jsx'
 import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
@@ -52,7 +53,10 @@ import {
 } from '../../utils/productionExceptionListModel.mjs'
 
 const TYPE_LABELS = {
-  SCRAP: '生产报废',
+  SCRAP: '放弃本批（报废）',
+  REWORK_ORIGINAL: '原厂／本厂返工',
+  REWORK_SWITCH: '换厂返工',
+  REMAKE: '补料重做',
   OVER_ISSUE: '超领申请',
   WIP_CONCESSION: '在制品让步',
 }
@@ -69,7 +73,7 @@ const EXECUTION_LABELS = {
 }
 const TYPE_FILTER_OPTIONS = [
   { label: '全部异常类型', value: '' },
-  { label: TYPE_LABELS.SCRAP, value: 'SCRAP' },
+  ...['SCRAP', 'REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE'].map((value) => ({ label: TYPE_LABELS[value], value })),
   { label: TYPE_LABELS.OVER_ISSUE, value: 'OVER_ISSUE' },
   { label: TYPE_LABELS.WIP_CONCESSION, value: 'WIP_CONCESSION' },
 ]
@@ -122,6 +126,7 @@ export default function ProductionExceptionDecisionPanel({
   onRefreshReady,
   onSummaryChange,
 }) {
+  const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const beginLatestRequest = useLatestRequestCoordinator()
   const [rows, setRows] = useState([])
@@ -143,7 +148,7 @@ export default function ProductionExceptionDecisionPanel({
     adminProfile,
     PermissionCode.PRODUCTION_EXCEPTION_SUBMIT
   )
-  const canExecute = hasActionPermission(adminProfile, PermissionCode.PRODUCTION_FACT_POST)
+  const canExecute = hasActionPermission(adminProfile, PermissionCode.PRODUCTION_EXCEPTION_EXECUTE)
   const canRecoverProcess = hasActionPermission(
     adminProfile,
     PermissionCode.PROCESS_RUNTIME_RECOVER
@@ -386,7 +391,7 @@ export default function ProductionExceptionDecisionPanel({
         })
         const node = findExceptionProcessActiveNode(
           processData,
-          'execute_production_exception'
+          ['execute_production_exception', 'execute_warehouse_production_exception']
         )
         const execution = await executeProductionExceptionProcess({
           ...(customerKey ? { customer_key: customerKey } : {}),
@@ -656,7 +661,7 @@ export default function ProductionExceptionDecisionPanel({
                 size="small"
                 type="primary"
                 data-business-action-key="production-exception-decide"
-                href="/erp/task-board"
+                onClick={() => navigate('/erp/task-board')}
                 disabled={actionAvailability.decide.disabled}
               >
                 去任务中心审批

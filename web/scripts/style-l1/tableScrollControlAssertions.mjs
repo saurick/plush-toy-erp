@@ -344,7 +344,7 @@ export async function exerciseTableScrollControls(page, wrapper, scroller) {
     return {
       left: node.scrollLeft,
       max: node.scrollWidth - node.clientWidth,
-      step: Math.max(80, (node.clientWidth - fixedWidth) * 0.8),
+      step: Math.min(240, Math.max(80, (node.clientWidth - fixedWidth) * 0.8)),
     }
   })
   await page.mouse.move(1, 1)

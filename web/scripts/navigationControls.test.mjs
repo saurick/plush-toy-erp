@@ -82,7 +82,7 @@ test('mobile progress uses an anchored dropdown without desktop date inputs', ()
     1,
     '移动进度只能保留一个自由文本搜索入口'
   )
-  assert.match(mobileProgressSource, /单号、客户、产品、负责人/u)
+  assert.match(mobileProgressSource, /单号、名称或负责人/u)
   assert.doesNotMatch(mobileProgressSource, /mobile-progress-owner-filter/u)
   assert.match(mobileProgressSource, /IntersectionObserver/u)
   assert.match(mobileProgressSource, /继续下滑加载/u)

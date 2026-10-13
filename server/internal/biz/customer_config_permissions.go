@@ -165,7 +165,7 @@ func processDomainCommandRequiredPermission(commandKey string) string {
 		ProcessDomainCommandProductionExceptionReject:
 		return PermissionProductionExceptionApprove
 	case ProcessDomainCommandProductionExceptionExecute:
-		return PermissionProductionFactPost
+		return PermissionProductionExceptionExecute
 	default:
 		return ""
 	}

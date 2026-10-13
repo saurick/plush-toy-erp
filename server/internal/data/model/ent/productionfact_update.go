@@ -506,6 +506,21 @@ func (_u *ProductionFactUpdate) AddOriginReworkBatches(v ...*ProductionWIPBatch)
 	return _u.AddOriginReworkBatchIDs(ids...)
 }
 
+// AddPackagingBatchIDs adds the "packaging_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_u *ProductionFactUpdate) AddPackagingBatchIDs(ids ...int) *ProductionFactUpdate {
+	_u.mutation.AddPackagingBatchIDs(ids...)
+	return _u
+}
+
+// AddPackagingBatches adds the "packaging_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionFactUpdate) AddPackagingBatches(v ...*ProductionWIPBatch) *ProductionFactUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPackagingBatchIDs(ids...)
+}
+
 // SetPosterID sets the "poster" edge to the AdminUser entity by ID.
 func (_u *ProductionFactUpdate) SetPosterID(id int) *ProductionFactUpdate {
 	_u.mutation.SetPosterID(id)
@@ -592,6 +607,27 @@ func (_u *ProductionFactUpdate) RemoveOriginReworkBatches(v ...*ProductionWIPBat
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveOriginReworkBatchIDs(ids...)
+}
+
+// ClearPackagingBatches clears all "packaging_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionFactUpdate) ClearPackagingBatches() *ProductionFactUpdate {
+	_u.mutation.ClearPackagingBatches()
+	return _u
+}
+
+// RemovePackagingBatchIDs removes the "packaging_batches" edge to ProductionWIPBatch entities by IDs.
+func (_u *ProductionFactUpdate) RemovePackagingBatchIDs(ids ...int) *ProductionFactUpdate {
+	_u.mutation.RemovePackagingBatchIDs(ids...)
+	return _u
+}
+
+// RemovePackagingBatches removes "packaging_batches" edges to ProductionWIPBatch entities.
+func (_u *ProductionFactUpdate) RemovePackagingBatches(v ...*ProductionWIPBatch) *ProductionFactUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePackagingBatchIDs(ids...)
 }
 
 // ClearPoster clears the "poster" edge to the AdminUser entity.
@@ -999,6 +1035,51 @@ func (_u *ProductionFactUpdate) sqlSave(ctx context.Context) (_node int, err err
 			Inverse: false,
 			Table:   productionfact.OriginReworkBatchesTable,
 			Columns: []string{productionfact.OriginReworkBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PackagingBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.PackagingBatchesTable,
+			Columns: []string{productionfact.PackagingBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPackagingBatchesIDs(); len(nodes) > 0 && !_u.mutation.PackagingBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.PackagingBatchesTable,
+			Columns: []string{productionfact.PackagingBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PackagingBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.PackagingBatchesTable,
+			Columns: []string{productionfact.PackagingBatchesColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
@@ -1558,6 +1639,21 @@ func (_u *ProductionFactUpdateOne) AddOriginReworkBatches(v ...*ProductionWIPBat
 	return _u.AddOriginReworkBatchIDs(ids...)
 }
 
+// AddPackagingBatchIDs adds the "packaging_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_u *ProductionFactUpdateOne) AddPackagingBatchIDs(ids ...int) *ProductionFactUpdateOne {
+	_u.mutation.AddPackagingBatchIDs(ids...)
+	return _u
+}
+
+// AddPackagingBatches adds the "packaging_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionFactUpdateOne) AddPackagingBatches(v ...*ProductionWIPBatch) *ProductionFactUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPackagingBatchIDs(ids...)
+}
+
 // SetPosterID sets the "poster" edge to the AdminUser entity by ID.
 func (_u *ProductionFactUpdateOne) SetPosterID(id int) *ProductionFactUpdateOne {
 	_u.mutation.SetPosterID(id)
@@ -1644,6 +1740,27 @@ func (_u *ProductionFactUpdateOne) RemoveOriginReworkBatches(v ...*ProductionWIP
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveOriginReworkBatchIDs(ids...)
+}
+
+// ClearPackagingBatches clears all "packaging_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionFactUpdateOne) ClearPackagingBatches() *ProductionFactUpdateOne {
+	_u.mutation.ClearPackagingBatches()
+	return _u
+}
+
+// RemovePackagingBatchIDs removes the "packaging_batches" edge to ProductionWIPBatch entities by IDs.
+func (_u *ProductionFactUpdateOne) RemovePackagingBatchIDs(ids ...int) *ProductionFactUpdateOne {
+	_u.mutation.RemovePackagingBatchIDs(ids...)
+	return _u
+}
+
+// RemovePackagingBatches removes "packaging_batches" edges to ProductionWIPBatch entities.
+func (_u *ProductionFactUpdateOne) RemovePackagingBatches(v ...*ProductionWIPBatch) *ProductionFactUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePackagingBatchIDs(ids...)
 }
 
 // ClearPoster clears the "poster" edge to the AdminUser entity.
@@ -2081,6 +2198,51 @@ func (_u *ProductionFactUpdateOne) sqlSave(ctx context.Context) (_node *Producti
 			Inverse: false,
 			Table:   productionfact.OriginReworkBatchesTable,
 			Columns: []string{productionfact.OriginReworkBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PackagingBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.PackagingBatchesTable,
+			Columns: []string{productionfact.PackagingBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPackagingBatchesIDs(); len(nodes) > 0 && !_u.mutation.PackagingBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.PackagingBatchesTable,
+			Columns: []string{productionfact.PackagingBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PackagingBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.PackagingBatchesTable,
+			Columns: []string{productionfact.PackagingBatchesColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),

@@ -173,6 +173,9 @@ func (d *jsonrpcDispatcher) mapInventoryError(ctx context.Context, err error) *v
 }
 
 func (d *jsonrpcDispatcher) inventoryErrorResult(ctx context.Context, err error) *v1.JsonrpcResult {
+	if errors.Is(err, biz.ErrShipmentPackingPending) {
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "成品尚未完成检验、查货或包装，请先办理对应任务；返工请从成品入库记录发起"}
+	}
 	if result := unitQuantityErrorResult(err); result != nil {
 		return result
 	}
@@ -226,18 +229,21 @@ func inventoryBalanceToAny(item *biz.InventoryBalance) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                       item.ID,
-		"subject_type":             item.SubjectType,
-		"stock_category":           item.StockCategory,
-		"subject_id":               item.SubjectID,
-		"product_sku_id":           optionalIntToAny(item.ProductSkuID),
-		"warehouse_id":             item.WarehouseID,
-		"lot_id":                   optionalIntToAny(item.LotID),
-		"unit_id":                  item.UnitID,
-		"quantity":                 item.Quantity.String(),
-		"active_reserved_quantity": item.ActiveReservedQuantity.String(),
-		"available_quantity":       item.AvailableQuantity.String(),
-		"updated_at":               item.UpdatedAt.Unix(),
+		"id":                          item.ID,
+		"subject_type":                item.SubjectType,
+		"stock_category":              item.StockCategory,
+		"subject_id":                  item.SubjectID,
+		"product_sku_id":              optionalIntToAny(item.ProductSkuID),
+		"warehouse_id":                item.WarehouseID,
+		"lot_id":                      optionalIntToAny(item.LotID),
+		"unit_id":                     item.UnitID,
+		"quantity":                    item.Quantity.String(),
+		"active_reserved_quantity":    item.ActiveReservedQuantity.String(),
+		"available_quantity":          item.AvailableQuantity.String(),
+		"pending_inspection_quantity": item.PendingInspectionQuantity.String(),
+		"pending_packaging_quantity":  item.PendingPackagingQuantity.String(),
+		"ready_to_ship_quantity":      item.ReadyToShipQuantity.String(),
+		"updated_at":                  item.UpdatedAt.Unix(),
 	}
 }
 

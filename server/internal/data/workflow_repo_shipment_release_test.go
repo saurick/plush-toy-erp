@@ -49,7 +49,7 @@ func TestWorkflowRepo_ShipmentReleaseDoneUpsertsBusinessStateOnly(t *testing.T) 
 	}
 	if state.BusinessStatusKey != "shipping_released" ||
 		state.OwnerRoleKey == nil ||
-		*state.OwnerRoleKey != "warehouse" {
+		*state.OwnerRoleKey != "sales" {
 		t.Fatalf("unexpected shipment release state %#v", state)
 	}
 	if state.Payload["shipment_release_task_id"] != float64(shipmentTask.ID) && state.Payload["shipment_release_task_id"] != shipmentTask.ID {

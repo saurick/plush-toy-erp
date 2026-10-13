@@ -2342,6 +2342,7 @@ async function advanceProductionWIPRoute({
       } else if (status === "OUTSOURCED") {
         await executeProductionWIPAction(rpc, {
           action: "RECEIVE_OUTSOURCING_RETURN",
+          quantity: batch.quantity,
           production_order_id: orderID,
           production_wip_batch_id: batch.id,
           expected_version: positiveID(

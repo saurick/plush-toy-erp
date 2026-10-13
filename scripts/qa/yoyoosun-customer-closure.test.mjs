@@ -53,6 +53,9 @@ const forbiddenRuntimeFactCommitClaims =
 
 const expectedRoleMenuSurfaces = Object.freeze({
   sales: [
+    "quality-inspections",
+    "production-exceptions",
+    "suppliers",
     "global-dashboard",
     "customers",
     "sales-orders",
@@ -125,6 +128,7 @@ const expectedRoleMenuSurfaces = Object.freeze({
     "print-center",
   ],
   warehouse: [
+    "production-exceptions",
     "production-orders",
     "processing-contracts",
     "accessories-purchase",
@@ -682,7 +686,7 @@ test("yoyoosun WIP role projection stays within Product Core ownership", () => {
     "production.wip.read",
     "production.wip.assign",
     "production.wip.execute",
-    "production.wip.rework",
+    "production.exception.execute",
   ]) {
     assert(production.capabilityKeys.includes(key), `production needs ${key}`);
   }

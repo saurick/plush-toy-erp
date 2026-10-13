@@ -16,6 +16,9 @@ const (
 	ProductionExceptionScrap             = "SCRAP"
 	ProductionExceptionOverIssue         = "OVER_ISSUE"
 	ProductionExceptionWIPConcession     = "WIP_CONCESSION"
+	ProductionExceptionReworkOriginal    = "REWORK_ORIGINAL"
+	ProductionExceptionReworkSwitch      = "REWORK_SWITCH"
+	ProductionExceptionRemake            = "REMAKE"
 	ProductionExceptionSubmitted         = "SUBMITTED"
 	ProductionExceptionApproved          = "APPROVED"
 	ProductionExceptionRejected          = "REJECTED"
@@ -44,6 +47,8 @@ type ProductionExceptionDecision struct {
 	DecisionNo, DecisionType, Status, ExecutionStatus, Reason          string
 	ProductionMaterialRequirementID, ProductionWIPBatchID              *int
 	QualityInspectionID, DecidedBy                                     *int
+	TargetSupplierID, TargetOperationID                                *int
+	StockDispositionRequired                                           bool
 	RequestedQuantity                                                  decimal.Decimal
 	ApprovedQuantity                                                   *decimal.Decimal
 	RequestedAt                                                        time.Time
@@ -58,11 +63,13 @@ type ProductionExceptionSubmit struct {
 	DecisionNo, DecisionType, Reason, IdempotencyKey                           string
 	ProductionOrderID, ProductionOrderItemID                                   int
 	ProductionMaterialRequirementID, ProductionWIPBatchID, QualityInspectionID *int
+	TargetSupplierID, TargetOperationID                                        *int
 	RequestedQuantity                                                          decimal.Decimal
 	RequestedBy                                                                int
 }
 
 type ProductionExceptionMutation struct {
+	WarehouseScope               *WarehouseDataScope `json:"-"`
 	ID, ExpectedVersion, ActorID int
 	ApprovedQuantity             *decimal.Decimal
 	Reason                       string
@@ -89,6 +96,37 @@ type ProductionExceptionSourceResolver interface {
 }
 type ProductionExceptionListRepo interface {
 	ListProductionExceptions(context.Context, ProductionExceptionFilter) ([]*ProductionExceptionDecision, int, error)
+}
+
+type ProductionExceptionContext struct {
+	ProductionOrderID        int    `json:"production_order_id"`
+	ProductionOrderItemID    int    `json:"production_order_item_id"`
+	BatchID                  int    `json:"production_wip_batch_id"`
+	BatchNo                  string `json:"batch_no"`
+	Quantity                 string `json:"quantity"`
+	UnitPrecision            int    `json:"unit_precision"`
+	UnitName                 string `json:"unit_name"`
+	OperationID              int    `json:"operation_id"`
+	OperationName            string `json:"operation_name"`
+	FabricOperationID        int    `json:"fabric_operation_id"`
+	OriginalSupplierID       *int   `json:"original_supplier_id"`
+	OriginalSupplierName     string `json:"original_supplier_name"`
+	StockDispositionRequired bool   `json:"stock_disposition_required"`
+}
+
+type ProductionExceptionContextRepo interface {
+	GetProductionExceptionContext(context.Context, int) (*ProductionExceptionContext, error)
+}
+
+func (uc *OperationalFactUsecase) GetProductionExceptionContext(ctx context.Context, inspectionID int) (*ProductionExceptionContext, error) {
+	if uc == nil || uc.repo == nil || inspectionID <= 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(ProductionExceptionContextRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return repo.GetProductionExceptionContext(ctx, inspectionID)
 }
 
 func (uc *OperationalFactUsecase) ListProductionExceptions(ctx context.Context, filter ProductionExceptionFilter) ([]*ProductionExceptionDecision, int, error) {
@@ -127,15 +165,18 @@ func (uc *OperationalFactUsecase) SubmitProductionException(ctx context.Context,
 		if n.ProductionMaterialRequirementID == nil || *n.ProductionMaterialRequirementID <= 0 || n.ProductionWIPBatchID != nil || n.QualityInspectionID != nil {
 			return nil, ErrProductionExceptionSourceInvalid
 		}
-	case ProductionExceptionWIPConcession:
-		if n.ProductionWIPBatchID == nil || n.QualityInspectionID == nil || n.ProductionMaterialRequirementID != nil {
-			return nil, ErrProductionExceptionSourceInvalid
-		}
-	case ProductionExceptionScrap:
-		if n.ProductionWIPBatchID == nil || n.QualityInspectionID == nil || n.ProductionMaterialRequirementID != nil {
+	case ProductionExceptionWIPConcession, ProductionExceptionScrap, ProductionExceptionReworkOriginal, ProductionExceptionReworkSwitch, ProductionExceptionRemake:
+		if n.ProductionWIPBatchID == nil || *n.ProductionWIPBatchID <= 0 || n.QualityInspectionID == nil || *n.QualityInspectionID <= 0 || n.ProductionMaterialRequirementID != nil {
 			return nil, ErrProductionExceptionSourceInvalid
 		}
 	default:
+		return nil, ErrBadParam
+	}
+	if ProductionExceptionCreatesBatch(n.DecisionType) {
+		if n.TargetOperationID == nil || *n.TargetOperationID <= 0 || (n.TargetSupplierID != nil && *n.TargetSupplierID <= 0) || (n.DecisionType != ProductionExceptionReworkOriginal && n.TargetSupplierID == nil) {
+			return nil, ErrProductionExceptionSourceInvalid
+		}
+	} else if n.TargetSupplierID != nil || n.TargetOperationID != nil {
 		return nil, ErrBadParam
 	}
 	payload, err := json.Marshal(n)
@@ -144,6 +185,10 @@ func (uc *OperationalFactUsecase) SubmitProductionException(ctx context.Context,
 	}
 	sum := sha256.Sum256(payload)
 	return repo.SubmitProductionException(ctx, &n, hex.EncodeToString(sum[:]))
+}
+
+func ProductionExceptionCreatesBatch(decisionType string) bool {
+	return decisionType == ProductionExceptionReworkOriginal || decisionType == ProductionExceptionReworkSwitch || decisionType == ProductionExceptionRemake
 }
 
 func (uc *OperationalFactUsecase) ApproveProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {

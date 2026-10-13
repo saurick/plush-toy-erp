@@ -149,10 +149,8 @@ test('mobile material task separates on-demand reading from versioned task proce
       .length,
     2
   )
-  const processTab = document.querySelector('[data-step-key="process"]')
-  await click(processTab)
-  assert.equal(openedActions, 2)
-  assert.equal(document.querySelector('[role="dialog"]'), null)
+  assert.equal(document.querySelector('[data-step-key="process"]'), null)
+  assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 1)
   assert.ok(calls.every(({ method }) => !method.includes('review_engineering')))
 
   await render({ selectedTask: { ...task, id: 9, assignee_id: 99 } })

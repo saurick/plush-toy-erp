@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"testing"
@@ -79,6 +80,8 @@ func TestFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T) {
 	}
 	assertFulfillmentTask(t, ctx, f.client, "outsourcing_issue", order.ID, "done", biz.WarehouseRoleKey)
 
+	finishedWarehouse := createTestProductWarehouse(t, ctx, f.client, "HANDOFF-FINISHED")
+	var completion *biz.ProductionFact
 	current := productionWIPBatchByID(t, wip, root.ID)
 	for index, code := range []string{biz.ProductionWIPOperationFabricProcessing, biz.ProductionWIPOperationSewing, biz.ProductionWIPOperationHandwork, biz.ProductionWIPOperationPackaging} {
 		action := func(suffix string) *biz.ProductionWIPAction {
@@ -113,13 +116,45 @@ func TestFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T) {
 		current = productionWIPBatchByID(t, wip, current.ID)
 		if index == 0 {
 			assertFulfillmentTask(t, ctx, f.client, "production_return", current.ID, "ready", biz.WarehouseRoleKey)
-			wip, err = f.uc.ReceiveProductionWIPOutsourcingReturn(ctx, action("return"))
+			returnInput := action("return")
+			returnInput.Quantity = current.Quantity
+			wip, err = f.uc.ReceiveProductionWIPOutsourcingReturn(ctx, returnInput)
 		} else {
 			wip, err = f.uc.CompleteProductionWIPOperation(ctx, action("complete"))
 		}
 		if err != nil {
 			t.Fatal(err)
 		}
+		if code == biz.ProductionWIPOperationHandwork {
+			assertFulfillmentTask(t, ctx, f.client, "production_completion", current.ID, "ready", biz.WarehouseRoleKey)
+			lotNo := "FG-HANDOFF"
+			completion, err = facts.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{FactNo: "FG-RECEIPT-HANDOFF", ProductionOrderID: wip.ProductionOrderID, ProductionOrderItemID: current.ProductionOrderItemID, ProductionWIPBatchID: current.ID, WarehouseID: finishedWarehouse.ID, NewLotNo: &lotNo, Quantity: current.Quantity, IdempotencyKey: "chain-completion"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertFulfillmentTask(t, ctx, f.client, "production_completion", current.ID, "done", biz.WarehouseRoleKey)
+			assertFulfillmentTask(t, ctx, f.client, "production_inbound", completion.ID, "ready", biz.WarehouseRoleKey)
+			assertInventoryTxnCount(t, ctx, f.client, 2)
+			if _, err = facts.CancelPostedProductionFact(ctx, operationalFactStatusMutation(completion.ID, completion.Version, f.actorID, "更正收仓数量")); err != nil {
+				t.Fatal(err)
+			}
+			assertFulfillmentTask(t, ctx, f.client, "production_completion", current.ID, "ready", biz.WarehouseRoleKey)
+			completion, err = facts.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{FactNo: "FG-RECEIPT-CORRECTED", ProductionOrderID: wip.ProductionOrderID, ProductionOrderItemID: current.ProductionOrderItemID, ProductionWIPBatchID: current.ID, WarehouseID: finishedWarehouse.ID, LotID: completion.LotID, Quantity: current.Quantity, IdempotencyKey: "chain-corrected-completion"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			completion, err = facts.PostProductionFact(ctx, operationalFactStatusMutation(completion.ID, completion.Version, f.actorID, ""))
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertFulfillmentTask(t, ctx, f.client, "production_inbound", completion.ID, "done", biz.WarehouseRoleKey)
+			assertInventoryTxnCount(t, ctx, f.client, 3)
+			readiness, err := productionFinishedGoodsReadiness(ctx, f.client, biz.InventoryBalanceKey{SubjectType: completion.SubjectType, SubjectID: completion.SubjectID, ProductSkuID: completion.ProductSkuID, WarehouseID: completion.WarehouseID, LotID: completion.LotID, UnitID: completion.UnitID})
+			if err != nil || !readiness.PendingInspection.Equal(current.Quantity) {
+				t.Fatalf("inbound before quality readiness=%+v err=%v", readiness, err)
+			}
+		}
+
 		for {
 			pending, err := f.client.QualityInspection.Query().Where(qualityinspection.ProductionWipBatchID(current.ID), qualityinspection.Status(biz.QualityInspectionStatusDraft)).All(ctx)
 			if err != nil {
@@ -150,42 +185,33 @@ func TestFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T) {
 			t.Fatalf("%s not accepted: %s", code, current.Status)
 		}
 		if index < 3 {
-			assertFulfillmentTask(t, ctx, f.client, "production_transfer", current.ID, "ready", biz.ProductionRoleKey)
+			kind, role := "production_transfer", biz.ProductionRoleKey
+			if code == biz.ProductionWIPOperationHandwork {
+				kind, role = "production_packaging_transfer", biz.WarehouseRoleKey
+			}
+			assertFulfillmentTask(t, ctx, f.client, kind, current.ID, "ready", role)
 			next := wip.Operations[index+1]
 			input := action("transfer")
 			input.TargetOperationID = next.ID
 			input.Quantity = current.Quantity
+			if code == biz.ProductionWIPOperationHandwork {
+				input.FinishedGoodsReceiptID = completion.ID
+			}
 			wip, err = f.uc.TransferProductionWIPToNextOperation(ctx, input)
 			if err != nil {
 				t.Fatal(err)
 			}
-			assertFulfillmentTask(t, ctx, f.client, "production_transfer", current.ID, "done", biz.ProductionRoleKey)
+			assertFulfillmentTask(t, ctx, f.client, kind, current.ID, "done", role)
 			current = productionWIPBatchForOperation(t, wip, next.ID)
 		}
 	}
-	assertFulfillmentTask(t, ctx, f.client, "production_completion", current.ID, "ready", biz.ProductionRoleKey)
-	finishedWarehouse := f.client.Warehouse.Create().SetCode("HANDOFF-FINISHED").SetName("测试成品仓").SetType("FINISHED_GOODS").SaveX(ctx)
-	lotNo := "FG-HANDOFF"
-	completion, err := facts.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{FactNo: "FG-RECEIPT-HANDOFF", ProductionOrderID: wip.ProductionOrderID, ProductionOrderItemID: current.ProductionOrderItemID, ProductionWIPBatchID: current.ID, WarehouseID: finishedWarehouse.ID, NewLotNo: &lotNo, Quantity: current.Quantity, IdempotencyKey: "chain-completion"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertFulfillmentTask(t, ctx, f.client, "production_completion", current.ID, "done", biz.ProductionRoleKey)
-	assertFulfillmentTask(t, ctx, f.client, "production_inbound", completion.ID, "ready", biz.WarehouseRoleKey)
-	assertInventoryTxnCount(t, ctx, f.client, 2)
-	if _, err = facts.CancelPostedProductionFact(ctx, operationalFactStatusMutation(completion.ID, completion.Version, f.actorID, "更正完工登记")); err != nil {
-		t.Fatal(err)
-	}
-	assertFulfillmentTask(t, ctx, f.client, "production_inbound", completion.ID, "withdrawn", biz.WarehouseRoleKey)
-	assertFulfillmentTask(t, ctx, f.client, "production_completion", current.ID, "ready", biz.ProductionRoleKey)
-	assertInventoryTxnCount(t, ctx, f.client, 2)
-	completion, err = facts.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{FactNo: "FG-RECEIPT-CORRECTED", ProductionOrderID: wip.ProductionOrderID, ProductionOrderItemID: current.ProductionOrderItemID, ProductionWIPBatchID: current.ID, WarehouseID: finishedWarehouse.ID, LotID: completion.LotID, Quantity: current.Quantity, IdempotencyKey: "chain-corrected-completion"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = facts.PostProductionFact(ctx, operationalFactStatusMutation(completion.ID, completion.Version, f.actorID, "")); err != nil {
-		t.Fatal(err)
-	}
-	assertFulfillmentTask(t, ctx, f.client, "production_inbound", completion.ID, "done", biz.WarehouseRoleKey)
+	assertFulfillmentTask(t, ctx, f.client, "production_packaging_execute", current.ID, "done", biz.WarehouseRoleKey)
 	assertInventoryTxnCount(t, ctx, f.client, 3)
+	readiness, err := productionFinishedGoodsReadiness(ctx, f.client, biz.InventoryBalanceKey{SubjectType: completion.SubjectType, SubjectID: completion.SubjectID, ProductSkuID: completion.ProductSkuID, WarehouseID: completion.WarehouseID, LotID: completion.LotID, UnitID: completion.UnitID})
+	if err != nil || !readiness.blocked().IsZero() {
+		t.Fatalf("packed readiness=%+v err=%v", readiness, err)
+	}
+	if _, err = facts.CancelPostedProductionFact(ctx, operationalFactStatusMutation(completion.ID, completion.Version, f.actorID, "已包装不能冲正来源")); !errors.Is(err, biz.ErrProductionReworkDependency) {
+		t.Fatalf("cancel packing source err=%v", err)
+	}
 }

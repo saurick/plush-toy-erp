@@ -360,6 +360,19 @@ export async function submitProductionException(params = {}) {
   return dataOf(result)?.production_exception || null
 }
 
+export async function getProductionExceptionContext(inspectionID, options = {}) {
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.GET_PRODUCTION_EXCEPTION_CONTEXT,
+    { quality_inspection_id: inspectionID },
+    options
+  )
+  const context = dataOf(result)?.exception_context
+  if (!context || !Number.isSafeInteger(context.production_wip_batch_id) || context.production_wip_batch_id <= 0 || !Number.isSafeInteger(context.operation_id) || !Number.isSafeInteger(context.fabric_operation_id) || typeof context.quantity !== 'string') {
+    throw Object.assign(new Error('异常来源暂时无法确认，请刷新重试'), { isInvalidResponse: true })
+  }
+  return context
+}
+
 async function productionExceptionResult(method, params) {
   const result = await method(params)
   return dataOf(result)?.production_exception || null

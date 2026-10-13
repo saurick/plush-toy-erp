@@ -393,9 +393,9 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await waitFirst(98000)
       assert.equal(await rows.count(), 1, '已办不受待办状态筛选影响')
       assert.equal(
-        await page.getByTestId('mobile-task-list-filter-trigger').count(),
-        0,
-        '已办不展示无效筛选入口'
+        await page.getByTestId('mobile-history-filter-trigger').count(),
+        1,
+        '已办展示独立的处理时间与结果筛选'
       )
       await page
         .getByLabel('任务状态', { exact: true })

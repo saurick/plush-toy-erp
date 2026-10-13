@@ -9,6 +9,7 @@ import {
   Typography,
 } from 'antd'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
+import { warehouseAcceptsSubject } from '../../utils/warehouseClassification.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
@@ -59,6 +60,9 @@ export default function ProductionCompletionModal({
   const [form] = Form.useForm()
   const quantityUnitOptions = useQuantityUnits(open)
   const editing = mode === 'edit'
+  const finishedWarehouseOptions = warehouseOptions.filter((warehouse) =>
+    warehouseAcceptsSubject(warehouse, 'PRODUCT')
+  )
   const Editor = editing ? BusinessFormPage : BusinessModal
   const selectedItemID = Form.useWatch('production_order_item_id', form)
   const selectedBatchID = Form.useWatch('production_wip_batch_id', form)
@@ -103,10 +107,12 @@ export default function ProductionCompletionModal({
 
   const initializeOpenForm = (visible) => {
     if (!visible) return
-    const firstAvailable = choices.find((item) => !item.disabled)
-    const firstBatch = firstAvailable?.batchChoices?.find(
-      (batch) => !batch.disabled
-    )
+    const firstAvailable = initialValues?.production_order_item_id
+      ? choiceByID(choices, initialValues.production_order_item_id)
+      : choices.find((item) => !item.disabled)
+    const firstBatch = initialValues?.production_wip_batch_id
+      ? choiceByID(firstAvailable?.batchChoices || [], initialValues.production_wip_batch_id)
+      : firstAvailable?.batchChoices?.find((batch) => !batch.disabled)
     const firstLotOptions = buildProductionCompletionLotOptions(
       firstAvailable?.item,
       lots
@@ -124,7 +130,9 @@ export default function ProductionCompletionModal({
         firstBatch?.remaining ||
         firstAvailable?.remaining ||
         '',
-      warehouse_id: initialValues?.warehouse_id || warehouseOptions[0]?.value,
+      warehouse_id: initialValues?.warehouse_id
+        ? choiceByID(finishedWarehouseOptions, initialValues.warehouse_id)?.value
+        : finishedWarehouseOptions[0]?.value,
       lot_selection: initialValues?.lot_selection || firstLotSelection,
       lot_id:
         initialValues?.lot_id ||
@@ -153,10 +161,10 @@ export default function ProductionCompletionModal({
         : { size: 'localAction', cancelText: '取消', destroyOnHidden: true })}
       title={
         editing
-          ? '核对待入库完工报告'
+          ? '核对成品收仓草稿'
           : order?.status === 'CLOSED'
-            ? '登记返工补完工报告'
-            : '登记生产完工'
+            ? '登记返工成品收仓'
+            : '登记成品收仓'
       }
       open={open}
       okText={editing ? '保存待入库草稿' : '生成待入库草稿'}
@@ -170,10 +178,10 @@ export default function ProductionCompletionModal({
         showIcon
         message={
           order?.status === 'CLOSED'
-            ? '当前订单已关闭，只能按已完成包装验收的成品返工补制批次登记补完工报告；生成草稿不会更新库存，仍须仓库核对并确认入库。'
+            ? '当前订单已关闭，只能按已完成手工的返工补制批次登记收仓；仓库确认入库后增加库存，检验与查货包装完成前禁止发货。'
             : editing
               ? '生产明细和完工来源批次保持不变；可修正拟入库仓库、批次、数量、时间和备注，保存后仍是待入库草稿，不会更新库存。'
-              : '生产岗位只提交完工报告；系统会按生产订单和包装验收批次核对数量，生成待入库草稿。仓库核对实收后确认入库，届时才增加成品库存。'
+              : '仓库按已完成手工的批次登记收仓，核对实收后确认入库并增加成品库存。待检或待包装库存不可发货；查货包装完成不再重复入库。'
         }
       />
       {blockedItems.length > 0 ? (
@@ -224,7 +232,7 @@ export default function ProductionCompletionModal({
               order?.status === 'RELEASED'
                 ? '已发布'
                 : order?.status === 'CLOSED'
-                  ? '已关闭，仅登记返工补完工'
+                  ? '已关闭，仅登记返工成品收仓'
                   : '待核对',
           },
         ]}
@@ -279,7 +287,7 @@ export default function ProductionCompletionModal({
             <Form.Item
               name="production_wip_batch_id"
               label="完工来源批次"
-              rules={[{ required: true, message: '请选择对应的包装验收批次' }]}
+              rules={[{ required: true, message: '请选择对应的手工成品批次' }]}
             >
               <Select
                 disabled={editing}
@@ -292,7 +300,7 @@ export default function ProductionCompletionModal({
                     disabled,
                   })
                 )}
-                placeholder="选择已完成包装验收的批次"
+                placeholder="选择已完成手工的批次"
                 onChange={(value) => {
                   const batchChoice = choiceByID(
                     selectedChoice.batchChoices,
@@ -308,7 +316,7 @@ export default function ProductionCompletionModal({
               <Text type="secondary">
                 {selectedBatchChoice
                   ? `所选批次 ${selectedBatchChoice.quantity || '0'} / 已入库 ${selectedBatchChoice.posted || '0'} / 待入库 ${selectedBatchChoice.draft || '0'} / 剩余 ${selectedBatchChoice.remaining || '0'}`
-                  : `计划 ${selectedChoice.planned || '0'} / 当前可完工上限 ${selectedChoice.acceptedPackaging || '0'} / 已入库 ${selectedChoice.posted || '0'} / 待入库 ${selectedChoice.draft || '0'}`}
+                  : `计划 ${selectedChoice.planned || '0'} / 当前可收仓上限 ${selectedChoice.receivableQuantity || '0'} / 已入库 ${selectedChoice.posted || '0'} / 待入库 ${selectedChoice.draft || '0'}`}
               </Text>
             </div>
           ) : null}
@@ -334,7 +342,7 @@ export default function ProductionCompletionModal({
                     ) {
                       return Promise.reject(
                         new Error(
-                          '本次数量不能超过所选包装验收批次扣减已入库和待入库后的剩余数量'
+                          '本次数量不能超过所选手工成品批次扣减已入库和待入库后的剩余数量'
                         )
                       )
                     }
@@ -358,7 +366,7 @@ export default function ProductionCompletionModal({
             <Select
               showSearch
               optionFilterProp="label"
-              options={warehouseOptions}
+              options={finishedWarehouseOptions}
               placeholder="选择仓库"
             />
           </Form.Item>

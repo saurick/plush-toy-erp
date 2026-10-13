@@ -308,14 +308,14 @@ export const HELP_VISUAL_EXAMPLES = {
   },
   'finished-goods': {
     title: '成品入库',
-    description: '核对完工报告与实物，确认入库后再检查库存。',
+    description: '核对成品收仓草稿与实物，确认入库后再检查库存。',
     entry: '生产记录',
     points: [
       ['找到待入库报告', '核对产品、规格和报告数量，先确认是本次要收的货。'],
       ['核对仓库、批次与实收', '有差异先交生产核对，处理后回到原报告继续。'],
       ['确认后检查结果', '使用“确认成品入库”，再核对入库状态和库存变化。'],
     ],
-    boundary: '提交完工报告时，库存还没有增加。',
+    boundary: '提交成品收仓草稿时，库存还没有增加。',
     before: '240',
     after: '340',
     unit: '件',
@@ -323,12 +323,12 @@ export const HELP_VISUAL_EXAMPLES = {
     resultTitle: '库存余额 · 示例',
     resultRows: [
       ['本次成品入库', '100 件'],
-      ['来源完工报告', 'PF-DEMO-001'],
+      ['来源成品收仓草稿', 'PF-DEMO-001'],
       ['应看到的记录', '已入库，可查来源'],
     ],
     exceptionTitle: '实收与报告不一致',
     exceptionTo: '生产',
-    exceptionBack: '原完工报告',
+    exceptionBack: '原成品收仓草稿',
     exceptionRows: [
       ['报告数量', '100 件'],
       ['实际点收', '80 件'],

@@ -2,10 +2,11 @@ import React, { Suspense } from 'react'
 import {
   Outlet,
   useLocation,
-  useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
+import { canonicalBusinessPath } from '../../utils/businessTaskRoute.mjs'
 import { Loading } from '@/common/components/loading'
 import {
   BusinessPageLayout,
@@ -35,9 +36,10 @@ function sameHeaderStats(current = [], next = []) {
 
 export default function ProductionRecordsLayout() {
   const context = useOutletContext()
-  const { pathname } = useLocation()
+  const location = useLocation()
+  const pathname = canonicalBusinessPath(location.pathname)
   const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
   const availableKeys = availableProductionRecordViews(
     context?.adminProfile || {},
     context?.allowedMenuPaths || []

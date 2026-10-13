@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Form } from 'antd'
 import {
-  useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { orderSubmissionSuccessMessage } from '../utils/approvalCondition.mjs'
@@ -137,12 +137,13 @@ import {
   LIFECYCLE_SCOPE,
   lifecycleScopeFromSearchParams,
   lifecycleScopeIncludesStatus,
+  normalizeLifecycleStatus,
   withLifecycleScopeSearchParam,
 } from '../utils/lifecycleScope.mjs'
 
 export default function PurchaseOrdersPage() {
   const outletContext = useOutletContext()
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -206,7 +207,14 @@ export default function PurchaseOrdersPage() {
   const [lifecycleScope, setLifecycleScope] = useState(() =>
     lifecycleScopeFromSearchParams(searchParams)
   )
-  const [status, setStatus] = useBusinessPageState('status', '')
+  const [savedStatus, setStatus] = useBusinessPageState('status', '')
+  const status = normalizeLifecycleStatus(lifecycleScope, savedStatus, [
+    'closed',
+    'canceled',
+  ])
+  useEffect(() => {
+    if (savedStatus !== status) setStatus(status)
+  }, [savedStatus, setStatus, status])
   const [supplierFilter, setSupplierFilter] = useBusinessPageState(
     'supplierFilter',
     ''

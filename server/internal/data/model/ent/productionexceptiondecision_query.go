@@ -4,10 +4,12 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/productionexceptiondecision"
+	"server/internal/data/model/ent/productionwipbatch"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
@@ -18,10 +20,11 @@ import (
 // ProductionExceptionDecisionQuery is the builder for querying ProductionExceptionDecision entities.
 type ProductionExceptionDecisionQuery struct {
 	config
-	ctx        *QueryContext
-	order      []productionexceptiondecision.OrderOption
-	inters     []Interceptor
-	predicates []predicate.ProductionExceptionDecision
+	ctx                  *QueryContext
+	order                []productionexceptiondecision.OrderOption
+	inters               []Interceptor
+	predicates           []predicate.ProductionExceptionDecision
+	withExecutionBatches *ProductionWIPBatchQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -56,6 +59,28 @@ func (_q *ProductionExceptionDecisionQuery) Unique(unique bool) *ProductionExcep
 func (_q *ProductionExceptionDecisionQuery) Order(o ...productionexceptiondecision.OrderOption) *ProductionExceptionDecisionQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QueryExecutionBatches chains the current query on the "execution_batches" edge.
+func (_q *ProductionExceptionDecisionQuery) QueryExecutionBatches() *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionexceptiondecision.Table, productionexceptiondecision.FieldID, selector),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionexceptiondecision.ExecutionBatchesTable, productionexceptiondecision.ExecutionBatchesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first ProductionExceptionDecision entity from the query.
@@ -245,15 +270,27 @@ func (_q *ProductionExceptionDecisionQuery) Clone() *ProductionExceptionDecision
 		return nil
 	}
 	return &ProductionExceptionDecisionQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]productionexceptiondecision.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.ProductionExceptionDecision{}, _q.predicates...),
+		config:               _q.config,
+		ctx:                  _q.ctx.Clone(),
+		order:                append([]productionexceptiondecision.OrderOption{}, _q.order...),
+		inters:               append([]Interceptor{}, _q.inters...),
+		predicates:           append([]predicate.ProductionExceptionDecision{}, _q.predicates...),
+		withExecutionBatches: _q.withExecutionBatches.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithExecutionBatches tells the query-builder to eager-load the nodes that are connected to
+// the "execution_batches" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductionExceptionDecisionQuery) WithExecutionBatches(opts ...func(*ProductionWIPBatchQuery)) *ProductionExceptionDecisionQuery {
+	query := (&ProductionWIPBatchClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withExecutionBatches = query
+	return _q
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -332,8 +369,11 @@ func (_q *ProductionExceptionDecisionQuery) prepareQuery(ctx context.Context) er
 
 func (_q *ProductionExceptionDecisionQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*ProductionExceptionDecision, error) {
 	var (
-		nodes = []*ProductionExceptionDecision{}
-		_spec = _q.querySpec()
+		nodes       = []*ProductionExceptionDecision{}
+		_spec       = _q.querySpec()
+		loadedTypes = [1]bool{
+			_q.withExecutionBatches != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*ProductionExceptionDecision).scanValues(nil, columns)
@@ -341,6 +381,7 @@ func (_q *ProductionExceptionDecisionQuery) sqlAll(ctx context.Context, hooks ..
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &ProductionExceptionDecision{config: _q.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -352,7 +393,50 @@ func (_q *ProductionExceptionDecisionQuery) sqlAll(ctx context.Context, hooks ..
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withExecutionBatches; query != nil {
+		if err := _q.loadExecutionBatches(ctx, query, nodes,
+			func(n *ProductionExceptionDecision) { n.Edges.ExecutionBatches = []*ProductionWIPBatch{} },
+			func(n *ProductionExceptionDecision, e *ProductionWIPBatch) {
+				n.Edges.ExecutionBatches = append(n.Edges.ExecutionBatches, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (_q *ProductionExceptionDecisionQuery) loadExecutionBatches(ctx context.Context, query *ProductionWIPBatchQuery, nodes []*ProductionExceptionDecision, init func(*ProductionExceptionDecision), assign func(*ProductionExceptionDecision, *ProductionWIPBatch)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductionExceptionDecision)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionwipbatch.FieldOriginExceptionDecisionID)
+	}
+	query.Where(predicate.ProductionWIPBatch(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productionexceptiondecision.ExecutionBatchesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.OriginExceptionDecisionID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "origin_exception_decision_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "origin_exception_decision_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
 }
 
 func (_q *ProductionExceptionDecisionQuery) sqlCount(ctx context.Context) (int, error) {

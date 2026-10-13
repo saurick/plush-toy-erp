@@ -6,6 +6,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Space, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import { TaskFulfillmentGuideButton } from '../components/flow-state/TaskFulfillmentGuide.jsx'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import DevPageNav from '../components/DevPageNav.jsx'
@@ -36,7 +37,7 @@ export default function DevUIDesignPage() {
   const readerRef = useRef(null)
   const fullscreenButtonRef = useRef(null)
   const requestedPage = searchParams.get('page')
-  const previewPage = ['login', 'help', 'workbench', 'controls', 'mobile-tasks'].includes(
+  const previewPage = ['login', 'help', 'workbench', 'controls', 'mobile-tasks', 'task-handling'].includes(
     requestedPage
   )
     ? requestedPage
@@ -161,6 +162,7 @@ export default function DevUIDesignPage() {
             value={previewPage}
             options={[
               { value: 'workspace', label: '业务界面' },
+              { value: 'task-handling', label: '任务处理' },
               { value: 'mobile-tasks', label: '移动端任务' },
               { value: 'workbench', label: '效能工作台' },
               { value: 'login', label: '登录页' },
@@ -173,6 +175,7 @@ export default function DevUIDesignPage() {
             }}
           />
           <Space wrap>
+            {['task-handling', 'mobile-tasks'].includes(previewPage) ? <TaskFulfillmentGuideButton /> : null}
             <Button
               icon={<ReloadOutlined />}
               onClick={() =>

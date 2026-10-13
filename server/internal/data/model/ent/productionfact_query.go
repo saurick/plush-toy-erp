@@ -35,6 +35,7 @@ type ProductionFactQuery struct {
 	withInventoryLot        *InventoryLotQuery
 	withProductionWipBatch  *ProductionWIPBatchQuery
 	withOriginReworkBatches *ProductionWIPBatchQuery
+	withPackagingBatches    *ProductionWIPBatchQuery
 	withPoster              *AdminUserQuery
 	withCanceller           *AdminUserQuery
 	// intermediate query (i.e. traversal path).
@@ -198,6 +199,28 @@ func (_q *ProductionFactQuery) QueryOriginReworkBatches() *ProductionWIPBatchQue
 			sqlgraph.From(productionfact.Table, productionfact.FieldID, selector),
 			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, productionfact.OriginReworkBatchesTable, productionfact.OriginReworkBatchesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPackagingBatches chains the current query on the "packaging_batches" edge.
+func (_q *ProductionFactQuery) QueryPackagingBatches() *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionfact.Table, productionfact.FieldID, selector),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionfact.PackagingBatchesTable, productionfact.PackagingBatchesColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -447,6 +470,7 @@ func (_q *ProductionFactQuery) Clone() *ProductionFactQuery {
 		withInventoryLot:        _q.withInventoryLot.Clone(),
 		withProductionWipBatch:  _q.withProductionWipBatch.Clone(),
 		withOriginReworkBatches: _q.withOriginReworkBatches.Clone(),
+		withPackagingBatches:    _q.withPackagingBatches.Clone(),
 		withPoster:              _q.withPoster.Clone(),
 		withCanceller:           _q.withCanceller.Clone(),
 		// clone intermediate query.
@@ -518,6 +542,17 @@ func (_q *ProductionFactQuery) WithOriginReworkBatches(opts ...func(*ProductionW
 		opt(query)
 	}
 	_q.withOriginReworkBatches = query
+	return _q
+}
+
+// WithPackagingBatches tells the query-builder to eager-load the nodes that are connected to
+// the "packaging_batches" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductionFactQuery) WithPackagingBatches(opts ...func(*ProductionWIPBatchQuery)) *ProductionFactQuery {
+	query := (&ProductionWIPBatchClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPackagingBatches = query
 	return _q
 }
 
@@ -621,13 +656,14 @@ func (_q *ProductionFactQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	var (
 		nodes       = []*ProductionFact{}
 		_spec       = _q.querySpec()
-		loadedTypes = [8]bool{
+		loadedTypes = [9]bool{
 			_q.withWarehouse != nil,
 			_q.withUnit != nil,
 			_q.withProductSku != nil,
 			_q.withInventoryLot != nil,
 			_q.withProductionWipBatch != nil,
 			_q.withOriginReworkBatches != nil,
+			_q.withPackagingBatches != nil,
 			_q.withPoster != nil,
 			_q.withCanceller != nil,
 		}
@@ -685,6 +721,15 @@ func (_q *ProductionFactQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 			func(n *ProductionFact) { n.Edges.OriginReworkBatches = []*ProductionWIPBatch{} },
 			func(n *ProductionFact, e *ProductionWIPBatch) {
 				n.Edges.OriginReworkBatches = append(n.Edges.OriginReworkBatches, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withPackagingBatches; query != nil {
+		if err := _q.loadPackagingBatches(ctx, query, nodes,
+			func(n *ProductionFact) { n.Edges.PackagingBatches = []*ProductionWIPBatch{} },
+			func(n *ProductionFact, e *ProductionWIPBatch) {
+				n.Edges.PackagingBatches = append(n.Edges.PackagingBatches, e)
 			}); err != nil {
 			return nil, err
 		}
@@ -886,6 +931,39 @@ func (_q *ProductionFactQuery) loadOriginReworkBatches(ctx context.Context, quer
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "origin_rework_fact_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductionFactQuery) loadPackagingBatches(ctx context.Context, query *ProductionWIPBatchQuery, nodes []*ProductionFact, init func(*ProductionFact), assign func(*ProductionFact, *ProductionWIPBatch)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductionFact)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionwipbatch.FieldFinishedGoodsReceiptID)
+	}
+	query.Where(predicate.ProductionWIPBatch(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productionfact.PackagingBatchesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.FinishedGoodsReceiptID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "finished_goods_receipt_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "finished_goods_receipt_id" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

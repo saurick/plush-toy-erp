@@ -148,7 +148,7 @@ export default function BusinessFormPage({
     if (!open) return undefined
     leavingRef.current = false
     triggerRef.current = document.activeElement
-    const scroller = pageRef.current?.closest('.erp-admin-content')
+    const scroller = pageRef.current?.closest('.erp-admin-content, .mobile-business-layout__content')
     const layout = pageRef.current?.closest('.erp-business-page-layout')
     scrollPositionRef.current = scroller
       ? { node: scroller, top: scroller.scrollTop }

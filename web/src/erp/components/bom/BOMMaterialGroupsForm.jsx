@@ -247,6 +247,7 @@ export default function BOMMaterialGroupsForm({
   const [creatingFor, setCreatingFor] = useState(null)
   const [focusRequest, setFocusRequest] = useState(null)
   const rowRefs = useRef(new Map())
+  const materialGroupSequence = useRef(0)
 
   useLayoutEffect(() => {
     if (!focusRequest) return
@@ -258,18 +259,29 @@ export default function BOMMaterialGroupsForm({
     requestLineItemScroll?.(focusRequest.index)
   }, [focusRequest, items.length, requestLineItemScroll])
 
-  const changeMaterial = (indexes, material) => {
+  const updateMaterialGroup = (indexes, changes = {}) => {
     const next = [...(form.getFieldValue('items') || [])]
+    // Preserve draft/source groups when adding parts or clearing material.
+    const groupKey =
+      next[indexes[0]]?._material_group_key ||
+      `draft-${++materialGroupSequence.current}`
     indexes.forEach((index) => {
       next[index] = {
         ...next[index],
-        material_id: material?.id,
-        unit_id: material?.default_unit_id,
-        total_usage_snapshot: undefined,
+        ...changes,
+        _material_group_key: next[index]?._material_group_key || groupKey,
       }
     })
     form.setFieldsValue({ items: next })
+    return next
   }
+
+  const changeMaterial = (indexes, material) =>
+    updateMaterialGroup(indexes, {
+      material_id: material?.id,
+      unit_id: material?.default_unit_id,
+      total_usage_snapshot: undefined,
+    })
 
   const pasteParts = (event, index, column, add) => {
     const text = event.clipboardData.getData('text/plain')
@@ -283,7 +295,8 @@ export default function BOMMaterialGroupsForm({
       if (all.length + pasted.length - 1 > MAX_PARTS) {
         throw new Error('Too many parts')
       }
-      const source = all[index]
+      const group = groups.find((entry) => entry.indexes.includes(index))
+      const source = updateMaterialGroup(group.indexes)[index]
       form.setFieldValue(['items', index], {
         ...source,
         ...pasted[0],
@@ -660,10 +673,9 @@ export default function BOMMaterialGroupsForm({
                                     disabled={fields.length >= MAX_PARTS}
                                     onClick={() => {
                                       const copy = {
-                                        ...form.getFieldValue([
-                                          'items',
-                                          itemIndex,
-                                        ]),
+                                        ...updateMaterialGroup(group.indexes)[
+                                          itemIndex
+                                        ],
                                       }
                                       delete copy.id
                                       delete copy._import_source
@@ -699,7 +711,10 @@ export default function BOMMaterialGroupsForm({
                                     disabled={fields.length >= MAX_PARTS}
                                     onClick={() => {
                                       const nextIndex = group.indexes.at(-1) + 1
-                                      add(blankPart(items[index]), nextIndex)
+                                      const source = updateMaterialGroup(
+                                        group.indexes
+                                      )[index]
+                                      add(blankPart(source), nextIndex)
                                       setFocusRequest({ index: nextIndex })
                                     }}
                                   >

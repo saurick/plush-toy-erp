@@ -214,7 +214,7 @@ func TestBusinessProgressCompletionReworkAndWIPPermission(t *testing.T) {
 	warehouse := createTestProductWarehouse(t, ctx, f.client, "PROGRESS-COMPLETION-WH")
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard)))
 	flow := releaseProductionWIPRoute(t, ctx, f, "MO-PROGRESS-DONE", 10, false)
-	flow, packaging := acceptProductionPackagingBatchForReworkTest(t, ctx, f.client, f.uc, f.actorID, flow, "progress-done")
+	flow, packaging := acceptProductionHandworkBatchForReworkTest(t, ctx, f.client, f.uc, f.actorID, flow, "progress-done")
 	lot := "PROGRESS-DONE-LOT"
 	completion, err := factUC.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
 		FactNo: "PROGRESS-DONE", ProductionOrderID: flow.ProductionOrderID, ProductionOrderItemID: flow.ProductionOrderItems[0].ID,

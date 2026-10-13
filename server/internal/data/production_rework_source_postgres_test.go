@@ -42,7 +42,7 @@ func TestProductionReworkPostgresConcurrentQuantityAndSourceCancellation(t *test
 		if err != nil {
 			t.Fatalf("get rework source WIP %s: %v", suffix, err)
 		}
-		_, packaging := acceptProductionPackagingBatchForReworkTest(
+		_, packaging := acceptProductionHandworkBatchForReworkTest(
 			t,
 			ctx,
 			f.client,

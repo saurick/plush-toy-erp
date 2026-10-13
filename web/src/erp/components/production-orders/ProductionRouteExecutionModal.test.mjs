@@ -16,7 +16,8 @@ test('production route modal is a self-contained production-order surface', () =
     'canAssign',
     'canExecute',
     'canReceiveReturn',
-    'canRework',
+    'canWarehousePackaging',
+    'canIssueCutting',
     'canConfirmPackaging',
     'canReadOutsourcingContracts',
   ]) {
@@ -30,17 +31,17 @@ test('production route modal is a self-contained production-order surface', () =
   )
   assert.match(
     source,
-    /const readOnly =[\s\S]*?!canAssign[\s\S]*?!canExecute[\s\S]*?!canRework[\s\S]*?!canConfirmPackaging/u
+    /const readOnly =[\s\S]*?!canAssign[\s\S]*?!canExecute[\s\S]*?!canWarehousePackaging[\s\S]*?!canConfirmPackaging/u
   )
 })
 
 test('route actions use separate business permissions and cancellation is assign-only', () => {
   assert.match(source, /canRunAction/u)
   assert.match(source, /PRODUCTION_WIP_ACTION\.CANCEL_BATCH/u)
-  assert.match(source, /canAssign \? \(/u)
+  assert.match(source, /actionVisible\(PRODUCTION_WIP_ACTION\.ASSIGN_EXECUTION\)/u)
   assert.match(
     source,
-    /\(canExecute \|\| canReceiveReturn\) && !assignmentOnly \? \(/u
+    /\(canExecute \|\| canReceiveReturn \|\| canWarehousePackaging \|\| canIssueCutting\) && !assignmentOnly \? \(/u
   )
   assert.match(
     source,
@@ -54,7 +55,6 @@ test('route actions use separate business permissions and cancellation is assign
     'START_OPERATION',
     'TRANSFER_TO_NEXT_OPERATION',
     'CONFIRM_PACKAGING_MATERIAL',
-    'REWORK',
   ]) {
     assert.match(
       source,
@@ -87,12 +87,12 @@ test('assignment-only mode is scoped to the trusted rework batch and one mutatio
   assert.match(source, /!assignmentOnly \? \(\s*<Steps/u)
 })
 
-test('confirmed plush flow and internal versus external wording stay explicit', () => {
-  assert.match(source, /布料加工 → 车缝 → 手工 →\s*包装/u)
-  assert.match(source, /本厂生产使用车间移交；外发加工完成返回才登记回仓/u)
-  assert.match(source, /车缝、手工两道分别独立决定本厂或外发/u)
-  assert.match(source, /包装在本厂完成/u)
-  assert.doesNotMatch(source, /每道生产工序分别决定本厂或外发/u)
+test('confirmed flow keeps warehouse receipt before packing and separates production assignment', () => {
+  assert.match(source, /裁片 → 车缝 → 手工 → 成品入库 → 查货与包装/u)
+  assert.match(source, /车缝、手工可本厂或委外/u)
+  assert.match(source, /查货与包装完成后才可发货/u)
+  assert.match(source, /currentOperation\?\.operation_code === 'PACKAGING'[\s\S]*return canWarehousePackaging/u)
+  assert.match(source, /currentOperation\?\.operation_code === 'FABRIC_PROCESSING'[\s\S]*return canIssueCutting/u)
 })
 
 test('completion, formal quality and transfer are three separate gates', () => {
@@ -100,8 +100,8 @@ test('completion, formal quality and transfer are three separate gates', () => {
   assert.match(source, /PRODUCTION_WIP_ACTION\.RECEIVE_OUTSOURCING_RETURN/u)
   assert.match(source, /PRODUCTION_WIP_ACTION\.TRANSFER_TO_NEXT_OPERATION/u)
   assert.match(source, /status === 'ACCEPTED' && Boolean\(nextOperation\)/u)
-  assert.match(source, /完工或回仓不会自动跳到下道工序/u)
-  assert.match(source, /检验合格后才能转下道/u)
+  assert.match(source, /仓库先清点本批次实收数量/u)
+  assert.match(source, /暂不能整批送检/u)
   assert.match(source, /“质量检验”办理/u)
   assert.match(source, /productionWipQualitySummary/u)
 })
@@ -112,18 +112,17 @@ test('modal uses only canonical batch statuses and operation snapshot fields', (
     'IN_PROGRESS',
     'OUTSOURCED',
     'ACCEPTED',
-    'REJECTED',
   ]) {
     assert.match(source, new RegExp(`['"]${status}['"]`, 'u'))
   }
   assert.doesNotMatch(source, /['"](?:READY|ASSIGNED|COMPLETED|BLOCKED)['"]/u)
-  assert.match(source, /production_order_operation_id/u)
-  assert.match(source, /source_batch_id/u)
+  assert.match(source, /currentProductionWipOperation/u)
+  assert.match(source, /productionWipOperationsForBatch/u)
   assert.doesNotMatch(source, /current_operation_id|parent_batch_id/u)
   assert.doesNotMatch(source, /operation\.(?:kind|status|sort_order)/u)
 })
 
-test('assignment, split and rework preserve quantity and external-contract boundaries', () => {
+test('assignment and split preserve quantity while rework requires an exception decision', () => {
   assert.match(source, /PRODUCTION_WIP_ACTION\.SPLIT_BATCH/u)
   assert.match(source, /拆分数量必须小于当前批次数量/u)
   assert.match(source, /buildProductionWipFormPayload/u)
@@ -141,12 +140,11 @@ test('assignment, split and rework preserve quantity and external-contract bound
   assert.match(source, /canReadOutsourcingContracts/u)
   assert.match(source, /提交时会再次核对/u)
   assert.match(source, /operation\.operation_code !== 'FABRIC_PROCESSING'/u)
-  assert.match(source, /布料加工按整单外发，首道不拆批/u)
-  assert.match(source, /转入车缝后，才可按产品数量拆分/u)
+  assert.match(source, /布料加工按生产明细整单外发，不在首道拆批/u)
+  assert.match(source, /裁片检验合格后再移交车缝/u)
   assert.match(source, /裁片返工按当前返工批次关联一条产品加工/u)
-  assert.match(source, /PRODUCTION_WIP_ACTION\.REWORK/u)
-  assert.match(source, /返工数量不能超过当前批次数量/u)
-  assert.match(source, /target_operation_id/u)
+  assert.doesNotMatch(source, /PRODUCTION_WIP_ACTION\.REWORK/u)
+  assert.match(source, /finished_goods_receipt_id/u)
 })
 
 test('packaging confirmation is item-level and shows only business evidence', () => {

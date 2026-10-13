@@ -138,6 +138,7 @@ import {
   shouldGuardCustomerBusinessPageRuntime,
 } from '../utils/adminProfileSync.mjs'
 import { getAllowedMobileRoleKeys } from '../utils/mobileRolePermissions.mjs'
+import { readWorkflowTaskNavigation, workflowTaskReturnNavigation } from '../utils/workflowTaskNavigation.mjs'
 
 const { Content, Header, Sider } = Layout
 const { Paragraph, Text } = Typography
@@ -373,6 +374,12 @@ export default function ERPLayout({ legalNotice }) {
   const [adminProfile, setAdminProfile] = useState(() =>
     getStoredAdminProfile()
   )
+  const [taskNavigation, setTaskNavigation] = useState(null)
+  useEffect(() => {
+    if (location.state?.clearWorkflowTaskNavigation || location.state?.workflowTaskReturn) { setTaskNavigation(null); return }
+    const next = readWorkflowTaskNavigation(location.state, location.pathname, adminProfile?.id)
+    setTaskNavigation((previous) => next || readWorkflowTaskNavigation({ workflowTaskNavigation: previous }, location.pathname, adminProfile?.id))
+  }, [location.state, location.pathname, adminProfile?.id])
   useEffect(
     () =>
       subscribeAdminERPPreferences((profile) => {
@@ -1141,6 +1148,7 @@ export default function ERPLayout({ legalNotice }) {
   const outletContext = useMemo(
     () => ({
       adminProfile,
+      workflowTaskNavigation: taskNavigation,
       allowedMenuPaths,
       visibleMenuPaths,
       profileSyncCompleted,
@@ -1152,6 +1160,7 @@ export default function ERPLayout({ legalNotice }) {
     }),
     [
       adminProfile,
+      taskNavigation,
       allowedMenuPaths,
       visibleMenuPaths,
       profileSyncCompleted,
@@ -1213,7 +1222,7 @@ export default function ERPLayout({ legalNotice }) {
       setMobileNavOpen(false)
       return
     }
-    if (nextPath === location.pathname || nextPath === `${location.pathname}${location.search}${location.hash}`) {
+    if (!navigateOptions?.state?.workflowTaskReturn && (nextPath === location.pathname || nextPath === `${location.pathname}${location.search}${location.hash}`)) {
       setMobileNavOpen(false)
       return
     }
@@ -1562,6 +1571,20 @@ export default function ERPLayout({ legalNotice }) {
           </Header>
 
           <Content className="erp-admin-content">
+            {taskNavigation ? (
+              <Space wrap className="erp-business-inline-note" data-testid="task-source-return">
+                <strong>{taskNavigation.taskName}</strong>
+                <span>保存业务结果后，相关待办自动更新</span>
+                <Button
+                  size="small"
+                  onClick={() => {
+                    const target = workflowTaskReturnNavigation(taskNavigation, window.history.state?.idx)
+                    handleNavigate(target.to, target.options)
+                  }}
+                >返回任务
+                </Button>
+              </Space>
+            ) : null}
             {!retainingBusinessPage ? legalNotice : null}
             {isLocalCustomerDesktopPreview ? (
               <Alert

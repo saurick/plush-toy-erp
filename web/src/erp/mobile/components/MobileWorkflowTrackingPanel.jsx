@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Alert, Button, Empty, Select, Spin, Tag } from 'antd'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
@@ -15,10 +16,10 @@ import WorkflowResponsibilities from '../../components/workflow/WorkflowResponsi
 import WorkflowInitiator from '../../components/workflow/WorkflowInitiator.jsx'
 import WorkflowTrackingDrawer from '../../components/workflow/WorkflowTrackingDrawer.jsx'
 import { trackingTitle, trackingStatus, trackingStatusColor, trackingHandoff, trackingResponsibilityParts } from '../../utils/workflowTracking.mjs'
-import { TRACKING_STATUS_OPTIONS, TRACKING_ROLE_OPTIONS, TRACKING_ATTENTION_OPTIONS, TRACKING_SOURCE_OPTIONS } from '../../utils/workflowTrackingFilters.mjs'
+import { TRACKING_STATUS_OPTIONS, TRACKING_SCOPE_OPTIONS, TRACKING_ROLE_OPTIONS, TRACKING_ATTENTION_OPTIONS, TRACKING_SOURCE_OPTIONS } from '../../utils/workflowTrackingFilters.mjs'
 import { formatWorkflowTaskEventTime } from '../../utils/workflowTaskEventPresentation.mjs'
 import { WORKFLOW_TASKS_CHANGED } from '../../utils/workflowTaskChanges.mjs'
-import { MOBILE_TRACKING_SCOPES, MOBILE_TRACKING_PAGE_SIZE, MOBILE_TRACKING_HISTORY_KEY, readMobileTrackingState, normalizeMobileTrackingQuery, mergeMobileTrackingItems } from '../utils/mobileWorkflowTracking.mjs'
+import { MOBILE_TRACKING_PAGE_SIZE, MOBILE_TRACKING_HISTORY_KEY, readMobileTrackingSource, readMobileTrackingState, normalizeMobileTrackingQuery, mergeMobileTrackingItems } from '../utils/mobileWorkflowTracking.mjs'
 import MobileFilterPopover from './MobileFilterPopover.jsx'
 import MobileTaskPullRefresh from './MobileTaskPullRefresh.jsx'
 import '../mobileWorkflowTracking.css'
@@ -28,8 +29,15 @@ function TrackingSearch({ value, onSearch }) {
   return <MobileSearchInput aria-label="搜索流转记录" placeholder="单号/任务/产品/款号" maxLength={100} value={search.value} onChange={search.onChange} onCompositionStart={search.onCompositionStart} onCompositionEnd={search.onCompositionEnd} onPressEnter={search.onPressEnter} clearVisible={Boolean(search.value)} onClear={() => search.onChange({ currentTarget: { value: '' } })} />
 }
 
-export default function MobileWorkflowTrackingPanel({ accessScope, scrollContainerRef, onOpenTask }) {
-  const [state, setState] = useState(() => readMobileTrackingState(window.history.state, accessScope))
+export default function MobileWorkflowTrackingPanel({ accessScope, ...props }) {
+  const location = useLocation()
+  const source = readMobileTrackingSource(location.search)
+  const scopeKey = source ? `${accessScope}|source:${source.source_type}:${source.source_id}` : accessScope
+  return <MobileTrackingContent key={scopeKey} {...props} accessScope={scopeKey} source={source} />
+}
+
+function MobileTrackingContent({ accessScope, scrollContainerRef, onOpenTask, source }) {
+  const [state, setState] = useState(() => readMobileTrackingState(window.history.state, accessScope, source))
   const [result, setResult] = useState(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [revision, setRevision] = useState(0)
@@ -47,7 +55,7 @@ export default function MobileWorkflowTrackingPanel({ accessScope, scrollContain
   resultRef.current = result
   const { scope } = state
   const { query } = state.scopes[scope]
-  const paramsKey = JSON.stringify({ scope, ...query })
+  const paramsKey = JSON.stringify({ scope, ...query, ...source })
   const key = JSON.stringify([accessScope, paramsKey, revision])
 
   const remember = useCallback((next = stateRef.current, push = false) => {
@@ -129,7 +137,7 @@ export default function MobileWorkflowTrackingPanel({ accessScope, scrollContain
   }, [remember, state])
   useEffect(() => {
     const restore = () => {
-      const next = readMobileTrackingState(window.history.state, accessScope)
+      const next = readMobileTrackingState(window.history.state, accessScope, source)
       positions.current = Object.fromEntries(Object.entries(next.scopes).map(([name, slot]) => [name, slot.scrollTop]))
       restoreScroll.current = true
       setFiltersOpen(false)
@@ -137,7 +145,7 @@ export default function MobileWorkflowTrackingPanel({ accessScope, scrollContain
     }
     window.addEventListener('popstate', restore)
     return () => window.removeEventListener('popstate', restore)
-  }, [accessScope])
+  }, [accessScope, source])
   useEffect(() => {
     const refresh = () => setRevision((value) => value + 1)
     window.addEventListener(WORKFLOW_TASKS_CHANGED, refresh)
@@ -195,22 +203,23 @@ export default function MobileWorkflowTrackingPanel({ accessScope, scrollContain
     <>
       <MobileTaskPullRefresh key={paramsKey} scrollContainerRef={scrollContainerRef} enabled={!filtersOpen && !state.selection} busy={loading} onRefresh={load} lastUpdated={current?.updatedAt} />
       <section className="mobile-workflow-tracking" aria-label="流程跟踪">
-        <SlidingSegmented block aria-label="跟踪范围" options={MOBILE_TRACKING_SCOPES} value={scope} onChange={changeScope} />
+        {source ? <strong>当前单据的流转记录</strong> : null}
         <div className="mobile-workflow-tracking-search">
           <TrackingSearch key={scope} value={query.keyword} onSearch={(keyword) => updateQuery({ keyword })} />
           <MobileFilterPopover contextLabel="流程" title="流转筛选" open={filtersOpen} onOpenChange={setFiltersOpen} count={filterCount} onReset={() => updateQuery({ owner_role_key: '', source_type: '', attention: '' })}>
-            <fieldset><legend>当前岗位</legend><Select aria-label="当前岗位" value={query.owner_role_key} options={TRACKING_ROLE_OPTIONS} onChange={(owner_role_key) => updateQuery({ owner_role_key })} /></fieldset>
-            <fieldset><legend>单据类型</legend><Select aria-label="单据类型" value={query.source_type} options={TRACKING_SOURCE_OPTIONS} onChange={(source_type) => updateQuery({ source_type })} /></fieldset>
-            <fieldset><legend>关注事项</legend><SlidingSegmented block aria-label="关注事项" value={query.attention} options={TRACKING_ATTENTION_OPTIONS} onChange={(attention) => updateQuery({ attention })} /></fieldset>
+            {!source ? <fieldset><legend>跟踪范围</legend><Select aria-label="跟踪范围" value={scope} options={TRACKING_SCOPE_OPTIONS} onChange={changeScope} /></fieldset> : null}
+            <fieldset><legend>当前岗位</legend><Select aria-label="当前岗位" value={query.owner_role_key} disabled={query.status === 'completed'} options={TRACKING_ROLE_OPTIONS} onChange={(owner_role_key) => updateQuery({ owner_role_key })} /></fieldset>
+            {!source ? <fieldset><legend>单据类型</legend><Select aria-label="单据类型" value={query.source_type} options={TRACKING_SOURCE_OPTIONS} onChange={(source_type) => updateQuery({ source_type })} /></fieldset> : null}
+            <fieldset><legend>关注事项</legend><SlidingSegmented block aria-label="关注事项" value={query.attention} disabled={query.status === 'completed'} options={TRACKING_ATTENTION_OPTIONS} onChange={(attention) => updateQuery({ attention })} /></fieldset>
           </MobileFilterPopover>
         </div>
+        {!source && scope !== 'visible' ? <p className="mobile-workflow-tracking-count" aria-label="当前跟踪范围">{TRACKING_SCOPE_OPTIONS.find((option) => option.value === scope)?.label}</p> : null}
         <div className="mobile-workflow-tracking-status">
           {TRACKING_STATUS_OPTIONS.map((option) => <FilterChip key={option.value} selected={query.status === option.value} onClick={() => updateQuery({ status: option.value })}>{option.label}</FilterChip>)}
         </div>
         {current?.refreshError && <Alert type="error" showIcon message={current.refreshError} action={<Button onClick={() => load()}>重新读取</Button>} />}
         {!current ? <Spin tip="正在读取任务进度"><div className="erp-workflow-tracking-loading" /></Spin> : current.error ? <Alert type="error" showIcon message={current.error} action={<Button onClick={() => load()}>重新读取</Button>} /> : (
           <>
-            <div className="mobile-workflow-tracking-count" role="status">共 {current.total} 条流转记录</div>
             <div className="mobile-workflow-tracking-list">
               {current.items.map((entry) => (
                 <WorkflowTaskCard key={`${entry.kind}:${entry.id}`} className="mobile-workflow-tracking-card" label={`流程跟踪：${trackingTitle(entry)}`} data-mobile-tracking-entry={`${entry.kind}:${entry.id}`} onOpen={() => select(entry)}>
@@ -222,9 +231,10 @@ export default function MobileWorkflowTrackingPanel({ accessScope, scrollContain
                 </WorkflowTaskCard>
             ))}
             </div>
-            {!current.items.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={Object.values(query).some(Boolean) ? '当前筛选下没有匹配记录' : scope === 'started' ? '暂无你发起的流程或跟进任务' : '暂无你处理过的流程或跟进任务'} />}
+            {!current.items.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={Object.values(query).some(Boolean) ? '当前筛选下没有匹配记录' : source ? '当前单据暂无可见流转记录' : scope === 'started' ? '暂无你发起的流程或跟进任务' : scope === 'participated' ? '暂无你处理过的流程或跟进任务' : '暂无可查看的流程或跟进任务'} />}
             <div ref={sentinel} className="mobile-workflow-tracking-more">
-              {current.appendError ? <><p role="alert">{current.appendError}，已加载记录仍保留。</p><Button onClick={() => load({ append: true })}>重新读取更多</Button></> : loading ? <Spin size="small" /> : current.nextOffset < current.total ? <Button onClick={() => load({ append: true })}>加载更多</Button> : current.items.length ? <span>已显示全部流转记录</span> : null}
+              {current.items.length > 0 && <div className="mobile-workflow-tracking-count" role="status">{current.nextOffset < current.total ? `已显示 ${current.items.length} / 共 ${current.total} 条` : `已显示全部 ${current.total} 条`}</div>}
+              {current.appendError ? <><p role="alert">{current.appendError}，已加载记录仍保留。</p><Button onClick={() => load({ append: true })}>重新读取更多</Button></> : loading ? <Spin size="small" /> : current.nextOffset < current.total ? <Button onClick={() => load({ append: true })}>加载更多</Button> : null}
             </div>
           </>
       )}

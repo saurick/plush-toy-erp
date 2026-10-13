@@ -81,6 +81,16 @@ func OriginReworkFactID(v int) predicate.ProductionWIPBatch {
 	return predicate.ProductionWIPBatch(sql.FieldEQ(FieldOriginReworkFactID, v))
 }
 
+// OriginExceptionDecisionID applies equality check predicate on the "origin_exception_decision_id" field. It's identical to OriginExceptionDecisionIDEQ.
+func OriginExceptionDecisionID(v int) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldEQ(FieldOriginExceptionDecisionID, v))
+}
+
+// FinishedGoodsReceiptID applies equality check predicate on the "finished_goods_receipt_id" field. It's identical to FinishedGoodsReceiptIDEQ.
+func FinishedGoodsReceiptID(v int) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldEQ(FieldFinishedGoodsReceiptID, v))
+}
+
 // BatchNo applies equality check predicate on the "batch_no" field. It's identical to BatchNoEQ.
 func BatchNo(v string) predicate.ProductionWIPBatch {
 	return predicate.ProductionWIPBatch(sql.FieldEQ(FieldBatchNo, v))
@@ -259,6 +269,66 @@ func OriginReworkFactIDIsNil() predicate.ProductionWIPBatch {
 // OriginReworkFactIDNotNil applies the NotNil predicate on the "origin_rework_fact_id" field.
 func OriginReworkFactIDNotNil() predicate.ProductionWIPBatch {
 	return predicate.ProductionWIPBatch(sql.FieldNotNull(FieldOriginReworkFactID))
+}
+
+// OriginExceptionDecisionIDEQ applies the EQ predicate on the "origin_exception_decision_id" field.
+func OriginExceptionDecisionIDEQ(v int) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldEQ(FieldOriginExceptionDecisionID, v))
+}
+
+// OriginExceptionDecisionIDNEQ applies the NEQ predicate on the "origin_exception_decision_id" field.
+func OriginExceptionDecisionIDNEQ(v int) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldNEQ(FieldOriginExceptionDecisionID, v))
+}
+
+// OriginExceptionDecisionIDIn applies the In predicate on the "origin_exception_decision_id" field.
+func OriginExceptionDecisionIDIn(vs ...int) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldIn(FieldOriginExceptionDecisionID, vs...))
+}
+
+// OriginExceptionDecisionIDNotIn applies the NotIn predicate on the "origin_exception_decision_id" field.
+func OriginExceptionDecisionIDNotIn(vs ...int) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldNotIn(FieldOriginExceptionDecisionID, vs...))
+}
+
+// OriginExceptionDecisionIDIsNil applies the IsNil predicate on the "origin_exception_decision_id" field.
+func OriginExceptionDecisionIDIsNil() predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldIsNull(FieldOriginExceptionDecisionID))
+}
+
+// OriginExceptionDecisionIDNotNil applies the NotNil predicate on the "origin_exception_decision_id" field.
+func OriginExceptionDecisionIDNotNil() predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldNotNull(FieldOriginExceptionDecisionID))
+}
+
+// FinishedGoodsReceiptIDEQ applies the EQ predicate on the "finished_goods_receipt_id" field.
+func FinishedGoodsReceiptIDEQ(v int) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldEQ(FieldFinishedGoodsReceiptID, v))
+}
+
+// FinishedGoodsReceiptIDNEQ applies the NEQ predicate on the "finished_goods_receipt_id" field.
+func FinishedGoodsReceiptIDNEQ(v int) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldNEQ(FieldFinishedGoodsReceiptID, v))
+}
+
+// FinishedGoodsReceiptIDIn applies the In predicate on the "finished_goods_receipt_id" field.
+func FinishedGoodsReceiptIDIn(vs ...int) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldIn(FieldFinishedGoodsReceiptID, vs...))
+}
+
+// FinishedGoodsReceiptIDNotIn applies the NotIn predicate on the "finished_goods_receipt_id" field.
+func FinishedGoodsReceiptIDNotIn(vs ...int) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldNotIn(FieldFinishedGoodsReceiptID, vs...))
+}
+
+// FinishedGoodsReceiptIDIsNil applies the IsNil predicate on the "finished_goods_receipt_id" field.
+func FinishedGoodsReceiptIDIsNil() predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldIsNull(FieldFinishedGoodsReceiptID))
+}
+
+// FinishedGoodsReceiptIDNotNil applies the NotNil predicate on the "finished_goods_receipt_id" field.
+func FinishedGoodsReceiptIDNotNil() predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(sql.FieldNotNull(FieldFinishedGoodsReceiptID))
 }
 
 // BatchNoEQ applies the EQ predicate on the "batch_no" field.
@@ -1039,6 +1109,52 @@ func HasCompletionFacts() predicate.ProductionWIPBatch {
 func HasCompletionFactsWith(preds ...predicate.ProductionFact) predicate.ProductionWIPBatch {
 	return predicate.ProductionWIPBatch(func(s *sql.Selector) {
 		step := newCompletionFactsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasOriginExceptionDecision applies the HasEdge predicate on the "origin_exception_decision" edge.
+func HasOriginExceptionDecision() predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, OriginExceptionDecisionTable, OriginExceptionDecisionColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOriginExceptionDecisionWith applies the HasEdge predicate on the "origin_exception_decision" edge with a given conditions (other predicates).
+func HasOriginExceptionDecisionWith(preds ...predicate.ProductionExceptionDecision) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(func(s *sql.Selector) {
+		step := newOriginExceptionDecisionStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasFinishedGoodsReceipt applies the HasEdge predicate on the "finished_goods_receipt" edge.
+func HasFinishedGoodsReceipt() predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, FinishedGoodsReceiptTable, FinishedGoodsReceiptColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasFinishedGoodsReceiptWith applies the HasEdge predicate on the "finished_goods_receipt" edge with a given conditions (other predicates).
+func HasFinishedGoodsReceiptWith(preds ...predicate.ProductionFact) predicate.ProductionWIPBatch {
+	return predicate.ProductionWIPBatch(func(s *sql.Selector) {
+		step := newFinishedGoodsReceiptStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

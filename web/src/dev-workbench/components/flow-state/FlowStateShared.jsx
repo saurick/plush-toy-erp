@@ -9,17 +9,21 @@ import {
   TeamOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Space, Spin, Typography } from 'antd'
-import { DEV_FLOW_STATE_OVERVIEW_CHAIN_KEY as ALL_BUSINESS_CHAINS_KEY } from '../../pages/devFlowStateQuery.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
 const VIEW_ITEMS = Object.freeze([
   {
     value: 'chain',
-    label: '看业务链',
+    label: '业务结构',
     englishLabel: 'Business Chain',
     description:
       '把基础资料、来源单据、人、路、业务动作、账、规则和计算结果串起来',
+  },
+  {
+    value: 'tracking',
+    label: '实例跟踪',
+    description: '按订单、来源单号或任务查看关联任务和异常',
   },
   {
     value: 'workflow',
@@ -235,46 +239,6 @@ function GuidanceDisclosure({ guidanceKey, title, summary, description }) {
   )
 }
 
-function ContextStrip({
-  view,
-  chain,
-  node,
-  selection,
-  canReturnToChain,
-  onReturnChain,
-}) {
-  const overviewSelected = chain?.key === ALL_BUSINESS_CHAINS_KEY
-  return (
-    <section className="erp-dev-flow-context" aria-label="当前观察上下文">
-      <div>
-        <span>当前视图</span>
-        <strong>{VIEW_META[view]?.label}</strong>
-      </div>
-      <div>
-        <span>当前业务链</span>
-        <strong>{chain?.label || '未选择'}</strong>
-      </div>
-      <div>
-        <span>{overviewSelected ? '总图范围' : '当前链路节点'}</span>
-        <strong>
-          {overviewSelected
-            ? `${chain.chainKeys.length} 条业务链 · ${chain.relations.length} 条衔接`
-            : node?.label || '未选择'}
-        </strong>
-      </div>
-      {selection ? (
-        <div>
-          <span>当前专项选择</span>
-          <strong>{selection}</strong>
-        </div>
-      ) : null}
-      {canReturnToChain ? (
-        <Button onClick={onReturnChain}>返回业务链</Button>
-      ) : null}
-    </section>
-  )
-}
-
 export {
   Paragraph,
   Text,
@@ -290,7 +254,6 @@ export {
   CatalogState,
   MemoryStrip,
   GuidanceDisclosure,
-  ContextStrip,
 }
 
 const DEFINITION_SELECT_CLASS_NAMES = Object.freeze({

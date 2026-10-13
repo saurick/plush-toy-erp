@@ -19,6 +19,8 @@ export function createDevFlowStateObservatoryScenarios({
   assert,
   assertNoHorizontalOverflow,
   expectText,
+  outputDir,
+  path,
 }) {
   const writeRequestsByPage = new WeakMap()
 
@@ -29,6 +31,10 @@ export function createDevFlowStateObservatoryScenarios({
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
         startNoWriteAudit(page, writeRequestsByPage)
+        await page.addInitScript(() => {
+          window.__flowPrintCount = 0
+          window.print = () => { window.__flowPrintCount += 1 }
+        })
       },
       verify: async (page) => {
         await expectText(page, '业务链观察')
@@ -49,7 +55,45 @@ export function createDevFlowStateObservatoryScenarios({
           'dev-flow-state-observatory-desktop-light'
         )
         await assertInactivePrintStylesDoNotHideApp(page)
+        await root.locator('[data-business-chain-topics] > summary').click()
         await verifyMermaidViewer(page, root.locator('.erp-markdown-mermaid').first(), assert)
+        const tabs = page.getByRole('tablist', { name: '业务链观察方式' })
+        assert.equal(await tabs.getByRole('tab').count(), 2)
+        await tabs.getByRole('tab', { name: '实例跟踪' }).click()
+        await expectText(page, '输入单号或任务，查看实际进度与异常')
+        await tabs.getByRole('tab', { name: '业务结构' }).click()
+        await root.locator('[data-business-chain-topics] > summary').click()
+        await root.locator('[data-mermaid-status="rendered"]').first().waitFor()
+        await page.getByRole('button', { name: '搜索定义', exact: true }).click()
+        await page.getByRole('dialog', { name: '搜索定义' }).waitFor()
+        await page.getByRole('dialog', { name: '搜索定义' }).locator('.ant-drawer-close').click()
+        const exportButton = page.getByRole('button', { name: '导出', exact: true })
+        await exportButton.hover()
+        await page.getByRole('menuitem', { name: '当前视图 · 打印 / 保存 PDF' }).click()
+        await page.waitForFunction(() => window.__flowPrintCount === 1)
+        assert.equal(await root.getAttribute('data-flow-print-current'), 'true')
+        await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
+        await page.waitForFunction(() => !document.querySelector('[data-flow-print-current]'))
+        await exportButton.hover()
+        await page.getByRole('menuitem', { name: '客户校对稿…' }).click()
+        const review = page.getByRole('dialog', { name: '客户校对稿' })
+        await review.waitFor()
+        await review.getByRole('button', { name: /取\s*消/u }).click()
+        assert.equal(await page.locator('[data-customer-review-print-root]').count(), 0)
+        await exportButton.hover()
+        await page.getByRole('menuitem', { name: '客户校对稿…' }).click()
+        await review.getByRole('button', { name: '打印 / 保存 PDF', exact: true }).click()
+        await page.waitForFunction(() => window.__flowPrintCount === 2)
+        const fulfillmentPrint = page.locator('[data-customer-review-fulfillment]')
+        assert.equal(await fulfillmentPrint.locator('tbody tr').count(), 14)
+        assert.match(await fulfillmentPrint.innerText(), /正式成品入库[\s\S]*查货与包装[\s\S]*业务显式确认实际发货/u)
+        await page.emulateMedia({ media: 'print' })
+        assert.equal(await page.locator('#root').evaluate((node) => getComputedStyle(node).display), 'none')
+        await fulfillmentPrint.waitFor({ state: 'visible' })
+        await page.pdf({ path: path.join(outputDir, 'order-role-flow-customer-review.pdf'), preferCSSPageSize: true, printBackground: true })
+        await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
+        await page.waitForFunction(() => !document.querySelector('[data-customer-review-print-root]'))
+        await page.emulateMedia({ media: 'screen' })
         await page.goto(new URL('/__dev/status-flows?view=states&flow=source.sales_order', page.url()).href)
         const filters = page.getByRole('group', { name: '状态转换筛选' })
         const graph = page.locator('.erp-dev-flow-state-graph')

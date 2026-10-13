@@ -99,98 +99,42 @@ test("dev flow state observatory: route and all catalogs stay DEV-only and read-
   assert(catalog.factDefinitions.every((fact) => fact.readOnly));
 });
 
-test("dev flow state observatory: five-view information architecture explains people, path, ledger, rules, and chain", () => {
+test("dev flow state observatory: the complete role flow is primary and technical views remain secondary", () => {
   const page = readObservatorySource();
-
-  assert.match(
-    page,
-    /import\.meta\.glob\(['"]\.\.\/config\/devFlowStateCatalog\.mjs['"]\)/u,
-  );
+  const shared = read("web/src/dev-workbench/components/flow-state/FlowStateShared.jsx");
+  const guide = read("web/src/dev-workbench/components/flow-state/TaskFulfillmentGuide.jsx");
+  assert.match(page, /import\.meta\.glob\(['"]\.\.\/config\/devFlowStateCatalog\.mjs['"]\)/u);
   assert.match(page, /moduleValue\?\.DEV_FLOW_STATE_CATALOG/u);
-  for (const copy of [
-    "业务链观察",
-    "Workflow 管“人”",
-    "ProcessRuntime 管“路”",
-    "Fact / Ledger 管“账”",
-    "状态机管“规则”",
-    "业务链负责串起来",
-    "看业务链",
-    "查责任与任务",
-    "看运行路径",
-    "看已生效结果",
-    "查状态规则",
-    "基础资料提供标准",
-    "例如客户、供应商、产品、材料和仓库",
-    "来源单据记录承诺",
-    "例如销售订单、采购订单、生产订单和加工合同",
-    "但不代表库存、出货或财务结果已经发生",
-    "受控业务动作负责真正执行",
-    "计算结果由正式来源和事实派生",
-    "权限、客户配置与审计贯穿全部视图",
-    "不单独构成业务链",
-  ]) {
-    assert(page.includes(copy), `missing visible boundary copy: ${copy}`);
-  }
   assert.deepEqual(
-    [...page.matchAll(/value:\s*'([^']+)'[\s\S]{0,100}?label:/gu)]
-      .slice(0, 5)
-      .map((match) => match[1]),
-    ["chain", "workflow", "runtime", "facts", "states"],
+    [...shared.matchAll(/value:\s*'([^']+)'[\s\S]{0,100}?label:/gu)].map((match) => match[1]),
+    ["chain", "tracking", "workflow", "runtime", "facts", "states"],
   );
+  assert.match(page, /const PRIMARY_VIEWS = VIEW_ITEMS\.filter\(\(item\) => \['chain', 'tracking'\]\.includes\(item\.value\)\)/u);
+  assert.match(page, /<Dropdown menu=\{\{ items: TECHNICAL_VIEWS\.map/u);
+  assert.match(page, /items=\{PRIMARY_VIEWS\}/u);
   assert.equal(DEV_FLOW_STATE_DEFAULT_VIEW, "chain");
-  assert.match(page, /DEV_FLOW_STATE_DEFAULT_VIEW as DEFAULT_VIEW/u);
-  assert.match(
-    page,
-    /把基础资料、来源单据、人、路、业务动作、账、规则和计算结果串起来/u,
-  );
-  assert.equal(
-    DEV_FLOW_STATE_CATALOG.businessChainOverview.label,
-    "全部业务链（设计总图）",
-  );
-  assert.match(page, /<Title level=\{2\}>\{overview\.label\}<\/Title>/u);
-  assert.match(page, /catalog\.businessChainOverview\.key/u);
+  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainOverview.label, "订单全流程（销售到出货）");
+  assert.match(page, /<TaskFulfillmentGuide[\s\S]*?<details[^>]*data-business-chain-topics/u);
+  assert.match(guide, /关注岗位/u);
+  assert.match(guide, /fulfillmentStepMatchesRole/u);
+  assert.match(guide, /fulfillmentTaskLinks/u);
+  assert.match(guide, /完整流程/u);
+  assert.match(guide, /异常处理/u);
+  assert.doesNotMatch(guide, /<details/u, "main fulfillment stages must stay visible");
+  for (const copy of [
+    "Workflow 管“人”", "ProcessRuntime 管“路”", "Fact / Ledger 管“账”",
+    "状态机管“规则”", "业务链负责串起来", "基础资料提供标准",
+    "来源单据记录承诺", "但不代表库存、出货或财务结果已经发生",
+    "受控业务动作负责真正执行", "计算结果由正式来源和事实派生",
+    "权限、客户配置与审计贯穿全部视图", "不单独构成业务链",
+  ]) assert(page.includes(copy), `missing domain boundary: ${copy}`);
   assert.match(page, /buildBusinessChainSelectOptions\(catalog\)/u);
-  assert.match(page, /总图只画链与链的衔接/u);
-  assert.match(page, /11 个节点分别代表 11 条正式设计链/u);
-  assert.match(page, /一次只看一条业务链/u);
-  assert.match(page, /业务链先看步骤，再查运行证据/u);
-  assert.match(page, /查询任务后，只高亮真实运行到的一个步骤/u);
-  assert.match(page, /具体运行实例/u);
-  for (const businessCopy of [
-    "业务单据",
-    "基础资料",
-    "流程运行",
-    "岗位协同",
-    "已生效业务记录",
-    "计算结果",
-    "查看一笔任务现在走到哪一步",
-    "按步骤看业务链",
-    "这一步做什么",
-    "谁来处理",
-    "怎样算完成",
-    "异常时怎么办",
-    "查看开发者信息",
-  ]) {
-    assert(
-      page.includes(businessCopy),
-      `missing business-first copy: ${businessCopy}`,
-    );
-  }
-  assert.match(
-    page,
-    /<div className="erp-dev-flow-overview-graph erp-dev-docs-markdown">/u,
-  );
-  assert.match(
-    page,
-    /<div className="erp-dev-flow-chain-graph erp-dev-docs-markdown">/u,
-  );
-  assert.doesNotMatch(page, /erp-dev-flow-graph-disclosure/u);
-  assert.doesNotMatch(page, /查看完整链间关系图|查看完整步骤关系图/u);
+  assert.match(page, /data-selected-chain-node/u);
+  assert.match(page, /data-business-chain-overview/u);
   assert.match(page, /<summary>查看查询边界与开发者信息<\/summary>/u);
-  assert.match(page, /<dt>稳定 key<\/dt>/u);
 });
 
-test("dev flow state observatory: long definition selects are grouped without changing ProcessRuntime order", () => {
+test("dev flow state observatory: business topics stay flat and long fact and state selects retain grouping", () => {
   const catalog = DEV_FLOW_STATE_CATALOG;
   const page = readObservatorySource();
   const chainOptions = buildBusinessChainSelectOptions(catalog);
@@ -198,8 +142,8 @@ test("dev flow state observatory: long definition selects are grouped without ch
   const stateOptions = buildStateDefinitionSelectOptions(catalog);
 
   assert.deepEqual(
-    chainOptions.slice(1).map((group) => group.label),
-    ["履约主链 · 3", "供给与库存支撑 · 3", "异常与返工 · 3", "冲正与纠正 · 2"],
+    chainOptions.map((option) => option.value),
+    [catalog.businessChainOverview.key, ...catalog.businessChains.map((chain) => chain.key)],
   );
   assert.deepEqual(
     factOptions.map((group) => group.label),
@@ -222,7 +166,7 @@ test("dev flow state observatory: English anchors stay paired with the concept l
   const taskNav = read("web/src/dev-workbench/components/DevTaskNav.jsx");
 
   for (const [label, englishLabel] of [
-    ["看业务链", "Business Chain"],
+    ["业务结构", "Business Chain"],
     ["查责任与任务", "Workflow / Task"],
     ["看运行路径", "ProcessRuntime"],
     ["看已生效结果", "Fact / Ledger"],
@@ -250,16 +194,9 @@ test("dev flow state observatory: pasted business text search is local, grouped,
     "web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx",
     "DefinitionSearch",
   );
-  const pageIndexStart = rootPage.indexOf(
-    '<details className="erp-dev-flow-definition-tools">',
-  );
-  const primaryNavStart = rootPage.indexOf(
-    '<section className="erp-dev-flow-nav">',
-  );
-  assert(
-    pageIndexStart >= 0 && primaryNavStart > pageIndexStart,
-    "definition index renders before the five primary tabs",
-  );
+  assert.match(rootPage, /useState\(false\)/u);
+  assert.match(rootPage, /<Button onClick=\{\(\) => setDefinitionSearchOpen\(true\)\}>搜索定义/u);
+  assert.match(rootPage, /<Drawer title="搜索定义"[^>]*open=\{definitionSearchOpen\}/u);
 
   for (const group of [
     "label: '业务链'",
@@ -275,9 +212,9 @@ test("dev flow state observatory: pasted business text search is local, grouped,
     /<strong>\{item\.label\}<\/strong>[\s\S]{0,220}?<code>\{item\.key\}<\/code>/u,
   );
   assert.match(search, /跨视图查定义/u);
-  assert.match(search, /覆盖 5 个视图/u);
-  assert.match(search, /这是本页 5[\s\S]{0,40}?个视图的定义总索引/u);
-  assert.match(search, /不属于当前 Tab/u);
+
+
+
   assert.match(search, /例如：销售订单、销售 PMC、已提交/u);
   assert.match(
     search,
@@ -304,17 +241,7 @@ test("dev flow state observatory: pasted business text search is local, grouped,
   assert.match(helper, /processDefinitionKeys/u);
   assert.match(helper, /flow\.states/u);
   assert.match(helper, /definition\.sourceDocument/u);
-  assert.match(page, /taskLookupFocusRequest/u);
-  assert.match(page, /document\.getElementById\('dev-flow-task-search'\)/u);
-  assert.match(
-    page,
-    /scrollIntoView\(\{ behavior: 'auto', block: 'center' \}\)/u,
-  );
-  assert.match(page, /focus\(\{ preventScroll: true \}\)/u);
-  assert.match(
-    page,
-    /onOpenTaskLookup=\{\(keyword\) => \{[\s\S]{0,260}?setTaskDraft\(nextDraft\)[\s\S]{0,220}?openGlobalDefinitionView\('workflow'\)/u,
-  );
+  assert.match(page, /onOpenTaskLookup=\{\(keyword\) => \{[^\n]*setTaskDraft\(cleanText\(keyword\)\)[^\n]*setDefinitionSearchOpen\(false\)[^\n]*openView\('tracking'\)/u);
   assert.match(
     page,
     /const openGlobalDefinitionView = \(nextView, patch = \{\}\) =>[\s\S]{0,180}?\[QUERY_KEYS\.chain\]: null,[\s\S]{0,80}?\[QUERY_KEYS\.node\]: null/u,
@@ -336,6 +263,7 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
     "process",
     "fact",
     "task_id",
+    "flow_role",
   ]);
   const canonical = canonicalizeDevFlowStateSearchParams(
     new URLSearchParams(
@@ -374,16 +302,8 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
   assert.match(page, /未登记组合不生成数据/u);
   assert.match(page, /恢复到业务总图/u);
   assert.match(page, /chain: catalog\.businessChainOverview\.key/u);
-  assert.match(page, /<ContextStrip[\s\S]{0,420}?onReturnChain/u);
-  assert.match(
-    page,
-    /chain=\{\s*view === 'chain' && overviewSelected\s*\? catalog\.businessChainOverview\s*: chain\s*\}/u,
-  );
-  assert.match(
-    page,
-    /node=\{view === 'chain' && overviewSelected \? null : node\}/u,
-  );
-  assert.match(page, /返回业务链/u);
+  assert.match(page, /onBackToChain=\{\(\) => openView\('chain'\)\}/u);
+  assert.match(page, /erp-dev-flow-context-path/u);
   assert.match(page, /data-selected-chain-node/u);
   assert.match(page, /data-business-chain-overview/u);
   assert.match(page, /data-overview-chain/u);
@@ -405,7 +325,7 @@ test("dev flow state observatory: customer review print is generated from the sh
   );
   assert.match(page, /buildDevBusinessChainCustomerReview/u);
   assert.match(page, /DevBusinessChainCustomerReviewPrint/u);
-  assert.match(page, /导出甲方校对版/u);
+  assert.match(page, /客户校对稿/u);
   assert.match(page, /window\.print\(\)/u);
   assert.match(page, /data-flow-state-view=\{view\}/u);
   assert.match(model, /catalog\.businessChains/u);
@@ -418,15 +338,16 @@ test("dev flow state observatory: customer review print is generated from the sh
   for (const copy of [
     "生成时间",
     "适用范围",
-    "谁负责",
-    "触发条件或前置条件",
-    "系统自动完成什么",
-    "人员需要办理什么",
-    "怎样算完成",
-    "下一步衔接到哪里",
-    "整条业务链的异常与纠正路径",
+    "岗位与完成条件",
+    "处理与完成条件",
+    "下一步",
+    "异常与纠正",
+    "完成边界",
   ]) {
     assert(printView.includes(copy), `missing customer review copy: ${copy}`);
+  }
+  for (const field of ["trigger", "responsibleRole", "completion", "actionOutcomes", "next"]) {
+    assert(printView.includes(`step.${field}`), `customer review must retain step ${field}`);
   }
   assert.match(styles, /@media print/u);
   assert.match(styles, /size: A4 portrait/u);
@@ -435,37 +356,18 @@ test("dev flow state observatory: customer review print is generated from the sh
   assert.doesNotMatch(`${model}\n${printView}`, /yoyoosun|永绅/iu);
 });
 
-test("dev flow state observatory: task selection stays in the URL without leaking into the global context strip", () => {
-  const page = readObservatorySource();
-  const context = readFunctionSource(
-    "web/src/dev-workbench/components/flow-state/FlowStateShared.jsx",
-    "ContextStrip",
-  );
-  const workflow = readFunctionSource(
-    "web/src/dev-workbench/components/flow-state/WorkflowView.jsx",
-    "WorkflowView",
-  );
-  const runtime = readFunctionSource(
-    "web/src/dev-workbench/components/flow-state/RuntimeView.jsx",
-    "RuntimeView",
-  );
-  const selectionStart = page.indexOf("const specialistSelection =");
-  const selectionEnd = page.indexOf("\n\n  const renderView", selectionStart);
-  assert(selectionStart >= 0 && selectionEnd > selectionStart);
-  const specialistSelection = page.slice(selectionStart, selectionEnd);
-
-  assert.doesNotMatch(context, /taskId|真实任务上下文|task_id/u);
-  assert.doesNotMatch(specialistSelection, /workflow|taskId|任务 \$\{/u);
-  assert.match(
-    page,
-    /const taskId = cleanText\(searchParams\.get\(QUERY_KEYS\.taskId\)\)/u,
-  );
-  assert.match(
-    page,
-    /updateParams\(\{ \[QUERY_KEYS\.taskId\]: String\(nextTaskId\) \}\)/u,
-  );
-  assert.match(workflow, /<TaskFinder/u);
-  assert.match(runtime, /<TaskFinder/u);
+test("dev flow state observatory: task selection stays in the URL and uses one shared finder", () => {
+  const page = read("web/src/dev-workbench/pages/DevFlowStateObservatoryPage.jsx");
+  const workflow = readFunctionSource("web/src/dev-workbench/components/flow-state/WorkflowView.jsx", "WorkflowView");
+  const runtime = readFunctionSource("web/src/dev-workbench/components/flow-state/RuntimeView.jsx", "RuntimeView");
+  assert.match(page, /const taskId = cleanText\(activeSearchParams\.get\(QUERY_KEYS\.taskId\)\)/u);
+  assert.match(page, /updateParams\(\{ \[QUERY_KEYS\.taskId\]: String\(nextTaskId\)/u);
+  assert.match(page, /updateParams\(\{ \[QUERY_KEYS\.taskId\]: null \}\)/u);
+  assert.equal((page.match(/<TaskFinder\b/gu) || []).length, 1);
+  assert.match(page, /selectTask\(id, task, 'tracking'\)/u);
+  assert.match(page, /<BusinessChainInstanceView taskId=\{taskId\}/u);
+  assert.doesNotMatch(workflow, /<TaskFinder/u);
+  assert.doesNotMatch(runtime, /<TaskFinder/u);
 });
 
 test("dev flow state observatory: task-name lookup and unlinked runtime boundary remain exact", () => {
@@ -473,11 +375,9 @@ test("dev flow state observatory: task-name lookup and unlinked runtime boundary
   const helper = read("web/src/dev-workbench/pages/devFlowStateTaskLookup.mjs");
 
   for (const copy of [
-    "查找后台任务",
-    "粘贴完整任务名称、任务编号、来源单号或数字 task_id",
-    "电脑端后台「任务管理」",
-    "从电脑端后台「任务管理」复制完整任务名称",
-    "数字 task_id 仅用于开发排障",
+    "定位业务",
+    "订单 / 来源单号 / 任务名称或编号",
+    "查询当前账号可见任务；数字任务 ID 可用于开发排障",
     "名称可能重复",
     "已找到任务，但它是模拟展示数据",
     "已找到任务，但它没有正式流程轨迹",
@@ -485,7 +385,7 @@ test("dev flow state observatory: task-name lookup and unlinked runtime boundary
   ]) {
     assert(page.includes(copy), `missing task lookup copy: ${copy}`);
   }
-  assert.match(page, /无需数据库\s*ID/u);
+  assert.match(page, /结果不完整时不会自动选择/u);
   assert.match(
     page,
     /listWorkflowTasks\(query,\s*\{ signal: controller\.signal \}\)/u,
@@ -547,19 +447,11 @@ test("dev flow state observatory: Runtime completion never promotes Workflow or 
     chain,
     /node\.machineKeys\.includes\(runtimeProcessKey\)/u,
   );
-  assert.match(page, /ProcessRuntime completed 不等于业务事实已落账/u);
+  assert.match(page, /下面的 completed 只属于 ProcessRuntime 节点；不会把 Workflow 或 Fact \/ Ledger 节点一并标成完成/u);
   assert.match(page, /尚未证明业务事实已落账/u);
-  assert.match(
-    page,
-    /业务单据、岗位协同、流程运行、已生效业务记录和计算结果[\s\S]{0,160}?不会因为流程走完就一起显示为完成/u,
-  );
+  assert.match(page, /流程走完不代表业务事实已经生效/u);
   assert.match(page, /Workflow task done ≠ Fact posted/u);
   assert.match(page, /未提供运行凭证查询|factRuntimeQuery\.label/u);
-  assert.match(page, /真实流程请先用任务信息定位/u);
-  assert.match(
-    page,
-    /使用任务名称、任务编号或来源单号定位，[\s\S]{0,40}?无需数据库[\s\S]{0,20}?ID/u,
-  );
   assert.doesNotMatch(
     page,
     /(?:get|list|search)(?:Fact|Ledger)(?:Proof|Voucher|Receipt)/u,

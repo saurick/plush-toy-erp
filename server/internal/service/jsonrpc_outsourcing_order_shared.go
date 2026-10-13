@@ -253,6 +253,7 @@ func outsourcingOrderToMap(item *biz.OutsourcingOrder) map[string]any {
 		"supplier_snapshot":       item.SupplierSnapshot,
 		"contract_party_snapshot": item.ContractPartySnapshot,
 		"source_order_no":         optionalStringValue(item.SourceOrderNo),
+		"source_wip_batch_id":     optionalIntValue(item.SourceWIPBatchID),
 		"order_date":              item.OrderDate.Unix(),
 		"expected_return_date":    optionalUnix(item.ExpectedReturnDate),
 		"lifecycle_status":        item.LifecycleStatus,

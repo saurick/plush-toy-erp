@@ -50,7 +50,6 @@ var debugBusinessDataClearTables = []string{
 	"inventory_txns",
 	"outsourcing_facts",
 	"outsourcing_return_dispositions",
-	"production_exception_decisions",
 	"production_facts",
 	"production_order_events",
 	"production_packaging_confirmations",
@@ -67,6 +66,7 @@ var debugBusinessDataClearTables = []string{
 	"purchase_returns",
 	"quality_inspections",
 	"production_wip_batches",
+	"production_exception_decisions",
 	"production_order_operations",
 	"production_order_items",
 	"production_orders",
@@ -102,6 +102,7 @@ type debugBusinessDataClearDetachment struct {
 
 var debugBusinessDataClearDetachments = []debugBusinessDataClearDetachment{
 	{tableName: "production_wip_batches", columnName: "origin_rework_fact_id"},
+	{tableName: "production_wip_batches", columnName: "finished_goods_receipt_id"},
 }
 
 func (r *debugSeedRepo) SeedBusinessChainDebugData(ctx context.Context, plan biz.DebugSeedPlan, actorID int) (*biz.DebugBusinessChainSeedResult, error) {

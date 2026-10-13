@@ -536,7 +536,7 @@ func buildProductionExceptionBlockedSideEffects(current *WorkflowTask, productio
 }
 
 func buildShipmentReleaseDoneSideEffects(current *WorkflowTask) *WorkflowTaskStatusSideEffects {
-	ownerRoleKey := "warehouse"
+	ownerRoleKey := SalesRoleKey
 	statePayload := workflowShipmentReleaseCommonPayload(current)
 	statePayload["shipment_release_task_id"] = current.ID
 	statePayload["shipment_release_result"] = "done"

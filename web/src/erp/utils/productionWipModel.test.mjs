@@ -86,10 +86,10 @@ test('WIP actions follow the batch stage and execution mode without hiding pendi
     false
   )
   assert.equal(
-    visible(PRODUCTION_WIP_ACTION.REWORK, { status: 'REJECTED' }),
-    true
+    visible('REWORK', { status: 'REJECTED' }),
+    false
   )
-  assert.equal(visible(PRODUCTION_WIP_ACTION.REWORK, internal), false)
+  assert.equal(visible('REWORK', internal), false)
   for (const status of ['SPLIT', 'CANCELLED']) {
     for (const action of Object.values(PRODUCTION_WIP_ACTION)) {
       assert.equal(visible(action, { status }), false)
@@ -307,6 +307,7 @@ function aggregateFixture(patch = {}) {
         created_at: 1784210000,
       },
     ],
+    finished_goods_receipts: [],
     quality_inspections: [
       {
         id: 51,
@@ -464,6 +465,7 @@ test('production WIP aggregate permits a fully uninitialized route but not a hal
     outsourcing_allocations: [],
     production_order_operations: [],
     packaging_confirmations: [],
+    finished_goods_receipts: [],
     quality_inspections: [],
   })
   assert.equal(uninitialized.initialized, false)
@@ -480,6 +482,10 @@ test('production WIP aggregate permits a fully uninitialized route but not a hal
 test('production WIP quantities are canonical and compared without floating point drift', () => {
   assert.equal(normalizeProductionWipQuantity('001.2300'), '1.23')
   assert.equal(compareProductionWipQuantity('0.30', '0.3'), 0)
+  assert.equal(compareProductionWipQuantity('0', '0.000000'), 0)
+  assert.equal(compareProductionWipQuantity('0.000001', '0'), 1)
+  assert.equal(compareProductionWipQuantity('0', '1'), -1)
+  assert.throws(() => normalizeProductionWipQuantity('0'))
   assert.equal(
     compareProductionWipQuantity('99999999999999.000001', '99999999999999'),
     1
@@ -830,31 +836,8 @@ test('packaging confirmation is item-level and never carries a WIP batch referen
   )
 })
 
-test('production WIP rework requires target, quantity and reason', () => {
-  const input = {
-    production_order_id: 7,
-    production_wip_batch_id: 32,
-    expected_version: 2,
-    target_operation_id: 41,
-    quantity: '20',
-    reason: '皮套针距不合格，退回车缝返工',
-    idempotency_key: 'rework-1',
-  }
-  const params = buildProductionWipActionParams(
-    PRODUCTION_WIP_ACTION.REWORK,
-    input
-  )
-  assert.equal(params.target_operation_id, 41)
-  assert.equal(params.quantity, '20')
-  assert.equal(params.reason, input.reason)
-  assert.throws(
-    () =>
-      buildProductionWipActionParams(PRODUCTION_WIP_ACTION.REWORK, {
-        ...input,
-        reason: '',
-      }),
-    /返工去向/u
-  )
+test('direct WIP rework is rejected and must use an approved exception decision', () => {
+  assert.throws(() => buildProductionWipActionParams('REWORK', { production_order_id: 7, production_wip_batch_id: 32, expected_version: 2, target_operation_id: 41, quantity: '20', reason: '返工', idempotency_key: 'rework-1' }))
 })
 
 test('planned WIP cancellation requires one auditable reason', () => {
@@ -899,12 +882,12 @@ test('production WIP labels show business line snapshots and never raw IDs', () 
   assert.equal(PRODUCTION_WIP_ROUTE_CODE, 'PLUSH_SEW_HAND_V1')
 })
 
-test('routed completion requires accepted packaging and item-level packaging confirmation', () => {
+test('handwork can be received before inspection and packaging confirmation', () => {
   const aggregate = validateProductionWipAggregate(aggregateFixture())
   const item = aggregate.items[0]
   assert.match(
     productionWipCompletionEligibility(aggregate, item).reason,
-    /完成包装工序/u
+    /手工完成或回货后/u
   )
 
   const packagingAccepted = {
@@ -914,27 +897,24 @@ test('routed completion requires accepted packaging and item-level packaging con
       {
         ...aggregate.batches[1],
         id: 33,
-        production_order_operation_id: 44,
+        production_order_operation_id: 43,
         source_batch_id: 32,
         batch_no: 'WIP-003',
-        status: 'ACCEPTED',
+        status: 'WAITING_QUALITY',
         quantity: '0.000001',
       },
       {
         ...aggregate.batches[1],
         id: 34,
-        production_order_operation_id: 44,
+        production_order_operation_id: 43,
         source_batch_id: 32,
         batch_no: 'WIP-004',
-        status: 'ACCEPTED',
+        status: 'WAITING_QUALITY',
         quantity: '39.999999',
       },
     ],
   }
-  assert.match(
-    productionWipCompletionEligibility(packagingAccepted, item).reason,
-    /确认包材版面和包装版本/u
-  )
+  assert.equal(productionWipCompletionEligibility(packagingAccepted, item).eligible, true)
 
   const ready = {
     ...packagingAccepted,
@@ -950,15 +930,15 @@ test('routed completion requires accepted packaging and item-level packaging con
   }
   const readyEligibility = productionWipCompletionEligibility(ready, item)
   assert.equal(readyEligibility.eligible, true)
-  assert.equal(readyEligibility.acceptedPackagingQuantity, '40')
+  assert.equal(readyEligibility.receivableQuantity, '40')
   assert.deepEqual(
-    readyEligibility.acceptedPackagingBatches.map((batch) => batch.id),
+    readyEligibility.receivableBatches.map((batch) => batch.id),
     [33, 34]
   )
 
   const readyPartition = partitionProductionCompletionItems([item], ready)
   assert.equal(
-    readyPartition.eligibleItems[0].accepted_packaging_quantity,
+    readyPartition.eligibleItems[0].receivable_quantity,
     '40'
   )
 
@@ -1120,7 +1100,7 @@ test('closed production orders expose only finished-goods rework lineage actions
       {
         ...aggregate.batches[1],
         id: 33,
-        production_order_operation_id: 44,
+        production_order_operation_id: 43,
         source_batch_id: 32,
         origin_rework_fact_id: 901,
         batch_no: 'WIP-RW-PACK',
@@ -1130,7 +1110,7 @@ test('closed production orders expose only finished-goods rework lineage actions
       {
         ...aggregate.batches[1],
         id: 34,
-        production_order_operation_id: 44,
+        production_order_operation_id: 43,
         source_batch_id: 32,
         origin_rework_fact_id: null,
         batch_no: 'WIP-NORMAL-PACK',
@@ -1149,9 +1129,9 @@ test('closed production orders expose only finished-goods rework lineage actions
     productionWipBatchID: 33,
   })
   assert.equal(eligibility.eligible, true)
-  assert.equal(eligibility.acceptedPackagingQuantity, '4')
+  assert.equal(eligibility.receivableQuantity, '4')
   assert.deepEqual(
-    eligibility.acceptedPackagingBatches.map((batch) => batch.id),
+    eligibility.receivableBatches.map((batch) => batch.id),
     [33]
   )
   assert.match(

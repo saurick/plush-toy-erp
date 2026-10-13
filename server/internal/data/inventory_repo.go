@@ -549,6 +549,7 @@ func (r *inventoryRepo) listInventoryBalances(ctx context.Context, filter biz.In
 	}
 	rows, err := query.
 		Order(ent.Desc(inventorybalance.FieldUpdatedAt), ent.Desc(inventorybalance.FieldID)).
+		WithInventoryLot().
 		Limit(filter.Limit).
 		Offset(filter.Offset).
 		All(ctx)
@@ -577,6 +578,19 @@ func (r *inventoryRepo) listInventoryBalances(ctx context.Context, filter biz.In
 		}
 		item.ActiveReservedQuantity = activeReserved
 		item.AvailableQuantity = calc.InventoryAvailableQuantity(item.Quantity, activeReserved)
+		readiness, err := productionFinishedGoodsReadiness(ctx, r.data.postgres, biz.InventoryBalanceKey{
+			SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID,
+			WarehouseID: row.WarehouseID, LotID: row.LotID, UnitID: row.UnitID,
+		})
+		if err != nil {
+			return nil, 0, err
+		}
+		item.PendingInspectionQuantity = readiness.PendingInspection
+		item.PendingPackagingQuantity = readiness.PendingPackaging
+		item.ReadyToShipQuantity = decimal.Max(decimal.Zero, decimal.Min(item.AvailableQuantity, item.Quantity.Sub(readiness.blocked())))
+		if row.SubjectType != biz.InventorySubjectProduct || (row.Edges.InventoryLot != nil && row.Edges.InventoryLot.Status != corestatus.InventoryLotActive) {
+			item.ReadyToShipQuantity = decimal.Zero
+		}
 		out = append(out, item)
 	}
 	return out, total, nil
@@ -861,6 +875,26 @@ func applyInventoryBalanceDelta(ctx context.Context, tx *inventoryDBTx, in *biz.
 			minimumRemaining, err = activeReservedQuantityForInventoryKey(ctx, tx.client, key)
 			if err != nil {
 				return nil, err
+			}
+			if in.TxnType != biz.InventoryTxnReversal {
+				disposition, err := isProductionReworkDispositionTxn(ctx, tx.client, in)
+				if err != nil {
+					return nil, err
+				}
+				if !disposition {
+					readiness, err := productionFinishedGoodsReadiness(ctx, tx.client, key)
+					if err != nil {
+						return nil, err
+					}
+					balance, err := getInventoryBalance(ctx, tx.client.InventoryBalance.Query(), key)
+					if err != nil {
+						return nil, err
+					}
+					if readiness.blocked().IsPositive() && balance.Quantity.Add(delta).LessThan(readiness.blocked()) {
+						return nil, biz.ErrShipmentPackingPending
+					}
+					minimumRemaining = decimal.Max(minimumRemaining, readiness.blocked())
+				}
 			}
 		}
 		affected, err := updateInventoryBalanceDelta(ctx, tx, key, delta, minimumRemaining)

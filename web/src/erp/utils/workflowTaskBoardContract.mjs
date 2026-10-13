@@ -9,7 +9,7 @@ export const WORKFLOW_TASK_BOARD_LANE_KEYS = Object.freeze([
 
 const WORKFLOW_TASK_BOARD_STATUS_KEYS_BY_LANE = Object.freeze({
   actionable: new Set([WorkflowTaskStatus.READY]),
-  exception: new Set([WorkflowTaskStatus.BLOCKED]),
+  exception: new Set([WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED]),
   due: new Set([WorkflowTaskStatus.READY]),
   finished: new Set([WorkflowTaskStatus.DONE, WorkflowTaskStatus.REJECTED, WorkflowTaskStatus.WITHDRAWN]),
 })

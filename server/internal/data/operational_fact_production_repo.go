@@ -656,8 +656,14 @@ func resolveProductionReworkMutation(
 	if err != nil {
 		return nil, nil, biz.ErrProductionReworkSourceInvalid
 	}
-	if _, err := resolveProductionCompletionWIPBatch(ctx, client, item, source.ProductionWipBatchID); err != nil {
+	batch, err := resolveProductionCompletionWIPBatch(ctx, client, item, source.ProductionWipBatchID, true)
+	if err != nil {
 		return nil, nil, biz.ErrProductionReworkSourceInvalid
+	}
+	// Failed or pending IQC must use its quality-exception decision. Stock
+	// rework is only available after the source batch has passed its gates.
+	if requirePosted && (batch == nil || batch.Status != biz.ProductionWIPStatusAccepted) {
+		return nil, nil, biz.ErrProductionReworkSourceState
 	}
 	sourceType := biz.ProductionFactSourceType
 	sourceID := source.ID
@@ -746,6 +752,15 @@ func validateProductionReworkQuantity(ctx context.Context, client *ent.Client, s
 	}
 	if total.GreaterThan(source.Quantity) {
 		return biz.ErrProductionReworkQuantityExceeded
+	}
+	packaging, err := productionReceiptPackagingBatches(ctx, client, source.ID)
+	if err != nil {
+		return err
+	}
+	for _, batch := range packaging {
+		if batch.Status != biz.ProductionWIPStatusAccepted && total.Add(sumProductionWIPBatchQuantity(packaging)).GreaterThan(source.Quantity) {
+			return biz.ErrProductionReworkExecutionDependency
+		}
 	}
 	return nil
 }
@@ -1174,7 +1189,15 @@ func validateProductionOrderFactSource(
 	if item.ProductionOrderID != orderID || item.ProductID != in.SubjectID || item.UnitID != in.UnitID || !sameOptionalInt(item.ProductSkuID, in.ProductSkuID) {
 		return nil, biz.ErrProductionOrderFactSourceInvalid
 	}
-	batch, err := resolveProductionCompletionWIPBatch(ctx, client, item, in.ProductionWIPBatchID)
+	recorded := false
+	if excludeFactID > 0 {
+		existing, readErr := client.ProductionFact.Get(ctx, excludeFactID)
+		if readErr != nil {
+			return nil, readErr
+		}
+		recorded = existing.PostedAt != nil
+	}
+	batch, err := resolveProductionCompletionWIPBatch(ctx, client, item, in.ProductionWIPBatchID, recorded)
 	if err != nil {
 		return nil, err
 	}
@@ -1230,6 +1253,7 @@ func resolveProductionCompletionWIPBatch(
 	client *ent.Client,
 	item *ent.ProductionOrderItem,
 	batchID *int,
+	recorded bool,
 ) (*ent.ProductionWIPBatch, error) {
 	if client == nil || item == nil {
 		return nil, biz.ErrProductionOrderFactSourceInvalid
@@ -1260,19 +1284,30 @@ func resolveProductionCompletionWIPBatch(
 		}
 		return nil, err
 	}
+	completedHandwork := operation.OperationCode == biz.ProductionWIPOperationHandwork &&
+		(batch.Status == biz.ProductionWIPStatusWaitingQuality || batch.Status == biz.ProductionWIPStatusAccepted || batch.Status == biz.ProductionWIPStatusRejected)
+	recordedPackaging := recorded && operation.OperationCode == biz.ProductionWIPOperationPackaging && batch.Status == biz.ProductionWIPStatusAccepted
 	if batch.ProductionOrderID != item.ProductionOrderID ||
 		batch.ProductionOrderItemID != item.ID ||
-		batch.Status != biz.ProductionWIPStatusAccepted ||
 		operation.ProductionOrderID != item.ProductionOrderID ||
 		operation.ProductionOrderItemID != item.ID ||
 		operation.RouteCode != biz.ProductionWIPRoutePlushSewHandV1 ||
 		operation.RouteVersion != biz.ProductionWIPRoutePlushSewHandV1Version ||
-		operation.OperationCode != biz.ProductionWIPOperationPackaging {
+		(!completedHandwork && !recordedPackaging) {
 		return nil, biz.ErrProductionWIPInvalidTransition
 	}
 	if batch.OriginReworkFactID != nil {
 		if err := validateProductionReworkOriginForBatch(ctx, client, batch); err != nil {
 			return nil, err
+		}
+	}
+	if !recorded {
+		activeDecision, err := client.ProductionExceptionDecision.Query().Where(productionexceptiondecision.ProductionWipBatchID(batch.ID), productionexceptiondecision.StatusIn(biz.ProductionExceptionSubmitted, biz.ProductionExceptionApproved), productionexceptiondecision.ExecutionStatusNEQ(biz.ProductionExceptionExecutionReversed)).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if activeDecision {
+			return nil, biz.ErrProductionExceptionFactDependency
 		}
 	}
 	return batch, nil
@@ -1298,7 +1333,7 @@ func validateProductionReworkOriginForBatch(ctx context.Context, client *ent.Cli
 
 // validateProductionWIPFinishedGoodsAvailability keeps route-less completions
 // independent from WIP. Explicit routes reserve capacity on one
-// accepted packaging batch; DRAFT and POSTED facts both consume that batch.
+// completed handwork batch; DRAFT and POSTED facts both consume that batch.
 func validateProductionWIPFinishedGoodsAvailability(
 	ctx context.Context,
 	client *ent.Client,
@@ -1319,8 +1354,12 @@ func validateProductionWIPFinishedGoodsAvailability(
 	if batch == nil || additional.IsNegative() {
 		return biz.ErrProductionOrderFactSourceInvalid
 	}
+	batchIDs, err := productionReceiptReservationBatchIDs(ctx, client, batch)
+	if err != nil {
+		return err
+	}
 	query := client.ProductionFact.Query().Where(
-		productionfact.ProductionWipBatchID(batch.ID),
+		productionfact.ProductionWipBatchIDIn(batchIDs...),
 		productionfact.FactType(biz.ProductionFactFinishedGoodsReceipt),
 		productionfact.StatusIn(biz.OperationalFactStatusDraft, biz.OperationalFactStatusPosted),
 	)
@@ -1388,6 +1427,11 @@ func productionOrderEffectiveCompletedQuantity(ctx context.Context, client *ent.
 		}
 		effective = effective.Sub(row.Quantity)
 	}
+	disposed, err := productionReceiptExceptionDisposedQuantity(ctx, client, completionIDs...)
+	if err != nil {
+		return decimal.Zero, err
+	}
+	effective = effective.Sub(disposed)
 	if effective.IsNegative() {
 		return decimal.Zero, biz.ErrProductionReworkQuantityExceeded
 	}
@@ -1714,7 +1758,7 @@ func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter bi
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := q.WithPoster().WithCanceller().Order(ent.Desc(productionfact.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := q.WithPoster().WithCanceller().WithWarehouse().WithUnit().WithInventoryLot().WithProductSku().Order(ent.Desc(productionfact.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -1748,6 +1792,9 @@ func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter bi
 			item.ProductionOrderItemID = &orderItemID
 		}
 		out = append(out, item)
+	}
+	if err := hydrateProductionFactIdentities(ctx, r.data.postgres, out); err != nil {
+		return nil, 0, err
 	}
 	return out, total, nil
 }
@@ -2135,6 +2182,16 @@ func (r *operationalFactRepo) postProductionOrderLinkedFact(ctx context.Context,
 				return nil, err
 			}
 			if row.Status == biz.OperationalFactStatusPosted {
+				packing, err := tx.client.ProductionWIPBatch.Query().Where(
+					productionwipbatch.FinishedGoodsReceiptID(row.ID),
+					productionwipbatch.StatusNEQ(biz.ProductionWIPStatusCancelled),
+				).Exist(ctx)
+				if err != nil {
+					return nil, err
+				}
+				if packing {
+					return nil, biz.ErrProductionReworkDependency
+				}
 				hasActiveRework, err := tx.client.ProductionFact.Query().Where(
 					productionfact.FactType(biz.ProductionFactRework),
 					productionfact.StatusNEQ(biz.OperationalFactStatusCancelled),
@@ -2277,5 +2334,18 @@ func entProductionFactToBiz(row *ent.ProductionFact) *biz.ProductionFact {
 		name := biz.AdminDisplayName(mapEntAdminUser(canceller))
 		cancellerName = &name
 	}
-	return &biz.ProductionFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, Version: row.Version, SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, ProductionWIPBatchID: row.ProductionWipBatchID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, PostedByName: posterName, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	out := &biz.ProductionFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, Version: row.Version, SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, ProductionWIPBatchID: row.ProductionWipBatchID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, PostedBy: row.PostedBy, PostedByName: posterName, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	if row.Edges.Warehouse != nil {
+		out.WarehouseName, out.WarehouseCode = row.Edges.Warehouse.Name, row.Edges.Warehouse.Code
+	}
+	if row.Edges.Unit != nil {
+		out.UnitName = row.Edges.Unit.Name
+	}
+	if row.Edges.InventoryLot != nil {
+		out.LotNo = row.Edges.InventoryLot.LotNo
+	}
+	if row.Edges.ProductSku != nil {
+		out.SKUCodeSnapshot = row.Edges.ProductSku.SkuCode
+	}
+	return out
 }

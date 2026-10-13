@@ -8,7 +8,6 @@ import { Alert, Empty, Select, Spin, Tag } from 'antd'
 import {
   getProcessOwnerPoolLabel,
   BusinessChainProjectionContext,
-  TaskFinder,
 } from './FlowTaskContext.jsx'
 import { useRuntimeContext } from './useFlowRuntime.mjs'
 import {
@@ -22,7 +21,6 @@ import {
   asArray,
   EvidenceDisclosure,
   KeyValue,
-  GuidanceDisclosure,
 } from './FlowStateShared.jsx'
 import { Markdown } from '@/common/components/markdown'
 import {
@@ -84,12 +82,7 @@ function ProcessDefinitionCard({ definition }) {
         </div>
         <Tag>{definition.processVersion}</Tag>
       </div>
-      <GuidanceDisclosure
-        guidanceKey="process-definition"
-        title="这是流程定义"
-        summary="不是某次运行实例"
-        description={definition.guardrail}
-      />
+
       <div className="erp-dev-flow-process-layout">
         <div className="erp-dev-flow-process-graph erp-dev-docs-markdown">
           <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
@@ -294,12 +287,8 @@ function RuntimeView({
   projection,
   definition,
   taskId,
-  draft,
   selectedTask,
   onSelectDefinition,
-  onDraftChange,
-  onClearTask,
-  onSelectTask,
   onBackToChain,
   onClearChainContext,
 }) {
@@ -333,12 +322,6 @@ function RuntimeView({
   )
   return (
     <div className="erp-dev-flow-view-stack">
-      <GuidanceDisclosure
-        guidanceKey="runtime"
-        title="ProcessRuntime 管“路”"
-        summary="completed 不等于事实落账"
-        description="它区分流程定义、流程 variant 和具体运行实例，回答走到哪里、走过什么、为何等待、失败或重试。ProcessRuntime completed 不等于业务事实已落账。"
-      />
       <BusinessChainProjectionContext
         projection={projection}
         onBackToChain={onBackToChain}
@@ -374,29 +357,6 @@ function RuntimeView({
         </Text>
       </section>
       {definition ? <ProcessDefinitionCard definition={definition} /> : null}
-      <section className="erp-dev-flow-runtime-query">
-        <div className="erp-dev-flow-section-heading">
-          <div>
-            <Text strong>定位具体运行实例</Text>
-            <Text type="secondary">
-              当前通用读取链只能从可见 Workflow 任务锚定实例。
-            </Text>
-          </div>
-        </div>
-        <Alert
-          showIcon
-          type="warning"
-          message="真实流程请先用任务信息定位"
-          description="粘贴任务名称、任务编号或来源单号即可，无需查询 ProcessRuntime 实例 ID。"
-        />
-        <TaskFinder
-          draft={draft}
-          onDraftChange={onDraftChange}
-          onClearTask={onClearTask}
-          onSelectTask={onSelectTask}
-          taskId={taskId}
-        />
-      </section>
       {!taskId ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}

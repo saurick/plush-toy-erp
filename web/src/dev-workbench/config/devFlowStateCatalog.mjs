@@ -3150,7 +3150,7 @@ export const processDefinitions = Object.freeze(
         processNode(
           'production_exception_execution',
           'human_task',
-          '报废或在制让步执行',
+          '未入库异常执行',
           {
             ownerPool: 'production',
             permission: [PermissionCode.WORKFLOW_TASK_COMPLETE],
@@ -3165,7 +3165,7 @@ export const processDefinitions = Object.freeze(
             ownerPool: 'production',
             action:
               'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
-            permission: [PermissionCode.PRODUCTION_FACT_POST],
+            permission: [PermissionCode.PRODUCTION_EXCEPTION_EXECUTE],
             factBoundary: 'production_wip_via_domain_usecase',
           }
         ),
@@ -3183,6 +3183,18 @@ export const processDefinitions = Object.freeze(
         ),
         processNode('rejected_end', 'end', '拒绝结束'),
         processNode('over_issue_end', 'end', '超领额度批准结束'),
+        processNode('warehouse_exception_execution', 'human_task', '已入库异常执行', {
+          ownerPool: 'warehouse',
+          permission: [PermissionCode.WORKFLOW_TASK_COMPLETE],
+          factBoundary: 'orchestration_only',
+        }),
+        processNode('execute_warehouse_production_exception', 'domain_command', '执行关联库存处置', {
+          ownerPool: 'warehouse',
+          action: 'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
+          permission: [PermissionCode.PRODUCTION_EXCEPTION_EXECUTE],
+          factBoundary: 'inventory_disposition_via_domain_usecase',
+        }),
+        processNode('warehouse_exception_end', 'end', '库存处置执行结束'),
       ],
       edges: [
         processEdge(
@@ -3201,8 +3213,9 @@ export const processDefinitions = Object.freeze(
           'approve_production_exception',
           'production_exception_execution',
           'production_exception.execution_route',
-          '报废或在制让步'
+          '尚未入库的在制批次'
         ),
+        processEdge('approve_production_exception', 'warehouse_exception_execution', 'production_exception.execution_route', '已经正式入库的批次'),
         processEdge(
           'approve_production_exception',
           'over_issue_end',
@@ -3215,6 +3228,8 @@ export const processDefinitions = Object.freeze(
         ),
         processEdge('execute_production_exception', 'end'),
         processEdge('reject_production_exception', 'rejected_end'),
+        processEdge('warehouse_exception_execution', 'execute_warehouse_production_exception'),
+        processEdge('execute_warehouse_production_exception', 'warehouse_exception_end'),
       ],
     },
   ].map(normalizeProcessDefinition)

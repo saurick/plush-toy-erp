@@ -21,10 +21,10 @@ import {
   Tag,
 } from 'antd'
 import {
-  useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -372,7 +372,7 @@ function canOpenSourceDocument(record = {}) {
 
 export default function InventoryLedgerPage() {
   const outletContext = useOutletContext()
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -1801,6 +1801,20 @@ export default function InventoryLedgerPage() {
         render: formatQuantity,
         exportValue: (record) => formatQuantity(record?.available_quantity),
       },
+      ...[
+        ['pending_inspection_quantity', '待成品检验'],
+        ['pending_packaging_quantity', '待查货包装'],
+        ['ready_to_ship_quantity', '可发货数量'],
+      ].map(([key, title]) => ({
+        title,
+exportTitle: title,
+dataIndex: key,
+width: 130,
+align: 'right',
+defaultPriority: 45,
+        render: (value, record) => record.subject_type === 'PRODUCT' ? formatQuantity(value) : '—',
+        exportValue: (record) => record.subject_type === 'PRODUCT' ? formatQuantity(record[key]) : '',
+      })),
     ]
   }, [
     activeView,

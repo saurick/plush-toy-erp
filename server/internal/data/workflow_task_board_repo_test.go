@@ -21,6 +21,42 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+func TestWorkflowRepo_ExceptionLaneKeepsReadyExceptionsUntilTerminal(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_ready_exceptions?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	now := time.Now()
+	due := now.Add(-time.Hour)
+	fixtures := []struct{ group, source string }{
+		{"handoff_production_exception", "quality_inspection"},
+		{"handoff_receipt_exception", "purchase_receipt"},
+		{"production_exception_approval", "production_exception_decision"},
+		{"disposition", "outsourcing_return_disposition"},
+		{"disposition", "purchase_rejection_disposition"},
+	}
+	for index, fixture := range fixtures {
+		for _, status := range []string{"ready", "done"} {
+			client.WorkflowTask.Create().SetTaskCode(fmt.Sprintf("EX-%d-%s", index, status)).SetTaskGroup(fixture.group).SetTaskName("异常处置").SetSourceType(fixture.source).SetSourceID(index + 1).SetTaskStatusKey(status).SetOwnerRoleKey(biz.SalesRoleKey).SetDueAt(due).SetPayload(map[string]any{}).SaveX(ctx)
+		}
+	}
+	board, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Limit: 50, SnapshotAt: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if board.Counts != (biz.WorkflowTaskBoardCounts{Exception: 5, Finished: 5}) {
+		t.Fatalf("unexpected exception counts: %+v", board.Counts)
+	}
+	for _, lane := range board.Lanes {
+		for _, task := range lane.Tasks {
+			got, err := biz.ClassifyWorkflowTaskBoardLane(task, now)
+			if err != nil || got != lane.Key {
+				t.Fatalf("SQL and task classification disagree: %s %s %v", got, lane.Key, err)
+			}
+		}
+	}
+}
+
 func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board?mode=memory&cache=shared&_fk=1")

@@ -19,11 +19,12 @@ import (
 )
 
 type catalog struct {
-	Permissions map[string]string            `json:"permissions"`
-	States      map[string]map[string]string `json:"states"`
-	Attachments map[string]any               `json:"attachments"`
-	Numeric     map[string]int64             `json:"numeric"`
-	RPC         map[string]map[string]string `json:"rpc"`
+	TaskDiscovery map[string]any               `json:"taskDiscovery"`
+	Permissions   map[string]string            `json:"permissions"`
+	States        map[string]map[string]string `json:"states"`
+	Attachments   map[string]any               `json:"attachments"`
+	Numeric       map[string]int64             `json:"numeric"`
+	RPC           map[string]map[string]string `json:"rpc"`
 }
 
 var wordBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
@@ -519,6 +520,13 @@ func collect(root string) (catalog, error) {
 	}
 	if len(out.Numeric) != 2 || out.Numeric["Precision"] <= out.Numeric["Scale"] {
 		return out, fmt.Errorf("invalid numeric contract")
+	}
+	discoveryJSON, err := os.ReadFile(filepath.Join(root, "server/internal/biz/workflow_task_catalog.json"))
+	if err != nil {
+		return out, err
+	}
+	if err := json.Unmarshal(discoveryJSON, &out.TaskDiscovery); err != nil {
+		return out, err
 	}
 	out.RPC, err = rpcMethods(root)
 	return out, err

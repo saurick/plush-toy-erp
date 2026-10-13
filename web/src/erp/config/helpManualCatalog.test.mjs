@@ -108,7 +108,7 @@ test('全部页面权限不扩大所选岗位的目录、图解或搜索范围',
     allowedMenuPaths: BUSINESS_USABILITY_CATALOG.map((entry) => entry.path),
   }
   const expected = {
-    warehouse: ['materials', 'inbound', 'inventory', 'production-progress', 'shipments', 'shipping-release', 'outbound'],
+    warehouse: ['materials', 'inbound', 'inventory', 'production-orders', 'production-progress', 'shipping-release', 'outbound'],
     engineering: ['products', 'materials', 'material-bom', 'processes', 'engineering-material-request'],
     finance: ['shipping-release', 'receivables', 'payables', 'finance-payments', 'reconciliation', 'invoices', 'engineering-material-request'],
     admin: [],

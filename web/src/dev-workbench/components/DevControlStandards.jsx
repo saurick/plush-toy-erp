@@ -16,6 +16,10 @@ import SearchInput from '@/common/components/SearchInput'
 import { useERPTheme } from '@/common/theme/erpTheme'
 import { getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
+import {
+  PROGRESS_SCOPE_OPTIONS,
+  progressRiskAvailable,
+} from '../../erp/utils/businessProgress.mjs'
 import '../styles/dev-ui-controls.css'
 
 const TOPICS = [
@@ -342,6 +346,9 @@ function FiltersExample() {
         .includes(keyword.trim().toLowerCase())
   )
   const rows = matching.filter((row) => risk === 'all' || row.risk === risk)
+  const scopeLabel = PROGRESS_SCOPE_OPTIONS.find(
+    ({ value }) => value === scope
+  )?.label
   return (
     <div className="erp-control-example-stack">
       <div
@@ -353,6 +360,9 @@ function FiltersExample() {
           <FilterChip
             key={key}
             selected={risk === key}
+            disabled={
+              !progressRiskAvailable(key === 'due' ? 'due_soon' : key, { scope })
+            }
             count={
               key === 'all'
                 ? matching.length
@@ -360,7 +370,7 @@ function FiltersExample() {
             }
             onClick={() => setRisk(key)}
           >
-            {key === 'all' ? '全部' : RISK_LABELS[key]}
+            {key === 'all' ? scopeLabel : RISK_LABELS[key]}
           </FilterChip>
         ))}
         <FilterChip disabled>暂不可用</FilterChip>
@@ -390,12 +400,15 @@ function FiltersExample() {
                   block
                   aria-label="演示记录范围"
                   value={scope}
-                  onChange={setScope}
-                  options={[
-                    { value: 'active', label: '在执行' },
-                    { value: 'all', label: '全部' },
-                    { value: 'ended', label: '已结束' },
-                  ]}
+                  onChange={(nextScope) => {
+                    setScope(nextScope)
+                    if (
+                      !progressRiskAvailable(risk === 'due' ? 'due_soon' : risk, {
+                        scope: nextScope,
+                      })
+                    ) setRisk('all')
+                  }}
+                  options={PROGRESS_SCOPE_OPTIONS}
                 />
               </fieldset>
               <Button type="text" block onClick={() => setScope('active')}>

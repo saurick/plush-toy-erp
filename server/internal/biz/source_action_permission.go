@@ -34,6 +34,7 @@ const (
 )
 
 var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionContract{
+	{Domain: "operational_fact", Method: "get_production_exception_context", Rules: sourceReadRules(PermissionQualityInspectionRead, PermissionProductionWIPRead)},
 	{Domain: "sales_order", Method: "list_engineering_material_requests", Rules: sourceReadRules(PermissionEngineeringMaterialRead, PermissionSalesOrderRead)},
 	{Domain: "sales_order", Method: "get_engineering_material_request", Rules: sourceReadRules(PermissionEngineeringMaterialRead, PermissionSalesOrderRead)},
 	{Domain: "sales_order", Method: "finance_review_engineering_material_request", Rules: sourceReadRules(PermissionEngineeringMaterialRead, PermissionSalesOrderRead)},
@@ -52,7 +53,7 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "quality", Method: "list_outsourcing_return_quality_inspections", Rules: sourceReadRules(PermissionOutsourcingFactRead)},
 	{Domain: "quality", Method: "list_finished_goods_quality_inspections", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "quality", Method: "list_production_stage_quality_inspections", Rules: sourceReadRules(PermissionProductionWIPRead)},
-	{Domain: "operational_fact", Method: "create_production_completion_from_order", Rules: sourceReadRules(PermissionPMCPlanRead)},
+	{Domain: "operational_fact", Method: "create_production_completion_from_order", Rules: sourceReadRules(PermissionProductionWIPRead)},
 	{Domain: "operational_fact", Method: "create_production_material_issue_from_order", Rules: sourceReadRules(PermissionPMCPlanRead)},
 	{Domain: "operational_fact", Method: "create_production_rework_from_completion", Rules: sourceReadRules(PermissionProductionFactRead, PermissionPMCPlanRead)},
 	{Domain: "operational_fact", Method: "save_production_completion_draft", Rules: sourceReadRules(PermissionProductionWIPRead)},

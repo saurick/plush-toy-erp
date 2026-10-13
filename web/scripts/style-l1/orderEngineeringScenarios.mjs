@@ -1,4 +1,5 @@
 import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+import { createBOMPreparationScenarios } from './bomPreparationScenarios.mjs'
 
 const fulfill = (route, id, data) =>
   route.fulfill({
@@ -13,6 +14,7 @@ export function createOrderEngineeringScenarios(deps) {
   let order
   let item
   return [
+    ...createBOMPreparationScenarios(deps),
     {
       name: 'sales-order-demand-and-material-approval-desktop',
       path: '/erp/sales/project-orders/sales-orders',

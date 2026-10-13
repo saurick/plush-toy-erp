@@ -1,0 +1,40 @@
+.mobile-history-custom-date {
+  margin-top: 8px;
+}
+
+.mobile-history-calendar > p,
+.mobile-history-filter-summary {
+  color: var(--erp-text-muted);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.mobile-history-calendar > p {
+  margin: 10px 0 4px;
+  text-align: center;
+}
+
+.mobile-history-calendar-month {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.mobile-history-calendar-day {
+  display: grid;
+  min-height: 36px;
+  place-items: center;
+  border-radius: 6px;
+}
+
+.mobile-history-calendar-day[data-selected='true'] {
+  color: var(--erp-primary-strong);
+  background: var(--erp-primary-softer);
+  box-shadow: inset 0 0 0 1px var(--erp-primary-strong);
+}
+
+.mobile-history-filter-summary {
+  margin: 8px 12px 0;
+}

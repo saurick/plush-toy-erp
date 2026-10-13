@@ -8,10 +8,11 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Popconfirm, Tag } from 'antd'
 import {
-  useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { formatUnitQuantitySummary } from '../utils/sourceOrderAmounts.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState'
@@ -168,7 +169,7 @@ function receiptQuantityTotal(receipt = {}) {
 
 export default function PurchaseReceiptsPage() {
   const outletContext = useOutletContext()
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -1224,6 +1225,7 @@ export default function PurchaseReceiptsPage() {
             selectionLabel="入库记录"
             onClear={() => setSelectedRow(null)}
           />
+          <BusinessTaskActions sourceType="purchase_receipt" record={selectedRow} adminProfile={adminProfile} />
           {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
               disabled={relatedActionAvailability.disabled}

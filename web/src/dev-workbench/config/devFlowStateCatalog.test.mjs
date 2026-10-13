@@ -334,7 +334,7 @@ const expectedProcessNodes = {
     [
       'production_exception_execution',
       'human_task',
-      '报废或在制让步执行',
+      '未入库异常执行',
       null,
       ['workflow.task.complete'],
     ],
@@ -343,7 +343,7 @@ const expectedProcessNodes = {
       'domain_command',
       '执行生产异常处置',
       'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand',
-      ['production.fact.post'],
+      ['production.exception.execute'],
     ],
     ['end', 'end', '处置执行结束', null, []],
     [
@@ -355,6 +355,9 @@ const expectedProcessNodes = {
     ],
     ['rejected_end', 'end', '拒绝结束', null, []],
     ['over_issue_end', 'end', '超领额度批准结束', null, []],
+    ['warehouse_exception_execution', 'human_task', '已入库异常执行', null, ['workflow.task.complete']],
+    ['execute_warehouse_production_exception', 'domain_command', '执行关联库存处置', 'OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand', ['production.exception.execute']],
+    ['warehouse_exception_end', 'end', '库存处置执行结束', null, []],
   ],
 }
 
@@ -410,10 +413,13 @@ const expectedProcessEdges = {
     ['production_exception_decision_approval', 'approve_production_exception'],
     ['production_exception_decision_approval', 'reject_production_exception'],
     ['approve_production_exception', 'production_exception_execution'],
+    ['approve_production_exception', 'warehouse_exception_execution'],
     ['approve_production_exception', 'over_issue_end'],
     ['production_exception_execution', 'execute_production_exception'],
     ['execute_production_exception', 'end'],
     ['reject_production_exception', 'rejected_end'],
+    ['warehouse_exception_execution', 'execute_warehouse_production_exception'],
+    ['execute_warehouse_production_exception', 'warehouse_exception_end'],
   ],
 }
 
@@ -1037,7 +1043,7 @@ test('devFlowStateCatalog: 搜索和筛选返回新对象且不改原目录', ()
   assert.equal(DEV_FLOW_STATE_CATALOG.flows.length, 35)
 })
 
-test('devFlowStateCatalog: 生产异常决策与执行状态属于同一来源单据且三类路径明确', () => {
+test('devFlowStateCatalog: 生产异常决策与执行状态属于同一来源单据且分流执行路径明确', () => {
   const decision = DEV_FLOW_STATE_CATALOG.flows.find(
     (flow) => flow.key === 'source.production_exception_decision'
   )
@@ -1102,6 +1108,7 @@ test('devFlowStateCatalog: 生产异常决策与执行状态属于同一来源�
     process.edges
       .filter((edge) => edge.branchPolicy)
       .map((edge) => edge.branchLabel),
-    ['批准', '拒绝', '报废或在制让步', '超领额度']
+    ['批准', '拒绝', '尚未入库的在制批次',
+    '已经正式入库的批次', '超领额度']
   )
 })

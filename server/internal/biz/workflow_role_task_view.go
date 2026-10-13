@@ -8,24 +8,71 @@ import (
 )
 
 const (
-	WorkflowRoleTaskViewTodo     = "todo"
-	WorkflowRoleTaskViewHistory  = "history"
-	WorkflowRoleTaskViewRisk     = "risk"
-	WorkflowRoleTaskViewApproval = "approval"
-	WorkflowRoleTaskSortNewest   = "newest"
-	WorkflowRoleTaskSortOldest   = "oldest"
-	WorkflowRoleTaskSortDue      = "due"
+	WorkflowRoleTaskViewTodo      = "todo"
+	WorkflowRoleTaskViewHistory   = "history"
+	WorkflowRoleTaskViewRisk      = "risk"
+	WorkflowRoleTaskViewApproval  = "approval"
+	WorkflowRoleTaskSortNewest    = "newest"
+	WorkflowRoleTaskSortOldest    = "oldest"
+	WorkflowRoleTaskSortDue       = "due"
+	WorkflowRoleTaskSortCompleted = "completed"
 )
 
-func ValidWorkflowRoleTaskListOptions(sortKey, statusKey string) bool {
+func ValidWorkflowRoleTaskListOptions(viewKey, sortKey, statusKey string) bool {
+	if viewKey == WorkflowRoleTaskViewHistory {
+		return (sortKey == "" || sortKey == WorkflowRoleTaskSortCompleted) &&
+			(statusKey == "" || statusKey == "done" || statusKey == "rejected" || statusKey == "withdrawn")
+	}
 	return (sortKey == "" || sortKey == WorkflowRoleTaskSortNewest || sortKey == WorkflowRoleTaskSortOldest || sortKey == WorkflowRoleTaskSortDue) &&
 		(statusKey == "" || statusKey == "ready" || statusKey == "blocked")
 }
 
+// History periods use whole business days. The cursor's snapshot fixes relative
+// periods across pagination, including requests made after midnight.
+func WorkflowRoleTaskHistoryDateBounds(period, dateFrom, dateTo string, snapshot time.Time) (*time.Time, *time.Time, error) {
+	zone := time.FixedZone("Asia/Shanghai", 8*3600)
+	if period == "custom" {
+		from, fromErr := time.ParseInLocation("2006-01-02", dateFrom, zone)
+		to, toErr := time.ParseInLocation("2006-01-02", dateTo, zone)
+		if fromErr != nil || toErr != nil || from.Format("2006-01-02") != dateFrom || to.Format("2006-01-02") != dateTo || from.After(to) {
+			return nil, nil, ErrBadParam
+		}
+		before := to.AddDate(0, 0, 1)
+		return &from, &before, nil
+	}
+	if dateFrom != "" || dateTo != "" {
+		return nil, nil, ErrBadParam
+	}
+	if period == "" {
+		return nil, nil, nil
+	}
+	days := 0
+	switch period {
+	case "today":
+		days = 1
+	case "7d":
+		days = 7
+	case "30d":
+		days = 30
+	default:
+		return nil, nil, ErrBadParam
+	}
+	if snapshot.IsZero() {
+		return nil, nil, ErrBadParam
+	}
+	local := snapshot.In(zone)
+	today := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, zone)
+	from, before := today.AddDate(0, 0, 1-days), today.AddDate(0, 0, 1)
+	return &from, &before, nil
+}
+
 type WorkflowRoleTaskViewQuery struct {
+	WorkflowTaskDiscoveryFilter
 	Keyword                  string
 	SortKey                  string
 	StatusKey                string
+	CompletedFrom            *time.Time
+	CompletedBefore          *time.Time
 	BeforeTime               *time.Time
 	ViewKey                  string
 	RoleKey                  string
@@ -112,6 +159,9 @@ type WorkflowRoleTaskViewRepo interface {
 }
 
 func (uc *WorkflowUsecase) ListRoleTaskView(ctx context.Context, query WorkflowRoleTaskViewQuery) (*WorkflowRoleTaskViewPage, error) {
+	if !ValidWorkflowTaskDiscoveryFilter(query.WorkflowTaskDiscoveryFilter) {
+		return nil, ErrBadParam
+	}
 	if uc == nil || uc.repo == nil {
 		return nil, ErrBadParam
 	}
@@ -137,8 +187,9 @@ func (uc *WorkflowUsecase) ListRoleTaskView(ctx context.Context, query WorkflowR
 	query.VisibilityScope = NormalizeWorkflowTaskVisibilityScope(query.VisibilityScope)
 	query.ApprovalVisibilityScopes = NormalizeWorkflowApprovalVisibilityScopes(query.ApprovalVisibilityScopes)
 	if query.RoleKey == "" || query.BeforeID < 0 ||
-		!ValidWorkflowRoleTaskListOptions(query.SortKey, query.StatusKey) ||
-		(query.ViewKey == WorkflowRoleTaskViewHistory && query.StatusKey != "") ||
+		!ValidWorkflowRoleTaskListOptions(query.ViewKey, query.SortKey, query.StatusKey) ||
+		(query.ViewKey != WorkflowRoleTaskViewHistory && (query.CompletedFrom != nil || query.CompletedBefore != nil)) ||
+		(query.CompletedFrom != nil && query.CompletedBefore != nil && !query.CompletedFrom.Before(*query.CompletedBefore)) ||
 		(query.BeforeID > 0 && (query.SortKey == WorkflowRoleTaskSortNewest || query.SortKey == WorkflowRoleTaskSortOldest) && query.BeforeTime == nil) {
 		return nil, ErrBadParam
 	}

@@ -43,3 +43,20 @@ test('malformed or overflowing pagination links fall back to a valid first page'
   }
   assert.deepEqual(readTrackingPagination(new URLSearchParams('track_page_size_started=100'), 'started'), { page: 1, pageSize: 20 })
 })
+
+test('结束记录清除当前岗位和关注条件，链接恢复与再次切换不带回残值', () => {
+  const params = new URLSearchParams('track_status_started=active&track_owner_role_key_started=engineering&track_attention_started=overdue&track_source_type_started=sales_order&track_date_from_started=2026-10-08&track_search_started=小熊&track_attention_participated=blocked')
+  const ended = writeTrackingFilters(params, 'started', { status: 'completed' })
+  assert.equal(ended.has('track_owner_role_key_started'), false)
+  assert.equal(ended.has('track_attention_started'), false)
+  assert.equal(ended.get('track_source_type_started'), 'sales_order')
+  assert.equal(ended.get('track_date_from_started'), '2026-10-08')
+  assert.equal(ended.get('track_search_started'), '小熊')
+  assert.equal(ended.get('track_attention_participated'), 'blocked')
+  params.set('track_status_started', 'completed')
+  assert.equal(readTrackingFilters(params, 'started').attention, '')
+  assert.equal(readTrackingFilters(params, 'started').owner_role_key, '')
+  const restored = writeTrackingFilters(params, 'started', { status: 'active' })
+  assert.equal(restored.has('track_attention_started'), false)
+  assert.equal(restored.has('track_owner_role_key_started'), false)
+})

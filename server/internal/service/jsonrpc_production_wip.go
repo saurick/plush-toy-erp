@@ -63,9 +63,6 @@ func (d *jsonrpcDispatcher) executeProductionWIPAction(ctx context.Context, pm m
 	if !ok || !productionOrderAllowsOnly(pm, allowed...) {
 		return invalidParamResult()
 	}
-	if res := d.RequireAdminPermission(ctx, permission); res != nil {
-		return res
-	}
 	admin, res := d.CurrentAdmin(ctx)
 	if res != nil {
 		return res
@@ -90,6 +87,16 @@ func (d *jsonrpcDispatcher) executeProductionWIPAction(ctx context.Context, pm m
 	if res := d.requireCustomerConfigModulesEnabled(ctx, "", modules...); res != nil {
 		return res
 	}
+	if in.BatchID > 0 {
+		current, err := d.productionOrderUC.GetProductionWIP(ctx, in.ProductionOrderID)
+		if err != nil {
+			return d.productionWIPAggregateResult(ctx, nil, err)
+		}
+		permission = biz.ProductionWIPActionPermission(in, current, permission)
+	}
+	if res := d.RequireAdminPermission(ctx, permission); res != nil {
+		return res
+	}
 	aggregate, err := d.productionOrderUC.ApplyProductionWIPAction(ctx, in)
 	return d.productionWIPAggregateResult(ctx, aggregate, err)
 }
@@ -109,13 +116,11 @@ func productionWIPActionContract(action string) (string, []string, []string, boo
 		biz.ProductionWIPActionReceiveOutsourcingReturn:
 		if action == biz.ProductionWIPActionReceiveOutsourcingReturn {
 			modules = append(modules, "outsourcing_orders")
-			return biz.PermissionOutsourcingReturnReceiptCreate, modules, append(base, "production_wip_batch_id"), true
+			return biz.PermissionOutsourcingReturnReceiptCreate, modules, append(base, "production_wip_batch_id", "quantity"), true
 		}
 		return biz.PermissionProductionWIPExecute, modules, append(base, "production_wip_batch_id"), true
 	case biz.ProductionWIPActionTransferToNextOperation:
-		return biz.PermissionProductionWIPExecute, modules, append(base, "production_wip_batch_id", "target_operation_id", "quantity"), true
-	case biz.ProductionWIPActionRework:
-		return biz.PermissionProductionWIPRework, modules, append(base, "production_wip_batch_id", "target_operation_id", "quantity", "reason"), true
+		return biz.PermissionProductionWIPExecute, modules, append(base, "production_wip_batch_id", "target_operation_id", "quantity", "finished_goods_receipt_id"), true
 	case biz.ProductionWIPActionConfirmPackagingMaterial:
 		return biz.PermissionPackagingMaterialConfirm, []string{productionOrderModuleKey}, append(base, "production_order_item_id", "packaging_version_snapshot", "note"), true
 	default:
@@ -175,27 +180,30 @@ func productionWIPActionFromParams(pm map[string]any, action string, actorID int
 	case biz.ProductionWIPActionTransferToNextOperation:
 		targetID, ok1 := productionOrderRequiredPositiveInt(pm, "target_operation_id")
 		quantity, ok2 := productionOrderRequiredDecimalString(pm, "quantity")
-		if !ok1 || !ok2 {
+		receiptID, ok3 := productionOrderOptionalPositiveInt(pm, "finished_goods_receipt_id")
+		if !ok1 || !ok2 || !ok3 {
 			return nil, false
 		}
 		in.TargetOperationID = targetID
 		in.Quantity = quantity
-	case biz.ProductionWIPActionRework:
-		targetID, ok1 := productionOrderRequiredPositiveInt(pm, "target_operation_id")
-		quantity, ok2 := productionOrderRequiredDecimalString(pm, "quantity")
-		reason, ok3 := productionOrderOptionalString(pm, "reason", 255)
-		if !ok1 || !ok2 || !ok3 || reason == nil {
+		if receiptID != nil {
+			in.FinishedGoodsReceiptID = *receiptID
+		}
+	case biz.ProductionWIPActionReceiveOutsourcingReturn:
+		quantity, ok := productionOrderRequiredDecimalString(pm, "quantity")
+		if !ok {
 			return nil, false
 		}
-		in.TargetOperationID = targetID
 		in.Quantity = quantity
-		in.Reason = reason
+	case biz.ProductionWIPActionStartOperation, biz.ProductionWIPActionCompleteOperation:
 	case biz.ProductionWIPActionCancelBatch:
 		reason, ok := productionOrderOptionalString(pm, "reason", 255)
 		if !ok || reason == nil {
 			return nil, false
 		}
 		in.Reason = reason
+	default:
+		return nil, false
 	}
 	return in, true
 }
@@ -282,7 +290,12 @@ func (d *jsonrpcDispatcher) productionWIPAggregateResult(ctx context.Context, ag
 	for _, inspection := range aggregate.QualityInspections {
 		inspections = append(inspections, productionWIPQualitySummaryToMap(inspection))
 	}
+	receipts := make([]any, 0, len(aggregate.FinishedGoodsReceipts))
+	for _, receipt := range aggregate.FinishedGoodsReceipts {
+		receipts = append(receipts, map[string]any{"id": receipt.ID, "production_wip_batch_id": receipt.ProductionWIPBatchID, "fact_no": receipt.FactNo, "status": receipt.Status, "quantity": receipt.Quantity.String(), "reworked_quantity": receipt.ReworkedQuantity.String()})
+	}
 	return okData(map[string]any{
+		"finished_goods_receipts":     receipts,
 		"production_order":            productionOrderToMap(aggregate.ProductionOrder),
 		"production_order_items":      items,
 		"material_requirements":       requirements,
@@ -319,8 +332,10 @@ func productionWIPBatchToMap(value *biz.ProductionWIPBatch) map[string]any {
 	return map[string]any{
 		"id": value.ID, "production_order_id": value.ProductionOrderID, "production_order_item_id": value.ProductionOrderItemID,
 		"production_order_operation_id": value.ProductionOrderOperationID, "source_batch_id": optionalIntValue(value.SourceBatchID),
-		"origin_rework_fact_id": optionalIntValue(value.OriginReworkFactID),
-		"batch_no":              value.BatchNo, "flow_type": value.FlowType, "execution_mode": optionalStringValue(value.ExecutionMode),
+		"origin_rework_fact_id":        optionalIntValue(value.OriginReworkFactID),
+		"origin_exception_decision_id": optionalIntValue(value.OriginExceptionDecisionID),
+		"finished_goods_receipt_id":    optionalIntValue(value.FinishedGoodsReceiptID),
+		"batch_no":                     value.BatchNo, "flow_type": value.FlowType, "execution_mode": optionalStringValue(value.ExecutionMode),
 		"status": value.Status, "version": value.Version, "quantity": value.Quantity.String(),
 		"rework_reason": optionalStringValue(value.ReworkReason),
 		"created_by":    value.CreatedBy, "started_at": optionalTimeUnix(value.StartedAt), "completed_at": optionalTimeUnix(value.CompletedAt),
@@ -377,6 +392,8 @@ func (d *jsonrpcDispatcher) mapProductionWIPError(ctx context.Context, err error
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产路线或工序档案不完整，请核对四个标准路线位置是否已分别绑定有效工序"}
 	case errors.Is(err, biz.ErrProductionWIPQuantityExceeded):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "办理数量超过当前在制批次可用数量"}
+	case errors.Is(err, biz.ErrProductionWIPReturnQuantityMismatch):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "实点数量与本批次不一致，请先与业务及加工厂核对，暂不能整批送检"}
 	case errors.Is(err, biz.ErrProductionWIPExecutionModeNotAllowed):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前工序不允许所选的本厂或外发方式"}
 	case errors.Is(err, biz.ErrProductionWIPOutsourcingAllocationInvalid):

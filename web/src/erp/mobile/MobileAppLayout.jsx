@@ -48,6 +48,7 @@ import {
   MOBILE_ALL_ROLES_KEY,
 } from '../utils/mobileRolePermissions.mjs'
 import { getRoleDisplayName } from '../utils/roleKeys.mjs'
+import './mobileRoleTasks.css'
 
 const PROFILE_BOOTSTRAP_RETRY_DELAYS_MS = [200, 600]
 const PROFILE_SYNC_INTERVAL_MS = 60 * 1000

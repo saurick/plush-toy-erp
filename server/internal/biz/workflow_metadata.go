@@ -80,7 +80,7 @@ var workflowBusinessStates = []WorkflowStateOption{
 	{Key: "warehouse_inbound_pending", Label: "待确认入库", Summary: "品质已放行，等待仓库确认入库数量、库位和经手人。"},
 	{Key: "inbound_done", Label: "入库协同已完成", Summary: "相关交接任务已经完成；实际库存以入库单过账结果为准。"},
 	{Key: "shipment_pending", Label: "待出货", Summary: "成品已入库或放行，等待出货准备、装箱、唛头和出库确认。"},
-	{Key: "shipping_released", Label: "已放行待出库", Summary: "业务确认和财务放行已完成，等待仓库出库执行。"},
+	{Key: "shipping_released", Label: "已放行待出库", Summary: "业务确认和财务放行已完成，等待业务办理发货。"},
 	{Key: "shipped", Label: "出货协同已完成", Summary: "出货链路已完成；实际出货数量和库存扣减以出货单为准。"},
 	{Key: "reconciling", Label: "对账中", Summary: "加工费、辅包材费用和异常费用正在核对。"},
 	{Key: "settled", Label: "结算协同已完成", Summary: "对账交接已经完成；实际应收应付和收付款以业务财务记录为准。"},

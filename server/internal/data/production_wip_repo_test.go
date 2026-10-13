@@ -503,7 +503,15 @@ func TestProductionWIPExternalReturnCreatesFirstQualityDraftAndReplaysExactly(t 
 	}
 	receivedInput := &biz.ProductionWIPAction{
 		ProductionOrderID: aggregate.ProductionOrderID, BatchID: root.ID, ExpectedVersion: startedRoot.Version,
-		ActorID: f.actorID, IdempotencyKey: "outsource-return",
+		ActorID: f.actorID, IdempotencyKey: "outsource-return", Quantity: startedRoot.Quantity,
+	}
+	shortReturn := *receivedInput
+	shortReturn.Quantity = startedRoot.Quantity.Sub(decimal.NewFromInt(1))
+	if _, err := f.uc.ReceiveProductionWIPOutsourcingReturn(ctx, &shortReturn); !errors.Is(err, biz.ErrProductionWIPReturnQuantityMismatch) {
+		t.Fatalf("short count must not create full-batch quality evidence: %v", err)
+	}
+	if current := f.client.ProductionWIPBatch.GetX(ctx, root.ID); current.Status != biz.ProductionWIPStatusOutsourced || current.Version != startedRoot.Version {
+		t.Fatal("rejected count changed the batch")
 	}
 	received, err := f.uc.ReceiveProductionWIPOutsourcingReturn(ctx, receivedInput)
 	if err != nil {
@@ -584,7 +592,7 @@ func TestProductionWIPFabricAllocationUsesManagerSelectionAndSingleContract(t *t
 func TestProductionWIPSplitTransferReworkPackagingAndCompletionGate(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "production_wip_flow")
-	processes := createProductionWIPRouteProcesses(t, ctx, f.client)
+	createProductionWIPRouteProcesses(t, ctx, f.client)
 	aggregate := releaseProductionWIPRoute(t, ctx, f, "MO-WIP-FLOW", 10, false)
 	root := aggregate.Batches[0]
 	if _, err := f.uc.SplitProductionWIPBatch(ctx, &biz.ProductionWIPAction{
@@ -643,69 +651,23 @@ func TestProductionWIPSplitTransferReworkPackagingAndCompletionGate(t *testing.T
 		t.Fatal("four-unit split child not found")
 	}
 	rejected := f.client.ProductionWIPBatch.UpdateOneID(four.ID).SetStatus(biz.ProductionWIPStatusRejected).AddVersion(1).SaveX(ctx)
-	fabric := productionWIPOperationForCode(t, aggregate, biz.ProductionWIPOperationFabricProcessing)
-	reason := "裁片返修"
-	reworked, err := f.uc.ReworkProductionWIPBatch(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID, BatchID: four.ID, TargetOperationID: fabric.ID,
-		ExpectedVersion: rejected.Version, ActorID: f.actorID, IdempotencyKey: "rework-four", Quantity: decimal.NewFromInt(4), Reason: &reason,
-	})
-	if err != nil {
-		t.Fatalf("rework rejected batch: %v", err)
-	}
-	var reworkChild *biz.ProductionWIPBatch
-	for _, batch := range reworked.Batches {
-		if batch.SourceBatchID != nil && *batch.SourceBatchID == four.ID && batch.FlowType == biz.ProductionWIPFlowRework {
-			reworkChild = batch
-		}
-	}
-	if reworkChild == nil || reworkChild.ReworkReason == nil || *reworkChild.ReworkReason != reason || !reworkChild.Quantity.Equal(decimal.NewFromInt(4)) {
-		t.Fatalf("rework child = %#v", reworkChild)
-	}
-	reworkSupplier := f.client.Supplier.Create().SetCode("WIP-REWORK-SUP").SetName("返工外发厂").SetSupplierType("outsourcing").SaveX(ctx)
-	reworkOrder := f.client.OutsourcingOrder.Create().SetOutsourcingOrderNo("WIP-REWORK-ORDER").SetSupplierID(reworkSupplier.ID).
-		SetOrderDate(time.Now().UTC()).SetLifecycleStatus(biz.OutsourcingOrderStatusConfirmed).SaveX(ctx)
-	reworkLine := f.client.OutsourcingOrderItem.Create().SetOutsourcingOrderID(reworkOrder.ID).SetLineNo(1).
-		SetSubjectType(biz.OutsourcingOrderSubjectProduct).SetProductID(f.productID).SetProductSkuID(f.skuID).
-		SetProcessID(processes[biz.ProductionWIPOperationFabricProcessing].ID).SetUnitID(f.unitID).
-		SetOutsourcingQuantity(decimal.NewFromInt(4)).SetLineStatus(biz.OutsourcingOrderItemStatusOpen).SaveX(ctx)
-	reworkAssigned, err := f.uc.AssignProductionWIPExecution(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID, BatchID: reworkChild.ID, ExpectedVersion: reworkChild.Version,
-		ActorID: f.actorID, IdempotencyKey: "rework-outsource-assign", ExecutionMode: biz.ProductionWIPExecutionOutsourced,
-		OutsourcingAllocations: []biz.ProductionWIPOutsourcingAllocationInput{{OutsourcingOrderItemID: reworkLine.ID}},
-	})
-	if err != nil {
-		t.Fatalf("assign fabric rework product contract: %v", err)
-	}
-	corruptedRework := *reworkAssigned
-	corruptedRework.OutsourcingAllocations = append([]*biz.ProductionWIPOutsourcingAllocation(nil), reworkAssigned.OutsourcingAllocations...)
-	badReworkAllocation := *corruptedRework.OutsourcingAllocations[len(corruptedRework.OutsourcingAllocations)-1]
-	badReworkAllocation.UnitID++
-	corruptedRework.OutsourcingAllocations[len(corruptedRework.OutsourcingAllocations)-1] = &badReworkAllocation
-	if err := validateProductionWIPAggregateShape(&corruptedRework); !errors.Is(err, biz.ErrProductionWIPInvalidRoute) {
-		t.Fatalf("corrupt product allocation aggregate error = %v", err)
-	}
-	reworkAssignedBatch := productionWIPBatchByID(t, reworkAssigned, reworkChild.ID)
-	if startedRework, err := f.uc.StartProductionWIPOperation(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID, BatchID: reworkChild.ID, ExpectedVersion: reworkAssignedBatch.Version,
-		ActorID: f.actorID, IdempotencyKey: "rework-outsource-start",
-	}); err != nil || productionWIPBatchByID(t, startedRework, reworkChild.ID).Status != biz.ProductionWIPStatusOutsourced {
-		t.Fatalf("start fabric rework without new material issue = %#v err=%v", startedRework, err)
-	}
-	if _, err := f.uc.ReworkProductionWIPBatch(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID, BatchID: four.ID, TargetOperationID: fabric.ID,
-		ExpectedVersion: rejected.Version + 1, ActorID: f.actorID, IdempotencyKey: "rework-overflow", Quantity: decimal.NewFromInt(1), Reason: &reason,
-	}); !errors.Is(err, biz.ErrProductionWIPQuantityExceeded) {
-		t.Fatalf("rework overflow error = %v", err)
+	if _, err := f.uc.ApplyProductionWIPAction(ctx, &biz.ProductionWIPAction{
+		Action: biz.ProductionWIPActionRework, ProductionOrderID: aggregate.ProductionOrderID,
+		BatchID: four.ID, ExpectedVersion: rejected.Version, ActorID: f.actorID, IdempotencyKey: "reject-direct-rework",
+	}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("direct rework must require a business exception decision: %v", err)
 	}
 
 	// Use a separate root route for the straight-through internal path so the
-	// split/rework lineage above cannot be double-counted as transfer output.
+	// split lineage above cannot be double-counted as transfer output.
 	flow := releaseProductionWIPRoute(t, ctx, f, "MO-WIP-PACKAGING", 10, false)
 	flowItem := flow.ProductionOrderItems[0]
 	factRepo := NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard))
 	if _, err := factRepo.ResolveProductionCompletionSource(ctx, flow.ProductionOrderID, flowItem.ID); err != nil {
 		t.Fatalf("completion source identity before exact batch selection: %v", err)
 	}
+	factUC := biz.NewOperationalFactUsecase(factRepo)
+	warehouse := createTestProductWarehouse(t, ctx, f.client, "WIP-PACKING-WH")
 	current := flow.Batches[0]
 	operationCodes := []string{
 		biz.ProductionWIPOperationSewing,
@@ -715,8 +677,20 @@ func TestProductionWIPSplitTransferReworkPackagingAndCompletionGate(t *testing.T
 	for index, targetCode := range operationCodes {
 		accepted := f.client.ProductionWIPBatch.UpdateOneID(current.ID).SetStatus(biz.ProductionWIPStatusAccepted).AddVersion(1).SaveX(ctx)
 		target := productionWIPOperationForCode(t, flow, targetCode)
+		receiptID := 0
+		if targetCode == biz.ProductionWIPOperationPackaging {
+			lotNo := "WIP-PACKING-LOT"
+			receipt, err := factUC.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{FactNo: "PF-WIP-PACK", ProductionOrderID: flow.ProductionOrderID, ProductionOrderItemID: flowItem.ID, ProductionWIPBatchID: current.ID, WarehouseID: warehouse.ID, NewLotNo: &lotNo, Quantity: current.Quantity, IdempotencyKey: "wip-packing-inbound"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = factUC.PostProductionFact(ctx, operationalFactStatusMutation(receipt.ID, receipt.Version, f.actorID, "")); err != nil {
+				t.Fatal(err)
+			}
+			receiptID = receipt.ID
+		}
 		transferred, err := f.uc.TransferProductionWIPToNextOperation(ctx, &biz.ProductionWIPAction{
-			ProductionOrderID: flow.ProductionOrderID, BatchID: current.ID, TargetOperationID: target.ID,
+			ProductionOrderID: flow.ProductionOrderID, BatchID: current.ID, TargetOperationID: target.ID, FinishedGoodsReceiptID: receiptID,
 			ExpectedVersion: accepted.Version, ActorID: f.actorID, IdempotencyKey: fmt.Sprintf("transfer-%d", index), Quantity: decimal.NewFromInt(10),
 		})
 		if err != nil {
@@ -781,10 +755,7 @@ func TestProductionWIPSplitTransferReworkPackagingAndCompletionGate(t *testing.T
 		t.Fatalf("completion source after packaging acceptance: %v", err)
 	}
 	itemRow := f.client.ProductionOrderItem.GetX(ctx, flowItem.ID)
-	if err := validateProductionOrderFinishedQuantity(ctx, f.client, itemRow, decimal.NewFromInt(10)); err != nil {
-		t.Fatalf("accepted completion quantity gate: %v", err)
-	}
-	if err := validateProductionOrderFinishedQuantity(ctx, f.client, itemRow, decimal.NewFromInt(11)); !errors.Is(err, biz.ErrProductionOrderQuantityExceeded) {
+	if err := validateProductionOrderFinishedQuantity(ctx, f.client, itemRow, decimal.NewFromInt(1)); !errors.Is(err, biz.ErrProductionOrderQuantityExceeded) {
 		t.Fatalf("completion overflow error = %v", err)
 	}
 }

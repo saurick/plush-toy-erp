@@ -166,18 +166,21 @@ type InventoryTxn struct {
 }
 
 type InventoryBalance struct {
-	StockCategory          string
-	ID                     int
-	SubjectType            string
-	SubjectID              int
-	ProductSkuID           *int
-	WarehouseID            int
-	LotID                  *int
-	UnitID                 int
-	Quantity               decimal.Decimal
-	ActiveReservedQuantity decimal.Decimal
-	AvailableQuantity      decimal.Decimal
-	UpdatedAt              time.Time
+	StockCategory             string
+	ID                        int
+	SubjectType               string
+	SubjectID                 int
+	ProductSkuID              *int
+	WarehouseID               int
+	LotID                     *int
+	UnitID                    int
+	Quantity                  decimal.Decimal
+	ActiveReservedQuantity    decimal.Decimal
+	AvailableQuantity         decimal.Decimal
+	PendingInspectionQuantity decimal.Decimal
+	PendingPackagingQuantity  decimal.Decimal
+	ReadyToShipQuantity       decimal.Decimal
+	UpdatedAt                 time.Time
 }
 
 type InventoryLotCreate struct {

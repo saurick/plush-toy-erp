@@ -24,10 +24,10 @@ test('rework progress distinguishes cancellation, work, packaging and completion
     '已撤销',
     '待安排',
     '待品质检验',
-    '待登记补完工',
-    '补完工草稿待过账',
-    '部分补完工已过账',
-    '补完工已过账',
+    '手工完成，待成品入库',
+    '成品入库草稿待过账',
+    '已入库，待查货包装',
+    '返工成品已可发货',
   ]) {
     assert.match(source, new RegExp(copy, 'u'))
   }
@@ -37,7 +37,7 @@ test('rework progress distinguishes cancellation, work, packaging and completion
 
 test('rework progress presents business labels without exposing lineage identifiers', () => {
   assert.match(source, /title="成品返工进度"/u)
-  assert.match(source, /手工补制、质量关口、包装验收到补完工过账/u)
+  assert.match(source, /手工补制、成品入库、质量关口到查货包装完成/u)
   assert.match(source, /成品返工补制独立于原生产批次/u)
   assert.match(source, /当前记录/u)
   assert.doesNotMatch(source, />\s*origin_rework_fact_id\s*</u)

@@ -209,6 +209,220 @@ export function createBOMMaterialGroupsScenarios(deps) {
   return [
     ...scenarios,
     {
+      ...scenarios[0],
+      name: 'bom-material-groups-before-selection',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const { assert } = deps
+        await deps.expectHeading(page, '物料清单（BOM）')
+        await page.getByRole('button', { name: '新建 BOM' }).click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await editor.getByRole('heading', { name: '新建 BOM 草稿' }).waitFor()
+        const groups = editor.locator('.erp-bom-material-group')
+        const first = groups.first()
+        const parts = first.locator('tr[data-bom-part-index]')
+        const addMaterial = editor.getByRole('button', {
+          name: '＋ 添加物料',
+          exact: true,
+        })
+        await addMaterial.click()
+        for (let count = 2; count <= 3; count += 1) {
+          await first
+            .getByRole('button', { name: '＋ 添加部位', exact: true })
+            .click()
+          assert.equal(
+            await groups.count(),
+            1,
+            '未选物料时添加部位应保留同一物料组'
+          )
+          assert.equal(await parts.count(), count)
+          await page.waitForFunction(
+            (label) =>
+              document.activeElement?.getAttribute('aria-label') === label,
+            `部位 ${count}`
+          )
+        }
+        await first.getByLabel('部位 1', { exact: true }).fill('头部')
+        await parts
+          .first()
+          .getByRole('button', { name: '复制', exact: true })
+          .click()
+        assert.equal(await groups.count(), 1)
+        assert.equal(
+          await first.getByLabel('部位 2', { exact: true }).inputValue(),
+          '头部'
+        )
+        await first.getByLabel('部位 1', { exact: true }).evaluate((input) => {
+          const data = new DataTransfer()
+          data.setData('text/plain', '头部\t2\t0.1\t0\n身体\t1\t0.2\t0')
+          input.dispatchEvent(
+            new ClipboardEvent('paste', {
+              clipboardData: data,
+              bubbles: true,
+              cancelable: true,
+            })
+          )
+        })
+        await first.getByLabel('部位 5', { exact: true }).waitFor()
+        assert.equal(
+          await groups.count(),
+          1,
+          '未选物料时复制和粘贴不能拆出新物料'
+        )
+        assert.equal(await parts.count(), 5)
+        assert.equal(
+          await first.getByRole('combobox', { name: /^物料名称 / }).count(),
+          1
+        )
+        assert.equal(
+          await first.locator('td').first().getAttribute('rowspan'),
+          '6'
+        )
+
+        await addMaterial.click()
+        await groups
+          .nth(1)
+          .getByRole('button', { name: '复制', exact: true })
+          .click()
+        assert.equal(
+          await groups.count(),
+          2,
+          '主动添加的另一种待选物料须保持独立'
+        )
+        assert.equal(await parts.count(), 5)
+        assert.equal(
+          await groups.nth(1).locator('tr[data-bom-part-index]').count(),
+          2
+        )
+        await addMaterial.click()
+        await groups
+          .nth(2)
+          .getByLabel('部位 8', { exact: true })
+          .evaluate((input) => {
+            const data = new DataTransfer()
+            data.setData('text/plain', '尾巴\n耳朵')
+            input.dispatchEvent(
+              new ClipboardEvent('paste', {
+                clipboardData: data,
+                bubbles: true,
+                cancelable: true,
+              })
+            )
+          })
+        assert.equal(
+          await groups.count(),
+          3,
+          '空白物料直接粘贴多个部位也应保持分组'
+        )
+        assert.equal(
+          await groups.nth(2).locator('tr[data-bom-part-index]').count(),
+          2
+        )
+        await groups
+          .nth(2)
+          .getByRole('button', { name: '移除物料', exact: true })
+          .click()
+        await editor
+          .getByRole('heading', { name: '材料分析明细表', exact: true })
+          .scrollIntoViewIfNeeded()
+        await page.screenshot({
+          path: `${deps.outputDir}/bom-parts-before-material-selection.png`,
+          fullPage: true,
+        })
+
+        const chooseMaterial = async (group, code) => {
+          const input = group.getByRole('combobox', { name: /^物料名称 / })
+          await input.fill(code)
+          const dropdown = await waitForMaterialDropdown(page)
+          await dropdown
+            .locator('.ant-select-item-option')
+            .filter({ hasText: code })
+            .click()
+          await dropdown.waitFor({ state: 'hidden' })
+        }
+        await chooseMaterial(first, 'MAT-STYLE-L1')
+        await chooseMaterial(groups.nth(1), 'MAT-STYLE-L1')
+        assert.equal(await groups.count(), 1, '相同物料和单位应合并部位')
+        assert.equal(await parts.count(), 7)
+        await first
+          .locator(
+            '.ant-select:has(input[aria-label^="物料名称 "]) .ant-select-clear'
+          )
+          .click({ force: true })
+        assert.equal(
+          await groups.count(),
+          2,
+          '清空已合并物料后恢复原来的待选物料组'
+        )
+        assert.equal(await parts.count(), 5)
+        assert.equal(
+          await groups.nth(1).locator('tr[data-bom-part-index]').count(),
+          2
+        )
+        assert.equal(
+          await first
+            .locator(
+              '.ant-select:has(input[aria-label^="单位 "]) .ant-select-selection-item'
+            )
+            .count(),
+          0,
+          '清空物料应同步清空单位'
+        )
+        await chooseMaterial(first, 'MAT-STYLE-L2')
+        await chooseMaterial(groups.nth(1), 'MAT-STYLE-L2')
+        assert.equal(await groups.count(), 1)
+        assert.equal(await parts.count(), 7)
+        await chooseMaterial(first, 'MAT-STYLE-L1')
+        await parts
+          .first()
+          .getByRole('button', { name: '移除', exact: true })
+          .click()
+        assert.equal(await groups.count(), 1, '移除首个部位不应拆分剩余部位')
+        assert.equal(await parts.count(), 6)
+        assert.equal(
+          await first.getByLabel('部位 1', { exact: true }).inputValue(),
+          '身体'
+        )
+        await addMaterial.click()
+        assert.equal(await groups.count(), 2)
+        await groups
+          .nth(1)
+          .getByRole('button', { name: '移除物料', exact: true })
+          .click()
+        assert.equal(await groups.count(), 1)
+        assert.equal(await parts.count(), 6)
+
+        const product = editor.locator('input#product_id')
+        await product.fill('PROD-STYLE-L1')
+        await product.press('Enter')
+        await editor
+          .getByLabel('BOM 版本', { exact: true })
+          .fill('V-PARTS-FIRST')
+        for (const input of await editor
+          .getByRole('textbox', { name: /^单位用量 / })
+          .all()) {
+          await input.fill('0.1')
+        }
+        await editor
+          .getByRole('button', { name: '保存草稿', exact: true })
+          .click()
+        await editor.waitFor({ state: 'hidden' })
+        assert.equal(saves.length, 1)
+        assert.equal(saves[0].items.length, 6)
+        assert.ok(
+          saves[0].items.every(
+            (item) => item.material_id === 1 && item.unit_id === 1
+          )
+        )
+        assert.ok(
+          saves[0].items.every(
+            (item) => !Object.hasOwn(item, '_material_group_key')
+          )
+        )
+      },
+    },
+    {
       name: 'bom-xlsx-merged-remarks',
       path: '/erp/purchase/material-bom',
       auth: 'admin',
@@ -771,7 +985,7 @@ export function createBOMMaterialGroupsScenarios(deps) {
         await closeBusinessFormPage(page, editor)
         await page.getByText('BOM-STYLE-L1', { exact: true }).dblclick()
         await editor
-          .getByRole('heading', { name: '查看 BOM 版本', exact: true })
+          .getByRole('heading', { name: '查看 BOM 版本 · 已启用 · 只读', exact: true })
           .waitFor()
         deps.assert.equal(
           await editor

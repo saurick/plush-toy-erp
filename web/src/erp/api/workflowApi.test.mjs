@@ -62,6 +62,8 @@ async function loadWorkflowApi(call) {
       'const isWorkflowApprovalTask = globalThis.__workflowApiTestIsApprovalTask'
     )
   const resolved = transformed
+    .replace('../utils/workflowTaskDiscovery.mjs', new URL('../utils/workflowTaskDiscovery.mjs', import.meta.url).href)
+    .replace('../utils/workflowRoleTaskHistory.mjs', new URL('../utils/workflowRoleTaskHistory.mjs', import.meta.url).href)
     .replace('../utils/workflowTracking.mjs', new URL('../utils/workflowTracking.mjs', import.meta.url).href)
     .replace('../utils/workflowFollowup.mjs', new URL('../utils/workflowFollowup.mjs', import.meta.url).href)
     .replace('../utils/workflowTaskChanges.mjs', new URL('../utils/workflowTaskChanges.mjs', import.meta.url).href)
@@ -173,6 +175,23 @@ function roleTaskCounts({
     withdrawn,
   }
 }
+
+test('workflowApi: 已办处理结果与日期完整传递，非法或跨视图条件不发请求', async () => {
+  const calls = []
+  const api = await loadWorkflowApi(async (method, params) => {
+    calls.push(params)
+    return { data: { items: [validTask()], has_more: false, next_cursor: '', server_time: 1_800_000_000, counts: roleTaskCounts({ done: 1 }), risk_scope: 'role' } }
+  })
+  const query = { view_key: 'history', role_key: 'sales', limit: 50, sort_key: 'completed', status_key: 'done', period: 'custom', date_from: '2026-10-01', date_to: '2026-10-12' }
+  await api.listWorkflowRoleTasks(query)
+  assert.deepEqual(calls, [query])
+  for (const invalid of [
+    { ...query, status_key: 'ready' }, { ...query, sort_key: 'newest' }, { ...query, period: '7d' },
+    { ...query, date_to: '2026-09-30' }, { ...query, date_from: '2026-02-30' }, { ...query, period: null },
+    { view_key: 'todo', role_key: 'sales', limit: 50, period: 'today' },
+  ]) await assert.rejects(api.listWorkflowRoleTasks(invalid), /任务查询条件有误/)
+  assert.equal(calls.length, 1)
+})
 
 function validProcessContext(overrides = {}) {
   const completedNode = {
@@ -1418,4 +1437,20 @@ test('workflowApi: only validated mutation receipts invalidate menu counts', asy
     if (previousWindow === undefined) delete globalThis.window
     else globalThis.window = previousWindow
   }
+})
+
+test('task handling chain defaults to task scope and keeps order scope explicit', async () => {
+  const calls = []
+  const api = await loadWorkflowApi(async (method, params, options) => {
+    calls.push({ method, params, options })
+    return { data: { truncated: false, items: [{ id: 41, task_name: '返工复检', task_status_key: 'blocked', owner_role_key: 'quality' }] } }
+  })
+  const controller = new AbortController()
+  await api.getWorkflowTaskHandlingChain(41, { signal: controller.signal })
+  assert.deepEqual(calls[0].params, { task_id: 41, view: 'task' })
+  assert.equal(calls[0].options.signal, controller.signal)
+  await api.getWorkflowTaskHandlingChain(41, { view: 'order' })
+  assert.deepEqual(calls[1].params, { task_id: 41, view: 'order' })
+  for (const view of ['', 'all', null, true]) await assert.rejects(api.getWorkflowTaskHandlingChain(41, { view }), /范围无效/u)
+  assert.equal(calls.length, 2)
 })

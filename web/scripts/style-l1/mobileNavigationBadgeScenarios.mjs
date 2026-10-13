@@ -330,7 +330,7 @@ export function createMobileNavigationBadgeScenarios({
           .getByLabel('任务状态', { exact: true })
           .getByText('已办', { exact: true })
           .tap()
-        await page.getByText('已办任务', { exact: true }).waitFor()
+        await page.getByRole('region', { name: '已办任务', exact: true }).waitFor()
         await expectCounts('22', '99+')
 
         fail = true

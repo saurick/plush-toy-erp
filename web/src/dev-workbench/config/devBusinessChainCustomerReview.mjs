@@ -3,6 +3,7 @@ import {
   describeDevBusinessChainNode,
   describeDevBusinessChainResponsibility,
 } from './devBusinessChainProjection.mjs'
+import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
 
 export const DEV_BUSINESS_CHAIN_CUSTOMER_REVIEW_UNDEFINED = '当前正式合同未定义'
 
@@ -66,15 +67,15 @@ const LAYER_GUIDANCE = Object.freeze({
 const DIAGRAM_LEGEND = freezeList([
   { tone: 'normal', label: '业务资料或系统步骤' },
   { tone: 'person', label: '需要人员办理' },
-  { tone: 'attention', label: '异常或纠正分支' },
+  { tone: 'attention', label: '关键条件与异常分支' },
   { tone: 'result', label: '正式业务结果' },
 ])
 
 const OVERVIEW_DIAGRAM_LEGEND = freezeList([
-  { tone: 'normal', label: '履约主链' },
-  { tone: 'person', label: '供给与库存支撑' },
+  { tone: 'normal', label: '销售、生产与出货' },
+  { tone: 'person', label: '采购、委外与库存' },
   { tone: 'attention', label: '异常与返工' },
-  { tone: 'result', label: '冲正与纠正' },
+  { tone: 'result', label: '收付款与业务纠正' },
 ])
 
 const asArray = (value) => (Array.isArray(value) ? value : [])
@@ -247,7 +248,7 @@ function buildChainDiagram(chain) {
     )
   })
   return Object.freeze({
-    title: '先看图：业务怎么走',
+    title: '流程关系',
     description: '按箭头看主路径；有分支时按箭头文字选择去向。',
     mermaidSource: lines.join('\n'),
     legend: DIAGRAM_LEGEND,
@@ -294,7 +295,7 @@ function buildOverviewDiagram(catalog) {
   })
 
   return Object.freeze({
-    title: '先看图：全部业务链怎样衔接',
+    title: '业务链总览',
     description: '四个分区只展示链与链的关系，不展开每条链的内部步骤。',
     mermaidSource: lines.join('\n'),
     legend: OVERVIEW_DIAGRAM_LEGEND,
@@ -335,6 +336,10 @@ function registeredExceptionEntries(catalog, chain, scenarios) {
       )
     for (const edge of edges) {
       entries.push({
+        customerFacing: scenario.kind === 'happy_path'
+          ? ATTENTION_EDGE_KINDS.has(edge.kind) || (outgoingCounts.get(edge.from) || 0) > 1
+          : ['interruption_recovery', 'correction'].includes(scenario.kind),
+        priority: 1,
         groupKey:
           scenario.kind === 'happy_path'
             ? `registered_branch/${edge.key}`
@@ -347,6 +352,8 @@ function registeredExceptionEntries(catalog, chain, scenarios) {
       const text = describeTransition(catalog, ref)
       if (text) {
         entries.push({
+          customerFacing: ['interruption_recovery', 'correction'].includes(scenario.kind),
+          priority: 0,
           groupKey: scenario.kind,
           text: `${scenario.label}：${text}`,
         })
@@ -382,7 +389,7 @@ function exceptionPathsForNode(catalog, chain, node) {
 function compactExceptionPaths(entries) {
   const seenGroups = new Set()
   const compact = []
-  for (const entry of entries) {
+  for (const entry of entries.filter((item) => item.customerFacing).sort((a, b) => a.priority - b.priority)) {
     if (seenGroups.has(entry.groupKey)) continue
     seenGroups.add(entry.groupKey)
     compact.push(entry.text)
@@ -478,11 +485,14 @@ function buildOverviewReview(catalog) {
     ),
   }))
   return Object.freeze({
-    overviewName: '业务链总览',
+    overviewName: '订单全流程',
     purpose: catalog.businessChainOverview.summary,
     compactOnly: true,
     detailBoundary:
-      '本页只列业务链名称、用途和分区，不展开每条链的内部步骤、系统规则或开发证据。',
+      '先按实际顺序列岗位交接、审批和异常，再附业务专题关系；不展开每条链的内部步骤、系统规则或开发证据。',
+    fulfillmentFlow: taskCatalog.fulfillment_flow,
+    exceptionFlow: taskCatalog.exception_flow,
+    exceptionApproval: taskCatalog.exception_approval,
     lanes: freezeList(lanes),
     diagram: buildOverviewDiagram(catalog),
   })
@@ -513,7 +523,7 @@ export function buildDevBusinessChainCustomerReview({
   const reviewContent = overviewSelected
     ? { overview: buildOverviewReview(catalog) }
     : { chain: buildChainReview(catalog, chain) }
-  const subjectName = overviewSelected ? '业务链总览' : chain.label
+  const subjectName = overviewSelected ? '订单全流程' : chain.label
   const reviewScope = resolveCustomerReviewScope(customerOverlay)
 
   return Object.freeze({

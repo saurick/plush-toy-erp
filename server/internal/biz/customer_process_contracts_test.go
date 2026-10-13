@@ -162,6 +162,9 @@ func TestNormalizeCustomerProcessContractsKeepsEveryRegisteredCanonicalGraph(t *
 				{key: "reject_production_exception", nodeType: ProcessNodeTypeDomainCommand, commandKey: ProcessDomainCommandProductionExceptionReject},
 				{key: "rejected_end", nodeType: ProcessNodeTypeEnd},
 				{key: "over_issue_end", nodeType: ProcessNodeTypeEnd},
+				{key: "warehouse_exception_execution", nodeType: ProcessNodeTypeHumanTask, ownerPool: WarehouseRoleKey},
+				{key: "execute_warehouse_production_exception", nodeType: ProcessNodeTypeDomainCommand, ownerPool: WarehouseRoleKey, commandKey: ProcessDomainCommandProductionExceptionExecute},
+				{key: "warehouse_exception_end", nodeType: ProcessNodeTypeEnd},
 			},
 		},
 	}

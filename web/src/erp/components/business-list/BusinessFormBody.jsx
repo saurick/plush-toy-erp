@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { activeFormSectionIndex } from '../../utils/businessFormSections.mjs'
 
 export default function BusinessFormBody({ open, loading, busy, children }) {
@@ -145,6 +146,7 @@ export default function BusinessFormBody({ open, loading, busy, children }) {
         inert={busy || loading ? '' : undefined}
       >
         {children}
+        <MobileBackToTop mobileOnly enabled={open && !loading && !busy} />
       </div>
     </div>
   )

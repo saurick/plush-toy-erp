@@ -164,7 +164,7 @@ test('shared role, status and source formatters fail closed to business language
     '岗位入口',
     '业务状态',
     '未知业务状态',
-    '业务来源',
+    '来源待核对',
     '已关联业务来源',
   ])
   assertNoTechnicalLeak(labels, '角色、状态和来源 formatter 不得透出 raw key')

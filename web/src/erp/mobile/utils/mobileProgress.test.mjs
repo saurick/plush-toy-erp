@@ -90,6 +90,13 @@ test('返回和刷新恢复查询与选择，账号、权限或岗位改变不�
   assert.equal(restored.query.to, '')
   assert.equal(restored.selection.id, 25)
   assert.equal(restored.scrollTop, 340)
+  const ended = readMobileProgressState(
+    { mobileProgress: { ...history.mobileProgress, query: { scope: 'ended', risk: 'overdue' } } },
+    'user7|boss|v1',
+    'orders'
+  )
+  assert.equal(ended.query.scope, 'ended')
+  assert.equal(ended.query.risk, 'all')
   const legacyOwner = readMobileProgressState(
     {
       mobileProgress: {

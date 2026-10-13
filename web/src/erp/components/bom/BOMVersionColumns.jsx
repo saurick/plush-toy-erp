@@ -11,13 +11,13 @@ export const BOM_MODULE_KEY = 'material-bom'
 export const BOM_STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
   { label: '草稿', value: 'DRAFT' },
-  { label: '已激活', value: 'ACTIVE' },
+  { label: '已启用', value: 'ACTIVE' },
   { label: '历史版本', value: 'ARCHIVED' },
 ]
 
 export const BOM_STATUS_LABELS = {
   DRAFT: '草稿',
-  ACTIVE: '已激活',
+  ACTIVE: '已启用',
   ARCHIVED: '历史版本',
 }
 

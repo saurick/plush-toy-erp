@@ -14,7 +14,7 @@ export default function BusinessStatusFilter({
 }) {
   const statusOptions = options.some((option) => option.value === '')
     ? options
-    : [{ value: '', label: '全部' }, ...options]
+    : [{ value: '', label: '不限状态' }, ...options]
   return (
     <div
       className="erp-business-status-filters"
@@ -24,7 +24,7 @@ export default function BusinessStatusFilter({
     >
       {statusOptions.map((option) => {
         const count = loading ? null : businessStatusCount(counts, option.value)
-        const text = option.value === '' ? '全部' : option.label
+        const text = option.value === '' ? '不限状态' : option.label
         const countText = count === null ? '—' : count.toLocaleString('zh-CN')
         return (
           <FilterChip

@@ -308,7 +308,7 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '生产订单',
     pageKind: 'formal',
     description:
-      '生产订单维护生产计划与固定工序路线；发布后按布料加工、车缝、手工、包装依次办理 WIP、逐工序内外发决策、分段质检与包材确认，并可生成领料或完工入库草稿。',
+      '生产订单维护生产计划与固定工序路线；发布后按裁片、车缝、手工、成品入库、查货包装推进，仓库点数、IQC 检验，生产经理安排车缝和手工的内外发，并可生成领料或完工入库草稿。',
     primaryEntity: 'production_orders / production_order_items',
     factSource:
       'production_orders, production_order_items, production_order_material_requirements, production_order_operations, production_wip_batches, production_wip_outsourcing_allocations, outsourcing_orders, outsourcing_order_items, production_packaging_confirmations, quality_inspections, production_facts',
@@ -379,11 +379,11 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '记录',
     pageKind: 'formal',
     description:
-      '生产记录用于处理生产发料、返工和待入库完工报告；生产提交完工报告，仓库核对实收后确认成品入库。',
+      '生产记录用于处理生产发料、返工和待入库成品收仓草稿；仓库按手工成品登记收仓并确认正式入库，检验与查货包装完成后才可发货。',
     primaryEntity: 'production_facts',
     factSource: 'production_facts, inventory_txns',
     boundary:
-      '任务标记为完成不会自动生成生产发料、完工报告、成品入库或返工记录；完工报告草稿不变更库存，仓库确认入库后才更新成品库存结存。',
+      '任务标记为完成不会自动生成生产发料、成品收仓草稿、成品入库或返工记录；成品收仓草稿不变更库存，仓库确认入库后才更新成品库存结存。',
     sourceRefs: [
       'production_orders',
       'production_order_items',
@@ -392,7 +392,7 @@ export const businessModuleDefinitions = Object.freeze([
       'workflow_tasks',
     ],
     currentScope: [
-      '从已发布生产订单生成领料草稿 / 待入库完工报告',
+      '从已发布生产订单生成领料草稿 / 待入库成品收仓草稿',
       '生产发料',
       '仓库核对并确认成品入库',
       '返工',
@@ -411,7 +411,7 @@ export const businessModuleDefinitions = Object.freeze([
     sidebarParentPath: '/erp/production/progress',
     pageKind: 'formal',
     description:
-      '异常处理用于办理报废、在制让步和超领申请；审批只记录决定，报废和让步由生产岗位显式执行或冲正，超领额度由正式领料消费。',
+      '异常处理用于办理原厂返工、换厂返工、补料重做、报废、在制让步和超领申请；业务提交方案，审批只记录决定，按是否已入库交生产或仓库显式执行或撤回，超领额度由正式领料消费。',
     primaryEntity:
       'production_exception_decisions / production_wip_events / workflow_tasks',
     factSource:
@@ -458,7 +458,7 @@ export const businessModuleDefinitions = Object.freeze([
     ],
     currentScope: [
       '出货单列表和明细维护',
-      '新建草稿和添加商品明细，可关联销售订单',
+      '新建出货单并填写商品明细，可关联销售订单',
       '确认出货和取消追溯',
       '从已出货记录生成应收 / 开票记录',
     ],
@@ -473,7 +473,7 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '放行',
     pageKind: 'formal',
     description:
-      '出货放行用于财务办理版本化出货审批；批准后仍须由仓库在出货单页面独立确认实际出货。',
+      '出货放行用于财务办理版本化出货审批；批准后仍须由业务在出货单页面独立确认实际出货。',
     primaryEntity: 'process_instances / workflow_tasks / shipments',
     factSource: 'shipments -> ProcessRuntime -> Shipment finance gate',
     boundary:

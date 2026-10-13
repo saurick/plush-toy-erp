@@ -63,10 +63,9 @@ test('business modules: 正式入口不再登记预览壳页', () => {
 
 test('production-orders module declares WIP route truth without claiming inventory facts', () => {
   const moduleItem = getBusinessModule('production-orders')
-  assert.match(moduleItem.description, /布料加工、车缝、手工、包装/u)
-  assert.match(moduleItem.description, /WIP/u)
-  assert.match(moduleItem.description, /分段质检与包材确认/u)
+  assert.match(moduleItem.description, /裁片、车缝、手工、成品入库、查货包装/u)
   assert.match(moduleItem.factSource, /production_wip_batches/u)
+  assert.ok(moduleItem.currentScope.some((value) => value.includes('分段质检与包材确认')))
   assert.match(moduleItem.factSource, /quality_inspections/u)
   assert.match(moduleItem.boundary, /不等于库存事实/u)
   assert.match(moduleItem.boundary, /只有已过账生产事实/u)

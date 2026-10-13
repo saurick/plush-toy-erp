@@ -1,6 +1,17 @@
 import { getWorkflowTaskSourceTypeLabel } from './dashboardTaskDisplay.mjs'
 import { TASK_BOARD_PAGE_SIZE_OPTIONS, TASK_BOARD_ROLE_OPTIONS } from './workflowTaskBoard.mjs'
 
+export const TRACKING_VIEW_OPTIONS = [
+  { value: 'tracking', label: '流程进度' },
+  { value: 'exceptions', label: '异常记录' },
+]
+
+export const TRACKING_SCOPE_OPTIONS = [
+  { value: 'visible', label: '相关流程' },
+  { value: 'started', label: '我发起的' },
+  { value: 'participated', label: '我参与的' },
+]
+
 export const TRACKING_STATUS_OPTIONS = [
   { value: '', label: '全部状态' },
   { value: 'active', label: '进行中' },
@@ -20,13 +31,20 @@ export const TRACKING_SOURCE_OPTIONS = [
 
 const FILTER_FIELDS = ['status', 'owner_role_key', 'source_type', 'attention', 'date_from', 'date_to']
 
+export function normalizeTrackingFilters(filters) {
+  return filters.status === 'completed'
+    ? { ...filters, owner_role_key: '', attention: '' }
+    : filters
+}
+
 export function readTrackingFilters(params, scope) {
-  return Object.fromEntries(FILTER_FIELDS.map((key) => [key, params.get(`track_${key}_${scope}`) || '']))
+  return normalizeTrackingFilters(Object.fromEntries(FILTER_FIELDS.map((key) => [key, params.get(`track_${key}_${scope}`) || ''])))
 }
 
 export function writeTrackingFilters(params, scope, changes) {
   const next = new URLSearchParams(params)
-  for (const [key, value] of Object.entries(changes)) {
+  const filters = normalizeTrackingFilters({ ...readTrackingFilters(params, scope), ...changes })
+  for (const [key, value] of Object.entries(filters)) {
     if (!FILTER_FIELDS.includes(key) && key !== 'search') continue
     const name = `track_${key}_${scope}`
     if (value) next.set(name, value)

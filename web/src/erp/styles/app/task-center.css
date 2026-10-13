@@ -20,7 +20,7 @@
   min-width: 0;
 }
 
-.erp-task-tracking-scope {
+.erp-task-tracking-views {
   justify-self: start;
 }
 
@@ -129,7 +129,7 @@
     min-height: 42px;
   }
 
-  .erp-dashboard-task-board-card .erp-task-tracking-scope.ant-segmented .ant-segmented-item-label {
+  .erp-dashboard-task-board-card .erp-task-tracking-views.ant-segmented .ant-segmented-item-label {
     min-height: 44px;
     padding-inline: 8px;
   }
@@ -348,9 +348,35 @@
   margin: 0;
 }
 
+.erp-task-action-drawer .ant-drawer-header {
+  min-height: 56px;
+  padding: 6px 12px;
+}
+
+.erp-task-action-drawer .ant-drawer-header-title {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+}
+
+.erp-task-action-drawer .ant-drawer-close {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  color: var(--erp-text);
+  font-size: 18px;
+}
+
+.erp-task-action-drawer .ant-drawer-title {
+  grid-column: 2;
+  min-width: 0;
+  text-align: center;
+}
+
 .erp-task-action-drawer__heading {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   min-width: 0;
 }

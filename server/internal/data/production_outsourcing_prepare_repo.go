@@ -61,6 +61,9 @@ func (r *productionOrderRepo) PrepareProductionOutsourcing(ctx context.Context, 
 	if batch.Version != in.ExpectedVersion {
 		return nil, biz.ErrProductionOrderConflict
 	}
+	if err := validateProductionExceptionBatchDestination(ctx, client, batch, &in.SupplierID); err != nil {
+		return nil, err
+	}
 	order, err := client.ProductionOrder.Get(ctx, batch.ProductionOrderID)
 	if err != nil {
 		return nil, err
@@ -90,10 +93,10 @@ func (r *productionOrderRepo) PrepareProductionOutsourcing(ctx context.Context, 
 	if err != nil {
 		return nil, err
 	}
-	isFabric := operation.OperationCode == biz.ProductionWIPOperationFabricProcessing && batch.FlowType == biz.ProductionWIPFlowNormal
+	isFabric := productionWIPNeedsFreshMaterial(operation.OperationCode, batch.FlowType)
 	var requirements []*ent.ProductionOrderMaterialRequirement
 	if isFabric {
-		if len(in.RequirementIDs) == 0 || batch.SourceBatchID != nil || !batch.Quantity.Equal(item.PlannedQuantity) {
+		if len(in.RequirementIDs) == 0 || (batch.FlowType == biz.ProductionWIPFlowNormal && (batch.SourceBatchID != nil || !batch.Quantity.Equal(item.PlannedQuantity))) {
 			return nil, biz.ErrProductionWIPOutsourcingAllocationInvalid
 		}
 		requirements, err = client.ProductionOrderMaterialRequirement.Query().Where(productionordermaterialrequirement.IDIn(in.RequirementIDs...), productionordermaterialrequirement.ProductionOrderItemID(item.ID)).Order(ent.Asc(productionordermaterialrequirement.FieldID)).All(ctx)
@@ -163,7 +166,11 @@ func (r *productionOrderRepo) PrepareProductionOutsourcing(ctx context.Context, 
 	}
 	if isFabric {
 		for i, req := range requirements {
-			_, err = makeLine(i + 1).SetSubjectType(biz.OutsourcingOrderSubjectMaterial).SetMaterialID(req.MaterialID).SetUnitID(req.UnitID).SetMaterialCodeSnapshot(req.MaterialCodeSnapshot).SetMaterialNameSnapshot(req.MaterialNameSnapshot).SetUnitNameSnapshot(req.UnitNameSnapshot).SetOutsourcingQuantity(req.PlannedQuantity).Save(ctx)
+			quantity, err := productionWIPFabricRequirementQuantity(ctx, client, batch, req)
+			if err != nil {
+				return nil, err
+			}
+			_, err = makeLine(i + 1).SetSubjectType(biz.OutsourcingOrderSubjectMaterial).SetMaterialID(req.MaterialID).SetUnitID(req.UnitID).SetMaterialCodeSnapshot(req.MaterialCodeSnapshot).SetMaterialNameSnapshot(req.MaterialNameSnapshot).SetUnitNameSnapshot(req.UnitNameSnapshot).SetOutsourcingQuantity(quantity).Save(ctx)
 			if err != nil {
 				return nil, err
 			}

@@ -1,7 +1,7 @@
-import { pullToRefresh } from './mobileGestureAssertions.mjs'
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { pullToRefresh } from './mobileGestureAssertions.mjs'
 import {
   assertThemeReadable,
   assertDarkThemeContrast,
@@ -932,13 +932,15 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     )
     assert(
       metrics.summary?.height > 0 &&
-        metrics.guide?.height > 0 &&
-        metrics.guideSteps?.height > 0 &&
         metrics.actionPanel?.height > 0 &&
         metrics.footer?.height > 0,
       `${scenarioName} 任务处理抽屉缺少关键分区: ${JSON.stringify(metrics)}`
     )
     const isContext = metrics.activeStep === 'erp-task-action-step-context'
+    const showSteps = !isContext || metrics.hasActionReceipt
+    for (const [name, box] of [['guide', metrics.guide], ['guideSteps', metrics.guideSteps], ['tabList', metrics.tabList]]) {
+      assert.equal(Boolean(box?.height), showSteps, `${scenarioName} ${name} 只在办理或已有回执时展示: ${JSON.stringify(metrics)}`)
+    }
     if (isContext || metrics.hasActionReceipt) {
       assert(
         metrics.metaGrid?.height > 0 && metrics.metaItems === 2,
@@ -987,10 +989,6 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       metrics.selectedTabs,
       1,
       `${scenarioName} 任务处理步骤应只有一个当前步骤: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.tabList?.height > 0,
-      `${scenarioName} 任务处理步骤缺少可访问的 tablist: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.footerButtons >= 1,

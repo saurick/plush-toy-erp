@@ -1,4 +1,6 @@
+import { normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from './workflowTaskDiscovery.mjs'
 import { normalizeRoleKey } from './roleKeys.mjs'
+import { WORKFLOW_HISTORY_STATUS_OPTIONS, isWorkflowHistoryDateFilter } from './workflowRoleTaskHistory.mjs'
 
 export const MOBILE_ROLE_TASK_PAGE_LIMIT = 50
 
@@ -16,26 +18,34 @@ export const MOBILE_TASK_STATUS_OPTIONS = Object.freeze([
 
 export function mobileTaskQueryScope(
   accessScope,
-  { keyword = '', sortKey = 'newest', statusKey = '' } = {}
+  { keyword = '', sortKey = 'newest', statusKey = '', period = '', dateFrom = '', dateTo = '', ...discovery } = {}
 ) {
-  return `${accessScope}|search:${keyword}|sort:${sortKey}|status:${statusKey}`
+  return `${accessScope}${Object.keys(normalizeTaskDiscoveryFilters(discovery)).length ? `|discovery:${JSON.stringify(normalizeTaskDiscoveryFilters(discovery))}` : ''}|search:${keyword}|sort:${sortKey}|status:${statusKey}${sortKey === 'completed' ? `|period:${period}|from:${dateFrom}|to:${dateTo}` : ''}`
+}
+
+export function normalizeMobileTaskQueryOptions(value, history = false) {
+  const options = value && typeof value === 'object' ? value : {}
+  const statuses = history ? WORKFLOW_HISTORY_STATUS_OPTIONS : MOBILE_TASK_STATUS_OPTIONS
+  return {
+    ...normalizeTaskDiscoveryFilters(options),
+    keyword: String(options.keyword || '').trim().slice(0, 100),
+    sortKey: history ? 'completed' : MOBILE_TASK_SORT_OPTIONS.some(({ value: key }) => key === options.sortKey) ? options.sortKey : 'newest',
+    statusKey: statuses.some(({ value: key }) => key === options.statusKey) ? options.statusKey : '',
+    ...(history ? isWorkflowHistoryDateFilter(options)
+      ? { period: options.period || '', dateFrom: options.dateFrom || '', dateTo: options.dateTo || '' }
+      : { period: '', dateFrom: '', dateTo: '' } : {}),
+  }
 }
 
 export function readMobileTaskQueryHistory(history, accessScope) {
-  const keyword = String(history?.mobileRoleTasksKeyword || '')
-    .trim()
-    .slice(0, 100)
-  const sortKey = MOBILE_TASK_SORT_OPTIONS.some(
-    (option) => option.value === history?.mobileRoleTasksSort
-  )
-    ? history.mobileRoleTasksSort
-    : 'newest'
-  const statusKey = MOBILE_TASK_STATUS_OPTIONS.some(
-    (option) => option.value === history?.mobileRoleTasksStatus
-  )
-    ? history.mobileRoleTasksStatus
-    : ''
-  const options = { keyword, sortKey, statusKey }
+  const isHistory = history?.mobileRoleTasksSort === 'completed'
+  const options = normalizeMobileTaskQueryOptions({
+    keyword: history?.mobileRoleTasksKeyword,
+    sortKey: history?.mobileRoleTasksSort,
+    statusKey: history?.mobileRoleTasksStatus,
+    ...history?.mobileRoleTasksDates,
+    ...history?.mobileRoleTasksDiscovery,
+  }, isHistory)
   return history?.mobileRoleTasksScope ===
     mobileTaskQueryScope(accessScope, options)
     ? options
@@ -322,7 +332,11 @@ export function buildMobileRoleTaskQuery({
   keyword = '',
   sortKey = '',
   statusKey = '',
+  period = '',
+  dateFrom = '',
+  dateTo = '',
   limit = MOBILE_ROLE_TASK_PAGE_LIMIT,
+  ...discovery
 } = {}) {
   const normalizedRoleKey = normalizeRoleKey(roleKey)
   const normalizedViewKey = String(viewKey || '').trim()
@@ -342,17 +356,20 @@ export function buildMobileRoleTaskQuery({
   if (normalizedKeyword === null || [...normalizedKeyword].length > 100) {
     throw new TypeError('搜索内容最多 100 个字')
   }
-  if (
-    (sortKey &&
-      !MOBILE_TASK_SORT_OPTIONS.some((option) => option.value === sortKey)) ||
-    !MOBILE_TASK_STATUS_OPTIONS.some((option) => option.value === statusKey) ||
-    (normalizedViewKey === 'history' && statusKey)
-  ) {
+  const history = normalizedViewKey === 'history'
+  const statuses = history ? WORKFLOW_HISTORY_STATUS_OPTIONS : MOBILE_TASK_STATUS_OPTIONS
+  if ((sortKey && (history ? sortKey !== 'completed' : !MOBILE_TASK_SORT_OPTIONS.some((option) => option.value === sortKey))) ||
+    !statuses.some((option) => option.value === statusKey) ||
+    (history ? !isWorkflowHistoryDateFilter({ period, dateFrom, dateTo }) : Boolean(period || dateFrom || dateTo))) {
     throw new TypeError('任务筛选或排序无效')
   }
   return {
+    ...taskDiscoveryRequest(discovery),
     ...(sortKey ? { sort_key: sortKey } : {}),
     ...(statusKey ? { status_key: statusKey } : {}),
+    ...(period ? { period } : {}),
+    ...(dateFrom ? { date_from: dateFrom } : {}),
+    ...(dateTo ? { date_to: dateTo } : {}),
     ...(normalizedKeyword ? { keyword: normalizedKeyword } : {}),
     view_key: normalizedViewKey,
     role_key: normalizedRoleKey,

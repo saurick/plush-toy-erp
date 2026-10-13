@@ -15,6 +15,8 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
+import { operationalFactTaskContext } from '../utils/workflowFollowup.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import useBusinessPageState from '../hooks/useBusinessPageState.js'
@@ -223,6 +225,7 @@ export function OperationalFactWorkspace({
   )
 
   const activeSelectedRow = selectedByKey[currentActiveKey] || null
+  const taskContext = operationalFactTaskContext(currentActiveKey, activeSelectedRow)
   const {
     activeCustomerKey,
     saving,
@@ -1068,6 +1071,7 @@ export function OperationalFactWorkspace({
             selectionLabel="业务记录"
             onClear={clearActiveSelection}
           />
+          <BusinessTaskActions sourceType={taskContext.sourceType} record={taskContext.record} adminProfile={adminProfile} allowCreate={false} />
           {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
               disabled={relatedActionAvailability.disabled}

@@ -1,10 +1,15 @@
 import React from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import {
   ExclamationCircleFilled,
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
+import { mobileBusinessPath } from '../../utils/businessTaskRoute.mjs'
+import { resolveWorkflowTaskEntryPath } from '../../utils/dashboardTaskDisplay.mjs'
+import { canOpenWorkflowTaskEntry } from '../../utils/workflowTaskEntryAccess.mjs'
+import { workflowTaskEntryNavigation } from '../../utils/workflowTaskNavigation.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import WorkflowFollowupDetails from '../../components/workflow/WorkflowFollowupDetails.jsx'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
@@ -58,6 +63,7 @@ export default function MobileTaskDetailScreen({
   actionAccess,
   backLabel = '返回任务列表',
   onBack,
+  onOpenLinkedTask,
   processingComplete = false,
   onOpenAction,
   onViewReceipt,
@@ -70,6 +76,14 @@ export default function MobileTaskDetailScreen({
   selectedTask,
 }) {
   const { adminProfile } = useOutletContext() || {}
+  const navigate = useNavigate()
+  const location = useLocation()
+  const entryPath = resolveWorkflowTaskEntryPath(selectedTask)
+  const canOpenSource = canOpenWorkflowTaskEntry(adminProfile, entryPath, actionAccess?.sourceAccess)
+  const openSource = () => {
+    const path = mobileBusinessPath(entryPath, location.pathname.split('/')[2])
+    if (canOpenSource) navigate(path, workflowTaskEntryNavigation(selectedTask, path, `${location.pathname}${location.search}`, adminProfile?.id))
+  }
   const materialContext = React.useMemo(
     () => getEngineeringMaterialTaskContext(selectedTask),
     [selectedTask]
@@ -220,6 +234,7 @@ export default function MobileTaskDetailScreen({
       ? actionAccess.retry
       : null
   const showFooterAction =
+    canOpenSource ||
     canOpenProcess ||
     canViewReceipt ||
     Boolean(retryAccess) ||
@@ -232,6 +247,8 @@ export default function MobileTaskDetailScreen({
       : '当前仅供查看'
   const actionGuidance = canProcessMaterial
     ? ''
+    : canOpenSource
+      ? '进入对应单据办理，保存后相关待办自动更新。'
     : actionAccess?.loading
       ? '正在确认当前账号的处理范围，请稍候。'
       : actionAccess?.failed
@@ -470,6 +487,7 @@ export default function MobileTaskDetailScreen({
 
         <WorkflowTaskHandlingChain
           task={selectedTask}
+          onOpenTask={onOpenLinkedTask}
           profile={adminProfile}
           processContext={processContext}
           processContextState={processContextState}
@@ -536,6 +554,7 @@ export default function MobileTaskDetailScreen({
             </div>
           </section>
         ) : null}
+        <MobileBackToTop />
       </main>
 
       {productionArrangementContext ? (
@@ -563,6 +582,10 @@ export default function MobileTaskDetailScreen({
               onClick={() => onOpenAction?.()}
             >
               处理任务
+            </button>
+          ) : canOpenSource ? (
+            <button type="button" className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white" onClick={openSource}>
+              进入单据办理
             </button>
           ) : canOpenProcess ? (
             <button

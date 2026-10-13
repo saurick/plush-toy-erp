@@ -104,7 +104,11 @@ func (uc *CustomerConfigUsecase) BuildProcessInstanceCreateFromActiveCustomerCon
 	if ok, err := boolFromProcessDefinition(definition, "runtime_loader_enabled"); err != nil || !ok {
 		return nil, ErrBadParam
 	}
-	if getStringFromAnyMap(definition, "fact_boundary") != "no_fact_posting" {
+	expectedFactBoundary := "no_fact_posting"
+	if processKey == ProcessKeyProductionExceptionApproval {
+		expectedFactBoundary = "inventory_disposition_by_explicit_domain_command"
+	}
+	if getStringFromAnyMap(definition, "fact_boundary") != expectedFactBoundary {
 		return nil, ErrBadParam
 	}
 	if getStringFromAnyMap(definition, "process_key") != processKey {

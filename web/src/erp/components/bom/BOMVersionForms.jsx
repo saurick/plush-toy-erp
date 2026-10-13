@@ -118,13 +118,18 @@ export function BOMHeaderFormFields({
     if (versionSuggestionLoading) {
       versionHint = '正在读取同产品已有 BOM 版本...'
     } else if (versionSuggestion) {
+      const suggestionApplied = version === versionSuggestion
       versionHint = (
-        <Space size={4} wrap>
-          <span>建议使用下一个版本号</span>
-          <Button size="small" type="link" onClick={onUseVersionSuggestion}>
-            {versionSuggestion}
+        <Space size={8} wrap>
+          <span>建议版本</span>
+          <Button
+            size="small"
+            disabled={suggestionApplied}
+            onClick={onUseVersionSuggestion}
+          >
+            {suggestionApplied ? '已使用' : '使用'} {versionSuggestion}
           </Button>
-          <span>，也可手动填写。</span>
+          <span>也可手动填写</span>
         </Space>
       )
     } else {

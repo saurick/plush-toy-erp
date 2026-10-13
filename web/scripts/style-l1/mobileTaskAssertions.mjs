@@ -1,3 +1,4 @@
+import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import { writeFile } from 'node:fs/promises'
 import { assertFilterAffordance } from './controlAffordanceAssertions.mjs'
 import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
@@ -315,16 +316,15 @@ export function createMobileTaskAssertions(deps) {
     const doneMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(doneMetrics, scenarioName)
     assertMobileTaskCompactCountTags(doneMetrics, {
-      expectedCount: 1,
-      expectedTestID: 'mobile-role-done-count',
+      expectedCount: 0,
       scenarioName,
       tabLabel: '已办页',
     })
     assert(
-      doneMetrics.sectionHeadings.includes('已办任务') &&
+      !doneMetrics.sectionHeadings.includes('已办任务') &&
         !doneMetrics.sectionHeadings.includes('当前岗位任务状态') &&
         !doneMetrics.sectionHeadings.includes('已加载任务进度'),
-      `${scenarioName} 已办分区应直接展示已办任务且不重复岗位状态摘要: ${JSON.stringify(doneMetrics)}`
+      `${scenarioName} 已办列表不应重复页签标题或岗位状态摘要: ${JSON.stringify(doneMetrics)}`
     )
     assert.equal(
       await page.getByTestId('mobile-loaded-task-overview').count(),
@@ -459,11 +459,12 @@ export function createMobileTaskAssertions(deps) {
     { scenarioName }
   ) {
     await page.getByTestId('mobile-role-filter-risk').click()
-    const visibleText = await readVisibleMobileTaskListText(page)
     await assertMobileTaskFilterSelected(page, 'mobile-role-filter-risk', {
       scenarioName,
       label: '跨岗风险',
     })
+    await page.locator('.erp-mobile-list-item').filter({ hasText: '暗色任务验证' }).first().waitFor()
+    const visibleText = await readVisibleMobileTaskListText(page)
     assert(
       visibleText.includes('暗色任务验证') &&
         !visibleText.includes('批量待办任务 1'),
@@ -886,7 +887,7 @@ export function createMobileTaskAssertions(deps) {
   }
 
   async function assertMobileTaskScrollTopControl(page, { scenarioName }) {
-    const button = page.getByTestId('mobile-role-scroll-top')
+    const button = page.getByTestId('mobile-back-to-top')
     await page.evaluate(() => {
       const scroll = document.querySelector(
         '[data-testid="mobile-role-scroll"]'
@@ -932,7 +933,7 @@ export function createMobileTaskAssertions(deps) {
     await button.waitFor({ state: 'visible', timeout: 10_000 })
     const visibleMetrics = await page.evaluate(() => {
       const buttonNode = document.querySelector(
-        '[data-testid="mobile-role-scroll-top"]'
+        '[data-testid="mobile-back-to-top"]'
       )
       const nav = document.querySelector(
         '[data-testid="mobile-role-bottom-nav"]'
@@ -1351,7 +1352,7 @@ export function createMobileTaskAssertions(deps) {
         buttons,
         flowSteps,
         scrollTopButtonCount: document.querySelectorAll(
-          '[data-testid="mobile-role-scroll-top"]'
+          '[data-testid="mobile-back-to-top"]'
         ).length,
         viewport: {
           width: window.innerWidth,
@@ -1391,16 +1392,9 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 任务附件应降级为摘要内的可触控次要动作: ${JSON.stringify(detailMetrics)}`
     )
     assert.deepEqual(
-      detailMetrics.flowSteps.map((step) => step.key),
-      ['detail', 'process', 'result'],
-      `${scenarioName} 详情页必须展示完整三步任务流程: ${JSON.stringify(detailMetrics)}`
-    )
-    assert(
-      detailMetrics.flowSteps[0]?.current === 'step' &&
-        detailMetrics.flowSteps[2]?.state === 'locked' &&
-        detailMetrics.flowSteps[2]?.disabled &&
-        detailMetrics.flowSteps.every((step) => step.height >= 44),
-      `${scenarioName} 详情页步骤状态或触控尺寸异常: ${JSON.stringify(detailMetrics)}`
+      detailMetrics.flowSteps,
+      [],
+      `${scenarioName} 尚未办理的详情页只显示任务信息，办理步骤在进入办理后显示`
     )
     assert.equal(
       detailMetrics.inlineActionInputCount,
@@ -1410,8 +1404,9 @@ export function createMobileTaskAssertions(deps) {
     assert.equal(
       detailMetrics.scrollTopButtonCount,
       0,
-      `${scenarioName} 详情页不应显示回到顶部按钮: ${JSON.stringify(detailMetrics)}`
+      `${scenarioName} 详情页初始位于顶部时不应显示回到顶部按钮: ${JSON.stringify(detailMetrics)}`
     )
+    await assertMobileBackToTop(page, page.getByTestId('mobile-task-detail-screen').locator('.mobile-role-tasks-page__detail-main'))
     assert(
       detailMetrics.documentScrollWidth <=
         detailMetrics.documentClientWidth + 1,

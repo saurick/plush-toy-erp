@@ -195,7 +195,7 @@ test('roleHelpContent: 永绅岗位帮助只指导已开放且有权限的动作
   )
   assert.match(purchaseCopy, /付款方式、是否需要发票、收货地址和到货日期/u)
   assert.doesNotMatch(warehouseCopy, /盘点、调拨|人工调整/u)
-  assert.match(warehouseCopy, /生产提交完工报告不等于成品已经入库/u)
+  assert.match(warehouseCopy, /仓库登记成品收仓草稿不等于成品已经入库/u)
   assert.match(warehouseCopy, /实际运费也不等于已经形成应付或付款/u)
   assert(
     warehouseGuide.priorities.some(
@@ -205,7 +205,7 @@ test('roleHelpContent: 永绅岗位帮助只指导已开放且有权限的动作
   assert.equal(productionGuide.label, '生产 / 委外')
   assert.match(
     JSON.stringify(productionGuide),
-    /完工报告交给仓库核对实收并确认入库/u
+    /手工成品交给仓库核对实收并确认入库/u
   )
   assert(
     productionGuide.priorities.some(

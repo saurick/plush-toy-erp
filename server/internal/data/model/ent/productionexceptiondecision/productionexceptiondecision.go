@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 const (
@@ -32,6 +33,10 @@ const (
 	FieldProductionWipBatchID = "production_wip_batch_id"
 	// FieldQualityInspectionID holds the string denoting the quality_inspection_id field in the database.
 	FieldQualityInspectionID = "quality_inspection_id"
+	// FieldTargetSupplierID holds the string denoting the target_supplier_id field in the database.
+	FieldTargetSupplierID = "target_supplier_id"
+	// FieldTargetOperationID holds the string denoting the target_operation_id field in the database.
+	FieldTargetOperationID = "target_operation_id"
 	// FieldRequestedQuantity holds the string denoting the requested_quantity field in the database.
 	FieldRequestedQuantity = "requested_quantity"
 	// FieldApprovedQuantity holds the string denoting the approved_quantity field in the database.
@@ -66,8 +71,17 @@ const (
 	FieldReversedAt = "reversed_at"
 	// FieldReverseReason holds the string denoting the reverse_reason field in the database.
 	FieldReverseReason = "reverse_reason"
+	// EdgeExecutionBatches holds the string denoting the execution_batches edge name in mutations.
+	EdgeExecutionBatches = "execution_batches"
 	// Table holds the table name of the productionexceptiondecision in the database.
 	Table = "production_exception_decisions"
+	// ExecutionBatchesTable is the table that holds the execution_batches relation/edge.
+	ExecutionBatchesTable = "production_wip_batches"
+	// ExecutionBatchesInverseTable is the table name for the ProductionWIPBatch entity.
+	// It exists in this package in order to avoid circular dependency with the "productionwipbatch" package.
+	ExecutionBatchesInverseTable = "production_wip_batches"
+	// ExecutionBatchesColumn is the table column denoting the execution_batches relation/edge.
+	ExecutionBatchesColumn = "origin_exception_decision_id"
 )
 
 // Columns holds all SQL columns for productionexceptiondecision fields.
@@ -82,6 +96,8 @@ var Columns = []string{
 	FieldProductionMaterialRequirementID,
 	FieldProductionWipBatchID,
 	FieldQualityInspectionID,
+	FieldTargetSupplierID,
+	FieldTargetOperationID,
 	FieldRequestedQuantity,
 	FieldApprovedQuantity,
 	FieldReason,
@@ -140,6 +156,10 @@ var (
 	ProductionWipBatchIDValidator func(int) error
 	// QualityInspectionIDValidator is a validator for the "quality_inspection_id" field. It is called by the builders before save.
 	QualityInspectionIDValidator func(int) error
+	// TargetSupplierIDValidator is a validator for the "target_supplier_id" field. It is called by the builders before save.
+	TargetSupplierIDValidator func(int) error
+	// TargetOperationIDValidator is a validator for the "target_operation_id" field. It is called by the builders before save.
+	TargetOperationIDValidator func(int) error
 	// ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
 	ReasonValidator func(string) error
 	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
@@ -219,6 +239,16 @@ func ByProductionWipBatchID(opts ...sql.OrderTermOption) OrderOption {
 // ByQualityInspectionID orders the results by the quality_inspection_id field.
 func ByQualityInspectionID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldQualityInspectionID, opts...).ToFunc()
+}
+
+// ByTargetSupplierID orders the results by the target_supplier_id field.
+func ByTargetSupplierID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTargetSupplierID, opts...).ToFunc()
+}
+
+// ByTargetOperationID orders the results by the target_operation_id field.
+func ByTargetOperationID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTargetOperationID, opts...).ToFunc()
 }
 
 // ByRequestedQuantity orders the results by the requested_quantity field.
@@ -304,4 +334,25 @@ func ByReversedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByReverseReason orders the results by the reverse_reason field.
 func ByReverseReason(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldReverseReason, opts...).ToFunc()
+}
+
+// ByExecutionBatchesCount orders the results by execution_batches count.
+func ByExecutionBatchesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newExecutionBatchesStep(), opts...)
+	}
+}
+
+// ByExecutionBatches orders the results by execution_batches terms.
+func ByExecutionBatches(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newExecutionBatchesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+func newExecutionBatchesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ExecutionBatchesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ExecutionBatchesTable, ExecutionBatchesColumn),
+	)
 }

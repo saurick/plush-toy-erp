@@ -184,8 +184,8 @@ test('released and closed production orders create a source-bound completion dra
   assert.match(page, /listAllInventoryLots\(\{ status: 'ACTIVE' \}\)/u)
   assert.match(page, /sourceBusinessActionNo/u)
   assert.match(page, /validateProductionCompletionResult/u)
-  assert.match(page, /返工补完工/u)
-  assert.match(page, /登记返工补完工/u)
+  assert.match(page, /返工成品收仓/u)
+  assert.match(page, /登记返工成品收仓/u)
   assert.doesNotMatch(page, /postProductionFact/u)
 })
 
@@ -195,7 +195,6 @@ test('released and closed production orders expose route execution through separ
     'production.wip.read',
     'production.wip.assign',
     'production.wip.execute',
-    'production.wip.rework',
     'production.packaging_material.confirm',
     'outsourcing.order.read',
   ]) {
@@ -203,7 +202,7 @@ test('released and closed production orders expose route execution through separ
   }
   assert.match(
     page,
-    /canAssign=\{canAssignProductionWip\}[\s\S]*canExecute=\{canExecuteProductionWip\}[\s\S]*canRework=\{canReworkProductionWip\}[\s\S]*canConfirmPackaging=\{canConfirmPackagingMaterial\}[\s\S]*canReadOutsourcingContracts=\{canReadOutsourcingContracts\}/u
+    /canAssign=\{canAssignProductionWip\}[\s\S]*canExecute=\{canExecuteProductionWip\}[\s\S]*canConfirmPackaging=\{canConfirmPackagingMaterial\}[\s\S]*canReadOutsourcingContracts=\{canReadOutsourcingContracts\}/u
   )
   assert.match(
     page,
@@ -266,7 +265,7 @@ test('routed completion fails closed until packaging is accepted and packaging m
   assert.match(page, /productionWipCompletionEligibility/u)
   assert.match(page, /hasRoutedItem \? getProductionWip\(orderID\)/u)
   assert.match(page, /eligibleItems\.length === 0/u)
-  assert.match(page, /暂不能登记生产完工/u)
+  assert.match(page, /暂不能登记成品收仓/u)
   assert.match(page, /工序状态已变化/u)
   assert.match(
     page,
@@ -295,7 +294,7 @@ test('production order page exposes authoritative finished-goods rework progress
   assert.match(page, /查看返工进度/u)
   assert.match(page, /onContinue=\{\(\) => \{/u)
   assert.match(reworkProgressModal, /成品返工进度/u)
-  assert.match(reworkProgressModal, /补完工已过账/u)
+  assert.match(reworkProgressModal, /返工成品已可发货/u)
   assert.match(reworkProgressModal, /productID: Number\(item\?\.product_id/u)
   assert.match(reworkProgressModal, /productId=\{item\.productID\}/u)
 })
@@ -306,11 +305,11 @@ test('production help and completion form explain route order and warehouse inbo
   assert.match(guide.flowSteps.join(' '), /布料加工、车缝、手工、包装/u)
   assert.match(
     guide.flowSteps.join(' '),
-    /生产提交完工报告，仓库核对实收并确认入库后，库存才增加/u
+    /手工成品由仓库正式入库并记录库存；检验合格、查货包装完成后才可发货/u
   )
-  assert.match(completionModal, /生产岗位只提交完工报告/u)
-  assert.match(completionModal, /仓库核对实收后确认入库，届时才增加成品库存/u)
-  assert.match(page, /请由仓库核对并确认成品入库/u)
+  assert.match(completionModal, /仓库按已完成手工的批次登记收仓/u)
+  assert.match(completionModal, /核对实收后确认入库并增加成品库存/u)
+  assert.match(page, /请核对并确认成品入库/u)
 })
 
 test('production completion keeps unknown attempts and links to filtered records', () => {

@@ -12,6 +12,8 @@ import {
   progressStatusLabel,
   progressSourcePath,
   progressStages,
+  progressRiskAvailable,
+  withProgressFilters,
 } from './businessProgress.mjs'
 
 test('progress responses reject missing, malformed and duplicate records instead of showing zero', () => {
@@ -124,6 +126,47 @@ test('source links identify the source record and keep task codes encoded', () =
     progressSourcePath({ kind: 'task', number: 'TASK + 1' }),
     '/erp/task-board?q=TASK%20%2B%201&status=all'
   )
+})
+
+test('进度范围与关注条件在切换和恢复时排除不可能的组合', () => {
+  for (const risk of ['overdue', 'due_soon', 'blocked']) {
+    const active = new URLSearchParams({ view: 'orders', scope: 'active', risk, q: '小熊' })
+    const ended = withProgressFilters(active, { scope: 'ended' })
+    assert.equal(ended.get('risk'), 'all')
+    assert.equal(ended.get('q'), '小熊')
+    assert.equal(progressRiskAvailable(risk, { scope: 'ended' }), false)
+    assert.equal(progressRiskAvailable(risk, { scope: 'all' }), true)
+    const restored = new URLSearchParams({ scope: 'ended', risk })
+    assert.equal(progressQueryFromURL(restored).risk, 'all')
+    assert.equal(withProgressFilters(restored, { scope: 'active' }).get('risk'), 'all')
+  }
+  for (const risk of ['all', 'undated', 'unlinked']) {
+    const params = new URLSearchParams({ view: 'production', scope: 'ended', risk })
+    assert.equal(progressQueryFromURL(params).risk, risk)
+  }
+  const production = new URLSearchParams('view=production&risk=unlinked')
+  assert.equal(withProgressFilters(production, { view: 'orders' }).get('risk'), 'all')
+  assert.equal(progressQueryFromURL(new URLSearchParams('view=orders&risk=unlinked')).risk, 'all')
+})
+
+test('未定交期与具体日期互斥，最后选择生效且搜索不受影响', () => {
+  const dated = new URLSearchParams('view=orders&q=小熊&owner=小陈&from=2026-10-01&to=2026-10-31')
+  const undated = withProgressFilters(dated, { risk: 'undated' })
+  assert.equal(undated.has('from'), false)
+  assert.equal(undated.has('to'), false)
+  assert.equal(undated.get('q'), '小熊')
+  assert.equal(undated.get('owner'), '小陈')
+  for (const key of ['from', 'to']) {
+    const selectedDate = withProgressFilters(undated, { [key]: '2026-10-12' })
+    assert.equal(selectedDate.get('risk'), 'all')
+    assert.equal(selectedDate.get(key), '2026-10-12')
+  }
+  const restored = new URLSearchParams(dated)
+  restored.set('risk', 'undated')
+  assert.equal(progressQueryFromURL(restored).date_from, '')
+  assert.equal(progressQueryFromURL(restored).date_to, '')
+  assert.equal(withProgressFilters(restored, { risk: 'all' }).has('from'), false)
+  assert.equal(withProgressFilters(dated, { q: '' }).has('q'), false)
 })
 
 test('stage summaries preserve independent facts, missing values and permission boundaries', () => {

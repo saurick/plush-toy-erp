@@ -7002,6 +7002,22 @@ func (c *ProductionExceptionDecisionClient) GetX(ctx context.Context, id int) *P
 	return obj
 }
 
+// QueryExecutionBatches queries the execution_batches edge of a ProductionExceptionDecision.
+func (c *ProductionExceptionDecisionClient) QueryExecutionBatches(_m *ProductionExceptionDecision) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionexceptiondecision.Table, productionexceptiondecision.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionexceptiondecision.ExecutionBatchesTable, productionexceptiondecision.ExecutionBatchesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *ProductionExceptionDecisionClient) Hooks() []Hook {
 	hooks := c.hooks.ProductionExceptionDecision
@@ -7225,6 +7241,22 @@ func (c *ProductionFactClient) QueryOriginReworkBatches(_m *ProductionFact) *Pro
 			sqlgraph.From(productionfact.Table, productionfact.FieldID, id),
 			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, productionfact.OriginReworkBatchesTable, productionfact.OriginReworkBatchesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPackagingBatches queries the packaging_batches edge of a ProductionFact.
+func (c *ProductionFactClient) QueryPackagingBatches(_m *ProductionFact) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionfact.Table, productionfact.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionfact.PackagingBatchesTable, productionfact.PackagingBatchesColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -8882,6 +8914,38 @@ func (c *ProductionWIPBatchClient) QueryCompletionFacts(_m *ProductionWIPBatch) 
 			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
 			sqlgraph.To(productionfact.Table, productionfact.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, productionwipbatch.CompletionFactsTable, productionwipbatch.CompletionFactsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOriginExceptionDecision queries the origin_exception_decision edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryOriginExceptionDecision(_m *ProductionWIPBatch) *ProductionExceptionDecisionQuery {
+	query := (&ProductionExceptionDecisionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(productionexceptiondecision.Table, productionexceptiondecision.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipbatch.OriginExceptionDecisionTable, productionwipbatch.OriginExceptionDecisionColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryFinishedGoodsReceipt queries the finished_goods_receipt edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryFinishedGoodsReceipt(_m *ProductionWIPBatch) *ProductionFactQuery {
+	query := (&ProductionFactClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(productionfact.Table, productionfact.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipbatch.FinishedGoodsReceiptTable, productionwipbatch.FinishedGoodsReceiptColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil

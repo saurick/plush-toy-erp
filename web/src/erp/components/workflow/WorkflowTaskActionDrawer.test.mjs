@@ -270,11 +270,30 @@ async function mountDrawer(t, overrides = {}) {
   }
 }
 
+test('drawer uses one header return for its source and prevents leaving during submission', async (t) => {
+  let returned = 0
+  const ui = await mountDrawer(t, { onReturnToTracking: () => returned++ })
+  const back = () => document.querySelector('.ant-drawer-header button[aria-label="返回流程"]')
+  assert(back())
+  assert.equal([...document.querySelectorAll('.ant-drawer-footer button')].some((button) => button.textContent.includes('返回流程')), false)
+  await ui.click(back())
+  assert.equal(returned, 1)
+  assert.equal(ui.closed, 0)
+  await ui.update({ actionSaving: true })
+  assert.equal(back(), null)
+  assert.equal(returned, 1)
+  await ui.update({ actionSaving: false, onReturnToTracking: null })
+  await ui.click(document.querySelector('.ant-drawer-header button[aria-label="返回列表"]'))
+  assert.equal(ui.closed, 1)
+})
+
 test('drawer step navigation and keyboard selection never submit an action', async (t) => {
   const ui = await mountDrawer(t)
   assert.equal(ui.tabs()[0].getAttribute('aria-selected'), 'true')
   assert.equal(ui.tabs()[2].disabled, true)
-  await ui.click(ui.tabs()[1])
+  assert.equal(document.querySelector('.erp-task-action-drawer__navigation').hidden, true)
+  await ui.click(ui.button('选择处理方式'))
+  assert.equal(document.querySelector('.erp-task-action-drawer__navigation').hidden, false)
   assert.equal(ui.tabs()[1].getAttribute('aria-selected'), 'true')
   await act(async () =>
     ui.tabs()[1].dispatchEvent(
@@ -305,14 +324,14 @@ test('drawer step navigation and keyboard selection never submit an action', asy
 
 test('all task types keep document viewing and the processing chain in the context step', async (t) => {
   const ui = await mountDrawer(t, { canOpenEntry: true })
-  assert.ok(ui.button('查看相关单据'))
+  assert.ok(ui.button('进入单据办理'))
   assert.ok(document.querySelector('[aria-label="任务处理链"]'))
-  await ui.click(ui.tabs()[1])
-  assert.equal(ui.button('查看相关单据'), undefined)
+  await ui.click(ui.button('选择处理方式'))
+  assert.equal(ui.button('进入单据办理'), undefined)
   assert.equal(document.querySelector('[aria-label="任务处理链"]'), null)
   assert.equal(document.querySelector('.erp-task-action-drawer__task-meta'), null)
   await ui.click(ui.tabs()[0])
-  assert.ok(ui.button('查看相关单据'))
+  assert.ok(ui.button('进入单据办理'))
   assert.ok(document.querySelector('[aria-label="任务处理链"]'))
   assert.equal(ui.submissions.length, 0)
 })
@@ -416,16 +435,16 @@ test('drawer renders authorized related-document entry and explains access loadi
     actionAvailabilityLoading: true,
   })
   assert.match(document.body.textContent, /正在确认可用的处理方式/)
-  assert.equal(ui.button('查看相关单据'), undefined)
+  assert.equal(ui.button('进入单据办理'), undefined)
   await ui.update({ canOpenEntry: true })
-  await ui.click(ui.button('查看相关单据'))
+  await ui.click(ui.button('进入单据办理'))
   assert.equal(ui.opened, 1)
   await ui.update({
     canOpenEntry: false,
     actionAvailabilityLoading: false,
     readonlyReason: '只能查看任务',
   })
-  assert.equal(ui.button('查看相关单据'), undefined)
+  assert.equal(ui.button('进入单据办理'), undefined)
   assert.match(document.body.textContent, /当前只能查看任务/)
 })
 

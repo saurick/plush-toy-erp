@@ -151,8 +151,9 @@ test('mismatched source, untrusted task and missing approval evidence cannot fab
 test('shared chain handles read errors, retry, source switching and permission withdrawal without stale records', async (t) => {
   const dom = installTestDOM()
   registerJSXTestLoader()
-  const [{ createRoot }, { default: Chain }, { JsonRpc }] = await Promise.all([
+  const [{ createRoot }, { MemoryRouter }, { default: Chain }, { JsonRpc }] = await Promise.all([
     import('react-dom/client'),
+    import('react-router-dom'),
     import('./WorkflowTaskHandlingChain.jsx'),
     import('../../../common/utils/jsonRpc.js'),
   ])
@@ -171,7 +172,7 @@ test('shared chain handles read errors, retry, source switching and permission w
   document.body.appendChild(container)
   const root = createRoot(container)
   const render = (task = taskFor(), user = profile) =>
-    act(async () => root.render(createElement(Chain, { task, profile: user })))
+    act(async () => root.render(createElement(MemoryRouter, {}, createElement(Chain, { task, profile: user }))))
   t.after(async () => {
     await act(async () => root.unmount())
     container.remove()
@@ -231,8 +232,8 @@ finance_reviewed_at: '2026-09-16T02:38:04Z',
     JsonRpc.prototype.call = original
     dom.restore()
   })
-  const render = (canOpen) => act(async () => root.render(createElement(MemoryRouter, {}, createElement(Chain, {
-    task: taskFor(), profile: { ...profile, permissions: [...profile.permissions, ...(canOpen ? ['purchase.order.read'] : [])], effective_session: { actions: [...profile.effective_session.actions, ...(canOpen ? ['purchase.order.read'] : [])] } },
+  const render = (canOpen, mobile = false) => act(async () => root.render(createElement(MemoryRouter, { key: mobile ? 'mobile' : 'desktop', initialEntries: [mobile ? '/m/engineering/tasks' : '/erp/task-board'] }, createElement(Chain, {
+    task: taskFor(), variant: mobile ? 'mobile' : 'desktop', profile: { ...profile, permissions: [...profile.permissions, ...(canOpen ? ['purchase.order.read'] : [])], effective_session: { actions: [...profile.effective_session.actions, ...(canOpen ? ['purchase.order.read'] : [])] } },
   }))))
   await render(true)
   assert.match(container.textContent, /已生成 2 张采购订单/)
@@ -241,4 +242,50 @@ finance_reviewed_at: '2026-09-16T02:38:04Z',
   await render(false)
   assert.equal(container.querySelectorAll('a').length, 0)
   assert.match(container.textContent, /PO-91/)
+  await render(true, true)
+  assert.deepEqual([...container.querySelectorAll('a')].map((a) => a.getAttribute('href')), ['/m/engineering/handle/purchase/accessories?purchase_order_id=91', '/m/engineering/handle/purchase/accessories?purchase_order_id=92'])
+  assert.doesNotMatch(container.textContent, /打印本次采购合同/u)
+})
+
+test('task detail requests only its own progress and opens the order overview explicitly', async (t) => {
+  const dom = installTestDOM()
+  registerJSXTestLoader()
+  const [{ createRoot }, { MemoryRouter }, { default: Chain }, { JsonRpc }] = await Promise.all([
+    import('react-dom/client'), import('react-router-dom'), import('./WorkflowTaskHandlingChain.jsx'), import('../../../common/utils/jsonRpc.js'),
+  ])
+  const original = JsonRpc.prototype.call
+  const views = []
+  const task = { id: 801, version: 1, task_name: '处理本次返工', source_type: 'production_fact', source_id: 41, task_status_key: 'ready', owner_role_key: 'production' }
+  const user = { id: 12, permissions: ['workflow.task.read'], effective_session: { actions: ['workflow.task.read'] } }
+  JsonRpc.prototype.call = async (method, params) => {
+    assert.equal(method, 'get_task_handling_chain')
+    views.push(params.view)
+    return { data: { truncated: false,
+items: [
+      { ...task, id: params.task_id },
+      { ...task, id: 802, task_name: '本次返工复检', source_type: 'quality_inspection', task_status_key: 'blocked' },
+      ...(params.view === 'order' ? [{ ...task, id: 803, task_name: '另一张采购单收货', source_type: 'purchase_order', task_status_key: 'blocked' }] : []),
+    ] } }
+  }
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove(); JsonRpc.prototype.call = original; dom.restore() })
+  const render = (id = 801) => act(async () => root.render(createElement(MemoryRouter, {}, createElement(Chain, { task: { ...task, id }, profile: user }))))
+  await render()
+  assert.deepEqual(views, ['task'])
+  assert.match(container.textContent, /本次返工复检/u)
+  assert.doesNotMatch(container.textContent, /另一张采购单收货|其他关联任务|接单与用料/u)
+  assert.equal(container.querySelectorAll('details').length, 0)
+  assert.equal(container.querySelectorAll('li').length, 2)
+  await act(async () => container.querySelector('button').click())
+  assert.deepEqual(views, ['task', 'order'])
+  assert.match(container.textContent, /订单全流程|另一张采购单收货/u)
+  await act(async () => container.querySelector('button').click())
+  assert.match(container.textContent, /本任务处理进度/u)
+  assert.doesNotMatch(container.textContent, /另一张采购单收货/u)
+  await act(async () => container.querySelector('button').click())
+  await render(804)
+  assert.equal(views.at(-1), 'task')
+  assert.doesNotMatch(container.textContent, /另一张采购单收货/u)
 })

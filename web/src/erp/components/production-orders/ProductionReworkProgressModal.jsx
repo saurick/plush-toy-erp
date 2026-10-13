@@ -64,7 +64,7 @@ function progressMeta({
     }
   }
   if (
-    compareNumeric20Scale6Values(acceptedPackagingQuantity, '0') > 0 &&
+    compareNumeric20Scale6Values(acceptedPackagingQuantity, root.quantity) >= 0 &&
     compareNumeric20Scale6Values(
       postedQuantity,
       acceptedPackagingQuantity
@@ -72,36 +72,36 @@ function progressMeta({
   ) {
     return {
       key: 'completed',
-      label: '补完工已过账',
+      label: '返工成品已可发货',
       color: 'green',
-      description: '包装验收批次已全部登记补完工，库存已按完工记录更新。',
+      description: '返工成品已收仓，查货与包装全部完成。',
       pending: false,
     }
   }
   if (compareNumeric20Scale6Values(postedQuantity, '0') > 0) {
     return {
       key: 'partially-completed',
-      label: '部分补完工已过账',
+      label: '已入库，待查货包装',
       color: 'blue',
-      description: '已有包装验收批次完成过账，其余返工数量仍待继续处理。',
+      description: '已记录成品库存；质量关口、查货和包装完成后才可发货。',
       pending: true,
     }
   }
   if (compareNumeric20Scale6Values(draftQuantity, '0') > 0) {
     return {
       key: 'completion-draft',
-      label: '补完工草稿待过账',
+      label: '成品入库草稿待过账',
       color: 'gold',
-      description: '补完工草稿已生成，待业务核对并过账。',
+      description: '成品入库草稿已生成，待仓库核对数量与库位后过账。',
       pending: true,
     }
   }
-  if (compareNumeric20Scale6Values(acceptedPackagingQuantity, '0') > 0) {
+  if (activeOperation?.operation_code === 'HANDWORK' && ['WAITING_QUALITY', 'ACCEPTED', 'REJECTED'].includes(activeBatch?.status)) {
     return {
       key: 'ready-for-completion',
-      label: '待登记补完工',
+      label: '手工完成，待成品入库',
       color: 'purple',
-      description: '包装和质量关口已完成，可按包装验收批次登记补完工。',
+      description: '仓库可按手工完成批次清点入库；待检和待包装数量暂不可发货。',
       pending: true,
     }
   }
@@ -115,7 +115,7 @@ function progressMeta({
     OUTSOURCED: `${operationLabel}正在外发加工。`,
     WAITING_QUALITY: `${operationLabel}已完工，待品质检验。`,
     ACCEPTED: `${operationLabel}已检验合格，待转入下道工序。`,
-    REJECTED: `${operationLabel}检验不合格，待办理工序返工。`,
+    REJECTED: `${operationLabel}检验不合格，待业务决定异常方案。`,
     SPLIT: '返工数量已拆分，待继续办理子批次。',
   }
   return {
@@ -176,7 +176,7 @@ export function buildProductionReworkProgressItems({
       )
       const totals = completionTotals(
         factRows,
-        new Set(acceptedPackagingBatches.map((batch) => batch.id))
+        new Set(lineage.map((batch) => batch.id))
       )
       const progress = progressMeta({
         root,
@@ -303,7 +303,7 @@ export default function ProductionReworkProgressModal({
       open={open}
       width={ERP_MODAL_WIDTHS.lineItems}
       title="成品返工进度"
-      description="从返工记录追踪手工补制、质量关口、包装验收到补完工过账。"
+      description="从返工记录追踪手工补制、成品入库、质量关口到查货包装完成。"
       icon={<BranchesOutlined />}
       footer={
         <Space wrap>

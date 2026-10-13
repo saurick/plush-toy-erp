@@ -281,8 +281,8 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
   'production-progress': guide({
     task: '记录实际领料、返工和完工入库。',
     completion:
-      '对应记录已过账且数量可查；完工报告须由仓库确认入库后才增加库存。',
-    handoff: '完工报告交仓库；缺料找 PMC / 采购，数量差异找来源经办岗位核对。',
+      '对应记录已过账且数量可查；成品收仓草稿须由仓库确认入库后才增加库存。',
+    handoff: '成品收仓草稿交仓库；缺料找 PMC / 采购，数量差异找来源经办岗位核对。',
     requiredHelpTypes: [
       BUSINESS_HELP_TYPES.TERM,
       BUSINESS_HELP_TYPES.SOURCE,
@@ -291,22 +291,22 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     ],
     flowSteps: [
       '打开来源生产订单，选择本次领料、返工或成品入库记录。',
-      '核对产品或材料、单位、数量、仓库和批次；完工报告交仓库核对实收。',
+      '核对产品或材料、单位、数量、仓库和批次；成品收仓草稿交仓库核对实收。',
       '按当前记录允许的动作确认，再查看过账状态和相关库存变化。',
     ],
     items: [
       helpItem(
         BUSINESS_HELP_TYPES.TERM,
         'report-vs-receipt',
-        '完工报告等于已经入库吗',
-        '不等于。生产提交报告后，仓库还要核对实收并确认成品入库。',
+        '成品收仓草稿等于已经入库吗',
+        '不等于。仓库登记草稿后，仓库还要核对实收并确认成品入库。',
         { effect: '草稿、工序完成和任务完成都不能代替正式库存记录。' }
       ),
       helpItem(
         BUSINESS_HELP_TYPES.SOURCE,
         'production-record-source',
         '数量从哪里核对',
-        '领料核对生产订单物料需求和已领数量；返工核对原完工来源；成品入库核对完工报告和实收数量。'
+        '领料核对生产订单物料需求和已领数量；返工核对原完工来源；成品入库核对成品收仓草稿和实收数量。'
       ),
       helpItem(
         BUSINESS_HELP_TYPES.DISABLED,
@@ -317,7 +317,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     ],
   }),
   'production-exceptions': guide({
-    task: '申请并跟进报废、在制让步或超领处理。',
+    task: '由业务确定并跟进返工、补料重做、报废、在制让步或超领方案。',
     completion:
       '来源、原因和审批结果可查；需要执行的处置还须核对正式执行结果。',
     handoff:
@@ -329,7 +329,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
       BUSINESS_HELP_TYPES.DISABLED,
     ],
     flowSteps: [
-      '核对生产来源、受影响数量和原因，选择报废、在制让步或超领申请。',
+      '核对生产来源、受影响数量和原因，选择原厂返工、换厂返工、补料重做、报废、在制让步或超领申请。',
       '补齐依据后提交申请，审批未通过前暂停受影响的办理。',
       '批准后按允许动作执行，回来源核对数量与状态；审批通过不等于已执行。',
     ],
@@ -356,8 +356,8 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
   }),
   'shipping-release': guide({
     task: '财务核对出货单，确认是否允许发货。',
-    completion: '当前出货单版本已获财务放行；实际发货仍由仓库确认。',
-    handoff: '放行后交仓库确认实际出货；金额或客户条件有差异先找销售核对。',
+    completion: '当前出货单版本已获财务放行；实际发货由业务在出货单确认。',
+    handoff: '放行后交业务确认实际出货；金额或客户条件有差异先找销售核对。',
     requiredHelpTypes: [
       BUSINESS_HELP_TYPES.TERM,
       BUSINESS_HELP_TYPES.SOURCE,
@@ -367,14 +367,14 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     flowSteps: [
       '打开出货单发起的财务审批，核对来源和当前版本。',
       '核对客户、订单、出货内容与财务条件，不符合时退回并说明原因。',
-      '批准后交仓库确认实物发出；再到出货单核对实际结果。',
+      '批准后交业务确认实物发出；再到出货单核对实际结果。',
     ],
     items: [
       helpItem(
         BUSINESS_HELP_TYPES.TERM,
         'release-vs-shipped',
         '放行就是已经出货吗',
-        '不是。放行表示允许继续发货，只有仓库确认“已出货”才表示实际出货和库存扣减完成。'
+        '不是。放行表示允许继续发货，只有业务确认“已出货”才表示实际出货和库存扣减完成。'
       ),
       helpItem(
         BUSINESS_HELP_TYPES.SOURCE,
@@ -394,7 +394,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     task: '查看销售订单锁定的库存，必要时释放预留。',
     completion:
       '预留来源、数量和当前状态可查；释放后可用数量恢复，实际出货另行确认。',
-    handoff: '需要发货交仓库到出货页面办理；订单或预留数量有差异先找销售核对。',
+    handoff: '需要发货交业务到出货页面办理；订单或预留数量有差异先找销售核对。',
     requiredHelpTypes: [
       BUSINESS_HELP_TYPES.TERM,
       BUSINESS_HELP_TYPES.SOURCE,
@@ -452,7 +452,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
         BUSINESS_HELP_TYPES.SOURCE,
         'receivable-source',
         '应收从哪里来',
-        '从仓库已确认实际出货的出货单生成，销售订单或放行审批本身不能代替出货来源。'
+        '从业务已确认实际出货的出货单生成，销售订单或放行审批本身不能代替出货来源。'
       ),
       helpItem(
         BUSINESS_HELP_TYPES.FORMULA,
@@ -609,7 +609,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
       '销售核对客户、产品、数量、价格和交期后保存订单。',
       '提交订单并等待审批；被退回时按原因修正后重新提交。',
       '订单显示“已生效”后，PMC、工程和生产再继续准备。',
-      '仓库确认实际出货后，财务再办理应收、发票和收款。',
+      '业务确认实际出货后，财务再办理应收、发票和收款。',
     ],
     items: [
       helpItem(
@@ -736,7 +736,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
         BUSINESS_HELP_TYPES.TERM,
         'purchase-commitment',
         '采购订单为什么不是入库单',
-        '采购订单记录向供应商采购什么、多少和何时到货；只有仓库确认入库过账后，库存才会变化。',
+        '采购订单记录向供应商采购什么、多少和何时到货；只有业务确认入库过账后，库存才会变化。',
         {
           effect: '订单审批、任务完成或供应商口头确认都不会自动增加库存。',
         }
@@ -801,7 +801,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
         BUSINESS_HELP_TYPES.SOURCE,
         'receipt-source',
         '入库明细从哪里来',
-        '正式入库草稿来自已审核采购订单。IQC 填写本次实点数量，可分批或分卷；送货标示数量只用于比较本次差异。',
+        '正式入库草稿来自已审核采购订单。仓库填写本次实点数量，可分批或分卷；送货标示数量只用于比较本次差异。',
         {
           updateRule:
             '未到货部分保留在订单余量中；未入库录错可取消后重录，已入库差异按退货、调整或冲正办理。',
@@ -991,7 +991,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     completion:
       '生产订单号、产品与规格、计划数量、冻结物料需求、固定工序路线、当前状态和交接记录都能查到。',
     handoff:
-      '发布后交 PMC 排程和生产执行；缺料交采购，质量关口交品质，完工报告交仓库核对实收并确认入库。',
+      '发布后交 PMC 排程和生产执行；缺料交采购，质量关口交品质，成品收仓草稿交仓库核对实收并确认入库。',
     requiredHelpTypes: [
       BUSINESS_HELP_TYPES.TERM,
       BUSINESS_HELP_TYPES.SOURCE,
@@ -1002,7 +1002,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
       '从销售来源、产品和当前生效物料清单准备生产订单。',
       '发布时冻结产品、物料需求和固定工序路线，并生成 PMC 排程待办。',
       '生产按在制批次推进布料加工、车缝、手工、包装及必要质检。',
-      '生产提交完工报告，仓库核对实收并确认入库后，库存才增加。',
+      '手工成品由仓库正式入库并记录库存；检验合格、查货包装完成后才可发货。',
     ],
     items: [
       helpItem(
@@ -1036,7 +1036,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
     completion:
       '出货单号、客户、销售来源、产品与规格、仓库、批次、数量、质检和财务放行状态都能查到；只有“已出货”才表示实际出货和库存扣减完成。',
     handoff:
-      '需要检验时先交品质，随后交财务放行，最后由仓库确认实际出货；已出货结果再交销售和财务办理应收及开票。',
+      '需要检验时先交品质，随后交财务放行，最后由业务确认实际出货；已出货结果再交销售和财务办理应收及开票。',
     requiredHelpTypes: [
       BUSINESS_HELP_TYPES.TERM,
       BUSINESS_HELP_TYPES.SOURCE,
@@ -1047,7 +1047,7 @@ const GUIDE_BY_PAGE_KEY = Object.freeze({
       '从销售订单准备出货草稿，核对客户、产品、规格、仓库、批次和数量。',
       '需要出货前检验时由品质完成合格或让步接收判定。',
       '启动财务放行并等待当前出货单版本审批通过。',
-      '仓库确认实际出货后才扣减库存，再由财务生成应收或发票记录。',
+      '业务确认实际出货后才扣减库存，再由财务生成应收或发票记录。',
     ],
     items: [
       helpItem(

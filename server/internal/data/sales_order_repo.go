@@ -208,6 +208,9 @@ func (r *salesOrderRepo) salesOrderListQuery(filter biz.SalesOrderFilter) *ent.S
 	if filter.CustomerID > 0 {
 		query = query.Where(salesorder.CustomerID(filter.CustomerID))
 	}
+	if filter.SampleBOMID > 0 {
+		query = query.Where(salesorder.HasItemsWith(salesorderitem.SampleBomID(filter.SampleBOMID)))
+	}
 	if filter.LifecycleStatus != "" {
 		query = query.Where(salesorder.LifecycleStatus(filter.LifecycleStatus))
 	} else if statuses := biz.LifecycleStatusesForScope(

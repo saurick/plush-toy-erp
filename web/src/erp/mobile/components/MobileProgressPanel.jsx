@@ -28,6 +28,10 @@ import {
   progressDelivery,
   progressQueryFromURL,
   progressStatusLabel,
+  PROGRESS_SCOPE_OPTIONS,
+  PROGRESS_RISK_OPTIONS,
+  progressRiskAvailable,
+  withProgressFilters,
 } from '../../utils/businessProgress.mjs'
 import { getWorkflowTaskOwnerRoleLabel } from '../../utils/workflowTaskBoard.mjs'
 import {
@@ -38,6 +42,7 @@ import {
 import MobileTaskPullRefresh from './MobileTaskPullRefresh'
 import MobileFilterPopover from './MobileFilterPopover'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
+import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import '../../styles/app/progress-board.css'
 import '../mobileProgress.css'
 
@@ -156,14 +161,17 @@ export default function MobileProgressPanel({
 
   const update = (changes) => {
     clearTimeout(timer.current)
-    setValues((current) => ({
-      ...current,
-      owner: '',
-      from: '',
-      to: '',
-      page: 1,
-      ...changes,
-    }))
+    setValues((current) => {
+      const next = withProgressFilters(current, changes)
+      return {
+        ...Object.fromEntries(next),
+        q: next.get('q') || '',
+        owner: '',
+        from: '',
+        to: '',
+        page: 1,
+      }
+    })
     restoreScroll.current = 0
     scrollRef.current?.scrollTo({ top: 0 })
   }
@@ -345,22 +353,24 @@ export default function MobileProgressPanel({
       : []),
   ]
   const filtered =
-    values.q || values.scope !== 'active' || values.risk !== 'all'
+    values.q || query.scope !== 'active' || query.risk !== 'all'
   const hiddenFilterCount = [
-    values.scope !== 'active',
-    ['undated', 'unlinked'].includes(values.risk),
+    query.scope !== 'active',
+    query.risk !== 'all',
   ].filter(Boolean).length
   const riskOptions = [
-    ['all', '全部', counts?.total],
+    [
+      'all',
+      PROGRESS_SCOPE_OPTIONS.find(({ value }) => value === query.scope)?.label,
+      counts?.total,
+    ],
     ['overdue', '已逾期', counts?.overdue],
-    ['due_soon', '7天内', counts?.due_soon],
+    ['due_soon', '7天内到期', counts?.due_soon],
     ['blocked', '任务受阻', counts?.blocked],
   ]
-  const moreRiskOptions = [
-    ['all', '不限'],
-    ['undated', '未定交期'],
-    ...(query.view === 'production' ? [['unlinked', '未关联销售']] : []),
-  ]
+  const riskDisabled = (risk) =>
+    !progressRiskAvailable(risk, query) ||
+    (risk === 'blocked' && data?.access.tasks === false)
   return (
     <section
       hidden={!active}
@@ -386,7 +396,7 @@ export default function MobileProgressPanel({
           <div className="mobile-progress-search">
             <MobileSearchInput
               aria-label="搜索进度"
-              placeholder="单号、客户、产品、负责人"
+              placeholder="单号、名称或负责人"
               value={keyword}
               maxLength={100}
               onCompositionStart={() => {
@@ -438,31 +448,32 @@ export default function MobileProgressPanel({
                 <SlidingSegmented
                   block
                   aria-label="记录范围"
-                  value={values.scope}
-                  options={[
-                    { value: 'active', label: '在执行' },
-                    { value: 'all', label: '全部' },
-                    { value: 'ended', label: '已结束' },
-                  ]}
+                  value={query.scope}
+                  options={PROGRESS_SCOPE_OPTIONS}
                   onChange={(scope) => update({ scope })}
                 />
               </fieldset>
               <fieldset>
-                <legend>其他关注</legend>
-                <SlidingSegmented
-                  block
-                  aria-label="其他关注"
-                  value={
-                    moreRiskOptions.some(([key]) => key === values.risk)
-                      ? values.risk
-                      : null
-                  }
-                  options={moreRiskOptions.map(([value, label]) => ({
-                    value,
-                    label,
-                  }))}
-                  onChange={(risk) => update({ risk })}
-                />
+                <legend>关注条件（单选）</legend>
+                <div
+                  className="mobile-progress-risk-options"
+                  role="group"
+                  aria-label="关注条件"
+                >
+                  {PROGRESS_RISK_OPTIONS.filter(
+                    ({ value }) =>
+                      value !== 'unlinked' || query.view === 'production'
+                  ).map(({ value, label }) => (
+                    <FilterChip
+                      key={value}
+                      selected={query.risk === value}
+                      disabled={riskDisabled(value)}
+                      onClick={() => update({ risk: value })}
+                    >
+                      {label}
+                    </FilterChip>
+                  ))}
+                </div>
               </fieldset>
             </MobileFilterPopover>
           </div>
@@ -476,19 +487,18 @@ export default function MobileProgressPanel({
                 key={key}
                 selected={query.risk === key}
                 count={count ?? '—'}
-                disabled={key === 'blocked' && data?.access.tasks === false}
+                disabled={riskDisabled(key)}
                 onClick={() => update({ risk: key })}
               >
                 {label}
               </FilterChip>
             ))}
           </div>
-          {(values.scope !== 'active' ||
+          {(values.scope === 'ended' ||
             query.risk === 'undated' ||
             query.risk === 'unlinked') && (
             <p className="mobile-progress-applied">
               {[
-                values.scope === 'all' && '全部记录',
                 values.scope === 'ended' && '已结束',
                 query.risk === 'undated' && '未定交期',
                 query.risk === 'unlinked' && '含未关联销售的生产明细',
@@ -706,6 +716,7 @@ export default function MobileProgressPanel({
             {query.view === 'orders' ? '订单' : '生产单'}
           </div>
         ) : null}
+        <MobileBackToTop enabled={active && !selection} />
       </div>
       <BusinessProgressDrawer
         mobile

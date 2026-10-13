@@ -27,6 +27,9 @@ func TestProductionWIPPrepareOutsourcingUsesManagerSelectionAndReplays(t *testin
 		t.Fatal(err)
 	}
 	order := f.client.OutsourcingOrder.GetX(ctx, prepared.OutsourcingOrderID)
+	if mapped := entOutsourcingOrderToBiz(order); mapped.SourceWIPBatchID == nil || *mapped.SourceWIPBatchID != batch.ID {
+		t.Fatal("contract response lost its prepared WIP source")
+	}
 	if order.LifecycleStatus != biz.OutsourcingOrderStatusDraft || order.SourceWipBatchID == nil || *order.SourceWipBatchID != batch.ID || order.SourceWipPreparedBy == nil || *order.SourceWipPreparedBy != f.actorID {
 		t.Fatalf("generated contract trace: %+v", order)
 	}

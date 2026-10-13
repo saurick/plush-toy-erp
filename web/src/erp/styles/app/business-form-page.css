@@ -74,6 +74,7 @@
 }
 
 .erp-business-form-page__main {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   min-height: 0;

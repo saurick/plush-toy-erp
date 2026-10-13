@@ -182,6 +182,7 @@ type SalesOrderWithItems struct {
 type SalesOrderFilter struct {
 	Keyword         string
 	CustomerID      int
+	SampleBOMID     int
 	LifecycleStatus string
 	LifecycleScope  string
 	DateField       string
@@ -775,7 +776,7 @@ func normalizeSalesOrderFilter(in SalesOrderFilter) (SalesOrderFilter, error) {
 	) {
 		return SalesOrderFilter{}, ErrBadParam
 	}
-	if in.CustomerID < 0 {
+	if in.CustomerID < 0 || in.SampleBOMID < 0 {
 		return SalesOrderFilter{}, ErrBadParam
 	}
 	switch in.DateField {

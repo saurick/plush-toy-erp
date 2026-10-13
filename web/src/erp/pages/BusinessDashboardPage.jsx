@@ -25,6 +25,9 @@ import {
   progressQueryFromURL,
   progressDelivery,
   progressStages,
+  PROGRESS_SCOPE_OPTIONS,
+  progressRiskAvailable,
+  withProgressFilters,
 } from '../utils/businessProgress.mjs'
 import useBusinessStatistics from '../components/business-visualizations/useBusinessStatistics.jsx'
 import BusinessProgressDrawer from '../components/business-visualizations/BusinessProgressDrawer.jsx'
@@ -37,11 +40,6 @@ import { DateRangeFilter } from '../components/business-list/BusinessListLayout.
 import { ProductThumbnail } from '../components/master-data/ProductIdentity.jsx'
 import '../styles/app/progress-board.css'
 
-const SCOPES = [
-  { value: 'active', label: '在执行' },
-  { value: 'ended', label: '已结束' },
-  { value: 'all', label: '全部记录' },
-]
 const count = (value) =>
   Number.isSafeInteger(value)
     ? new Intl.NumberFormat('zh-CN').format(value)
@@ -101,15 +99,11 @@ export default function BusinessDashboardPage() {
   const update = useCallback(
     (changes) => {
       setParams((previous) => {
-        const next = new URLSearchParams(previous)
-        next.delete('page')
-        next.delete('selected')
-        for (const [key, value] of Object.entries(changes)) {
-          if (value === '' || value === null || value === undefined) {
-            next.delete(key)
-          } else next.set(key, String(value))
-        }
-        return next
+        return withProgressFilters(previous, {
+          page: '',
+          selected: '',
+          ...changes,
+        })
       })
       setSelection(null)
     },
@@ -211,14 +205,15 @@ export default function BusinessDashboardPage() {
     {
       key: 'all',
       label:
-        SCOPES.find((item) => item.value === query.scope)?.label || '在执行',
+        PROGRESS_SCOPE_OPTIONS.find((item) => item.value === query.scope)
+          ?.label || '在执行',
       number: data?.counts.total,
     },
     { key: 'overdue', label: '已逾期', number: data?.counts.overdue },
-    { key: 'due_soon', label: '7 天内到期', number: data?.counts.due_soon },
+    { key: 'due_soon', label: '7天内到期', number: data?.counts.due_soon },
     {
       key: 'blocked',
-      label: '任务阻塞',
+      label: '任务受阻',
       number: access?.tasks === false ? undefined : data?.counts.blocked,
     },
     { key: 'undated', label: '未定交期', number: data?.counts.undated },
@@ -316,7 +311,7 @@ export default function BusinessDashboardPage() {
               <Select
                 aria-label="记录范围"
                 value={query.scope}
-                options={SCOPES}
+                options={PROGRESS_SCOPE_OPTIONS}
                 onChange={(value) => update({ scope: value })}
                 className="erp-progress-scope"
               />
@@ -362,7 +357,7 @@ export default function BusinessDashboardPage() {
                     {view === 'production' && (
                       <Button
                         onClick={() => {
-                          update({ risk: 'unlinked' })
+                          update({ view: 'production', risk: 'unlinked' })
                           setMoreOpen(false)
                         }}
                       >
@@ -425,6 +420,7 @@ export default function BusinessDashboardPage() {
                   disabled={
                     loading ||
                     !data ||
+                    !progressRiskAvailable(metric.key, query) ||
                     (metric.key === 'blocked' && access?.tasks === false)
                   }
                   onClick={() => update({ risk: metric.key })}

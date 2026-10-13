@@ -7,6 +7,7 @@ import test from 'node:test'
 import {
   buildPreflightReport,
   buildRealSmokeReport,
+  createPageRequestTracker,
   evaluatePagePerformanceAcceptance,
   summarizePagePerformance,
 } from './trialDemoAccountBrowserSmoke.mjs'
@@ -16,6 +17,54 @@ const scriptPath = path.resolve(
   repoRoot,
   'web/scripts/trialDemoAccountBrowserSmoke.mjs'
 )
+
+function trackedRPC(id, params = { limit: 1 }) {
+  const payload = { jsonrpc: '2.0', id, method: 'get_task_board', params }
+  return {
+    method: () => 'POST',
+    url: () => 'http://localhost/rpc/workflow',
+    postData: () => JSON.stringify(payload),
+    postDataJSON: () => payload,
+  }
+}
+
+test('page request sample stays open until response body transfer finishes', async () => {
+  const tracker = createPageRequestTracker()
+  const request = trackedRPC('slow-body')
+  tracker.begin({ username: 'demo', label: '任务管理', path: '/erp/task-board' })
+  tracker.record(request)
+  tracker.recordResponse({ request: () => request, status: () => 200 })
+  let settled = false
+  const completion = tracker.finish().then((result) => {
+    settled = true
+    return result
+  })
+  await new Promise((resolve) => setTimeout(resolve, 140))
+  const settledBeforeBody = settled
+  tracker.recordFinished(request)
+  const result = await completion
+  assert.equal(settledBeforeBody, false)
+  assert.equal(result.completedRpcRequestCount, 1)
+  assert.equal(result.unsettledRpcRequestCount, 0)
+})
+
+test('page request samples count identical business reads despite different RPC ids and reset on the next page', async () => {
+  const tracker = createPageRequestTracker()
+  const meta = { username: 'demo', label: '任务管理', path: '/erp/task-board' }
+  tracker.begin(meta)
+  for (const request of [trackedRPC('first'), trackedRPC('second'), trackedRPC('other-query', { limit: 20 })]) {
+    tracker.record(request)
+    tracker.recordResponse({ request: () => request, status: () => 200 })
+    tracker.recordFinished(request)
+  }
+  const first = await tracker.finish()
+  assert.equal(first.rpcRequestCount, 3)
+  assert.equal(first.semanticDuplicateRequestCount, 1)
+  tracker.begin(meta)
+  const second = await tracker.finish()
+  assert.equal(second.rpcRequestCount, 0)
+  assert.equal(second.semanticDuplicateRequestCount, 0)
+})
 
 function createMockYoyoosunEntryAuditRuntime() {
   return {
@@ -796,19 +845,13 @@ test('trial demo account browser smoke source keeps no-write template before run
   assert.match(source, /legal-notice-gate[\s\S]*?\.ant-modal:visible/u)
   assert.match(source, /legal-notice-acknowledge/u)
   assert.doesNotMatch(source, /legal-notice-gate"\]:visible/u)
-  assert.match(
-    source,
-    /for \(const label of expectedVisibleLeafMenus\)[\s\S]*?findVisibleMenuItem/u
-  )
-  assert.match(source, /ancestor::li/u)
-  assert.match(source, /ant-menu-submenu-open/u)
-  assert.match(source, /attempt <= 3/u)
-  assert.doesNotMatch(source, /submenu\.elementHandle/u)
-  assert.match(source, /item\.count\(\)\) === 0/u)
+  assert.match(source, /openModuleCatalog/u)
+  assert.match(source, /erp-module-catalog__entry/u)
+  assert.match(source, /actualVisibleMenus,[\s\S]*?expectedVisibleLeafMenus/u)
+  assert.match(source, /actualSidebarLabels, expectedSidebarLabels/u)
+  assert.match(source, /getBusinessModuleGroup\(definition.path\)/u)
   assert.match(source, /data-navigation-presentation/u)
-  assert.match(source, /不在首层菜单时必须存在唯一的“更多功能”入口/u)
-  assert.match(source, /父菜单必须是正式“更多功能”分组/u)
-  assert.doesNotMatch(source, /if \(await item\.isVisible/u)
+  assert.doesNotMatch(source, /ant-menu-submenu-open|更多功能/u)
   assert.match(source, /\.ant-menu-item-group/u)
   assert.match(source, /\.ant-menu-item-group-title/u)
   assert.match(source, /\.ant-menu-item-group-list/u)

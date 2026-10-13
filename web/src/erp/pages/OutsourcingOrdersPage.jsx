@@ -9,7 +9,8 @@ import {
   SettingOutlined,
 } from '@ant-design/icons'
 import { Button, Space } from 'antd'
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
@@ -128,7 +129,7 @@ import {
 
 export default function OutsourcingOrdersPage() {
   const outletContext = useOutletContext()
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
 
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},

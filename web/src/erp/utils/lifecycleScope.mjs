@@ -83,3 +83,9 @@ export function lifecycleScopeIncludesStatus(
     ? isHistory
     : !isHistory
 }
+
+export function normalizeLifecycleStatus(scope, status, historyStatuses = []) {
+  return lifecycleScopeIncludesStatus(scope, status, historyStatuses)
+    ? status || ''
+    : ''
+}

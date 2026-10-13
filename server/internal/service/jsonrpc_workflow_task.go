@@ -27,9 +27,15 @@ const (
 )
 
 type workflowRoleTaskViewRequest struct {
+	biz.WorkflowTaskDiscoveryFilter
 	Keyword              string
 	SortKey              string
 	StatusKey            string
+	Period               string
+	DateFrom             string
+	DateTo               string
+	CompletedFrom        *time.Time
+	CompletedBefore      *time.Time
 	BeforeTime           *time.Time
 	Method               string
 	ViewKey              string
@@ -47,9 +53,13 @@ type workflowRoleTaskViewRequest struct {
 }
 
 type workflowRoleTaskViewCursor struct {
+	biz.WorkflowTaskDiscoveryFilter
 	Keyword        string     `json:"keyword"`
 	SortKey        string     `json:"sort_key"`
 	StatusKey      string     `json:"status_key"`
+	Period         string     `json:"period"`
+	DateFrom       string     `json:"date_from"`
+	DateTo         string     `json:"date_to"`
 	BeforeTime     *time.Time `json:"before_time"`
 	Version        int        `json:"v"`
 	Method         string     `json:"method"`
@@ -322,6 +332,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			"owner_role_key",
 			"due",
 			"source_type",
+			"module_key", "stage_key", "chain_key", "assignee",
 			"lane_key",
 			"sort",
 			"approval_only",
@@ -640,6 +651,10 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 }
 
 func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *v1.JsonrpcResult) {
+	discovery, discoveryRes := getWorkflowTaskDiscoveryFilter(pm)
+	if discoveryRes != nil {
+		return biz.WorkflowTaskBoardQuery{}, discoveryRes
+	}
 	keyword, res := getOptionalWorkflowTaskBoardString(pm, "keyword", 200)
 	if res != nil {
 		return biz.WorkflowTaskBoardQuery{}, res
@@ -696,17 +711,18 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 		return biz.WorkflowTaskBoardQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "offset 必须是非负整数"}
 	}
 	return biz.WorkflowTaskBoardQuery{
-		Keyword:      keyword,
-		Status:       status,
-		OwnerRoleKey: ownerRoleKey,
-		Due:          due,
-		SourceType:   sourceType,
-		LaneKey:      laneKey,
-		Sort:         sortKey,
-		ApprovalOnly: approvalOnly,
-		TodoOnly:     todoOnly,
-		Limit:        limit,
-		Offset:       offset,
+		WorkflowTaskDiscoveryFilter: discovery,
+		Keyword:                     keyword,
+		Status:                      status,
+		OwnerRoleKey:                ownerRoleKey,
+		Due:                         due,
+		SourceType:                  sourceType,
+		LaneKey:                     laneKey,
+		Sort:                        sortKey,
+		ApprovalOnly:                approvalOnly,
+		TodoOnly:                    todoOnly,
+		Limit:                       limit,
+		Offset:                      offset,
 	}, nil
 }
 
@@ -822,6 +838,7 @@ func workflowTaskBoardToMap(board *biz.WorkflowTaskBoard) map[string]any {
 		"lanes":           lanes,
 		"source_types":    toAnySliceString(board.SourceTypes),
 		"owner_role_keys": toAnySliceString(board.OwnerRoleKeys),
+		"assignees":       workflowTaskPeopleToAny(board.Assignees),
 	}
 }
 
@@ -1268,7 +1285,7 @@ func parseWorkflowRoleTaskViewRequest(
 	pm map[string]any,
 	method string,
 ) (workflowRoleTaskViewRequest, *v1.JsonrpcResult) {
-	if res := rejectUnknownWorkflowTaskParams(pm, method, "view_key", "role_key", "limit", "cursor", "keyword", "sort_key", "status_key"); res != nil {
+	if res := rejectUnknownWorkflowTaskParams(pm, method, "view_key", "role_key", "limit", "cursor", "keyword", "sort_key", "status_key", "period", "date_from", "date_to", "module_key", "stage_key", "chain_key", "assignee"); res != nil {
 		return workflowRoleTaskViewRequest{}, res
 	}
 	request := workflowRoleTaskViewRequest{
@@ -1289,7 +1306,7 @@ func parseWorkflowRoleTaskViewRequest(
 		}
 		request.Keyword = strings.TrimSpace(value)
 	}
-	for key, target := range map[string]*string{"sort_key": &request.SortKey, "status_key": &request.StatusKey} {
+	for key, target := range map[string]*string{"sort_key": &request.SortKey, "status_key": &request.StatusKey, "period": &request.Period, "date_from": &request.DateFrom, "date_to": &request.DateTo} {
 		if raw, exists := pm[key]; exists {
 			value, ok := raw.(string)
 			if !ok || value == "" || value != strings.TrimSpace(value) {
@@ -1298,11 +1315,18 @@ func parseWorkflowRoleTaskViewRequest(
 			*target = value
 		}
 	}
-	if !biz.ValidWorkflowRoleTaskListOptions(request.SortKey, request.StatusKey) ||
-		(request.ViewKey == biz.WorkflowRoleTaskViewHistory && request.StatusKey != "") {
+	if !biz.ValidWorkflowRoleTaskListOptions(request.ViewKey, request.SortKey, request.StatusKey) ||
+		(request.ViewKey != biz.WorkflowRoleTaskViewHistory && (request.Period != "" || request.DateFrom != "" || request.DateTo != "")) {
 		return workflowRoleTaskViewRequest{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务筛选或排序无效"}
 	}
+	if request.ViewKey == biz.WorkflowRoleTaskViewHistory {
+		request.SortKey = biz.WorkflowRoleTaskSortCompleted
+	}
 	limit, limitRes := getWorkflowRoleTaskViewLimit(pm)
+	if limitRes != nil {
+		return workflowRoleTaskViewRequest{}, limitRes
+	}
+	request.WorkflowTaskDiscoveryFilter, limitRes = getWorkflowTaskDiscoveryFilter(pm)
 	if limitRes != nil {
 		return workflowRoleTaskViewRequest{}, limitRes
 	}
@@ -1322,10 +1346,12 @@ func parseWorkflowRoleTaskViewRequest(
 	if cursor != "" {
 		cursorState, cursorRes := decodeWorkflowRoleTaskViewCursor(cursor)
 		if cursorRes != nil ||
+			cursorState.WorkflowTaskDiscoveryFilter != request.WorkflowTaskDiscoveryFilter ||
 			cursorState.Method != request.Method ||
 			cursorState.ViewKey != request.ViewKey ||
 			cursorState.RoleKey != request.RoleKey || cursorState.Keyword != request.Keyword ||
-			cursorState.SortKey != request.SortKey || cursorState.StatusKey != request.StatusKey {
+			cursorState.SortKey != request.SortKey || cursorState.StatusKey != request.StatusKey ||
+			cursorState.Period != request.Period || cursorState.DateFrom != request.DateFrom || cursorState.DateTo != request.DateTo {
 			if cursorRes != nil {
 				return workflowRoleTaskViewRequest{}, cursorRes
 			}
@@ -1339,6 +1365,11 @@ func parseWorkflowRoleTaskViewRequest(
 		request.CursorRiskScope = cursorState.RiskScope
 		request.CursorReviewScopeKey = cursorState.ReviewScopeKey
 		request.HasCursor = true
+	}
+	var dateErr error
+	request.CompletedFrom, request.CompletedBefore, dateErr = biz.WorkflowRoleTaskHistoryDateBounds(request.Period, request.DateFrom, request.DateTo, request.SnapshotAt)
+	if dateErr != nil {
+		return workflowRoleTaskViewRequest{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "处理时间范围无效，请重新选择"}
 	}
 	return request, nil
 }
@@ -1380,8 +1411,8 @@ func decodeWorkflowRoleTaskViewCursor(cursor string) (workflowRoleTaskViewCursor
 	if err := json.Unmarshal(raw, &decoded); err != nil {
 		return workflowRoleTaskViewCursor{}, invalidWorkflowRoleTaskViewCursorResult()
 	}
-	if decoded.Version != workflowRoleTaskViewCursorVersion ||
-		!biz.ValidWorkflowRoleTaskListOptions(decoded.SortKey, decoded.StatusKey) ||
+	if !biz.ValidWorkflowTaskDiscoveryFilter(decoded.WorkflowTaskDiscoveryFilter) || decoded.Version != workflowRoleTaskViewCursorVersion ||
+		!biz.ValidWorkflowRoleTaskListOptions(decoded.ViewKey, decoded.SortKey, decoded.StatusKey) ||
 		((decoded.SortKey == biz.WorkflowRoleTaskSortNewest || decoded.SortKey == biz.WorkflowRoleTaskSortOldest) && decoded.BeforeTime == nil) ||
 		(decoded.Method != "list_role_tasks" && decoded.Method != "list_workbench_role_tasks") ||
 		decoded.BeforeID <= 0 ||
@@ -1424,20 +1455,23 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 		return invalidWorkflowRoleTaskViewCursorResult()
 	}
 	page, err := d.workflowUC.ListRoleTaskView(ctx, biz.WorkflowRoleTaskViewQuery{
-		Keyword:                  request.Keyword,
-		SortKey:                  request.SortKey,
-		StatusKey:                request.StatusKey,
-		BeforeTime:               request.BeforeTime,
-		ViewKey:                  request.ViewKey,
-		RoleKey:                  request.RoleKey,
-		ReviewRoleKeys:           request.ReviewRoleKeys,
-		Limit:                    request.Limit,
-		BeforeID:                 request.BeforeID,
-		IncludeCounts:            includeCounts,
-		CrossRoleRiskAllowed:     crossRoleRisk,
-		SnapshotAt:               request.SnapshotAt,
-		VisibilityScope:          visibilityScope,
-		ApprovalVisibilityScopes: approvalVisibilityScopes,
+		WorkflowTaskDiscoveryFilter: request.WorkflowTaskDiscoveryFilter,
+		Keyword:                     request.Keyword,
+		SortKey:                     request.SortKey,
+		StatusKey:                   request.StatusKey,
+		CompletedFrom:               request.CompletedFrom,
+		CompletedBefore:             request.CompletedBefore,
+		BeforeTime:                  request.BeforeTime,
+		ViewKey:                     request.ViewKey,
+		RoleKey:                     request.RoleKey,
+		ReviewRoleKeys:              request.ReviewRoleKeys,
+		Limit:                       request.Limit,
+		BeforeID:                    request.BeforeID,
+		IncludeCounts:               includeCounts,
+		CrossRoleRiskAllowed:        crossRoleRisk,
+		SnapshotAt:                  request.SnapshotAt,
+		VisibilityScope:             visibilityScope,
+		ApprovalVisibilityScopes:    approvalVisibilityScopes,
 	})
 	if err != nil {
 		return d.mapWorkflowError(ctx, err)
@@ -1467,19 +1501,23 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 			cursorExpectedTotal = -1
 		}
 		nextCursor = encodeWorkflowRoleTaskViewCursor(workflowRoleTaskViewCursor{
-			Keyword:        request.Keyword,
-			SortKey:        request.SortKey,
-			StatusKey:      request.StatusKey,
-			BeforeTime:     page.NextTime,
-			Method:         request.Method,
-			ViewKey:        request.ViewKey,
-			RoleKey:        request.RoleKey,
-			BeforeID:       page.NextID,
-			SnapshotUnix:   page.SnapshotAt.Unix(),
-			ExpectedTotal:  cursorExpectedTotal,
-			SeenTotal:      seenTotal,
-			RiskScope:      riskScope,
-			ReviewScopeKey: request.ReviewScopeKey,
+			WorkflowTaskDiscoveryFilter: request.WorkflowTaskDiscoveryFilter,
+			Keyword:                     request.Keyword,
+			SortKey:                     request.SortKey,
+			StatusKey:                   request.StatusKey,
+			Period:                      request.Period,
+			DateFrom:                    request.DateFrom,
+			DateTo:                      request.DateTo,
+			BeforeTime:                  page.NextTime,
+			Method:                      request.Method,
+			ViewKey:                     request.ViewKey,
+			RoleKey:                     request.RoleKey,
+			BeforeID:                    page.NextID,
+			SnapshotUnix:                page.SnapshotAt.Unix(),
+			ExpectedTotal:               cursorExpectedTotal,
+			SeenTotal:                   seenTotal,
+			RiskScope:                   riskScope,
+			ReviewScopeKey:              request.ReviewScopeKey,
 		})
 		if nextCursor == "" {
 			return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
@@ -2340,4 +2378,27 @@ func workflowOwnerRoleVisible(ownerRoleKey string, visibleOwnerRoleKeys []string
 
 func workflowTaskAssignedToAdmin(admin *biz.AdminUser, task *biz.WorkflowTask) bool {
 	return admin != nil && task != nil && task.AssigneeID != nil && *task.AssigneeID == admin.ID
+}
+
+func getWorkflowTaskDiscoveryFilter(pm map[string]any) (biz.WorkflowTaskDiscoveryFilter, *v1.JsonrpcResult) {
+	f := biz.WorkflowTaskDiscoveryFilter{}
+	for key, target := range map[string]*string{"module_key": &f.ModuleKey, "stage_key": &f.StageKey, "chain_key": &f.ChainKey, "assignee": &f.Assignee} {
+		value, res := getOptionalWorkflowTaskBoardString(pm, key, 64)
+		if res != nil {
+			return f, res
+		}
+		*target = value
+	}
+	if !biz.ValidWorkflowTaskDiscoveryFilter(f) {
+		return f, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务分类或办理人条件无效，请重新选择"}
+	}
+	return f, nil
+}
+
+func workflowTaskPeopleToAny(people []biz.WorkflowTaskPerson) []any {
+	result := make([]any, 0, len(people))
+	for _, person := range people {
+		result = append(result, map[string]any{"id": person.ID, "name": person.Name})
+	}
+	return result
 }

@@ -16,6 +16,21 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
+func TestProductionFactReadIdentityDTO(t *testing.T) {
+	got := productionFactToAny(&biz.ProductionFact{
+		SubjectName: "产品快照名称", SubjectCode: "PRODUCT-A", SKUCodeSnapshot: "SKU-A",
+		WarehouseName: "成品仓", WarehouseCode: "FG", UnitName: "个", LotNo: "LOT-A",
+	})
+	for key, want := range map[string]string{
+		"subject_name": "产品快照名称", "subject_code": "PRODUCT-A", "sku_code_snapshot": "SKU-A",
+		"warehouse_name": "成品仓", "warehouse_code": "FG", "unit_name": "个", "lot_no": "LOT-A",
+	} {
+		if got[key] != want {
+			t.Fatalf("%s = %v, want %s", key, got[key], want)
+		}
+	}
+}
+
 func newOperationalFactJSONRPCTestData(t *testing.T, admin *biz.AdminUser) *jsonrpcDispatcher {
 	t.Helper()
 	return newOperationalFactJSONRPCTestDataWithRepo(t, admin, &stubBusinessDashboardOperationalFactRepo{})
@@ -350,7 +365,7 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresDedicatedShipmentPermissions(t *te
 		t.Fatalf("expected usecase to run after shipment create-with-items permission, got %#v", createWithItemsRes)
 	}
 
-	shipAdmin := workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionShipmentShip)
+	shipAdmin := workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionShipmentShip)
 	j = newOperationalFactJSONRPCTestData(t, shipAdmin)
 	_, shipRes, err := j.handleOperationalFact(ctx, "ship_shipment", "5", mustJSONRPCStruct(t, map[string]any{"id": 99}))
 	if err != nil {
@@ -360,7 +375,7 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresDedicatedShipmentPermissions(t *te
 		t.Fatalf("expected usecase to run after shipment ship permission, got %#v", shipRes)
 	}
 
-	cancelAdmin := workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionShipmentCancel)
+	cancelAdmin := workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionShipmentCancel)
 	j = newOperationalFactJSONRPCTestData(t, cancelAdmin)
 	_, cancelRes, err := j.handleOperationalFact(ctx, "cancel_shipment", "6", mustJSONRPCStruct(t, map[string]any{"id": 99}))
 	if err != nil {
@@ -922,6 +937,7 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 		biz.PermissionProductionFactRead,
 		biz.PermissionWarehouseInboundConfirm,
 		biz.PermissionPMCPlanRead,
+		biz.PermissionProductionWIPRead,
 	)
 	repo := &productionModuleGateOperationalFactRepo{}
 	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
@@ -1261,9 +1277,9 @@ func TestJsonrpcDispatcher_ProductionCompletionUsesDedicatedPermissionAndServerO
 	ctx := workflowJSONRPCAdminContext()
 	repo := &productionModuleGateOperationalFactRepo{}
 	admin := workflowJSONRPCAdmin(
-		[]string{biz.ProductionRoleKey},
+		[]string{biz.WarehouseRoleKey},
 		biz.PermissionProductionCompletionCreate,
-		biz.PermissionPMCPlanRead,
+		biz.PermissionProductionWIPRead,
 	)
 	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
 	enabledProductionConfig := customerConfigPublishParamsWithRevisionAndModuleState(
@@ -1324,7 +1340,7 @@ func TestJsonrpcDispatcher_ProductionCompletionUsesDedicatedPermissionAndServerO
 	}
 
 	oldPermissionAdmin := workflowJSONRPCAdmin(
-		[]string{biz.ProductionRoleKey},
+		[]string{biz.WarehouseRoleKey},
 		biz.PermissionPMCPlanUpdate,
 		biz.PermissionWarehouseAdjustmentCreate,
 	)

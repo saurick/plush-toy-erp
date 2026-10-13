@@ -85,6 +85,7 @@ const ShipmentsPage = lazyRoute(() => import('./pages/ShipmentsPage.jsx'))
 const FinancePaymentsPage = lazyRoute(
   () => import('./pages/FinancePaymentsPage.jsx')
 )
+const MobileBusinessLayout = lazyRoute(() => import('./mobile/MobileBusinessLayout.jsx'))
 const MobileAppLayout = lazyRoute(() => import('./mobile/MobileAppLayout'))
 const MobileRoleTasksPage = lazyRoute(
   () => import('./mobile/pages/MobileRoleTasksPage')
@@ -282,6 +283,97 @@ function MobileShellRoute() {
   )
 }
 
+function businessTaskRoutes() {
+  return (
+    <>
+      <Route
+        path="sales/project-orders/sales-orders"
+        element={<SalesOrdersPage />}
+      />
+      <Route
+        path="purchase/accessories"
+        element={<PurchaseOrdersPage />}
+      />
+      <Route
+        path="warehouse/inbound"
+        element={<PurchaseReceiptsPage />}
+      />
+      <Route
+        path="production/quality-inspections"
+        element={<QualityInspectionsPage />}
+      />
+      <Route
+        path="warehouse/inventory"
+        element={<InventoryLedgerPage />}
+      />
+      <Route path="purchase/material-bom" element={<BOMVersionsPage />} />
+      <Route
+        path="engineering/processes"
+        element={<MasterDataPage key="processes" type="processes" />}
+      />
+      <Route path="warehouse/shipments" element={<ShipmentsPage />} />
+      <Route
+        path="purchase/processing-contracts"
+        element={<OutsourcingOrdersPage />}
+      />
+      <Route
+        path="production/orders"
+        element={<ProductionOrdersPage />}
+      />
+      <Route element={<ProductionRecordsLayout />}>
+        <Route
+          path="production/progress"
+          element={
+            <OperationalFactPage moduleKey="production-progress" />
+                }
+        />
+        <Route
+          path="production/exceptions"
+          element={
+            <WorkflowBusinessModulePage moduleKey="production-exceptions" />
+                }
+        />
+      </Route>
+      <Route
+        path="production/scheduling"
+        element={
+          <WorkflowBusinessModulePage moduleKey="production-scheduling" />
+              }
+      />
+      <Route
+        path="warehouse/shipping-release"
+        element={
+          <WorkflowBusinessModulePage
+            key="shipping-release"
+            moduleKey="shipping-release"
+          />
+              }
+      />
+      <Route
+        path="warehouse/outbound"
+        element={<OperationalFactPage moduleKey="outbound" />}
+      />
+      <Route
+        path="finance/reconciliation"
+        element={<OperationalFactPage moduleKey="reconciliation" />}
+      />
+      <Route path="finance/payments" element={<FinancePaymentsPage />} />
+      <Route
+        path="finance/payables"
+        element={<OperationalFactPage moduleKey="payables" />}
+      />
+      <Route
+        path="finance/receivables"
+        element={<OperationalFactPage moduleKey="receivables" />}
+      />
+      <Route
+        path="finance/invoices"
+        element={<OperationalFactPage moduleKey="invoices" />}
+      />
+    </>
+  )
+}
+
 export default function ERPRouter() {
   return (
     <RouteRuntimeBoundary>
@@ -342,90 +434,7 @@ export default function ERPRouter() {
                 <MasterDataPage key="product_skus" type="product_skus" />
               }
             />
-            <Route
-              path="sales/project-orders/sales-orders"
-              element={<SalesOrdersPage />}
-            />
-            <Route
-              path="purchase/accessories"
-              element={<PurchaseOrdersPage />}
-            />
-            <Route
-              path="warehouse/inbound"
-              element={<PurchaseReceiptsPage />}
-            />
-            <Route
-              path="production/quality-inspections"
-              element={<QualityInspectionsPage />}
-            />
-            <Route
-              path="warehouse/inventory"
-              element={<InventoryLedgerPage />}
-            />
-            <Route path="purchase/material-bom" element={<BOMVersionsPage />} />
-            <Route
-              path="engineering/processes"
-              element={<MasterDataPage key="processes" type="processes" />}
-            />
-            <Route path="warehouse/shipments" element={<ShipmentsPage />} />
-            <Route
-              path="purchase/processing-contracts"
-              element={<OutsourcingOrdersPage />}
-            />
-            <Route
-              path="production/orders"
-              element={<ProductionOrdersPage />}
-            />
-            <Route element={<ProductionRecordsLayout />}>
-              <Route
-                path="production/progress"
-                element={
-                  <OperationalFactPage moduleKey="production-progress" />
-                }
-              />
-              <Route
-                path="production/exceptions"
-                element={
-                  <WorkflowBusinessModulePage moduleKey="production-exceptions" />
-                }
-              />
-            </Route>
-            <Route
-              path="production/scheduling"
-              element={
-                <WorkflowBusinessModulePage moduleKey="production-scheduling" />
-              }
-            />
-            <Route
-              path="warehouse/shipping-release"
-              element={
-                <WorkflowBusinessModulePage
-                  key="shipping-release"
-                  moduleKey="shipping-release"
-                />
-              }
-            />
-            <Route
-              path="warehouse/outbound"
-              element={<OperationalFactPage moduleKey="outbound" />}
-            />
-            <Route
-              path="finance/reconciliation"
-              element={<OperationalFactPage moduleKey="reconciliation" />}
-            />
-            <Route path="finance/payments" element={<FinancePaymentsPage />} />
-            <Route
-              path="finance/payables"
-              element={<OperationalFactPage moduleKey="payables" />}
-            />
-            <Route
-              path="finance/receivables"
-              element={<OperationalFactPage moduleKey="receivables" />}
-            />
-            <Route
-              path="finance/invoices"
-              element={<OperationalFactPage moduleKey="invoices" />}
-            />
+            {businessTaskRoutes()}
             <Route path="print-center" element={<PrintCenterPage />} />
             <Route
               path="print-center/:templateKey"
@@ -448,6 +457,9 @@ export default function ERPRouter() {
           <Route path="/m/:roleKey" element={<MobileShellRoute />}>
             <Route index element={<Navigate to="tasks" replace />} />
             <Route path="tasks" element={<MobileRoleTasksPage />} />
+            <Route path="handle" element={<MobileBusinessLayout />}>
+              {businessTaskRoutes()}
+            </Route>
             <Route path="*" element={<MobileRoleTasksRedirect />} />
           </Route>
 

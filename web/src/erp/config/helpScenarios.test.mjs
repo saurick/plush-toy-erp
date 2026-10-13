@@ -92,15 +92,15 @@ test('仓库的材料入库、成品入库、库存查询和出货互相独立',
   const scenes = getRoleHelpScenarios(getRoleHelpGuide('warehouse'))
   assert.deepEqual(
     scenes.map((scene) => scene.key),
-    ['inbound', 'finished-goods', 'inventory-query', 'shipments', 'materials', 'shipping-release', 'outbound']
+    ['inbound', 'finished-goods', 'inventory-query', 'production-orders', 'materials', 'shipping-release', 'outbound']
   )
   const finished = scenes.find((scene) => scene.key === 'finished-goods')
   assert.deepEqual(
     finished.steps.map((step) => step.roles),
-    [['production'], ['warehouse'], ['warehouse'], ['warehouse']]
+    [['warehouse'], ['warehouse'], ['warehouse'], ['warehouse']]
   )
-  assert.match(finished.completion, /提交完工报告本身不代表成品已经入库/u)
-  assert.match(finished.exception.action, /处理后回到同一报告重新核对/u)
+  assert.match(finished.completion, /仓库登记成品收仓草稿本身不代表成品已经入库/u)
+  assert.match(finished.exception.action, /处理后回到同一收仓记录重新核对/u)
   assert.doesNotMatch(JSON.stringify(finished), /采购订单|财务放行/u)
   const inventory = scenes.find((scene) => scene.key === 'inventory-query')
   assert.doesNotMatch(JSON.stringify(inventory.steps), /盘点|调拨|人工调整/u)

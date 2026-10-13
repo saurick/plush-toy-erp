@@ -101,6 +101,7 @@ export const MOBILE_MAIN_TAB_KEYS = Object.freeze({
   TODO: 'todo',
   DONE: 'done',
   TRACKING: 'tracking',
+  EXCEPTIONS: 'exceptions',
   MESSAGES: 'messages',
   MINE: 'mine',
 })
@@ -138,8 +139,6 @@ export const MOBILE_LIST_COLLAPSED_LIMITS = Object.freeze({
   [MOBILE_LIST_KEYS.WARNING]: 8,
   [MOBILE_LIST_KEYS.NOTICE]: 8,
 })
-
-export const MOBILE_SCROLL_TOP_VISIBLE_OFFSET = 280
 
 export function getMobileRoleLabel(roleKey) {
   const normalizedRoleKey = normalizeRoleKey(roleKey)

@@ -10,10 +10,10 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Form, Popconfirm, Space, Tag, Typography } from 'antd'
 import {
-  useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import ProcessSubmissionRoute from '../components/workflow/ProcessSubmissionRoute.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -254,7 +254,7 @@ function shipmentFormValues(shipment = {}) {
 }
 
 export default function ShipmentsPage() {
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
   const outletContext = useOutletContext()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
@@ -1694,7 +1694,7 @@ export default function ShipmentsPage() {
               icon={<PlusOutlined />}
               onClick={openCreate}
             >
-              新建草稿
+              新建出货单
             </ToolbarButton>
           ) : null
         }

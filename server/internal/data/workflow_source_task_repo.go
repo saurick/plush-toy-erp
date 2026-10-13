@@ -426,6 +426,18 @@ func workflowSourceTaskIntentHash(task *biz.WorkflowTaskCreate) (string, error) 
 	if task == nil {
 		return "", biz.ErrBadParam
 	}
+	var dueAt *time.Time
+	if task.DueAt != nil {
+		utc := task.DueAt.UTC()
+		dueAt = &utc
+	}
+	return workflowSourceTaskIntentHashWithDueAt(task, dueAt)
+}
+
+// The intent identifies an instant, independently of the database driver's
+// local timezone. The explicit date is also used by the controlled repair to
+// prove and convert pre-normalization receipts without rewriting their events.
+func workflowSourceTaskIntentHashWithDueAt(task *biz.WorkflowTaskCreate, dueAt *time.Time) (string, error) {
 	payload, err := json.Marshal(struct {
 		TaskCode          string         `json:"task_code"`
 		TaskGroup         string         `json:"task_group"`
@@ -441,7 +453,7 @@ func workflowSourceTaskIntentHash(task *biz.WorkflowTaskCreate) (string, error) 
 		TaskCode: task.TaskCode, TaskGroup: task.TaskGroup, TaskName: task.TaskName,
 		SourceType: task.SourceType, SourceID: task.SourceID, SourceNo: task.SourceNo,
 		BusinessStatusKey: task.BusinessStatusKey, OwnerRoleKey: task.OwnerRoleKey,
-		DueAt: task.DueAt, Payload: task.Payload,
+		DueAt: dueAt, Payload: task.Payload,
 	})
 	if err != nil {
 		return "", err

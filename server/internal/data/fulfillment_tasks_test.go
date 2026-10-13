@@ -38,7 +38,7 @@ func TestFulfillmentReceiptQualityInboundAndReplay(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertFulfillmentTask(t, ctx, client, "purchase_arrival", item.PurchaseOrderID, "done", biz.QualityRoleKey)
+	assertFulfillmentTask(t, ctx, client, "purchase_arrival", item.PurchaseOrderID, "done", biz.WarehouseRoleKey)
 	assertFulfillmentTask(t, ctx, client, "receipt_quality", receipt.QualityInspections[0].ID, "ready", biz.QualityRoleKey)
 	assertFulfillmentTask(t, ctx, client, "receipt_inbound", receipt.ID, "blocked", biz.WarehouseRoleKey)
 	assertInventoryTxnCount(t, ctx, client, 0)
@@ -89,7 +89,7 @@ func TestFulfillmentReceiptRejectCorrectionAndCancellation(t *testing.T) {
 	}
 	assertFulfillmentTask(t, ctx, client, "receipt_inbound", receipt.ID, "withdrawn", biz.WarehouseRoleKey)
 	assertFulfillmentTask(t, ctx, client, "receipt_exception", receipt.ID, "withdrawn", biz.PurchaseRoleKey)
-	assertFulfillmentTask(t, ctx, client, "purchase_arrival", item.PurchaseOrderID, "ready", biz.QualityRoleKey)
+	assertFulfillmentTask(t, ctx, client, "purchase_arrival", item.PurchaseOrderID, "ready", biz.WarehouseRoleKey)
 	assertInventoryTxnCount(t, ctx, client, 0)
 }
 
@@ -128,6 +128,6 @@ func TestFulfillmentSequentialQualityHandsOffToProduction(t *testing.T) {
 			assertFulfillmentTask(t, f.ctx, f.client, "production_quality", current.ID, "ready", biz.QualityRoleKey)
 		}
 	}
-	assertFulfillmentTask(t, f.ctx, f.client, "production_transfer", b.batch.ID, "ready", biz.ProductionRoleKey)
+	assertFulfillmentTask(t, f.ctx, f.client, "production_packaging_transfer", b.batch.ID, "blocked", biz.WarehouseRoleKey)
 	assertInventoryTxnCount(t, f.ctx, f.client, 0)
 }

@@ -1,8 +1,11 @@
+import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import { assertFilterAffordance } from './controlAffordanceAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { MOBILE_ROLE_TASK_PAGE_LIMIT } from '../../src/erp/utils/mobileTaskQueries.mjs'
 import { mobileTaskListOptionsScenario } from './mobileTaskListOptionsScenario.mjs'
 import { mobileTaskRefreshScenario } from './mobileTaskRefreshScenario.mjs'
+import { mobileTaskHistoryFiltersScenario } from './mobileTaskHistoryFiltersScenario.mjs'
+import { mobileTaskDiscoveryScenario } from './mobileTaskDiscoveryScenario.mjs'
 import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import { assertTaskEventTrailMarkers } from './taskEventTrailAssertions.mjs'
@@ -34,6 +37,8 @@ export function createMobileTaskScenarios({
   return [
     mobileTaskListOptionsScenario({ assert, path, outputDir }),
     mobileTaskRefreshScenario({ assert, path, outputDir }),
+    mobileTaskHistoryFiltersScenario({ assert, path, outputDir }),
+    mobileTaskDiscoveryScenario({ assert, path, outputDir }),
     {
       name: 'mobile-task-search-and-product-image',
       path: '/m/engineering/tasks',
@@ -2454,11 +2459,9 @@ export function createMobileTaskScenarios({
           'effective-session 只读详情应使用顶部返回，不再重复底部返回列表'
         )
         assert.equal(
-          await page
-            .locator('[data-step-key="process"]')
-            .getAttribute('data-state'),
-          'locked',
-          'effective-session 只读详情的处理步骤应保持锁定'
+          await page.locator('[data-step-key="process"]').count(),
+          0,
+          'effective-session 只读详情不显示办理步骤'
         )
         const factGridMetrics = await page.evaluate(() => {
           const grid = document.querySelector(
@@ -2580,6 +2583,10 @@ export function createMobileTaskScenarios({
           '排期已核对，继续由老板岗位确认订单。',
           '底部返回任务后再次进入，应保留解除阻塞说明'
         )
+        const actionViewport = page.viewportSize()
+        await page.setViewportSize({ width: 393, height: 500 })
+        assert.equal(await assertMobileBackToTop(page, action.locator('.mobile-role-tasks-page__detail-main')), false, '简短任务办理不显示回顶按钮')
+        await page.setViewportSize(actionViewport)
         await action.screenshot({
           path: path.join(outputDir, 'mobile-resume-action-pink-393.png'),
         })
@@ -2595,6 +2602,7 @@ export function createMobileTaskScenarios({
           0,
           '成功回执已经反馈办理结果，不应再弹浮层遮住页标题'
         )
+        await assertMobileBackToTop(page, receipt.locator('.mobile-role-tasks-page__detail-main'))
         await receipt.screenshot({
           path: path.join(outputDir, 'mobile-resume-receipt-pink-393.png'),
         })

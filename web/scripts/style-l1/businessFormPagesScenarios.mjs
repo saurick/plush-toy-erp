@@ -1,3 +1,4 @@
+import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import {
   assertBusinessFormPage,
   closeBusinessFormPage,
@@ -34,7 +35,7 @@ export function createBusinessFormPagesScenarios(deps) {
     ],
     ['payment', '/erp/finance/payments', '登记收付款', '登记收付款'],
 
-    ['bom', '/erp/purchase/material-bom', '新建草稿', '新建 BOM 草稿'],
+    ['bom', '/erp/purchase/material-bom', '新建 BOM', '新建 BOM 草稿'],
     [
       'sales',
       '/erp/sales/project-orders/sales-orders',
@@ -48,7 +49,7 @@ export function createBusinessFormPagesScenarios(deps) {
       '新建加工合同',
       '新建加工合同',
     ],
-    ['shipment', '/erp/warehouse/shipments', '新建草稿', '新建出货单'],
+    ['shipment', '/erp/warehouse/shipments', '新建出货单', '新建出货单'],
   ]
   const scenarios = documents.map(([key, path, triggerName, title]) => ({
     name: `business-form-page-${key}-desktop`,
@@ -72,6 +73,9 @@ export function createBusinessFormPagesScenarios(deps) {
       const editor = page.locator('.erp-business-form-page:not([hidden])')
       await editor.getByRole('heading', { name: title, exact: true }).waitFor()
       await assertBusinessFormPage(page, editor)
+      if (page.viewportSize().width <= 767) {
+        await assertMobileBackToTop(page, editor.locator('.erp-business-form-page__body'), { keyboard: true })
+      }
       await page.screenshot({
         path: `${deps.outputDir}/business-form-page-${key}-initial.png`,
         fullPage: true,
@@ -966,13 +970,39 @@ export function createBusinessFormPagesScenarios(deps) {
       themeMode,
     })),
     {
+      ...scenarios.find((scenario) => scenario.name === 'business-form-page-production-desktop'),
+      name: 'mobile-business-form-back-top',
+      path: '/m/boss/handle/production/orders',
+      viewport: { width: 432, height: 768 },
+      deviceScaleFactor: 5,
+      verify: async (page) => {
+        await page.getByRole('button', { name: '新建生产订单' }).click()
+        const editor = page.locator('.erp-business-form-page:not([hidden])')
+        await editor.getByRole('heading', { name: '新建生产订单', exact: true }).waitFor()
+        await assertBusinessFormPage(page, editor)
+        const body = editor.locator('.erp-business-form-page__body')
+        const notes = body.getByRole('textbox', { name: '备注', exact: true })
+        await notes.fill('回顶后保留的模拟备注')
+        await body.evaluate((node) => { node.scrollTop = 300 })
+        await page.waitForTimeout(50)
+        deps.assert.equal(await editor.getByTestId('mobile-back-to-top').count(), 0, '输入期间回顶按钮隐藏')
+        deps.assert(await assertMobileBackToTop(page, body, { screenshotPath: `${deps.outputDir}/mobile-back-top-form-4k.png`, keyboard: true }), '手机长表单支持回顶')
+        deps.assert.equal(await notes.inputValue(), '回顶后保留的模拟备注')
+        await page.emulateMedia({ reducedMotion: 'reduce' })
+        deps.assert(await assertMobileBackToTop(page, body), '减少动态效果下仍可回顶')
+        await closeBusinessFormPage(page, editor)
+        await page.getByRole('button', { name: '返回任务', exact: true }).click()
+        await page.waitForURL('**/m/boss/tasks')
+      },
+    },
+    {
       name: 'business-form-page-pending-attachment-recovery',
       path: '/erp/purchase/material-bom',
       auth: 'admin',
       effectiveSession: deps.customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        const trigger = page.getByRole('button', { name: '新建草稿' })
+        const trigger = page.getByRole('button', { name: '新建 BOM' })
         await trigger.click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await editor.getByRole('status').getByText('尚未修改').waitFor()
@@ -1038,7 +1068,7 @@ export function createBusinessFormPagesScenarios(deps) {
             .click()
         }
         await openModule('物料清单（BOM）')
-        await page.getByRole('button', { name: '新建草稿' }).click()
+        await page.getByRole('button', { name: '新建 BOM' }).click()
         const editor = page.locator('.erp-business-form-page:not([hidden])')
         await editor.locator('textarea').fill('导航保护测试')
         await page.getByRole('button', { name: '刷新当前页' }).click()
@@ -1069,7 +1099,7 @@ export function createBusinessFormPagesScenarios(deps) {
           .getByRole('heading', { name: '材料档案', exact: true })
           .waitFor()
         await openModule('物料清单（BOM）')
-        await page.getByRole('button', { name: '新建草稿' }).click()
+        await page.getByRole('button', { name: '新建 BOM' }).click()
         await editor.locator('textarea').fill('刷新放弃测试')
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await page

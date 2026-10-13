@@ -1514,6 +1514,29 @@ func HasOriginReworkBatchesWith(preds ...predicate.ProductionWIPBatch) predicate
 	})
 }
 
+// HasPackagingBatches applies the HasEdge predicate on the "packaging_batches" edge.
+func HasPackagingBatches() predicate.ProductionFact {
+	return predicate.ProductionFact(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, PackagingBatchesTable, PackagingBatchesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPackagingBatchesWith applies the HasEdge predicate on the "packaging_batches" edge with a given conditions (other predicates).
+func HasPackagingBatchesWith(preds ...predicate.ProductionWIPBatch) predicate.ProductionFact {
+	return predicate.ProductionFact(func(s *sql.Selector) {
+		step := newPackagingBatchesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasPoster applies the HasEdge predicate on the "poster" edge.
 func HasPoster() predicate.ProductionFact {
 	return predicate.ProductionFact(func(s *sql.Selector) {

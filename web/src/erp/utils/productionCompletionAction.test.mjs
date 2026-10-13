@@ -52,6 +52,24 @@ test('production completion choices reserve both posted facts and existing draft
   assert.match(choices[0].label, /剩余 4 件/u)
 })
 
+test('historical packaging receipts reserve ancestor handwork capacity without rewriting their source', () => {
+  const item = { id: 11, route_code: 'PLUSH_SEW_HAND_V1', planned_quantity: '10' }
+  const aggregate = {
+    initialized: true,
+    productionOrder: { status: 'RELEASED' },
+    operations: [{ id: 21, production_order_item_id: 11, operation_code: 'HANDWORK' }, { id: 22, production_order_item_id: 11, operation_code: 'PACKAGING' }],
+    batches: [
+      { id: 101, production_order_item_id: 11, production_order_operation_id: 21, status: 'ACCEPTED', quantity: '10' },
+      { id: 102, production_order_item_id: 11, production_order_operation_id: 22, source_batch_id: 101, status: 'SPLIT', quantity: '6' },
+      { id: 103, production_order_item_id: 11, production_order_operation_id: 22, source_batch_id: 102, status: 'ACCEPTED', quantity: '6' },
+    ],
+  }
+  const fact = { id: 51, fact_type: 'FINISHED_GOODS_RECEIPT', source_type: 'PRODUCTION_ORDER', source_line_id: 11, production_wip_batch_id: 103, status: 'POSTED', quantity: '6' }
+  assert.equal(buildProductionCompletionChoices([item], [fact], aggregate)[0].remaining, '4')
+  assert.equal(fact.production_wip_batch_id, 103)
+  assert.equal(buildProductionCompletionChoices([item], [{ ...fact, status: 'CANCELLED' }], aggregate)[0].remaining, '10')
+})
+
 test('production completion edit excludes only the current draft from the available cap', () => {
   const choices = buildProductionCompletionChoices(
     [
@@ -87,13 +105,13 @@ test('production completion edit excludes only the current draft from the availa
   assert.equal(choices[0].remaining, '7')
 })
 
-test('production completion is capped by accepted packaging WIP before planned quantity', () => {
+test('production completion is capped by completed handwork WIP before planned quantity', () => {
   const [choice] = buildProductionCompletionChoices(
     [
       {
         id: 11,
         planned_quantity: '100',
-        accepted_packaging_quantity: '40',
+        receivable_quantity: '40',
         product_code_snapshot: 'P-001',
         unit_name_snapshot: '件',
       },
@@ -109,7 +127,7 @@ test('production completion is capped by accepted packaging WIP before planned q
     ]
   )
   assert.equal(choice.planned, '100')
-  assert.equal(choice.acceptedPackaging, '40')
+  assert.equal(choice.receivableQuantity, '40')
   assert.equal(choice.posted, '0.000001')
   assert.equal(choice.remaining, '39.999999')
   assert.match(choice.label, /剩余 39\.999999 件/u)
@@ -120,18 +138,18 @@ test('production completion is capped by accepted packaging WIP before planned q
   assert.equal(compareProductionCompletionQuantity('40', choice.remaining), 1)
 })
 
-test('production completion clamps fully consumed packaging quantity at zero', () => {
+test('production completion clamps fully consumed handwork quantity at zero', () => {
   const choices = buildProductionCompletionChoices(
     [
       {
         id: 11,
         planned_quantity: '100',
-        accepted_packaging_quantity: '40',
+        receivable_quantity: '40',
       },
       {
         id: 12,
         planned_quantity: '100',
-        accepted_packaging_quantity: '40',
+        receivable_quantity: '40',
       },
     ],
     [
@@ -351,14 +369,14 @@ test('production completion rejects a production order outside an actionable sta
   )
 })
 
-test('routed completion choices reserve capacity on each accepted packaging batch', () => {
+test('routed completion choices reserve capacity on each completed handwork batch', () => {
   const item = {
     id: 11,
     route_code: 'PLUSH_SEW_HAND_V1',
     planned_quantity: '10',
     product_code_snapshot: 'P-ROUTED',
     unit_name_snapshot: '件',
-    accepted_packaging_batches: [
+    receivable_batches: [
       {
         id: 101,
         production_order_item_id: 11,
@@ -435,7 +453,7 @@ test('routed completion facts fail closed when the exact WIP batch cannot be ver
     id: 11,
     route_code: 'PLUSH_SEW_HAND_V1',
     planned_quantity: '10',
-    accepted_packaging_batches: [
+    receivable_batches: [
       {
         id: 101,
         production_order_item_id: 11,
@@ -471,9 +489,9 @@ test('routed completion facts fail closed when the exact WIP batch cannot be ver
           {
             ...item,
             id: 12,
-            accepted_packaging_batches: [
+            receivable_batches: [
               {
-                ...item.accepted_packaging_batches[0],
+                ...item.receivable_batches[0],
                 production_order_item_id: 12,
               },
             ],
@@ -490,7 +508,7 @@ test('routed and closed-order completion payloads require an eligible lineage ba
   const routedItem = {
     id: 11,
     route_code: 'PLUSH_SEW_HAND_V1',
-    accepted_packaging_batches: [
+    receivable_batches: [
       {
         id: 102,
         production_order_item_id: 11,
@@ -530,7 +548,7 @@ test('routed and closed-order completion payloads require an eligible lineage ba
         { id: 5, status: 'RELEASED' },
         routedItem
       ),
-    /包装验收批次/u
+    /手工成品批次/u
   )
   assert.throws(
     () =>
@@ -539,9 +557,9 @@ test('routed and closed-order completion payloads require an eligible lineage ba
         { id: 5, status: 'CLOSED' },
         {
           ...routedItem,
-          accepted_packaging_batches: [
+          receivable_batches: [
             {
-              ...routedItem.accepted_packaging_batches[0],
+              ...routedItem.receivable_batches[0],
               origin_rework_fact_id: null,
             },
           ],

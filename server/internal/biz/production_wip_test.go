@@ -393,7 +393,7 @@ func TestProductionWIPCancelOnlyAllowsPlannedBatch(t *testing.T) {
 	}
 }
 
-func TestProductionWIPTransferRequiresAcceptedImmediateNextOperationAndFullQuantity(t *testing.T) {
+func TestProductionWIPTransferRequiresAcceptedImmediateNextOperationAndConservedQuantity(t *testing.T) {
 	sourceOperation := &ProductionOrderOperation{ID: 20, ProductionOrderID: 1, ProductionOrderItemID: 2, RouteCode: ProductionWIPRoutePlushSewHandV1, RouteVersion: 1, StepNo: 20}
 	targetOperation := &ProductionOrderOperation{ID: 30, ProductionOrderID: 1, ProductionOrderItemID: 2, RouteCode: ProductionWIPRoutePlushSewHandV1, RouteVersion: 1, StepNo: 30}
 	batch := &ProductionWIPBatch{ProductionOrderOperationID: 20, ProductionOrderItemID: 2, Status: ProductionWIPStatusAccepted, Quantity: productionWIPTestDecimal("10")}
@@ -403,8 +403,11 @@ func TestProductionWIPTransferRequiresAcceptedImmediateNextOperationAndFullQuant
 	if err := ValidateProductionWIPTransferAllocation(batch.Quantity, decimal.Zero, productionWIPTestDecimal("10")); err != nil {
 		t.Fatal(err)
 	}
-	if err := ValidateProductionWIPTransferAllocation(batch.Quantity, decimal.Zero, productionWIPTestDecimal("9")); !errors.Is(err, ErrProductionWIPQuantityExceeded) {
+	if err := ValidateProductionWIPTransferAllocation(batch.Quantity, decimal.Zero, productionWIPTestDecimal("9")); err != nil {
 		t.Fatalf("partial transfer error=%v", err)
+	}
+	if err := ValidateProductionWIPTransferAllocation(batch.Quantity, productionWIPTestDecimal("9"), productionWIPTestDecimal("2")); !errors.Is(err, ErrProductionWIPQuantityExceeded) {
+		t.Fatalf("over-allocation error=%v", err)
 	}
 	skipped := *targetOperation
 	skipped.StepNo = 40

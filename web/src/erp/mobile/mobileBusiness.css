@@ -1,0 +1,65 @@
+.mobile-business-layout {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100dvh;
+  overflow: hidden;
+  padding: 12px;
+  color: var(--erp-text-primary, #1f2937);
+}
+
+.mobile-business-layout__content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.mobile-business-layout__content[data-business-form-editing='true'] {
+  overflow: hidden;
+}
+
+.mobile-business-layout__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.mobile-business-layout__header strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mobile-business-layout__hint {
+  margin: 0 0 12px;
+  color: var(--erp-text-secondary, #64748b);
+  font-size: 12px;
+}
+
+.mobile-business-layout__content[data-business-form-editing='true']
+  > .mobile-business-layout__hint {
+  display: none;
+}
+
+.mobile-business-layout .erp-business-page {
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .mobile-business-layout {
+    padding: 8px;
+  }
+
+  .mobile-business-layout .ant-descriptions-view table {
+    table-layout: fixed;
+  }
+
+  .mobile-business-layout .ant-descriptions-item-content {
+    overflow-wrap: anywhere;
+  }
+}

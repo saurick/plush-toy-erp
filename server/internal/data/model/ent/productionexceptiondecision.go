@@ -36,6 +36,10 @@ type ProductionExceptionDecision struct {
 	ProductionWipBatchID *int `json:"production_wip_batch_id,omitempty"`
 	// QualityInspectionID holds the value of the "quality_inspection_id" field.
 	QualityInspectionID *int `json:"quality_inspection_id,omitempty"`
+	// TargetSupplierID holds the value of the "target_supplier_id" field.
+	TargetSupplierID *int `json:"target_supplier_id,omitempty"`
+	// TargetOperationID holds the value of the "target_operation_id" field.
+	TargetOperationID *int `json:"target_operation_id,omitempty"`
 	// RequestedQuantity holds the value of the "requested_quantity" field.
 	RequestedQuantity decimal.Decimal `json:"requested_quantity,omitempty"`
 	// ApprovedQuantity holds the value of the "approved_quantity" field.
@@ -70,7 +74,28 @@ type ProductionExceptionDecision struct {
 	ReversedAt *time.Time `json:"reversed_at,omitempty"`
 	// ReverseReason holds the value of the "reverse_reason" field.
 	ReverseReason *string `json:"reverse_reason,omitempty"`
-	selectValues  sql.SelectValues
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the ProductionExceptionDecisionQuery when eager-loading is set.
+	Edges        ProductionExceptionDecisionEdges `json:"edges"`
+	selectValues sql.SelectValues
+}
+
+// ProductionExceptionDecisionEdges holds the relations/edges for other nodes in the graph.
+type ProductionExceptionDecisionEdges struct {
+	// ExecutionBatches holds the value of the execution_batches edge.
+	ExecutionBatches []*ProductionWIPBatch `json:"execution_batches,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// ExecutionBatchesOrErr returns the ExecutionBatches value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductionExceptionDecisionEdges) ExecutionBatchesOrErr() ([]*ProductionWIPBatch, error) {
+	if e.loadedTypes[0] {
+		return e.ExecutionBatches, nil
+	}
+	return nil, &NotLoadedError{edge: "execution_batches"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -82,7 +107,7 @@ func (*ProductionExceptionDecision) scanValues(columns []string) ([]any, error) 
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case productionexceptiondecision.FieldRequestedQuantity:
 			values[i] = new(decimal.Decimal)
-		case productionexceptiondecision.FieldID, productionexceptiondecision.FieldProductionOrderID, productionexceptiondecision.FieldProductionOrderItemID, productionexceptiondecision.FieldProductionMaterialRequirementID, productionexceptiondecision.FieldProductionWipBatchID, productionexceptiondecision.FieldQualityInspectionID, productionexceptiondecision.FieldVersion, productionexceptiondecision.FieldRequestedBy, productionexceptiondecision.FieldDecidedBy, productionexceptiondecision.FieldExecutedBy, productionexceptiondecision.FieldReversedBy:
+		case productionexceptiondecision.FieldID, productionexceptiondecision.FieldProductionOrderID, productionexceptiondecision.FieldProductionOrderItemID, productionexceptiondecision.FieldProductionMaterialRequirementID, productionexceptiondecision.FieldProductionWipBatchID, productionexceptiondecision.FieldQualityInspectionID, productionexceptiondecision.FieldTargetSupplierID, productionexceptiondecision.FieldTargetOperationID, productionexceptiondecision.FieldVersion, productionexceptiondecision.FieldRequestedBy, productionexceptiondecision.FieldDecidedBy, productionexceptiondecision.FieldExecutedBy, productionexceptiondecision.FieldReversedBy:
 			values[i] = new(sql.NullInt64)
 		case productionexceptiondecision.FieldDecisionNo, productionexceptiondecision.FieldDecisionType, productionexceptiondecision.FieldStatus, productionexceptiondecision.FieldExecutionStatus, productionexceptiondecision.FieldReason, productionexceptiondecision.FieldIdempotencyKey, productionexceptiondecision.FieldIdempotencyPayloadHash, productionexceptiondecision.FieldDecisionReason, productionexceptiondecision.FieldExecutionReason, productionexceptiondecision.FieldReverseReason:
 			values[i] = new(sql.NullString)
@@ -165,6 +190,20 @@ func (_m *ProductionExceptionDecision) assignValues(columns []string, values []a
 			} else if value.Valid {
 				_m.QualityInspectionID = new(int)
 				*_m.QualityInspectionID = int(value.Int64)
+			}
+		case productionexceptiondecision.FieldTargetSupplierID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field target_supplier_id", values[i])
+			} else if value.Valid {
+				_m.TargetSupplierID = new(int)
+				*_m.TargetSupplierID = int(value.Int64)
+			}
+		case productionexceptiondecision.FieldTargetOperationID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field target_operation_id", values[i])
+			} else if value.Valid {
+				_m.TargetOperationID = new(int)
+				*_m.TargetOperationID = int(value.Int64)
 			}
 		case productionexceptiondecision.FieldRequestedQuantity:
 			if value, ok := values[i].(*decimal.Decimal); !ok {
@@ -291,6 +330,11 @@ func (_m *ProductionExceptionDecision) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
+// QueryExecutionBatches queries the "execution_batches" edge of the ProductionExceptionDecision entity.
+func (_m *ProductionExceptionDecision) QueryExecutionBatches() *ProductionWIPBatchQuery {
+	return NewProductionExceptionDecisionClient(_m.config).QueryExecutionBatches(_m)
+}
+
 // Update returns a builder for updating this ProductionExceptionDecision.
 // Note that you need to call ProductionExceptionDecision.Unwrap() before calling this method if this ProductionExceptionDecision
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -344,6 +388,16 @@ func (_m *ProductionExceptionDecision) String() string {
 	builder.WriteString(", ")
 	if v := _m.QualityInspectionID; v != nil {
 		builder.WriteString("quality_inspection_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.TargetSupplierID; v != nil {
+		builder.WriteString("target_supplier_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.TargetOperationID; v != nil {
+		builder.WriteString("target_operation_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

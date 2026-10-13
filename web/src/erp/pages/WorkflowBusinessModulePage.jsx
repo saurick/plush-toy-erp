@@ -9,6 +9,7 @@ import {
 import { Alert, Button, Input, Space, Tag } from 'antd'
 import dayjs from 'dayjs'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { message } from '@/common/utils/antdApp'
@@ -172,6 +173,7 @@ function getTaskID(task = {}) {
 }
 
 export default function WorkflowBusinessModulePage({ moduleKey }) {
+  const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const beginLatestRequest = useLatestRequestCoordinator()
   const mutationAttemptsRef = useRef(null)
@@ -1148,7 +1150,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           showIcon
           message="页面暂不可用"
           description="请返回工作台或联系管理员。"
-          action={<Button href="/erp/dashboard">返回工作台</Button>}
+          action={<Button onClick={() => navigate('/erp/dashboard')}>返回工作台</Button>}
         />
       </BusinessPageLayout>
     )

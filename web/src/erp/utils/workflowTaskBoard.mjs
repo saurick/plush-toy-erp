@@ -1,3 +1,4 @@
+import { DISCOVERY_FILTER_KEYS, DISCOVERY_REQUEST_KEYS, normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from './workflowTaskDiscovery.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { getWorkflowTaskDueStatus } from './workflowDashboardStats.mjs'
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
@@ -67,7 +68,7 @@ export const TASK_BOARD_DUE_OPTIONS = Object.freeze([
 export function getWorkflowTaskBoardStatusOptions(lane = 'all', mode = 'all') {
   const values = {
     actionable: ['all', 'ready'],
-    exception: ['all', 'blocked', 'overdue', 'dueSoon'],
+    exception: ['all', 'ready', 'blocked', 'overdue', 'dueSoon'],
     due: ['all', 'ready', 'overdue', 'dueSoon'],
     finished: ['all', 'done', 'rejected', 'withdrawn'],
   }[lane]
@@ -129,9 +130,9 @@ export const TASK_BOARD_LANE_DEFINITIONS = Object.freeze([
   },
   {
     key: 'exception',
-    title: '阻塞',
-    description: '当前阻塞的任务，优先补齐原因和责任交接。',
-    actionLabel: '查看全部阻塞任务',
+    title: '异常处理',
+    description: '质量异常决策、处置执行及阻塞任务，关联原单据和处理分支。',
+    actionLabel: '查看全部异常任务',
     tagColor: 'red',
   },
   {
@@ -386,6 +387,7 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
   const status = normalizeKnownFilterValue(filters.status, STATUS_FILTER_VALUES)
   const due = normalizeKnownFilterValue(filters.due, DUE_FILTER_VALUES)
   return {
+    ...normalizeTaskDiscoveryFilters(filters),
     keyword: String(filters.keyword || '').trim(),
     status: getWorkflowTaskBoardStatusOptions(lane, mode).some(
       (option) => option.value === status
@@ -413,6 +415,7 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
 export function hasActiveWorkflowTaskBoardFilters(filters = {}) {
   const normalized = normalizeWorkflowTaskBoardFilters(filters)
   return (
+    DISCOVERY_FILTER_KEYS.some((key) => Boolean(normalized[key])) ||
     normalized.keyword !== DEFAULT_TASK_BOARD_FILTERS.keyword ||
     normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status ||
     normalized.role !== DEFAULT_TASK_BOARD_FILTERS.role ||
@@ -428,6 +431,7 @@ export function readWorkflowTaskBoardFiltersFromSearch(searchParams = '') {
       ? searchParams
       : new URLSearchParams(searchParams)
   return normalizeWorkflowTaskBoardFilters({
+    ...Object.fromEntries(DISCOVERY_FILTER_KEYS.map((key) => [key, params.get(DISCOVERY_REQUEST_KEYS[key])])),
     keyword: params.get(FILTER_QUERY_KEYS.keyword),
     status: params.get(FILTER_QUERY_KEYS.status),
     role: params.get(FILTER_QUERY_KEYS.role),
@@ -452,6 +456,7 @@ export function writeWorkflowTaskBoardFiltersToSearch(
   const normalized = normalizeWorkflowTaskBoardFilters(filters)
 
   Object.values(FILTER_QUERY_KEYS).forEach((key) => params.delete(key))
+  DISCOVERY_FILTER_KEYS.forEach((key) => { params.delete(DISCOVERY_REQUEST_KEYS[key]); if (normalized[key]) params.set(DISCOVERY_REQUEST_KEYS[key], normalized[key]) })
 
   if (normalized.keyword) {
     params.set(FILTER_QUERY_KEYS.keyword, normalized.keyword)
@@ -489,6 +494,7 @@ export function buildWorkflowTaskBoardRequest(filters = {}) {
   const normalized = normalizeWorkflowTaskBoardFilters(filters)
   const focused = normalized.lane !== DEFAULT_TASK_BOARD_FILTERS.lane
   const params = {
+    ...taskDiscoveryRequest(normalized),
     limit: focused ? normalized.pageSize : TASK_BOARD_OVERVIEW_LIMIT,
     offset: focused ? (normalized.page - 1) * normalized.pageSize : 0,
   }

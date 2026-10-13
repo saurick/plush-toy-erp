@@ -653,6 +653,7 @@ async function wipAction(rpc, plan, batch, action, extra = {}) {
       production_order_id: batch.production_order_id,
       production_wip_batch_id: batch.id,
       expected_version: batch.version,
+      ...(action === "RECEIVE_OUTSOURCING_RETURN" ? { quantity: batch.quantity } : {}),
       idempotency_key: identity(plan, `wip:${batch.id}:${action}`),
       ...extra,
     },

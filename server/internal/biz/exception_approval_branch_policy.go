@@ -81,6 +81,8 @@ func (productionExceptionExecutionBranchPolicyHandler) ResolveProcessBranch(
 		return &ProcessBranchPolicyResult{NextNodeKey: "over_issue_end"}, nil
 	case ProductionExceptionProcessCommandOutcomeApprovedWIP:
 		return &ProcessBranchPolicyResult{NextNodeKey: "production_exception_execution"}, nil
+	case ProductionExceptionProcessCommandOutcomeApprovedStock:
+		return &ProcessBranchPolicyResult{NextNodeKey: "warehouse_exception_execution"}, nil
 	default:
 		return nil, ErrBadParam
 	}
@@ -154,7 +156,7 @@ func exceptionApprovalProcessBranchPolicyRegistrations() []exceptionApprovalProc
 		},
 		{
 			key:          ProcessBranchPolicyProductionExceptionExecution,
-			nextNodeKeys: []string{"production_exception_execution", "over_issue_end"},
+			nextNodeKeys: []string{"production_exception_execution", "warehouse_exception_execution", "over_issue_end"},
 			handler:      productionExceptionExecutionBranchPolicyHandler{},
 		},
 	}

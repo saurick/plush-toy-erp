@@ -44,6 +44,7 @@ const (
 
 	ProductionWIPFlowNormal = "NORMAL"
 	ProductionWIPFlowRework = "REWORK"
+	ProductionWIPFlowRemake = "REMAKE"
 
 	ProductionWIPStatusPlanned        = "PLANNED"
 	ProductionWIPStatusSplit          = "SPLIT"
@@ -81,6 +82,7 @@ var (
 	ErrProductionWIPInvalidRoute                    = errors.New("production WIP route invalid")
 	ErrProductionWIPInvalidTransition               = errors.New("production WIP transition invalid")
 	ErrProductionWIPQuantityExceeded                = errors.New("production WIP quantity exceeded")
+	ErrProductionWIPReturnQuantityMismatch          = errors.New("production WIP return count does not match batch")
 	ErrProductionWIPExecutionModeNotAllowed         = errors.New("production WIP execution mode not allowed")
 	ErrProductionWIPOutsourcingAllocationInvalid    = errors.New("production WIP outsourcing allocation invalid")
 	ErrProductionWIPOutsourcingMaterialIssuePending = errors.New("production WIP outsourcing material issue pending")
@@ -133,6 +135,8 @@ type ProductionWIPBatch struct {
 	ProductionOrderOperationID int
 	SourceBatchID              *int
 	OriginReworkFactID         *int
+	OriginExceptionDecisionID  *int
+	FinishedGoodsReceiptID     *int
 	BatchNo                    string
 	FlowType                   string
 	ExecutionMode              *string
@@ -202,6 +206,39 @@ type ProductionWIPAggregate struct {
 	OutsourcingAllocations []*ProductionWIPOutsourcingAllocation
 	PackagingConfirmations []*ProductionPackagingConfirmation
 	QualityInspections     []*ProductionWIPQualityInspectionSummary
+	FinishedGoodsReceipts  []*ProductionWIPReceiptSummary
+}
+
+type ProductionWIPReceiptSummary struct {
+	ID, ProductionWIPBatchID int
+	FactNo, Status           string
+	Quantity                 decimal.Decimal
+	ReworkedQuantity         decimal.Decimal
+}
+
+// Permissions follow the actual operation, never a caller-supplied role or label.
+func ProductionWIPActionPermission(in *ProductionWIPAction, aggregate *ProductionWIPAggregate, base string) string {
+	if in == nil || aggregate == nil {
+		return base
+	}
+	for _, batch := range aggregate.Batches {
+		if batch.ID != in.BatchID {
+			continue
+		}
+		for _, operation := range aggregate.Operations {
+			if operation.ID != batch.ProductionOrderOperationID {
+				continue
+			}
+			if operation.OperationCode == ProductionWIPOperationPackaging ||
+				(operation.OperationCode == ProductionWIPOperationHandwork && in.Action == ProductionWIPActionTransferToNextOperation) {
+				return PermissionWarehousePackagingExecute
+			}
+			if operation.OperationCode == ProductionWIPOperationFabricProcessing && in.Action == ProductionWIPActionStartOperation {
+				return PermissionOutsourcingMaterialIssueCreate
+			}
+		}
+	}
+	return base
 }
 
 type ProductionWIPSplit struct {
@@ -214,6 +251,7 @@ type ProductionWIPAction struct {
 	ProductionOrderItemID    int
 	BatchID                  int
 	TargetOperationID        int
+	FinishedGoodsReceiptID   int
 	ExpectedVersion          int
 	ActorID                  int
 	IdempotencyKey           string
@@ -466,10 +504,6 @@ func (uc *ProductionOrderUsecase) ConfirmProductionWIPPackagingMaterial(ctx cont
 	return uc.applyNamedProductionWIPAction(ctx, in, ProductionWIPActionConfirmPackagingMaterial)
 }
 
-func (uc *ProductionOrderUsecase) ReworkProductionWIPBatch(ctx context.Context, in *ProductionWIPAction) (*ProductionWIPAggregate, error) {
-	return uc.applyNamedProductionWIPAction(ctx, in, ProductionWIPActionRework)
-}
-
 func (uc *ProductionOrderUsecase) applyNamedProductionWIPAction(ctx context.Context, in *ProductionWIPAction, action string) (*ProductionWIPAggregate, error) {
 	if in == nil {
 		return nil, ErrBadParam
@@ -486,6 +520,9 @@ func normalizeProductionWIPAction(in ProductionWIPAction) (ProductionWIPAction, 
 	in.Reason = normalizeOptionalProductionOrderText(in.Reason)
 	in.PackagingVersionSnapshot = normalizeOptionalProductionOrderText(in.PackagingVersionSnapshot)
 	in.Note = normalizeOptionalProductionOrderText(in.Note)
+	if in.FinishedGoodsReceiptID < 0 || (in.FinishedGoodsReceiptID != 0 && in.Action != ProductionWIPActionTransferToNextOperation) {
+		return ProductionWIPAction{}, ErrBadParam
+	}
 	if in.ProductionOrderID <= 0 || in.ExpectedVersion <= 0 || in.ActorID <= 0 || in.IdempotencyKey == "" || len(in.IdempotencyKey) > 128 ||
 		(in.Reason != nil && len(*in.Reason) > 255) ||
 		(in.PackagingVersionSnapshot != nil && len(*in.PackagingVersionSnapshot) > 128) ||
@@ -534,17 +571,16 @@ func normalizeProductionWIPAction(in ProductionWIPAction) (ProductionWIPAction, 
 		if in.ExecutionMode == ProductionWIPExecutionOutsourced && len(in.OutsourcingAllocations) == 0 {
 			return ProductionWIPAction{}, ErrBadParam
 		}
-	case ProductionWIPActionStartOperation, ProductionWIPActionCompleteOperation, ProductionWIPActionReceiveOutsourcingReturn:
+	case ProductionWIPActionReceiveOutsourcingReturn:
+		if in.TargetOperationID != 0 || in.ExecutionMode != "" || len(in.OutsourcingAllocations) != 0 || len(in.Splits) != 0 || !in.Quantity.GreaterThan(decimal.Zero) || in.Reason != nil {
+			return ProductionWIPAction{}, ErrBadParam
+		}
+	case ProductionWIPActionStartOperation, ProductionWIPActionCompleteOperation:
 		if in.TargetOperationID != 0 || in.ExecutionMode != "" || len(in.OutsourcingAllocations) != 0 || len(in.Splits) != 0 || !in.Quantity.IsZero() || in.Reason != nil {
 			return ProductionWIPAction{}, ErrBadParam
 		}
 	case ProductionWIPActionCancelBatch:
 		if in.TargetOperationID != 0 || in.ExecutionMode != "" || len(in.OutsourcingAllocations) != 0 || len(in.Splits) != 0 || !in.Quantity.IsZero() || in.Reason == nil {
-			return ProductionWIPAction{}, ErrBadParam
-		}
-	case ProductionWIPActionRework:
-		if in.TargetOperationID <= 0 || !in.Quantity.GreaterThan(decimal.Zero) || in.Reason == nil ||
-			in.ExecutionMode != "" || len(in.OutsourcingAllocations) != 0 || len(in.Splits) != 0 {
 			return ProductionWIPAction{}, ErrBadParam
 		}
 	default:
@@ -704,17 +740,13 @@ func ValidateProductionWIPTransfer(source *ProductionWIPBatch, sourceOperation, 
 	return nil
 }
 
-// ValidateProductionWIPTransferAllocation requires one explicit transfer
-// quantity to consume the complete untransferred source batch. Operators split
-// first when the next operation needs multiple child batches.
+// Transfers may consume part of an accepted batch. The source version and
+// aggregate allocation cap prevent parallel transfers from consuming it twice.
 func ValidateProductionWIPTransferAllocation(sourceQuantity, alreadyTransferred, quantity decimal.Decimal) error {
 	if !sourceQuantity.GreaterThan(decimal.Zero) || alreadyTransferred.IsNegative() || !quantity.GreaterThan(decimal.Zero) {
 		return ErrBadParam
 	}
 	if alreadyTransferred.Add(quantity).GreaterThan(sourceQuantity) {
-		return ErrProductionWIPQuantityExceeded
-	}
-	if !alreadyTransferred.Add(quantity).Equal(sourceQuantity) {
 		return ErrProductionWIPQuantityExceeded
 	}
 	return nil

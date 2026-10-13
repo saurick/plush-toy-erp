@@ -212,7 +212,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'purchase_approval:creates_fact_draft:purchase_receipt': step({
         responsibilityMode: 'human',
-        ownerPoolKeys: ['quality'],
+        ownerPoolKeys: ['warehouse'],
         capabilityKeys: [PermissionCode.PURCHASE_RECEIPT_CREATE],
         stateRefs: [
           state('source.purchase_order', 'approved', 'precondition'),
@@ -320,55 +320,53 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         ],
         stateRefs: [state('fact.production_wip_batch', 'PLANNED', 'result')],
       }),
-      'wip_batch:requires:packaging_confirmation': step({
+      'wip_batch:posts_fact:production_completion': step({
         responsibilityMode: 'human',
-        stateTransitionRefs: [
-          transition(
-            'fact.production_packaging_confirmation',
-            'PENDING->CONFIRMED'
-          ),
-        ],
-        stateRefs: [
-          state('fact.production_wip_batch', 'IN_PROGRESS', 'precondition'),
-        ],
-      }),
-      'packaging_confirmation:posts_fact:production_completion': step({
-        responsibilityMode: 'human',
+        ownerPoolKeys: ['warehouse'],
         stateTransitionRefs: [transition('fact.production', 'DRAFT->POSTED')],
-        stateRefs: [
-          state(
-            'fact.production_packaging_confirmation',
-            'CONFIRMED',
-            'precondition'
-          ),
-        ],
       }),
       'production_completion:posts_fact:finished_goods_lot': step({
         responsibilityMode: 'system',
-        stateRefs: [
-          state('fact.production', 'POSTED', 'precondition'),
-          state('fact.inventory_lot', 'ACTIVE', 'result'),
-        ],
+        stateRefs: [state('fact.production', 'POSTED', 'precondition'), state('fact.inventory_lot', 'ACTIVE', 'result')],
+      }),
+      'finished_goods_lot:requires:finished_quality': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['quality'],
+        capabilityKeys: [PermissionCode.QUALITY_INSPECTION_UPDATE],
+        stateTransitionRefs: [transition('fact.quality_inspection', 'SUBMITTED->PASSED')],
+      }),
+      'finished_quality:requires:packaging_confirmation': step({
+        responsibilityMode: 'human',
+        capabilityKeys: [PermissionCode.PRODUCTION_PACKAGING_MATERIAL_CONFIRM],
+        stateTransitionRefs: [transition('fact.production_packaging_confirmation', 'PENDING->CONFIRMED')],
+      }),
+      'packaging_confirmation:posts_fact:packaging_execution': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['warehouse'],
+        capabilityKeys: [PermissionCode.WAREHOUSE_PACKAGING_EXECUTE],
+        stateRefs: [state('fact.production_packaging_confirmation', 'CONFIRMED', 'precondition'), state('fact.production_wip_batch', 'ACCEPTED', 'result')],
       }),
     }),
     profile: profile({
       happyStepKeys: [
         'released_production_order:posts_fact:wip_batch',
-        'wip_batch:requires:packaging_confirmation',
-        'packaging_confirmation:posts_fact:production_completion',
+        'wip_batch:posts_fact:production_completion',
         'production_completion:posts_fact:finished_goods_lot',
+        'finished_goods_lot:requires:finished_quality',
+        'finished_quality:requires:packaging_confirmation',
+        'packaging_confirmation:posts_fact:packaging_execution',
       ],
-      interruptionStepKeys: ['wip_batch:requires:packaging_confirmation'],
+      interruptionStepKeys: ['finished_quality:requires:packaging_confirmation'],
       interruptionKinds: ['blocked', 'rejected', 'rework', 'recovery'],
       correctionStepKeys: [
-        'packaging_confirmation:posts_fact:production_completion',
+        'wip_batch:posts_fact:production_completion',
       ],
       protectedStepKey:
-        'packaging_confirmation:posts_fact:production_completion',
+        'wip_batch:posts_fact:production_completion',
       wrongStateStepKey:
-        'packaging_confirmation:posts_fact:production_completion',
+        'wip_batch:posts_fact:production_completion',
       idempotentStepKey:
-        'packaging_confirmation:posts_fact:production_completion',
+        'wip_batch:posts_fact:production_completion',
       dataStageKeys: ['source', 'facts', 'readiness'],
       interruptionTransitionRefs: [
         transition('fact.production_wip_batch', 'PLANNED->CANCELLED'),
@@ -875,6 +873,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
               PRODUCTION_EXCEPTION_APPROVAL,
               'production_exception_execution'
             ),
+            processNode(PRODUCTION_EXCEPTION_APPROVAL, 'warehouse_exception_execution'),
           ],
         }),
       'production_exception_execution_task:calls_domain_command:production_exception_execution':
@@ -892,11 +891,12 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
               PRODUCTION_EXCEPTION_APPROVAL,
               'execute_production_exception'
             ),
+            processNode(PRODUCTION_EXCEPTION_APPROVAL, 'execute_warehouse_production_exception'),
           ],
         }),
       'production_exception_execution:reworks:affected_wip': step({
         responsibilityMode: 'human',
-        capabilityKeys: [PermissionCode.PRODUCTION_FACT_POST],
+        capabilityKeys: [PermissionCode.PRODUCTION_EXCEPTION_EXECUTE],
         stateRefs: [
           state(
             'source.production_exception_execution',

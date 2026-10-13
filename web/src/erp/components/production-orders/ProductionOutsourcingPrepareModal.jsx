@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Form, Select } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import BusinessFormModal from '../business-list/BusinessFormModal.jsx'
 import { DateInput } from '../business-list/BusinessListLayout.jsx'
 import MaterialSupplierSelect from '../master-data/MaterialSupplierSelect.jsx'
@@ -19,10 +19,10 @@ export default function ProductionOutsourcingPrepareModal({
   const [form] = Form.useForm()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
   const fabric =
     operation?.operation_code === 'FABRIC_PROCESSING' &&
-    batch?.flow_type === 'NORMAL'
+    ['NORMAL', 'REMAKE'].includes(batch?.flow_type)
   useEffect(() => {
     if (open) {
       form.resetFields()

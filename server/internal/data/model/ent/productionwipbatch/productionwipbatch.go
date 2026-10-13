@@ -25,6 +25,10 @@ const (
 	FieldSourceBatchID = "source_batch_id"
 	// FieldOriginReworkFactID holds the string denoting the origin_rework_fact_id field in the database.
 	FieldOriginReworkFactID = "origin_rework_fact_id"
+	// FieldOriginExceptionDecisionID holds the string denoting the origin_exception_decision_id field in the database.
+	FieldOriginExceptionDecisionID = "origin_exception_decision_id"
+	// FieldFinishedGoodsReceiptID holds the string denoting the finished_goods_receipt_id field in the database.
+	FieldFinishedGoodsReceiptID = "finished_goods_receipt_id"
 	// FieldBatchNo holds the string denoting the batch_no field in the database.
 	FieldBatchNo = "batch_no"
 	// FieldFlowType holds the string denoting the flow_type field in the database.
@@ -63,6 +67,10 @@ const (
 	EdgeOriginReworkFact = "origin_rework_fact"
 	// EdgeCompletionFacts holds the string denoting the completion_facts edge name in mutations.
 	EdgeCompletionFacts = "completion_facts"
+	// EdgeOriginExceptionDecision holds the string denoting the origin_exception_decision edge name in mutations.
+	EdgeOriginExceptionDecision = "origin_exception_decision"
+	// EdgeFinishedGoodsReceipt holds the string denoting the finished_goods_receipt edge name in mutations.
+	EdgeFinishedGoodsReceipt = "finished_goods_receipt"
 	// EdgeEvents holds the string denoting the events edge name in mutations.
 	EdgeEvents = "events"
 	// EdgeQualityInspections holds the string denoting the quality_inspections edge name in mutations.
@@ -116,6 +124,20 @@ const (
 	CompletionFactsInverseTable = "production_facts"
 	// CompletionFactsColumn is the table column denoting the completion_facts relation/edge.
 	CompletionFactsColumn = "production_wip_batch_id"
+	// OriginExceptionDecisionTable is the table that holds the origin_exception_decision relation/edge.
+	OriginExceptionDecisionTable = "production_wip_batches"
+	// OriginExceptionDecisionInverseTable is the table name for the ProductionExceptionDecision entity.
+	// It exists in this package in order to avoid circular dependency with the "productionexceptiondecision" package.
+	OriginExceptionDecisionInverseTable = "production_exception_decisions"
+	// OriginExceptionDecisionColumn is the table column denoting the origin_exception_decision relation/edge.
+	OriginExceptionDecisionColumn = "origin_exception_decision_id"
+	// FinishedGoodsReceiptTable is the table that holds the finished_goods_receipt relation/edge.
+	FinishedGoodsReceiptTable = "production_wip_batches"
+	// FinishedGoodsReceiptInverseTable is the table name for the ProductionFact entity.
+	// It exists in this package in order to avoid circular dependency with the "productionfact" package.
+	FinishedGoodsReceiptInverseTable = "production_facts"
+	// FinishedGoodsReceiptColumn is the table column denoting the finished_goods_receipt relation/edge.
+	FinishedGoodsReceiptColumn = "finished_goods_receipt_id"
 	// EventsTable is the table that holds the events relation/edge.
 	EventsTable = "production_wip_events"
 	// EventsInverseTable is the table name for the ProductionWIPEvent entity.
@@ -154,6 +176,8 @@ var Columns = []string{
 	FieldProductionOrderOperationID,
 	FieldSourceBatchID,
 	FieldOriginReworkFactID,
+	FieldOriginExceptionDecisionID,
+	FieldFinishedGoodsReceiptID,
 	FieldBatchNo,
 	FieldFlowType,
 	FieldExecutionMode,
@@ -195,6 +219,10 @@ var (
 	SourceBatchIDValidator func(int) error
 	// OriginReworkFactIDValidator is a validator for the "origin_rework_fact_id" field. It is called by the builders before save.
 	OriginReworkFactIDValidator func(int) error
+	// OriginExceptionDecisionIDValidator is a validator for the "origin_exception_decision_id" field. It is called by the builders before save.
+	OriginExceptionDecisionIDValidator func(int) error
+	// FinishedGoodsReceiptIDValidator is a validator for the "finished_goods_receipt_id" field. It is called by the builders before save.
+	FinishedGoodsReceiptIDValidator func(int) error
 	// BatchNoValidator is a validator for the "batch_no" field. It is called by the builders before save.
 	BatchNoValidator func(string) error
 	// DefaultFlowType holds the default value on creation for the "flow_type" field.
@@ -254,6 +282,16 @@ func BySourceBatchID(opts ...sql.OrderTermOption) OrderOption {
 // ByOriginReworkFactID orders the results by the origin_rework_fact_id field.
 func ByOriginReworkFactID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOriginReworkFactID, opts...).ToFunc()
+}
+
+// ByOriginExceptionDecisionID orders the results by the origin_exception_decision_id field.
+func ByOriginExceptionDecisionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldOriginExceptionDecisionID, opts...).ToFunc()
+}
+
+// ByFinishedGoodsReceiptID orders the results by the finished_goods_receipt_id field.
+func ByFinishedGoodsReceiptID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFinishedGoodsReceiptID, opts...).ToFunc()
 }
 
 // ByBatchNo orders the results by the batch_no field.
@@ -379,6 +417,20 @@ func ByCompletionFacts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByOriginExceptionDecisionField orders the results by origin_exception_decision field.
+func ByOriginExceptionDecisionField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOriginExceptionDecisionStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByFinishedGoodsReceiptField orders the results by finished_goods_receipt field.
+func ByFinishedGoodsReceiptField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newFinishedGoodsReceiptStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByEventsCount orders the results by events count.
 func ByEventsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -474,6 +526,20 @@ func newCompletionFactsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(CompletionFactsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, CompletionFactsTable, CompletionFactsColumn),
+	)
+}
+func newOriginExceptionDecisionStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OriginExceptionDecisionInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, OriginExceptionDecisionTable, OriginExceptionDecisionColumn),
+	)
+}
+func newFinishedGoodsReceiptStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(FinishedGoodsReceiptInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, FinishedGoodsReceiptTable, FinishedGoodsReceiptColumn),
 	)
 }
 func newEventsStep() *sqlgraph.Step {

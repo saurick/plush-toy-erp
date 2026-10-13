@@ -79,6 +79,14 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderRead); res != nil {
 			return id, res, nil
 		}
+		var sampleBOMID int
+		if _, exists := pm["sample_bom_id"]; exists {
+			var valid bool
+			sampleBOMID, valid = getRequiredJSONRPCPositiveInt(pm, "sample_bom_id")
+			if !valid {
+				return id, invalidParamResult(), nil
+			}
+		}
 		dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -90,6 +98,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		filter := biz.SalesOrderFilter{
 			Keyword:         getString(pm, "keyword"),
 			CustomerID:      getInt(pm, "customer_id", 0),
+			SampleBOMID:     sampleBOMID,
 			LifecycleStatus: getString(pm, "lifecycle_status"),
 			LifecycleScope:  getString(pm, "lifecycle_scope"),
 			DateField:       getString(pm, "date_field"),

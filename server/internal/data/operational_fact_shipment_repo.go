@@ -1857,6 +1857,21 @@ func prepareShipmentReservationsAndAvailability(ctx context.Context, tx *invento
 			activeTotal = activeTotal.Add(reservation.Quantity)
 		}
 		freeQuantity := balance.Quantity.Sub(activeTotal)
+		readiness, err := productionFinishedGoodsReadiness(ctx, tx.client, biz.InventoryBalanceKey{
+			SubjectType: biz.InventorySubjectProduct, SubjectID: grain.productID,
+			ProductSkuID: optionalPositiveInt(grain.productSkuID), WarehouseID: grain.warehouseID,
+			LotID: lotID, UnitID: grain.unitID,
+		})
+		if err != nil {
+			return err
+		}
+		demandTotal := decimal.Zero
+		for _, item := range itemsByGrain[grain] {
+			demandTotal = demandTotal.Add(item.Quantity)
+		}
+		if readiness.blocked().IsPositive() && balance.Quantity.Sub(readiness.blocked()).LessThan(demandTotal) {
+			return biz.ErrShipmentPackingPending
+		}
 		demandQuantities := make(map[shipmentReservationDemand]decimal.Decimal)
 		for _, item := range itemsByGrain[grain] {
 			demand := shipmentReservationDemand{
@@ -2057,11 +2072,28 @@ func commitShipment(ctx context.Context, tx *inventoryDBTx, row *ent.Shipment) (
 	if err != nil {
 		return nil, err
 	}
+	if err := syncShipmentHandoff(ctx, tx.client, out); err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
 	tx.sqlTx = nil
 	return out, nil
+}
+
+func syncShipmentHandoff(ctx context.Context, client *ent.Client, row *biz.Shipment) error {
+	status := ""
+	if len(row.Items) > 0 {
+		status = "ready"
+	}
+	if row.Status == biz.ShipmentStatusShipped {
+		status = "done"
+	}
+	if row.Status == biz.ShipmentStatusCancelled {
+		status = "withdrawn"
+	}
+	return syncFulfillmentTask(ctx, client, "shipment_execute", row.ID, row.ShipmentNo, "", status, "", 0)
 }
 
 func shipmentWithItems(ctx context.Context, client *ent.Client, row *ent.Shipment) (*biz.Shipment, error) {

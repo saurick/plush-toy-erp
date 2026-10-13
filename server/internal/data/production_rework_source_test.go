@@ -19,7 +19,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func acceptProductionPackagingBatchForReworkTest(
+func acceptProductionHandworkBatchForReworkTest(
 	t *testing.T,
 	ctx context.Context,
 	client *ent.Client,
@@ -36,7 +36,6 @@ func acceptProductionPackagingBatchForReworkTest(
 	for index, targetCode := range []string{
 		biz.ProductionWIPOperationSewing,
 		biz.ProductionWIPOperationHandwork,
-		biz.ProductionWIPOperationPackaging,
 	} {
 		accepted := client.ProductionWIPBatch.UpdateOneID(current.ID).
 			SetStatus(biz.ProductionWIPStatusAccepted).
@@ -58,61 +57,15 @@ func acceptProductionPackagingBatchForReworkTest(
 		aggregate = next
 		current = productionWIPBatchForOperation(t, aggregate, target.ID)
 	}
-	assigned, err := orderUC.AssignProductionWIPExecution(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID,
-		BatchID:           current.ID,
-		ExpectedVersion:   current.Version,
-		ActorID:           actorID,
-		IdempotencyKey:    key + "-packaging-assign",
-		ExecutionMode:     biz.ProductionWIPExecutionInHouse,
-	})
+	client.ProductionWIPBatch.UpdateOneID(current.ID).SetStatus(biz.ProductionWIPStatusAccepted).AddVersion(1).SaveX(ctx)
+	accepted, err := orderUC.GetProductionWIP(ctx, aggregate.ProductionOrderID)
 	if err != nil {
-		t.Fatalf("assign packaging fixture: %v", err)
+		t.Fatal(err)
 	}
-	current = productionWIPBatchByID(t, assigned, current.ID)
-	confirmation := assigned.PackagingConfirmations[0]
-	versionSnapshot := "返工闭环测试包装版"
-	confirmed, err := orderUC.ConfirmProductionWIPPackagingMaterial(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID:        aggregate.ProductionOrderID,
-		ProductionOrderItemID:    aggregate.ProductionOrderItems[0].ID,
-		ExpectedVersion:          confirmation.Version,
-		ActorID:                  actorID,
-		IdempotencyKey:           key + "-packaging-confirm",
-		PackagingVersionSnapshot: &versionSnapshot,
-	})
-	if err != nil {
-		t.Fatalf("confirm packaging fixture: %v", err)
-	}
-	current = productionWIPBatchByID(t, confirmed, current.ID)
-	started, err := orderUC.StartProductionWIPOperation(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID,
-		BatchID:           current.ID,
-		ExpectedVersion:   current.Version,
-		ActorID:           actorID,
-		IdempotencyKey:    key + "-packaging-start",
-	})
-	if err != nil {
-		t.Fatalf("start packaging fixture: %v", err)
-	}
-	current = productionWIPBatchByID(t, started, current.ID)
-	completed, err := orderUC.CompleteProductionWIPOperation(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID,
-		BatchID:           current.ID,
-		ExpectedVersion:   current.Version,
-		ActorID:           actorID,
-		IdempotencyKey:    key + "-packaging-complete",
-	})
-	if err != nil {
-		t.Fatalf("complete packaging fixture: %v", err)
-	}
-	current = productionWIPBatchByID(t, completed, current.ID)
-	if current.Status != biz.ProductionWIPStatusAccepted {
-		t.Fatalf("packaging fixture status = %s", current.Status)
-	}
-	return completed, current
+	return accepted, productionWIPBatchByID(t, accepted, current.ID)
 }
 
-func acceptProductionReworkReplacementPackagingForTest(
+func acceptProductionReworkReplacementHandworkForTest(
 	t *testing.T,
 	ctx context.Context,
 	data *Data,
@@ -194,72 +147,7 @@ func acceptProductionReworkReplacementPackagingForTest(
 		t.Fatalf("read accepted rework WIP: %v", err)
 	}
 	current = productionWIPBatchByID(t, acceptedAggregate, current.ID)
-	packagingOperation := productionWIPOperationForCode(t, acceptedAggregate, biz.ProductionWIPOperationPackaging)
-	transferred, err := orderUC.TransferProductionWIPToNextOperation(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID,
-		BatchID:           current.ID,
-		TargetOperationID: packagingOperation.ID,
-		ExpectedVersion:   current.Version,
-		ActorID:           actorID,
-		IdempotencyKey:    key + "-to-packaging",
-		Quantity:          current.Quantity,
-	})
-	if err != nil {
-		t.Fatalf("transfer accepted rework to packaging: %v", err)
-	}
-	var packaging *biz.ProductionWIPBatch
-	for _, batch := range transferred.Batches {
-		if batch.ProductionOrderOperationID == packagingOperation.ID &&
-			batch.SourceBatchID != nil && *batch.SourceBatchID == current.ID &&
-			batch.Status != biz.ProductionWIPStatusCancelled {
-			packaging = batch
-			break
-		}
-	}
-	if packaging == nil {
-		t.Fatal("replacement packaging batch not found")
-	}
-	if packaging.OriginReworkFactID == nil || root.OriginReworkFactID == nil || *packaging.OriginReworkFactID != *root.OriginReworkFactID {
-		t.Fatalf("replacement packaging lineage = %#v, root=%#v", packaging.OriginReworkFactID, root.OriginReworkFactID)
-	}
-	assigned, err = orderUC.AssignProductionWIPExecution(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID,
-		BatchID:           packaging.ID,
-		ExpectedVersion:   packaging.Version,
-		ActorID:           actorID,
-		IdempotencyKey:    key + "-packaging-assign",
-		ExecutionMode:     biz.ProductionWIPExecutionInHouse,
-	})
-	if err != nil {
-		t.Fatalf("assign replacement packaging: %v", err)
-	}
-	packaging = productionWIPBatchByID(t, assigned, packaging.ID)
-	started, err = orderUC.StartProductionWIPOperation(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID,
-		BatchID:           packaging.ID,
-		ExpectedVersion:   packaging.Version,
-		ActorID:           actorID,
-		IdempotencyKey:    key + "-packaging-start",
-	})
-	if err != nil {
-		t.Fatalf("start replacement packaging: %v", err)
-	}
-	packaging = productionWIPBatchByID(t, started, packaging.ID)
-	completed, err := orderUC.CompleteProductionWIPOperation(ctx, &biz.ProductionWIPAction{
-		ProductionOrderID: aggregate.ProductionOrderID,
-		BatchID:           packaging.ID,
-		ExpectedVersion:   packaging.Version,
-		ActorID:           actorID,
-		IdempotencyKey:    key + "-packaging-complete",
-	})
-	if err != nil {
-		t.Fatalf("complete replacement packaging: %v", err)
-	}
-	packaging = productionWIPBatchByID(t, completed, packaging.ID)
-	if packaging.Status != biz.ProductionWIPStatusAccepted {
-		t.Fatalf("replacement packaging status = %s", packaging.Status)
-	}
-	return completed, packaging
+	return acceptedAggregate, current
 }
 
 func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.T) {
@@ -270,7 +158,7 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 	warehouse := createTestProductWarehouse(t, ctx, f.client, "REWORK-WH")
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, logger))
 	flow := releaseProductionWIPRoute(t, ctx, f, "MO-REWORK-001", 10, false)
-	flow, packaging := acceptProductionPackagingBatchForReworkTest(
+	flow, packaging := acceptProductionHandworkBatchForReworkTest(
 		t, ctx, f.client, f.uc, f.actorID, flow, "rework-source",
 	)
 	firstLotNo := "REWORK-SOURCE-LOT"
@@ -328,6 +216,16 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 		root.FlowType != biz.ProductionWIPFlowRework ||
 		root.ReworkReason == nil || *root.ReworkReason != reworkIn.Reason {
 		t.Fatalf("posted rework root WIP = %#v", root)
+	}
+	chainAnchor := f.client.WorkflowTask.Query().Where(workflowtask.SourceType(biz.WorkflowSourceTaskProductionFactSourceType), workflowtask.SourceID(rework.ID)).OnlyX(ctx)
+	chain, err := NewWorkflowRepo(f.data, logger).GetWorkflowHandlingChain(ctx, chainAnchor.ID, biz.WorkflowHandlingChainTaskView, &biz.WorkflowTaskVisibilityScope{StandaloneAllowAllOwnerRoles: true})
+	if err != nil || len(chain.Items) < 2 || chain.Truncated {
+		t.Fatalf("rework task must include its execution batch: %+v %v", chain, err)
+	}
+	for _, item := range chain.Items {
+		if item.ID != chainAnchor.ID && item.BatchNo != root.BatchNo {
+			t.Fatalf("rework detail contains unrelated order work: %+v", item)
+		}
 	}
 	postReplay, err := factUC.PostProductionFact(ctx, operationalFactStatusMutation(rework.ID, rework.Version, f.actorID, ""))
 	if err != nil || postReplay.ID != postedRework.ID {
@@ -405,7 +303,7 @@ func TestClosedProductionOrderReworkRequiresAcceptedReplacementPackaging(t *test
 	warehouse := createTestProductWarehouse(t, ctx, f.client, "CLOSED-REWORK-WH")
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, logger))
 	flow := releaseProductionWIPRoute(t, ctx, f, "MO-CLOSED-REWORK", 10, false)
-	flow, originalPackaging := acceptProductionPackagingBatchForReworkTest(
+	flow, originalPackaging := acceptProductionHandworkBatchForReworkTest(
 		t, ctx, f.client, f.uc, f.actorID, flow, "closed-rework-source",
 	)
 	completeProductionSchedulingTaskForTest(t, ctx, f.data, f.client, flow.ProductionOrderID, f.actorID)
@@ -459,6 +357,12 @@ func TestClosedProductionOrderReworkRequiresAcceptedReplacementPackaging(t *test
 		productionwipbatch.SourceBatchIDIsNil(),
 	).OnlyX(ctx)
 	assertFulfillmentTask(t, ctx, f.client, "production_execute", rootRow.ID, "ready", biz.ProductionRoleKey)
+	// A closed order can still have an active finished-goods repair chain.
+	// Controlled reconciliation must keep its handoffs in scope.
+	backfill, err := reconcileMissingWorkflowSourceTasksWithClient(ctx, f.client)
+	if err != nil || backfill.ProductionSchedulingScanned != 0 || backfill.FulfillmentProductionScanned != 1 {
+		t.Fatalf("closed-order repair handoff backfill=%+v err=%v", backfill, err)
+	}
 	aggregate, err := f.uc.GetProductionWIP(ctx, flow.ProductionOrderID)
 	if err != nil {
 		t.Fatalf("read finished-goods rework WIP: %v", err)
@@ -478,10 +382,10 @@ func TestClosedProductionOrderReworkRequiresAcceptedReplacementPackaging(t *test
 		t.Fatalf("closed normal packaging completion error = %v", err)
 	}
 
-	aggregate, replacementPackaging := acceptProductionReworkReplacementPackagingForTest(
+	aggregate, replacementPackaging := acceptProductionReworkReplacementHandworkForTest(
 		t, ctx, f.data, f.client, f.uc, f.actorID, aggregate, root, "closed-rework-replacement",
 	)
-	assertFulfillmentTask(t, ctx, f.client, "production_completion", replacementPackaging.ID, "ready", biz.ProductionRoleKey)
+	assertFulfillmentTask(t, ctx, f.client, "production_completion", replacementPackaging.ID, "ready", biz.WarehouseRoleKey)
 	replacementLotNo := "CLOSED-REWORK-REPLACEMENT"
 	replacement, err := factUC.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{
 		FactNo: "PF-CLOSED-REWORK-REPLACEMENT", ProductionOrderID: aggregate.ProductionOrderID,

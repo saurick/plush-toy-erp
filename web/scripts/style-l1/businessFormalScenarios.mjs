@@ -5,6 +5,8 @@ import { createBusinessFormPagesScenarios } from './businessFormPagesScenarios.m
 import { createSalesOrderSubmissionScenarios } from './salesOrderSubmissionScenarios.mjs'
 import { createWarehouseClassificationScenarios } from './warehouseClassificationScenarios.mjs'
 import { createOrderEngineeringScenarios } from './orderEngineeringScenarios.mjs'
+import { createBOMTaskActionsScenarios } from './bomTaskActionsScenarios.mjs'
+import { createBOMRevisionScenarios } from './bomRevisionScenarios.mjs'
 import {
   createBOMMaterialGroupsScenarios,
   verifyBOMMaterialGroups,
@@ -1401,6 +1403,8 @@ export function createBusinessFormalScenarios(deps) {
     ...createSalesOrderSkuGrainScenarios(deps),
     ...createSalesOrderSubmissionScenarios(deps),
     ...createBOMMaterialGroupsScenarios(deps),
+    ...createBOMTaskActionsScenarios(deps),
+    ...createBOMRevisionScenarios(deps),
     ...createBusinessFormPagesScenarios(deps),
     ...createWarehouseClassificationScenarios(deps),
     ...createOrderEngineeringScenarios(deps),
@@ -1734,7 +1738,7 @@ export function createBusinessFormalScenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '出货单')
-        await expectButton(page, '新建草稿')
+        await expectButton(page, '新建出货单')
         await page
           .locator('.erp-business-data-table-card .ant-table-content')
           .first()
@@ -1763,7 +1767,7 @@ export function createBusinessFormalScenarios(deps) {
           )}`
         )
         await verifyBusinessActionFormModal(page, {
-          buttonName: '新建草稿',
+          buttonName: '新建出货单',
           titleText: '新建出货单',
           minFieldCount: 12,
           screenshotName: 'shipment-net-weight-incomplete',
@@ -1940,7 +1944,7 @@ export function createBusinessFormalScenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '物料清单（BOM）')
-        await page.getByRole('button', { name: '新建草稿' }).click()
+        await page.getByRole('button', { name: '新建 BOM' }).click()
         const modal = page
           .locator(
             '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
@@ -2440,11 +2444,11 @@ export function createBusinessFormalScenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '出货单')
-        await expectButton(page, '新建草稿')
+        await expectButton(page, '新建出货单')
         const shipmentSourceContract =
           await installShipmentSourceCandidateContract(page)
         await verifyBusinessActionFormModal(page, {
-          buttonName: '新建草稿',
+          buttonName: '新建出货单',
           titleText: '新建出货单',
           minFieldCount: 12,
           screenshotName: 'shipment-source-candidates-desktop',
@@ -3935,7 +3939,7 @@ export function createBusinessFormalScenarios(deps) {
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '出货单')
-        await expectButton(page, '新建草稿')
+        await expectButton(page, '新建出货单')
         for (const headerText of [
           '实际 / 最终总净重（克）',
           '计划出货日期 / 实际出货日期',
@@ -4036,14 +4040,14 @@ export function createBusinessFormalScenarios(deps) {
           },
         })
         await assertBusinessFormModalKeyboardRecovery(page, {
-          triggerName: '新建草稿',
+          triggerName: '新建出货单',
           titleText: '新建出货单',
           scenarioName: 'business-formal-shipments',
         })
         const shipmentSourceContract =
           await installShipmentSourceCandidateContract(page)
         await verifyBusinessActionFormModal(page, {
-          buttonName: '新建草稿',
+          buttonName: '新建出货单',
           titleText: '新建出货单',
           minFieldCount: 12,
           screenshotName: 'business-formal-shipment-create-form-modal',

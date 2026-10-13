@@ -15,6 +15,8 @@ import { businessModuleDefinitions } from '../src/erp/config/businessModules.mjs
 import { MAX_ROLE_PRIMARY_LIMIT } from '../src/erp/config/roleGuidedNavigation.mjs'
 import { navigationItemRegistry } from '../src/erp/config/seedData.mjs'
 import { getRoleDisplayName } from '../src/erp/utils/roleKeys.mjs'
+import { getBusinessModuleGroup } from '../src/erp/utils/businessModuleGroups.mjs'
+import { BUSINESS_SEARCH_SCOPES } from '../src/erp/utils/businessSearchScopes.mjs'
 import {
   buildYoyoosunLocalEntryAudit,
   defaultYoyoosunEntryAuditPorts,
@@ -231,6 +233,7 @@ function pageRouteTarget(pageKey) {
     path: definition.path,
     sidebarVisible: !routeOnlyCustomerMenuKeys.has(pageKey),
     sidebarLabel:
+      getBusinessModuleGroup(definition.path)?.label ||
       menuLabelByPath.get(definition.sidebarParentPath) || definition.label,
   }
 }
@@ -999,7 +1002,7 @@ export function summarizePagePerformance(rows = []) {
   }
 }
 
-function createPageRequestTracker() {
+export function createPageRequestTracker() {
   let active = null
   const isRPCRequest = (request) => {
     try {
@@ -1048,7 +1051,7 @@ function createPageRequestTracker() {
         requestFingerprints: [],
         requests: new Set(),
         pendingRequests: new Set(),
-        lastRequestAt: Date.now(),
+        lastActivityAt: Date.now(),
         completedRpcRequestCount: 0,
         abortedRpcRequestCount: 0,
         failedRpcRequestCount: 0,
@@ -1060,11 +1063,12 @@ function createPageRequestTracker() {
       active.requestFingerprints.push(requestFingerprint(request))
       active.requests.add(request)
       active.pendingRequests.add(request)
-      active.lastRequestAt = Date.now()
+      active.lastActivityAt = Date.now()
     },
     recordFailure(request) {
       if (!active || !active.requests.has(request)) return
       active.pendingRequests.delete(request)
+      active.lastActivityAt = Date.now()
       if (request.failure()?.errorText === 'net::ERR_ABORTED') {
         active.abortedRpcRequestCount += 1
         return
@@ -1073,11 +1077,15 @@ function createPageRequestTracker() {
     },
     recordResponse(response) {
       if (!active || !active.requests.has(response.request())) return
-      active.pendingRequests.delete(response.request())
       active.completedRpcRequestCount += 1
       if (response.status() >= 400) {
         active.failedRpcRequestCount += 1
       }
+    },
+    recordFinished(request) {
+      if (!active || !active.requests.has(request)) return
+      active.pendingRequests.delete(request)
+      active.lastActivityAt = Date.now()
     },
     async finish() {
       assert(active, '页面性能采样尚未开始')
@@ -1085,7 +1093,7 @@ function createPageRequestTracker() {
       while (
         Date.now() < deadline &&
         (active.pendingRequests.size > 0 ||
-          Date.now() - active.lastRequestAt < 100)
+          Date.now() - active.lastActivityAt < 100)
       ) {
         await delay(20)
       }
@@ -1354,6 +1362,7 @@ async function newPage(browser, viewport) {
   }
   const requestTracker = createPageRequestTracker()
   page.on('request', (request) => requestTracker.record(request))
+  page.on('requestfinished', (request) => requestTracker.recordFinished(request))
   page.on('console', (message) => {
     if (message.type() === 'error') {
       runtimeErrors.push(`console error: ${message.text()}`)
@@ -1409,7 +1418,9 @@ async function verifyDesktopAccount(browser, account) {
       state: 'visible',
       timeout: 15_000,
     })
-    await page.getByText(account.username, { exact: true }).waitFor({
+    await page.getByRole('button', { name: /^账号菜单：/u }).filter({
+      hasText: account.username,
+    }).waitFor({
       state: 'visible',
       timeout: 15_000,
     })
@@ -1425,19 +1436,15 @@ async function verifyDesktopAccount(browser, account) {
       ...authenticatedMenuLabels,
     ]).sort((left, right) => left.localeCompare(right, 'zh-CN'))
     await verifyRoleGuidedMenuStructure(page, account.username)
-    for (const label of expectedVisibleLeafMenus) {
-      await findVisibleMenuItem(page, label)
-    }
-    const actualVisibleMenus = (
-      await page.locator('.erp-admin-menu .ant-menu-item').allTextContents()
-    )
-      .map((label) => label.trim())
-      .filter(Boolean)
-      .sort((left, right) => left.localeCompare(right, 'zh-CN'))
+    const catalog = await openModuleCatalog(page)
+    const actualVisibleMenus = (await catalog
+      .locator('.erp-module-catalog__entry')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label')))
+    ).sort((left, right) => left.localeCompare(right, 'zh-CN'))
     assert.deepEqual(
       actualVisibleMenus,
       expectedVisibleLeafMenus,
-      `${account.username} 左侧叶子菜单必须与角色投影精确一致`
+      `${account.username} 全部模块入口必须与角色投影精确一致`
     )
     for (const label of account.forbiddenMenus || []) {
       await assertNotVisibleInMenu(page, label, account.username)
@@ -1448,6 +1455,16 @@ async function verifyDesktopAccount(browser, account) {
     for (const label of forbiddenLegacyMenuLabels) {
       await assertNotVisibleInMenu(page, label, account.username)
     }
+    await page.keyboard.press('Escape')
+    await catalog.waitFor({ state: 'hidden' })
+    const expectedSidebarLabels = uniqueStrings(expectedVisibleLeafMenus.map((label) => {
+      const definition = [...pageDefinitionByKey.values()].find((entry) => entry.label === label)
+      return getBusinessModuleGroup(definition?.path)?.label || label
+    })).sort((left, right) => left.localeCompare(right, 'zh-CN'))
+    const actualSidebarLabels = (await page.locator('.erp-admin-menu .ant-menu-item')
+      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label')))
+    ).sort((left, right) => left.localeCompare(right, 'zh-CN'))
+    assert.deepEqual(actualSidebarLabels, expectedSidebarLabels, `${account.username} 侧栏业务分组必须与已授权入口一致`)
     const routeAccess = roleRouteAccessByUsername.get(account.username)
     let pagePerformance = []
     if (routeAccess) {
@@ -1460,7 +1477,7 @@ async function verifyDesktopAccount(browser, account) {
     }
     const diagnostic = await verifyEffectiveSessionDiagnostic(page, {
       username: account.username,
-      expectedMenuCount: expectedVisibleMenus.length,
+      expectedMenuCount: routeAccess?.allowedPages.length || expectedVisibleMenus.length,
       assertExactCounts: account.username !== 'demo_admin',
     })
     await page.screenshot({
@@ -1477,64 +1494,23 @@ async function verifyDesktopAccount(browser, account) {
   }
 }
 
-async function findVisibleMenuItem(page, label) {
-  const menu = page.locator('.erp-admin-menu')
-  const moreFunctions = menu
-    .locator('.ant-menu-submenu-title')
-    .filter({ hasText: '更多功能' })
-    .first()
-  const openMoreFunctions = async () => {
-    assert.equal(
-      await moreFunctions.count(),
-      1,
-      `${label} 不在首层菜单时必须存在唯一的“更多功能”入口`
-    )
-    const submenu = moreFunctions.locator('..')
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
-      const submenuClass = String((await submenu.getAttribute('class')) || '')
-      if (submenuClass.includes('ant-menu-submenu-open')) {
-        return submenu
-      }
-      await moreFunctions.waitFor({ state: 'visible', timeout: 15_000 })
-      await moreFunctions.click()
-      await page.waitForTimeout(150)
-    }
-    assert.match(
-      String((await submenu.getAttribute('class')) || ''),
-      /ant-menu-submenu-open/u,
-      `${label} 的“更多功能”菜单重试后仍未展开`
-    )
-    return submenu
-  }
-  const item = menu
-    .getByText(label, { exact: true })
-    .locator(
-      'xpath=ancestor::li[contains(concat(" ", normalize-space(@class), " "), " ant-menu-item ")][1]'
-    )
-  if (
-    (await item.count()) === 0 &&
-    (await menu.getAttribute('data-navigation-presentation')) === 'role_guided'
-  ) {
-    await openMoreFunctions()
-  }
-  assert.equal(await item.count(), 1, `左侧菜单必须且只能有一个“${label}”入口`)
-  const parentSubmenu = item.locator(
-    'xpath=ancestor::li[contains(concat(" ", normalize-space(@class), " "), " ant-menu-submenu ")][1]'
-  )
-  if ((await parentSubmenu.count()) === 0) {
-    await item.waitFor({ state: 'visible', timeout: 15_000 })
-    return item
-  }
+async function openModuleCatalog(page) {
+  await page.getByRole('button', { name: '全部模块', exact: true }).click()
+  const catalog = page.getByRole('dialog', { name: '全部模块', exact: true })
+  await catalog.waitFor({ state: 'visible' })
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '搜索功能或分组')
+  return catalog
+}
 
-  const submenuClass = String((await parentSubmenu.getAttribute('class')) || '')
-  assert.match(
-    String((await moreFunctions.innerText()) || '').trim(),
-    /^更多功能$/u,
-    `${label} 的父菜单必须是正式“更多功能”分组`
-  )
-  if (!submenuClass.includes('ant-menu-submenu-open')) {
-    await openMoreFunctions()
+async function findVisibleMenuItem(page, label) {
+  const sidebarItem = page.locator('.erp-admin-menu').getByRole('menuitem', { name: label, exact: true })
+  if (await sidebarItem.count()) {
+    assert.equal(await sidebarItem.count(), 1, `侧栏必须且只能有一个“${label}”入口`)
+    return sidebarItem
   }
+  const catalog = await openModuleCatalog(page)
+  const item = catalog.getByRole('button', { name: label, exact: true })
+  assert.equal(await item.count(), 1, `全部模块必须且只能有一个“${label}”入口`)
   await item.waitFor({ state: 'visible', timeout: 15_000 })
   return item
 }
@@ -1598,13 +1574,15 @@ async function verifyRoleGuidedMenuStructure(page, username) {
 async function verifyAllowedRolePages(page, routeAccess, requestTracker) {
   const measurements = []
   for (const target of routeAccess.allowedPages) {
+    const menuItem = target.sidebarVisible
+      ? await findVisibleMenuItem(page, target.label)
+      : null
     requestTracker.begin({
       username: routeAccess.username,
       label: target.label,
       path: target.path,
     })
-    if (target.sidebarVisible) {
-      const menuItem = await findVisibleMenuItem(page, target.label)
+    if (menuItem) {
       await menuItem.click()
     } else {
       await page.goto(new URL(target.path, `${baseURL}/`).toString(), {
@@ -1615,16 +1593,30 @@ async function verifyAllowedRolePages(page, routeAccess, requestTracker) {
       timeout: 15_000,
     })
     await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 })
+    // A SPA URL can change while the previous page is still visible and its
+    // network-idle lifecycle is satisfied. Require the destination to commit.
+    const pageTitle = target.key === 'production-exceptions'
+      ? '生产记录' : target.title
+    const main = page.getByRole('main')
+    await main.getByRole('heading', { name: pageTitle, exact: true })
+      .or(main.getByRole('region', { name: pageTitle, exact: true })).first()
+      .waitFor({ state: 'visible', timeout: 15_000 })
+    if (target.key === 'production-progress') {
+      // Records and exceptions keep the same workspace header mounted.
+      await main.getByPlaceholder(BUSINESS_SEARCH_SCOPES.production_fact.placeholder, {
+        exact: true,
+      }).waitFor({ state: 'visible', timeout: 15_000 })
+    }
+    await page.waitForLoadState('networkidle', { timeout: 15_000 })
     await page
-      .locator('.loading-page--erp')
+      .locator('.loading-page:visible')
       .waitFor({ state: 'hidden', timeout: 15_000 })
-      .catch(() => {})
     await page.waitForFunction(
       (label) =>
         [...document.querySelectorAll('.erp-admin-menu .ant-menu-item')].some(
           (node) =>
             node.classList.contains('ant-menu-item-selected') &&
-            (node.textContent || '').trim().includes(label)
+            node.getAttribute('aria-label') === label
         ),
       target.sidebarLabel,
       { timeout: 15_000 }
@@ -1632,8 +1624,8 @@ async function verifyAllowedRolePages(page, routeAccess, requestTracker) {
     const selectedLabels = (
       await page
         .locator('.erp-admin-menu .ant-menu-item-selected')
-        .allTextContents()
-    ).map((label) => label.trim())
+        .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label')))
+    )
     assert(
       selectedLabels.includes(target.sidebarLabel),
       `${routeAccess.username} 打开 ${target.label} 后侧栏未保持 ${target.sidebarLabel} 选中`
@@ -1739,7 +1731,7 @@ async function verifyEffectiveSessionDiagnostic(
     assert.equal(
       Number(diagnostic.counts.visibleMenuItems),
       expectedMenuCount,
-      `${username} effective session 可见菜单计数必须与角色投影一致`
+      `${username} effective session 可访问入口计数必须与岗位页面投影一致`
     )
     assert.equal(
       Number(diagnostic.counts.pages),
@@ -1825,7 +1817,11 @@ async function verifyMobileAccount(browser, { username, roleKey }) {
       state: 'visible',
       timeout: 15_000,
     })
-    await page.getByRole('heading', { name: '待办' }).waitFor({
+    const taskTab = page.getByTestId('mobile-role-bottom-nav')
+      .getByRole('tab', { name: '任务管理', exact: true })
+    await taskTab.click()
+    assert.equal(await taskTab.getAttribute('aria-selected'), 'true')
+    await page.getByRole('radiogroup', { name: '任务状态', exact: true }).waitFor({
       state: 'visible',
       timeout: 15_000,
     })
@@ -1937,14 +1933,12 @@ async function login(
     })
   }
   await ensureLoginFormReady(page, { username, fromPath })
-  const entryLabel = entry === 'mobile' ? '手机端待办' : '电脑端业务管理'
+  const entryLabel = entry === 'mobile' ? '手机版' : '电脑版'
   const entryButton = page
     .locator('.ant-segmented-item')
     .filter({ hasText: entryLabel })
     .first()
-  if (await entryButton.isVisible().catch(() => false)) {
-    await entryButton.click()
-  }
+  await entryButton.click()
   await page.getByLabel('账号').fill(username)
   await page.locator('input[type="password"]').fill(readDemoPassword())
   const submit = page.locator('button[type="submit"]').first()
@@ -2086,11 +2080,13 @@ async function describeLoginPageState(page) {
 }
 
 async function assertNotVisibleInMenu(page, label, username) {
-  const count = await page
+  const sidebarCount = await page
     .locator('.erp-admin-menu')
-    .getByText(label, { exact: true })
+    .getByRole('menuitem', { name: label, exact: true })
     .count()
-  assert.equal(count, 0, `${username} 不应看到菜单: ${label}`)
+  const catalogCount = await page.getByRole('dialog', { name: '全部模块', exact: true })
+    .getByRole('button', { name: label, exact: true }).count()
+  assert.equal(sidebarCount + catalogCount, 0, `${username} 不应看到菜单: ${label}`)
 }
 
 function assertNoRuntimeErrors(runtimeErrors, scope) {

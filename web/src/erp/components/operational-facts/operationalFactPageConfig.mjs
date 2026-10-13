@@ -191,17 +191,20 @@ function sourceColumnText(record = {}) {
 }
 
 function subjectColumnText(record = {}) {
-  return safeRefText(
-    SUBJECT_TYPE_LABELS[record.subject_type] || '业务记录',
-    record.subject_id || record.product_id
-  )
+  return [
+    namedBusinessReference(record.subject_name, record.subject_code, safeRefText(
+      SUBJECT_TYPE_LABELS[record.subject_type] || '业务记录',
+      record.subject_id || record.product_id
+    )),
+    normalizeText(record.sku_code_snapshot),
+  ].filter(Boolean).join(' / ')
 }
 
 function stockContextText(record = {}) {
   return [
-    safeRefText('仓库', record.warehouse_id),
-    safeRefText('批次', record.lot_id),
-    safeRefText('单位', record.unit_id),
+    namedBusinessReference(record.warehouse_name, record.warehouse_code, safeRefText('仓库', record.warehouse_id)),
+    normalizeText(record.lot_no) || safeRefText('批次', record.lot_id),
+    normalizeText(record.unit_name) || safeRefText('单位', record.unit_id),
   ].join(' / ')
 }
 

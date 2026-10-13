@@ -46,6 +46,7 @@ export function renderCatalog(catalog) {
   }
   const domains = Object.fromEntries(Object.keys(catalog.rpc).map((domain) => [domain.toUpperCase(), domain]))
   return {
+    'workflowTaskDiscovery.generated.mjs': moduleSource('server/internal/biz/workflow_task_catalog.json', { WorkflowTaskDiscoveryCatalog: catalog.taskDiscovery }),
     'permissions.generated.mjs': moduleSource('server/internal/biz/rbac.go', { PermissionCode: catalog.permissions }),
     'statuses.generated.mjs': moduleSource('server/internal/core/status、server/internal/biz/workflow_metadata.go、server/internal/biz/operational_fact.go、server/internal/biz/outsourcing_order.go、server/internal/biz/production_order.go', catalog.states),
     'attachments.generated.mjs': moduleSource('server/internal/biz/business_attachment.go', { AttachmentPolicy: catalog.attachments }),
@@ -79,12 +80,29 @@ export function syncOutputs(outputs, { repositoryRoot = root, check = false } = 
   return changed
 }
 
+export function syncTaskDesignCatalog(catalog, { repositoryRoot = root, check = false } = {}) {
+  const relative = 'docs/product/ui-design/index.html'
+  const destination = path.join(repositoryRoot, relative)
+  const source = fs.readFileSync(destination, 'utf8')
+  const start = '    // BEGIN GENERATED TASK DISCOVERY'
+  const end = '    // END GENERATED TASK DISCOVERY'
+  if (!source.includes(start) || !source.includes(end)) throw new Error('任务交互设计缺少分类生成标记')
+  const begin = source.indexOf(start)
+  const finish = source.indexOf(end, begin) + end.length
+  const next = source.slice(0, begin) + `${start}\n    const taskDiscoveryCatalog = ${JSON.stringify(catalog.taskDiscovery)};\n${end}` + source.slice(finish)
+  if (next === source) return []
+  if (check) throw new Error('任务交互设计分类未同步，请运行 node scripts/gen-public-contracts.mjs')
+  fs.writeFileSync(destination, next)
+  return [relative]
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const args = process.argv.slice(2)
     if (args.some((arg) => arg !== '--check') || args.length > 1) throw new Error('仅支持 --check 或无参数生成')
-    const outputs = renderCatalog(loadCatalog())
-    const changed = syncOutputs(outputs, { check: args.includes('--check') })
+    const catalog = loadCatalog()
+    const outputs = renderCatalog(catalog)
+    const changed = [...syncOutputs(outputs, { check: args.includes('--check') }), ...syncTaskDesignCatalog(catalog, { check: args.includes('--check') })]
     console.log(`[gen-public-contracts] ${args.includes('--check') ? '检查通过' : `已同步 ${changed.length} 个文件`}`)
   } catch (error) {
     console.error(`[gen-public-contracts] ${error.message}`)

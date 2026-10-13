@@ -963,7 +963,7 @@ export function createBusinessAttachmentScenarios({
         path: path.join(outputDir, 'attachment-bom-draft-loaded.png'),
       })
       await closeEditor()
-      await page.getByRole('button', { name: /新建草稿$/u }).click()
+      await page.getByRole('button', { name: /新建 BOM$/u }).click()
       await expandInlineAttachments(panel)
       await panel
         .getByText('暂无附件，可先选择后随保存上传', { exact: true })

@@ -53,7 +53,7 @@ test('BOM form is mounted before open handlers initialize its form instance', ()
   assert.doesNotMatch(editor, /if\s*\(!open\)\s*return null/u)
   assert.match(
     pageSource,
-    /const openCreate = \(\) => \{[\s\S]*headerForm\.resetFields/u
+    /const openCreate = useCallback\([\s\S]*headerForm\.resetFields/u
   )
 })
 

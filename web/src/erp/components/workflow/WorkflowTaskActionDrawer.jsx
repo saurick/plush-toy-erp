@@ -2,6 +2,7 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import {
   CheckCircleOutlined,
+  LeftOutlined,
   LinkOutlined,
   SendOutlined,
 } from '@ant-design/icons'
@@ -209,6 +210,7 @@ function getTaskActionTone(actionMode = '') {
 }
 
 export default function WorkflowTaskActionDrawer({
+  onOpenRelatedTask,
   task,
   profile,
   actionReceipt = null,
@@ -277,6 +279,7 @@ export default function WorkflowTaskActionDrawer({
   const [approvedQuantity, setApprovedQuantity] = React.useState('')
   const previousTaskIdentityRef = React.useRef('')
   const navigationRef = React.useRef(null)
+  const contextActionRef = React.useRef(null)
   const stepButtonRefs = React.useRef(new Map())
   const actionOptionRefs = React.useRef(new Map())
   const visibleActionModes = orderWorkflowTaskActions({
@@ -461,6 +464,7 @@ export default function WorkflowTaskActionDrawer({
       fallbackStep: activeStepKey,
     })
     setActiveStepKey(nextStep)
+    if (nextStep === 'context') requestAnimationFrame(() => contextActionRef.current?.focus())
   }
 
   const submitAction = () => {
@@ -510,7 +514,7 @@ export default function WorkflowTaskActionDrawer({
     event.preventDefault()
     setActiveStepKey(nextStepKey)
     requestAnimationFrame(() =>
-      stepButtonRefs.current.get(nextStepKey)?.focus()
+      (nextStepKey === 'context' ? contextActionRef.current : stepButtonRefs.current.get(nextStepKey))?.focus()
     )
   }
 
@@ -552,8 +556,7 @@ export default function WorkflowTaskActionDrawer({
 
   const showFooter = Boolean(
     task &&
-      (onReturnToTracking ||
-        hasActionReceipt ||
+      (hasActionReceipt ||
         activeStepKey !== 'context' ||
         canOpenRelatedEntry ||
         canViewAttachments ||
@@ -583,25 +586,17 @@ export default function WorkflowTaskActionDrawer({
       width="min(640px, calc(100vw - 24px))"
       open={Boolean(task)}
       forceRender
-      closable={!actionSaving}
+      closeIcon={<LeftOutlined aria-hidden />}
+      closable={actionSaving ? false : { placement: 'start', 'aria-label': onReturnToTracking ? '返回流程' : '返回列表' }}
       maskClosable={!actionSaving}
       keyboard={!actionSaving}
       onClose={() => {
-        if (!actionSaving) onClose?.()
+        if (!actionSaving) (onReturnToTracking || onClose)?.()
       }}
       className="erp-workflow-drawer erp-task-action-drawer"
       footer={
         showFooter ? (
           <div className="erp-task-action-drawer__footer">
-            {onReturnToTracking ? (
-              <Button
-                className="erp-task-action-drawer__footer-return"
-                disabled={actionSaving}
-                onClick={onReturnToTracking}
-              >
-                返回流程
-              </Button>
-            ) : null}
             <div
               ref={setSourceFooter}
               className="erp-material-task-action__footer-host"
@@ -637,7 +632,7 @@ export default function WorkflowTaskActionDrawer({
                   disabled={actionSaving}
                   onClick={() => onOpenEntry(task)}
                 >
-                  查看相关单据
+                  进入单据办理
                 </Button>
               ) : null}
               {showTaskContext && canViewAttachments ? (
@@ -672,6 +667,7 @@ export default function WorkflowTaskActionDrawer({
                 </Button>
               ) : activeStepKey === 'context' && canChooseActions ? (
                 <Button
+                  ref={contextActionRef}
                   type="primary"
                   disabled={actionSaving}
                   onClick={() => selectStep('action')}
@@ -721,6 +717,7 @@ export default function WorkflowTaskActionDrawer({
         <div
           ref={navigationRef}
           className="erp-task-action-drawer__navigation"
+          hidden={showTaskContext}
         >
           <section
             className="erp-task-action-drawer__guide"
@@ -883,6 +880,7 @@ export default function WorkflowTaskActionDrawer({
           {(hasActionReceipt && isEngineeringMaterialTask(task)) || activeStepKey === 'context' ? (
             <WorkflowTaskHandlingChain
               onOpenTracking={onReturnToTracking}
+              onOpenTask={onOpenRelatedTask}
               task={task}
               profile={profile}
               processContext={processContext}

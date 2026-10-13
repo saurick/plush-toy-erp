@@ -1,0 +1,34 @@
+.erp-dev-fulfillment-guide { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--erp-border); border-radius: 10px; background: var(--erp-surface-bg); }
+.erp-dev-fulfillment-guide__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.erp-dev-fulfillment-guide h2 { margin: 0; font-size: 18px; }
+.erp-dev-fulfillment-guide p { margin: 0; line-height: 1.7; }
+.erp-dev-fulfillment-guide__steps { display: grid; grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap: 10px; list-style: none; margin: 0; padding: 0; }
+.erp-dev-fulfillment-guide__steps button { display: grid; grid-template-columns: 24px 1fr; gap: 6px; width: 100%; height: 100%; min-height: 90px; text-align: left; padding: 12px; border: 1px solid var(--erp-border); border-radius: 8px; background: var(--erp-surface-bg); color: var(--erp-text); cursor: pointer; }
+.erp-dev-fulfillment-guide__steps button[aria-pressed="true"] { border-color: var(--erp-primary); background: var(--erp-primary-soft); }
+.erp-dev-fulfillment-guide__steps button:focus-visible { outline: 2px solid var(--erp-primary); outline-offset: 2px; }
+.erp-dev-fulfillment-guide__steps small { grid-column: 2; color: var(--erp-text-muted); }
+.erp-dev-fulfillment-guide__result { display: grid; gap: 10px; padding: 12px; background: var(--erp-surface-bg-soft); border-radius: 8px; min-width: 0; overflow-wrap: anywhere; }
+.erp-dev-fulfillment-guide__exceptions { display: flex; flex-wrap: wrap; gap: 10px 28px; padding-left: 24px; }
+.erp-dev-fulfillment-guide__boundary { color: var(--erp-text-muted); font-size: 12px; }
+.erp-dev-fulfillment-guide__heading p { margin-top: 4px; font-size: 13px; color: var(--erp-text-muted); }
+.erp-dev-fulfillment-guide__role { display: flex; align-items: center; gap: 10px; }
+.erp-dev-fulfillment-guide__role .ant-select { width: 160px; }
+.erp-dev-fulfillment-guide__body { display: grid; grid-template-columns: minmax(0,1fr) minmax(280px,360px); gap: 16px; align-items: start; }
+.erp-dev-fulfillment-guide__steps li { min-width: 0; }
+.erp-dev-fulfillment-guide__steps li[data-role-match="true"] button { box-shadow: inset 3px 0 var(--erp-primary); }
+.erp-dev-fulfillment-guide__steps li[data-role-match="false"] button { background: var(--erp-surface-bg-soft); }
+.erp-dev-fulfillment-guide__marker { font-size: 11px; }
+.erp-dev-fulfillment-guide__result > ol { margin: 0; padding-left: 20px; line-height: 1.7; }
+.erp-dev-fulfillment-guide__approval, .erp-dev-fulfillment-guide__exception { display: grid; gap: 5px; padding-top: 10px; border-top: 1px solid var(--erp-border); font-size: 13px; }
+.erp-dev-fulfillment-guide__links { display: flex; gap: 8px 14px; flex-wrap: wrap; font-size: 13px; }
+.erp-dev-fulfillment-guide__links > strong { flex-basis: 100%; }
+.erp-dev-fulfillment-guide__exception-body { display: grid; gap: 12px; min-width: 0; }
+.erp-dev-fulfillment-drawer .ant-drawer-title { text-align: center; padding-right: 44px; }
+.erp-dev-fulfillment-drawer .ant-drawer-close { min-width: 44px; min-height: 44px; margin: 0; }
+@media (max-width: 800px) {
+  .erp-dev-fulfillment-guide__body { grid-template-columns: minmax(0,1fr); }
+  .erp-dev-fulfillment-guide__steps { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+  .erp-dev-fulfillment-guide__steps button { padding: 10px; grid-template-columns: 18px 1fr; min-height: 96px; font-size: 13px; }
+  .erp-dev-fulfillment-guide__role { width: 100%; }
+  .erp-dev-fulfillment-guide__role .ant-select { flex: 1; }
+}

@@ -26,8 +26,8 @@ const ROLE_EXPECTATIONS = Object.freeze({
     denied: "warehouse.inbound.confirm",
   }),
   warehouse: Object.freeze({
-    allowed: "shipment.ship",
-    denied: "quality.inspection.update",
+    allowed: "warehouse.inbound.confirm",
+    denied: "shipment.ship",
   }),
   quality: Object.freeze({
     allowed: "quality.inspection.update",

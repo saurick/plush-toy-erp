@@ -40,6 +40,10 @@ func (d *jsonrpcDispatcher) handleWorkflow(
 	}
 
 	switch method {
+	case "list_exceptions":
+		return d.handleWorkflowExceptions(ctx, id, pm)
+	case "get_task_handling_chain":
+		return d.handleWorkflowHandlingChain(ctx, id, pm)
 	case "list_tracking", "get_tracking":
 		return d.handleWorkflowTracking(ctx, method, id, pm)
 	case "get_task_create_options", "create_followup_task":

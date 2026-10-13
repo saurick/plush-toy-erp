@@ -18,6 +18,7 @@ var (
 )
 
 type WorkflowTask struct {
+	Discovery             *WorkflowTaskDiscovery
 	ID                    int
 	TaskCode              string
 	TaskGroup             string
@@ -91,6 +92,7 @@ type WorkflowTaskFilter struct {
 }
 
 type WorkflowTaskBoardQuery struct {
+	WorkflowTaskDiscoveryFilter
 	Keyword                  string
 	Status                   string
 	OwnerRoleKey             string
@@ -124,7 +126,13 @@ type WorkflowTaskBoardLane struct {
 	Tasks  []*WorkflowTask
 }
 
+type WorkflowTaskPerson struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
 type WorkflowTaskBoard struct {
+	Assignees     []WorkflowTaskPerson
 	SnapshotAt    time.Time
 	Total         int
 	Counts        WorkflowTaskBoardCounts

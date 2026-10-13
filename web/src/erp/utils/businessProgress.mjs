@@ -132,6 +132,28 @@ export function requireProgressDetail(value) {
   return value
 }
 
+export const PROGRESS_SCOPE_OPTIONS = [
+  { value: 'active', label: '在执行' },
+  { value: 'all', label: '全部记录' },
+  { value: 'ended', label: '已结束' },
+]
+
+export const PROGRESS_RISK_OPTIONS = [
+  { value: 'all', label: '不限' },
+  { value: 'overdue', label: '已逾期' },
+  { value: 'due_soon', label: '7天内到期' },
+  { value: 'blocked', label: '任务受阻' },
+  { value: 'undated', label: '未定交期' },
+  { value: 'unlinked', label: '未关联销售' },
+]
+
+export function progressRiskAvailable(risk, { scope, view }) {
+  if (risk === 'unlinked') return view === 'production'
+  return !(
+    scope === 'ended' && ['overdue', 'due_soon', 'blocked'].includes(risk)
+  )
+}
+
 export function progressQueryFromURL(params) {
   const allowed = (key, values, fallback) =>
     values.includes(params.get(key)) ? params.get(key) : fallback
@@ -145,21 +167,60 @@ export function progressQueryFromURL(params) {
   const limit = TASK_BOARD_PAGE_SIZE_OPTIONS.includes(requestedLimit)
     ? requestedLimit
     : 20
+  const view = allowed('view', ['orders', 'production'], '')
+  const scope = allowed('scope', ['active', 'all', 'ended'], 'active')
+  const requestedRisk = allowed(
+    'risk',
+    PROGRESS_RISK_OPTIONS.map(({ value }) => value),
+    'all'
+  )
+  const risk = progressRiskAvailable(requestedRisk, { scope, view })
+    ? requestedRisk
+    : 'all'
   return {
-    view: allowed('view', ['orders', 'production'], ''),
+    view,
     keyword: (params.get('q') || '').slice(0, 100),
-    scope: allowed('scope', ['active', 'all', 'ended'], 'active'),
-    risk: allowed(
-      'risk',
-      ['all', 'overdue', 'due_soon', 'blocked', 'undated', 'unlinked'],
-      'all'
-    ),
+    scope,
+    risk,
     owner: (params.get('owner') || '').slice(0, 100),
-    date_from: date('from'),
-    date_to: date('to'),
+    date_from: risk === 'undated' ? '' : date('from'),
+    date_to: risk === 'undated' ? '' : date('to'),
     limit,
     offset: (page - 1) * limit,
   }
+}
+
+function normalizeProgressFilterParams(params) {
+  const next = new URLSearchParams(params)
+  const query = progressQueryFromURL(next)
+  next.set('scope', query.scope)
+  next.set('risk', query.risk)
+  for (const [key, value] of [
+    ['from', query.date_from],
+    ['to', query.date_to],
+  ]) {
+    if (value) next.set(key, value)
+    else next.delete(key)
+  }
+  return next
+}
+
+export function withProgressFilters(params, changes) {
+  const next = normalizeProgressFilterParams(params)
+  for (const [key, value] of Object.entries(changes)) {
+    if (value === '' || value === null || value === undefined) next.delete(key)
+    else next.set(key, String(value))
+  }
+  // A dated range and an undated record cannot match together. The user's
+  // latest choice wins; restored links keep their explicit attention filter.
+  if (
+    (changes.from || changes.to) &&
+    changes.risk !== 'undated' &&
+    next.get('risk') === 'undated'
+  ) {
+    next.set('risk', 'all')
+  }
+  return normalizeProgressFilterParams(next)
 }
 
 const statusLabels = {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/productionexceptiondecision"
+	"server/internal/data/model/ent/productionwipbatch"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -111,6 +112,34 @@ func (_c *ProductionExceptionDecisionCreate) SetQualityInspectionID(v int) *Prod
 func (_c *ProductionExceptionDecisionCreate) SetNillableQualityInspectionID(v *int) *ProductionExceptionDecisionCreate {
 	if v != nil {
 		_c.SetQualityInspectionID(*v)
+	}
+	return _c
+}
+
+// SetTargetSupplierID sets the "target_supplier_id" field.
+func (_c *ProductionExceptionDecisionCreate) SetTargetSupplierID(v int) *ProductionExceptionDecisionCreate {
+	_c.mutation.SetTargetSupplierID(v)
+	return _c
+}
+
+// SetNillableTargetSupplierID sets the "target_supplier_id" field if the given value is not nil.
+func (_c *ProductionExceptionDecisionCreate) SetNillableTargetSupplierID(v *int) *ProductionExceptionDecisionCreate {
+	if v != nil {
+		_c.SetTargetSupplierID(*v)
+	}
+	return _c
+}
+
+// SetTargetOperationID sets the "target_operation_id" field.
+func (_c *ProductionExceptionDecisionCreate) SetTargetOperationID(v int) *ProductionExceptionDecisionCreate {
+	_c.mutation.SetTargetOperationID(v)
+	return _c
+}
+
+// SetNillableTargetOperationID sets the "target_operation_id" field if the given value is not nil.
+func (_c *ProductionExceptionDecisionCreate) SetNillableTargetOperationID(v *int) *ProductionExceptionDecisionCreate {
+	if v != nil {
+		_c.SetTargetOperationID(*v)
 	}
 	return _c
 }
@@ -313,6 +342,21 @@ func (_c *ProductionExceptionDecisionCreate) SetNillableReverseReason(v *string)
 	return _c
 }
 
+// AddExecutionBatchIDs adds the "execution_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_c *ProductionExceptionDecisionCreate) AddExecutionBatchIDs(ids ...int) *ProductionExceptionDecisionCreate {
+	_c.mutation.AddExecutionBatchIDs(ids...)
+	return _c
+}
+
+// AddExecutionBatches adds the "execution_batches" edges to the ProductionWIPBatch entity.
+func (_c *ProductionExceptionDecisionCreate) AddExecutionBatches(v ...*ProductionWIPBatch) *ProductionExceptionDecisionCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddExecutionBatchIDs(ids...)
+}
+
 // Mutation returns the ProductionExceptionDecisionMutation object of the builder.
 func (_c *ProductionExceptionDecisionCreate) Mutation() *ProductionExceptionDecisionMutation {
 	return _c.mutation
@@ -435,6 +479,16 @@ func (_c *ProductionExceptionDecisionCreate) check() error {
 	if v, ok := _c.mutation.QualityInspectionID(); ok {
 		if err := productionexceptiondecision.QualityInspectionIDValidator(v); err != nil {
 			return &ValidationError{Name: "quality_inspection_id", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.quality_inspection_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.TargetSupplierID(); ok {
+		if err := productionexceptiondecision.TargetSupplierIDValidator(v); err != nil {
+			return &ValidationError{Name: "target_supplier_id", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.target_supplier_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.TargetOperationID(); ok {
+		if err := productionexceptiondecision.TargetOperationIDValidator(v); err != nil {
+			return &ValidationError{Name: "target_operation_id", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.target_operation_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.RequestedQuantity(); !ok {
@@ -575,6 +629,14 @@ func (_c *ProductionExceptionDecisionCreate) createSpec() (*ProductionExceptionD
 		_spec.SetField(productionexceptiondecision.FieldQualityInspectionID, field.TypeInt, value)
 		_node.QualityInspectionID = &value
 	}
+	if value, ok := _c.mutation.TargetSupplierID(); ok {
+		_spec.SetField(productionexceptiondecision.FieldTargetSupplierID, field.TypeInt, value)
+		_node.TargetSupplierID = &value
+	}
+	if value, ok := _c.mutation.TargetOperationID(); ok {
+		_spec.SetField(productionexceptiondecision.FieldTargetOperationID, field.TypeInt, value)
+		_node.TargetOperationID = &value
+	}
 	if value, ok := _c.mutation.RequestedQuantity(); ok {
 		_spec.SetField(productionexceptiondecision.FieldRequestedQuantity, field.TypeOther, value)
 		_node.RequestedQuantity = value
@@ -642,6 +704,22 @@ func (_c *ProductionExceptionDecisionCreate) createSpec() (*ProductionExceptionD
 	if value, ok := _c.mutation.ReverseReason(); ok {
 		_spec.SetField(productionexceptiondecision.FieldReverseReason, field.TypeString, value)
 		_node.ReverseReason = &value
+	}
+	if nodes := _c.mutation.ExecutionBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionexceptiondecision.ExecutionBatchesTable,
+			Columns: []string{productionexceptiondecision.ExecutionBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

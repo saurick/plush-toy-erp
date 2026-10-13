@@ -7,6 +7,12 @@
   margin-bottom: 16px;
 }
 
+.erp-workflow-tracking-scope-summary {
+  margin: 0 0 8px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
 .erp-workflow-tracking-panel .erp-task-table-row {
   cursor: pointer;
 }
@@ -75,6 +81,23 @@
   border: 1px solid var(--erp-border);
   border-radius: 10px;
   background: var(--erp-surface-bg);
+}
+
+.erp-workflow-tracking-exceptions {
+  min-width: 0;
+  margin-top: 12px;
+  border-top: 1px solid var(--erp-border);
+}
+
+.erp-workflow-tracking-exceptions > summary {
+  min-height: 44px;
+  align-content: center;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.erp-workflow-tracking-exceptions[open] > summary {
+  margin-bottom: 12px;
 }
 
 .erp-workflow-tracking-detail h2,
@@ -165,6 +188,7 @@
 }
 
 .erp-workflow-tracking-open-task > span {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -196,6 +220,36 @@
   margin-top: 12px;
 }
 
+.erp-workflow-tracking-drawer .ant-drawer-header {
+  min-height: 58px;
+  padding: 6px 12px;
+}
+
+.erp-workflow-tracking-drawer .ant-drawer-header-title {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-workflow-tracking-drawer .ant-drawer-close {
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  color: var(--erp-text);
+  font-size: 18px;
+}
+
+.erp-workflow-tracking-drawer .ant-drawer-title {
+  min-width: 0;
+  text-align: center;
+  font-size: 18px;
+}
+
+.erp-workflow-tracking-drawer .ant-drawer-footer {
+  padding: 12px 16px max(12px, env(safe-area-inset-bottom));
+}
+
 .erp-workflow-tracking-footer {
   display: grid;
   gap: 8px;
@@ -203,23 +257,17 @@
 
 .erp-workflow-tracking-footer-actions {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.erp-workflow-tracking-footer-controls {
-  display: flex;
-  flex: 1;
-  min-width: 0;
-  align-items: center;
+  align-items: stretch;
   justify-content: flex-end;
-  flex-wrap: wrap;
   gap: 8px;
 }
 
-.erp-workflow-tracking-footer-controls > .ant-btn {
+.erp-workflow-tracking-footer-actions > .ant-btn {
+  min-width: 0;
   max-width: 100%;
+  height: auto;
+  min-height: 44px;
+  white-space: normal;
 }
 
 .erp-workflow-tracking-footer-actions > .ant-btn:first-child {
@@ -231,13 +279,6 @@
   min-width: 0;
 }
 
-.erp-workflow-tracking-open-task.ant-btn {
-  min-width: 0;
-  height: auto;
-  min-height: 32px;
-  white-space: normal;
-}
-
 @media (width <= 575px) {
   .erp-workflow-tracking-detail {
     padding: 10px;
@@ -245,6 +286,15 @@
 
   .erp-workflow-tracking-detail > section {
     padding: 14px;
+  }
+
+  .erp-workflow-tracking-footer-actions {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .erp-workflow-tracking-footer-actions > .ant-btn:only-child {
+    grid-column: 1 / -1;
   }
 
 }

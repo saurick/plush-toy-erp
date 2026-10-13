@@ -1,3 +1,4 @@
+import { DISCOVERY_REQUEST_KEYS, normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from '../utils/workflowTaskDiscovery.mjs'
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
@@ -9,6 +10,7 @@ import { requireWorkflowTaskBoardResponse } from '../utils/workflowTaskBoardCont
 import { notifyWorkflowTasksChanged } from '../utils/workflowTaskChanges.mjs'
 import { isWorkflowApprovalTask } from '../utils/workflowTaskActionContract.mjs'
 import { requireTrackingDetail, requireTrackingPage } from '../utils/workflowTracking.mjs'
+import { isWorkflowHistoryDateFilter } from '../utils/workflowRoleTaskHistory.mjs'
 
 import { requireFollowupCreateParams, requireFollowupOptions, requireFollowupReceipt } from '../utils/workflowFollowup.mjs'
 
@@ -39,11 +41,15 @@ const WORKFLOW_ROLE_TASK_VIEW_KEYS = new Set([
 const WORKFLOW_ROLE_TASK_QUERY_KEYS = new Set([
   'view_key',
   'role_key',
+  'module_key', 'chain_key', 'stage_key', 'assignee',
   'limit',
   'cursor',
   'keyword',
   'sort_key',
   'status_key',
+  'period',
+  'date_from',
+  'date_to',
 ])
 const WORKFLOW_ROLE_TASK_STATUS_KEYS_BY_VIEW = Object.freeze({
   todo: new Set([WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED]),
@@ -118,15 +124,21 @@ function requireWorkflowRoleTaskQuery(params = {}) {
     }
   }
 
+  const discoveryInput = Object.fromEntries(Object.entries(DISCOVERY_REQUEST_KEYS).filter(([, requestKey]) => params[requestKey] !== undefined).map(([key, requestKey]) => [key, params[requestKey]]))
+  const discovery = normalizeTaskDiscoveryFilters(discoveryInput)
+  if (Object.keys(discoveryInput).some((key) => typeof discoveryInput[key] !== 'string' || discovery[key] !== discoveryInput[key])) throw new TypeError('任务筛选条件无效，请重新选择')
+
   const viewKey = typeof params.view_key === 'string' ? params.view_key : ''
   const roleKey = typeof params.role_key === 'string' ? params.role_key : ''
   const { cursor } = params
   if (
     (params.sort_key !== undefined &&
-      !['newest', 'oldest', 'due'].includes(params.sort_key)) ||
+      !(viewKey === 'history' ? ['completed'] : ['newest', 'oldest', 'due']).includes(params.sort_key)) ||
     (params.status_key !== undefined &&
-      (![WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(params.status_key) ||
-        viewKey === 'history')) ||
+      !WORKFLOW_ROLE_TASK_STATUS_KEYS_BY_VIEW[viewKey]?.has(params.status_key)) ||
+    (['period', 'date_from', 'date_to'].some((key) => params[key] !== undefined) &&
+      (viewKey !== 'history' || ['period', 'date_from', 'date_to'].some((key) => params[key] !== undefined && (typeof params[key] !== 'string' || !params[key])) ||
+        !isWorkflowHistoryDateFilter({ period: params.period, dateFrom: params.date_from, dateTo: params.date_to }))) ||
     (params.keyword !== undefined &&
       (typeof params.keyword !== 'string' ||
         !params.keyword.trim() ||
@@ -145,12 +157,16 @@ function requireWorkflowRoleTaskQuery(params = {}) {
   }
 
   return {
+    ...taskDiscoveryRequest(discovery),
     view_key: viewKey,
     role_key: roleKey,
     limit: params.limit,
     ...(params.keyword ? { keyword: params.keyword } : {}),
     ...(params.sort_key ? { sort_key: params.sort_key } : {}),
     ...(params.status_key ? { status_key: params.status_key } : {}),
+    ...(params.period ? { period: params.period } : {}),
+    ...(params.date_from ? { date_from: params.date_from } : {}),
+    ...(params.date_to ? { date_to: params.date_to } : {}),
     ...(cursor ? { cursor } : {}),
   }
 }
@@ -580,6 +596,19 @@ export async function getWorkflowTaskProcessContext(taskId, options = {}) {
   }
 }
 
+export async function getWorkflowTaskHandlingChain(taskId, { view = 'task', offset = 0, ...options } = {}) {
+  if (!Number.isSafeInteger(taskId) || taskId <= 0) throw new Error('任务参数无效')
+  if (!['task', 'order'].includes(view)) throw new Error('任务链查看范围无效')
+  if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('任务链分页条件无效')
+  const result = await workflowRpc.call(RpcMethod.workflow.GET_TASK_HANDLING_CHAIN, { task_id: taskId, view, ...(offset ? { offset } : {}) }, options)
+  const data = dataOf(result)
+  if (!Array.isArray(data?.items) || data.items.length > 100 || typeof data.truncated !== 'boolean' || !data.items.every((item) =>
+    Number.isSafeInteger(item?.id) && item.id > 0 && typeof item.task_name === 'string' &&
+    ['ready', 'blocked', 'done', 'rejected', 'withdrawn'].includes(item.task_status_key) && typeof item.owner_role_key === 'string'
+  )) throw new Error('任务链返回格式无效')
+  return data
+}
+
 async function listWorkflowRoleTaskPage(method, params = {}) {
   const query = requireWorkflowRoleTaskQuery(params)
   const result = await workflowRpc.call(method, query)
@@ -741,4 +770,11 @@ export async function createWorkflowFollowupTask(params) {
   const receipt = requireFollowupReceipt(dataOf(result), input)
   notifyWorkflowTasksChanged()
   return receipt
+}
+
+export async function listWorkflowExceptions(params = {}, options = {}) {
+  const result = await workflowRpc.call(RpcMethod.workflow.LIST_EXCEPTIONS, params, options)
+  const data = dataOf(result)
+  if (!Array.isArray(data?.items) || !Array.isArray(data?.tasks) || !Array.isArray(data?.orders) || !['total', 'view_total', 'pending_tasks', 'affected_orders', 'open', 'closed'].every((key) => Number.isSafeInteger(data[key]) && data[key] >= 0) || data.items.some((item) => !item.key || !Array.isArray(item.tasks) || !Array.isArray(item.task_ids) || !Array.isArray(item.orders))) throw new Error('异常记录返回不完整，请重试')
+  return data
 }

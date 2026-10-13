@@ -154,6 +154,8 @@ func (ProductionFact) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("origin_rework_batches", ProductionWIPBatch.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("packaging_batches", ProductionWIPBatch.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("poster", AdminUser.Type).
 			Field("posted_by").
 			Unique().

@@ -517,7 +517,7 @@ const EXCEPTION_PROCESS_CONTRACTS = Object.freeze({
     getMethod: 'get_production_exception_approval_process',
     startNodeKey: 'production_exception_decision_approval',
     executeMethods: Object.freeze({
-      execute_production_exception_process: 'execute_production_exception',
+      execute_production_exception_process: Object.freeze(['execute_production_exception', 'execute_warehouse_production_exception']),
     }),
   }),
 })
@@ -711,7 +711,7 @@ async function executeExceptionProcess(processKey, method, params = {}) {
     context.process_instance.id
   )
   if (
-    completedNode.node_key !== expectedNodeKey ||
+    !(Array.isArray(expectedNodeKey) ? expectedNodeKey : [expectedNodeKey]).includes(completedNode.node_key) ||
     completedNode.node_type !== 'domain_command' ||
     completedNode.status !== 'completed' ||
     !context.nodes.some(
@@ -729,7 +729,7 @@ async function executeExceptionProcess(processKey, method, params = {}) {
 export function findExceptionProcessActiveNode(data, nodeKey) {
   const nodes = data?.process_context?.active_nodes
   const matches = Array.isArray(nodes)
-    ? nodes.filter((node) => node?.node_key === nodeKey)
+    ? nodes.filter((node) => (Array.isArray(nodeKey) ? nodeKey : [nodeKey]).includes(node?.node_key))
     : []
   if (matches.length !== 1) throw exceptionProcessResultInvalid()
   return matches[0]

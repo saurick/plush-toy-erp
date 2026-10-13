@@ -44,6 +44,7 @@ type OutsourcingOrder struct {
 	SupplierSnapshot      map[string]any
 	ContractPartySnapshot map[string]any
 	SourceOrderNo         *string
+	SourceWIPBatchID      *int
 	OrderDate             time.Time
 	ExpectedReturnDate    *time.Time
 	LifecycleStatus       string

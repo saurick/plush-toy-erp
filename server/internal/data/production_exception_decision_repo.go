@@ -77,7 +77,7 @@ func (r *operationalFactRepo) SubmitProductionException(ctx context.Context, in 
 	if err := validateProductionExceptionSource(ctx, tx.client, in); err != nil {
 		return nil, err
 	}
-	row, err := tx.client.ProductionExceptionDecision.Create().SetDecisionNo(in.DecisionNo).SetDecisionType(in.DecisionType).SetStatus(biz.ProductionExceptionSubmitted).SetProductionOrderID(in.ProductionOrderID).SetProductionOrderItemID(in.ProductionOrderItemID).SetNillableProductionMaterialRequirementID(in.ProductionMaterialRequirementID).SetNillableProductionWipBatchID(in.ProductionWIPBatchID).SetNillableQualityInspectionID(in.QualityInspectionID).SetRequestedQuantity(in.RequestedQuantity).SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(hash).SetRequestedBy(in.RequestedBy).Save(ctx)
+	row, err := tx.client.ProductionExceptionDecision.Create().SetDecisionNo(in.DecisionNo).SetDecisionType(in.DecisionType).SetStatus(biz.ProductionExceptionSubmitted).SetProductionOrderID(in.ProductionOrderID).SetProductionOrderItemID(in.ProductionOrderItemID).SetNillableProductionMaterialRequirementID(in.ProductionMaterialRequirementID).SetNillableProductionWipBatchID(in.ProductionWIPBatchID).SetNillableQualityInspectionID(in.QualityInspectionID).SetNillableTargetSupplierID(in.TargetSupplierID).SetNillableTargetOperationID(in.TargetOperationID).SetRequestedQuantity(in.RequestedQuantity).SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(hash).SetRequestedBy(in.RequestedBy).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			rollbackInventoryDBTx(ctx, tx, r.log)
@@ -116,10 +116,13 @@ func validateProductionExceptionSource(ctx context.Context, client *ent.Client, 
 		if err != nil || requirement.ProductionOrderID != in.ProductionOrderID || requirement.ProductionOrderItemID != in.ProductionOrderItemID {
 			return biz.ErrProductionExceptionSourceInvalid
 		}
-	case biz.ProductionExceptionWIPConcession, biz.ProductionExceptionScrap:
+	case biz.ProductionExceptionWIPConcession, biz.ProductionExceptionScrap, biz.ProductionExceptionReworkOriginal, biz.ProductionExceptionReworkSwitch, biz.ProductionExceptionRemake:
 		batch, inspection, err := productionExceptionWIPSource(ctx, client, *in.ProductionWIPBatchID, *in.QualityInspectionID)
 		if err != nil || batch.ProductionOrderID != in.ProductionOrderID || batch.ProductionOrderItemID != in.ProductionOrderItemID || batch.Status != biz.ProductionWIPStatusRejected || inspection.Status != biz.QualityInspectionStatusRejected || inspection.Result == nil || *inspection.Result != biz.QualityInspectionResultReject || !batch.Quantity.Equal(in.RequestedQuantity) {
 			return biz.ErrProductionExceptionSourceInvalid
+		}
+		if err := validateProductionExceptionTarget(ctx, client, batch, in.DecisionType, in.TargetOperationID, in.TargetSupplierID); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -326,6 +329,10 @@ func (r *operationalFactRepo) executeProductionException(
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
 	if command != nil {
 		in.ExpectedVersion = row.Version
+		in.WarehouseScope = command.WarehouseScope
+	}
+	if err := validateProductionExceptionWarehouseScope(ctx, tx.client, row, in.WarehouseScope, command); err != nil {
+		return nil, err
 	}
 	if row.ExecutionStatus == biz.ProductionExceptionExecutionApplied && row.ExecutedBy != nil && *row.ExecutedBy == in.ActorID &&
 		row.ExecutionReason != nil && *row.ExecutionReason == in.Reason && row.Version == in.ExpectedVersion+1 {
@@ -362,6 +369,9 @@ func (r *operationalFactRepo) ReverseProductionException(ctx context.Context, in
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := validateProductionExceptionWarehouseScope(ctx, tx.client, row, in.WarehouseScope, nil); err != nil {
+		return nil, err
+	}
 	if row.ExecutionStatus == biz.ProductionExceptionExecutionReversed && row.ReversedBy != nil && *row.ReversedBy == in.ActorID && row.ReverseReason != nil && *row.ReverseReason == in.Reason && row.Version == in.ExpectedVersion+1 {
 		return commitProductionException(ctx, tx, row.ID)
 	}
@@ -385,6 +395,19 @@ func (r *operationalFactRepo) ReverseProductionException(ctx context.Context, in
 		}
 	case biz.ProductionExceptionScrap:
 		if err := reverseProductionExceptionWIPStatus(ctx, tx, row, biz.ProductionWIPStatusCancelled, biz.ProductionWIPStatusRejected, in.ActorID, in.Reason); err != nil {
+			return nil, err
+		}
+		if err := r.applyProductionExceptionStock(ctx, tx, row, in.ActorID, in.Reason, true); err != nil {
+			return nil, err
+		}
+	case biz.ProductionExceptionReworkOriginal, biz.ProductionExceptionReworkSwitch, biz.ProductionExceptionRemake:
+		if err := cancelProductionExceptionExecutionBatch(ctx, tx.client, row); err != nil {
+			return nil, err
+		}
+		if err := reverseProductionExceptionWIPStatus(ctx, tx, row, biz.ProductionWIPStatusCancelled, biz.ProductionWIPStatusRejected, in.ActorID, in.Reason); err != nil {
+			return nil, err
+		}
+		if err := r.applyProductionExceptionStock(ctx, tx, row, in.ActorID, in.Reason, true); err != nil {
 			return nil, err
 		}
 	case biz.ProductionExceptionWIPConcession:
@@ -570,7 +593,7 @@ func (r *operationalFactRepo) applyProductionExceptionApproval(ctx context.Conte
 	switch row.DecisionType {
 	case biz.ProductionExceptionOverIssue:
 		return lockOperationalFactRow(ctx, tx, "production_order_material_requirements", *row.ProductionMaterialRequirementID, biz.ErrProductionExceptionSourceInvalid)
-	case biz.ProductionExceptionWIPConcession, biz.ProductionExceptionScrap:
+	case biz.ProductionExceptionWIPConcession, biz.ProductionExceptionScrap, biz.ProductionExceptionReworkOriginal, biz.ProductionExceptionReworkSwitch, biz.ProductionExceptionRemake:
 		if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", *row.ProductionWipBatchID, biz.ErrProductionExceptionSourceInvalid); err != nil {
 			return err
 		}
@@ -582,8 +605,16 @@ func (r *operationalFactRepo) applyProductionExceptionApproval(ctx context.Conte
 			return err
 		}
 		target := biz.ProductionWIPStatusAccepted
-		if row.DecisionType == biz.ProductionExceptionScrap {
+		if row.DecisionType != biz.ProductionExceptionWIPConcession {
+			if err := r.applyProductionExceptionStock(ctx, tx, row, actorID, executionReason, false); err != nil {
+				return err
+			}
 			target = biz.ProductionWIPStatusCancelled
+		}
+		if biz.ProductionExceptionCreatesBatch(row.DecisionType) {
+			if err := createProductionExceptionExecutionBatch(ctx, tx.client, row, batch, actorID); err != nil {
+				return err
+			}
 		}
 		affected, err := tx.client.ProductionWIPBatch.Update().Where(productionwipbatch.ID(batch.ID), productionwipbatch.StatusEQ(biz.ProductionWIPStatusRejected), productionwipbatch.VersionEQ(batch.Version)).SetStatus(target).AddVersion(1).Save(ctx)
 		if err != nil || affected != 1 {
@@ -700,7 +731,10 @@ func (r *operationalFactRepo) GetProductionException(ctx context.Context, id int
 	if ent.IsNotFound(err) {
 		return nil, biz.ErrProductionExceptionNotFound
 	}
-	return entProductionExceptionToBiz(row), err
+	if err != nil {
+		return nil, err
+	}
+	return hydrateProductionException(ctx, r.data.postgres, row)
 }
 func (r *operationalFactRepo) ListProductionExceptions(ctx context.Context, filter biz.ProductionExceptionFilter) ([]*biz.ProductionExceptionDecision, int, error) {
 	query := r.data.postgres.ProductionExceptionDecision.Query()
@@ -726,7 +760,11 @@ func (r *operationalFactRepo) ListProductionExceptions(ctx context.Context, filt
 	}
 	out := make([]*biz.ProductionExceptionDecision, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, entProductionExceptionToBiz(row))
+		item, err := hydrateProductionException(ctx, r.data.postgres, row)
+		if err != nil {
+			return nil, 0, err
+		}
+		out = append(out, item)
 	}
 	return out, total, nil
 }
@@ -745,16 +783,30 @@ func commitProductionException(ctx context.Context, tx *inventoryDBTx, id int) (
 			return nil, err
 		}
 	}
+	item, err := hydrateProductionException(ctx, tx.client, row)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
 	tx.sqlTx = nil
-	return entProductionExceptionToBiz(row), nil
+	return item, nil
+}
+
+func hydrateProductionException(ctx context.Context, client *ent.Client, row *ent.ProductionExceptionDecision) (*biz.ProductionExceptionDecision, error) {
+	item := entProductionExceptionToBiz(row)
+	if row.ProductionWipBatchID == nil {
+		return item, nil
+	}
+	hasStock, err := client.ProductionFact.Query().Where(productionfact.ProductionWipBatchID(*row.ProductionWipBatchID), productionfact.FactType(biz.ProductionFactFinishedGoodsReceipt), productionfact.StatusNEQ(biz.OperationalFactStatusCancelled)).Exist(ctx)
+	item.StockDispositionRequired = hasStock
+	return item, err
 }
 
 func entProductionExceptionToBiz(row *ent.ProductionExceptionDecision) *biz.ProductionExceptionDecision {
 	if row == nil {
 		return nil
 	}
-	return &biz.ProductionExceptionDecision{ID: row.ID, DecisionNo: row.DecisionNo, DecisionType: row.DecisionType, Status: row.Status, ExecutionStatus: row.ExecutionStatus, ProductionOrderID: row.ProductionOrderID, ProductionOrderItemID: row.ProductionOrderItemID, ProductionMaterialRequirementID: row.ProductionMaterialRequirementID, ProductionWIPBatchID: row.ProductionWipBatchID, QualityInspectionID: row.QualityInspectionID, RequestedQuantity: row.RequestedQuantity, ApprovedQuantity: row.ApprovedQuantity, Reason: row.Reason, Version: row.Version, RequestedBy: row.RequestedBy, RequestedAt: row.RequestedAt, DecidedBy: row.DecidedBy, DecidedAt: row.DecidedAt, DecisionReason: row.DecisionReason, ExecutedBy: row.ExecutedBy, ExecutedAt: row.ExecutedAt, ExecutionReason: row.ExecutionReason, ReversedBy: row.ReversedBy, ReversedAt: row.ReversedAt, ReverseReason: row.ReverseReason}
+	return &biz.ProductionExceptionDecision{ID: row.ID, DecisionNo: row.DecisionNo, DecisionType: row.DecisionType, Status: row.Status, ExecutionStatus: row.ExecutionStatus, ProductionOrderID: row.ProductionOrderID, ProductionOrderItemID: row.ProductionOrderItemID, ProductionMaterialRequirementID: row.ProductionMaterialRequirementID, ProductionWIPBatchID: row.ProductionWipBatchID, QualityInspectionID: row.QualityInspectionID, TargetSupplierID: row.TargetSupplierID, TargetOperationID: row.TargetOperationID, RequestedQuantity: row.RequestedQuantity, ApprovedQuantity: row.ApprovedQuantity, Reason: row.Reason, Version: row.Version, RequestedBy: row.RequestedBy, RequestedAt: row.RequestedAt, DecidedBy: row.DecidedBy, DecidedAt: row.DecidedAt, DecisionReason: row.DecisionReason, ExecutedBy: row.ExecutedBy, ExecutedAt: row.ExecutedAt, ExecutionReason: row.ExecutionReason, ReversedBy: row.ReversedBy, ReversedAt: row.ReversedAt, ReverseReason: row.ReverseReason}
 }

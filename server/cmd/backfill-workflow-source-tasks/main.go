@@ -58,8 +58,9 @@ func main() {
 		"mode":     map[bool]string{true: "apply", false: "dry-run"}[*apply],
 		"result":   result,
 		"notes": []string{
-			"only active RELEASED production orders and POSTED REWORK facts are reconciled",
-			"created tasks stay ready for real owners; no done or rejected outcome is inferred",
+			"reconciles RELEASED production orders, POSTED REWORK bundles and DRAFT shipment preparation tasks",
+			"normalizes proven timezone-only source intent differences and preserves original workflow events",
+			"fulfillment handoffs follow source facts; no approval, stock movement or shipment fact is fabricated",
 			"DRAFT shipments still require an explicit submit action from the shipment page",
 		},
 	}

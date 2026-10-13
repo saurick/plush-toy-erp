@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"time"
@@ -16,7 +17,7 @@ func (ProductionExceptionDecision) Hooks() []ent.Hook {
 }
 func (ProductionExceptionDecision) Annotations() []schema.Annotation {
 	return []schema.Annotation{entsql.Annotation{Checks: map[string]string{
-		"production_exception_decisions_type_allowed":      "decision_type IN ('SCRAP', 'OVER_ISSUE', 'WIP_CONCESSION')",
+		"production_exception_decisions_type_allowed":      "decision_type IN ('SCRAP', 'OVER_ISSUE', 'WIP_CONCESSION', 'REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE')",
 		"production_exception_decisions_status_allowed":    "status IN ('SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED')",
 		"production_exception_decisions_execution_allowed": "execution_status IN ('PENDING', 'APPLIED', 'REVERSED')",
 		"production_exception_decisions_quantity_positive": "requested_quantity > 0 AND (approved_quantity IS NULL OR approved_quantity > 0)",
@@ -26,8 +27,9 @@ func (ProductionExceptionDecision) Annotations() []schema.Annotation {
 (
   (decision_type = 'OVER_ISSUE' AND production_material_requirement_id IS NOT NULL AND production_wip_batch_id IS NULL AND quality_inspection_id IS NULL)
   OR
-  (decision_type IN ('SCRAP', 'WIP_CONCESSION') AND production_material_requirement_id IS NULL AND production_wip_batch_id IS NOT NULL AND quality_inspection_id IS NOT NULL)
+  (decision_type IN ('SCRAP', 'WIP_CONCESSION', 'REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE') AND production_material_requirement_id IS NULL AND production_wip_batch_id IS NOT NULL AND quality_inspection_id IS NOT NULL)
 )`,
+		"production_exception_decisions_target_bundle": "((decision_type IN ('REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE') AND target_operation_id IS NOT NULL AND (decision_type = 'REWORK_ORIGINAL' OR target_supplier_id IS NOT NULL)) OR (decision_type NOT IN ('REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE') AND target_operation_id IS NULL AND target_supplier_id IS NULL))",
 		"production_exception_decisions_execution_audit": `
 (
   (execution_status = 'PENDING' AND executed_at IS NULL AND executed_by IS NULL AND execution_reason IS NULL AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)
@@ -35,7 +37,7 @@ func (ProductionExceptionDecision) Annotations() []schema.Annotation {
   OR (execution_status = 'REVERSED'
     AND reversed_at IS NOT NULL AND reversed_by IS NOT NULL AND length(trim(reverse_reason)) BETWEEN 1 AND 255
     AND ((decision_type = 'OVER_ISSUE' AND executed_at IS NULL AND executed_by IS NULL AND execution_reason IS NULL)
-      OR (decision_type IN ('SCRAP', 'WIP_CONCESSION') AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND length(trim(execution_reason)) BETWEEN 1 AND 255)))
+      OR (decision_type IN ('SCRAP', 'WIP_CONCESSION', 'REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE') AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND length(trim(execution_reason)) BETWEEN 1 AND 255)))
 )`,
 	}}}
 }
@@ -48,6 +50,8 @@ func (ProductionExceptionDecision) Fields() []ent.Field {
 		field.Int("production_material_requirement_id").Optional().Nillable().Positive().Immutable(),
 		field.Int("production_wip_batch_id").Optional().Nillable().Positive().Immutable(),
 		field.Int("quality_inspection_id").Optional().Nillable().Positive().Immutable(),
+		field.Int("target_supplier_id").Optional().Nillable().Positive().Immutable(),
+		field.Int("target_operation_id").Optional().Nillable().Positive().Immutable(),
 		immutableDecimalQuantityField("requested_quantity"), optionalDecimalField("approved_quantity"),
 		field.String("reason").NotEmpty().MaxLen(255).Immutable(),
 		field.String("idempotency_key").NotEmpty().MaxLen(128).Immutable(), field.String("idempotency_payload_hash").NotEmpty().MinLen(64).MaxLen(64).Immutable(),
@@ -62,6 +66,10 @@ func (ProductionExceptionDecision) Indexes() []ent.Index {
 		index.Fields("decision_no").Unique(), index.Fields("requested_by", "idempotency_key").Unique(),
 		index.Fields("decision_type", "status", "execution_status", "requested_at"), index.Fields("production_order_id", "production_order_item_id"),
 		// Reversed executions retain their audit history but release the inspection for a new decision.
-		index.Fields("quality_inspection_id").Unique().Annotations(entsql.IndexWhere("((decision_type = 'SCRAP' OR decision_type = 'WIP_CONCESSION') AND (status = 'SUBMITTED' OR status = 'APPROVED') AND execution_status <> 'REVERSED')")),
+		index.Fields("quality_inspection_id").Unique().Annotations(entsql.IndexWhere("(quality_inspection_id IS NOT NULL AND (status = 'SUBMITTED' OR status = 'APPROVED') AND execution_status <> 'REVERSED')")),
 	}
+}
+
+func (ProductionExceptionDecision) Edges() []ent.Edge {
+	return []ent.Edge{edge.To("execution_batches", ProductionWIPBatch.Type).Annotations(entsql.OnDelete(entsql.NoAction))}
 }

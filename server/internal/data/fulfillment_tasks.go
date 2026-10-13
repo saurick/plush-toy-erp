@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorderitem"
+	"server/internal/data/model/ent/productionexceptiondecision"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionpackagingconfirmation"
 	"server/internal/data/model/ent/productionwipbatch"
@@ -55,11 +56,17 @@ func syncFulfillmentTask(ctx context.Context, client *ent.Client, kind string, i
 	if status == "withdrawn" && reason == "" {
 		reason = "来源已取消或本步骤不再适用"
 	}
-	if row.TaskStatusKey == status && optionalStringValueOrEmpty(row.BlockedReason) == reason && optionalStringValueOrEmpty(row.SourceNo) == no {
+	entryChanged := row.Payload["entry_path"] != expected.Payload["entry_path"] || row.TaskName != expected.TaskName
+	if row.TaskStatusKey == status && optionalStringValueOrEmpty(row.BlockedReason) == reason && optionalStringValueOrEmpty(row.SourceNo) == no && !entryChanged {
 		return nil
 	}
 	update := client.WorkflowTask.Update().Where(workflowtask.ID(row.ID), workflowtask.Version(row.Version)).
 		SetTaskStatusKey(status).SetSourceNo(no).AddVersion(1)
+	if entryChanged {
+		payload := cloneSourceWorkflowPayload(row.Payload)
+		payload["entry_path"] = expected.Payload["entry_path"]
+		update.SetTaskName(expected.TaskName).SetPayload(payload)
+	}
 	if reason == "" {
 		update.ClearBlockedReason()
 	} else {
@@ -80,8 +87,12 @@ func syncFulfillmentTask(ctx context.Context, client *ent.Client, kind string, i
 	if count != 1 {
 		return biz.ErrIdempotencyConflict
 	}
+	eventType := "status_changed"
+	if row.TaskStatusKey == status {
+		eventType = "source_updated"
+	}
 	event := client.WorkflowTaskEvent.Create().SetTaskID(row.ID).SetTaskVersion(row.Version + 1).
-		SetEventType("status_changed").SetFromStatusKey(row.TaskStatusKey).SetToStatusKey(status).
+		SetEventType(eventType).SetFromStatusKey(row.TaskStatusKey).SetToStatusKey(status).
 		SetPayload(map[string]any{"source_task_producer": biz.FulfillmentTaskProducer, "source_action": kind, "source_id": id})
 	if reason != "" {
 		event.SetReason(reason)
@@ -341,6 +352,7 @@ func syncProductionHandoffs(ctx context.Context, client *ent.Client, orderID, ac
 		}
 		path := fmt.Sprintf("/erp/production/orders?production_order_id=%d&wip_batch_id=%d", orderID, batch.ID)
 		execute, transfer, exception, completion := "", "", "", ""
+		transferReason := ""
 		switch batch.Status {
 		case "PLANNED", "IN_PROGRESS":
 			execute = "ready"
@@ -353,19 +365,7 @@ func syncProductionHandoffs(ctx context.Context, client *ent.Client, orderID, ac
 		case "ACCEPTED":
 			execute, exception = "done", "done"
 			allocated := decimal.Zero
-			if operation.OperationCode == biz.ProductionWIPOperationPackaging {
-				facts, err := client.ProductionFact.Query().Where(productionfact.ProductionWipBatchID(batch.ID), productionfact.StatusNEQ("CANCELLED"), productionfact.FactType(biz.ProductionFactFinishedGoodsReceipt)).All(ctx)
-				if err != nil {
-					return err
-				}
-				for _, fact := range facts {
-					allocated = allocated.Add(fact.Quantity)
-				}
-				completion = "done"
-				if allocated.LessThan(batch.Quantity) {
-					completion = "ready"
-				}
-			} else {
+			if operation.OperationCode != biz.ProductionWIPOperationPackaging {
 				for _, child := range batches {
 					if child.SourceBatchID != nil && *child.SourceBatchID == batch.ID && child.Status != "CANCELLED" && child.FlowType == biz.ProductionWIPFlowNormal && child.ProductionOrderOperationID != batch.ProductionOrderOperationID {
 						allocated = allocated.Add(child.Quantity)
@@ -381,7 +381,48 @@ func syncProductionHandoffs(ctx context.Context, client *ent.Client, orderID, ac
 		case "CANCELLED":
 			execute, transfer, exception, completion = "withdrawn", "withdrawn", "withdrawn", "withdrawn"
 		}
+		if operation.OperationCode == biz.ProductionWIPOperationHandwork && (batch.Status == "WAITING_QUALITY" || batch.Status == "ACCEPTED" || batch.Status == "REJECTED") {
+			receiptBatchIDs, err := productionReceiptReservationBatchIDs(ctx, client, batch)
+			if err != nil {
+				return err
+			}
+			facts, err := client.ProductionFact.Query().Where(productionfact.ProductionWipBatchIDIn(receiptBatchIDs...), productionfact.StatusNEQ("CANCELLED"), productionfact.FactType(biz.ProductionFactFinishedGoodsReceipt)).All(ctx)
+			if err != nil {
+				return err
+			}
+			allocated, availableToPack := decimal.Zero, decimal.Zero
+			for _, fact := range facts {
+				allocated = allocated.Add(fact.Quantity)
+				if fact.Status == "POSTED" && fact.ProductionWipBatchID != nil && *fact.ProductionWipBatchID == batch.ID {
+					packaging, err := productionReceiptPackagingBatches(ctx, client, fact.ID)
+					if err != nil {
+						return err
+					}
+					reworked, err := productionReceiptReworkedQuantity(ctx, client, fact.ID)
+					if err != nil {
+						return err
+					}
+					availableToPack = availableToPack.Add(decimal.Max(decimal.Zero, fact.Quantity.Sub(reworked).Sub(sumProductionWIPBatchQuantity(packaging))))
+				}
+			}
+			completion = "done"
+			if allocated.LessThan(batch.Quantity) {
+				completion = "ready"
+			}
+			if transfer == "ready" && !availableToPack.IsPositive() {
+				transfer = "blocked"
+				transferReason = "暂无可安排包装的已入库数量，请先完成成品收仓；已安排的数量请在包装批次继续办理"
+			}
+		}
+
 		if exception == "ready" {
+			decided, err := client.ProductionExceptionDecision.Query().Where(productionexceptiondecision.ProductionWipBatchID(batch.ID), productionexceptiondecision.StatusIn(biz.ProductionExceptionSubmitted, biz.ProductionExceptionApproved), productionexceptiondecision.ExecutionStatusNEQ(biz.ProductionExceptionExecutionReversed)).Exist(ctx)
+			if err != nil {
+				return err
+			}
+			if decided {
+				exception = "done"
+			}
 			allocated := decimal.Zero
 			for _, child := range batches {
 				if child.SourceBatchID != nil && *child.SourceBatchID == batch.ID && child.FlowType == "REWORK" && child.Status != "CANCELLED" {
@@ -392,13 +433,61 @@ func syncProductionHandoffs(ctx context.Context, client *ent.Client, orderID, ac
 				exception = "done"
 			}
 		}
+		if batch.Status == biz.ProductionWIPStatusCancelled {
+			applied, err := client.ProductionExceptionDecision.Query().Where(productionexceptiondecision.ProductionWipBatchID(batch.ID), productionexceptiondecision.ExecutionStatus(biz.ProductionExceptionExecutionApplied)).Exist(ctx)
+			if err != nil {
+				return err
+			}
+			if applied {
+				exception = "done"
+			}
+		}
 		inactive := order.Status == biz.ProductionOrderStatusCancelled ||
 			(order.Status == biz.ProductionOrderStatusClosed && batch.OriginReworkFactID == nil)
 		if inactive {
 			execute, transfer, exception, completion = "", "", "", ""
 		}
-		for _, step := range []struct{ kind, status string }{{"production_execute", execute}, {"production_transfer", transfer}, {"production_exception", exception}, {"production_completion", completion}} {
-			if err := syncFulfillmentTask(ctx, client, step.kind, batch.ID, batch.BatchNo, path, step.status, "", actorID); err != nil {
+		executeKind, transferKind, cutting := "production_execute", "production_transfer", ""
+		if operation.OperationCode == biz.ProductionWIPOperationPackaging {
+			executeKind = "production_packaging_execute"
+		}
+		if operation.OperationCode == biz.ProductionWIPOperationHandwork {
+			transferKind = "production_packaging_transfer"
+		}
+		if operation.OperationCode == biz.ProductionWIPOperationFabricProcessing && batch.ExecutionMode != nil && *batch.ExecutionMode == biz.ProductionWIPExecutionOutsourced {
+			cutting, execute = execute, "done"
+		}
+
+		// Retire the previous production-owned projection when responsibility
+		// moves to the warehouse. Audit events remain on the original task.
+		for _, kind := range []string{"production_execute", "production_transfer"} {
+			if (kind == "production_execute" && executeKind != kind) || (kind == "production_transfer" && transferKind != kind) {
+				if err := syncFulfillmentTask(ctx, client, kind, batch.ID, batch.BatchNo, path, "", "岗位职责已移交仓库", actorID); err != nil {
+					return err
+				}
+			}
+		}
+
+		exceptionPath := path
+		if exception == "ready" {
+			rejectedInspection, err := client.QualityInspection.Query().Where(qualityinspection.ProductionWipBatchID(batch.ID), qualityinspection.Status(biz.QualityInspectionStatusRejected)).Order(ent.Desc(qualityinspection.FieldID)).First(ctx)
+			if err != nil && !ent.IsNotFound(err) {
+				return err
+			}
+			if rejectedInspection != nil {
+				exceptionPath = fmt.Sprintf("/erp/production/quality-inspections?quality_inspection_id=%d", rejectedInspection.ID)
+			}
+		}
+		for _, step := range []struct{ kind, status string }{{executeKind, execute}, {transferKind, transfer}, {"production_cutting_issue", cutting}, {"production_exception", exception}, {"production_completion", completion}} {
+			reason := ""
+			if step.kind == transferKind && step.status == "blocked" {
+				reason = transferReason
+			}
+			stepPath := path
+			if step.kind == "production_exception" {
+				stepPath = exceptionPath
+			}
+			if err := syncFulfillmentTask(ctx, client, step.kind, batch.ID, batch.BatchNo, stepPath, step.status, reason, actorID); err != nil {
 				return err
 			}
 		}

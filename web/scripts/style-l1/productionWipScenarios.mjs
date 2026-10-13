@@ -1,3 +1,5 @@
+import { createTaskBusinessReturnScenarios } from './taskBusinessReturnScenarios.mjs'
+
 function productionWipPermissions() {
   return [
     'pmc.plan.read',
@@ -7,7 +9,10 @@ function productionWipPermissions() {
     'production.wip.read',
     'production.wip.assign',
     'production.wip.execute',
-    'production.wip.rework',
+    'warehouse.packaging.execute',
+    'outsourcing.material_issue.create',
+    'outsourcing.return_receipt.create',
+    'mobile.production.access',
     'production.packaging_material.confirm',
     'outsourcing.order.read',
   ]
@@ -60,6 +65,7 @@ export function createProductionWipScenarios(deps) {
   }
 
   return [
+    ...createTaskBusinessReturnScenarios(deps),
     ...[
       ['warehouse', 'wip_batch_id=91021', 'outsourcing.return_receipt.create'],
       [
@@ -317,6 +323,7 @@ export function createProductionWipScenarios(deps) {
           .click()
         await page
           .locator('.ant-select-dropdown:visible')
+          .first()
           .waitFor({ state: 'hidden', timeout: 10_000 })
         const fabricMainSelect = routeModal.getByLabel(
           'MAT-STYLE-L1 / 样式短毛绒布'
@@ -430,10 +437,9 @@ export function createProductionWipScenarios(deps) {
             'production-wip-route-modal-desktop.png'
           ),
         })
-        await routeModal.locator('button.ant-modal-close').click()
+        await routeModal.getByText(/WIP-STYLE-91003/u).first().click()
+        await routeModal.getByRole('button', { name: '登记成品收仓', exact: true }).click()
         await routeModal.waitFor({ state: 'hidden', timeout: 10_000 })
-
-        await clickVisibleAction(page, '登记生产完工')
         await page.waitForFunction(
           () =>
             Array.from(
@@ -443,7 +449,7 @@ export function createProductionWipScenarios(deps) {
               return (
                 rect?.width > 0 &&
                 rect?.height > 0 &&
-                ['登记生产完工', '暂不能登记生产完工'].includes(
+                ['登记成品收仓', '暂不能登记成品收仓'].includes(
                   String(node.textContent || '').trim()
                 )
               )
@@ -455,7 +461,7 @@ export function createProductionWipScenarios(deps) {
               return (
                 rect.width > 0 &&
                 rect.height > 0 &&
-                String(node.textContent || '').includes('加载生产完工详情')
+                String(node.textContent || '').includes('加载成品收仓详情')
               )
             }),
           undefined,
@@ -477,7 +483,7 @@ export function createProductionWipScenarios(deps) {
           .locator('.ant-message-notice-content:visible')
           .allInnerTexts()
         assert(
-          visibleModalSummaries.some((item) => item.title === '登记生产完工'),
+          visibleModalSummaries.some((item) => item.title === '登记成品收仓'),
           `生产完工未进入可办理弹窗: ${JSON.stringify({
             modals: visibleModalSummaries,
             messages: visibleMessageTexts,
@@ -485,9 +491,10 @@ export function createProductionWipScenarios(deps) {
         )
         const completionModal = page
           .locator('.ant-modal:visible')
-          .filter({ has: page.getByText('登记生产完工', { exact: true }) })
+          .filter({ has: page.getByText('登记成品收仓', { exact: true }) })
           .last()
         await completionModal.waitFor({ state: 'visible', timeout: 10_000 })
+        await completionModal.getByText(/WIP-STYLE-91003.*剩余/u).waitFor()
         await expectText(page, '部分路线明细暂不可登记')
         const selectedCompletionItem = String(
           (await completionModal
@@ -498,7 +505,7 @@ export function createProductionWipScenarios(deps) {
         assert.match(
           selectedCompletionItem,
           /PROD-STYLE-L1/u,
-          `生产完工只应默认选择已完成包装且已确认包材的明细: ${selectedCompletionItem}`
+          `成品收仓只应默认选择已完成手工且有剩余数量的明细: ${selectedCompletionItem}`
         )
         await page.keyboard.press('Escape')
         await completionModal.waitFor({ state: 'hidden', timeout: 10_000 })
@@ -507,18 +514,21 @@ export function createProductionWipScenarios(deps) {
     },
     {
       name: 'production-wip-route-execution-mobile',
-      path: '/erp/production/orders',
+      path: '/m/production/handle/production/orders',
+      productionOrderReleased: true,
       auth: 'admin',
       viewport: { width: 390, height: 844 },
       adminProfile: {
         username: 'style-l1-production-wip-mobile',
-        is_super_admin: true,
+        is_super_admin: false,
+        roles: [{ role_key: 'production', name: '生产经理' }],
+        menus: [{ key: 'production-orders', path: '/erp/production/orders', label: '生产订单', required_any: ['production.wip.read'], required_all: [] }],
         permissions,
       },
       effectiveSession,
       verify: async (page) => {
         await expectHeading(page, '生产订单')
-        await releaseProductionOrder(page, expectText)
+        await page.getByText('MO-STYLE-L1-20260713', { exact: true }).first().click()
         await clickVisibleAction(page, '工序办理')
         const routeModal = page
           .locator('.ant-modal:visible')
@@ -529,7 +539,7 @@ export function createProductionWipScenarios(deps) {
           .getByRole('note')
           .filter({
             hasText:
-              /按布料加工\s*→\s*车缝\s*→\s*手工\s*→\s*包装顺序办理/u,
+              /成品入库\s*→\s*查货与包装/u,
           })
           .waitFor({ state: 'visible', timeout: 10_000 })
         const mobileMetrics = await routeModal.evaluate((element) => {

@@ -87,6 +87,9 @@ func displayInt(value *int) int {
 // Source-time name/code snapshots are preserved; product style and supplier item
 // numbers come from their distinct master fields, never from internal codes.
 func hydrateWorkflowTaskDisplayContexts(ctx context.Context, client *ent.Client, tasks []*biz.WorkflowTask) error {
+	if err := hydrateWorkflowTaskDiscovery(ctx, client, tasks); err != nil {
+		return err
+	}
 	processIDs := []int{}
 	for _, task := range tasks {
 		if task != nil && workflowDisplaySourceKind(task.SourceType) != "" && task.ProcessInstanceID != nil {

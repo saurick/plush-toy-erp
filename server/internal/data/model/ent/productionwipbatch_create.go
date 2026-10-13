@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/productionexceptiondecision"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
@@ -71,6 +72,34 @@ func (_c *ProductionWIPBatchCreate) SetOriginReworkFactID(v int) *ProductionWIPB
 func (_c *ProductionWIPBatchCreate) SetNillableOriginReworkFactID(v *int) *ProductionWIPBatchCreate {
 	if v != nil {
 		_c.SetOriginReworkFactID(*v)
+	}
+	return _c
+}
+
+// SetOriginExceptionDecisionID sets the "origin_exception_decision_id" field.
+func (_c *ProductionWIPBatchCreate) SetOriginExceptionDecisionID(v int) *ProductionWIPBatchCreate {
+	_c.mutation.SetOriginExceptionDecisionID(v)
+	return _c
+}
+
+// SetNillableOriginExceptionDecisionID sets the "origin_exception_decision_id" field if the given value is not nil.
+func (_c *ProductionWIPBatchCreate) SetNillableOriginExceptionDecisionID(v *int) *ProductionWIPBatchCreate {
+	if v != nil {
+		_c.SetOriginExceptionDecisionID(*v)
+	}
+	return _c
+}
+
+// SetFinishedGoodsReceiptID sets the "finished_goods_receipt_id" field.
+func (_c *ProductionWIPBatchCreate) SetFinishedGoodsReceiptID(v int) *ProductionWIPBatchCreate {
+	_c.mutation.SetFinishedGoodsReceiptID(v)
+	return _c
+}
+
+// SetNillableFinishedGoodsReceiptID sets the "finished_goods_receipt_id" field if the given value is not nil.
+func (_c *ProductionWIPBatchCreate) SetNillableFinishedGoodsReceiptID(v *int) *ProductionWIPBatchCreate {
+	if v != nil {
+		_c.SetFinishedGoodsReceiptID(*v)
 	}
 	return _c
 }
@@ -274,6 +303,16 @@ func (_c *ProductionWIPBatchCreate) AddCompletionFacts(v ...*ProductionFact) *Pr
 	return _c.AddCompletionFactIDs(ids...)
 }
 
+// SetOriginExceptionDecision sets the "origin_exception_decision" edge to the ProductionExceptionDecision entity.
+func (_c *ProductionWIPBatchCreate) SetOriginExceptionDecision(v *ProductionExceptionDecision) *ProductionWIPBatchCreate {
+	return _c.SetOriginExceptionDecisionID(v.ID)
+}
+
+// SetFinishedGoodsReceipt sets the "finished_goods_receipt" edge to the ProductionFact entity.
+func (_c *ProductionWIPBatchCreate) SetFinishedGoodsReceipt(v *ProductionFact) *ProductionWIPBatchCreate {
+	return _c.SetFinishedGoodsReceiptID(v.ID)
+}
+
 // AddEventIDs adds the "events" edge to the ProductionWIPEvent entity by IDs.
 func (_c *ProductionWIPBatchCreate) AddEventIDs(ids ...int) *ProductionWIPBatchCreate {
 	_c.mutation.AddEventIDs(ids...)
@@ -430,6 +469,16 @@ func (_c *ProductionWIPBatchCreate) check() error {
 	if v, ok := _c.mutation.OriginReworkFactID(); ok {
 		if err := productionwipbatch.OriginReworkFactIDValidator(v); err != nil {
 			return &ValidationError{Name: "origin_rework_fact_id", err: fmt.Errorf(`ent: validator failed for field "ProductionWIPBatch.origin_rework_fact_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.OriginExceptionDecisionID(); ok {
+		if err := productionwipbatch.OriginExceptionDecisionIDValidator(v); err != nil {
+			return &ValidationError{Name: "origin_exception_decision_id", err: fmt.Errorf(`ent: validator failed for field "ProductionWIPBatch.origin_exception_decision_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.FinishedGoodsReceiptID(); ok {
+		if err := productionwipbatch.FinishedGoodsReceiptIDValidator(v); err != nil {
+			return &ValidationError{Name: "finished_goods_receipt_id", err: fmt.Errorf(`ent: validator failed for field "ProductionWIPBatch.finished_goods_receipt_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.BatchNo(); !ok {
@@ -688,6 +737,40 @@ func (_c *ProductionWIPBatchCreate) createSpec() (*ProductionWIPBatch, *sqlgraph
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OriginExceptionDecisionIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   productionwipbatch.OriginExceptionDecisionTable,
+			Columns: []string{productionwipbatch.OriginExceptionDecisionColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionexceptiondecision.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.OriginExceptionDecisionID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.FinishedGoodsReceiptIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   productionwipbatch.FinishedGoodsReceiptTable,
+			Columns: []string{productionwipbatch.FinishedGoodsReceiptColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionfact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.FinishedGoodsReceiptID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.EventsIDs(); len(nodes) > 0 {

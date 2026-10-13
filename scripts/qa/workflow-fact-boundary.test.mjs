@@ -8,18 +8,18 @@ const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const workflowSourceFiles = [
   ...readdirSync(path.join(repoRoot, "server/internal/biz"))
     .filter(
-      (fileName) => fileName.startsWith("workflow") && fileName.endsWith(".go"),
+      (fileName) => fileName.startsWith("workflow") && fileName.endsWith(".go") && !fileName.endsWith("_test.go"),
     )
     .map((fileName) => `server/internal/biz/${fileName}`),
   ...readdirSync(path.join(repoRoot, "server/internal/data"))
     .filter(
-      (fileName) => fileName.startsWith("workflow") && fileName.endsWith(".go"),
+      (fileName) => fileName.startsWith("workflow") && fileName.endsWith(".go") && !fileName.endsWith("_test.go"),
     )
     .map((fileName) => `server/internal/data/${fileName}`),
   ...readdirSync(path.join(repoRoot, "server/internal/service"))
     .filter(
       (fileName) =>
-        fileName.startsWith("jsonrpc_workflow") && fileName.endsWith(".go"),
+        fileName.startsWith("jsonrpc_workflow") && fileName.endsWith(".go") && !fileName.endsWith("_test.go"),
     )
     .map((fileName) => `server/internal/service/${fileName}`),
 ];
@@ -43,22 +43,32 @@ const forbiddenRuntimeFactReferences = [
   "shipment_items",
 ];
 
-// Identity search joins only fields needed to recognize an already authorized
-// task. It cannot use domain writes or turn task completion into fact posting.
-const identityReadFiles = [
-  "server/internal/data/workflow_task_display_context.go",
-  "server/internal/data/workflow_task_identity_search.go",
-];
-const identitySearchTables = new Set(["production_facts", "shipment_items"]);
+// Task discovery and tracking can read facts visible through an authorized task.
+// Each explicit projection remains subject to the mutation guards below.
+const factReadProjections = new Map([
+  ["server/internal/data/workflow_task_display_context.go", []],
+  ["server/internal/data/workflow_task_identity_search.go", ["production_facts", "shipment_items"]],
+  ["server/internal/data/workflow_task_source_links.go", ["production_facts", "outsourcing_facts"]],
+  ["server/internal/data/workflow_task_discovery.go", ["production_facts", "outsourcing_facts"]],
+  ["server/internal/data/workflow_handling_chain.go", ["production_facts", "outsourcing_facts"]],
+  ["server/internal/data/workflow_exceptions.go", ["outsourcing_facts"]],
+]);
+const backfillLock = '"LOCK TABLE production_orders, production_facts, production_wip_batches, shipments, workflow_tasks IN SHARE ROW EXCLUSIVE MODE"';
 
 test("workflow fact boundary: workflow runtime does not post domain facts", () => {
   assert(workflowSourceFiles.length > 0, "expected workflow runtime files");
   for (const relativePath of workflowSourceFiles) {
-    const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
+    const original = readFileSync(path.join(repoRoot, relativePath), "utf8");
+    // The one-off repair locks source rows while writing only task projections.
+    const source = relativePath === "server/internal/data/workflow_source_task_backfill.go"
+      ? original.replace(backfillLock, '"source projection lock"')
+      : original;
+    if (!relativePath.endsWith("_test.go")) {
+      assert.doesNotMatch(source, /\.(?:ProductionFact|OutsourcingFact|FinanceFact|InventoryTxn|InventoryBalance|InventoryLot|Shipment|ShipmentItem)\.(?:Create|Update|Delete)\w*\(/u);
+    }
     for (const forbidden of forbiddenRuntimeFactReferences) {
       if (
-        relativePath === "server/internal/data/workflow_task_identity_search.go" &&
-        identitySearchTables.has(forbidden)
+        factReadProjections.get(relativePath)?.includes(forbidden)
       ) continue;
       assert(
         !source.includes(forbidden),
@@ -68,8 +78,8 @@ test("workflow fact boundary: workflow runtime does not post domain facts", () =
   }
 });
 
-test("workflow fact boundary: task identity projections only read source data", () => {
-  for (const relativePath of identityReadFiles) {
+test("workflow fact boundary: task discovery and tracking projections only read source data", () => {
+  for (const relativePath of factReadProjections.keys()) {
     const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
     assert.doesNotMatch(
       source,

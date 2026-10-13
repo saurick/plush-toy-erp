@@ -931,6 +931,7 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	if err != nil {
 		t.Fatalf("create shipment with items failed: %v", err)
 	}
+	assertFulfillmentTask(t, ctx, client, "shipment_execute", shipment.ID, "ready", biz.SalesRoleKey)
 	if len(shipment.Items) != 1 {
 		t.Fatalf("expected one shipment item, got %d", len(shipment.Items))
 	}
@@ -939,6 +940,7 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	if err != nil {
 		t.Fatalf("ship shipment failed: %v", err)
 	}
+	assertFulfillmentTask(t, ctx, client, "shipment_execute", shipment.ID, "done", biz.SalesRoleKey)
 	if shipped.Status != biz.ShipmentStatusShipped {
 		t.Fatalf("expected SHIPPED, got %s", shipped.Status)
 	}
@@ -969,6 +971,7 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	if err != nil {
 		t.Fatalf("cancel shipped shipment failed: %v", err)
 	}
+	assertFulfillmentTask(t, ctx, client, "shipment_execute", shipment.ID, "withdrawn", biz.SalesRoleKey)
 	if cancelled.Status != biz.ShipmentStatusCancelled {
 		t.Fatalf("expected CANCELLED, got %s", cancelled.Status)
 	}

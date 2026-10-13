@@ -24,6 +24,7 @@ import {
 } from '../../utils/numeric20Scale6.mjs'
 import { getWorkflowTaskActionOutcomeHint } from '../../utils/workflowTaskProcessingHint.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
+import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { orderWorkflowTaskActions } from '../../utils/workflowTaskActionFlow.mjs'
 
 const ACTION_OPTIONS = Object.freeze([
@@ -670,47 +671,42 @@ function MobileWorkflowTaskActionScreen({
             </section>
           </>
         ) : null}
+        <MobileBackToTop />
       </main>
 
-      <div className="mobile-role-action-bar mobile-task-action-footer">
-        <button
-          type="button"
-          className="mobile-detail-secondary"
-          disabled={busy}
-          onClick={onBack}
-        >
-          返回任务
-        </button>
-        {accessAllowsSubmit ? (
-          <button
-            type="submit"
-            className="mobile-detail-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={busy || !canSubmit || visibleActions.length === 0}
-          >
-            {busy ? <LoadingOutlined spin /> : null}
-            <span>{busy ? busySubmitLabel : submitLabel}</span>
-          </button>
-        ) : null}
-        {showFooterRetry ? (
-          <button
-            type="button"
-            className="mobile-detail-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
-            disabled={busy}
-            onClick={onRetryAccess}
-          >
-            <ReloadOutlined />
-            重新确认
-          </button>
-        ) : showDisabledSubmit ? (
-          <button
-            type="button"
-            className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
-            disabled
-          >
-            暂不能提交
-          </button>
-        ) : null}
-      </div>
+      {accessAllowsSubmit || showFooterRetry || showDisabledSubmit ? (
+        <div className="mobile-role-action-bar mobile-task-action-footer">
+          {accessAllowsSubmit ? (
+            <button
+              type="submit"
+              className="mobile-detail-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={busy || !canSubmit || visibleActions.length === 0}
+            >
+              {busy ? <LoadingOutlined spin /> : null}
+              <span>{busy ? busySubmitLabel : submitLabel}</span>
+            </button>
+          ) : null}
+          {showFooterRetry ? (
+            <button
+              type="button"
+              className="mobile-detail-primary inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={busy}
+              onClick={onRetryAccess}
+            >
+              <ReloadOutlined />
+              重新确认
+            </button>
+          ) : showDisabledSubmit ? (
+            <button
+              type="button"
+              className="inline-flex min-h-[48px] w-full items-center justify-center rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
+              disabled
+            >
+              暂不能提交
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </form>
   )
 }
@@ -755,18 +751,13 @@ export default function MobileTaskActionScreen(props) {
         <div className="erp-material-task-action erp-material-task-action--mobile">
           {content}
         </div>
+        <MobileBackToTop />
       </main>
-      <div className="mobile-role-action-bar mobile-task-action-footer">
-        <button
-          type="button"
-          className="mobile-detail-secondary"
-          disabled={saving}
-          onClick={onBack}
-        >
-          返回任务
-        </button>
-        {footer}
-      </div>
+      {footer ? (
+        <div className="mobile-role-action-bar mobile-task-action-footer">
+          {footer}
+        </div>
+      ) : null}
     </div>
   ))
 }

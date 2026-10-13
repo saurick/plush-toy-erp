@@ -437,7 +437,7 @@ export function createTabMotionScenarios({ outputDir }) {
             '控件页面不应出现页面级横向溢出'
           )
           await controls.waitFor()
-          assert.equal(await preview.getByRole('radio').count(), 5)
+          assert.equal(await preview.getByRole('radio').count(), 7)
           assert.equal(await page.getByRole('dialog').count(), 0)
           assert.equal(await page.getByRole('button', { name: '下载 HTML' }).count(), 0)
           await assertFits()
@@ -480,7 +480,7 @@ export function createTabMotionScenarios({ outputDir }) {
           await sampleSearch.fill('布偶熊')
           await controls.getByRole('button', { name: '筛选', exact: true }).click()
           const range = page.getByLabel('演示记录范围', { exact: true })
-          await range.getByText('全部', { exact: true }).click()
+          await range.getByText('全部记录', { exact: true }).click()
           assert.equal(await sampleRows.count(), 2)
           await page.getByRole('button', { name: '重置筛选', exact: true }).click()
           assert.equal(await sampleSearch.inputValue(), '布偶熊')

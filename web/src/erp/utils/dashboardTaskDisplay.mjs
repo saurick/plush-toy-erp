@@ -10,6 +10,7 @@ import {
 } from './workflowDocumentRefs.mjs'
 
 const TASK_SOURCE_TITLE_MAP = new Map([
+  ['simulated-manual-acceptance-task-batch', '模拟验收任务'],
   ['engineering_material_request', '工程用料审批'],
   ['purchase_receipt', '采购收货单'],
   ['quality_inspection', '质量检验'],
@@ -160,7 +161,7 @@ const STANDALONE_SOURCE_TASK_CONTRACTS = new Map([
 
 export function getWorkflowTaskSourceTypeLabel(
   sourceType,
-  fallback = '业务来源'
+  fallback = '来源待核对'
 ) {
   const normalizedSourceType = String(sourceType || '').trim()
   if (!normalizedSourceType) {
@@ -292,6 +293,7 @@ function isTrustedStandaloneSourceTask(task = {}) {
 }
 
 export function resolveWorkflowTaskSourceEntryPath(task = {}) {
+  if (!task) return ''
   const sourceTaskContract = standaloneSourceTaskContract(task)
   const standaloneSourceTrusted = isTrustedStandaloneSourceTask(task)
   if (sourceTaskContract && !standaloneSourceTrusted) {
@@ -324,6 +326,7 @@ export function resolveWorkflowTaskSourceEntryPath(task = {}) {
 }
 
 export function resolveWorkflowTaskEntryPath(task = {}) {
+  if (!task) return ''
   if (isFulfillmentTask(task)) return fulfillmentTaskEntryPath(task)
   const materialEntry = engineeringMaterialTaskEntryPath(task)
   if (materialEntry) return materialEntry

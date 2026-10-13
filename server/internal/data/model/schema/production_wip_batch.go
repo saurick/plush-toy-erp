@@ -34,10 +34,11 @@ func (ProductionWIPBatch) Annotations() []schema.Annotation {
 			"production_wip_batches_order_positive":    "production_order_id > 0",
 			"production_wip_batches_quantity_positive": "quantity > 0",
 			"production_wip_batches_version_positive":  "version > 0",
-			"production_wip_batches_flow_type_allowed": "flow_type IN ('NORMAL', 'REWORK')",
+			"production_wip_batches_flow_type_allowed": "flow_type IN ('NORMAL', 'REWORK', 'REMAKE')",
 			"production_wip_batches_execution_allowed": "execution_mode IS NULL OR execution_mode IN ('IN_HOUSE', 'OUTSOURCED')",
 			"production_wip_batches_status_allowed":    "status IN ('PLANNED', 'SPLIT', 'IN_PROGRESS', 'OUTSOURCED', 'WAITING_QUALITY', 'ACCEPTED', 'REJECTED', 'CANCELLED')",
-			"production_wip_batches_rework_bundle":     "((flow_type = 'NORMAL' AND rework_reason IS NULL) OR (flow_type = 'REWORK' AND rework_reason IS NOT NULL AND length(trim(rework_reason)) BETWEEN 1 AND 255 AND (source_batch_id IS NOT NULL OR origin_rework_fact_id IS NOT NULL)))",
+			"production_wip_batches_rework_bundle":     "((flow_type = 'NORMAL' AND rework_reason IS NULL) OR (flow_type IN ('REWORK', 'REMAKE') AND rework_reason IS NOT NULL AND length(trim(rework_reason)) BETWEEN 1 AND 255 AND (source_batch_id IS NOT NULL OR origin_rework_fact_id IS NOT NULL)))",
+			"production_wip_batches_remake_origin":     "flow_type <> 'REMAKE' OR origin_exception_decision_id IS NOT NULL",
 		}},
 	}
 }
@@ -49,6 +50,10 @@ func (ProductionWIPBatch) Fields() []ent.Field {
 		field.Int("production_order_operation_id").Positive().Immutable(),
 		field.Int("source_batch_id").Optional().Nillable().Positive().Immutable(),
 		field.Int("origin_rework_fact_id").Optional().Nillable().Positive().Immutable(),
+		field.Int("origin_exception_decision_id").Optional().Nillable().Positive().Immutable(),
+		// Packaging consumes a specific posted receipt, so partial packing cannot
+		// release stock from a different warehouse or inventory lot.
+		field.Int("finished_goods_receipt_id").Optional().Nillable().Positive().Immutable(),
 		field.String("batch_no").NotEmpty().MaxLen(64).Immutable(),
 		field.String("flow_type").NotEmpty().Default("NORMAL").MaxLen(16).Immutable(),
 		field.String("execution_mode").Optional().Nillable().MaxLen(16),
@@ -102,6 +107,14 @@ func (ProductionWIPBatch) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("completion_facts", ProductionFact.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.From("origin_exception_decision", ProductionExceptionDecision.Type).
+			Ref("execution_batches").Field("origin_exception_decision_id").Unique().Immutable().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.From("finished_goods_receipt", ProductionFact.Type).
+			Ref("packaging_batches").
+			Field("finished_goods_receipt_id").
+			Unique().Immutable().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("events", ProductionWIPEvent.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("quality_inspections", QualityInspection.Type).
@@ -122,6 +135,8 @@ func (ProductionWIPBatch) Indexes() []ent.Index {
 		index.Fields("batch_no").Unique(),
 		index.Fields("production_order_item_id", "production_order_operation_id"),
 		index.Fields("source_batch_id"),
+		index.Fields("origin_exception_decision_id", "status"),
+		index.Fields("finished_goods_receipt_id", "status"),
 		index.Fields("origin_rework_fact_id").
 			Unique().
 			Annotations(entsql.IndexWhere("origin_rework_fact_id IS NOT NULL AND source_batch_id IS NULL")),

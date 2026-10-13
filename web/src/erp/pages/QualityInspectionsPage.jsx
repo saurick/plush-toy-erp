@@ -23,10 +23,11 @@ import {
   Typography,
 } from 'antd'
 import {
-  useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
@@ -268,7 +269,7 @@ function buildDecisionSourceSummary({
 
 export default function QualityInspectionsPage() {
   const outletContext = useOutletContext()
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || EMPTY_ADMIN_PROFILE,
@@ -1828,6 +1829,7 @@ export default function QualityInspectionsPage() {
             selectionLabel="质检记录"
             onClear={() => setSelectedRow(null)}
           />
+          <BusinessTaskActions sourceType="quality_inspection" record={selectedRow} adminProfile={adminProfile} />
           {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
               disabled={relatedActionAvailability.disabled}

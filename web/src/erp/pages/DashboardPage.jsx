@@ -16,10 +16,15 @@ import {
 } from '@ant-design/icons'
 import { Alert, Button, Card, Empty, Space, Tag, Typography } from 'antd'
 import {
+  useLocation,
   useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import WorkflowTaskDiscoveryFilters from '../components/workflow/WorkflowTaskDiscoveryFilters.jsx'
+import WorkflowExceptionPanel from '../components/workflow/WorkflowExceptionPanel.jsx'
+import { TRACKING_VIEW_OPTIONS } from '../utils/workflowTrackingFilters.mjs'
+import useReturnedWorkflowTask from '../hooks/useReturnedWorkflowTask.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { getWorkflowTaskDisplayName } from '../utils/processRuntimePresentation.mjs'
 import { buildWorkflowTaskResponsibilityItems } from '../utils/workflowTaskEventPresentation.mjs'
@@ -99,6 +104,7 @@ import {
   writeWorkflowTaskBoardFiltersToSearch,
 } from '../utils/workflowTaskBoard.mjs'
 import { canOpenWorkflowTaskEntry } from '../utils/workflowTaskEntryAccess.mjs'
+import { workflowTaskEntryNavigation } from '../utils/workflowTaskNavigation.mjs'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import EngineeringMaterialTaskAction from '../components/sales-orders/EngineeringMaterialTaskAction.jsx'
 import EngineeringMaterialTaskSummaryEntry from '../components/sales-orders/EngineeringMaterialTaskSummaryEntry.jsx'
@@ -460,6 +466,7 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
               render: (_, task) => (
                 <div className="erp-workbench-task-cell">
                   <WorkflowTaskSource task={task} />
+                  <span className="erp-task-board-card-meta">{task.discovery?.path}</span>
                   <WorkflowTaskTiming task={task} />
                 </div>
               ),
@@ -587,10 +594,11 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
                     {reasonMeta.label}：{reasonMeta.value}
                   </Text>
                 ) : null}
+                <span className="erp-task-board-card-meta">{task.discovery?.path}</span>
                 <WorkflowTaskTiming task={task} />
                 <span className="erp-task-board-card-footer">
                   <Text type="secondary" className="erp-task-board-card-meta">
-                    {getWorkflowTaskOwnerRoleLabel(task)}
+                    {getWorkflowTaskOwnerRoleLabel(task)} · {task.discovery?.assignee_name || '岗位待领取'}
                   </Text>
                 </span>
               </WorkflowTaskCard>
@@ -706,6 +714,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const mutationInFlightRef = useRef(null)
   mutationInFlightRef.current ||= createTaskMutationInFlightGuard()
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
   const outletContext = useOutletContext()
   const adminProfile = useMemo(
@@ -756,12 +765,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [canViewApprovalInbox, requestedFilters]
   )
   const isTaskBoardView = initialView === 'task-board'
+  const exceptionsView = isTaskBoardView && searchParams.get('view') === 'exceptions'
   const trackingScope = isTaskBoardView && ['started', 'participated', 'visible'].includes(searchParams.get('tracking'))
     ? searchParams.get('tracking') : ''
-  const trackingSourceID = Number(searchParams.get('track_source_id'))
-  const hasTrackingSource = Boolean(searchParams.get('track_source_type'))
-    && Number.isSafeInteger(trackingSourceID) && trackingSourceID > 0
   const [trackingRefresh, setTrackingRefresh] = useState(0)
+  const exceptionQueryRef = useRef(null)
   const taskBoardRequest = useMemo(
     () => buildWorkflowTaskBoardRequest(filters),
     [filters]
@@ -811,7 +819,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       request.finish()
       return true
     }
-    if (summaryOpen || trackingScope) {
+    if (summaryOpen || trackingScope || exceptionsView) {
       setLoading(false)
       request.finish()
       return true
@@ -925,6 +933,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     shouldShowProductCoreDashboard,
     summaryOpen,
     trackingScope,
+    exceptionsView,
     taskBoardRequest,
     taskBoardRequestKey,
     taskBoardSummaryRequestKey,
@@ -944,10 +953,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(() => {
       if (summaryOpen) setSummaryRefreshRevision((value) => value + 1)
-      if (trackingScope) setTrackingRefresh((value) => value + 1)
+      if (trackingScope || exceptionsView) setTrackingRefresh((value) => value + 1)
       return loadDashboardStats()
     })
-  }, [loadDashboardStats, outletContext, summaryOpen, trackingScope])
+  }, [loadDashboardStats, outletContext, summaryOpen, trackingScope, exceptionsView])
 
   useEffect(() => {
     setActiveView(initialView)
@@ -1281,7 +1290,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const updateFilter = (key, value) => {
     const nextFilters = {
       ...filters,
-      [key]: value,
+      ...(typeof key === 'object' ? key : { [key]: value }),
       page: 1,
     }
     pendingTaskBoardPageScrollRef.current = null
@@ -1313,21 +1322,28 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     )
   }
 
-  const selectTaskView = (view) => {
+  const selectTaskView = (view, restoreTrackingView = false) => {
     if (taskViewsRef.current?.session !== workflowWorkbenchScopeKey) {
       taskViewsRef.current = {
         session: workflowWorkbenchScopeKey,
         filters: {},
-        tracking: 'started',
+        tracking: 'visible',
+        trackingView: 'tracking',
       }
     }
     const views = taskViewsRef.current
-    if (trackingScope) views.tracking = trackingScope
-    else views.filters[filters.mode] = filters
-    const next = view === 'tracking'
+    if (trackingScope || exceptionsView) {
+      if (trackingScope) views.tracking = trackingScope
+      views.trackingView = exceptionsView ? 'exceptions' : 'tracking'
+    } else views.filters[filters.mode] = filters
+    if (view === 'tracking' && restoreTrackingView) view = views.trackingView
+    const isTrackingView = view === 'tracking' || view === 'exceptions'
+    const next = isTrackingView
       ? new URLSearchParams(searchParams)
       : writeWorkflowTaskBoardFiltersToSearch(searchParams, views.filters[view] || { mode: view })
-    if (view === 'tracking') next.set('tracking', views.tracking)
+    if (view === 'exceptions') next.set('view', 'exceptions')
+    else next.delete('view')
+    if (isTrackingView) next.set('tracking', views.tracking)
     else next.delete('tracking')
     next.delete('track_kind')
     next.delete('track_id')
@@ -1398,7 +1414,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     if (
       canOpenWorkflowTaskEntry(adminProfile, entryPath, access?.sourceAccess)
     ) {
-      navigate(entryPath)
+      navigate(entryPath, workflowTaskEntryNavigation(task, entryPath, `${location.pathname}${location.search}`, adminProfile?.id))
     }
   }
 
@@ -1446,6 +1462,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setAssignmentTarget(undefined)
     setActionReceipt(null)
   }
+
+  useReturnedWorkflowTask(adminProfile?.id, openTaskDrawer)
 
   const closeTaskDrawer = () => {
     if (actionSaving || materialSaving) return
@@ -1875,43 +1893,46 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           <div className="erp-task-management-scope erp-task-board-scope-filter">
             <Segmented
               aria-label="任务范围"
-              value={trackingScope ? 'tracking' : filters.mode}
+              value={exceptionsView || trackingScope ? 'tracking' : filters.mode}
               options={TASK_BOARD_SCOPE_OPTIONS.filter((option) => canViewApprovalInbox || option.value !== 'approval')}
-              onChange={selectTaskView}
+              onChange={(view) => selectTaskView(view, true)}
             />
           </div>
           <Card
             className="erp-dashboard-card erp-dashboard-task-board-card"
             variant="borderless"
-            loading={!trackingScope && taskBoardInitialLoading}
+            loading={!trackingScope && !exceptionsView && taskBoardInitialLoading}
             style={
-            !trackingScope && taskBoardTransitionMinHeight > 0
+            !trackingScope && !exceptionsView && taskBoardTransitionMinHeight > 0
               ? { minHeight: taskBoardTransitionMinHeight }
               : undefined
           }
           >
-            {trackingScope ? (
+            {exceptionsView || trackingScope ? (
               <div className="erp-dashboard-block">
                 <Segmented
-                  className="erp-task-tracking-scope"
-                  aria-label="跟踪范围"
-                  value={trackingScope}
-                  options={[
-                    { label: '我发起的', value: 'started' },
-                    { label: '我参与的', value: 'participated' },
-                    ...(trackingScope === 'visible' || hasTrackingSource
-                      ? [{ label: '相关流程', value: 'visible' }] : []),
-                  ]}
-                  onChange={selectTrackingScope}
+                  className="erp-task-tracking-views"
+                  aria-label="跟踪内容"
+                  value={exceptionsView ? 'exceptions' : 'tracking'}
+                  options={TRACKING_VIEW_OPTIONS}
+                  onChange={selectTaskView}
                 />
-                <WorkflowTrackingPanel
+                {exceptionsView ? <WorkflowExceptionPanel
+                  key={workflowWorkbenchScopeKey}
+                  profile={adminProfile}
+                  onOpenTask={openTaskDrawer}
+                  refreshKey={trackingRefresh}
+                  initialQuery={exceptionQueryRef.current?.scope === workflowWorkbenchScopeKey ? exceptionQueryRef.current.query : {}}
+                  onQueryChange={(query) => { exceptionQueryRef.current = { scope: workflowWorkbenchScopeKey, query } }}
+                /> : <WorkflowTrackingPanel
                   key={`${trackingScope}:${workflowWorkbenchScopeKey}`}
                   scope={trackingScope}
+                  onScopeChange={selectTrackingScope}
                   sessionKey={workflowWorkbenchScopeKey}
                   refreshKey={trackingRefresh}
                   onOpenTask={openTaskDrawer}
                   taskHandlingOpen={Boolean(selectedTask)}
-                />
+                />}
               </div>
             ) : (
               <div className="erp-dashboard-block">
@@ -1924,6 +1945,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 />
 
                 <div className="erp-task-board-controls">
+                  <WorkflowTaskDiscoveryFilters value={filters} profile={adminProfile} people={taskBoardSummaryResponse?.assignees || taskBoardResponse?.assignees} onChange={(next) => updateFilter(next)} />
                   <div className="erp-task-board-filters">
                     <BusinessOperationPanel
                       key={`${filters.mode}:${workflowWorkbenchScopeKey}`}
@@ -1959,12 +1981,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                             options={dueOptions}
                             onChange={(value) => updateFilter('due', value)}
                           />
-                          <SelectFilter
-                            aria-label="业务来源"
+                          <label className="workflow-task-discovery__auxiliary"><span>来源单据</span><SelectFilter
+                            aria-label="来源单据"
                             value={filters.sourceType}
                             options={sourceOptions}
                             onChange={(value) => updateFilter('sourceType', value)}
                           />
+                          </label>
                         </>
                       )}
                       actions={taskBoardModel.focused ? (
@@ -2024,6 +2047,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ) : null}
 
       <WorkflowTaskActionDrawer
+        onOpenRelatedTask={openTaskDrawer}
         task={selectedTask}
         profile={adminProfile}
         sourceSummary={

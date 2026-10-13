@@ -261,7 +261,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'purchase_to_inventory',
     '采购下单到入库应付',
     'primary',
-    '采购订单经审批后，由仓库所属 IQC 登记本次实点数量和通用验收项目；质量允许接收后，再由仓库确认入库。',
+    '采购订单经审批后，仓库登记到货并清点数量，IQC 检验颜色等质量项目；检验允许接收后，由仓库确认入库。',
     [
       chainNode('purchase_order', '采购订单与订单行', 'source_document', {
         machineKeys: ['source.purchase_order', 'source.order_item'],
@@ -335,7 +335,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'purchase_approval',
         'purchase_receipt',
-        'IQC 登记本次到货',
+        '仓库登记到货并清点数量',
         'creates_fact_draft',
         {
           action: 'InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder',
@@ -409,9 +409,9 @@ const BUSINESS_CHAIN_DEFINITIONS = [
   ),
   chain(
     'production_to_inventory',
-    '生产执行到成品入库',
+    '生产执行、成品入库与包装',
     'primary',
-    '生产订单释放后进入在制批次，经过工序、包材确认和完工过账形成成品库存。',
+    '按工艺路线完成裁片、车缝、手工及规定检验；手工完成后先正式入成品仓，再完成成品检验、查货和包装，满足放行条件后才能发货。',
     [
       chainNode(
         'released_production_order',
@@ -426,17 +426,25 @@ const BUSINESS_CHAIN_DEFINITIONS = [
         machineKeys: ['fact.production_wip_batch'],
         sourceRefs: ['server/internal/biz/production_wip.go'],
       }),
-      chainNode('packaging_confirmation', '包材确认', 'fact_ledger', {
-        machineKeys: ['fact.production_packaging_confirmation'],
-        sourceRefs: ['server/internal/biz/production_wip.go'],
-      }),
-      chainNode('production_completion', '生产完工事实', 'fact_ledger', {
+      chainNode('production_completion', '仓库登记成品入库', 'fact_ledger', {
         machineKeys: ['fact.production'],
         sourceRefs: ['server/internal/biz/operational_fact.go'],
       }),
-      chainNode('finished_goods_lot', '成品库存批次', 'fact_ledger', {
+      chainNode('finished_goods_lot', '正式成品库存', 'fact_ledger', {
         machineKeys: ['fact.inventory_lot'],
-        sourceRefs: ['server/internal/biz/inventory.go'],
+        sourceRefs: ['server/internal/data/production_finished_goods_readiness.go'],
+      }),
+      chainNode('finished_quality', '成品质量关口', 'fact_ledger', {
+        machineKeys: ['fact.quality_inspection'],
+        sourceRefs: ['server/internal/biz/production_wip.go'],
+      }),
+      chainNode('packaging_confirmation', '确认包装用料', 'fact_ledger', {
+        machineKeys: ['fact.production_packaging_confirmation'],
+        sourceRefs: ['server/internal/biz/production_wip.go'],
+      }),
+      chainNode('packaging_execution', '仓库查货与包装', 'fact_ledger', {
+        machineKeys: ['fact.production_wip_batch'],
+        sourceRefs: ['server/internal/data/production_finished_goods_readiness.go'],
       }),
     ],
     [
@@ -454,44 +462,31 @@ const BUSINESS_CHAIN_DEFINITIONS = [
           ],
         }
       ),
-      chainEdge(
-        'wip_batch',
-        'packaging_confirmation',
-        '包装工序确认包材',
-        'requires',
-        {
-          action:
-            'ProductionOrderUsecase.ConfirmProductionWIPPackagingMaterial',
-          factBoundary: 'production_wip_and_packaging_confirmation',
-          sourceRefs: ['server/internal/biz/production_wip.go'],
-        }
-      ),
-      chainEdge(
-        'packaging_confirmation',
-        'production_completion',
-        '完成生产并生成事实',
-        'posts_fact',
-        {
-          action:
-            'OperationalFactUsecase.CreateProductionFactFromOrder / PostProductionFact',
-          factBoundary: 'production_fact',
-          sourceRefs: ['server/internal/biz/operational_fact.go'],
-        }
-      ),
-      chainEdge(
-        'production_completion',
-        'finished_goods_lot',
-        '完工过账增加成品库存',
-        'posts_fact',
-        {
-          action: 'InventoryUsecase.CreateInventoryTxn',
-          factBoundary: 'inventory_txn_and_lot',
-          sourceRefs: [
-            'server/internal/biz/operational_fact.go',
-            'server/internal/biz/inventory.go',
-          ],
-        }
-      ),
+      chainEdge('wip_batch', 'production_completion', '手工完成后登记并过账入库', 'posts_fact', {
+        action: 'OperationalFactUsecase.CreateProductionFactFromOrder / PostProductionFact',
+        factBoundary: 'production_fact',
+        sourceRefs: ['server/internal/data/operational_fact_production_repo.go'],
+      }),
+      chainEdge('production_completion', 'finished_goods_lot', '入成品仓，尚未满足发货条件', 'posts_fact', {
+        action: 'InventoryUsecase.CreateInventoryTxn',
+        factBoundary: 'inventory_txn_and_lot',
+        sourceRefs: ['server/internal/data/operational_fact_production_repo.go'],
+      }),
+      chainEdge('finished_goods_lot', 'finished_quality', '按工艺路线完成成品检验', 'requires', {
+        action: 'InventoryUsecase.PassQualityInspection',
+        factBoundary: 'quality_inspection_fact',
+        sourceRefs: ['server/internal/data/production_wip_quality_inspection_repo_test.go'],
+      }),
+      chainEdge('finished_quality', 'packaging_confirmation', '质量条件满足后确认包装用料', 'requires', {
+        action: 'ProductionOrderUsecase.ConfirmProductionWIPPackagingMaterial',
+        factBoundary: 'production_wip_and_packaging_confirmation',
+        sourceRefs: ['server/internal/biz/production_wip.go'],
+      }),
+      chainEdge('packaging_confirmation', 'packaging_execution', '仓库完成查货与包装', 'posts_fact', {
+        action: 'ProductionOrderUsecase.StartProductionWIPOperation / CompleteProductionWIPOperation',
+        factBoundary: 'production_wip',
+        sourceRefs: ['server/internal/data/production_finished_goods_readiness.go'],
+      }),
     ]
   ),
   chain(
@@ -1023,7 +1018,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
     'production_exception',
     '生产异常决策与执行',
     'exception',
-    '生产异常先形成决策单；拒绝或取消后结束，超领批准后由正常领料路径消费额度，只有报废或在制让步会进入独立执行任务和领域命令。',
+    '生产异常先形成决策单；拒绝或取消后结束，超领批准后由正常领料路径消费额度，其他已批准处置按是否正式入库分派给生产或仓库执行。',
     [
       chainNode(
         'production_exception_decision',
@@ -1078,10 +1073,10 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       ),
       chainNode(
         'production_exception_execution_task',
-        '报废或在制让步执行任务',
+        '生产或仓库异常执行任务',
         'workflow_task',
         {
-          responsibleRoleKeys: ['production'],
+          responsibleRoleKeys: ['production', 'warehouse'],
           processDefinitionKeys: [
             'production_exception_approval/exception_decision_approval',
           ],
@@ -1172,7 +1167,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'production_exception_task',
         'production_exception_execution_task',
-        '批准报废或在制让步后创建执行任务',
+        '批准处置后按库存状态分派执行任务',
         'creates_task',
         {
           action:
@@ -1545,13 +1540,13 @@ const BUSINESS_CHAIN_DEFINITIONS = [
 
 const BUSINESS_CHAIN_OVERVIEW_DEFINITION = {
   key: DEV_BUSINESS_CHAIN_OVERVIEW_KEY,
-  label: '全部业务链（设计总图）',
+  label: '订单全流程（销售到出货）',
   summary:
     '先看销售、供给、生产、出货与结算怎样衔接，再下钻主链、支撑链、异常链、返工链或冲正链。',
   lanes: [
     {
       key: 'primary',
-      label: '履约主链',
+      label: '销售、生产与出货',
       summary: '从销售受理、生产执行到成品出货和结算。',
       chainKeys: [
         'sales_to_production',
@@ -1561,7 +1556,7 @@ const BUSINESS_CHAIN_OVERVIEW_DEFINITION = {
     },
     {
       key: 'supply',
-      label: '供给与库存支撑',
+      label: '采购、委外与库存',
       summary: '采购、委外和人工库存调整为履约提供材料与库存。',
       chainKeys: [
         'purchase_to_inventory',
@@ -1581,8 +1576,8 @@ const BUSINESS_CHAIN_OVERVIEW_DEFINITION = {
     },
     {
       key: 'correction',
-      label: '冲正与纠正',
-      summary: '已过账结果不直接改历史，通过核销、红冲、退货或调整纠正。',
+      label: '收付款与业务纠正',
+      summary: '正常收付款与核销，以及已过账业务的退货、调整与冲正。',
       chainKeys: [
         'finance_payment_and_reversal',
         'purchase_posting_corrections',
@@ -1599,7 +1594,7 @@ const BUSINESS_CHAIN_OVERVIEW_DEFINITION = {
     {
       fromChainKey: 'production_to_inventory',
       toChainKey: 'delivery_to_settlement',
-      label: '成品入库后安排出货',
+      label: '成品入库、质检与包装完成后安排出货',
       kind: 'continues',
     },
     {

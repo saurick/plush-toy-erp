@@ -84,3 +84,10 @@ test('dev flow state query does not hide duplicate parameters', () => {
     }
   )
 })
+
+test('instance tracking retains task and chain context without specialist selections', () => {
+  assert.deepEqual(canonicalize('view=tracking&chain=production_to_inventory&node=wip_batch&task_id=42&fact=fact.production&process=old&flow=workflow.task'), {
+    changed: true,
+    query: 'view=tracking&chain=production_to_inventory&node=wip_batch&task_id=42',
+  })
+})

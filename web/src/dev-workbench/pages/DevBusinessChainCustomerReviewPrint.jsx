@@ -76,35 +76,44 @@ function OverviewContent({ overview }) {
   return (
     <main data-customer-review-overview>
       <section className="erp-dev-flow-customer-review__summary">
-        <h2>这份总览解决什么问题</h2>
+        <h2>业务范围</h2>
         <p>{overview.purpose}</p>
       </section>
-      <ReviewDiagram diagram={overview.diagram} label="全部业务链总览图" />
-      <section className="erp-dev-flow-customer-review__overview-index">
-        <h2>四个业务区</h2>
+      <section className="erp-dev-flow-customer-review__step-table" data-customer-review-fulfillment>
+        <h2>订单全流程与岗位交接</h2>
         <table>
-          <thead>
-            <tr>
-              <th scope="col">业务区</th>
-              <th scope="col">包含哪些业务链</th>
-            </tr>
-          </thead>
+          <thead><tr><th scope="col">环节</th><th scope="col">岗位</th><th scope="col">交接、审批与异常</th></tr></thead>
           <tbody>
-            {overview.lanes.map((lane) => (
-              <tr key={lane.name}>
-                <th scope="row">{lane.name}</th>
+            {overview.fulfillmentFlow.map((step, index) => (
+              <tr key={step.stage}>
+                <th scope="row">{index + 1}. {step.label}</th>
+                <td>{step.role}</td>
                 <td>
-                  {lane.chains.map((chain) => (
-                    <span key={`${chain.number}-${chain.name}`}>
-                      {chain.number}. {chain.name}
-                    </span>
+                  <p>{step.result}</p>
+                  {step.handoffs?.map((handoff) => <p key={handoff}>{handoff}</p>)}
+                  {step.approvals?.map((approval) => (
+                    <div key={approval.label}>
+                      <strong>{approval.label}</strong>
+                      <p>{approval.condition}</p>
+                      <p>通过：{approval.passed}</p>
+                      <p>未通过：{approval.rejected}</p>
+                    </div>
                   ))}
+                  {step.exception ? <p>异常：{step.exception}</p> : null}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </section>
+      <section className="erp-dev-flow-customer-review__all-exceptions">
+        <h2>质量异常处理</h2>
+        <p>{overview.exceptionFlow.join(' → ')}</p>
+        <p>{overview.exceptionApproval.condition}</p>
+        <p>通过：{overview.exceptionApproval.passed}</p>
+        <p>未通过：{overview.exceptionApproval.rejected}</p>
+      </section>
+      <ReviewDiagram diagram={overview.diagram} label="相关业务专题关系图" />
     </main>
   )
 }
@@ -124,7 +133,7 @@ function ChainContent({ chain }) {
     <main data-customer-review-chain>
       <section className="erp-dev-flow-customer-review__summary">
         <p>{chain.chainKind}</p>
-        <h2>这条业务链解决什么问题</h2>
+        <h2>业务范围</h2>
         <p>{chain.purpose}</p>
       </section>
       <ReviewDiagram
@@ -132,45 +141,25 @@ function ChainContent({ chain }) {
         label={`${chain.chainName}关系图`}
       />
       <section className="erp-dev-flow-customer-review__step-table">
-        <h2>再看表：每一步谁办、怎么办</h2>
+        <h2>岗位与完成条件</h2>
         <table>
           <thead>
             <tr>
-              <th scope="col">
-                步骤
-                <br />
-                触发条件或前置条件
-              </th>
-              <th scope="col">谁负责</th>
-              <th scope="col">人员与系统怎么配合</th>
-              <th scope="col">
-                怎样算完成
-                <br />
-                下一步衔接到哪里
-              </th>
+              <th scope="col">环节</th>
+              <th scope="col">岗位</th>
+              <th scope="col">处理与完成条件</th>
             </tr>
           </thead>
           <tbody>
             {chain.steps.map((step) => (
               <tr key={`${step.number}-${step.name}`}>
                 <th scope="row">
-                  <span>第 {step.number} 步</span>
-                  <strong>{step.name}</strong>
+                  <strong>{step.number}. {step.name}</strong>
                   <small>进入：{step.trigger}</small>
                 </th>
                 <td>{step.responsibleRole}</td>
                 <td>
-                  <p>
-                    <strong>人员需要办理什么</strong>
-                    {step.personAction}
-                  </p>
-                  <p>
-                    <strong>系统自动完成什么</strong>
-                    {step.systemAction}
-                  </p>
-                </td>
-                <td>
-                  <p>{step.completion}</p>
+                  {step.actionOutcomes.length === 0 ? <p>{step.completion}</p> : null}
                   {step.actionOutcomes.map((action) => (
                     <p key={action.key}>
                       <strong>{action.label}</strong>
@@ -189,8 +178,7 @@ function ChainContent({ chain }) {
         </table>
       </section>
       <section className="erp-dev-flow-customer-review__all-exceptions">
-        <h2>整条业务链的异常与纠正路径</h2>
-        <p>图中已标出主要分支；下列校对点只列一次，不在每一步重复。</p>
+        <h2>异常与纠正</h2>
         <ExceptionList paths={chain.displayExceptionPaths} />
       </section>
     </main>

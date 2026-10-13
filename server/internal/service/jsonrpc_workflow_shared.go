@@ -132,6 +132,7 @@ func workflowTaskToMap(task *biz.WorkflowTask) map[string]any {
 		"completed_at":             workflowUnixValue(task.CompletedAt),
 		"payload":                  workflowMapValue(task.Payload),
 		"display_context":          workflowTaskDisplayContextToMap(task.DisplayContext),
+		"discovery":                workflowTaskDiscoveryToMap(task.Discovery),
 		"version":                  task.Version,
 		"created_by":               workflowIntValue(task.CreatedBy),
 		"updated_by":               workflowIntValue(task.UpdatedBy),
@@ -425,4 +426,11 @@ func getWorkflowUnixTimePtr(m map[string]any, key string) (*time.Time, bool) {
 	}
 	value := time.Unix(int64(unixValue), 0)
 	return &value, true
+}
+
+func workflowTaskDiscoveryToMap(d *biz.WorkflowTaskDiscovery) any {
+	if d == nil {
+		return nil
+	}
+	return map[string]any{"stage_key": d.StageKey, "module_key": d.ModuleKey, "chain_key": d.ChainKey, "path": d.Path, "assignee_name": d.AssigneeName}
 }

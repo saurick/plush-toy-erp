@@ -35,7 +35,7 @@ test('yoyoosun production preview keeps sewing before handwork and points to the
   assert.match(productionFlow.guardrail, /显式子批/u)
   assert.match(productionFlow.guardrail, /本厂车间移交或外发回仓/u)
   assert.match(productionFlow.guardrail, /条件性客户验货/u)
-  assert.match(productionFlow.guardrail, /仍是客户流程预览，不替代生产、委外、质检或库存 usecase/u)
+  assert.match(productionFlow.guardrail, /此处仅作流程说明，库存和出货仍由正式领域 usecase 记录/u)
 })
 
 test('yoyoosun purchase preview keeps receipt draft and IQC before posted inventory', () => {

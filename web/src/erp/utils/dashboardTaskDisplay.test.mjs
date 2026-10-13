@@ -55,7 +55,7 @@ test('dashboardTaskDisplay: 任务来源类型使用业务可读标签', () => {
     getWorkflowTaskSourceTypeLabel('production_exception_decision'),
     '生产异常处置'
   )
-  assert.equal(getWorkflowTaskSourceTypeLabel('unknown_source_key'), '业务来源')
+  assert.equal(getWorkflowTaskSourceTypeLabel('unknown_source_key'), '来源待核对')
   assert.equal(getWorkflowTaskSourceTypeLabel('', '全部模块'), '全部模块')
 })
 
@@ -283,4 +283,8 @@ test('dashboardTaskDisplay: 出货财务审批只信任 ProcessRuntime 关联来
     resolveWorkflowTaskEntryPath(retiredStandaloneTask),
     '/erp/warehouse/shipments?link_source=task-dashboard&link_fields=document_no%2Csource_no'
   )
+})
+test('unselected business task has no source entry', () => {
+  assert.equal(resolveWorkflowTaskEntryPath(null), '')
+  assert.equal(resolveWorkflowTaskSourceEntryPath(null), '')
 })

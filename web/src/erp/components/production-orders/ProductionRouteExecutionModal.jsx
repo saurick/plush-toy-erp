@@ -46,10 +46,12 @@ import {
   compareProductionWipQuantity,
   currentProductionWipOperation,
   nextProductionWipOperation,
+  normalizeProductionWipQuantity,
   positiveSafeInteger,
   productionWipBatchForOperation,
   productionWipBatchLabel,
   productionWipBatchLineageMeta,
+  productionWipCompletionEligibility,
   productionWipFabricMaterialRequirements,
   productionWipOperationLabel,
   productionWipOperationsForBatch,
@@ -58,6 +60,8 @@ import {
   productionWipOrderItem,
   productionWipOutputLabel,
   productionWipPackagingConfirmationForBatch,
+  productionWipPackagingReceiptChoices,
+  productionWipTransferRemainingQuantity,
   productionWipQualityGateLabel,
   productionWipQualitySummary,
   productionWipStatusMeta,
@@ -77,7 +81,6 @@ const ACTION_SUCCESS_TEXT = Object.freeze({
   [PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN]: '外发回仓已登记',
   [PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION]: '已转入下道工序',
   [PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL]: '包材要求已确认',
-  [PRODUCTION_WIP_ACTION.REWORK]: '返工去向已登记',
 })
 
 const ACTION_TITLE = Object.freeze({
@@ -89,7 +92,6 @@ const ACTION_TITLE = Object.freeze({
   [PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN]: '登记外发回仓',
   [PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION]: '转入下道工序',
   [PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL]: '确认包材要求',
-  [PRODUCTION_WIP_ACTION.REWORK]: '登记返工去向',
 })
 
 function operationStepStatus(batch, operation, currentOperationID) {
@@ -176,8 +178,6 @@ function actionButtonEnabled(
         packagingConfirmation?.status === 'PENDING' &&
         !['SPLIT', 'CANCELLED'].includes(status)
       )
-    case PRODUCTION_WIP_ACTION.REWORK:
-      return status === 'REJECTED'
     default:
       return false
   }
@@ -227,13 +227,17 @@ export default function ProductionRouteExecutionModal({
   canAssign = false,
   canExecute = false,
   canReceiveReturn = false,
+  canCreateCompletion = false,
+  completionLoading = false,
+  canWarehousePackaging = false,
+  canIssueCutting = false,
   initialBatchID = null,
   initialItemID = null,
-  canRework = false,
   canConfirmPackaging = false,
   canReadOutsourcingContracts = false,
   onCancel,
   onChanged,
+  onCreateCompletion,
 }) {
   const [actionForm] = Form.useForm()
   const quantityUnitOptions = useQuantityUnits(open)
@@ -275,50 +279,11 @@ export default function ProductionRouteExecutionModal({
     !canAssign &&
     !canExecute &&
     !canReceiveReturn &&
-    !canRework &&
+    !canCreateCompletion &&
+    !canWarehousePackaging &&
+    !canIssueCutting &&
     !canConfirmPackaging
   const scopedReworkFactID = Number(originReworkFactID || 0)
-  const canRunAction = useCallback(
-    (action) => {
-      if (assignmentOnly && action !== PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION) {
-        return false
-      }
-      if (
-        [
-          PRODUCTION_WIP_ACTION.SPLIT_BATCH,
-          PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION,
-          PRODUCTION_WIP_ACTION.CANCEL_BATCH,
-        ].includes(action)
-      ) {
-        return canAssign
-      }
-      if (action === PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN) {
-        return canReceiveReturn
-      }
-      if (
-        [
-          PRODUCTION_WIP_ACTION.START_OPERATION,
-          PRODUCTION_WIP_ACTION.COMPLETE_OPERATION,
-          PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION,
-        ].includes(action)
-      ) {
-        return canExecute
-      }
-      if (action === PRODUCTION_WIP_ACTION.REWORK) return canRework
-      if (action === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL) {
-        return canConfirmPackaging
-      }
-      return false
-    },
-    [
-      assignmentOnly,
-      canAssign,
-      canConfirmPackaging,
-      canExecute,
-      canReceiveReturn,
-      canRework,
-    ]
-  )
 
   const loadOutsourcingSources = useCallback(
     async ({ force = false } = {}) => {
@@ -494,32 +459,74 @@ export default function ProductionRouteExecutionModal({
     () => productionWipPackagingConfirmationForBatch(aggregate, selectedBatch),
     [aggregate, selectedBatch]
   )
+  const canReceiveFinishedGoods = Boolean(
+    !assignmentOnly &&
+      canCreateCompletion &&
+      onCreateCompletion &&
+      selectedBatch &&
+      selectedOrderItem &&
+      productionWipCompletionEligibility(aggregate, selectedOrderItem, {
+        orderStatus,
+        productionWipBatchID: selectedBatch.id,
+      }).eligible
+  )
   const nextOperation = useMemo(() => {
     const candidate = nextProductionWipOperation(aggregate, selectedBatch)
     if (!candidate) return null
-    const alreadyTransferred = aggregate.batches.some(
-      (batch) =>
-        batch.source_batch_id === selectedBatch.id &&
-        batch.production_order_operation_id === candidate.id &&
-        batch.status !== 'CANCELLED'
-    )
-    return alreadyTransferred ? null : candidate
+    return compareProductionWipQuantity(productionWipTransferRemainingQuantity(aggregate, selectedBatch, candidate), '0') > 0 ? candidate : null
   }, [aggregate, selectedBatch])
+  const canRunAction = useCallback(
+    (action) => {
+      if (assignmentOnly && action !== PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION) {
+        return false
+      }
+      if (currentOperation?.operation_code === 'PACKAGING' || (currentOperation?.operation_code === 'HANDWORK' && action === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION)) return canWarehousePackaging
+      if (currentOperation?.operation_code === 'FABRIC_PROCESSING' && action === PRODUCTION_WIP_ACTION.START_OPERATION) return canIssueCutting
+      if (
+        [
+          PRODUCTION_WIP_ACTION.SPLIT_BATCH,
+          PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION,
+          PRODUCTION_WIP_ACTION.CANCEL_BATCH,
+        ].includes(action)
+      ) {
+        return canAssign
+      }
+      if (action === PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN) {
+        return canReceiveReturn
+      }
+      if (
+        [
+          PRODUCTION_WIP_ACTION.START_OPERATION,
+          PRODUCTION_WIP_ACTION.COMPLETE_OPERATION,
+          PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION,
+        ].includes(action)
+      ) {
+        return canExecute
+      }
+      if (action === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL) {
+        return canConfirmPackaging
+      }
+      return false
+    },
+    [
+      assignmentOnly,
+      currentOperation,
+      canWarehousePackaging,
+      canIssueCutting,
+      canAssign,
+      canConfirmPackaging,
+      canExecute,
+      canReceiveReturn,
+    ]
+  )
+
   const visibleOperations = useMemo(
     () => productionWipOperationsForBatch(aggregate, selectedBatch),
     [aggregate, selectedBatch]
   )
-  const eligibleReworkTargets = useMemo(
-    () =>
-      visibleOperations.filter(
-        (operation) =>
-          !currentOperation || operation.step_no <= currentOperation.step_no
-      ),
-    [currentOperation, visibleOperations]
-  )
   const isNormalFabricBatch =
     currentOperation?.operation_code === 'FABRIC_PROCESSING' &&
-    selectedBatch?.flow_type === PRODUCTION_WIP_FLOW_TYPE.NORMAL
+    [PRODUCTION_WIP_FLOW_TYPE.NORMAL, PRODUCTION_WIP_FLOW_TYPE.REMAKE].includes(selectedBatch?.flow_type)
   const availableFabricRequirements = useMemo(
     () => productionWipFabricMaterialRequirements(aggregate, selectedBatch),
     [aggregate, selectedBatch]
@@ -536,8 +543,9 @@ export default function ProductionRouteExecutionModal({
       buildProductionWipFabricContractOptions(outsourcingSources, {
         requirements: fabricMaterialRequirements,
         operation: currentOperation,
+        batch: selectedBatch,
       }),
-    [currentOperation, fabricMaterialRequirements, outsourcingSources]
+    [currentOperation, fabricMaterialRequirements, outsourcingSources, selectedBatch]
   )
   const selectedFabricContract = useMemo(
     () =>
@@ -608,15 +616,15 @@ export default function ProductionRouteExecutionModal({
       ? selectedBatch.execution_mode
       : executionModeOptions.find((option) => !option.disabled)?.value
     actionForm.setFieldsValue({
-      quantity: undefined,
+      quantity: action === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION
+        ? productionWipTransferRemainingQuantity(aggregate, selectedBatch, nextOperation)
+        : undefined,
+      finished_goods_receipt_id: undefined,
       execution_mode: selectedExecutionMode,
       outsourcing_order_item_id: undefined,
       fabric_contract_order_id: undefined,
       fabric_outsourcing_item_ids: {},
-      target_operation_id:
-        action === PRODUCTION_WIP_ACTION.REWORK
-          ? eligibleReworkTargets.at(-1)?.id
-          : undefined,
+      target_operation_id: undefined,
       reason: '',
       packaging_version_snapshot:
         selectedPackagingConfirmation?.packaging_version_snapshot || '',
@@ -1140,10 +1148,27 @@ export default function ProductionRouteExecutionModal({
             type="info"
             message={
               activeAction === PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN
-                ? '按当前批次登记外发回仓，系统随后生成正式质量检验；检验合格后才能转下道。'
+                ? '仓库先清点本批次实收数量，点数一致后送 IQC 检验。当前按整批回货；少收、多收请先与业务及加工厂核对，不能按应收数量代填。'
                 : '按当前批次登记本厂完工，系统随后生成正式质量检验；检验合格后才能转下道。'
             }
           />
+        ) : null}
+
+        {activeAction === PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN ? (
+          <Form.Item
+            name="quantity"
+            label="仓库实点数量"
+            extra={`本批次应收 ${selectedBatch?.quantity || '—'}；请按实物清点后填写。`}
+            rules={[
+            { required: true, message: '请填写仓库实点数量' },
+            { validator: async (_, value) => {
+              if (!value) return
+              if (compareProductionWipQuantity(normalizeProductionWipQuantity(value), selectedBatch.quantity) !== 0) throw new Error('实点数量与本批次不一致，请先核对，暂不能整批送检')
+            } },
+          ]}
+          >
+            <Input inputMode="decimal" maxLength={PRODUCTION_WIP_QUANTITY_MAX_LENGTH} placeholder="实物清点后填写" />
+          </Form.Item>
         ) : null}
 
         {activeAction === PRODUCTION_WIP_ACTION.START_OPERATION ? (
@@ -1172,11 +1197,38 @@ export default function ProductionRouteExecutionModal({
         ) : null}
 
         {activeAction === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION ? (
-          <div className="erp-business-inline-note" role="note">
-            当前批次已检验合格，将移交进入
-            {productionWipOperationLabel(nextOperation)}
-            ；完工或回仓不会自动跳到下道工序。
-          </div>
+          <>
+            <div className="erp-business-inline-note" role="note">
+              {nextOperation?.operation_code === 'PACKAGING'
+                ? '选择已入库的成品，仓库查货后办理包装。包装完成后才可发货。'
+                : `移交进入${productionWipOperationLabel(nextOperation)}，可分批办理。`}
+            </div>
+            {nextOperation?.operation_code === 'PACKAGING' ? (
+              <Form.Item name="finished_goods_receipt_id" label="成品入库单" rules={[{ required: true, message: '请选择已入库且尚有待包装数量的成品' }]}>
+                <Select
+                  placeholder="选择已确认的成品入库单"
+                  options={productionWipPackagingReceiptChoices(aggregate, selectedBatch).map((receipt) => ({ value: receipt.id, label: `${receipt.fact_no} · 可包装 ${receipt.remaining_quantity}` }))}
+                  onChange={(id) => actionForm.setFieldValue('quantity', productionWipPackagingReceiptChoices(aggregate, selectedBatch).find((receipt) => receipt.id === id)?.remaining_quantity)}
+                />
+              </Form.Item>
+            ) : null}
+            <Form.Item
+              name="quantity"
+              label="本次移交数量"
+              rules={[
+              unitQuantityRuleFromOptions(quantityUnitOptions, selectedOrderItem?.unit_id),
+              { required: true, message: '请填写本次移交数量' },
+              { validator: async (_, value) => {
+                const remaining = nextOperation?.operation_code === 'PACKAGING'
+                  ? productionWipPackagingReceiptChoices(aggregate, selectedBatch).find((receipt) => receipt.id === actionForm.getFieldValue('finished_goods_receipt_id'))?.remaining_quantity
+                  : productionWipTransferRemainingQuantity(aggregate, selectedBatch, nextOperation)
+                if (!remaining || compareProductionWipQuantity(value, remaining) > 0) throw new Error('不能超过当前可移交数量，请核对入库和已移交记录')
+              } },
+            ]}
+            >
+              <Input inputMode="decimal" maxLength={PRODUCTION_WIP_QUANTITY_MAX_LENGTH} />
+            </Form.Item>
+          </>
         ) : null}
 
         {activeAction === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL ? (
@@ -1202,62 +1254,6 @@ export default function ProductionRouteExecutionModal({
                 showCount
                 placeholder="可填写版面、颜色、包装方式等核对说明"
               />
-            </Form.Item>
-          </>
-        ) : null}
-
-        {activeAction === PRODUCTION_WIP_ACTION.REWORK ? (
-          <>
-            <Form.Item
-              name="quantity"
-              label="返工数量"
-              extra={`当前批次数量：${selectedBatch?.quantity || '-'}`}
-              rules={[
-                unitQuantityRuleFromOptions(
-                  quantityUnitOptions,
-                  selectedOrderItem?.unit_id
-                ),
-                { required: true, message: '请填写返工数量' },
-                {
-                  validator: async (_, value) => {
-                    if (
-                      compareProductionWipQuantity(
-                        value,
-                        selectedBatch?.quantity
-                      ) > 0
-                    ) {
-                      throw new Error('返工数量不能超过当前批次数量')
-                    }
-                  },
-                },
-              ]}
-            >
-              <Input
-                inputMode="decimal"
-                maxLength={PRODUCTION_WIP_QUANTITY_MAX_LENGTH}
-              />
-            </Form.Item>
-            <Form.Item
-              name="target_operation_id"
-              label="返工去向"
-              rules={[{ required: true, message: '请选择返工去向' }]}
-            >
-              <Select
-                options={eligibleReworkTargets.map((operation) => ({
-                  value: operation.id,
-                  label: productionWipOperationLabel(operation),
-                }))}
-                placeholder="选择退回的生产工序"
-              />
-            </Form.Item>
-            <Form.Item
-              name="reason"
-              label="返工原因"
-              rules={[
-                { required: true, whitespace: true, message: '请填写返工原因' },
-              ]}
-            >
-              <Input.TextArea rows={3} maxLength={255} showCount />
             </Form.Item>
           </>
         ) : null}
@@ -1299,7 +1295,7 @@ export default function ProductionRouteExecutionModal({
       description={
         assignmentOnly
           ? '只为当前返工任务关联的在制批次选择生产方式。'
-          : '按在制批次依次办理布料加工、车缝、手工和包装；完工或回仓后由品质办理质量关口，合格后再转下道。'
+          : '按批次办理裁片、车缝和手工；手工成品先入库，查货与包装完成后才可发货。'
       }
       icon={<BranchesOutlined />}
       footer={
@@ -1318,8 +1314,7 @@ export default function ProductionRouteExecutionModal({
         </div>
       ) : (
         <div className="erp-business-inline-note" role="note">
-          按布料加工 → 车缝 → 手工 →
-          包装顺序办理；车缝、手工两道分别独立决定本厂或外发，包装在本厂完成；质量判定由品质人员在“质量检验”办理。
+          裁片 → 车缝 → 手工 → 成品入库 → 查货与包装。车缝、手工可本厂或委外，质量判定在“质量检验”办理。
         </div>
       )}
       {orderStatus === 'CLOSED' ? (
@@ -1509,7 +1504,17 @@ export default function ProductionRouteExecutionModal({
                   </Space>
                 </div>
                 <Space wrap>
-                  {canAssign ? (
+                  {canReceiveFinishedGoods ? (
+                    <Button
+                      type="primary"
+                      loading={completionLoading}
+                      disabled={saving || loading || completionLoading}
+                      onClick={() => onCreateCompletion(selectedBatch)}
+                    >
+                      登记成品收仓
+                    </Button>
+                  ) : null}
+                  {(canAssign || canWarehousePackaging) ? (
                     <>
                       {actionVisible(PRODUCTION_WIP_ACTION.SPLIT_BATCH) ? (
                         <Button
@@ -1521,7 +1526,7 @@ export default function ProductionRouteExecutionModal({
                               currentOperation,
                               nextOperation,
                               selectedPackagingConfirmation,
-                              canAssign,
+                              canRunAction(PRODUCTION_WIP_ACTION.SPLIT_BATCH),
                               authoritativeOrder
                             )
                           }
@@ -1543,7 +1548,7 @@ export default function ProductionRouteExecutionModal({
                               currentOperation,
                               nextOperation,
                               selectedPackagingConfirmation,
-                              canAssign,
+                              canRunAction(PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION),
                               authoritativeOrder
                             )
                           }
@@ -1565,7 +1570,7 @@ export default function ProductionRouteExecutionModal({
                               currentOperation,
                               nextOperation,
                               selectedPackagingConfirmation,
-                              canAssign,
+                              canRunAction(PRODUCTION_WIP_ACTION.CANCEL_BATCH),
                               authoritativeOrder
                             )
                           }
@@ -1578,7 +1583,7 @@ export default function ProductionRouteExecutionModal({
                       ) : null}
                     </>
                   ) : null}
-                  {(canExecute || canReceiveReturn) && !assignmentOnly ? (
+                  {(canExecute || canReceiveReturn || canWarehousePackaging || canIssueCutting) && !assignmentOnly ? (
                     <>
                       {actionVisible(PRODUCTION_WIP_ACTION.START_OPERATION) ? (
                         <Button
@@ -1590,7 +1595,7 @@ export default function ProductionRouteExecutionModal({
                               currentOperation,
                               nextOperation,
                               selectedPackagingConfirmation,
-                              canExecute,
+                              canRunAction(PRODUCTION_WIP_ACTION.START_OPERATION),
                               authoritativeOrder
                             )
                           }
@@ -1598,7 +1603,7 @@ export default function ProductionRouteExecutionModal({
                             selectAction(PRODUCTION_WIP_ACTION.START_OPERATION)
                           }
                         >
-                          开始工序
+                          {currentOperation?.operation_code === 'PACKAGING' ? '查货完成，开始包装' : currentOperation?.operation_code === 'FABRIC_PROCESSING' ? '确认外发裁片' : '开始工序'}
                         </Button>
                       ) : null}
                       {actionVisible(completionAction) ? (
@@ -1617,7 +1622,7 @@ export default function ProductionRouteExecutionModal({
                           }
                           onClick={() => selectAction(completionAction)}
                         >
-                          {ACTION_TITLE[completionAction]}
+                          {currentOperation?.operation_code === 'PACKAGING' ? '完成包装' : ACTION_TITLE[completionAction]}
                         </Button>
                       ) : null}
                       {actionVisible(
@@ -1633,7 +1638,7 @@ export default function ProductionRouteExecutionModal({
                               currentOperation,
                               nextOperation,
                               selectedPackagingConfirmation,
-                              canExecute,
+                              canRunAction(PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION),
                               authoritativeOrder
                             )
                           }
@@ -1643,7 +1648,7 @@ export default function ProductionRouteExecutionModal({
                             )
                           }
                         >
-                          转下道工序
+                          {nextOperation?.operation_code === 'PACKAGING' ? '安排查货包装' : '移交下道工序'}
                         </Button>
                       ) : null}
                     </>
@@ -1673,31 +1678,12 @@ export default function ProductionRouteExecutionModal({
                       确认包材要求
                     </Button>
                   ) : null}
-                  {actionVisible(PRODUCTION_WIP_ACTION.REWORK) ? (
-                    <Button
-                      danger
-                      disabled={
-                        saving ||
-                        !actionButtonEnabled(
-                          PRODUCTION_WIP_ACTION.REWORK,
-                          selectedBatch,
-                          currentOperation,
-                          nextOperation,
-                          selectedPackagingConfirmation,
-                          canRework,
-                          authoritativeOrder
-                        )
-                      }
-                      onClick={() => selectAction(PRODUCTION_WIP_ACTION.REWORK)}
-                    >
-                      登记返工
-                    </Button>
-                  ) : null}
+                  {selectedBatch?.status === 'REJECTED' ? <Text type="warning">检验不合格，请由业务在质检单发起异常方案，审批后继续办理。</Text> : null}
                 </Space>
               </Space>
               {isNormalFabricBatch ? (
                 <div className="erp-business-inline-note" role="note">
-                  布料加工按整单外发，首道不拆批；裁片检验合格并转入车缝后，才可按产品数量拆分。
+                  布料加工按当前批次外发；补料重做须使用本批次新合同重新发料。裁片检验合格后再移交车缝。
                 </div>
               ) : currentOperation?.operation_code === 'FABRIC_PROCESSING' ? (
                 <div className="erp-business-inline-note" role="note">

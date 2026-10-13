@@ -80,6 +80,7 @@ var (
 	ErrShipmentReservationSplit             = errors.New("shipment requires partial reservation consumption")
 	ErrShipmentFinanceDependency            = errors.New("shipment has active finance facts")
 	ErrShipmentQualityPending               = errors.New("shipment has pending finished goods quality inspection")
+	ErrShipmentPackingPending               = errors.New("shipment quantity exceeds checked and packed stock")
 	ErrShipmentQualityRejected              = errors.New("shipment has rejected finished goods quality inspection")
 	ErrShipmentReleaseRequired              = errors.New("shipment release task is required")
 	ErrShipmentReleasePending               = errors.New("shipment release task is not completed")
@@ -106,13 +107,21 @@ var (
 )
 
 type ProductionFact struct {
-	ID                    int
-	FactNo                string
-	FactType              string
-	Status                string
-	Version               int
-	SubjectType           string
-	SubjectID             int
+	ID          int
+	FactNo      string
+	FactType    string
+	Status      string
+	Version     int
+	SubjectType string
+	SubjectID   int
+	// Display fields are read projections; source-line snapshots own product identity.
+	SubjectName           string
+	SubjectCode           string
+	SKUCodeSnapshot       string
+	WarehouseName         string
+	WarehouseCode         string
+	UnitName              string
+	LotNo                 string
 	ProductSkuID          *int
 	WarehouseID           int
 	UnitID                int

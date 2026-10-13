@@ -95,6 +95,10 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 
 	visibleQuery := client.WorkflowTask.Query()
 	visibleQuery = applyWorkflowTaskBoardVisibility(visibleQuery, query)
+	assignees, err := workflowTaskVisiblePeople(ctx, visibleQuery.Clone())
+	if err != nil {
+		return nil, err
+	}
 	var sourceRows []struct {
 		SourceType string `json:"source_type"`
 	}
@@ -194,6 +198,7 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 		Lanes:         lanes,
 		SourceTypes:   sourceTypes,
 		OwnerRoleKeys: ownerRoleKeys,
+		Assignees:     assignees,
 	}, nil
 }
 
@@ -254,6 +259,7 @@ func applyWorkflowTaskBoardVisibility(query *ent.WorkflowTaskQuery, filter biz.W
 }
 
 func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.WorkflowTaskBoardQuery) (*ent.WorkflowTaskQuery, error) {
+	query = query.Where(workflowTaskDiscoveryPredicate(filter.WorkflowTaskDiscoveryFilter))
 	if filter.TodoOnly {
 		query = query.Where(workflowTaskBoardUnsettledStatusPredicate())
 	}
@@ -288,6 +294,7 @@ func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.Work
 
 func workflowTaskKeywordPredicate(keyword string) predicate.WorkflowTask {
 	return workflowtask.Or(
+		workflowTaskDiscoveryKeywordPredicate(keyword),
 		workflowtask.TaskCodeContainsFold(keyword),
 		workflowtask.TaskGroupContainsFold(keyword),
 		workflowtask.TaskNameContainsFold(keyword),
@@ -368,17 +375,19 @@ func workflowTaskBoardDueFilterPredicate(filter biz.WorkflowTaskBoardQuery) (pre
 func workflowTaskBoardLanePredicate(laneKey string, query biz.WorkflowTaskBoardQuery) (predicate.WorkflowTask, error) {
 	switch laneKey {
 	case biz.WorkflowTaskBoardLaneException:
-		return workflowtask.TaskStatusKey("blocked"), nil
+		return workflowtask.Or(workflowtask.TaskStatusKey("blocked"), workflowtask.And(workflowtask.TaskStatusKey("ready"), workflowExceptionTaskPredicate())), nil
 	case biz.WorkflowTaskBoardLaneFinished:
 		return workflowtask.TaskStatusKeyIn("done", "rejected", "withdrawn"), nil
 	case biz.WorkflowTaskBoardLaneDue:
 		return workflowtask.And(
 			workflowtask.TaskStatusKey("ready"),
+			workflowtask.Not(workflowExceptionTaskPredicate()),
 			workflowtask.DueAtLTE(query.SnapshotAt.Add(biz.WorkflowTaskBoardDueWindow)),
 		), nil
 	case biz.WorkflowTaskBoardLaneActionable:
 		return workflowtask.And(
 			workflowtask.TaskStatusKey("ready"),
+			workflowtask.Not(workflowExceptionTaskPredicate()),
 			workflowtask.Or(
 				workflowtask.DueAtIsNil(),
 				workflowtask.DueAtGT(query.SnapshotAt.Add(biz.WorkflowTaskBoardDueWindow)),
@@ -387,6 +396,10 @@ func workflowTaskBoardLanePredicate(laneKey string, query biz.WorkflowTaskBoardQ
 	default:
 		return nil, biz.ErrBadParam
 	}
+}
+
+func workflowExceptionTaskPredicate() predicate.WorkflowTask {
+	return workflowtask.Or(workflowtask.TaskGroupIn(biz.WorkflowExceptionTaskGroups()...), workflowtask.SourceTypeIn(biz.WorkflowExceptionSourceTypes()...))
 }
 
 func workflowTaskBoardUnsettledStatusPredicate() predicate.WorkflowTask {

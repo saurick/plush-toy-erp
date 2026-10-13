@@ -8,6 +8,7 @@ import { createDevUIFeedbackScenarios } from './devUIFeedbackScenarios.mjs'
 import { createDevUIDesignWorkflowScenarios } from './devUIDesignWorkflowScenarios.mjs'
 import { createDevUIDesignMobileTrackingScenario } from './devUIDesignMobileTrackingScenario.mjs'
 import { createMobileProgressScenarios } from './mobileProgressScenarios.mjs'
+import { createFilterConflictScenarios } from './filterConflictScenarios.mjs'
 import { createMobileNavigationBadgeScenarios } from './mobileNavigationBadgeScenarios.mjs'
 import { createDesktopNavigationBadgeScenarios } from './desktopNavigationBadgeScenarios.mjs'
 import { createBusinessFormInteractionScenarios } from './businessFormInteractionScenarios.mjs'
@@ -478,7 +479,8 @@ export function createStyleL1Scenarios(deps) {
       assert,
       assertNoHorizontalOverflow,
       expectText,
-      gotoScenarioPath,
+      outputDir,
+      path,
     }),
     ...createBusinessActionStabilityScenarios({
       assert,
@@ -598,6 +600,7 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
     }),
     ...createMobileWorkflowTrackingScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createFilterConflictScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileNavigationBadgeScenarios({
       ...deps,
       customerRuntimeEffectiveSession,

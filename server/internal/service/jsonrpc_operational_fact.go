@@ -37,6 +37,7 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"cancel_production_exception",
 		"reverse_production_exception",
 		"get_production_exception",
+		"get_production_exception_context",
 		"list_production_exceptions",
 		"post_production_fact",
 		"cancel_production_fact",

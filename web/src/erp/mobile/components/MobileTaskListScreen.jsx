@@ -2,7 +2,6 @@ import '../mobileMine.css'
 import React, { useEffect, useId, useRef, useState } from 'react'
 import { Empty } from 'antd'
 import {
-  ArrowUpOutlined,
   BarChartOutlined,
   BellOutlined,
   FileTextOutlined,
@@ -21,6 +20,7 @@ import FilterChip from '@/common/components/navigation/FilterChip'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import MobileProgressPanel from './MobileProgressPanel'
+import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import MobileWorkflowTrackingPanel from './MobileWorkflowTrackingPanel.jsx'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
@@ -31,6 +31,8 @@ import WorkflowTaskTiming from '../../components/workflow/WorkflowTaskTiming.jsx
 import { getWorkflowTaskIdentity } from '../../utils/workflowTaskIdentity.mjs'
 import MobileTaskListSkeleton from './MobileTaskListSkeleton.jsx'
 import MobileTaskListOptions from './MobileTaskListOptions.jsx'
+import MobileTaskHistoryOptions from './MobileTaskHistoryOptions.jsx'
+import { workflowHistoryFilterSummary } from '../../utils/workflowRoleTaskHistory.mjs'
 import MobileTaskListToolbar from './MobileTaskListToolbar.jsx'
 import MobileTaskPullRefresh from './MobileTaskPullRefresh.jsx'
 import MobileNavigationIcon from './MobileNavigationIcon.jsx'
@@ -49,6 +51,10 @@ import {
   resolveTaskReasonLabel,
   resolveMobileTaskStatusLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
+
+import MobileWorkflowExceptionPanel from './MobileWorkflowExceptionPanel.jsx'
+import { taskDiscoveryFilterLabels } from '../../utils/workflowTaskDiscovery.mjs'
+import { TRACKING_VIEW_OPTIONS } from '../../utils/workflowTrackingFilters.mjs'
 
 const MOBILE_MAIN_TAB_ITEMS = [
   { key: 'tasks', label: '任务管理', Icon: InboxOutlined },
@@ -93,17 +99,16 @@ export default function MobileTaskListScreen({
   runtimeBuildIdentity,
   serverDataTime,
   scrollContainerRef,
-  scrollMainToTop,
   selectedTask,
   setActiveFilterKey,
   setActiveMainTabKey,
   setActiveMessageTabKey,
   setDetailAction,
   setSelectedTaskID,
-  showScrollTopButton,
   taskKeyword,
   taskSortKey,
   taskStatusKey,
+  taskHistoryOptions,
   onTaskListOptionsChange,
   onSearchTasks,
   visibleListLimitsByKey,
@@ -117,17 +122,24 @@ export default function MobileTaskListScreen({
   })
   const isProgress = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
   const isTracking = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TRACKING
+  const isExceptions = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.EXCEPTIONS
+  const historyFilterSummary = workflowHistoryFilterSummary(taskHistoryOptions)
+  const discoverySummary = taskDiscoveryFilterLabels(taskHistoryOptions).map((item) => item.label).join('；')
   const isTasks = [
     MOBILE_MAIN_TAB_KEYS.TODO,
     MOBILE_MAIN_TAB_KEYS.DONE,
     MOBILE_MAIN_TAB_KEYS.TRACKING,
+    MOBILE_MAIN_TAB_KEYS.EXCEPTIONS,
   ].includes(activeMainTabKey)
   const canFilterTaskList = [
     MOBILE_MAIN_TAB_KEYS.TODO,
     MOBILE_MAIN_TAB_KEYS.MESSAGES,
   ].includes(activeMainTabKey)
   const lastTaskTab = useRef(MOBILE_MAIN_TAB_KEYS.TODO)
+  const lastTrackingView = useRef(MOBILE_MAIN_TAB_KEYS.TRACKING)
   if (isTasks) lastTaskTab.current = activeMainTabKey
+  if (isTracking || isExceptions) lastTrackingView.current = activeMainTabKey
+  const selectedTaskTab = isTasks ? activeMainTabKey : lastTaskTab.current
   const navigationItems = progressAccess?.enabled
     ? [
         {
@@ -328,6 +340,7 @@ export default function MobileTaskListScreen({
             <FileTextOutlined aria-hidden="true" />
             <span className="mobile-task-list-row__source-text">
               <WorkflowTaskSource task={task} copyable={false} />
+              <span className="workflow-task-discovery__summary">{task.discovery?.path} · {task.discovery?.assignee_name || '岗位待领取'}</span>
             </span>
           </div>
           {listMeta ? (
@@ -543,6 +556,7 @@ export default function MobileTaskListScreen({
             <FileTextOutlined aria-hidden="true" />
             <span className="mobile-task-list-row__source-text">
               <WorkflowTaskSource task={task} copyable={false} />
+              <span className="workflow-task-discovery__summary">{task.discovery?.path} · {task.discovery?.assignee_name || '岗位待领取'}</span>
             </span>
           </div>
         </div>
@@ -558,46 +572,27 @@ export default function MobileTaskListScreen({
   const renderDonePanel = () => (
     <>
       {renderListFeedback()}
-      <section className="mobile-task-results mobile-task-history">
-        <section>
-          <div className="mobile-task-history-summary">
-            <h2>已办任务</h2>
-            <span
-              className="mobile-role-count-tag mobile-role-section-count"
-              data-testid="mobile-role-done-count"
-              aria-label={
-                authoritativeTaskCounts
-                  ? `已办任务共 ${authoritativeTaskCounts.history} 条，当前已加载 ${doneTasks.length} 条`
-                  : `已办任务总数暂不可用，当前已加载 ${doneTasks.length} 条`
-              }
-            >
-              {authoritativeTaskCounts?.history ?? '—'}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {doneTasks.length === 0 ? (
-              <>
-                {renderEmptyState('暂无已办任务')}
-                {renderListLimitControl(
-                  doneTasks,
-                  MOBILE_LIST_KEYS.DONE,
-                  '条已办'
-                )}
-              </>
-            ) : (
-              <>
-                {getVisibleListItems(doneTasks, MOBILE_LIST_KEYS.DONE).map(
-                  renderDoneTaskItem
-                )}
-                {renderListLimitControl(
-                  doneTasks,
-                  MOBILE_LIST_KEYS.DONE,
-                  '条已办'
-                )}
-              </>
-            )}
-          </div>
-        </section>
+      <section className="mobile-task-results mobile-task-history" aria-label="已办任务">
+        <div className="space-y-3">
+          {doneTasks.length === 0
+            ? renderEmptyState(taskKeyword || historyFilterSummary ? '当前筛选下暂无已办任务' : '暂无已办任务')
+            : getVisibleListItems(doneTasks, MOBILE_LIST_KEYS.DONE).map(renderDoneTaskItem)}
+        </div>
+        <div className="mobile-task-history-summary" role="status">
+          已显示 {getVisibleListItems(doneTasks, MOBILE_LIST_KEYS.DONE).length} / 共{' '}
+          <span
+            data-testid="mobile-role-done-count"
+            aria-label={
+              authoritativeTaskCounts
+                ? `已办任务共 ${authoritativeTaskCounts.history} 条，当前已加载 ${doneTasks.length} 条`
+                : `已办任务总数暂不可用，当前已加载 ${doneTasks.length} 条`
+            }
+          >
+            {authoritativeTaskCounts?.history ?? '—'}
+          </span>{' '}
+          条
+        </div>
+        {renderListLimitControl(doneTasks, MOBILE_LIST_KEYS.DONE, '条已办')}
       </section>
     </>
   )
@@ -691,6 +686,7 @@ export default function MobileTaskListScreen({
                   </div>
                   <div className="mobile-role-message-card__source mt-1 break-all text-xs text-amber-700">
                     <WorkflowTaskSource task={task} copyable={false} />
+                    <span className="workflow-task-discovery__summary">{task.discovery?.path} · {task.discovery?.assignee_name || '岗位待领取'}</span>
                   </div>
                   {resolveTaskReason(task) ? (
                     <div className="mobile-role-message-card__reason mt-1 text-sm text-red-600">
@@ -747,6 +743,7 @@ export default function MobileTaskListScreen({
                     />
                     <span className="mobile-role-message-card__source mt-1 block break-all text-xs text-slate-500">
                       <WorkflowTaskSource task={task} copyable={false} />
+                      <span className="workflow-task-discovery__summary">{task.discovery?.path} · {task.discovery?.assignee_name || '岗位待领取'}</span>
                     </span>
                   </span>
                   <div className="mt-2">
@@ -903,6 +900,9 @@ export default function MobileTaskListScreen({
   }
 
   const renderActiveTabPanel = () => {
+    if (isExceptions) {
+      return <MobileWorkflowExceptionPanel key={accessScopeKey} accessScope={accessScopeKey} profile={adminProfile} onOpenTask={onOpenLinkedTask} scrollContainerRef={scrollContainerRef} />
+    }
     if (isTracking) {
       return <MobileWorkflowTrackingPanel accessScope={accessScopeKey} scrollContainerRef={scrollContainerRef} onOpenTask={onOpenLinkedTask} />
     }
@@ -990,8 +990,8 @@ export default function MobileTaskListScreen({
             : ''
         }`}
         data-testid="mobile-role-scroll"
-        aria-busy={!isTracking && initialLoading ? 'true' : 'false'}
-        data-refreshing={!isTracking && (loading || loadingMore) ? 'true' : 'false'}
+        aria-busy={!isTracking && !isExceptions && initialLoading ? 'true' : 'false'}
+        data-refreshing={!isTracking && !isExceptions && (loading || loadingMore) ? 'true' : 'false'}
         onScroll={handleMainScroll}
       >
         <header className="erp-sr-only" data-testid="mobile-task-list-header">
@@ -1016,14 +1016,14 @@ export default function MobileTaskListScreen({
           <SlidingSegmented
             block
             aria-label="任务状态"
-            value={isTasks ? activeMainTabKey : lastTaskTab.current}
+            value={selectedTaskTab === MOBILE_MAIN_TAB_KEYS.EXCEPTIONS ? MOBILE_MAIN_TAB_KEYS.TRACKING : selectedTaskTab}
             options={[
               {
                 value: MOBILE_MAIN_TAB_KEYS.TODO,
                 label: (
                   <>
                     <span>待办</span>{' '}
-                    <span>{authoritativeTaskCounts?.todo ?? ''}</span>
+                    <span>{navigationCounts.counts?.todo ?? ''}</span>
                   </>
                 ),
               },
@@ -1032,7 +1032,7 @@ export default function MobileTaskListScreen({
                 label: (
                   <>
                     <span>已办</span>{' '}
-                    <span>{authoritativeTaskCounts?.history ?? ''}</span>
+                    <span>{navigationCounts.counts?.history ?? ''}</span>
                   </>
                 ),
               },
@@ -1040,13 +1040,22 @@ export default function MobileTaskListScreen({
             ]}
             onChange={(key) =>
               openTaskBucket({
-                mainTabKey: key,
+                mainTabKey: key === MOBILE_MAIN_TAB_KEYS.TRACKING ? lastTrackingView.current : key,
                 filterKey: activeFilterKey,
               })
             }
           />
         </div>
-        {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE && !isTracking ? (
+        <div hidden={!isTracking && !isExceptions} className="mobile-workspace-tracking-views">
+          <SlidingSegmented
+            block
+            aria-label="跟踪内容"
+            value={lastTrackingView.current}
+            options={TRACKING_VIEW_OPTIONS}
+            onChange={(key) => openTaskBucket({ mainTabKey: key, filterKey: activeFilterKey })}
+          />
+        </div>
+        {activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.MINE && !isTracking && !isExceptions ? (
           <div className="mobile-role-task-query">
             <form
               className="mobile-role-task-search"
@@ -1101,8 +1110,11 @@ export default function MobileTaskListScreen({
                 }}
               />
             </form>
-            {canFilterTaskList ? (
+            {activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE ? (
+              <MobileTaskHistoryOptions options={taskHistoryOptions} onChange={onTaskListOptionsChange} profile={adminProfile} roleKey={activeRoleKey} />
+            ) : canFilterTaskList ? (
               <MobileTaskListOptions
+                key={activeMainTabKey}
                 contextLabel={
                   activeMainTabKey === MOBILE_MAIN_TAB_KEYS.MESSAGES
                     ? '风险'
@@ -1110,12 +1122,22 @@ export default function MobileTaskListScreen({
                 }
                 sortKey={taskSortKey}
                 statusKey={taskStatusKey}
+                options={taskHistoryOptions}
+                profile={adminProfile}
+                roleKey={activeRoleKey}
                 onChange={onTaskListOptionsChange}
               />
             ) : null}
           </div>
         ) : null}
+        {activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE && historyFilterSummary && (
+          <p className="mobile-history-filter-summary" aria-label="当前已办筛选">{historyFilterSummary}</p>
+        )}
+        {(canFilterTaskList || activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE) && discoverySummary && (
+          <p className="mobile-history-filter-summary" aria-label="当前任务分类筛选">{discoverySummary}</p>
+        )}
         {renderActiveTabPanel()}
+        <MobileBackToTop enabled={!isProgress} />
       </div>
 
       {progressAccess?.enabled && (
@@ -1129,17 +1151,6 @@ export default function MobileTaskListScreen({
           canEnterDesktop={canEnterDesktop}
         />
       )}
-      {!isProgress && showScrollTopButton ? (
-        <button
-          type="button"
-          className="mobile-role-scroll-top"
-          data-testid="mobile-role-scroll-top"
-          aria-label="回到顶部"
-          onClick={scrollMainToTop}
-        >
-          <ArrowUpOutlined aria-hidden="true" />
-        </button>
-      ) : null}
 
       {navigationCounts.error && (
         <button

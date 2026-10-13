@@ -48,6 +48,34 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
           } else if (method === 'list_tasks' && params.source_type === 'sales_order' && params.source_id === 1) {
             const approval = { id: 100, version: 1, task_code: 'SO-APPROVAL-100', task_name: '销售订单审批', task_group: 'sales_order_approval', source_type: 'sales_order', source_id: 1, owner_role_key: 'sales', task_status_key: 'ready' }
             data = { tasks: created ? [created, approval] : [approval], total: created ? 2 : 1, limit: params.limit, offset: params.offset }
+          } else if (method === 'list_tracking') {
+            assert.equal(params.scope, 'visible')
+            assert.equal(params.source_type, 'sales_order')
+            assert.equal(params.source_id, 1)
+            assert.equal(created?.task_status_key, 'done')
+            data = {
+              items: [{
+                kind: 'task',
+                id: created.id,
+                process_key: '',
+                title: created.task_name,
+                source_type: created.source_type,
+                source_id: created.source_id,
+                source_no: created.source_no,
+                display_context: null,
+                status: created.task_status_key,
+                resolution_kind: null,
+                started_at: created.created_at,
+                updated_at: created.updated_at,
+                completed_at: created.updated_at,
+                initiator_name: '业务人员',
+                initiator_role_key: 'sales',
+                current_tasks: [],
+              }],
+              total: 1,
+              limit: params.limit,
+              offset: params.offset,
+            }
           } else {
             await route.fallback()
             return
@@ -56,15 +84,23 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         })
       },
       verify: async (page) => {
-        const create = page.locator('[data-business-action-key="create-followup"]')
         const dialog = page.getByRole('dialog', { name: '新建跟进任务', exact: true })
         const openCreateDialog = async () => {
-          if (!(await create.isVisible())) await page.getByRole('button', { name: /^更多操作，共/ }).click()
-          await create.click()
+          const relatedEntry = page.locator('[data-business-action-key="related-tasks"]').first()
+          if (!(await relatedEntry.isVisible())) await page.getByRole('button', { name: /^更多操作，共/ }).click()
+          await relatedEntry.click()
+          const relatedPanel = page.getByRole('dialog', { name: '相关任务', exact: true })
+          await relatedPanel.getByRole('button', { name: '流程跟踪', exact: true }).waitFor()
+          await relatedPanel.locator('[data-business-action-key="create-followup"]').click()
           await dialog.waitFor()
         }
         await page.locator('.ant-table-tbody .ant-table-row').first().waitFor()
         await page.locator('.ant-table-tbody input[type="radio"]').first().check()
+        assert.equal(await page.locator('[data-business-action-key="create-followup"]:visible').count(), 0, '业务操作区只保留相关任务入口')
+        assert.equal(await page.locator('[data-business-action-key="workflow-progress"]:visible').count(), 0)
+        await openCreateDialog()
+        await dialog.getByRole('button', { name: '返回相关任务', exact: true }).click()
+        await page.getByRole('dialog', { name: '相关任务', exact: true }).getByRole('button', { name: '关闭', exact: true }).click()
         await openCreateDialog()
         await clickDialogBackdrop(dialog)
         await dialog.waitFor({ state: 'hidden' })
@@ -77,6 +113,12 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await discard.waitFor({ state: 'hidden' })
         assert.equal(await dialog.getByLabel('任务事项').inputValue(), '确认包装尺寸')
         await dialog.getByLabel('需要对方完成什么').fill('请核对最终包装尺寸，并反馈结果。')
+        if (page.viewportSize().width < 576) {
+          await page.setViewportSize({ width: 844, height: 390 })
+          assert.equal(await dialog.getByLabel('任务事项').inputValue(), '确认包装尺寸', '横屏切换保留未提交任务')
+          await page.setViewportSize({ width: 390, height: 844 })
+          assert.equal(await dialog.getByLabel('需要对方完成什么').inputValue(), '请核对最终包装尺寸，并反馈结果。')
+        }
         await dialog.locator('.ant-form-item').filter({ hasText: '责任岗位' }).locator('.ant-select-selector').click()
         await page.getByTitle('品质', { exact: true }).click()
         await dialog.locator('.ant-form-item').filter({ hasText: '办理人' }).locator('.ant-select-selector').click()
@@ -183,6 +225,13 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await dialog.getByText('创建结果暂未确认，内容已保留。请使用原内容重试，系统会核对已有结果。').waitFor()
         assert.equal(await dialog.getByLabel('任务事项').isDisabled(), true)
         assert.equal(await deadlineInput.isDisabled(), true)
+        await dialog.getByRole('button', { name: '关闭', exact: true }).click()
+        const pendingEntry = page.locator('[data-business-action-key="related-tasks"]').first()
+        if (!(await pendingEntry.isVisible())) await page.getByRole('button', { name: /^更多操作，共/ }).click()
+        assert.match(await pendingEntry.innerText(), /确认任务创建结果/u)
+        await pendingEntry.click()
+        await dialog.waitFor()
+        assert.equal(await dialog.getByLabel('任务事项').inputValue(), '确认包装尺寸')
         await dialog.getByRole('button', { name: '重试并确认结果' }).click()
         const receipt = page.getByRole('dialog', { name: '跟进任务已创建', exact: true })
         await receipt.waitFor()
@@ -209,9 +258,11 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await drawer.waitFor({ state: 'hidden' })
         await related.getByRole('button', { name: '确认包装尺寸' }).waitFor()
         await page.screenshot({ path: path.join(outputDir, `business-followup-related-${page.viewportSize().width}.png`), animations: 'disabled' })
-        await related.getByRole('button', { name: '销售订单审批（任务管理）', exact: true }).click()
+        await related.getByRole('button', { name: '流程跟踪', exact: true }).click()
         await page.waitForURL('**/erp/task-board?*')
-        assert.equal(new URL(page.url()).searchParams.get('q'), 'SO-APPROVAL-100')
+        assert.equal(new URL(page.url()).searchParams.get('track_source_type'), 'sales_order')
+        assert.equal(new URL(page.url()).searchParams.get('track_source_id'), '1')
+        await page.locator('.erp-workflow-tracking-panel').getByText('确认包装尺寸', { exact: true }).waitFor()
         await assertNoHorizontalOverflow(page, 'business-followup-create-retry-and-track')
       },
     },
@@ -224,14 +275,16 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await frame.getByRole('button', { name: '销售管理', exact: true }).click()
         await frame.locator('[data-action="status"][data-value="closed"]').click()
         await frame.locator('[data-action="select-row"]').first().check()
-        assert.equal(await frame.locator('[data-action="open-task-create"]').isDisabled(), true)
+        assert.equal(await frame.locator('[data-action="open-task-create"]').count(), 0)
         await frame.locator('[data-action="open-related-tasks"]').click()
         const relatedTasks = frame.getByRole('dialog', { name: '相关任务' })
         await relatedTasks.waitFor()
+        assert.equal(await relatedTasks.locator('[data-action="open-task-create"]').isDisabled(), true)
         await clickDialogBackdrop(relatedTasks)
         await relatedTasks.waitFor({ state: 'hidden' })
-        await frame.locator('[data-action="status"][data-value="draft"]').click()
+        await frame.locator('[data-action="status"][data-value="active"]').click()
         await frame.locator('[data-action="select-row"]').first().check()
+        await frame.locator('[data-action="open-related-tasks"]').click()
         await frame.locator('[data-action="open-task-create"]').click()
         const taskCreate = frame.getByRole('dialog', {
           name: '新建跟进任务',
@@ -239,7 +292,8 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         })
         await clickDialogBackdrop(taskCreate)
         await taskCreate.waitFor({ state: 'hidden' })
-        await frame.locator('[data-action="open-task-create"]').click()
+        await relatedTasks.waitFor()
+        await relatedTasks.locator('[data-action="open-task-create"]').click()
         await frame.locator('#task-create-name').fill('补充包装稿')
         await clickDialogBackdrop(taskCreate)
         const discard = frame.getByRole('dialog', {
@@ -277,6 +331,163 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
         await page.screenshot({ path: path.join(outputDir, 'ui-design-followup-receipt.png'), animations: 'disabled' })
       },
     },
+    {
+      name: 'dev-ui-design-bom-task-entry',
+      path: '/__dev/ui-design',
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        await page.getByRole('button', { name: /全屏预览/u }).click()
+        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        await frame.locator('.nav-item[data-page="engineering-hub"]').click()
+        await frame.locator('.table-wrap [data-action="select-row"][data-id="bom-1"]').check()
+        await frame.locator('.business-record-actions [data-action="open-related-tasks"]').first().click()
+        const related = frame.getByRole('dialog', { name: '相关任务', exact: true })
+        const picker = related.getByLabel('关联销售订单', { exact: true })
+        const orders = await picker.locator('option[value]:not([value=""])').evaluateAll((items) => items.map((item) => ({ value: item.value, label: item.label })))
+        assert(orders.length > 0)
+        if (orders.length === 1) assert.equal(await picker.inputValue(), orders[0].value, '唯一关联订单自动选中')
+        else {
+          assert.equal(await related.locator('[data-action="open-task-create"]').isDisabled(), true)
+          await picker.selectOption(orders[0].value)
+        }
+        const orderNo = orders[0].label
+        assert.equal(await frame.locator('[role="dialog"]:visible').count(), 1)
+        await related.locator('[data-action="open-task-create"]').click()
+        const create = frame.getByRole('dialog', { name: '新建跟进任务', exact: true })
+        await create.getByText(orderNo, { exact: true }).waitFor()
+        await create.getByRole('button', { name: '取消', exact: true }).click()
+        assert.equal(await picker.inputValue(), orders[0].value, '新建返回保留 BOM 和关联订单')
+        await related.getByRole('button', { name: '流程跟踪', exact: true }).click()
+        const tracking = frame.getByRole('dialog', { name: '流程跟踪', exact: true })
+        await tracking.getByRole('heading', { name: orderNo, exact: true }).waitFor()
+        await tracking.getByRole('button', { name: '返回相关任务', exact: true }).click()
+        assert.equal(await picker.inputValue(), orders[0].value)
+        await page.screenshot({ path: path.join(outputDir, 'ui-design-bom-task-entry-panel.png'), animations: 'disabled' })
+      },
+    },
   ]
-  return [...scenarios, { ...scenarios[0], name: 'business-followup-dark-compact', themeMode: 'dark', viewport: { width: 390, height: 844 } }]
+  const groupedEntries = [
+    ['sales', 'sales_order', '/erp/sales/project-orders/sales-orders'],
+    ['purchase', 'purchase_order', '/erp/purchase/accessories'],
+    ['outsourcing', 'outsourcing_order', '/erp/purchase/processing-contracts'],
+    ['production', 'production_order', '/erp/production/orders'],
+    ['shipment', 'shipment', '/erp/warehouse/shipments'],
+  ].map(([key, sourceType, pagePath]) => {
+    let sourceID = null
+    return {
+      name: `business-task-entry-${key}`,
+      path: pagePath,
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/workflow', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method === 'list_tracking') {
+            assert.equal(params.scope, 'visible')
+            assert.equal(params.source_type, sourceType)
+            assert.equal(params.source_id, sourceID)
+            return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data: { items: [], total: 0, limit: params.limit, offset: params.offset } } } })
+          }
+          if (method !== 'list_tasks' || !params.source_id || params.source_type !== sourceType) return route.fallback()
+          assert.equal(params.source_type, sourceType)
+          assert(Number.isSafeInteger(params.source_id) && params.source_id > 0)
+          sourceID = params.source_id
+          await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data: { tasks: [], total: 0 } } }) })
+        })
+      },
+      verify: async (page) => {
+        const rowSelector = page.locator('.ant-table-tbody .ant-table-row input[type="radio"]:visible, .ant-table-tbody .ant-table-row input[type="checkbox"]:visible').first()
+        await rowSelector.check()
+        const entry = page.locator('[data-business-action-key="related-tasks"]').first()
+        if (!(await entry.isVisible())) await page.getByRole('button', { name: /^更多操作，共/ }).click()
+        assert.equal(await page.locator('[data-business-action-key="create-followup"]:visible').count(), 0)
+        assert.equal(await page.locator('[data-business-action-key="workflow-progress"]:visible').count(), 0)
+        await entry.click()
+        const related = page.getByRole('dialog', { name: '相关任务', exact: true })
+        await related.getByText('当前单据暂无可见任务', { exact: true }).waitFor()
+        await related.locator('[data-business-action-key="create-followup"]').waitFor()
+        await related.getByRole('button', { name: '流程跟踪', exact: true }).waitFor()
+        const bounds = await related.evaluate((node) => ({ width: node.clientWidth, scrollWidth: node.scrollWidth }))
+        assert(bounds.scrollWidth <= bounds.width + 1, `${key} 任务面板不能横向溢出`)
+        await page.screenshot({ path: path.join(outputDir, `business-task-entry-${key}-panel.png`), animations: 'disabled' })
+        await related.getByRole('button', { name: '流程跟踪', exact: true }).click()
+        await page.waitForURL('**/erp/task-board?*')
+        assert.equal(new URL(page.url()).searchParams.get('track_source_type'), sourceType)
+        assert.equal(new URL(page.url()).searchParams.get('track_source_id'), String(sourceID))
+        await page.getByText('当前筛选下没有匹配记录', { exact: true }).waitFor()
+        await assertNoHorizontalOverflow(page, `business-task-entry-${key}`)
+      },
+    }
+  })
+  const pagedTasks = Array.from({ length: 21 }, (_, index) => ({
+    id: 99100 + index,
+    version: 1,
+    task_code: `FOLLOWUP-PAGED-${index + 1}`,
+    task_name: index === 0 ? '核对包装尺寸、色卡、车缝位置及不同批次产品规格，确认全部资料后反馈处理结果' : `核对任务 ${index + 1}`,
+    task_group: 'business_followup',
+    source_type: 'sales_order',
+    source_id: 1,
+    source_no: 'SO-STYLE-L1',
+    owner_role_key: 'sales',
+    task_status_key: 'ready',
+    payload: { description: '检查资料并反馈处理结果' },
+  }))
+  let appendFailed = false
+  const mobilePagination = {
+    name: 'business-related-tasks-mobile-pagination',
+    path: '/erp/sales/project-orders/sales-orders',
+    auth: 'admin',
+    effectiveSession: customerRuntimeEffectiveSession,
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    workflowTaskFixtures: pagedTasks,
+    beforeNavigate: async (page) => {
+      appendFailed = false
+      pagedTasks[0].task_status_key = 'ready'
+      await page.route('**/rpc/workflow', async (route) => {
+        const { id, method, params = {} } = route.request().postDataJSON()
+        if (method !== 'list_tasks' || params.source_type !== 'sales_order' || params.source_id !== 1) return route.fallback()
+        if (params.offset === 10 && !appendFailed) {
+          appendFailed = true
+          return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 500, message: '暂时无法读取' } } })
+        }
+        return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data: { tasks: pagedTasks.slice(params.offset, params.offset + params.limit), total: pagedTasks.length, offset: params.offset, limit: params.limit } } } })
+      })
+    },
+    verify: async (page) => {
+      await page.locator('.ant-table-tbody input[type="radio"]').first().check()
+      const entry = page.locator('[data-business-action-key="related-tasks"]').first()
+      if (!(await entry.isVisible())) await page.getByRole('button', { name: /^更多操作，共/ }).click()
+      await entry.click()
+      const panel = page.getByRole('dialog', { name: '相关任务', exact: true })
+      const cards = panel.getByRole('listitem')
+      await cards.first().waitFor()
+      await panel.locator('.business-task-panel__more').scrollIntoViewIfNeeded()
+      const retry = panel.locator('.business-task-panel__more').getByRole('button', { name: '重新读取', exact: true })
+      await retry.waitFor()
+      assert.equal(await cards.count(), 10, '追加失败保留已加载任务')
+      await retry.click()
+      await panel.getByRole('button', { name: '核对任务 20', exact: true }).waitFor()
+      await panel.locator('.business-task-panel__more').scrollIntoViewIfNeeded()
+      await panel.getByRole('button', { name: '核对任务 21', exact: true }).waitFor()
+      assert.equal(await cards.count(), 21, '重试后连续追加，不能重复或丢失任务')
+      assert.equal(await panel.locator('.ant-pagination:visible').count(), 0)
+      pagedTasks[0].task_status_key = 'done'
+      await panel.getByRole('button', { name: '核对任务 21', exact: true }).click()
+      const drawer = page.locator('.erp-task-action-drawer:visible')
+      await drawer.locator('.ant-drawer-close').click()
+      await cards.first().getByText('已完成', { exact: true }).waitFor()
+      await page.setViewportSize({ width: 844, height: 390 })
+      await panel.getByRole('cell', { name: pagedTasks[0].task_name, exact: true }).waitFor()
+      await page.setViewportSize({ width: 390, height: 844 })
+      await cards.first().getByText('已完成', { exact: true }).waitFor()
+      const bounds = await panel.evaluate((node) => ({ width: node.clientWidth, scrollWidth: node.scrollWidth }))
+      assert(bounds.scrollWidth <= bounds.width + 1, '长任务名称与手机横竖屏切换不能产生横向溢出')
+      await page.screenshot({ path: path.join(outputDir, 'business-related-tasks-mobile-long-title.png'), animations: 'disabled' })
+    },
+  }
+  return [...scenarios, ...groupedEntries, mobilePagination, { ...scenarios[0], name: 'business-followup-dark-compact', themeMode: 'dark', viewport: { width: 390, height: 844 } }]
 }

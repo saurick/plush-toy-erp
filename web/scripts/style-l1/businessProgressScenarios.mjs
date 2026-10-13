@@ -208,7 +208,7 @@ export function createBusinessProgressScenarios({
               .isDisabled()
           )
           assert(
-            await board.getByRole('button', { name: /任务阻塞/ }).isDisabled()
+            await board.getByRole('button', { name: /任务受阻/ }).isDisabled()
           )
           return
         }

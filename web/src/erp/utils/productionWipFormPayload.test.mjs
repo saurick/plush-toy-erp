@@ -25,25 +25,23 @@ function payload(action, values = {}, overrides = {}) {
   })
 }
 
-test('production form splitting conserves quantity and transfer uses the full selected batch', () => {
+test('outsourcing return preserves warehouse counts and never substitutes the planned quantity', () => {
+  assert.equal(payload(ACTION.RECEIVE_OUTSOURCING_RETURN).quantity, undefined)
+  assert.equal(payload(ACTION.RECEIVE_OUTSOURCING_RETURN, { quantity: '9' }).quantity, '9')
+  assert.equal(payload(ACTION.RECEIVE_OUTSOURCING_RETURN, { quantity: '10.000001' }).quantity, '10.000001')
+})
+
+test('production form splitting conserves quantity and transfer uses the entered partial quantity', () => {
   assert.deepEqual(payload(ACTION.SPLIT_BATCH, { quantity: '4' }).splits, [
     { quantity: '4' },
     { quantity: '6.000001' },
   ])
   const transfer = payload(ACTION.TRANSFER_TO_NEXT_OPERATION, {
-    quantity: '99',
+    quantity: '4',
     target_operation_id: 99,
   })
-  assert.equal(transfer.quantity, '10.000001')
+  assert.equal(transfer.quantity, '4')
   assert.equal(transfer.target_operation_id, 5)
-  const rework = payload(ACTION.REWORK, {
-    quantity: '2',
-    target_operation_id: 8,
-    reason: '返工',
-  })
-  assert.equal(rework.quantity, '2')
-  assert.equal(rework.target_operation_id, 8)
-  assert.equal(rework.reason, '返工')
 })
 
 test('production assignment maps fabric requirements and excludes stale external choices for in-house work', () => {

@@ -4,6 +4,19 @@ export const FOLLOWUP_SOURCE_TYPES = Object.freeze([
   'sales_order', 'purchase_order', 'outsourcing_order', 'production_order', 'shipment',
 ])
 
+export const BUSINESS_TASK_SOURCE_TYPES = Object.freeze([...FOLLOWUP_SOURCE_TYPES, 'purchase_receipt', 'quality_inspection', 'production_fact', 'outsourcing_fact', 'finance_payment', 'inventory_operation'])
+export function businessTaskSource(sourceType, record) {
+  if (!BUSINESS_TASK_SOURCE_TYPES.includes(sourceType) || !Number.isSafeInteger(record?.id) || record.id <= 0) return null
+  return { source_type: sourceType, source_id: record.id }
+}
+
+export function operationalFactTaskContext(activeKey, record) {
+  if (activeKey !== 'finance') return { sourceType: { production: 'production_fact', outsourcing: 'outsourcing_fact', shipment: 'shipment' }[activeKey], record }
+  const sourceType = { SHIPMENT: 'shipment', PURCHASE_RECEIPT: 'purchase_receipt', OUTSOURCING_FACT: 'outsourcing_fact' }[record?.source_type]
+  if (!sourceType || !Number.isSafeInteger(record?.source_id) || record.source_id <= 0) return { sourceType: null, record: null }
+  return { sourceType, record: { id: record.source_id, source_no: record.source_no || '' } }
+}
+
 export function followupSource(sourceType, record) {
   if (!FOLLOWUP_SOURCE_TYPES.includes(sourceType) || !Number.isSafeInteger(record?.id) || record.id <= 0) return null
   return { source_type: sourceType, source_id: record.id }

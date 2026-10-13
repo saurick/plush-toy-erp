@@ -2,13 +2,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   InfoCircleOutlined,
   PartitionOutlined,
+  DownOutlined,
+  ExportOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Empty, Popover, Space, Tag } from 'antd'
+import { Alert, Button, Drawer, Dropdown, Empty, Modal, Popover, Space, Tag, message } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
 import { StateRulesView } from '../components/flow-state/StateRulesView.jsx'
 import { FactsView } from '../components/flow-state/FactsView.jsx'
 import { RuntimeView } from '../components/flow-state/RuntimeView.jsx'
 import { WorkflowView } from '../components/flow-state/WorkflowView.jsx'
+import BusinessChainInstanceView from '../components/flow-state/BusinessChainInstanceView.jsx'
+import { TaskFinder } from '../components/flow-state/FlowTaskContext.jsx'
 import {
   BusinessChainOverviewView,
   BusinessChainView,
@@ -22,9 +26,9 @@ import {
   asArray,
   CatalogState,
   MemoryStrip,
-  ContextStrip,
 } from '../components/flow-state/FlowStateShared.jsx'
 import SearchInput from '@/common/components/SearchInput'
+import { AUTH_SESSION_CHANGED_EVENT, getToken } from '@/common/auth/auth'
 
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
@@ -61,6 +65,8 @@ const KNOWN_QUERY_KEYS = new Set([
 ])
 
 const VIEW_KEYS = new Set(VIEW_ITEMS.map((item) => item.value))
+const PRIMARY_VIEWS = VIEW_ITEMS.filter((item) => ['chain', 'tracking'].includes(item.value)).map(({ value, label }) => ({ value, label }))
+const TECHNICAL_VIEWS = VIEW_ITEMS.filter((item) => !['chain', 'tracking'].includes(item.value))
 
 const DEFINITION_SEARCH_GUIDE_GROUPS = Object.freeze([
   {
@@ -328,11 +334,9 @@ function DefinitionSearch({ catalog, onOpen, onOpenTaskLookup }) {
             <Text strong id="dev-flow-global-search-title">
               跨视图查定义
             </Text>
-            <Tag color="blue">覆盖 5 个视图</Tag>
           </Space>
           <Text type="secondary">
-            这是本页 5 个视图的定义总索引，不属于当前
-            Tab；统一查业务链、Workflow、ProcessRuntime、状态和事实定义，不查具体任务、运行实例或真实业务记录。
+            搜索业务链、流程、状态和事实定义。查某张订单的进度，请使用“定位业务”。
           </Text>
         </div>
         <Space size={8} wrap>
@@ -545,10 +549,15 @@ export default function DevFlowStateObservatoryPage() {
   const activeSearchParams = queryCanonicalization.searchParams
   const requestedView = cleanText(activeSearchParams.get(QUERY_KEYS.view))
   const view = requestedView || DEFAULT_VIEW
+  const [customerExportOpen, setCustomerExportOpen] = useState(false)
+  const [definitionSearchOpen, setDefinitionSearchOpen] = useState(false)
+  const [printingCurrent, setPrintingCurrent] = useState(false)
+  const [printingCustomer, setPrintingCustomer] = useState(false)
+  const printRequestRef = useRef(0)
   const customerScope = useDevCustomerScope({
     searchParams,
     setSearchParams,
-    normalize: view === 'chain',
+    normalize: customerExportOpen,
   })
   const customerReady = customerScope.status === 'ready'
   const requestedChainKey = cleanText(activeSearchParams.get(QUERY_KEYS.chain))
@@ -562,14 +571,38 @@ export default function DevFlowStateObservatoryPage() {
   const taskId = cleanText(activeSearchParams.get(QUERY_KEYS.taskId))
   const [taskDraft, setTaskDraft] = useState(taskId)
   const [selectedTask, setSelectedTask] = useState(null)
-  const [taskLookupFocusRequest, setTaskLookupFocusRequest] = useState(0)
   const [customerReviewPrintSnapshot, setCustomerReviewPrintSnapshot] =
     useState(null)
   const taskSelectionRef = useRef(taskId)
+  const sessionTokenRef = useRef(getToken())
+  const [sessionRevision, setSessionRevision] = useState(0)
   const chainReturnRef = useRef({
     [QUERY_KEYS.chain]: requestedChainKey || ALL_BUSINESS_CHAINS_KEY,
     [QUERY_KEYS.node]: requestedNodeKey || null,
   })
+
+  useEffect(() => {
+    const resetSession = () => {
+      const token = getToken()
+      if (sessionTokenRef.current === token) return
+      sessionTokenRef.current = token
+      taskSelectionRef.current = ''
+      setSelectedTask(null)
+      setTaskDraft('')
+      setSessionRevision((value) => value + 1)
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current)
+        next.delete(QUERY_KEYS.taskId)
+        return next
+      }, { replace: true })
+    }
+    window.addEventListener(AUTH_SESSION_CHANGED_EVENT, resetSession)
+    window.addEventListener('storage', resetSession)
+    return () => {
+      window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, resetSession)
+      window.removeEventListener('storage', resetSession)
+    }
+  }, [setSearchParams])
 
   useEffect(() => {
     if (taskSelectionRef.current === taskId) return
@@ -619,14 +652,6 @@ export default function DevFlowStateObservatoryPage() {
           : requestedNodeKey || null,
     }
   }, [catalog, requestedChainKey, requestedNodeKey, valid, view])
-
-  useEffect(() => {
-    if (taskLookupFocusRequest === 0 || view !== 'workflow' || !valid) return
-    const input = document.getElementById('dev-flow-task-search')
-    if (!input) return
-    input.scrollIntoView({ behavior: 'auto', block: 'center' })
-    input.focus({ preventScroll: true })
-  }, [taskLookupFocusRequest, valid, view])
 
   const overviewSelected = catalog
     ? !requestedChainKey ||
@@ -687,7 +712,7 @@ export default function DevFlowStateObservatoryPage() {
   }, [catalog, customerReady, customerScope.customerKey])
   const customerReviewReady = Boolean(customerReady && customerOverlay)
   const customerReview = useMemo(() => {
-    if (!catalog || !valid || view !== 'chain' || !customerReviewReady) {
+    if (!catalog || !valid || !customerReviewReady) {
       return null
     }
     const chainKey = overviewSelected
@@ -706,7 +731,6 @@ export default function DevFlowStateObservatoryPage() {
     customerReviewReady,
     overviewSelected,
     valid,
-    view,
   ])
   const customerReviewScopeKey = customerReview
     ? [
@@ -767,10 +791,10 @@ export default function DevFlowStateObservatoryPage() {
     view,
   ])
 
-  const selectTask = (nextTaskId, task) => {
+  const selectTask = (nextTaskId, task, targetView) => {
     taskSelectionRef.current = String(nextTaskId)
     setSelectedTask(task || null)
-    updateParams({ [QUERY_KEYS.taskId]: String(nextTaskId) })
+    updateParams({ [QUERY_KEYS.taskId]: String(nextTaskId), ...(targetView ? { [QUERY_KEYS.view]: targetView } : {}) })
   }
   const clearTask = () => {
     taskSelectionRef.current = ''
@@ -812,10 +836,47 @@ export default function DevFlowStateObservatoryPage() {
       [QUERY_KEYS.node]: null,
       ...patch,
     })
+  useEffect(() => {
+    const finishPrint = () => {
+      printRequestRef.current += 1
+      setCustomerReviewPrintSnapshot(null)
+      setPrintingCurrent(false)
+      setPrintingCustomer(false)
+    }
+    window.addEventListener('afterprint', finishPrint)
+    return () => window.removeEventListener('afterprint', finishPrint)
+  }, [])
+
+  useEffect(() => {
+    setPrintingCurrent(false)
+    setPrintingCustomer(false)
+    setCustomerReviewPrintSnapshot(null)
+    return () => { printRequestRef.current += 1 }
+  }, [searchParams])
+
+  const printCurrentView = async () => {
+    const request = ++printRequestRef.current
+    setCustomerReviewPrintSnapshot(null)
+    setPrintingCurrent(true)
+    await new Promise((resolve) => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)))
+    if (request !== printRequestRef.current) return
+    const pending = document.querySelector('.erp-dev-flow-main .erp-dev-flow-loading, .erp-dev-flow-main .erp-markdown-mermaid:not([data-mermaid-status="rendered"])')
+    if (pending) {
+      setPrintingCurrent(false)
+      message.info('页面内容尚未加载完成，请稍后导出')
+      return
+    }
+    window.print()
+  }
+
   const printCustomerReview = async () => {
     if (!customerReviewReady || !customerReview || !customerReviewScopeKey) {
       return
     }
+    const request = ++printRequestRef.current
+    setPrintingCustomer(true)
+    setCustomerExportOpen(false)
+    setPrintingCurrent(false)
     setCustomerReviewPrintSnapshot({
       scopeKey: customerReviewScopeKey,
       review: {
@@ -835,6 +896,7 @@ export default function DevFlowStateObservatoryPage() {
           )
           ?.getAttribute('data-mermaid-status')
         if (
+          request !== printRequestRef.current ||
           status === 'rendered' ||
           status === 'error' ||
           window.performance.now() - startedAt >= 5_000
@@ -846,6 +908,13 @@ export default function DevFlowStateObservatoryPage() {
       }
       checkDiagram()
     })
+    if (request !== printRequestRef.current) return
+    if (document.querySelector('[data-customer-review-diagram] .erp-markdown-mermaid')?.getAttribute('data-mermaid-status') !== 'rendered') {
+      setPrintingCustomer(false)
+      setCustomerReviewPrintSnapshot(null)
+      message.error('业务链图尚未生成，请稍后重新导出')
+      return
+    }
     window.print()
   }
   const specialistSelection =
@@ -874,9 +943,7 @@ export default function DevFlowStateObservatoryPage() {
                 [QUERY_KEYS.node]: null,
               })
             }
-            onOpenView={openGlobalDefinitionView}
-            onPrintCustomerReview={printCustomerReview}
-            customerReviewReady={customerReviewReady}
+            onOpenView={openView}
           />
         )
       }
@@ -892,22 +959,17 @@ export default function DevFlowStateObservatoryPage() {
             updateParams({ [QUERY_KEYS.chain]: key, [QUERY_KEYS.node]: null })
           }
           onSelectNode={(key) => updateParams({ [QUERY_KEYS.node]: key })}
-          onOpenView={openGlobalDefinitionView}
-          onPrintCustomerReview={printCustomerReview}
-          customerReviewReady={customerReviewReady}
+          onOpenView={openView}
         />
       )
     }
+    if (view === 'tracking') return <BusinessChainInstanceView taskId={taskId} onSelectTask={selectTask} onTaskLoaded={setSelectedTask} onOpenView={openView} />
     if (view === 'workflow') {
       return (
         <WorkflowView
           projection={chainProjection}
           taskId={taskId}
-          draft={taskDraft}
           selectedTask={selectedTask}
-          onDraftChange={setTaskDraft}
-          onClearTask={clearTask}
-          onSelectTask={selectTask}
           onBackToChain={() => openView('chain')}
           onClearChainContext={clearChainContext}
         />
@@ -920,14 +982,10 @@ export default function DevFlowStateObservatoryPage() {
           projection={chainProjection}
           definition={definition}
           taskId={taskId}
-          draft={taskDraft}
           selectedTask={selectedTask}
           onSelectDefinition={(key) =>
             updateParams({ [QUERY_KEYS.process]: key })
           }
-          onDraftChange={setTaskDraft}
-          onClearTask={clearTask}
-          onSelectTask={selectTask}
           onBackToChain={() => openView('chain')}
           onClearChainContext={clearChainContext}
         />
@@ -973,6 +1031,7 @@ export default function DevFlowStateObservatoryPage() {
       className="erp-dev-flow-state-page erp-dev-workspace-page"
       data-dev-flow-state-observatory
       data-catalog-status={catalogState.status}
+      data-flow-print-current={printingCurrent || undefined}
     >
       <DevPageNav sourcePath={SOURCE_PATH} />
       <header className="erp-dev-flow-header">
@@ -981,97 +1040,72 @@ export default function DevFlowStateObservatoryPage() {
           <Title level={1}>业务链观察</Title>
           <Link to={`${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?${new URLSearchParams({ chain: chain?.key || 'all' })}`}>查看链路实测</Link>
         </Space>
-        <details className="erp-dev-flow-concepts">
-          <summary>
-            <span>概念解释</span>
-
-          </summary>
-          <MemoryStrip />
-        </details>
+        <Space className="erp-dev-flow-header-actions">
+          <Button onClick={() => setDefinitionSearchOpen(true)}>搜索定义</Button>
+          <Dropdown menu={{ items: TECHNICAL_VIEWS.map((item) => ({ key: item.value, label: item.label })), onClick: ({ key }) => openView(key) }} disabled={!valid || !catalog}>
+            <Button>技术详情 <DownOutlined /></Button>
+          </Dropdown>
+          <Dropdown disabled={!valid || !catalog || printingCustomer} menu={{ items: [{ key: 'current', label: '当前视图 · 打印 / 保存 PDF' }, { key: 'customer', label: '客户校对稿…' }], onClick: ({ key }) => key === 'current' ? printCurrentView() : setCustomerExportOpen(true) }}>
+            <Button aria-label="导出" icon={<ExportOutlined />} loading={printingCustomer}>导出 <DownOutlined /></Button>
+          </Dropdown>
+        </Space>
       </header>
-      {catalogState.status === 'ready' && catalog && view === 'chain' ? (
-        <>
-          <DevCustomerScopeSelector
-            scope={customerScope}
-            onChange={customerScope.selectCustomer}
-            label="甲方校对稿"
-            note="选择只绑定甲方校对稿的客户配置预览；通用业务链仍来自 Product Core，不代表配置已发布或甲方已验收。"
-            invalidDescription="当前甲方没有登记校对预览；甲方校对稿导出已停止，通用业务链与运行观察仍可使用。"
-          />
-          {customerReady && !customerOverlay ? (
-            <Alert
-              type="warning"
-              showIcon
-              message="所选甲方没有业务链配置预览"
-              description="甲方校对稿导出已停止；请先登记只读客户配置预览，不能用产品通用设计冒充客户版本。"
-            />
-          ) : null}
-        </>
-      ) : null}
-      {catalogState.status === 'ready' && catalog ? (
-        <details className="erp-dev-flow-definition-tools">
-          <summary>
-            <span>本页定义总索引</span>
-            <small>统一搜索 5 个视图，不属于当前 Tab</small>
-          </summary>
-          <DefinitionSearch
-            catalog={catalog}
-            onOpenTaskLookup={(keyword) => {
-              const nextDraft = cleanText(keyword)
-              if (nextDraft) setTaskDraft(nextDraft)
-              setTaskLookupFocusRequest((current) => current + 1)
-              openGlobalDefinitionView('workflow')
-            }}
-            onOpen={(item) => {
-              if (item.type === 'chain') {
-                openView('chain', {
-                  [QUERY_KEYS.chain]: item.key,
-                  [QUERY_KEYS.node]: item.nodeKey || null,
-                })
-              } else if (item.type === 'runtime') {
-                openGlobalDefinitionView('runtime', {
-                  [QUERY_KEYS.process]: item.key,
-                })
-              } else if (item.type === 'facts') {
-                openGlobalDefinitionView('facts', {
-                  [QUERY_KEYS.fact]: item.key,
-                })
-              } else if (item.type === 'states') {
-                openGlobalDefinitionView('states', {
-                  [QUERY_KEYS.flow]: item.key,
-                  [QUERY_KEYS.state]: null,
-                })
-              } else openGlobalDefinitionView('workflow')
-            }}
-          />
-        </details>
-      ) : null}
-      <section className="erp-dev-flow-nav">
+      <section className="erp-dev-flow-nav erp-dev-flow-workspace-nav">
         <DevTaskNav
           compact
           level="primary"
-          ariaLabel="业务链与运行观察视图"
-          items={VIEW_ITEMS}
-          value={view}
+          ariaLabel="业务链观察方式"
+          items={PRIMARY_VIEWS}
+          value={['tracking', 'workflow', 'runtime'].includes(view) ? 'tracking' : 'chain'}
           disabled={catalogState.status === 'loading'}
           onChange={(nextView) => openView(nextView)}
         />
+        <Tag>{['tracking', 'workflow'].includes(view) ? '运行记录' : view === 'runtime' && taskId ? '流程记录' : '设计结构'}</Tag>
+        {!['chain', 'tracking'].includes(view) ? <span>{VIEW_META[view]?.label}{specialistSelection ? ` · ${specialistSelection}` : ''}</span> : null}
+        {chain ? <span className="erp-dev-flow-context-path">{chain.label}{node ? ` / ${node.label}` : ''}</span> : null}
       </section>
-      {catalogState.status === 'ready' && catalog ? (
-        <ContextStrip
-          view={view}
-          chain={
-            view === 'chain' && overviewSelected
-              ? catalog.businessChainOverview
-              : chain
-          }
-          node={view === 'chain' && overviewSelected ? null : node}
-          selection={specialistSelection}
-          canReturnToChain={valid && view !== 'chain'}
-          onReturnChain={() => openView('chain')}
-        />
+      {valid && catalog && ['chain', 'tracking', 'workflow', 'runtime'].includes(view) ? (
+        <TaskFinder key={`finder-${sessionRevision}`} draft={taskDraft} onDraftChange={setTaskDraft} onClearTask={clearTask} onSelectTask={(id, task) => selectTask(id, task, 'tracking')} taskId={taskId} />
       ) : null}
-      <main className="erp-dev-flow-main" data-flow-state-view={view}>
+      <Drawer title="搜索定义" width={860} open={definitionSearchOpen} onClose={() => setDefinitionSearchOpen(false)} destroyOnHidden>
+        {catalog ? <DefinitionSearch
+          catalog={catalog}
+          onOpenTaskLookup={(keyword) => { setTaskDraft(cleanText(keyword)); setDefinitionSearchOpen(false); openView('tracking') }}
+          onOpen={(item) => {
+            setDefinitionSearchOpen(false)
+            if (item.type === 'chain') openView('chain', { [QUERY_KEYS.chain]: item.key, [QUERY_KEYS.node]: item.nodeKey || null })
+            else if (item.type === 'runtime') openGlobalDefinitionView('runtime', { [QUERY_KEYS.process]: item.key })
+            else if (item.type === 'facts') openGlobalDefinitionView('facts', { [QUERY_KEYS.fact]: item.key })
+            else if (item.type === 'states') openGlobalDefinitionView('states', { [QUERY_KEYS.flow]: item.key, [QUERY_KEYS.state]: null })
+            else openGlobalDefinitionView('workflow')
+          }}
+        /> : null}
+        <details className="erp-dev-flow-concepts"><summary>概念与数据边界</summary><MemoryStrip /></details>
+      </Drawer>
+      <Modal
+        title="客户校对稿"
+        open={customerExportOpen}
+        onCancel={() => { if (!printingCustomer) setCustomerExportOpen(false) }}
+        closable={!printingCustomer}
+        keyboard={!printingCustomer}
+        maskClosable={!printingCustomer}
+        cancelButtonProps={{ disabled: printingCustomer }}
+        onOk={printCustomerReview}
+        okText="打印 / 保存 PDF"
+        confirmLoading={printingCustomer}
+        okButtonProps={{ disabled: !customerReviewReady || !customerReview }}
+      >
+        <p>导出范围：{chain?.label || catalog?.businessChainOverview.label}</p>
+        <DevCustomerScopeSelector
+          scope={customerScope}
+          onChange={customerScope.selectCustomer}
+          label="客户"
+          note="按所选客户配置生成设计校对稿；实际运行结果请导出当前视图。"
+          invalidDescription="当前客户尚未登记校对预览，请选择已登记客户。"
+        />
+        {customerReady && !customerOverlay ? <Alert type="warning" showIcon message="该客户没有业务链配置预览，暂不能导出校对稿" /> : null}
+      </Modal>
+      <main key={`view-${sessionRevision}`} className="erp-dev-flow-main" data-flow-state-view={view}>
         <CatalogState state={catalogState} onRetry={catalogState.reload} />
         {catalogState.status === 'ready' &&
         catalog &&

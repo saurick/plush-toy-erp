@@ -1,4 +1,4 @@
-import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
 
 export function createQualitySourceActionScenarios(deps) {
   const {
@@ -47,6 +47,7 @@ export function createQualitySourceActionScenarios(deps) {
     const overflowButtons = actionMenu
       .locator('button')
       .filter({ hasText: actionName })
+    await overflowButtons.first().waitFor({ state: 'visible' })
     for (let index = 0; index < (await overflowButtons.count()); index += 1) {
       const candidate = overflowButtons.nth(index)
       if (compact(await candidate.innerText()) === compact(actionName)) {
@@ -81,7 +82,7 @@ export function createQualitySourceActionScenarios(deps) {
         result: 'REJECT',
       }
       return {
-        name: `quality-${kind}-positive-quantity`,
+        name: production ? 'quality-production-whole-batch-context' : 'quality-outsourcing-positive-quantity',
         path: '/erp/production/quality-inspections',
         auth: 'admin',
         effectiveSession: customerRuntimeEffectiveSession,
@@ -123,6 +124,35 @@ export function createQualitySourceActionScenarios(deps) {
           })
           await page.route('**/rpc/operational_fact', async (route) => {
             const { id, method, params = {} } = route.request().postDataJSON()
+            if (method === 'get_production_exception_context') {
+              assert.equal(params.quality_inspection_id, inspection.id)
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id,
+                  result: styleRpcResult({
+                    exception_context: {
+                      production_order_id: 71,
+                      production_order_item_id: 7100,
+                      production_wip_batch_id: inspection.production_wip_batch_id,
+                      batch_no: 'WIP-QUALITY-STYLE-L1',
+                      operation_id: 712,
+                      operation_name: '裁片',
+                      fabric_operation_id: 712,
+                      quantity: '2',
+                      unit_precision: 0,
+                      unit_name: '个',
+                      original_supplier_id: 713,
+                      original_supplier_name: '模拟加工厂',
+                      stock_disposition_required: false,
+                    },
+                  }),
+                }),
+              })
+              return
+            }
             if (method !== 'list_outsourcing_return_dispositions') {
               return route.fallback()
             }
@@ -149,14 +179,24 @@ export function createQualitySourceActionScenarios(deps) {
           await selectRow(page, inspection.inspection_no)
           await clickSelectionAction(page, '不合格处置')
           const modal = page.getByRole('dialog', {
-            name: production ? '提交生产异常申请' : '委外不合格返厂 / 返工',
+            name: production ? '决定质量异常处理方案' : '委外不合格返厂 / 返工',
           })
-          const input = modal.getByLabel(production ? '申请数量' : '处置数量', {
+          const input = modal.getByLabel(production ? '异常批次数量' : '处置数量', {
             exact: true,
           })
           const action = modal.getByRole('button', {
-            name: production ? /提交申请$/u : /生成处置草稿$/u,
+            name: production ? /提交方案审批$/u : /生成处置草稿$/u,
           })
+          if (production) {
+            await page.waitForFunction(() => document.querySelector('#production-exception-request_requested_quantity')?.value === '2')
+            assert.equal(await input.inputValue(), '2', '异常数量以来源批次为准')
+            assert.equal(await input.getAttribute('readonly'), '', '整批异常不得在申请中自行拆数量')
+            assert.equal(await action.isEnabled(), true)
+            assert.match(await modal.innerText(), /模拟加工厂/u)
+            assert.equal(writes.length, 0, '读取来源不能产生处置事实')
+            await page.screenshot({ path: `${outputDir}/quality-production-batch-4k.png` })
+            return
+          }
           for (const quantity of ['0', '-1', '0.1']) {
             await input.fill(quantity)
             await action.click()

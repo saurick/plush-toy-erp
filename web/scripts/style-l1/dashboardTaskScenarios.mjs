@@ -8,6 +8,7 @@ import { createTaskDrawerAppearanceScenarios } from './taskDrawerAppearanceScena
 import { createProcessRuntimeClosureScenarios } from './processRuntimeClosureScenarios.mjs'
 import { createTaskTrackingScenarios } from './taskTrackingScenarios.mjs'
 import { createTaskTrackingFilterScenarios } from './taskTrackingFilterScenarios.mjs'
+import { workflowExceptionScenario } from './workflowExceptionScenario.mjs'
 
 export function createDashboardTaskScenarios({
   expectText,
@@ -33,6 +34,7 @@ export function createDashboardTaskScenarios({
   assertDarkThemeNeutralInteractions,
 }) {
   return [
+    workflowExceptionScenario({ assert, path, outputDir, customerRuntimeEffectiveSession, assertTaskActionDrawerLayout }),
     ...createTaskTrackingScenarios({ assert, path, outputDir, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
     ...createTaskTrackingFilterScenarios({ outputDir, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }),
     ...createProcessRuntimeClosureScenarios({

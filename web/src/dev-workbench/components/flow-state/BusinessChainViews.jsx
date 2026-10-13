@@ -1,6 +1,6 @@
 import React, { useCallback, useMemo } from 'react'
-import { PrinterOutlined } from '@ant-design/icons'
 import { Alert, Button, Empty, Select, Space, Spin, Tag } from 'antd'
+import TaskFulfillmentGuide from './TaskFulfillmentGuide.jsx'
 import { useRuntimeContext } from './useFlowRuntime.mjs'
 import {
   DEFINITION_SELECT_CLASS_NAMES,
@@ -15,7 +15,6 @@ import {
   asArray,
   EvidenceDisclosure,
   KeyValue,
-  GuidanceDisclosure,
 } from './FlowStateShared.jsx'
 import { Markdown } from '@/common/components/markdown'
 
@@ -239,19 +238,12 @@ function BusinessChainSelector({ catalog, value, onChange }) {
     },
     [catalog.businessChainOverview, chainOptionFilter]
   )
-  const overviewSelected = value === ALL_BUSINESS_CHAINS_KEY
-  const selectedChain = catalog.businessChains.find(
-    (item) => item.key === value
-  )
-  const selectedKind = selectedChain
-    ? CHAIN_KIND_PRESENTATION[selectedChain.kind]
-    : null
   return (
     <div className="erp-dev-flow-chain-selector">
-      <label htmlFor="dev-flow-chain-select">选择业务链</label>
+      <label htmlFor="dev-flow-chain-select">查看业务专题</label>
       <Select
         id="dev-flow-chain-select"
-        aria-label="选择业务链"
+        aria-label="查看业务专题"
         showSearch
         virtual={false}
         {...searchProps}
@@ -263,11 +255,7 @@ function BusinessChainSelector({ catalog, value, onChange }) {
         optionRender={renderDefinitionSelectOption}
         onChange={onChange}
       />
-      {overviewSelected ? (
-        <Tag color="geekblue">链级设计总图</Tag>
-      ) : selectedKind ? (
-        <Tag color={selectedKind.color}>{selectedKind.label}</Tag>
-      ) : null}
+
     </div>
   )
 }
@@ -294,8 +282,6 @@ function BusinessChainOverviewView({
   selectedTask,
   onSelectChain,
   onOpenView,
-  onPrintCustomerReview,
-  customerReviewReady,
 }) {
   const overview = catalog.businessChainOverview
   const chainByKey = useMemo(
@@ -335,153 +321,133 @@ function BusinessChainOverviewView({
 
   return (
     <div className="erp-dev-flow-view-stack" data-business-chain-overview>
-      <GuidanceDisclosure
-        guidanceKey="chain-overview"
-        title="总图只画链与链的衔接"
-        summary="点击一条链，再按步骤查看业务单据、岗位协同、流程运行和已生效结果"
-        description="这里的 11 个节点分别代表 11 条正式设计链，不会把每条链内部几十个业务单据、岗位任务、流程步骤和业务凭证挤在同一张图里。总图只说明允许怎样衔接，不是一笔业务的完整运行历史。"
-      />
+      <TaskFulfillmentGuide onExploreStage={onSelectChain} />
 
-      <section className="erp-dev-flow-chain-heading">
-        <div>
-          <Text className="erp-dev-flow-eyebrow">全部业务链 · 设计总图</Text>
-          <Title level={2}>{overview.label}</Title>
-          <Paragraph>{overview.summary}</Paragraph>
-        </div>
-        <div className="erp-dev-flow-chain-heading__actions">
-          <BusinessChainSelector
-            catalog={catalog}
-            value={overview.key}
-            onChange={onSelectChain}
-          />
-          <Button
-            type="primary"
-            icon={<PrinterOutlined />}
-            disabled={!customerReviewReady}
-            title={
-              customerReviewReady
-                ? '导出所选甲方的配置预览校对稿'
-                : '先选择已登记且具备配置预览的甲方'
-            }
-            onClick={onPrintCustomerReview}
-          >
-            导出甲方校对版
-          </Button>
-        </div>
-      </section>
-
-      <section
-        className="erp-dev-flow-chain-runtime"
-        data-runtime-overlay={runtime.status}
-      >
-        <div className="erp-dev-flow-section-heading">
+      <details className="erp-dev-flow-developer-details" data-business-chain-topics>
+        <summary>业务专题与系统衔接</summary>
+        <section className="erp-dev-flow-chain-heading">
           <div>
-            <Text strong>查看一笔任务现在走到哪里</Text>
-            <Text type="secondary">
-              按任务名称、任务编号或来源单号查询；总图最多只高亮这笔任务所属的一条业务链。
-            </Text>
+            <Title level={2}>{overview.label}</Title>
+            <Paragraph>{overview.summary}</Paragraph>
           </div>
-          <Button onClick={() => onOpenView(taskId ? 'runtime' : 'workflow')}>
-            {taskId ? '查看完整运行路径' : '查询任务位置'}
-          </Button>
-        </div>
-        {!taskId ? (
-          <p>
-            尚未查询运行数据。当前只展示允许怎样衔接，不表示任何业务实例已经发生。
-          </p>
-        ) : null}
-        {runtime.status === 'loading' ? (
-          <div className="erp-dev-flow-loading">
-            <Spin />
-            <span>正在定位任务所属业务链…</span>
+          <div className="erp-dev-flow-chain-heading__actions">
+            <BusinessChainSelector
+              catalog={catalog}
+              value={overview.key}
+              onChange={onSelectChain}
+            />
           </div>
+        </section>
+
+        {taskId ? (
+          <section
+            className="erp-dev-flow-chain-runtime"
+            data-runtime-overlay={runtime.status}
+          >
+            <div className="erp-dev-flow-section-heading">
+              <div>
+                <Text strong>查看一笔任务现在走到哪里</Text>
+                <Text type="secondary">
+                  按任务名称、任务编号或来源单号查询；总图最多只高亮这笔任务所属的一条业务链。
+                </Text>
+              </div>
+              <Button onClick={() => onOpenView('runtime')}>
+                查看完整运行路径
+              </Button>
+            </div>
+            {runtime.status === 'loading' ? (
+              <div className="erp-dev-flow-loading">
+                <Spin />
+                <span>正在定位任务所属业务链…</span>
+              </div>
         ) : null}
-        {runtime.status === 'error' ? (
-          <Alert
-            showIcon
-            type="error"
-            message="所属业务链定位失败"
-            description={runtime.error}
-          />
+            {runtime.status === 'error' ? (
+              <Alert
+                showIcon
+                type="error"
+                message="所属业务链定位失败"
+                description={runtime.error}
+              />
         ) : null}
-        {runtime.status === 'unlinked' ? (
-          <Alert
-            showIcon
-            type="info"
-            message="当前任务没有正式流程运行记录"
-            description="页面不会根据任务标题或相似名称猜测它属于哪条业务链。"
-          />
+            {runtime.status === 'unlinked' ? (
+              <Alert
+                showIcon
+                type="info"
+                message="当前任务没有正式流程运行记录"
+                description="页面不会根据任务标题或相似名称猜测它属于哪条业务链。"
+              />
         ) : null}
-        {runtime.status === 'ready' ? (
-          <div className="erp-dev-flow-runtime-proof">
-            {matchingChain ? (
-              <Tag color="orange">当前实例所属链：{matchingChain.label}</Tag>
+            {runtime.status === 'ready' ? (
+              <div className="erp-dev-flow-runtime-proof">
+                {matchingChain ? (
+                  <Tag color="orange">当前实例所属链：{matchingChain.label}</Tag>
             ) : (
               <Tag>当前流程未登记到业务总图</Tag>
             )}
-            <dl>
-              <div>
-                <dt>流程</dt>
-                <dd>{getProcessLabel(runtime.context.process_instance)}</dd>
+                <dl>
+                  <div>
+                    <dt>流程</dt>
+                    <dd>{getProcessLabel(runtime.context.process_instance)}</dd>
+                  </div>
+                  <div>
+                    <dt>来源单号</dt>
+                    <dd>{runtime.context.source?.no || '未声明'}</dd>
+                  </div>
+                  <div>
+                    <dt>查询时间</dt>
+                    <dd>{formatQueryTime(runtime.queriedAt)}</dd>
+                  </div>
+                </dl>
+                <strong>
+                  只证明定位到所属链；尚未证明上下游完成或业务事实已落账
+                </strong>
+                <details className="erp-dev-flow-developer-details">
+                  <summary>查看查询边界与开发者信息</summary>
+                  <dl>
+                    <div>
+                      <dt>数据来源</dt>
+                      <dd>
+                        <code>workflow.get_task_process_context</code>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>流程实例 ID</dt>
+                      <dd>
+                        <KeyValue
+                          value={String(runtime.context.process_instance.id)}
+                        />
+                      </dd>
+                    </div>
+                  </dl>
+                </details>
               </div>
-              <div>
-                <dt>来源单号</dt>
-                <dd>{runtime.context.source?.no || '未声明'}</dd>
-              </div>
-              <div>
-                <dt>查询时间</dt>
-                <dd>{formatQueryTime(runtime.queriedAt)}</dd>
-              </div>
-            </dl>
-            <strong>
-              只证明定位到所属链；尚未证明上下游完成或业务事实已落账
-            </strong>
-            <details className="erp-dev-flow-developer-details">
-              <summary>查看查询边界与开发者信息</summary>
-              <dl>
-                <div>
-                  <dt>数据来源</dt>
-                  <dd>
-                    <code>workflow.get_task_process_context</code>
-                  </dd>
-                </div>
-                <div>
-                  <dt>流程实例 ID</dt>
-                  <dd>
-                    <KeyValue
-                      value={String(runtime.context.process_instance.id)}
-                    />
-                  </dd>
-                </div>
-              </dl>
-            </details>
-          </div>
         ) : null}
-      </section>
+          </section>
+      ) : null}
 
-      <section className="erp-dev-flow-overview-map">
-        <div className="erp-dev-flow-section-heading">
-          <div>
-            <Text strong>业务链级总图</Text>
-            <Text type="secondary">
-              11 条正式设计链、4 个业务分区、{overview.relations.length}{' '}
-              条明确衔接。
-            </Text>
-          </div>
-          <Space wrap>
-            {Object.entries(CHAIN_KIND_PRESENTATION).map(([key, item]) => (
-              <Tag color={item.color} key={key}>
-                {item.label}
-              </Tag>
+        <section className="erp-dev-flow-overview-map">
+          <div className="erp-dev-flow-section-heading">
+            <div>
+              <Text strong>业务链总览</Text>
+              <Text type="secondary">
+                {catalog.businessChains.length} 条业务链 · {overview.relations.length}{' '}
+                条关联
+              </Text>
+            </div>
+            <Space wrap>
+              {Object.entries(CHAIN_KIND_PRESENTATION).map(([key, item]) => (
+                <Tag color={item.color} key={key}>
+                  {item.label}
+                </Tag>
             ))}
-          </Space>
-        </div>
-        <div className="erp-dev-flow-overview-graph erp-dev-docs-markdown">
-          <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
-        </div>
+            </Space>
+          </div>
+          <div className="erp-dev-flow-overview-graph erp-dev-docs-markdown">
+            <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
+          </div>
 
-        <div className="erp-dev-flow-overview-lanes">
-          {overview.lanes.map((lane) => {
+          <div className="erp-dev-flow-overview-lanes">
+            {overview.lanes.map((lane) => {
             const lanePresentation = CHAIN_OVERVIEW_LANE_PRESENTATION[lane.key]
             return (
               <details
@@ -532,12 +498,12 @@ function BusinessChainOverviewView({
               </details>
             )
           })}
-        </div>
+          </div>
 
-        <details className="erp-dev-flow-overview-relations">
-          <summary>查看全部链间衔接（{overview.relations.length}）</summary>
-          <ul>
-            {overview.relations.map((relation) => {
+          <details className="erp-dev-flow-overview-relations">
+            <summary>查看全部链间衔接（{overview.relations.length}）</summary>
+            <ul>
+              {overview.relations.map((relation) => {
               const presentation = CHAIN_RELATION_PRESENTATION[relation.kind]
               return (
                 <li data-overview-relation={relation.key} key={relation.key}>
@@ -550,10 +516,11 @@ function BusinessChainOverviewView({
                 </li>
               )
             })}
-          </ul>
-        </details>
-        <EvidenceDisclosure value={overview} label="查看业务总图证据" />
-      </section>
+            </ul>
+          </details>
+          <EvidenceDisclosure value={overview} label="查看业务总图证据" />
+        </section>
+      </details>
     </div>
   )
 }
@@ -567,8 +534,6 @@ function BusinessChainView({
   onSelectChain,
   onSelectNode,
   onOpenView,
-  onPrintCustomerReview,
-  customerReviewReady,
 }) {
   const { runtime, runtimeProcessKey, matchingChain } = useBusinessChainRuntime(
     catalog,
@@ -626,21 +591,12 @@ function BusinessChainView({
 
   return (
     <div className="erp-dev-flow-view-stack">
-      <GuidanceDisclosure
-        guidanceKey="chain"
-        title="业务链先看步骤，再查运行证据"
-        summary="查询任务后，只高亮真实运行到的一个步骤"
-        description="业务单据、岗位协同、流程运行、已生效业务记录和计算结果各自保留权威来源，不会因为流程走完就一起显示为完成。"
-      />
+
       <section className="erp-dev-flow-chain-heading">
         <div>
-          <Text className="erp-dev-flow-eyebrow">一次只看一条业务链</Text>
           <Title level={2}>{chain.label}</Title>
           <Paragraph>{chain.summary}</Paragraph>
-          <Text type="secondary">
-            {chain.steps.length} 个链路步骤 · {chain.acceptanceScenarios.length}{' '}
-            个已登记场景合同
-          </Text>
+
         </div>
         <div className="erp-dev-flow-chain-heading__actions">
           <BusinessChainSelector
@@ -648,73 +604,55 @@ function BusinessChainView({
             value={chain.key}
             onChange={onSelectChain}
           />
-          <Button
-            type="primary"
-            icon={<PrinterOutlined />}
-            disabled={!customerReviewReady}
-            title={
-              customerReviewReady
-                ? '导出所选甲方的配置预览校对稿'
-                : '先选择已登记且具备配置预览的甲方'
-            }
-            onClick={onPrintCustomerReview}
-          >
-            导出甲方校对版
-          </Button>
         </div>
       </section>
 
-      <section
-        className="erp-dev-flow-chain-runtime"
-        data-runtime-overlay={runtime.status}
-      >
-        <div className="erp-dev-flow-section-heading">
-          <div>
-            <Text strong>查看一笔任务现在走到哪一步</Text>
-            <Text type="secondary">
-              按任务名称、任务编号或来源单号查询；只高亮这笔任务对应的一个流程步骤。
-            </Text>
+      {taskId ? (
+        <section
+          className="erp-dev-flow-chain-runtime"
+          data-runtime-overlay={runtime.status}
+        >
+          <div className="erp-dev-flow-section-heading">
+            <div>
+              <Text strong>查看一笔任务现在走到哪一步</Text>
+              <Text type="secondary">
+                按任务名称、任务编号或来源单号查询；只高亮这笔任务对应的一个流程步骤。
+              </Text>
+            </div>
+            <Button onClick={() => onOpenView('runtime')}>
+              查看完整运行路径
+            </Button>
           </div>
-          <Button onClick={() => onOpenView('runtime')}>
-            {taskId ? '查看完整运行路径' : '查询任务位置'}
-          </Button>
-        </div>
-        {!taskId ? (
-          <p>
-            尚未查询运行数据；使用任务名称、任务编号或来源单号定位，无需数据库
-            ID。
-          </p>
+          {runtime.status === 'loading' ? (
+            <div className="erp-dev-flow-loading">
+              <Spin />
+              <span>正在读取真实流程位置…</span>
+            </div>
         ) : null}
-        {runtime.status === 'loading' ? (
-          <div className="erp-dev-flow-loading">
-            <Spin />
-            <span>正在读取真实流程位置…</span>
-          </div>
+          {runtime.status === 'error' ? (
+            <Alert
+              showIcon
+              type="error"
+              message="运行叠加查询失败"
+              description={runtime.error}
+            />
         ) : null}
-        {runtime.status === 'error' ? (
-          <Alert
-            showIcon
-            type="error"
-            message="运行叠加查询失败"
-            description={runtime.error}
-          />
-        ) : null}
-        {runtime.status === 'unlinked' ? (
-          <Alert
-            showIcon
-            type={isDisplayOnlyWorkflowTask(selectedTask) ? 'warning' : 'info'}
-            message={
+          {runtime.status === 'unlinked' ? (
+            <Alert
+              showIcon
+              type={isDisplayOnlyWorkflowTask(selectedTask) ? 'warning' : 'info'}
+              message={
               isDisplayOnlyWorkflowTask(selectedTask)
                 ? '模拟展示任务没有正式流程运行记录'
                 : '当前任务没有正式流程运行记录'
             }
-            description="页面不会根据任务标题或相似名称猜测流程位置。"
-          />
+              description="页面不会根据任务标题或相似名称猜测流程位置。"
+            />
         ) : null}
-        {runtime.status === 'ready' ? (
-          <div className="erp-dev-flow-runtime-proof">
-            {currentRuntimeNode ? (
-              <Tag color="orange">当前实例位于：{currentRuntimeNode.label}</Tag>
+          {runtime.status === 'ready' ? (
+            <div className="erp-dev-flow-runtime-proof">
+              {currentRuntimeNode ? (
+                <Tag color="orange">当前实例位于：{currentRuntimeNode.label}</Tag>
             ) : matchingChain ? (
               <Button
                 size="small"
@@ -725,43 +663,44 @@ function BusinessChainView({
             ) : (
               <Tag>当前流程未登记到业务链</Tag>
             )}
-            <dl>
-              <div>
-                <dt>流程</dt>
-                <dd>{getProcessLabel(runtime.context.process_instance)}</dd>
-              </div>
-              <div>
-                <dt>来源单号</dt>
-                <dd>{runtime.context.source?.no || '未声明'}</dd>
-              </div>
-              <div>
-                <dt>查询时间</dt>
-                <dd>{formatQueryTime(runtime.queriedAt)}</dd>
-              </div>
-            </dl>
-            <strong>尚未证明业务事实已落账</strong>
-            <details className="erp-dev-flow-developer-details">
-              <summary>查看查询边界与开发者信息</summary>
               <dl>
                 <div>
-                  <dt>数据来源</dt>
-                  <dd>
-                    <code>workflow.get_task_process_context</code>
-                  </dd>
+                  <dt>流程</dt>
+                  <dd>{getProcessLabel(runtime.context.process_instance)}</dd>
                 </div>
                 <div>
-                  <dt>流程实例 ID</dt>
-                  <dd>
-                    <KeyValue
-                      value={String(runtime.context.process_instance.id)}
-                    />
-                  </dd>
+                  <dt>来源单号</dt>
+                  <dd>{runtime.context.source?.no || '未声明'}</dd>
+                </div>
+                <div>
+                  <dt>查询时间</dt>
+                  <dd>{formatQueryTime(runtime.queriedAt)}</dd>
                 </div>
               </dl>
-            </details>
-          </div>
+              <strong>尚未证明业务事实已落账</strong>
+              <details className="erp-dev-flow-developer-details">
+                <summary>查看查询边界与开发者信息</summary>
+                <dl>
+                  <div>
+                    <dt>数据来源</dt>
+                    <dd>
+                      <code>workflow.get_task_process_context</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>流程实例 ID</dt>
+                    <dd>
+                      <KeyValue
+                        value={String(runtime.context.process_instance.id)}
+                      />
+                    </dd>
+                  </div>
+                </dl>
+              </details>
+            </div>
         ) : null}
-      </section>
+        </section>
+      ) : null}
 
       <section className="erp-dev-flow-chain-workspace">
         <div className="erp-dev-flow-chain-map">

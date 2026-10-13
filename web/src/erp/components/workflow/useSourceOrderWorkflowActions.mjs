@@ -7,8 +7,11 @@ import {
   rejectWorkflowTaskAction,
   resumeWorkflowTaskAction,
   urgeWorkflowTask,
+  getWorkflowTaskAssignmentOptions,
+  reassignWorkflowTask,
 } from '../../api/workflowApi.mjs'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../../utils/workflowTaskActionSubmitGuard.mjs'
+import { buildDesktopWorkflowTaskActionParams } from '../../utils/desktopWorkflowTaskAction.mjs'
 import {
   createTaskMutationAttemptStore,
   createTaskMutationInFlightGuard,
@@ -34,18 +37,10 @@ export function useSourceOrderWorkflowActions({
     }
   }, [])
   const completeWorkflowTask = useCallback(
-    async (task, { reason = '' } = {}) => {
+    async (task, { reason = '', processDecision = null } = {}) => {
       const scope = `${task.id}:complete`
       const operation = 'complete'
-      const params = {
-        task_id: task.id,
-        expected_version: task.version,
-        action_key: operation,
-        reason: task.task_group === 'business_followup' ? reason.trim() : '',
-        payload: {
-          surface_key: surfaceKey,
-        },
-      }
+      const params = buildDesktopWorkflowTaskActionParams({ task, actionMode: operation, reason, processDecision, surfaceKey })
       return runMutationInFlight(task.id, async () => {
         const accessVerified = await verifyNewWorkflowTaskMutationAttempt({
           attemptStore: mutationAttemptsRef.current,
@@ -56,6 +51,7 @@ export function useSourceOrderWorkflowActions({
             verifyWorkflowTaskActionAccessBeforeSubmit({
               task,
               actionKey: operation,
+              reason: reason.trim(),
               onWarning: message.warning,
               onError: message.error,
             }),
@@ -287,7 +283,34 @@ export function useSourceOrderWorkflowActions({
     [loadWorkflowTasks, runMutationInFlight, surfaceKey]
   )
 
+  const assignWorkflowTask = useCallback(async (task, { reason = '', assignmentTarget } = {}) => {
+    const scope = `${task.id}:assign`
+    const params = buildDesktopWorkflowTaskActionParams({ task, actionMode: 'assign', assignmentTarget, reason, surfaceKey })
+    return runMutationInFlight(task.id, async () => {
+      const verified = await verifyNewWorkflowTaskMutationAttempt({
+        attemptStore: mutationAttemptsRef.current,
+scope,
+operation: 'assign',
+params,
+        verify: async () => {
+          const access = await getWorkflowTaskAssignmentOptions({ task_id: task.id })
+          const allowed = assignmentTarget === 'pool' ? access.can_return_to_pool : access.candidates.some((item) => item.admin_id === assignmentTarget)
+          if (access.task_version !== task.version || !access.can_reassign || !allowed) {
+            message.warning(access.reason || '转交去向已失效，请重新选择')
+            return false
+          }
+          return true
+        },
+      })
+      if (!verified) return false
+      const updated = await runWorkflowTaskMutationWithFailureRefresh(() => mutationAttemptsRef.current.run({ scope, operation: 'assign', mutate: reassignWorkflowTask, params }), loadWorkflowTasks)
+      await loadWorkflowTasks()
+      return updated
+    })
+  }, [loadWorkflowTasks, runMutationInFlight, surfaceKey])
+
   return {
+    assignWorkflowTask,
     blockWorkflowTask,
     completeWorkflowTask,
     rejectWorkflowTask,

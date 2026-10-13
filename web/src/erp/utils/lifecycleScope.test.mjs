@@ -8,6 +8,7 @@ import {
   lifecycleScopeFromSearchParams,
   lifecycleScopeIncludesStatus,
   normalizeLifecycleScope,
+  normalizeLifecycleStatus,
   withLifecycleScopeSearchParam,
 } from './lifecycleScope.mjs'
 
@@ -46,6 +47,20 @@ test('状态选项按当前与历史语义过滤并保留全部状态入口', ()
     lifecycleScopeIncludesStatus('history', 'draft', ['closed', 'canceled']),
     false
   )
+})
+
+test('链接与缓存恢复不保留范围外状态，合法状态保持原值', () => {
+  for (const history of [['closed', 'canceled'], ['CLOSED', 'CANCELLED'], ['ARCHIVED']]) {
+    for (const status of history) {
+      assert.equal(normalizeLifecycleStatus('current', status, history), '')
+      assert.equal(normalizeLifecycleStatus('history', status, history), status)
+      assert.equal(normalizeLifecycleStatus('all', status, history), status)
+    }
+    assert.equal(normalizeLifecycleStatus('history', 'draft', history), '')
+    assert.equal(normalizeLifecycleStatus('current', 'draft', history), 'draft')
+    assert.equal(normalizeLifecycleStatus('all', 'draft', history), 'draft')
+    assert.equal(normalizeLifecycleStatus('current', null, history), '')
+  }
 })
 
 test('当前范围不污染 URL，历史与全部范围可稳定深链', () => {

@@ -40,8 +40,8 @@ func TestDebugBusinessDataClearReworkConstraintAndRollback(t *testing.T) {
 				"PRAGMA foreign_keys = ON",
 				"CREATE TABLE units (id INTEGER PRIMARY KEY)",
 				"INSERT INTO units VALUES (1)",
-				"CREATE TABLE production_wip_batches (id INTEGER PRIMARY KEY, flow_type TEXT NOT NULL, rework_reason TEXT, source_batch_id INTEGER, origin_rework_fact_id INTEGER, CHECK (" + check + "))",
-				"INSERT INTO production_wip_batches VALUES (1, 'REWORK', '模拟返工', NULL, 42), (2, 'REWORK', '模拟返工拆分', 1, 42)",
+				"CREATE TABLE production_wip_batches (id INTEGER PRIMARY KEY, flow_type TEXT NOT NULL, rework_reason TEXT, source_batch_id INTEGER, origin_rework_fact_id INTEGER, finished_goods_receipt_id INTEGER, CHECK (" + check + "))",
+				"INSERT INTO production_wip_batches VALUES (1, 'REWORK', '模拟返工', NULL, 42, 21), (2, 'REWORK', '模拟返工拆分', 1, 42, 21)",
 			}
 			if failDelete {
 				statements = append(statements,
@@ -70,7 +70,7 @@ func TestDebugBusinessDataClearReworkConstraintAndRollback(t *testing.T) {
 					t.Fatalf("preserved foreign key must reject cleanup after detachment: %v", err)
 				}
 				var unchanged int
-				if err := db.QueryRow("SELECT count(*) FROM production_wip_batches WHERE flow_type = 'REWORK' AND rework_reason IS NOT NULL AND origin_rework_fact_id = 42").Scan(&unchanged); err != nil || unchanged != 2 {
+				if err := db.QueryRow("SELECT count(*) FROM production_wip_batches WHERE flow_type = 'REWORK' AND rework_reason IS NOT NULL AND origin_rework_fact_id = 42 AND finished_goods_receipt_id = 21").Scan(&unchanged); err != nil || unchanged != 2 {
 					t.Fatalf("failed cleanup did not restore rework evidence: count=%d err=%v", unchanged, err)
 				}
 				return

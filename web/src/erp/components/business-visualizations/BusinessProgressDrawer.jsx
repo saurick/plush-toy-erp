@@ -5,6 +5,7 @@ import {
   DownOutlined,
   RightOutlined,
 } from '@ant-design/icons'
+import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { getBusinessProgress } from '../../api/businessProgressApi.mjs'
@@ -544,6 +545,7 @@ export default function BusinessProgressDrawer({
           </>
         )}
       </section>
+      <MobileBackToTop enabled={mobile && Boolean(selection)} />
     </Surface>
   )
 }

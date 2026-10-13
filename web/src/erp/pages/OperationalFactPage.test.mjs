@@ -49,9 +49,9 @@ test('production records keep fact truth and expose permission-aware internal vi
     new URL('../config/roleHelpContent.mjs', import.meta.url),
     'utf8'
   )
-  assert.match(help, /办理领料、提交完工报告和返工来源记录/u)
-  assert.match(help, /核对实收数量、仓库和批次后确认成品入库/u)
-  assert.match(help, /生产提交完工报告不等于成品已经入库/u)
+  assert.match(help, /办理领料，核对手工完工及已批准的返工来源记录/u)
+  assert.match(help, /核对实收数量、仓库和批次后正式入库/u)
+  assert.match(help, /包装不再次增加库存/u)
 })
 
 test('operational fact workspace enforces exact outsourcing read and mutation context', () => {

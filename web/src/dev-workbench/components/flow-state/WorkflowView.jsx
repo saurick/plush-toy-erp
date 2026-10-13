@@ -3,14 +3,12 @@ import { Alert, Empty, Spin, Tag } from 'antd'
 import {
   getProcessOwnerPoolLabel,
   BusinessChainProjectionContext,
-  TaskFinder,
 } from './FlowTaskContext.jsx'
 import {
   formatQueryTime,
   Text,
   Title,
   KeyValue,
-  GuidanceDisclosure,
 } from './FlowStateShared.jsx'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -85,11 +83,7 @@ function useWorkflowEvents(taskId) {
 function WorkflowView({
   projection,
   taskId,
-  draft,
   selectedTask,
-  onDraftChange,
-  onClearTask,
-  onSelectTask,
   onBackToChain,
   onClearChainContext,
 }) {
@@ -101,24 +95,13 @@ function WorkflowView({
   const status = selectedTask ? getWorkflowTaskStatusMeta(selectedTask) : null
   return (
     <div className="erp-dev-flow-view-stack">
-      <GuidanceDisclosure
-        guidanceKey="workflow"
-        title="Workflow 管“人”"
-        summary="任务 done 不等于业务事实发生"
-        description="它回答谁负责、谁审批、谁接棒，以及为什么阻塞或退回。任务 done 只表示协同任务结束，不证明库存、出货、质检或财务事实已经发生。"
-      />
+
       <BusinessChainProjectionContext
         projection={projection}
         onBackToChain={onBackToChain}
         onClearChainContext={onClearChainContext}
       />
-      <TaskFinder
-        draft={draft}
-        onDraftChange={onDraftChange}
-        onClearTask={onClearTask}
-        onSelectTask={onSelectTask}
-        taskId={taskId}
-      />
+
       {!taskId ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -272,6 +255,5 @@ function WorkflowView({
 export {
   getProcessOwnerPoolLabel,
   BusinessChainProjectionContext,
-  TaskFinder,
   WorkflowView,
 }

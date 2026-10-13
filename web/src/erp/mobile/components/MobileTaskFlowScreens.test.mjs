@@ -1,12 +1,32 @@
 import assert from 'node:assert/strict'
 
 import test from 'node:test'
+import { act, createElement } from 'react'
+import { registerJSXTestLoader, installTestDOM } from '../../../../scripts/test/reactRuntime.mjs'
 import { readContractSource as readFileSync } from '../../../../scripts/test/publicContractSource.mjs'
 
 const actionScreenSource = readFileSync(
   new URL('./MobileTaskActionScreen.jsx', import.meta.url),
   'utf8'
 )
+
+test('mobile detail defers handling steps and keeps existing receipt navigation available', async (t) => {
+  const dom = installTestDOM()
+  registerJSXTestLoader()
+  const [{ createRoot }, { default: Header }] = await Promise.all([import('react-dom/client'), import('./MobileTaskFlowHeader.jsx')])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  t.after(async () => { await act(async () => root.unmount()); container.remove(); dom.restore() })
+  const render = (props) => act(async () => root.render(createElement(Header, props)))
+  await render({ currentStep: 'detail', canOpenProcess: true })
+  assert.equal(container.querySelector('[aria-label="任务处理步骤"]'), null)
+  await render({ currentStep: 'process' })
+  assert.equal(container.querySelectorAll('[data-step-key]').length, 3)
+  assert.equal(container.querySelector('[data-step-key="result"]').disabled, true)
+  await render({ currentStep: 'detail', canOpenReceipt: true, onOpenReceipt: () => {} })
+  assert.equal(container.querySelector('[data-step-key="result"]').disabled, false)
+})
 const detailScreenSource = readFileSync(
   new URL('./MobileTaskDetailScreen.jsx', import.meta.url),
   'utf8'
@@ -322,7 +342,8 @@ test('mobile task detail loads formal process position without QA-only banners',
   assert.doesNotMatch(actionScreenSource, /WorkflowTaskIdentity/u)
   assert.match(detailScreenSource, /getWorkflowTaskProcessContext/u)
   assert.match(handlingChainSource, /mobile-task-process-context/u)
-  assert.match(handlingChainSource, />\s*任务处理链\s*</u)
+  assert.match(handlingChainSource, /本任务处理进度/u)
+  assert.match(handlingChainSource, /查看订单全流程/u)
   assert.match(handlingChainSource, /业务流程/u)
   assert.match(handlingChainSource, /发起时间/u)
   assert.match(handlingChainSource, /流程状态/u)

@@ -2,6 +2,56 @@ import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertTaskCopy } from './taskCopyAssertions.mjs'
 
+export async function assertTrackingNavigation(page, assert, drawer) {
+  await waitForFiniteAnimations(page)
+  const header = drawer.locator('.ant-drawer-header')
+  const back = header.getByRole('button', { name: '返回列表', exact: true })
+  const footer = drawer.locator('.ant-drawer-footer')
+  assert.equal(await header.getByRole('button', { name: '关闭', exact: true }).count(), 0)
+  assert.equal(await footer.getByRole('button', { name: /^返回/ }).count(), 0)
+  const geometry = await drawer.evaluate((element) => {
+    const box = element.getBoundingClientRect()
+    const back = element.querySelector('.ant-drawer-header button').getBoundingClientRect()
+    const title = element.querySelector('.ant-drawer-title').getBoundingClientRect()
+    const footer = element.querySelector('.ant-drawer-footer')
+    return {
+      backOffset: back.left - box.left,
+      backWidth: back.width,
+      backHeight: back.height,
+      centeredTitle: Math.abs(title.left + title.width / 2 - box.left - box.width / 2) < 1,
+      footerOverflow: footer.scrollWidth - footer.clientWidth,
+      buttonHeights: [...footer.querySelectorAll('button')].map((button) => button.getBoundingClientRect().height),
+    }
+  })
+  assert.ok(geometry.backOffset >= 0 && geometry.backOffset <= 16, JSON.stringify(geometry))
+  assert.ok(geometry.backWidth >= 44 && geometry.backHeight >= 44 && geometry.centeredTitle, JSON.stringify(geometry))
+  assert.ok(geometry.footerOverflow < 2 && geometry.buttonHeights.every((height) => height >= 44), JSON.stringify(geometry))
+  await back.focus()
+  assert.equal(await back.evaluate((element) => element === document.activeElement), true)
+}
+
+export async function assertTrackingExceptionContext(page, assert, drawer, screenshotPath) {
+  const details = drawer.locator('.erp-workflow-tracking-exceptions')
+  const summary = details.locator(':scope > summary')
+  assert.equal(await details.getAttribute('open'), null)
+  assert.equal(await details.locator('.workflow-exceptions').count(), 0)
+  await summary.click()
+  await details.getByText('EX-TRACK-010', { exact: true }).waitFor()
+  assert.equal(await details.locator('.workflow-exceptions__query, .workflow-exceptions__states, .workflow-exceptions__views').count(), 0)
+  assert.equal(await details.getByText('EX-UNRELATED', { exact: true }).count(), 0)
+  assert.equal(await details.locator('details[open]').count(), 0)
+  assert.equal(await details.locator('.workflow-exceptions__pending').count(), 1)
+  assert.match(await details.innerText(), /当前待办.*工程资料/s)
+  const geometry = await details.evaluate((element) => ({ width: element.clientWidth, scroll: element.scrollWidth, touch: element.querySelector('summary').getBoundingClientRect().height }))
+  assert.ok(geometry.scroll <= geometry.width + 1 && geometry.touch >= 44, JSON.stringify(geometry))
+  if (screenshotPath) {
+    await page.waitForFunction(() => !document.querySelector('.ant-message-notice-content'))
+    await page.screenshot({ path: screenshotPath })
+  }
+  await summary.click()
+  await details.locator('.workflow-exceptions').waitFor({ state: 'detached' })
+}
+
 function trackingData() {
   const now = 1791367200
   const approval = { task_id: 300, task_name: '订单审批', node_instance_id: 20, owner_role_key: 'boss', assignee_name: '审批负责人', status: 'done', created_at: now, completed_at: now + 100, due_at: null }
@@ -97,6 +147,12 @@ approval_form: null,
         })
         await page.route('**/rpc/workflow', async (route) => {
           const body = route.request().postDataJSON()
+          if (body.method === 'list_exceptions') {
+            const scoped = body.params?.tracking_kind === 'process' && body.params?.tracking_id === 10
+            const task = { id: 301, task_name: '工程资料', task_status_key: 'ready', owner_role_key: 'engineering', discovery: { assignee_name: '', path: '订单履约 / 工程资料' } }
+            const data = { items: [{ key: 'quality:10', number: scoped ? 'EX-TRACK-010' : 'EX-UNRELATED', state: 'open', reason: '确认样与工艺说明不一致', batch_no: 'WIP-TRACK-010', occurred_at: '2026-10-13T08:00:00Z', tasks: [task], task_ids: [301], orders: [{ id: 1, number: 'SO-TRACK-001' }] }], tasks: [], orders: [], total: 1, view_total: 1, open: 1, closed: 0, pending_tasks: 1, affected_orders: 1 }
+            return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, data } } })
+          }
           if (body.method === 'get_task' && failTask) {
             failTask = false
             return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 500, message: '任务暂时无法读取，请重试', data: {} } } })
@@ -131,9 +187,9 @@ approval_form: null,
         const pager = panel.getByRole('navigation', { name: '流转记录分页' })
         await panel.getByText('任务分页记录 1', { exact: true }).waitFor()
         const historicalInitiator = panel.locator('.ant-table-row').nth(0).locator('.erp-workflow-initiator')
-        assert.equal(await historicalInitiator.innerText(), '业务小李')
-        assert.equal(await historicalInitiator.locator('small').count(), 0)
-        assert.equal(await historicalInitiator.locator('strong').getAttribute('title'), '发起时岗位未留存')
+        assert.match(await historicalInitiator.innerText(), /业务小李.*发起岗位：未记录/s)
+        assert.equal(await historicalInitiator.locator('small').isVisible(), true)
+        assert.equal(await historicalInitiator.locator('.erp-workflow-responsibilities__role').count(), 0)
         assert.match(await panel.locator('.ant-table-row').nth(1).innerText(), /发起岗位：管理员/)
         assert.match(await pager.innerText(), /第 1–20 条，共 161 条/)
         assert.equal(await panel.getByRole('button', { name: '加载更多', exact: true }).count(), 0)
@@ -154,7 +210,7 @@ approval_form: null,
         assert.equal(roleStyle.border, '1px')
         assert.equal(roleStyle.interactive, false)
         assert.match(await pager.innerText(), /第 21–40 条，共 161 条/)
-        assert.equal(new URL(page.url()).searchParams.get('track_page_started'), '2')
+        assert.equal(new URL(page.url()).searchParams.get('track_page_visible'), '2')
         const firstRowBox = await panel.locator('.ant-table-row').first().boundingBox()
         assert.ok(firstRowBox.y >= 0 && firstRowBox.y + firstRowBox.height < 1080, 'new page starts at the first record')
         const jump = pager.locator('.ant-pagination-options-quick-jumper input')
@@ -170,7 +226,7 @@ approval_form: null,
         await panel.getByText('任务分页记录 1', { exact: true }).waitFor()
         assert.equal(await panel.locator('.ant-table-row').count(), 8)
         await waitForFiniteAnimations(page)
-        assert.equal(new URL(page.url()).searchParams.get('track_page_started'), '1')
+        assert.equal(new URL(page.url()).searchParams.get('track_page_visible'), '1')
         await pager.locator('.ant-select[aria-label="每页流转记录数"]').click()
         await page.locator('.ant-select-dropdown:visible').getByText('20 条 / 页', { exact: true }).click()
         await page.waitForFunction(() => document.querySelectorAll('.erp-workflow-tracking-panel .ant-table-row').length === 20)
@@ -219,6 +275,8 @@ approval_form: null,
         await page.evaluate(() => window.getSelection().removeAllRanges())
         await row.locator('td').nth(3).click()
         await drawer.getByText('审批已通过', { exact: true }).waitFor()
+        await assertTrackingNavigation(page, assert, drawer)
+        await assertTrackingExceptionContext(page, assert, drawer, path.join(outputDir, `tracking-exceptions-${themeMode}-4k.png`))
         assert.match(await drawer.locator('.erp-workflow-initiator').innerText(), /业务小李.*发起岗位：业务/s)
         await assertTaskCopy(page, drawer.getByRole('button', { name: '复制单据编号', exact: true }), 'SO-TRACK-001')
         await drawer.getByText('展开其余 1 项关联内容', { exact: true }).click()
@@ -238,10 +296,13 @@ approval_form: null,
         assert.equal(await drawer.locator('.ant-drawer-footer [role="alert"]').count(), 1)
         await entryAction.click()
         const handling = page.locator('.erp-task-action-drawer')
-        await handling.getByRole('button', { name: '返回流程', exact: true }).waitFor()
+        await handling.locator('.ant-drawer-header').getByRole('button', { name: '返回流程', exact: true }).waitFor()
+        assert.equal(await handling.locator('.ant-drawer-footer').getByRole('button', { name: '返回流程', exact: true }).count(), 0)
         await waitForFiniteAnimations(page)
         assert.equal(await drawer.isVisible(), false, 'handling must replace the progress drawer')
-        await handling.locator('[aria-label="任务处理步骤"]').waitFor()
+        assert.equal(await handling.getByRole('tablist', { name: '任务处理步骤', exact: true }).isVisible(), false)
+        await handling.getByRole('button', { name: '选择处理方式', exact: true }).click()
+        await handling.getByRole('tablist', { name: '任务处理步骤', exact: true }).waitFor()
         assert.match(await handling.innerText(), /核对任务.*选择处理.*确认/s)
         await handling.getByRole('button', { name: '返回流程', exact: true }).click()
         await drawer.getByText('审批已通过', { exact: true }).waitFor()
@@ -255,7 +316,7 @@ approval_form: null,
         await drawer.locator('.erp-workflow-initiator > strong').evaluate((element) => { element.textContent = '跨部门协作的流程发起人姓名用于窄屏换行核验' })
         for (const width of [390, 320]) {
           await page.setViewportSize({ width, height: 844 })
-          await waitForFiniteAnimations(page)
+          await assertTrackingNavigation(page, assert, drawer)
           const geometry = await drawer.evaluate((element) => {
             const body = element.querySelector('.ant-drawer-body')
             const footer = element.querySelector('.ant-drawer-footer').getBoundingClientRect()
@@ -268,7 +329,7 @@ approval_form: null,
         }
         if (images) await page.screenshot({ path: path.resolve(outputDir, `erp-task-tracking-${themeMode}-narrow.png`) })
         await page.setViewportSize({ width: 1920, height: 1080 })
-        await page.keyboard.press('Escape')
+        await drawer.locator('.ant-drawer-header').getByRole('button', { name: '返回列表', exact: true }).click()
         await drawer.waitFor({ state: 'hidden' })
         const title = row.getByRole('button', { name: /销售订单受理/ })
         assert.equal(await title.evaluate((element) => element === document.activeElement), true, 'returning from handling and closing progress restores the original row entry')
@@ -278,10 +339,15 @@ approval_form: null,
         await drawer.waitFor({ state: 'hidden' })
         assert.equal(await title.evaluate((element) => element === document.activeElement), true)
         const chooseScope = async (label) => {
-          const scope = label === '我参与的' ? 'participated' : 'started'
+          const scope = label === '我参与的' ? 'participated' : label === '相关流程' ? 'visible' : 'started'
           await Promise.all([
             page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.method() === 'POST' && request.postDataJSON().method === 'list_tracking' && request.postDataJSON().params.scope === scope),
-            page.locator('.erp-task-tracking-scope').getByText(label, { exact: true }).click(),
+            (async () => {
+              await panel.getByRole('button', { name: /筛选/u }).click()
+              await page.locator('.ant-select[aria-label="跟踪范围"]').click()
+              await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: label }).click()
+              assert.equal(new URL(page.url()).searchParams.get('tracking'), scope, '跟踪范围应立即更新 URL')
+            })(),
           ])
         }
         await chooseScope('我参与的')
@@ -290,10 +356,10 @@ approval_form: null,
         const search = page.getByPlaceholder('单号 / 任务 / 产品 / 款号')
         await search.fill('不存在的单号')
         await page.getByText('当前筛选下没有匹配记录', { exact: true }).waitFor()
-        await chooseScope('我发起的')
+        await chooseScope('相关流程')
         await page.getByText('SO-TRACK-001', { exact: true }).waitFor()
         assert.equal(await search.inputValue(), '')
-        assert.equal(new URL(page.url()).searchParams.get('track_page_started'), '2')
+        assert.equal(new URL(page.url()).searchParams.get('track_page_visible'), '2')
         assert.match(await pager.innerText(), /第 21–40 条，共 161 条/)
         assert(calls.filter((call) => call.method === 'list_tracking').every((call) => !('cursor' in call.params)))
         const paginationBoxes = await pager.evaluate((element) => ({ client: element.clientWidth, scroll: element.scrollWidth, bottom: element.getBoundingClientRect().bottom, viewportHeight: innerHeight }))
@@ -339,6 +405,7 @@ approval_form: null,
       verify: async (page) => {
         const drawer = page.getByRole('dialog', { name: '流程跟踪', exact: true })
         await drawer.getByRole('region', { name: '流程概况', exact: true }).getByRole('group', { name: '当前进度', exact: true }).waitFor()
+        await assertTrackingNavigation(page, assert, drawer)
         const footer = drawer.locator('.ant-drawer-footer')
         assert.equal(await drawer.locator('.ant-drawer-header').getByRole('button', { name: /刷新进度/ }).count(), 0, 'refresh must not return to the drawer header')
         assert.equal(await footer.getByRole('button', { name: /刷新进度/ }).count(), 1, 'refresh shares the fixed footer with task entry actions')
@@ -353,18 +420,19 @@ approval_form: null,
           const select = footer.locator('.ant-select[aria-label="选择当前任务"]')
           await select.click()
           const options = page.locator('.ant-select-dropdown:visible .ant-select-item-option')
+          await options.first().waitFor()
           assert.equal(await options.count(), 2, 'unreadable tasks are excluded from choices')
           await options.nth(1).click()
           assert.match(await action.innerText(), /^查看核对毛绒产品/)
           const geometry = await footer.evaluate((element) => {
             const action = element.querySelector('.erp-workflow-tracking-open-task')
-            const back = element.querySelector('button')
+            const refresh = element.querySelector('button')
             const a = action.getBoundingClientRect()
-            const b = back.getBoundingClientRect()
+            const b = refresh.getBoundingClientRect()
             const f = element.getBoundingClientRect()
-            return { width: element.clientWidth, scrollWidth: element.scrollWidth, footerBottom: f.bottom, viewport: innerHeight, actionTop: a.top, actionBottom: a.bottom, actionLeft: a.left, backRight: b.right }
+            return { width: element.clientWidth, scrollWidth: element.scrollWidth, footerBottom: f.bottom, viewport: innerHeight, actionTop: a.top, actionBottom: a.bottom, actionLeft: a.left, refreshRight: b.right }
           })
-          assert.ok(geometry.scrollWidth <= geometry.width && geometry.footerBottom <= geometry.viewport && geometry.actionLeft >= geometry.backRight && geometry.actionBottom <= geometry.footerBottom, JSON.stringify(geometry))
+          assert.ok(geometry.scrollWidth <= geometry.width && geometry.footerBottom <= geometry.viewport && geometry.actionLeft >= geometry.refreshRight && geometry.actionBottom <= geometry.footerBottom, JSON.stringify(geometry))
           await drawer.locator('.ant-drawer-body').evaluate((element) => { element.scrollTop = element.scrollHeight })
           assert.equal((await action.boundingBox()).y, geometry.actionTop, 'long selected action stays fixed')
           await waitForFiniteAnimations(page)
@@ -386,6 +454,7 @@ approval_form: null,
           await drawer.getByRole('region', { name: '流程概况', exact: true }).getByRole('group', { name: '当前进度', exact: true }).waitFor()
           if (multiple) assert.equal(await action.isDisabled(), true, 'return rechecks permissions and task selection')
         }
+        await waitForFiniteAnimations(page)
         if (!multiple) await page.screenshot({ path: path.resolve(outputDir, `erp-task-tracking-access-${mode}-4k.png`) })
         await assertNoHorizontalOverflow(page, `任务入口权限 ${mode}`)
       },

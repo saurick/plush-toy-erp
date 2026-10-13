@@ -1159,13 +1159,12 @@
 
 .erp-dev-flow-task-finder form {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) auto auto;
+  grid-template-columns: auto minmax(180px, 1fr) auto auto;
   gap: 8px;
-  align-items: end;
+  align-items: center;
 }
 
 .erp-dev-flow-task-finder form label {
-  grid-column: 1 / -1;
   font-weight: 600;
 }
 
@@ -2094,7 +2093,7 @@
   }
 
   .erp-dev-flow-customer-review__step-table th:nth-child(1) {
-    width: 24%;
+    width: 28%;
   }
 
   .erp-dev-flow-customer-review__step-table th:nth-child(2) {
@@ -2102,11 +2101,7 @@
   }
 
   .erp-dev-flow-customer-review__step-table th:nth-child(3) {
-    width: 28%;
-  }
-
-  .erp-dev-flow-customer-review__step-table th:nth-child(4) {
-    width: 33%;
+    width: 57%;
   }
 
   .erp-dev-flow-customer-review__step-table tbody th > span,
@@ -2647,5 +2642,220 @@
   .erp-dev-flow-runtime-nodes li > .ant-tag {
     grid-column: 2;
     justify-self: start;
+  }
+}
+
+.erp-dev-flow-state-page .erp-dev-flow-workspace-nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+}
+
+.erp-dev-flow-state-page > .erp-dev-flow-task-finder {
+  margin-bottom: 12px;
+}
+
+.erp-dev-flow-context-path {
+  color: var(--erp-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-flow-header-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.erp-dev-flow-overview-map > .erp-dev-flow-section-heading > .ant-space {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.erp-dev-flow-instance-heading,
+.erp-dev-flow-instance-stage > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.erp-dev-flow-instance-heading h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.erp-dev-flow-instance-heading span,
+.erp-dev-flow-instance-note {
+  color: var(--erp-text-muted);
+  font-size: 13px;
+}
+
+.erp-dev-flow-instance-stages {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.erp-dev-flow-instance-stage {
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+}
+
+.erp-dev-flow-instance-stage[data-current] {
+  border-color: var(--erp-primary);
+}
+
+.erp-dev-flow-instance-stage > header {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--erp-border);
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-dev-flow-instance-stage ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.erp-dev-flow-instance-stage li + li {
+  border-top: 1px solid var(--erp-border);
+}
+
+.erp-dev-flow-instance-stage button {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--erp-text);
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-flow-instance-stage button:hover,
+.erp-dev-flow-instance-stage button[aria-current] {
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-dev-flow-instance-stage button:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: -2px;
+}
+
+.erp-dev-flow-instance-stage button small {
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-flow-instance-exceptions {
+  margin: 16px 0;
+}
+
+.erp-dev-flow-instance-filters {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.erp-dev-flow-instance-filters .ant-select {
+  width: 300px;
+  max-width: 100%;
+}
+
+.erp-dev-flow-instance-filters > span {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+@media print {
+  @page flow-observation {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  body:has([data-flow-print-current]) {
+    background: white;
+  }
+
+  body:has([data-flow-print-current]) > :not(#root) {
+    display: none;
+  }
+
+  [data-flow-print-current].erp-dev-workspace-page {
+    page: flow-observation;
+    display: block;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    background: white;
+  }
+
+  [data-flow-print-current] :is(nav, button, .ant-select, .erp-dev-flow-header a, .erp-dev-flow-definition-selector, .erp-dev-flow-header-actions, .erp-dev-flow-nav, .erp-dev-flow-task-finder, .erp-dev-flow-chain-heading__actions, .erp-dev-flow-guidance, .erp-dev-flow-developer-details, .erp-dev-flow-evidence, .erp-dev-flow-node-technical, .erp-dev-flow-overview-lanes, .erp-dev-flow-overview-relations) {
+    display: none;
+  }
+
+  [data-flow-print-current] .erp-dev-flow-instance-stage button {
+    display: grid;
+  }
+
+  [data-flow-print-current] :is(.erp-dev-flow-main, .erp-dev-flow-overview-map, .erp-dev-flow-chain-workspace, .erp-dev-flow-chain-map, .erp-dev-flow-view-stack) {
+    display: block;
+    max-width: none;
+    min-height: 0;
+    height: auto;
+    overflow: visible;
+    box-shadow: none;
+    padding: 2mm;
+  }
+
+  [data-flow-print-current] :is(.erp-dev-flow-overview-graph, .erp-dev-flow-chain-graph, .erp-dev-flow-process-graph, .erp-dev-flow-state-graph) {
+    display: block;
+    padding: 0;
+    margin: 2mm 0;
+    overflow: visible;
+    break-inside: avoid;
+  }
+
+  [data-flow-print-current] .erp-markdown-mermaid {
+    padding: 0;
+    margin: 0;
+    border: 0;
+  }
+
+  [data-flow-print-current] .erp-markdown-mermaid__viewport {
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  [data-flow-print-current] .erp-markdown-mermaid__canvas {
+    width: 100%;
+  }
+
+  [data-flow-print-current] .erp-markdown-mermaid__canvas > svg {
+    max-height: 125mm;
+  }
+
+  [data-flow-print-current] .erp-dev-flow-node-detail {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  [data-flow-print-current] .erp-dev-flow-instance-stages {
+    display: block;
+  }
+
+  [data-flow-print-current] :is(.erp-dev-flow-instance-stage li, .erp-dev-flow-node-answers > section) {
+    break-inside: avoid;
   }
 }

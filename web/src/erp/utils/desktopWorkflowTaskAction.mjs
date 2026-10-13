@@ -21,6 +21,7 @@ export function buildDesktopWorkflowTaskActionParams({
   reason = '',
   assignmentTarget,
   processDecision = null,
+  surfaceKey = 'desktop_task_board',
 } = {}) {
   if (
     !task ||
@@ -65,7 +66,7 @@ export function buildDesktopWorkflowTaskActionParams({
       action: 'urge_task',
       reason: normalizedReason,
       payload: {
-        surface_key: 'desktop_task_board',
+        surface_key: surfaceKey,
       },
     })
   }
@@ -76,7 +77,7 @@ export function buildDesktopWorkflowTaskActionParams({
     action_key: actionMode,
     reason: normalizedReason,
     payload: {
-      surface_key: 'desktop_task_board',
+      surface_key: surfaceKey,
       ...(canonicalProcessDecision
         ? { process_decision: canonicalProcessDecision }
         : {}),

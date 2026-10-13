@@ -306,6 +306,13 @@ func (d *jsonrpcDispatcher) requireCustomerConfigProcessDomainCommandAllowed(
 	if res := d.requirePurchaseReceiptProcessWarehouseAccess(ctx, in, instance, targetNode); res != nil {
 		return "", res
 	}
+	if in.CommandKey == biz.ProcessDomainCommandProductionExceptionExecute {
+		scope, res := d.currentWarehouseDataScope(ctx)
+		if res != nil {
+			return "", res
+		}
+		in.WarehouseScope = &scope
+	}
 	return instance.ConfigRevision, nil
 }
 
@@ -756,6 +763,8 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 	case errors.Is(err, biz.ErrShipmentQualityRejected):
 		l.Warnf("[customer_config] shipment quality gate rejected err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单的出货前成品检验不合格，请先完成质量处置"}
+	case errors.Is(err, biz.ErrShipmentPackingPending):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货超过可发数量，请先完成对应成品的检验、查货和包装"}
 	default:
 		if result := d.processBusinessErrorResult(ctx, err); result != nil {
 			return result

@@ -48,7 +48,7 @@ export function createDeliveryAddressScenarios({
       '新建订单',
       'delivery_address',
     ],
-    ['shipment', '/erp/warehouse/shipments', '新建草稿', 'delivery_address'],
+    ['shipment', '/erp/warehouse/shipments', '新建出货单', 'delivery_address'],
   ].map(([key, path, trigger, field]) => ({
     name: `delivery-address-${key}`,
     path,

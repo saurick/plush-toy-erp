@@ -69,7 +69,7 @@ test('共同办理的链路默认定位本岗位，恢复回到需要重验的�
   const scene = sceneFor('warehouse', 'finished-goods')
   assert.equal(
     getHelpScenarioPresentation(scene, 'warehouse').defaultStep.number,
-    2
+    1
   )
   assert.equal(
     getHelpScenarioPresentation(scene, 'production').defaultStep.number,

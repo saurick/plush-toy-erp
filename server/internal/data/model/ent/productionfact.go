@@ -96,13 +96,15 @@ type ProductionFactEdges struct {
 	ProductionWipBatch *ProductionWIPBatch `json:"production_wip_batch,omitempty"`
 	// OriginReworkBatches holds the value of the origin_rework_batches edge.
 	OriginReworkBatches []*ProductionWIPBatch `json:"origin_rework_batches,omitempty"`
+	// PackagingBatches holds the value of the packaging_batches edge.
+	PackagingBatches []*ProductionWIPBatch `json:"packaging_batches,omitempty"`
 	// Poster holds the value of the poster edge.
 	Poster *AdminUser `json:"poster,omitempty"`
 	// Canceller holds the value of the canceller edge.
 	Canceller *AdminUser `json:"canceller,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [8]bool
+	loadedTypes [9]bool
 }
 
 // WarehouseOrErr returns the Warehouse value or an error if the edge
@@ -169,12 +171,21 @@ func (e ProductionFactEdges) OriginReworkBatchesOrErr() ([]*ProductionWIPBatch, 
 	return nil, &NotLoadedError{edge: "origin_rework_batches"}
 }
 
+// PackagingBatchesOrErr returns the PackagingBatches value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductionFactEdges) PackagingBatchesOrErr() ([]*ProductionWIPBatch, error) {
+	if e.loadedTypes[6] {
+		return e.PackagingBatches, nil
+	}
+	return nil, &NotLoadedError{edge: "packaging_batches"}
+}
+
 // PosterOrErr returns the Poster value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e ProductionFactEdges) PosterOrErr() (*AdminUser, error) {
 	if e.Poster != nil {
 		return e.Poster, nil
-	} else if e.loadedTypes[6] {
+	} else if e.loadedTypes[7] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "poster"}
@@ -185,7 +196,7 @@ func (e ProductionFactEdges) PosterOrErr() (*AdminUser, error) {
 func (e ProductionFactEdges) CancellerOrErr() (*AdminUser, error) {
 	if e.Canceller != nil {
 		return e.Canceller, nil
-	} else if e.loadedTypes[7] {
+	} else if e.loadedTypes[8] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "canceller"}
@@ -436,6 +447,11 @@ func (_m *ProductionFact) QueryProductionWipBatch() *ProductionWIPBatchQuery {
 // QueryOriginReworkBatches queries the "origin_rework_batches" edge of the ProductionFact entity.
 func (_m *ProductionFact) QueryOriginReworkBatches() *ProductionWIPBatchQuery {
 	return NewProductionFactClient(_m.config).QueryOriginReworkBatches(_m)
+}
+
+// QueryPackagingBatches queries the "packaging_batches" edge of the ProductionFact entity.
+func (_m *ProductionFact) QueryPackagingBatches() *ProductionWIPBatchQuery {
+	return NewProductionFactClient(_m.config).QueryPackagingBatches(_m)
 }
 
 // QueryPoster queries the "poster" edge of the ProductionFact entity.

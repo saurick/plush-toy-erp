@@ -71,7 +71,7 @@ test('workflowTaskBoard: 分类只提供可以匹配的状态和日期条件', (
     ['finished', 'blocked', 'overdue'],
     ['actionable', 'done', 'dueSoon'],
     ['due', 'rejected', 'noDue'],
-    ['exception', 'ready', 'all'],
+    ['exception', 'done', 'all'],
   ]) {
     const filters = readWorkflowTaskBoardFiltersFromSearch(
       `lane=${lane}&status=${status}&due=${due}&q=兔子&role=engineering&pageSize=20`

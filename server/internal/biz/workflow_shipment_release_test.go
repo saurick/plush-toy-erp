@@ -52,7 +52,7 @@ func TestWorkflowUsecase_ShipmentReleaseDoneUpsertsShippingReleasedOnly(t *testi
 	}
 	if effects.BusinessState.BusinessStatusKey != workflowShippingReleasedStatusKey ||
 		effects.BusinessState.OwnerRoleKey == nil ||
-		*effects.BusinessState.OwnerRoleKey != "warehouse" {
+		*effects.BusinessState.OwnerRoleKey != "sales" {
 		t.Fatalf("unexpected shipment release business state %#v", effects.BusinessState)
 	}
 	if effects.BusinessState.Payload["shipment_release_task_id"] != task.ID ||

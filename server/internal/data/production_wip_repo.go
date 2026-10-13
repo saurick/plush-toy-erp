@@ -15,6 +15,7 @@ import (
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/process"
+	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/productionorderoperation"
@@ -304,6 +305,21 @@ func loadProductionWIPAggregate(ctx context.Context, client *ent.Client, orderID
 		aggregate.PackagingConfirmations = append(aggregate.PackagingConfirmations, entProductionPackagingConfirmationToBiz(row))
 	}
 	if len(batchIDs) > 0 {
+		receipts, err := client.ProductionFact.Query().Where(productionfact.ProductionWipBatchIDIn(batchIDs...), productionfact.FactType(biz.ProductionFactFinishedGoodsReceipt)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, receipt := range receipts {
+			reworked, err := productionReceiptReworkedQuantity(ctx, client, receipt.ID)
+			if err != nil {
+				return nil, err
+			}
+			aggregate.FinishedGoodsReceipts = append(aggregate.FinishedGoodsReceipts, &biz.ProductionWIPReceiptSummary{
+				ID: receipt.ID, ProductionWIPBatchID: *receipt.ProductionWipBatchID,
+				FactNo: receipt.FactNo, Status: receipt.Status, Quantity: receipt.Quantity,
+				ReworkedQuantity: reworked,
+			})
+		}
 		allocationRows, err := client.ProductionWIPOutsourcingAllocation.Query().
 			Where(productionwipoutsourcingallocation.ProductionWipBatchIDIn(batchIDs...)).
 			Order(ent.Asc(productionwipoutsourcingallocation.FieldProductionWipBatchID), ent.Asc(productionwipoutsourcingallocation.FieldID)).
@@ -438,13 +454,13 @@ func validateProductionWIPAggregateShape(aggregate *biz.ProductionWIPAggregate) 
 		if allocation.UnitID <= 0 || allocation.OutsourcingOrderItemID <= 0 {
 			return biz.ErrProductionWIPInvalidRoute
 		}
-		if operation.OperationCode == biz.ProductionWIPOperationFabricProcessing && batch.FlowType == biz.ProductionWIPFlowNormal {
+		if productionWIPNeedsFreshMaterial(operation.OperationCode, batch.FlowType) {
 			if allocation.SubjectType != biz.OutsourcingOrderSubjectMaterial || allocation.ProductionOrderMaterialRequirementID == nil {
 				return biz.ErrProductionWIPInvalidRoute
 			}
 			requirement := requirementByID[*allocation.ProductionOrderMaterialRequirementID]
 			if requirement == nil || requirement.ProductionOrderItemID != batch.ProductionOrderItemID ||
-				allocation.UnitID != requirement.UnitID || !allocation.AllocatedQuantity.Equal(requirement.PlannedQuantity) {
+				allocation.UnitID != requirement.UnitID || (batch.FlowType == biz.ProductionWIPFlowNormal && !allocation.AllocatedQuantity.Equal(requirement.PlannedQuantity)) {
 				return biz.ErrProductionWIPInvalidRoute
 			}
 			covered := coveredFabricRequirementsByBatch[batch.ID]
@@ -465,14 +481,14 @@ func validateProductionWIPAggregateShape(aggregate *biz.ProductionWIPAggregate) 
 	}
 	for _, batch := range aggregate.Batches {
 		operation := operationByID[batch.ProductionOrderOperationID]
-		if operation == nil || operation.OperationCode != biz.ProductionWIPOperationFabricProcessing || batch.FlowType != biz.ProductionWIPFlowNormal ||
+		if operation == nil || !productionWIPNeedsFreshMaterial(operation.OperationCode, batch.FlowType) ||
 			batch.ExecutionMode == nil || *batch.ExecutionMode != biz.ProductionWIPExecutionOutsourced {
 			continue
 		}
 		item := itemByID[batch.ProductionOrderItemID]
 		expected := fabricRequirementIDsByItem[batch.ProductionOrderItemID]
 		covered := coveredFabricRequirementsByBatch[batch.ID]
-		if item == nil || batch.SourceBatchID != nil || !batch.Quantity.Equal(item.PlannedQuantity) || len(covered) == 0 {
+		if item == nil || (batch.FlowType == biz.ProductionWIPFlowNormal && (batch.SourceBatchID != nil || !batch.Quantity.Equal(item.PlannedQuantity))) || len(covered) == 0 {
 			return biz.ErrProductionWIPInvalidRoute
 		}
 		for requirementID := range covered {
@@ -535,8 +551,10 @@ func entProductionWIPBatchToBiz(row *ent.ProductionWIPBatch) *biz.ProductionWIPB
 	return &biz.ProductionWIPBatch{
 		ID: row.ID, ProductionOrderID: row.ProductionOrderID, ProductionOrderItemID: row.ProductionOrderItemID,
 		ProductionOrderOperationID: row.ProductionOrderOperationID, SourceBatchID: row.SourceBatchID,
-		OriginReworkFactID: row.OriginReworkFactID,
-		BatchNo:            row.BatchNo, FlowType: row.FlowType, ExecutionMode: row.ExecutionMode, Status: row.Status,
+		OriginReworkFactID:        row.OriginReworkFactID,
+		OriginExceptionDecisionID: row.OriginExceptionDecisionID,
+		FinishedGoodsReceiptID:    row.FinishedGoodsReceiptID,
+		BatchNo:                   row.BatchNo, FlowType: row.FlowType, ExecutionMode: row.ExecutionMode, Status: row.Status,
 		Version: row.Version, Quantity: row.Quantity,
 		ReworkReason: row.ReworkReason, CreatedBy: row.CreatedBy, StartedAt: row.StartedAt, CompletedAt: row.CompletedAt,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
@@ -673,6 +691,14 @@ func (r *productionOrderRepo) ApplyProductionWIPCommand(ctx context.Context, in 
 		}
 		if exists {
 			return nil, biz.ErrProductionWIPPreparedContractDependency
+		}
+	}
+	if batchRow.OriginExceptionDecisionID != nil && in.Action == biz.ProductionWIPActionCancelBatch {
+		return nil, biz.ErrProductionExceptionWIPDependency
+	}
+	if in.Action == biz.ProductionWIPActionAssignExecution && in.ExecutionMode == biz.ProductionWIPExecutionInHouse {
+		if err := validateProductionExceptionBatchDestination(ctx, tx.client, batchRow, nil); err != nil {
+			return nil, err
 		}
 	}
 	if batchRow.OriginReworkFactID != nil {
@@ -840,7 +866,7 @@ func applyProductionWIPBatchMutation(
 		if err != nil {
 			return nil, err
 		}
-		if operation.OperationCode == biz.ProductionWIPOperationFabricProcessing && batch.FlowType == biz.ProductionWIPFlowNormal {
+		if productionWIPNeedsFreshMaterial(operation.OperationCode, batch.FlowType) {
 			if err := validateProductionWIPOutsourcingMaterialIssues(ctx, client, batchRow, operationRow, allocations); err != nil {
 				return nil, err
 			}
@@ -872,6 +898,11 @@ func applyProductionWIPBatchMutation(
 			return nil, biz.ErrProductionWIPInvalidTransition
 		}
 	case biz.ProductionWIPActionCompleteOperation, biz.ProductionWIPActionReceiveOutsourcingReturn:
+		// A return closes one immutable processing batch. Do not pass a short or
+		// excessive count into quality as if the complete batch had arrived.
+		if in.Action == biz.ProductionWIPActionReceiveOutsourcingReturn && !in.Quantity.Equal(batch.Quantity) {
+			return nil, biz.ErrProductionWIPReturnQuantityMismatch
+		}
 		allocations, err := loadProductionWIPBatchAllocations(ctx, client, batch.ID)
 		if err != nil {
 			return nil, err
@@ -907,16 +938,18 @@ func applyProductionWIPBatchMutation(
 		if err := biz.ValidateProductionWIPTransfer(batch, operation, entProductionOrderOperationToBiz(target)); err != nil {
 			return nil, err
 		}
+		if err := validateProductionPackagingReceipt(ctx, client, batchRow, target, in.FinishedGoodsReceiptID, in.Quantity); err != nil {
+			return nil, err
+		}
 		children, err := client.ProductionWIPBatch.Query().Where(
 			productionwipbatch.SourceBatchID(batch.ID),
 			productionwipbatch.ProductionOrderOperationID(target.ID),
 			productionwipbatch.FlowType(biz.ProductionWIPFlowNormal),
-			productionwipbatch.StatusNEQ(biz.ProductionWIPStatusCancelled),
 		).All(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if err := biz.ValidateProductionWIPTransferAllocation(batch.Quantity, sumProductionWIPBatchQuantity(children), in.Quantity); err != nil {
+		if err := biz.ValidateProductionWIPTransferAllocation(batch.Quantity, sumActiveProductionWIPBatchQuantity(children), in.Quantity); err != nil {
 			return nil, err
 		}
 		affected, err := client.ProductionWIPBatch.Update().Where(
@@ -932,38 +965,7 @@ func applyProductionWIPBatchMutation(
 		if err != nil {
 			return nil, err
 		}
-		if _, err := createProductionWIPChildBatch(ctx, client, batchRow, target.ID, batchNo, biz.ProductionWIPFlowNormal, in.Quantity, in.ActorID, nil); err != nil {
-			return nil, err
-		}
-	case biz.ProductionWIPActionRework:
-		target, err := client.ProductionOrderOperation.Get(ctx, in.TargetOperationID)
-		if err != nil {
-			return nil, err
-		}
-		children, err := client.ProductionWIPBatch.Query().Where(
-			productionwipbatch.SourceBatchID(batch.ID), productionwipbatch.FlowType(biz.ProductionWIPFlowRework),
-			productionwipbatch.StatusNEQ(biz.ProductionWIPStatusCancelled),
-		).All(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if err := biz.ValidateProductionWIPRework(batch, operation, entProductionOrderOperationToBiz(target), sumProductionWIPBatchQuantity(children), in.Quantity, *in.Reason); err != nil {
-			return nil, err
-		}
-		affected, err := client.ProductionWIPBatch.Update().Where(
-			productionwipbatch.ID(batch.ID), productionwipbatch.Version(in.ExpectedVersion), productionwipbatch.Status(biz.ProductionWIPStatusRejected),
-		).AddVersion(1).Save(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if affected != 1 {
-			return nil, biz.ErrProductionWIPInvalidTransition
-		}
-		batchNo, err := biz.BuildProductionWIPLineageBatchNo(batch.BatchNo, in.Action, 0, len(children)+1)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := createProductionWIPChildBatch(ctx, client, batchRow, target.ID, batchNo, biz.ProductionWIPFlowRework, in.Quantity, in.ActorID, in.Reason); err != nil {
+		if _, err := createProductionWIPChildBatch(ctx, client, batchRow, target.ID, batchNo, biz.ProductionWIPFlowNormal, in.Quantity, in.ActorID, nil, in.FinishedGoodsReceiptID); err != nil {
 			return nil, err
 		}
 	default:
@@ -974,7 +976,7 @@ func applyProductionWIPBatchMutation(
 		return nil, err
 	}
 	quantity := batch.Quantity
-	if in.Action == biz.ProductionWIPActionTransferToNextOperation || in.Action == biz.ProductionWIPActionRework {
+	if in.Action == biz.ProductionWIPActionTransferToNextOperation {
 		quantity = in.Quantity
 	}
 	return &productionWIPMutationOutcome{
@@ -991,9 +993,17 @@ func createProductionWIPChildBatch(
 	quantity decimal.Decimal,
 	actorID int,
 	reworkReason *string,
+	finishedGoodsReceiptID ...int,
 ) (*ent.ProductionWIPBatch, error) {
 	if client == nil || parent == nil || targetOperationID <= 0 || actorID <= 0 || !quantity.GreaterThan(decimal.Zero) {
 		return nil, biz.ErrBadParam
+	}
+	var receiptID *int
+	if targetOperationID == parent.ProductionOrderOperationID && flowType == biz.ProductionWIPFlowNormal {
+		receiptID = parent.FinishedGoodsReceiptID
+	}
+	if len(finishedGoodsReceiptID) > 0 {
+		receiptID = optionalPositiveInt(finishedGoodsReceiptID[0])
 	}
 	return client.ProductionWIPBatch.Create().
 		SetProductionOrderID(parent.ProductionOrderID).
@@ -1001,6 +1011,8 @@ func createProductionWIPChildBatch(
 		SetProductionOrderOperationID(targetOperationID).
 		SetSourceBatchID(parent.ID).
 		SetNillableOriginReworkFactID(parent.OriginReworkFactID).
+		SetNillableOriginExceptionDecisionID(parent.OriginExceptionDecisionID).
+		SetNillableFinishedGoodsReceiptID(receiptID).
 		SetBatchNo(batchNo).
 		SetFlowType(flowType).
 		SetStatus(biz.ProductionWIPStatusPlanned).
@@ -1015,6 +1027,16 @@ func sumProductionWIPBatchQuantity(rows []*ent.ProductionWIPBatch) decimal.Decim
 	total := decimal.Zero
 	for _, row := range rows {
 		if row != nil {
+			total = total.Add(row.Quantity)
+		}
+	}
+	return total
+}
+
+func sumActiveProductionWIPBatchQuantity(rows []*ent.ProductionWIPBatch) decimal.Decimal {
+	total := decimal.Zero
+	for _, row := range rows {
+		if row != nil && row.Status != biz.ProductionWIPStatusCancelled {
 			total = total.Add(row.Quantity)
 		}
 	}
@@ -1064,12 +1086,15 @@ func validateProductionWIPOutsourcingAssignment(
 			item.ProcessID != operation.ProcessID || (parentOrderID != 0 && parentOrderID != parent.ID) {
 			return nil, biz.ErrProductionWIPOutsourcingAllocationInvalid
 		}
+		if err := validateProductionExceptionBatchDestination(ctx, client, batch, &parent.SupplierID); err != nil {
+			return nil, err
+		}
 		parentOrderID = parent.ID
 		itemByID[item.ID] = item
 	}
 
-	if operation.OperationCode == biz.ProductionWIPOperationFabricProcessing && batch.FlowType == biz.ProductionWIPFlowNormal {
-		if batch.SourceBatchID != nil || !batch.Quantity.Equal(orderItem.PlannedQuantity) {
+	if productionWIPNeedsFreshMaterial(operation.OperationCode, batch.FlowType) {
+		if batch.FlowType == biz.ProductionWIPFlowNormal && (batch.SourceBatchID != nil || !batch.Quantity.Equal(orderItem.PlannedQuantity)) {
 			return nil, biz.ErrProductionWIPOutsourcingAllocationInvalid
 		}
 		requirementRows, err := client.ProductionOrderMaterialRequirement.Query().Where(
@@ -1099,15 +1124,22 @@ func validateProductionWIPOutsourcingAssignment(
 			}
 			requirement := fabricByID[*input.ProductionOrderMaterialRequirementID]
 			item := itemByID[input.OutsourcingOrderItemID]
-			if requirement == nil || rowByID[requirement.ID] == nil || item == nil ||
+			if requirement == nil || rowByID[requirement.ID] == nil {
+				return nil, biz.ErrProductionWIPOutsourcingAllocationInvalid
+			}
+			quantity, err := productionWIPFabricRequirementQuantity(ctx, client, batch, rowByID[requirement.ID])
+			if err != nil {
+				return nil, err
+			}
+			if item == nil ||
 				item.SubjectType != biz.OutsourcingOrderSubjectMaterial || item.MaterialID == nil || *item.MaterialID != requirement.MaterialID ||
 				item.ProductID != nil || item.ProductSkuID != nil || item.UnitID != requirement.UnitID ||
-				!item.OutsourcingQuantity.Equal(requirement.PlannedQuantity) {
+				!item.OutsourcingQuantity.Equal(quantity) {
 				return nil, biz.ErrProductionWIPOutsourcingAllocationInvalid
 			}
 			allocations = append(allocations, &biz.ProductionWIPOutsourcingAllocation{
 				OutsourcingOrderItemID: item.ID, ProductionOrderMaterialRequirementID: input.ProductionOrderMaterialRequirementID,
-				SubjectType: biz.OutsourcingOrderSubjectMaterial, AllocatedQuantity: requirement.PlannedQuantity, UnitID: requirement.UnitID,
+				SubjectType: biz.OutsourcingOrderSubjectMaterial, AllocatedQuantity: quantity, UnitID: requirement.UnitID,
 			})
 			delete(fabricByID, requirement.ID)
 		}
@@ -1154,7 +1186,7 @@ func validateProductionWIPOutsourcingMaterialIssues(
 	allocations []*biz.ProductionWIPOutsourcingAllocation,
 ) error {
 	if client == nil || batch == nil || operation == nil || operation.OperationCode != biz.ProductionWIPOperationFabricProcessing ||
-		batch.FlowType != biz.ProductionWIPFlowNormal || len(allocations) == 0 {
+		!productionWIPNeedsFreshMaterial(operation.OperationCode, batch.FlowType) || len(allocations) == 0 {
 		return biz.ErrProductionWIPOutsourcingAllocationInvalid
 	}
 	for _, allocation := range allocations {

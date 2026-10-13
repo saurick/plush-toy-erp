@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import vm from 'node:vm'
+import { buildDesktopWorkflowTaskActionParams } from '../utils/desktopWorkflowTaskAction.mjs'
 
 import {
   createTaskMutationAttemptStore,
@@ -63,6 +64,9 @@ function loadOrderWorkflowHook({
       },
       '../../utils/workflowTaskActionSubmitGuard.mjs': {
         verifyWorkflowTaskActionAccessBeforeSubmit,
+      },
+      '../../utils/desktopWorkflowTaskAction.mjs': {
+        buildDesktopWorkflowTaskActionParams,
       },
       '../../utils/workflowTaskMutation.mjs': {
         createTaskMutationAttemptStore,

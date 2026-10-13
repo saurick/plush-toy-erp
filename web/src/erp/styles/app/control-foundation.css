@@ -86,7 +86,7 @@ body
 /* 手机输入与组合外壳保持同一字号，防止 iPhone 聚焦时缩放页面。 */
 @media (max-width: 640px) {
   body
-    :is(.erp-task-action-drawer, .erp-business-filter-popover)
+    :is(.erp-task-action-drawer, .erp-business-filter-popover, .erp-sales-order-engineering-form)
     .ant-select
     .ant-select-selector
     .ant-select-selection-search-input,

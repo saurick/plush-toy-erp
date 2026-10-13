@@ -261,7 +261,7 @@ func customerProcessDefinitionFromContract(contract customerProcessContract) map
 				"process_runtime_handler_registered": true,
 				"runtime_loader_blockers":            []any{},
 				"runtime_execute_blockers":           []any{},
-				"writes_fact":                        false,
+				"writes_fact":                        boolValueFromAny(policy["writes_fact"]),
 			}
 		}
 		nodes = append(nodes, item)
@@ -628,8 +628,8 @@ func newProductionExceptionApprovalContract() customerProcessContract {
 			BusinessRefType: "production_exception_decision",
 		},
 		DomainBoundary: "explicit_source_and_wip_commands",
-		FactBoundary:   "no_fact_posting",
-		Guardrail:      "Approval records only the production-exception decision and quantity. Scrap and WIP-concession execution remains a separate production task and explicit command; an over-issue approval is an allowance consumed only by the normal material-issue fact path.",
+		FactBoundary:   "inventory_disposition_by_explicit_domain_command",
+		Guardrail:      "Approval records the decision and quantity. Production executes unreceived WIP decisions; warehouse executes decisions involving received stock. The operational fact command records exact receipt-linked stock movements, while Workflow only coordinates. Fresh-material replacement creates a separate WIP branch and new outsourcing material demand.",
 		Nodes: []ProcessNodeInstanceCreate{
 			approval,
 			approve,
@@ -644,7 +644,7 @@ func newProductionExceptionApprovalContract() customerProcessContract {
 			customerDomainCommandNode(
 				"execute_production_exception",
 				"production",
-				PermissionProductionFactPost,
+				PermissionProductionExceptionExecute,
 				ProcessDomainCommandProductionExceptionExecute,
 				"OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand",
 			),
@@ -658,6 +658,15 @@ func newProductionExceptionApprovalContract() customerProcessContract {
 			),
 			{NodeKey: "rejected_end", NodeType: ProcessNodeTypeEnd},
 			{NodeKey: "over_issue_end", NodeType: ProcessNodeTypeEnd},
+			customerHumanProcessNode(
+				"warehouse_exception_execution", ProcessNodeTypeHumanTask, WarehouseRoleKey,
+				PermissionWorkflowTaskComplete, "production_exception_execution", "production_exception_execution",
+			),
+			customerDomainCommandNode(
+				"execute_warehouse_production_exception", WarehouseRoleKey, PermissionProductionExceptionExecute,
+				ProcessDomainCommandProductionExceptionExecute, "OperationalFactUsecase.ExecuteProductionExceptionForProcessCommand",
+			),
+			{NodeKey: "warehouse_exception_end", NodeType: ProcessNodeTypeEnd},
 		},
 	}
 }
@@ -683,7 +692,7 @@ func customerDomainCommandNode(nodeKey, ownerPoolKey, capabilityKey, commandKey,
 			"command_key":              commandKey,
 			"handler":                  handler,
 			"idempotency_key_required": true,
-			"writes_fact":              false,
+			"writes_fact":              commandKey == ProcessDomainCommandProductionExceptionExecute,
 		},
 	}
 	if commandKey == ProcessDomainCommandSalesOrderActivate ||

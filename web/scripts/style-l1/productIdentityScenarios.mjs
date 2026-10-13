@@ -231,7 +231,7 @@ export function createProductIdentityScenarios({
           .first()
           .click()
         await closeImage(page)
-        await page.getByRole('button', { name: '新建草稿' }).click()
+        await page.getByRole('button', { name: '新建 BOM' }).click()
         const modal = page
           .locator('.erp-business-form-page:not([hidden])')
           .last()

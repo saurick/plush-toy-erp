@@ -8,6 +8,7 @@ import (
 const (
 	ProductionExceptionProcessCommandOutcomeApprovedOverIssue = "production_exception.approved_over_issue"
 	ProductionExceptionProcessCommandOutcomeApprovedWIP       = "production_exception.approved_wip"
+	ProductionExceptionProcessCommandOutcomeApprovedStock     = "production_exception.approved_stock"
 	ProductionExceptionProcessCommandOutcomeRejected          = "production_exception.rejected"
 	ProductionExceptionProcessCommandOutcomeExecuted          = "production_exception.executed"
 	productionExceptionProcessBusinessRefType                 = "production_exception_decision"
@@ -164,6 +165,8 @@ func (h *productionExceptionProcessCommandHandler) ExecuteProcessDomainCommand(c
 	case ProcessDomainCommandProductionExceptionApprove:
 		if item.DecisionType == ProductionExceptionOverIssue {
 			result.Outcome = ProductionExceptionProcessCommandOutcomeApprovedOverIssue
+		} else if item.StockDispositionRequired {
+			result.Outcome = ProductionExceptionProcessCommandOutcomeApprovedStock
 		} else {
 			result.Outcome = ProductionExceptionProcessCommandOutcomeApprovedWIP
 		}
@@ -179,9 +182,10 @@ func (h *productionExceptionProcessCommandHandler) ExecuteProcessDomainCommand(c
 		return nil, ErrProcessDomainCommandHandlerNotFound
 	}
 	mutation := &ProductionExceptionMutation{
-		ID:      id,
-		ActorID: actorID,
-		Reason:  strings.TrimSpace(processCommandStringFromPayload(in.Payload, processDecisionPayloadReason)),
+		WarehouseScope: in.WarehouseScope,
+		ID:             id,
+		ActorID:        actorID,
+		Reason:         strings.TrimSpace(processCommandStringFromPayload(in.Payload, processDecisionPayloadReason)),
 	}
 	if h.commandKey == ProcessDomainCommandProductionExceptionApprove {
 		if raw, exists := in.Payload[productionExceptionProcessPayloadApprovedQuantity]; exists && raw != nil {

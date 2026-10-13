@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import path from 'node:path'
-import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizontalOverflow, customerRuntimeEffectiveSession }) {
   return ['light', 'dark'].map((themeMode) => ({
@@ -37,8 +37,8 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       await panel.getByText('SO-FILTER-801', { exact: true }).waitFor()
       const navigation = page.locator('.erp-task-management-scope')
       assert.deepEqual((await navigation.locator('.ant-segmented-item').allTextContents()).map((text) => text.trim()), ['待我处理', '待我审批', '全部任务', '流程跟踪'])
-      const trackingNavigation = page.locator('.erp-task-tracking-scope')
-      assert.deepEqual((await trackingNavigation.locator('.ant-segmented-item').allTextContents()).map((text) => text.trim()), ['我发起的', '我参与的'])
+      const trackingNavigation = page.locator('.erp-task-tracking-views')
+      assert.deepEqual((await trackingNavigation.locator('.ant-segmented-item').allTextContents()).map((text) => text.trim()), ['流程进度', '异常记录'])
       assert.equal(await page.getByRole('combobox', { name: '跟踪范围', exact: true }).count(), 0)
       const scopeBox = await trackingNavigation.boundingBox()
       const controlsBox = await panel.locator('.erp-workflow-tracking-controls').boundingBox()
@@ -75,23 +75,14 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
         return captured.postDataJSON().params
       }
       const choose = async (label, option) => {
-        if (label === '跟踪范围') {
-          await closeFilters()
-          await trackingNavigation.getByText(option, { exact: true }).click()
-          return
-        }
         await openFilters()
         await page.locator(`.ant-select[aria-label="${label}"]`).click()
         await page.locator('.ant-select-dropdown:visible').getByText(option, { exact: true }).click()
       }
-      await change(() => verifyMobileNavigationMotion(page, assert, '.erp-task-tracking-scope', 1), (p) => p.scope === 'participated')
-      await change(() => verifyMobileNavigationMotion(page, assert, '.erp-task-tracking-scope', 0, true), (p) => p.scope === 'started')
+      await change(() => choose('跟踪范围', '我参与的'), (p) => p.scope === 'participated')
+      await change(() => choose('跟踪范围', '我发起的'), (p) => p.scope === 'started')
       const restoredScopeBox = await trackingNavigation.boundingBox()
-      assert.ok(Math.abs(restoredScopeBox.x - scopeBox.x) < 1 && Math.abs(restoredScopeBox.y - scopeBox.y) < 1, 'tracking tabs keep their position across scope changes')
-      await trackingNavigation.locator('input:checked').focus()
-      await change(() => page.keyboard.press('ArrowRight'), (p) => p.scope === 'participated')
-      await change(() => page.keyboard.press('ArrowLeft'), (p) => p.scope === 'started')
-      assert.equal(await trackingNavigation.locator('input:checked').evaluate((node) => node === document.activeElement), true)
+      assert.ok(Math.abs(restoredScopeBox.y - scopeBox.y) < 1, '切换范围保持追踪视图导航位置')
       await change(() => choose('流转状态', '进行中'), (p) => p.status === 'active')
       await change(() => choose('当前岗位', '工程'), (p) => p.owner_role_key === 'engineering' && p.status === 'active')
       const search = panel.getByPlaceholder('单号 / 任务 / 产品 / 款号')
@@ -149,7 +140,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       await change(() => choose('跟踪范围', '我发起的'), (p) => p.scope === 'started' && !p.keyword)
       await panel.getByText('SO-FILTER-801', { exact: true }).waitFor()
       await search.fill('尚未提交的搜索')
-      await change(() => trackingNavigation.getByText('我参与的', { exact: true }).evaluate((node) => node.click()), (p) => p.scope === 'participated' && p.status === 'completed')
+      await change(() => choose('跟踪范围', '我参与的'), (p) => p.scope === 'participated' && p.status === 'completed')
       await page.waitForTimeout(400)
       assert.equal(await search.inputValue(), '', 'a pending search must not move into another tab')
       assert.equal(new URL(page.url()).searchParams.get('track_search_participated'), null)
@@ -189,8 +180,8 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       assert.equal(await taskFilters.evaluate((node) => node === document.activeElement), true)
       await change(() => page.goto(new URL('/erp/task-board?tracking=visible&track_source_type=sales_order&track_source_id=1', page.url()).href), (p) => p.scope === 'visible' && p.source_type === 'sales_order' && p.source_id === 1)
       await panel.getByText('SO-FILTER-801', { exact: true }).waitFor()
-      assert.deepEqual((await trackingNavigation.locator('.ant-segmented-item').allTextContents()).map((text) => text.trim()), ['我发起的', '我参与的', '相关流程'])
-      assert.equal(await trackingNavigation.getByRole('radio', { name: '相关流程', exact: true }).isChecked(), true)
+      assert.deepEqual((await trackingNavigation.locator('.ant-segmented-item').allTextContents()).map((text) => text.trim()), ['流程进度', '异常记录'])
+      assert.equal(new URL(page.url()).searchParams.get('tracking'), 'visible')
       await page.setViewportSize({ width: 320, height: 844 })
       await waitForFiniteAnimations(page)
       const sourceScopeBox = await trackingNavigation.boundingBox()

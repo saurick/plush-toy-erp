@@ -1,3 +1,8 @@
+.ant-form-item-additional > :is(.ant-form-item-extra, .ant-form-item-explain) {
+  /* 将留白计入辅助区高度，保持表单校验出现和收起时的高度测量一致。 */
+  padding-block-start: 6px;
+}
+
 .ant-input-textarea-show-count {
   position: relative;
   display: block;

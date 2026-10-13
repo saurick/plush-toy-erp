@@ -2114,6 +2114,8 @@ var (
 		{Name: "production_material_requirement_id", Type: field.TypeInt, Nullable: true},
 		{Name: "production_wip_batch_id", Type: field.TypeInt, Nullable: true},
 		{Name: "quality_inspection_id", Type: field.TypeInt, Nullable: true},
+		{Name: "target_supplier_id", Type: field.TypeInt, Nullable: true},
+		{Name: "target_operation_id", Type: field.TypeInt, Nullable: true},
 		{Name: "requested_quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "approved_quantity", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "reason", Type: field.TypeString, Size: 255},
@@ -2146,12 +2148,12 @@ var (
 			{
 				Name:    "productionexceptiondecision_requested_by_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{ProductionExceptionDecisionsColumns[16], ProductionExceptionDecisionsColumns[13]},
+				Columns: []*schema.Column{ProductionExceptionDecisionsColumns[18], ProductionExceptionDecisionsColumns[15]},
 			},
 			{
 				Name:    "productionexceptiondecision_decision_type_status_execution_status_requested_at",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionExceptionDecisionsColumns[2], ProductionExceptionDecisionsColumns[3], ProductionExceptionDecisionsColumns[4], ProductionExceptionDecisionsColumns[17]},
+				Columns: []*schema.Column{ProductionExceptionDecisionsColumns[2], ProductionExceptionDecisionsColumns[3], ProductionExceptionDecisionsColumns[4], ProductionExceptionDecisionsColumns[19]},
 			},
 			{
 				Name:    "productionexceptiondecision_production_order_id_production_order_item_id",
@@ -2163,7 +2165,7 @@ var (
 				Unique:  true,
 				Columns: []*schema.Column{ProductionExceptionDecisionsColumns[9]},
 				Annotation: &entsql.IndexAnnotation{
-					Where: "((decision_type = 'SCRAP' OR decision_type = 'WIP_CONCESSION') AND (status = 'SUBMITTED' OR status = 'APPROVED') AND execution_status <> 'REVERSED')",
+					Where: "(quality_inspection_id IS NOT NULL AND (status = 'SUBMITTED' OR status = 'APPROVED') AND execution_status <> 'REVERSED')",
 				},
 			},
 		},
@@ -2736,7 +2738,9 @@ var (
 		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "origin_exception_decision_id", Type: field.TypeInt, Nullable: true},
 		{Name: "origin_rework_fact_id", Type: field.TypeInt, Nullable: true},
+		{Name: "finished_goods_receipt_id", Type: field.TypeInt, Nullable: true},
 		{Name: "production_order_id", Type: field.TypeInt},
 		{Name: "production_order_item_id", Type: field.TypeInt},
 		{Name: "production_order_operation_id", Type: field.TypeInt},
@@ -2750,38 +2754,50 @@ var (
 		PrimaryKey: []*schema.Column{ProductionWipBatchesColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
-				Symbol:     "production_wip_batches_production_facts_origin_rework_batches",
+				Symbol:     "production_wip_batches_production_exception_decisions_execution_batches",
 				Columns:    []*schema.Column{ProductionWipBatchesColumns[12]},
+				RefColumns: []*schema.Column{ProductionExceptionDecisionsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_wip_batches_production_facts_origin_rework_batches",
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[13]},
+				RefColumns: []*schema.Column{ProductionFactsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "production_wip_batches_production_facts_packaging_batches",
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[14]},
 				RefColumns: []*schema.Column{ProductionFactsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_wip_batches_production_orders_wip_batches",
-				Columns:    []*schema.Column{ProductionWipBatchesColumns[13]},
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[15]},
 				RefColumns: []*schema.Column{ProductionOrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_wip_batches_production_order_items_wip_batches",
-				Columns:    []*schema.Column{ProductionWipBatchesColumns[14]},
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[16]},
 				RefColumns: []*schema.Column{ProductionOrderItemsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_wip_batches_production_order_operations_wip_batches",
-				Columns:    []*schema.Column{ProductionWipBatchesColumns[15]},
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[17]},
 				RefColumns: []*schema.Column{ProductionOrderOperationsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_wip_batches_production_wip_batches_child_batches",
-				Columns:    []*schema.Column{ProductionWipBatchesColumns[16]},
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[18]},
 				RefColumns: []*schema.Column{ProductionWipBatchesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "production_wip_batches_admin_users_creator",
-				Columns:    []*schema.Column{ProductionWipBatchesColumns[17]},
+				Columns:    []*schema.Column{ProductionWipBatchesColumns[19]},
 				RefColumns: []*schema.Column{AdminUsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -2795,17 +2811,27 @@ var (
 			{
 				Name:    "productionwipbatch_production_order_item_id_production_order_operation_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionWipBatchesColumns[14], ProductionWipBatchesColumns[15]},
+				Columns: []*schema.Column{ProductionWipBatchesColumns[16], ProductionWipBatchesColumns[17]},
 			},
 			{
 				Name:    "productionwipbatch_source_batch_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionWipBatchesColumns[16]},
+				Columns: []*schema.Column{ProductionWipBatchesColumns[18]},
+			},
+			{
+				Name:    "productionwipbatch_origin_exception_decision_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionWipBatchesColumns[12], ProductionWipBatchesColumns[4]},
+			},
+			{
+				Name:    "productionwipbatch_finished_goods_receipt_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{ProductionWipBatchesColumns[14], ProductionWipBatchesColumns[4]},
 			},
 			{
 				Name:    "productionwipbatch_origin_rework_fact_id",
 				Unique:  true,
-				Columns: []*schema.Column{ProductionWipBatchesColumns[12]},
+				Columns: []*schema.Column{ProductionWipBatchesColumns[13]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "origin_rework_fact_id IS NOT NULL AND source_batch_id IS NULL",
 				},
@@ -2813,7 +2839,7 @@ var (
 			{
 				Name:    "productionwipbatch_origin_rework_fact_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{ProductionWipBatchesColumns[12], ProductionWipBatchesColumns[4]},
+				Columns: []*schema.Column{ProductionWipBatchesColumns[13], ProductionWipBatchesColumns[4]},
 			},
 			{
 				Name:    "productionwipbatch_status_execution_mode",
@@ -5298,12 +5324,13 @@ func init() {
 	ProductionExceptionDecisionsTable.Annotation = &entsql.Annotation{}
 	ProductionExceptionDecisionsTable.Annotation.Checks = map[string]string{
 		"production_exception_decisions_execution_allowed": "execution_status IN ('PENDING', 'APPLIED', 'REVERSED')",
-		"production_exception_decisions_execution_audit":   "\n(\n  (execution_status = 'PENDING' AND executed_at IS NULL AND executed_by IS NULL AND execution_reason IS NULL AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR (execution_status = 'APPLIED' AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND length(trim(execution_reason)) BETWEEN 1 AND 255 AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR (execution_status = 'REVERSED'\n    AND reversed_at IS NOT NULL AND reversed_by IS NOT NULL AND length(trim(reverse_reason)) BETWEEN 1 AND 255\n    AND ((decision_type = 'OVER_ISSUE' AND executed_at IS NULL AND executed_by IS NULL AND execution_reason IS NULL)\n      OR (decision_type IN ('SCRAP', 'WIP_CONCESSION') AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND length(trim(execution_reason)) BETWEEN 1 AND 255)))\n)",
+		"production_exception_decisions_execution_audit":   "\n(\n  (execution_status = 'PENDING' AND executed_at IS NULL AND executed_by IS NULL AND execution_reason IS NULL AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR (execution_status = 'APPLIED' AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND length(trim(execution_reason)) BETWEEN 1 AND 255 AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR (execution_status = 'REVERSED'\n    AND reversed_at IS NOT NULL AND reversed_by IS NOT NULL AND length(trim(reverse_reason)) BETWEEN 1 AND 255\n    AND ((decision_type = 'OVER_ISSUE' AND executed_at IS NULL AND executed_by IS NULL AND execution_reason IS NULL)\n      OR (decision_type IN ('SCRAP', 'WIP_CONCESSION', 'REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE') AND executed_at IS NOT NULL AND executed_by IS NOT NULL AND length(trim(execution_reason)) BETWEEN 1 AND 255)))\n)",
 		"production_exception_decisions_intent_bundle":     "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
 		"production_exception_decisions_quantity_positive": "requested_quantity > 0 AND (approved_quantity IS NULL OR approved_quantity > 0)",
-		"production_exception_decisions_source_bundle":     "\n(\n  (decision_type = 'OVER_ISSUE' AND production_material_requirement_id IS NOT NULL AND production_wip_batch_id IS NULL AND quality_inspection_id IS NULL)\n  OR\n  (decision_type IN ('SCRAP', 'WIP_CONCESSION') AND production_material_requirement_id IS NULL AND production_wip_batch_id IS NOT NULL AND quality_inspection_id IS NOT NULL)\n)",
+		"production_exception_decisions_source_bundle":     "\n(\n  (decision_type = 'OVER_ISSUE' AND production_material_requirement_id IS NOT NULL AND production_wip_batch_id IS NULL AND quality_inspection_id IS NULL)\n  OR\n  (decision_type IN ('SCRAP', 'WIP_CONCESSION', 'REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE') AND production_material_requirement_id IS NULL AND production_wip_batch_id IS NOT NULL AND quality_inspection_id IS NOT NULL)\n)",
 		"production_exception_decisions_status_allowed":    "status IN ('SUBMITTED', 'APPROVED', 'REJECTED', 'CANCELLED')",
-		"production_exception_decisions_type_allowed":      "decision_type IN ('SCRAP', 'OVER_ISSUE', 'WIP_CONCESSION')",
+		"production_exception_decisions_target_bundle":     "((decision_type IN ('REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE') AND target_operation_id IS NOT NULL AND (decision_type = 'REWORK_ORIGINAL' OR target_supplier_id IS NOT NULL)) OR (decision_type NOT IN ('REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE') AND target_operation_id IS NULL AND target_supplier_id IS NULL))",
+		"production_exception_decisions_type_allowed":      "decision_type IN ('SCRAP', 'OVER_ISSUE', 'WIP_CONCESSION', 'REWORK_ORIGINAL', 'REWORK_SWITCH', 'REMAKE')",
 		"production_exception_decisions_version_positive":  "version > 0",
 	}
 	ProductionFactsTable.ForeignKeys[0].RefTable = InventoryLotsTable
@@ -5412,19 +5439,22 @@ func init() {
 		"production_packaging_confirmations_status_allowed":   "status IN ('PENDING', 'CONFIRMED')",
 		"production_packaging_confirmations_version_positive": "version > 0",
 	}
-	ProductionWipBatchesTable.ForeignKeys[0].RefTable = ProductionFactsTable
-	ProductionWipBatchesTable.ForeignKeys[1].RefTable = ProductionOrdersTable
-	ProductionWipBatchesTable.ForeignKeys[2].RefTable = ProductionOrderItemsTable
-	ProductionWipBatchesTable.ForeignKeys[3].RefTable = ProductionOrderOperationsTable
-	ProductionWipBatchesTable.ForeignKeys[4].RefTable = ProductionWipBatchesTable
-	ProductionWipBatchesTable.ForeignKeys[5].RefTable = AdminUsersTable
+	ProductionWipBatchesTable.ForeignKeys[0].RefTable = ProductionExceptionDecisionsTable
+	ProductionWipBatchesTable.ForeignKeys[1].RefTable = ProductionFactsTable
+	ProductionWipBatchesTable.ForeignKeys[2].RefTable = ProductionFactsTable
+	ProductionWipBatchesTable.ForeignKeys[3].RefTable = ProductionOrdersTable
+	ProductionWipBatchesTable.ForeignKeys[4].RefTable = ProductionOrderItemsTable
+	ProductionWipBatchesTable.ForeignKeys[5].RefTable = ProductionOrderOperationsTable
+	ProductionWipBatchesTable.ForeignKeys[6].RefTable = ProductionWipBatchesTable
+	ProductionWipBatchesTable.ForeignKeys[7].RefTable = AdminUsersTable
 	ProductionWipBatchesTable.Annotation = &entsql.Annotation{}
 	ProductionWipBatchesTable.Annotation.Checks = map[string]string{
 		"production_wip_batches_execution_allowed": "execution_mode IS NULL OR execution_mode IN ('IN_HOUSE', 'OUTSOURCED')",
-		"production_wip_batches_flow_type_allowed": "flow_type IN ('NORMAL', 'REWORK')",
+		"production_wip_batches_flow_type_allowed": "flow_type IN ('NORMAL', 'REWORK', 'REMAKE')",
 		"production_wip_batches_order_positive":    "production_order_id > 0",
 		"production_wip_batches_quantity_positive": "quantity > 0",
-		"production_wip_batches_rework_bundle":     "((flow_type = 'NORMAL' AND rework_reason IS NULL) OR (flow_type = 'REWORK' AND rework_reason IS NOT NULL AND length(trim(rework_reason)) BETWEEN 1 AND 255 AND (source_batch_id IS NOT NULL OR origin_rework_fact_id IS NOT NULL)))",
+		"production_wip_batches_remake_origin":     "flow_type <> 'REMAKE' OR origin_exception_decision_id IS NOT NULL",
+		"production_wip_batches_rework_bundle":     "((flow_type = 'NORMAL' AND rework_reason IS NULL) OR (flow_type IN ('REWORK', 'REMAKE') AND rework_reason IS NOT NULL AND length(trim(rework_reason)) BETWEEN 1 AND 255 AND (source_batch_id IS NOT NULL OR origin_rework_fact_id IS NOT NULL)))",
 		"production_wip_batches_status_allowed":    "status IN ('PLANNED', 'SPLIT', 'IN_PROGRESS', 'OUTSOURCED', 'WAITING_QUALITY', 'ACCEPTED', 'REJECTED', 'CANCELLED')",
 		"production_wip_batches_version_positive":  "version > 0",
 	}

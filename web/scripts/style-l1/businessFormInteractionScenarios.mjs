@@ -1246,7 +1246,7 @@ export function createBusinessFormInteractionScenarios({
         await expectHeading(page, '出货单')
         await expectText(page, '计划出货日期')
         await expectText(page, '实际出货日期')
-        await expectText(page, '新建草稿')
+        await expectText(page, '新建出货单')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'shipment-date-filter-desktop',
         })

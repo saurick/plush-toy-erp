@@ -6,6 +6,7 @@ import {
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import {
   normalizeMobileTaskActionKey,
@@ -306,6 +307,7 @@ export default function MobileTaskReceiptScreen({
             )}
           </section>
         ) : null}
+        <MobileBackToTop />
       </main>
 
       <div

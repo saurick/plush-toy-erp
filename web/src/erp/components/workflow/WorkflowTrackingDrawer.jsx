@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ArrowRightOutlined, ReloadOutlined } from '@ant-design/icons'
+import { LeftOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Alert, Button, Drawer, Empty, Select, Space, Spin, Tag, Timeline } from 'antd'
+import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { getWorkflowTask, getWorkflowTracking } from '../../api/workflowApi.mjs'
 import { getProcessNodeLabel, getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
@@ -9,11 +10,22 @@ import { buildTrackingStageModel, trackingHandoff, trackingResponsibilityParts, 
 import WorkflowProcessStageTrack from './WorkflowProcessStageTrack.jsx'
 import WorkflowResponsibilities from './WorkflowResponsibilities.jsx'
 import WorkflowInitiator from './WorkflowInitiator.jsx'
+import WorkflowExceptionPanel from './WorkflowExceptionPanel.jsx'
 import { getWorkflowTaskSourceNo } from '../../utils/dashboardTaskDisplay.mjs'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
 import { WorkflowTaskSource } from './WorkflowTaskCopy.jsx'
 import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
 import './workflowTracking.css'
+
+function TrackingExceptions({ trackingRef, onOpenTask, refreshKey }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <details className="erp-workflow-tracking-exceptions" onToggle={(event) => setExpanded(event.currentTarget.open)}>
+      <summary>本流程异常记录</summary>
+      {expanded ? <WorkflowExceptionPanel trackingRef={trackingRef} onOpenTask={onOpenTask} compact refreshKey={refreshKey} /> : null}
+    </details>
+  )
+}
 
 export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTask, onAfterClose, refreshKey = '', closeLabel = '返回列表' }) {
   const [result, setResult] = useState(null)
@@ -133,6 +145,8 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
   return (
     <Drawer
       title="流程跟踪"
+      closeIcon={<LeftOutlined aria-hidden />}
+      closable={{ placement: 'start', 'aria-label': closeLabel }}
       open={Boolean(trackingRef)}
       onClose={onClose}
       afterOpenChange={(open) => { if (!open) onAfterClose?.() }}
@@ -154,18 +168,15 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
             />
           ) : null}
           <div className="erp-workflow-tracking-footer-actions">
-            <Button onClick={onClose}>{closeLabel}</Button>
-            <div className="erp-workflow-tracking-footer-controls">
-              <Button
-                icon={<ReloadOutlined aria-hidden />}
-                loading={!current}
-                disabled={!current || Boolean(openingTask)}
-                onClick={() => setReload((value) => value + 1)}
-              >
-                刷新进度
-              </Button>
-              {availableTasks.length ? <Button type={selectedTask?.canHandle ? 'primary' : 'default'} className="erp-workflow-tracking-open-task" icon={<ArrowRightOutlined aria-hidden />} aria-label={taskActionLabel} aria-haspopup="dialog" disabled={!selectedTask} loading={Boolean(openingTask)} onClick={() => openTask(selectedTask.task_id)}>{taskActionLabel}</Button> : null}
-            </div>
+            <Button
+              icon={<ReloadOutlined aria-hidden />}
+              loading={!current}
+              disabled={!current || Boolean(openingTask)}
+              onClick={() => setReload((value) => value + 1)}
+            >
+              刷新进度
+            </Button>
+            {availableTasks.length ? <Button type={selectedTask?.canHandle ? 'primary' : 'default'} className="erp-workflow-tracking-open-task" aria-label={taskActionLabel} aria-haspopup="dialog" disabled={!selectedTask} loading={Boolean(openingTask)} onClick={() => openTask(selectedTask.task_id)}>{taskActionLabel}</Button> : null}
           </div>
         </div>
       }
@@ -200,6 +211,7 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
               <span className="erp-workflow-tracking-meta">发起于 {formatWorkflowTaskEventTime(summary.started_at)}</span>
             </div>
             {summary.display_context ? <div className="erp-workflow-tracking-identity"><WorkflowTaskIdentity task={summary} /></div> : null}
+            <TrackingExceptions key={`${kind}:${id}:${refreshKey}`} trackingRef={{ kind, id }} onOpenTask={onOpenTask} refreshKey={reload} />
           </section>
           {stageModel?.items.length ? (
             <section aria-label="已发生的流程节点">
@@ -215,6 +227,7 @@ export default function WorkflowTrackingDrawer({ trackingRef, onClose, onOpenTas
           </section>
         </div>
       )}
+      <MobileBackToTop mobileOnly enabled={Boolean(trackingRef)} />
     </Drawer>
   )
 }

@@ -414,7 +414,7 @@ func validateCustomerConfigProcessNode(processKey, businessRefType, nodeKey, nod
 		if !customerConfigDomainCommandNodeAllowed(processKey, businessRefType, nodeKey, getStringFromAnyMap(policySnapshot, "command_key")) {
 			return ErrBadParam
 		}
-		if writesFact, err := boolFromProcessDefinition(policySnapshot, "writes_fact"); err != nil || writesFact {
+		if writesFact, err := boolFromProcessDefinition(policySnapshot, "writes_fact"); err != nil || (writesFact && getStringFromAnyMap(policySnapshot, "command_key") != ProcessDomainCommandProductionExceptionExecute) {
 			return ErrBadParam
 		}
 	case ProcessNodeTypeApproval, ProcessNodeTypeHumanTask:
@@ -534,7 +534,7 @@ func customerConfigDomainCommandNodeAllowed(processKey, businessRefType, nodeKey
 		switch nodeKey {
 		case "approve_production_exception":
 			return commandKey == ProcessDomainCommandProductionExceptionApprove
-		case "execute_production_exception":
+		case "execute_production_exception", "execute_warehouse_production_exception":
 			return commandKey == ProcessDomainCommandProductionExceptionExecute
 		case "reject_production_exception":
 			return commandKey == ProcessDomainCommandProductionExceptionReject

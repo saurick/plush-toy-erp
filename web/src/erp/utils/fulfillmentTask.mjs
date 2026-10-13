@@ -1,4 +1,5 @@
 const SOURCE_TYPES = Object.freeze({
+  shipment_execute: 'shipment',
   purchase_arrival: 'purchase_order',
   receipt_quality: 'quality_inspection',
   receipt_inbound: 'purchase_receipt',
@@ -9,6 +10,9 @@ const SOURCE_TYPES = Object.freeze({
   outsourcing_quality: 'quality_inspection',
   outsourcing_inbound: 'outsourcing_fact',
   production_execute: 'production_wip_batch',
+  production_cutting_issue: 'production_wip_batch',
+  production_packaging_transfer: 'production_wip_batch',
+  production_packaging_execute: 'production_wip_batch',
   production_return: 'production_wip_batch',
   production_quality: 'quality_inspection',
   production_transfer: 'production_wip_batch',
@@ -48,7 +52,11 @@ export function fulfillmentTaskEntryPath(task) {
       : ''
   }
   const source = SOURCE_TYPES[kind]
+  if (kind === 'production_exception') {
+    return /^\/erp\/production\/quality-inspections\?quality_inspection_id=[1-9][0-9]*$/u.test(path) ? path : ''
+  }
   const expected = {
+    shipment: `/erp/warehouse/shipments?shipment_id=${id}`,
     purchase_order: `/erp/purchase/accessories?purchase_order_id=${id}`,
     purchase_receipt: `/erp/warehouse/inbound?receipt_id=${id}`,
     quality_inspection: `/erp/production/quality-inspections?quality_inspection_id=${id}`,

@@ -44,27 +44,12 @@ function assertExactCoverage(items, options, keyOf, label) {
 export function buildBusinessChainSelectOptions(catalog) {
   const chains = asArray(catalog?.businessChains)
   const overview = catalog?.businessChainOverview
-  const lanes = asArray(overview?.lanes)
-  const chainByKey = new Map(chains.map((chain) => [chain.key, chain]))
-  if (!overview?.key || !overview?.label || lanes.length === 0) {
-    throw new Error('business chain select is missing its overview groups')
+  if (!overview?.key || !overview?.label) {
+    throw new Error('business chain select is missing its overview')
   }
-
-  const groups = lanes.map((lane) =>
-    selectGroup(
-      `chain:${lane.key}`,
-      lane.label,
-      asArray(lane.chainKeys).map((chainKey) => {
-        const chain = chainByKey.get(chainKey)
-        if (!chain) {
-          throw new Error(`business chain select references ${chainKey}`)
-        }
-        return selectOption(chain.key, chain.label)
-      })
-    )
-  )
-  assertExactCoverage(chains, groups, (chain) => chain.key, 'business chain')
-  return [selectOption(overview.key, overview.label), ...groups]
+  const options = chains.map((chain) => selectOption(chain.key, chain.label))
+  assertExactCoverage(chains, options, (chain) => chain.key, 'business chain')
+  return [selectOption(overview.key, overview.label), ...options]
 }
 
 function processGroupLabel(definitions, processKey) {

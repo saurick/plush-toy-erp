@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/productionexceptiondecision"
+	"server/internal/data/model/ent/productionwipbatch"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -299,9 +300,45 @@ func (_u *ProductionExceptionDecisionUpdate) ClearReverseReason() *ProductionExc
 	return _u
 }
 
+// AddExecutionBatchIDs adds the "execution_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_u *ProductionExceptionDecisionUpdate) AddExecutionBatchIDs(ids ...int) *ProductionExceptionDecisionUpdate {
+	_u.mutation.AddExecutionBatchIDs(ids...)
+	return _u
+}
+
+// AddExecutionBatches adds the "execution_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionExceptionDecisionUpdate) AddExecutionBatches(v ...*ProductionWIPBatch) *ProductionExceptionDecisionUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddExecutionBatchIDs(ids...)
+}
+
 // Mutation returns the ProductionExceptionDecisionMutation object of the builder.
 func (_u *ProductionExceptionDecisionUpdate) Mutation() *ProductionExceptionDecisionMutation {
 	return _u.mutation
+}
+
+// ClearExecutionBatches clears all "execution_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionExceptionDecisionUpdate) ClearExecutionBatches() *ProductionExceptionDecisionUpdate {
+	_u.mutation.ClearExecutionBatches()
+	return _u
+}
+
+// RemoveExecutionBatchIDs removes the "execution_batches" edge to ProductionWIPBatch entities by IDs.
+func (_u *ProductionExceptionDecisionUpdate) RemoveExecutionBatchIDs(ids ...int) *ProductionExceptionDecisionUpdate {
+	_u.mutation.RemoveExecutionBatchIDs(ids...)
+	return _u
+}
+
+// RemoveExecutionBatches removes "execution_batches" edges to ProductionWIPBatch entities.
+func (_u *ProductionExceptionDecisionUpdate) RemoveExecutionBatches(v ...*ProductionWIPBatch) *ProductionExceptionDecisionUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveExecutionBatchIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -408,6 +445,12 @@ func (_u *ProductionExceptionDecisionUpdate) sqlSave(ctx context.Context) (_node
 	if _u.mutation.QualityInspectionIDCleared() {
 		_spec.ClearField(productionexceptiondecision.FieldQualityInspectionID, field.TypeInt)
 	}
+	if _u.mutation.TargetSupplierIDCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldTargetSupplierID, field.TypeInt)
+	}
+	if _u.mutation.TargetOperationIDCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldTargetOperationID, field.TypeInt)
+	}
 	if value, ok := _u.mutation.ApprovedQuantity(); ok {
 		_spec.SetField(productionexceptiondecision.FieldApprovedQuantity, field.TypeOther, value)
 	}
@@ -482,6 +525,51 @@ func (_u *ProductionExceptionDecisionUpdate) sqlSave(ctx context.Context) (_node
 	}
 	if _u.mutation.ReverseReasonCleared() {
 		_spec.ClearField(productionexceptiondecision.FieldReverseReason, field.TypeString)
+	}
+	if _u.mutation.ExecutionBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionexceptiondecision.ExecutionBatchesTable,
+			Columns: []string{productionexceptiondecision.ExecutionBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedExecutionBatchesIDs(); len(nodes) > 0 && !_u.mutation.ExecutionBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionexceptiondecision.ExecutionBatchesTable,
+			Columns: []string{productionexceptiondecision.ExecutionBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ExecutionBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionexceptiondecision.ExecutionBatchesTable,
+			Columns: []string{productionexceptiondecision.ExecutionBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -773,9 +861,45 @@ func (_u *ProductionExceptionDecisionUpdateOne) ClearReverseReason() *Production
 	return _u
 }
 
+// AddExecutionBatchIDs adds the "execution_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_u *ProductionExceptionDecisionUpdateOne) AddExecutionBatchIDs(ids ...int) *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.AddExecutionBatchIDs(ids...)
+	return _u
+}
+
+// AddExecutionBatches adds the "execution_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionExceptionDecisionUpdateOne) AddExecutionBatches(v ...*ProductionWIPBatch) *ProductionExceptionDecisionUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddExecutionBatchIDs(ids...)
+}
+
 // Mutation returns the ProductionExceptionDecisionMutation object of the builder.
 func (_u *ProductionExceptionDecisionUpdateOne) Mutation() *ProductionExceptionDecisionMutation {
 	return _u.mutation
+}
+
+// ClearExecutionBatches clears all "execution_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionExceptionDecisionUpdateOne) ClearExecutionBatches() *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.ClearExecutionBatches()
+	return _u
+}
+
+// RemoveExecutionBatchIDs removes the "execution_batches" edge to ProductionWIPBatch entities by IDs.
+func (_u *ProductionExceptionDecisionUpdateOne) RemoveExecutionBatchIDs(ids ...int) *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.RemoveExecutionBatchIDs(ids...)
+	return _u
+}
+
+// RemoveExecutionBatches removes "execution_batches" edges to ProductionWIPBatch entities.
+func (_u *ProductionExceptionDecisionUpdateOne) RemoveExecutionBatches(v ...*ProductionWIPBatch) *ProductionExceptionDecisionUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveExecutionBatchIDs(ids...)
 }
 
 // Where appends a list predicates to the ProductionExceptionDecisionUpdate builder.
@@ -912,6 +1036,12 @@ func (_u *ProductionExceptionDecisionUpdateOne) sqlSave(ctx context.Context) (_n
 	if _u.mutation.QualityInspectionIDCleared() {
 		_spec.ClearField(productionexceptiondecision.FieldQualityInspectionID, field.TypeInt)
 	}
+	if _u.mutation.TargetSupplierIDCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldTargetSupplierID, field.TypeInt)
+	}
+	if _u.mutation.TargetOperationIDCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldTargetOperationID, field.TypeInt)
+	}
 	if value, ok := _u.mutation.ApprovedQuantity(); ok {
 		_spec.SetField(productionexceptiondecision.FieldApprovedQuantity, field.TypeOther, value)
 	}
@@ -986,6 +1116,51 @@ func (_u *ProductionExceptionDecisionUpdateOne) sqlSave(ctx context.Context) (_n
 	}
 	if _u.mutation.ReverseReasonCleared() {
 		_spec.ClearField(productionexceptiondecision.FieldReverseReason, field.TypeString)
+	}
+	if _u.mutation.ExecutionBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionexceptiondecision.ExecutionBatchesTable,
+			Columns: []string{productionexceptiondecision.ExecutionBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedExecutionBatchesIDs(); len(nodes) > 0 && !_u.mutation.ExecutionBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionexceptiondecision.ExecutionBatchesTable,
+			Columns: []string{productionexceptiondecision.ExecutionBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ExecutionBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionexceptiondecision.ExecutionBatchesTable,
+			Columns: []string{productionexceptiondecision.ExecutionBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &ProductionExceptionDecision{config: _u.config}
 	_spec.Assign = _node.assignValues

@@ -381,6 +381,21 @@ func (_c *ProductionFactCreate) AddOriginReworkBatches(v ...*ProductionWIPBatch)
 	return _c.AddOriginReworkBatchIDs(ids...)
 }
 
+// AddPackagingBatchIDs adds the "packaging_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_c *ProductionFactCreate) AddPackagingBatchIDs(ids ...int) *ProductionFactCreate {
+	_c.mutation.AddPackagingBatchIDs(ids...)
+	return _c
+}
+
+// AddPackagingBatches adds the "packaging_batches" edges to the ProductionWIPBatch entity.
+func (_c *ProductionFactCreate) AddPackagingBatches(v ...*ProductionWIPBatch) *ProductionFactCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddPackagingBatchIDs(ids...)
+}
+
 // SetPosterID sets the "poster" edge to the AdminUser entity by ID.
 func (_c *ProductionFactCreate) SetPosterID(id int) *ProductionFactCreate {
 	_c.mutation.SetPosterID(id)
@@ -830,6 +845,22 @@ func (_c *ProductionFactCreate) createSpec() (*ProductionFact, *sqlgraph.CreateS
 			Inverse: false,
 			Table:   productionfact.OriginReworkBatchesTable,
 			Columns: []string{productionfact.OriginReworkBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PackagingBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionfact.PackagingBatchesTable,
+			Columns: []string{productionfact.PackagingBatchesColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),

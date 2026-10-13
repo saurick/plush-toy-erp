@@ -1,3 +1,5 @@
+import { stylePaginatedRpcData, styleRpcResult } from './rpcMockResult.mjs'
+
 export function createProductionSourceInboundLotScenarios(deps) {
   const {
     assert,
@@ -43,6 +45,20 @@ export function createProductionSourceInboundLotScenarios(deps) {
       beforeNavigate: async (page) => {
         operationalFactMethods = []
         completionCreateParams = []
+        await page.route('**/rpc/masterdata', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method !== 'list_warehouses') return route.fallback()
+          return route.fulfill({ json: {
+            jsonrpc: '2.0',
+            id,
+            result: styleRpcResult(stylePaginatedRpcData(
+              [
+                { id: 1, code: 'MAT-WH', name: '材料仓', type: 'MAIN_MATERIAL', is_active: true },
+                { id: 2, code: 'FG-WH', name: '成品仓', type: 'FINISHED_GOODS', is_active: true },
+              ], 'warehouses', params
+            )),
+          } })
+        })
         page.on('request', (request) => {
           if (!request.url().includes('/rpc/operational_fact')) return
           try {
@@ -73,13 +89,13 @@ export function createProductionSourceInboundLotScenarios(deps) {
         await expectText(page, '生产订单已发布，排产确认已进入 PMC 待办')
 
         const completionButton = page.getByRole('button', {
-          name: '登记生产完工',
+          name: '登记成品收仓',
         })
         await completionButton.waitFor({ state: 'visible', timeout: 10_000 })
         await completionButton.click()
         const modal = page
           .locator('.ant-modal:visible')
-          .filter({ hasText: '登记生产完工' })
+          .filter({ hasText: '登记成品收仓' })
           .last()
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
         const modalText = String((await modal.innerText()) || '').replace(
@@ -127,7 +143,7 @@ export function createProductionSourceInboundLotScenarios(deps) {
           await completionBatchField
             .locator('.ant-select-selection-item')
             .innerText(),
-          /WIP-STYLE-91004/u
+          /WIP-STYLE-91003/u
         )
         await modal.getByLabel('本次完工数量').fill('2')
         await modal
@@ -145,7 +161,7 @@ export function createProductionSourceInboundLotScenarios(deps) {
           .click()
         await expectText(
           page,
-          '已重新读取并确认生产完工报告草稿，请由仓库核对并确认成品入库'
+          '已重新读取并确认成品收仓草稿，请核对并确认成品入库'
         )
 
         assert.equal(completionCreateParams.length, 1)
@@ -170,8 +186,8 @@ export function createProductionSourceInboundLotScenarios(deps) {
         assert.equal(params.customer_key, 'yoyoosun')
         assert.equal(params.production_order_id, 71)
         assert.equal(params.production_order_item_id, 7100)
-        assert.equal(params.production_wip_batch_id, 91_004)
-        assert.equal(params.warehouse_id, 1)
+        assert.equal(params.production_wip_batch_id, 91_003)
+        assert.equal(params.warehouse_id, 2)
         assert.equal(params.new_lot_no, 'PROD-NEW-LOT-REREAD-L1')
         assert.equal(params.quantity, '2')
         assert.equal(Object.hasOwn(params, 'lot_id'), false)
@@ -189,7 +205,7 @@ export function createProductionSourceInboundLotScenarios(deps) {
         await completionButton.click()
         const reopened = page
           .locator('.ant-modal:visible')
-          .filter({ hasText: '登记生产完工' })
+          .filter({ hasText: '登记成品收仓' })
           .last()
         await reopened.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(

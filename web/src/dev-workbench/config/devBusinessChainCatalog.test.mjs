@@ -254,7 +254,7 @@ test('business chain overview covers every real chain once with explicit read-on
   const allowedRelationKinds = new Set(DEV_BUSINESS_CHAIN_RELATION_KINDS)
 
   assert.equal(overview.key, DEV_BUSINESS_CHAIN_OVERVIEW_KEY)
-  assert.equal(overview.label, '全部业务链（设计总图）')
+  assert.equal(overview.label, '订单全流程（销售到出货）')
   assert.equal(overview.readOnly, true)
   assert.equal(overview.allowsActionExecution, false)
   assert.equal(overview.runtimeAuthority, 'design_projection_only')
@@ -434,7 +434,7 @@ test('business chain steps bind formal responsibility, state, action, process, F
   )
   const roleProfiles = yoyoosunRoleFlowMatrix.roles
 
-  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 72)
+  assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepCount, 74)
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainCoverage.scenarioCount, 66)
   assert.equal(
     DEV_FLOW_STATE_CATALOG.businessChainCoverage.stepContractComplete,
@@ -583,7 +583,7 @@ test('production exception chain keeps the decision as a source document and exp
   assert.deepEqual(branchLabels, [
     '拒绝或取消后结束，不进入执行',
     '批准超领额度，转正常领料路径使用',
-    '批准报废或在制让步后创建执行任务',
+    '批准处置后按库存状态分派执行任务',
   ])
   assert(
     chain.nodes.some(
@@ -636,4 +636,22 @@ test('business chain catalog fails closed when a state machine or process defini
       }),
     /misses process definitions: unregistered_process\/unregistered_variant/u
   )
+})
+
+test('warehouse receipt precedes IQC and finished inventory precedes packaging', () => {
+  const purchase = DEV_FLOW_STATE_CATALOG.businessChains.find((chain) => chain.key === 'purchase_to_inventory')
+  const receipt = purchase.steps.find((step) => step.toNodeKey === 'purchase_receipt')
+  assert.deepEqual(receipt.responsibility.ownerPoolKeys, ['warehouse'])
+  assert(purchase.steps.some((step) => step.fromNodeKey === 'purchase_receipt' && step.toNodeKey === 'purchase_quality'))
+
+  const production = DEV_FLOW_STATE_CATALOG.businessChains.find((chain) => chain.key === 'production_to_inventory')
+  const path = ['wip_batch', 'production_completion', 'finished_goods_lot', 'finished_quality', 'packaging_confirmation', 'packaging_execution']
+  for (let index = 1; index < path.length; index += 1) {
+    assert(production.edges.some((edge) => edge.from === path[index - 1] && edge.to === path[index]), `${path[index - 1]} → ${path[index]}`)
+  }
+  const inbound = production.steps.find((step) => step.toNodeKey === 'production_completion')
+  assert.deepEqual(inbound.responsibility.ownerPoolKeys, ['warehouse'])
+  assert.equal(inbound.fromNodeKey, 'wip_batch', 'packaging must not be a prerequisite for formal finished-goods receipt')
+  assert.deepEqual(production.steps.find((step) => step.toNodeKey === 'finished_quality').responsibility.ownerPoolKeys, ['quality'])
+  assert.deepEqual(production.steps.find((step) => step.toNodeKey === 'packaging_execution').responsibility.ownerPoolKeys, ['warehouse'])
 })

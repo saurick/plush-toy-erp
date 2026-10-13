@@ -246,6 +246,18 @@ const allowedERPImports = new Set([
 ]);
 const allowedERPImportsByFile = new Map([
   [
+    "web/src/dev-workbench/components/DevControlStandards.jsx",
+    new Set(["utils/businessProgress.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/components/flow-state/BusinessChainInstanceView.jsx",
+    new Set(["utils/workflowBusinessChain.mjs", "utils/dashboardTaskDisplay.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/components/flow-state/TaskFulfillmentGuide.jsx",
+    new Set(["utils/workflowFulfillment.mjs"]),
+  ],
+  [
     "web/src/dev-workbench/components/DevUIFeedbackExamples.jsx",
     new Set([
       "components/business-list/BusinessFormModal",
