@@ -1035,7 +1035,7 @@ export function readBusinessSummaryTotal(targetKey, bodyText = "") {
     return match ? [Number(match[1])] : [];
   });
   if (targetKey === "task-board") {
-    const boardCounts = ["常规待办", "阻塞", "到期提醒", "已结束"].map(
+    const boardCounts = ["常规待办", "异常处理", "到期提醒", "已结束"].map(
       (label) => {
         const match = String(bodyText).match(
           new RegExp(`${label}\\s*(\\d+)`, "u"),

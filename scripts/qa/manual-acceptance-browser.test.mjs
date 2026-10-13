@@ -1679,9 +1679,13 @@ test("business summary totals use the visible client-facing counters", () => {
   assert.equal(
     readBusinessSummaryTotal(
       "task-board",
-      "常规待办 6 阻塞 3 到期提醒 8 已结束 3",
+      "常规待办 7 异常处理 3 到期提醒 8 已结束 2",
     ),
     20,
+  );
+  assert.equal(
+    readBusinessSummaryTotal("task-board", "常规待办 7 到期提醒 8 已结束 2"),
+    0,
   );
   assert.equal(
     readBusinessSummaryTotal("products", "总产品 34 当前结果 20"),
