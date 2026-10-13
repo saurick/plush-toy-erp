@@ -1010,6 +1010,9 @@ test("production exception fixture completes one formal over-issue approval and 
         "reject_production_exception",
         "rejected_end",
         "over_issue_end",
+        "warehouse_exception_execution",
+        "execute_warehouse_production_exception",
+        "warehouse_exception_end",
       ];
       nodes = nodeKeys.map((nodeKey, index) => ({
         id: 91 + index,
@@ -1089,6 +1092,19 @@ test("production exception fixture completes one formal over-issue approval and 
     apply: false,
   });
   assert.deepEqual(second, first);
+  assert.equal(mutations, 3);
+  const warehouseNode = nodes.find((node) => node.node_key === "warehouse_exception_execution");
+  warehouseNode.status = "active";
+  await assert.rejects(
+    () => ensureManualAcceptanceProductionExceptionApproval({ ...args, apply: false }),
+    /warehouse_exception_execution expected waiting/u,
+  );
+  warehouseNode.status = "waiting";
+  nodes = nodes.filter((node) => node !== warehouseNode);
+  await assert.rejects(
+    () => ensureManualAcceptanceProductionExceptionApproval({ ...args, apply: false }),
+    /warehouse_exception_execution/u,
+  );
   assert.equal(mutations, 3);
 });
 

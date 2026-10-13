@@ -3318,13 +3318,27 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
     ["completed"],
     `${decisionNo} approval readback`,
   );
+  for (const nodeKey of [
+    "production_exception_execution",
+    "execute_production_exception",
+    "end",
+    "reject_production_exception",
+    "rejected_end",
+    "warehouse_exception_execution",
+    "execute_warehouse_production_exception",
+    "warehouse_exception_end",
+  ]) {
+    requireProductionExceptionProcessNode(
+      processData, nodeKey, ["waiting"], `${decisionNo} approval readback`,
+    );
+  }
   const nodes = productionExceptionProcessNodes(
     processData,
     `${decisionNo} approval readback`,
   );
   const sourceReadback = processData?.source_readback;
   if (
-    nodes.length !== 8 ||
+    nodes.length !== 11 ||
     String(instance.status || "").toLowerCase() !== "completed" ||
     Number(sourceReadback?.id) !== decisionID ||
     String(sourceReadback?.status || "").toUpperCase() !== "APPROVED" ||
