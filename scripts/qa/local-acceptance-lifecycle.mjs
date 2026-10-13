@@ -275,7 +275,9 @@ export async function runLocalAcceptanceLifecycle({
       return result;
     } catch (error) {
       if (error instanceof LocalAcceptanceLifecycleError) throw error;
-      throw new LocalAcceptanceLifecycleError(name, safeError(error));
+      const failure = new LocalAcceptanceLifecycleError(name, safeError(error));
+      if (error?.datasetEvidence) failure.datasetEvidence = error.datasetEvidence;
+      throw failure;
     }
   };
 

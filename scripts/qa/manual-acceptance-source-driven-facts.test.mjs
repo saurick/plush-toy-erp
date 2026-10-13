@@ -200,8 +200,8 @@ function createRPC({
     return { [key]: item };
   };
 
-  const rpc = async ({ domain, method, params }) => {
-    calls.push({ domain, method, params: structuredClone(params) });
+  const rpc = async ({ actor, domain, method, params }) => {
+    calls.push({ actor, domain, method, params: structuredClone(params) });
     if (method === conflictMethod) {
       return { code: 40901, message: "source conflict" };
     }
@@ -274,6 +274,7 @@ function createRPC({
         assert.equal(domain, "production_wip");
         assert.equal(params.production_order_id, 600);
         if (params.action === "CONFIRM_PACKAGING_MATERIAL") {
+          assert.equal(actor, "sales");
           assert.equal(params.production_order_item_id, 601);
           assert.equal(params.expected_version, packagingConfirmation.version);
           packagingConfirmation.status = "CONFIRMED";
@@ -353,6 +354,14 @@ function createRPC({
           );
           assert.ok(target);
           assert.equal(params.quantity, batch.quantity);
+          if (target.operation_code === "PACKAGING") {
+            const receipt = records.get(params.finished_goods_receipt_id)?.item;
+            assert.equal(receipt?.status, "POSTED");
+            assert.equal(receipt.production_wip_batch_id, batch.id);
+            assert.equal(receipt.quantity, params.quantity);
+          } else {
+            assert.equal(params.finished_goods_receipt_id, undefined);
+          }
           batch.version += 1;
           productionWIPBatches.push({
             id: 711 + productionWIPBatches.length,
@@ -374,14 +383,21 @@ function createRPC({
       case "create_production_material_issue_from_order":
       case "create_production_rework_from_completion":
         return createRecord("production_fact", {}, method);
-      case "create_production_completion_from_order":
+      case "create_production_completion_from_order": {
+        if (params.production_wip_batch_id != null) {
+          const batch = productionWIPBatches.find((item) => item.id === params.production_wip_batch_id);
+          assert.equal(batch?.production_order_operation_id, 703);
+          assert.equal(batch.status, "WAITING_QUALITY");
+        }
         return createRecord(
           "production_fact",
           {
             production_wip_batch_id: params.production_wip_batch_id ?? null,
+            quantity: params.quantity,
           },
           method,
         );
+      }
       case "post_production_fact": {
         const record = records.get(params.id);
         assert.equal(record?.key, "production_fact");
@@ -455,6 +471,10 @@ function createRPC({
             (item) => item.id === batch.production_order_operation_id,
           );
           const gates = qualityGatesByOperation.get(operation.operation_code);
+          if (operation.operation_code === "HANDWORK") {
+            assert.ok([...records.values()].some(({ item }) =>
+              item.production_wip_batch_id === batch.id && item.status === "POSTED"));
+          }
           const nextGate = gates[inspections.length];
           if (nextGate) {
             inspections.push({
@@ -923,6 +943,18 @@ test("phase-scoped apply executes the formal production chain and returns exact 
       "COMPLETE_OPERATION",
     ],
   );
+  assert.deepEqual(
+    calls.filter((call) => call.method === "execute_production_wip_action").map((call) => call.actor),
+    [
+      "production", "warehouse", "warehouse", "production",
+      "production", "production", "production", "production",
+      "production", "production", "production", "warehouse",
+      "sales", "warehouse", "warehouse", "warehouse",
+    ],
+  );
+  const receiptIndex = calls.findIndex((call) => call.method === "create_production_completion_from_order");
+  const packagingIndex = calls.findIndex((call) => call.params.finished_goods_receipt_id != null);
+  assert.ok(receiptIndex > 0 && receiptIndex < packagingIndex);
   assert.equal(
     calls.filter(
       (call) =>

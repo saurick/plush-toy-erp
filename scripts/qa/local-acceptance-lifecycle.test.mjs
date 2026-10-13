@@ -413,6 +413,22 @@ test("local acceptance lifecycle cleans the acceptance database after a workflow
   );
 });
 
+test("local acceptance lifecycle retains failed dataset evidence through stage wrapping and cleanup", async () => {
+  const runtime = fakeRuntime();
+  const datasetEvidence = { ok: false, completedStages: 5, report: "output/dataset/apply-report.json" };
+  runtime.applyManualDataset = async () => {
+    const failure = new Error("manual acceptance dataset failed at facts");
+    failure.datasetEvidence = datasetEvidence;
+    throw failure;
+  };
+  const report = await runLocalAcceptanceLifecycle({ commit: COMMIT, runID: "dataset-failure", runtime });
+  assert.equal(report.status, "failed");
+  assert.deepEqual(report.evidence.dataset, datasetEvidence);
+  assert.equal(report.cleanup.complete, true);
+  assert.ok(report.stages.some((item) => item.stage === "manual-dataset-apply" && item.status === "failed"));
+  assert.equal(runtime.events.includes("browser:manual"), false);
+});
+
 test("local acceptance lifecycle reports one exact residual database and fails closed", async () => {
   const identity = buildLocalAcceptanceLifecycleIdentity({
     commit: COMMIT,
