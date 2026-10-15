@@ -1,0 +1,245 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+
+import { bindWorkflowActionSubmitGuard } from './workflowTaskActionSubmitGuardCore.mjs'
+
+function loadSubmitGuard({ explainWorkflowActionAccess }) {
+  return {
+    verifyWorkflowTaskActionAccessBeforeSubmit:
+      bindWorkflowActionSubmitGuard({
+        explain: explainWorkflowActionAccess,
+      }),
+  }
+}
+
+test('workflowTaskActionSubmitGuard: missing task or action stops before backend explain', async () => {
+  let explainCalls = 0
+  const warnings = []
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => {
+      explainCalls += 1
+      return { actions: [] }
+    },
+  })
+
+  const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+    task: { task_id: 42 },
+    actionKey: '',
+    onWarning: (message) => warnings.push(message),
+  })
+
+  assert.equal(allowed, false)
+  assert.equal(explainCalls, 0)
+  assert.deepEqual(warnings, ['当前操作暂时无法提交，请刷新后重试'])
+})
+
+test('workflowTaskActionSubmitGuard: unknown action key stops before backend explain', async () => {
+  let explainCalls = 0
+  const warnings = []
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => {
+      explainCalls += 1
+      return { actions: [] }
+    },
+  })
+
+  const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+    task: { id: 42 },
+    actionKey: 'custom_backend_action_key',
+    onWarning: (message) => warnings.push(message),
+  })
+
+  assert.equal(allowed, false)
+  assert.equal(explainCalls, 0)
+  assert.deepEqual(warnings, ['当前操作暂时无法提交，请刷新后重试'])
+})
+
+test('workflowTaskActionSubmitGuard: allows only after backend explain allows the formal action', async () => {
+  const requests = []
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async (params) => {
+      requests.push(params)
+      return {
+        source_access: {
+          applicable: false,
+          resolved: true,
+          allowed: true,
+        },
+        actions: [{ action_key: 'complete', allowed: true, reason: '可完成' }],
+      }
+    },
+  })
+
+  const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+    task: { id: 42, task_id: 99 },
+    actionKey: 'complete',
+  })
+
+  assert.equal(allowed, true)
+  assert.deepEqual(
+    requests.map((request) => ({ ...request })),
+    [{ task_id: 42, action_key: 'complete' }]
+  )
+})
+
+test('workflowTaskActionSubmitGuard: source access is required for non-reminder actions', async () => {
+  const warnings = []
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => ({
+      source_access: {
+        applicable: true,
+        resolved: true,
+        allowed: false,
+        reason: '当前账号不能查看该任务的相关单据，因此不能办理。',
+      },
+      action: {
+        action_key: 'complete',
+        allowed: true,
+        reason: '可完成',
+      },
+    }),
+  })
+
+  const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+    task: { id: 42 },
+    actionKey: 'complete',
+    onWarning: (message) => warnings.push(message),
+  })
+
+  assert.equal(allowed, false)
+  assert.deepEqual(warnings, [
+    '当前账号不能查看该任务的相关单据，因此不能办理。',
+  ])
+})
+
+test('workflowTaskActionSubmitGuard: reminder stays independent from source access', async () => {
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => ({
+      source_access: {
+        applicable: true,
+        resolved: true,
+        allowed: false,
+      },
+      action: {
+        action_key: 'urge',
+        allowed: true,
+      },
+    }),
+  })
+
+  assert.equal(
+    await verifyWorkflowTaskActionAccessBeforeSubmit({
+      task: { id: 42 },
+      actionKey: 'urge',
+      reason: '请尽快处理',
+    }),
+    true
+  )
+})
+
+test('workflowTaskActionSubmitGuard: hides raw backend deny reason from user visible warning', async () => {
+  const warnings = []
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => ({
+      actions: [
+        {
+          action_key: 'block',
+          allowed: false,
+          reason: 'owner_role_key mismatch: warehouse',
+        },
+      ],
+    }),
+  })
+
+  const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+    task: { id: 42 },
+    actionKey: 'block',
+    reason: '等待仓库确认',
+    onWarning: (message) => warnings.push(message),
+  })
+
+  assert.equal(allowed, false)
+  assert.deepEqual(warnings, ['当前账号不能提交这项操作'])
+})
+
+test('workflowTaskActionSubmitGuard: required reason stops before backend explain', async () => {
+  let explainCalls = 0
+  const warnings = []
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => {
+      explainCalls += 1
+      return { actions: [{ action_key: 'reject', allowed: true }] }
+    },
+  })
+
+  const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+    task: { id: 42 },
+    actionKey: 'reject',
+    reason: '  ',
+    onWarning: (message) => warnings.push(message),
+  })
+
+  assert.equal(allowed, false)
+  assert.equal(explainCalls, 0)
+  assert.deepEqual(warnings, ['请先填写退回原因'])
+})
+
+test('workflowTaskActionSubmitGuard: resume requires an unblock explanation', async () => {
+  let explainCalls = 0
+  const warnings = []
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => {
+      explainCalls += 1
+      return { actions: [{ action_key: 'resume', allowed: true }] }
+    },
+  })
+
+  const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+    task: { id: 42 },
+    actionKey: 'resume',
+    reason: ' ',
+    onWarning: (message) => warnings.push(message),
+  })
+
+  assert.equal(allowed, false)
+  assert.equal(explainCalls, 0)
+  assert.deepEqual(warnings, ['请先填写阻塞解除说明'])
+})
+
+test('workflowTaskActionSubmitGuard: missing requested backend action denies before submit', async () => {
+  const warnings = []
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => ({
+      actions: [{ action_key: 'complete', allowed: true }],
+    }),
+  })
+
+  const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+    task: { id: 42 },
+    actionKey: 'reject',
+    reason: '资料不完整',
+    onWarning: (message) => warnings.push(message),
+  })
+
+  assert.equal(allowed, false)
+  assert.deepEqual(warnings, ['当前账号不能提交这项操作'])
+})
+
+test('workflowTaskActionSubmitGuard: backend explain failure reports sanitized action error', async () => {
+  const errors = []
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => {
+      throw new Error('permission denied by owner_role_key')
+    },
+  })
+
+  const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+    task: { id: 42 },
+    actionKey: 'urge',
+    reason: '请尽快处理',
+    onError: (message) => errors.push(message),
+  })
+
+  assert.equal(allowed, false)
+  assert.deepEqual(errors, ['暂时无法确认这项操作是否可用，请稍后重试'])
+})
