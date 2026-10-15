@@ -1,0 +1,1058 @@
+.erp-entry-card__button.ant-btn {
+  min-height: 56px;
+  justify-content: flex-start;
+  border-radius: 18px;
+  border-color: #d1d5db;
+  color: #204160;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.erp-entry-card__button.ant-btn:hover,
+.erp-entry-card__button.ant-btn:focus-visible {
+  border-color: #8fb39a;
+  color: #204160;
+}
+
+.erp-primary-button,
+.erp-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.erp-primary-button {
+  border: 1px solid #2f8f4b;
+  background: #2f8f4b;
+  color: white;
+}
+
+.erp-primary-button:hover {
+  background: #24723b;
+}
+
+.erp-secondary-button {
+  border: 1px solid #d9e6da;
+  background: var(--erp-surface-bg);
+  color: #1f2937;
+}
+
+.erp-secondary-button:hover {
+  border-color: #b7ccb9;
+  background: #f7faf7;
+}
+
+.erp-print-center-page {
+  gap: 14px;
+}
+
+.erp-print-center-workbench-card .ant-card-body {
+  padding: 20px;
+}
+
+.erp-print-center-detail-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+  color: var(--erp-primary-strong);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.erp-print-center-nav-panel {
+  min-width: 0;
+}
+
+.erp-print-center-nav-title {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.erp-print-center-note-text,
+.erp-print-center-workbench-note {
+  color: var(--erp-text-muted);
+  line-height: 1.6;
+}
+
+.erp-print-center-section-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+  margin-bottom: 16px;
+}
+
+.erp-print-center-section-title.ant-typography {
+  margin: 0;
+}
+
+.erp-print-center-workbench-note {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+
+.erp-print-center-workbench {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(420px, 1.6fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.erp-print-center-nav-panel,
+.erp-print-center-preview-panel {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg-soft);
+  overflow: hidden;
+}
+
+.erp-print-center-nav-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.erp-print-center-template-list {
+  display: grid;
+  gap: 8px;
+}
+
+.erp-print-center-template-btn {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  min-height: 62px;
+  padding: 12px;
+  color: var(--erp-text);
+  text-align: left;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.erp-print-center-template-btn:hover,
+.erp-print-center-template-btn--active {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-softer);
+  box-shadow: var(--erp-surface-shadow);
+}
+
+.erp-print-center-template-btn:disabled {
+  color: var(--erp-text-subtle);
+  cursor: not-allowed;
+  background: var(--erp-surface-bg-soft);
+  box-shadow: none;
+}
+
+.erp-print-center-template-title,
+.erp-print-center-template-meta {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-print-center-template-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.erp-print-center-template-icon {
+  flex: none;
+  font-size: 16px;
+}
+
+.erp-print-center-template-meta {
+  color: var(--erp-primary-strong);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.erp-print-center-template-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-print-center-template-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  color: var(--erp-primary-strong);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.erp-print-center-template-action .anticon {
+  font-size: 11px;
+}
+
+.erp-print-center-note-list {
+  display: grid;
+  gap: 6px;
+}
+
+.erp-print-center-note-item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-print-center-note-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: var(--erp-primary);
+}
+
+.erp-print-center-paper-preview {
+  position: relative;
+  min-height: 360px;
+  padding: 22px;
+  color: #1f2937;
+  border: 1px solid #d9d9d9;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 32px rgb(15 23 42 / 8%);
+}
+
+.erp-print-center-paper-title {
+  display: block;
+  margin-bottom: 16px;
+  color: #111827;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.erp-print-center-paper-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 10px;
+}
+
+.erp-print-center-paper-line {
+  min-height: 30px;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 13px;
+}
+
+.erp-print-center-paper-section {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.erp-print-center-paper-section span {
+  min-height: 34px;
+  padding: 8px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: #f9fafb;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.erp-print-center-paper-stamp {
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+  color: #9ca3af;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+}
+
+@media screen and (max-width: 1200px) {
+  .erp-command-center-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-command-center-rail-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-command-center-rail-group + .erp-command-center-rail-group {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+}
+
+@media screen and (max-width: 860px) {
+  .erp-print-center-workbench {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media screen and (max-width: 720px) {
+  .erp-command-center-rail-nav,
+  .erp-print-center-section-head,
+  .erp-print-center-paper-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-print-center-paper-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+.erp-print-shell {
+  --erp-print-selection-color: var(--erp-accent);
+  --erp-print-selection-background: color-mix(
+    in srgb,
+    var(--erp-accent) 10%,
+    #fff
+  );
+  --erp-print-selection-anchor-background: color-mix(
+    in srgb,
+    var(--erp-accent) 18%,
+    #fff
+  );
+  color: var(--erp-text);
+  position: relative;
+  min-height: 100vh;
+  padding: 10px 14px 14px;
+  background: var(--erp-page-bg);
+}
+
+.erp-print-shell__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+}
+
+.erp-print-shell__toolbar-copy {
+  display: flex;
+  flex: 1 1 260px;
+  min-width: min(100%, 260px);
+  align-items: center;
+  align-content: flex-start;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  color: var(--erp-text);
+}
+
+.erp-print-shell__source-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
+  font-size: 12px;
+}
+
+.erp-print-shell__toolbar-status {
+  font-size: 12px;
+  color: var(--erp-text-muted);
+}
+
+.erp-print-shell__toolbar-actions {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  align-items: flex-start;
+  align-content: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-print-shell__toolbar-group {
+  display: inline-flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  align-items: center;
+  align-content: flex-start;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-print-shell__button {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease;
+}
+
+.erp-print-shell__button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.erp-print-shell__button--ghost {
+  border: 1px solid var(--erp-border-strong);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+}
+
+.erp-print-shell__button--ghost:hover:not(:disabled) {
+  border-color: var(--erp-primary-strong);
+  color: var(--erp-primary-strong);
+}
+
+.erp-print-shell__button--primary {
+  border: 1px solid var(--erp-primary);
+  background: var(--erp-primary);
+  color: var(--erp-on-accent);
+}
+
+.erp-print-shell__button--primary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--erp-primary) 90%, #000);
+  background: color-mix(in srgb, var(--erp-primary) 90%, #000);
+}
+
+.erp-print-shell__button--active {
+  border-color: var(--erp-primary-strong);
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
+}
+
+.erp-print-shell__counter {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 16px;
+  background: var(--erp-surface-bg-soft);
+  font-size: 12px;
+  color: var(--erp-text-muted);
+  white-space: nowrap;
+}
+
+.erp-print-shell__formula-panel {
+  display: grid;
+  gap: 6px;
+  margin-top: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg-soft);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--erp-text);
+}
+
+.erp-print-shell__content {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: 12px;
+  margin-top: 12px;
+  align-items: start;
+}
+
+.erp-print-shell--preparing::before {
+  content: attr(data-preparing-text);
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--erp-page-bg);
+  color: var(--erp-text);
+  font:
+    14px/1.6 -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.erp-print-shell--preparing .erp-print-shell__toolbar,
+.erp-print-shell--preparing .erp-print-shell__formula-panel,
+.erp-print-shell--preparing .erp-print-shell__content {
+  visibility: hidden;
+}
+
+.erp-print-shell__panel {
+  min-width: 0;
+}
+
+.erp-print-shell__record-panel {
+  max-height: calc(100vh - 96px);
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+  font:
+    400 13px/20px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+.erp-print-shell__record-panel p {
+  margin: 8px 0 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--erp-text-muted);
+}
+
+.erp-print-shell__tool-section {
+  padding: 12px 0;
+  border-top: 1px solid var(--erp-border);
+}
+
+.erp-print-shell__tool-section:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.erp-print-shell__tool-section:last-child {
+  padding-bottom: 0;
+}
+
+.erp-print-shell__tool-section h3 {
+  margin: 0 0 8px;
+  color: var(--erp-text);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.erp-print-shell__tool-section .erp-print-shell__toolbar-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  width: 100%;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.erp-print-shell__tool-section .erp-print-shell__button {
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 6px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  font:
+    400 13px/20px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  white-space: nowrap;
+}
+
+.erp-print-shell__tool-section .erp-print-shell__button:hover:not(:disabled) {
+  border-color: var(--erp-primary);
+}
+
+.erp-print-shell__tool-section .erp-print-shell__button--active {
+  border-color: var(--erp-primary-strong);
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
+}
+
+.erp-print-shell__tool-section .erp-print-shell__counter {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 24px;
+  padding: 0;
+  justify-content: flex-start;
+  border: 0;
+  border-radius: 4px;
+}
+
+.erp-print-shell__workspace {
+  min-width: 0;
+}
+
+.erp-print-shell .print-zoom-control {
+  --erp-control-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--erp-text);
+  font:
+    400 13px/20px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  white-space: nowrap;
+}
+
+.erp-print-shell .print-zoom-select {
+  position: relative;
+  display: inline-flex;
+  width: 120px;
+  flex: 0 0 120px;
+}
+
+.erp-print-shell .print-zoom-select::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  box-sizing: border-box;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--erp-text-subtle);
+  border-bottom: 1.5px solid var(--erp-text-subtle);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+.erp-print-shell .print-zoom-select select {
+  appearance: none;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: 32px;
+  min-width: 0;
+  margin: 0;
+  padding: 4px 28px 4px 10px;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 6px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  font: inherit;
+  letter-spacing: normal;
+  line-height: 20px;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.erp-print-shell .print-zoom-select select:hover {
+  border-color: var(--erp-primary);
+}
+
+.erp-print-shell .print-zoom-select select:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.erp-print-shell__feedback {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  font:
+    400 13px/20px system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  box-shadow: 0 4px 16px rgb(15 23 42 / 12%);
+  transform: translateX(-50%);
+}
+
+.erp-print-shell__feedback > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-print-shell__feedback-close {
+  flex: 0 0 24px;
+  align-self: flex-start;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--erp-text-subtle);
+  font:
+    20px/24px system-ui,
+    sans-serif;
+  cursor: pointer;
+}
+
+.erp-print-shell__feedback-close:hover {
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-print-shell__feedback-close:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.erp-print-shell__record-panel .erp-print-shell__tool-feedback {
+  margin: 8px 0 0;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.erp-print-shell [data-print-feedback][data-tone='error'] {
+  color: var(--erp-visual-danger-text);
+}
+
+@media screen {
+  .erp-print-shell .erp-material-contract-meta__row,
+  .erp-print-shell .erp-processing-contract-meta__row {
+    column-gap: 8px;
+  }
+
+  .erp-print-shell .erp-material-contract-meta__row--top-item {
+    --erp-material-contract-label-width: 20mm;
+  }
+
+  .erp-print-shell__stage-wrap {
+    width: max-content;
+    zoom: var(--print-view-scale, 1);
+  }
+  .erp-print-shell__stage-wrap > * {
+    flex-shrink: 0;
+  }
+
+  .erp-print-shell__stage {
+    --erp-print-focus-color: color-mix(
+      in srgb,
+      var(--erp-accent) 82%,
+      transparent
+    );
+    --erp-print-focus-background: color-mix(
+      in srgb,
+      var(--erp-accent) 8%,
+      transparent
+    );
+    --erp-print-focus-outset: 5px;
+  }
+
+  /* The focus frame includes the font's caret bounds without changing paper layout. */
+  .erp-print-shell__stage [contenteditable='true']:focus,
+  .erp-print-shell__stage
+    [data-print-focus-group]:has([contenteditable='true']:focus) {
+    outline: 1px dashed var(--erp-print-focus-color);
+    outline-offset: var(--erp-print-focus-outset);
+    background: var(--erp-print-focus-background);
+    box-shadow: 0 0 0 var(--erp-print-focus-outset)
+      var(--erp-print-focus-background);
+  }
+
+  .erp-print-shell__stage
+    :is(td, th):has([contenteditable='true']:focus):where(
+      :not(:has(:is(td, th):focus-within))
+    ),
+  .erp-print-shell__stage :is(td, th)[contenteditable='true']:focus {
+    outline: 1px dashed var(--erp-print-focus-color);
+    outline-offset: -2px;
+    background: var(--erp-print-focus-background);
+    box-shadow: none;
+  }
+
+  .erp-print-shell__stage
+    :is(td, th)
+    [contenteditable='true']:not(td, th):focus {
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .erp-print-shell__stage
+    [data-print-focus-group]
+    [contenteditable='true']:focus {
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .erp-print-shell [contenteditable][data-print-empty='true'] {
+    position: relative;
+  }
+  .erp-print-shell [contenteditable='true'][data-print-empty='true']::before {
+    content: '点击填写';
+    position: absolute;
+    inset-inline: min(2px, 5%);
+    top: 50%;
+    transform: translateY(-50%);
+    max-height: 100%;
+    overflow: hidden;
+    color: #8b9890;
+    font-family:
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      sans-serif;
+    font-size: min(10px, 0.9em);
+    font-weight: 400;
+    line-height: 1.2;
+    text-align: inherit;
+    pointer-events: none;
+    user-select: none;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+@media print {
+  .erp-print-shell__feedback {
+    display: none;
+  }
+}
+
+.erp-print-shell__stage {
+  max-height: calc(100vh - 96px);
+  padding: 24px;
+  overflow: auto;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-page-bg);
+}
+
+.erp-print-shell__stage-wrap {
+  display: flex;
+  justify-content: center;
+  min-width: 100%;
+}
+
+.erp-print-shell__stage-wrap--continued {
+  align-items: flex-start;
+}
+
+.erp-print-shell__selection-impact {
+  display: block;
+  margin-top: 4px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.erp-print-shell__tool-section > details > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  color: var(--erp-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.erp-print-shell__tool-section > details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.erp-print-shell__tool-section > details > summary::after {
+  content: '';
+  flex: 0 0 6px;
+  width: 6px;
+  height: 6px;
+  margin: 0 3px 3px auto;
+  border-right: 1.5px solid var(--erp-text-subtle);
+  border-bottom: 1.5px solid var(--erp-text-subtle);
+  transform: rotate(45deg);
+}
+
+.erp-print-shell__tool-section > details[open] > summary::after {
+  margin-bottom: -3px;
+  transform: rotate(225deg);
+}
+
+.erp-print-shell__tool-section
+  > details[open]
+  > .erp-print-shell__tool-content {
+  padding-top: 8px;
+}
+
+.erp-print-shell__tool-count {
+  color: var(--erp-text-subtle);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.erp-print-tool-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  gap: 8px;
+  text-align: left;
+}
+
+.erp-print-tool-button[data-print-tool-wide] {
+  grid-column: 1 / -1;
+  width: 100%;
+}
+
+.erp-print-tool-icon {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--erp-primary-strong);
+}
+
+.erp-print-shell__toolbar .erp-print-tool-button {
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.erp-print-shell__toolbar .erp-print-tool-icon {
+  color: inherit;
+}
+
+.erp-print-shell__record-panel :is(button, summary, select):focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.erp-print-shell__selection {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed var(--erp-border-strong);
+}
+
+.erp-print-shell__selection > p {
+  margin: 0;
+  color: var(--erp-primary-strong);
+}
+
+.erp-print-image-tools {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.erp-print-image-tool {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+}
+
+.erp-print-image-tool__thumbnail {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 4px;
+  background: var(--erp-surface-bg-soft);
+  overflow: hidden;
+}
+
+.erp-print-image-tool__thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.erp-print-image-tool__copy {
+  min-width: 0;
+}
+
+.erp-print-image-tool__copy strong {
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.erp-print-image-tool__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-print-image-tool__actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--erp-primary-strong);
+  font: inherit;
+  cursor: pointer;
+}
+
+.erp-print-image-tool__actions .erp-print-tool-icon {
+  flex-basis: 14px;
+  width: 14px;
+  height: 14px;
+  color: inherit;
+}
+
+.erp-print-image-tool__actions button:last-child {
+  color: var(--erp-text-subtle);
+}
+
+.erp-print-shell__record-panel > .erp-print-shell__tool-section > h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.erp-print-shell__record-panel button:disabled {
+  opacity: 0.45;
+}
