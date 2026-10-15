@@ -1,0 +1,1782 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+
+import { RpcErrorCode } from '../../common/consts/errorCodes.js'
+import { referenceCustomerPackage } from '../../../../config/customers/reference-customer/customerPackage.mjs'
+import { buildRuntimePreviewManifest } from '../../../../scripts/qa/customer-config-runtime-manifest.mjs'
+import {
+  attachEffectiveSessionToAdminProfile,
+  attachUnavailableEffectiveSessionToAdminProfile,
+  applyEffectiveFieldPolicyFlags,
+  buildEffectiveSessionDiagnosticSummary,
+  canMountCustomerRuntime,
+  effectiveSessionAllowsAction,
+  effectiveSessionAllowsPage,
+  filterColumnsByEffectiveFieldPolicy,
+  filterNavigationSectionsByAdminProfile,
+  getEffectiveFieldPolicy,
+  getEffectivePrintTemplateDefaults,
+  getAdminProfileSyncErrorAction,
+  getProfileSyncFailure,
+  hasExpectedDesktopCustomerSession,
+  hasExpectedCustomerRuntime,
+  hasEffectiveSessionAction,
+  isLocalCustomerDesktopPreviewSession,
+  isTransientProfileSyncError,
+  loadProfileSyncReadWithRetry,
+  resolveDefaultFieldPolicySurface,
+  resolveEffectiveSessionCustomerKey,
+  resolveEffectiveSessionPageAccess,
+  shouldRedirectFromCurrentNavigation,
+  shouldGuardCustomerBusinessPageRuntime,
+} from './adminProfileSync.mjs'
+
+const erpRootDir = dirname(dirname(fileURLToPath(import.meta.url)))
+
+function readERPLayoutSource() {
+  return readFileSync(join(erpRootDir, 'components/ERPLayout.jsx'), 'utf8')
+}
+
+test('ERPLayout: 管理员 profile 后台同步调度合同', () => {
+  const source = readERPLayoutSource()
+
+  assert.match(source, /const PROFILE_SYNC_INTERVAL_MS = 60 \* 1000/u)
+  assert.match(source, /const profileSyncInFlightRef = useRef\(null\)/u)
+  assert.match(source, /const profileSyncActiveRef = useRef\(false\)/u)
+  assert.match(source, /const profileInitialSyncStartedRef = useRef\(false\)/u)
+  assert.match(
+    source,
+    /if \(profileSyncInFlightRef\.current\) \{\s*return profileSyncInFlightRef\.current\s*\}/u,
+    'single-flight guard should return the in-flight profile sync promise'
+  )
+  assert.match(
+    source,
+    /const PROFILE_BOOTSTRAP_RETRY_DELAYS_MS = \[200, 600\]/u
+  )
+  assert.match(
+    source,
+    /loadCurrentSyncRead\(\s*\(\) => adminRpc\.call\('me', \{\}\),\s*bootstrapRetryDelays\s*\)/u
+  )
+  assert.match(
+    source,
+    /const effectiveSession = await loadCurrentSyncRead\(\s*\(\) =>\s*getEffectiveSession\(\{\s*customer_key: effectiveSessionCustomerKey,\s*\}\),\s*bootstrapRetryDelays\s*\)/u
+  )
+  assert.match(
+    source,
+    /profileSyncInFlightRef\.current = syncPromise/u,
+    'new profile sync should publish its in-flight promise'
+  )
+  assert.match(
+    source,
+    /if \(profileSyncInFlightRef\.current === syncPromise\) \{\s*profileSyncInFlightRef\.current = null\s*\}/u,
+    'profile sync should clear only the matching in-flight promise'
+  )
+  assert.match(
+    source,
+    /const isCurrentGeneration = \(\) =>\s*profileSyncActiveRef\.current &&\s*profileSyncGenerationRef\.current === syncGeneration/u
+  )
+  assert.match(
+    source,
+    /const loadCurrentSyncRead = \(load, retryDelaysMs\) =>[\s\S]*?if \(!isCurrentSync\(\)\) \{[\s\S]*?isAbortError: true/u,
+    'each retry attempt must stop before issuing an RPC after unmount'
+  )
+  assert.match(
+    source,
+    /if \(!isCurrentSync\(\)\) \{\s*return\s*\}[\s\S]*?persistAuthMeta/u,
+    'stale profile reads must stop before persisting auth metadata'
+  )
+})
+
+test('ERPLayout: 跨窗口登录态变化会先关闭旧投影并使在途同步失效', () => {
+  const source = readERPLayoutSource()
+
+  assert.match(
+    source,
+    /const ADMIN_AUTH_STORAGE_KEYS = new Set\(\[\s*'admin_access_token',\s*'admin_user_id'\s*,?\s*\]\)/u
+  )
+  assert.match(
+    source,
+    /setProfileSyncCompleted\(false\)[\s\S]*?profileSyncGenerationRef\.current \+= 1[\s\S]*?profileSyncInFlightRef\.current = null[\s\S]*?loadProfile\(\{ showLoading: true \}\)/u
+  )
+  assert.match(
+    source,
+    /window\.addEventListener\('storage', handleAdminAuthStorageChange\)[\s\S]*?window\.removeEventListener\('storage', handleAdminAuthStorageChange\)/u
+  )
+})
+
+test('ERPLayout: profile 同步只由首次挂载、前台恢复和 visible 定时触发', () => {
+  const source = readERPLayoutSource()
+
+  assert.match(
+    source,
+    /useEffect\(\(\) => \{\s*profileSyncActiveRef\.current = true\s*if \(!profileInitialSyncStartedRef\.current\) \{\s*profileInitialSyncStartedRef\.current = true\s*loadProfile\(\{ showLoading: true \}\)\s*\}/u,
+    'layout mount should request admin.me through loadProfile'
+  )
+  assert.match(
+    source,
+    /document\.addEventListener\('visibilitychange', handleVisibilityChange\)/u
+  )
+  assert.match(
+    source,
+    /const handleVisibilityChange = \(\) => \{\s*if \(document\.visibilityState === 'visible'\) \{\s*loadProfile\(\)\s*\}\s*\}/u,
+    'returning from hidden to visible should trigger exactly the shared sync path'
+  )
+  assert.match(
+    source,
+    /const profileSyncTimer = window\.setInterval\(\(\) => \{\s*if \(document\.visibilityState === 'visible'\) \{\s*loadProfile\(\)\s*\}\s*\}, PROFILE_SYNC_INTERVAL_MS\)/u,
+    'timer callback must not request profile while document is hidden'
+  )
+  assert.match(
+    source,
+    /return \(\) => \{\s*profileSyncActiveRef\.current = false\s*document\.removeEventListener\('visibilitychange', handleVisibilityChange\)\s*window\.clearInterval\(profileSyncTimer\)\s*\}/u,
+    'unmount should clean the visibility listener and timer'
+  )
+  assert.match(
+    source,
+    /useEffect\(\(\) => \{[\s\S]*?window\.clearInterval\(profileSyncTimer\)[\s\S]*?\}, \[loadProfile\]\)/u,
+    'ordinary route or menu changes should not re-run profile sync effect'
+  )
+  assert.match(
+    source,
+    /\},\s*\[\s*activeBrand,\s*adminRpc,\s*configuredCustomerKey,\s*pauseBusinessRequests\s*\]\s*\)/u,
+    'loadProfile should not depend on location or selected menu state'
+  )
+  assert.match(
+    source,
+    /const loadProfile = useCallback\(\s*\(\{ showLoading = false \} = \{\}\) =>/u,
+    'background profile sync should default to silent mode'
+  )
+  assert.match(
+    source,
+    /if \(showLoading\) \{\s*if \(!verifiedAccessKeyRef\.current\) setProfileSyncCompleted\(false\)\s*setProfileLoading\(true\)\s*\}/u,
+    'only the first explicit loading sync should reset visible loading/completed state'
+  )
+})
+
+test('ERPLayout: 客户构建在有效会话完成前不渲染产品核心页面', () => {
+  const source = readERPLayoutSource()
+
+  assert.match(
+    source,
+    /const configuredCustomerKey = resolveEffectiveSessionCustomerKey\(activeBrand\)/u
+  )
+  assert.match(
+    source,
+    /const customerRuntimeBootstrapPending =\s*requiresConfiguredCustomerRuntime && !profileSyncCompleted/u
+  )
+  assert.match(
+    source,
+    /isSuperAdmin &&\s*!requiresConfiguredCustomerRuntime &&\s*!effectiveSessionCustomerKey/u
+  )
+  assert.match(
+    source,
+    /shouldUseProductCoreNavigation\s*\? permissionGovernedSections\s*:\s*filterNavigationSectionsByAdminProfile/u,
+    'neutral Product Core navigation must not be filtered by an absent customer projection'
+  )
+  assert.match(
+    source,
+    /if \(shouldUseProductCoreNavigation\) \{\s*return currentNavigationEntry\.matched !== true/u,
+    'neutral Product Core may open registered capability-review routes but not unknown routes'
+  )
+  assert.match(
+    source,
+    /const customerRuntimeGate = resolveCustomerRuntimeGate\([\s\S]*?bootstrapPending: customerRuntimeBootstrapPending[\s\S]*?pageRequiresCustomerRuntime:[\s\S]*?currentPageRequiresConfiguredCustomerRuntime/u
+  )
+  assert.match(
+    source,
+    /if \(\s*customerRuntimeGate !== CUSTOMER_RUNTIME_GATE\.READY \|\|\s*!currentPageShouldRedirect\s*\) \{\s*return\s*\}/u,
+    'configured customer business pages must not redirect during bootstrap or replace the fail-closed runtime boundary'
+  )
+  assert.match(
+    source,
+    /if \(customerRuntimeGate === CUSTOMER_RUNTIME_GATE\.BOOTSTRAP\) \{[\s\S]*?data-customer-runtime-bootstrap="true"/u
+  )
+  assert.match(
+    source,
+    /customerRuntimeGate === CUSTOMER_RUNTIME_GATE\.UNAVAILABLE \|\|[\s\S]*?<CustomerRuntimeUnavailable/u
+  )
+  assert.match(
+    source,
+    /hasExpectedDesktopCustomerSession\([\s\S]*?isLocalDev: import\.meta\.env\.DEV === true/u
+  )
+  assert.match(
+    source,
+    /data-local-customer-desktop-preview="true"[\s\S]*?本地功能预览/u
+  )
+  assert.match(
+    source,
+    /LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS = new Set\(\[[\s\S]*?'global-dashboard'[\s\S]*?'task-board'/u
+  )
+  assert.match(
+    source,
+    /isLocalCustomerDesktopPreview &&[\s\S]*?LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS\.has/u
+  )
+})
+
+test('ERPLayout: profile 或 effective session 同步失败时不复用缓存授权投影', () => {
+  const source = readERPLayoutSource()
+
+  assert.doesNotMatch(source, /const cachedEffectiveSession/u)
+  assert.doesNotMatch(source, /继续使用缓存投影/u)
+  assert.doesNotMatch(source, /继续使用本地缓存 profile/u)
+  assert.match(
+    source,
+    /pauseBusinessRequests\(\)[\s\S]*?const retainPage =[\s\S]*?failure\.kind === 'service' &&\s*Boolean\(verifiedAccessKeyRef\.current\)/u
+  )
+  assert.match(
+    source,
+    /const unavailableProfile = buildUnavailableCachedAdminProfile\(\s*adminProfileRef\.current\s*\)[\s\S]*?is_super_admin: false[\s\S]*?roles: \[\][\s\S]*?permissions: \[\][\s\S]*?menus: \[\][\s\S]*?setAdminProfile\(unavailableProfile\)/u
+  )
+})
+
+test('ERPLayout: 系统页只按本次 admin.me 的 RBAC 判断，不借客户业务投影放行', () => {
+  const source = readERPLayoutSource()
+
+  assert.match(
+    source,
+    /const currentPageRequiresConfiguredCustomerRuntime =[\s\S]*?currentEntry\?\.access !== 'authenticated'[\s\S]*?resolveEffectiveSessionPageAccess\([\s\S]*?\.reason !== 'system_page_rbac_scope'/u
+  )
+  assert.match(
+    source,
+    /pageRequiresCustomerRuntime:\s*currentPageRequiresConfiguredCustomerRuntime/u
+  )
+})
+
+test('ERPLayout: 无权直达页在跳转前不挂载业务 Outlet', () => {
+  const source = readERPLayoutSource()
+  const guardIndex = source.indexOf('{shouldBlockOutlet ?')
+  const outletIndex = source.indexOf('<Outlet context={outletContext}')
+
+  assert.match(source, /const shouldBlockOutlet = currentPageShouldRedirect/u)
+  assert.doesNotMatch(
+    source,
+    /const shouldBlockOutlet = noVisibleMenus && currentPageShouldRedirect/u
+  )
+  assert(guardIndex >= 0, 'layout must render an unauthorized-route guard')
+  assert(
+    outletIndex > guardIndex,
+    'unauthorized-route guard must wrap Outlet before a page can issue RPC reads'
+  )
+  assert.match(source, /当前页面不可用/u)
+  assert.match(source, /正在返回当前账号可用的页面/u)
+})
+
+test('adminProfileSync: 当前管理员会话不可用时要求重新登录', () => {
+  for (const code of [
+    RpcErrorCode.HTTP_UNAUTHORIZED,
+    RpcErrorCode.ADMIN_REQUIRED,
+    RpcErrorCode.ADMIN_DISABLED,
+    RpcErrorCode.ADMIN_NOT_FOUND,
+    RpcErrorCode.AUTH_CURRENT_USER_FAILED,
+  ]) {
+    assert.equal(getAdminProfileSyncErrorAction({ code }), 'reauth')
+  }
+})
+
+test('adminProfileSync: 有缓存 profile 时后台同步失败走静默失败关闭分支', () => {
+  assert.equal(
+    getAdminProfileSyncErrorAction(
+      { code: RpcErrorCode.INTERNAL },
+      { hasCachedProfile: true }
+    ),
+    'keep_cached'
+  )
+  assert.equal(
+    getAdminProfileSyncErrorAction(
+      { isNetworkError: true },
+      { hasCachedProfile: true }
+    ),
+    'keep_cached'
+  )
+})
+
+test('adminProfileSync: 断连与权限及配置异常分别展示，登录失效不重试', () => {
+  for (const error of [
+    { isNetworkError: true },
+    { httpStatus: 503 },
+    { code: RpcErrorCode.INTERNAL },
+  ]) {
+    assert.equal(getProfileSyncFailure(error).kind, 'service')
+  }
+  assert.equal(
+    getProfileSyncFailure({ code: RpcErrorCode.PERMISSION_DENIED }).kind,
+    'permission'
+  )
+  assert.equal(
+    getProfileSyncFailure({ httpStatus: 403, isInvalidResponse: true }).kind,
+    'permission'
+  )
+  assert.equal(getProfileSyncFailure().kind, 'configuration')
+  for (const error of [
+    { code: RpcErrorCode.AUTH_EXPIRED },
+    { code: RpcErrorCode.AUTH_INVALID },
+    { httpStatus: 401 },
+  ]) {
+    assert.equal(
+      getAdminProfileSyncErrorAction(error, { hasCachedProfile: true }),
+      'reauth'
+    )
+    assert.equal(isTransientProfileSyncError(error), false)
+  }
+})
+
+test('adminProfileSync: 没有缓存 profile 时普通失败最多提示一次', () => {
+  assert.equal(
+    getAdminProfileSyncErrorAction(
+      { code: RpcErrorCode.INTERNAL },
+      { hasCachedProfile: false, alreadyNotified: false }
+    ),
+    'notify'
+  )
+  assert.equal(
+    getAdminProfileSyncErrorAction(
+      { code: RpcErrorCode.INTERNAL },
+      { hasCachedProfile: false, alreadyNotified: true }
+    ),
+    'silent'
+  )
+})
+
+test('adminProfileSync: 首次只读同步仅重试瞬时错误并保持最终结果', async () => {
+  const waits = []
+  let attempts = 0
+  const result = await loadProfileSyncReadWithRetry(
+    async () => {
+      attempts += 1
+      if (attempts === 1) {
+        throw Object.assign(new Error('network'), { isNetworkError: true })
+      }
+      if (attempts === 2) {
+        throw Object.assign(new Error('invalid proxy response'), {
+          isInvalidResponse: true,
+          httpStatus: 200,
+        })
+      }
+      return { customerKey: 'yoyoosun' }
+    },
+    {
+      retryDelaysMs: [200, 600],
+      wait: async (delayMs) => {
+        waits.push(delayMs)
+      },
+    }
+  )
+
+  assert.deepEqual(result, { customerKey: 'yoyoosun' })
+  assert.equal(attempts, 3)
+  assert.deepEqual(waits, [200, 600])
+})
+
+test('adminProfileSync: 权限和未激活等业务错误不由首次同步重试掩盖', async () => {
+  for (const error of [
+    Object.assign(new Error('permission denied'), {
+      code: RpcErrorCode.PERMISSION_DENIED,
+      httpStatus: 500,
+    }),
+    Object.assign(new Error('auth required'), {
+      code: RpcErrorCode.AUTH_REQUIRED,
+      isInvalidResponse: true,
+      httpStatus: 401,
+    }),
+    Object.assign(new Error('aborted'), {
+      isAbortError: true,
+      isNetworkError: true,
+    }),
+  ]) {
+    let attempts = 0
+    await assert.rejects(
+      loadProfileSyncReadWithRetry(
+        async () => {
+          attempts += 1
+          throw error
+        },
+        { retryDelaysMs: [0, 0], wait: async () => {} }
+      ),
+      (actual) => actual === error
+    )
+    assert.equal(attempts, 1)
+    assert.equal(isTransientProfileSyncError(error), false)
+  }
+})
+
+test('adminProfileSync: effective session 作为当前 profile 投影，不覆盖 RBAC 基础字段', () => {
+  const profile = {
+    id: 1,
+    username: 'admin',
+    permissions: ['system.user.read'],
+    menus: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
+  }
+  const next = attachEffectiveSessionToAdminProfile(profile, {
+    configRevision: '2026.06.28.1',
+    configHash: 'hash',
+    customer: { key: 'yoyoosun', name: '永绅' },
+    modules: { sales_orders: 'enabled' },
+    roles: ['admin'],
+    pages: ['global-dashboard'],
+    actions: ['customer_config.read'],
+    workPools: ['admin'],
+    fieldPolicies: {
+      'sales_orders.default': { source_no: { visible: false } },
+    },
+    printTemplateDefaults: {
+      templates: [
+        {
+          template_key: 'material-purchase-contract',
+          party_defaults: {
+            buyerCompany: '永绅',
+          },
+          supplier_defaults_allowed: false,
+        },
+      ],
+    },
+    source: 'active_customer_config_revision',
+  })
+
+  assert.deepEqual(next.permissions, ['system.user.read'])
+  assert.deepEqual(next.menus, [
+    { key: 'global-dashboard', path: '/erp/dashboard' },
+  ])
+  assert.equal(next.effective_session.config_revision, '2026.06.28.1')
+  assert.equal(next.effective_session.customer.name, '永绅')
+  assert.deepEqual(next.effective_session.work_pools, ['admin'])
+  assert.equal(effectiveSessionAllowsPage(next, 'global-dashboard'), true)
+  assert.equal(effectiveSessionAllowsPage(next, 'permission-center'), true)
+  assert.equal(hasEffectiveSessionAction(next, 'customer_config.read'), true)
+  assert.equal(
+    hasEffectiveSessionAction(next, 'customer_config.publish'),
+    false
+  )
+  assert.equal(effectiveSessionAllowsAction(next, 'customer_config.read'), true)
+  assert.equal(
+    effectiveSessionAllowsAction(next, 'customer_config.publish'),
+    false
+  )
+  assert.deepEqual(
+    getEffectiveFieldPolicy(next, 'sales_orders.default', 'source_no'),
+    { visible: false }
+  )
+  assert.deepEqual(
+    getEffectivePrintTemplateDefaults(next, 'material-purchase-contract'),
+    {
+      templates: [
+        {
+          template_key: 'material-purchase-contract',
+          party_defaults: {
+            buyerCompany: '永绅',
+          },
+          supplier_defaults_allowed: false,
+        },
+      ],
+    }
+  )
+})
+
+test('adminProfileSync: effective session customer key 不 fallback 到种子客户', () => {
+  assert.equal(
+    resolveEffectiveSessionCustomerKey({ customerKey: ' demo ' }),
+    'demo'
+  )
+  assert.equal(resolveEffectiveSessionCustomerKey({ customerKey: '' }), '')
+  assert.equal(resolveEffectiveSessionCustomerKey({}), '')
+  assert.equal(resolveEffectiveSessionCustomerKey(null), '')
+})
+
+test('adminProfileSync: 客户运行态必须匹配当前静态客户入口', () => {
+  const yoyoosunProfile = attachEffectiveSessionToAdminProfile(
+    { id: 1, username: 'admin' },
+    {
+      customer: { key: 'yoyoosun' },
+      source: 'active_customer_config_revision',
+    }
+  )
+
+  const builtinFallbackProfile = attachEffectiveSessionToAdminProfile(
+    { id: 2, username: 'admin' },
+    {
+      customer: { key: 'yoyoosun' },
+      source: 'builtin_rbac_fallback',
+    }
+  )
+
+  assert.equal(hasExpectedCustomerRuntime(yoyoosunProfile, 'yoyoosun'), true)
+  assert.equal(hasExpectedCustomerRuntime(yoyoosunProfile, 'demo'), false)
+  assert.equal(
+    hasExpectedCustomerRuntime(builtinFallbackProfile, 'yoyoosun'),
+    false
+  )
+  assert.equal(hasExpectedCustomerRuntime({ id: 1 }, 'yoyoosun'), false)
+  assert.equal(hasExpectedCustomerRuntime({ id: 1 }, ''), true)
+})
+
+test('adminProfileSync: 本地桌面预览可使用同客户内置投影但不冒充客户运行态', () => {
+  const builtinFallbackProfile = attachEffectiveSessionToAdminProfile(
+    { id: 1, username: 'admin' },
+    {
+      customer: { key: 'yoyoosun' },
+      source: 'builtin_rbac_fallback',
+    }
+  )
+
+  assert.equal(
+    isLocalCustomerDesktopPreviewSession(builtinFallbackProfile, 'yoyoosun'),
+    true
+  )
+  assert.equal(
+    isLocalCustomerDesktopPreviewSession(builtinFallbackProfile, 'demo'),
+    false
+  )
+  assert.equal(
+    isLocalCustomerDesktopPreviewSession(builtinFallbackProfile, ''),
+    false
+  )
+  assert.equal(
+    hasExpectedDesktopCustomerSession(builtinFallbackProfile, 'yoyoosun'),
+    false
+  )
+  assert.equal(
+    hasExpectedDesktopCustomerSession(builtinFallbackProfile, 'yoyoosun', {
+      isLocalDev: true,
+    }),
+    true
+  )
+  assert.equal(
+    hasExpectedDesktopCustomerSession(builtinFallbackProfile, 'demo', {
+      isLocalDev: true,
+    }),
+    false
+  )
+  assert.equal(canMountCustomerRuntime(builtinFallbackProfile), false)
+
+  const activeRevisionProfile = attachEffectiveSessionToAdminProfile(
+    { id: 2, username: 'admin' },
+    {
+      customer: { key: 'yoyoosun' },
+      source: 'active_customer_config_revision',
+    }
+  )
+  assert.equal(
+    hasExpectedDesktopCustomerSession(activeRevisionProfile, 'yoyoosun'),
+    true
+  )
+
+  const diagnostic = buildEffectiveSessionDiagnosticSummary({
+    adminProfile: builtinFallbackProfile,
+    allowedMenuPaths: ['/erp/dashboard'],
+    visibleSections: [
+      {
+        title: '工作台',
+        items: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
+      },
+    ],
+    isLocalDev: true,
+  })
+  assert.equal(diagnostic.dataRuntimeScope, 'customer_runtime_missing')
+  assert.equal(diagnostic.canMountCustomerBusinessPages, false)
+})
+
+test('adminProfileSync: 打印默认值只从 effective session 投影读取', () => {
+  const adminProfile = {
+    effective_session: {
+      print_template_defaults: {
+        templates: [
+          {
+            template_key: 'material-purchase-contract',
+            party_defaults: {
+              buyerCompany: '客户配置买方公司',
+              supplierName: '不应透出',
+            },
+            supplier_defaults_allowed: false,
+          },
+          {
+            template_key: 'processing-contract',
+            party_defaults: {
+              buyerCompany: '加工合同买方',
+            },
+            supplier_defaults_allowed: true,
+          },
+        ],
+      },
+    },
+  }
+
+  assert.deepEqual(
+    getEffectivePrintTemplateDefaults(
+      adminProfile,
+      'material-purchase-contract'
+    ),
+    {
+      templates: [
+        {
+          template_key: 'material-purchase-contract',
+          party_defaults: {
+            buyerCompany: '客户配置买方公司',
+          },
+          supplier_defaults_allowed: false,
+        },
+      ],
+    }
+  )
+  assert.deepEqual(
+    getEffectivePrintTemplateDefaults(adminProfile, 'processing-contract'),
+    {}
+  )
+})
+
+test('adminProfileSync: 生成脱敏 effective session 诊断摘要', () => {
+  const profile = attachEffectiveSessionToAdminProfile(
+    {
+      id: 1,
+      username: 'admin',
+      is_super_admin: false,
+      permissions: ['sales_order.create'],
+      menus: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
+    },
+    {
+      configRevision: 'yoyoosun-customer-package-v1',
+      configHash: 'hash-must-not-leak',
+      customer: { key: 'yoyoosun', name: '永绅' },
+      modules: { sales_orders: 'enabled', shipments: 'disabled' },
+      roles: ['sales'],
+      pages: ['global-dashboard', 'sales-orders'],
+      actions: ['sales_order.create', 'workflow.task.read'],
+      workPools: ['sales_order_acceptance'],
+      fieldPolicies: {
+        'sales_orders.default': {
+          source_no: { visible: true },
+          internal_note: { visible: false },
+        },
+      },
+      source: 'active_customer_config_revision',
+    }
+  )
+
+  const summary = buildEffectiveSessionDiagnosticSummary({
+    adminProfile: profile,
+    allowedMenuPaths: ['/erp/dashboard'],
+    visibleSections: [
+      {
+        title: '看板',
+        items: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
+      },
+    ],
+    isLocalDev: false,
+  })
+
+  assert.deepEqual(summary, {
+    source: 'active_customer_config_revision',
+    customerKey: 'yoyoosun',
+    configRevision: 'yoyoosun-customer-package-v1',
+    projectionMode: 'formal_effective_session_projection',
+    visibilityMode: 'formal_effective_session_projection',
+    dataRuntimeScope: 'customer_runtime',
+    canMountCustomerBusinessPages: true,
+    isSuperAdmin: false,
+    isLocalDev: false,
+    counts: {
+      rbacMenuPaths: 1,
+      visibleMenuItems: 1,
+      pages: 2,
+      actions: 2,
+      roles: 1,
+      workPools: 1,
+      modules: 2,
+      fieldPolicySurfaces: 1,
+      fieldPolicyFields: 2,
+      hiddenFieldPolicies: 1,
+    },
+    blockers: [],
+  })
+  assert.equal(JSON.stringify(summary).includes('hash-must-not-leak'), false)
+  assert.equal(JSON.stringify(summary).includes('sales_order.create'), false)
+})
+
+test('adminProfileSync: 诊断摘要区分 super admin 看全和 sync failure 空投影', () => {
+  const syncFailed = attachUnavailableEffectiveSessionToAdminProfile({
+    id: 1,
+    username: 'admin',
+    menus: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
+  })
+
+  assert.deepEqual(
+    buildEffectiveSessionDiagnosticSummary({
+      adminProfile: syncFailed,
+      allowedMenuPaths: ['/erp/dashboard'],
+      visibleSections: [],
+      isLocalDev: true,
+    }),
+    {
+      source: 'effective_session_sync_failed',
+      customerKey: '',
+      configRevision: '',
+      projectionMode: 'local_dev_sync_failed_diagnostic',
+      visibilityMode: 'local_dev_sync_failed_diagnostic',
+      dataRuntimeScope: 'sync_failed_diagnostic',
+      canMountCustomerBusinessPages: false,
+      isSuperAdmin: false,
+      isLocalDev: true,
+      counts: {
+        rbacMenuPaths: 1,
+        visibleMenuItems: 0,
+        pages: 0,
+        actions: 0,
+        roles: 0,
+        workPools: 0,
+        modules: 0,
+        fieldPolicySurfaces: 0,
+        fieldPolicyFields: 0,
+        hiddenFieldPolicies: 0,
+      },
+      blockers: [
+        'effective_session_sync_failed',
+        'effective_session_pages_empty',
+        'no_visible_menu_items',
+      ],
+    }
+  )
+
+  const superAdminSummary = buildEffectiveSessionDiagnosticSummary({
+    adminProfile: syncFailed,
+    allowedMenuPaths: [],
+    visibleSections: [],
+    isSuperAdmin: true,
+    isLocalDev: false,
+  })
+  assert.equal(superAdminSummary.projectionMode, 'super_admin_product_core')
+  assert.equal(superAdminSummary.visibilityMode, 'super_admin_product_core')
+  assert.equal(superAdminSummary.dataRuntimeScope, 'sync_failed_diagnostic')
+  assert.equal(superAdminSummary.canMountCustomerBusinessPages, false)
+  assert.equal(
+    superAdminSummary.blockers.includes('no_visible_menu_items'),
+    false
+  )
+})
+
+test('adminProfileSync: 仅系统管理页可见时空客户业务页不是阻塞', () => {
+  const summary = buildEffectiveSessionDiagnosticSummary({
+    adminProfile: {
+      effective_session: {
+        source: 'active_customer_config_revision',
+        customer: { key: 'yoyoosun' },
+        pages: [],
+        actions: [],
+      },
+    },
+    allowedMenuPaths: ['/erp/system/permissions'],
+    visibleSections: [
+      {
+        title: '系统管理',
+        items: [{ key: 'permission-center', path: '/erp/system/permissions' }],
+      },
+    ],
+    isSuperAdmin: false,
+    isLocalDev: false,
+  })
+
+  assert.deepEqual(summary.blockers, [])
+  assert.equal(summary.counts.pages, 0)
+  assert.equal(summary.counts.visibleMenuItems, 1)
+})
+
+test('adminProfileSync: 业务页挂载只看数据运行态，不复用 super admin 可见性 reason', () => {
+  const superAdminCustomerProfile = attachEffectiveSessionToAdminProfile(
+    {
+      id: 1,
+      username: 'admin',
+      is_super_admin: true,
+      menus: [],
+    },
+    {
+      customer: { key: 'yoyoosun', name: '永绅' },
+      pages: ['global-dashboard'],
+      actions: [],
+      fieldPolicies: {},
+      workPools: [],
+      source: 'active_customer_config_revision',
+    }
+  )
+  const superAdminCustomerSummary = buildEffectiveSessionDiagnosticSummary({
+    adminProfile: superAdminCustomerProfile,
+    allowedMenuPaths: [],
+    visibleSections: [],
+    isSuperAdmin: true,
+    isLocalDev: false,
+  })
+
+  assert.equal(
+    superAdminCustomerSummary.visibilityMode,
+    'super_admin_product_core'
+  )
+  assert.equal(superAdminCustomerSummary.dataRuntimeScope, 'customer_runtime')
+  assert.equal(superAdminCustomerSummary.canMountCustomerBusinessPages, true)
+  assert.equal(
+    shouldGuardCustomerBusinessPageRuntime({
+      effectiveSessionDiagnostic: superAdminCustomerSummary,
+      isCustomerBusinessDataPage: true,
+    }),
+    false
+  )
+
+  const superAdminNoCustomerSummary = buildEffectiveSessionDiagnosticSummary({
+    adminProfile: attachUnavailableEffectiveSessionToAdminProfile({
+      id: 2,
+      username: 'admin',
+      is_super_admin: true,
+    }),
+    allowedMenuPaths: [],
+    visibleSections: [],
+    isSuperAdmin: true,
+    isLocalDev: false,
+  })
+  assert.equal(
+    superAdminNoCustomerSummary.visibilityMode,
+    'super_admin_product_core'
+  )
+  assert.equal(
+    superAdminNoCustomerSummary.dataRuntimeScope,
+    'sync_failed_diagnostic'
+  )
+  assert.equal(superAdminNoCustomerSummary.canMountCustomerBusinessPages, false)
+  assert.equal(
+    shouldGuardCustomerBusinessPageRuntime({
+      effectiveSessionDiagnostic: superAdminNoCustomerSummary,
+      isCustomerBusinessDataPage: true,
+    }),
+    true
+  )
+  assert.equal(
+    shouldGuardCustomerBusinessPageRuntime({
+      effectiveSessionDiagnostic: superAdminNoCustomerSummary,
+      isCustomerBusinessDataPage: false,
+    }),
+    false
+  )
+})
+
+test('adminProfileSync: 岗位任务端挂载只认客户运行态 customer key', () => {
+  const customerRuntimeProfile = attachEffectiveSessionToAdminProfile(
+    {
+      id: 1,
+      username: 'demo_boss',
+      permissions: ['mobile.boss.access'],
+    },
+    {
+      customer: { key: 'yoyoosun', name: '永绅' },
+      pages: ['global-dashboard'],
+      actions: ['workflow.task.read'],
+      workPools: ['boss'],
+      source: 'active_customer_config_revision',
+    }
+  )
+  assert.equal(canMountCustomerRuntime(customerRuntimeProfile), true)
+
+  const builtinFallbackProfile = attachEffectiveSessionToAdminProfile(
+    {
+      id: 2,
+      username: 'admin',
+      permissions: ['mobile.boss.access'],
+    },
+    {
+      customer: { key: 'yoyoosun', name: '永绅' },
+      pages: ['global-dashboard'],
+      actions: ['workflow.task.read'],
+      source: 'builtin_rbac_fallback',
+    }
+  )
+  assert.equal(canMountCustomerRuntime(builtinFallbackProfile), false)
+
+  const productCoreProfile = attachUnavailableEffectiveSessionToAdminProfile({
+    id: 3,
+    username: 'admin',
+    is_super_admin: true,
+    permissions: ['mobile.boss.access'],
+  })
+  assert.equal(canMountCustomerRuntime(productCoreProfile), false)
+  assert.equal(
+    canMountCustomerRuntime({
+      id: 4,
+      username: 'demo_boss',
+      permissions: ['mobile.boss.access'],
+    }),
+    false
+  )
+})
+
+test('adminProfileSync: effective session 同步失败时正式普通账号不按 RBAC 放开页面', () => {
+  const profile = {
+    id: 1,
+    username: 'admin',
+    menus: [
+      { key: 'global-dashboard', path: '/erp/dashboard' },
+      { key: 'permission-center', path: '/erp/system/permissions' },
+    ],
+  }
+  const unavailable = attachUnavailableEffectiveSessionToAdminProfile(profile)
+
+  assert.equal(
+    unavailable.effective_session.source,
+    'effective_session_sync_failed'
+  )
+  assert.deepEqual(unavailable.effective_session.pages, [])
+  assert.equal(
+    effectiveSessionAllowsPage(unavailable, 'global-dashboard'),
+    false
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(unavailable, 'sales_order.create'),
+    false
+  )
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections: [
+        {
+          title: '主路径',
+          items: [
+            { key: 'global-dashboard', path: '/erp/dashboard' },
+            { key: 'permission-center', path: '/erp/system/permissions' },
+          ],
+        },
+      ],
+      adminProfile: unavailable,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/system/permissions'],
+      isLocalDev: false,
+    }),
+    [
+      {
+        title: '主路径',
+        items: [{ key: 'permission-center', path: '/erp/system/permissions' }],
+      },
+    ]
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile: unavailable,
+      allowedMenuPaths: ['/erp/dashboard'],
+      isLocalDev: false,
+      currentMenuPath: '/erp/dashboard',
+      currentPageKey: 'global-dashboard',
+    }),
+    true
+  )
+})
+
+test('adminProfileSync: sync failure 下本地和正式环境的业务页都 fail closed', () => {
+  const profile = {
+    id: 1,
+    username: 'admin',
+    menus: [
+      { key: 'global-dashboard', path: '/erp/dashboard' },
+      { key: 'permission-center', path: '/erp/system/permissions' },
+    ],
+  }
+  const unavailable = attachUnavailableEffectiveSessionToAdminProfile(profile)
+  const navigationSections = [
+    {
+      title: '主路径',
+      items: [
+        { key: 'global-dashboard', path: '/erp/dashboard' },
+        { key: 'permission-center', path: '/erp/system/permissions' },
+      ],
+    },
+  ]
+
+  assert.deepEqual(
+    resolveEffectiveSessionPageAccess(unavailable, 'global-dashboard', {
+      isLocalDev: true,
+    }),
+    { allowed: false, reason: 'effective_session_page_blocked' }
+  )
+  assert.deepEqual(
+    resolveEffectiveSessionPageAccess(unavailable, 'global-dashboard', {
+      isSuperAdmin: true,
+      isLocalDev: false,
+    }),
+    { allowed: false, reason: 'effective_session_page_blocked' }
+  )
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile: unavailable,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/system/permissions'],
+      isLocalDev: true,
+    }),
+    [
+      {
+        title: '主路径',
+        items: [{ key: 'permission-center', path: '/erp/system/permissions' }],
+      },
+    ]
+  )
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile: unavailable,
+      allowedMenuPaths: [],
+      isSuperAdmin: true,
+      isLocalDev: false,
+    }),
+    [
+      {
+        title: '主路径',
+        items: [{ key: 'permission-center', path: '/erp/system/permissions' }],
+      },
+    ]
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile: unavailable,
+      allowedMenuPaths: ['/erp/system/permissions'],
+      isLocalDev: true,
+      currentMenuPath: '/erp/system/permissions',
+      currentPageKey: 'permission-center',
+    }),
+    false
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(unavailable, 'sales_order.create'),
+    false
+  )
+  assert.equal(
+    hasEffectiveSessionAction(unavailable, 'workflow.task.complete'),
+    false
+  )
+})
+
+test('adminProfileSync: super admin 与普通账号的业务动作都只认后端 effective session', () => {
+  const syncFailedProfile = attachUnavailableEffectiveSessionToAdminProfile({
+    id: 1,
+    username: 'admin',
+    is_super_admin: true,
+    permissions: ['sales_order.create', 'workflow.task.complete'],
+    menus: [
+      { key: 'global-dashboard', path: '/erp/dashboard' },
+      { key: 'permission-center', path: '/erp/system/permissions' },
+    ],
+  })
+  const activeProfile = attachEffectiveSessionToAdminProfile(
+    {
+      id: 2,
+      username: 'super',
+      is_super_admin: true,
+      permissions: ['sales_order.create', 'workflow.task.complete'],
+      menus: [],
+    },
+    {
+      pages: ['global-dashboard'],
+      actions: ['workflow.task.read'],
+      fieldPolicies: {},
+      workPools: [],
+      source: 'active_customer_config_revision',
+    }
+  )
+
+  assert.deepEqual(
+    resolveEffectiveSessionPageAccess(syncFailedProfile, 'global-dashboard', {
+      isLocalDev: true,
+    }),
+    { allowed: false, reason: 'effective_session_page_blocked' }
+  )
+  assert.deepEqual(
+    resolveEffectiveSessionPageAccess(syncFailedProfile, 'global-dashboard', {
+      isSuperAdmin: true,
+      isLocalDev: false,
+    }),
+    { allowed: false, reason: 'effective_session_page_blocked' }
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(syncFailedProfile, 'sales_order.create'),
+    false
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(syncFailedProfile, 'workflow.task.complete'),
+    false
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(activeProfile, 'workflow.task.read'),
+    true
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(activeProfile, 'workflow.task.complete'),
+    false
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(activeProfile, 'sales_order.create'),
+    false
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(
+      { is_super_admin: true },
+      'unknown.future.action'
+    ),
+    false
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(
+      {
+        permissions: ['sales_order.create', 'workflow.task.complete'],
+        effective_session: {
+          source: 'active_customer_config_revision',
+          actions: ['workflow.task.read'],
+        },
+      },
+      'sales_order.create'
+    ),
+    false
+  )
+})
+
+test('adminProfileSync: 没有 effective session 时普通账号不回退旧 RBAC 动作', () => {
+  const profile = { permissions: ['sales_order.create'] }
+  assert.deepEqual(
+    resolveEffectiveSessionPageAccess(profile, 'global-dashboard', {
+      isLocalDev: false,
+    }),
+    { allowed: false, reason: 'effective_session_pages_missing' }
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(profile, 'sales_order.create'),
+    false
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(
+      { is_super_admin: true, permissions: ['sales_order.create'] },
+      'sales_order.create'
+    ),
+    false
+  )
+  assert.deepEqual(
+    filterColumnsByEffectiveFieldPolicy(
+      [{ dataIndex: 'order_no' }, { dataIndex: 'customer_order_no' }],
+      profile,
+      'sales_orders.default'
+    ),
+    [{ dataIndex: 'order_no' }, { dataIndex: 'customer_order_no' }]
+  )
+})
+
+test('adminProfileSync: 委外来源动作与事实权限必须来自后端 effective session', () => {
+  const actions = [
+    'outsourcing.fact.read',
+    'outsourcing.material_issue.create',
+    'outsourcing.return_receipt.create',
+    'outsourcing.fact.post',
+    'outsourcing.fact.cancel',
+  ]
+  for (const permission of actions) {
+    assert.equal(
+      effectiveSessionAllowsAction(
+        { is_super_admin: true, effective_session: { actions } },
+        permission
+      ),
+      true,
+      permission
+    )
+  }
+})
+
+test('adminProfileSync: 生产领料只登记精确来源动作权限', () => {
+  assert.equal(
+    effectiveSessionAllowsAction(
+      {
+        is_super_admin: true,
+        effective_session: { actions: ['production.material_issue.create'] },
+      },
+      'production.material_issue.create'
+    ),
+    true
+  )
+  assert.equal(
+    effectiveSessionAllowsAction(
+      {
+        permissions: ['pmc.plan.update', 'warehouse.adjustment.create'],
+        effective_session: {
+          actions: ['pmc.plan.update', 'warehouse.adjustment.create'],
+        },
+      },
+      'production.material_issue.create'
+    ),
+    false
+  )
+})
+
+test('adminProfileSync: field policy 收窄列表列但不改写列定义真源', () => {
+  const adminProfile = {
+    effective_session: {
+      field_policies: {
+        'sales_orders.default': {
+          source_no: { visible: false },
+          expected_ship_date: { visible: true },
+        },
+      },
+    },
+  }
+  const columns = [
+    { dataIndex: 'order_no' },
+    { dataIndex: 'customer_order_no', effectiveFieldKey: 'source_no' },
+    {
+      dataIndex: 'planned_delivery_date',
+      effectiveFieldKey: 'expected_ship_date',
+    },
+  ]
+
+  assert.deepEqual(
+    filterColumnsByEffectiveFieldPolicy(
+      columns,
+      adminProfile,
+      'sales_orders.default'
+    ),
+    [columns[0], columns[2]]
+  )
+})
+
+test('adminProfileSync: super admin 不受 field policy 隐藏列收窄', () => {
+  const adminProfile = {
+    is_super_admin: true,
+    effective_session: {
+      field_policies: {
+        'sales_orders.default': {
+          source_no: { visible: false },
+        },
+      },
+    },
+  }
+  const columns = [
+    { dataIndex: 'order_no' },
+    { dataIndex: 'customer_order_no', effectiveFieldKey: 'source_no' },
+  ]
+
+  assert.deepEqual(
+    filterColumnsByEffectiveFieldPolicy(
+      columns,
+      adminProfile,
+      'sales_orders.default'
+    ),
+    columns
+  )
+})
+
+test('adminProfileSync: master data field policy 可映射客户和供应商页面已有列', () => {
+  const adminProfile = {
+    effective_session: {
+      field_policies: {
+        'customers.default': {
+          customer_code: { visible: false },
+          display_name: { visible: true },
+          tax_no: { visible: false },
+        },
+        'suppliers.default': {
+          supplier_code: { visible: true },
+          supplier_type: { visible: false },
+        },
+      },
+    },
+  }
+
+  const customerColumns = [
+    { dataIndex: 'code', effectiveFieldKey: 'customer_code' },
+    { dataIndex: 'name' },
+    { dataIndex: 'short_name', effectiveFieldKey: 'display_name' },
+    { dataIndex: 'tax_no', effectiveFieldKey: 'tax_no' },
+  ]
+  const supplierColumns = [
+    { dataIndex: 'code', effectiveFieldKey: 'supplier_code' },
+    { dataIndex: 'supplier_type', effectiveFieldKey: 'supplier_type' },
+    { dataIndex: 'tax_no' },
+  ]
+
+  assert.deepEqual(
+    filterColumnsByEffectiveFieldPolicy(
+      customerColumns,
+      adminProfile,
+      'customers.default'
+    ).map((column) => column.dataIndex),
+    ['name', 'short_name', 'tax_no']
+  )
+  assert.deepEqual(
+    filterColumnsByEffectiveFieldPolicy(
+      supplierColumns,
+      adminProfile,
+      'suppliers.default'
+    ).map((column) => column.dataIndex),
+    ['code', 'tax_no']
+  )
+})
+
+test('adminProfileSync: reference preview manifest 字段投影进入供应商列表消费且不冒充已激活', () => {
+  const manifest = buildRuntimePreviewManifest(referenceCustomerPackage)
+  const adminProfile = attachEffectiveSessionToAdminProfile(
+    { is_super_admin: false },
+    {
+      customer: manifest.compiled_snapshot.customer,
+      pages: manifest.compiled_snapshot.pages,
+      fieldPolicies: manifest.compiled_snapshot.fieldPolicies,
+      source: 'preview_only_reference_manifest',
+    }
+  )
+  const columns = [
+    { dataIndex: 'code', effectiveFieldKey: 'supplier_code' },
+    { dataIndex: 'supplier_type', effectiveFieldKey: 'supplier_type' },
+  ]
+
+  assert.deepEqual(
+    filterColumnsByEffectiveFieldPolicy(
+      columns,
+      adminProfile,
+      'suppliers.default'
+    ).map((column) => column.dataIndex),
+    ['code']
+  )
+  assert.equal(columns.length, 2)
+  assert.equal(
+    adminProfile.effective_session.source,
+    'preview_only_reference_manifest'
+  )
+})
+
+test('adminProfileSync: unsupported formal field contracts cannot become runtime policies through local aliases', () => {
+  const adminProfile = {
+    effective_session: {
+      field_policies: {
+        'purchase_orders.default': {
+          supplier_snapshot: { visible: false },
+        },
+        'outsourcing_orders.default': {
+          processor_snapshot: { visible: false },
+          expected_return_date: { visible: false },
+        },
+        'shipments.default': {
+          sales_order_no: { visible: false },
+        },
+        'quality_inspections.default': {
+          source_no: { visible: false },
+        },
+      },
+    },
+  }
+  const cases = [
+    {
+      moduleKey: 'accessories-purchase',
+      surface: 'purchase_orders.default',
+      column: {
+        dataIndex: 'supplier_id',
+        effectiveFieldKey: 'supplier_snapshot',
+      },
+    },
+    {
+      moduleKey: 'processing-contracts',
+      surface: 'outsourcing_orders.default',
+      column: {
+        dataIndex: 'supplier_id',
+        effectiveFieldKey: 'processor_snapshot',
+      },
+    },
+    {
+      moduleKey: 'processing-contracts',
+      surface: 'outsourcing_orders.default',
+      column: {
+        dataIndex: 'expected_return_date',
+        effectiveFieldKey: 'expected_return_date',
+      },
+    },
+    {
+      moduleKey: 'shipments',
+      surface: 'shipments.default',
+      column: {
+        dataIndex: 'sales_order_id',
+        effectiveFieldKey: 'sales_order_no',
+      },
+    },
+    {
+      moduleKey: 'quality-inspections',
+      surface: 'quality_inspections.default',
+      column: {
+        dataIndex: 'purchase_receipt_id',
+        effectiveFieldKey: 'source_no',
+      },
+    },
+  ]
+
+  for (const item of cases) {
+    assert.equal(resolveDefaultFieldPolicySurface(item.moduleKey), '')
+    const columns = [{ dataIndex: 'always_visible' }, item.column]
+    applyEffectiveFieldPolicyFlags({
+      adminProfile,
+      moduleKey: item.moduleKey,
+      columns,
+    })
+    assert.equal(columns[0].hiddenByEffectiveFieldPolicy, undefined)
+    assert.equal(columns[1].hiddenByEffectiveFieldPolicy, undefined)
+    assert.equal(
+      getEffectiveFieldPolicy(
+        adminProfile,
+        item.surface,
+        item.column.effectiveFieldKey
+      ),
+      null
+    )
+  }
+})
+
+test('adminProfileSync: 正式普通账号菜单按 RBAC 与 effective session 取交集', () => {
+  const navigationSections = [
+    {
+      title: '主路径',
+      items: [
+        { key: 'global-dashboard', path: '/erp/dashboard' },
+        { key: 'permission-center', path: '/erp/system/permissions' },
+      ],
+    },
+    {
+      title: '业务',
+      items: [{ key: 'sales-orders', path: '/erp/sales/orders' }],
+    },
+  ]
+  const adminProfile = {
+    effective_session: {
+      pages: ['global-dashboard', 'sales-orders'],
+    },
+  }
+
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/system/permissions'],
+      isSuperAdmin: false,
+      isLocalDev: false,
+    }),
+    [
+      {
+        title: '主路径',
+        items: [
+          { key: 'global-dashboard', path: '/erp/dashboard' },
+          { key: 'permission-center', path: '/erp/system/permissions' },
+        ],
+      },
+    ]
+  )
+
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile,
+      allowedMenuPaths: [],
+      isSuperAdmin: true,
+      isLocalDev: false,
+    }),
+    [
+      {
+        title: '主路径',
+        items: [
+          { key: 'global-dashboard', path: '/erp/dashboard' },
+          { key: 'permission-center', path: '/erp/system/permissions' },
+        ],
+      },
+      {
+        title: '业务',
+        items: [{ key: 'sales-orders', path: '/erp/sales/orders' }],
+      },
+    ]
+  )
+})
+
+test('adminProfileSync: active revision 空页面清单不回退 RBAC-only', () => {
+  const navigationSections = [
+    {
+      title: '业务',
+      items: [
+        { key: 'global-dashboard', path: '/erp/dashboard' },
+        { key: 'sales-orders', path: '/erp/sales/orders' },
+      ],
+    },
+  ]
+  const adminProfile = {
+    effective_session: {
+      source: 'active_customer_config_revision',
+      pages: [],
+    },
+  }
+
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/sales/orders'],
+      isSuperAdmin: false,
+      isLocalDev: false,
+    }),
+    []
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard'],
+      isSuperAdmin: false,
+      isLocalDev: false,
+      currentMenuPath: '/erp/dashboard',
+      currentPageKey: 'global-dashboard',
+    }),
+    true
+  )
+})
+
+test('adminProfileSync: 模块 disabled 后端投影隐藏业务页时正式账号需要跳转', () => {
+  const navigationSections = [
+    {
+      title: '看板',
+      items: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
+    },
+    {
+      title: '业务',
+      items: [{ key: 'shipments', path: '/erp/warehouse/shipments' }],
+    },
+  ]
+  const adminProfile = {
+    effective_session: {
+      source: 'active_customer_config_revision',
+      modules: { shipments: 'disabled' },
+      pages: ['global-dashboard'],
+      actions: ['erp.workbench.read'],
+    },
+  }
+
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/warehouse/shipments'],
+      isSuperAdmin: false,
+      isLocalDev: false,
+    }),
+    [
+      {
+        title: '看板',
+        items: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
+      },
+    ]
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/warehouse/shipments'],
+      isSuperAdmin: false,
+      isLocalDev: false,
+      currentMenuPath: '/erp/warehouse/shipments',
+      currentPageKey: 'shipments',
+    }),
+    true
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/warehouse/shipments'],
+      isSuperAdmin: false,
+      isLocalDev: false,
+      currentMenuPath: '/erp/dashboard',
+      currentPageKey: 'global-dashboard',
+    }),
+    false
+  )
+})
+
+test('adminProfileSync: 正式 super admin 不绕过 active revision 页面投影', () => {
+  const navigationSections = [
+    {
+      title: '系统',
+      items: [
+        { key: 'permission-center', path: '/erp/system/permissions' },
+        { key: 'system-audit-logs', path: '/erp/system/audit-logs' },
+      ],
+    },
+    {
+      title: '业务',
+      items: [
+        { key: 'sales-orders', path: '/erp/sales/orders' },
+        { key: 'shipments', path: '/erp/shipments' },
+      ],
+    },
+  ]
+  const adminProfile = {
+    effective_session: {
+      source: 'active_customer_config_revision',
+      pages: ['global-dashboard'],
+    },
+  }
+
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile,
+      allowedMenuPaths: [],
+      isSuperAdmin: true,
+      isLocalDev: false,
+    }),
+    [
+      {
+        title: '系统',
+        items: [
+          { key: 'permission-center', path: '/erp/system/permissions' },
+          { key: 'system-audit-logs', path: '/erp/system/audit-logs' },
+        ],
+      },
+    ]
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: [],
+      isSuperAdmin: true,
+      isLocalDev: false,
+      currentMenuPath: '/erp/sales/orders',
+      currentPageKey: 'sales-orders',
+    }),
+    true
+  )
+})
+
+test('adminProfileSync: 系统独立页仍按 RBAC 访问且不受客户页面投影收窄', () => {
+  const navigationSections = [
+    {
+      title: '主路径',
+      items: [
+        { key: 'global-dashboard', path: '/erp/dashboard' },
+        { key: 'permission-center', path: '/erp/system/permissions' },
+      ],
+    },
+  ]
+  const adminProfile = {
+    effective_session: {
+      source: 'active_customer_config_revision',
+      pages: ['global-dashboard'],
+    },
+  }
+
+  assert.deepEqual(
+    resolveEffectiveSessionPageAccess(adminProfile, 'permission-center', {
+      isLocalDev: true,
+    }),
+    { allowed: true, reason: 'system_page_rbac_scope' }
+  )
+  assert.deepEqual(
+    filterNavigationSectionsByAdminProfile({
+      navigationSections,
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/system/permissions'],
+      isLocalDev: true,
+    }),
+    [
+      {
+        title: '主路径',
+        items: [
+          { key: 'global-dashboard', path: '/erp/dashboard' },
+          { key: 'permission-center', path: '/erp/system/permissions' },
+        ],
+      },
+    ]
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard', '/erp/system/permissions'],
+      isLocalDev: true,
+      currentMenuPath: '/erp/system/permissions',
+      currentPageKey: 'permission-center',
+    }),
+    false
+  )
+})
+
+test('adminProfileSync: 当前页面被 effective session 隐藏时需要跳转', () => {
+  const adminProfile = {
+    effective_session: {
+      pages: ['global-dashboard'],
+    },
+  }
+
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      profileLoading: true,
+      adminProfile,
+      allowedMenuPaths: ['/erp/system/permissions'],
+      currentMenuPath: '/erp/system/permissions',
+      currentPageKey: 'permission-center',
+    }),
+    false
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: ['/erp/system/permissions'],
+      isLocalDev: false,
+      currentMenuPath: '/erp/system/permissions',
+      currentPageKey: 'permission-center',
+    }),
+    false
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: [],
+      isSuperAdmin: true,
+      isLocalDev: false,
+      currentMenuPath: '/erp/system/permissions',
+      currentPageKey: 'permission-center',
+    }),
+    false
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard'],
+      currentMenuPath: '/erp/dashboard',
+      currentPageKey: 'global-dashboard',
+    }),
+    false
+  )
+})
+
+test('adminProfileSync: 未登记路由 fallback 不授予菜单或页面访问', () => {
+  const adminProfile = {
+    effective_session: {
+      source: 'active_customer_config_revision',
+      pages: ['global-dashboard'],
+    },
+  }
+
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard'],
+      isLocalDev: false,
+      currentMenuPath: '',
+      currentPageKey: '',
+      currentNavigationMatched: false,
+    }),
+    true
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      adminProfile,
+      allowedMenuPaths: [],
+      isSuperAdmin: true,
+      isLocalDev: false,
+      currentMenuPath: '',
+      currentPageKey: '',
+      currentNavigationMatched: false,
+    }),
+    true
+  )
+  assert.equal(
+    shouldRedirectFromCurrentNavigation({
+      profileLoading: true,
+      adminProfile,
+      allowedMenuPaths: ['/erp/dashboard'],
+      currentMenuPath: '',
+      currentPageKey: '',
+      currentNavigationMatched: false,
+    }),
+    false
+  )
+})
