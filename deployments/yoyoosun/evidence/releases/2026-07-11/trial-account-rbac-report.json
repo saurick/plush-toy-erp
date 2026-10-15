@@ -1,0 +1,108 @@
+{
+  "scope": "trial-account-rbac-verification-report",
+  "generatedAt": "2026-07-11T05:38:56.581Z",
+  "backendEndpointAlias": "http://192.168.0.133:5175",
+  "writesDatabase": false,
+  "checkedAccounts": [
+    {
+      "username": "demo_boss",
+      "role": "老板",
+      "mobileTaskEntry": "老板岗位任务端",
+      "mobileAccessVerified": true,
+      "debugPermissionCount": 0,
+      "isSuperAdmin": false,
+      "disabled": false
+    },
+    {
+      "username": "demo_sales",
+      "role": "业务",
+      "mobileTaskEntry": "业务岗位任务端",
+      "mobileAccessVerified": true,
+      "debugPermissionCount": 0,
+      "isSuperAdmin": false,
+      "disabled": false
+    },
+    {
+      "username": "demo_purchase",
+      "role": "采购",
+      "mobileTaskEntry": "采购岗位任务端",
+      "mobileAccessVerified": true,
+      "debugPermissionCount": 0,
+      "isSuperAdmin": false,
+      "disabled": false
+    },
+    {
+      "username": "demo_production",
+      "role": "生产经理",
+      "mobileTaskEntry": "生产经理岗位任务端",
+      "mobileAccessVerified": true,
+      "debugPermissionCount": 0,
+      "isSuperAdmin": false,
+      "disabled": false
+    },
+    {
+      "username": "demo_warehouse",
+      "role": "仓库",
+      "mobileTaskEntry": "仓库岗位任务端",
+      "mobileAccessVerified": true,
+      "debugPermissionCount": 0,
+      "isSuperAdmin": false,
+      "disabled": false
+    },
+    {
+      "username": "demo_quality",
+      "role": "品质",
+      "mobileTaskEntry": "品质岗位任务端",
+      "mobileAccessVerified": true,
+      "debugPermissionCount": 0,
+      "isSuperAdmin": false,
+      "disabled": false
+    },
+    {
+      "username": "demo_finance",
+      "role": "财务",
+      "mobileTaskEntry": "财务岗位任务端",
+      "mobileAccessVerified": true,
+      "debugPermissionCount": 0,
+      "isSuperAdmin": false,
+      "disabled": false
+    },
+    {
+      "username": "demo_pmc",
+      "role": "PMC",
+      "mobileTaskEntry": "PMC岗位任务端",
+      "mobileAccessVerified": true,
+      "debugPermissionCount": 0,
+      "isSuperAdmin": false,
+      "disabled": false
+    },
+    {
+      "username": "demo_engineering",
+      "role": "工程",
+      "mobileTaskEntry": "工程岗位任务端",
+      "mobileAccessVerified": true,
+      "debugPermissionCount": 0,
+      "isSuperAdmin": false,
+      "disabled": false
+    },
+    {
+      "username": "demo_admin",
+      "role": "后台管理员",
+      "mobileTaskEntry": "不开放岗位任务端",
+      "mobileAccessVerified": false,
+      "debugPermissionCount": 0,
+      "isSuperAdmin": false,
+      "disabled": false
+    }
+  ],
+  "summary": {
+    "totalAccounts": 10,
+    "passedAccounts": 10,
+    "failedAccounts": 0
+  },
+  "redaction": {
+    "storesPassword": false,
+    "storesAccessToken": false,
+    "storesAuthorizationHeader": false
+  }
+}

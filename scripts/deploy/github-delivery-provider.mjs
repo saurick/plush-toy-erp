@@ -1,0 +1,796 @@
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+} from "node:fs";
+import { createHash } from "node:crypto";
+import path from "node:path";
+import process from "node:process";
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
+
+import {
+  DELIVERY_RELEASE_ASSETS,
+  DELIVERY_PROVIDER_CONTRACT,
+  DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT,
+  LEGACY_DELIVERY_RELEASE_ASSETS,
+  validateDeliveryReleaseVersion,
+  validateReleaseDispatchRequest,
+} from "./delivery-provider.mjs";
+import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
+import {
+  validateReleaseArtifactBinding,
+  validateReleaseManifest,
+  validateReleaseRehearsalReceipt,
+} from "./release-catalog.mjs";
+
+export const GITHUB_API_VERSION = "2022-11-28";
+export const GITHUB_DELIVERY_REPOSITORY = "saurick/plush-toy-erp";
+export const GITHUB_RELEASE_WORKFLOW = "release.yml";
+export const GITHUB_PIPELINE_TIMINGS_CONTRACT =
+  "plush.delivery-pipeline-timings/v1";
+export const GITHUB_LEGACY_RELEASE_ASSETS = LEGACY_DELIVERY_RELEASE_ASSETS;
+export const GITHUB_RELEASE_ASSETS = DELIVERY_RELEASE_ASSETS;
+
+const SHA_PATTERN = /^[0-9a-f]{40}$/u;
+const SHA256_DIGEST_PATTERN = /^sha256:[0-9a-f]{64}$/u;
+const MAX_GITHUB_OUTPUT_BYTES = 8 * 1024 * 1024;
+const MAX_RELEASE_DETAIL_BYTES = 512 * 1024;
+const TRACKED_WORKFLOWS = Object.freeze({
+  ".github/workflows/release.yml": "release",
+});
+const RUN_STATUSES = new Set([
+  "queued",
+  "in_progress",
+  "completed",
+  "waiting",
+  "requested",
+  "pending",
+]);
+const execFileAsync = promisify(execFile);
+
+function exactAssetSet(assets, expected) {
+  const sorted = [...expected].sort();
+  return (
+    assets.length === sorted.length &&
+    assets.every((asset, index) => asset === sorted[index])
+  );
+}
+
+function expectedAssetsForManifest(manifest) {
+  return manifest.schemaVersion === "plush.release-manifest/v2"
+    ? GITHUB_RELEASE_ASSETS
+    : GITHUB_LEGACY_RELEASE_ASSETS;
+}
+
+function sha256Text(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function isCommandTimeout(error, result = {}) {
+  return (
+    error?.code === "ETIMEDOUT" ||
+    error?.code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER" ||
+    error?.signal === "SIGTERM" ||
+    result?.signal === "SIGTERM"
+  );
+}
+
+async function runGh(runCommand, args, { cwd, timeout = 30_000 } = {}) {
+  let result;
+  try {
+    result = await runCommand("gh", args, {
+      cwd,
+      encoding: "utf8",
+      timeout,
+      maxBuffer: MAX_GITHUB_OUTPUT_BYTES,
+      env: process.env,
+    });
+  } catch (error) {
+    if (isCommandTimeout(error)) {
+      throw new Error("GitHub adapter command timed out");
+    }
+    if (Number.isInteger(error?.code)) {
+      throw new Error(
+        `GitHub adapter command failed with exit ${String(error.code)}`,
+      );
+    }
+    throw new Error("GitHub adapter could not start gh");
+  }
+  if (result?.error) {
+    throw new Error(
+      isCommandTimeout(result.error, result)
+        ? "GitHub adapter command timed out"
+        : "GitHub adapter could not start gh",
+    );
+  }
+  if (Number.isInteger(result?.status) && result.status !== 0) {
+    throw new Error(
+      `GitHub adapter command failed with exit ${String(result.status)}`,
+    );
+  }
+  return String(result?.stdout || "");
+}
+
+function parseGithubUrl(value, expectedSuffix) {
+  const text = String(value || "");
+  if (
+    text !== `https://github.com/${GITHUB_DELIVERY_REPOSITORY}${expectedSuffix}`
+  ) {
+    throw new Error("GitHub response URL is outside the fixed repository");
+  }
+  return text;
+}
+
+function normalizeRelease(raw) {
+  const tag = String(raw?.tag_name || "");
+  const match = /^artifact-([0-9a-f]{40})$/u.exec(tag);
+  if (!match || raw?.target_commitish !== match[1]) {
+    throw new Error("GitHub release identity is invalid");
+  }
+  const rawAssets = Array.isArray(raw.assets) ? raw.assets : [];
+  if (
+    rawAssets.some(
+      (asset) =>
+        !GITHUB_RELEASE_ASSETS.includes(String(asset?.name || "")),
+    )
+  ) {
+    throw new Error("GitHub release contains an unknown asset");
+  }
+  const assets = rawAssets
+    .map((asset) => String(asset?.name || ""))
+    .filter((name) => GITHUB_RELEASE_ASSETS.includes(name))
+    .sort();
+  const assetByName = new Map(
+    rawAssets
+      .filter((asset) =>
+        GITHUB_RELEASE_ASSETS.includes(String(asset?.name || "")),
+      )
+      .map((asset) => [String(asset.name), asset]),
+  );
+  const sizeOf = (name) => {
+    const size = assetByName.get(name)?.size;
+    return Number.isSafeInteger(size) && size >= 0 ? size : 0;
+  };
+  return validateDeliveryReleaseVersion({
+    schemaVersion: "plush.delivery-version/v1",
+    status: raw.draft ? "draft" : raw.prerelease ? "prerelease" : "published",
+    tag,
+    gitSha: match[1],
+    version: String(raw.name || ""),
+    publishedAt: String(raw.published_at || ""),
+    url: parseGithubUrl(raw.html_url, `/releases/tag/${tag}`),
+    assets,
+    artifactSummary: {
+      totalBytes: [...assetByName.values()].reduce(
+        (total, asset) =>
+          total +
+          (Number.isSafeInteger(asset?.size) && asset.size >= 0
+            ? asset.size
+            : 0),
+        0,
+      ),
+      serverImageBytes: sizeOf("server-image.tar"),
+      webImageBytes: sizeOf("web-image.tar"),
+      sbomBytes: sizeOf("sbom.cdx.json"),
+    },
+    buildPerformance: null,
+    imageDigests: null,
+    completeAssets:
+      exactAssetSet(assets, GITHUB_RELEASE_ASSETS) ||
+      exactAssetSet(assets, GITHUB_LEGACY_RELEASE_ASSETS),
+    promotionEligible: false,
+  });
+}
+
+function normalizeRun(raw, gitSha) {
+  const createdAt = String(raw?.createdAt || "");
+  if (
+    !Number.isSafeInteger(raw?.databaseId) ||
+    raw.databaseId <= 0 ||
+    raw?.headSha !== gitSha ||
+    Number.isNaN(Date.parse(createdAt)) ||
+    !["queued", "in_progress", "completed", "waiting", "requested"].includes(
+      raw?.status,
+    )
+  ) {
+    throw new Error("GitHub workflow run identity is invalid");
+  }
+  const url = String(raw.url || "");
+  if (
+    !new RegExp(
+      `^https://github\\.com/saurick/plush-toy-erp/actions/runs/${raw.databaseId}$`,
+      "u",
+    ).test(url)
+  ) {
+    throw new Error("GitHub workflow run URL is invalid");
+  }
+  return {
+    id: raw.databaseId,
+    status: raw.status,
+    conclusion: String(raw.conclusion || ""),
+    createdAt,
+    gitSha,
+    url,
+  };
+}
+
+function normalizeLabel(value, field) {
+  const label = String(value || "").trim();
+  if (!label || label.length > 160 || /[\u0000-\u001f\u007f]/u.test(label)) {
+    throw new Error(`GitHub ${field} label is invalid`);
+  }
+  return label;
+}
+
+function normalizeTimestamp(value, field, { optional = false } = {}) {
+  if ((value === null || value === undefined || value === "") && optional) {
+    return null;
+  }
+  const timestamp = String(value || "");
+  if (Number.isNaN(Date.parse(timestamp))) {
+    throw new Error(`GitHub ${field} timestamp is invalid`);
+  }
+  return timestamp;
+}
+
+function elapsedMs(startedAt, finishedAt) {
+  if (!startedAt || !finishedAt) return null;
+  return Math.max(0, Date.parse(finishedAt) - Date.parse(startedAt));
+}
+
+function normalizePipelineStatus(value, field) {
+  const status = String(value || "");
+  if (!RUN_STATUSES.has(status)) {
+    throw new Error(`GitHub ${field} status is invalid`);
+  }
+  return status;
+}
+
+function normalizePipelineStep(raw) {
+  const startedAt = normalizeTimestamp(raw?.started_at, "step start", {
+    optional: true,
+  });
+  const finishedAt = normalizeTimestamp(raw?.completed_at, "step finish", {
+    optional: true,
+  });
+  if (!Number.isSafeInteger(raw?.number) || raw.number < 1) {
+    throw new Error("GitHub step number is invalid");
+  }
+  return {
+    number: raw.number,
+    name: normalizeLabel(raw?.name, "step"),
+    status: normalizePipelineStatus(raw?.status, "step"),
+    conclusion: String(raw?.conclusion || ""),
+    startedAt,
+    finishedAt,
+    durationMs: elapsedMs(startedAt, finishedAt),
+  };
+}
+
+function normalizePipelineJob(raw) {
+  if (!Number.isSafeInteger(raw?.id) || raw.id < 1) {
+    throw new Error("GitHub job identity is invalid");
+  }
+  const startedAt = normalizeTimestamp(raw?.started_at, "job start", {
+    optional: true,
+  });
+  const finishedAt = normalizeTimestamp(raw?.completed_at, "job finish", {
+    optional: true,
+  });
+  const steps = Array.isArray(raw?.steps)
+    ? raw.steps.map(normalizePipelineStep)
+    : [];
+  if (steps.length > 100) {
+    throw new Error("GitHub job step response is too large");
+  }
+  return {
+    id: raw.id,
+    name: normalizeLabel(raw?.name, "job"),
+    status: normalizePipelineStatus(raw?.status, "job"),
+    conclusion: String(raw?.conclusion || ""),
+    startedAt,
+    finishedAt,
+    durationMs: elapsedMs(startedAt, finishedAt),
+    steps,
+  };
+}
+
+function normalizePipelineRun(raw, jobs) {
+  const workflow = TRACKED_WORKFLOWS[String(raw?.path || "")];
+  if (
+    !workflow ||
+    !Number.isSafeInteger(raw?.id) ||
+    raw.id < 1 ||
+    !Number.isSafeInteger(raw?.run_attempt) ||
+    raw.run_attempt < 1 ||
+    !SHA_PATTERN.test(String(raw?.head_sha || ""))
+  ) {
+    throw new Error("GitHub pipeline run identity is invalid");
+  }
+  const createdAt = normalizeTimestamp(raw?.created_at, "run creation");
+  const startedAt = normalizeTimestamp(raw?.run_started_at, "run start", {
+    optional: true,
+  });
+  const finishedAt =
+    raw?.status === "completed"
+      ? normalizeTimestamp(raw?.updated_at, "run finish")
+      : null;
+  const url = parseGithubUrl(raw?.html_url, `/actions/runs/${raw.id}`);
+  return {
+    id: raw.id,
+    attempt: raw.run_attempt,
+    workflow,
+    event: normalizeLabel(raw?.event, "event"),
+    status: normalizePipelineStatus(raw?.status, "run"),
+    conclusion: String(raw?.conclusion || ""),
+    gitSha: raw.head_sha,
+    createdAt,
+    startedAt,
+    finishedAt,
+    queueMs: elapsedMs(createdAt, startedAt),
+    durationMs: elapsedMs(startedAt, finishedAt),
+    url,
+    jobs,
+  };
+}
+
+function assertDownloadDirectory(projectRoot, destination) {
+  const outputRoot = path.join(realpathSync(projectRoot), "output");
+  const candidate = path.resolve(destination);
+  if (
+    !candidate.startsWith(
+      `${path.join(outputRoot, "dev-workbench", "releases")}${path.sep}`,
+    )
+  ) {
+    throw new Error(
+      "GitHub release download must remain in the fixed output root",
+    );
+  }
+  let cursor = candidate;
+  while (cursor !== outputRoot) {
+    if (existsSync(cursor) && lstatSync(cursor).isSymbolicLink()) {
+      throw new Error("GitHub release download path contains a symbolic link");
+    }
+    cursor = path.dirname(cursor);
+  }
+  return candidate;
+}
+
+export function createGithubDeliveryProvider({
+  projectRoot = process.cwd(),
+  runCommand = execFileAsync,
+  now = () => new Date().toISOString(),
+} = {}) {
+  const root = realpathSync(projectRoot);
+  const releaseDetailCache = new Map();
+
+  async function readReleaseDetail(rawRelease, version) {
+    const cached = releaseDetailCache.get(version.gitSha);
+    if (cached) return cached;
+    const assets = Array.isArray(rawRelease?.assets) ? rawRelease.assets : [];
+    const readAsset = async (name) => {
+      const asset = assets.find((item) => item?.name === name);
+      if (
+        !Number.isSafeInteger(asset?.id) ||
+        asset.id <= 0 ||
+        !Number.isSafeInteger(asset?.size) ||
+        asset.size <= 0 ||
+        asset.size > MAX_RELEASE_DETAIL_BYTES
+      ) {
+        throw new Error("GitHub release detail asset is invalid");
+      }
+      const output = await runGh(
+        runCommand,
+        [
+          "api",
+          "--method",
+          "GET",
+          "-H",
+          `X-GitHub-Api-Version: ${GITHUB_API_VERSION}`,
+          "-H",
+          "Accept: application/octet-stream",
+          `repos/${GITHUB_DELIVERY_REPOSITORY}/releases/assets/${asset.id}`,
+        ],
+        { cwd: root },
+      );
+      if (Buffer.byteLength(output) > MAX_RELEASE_DETAIL_BYTES) {
+        throw new Error("GitHub release detail response is too large");
+      }
+      return { value: JSON.parse(output), sha256: sha256Text(output) };
+    };
+    const artifactAsset = await readAsset("release-artifact.json");
+    const artifact = assertReleaseArtifactManifest(artifactAsset.value);
+    const manifestAsset = await readAsset("release-manifest.json");
+    const manifest = validateReleaseManifest(
+      manifestAsset.value,
+    );
+    validateReleaseArtifactBinding(manifest, artifact, artifactAsset.sha256);
+    if (
+      artifact?.schemaVersion !== "plush-release-artifact/v1" ||
+      artifact?.git?.commit !== version.gitSha ||
+      manifest.gitSha !== version.gitSha ||
+      manifest.version !== version.version
+    ) {
+      throw new Error("GitHub release detail identity is invalid");
+    }
+    let promotionEligible = false;
+    if (manifest.schemaVersion === "plush.release-manifest/v2") {
+      if (!exactAssetSet(version.assets, GITHUB_RELEASE_ASSETS)) {
+        throw new Error("GitHub v2 release assets are incomplete");
+      }
+      const rehearsalAsset = await readAsset("release-rehearsal.json");
+      validateReleaseRehearsalReceipt(rehearsalAsset.value, artifact, {
+        sha: version.gitSha,
+        version: version.version,
+        customer: "yoyoosun",
+      });
+      if (rehearsalAsset.sha256 !== manifest.rehearsal?.receiptSha256) {
+        throw new Error("GitHub release rehearsal digest is invalid");
+      }
+      promotionEligible = true;
+    } else if (!exactAssetSet(version.assets, GITHUB_LEGACY_RELEASE_ASSETS)) {
+      throw new Error("GitHub legacy release assets are incomplete");
+    }
+    const imageDigests = Object.fromEntries(
+      manifest.images.map((image) => [image.kind, image.digest]),
+    );
+    if (
+      !SHA256_DIGEST_PATTERN.test(String(imageDigests.server || "")) ||
+      !SHA256_DIGEST_PATTERN.test(String(imageDigests.web || ""))
+    ) {
+      throw new Error("GitHub release image digests are invalid");
+    }
+    const detail = validateDeliveryReleaseVersion({
+      ...version,
+      buildPerformance: artifact?.performance?.build || null,
+      imageDigests,
+      promotionEligible,
+    });
+    releaseDetailCache.set(version.gitSha, detail);
+    return detail;
+  }
+
+  return {
+    schemaVersion: DELIVERY_PROVIDER_CONTRACT,
+    provider: "github",
+    repository: GITHUB_DELIVERY_REPOSITORY,
+    workflow: GITHUB_RELEASE_WORKFLOW,
+
+    async listVersions({ limit = 20 } = {}) {
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+        throw new Error("GitHub release list limit is invalid");
+      }
+      const output = await runGh(
+        runCommand,
+        [
+          "api",
+          "--method",
+          "GET",
+          "-H",
+          `X-GitHub-Api-Version: ${GITHUB_API_VERSION}`,
+          `repos/${GITHUB_DELIVERY_REPOSITORY}/releases?per_page=${limit}`,
+        ],
+        { cwd: root },
+      );
+      const releases = JSON.parse(output);
+      if (!Array.isArray(releases) || releases.length > limit) {
+        throw new Error("GitHub release list response is invalid");
+      }
+      const normalized = releases
+        .filter((release) =>
+          /^artifact-[0-9a-f]{40}$/u.test(String(release?.tag_name || "")),
+        )
+        .map((release) => ({
+          raw: release,
+          version: normalizeRelease(release),
+        }))
+        .sort(
+          (left, right) =>
+            Date.parse(right.version.publishedAt) -
+            Date.parse(left.version.publishedAt),
+        );
+      for (let index = 0; index < normalized.length; index += 1) {
+        const item = normalized[index];
+        const requiresPromotionEvidence = exactAssetSet(
+          item.version.assets,
+          GITHUB_RELEASE_ASSETS,
+        );
+        if (
+          !item.version.completeAssets ||
+          (!requiresPromotionEvidence && index !== 0)
+        ) {
+          continue;
+        }
+        try {
+          item.version = await readReleaseDetail(
+            item.raw,
+            item.version,
+          );
+        } catch {
+          // Names and byte sizes remain readable; invalid detail evidence stays non-promotable.
+        }
+      }
+      return normalized.map((item) => item.version);
+    },
+
+    async listPipelineTimings({ limit = 8 } = {}) {
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 20) {
+        throw new Error("GitHub pipeline timing limit is invalid");
+      }
+      const runOutput = await runGh(
+        runCommand,
+        [
+          "api",
+          "--method",
+          "GET",
+          "-H",
+          `X-GitHub-Api-Version: ${GITHUB_API_VERSION}`,
+          `repos/${GITHUB_DELIVERY_REPOSITORY}/actions/runs?per_page=${Math.max(
+            20,
+            limit * 3,
+          )}&exclude_pull_requests=true`,
+        ],
+        { cwd: root, timeout: 60_000 },
+      );
+      const response = JSON.parse(runOutput);
+      if (
+        !response ||
+        !Array.isArray(response.workflow_runs) ||
+        response.workflow_runs.length > Math.max(20, limit * 3)
+      ) {
+        throw new Error("GitHub pipeline run response is invalid");
+      }
+      const selectedRuns = response.workflow_runs
+        .filter((run) =>
+          Object.hasOwn(TRACKED_WORKFLOWS, String(run?.path || "")),
+        )
+        .sort(
+          (left, right) =>
+            Date.parse(String(right?.created_at || "")) -
+            Date.parse(String(left?.created_at || "")),
+        )
+        .slice(0, limit);
+      const runs = [];
+      for (const run of selectedRuns) {
+        const jobOutput = await runGh(
+          runCommand,
+          [
+            "api",
+            "--method",
+            "GET",
+            "-H",
+            `X-GitHub-Api-Version: ${GITHUB_API_VERSION}`,
+            `repos/${GITHUB_DELIVERY_REPOSITORY}/actions/runs/${run.id}/attempts/${run.run_attempt}/jobs?per_page=100`,
+          ],
+          { cwd: root, timeout: 60_000 },
+        );
+        const jobResponse = JSON.parse(jobOutput);
+        if (
+          !jobResponse ||
+          !Array.isArray(jobResponse.jobs) ||
+          jobResponse.jobs.length > 100
+        ) {
+          throw new Error("GitHub pipeline job response is invalid");
+        }
+        runs.push(
+          normalizePipelineRun(run, jobResponse.jobs.map(normalizePipelineJob)),
+        );
+      }
+      return {
+        schemaVersion: GITHUB_PIPELINE_TIMINGS_CONTRACT,
+        generatedAt: normalizeTimestamp(now(), "timing generation"),
+        runs,
+      };
+    },
+
+    async getReleaseStatus(gitSha) {
+      if (!SHA_PATTERN.test(String(gitSha || ""))) {
+        throw new Error("release status SHA is invalid");
+      }
+      const release = (await this.listVersions({ limit: 50 })).find(
+        (item) => item.gitSha === gitSha,
+      );
+      if (release) {
+        return {
+          schemaVersion: DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT,
+          status: release.completeAssets ? "published" : "failed",
+          gitSha,
+          release,
+          run: null,
+        };
+      }
+      const output = await runGh(
+        runCommand,
+        [
+          "run",
+          "list",
+          "--repo",
+          GITHUB_DELIVERY_REPOSITORY,
+          "--workflow",
+          GITHUB_RELEASE_WORKFLOW,
+          "--commit",
+          gitSha,
+          "--event",
+          "workflow_dispatch",
+          "--limit",
+          "20",
+          "--json",
+          "databaseId,status,conclusion,url,createdAt,headSha",
+        ],
+        { cwd: root },
+      );
+      const runs = JSON.parse(output);
+      if (!Array.isArray(runs) || runs.length > 20) {
+        throw new Error("GitHub workflow run response is invalid");
+      }
+      const normalizedRuns = runs
+        .map((item) => normalizeRun(item, gitSha))
+        .sort(
+          (left, right) =>
+            Date.parse(right.createdAt) - Date.parse(left.createdAt),
+        );
+      const run = normalizedRuns[0] || null;
+      return {
+        schemaVersion: DELIVERY_PROVIDER_RELEASE_STATUS_CONTRACT,
+        status: !run
+          ? "missing"
+          : run.status !== "completed"
+            ? "running"
+            : run.conclusion === "success"
+              ? "awaiting_release"
+              : "failed",
+        gitSha,
+        release: null,
+        run,
+      };
+    },
+
+    async dispatchRelease(request) {
+      validateReleaseDispatchRequest(request);
+      throw new Error(
+        "GitHub publication is disabled by the read-only provider boundary",
+      );
+    },
+
+    async downloadRelease(gitSha, destination) {
+      if (!SHA_PATTERN.test(String(gitSha || ""))) {
+        throw new Error("release download SHA is invalid");
+      }
+      const target = assertDownloadDirectory(root, destination);
+      if (existsSync(target)) {
+        const files = readdirSync(target).sort();
+        if (files.includes("release-manifest.json")) {
+          const releaseManifest = validateReleaseManifest(
+            JSON.parse(
+              readBoundedManifest(path.join(target, "release-manifest.json")),
+            ),
+          );
+          if (releaseManifest.gitSha !== gitSha) {
+            throw new Error("cached GitHub release identity is invalid");
+          }
+          const expected = [
+            ...expectedAssetsForManifest(releaseManifest),
+          ].sort();
+          if (!exactAssetSet(files, expected)) {
+            throw new Error("cached GitHub release asset set is invalid");
+          }
+          const artifactText = readBoundedManifest(
+            path.join(target, "release-artifact.json"),
+          );
+          const artifact = assertReleaseArtifactManifest(JSON.parse(artifactText));
+          validateReleaseArtifactBinding(
+            releaseManifest,
+            artifact,
+            sha256Text(artifactText),
+          );
+          if (releaseManifest.schemaVersion === "plush.release-manifest/v2") {
+            const receiptText = readBoundedManifest(
+              path.join(target, "release-rehearsal.json"),
+            );
+            validateReleaseRehearsalReceipt(JSON.parse(receiptText), artifact, {
+              sha: gitSha,
+              version: releaseManifest.version,
+              customer: "yoyoosun",
+            });
+            if (sha256Text(receiptText) !== releaseManifest.rehearsal?.receiptSha256) {
+              throw new Error("cached GitHub rehearsal digest is invalid");
+            }
+          }
+          return { directory: target, reused: true, assets: files };
+        }
+        throw new Error("GitHub release download directory is not empty");
+      }
+      mkdirSync(target, { recursive: true, mode: 0o700 });
+      try {
+        await runGh(
+          runCommand,
+          [
+            "release",
+            "download",
+            `artifact-${gitSha}`,
+            "--repo",
+            GITHUB_DELIVERY_REPOSITORY,
+            "--dir",
+            target,
+          ],
+          { cwd: root, timeout: 10 * 60_000 },
+        );
+        const files = readdirSync(target).sort();
+        const releaseManifest = validateReleaseManifest(
+          JSON.parse(
+            readBoundedManifest(path.join(target, "release-manifest.json")),
+          ),
+        );
+        if (releaseManifest.gitSha !== gitSha) {
+          throw new Error("downloaded GitHub release SHA does not match");
+        }
+        const expected = [...expectedAssetsForManifest(releaseManifest)].sort();
+        if (!exactAssetSet(files, expected)) {
+          throw new Error("downloaded GitHub release assets are incomplete");
+        }
+        const artifactText = readBoundedManifest(
+          path.join(target, "release-artifact.json"),
+        );
+        const artifact = assertReleaseArtifactManifest(JSON.parse(artifactText));
+        validateReleaseArtifactBinding(
+          releaseManifest,
+          artifact,
+          sha256Text(artifactText),
+        );
+        if (releaseManifest.schemaVersion === "plush.release-manifest/v2") {
+          const receiptText = readBoundedManifest(
+            path.join(target, "release-rehearsal.json"),
+          );
+          validateReleaseRehearsalReceipt(JSON.parse(receiptText), artifact, {
+            sha: gitSha,
+            version: releaseManifest.version,
+            customer: "yoyoosun",
+          });
+          if (sha256Text(receiptText) !== releaseManifest.rehearsal?.receiptSha256) {
+            throw new Error("downloaded GitHub rehearsal digest is invalid");
+          }
+        }
+        return { directory: target, reused: false, assets: files };
+      } catch (error) {
+        rmSync(target, { recursive: true, force: true });
+        throw error;
+      }
+    },
+  };
+}
+
+function readBoundedManifest(file) {
+  const stat = lstatSync(file);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.size > 512 * 1024) {
+    throw new Error("downloaded release manifest is invalid");
+  }
+  return readFileSync(file, "utf8");
+}
+
+function isMainModule() {
+  try {
+    return (
+      realpathSync(fileURLToPath(import.meta.url)) ===
+      realpathSync(process.argv[1])
+    );
+  } catch {
+    return false;
+  }
+}
+
+if (isMainModule()) {
+  try {
+    const provider = createGithubDeliveryProvider();
+    const versions = await provider.listVersions({ limit: 20 });
+    console.log(JSON.stringify(versions, null, 2));
+  } catch (error) {
+    console.error(`[github-delivery-provider] ${error.message}`);
+    process.exit(1);
+  }
+}
