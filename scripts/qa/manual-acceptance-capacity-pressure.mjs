@@ -1,0 +1,704 @@
+#!/usr/bin/env node
+
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { createHash } from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
+import { assertDisposableDatabaseTarget } from "./database-target.mjs";
+import { DEFAULT_PRESSURE_LIMITS, normalizePressureURL, pressureLogicFingerprint, pressureRPC as rpc, runPressureLevel as runLevel, verifyPressureRuntime } from "./pressure-runtime.mjs";
+import { capacityDatasetLogicFingerprint } from "./capacity-dataset.mjs";
+
+const READ_PRESSURE_LOGIC_FILES = ["scripts/qa/manual-acceptance-capacity-pressure.mjs", "scripts/qa/pressure-runtime.mjs"];
+const importedReadPressureFingerprint = pressureLogicFingerprint(READ_PRESSURE_LOGIC_FILES);
+
+export const CONFIRM_PHRASE = "RUN_ISOLATED_MANUAL_ACCEPTANCE_PRESSURE";
+const execFileAsync = promisify(execFile);
+const RUNTIME_METRIC_NAMES = Object.freeze([
+  "plush_erp_go_goroutines",
+  "plush_erp_go_heap_alloc_bytes",
+  "plush_erp_db_connections_open",
+  "plush_erp_db_connections_in_use",
+  "plush_erp_db_wait_total",
+  "plush_erp_pdf_render_active",
+  "plush_erp_pdf_admitted",
+  "plush_erp_pdf_queued",
+  "plush_erp_pdf_warmup_ready",
+  "plush_erp_pdf_chrome_starts_total",
+  "plush_erp_attachment_relation_bytes",
+]);
+
+export const PRESSURE_PROFILES = Object.freeze({
+  capacity: Object.freeze([
+    Object.freeze({ key: "ramp", concurrency: 5, requests: 100 }),
+    Object.freeze({
+      key: "capacity",
+      concurrency: 20,
+      requests: 1000,
+      cooldownBeforeMs: 2000,
+      pacingMs: 400,
+    }),
+    Object.freeze({
+      key: "recovery",
+      concurrency: 5,
+      requests: 100,
+      cooldownBeforeMs: 5000,
+      pacingMs: 200,
+    }),
+  ]),
+  sustained: Object.freeze([
+    Object.freeze({ key: "ramp", concurrency: 5, requests: 100 }),
+    Object.freeze({ key: "sustained", concurrency: 20, durationMs: 600000, pacingMs: 400 }),
+    Object.freeze({ key: "recovery", concurrency: 5, requests: 100, cooldownBeforeMs: 5000, pacingMs: 200 }),
+  ]),
+  saturation: Object.freeze([
+    Object.freeze({ key: "ramp", concurrency: 20, requests: 500 }),
+    Object.freeze({
+      key: "saturation",
+      concurrency: 100,
+      requests: 5000,
+      allowedErrorClasses: Object.freeze([
+        "rate_limited",
+        "overloaded",
+        "timeout",
+      ]),
+    }),
+    Object.freeze({
+      key: "recovery",
+      concurrency: 5,
+      requests: 100,
+      cooldownBeforeMs: 5000,
+      pacingMs: 200,
+    }),
+  ]),
+  soak: Object.freeze([
+    Object.freeze({ key: "ramp", concurrency: 10, requests: 200 }),
+    Object.freeze({
+      key: "soak",
+      concurrency: 20,
+      // 20 workers each wait 400 ms between requests: 90k requests hold the
+      // steady phase for at least 30 minutes before response latency is added.
+      requests: 90000,
+      pacingMs: 400,
+    }),
+    Object.freeze({
+      key: "recovery",
+      concurrency: 5,
+      requests: 100,
+      cooldownBeforeMs: 5000,
+      pacingMs: 200,
+    }),
+  ]),
+});
+
+export const PRESSURE_LEVELS = PRESSURE_PROFILES.capacity;
+
+function sha256(value) {
+  return createHash("sha256").update(String(value)).digest("hex");
+}
+
+export async function readExecutionIdentity() {
+  const [{ stdout: commit }, { stdout: status }] = await Promise.all([
+    execFileAsync("git", ["rev-parse", "HEAD"]),
+    execFileAsync("git", ["status", "--porcelain=v1", "--untracked-files=no"], {
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+    }),
+  ]);
+  const hardware = {
+    platform: os.platform(),
+    arch: os.arch(),
+    cpuCount: os.cpus().length,
+    memoryBytes: os.totalmem(),
+    node: process.version,
+  };
+  return {
+    commit: commit.trim(),
+    treeState: status.trim() ? "dirty" : "clean",
+    hardware,
+    hardwareFingerprint: sha256(JSON.stringify(hardware)),
+  };
+}
+
+export function percentile(values, ratio) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[
+    Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1)
+  ];
+}
+
+export function normalizeLoopbackURL(value) { return normalizePressureURL(value); }
+
+export function resolvePsqlBin(env = process.env) {
+  return String(env?.PSQL_BIN || "psql").trim() || "psql";
+}
+
+export function parseRuntimeMetrics(text) {
+  const expected = new Set(RUNTIME_METRIC_NAMES);
+  const metrics = {};
+  for (const line of String(text || "").split(/\r?\n/u)) {
+    if (!line || line.startsWith("#")) continue;
+    const [name, rawValue, ...extra] = line.trim().split(/\s+/u);
+    if (!expected.has(name) || extra.length > 0) continue;
+    const value = Number(rawValue);
+    if (Number.isFinite(value)) metrics[name] = value;
+  }
+  for (const name of RUNTIME_METRIC_NAMES) {
+    if (!Number.isFinite(metrics[name])) {
+      throw new Error(`runtime metrics missing ${name}`);
+    }
+  }
+  return metrics;
+}
+
+async function readRuntimeMetrics(baseURL) {
+  const response = await fetch(`${baseURL}/metrics`, {
+    headers: { accept: "text/plain" },
+    signal: AbortSignal.timeout(2000),
+  });
+  if (!response.ok)
+    throw new Error(`runtime metrics returned ${response.status}`);
+  return parseRuntimeMetrics(await response.text());
+}
+
+function startSampler(read, names) {
+  let stopped = false, timer, pending, stopResult;
+  let sampleCount = 0, sampleErrors = 0, first = null, last = null;
+  const maximum = Object.fromEntries(names.map((name) => [name, 0]));
+  const sample = async () => {
+    sampleCount++;
+    try {
+      const result = { at: new Date().toISOString(), ...await read() };
+      first ||= result; last = result;
+      for (const name of names) maximum[name] = Math.max(maximum[name], Number(result[name] || 0));
+    } catch { sampleErrors++; }
+  };
+  const run = () => {
+    pending = sample().finally(() => {
+      if (!stopped) { timer = setTimeout(run, 1000); timer.unref(); }
+    });
+  };
+  run();
+  return () => stopResult ||= (async () => {
+    stopped = true; clearTimeout(timer); await pending; await sample();
+    return { sampleCount, sampleErrors, first, last, maximum };
+  })();
+}
+
+export function startRuntimeMetricsSampler(baseURL) {
+  return startSampler(() => readRuntimeMetrics(baseURL), RUNTIME_METRIC_NAMES);
+}
+
+export function selectCapacityIdempotencyTask(
+  tasks = [],
+  { sourceType, sourceID } = {},
+) {
+  const expectedSourceType = String(sourceType || "").trim();
+  const expectedSourceID = Number(sourceID);
+  if (
+    !expectedSourceType ||
+    !Number.isSafeInteger(expectedSourceID) ||
+    expectedSourceID <= 0
+  ) {
+    return undefined;
+  }
+  return (Array.isArray(tasks) ? tasks : []).find(
+    (task) =>
+      task?.task_group === "trial_pmc_work" &&
+      task?.task_status_key === "ready" &&
+      task?.owner_role_key === "pmc" &&
+      task?.source_type === expectedSourceType &&
+      Number(task?.source_id) === expectedSourceID &&
+      task?.payload?.simulated_only === true &&
+      task?.payload?.real_customer_data === false &&
+      task?.payload?.trial_task === true,
+  );
+}
+
+export async function readDatabaseStats(databaseURL) {
+  const { stdout } = await execFileAsync(
+    resolvePsqlBin(),
+    [
+      databaseURL,
+      "-Atc",
+      "select json_build_object('workflow_tasks',(select count(*) from workflow_tasks),'workflow_task_version_sum',(select coalesce(sum(version),0) from workflow_tasks),'workflow_task_events',(select count(*) from workflow_task_events),'production_facts',(select count(*) from production_facts),'finance_facts',(select count(*) from finance_facts),'attachments',(select count(*) from business_attachments),'backends',numbackends,'conflicts',conflicts,'deadlocks',deadlocks,'temp_files',temp_files,'temp_bytes',temp_bytes,'active_queries',(select count(*) from pg_stat_activity where datname=current_database() and state='active'),'lock_waiters',(select count(*) from pg_stat_activity where datname=current_database() and wait_event_type='Lock')) from pg_stat_database where datname=current_database()",
+    ],
+    { maxBuffer: 1024 * 1024, timeout: 4000 },
+  );
+  return JSON.parse(stdout.trim());
+}
+
+async function readIdempotencyReceipt(databaseURL, taskID, idempotencyKey) {
+  const { stdout } = await execFileAsync(
+    resolvePsqlBin(),
+    [
+      databaseURL,
+      "-Atc",
+      `select json_build_object(
+        'event_count', count(*),
+        'task_version_count', count(distinct task_version),
+        'intent_hash_count', count(distinct intent_hash),
+        'command_key_count', count(distinct command_key),
+        'has_mutation_result', bool_and(mutation_result is not null)
+      )
+      from workflow_task_events
+      where task_id = ${Number(taskID)}
+        and idempotency_key = '${String(idempotencyKey).replaceAll("'", "''")}'`,
+    ],
+    { maxBuffer: 1024 * 1024, timeout: 4000 },
+  );
+  return JSON.parse(stdout.trim());
+}
+
+export function startDatabaseSampler(databaseURL) {
+  const stop = startSampler(() => readDatabaseStats(databaseURL), ["backends", "active_queries", "lock_waiters", "deadlocks", "conflicts"]);
+  return async () => {
+    const result = await stop();
+    return { ...result, maxBackends: result.maximum.backends, maxActiveQueries: result.maximum.active_queries,
+      maxLockWaiters: result.maximum.lock_waiters, maxDeadlocks: result.maximum.deadlocks, maxConflicts: result.maximum.conflicts };
+  };
+}
+
+async function login(baseURL, username, password) {
+  const result = await rpc({
+    baseURL,
+    domain: "auth",
+    method: "admin_login",
+    params: { username, password },
+  });
+  if (!result.ok) throw new Error(result.error);
+  const token = result.data.access_token || result.data.token;
+  if (!token) throw new Error(`${username} login response missing token`);
+  return { token, profile: result.data };
+}
+
+export async function runIsolatedPressure({
+  baseURL,
+  adminUsername = "demo_admin",
+  debugUsername = "demo_debug",
+  password,
+  rolePassword = password,
+  confirm,
+  databaseName,
+  databaseURL,
+  datasetReceipt,
+  profile = "capacity",
+  taskSourceType,
+  taskSourceID,
+  expectedCommit,
+  expectedMigration,
+  limits = DEFAULT_PRESSURE_LIMITS,
+  signal,
+}) {
+  baseURL = normalizeLoopbackURL(baseURL);
+  if (confirm !== CONFIRM_PHRASE)
+    throw new Error(`confirmation must equal ${CONFIRM_PHRASE}`);
+  const databaseTarget = assertDisposableDatabaseTarget({
+    databaseName,
+    databaseURL,
+    profile: "capacity",
+  });
+  if (!password)
+    throw new Error("MANUAL_ACCEPTANCE_ADMIN_PASSWORD is required");
+  if (!rolePassword)
+    throw new Error("MANUAL_ACCEPTANCE_ROLE_PASSWORD is required");
+  taskSourceType = String(taskSourceType || "").trim();
+  taskSourceID = Number(taskSourceID);
+  if (
+    !taskSourceType ||
+    !Number.isSafeInteger(taskSourceID) ||
+    taskSourceID <= 0
+  ) {
+    throw new Error(
+      "taskSourceType and taskSourceID must bind the simulated pressure task batch",
+    );
+  }
+  const levelsToRun = PRESSURE_PROFILES[profile];
+  if (!levelsToRun) {
+    throw new Error(
+      `pressure profile must be one of ${Object.keys(PRESSURE_PROFILES).join(", ")}`,
+    );
+  }
+  if (
+    !datasetReceipt ||
+    datasetReceipt.status !== "passed" ||
+    datasetReceipt.logicFingerprint !== capacityDatasetLogicFingerprint() ||
+    datasetReceipt.databaseTargetFingerprint !== databaseTarget.targetFingerprint ||
+    datasetReceipt.databaseName !== databaseName ||
+    datasetReceipt.taskSourceType !== taskSourceType ||
+    Number(datasetReceipt.taskSourceID) !== taskSourceID ||
+    !Number.isSafeInteger(
+      Number(datasetReceipt.after?.capacityAttachmentOwnerID),
+    ) ||
+    Number(datasetReceipt.after?.capacityAttachmentOwnerID) <= 0 ||
+    !/^[0-9a-f]{64}$/u.test(String(datasetReceipt.datasetHash || ""))
+  ) {
+    throw new Error(
+      "passed capacity dataset receipt must bind the database and task batch",
+    );
+  }
+  const capacityAttachmentOwnerID = Number(
+    datasetReceipt.after.capacityAttachmentOwnerID,
+  );
+  if (importedReadPressureFingerprint !== pressureLogicFingerprint(READ_PRESSURE_LOGIC_FILES)) throw new Error("read pressure logic changed after loading; restart required");
+  const runtimeBefore = await verifyPressureRuntime({ baseURL, databaseName, commit: expectedCommit, migration: expectedMigration, signal });
+  const sourceFingerprint = pressureLogicFingerprint(READ_PRESSURE_LOGIC_FILES);
+  const startedAt = new Date().toISOString();
+  const admin = await login(baseURL, adminUsername, password);
+  const adminRoleKeys = new Set(
+    (admin.profile.roles || []).map((role) => role?.role_key),
+  );
+  if (
+    admin.profile.is_super_admin !== true &&
+    !adminRoleKeys.has("admin")
+  ) {
+    throw new Error("capacity admin identity must be super admin or admin role");
+  }
+  const debug = await login(baseURL, debugUsername, rolePassword);
+  const capabilities = await rpc({
+    baseURL,
+    domain: "debug",
+    method: "capabilities",
+    token: debug.token,
+  });
+  if (
+    !capabilities.ok ||
+    !new Set(["local", "dev"]).has(capabilities.data.environment)
+  )
+    throw new Error("runtime must report local/dev");
+  const session = await rpc({
+    baseURL,
+    domain: "customer_config",
+    method: "get_effective_session",
+    params: { customer_key: "yoyoosun" },
+    token: admin.token,
+  });
+  if (!session.ok || !session.data.session?.source) {
+    throw new Error("customer config session identity is required");
+  }
+
+  const accounts = {};
+  for (const [key, username] of Object.entries({
+    pmc: "demo_pmc",
+    production: "demo_production",
+    finance: "demo_finance",
+    sales: "demo_sales",
+  })) {
+    accounts[key] = await login(baseURL, username, rolePassword);
+  }
+
+  const probes = [
+    {
+      key: "workflow",
+      domain: "workflow",
+      method: "list_tasks",
+      token: accounts.pmc.token,
+      params: (index) => ({ limit: 50, offset: (index * 50) % 4950 }),
+      validate: (data) => Array.isArray(data.tasks) && Number.isSafeInteger(data.total),
+    },
+    {
+      key: "production",
+      domain: "operational_fact",
+      method: "list_production_facts",
+      token: accounts.production.token,
+      params: (index) => ({ limit: 50, offset: (index * 50) % 1950 }),
+      validate: (data) => Array.isArray(data.production_facts) && Number.isSafeInteger(data.total),
+    },
+    {
+      key: "finance",
+      domain: "operational_fact",
+      method: "list_finance_facts",
+      token: accounts.finance.token,
+      params: (index) => ({ limit: 50, offset: (index * 50) % 1950 }),
+      validate: (data) => Array.isArray(data.finance_facts) && Number.isSafeInteger(data.total),
+    },
+    {
+      key: "attachments",
+      validate: (data) => Array.isArray(data.attachments),
+      domain: "attachment",
+      method: "list_attachments",
+      token: accounts.pmc.token,
+      params: () => ({
+        owner_type: "workflow_task",
+        owner_id: capacityAttachmentOwnerID,
+      }),
+    },
+  ];
+  const baseline = {};
+  for (const probe of probes) {
+    const result = await rpc({ baseURL, ...probe, params: probe.params(0) });
+    if (!result.ok)
+      throw new Error(`baseline ${probe.key} failed: ${result.error}`);
+    baseline[probe.key] = Number(
+      result.data.total ??
+        result.data.attachments?.length ??
+        result.data[`${probe.key}_facts`]?.length ??
+        0,
+    );
+  }
+
+  const databaseBefore = await readDatabaseStats(databaseURL);
+  const stopDatabaseSampler = startDatabaseSampler(databaseURL);
+  const stopRuntimeMetricsSampler = startRuntimeMetricsSampler(baseURL);
+  const levels = [];
+  try {
+  for (const level of levelsToRun) {
+    levels.push(
+      await runLevel({
+        level, limits, signal,
+        expectedMethods: probes.map((probe) => `${probe.domain}.${probe.method}`),
+        requestFactory: (index, observe, activeSignal) => {
+          const probe = probes[index % probes.length];
+          return rpc({
+            baseURL,
+            domain: probe.domain,
+            method: probe.method,
+            token: probe.token,
+            params: probe.params(index), validate: probe.validate, observe, signal: activeSignal,
+          });
+        },
+      }),
+    );
+  }
+
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  const taskList = await rpc({
+    baseURL,
+    domain: "workflow",
+    method: "list_tasks",
+    token: accounts.pmc.token,
+    params: {
+      task_group: "trial_pmc_work",
+      task_status_key: "ready",
+      source_type: taskSourceType,
+      source_id: taskSourceID,
+      limit: 20,
+    },
+  });
+  const task = selectCapacityIdempotencyTask(taskList.data?.tasks, {
+    sourceType: taskSourceType,
+    sourceID: taskSourceID,
+  });
+  if (!task?.id || !task?.version) {
+    throw new Error(
+      "same-batch simulated trial_pmc_work idempotency probe task is missing",
+    );
+  }
+  const idempotencyKey = `capacity-idempotency-${databaseName}-${task.id}-${Date.now()}`;
+  const runIdempotencyRequest = () =>
+    rpc({
+      baseURL,
+      domain: "workflow",
+      method: "urge_task",
+      token: accounts.pmc.token,
+      params: {
+        task_id: task.id,
+        expected_version: task.version,
+        idempotency_key: idempotencyKey,
+        action: "urge_task",
+        reason: "【容量测试】并发重复催办只应形成一次处理结果。",
+        payload: {},
+      },
+    });
+  const idempotencyInitialResults = await Promise.all(
+    Array.from({ length: 20 }, runIdempotencyRequest),
+  );
+  const initialFailures = idempotencyInitialResults.filter((item) => !item.ok);
+  const idempotencyRetryResults = [];
+  let eventualFailures = initialFailures;
+  for (let round = 1; round <= 5 && eventualFailures.length > 0; round += 1) {
+    await new Promise((resolve) => setTimeout(resolve, round * 1000));
+    const roundResults = await Promise.all(
+      eventualFailures.map(runIdempotencyRequest),
+    );
+    idempotencyRetryResults.push(...roundResults);
+    eventualFailures = roundResults.filter((item) => !item.ok);
+  }
+  const allSuccessfulIdempotencyResults = [
+    ...idempotencyInitialResults.filter((item) => item.ok),
+    ...idempotencyRetryResults.filter((item) => item.ok),
+  ];
+  const idempotencyVersions = [
+    ...new Set(
+      allSuccessfulIdempotencyResults.map((item) => item.data.task?.version),
+    ),
+  ];
+  const initialErrors = Object.fromEntries(
+    [...new Set(initialFailures.map((item) => item.error))].map((error) => [
+      error,
+      initialFailures.filter((item) => item.error === error).length,
+    ]),
+  );
+  const durableIdempotencyReceipt = await readIdempotencyReceipt(
+    databaseURL,
+    task.id,
+    idempotencyKey,
+  );
+  const after = {};
+  for (const probe of probes) {
+    const result = await rpc({ baseURL, ...probe, params: probe.params(0) });
+    if (!result.ok)
+      throw new Error(`after ${probe.key} failed: ${result.error}`);
+    after[probe.key] = Number(
+      result.data.total ??
+        result.data.attachments?.length ??
+        result.data[`${probe.key}_facts`]?.length ??
+        0,
+    );
+  }
+  const databaseSampling = await stopDatabaseSampler();
+  const runtimeSampling = await stopRuntimeMetricsSampler();
+  const databaseAfter = await readDatabaseStats(databaseURL);
+  const execution = await readExecutionIdentity();
+  const runtimeAfter = await verifyPressureRuntime({ baseURL, databaseName, commit: expectedCommit, migration: expectedMigration, signal });
+  if (sourceFingerprint !== pressureLogicFingerprint(READ_PRESSURE_LOGIC_FILES)) throw new Error("pressure source changed during execution");
+  const expectedDatabaseDelta =
+    Number(databaseAfter.workflow_task_events) -
+      Number(databaseBefore.workflow_task_events) ===
+      1 &&
+    Number(databaseAfter.workflow_task_version_sum) -
+      Number(databaseBefore.workflow_task_version_sum) ===
+      1;
+  const recovery = levels.at(-1);
+  return {
+    schemaVersion: "plush-pressure-report/v2",
+    scope: "manual-acceptance-isolated-capacity-pressure",
+    startedAt, completedAt: new Date().toISOString(),
+    runtimeIdentity: { before: runtimeBefore, after: runtimeAfter },
+    sourceFingerprint, limits, loadModel: "closed-loop-paced",
+    profile,
+    execution,
+    databaseName,
+    databaseRunIdentity: databaseTarget.databaseRunIdentity,
+    databaseTargetFingerprint: databaseTarget.targetFingerprint,
+    environment: capabilities.data.environment,
+    customerConfig: {
+      source: session.data.session.source,
+      revision: session.data.session.configRevision || "",
+    },
+    dataset: {
+      version: datasetReceipt.datasetVersion,
+      hash: datasetReceipt.datasetHash,
+      workflowTasks: Number(databaseBefore.workflow_tasks),
+      productionFacts: Number(databaseBefore.production_facts),
+      financeFacts: Number(databaseBefore.finance_facts),
+      attachments: Number(databaseBefore.attachments),
+    },
+    levels,
+    idempotency: {
+      key: idempotencyKey,
+      concurrency: 20,
+      initialSuccesses: idempotencyInitialResults.filter((item) => item.ok)
+        .length,
+      initialFailures: initialFailures.length,
+      initialErrors,
+      retryAttempts: idempotencyRetryResults.length,
+      retrySuccesses: idempotencyRetryResults.filter((item) => item.ok).length,
+      eventualFailures: eventualFailures.length,
+      resultVersions: idempotencyVersions,
+      singleResultVersion: idempotencyVersions.length === 1,
+      durableReceipt: durableIdempotencyReceipt,
+    },
+    consistency: {
+      baseline,
+      after,
+      unchanged: JSON.stringify(baseline) === JSON.stringify(after),
+      expectedDatabaseDelta,
+    },
+    recovery: {
+      key: recovery?.key,
+      accepted: recovery?.acceptance === true,
+      successRate: recovery?.successRate,
+    },
+    database: {
+      before: databaseBefore,
+      after: databaseAfter,
+      sampling: databaseSampling,
+    },
+    runtime: {
+      sampling: runtimeSampling,
+    },
+    passed:
+      levels.every((item) => item.acceptance === true) &&
+      eventualFailures.length === 0 &&
+      idempotencyVersions.length === 1 &&
+      Number(durableIdempotencyReceipt.event_count) === 1 &&
+      Number(durableIdempotencyReceipt.task_version_count) === 1 &&
+      Number(durableIdempotencyReceipt.intent_hash_count) === 1 &&
+      Number(durableIdempotencyReceipt.command_key_count) === 1 &&
+      durableIdempotencyReceipt.has_mutation_result === true &&
+      JSON.stringify(baseline) === JSON.stringify(after) &&
+      expectedDatabaseDelta &&
+      recovery?.key === "recovery" &&
+      recovery?.acceptance === true &&
+      databaseSampling.sampleErrors === 0 &&
+      runtimeSampling.sampleErrors === 0 &&
+      databaseSampling.maxDeadlocks === 0 &&
+      databaseSampling.maxConflicts === 0 &&
+      Number(databaseBefore.workflow_tasks) >= 5000 &&
+      Number(databaseBefore.production_facts) >= 2000 &&
+      Number(databaseBefore.finance_facts) >= 2000 &&
+      Number(databaseBefore.attachments) >= 1000,
+  };
+  } catch (error) {
+    error.pressureReport = { schemaVersion: "plush-pressure-report/v2", passed: false, profile, databaseName,
+      sourceFingerprint, levels: [...levels, ...(error.pressureLevel ? [error.pressureLevel] : [])], failure: "execution_failed" };
+    throw error;
+  } finally { await Promise.all([stopDatabaseSampler(), stopRuntimeMetricsSampler()]); }
+}
+
+async function main() {
+  const args = new Map(
+    process.argv.slice(2).map((value, index, all) => [value, all[index + 1]]),
+  );
+  if (args.has("--help") || args.has("--plan")) {
+    process.stdout.write(JSON.stringify({ usage: "--base-url --database-name --dataset-receipt --commit --migration --profile --out", profiles: PRESSURE_PROFILES,
+      limits: DEFAULT_PRESSURE_LIMITS, env: ["MANUAL_ACCEPTANCE_PRESSURE_DATABASE_URL", "MANUAL_ACCEPTANCE_ADMIN_PASSWORD", "MANUAL_ACCEPTANCE_ROLE_PASSWORD", "MANUAL_ACCEPTANCE_PRESSURE_CONFIRM"] }, null, 2) + "\n");
+    return;
+  }
+  const datasetReceiptPath = args.get("--dataset-receipt");
+  if (!datasetReceiptPath) {
+    throw new Error("--dataset-receipt is required");
+  }
+  const datasetReceipt = JSON.parse(
+    fs.readFileSync(path.resolve(datasetReceiptPath), "utf8"),
+  );
+  const report = await runIsolatedPressure({
+    baseURL: args.get("--base-url") || "http://127.0.0.1:8300",
+    adminUsername: args.get("--admin-username") || "demo_admin",
+    debugUsername: args.get("--debug-username") || "demo_debug",
+    databaseName: args.get("--database-name"),
+    databaseURL: process.env.MANUAL_ACCEPTANCE_PRESSURE_DATABASE_URL,
+    password: process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+    rolePassword:
+      process.env.MANUAL_ACCEPTANCE_ROLE_PASSWORD ||
+      process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+    confirm: process.env.MANUAL_ACCEPTANCE_PRESSURE_CONFIRM,
+    datasetReceipt,
+    expectedCommit: args.get("--commit"), expectedMigration: args.get("--migration"),
+    profile: args.get("--profile") || "capacity",
+    taskSourceType: args.get("--task-source-type"),
+    taskSourceID: args.get("--task-source-id"),
+  });
+  const out =
+    args.get("--out") ||
+    "output/qa/manual-acceptance/capacity-pressure/report.json";
+  fs.mkdirSync(path.dirname(out), { recursive: true });
+  fs.writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
+  process.stdout.write(
+    `[qa:manual-acceptance-capacity-pressure] passed=${report.passed} report=${out}\n`,
+  );
+  if (!report.passed) process.exitCode = 1;
+}
+
+if (process.argv[1]?.endsWith("manual-acceptance-capacity-pressure.mjs"))
+  main().catch((error) => {
+    const outIndex = process.argv.indexOf("--out");
+    const out = (outIndex >= 0 && process.argv[outIndex + 1]) || "output/qa/manual-acceptance/capacity-pressure/report.json";
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, JSON.stringify(error.pressureReport || { passed: false, failure: "preflight_or_execution_failed" }, null, 2) + "\n");
+    console.error("[qa:manual-acceptance-capacity-pressure] failed; see report", out);
+    process.exitCode = 1;
+  });
