@@ -1,0 +1,47 @@
+{
+  "customerCode": "yoyoosun",
+  "environment": "待填写",
+  "releaseVersion": "20260629T0802-draft",
+  "backupId": "待填写",
+  "verifiedAt": "待填写",
+  "sourceAlias": "待填写",
+  "restoreTarget": "待填写",
+  "artifacts": {
+    "backupEvidence": "backup-evidence.md",
+    "preMigrationStatus": "migration-status-before-apply.txt",
+    "migrationStatus": "migration-status.txt",
+    "commandSummary": "command-summary.txt"
+  },
+  "backup": {
+    "databaseBackupSize": 0,
+    "databaseBackupHash": "待填写",
+    "storageLocationAlias": "待填写",
+    "migrationVersion": "待填写，必须等于 release-evidence.md migrationBefore"
+  },
+  "restore": {
+    "restoreTestStatus": "待填写",
+    "migrationBeforeApply": "待填写，必须等于 release-evidence.md migrationBefore",
+    "restoreMigrationVersion": "待填写",
+    "pendingFiles": "待填写"
+  },
+  "smoke": {
+    "smokeQueryStatus": "待填写",
+    "publicTableCount": 0,
+    "adminUserCount": "待填写",
+    "backendHealthStatus": "待填写",
+    "backendReadyStatus": "待填写",
+    "webSmokeStatus": "待填写"
+  },
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "containsDumpContent": false,
+    "containsFullDsn": false
+  },
+  "summary": {
+    "backupCreated": false,
+    "restoreCompleted": false,
+    "migrationStatus": "待填写",
+    "smokeQueryStatus": "待填写"
+  }
+}

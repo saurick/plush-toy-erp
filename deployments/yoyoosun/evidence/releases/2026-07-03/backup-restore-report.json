@@ -1,0 +1,43 @@
+{
+  "customerCode": "yoyoosun",
+  "environment": "customer-trial-133",
+  "releaseVersion": "yoyoosun-20260703-c298a2a3-amd64",
+  "backupId": "plush-yoyoosun-20260703T1315-c298a2a3-pre-migration",
+  "verifiedAt": "2026-07-03T05:15:00Z",
+  "sourceAlias": "133-compose-postgres-loopback",
+  "restoreTarget": "isolated-postgres-db-plush_restore_c298a2a3_051446",
+  "artifacts": {
+    "backupEvidence": "backup-evidence.md",
+    "preMigrationStatus": "migration-status-before-apply.txt",
+    "migrationStatus": "migration-status.txt",
+    "commandSummary": "command-summary.txt"
+  },
+  "backup": {
+    "storageLocationAlias": "133-compose-backups/plush-yoyoosun-20260703T1315-c298a2a3-pre-migration",
+    "databaseBackupSize": 169059,
+    "databaseBackupHash": "sha256:15169b008570792670d420a2c66caa978bf8064a087fcda61e76f76c4cd63b68",
+    "migrationVersion": "20260612112337"
+  },
+  "restore": {
+    "restoreTestStatus": "passed",
+    "migrationBeforeApply": "20260612112337",
+    "restoreMigrationVersion": "20260701152057",
+    "pendingFiles": "0"
+  },
+  "smoke": {
+    "smokeQueryStatus": "passed",
+    "publicTableCount": 52
+  },
+  "summary": {
+    "backupCreated": true,
+    "restoreCompleted": true,
+    "migrationStatus": "ok",
+    "smokeQueryStatus": "passed"
+  },
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "containsDumpContent": false,
+    "containsFullDsn": false
+  }
+}
