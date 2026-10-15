@@ -1,0 +1,582 @@
+import { createTaskBusinessReturnScenarios } from './taskBusinessReturnScenarios.mjs'
+
+function productionWipPermissions() {
+  return [
+    'pmc.plan.read',
+    'pmc.plan.update',
+    'production.fact.read',
+    'production.completion.create',
+    'production.wip.read',
+    'production.wip.assign',
+    'production.wip.execute',
+    'warehouse.packaging.execute',
+    'outsourcing.material_issue.create',
+    'outsourcing.return_receipt.create',
+    'mobile.production.access',
+    'production.packaging_material.confirm',
+    'outsourcing.order.read',
+  ]
+}
+
+async function clickVisibleAction(page, text) {
+  const pattern = text instanceof RegExp ? text : new RegExp(`^${text}$`, 'u')
+  const compact = Number(page.viewportSize()?.width || 0) < 992
+  let action = page.locator('button:visible', { hasText: pattern }).first()
+  if (compact && (await action.count()) === 0) {
+    const more = page.locator(
+      '.erp-business-selection-action-bar__compact-more:visible'
+    )
+    await more.waitFor({ state: 'visible', timeout: 10_000 })
+    await more.click()
+    const actionMenu = page
+      .locator('.erp-business-selection-action-menu:visible')
+      .last()
+    await actionMenu.waitFor({ state: 'visible', timeout: 10_000 })
+    action = actionMenu.locator('button:visible', { hasText: pattern }).first()
+  }
+  await action.waitFor({ state: 'visible', timeout: 10_000 })
+  await action.click()
+}
+
+async function releaseProductionOrder(page, expectText) {
+  await page.getByText('MO-STYLE-L1-20260713', { exact: true }).first().click()
+  await clickVisibleAction(page, '发布')
+  await page.getByRole('button', { name: '确认发布' }).click()
+  await expectText(page, '生产订单已发布，排产确认已进入 PMC 待办')
+}
+
+export function createProductionWipScenarios(deps) {
+  const {
+    assert,
+    assertNoHorizontalOverflow,
+    customerRuntimeEffectiveSession,
+    expectHeading,
+    expectText,
+    outputDir,
+    path,
+  } = deps
+  const permissions = productionWipPermissions()
+  const effectiveSession = {
+    ...customerRuntimeEffectiveSession,
+    actions: [
+      ...(customerRuntimeEffectiveSession?.actions || []),
+      ...permissions,
+    ],
+  }
+
+  return [
+    ...createTaskBusinessReturnScenarios(deps),
+    ...[
+      ['warehouse', 'wip_batch_id=91021', 'outsourcing.return_receipt.create'],
+      [
+        'sales',
+        'production_order_item_id=7101',
+        'production.packaging_material.confirm',
+      ],
+    ].map(([role, query, capability]) => ({
+      name: `production-handoff-${role}-source-desktop`,
+      productionOrderReleased: true,
+      path: `/erp/production/orders?production_order_id=71&${query}`,
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      adminProfile: {
+        username: `style-handoff-${role}`,
+        is_super_admin: false,
+        roles: [{ role_key: role, name: role === 'sales' ? '业务' : '仓库' }],
+        permissions: ['production.wip.read', capability],
+        menus: [
+          {
+            key: 'production-orders',
+            label: '生产订单',
+            path: '/erp/production/orders',
+            required_any: ['production.wip.read'],
+            required_all: [],
+          },
+        ],
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: ['production-orders'],
+        actions: ['production.wip.read', capability],
+      },
+      verify: async (page) => {
+        const modal = page
+          .locator('.ant-modal:visible')
+          .filter({ hasText: '生产工序办理' })
+          .last()
+        await modal.waitFor({ state: 'visible' })
+        await expectText(page, '当前：布料加工')
+        assert.equal(
+          await modal
+            .getByRole('button', { name: '安排加工', exact: true })
+            .count(),
+          0
+        )
+        if (role === 'warehouse') {
+          assert.equal(
+            await modal
+              .getByRole('button', { name: '开始工序', exact: true })
+              .count(),
+            0,
+            '仓库来源查看只展示工序信息，不应暴露生产执行入口'
+          )
+        } else {
+          assert.equal(
+            await modal
+              .getByRole('button', { name: '确认包材要求', exact: true })
+              .isEnabled(),
+            true
+          )
+        }
+        await page.screenshot({
+          path: path.resolve(outputDir, `production-handoff-${role}.png`),
+          fullPage: true,
+        })
+      },
+    })),
+    {
+      name: 'production-wip-prepare-outsourcing-desktop',
+      path: '/erp/production/orders',
+      auth: 'admin',
+      effectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/production_wip', async (route) => {
+          const { id, method, params } = route.request().postDataJSON()
+          if (method !== 'prepare_production_outsourcing_order') {
+            return route.fallback()
+          }
+          assert.ok(params.production_wip_batch_id > 0)
+          assert.ok(params.supplier_id > 0)
+          assert.equal(params.expected_return_date, '2026-10-01')
+          assert.ok(!Object.hasOwn(params, 'quantity'))
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id,
+              result: {
+                code: 0,
+                message: 'ok',
+                data: {
+                  outsourcing_order_id: 1,
+                  outsourcing_order_no: 'OS-WIP-TEST-1',
+                },
+              },
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        await expectHeading(page, '生产订单')
+        await releaseProductionOrder(page, expectText)
+        await clickVisibleAction(page, '工序办理')
+        const routeModal = page
+          .getByRole('dialog')
+          .filter({ hasText: '生产工序办理' })
+          .last()
+        await routeModal
+          .getByRole('button', { name: '安排加工', exact: true })
+          .click()
+        await routeModal.getByRole('radio', { name: '外发加工' }).check()
+        await routeModal
+          .getByRole('button', { name: '按加工安排生成委外草稿', exact: true })
+          .click()
+        const modal = page
+          .getByRole('dialog')
+          .filter({ hasText: '生成委外草稿' })
+          .last()
+        await modal.getByLabel('加工厂', { exact: true }).click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .first()
+          .click()
+        await modal.getByLabel('预计回厂日期', { exact: true }).click()
+        await page
+          .locator('.ant-picker-dropdown:visible')
+          .getByTitle('2026-10-01')
+          .click()
+        await page.screenshot({
+          path: path.join(outputDir, 'production-outsourcing-prepare.png'),
+          fullPage: true,
+        })
+        await modal.locator('.ant-modal-footer .ant-btn-primary').click()
+        await page.waitForURL(/processing-contracts.*outsourcing_order_id=1/u)
+      },
+    },
+    {
+      name: 'production-wip-route-execution-desktop',
+      path: '/erp/production/orders',
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      adminProfile: {
+        username: 'style-l1-production-wip-desktop',
+        is_super_admin: true,
+        permissions,
+      },
+      effectiveSession,
+      verify: async (page) => {
+        await expectHeading(page, '生产订单')
+        await releaseProductionOrder(page, expectText)
+        await clickVisibleAction(page, '工序办理')
+
+        const routeModal = page
+          .locator('.ant-modal:visible')
+          .filter({ hasText: '生产工序办理' })
+          .last()
+        await routeModal.waitFor({ state: 'visible', timeout: 10_000 })
+        for (const copy of ['布料加工', '车缝', '手工', '包装', '在制批次']) {
+          assert(
+            String((await routeModal.innerText()) || '').includes(copy),
+            `生产工序弹窗缺少业务口径：${copy}`
+          )
+        }
+        for (const technicalCopy of [
+          'production_order_id',
+          'production_wip_batch_id',
+          'target_operation_id',
+          'expected_version',
+          'idempotency_key',
+        ]) {
+          assert.equal(
+            await routeModal.getByText(technicalCopy, { exact: true }).count(),
+            0,
+            `生产工序弹窗不应显示技术字段 ${technicalCopy}`
+          )
+        }
+
+        const splitButton = routeModal.getByRole('button', {
+          name: '拆分批次',
+        })
+        const assignButton = routeModal.getByRole('button', {
+          name: '安排加工',
+        })
+        assert.equal(await splitButton.isEnabled(), true)
+        assert.equal(await assignButton.isEnabled(), true)
+        await splitButton.click()
+        await routeModal.getByLabel('拆出数量').waitFor({ state: 'visible' })
+        await routeModal.getByRole('button', { name: '返回工序' }).click()
+
+        await assignButton.click()
+        const inhouse = routeModal.getByRole('radio', { name: '本厂生产' })
+        const outsourced = routeModal.getByRole('radio', { name: '外发加工' })
+        assert.equal(await inhouse.isEnabled(), true)
+        assert.equal(await outsourced.isEnabled(), true)
+        assert.equal(await inhouse.isChecked(), true)
+        await outsourced.check()
+        const outsourcingSelect = routeModal.getByLabel('关联加工合同明细')
+        await outsourcingSelect.click()
+        await page
+          .getByText(/SIM-OUTSOURCE-SEWING-CONFIRMED.*永绅车缝加工厂/u)
+          .last()
+          .click()
+        await routeModal
+          .getByText('安排本厂或外发加工', { exact: true })
+          .click()
+        await expectText(
+          page,
+          '匹配核对：产品 PROD-STYLE-L1 / 超长产品名称用于验证生产订单明细可读换行；规格 SKU-STYLE-L1-LONG；工序 车缝；数量 20 只'
+        )
+        await routeModal.screenshot({
+          path: path.resolve(
+            outputDir,
+            'production-wip-outsourcing-contract-candidate-desktop.png'
+          ),
+        })
+        await inhouse.check()
+        await expectText(
+          page,
+          '本厂生产使用车间移交；外发加工完成返回才登记回仓。需要分开安排时，请先拆分批次。'
+        )
+        await routeModal.getByRole('button', { name: '返回工序' }).click()
+
+        await routeModal
+          .getByText(/WIP-STYLE-91021/u)
+          .first()
+          .click()
+        await expectText(page, '当前：布料加工')
+        assert.equal(
+          await routeModal.getByRole('button', { name: '拆分批次' }).count(),
+          0,
+          '正常首道布料加工不应提供拆批入口'
+        )
+        await routeModal.getByRole('button', { name: '安排加工' }).click()
+        await expectText(page, '安排布料整单外发')
+        await routeModal.getByLabel('本次外发的材料', { exact: true }).click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '样式短毛绒布' })
+          .click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '样式里布' })
+          .click()
+        await routeModal
+          .getByLabel('本次外发的材料', { exact: true })
+          .press('Escape')
+        const fabricContractSelect = routeModal.getByLabel('布料加工合同')
+        await fabricContractSelect.click()
+        await page
+          .getByText(/SIM-OUTSOURCE-SEWING-CONFIRMED.*覆盖 2 项布料/u)
+          .last()
+          .click()
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .first()
+          .waitFor({ state: 'hidden', timeout: 10_000 })
+        const fabricMainSelect = routeModal.getByLabel(
+          'MAT-STYLE-L1 / 样式短毛绒布'
+        )
+        const fabricMainField = routeModal
+          .locator('.ant-form-item')
+          .filter({ hasText: 'MAT-STYLE-L1 / 样式短毛绒布' })
+          .first()
+        await fabricMainSelect.click()
+        await page
+          .getByText(/第 4 行.*MAT-STYLE-L1.*10\.2 米/u)
+          .last()
+          .click()
+        const fabricLiningSelect = routeModal.getByLabel(
+          'MAT-LINING-L1 / 样式里布'
+        )
+        const fabricLiningField = routeModal
+          .locator('.ant-form-item')
+          .filter({ hasText: 'MAT-LINING-L1 / 样式里布' })
+          .first()
+        await fabricLiningSelect.click()
+        await page
+          .getByText(/第 5 行.*MAT-LINING-L1.*5 米/u)
+          .last()
+          .click()
+        await routeModal.getByText('安排布料整单外发', { exact: true }).click()
+        await expectText(page, 'MAT-STYLE-L1 / 样式短毛绒布')
+        await expectText(page, 'MAT-LINING-L1 / 样式里布')
+        assert.match(
+          await fabricMainField
+            .locator('.ant-select-selection-item')
+            .innerText(),
+          /第 4 行/u
+        )
+        assert.match(
+          await fabricLiningField
+            .locator('.ant-select-selection-item')
+            .innerText(),
+          /第 5 行/u
+        )
+        await expectText(page, '外发开工前还必须把合同对应材料发料过账')
+        await routeModal.screenshot({
+          path: path.resolve(
+            outputDir,
+            'production-wip-fabric-contract-allocation-desktop.png'
+          ),
+        })
+        await routeModal.getByRole('button', { name: '返回工序' }).click()
+        await routeModal
+          .getByText(/WIP-STYLE-91012/u)
+          .first()
+          .click()
+        await expectText(page, '当前：车缝')
+
+        await routeModal.getByRole('button', { name: '确认包材要求' }).click()
+        const packagingVersionItem = routeModal
+          .locator('.ant-form-item')
+          .filter({ hasText: '包装版本' })
+          .first()
+        assert.equal(
+          await packagingVersionItem.locator('.ant-form-item-required').count(),
+          1,
+          '包材确认的包装版本必须显示为必填字段'
+        )
+        assert.equal(
+          await packagingVersionItem.locator('input').inputValue(),
+          '',
+          '未填写包装版本时不得预造确认值'
+        )
+        await routeModal.getByRole('button', { name: '返回工序' }).click()
+
+        await splitButton.click()
+        await routeModal.getByLabel('拆出数量').fill('1')
+        await routeModal.getByRole('button', { name: '确认办理' }).click()
+        await expectText(page, '在制批次已拆分')
+        await expectText(page, '19')
+
+        const desktopMetrics = await routeModal.evaluate((element) => {
+          const rect = element.getBoundingClientRect()
+          return {
+            documentOverflow:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+            left: rect.left,
+            right: rect.right,
+            viewportWidth: window.innerWidth,
+            visibleButtons: Array.from(
+              element.querySelectorAll('button:not([disabled])')
+            ).map((button) => ({
+              text: String(button.textContent || '')
+                .replace(/\s+/gu, ' ')
+                .trim(),
+              writingMode: window.getComputedStyle(button).writingMode,
+            })),
+          }
+        })
+        assert(
+          desktopMetrics.documentOverflow <= 1 &&
+            desktopMetrics.left >= 0 &&
+            desktopMetrics.right <= desktopMetrics.viewportWidth + 1 &&
+            desktopMetrics.visibleButtons.every(
+              (button) => !button.writingMode.startsWith('vertical')
+            ),
+          `生产工序桌面弹窗发生页面级溢出或按钮竖排: ${JSON.stringify(
+            desktopMetrics
+          )}`
+        )
+        await routeModal.screenshot({
+          path: path.resolve(
+            outputDir,
+            'production-wip-route-modal-desktop.png'
+          ),
+        })
+        await routeModal.getByText(/WIP-STYLE-91003/u).first().click()
+        await routeModal.getByRole('button', { name: '登记成品收仓', exact: true }).click()
+        await routeModal.waitFor({ state: 'hidden', timeout: 10_000 })
+        await page.waitForFunction(
+          () =>
+            Array.from(
+              document.querySelectorAll('.ant-modal .ant-modal-title')
+            ).some((node) => {
+              const rect = node.closest('.ant-modal')?.getBoundingClientRect()
+              return (
+                rect?.width > 0 &&
+                rect?.height > 0 &&
+                ['登记成品收仓', '暂不能登记成品收仓'].includes(
+                  String(node.textContent || '').trim()
+                )
+              )
+            }) ||
+            Array.from(
+              document.querySelectorAll('.ant-message-notice-content')
+            ).some((node) => {
+              const rect = node.getBoundingClientRect()
+              return (
+                rect.width > 0 &&
+                rect.height > 0 &&
+                String(node.textContent || '').includes('加载成品收仓详情')
+              )
+            }),
+          undefined,
+          { timeout: 10_000 }
+        )
+        const visibleModalSummaries = await page
+          .locator('.ant-modal:visible')
+          .evaluateAll((nodes) =>
+            nodes.map((node) => ({
+              title:
+                node.querySelector('.ant-modal-title')?.textContent?.trim() ||
+                '',
+              text: String(node.textContent || '')
+                .replace(/\s+/gu, ' ')
+                .trim(),
+            }))
+          )
+        const visibleMessageTexts = await page
+          .locator('.ant-message-notice-content:visible')
+          .allInnerTexts()
+        assert(
+          visibleModalSummaries.some((item) => item.title === '登记成品收仓'),
+          `生产完工未进入可办理弹窗: ${JSON.stringify({
+            modals: visibleModalSummaries,
+            messages: visibleMessageTexts,
+          })}`
+        )
+        const completionModal = page
+          .locator('.ant-modal:visible')
+          .filter({ has: page.getByText('登记成品收仓', { exact: true }) })
+          .last()
+        await completionModal.waitFor({ state: 'visible', timeout: 10_000 })
+        await completionModal.getByText(/WIP-STYLE-91003.*剩余/u).waitFor()
+        await expectText(page, '部分路线明细暂不可登记')
+        const selectedCompletionItem = String(
+          (await completionModal
+            .locator('.ant-select-selection-item')
+            .first()
+            .innerText()) || ''
+        )
+        assert.match(
+          selectedCompletionItem,
+          /PROD-STYLE-L1/u,
+          `成品收仓只应默认选择已完成手工且有剩余数量的明细: ${selectedCompletionItem}`
+        )
+        await page.keyboard.press('Escape')
+        await completionModal.waitFor({ state: 'hidden', timeout: 10_000 })
+        await assertNoHorizontalOverflow(page, 'production-wip-route-desktop')
+      },
+    },
+    {
+      name: 'production-wip-route-execution-mobile',
+      path: '/m/production/handle/production/orders',
+      productionOrderReleased: true,
+      auth: 'admin',
+      viewport: { width: 390, height: 844 },
+      adminProfile: {
+        username: 'style-l1-production-wip-mobile',
+        is_super_admin: false,
+        roles: [{ role_key: 'production', name: '生产经理' }],
+        menus: [{ key: 'production-orders', path: '/erp/production/orders', label: '生产订单', required_any: ['production.wip.read'], required_all: [] }],
+        permissions,
+      },
+      effectiveSession,
+      verify: async (page) => {
+        await expectHeading(page, '生产订单')
+        await page.getByText('MO-STYLE-L1-20260713', { exact: true }).first().click()
+        await clickVisibleAction(page, '工序办理')
+        const routeModal = page
+          .locator('.ant-modal:visible')
+          .filter({ hasText: '生产工序办理' })
+          .last()
+        await routeModal.waitFor({ state: 'visible', timeout: 10_000 })
+        await routeModal
+          .getByRole('note')
+          .filter({
+            hasText:
+              /成品入库\s*→\s*查货与包装/u,
+          })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const mobileMetrics = await routeModal.evaluate((element) => {
+          const rect = element.getBoundingClientRect()
+          const table = element.querySelector('.ant-table-content')
+          return {
+            documentClientWidth: document.documentElement.clientWidth,
+            documentScrollWidth: document.documentElement.scrollWidth,
+            modalLeft: rect.left,
+            modalRight: rect.right,
+            viewportWidth: window.innerWidth,
+            tableClientWidth: table?.clientWidth || 0,
+            tableScrollWidth: table?.scrollWidth || 0,
+            verticalButtons: Array.from(
+              element.querySelectorAll('button')
+            ).filter((button) =>
+              window.getComputedStyle(button).writingMode.startsWith('vertical')
+            ).length,
+          }
+        })
+        assert(
+          mobileMetrics.documentScrollWidth <=
+            mobileMetrics.documentClientWidth + 1 &&
+            mobileMetrics.modalLeft >= 0 &&
+            mobileMetrics.modalRight <= mobileMetrics.viewportWidth + 1 &&
+            mobileMetrics.tableScrollWidth >= mobileMetrics.tableClientWidth &&
+            mobileMetrics.verticalButtons === 0,
+          `生产工序窄屏布局异常: ${JSON.stringify(mobileMetrics)}`
+        )
+        await routeModal.screenshot({
+          path: path.resolve(
+            outputDir,
+            'production-wip-route-modal-mobile.png'
+          ),
+        })
+        await assertNoHorizontalOverflow(page, 'production-wip-route-mobile')
+      },
+    },
+  ]
+}

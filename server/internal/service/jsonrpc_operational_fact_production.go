@@ -1,0 +1,430 @@
+package service
+
+import (
+	"context"
+
+	v1 "server/api/jsonrpc/v1"
+	"server/internal/biz"
+)
+
+func (d *jsonrpcDispatcher) handleOperationalFactProduction(
+	ctx context.Context,
+	method, id string,
+	pm map[string]any,
+	actorID int,
+) (string, *v1.JsonrpcResult, error) {
+	switch method {
+	case "submit_production_exception", "cancel_production_exception", "reverse_production_exception", "get_production_exception", "list_production_exceptions", "get_production_exception_context":
+		return d.handleProductionException(ctx, method, id, pm, actorID)
+	case "create_production_completion_from_order":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionCompletionCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "production_orders"); res != nil {
+			return id, res, nil
+		}
+		in, ok := productionCompletionFromOrderCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.CreateProductionCompletionFromOrder(ctx, in)
+		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
+	case "create_production_material_issue_from_order":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionMaterialIssueCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "production_orders"); res != nil {
+			return id, res, nil
+		}
+		in, ok := productionMaterialIssueFromOrderCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.CreateProductionMaterialIssueFromOrder(ctx, in)
+		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
+	case "create_production_rework_from_completion":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionReworkCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(
+			ctx,
+			getString(pm, "customer_key"),
+			"production",
+			"production_orders",
+			"quality_inspections",
+			workflowModuleKeyTasks,
+		); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "production_orders"); res != nil {
+			return id, res, nil
+		}
+		in, ok := productionReworkFromCompletionCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.CreateProductionReworkFromCompletion(ctx, in)
+		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
+	case "save_production_material_issue_draft",
+		"save_production_completion_draft",
+		"save_production_rework_from_completion_draft":
+		in, ok := productionFactDraftSaveFromParams(pm, method)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		var permissions []string
+		var modules []string
+		var save func(context.Context, *biz.ProductionFactDraftSave) (*biz.ProductionFact, error)
+		switch method {
+		case "save_production_material_issue_draft":
+			permissions = []string{biz.PermissionProductionMaterialIssueCreate}
+			modules = []string{"production", "production_orders"}
+			save = d.operationalFactUC.SaveProductionMaterialIssueDraft
+		case "save_production_completion_draft":
+			permissions = []string{biz.PermissionProductionCompletionCreate, biz.PermissionWarehouseInboundConfirm}
+			modules = []string{"production", "production_orders"}
+			save = d.operationalFactUC.SaveProductionCompletionDraft
+		case "save_production_rework_from_completion_draft":
+			permissions = []string{biz.PermissionProductionReworkCreate}
+			modules = []string{"production", "production_orders", "quality_inspections", workflowModuleKeyTasks}
+			save = d.operationalFactUC.SaveProductionReworkFromCompletionDraft
+		}
+		if res := d.RequireAdminAnyPermission(ctx, permissions...); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "production_orders"); res != nil {
+			return id, res, nil
+		}
+		item, err := save(ctx, in)
+		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
+	case "post_production_fact":
+		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version") {
+			return id, invalidParamResult(), nil
+		}
+		mutation, ok := operationalFactStatusMutationFromParams(pm, actorID, false)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionProductionFactPost, biz.PermissionWarehouseInboundConfirm); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		factID := mutation.ID
+		policy, err := d.operationalFactUC.GetProductionFactTransitionPolicy(ctx, factID)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		permission := biz.PermissionProductionFactPost
+		if policy.FactType == biz.ProductionFactFinishedGoodsReceipt {
+			permission = biz.PermissionWarehouseInboundConfirm
+		}
+		if res := d.RequireAdminPermission(ctx, permission); res != nil {
+			return id, res, nil
+		}
+		modules := []string{"production"}
+		if policy.RequiresSourceTask {
+			modules = append(modules, "production_orders", "quality_inspections", workflowModuleKeyTasks)
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
+			return id, res, nil
+		}
+		item, err := d.operationalFactUC.PostProductionFact(ctx, mutation)
+		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
+	case "cancel_production_fact":
+		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version", "reason") {
+			return id, invalidParamResult(), nil
+		}
+		mutation, ok := operationalFactStatusMutationFromParams(pm, actorID, true)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionProductionFactCancel, biz.PermissionWarehouseInboundConfirm); res != nil {
+			return id, res, nil
+		}
+		factID := mutation.ID
+		policy, err := d.operationalFactUC.GetProductionFactTransitionPolicy(ctx, factID)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		permission := biz.PermissionProductionFactCancel
+		if policy.FactType == biz.ProductionFactFinishedGoodsReceipt &&
+			(policy.Status == biz.OperationalFactStatusPosted || policy.WasPosted) {
+			permission = biz.PermissionWarehouseInboundConfirm
+		}
+		if res := d.RequireAdminPermission(ctx, permission); res != nil {
+			return id, res, nil
+		}
+		modules := []string{"production"}
+		if policy.RequiresSourceTask {
+			modules = append(modules, "production_orders", "quality_inspections", workflowModuleKeyTasks)
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
+			return id, res, nil
+		}
+		item, err := d.operationalFactUC.CancelPostedProductionFact(ctx, mutation)
+		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
+	case "list_production_facts":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactRead); res != nil {
+			return id, res, nil
+		}
+		filter, ok := operationalFactFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.operationalFactUC.ListProductionFacts(ctx, filter)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		return id, okData(map[string]any{"production_facts": productionFactsToAny(items), "total": total, "limit": normalizedLimit(pm), "offset": normalizedOffset(pm)}), nil
+	case "list_production_order_material_requirements":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "production", "production_orders"); res != nil {
+			return id, res, nil
+		}
+		if !productionCompletionAllowsOnly(pm, "customer_key", "production_order_id") {
+			return id, invalidParamResult(), nil
+		}
+		items, err := d.operationalFactUC.ListProductionOrderMaterialRequirements(ctx, getInt(pm, "production_order_id", 0))
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		return id, okData(map[string]any{"material_requirements": productionOrderMaterialRequirementsToAny(items)}), nil
+	default:
+		return id, unknownOperationalFactResult(method), nil
+	}
+}
+
+func productionMaterialIssueFromOrderCreateFromParams(pm map[string]any) (*biz.ProductionMaterialIssueFromOrderCreate, bool) {
+	if !productionCompletionAllowsOnly(
+		pm,
+		"customer_key",
+		"fact_no",
+		"production_order_id",
+		"production_order_item_id",
+		"production_order_material_requirement_id",
+		"warehouse_id",
+		"lot_id",
+		"quantity",
+		"idempotency_key",
+		"occurred_at",
+		"note",
+	) {
+		return nil, false
+	}
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
+	if !ok {
+		return nil, false
+	}
+	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
+	if !ok {
+		return nil, false
+	}
+	return &biz.ProductionMaterialIssueFromOrderCreate{
+		FactNo:                               getString(pm, "fact_no"),
+		ProductionOrderID:                    getInt(pm, "production_order_id", 0),
+		ProductionOrderItemID:                getInt(pm, "production_order_item_id", 0),
+		ProductionOrderMaterialRequirementID: getInt(pm, "production_order_material_requirement_id", 0),
+		WarehouseID:                          getInt(pm, "warehouse_id", 0),
+		LotID:                                getOptionalInt(pm, "lot_id"),
+		Quantity:                             quantity,
+		IdempotencyKey:                       getString(pm, "idempotency_key"),
+		OccurredAt:                           optionalTimeValue(occurredAt),
+		Note:                                 getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func productionCompletionFromOrderCreateFromParams(pm map[string]any) (*biz.ProductionCompletionFromOrderCreate, bool) {
+	if !productionCompletionAllowsOnly(
+		pm,
+		"customer_key",
+		"fact_no",
+		"production_order_id",
+		"production_order_item_id",
+		"production_wip_batch_id",
+		"warehouse_id",
+		"lot_id",
+		"new_lot_no",
+		"quantity",
+		"idempotency_key",
+		"occurred_at",
+		"note",
+	) {
+		return nil, false
+	}
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
+	if !ok {
+		return nil, false
+	}
+	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
+	if !ok {
+		return nil, false
+	}
+	return &biz.ProductionCompletionFromOrderCreate{
+		FactNo:                getString(pm, "fact_no"),
+		ProductionOrderID:     getInt(pm, "production_order_id", 0),
+		ProductionOrderItemID: getInt(pm, "production_order_item_id", 0),
+		ProductionWIPBatchID:  getInt(pm, "production_wip_batch_id", 0),
+		WarehouseID:           getInt(pm, "warehouse_id", 0),
+		LotID:                 getOptionalInt(pm, "lot_id"),
+		NewLotNo:              getWorkflowStringPtr(pm, "new_lot_no"),
+		Quantity:              quantity,
+		IdempotencyKey:        getString(pm, "idempotency_key"),
+		OccurredAt:            optionalTimeValue(occurredAt),
+		Note:                  getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func productionReworkFromCompletionCreateFromParams(pm map[string]any) (*biz.ProductionReworkFromCompletionCreate, bool) {
+	if !productionCompletionAllowsOnly(
+		pm,
+		"customer_key",
+		"fact_no",
+		"source_completion_fact_id",
+		"quantity",
+		"idempotency_key",
+		"occurred_at",
+		"reason",
+	) {
+		return nil, false
+	}
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
+	if !ok {
+		return nil, false
+	}
+	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
+	if !ok {
+		return nil, false
+	}
+	return &biz.ProductionReworkFromCompletionCreate{
+		FactNo:                 getString(pm, "fact_no"),
+		SourceCompletionFactID: getInt(pm, "source_completion_fact_id", 0),
+		Quantity:               quantity,
+		IdempotencyKey:         getString(pm, "idempotency_key"),
+		OccurredAt:             optionalTimeValue(occurredAt),
+		Reason:                 getString(pm, "reason"),
+	}, true
+}
+
+func productionFactDraftSaveFromParams(pm map[string]any, method string) (*biz.ProductionFactDraftSave, bool) {
+	rework := method == "save_production_rework_from_completion_draft"
+	if rework {
+		if !productionCompletionAllowsOnly(pm, "customer_key", "id", "expected_version", "fact_no", "quantity", "occurred_at", "reason") {
+			return nil, false
+		}
+	} else {
+		keys := []string{"customer_key", "id", "expected_version", "warehouse_id", "lot_id", "quantity", "occurred_at", "note"}
+		if method == "save_production_completion_draft" {
+			keys = append(keys, "new_lot_no")
+		}
+		if !productionCompletionAllowsOnly(pm, keys...) {
+			return nil, false
+		}
+	}
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
+	if !ok {
+		return nil, false
+	}
+	occurredAt, ok := getOptionalJSONRPCTime(pm, "occurred_at")
+	if !ok || occurredAt == nil {
+		return nil, false
+	}
+	note := getWorkflowStringPtr(pm, "note")
+	if rework {
+		note = getWorkflowStringPtr(pm, "reason")
+	}
+	return &biz.ProductionFactDraftSave{
+		ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0),
+		FactNo: getString(pm, "fact_no"), WarehouseID: getInt(pm, "warehouse_id", 0),
+		LotID: getOptionalInt(pm, "lot_id"), NewLotNo: getWorkflowStringPtr(pm, "new_lot_no"),
+		Quantity: quantity, OccurredAt: optionalTimeValue(occurredAt), Note: note,
+	}, true
+}
+
+func productionCompletionAllowsOnly(pm map[string]any, keys ...string) bool {
+	allowed := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		allowed[key] = struct{}{}
+	}
+	for key := range pm {
+		if _, ok := allowed[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func operationalFactProductionFactResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.ProductionFact, err error) *v1.JsonrpcResult {
+	if err != nil {
+		return d.mapOperationalFactError(ctx, err)
+	}
+	return okData(map[string]any{"production_fact": productionFactToAny(item)})
+}
+
+func productionFactsToAny(items []*biz.ProductionFact) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, productionFactToAny(item))
+	}
+	return out
+}
+
+func productionOrderMaterialRequirementsToAny(items []*biz.ProductionOrderMaterialRequirement) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, productionOrderMaterialRequirementToAny(item))
+	}
+	return out
+}
+
+func productionOrderMaterialRequirementToAny(item *biz.ProductionOrderMaterialRequirement) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"id": item.ID, "production_order_id": item.ProductionOrderID, "production_order_item_id": item.ProductionOrderItemID,
+		"bom_header_id": item.BOMHeaderID, "bom_item_id": item.BOMItemID, "material_id": item.MaterialID, "unit_id": item.UnitID,
+		"unit_quantity_snapshot": item.UnitQuantitySnapshot.String(), "loss_rate_snapshot": item.LossRateSnapshot.String(),
+		"planned_quantity":             item.PlannedQuantity.String(),
+		"approved_over_issue_quantity": item.ApprovedOverIssueQuantity.String(),
+		"effective_limit_quantity":     item.EffectiveLimitQuantity.String(),
+		"issued_quantity":              item.IssuedQuantity.String(), "remaining_quantity": item.RemainingQuantity.String(),
+		"material_code_snapshot": item.MaterialCodeSnapshot, "material_name_snapshot": item.MaterialNameSnapshot,
+		"unit_code_snapshot": item.UnitCodeSnapshot, "unit_name_snapshot": item.UnitNameSnapshot,
+		"created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix(),
+	}
+}
+
+func productionFactToAny(item *biz.ProductionFact) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	return map[string]any{"id": item.ID, "fact_no": item.FactNo, "fact_type": item.FactType, "status": item.Status, "version": item.Version, "subject_type": item.SubjectType, "subject_id": item.SubjectID, "subject_name": item.SubjectName, "subject_code": item.SubjectCode, "sku_code_snapshot": item.SKUCodeSnapshot, "warehouse_name": item.WarehouseName, "warehouse_code": item.WarehouseCode, "unit_name": item.UnitName, "lot_no": item.LotNo, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "source_type": optionalStringToAny(item.SourceType), "source_id": optionalIntToAny(item.SourceID), "source_no": optionalStringToAny(item.SourceNo), "source_line_id": optionalIntToAny(item.SourceLineID), "production_wip_batch_id": optionalIntToAny(item.ProductionWIPBatchID), "production_order_id": optionalIntToAny(item.ProductionOrderID), "production_order_item_id": optionalIntToAny(item.ProductionOrderItemID), "idempotency_key": item.IdempotencyKey, "occurred_at": item.OccurredAt.Unix(), "posted_at": optionalUnix(item.PostedAt), "posted_by": optionalIntToAny(item.PostedBy), "posted_by_name": optionalStringToAny(item.PostedByName), "cancelled_at": optionalUnix(item.CancelledAt), "cancelled_by": optionalIntToAny(item.CancelledBy), "cancelled_by_name": optionalStringToAny(item.CancelledByName), "cancel_reason": optionalStringToAny(item.CancelReason), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+}
