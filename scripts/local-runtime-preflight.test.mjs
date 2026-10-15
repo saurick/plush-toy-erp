@@ -1,0 +1,447 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  LOCAL_RUNTIME_RECOVERY_MODE,
+  LocalRuntimePreflightError,
+  checkBackendReadiness,
+  checkLocalDatabaseMigrations,
+  evaluateMigrationStatus,
+  isLoopbackAPIOrigin,
+  isRecoverableWebRuntimePreflightError,
+  normalizeAPIOrigin,
+  runWebRuntimePreflight,
+} from "./local-runtime-preflight.mjs";
+
+function currentMigrationStatus() {
+  return {
+    Status: "OK",
+    Current: "20260714081153",
+    Next: "Already at latest version",
+    Available: [{ Version: "20260714080000" }, { Version: "20260714081153" }],
+    Applied: [{ Version: "20260714080000" }, { Version: "20260714081153" }],
+  };
+}
+
+test("local runtime preflight: 每个外部命令有超时与取消信号，错误分层且不回显凭据", async () => {
+  for (const [failedCommand, expectedCode] of [
+    ["bash", "workspace_migration_invalid"],
+    ["go", "database_config_unavailable"],
+    ["atlas", "database_status_unavailable"],
+    ["node", "database_programmability_blocked"],
+  ]) {
+    const controller = new AbortController();
+    const calls = [];
+    await assert.rejects(
+      checkLocalDatabaseMigrations({
+        readActiveBundle: () => null,
+        signal: controller.signal,
+        writeLine: () => {},
+        execFile: async (command, args, options) => {
+          calls.push(command);
+          assert.equal(options.signal, controller.signal);
+          assert(options.timeout > 0 && options.timeout <= 15_000);
+          if (command === failedCommand)
+            throw new Error("postgres://user:secret@host/db");
+          return {
+            stdout:
+              command === "go"
+                ? "postgres://user:secret@host/db"
+                : command === "atlas"
+                  ? JSON.stringify(currentMigrationStatus())
+                  : "",
+          };
+        },
+      }),
+      (error) => {
+        assert.equal(error.code, expectedCode);
+        assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+        assert.doesNotMatch(error.message, /secret|postgres:\/\//u);
+        return true;
+      },
+    );
+    assert.equal(calls.at(-1), failedCommand);
+  }
+});
+
+test("local runtime preflight: migration 必须精确落到最新 version", () => {
+  assert.deepEqual(evaluateMigrationStatus(currentMigrationStatus()), {
+    ok: true,
+    currentVersion: "20260714081153",
+    latestVersion: "20260714081153",
+    appliedFiles: 2,
+    availableFiles: 2,
+    pendingFiles: 0,
+  });
+
+  const pending = currentMigrationStatus();
+  pending.Applied = pending.Applied.slice(0, 1);
+  pending.Current = "20260714080000";
+  pending.Next = "20260714081153";
+  assert.equal(evaluateMigrationStatus(pending).ok, false);
+
+  const mismatched = currentMigrationStatus();
+  mismatched.Current = "20260714080000";
+  assert.equal(evaluateMigrationStatus(mismatched).ok, false);
+});
+
+test("local runtime preflight: API origin 拒绝凭据与非 HTTP 协议", () => {
+  assert.equal(
+    normalizeAPIOrigin("http://127.0.0.1:8300/"),
+    "http://127.0.0.1:8300",
+  );
+  assert.throws(
+    () => normalizeAPIOrigin("http://admin:secret@127.0.0.1:8300"),
+    /不得包含账号或密码/u,
+  );
+  assert.throws(
+    () => normalizeAPIOrigin("file:///tmp/socket"),
+    /http 或 https/u,
+  );
+  assert.throws(
+    () => normalizeAPIOrigin("http://127.0.0.1:8300/api?token=value"),
+    /不得包含路径、查询或片段/u,
+  );
+});
+
+test("local runtime preflight: 本机 API 别名不能绕过数据库检查", () => {
+  for (const origin of [
+    "http://127.0.0.2:8300",
+    "http://0.0.0.0:8300",
+    "http://localhost.:8300",
+    "http://dev.localhost:8300",
+    "http://[::]:8300",
+    "http://[::1]:8300",
+    "http://[::ffff:127.0.0.1]:8300",
+  ]) {
+    assert.equal(isLoopbackAPIOrigin(origin), true, origin);
+  }
+  assert.equal(isLoopbackAPIOrigin("https://erp.example.com"), false);
+  assert.equal(isLoopbackAPIOrigin("http://192.168.1.20:8300"), false);
+});
+
+test("local runtime preflight: healthz 与 readyz 都通过才接受后端", async () => {
+  const calls = [];
+  const requestOptions = [];
+  const output = [];
+  const fetch = async (url, options) => {
+    calls.push(url);
+    requestOptions.push(options);
+    const isReady = url.endsWith("/readyz");
+    return {
+      ok: true,
+      status: 200,
+      text: async () => (isReady ? "ready" : "ok"),
+    };
+  };
+
+  await checkBackendReadiness("http://127.0.0.1:8300", {
+    readActiveBundle: () => null,
+    fetch,
+    writeLine: (line) => output.push(line),
+  });
+
+  assert.deepEqual(calls, [
+    "http://127.0.0.1:8300/healthz",
+    "http://127.0.0.1:8300/readyz",
+  ]);
+  assert(requestOptions.every((options) => options.redirect === "manual"));
+  assert.equal(output.length, 2);
+});
+
+test("local runtime preflight: readyz 失败时 fail closed", async () => {
+  await assert.rejects(
+    checkBackendReadiness("http://127.0.0.1:8300", {
+      readActiveBundle: () => null,
+      endpointTimeoutMs: 1,
+      retryIntervalMs: 1,
+      sleep: async () => {},
+      writeLine: () => {},
+      fetch: async (url) => ({
+        ok: !url.endsWith("/readyz"),
+        status: url.endsWith("/readyz") ? 503 : 200,
+        text: async () =>
+          url.endsWith("/readyz") ? "postgres not ready" : "ok",
+      }),
+    }),
+    /readyz.*未就绪/u,
+  );
+});
+
+test("local runtime preflight: 本地 web 启动复用 database 与 backend 两层检查", async () => {
+  const calls = [];
+  const result = await runWebRuntimePreflight(
+    { apiOrigin: "http://localhost:8300" },
+    {
+      checkDatabase: async () => calls.push("database"),
+      checkBackend: async (origin) => calls.push(`backend:${origin}`),
+      writeLine: () => {},
+    },
+  );
+  assert.deepEqual(calls, ["database", "backend:http://localhost:8300"]);
+  assert.equal(result.complete, true);
+});
+
+test("local runtime preflight: frontend-only 是显式降级且不产生绿色证据", async () => {
+  const calls = [];
+  const output = [];
+  const result = await runWebRuntimePreflight(
+    { apiOrigin: "http://127.0.0.1:8300", frontendOnly: true },
+    {
+      checkDatabase: async () => calls.push("database"),
+      checkBackend: async () => calls.push("backend"),
+      writeLine: (line) => output.push(line),
+    },
+  );
+  assert.deepEqual(calls, []);
+  assert.equal(result.complete, false);
+  assert.match(output.join("\n"), /降级模式.*不可作为有效验证证据/u);
+});
+
+for (const diagnostic of [
+  "[db-guard] product_skus 缺少 versioned DDL proof",
+  "[qa:db-guard] 禁止新增数据库 Function、Procedure、非内部 Trigger 或其执行语句: server/internal/data/admin_password_repo_test.go",
+]) {
+  test(`local runtime preflight: db-guard 失败保留诊断且不误报目标库待迁移 ${diagnostic}`, async () => {
+    const calls = [];
+    await assert.rejects(
+      checkLocalDatabaseMigrations({
+        readActiveBundle: () => null,
+        writeLine: () => {},
+        execFile: async (command) => {
+          calls.push(command);
+          const error = new Error("db guard failed");
+          error.stderr = diagnostic;
+          throw error;
+        },
+      }),
+      (error) => {
+        assert.equal(error.code, "workspace_migration_invalid");
+        assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+        assert.match(error.message, /工作区数据库规则检查未通过/u);
+        assert.doesNotMatch(error.message, /不一致|make migrate|未到最新版本/u);
+        assert.equal(error.diagnostic, diagnostic);
+        return true;
+      },
+    );
+    assert.deepEqual(calls, ["bash"]);
+  });
+}
+
+test("local runtime preflight: 数据库配置失败不回显 DSN 或密码", async () => {
+  const calls = [];
+  await assert.rejects(
+    checkLocalDatabaseMigrations({
+      readActiveBundle: () => null,
+      writeLine: () => {},
+      execFile: async (command) => {
+        calls.push(command);
+        if (command === "bash") return { stdout: "", stderr: "" };
+        const error = new Error("dburl failed");
+        error.stderr = "postgres://admin:top-secret@127.0.0.1:5432/plush_erp";
+        throw error;
+      },
+    }),
+    (error) => {
+      assert.match(error.message, /无法解析本地开发数据库配置/u);
+      assert.doesNotMatch(error.message, /top-secret|postgres:\/\//u);
+      return true;
+    },
+  );
+  assert.deepEqual(calls, ["bash", "go"]);
+});
+
+test("local runtime preflight: pending migration 指向高层迁移入口，不自动 apply", async () => {
+  const calls = [];
+  const pending = currentMigrationStatus();
+  pending.Applied = pending.Applied.slice(0, 1);
+  pending.Current = "20260714080000";
+  pending.Next = "20260714081153";
+
+  await assert.rejects(
+    checkLocalDatabaseMigrations({
+      readActiveBundle: () => null,
+      writeLine: () => {},
+      execFile: async (command, args) => {
+        calls.push([command, ...args]);
+        if (command === "bash") return { stdout: "", stderr: "" };
+        if (command === "go") {
+          return {
+            stdout:
+              "postgres://test_user:private-secret@192.168.0.133:5432/plush_erp_simon_dev",
+            stderr: "",
+          };
+        }
+        return { stdout: JSON.stringify(pending), stderr: "" };
+      },
+    }),
+    (error) => {
+      assert.equal(error.code, "database_migration_pending");
+      assert.equal(error.recoveryMode, LOCAL_RUNTIME_RECOVERY_MODE);
+      assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+      assert.match(
+        error.message,
+        /make migrate.*migrate_prepare \/ migrate_execute.*plan 与备份恢复验证.*不会自动 apply/u,
+      );
+      return true;
+    },
+  );
+  assert.deepEqual(
+    calls.map(([command]) => command),
+    ["bash", "go", "atlas"],
+  );
+});
+
+test("local runtime preflight: 本地后端未就绪可进入受限恢复模式", async () => {
+  await assert.rejects(
+    runWebRuntimePreflight(
+      { apiOrigin: "http://127.0.0.1:8300" },
+      {
+        checkDatabase: async () => {},
+        checkBackend: async () => {
+          throw new Error("readyz unavailable");
+        },
+        writeLine: () => {},
+      },
+    ),
+    (error) => {
+      assert(error instanceof LocalRuntimePreflightError);
+      assert.equal(error.code, "local_backend_unavailable");
+      assert.equal(isRecoverableWebRuntimePreflightError(error), true);
+      assert.doesNotMatch(error.message, /readyz unavailable/u);
+      return true;
+    },
+  );
+});
+
+test("local runtime preflight: 外部后端失败不能降级成本机恢复模式", async () => {
+  await assert.rejects(
+    runWebRuntimePreflight(
+      { apiOrigin: "https://erp.example.com" },
+      {
+        checkBackend: async () => {
+          throw new Error("external backend unavailable");
+        },
+        writeLine: () => {},
+      },
+    ),
+    (error) => {
+      assert.equal(error.message, "external backend unavailable");
+      assert.equal(isRecoverableWebRuntimePreflightError(error), false);
+      return true;
+    },
+  );
+});
+
+test("local runtime preflight: migration 最新后仍强制数据库可编程对象为零", async () => {
+  const calls = [];
+  const output = [];
+  const result = await checkLocalDatabaseMigrations({
+    readActiveBundle: () => null,
+    writeLine: (line) => output.push(line),
+    execFile: async (command, args, options) => {
+      calls.push([command, ...args]);
+      if (command === "bash") return { stdout: "", stderr: "" };
+      if (command === "go") {
+        return {
+          stdout:
+            "postgres://test_user:private-secret@192.168.0.133:5432/plush_erp",
+          stderr: "",
+        };
+      }
+      if (command === "atlas") {
+        return { stdout: JSON.stringify(currentMigrationStatus()), stderr: "" };
+      }
+      assert.equal(command, "node");
+      assert.equal(
+        options.env.PLUSH_DATABASE_PROGRAMMABILITY_URL,
+        "postgres://test_user:private-secret@192.168.0.133:5432/plush_erp",
+      );
+      return { stdout: "[db-programmability] clean\n", stderr: "" };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(
+    calls.map(([command]) => command),
+    ["bash", "go", "atlas", "node"],
+  );
+  assert.match(output.join("\n"), /function=0.*procedure=0.*trigger=0/u);
+});
+
+test("local runtime preflight: 自定义数据库执行对象阻断启动且诊断不泄露 DSN", async () => {
+  await assert.rejects(
+    checkLocalDatabaseMigrations({
+      readActiveBundle: () => null,
+      writeLine: () => {},
+      execFile: async (command) => {
+        if (command === "bash") return { stdout: "", stderr: "" };
+        if (command === "go") {
+          return {
+            stdout:
+              "postgres://test_user:private-secret@192.168.0.133:5432/plush_erp",
+            stderr: "",
+          };
+        }
+        if (command === "atlas") {
+          return {
+            stdout: JSON.stringify(currentMigrationStatus()),
+            stderr: "",
+          };
+        }
+        const error = new Error("programmability check failed");
+        error.stderr =
+          "[db-programmability] ERROR: trigger: public.items.forbidden";
+        throw error;
+      },
+    }),
+    (error) => {
+      assert.match(error.message, /自定义 Function.*Procedure.*Trigger/su);
+      assert.equal(error.code, "database_programmability_blocked");
+      assert.match(error.diagnostic, /public\.items\.forbidden/u);
+      assert.doesNotMatch(error.message, /private-secret|postgres:\/\//u);
+      return true;
+    },
+  );
+});
+
+test("explicit fixed runtime checks its snapshot; ordinary startup checks workspace migrations", async () => {
+  let verified = false;
+  const active = { id: "fixed", migrationVersion: "144" };
+  const result = await checkLocalDatabaseMigrations({
+    readActiveBundle: () => active,
+    useFixedRuntime: true,
+    verifyActiveBundle: async (value) => {
+      assert.equal(value, active);
+      verified = true;
+    },
+    execFile: async () => {
+      throw new Error("must not inspect an unfinished working tree");
+    },
+    writeLine() {},
+  });
+  assert.equal(verified, true);
+  assert.equal(result.bundleId, "fixed");
+  await assert.rejects(
+    checkLocalDatabaseMigrations({
+      readActiveBundle: () => active,
+      execFile: async (command) => {
+        assert.equal(command, "bash");
+        throw new Error("current workspace check failed");
+      },
+      writeLine() {},
+    }),
+    { code: "workspace_migration_invalid" },
+  );
+  await assert.rejects(
+    checkLocalDatabaseMigrations({
+      readActiveBundle: () => active,
+      useFixedRuntime: true,
+      verifyActiveBundle: async () => {
+        throw new Error("database drift");
+      },
+      writeLine() {},
+    }),
+    { code: "database_status_unavailable" },
+  );
+});
