@@ -1,0 +1,104 @@
+.erp-dev-customer-scope {
+  width: 100%;
+  margin-block: 0 12px;
+  overflow: hidden;
+  border: 1px solid var(--dev-customer-scope-border);
+  border-radius: 12px;
+  background: var(--dev-customer-scope-bg);
+}
+
+.erp-dev-customer-scope__main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(220px, 320px);
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+}
+
+.erp-dev-customer-scope__icon {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--dev-customer-scope-soft);
+  color: var(--dev-customer-scope-primary);
+  font-size: 17px;
+}
+
+.erp-dev-customer-scope__copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.erp-dev-customer-scope__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.erp-dev-customer-scope__copy > .ant-typography:last-child {
+  margin: 0;
+  color: var(--dev-customer-scope-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.erp-dev-customer-scope > .ant-alert {
+  margin: 0 12px 12px;
+}
+
+.erp-dev-customer-scope--compact {
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.erp-dev-customer-scope--compact .erp-dev-customer-scope__main {
+  grid-template-columns: auto minmax(180px, 230px) minmax(0, 1fr);
+  gap: 10px;
+  padding: 0;
+}
+
+.erp-dev-customer-scope--compact .erp-dev-customer-scope__copy {
+  white-space: nowrap;
+}
+
+.erp-dev-customer-scope--compact .erp-dev-customer-scope__note {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.erp-dev-customer-scope--compact > .ant-alert {
+  margin: 10px 0 0;
+}
+
+@media (max-width: 760px) {
+  .erp-dev-customer-scope__main {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 12px;
+  }
+
+  .erp-dev-customer-scope__main > .ant-select {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .erp-dev-customer-scope--compact .erp-dev-customer-scope__main {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 0;
+  }
+
+  .erp-dev-customer-scope--compact .erp-dev-customer-scope__main > .ant-select {
+    grid-column: auto;
+  }
+
+  .erp-dev-customer-scope--compact .erp-dev-customer-scope__note {
+    grid-column: 1 / -1;
+  }
+}
