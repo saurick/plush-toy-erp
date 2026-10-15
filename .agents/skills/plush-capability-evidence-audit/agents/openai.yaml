@@ -1,4 +1,0 @@
-interface:
-  display_name: "Plush Capability Evidence Audit"
-  short_description: "按问题核对产品事实、本地验证、目标运行态和客户结果"
-  default_prompt: "Use $plush-capability-evidence-audit 只读核对当前问题需要的证据，区分产品事实、本地验证、目标运行与客户结果，不展开无关层次。"

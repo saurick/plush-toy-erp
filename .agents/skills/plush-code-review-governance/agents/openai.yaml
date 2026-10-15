@@ -1,4 +1,0 @@
-interface:
-  display_name: "Plush Code Review Governance"
-  short_description: "代码审查治理 Code review，包含工程质量门禁和视觉证据"
-  default_prompt: "Use $plush-code-review-governance 审查 plush diff，先列 Workflow/Fact、RBAC、字段、页面、打印和测试 findings。"

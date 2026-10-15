@@ -1,4 +1,0 @@
-interface:
-  display_name: "Plush Docs Governance"
-  short_description: "文档治理 Docs：真源、索引、读者路径与质量门禁检查"
-  default_prompt: "Use $plush-docs-governance 核对当前真源、文档清单、中文路径、读者入口和 progress 边界。"
