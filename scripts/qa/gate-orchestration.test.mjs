@@ -1,0 +1,753 @@
+import assert from "node:assert/strict";
+import { spawn, spawnSync } from "node:child_process";
+import { EventEmitter, once } from "node:events";
+import { readFileSync } from "node:fs";
+import net from "node:net";
+import path from "node:path";
+import test from "node:test";
+import { setTimeout as delay } from "node:timers/promises";
+
+import {
+  installStyleL1TerminationHandlers,
+  isOwnedProcessGroupAlive,
+  listDevServerPortPIDs,
+  terminateOwnedProcessGroup,
+} from "../../web/scripts/styleL1.mjs";
+
+const root = path.resolve(import.meta.dirname, "../..");
+
+function read(file) {
+  return readFileSync(path.join(root, file), "utf8");
+}
+
+function cleanGateEnv(overrides = {}) {
+  const env = { ...process.env, ...overrides };
+  for (const key of [
+    "SKIP_DB_GUARD",
+    "SKIP_PRE_PUSH",
+    "SKIP_ERROR_CODE_SYNC",
+    "SKIP_ERROR_CODE_GUARD",
+    "ERROR_CODE_GUARD_STAGED_ONLY",
+    "SKIP_SECRETS_SCAN",
+    "SECRETS_STAGED_ONLY",
+    "SKIP_GOVULNCHECK",
+    "SKIP_SHELLCHECK",
+    "SKIP_SHFMT",
+    "SKIP_YAMLLINT",
+    "STRICT_SKIP_SHELLCHECK",
+    "STRICT_SKIP_SHFMT",
+    "STRICT_SKIP_GOVULNCHECK",
+    "STYLE_L1_BASE_URL",
+    "QA_GATE_COVERAGE_RECEIPT",
+    "QA_GATE_ORCHESTRATOR",
+  ]) {
+    if (!(key in overrides)) delete env[key];
+  }
+  return env;
+}
+
+async function reserveDistinctPorts(count) {
+  const servers = Array.from({ length: count }, () => net.createServer());
+  try {
+    await Promise.all(
+      servers.map(
+        (server) =>
+          new Promise((resolve, reject) => {
+            server.once("error", reject);
+            server.listen(0, "127.0.0.1", resolve);
+          }),
+      ),
+    );
+    return servers.map((server) => server.address().port);
+  } finally {
+    await Promise.all(
+      servers.map(
+        (server) =>
+          new Promise((resolve, reject) => {
+            server.close((error) => {
+              if (error) reject(error);
+              else resolve();
+            });
+          }),
+      ),
+    );
+  }
+}
+
+function canConnect(port) {
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host: "127.0.0.1", port });
+    socket.setTimeout(250);
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    const unavailable = () => {
+      socket.destroy();
+      resolve(false);
+    };
+    socket.once("error", unavailable);
+    socket.once("timeout", unavailable);
+  });
+}
+
+async function waitFor(predicate, message, timeoutMs = 3000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await predicate()) return;
+    await delay(25);
+  }
+  assert.fail(message);
+}
+
+const listenerSource = String.raw`
+  const net = require('node:net');
+  const port = Number(process.argv[1]);
+  process.on('SIGTERM', () => {});
+  process.on('SIGHUP', () => {});
+  net.createServer((socket) => {
+    socket.on('error', () => {});
+    socket.end();
+  }).listen(port, '127.0.0.1');
+  setInterval(() => {}, 1000);
+`;
+
+function spawnUnrelatedListener(port) {
+  return spawn(process.execPath, ["-e", listenerSource, String(port)], {
+    detached: true,
+    stdio: "ignore",
+  });
+}
+
+function spawnLeaderWithStubbornListener(port) {
+  const leaderSource = String.raw`
+    const { spawn } = require('node:child_process');
+    const net = require('node:net');
+    const port = process.argv[1];
+    const source = ${JSON.stringify(listenerSource)};
+    process.on('SIGTERM', () => process.exit(0));
+    const child = spawn(process.execPath, ['-e', source, port], {
+      detached: false,
+      stdio: 'ignore',
+    });
+    const reportWhenReady = () => {
+      const socket = net.createConnection({ host: '127.0.0.1', port: Number(port) });
+      socket.once('connect', () => {
+        socket.destroy();
+        process.stdout.write(String(child.pid) + '\n');
+      });
+      socket.once('error', () => setTimeout(reportWhenReady, 10));
+    };
+    reportWhenReady();
+    setInterval(() => {}, 1000);
+  `;
+  return spawn(process.execPath, ["-e", leaderSource, String(port)], {
+    detached: true,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+function readSpawnedPID(child) {
+  return new Promise((resolve, reject) => {
+    let output = "";
+    let stderr = "";
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+    const timeout = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `fixture leader did not report its child PID: ${stderr.trim()}`,
+          ),
+        ),
+      5000,
+    );
+    child.stdout.on("data", (chunk) => {
+      output += chunk.toString();
+      if (!output.includes("\n")) return;
+      clearTimeout(timeout);
+      const pid = Number(output.trim());
+      if (!Number.isInteger(pid) || pid <= 0) {
+        reject(new Error(`invalid fixture child PID: ${output.trim()}`));
+        return;
+      }
+      resolve(pid);
+    });
+    child.once("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
+    child.once("exit", (code) => {
+      if (output.includes("\n")) return;
+      clearTimeout(timeout);
+      reject(
+        new Error(
+          `fixture leader exited before reporting child PID: code=${code} stderr=${stderr.trim()}`,
+        ),
+      );
+    });
+  });
+}
+
+function readProcessGroupID(pid) {
+  const result = spawnSync("ps", ["-o", "pgid=", "-p", String(pid)], {
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const processGroupID = Number(result.stdout.trim());
+  assert(Number.isInteger(processGroupID) && processGroupID > 0);
+  return processGroupID;
+}
+
+async function killFixtureProcess(child) {
+  if (!child?.pid) return;
+  if (child.exitCode === null) {
+    child.kill("SIGKILL");
+    await Promise.race([once(child, "exit"), delay(1000)]);
+  }
+  child.stderr?.destroy();
+  child.unref();
+}
+
+test("full and strict reject ordinary skip environments before running gates", () => {
+  for (const [script, variable] of [
+    ["scripts/qa/full.sh", "SKIP_DB_GUARD"],
+    ["scripts/qa/full.sh", "SKIP_ERROR_CODE_SYNC"],
+    ["scripts/qa/full.sh", "SKIP_ERROR_CODE_GUARD"],
+    ["scripts/qa/full.sh", "ERROR_CODE_GUARD_STAGED_ONLY"],
+    ["scripts/qa/full.sh", "SKIP_SECRETS_SCAN"],
+    ["scripts/qa/full.sh", "SECRETS_STAGED_ONLY"],
+    ["scripts/qa/full.sh", "SKIP_GOVULNCHECK"],
+    ["scripts/qa/strict.sh", "SKIP_SHELLCHECK"],
+    ["scripts/qa/strict.sh", "SKIP_SHFMT"],
+    ["scripts/qa/strict.sh", "SKIP_YAMLLINT"],
+    ["scripts/qa/strict.sh", "STRICT_SKIP_SHELLCHECK"],
+    ["scripts/qa/strict.sh", "STRICT_SKIP_SHFMT"],
+    ["scripts/qa/strict.sh", "STRICT_SKIP_GOVULNCHECK"],
+  ]) {
+    const result = spawnSync("bash", [script], {
+      cwd: root,
+      encoding: "utf8",
+      env: cleanGateEnv({ [variable]: "1" }),
+    });
+    assert.equal(result.status, 2, `${script} ${variable}: ${result.stderr}`);
+    assert.match(result.stdout, /status=incomplete reason=forbidden_skip/u);
+    assert.match(result.stdout, new RegExp(`variable=${variable}`, "u"));
+  }
+});
+
+test("full and strict validate current and child Bash before expensive gates", () => {
+  const full = read("scripts/qa/full.sh");
+  const strict = read("scripts/qa/strict.sh");
+
+  for (const source of [full, strict]) {
+    assert.match(source, /source "\$ROOT_DIR\/scripts\/lib\/bash\.sh"/u);
+    assert.match(source, /require_project_bash/u);
+  }
+  assert.match(
+    full,
+    /qa_full_environment_profile\(\) \{\s+require_project_bash "qa:full"/u,
+  );
+  assert.match(
+    strict,
+    /qa_strict_profile\(\) \{\s+require_project_bash "qa:strict"/u,
+  );
+});
+
+test("full browser evidence is current-worktree self-hosted on an isolated port", () => {
+  const full = read("scripts/qa/full.sh");
+  const style = read("web/scripts/styleL1.mjs");
+
+  assert.match(full, /external_browser_target_forbidden/u);
+  assert.match(full, /dev-ports\.mjs/u);
+  assert.match(full, /--find-free-aux-port/u);
+  assert.doesNotMatch(full, /listen\(0/u);
+  assert.match(
+    full,
+    /source "\$ROOT_DIR\/scripts\/qa\/browser-gate-lock\.sh"/u,
+  );
+  assert.match(full, /trap browser_gate_lock_release EXIT/u);
+  assert.match(full, /browser_gate_lock_acquire/u);
+  assert.match(full, /browser_gate_lock_release/u);
+  assert.match(full, /STYLE_L1_BASE_URL=""/u);
+  assert.match(full, /STYLE_L1_PORT="\$browser_port"/u);
+  assert.match(full, /DEFAULT_QA_BROWSER_SCENARIOS="root-redirect-desktop"/u);
+  assert.doesNotMatch(full, /DEFAULT_QA_BROWSER_SCENARIOS="[^"]*dev-/u);
+  assert.match(
+    full,
+    /local browser_scenarios="\$DEFAULT_QA_BROWSER_SCENARIOS"/u,
+  );
+  assert.match(
+    full,
+    /browser_scenarios="\$\{browser_scenarios\},\$\{QA_BROWSER_SCENARIOS\}"/u,
+  );
+  assert.match(full, /STYLE_L1_SCENARIOS="\$browser_scenarios"/u);
+  assert.doesNotMatch(full, /STYLE_L1_SCENARIOS="\$\{QA_BROWSER_SCENARIOS:-/u);
+  assert.match(full, /"\$PNPM_BIN" style:l1/u);
+  assert.doesNotMatch(full, /QA_BROWSER_SMOKE/u);
+
+  assert.match(style, /target=self-host worktree=/u);
+  assert.match(style, /target=external base_url=/u);
+  assert.match(style, /STYLE_L1_OUTPUT_DIR/u);
+  assert.match(style, /STYLE_L1_SCENARIO_MAX_ATTEMPTS/u);
+  assert.match(
+    style,
+    /\[style:l1:scenario\] id=\$\{scenario[.]name\} status=passed/u,
+  );
+  assert.match(style, /detached:\s*true/u);
+  assert.match(style, /assertPortAvailable\(devServerPort\)/u);
+  assert.match(
+    style,
+    /assertDevServerPortOwnership\(devServerProcessGroupID\)/u,
+  );
+  assert.match(style, /terminateOwnedProcessGroup\(devServerProcessGroupID\)/u);
+  assert.match(style, /process\.kill\(-processGroupID, signal\)/u);
+  assert.match(style, /self-host ownership verified/u);
+  assert.doesNotMatch(style, /killDevServerPortListeners/u);
+});
+
+test("full production build cannot inherit the DEV server environment", () => {
+  const full = read("scripts/qa/full.sh");
+
+  assert.match(
+    full,
+    /qa_run_substep "\$full_profile" web production_build \\\s+env NODE_ENV=production "\$PNPM_BIN" build\s+qa_run_substep "\$full_profile" web production_boundary/u,
+  );
+  assert.equal(full.match(/NODE_ENV=production/gu)?.length, 1);
+});
+
+for (const [signal, exitCode] of [
+  ["SIGTERM", 143],
+  ["SIGINT", 130],
+]) {
+  test(`style cleanup handles ${signal} once before exiting`, async () => {
+    const processRef = new EventEmitter();
+    const exits = [];
+    let cleanupCalls = 0;
+    const termination = installStyleL1TerminationHandlers({
+      processRef,
+      cleanup: async () => {
+        cleanupCalls += 1;
+      },
+      exit: (code) => exits.push(code),
+    });
+    processRef.emit(signal);
+    processRef.emit(signal);
+    processRef.emit(signal === "SIGTERM" ? "SIGINT" : "SIGTERM");
+    await termination.shutdownPromise;
+    assert.equal(termination.signal, signal);
+    assert.equal(cleanupCalls, 1);
+    assert.deepEqual(exits, [exitCode]);
+    termination.dispose();
+    assert.equal(processRef.listenerCount("SIGTERM"), 0);
+    assert.equal(processRef.listenerCount("SIGINT"), 0);
+  });
+}
+
+test("style listener lookup times out without leaving its probe running", async () => {
+  let probe;
+  await assert.rejects(
+    listDevServerPortPIDs(process.pid, {
+      port: 15200,
+      timeoutMs: 100,
+      spawnProcess: () => {
+        probe = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"]);
+        return probe;
+      },
+    }),
+    /owned listener lookup timed out/u,
+  );
+  assert.equal(probe.killed, true);
+  if (probe.exitCode === null && probe.signalCode === null) {
+    await once(probe, "exit");
+  }
+  assert.equal(probe.signalCode, "SIGKILL");
+});
+
+test("style cleanup SIGKILLs a surviving owned group without touching an unrelated listener", async () => {
+  const [ownedPort, unrelatedPort] = await reserveDistinctPorts(2);
+  const ownedLeader = spawnLeaderWithStubbornListener(ownedPort);
+  const ownedGrandchildPID = await readSpawnedPID(ownedLeader);
+  const unrelatedListener = spawnUnrelatedListener(unrelatedPort);
+  let ownedCleanupCompleted = false;
+
+  try {
+    await waitFor(
+      () => canConnect(ownedPort),
+      "owned grandchild listener did not start",
+    );
+    await waitFor(
+      () => canConnect(unrelatedPort),
+      "unrelated listener did not start",
+    );
+    assert.equal(
+      ownedLeader.exitCode,
+      null,
+      "fixture leader exited before cleanup",
+    );
+    assert.equal(readProcessGroupID(ownedGrandchildPID), ownedLeader.pid);
+    assert.equal(isOwnedProcessGroupAlive(ownedLeader.pid), true);
+    assert.deepEqual(
+      await listDevServerPortPIDs(ownedLeader.pid, { port: ownedPort }),
+      [ownedGrandchildPID],
+    );
+    assert.deepEqual(
+      await listDevServerPortPIDs(ownedLeader.pid, { port: unrelatedPort }),
+      [],
+      "an unrelated listener must not prove ownership for the test server",
+    );
+
+    const leaderExit = once(ownedLeader, "exit");
+    const cleanup = terminateOwnedProcessGroup(ownedLeader.pid, {
+      termGraceMs: 500,
+      killGraceMs: 1500,
+      pollIntervalMs: 20,
+    });
+    await Promise.race([
+      leaderExit,
+      delay(2000).then(() => {
+        throw new Error("fixture leader did not exit after SIGTERM");
+      }),
+    ]);
+    assert.equal(
+      ownedLeader.exitCode,
+      0,
+      "fixture leader must exit cleanly on SIGTERM",
+    );
+    assert.equal(
+      await canConnect(ownedPort),
+      true,
+      "owned grandchild listener must survive the leader's SIGTERM exit",
+    );
+
+    const result = await cleanup;
+    assert.equal(result.signal, "SIGKILL");
+    await waitFor(
+      async () => !(await canConnect(ownedPort)),
+      "owned grandchild listener survived cleanup",
+    );
+    ownedCleanupCompleted = true;
+    assert.equal(
+      await canConnect(unrelatedPort),
+      true,
+      "cleanup killed an unrelated listener",
+    );
+    assert.equal(isOwnedProcessGroupAlive(unrelatedListener.pid), true);
+  } finally {
+    if (!ownedCleanupCompleted) {
+      try {
+        if (isOwnedProcessGroupAlive(ownedLeader.pid)) {
+          process.kill(-ownedLeader.pid, "SIGKILL");
+        }
+      } catch (error) {
+        if (!new Set(["EPERM", "ESRCH"]).has(error?.code)) throw error;
+      }
+      try {
+        process.kill(ownedGrandchildPID, "SIGKILL");
+      } catch (error) {
+        if (!new Set(["EPERM", "ESRCH"]).has(error?.code)) throw error;
+      }
+    }
+    await killFixtureProcess(unrelatedListener);
+    ownedLeader.stdout?.destroy();
+    ownedLeader.stderr?.destroy();
+    ownedLeader.unref();
+  }
+});
+
+test("fixed full and strict gates cannot disappear behind file or package probes", () => {
+  const criticalPostgres = read("scripts/qa/critical-postgres-tests.sh");
+  const full = read("scripts/qa/full.sh");
+  const pdfChromiumIntegration = read(
+    "server/internal/server/template_pdf_chromium_integration_test.go",
+  );
+  const strict = read("scripts/qa/strict.sh");
+  for (const source of [full, strict]) {
+    assert.doesNotMatch(source, /\[ -[fx] /u);
+    assert.doesNotMatch(source, /\[\[.*-[fx] /u);
+  }
+  assert.match(full, /web\/package\.json 缺少 scripts\.test/u);
+  assert.match(full, /"\$PNPM_BIN" test/u);
+  assert.match(full, /--kind node --label web-all/u);
+  assert.match(full, /--kind go --label server-all/u);
+  assert.match(
+    full,
+    /ERP_PDF_CHROMIUM_INTEGRATION=1\s+\\\s+node "\$ROOT_DIR\/scripts\/qa\/run-test-gate\.mjs"/u,
+  );
+  assert.match(
+    full,
+    /source "\$ROOT_DIR\/scripts\/qa\/critical-postgres-tests\.sh"/u,
+  );
+  assert.match(
+    full,
+    /go test -count=1 -json -skip "\$CRITICAL_POSTGRES_TEST_PATTERN" \.\/\.\.\./u,
+  );
+  assert.match(
+    full,
+    /--kind go --label server-all\s+\\\s+--exclude-skip-pattern "\$CRITICAL_POSTGRES_TEST_PATTERN"\s+\\\s+"\$\{test_gate_output_args\[@\]\}" --/u,
+  );
+  assert.match(
+    full,
+    /if \[\[ -n "\$ci_shard" \|\| -n "\$ci_lane" \]\]; then\s+test_gate_output_args=\(--output-mode summary\)/u,
+  );
+  assert.match(
+    full,
+    /--ci-lane web-checks\|web-build\|server-schema\|server-upgrade\|server-test-build\|server-postgres/u,
+  );
+  assert.match(
+    full,
+    /web-checks\)\s+qa_run_stage strict web qa_full_web_checks/u,
+  );
+  assert.match(
+    full,
+    /web-build\)\s+qa_run_stage strict web qa_full_web_build/u,
+  );
+  assert.match(
+    full,
+    /server-schema\)\s+qa_run_stage strict server qa_full_server_schema/u,
+  );
+  assert.match(
+    full,
+    /server-upgrade\)\s+qa_run_stage strict environment_profile qa_full_environment_profile\s+qa_run_stage strict server qa_full_server_upgrade/u,
+  );
+  assert.match(
+    full,
+    /server-test-build\)\s+qa_run_stage strict server qa_full_server_test_build/u,
+  );
+  assert.match(
+    full,
+    /server-postgres\)\s+qa_run_stage strict critical_postgres qa_full_critical_postgres/u,
+  );
+  assert.match(
+    full,
+    /disposable-database-runner\.mjs"[\s\S]*--profile ci[\s\S]*--workflow critical-postgres/u,
+  );
+  assert.match(criticalPostgres, /TestProductionWIPQualityInspectionPostgres/u);
+  assert.match(criticalPostgres, /TestOperationalFactPostgres/u);
+  assert.doesNotMatch(
+    full,
+    /make purchase_return_(?:pg_createdb|migrate_apply|pg_test)/u,
+  );
+  assert.doesNotMatch(
+    full,
+    /-skip '[^']*TemplatePDFChromiumSecurityIntegration/u,
+  );
+  assert.match(
+    pdfChromiumIntegration,
+    /ERP_PDF_CHROMIUM_INTEGRATION[\s\S]*t\.Skip/u,
+  );
+  assert.match(
+    pdfChromiumIntegration,
+    /strings\.HasPrefix\(string\(pdfBytes\), "%PDF"\)/u,
+  );
+  assert.match(pdfChromiumIntegration, /egressHits\.Load\(\)[\s\S]*hits != 0/u);
+  assert.doesNotMatch(full, /未定义 test，跳过/u);
+  assert.match(strict, /bash "\$ROOT_DIR\/scripts\/qa\/full\.sh"/u);
+  assert.match(strict, /YAMLLINT_STRICT=1 YAMLLINT_ALL=1/u);
+  assert.match(strict, /scripts\/qa\/yamllint\.sh/u);
+});
+
+test("direct full rejects caller-supplied synthetic coverage before any gate", () => {
+  const result = spawnSync("bash", ["scripts/qa/full.sh"], {
+    cwd: root,
+    encoding: "utf8",
+    env: cleanGateEnv({
+      QA_GATE_COVERAGE_RECEIPT: "/tmp/forged-receipt.json",
+      QA_GATE_ORCHESTRATOR: "pre-push",
+    }),
+  });
+  assert.equal(result.status, 2, result.stderr || result.stdout);
+  assert.match(result.stdout, /reason=forbidden_coverage/u);
+  assert.doesNotMatch(result.stdout, /先运行 fast 检查/u);
+});
+
+test("direct full validates its disposable database base before expensive gates", () => {
+  const missing = spawnSync("bash", ["scripts/qa/full.sh"], {
+    cwd: root,
+    encoding: "utf8",
+    env: cleanGateEnv({
+      DISPOSABLE_DATABASE_BASE_URL: "",
+    }),
+  });
+  assert.equal(missing.status, 2, missing.stderr || missing.stdout);
+  assert.match(
+    `${missing.stdout}\n${missing.stderr}`,
+    /reason=missing_database_base/u,
+  );
+  assert.doesNotMatch(
+    `${missing.stdout}\n${missing.stderr}`,
+    /\[qa:fast\]|运行 web 测试与构建/u,
+  );
+
+  const invalid = spawnSync("bash", ["scripts/qa/full.sh"], {
+    cwd: root,
+    encoding: "utf8",
+    env: cleanGateEnv({
+      DISPOSABLE_DATABASE_BASE_URL:
+        "postgres://tester:local-secret@192.168.0.133:5432/postgres",
+    }),
+  });
+  assert.equal(invalid.status, 2, invalid.stderr || invalid.stdout);
+  assert.match(
+    `${invalid.stdout}\n${invalid.stderr}`,
+    /reason=invalid_database_base/u,
+  );
+  assert.doesNotMatch(
+    `${invalid.stdout}\n${invalid.stderr}`,
+    /local-secret|\[qa:fast\]|运行 web 测试与构建/u,
+  );
+});
+
+test("local receipt has one repository-owned issuer while full and CI stay real", () => {
+  const full = read("scripts/qa/full.sh");
+  const strict = read("scripts/qa/strict.sh");
+  const prePush = read("scripts/git-hooks/pre-push.sh");
+  const preparePush = read("scripts/qa/prepare-push.sh");
+  const receipt = read("scripts/qa/pre-push-receipt.mjs");
+
+  assert.match(full, /SECRETS_STRICT=1 bash/u);
+  assert.match(full, /GOVULNCHECK_STRICT=1 bash/u);
+  assert.doesNotMatch(
+    full,
+    /gate-coverage\.mjs|covered_by_|component_complete/u,
+  );
+  assert.doesNotMatch(
+    strict,
+    /gate-coverage\.mjs|covered_by_|component_complete/u,
+  );
+  assert.match(strict, /bash "\$ROOT_DIR\/scripts\/qa\/full\.sh"/u);
+  assert.match(strict, /QA_FULL_PROFILE=strict/u);
+  assert.doesNotMatch(strict, /scripts\/qa\/govulncheck\.sh/u);
+  assert.match(strict, /status=complete/u);
+  assert.doesNotMatch(
+    `${full}\n${strict}`,
+    /pre-push-receipt|PRE_PUSH_RECEIPT/u,
+  );
+
+  assert.match(preparePush, /DISPOSABLE_DATABASE_BASE_URL/u);
+  assert.match(preparePush, /prepare-mode/u);
+  assert.match(preparePush, /pre-push-receipt\.mjs" prepare/u);
+  assert.match(preparePush, /run-gate-with-managed-database\.mjs/u);
+  assert.match(preparePush, /--prepare-push/u);
+  assert.match(preparePush, /randomUUID/u);
+  assert.match(prePush, /args=\(verify-hook --remote "\$remote_name"\)/u);
+  assert.doesNotMatch(prePush, /full\.sh|SKIP_PRE_PUSH/u);
+  assert.match(receipt, /PRE_PUSH_RECEIPT_TTL_MS = 30 \* 60 \* 1000/u);
+  assert.match(receipt, /resolvePrePushGateDecision/u);
+  assert.match(receipt, /SERVER_CI_REQUIRED_CONTRACT/u);
+  assert.match(receipt, /profile: "server-ci"/u);
+  assert.match(receipt, /serverCiRequired: gateDecision\.serverCiRequired/u);
+  assert.match(receipt, /initialGateDecision\.profile === "server-ci"/u);
+  assert.match(
+    receipt,
+    /allowServerCi: receipt\?\.gate\?\.profile === "server-ci"/u,
+  );
+  assert.match(receipt, /full_confirmation_required/u);
+  assert.match(receipt, /scripts\/qa\/affected\.mjs/u);
+  assert.match(receipt, /rev-parse", "--git-common-dir"/u);
+  assert.match(receipt, /createHmac\("sha256"/u);
+  assert.match(receipt, /acquireReceiptLock/u);
+  assert.match(receipt, /renameSync\(temporary, target\)/u);
+  assert.match(receipt, /readFileSync\(0, "utf8"\)/u);
+  assert.match(
+    receipt,
+    /git", \["log", "--check", "--format=", check\.gitLogRange\]/u,
+  );
+  assert.match(receipt, /QA_BASE_RANGE: check\.secretsRange/u);
+  assert.match(receipt, /liveChecks: gateDecision\.liveChecks/u);
+  assert.match(receipt, /stableStringify\(receipt\?\.gate\?\.liveChecks\)/u);
+  assert.match(receipt, /SECRETS_STRICT: "1"/u);
+  assert.doesNotMatch(receipt, /review\/gpt|review-only|--review/u);
+  assert.doesNotMatch(receipt, /process\.env\.PRE_PUSH_RECEIPT_/u);
+  assert.doesNotMatch(strict, /SKIP_GOVULNCHECK=1/u);
+});
+
+test("fixed Node and Go gates require fail-closed execution summaries", () => {
+  const criticalPostgres = read("scripts/qa/critical-postgres-tests.sh");
+  const fast = read("scripts/qa/fast.sh");
+  const full = read("scripts/qa/full.sh");
+
+  assert.match(fast, /run-node-tests\.mjs/u);
+  assert.match(fast, /--kind node --label customer-index/u);
+  assert.match(fast, /--kind node --label web-contracts/u);
+  assert.match(fast, /--kind go --label server-quick/u);
+  assert.match(
+    fast,
+    /go test -count=1 -json\s+\\\s+-skip "\$\{CRITICAL_POSTGRES_TEST_PATTERN\}\|\^TestTemplatePDFChromiumSecurityIntegration\$"\s+\\\s+\.\/internal\/\.\.\. \.\/pkg\/\.\.\./u,
+  );
+  assert.match(
+    fast,
+    /--kind go --label server-quick\s+\\\s+--exclude-skip-pattern "\$\{CRITICAL_POSTGRES_TEST_PATTERN\}\|\^TestTemplatePDFChromiumSecurityIntegration\$" --/u,
+  );
+  assert.match(full, /--kind node --label web-all/u);
+  assert.match(full, /"\$PNPM_BIN" test --test-reporter=tap/u);
+  assert.match(full, /--kind go --label server-all/u);
+  assert.match(
+    full,
+    /go test -count=1 -json -skip "\$CRITICAL_POSTGRES_TEST_PATTERN" \.\/\.\.\./u,
+  );
+  assert.match(
+    full,
+    /disposable-database-runner\.mjs"[\s\S]*--profile ci[\s\S]*--workflow critical-postgres/u,
+  );
+  assert.match(full, /ERP_PDF_CHROMIUM_INTEGRATION=1/u);
+  assert.match(criticalPostgres, /readonly CRITICAL_POSTGRES_TEST_PATTERN/u);
+  assert.match(
+    criticalPostgres,
+    /readonly -a CRITICAL_POSTGRES_REQUIRED_PREFIXES/u,
+  );
+});
+
+test("full overlaps only independent shared, Web and Server stages", () => {
+  const full = read("scripts/qa/full.sh");
+  assert.match(
+    full,
+    /qa_run_stage "\$full_profile" environment_profile qa_full_environment_profile\s+qa_run_stage "\$full_profile" secrets qa_full_secrets\s+qa_run_parallel_stages \\\s+"\$full_profile" \\\s+shared qa_full_shared \\\s+web qa_full_web \\\s+server qa_full_server\s+qa_run_stage \\\s+"\$full_profile" \\\s+resource_sensitive_node \\\s+qa_full_resource_sensitive_node\s+qa_run_stage "\$full_profile" critical_postgres qa_full_critical_postgres\s+qa_run_stage "\$full_profile" browser qa_full_browser\s+qa_run_stage "\$full_profile" govulncheck qa_full_govulncheck/u,
+  );
+  const serverBody =
+    full.match(/qa_full_server\(\) \{([\s\S]*?)\n\}/u)?.[1] || "";
+  const criticalBody =
+    full.match(/qa_full_critical_postgres\(\) \{([\s\S]*?)\n\}/u)?.[1] || "";
+  assert.doesNotMatch(serverBody, /--workflow critical-postgres/u);
+  assert.match(criticalBody, /--workflow critical-postgres/u);
+  assert.match(full, /local node_test_profile=parallel_safe/u);
+  assert.match(full, /node_test_profile=ci_lanes/u);
+  assert.match(full, /QA_NODE_TEST_PROFILE="\$node_test_profile"/u);
+  assert.match(full, /run-node-tests\.mjs" --profile resource_sensitive/u);
+  assert.match(full, /QA_FAST_GATE_PROFILE="\$full_profile"/u);
+});
+
+test("GitLab quality shards are fixed, trusted and preserve every strict stage", () => {
+  const full = read("scripts/qa/full.sh");
+  const strict = read("scripts/qa/strict.sh");
+  assert.match(
+    full,
+    /--ci-shard node\|web\|server\|resource\|browser\|security/u,
+  );
+  assert.match(full, /untrusted_ci_shard_context/u);
+  assert.match(full, /dirty_ci_shard/u);
+  for (const contract of [
+    ["node", "secrets", "shared"],
+    ["web", "web"],
+    ["server", "environment_profile", "server", "critical_postgres"],
+    ["resource", "resource_sensitive_node"],
+    ["browser", "browser"],
+    ["security", "govulncheck"],
+  ]) {
+    const [shard, ...stages] = contract;
+    const body = full.match(
+      new RegExp(`${shard}\\)\\n([\\s\\S]*?)(?=\\n[a-z]+\\)|\\n""\\))`, "u"),
+    )?.[1];
+    assert.ok(body, `missing ${shard} shard`);
+    for (const stage of stages) {
+      assert.match(body, new RegExp(`qa_run_stage strict ${stage}`, "u"));
+    }
+  }
+  assert.match(strict, /--ci-shard static/u);
+  assert.match(strict, /untrusted_ci_shard_context/u);
+  assert.match(strict, /qa_run_stage strict strict_profile/u);
+  assert.match(strict, /qa_run_stage strict shellcheck/u);
+  assert.match(strict, /qa_run_stage strict shfmt/u);
+  assert.match(strict, /qa_run_stage strict yamllint/u);
+});
