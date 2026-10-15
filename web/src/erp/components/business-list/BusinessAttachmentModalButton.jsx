@@ -1,0 +1,167 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { PaperClipOutlined } from '@ant-design/icons'
+import { Button, Tooltip } from 'antd'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+
+import { listBusinessAttachments } from '../../api/attachmentApi.mjs'
+import { resolveBusinessAttachmentActionLabel } from '../../utils/businessAttachmentPanelState.mjs'
+import BusinessAttachmentPanel from './BusinessAttachmentPanel.jsx'
+
+export default function BusinessAttachmentModalButton({
+  ownerType,
+  ownerId,
+  ownerVersion,
+  buttonText = '附件',
+  modalTitle = '业务附件',
+  panelTitle = '附件',
+  description,
+  canUpload = true,
+  canWithdraw = false,
+  disabled = false,
+  disabledReason = '请先选择一条记录',
+  buttonProps = {},
+  showAttachmentCount = false,
+  countLabel = '附件',
+  emptyUploadLabel = '添加附件',
+  emptyReadLabel = '查看附件',
+}) {
+  const [open, setOpen] = useState(false)
+  const [panelState, setPanelState] = useState({ busy: false, pendingCount: 0 })
+  const [confirmClose, setConfirmClose] = useState(false)
+  const [attachmentCount, setAttachmentCount] = useState(null)
+  const countRequestSeqRef = useRef(0)
+  const normalizedOwnerId = Number(ownerId || 0)
+  const missingOwner = !ownerType || normalizedOwnerId <= 0
+  const actionDisabled = disabled || missingOwner
+  const close = () => {
+    if (panelState.busy) return
+    if (panelState.pendingCount > 0) {
+      setConfirmClose(true)
+      return
+    }
+    setOpen(false)
+    loadAttachmentCount()
+  }
+
+  useEffect(() => {
+    setOpen(false)
+    setConfirmClose(false)
+    setPanelState({ busy: false, pendingCount: 0 })
+  }, [ownerType, normalizedOwnerId])
+  const loadAttachmentCount = useCallback(async () => {
+    const requestID = countRequestSeqRef.current + 1
+    countRequestSeqRef.current = requestID
+    setAttachmentCount(null)
+    if (!showAttachmentCount || missingOwner) return
+
+    try {
+      const items = await listBusinessAttachments({
+        owner_type: ownerType,
+        owner_id: normalizedOwnerId,
+      })
+      if (countRequestSeqRef.current === requestID) {
+        setAttachmentCount(Array.isArray(items) ? items.length : 0)
+      }
+    } catch {
+      if (countRequestSeqRef.current === requestID) {
+        setAttachmentCount(null)
+      }
+    }
+  }, [missingOwner, normalizedOwnerId, ownerType, showAttachmentCount])
+
+  useEffect(() => {
+    loadAttachmentCount()
+    return () => {
+      countRequestSeqRef.current += 1
+    }
+  }, [loadAttachmentCount])
+
+  const resolvedButtonText = showAttachmentCount
+    ? resolveBusinessAttachmentActionLabel({
+        attachmentCount,
+        canUpload,
+        fallbackLabel: buttonText,
+        countLabel,
+        emptyUploadLabel,
+        emptyReadLabel,
+      })
+    : buttonText
+
+  const triggerButton = (
+    <Button
+      size="small"
+      icon={<PaperClipOutlined aria-hidden="true" />}
+      {...buttonProps}
+      disabled={actionDisabled}
+      onClick={(event) => {
+        buttonProps.onClick?.(event)
+        if (!event.defaultPrevented) {
+          setOpen(true)
+        }
+      }}
+    >
+      {resolvedButtonText}
+    </Button>
+  )
+
+  return (
+    <>
+      {actionDisabled ? (
+        <Tooltip title={disabledReason}>
+          <span>{triggerButton}</span>
+        </Tooltip>
+      ) : (
+        triggerButton
+      )}
+      <BusinessModal
+        centered
+        destroyOnHidden
+        className="business-attachment-modal"
+        footer={null}
+        open={open}
+        title={modalTitle}
+        size="localAction"
+        width="min(780px, calc(100vw - 32px))"
+        closable={!panelState.busy}
+        maskClosable={!panelState.busy}
+        keyboard={!panelState.busy}
+        onCancel={close}
+      >
+        <BusinessAttachmentPanel
+          key={`${ownerType}:${normalizedOwnerId}`}
+          ownerType={ownerType}
+          ownerId={normalizedOwnerId}
+          ownerVersion={ownerVersion}
+          title={panelTitle}
+          description={description}
+          canUpload={canUpload}
+          canWithdraw={canWithdraw}
+          allowPendingAttachmentsWithoutOwner={false}
+          missingOwnerDescription={disabledReason}
+          missingOwnerEmptyText={disabledReason}
+          variant="manager"
+          onStateChange={setPanelState}
+          onClose={close}
+        />
+      </BusinessModal>
+      <BusinessModal
+        size="confirm"
+        open={confirmClose}
+        title="放弃未上传附件？"
+        okText="放弃并关闭"
+        cancelText="继续处理"
+        okButtonProps={{ danger: true }}
+        onCancel={() => setConfirmClose(false)}
+        onOk={() => {
+          setConfirmClose(false)
+          setOpen(false)
+          setPanelState({ busy: false, pendingCount: 0 })
+          loadAttachmentCount()
+        }}
+      >
+        当前还有 {panelState.pendingCount}{' '}
+        个附件未完成。关闭后需要重新选择文件；已上传的附件会保留。结果待确认的文件请重新打开列表核对。
+      </BusinessModal>
+    </>
+  )
+}

@@ -1,0 +1,35 @@
+.erp-image-placeholder {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 8px;
+  color: var(--erp-text-muted, #64748b);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+  white-space: normal;
+}
+
+.erp-image-placeholder > .anticon {
+  font-size: 24px;
+}
+
+.erp-image-placeholder--compact {
+  gap: 3px;
+  padding: 0;
+  font-size: 10px;
+}
+
+.erp-image-placeholder--compact > .anticon {
+  font-size: 18px;
+}
+
+@media print {
+  .erp-image-placeholder {
+    display: none;
+  }
+}

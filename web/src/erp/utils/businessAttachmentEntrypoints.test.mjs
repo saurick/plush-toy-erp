@@ -1,0 +1,152 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+const pageLevelAttachmentEntrypoints = [
+  '../pages/WorkflowBusinessModulePage.jsx',
+  '../pages/PurchaseReceiptsPage.jsx',
+  '../pages/OperationalFactsPage.jsx',
+  '../mobile/components/MobileTaskDetailScreen.jsx',
+  '../components/workflow/WorkflowTaskActionDrawer.jsx',
+]
+
+const formModalAttachmentEntrypoints = [
+  '../pages/BOMVersionsPage.jsx',
+  '../pages/MasterDataPage.jsx',
+  '../pages/OutsourcingOrdersPage.jsx',
+  '../pages/QualityInspectionsPage.jsx',
+  '../components/shipments/ShipmentEditor.jsx',
+  '../components/purchase-orders/PurchaseOrderEditor.jsx',
+  '../components/sales-orders/SalesOrderEditor.jsx',
+]
+
+test('page-level attachment entrypoints open attachments through modal actions', () => {
+  for (const relativePath of pageLevelAttachmentEntrypoints) {
+    const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8')
+
+    assert(
+      source.includes('BusinessAttachmentModalButton'),
+      `${relativePath} should expose page-level attachments through the modal action button`
+    )
+    assert(
+      !source.includes('<BusinessAttachmentPanel'),
+      `${relativePath} should not render page-level BusinessAttachmentPanel directly`
+    )
+  }
+})
+
+test('BusinessAttachmentModalButton is the only page-level wrapper around BusinessAttachmentPanel', () => {
+  const source = readFileSync(
+    new URL(
+      '../components/business-list/BusinessAttachmentModalButton.jsx',
+      import.meta.url
+    ),
+    'utf8'
+  )
+
+  assert(source.includes('BusinessAttachmentPanel'))
+  assert(source.includes('<BusinessModal'))
+  assert(source.includes('allowPendingAttachmentsWithoutOwner={false}'))
+  assert(source.includes('<PaperClipOutlined aria-hidden="true" />'))
+})
+
+test('read-only attachment panels do not expose a fake upload control', () => {
+  const source = readFileSync(
+    new URL(
+      '../components/business-list/BusinessAttachmentPanel.jsx',
+      import.meta.url
+    ),
+    'utf8'
+  )
+
+  assert.match(
+    source,
+    /\{canUpload \? \([\s\S]*<Button[\s\S]*<input[\s\S]*\) : null\}/u
+  )
+})
+
+test('attachment panel reports batch results and retries only explicit failures', () => {
+  const source = readFileSync(
+    new URL(
+      '../components/business-list/BusinessAttachmentPanel.jsx',
+      import.meta.url
+    ),
+    'utf8'
+  )
+
+  assert.match(source, /settleBusinessAttachmentBatchUpload/u)
+  assert.match(source, /title="部分附件上传失败"/u)
+  assert.match(source, /重试失败项/u)
+  assert.match(source, /成功项已经保留，重试时不会重复上传/u)
+  assert.match(source, /item\.upload_status === 'failed'/u)
+  assert.match(source, /item\.upload_status === 'unconfirmed'/u)
+  assert.match(source, /结果待确认/u)
+  assert.match(source, /isMutationResultUnknown/u)
+})
+
+test('outsourcing attachment panel exposes a typed contract-image upload without changing normal evidence uploads', () => {
+  const panelSource = readFileSync(
+    new URL(
+      '../components/business-list/BusinessAttachmentPanel.jsx',
+      import.meta.url
+    ),
+    'utf8'
+  )
+  const pageSource = readFileSync(
+    new URL('../pages/OutsourcingOrdersPage.jsx', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(panelSource, /PRINT_APPENDIX_ATTACHMENT_TYPE/u)
+  assert.match(panelSource, /选择合同附图/u)
+  assert.match(panelSource, /item\.attachment_type \|\| attachmentType/u)
+  assert.match(pageSource, /enablePrintAppendixUpload/u)
+})
+
+test('direct attachment panels stay inside business editors and auxiliary forms', () => {
+  const modalWrappers = [
+    ['<BusinessFormModal', '</BusinessFormModal>'],
+    ['<BusinessDetailsModal', '</BusinessDetailsModal>'],
+    ['<BusinessFormPage', '</BusinessFormPage>'],
+    ['<InspectionEditor', '</InspectionEditor>'],
+  ]
+  for (const relativePath of formModalAttachmentEntrypoints) {
+    const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8')
+    const panelIndexes = [...source.matchAll(/<BusinessAttachmentPanel/g)].map(
+      (match) => match.index
+    )
+
+    assert(
+      panelIndexes.length > 0,
+      `${relativePath} should keep its direct attachment panel explicit`
+    )
+    for (const panelIndex of panelIndexes) {
+      const isInsideFormBackedModal = modalWrappers.some(
+        ([startTag, endTag]) =>
+          source.lastIndexOf(startTag, panelIndex) >= 0 &&
+          source.indexOf(endTag, panelIndex) > panelIndex
+      )
+      assert(
+        isInsideFormBackedModal,
+        `${relativePath} direct BusinessAttachmentPanel must remain inside a form-backed business modal`
+      )
+    }
+  }
+})
+
+test('BusinessDetailsModal remains a read-only BusinessFormModal wrapper', () => {
+  const source = readFileSync(
+    new URL(
+      '../components/business-list/BusinessDetailsModal.jsx',
+      import.meta.url
+    ),
+    'utf8'
+  )
+
+  assert(
+    source.includes("import BusinessFormModal from './BusinessFormModal.jsx'")
+  )
+  assert(source.includes('<BusinessFormModal'))
+  assert(source.includes('<Button key="close" onClick={onClose}>'))
+  assert(!source.includes('onOk='))
+})
