@@ -1,0 +1,1688 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  CheckCircleOutlined,
+  EyeOutlined,
+  ExclamationCircleOutlined,
+  RedoOutlined,
+  SendOutlined,
+} from '@ant-design/icons'
+import { Alert, Button, Input, Space, Tag } from 'antd'
+import dayjs from 'dayjs'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
+import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import { message } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import {
+  blockWorkflowTaskAction,
+  completeWorkflowTaskAction,
+  getWorkflowTaskProcessContext,
+  listWorkflowTasks,
+  rejectWorkflowTaskAction,
+  resumeWorkflowTaskAction,
+  urgeWorkflowTask,
+} from '../api/workflowApi.mjs'
+import {
+  BusinessActionTooltip,
+  BusinessDataTable,
+  BusinessOperationPanel,
+  BusinessPageLayout,
+  DateRangeFilter,
+  PageHeaderCard,
+  SearchInput,
+  SelectFilter,
+  SelectionActionBar,
+  SelectionClearAction,
+} from '../components/business-list/BusinessListLayout.jsx'
+import {
+  BusinessListToolbarActions,
+  useBusinessColumnOrder,
+} from '../components/business-list/BusinessListToolbarActions.jsx'
+import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
+import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
+import ProductionExceptionDecisionPanel from '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
+import {
+  canReadProductionExceptionDecisions,
+  PRODUCTION_RECORD_VIEW_KEYS,
+  resolveProductionExceptionTab,
+} from '../utils/productionRecordViews.mjs'
+import { getBusinessModule } from '../config/businessModules.mjs'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
+import useBusinessPageState from '../hooks/useBusinessPageState.js'
+import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
+import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
+import { getRoleDisplayName } from '../utils/roleKeys.mjs'
+import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
+import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../utils/workflowTaskActionSubmitGuard.mjs'
+import {
+  createTaskMutationAttemptStore,
+  createTaskMutationInFlightGuard,
+  isWorkflowTaskMutationResultUnknown,
+  verifyNewWorkflowTaskMutationAttempt,
+} from '../utils/workflowTaskMutation.mjs'
+import { formatWorkflowTaskSource } from '../utils/dashboardTaskDisplay.mjs'
+import {
+  createBusinessTablePagination,
+  resetBusinessPaginationCurrent,
+} from '../utils/businessPagination.mjs'
+import {
+  buildWorkflowBusinessTaskQuery,
+  buildWorkflowBusinessTaskStats,
+  reconcileWorkflowBusinessTaskPage,
+  requireWorkflowBusinessTaskPage,
+} from '../utils/workflowBusinessModuleModel.mjs'
+import {
+  getWorkflowTaskCodeLabel,
+  getWorkflowTaskDueLabel,
+  getWorkflowTaskOwnerRoleLabel,
+  getWorkflowTaskReason,
+  getWorkflowTaskStatusMeta,
+} from '../utils/workflowTaskBoard.mjs'
+import { resolveReadableWorkflowSourceNo } from '../utils/workflowDocumentRefs.mjs'
+import {
+  canWorkflowTaskStatusRunAction,
+  getWorkflowTaskActionPermission,
+  isWorkflowProcessDecisionTask,
+} from '../utils/workflowTaskActionContract.mjs'
+import {
+  buildWorkflowProcessDecision,
+  getWorkflowProcessDecisionApprovalForm,
+  getWorkflowProcessDecisionApprovedQuantityError,
+  requireWorkflowProcessDecisionSubmission,
+  workflowProcessDecisionAllowsApprovedQuantity,
+} from '../utils/workflowProcessDecision.mjs'
+
+function businessActionModalTitle(title, description) {
+  return (
+    <div className="erp-business-action-modal__title">
+      <span>{title}</span>
+      <small>{description}</small>
+    </div>
+  )
+}
+
+function workflowRoleOption(value) {
+  return { label: getRoleDisplayName(value, '责任岗位'), value }
+}
+
+const TASK_STATUS_OPTIONS = Object.freeze([
+  { label: '全部状态', value: '' },
+  { label: '可执行', value: 'ready' },
+  { label: '阻塞', value: 'blocked' },
+  { label: '退回', value: 'rejected' },
+  { label: '已完成', value: 'done' },
+])
+const DUE_DATE_FILTER_OPTIONS = Object.freeze([
+  { label: '到期日期', value: 'due_at' },
+])
+const PRODUCTION_EXCEPTION_TAB_KEYS = Object.freeze({
+  DECISIONS: PRODUCTION_RECORD_VIEW_KEYS.DECISIONS,
+  TASKS: PRODUCTION_RECORD_VIEW_KEYS.TASKS,
+})
+
+const MODULE_WORKFLOW_CONFIG = Object.freeze({
+  'production-scheduling': {
+    taskGroup: 'production_scheduling',
+    completionMessage:
+      '排产确认已完成，领料、完工和入库仍需到对应业务页面办理。',
+    emptyText: '暂无排产确认任务。',
+    ownerRoleOptions: [
+      workflowRoleOption('pmc'),
+      workflowRoleOption('production'),
+      workflowRoleOption('warehouse'),
+    ],
+    payloadScope: 'production_scheduling_workflow_only',
+  },
+  'production-exceptions': {
+    taskGroup: 'production_exception_decision_approval',
+    completionMessage:
+      '异常审批已完成；生产岗位仍需在异常来源记录中执行或冲正，任务完成本身不写生产或库存事实。',
+    emptyText: '暂无待审批的生产异常处置申请。',
+    ownerRoleOptions: [workflowRoleOption('boss')],
+    payloadScope: 'production_exception_decision_process_approval',
+  },
+  'shipping-release': {
+    taskGroup: 'shipment_finance_approval',
+    completionMessage:
+      '出货财务审批已完成；仓库仍需在出货单中独立确认实际出货。',
+    emptyText: '暂无出货财务审批任务。',
+    ownerRoleOptions: [
+      workflowRoleOption('finance'),
+      workflowRoleOption('boss'),
+    ],
+    payloadScope: 'shipment_finance_approval_process_only',
+  },
+})
+
+function toUnixSeconds(value) {
+  if (!value) return undefined
+  const parsed = dayjs(String(value).trim())
+  return parsed.isValid() ? parsed.endOf('day').unix() : undefined
+}
+
+function toUnixStartSeconds(value) {
+  if (!value) return undefined
+  const parsed = dayjs(String(value).trim())
+  return parsed.isValid() ? parsed.startOf('day').unix() : undefined
+}
+
+function getTaskID(task = {}) {
+  return Number(task.id || 0)
+}
+
+export default function WorkflowBusinessModulePage({ moduleKey }) {
+  const navigate = useBusinessNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const beginLatestRequest = useLatestRequestCoordinator()
+  const mutationAttemptsRef = useRef(null)
+  mutationAttemptsRef.current ||= createTaskMutationAttemptStore()
+  const mutationInFlightRef = useRef(null)
+  mutationInFlightRef.current ||= createTaskMutationInFlightGuard()
+  const runMutationInFlight = useCallback(async (scope, run) => {
+    const lease = mutationInFlightRef.current.acquire(scope)
+    if (!lease) return false
+    try {
+      return await run()
+    } finally {
+      mutationInFlightRef.current.release(lease)
+    }
+  }, [])
+  const moduleItem = getBusinessModule(moduleKey)
+  const config = MODULE_WORKFLOW_CONFIG[moduleKey]
+  const outletContext = useOutletContext()
+  const productionRecordsWorkspace =
+    outletContext?.productionRecordsWorkspace || null
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
+  const [tasks, setTasks] = useState([])
+  const [total, setTotal] = useState(0)
+  const [pagination, setPagination] = useBusinessPageState('pagination', {
+    current: 1,
+    pageSize: 10,
+  })
+  const [loading, setLoading] = useState(false)
+  const [taskReasonModal, setTaskReasonModal] = useState(null)
+  const [taskReasonProcessContext, setTaskReasonProcessContext] = useState(null)
+  const [taskReasonProcessContextState, setTaskReasonProcessContextState] =
+    useState('idle')
+  const linkedKeyword = String(searchParams.get('link_keyword') || '').trim()
+  const routeSourceType = String(searchParams.get('source_type') || '').trim()
+  const routeSourceID = Number(searchParams.get('source_id') || 0)
+  const hasRouteSourceContext = Boolean(
+    moduleKey === 'production-scheduling' &&
+      routeSourceType === 'production-orders' &&
+      Number.isSafeInteger(routeSourceID) &&
+      routeSourceID > 0
+  )
+  const [keyword, setKeyword] = useBusinessPageState(
+    `keyword:${linkedKeyword}`,
+    linkedKeyword
+  )
+  const linkedKeywordRef = useRef(linkedKeyword)
+  const [status, setStatus] = useBusinessPageState('status', '')
+  const [ownerRoleKey, setOwnerRoleKey] = useBusinessPageState('ownerRoleKey', '')
+  const [dueFrom, setDueFrom] = useBusinessPageState('dueFrom', '')
+  const [dueTo, setDueTo] = useBusinessPageState('dueTo', '')
+  const [selectedTaskKeys, setSelectedTaskKeys] = useState([])
+  const [detailTask, setDetailTask] = useState(null)
+  const [taskActionLoadingID, setTaskActionLoadingID] = useState(0)
+  const [urgingTaskID, setUrgingTaskID] = useState(0)
+  const canReadWorkflowTasks = hasActionPermission(
+    adminProfile,
+    PermissionCode.WORKFLOW_TASK_READ
+  )
+  const canUpdateWorkflowTasks = hasActionPermission(
+    adminProfile,
+    PermissionCode.WORKFLOW_TASK_UPDATE
+  )
+  const canCompleteWorkflowTasks = hasActionPermission(
+    adminProfile,
+    PermissionCode.WORKFLOW_TASK_COMPLETE
+  )
+  const canApproveWorkflowTasks = hasActionPermission(
+    adminProfile,
+    PermissionCode.WORKFLOW_TASK_APPROVE
+  )
+  const canCompleteOrApproveWorkflowTasks =
+    canCompleteWorkflowTasks ||
+    canApproveWorkflowTasks ||
+    [
+      PermissionCode.FINANCE_PAYMENT_APPROVE,
+      PermissionCode.WAREHOUSE_ADJUSTMENT_APPROVE,
+      PermissionCode.PRODUCTION_EXCEPTION_APPROVE,
+    ].some((permission) => hasActionPermission(adminProfile, permission))
+  const canRejectWorkflowTasks = hasActionPermission(
+    adminProfile,
+    PermissionCode.WORKFLOW_TASK_REJECT
+  )
+  const isProductionExceptionPage = moduleKey === 'production-exceptions'
+  const canReadProductionExceptionRecords =
+    isProductionExceptionPage &&
+    canReadProductionExceptionDecisions(adminProfile)
+  const linkedProductionExceptionID = Number(
+    searchParams.get('production_exception_id') || 0
+  )
+  const requestedProductionExceptionView = String(
+    searchParams.get('view') || ''
+  ).trim()
+  const [productionExceptionSummary, setProductionExceptionSummary] = useState({
+    total: 0,
+    pageCount: 0,
+  })
+  const productionExceptionRefreshRef = useRef(null)
+  const productionExceptionTabKeys = useMemo(
+    () =>
+      [
+        canReadProductionExceptionRecords
+          ? PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+          : null,
+        canReadWorkflowTasks ? PRODUCTION_EXCEPTION_TAB_KEYS.TASKS : null,
+      ].filter(Boolean),
+    [canReadProductionExceptionRecords, canReadWorkflowTasks]
+  )
+  const effectiveProductionExceptionTab = resolveProductionExceptionTab({
+    linkedProductionExceptionID,
+    linkedKeyword,
+    requestedView: requestedProductionExceptionView,
+    canReadRecords: canReadProductionExceptionRecords,
+    canReadTasks: canReadWorkflowTasks,
+  })
+  const isWorkflowTaskWorkspaceActive =
+    !isProductionExceptionPage ||
+    effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
+
+  useEffect(() => {
+    if (isWorkflowTaskWorkspaceActive) return
+    setDetailTask(null)
+    setTaskReasonModal(null)
+    setTaskReasonProcessContext(null)
+    setTaskReasonProcessContextState('idle')
+  }, [isWorkflowTaskWorkspaceActive])
+
+  const loadWorkflowTasks = useCallback(async () => {
+    const request = beginLatestRequest('workflow-business-tasks')
+    if (!isWorkflowTaskWorkspaceActive) {
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
+      return false
+    }
+    if (!config || !canReadWorkflowTasks) {
+      if (request.isCurrent()) {
+        setTasks([])
+        setTotal(0)
+        setSelectedTaskKeys([])
+        setDetailTask(null)
+        setLoading(false)
+        request.finish()
+      }
+      return false
+    }
+    setLoading(true)
+    try {
+      const query = buildWorkflowBusinessTaskQuery({
+        taskGroup: config.taskGroup,
+        keyword,
+        status,
+        ownerRoleKey,
+        dueFrom: toUnixStartSeconds(dueFrom),
+        dueTo: toUnixSeconds(dueTo),
+        sourceType: hasRouteSourceContext ? routeSourceType : '',
+        sourceID: hasRouteSourceContext ? routeSourceID : 0,
+        pagination,
+      })
+      const data = await listWorkflowTasks(query, { signal: request.signal })
+      if (!request.isCurrent()) return false
+      const page = requireWorkflowBusinessTaskPage(data, {
+        taskGroup: config.taskGroup,
+        limit: query.limit,
+        offset: query.offset,
+      })
+      const pageState = reconcileWorkflowBusinessTaskPage({
+        tasks: page.tasks,
+        total: page.total,
+        pagination,
+      })
+      setTotal(page.total)
+      setTasks(pageState.tasks)
+      setSelectedTaskKeys(
+        (current) =>
+          reconcileWorkflowBusinessTaskPage({
+            tasks: page.tasks,
+            total: page.total,
+            pagination,
+            selectedTaskKeys: current,
+          }).selectedTaskKeys
+      )
+      setDetailTask((current) =>
+        current
+          ? pageState.tasks.find((task) => task.id === current.id) || null
+          : null
+      )
+      if (pageState.shouldRetreat) {
+        setPagination((current) => ({
+          ...current,
+          current: pageState.current,
+        }))
+      }
+      return true
+    } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) return false
+      setTasks([])
+      setTotal(0)
+      setSelectedTaskKeys([])
+      setDetailTask(null)
+      message.error(
+        getActionErrorMessage(
+          error,
+          `加载${moduleItem?.title || '当前页面'}任务失败`
+        )
+      )
+      return false
+    } finally {
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
+    }
+  }, [
+    beginLatestRequest,
+    canReadWorkflowTasks,
+    config,
+    dueFrom,
+    dueTo,
+    keyword,
+    hasRouteSourceContext,
+    isWorkflowTaskWorkspaceActive,
+    moduleItem?.title,
+    ownerRoleKey,
+    pagination,
+    routeSourceID,
+    routeSourceType,
+    status,
+    setPagination,
+  ])
+
+  useEffect(() => {
+    loadWorkflowTasks()
+  }, [loadWorkflowTasks])
+
+  useEffect(() => {
+    if (linkedKeywordRef.current === linkedKeyword) return
+    linkedKeywordRef.current = linkedKeyword
+    setKeyword(linkedKeyword)
+    resetBusinessPaginationCurrent(setPagination)
+  }, [linkedKeyword, setKeyword, setPagination])
+
+  useEffect(() => {
+    if (!moduleItem) return undefined
+    return outletContext?.registerPageRefresh?.(async () => {
+      if (
+        isProductionExceptionPage &&
+        effectiveProductionExceptionTab ===
+          PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+      ) {
+        const refreshed = await productionExceptionRefreshRef.current?.()
+        if (refreshed) {
+          message.success('异常处理申请已刷新')
+        }
+        return false
+      }
+      const refreshed = await loadWorkflowTasks()
+      if (refreshed) {
+        message.success(`${moduleItem.title}任务已刷新`)
+      }
+      return false
+    })
+  }, [
+    effectiveProductionExceptionTab,
+    isProductionExceptionPage,
+    loadWorkflowTasks,
+    moduleItem,
+    outletContext,
+  ])
+
+  const selectedTasks = useMemo(
+    () => tasks.filter((task) => selectedTaskKeys.includes(task.id)),
+    [selectedTaskKeys, tasks]
+  )
+  const selectedTask = selectedTasks[0] || null
+  const taskReasonProcessDecisionRequired = Boolean(
+    taskReasonModal?.mode === 'complete' &&
+      isWorkflowProcessDecisionTask(selectedTask)
+  )
+  const taskReasonProcessApprovalForm = getWorkflowProcessDecisionApprovalForm(
+    selectedTask,
+    taskReasonProcessContext
+  )
+  const taskReasonProcessDecisionReady =
+    !taskReasonProcessDecisionRequired ||
+    (taskReasonProcessContextState === 'ready' &&
+      Boolean(taskReasonProcessApprovalForm))
+  const taskReasonApprovedQuantityAllowed =
+    taskReasonProcessDecisionRequired &&
+    workflowProcessDecisionAllowsApprovedQuantity(taskReasonProcessApprovalForm)
+  const taskReasonApprovedQuantityError = taskReasonApprovedQuantityAllowed
+    ? getWorkflowProcessDecisionApprovedQuantityError(
+        taskReasonProcessApprovalForm,
+        taskReasonModal?.approvedQuantity || ''
+      )
+    : ''
+
+  useEffect(() => {
+    if (!taskReasonProcessDecisionRequired) {
+      setTaskReasonProcessContext(null)
+      setTaskReasonProcessContextState('idle')
+      return undefined
+    }
+    if (!selectedTask?.id || !selectedTask?.process_instance_id) {
+      setTaskReasonProcessContext(null)
+      setTaskReasonProcessContextState('error')
+      return undefined
+    }
+
+    const controller = new AbortController()
+    setTaskReasonProcessContext(null)
+    setTaskReasonProcessContextState('loading')
+    getWorkflowTaskProcessContext(selectedTask.id, {
+      signal: controller.signal,
+    })
+      .then((context) => {
+        if (!getWorkflowProcessDecisionApprovalForm(selectedTask, context)) {
+          throw new Error('审批表单与流程节点不一致')
+        }
+        setTaskReasonProcessContext(context)
+        setTaskReasonProcessContextState('ready')
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return
+        setTaskReasonProcessContext(null)
+        setTaskReasonProcessContextState('error')
+      })
+    return () => controller.abort()
+  }, [selectedTask, taskReasonProcessDecisionRequired])
+
+  const stats = useMemo(
+    () => buildWorkflowBusinessTaskStats({ total, pageCount: tasks.length }),
+    [tasks.length, total]
+  )
+  const productionExceptionStats = useMemo(
+    () => [
+      {
+        key: 'production-exception-total',
+        label: '异常记录',
+        value: productionExceptionSummary.total,
+      },
+      {
+        key: 'production-exception-page',
+        label: '当前显示',
+        value: productionExceptionSummary.pageCount,
+      },
+    ],
+    [productionExceptionSummary.pageCount, productionExceptionSummary.total]
+  )
+  const headerStats =
+    isProductionExceptionPage &&
+    effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+      ? productionExceptionStats
+      : stats
+
+  useEffect(() => {
+    if (!isProductionExceptionPage || !productionRecordsWorkspace) return
+    productionRecordsWorkspace.setHeaderStats(
+      effectiveProductionExceptionTab,
+      headerStats
+    )
+  }, [
+    effectiveProductionExceptionTab,
+    headerStats,
+    isProductionExceptionPage,
+    productionRecordsWorkspace,
+  ])
+
+  const selectedTaskLabel = selectedTask
+    ? `${getWorkflowTaskCodeLabel(selectedTask)} / ${
+        selectedTask.task_name || '未填写任务名称'
+      }`
+    : `请先选择一条${moduleItem?.shortLabel || ''}任务`
+  const selectedTaskItems = selectedTask
+    ? [
+        {
+          key: selectedTask.id,
+          label: selectedTask.task_name || selectedTask.task_code,
+          title: selectedTask.task_code || '',
+        },
+      ]
+    : []
+  const selectedTaskStatusMeta = selectedTask
+    ? getWorkflowTaskStatusMeta(selectedTask)
+    : null
+  const selectedTaskActionAccess = useWorkflowTaskActionAccess({
+    adminProfile,
+    task: selectedTask,
+    enabled: Boolean(
+      selectedTask && canReadWorkflowTasks && isWorkflowTaskWorkspaceActive
+    ),
+  })
+  const selectedTaskReadonlyReason = selectedTaskActionAccess.loading
+    ? '正在确认您是否可以处理当前任务。'
+    : selectedTaskActionAccess.readonlyReason
+  const canCompleteSelected =
+    Boolean(selectedTask) && selectedTaskActionAccess.canRun('complete')
+  const canBlockSelected =
+    Boolean(selectedTask) && selectedTaskActionAccess.canRun('block')
+  const canRejectSelected =
+    Boolean(selectedTask) && selectedTaskActionAccess.canRun('reject')
+  const canResumeSelected =
+    Boolean(selectedTask) && selectedTaskActionAccess.canRun('resume')
+  const canUrgeSelected =
+    Boolean(selectedTask) && selectedTaskActionAccess.canRun('urge')
+  const workflowActionDisabledReason = (actionMode, actionLabel) => {
+    if (!selectedTask) return '请先选择一条任务'
+    if (selectedTaskActionAccess.loading) {
+      return `正在确认是否可以${actionLabel}`
+    }
+    if (!selectedTaskActionAccess.canRun(actionMode)) {
+      return (
+        selectedTaskActionAccess.getReason(actionMode) ||
+        `当前任务暂不能${actionLabel}`
+      )
+    }
+    if (taskActionLoadingID > 0 || urgingTaskID > 0) {
+      return '当前操作完成后可继续办理'
+    }
+    return ''
+  }
+
+  const verifyMutationAccess = useCallback(
+    ({ task, actionKey, reason = '', scope, operation, params }) =>
+      verifyNewWorkflowTaskMutationAttempt({
+        attemptStore: mutationAttemptsRef.current,
+        scope,
+        operation,
+        params,
+        verify: () =>
+          verifyWorkflowTaskActionAccessBeforeSubmit({
+            task,
+            actionKey,
+            reason,
+            onWarning: message.warning,
+            onError: message.error,
+          }),
+      }),
+    []
+  )
+
+  const completeWorkflowTask = useCallback(
+    async (task, { processDecision = null, reason = '' } = {}) => {
+      const requiresDecision = isWorkflowProcessDecisionTask(task)
+      const normalizedReason = String(reason || '').trim()
+      if (requiresDecision && !normalizedReason) {
+        message.warning('请先填写审批意见')
+        return false
+      }
+      let canonicalProcessDecision = null
+      if (requiresDecision) {
+        try {
+          canonicalProcessDecision = requireWorkflowProcessDecisionSubmission(
+            task,
+            processDecision,
+            {
+              reason: normalizedReason,
+            }
+          )
+        } catch (error) {
+          message.warning(
+            getActionErrorMessage(
+              error,
+              '审批表单与当前流程节点不一致，请刷新后重试'
+            )
+          )
+          return false
+        }
+      }
+      const scope = `${task.id}:complete`
+      const operation = 'complete'
+      const params = {
+        task_id: task.id,
+        expected_version: task.version,
+        action_key: operation,
+        ...(normalizedReason ? { reason: normalizedReason } : {}),
+        payload: {
+          entry_path: moduleItem?.path || '',
+          surface_key: 'workflow_business_module',
+          ...(canonicalProcessDecision
+            ? { process_decision: canonicalProcessDecision }
+            : {}),
+        },
+      }
+      return runMutationInFlight(`task:${task.id}`, async () => {
+        const accessVerified = await verifyMutationAccess({
+          task,
+          actionKey: operation,
+          reason: normalizedReason,
+          scope,
+          operation,
+          params,
+        })
+        if (!accessVerified) return false
+        setTaskActionLoadingID(getTaskID(task))
+        try {
+          await mutationAttemptsRef.current.run({
+            scope,
+            operation,
+            mutate: completeWorkflowTaskAction,
+            params,
+          })
+          message.success(config.completionMessage)
+          try {
+            await loadWorkflowTasks()
+          } catch {
+            message.warning('操作已成功但列表刷新失败，请手动刷新')
+          }
+          return true
+        } catch (error) {
+          if (isWorkflowTaskMutationResultUnknown(error)) {
+            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+          } else {
+            message.error(getActionErrorMessage(error, '完成任务失败'))
+            await loadWorkflowTasks().catch(() => {})
+          }
+          return false
+        } finally {
+          setTaskActionLoadingID(0)
+        }
+      })
+    },
+    [
+      config,
+      loadWorkflowTasks,
+      moduleItem?.path,
+      runMutationInFlight,
+      verifyMutationAccess,
+    ]
+  )
+
+  const blockWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      const scope = `${task.id}:block`
+      const operation = 'block'
+      const params = {
+        task_id: task.id,
+        expected_version: task.version,
+        action_key: operation,
+        reason,
+        payload: {
+          entry_path: moduleItem?.path || '',
+          surface_key: 'workflow_business_module',
+        },
+      }
+      return runMutationInFlight(`task:${task.id}`, async () => {
+        const accessVerified = await verifyMutationAccess({
+          task,
+          actionKey: operation,
+          reason,
+          scope,
+          operation,
+          params,
+        })
+        if (!accessVerified) return false
+        setTaskActionLoadingID(getTaskID(task))
+        try {
+          await mutationAttemptsRef.current.run({
+            scope,
+            operation,
+            mutate: blockWorkflowTaskAction,
+            params,
+          })
+          message.success('阻塞原因已记录')
+          try {
+            await loadWorkflowTasks()
+          } catch {
+            message.warning('操作已成功但列表刷新失败，请手动刷新')
+          }
+          return true
+        } catch (error) {
+          if (isWorkflowTaskMutationResultUnknown(error)) {
+            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+          } else {
+            message.error(getActionErrorMessage(error, '标记阻塞失败'))
+            await loadWorkflowTasks().catch(() => {})
+          }
+          return false
+        } finally {
+          setTaskActionLoadingID(0)
+        }
+      })
+    },
+    [
+      loadWorkflowTasks,
+      moduleItem?.path,
+      runMutationInFlight,
+      verifyMutationAccess,
+    ]
+  )
+
+  const rejectWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      const scope = `${task.id}:reject`
+      const operation = 'reject'
+      const params = {
+        task_id: task.id,
+        expected_version: task.version,
+        action_key: operation,
+        reason,
+        payload: {
+          entry_path: moduleItem?.path || '',
+          surface_key: 'workflow_business_module',
+        },
+      }
+      return runMutationInFlight(`task:${task.id}`, async () => {
+        const accessVerified = await verifyMutationAccess({
+          task,
+          actionKey: operation,
+          reason,
+          scope,
+          operation,
+          params,
+        })
+        if (!accessVerified) return false
+        setTaskActionLoadingID(getTaskID(task))
+        try {
+          await mutationAttemptsRef.current.run({
+            scope,
+            operation,
+            mutate: rejectWorkflowTaskAction,
+            params,
+          })
+          message.success('退回原因已记录')
+          try {
+            await loadWorkflowTasks()
+          } catch {
+            message.warning('操作已成功但列表刷新失败，请手动刷新')
+          }
+          return true
+        } catch (error) {
+          if (isWorkflowTaskMutationResultUnknown(error)) {
+            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+          } else {
+            message.error(getActionErrorMessage(error, '退回任务失败'))
+            await loadWorkflowTasks().catch(() => {})
+          }
+          return false
+        } finally {
+          setTaskActionLoadingID(0)
+        }
+      })
+    },
+    [
+      loadWorkflowTasks,
+      moduleItem?.path,
+      runMutationInFlight,
+      verifyMutationAccess,
+    ]
+  )
+
+  const resumeWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      const scope = `${task.id}:resume`
+      const operation = 'resume'
+      const params = {
+        task_id: task.id,
+        expected_version: task.version,
+        action_key: operation,
+        reason,
+        payload: {
+          entry_path: moduleItem?.path || '',
+          surface_key: 'workflow_business_module',
+        },
+      }
+      return runMutationInFlight(`task:${task.id}`, async () => {
+        const accessVerified = await verifyMutationAccess({
+          task,
+          actionKey: operation,
+          reason,
+          scope,
+          operation,
+          params,
+        })
+        if (!accessVerified) return false
+        setTaskActionLoadingID(getTaskID(task))
+        try {
+          await mutationAttemptsRef.current.run({
+            scope,
+            operation,
+            mutate: resumeWorkflowTaskAction,
+            params,
+          })
+          message.success('任务已解除阻塞')
+          try {
+            await loadWorkflowTasks()
+          } catch {
+            message.warning('操作已成功但列表刷新失败，请手动刷新')
+          }
+          return true
+        } catch (error) {
+          if (isWorkflowTaskMutationResultUnknown(error)) {
+            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+          } else {
+            message.error(getActionErrorMessage(error, '解除任务阻塞失败'))
+            await loadWorkflowTasks().catch(() => {})
+          }
+          return false
+        } finally {
+          setTaskActionLoadingID(0)
+        }
+      })
+    },
+    [
+      loadWorkflowTasks,
+      moduleItem?.path,
+      runMutationInFlight,
+      verifyMutationAccess,
+    ]
+  )
+
+  const urgeWorkflowTaskFromPage = useCallback(
+    async (task, { reason = '' } = {}) => {
+      const scope = `${task.id}:urge`
+      const operation = 'urge'
+      const params = {
+        task_id: task.id,
+        expected_version: task.version,
+        action: 'urge_task',
+        reason,
+        payload: {
+          entry_path: moduleItem?.path || '',
+          surface_key: 'workflow_business_module',
+        },
+      }
+      return runMutationInFlight(`task:${task.id}`, async () => {
+        const accessVerified = await verifyMutationAccess({
+          task,
+          actionKey: operation,
+          reason,
+          scope,
+          operation,
+          params,
+        })
+        if (!accessVerified) return false
+        setUrgingTaskID(getTaskID(task))
+        try {
+          await mutationAttemptsRef.current.run({
+            scope,
+            operation,
+            mutate: urgeWorkflowTask,
+            params,
+          })
+          message.success('催办已记录')
+          try {
+            await loadWorkflowTasks()
+          } catch {
+            message.warning('操作已成功但列表刷新失败，请手动刷新')
+          }
+          return true
+        } catch (error) {
+          if (isWorkflowTaskMutationResultUnknown(error)) {
+            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+          } else {
+            message.error(getActionErrorMessage(error, '催办任务失败'))
+            await loadWorkflowTasks().catch(() => {})
+          }
+          return false
+        } finally {
+          setUrgingTaskID(0)
+        }
+      })
+    },
+    [
+      loadWorkflowTasks,
+      moduleItem?.path,
+      runMutationInFlight,
+      verifyMutationAccess,
+    ]
+  )
+
+  const openTaskReasonModal = useCallback((mode) => {
+    setTaskReasonModal({ approvedQuantity: '', mode, reason: '' })
+  }, [])
+
+  const closeTaskReasonModal = useCallback(() => {
+    setTaskReasonModal(null)
+  }, [])
+
+  const submitTaskReasonAction = useCallback(async () => {
+    if (!selectedTask || !taskReasonModal?.mode) return
+    const reason = String(taskReasonModal.reason || '').trim()
+    if (!reason) {
+      message.warning('请先填写原因')
+      return
+    }
+    const approvedQuantity = String(
+      taskReasonModal.approvedQuantity || ''
+    ).trim()
+    let succeeded = false
+    if (taskReasonModal.mode === 'complete') {
+      let processDecision = null
+      if (taskReasonProcessDecisionRequired) {
+        if (!taskReasonProcessDecisionReady) {
+          message.warning('审批表单与当前流程节点不一致，请关闭后刷新任务再试')
+          return
+        }
+        try {
+          processDecision = buildWorkflowProcessDecision({
+            task: selectedTask,
+            processContext: taskReasonProcessContext,
+            reason,
+            approvedQuantity,
+          })
+        } catch (error) {
+          message.warning(
+            getActionErrorMessage(
+              error,
+              '审批表单与当前流程节点不一致，请刷新后重试'
+            )
+          )
+          return
+        }
+      }
+      succeeded = await completeWorkflowTask(selectedTask, {
+        processDecision,
+        reason,
+      })
+    } else if (taskReasonModal.mode === 'block') {
+      succeeded = await blockWorkflowTask(selectedTask, { reason })
+    } else if (taskReasonModal.mode === 'reject') {
+      succeeded = await rejectWorkflowTask(selectedTask, { reason })
+    } else if (taskReasonModal.mode === 'resume') {
+      succeeded = await resumeWorkflowTask(selectedTask, { reason })
+    } else if (taskReasonModal.mode === 'urge') {
+      succeeded = await urgeWorkflowTaskFromPage(selectedTask, { reason })
+    }
+    if (succeeded) closeTaskReasonModal()
+  }, [
+    blockWorkflowTask,
+    closeTaskReasonModal,
+    completeWorkflowTask,
+    rejectWorkflowTask,
+    resumeWorkflowTask,
+    selectedTask,
+    taskReasonModal,
+    taskReasonProcessContext,
+    taskReasonProcessDecisionReady,
+    taskReasonProcessDecisionRequired,
+    urgeWorkflowTaskFromPage,
+  ])
+
+  const columns = useMemo(
+    () =>
+      applyBusinessColumnSorters([
+        {
+          align: 'left',
+          title: '任务编号',
+          exportTitle: '任务编号',
+          dataIndex: 'task_code',
+          key: 'task_code',
+          copyable: {
+            resolveValue: (_value, record) => getWorkflowTaskCodeLabel(record),
+          },
+          detailCopyable: true,
+          width: 190,
+          fixed: 'left',
+          render: (value, record) => (
+            <Space direction="vertical" size={2}>
+              <strong>{value || getWorkflowTaskCodeLabel(record)}</strong>
+              <span>{record.task_name}</span>
+            </Space>
+          ),
+          exportValue: getWorkflowTaskCodeLabel,
+        },
+        {
+          align: 'left',
+          title: '来源',
+          exportTitle: '来源',
+          dataIndex: 'source_no',
+          key: 'source_no',
+          copyable: {
+            resolveValue: (_value, record) =>
+              resolveReadableWorkflowSourceNo(record, ['source_no']),
+          },
+          detailCopyable: true,
+          width: 170,
+          render: (_, record) => formatWorkflowTaskSource(record),
+          exportValue: formatWorkflowTaskSource,
+        },
+        {
+          title: '状态',
+          exportTitle: '状态',
+          key: 'task_status',
+          width: 120,
+          render: (_, record) => {
+            const statusMeta = getWorkflowTaskStatusMeta(record)
+            return <Tag color={statusMeta.color}>{statusMeta.label}</Tag>
+          },
+          exportValue: (record) => getWorkflowTaskStatusMeta(record).label,
+        },
+        {
+          title: '负责岗位',
+          exportTitle: '负责岗位',
+          key: 'owner_role',
+          width: 160,
+          render: (_, record) => getWorkflowTaskOwnerRoleLabel(record),
+          exportValue: (record) => getWorkflowTaskOwnerRoleLabel(record),
+        },
+        {
+          title: '到期',
+          exportTitle: '到期',
+          dataIndex: 'due_at',
+          key: 'due_at',
+          width: 140,
+          render: (_, record) => getWorkflowTaskDueLabel(record),
+          exportValue: getWorkflowTaskDueLabel,
+        },
+        {
+          align: 'left',
+          title: '原因 / 备注',
+          exportTitle: '原因 / 备注',
+          dataIndex: 'blocked_reason',
+          key: 'reason',
+          width: 340,
+          render: (_, record) =>
+            getWorkflowTaskReason(record) || '按当前任务要求处理',
+          exportValue: (record) => getWorkflowTaskReason(record),
+        },
+      ]),
+    []
+  )
+  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
+    useBusinessColumnOrder({
+      adminProfile,
+      moduleKey,
+      moduleTitle: moduleItem?.title || '页面暂不可用',
+      columns,
+    })
+  const hasActiveFilters = Boolean(
+    keyword.trim() ||
+      status ||
+      ownerRoleKey ||
+      dueFrom ||
+      dueTo ||
+      hasRouteSourceContext
+  )
+  const clearFilters = useCallback(() => {
+    setKeyword('')
+    setStatus('')
+    setOwnerRoleKey('')
+    setDueFrom('')
+    setDueTo('')
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('link_keyword')
+    nextParams.delete('link_source')
+    nextParams.delete('link_fields')
+    nextParams.delete('source_type')
+    nextParams.delete('source_id')
+    setSearchParams(nextParams, { replace: true })
+    resetBusinessPaginationCurrent(setPagination)
+  }, [
+    searchParams,
+    setSearchParams,
+    setKeyword,
+    setStatus,
+    setOwnerRoleKey,
+    setDueFrom,
+    setDueTo,
+    setPagination,
+  ])
+  const handleProductionExceptionRefreshReady = useCallback((refresh) => {
+    productionExceptionRefreshRef.current = refresh
+  }, [])
+
+  if (!moduleItem || !config) {
+    return (
+      <BusinessPageLayout>
+        <Alert
+          type="warning"
+          showIcon
+          message="页面暂不可用"
+          description="请返回工作台或联系管理员。"
+          action={<Button onClick={() => navigate('/erp/dashboard')}>返回工作台</Button>}
+        />
+      </BusinessPageLayout>
+    )
+  }
+
+  const showingProductionExceptionDecisions =
+    isProductionExceptionPage &&
+    effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+
+  const workflowTaskWorkspace = (
+    <>
+      <BusinessOperationPanel
+        compact
+        onClearFilters={clearFilters}
+        clearFiltersDisabled={!hasActiveFilters}
+        filters={
+          <>
+            <SearchInput
+              aria-label="搜索待办任务"
+              placeholder="搜索任务"
+              searchHint="可搜索：任务、来源号、原因"
+              value={keyword}
+              onChange={(event) => {
+                setKeyword(event.target.value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              aria-label="任务状态"
+              value={status}
+              options={TASK_STATUS_OPTIONS}
+              onChange={(value) => {
+                setStatus(value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <SelectFilter
+              aria-label="负责岗位"
+              value={ownerRoleKey}
+              options={[
+                { label: '全部岗位', value: '' },
+                ...config.ownerRoleOptions,
+              ]}
+              onChange={(value) => {
+                setOwnerRoleKey(value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            <DateRangeFilter
+              options={DUE_DATE_FILTER_OPTIONS}
+              value="due_at"
+              startValue={dueFrom}
+              endValue={dueTo}
+              onStartChange={(value) => {
+                setDueFrom(value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+              onEndChange={(value) => {
+                setDueTo(value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+            />
+            {hasRouteSourceContext ? (
+              <Tag
+                closable
+                onClose={(event) => {
+                  event.preventDefault()
+                  const nextParams = new URLSearchParams(searchParams)
+                  nextParams.delete('source_type')
+                  nextParams.delete('source_id')
+                  setSearchParams(nextParams, { replace: true })
+                  resetBusinessPaginationCurrent(setPagination)
+                }}
+              >
+                已按生产订单 #{routeSourceID} 筛选
+              </Tag>
+            ) : null}
+          </>
+        }
+        actions={
+          <BusinessListToolbarActions
+            moduleTitle={moduleItem.title}
+            showExport={false}
+            onOpenColumnOrder={openColumnOrder}
+          />
+        }
+      >
+        <SelectionActionBar
+          embedded
+          selectedCount={selectedTask ? 1 : 0}
+          selectedLabel={selectedTaskLabel}
+          selectedItems={selectedTaskItems}
+          collaborationItems={
+            selectedTaskStatusMeta
+              ? [
+                  {
+                    key: 'status',
+                    label: '状态',
+                    value: selectedTaskStatusMeta.label,
+                    color: selectedTaskStatusMeta.color,
+                  },
+                  {
+                    key: 'owner',
+                    label: '责任',
+                    value: getWorkflowTaskOwnerRoleLabel(selectedTask),
+                  },
+                ]
+              : []
+          }
+          boundaryText={
+            selectedTaskReadonlyReason ||
+            '当前操作只更新任务状态；生产、库存、出货、财务、开票和收付款仍需在对应业务页面完成。'
+          }
+        >
+          <SelectionClearAction
+            selectedCount={selectedTask ? 1 : 0}
+            selectionLabel="任务"
+            onClear={() => setSelectedTaskKeys([])}
+          />
+          <BusinessActionTooltip
+            disabled={!selectedTask}
+            disabledReason="请先选择一条任务"
+          >
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              data-business-action-key="workflow-task-details"
+              disabled={!selectedTask}
+              onClick={() => setDetailTask(selectedTask)}
+            >
+              查看任务
+            </Button>
+          </BusinessActionTooltip>
+          {canCompleteOrApproveWorkflowTasks ? (
+            <BusinessActionTooltip
+              visible={
+                !selectedTask ||
+                (canWorkflowTaskStatusRunAction(selectedTask, 'complete') &&
+                  hasActionPermission(
+                    adminProfile,
+                    getWorkflowTaskActionPermission('complete', selectedTask)
+                  ))
+              }
+              disabled={
+                !canCompleteSelected ||
+                taskActionLoadingID > 0 ||
+                urgingTaskID > 0
+              }
+              disabledReason={workflowActionDisabledReason(
+                'complete',
+                isWorkflowProcessDecisionTask(selectedTask)
+                  ? '审批通过'
+                  : '完成任务'
+              )}
+            >
+              <Button
+                size="small"
+                type="primary"
+                className="erp-business-module-status-action"
+                icon={<CheckCircleOutlined />}
+                data-business-action-key="workflow-task-complete"
+                loading={taskActionLoadingID === selectedTask?.id}
+                disabled={
+                  !canCompleteSelected ||
+                  taskActionLoadingID > 0 ||
+                  urgingTaskID > 0
+                }
+                onClick={() =>
+                  isWorkflowProcessDecisionTask(selectedTask)
+                    ? openTaskReasonModal('complete')
+                    : completeWorkflowTask(selectedTask)
+                }
+              >
+                {isWorkflowProcessDecisionTask(selectedTask)
+                  ? '审批通过'
+                  : '完成任务'}
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canUpdateWorkflowTasks ? (
+            <BusinessActionTooltip
+              visible={
+                !selectedTask ||
+                (canWorkflowTaskStatusRunAction(selectedTask, 'block') &&
+                  hasActionPermission(
+                    adminProfile,
+                    getWorkflowTaskActionPermission('block', selectedTask)
+                  ))
+              }
+              disabled={
+                !canBlockSelected || taskActionLoadingID > 0 || urgingTaskID > 0
+              }
+              disabledReason={workflowActionDisabledReason('block', '标记阻塞')}
+            >
+              <Button
+                size="small"
+                danger
+                className="erp-business-module-status-action"
+                icon={<ExclamationCircleOutlined />}
+                data-business-action-key="workflow-task-block"
+                disabled={
+                  !canBlockSelected ||
+                  taskActionLoadingID > 0 ||
+                  urgingTaskID > 0
+                }
+                onClick={() => openTaskReasonModal('block')}
+              >
+                标记阻塞
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canRejectWorkflowTasks ? (
+            <BusinessActionTooltip
+              visible={
+                !selectedTask ||
+                (canWorkflowTaskStatusRunAction(selectedTask, 'reject') &&
+                  hasActionPermission(
+                    adminProfile,
+                    getWorkflowTaskActionPermission('reject', selectedTask)
+                  ))
+              }
+              disabled={
+                !canRejectSelected ||
+                taskActionLoadingID > 0 ||
+                urgingTaskID > 0
+              }
+              disabledReason={workflowActionDisabledReason(
+                'reject',
+                '退回任务'
+              )}
+            >
+              <Button
+                size="small"
+                danger
+                className="erp-business-module-status-action"
+                icon={<ExclamationCircleOutlined />}
+                data-business-action-key="workflow-task-reject"
+                disabled={
+                  !canRejectSelected ||
+                  taskActionLoadingID > 0 ||
+                  urgingTaskID > 0
+                }
+                onClick={() => openTaskReasonModal('reject')}
+              >
+                退回任务
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canUpdateWorkflowTasks ? (
+            <BusinessActionTooltip
+              visible={
+                !selectedTask ||
+                (canWorkflowTaskStatusRunAction(selectedTask, 'resume') &&
+                  hasActionPermission(
+                    adminProfile,
+                    getWorkflowTaskActionPermission('resume', selectedTask)
+                  ))
+              }
+              disabled={
+                !canResumeSelected ||
+                taskActionLoadingID > 0 ||
+                urgingTaskID > 0
+              }
+              disabledReason={workflowActionDisabledReason(
+                'resume',
+                '解除阻塞'
+              )}
+            >
+              <Button
+                size="small"
+                type="primary"
+                className="erp-business-module-status-action"
+                icon={<RedoOutlined />}
+                data-business-action-key="workflow-task-resume"
+                disabled={
+                  !canResumeSelected ||
+                  taskActionLoadingID > 0 ||
+                  urgingTaskID > 0
+                }
+                onClick={() => openTaskReasonModal('resume')}
+              >
+                解除阻塞
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          {canUpdateWorkflowTasks ? (
+            <BusinessActionTooltip
+              visible={
+                !selectedTask ||
+                (canWorkflowTaskStatusRunAction(selectedTask, 'urge') &&
+                  hasActionPermission(
+                    adminProfile,
+                    getWorkflowTaskActionPermission('urge', selectedTask)
+                  ))
+              }
+              disabled={
+                !canUrgeSelected || taskActionLoadingID > 0 || urgingTaskID > 0
+              }
+              disabledReason={workflowActionDisabledReason('urge', '催办')}
+            >
+              <Button
+                size="small"
+                icon={<SendOutlined />}
+                data-business-action-key="workflow-task-urge"
+                loading={urgingTaskID === selectedTask?.id}
+                disabled={
+                  !canUrgeSelected ||
+                  taskActionLoadingID > 0 ||
+                  urgingTaskID > 0
+                }
+                onClick={() => openTaskReasonModal('urge')}
+              >
+                催办
+              </Button>
+            </BusinessActionTooltip>
+          ) : null}
+          <BusinessAttachmentModalButton
+            ownerType="workflow_task"
+            ownerId={selectedTask?.id}
+            ownerVersion={selectedTask?.version}
+            modalTitle="任务附件"
+            panelTitle="任务附件"
+            description="上传现场照片、异常截图或任务处理证据；附件不代表任务已完成，也不会改变相关业务记录。"
+            canUpload={canUpdateWorkflowTasks}
+            canWithdraw={canUpdateWorkflowTasks}
+            disabled={!selectedTask}
+            disabledReason="请先选择一条任务"
+            buttonProps={{
+              'data-business-action-key': 'workflow-task-attachments',
+            }}
+          />
+        </SelectionActionBar>
+      </BusinessOperationPanel>
+
+      <BusinessDataTable
+        rowKey="id"
+        loading={loading}
+        columns={tableColumns}
+        dataSource={tasks}
+        scroll={{ x: 1000 }}
+        emptyDescription={
+          canReadWorkflowTasks ? config.emptyText : '当前账号不能查看此类任务。'
+        }
+        rowSelection={{
+          type: 'radio',
+          selectedRowKeys: selectedTaskKeys,
+          onChange: (nextKeys) => setSelectedTaskKeys(nextKeys.slice(-1)),
+        }}
+        rowClassName={(record) =>
+          selectedTaskKeys.includes(record.id) ? 'ant-table-row-selected' : ''
+        }
+        onRow={(record) => ({
+          onClick: () => setSelectedTaskKeys([record.id]),
+        })}
+        onOpenRecord={(record) => {
+          setSelectedTaskKeys([record.id])
+          setDetailTask(record)
+        }}
+        pagination={createBusinessTablePagination({
+          pagination,
+          total,
+          onChange: (current, pageSize) => {
+            setSelectedTaskKeys([])
+            setDetailTask(null)
+            setPagination({ current, pageSize })
+          },
+        })}
+      />
+      {columnOrderModal}
+
+      <BusinessDetailsModal
+        columns={visibleColumns}
+        description="查看任务来源、责任、到期和当前原因；完成、阻塞、退回和催办仍从当前操作区办理。"
+        open={Boolean(detailTask)}
+        record={detailTask}
+        title={`${moduleItem.title}任务详情`}
+        onClose={() => setDetailTask(null)}
+      />
+
+      <BusinessModal
+        className="erp-business-action-modal"
+        size="confirm"
+        title={businessActionModalTitle(
+          taskReasonModal?.mode === 'block'
+            ? '标记阻塞'
+            : taskReasonModal?.mode === 'complete'
+              ? '审批通过'
+              : taskReasonModal?.mode === 'reject'
+                ? '退回任务'
+                : taskReasonModal?.mode === 'resume'
+                  ? '解除阻塞'
+                  : '催办任务',
+          selectedTaskLabel
+        )}
+        open={Boolean(taskReasonModal)}
+        onCancel={closeTaskReasonModal}
+        onOk={submitTaskReasonAction}
+        okButtonProps={{
+          disabled:
+            !taskReasonProcessDecisionReady ||
+            Boolean(taskReasonApprovedQuantityError),
+        }}
+        okText={
+          taskReasonModal?.mode === 'block'
+            ? '确认阻塞'
+            : taskReasonModal?.mode === 'complete'
+              ? '确认通过'
+              : taskReasonModal?.mode === 'reject'
+                ? '确认退回'
+                : taskReasonModal?.mode === 'resume'
+                  ? '确认恢复'
+                  : '确认催办'
+        }
+        confirmLoading={taskActionLoadingID > 0 || urgingTaskID > 0}
+        maskClosable={taskActionLoadingID <= 0 && urgingTaskID <= 0}
+        destroyOnHidden
+      >
+        {taskReasonProcessDecisionRequired &&
+        taskReasonProcessContextState === 'loading' ? (
+          <Alert
+            type="info"
+            showIcon
+            message="正在核对当前流程的审批表单"
+            description="核对完成前不会提交审批决策。"
+            style={{ marginBottom: 16 }}
+          />
+        ) : null}
+        {taskReasonProcessDecisionRequired &&
+        taskReasonProcessContextState !== 'loading' &&
+        !taskReasonProcessApprovalForm ? (
+          <Alert
+            type="error"
+            showIcon
+            message="审批表单与当前流程节点不一致"
+            description="请关闭后刷新任务再试；系统不会按任务名称或页面入口猜测审批字段。"
+            style={{ marginBottom: 16 }}
+          />
+        ) : null}
+        <Input.TextArea
+          rows={4}
+          maxLength={240}
+          showCount
+          autoFocus
+          placeholder={
+            taskReasonModal?.mode === 'block'
+              ? '填写阻塞原因；提交后只更新当前任务状态。'
+              : taskReasonModal?.mode === 'complete'
+                ? '填写审批意见和判断依据；审批不会直接写入业务事实。'
+                : taskReasonModal?.mode === 'reject'
+                  ? '填写退回原因；提交后只更新当前任务状态。'
+                  : taskReasonModal?.mode === 'resume'
+                    ? '填写阻塞解除说明；任务将恢复为可执行。'
+                    : '填写催办原因；只保存本次催办记录。'
+          }
+          value={taskReasonModal?.reason || ''}
+          onChange={(event) =>
+            setTaskReasonModal((current) =>
+              current ? { ...current, reason: event.target.value } : current
+            )
+          }
+        />
+        {taskReasonApprovedQuantityAllowed ? (
+          <>
+            <Input
+              style={{ marginTop: 16 }}
+              inputMode="decimal"
+              status={taskReasonApprovedQuantityError ? 'error' : undefined}
+              placeholder="批准数量（可选；留空表示按申请数量批准）"
+              value={taskReasonModal?.approvedQuantity || ''}
+              onChange={(event) =>
+                setTaskReasonModal((current) =>
+                  current
+                    ? { ...current, approvedQuantity: event.target.value }
+                    : current
+                )
+              }
+            />
+            {taskReasonApprovedQuantityError ? (
+              <Alert
+                type="error"
+                showIcon
+                message={taskReasonApprovedQuantityError}
+                style={{ marginTop: 8 }}
+              />
+            ) : null}
+          </>
+        ) : null}
+      </BusinessModal>
+    </>
+  )
+
+  const LayoutRoot = productionRecordsWorkspace
+    ? React.Fragment
+    : BusinessPageLayout
+  const layoutProps = productionRecordsWorkspace
+    ? {}
+    : { className: 'erp-workflow-business-page' }
+
+  return (
+    <LayoutRoot {...layoutProps}>
+      {productionRecordsWorkspace ? null : (
+        <PageHeaderCard
+          title={isProductionExceptionPage ? '生产记录' : moduleItem.title}
+          helpKey={moduleKey}
+          stats={headerStats}
+          compact
+        />
+      )}
+
+      {isProductionExceptionPage ? (
+        productionExceptionTabKeys.length > 0 ? (
+          showingProductionExceptionDecisions ? (
+            <ProductionExceptionDecisionPanel
+              adminProfile={adminProfile}
+              onRefreshReady={handleProductionExceptionRefreshReady}
+              onSummaryChange={setProductionExceptionSummary}
+            />
+          ) : (
+            <BusinessPageLayout className="erp-workflow-business-page__tab-workspace">
+              {workflowTaskWorkspace}
+            </BusinessPageLayout>
+          )
+        ) : (
+          <Alert
+            type="warning"
+            showIcon
+            message="当前账号不能查看异常处理申请或待审批任务。"
+          />
+        )
+      ) : (
+        workflowTaskWorkspace
+      )}
+    </LayoutRoot>
+  )
+}
