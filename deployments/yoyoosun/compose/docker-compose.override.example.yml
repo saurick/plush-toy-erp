@@ -1,0 +1,14 @@
+# 仅作客户环境覆盖样例。真实 override 必须放受控部署目录，不要把带真实路径或 secret 的文件提交到 Git。
+services:
+  app-server:
+    environment:
+      ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-4}"
+      ERP_PDF_QUEUE_CAPACITY: "${ERP_PDF_QUEUE_CAPACITY:-2}"
+
+  postgres:
+    volumes:
+      - "${POSTGRES_DATA_DIR:-/data/plush-toy-erp-yoyoosun/postgres}:/var/lib/postgresql"
+
+  web-desktop:
+    environment:
+      PROXY_TIMEOUT_MS: "${WEB_PROXY_TIMEOUT_MS:-30000}"
