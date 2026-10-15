@@ -1,0 +1,217 @@
+/* DEV 页面与业务桌面共用主题；这里只统一工作台的页面几何与阅读密度。 */
+.erp-dev-workspace-page {
+  min-height: 100vh;
+  padding: 0 16px 16px 0;
+  background: var(--erp-page-bg);
+  color: var(--erp-text);
+  font-size: 14px;
+}
+
+.erp-dev-workspace-page > :not(.erp-dev-workspace-nav) {
+  min-width: 0;
+  max-width: none;
+  margin-inline: 0;
+}
+
+.erp-dev-workspace-page > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  width: calc(100% + 28px);
+  margin: 0 0 0 -12px;
+  padding: 8px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--erp-border);
+  border-radius: 0;
+  background: var(--erp-surface-bg);
+  box-shadow: none;
+}
+
+.erp-dev-workspace-page > header h1.ant-typography {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.erp-dev-workspace-page > header [class$='header__icon'] {
+  font-size: 18px;
+}
+
+.erp-dev-workspace-page > header [class$='header__copy'] {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.erp-dev-workspace-page > header > .ant-space-vertical {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+.erp-dev-workspace-page > header h1 {
+  white-space: nowrap;
+}
+
+.erp-dev-workspace-nav__brand {
+  min-height: 52px;
+  height: 52px;
+  gap: 8px;
+  padding: 0 14px;
+}
+
+.erp-dev-workspace-nav__brand-mark {
+  width: 26px;
+  height: 26px;
+  flex-basis: 26px;
+  border-radius: 6px;
+}
+
+.erp-dev-workspace-nav__routes {
+  gap: 10px;
+  padding: 10px 8px;
+}
+
+.erp-dev-workspace-nav__route {
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.erp-dev-workspace-nav__route span {
+  font-weight: 600;
+}
+
+.erp-dev-workspace-nav__secondary-route {
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.erp-dev-workspace-nav__secondary-route:hover,
+.erp-dev-workspace-nav__route:hover {
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-dev-workspace-nav :is(a, button):focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: -2px;
+}
+
+.erp-dev-workspace-nav__actions {
+  gap: 4px;
+  padding: 8px;
+}
+
+.erp-dev-workspace-nav__actions .ant-btn {
+  height: 30px;
+  box-shadow: none;
+  font-size: 12px;
+}
+
+.erp-dev-workspace-page :is(.erp-dev-hub-shell, .erp-dev-testing-shell) {
+  box-shadow: none;
+}
+
+.erp-dev-workspace-page
+  :is(.erp-dev-testing-validation, .erp-dev-testing-validation-plan) {
+  border-color: var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+  box-shadow: none;
+}
+
+.erp-dev-workspace-page .erp-dev-testing-validation-plan {
+  padding: 12px;
+}
+
+.erp-dev-static-guidance {
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-static-guidance > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.erp-dev-static-guidance > summary small {
+  color: var(--erp-text-muted);
+  font-weight: 400;
+}
+
+.erp-dev-static-guidance__content {
+  margin: 0;
+  border-top: 1px solid var(--erp-border);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.erp-dev-docs-shell {
+  gap: 12px;
+  height: calc(100vh - 80px);
+}
+
+.erp-dev-workspace-page
+  :is(
+    .erp-dev-version-summary,
+    .erp-dev-database-migration-summary,
+    .erp-dev-data-preflight
+  ) {
+  gap: 12px;
+}
+
+.erp-dev-workspace-page .ant-card-head {
+  min-height: 42px;
+  padding-inline: 14px;
+  font-size: 14px;
+}
+
+.erp-dev-workspace-page .ant-card-body {
+  padding: 14px;
+}
+
+@media (max-width: 980px) {
+  .erp-dev-workspace-page {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 8px;
+  }
+  .erp-dev-workspace-page > :not(.erp-dev-workspace-nav) {
+    grid-column: 1;
+  }
+  .erp-dev-workspace-nav {
+    position: relative;
+    width: 100%;
+    height: auto;
+    max-height: 320px;
+  }
+  .erp-dev-workspace-nav__routes {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(150px, 1fr));
+    overflow: auto;
+  }
+  .erp-dev-workspace-nav__actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .erp-dev-workspace-nav__actions .ant-btn {
+    width: auto;
+  }
+  .erp-dev-workspace-page > header {
+    width: 100%;
+    margin: 0;
+    flex-wrap: wrap;
+  }
+  .erp-dev-docs-shell {
+    height: auto;
+  }
+}
