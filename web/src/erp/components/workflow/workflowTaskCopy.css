@@ -1,0 +1,101 @@
+.erp-task-copy-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  vertical-align: middle;
+}
+
+.erp-task-copy-field__value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-copy.ant-btn {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border-radius: 6px;
+  color: var(--erp-text-muted, #64748b);
+  vertical-align: middle;
+}
+
+.erp-task-copy.ant-btn:hover {
+  color: var(--erp-primary, #237234);
+  background: var(--erp-primary-soft, #eaf4ed);
+}
+
+.erp-task-copy--label.ant-btn {
+  width: auto;
+  padding-inline: 8px;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.erp-task-copy.ant-btn:focus-visible {
+  outline: 2px solid var(--erp-primary, #237234);
+  outline-offset: 2px;
+}
+
+.erp-task-copy-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-task-copy-heading > :first-child {
+  flex: 1 1 180px;
+  min-width: 0;
+  margin: 0;
+}
+
+.erp-task-card {
+  position: relative;
+  isolation: isolate;
+}
+
+.erp-task-card__open {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: inherit;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.erp-task-card__open:focus-visible {
+  outline: 2px solid var(--erp-primary, #237234);
+  outline-offset: 2px;
+}
+
+.erp-task-card__content {
+  position: relative;
+  display: grid;
+  gap: inherit;
+  min-width: 0;
+  pointer-events: none;
+}
+
+.erp-task-card__content .erp-task-copy {
+  pointer-events: auto;
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .erp-task-copy.ant-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .erp-task-copy--label.ant-btn {
+    width: auto;
+    font-size: 13px;
+  }
+}
