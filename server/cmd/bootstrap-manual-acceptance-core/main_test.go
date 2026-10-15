@@ -1,0 +1,546 @@
+package main
+
+import (
+	"context"
+	"database/sql/driver"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"server/internal/customertrialconfig"
+	"server/internal/data"
+
+	"github.com/DATA-DOG/go-sqlmock"
+)
+
+const (
+	testMigration   = "20260716123456"
+	testRelease     = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	trialDSN        = "postgres://postgres:runtime-password@postgres:5432/plush_erp_demo_v1?sslmode=disable"
+	customerTestDSN = "postgres://postgres:runtime-password@postgres:5432/plush_erp_customer_test_v1?sslmode=disable"
+)
+
+func validOptions() options {
+	opts := options{
+		target:                   customertrialconfig.ExpectedTarget,
+		expectedDatabase:         manualAcceptanceContract.CustomerTrial133.DatabaseName,
+		expectedMigrationVersion: testMigration,
+		expectedRelease:          testRelease,
+		timeout:                  30 * time.Second,
+	}
+	confirmation, err := expectedConfirmation(opts)
+	if err != nil {
+		panic(err)
+	}
+	opts.confirm = confirmation
+	return opts
+}
+
+func validCustomerTestOptions() options {
+	opts := options{
+		target:                   customerTestTarget,
+		expectedDatabase:         customerTestDatabase,
+		expectedMigrationVersion: testMigration,
+		expectedRelease:          testRelease,
+		timeout:                  30 * time.Second,
+	}
+	confirmation, err := expectedConfirmation(opts)
+	if err != nil {
+		panic(err)
+	}
+	opts.confirm = confirmation
+	return opts
+}
+
+func enabledTrialEnv(key string) string {
+	switch key {
+	case customertrialconfig.AllowEnv:
+		return "1"
+	case customertrialconfig.TargetEnv:
+		return customertrialconfig.ExpectedTarget
+	case customertrialconfig.DebugEnv:
+		return "prod"
+	default:
+		return ""
+	}
+}
+
+func customerTestEnv(key string) string {
+	if key == customertrialconfig.DebugEnv {
+		return "prod"
+	}
+	return ""
+}
+
+func exactTrialSnapshot(t *testing.T) []byte {
+	t.Helper()
+	raw, err := json.Marshal(map[string]any{
+		"applyPurpose":   customertrialconfig.ApplyPurpose,
+		"datasetVersion": customertrialconfig.DatasetVersion,
+		"target":         customertrialconfig.ExpectedTarget,
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	return raw
+}
+
+func exactCustomerTestSnapshot(t *testing.T) []byte {
+	t.Helper()
+	raw, err := json.Marshal(map[string]any{
+		"customerKey": customertrialconfig.ExpectedCustomerKey,
+		"pages":       []any{"sales-orders"},
+	})
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	return raw
+}
+
+func TestValidateInvocationRequiresEveryExactBoundaryBeforeDatabaseAccess(t *testing.T) {
+	if err := validateInvocation(validOptions(), trialDSN, enabledTrialEnv, testRelease); err != nil {
+		t.Fatalf("validateInvocation() exact input error = %v", err)
+	}
+
+	tests := []struct {
+		name            string
+		mutate          func(*options)
+		dsn             string
+		getenv          func(string) string
+		compiledVersion string
+	}{
+		{name: "wrong database", mutate: func(opts *options) { opts.expectedDatabase = "plush_erp" }, dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "wrong migration", mutate: func(opts *options) { opts.expectedMigrationVersion = "latest" }, dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "wrong release", mutate: func(opts *options) { opts.expectedRelease = strings.Repeat("A", 40) }, dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "wrong confirmation", mutate: func(opts *options) { opts.confirm = "yes" }, dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "timeout too long", mutate: func(opts *options) { opts.timeout = 2 * time.Minute }, dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "missing dsn", dsn: "", getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "dsn whitespace", dsn: " " + trialDSN, getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "gate disabled", dsn: trialDSN, getenv: func(string) string { return "" }, compiledVersion: testRelease},
+		{name: "wrong gate database", dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable", getenv: enabledTrialEnv, compiledVersion: testRelease},
+		{name: "compiled release mismatch", dsn: trialDSN, getenv: enabledTrialEnv, compiledVersion: strings.Repeat("b", 40)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := validOptions()
+			if tt.mutate != nil {
+				tt.mutate(&opts)
+			}
+			if err := validateInvocation(opts, tt.dsn, tt.getenv, tt.compiledVersion); err == nil {
+				t.Fatal("validateInvocation() unexpectedly accepted an incomplete or mismatched boundary")
+			} else if strings.Contains(err.Error(), "runtime-password") {
+				t.Fatalf("validation error leaked DSN credentials: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateInvocationAcceptsOnlyTheRegisteredCustomerTestRuntime(t *testing.T) {
+	opts := validCustomerTestOptions()
+	if err := validateInvocation(opts, customerTestDSN, customerTestEnv, testRelease); err != nil {
+		t.Fatalf("validateInvocation() customer test input error = %v", err)
+	}
+	for name, candidate := range map[string]struct {
+		dsn    string
+		getenv func(string) string
+	}{
+		"trial database": {dsn: trialDSN, getenv: customerTestEnv},
+		"extra query":    {dsn: customerTestDSN + "&application_name=seed", getenv: customerTestEnv},
+		"trial gate":     {dsn: customerTestDSN, getenv: enabledTrialEnv},
+		"non prod":       {dsn: customerTestDSN, getenv: func(string) string { return "" }},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := validateInvocation(opts, candidate.dsn, candidate.getenv, testRelease); err == nil {
+				t.Fatal("validateInvocation() unexpectedly accepted a mismatched customer test runtime")
+			} else if strings.Contains(err.Error(), "runtime-password") {
+				t.Fatalf("validation error leaked DSN credentials: %v", err)
+			}
+		})
+	}
+}
+
+func TestExpectedConfirmationBindsFixedDatasetAndRun(t *testing.T) {
+	confirmation, err := expectedConfirmation(validOptions())
+	if err != nil {
+		t.Fatalf("expectedConfirmation() error = %v", err)
+	}
+	for _, required := range []string{
+		customertrialconfig.ExpectedTarget,
+		customertrialconfig.ExpectedCustomerKey,
+		manualAcceptanceContract.CustomerTrial133.DatabaseName,
+		manualAcceptanceContract.DatasetKey,
+		customertrialconfig.DatasetVersion,
+		manualAcceptanceContract.RunID,
+		testMigration,
+		testRelease,
+	} {
+		if !strings.Contains(confirmation, required) {
+			t.Fatalf("confirmation %q does not bind %q", confirmation, required)
+		}
+	}
+	customerTestConfirmation, err := expectedConfirmation(validCustomerTestOptions())
+	if err != nil {
+		t.Fatalf("expectedConfirmation(customer-test) error = %v", err)
+	}
+	for _, required := range []string{
+		"BOOTSTRAP_CUSTOMER_TEST_CORE",
+		customerTestTarget,
+		customerTestDatabase,
+		customerTestFoundationKey,
+		manualAcceptanceContract.DataVersion,
+		manualAcceptanceContract.RunID,
+		testMigration,
+		testRelease,
+	} {
+		if !strings.Contains(customerTestConfirmation, required) {
+			t.Fatalf("customer test confirmation %q does not bind %q", customerTestConfirmation, required)
+		}
+	}
+}
+
+func TestDockerfileBuildsAndCopiesOneShotBinaryWithReleaseVersion(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "Dockerfile"))
+	if err != nil {
+		t.Fatalf("os.ReadFile(Dockerfile) error = %v", err)
+	}
+	source := string(raw)
+	for _, required := range []string{
+		`-ldflags "-s -w -X main.Version=${GIT_SHA}" \
+      -o ./bin/bootstrap-manual-acceptance-core ./cmd/bootstrap-manual-acceptance-core`,
+		`COPY --from=go-builder /src/bin/bootstrap-manual-acceptance-core /app/bootstrap-manual-acceptance-core`,
+	} {
+		if !strings.Contains(source, required) {
+			t.Fatalf("Dockerfile is missing one-shot binary contract %q", required)
+		}
+	}
+}
+
+func TestCoreReferencesUseCanonicalUnitsAndReservedWarehouseNamespace(t *testing.T) {
+	dataset := data.DefaultCoreDemoReferenceSeedDataset()
+	if err := validateReferenceDataset(dataset); err != nil {
+		t.Fatalf("validateReferenceDataset() error = %v", err)
+	}
+	warehousePattern, err := coreCodeNamespacePattern(dataset.Warehouses[0].Code)
+	if err != nil {
+		t.Fatalf("coreCodeNamespacePattern(warehouse) error = %v", err)
+	}
+	if warehousePattern != dataset.Prefix+"-CK-%" {
+		t.Fatalf("unexpected reference warehouse namespace %q", warehousePattern)
+	}
+	for _, mutate := range []func(*data.CoreDemoReferenceSeedDataset){
+		func(value *data.CoreDemoReferenceSeedDataset) { value.Units[0].Code = value.Prefix + "-DW-001" },
+		func(value *data.CoreDemoReferenceSeedDataset) { value.Units[0].Precision++ },
+		func(value *data.CoreDemoReferenceSeedDataset) { value.Units[0].Name = "米" },
+		func(value *data.CoreDemoReferenceSeedDataset) { value.Units[0] = value.Units[1] },
+	} {
+		invalid := data.DefaultCoreDemoReferenceSeedDataset()
+		mutate(&invalid)
+		if err := validateReferenceDataset(invalid); !errors.Is(err, errCoreBoundaryViolation) {
+			t.Fatalf("expected changed canonical unit to fail, got %v", err)
+		}
+	}
+	if _, err := coreCodeNamespacePattern("invalid"); !errors.Is(err, errCoreBoundaryViolation) {
+		t.Fatalf("expected invalid namespace error, got %v", err)
+	}
+	invalid := dataset
+	invalid.Warehouses = invalid.Warehouses[:3]
+	if err := validateReferenceDataset(invalid); !errors.Is(err, errCoreBoundaryViolation) {
+		t.Fatalf("expected invalid default dataset shape, got %v", err)
+	}
+}
+
+func expectDatabasePreflight(
+	t *testing.T,
+	mock sqlmock.Sqlmock,
+	opts options,
+	migration string,
+	snapshot []byte,
+	activeCount int64,
+) {
+	t.Helper()
+	policy, err := resolveTargetPolicy(opts.target)
+	if err != nil {
+		t.Fatalf("resolveTargetPolicy() error = %v", err)
+	}
+	revision := "yoyoosun-customer-trial-133.0123456789abcdef01234567"
+	productVersion := customertrialconfig.ProductVersion
+	if policy.target == customerTestTarget {
+		revision = "yoyoosun-customer-package-v7.runtime-manifest-v1"
+		productVersion = "local-customer-package"
+	}
+	mock.ExpectQuery(`SELECT current_database\(\)`).
+		WillReturnRows(sqlmock.NewRows([]string{"current_database"}).AddRow(policy.database))
+	mock.ExpectQuery(`SELECT CASE WHEN`).
+		WillReturnRows(sqlmock.NewRows([]string{"schema_status"}).AddRow("ready"))
+	mock.ExpectQuery(`SELECT version[\s\S]+FROM atlas_schema_revisions\.atlas_schema_revisions`).
+		WillReturnRows(sqlmock.NewRows([]string{"version"}).AddRow(migration))
+	if migration != opts.expectedMigrationVersion {
+		return
+	}
+	mock.ExpectQuery(`SELECT revision, product_version, compiled_snapshot, COUNT\(\*\) OVER \(\)`).
+		WithArgs(policy.customerKey).
+		WillReturnRows(sqlmock.NewRows([]string{"revision", "product_version", "compiled_snapshot", "active_count"}).AddRow(
+			revision,
+			productVersion,
+			snapshot,
+			activeCount,
+		))
+}
+
+func boundaryValues(dataset data.CoreDemoReferenceSeedDataset) []driver.Value {
+	unitPattern := dataset.Prefix + "-DW-%"
+	warehousePattern, _ := coreCodeNamespacePattern(dataset.Warehouses[0].Code)
+	values := []driver.Value{
+		unitPattern,
+		warehousePattern,
+	}
+	for _, unit := range dataset.Units {
+		values = append(values, unit.Code, unit.Name, unit.Precision)
+	}
+	for _, warehouse := range dataset.Warehouses {
+		values = append(values, warehouse.Code, warehouse.Name, warehouse.Type)
+	}
+	return values
+}
+
+func expectBoundary(mock sqlmock.Sqlmock, dataset data.CoreDemoReferenceSeedDataset, boundary coreBoundary) {
+	mock.ExpectQuery(`manual-acceptance-core-boundary[\s\S]+FROM units WHERE code IN \([^)]+\) OR code LIKE \$1 OR code LIKE \$2`).
+		WithArgs(boundaryValues(dataset)...).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"unit_total",
+			"unit_exact",
+			"warehouse_total",
+			"warehouse_exact",
+			"material_count",
+			"product_count",
+			"process_count",
+			"bom_header_count",
+		}).AddRow(
+			boundary.unitTotal,
+			boundary.unitExact,
+			boundary.warehouseTotal,
+			boundary.warehouseExact,
+			boundary.materialCount,
+			boundary.productCount,
+			boundary.processCount,
+			boundary.bomHeaderCount,
+		))
+}
+
+func expectReferenceUpserts(mock sqlmock.Sqlmock, dataset data.CoreDemoReferenceSeedDataset, retireLegacy bool) {
+	for index, unit := range dataset.Units {
+		mock.ExpectQuery(`INSERT INTO units`).
+			WithArgs(unit.Code, unit.Name, unit.Precision).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11 + index))
+	}
+	for index, warehouse := range dataset.Warehouses {
+		mock.ExpectQuery(`INSERT INTO warehouses`).
+			WithArgs(warehouse.Code, warehouse.Name, warehouse.Type).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(21 + index))
+	}
+	if !retireLegacy {
+		return
+	}
+	for _, legacy := range data.LegacyCoreDemoReferenceSeedDatasets() {
+		for _, unit := range legacy.Units {
+			mock.ExpectQuery(`SELECT id, name, precision, is_active`).
+				WithArgs(unit.Code).
+				WillReturnRows(sqlmock.NewRows([]string{"id", "name", "precision", "is_active"}))
+		}
+		for _, warehouse := range legacy.Warehouses {
+			mock.ExpectQuery(`SELECT id, name, type, is_active`).
+				WithArgs(warehouse.Code).
+				WillReturnRows(sqlmock.NewRows([]string{"id", "name", "type", "is_active"}))
+		}
+	}
+}
+
+func TestBootstrapManualAcceptanceCoreRejectsMigrationBeforeWrite(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	opts := validOptions()
+	expectDatabasePreflight(t, mock, opts, "20260715000000", exactTrialSnapshot(t), 1)
+	mock.ExpectClose()
+
+	if _, err := bootstrapManualAcceptanceCore(context.Background(), db, opts); err == nil || !strings.Contains(err.Error(), "atlas migration") {
+		t.Fatalf("expected migration mismatch before write, got %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestBootstrapManualAcceptanceCoreRejectsActiveConfigBeforeWrite(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	opts := validOptions()
+	snapshot := exactTrialSnapshot(t)
+	var decoded map[string]any
+	if err := json.Unmarshal(snapshot, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	decoded["datasetVersion"] = "2026.07.15-v3"
+	snapshot, err = json.Marshal(decoded)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	expectDatabasePreflight(t, mock, opts, opts.expectedMigrationVersion, snapshot, 1)
+	mock.ExpectClose()
+
+	if _, err := bootstrapManualAcceptanceCore(context.Background(), db, opts); err == nil || !strings.Contains(err.Error(), "configuration is invalid") {
+		t.Fatalf("expected active config mismatch before write, got %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestBootstrapManualAcceptanceCoreRejectsPollutedNamespaceBeforeWrite(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	opts := validOptions()
+	dataset := data.DefaultCoreDemoReferenceSeedDataset()
+	expectDatabasePreflight(t, mock, opts, opts.expectedMigrationVersion, exactTrialSnapshot(t), 1)
+	mock.ExpectBegin()
+	expectBoundary(mock, dataset, coreBoundary{materialCount: 1})
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	if _, err := bootstrapManualAcceptanceCore(context.Background(), db, opts); !errors.Is(err, errCoreBoundaryViolation) {
+		t.Fatalf("expected polluted namespace rejection before write, got %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestBootstrapManualAcceptanceCoreRollsBackFailedExactReadback(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	opts := validOptions()
+	dataset := data.DefaultCoreDemoReferenceSeedDataset()
+	expectDatabasePreflight(t, mock, opts, opts.expectedMigrationVersion, exactTrialSnapshot(t), 1)
+	mock.ExpectBegin()
+	expectBoundary(mock, dataset, coreBoundary{})
+	expectReferenceUpserts(mock, dataset, true)
+	expectBoundary(mock, dataset, coreBoundary{unitTotal: int64(len(dataset.Units)), unitExact: int64(len(dataset.Units)), warehouseTotal: 3, warehouseExact: 3})
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	if _, err := bootstrapManualAcceptanceCore(context.Background(), db, opts); !errors.Is(err, errCoreBoundaryViolation) {
+		t.Fatalf("expected failed exact readback rollback, got %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestBootstrapManualAcceptanceCoreIsIdempotentWithExactReadback(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	opts := validOptions()
+	dataset := data.DefaultCoreDemoReferenceSeedDataset()
+	exact := coreBoundary{unitTotal: int64(len(dataset.Units)), unitExact: int64(len(dataset.Units)), warehouseTotal: 4, warehouseExact: 4}
+	for run := 0; run < 2; run++ {
+		expectDatabasePreflight(t, mock, opts, opts.expectedMigrationVersion, exactTrialSnapshot(t), 1)
+		mock.ExpectBegin()
+		if run == 0 {
+			expectBoundary(mock, dataset, coreBoundary{})
+		} else {
+			expectBoundary(mock, dataset, exact)
+		}
+		expectReferenceUpserts(mock, dataset, true)
+		expectBoundary(mock, dataset, exact)
+		mock.ExpectCommit()
+	}
+	mock.ExpectClose()
+
+	for run := 0; run < 2; run++ {
+		result, err := bootstrapManualAcceptanceCore(context.Background(), db, opts)
+		if err != nil {
+			t.Fatalf("bootstrapManualAcceptanceCore() run %d error = %v", run+1, err)
+		}
+		if len(result.unitIDs) != len(dataset.Units) || len(result.warehouseIDs) != 4 {
+			t.Fatalf("unexpected run %d result: %#v", run+1, result)
+		}
+		if result.unitIDs[dataset.Units[0].Code] != 11 {
+			t.Fatalf("run %d did not return the exact unit id: %#v", run+1, result.unitIDs)
+		}
+		for index, warehouse := range dataset.Warehouses {
+			if result.warehouseIDs[warehouse.Code] != 21+index {
+				t.Fatalf("run %d did not return exact warehouse ids: %#v", run+1, result.warehouseIDs)
+			}
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestBootstrapCustomerTestCorePreservesExistingReferences(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	opts := validCustomerTestOptions()
+	dataset := data.DefaultCoreDemoReferenceSeedDataset()
+	exact := coreBoundary{
+		unitTotal:      int64(len(dataset.Units)),
+		unitExact:      int64(len(dataset.Units)),
+		warehouseTotal: int64(len(dataset.Warehouses)),
+		warehouseExact: int64(len(dataset.Warehouses)),
+	}
+	expectDatabasePreflight(t, mock, opts, opts.expectedMigrationVersion, exactCustomerTestSnapshot(t), 1)
+	mock.ExpectBegin()
+	expectBoundary(mock, dataset, coreBoundary{})
+	expectReferenceUpserts(mock, dataset, false)
+	expectBoundary(mock, dataset, exact)
+	mock.ExpectCommit()
+	mock.ExpectClose()
+
+	result, err := bootstrapManualAcceptanceCore(context.Background(), db, opts)
+	if err != nil {
+		t.Fatalf("bootstrapManualAcceptanceCore(customer-test) error = %v", err)
+	}
+	if len(result.unitIDs) != len(dataset.Units) || len(result.warehouseIDs) != len(dataset.Warehouses) {
+		t.Fatalf("unexpected customer test result: %#v", result)
+	}
+	if len(result.retiredUnitIDs) != 0 || len(result.retiredWarehouseIDs) != 0 {
+		t.Fatalf("customer test bootstrap retired existing references: %#v", result)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
