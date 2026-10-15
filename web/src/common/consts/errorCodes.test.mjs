@@ -1,0 +1,118 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  RpcErrorCode,
+  ADMIN_SESSION_UNAVAILABLE_ERROR_CODES,
+  AUTH_FAILURE_ERROR_CODES,
+  isAdminSessionUnavailableCode,
+  isAuthFailureCode,
+  DEFAULT_RPC_ERROR_MESSAGES,
+} from './errorCodes.js'
+
+test('errorCodes: 所有错误码保持唯一', () => {
+  const values = Object.values(RpcErrorCode)
+  assert.equal(new Set(values).size, values.length)
+})
+
+test('errorCodes: 仅登录态失效错误触发重新登录', () => {
+  assert.deepEqual(
+    [...AUTH_FAILURE_ERROR_CODES],
+    [
+      RpcErrorCode.AUTH_EXPIRED,
+      RpcErrorCode.AUTH_INVALID,
+      RpcErrorCode.AUTH_REQUIRED,
+    ]
+  )
+  assert.equal(isAuthFailureCode(RpcErrorCode.AUTH_REQUIRED), true)
+  assert.equal(isAuthFailureCode(RpcErrorCode.AUTH_EXPIRED), true)
+  assert.equal(isAuthFailureCode(RpcErrorCode.AUTH_INVALID), true)
+  assert.equal(isAuthFailureCode(RpcErrorCode.PERMISSION_DENIED), false)
+  assert.equal(isAuthFailureCode(RpcErrorCode.ADMIN_DISABLED), false)
+})
+
+test('errorCodes: 后台 profile 同步单独识别当前管理员会话不可用', () => {
+  assert.deepEqual(
+    [...ADMIN_SESSION_UNAVAILABLE_ERROR_CODES],
+    [
+      RpcErrorCode.HTTP_UNAUTHORIZED,
+      RpcErrorCode.ADMIN_REQUIRED,
+      RpcErrorCode.ADMIN_DISABLED,
+      RpcErrorCode.ADMIN_NOT_FOUND,
+      RpcErrorCode.AUTH_CURRENT_USER_FAILED,
+    ]
+  )
+  assert.equal(isAdminSessionUnavailableCode(RpcErrorCode.ADMIN_REQUIRED), true)
+  assert.equal(isAdminSessionUnavailableCode(RpcErrorCode.ADMIN_DISABLED), true)
+  assert.equal(
+    isAdminSessionUnavailableCode(RpcErrorCode.ADMIN_NOT_FOUND),
+    true
+  )
+  assert.equal(
+    isAdminSessionUnavailableCode(RpcErrorCode.PERMISSION_DENIED),
+    false
+  )
+  assert.equal(isAdminSessionUnavailableCode(RpcErrorCode.AUTH_REQUIRED), false)
+})
+
+test('errorCodes: 默认文案覆盖核心鉴权错误', () => {
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_REQUIRED],
+    '请先登录'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.PERMISSION_DENIED],
+    '权限不足'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_USER_NOT_FOUND],
+    '账号不存在'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_INVALID_PASSWORD],
+    '密码错误'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_USER_DISABLED],
+    '账号已停用'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_ACCOUNT_REVOKED],
+    '账号已注销'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_CREDENTIALS_CHANGED],
+    '账号信息已变更，请重新登录'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_INVALID_SMS_CODE],
+    '验证码错误'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_LOGIN_DISABLED],
+    '短信登录暂未开通，请使用密码登录'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_SERVICE_UNAVAILABLE],
+    '暂时无法发送验证码，请稍后再试或联系系统管理员'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_SERVICE_QUOTA_EXCEEDED],
+    '暂时无法发送验证码，请联系系统管理员'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_MOBILE_ROLE_DENIED],
+    '当前账号不能使用手机端待办，请联系系统管理员'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.IDEMPOTENCY_CONFLICT],
+    '本次操作内容与刚才提交的不一致，请刷新页面后重新办理'
+  )
+})
+
+test('errorCodes: 资源版本冲突使用统一刷新提示', () => {
+  assert.equal(RpcErrorCode.RESOURCE_VERSION_CONFLICT, 40922)
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.RESOURCE_VERSION_CONFLICT],
+    '记录已被其他操作更新，请刷新后重试'
+  )
+})

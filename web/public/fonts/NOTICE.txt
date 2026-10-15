@@ -1,0 +1,8 @@
+Print fonts
+
+Noto Sans SC Variable: @fontsource-variable/noto-sans-sc 5.3.0
+Noto Serif SC Variable: @fontsource-variable/noto-serif-sc 5.3.0
+
+Source packages: https://fontsource.org/fonts/noto-sans-sc and https://fontsource.org/fonts/noto-serif-sc
+The variable WOFF2 font files are emitted from these exact locked dependencies by the frontend build.
+Their upstream SIL Open Font License texts are included alongside this notice.
