@@ -1,0 +1,324 @@
+.erp-progress-board--statistics .erp-progress-toolbar {
+  flex-wrap: wrap;
+  padding-bottom: 0;
+}
+.erp-statistics-toolbar-spacer {
+  flex: 1;
+  min-width: 6px;
+}
+.erp-statistics-meta {
+  display: inline-grid;
+  flex: 0 0 auto;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Reserve the full timestamp width during loading and retries. */
+.erp-statistics-meta::before {
+  grid-area: 1 / 1;
+  visibility: hidden;
+  content: '截至 0000-00-00 00:00';
+}
+.erp-statistics-meta > span {
+  grid-area: 1 / 1;
+}
+.erp-statistics-help {
+  max-width: 440px;
+  color: var(--erp-text-muted);
+  font-size: 13px;
+}
+.erp-statistics-help p {
+  margin: 0 0 8px;
+}
+.erp-statistics-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 9px 0;
+}
+.erp-statistics-filters > .ant-select {
+  min-width: 114px;
+}
+.erp-statistics-filters > .ant-input-affix-wrapper {
+  width: 250px;
+}
+.erp-statistics-metrics {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--erp-border);
+  gap: 0;
+}
+.erp-statistics-metrics > .erp-filter-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  padding: 2px 12px;
+  margin-right: 6px;
+}
+.erp-statistics-metrics strong {
+  color: var(--erp-text);
+  font-size: 24px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.erp-statistics-metrics small {
+  font-size: 12px;
+}
+.erp-statistics-metrics > .erp-filter-chip:disabled {
+  cursor: default;
+}
+.erp-statistics-total-amount {
+  margin-left: auto;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-total-amount strong {
+  font-size: 14px;
+}
+.erp-statistics-results {
+  margin-top: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+.erp-statistics-result-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+}
+.erp-statistics-result-head > strong {
+  min-width: 0;
+  overflow: hidden;
+  max-width: 45%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.erp-statistics-result-head > strong::before {
+  display: inline-block;
+  width: 3px;
+  height: 15px;
+  margin-right: 8px;
+  border-radius: 2px;
+  background: var(--erp-primary);
+  content: '';
+  vertical-align: -2px;
+}
+.erp-statistics-result-head small {
+  margin-left: 9px;
+  color: var(--erp-text-muted);
+  font-weight: 400;
+}
+.erp-statistics-body {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.erp-statistics-chart {
+  padding: 2px 14px 12px;
+}
+.erp-statistics-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px 15px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-legend > span:first-child {
+  margin-right: auto;
+}
+.erp-statistics-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 1px;
+}
+.erp-statistics-plot {
+  display: grid;
+  grid-template-columns: repeat(var(--statistics-columns), minmax(86px, 1fr));
+  padding: 12px 14px 0;
+  overflow-x: auto;
+}
+.erp-statistics-column {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+}
+.erp-statistics-bar-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  height: 100px;
+  border-bottom: 1px solid var(--erp-border);
+  background: repeating-linear-gradient(
+    to top,
+    transparent 0,
+    transparent 23px,
+    var(--erp-border) 24px
+  );
+}
+.erp-statistics-stack {
+  display: flex;
+  flex-direction: column-reverse;
+  width: 54px;
+  max-width: 65%;
+}
+.erp-statistics-stack button {
+  flex-shrink: 0;
+  min-height: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+.erp-statistics-stack button:hover {
+  filter: brightness(0.9);
+}
+.erp-statistics-stack button:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+.erp-statistics-chart .ant-btn {
+  height: auto;
+  padding: 3px 0;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-chart-number {
+  font-variant-numeric: tabular-nums;
+}
+.erp-statistics-chart .erp-statistics-chart-name {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.erp-statistics-tone-done,
+.erp-statistics-tone-not_due {
+  background: var(--erp-primary);
+}
+.erp-statistics-tone-pending_not_late {
+  background: var(--erp-border-strong);
+}
+.erp-statistics-tone-overdue,
+.erp-statistics-tone-late_7 {
+  background: #c47575;
+}
+.erp-statistics-tone-late_30 {
+  background: #ad6060;
+}
+.erp-statistics-tone-late_60 {
+  background: #964e4e;
+}
+.erp-statistics-tone-late_more {
+  background: #773c3c;
+}
+.erp-statistics-tone-closed {
+  background: var(--erp-text-muted);
+}
+.erp-statistics-tone-unknown,
+.erp-statistics-tone-unknown_due {
+  background: var(--erp-text-subtle);
+}
+.erp-statistics-context {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--erp-border);
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-table {
+  padding: 0 12px 8px;
+  font-variant-numeric: tabular-nums;
+}
+.erp-statistics-table .ant-table-cell {
+  white-space: nowrap;
+}
+.erp-statistics-table .ant-btn-link {
+  padding: 0;
+  height: auto;
+  font-size: 13px;
+}
+.erp-statistics-table .erp-statistics-name {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+.erp-statistics-table .ant-table-summary {
+  background: var(--erp-surface-bg-muted);
+  font-weight: 600;
+}
+.erp-statistics-table .ant-table-summary .ant-table-cell {
+  font-size: 13px;
+}
+.erp-statistics-danger,
+.erp-statistics-metrics .erp-statistics-danger,
+.erp-statistics-table .erp-statistics-danger {
+  color: var(--erp-danger, #bd3838);
+}
+.erp-statistics-source-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 8px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-state {
+  display: grid;
+  place-items: center;
+  min-height: 200px;
+  color: var(--erp-text-muted);
+}
+.erp-statistics-missing {
+  margin: 6px 12px;
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+.erp-statistics-body > .ant-alert,
+.erp-statistics-body > .ant-empty {
+  margin: 14px;
+}
+@media (width <= 900px) {
+  .erp-statistics-filters > .ant-input-affix-wrapper {
+    flex: 1;
+    min-width: 180px;
+  }
+  .erp-statistics-result-head > strong {
+    max-width: 100%;
+  }
+  .erp-statistics-metrics {
+    row-gap: 8px;
+  }
+  .erp-statistics-metrics > .erp-filter-chip {
+    padding: 0 10px;
+  }
+  .erp-statistics-metrics strong {
+    font-size: 20px;
+  }
+  .erp-statistics-total-amount {
+    width: 100%;
+    margin-top: 8px;
+  }
+}
