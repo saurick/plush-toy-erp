@@ -1,0 +1,145 @@
+import { getPrintTemplateByKey } from '../../erp/config/printTemplates.mjs'
+
+export const ERP_FAVICON_VARIANTS = Object.freeze({
+  admin: Object.freeze({
+    key: 'admin',
+    href: '/favicon-admin.svg',
+    type: 'image/svg+xml',
+  }),
+  tasks: Object.freeze({
+    key: 'tasks',
+    href: '/favicon-tasks.svg',
+    type: 'image/svg+xml',
+  }),
+})
+
+function normalizePathname(pathname = '') {
+  const normalized = String(pathname || '').trim()
+  return normalized.startsWith('/') ? normalized : `/${normalized}`
+}
+
+function isMobileTaskPath(pathname = '') {
+  return /^\/m\/[^/]+(?:\/tasks)?(?:\/.*)?$/.test(pathname)
+}
+
+function buildCustomerFaviconVariant(href = '') {
+  const normalizedHref = String(href || '').trim()
+  if (!normalizedHref) {
+    return null
+  }
+  return Object.freeze({
+    key: 'customer',
+    href: normalizedHref,
+    type: normalizedHref.endsWith('.ico')
+      ? 'image/x-icon'
+      : normalizedHref.endsWith('.png')
+        ? 'image/png'
+        : 'image/svg+xml',
+  })
+}
+
+function escapeSVGText(text = '') {
+  return String(text)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+}
+
+function getFirstVisibleGlyph(text = '', fallback = '模') {
+  return (
+    Array.from(String(text || '').trim()).find((glyph) => glyph.trim()) ||
+    fallback
+  )
+}
+
+function buildPrintTemplateFaviconHref(glyph) {
+  const safeGlyph = escapeSVGText(getFirstVisibleGlyph(glyph))
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Print template favicon"><rect width="256" height="256" rx="52" fill="#7c3f12"/><rect x="46" y="42" width="164" height="172" rx="24" fill="#fff7ed"/><path d="M78 82h100M78 120h100M78 158h66" stroke="#fed7aa" stroke-width="14" stroke-linecap="round"/><text x="128" y="165" text-anchor="middle" font-family="Noto Sans SC, PingFang SC, Microsoft YaHei, sans-serif" font-size="92" font-weight="700" fill="#7c2d12">${safeGlyph}</text></svg>`
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`
+}
+
+function resolvePrintTemplateKeyFromPath(pathname = '') {
+  const match = normalizePathname(pathname).match(
+    /^\/erp\/print-workspace\/([^/]+)\/?$/
+  )
+  if (!match) {
+    return ''
+  }
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return ''
+  }
+}
+
+function buildPrintTemplateFaviconVariant(pathname = '') {
+  const templateKey = resolvePrintTemplateKeyFromPath(pathname)
+  const template = getPrintTemplateByKey(templateKey)
+  if (!template) {
+    return null
+  }
+
+  const glyph = getFirstVisibleGlyph(template.shortTitle || template.title)
+  return Object.freeze({
+    key: `print-template:${template.key}`,
+    href: buildPrintTemplateFaviconHref(glyph),
+    type: 'image/svg+xml',
+    glyph,
+  })
+}
+
+export function resolveERPFavicon(pathname = '', options = {}) {
+  const normalizedPathname = normalizePathname(pathname)
+  const normalizedFromPathname = options.fromPathname
+    ? normalizePathname(options.fromPathname)
+    : ''
+  const printTemplateFavicon =
+    buildPrintTemplateFaviconVariant(normalizedPathname)
+  if (printTemplateFavicon) {
+    return printTemplateFavicon
+  }
+  const isMobileExperience =
+    options.isMobileExperience ||
+    isMobileTaskPath(normalizedPathname) ||
+    isMobileTaskPath(normalizedFromPathname)
+  const mobileCustomerFavicon = isMobileExperience
+    ? buildCustomerFaviconVariant(options.customerMobileFaviconHref)
+    : null
+  if (mobileCustomerFavicon) {
+    return mobileCustomerFavicon
+  }
+  const customerFavicon = buildCustomerFaviconVariant(
+    options.customerFaviconHref
+  )
+  if (customerFavicon) {
+    return customerFavicon
+  }
+  if (isMobileExperience) {
+    return ERP_FAVICON_VARIANTS.tasks
+  }
+  return ERP_FAVICON_VARIANTS.admin
+}
+
+export function applyERPFavicon(documentRef, pathname = '', options = {}) {
+  if (!documentRef?.head) {
+    return null
+  }
+
+  const favicon = resolveERPFavicon(pathname, options)
+  const iconLinks = Array.from(
+    documentRef.querySelectorAll('link[rel~="icon"]')
+  )
+
+  iconLinks.slice(1).forEach((link) => link.remove())
+
+  const link = iconLinks[0] || documentRef.createElement('link')
+  link.setAttribute('rel', 'icon')
+  link.setAttribute('type', favicon.type)
+  link.setAttribute('href', favicon.href)
+
+  if (!link.parentNode) {
+    documentRef.head.appendChild(link)
+  }
+
+  return favicon
+}

@@ -1,0 +1,140 @@
+[data-table-scroll-toolbar] {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.app-table-scroll-buttons {
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.app-table-scroll-buttons .ant-btn {
+  width: 34px;
+  min-width: 34px;
+  padding-inline: 0;
+}
+
+.app-table-scroll-top {
+  position: sticky;
+  left: 0;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  padding-bottom: 6px;
+}
+
+.app-table-scroll-bottom {
+  position: sticky;
+  z-index: 4;
+  left: 0;
+  height: 24px;
+}
+
+[data-table-scroll-toolbar]:empty,
+.app-table-scroll-top:empty,
+.app-table-scroll-bottom:empty {
+  display: none;
+}
+
+.app-table-scroll-dock {
+  box-sizing: border-box;
+  height: 24px;
+  padding-inline: 4px;
+  background: var(--erp-surface-bg, #fff);
+  border-top: 1px solid var(--erp-border, #d9e1dc);
+}
+
+.app-table-scroll-range {
+  --table-scroll-thickness: 6px;
+
+  display: block;
+  appearance: none;
+  width: 100%;
+  height: 22px;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  touch-action: pan-y;
+}
+
+.app-table-scroll-range::-webkit-slider-runnable-track {
+  height: var(--table-scroll-thickness);
+  border-radius: 4px;
+  background: var(--erp-border, #d9e1dc);
+}
+
+.app-table-scroll-range::-moz-range-track {
+  height: var(--table-scroll-thickness);
+  border-radius: 4px;
+  background: var(--erp-border, #d9e1dc);
+}
+
+.app-table-scroll-range::-webkit-slider-thumb {
+  appearance: none;
+  width: var(--table-scroll-thumb);
+  height: var(--table-scroll-thickness);
+  border-radius: 4px;
+  background: var(--erp-text-subtle, #829589);
+  cursor: grab;
+}
+
+.app-table-scroll-range::-moz-range-thumb {
+  width: var(--table-scroll-thumb);
+  height: var(--table-scroll-thickness);
+  border: 0;
+  border-radius: 4px;
+  background: var(--erp-text-subtle, #829589);
+  cursor: grab;
+}
+
+.app-table-scroll-range:hover,
+.app-table-scroll-range:focus-visible,
+.app-table-scroll-range:active {
+  --table-scroll-thickness: 10px;
+}
+
+.app-table-scroll-range:hover::-webkit-slider-thumb,
+.app-table-scroll-range:focus-visible::-webkit-slider-thumb {
+  background: var(--erp-primary, #427653);
+}
+
+.app-table-scroll-range:hover::-moz-range-thumb,
+.app-table-scroll-range:focus-visible::-moz-range-thumb {
+  background: var(--erp-primary, #427653);
+}
+
+.app-table-scroll-range:focus-visible {
+  outline: 2px solid var(--erp-primary, #427653);
+  outline-offset: -2px;
+  border-radius: 4px;
+}
+
+.app-table-scroll-enhanced,
+.app-table .ant-table-container > .app-table-scroll-enhanced {
+  /* Standard colors override WebKit sizing. A stable gutter can also reserve
+     space for an overlay scrollbar that the native scroll range does not use. */
+  scrollbar-width: auto;
+  scrollbar-color: auto;
+  scrollbar-gutter: auto;
+}
+
+.app-table-scroll-enhanced::-webkit-scrollbar {
+  height: 0;
+}
+
+@media (hover: none), (pointer: coarse) {
+  .app-table-scroll-buttons .ant-btn {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+}
+
+@media print {
+  .app-table-scroll-buttons,
+  .app-table-scroll-top,
+  .app-table-scroll-bottom {
+    display: none;
+  }
+}

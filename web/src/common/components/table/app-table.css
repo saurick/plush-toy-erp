@@ -1,0 +1,149 @@
+.app-table.ant-table-wrapper .ant-table-tbody > tr > .ant-table-cell,
+.app-table.ant-table-wrapper .ant-table-summary > tr > .ant-table-cell {
+  vertical-align: middle;
+}
+
+.app-table.ant-table-wrapper .ant-table-tbody > .ant-table-row > td {
+  height: var(--erp-row-height);
+}
+
+@media screen {
+  [data-erp-table-lines='grid']
+    .app-table.ant-table-wrapper
+    .ant-table:not(.ant-table-bordered)
+    .ant-table-summary
+    > tr
+    > .ant-table-cell:not(:last-child),
+  [data-erp-table-lines='grid']
+    .app-table.ant-table-wrapper
+    .ant-table:not(.ant-table-bordered)
+    .ant-table-tbody
+    > .ant-table-row
+    > .ant-table-cell:not(:last-child) {
+    box-shadow: inset -1px 0 0 var(--erp-border);
+  }
+}
+
+/* 测量副本保留布局尺寸，但不能让内部按钮进入键盘焦点。 */
+.app-table.ant-table-wrapper .ant-table-measure-cell-content {
+  visibility: hidden;
+}
+
+.app-table.ant-table-wrapper .ant-table-thead > tr > .ant-table-cell {
+  height: 40px;
+  padding: 7px 11px;
+  border-bottom: 1px solid var(--erp-border-strong);
+  background: var(--erp-surface-bg-muted);
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 20px;
+  vertical-align: middle;
+}
+
+.app-table.ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > .ant-table-cell:not(:last-child) {
+  border-inline-end: 1px solid var(--erp-border-strong);
+}
+
+.app-table.ant-table-wrapper .ant-table-thead > tr > .ant-table-cell::before {
+  display: none;
+}
+
+.app-table.ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > .ant-table-cell.ant-table-column-has-sorters:hover {
+  background: var(--erp-interactive-bg-hover);
+}
+
+.app-table.ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > .ant-table-cell.ant-table-column-sort {
+  border-bottom-color: var(--erp-primary);
+  background: var(--erp-primary-softer);
+  color: var(--erp-primary-strong);
+}
+
+.app-table.ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > .ant-table-cell:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: -3px;
+}
+
+.app-table.ant-table-wrapper .ant-table-column-sorters,
+.app-table.ant-table-wrapper .ant-table-filter-column {
+  justify-content: flex-start;
+}
+
+.app-table.ant-table-wrapper
+  th[data-column-align='right']
+  .ant-table-column-sorters,
+.app-table.ant-table-wrapper
+  th[data-column-align='right']
+  .ant-table-filter-column {
+  justify-content: flex-end;
+}
+
+.app-table.ant-table-wrapper
+  th[data-column-align='center']
+  .ant-table-column-sorters,
+.app-table.ant-table-wrapper
+  th[data-column-align='center']
+  .ant-table-filter-column {
+  justify-content: center;
+}
+
+.app-table.ant-table-wrapper .ant-table-column-title {
+  flex: 0 1 auto;
+}
+
+.app-table.ant-table-wrapper .ant-table-cell > .ant-tag:only-child {
+  margin-inline-end: 0;
+}
+
+.app-table.ant-table-wrapper .ant-table-cell > .ant-space-vertical {
+  align-items: inherit;
+}
+
+.app-table.ant-table-wrapper .ant-table-thead > tr > th {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.app-table.ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th
+  .ant-table-column-sorters {
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.app-table.ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th
+  .ant-table-column-title {
+  min-width: max-content;
+  overflow: visible;
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
+.app-table.ant-table-wrapper
+  .ant-table-thead
+  > tr
+  > th
+  .ant-table-column-sorter {
+  flex: 0 0 auto;
+  margin-inline-start: 0;
+  color: var(--erp-text-subtle);
+}
