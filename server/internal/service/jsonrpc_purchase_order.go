@@ -1,0 +1,44 @@
+package service
+
+import (
+	"context"
+
+	v1 "server/api/jsonrpc/v1"
+	"server/internal/errcode"
+
+	"google.golang.org/protobuf/types/known/structpb"
+)
+
+func (d *jsonrpcDispatcher) handlePurchaseOrder(
+	ctx context.Context,
+	method, id string,
+	params *structpb.Struct,
+) (string, *v1.JsonrpcResult, error) {
+	pm := map[string]any{}
+	if params != nil {
+		pm = params.AsMap()
+	}
+	claims, res := d.requireAdmin(ctx)
+	if res != nil {
+		return id, res, nil
+	}
+	if d.purchaseOrderUC == nil {
+		return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
+	}
+
+	switch method {
+	case "save_purchase_order_with_items",
+		"reorder_purchase_order_items",
+		"get_purchase_order",
+		"get_purchase_order_receipt_progress",
+		"list_purchase_orders":
+		return d.handlePurchaseOrderDocument(ctx, method, id, pm)
+	case "close_purchase_order",
+		"cancel_purchase_order":
+		return d.handlePurchaseOrderLifecycle(ctx, method, id, pm, claims.UserID)
+	case "list_purchase_order_items":
+		return d.handlePurchaseOrderItem(ctx, method, id, pm)
+	default:
+		return id, unknownPurchaseOrderResult(method), nil
+	}
+}
