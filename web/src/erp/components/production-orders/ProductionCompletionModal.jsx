@@ -1,0 +1,450 @@
+import React, { useMemo } from 'react'
+import {
+  Alert,
+  Descriptions,
+  Form,
+  Input,
+  Radio,
+  Select,
+  Typography,
+} from 'antd'
+import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
+import { warehouseAcceptsSubject } from '../../utils/warehouseClassification.mjs'
+import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
+import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
+import { DateTimeInput } from '../business-list/BusinessListLayout.jsx'
+
+import BusinessFormSection from '../business-list/BusinessFormSection.jsx'
+import {
+  buildProductionCompletionChoices,
+  buildProductionCompletionLotOptions,
+  compareProductionCompletionQuantity,
+} from '../../utils/productionCompletionAction.mjs'
+import {
+  SOURCE_INBOUND_LOT_SELECTION,
+  sourceInboundLotSelectionForOptions,
+} from '../../utils/sourceInboundLotSelection.mjs'
+
+const { Text } = Typography
+
+function choiceByID(choices, value) {
+  const id = Number(value || 0)
+  return choices.find((item) => item.value === id) || null
+}
+
+function localDateTimeValue() {
+  const now = new Date()
+  const offset = now.getTimezoneOffset() * 60_000
+  return new Date(now.getTime() - offset).toISOString().slice(0, 16)
+}
+
+export default function ProductionCompletionModal({
+  open,
+  mode = 'create',
+  initialValues = null,
+  excludeFactID = 0,
+  order,
+  items = [],
+  blockedItems = [],
+  facts = [],
+  wipAggregate = null,
+  warehouseOptions = [],
+  lots = [],
+  loading = false,
+  onCancel,
+  onSubmit,
+}) {
+  const [form] = Form.useForm()
+  const quantityUnitOptions = useQuantityUnits(open)
+  const editing = mode === 'edit'
+  const finishedWarehouseOptions = warehouseOptions.filter((warehouse) =>
+    warehouseAcceptsSubject(warehouse, 'PRODUCT')
+  )
+  const Editor = editing ? BusinessFormPage : BusinessModal
+  const selectedItemID = Form.useWatch('production_order_item_id', form)
+  const selectedBatchID = Form.useWatch('production_wip_batch_id', form)
+  const lotSelection = Form.useWatch('lot_selection', form)
+  const choices = useMemo(
+    () =>
+      buildProductionCompletionChoices(items, facts, wipAggregate, {
+        excludeFactID,
+      }),
+    [excludeFactID, facts, items, wipAggregate]
+  )
+  const selectedChoice = choiceByID(choices, selectedItemID)
+  const selectedBatchChoice = choiceByID(
+    selectedChoice?.batchChoices || [],
+    selectedBatchID
+  )
+  const lotOptions = useMemo(
+    () => buildProductionCompletionLotOptions(selectedChoice?.item, lots),
+    [lots, selectedChoice]
+  )
+
+  React.useEffect(() => {
+    // The batch field mounts after the source is selected; read the stored value
+    // so its first watch notification cannot replace an initialized quantity.
+    if (
+      !open ||
+      editing ||
+      !selectedChoice?.requiresBatch ||
+      form.getFieldValue('production_wip_batch_id')
+    ) {
+      return
+    }
+    const firstBatch = selectedChoice.batchChoices.find(
+      (batch) => !batch.disabled
+    )
+    if (!firstBatch) return
+    form.setFieldsValue({
+      production_wip_batch_id: firstBatch.value,
+      quantity: firstBatch.remaining,
+    })
+  }, [editing, form, open, selectedBatchID, selectedChoice])
+
+  const initializeOpenForm = (visible) => {
+    if (!visible) return
+    const firstAvailable = initialValues?.production_order_item_id
+      ? choiceByID(choices, initialValues.production_order_item_id)
+      : choices.find((item) => !item.disabled)
+    const firstBatch = initialValues?.production_wip_batch_id
+      ? choiceByID(firstAvailable?.batchChoices || [], initialValues.production_wip_batch_id)
+      : firstAvailable?.batchChoices?.find((batch) => !batch.disabled)
+    const firstLotOptions = buildProductionCompletionLotOptions(
+      firstAvailable?.item,
+      lots
+    )
+    const firstLotSelection =
+      sourceInboundLotSelectionForOptions(firstLotOptions)
+    form.resetFields()
+    form.setFieldsValue({
+      production_order_item_id:
+        initialValues?.production_order_item_id || firstAvailable?.value,
+      production_wip_batch_id:
+        initialValues?.production_wip_batch_id || firstBatch?.value,
+      quantity:
+        initialValues?.quantity ||
+        firstBatch?.remaining ||
+        firstAvailable?.remaining ||
+        '',
+      warehouse_id: initialValues?.warehouse_id
+        ? choiceByID(finishedWarehouseOptions, initialValues.warehouse_id)?.value
+        : finishedWarehouseOptions[0]?.value,
+      lot_selection: initialValues?.lot_selection || firstLotSelection,
+      lot_id:
+        initialValues?.lot_id ||
+        (firstLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
+          ? firstLotOptions[0]?.value
+          : undefined),
+      new_lot_no: initialValues?.new_lot_no,
+      occurred_at: initialValues?.occurred_at || localDateTimeValue(),
+      note: initialValues?.note || '',
+    })
+  }
+
+  const submit = async () => {
+    try {
+      const values = await form.validateFields()
+      await onSubmit?.(values)
+    } catch (error) {
+      if (!error?.errorFields) throw error
+    }
+  }
+
+  return (
+    <Editor
+      {...(editing
+        ? { form }
+        : { size: 'localAction', cancelText: '取消', destroyOnHidden: true })}
+      title={
+        editing
+          ? '核对成品收仓草稿'
+          : order?.status === 'CLOSED'
+            ? '登记返工成品收仓'
+            : '登记成品收仓'
+      }
+      open={open}
+      okText={editing ? '保存待入库草稿' : '生成待入库草稿'}
+      confirmLoading={loading}
+      afterOpenChange={initializeOpenForm}
+      onCancel={onCancel}
+      onOk={submit}
+    >
+      <Alert
+        type="info"
+        showIcon
+        message={
+          order?.status === 'CLOSED'
+            ? '当前订单已关闭，只能按已完成手工的返工补制批次登记收仓；仓库确认入库后增加库存，检验与查货包装完成前禁止发货。'
+            : editing
+              ? '生产明细和完工来源批次保持不变；可修正拟入库仓库、批次、数量、时间和备注，保存后仍是待入库草稿，不会更新库存。'
+              : '仓库按已完成手工的批次登记收仓，核对实收后确认入库并增加成品库存。待检或待包装库存不可发货；查货包装完成不再重复入库。'
+        }
+      />
+      {blockedItems.length > 0 ? (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginTop: 12 }}
+          message="部分路线明细暂不可登记"
+          description={blockedItems
+            .slice(0, 3)
+            .map(({ item, reason }) => {
+              const line = item?.line_no ? `第 ${item.line_no} 行` : '生产明细'
+              const product =
+                [item?.product_name_snapshot, item?.sku_code_snapshot]
+                  .map((value) => String(value || '').trim())
+                  .filter(Boolean)
+                  .join(' / ') || '产品已关联'
+              return `${line} · ${product}：${reason}`
+            })
+            .join('；')}
+        />
+      ) : null}
+      <Descriptions
+        size="small"
+        column={editing ? { xs: 1, sm: 2, lg: 3 } : 1}
+        style={{ marginTop: 16, marginBottom: 8 }}
+        items={[
+          { key: 'order', label: '生产订单', children: order?.order_no || '-' },
+          ...(selectedChoice?.item?.product_id
+            ? [
+                {
+                  key: 'product',
+                  label: '产品',
+                  children: (
+                    <ProductIdentity
+                      productId={selectedChoice.item.product_id}
+                      name={selectedChoice.item.product_name_snapshot}
+                      code={selectedChoice.item.product_code_snapshot}
+                    />
+                  ),
+                },
+              ]
+            : []),
+          {
+            key: 'status',
+            label: '来源状态',
+            children:
+              order?.status === 'RELEASED'
+                ? '已发布'
+                : order?.status === 'CLOSED'
+                  ? '已关闭，仅登记返工成品收仓'
+                  : '待核对',
+          },
+        ]}
+      />
+      <Form
+        form={form}
+        className="erp-business-action-form"
+        layout="vertical"
+        preserve={false}
+        disabled={loading}
+      >
+        <BusinessFormSection title="完工来源与数量">
+          <Form.Item
+            name="production_order_item_id"
+            label="生产明细"
+            rules={[{ required: true, message: '请选择要完工的生产明细' }]}
+          >
+            <Select
+              disabled={editing}
+              showSearch
+              optionFilterProp="label"
+              options={choices.map(({ value, label, disabled }) => ({
+                value,
+                label,
+                disabled,
+              }))}
+              onChange={(value) => {
+                const choice = choiceByID(choices, value)
+                const nextBatch = choice?.batchChoices?.find(
+                  (batch) => !batch.disabled
+                )
+                const nextLotOptions = buildProductionCompletionLotOptions(
+                  choice?.item,
+                  lots
+                )
+                const nextLotSelection =
+                  sourceInboundLotSelectionForOptions(nextLotOptions)
+                form.setFieldsValue({
+                  production_wip_batch_id: nextBatch?.value,
+                  quantity: nextBatch?.remaining || choice?.remaining || '',
+                  lot_selection: nextLotSelection,
+                  lot_id:
+                    nextLotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
+                      ? nextLotOptions[0]?.value
+                      : undefined,
+                  new_lot_no: undefined,
+                })
+              }}
+            />
+          </Form.Item>
+          {selectedChoice?.requiresBatch ? (
+            <Form.Item
+              name="production_wip_batch_id"
+              label="完工来源批次"
+              rules={[{ required: true, message: '请选择对应的手工成品批次' }]}
+            >
+              <Select
+                disabled={editing}
+                showSearch
+                optionFilterProp="label"
+                options={selectedChoice.batchChoices.map(
+                  ({ value, label, disabled }) => ({
+                    value,
+                    label,
+                    disabled,
+                  })
+                )}
+                placeholder="选择已完成手工的批次"
+                onChange={(value) => {
+                  const batchChoice = choiceByID(
+                    selectedChoice.batchChoices,
+                    value
+                  )
+                  form.setFieldValue('quantity', batchChoice?.remaining || '')
+                }}
+              />
+            </Form.Item>
+          ) : null}
+          {selectedChoice ? (
+            <div className="erp-business-source-summary">
+              <Text type="secondary">
+                {selectedBatchChoice
+                  ? `所选批次 ${selectedBatchChoice.quantity || '0'} / 已入库 ${selectedBatchChoice.posted || '0'} / 待入库 ${selectedBatchChoice.draft || '0'} / 剩余 ${selectedBatchChoice.remaining || '0'}`
+                  : `计划 ${selectedChoice.planned || '0'} / 当前可收仓上限 ${selectedChoice.receivableQuantity || '0'} / 已入库 ${selectedChoice.posted || '0'} / 待入库 ${selectedChoice.draft || '0'}`}
+              </Text>
+            </div>
+          ) : null}
+          <Form.Item
+            name="quantity"
+            label="本次完工数量"
+            rules={[
+              unitQuantityRuleFromOptions(
+                quantityUnitOptions,
+                selectedChoice?.item?.unit_id
+              ),
+              { required: true, message: '请填写本次完工数量' },
+              {
+                validator: (_, value) => {
+                  try {
+                    if (
+                      compareProductionCompletionQuantity(
+                        value,
+                        selectedBatchChoice?.remaining ||
+                          selectedChoice?.remaining ||
+                          '0'
+                      ) > 0
+                    ) {
+                      return Promise.reject(
+                        new Error(
+                          '本次数量不能超过所选手工成品批次扣减已入库和待入库后的剩余数量'
+                        )
+                      )
+                    }
+                  } catch {
+                    return Promise.reject(new Error('完工数量必须大于 0'))
+                  }
+                  return Promise.resolve()
+                },
+              },
+            ]}
+          >
+            <Input inputMode="decimal" maxLength={21} placeholder="例如：100" />
+          </Form.Item>
+        </BusinessFormSection>
+        <BusinessFormSection title="待核对的入库仓库与批次">
+          <Form.Item
+            name="warehouse_id"
+            label="拟入库仓库"
+            rules={[{ required: true, message: '请选择拟入库仓库' }]}
+          >
+            <Select
+              showSearch
+              optionFilterProp="label"
+              options={finishedWarehouseOptions}
+              placeholder="选择仓库"
+            />
+          </Form.Item>
+          <Form.Item
+            name="lot_selection"
+            label="拟入库批次方式"
+            rules={[{ required: true, message: '请选择拟入库批次方式' }]}
+          >
+            <Radio.Group
+              options={[
+                {
+                  label: '选择已有批次',
+                  value: SOURCE_INBOUND_LOT_SELECTION.EXISTING,
+                },
+                {
+                  label: '填写新批次号',
+                  value: SOURCE_INBOUND_LOT_SELECTION.NEW,
+                },
+              ]}
+              onChange={(event) => {
+                const nextSelection = event.target.value
+                form.setFieldsValue({
+                  lot_id:
+                    nextSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING
+                      ? lotOptions[0]?.value
+                      : undefined,
+                  new_lot_no: undefined,
+                })
+              }}
+            />
+          </Form.Item>
+          {lotSelection === SOURCE_INBOUND_LOT_SELECTION.EXISTING ? (
+            <Form.Item
+              name="lot_id"
+              label="拟使用的已有入库批次"
+              rules={[
+                { required: true, message: '请选择拟使用的已有入库批次' },
+              ]}
+            >
+              <Select
+                showSearch
+                optionFilterProp="label"
+                options={lotOptions}
+                notFoundContent="暂无匹配的已有批次"
+                placeholder="选择已有批次"
+              />
+            </Form.Item>
+          ) : null}
+          {lotSelection === SOURCE_INBOUND_LOT_SELECTION.NEW ? (
+            <Form.Item
+              name="new_lot_no"
+              label="新批次号"
+              rules={[
+                { required: true, message: '请填写本次完工的新批次号' },
+                { max: 64, message: '新批次号不能超过 64 个字符' },
+              ]}
+            >
+              <Input maxLength={64} placeholder="填写本次完工的新批次号" />
+            </Form.Item>
+          ) : null}
+          <Form.Item
+            name="occurred_at"
+            label="完工时间"
+            rules={[{ required: true, message: '请选择完工时间' }]}
+          >
+            <DateTimeInput />
+          </Form.Item>
+        </BusinessFormSection>
+        <BusinessFormSection title="备注">
+          <Form.Item
+            className="erp-business-action-form__field--full"
+            name="note"
+            label="备注"
+          >
+            <BusinessTextArea maxLength={255} showCount />
+          </Form.Item>
+        </BusinessFormSection>
+      </Form>
+    </Editor>
+  )
+}
