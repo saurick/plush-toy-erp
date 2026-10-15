@@ -19,6 +19,7 @@ func (d *jsonrpcDispatcher) handleDebugClearBusinessData(
 		return id, res, nil
 	}
 	input := biz.DebugBusinessDataClearInput{
+		ActorID:      actorID,
 		DryRun:       getBool(pm, "dryRun", true),
 		Confirmation: getString(pm, "confirmation"),
 	}

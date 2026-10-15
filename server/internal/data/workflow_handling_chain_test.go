@@ -63,6 +63,40 @@ func testWorkflowHandlingChainRelations(t *testing.T, f productionOrderTestFixtu
 	if _, err = repo.GetWorkflowHandlingChain(ctx, warehouse.ID, biz.WorkflowHandlingChainTaskView, scope); !errors.Is(err, biz.ErrWorkflowTaskNotFound) {
 		t.Fatalf("hidden anchor=%v", err)
 	}
+	// A forwarded link can follow the same batch after handoff without exposing
+	// the hidden original task or other work on the same order.
+	quality := f.client.WorkflowTask.Create().SetTaskCode("chain-link-quality-" + suffix).SetTaskGroup("quality_followup").SetTaskName("裁片检查").SetSourceType("production_wip_batch").SetSourceID(root.ID).SetOwnerRoleKey("engineering").SetTaskStatusKey("ready").SaveX(ctx)
+	engineeringScope := &biz.WorkflowTaskVisibilityScope{StandaloneVisibleOwnerRoleKeys: []string{"engineering"}}
+	shared, err := repo.GetWorkflowHandlingChain(ctx, warehouse.ID, biz.WorkflowHandlingChainLinkView, engineeringScope)
+	if err != nil || len(shared.Items) != 1 || shared.Items[0].ID != quality.ID {
+		t.Fatalf("link must follow authorized batch task only: %+v %v", shared, err)
+	}
+	f.client.WorkflowTask.UpdateOneID(quality.ID).SetTaskStatusKey("done").SaveX(ctx)
+	next := f.client.WorkflowTask.Create().SetTaskCode("chain-link-next-" + suffix).SetTaskGroup("quality_followup").SetTaskName("复核裁片").SetSourceType("production_wip_batch").SetSourceID(root.ID).SetOwnerRoleKey("engineering").SetTaskStatusKey("ready").SaveX(ctx)
+	shared, err = repo.GetWorkflowHandlingChain(ctx, warehouse.ID, biz.WorkflowHandlingChainLinkView, engineeringScope)
+	if err != nil || len(shared.Items) != 2 || shared.Items[0].ID != next.ID || shared.Items[1].Status != "done" {
+		t.Fatalf("old link must reflect current task state: %+v %v", shared, err)
+	}
+	f.client.WorkflowTask.UpdateOneID(next.ID).SetTaskStatusKey("done").SaveX(ctx)
+	qualityCurrent := f.client.WorkflowTask.Create().SetTaskCode("chain-link-handoff-" + suffix).SetTaskGroup("quality_followup").SetTaskName("品质接收裁片").SetSourceType("production_wip_batch").SetSourceID(root.ID).SetOwnerRoleKey(biz.QualityRoleKey).SetTaskStatusKey("ready").SaveX(ctx)
+	shared, err = repo.GetWorkflowHandlingChain(ctx, warehouse.ID, biz.WorkflowHandlingChainLinkView, engineeringScope)
+	if err != nil || len(shared.Items) != 2 || shared.Items[0].Status != "done" || shared.Items[1].Status != "done" {
+		t.Fatalf("previous role must see its completed history after cross-role handoff: %+v %v", shared, err)
+	}
+	qualityScope := &biz.WorkflowTaskVisibilityScope{StandaloneVisibleOwnerRoleKeys: []string{biz.QualityRoleKey}}
+	shared, err = repo.GetWorkflowHandlingChain(ctx, warehouse.ID, biz.WorkflowHandlingChainLinkView, qualityScope)
+	if err != nil || len(shared.Items) != 1 || shared.Items[0].ID != qualityCurrent.ID || shared.Items[0].Status != "ready" {
+		t.Fatalf("next role must receive its current task through the same old link: %+v %v", shared, err)
+	}
+	for _, hiddenID := range []int{other.ID, anchor.ID, warehouse.ID + 1000000} {
+		if _, err = repo.GetWorkflowHandlingChain(ctx, hiddenID, biz.WorkflowHandlingChainLinkView, engineeringScope); !errors.Is(err, biz.ErrWorkflowTaskNotFound) {
+			t.Fatalf("link must not expose unrelated or missing anchor %d: %v", hiddenID, err)
+		}
+	}
+	privateFollowup := f.client.WorkflowTask.Create().SetTaskCode("chain-link-private-" + suffix).SetTaskGroup(biz.WorkflowFollowupTaskGroup).SetTaskName("独立跟进").SetSourceType("production_wip_batch").SetSourceID(root.ID).SetOwnerRoleKey("sales").SetTaskStatusKey("ready").SaveX(ctx)
+	if _, err = repo.GetWorkflowHandlingChain(ctx, privateFollowup.ID, biz.WorkflowHandlingChainLinkView, engineeringScope); !errors.Is(err, biz.ErrWorkflowTaskNotFound) {
+		t.Fatalf("independent followup must not jump to another task: %v", err)
+	}
 	scope.StandaloneAllowAllOwnerRoles = true
 	chain, err = repo.GetWorkflowHandlingChain(ctx, anchor.ID, biz.WorkflowHandlingChainOrderView, scope)
 	if err != nil {
@@ -92,6 +126,9 @@ func testWorkflowHandlingChainRelations(t *testing.T, f productionOrderTestFixtu
 		t.Fatalf("parallel order work must not crowd out task detail: %+v %v", focused, err)
 	}
 	for _, item := range focused.Items {
+		if item.ID == privateFollowup.ID {
+			t.Fatalf("standalone followup must not become another task's handling target: %+v", item)
+		}
 		if item.BatchNo != root.BatchNo {
 			t.Fatalf("task detail contains unrelated work: %+v", item)
 		}
@@ -100,4 +137,68 @@ func testWorkflowHandlingChainRelations(t *testing.T, f productionOrderTestFixtu
 	if err != nil || !order.Truncated || len(order.Items) != 100 || order.Items[0].ID != warehouse.ID {
 		t.Fatalf("explicit order overview must remain bounded and retain anchor: %+v %v", order, err)
 	}
+	uc := biz.NewWorkflowUsecase(repo)
+	linkFirst, err := uc.GetHandlingChainPage(ctx, anchor.ID, biz.WorkflowHandlingChainLinkView, scope, 0)
+	if err != nil || len(linkFirst.Items) != 100 || !linkFirst.Truncated {
+		t.Fatalf("link page must remain bounded: %+v %v", linkFirst, err)
+	}
+	linkNext, err := uc.GetHandlingChainPage(ctx, anchor.ID, biz.WorkflowHandlingChainLinkView, scope, 100)
+	if err != nil || len(linkNext.Items) != 6 || linkNext.Truncated {
+		t.Fatalf("link must continue the same source: %+v %v", linkNext, err)
+	}
+	seen := map[int]bool{}
+	for _, page := range []*biz.WorkflowHandlingChain{linkFirst, linkNext} {
+		for _, item := range page.Items {
+			if seen[item.ID] || item.ID == other.ID || item.ID == warehouse.ID {
+				t.Fatalf("link paging duplicated or crossed scope: %+v", item)
+			}
+			seen[item.ID] = true
+		}
+	}
+
+	// Every recipient opens the same link. The SQL projection must contain only
+	// that recipient's current scope, even when the shared anchor is hidden.
+	roleTasks := map[string]int{}
+	for _, role := range []string{biz.SalesRoleKey, biz.EngineeringRoleKey, biz.PurchaseRoleKey, biz.ProductionRoleKey, biz.WarehouseRoleKey, biz.QualityRoleKey, biz.FinanceRoleKey, biz.PMCRoleKey, biz.BossRoleKey} {
+		task := f.client.WorkflowTask.Create().SetTaskCode("chain-role-" + role + "-" + suffix).SetTaskGroup("role_followup").SetTaskName("岗位待办").SetSourceType(other.SourceType).SetSourceID(other.SourceID).SetOwnerRoleKey(role).SetTaskStatusKey("ready").SaveX(ctx)
+		roleTasks[role] = task.ID
+	}
+	assertRoleScope := func(t *testing.T, roles []string, all bool) {
+		t.Helper()
+		result, err := repo.GetWorkflowHandlingChain(ctx, other.ID, biz.WorkflowHandlingChainLinkView, &biz.WorkflowTaskVisibilityScope{StandaloneVisibleOwnerRoleKeys: roles, StandaloneAllowAllOwnerRoles: all})
+		if len(roles) == 0 && !all {
+			if !errors.Is(err, biz.ErrWorkflowTaskNotFound) {
+				t.Fatalf("unrelated recipient must not discover the chain: %+v %v", result, err)
+			}
+			return
+		}
+		want := map[int]bool{}
+		for role, id := range roleTasks {
+			allowed := all
+			for _, visibleRole := range roles {
+				allowed = allowed || visibleRole == role
+			}
+			if allowed {
+				want[id] = true
+				if role == biz.SalesRoleKey {
+					want[other.ID] = true
+				}
+			}
+		}
+		if err != nil || len(result.Items) != len(want) {
+			t.Fatalf("recipient roles=%v all=%v chain=%+v err=%v", roles, all, result, err)
+		}
+		for _, item := range result.Items {
+			if !want[item.ID] {
+				t.Fatalf("recipient received another role's task: %+v", item)
+			}
+			delete(want, item.ID)
+		}
+	}
+	for role := range roleTasks {
+		t.Run("shared_link_"+role, func(t *testing.T) { assertRoleScope(t, []string{role}, false) })
+	}
+	t.Run("shared_link_multiple_roles", func(t *testing.T) { assertRoleScope(t, []string{biz.PurchaseRoleKey, biz.FinanceRoleKey}, false) })
+	t.Run("shared_link_supervision", func(t *testing.T) { assertRoleScope(t, nil, true) })
+	t.Run("shared_link_no_visible_role", func(t *testing.T) { assertRoleScope(t, nil, false) })
 }

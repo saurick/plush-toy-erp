@@ -30,7 +30,7 @@
   margin: 0;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--ant-color-border, #d9d9d9);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
 }
 
 .erp-outsourcing-contract-form__parties .ant-form-item {

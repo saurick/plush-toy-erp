@@ -79,6 +79,9 @@ func (_u *FinanceAllocationUpdate) sqlSave(ctx context.Context) (_node int, err 
 			}
 		}
 	}
+	if _u.mutation.ReasonCleared() {
+		_spec.ClearField(financeallocation.FieldReason, field.TypeString)
+	}
 	if _u.mutation.ReversalOfAllocationIDCleared() {
 		_spec.ClearField(financeallocation.FieldReversalOfAllocationID, field.TypeInt)
 	}
@@ -183,6 +186,9 @@ func (_u *FinanceAllocationUpdateOne) sqlSave(ctx context.Context) (_node *Finan
 				ps[i](selector)
 			}
 		}
+	}
+	if _u.mutation.ReasonCleared() {
+		_spec.ClearField(financeallocation.FieldReason, field.TypeString)
 	}
 	if _u.mutation.ReversalOfAllocationIDCleared() {
 		_spec.ClearField(financeallocation.FieldReversalOfAllocationID, field.TypeInt)

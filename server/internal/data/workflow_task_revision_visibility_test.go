@@ -97,8 +97,21 @@ func TestWorkflowTaskRevisionVisibilityScopesApplyBeforeListBoardAndRolePaginati
 		if fixture.visible {
 			visibleCodes[created.TaskCode] = struct{}{}
 		}
+
+		if _, err := repo.UpsertWorkflowBusinessState(ctx, &biz.WorkflowBusinessStateUpsert{SourceType: created.SourceType, SourceID: created.SourceID, BusinessStatusKey: "production_ready", OwnerRoleKey: &created.OwnerRoleKey, Payload: map[string]any{"task": created.TaskCode}}, 7); err != nil {
+			t.Fatal(err)
+		}
 	}
 
+	states, stateTotal, err := repo.ListWorkflowBusinessStates(ctx, biz.WorkflowBusinessStateFilter{Limit: 100, VisibilityScope: scope})
+	if err != nil || stateTotal != len(visibleCodes) {
+		t.Fatalf("state visibility count=%d err=%v", stateTotal, err)
+	}
+	for _, state := range states {
+		if _, ok := visibleCodes[state.Payload["task"].(string)]; !ok {
+			t.Fatalf("foreign state leaked: %+v", state)
+		}
+	}
 	page, total, err := repo.ListWorkflowTasks(ctx, biz.WorkflowTaskFilter{
 		Limit:           2,
 		Offset:          1,

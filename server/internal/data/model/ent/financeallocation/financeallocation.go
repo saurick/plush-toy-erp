@@ -15,6 +15,8 @@ const (
 	Label = "finance_allocation"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldReason holds the string denoting the reason field in the database.
+	FieldReason = "reason"
 	// FieldPaymentID holds the string denoting the payment_id field in the database.
 	FieldPaymentID = "payment_id"
 	// FieldFinanceFactID holds the string denoting the finance_fact_id field in the database.
@@ -49,6 +51,7 @@ const (
 // Columns holds all SQL columns for financeallocation fields.
 var Columns = []string{
 	FieldID,
+	FieldReason,
 	FieldPaymentID,
 	FieldFinanceFactID,
 	FieldAmount,
@@ -77,6 +80,8 @@ func ValidColumn(column string) bool {
 //	import _ "server/internal/data/model/ent/runtime"
 var (
 	Hooks [1]ent.Hook
+	// ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
+	ReasonValidator func(string) error
 	// PaymentIDValidator is a validator for the "payment_id" field. It is called by the builders before save.
 	PaymentIDValidator func(int) error
 	// FinanceFactIDValidator is a validator for the "finance_fact_id" field. It is called by the builders before save.
@@ -103,6 +108,11 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// ByReason orders the results by the reason field.
+func ByReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReason, opts...).ToFunc()
 }
 
 // ByPaymentID orders the results by the payment_id field.

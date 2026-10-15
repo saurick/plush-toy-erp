@@ -15,7 +15,7 @@
   padding: 7px 6px;
   background: var(--erp-sales-order-lines-bg, #f8fbf9);
   color: var(--erp-text-muted, #64748b);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   font-weight: 600;
   text-align: left;
 }
@@ -75,10 +75,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 30px;
+  min-height: max(30px, var(--erp-touch-target, 0px));
   color: var(--erp-text-muted, #64748b);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-optional-field > summary::before {
@@ -121,7 +121,7 @@
   min-width: 0;
   padding: 10px 0;
   color: var(--erp-text-muted, #64748b);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-inventory-operation-fields {

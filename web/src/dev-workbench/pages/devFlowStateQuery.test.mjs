@@ -91,3 +91,16 @@ test('instance tracking retains task and chain context without specialist select
     query: 'view=tracking&chain=production_to_inventory&node=wip_batch&task_id=42',
   })
 })
+
+test('role and selected handoff survive view changes without restoring stale technical selections', () => {
+  assert.deepEqual(canonicalize('view=chain&chain=purchase_to_inventory&flow_role=warehouse&flow_stage=incoming_quality&flow_substep=inbound&fact=fact.inventory_lot'), {
+    changed: true,
+    query: 'view=chain&chain=purchase_to_inventory&flow_role=warehouse&flow_stage=incoming_quality&flow_substep=inbound',
+  })
+})
+
+test('exception source, decision and selected step survive refresh and view canonicalization', () => {
+  const query = 'view=chain&chain=all&flow_role=purchase&flow_stage=cutting_quality&flow_exception=production_quality&flow_decision=scrap&flow_exception_step=execute'
+  assert.deepEqual(canonicalize(`${query}&node=purchase_order&process=old`), { changed: true, query })
+  assert.deepEqual(canonicalize(query), { changed: false, query })
+})

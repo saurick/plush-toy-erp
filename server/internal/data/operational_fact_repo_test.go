@@ -21,6 +21,7 @@ import (
 func TestOperationalFactRepo_SourceLessProductionDraftCannotPost(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_production")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	actor := client.AdminUser.Create().SetUsername("source-less-production-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
@@ -49,6 +50,7 @@ func TestOperationalFactRepo_SourceLessProductionDraftCannotPost(t *testing.T) {
 func TestOperationalFactRepo_FactCreationIdempotencyRequiresSamePayload(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_create_idempotency")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 
@@ -134,6 +136,7 @@ func TestOperationalFactRepo_FactCreationIdempotencyRequiresSamePayload(t *testi
 func TestOperationalFactUsecase_IdempotencyDistinguishesExplicitFactTimes(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_idempotency_explicit_times")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	logger := log.NewStdLogger(io.Discard)
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
@@ -294,6 +297,7 @@ func TestOperationalFactUsecase_IdempotencyDistinguishesExplicitFactTimes(t *tes
 func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalActionsAllowed(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_inactive_refs")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
@@ -314,7 +318,7 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 		t.Fatalf("seed product inventory failed: %v", err)
 	}
 	order, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{
-		Draft: biz.ProductionOrderDraft{OrderNo: "MO-INACTIVE-HISTORY", Items: []biz.ProductionOrderDraftItem{{
+		Draft: biz.ProductionOrderDraft{OrderNo: "MO-INACTIVE-HISTORY", Items: []biz.ProductionOrderDraftItem{{RouteCode: stringPtr(biz.ProductionWIPRoutePlushSewHandV1),
 			LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID, PlannedQuantity: decimal.NewFromInt(1),
 		}}},
 		ActorID: actor.ID, IdempotencyKey: "MO-INACTIVE-HISTORY",
@@ -322,6 +326,7 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 	if err != nil {
 		t.Fatalf("create production order failed: %v", err)
 	}
+	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, order.Order.ID)
 	order, err = orderUC.Release(ctx, &biz.ProductionOrderAction{
 		ID: order.Order.ID, ExpectedVersion: order.Order.Version, ActorID: actor.ID, IdempotencyKey: "MO-INACTIVE-HISTORY:RELEASE",
 	})
@@ -401,6 +406,7 @@ func TestOperationalFactUsecase_RejectsInactiveNewReferencesAndKeepsHistoricalAc
 func TestOperationalFactUsecase_ShipmentRejectsInactiveManualReferences(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_inactive_refs")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 
@@ -461,6 +467,7 @@ func TestOperationalFactUsecase_ShipmentRejectsInactiveManualReferences(t *testi
 func TestOperationalFactUsecase_SourceLinkedShipmentAndReservationAllowInactiveOrderReferences(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_source_linked_inactive_refs")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
@@ -599,6 +606,7 @@ func ptrString(value string) *string {
 func TestOperationalFactRepo_StockReservationChecksAvailableQuantity(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_reservation")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
@@ -641,6 +649,7 @@ func TestOperationalFactRepo_StockReservationChecksAvailableQuantity(t *testing.
 func TestOperationalFactRepo_StockReservationIdempotencyRequiresSamePayload(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_reservation_idempotency")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
@@ -689,6 +698,7 @@ func TestOperationalFactRepo_StockReservationIdempotencyRequiresSamePayload(t *t
 func TestOperationalFactRepo_SourceLessOutsourcingCannotPostButPostedFactCanReverse(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_outsourcing")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
@@ -780,6 +790,7 @@ func TestOperationalFactRepo_SourceLessOutsourcingCannotPostButPostedFactCanReve
 func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsCancelAllowed(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_outsourcing_inactive_refs")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 	actor := client.AdminUser.Create().SetUsername("inactive-outsourcing-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
@@ -893,6 +904,7 @@ func TestOperationalFactUsecase_OutsourcingRejectsInactiveNewReferencesAndKeepsC
 func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
@@ -996,6 +1008,7 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 func TestOperationalFactRepo_ShipmentFinanceReleaseProcessCommandUsesExistingTransaction(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "shipment_finance_release_process_command_tx")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	logger := log.NewStdLogger(io.Discard)
 	repo := NewOperationalFactRepo(data, logger)
@@ -1108,6 +1121,7 @@ func TestOperationalFactRepo_ShipmentFinanceReleaseProcessCommandUsesExistingTra
 func TestOperationalFactRepo_ShipmentFinanceRejectionUsesExistingTransaction(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "shipment_finance_rejection_process_command_tx")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	logger := log.NewStdLogger(io.Discard)
 	repo := NewOperationalFactRepo(data, logger)
@@ -1168,6 +1182,7 @@ func TestOperationalFactRepo_ShipmentFinanceRejectionUsesExistingTransaction(t *
 func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_net_weight")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
@@ -1270,6 +1285,7 @@ func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testi
 func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_net_weight_rollback")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	unitNetWeightG := decimal.RequireFromString("0.500000")
@@ -1350,6 +1366,7 @@ func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *t
 func TestOperationalFactRepo_ShipmentSourceIntegrityAndCumulativeQuantity(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_source_integrity")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
@@ -1477,6 +1494,7 @@ func TestOperationalFactRepo_ShipmentSourceIntegrityAndCumulativeQuantity(t *tes
 func TestOperationalFactRepo_ShipmentConsumesOwnReservationWithoutStealingAnotherOrder(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_reservation_consumption")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
@@ -1588,6 +1606,7 @@ func TestOperationalFactRepo_ShipmentConsumesOwnReservationWithoutStealingAnothe
 func TestOperationalFactRepo_ShipmentRejectsPartialAtomicReservationConsumption(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_partial_reservation")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
@@ -1647,6 +1666,7 @@ func TestOperationalFactRepo_ShipmentRejectsPartialAtomicReservationConsumption(
 func TestOperationalFactRepo_ShipmentRejectsRemainingReservationAcrossInventoryGrains(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_cross_grain_reservation")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	otherWarehouse := createTestProductWarehouse(t, ctx, client, "WH-CROSS-GRAIN")
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
@@ -1716,6 +1736,7 @@ func TestOperationalFactRepo_ShipmentRejectsRemainingReservationAcrossInventoryG
 func TestConsumeActiveStockReservationRejectsReleasedState(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_consume_active_condition")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	releasedAt := time.Now()
 	reservation := client.StockReservation.Create().
@@ -1748,6 +1769,7 @@ func TestConsumeActiveStockReservationRejectsReleasedState(t *testing.T) {
 func TestOperationalFactRepo_CreateShipmentDraftWithItemsRollsBackWhenItemFails(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_with_items_rollback")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 
@@ -1782,6 +1804,7 @@ func TestOperationalFactRepo_CreateShipmentDraftWithItemsRollsBackWhenItemFails(
 func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePayload(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_idempotency")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
@@ -1879,6 +1902,7 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 func TestOperationalFactRepo_ListShipmentsFiltersByPlannedShipDate(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_date_filter")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	earlyDate := time.Date(2026, 6, 1, 0, 0, 0, 0, time.UTC)
@@ -1924,6 +1948,7 @@ func TestOperationalFactRepo_ListShipmentsFiltersByPlannedShipDate(t *testing.T)
 func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_finance")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
@@ -2122,6 +2147,7 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 func TestOperationalFactUsecase_FinanceRejectsInactiveManualCounterparties(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_finance_inactive_counterparty")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 
 	customer, err := client.Customer.Create().

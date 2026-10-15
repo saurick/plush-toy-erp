@@ -6,12 +6,36 @@ export const LOGIN_MODE = Object.freeze({
 const LOGIN_MODE_STORAGE_KEY = 'erp:admin_login_mode'
 const SMS_LOGIN_SESSION_KEY = 'erp:admin_login_sms_state'
 
+const memoryStorage = { local: new Map(), session: new Map() }
 function safeStorage(type) {
   if (typeof window === 'undefined') return null
-  try {
-    return type === 'session' ? window.sessionStorage : window.localStorage
-  } catch {
-    return null
+  const memory = memoryStorage[type]
+  const storage = () =>
+    type === 'session' ? window.sessionStorage : window.localStorage
+  return {
+    getItem(key) {
+      try {
+        return storage().getItem(key)
+      } catch {
+        return memory.get(key) ?? null
+      }
+    },
+    setItem(key, value) {
+      memory.set(key, value)
+      try {
+        storage().setItem(key, value)
+      } catch {
+        /* Preferences may stay in memory. */
+      }
+    },
+    removeItem(key) {
+      memory.delete(key)
+      try {
+        storage().removeItem(key)
+      } catch {
+        /* Preferences may stay in memory. */
+      }
+    },
   }
 }
 

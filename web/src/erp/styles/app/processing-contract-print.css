@@ -423,3 +423,11 @@
   font-weight: 600;
   letter-spacing: 0.08em;
 }
+
+@media print {
+  .erp-processing-contract-table__cell-selected,
+  .erp-processing-contract-table__cell-selected-anchor {
+    background: transparent;
+    box-shadow: none;
+  }
+}

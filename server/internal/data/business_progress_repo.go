@@ -39,13 +39,12 @@ func (r *businessProgressRepo) ListBusinessProgress(ctx context.Context, q biz.B
 	result := &biz.BusinessProgressBoard{Rows: []*biz.BusinessProgressRow{}, SnapshotAt: q.SnapshotAt, Access: q.Access}
 	err := r.read(ctx, func(tx *stdsql.Tx) error {
 		cte, args := progressQuery(q, r.data.sqlDialect)
-		err := tx.QueryRowContext(ctx, cte+` SELECT COUNT(*),COALESCE(SUM(overdue),0),COALESCE(SUM(due_soon),0),
- COALESCE(SUM(blocked),0),COALESCE(SUM(CASE WHEN due_at IS NULL THEN 1 ELSE 0 END),0) FROM filtered`, args...).
-			Scan(&result.Counts.Total, &result.Counts.Overdue, &result.Counts.DueSoon, &result.Counts.Blocked, &result.Counts.Undated)
+		err := tx.QueryRowContext(ctx, cte+progressCountsSQL(q), args...).
+			Scan(&result.Counts.Total, &result.Counts.Overdue, &result.Counts.DueSoon, &result.Counts.Undated, &result.Counts.Blocked, &result.Counts.Unlinked)
 		if err != nil {
 			return err
 		}
-		if err = tx.QueryRowContext(ctx, cte+" SELECT COUNT(*) FROM filtered"+progressRiskWhere(q), args...).Scan(&result.Total); err != nil {
+		if err = tx.QueryRowContext(ctx, cte+" SELECT COUNT(*) FROM filtered"+(" WHERE "+progressFilterCondition(q)), args...).Scan(&result.Total); err != nil {
 			return err
 		}
 		result.Rows, err = loadBusinessProgressRows(ctx, tx, q, cte, args)
@@ -60,7 +59,7 @@ func loadBusinessProgressRows(ctx context.Context, tx *stdsql.Tx, q biz.Business
  active,unlinked,unit_name,CAST(ordered_quantity AS TEXT),CAST(shipped_quantity AS TEXT),delivery_known,engineering_total,engineering_ready,
  overdue,due_soon,blocked,production_orders,production_closed,material_total,material_pending,in_progress_batches,outsourced_batches,
  waiting_batches,rejected_batches,planned_batches,open_tasks,blocked_tasks,unassigned_tasks,attention_task_id,attention_task,
- attention_reason,attention_owner,attention_role,CAST(completed_quantity AS TEXT),current_operation,operation_count FROM filtered` + progressRiskWhere(q) +
+ attention_reason,attention_owner,attention_role,CAST(completed_quantity AS TEXT),current_operation,operation_count FROM filtered` + (" WHERE " + progressFilterCondition(q)) +
 		fmt.Sprintf(" ORDER BY active DESC,overdue DESC,blocked DESC,CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,due_at,id DESC LIMIT $%d OFFSET $%d", len(args)-1, len(args))
 	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {

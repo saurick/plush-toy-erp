@@ -1,3 +1,4 @@
+import { parseDateInputValue } from './dateRange.mjs'
 import { TASK_BOARD_PAGE_SIZE_OPTIONS } from './workflowTaskBoard.mjs'
 
 const integer = (value) => Number.isSafeInteger(value) && value >= 0
@@ -80,8 +81,8 @@ export function requireProgressBoard(value) {
     !validEnvelope(value) ||
     !Array.isArray(value.rows) ||
     !integer(value.total) ||
-    !['total', 'overdue', 'due_soon', 'blocked', 'undated'].every((key) =>
-      integer(value.counts?.[key])
+    !['total', 'overdue', 'due_soon', 'blocked', 'undated', 'unlinked'].every(
+      (key) => integer(value.counts?.[key])
     ) ||
     value.total > value.counts.total ||
     value.rows.length > value.total ||
@@ -133,58 +134,85 @@ export function requireProgressDetail(value) {
 }
 
 export const PROGRESS_SCOPE_OPTIONS = [
-  { value: 'active', label: '在执行' },
+  { value: 'active', label: '未结束' },
   { value: 'all', label: '全部记录' },
   { value: 'ended', label: '已结束' },
 ]
 
-export const PROGRESS_RISK_OPTIONS = [
-  { value: 'all', label: '不限' },
+export const PROGRESS_DUE_OPTIONS = [
+  { value: 'all', label: '不限交期' },
   { value: 'overdue', label: '已逾期' },
   { value: 'due_soon', label: '7天内到期' },
-  { value: 'blocked', label: '任务受阻' },
   { value: 'undated', label: '未定交期' },
-  { value: 'unlinked', label: '未关联销售' },
 ]
 
-export function progressRiskAvailable(risk, { scope, view }) {
-  if (risk === 'unlinked') return view === 'production'
-  return !(
-    scope === 'ended' && ['overdue', 'due_soon', 'blocked'].includes(risk)
+export function progressDueOptions(scope) {
+  return PROGRESS_DUE_OPTIONS.filter(({ value }) =>
+    scope !== 'ended' || !['overdue', 'due_soon'].includes(value)
   )
+}
+
+export function progressFilterCount(query) {
+  return [
+    query.scope !== 'active',
+    query.due_status !== 'all',
+    query.blocked_only,
+    query.unlinked_only,
+    Boolean(query.owner),
+    Boolean(query.date_from || query.date_to),
+  ].filter(Boolean).length
+}
+
+export const PROGRESS_FILTER_RESET = {
+  scope: 'active',
+  due_status: 'all',
+  blocked_only: false,
+  unlinked_only: false,
+  owner: '',
+  from: '',
+  to: '',
 }
 
 export function progressQueryFromURL(params) {
   const allowed = (key, values, fallback) =>
     values.includes(params.get(key)) ? params.get(key) : fallback
   const date = (key) =>
-    /^\d{4}-\d{2}-\d{2}$/u.test(params.get(key) || '') ? params.get(key) : ''
-  const page = Math.max(
-    1,
-    Math.min(50000, Number.parseInt(params.get('page'), 10) || 1)
-  )
+    /^\d{4}-\d{2}-\d{2}$/u.test(params.get(key) || '') &&
+    parseDateInputValue(params.get(key))
+      ? params.get(key)
+      : ''
+  const reversed = date('from') && date('to') && date('from') > date('to')
   const requestedLimit = Number(params.get('page_size'))
   const limit = TASK_BOARD_PAGE_SIZE_OPTIONS.includes(requestedLimit)
     ? requestedLimit
     : 20
+  const page = Math.max(
+    1,
+    Math.min(
+      Math.floor(1000000 / limit) + 1,
+      Number.parseInt(params.get('page'), 10) || 1
+    )
+  )
   const view = allowed('view', ['orders', 'production'], '')
   const scope = allowed('scope', ['active', 'all', 'ended'], 'active')
-  const requestedRisk = allowed(
-    'risk',
-    PROGRESS_RISK_OPTIONS.map(({ value }) => value),
+  const requestedDue = allowed(
+    'due_status',
+    PROGRESS_DUE_OPTIONS.map(({ value }) => value),
     'all'
   )
-  const risk = progressRiskAvailable(requestedRisk, { scope, view })
-    ? requestedRisk
+  const dueStatus = progressDueOptions(scope).some(({ value }) => value === requestedDue)
+    ? requestedDue
     : 'all'
   return {
     view,
     keyword: (params.get('q') || '').slice(0, 100),
     scope,
-    risk,
+    due_status: dueStatus,
+    blocked_only: scope !== 'ended' && params.get('blocked_only') === 'true',
+    unlinked_only: view === 'production' && params.get('unlinked_only') === 'true',
     owner: (params.get('owner') || '').slice(0, 100),
-    date_from: risk === 'undated' ? '' : date('from'),
-    date_to: risk === 'undated' ? '' : date('to'),
+    date_from: dueStatus === 'undated' || reversed ? '' : date('from'),
+    date_to: dueStatus === 'undated' || reversed ? '' : date('to'),
     limit,
     offset: (page - 1) * limit,
   }
@@ -194,7 +222,12 @@ function normalizeProgressFilterParams(params) {
   const next = new URLSearchParams(params)
   const query = progressQueryFromURL(next)
   next.set('scope', query.scope)
-  next.set('risk', query.risk)
+  next.set('due_status', query.due_status)
+  next.delete('risk')
+  for (const key of ['blocked_only', 'unlinked_only']) {
+    if (query[key]) next.set(key, 'true')
+    else next.delete(key)
+  }
   for (const [key, value] of [
     ['from', query.date_from],
     ['to', query.date_to],
@@ -211,14 +244,13 @@ export function withProgressFilters(params, changes) {
     if (value === '' || value === null || value === undefined) next.delete(key)
     else next.set(key, String(value))
   }
-  // A dated range and an undated record cannot match together. The user's
-  // latest choice wins; restored links keep their explicit attention filter.
+  // The last date choice wins; normalization also clears incompatible restored filters.
   if (
     (changes.from || changes.to) &&
-    changes.risk !== 'undated' &&
-    next.get('risk') === 'undated'
+    changes.due_status !== 'undated' &&
+    next.get('due_status') === 'undated'
   ) {
-    next.set('risk', 'all')
+    next.set('due_status', 'all')
   }
   return normalizeProgressFilterParams(next)
 }

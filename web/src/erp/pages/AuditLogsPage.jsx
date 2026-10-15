@@ -104,6 +104,12 @@ const actionMetaMap = {
     intent: '确认某个岗位可使用的功能是否变化',
     next: '重点核对修改前后的功能，确认是否新增账号管理等重要功能。',
   },
+  'role.settings.set': {
+    label: '岗位设置变更',
+    risk: 'high',
+    intent: '确认岗位功能、数据范围和导航设置的变化',
+    next: '核对岗位功能与数据范围是否符合实际职责。',
+  },
   'customer_config.publish': {
     label: '保存客户业务设置',
     risk: 'high',
@@ -293,7 +299,7 @@ function getActionMeta(event = {}) {
     ? event.risk_level
     : 'normal'
   return {
-    label: '其他系统操作',
+    label: getVisibleAuditText(event.action_label, '其他系统操作'),
     risk,
     intent: '系统记录了一项管理操作',
     next: '请核对操作人、相关账号或岗位和修改内容；如有疑问，请联系系统维护人员。',
@@ -310,6 +316,7 @@ function buildAuditConclusion(event = {}) {
   const target = getEventTargetText(event)
   const after = event.payload?.after || {}
   if (event.event_key === 'admin_user.password.reset') {
+    if (after.reset_to_temporary) return `${actor} 为 ${target} 生成了临时密码`
     if (after.reset_to_default) {
       return `${actor} 将 ${target} 的密码重置为默认密码`
     }
@@ -678,11 +685,7 @@ export default function AuditLogsPage() {
 
   return (
     <BusinessPageLayout className="erp-audit-records-page">
-      <PageHeaderCard
-        compact
-        title="系统操作记录"
-        stats={[{ key: 'total', label: '筛选结果', value: total }]}
-      />
+      <PageHeaderCard compact title="系统操作记录" />
       <BusinessOperationPanel
         compact
         clearFiltersDisabled={!hasActiveFilters}

@@ -272,3 +272,21 @@ test('quality rejection return eligibility and business fields are strict', () =
     )
   )
 })
+
+test('corrected outsourcing inspection replaces the superseded rejection', () => {
+  const previous = {
+    status: 'REJECTED',
+    result: 'REJECT',
+    superseded_at: 1720000000,
+  }
+  const replacement = { status: 'PASSED', result: 'PASS' }
+  assert.equal(
+    resolveOutsourcingReturnQualityGate([previous, replacement]).state,
+    'ACCEPTED'
+  )
+  assert.equal(
+    resolveOutsourcingReturnQualityGate([previous, { status: 'CANCELLED' }])
+      .state,
+    'PENDING'
+  )
+})

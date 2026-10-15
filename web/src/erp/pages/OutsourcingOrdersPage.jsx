@@ -109,7 +109,6 @@ import {
   OUTSOURCING_ORDER_LIFECYCLE_ACTIONS,
   OUTSOURCING_ORDER_SORT_OPTIONS,
   OUTSOURCING_ORDERS_MODULE_KEY,
-  buildOutsourcingOrderStats,
   canEditOutsourcingOrder,
   getOutsourcingOrderDisplayNo,
 } from '../components/outsourcing-orders/outsourcingOrderPageConfig.mjs'
@@ -523,11 +522,6 @@ export default function OutsourcingOrdersPage() {
     }
   }
 
-  const pageStats = buildOutsourcingOrderStats({
-    rows,
-    total,
-  })
-
   const resolveSupplierName = useCallback(
     (record = {}) =>
       record?.supplier_snapshot?.short_name ||
@@ -679,21 +673,26 @@ export default function OutsourcingOrdersPage() {
 
   return (
     <BusinessPageLayout className="erp-outsourcing-orders-page">
-      <div className="erp-business-page-navigation">
-        <Tabs
-          activeKey={searchParams.get('view') === 'items' ? 'items' : 'contracts'}
-          items={[
-            { key: 'contracts', label: '加工合同' },
-            ...(canRead ? [{ key: 'items', label: '加工明细' }] : []),
-          ]}
-          onChange={(view) => {
-            const next = new URLSearchParams(searchParams)
-            if (view === 'items') next.set('view', 'items')
-            else next.delete('view')
-            setSearchParams(next, { replace: true })
-          }}
-        />
-      </div>
+      <PageHeaderCard
+        compact
+        helpKey="processing-contracts"
+        title="委外订单"
+        viewSwitch={
+          <Tabs
+            activeKey={searchParams.get('view') === 'items' ? 'items' : 'contracts'}
+            items={[
+              { key: 'contracts', label: '加工合同' },
+              ...(canRead ? [{ key: 'items', label: '加工明细' }] : []),
+            ]}
+            onChange={(view) => {
+              const next = new URLSearchParams(searchParams)
+              if (view === 'items') next.set('view', 'items')
+              else next.delete('view')
+              setSearchParams(next, { replace: true })
+            }}
+          />
+        }
+      />
       {summaryVisible ? (
         <OutsourcingOrderSummaryPanel
           ref={summaryRef}
@@ -712,13 +711,6 @@ export default function OutsourcingOrdersPage() {
         />
       ) : (
         <>
-          <PageHeaderCard
-            compact
-            helpKey="processing-contracts"
-            title="委外订单"
-            stats={pageStats}
-          />
-
           <BusinessOperationPanel
             compact
             onClearFilters={clearFilters}
@@ -784,6 +776,7 @@ export default function OutsourcingOrdersPage() {
                   }}
                 />
                 <SelectFilter
+                  aria-label="加工厂"
                   className="erp-business-filter-control--status"
                   value={supplierFilter}
                   options={[
@@ -817,6 +810,7 @@ export default function OutsourcingOrdersPage() {
                   }}
                 />
                 <SelectFilter
+                  aria-label="排序方式"
                   className="erp-business-filter-control--sort"
                   value={sortValue}
                   options={OUTSOURCING_ORDER_SORT_OPTIONS}

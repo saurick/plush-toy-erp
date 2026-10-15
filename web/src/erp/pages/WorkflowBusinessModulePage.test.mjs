@@ -64,14 +64,14 @@ test('production records navigation stays mounted in the shared page header', ()
     layout,
     /<BusinessPageLayout[\s\S]*<PageHeaderCard[\s\S]*<ProductionRecordsNavigation[\s\S]*<Suspense[\s\S]*<Outlet/u
   )
-  assert.match(layout, /productionRecordsWorkspace:\s*\{ setHeaderStats \}/u)
+  assert.match(layout, /productionRecordsWorkspace:\s*true/u)
   for (const label of ['记录明细', '生产工序', '异常处理', '待审批']) {
     assert.ok(productionRecordsNavigation.includes(label))
   }
   assert.match(productionRecordsNavigation, /aria-label="生产记录工作区"/u)
   assert.doesNotMatch(source, /<ProductionRecordsNavigation|productionExceptionViewTabs/u)
-  assert.match(source, /productionRecordsWorkspace\.setHeaderStats/u)
-  assert.match(operationalFactsPage, /productionRecordsWorkspace\.setHeaderStats/u)
+  assert.doesNotMatch(source, /setHeaderStats/u)
+  assert.doesNotMatch(operationalFactsPage, /setHeaderStats/u)
   assert.match(
     operationalFactsPage,
     /productionRecordsWorkspace\s*\?\s*React\.Fragment\s*:\s*BusinessPageLayout/u
@@ -89,11 +89,10 @@ test('ordinary workflow pages keep the module title without persistent helper ta
   assert.doesNotMatch(source, /业务处理分开完成/u)
 })
 
-test('production exception disposition tabs refresh and summarize only the active workspace', () => {
+test('production exception disposition tabs refresh only the active workspace', () => {
   assert.match(source, /异常处理申请已刷新/u)
   assert.match(source, /productionExceptionRefreshRef\.current/u)
-  assert.match(source, /label: '异常记录'/u)
-  assert.match(source, /label: '当前显示'/u)
+  assert.doesNotMatch(source, /setHeaderStats|onSummaryChange/u)
   assert.match(
     source,
     /if \(!isWorkflowTaskWorkspaceActive\) \{[\s\S]*request\.finish\(\)[\s\S]*return false/u

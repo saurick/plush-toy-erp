@@ -40,7 +40,7 @@
 }
 
 .loading-page__description {
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   line-height: 1.7;
   color: var(--erp-text-muted, #4d5d53);
 }
@@ -53,14 +53,14 @@
 }
 
 .loading-page__action-button {
-  min-height: 34px;
+  min-height: max(34px, var(--erp-touch-target, 0px));
   padding: 0 14px;
   border: 1px solid var(--erp-border-strong, #bccbc2);
   border-radius: 8px;
   background: var(--erp-surface-bg, #fff);
   color: var(--erp-primary-strong, #0b4f96);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   line-height: 1.4;
   cursor: pointer;
 }

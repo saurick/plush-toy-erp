@@ -2,7 +2,7 @@
 
 GitLab 宿主上的自建 GitLab、隔离 Runner、备份与 GitHub 单向镜像定义见 [`gitlab/README.md`](gitlab/README.md)。它与业务服务部署分离，不会由生产 Compose 自动启动。
 
-当前仓库只保留一条部署主路径：`server/deploy/compose/prod`。
+正式部署主路径为 `server/deploy/compose/prod`。开发机的独立备用中间件见 [Orb 本地开发备用环境](compose/dev-orb/README.md)，它不承担 demo / test 发布。
 
 该目录的 `compose.observability.yml` 是可选独立日志工作台，采集当前工作区和显式启用的登记环境，不推进业务版本或数据库。入口与边界见[集中日志接入与运维](../../docs/observability/集中日志接入与运维.md)。
 

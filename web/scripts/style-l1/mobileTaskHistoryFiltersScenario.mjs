@@ -3,6 +3,7 @@ import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import { formatBusinessDate } from '../../src/erp/utils/businessDate.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { assertMobileFilterConsistency } from './mobileFilterConsistencyAssertions.mjs'
 
 export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
   const base = mobileTaskListOptionsScenario({ assert, path, outputDir })
@@ -98,10 +99,13 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
           count
         )
       await open()
+      const outcomeCounts = () => dialog.getByRole('group', { name: '处理结果筛选', exact: true }).locator('.erp-filter-chip__count').allTextContents()
+      assert.deepEqual(await outcomeCounts(), ['66', '64', '1', '1'])
       await dialog.getByText('今天', { exact: true }).click()
       await waitCount(1)
       await dialog.getByText('已完成', { exact: true }).click()
       await waitCount(0)
+      assert.deepEqual(await outcomeCounts(), ['1', '0', '1', '0'])
       await close()
       await page.getByText('当前筛选下暂无已办任务', { exact: true }).waitFor()
       await open()
@@ -110,12 +114,17 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       await close()
       assert.equal(
         await trigger.getAttribute('aria-label'),
-        '筛选已办，已应用 2 项'
+        '筛选已办，已应用 1 项'
       )
       assert.match(
         await page.getByLabel('当前已办筛选').innerText(),
-        /近 7 天 · 已完成/
+        /处理结果：已完成/
       )
+      const quick = page.getByRole('group', { name: '已办快捷筛选', exact: true })
+      await assertMobileFilterConsistency({ assert, quick, applied: page.getByLabel('当前已办筛选') })
+      const sevenDays = quick.getByRole('button', { name: '近 7 天', exact: true })
+      assert.equal(await sevenDays.locator('.erp-filter-chip__clear').count(), 1)
+      assert.doesNotMatch(await page.getByLabel('当前已办筛选').innerText(), /近 7 天/)
       const scroller = page.getByTestId('mobile-role-scroll')
       for (let i = 0; i < 8 && (await rows.count()) < 64; i += 1) {
         const count = await rows.count()
@@ -161,7 +170,7 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       await waitCount(64)
       assert.equal(
         await trigger.getAttribute('aria-label'),
-        '筛选已办，已应用 2 项'
+        '筛选已办，已应用 1 项'
       )
       await search.fill('历史筛选')
       await search.press('Enter')
@@ -187,15 +196,39 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
         .getByRole('button', { name: '自定义日期', exact: true })
         .click()
       const yesterday = formatBusinessDate((today - 86400) * 1000)
-      if (
-        yesterday.slice(0, 7) !== formatBusinessDate(today * 1000).slice(0, 7)
-      )
-        await dialog.getByRole('button', { name: '上个月' }).click()
-      const day = dialog.locator(`td[title="${yesterday}"]`)
+      const calendar = page.getByRole('dialog', { name: '选择处理日期范围', exact: true })
+      await calendar.waitFor()
+      if (yesterday.slice(0, 7) !== formatBusinessDate(today * 1000).slice(0, 7)) await calendar.getByRole('button', { name: '上个月', exact: true }).click()
+      const day = calendar.getByRole('button', { name: yesterday, exact: true })
+      await day.click()
+      assert.equal(await calendar.getByRole('button', { name: '应用日期', exact: true }).isEnabled(), false)
+      await waitCount(66)
+      await calendar.getByRole('button', { name: '取消', exact: true }).click()
+      await dialog.waitFor()
+      await dialog.getByRole('button', { name: '自定义日期', exact: true }).click()
+      await calendar.waitFor()
+      if (yesterday.slice(0, 7) !== formatBusinessDate(today * 1000).slice(0, 7)) await calendar.getByRole('button', { name: '上个月', exact: true }).click()
       await day.click()
       await day.click()
+      await waitCount(66)
+      for (const width of [320, 390, 430]) {
+        await page.setViewportSize({ width, height: 568 })
+        await waitForFiniteAnimations(page)
+        const geometry = await calendar.evaluate((node) => {
+          const content = node.querySelector('.ant-modal-content').getBoundingClientRect()
+          const footer = node.querySelector('.ant-modal-footer').getBoundingClientRect()
+          const closeButton = node.querySelector('.ant-modal-close').getBoundingClientRect()
+          const days = [...node.querySelectorAll('.erp-filter-date-days button')]
+          return { content: content.toJSON(), footer: footer.toJSON(), close: closeButton.toJSON(), dayCount: days.length, minDayHeight: Math.min(...days.map((day) => day.getBoundingClientRect().height)), viewport: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth - innerWidth }
+        })
+        assert.equal(geometry.dayCount, 42)
+        assert(geometry.minDayHeight >= 44 && geometry.close.height >= 44, JSON.stringify(geometry))
+        assert(geometry.content.left >= 0 && geometry.content.right <= geometry.viewport && geometry.content.top >= 0 && geometry.footer.bottom <= geometry.height && geometry.overflow <= 1, JSON.stringify(geometry))
+      }
+      await page.screenshot({ path: path.join(outputDir, 'mobile-history-date-range.png') })
+      await calendar.getByRole('button', { name: '应用日期', exact: true }).click()
+      await page.setViewportSize({ width: 390, height: 844 })
       await waitCount(64)
-      await close()
       assert.match(
         await page.getByLabel('当前已办筛选').innerText(),
         new RegExp(yesterday)
@@ -204,6 +237,7 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
         .getByLabel('任务状态', { exact: true })
         .getByText('待办', { exact: true })
         .click()
+      await waitForFiniteAnimations(page)
       assert.equal(await search.inputValue(), '排序')
       await page
         .getByLabel('任务状态', { exact: true })
@@ -255,6 +289,16 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       await page.screenshot({
         path: path.join(outputDir, 'mobile-history-filters-dark.png'),
       })
+      await dialog.getByRole('button', { name: `${yesterday} 至 ${yesterday}`, exact: true }).click()
+      await calendar.waitFor()
+      await dialog.waitFor({ state: 'hidden' })
+      await waitForFiniteAnimations(page)
+      await page.waitForFunction(() => {
+        const modal = document.querySelector('.erp-filter-date-dialog')
+        return modal && getComputedStyle(modal).opacity === '1' && !/-(appear|enter|leave)(-|\s|$)/u.test(modal.className)
+      })
+      await page.screenshot({ path: path.join(outputDir, 'mobile-history-date-range-dark.png') })
+      await calendar.getByRole('button', { name: '取消', exact: true }).click()
       await close()
     },
   }

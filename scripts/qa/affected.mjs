@@ -1117,6 +1117,9 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
           state.localGate = "full";
           addReason(state, "full", file);
         }
+      } else {
+        state.localGate = "full";
+        addReason(state, "full", file);
       }
       continue;
     }

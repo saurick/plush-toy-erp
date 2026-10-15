@@ -306,10 +306,10 @@
       "title": "财务核销分配",
       "domain": "shipping-finance",
       "kind": "Fact",
-      "purpose": "保存一笔已过账收付款对一条财务事实的核销金额。",
+      "purpose": "保存结算款过账核销或已过账首款后续抵扣一条应收应付的金额，以及撤销原因。",
       "boundary": "它是实际核销分录，不是收付款审批状态或应收应付主事实。",
       "lifecycle": "POSTED 后不可修改和删除；冲正通过新增 REVERSED 反向分配记录完成。",
-      "writeBoundary": "FinancePayment 的过账和冲正事务内由 OperationalFactUsecase/repo 写入。"
+      "writeBoundary": "OperationalFactUsecase/repo 在结算款过账、首款后续抵扣、单独撤销抵扣和收付款冲正事务内追加分配；不改写原记录。"
     },
     {
       "name": "finance_credit_notes",
@@ -336,8 +336,8 @@
       "title": "收付款单",
       "domain": "shipping-finance",
       "kind": "SourceDocument",
-      "purpose": "保存收款或付款的登记、审批、过账、账户凭据和金额。",
-      "boundary": "审批只改变单据阶段；只有显式过账事务才创建核销分配，Workflow done 不等于 payment POSTED。",
+      "purpose": "保存结算款、关联订单的首款或预付款、关联原款的实际退款及其登记、审批、过账、账户凭据和金额。",
+      "boundary": "审批只改变单据阶段，Workflow done 不等于 payment POSTED。结算款显式过账时核销；首款先确认实际收付，待同订单应收应付过账后再抵扣；退款独立审批和过账，不参与核销。",
       "lifecycle": "DRAFT 可经 ProcessRuntime 转 APPROVED 或 REJECTED；DRAFT 或受控 APPROVED 可 CANCELLED；APPROVED 可 POSTED；POSTED 可 REVERSED；不物理删除。",
       "writeBoundary": "OperationalFactUsecase 创建、取消和冲正；审批、拒绝与过账通过 ProcessRuntime 白名单领域命令执行。",
       "notes": "clean schema 明确称其为 accounting source document；已过账收付款与不可变核销事实由 finance_allocations 分层承接。",

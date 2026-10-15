@@ -77,6 +77,91 @@ export function createAuthenticationEntryScenarios({
       waitForPath,
       customerRuntimeEffectiveSession,
     }),
+    ...['mobile', 'desktop', 'login'].map((entry) => {
+      const sourcePath = {
+        mobile: '/m/boss/tasks?return=rules#mine',
+        desktop: '/erp/business-dashboard?return=rules#overview',
+        login: '/admin-login?return=rules#login',
+      }[entry]
+      return {
+        name: `legal-document-return-${entry}`,
+        path: sourcePath,
+        ...(entry === 'login' ? { mockAdminRpc: true } : { auth: 'admin' }),
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport:
+          entry === 'mobile'
+            ? { width: 390, height: 844 }
+            : { width: 1440, height: 900 },
+        verify: async (page) => {
+          if (entry === 'mobile') {
+            await page.getByTestId('mobile-role-nav-mine').click()
+          }
+          for (const mode of ['direct', 'tabs-and-reload', 'browser-back']) {
+            if (entry === 'mobile') {
+              await page.getByTestId('mobile-privacy-rules-entry').click()
+            } else if (entry === 'desktop') {
+              await page.getByTestId('desktop-account-menu-trigger').click()
+              await page
+                .getByRole('menuitem', { name: '隐私与使用规则' })
+                .click()
+            } else {
+              await page.getByRole('link', { name: '个人信息处理规则' }).click()
+            }
+            await waitForPath(page, '/legal/privacy')
+            if (mode !== 'direct') {
+              for (const name of [
+                '系统使用规则',
+                '个人信息处理规则',
+                '系统使用规则',
+              ]) {
+                await page.getByRole('link', { name, exact: true }).click()
+                await page.getByRole('heading', { name, exact: true }).waitFor()
+              }
+              await page.reload()
+              await page
+                .getByRole('heading', { name: '系统使用规则', exact: true })
+                .waitFor()
+            }
+            if (mode === 'browser-back') {
+              await page.goBack()
+            } else {
+              await page.getByRole('button', { name: '返回系统' }).click()
+            }
+            await page.waitForURL(
+              (url) => `${url.pathname}${url.search}${url.hash}` === sourcePath
+            )
+            if (entry === 'mobile') {
+              await page.getByTestId('mobile-privacy-rules-entry').waitFor()
+              assert.equal(
+                await page
+                  .getByTestId('mobile-role-nav-mine')
+                  .getAttribute('aria-selected'),
+                'true',
+                '查阅规则后应回到我的，不能回到默认首页'
+              )
+            } else if (entry === 'desktop') {
+              await page.getByTestId('desktop-account-menu-trigger').waitFor()
+            } else {
+              await page.getByLabel('账号').waitFor()
+            }
+          }
+        },
+      }
+    }),
+    {
+      name: 'legal-document-direct-visit',
+      path: '/legal/privacy',
+      mockAdminRpc: true,
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await page
+          .getByRole('link', { name: '系统使用规则', exact: true })
+          .click()
+        await page.getByRole('button', { name: '返回系统' }).click()
+        await waitForPath(page, '/admin-login')
+        await page.getByLabel('账号').waitFor()
+      },
+    },
     {
       name: 'admin-login-small-screen-disabled-entries',
       path: '/admin-login',

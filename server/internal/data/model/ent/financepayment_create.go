@@ -22,6 +22,76 @@ type FinancePaymentCreate struct {
 	hooks    []Hook
 }
 
+// SetKind sets the "kind" field.
+func (_c *FinancePaymentCreate) SetKind(v string) *FinancePaymentCreate {
+	_c.mutation.SetKind(v)
+	return _c
+}
+
+// SetNillableKind sets the "kind" field if the given value is not nil.
+func (_c *FinancePaymentCreate) SetNillableKind(v *string) *FinancePaymentCreate {
+	if v != nil {
+		_c.SetKind(*v)
+	}
+	return _c
+}
+
+// SetSourceType sets the "source_type" field.
+func (_c *FinancePaymentCreate) SetSourceType(v string) *FinancePaymentCreate {
+	_c.mutation.SetSourceType(v)
+	return _c
+}
+
+// SetNillableSourceType sets the "source_type" field if the given value is not nil.
+func (_c *FinancePaymentCreate) SetNillableSourceType(v *string) *FinancePaymentCreate {
+	if v != nil {
+		_c.SetSourceType(*v)
+	}
+	return _c
+}
+
+// SetSourceID sets the "source_id" field.
+func (_c *FinancePaymentCreate) SetSourceID(v int) *FinancePaymentCreate {
+	_c.mutation.SetSourceID(v)
+	return _c
+}
+
+// SetNillableSourceID sets the "source_id" field if the given value is not nil.
+func (_c *FinancePaymentCreate) SetNillableSourceID(v *int) *FinancePaymentCreate {
+	if v != nil {
+		_c.SetSourceID(*v)
+	}
+	return _c
+}
+
+// SetRefundOfPaymentID sets the "refund_of_payment_id" field.
+func (_c *FinancePaymentCreate) SetRefundOfPaymentID(v int) *FinancePaymentCreate {
+	_c.mutation.SetRefundOfPaymentID(v)
+	return _c
+}
+
+// SetNillableRefundOfPaymentID sets the "refund_of_payment_id" field if the given value is not nil.
+func (_c *FinancePaymentCreate) SetNillableRefundOfPaymentID(v *int) *FinancePaymentCreate {
+	if v != nil {
+		_c.SetRefundOfPaymentID(*v)
+	}
+	return _c
+}
+
+// SetPurposeNote sets the "purpose_note" field.
+func (_c *FinancePaymentCreate) SetPurposeNote(v string) *FinancePaymentCreate {
+	_c.mutation.SetPurposeNote(v)
+	return _c
+}
+
+// SetNillablePurposeNote sets the "purpose_note" field if the given value is not nil.
+func (_c *FinancePaymentCreate) SetNillablePurposeNote(v *string) *FinancePaymentCreate {
+	if v != nil {
+		_c.SetPurposeNote(*v)
+	}
+	return _c
+}
+
 // SetPaymentNo sets the "payment_no" field.
 func (_c *FinancePaymentCreate) SetPaymentNo(v string) *FinancePaymentCreate {
 	_c.mutation.SetPaymentNo(v)
@@ -355,6 +425,40 @@ func (_c *FinancePaymentCreate) AddAllocations(v ...*FinanceAllocation) *Finance
 	return _c.AddAllocationIDs(ids...)
 }
 
+// AddRefundIDs adds the "refunds" edge to the FinancePayment entity by IDs.
+func (_c *FinancePaymentCreate) AddRefundIDs(ids ...int) *FinancePaymentCreate {
+	_c.mutation.AddRefundIDs(ids...)
+	return _c
+}
+
+// AddRefunds adds the "refunds" edges to the FinancePayment entity.
+func (_c *FinancePaymentCreate) AddRefunds(v ...*FinancePayment) *FinancePaymentCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddRefundIDs(ids...)
+}
+
+// SetRefundSourceID sets the "refund_source" edge to the FinancePayment entity by ID.
+func (_c *FinancePaymentCreate) SetRefundSourceID(id int) *FinancePaymentCreate {
+	_c.mutation.SetRefundSourceID(id)
+	return _c
+}
+
+// SetNillableRefundSourceID sets the "refund_source" edge to the FinancePayment entity by ID if the given value is not nil.
+func (_c *FinancePaymentCreate) SetNillableRefundSourceID(id *int) *FinancePaymentCreate {
+	if id != nil {
+		_c = _c.SetRefundSourceID(*id)
+	}
+	return _c
+}
+
+// SetRefundSource sets the "refund_source" edge to the FinancePayment entity.
+func (_c *FinancePaymentCreate) SetRefundSource(v *FinancePayment) *FinancePaymentCreate {
+	return _c.SetRefundSourceID(v.ID)
+}
+
 // Mutation returns the FinancePaymentMutation object of the builder.
 func (_c *FinancePaymentCreate) Mutation() *FinancePaymentMutation {
 	return _c.mutation
@@ -392,6 +496,10 @@ func (_c *FinancePaymentCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *FinancePaymentCreate) defaults() error {
+	if _, ok := _c.mutation.Kind(); !ok {
+		v := financepayment.DefaultKind
+		_c.mutation.SetKind(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := financepayment.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -426,6 +534,34 @@ func (_c *FinancePaymentCreate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *FinancePaymentCreate) check() error {
+	if _, ok := _c.mutation.Kind(); !ok {
+		return &ValidationError{Name: "kind", err: errors.New(`ent: missing required field "FinancePayment.kind"`)}
+	}
+	if v, ok := _c.mutation.Kind(); ok {
+		if err := financepayment.KindValidator(v); err != nil {
+			return &ValidationError{Name: "kind", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.kind": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SourceType(); ok {
+		if err := financepayment.SourceTypeValidator(v); err != nil {
+			return &ValidationError{Name: "source_type", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.source_type": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SourceID(); ok {
+		if err := financepayment.SourceIDValidator(v); err != nil {
+			return &ValidationError{Name: "source_id", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.source_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.RefundOfPaymentID(); ok {
+		if err := financepayment.RefundOfPaymentIDValidator(v); err != nil {
+			return &ValidationError{Name: "refund_of_payment_id", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.refund_of_payment_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.PurposeNote(); ok {
+		if err := financepayment.PurposeNoteValidator(v); err != nil {
+			return &ValidationError{Name: "purpose_note", err: fmt.Errorf(`ent: validator failed for field "FinancePayment.purpose_note": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.PaymentNo(); !ok {
 		return &ValidationError{Name: "payment_no", err: errors.New(`ent: missing required field "FinancePayment.payment_no"`)}
 	}
@@ -600,6 +736,22 @@ func (_c *FinancePaymentCreate) createSpec() (*FinancePayment, *sqlgraph.CreateS
 		_node = &FinancePayment{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(financepayment.Table, sqlgraph.NewFieldSpec(financepayment.FieldID, field.TypeInt))
 	)
+	if value, ok := _c.mutation.Kind(); ok {
+		_spec.SetField(financepayment.FieldKind, field.TypeString, value)
+		_node.Kind = value
+	}
+	if value, ok := _c.mutation.SourceType(); ok {
+		_spec.SetField(financepayment.FieldSourceType, field.TypeString, value)
+		_node.SourceType = &value
+	}
+	if value, ok := _c.mutation.SourceID(); ok {
+		_spec.SetField(financepayment.FieldSourceID, field.TypeInt, value)
+		_node.SourceID = &value
+	}
+	if value, ok := _c.mutation.PurposeNote(); ok {
+		_spec.SetField(financepayment.FieldPurposeNote, field.TypeString, value)
+		_node.PurposeNote = &value
+	}
 	if value, ok := _c.mutation.PaymentNo(); ok {
 		_spec.SetField(financepayment.FieldPaymentNo, field.TypeString, value)
 		_node.PaymentNo = value
@@ -730,6 +882,39 @@ func (_c *FinancePaymentCreate) createSpec() (*FinancePayment, *sqlgraph.CreateS
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.RefundsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financepayment.RefundsTable,
+			Columns: []string{financepayment.RefundsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financepayment.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.RefundSourceIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   financepayment.RefundSourceTable,
+			Columns: []string{financepayment.RefundSourceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financepayment.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.RefundOfPaymentID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

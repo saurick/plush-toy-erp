@@ -22,6 +22,20 @@ type FinanceAllocationCreate struct {
 	hooks    []Hook
 }
 
+// SetReason sets the "reason" field.
+func (_c *FinanceAllocationCreate) SetReason(v string) *FinanceAllocationCreate {
+	_c.mutation.SetReason(v)
+	return _c
+}
+
+// SetNillableReason sets the "reason" field if the given value is not nil.
+func (_c *FinanceAllocationCreate) SetNillableReason(v *string) *FinanceAllocationCreate {
+	if v != nil {
+		_c.SetReason(*v)
+	}
+	return _c
+}
+
 // SetPaymentID sets the "payment_id" field.
 func (_c *FinanceAllocationCreate) SetPaymentID(v int) *FinanceAllocationCreate {
 	_c.mutation.SetPaymentID(v)
@@ -158,6 +172,11 @@ func (_c *FinanceAllocationCreate) defaults() error {
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *FinanceAllocationCreate) check() error {
+	if v, ok := _c.mutation.Reason(); ok {
+		if err := financeallocation.ReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reason", err: fmt.Errorf(`ent: validator failed for field "FinanceAllocation.reason": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.PaymentID(); !ok {
 		return &ValidationError{Name: "payment_id", err: errors.New(`ent: missing required field "FinanceAllocation.payment_id"`)}
 	}
@@ -246,6 +265,10 @@ func (_c *FinanceAllocationCreate) createSpec() (*FinanceAllocation, *sqlgraph.C
 		_node = &FinanceAllocation{config: _c.config}
 		_spec = sqlgraph.NewCreateSpec(financeallocation.Table, sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt))
 	)
+	if value, ok := _c.mutation.Reason(); ok {
+		_spec.SetField(financeallocation.FieldReason, field.TypeString, value)
+		_node.Reason = &value
+	}
 	if value, ok := _c.mutation.FinanceFactID(); ok {
 		_spec.SetField(financeallocation.FieldFinanceFactID, field.TypeInt, value)
 		_node.FinanceFactID = value

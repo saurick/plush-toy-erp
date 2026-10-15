@@ -77,19 +77,20 @@ test('inventory transaction lineage assertions use the visible business labels',
   assert.doesNotMatch(source, /expectText\(page, '已关联原流水'\)/u)
 })
 
-test('inventory header summary keeps view text in tabs and numeric values in cards', () => {
+test('inventory header keeps navigation compact without duplicate counts', () => {
   const startIndex = source.indexOf("name: 'inventory-visible-copy-desktop'")
   const interaction = source.slice(startIndex, startIndex + 2_600)
 
   assert.ok(startIndex >= 0)
-  assert.match(interaction, /expectedLabels:\s*\['筛选结果', '本页显示'\]/u)
+  assert.match(interaction, /assertBusinessHeaderCompact/u)
+  assert.doesNotMatch(interaction, /expectedLabels/u)
   assert.match(interaction, /name: '库存批次'/u)
   assert.match(interaction, /name: '库存变动记录'/u)
   assert.match(interaction, /assertTextAbsent\(page, '查看内容'\)/u)
   assert.doesNotMatch(interaction, /expectText\(page, '查看内容'\)/u)
-  assert.match(source, /name: 'inventory-numeric-summary-dark-mobile'/u)
-  assert.match(source, /inventory-numeric-summary-dark-mobile\.png/u)
-  assert.match(source, /inventory-numeric-summary-dark-mobile-header\.png/u)
+  assert.match(source, /name: 'inventory-compact-header-dark-mobile'/u)
+  assert.match(source, /inventory-compact-header-dark-mobile\.png/u)
+  assert.match(source, /inventory-compact-header-dark-mobile-header\.png/u)
 })
 
 test('product table headers keep the shared single-line browser regression', () => {

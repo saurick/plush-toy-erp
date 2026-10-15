@@ -23,7 +23,7 @@
 .erp-material-notes__closed,
 .erp-material-notes__opened {
   color: var(--erp-primary-color, #1677ff);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-material-notes .erp-material-notes__opened,
@@ -75,7 +75,7 @@
 
 .erp-material-product h3 {
   margin: 0 0 4px;
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
   line-height: 1.5;
 }
 
@@ -107,7 +107,7 @@
 }
 
 .erp-material-product__quantity small {
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   font-weight: normal;
   color: var(--erp-text-muted, #64748b);
 }
@@ -123,7 +123,7 @@
 
 .erp-material-sheet__order {
   color: var(--erp-text-muted, #64748b);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   margin: 0 0 12px;
   overflow-wrap: anywhere;
 }
@@ -194,7 +194,7 @@
   min-width: 20px;
   margin-right: 6px;
   color: var(--erp-text-muted, #64748b);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: normal;
 }
 
@@ -278,7 +278,7 @@
 .erp-material-card dt {
   color: var(--erp-text-muted, #64748b);
   margin-bottom: 5px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-material-card dd {
@@ -325,7 +325,7 @@
 .erp-material-view-switch .ant-segmented-item-label {
   min-height: 48px;
   padding: 10px 12px;
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
   line-height: 28px;
   font-weight: 700;
 }

@@ -101,7 +101,6 @@ const currentMarkdownModules = import.meta.glob(
 const archiveMarkdownModules = import.meta.glob(
   '../../../../docs/archive/**/*.md',
   {
-    eager: true,
     import: 'default',
     query: '?raw',
   }
@@ -455,11 +454,9 @@ export default function DevDocsPage() {
     allDirectoryKeys.every((key) => expandedKeys.has(key))
 
   const selectedDoc =
-    (isSearching
-      ? visibleDocs.find((item) => item.key === selectedKey)
-      : lifecycleDocs.find((item) => item.key === selectedKey)) ||
-    visibleDocs[0] ||
-    (isSearching ? undefined : lifecycleDocs[0])
+    (isSearching ? visibleDocs : lifecycleDocs).find(
+      (item) => item.key === selectedKey
+    ) || (isSearching ? undefined : visibleDocs[0] || lifecycleDocs[0])
   const {
     path: selectedDocPath,
     source: selectedDocSource,

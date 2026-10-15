@@ -32,13 +32,8 @@ fi
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
-if ! command -v pnpm >/dev/null 2>&1; then
-  echo "[bootstrap] 未找到 pnpm，请先安装 pnpm"
-  exit 1
-fi
-
-if ! command -v node >/dev/null 2>&1; then
-  echo "[bootstrap] 未找到 node，请先安装 Node"
+if ! command -v n >/dev/null 2>&1 || ! command -v node >/dev/null 2>&1; then
+  echo "[bootstrap] 请先安装 n，并在仓库根目录执行 n auto；安装说明见 scripts/README.md#版本锁定"
   exit 1
 fi
 
@@ -49,12 +44,16 @@ fi
 
 echo "[bootstrap] 运行本机环境自检"
 bash "$ROOT_DIR/scripts/doctor.sh"
+# shellcheck source=scripts/lib/pnpm.sh
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/lib/pnpm.sh"
+project_pnpm="$(resolve_project_pnpm "$ROOT_DIR")"
 
 if [[ "${BOOTSTRAP_SKIP_INSTALL:-0}" != "1" ]]; then
   echo "[bootstrap] 安装 web 依赖"
   (
     cd "$ROOT_DIR/web"
-    pnpm install
+    "$project_pnpm" install
   )
 
   echo "[bootstrap] 下载 server Go 依赖"

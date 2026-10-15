@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -36,6 +37,11 @@ VALUES (1,'source-handoff-purchase-arrival-1','handoff_purchase_arrival','旧到
 `); err != nil {
 		t.Fatal(err)
 	}
+	if _, err = tx.ExecContext(ctx, `UPDATE workflow_tasks SET assignee_id=17 WHERE id=2;
+INSERT INTO workflow_task_events (task_id,task_version,event_type,from_status_key,to_status_key,actor_id,idempotency_key,intent_hash,command_key,mutation_result,payload,created_at)
+VALUES (2,3,'completed','ready','done',99,'prior-terminal-receipt',repeat('a',64),'complete','{"contract":"workflow.task-mutation-result/v1","task":{"id":2,"task_status_key":"done","assignee_id":17}}','{}',now());`); err != nil {
+		t.Fatal(err)
+	}
 	sql, err := os.ReadFile(filepath.Join("model", "migrate", "20261010185222_migrate.sql"))
 	if err != nil {
 		t.Fatal(err)
@@ -65,5 +71,82 @@ VALUES (1,'source-handoff-purchase-arrival-1','handoff_purchase_arrival','旧到
 	var version int
 	if err = tx.QueryRowContext(ctx, `SELECT version FROM roles WHERE id=5`).Scan(&version); err != nil || version != 8 {
 		t.Fatalf("retired permission must invalidate custom role sessions: %d %v", version, err)
+	}
+	correction, err := os.ReadFile(filepath.Join("model", "migrate", "20261015082400_restore_terminal_task_assignees.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.ExecContext(ctx, string(correction)); err != nil {
+		t.Fatal(err)
+	}
+	var assignee int
+	if err = tx.QueryRowContext(ctx, "SELECT assignee_id FROM workflow_tasks WHERE id=2").Scan(&assignee); err != nil || assignee != 17 {
+		t.Fatalf("restored assignee=%d err=%v", assignee, err)
+	}
+	if _, err = tx.ExecContext(ctx, string(correction)); err != nil {
+		t.Fatal(err)
+	}
+	if err = tx.QueryRowContext(ctx, "SELECT count(*) FROM workflow_task_events WHERE payload->>'source'='terminal_task_assignee_restoration'").Scan(&changed); err != nil || changed != 1 {
+		t.Fatalf("restoration events=%d err=%v", changed, err)
+	}
+
+}
+
+func TestProductionOrderPostgresTerminalAssigneeRequiresOriginalProof(t *testing.T) {
+	data, _ := openPurchaseReceiptPostgresTestData(t)
+	migration, err := os.ReadFile(filepath.Join("model", "migrate", "20261015082400_restore_terminal_task_assignees.sql"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, receipt string
+		blocked       bool
+	}{
+		{"missing receipt", "", true},
+		{"different task", `{"contract":"workflow.task-mutation-result/v1","task":{"id":8,"task_status_key":"done","assignee_id":17}}`, true},
+		{"malformed assignee", `{"contract":"workflow.task-mutation-result/v1","task":{"id":2,"task_status_key":"done","assignee_id":"unknown"}}`, true},
+		{"proven originally unassigned", `{"contract":"workflow.task-mutation-result/v1","task":{"id":2,"task_status_key":"done"}}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := t.Context()
+			tx, err := data.sqldb.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = tx.Rollback() }()
+			for _, table := range []string{"workflow_tasks", "workflow_task_events"} {
+				if _, err = tx.ExecContext(ctx, "CREATE TEMP TABLE "+table+" (LIKE public."+table+" INCLUDING ALL) ON COMMIT DROP"); err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err = tx.ExecContext(ctx, `INSERT INTO workflow_tasks (id,task_code,task_group,task_name,source_type,source_id,task_status_key,owner_role_key,version,payload,created_at,updated_at)
+VALUES(2,'review-proof','handoff_production_completion','历史终态','production_wip_batch',2,'done','warehouse',4,'{}',now(),now());
+INSERT INTO workflow_task_events(task_id,task_version,event_type,from_status_key,to_status_key,payload,created_at)
+VALUES(2,4,'source_updated','done','done','{"source":"production_task_responsibility_migration"}',now());`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.receipt != "" {
+				_, err = tx.ExecContext(ctx, `INSERT INTO workflow_task_events(task_id,task_version,event_type,from_status_key,to_status_key,actor_id,idempotency_key,intent_hash,command_key,mutation_result,payload,created_at)
+VALUES(2,3,'completed','ready','done',99,'review-proof',repeat('b',64),'complete',$1::jsonb,'{}',now())`, tc.receipt)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			_, err = tx.ExecContext(ctx, string(migration))
+			if tc.blocked {
+				if err == nil || !strings.Contains(err.Error(), "assignee recovery blocked") {
+					t.Fatalf("unproven assignment must block: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var unchanged bool
+			if err = tx.QueryRowContext(ctx, "SELECT assignee_id IS NULL AND version=4 FROM workflow_tasks WHERE id=2").Scan(&unchanged); err != nil || !unchanged {
+				t.Fatalf("proven unassigned task was rewritten: %v", err)
+			}
+		})
 	}
 }

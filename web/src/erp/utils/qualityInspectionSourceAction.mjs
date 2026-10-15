@@ -92,7 +92,8 @@ export function resolveOutsourcingReturnQualityGate(inspections = []) {
     Array.isArray(inspections) ? inspections : []
   ).filter(
     (inspection) =>
-      String(inspection?.status || '').toUpperCase() !== 'CANCELLED'
+      String(inspection?.status || '').toUpperCase() !== 'CANCELLED' &&
+      !inspection?.superseded_at
   )
 
   if (activeInspections.length !== 1) {
@@ -135,21 +136,21 @@ export function resolveOutsourcingReturnQualityGate(inspections = []) {
 export function isPostedOutsourcingReturn(fact) {
   return Boolean(
     positiveID(fact?.id) &&
-      String(fact?.fact_type || '').toUpperCase() === 'RETURN_RECEIPT' &&
-      String(fact?.status || '').toUpperCase() === 'POSTED'
+    String(fact?.fact_type || '').toUpperCase() === 'RETURN_RECEIPT' &&
+    String(fact?.status || '').toUpperCase() === 'POSTED'
   )
 }
 
 export function isRejectedIncomingInspection(inspection) {
   return Boolean(
     positiveID(inspection?.id) &&
-      String(inspection?.status || '').toUpperCase() === 'REJECTED' &&
-      String(inspection?.result || '').toUpperCase() === 'REJECT' &&
-      String(inspection?.source_type || '').toUpperCase() ===
-        'PURCHASE_RECEIPT' &&
-      String(inspection?.inspection_type || '').toUpperCase() === 'INCOMING' &&
-      positiveID(inspection?.purchase_receipt_id) &&
-      positiveID(inspection?.purchase_receipt_item_id)
+    String(inspection?.status || '').toUpperCase() === 'REJECTED' &&
+    String(inspection?.result || '').toUpperCase() === 'REJECT' &&
+    String(inspection?.source_type || '').toUpperCase() ===
+      'PURCHASE_RECEIPT' &&
+    String(inspection?.inspection_type || '').toUpperCase() === 'INCOMING' &&
+    positiveID(inspection?.purchase_receipt_id) &&
+    positiveID(inspection?.purchase_receipt_item_id)
   )
 }
 
@@ -159,9 +160,9 @@ export function canCreatePurchaseReturnFromRejectedInspection(
 ) {
   return Boolean(
     isRejectedIncomingInspection(inspection) &&
-      positiveID(purchaseReceipt?.id) ===
-        positiveID(inspection?.purchase_receipt_id) &&
-      String(purchaseReceipt?.status || '').toUpperCase() === 'POSTED'
+    positiveID(purchaseReceipt?.id) ===
+      positiveID(inspection?.purchase_receipt_id) &&
+    String(purchaseReceipt?.status || '').toUpperCase() === 'POSTED'
   )
 }
 
@@ -186,14 +187,14 @@ export function buildOutsourcingReturnQualityInspectionPayload(
 export function isMatchingOutsourcingReturnQualityInspection(inspection, fact) {
   return Boolean(
     positiveID(inspection?.id) &&
-      positiveID(fact?.id) &&
-      String(inspection?.source_type || '').toUpperCase() ===
-        'OUTSOURCING_FACT' &&
-      positiveID(inspection?.source_id) === positiveID(fact.id) &&
-      String(inspection?.inspection_type || '').toUpperCase() ===
-        'OUTSOURCING_RETURN' &&
-      String(inspection?.subject_type || '').toUpperCase() === 'PRODUCT' &&
-      String(inspection?.status || '').toUpperCase() === 'DRAFT'
+    positiveID(fact?.id) &&
+    String(inspection?.source_type || '').toUpperCase() ===
+      'OUTSOURCING_FACT' &&
+    positiveID(inspection?.source_id) === positiveID(fact.id) &&
+    String(inspection?.inspection_type || '').toUpperCase() ===
+      'OUTSOURCING_RETURN' &&
+    String(inspection?.subject_type || '').toUpperCase() === 'PRODUCT' &&
+    String(inspection?.status || '').toUpperCase() === 'DRAFT'
   )
 }
 

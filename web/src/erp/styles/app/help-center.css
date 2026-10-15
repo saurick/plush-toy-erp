@@ -5,7 +5,7 @@
 .erp-help-center-page {
   min-width: 0;
   color: var(--erp-text);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.65;
 }
 
@@ -73,7 +73,7 @@
 .erp-help-role-note {
   margin: -12px 0 16px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-sidebar {
@@ -100,11 +100,11 @@
 .erp-help-mobile-picker label,
 .erp-help-sidebar__label {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-current-role > strong {
-  font-size: 14px;
+  font-size: var(--erp-font-body);
 }
 
 .erp-help-mobile-picker {
@@ -124,13 +124,13 @@
 .erp-help-topic--entry {
   width: calc(100% - 12px);
   margin-left: 12px;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-topics h2 {
   margin: 0 10px 8px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 500;
 }
 
@@ -173,7 +173,7 @@
   margin-top: 24px;
   gap: 8px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-sidebar__footer p {
@@ -201,7 +201,7 @@
   border: 1px solid var(--erp-border);
   border-radius: var(--erp-business-card-radius, 10px);
   background: var(--erp-surface-bg);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   line-height: 1.9;
 }
 
@@ -260,7 +260,7 @@
 .erp-help-reference-index > strong {
   width: 100%;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-reference-index button,
@@ -331,12 +331,12 @@
 
 .erp-help-search-results strong {
   color: var(--erp-primary-strong);
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
 }
 
 .erp-help-search-results__kind {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-search-results :where(button > span:last-child) {
@@ -393,14 +393,14 @@
 .erp-help-flow__heading h3,
 .erp-help-view-body h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   font-weight: 600;
 }
 
 .erp-help-flow__heading > span,
 .erp-help-caption {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-flow__scroll {
@@ -455,7 +455,7 @@
 .erp-help-flow__step-copy > span,
 .erp-help-flow__step-copy em {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-style: normal;
 }
 
@@ -475,7 +475,7 @@
   border-radius: 50%;
   background: var(--erp-surface-bg);
   color: var(--erp-primary-strong);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 600;
 }
 
@@ -522,7 +522,7 @@
   display: block;
   min-height: 26px;
   color: var(--erp-warning-text);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-flow__condition {
@@ -558,7 +558,7 @@
 }
 
 .erp-help-flow__issue :where(button) > span {
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-flow__return {
@@ -634,13 +634,12 @@
 
 .erp-help-example :where(figcaption) > span {
   color: var(--erp-text-muted);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }
 
 .erp-help-example__area {
   position: relative;
   padding: 16px 13px 16px 46px;
-  border-left: 3px solid transparent;
 }
 
 .erp-help-example__area + .erp-help-example__area {
@@ -648,7 +647,6 @@
 }
 
 .erp-help-example__area[data-active='true'] {
-  border-left-color: var(--erp-primary);
   background: var(--erp-primary-softer);
 }
 
@@ -682,14 +680,14 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-example__fields strong,
 .erp-help-example__quantity strong {
   display: block;
   color: var(--erp-text);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
 }
 
 .erp-help-example__quantity {
@@ -698,7 +696,7 @@
 
 .erp-help-example__quantity > :where(span:first-child) {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-example__quantity strong {
@@ -707,7 +705,7 @@
 }
 
 .erp-help-example__quantity small {
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 400;
 }
 
@@ -716,7 +714,7 @@
   border-radius: 4px;
   background: var(--erp-primary-soft);
   color: var(--erp-primary-strong);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-example__action {
@@ -739,7 +737,7 @@
 .erp-help-example table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-variant-numeric: tabular-nums;
 }
 
@@ -849,7 +847,7 @@
   padding: 8px 4px;
   margin: 0;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-result__change {
@@ -879,14 +877,14 @@
 .erp-help-result__change small {
   margin-top: 4px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-result__delta {
   display: grid;
   gap: 5px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-result dl,
@@ -960,7 +958,7 @@
 
 .erp-help-exception-path > li > span {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-exception-path > li:not(:last-child)::after {
@@ -981,7 +979,7 @@
 .erp-help-exception-example h4 {
   margin: 0 0 10px;
   color: var(--erp-warning-text);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-help-exception-example dl {
@@ -1017,7 +1015,7 @@
 
 .erp-help-muted {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-source-details {
@@ -1045,7 +1043,7 @@
 
 .erp-help-role-context {
   margin: 4px 2px 0;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-help-topic:focus-visible,
@@ -1179,7 +1177,7 @@
 
   .erp-help-exception-path {
     gap: 15px;
-    font-size: 12px;
+    font-size: var(--erp-font-caption);
   }
 
   .erp-help-exception-path > li:not(:last-child)::after {

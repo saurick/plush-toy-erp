@@ -22,11 +22,11 @@ go run ./cmd/schema-doc --write
 | 项目 | 数量 |
 | --- | ---: |
 | 应用表 | 76 |
-| 字段 | 1278 |
-| 外键 | 156 |
-| 显式索引 | 345 |
+| 字段 | 1284 |
+| 外键 | 157 |
+| 显式索引 | 347 |
 | 其中 partial index | 34 |
-| 命名 / 表级 CHECK | 316 |
+| 命名 / 表级 CHECK | 317 |
 
 ## 分域入口
 
@@ -57,10 +57,10 @@ go run ./cmd/schema-doc --write
 | [`deployment_module_states`](账号权限与配置.md#table-deployment-module-states) | 模块状态投影 | 账号、权限与配置 | Derived / 派生投影 | 保存客户配置版本编译出的模块 enabled、read_only 或 disabled 状态。 |
 | [`engineering_material_request_items`](销售与采购.md#table-engineering-material-request-items) | 工程用料汇总明细 | 销售与采购 | Source Document / 源单据 | 按材料和单位归并本订单各部位用料，冻结厂商、规格快照和应需数量；财务批准时直接以应需数量生成采购行。 |
 | [`engineering_material_requests`](销售与采购.md#table-engineering-material-requests) | 工程用料审批 | 销售与采购 | Source Document / 源单据 | 保存订单用料汇总的提交、老板审核、财务审核、退回和不可改写的来源快照。 |
-| [`finance_allocations`](出货与财务.md#table-finance-allocations) | 财务核销分配 | 出货与财务 | Fact / 事实 | 保存一笔已过账收付款对一条财务事实的核销金额。 |
+| [`finance_allocations`](出货与财务.md#table-finance-allocations) | 财务核销分配 | 出货与财务 | Fact / 事实 | 保存结算款过账核销或已过账首款后续抵扣一条应收应付的金额，以及撤销原因。 |
 | [`finance_credit_notes`](出货与财务.md#table-finance-credit-notes) | 财务红冲 | 出货与财务 | Fact / 事实 | 保存针对财务事实的红冲及反向红冲记录。 |
 | [`finance_facts`](出货与财务.md#table-finance-facts) | 业务财务事实 | 出货与财务 | Fact / 事实 | 保存来源可追溯的应收、应付、发票和对账事实。 |
-| [`finance_payments`](出货与财务.md#table-finance-payments) | 收付款单 | 出货与财务 | Source Document / 源单据 | 保存收款或付款的登记、审批、过账、账户凭据和金额。 |
+| [`finance_payments`](出货与财务.md#table-finance-payments) | 收付款单 | 出货与财务 | Source Document / 源单据 | 保存结算款、关联订单的首款或预付款、关联原款的实际退款及其登记、审批、过账、账户凭据和金额。 |
 | [`inventory_balances`](库存与质检.md#table-inventory-balances) | 库存余额投影 | 库存与质检 | Derived / 派生投影 | 按物料或产品、SKU、仓库、批次和单位保存当前库存余额。 |
 | [`inventory_lot_status_events`](库存与质检.md#table-inventory-lot-status-events) | 库存批次状态事件 | 库存与质检 | Fact / 事实 | 追加保存命名批次动作的前后状态、版本、原因、actor、幂等键和关联质检证据。 |
 | [`inventory_lots`](库存与质检.md#table-inventory-lots) | 库存批次 | 库存与质检 | Fact / 事实 | 保存库存批次身份、物料或产品粒度、供应商批号及质量可用状态。 |

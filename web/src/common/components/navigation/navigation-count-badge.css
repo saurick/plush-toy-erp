@@ -10,7 +10,7 @@
   border-radius: 10px;
   background: var(--navigation-count-bg);
   color: var(--navigation-count-color);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 20px;
@@ -24,5 +24,5 @@
 }
 
 .navigation-count-badge small {
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }

@@ -87,7 +87,9 @@ Node 公共依赖安装固定优先使用 pnpm store，并直连 `https://regist
 
 `govulncheck` 固定安装 `v1.6.0`，`shfmt` 固定安装 `v3.13.1`；两者的安装命令都使用上述代理和 checksum database，并保留有界重试与超时。Runner bootstrap 不依赖 GitHub Release CDN，避免可达性间歇变化绕过统一模块校验路径。最终门禁必须分别用 `ubuntu`、`root`、`gitlab-runner` 的登录 shell 读回相同的 `GOPROXY` 与 `GOSUMDB`，防止 bootstrap 成功但 CI job 回到不可达或未校验的下载路径。
 
-恢复执行 Runner bootstrap 时，只有 Node、pnpm、Go 的固定安装路径、符号链接目标和精确版本同时匹配，才跳过对应的基础工具下载。任一条件缺失或不匹配时，仍走原有的 checksum 校验下载与原子替换；不得仅凭 `command -v` 或文件存在就判定可复用。
+Runner 的 Node 统一由固定版本 `n` 管理，目标版本与根目录 `.n-node-version` 一致。bootstrap 先校验并安装 `n`，再把通过固定 SHA-256 校验的 Node 归档解压到 `n` 缓存，使用 `n --offline` 安装到 `/usr/local`。安装读回通过后清理原独立前缀；CI job 只核对版本，不切换共享工具链。pnpm 仍按 `web/package.json#packageManager` 固定安装。
+
+恢复执行 Runner bootstrap 时，`n` 必须满足精确版本、脚本校验值和 root 归属；Node 必须与 `n` 缓存二进制一致，npm / npx / Corepack 链接及 Node 精确版本也须匹配。pnpm、Go 同样核对固定路径、符号链接目标和精确版本后才复用。任一条件缺失或不匹配时重新走对应校验安装路径，不能仅凭 `command -v` 或文件存在判定可复用。仓库配方验证不代表现有 Runner 已更新，目标机应用仍按运行操作授权执行。
 
 `govulncheck`、`shfmt`、Atlas、gitleaks 与 GitLab Runner 同样只在固定路径、精确版本及 `root:root 0755` 同时匹配时复用，否则重新进入各自的校验安装路径。gitleaks 先解压到私有临时目录，再显式安装为 `root:root 0755`，不继承发布归档内的 uid/gid。
 

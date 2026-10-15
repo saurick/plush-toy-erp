@@ -19,6 +19,7 @@ import {
   statisticsRatio,
   statisticsSum,
   statisticsQueryFromURL,
+  normalizeStatisticsStatus,
   statisticsPaginationFromURL,
   STATISTICS_AGES,
   STATISTICS_STATUSES,
@@ -152,16 +153,24 @@ export default function useBusinessStatistics({
   navigate,
 }) {
   const canSales =
+    canOpen('/erp/sales/project-orders/sales-orders') &&
     hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_READ) &&
     hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_ITEM_READ)
   const canFinance =
+    canOpen('/erp/finance/receivables') &&
     hasActionPermission(adminProfile, PermissionCode.FINANCE_RECEIVABLE_READ) &&
-    hasActionPermission(adminProfile, PermissionCode.FIELD_FINANCE_SETTLEMENT_READ)
+    hasActionPermission(
+      adminProfile,
+      PermissionCode.FIELD_FINANCE_SETTLEMENT_READ
+    )
   const queryKey = JSON.stringify(statisticsQueryFromURL(params))
   const query = useMemo(() => JSON.parse(queryKey), [queryKey])
   const groupKey = params.get('group_key') || ''
   const groupLabel = params.get('group_name') || ''
-  const sourceFilter = params.get('source_status') || 'all'
+  const sourceFilter = normalizeStatisticsStatus(
+    query.report,
+    params.get('source_status')
+  )
   const sourceFrom = params.get('source_from') || ''
   const sourceTo = params.get('source_to') || ''
   const { limit: sourcePageSize, offset: sourceOffset } =

@@ -150,6 +150,7 @@ type DebugBusinessDataClearResult struct {
 }
 
 type DebugBusinessDataClearInput struct {
+	ActorID      int
 	DryRun       bool
 	Confirmation string
 }
@@ -375,6 +376,9 @@ func (uc *DebugUsecase) ClearBusinessData(ctx context.Context, in DebugBusinessD
 	}
 	if !in.DryRun && in.Confirmation != DebugBusinessDataClearConfirmation {
 		return nil, ErrDebugBusinessDataClearConfirmationInvalid
+	}
+	if !in.DryRun && in.ActorID <= 0 {
+		return nil, ErrBadParam
 	}
 	return uc.repo.ClearBusinessData(ctx, in)
 }

@@ -434,10 +434,41 @@ export async function runProductionOrderBrowserE2E({
 
     await resetLogin(page);
     await login(page, frontend, noPermissionUsername, password);
+    const deniedResponse = page
+      .waitForResponse(
+        (response) => {
+          try {
+            return (
+              response.request().postDataJSON()?.method ===
+              "list_production_orders"
+            );
+          } catch {
+            return false;
+          }
+        },
+        { timeout: PAGE_TIMEOUT_MS },
+      )
+      .then(async (response) => {
+        const body = await response.json();
+        const data = body?.result?.data;
+        if (Number(data?.total || 0) > 0 || data?.production_orders?.length)
+          throw new Error("无权限角色直达生产订单后读取到了业务数据");
+      });
+    // A guarded route may redirect without making a business request.
+    deniedResponse.catch(() => {});
     await page.goto(new URL("/erp/production/orders", frontend).toString(), {
       waitUntil: "domcontentloaded",
     });
-    await page.waitForTimeout(800);
+    await Promise.race([
+      deniedResponse,
+      page.waitForURL((url) => url.pathname !== "/erp/production/orders", {
+        timeout: PAGE_TIMEOUT_MS,
+      }),
+      page
+        .getByText(/无权访问|暂无访问权限|没有权限访问/)
+        .first()
+        .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS }),
+    ]);
     if (page.url().includes("/erp/production/orders")) {
       const heading = page.getByRole("heading", { name: "生产订单" });
       if (

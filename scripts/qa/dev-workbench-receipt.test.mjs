@@ -231,3 +231,19 @@ test("dev workbench receipt writer validates the final object before persisting"
     assert.equal(existsSync(outPath), false);
   });
 });
+
+test('passed receipts reject missing or modified artifacts on readback', () => {
+  withRepo(repoRoot => {
+    const receipt = buildDevWorkbenchReceipt({
+      artifactPaths: ['artifact.txt'], durationMs: 10, finishedAt: 20,
+      gate: 'full', gitContext, metrics: {}, notProven: ['target release'],
+      profile: 'full', repoRoot, startedAt: 10, status: 'passed',
+      summary: {executed: 1, passed: 1, failed: 0, skipped: 0},
+    })
+    assert.equal(validateDevWorkbenchReceipt(receipt, {repoRoot}), receipt)
+    writeFileSync(path.join(repoRoot,'artifact.txt'), 'changed artifact')
+    assert.throws(() => validateDevWorkbenchReceipt(receipt, {repoRoot}), /artifact/)
+    rmSync(path.join(repoRoot,'artifact.txt'))
+    assert.throws(() => validateDevWorkbenchReceipt(receipt, {repoRoot}), /artifact/)
+  })
+})

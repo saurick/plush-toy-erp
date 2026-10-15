@@ -225,7 +225,7 @@ test('shipment source import requires a writable mode and both source read permi
 test('sales delivery drafts use fail-closed load-before-edit and optimistic save', () => {
   assert.match(
     source,
-    /hasActionPermission\(adminProfile, 'shipment\.update'\)/u
+    /hasActionPermission\(\s*adminProfile,\s*'shipment\.update'\s*\)/u
   )
   assert.match(source, /const openEdit = async \(shipment\) =>/u)
   assert.match(
@@ -280,7 +280,7 @@ test('draft shipment starts the versioned finance approval process', () => {
     /action: 'release',[\s\S]{0,120}authorized: canSubmitShipmentRelease/u
   )
   assert.match(source, /action: 'ship',[\s\S]{0,120}authorized: canShip/u)
-  assert.match(source, /showProcessSubmissionReceipt\(\{ result, title: '财务审批已提交/u)
+  assert.match(source, /showProcessSubmissionReceipt\(\{\s*result,\s*title: '财务审批已提交/u)
   assert.match(source, /成品质检仍由品质检验单独判定/u)
   assert.match(source, /审批通过也不等于已出货/u)
 })
@@ -296,7 +296,7 @@ test('shipment cancellation distinguishes draft exit from shipped reversal', () 
   assert.match(source, /\? '作废草稿'\s*: '撤销已出货'/u)
   assert.match(
     source,
-    /hasActionPermission\(adminProfile, 'shipment\.cancel'\)/u
+    /hasActionPermission\(\s*adminProfile,\s*'shipment\.cancel'\s*\)/u
   )
 })
 

@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { withDeadline } from './boundedWait.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { verifyPurchaseArrivalRedesign } from './purchaseArrivalRedesignScenarios.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
@@ -14,7 +15,7 @@ export function createBusinessFormInteractionScenarios({
   assertTextAbsent,
   assertBusinessPageRefreshEntrypoint,
   assertBusinessHeaderHasNoSectionTitle,
-  assertBusinessHeaderStatsSingleLine,
+  assertBusinessHeaderCompact,
   assertBusinessMainTableHasNoOperationColumn,
   assertBusinessMainTableInitialSelectionEmpty,
   assertBusinessMainTableSortableColumns,
@@ -133,9 +134,7 @@ export function createBusinessFormInteractionScenarios({
       `${scenarioName} 当前操作区不应横向溢出: ${JSON.stringify(metrics)}`
     )
     assert.equal(
-      await page
-        .locator('.erp-business-selection-action-menu:visible')
-        .count(),
+      await page.locator('.erp-business-selection-action-menu:visible').count(),
       0,
       `${scenarioName} 更多操作面板默认必须关闭`
     )
@@ -351,9 +350,8 @@ export function createBusinessFormInteractionScenarios({
         await assertBusinessHeaderHasNoSectionTitle(page, {
           scenarioName: 'material-master-header-desktop',
         })
-        await assertBusinessHeaderStatsSingleLine(page, {
+        await assertBusinessHeaderCompact(page, {
           scenarioName: 'material-master-header-desktop',
-          expectedLabels: ['总材料', '本页显示', '启用材料'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'material-master-header-desktop',
@@ -621,7 +619,10 @@ export function createBusinessFormInteractionScenarios({
         await expectText(page, '下单日期')
         await expectText(page, '预计到货日期')
         await expectText(page, '新建采购订单')
-        await purchaseOrderInitialReferenceStarted
+        await withDeadline(
+          purchaseOrderInitialReferenceStarted,
+          'purchaseOrderInitialReferenceStarted'
+        )
         const createButton = page
           .locator('button.erp-business-list-toolbar__primary-action')
           .filter({ hasText: '新建采购订单' })
@@ -648,9 +649,15 @@ export function createBusinessFormInteractionScenarios({
 
         purchaseOrderMaterialReferenceMode = 'fail'
         await refreshButton.click()
-        await purchaseOrderFailedRefreshSettled
+        await withDeadline(
+          purchaseOrderFailedRefreshSettled,
+          'purchaseOrderFailedRefreshSettled'
+        )
         releasePurchaseOrderInitialReference()
-        await purchaseOrderPendingReferenceDrained
+        await withDeadline(
+          purchaseOrderPendingReferenceDrained,
+          'purchaseOrderPendingReferenceDrained'
+        )
         await refreshButton.waitFor({ state: 'visible', timeout: 10_000 })
         await page.waitForFunction(
           (button) => Boolean(button && !button.disabled),
@@ -668,7 +675,10 @@ export function createBusinessFormInteractionScenarios({
         )
         purchaseOrderMaterialReferenceMode = 'empty'
         await refreshButton.click()
-        await purchaseOrderEmptyRefreshSettled
+        await withDeadline(
+          purchaseOrderEmptyRefreshSettled,
+          'purchaseOrderEmptyRefreshSettled'
+        )
         await page.waitForFunction(
           (button) => Boolean(button && !button.disabled),
           await refreshButton.elementHandle()
@@ -695,7 +705,10 @@ export function createBusinessFormInteractionScenarios({
 
         purchaseOrderMaterialReferenceMode = 'full'
         await refreshButton.click()
-        await purchaseOrderFullRefreshSettled
+        await withDeadline(
+          purchaseOrderFullRefreshSettled,
+          'purchaseOrderFullRefreshSettled'
+        )
         await page.waitForFunction(
           (button) => Boolean(button && !button.disabled),
           await refreshButton.elementHandle()
@@ -708,9 +721,8 @@ export function createBusinessFormInteractionScenarios({
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
         })
-        await assertBusinessHeaderStatsSingleLine(page, {
+        await assertBusinessHeaderCompact(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
-          expectedLabels: ['符合条件', '本页显示'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
@@ -1250,9 +1262,8 @@ export function createBusinessFormInteractionScenarios({
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'shipment-date-filter-desktop',
         })
-        await assertBusinessHeaderStatsSingleLine(page, {
+        await assertBusinessHeaderCompact(page, {
           scenarioName: 'shipment-date-filter-desktop',
-          expectedLabels: ['符合条件', '本页显示'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'shipment-date-filter-desktop',
@@ -1592,22 +1603,40 @@ export function createBusinessFormInteractionScenarios({
         assert.match(await note.locator('summary').innerText(), /核对后保留/)
         for (const [type, title, field, value] of [
           ['transfer', '登记库存调拨', '调拨数量', '5'],
-          ['manual_adjustment', '登记人工库存调整', '调整数量（增加填正数，扣减填负数）', '-2'],
+          [
+            'manual_adjustment',
+            '登记人工库存调整',
+            '调整数量（增加填正数，扣减填负数）',
+            '-2',
+          ],
         ]) {
           await closeBusinessFormModal(page, dialog)
-          const action = page.locator(`button[data-business-action-key="inventory-${type}"]:visible`)
+          const action = page.locator(
+            `button[data-business-action-key="inventory-${type}"]:visible`
+          )
           if (!(await action.count())) {
             await page.getByRole('button', { name: /^更多操作，共/u }).click()
           }
           await action.click()
           await dialog.getByText(title, { exact: true }).waitFor()
           await dialog.getByLabel(field, { exact: true }).fill(value)
-          assert.equal(await dialog.getByLabel(field, { exact: true }).inputValue(), value)
-          assert.equal(await dialog.getByLabel('目标仓库', { exact: true }).count(), type === 'transfer' ? 1 : 0)
-          assert.equal(await dialog.locator('.erp-optional-field__summary').count(), 0)
+          assert.equal(
+            await dialog.getByLabel(field, { exact: true }).inputValue(),
+            value
+          )
+          assert.equal(
+            await dialog.getByLabel('目标仓库', { exact: true }).count(),
+            type === 'transfer' ? 1 : 0
+          )
+          assert.equal(
+            await dialog.locator('.erp-optional-field__summary').count(),
+            0
+          )
           await page.setViewportSize({ width: 390, height: 844 })
           await assertNoHorizontalOverflow(page, `inventory-${type}-narrow`)
-          await dialog.screenshot({ path: path.join(outputDir, `inventory-${type}-narrow.png`) })
+          await dialog.screenshot({
+            path: path.join(outputDir, `inventory-${type}-narrow.png`),
+          })
           await page.setViewportSize({ width: 1600, height: 900 })
         }
       },
@@ -1632,7 +1661,7 @@ export function createBusinessFormInteractionScenarios({
       },
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectHeading(page, '收付款与核销')
+        await expectHeading(page, '收付款')
         await expectText(page, 'PAY-STYLE-L1')
         await expectText(page, '回单 STYLE-L1')
         await expectText(page, '暗色客户')
@@ -1688,9 +1717,8 @@ export function createBusinessFormInteractionScenarios({
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'exception-finance-payment-dark-desktop',
         })
-        await assertBusinessHeaderStatsSingleLine(page, {
+        await assertBusinessHeaderCompact(page, {
           scenarioName: 'exception-finance-payment-dark-desktop',
-          expectedLabels: ['收付款记录', '本页显示'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'exception-finance-payment-dark-desktop',
@@ -1702,7 +1730,10 @@ export function createBusinessFormInteractionScenarios({
         const financeDataCard = page
           .locator('.erp-finance-payments-page .erp-business-data-table-card')
           .first()
-        const financeTabsNav = financeDataCard.locator('.ant-tabs-nav').first()
+        const financeViewCard = page.locator(
+          '.erp-finance-payments-page .erp-business-page-header-card'
+        )
+        const financeTabsNav = financeViewCard.locator('.ant-tabs-nav').first()
         const financeTable = financeDataCard
           .locator('.ant-table-wrapper')
           .first()
@@ -1712,38 +1743,40 @@ export function createBusinessFormInteractionScenarios({
           '收付款页签不应悬在业务页面卡片之外'
         )
         assert.equal(
-          await financeDataCard
+          await financeViewCard
             .getByRole('tab', { name: '收付款记录', exact: true })
             .count(),
           1,
-          '收付款记录页签应位于数据表卡片内'
+          '收付款记录页签应位于页面的视图切换卡片内'
         )
         assert.equal(
-          await financeDataCard
+          await financeViewCard
             .getByRole('tab', { name: '红冲记录', exact: true })
             .count(),
           1,
-          '红冲记录页签应位于数据表卡片内'
+          '红冲记录页签应位于页面的视图切换卡片内'
         )
         const [financeCardBox, financeTabsBox, financeTableBox] =
           await Promise.all([
-            financeDataCard.boundingBox(),
+            financeViewCard.boundingBox(),
             financeTabsNav.boundingBox(),
             financeTable.boundingBox(),
           ])
-        assert(financeCardBox, '收付款数据表卡片应有可测量布局')
+        assert(financeCardBox, '收付款视图切换卡片应有可测量布局')
         assert(financeTabsBox, '收付款页签应有可测量布局')
         assert(financeTableBox, '收付款表格应有可测量布局')
         assert(
           financeTabsBox.x >= financeCardBox.x &&
             financeTabsBox.x + financeTabsBox.width <=
               financeCardBox.x + financeCardBox.width + 1,
-          '收付款页签不应横向溢出数据表卡片'
+          '收付款页签不应横向溢出视图切换卡片'
         )
         assert(
           financeTabsBox.y >= financeCardBox.y &&
-            financeTabsBox.y + financeTabsBox.height <= financeTableBox.y + 1,
-          '收付款页签应位于数据表卡片顶部、表格之前'
+            financeTabsBox.y + financeTabsBox.height <=
+              financeCardBox.y + financeCardBox.height + 1 &&
+            financeCardBox.y + financeCardBox.height <= financeTableBox.y + 1,
+          '收付款页签应完整位于视图切换卡片内，并处于表格之前'
         )
         await page.screenshot({
           path: path.join(
@@ -1754,7 +1787,7 @@ export function createBusinessFormInteractionScenarios({
         })
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'finance-payments-records',
-          heading: '收付款与核销',
+          heading: '收付款',
           headerMenuTargetLabel: '方向',
         })
         await page.getByRole('tab', { name: '红冲记录', exact: true }).click()
@@ -1811,9 +1844,8 @@ export function createBusinessFormInteractionScenarios({
           state: 'hidden',
           timeout: 10_000,
         })
-        await assertBusinessHeaderStatsSingleLine(page, {
+        await assertBusinessHeaderCompact(page, {
           scenarioName: 'exception-finance-payment-dark-desktop-credit-tab',
-          expectedLabels: ['红冲记录', '本页显示'],
         })
         await assertNoHorizontalOverflow(
           page,
@@ -1887,8 +1919,12 @@ export function createBusinessFormInteractionScenarios({
         await page
           .locator('.erp-business-inline-help-popover')
           .waitFor({ state: 'visible' })
-        await allocationDialog.locator('.ant-modal-footer').click({ position: { x: 10, y: 10 } })
-        await page.locator('.erp-business-inline-help-popover').waitFor({ state: 'hidden' })
+        await allocationDialog
+          .locator('.ant-modal-footer')
+          .click({ position: { x: 10, y: 10 } })
+        await page
+          .locator('.erp-business-inline-help-popover')
+          .waitFor({ state: 'hidden' })
         await page.screenshot({
           path: `${outputDir}/finance-allocation-narrow-help.png`,
           fullPage: true,

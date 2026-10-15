@@ -62,6 +62,9 @@ async function loadWorkflowApi(call) {
       'const isWorkflowApprovalTask = globalThis.__workflowApiTestIsApprovalTask'
     )
   const resolved = transformed
+    .replace('../utils/workflowTaskListFilters.mjs', new URL('../utils/workflowTaskListFilters.mjs', import.meta.url).href)
+    .replace('../utils/workflowTaskCalendar.mjs', new URL('../utils/workflowTaskCalendar.mjs', import.meta.url).href)
+    .replace('../utils/businessStatusCounts.mjs', new URL('../utils/businessStatusCounts.mjs', import.meta.url).href)
     .replace('../utils/workflowTaskDiscovery.mjs', new URL('../utils/workflowTaskDiscovery.mjs', import.meta.url).href)
     .replace('../utils/workflowRoleTaskHistory.mjs', new URL('../utils/workflowRoleTaskHistory.mjs', import.meta.url).href)
     .replace('../utils/workflowTracking.mjs', new URL('../utils/workflowTracking.mjs', import.meta.url).href)
@@ -87,6 +90,67 @@ function validTask(overrides = {}) {
   }
 }
 
+test('workflowApi: shared links preserve task identity, paging and cancellation without claiming an action', async () => {
+  const calls = []
+  const { signal } = new AbortController()
+  const data = { items: [{ id: 42, task_name: '工程资料', owner_role_key: 'engineering', task_status_key: 'ready', can_handle: true }], truncated: false }
+  const api = await loadWorkflowApi(async (method, params, options) => {
+    calls.push({ method, params, options })
+    return { data }
+  })
+  assert.equal(await api.getWorkflowTaskLink(41, { signal }), data)
+  assert.equal(await api.getWorkflowTaskLink(41, { offset: 100, signal }), data)
+  assert.deepEqual(calls, [
+    { method: 'get_task_link', params: { task_id: 41 }, options: { signal } },
+    { method: 'get_task_link', params: { task_id: 41, offset: 100 }, options: { signal } },
+  ])
+  for (const id of [0, -1, 1.5, '41', Number.MAX_SAFE_INTEGER + 1]) await assert.rejects(api.getWorkflowTaskLink(id), /任务链接无效/u)
+  await assert.rejects(api.getWorkflowTaskLink(41, { offset: -1 }), /任务链接无效/u)
+  assert.equal(calls.length, 2)
+})
+
+test('workflowApi: incomplete or contradictory shared task access fails closed', async () => {
+  const task = { id: 42, task_name: '工程资料', owner_role_key: 'engineering', task_status_key: 'ready', can_handle: true }
+  let data
+  const api = await loadWorkflowApi(async () => ({ data }))
+  for (const invalid of [null, { items: [task] }, { items: [], truncated: false }, { items: [task], truncated: true },
+    { items: [task, task], truncated: false }, { items: [{ ...task, can_handle: undefined }], truncated: false },
+    { items: [{ ...task, task_status_key: 'done' }], truncated: false }]) {
+    data = invalid
+    await assert.rejects(api.getWorkflowTaskLink(41))
+  }
+  data = { items: [], truncated: false }
+  assert.equal(await api.getWorkflowTaskLink(41, { offset: 100 }), data)
+})
+
+test('workflowApi: calendar reads preserve scope, cancellation and complete date counts', async () => {
+  const { signal } = new AbortController()
+  let incomplete = false
+  const api = await loadWorkflowApi(async (method, params, options) => {
+    assert.equal(method, params.role_key ? 'list_role_tasks' : 'get_task_board')
+    assert.equal(options.signal, signal)
+    assert.equal(params.keyword, '待跟进')
+    return { data: { calendar: {
+      month: params.calendar_month,
+      selection: params.calendar_selection,
+      days: {},
+      overdue: 0,
+      undated: 1,
+      total: 1,
+      limit: 30,
+      offset: 0,
+      snapshot_at: 1791900000,
+      items: incomplete ? [] : [validTask({ task_status_key: 'ready', due_at: null })],
+    } } }
+  })
+  const params = { calendar_month: '2026-10', calendar_selection: 'undated', limit: 30, keyword: '待跟进' }
+  for (const scope of [{ todo_only: true }, { view_key: 'todo', role_key: 'sales' }]) {
+    assert.equal((await api.getWorkflowTaskCalendar({ ...params, ...scope }, { signal })).items[0].id, 42)
+  }
+  incomplete = true
+  await assert.rejects(api.getWorkflowTaskCalendar({ ...params, todo_only: true }, { signal }), { isInvalidResponse: true })
+})
+
 test('workflowApi: tracking reads preserve cancellation and reject mismatched receipts', async () => {
   const { signal } = new AbortController()
   let wrongID = false
@@ -94,7 +158,7 @@ test('workflowApi: tracking reads preserve cancellation and reject mismatched re
     assert.equal(options.signal, signal)
     if (method === 'list_tracking') {
       assert.equal(params.scope, 'started')
-      return { data: { items: [], total: 0, limit: 20, offset: 0 } }
+      return { data: { items: [], total: 0, status_counts: {}, limit: 20, offset: 0 } }
     }
     assert.equal(method, 'get_tracking')
     const now = 1791367200
@@ -108,7 +172,7 @@ test('workflowApi: tracking reads preserve cancellation and reject mismatched re
       next_event_id: 0,
     } } }
   })
-  assert.deepEqual(await api.listWorkflowTracking({ scope: 'started' }, { signal }), { items: [], total: 0, limit: 20, offset: 0 })
+  assert.deepEqual(await api.listWorkflowTracking({ scope: 'started' }, { signal }), { items: [], total: 0, status_counts: {}, limit: 20, offset: 0 })
   assert.equal((await api.getWorkflowTracking({ kind: 'process', id: 10 }, { signal })).summary.id, 10)
   wrongID = true
   await assert.rejects(api.getWorkflowTracking({ kind: 'process', id: 10 }, { signal }), { isInvalidResponse: true })
@@ -180,7 +244,7 @@ test('workflowApi: 已办处理结果与日期完整传递，非法或跨视图�
   const calls = []
   const api = await loadWorkflowApi(async (method, params) => {
     calls.push(params)
-    return { data: { items: [validTask()], has_more: false, next_cursor: '', server_time: 1_800_000_000, counts: roleTaskCounts({ done: 1 }), risk_scope: 'role' } }
+    return { data: { items: [validTask()], has_more: false, next_cursor: '', server_time: 1_800_000_000, counts: roleTaskCounts({ done: 1 }), status_counts: { done: 1 }, risk_scope: 'role' } }
   })
   const query = { view_key: 'history', role_key: 'sales', limit: 50, sort_key: 'completed', status_key: 'done', period: 'custom', date_from: '2026-10-01', date_to: '2026-10-12' }
   await api.listWorkflowRoleTasks(query)
@@ -191,6 +255,22 @@ test('workflowApi: 已办处理结果与日期完整传递，非法或跨视图�
     { view_key: 'todo', role_key: 'sales', limit: 50, period: 'today' },
   ]) await assert.rejects(api.listWorkflowRoleTasks(invalid), /任务查询条件有误/)
   assert.equal(calls.length, 1)
+})
+
+test('workflowApi: 截止和来源筛选通过真实 API 包装传递，非法条件不发请求', async () => {
+  const calls = []
+  const api = await loadWorkflowApi(async (method, params) => {
+    calls.push({ method, params })
+    return { data: { items: [validTask({ task_status_key: 'ready' })], has_more: false, next_cursor: '', server_time: 1_800_000_000, ...(method === 'list_role_tasks' ? { counts: roleTaskCounts({ ready: 1 }), status_counts: { ready: 1 }, risk_scope: 'role' } : {}) } }
+  })
+  const query = { view_key: 'todo', role_key: 'sales', limit: 50, due: 'noDue', source_type: 'sales_order' }
+  for (const read of [api.listWorkflowRoleTasks, api.listWorkflowWorkbenchRoleTasks]) {
+    await read(query)
+    for (const patch of [{ due: 'unknown' }, { due: null }, { source_type: '' }, { source_type: ' padded ' }, { source_type: '源'.repeat(65) }, { source_type: 1 }]) {
+      await assert.rejects(read({ ...query, ...patch }), /任务查询条件有误/)
+    }
+  }
+  assert.deepEqual(calls.map(({ params }) => params), [query, query])
 })
 
 function validProcessContext(overrides = {}) {
@@ -568,6 +648,7 @@ test('workflowApi: 排序状态传递给服务端并拒绝状态不匹配的响�
         next_cursor: '',
         server_time: 1_788_840_000,
         counts: roleTaskCounts({ blocked: 1 }),
+        status_counts: { blocked: 1, ready: 3 },
         risk_scope: 'role',
       },
     }
@@ -607,6 +688,7 @@ test('workflowApi: approval role view accepts only registered active approval ta
       has_more: false,
       server_time: 1_720_000_000,
       counts: roleTaskCounts({ ready: 8, approval: 1, risk: 3, overdue: 2 }),
+      status_counts: { ready: 1 },
       risk_scope: 'role',
     },
   }))
@@ -622,6 +704,7 @@ test('workflowApi: approval role view accepts only registered active approval ta
       has_more: false,
       server_time: 1_720_000_000,
       counts: roleTaskCounts({ ready: 8, approval: 1, risk: 3, overdue: 2 }),
+      status_counts: { ready: 1 },
       risk_scope: 'role',
     }
   )
@@ -638,6 +721,7 @@ test('workflowApi: approval role view accepts only registered active approval ta
       has_more: false,
       server_time: 1_720_000_000,
       counts: roleTaskCounts({ ready: 8, approval: 1, risk: 3, overdue: 2 }),
+      status_counts: { ready: 1 },
       risk_scope: 'role',
     },
   }))
@@ -667,6 +751,7 @@ test('workflowApi: initial mobile role page requires exact authoritative counts'
       overdue: 61,
     }),
     risk_scope: 'supervised',
+    status_counts: { ready: 348, blocked: 3 },
   }
   const api = await loadWorkflowApi(async () => ({ data: response }))
   const params = { view_key: 'todo', role_key: 'sales', limit: 50 }

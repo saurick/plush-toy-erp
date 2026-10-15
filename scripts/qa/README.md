@@ -8,6 +8,8 @@
 
 主机 Docker 默认地址池耗尽时，可为该夹具设置 `ATTACHMENT_CONSOLE_FIXTURE_SUBNET`，值须为已核对不冲突、地址对齐的私有 IPv4 `/27`；夹具拆为两个 `/28`，分别用于内部附件网络和本机浏览器入口，结束后检查网络与卷均已清理。该配置只影响一次性测试，不改变正式 Compose 或主机 Docker 配置。
 
+终态来源任务办理人的前向修复使用 [terminal-task-assignee-preflight.sql](terminal-task-assignee-preflight.sql) 核查旧职责迁移与原始回执。没有可证明的原始分派记录时阻断升级，必须核对升级前备份；事件操作人不能替代任务办理人。备份恢复入口及 dry-run / apply 边界见 [服务端开发说明](../../server/README.md)，对应 PostgreSQL 回归覆盖真实分派、原本未分派、备份不匹配拒绝与重复执行。
+
 ## 目录职责
 
 `scripts/qa/` 只放本地验收、静态守卫、边界扫描和测试编排脚本。它可以读取代码、配置、文档和本地输出，必要时生成 ignored evidence；它不负责生产发布、不直接导入真实客户数据、不替代后端 RBAC / Workflow / Fact usecase。
@@ -44,6 +46,7 @@
 | `node scripts/qa/candidate-sha-freeze.mjs --sha <40sha> --terminal <strict-terminal.json>` | 在已通过 strict 的 clean exact HEAD 上固定执行复用/失败/公网读回/DEV 隔离合同，以及版本中心桌面真实浏览器 smoke；生成单一候选冻结回执，不建立 DEV 移动端或暗色验收承诺，也不替代远端 CI、Release 或 133 发布 | 最终候选第一次正式 push 前 |
 | `node scripts/qa/output-retention-preview.mjs --protect-sha <40sha> --out output/dev-workbench/retention/previews/<name>.json` | 对登记的 managed output 生成数量与 5GiB 容量预算预览，保护最新状态、operation 引用和显式 SHA；无 `--apply`，不删除文件 | 定期检查本地证据膨胀 |
 | `bash scripts/qa/unit-normalization-postgres.sh` | 使用无挂载、随机 loopback 端口的一次性 PostgreSQL，核对单位迁移 fresh / upgrade、余额合并、异常事务回滚及库存业务；结束精确删除该容器。 | 计量单位迁移和数量校验改动后；正式 full / strict 的 server upgrade lane 也执行 |
+| `node scripts/qa/transaction-browser-isolated.mjs --run` | 冻结当前含未提交改动的源码副本，启动一次性 PostgreSQL / S3 / Go / Vite，执行库存、质检、应收应付结算及退款的桌面和手机浏览器链路，以及现有 critical PostgreSQL gate，结束读回清理结果 | 验证页面、后端和数据库之间的业务闭环；不自动加入全量门禁 |
 | `node scripts/qa/database-inventory.mjs --out <report.json>` | 从环境中的固定数据库 URL 只读盘点同服务器项目库、连接数、migration、仓库引用和 disposable 分类；不授权删除 | 发布演练前后或发现临时库堆积时 |
 | `node scripts/qa/database-archive.mjs --database-name <name> --out <dir>` | 只接受已登记 disposable 库且要求零连接；生成归档并在临时 restore 库核对 migration、schema 与逐表计数，最后删除 restore 库并读回零残留 | 清理候选库取得可恢复证据时 |
 | `node scripts/qa/database-cleanup.mjs --database-name <name> --inventory <report> --manifest <manifest> --print-confirmation` | 从同一 inventory 与 archive manifest 生成精确确认串；正式 cleanup 还需通过环境提供 admin URL、传入确认串和输出报告，成功后读回源库已不存在。登记 133 仅在三个命令均显式加 `--allow-registered-development` 时开放；长期或未分类库始终拒绝 | archive / restore 已通过后清理同一 disposable 库 |
@@ -152,11 +155,21 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 
 ## 输出与写入边界
 
+库存、质检和收付款专项入口为 `transaction-browser-isolated.mjs`；不带参数仅显示帮助，`--run` 每次建立新环境，`--out output/qa/<目录>` 可指定本轮证据目录。使用仓库锁定的 Node、已安装的 Web 依赖与 Chromium、本机 Go / Atlas / psql，以及已缓存的 `postgres:18.6` 和 `chrislusf/seaweedfs:4.46`；不自动拉取镜像。数据库运行身份与前端代理的认证读回均通过后，才操作页面；正常请求使用 Vite 的真实代理，故障注入仅在后端已成功处理后丢弃响应，不伪造业务返回。业务夹具走正式 seed、API、审批与岗位范围设置，数据库查询使用只读会话。
+
+该专项覆盖 IQC 不合格与复检、采购入库、库存盘点过账和取消、应收应付结算、订单预收预付、客户与供应商的部分和全额退款，以及审批与资金事实分离、响应丢失恢复、幂等重放、越权拒绝、超额阻断和冲销后的余额。手机回归使用 Chromium 的 390×844 触摸视口，进入 `/m/:roleKey/tasks` 和正式业务办理路由，实际完成审批、处理回执和上述业务表单，并检查页面横向溢出。应收来源通过正式库存盘点、销售订单、出货审批及实际出货 API 建立，库存准备不代表生产全流程已验证。质检更正当前没有页面动作，测试通过正式 API 创建复检，判定仍由浏览器完成。`browser/report.json` 保存各链路、手机任务和真实出货来源结果，`postgres.jsonl` 保存真实数据库测试事件，`lifecycle.json` 绑定源码身份、镜像、迁移和清理结果；共享工作区后续变化不会覆盖快照身份。它不证明手机真机 / Safari、存量数据库升级或客户验收全部完成。
+
+请求观测复用现有服务端组件：按响应 `X-Request-Id` 核对正常、拒绝和丢失响应请求的唯一完成日志、method、code 与 outcome，并扫描本轮凭据泄漏；报告只保留关联计数与受控字段。`observability.jsonl` 保存现有 Go 日志、Trace 父子关系、异常分类、SQL 脱敏和审计 request ID 合同的实际结果。隔离服务不向共享 Jaeger 导出 Trace，不把合同测试写成目标平台已收到 Trace。
+
+移动 Workflow 和采购入库真实写入浏览器脚本使用 `browser-write-target.mjs` 复核明确提供的开发 / 隔离数据库身份，并将浏览器 RPC 绑定到该后端。前端与后端均限定 loopback HTTP(S)，不通过页面代理猜测写入目标。移动脚本必须传入 `--accept-persistent-test-data --database-name <库名>`（也可使用同名 `MOBILE_WORKFLOW_BROWSER_SMOKE_*` 环境变量）；采购入库脚本须提供 `PURCHASE_RECEIPT_E2E_DATABASE_NAME` 和现有持久测试数据确认。采购脚本附带 seed 时还须显式提供同库的 `POSTGRES_DSN`。远程试用沿用登记的 manual acceptance 目标流程。
+
+数据库归档清理要求一小时内、服务器匹配的完整 inventory；执行前重新扫描当前仓库引用，扫描失败或出现引用均拒绝删除。清理工具不会仅凭旧清单的空引用执行删除。
+
 - 脱敏报告和模拟 evidence 默认写到 `output/**` 或调用方显式指定的 ignored 目录。
 - 覆盖报告固定留在 `output/qa/coverage/**`，不得放入 `web/public/**`、生产构建或长期 Markdown。DEV 接口分别通过固定 GET `/__dev/api/qa/coverage` 和 `/__dev/api/qa/coverage/snapshot` 读取当前工作区与隔离报告；POST 只接受固定 `collect + idempotencyKey`，拒绝调用方命令、参数、路径、环境变量、profile 和 query。访问沿用开发工作台网络及运维身份边界，执行动作另需同源与本次 DEV 会话 CSRF token。
 - 覆盖基线操作状态固定留在私有 ignored 目录 `output/dev-workbench/coverage-operations/**`；开发测试固定动作状态留在 `output/dev-workbench/testing-operations/**`。两者只公开脱敏阶段投影，不保存或返回 stdout、stderr、PID、命令、幂等 key、环境变量或凭据。同 key 重试复用同一操作，且共同使用 `output/dev-workbench/qa-execution.lock`；覆盖基线、fast、岗位巡检和字段联动同一时间只能有一项运行，避免争用仓库身份和 canonical evidence。
 - 数据库迁移操作状态固定留在私有 ignored 目录 `output/dev-workbench/database-migration-operations/**`，备份恢复制品固定留在 `output/dev-workbench/database-migration-backups/**`。公开 operation 不返回底层目标 / apply / 维护确认值、PID、命令、DSN 或真实路径；CLI 与页面执行器只允许登记共享开发库，使用幂等索引和跨进程排他锁，同一计划只 apply 一次，并在 apply 前重新验证准备阶段的备份文件身份。进程中断或提交结果不明确时先读回而不自动重试；非交互 prepare 的 exit 0 只表示 `ready / writes=0`，execute 读回通过才表示迁移完成。
-- baseline 采集器先冻结仓库 identity 与 `affected` 层级，使用仓库锁定的 Node 与 pnpm，先以 `node scripts/gen-error-codes.mjs --check` 证明错误码生成物无漂移，再直接用项目 Node 执行 Web native coverage，避免 `pnpm test` 的 `pretest` 在采集中改写 tracked 文件。完成 Go / Web / import / field-linkage 后再次核对同一 identity 并自动聚合；字段联动 runner 也先在同目录 staging 生成 TAP 与报告，只有测试、builder 和身份复核均通过才最后提升 canonical 报告，失败时保留上一份。baseline evidence 和 candidate latest 同样先写 `output/qa/coverage/.staging/<uuid>/**`，候选 schema / repository / staging 泄漏检查和读回通过后，才按 evidence、字段联动和 latest 的顺序提升；latest 提升后的 identity 复核失败会恢复旧 latest。它不写 PostgreSQL、不运行真实业务浏览器、不探测 readiness、不部署、不做 UAT。受影响但未执行的层级必须保留 `missing`，只有未受影响层可写 `not_applicable`。
+- baseline 采集器先冻结仓库 identity 与 `affected` 层级，使用仓库锁定的 Node 与 pnpm，先以 `node scripts/gen-error-codes.mjs --check` 证明错误码生成物无漂移，再直接用项目 Node 执行 Web native coverage，统计只包含当前仓库路径下的代码并保留 node_modules 排除，不把外部工具链或临时 fixture 计入项目覆盖率；这些过滤只影响统计，不减少测试执行。这样也避免 `pnpm test` 的 `pretest` 在采集中改写 tracked 文件。完成 Go / Web / import / field-linkage 后再次核对同一 identity 并自动聚合；字段联动 runner 也先在同目录 staging 生成 TAP 与报告，只有测试、builder 和身份复核均通过才最后提升 canonical 报告，失败时保留上一份。baseline evidence 和 candidate latest 同样先写 `output/qa/coverage/.staging/<uuid>/**`，候选 schema / repository / staging 泄漏检查和读回通过后，才按 evidence、字段联动和 latest 的顺序提升；latest 提升后的 identity 复核失败会恢复旧 latest。它不写 PostgreSQL、不运行真实业务浏览器、不探测 readiness、不部署、不做 UAT。受影响但未执行的层级必须保留 `missing`，只有未受影响层可写 `not_applicable`。
 - 采集进程完成且仓库身份一致时，退出码 `0` 记为 `passed`，测试存在失败、缺失或零执行的退出码 `2` 记为 `issues` 并发布当前失败报告，避免旧绿色遮蔽当前结果；启动失败、进程/服务中断、报告读回失败或身份变化记为 `failed / not_proven`，不得替换上一份可读报告。当前版本不提供取消按钮，避免固定制品写到一半形成含糊终态；页面离开只停止轮询，不停止后台任务。
 - Go 业务域与字段联动打印域使用脚本内显式 `scenario id -> package/test prefix`、`caseId` 注册表；不得以测试名、目录、退出码或文件数量推断领域完成。字段联动已声明的不适用场景排除出适用分母，不能计为执行或通过；缺失、失败、跳过和零执行仍分别报告。通用 full / strict 回执不能拆成 PostgreSQL、浏览器或目标验收通过。
 - “证据与覆盖”保留两个独立来源：当前工作区按实时 commit / dirty / fingerprint 判定新鲜度，最近隔离验证保留原源码身份并始终标为 `snapshot`。默认展示当前工作区；当前报告缺失时明确显示尚未验证，历史隔离结果必须主动切换查看。两类读取独立失败，重新读取和快速切换会丢弃已取消或过期响应。Go 执行数按最末级用例去重，父用例独立失败、跳过或未结束时单列；本域场景全部通过但整体 Go 基线未通过时标为受阻，场景自身的失败、缺失和跳过保留，整体门禁继续阻断。Go / Web 执行计数、业务规则、失败用例与数据库 / 浏览器场景可分别展开，支持“仅看未通过场景”。专项通过不补成完整 gate、真实前后端闭环、exact-SHA CI 或 UAT 通过；来源的范围说明必须随结果保留。
@@ -195,9 +208,9 @@ demo 造数前必须先在固定 release 上完成登记 target 的 migration、
 
 51 个正式验收目标统一登记在 `manual-acceptance-page-data-contract.mjs`。每页只能引用共享的 `role / source / task / facts / catalog` 阶段，不允许页面自带 builder、脚本或另一套 fixture；业务看板可以同时消费多个共享阶段，但不能另造页面数据。`manual-acceptance-dataset-runner.mjs` 直接消费相同的阶段入口。新增页面、probe 或入口发生漏登、重复或分叉时，readiness 合同测试会 fail closed。
 
-业务链回归统一从 `manual-acceptance-business-chain-contract.mjs` 读取观察台的同一份步骤目录：先选择业务链，再展开步骤绑定的责任、前置状态、动作、结果状态和 Fact，最后只把已登记的场景合同投影到现有阶段。当前 11 条业务链共登记 74 个步骤和 66 个场景合同；每条链固定包含正常主路径、阻塞 / 退回 / 恢复、无权限、错误状态、取消 / 调整 / 冲正、重复提交 / 幂等六类。无权限和错误状态等非法结果只由合同测试或受控浏览器动作证明，不会为了覆盖而写入非法数据库状态。这个合同不新增 writer，顶层 `manual-acceptance-dataset.mjs` 和现有串行 runner 仍是唯一整批造数入口。
+业务链回归统一从 `manual-acceptance-business-chain-contract.mjs` 读取观察台的同一份步骤目录：先选择业务链，再展开步骤绑定的责任、前置状态、动作、结果状态和 Fact，最后只把已登记的场景合同投影到现有阶段。当前 11 条业务链共登记 77 个步骤和 66 个场景合同；每条链固定包含正常主路径、阻塞 / 退回 / 恢复、无权限、错误状态、取消 / 调整 / 冲正、重复提交 / 幂等六类。无权限和错误状态等非法结果只由合同测试或受控浏览器动作证明，不会为了覆盖而写入非法数据库状态。这个合同不新增 writer，顶层 `manual-acceptance-dataset.mjs` 和现有串行 runner 仍是唯一整批造数入口。
 
-`/__dev/data-preparation` 直接读取该合同的可读投影，当前同时显示 11 条业务链、74 个步骤、66 个场景合同、9 个现有造数阶段和 51 个页面目标。页面里的业务链选择只用于展开核对，不创建局部 writer；“按最新业务链完整回归”每次都使用现有 lifecycle 建立新隔离批次，执行全部已登记场景合同，成功或失败后自动清理。规范 apply 回执记录造数总 `startedAt / completedAt / durationMs`，并对 9 个阶段分别记录同样的真实耗时；未开始的阶段保持空值，不能冒充 `0 ms`。
+`/__dev/data-preparation` 直接读取该合同的可读投影，当前同时显示 11 条业务链、77 个步骤、66 个场景合同、9 个现有造数阶段和 51 个页面目标。页面里的业务链选择只用于展开核对，不创建局部 writer；“按最新业务链完整回归”每次都使用现有 lifecycle 建立新隔离批次，执行全部已登记场景合同，成功或失败后自动清理。规范 apply 回执记录造数总 `startedAt / completedAt / durationMs`，并对 9 个阶段分别记录同样的真实耗时；未开始的阶段保持空值，不能冒充 `0 ms`。
 
 计划和规范总回执同时保存 `chainDataDigest` 与 `chainVerificationDigest`。代码变化后按下表处理，不需要 Codex 定时同步平行清单：
 

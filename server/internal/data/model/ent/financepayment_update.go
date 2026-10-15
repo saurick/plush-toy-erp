@@ -380,6 +380,21 @@ func (_u *FinancePaymentUpdate) AddAllocations(v ...*FinanceAllocation) *Finance
 	return _u.AddAllocationIDs(ids...)
 }
 
+// AddRefundIDs adds the "refunds" edge to the FinancePayment entity by IDs.
+func (_u *FinancePaymentUpdate) AddRefundIDs(ids ...int) *FinancePaymentUpdate {
+	_u.mutation.AddRefundIDs(ids...)
+	return _u
+}
+
+// AddRefunds adds the "refunds" edges to the FinancePayment entity.
+func (_u *FinancePaymentUpdate) AddRefunds(v ...*FinancePayment) *FinancePaymentUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddRefundIDs(ids...)
+}
+
 // Mutation returns the FinancePaymentMutation object of the builder.
 func (_u *FinancePaymentUpdate) Mutation() *FinancePaymentMutation {
 	return _u.mutation
@@ -404,6 +419,27 @@ func (_u *FinancePaymentUpdate) RemoveAllocations(v ...*FinanceAllocation) *Fina
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveAllocationIDs(ids...)
+}
+
+// ClearRefunds clears all "refunds" edges to the FinancePayment entity.
+func (_u *FinancePaymentUpdate) ClearRefunds() *FinancePaymentUpdate {
+	_u.mutation.ClearRefunds()
+	return _u
+}
+
+// RemoveRefundIDs removes the "refunds" edge to FinancePayment entities by IDs.
+func (_u *FinancePaymentUpdate) RemoveRefundIDs(ids ...int) *FinancePaymentUpdate {
+	_u.mutation.RemoveRefundIDs(ids...)
+	return _u
+}
+
+// RemoveRefunds removes "refunds" edges to FinancePayment entities.
+func (_u *FinancePaymentUpdate) RemoveRefunds(v ...*FinancePayment) *FinancePaymentUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveRefundIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -514,6 +550,15 @@ func (_u *FinancePaymentUpdate) sqlSave(ctx context.Context) (_node int, err err
 				ps[i](selector)
 			}
 		}
+	}
+	if _u.mutation.SourceTypeCleared() {
+		_spec.ClearField(financepayment.FieldSourceType, field.TypeString)
+	}
+	if _u.mutation.SourceIDCleared() {
+		_spec.ClearField(financepayment.FieldSourceID, field.TypeInt)
+	}
+	if _u.mutation.PurposeNoteCleared() {
+		_spec.ClearField(financepayment.FieldPurposeNote, field.TypeString)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(financepayment.FieldStatus, field.TypeString, value)
@@ -658,6 +703,51 @@ func (_u *FinancePaymentUpdate) sqlSave(ctx context.Context) (_node int, err err
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RefundsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financepayment.RefundsTable,
+			Columns: []string{financepayment.RefundsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financepayment.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedRefundsIDs(); len(nodes) > 0 && !_u.mutation.RefundsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financepayment.RefundsTable,
+			Columns: []string{financepayment.RefundsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financepayment.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RefundsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financepayment.RefundsTable,
+			Columns: []string{financepayment.RefundsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financepayment.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1036,6 +1126,21 @@ func (_u *FinancePaymentUpdateOne) AddAllocations(v ...*FinanceAllocation) *Fina
 	return _u.AddAllocationIDs(ids...)
 }
 
+// AddRefundIDs adds the "refunds" edge to the FinancePayment entity by IDs.
+func (_u *FinancePaymentUpdateOne) AddRefundIDs(ids ...int) *FinancePaymentUpdateOne {
+	_u.mutation.AddRefundIDs(ids...)
+	return _u
+}
+
+// AddRefunds adds the "refunds" edges to the FinancePayment entity.
+func (_u *FinancePaymentUpdateOne) AddRefunds(v ...*FinancePayment) *FinancePaymentUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddRefundIDs(ids...)
+}
+
 // Mutation returns the FinancePaymentMutation object of the builder.
 func (_u *FinancePaymentUpdateOne) Mutation() *FinancePaymentMutation {
 	return _u.mutation
@@ -1060,6 +1165,27 @@ func (_u *FinancePaymentUpdateOne) RemoveAllocations(v ...*FinanceAllocation) *F
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveAllocationIDs(ids...)
+}
+
+// ClearRefunds clears all "refunds" edges to the FinancePayment entity.
+func (_u *FinancePaymentUpdateOne) ClearRefunds() *FinancePaymentUpdateOne {
+	_u.mutation.ClearRefunds()
+	return _u
+}
+
+// RemoveRefundIDs removes the "refunds" edge to FinancePayment entities by IDs.
+func (_u *FinancePaymentUpdateOne) RemoveRefundIDs(ids ...int) *FinancePaymentUpdateOne {
+	_u.mutation.RemoveRefundIDs(ids...)
+	return _u
+}
+
+// RemoveRefunds removes "refunds" edges to FinancePayment entities.
+func (_u *FinancePaymentUpdateOne) RemoveRefunds(v ...*FinancePayment) *FinancePaymentUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveRefundIDs(ids...)
 }
 
 // Where appends a list predicates to the FinancePaymentUpdate builder.
@@ -1200,6 +1326,15 @@ func (_u *FinancePaymentUpdateOne) sqlSave(ctx context.Context) (_node *FinanceP
 				ps[i](selector)
 			}
 		}
+	}
+	if _u.mutation.SourceTypeCleared() {
+		_spec.ClearField(financepayment.FieldSourceType, field.TypeString)
+	}
+	if _u.mutation.SourceIDCleared() {
+		_spec.ClearField(financepayment.FieldSourceID, field.TypeInt)
+	}
+	if _u.mutation.PurposeNoteCleared() {
+		_spec.ClearField(financepayment.FieldPurposeNote, field.TypeString)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(financepayment.FieldStatus, field.TypeString, value)
@@ -1344,6 +1479,51 @@ func (_u *FinancePaymentUpdateOne) sqlSave(ctx context.Context) (_node *FinanceP
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RefundsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financepayment.RefundsTable,
+			Columns: []string{financepayment.RefundsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financepayment.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedRefundsIDs(); len(nodes) > 0 && !_u.mutation.RefundsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financepayment.RefundsTable,
+			Columns: []string{financepayment.RefundsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financepayment.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RefundsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financepayment.RefundsTable,
+			Columns: []string{financepayment.RefundsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financepayment.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

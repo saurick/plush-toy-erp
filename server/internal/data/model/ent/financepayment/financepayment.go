@@ -15,6 +15,16 @@ const (
 	Label = "finance_payment"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldKind holds the string denoting the kind field in the database.
+	FieldKind = "kind"
+	// FieldSourceType holds the string denoting the source_type field in the database.
+	FieldSourceType = "source_type"
+	// FieldSourceID holds the string denoting the source_id field in the database.
+	FieldSourceID = "source_id"
+	// FieldRefundOfPaymentID holds the string denoting the refund_of_payment_id field in the database.
+	FieldRefundOfPaymentID = "refund_of_payment_id"
+	// FieldPurposeNote holds the string denoting the purpose_note field in the database.
+	FieldPurposeNote = "purpose_note"
 	// FieldPaymentNo holds the string denoting the payment_no field in the database.
 	FieldPaymentNo = "payment_no"
 	// FieldDirection holds the string denoting the direction field in the database.
@@ -75,6 +85,10 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeAllocations holds the string denoting the allocations edge name in mutations.
 	EdgeAllocations = "allocations"
+	// EdgeRefunds holds the string denoting the refunds edge name in mutations.
+	EdgeRefunds = "refunds"
+	// EdgeRefundSource holds the string denoting the refund_source edge name in mutations.
+	EdgeRefundSource = "refund_source"
 	// Table holds the table name of the financepayment in the database.
 	Table = "finance_payments"
 	// AllocationsTable is the table that holds the allocations relation/edge.
@@ -84,11 +98,24 @@ const (
 	AllocationsInverseTable = "finance_allocations"
 	// AllocationsColumn is the table column denoting the allocations relation/edge.
 	AllocationsColumn = "payment_id"
+	// RefundsTable is the table that holds the refunds relation/edge.
+	RefundsTable = "finance_payments"
+	// RefundsColumn is the table column denoting the refunds relation/edge.
+	RefundsColumn = "refund_of_payment_id"
+	// RefundSourceTable is the table that holds the refund_source relation/edge.
+	RefundSourceTable = "finance_payments"
+	// RefundSourceColumn is the table column denoting the refund_source relation/edge.
+	RefundSourceColumn = "refund_of_payment_id"
 )
 
 // Columns holds all SQL columns for financepayment fields.
 var Columns = []string{
 	FieldID,
+	FieldKind,
+	FieldSourceType,
+	FieldSourceID,
+	FieldRefundOfPaymentID,
+	FieldPurposeNote,
 	FieldPaymentNo,
 	FieldDirection,
 	FieldStatus,
@@ -137,6 +164,18 @@ func ValidColumn(column string) bool {
 //	import _ "server/internal/data/model/ent/runtime"
 var (
 	Hooks [1]ent.Hook
+	// DefaultKind holds the default value on creation for the "kind" field.
+	DefaultKind string
+	// KindValidator is a validator for the "kind" field. It is called by the builders before save.
+	KindValidator func(string) error
+	// SourceTypeValidator is a validator for the "source_type" field. It is called by the builders before save.
+	SourceTypeValidator func(string) error
+	// SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
+	SourceIDValidator func(int) error
+	// RefundOfPaymentIDValidator is a validator for the "refund_of_payment_id" field. It is called by the builders before save.
+	RefundOfPaymentIDValidator func(int) error
+	// PurposeNoteValidator is a validator for the "purpose_note" field. It is called by the builders before save.
+	PurposeNoteValidator func(string) error
 	// PaymentNoValidator is a validator for the "payment_no" field. It is called by the builders before save.
 	PaymentNoValidator func(string) error
 	// DirectionValidator is a validator for the "direction" field. It is called by the builders before save.
@@ -197,6 +236,31 @@ type OrderOption func(*sql.Selector)
 // ByID orders the results by the id field.
 func ByID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldID, opts...).ToFunc()
+}
+
+// ByKind orders the results by the kind field.
+func ByKind(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldKind, opts...).ToFunc()
+}
+
+// BySourceType orders the results by the source_type field.
+func BySourceType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceType, opts...).ToFunc()
+}
+
+// BySourceID orders the results by the source_id field.
+func BySourceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSourceID, opts...).ToFunc()
+}
+
+// ByRefundOfPaymentID orders the results by the refund_of_payment_id field.
+func ByRefundOfPaymentID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRefundOfPaymentID, opts...).ToFunc()
+}
+
+// ByPurposeNote orders the results by the purpose_note field.
+func ByPurposeNote(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPurposeNote, opts...).ToFunc()
 }
 
 // ByPaymentNo orders the results by the payment_no field.
@@ -357,10 +421,45 @@ func ByAllocations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newAllocationsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByRefundsCount orders the results by refunds count.
+func ByRefundsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newRefundsStep(), opts...)
+	}
+}
+
+// ByRefunds orders the results by refunds terms.
+func ByRefunds(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newRefundsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByRefundSourceField orders the results by refund_source field.
+func ByRefundSourceField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newRefundSourceStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newAllocationsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(AllocationsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, AllocationsTable, AllocationsColumn),
+	)
+}
+func newRefundsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(Table, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, RefundsTable, RefundsColumn),
+	)
+}
+func newRefundSourceStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(Table, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, RefundSourceTable, RefundSourceColumn),
 	)
 }

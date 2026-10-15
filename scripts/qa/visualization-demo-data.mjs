@@ -323,10 +323,8 @@ function productionItem(candidate, lineNo, { routed }) {
     ),
     unit_id: requiredPositiveInt(item.unitId, "production item.unitId"),
     planned_quantity: String(20 + lineNo * 10),
-    bom_header_id: routed
-      ? requiredPositiveInt(bom.id, "production item.bom.id")
-      : undefined,
-    route_code: routed ? "PLUSH_SEW_HAND_V1" : undefined,
+    bom_header_id: requiredPositiveInt(bom.id, "production item.bom.id"),
+    route_code: "PLUSH_SEW_HAND_V1",
     customer_inspection_required: routed ? lineNo % 2 === 0 : false,
     note: routed ? `产品行 ${lineNo}，完整工序路线` : "生产计划可视化样本",
   });
@@ -553,6 +551,60 @@ async function exactSourceOrder({
   return matches[0] || null;
 }
 
+function comparablePlannedValue(value, key) {
+  if (value == null || value === "") return "";
+  if (key.endsWith("_date")) {
+    if (typeof value === "number") {
+      return new Intl.DateTimeFormat("sv-SE", {
+        timeZone: "Asia/Shanghai",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(value * 1000));
+    }
+    return String(value).slice(0, 10);
+  }
+  if (/^(?:[0-9]+)(?:[.][0-9]+)?$/u.test(String(value))) {
+    const [whole, fraction = ""] = String(value).split(".");
+    const digits = fraction.replace(/0+$/u, "");
+    return whole.replace(/^0+(?=[0-9])/u, "") + (digits ? `.${digits}` : "");
+  }
+  return value;
+}
+
+export function assertVisualizationOrderMatchesPlan(order, items, params) {
+  const check = (actual, expected, label) => {
+    for (const [key, value] of Object.entries(expected)) {
+      if (["items", "idempotency_key", "customer_key"].includes(key)) continue;
+      if (value && typeof value === "object") {
+        check(actual?.[key], value, `${label}.${key}`);
+      } else if (
+        comparablePlannedValue(actual?.[key], key) !==
+        comparablePlannedValue(value, key)
+      ) {
+        throw new VisualizationDemoError(
+          `${label}.${key} conflicts with the current plan`,
+        );
+      }
+    }
+  };
+  check(order, params, String(params.order_no || params.purchase_order_no));
+  if (items.length !== params.items.length)
+    throw new VisualizationDemoError(
+      "order item count conflicts with the current plan",
+    );
+  for (const expected of params.items) {
+    const matches = items.filter(
+      (item) => Number(item.line_no) === Number(expected.line_no),
+    );
+    if (matches.length !== 1)
+      throw new VisualizationDemoError(
+        "order line identity conflicts with the current plan",
+      );
+    check(matches[0], expected, `line ${expected.line_no}`);
+  }
+}
+
 async function ensureSourceOrders({ plan, token, domain, specs, fetchImpl }) {
   const sales = domain === "sales_order";
   const listMethod = sales ? "list_sales_orders" : "list_purchase_orders";
@@ -612,6 +664,7 @@ async function ensureSourceOrders({ plan, token, domain, specs, fetchImpl }) {
         `${spec.orderNo} item count drifted: ${items.length}`,
       );
     }
+    assertVisualizationOrderMatchesPlan(order, items, spec.params);
     results.push({ action, id, businessNo: spec.orderNo, status });
   }
   return results;
@@ -675,6 +728,11 @@ async function ensureProductionOrders({ plan, token, fetchImpl }) {
       fetchImpl,
     });
     order = aggregate.production_order;
+    assertVisualizationOrderMatchesPlan(
+      order,
+      aggregate.production_order_items || [],
+      spec.params,
+    );
     if (spec.release && String(order?.status || "").toUpperCase() === "DRAFT") {
       aggregate = await rpcCall({
         backendURL: plan.backendURL,

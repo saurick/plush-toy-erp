@@ -28,16 +28,17 @@
 | `local-runtime-console.mjs` | 将 Kratos JSON 转为紧凑终端日志，按级别和关键词筛选，回放启动记录并跟随重启；人工终端常驻，macOS 非交互启动打开日志终端，参数与运行边界见 [服务端入口](../server/README.md#快速开始) |
 | `terminal-log.mjs` | 前后端启动与日志共用的终端高亮、无颜色输出和 PostgreSQL 凭据脱敏 |
 | `local-database-roles.mjs`、`local-runtime-rehearsal.mjs` | 复用部署角色策略，使用独立只读账号审计，并在临时恢复库验证固定候选版本 |
+| `local-orb.mjs` | 查看、启动 Orb 备用中间件及显式切换开发连接；拒绝覆盖运行中的开发任务，见 [Orb 备用环境](../server/deploy/compose/dev-orb/README.md) |
 | `local-migration-workflow.mjs`、`local-migration.mjs` | 迁移高层编排与低层受控实现，通过 Make / 迁移页使用 |
 | `seed-role-demo-admins.sh`、`seed-core-demo-data.sh`、`seed-trial-sim-masterdata.sh` | 显式准备模拟账号或主数据；目标、命名、读回与清理见 QA 数据合同 |
 | `build/apply-customer-web-config.mjs` | 将已审查客户配置与 public-assets 注入构建产物，不复制客户原件 |
 
 ## 推荐顺序
 
-1. 新机器先检查版本并安装依赖：
+1. 新机器先按[版本锁定](#版本锁定)安装 `n` 与 pnpm，再检查版本并安装依赖：
 
    ```bash
-   corepack enable
+   sudo n auto
    bash scripts/doctor.sh
    bash scripts/bootstrap.sh
    ```
@@ -69,7 +70,21 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 
 ## 版本锁定
 
-`doctor.sh` 同时核对当前 Bash 与 PATH 子进程 Bash（major ≥ 4），根目录三个 Node 版本文件、`web/package.json#packageManager` 和 `server/go.mod`。以这些文件作为版本真源，切换工具链后重新运行 doctor，不在各 README 另记一套版本。
+Node 统一由 `n` 管理，`.n-node-version` 是唯一精确版本真源；当前为 `24.21.0`，`web/package.json#engines.node` 声明同一 `24.21.x` 系列。安装、切换和升级都在仓库根目录使用 `n auto`；升级补丁版本时同步该文件、构建镜像与 Runner 的固定版本及校验值。
+
+macOS 首次安装：
+
+```bash
+brew install n
+cd "$(git rev-parse --show-toplevel)"
+sudo n auto
+sudo npm install --global "$(node -p 'require("./web/package.json").packageManager')"
+bash scripts/doctor.sh
+```
+
+`n` 默认将 Node 安装到 `/usr/local/bin`，该目录需排在 PATH 的其他 Node 路径之前；使用可写的自定义 `N_PREFIX` 时，可去掉 `sudo` 并把 `$N_PREFIX/bin` 加入 PATH。切换后新开终端，核对 `command -v node` 和 `node --version`。Linux / WSL 同样使用 [n 官方安装方式](https://github.com/tj/n#installation)；原生 Windows 开发入口使用 WSL。
+
+`doctor.sh` 核对 `n`、当前 Node、唯一版本锁与 `engines.node`，并阻断重复版本文件；同时检查 Bash（major ≥ 4）、`web/package.json#packageManager` 和 `server/go.mod`。开发工作台与覆盖率采集器校验当前进程版本，版本不符时先用 `n auto` 切换并重启前端。CI 继续校验精确版本，Docker 构建和运行镜像固定相同补丁版本。
 
 ## npm registry token 边界
 

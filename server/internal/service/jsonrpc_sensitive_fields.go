@@ -76,10 +76,14 @@ var commercialFieldKeys = map[string]struct{}{
 }
 
 var financeSettlementFieldKeys = map[string]struct{}{
-	"account_name": {}, "collection_type": {}, "currency": {},
-	"currency_snapshot": {}, "fee_amount": {}, "invoice_category": {},
-	"paid_amount": {}, "payment_term": {}, "payment_term_days": {},
+	"account_name": {}, "collection_type": {},
+	"fee_amount": {}, "invoice_category": {},
+	"paid_amount":    {},
 	"settled_amount": {}, "settlement_account": {}, "unpaid_amount": {},
+}
+
+var contractCommercialFieldKeys = map[string]struct{}{
+	"currency": {}, "currency_snapshot": {}, "payment_term": {}, "payment_term_days": {},
 }
 
 func (d *jsonrpcDispatcher) applySensitiveFieldReadPolicy(
@@ -159,6 +163,11 @@ func redactSensitiveFieldMap(value map[string]any, commercialDomain string, poli
 			continue
 		}
 		if !policy.financeSettlement && isSensitiveFieldKey(normalizedKey, financeSettlementFieldKeys) {
+			delete(value, key)
+			continue
+		}
+		if isSensitiveFieldKey(normalizedKey, contractCommercialFieldKeys) &&
+			!commercialFieldVisible(commercialDomain, policy) {
 			delete(value, key)
 			continue
 		}

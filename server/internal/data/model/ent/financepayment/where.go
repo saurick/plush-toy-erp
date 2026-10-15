@@ -56,6 +56,31 @@ func IDLTE(id int) predicate.FinancePayment {
 	return predicate.FinancePayment(sql.FieldLTE(FieldID, id))
 }
 
+// Kind applies equality check predicate on the "kind" field. It's identical to KindEQ.
+func Kind(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldKind, v))
+}
+
+// SourceType applies equality check predicate on the "source_type" field. It's identical to SourceTypeEQ.
+func SourceType(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldSourceType, v))
+}
+
+// SourceID applies equality check predicate on the "source_id" field. It's identical to SourceIDEQ.
+func SourceID(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldSourceID, v))
+}
+
+// RefundOfPaymentID applies equality check predicate on the "refund_of_payment_id" field. It's identical to RefundOfPaymentIDEQ.
+func RefundOfPaymentID(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldRefundOfPaymentID, v))
+}
+
+// PurposeNote applies equality check predicate on the "purpose_note" field. It's identical to PurposeNoteEQ.
+func PurposeNote(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldPurposeNote, v))
+}
+
 // PaymentNo applies equality check predicate on the "payment_no" field. It's identical to PaymentNoEQ.
 func PaymentNo(v string) predicate.FinancePayment {
 	return predicate.FinancePayment(sql.FieldEQ(FieldPaymentNo, v))
@@ -199,6 +224,301 @@ func CreatedAt(v time.Time) predicate.FinancePayment {
 // UpdatedAt applies equality check predicate on the "updated_at" field. It's identical to UpdatedAtEQ.
 func UpdatedAt(v time.Time) predicate.FinancePayment {
 	return predicate.FinancePayment(sql.FieldEQ(FieldUpdatedAt, v))
+}
+
+// KindEQ applies the EQ predicate on the "kind" field.
+func KindEQ(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldKind, v))
+}
+
+// KindNEQ applies the NEQ predicate on the "kind" field.
+func KindNEQ(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldKind, v))
+}
+
+// KindIn applies the In predicate on the "kind" field.
+func KindIn(vs ...string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldKind, vs...))
+}
+
+// KindNotIn applies the NotIn predicate on the "kind" field.
+func KindNotIn(vs ...string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldKind, vs...))
+}
+
+// KindGT applies the GT predicate on the "kind" field.
+func KindGT(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldKind, v))
+}
+
+// KindGTE applies the GTE predicate on the "kind" field.
+func KindGTE(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldKind, v))
+}
+
+// KindLT applies the LT predicate on the "kind" field.
+func KindLT(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldKind, v))
+}
+
+// KindLTE applies the LTE predicate on the "kind" field.
+func KindLTE(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldKind, v))
+}
+
+// KindContains applies the Contains predicate on the "kind" field.
+func KindContains(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldContains(FieldKind, v))
+}
+
+// KindHasPrefix applies the HasPrefix predicate on the "kind" field.
+func KindHasPrefix(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldHasPrefix(FieldKind, v))
+}
+
+// KindHasSuffix applies the HasSuffix predicate on the "kind" field.
+func KindHasSuffix(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldHasSuffix(FieldKind, v))
+}
+
+// KindEqualFold applies the EqualFold predicate on the "kind" field.
+func KindEqualFold(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEqualFold(FieldKind, v))
+}
+
+// KindContainsFold applies the ContainsFold predicate on the "kind" field.
+func KindContainsFold(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldContainsFold(FieldKind, v))
+}
+
+// SourceTypeEQ applies the EQ predicate on the "source_type" field.
+func SourceTypeEQ(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldSourceType, v))
+}
+
+// SourceTypeNEQ applies the NEQ predicate on the "source_type" field.
+func SourceTypeNEQ(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldSourceType, v))
+}
+
+// SourceTypeIn applies the In predicate on the "source_type" field.
+func SourceTypeIn(vs ...string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldSourceType, vs...))
+}
+
+// SourceTypeNotIn applies the NotIn predicate on the "source_type" field.
+func SourceTypeNotIn(vs ...string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldSourceType, vs...))
+}
+
+// SourceTypeGT applies the GT predicate on the "source_type" field.
+func SourceTypeGT(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldSourceType, v))
+}
+
+// SourceTypeGTE applies the GTE predicate on the "source_type" field.
+func SourceTypeGTE(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldSourceType, v))
+}
+
+// SourceTypeLT applies the LT predicate on the "source_type" field.
+func SourceTypeLT(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldSourceType, v))
+}
+
+// SourceTypeLTE applies the LTE predicate on the "source_type" field.
+func SourceTypeLTE(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldSourceType, v))
+}
+
+// SourceTypeContains applies the Contains predicate on the "source_type" field.
+func SourceTypeContains(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldContains(FieldSourceType, v))
+}
+
+// SourceTypeHasPrefix applies the HasPrefix predicate on the "source_type" field.
+func SourceTypeHasPrefix(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldHasPrefix(FieldSourceType, v))
+}
+
+// SourceTypeHasSuffix applies the HasSuffix predicate on the "source_type" field.
+func SourceTypeHasSuffix(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldHasSuffix(FieldSourceType, v))
+}
+
+// SourceTypeIsNil applies the IsNil predicate on the "source_type" field.
+func SourceTypeIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldSourceType))
+}
+
+// SourceTypeNotNil applies the NotNil predicate on the "source_type" field.
+func SourceTypeNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldSourceType))
+}
+
+// SourceTypeEqualFold applies the EqualFold predicate on the "source_type" field.
+func SourceTypeEqualFold(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEqualFold(FieldSourceType, v))
+}
+
+// SourceTypeContainsFold applies the ContainsFold predicate on the "source_type" field.
+func SourceTypeContainsFold(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldContainsFold(FieldSourceType, v))
+}
+
+// SourceIDEQ applies the EQ predicate on the "source_id" field.
+func SourceIDEQ(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldSourceID, v))
+}
+
+// SourceIDNEQ applies the NEQ predicate on the "source_id" field.
+func SourceIDNEQ(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldSourceID, v))
+}
+
+// SourceIDIn applies the In predicate on the "source_id" field.
+func SourceIDIn(vs ...int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldSourceID, vs...))
+}
+
+// SourceIDNotIn applies the NotIn predicate on the "source_id" field.
+func SourceIDNotIn(vs ...int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldSourceID, vs...))
+}
+
+// SourceIDGT applies the GT predicate on the "source_id" field.
+func SourceIDGT(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldSourceID, v))
+}
+
+// SourceIDGTE applies the GTE predicate on the "source_id" field.
+func SourceIDGTE(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldSourceID, v))
+}
+
+// SourceIDLT applies the LT predicate on the "source_id" field.
+func SourceIDLT(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldSourceID, v))
+}
+
+// SourceIDLTE applies the LTE predicate on the "source_id" field.
+func SourceIDLTE(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldSourceID, v))
+}
+
+// SourceIDIsNil applies the IsNil predicate on the "source_id" field.
+func SourceIDIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldSourceID))
+}
+
+// SourceIDNotNil applies the NotNil predicate on the "source_id" field.
+func SourceIDNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldSourceID))
+}
+
+// RefundOfPaymentIDEQ applies the EQ predicate on the "refund_of_payment_id" field.
+func RefundOfPaymentIDEQ(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldRefundOfPaymentID, v))
+}
+
+// RefundOfPaymentIDNEQ applies the NEQ predicate on the "refund_of_payment_id" field.
+func RefundOfPaymentIDNEQ(v int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldRefundOfPaymentID, v))
+}
+
+// RefundOfPaymentIDIn applies the In predicate on the "refund_of_payment_id" field.
+func RefundOfPaymentIDIn(vs ...int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldRefundOfPaymentID, vs...))
+}
+
+// RefundOfPaymentIDNotIn applies the NotIn predicate on the "refund_of_payment_id" field.
+func RefundOfPaymentIDNotIn(vs ...int) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldRefundOfPaymentID, vs...))
+}
+
+// RefundOfPaymentIDIsNil applies the IsNil predicate on the "refund_of_payment_id" field.
+func RefundOfPaymentIDIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldRefundOfPaymentID))
+}
+
+// RefundOfPaymentIDNotNil applies the NotNil predicate on the "refund_of_payment_id" field.
+func RefundOfPaymentIDNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldRefundOfPaymentID))
+}
+
+// PurposeNoteEQ applies the EQ predicate on the "purpose_note" field.
+func PurposeNoteEQ(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEQ(FieldPurposeNote, v))
+}
+
+// PurposeNoteNEQ applies the NEQ predicate on the "purpose_note" field.
+func PurposeNoteNEQ(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNEQ(FieldPurposeNote, v))
+}
+
+// PurposeNoteIn applies the In predicate on the "purpose_note" field.
+func PurposeNoteIn(vs ...string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIn(FieldPurposeNote, vs...))
+}
+
+// PurposeNoteNotIn applies the NotIn predicate on the "purpose_note" field.
+func PurposeNoteNotIn(vs ...string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotIn(FieldPurposeNote, vs...))
+}
+
+// PurposeNoteGT applies the GT predicate on the "purpose_note" field.
+func PurposeNoteGT(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGT(FieldPurposeNote, v))
+}
+
+// PurposeNoteGTE applies the GTE predicate on the "purpose_note" field.
+func PurposeNoteGTE(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldGTE(FieldPurposeNote, v))
+}
+
+// PurposeNoteLT applies the LT predicate on the "purpose_note" field.
+func PurposeNoteLT(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLT(FieldPurposeNote, v))
+}
+
+// PurposeNoteLTE applies the LTE predicate on the "purpose_note" field.
+func PurposeNoteLTE(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldLTE(FieldPurposeNote, v))
+}
+
+// PurposeNoteContains applies the Contains predicate on the "purpose_note" field.
+func PurposeNoteContains(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldContains(FieldPurposeNote, v))
+}
+
+// PurposeNoteHasPrefix applies the HasPrefix predicate on the "purpose_note" field.
+func PurposeNoteHasPrefix(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldHasPrefix(FieldPurposeNote, v))
+}
+
+// PurposeNoteHasSuffix applies the HasSuffix predicate on the "purpose_note" field.
+func PurposeNoteHasSuffix(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldHasSuffix(FieldPurposeNote, v))
+}
+
+// PurposeNoteIsNil applies the IsNil predicate on the "purpose_note" field.
+func PurposeNoteIsNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldIsNull(FieldPurposeNote))
+}
+
+// PurposeNoteNotNil applies the NotNil predicate on the "purpose_note" field.
+func PurposeNoteNotNil() predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldNotNull(FieldPurposeNote))
+}
+
+// PurposeNoteEqualFold applies the EqualFold predicate on the "purpose_note" field.
+func PurposeNoteEqualFold(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldEqualFold(FieldPurposeNote, v))
+}
+
+// PurposeNoteContainsFold applies the ContainsFold predicate on the "purpose_note" field.
+func PurposeNoteContainsFold(v string) predicate.FinancePayment {
+	return predicate.FinancePayment(sql.FieldContainsFold(FieldPurposeNote, v))
 }
 
 // PaymentNoEQ applies the EQ predicate on the "payment_no" field.
@@ -1806,6 +2126,52 @@ func HasAllocations() predicate.FinancePayment {
 func HasAllocationsWith(preds ...predicate.FinanceAllocation) predicate.FinancePayment {
 	return predicate.FinancePayment(func(s *sql.Selector) {
 		step := newAllocationsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRefunds applies the HasEdge predicate on the "refunds" edge.
+func HasRefunds() predicate.FinancePayment {
+	return predicate.FinancePayment(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, RefundsTable, RefundsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRefundsWith applies the HasEdge predicate on the "refunds" edge with a given conditions (other predicates).
+func HasRefundsWith(preds ...predicate.FinancePayment) predicate.FinancePayment {
+	return predicate.FinancePayment(func(s *sql.Selector) {
+		step := newRefundsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRefundSource applies the HasEdge predicate on the "refund_source" edge.
+func HasRefundSource() predicate.FinancePayment {
+	return predicate.FinancePayment(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, RefundSourceTable, RefundSourceColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRefundSourceWith applies the HasEdge predicate on the "refund_source" edge with a given conditions (other predicates).
+func HasRefundSourceWith(preds ...predicate.FinancePayment) predicate.FinancePayment {
+	return predicate.FinancePayment(func(s *sql.Selector) {
+		step := newRefundSourceStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

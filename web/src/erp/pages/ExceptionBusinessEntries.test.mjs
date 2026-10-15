@@ -48,7 +48,7 @@ test('first incoming rejection: keeps draft, post and cancellation distinct from
   assert.match(rejectionModal, /createPurchaseRejectionDisposition/u)
   assert.match(rejectionModal, /postPurchaseRejectionDisposition/u)
   assert.match(rejectionModal, /cancelPurchaseRejectionDisposition/u)
-  assert.match(rejectionModal, /不会生成库存退货流水/u)
+  assert.match(rejectionModal, /不生成库存退货流水/u)
   assert.match(rejectionModal, /createSourceBusinessActionAttemptStore/u)
   assert.match(rejectionModal, /expected_version: record\.version/u)
 })

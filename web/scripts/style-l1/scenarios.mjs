@@ -1,4 +1,6 @@
 import { createEmptyStateScenarios } from './emptyStateScenarios.mjs'
+import { createPageHeaderScenarios } from './pageHeaderScenarios.mjs'
+import { createTaskCalendarScenarios } from './taskCalendarScenarios.mjs'
 import { createBusinessStatusCountsScenarios } from './businessStatusCountsScenarios.mjs'
 import { createBusinessFollowupScenarios } from './businessFollowupScenarios.mjs'
 import { createHighFidelityScenarios } from './highFidelityScenarios.mjs'
@@ -8,8 +10,10 @@ import { createDevUIFeedbackScenarios } from './devUIFeedbackScenarios.mjs'
 import { createDevUIDesignWorkflowScenarios } from './devUIDesignWorkflowScenarios.mjs'
 import { createDevUIDesignMobileTrackingScenario } from './devUIDesignMobileTrackingScenario.mjs'
 import { createMobileProgressScenarios } from './mobileProgressScenarios.mjs'
+import { createMobileScrollScenarios } from './mobileScrollScenarios.mjs'
 import { createFilterConflictScenarios } from './filterConflictScenarios.mjs'
 import { createMobileNavigationBadgeScenarios } from './mobileNavigationBadgeScenarios.mjs'
+import { createLoadFeedbackScenarios } from './loadFeedbackScenarios.mjs'
 import { createDesktopNavigationBadgeScenarios } from './desktopNavigationBadgeScenarios.mjs'
 import { createBusinessFormInteractionScenarios } from './businessFormInteractionScenarios.mjs'
 import { createBusinessPageContractScenarios } from './businessPageContractScenarios.mjs'
@@ -20,6 +24,7 @@ import { createTableAlignmentScenarios } from './tableAlignmentScenarios.mjs'
 import { createBusinessTableScrollScenarios } from './businessTableScrollScenarios.mjs'
 import { createMobileTaskScenarios } from './mobileTaskScenarios.mjs'
 import { createMobileWorkflowTrackingScenarios } from './mobileWorkflowTrackingScenarios.mjs'
+import { createTaskLinkScenarios } from './taskLinkScenarios.mjs'
 import { createMobileInputScenarios } from './mobileInputScenarios.mjs'
 import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
 import { createTaskImagePreviewScenarios } from './taskImagePreviewScenarios.mjs'
@@ -48,6 +53,8 @@ import { createDevPressureScenarios } from './devPressureScenarios.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
 import { createDevDataPreparationScenarios } from './devDataPreparationScenarios.mjs'
 import { createDevDeliveryWorkspaceScenarios } from './devDeliveryWorkspaceScenarios.mjs'
+import { createFinanceAdvanceScenarios } from './financeAdvanceScenarios.mjs'
+import { createTransactionFormRecoveryScenarios } from './transactionFormRecoveryScenarios.mjs'
 import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
 import { createBusinessModuleNavigationScenarios } from './businessModuleNavigationScenarios.mjs'
 import { createFinishedGoodsDeliveryScenarios } from './finishedGoodsDeliveryScenarios.mjs'
@@ -67,6 +74,7 @@ import { createFormDensityScenarios } from './formDensityScenarios.mjs'
 import { createTableDensityScenarios } from './tableDensityScenarios.mjs'
 import { createTableLinesScenarios } from './tableLinesScenarios.mjs'
 import { createAccountAppearanceScenarios } from './accountAppearanceScenarios.mjs'
+import { createAccountIdentityScenarios } from './accountIdentityScenarios.mjs'
 import { createBusinessColumnSettingsScenarios } from './businessColumnSettingsScenarios.mjs'
 
 export function createStyleL1Scenarios(deps) {
@@ -81,7 +89,7 @@ export function createStyleL1Scenarios(deps) {
     assertBusinessCollaborationPanelCollapsedByDefault,
     assertBusinessFormModalKeyboardRecovery,
     assertBusinessHeaderHasNoSectionTitle,
-    assertBusinessHeaderStatsSingleLine,
+    assertBusinessHeaderCompact,
     assertBusinessListEmptySearchState,
     assertBusinessMainTableHasNoOperationColumn,
     assertBusinessMainTableInitialSelectionEmpty,
@@ -373,12 +381,17 @@ export function createStyleL1Scenarios(deps) {
       ...deps,
       customerRuntimeEffectiveSession,
     }),
+    ...createAccountIdentityScenarios({
+      ...deps,
+      customerRuntimeEffectiveSession,
+    }),
     ...createBusinessModuleNavigationScenarios({
       customerRuntimeEffectiveSession,
       assertNoHorizontalOverflow,
       outputDir,
       path,
     }),
+    ...createPageHeaderScenarios({ customerRuntimeEffectiveSession, assertNoHorizontalOverflow }),
     ...createBusinessColumnSettingsScenarios({
       ...deps,
       customerRuntimeEffectiveSession,
@@ -571,6 +584,7 @@ export function createStyleL1Scenarios(deps) {
       outputDir,
       customerRuntimeEffectiveSession,
     }),
+    ...createTaskCalendarScenarios(deps),
     ...createDashboardTaskScenarios({
       expectText,
       expectHeading,
@@ -599,12 +613,15 @@ export function createStyleL1Scenarios(deps) {
       ...deps,
       customerRuntimeEffectiveSession,
     }),
+    ...createMobileScrollScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileWorkflowTrackingScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createTaskLinkScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createFilterConflictScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileNavigationBadgeScenarios({
       ...deps,
       customerRuntimeEffectiveSession,
     }),
+    ...createLoadFeedbackScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createDesktopNavigationBadgeScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileTaskScenarios({
       expectText,
@@ -732,6 +749,8 @@ export function createStyleL1Scenarios(deps) {
       verifyBusinessModuleColumnOrderDialog,
       customerRuntimeEffectiveSession,
     }),
+    ...createFinanceAdvanceScenarios({ assert, customerRuntimeEffectiveSession, expectText, outputDir, assertNoHorizontalOverflow }),
+    ...createTransactionFormRecoveryScenarios({ assert, customerRuntimeEffectiveSession, expectHeading, expectText, outputDir, assertNoHorizontalOverflow }),
     ...createFinanceBusinessSourceScenarios({
       assert,
       assertNoHorizontalOverflow,
@@ -759,7 +778,7 @@ export function createStyleL1Scenarios(deps) {
       assertTextAbsent,
       assertBusinessPageRefreshEntrypoint,
       assertBusinessHeaderHasNoSectionTitle,
-      assertBusinessHeaderStatsSingleLine,
+      assertBusinessHeaderCompact,
       assertBusinessMainTableHasNoOperationColumn,
       assertBusinessMainTableInitialSelectionEmpty,
       assertBusinessMainTableSortableColumns,
@@ -803,7 +822,7 @@ export function createStyleL1Scenarios(deps) {
       assertAntdModalCentered,
       assertBusinessFormModalKeyboardRecovery,
       assertBusinessHeaderHasNoSectionTitle,
-      assertBusinessHeaderStatsSingleLine,
+      assertBusinessHeaderCompact,
       assertBusinessListEmptySearchState,
       assertBusinessMainTableHasNoOperationColumn,
       assertBusinessMainTableInitialSelectionEmpty,

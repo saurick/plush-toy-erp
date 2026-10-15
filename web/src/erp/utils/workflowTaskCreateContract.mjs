@@ -1,4 +1,5 @@
 const WORKFLOW_TASK_CREATE_PUBLIC_PARAM_KEYS = new Set([
+  'idempotency_key',
   'task_code',
   'task_group',
   'task_name',
@@ -17,6 +18,7 @@ const WORKFLOW_TASK_CREATE_PUBLIC_PARAM_KEYS = new Set([
 ])
 
 const WORKFLOW_TASK_CREATE_REQUIRED_STRING_KEYS = Object.freeze([
+  'idempotency_key',
   'task_code',
   'task_group',
   'task_name',

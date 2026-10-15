@@ -89,8 +89,6 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             开始验证
           </Button>
         ) : null}
-      </header>
-      <main className="erp-dev-hub-shell">
         {isDelivery ? (
           <DevTaskNav
             compact
@@ -107,6 +105,9 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             }}
           />
         ) : null}
+      </header>
+      <main className="erp-dev-hub-shell">
+
         <div
           hidden={isDelivery && activeView !== 'prepare'}
           id={isDelivery ? 'dev-delivery-panel-prepare' : undefined}

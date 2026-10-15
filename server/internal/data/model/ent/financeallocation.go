@@ -19,6 +19,8 @@ type FinanceAllocation struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
+	// Reason holds the value of the "reason" field.
+	Reason *string `json:"reason,omitempty"`
 	// PaymentID holds the value of the "payment_id" field.
 	PaymentID int `json:"payment_id,omitempty"`
 	// FinanceFactID holds the value of the "finance_fact_id" field.
@@ -72,7 +74,7 @@ func (*FinanceAllocation) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case financeallocation.FieldID, financeallocation.FieldPaymentID, financeallocation.FieldFinanceFactID, financeallocation.FieldReversalOfAllocationID, financeallocation.FieldCreatedBy:
 			values[i] = new(sql.NullInt64)
-		case financeallocation.FieldCurrency, financeallocation.FieldStatus, financeallocation.FieldIdempotencyKey:
+		case financeallocation.FieldReason, financeallocation.FieldCurrency, financeallocation.FieldStatus, financeallocation.FieldIdempotencyKey:
 			values[i] = new(sql.NullString)
 		case financeallocation.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -97,6 +99,13 @@ func (_m *FinanceAllocation) assignValues(columns []string, values []any) error 
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			_m.ID = int(value.Int64)
+		case financeallocation.FieldReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field reason", values[i])
+			} else if value.Valid {
+				_m.Reason = new(string)
+				*_m.Reason = value.String
+			}
 		case financeallocation.FieldPaymentID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field payment_id", values[i])
@@ -193,6 +202,11 @@ func (_m *FinanceAllocation) String() string {
 	var builder strings.Builder
 	builder.WriteString("FinanceAllocation(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
+	if v := _m.Reason; v != nil {
+		builder.WriteString("reason=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
 	builder.WriteString("payment_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.PaymentID))
 	builder.WriteString(", ")

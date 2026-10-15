@@ -58,16 +58,21 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	failed := false
 	for _, acc := range accounts {
 		fmt.Println("-------------------------------------------------")
 		fmt.Printf("Testing PostgreSQL account: %s\n", acc.Name)
 		fmt.Printf("DSN (masked): %s\n", maskPassword(acc.DSN))
 
 		if err := testPostgres(ctx, acc.DSN); err != nil {
+			failed = true
 			fmt.Printf("❌ %s connect failed: %v\n", acc.Name, err)
 		} else {
 			fmt.Printf("✅ %s connect OK\n", acc.Name)
 		}
+	}
+	if failed {
+		os.Exit(1)
 	}
 }
 

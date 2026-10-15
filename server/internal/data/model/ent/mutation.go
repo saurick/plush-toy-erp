@@ -15157,6 +15157,7 @@ type FinanceAllocationMutation struct {
 	op                           Op
 	typ                          string
 	id                           *int
+	reason                       *string
 	finance_fact_id              *int
 	addfinance_fact_id           *int
 	amount                       *decimal.Decimal
@@ -15272,6 +15273,55 @@ func (m *FinanceAllocationMutation) IDs(ctx context.Context) ([]int, error) {
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
+}
+
+// SetReason sets the "reason" field.
+func (m *FinanceAllocationMutation) SetReason(s string) {
+	m.reason = &s
+}
+
+// Reason returns the value of the "reason" field in the mutation.
+func (m *FinanceAllocationMutation) Reason() (r string, exists bool) {
+	v := m.reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReason returns the old "reason" field's value of the FinanceAllocation entity.
+// If the FinanceAllocation object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinanceAllocationMutation) OldReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReason: %w", err)
+	}
+	return oldValue.Reason, nil
+}
+
+// ClearReason clears the value of the "reason" field.
+func (m *FinanceAllocationMutation) ClearReason() {
+	m.reason = nil
+	m.clearedFields[financeallocation.FieldReason] = struct{}{}
+}
+
+// ReasonCleared returns if the "reason" field was cleared in this mutation.
+func (m *FinanceAllocationMutation) ReasonCleared() bool {
+	_, ok := m.clearedFields[financeallocation.FieldReason]
+	return ok
+}
+
+// ResetReason resets all changes to the "reason" field.
+func (m *FinanceAllocationMutation) ResetReason() {
+	m.reason = nil
+	delete(m.clearedFields, financeallocation.FieldReason)
 }
 
 // SetPaymentID sets the "payment_id" field.
@@ -15733,7 +15783,10 @@ func (m *FinanceAllocationMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *FinanceAllocationMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 10)
+	if m.reason != nil {
+		fields = append(fields, financeallocation.FieldReason)
+	}
 	if m.payment != nil {
 		fields = append(fields, financeallocation.FieldPaymentID)
 	}
@@ -15769,6 +15822,8 @@ func (m *FinanceAllocationMutation) Fields() []string {
 // schema.
 func (m *FinanceAllocationMutation) Field(name string) (ent.Value, bool) {
 	switch name {
+	case financeallocation.FieldReason:
+		return m.Reason()
 	case financeallocation.FieldPaymentID:
 		return m.PaymentID()
 	case financeallocation.FieldFinanceFactID:
@@ -15796,6 +15851,8 @@ func (m *FinanceAllocationMutation) Field(name string) (ent.Value, bool) {
 // database failed.
 func (m *FinanceAllocationMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
+	case financeallocation.FieldReason:
+		return m.OldReason(ctx)
 	case financeallocation.FieldPaymentID:
 		return m.OldPaymentID(ctx)
 	case financeallocation.FieldFinanceFactID:
@@ -15823,6 +15880,13 @@ func (m *FinanceAllocationMutation) OldField(ctx context.Context, name string) (
 // type.
 func (m *FinanceAllocationMutation) SetField(name string, value ent.Value) error {
 	switch name {
+	case financeallocation.FieldReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReason(v)
+		return nil
 	case financeallocation.FieldPaymentID:
 		v, ok := value.(int)
 		if !ok {
@@ -15955,6 +16019,9 @@ func (m *FinanceAllocationMutation) AddField(name string, value ent.Value) error
 // mutation.
 func (m *FinanceAllocationMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(financeallocation.FieldReason) {
+		fields = append(fields, financeallocation.FieldReason)
+	}
 	if m.FieldCleared(financeallocation.FieldReversalOfAllocationID) {
 		fields = append(fields, financeallocation.FieldReversalOfAllocationID)
 	}
@@ -15972,6 +16039,9 @@ func (m *FinanceAllocationMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *FinanceAllocationMutation) ClearField(name string) error {
 	switch name {
+	case financeallocation.FieldReason:
+		m.ClearReason()
+		return nil
 	case financeallocation.FieldReversalOfAllocationID:
 		m.ClearReversalOfAllocationID()
 		return nil
@@ -15983,6 +16053,9 @@ func (m *FinanceAllocationMutation) ClearField(name string) error {
 // It returns an error if the field is not defined in the schema.
 func (m *FinanceAllocationMutation) ResetField(name string) error {
 	switch name {
+	case financeallocation.FieldReason:
+		m.ResetReason()
+		return nil
 	case financeallocation.FieldPaymentID:
 		m.ResetPaymentID()
 		return nil
@@ -19660,6 +19733,11 @@ type FinancePaymentMutation struct {
 	op                       Op
 	typ                      string
 	id                       *int
+	kind                     *string
+	source_type              *string
+	source_id                *int
+	addsource_id             *int
+	purpose_note             *string
 	payment_no               *string
 	direction                *string
 	status                   *string
@@ -19701,6 +19779,11 @@ type FinancePaymentMutation struct {
 	allocations              map[int]struct{}
 	removedallocations       map[int]struct{}
 	clearedallocations       bool
+	refunds                  map[int]struct{}
+	removedrefunds           map[int]struct{}
+	clearedrefunds           bool
+	refund_source            *int
+	clearedrefund_source     bool
 	done                     bool
 	oldValue                 func(context.Context) (*FinancePayment, error)
 	predicates               []predicate.FinancePayment
@@ -19802,6 +19885,259 @@ func (m *FinancePaymentMutation) IDs(ctx context.Context) ([]int, error) {
 	default:
 		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
 	}
+}
+
+// SetKind sets the "kind" field.
+func (m *FinancePaymentMutation) SetKind(s string) {
+	m.kind = &s
+}
+
+// Kind returns the value of the "kind" field in the mutation.
+func (m *FinancePaymentMutation) Kind() (r string, exists bool) {
+	v := m.kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKind returns the old "kind" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldKind(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKind: %w", err)
+	}
+	return oldValue.Kind, nil
+}
+
+// ResetKind resets all changes to the "kind" field.
+func (m *FinancePaymentMutation) ResetKind() {
+	m.kind = nil
+}
+
+// SetSourceType sets the "source_type" field.
+func (m *FinancePaymentMutation) SetSourceType(s string) {
+	m.source_type = &s
+}
+
+// SourceType returns the value of the "source_type" field in the mutation.
+func (m *FinancePaymentMutation) SourceType() (r string, exists bool) {
+	v := m.source_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceType returns the old "source_type" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldSourceType(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceType: %w", err)
+	}
+	return oldValue.SourceType, nil
+}
+
+// ClearSourceType clears the value of the "source_type" field.
+func (m *FinancePaymentMutation) ClearSourceType() {
+	m.source_type = nil
+	m.clearedFields[financepayment.FieldSourceType] = struct{}{}
+}
+
+// SourceTypeCleared returns if the "source_type" field was cleared in this mutation.
+func (m *FinancePaymentMutation) SourceTypeCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldSourceType]
+	return ok
+}
+
+// ResetSourceType resets all changes to the "source_type" field.
+func (m *FinancePaymentMutation) ResetSourceType() {
+	m.source_type = nil
+	delete(m.clearedFields, financepayment.FieldSourceType)
+}
+
+// SetSourceID sets the "source_id" field.
+func (m *FinancePaymentMutation) SetSourceID(i int) {
+	m.source_id = &i
+	m.addsource_id = nil
+}
+
+// SourceID returns the value of the "source_id" field in the mutation.
+func (m *FinancePaymentMutation) SourceID() (r int, exists bool) {
+	v := m.source_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceID returns the old "source_id" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldSourceID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceID: %w", err)
+	}
+	return oldValue.SourceID, nil
+}
+
+// AddSourceID adds i to the "source_id" field.
+func (m *FinancePaymentMutation) AddSourceID(i int) {
+	if m.addsource_id != nil {
+		*m.addsource_id += i
+	} else {
+		m.addsource_id = &i
+	}
+}
+
+// AddedSourceID returns the value that was added to the "source_id" field in this mutation.
+func (m *FinancePaymentMutation) AddedSourceID() (r int, exists bool) {
+	v := m.addsource_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearSourceID clears the value of the "source_id" field.
+func (m *FinancePaymentMutation) ClearSourceID() {
+	m.source_id = nil
+	m.addsource_id = nil
+	m.clearedFields[financepayment.FieldSourceID] = struct{}{}
+}
+
+// SourceIDCleared returns if the "source_id" field was cleared in this mutation.
+func (m *FinancePaymentMutation) SourceIDCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldSourceID]
+	return ok
+}
+
+// ResetSourceID resets all changes to the "source_id" field.
+func (m *FinancePaymentMutation) ResetSourceID() {
+	m.source_id = nil
+	m.addsource_id = nil
+	delete(m.clearedFields, financepayment.FieldSourceID)
+}
+
+// SetRefundOfPaymentID sets the "refund_of_payment_id" field.
+func (m *FinancePaymentMutation) SetRefundOfPaymentID(i int) {
+	m.refund_source = &i
+}
+
+// RefundOfPaymentID returns the value of the "refund_of_payment_id" field in the mutation.
+func (m *FinancePaymentMutation) RefundOfPaymentID() (r int, exists bool) {
+	v := m.refund_source
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRefundOfPaymentID returns the old "refund_of_payment_id" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldRefundOfPaymentID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRefundOfPaymentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRefundOfPaymentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRefundOfPaymentID: %w", err)
+	}
+	return oldValue.RefundOfPaymentID, nil
+}
+
+// ClearRefundOfPaymentID clears the value of the "refund_of_payment_id" field.
+func (m *FinancePaymentMutation) ClearRefundOfPaymentID() {
+	m.refund_source = nil
+	m.clearedFields[financepayment.FieldRefundOfPaymentID] = struct{}{}
+}
+
+// RefundOfPaymentIDCleared returns if the "refund_of_payment_id" field was cleared in this mutation.
+func (m *FinancePaymentMutation) RefundOfPaymentIDCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldRefundOfPaymentID]
+	return ok
+}
+
+// ResetRefundOfPaymentID resets all changes to the "refund_of_payment_id" field.
+func (m *FinancePaymentMutation) ResetRefundOfPaymentID() {
+	m.refund_source = nil
+	delete(m.clearedFields, financepayment.FieldRefundOfPaymentID)
+}
+
+// SetPurposeNote sets the "purpose_note" field.
+func (m *FinancePaymentMutation) SetPurposeNote(s string) {
+	m.purpose_note = &s
+}
+
+// PurposeNote returns the value of the "purpose_note" field in the mutation.
+func (m *FinancePaymentMutation) PurposeNote() (r string, exists bool) {
+	v := m.purpose_note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPurposeNote returns the old "purpose_note" field's value of the FinancePayment entity.
+// If the FinancePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinancePaymentMutation) OldPurposeNote(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPurposeNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPurposeNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPurposeNote: %w", err)
+	}
+	return oldValue.PurposeNote, nil
+}
+
+// ClearPurposeNote clears the value of the "purpose_note" field.
+func (m *FinancePaymentMutation) ClearPurposeNote() {
+	m.purpose_note = nil
+	m.clearedFields[financepayment.FieldPurposeNote] = struct{}{}
+}
+
+// PurposeNoteCleared returns if the "purpose_note" field was cleared in this mutation.
+func (m *FinancePaymentMutation) PurposeNoteCleared() bool {
+	_, ok := m.clearedFields[financepayment.FieldPurposeNote]
+	return ok
+}
+
+// ResetPurposeNote resets all changes to the "purpose_note" field.
+func (m *FinancePaymentMutation) ResetPurposeNote() {
+	m.purpose_note = nil
+	delete(m.clearedFields, financepayment.FieldPurposeNote)
 }
 
 // SetPaymentNo sets the "payment_no" field.
@@ -21236,6 +21572,100 @@ func (m *FinancePaymentMutation) ResetAllocations() {
 	m.removedallocations = nil
 }
 
+// AddRefundIDs adds the "refunds" edge to the FinancePayment entity by ids.
+func (m *FinancePaymentMutation) AddRefundIDs(ids ...int) {
+	if m.refunds == nil {
+		m.refunds = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.refunds[ids[i]] = struct{}{}
+	}
+}
+
+// ClearRefunds clears the "refunds" edge to the FinancePayment entity.
+func (m *FinancePaymentMutation) ClearRefunds() {
+	m.clearedrefunds = true
+}
+
+// RefundsCleared reports if the "refunds" edge to the FinancePayment entity was cleared.
+func (m *FinancePaymentMutation) RefundsCleared() bool {
+	return m.clearedrefunds
+}
+
+// RemoveRefundIDs removes the "refunds" edge to the FinancePayment entity by IDs.
+func (m *FinancePaymentMutation) RemoveRefundIDs(ids ...int) {
+	if m.removedrefunds == nil {
+		m.removedrefunds = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.refunds, ids[i])
+		m.removedrefunds[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedRefunds returns the removed IDs of the "refunds" edge to the FinancePayment entity.
+func (m *FinancePaymentMutation) RemovedRefundsIDs() (ids []int) {
+	for id := range m.removedrefunds {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// RefundsIDs returns the "refunds" edge IDs in the mutation.
+func (m *FinancePaymentMutation) RefundsIDs() (ids []int) {
+	for id := range m.refunds {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetRefunds resets all changes to the "refunds" edge.
+func (m *FinancePaymentMutation) ResetRefunds() {
+	m.refunds = nil
+	m.clearedrefunds = false
+	m.removedrefunds = nil
+}
+
+// SetRefundSourceID sets the "refund_source" edge to the FinancePayment entity by id.
+func (m *FinancePaymentMutation) SetRefundSourceID(id int) {
+	m.refund_source = &id
+}
+
+// ClearRefundSource clears the "refund_source" edge to the FinancePayment entity.
+func (m *FinancePaymentMutation) ClearRefundSource() {
+	m.clearedrefund_source = true
+	m.clearedFields[financepayment.FieldRefundOfPaymentID] = struct{}{}
+}
+
+// RefundSourceCleared reports if the "refund_source" edge to the FinancePayment entity was cleared.
+func (m *FinancePaymentMutation) RefundSourceCleared() bool {
+	return m.RefundOfPaymentIDCleared() || m.clearedrefund_source
+}
+
+// RefundSourceID returns the "refund_source" edge ID in the mutation.
+func (m *FinancePaymentMutation) RefundSourceID() (id int, exists bool) {
+	if m.refund_source != nil {
+		return *m.refund_source, true
+	}
+	return
+}
+
+// RefundSourceIDs returns the "refund_source" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// RefundSourceID instead. It exists only for internal usage by the builders.
+func (m *FinancePaymentMutation) RefundSourceIDs() (ids []int) {
+	if id := m.refund_source; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetRefundSource resets all changes to the "refund_source" edge.
+func (m *FinancePaymentMutation) ResetRefundSource() {
+	m.refund_source = nil
+	m.clearedrefund_source = false
+}
+
 // Where appends a list predicates to the FinancePaymentMutation builder.
 func (m *FinancePaymentMutation) Where(ps ...predicate.FinancePayment) {
 	m.predicates = append(m.predicates, ps...)
@@ -21270,7 +21700,22 @@ func (m *FinancePaymentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *FinancePaymentMutation) Fields() []string {
-	fields := make([]string, 0, 29)
+	fields := make([]string, 0, 34)
+	if m.kind != nil {
+		fields = append(fields, financepayment.FieldKind)
+	}
+	if m.source_type != nil {
+		fields = append(fields, financepayment.FieldSourceType)
+	}
+	if m.source_id != nil {
+		fields = append(fields, financepayment.FieldSourceID)
+	}
+	if m.refund_source != nil {
+		fields = append(fields, financepayment.FieldRefundOfPaymentID)
+	}
+	if m.purpose_note != nil {
+		fields = append(fields, financepayment.FieldPurposeNote)
+	}
 	if m.payment_no != nil {
 		fields = append(fields, financepayment.FieldPaymentNo)
 	}
@@ -21366,6 +21811,16 @@ func (m *FinancePaymentMutation) Fields() []string {
 // schema.
 func (m *FinancePaymentMutation) Field(name string) (ent.Value, bool) {
 	switch name {
+	case financepayment.FieldKind:
+		return m.Kind()
+	case financepayment.FieldSourceType:
+		return m.SourceType()
+	case financepayment.FieldSourceID:
+		return m.SourceID()
+	case financepayment.FieldRefundOfPaymentID:
+		return m.RefundOfPaymentID()
+	case financepayment.FieldPurposeNote:
+		return m.PurposeNote()
 	case financepayment.FieldPaymentNo:
 		return m.PaymentNo()
 	case financepayment.FieldDirection:
@@ -21433,6 +21888,16 @@ func (m *FinancePaymentMutation) Field(name string) (ent.Value, bool) {
 // database failed.
 func (m *FinancePaymentMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
 	switch name {
+	case financepayment.FieldKind:
+		return m.OldKind(ctx)
+	case financepayment.FieldSourceType:
+		return m.OldSourceType(ctx)
+	case financepayment.FieldSourceID:
+		return m.OldSourceID(ctx)
+	case financepayment.FieldRefundOfPaymentID:
+		return m.OldRefundOfPaymentID(ctx)
+	case financepayment.FieldPurposeNote:
+		return m.OldPurposeNote(ctx)
 	case financepayment.FieldPaymentNo:
 		return m.OldPaymentNo(ctx)
 	case financepayment.FieldDirection:
@@ -21500,6 +21965,41 @@ func (m *FinancePaymentMutation) OldField(ctx context.Context, name string) (ent
 // type.
 func (m *FinancePaymentMutation) SetField(name string, value ent.Value) error {
 	switch name {
+	case financepayment.FieldKind:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKind(v)
+		return nil
+	case financepayment.FieldSourceType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceType(v)
+		return nil
+	case financepayment.FieldSourceID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceID(v)
+		return nil
+	case financepayment.FieldRefundOfPaymentID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRefundOfPaymentID(v)
+		return nil
+	case financepayment.FieldPurposeNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPurposeNote(v)
+		return nil
 	case financepayment.FieldPaymentNo:
 		v, ok := value.(string)
 		if !ok {
@@ -21711,6 +22211,9 @@ func (m *FinancePaymentMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *FinancePaymentMutation) AddedFields() []string {
 	var fields []string
+	if m.addsource_id != nil {
+		fields = append(fields, financepayment.FieldSourceID)
+	}
 	if m.addcounterparty_id != nil {
 		fields = append(fields, financepayment.FieldCounterpartyID)
 	}
@@ -21743,6 +22246,8 @@ func (m *FinancePaymentMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *FinancePaymentMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case financepayment.FieldSourceID:
+		return m.AddedSourceID()
 	case financepayment.FieldCounterpartyID:
 		return m.AddedCounterpartyID()
 	case financepayment.FieldVersion:
@@ -21768,6 +22273,13 @@ func (m *FinancePaymentMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *FinancePaymentMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case financepayment.FieldSourceID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSourceID(v)
+		return nil
 	case financepayment.FieldCounterpartyID:
 		v, ok := value.(int)
 		if !ok {
@@ -21832,6 +22344,18 @@ func (m *FinancePaymentMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *FinancePaymentMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(financepayment.FieldSourceType) {
+		fields = append(fields, financepayment.FieldSourceType)
+	}
+	if m.FieldCleared(financepayment.FieldSourceID) {
+		fields = append(fields, financepayment.FieldSourceID)
+	}
+	if m.FieldCleared(financepayment.FieldRefundOfPaymentID) {
+		fields = append(fields, financepayment.FieldRefundOfPaymentID)
+	}
+	if m.FieldCleared(financepayment.FieldPurposeNote) {
+		fields = append(fields, financepayment.FieldPurposeNote)
+	}
 	if m.FieldCleared(financepayment.FieldApprovedAt) {
 		fields = append(fields, financepayment.FieldApprovedAt)
 	}
@@ -21885,6 +22409,18 @@ func (m *FinancePaymentMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *FinancePaymentMutation) ClearField(name string) error {
 	switch name {
+	case financepayment.FieldSourceType:
+		m.ClearSourceType()
+		return nil
+	case financepayment.FieldSourceID:
+		m.ClearSourceID()
+		return nil
+	case financepayment.FieldRefundOfPaymentID:
+		m.ClearRefundOfPaymentID()
+		return nil
+	case financepayment.FieldPurposeNote:
+		m.ClearPurposeNote()
+		return nil
 	case financepayment.FieldApprovedAt:
 		m.ClearApprovedAt()
 		return nil
@@ -21932,6 +22468,21 @@ func (m *FinancePaymentMutation) ClearField(name string) error {
 // It returns an error if the field is not defined in the schema.
 func (m *FinancePaymentMutation) ResetField(name string) error {
 	switch name {
+	case financepayment.FieldKind:
+		m.ResetKind()
+		return nil
+	case financepayment.FieldSourceType:
+		m.ResetSourceType()
+		return nil
+	case financepayment.FieldSourceID:
+		m.ResetSourceID()
+		return nil
+	case financepayment.FieldRefundOfPaymentID:
+		m.ResetRefundOfPaymentID()
+		return nil
+	case financepayment.FieldPurposeNote:
+		m.ResetPurposeNote()
+		return nil
 	case financepayment.FieldPaymentNo:
 		m.ResetPaymentNo()
 		return nil
@@ -22025,9 +22576,15 @@ func (m *FinancePaymentMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *FinancePaymentMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.allocations != nil {
 		edges = append(edges, financepayment.EdgeAllocations)
+	}
+	if m.refunds != nil {
+		edges = append(edges, financepayment.EdgeRefunds)
+	}
+	if m.refund_source != nil {
+		edges = append(edges, financepayment.EdgeRefundSource)
 	}
 	return edges
 }
@@ -22042,15 +22599,28 @@ func (m *FinancePaymentMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case financepayment.EdgeRefunds:
+		ids := make([]ent.Value, 0, len(m.refunds))
+		for id := range m.refunds {
+			ids = append(ids, id)
+		}
+		return ids
+	case financepayment.EdgeRefundSource:
+		if id := m.refund_source; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *FinancePaymentMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.removedallocations != nil {
 		edges = append(edges, financepayment.EdgeAllocations)
+	}
+	if m.removedrefunds != nil {
+		edges = append(edges, financepayment.EdgeRefunds)
 	}
 	return edges
 }
@@ -22065,15 +22635,27 @@ func (m *FinancePaymentMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case financepayment.EdgeRefunds:
+		ids := make([]ent.Value, 0, len(m.removedrefunds))
+		for id := range m.removedrefunds {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *FinancePaymentMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.clearedallocations {
 		edges = append(edges, financepayment.EdgeAllocations)
+	}
+	if m.clearedrefunds {
+		edges = append(edges, financepayment.EdgeRefunds)
+	}
+	if m.clearedrefund_source {
+		edges = append(edges, financepayment.EdgeRefundSource)
 	}
 	return edges
 }
@@ -22084,6 +22666,10 @@ func (m *FinancePaymentMutation) EdgeCleared(name string) bool {
 	switch name {
 	case financepayment.EdgeAllocations:
 		return m.clearedallocations
+	case financepayment.EdgeRefunds:
+		return m.clearedrefunds
+	case financepayment.EdgeRefundSource:
+		return m.clearedrefund_source
 	}
 	return false
 }
@@ -22092,6 +22678,9 @@ func (m *FinancePaymentMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *FinancePaymentMutation) ClearEdge(name string) error {
 	switch name {
+	case financepayment.EdgeRefundSource:
+		m.ClearRefundSource()
+		return nil
 	}
 	return fmt.Errorf("unknown FinancePayment unique edge %s", name)
 }
@@ -22102,6 +22691,12 @@ func (m *FinancePaymentMutation) ResetEdge(name string) error {
 	switch name {
 	case financepayment.EdgeAllocations:
 		m.ResetAllocations()
+		return nil
+	case financepayment.EdgeRefunds:
+		m.ResetRefunds()
+		return nil
+	case financepayment.EdgeRefundSource:
+		m.ResetRefundSource()
 		return nil
 	}
 	return fmt.Errorf("unknown FinancePayment edge %s", name)

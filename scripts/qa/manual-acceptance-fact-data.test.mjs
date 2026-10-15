@@ -13,6 +13,7 @@ import {
   buildManualAcceptanceFactPlan,
   ensureManualAcceptanceProductionExceptionApproval,
   ensureReceiptQualities,
+  assertReceiptMatchesPlan,
   manualAcceptanceFactRPCCall,
   manualAcceptanceFactRole,
   manualAcceptanceFactRPCParams,
@@ -915,7 +916,11 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
     ),
     "sales",
   );
-  for (const method of ["create_shipment_with_items", "get_shipment", "ship_shipment"]) {
+  for (const method of [
+    "create_shipment_with_items",
+    "get_shipment",
+    "ship_shipment",
+  ]) {
     assert.equal(manualAcceptanceFactRole("operational_fact", method), "sales");
   }
   assert.equal(
@@ -1093,16 +1098,26 @@ test("production exception fixture completes one formal over-issue approval and 
   });
   assert.deepEqual(second, first);
   assert.equal(mutations, 3);
-  const warehouseNode = nodes.find((node) => node.node_key === "warehouse_exception_execution");
+  const warehouseNode = nodes.find(
+    (node) => node.node_key === "warehouse_exception_execution",
+  );
   warehouseNode.status = "active";
   await assert.rejects(
-    () => ensureManualAcceptanceProductionExceptionApproval({ ...args, apply: false }),
+    () =>
+      ensureManualAcceptanceProductionExceptionApproval({
+        ...args,
+        apply: false,
+      }),
     /warehouse_exception_execution expected waiting/u,
   );
   warehouseNode.status = "waiting";
   nodes = nodes.filter((node) => node !== warehouseNode);
   await assert.rejects(
-    () => ensureManualAcceptanceProductionExceptionApproval({ ...args, apply: false }),
+    () =>
+      ensureManualAcceptanceProductionExceptionApproval({
+        ...args,
+        apply: false,
+      }),
     /warehouse_exception_execution/u,
   );
   assert.equal(mutations, 3);
@@ -3000,4 +3015,36 @@ test("fulfillment readback binds warehouse tasks to posted sources and rejects w
     () => readManualAcceptanceFulfillmentHandoffs(rpc, {}, {}),
     /requires both/u,
   );
+});
+
+test("receipt number collisions cannot cross source, supplier, warehouse or item grains", () => {
+  const plan = {
+    receiptNo: "SIM-R1",
+    sourcePurchaseOrderNo: "SIM-P1",
+    supplierId: 2,
+    warehouseId: 3,
+    items: [{ materialId: 4, unitId: 5, quantity: "10" }],
+  };
+  const receipt = {
+    receipt_no: "SIM-R1",
+    purchase_order_id: 1,
+    purchase_order_no: "SIM-P1",
+    supplier_id: 2,
+    items: [
+      { material_id: 4, unit_id: 5, quantity: "10.000000", warehouse_id: 3 },
+    ],
+  };
+  assert.doesNotThrow(() => assertReceiptMatchesPlan(receipt, plan, { id: 1 }));
+  for (const field of ["purchase_order_id", "supplier_id"])
+    assert.throws(() =>
+      assertReceiptMatchesPlan({ ...receipt, [field]: 999 }, plan, { id: 1 }),
+    );
+  for (const field of ["material_id", "unit_id", "quantity", "warehouse_id"])
+    assert.throws(() =>
+      assertReceiptMatchesPlan(
+        { ...receipt, items: [{ ...receipt.items[0], [field]: 999 }] },
+        plan,
+        { id: 1 },
+      ),
+    );
 });

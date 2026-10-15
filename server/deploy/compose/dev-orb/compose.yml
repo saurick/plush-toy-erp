@@ -1,0 +1,71 @@
+name: plush-erp-dev-orb
+
+x-runtime: &runtime
+  restart: unless-stopped
+  cpus: 1
+  stop_grace_period: 45s
+  logging:
+    driver: json-file
+    options:
+      max-size: 5m
+      max-file: "2"
+
+services:
+  postgres:
+    <<: *runtime
+    image: postgres:18.1@sha256:1090bc3a8ccfb0b55f78a494d76f8d603434f7e4553543d6e807bc7bd6bbd17f
+    mem_limit: 512m
+    ports: ["127.0.0.1:15432:5432"]
+    environment:
+      POSTGRES_USER: plush_orb_admin
+      POSTGRES_DB: plush_erp
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?required}"
+      POSTGRES_ROLE_PREFIX: plush_dev
+      POSTGRES_APP_PASSWORD: "${POSTGRES_APP_PASSWORD:?required}"
+      POSTGRES_MIGRATOR_PASSWORD: "${POSTGRES_MIGRATOR_PASSWORD:?required}"
+      POSTGRES_BACKUP_PASSWORD: "${POSTGRES_BACKUP_PASSWORD:?required}"
+    volumes:
+      - postgres-data:/var/lib/postgresql
+      - ../prod/database_roles.sh:/docker-entrypoint-initdb.d/20-roles.sh:ro
+      - ../prod/database_roles.sh:/usr/local/bin/plush-database-roles:ro
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U plush_orb_admin -d plush_erp"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  attachments:
+    <<: *runtime
+    image: chrislusf/seaweedfs:4.46@sha256:08d516132314207d10c8e37cbffc1f32b147d870169688734cc61c6231625b62
+    mem_limit: 768m
+    ports: ["127.0.0.1:18333:8333"]
+    command: [mini, -dir=/data, -admin.ui=false, -webdav=false, -s3.iam=false, -s3.port.iceberg=0, -s3.port.lance=0]
+    environment:
+      AWS_ACCESS_KEY_ID: "${ATTACHMENT_S3_ACCESS_KEY_ID:?required}"
+      AWS_SECRET_ACCESS_KEY: "${ATTACHMENT_S3_SECRET_ACCESS_KEY:?required}"
+      S3_BUCKET: plush-orb-dev-files
+    volumes: [attachments-data:/data]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --max-time, "2", "http://127.0.0.1:9333/cluster/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 15s
+  jaeger:
+    <<: *runtime
+    image: jaegertracing/jaeger:2.19.0@sha256:ede4864215be4cd85bd8c3129a2fea6c5713c5653c7282c429dba123014bc68b
+    mem_limit: 192m
+    ports:
+      - "127.0.0.1:14318:4318"
+      - "127.0.0.1:16687:16686"
+      - "127.0.0.1:13134:13133"
+    command: [--config, /etc/jaeger/config.yml]
+    environment:
+      GOMEMLIMIT: 128MiB
+    volumes:
+      - ../prod/jaeger-v2.yml:/etc/jaeger/config.yml:ro
+      - jaeger-data:/tmp
+
+volumes:
+  postgres-data:
+  attachments-data:
+  jaeger-data:

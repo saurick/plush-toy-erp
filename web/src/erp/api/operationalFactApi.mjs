@@ -1,4 +1,7 @@
-import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
+import {
+  RpcDomain,
+  RpcMethod,
+} from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc, requireRpcData as dataOf } from '@/common/utils/jsonRpc'
@@ -360,15 +363,27 @@ export async function submitProductionException(params = {}) {
   return dataOf(result)?.production_exception || null
 }
 
-export async function getProductionExceptionContext(inspectionID, options = {}) {
+export async function getProductionExceptionContext(
+  inspectionID,
+  options = {}
+) {
   const result = await operationalFactRpc.call(
     RpcMethod.operational_fact.GET_PRODUCTION_EXCEPTION_CONTEXT,
     { quality_inspection_id: inspectionID },
     options
   )
   const context = dataOf(result)?.exception_context
-  if (!context || !Number.isSafeInteger(context.production_wip_batch_id) || context.production_wip_batch_id <= 0 || !Number.isSafeInteger(context.operation_id) || !Number.isSafeInteger(context.fabric_operation_id) || typeof context.quantity !== 'string') {
-    throw Object.assign(new Error('异常来源暂时无法确认，请刷新重试'), { isInvalidResponse: true })
+  if (
+    !context ||
+    !Number.isSafeInteger(context.production_wip_batch_id) ||
+    context.production_wip_batch_id <= 0 ||
+    !Number.isSafeInteger(context.operation_id) ||
+    !Number.isSafeInteger(context.fabric_operation_id) ||
+    typeof context.quantity !== 'string'
+  ) {
+    throw Object.assign(new Error('异常来源暂时无法确认，请刷新重试'), {
+      isInvalidResponse: true,
+    })
   }
   return context
 }
@@ -380,14 +395,20 @@ async function productionExceptionResult(method, params) {
 export async function cancelProductionException(params = {}) {
   return productionExceptionResult(
     (request) =>
-      operationalFactRpc.call(RpcMethod.operational_fact.CANCEL_PRODUCTION_EXCEPTION, request),
+      operationalFactRpc.call(
+        RpcMethod.operational_fact.CANCEL_PRODUCTION_EXCEPTION,
+        request
+      ),
     params
   )
 }
 export async function reverseProductionException(params = {}) {
   return productionExceptionResult(
     (request) =>
-      operationalFactRpc.call(RpcMethod.operational_fact.REVERSE_PRODUCTION_EXCEPTION, request),
+      operationalFactRpc.call(
+        RpcMethod.operational_fact.REVERSE_PRODUCTION_EXCEPTION,
+        request
+      ),
     params
   )
 }
@@ -402,7 +423,11 @@ export async function listShipments(params = {}, options = {}) {
 }
 
 export async function getShipment(params = {}, options = {}) {
-  const result = await operationalFactRpc.call(RpcMethod.operational_fact.GET_SHIPMENT, params, options)
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.GET_SHIPMENT,
+    params,
+    options
+  )
   return dataOf(result)?.shipment || null
 }
 
@@ -431,17 +456,26 @@ export async function createShipmentWithItems(params = {}) {
 }
 
 export async function saveShipmentDraft(params = {}) {
-  const result = await operationalFactRpc.call(RpcMethod.operational_fact.SAVE_SHIPMENT_DRAFT, params)
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.SAVE_SHIPMENT_DRAFT,
+    params
+  )
   return dataOf(result)?.shipment || null
 }
 
 export async function shipShipment(params = {}) {
-  const result = await operationalFactRpc.call(RpcMethod.operational_fact.SHIP_SHIPMENT, params)
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.SHIP_SHIPMENT,
+    params
+  )
   return dataOf(result)?.shipment || null
 }
 
 export async function cancelShipment(params = {}) {
-  const result = await operationalFactRpc.call(RpcMethod.operational_fact.CANCEL_SHIPMENT, params)
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.CANCEL_SHIPMENT,
+    params
+  )
   return dataOf(result)?.shipment || null
 }
 
@@ -565,12 +599,46 @@ export async function postFinanceFact(params = {}) {
 }
 
 export async function createFinancePayment(params = {}) {
-  const result = await operationalFactRpc.call(RpcMethod.operational_fact.CREATE_FINANCE_PAYMENT, params)
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.CREATE_FINANCE_PAYMENT,
+    params
+  )
   return dataOf(result)?.payment || null
 }
 
+export async function allocateFinancePayment(params = {}) {
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.ALLOCATE_FINANCE_PAYMENT,
+    params
+  )
+  return dataOf(result)?.payment || null
+}
+
+export async function reverseFinanceAllocation(params = {}) {
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.REVERSE_FINANCE_ALLOCATION,
+    params
+  )
+  return dataOf(result)?.payment || null
+}
+
+export async function listFinancePaymentAllocationCandidates(
+  params = {},
+  options = {}
+) {
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.LIST_FINANCE_PAYMENT_ALLOCATION_CANDIDATES,
+    params,
+    options
+  )
+  return dataOf(result)?.facts || []
+}
+
 export async function cancelFinancePayment(params = {}) {
-  const result = await operationalFactRpc.call(RpcMethod.operational_fact.CANCEL_FINANCE_PAYMENT, params)
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.CANCEL_FINANCE_PAYMENT,
+    params
+  )
   return dataOf(result)?.payment || null
 }
 
@@ -669,7 +737,10 @@ export async function settleFinanceFact(params = {}) {
 
 export async function cancelFinanceFact(params = {}) {
   const request = normalizeFinanceCancellationRequest(params)
-  const result = await operationalFactRpc.call(RpcMethod.operational_fact.CANCEL_FINANCE_FACT, request)
+  const result = await operationalFactRpc.call(
+    RpcMethod.operational_fact.CANCEL_FINANCE_FACT,
+    request
+  )
   return validateFinanceCancellationResult(
     dataOf(result)?.finance_fact,
     request

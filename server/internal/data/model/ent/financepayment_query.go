@@ -20,11 +20,13 @@ import (
 // FinancePaymentQuery is the builder for querying FinancePayment entities.
 type FinancePaymentQuery struct {
 	config
-	ctx             *QueryContext
-	order           []financepayment.OrderOption
-	inters          []Interceptor
-	predicates      []predicate.FinancePayment
-	withAllocations *FinanceAllocationQuery
+	ctx              *QueryContext
+	order            []financepayment.OrderOption
+	inters           []Interceptor
+	predicates       []predicate.FinancePayment
+	withAllocations  *FinanceAllocationQuery
+	withRefunds      *FinancePaymentQuery
+	withRefundSource *FinancePaymentQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -76,6 +78,50 @@ func (_q *FinancePaymentQuery) QueryAllocations() *FinanceAllocationQuery {
 			sqlgraph.From(financepayment.Table, financepayment.FieldID, selector),
 			sqlgraph.To(financeallocation.Table, financeallocation.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, financepayment.AllocationsTable, financepayment.AllocationsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryRefunds chains the current query on the "refunds" edge.
+func (_q *FinancePaymentQuery) QueryRefunds() *FinancePaymentQuery {
+	query := (&FinancePaymentClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financepayment.Table, financepayment.FieldID, selector),
+			sqlgraph.To(financepayment.Table, financepayment.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, financepayment.RefundsTable, financepayment.RefundsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryRefundSource chains the current query on the "refund_source" edge.
+func (_q *FinancePaymentQuery) QueryRefundSource() *FinancePaymentQuery {
+	query := (&FinancePaymentClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financepayment.Table, financepayment.FieldID, selector),
+			sqlgraph.To(financepayment.Table, financepayment.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, financepayment.RefundSourceTable, financepayment.RefundSourceColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -270,12 +316,14 @@ func (_q *FinancePaymentQuery) Clone() *FinancePaymentQuery {
 		return nil
 	}
 	return &FinancePaymentQuery{
-		config:          _q.config,
-		ctx:             _q.ctx.Clone(),
-		order:           append([]financepayment.OrderOption{}, _q.order...),
-		inters:          append([]Interceptor{}, _q.inters...),
-		predicates:      append([]predicate.FinancePayment{}, _q.predicates...),
-		withAllocations: _q.withAllocations.Clone(),
+		config:           _q.config,
+		ctx:              _q.ctx.Clone(),
+		order:            append([]financepayment.OrderOption{}, _q.order...),
+		inters:           append([]Interceptor{}, _q.inters...),
+		predicates:       append([]predicate.FinancePayment{}, _q.predicates...),
+		withAllocations:  _q.withAllocations.Clone(),
+		withRefunds:      _q.withRefunds.Clone(),
+		withRefundSource: _q.withRefundSource.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -293,18 +341,40 @@ func (_q *FinancePaymentQuery) WithAllocations(opts ...func(*FinanceAllocationQu
 	return _q
 }
 
+// WithRefunds tells the query-builder to eager-load the nodes that are connected to
+// the "refunds" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *FinancePaymentQuery) WithRefunds(opts ...func(*FinancePaymentQuery)) *FinancePaymentQuery {
+	query := (&FinancePaymentClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withRefunds = query
+	return _q
+}
+
+// WithRefundSource tells the query-builder to eager-load the nodes that are connected to
+// the "refund_source" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *FinancePaymentQuery) WithRefundSource(opts ...func(*FinancePaymentQuery)) *FinancePaymentQuery {
+	query := (&FinancePaymentClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withRefundSource = query
+	return _q
+}
+
 // GroupBy is used to group vertices by one or more fields/columns.
 // It is often used with aggregate functions, like: count, max, mean, min, sum.
 //
 // Example:
 //
 //	var v []struct {
-//		PaymentNo string `json:"payment_no,omitempty"`
+//		Kind string `json:"kind,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.FinancePayment.Query().
-//		GroupBy(financepayment.FieldPaymentNo).
+//		GroupBy(financepayment.FieldKind).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *FinancePaymentQuery) GroupBy(field string, fields ...string) *FinancePaymentGroupBy {
@@ -322,11 +392,11 @@ func (_q *FinancePaymentQuery) GroupBy(field string, fields ...string) *FinanceP
 // Example:
 //
 //	var v []struct {
-//		PaymentNo string `json:"payment_no,omitempty"`
+//		Kind string `json:"kind,omitempty"`
 //	}
 //
 //	client.FinancePayment.Query().
-//		Select(financepayment.FieldPaymentNo).
+//		Select(financepayment.FieldKind).
 //		Scan(ctx, &v)
 func (_q *FinancePaymentQuery) Select(fields ...string) *FinancePaymentSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)
@@ -371,8 +441,10 @@ func (_q *FinancePaymentQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 	var (
 		nodes       = []*FinancePayment{}
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [3]bool{
 			_q.withAllocations != nil,
+			_q.withRefunds != nil,
+			_q.withRefundSource != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -397,6 +469,19 @@ func (_q *FinancePaymentQuery) sqlAll(ctx context.Context, hooks ...queryHook) (
 		if err := _q.loadAllocations(ctx, query, nodes,
 			func(n *FinancePayment) { n.Edges.Allocations = []*FinanceAllocation{} },
 			func(n *FinancePayment, e *FinanceAllocation) { n.Edges.Allocations = append(n.Edges.Allocations, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withRefunds; query != nil {
+		if err := _q.loadRefunds(ctx, query, nodes,
+			func(n *FinancePayment) { n.Edges.Refunds = []*FinancePayment{} },
+			func(n *FinancePayment, e *FinancePayment) { n.Edges.Refunds = append(n.Edges.Refunds, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withRefundSource; query != nil {
+		if err := _q.loadRefundSource(ctx, query, nodes, nil,
+			func(n *FinancePayment, e *FinancePayment) { n.Edges.RefundSource = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -433,6 +518,71 @@ func (_q *FinancePaymentQuery) loadAllocations(ctx context.Context, query *Finan
 	}
 	return nil
 }
+func (_q *FinancePaymentQuery) loadRefunds(ctx context.Context, query *FinancePaymentQuery, nodes []*FinancePayment, init func(*FinancePayment), assign func(*FinancePayment, *FinancePayment)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*FinancePayment)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(financepayment.FieldRefundOfPaymentID)
+	}
+	query.Where(predicate.FinancePayment(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(financepayment.RefundsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.RefundOfPaymentID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "refund_of_payment_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "refund_of_payment_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *FinancePaymentQuery) loadRefundSource(ctx context.Context, query *FinancePaymentQuery, nodes []*FinancePayment, init func(*FinancePayment), assign func(*FinancePayment, *FinancePayment)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*FinancePayment)
+	for i := range nodes {
+		if nodes[i].RefundOfPaymentID == nil {
+			continue
+		}
+		fk := *nodes[i].RefundOfPaymentID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(financepayment.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "refund_of_payment_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 
 func (_q *FinancePaymentQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := _q.querySpec()
@@ -458,6 +608,9 @@ func (_q *FinancePaymentQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != financepayment.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withRefundSource != nil {
+			_spec.Node.AddColumnOnce(financepayment.FieldRefundOfPaymentID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

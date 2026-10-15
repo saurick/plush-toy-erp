@@ -17,6 +17,7 @@ import (
 func TestProductionCompletionFromOrderDerivesSourceAndReplays(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "production_completion_from_order")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	logger := log.NewStdLogger(io.Discard)
 	actor := client.AdminUser.Create().SetUsername("production-completion-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 	unitRow := createTestUnit(t, ctx, client, "PCO-U")
@@ -27,7 +28,7 @@ func TestProductionCompletionFromOrderDerivesSourceAndReplays(t *testing.T) {
 	orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
 	created, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{
-		Draft: biz.ProductionOrderDraft{OrderNo: "MO-COMPLETION-001", Items: []biz.ProductionOrderDraftItem{{
+		Draft: biz.ProductionOrderDraft{OrderNo: "MO-COMPLETION-001", Items: []biz.ProductionOrderDraftItem{{RouteCode: stringPtr(biz.ProductionWIPRoutePlushSewHandV1),
 			LineNo: 1, ProductID: productRow.ID, ProductSKUID: &skuRow.ID, UnitID: unitRow.ID, PlannedQuantity: decimal.NewFromInt(10),
 		}}},
 		ActorID: actor.ID, IdempotencyKey: "mo-completion-create",
@@ -35,6 +36,7 @@ func TestProductionCompletionFromOrderDerivesSourceAndReplays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create production order: %v", err)
 	}
+	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, created.Order.ID)
 	released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{
 		ID: created.Order.ID, ExpectedVersion: 1, ActorID: actor.ID, IdempotencyKey: "mo-completion-release",
 	})
@@ -93,6 +95,7 @@ func TestProductionCompletionFromOrderDerivesSourceAndReplays(t *testing.T) {
 func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "production_order_fact_linkage")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	logger := log.NewStdLogger(io.Discard)
 	actor := client.AdminUser.Create().SetUsername("production-order-fact-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 	unitRow := createTestUnit(t, ctx, client, "POF-U")
@@ -103,7 +106,7 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
 	created, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{
-		Draft: biz.ProductionOrderDraft{OrderNo: "MO-FACT-001", Items: []biz.ProductionOrderDraftItem{{
+		Draft: biz.ProductionOrderDraft{OrderNo: "MO-FACT-001", Items: []biz.ProductionOrderDraftItem{{RouteCode: stringPtr(biz.ProductionWIPRoutePlushSewHandV1),
 			LineNo: 1, ProductID: productRow.ID, ProductSKUID: &skuRow.ID, UnitID: unitRow.ID, PlannedQuantity: decimal.NewFromInt(10),
 		}}},
 		ActorID: actor.ID, IdempotencyKey: "mo-fact-create",
@@ -111,6 +114,7 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	if err != nil {
 		t.Fatalf("create production order: %v", err)
 	}
+	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, created.Order.ID)
 	released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 1, ActorID: actor.ID, IdempotencyKey: "mo-fact-release"})
 	if err != nil {
 		t.Fatalf("release production order: %v", err)
@@ -215,6 +219,7 @@ func TestProductionOrderDraftCancelFailsClosedForActiveLinkedFacts(t *testing.T)
 	} {
 		t.Run(status, func(t *testing.T) {
 			data, client := openInventoryRepoTestData(t, "production_order_draft_cancel_"+status)
+			createProductionWIPRouteProcesses(t, ctx, client)
 			logger := log.NewStdLogger(io.Discard)
 			actor := client.AdminUser.Create().SetUsername("production-draft-cancel-" + status).SetPasswordHash("test-password-hash").SaveX(ctx)
 			unitRow := createTestUnit(t, ctx, client, "PDC-U-"+status)
@@ -222,7 +227,7 @@ func TestProductionOrderDraftCancelFailsClosedForActiveLinkedFacts(t *testing.T)
 			warehouseRow := createTestProductWarehouse(t, ctx, client, "PDC-WH-"+status)
 			orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
 			created, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{
-				Draft: biz.ProductionOrderDraft{OrderNo: "MO-DRAFT-CANCEL-" + status, Items: []biz.ProductionOrderDraftItem{{
+				Draft: biz.ProductionOrderDraft{OrderNo: "MO-DRAFT-CANCEL-" + status, Items: []biz.ProductionOrderDraftItem{{RouteCode: stringPtr(biz.ProductionWIPRoutePlushSewHandV1),
 					LineNo: 1, ProductID: productRow.ID, UnitID: unitRow.ID, PlannedQuantity: decimal.NewFromInt(1),
 				}}},
 				ActorID: actor.ID, IdempotencyKey: "mo-draft-cancel-" + status,
@@ -250,6 +255,7 @@ func TestProductionOrderDraftCancelFailsClosedForActiveLinkedFacts(t *testing.T)
 					SetOccurredAtSpecified(true).
 					SaveX(ctx)
 			case biz.OperationalFactStatusPosted, biz.OperationalFactStatusCancelled:
+				markProductionOrderHistoricalUnroutedForTest(t, ctx, client, created.Order.ID)
 				released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{
 					ID: created.Order.ID, ExpectedVersion: created.Order.Version, ActorID: actor.ID,
 					IdempotencyKey: "release-draft-order-" + status,
@@ -305,6 +311,7 @@ func TestProductionOrderDraftCancelFailsClosedForActiveLinkedFacts(t *testing.T)
 func TestProductionOrderFactLinkageRejectsWrongSourceShape(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "production_order_fact_wrong_source")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	logger := log.NewStdLogger(io.Discard)
 	actor := client.AdminUser.Create().SetUsername("production-order-wrong-source-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 	unitRow := createTestUnit(t, ctx, client, "POW-U")
@@ -316,12 +323,13 @@ func TestProductionOrderFactLinkageRejectsWrongSourceShape(t *testing.T) {
 	warehouseRow := createTestProductWarehouse(t, ctx, client, "POW-WH")
 	orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
-	created, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: biz.ProductionOrderDraft{OrderNo: "MO-WRONG", Items: []biz.ProductionOrderDraftItem{{
+	created, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: biz.ProductionOrderDraft{OrderNo: "MO-WRONG", Items: []biz.ProductionOrderDraftItem{{RouteCode: stringPtr(biz.ProductionWIPRoutePlushSewHandV1),
 		LineNo: 1, ProductID: productRow.ID, ProductSKUID: &skuRow.ID, UnitID: unitRow.ID, PlannedQuantity: decimal.NewFromInt(10),
 	}}}, ActorID: actor.ID, IdempotencyKey: "mo-wrong-create"})
 	if err != nil {
 		t.Fatalf("create source order: %v", err)
 	}
+	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, created.Order.ID)
 	released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 1, ActorID: actor.ID, IdempotencyKey: "mo-wrong-release"})
 	if err != nil {
 		t.Fatalf("release source order: %v", err)

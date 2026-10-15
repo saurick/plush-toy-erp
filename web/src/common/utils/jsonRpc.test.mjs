@@ -388,3 +388,83 @@ test('jsonRpc: withAuth=false 的 HTTP 鉴权失败不触发重新登录弹窗',
   assert.deepEqual(harness.logoutCalls, [])
   assert.deepEqual(harness.events, [])
 })
+
+test('jsonRpc: 各类响应错误保留服务端请求编号且不改变错误处理', async (t) => {
+  const harness = createJsonRpcHarness(t)
+  const rpc = new harness.JsonRpc({ url: 'system', withAuth: false })
+  const scenarios = [
+    { name: 'HTTP', status: 503, body: () => ({ message: 'unavailable' }) },
+    { name: 'invalid JSON', body: () => 'not-json', raw: true },
+    { name: 'invalid envelope', body: () => ({}) },
+    {
+      name: 'framework',
+      body: () => ({ code: 500, message: 'failed' }),
+      canReturn: true,
+    },
+    {
+      name: 'RPC',
+      body: () => ({ error: { code: -32603, message: 'failed' } }),
+      canReturn: true,
+    },
+    {
+      name: 'business',
+      body: (id) => ({
+        jsonrpc: '2.0',
+        id,
+        result: { code: 40304, message: 'denied' },
+      }),
+      canReturn: true,
+    },
+  ]
+  for (const scenario of scenarios) {
+    harness.setFetch(async (_url, init) => {
+      const body = scenario.body(JSON.parse(init.body).id)
+      return new Response(scenario.raw ? body : JSON.stringify(body), {
+        status: scenario.status || 200,
+        headers: {
+          'X-Request-Id': `req-${scenario.name.replaceAll(' ', '-')}`,
+        },
+      })
+    })
+    for (const receiveError of [false, true]) {
+      const expected = `req-${scenario.name.replaceAll(' ', '-')}`
+      if (receiveError && scenario.canReturn) {
+        const error = await rpc.call('ping', {}, { receiveError })
+        assert.equal(error.name, 'RpcError')
+        assert.equal(error.requestId, expected)
+      } else {
+        await assert.rejects(
+          rpc.call('ping', {}, { receiveError }),
+          (error) => {
+            assert.equal(error.name, 'RpcError')
+            assert.equal(error.requestId, expected, scenario.name)
+            assert.equal(error.message.includes(expected), false)
+            return true
+          }
+        )
+      }
+    }
+  }
+})
+
+test('jsonRpc: 缺失或非法请求编号及无响应的网络失败不伪造关联', async (t) => {
+  const harness = createJsonRpcHarness(t)
+  const rpc = new harness.JsonRpc({ url: 'system', withAuth: false })
+  for (const requestId of ['', 'private value', 'x'.repeat(129)]) {
+    harness.setFetch(
+      async () => new Response('{}', { headers: { 'X-Request-Id': requestId } })
+    )
+    await assert.rejects(rpc.call('ping'), (error) => {
+      assert.equal(error.requestId, null)
+      return true
+    })
+  }
+  harness.setFetch(async () => {
+    throw new TypeError('network unavailable')
+  })
+  await assert.rejects(rpc.call('ping'), (error) => {
+    assert.equal(error.isNetworkError, true)
+    assert.equal(error.requestId, null)
+    return true
+  })
+})

@@ -1,6 +1,6 @@
 import { RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Alert, Button, Form, Input, Select, Space, Tag } from 'antd'
+import { Alert, Button, Form, Input, Space, Tag } from 'antd'
 import {
   unitQuantityRule,
   unitPrecisionFromOptions,
@@ -84,7 +84,6 @@ export default function OutsourcingReturnDispositionModal({
         inspection?.inspection_no || 'QUALITY',
         sourceBusinessActionUUID()
       ),
-      disposition_type: 'RETURN_TO_VENDOR',
       quantity: '',
       reason: '委外回货检验不合格',
       cancel_reason: '',
@@ -98,7 +97,6 @@ export default function OutsourcingReturnDispositionModal({
     try {
       values = await form.validateFields([
         'disposition_no',
-        'disposition_type',
         'quantity',
         'reason',
       ])
@@ -109,7 +107,7 @@ export default function OutsourcingReturnDispositionModal({
     const payload = {
       disposition_no: values.disposition_no.trim(),
       quality_inspection_id: sourceInspectionID,
-      disposition_type: values.disposition_type,
+      disposition_type: 'RETURN_TO_VENDOR',
       quantity: String(values.quantity).trim(),
       reason: values.reason.trim(),
     }
@@ -177,7 +175,7 @@ export default function OutsourcingReturnDispositionModal({
       await load()
       onChanged?.()
       message.success(
-        mode === 'post' ? '委外返厂或返工已确认' : '委外处置已取消'
+        mode === 'post' ? '委外返厂已确认' : '委外处置已取消'
       )
     } catch (error) {
       const refreshed = await load()
@@ -199,7 +197,7 @@ export default function OutsourcingReturnDispositionModal({
   }
   return (
     <BusinessModal
-      title={readOnly ? '查看委外不合格处置' : '委外不合格返厂 / 返工'}
+      title={readOnly ? '查看委外不合格处置' : '委外不合格返厂'}
       open={open}
       size="recordDetails"
       footer={
@@ -212,7 +210,7 @@ export default function OutsourcingReturnDispositionModal({
               生成处置草稿
             </Button>
           ) : null}
-          {selected?.status === 'DRAFT' && canPost ? (
+          {selected?.status === 'DRAFT' && selected.disposition_type === 'RETURN_TO_VENDOR' && canPost ? (
             <Button
               type="primary"
               onClick={() => transition('post')}
@@ -240,7 +238,7 @@ export default function OutsourcingReturnDispositionModal({
       <Alert
         type="warning"
         showIcon
-        message="返厂确认写库存出库，取消写冲正；返工确认生成新的在制返工批次。质检结论本身不会代写这些事实。"
+        message="品质登记返厂方案，仓库确认实际退厂后记录出库；取消须按依赖检查冲正。生产返工由业务提出方案，经正式审批后由生产或仓库执行。"
       />
       {!sourceInspectionID && rows.length === 0 && !loading ? (
         <Alert
@@ -266,19 +264,6 @@ export default function OutsourcingReturnDispositionModal({
                 rules={[{ required: true, whitespace: true }]}
               >
                 <Input maxLength={64} />
-              </Form.Item>
-              <Form.Item
-                name="disposition_type"
-                label="处置方式"
-                rules={[{ required: true }]}
-              >
-                <Select
-                  style={{ width: 180 }}
-                  options={[
-                    { value: 'RETURN_TO_VENDOR', label: '返厂' },
-                    { value: 'REWORK', label: '返工' },
-                  ]}
-                />
               </Form.Item>
               <Form.Item
                 name="quantity"

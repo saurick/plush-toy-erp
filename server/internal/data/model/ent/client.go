@@ -3401,6 +3401,38 @@ func (c *FinancePaymentClient) QueryAllocations(_m *FinancePayment) *FinanceAllo
 	return query
 }
 
+// QueryRefunds queries the refunds edge of a FinancePayment.
+func (c *FinancePaymentClient) QueryRefunds(_m *FinancePayment) *FinancePaymentQuery {
+	query := (&FinancePaymentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financepayment.Table, financepayment.FieldID, id),
+			sqlgraph.To(financepayment.Table, financepayment.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, financepayment.RefundsTable, financepayment.RefundsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryRefundSource queries the refund_source edge of a FinancePayment.
+func (c *FinancePaymentClient) QueryRefundSource(_m *FinancePayment) *FinancePaymentQuery {
+	query := (&FinancePaymentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financepayment.Table, financepayment.FieldID, id),
+			sqlgraph.To(financepayment.Table, financepayment.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, financepayment.RefundSourceTable, financepayment.RefundSourceColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *FinancePaymentClient) Hooks() []Hook {
 	hooks := c.hooks.FinancePayment

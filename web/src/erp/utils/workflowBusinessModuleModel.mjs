@@ -119,10 +119,3 @@ export function reconcileWorkflowBusinessTaskPage({
     ),
   }
 }
-
-export function buildWorkflowBusinessTaskStats({ total = 0, pageCount = 0 }) {
-  return [
-    { key: 'total', label: '筛选结果', value: total },
-    { key: 'page', label: '本页任务', value: pageCount },
-  ]
-}

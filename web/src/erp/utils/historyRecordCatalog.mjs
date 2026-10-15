@@ -1,3 +1,4 @@
+import { resolveBusinessStatusCounts } from './businessStatusCounts.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 
 const MASTER_HISTORY_STATUS = Object.freeze({
@@ -118,7 +119,7 @@ function masterSource(config) {
 }
 
 function orderSource(config) {
-  const source = { kind: 'order', ...config }
+  const source = { kind: 'order', statusCounts: true, ...config }
   return Object.freeze({
     ...source,
     normalize: (record) =>
@@ -262,6 +263,7 @@ export const HISTORY_RECORD_SOURCES = Object.freeze([
   }),
   orderSource({
     key: 'bom_versions',
+    statusCounts: false,
     label: 'BOM 版本',
     menuPath: '/erp/purchase/material-bom',
     responseKey: 'bom_versions',
@@ -324,4 +326,13 @@ export function normalizeHistoryRecords(source, records = []) {
       }
       return normalized
     })
+}
+
+export function resolveHistoryStatusCounts(source, response) {
+  if (source?.statusCounts) return resolveBusinessStatusCounts(response)
+  const states = source?.historyStatusOptions?.filter((option) => option.value) || []
+  // A single history state covers the full query, including unloaded pages.
+  return states.length === 1 && Number.isSafeInteger(response?.total) && response.total >= 0
+    ? { [states[0].value]: response.total }
+    : null
 }

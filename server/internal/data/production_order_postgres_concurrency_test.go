@@ -44,6 +44,7 @@ func openProductionOrderPGFixture(t *testing.T) productionOrderPGFixture {
 	ctx := context.Background()
 	data, client := openPurchaseReceiptPostgresTestData(t)
 	suffix := postgresTestSuffix()
+	ensureProductionWIPRouteProcessesForPostgresRace(t, ctx, client, suffix)
 	actor := client.AdminUser.Create().SetUsername("production-order-pg-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
 	unitRow := createTestUnit(t, ctx, client, "POU-"+suffix)
 	productRow := createTestProduct(t, ctx, client, unitRow.ID, "POP-"+suffix)
@@ -72,7 +73,7 @@ func openProductionOrderPGFixture(t *testing.T) productionOrderPGFixture {
 		factUC:              biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger)), data: data,
 		client: client, actorID: actor.ID, unitID: unitRow.ID, materialID: materialRow.ID, productID: productRow.ID,
 		skuID: skuRow.ID, salesOrderID: salesOrder.ID, salesItemID: salesItem.ID, warehouseID: warehouse.ID, suffix: suffix,
-		item: biz.ProductionOrderDraftItem{LineNo: 1, ProductID: productRow.ID, ProductSKUID: &skuRow.ID, UnitID: unitRow.ID,
+		item: biz.ProductionOrderDraftItem{RouteCode: stringPtr(biz.ProductionWIPRoutePlushSewHandV1), LineNo: 1, ProductID: productRow.ID, ProductSKUID: &skuRow.ID, UnitID: unitRow.ID,
 			PlannedQuantity: decimal.NewFromInt(10), SalesOrderItemID: &salesItem.ID, BOMHeaderID: &bom.ID},
 	}
 }
@@ -461,6 +462,7 @@ func TestOperationalFactPostgresConcurrentSourceInboundLotCreateReusesOneBatch(t
 	if err != nil {
 		t.Fatalf("create postgres inbound lot order: %v", err)
 	}
+	markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, created.Order.ID)
 	released, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
 		ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "pg-inbound-lot-release-" + f.suffix,
 	})

@@ -38,11 +38,15 @@ test('quality gates styles: environment readiness stays page-owned and compact',
 })
 
 test('quality gates styles: GitLab CI evidence stays compact and source-backed', () => {
-  assert.match(css, /\.erp-dev-quality-server-evidence/u)
-  assert.match(
-    css,
-    /\.erp-dev-quality-server-evidence[\s\S]*?border-inline-start:\s*4px solid var\(--erp-primary/u
+  const evidence = css.match(
+    /\.erp-dev-quality-server-evidence\s*\{([^}]+)\}/u
   )
+  assert.ok(evidence, 'CI evidence retains its own bounded container')
+  assert.match(evidence[1], /display:\s*grid;/u)
+  assert.match(evidence[1], /min-width:\s*0;/u)
+  assert.match(evidence[1], /border:\s*1px solid var\(--erp-border\);/u)
+  assert.match(evidence[1], /background:\s*var\(--erp-surface-bg-soft\);/u)
+  assert.doesNotMatch(evidence[1], /border-(?:inline-start|left):/u)
   assert.match(css, /\.erp-dev-quality-server-evidence__facts/u)
   assert.match(css, /\.erp-dev-quality-server-evidence__job-list/u)
   assert.match(css, /--quality-server-job-width/u)

@@ -1,3 +1,5 @@
+import { normalizeTaskListFilters, taskListFilterRequest, WORKFLOW_TASK_DUE_OPTIONS } from './workflowTaskListFilters.mjs'
+import { resolveBusinessStatusCounts } from './businessStatusCounts.mjs'
 import { normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from './workflowTaskDiscovery.mjs'
 import { normalizeRoleKey } from './roleKeys.mjs'
 import { WORKFLOW_HISTORY_STATUS_OPTIONS, isWorkflowHistoryDateFilter } from './workflowRoleTaskHistory.mjs'
@@ -20,7 +22,9 @@ export function mobileTaskQueryScope(
   accessScope,
   { keyword = '', sortKey = 'newest', statusKey = '', period = '', dateFrom = '', dateTo = '', ...discovery } = {}
 ) {
-  return `${accessScope}${Object.keys(normalizeTaskDiscoveryFilters(discovery)).length ? `|discovery:${JSON.stringify(normalizeTaskDiscoveryFilters(discovery))}` : ''}|search:${keyword}|sort:${sortKey}|status:${statusKey}${sortKey === 'completed' ? `|period:${period}|from:${dateFrom}|to:${dateTo}` : ''}`
+  const listFilters = normalizeTaskListFilters(sortKey === 'completed' ? { sourceType: discovery.sourceType } : discovery)
+  const discoveryFilters = normalizeTaskDiscoveryFilters(discovery)
+  return `${accessScope}${Object.keys(listFilters).length ? `|filters:${JSON.stringify(listFilters)}` : ''}${Object.keys(discoveryFilters).length ? `|discovery:${JSON.stringify(discoveryFilters)}` : ''}|search:${keyword}|sort:${sortKey}|status:${statusKey}${sortKey === 'completed' ? `|period:${period}|from:${dateFrom}|to:${dateTo}` : ''}`
 }
 
 export function normalizeMobileTaskQueryOptions(value, history = false) {
@@ -28,6 +32,7 @@ export function normalizeMobileTaskQueryOptions(value, history = false) {
   const statuses = history ? WORKFLOW_HISTORY_STATUS_OPTIONS : MOBILE_TASK_STATUS_OPTIONS
   return {
     ...normalizeTaskDiscoveryFilters(options),
+    ...normalizeTaskListFilters(history ? { sourceType: options.sourceType } : options),
     keyword: String(options.keyword || '').trim().slice(0, 100),
     sortKey: history ? 'completed' : MOBILE_TASK_SORT_OPTIONS.some(({ value: key }) => key === options.sortKey) ? options.sortKey : 'newest',
     statusKey: statuses.some(({ value: key }) => key === options.statusKey) ? options.statusKey : '',
@@ -94,6 +99,7 @@ export function createMobileRoleTaskSlot() {
     has_more: false,
     server_time: 0,
     count_summary: null,
+    status_counts: null,
     loaded: false,
     loading: false,
     error: '',
@@ -275,6 +281,7 @@ export function reconcileMobileRoleTaskMutation(
           }),
           loaded: slotKey === viewKey ? slot.loaded : false,
           count_summary: null,
+          status_counts: null,
           loading: false,
           error: '',
         },
@@ -356,6 +363,7 @@ export function buildMobileRoleTaskQuery({
   if (normalizedKeyword === null || [...normalizedKeyword].length > 100) {
     throw new TypeError('搜索内容最多 100 个字')
   }
+  if ((discovery.due && !WORKFLOW_TASK_DUE_OPTIONS.some(({ value }) => value === discovery.due)) || (discovery.sourceType && (typeof discovery.sourceType !== 'string' || [...discovery.sourceType].length > 64))) throw new TypeError('任务筛选条件无效')
   const history = normalizedViewKey === 'history'
   const statuses = history ? WORKFLOW_HISTORY_STATUS_OPTIONS : MOBILE_TASK_STATUS_OPTIONS
   if ((sortKey && (history ? sortKey !== 'completed' : !MOBILE_TASK_SORT_OPTIONS.some((option) => option.value === sortKey))) ||
@@ -365,6 +373,7 @@ export function buildMobileRoleTaskQuery({
   }
   return {
     ...taskDiscoveryRequest(discovery),
+    ...taskListFilterRequest(history ? { sourceType: discovery.sourceType } : discovery),
     ...(sortKey ? { sort_key: sortKey } : {}),
     ...(statusKey ? { status_key: statusKey } : {}),
     ...(period ? { period } : {}),
@@ -492,6 +501,7 @@ export function mergeMobileRoleTaskPage(
     has_more: hasMore,
     server_time: response.server_time || 0,
     count_summary: countSummary,
+    status_counts: append ? currentSlot.status_counts : resolveBusinessStatusCounts(response),
     loaded: true,
     loading: false,
     error: '',

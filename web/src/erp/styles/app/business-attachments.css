@@ -47,7 +47,7 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.6;
   text-align: start;
   cursor: pointer;
@@ -128,7 +128,7 @@
 .business-attachment-panel__upload-limit,
 .business-attachment-panel__mobile-hint {
   color: var(--erp-text-subtle);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .business-attachment-panel__mobile-hint {
@@ -229,7 +229,7 @@
   gap: 4px 10px;
   margin-block-start: 5px;
   color: var(--erp-text-subtle);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   overflow-wrap: anywhere;
 }
 
@@ -245,7 +245,7 @@
 .business-attachment-panel__file-error {
   margin-block-start: 6px;
   color: var(--erp-visual-danger-text);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   overflow-wrap: anywhere;
 }
 
@@ -273,7 +273,7 @@
 }
 
 .business-attachment-panel__empty > span:last-child {
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .business-attachment-panel__footer {
@@ -300,7 +300,7 @@
   gap: 8px;
   margin-inline-end: auto;
   color: var(--erp-text-subtle);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .business-attachment-panel__preview-frame {

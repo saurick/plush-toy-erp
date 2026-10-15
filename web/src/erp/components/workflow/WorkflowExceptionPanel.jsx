@@ -2,16 +2,16 @@ import React from 'react'
 import {
   Alert,
   Button,
-  Drawer,
   Empty,
   Pagination,
   Spin,
   Tag,
 } from 'antd'
+import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import { WorkflowTaskStatus } from '@/common/consts/statuses.generated.mjs'
-import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
+import HorizontalScroll from '@/common/components/scroll/HorizontalScroll'
 import SearchInput from '@/common/components/SearchInput'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -21,6 +21,7 @@ import {
   listWorkflowExceptions,
 } from '../../api/workflowApi.mjs'
 import {
+  normalizeTaskDiscoveryFilters,
   taskDiscoveryRequest,
   taskDiscoveryFilterLabels,
 } from '../../utils/workflowTaskDiscovery.mjs'
@@ -31,12 +32,17 @@ import {
 } from '../../utils/workflowTaskBoard.mjs'
 import WorkflowTaskDiscoveryFilters from './WorkflowTaskDiscoveryFilters.jsx'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
+import useWorkflowTaskAssignees from '../../hooks/useWorkflowTaskAssignees'
+import MobileFilterPopover from '../../mobile/components/MobileFilterPopover.jsx'
+import MobileAppliedFilters from '../../mobile/components/MobileAppliedFilters.jsx'
+import MobileScrollEdge from '../../mobile/components/MobileScrollEdge.jsx'
+import { usePageLoadFeedback } from '../PageLoadFeedback.jsx'
 import './workflowExceptions.css'
 
 const states = {
   open: '待定方案',
   executing: '执行与复检中',
-  closed: '已闭环',
+  closed: '已处理完',
   corrected: '检验更正后合格',
 }
 const dispositions = {
@@ -63,11 +69,13 @@ export default function WorkflowExceptionPanel({
   renderRefreshControl,
   trackingRef,
 }) {
-  const [filters, setFilters] = React.useState(initialQuery.filters || {})
+  const [filters, setFilters] = React.useState(() => normalizeTaskDiscoveryFilters(initialQuery.filters))
   const [filterOpen, setFilterOpen] = React.useState(false)
+  const assignees = useWorkflowTaskAssignees(profile, roleKey)
   const [keyword, setKeyword] = React.useState(initialQuery.keyword || '')
   const [state, setState] = React.useState(initialQuery.state || '')
   const [view, setView] = React.useState(initialQuery.view || '')
+  const [listPosition, setListPosition] = React.useState(initialQuery.listPosition || null)
   const [page, setPage] = React.useState(initialQuery.page || 1)
   const [loadedCount, setLoadedCount] = React.useState(initialQuery.loadedCount || 20)
   const [loading, setLoading] = React.useState(false)
@@ -79,7 +87,9 @@ export default function WorkflowExceptionPanel({
   const loadedCountRef = React.useRef(loadedCount)
   const appendPending = React.useRef(false)
   const sentinel = React.useRef(null)
-  const restoreScroll = React.useRef(true)
+  const panelRef = React.useRef(null)
+  const restoreScroll = React.useRef(initialQuery.scrollTop || 0)
+  const restoreFocus = React.useRef(null)
   const begin = useLatestRequestCoordinator()
   resultRef.current = result
   loadedCountRef.current = loadedCount
@@ -97,8 +107,8 @@ export default function WorkflowExceptionPanel({
   const key = `${access}:${request}`
   const listField = view === 'tasks' ? 'tasks' : view === 'orders' ? 'orders' : 'items'
   React.useEffect(() => {
-    onQueryChange?.({ filters, keyword, state, view, page, loadedCount })
-  }, [filters, keyword, state, view, page, loadedCount, onQueryChange])
+    onQueryChange?.({ filters, keyword, state, view, page, loadedCount, listPosition })
+  }, [filters, keyword, state, view, page, loadedCount, listPosition, onQueryChange])
   React.useEffect(() => () => taskRead.current?.abort(), [key, refreshKey])
   const load = React.useCallback(async ({ append = false, showRefreshFeedback = false } = {}) => {
     const previous = resultRef.current?.key === key ? resultRef.current : null
@@ -129,10 +139,10 @@ export default function WorkflowExceptionPanel({
         updatedAt: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
       })
       if (compact) setLoadedCount(Math.max(20, offset))
-      if (showRefreshFeedback) message.success({ key: 'mobile-exceptions-refresh', content: '异常记录已刷新' })
+      if (showRefreshFeedback) message.success({ key: 'mobile-exceptions-refresh', content: '异常跟踪已刷新' })
     } catch (error) {
       if (!read.isCurrent()) return
-      const feedback = getActionErrorMessage(error, append ? '读取更多异常记录' : '读取异常记录')
+      const feedback = getActionErrorMessage(error, append ? '读取更多异常跟踪信息' : '读取异常跟踪信息')
       setResult(previous?.data
         ? { ...previous, appendError: append ? feedback : '', refreshError: append ? previous.refreshError : feedback }
         : { key, error: feedback })
@@ -149,12 +159,22 @@ export default function WorkflowExceptionPanel({
     return () => { const read = begin('exceptions'); read.finish() }
   }, [begin, load, refreshKey])
   const current = result?.key === key ? result : null
+  const loadFeedback = usePageLoadFeedback({
+    error: current?.error || current?.refreshError || current?.appendError,
+    retry: () => load({ append: Boolean(current?.appendError && !current?.error && !current?.refreshError) }),
+  })
+  const scrollContainer = () => scrollContainerRef?.current || panelRef.current?.closest('.erp-admin-content')
   React.useLayoutEffect(() => {
-    if (compact && current?.data && restoreScroll.current && scrollContainerRef?.current) {
-      scrollContainerRef.current.scrollTop = initialQuery.scrollTop || 0
-      restoreScroll.current = false
+    if (current?.data && restoreScroll.current !== null) {
+      const container = scrollContainerRef?.current || panelRef.current?.closest('.erp-admin-content')
+      if (container) container.scrollTop = restoreScroll.current
+      restoreScroll.current = null
+      if (restoreFocus.current) {
+        panelRef.current?.querySelector(restoreFocus.current)?.focus({ preventScroll: true })
+        restoreFocus.current = null
+      }
     }
-  }, [compact, current, initialQuery.scrollTop, scrollContainerRef])
+  }, [current, scrollContainerRef])
   React.useEffect(() => {
     if (!compact || !scrollContainerRef?.current || !sentinel.current || !current?.hasMore || current.appendError || current.refreshError || loading || filterOpen) return undefined
     const observer = new IntersectionObserver((entries) => {
@@ -164,7 +184,7 @@ export default function WorkflowExceptionPanel({
     return () => observer.disconnect()
   }, [compact, current, filterOpen, load, loading, scrollContainerRef])
   const resetPosition = () => {
-    restoreScroll.current = false
+    restoreScroll.current = null
     setPage(1)
     setLoadedCount(20)
     scrollContainerRef?.current?.scrollTo({ top: 0 })
@@ -172,6 +192,21 @@ export default function WorkflowExceptionPanel({
   const selectState = (next) => {
     setState(next)
     resetPosition()
+  }
+  const openRelated = (next) => {
+    setListPosition({ page, loadedCount, scrollTop: scrollContainer()?.scrollTop || 0 })
+    setView(next)
+    setPage(1)
+    setLoadedCount(20)
+    restoreScroll.current = 0
+    restoreFocus.current = '.workflow-exceptions__detail-heading'
+  }
+  const returnToExceptions = () => {
+    restoreFocus.current = `[data-exception-related="${view}"]`
+    restoreScroll.current = listPosition?.scrollTop || 0
+    setPage(listPosition?.page || 1)
+    setLoadedCount(listPosition?.loadedCount || 20)
+    setView('')
   }
   const search = useLiveSearch({ value: keyword, onSearch: (value) => { setKeyword(value); resetPosition() } })
   const openTask = async (id) => {
@@ -217,41 +252,35 @@ export default function WorkflowExceptionPanel({
       profile={profile}
       roleKey={roleKey}
       value={filters}
+      people={assignees.people}
+      peopleError={assignees.error}
+      onRetryPeople={assignees.reload}
       onChange={(next) => {
         setFilters(next)
         resetPosition()
       }}
     />
   )
+  const StateFilters = compact ? HorizontalScroll : 'div'
   return (
-    <>
-      {renderRefreshControl?.({ key, onRefresh: load, busy: loading, enabled: !filterOpen && opening?.key !== key, lastUpdated: current?.updatedAt })}
-      <section className="workflow-exceptions" aria-label="异常记录" aria-busy={loading}>
-        {!trackingRef ? (
-          <>
-            {compact ? (
-              <Drawer
-                title="筛选异常记录"
-                placement="bottom"
-                height="auto"
-                styles={{ content: { maxHeight: '80dvh' } }}
-                open={filterOpen}
-                onClose={() => setFilterOpen(false)}
-                footer={
-                  <Button block type="primary" onClick={() => setFilterOpen(false)}>
-                    查看结果
-                  </Button>
-                }
-              >
-                {filterControls}
-              </Drawer>
-            ) : (
-              filterControls
-            )}
+    <section ref={panelRef} className="workflow-exceptions" aria-label="异常跟踪" aria-busy={loading}>
+      {view ? (
+        <header className="workflow-exceptions__detail-header">
+          <Button icon={<LeftOutlined aria-hidden />} onClick={returnToExceptions}>返回异常跟踪</Button>
+          <h3 className="workflow-exceptions__detail-heading" tabIndex={-1}>
+            {view === 'tasks' ? '关联待办' : '关联订单'}
+            {current?.data ? <span> {current.data.view_total} 项</span> : null}
+          </h3>
+        </header>
+        ) : null}
+      {!trackingRef && !view ? (
+        <>
+          <div className="workflow-exceptions__controls">
+            {!compact && filterControls}
             <div className="workflow-exceptions__query">
               {compact ? <MobileSearchInput
                 aria-label="搜索异常单号、订单、批次或原因"
-                placeholder="异常单号 / 订单 / 批次 / 原因"
+                placeholder="单号/订单/批次/原因"
                 value={search.value}
                 onChange={search.onChange}
                 onCompositionStart={search.onCompositionStart}
@@ -270,74 +299,59 @@ export default function WorkflowExceptionPanel({
                 onPressEnter={search.onPressEnter}
               />}
               {compact ? (
-                <Button onClick={() => setFilterOpen(true)}>
-                  筛选
-                  {Object.values(taskDiscoveryRequest(filters)).length
-                    ? ` · ${Object.values(taskDiscoveryRequest(filters)).length}`
-                    : ''}
-                </Button>
+                <MobileFilterPopover
+                  contextLabel="异常跟踪"
+                  title="异常跟踪筛选"
+                  open={filterOpen}
+                  onOpenChange={setFilterOpen}
+                  count={Object.keys(taskDiscoveryRequest(filters)).length}
+                  onReset={() => { setFilters({}); resetPosition() }}
+                >
+                  {filterControls}
+                </MobileFilterPopover>
               ) : null}
             </div>
-            {compact && Object.keys(taskDiscoveryRequest(filters)).length ? (
-              <p>
-                {taskDiscoveryFilterLabels(filters)
-                  .map((item) => item.label)
-                  .join('；')}
-                <Button
-                  size="small"
-                  type="link"
-                  onClick={() => {
-                    setFilters({})
-                    resetPosition()
-                  }}
-                >
-                  清除
-                </Button>
-              </p>
-            ) : null}
-            <div className="workflow-exceptions__states" aria-label="异常处理状态">
+            <StateFilters className="workflow-exceptions__states" role="group" aria-label="异常处理状态">
               {[
-                { label: '全部异常', value: '' },
-                { label: '未闭环', value: 'open' },
-                { label: '已闭环', value: 'closed' },
-              ].map((option) => <FilterChip key={option.value} selected={state === option.value} onClick={() => selectState(option.value)}>{option.label}</FilterChip>)}
+                { label: '全部异常', value: '', count: current?.data ? current.data.open + current.data.closed : '—' },
+                { label: '未处理完', value: 'open', count: current?.data?.open ?? '—' },
+                { label: '已处理完', value: 'closed', count: current?.data?.closed ?? '—' },
+              ].map((option) => <FilterChip key={option.value} count={option.count} selected={state === option.value} removable={compact && Boolean(option.value)} onClick={() => selectState(compact && state === option.value ? '' : option.value)}>{option.label}</FilterChip>)}
+            </StateFilters>
+            {compact && <MobileAppliedFilters
+              label="当前异常筛选"
+              items={taskDiscoveryFilterLabels(filters, assignees.people)}
+              onClear={(key) => {
+              setFilters((current) => ({ ...current, [key]: '' }))
+              resetPosition()
+            }}
+            />}
+            {compact && <MobileScrollEdge scrollContainerRef={scrollContainerRef} />}
+          </div>
+          <div className="workflow-exceptions__summary" aria-label="异常关联入口">
+            <div className="workflow-exceptions__related-links">
+              {[
+                  ['tasks', '关联待办', 'pending_tasks'],
+                  ['orders', '关联订单', 'affected_orders'],
+                ].map(([value, label, count]) => (
+                  <Button type="link" key={value} data-exception-related={value} disabled={!current?.data} onClick={() => openRelated(value)}>
+                    {label} <strong>{current?.data?.[count] ?? '—'}</strong><RightOutlined aria-hidden />
+                  </Button>
+                ))}
             </div>
-            <SlidingSegmented
-              block
-              className="workflow-exceptions__views"
-              aria-label="异常明细视图"
-              value={view}
-              options={[
-                ['', '异常事件', '异常', 'total'],
-                ['tasks', '待处理关联任务', '关联待办', 'pending_tasks'],
-                ['orders', '受影响订单', '关联订单', 'affected_orders'],
-              ].map(([value, label, shortLabel, count]) => ({
-                value,
-                title: label,
-                label: <span>{compact ? shortLabel : label} <strong>{current?.data?.[count] ?? '—'}</strong></span>,
-              }))}
-              onChange={(value) => { setView(value); resetPosition() }}
-            />
-          </>
+          </div>
+        </>
         ) : null}
-        {actionError ? (
-          <Alert type="error" showIcon message={actionError} />
+      {renderRefreshControl?.({ key, onRefresh: load, busy: loading, enabled: !filterOpen && opening?.key !== key, lastUpdated: current?.updatedAt })}
+      {actionError ? (
+        <Alert type="error" showIcon message={actionError} />
         ) : null}
-        {current?.refreshError ? <Alert type="error" showIcon message={current.refreshError} description="已保留上次结果。" action={<Button loading={loading} onClick={() => load()}>重试</Button>} /> : null}
-        {!current ? (
-          <Spin tip="正在读取异常记录">
-            <div className="workflow-exceptions__loading" />
-          </Spin>
-        ) : current.error ? (
-          <Alert
-            type="error"
-            showIcon
-            message={current.error}
-            action={
-              <Button loading={loading} onClick={() => load()}>重试</Button>
-            }
-          />
-        ) : (
+      {loadFeedback.visible && (current.error || current.refreshError) ? <Alert type="error" showIcon message={current.error || current.refreshError} description={current.refreshError ? '已保留上次结果。' : undefined} action={<Button loading={loading || loadFeedback.retrying} onClick={loadFeedback.retry}>重试</Button>} /> : null}
+      {!current ? (
+        <Spin tip="正在读取异常跟踪信息">
+          <div className="workflow-exceptions__loading" />
+        </Spin>
+        ) : current.error ? null : (
           <>
             {view === 'tasks' ? (
               current.data.tasks.length ? (
@@ -415,14 +429,14 @@ export default function WorkflowExceptionPanel({
               })
             ) : (
               <Empty
-                description={trackingRef ? '本流程暂无可见异常记录' : '当前条件下没有异常记录'}
+                description={trackingRef ? '本流程暂无可见异常' : '当前条件下没有可跟踪的异常'}
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
               />
             )}
             {compact ? (
               <div ref={sentinel} className="workflow-exceptions__more">
                 {current.data[listField].length ? <span role="status">{current.hasMore ? `已显示 ${current.data[listField].length} / 共 ${current.data.view_total} 条` : `已显示全部 ${current.data.view_total} 条`}</span> : null}
-                {current.appendError ? <><p role="alert">{current.appendError}，已加载记录仍保留。</p><Button loading={loading} onClick={() => load({ append: true })}>重新读取更多</Button></> : loading ? <Spin size="small" /> : current.hasMore ? <Button onClick={() => load({ append: true })}>加载更多</Button> : null}
+                {current.appendError ? loadFeedback.visible && !current.refreshError ? <><p role="alert">{current.appendError}，已加载记录仍保留。</p><Button loading={loading || loadFeedback.retrying} onClick={loadFeedback.retry}>重新读取更多</Button></> : null : loading ? <Spin size="small" /> : current.hasMore ? <Button onClick={() => load({ append: true })}>加载更多</Button> : null}
               </div>
             ) : (
               <Pagination
@@ -436,7 +450,6 @@ export default function WorkflowExceptionPanel({
             )}
           </>
         )}
-      </section>
-    </>
+    </section>
   )
 }

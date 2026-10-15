@@ -23,7 +23,6 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/shopspring/decimal"
 )
 
 type outsourcingOrderRepo struct {
@@ -342,6 +341,16 @@ func (r *outsourcingOrderRepo) ApplyOutsourcingOrderLifecycleAction(
 		}
 		return nil, err
 	}
+	if replayed, err := resolveSourceOrderLifecycleActionReplay(ctx, tx.client, "outsourcing_order", in); err != nil {
+		return nil, err
+	} else if replayed {
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return entOutsourcingOrderToBiz(current), nil
+	}
+
 	if current.Version != in.ExpectedVersion {
 		return nil, biz.ErrOutsourcingOrderConflict
 	}
@@ -473,25 +482,9 @@ func validateOutsourcingOrderFullySettled(ctx context.Context, client *ent.Clien
 	if len(items) == 0 {
 		return nil
 	}
-	itemIDs := make([]int, 0, len(items))
-	for _, item := range items {
-		itemIDs = append(itemIDs, item.ID)
-	}
-	facts, err := client.OutsourcingFact.Query().Where(
-		outsourcingfact.FactType(biz.OutsourcingFactReturnReceipt),
-		outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
-		outsourcingfact.SourceID(outsourcingOrderID),
-		outsourcingfact.SourceLineIDIn(itemIDs...),
-		outsourcingfact.Status(biz.OperationalFactStatusPosted),
-	).All(ctx)
+	settledByItem, err := outsourcingOrderSettledQuantities(ctx, client, outsourcingOrderID, items)
 	if err != nil {
 		return err
-	}
-	settledByItem := make(map[int]decimal.Decimal, len(items))
-	for _, fact := range facts {
-		if fact.SourceLineID != nil {
-			settledByItem[*fact.SourceLineID] = settledByItem[*fact.SourceLineID].Add(fact.Quantity)
-		}
 	}
 	for _, item := range items {
 		if settledByItem[item.ID].Cmp(item.OutsourcingQuantity) < 0 {
@@ -511,25 +504,9 @@ func outsourcingOrderLifecycleLineResults(ctx context.Context, client *ent.Clien
 	if len(items) == 0 {
 		return []map[string]any{}, nil
 	}
-	itemIDs := make([]int, 0, len(items))
-	for _, item := range items {
-		itemIDs = append(itemIDs, item.ID)
-	}
-	facts, err := client.OutsourcingFact.Query().Where(
-		outsourcingfact.FactType(biz.OutsourcingFactReturnReceipt),
-		outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
-		outsourcingfact.SourceID(outsourcingOrderID),
-		outsourcingfact.SourceLineIDIn(itemIDs...),
-		outsourcingfact.Status(biz.OperationalFactStatusPosted),
-	).All(ctx)
+	fulfilledByItem, err := outsourcingOrderSettledQuantities(ctx, client, outsourcingOrderID, items)
 	if err != nil {
 		return nil, err
-	}
-	fulfilledByItem := make(map[int]decimal.Decimal, len(items))
-	for _, fact := range facts {
-		if fact.SourceLineID != nil {
-			fulfilledByItem[*fact.SourceLineID] = fulfilledByItem[*fact.SourceLineID].Add(fact.Quantity)
-		}
 	}
 	results := make([]map[string]any, 0, len(items))
 	for _, item := range items {

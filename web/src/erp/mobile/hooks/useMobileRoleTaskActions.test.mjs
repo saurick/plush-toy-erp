@@ -76,7 +76,13 @@ test('mobile task page keeps load failures explicit and invalidates inactive vie
   assert.match(pageSource, /loadTasks: refreshTasksAfterMutation/u)
   assert.match(listSource, /role="alert"/u)
   assert.match(listSource, /当前没有可确认的任务数据，请重试/u)
-  assert.match(listSource, /onClick=\{\(\) => loadTasks\(\)\}/u)
+  assert.match(
+    listSource,
+    /const listFeedback = usePageLoadFeedback\(\{\s*error: loadError,\s*retry: loadTasks,/u
+  )
+  assert.match(listSource, /listFeedback\.visible \? \([\s\S]*?role="alert"/u)
+  assert.match(listSource, /onClick=\{listFeedback\.retry\}/u)
+  assert.match(listSource, /disabled=\{loading \|\| listFeedback\.retrying\}/u)
   assert.doesNotMatch(listSource, /taskSummary/u)
   assert.match(listSource, /authoritativeTaskCounts\?\.history \?\? '—'/u)
   assert.match(listSource, /authoritativeTaskCounts\?\.risk \?\? '—'/u)

@@ -216,20 +216,20 @@ function validateSmokeReport(smokeReport, smokeReportPath, options = {}) {
     if (!isMeaningful(check?.name)) {
       throw new Error(`post smoke report checks[${index}].name is missing`);
     }
+    if (!isPassStatus(check?.status)) {
+      throw new Error(`post smoke report checks[${index}].status must be pass`);
+    }
     const target = String(check?.target ?? "").trim();
     if (!isMeaningful(target)) {
       throw new Error(`post smoke report checks[${index}].target is missing`);
     }
     if (
       /^(https?:\/\/|\/)/i.test(target) &&
-      !/^[1-5]\d{2}$/.test(String(check?.httpCode ?? "").trim())
+      !/^200$/.test(String(check?.httpCode ?? "").trim())
     ) {
       throw new Error(
-        `post smoke report checks[${index}].httpCode must be a 100-599 HTTP status for URL targets`,
+        `post smoke report checks[${index}].httpCode must be HTTP 200 for URL targets`,
       );
-    }
-    if (!isPassStatus(check?.status)) {
-      throw new Error(`post smoke report checks[${index}].status must be pass`);
     }
   }
   if (Number(smokeReport.summary?.total) !== checks.length) {
@@ -325,6 +325,10 @@ function buildReport(options, now = new Date()) {
     throw new Error(
       "customerConfigRevision must be provided and must not be a placeholder",
     );
+  }
+
+  if (!isPassStatus(options.evidenceReviewStatus)) {
+    throw new Error("evidenceReviewStatus must be pass");
   }
 
   const steps = options.steps.map(parseStep);

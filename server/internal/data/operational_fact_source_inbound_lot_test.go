@@ -16,6 +16,7 @@ import (
 func TestSourceDrivenInboundFactsCreateAndReplayDerivedLots(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "source_inbound_fact_lots")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	logger := log.NewStdLogger(io.Discard)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
@@ -28,7 +29,7 @@ func TestSourceDrivenInboundFactsCreateAndReplayDerivedLots(t *testing.T) {
 	created, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{
 		Draft: biz.ProductionOrderDraft{
 			OrderNo: "MO-SOURCE-LOT-001",
-			Items: []biz.ProductionOrderDraftItem{{
+			Items: []biz.ProductionOrderDraftItem{{RouteCode: stringPtr(biz.ProductionWIPRoutePlushSewHandV1),
 				LineNo:          1,
 				ProductID:       fixtures.productID,
 				UnitID:          fixtures.unitID,
@@ -40,6 +41,7 @@ func TestSourceDrivenInboundFactsCreateAndReplayDerivedLots(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create production order: %v", err)
 	}
+	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, created.Order.ID)
 	released, err := orderUC.Release(ctx, &biz.ProductionOrderAction{
 		ID: created.Order.ID, ExpectedVersion: created.Order.Version,
 		ActorID: actor.ID, IdempotencyKey: "mo-source-lot-release",

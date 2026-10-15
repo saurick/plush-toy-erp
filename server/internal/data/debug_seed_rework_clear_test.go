@@ -38,6 +38,7 @@ func TestDebugBusinessDataClearReworkConstraintAndRollback(t *testing.T) {
 			}
 			statements := []string{
 				"PRAGMA foreign_keys = ON",
+				"CREATE TABLE runtime_audit_events (id INTEGER PRIMARY KEY, event_type TEXT, event_key TEXT, source TEXT, payload JSON, created_at DATETIME)",
 				"CREATE TABLE units (id INTEGER PRIMARY KEY)",
 				"INSERT INTO units VALUES (1)",
 				"CREATE TABLE production_wip_batches (id INTEGER PRIMARY KEY, flow_type TEXT NOT NULL, rework_reason TEXT, source_batch_id INTEGER, origin_rework_fact_id INTEGER, finished_goods_receipt_id INTEGER, CHECK (" + check + "))",
@@ -63,6 +64,7 @@ func TestDebugBusinessDataClearReworkConstraintAndRollback(t *testing.T) {
 				t.Fatalf("unexpected preview: %#v, %v", preview, err)
 			}
 			result, err := uc.ClearBusinessData(context.Background(), biz.DebugBusinessDataClearInput{
+				ActorID:      1,
 				Confirmation: biz.DebugBusinessDataClearConfirmation,
 			})
 			if failDelete {

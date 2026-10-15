@@ -13,11 +13,11 @@
 
 ## 环境版本
 
-前端依赖 pnpm，版本由 `web/package.json` 的 `packageManager` 固定为 `pnpm@10.34.5`；Node.js 版本由仓库根目录 `.n-node-version`、`.node-version` 和 `.nvmrc` 共同锁定为 `24.21.0`。
+Node.js 统一由 `n` 管理，唯一版本文件为根目录 `.n-node-version`，当前精确锁定 `24.21.0`；`web/package.json#engines.node` 声明 `24.21.x`。pnpm 由 `web/package.json#packageManager` 固定为 `pnpm@10.34.5`。首次安装见 [工具链安装](../scripts/README.md#版本锁定)。
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-corepack enable
+sudo n auto
 bash scripts/doctor.sh
 
 cd "$(git rev-parse --show-toplevel)/web"

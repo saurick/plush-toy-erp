@@ -18,6 +18,16 @@ type FinancePayment struct {
 	config `json:"-"`
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
+	// Kind holds the value of the "kind" field.
+	Kind string `json:"kind,omitempty"`
+	// SourceType holds the value of the "source_type" field.
+	SourceType *string `json:"source_type,omitempty"`
+	// SourceID holds the value of the "source_id" field.
+	SourceID *int `json:"source_id,omitempty"`
+	// RefundOfPaymentID holds the value of the "refund_of_payment_id" field.
+	RefundOfPaymentID *int `json:"refund_of_payment_id,omitempty"`
+	// PurposeNote holds the value of the "purpose_note" field.
+	PurposeNote *string `json:"purpose_note,omitempty"`
 	// PaymentNo holds the value of the "payment_no" field.
 	PaymentNo string `json:"payment_no,omitempty"`
 	// Direction holds the value of the "direction" field.
@@ -86,9 +96,13 @@ type FinancePayment struct {
 type FinancePaymentEdges struct {
 	// Allocations holds the value of the allocations edge.
 	Allocations []*FinanceAllocation `json:"allocations,omitempty"`
+	// Refunds holds the value of the refunds edge.
+	Refunds []*FinancePayment `json:"refunds,omitempty"`
+	// RefundSource holds the value of the refund_source edge.
+	RefundSource *FinancePayment `json:"refund_source,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [3]bool
 }
 
 // AllocationsOrErr returns the Allocations value or an error if the edge
@@ -100,6 +114,26 @@ func (e FinancePaymentEdges) AllocationsOrErr() ([]*FinanceAllocation, error) {
 	return nil, &NotLoadedError{edge: "allocations"}
 }
 
+// RefundsOrErr returns the Refunds value or an error if the edge
+// was not loaded in eager-loading.
+func (e FinancePaymentEdges) RefundsOrErr() ([]*FinancePayment, error) {
+	if e.loadedTypes[1] {
+		return e.Refunds, nil
+	}
+	return nil, &NotLoadedError{edge: "refunds"}
+}
+
+// RefundSourceOrErr returns the RefundSource value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e FinancePaymentEdges) RefundSourceOrErr() (*FinancePayment, error) {
+	if e.RefundSource != nil {
+		return e.RefundSource, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: financepayment.Label}
+	}
+	return nil, &NotLoadedError{edge: "refund_source"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*FinancePayment) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -107,9 +141,9 @@ func (*FinancePayment) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case financepayment.FieldAmount:
 			values[i] = new(decimal.Decimal)
-		case financepayment.FieldID, financepayment.FieldCounterpartyID, financepayment.FieldVersion, financepayment.FieldApprovedBy, financepayment.FieldRejectedBy, financepayment.FieldPostedBy, financepayment.FieldCancelledBy, financepayment.FieldReversedBy, financepayment.FieldCreatedBy:
+		case financepayment.FieldID, financepayment.FieldSourceID, financepayment.FieldRefundOfPaymentID, financepayment.FieldCounterpartyID, financepayment.FieldVersion, financepayment.FieldApprovedBy, financepayment.FieldRejectedBy, financepayment.FieldPostedBy, financepayment.FieldCancelledBy, financepayment.FieldReversedBy, financepayment.FieldCreatedBy:
 			values[i] = new(sql.NullInt64)
-		case financepayment.FieldPaymentNo, financepayment.FieldDirection, financepayment.FieldStatus, financepayment.FieldCounterpartyType, financepayment.FieldCurrency, financepayment.FieldAccountRef, financepayment.FieldEvidenceRef, financepayment.FieldIdempotencyKey, financepayment.FieldIdempotencyPayloadHash, financepayment.FieldRejectReason, financepayment.FieldCancelReason, financepayment.FieldReverseReason:
+		case financepayment.FieldKind, financepayment.FieldSourceType, financepayment.FieldPurposeNote, financepayment.FieldPaymentNo, financepayment.FieldDirection, financepayment.FieldStatus, financepayment.FieldCounterpartyType, financepayment.FieldCurrency, financepayment.FieldAccountRef, financepayment.FieldEvidenceRef, financepayment.FieldIdempotencyKey, financepayment.FieldIdempotencyPayloadHash, financepayment.FieldRejectReason, financepayment.FieldCancelReason, financepayment.FieldReverseReason:
 			values[i] = new(sql.NullString)
 		case financepayment.FieldOccurredAt, financepayment.FieldApprovedAt, financepayment.FieldRejectedAt, financepayment.FieldPostedAt, financepayment.FieldCancelledAt, financepayment.FieldReversedAt, financepayment.FieldCreatedAt, financepayment.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -134,6 +168,40 @@ func (_m *FinancePayment) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field id", value)
 			}
 			_m.ID = int(value.Int64)
+		case financepayment.FieldKind:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field kind", values[i])
+			} else if value.Valid {
+				_m.Kind = value.String
+			}
+		case financepayment.FieldSourceType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field source_type", values[i])
+			} else if value.Valid {
+				_m.SourceType = new(string)
+				*_m.SourceType = value.String
+			}
+		case financepayment.FieldSourceID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field source_id", values[i])
+			} else if value.Valid {
+				_m.SourceID = new(int)
+				*_m.SourceID = int(value.Int64)
+			}
+		case financepayment.FieldRefundOfPaymentID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field refund_of_payment_id", values[i])
+			} else if value.Valid {
+				_m.RefundOfPaymentID = new(int)
+				*_m.RefundOfPaymentID = int(value.Int64)
+			}
+		case financepayment.FieldPurposeNote:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field purpose_note", values[i])
+			} else if value.Valid {
+				_m.PurposeNote = new(string)
+				*_m.PurposeNote = value.String
+			}
 		case financepayment.FieldPaymentNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field payment_no", values[i])
@@ -339,6 +407,16 @@ func (_m *FinancePayment) QueryAllocations() *FinanceAllocationQuery {
 	return NewFinancePaymentClient(_m.config).QueryAllocations(_m)
 }
 
+// QueryRefunds queries the "refunds" edge of the FinancePayment entity.
+func (_m *FinancePayment) QueryRefunds() *FinancePaymentQuery {
+	return NewFinancePaymentClient(_m.config).QueryRefunds(_m)
+}
+
+// QueryRefundSource queries the "refund_source" edge of the FinancePayment entity.
+func (_m *FinancePayment) QueryRefundSource() *FinancePaymentQuery {
+	return NewFinancePaymentClient(_m.config).QueryRefundSource(_m)
+}
+
 // Update returns a builder for updating this FinancePayment.
 // Note that you need to call FinancePayment.Unwrap() before calling this method if this FinancePayment
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -362,6 +440,29 @@ func (_m *FinancePayment) String() string {
 	var builder strings.Builder
 	builder.WriteString("FinancePayment(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
+	builder.WriteString("kind=")
+	builder.WriteString(_m.Kind)
+	builder.WriteString(", ")
+	if v := _m.SourceType; v != nil {
+		builder.WriteString("source_type=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.SourceID; v != nil {
+		builder.WriteString("source_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RefundOfPaymentID; v != nil {
+		builder.WriteString("refund_of_payment_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.PurposeNote; v != nil {
+		builder.WriteString("purpose_note=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
 	builder.WriteString("payment_no=")
 	builder.WriteString(_m.PaymentNo)
 	builder.WriteString(", ")

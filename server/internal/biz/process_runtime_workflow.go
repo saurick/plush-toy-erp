@@ -194,6 +194,8 @@ func (uc *ProcessRuntimeUsecase) ReconcilePendingProcessRuntimeNodes(
 			}
 		case node.Status == ProcessNodeStatusCompleted && node.NodeType == ProcessNodeTypeEnd:
 			reconcileErr = uc.ensureProcessInstanceCompleted(ctx, node.ProcessInstanceID, actorID)
+		case node.Status == ProcessNodeStatusCompleted && node.NodeType == ProcessNodeTypeWaitEvent:
+			reconcileErr = uc.advanceAfterNodeCompletion(ctx, node, actorID)
 		default:
 			reconcileErr = ErrProcessNodeInstanceConflict
 		}

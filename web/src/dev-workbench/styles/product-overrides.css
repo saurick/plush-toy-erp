@@ -37,7 +37,7 @@
   max-width: 760px;
   margin-top: 5px;
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.55;
 }
 
@@ -49,7 +49,6 @@
   display: grid;
   gap: 12px;
   padding: 14px;
-  box-shadow: inset 3px 0 0 var(--erp-primary);
 }
 
 .erp-dev-testing-validation-plan__head > div {
@@ -91,12 +90,12 @@
 .erp-dev-testing-validation-plan__note,
 .erp-dev-testing-validation-plan__empty {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-dev-testing-validation-plan__identity code {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   overflow-wrap: anywhere;
 }
 
@@ -125,7 +124,7 @@
 .erp-dev-testing-validation-plan__lists li,
 .erp-dev-testing-validation-plan__lists p {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -532,7 +531,7 @@
     width: 30px;
     height: 30px;
     border-radius: 9px;
-    font-size: 15px;
+    font-size: var(--erp-font-emphasis);
   }
 
   .erp-dev-testing-metric__note {
@@ -846,7 +845,7 @@
 }
 
 [data-erp-theme='dark'] .erp-dev-docs-markdown blockquote {
-  border-left-color: var(--erp-interactive-border-focus);
+  border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
 }
 
@@ -920,18 +919,6 @@
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-dev-customer-import-step,
-[data-erp-theme='dark'] .erp-dev-customer-db-target,
-[data-erp-theme='dark'] .erp-dev-customer-dry-run-metrics > div,
-[data-erp-theme='dark'] .erp-dev-customer-dry-run-paths,
-[data-erp-theme='dark'] .erp-dev-customer-test-apply-step,
-[data-erp-theme='dark'] .erp-dev-customer-test-apply-facts > div,
-[data-erp-theme='dark'] .erp-dev-customer-test-apply-session,
-[data-erp-theme='dark'] .erp-dev-customer-release-missing,
-[data-erp-theme='dark'] .erp-dev-customer-release-facts > div {
-  box-shadow: inset 3px 0 0 #1e3a5f;
-}
-
 [data-erp-theme='dark'] .erp-dev-customer-import-step__index {
   background: var(--erp-interactive-bg-hover);
   color: var(--erp-border-strong);
@@ -988,7 +975,6 @@
 
 [data-erp-theme='dark'] .erp-dev-customer-quick-action {
   border-color: var(--erp-primary);
-  box-shadow: inset 3px 0 0 var(--erp-primary);
 }
 
 [data-erp-theme='dark'] .erp-dev-customer-quick-action:hover,
@@ -1045,7 +1031,6 @@
 [data-erp-theme='dark'] .erp-dev-hub-card:focus-within {
   border-color: var(--erp-interactive-border-hover);
   box-shadow:
-    inset 3px 0 0 var(--erp-primary),
     0 10px 24px rgb(0 0 0 / 0.28);
 }
 
@@ -1145,10 +1130,6 @@
   color: var(--erp-text-muted);
 }
 
-[data-erp-theme='dark'] .erp-dev-testing-preset {
-  box-shadow: inset 3px 0 0 #134e4a;
-}
-
 [data-erp-theme='dark'] .erp-dev-testing-preset:hover,
 [data-erp-theme='dark'] .erp-dev-testing-preset:focus-visible,
 [data-erp-theme='dark'] .erp-dev-testing-filter__item:hover,
@@ -1162,7 +1143,6 @@
   border-color: #5eead4;
   background: #134e4a;
   color: #f0fdfa;
-  box-shadow: inset 3px 0 0 #5eead4;
 }
 
 [data-erp-theme='dark'] .erp-dev-testing-command-block__head {
@@ -1250,10 +1230,6 @@
   color: var(--erp-text-muted);
 }
 
-[data-erp-theme='dark'] .erp-dev-ui-design-card {
-  box-shadow: inset 3px 0 0 #1e3a5f;
-}
-
 [data-erp-theme='dark'] .erp-dev-ui-design-card:hover,
 [data-erp-theme='dark'] .erp-dev-ui-design-card:focus-within,
 [data-erp-theme='dark'] .erp-dev-ui-design-card--active,
@@ -1271,14 +1247,12 @@
   border-color: var(--erp-interactive-border-hover);
   background: var(--erp-interactive-bg-hover);
   color: var(--erp-text);
-  box-shadow: inset 3px 0 0 var(--erp-primary);
 }
 
 [data-erp-theme='dark'] .erp-dev-ui-design-filter__item--active {
   border-color: var(--erp-primary);
   background: #1e3a8a;
   color: var(--erp-surface-bg-soft);
-  box-shadow: inset 3px 0 0 var(--erp-primary);
 }
 
 [data-erp-theme='dark'] .erp-dev-ui-design-preview__frame,

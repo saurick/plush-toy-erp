@@ -15,6 +15,7 @@ import (
 	"server/internal/errcode"
 	pkglogger "server/pkg/logger"
 
+	kratoserrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	httpx "github.com/go-kratos/kratos/v2/transport/http"
 	"google.golang.org/protobuf/types/known/structpb"
@@ -33,6 +34,9 @@ func TestSafeServerLoggingRecordsBusinessOutcomeWithoutPayloads(t *testing.T) {
 		{name: "domain system error", outcome: "error", level: "ERROR", code: errcode.UserListFailed.Code},
 		{name: "reply error", outcome: "error", level: "ERROR", replyError: "private-reply-error"},
 		{name: "transport error", outcome: "error", level: "ERROR", err: errors.New("private-transport-error")},
+		{name: "transport bad request", outcome: "rejected", level: "WARN", err: kratoserrors.BadRequest("INVALID_INPUT", "private-message")},
+		{name: "transport rate limit", outcome: "rejected", level: "WARN", err: kratoserrors.New(429, "RATE_LIMIT", "private-message")},
+		{name: "transport unavailable", outcome: "error", level: "ERROR", err: kratoserrors.ServiceUnavailable("UNAVAILABLE", "private-message")},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var output bytes.Buffer
@@ -46,7 +50,7 @@ func TestSafeServerLoggingRecordsBusinessOutcomeWithoutPayloads(t *testing.T) {
 				t.Fatalf("logging changed the response or error")
 			}
 			text := output.String()
-			for _, want := range []string{tc.level, "request completed", "outcome=" + tc.outcome, fmt.Sprintf("rpc_result_code=%d", tc.code), "request_id=req-outcome", "id=rpc-outcome", "latency="} {
+			for _, want := range []string{tc.level, "request completed", "outcome=" + tc.outcome, fmt.Sprintf("rpc_result_code=%d", tc.code), "request_id=req-outcome", "rpc.service=system", "rpc.method=ping", "id=rpc-outcome", "latency="} {
 				if !strings.Contains(text, want) {
 					t.Fatalf("missing %q: %s", want, text)
 				}
@@ -62,6 +66,15 @@ func TestSafeServerLoggingRecordsBusinessOutcomeWithoutPayloads(t *testing.T) {
 				t.Fatalf("error counter disagrees with outcome %q: got %d want %d", tc.outcome, gotErrors, wantErrors)
 			}
 		})
+	}
+}
+
+func TestSafeRequestSummaryBoundsUntrustedMetadata(t *testing.T) {
+	summary := safeRequestSummary(&v1.PostJsonrpcRequest{
+		Url: "private-customer/path", Method: "password=private-value", Id: strings.Repeat("x", 129),
+	})
+	if summary != "jsonrpc.post url=unknown method=unknown id=" {
+		t.Fatalf("unsafe request metadata: %s", summary)
 	}
 }
 

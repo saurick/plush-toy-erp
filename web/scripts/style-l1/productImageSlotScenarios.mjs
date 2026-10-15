@@ -1,5 +1,6 @@
-import { installAdminRpcMocks } from './adminRpcMocks.mjs'
 import { readFileSync } from 'node:fs'
+import { openBusinessRecordDetails } from './businessDetailsScenarios.mjs'
+import { installAdminRpcMocks } from './adminRpcMocks.mjs'
 
 const PRODUCT_IMAGE_PNG_BASE64 =
   readFileSync(new URL('../../../scripts/qa/fixtures/manual-acceptance-image.png', import.meta.url)).toString('base64')
@@ -165,7 +166,7 @@ async function openProductEditModal(page, assert) {
     .filter({ hasText: 'PROD-STYLE-L1' })
   await productRow.waitFor()
   assert.equal(await productRow.count(), 1, '产品列表应有且仅有一条目标记录')
-  await productRow.getByText('PROD-STYLE-L1', { exact: true }).dblclick()
+  await openBusinessRecordDetails(page, 'PROD-STYLE-L1', '编辑产品')
   const modal = page.locator(
     '.erp-business-form-page:not([hidden])'
   )
@@ -291,7 +292,8 @@ export function createProductImageSlotScenarios(deps) {
           await primary.locator('img').evaluate((img) => img.decode())
           assert.equal(await primary.getByText('图片不可用', { exact: true }).count(), 0)
           await primary.locator('input[type="file"]').setInputFiles({
-            name: '替换后的有效样品图片.jpg', mimeType: 'image/jpeg',
+            name: '替换后的有效样品图片.jpg',
+            mimeType: 'image/jpeg',
             buffer: readFileSync(new URL('../../../scripts/qa/fixtures/manual-acceptance-image.jpg', import.meta.url)),
           })
           await primary.getByText('保存产品后替换', { exact: true }).waitFor()

@@ -12,7 +12,13 @@ import {
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 
-const ALLOWED_MODES = Object.freeze(["validate", "compile", "preview", "activate", "rollback"]);
+const ALLOWED_MODES = Object.freeze([
+  "validate",
+  "compile",
+  "preview",
+  "activate",
+  "rollback",
+]);
 const ALLOWED_MODULE_STATES = new Set(["enabled", "read_only", "disabled"]);
 
 function assert(condition, message) {
@@ -22,7 +28,10 @@ function assert(condition, message) {
 }
 
 function assertNonEmptyString(value, key) {
-  assert(typeof value === "string" && value.trim() !== "", `${key} must be a non-empty string`);
+  assert(
+    typeof value === "string" && value.trim() !== "",
+    `${key} must be a non-empty string`,
+  );
 }
 
 export function isNamespacedPackageKey(customerKey, packageKey) {
@@ -95,7 +104,9 @@ function toKeySet(items = []) {
 function assertStringList(values, key) {
   assert(Array.isArray(values), `${key} must be an array`);
   assert(values.length > 0, `${key} must not be empty`);
-  values.forEach((value, index) => assertNonEmptyString(value, `${key}[${index}]`));
+  values.forEach((value, index) =>
+    assertNonEmptyString(value, `${key}[${index}]`),
+  );
 }
 
 function validateModuleStates(config, moduleKeys) {
@@ -106,13 +117,25 @@ function validateModuleStates(config, moduleKeys) {
   const seen = new Set();
   config.moduleStates.forEach((item, index) => {
     const path = `moduleStates[${index}]`;
-    assert(item && typeof item === "object" && !Array.isArray(item), `${path} must be an object`);
+    assert(
+      item && typeof item === "object" && !Array.isArray(item),
+      `${path} must be an object`,
+    );
     assertNonEmptyString(item.moduleKey, `${path}.moduleKey`);
-    assert(moduleKeys.has(item.moduleKey), `${path}.moduleKey contains unknown module ${item.moduleKey}`);
-    assert(!seen.has(item.moduleKey), `${path}.moduleKey must not be duplicated`);
+    assert(
+      moduleKeys.has(item.moduleKey),
+      `${path}.moduleKey contains unknown module ${item.moduleKey}`,
+    );
+    assert(
+      !seen.has(item.moduleKey),
+      `${path}.moduleKey must not be duplicated`,
+    );
     seen.add(item.moduleKey);
     assertNonEmptyString(item.state, `${path}.state`);
-    assert(ALLOWED_MODULE_STATES.has(item.state), `${path}.state must be enabled, read_only or disabled`);
+    assert(
+      ALLOWED_MODULE_STATES.has(item.state),
+      `${path}.state must be enabled, read_only or disabled`,
+    );
     if (item.state !== "enabled") {
       assertNonEmptyString(item.reason, `${path}.reason`);
     }
@@ -123,32 +146,61 @@ function validatePrintTemplateDefaults(config, schema = customerPackageSchema) {
   if (config.printTemplateDefaults == null) {
     return;
   }
-  assert(Array.isArray(config.printTemplateDefaults), "printTemplateDefaults must be an array");
+  assert(
+    Array.isArray(config.printTemplateDefaults),
+    "printTemplateDefaults must be an array",
+  );
   const allowedTemplateKeys = new Set(schema.allowedPrintTemplateKeys || []);
   const allowedPartyKeys = new Set(schema.allowedPrintPartyDefaultKeys || []);
   const requiredPartyKeys = new Set(schema.requiredPrintPartyDefaultKeys || []);
   const seen = new Set();
   config.printTemplateDefaults.forEach((item, index) => {
     const itemPath = `printTemplateDefaults[${index}]`;
-    assert(item && typeof item === "object" && !Array.isArray(item), `${itemPath} must be an object`);
+    assert(
+      item && typeof item === "object" && !Array.isArray(item),
+      `${itemPath} must be an object`,
+    );
     assertNonEmptyString(item.templateKey, `${itemPath}.templateKey`);
-    assert(allowedTemplateKeys.has(item.templateKey), `${itemPath}.templateKey contains unsupported template ${item.templateKey}`);
-    assert(!seen.has(item.templateKey), `${itemPath}.templateKey must not be duplicated`);
+    assert(
+      allowedTemplateKeys.has(item.templateKey),
+      `${itemPath}.templateKey contains unsupported template ${item.templateKey}`,
+    );
+    assert(
+      !seen.has(item.templateKey),
+      `${itemPath}.templateKey must not be duplicated`,
+    );
     seen.add(item.templateKey);
-    assert(item.status === "preview_only", `${itemPath}.status must stay preview_only`);
+    assert(
+      item.status === "preview_only",
+      `${itemPath}.status must stay preview_only`,
+    );
     assertNonEmptyString(item.guardrail, `${itemPath}.guardrail`);
     assert(
-      item.partyDefaults && typeof item.partyDefaults === "object" && !Array.isArray(item.partyDefaults),
+      item.partyDefaults &&
+        typeof item.partyDefaults === "object" &&
+        !Array.isArray(item.partyDefaults),
       `${itemPath}.partyDefaults must be an object`,
     );
     const partyDefaultEntries = Object.entries(item.partyDefaults);
-    assert(partyDefaultEntries.length > 0, `${itemPath}.partyDefaults must not be empty`);
+    assert(
+      partyDefaultEntries.length > 0,
+      `${itemPath}.partyDefaults must not be empty`,
+    );
     partyDefaultEntries.forEach(([key, value]) => {
-      assert(allowedPartyKeys.has(key), `${itemPath}.partyDefaults.${key} is not an allowed print party default`);
-      assert(typeof value === "string", `${itemPath}.partyDefaults.${key} must be a string`);
+      assert(
+        allowedPartyKeys.has(key),
+        `${itemPath}.partyDefaults.${key} is not an allowed print party default`,
+      );
+      assert(
+        typeof value === "string",
+        `${itemPath}.partyDefaults.${key} must be a string`,
+      );
     });
     requiredPartyKeys.forEach((key) =>
-      assertNonEmptyString(item.partyDefaults[key], `${itemPath}.partyDefaults.${key}`),
+      assertNonEmptyString(
+        item.partyDefaults[key],
+        `${itemPath}.partyDefaults.${key}`,
+      ),
     );
     assert(
       item.supplierDefaults == null,
@@ -166,14 +218,27 @@ function validateRoleProfiles(config, catalog) {
   const seenRoles = new Set();
   config.roleProfiles.forEach((profile, index) => {
     const path = `roleProfiles[${index}]`;
-    assert(profile && typeof profile === "object" && !Array.isArray(profile), `${path} must be an object`);
+    assert(
+      profile && typeof profile === "object" && !Array.isArray(profile),
+      `${path} must be an object`,
+    );
     assertNonEmptyString(profile.roleKey, `${path}.roleKey`);
-    assert(!seenRoles.has(profile.roleKey), `${path}.roleKey must not be duplicated`);
+    assert(
+      knownPools.has(profile.roleKey),
+      `${path}.roleKey is not a registered Product Core role`,
+    );
+    assert(
+      !seenRoles.has(profile.roleKey),
+      `${path}.roleKey must not be duplicated`,
+    );
     seenRoles.add(profile.roleKey);
     assertNonEmptyString(profile.displayName, `${path}.displayName`);
     assertStringList(profile.ownerPools, `${path}.ownerPools`);
     profile.ownerPools.forEach((poolKey) =>
-      assert(knownPools.has(poolKey), `${path}.ownerPools contains unknown pool ${poolKey}`),
+      assert(
+        knownPools.has(poolKey),
+        `${path}.ownerPools contains unknown pool ${poolKey}`,
+      ),
     );
     assertStringList(profile.capabilityKeys, `${path}.capabilityKeys`);
     assert(
@@ -185,7 +250,10 @@ function validateRoleProfiles(config, catalog) {
 
 function fieldPolicySurfacesByKey(catalog) {
   return new Map(
-    (catalog.fieldPolicySurfaces || []).map((surface) => [surface.key, surface]),
+    (catalog.fieldPolicySurfaces || []).map((surface) => [
+      surface.key,
+      surface,
+    ]),
   );
 }
 
@@ -200,7 +268,8 @@ function validateFieldPolicyOverrides(config, catalog) {
   const allowedKeys = new Set(
     customerPackageSchema.allowedFieldPolicyOverrideKeys || [],
   );
-  const requiredKeys = customerPackageSchema.requiredFieldPolicyOverrideKeys || [];
+  const requiredKeys =
+    customerPackageSchema.requiredFieldPolicyOverrideKeys || [];
   const surfaces = fieldPolicySurfacesByKey(catalog);
   const seen = new Set();
 
@@ -273,7 +342,11 @@ function normalizeProcessPolicyRule(rule, schema = customerPackageSchema) {
   return normalized;
 }
 
-function assertProcessPolicyRules(rules, policyPath, schema = customerPackageSchema) {
+function assertProcessPolicyRules(
+  rules,
+  policyPath,
+  schema = customerPackageSchema,
+) {
   assert(Array.isArray(rules), `${policyPath}.rules must be an array`);
   assert(rules.length > 0, `${policyPath}.rules must not be empty`);
   const allowedKeys = new Set(schema.allowedProcessPolicyRuleKeys);
@@ -283,27 +356,49 @@ function assertProcessPolicyRules(rules, policyPath, schema = customerPackageSch
 
   rules.forEach((rule, ruleIndex) => {
     const rulePath = `${policyPath}.rules[${ruleIndex}]`;
-    assert(rule && typeof rule === "object" && !Array.isArray(rule), `${rulePath} must be a rule object`);
+    assert(
+      rule && typeof rule === "object" && !Array.isArray(rule),
+      `${rulePath} must be a rule object`,
+    );
     for (const [key, value] of Object.entries(rule)) {
-      assert(!forbiddenKeys.has(key), `${rulePath}.${key} must not register executable policy behavior`);
-      assert(allowedKeys.has(key), `${rulePath}.${key} is not an allowed process policy rule field`);
+      assert(
+        !forbiddenKeys.has(key),
+        `${rulePath}.${key} must not register executable policy behavior`,
+      );
+      assert(
+        allowedKeys.has(key),
+        `${rulePath}.${key} is not an allowed process policy rule field`,
+      );
       assertNonEmptyString(value, `${rulePath}.${key}`);
     }
     assert(
-      triggerKeys.some((key) => typeof rule[key] === "string" && rule[key].trim() !== ""),
+      triggerKeys.some(
+        (key) => typeof rule[key] === "string" && rule[key].trim() !== "",
+      ),
       `${rulePath} must declare key or when`,
     );
     assert(
-      resultKeys.some((key) => typeof rule[key] === "string" && rule[key].trim() !== ""),
+      resultKeys.some(
+        (key) => typeof rule[key] === "string" && rule[key].trim() !== "",
+      ),
       `${rulePath} must declare decision or action`,
     );
   });
 }
 
 function validateCatalog(catalog) {
-  assert(catalog.catalogKey === "customer-package-catalog", "catalogKey must stay customer-package-catalog");
-  assert(catalog.status === "draft_catalog", "catalog status must stay draft_catalog");
-  assert(catalog.runtimeEnabled === false, "catalog must not be runtime-enabled");
+  assert(
+    catalog.catalogKey === "customer-package-catalog",
+    "catalogKey must stay customer-package-catalog",
+  );
+  assert(
+    catalog.status === "draft_catalog",
+    "catalog status must stay draft_catalog",
+  );
+  assert(
+    catalog.runtimeEnabled === false,
+    "catalog must not be runtime-enabled",
+  );
   for (const key of [
     "changesSchema",
     "changesMigration",
@@ -313,10 +408,25 @@ function validateCatalog(catalog) {
     "executesImport",
     "writesFacts",
   ]) {
-    assert(catalog.boundaries?.[key] === false, `catalog.boundaries.${key} must stay false`);
+    assert(
+      catalog.boundaries?.[key] === false,
+      `catalog.boundaries.${key} must stay false`,
+    );
   }
-  for (const section of ["modules", "capabilities", "pages", "fields", "fieldPolicySurfaces", "workPools", "policies", "commands"]) {
-    assert(Array.isArray(catalog[section]), `catalog.${section} must be an array`);
+  for (const section of [
+    "modules",
+    "capabilities",
+    "pages",
+    "fields",
+    "fieldPolicySurfaces",
+    "workPools",
+    "policies",
+    "commands",
+  ]) {
+    assert(
+      Array.isArray(catalog[section]),
+      `catalog.${section} must be an array`,
+    );
     assert(catalog[section].length > 0, `catalog.${section} must not be empty`);
   }
   const moduleKeys = toKeySet(catalog.modules);
@@ -329,8 +439,14 @@ function validateCatalog(catalog) {
     assertNonEmptyString(page.label, `${pagePath}.label`);
     const requiredAll = page.requiredCapabilityKeys || [];
     const requiredAny = page.requiredAnyCapabilityKeys || [];
-    assert(Array.isArray(requiredAll), `${pagePath}.requiredCapabilityKeys must be an array`);
-    assert(Array.isArray(requiredAny), `${pagePath}.requiredAnyCapabilityKeys must be an array`);
+    assert(
+      Array.isArray(requiredAll),
+      `${pagePath}.requiredCapabilityKeys must be an array`,
+    );
+    assert(
+      Array.isArray(requiredAny),
+      `${pagePath}.requiredAnyCapabilityKeys must be an array`,
+    );
     assert(
       requiredAll.length > 0 || requiredAny.length > 0,
       `${pagePath} must declare requiredCapabilityKeys or requiredAnyCapabilityKeys`,
@@ -342,7 +458,10 @@ function validateCatalog(catalog) {
       const seen = new Set();
       values.forEach((value, valueIndex) => {
         assertNonEmptyString(value, `${pagePath}.${key}[${valueIndex}]`);
-        assert(!seen.has(value), `${pagePath}.${key} must not contain duplicates`);
+        assert(
+          !seen.has(value),
+          `${pagePath}.${key} must not contain duplicates`,
+        );
         seen.add(value);
       });
     }
@@ -411,7 +530,8 @@ function validateRuntimeProcessSelections(
       `${selectionPath} must be an object`,
     );
     assert(
-      JSON.stringify(Object.keys(selection).sort()) === JSON.stringify(allowedKeys),
+      JSON.stringify(Object.keys(selection).sort()) ===
+        JSON.stringify(allowedKeys),
       `${selectionPath} may only declare ${allowedKeys.join(", ")}`,
     );
     for (const key of allowedKeys) {
@@ -450,14 +570,23 @@ function validatePackage(
     assert(config[key] !== undefined, `customer package missing ${key}`);
   }
   assertNonEmptyString(config.customerKey, "customerKey");
-  assert(config.customerKey !== "current", "customerKey must not use legacy current alias");
-  assert(config.customerKey !== "tenant", "customerKey must not be treated as a SaaS tenant");
+  assert(
+    config.customerKey !== "current",
+    "customerKey must not use legacy current alias",
+  );
+  assert(
+    config.customerKey !== "tenant",
+    "customerKey must not be treated as a SaaS tenant",
+  );
   assertNonEmptyString(config.packageKey, "packageKey");
   assert(
     isNamespacedPackageKey(config.customerKey, config.packageKey),
     "packageKey must be namespaced by customerKey and end with package",
   );
-  assert(schema.allowedStatuses.includes(config.status), `status must be one of ${schema.allowedStatuses.join(", ")}`);
+  assert(
+    schema.allowedStatuses.includes(config.status),
+    `status must be one of ${schema.allowedStatuses.join(", ")}`,
+  );
   const releaseReady = config.status === "release_ready";
   assert(
     !releaseReady || allowReleaseReady,
@@ -469,10 +598,22 @@ function validatePackage(
       ? "release-ready customer package must enable runtime compilation"
       : "customer package must not be runtime-enabled",
   );
-  assert(config.sourcePolicy?.externalImportAllowsCode === false, "external import must not allow code");
-  assert(config.sourcePolicy?.externalImportAllowsSql === false, "external import must not allow SQL");
-  assert(config.sourcePolicy?.externalImportAllowsSecrets === false, "external import must not allow secrets");
-  assert(config.sourcePolicy?.externalImportAllowsRawCustomerFiles === false, "external import must not allow raw customer files");
+  assert(
+    config.sourcePolicy?.externalImportAllowsCode === false,
+    "external import must not allow code",
+  );
+  assert(
+    config.sourcePolicy?.externalImportAllowsSql === false,
+    "external import must not allow SQL",
+  );
+  assert(
+    config.sourcePolicy?.externalImportAllowsSecrets === false,
+    "external import must not allow secrets",
+  );
+  assert(
+    config.sourcePolicy?.externalImportAllowsRawCustomerFiles === false,
+    "external import must not allow raw customer files",
+  );
   assert(
     config.sourcePolicy?.previewOnly === !releaseReady,
     releaseReady
@@ -485,8 +626,14 @@ function validatePackage(
       ? "release-ready customer package must enable publish compilation"
       : "publish must stay disabled",
   );
-  assert(config.sourcePolicy?.activateEnabled === false, "activate must stay disabled");
-  assert(config.sourcePolicy?.rollbackEnabled === false, "rollback must stay disabled");
+  assert(
+    config.sourcePolicy?.activateEnabled === false,
+    "activate must stay disabled",
+  );
+  assert(
+    config.sourcePolicy?.rollbackEnabled === false,
+    "rollback must stay disabled",
+  );
   if (config.sourcePolicy?.localTestApplyEnabled !== undefined) {
     assert(
       typeof config.sourcePolicy.localTestApplyEnabled === "boolean",
@@ -495,7 +642,10 @@ function validatePackage(
   }
 
   for (const key of schema.requiredBoundaryFalseKeys) {
-    assert(config.boundaries?.[key] === false, `boundaries.${key} must stay false`);
+    assert(
+      config.boundaries?.[key] === false,
+      `boundaries.${key} must stay false`,
+    );
   }
   assertNoForbiddenPayload(config);
 
@@ -515,25 +665,52 @@ function validatePackage(
     const workflowPath = `workflows[${workflowIndex}]`;
     assertNonEmptyString(workflow.key, `${workflowPath}.key`);
     assertNonEmptyString(workflow.label, `${workflowPath}.label`);
-    assert(workflow.status === "preview_only", `${workflowPath}.status must stay preview_only`);
-    assert(workflow.factBoundary === "workflow_only", `${workflowPath}.factBoundary must stay workflow_only`);
+    assert(
+      workflow.status === "preview_only",
+      `${workflowPath}.status must stay preview_only`,
+    );
+    assert(
+      workflow.factBoundary === "workflow_only",
+      `${workflowPath}.factBoundary must stay workflow_only`,
+    );
     assertStringList(workflow.sourceModules, `${workflowPath}.sourceModules`);
     workflow.sourceModules.forEach((moduleKey) =>
-      assert(moduleKeys.has(moduleKey), `${workflowPath}.sourceModules contains unknown module ${moduleKey}`),
+      assert(
+        moduleKeys.has(moduleKey),
+        `${workflowPath}.sourceModules contains unknown module ${moduleKey}`,
+      ),
     );
     assertStringList(workflow.ownerPools, `${workflowPath}.ownerPools`);
     workflow.ownerPools.forEach((poolKey) =>
-      assert(workPoolKeys.has(poolKey), `${workflowPath}.ownerPools contains unknown work pool ${poolKey}`),
+      assert(
+        workPoolKeys.has(poolKey),
+        `${workflowPath}.ownerPools contains unknown work pool ${poolKey}`,
+      ),
     );
-    assert(Array.isArray(workflow.nodes), `${workflowPath}.nodes must be an array`);
-    assert(workflow.nodes.length >= 2, `${workflowPath}.nodes must include task and end nodes`);
+    assert(
+      Array.isArray(workflow.nodes),
+      `${workflowPath}.nodes must be an array`,
+    );
+    assert(
+      workflow.nodes.length >= 2,
+      `${workflowPath}.nodes must include task and end nodes`,
+    );
     workflow.nodes.forEach((node, nodeIndex) => {
       const nodePath = `${workflowPath}.nodes[${nodeIndex}]`;
       assertNonEmptyString(node.key, `${nodePath}.key`);
-      assert(schema.allowedWorkflowNodeTypes.includes(node.type), `${nodePath}.type is not allowed`);
-      assert(workPoolKeys.has(node.ownerPool), `${nodePath}.ownerPool is not registered`);
+      assert(
+        schema.allowedWorkflowNodeTypes.includes(node.type),
+        `${nodePath}.type is not allowed`,
+      );
+      assert(
+        workPoolKeys.has(node.ownerPool),
+        `${nodePath}.ownerPool is not registered`,
+      );
       if (node.command) {
-        assert(commandKeys.has(node.command), `${nodePath}.command is not registered`);
+        assert(
+          commandKeys.has(node.command),
+          `${nodePath}.command is not registered`,
+        );
       }
     });
     assertNonEmptyString(workflow.guardrail, `${workflowPath}.guardrail`);
@@ -544,10 +721,16 @@ function validatePackage(
     const flowPath = `businessFlows[${index}]`;
     assertNonEmptyString(flow.key, `${flowPath}.key`);
     assertNonEmptyString(flow.label, `${flowPath}.label`);
-    assert(flow.status === "preview_only", `${flowPath}.status must stay preview_only`);
+    assert(
+      flow.status === "preview_only",
+      `${flowPath}.status must stay preview_only`,
+    );
     assertStringList(flow.modules, `${flowPath}.modules`);
     flow.modules.forEach((moduleKey) =>
-      assert(moduleKeys.has(moduleKey), `${flowPath}.modules contains unknown module ${moduleKey}`),
+      assert(
+        moduleKeys.has(moduleKey),
+        `${flowPath}.modules contains unknown module ${moduleKey}`,
+      ),
     );
     assertNonEmptyString(flow.guardrail, `${flowPath}.guardrail`);
   });
@@ -557,33 +740,63 @@ function validatePackage(
     const path = `stateMachines[${index}]`;
     assertNonEmptyString(stateMachine.key, `${path}.key`);
     assertNonEmptyString(stateMachine.label, `${path}.label`);
-    assert(stateMachine.status === "preview_only", `${path}.status must stay preview_only`);
+    assert(
+      stateMachine.status === "preview_only",
+      `${path}.status must stay preview_only`,
+    );
     assertStringList(stateMachine.states, `${path}.states`);
-    assert(Array.isArray(stateMachine.transitions), `${path}.transitions must be an array`);
+    assert(
+      Array.isArray(stateMachine.transitions),
+      `${path}.transitions must be an array`,
+    );
     stateMachine.transitions.forEach((transition, transitionIndex) => {
-      assert(Array.isArray(transition) && transition.length === 2, `${path}.transitions[${transitionIndex}] must be a pair`);
-      assert(stateMachine.states.includes(transition[0]), `${path}.transitions[${transitionIndex}] from state is unknown`);
-      assert(stateMachine.states.includes(transition[1]), `${path}.transitions[${transitionIndex}] to state is unknown`);
+      assert(
+        Array.isArray(transition) && transition.length === 2,
+        `${path}.transitions[${transitionIndex}] must be a pair`,
+      );
+      assert(
+        stateMachine.states.includes(transition[0]),
+        `${path}.transitions[${transitionIndex}] from state is unknown`,
+      );
+      assert(
+        stateMachine.states.includes(transition[1]),
+        `${path}.transitions[${transitionIndex}] to state is unknown`,
+      );
     });
     assertNonEmptyString(stateMachine.guardrail, `${path}.guardrail`);
   });
 
-  assert(Array.isArray(config.processPolicies), "processPolicies must be an array");
+  assert(
+    Array.isArray(config.processPolicies),
+    "processPolicies must be an array",
+  );
   config.processPolicies.forEach((policy, index) => {
     const policyPath = `processPolicies[${index}]`;
     assert(policyKeys.has(policy.key), `${policyPath}.key is not registered`);
-    assert(schema.allowedPolicyKinds.includes(policy.kind), `${policyPath}.kind is not allowed`);
-    assert(policy.status === "preview_only", `${policyPath}.status must stay preview_only`);
+    assert(
+      schema.allowedPolicyKinds.includes(policy.kind),
+      `${policyPath}.kind is not allowed`,
+    );
+    assert(
+      policy.status === "preview_only",
+      `${policyPath}.status must stay preview_only`,
+    );
     assertProcessPolicyRules(policy.rules, policyPath, schema);
     assertNonEmptyString(policy.guardrail, `${policyPath}.guardrail`);
   });
 
-  assert(Array.isArray(config.extensionPoints), "extensionPoints must be an array");
+  assert(
+    Array.isArray(config.extensionPoints),
+    "extensionPoints must be an array",
+  );
   config.extensionPoints.forEach((extensionPoint, index) => {
     const extensionPath = `extensionPoints[${index}]`;
     assertNonEmptyString(extensionPoint.key, `${extensionPath}.key`);
     assertNonEmptyString(extensionPoint.label, `${extensionPath}.label`);
-    assert(extensionPoint.status === "preview_only", `${extensionPath}.status must stay preview_only`);
+    assert(
+      extensionPoint.status === "preview_only",
+      `${extensionPath}.status must stay preview_only`,
+    );
     assert(
       extensionPoint.runtimeEnabled === false,
       `${extensionPath}.runtimeEnabled must stay false until an extension contract is reviewed`,
@@ -592,7 +805,10 @@ function validatePackage(
       extensionPoint.handler == null && extensionPoint.module == null,
       `${extensionPath} must not register executable extension handlers`,
     );
-    assertNonEmptyString(extensionPoint.guardrail, `${extensionPath}.guardrail`);
+    assertNonEmptyString(
+      extensionPoint.guardrail,
+      `${extensionPath}.guardrail`,
+    );
   });
 }
 
@@ -606,12 +822,14 @@ function buildPreview(config) {
       runtimeEnabled: config.runtimeEnabled,
       previewOnly: config.sourcePolicy.previewOnly,
     },
-    runtimeProcessSelections: (config.runtimeProcessSelections || []).map((selection) => ({
-      processKey: selection.processKey,
-      processVersion: selection.processVersion,
-      variantKey: selection.variantKey,
-      businessRefType: selection.businessRefType,
-    })),
+    runtimeProcessSelections: (config.runtimeProcessSelections || []).map(
+      (selection) => ({
+        processKey: selection.processKey,
+        processVersion: selection.processVersion,
+        variantKey: selection.variantKey,
+        businessRefType: selection.businessRefType,
+      }),
+    ),
     workflows: config.workflows.map((workflow) => ({
       key: workflow.key,
       label: workflow.label,
@@ -667,18 +885,42 @@ function validatePreview(preview, schema = customerPackageSchema) {
     JSON.stringify(previewSections) === JSON.stringify(allowedSections),
     `preview sections must be ${allowedSections.join(", ")}`,
   );
-  assert(preview.identity.runtimeEnabled === false, "preview must not enable runtime");
-  assert(preview.identity.previewOnly === true, "preview must stay preview-only");
+  assert(
+    preview.identity.runtimeEnabled === false,
+    "preview must not enable runtime",
+  );
+  assert(
+    preview.identity.previewOnly === true,
+    "preview must stay preview-only",
+  );
   assert(
     Array.isArray(preview.runtimeProcessSelections),
     "preview.runtimeProcessSelections must be an array",
   );
-  assert(Array.isArray(preview.workflows), "preview.workflows must be an array");
-  assert(Array.isArray(preview.businessFlows), "preview.businessFlows must be an array");
-  assert(Array.isArray(preview.stateMachines), "preview.stateMachines must be an array");
-  assert(Array.isArray(preview.processPolicies), "preview.processPolicies must be an array");
-  assert(Array.isArray(preview.extensionPoints), "preview.extensionPoints must be an array");
-  assert(Array.isArray(preview.printTemplateDefaults), "preview.printTemplateDefaults must be an array");
+  assert(
+    Array.isArray(preview.workflows),
+    "preview.workflows must be an array",
+  );
+  assert(
+    Array.isArray(preview.businessFlows),
+    "preview.businessFlows must be an array",
+  );
+  assert(
+    Array.isArray(preview.stateMachines),
+    "preview.stateMachines must be an array",
+  );
+  assert(
+    Array.isArray(preview.processPolicies),
+    "preview.processPolicies must be an array",
+  );
+  assert(
+    Array.isArray(preview.extensionPoints),
+    "preview.extensionPoints must be an array",
+  );
+  assert(
+    Array.isArray(preview.printTemplateDefaults),
+    "preview.printTemplateDefaults must be an array",
+  );
 }
 
 function writePreview(outPath, preview) {
@@ -688,7 +930,11 @@ function writePreview(outPath, preview) {
     "--out must write under output/",
   );
   mkdirSync(path.dirname(absoluteOutPath), { recursive: true });
-  writeFileSync(absoluteOutPath, `${JSON.stringify(preview, null, 2)}\n`, "utf8");
+  writeFileSync(
+    absoluteOutPath,
+    `${JSON.stringify(preview, null, 2)}\n`,
+    "utf8",
+  );
 }
 
 function assertDocsExist() {
@@ -702,11 +948,23 @@ function assertDocsExist() {
       (customerKey) => `config/customers/${customerKey}/customerPackage.mjs`,
     ),
   ]) {
-    assert(existsSync(path.join(repoRoot, relativePath)), `${relativePath} must exist`);
+    assert(
+      existsSync(path.join(repoRoot, relativePath)),
+      `${relativePath} must exist`,
+    );
   }
-  const configReadme = readFileSync(path.join(repoRoot, "config/README.md"), "utf8");
-  assert(configReadme.includes("config/catalog"), "config/README.md must mention config/catalog");
-  assert(configReadme.includes("config/schemas"), "config/README.md must mention config/schemas");
+  const configReadme = readFileSync(
+    path.join(repoRoot, "config/README.md"),
+    "utf8",
+  );
+  assert(
+    configReadme.includes("config/catalog"),
+    "config/README.md must mention config/catalog",
+  );
+  assert(
+    configReadme.includes("config/schemas"),
+    "config/README.md must mention config/schemas",
+  );
 }
 
 function normalizeMode(args) {
@@ -728,11 +986,17 @@ function normalizeCustomerKeys(args = {}) {
       ? args.customers
       : [args.customer || "yoyoosun"]
   ).map((customerKey) => String(customerKey || "").trim());
-  assert(customerKeys.length > 0, "at least one customer package must be selected");
+  assert(
+    customerKeys.length > 0,
+    "at least one customer package must be selected",
+  );
   const seen = new Set();
   for (const customerKey of customerKeys) {
     assert(customerKey !== "", "customer package key must not be empty");
-    assert(!seen.has(customerKey), `customer package key is duplicated: ${customerKey}`);
+    assert(
+      !seen.has(customerKey),
+      `customer package key is duplicated: ${customerKey}`,
+    );
     seen.add(customerKey);
   }
   return customerKeys;

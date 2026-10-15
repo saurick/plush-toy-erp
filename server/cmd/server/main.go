@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -581,9 +582,28 @@ func (s operationRootSampler) Description() string {
 	return "OperationRoot(" + s.business.Description() + ",background=" + s.background.Description() + ")"
 }
 
+func normalizeTraceEndpoint(value string) (string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", nil
+	}
+	if !strings.Contains(value, "://") {
+		value = "http://" + value + "/v1/traces"
+	}
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Hostname() == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" {
+		return "", fmt.Errorf("invalid trace endpoint")
+	}
+	if parsed.Path == "" || parsed.Path == "/" {
+		parsed.Path = "/v1/traces"
+	}
+	return parsed.String(), nil
+}
+
 func resolveTraceEnvOverrides(traceEndpoint string, traceRatio float64, getenv func(string) string) (string, float64, error) {
 	if getenv == nil {
-		return traceEndpoint, traceRatio, nil
+		_, err := normalizeTraceEndpoint(traceEndpoint)
+		return traceEndpoint, traceRatio, err
 	}
 	if v := strings.TrimSpace(getenv("TRACE_ENDPOINT")); v != "" {
 		traceEndpoint = v
@@ -595,7 +615,8 @@ func resolveTraceEnvOverrides(traceEndpoint string, traceRatio float64, getenv f
 		}
 		traceRatio = normalizeTraceRatio(ratio)
 	}
-	return traceEndpoint, traceRatio, nil
+	_, err := normalizeTraceEndpoint(traceEndpoint)
+	return traceEndpoint, traceRatio, err
 }
 
 // 初始化 TracerProvider：优先远端 OTLP（异步 Batch），失败或未配置就本地 provider。
@@ -610,11 +631,12 @@ func initTracerProvider(traceName, traceEndpoint string, traceRatio float64, bas
 
 	// 1) 有 endpoint → 尝试 OTLP HTTP exporter
 	if traceEndpoint != "" {
-		exp, err := otlptracehttp.New(
-			context.Background(),
-			otlptracehttp.WithEndpoint(traceEndpoint),
-			otlptracehttp.WithInsecure(),
-		)
+		endpointURL, endpointErr := normalizeTraceEndpoint(traceEndpoint)
+		if endpointErr != nil {
+			helper.Warnw("msg", "invalid trace endpoint; using local tracer")
+			return tracesdk.NewTracerProvider(samplerOption, resourceOption)
+		}
+		exp, err := otlptracehttp.New(context.Background(), otlptracehttp.WithEndpointURL(endpointURL))
 		if err != nil {
 			helper.Warnw(
 				"msg", "init otlp exporter failed, fallback to local tracer",

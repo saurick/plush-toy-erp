@@ -149,13 +149,14 @@ test('customer review retains separate partial and settled outcomes instead of o
     generatedAt,
   })
   const allocation = review.chain.steps.find((step) => step.name === '核销记录')
-  assert.equal(allocation.actionOutcomes.length, 2)
+  assert.equal(allocation.actionOutcomes.length, 3)
   const partial = allocation.actionOutcomes.find((action) =>
     action.condition.includes('大于零')
   )
   const settled = allocation.actionOutcomes.find((action) =>
     action.condition.includes('金额为零')
   )
+  assert(allocation.actionOutcomes.some((action) => action.action === '撤销抵扣恢复可用余额' || JSON.stringify(action).includes('撤销抵扣')))
   assert(partial.results.length > 0)
   assert(!partial.results.some((value) => value.includes('结清')))
   assert(settled.results.some((value) => value.includes('结清')))
@@ -212,8 +213,7 @@ test('customer review overview shares the order flow and keeps technical chain i
   assert.equal(review.overview.compactOnly, true)
   assert.equal(review.documentTitle, '业务链甲方校对版｜订单全流程')
   assert.deepEqual(review.overview.fulfillmentFlow, taskCatalog.fulfillment_flow)
-  assert.deepEqual(review.overview.exceptionFlow, taskCatalog.exception_flow)
-  assert.deepEqual(review.overview.exceptionApproval, taskCatalog.exception_approval)
+  assert.deepEqual(review.overview.exceptionGuides, taskCatalog.exception_guides)
   assert.equal(Object.hasOwn(review, 'chain'), false)
   assert.equal(review.overview.lanes.length, 4)
   assert.equal(review.overview.lanes.flatMap((lane) => lane.chains).length, 11)

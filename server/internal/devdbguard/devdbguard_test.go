@@ -74,6 +74,22 @@ func TestRequireLocalDevDSNAllowsLocalDevServer(t *testing.T) {
 	}
 }
 
+func TestRequireLocalDevDSNOverrideRetainsTargetValidation(t *testing.T) {
+	t.Parallel()
+	for _, dsn := range []string{
+		"invalid",
+		"postgres://postgres:unused@db.example:5432/plush_erp",
+		"postgres://postgres:unused@192.168.0.133:5435/production",
+		"postgres://postgres:unused@192.168.0.133:5435/plush_erp?dbname=production",
+		"postgres://postgres:unused@192.168.0.133:5435/plush_erp?hostaddr=192.0.2.10",
+		"host=192.168.0.133,192.0.2.10 port=5435,5432 dbname=plush_erp user=postgres sslmode=disable",
+	} {
+		if err := RequireLocalDevDSN("configs/dev/config.yaml", dsn, func(string) string { return "1" }); err == nil {
+			t.Fatalf("test override accepted an unverified target: %s", dsn)
+		}
+	}
+}
+
 func TestRequireCustomerConfigLocalTestDSNOnlyAllowsRegisteredDevelopmentFamily(t *testing.T) {
 	t.Parallel()
 

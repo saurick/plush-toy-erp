@@ -436,7 +436,12 @@ export function buildManualAcceptanceRetirementActions(snapshot) {
         role: config.role,
         domain: config.domain,
         method: config.method,
-        params: { id: item.id },
+        params: {
+          id: item.id,
+          expected_version: item.version,
+          idempotency_key: `manual-acceptance-retire:${datasetKey}:${item.id}:${item.version}`,
+          reason: "模拟验收数据退役",
+        },
       });
     }
   }

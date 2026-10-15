@@ -532,10 +532,18 @@ export function buildDevEnvironmentEvidence({
     cards: Object.freeze([
       Object.freeze(localEnvironmentCard(dataSummary, dataError)),
       Object.freeze(
-        demoProjectCard(dataSummary, deliverySummary, deliveryError)
+        demoProjectCard(
+          dataSummary,
+          deliverySummary,
+          [dataError, deliveryError].filter(Boolean).join('；')
+        )
       ),
       Object.freeze(
-        customerTestCard(dataSummary, deliverySummary, deliveryError)
+        customerTestCard(
+          dataSummary,
+          deliverySummary,
+          [dataError, deliveryError].filter(Boolean).join('；')
+        )
       ),
       Object.freeze(isolatedAcceptanceCard(dataSummary, dataError)),
     ]),

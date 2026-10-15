@@ -16,6 +16,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/build/apply-customer-web-config.test.mjs",
     "scripts/dev-ports.test.mjs",
     "scripts/dev-process-inspection.test.mjs",
+    "scripts/doctor.test.mjs",
     "scripts/gen-error-codes.test.mjs",
     "scripts/gen-public-contracts.test.mjs",
     "scripts/git-hooks/commit-msg.test.mjs",
@@ -117,6 +118,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/local-database-roles.test.mjs",
     "scripts/local-migration-workflow.test.mjs",
     "scripts/local-migration.test.mjs",
+    "scripts/local-orb.test.mjs",
     "scripts/local-runtime-build-inputs.test.mjs",
     "scripts/local-runtime-bundle.test.mjs",
     "scripts/local-runtime-console.test.mjs",
@@ -146,6 +148,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs",
     "scripts/qa/production-order-browser-e2e.test.mjs",
     "scripts/qa/purchase-receipt-real-write-e2e.test.mjs",
+    "scripts/qa/transaction-real-backend-browser.test.mjs",
   ]),
   release: Object.freeze([
     "scripts/deploy/attachment-console.test.mjs",

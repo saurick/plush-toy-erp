@@ -80,7 +80,19 @@ export function createDevCustomerConfigPlugin({ projectRoot } = {}) {
           const assetPath = path.resolve(customerAssetsDir, relativeAssetPath)
           const allowedRoot = `${path.resolve(customerAssetsDir)}${path.sep}`
 
-          if (!assetPath.startsWith(allowedRoot) || !fs.existsSync(assetPath)) {
+          let regularAsset = false
+          try {
+            const stats = fs.lstatSync(assetPath)
+            regularAsset =
+              stats.isFile() &&
+              !stats.isSymbolicLink() &&
+              fs
+                .realpathSync(assetPath)
+                .startsWith(`${fs.realpathSync(customerAssetsDir)}${path.sep}`)
+          } catch {
+            /* Missing or inaccessible assets are not served. */
+          }
+          if (!assetPath.startsWith(allowedRoot) || !regularAsset) {
             response.writeHead(404, {
               'content-type': 'text/plain; charset=utf-8',
             })
@@ -88,11 +100,23 @@ export function createDevCustomerConfigPlugin({ projectRoot } = {}) {
             return
           }
 
-          response.writeHead(200, {
-            'cache-control': 'no-cache',
-            'content-type': contentTypeFor(assetPath),
+          const stream = fs.createReadStream(assetPath)
+          stream.once('error', () => {
+            if (response.headersSent) response.destroy()
+            else {
+              response.writeHead(404, {
+                'content-type': 'text/plain; charset=utf-8',
+              })
+              response.end('customer asset not found')
+            }
           })
-          fs.createReadStream(assetPath).pipe(response)
+          stream.once('open', () => {
+            response.writeHead(200, {
+              'cache-control': 'no-cache',
+              'content-type': contentTypeFor(assetPath),
+            })
+            stream.pipe(response)
+          })
           return
         }
 

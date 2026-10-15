@@ -75,8 +75,8 @@
 .erp-login-card__theme-toggle.ant-btn {
   position: static;
   flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
+  width: max(36px, var(--erp-touch-target, 0px));
+  height: max(36px, var(--erp-touch-target, 0px));
   padding: 0;
 }
 
@@ -89,7 +89,7 @@
   align-items: center;
   justify-content: center;
   min-height: 34px;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
 }
 
 .erp-login-methods.erp-sliding-tab-list {
@@ -101,28 +101,8 @@
 }
 
 .erp-login-methods > button {
-  min-height: 40px;
+  min-height: max(40px, var(--erp-touch-target, 0px));
   padding: 0 10px;
-  border: 0;
-  border-radius: 8px 8px 0 0;
-  background: transparent;
-  color: var(--erp-text-muted);
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.erp-login-methods.erp-sliding-tab-list::before {
-  top: auto;
-  bottom: -1px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--erp-primary);
-  box-shadow: none;
-  transform: translateX(var(--erp-slider-x, 0px));
-}
-
-.erp-login-methods > button[aria-selected='true'] {
-  font-weight: 650;
 }
 
 .erp-login-methods > button:disabled {
@@ -145,7 +125,7 @@
   height: auto;
   min-height: 20px;
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   font-weight: 600;
 }
 
@@ -156,7 +136,7 @@
   padding-block: 0;
   border-color: var(--erp-border-strong);
   background: var(--erp-surface-bg);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   line-height: 42px;
 }
 
@@ -174,8 +154,8 @@
 
 .erp-login-password-toggle {
   display: inline-grid;
-  width: 32px;
-  height: 32px;
+  width: max(32px, var(--erp-touch-target, 0px));
+  height: max(32px, var(--erp-touch-target, 0px));
   place-items: center;
   padding: 0;
   border: 0;
@@ -242,7 +222,7 @@
   background: var(--erp-surface-bg);
   box-shadow: none;
   color: var(--erp-primary-strong);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   font-variant-numeric: tabular-nums;
 }
 
@@ -262,12 +242,12 @@
 .erp-login-feedback > p {
   margin: 0;
   color: var(--erp-warning-text);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-login-card .ant-alert {
   border-radius: 8px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   overflow-wrap: anywhere;
 }
 
@@ -285,7 +265,7 @@
 .erp-login-card .erp-login-submit.ant-btn.ant-btn-primary {
   height: 44px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   font-weight: 650;
 }
 
@@ -297,13 +277,13 @@
   gap: 0 10px;
   margin-top: 16px;
   color: var(--erp-text-subtle);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.6;
 }
 
 .erp-login-legal-links a {
   display: inline-flex;
-  min-height: 28px;
+  min-height: max(28px, var(--erp-touch-target, 0px));
   align-items: center;
   color: var(--erp-text-muted);
 }
@@ -342,11 +322,11 @@
   .erp-login-card .ant-segmented .ant-segmented-item-label,
   .erp-login-methods > button,
   .erp-login-password-toggle {
-    min-height: 40px;
+    min-height: max(40px, var(--erp-touch-target, 0px));
   }
 
   .erp-login-legal-links a {
-    min-height: 40px;
+    min-height: max(40px, var(--erp-touch-target, 0px));
   }
 }
 

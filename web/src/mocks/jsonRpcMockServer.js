@@ -1,3 +1,9 @@
+import {
+  ADMIN_TOKEN_ISSUER,
+  ADMIN_TOKEN_AUDIENCE,
+  ADMIN_TOKEN_SUBJECT,
+} from '../common/auth/adminTokenContract.mjs'
+import { sourceBusinessActionSignature } from '../erp/utils/sourceBusinessAction.mjs'
 import { PermissionCode } from '../common/consts/permissions.generated.mjs'
 import { normalizeERPAccountAppearance } from '../common/theme/erpAppearance.mjs'
 // src/mocks/jsonRpcMockServer.js
@@ -18,11 +24,22 @@ import {
 import { buildWorkflowTaskBoardMock } from './workflowTaskBoardMock.mjs'
 import { buildWorkflowRoleTaskPageMock } from './workflowRoleTaskMock.mjs'
 
+function mockAdminAccessToken() {
+  const now = Math.floor(Date.now() / 1000)
+  const encode = (value) =>
+    btoa(JSON.stringify(value))
+      .replaceAll('+', '-')
+      .replaceAll('/', '_')
+      .replaceAll('=', '')
+  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ uid: 1, auth_version: 1, iat: now, exp: now + 3600, sid: 'mock-session', jti: 'mock-session', iss: ADMIN_TOKEN_ISSUER, sub: ADMIN_TOKEN_SUBJECT, aud: ADMIN_TOKEN_AUDIENCE })}.mock-signature`
+}
+const mockProductionMutationReceipts = new Map()
 let originalFetch = null
 let mockWorkflowTaskID = 1
 const mockWorkflowTasks = []
 const mockWorkflowBusinessStates = []
 const mockWorkflowMutationReceipts = new Map()
+const mockWorkflowCreateReceipts = new Map()
 const mockLegalNoticeAcknowledgements = new Map()
 
 function workflowMockRoleTaskReadAllowed(
@@ -138,7 +155,11 @@ function mockProductionMaterialRequirementProjection() {
 }
 
 const mockPermissions = [
-  { permission_key: PermissionCode.SYSTEM_USER_READ, name: '查看管理员', module: 'system' },
+  {
+    permission_key: PermissionCode.SYSTEM_USER_READ,
+    name: '查看管理员',
+    module: 'system',
+  },
   {
     permission_key: PermissionCode.SYSTEM_USER_CREATE,
     name: '创建管理员',
@@ -154,7 +175,11 @@ const mockPermissions = [
     name: '启停管理员',
     module: 'system',
   },
-  { permission_key: PermissionCode.SYSTEM_ROLE_READ, name: '查看角色', module: 'system' },
+  {
+    permission_key: PermissionCode.SYSTEM_ROLE_READ,
+    name: '查看角色',
+    module: 'system',
+  },
   {
     permission_key: PermissionCode.SYSTEM_ROLE_PERMISSION_MANAGE,
     name: '管理角色权限',
@@ -205,9 +230,21 @@ const mockPermissions = [
     name: '进入业务岗位任务端',
     module: 'mobile',
   },
-  { permission_key: PermissionCode.PMC_PLAN_READ, name: '查看生产计划', module: 'pmc' },
-  { permission_key: PermissionCode.PMC_PLAN_CREATE, name: '新建生产计划', module: 'pmc' },
-  { permission_key: PermissionCode.PMC_PLAN_UPDATE, name: '更新生产计划', module: 'pmc' },
+  {
+    permission_key: PermissionCode.PMC_PLAN_READ,
+    name: '查看生产计划',
+    module: 'pmc',
+  },
+  {
+    permission_key: PermissionCode.PMC_PLAN_CREATE,
+    name: '新建生产计划',
+    module: 'pmc',
+  },
+  {
+    permission_key: PermissionCode.PMC_PLAN_UPDATE,
+    name: '更新生产计划',
+    module: 'pmc',
+  },
   {
     permission_key: PermissionCode.MOBILE_PURCHASE_ACCESS,
     name: '进入采购岗位任务端',
@@ -320,7 +357,10 @@ const mockMenus = [
     key: 'permission-center',
     label: '权限管理',
     path: '/erp/system/permissions',
-    required_any: [PermissionCode.SYSTEM_USER_READ, PermissionCode.SYSTEM_ROLE_READ],
+    required_any: [
+      PermissionCode.SYSTEM_USER_READ,
+      PermissionCode.SYSTEM_ROLE_READ,
+    ],
     required_all: [],
   },
 ]
@@ -742,10 +782,10 @@ function mockProductionOrderParamsValid(method, params) {
   const allowed = mockProductionOrderParamKeys[method]
   const allowedKeys = Boolean(
     allowed &&
-      params &&
-      typeof params === 'object' &&
-      !Array.isArray(params) &&
-      Object.keys(params).every((key) => allowed.has(key))
+    params &&
+    typeof params === 'object' &&
+    !Array.isArray(params) &&
+    Object.keys(params).every((key) => allowed.has(key))
   )
   if (!allowedKeys) return false
   const positive = (value) => Number.isSafeInteger(value) && value > 0
@@ -1093,7 +1133,7 @@ export function setupJsonRpcMockServer() {
           id,
           result: makeBizResult({
             ...mockSuperAdminProfile,
-            access_token: 'mock-admin-token',
+            access_token: mockAdminAccessToken(),
             expires_at: Math.floor(Date.now() / 1000) + 3600,
             token_type: 'Bearer',
             username: params.username || mockSuperAdminProfile.username,
@@ -1126,7 +1166,7 @@ export function setupJsonRpcMockServer() {
             id,
             result: makeBizResult({
               ...mockSuperAdminProfile,
-              access_token: 'mock-admin-token',
+              access_token: mockAdminAccessToken(),
               expires_at: Math.floor(Date.now() / 1000) + 3600,
               token_type: 'Bearer',
               phone: params.phone || mockSuperAdminProfile.phone,
@@ -1391,42 +1431,66 @@ export function setupJsonRpcMockServer() {
           error: '',
         }
       } else {
-        const nextStatus = {
-          release_production_order: 'RELEASED',
-          close_production_order: 'CLOSED',
-          cancel_production_order: 'CANCELLED',
-        }[method]
-        Object.assign(mockProductionOrder, {
-          order_no: params.order_no || mockProductionOrder.order_no,
-          planned_start_at:
-            params.planned_start_at ?? mockProductionOrder.planned_start_at,
-          planned_end_at:
-            params.planned_end_at ?? mockProductionOrder.planned_end_at,
-          note: params.note ?? mockProductionOrder.note,
-          status: nextStatus || mockProductionOrder.status,
-          version: mockProductionOrder.version + 1,
-          close_reason:
-            method === 'close_production_order'
-              ? params.reason || null
-              : mockProductionOrder.close_reason,
-          cancel_reason:
-            method === 'cancel_production_order'
-              ? params.reason
-              : mockProductionOrder.cancel_reason,
-          updated_at: nowUnix(),
-        })
-        if (method === 'release_production_order') {
-          mockProductionRequirementsFrozen = true
-        }
-        responseBody = {
-          jsonrpc: '2.0',
-          id,
-          result: makeBizResult({
-            production_order: mockProductionOrder,
-            production_order_items: mockProductionOrderItems,
-            ...mockProductionMaterialRequirementProjection(),
-          }),
-          error: '',
+        const receiptKey = `${method}:${params.production_order_id || 0}:${params.idempotency_key}`
+        const intent = sourceBusinessActionSignature(params)
+        const previous = mockProductionMutationReceipts.get(receiptKey)
+        if (previous) {
+          responseBody =
+            previous.intent === intent
+              ? { ...structuredClone(previous.response), id }
+              : makeJsonRpcBizError(id, 40920, '重复请求内容与首次提交不一致')
+        } else if (
+          method !== 'create_production_order' &&
+          (params.production_order_id !== mockProductionOrder.id ||
+            params.expected_version !== mockProductionOrder.version)
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40922,
+            '记录已被其他操作更新，请刷新后重试'
+          )
+        } else {
+          const nextStatus = {
+            release_production_order: 'RELEASED',
+            close_production_order: 'CLOSED',
+            cancel_production_order: 'CANCELLED',
+          }[method]
+          Object.assign(mockProductionOrder, {
+            order_no: params.order_no || mockProductionOrder.order_no,
+            planned_start_at:
+              params.planned_start_at ?? mockProductionOrder.planned_start_at,
+            planned_end_at:
+              params.planned_end_at ?? mockProductionOrder.planned_end_at,
+            note: params.note ?? mockProductionOrder.note,
+            status: nextStatus || mockProductionOrder.status,
+            version: mockProductionOrder.version + 1,
+            close_reason:
+              method === 'close_production_order'
+                ? params.reason || null
+                : mockProductionOrder.close_reason,
+            cancel_reason:
+              method === 'cancel_production_order'
+                ? params.reason
+                : mockProductionOrder.cancel_reason,
+            updated_at: nowUnix(),
+          })
+          if (method === 'release_production_order') {
+            mockProductionRequirementsFrozen = true
+          }
+          responseBody = {
+            jsonrpc: '2.0',
+            id,
+            result: makeBizResult({
+              production_order: mockProductionOrder,
+              production_order_items: mockProductionOrderItems,
+              ...mockProductionMaterialRequirementProjection(),
+            }),
+            error: '',
+          }
+          mockProductionMutationReceipts.set(receiptKey, {
+            intent,
+            response: structuredClone(responseBody),
+          })
         }
       }
     } else if (domain === 'workflow') {
@@ -1825,6 +1889,27 @@ export function setupJsonRpcMockServer() {
             '当前账号缺少创建协同任务权限'
           )
         }
+        const createReceiptKey = createParams?.idempotency_key
+        const createIntent =
+          createParams && sourceBusinessActionSignature(createParams)
+        const priorCreate = mockWorkflowCreateReceipts.get(createReceiptKey)
+        if (!responseBody && priorCreate) {
+          responseBody =
+            priorCreate.intent === createIntent
+              ? {
+                  jsonrpc: '2.0',
+                  id,
+                  result: makeBizResult({
+                    task: cloneMockWorkflowMutationResult(priorCreate.task),
+                  }),
+                  error: '',
+                }
+              : makeJsonRpcBizError(
+                  id,
+                  40920,
+                  '重复请求内容与首次提交不一致，请刷新后重试'
+                )
+        }
         if (!responseBody) {
           const task = {
             id: mockWorkflowTaskID++,
@@ -1851,6 +1936,10 @@ export function setupJsonRpcMockServer() {
             updated_at: nowUnix(),
           }
           mockWorkflowTasks.unshift(task)
+          mockWorkflowCreateReceipts.set(createReceiptKey, {
+            intent: createIntent,
+            task: cloneMockWorkflowMutationResult(task),
+          })
           responseBody = {
             jsonrpc: '2.0',
             id,

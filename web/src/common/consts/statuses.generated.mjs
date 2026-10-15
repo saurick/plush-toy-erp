@@ -1,5 +1,11 @@
 // 由 `node scripts/gen-public-contracts.mjs` 生成；请勿手改。
 // 真源：server/internal/core/status、server/internal/biz/workflow_metadata.go、server/internal/biz/operational_fact.go、server/internal/biz/outsourcing_order.go、server/internal/biz/production_order.go。
+export const FinancePaymentKind = Object.freeze({
+  ADVANCE: 'ADVANCE',
+  REFUND: 'REFUND',
+  SETTLEMENT: 'SETTLEMENT',
+})
+
 export const InventoryLotStatus = Object.freeze({
   ACTIVE: 'ACTIVE',
   DISABLED: 'DISABLED',

@@ -187,13 +187,17 @@ export function createDashboardTaskScenarios({
       verify: async (page) => {
         await expectText(page, '毛绒玩具管理系统')
         await expectText(page, '超级管理员')
-        await expectText(page, 'style-l1-admin')
+        await page.getByTestId('desktop-account-menu-trigger').click()
+        const accountIdentity = page.locator('.erp-account-menu__identity [data-testid="account-identity"]')
+        await expectText(accountIdentity, '账号：style-l1-admin')
+        await page.keyboard.press('Escape')
+        await accountIdentity.waitFor({ state: 'hidden' })
         await expectText(page, '工作中心')
         await page
           .getByRole('region', { name: '任务管理', exact: true })
           .waitFor({ state: 'visible' })
         await expectText(page, '常规待办')
-        await expectText(page, '阻塞')
+        await expectText(page, '异常处理')
         await expectText(page, '到期提醒')
         await expectText(page, '已结束')
         await assertTextAbsent(page, '内部来源')
@@ -240,33 +244,16 @@ export function createDashboardTaskScenarios({
           .getByRole('button', { name: /筛选/ })
         await moreFilters.click()
         const extraFilters = page.getByRole('dialog', { name: '筛选条件', exact: true })
-        await extraFilters.getByText('全部状态', { exact: true }).click()
-        const visibleOptions = page.locator(
-          '.ant-select-dropdown:visible .ant-select-item-option'
-        )
-        await visibleOptions
-          .locator('.ant-select-item-option-content')
-          .filter({ hasText: '已完成' })
-          .waitFor()
-        await page.waitForFunction(() => {
-          const options = [
-            ...document.querySelectorAll(
-              '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content'
-            ),
-          ]
-          return (
-            options.map((option) => option.textContent).join('|') ===
-            '全部状态|退回|撤回|已完成'
-          )
-        })
-        await visibleOptions.filter({ hasText: '已完成' }).click()
+        const statusChoices = extraFilters.getByRole('group', { name: '任务状态', exact: true })
+        assert.deepEqual(await statusChoices.getByRole('button').allTextContents(), ['全部状态', '已驳回', '已撤回', '已完成'])
+        await statusChoices.getByRole('button', { name: '已完成', exact: true }).click()
         await page.waitForFunction(
           () => new URLSearchParams(location.search).get('status') === 'done'
         )
         await moreFilters.click()
         await extraFilters.waitFor({ state: 'hidden' })
         assert.match(await moreFilters.innerText(), /已应用/)
-        await page.getByRole('button', { name: /阻塞/ }).click()
+        await page.getByRole('button', { name: /异常处理/ }).click()
         await page.waitForFunction(() => {
           const params = new URLSearchParams(location.search)
           return params.get('lane') === 'exception' && !params.has('status')
@@ -283,12 +270,13 @@ export function createDashboardTaskScenarios({
         await layoutSearch.fill('布局验证无匹配任务')
         await expectText(page, '当前分类暂无匹配任务')
         await moreFilters.click()
-        await extraFilters.getByRole('button', { name: /清空筛选/ }).click()
+        assert.equal(await extraFilters.getByRole('button', { name: /清空筛选/ }).isDisabled(), true, '只有搜索词时没有可清空的筛选条件')
         await extraFilters.getByRole('button', { name: '完成', exact: true }).click()
         await page.waitForFunction(() => {
           const params = new URLSearchParams(location.search)
-          return params.get('lane') === 'exception' && !params.has('q')
+          return params.get('lane') === 'exception' && params.get('q') === '布局验证无匹配任务'
         })
+        await layoutSearch.fill('')
         await page
           .getByRole('button', { name: '任务概览', exact: true })
           .click()
@@ -346,8 +334,9 @@ export function createDashboardTaskScenarios({
             scopeBeforeCard:
               Boolean(scopeFilterRect && cardRect) &&
               scopeFilterRect.bottom <= cardRect.top,
-            scopeBesideCard: Boolean(
-              card && scopeFilter && scopeFilter.parentElement === card.parentElement
+            scopeInPageHeader: Boolean(
+              scopeFilter?.closest('.erp-task-management-header') &&
+              !card?.contains(scopeFilter)
             ),
             scopeFilterVisible:
               Boolean(cardRect && scopeFilterRect) &&
@@ -362,7 +351,7 @@ export function createDashboardTaskScenarios({
           approvalInboxLayout.cardFits &&
             approvalInboxLayout.filtersInsideCard &&
             approvalInboxLayout.scopeBeforeCard &&
-            approvalInboxLayout.scopeBesideCard &&
+            approvalInboxLayout.scopeInPageHeader &&
             approvalInboxLayout.scopeFilterVisible &&
             approvalInboxLayout.selectedScope === '待我审批',
           `待我审批入口存在溢出或不可见控件: ${JSON.stringify(
@@ -492,7 +481,7 @@ export function createDashboardTaskScenarios({
         }
         await expectText(page, '本任务处理记录')
         await expectText(page, '等待审批人核对来源单据与放行条件')
-        await expectText(page, '任务处理链')
+        await expectText(page, '本任务处理进度')
         await expectText(page, '出货财务放行')
         await expectText(page, '流程状态')
         await expectText(page, '办理中')
@@ -527,6 +516,7 @@ export function createDashboardTaskScenarios({
             taskEventTrailMetrics
           )}`
         )
+        await expectText(taskEventTrail, '最近在前')
         await taskEventTrail.screenshot({
           path: path.resolve(outputDir, 'erp-task-board-task-event-trail.png'),
         })
@@ -535,7 +525,7 @@ export function createDashboardTaskScenarios({
         await executionTrail.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(
           page.getByTestId('workflow-task-handling-chain'),
-          '任务处理链'
+          '本任务处理进度'
         )
         await assertTextAbsent(executionTrail, '执行轨迹')
         await expectText(executionTrail, '成品质检')
@@ -556,26 +546,16 @@ export function createDashboardTaskScenarios({
               const markerRect = marker?.getBoundingClientRect()
               const contentRect = content?.getBoundingClientRect()
               const connectorStyle = window.getComputedStyle(item, '::after')
-              const connectorTop =
-                itemRect.top +
-                Number.parseFloat(connectorStyle.top || '0') +
-                Number.parseFloat(connectorStyle.height || '0') / 2
-              const markerCenter = markerRect
-                ? markerRect.top + markerRect.height / 2
-                : Number.NaN
-
+              const connectorX = itemRect.left + Number.parseFloat(connectorStyle.left) + Number.parseFloat(connectorStyle.width) / 2
+              const markerCenterX = markerRect ? markerRect.left + markerRect.width / 2 : Number.NaN
+              const arrow = window.getComputedStyle(item, '::before')
+              const nextMarker = items[index + 1]?.querySelector('.workflow-process-stage__marker')?.getBoundingClientRect()
+              const arrowTip = itemRect.bottom - Number.parseFloat(arrow.bottom)
               return {
-                connectorAligned:
-                  index === items.length - 1 ||
-                  Math.abs(connectorTop - markerCenter) <= 1,
-                connectorClearsContent:
-                  index === items.length - 1 ||
-                  Boolean(contentRect && connectorTop < contentRect.top - 1),
-                contentBelowMarker: Boolean(
-                  markerRect &&
-                  contentRect &&
-                  contentRect.top >= markerRect.bottom + 4
-                ),
+                connectorAligned: index === items.length - 1 || Math.abs(connectorX - markerCenterX) <= 1,
+                connectorClearsContent: index === items.length - 1 || Boolean(contentRect && connectorX < contentRect.left - 1),
+                contentBesideMarker: Boolean(markerRect && contentRect && contentRect.left >= markerRect.right + 4),
+                forward: !nextMarker || (nextMarker.top > markerRect.bottom && Math.abs(nextMarker.left - markerRect.left) <= 1 && Number.parseFloat(arrow.height) > 0 && arrow.clipPath.startsWith('polygon(') && arrowTip > markerRect.bottom && arrowTip < nextMarker.top),
               }
             })
 
@@ -594,9 +574,10 @@ export function createDashboardTaskScenarios({
               connectorClearCount: geometry.filter(
                 (item) => item.connectorClearsContent
               ).length,
-              contentBelowMarkerCount: geometry.filter(
-                (item) => item.contentBelowMarker
+              contentBesideMarkerCount: geometry.filter(
+                (item) => item.contentBesideMarker
               ).length,
+              forwardCount: geometry.filter((item) => item.forward).length,
             }
           }
         )
@@ -608,8 +589,9 @@ export function createDashboardTaskScenarios({
               executionTrailMetrics.itemCount &&
             executionTrailMetrics.connectorClearCount ===
               executionTrailMetrics.itemCount &&
-            executionTrailMetrics.contentBelowMarkerCount ===
-              executionTrailMetrics.itemCount,
+            executionTrailMetrics.contentBesideMarkerCount ===
+              executionTrailMetrics.itemCount &&
+            executionTrailMetrics.forwardCount === executionTrailMetrics.itemCount,
           `任务抽屉执行轨迹状态不完整: ${JSON.stringify(executionTrailMetrics)}`
         )
         await page.waitForFunction(() => {
@@ -860,6 +842,7 @@ export function createDashboardTaskScenarios({
               id: 'dashboard-task-navigation',
               method: 'create_task',
               params: {
+                idempotency_key: 'style-l1-dashboard-task-navigation',
                 task_code: 'style-l1-dashboard-task-navigation',
                 task_group: 'trial_warehouse_work',
                 task_name: '看板跳转测试任务',
@@ -907,6 +890,7 @@ export function createDashboardTaskScenarios({
                   id: `dashboard-task-pagination-${suffix}`,
                   method: 'create_task',
                   params: {
+                    idempotency_key: `style-l1-dashboard-pagination-${suffix}`,
                     task_code: `style-l1-dashboard-pagination-${suffix}`,
                     task_group: 'trial_warehouse_work',
                     task_name: `看板分页测试任务 ${suffix}`,
@@ -957,8 +941,9 @@ export function createDashboardTaskScenarios({
           .locator('.erp-task-board-lane')
           .filter({ hasText: '常规待办' })
           .first()
-        await actionableOverviewLane
-          .getByText('18', { exact: true })
+        await page
+          .locator('.erp-task-progress-rail__item[data-lane="actionable"] .erp-task-progress-rail__value')
+          .filter({ hasText: /^18$/ })
           .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await actionableOverviewLane.locator('.erp-task-board-card').count(),
@@ -1315,6 +1300,7 @@ export function createDashboardTaskScenarios({
             expectedTop,
             lanesTop: lanesRect?.top || 0,
             lanesTopError: Math.abs((lanesRect?.top || 0) - expectedTop),
+            atScrollEnd: Boolean(content) && Math.abs(content.scrollTop - (content.scrollHeight - content.clientHeight)) <= 1,
             firstCardVisible: Boolean(
               contentRect &&
               firstCardRect &&
@@ -1327,7 +1313,8 @@ export function createDashboardTaskScenarios({
           paginationScrollAfter.scrollTop > 0 &&
             paginationScrollAfter.scrollTrace.length > 0 &&
             Math.max(...paginationScrollAfter.scrollTrace) > 0 &&
-            paginationScrollAfter.lanesTopError <= 4 &&
+            (paginationScrollAfter.lanesTopError <= 4 ||
+              (paginationScrollAfter.atScrollEnd && paginationScrollAfter.lanesTop > paginationScrollAfter.expectedTop)) &&
             paginationScrollAfter.firstCardVisible,
           `任务管理翻页后应定位当前泳道起点，不能跳回整页顶部: ${JSON.stringify(
             paginationScrollAfter
@@ -1528,6 +1515,7 @@ export function createDashboardTaskScenarios({
               id: 'dashboard-task-role-filter-sales',
               method: 'create_task',
               params: {
+                idempotency_key: 'style-l1-dashboard-role-filter-sales',
                 task_code: 'style-l1-dashboard-role-filter-sales',
                 task_group: 'trial_sales_work',
                 task_name: '业务岗位筛选边界任务',
@@ -1553,8 +1541,9 @@ export function createDashboardTaskScenarios({
           .getByRole('region', { name: '任务管理', exact: true })
           .waitFor({ state: 'visible' })
         await page.locator('.erp-task-board-filters').getByRole('button', { name: /筛选/ }).click()
-        await page.getByRole('dialog', { name: '筛选条件', exact: true }).getByText('全部可见岗位').click()
-        await page.getByTitle('仓库', { exact: true }).click()
+        await page.getByRole('dialog', { name: '筛选条件', exact: true })
+          .getByRole('group', { name: '负责岗位', exact: true })
+          .getByRole('button', { name: '仓库', exact: true }).click()
         await page.reload({ waitUntil: 'domcontentloaded' })
         await waitForPath(page, '/erp/task-board')
         assert.match(
@@ -1678,6 +1667,7 @@ export function createDashboardTaskScenarios({
           expectedTaskText: '看板跳转测试任务',
           expectReasonInput: false,
         })
+        await taskDrawer.getByRole('button', { name: '选择处理方式', exact: true }).click()
         const actionStep = taskDrawer.getByRole('tab', {
           name: /选择处理/,
         })
@@ -1765,6 +1755,7 @@ export function createDashboardTaskScenarios({
           expectedTaskText: '看板跳转测试任务',
           expectReasonInput: false,
         })
+        await taskDrawer.getByRole('button', { name: '选择处理方式', exact: true }).click()
         await taskDrawer.getByRole('tab', { name: /选择处理/ }).click()
         await taskDrawer.getByRole('radio', { name: /标记阻塞/ }).click()
         await assertTaskActionDrawerLayout(page, {
@@ -1864,25 +1855,23 @@ export function createDashboardTaskScenarios({
         await clearFiltersButton.click()
         assert.doesNotMatch(
           page.url(),
-          /[?&](q|role)=/,
-          '清空筛选后应移除任务管理 URL 筛选参数'
+          /[?&]role=/,
+          '清空筛选后应移除岗位条件'
         )
-        await page.waitForFunction(
-          () =>
-            document.querySelector(
-              'input[placeholder="订单 / 产品 / 物料 / 款号"]'
-            )?.value === ''
-        )
-        const clearedKeyword = await page
+        assert.equal(new URL(page.url()).searchParams.get('q'), 'OUT-DASH-NAV', '清空筛选应保留搜索关键词')
+        const retainedKeyword = await page
           .getByPlaceholder('订单 / 产品 / 物料 / 款号')
           .inputValue()
-        assert.equal(clearedKeyword, '')
+        assert.equal(retainedKeyword, 'OUT-DASH-NAV')
+        await clearFiltersButton.and(page.locator(':disabled')).waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await clearFiltersButton.isEnabled(),
           false,
           '任务管理回到默认筛选后清空按钮不可用'
         )
         await page.getByRole('dialog', { name: '筛选条件', exact: true }).getByRole('button', { name: '完成', exact: true }).click()
+        await taskBoardSearch.fill('')
+        await page.waitForFunction(() => !new URLSearchParams(location.search).has('q'))
         await taskBoardSearch.focus()
         const taskBoardSearchControl = page.locator(
           '.erp-task-board-filters .erp-business-filter-control--search.ant-input-affix-wrapper'

@@ -747,10 +747,14 @@ const BUSINESS_CHAIN_DEFINITIONS = [
   ),
   chain(
     'finance_payment_and_reversal',
-    '收付款、核销与冲正',
+    '首款、结算与退款',
     'reversal',
-    '收付款过账形成核销；冲正删除有效核销影响并在余额重新出现时把应收应付从结清重开。',
+    '订单首款先确认实际收付并保留余额；真实应收应付产生后抵扣，尾款结清。退款另行审批，撤销抵扣与冲正保留审计。',
     [
+      chainNode('payment_order', '首款对应订单 / 合同', 'source_document', {
+        machineKeys: ['source.sales_order', 'source.purchase_order', 'source.outsourcing_order'],
+        sourceRefs: ['server/internal/data/finance_payment_balance_repo.go'],
+      }),
       chainNode('open_finance_fact', '未结应收 / 应付', 'fact_ledger', {
         machineKeys: ['fact.finance'],
         sourceRefs: ['server/internal/biz/operational_fact.go'],
@@ -782,6 +786,22 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       }),
     ],
     [
+      chainEdge('payment_order', 'finance_payment_process', '财务登记订单首款并申请审批', 'starts_process', {
+        action: 'OperationalFactUsecase.CreateFinancePayment',
+        factBoundary: 'order_advance_cash_without_receivable_or_payable',
+        sourceRefs: ['server/internal/data/finance_payment_balance_repo.go'],
+      }),
+      chainEdge('finance_payment', 'finance_payment_process', '可退余额另建退款单并重新审批', 'starts_process', {
+        action: 'OperationalFactUsecase.CreateFinancePayment',
+        condition: '原款已过账，退回同一往来方与币种，金额不超过可用余额',
+        factBoundary: 'separate_refund_cash_with_original_payment_reference',
+        sourceRefs: ['server/internal/data/finance_payment_balance_repo.go'],
+      }),
+      chainEdge('finance_allocation', 'finance_payment', '撤销抵扣恢复可用余额', 'reverses', {
+        action: 'OperationalFactUsecase.ReverseFinanceAllocation',
+        factBoundary: 'reverse_allocation_without_cash_movement',
+        sourceRefs: ['server/internal/data/finance_payment_balance_repo.go'],
+      }),
       chainEdge(
         'open_finance_fact',
         'finance_payment_process',
@@ -796,7 +816,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'finance_payment_process',
         'finance_payment',
-        '领域命令批准并过账',
+        '审批通过后财务确认实际收付',
         'calls_domain_command',
         {
           action: 'OperationalFactUsecase.PostFinancePaymentForProcessCommand',
@@ -809,10 +829,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'finance_payment',
         'finance_allocation',
-        '生成核销记录',
+        '结算款过账核销，首款后续按订单抵扣',
         'posts_fact',
         {
-          action: 'OperationalFactUsecase.PostFinancePayment',
+          action: 'OperationalFactUsecase.AllocateFinancePayment',
+          condition: '应收应付已经真实过账，方向、往来方、币种匹配；首款还须匹配同一订单',
           factBoundary: 'finance_payment_and_allocations',
           sourceRefs: ['server/internal/biz/finance_payment.go'],
         }
@@ -1307,11 +1328,11 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'purchase_disposition',
         'replacement_receipt',
-        '过账补换处置并生成新待收',
+        '仓库确认补换实点并生成新待收',
         'creates_fact_draft',
         {
           action: 'InventoryUsecase.PostPurchaseRejectionDisposition',
-          condition: '选择供应商补换，原收货尚未入库',
+          condition: '供应商补换实物已到货，仓库实点数量与本笔方案一致，原收货尚未入库',
           factBoundary: 'replacement_receipt_draft_only',
           sourceRefs: [
             'server/internal/data/purchase_rejection_disposition_repo.go',
@@ -1321,7 +1342,7 @@ const BUSINESS_CHAIN_DEFINITIONS = [
       chainEdge(
         'replacement_receipt',
         'replacement_quality',
-        '补换待收自动建立逐行 IQC',
+        '补换实点确认后建立逐行 IQC',
         'creates_fact_draft',
         {
           action:

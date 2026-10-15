@@ -73,7 +73,7 @@ func TestOutsourcingOrderSummaryJSONRPCPermissionsFiltersAndRedaction(t *testing
 			}
 			money := tc.super || tc.name == "commercial reader"
 			private := tc.super || tc.name == "private reader"
-			if (row["unit_price"] != nil) != money || (row["amount"] != nil) != money || (row["buyer_phone"] != nil) != private || (row["currency"] != nil) != tc.super {
+			if (row["unit_price"] != nil) != money || (row["amount"] != nil) != money || (row["buyer_phone"] != nil) != private || (row["currency"] != nil) != money {
 				t.Fatalf("sensitive field leak: %+v", row)
 			}
 			if tc.name == "source reader" && (repo.filter.Keyword != "内容" || repo.filter.SupplierID != 5 || repo.filter.ProcessID != 2 || repo.filter.Offset != 20) {

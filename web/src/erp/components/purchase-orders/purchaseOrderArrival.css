@@ -20,7 +20,7 @@
 .erp-purchase-arrival__help,
 .erp-purchase-arrival__footer-summary {
   color: var(--erp-text-muted, #64748b);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-business-action-form.erp-purchase-arrival__form {
@@ -48,7 +48,7 @@
 
 .erp-purchase-arrival__section-head h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
   font-weight: 600;
 }
 
@@ -95,7 +95,7 @@
 }
 
 .erp-purchase-arrival__material-quantity strong {
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   font-weight: 500;
   font-variant-numeric: tabular-nums;
 }

@@ -594,7 +594,7 @@ print(sms["requiredMode"])
   [[ "$jaeger_image" != *":dev" && "$jaeger_image" != *":latest" ]] || fail "JAEGER_IMAGE 不能使用 :dev 或 :latest"
   [[ "$web_proxy_prefixes" == "/rpc,/templates,/readyz/runtime-identity" ]] ||
     fail "WEB_PROXY_PREFIXES 必须保留 RPC、模板和运行身份探针的精确代理合同"
-  [[ "$app_auth_sms_mode" != "mock" ]] || fail "APP_AUTH_SMS_MODE 生产环境不能使用 mock"
+  [[ "$app_auth_sms_mode" == "disabled" || "$app_auth_sms_mode" == "provider" ]] || fail "APP_AUTH_SMS_MODE 必须为 disabled 或 provider"
   if [[ "$app_auth_sms_mode" == "provider" ]]; then
     provider_required_keys=(
       APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID
@@ -680,7 +680,7 @@ print(sms["requiredMode"])
     fail "BOOTSTRAP_ADMIN_ONCE=true 时必须临时注入 APP_ADMIN_PASSWORD"
   fi
 
-  if ! awk -v ratio="$trace_ratio" 'BEGIN { exit !(ratio + 0 >= 0 && ratio + 0 <= 1) }'; then
+  if ! awk -v ratio="$trace_ratio" 'BEGIN { exit !(ratio ~ /^[+-]?([0-9]+([.][0-9]*)?|[.][0-9]+)([eE][+-]?[0-9]+)?$/ && ratio + 0 >= 0 && ratio + 0 <= 1) }'; then
     fail "TRACE_RATIO 必须在 0 到 1 之间"
   fi
   ok "生产 secret、镜像 tag、debug、后端端口和 PostgreSQL / Jaeger 暴露边界通过"

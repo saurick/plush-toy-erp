@@ -1455,7 +1455,7 @@ func (r *adminManageRepo) ResetAdminPasswordWithAudit(ctx context.Context, reset
 	if err != nil {
 		return nil, err
 	}
-	if reset.UseDefaultPassword && !operator.IsSuperAdmin {
+	if reset.UseTemporaryPassword && !operator.IsSuperAdmin {
 		return nil, biz.ErrNoPermission
 	}
 	if err := biz.ValidateAdminControlTarget(operator, before); err != nil {
@@ -1498,7 +1498,7 @@ func (r *adminManageRepo) ResetAdminPasswordWithAudit(ctx context.Context, reset
 		map[string]any{"password_reset": false},
 		map[string]any{
 			"password_reset":        true,
-			"reset_to_default":      reset.UseDefaultPassword,
+			"reset_to_temporary":    reset.UseTemporaryPassword,
 			"revoked_session_count": revokedSessionCount,
 			"session_revoke_reason": adminSessionRevokeReasonPasswordReset,
 		},
@@ -1602,6 +1602,36 @@ func (r *adminManageRepo) RecordRuntimeAuditEvent(ctx context.Context, event *bi
 	if err != nil {
 		return err
 	}
+	if eventType == biz.LegalNoticeAuditEventType {
+		tx, err := r.data.postgres.Tx(ctx)
+		if err != nil {
+			return err
+		}
+		defer func() { rollbackEntTx(ctx, tx, r.log) }()
+		actor, _ := event.Payload["actor"].(map[string]any)
+		actorID, ok := actor["id"].(int)
+		if !ok || actorID <= 0 {
+			return biz.ErrBadParam
+		}
+		if _, err := r.loadOperatorForUpdate(ctx, tx, actorID); err != nil {
+			return err
+		}
+		exists, err := tx.RuntimeAuditEvent.Query().Where(runtimeauditevent.EventKey(eventKey), runtimeauditevent.EventType(eventType), runtimeauditevent.Source(source)).Exist(ctx)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			if err := createRuntimeAuditEventInTx(ctx, tx, event); err != nil {
+				return err
+			}
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		tx = nil
+		return nil
+	}
+
 	_, err = r.data.postgres.RuntimeAuditEvent.Create().
 		SetEventType(eventType).
 		SetEventKey(eventKey).
@@ -1685,16 +1715,19 @@ func (r *adminManageRepo) ListRuntimeAuditEvents(
 		countQuery = countQuery.Where(runtimeauditevent.CreatedAtLTE(filter.CreatedTo))
 	}
 	if actorKey := strings.TrimSpace(filter.ActorKey); actorKey != "" {
-		query = query.Where(runtimeauditevent.PayloadContainsFold(actorKey))
-		countQuery = countQuery.Where(runtimeauditevent.PayloadContainsFold(actorKey))
+		match := runtimeAuditPayloadFieldEquals(actorKey, []string{"actor", "username"}, []string{"actor", "id"}, []string{"actor", "display_name"})
+		query = query.Where(match)
+		countQuery = countQuery.Where(match)
 	}
 	if targetType := strings.TrimSpace(filter.TargetType); targetType != "" {
-		query = query.Where(runtimeauditevent.PayloadContainsFold(targetType))
-		countQuery = countQuery.Where(runtimeauditevent.PayloadContainsFold(targetType))
+		match := runtimeAuditPayloadFieldEquals(targetType, []string{"target", "type"})
+		query = query.Where(match)
+		countQuery = countQuery.Where(match)
 	}
 	if targetKey := strings.TrimSpace(filter.TargetKey); targetKey != "" {
-		query = query.Where(runtimeauditevent.PayloadContainsFold(targetKey))
-		countQuery = countQuery.Where(runtimeauditevent.PayloadContainsFold(targetKey))
+		match := runtimeAuditPayloadFieldEquals(targetKey, []string{"target", "key"})
+		query = query.Where(match)
+		countQuery = countQuery.Where(match)
 	}
 	if keyword := strings.TrimSpace(filter.Keyword); keyword != "" {
 		predicate := runtimeauditevent.Or(
@@ -1702,6 +1735,7 @@ func (r *adminManageRepo) ListRuntimeAuditEvents(
 			runtimeauditevent.EventKeyContainsFold(keyword),
 			runtimeauditevent.SourceContainsFold(keyword),
 			runtimeauditevent.PayloadContainsFold(keyword),
+			runtimeAuditActorKeyword(keyword),
 		)
 		query = query.Where(predicate)
 		countQuery = countQuery.Where(predicate)

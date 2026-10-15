@@ -36,7 +36,7 @@
 
 .erp-product-identity__text small {
   color: var(--erp-text-muted, #64748b);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .ant-table-wrapper .ant-table-cell.erp-product-identity-cell {

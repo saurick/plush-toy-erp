@@ -10,7 +10,7 @@
   display: inline-grid;
   flex: 0 0 auto;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -26,7 +26,7 @@
 .erp-statistics-help {
   max-width: 440px;
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 .erp-statistics-help p {
   margin: 0 0 8px;
@@ -66,7 +66,7 @@
   font-variant-numeric: tabular-nums;
 }
 .erp-statistics-metrics small {
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .erp-statistics-metrics > .erp-filter-chip:disabled {
   cursor: default;
@@ -74,10 +74,10 @@
 .erp-statistics-total-amount {
   margin-left: auto;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .erp-statistics-total-amount strong {
-  font-size: 14px;
+  font-size: var(--erp-font-body);
 }
 .erp-statistics-results {
   margin-top: 0;
@@ -105,16 +105,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.erp-statistics-result-head > strong::before {
-  display: inline-block;
-  width: 3px;
-  height: 15px;
-  margin-right: 8px;
-  border-radius: 2px;
-  background: var(--erp-primary);
-  content: '';
-  vertical-align: -2px;
-}
 .erp-statistics-result-head small {
   margin-left: 9px;
   color: var(--erp-text-muted);
@@ -136,7 +126,7 @@
   justify-content: flex-end;
   gap: 7px 15px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .erp-statistics-legend > span:first-child {
   margin-right: auto;
@@ -199,7 +189,7 @@
   height: auto;
   padding: 3px 0;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .erp-statistics-chart-number {
   font-variant-numeric: tabular-nums;
@@ -245,7 +235,7 @@
   padding: 9px 12px;
   border-top: 1px solid var(--erp-border);
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .erp-statistics-table {
   padding: 0 12px 8px;
@@ -257,7 +247,7 @@
 .erp-statistics-table .ant-btn-link {
   padding: 0;
   height: auto;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 .erp-statistics-table .erp-statistics-name {
   max-width: 260px;
@@ -270,7 +260,7 @@
   font-weight: 600;
 }
 .erp-statistics-table .ant-table-summary .ant-table-cell {
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 .erp-statistics-danger,
 .erp-statistics-metrics .erp-statistics-danger,
@@ -283,7 +273,7 @@
   gap: 6px;
   padding-top: 8px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .erp-statistics-state {
   display: grid;
@@ -294,7 +284,7 @@
 .erp-statistics-missing {
   margin: 6px 12px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .erp-statistics-body > .ant-alert,
 .erp-statistics-body > .ant-empty {

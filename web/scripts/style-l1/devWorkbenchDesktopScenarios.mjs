@@ -1,3 +1,4 @@
+import { DEV_HUB_ITEMS } from '../../src/dev-workbench/config/devHub.mjs'
 import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
 import { fitMermaidDiagram, switchMermaidLayout, verifyMermaidViewer } from './mermaidViewerAssertions.mjs'
 import {
@@ -201,17 +202,19 @@ export function createDevWorkbenchDesktopScenarios({
           .click()
         await page.locator('.ant-select-dropdown [title="质量验证"]').click()
         assert.equal(new URL(page.url()).searchParams.get('group'), 'quality')
+        const qualityToolCount = DEV_HUB_ITEMS.filter((tool) => tool.areaKey === 'quality').length
         await page.waitForFunction(
-          () =>
+          (expected) =>
             document.querySelectorAll(
               'table[aria-label="全部开发工具"] tbody tr'
-            ).length === 4
+            ).length === expected,
+          qualityToolCount
         )
         assert.equal(
           await page
             .locator('table[aria-label="全部开发工具"] tbody tr')
             .count(),
-          4
+          qualityToolCount
         )
         await page.reload()
         await page
@@ -222,7 +225,7 @@ export function createDevWorkbenchDesktopScenarios({
           await page
             .locator('table[aria-label="全部开发工具"] tbody tr')
             .count(),
-          4
+          qualityToolCount
         )
         await page
           .getByRole('table', { name: '全部开发工具' })
@@ -237,7 +240,7 @@ export function createDevWorkbenchDesktopScenarios({
             .getByRole('table', { name: '全部开发工具' })
             .locator('tbody tr')
             .count(),
-          4
+          qualityToolCount
         )
       }
       if (item.route === DEV_TESTING_ROUTE) {

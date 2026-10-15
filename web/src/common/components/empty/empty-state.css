@@ -4,7 +4,7 @@
   margin: 0;
   padding: 24px 16px;
   color: var(--erp-text-muted);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   line-height: 22px;
   text-align: center;
 }

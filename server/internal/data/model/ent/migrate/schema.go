@@ -612,6 +612,7 @@ var (
 	// FinanceAllocationsColumns holds the columns for the "finance_allocations" table.
 	FinanceAllocationsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "finance_fact_id", Type: field.TypeInt},
 		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "currency", Type: field.TypeString, Size: 16},
@@ -630,7 +631,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "finance_allocations_finance_payments_allocations",
-				Columns:    []*schema.Column{FinanceAllocationsColumns[9]},
+				Columns:    []*schema.Column{FinanceAllocationsColumns[10]},
 				RefColumns: []*schema.Column{FinancePaymentsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -639,17 +640,17 @@ var (
 			{
 				Name:    "financeallocation_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceAllocationsColumns[6]},
+				Columns: []*schema.Column{FinanceAllocationsColumns[7]},
 			},
 			{
 				Name:    "financeallocation_payment_id_finance_fact_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{FinanceAllocationsColumns[9], FinanceAllocationsColumns[1], FinanceAllocationsColumns[4]},
+				Columns: []*schema.Column{FinanceAllocationsColumns[10], FinanceAllocationsColumns[2], FinanceAllocationsColumns[5]},
 			},
 			{
 				Name:    "financeallocation_reversal_of_allocation_id",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceAllocationsColumns[5]},
+				Columns: []*schema.Column{FinanceAllocationsColumns[6]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "reversal_of_allocation_id IS NOT NULL",
 				},
@@ -800,6 +801,10 @@ var (
 	// FinancePaymentsColumns holds the columns for the "finance_payments" table.
 	FinancePaymentsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "kind", Type: field.TypeString, Size: 16, Default: "SETTLEMENT"},
+		{Name: "source_type", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "source_id", Type: field.TypeInt, Nullable: true},
+		{Name: "purpose_note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "payment_no", Type: field.TypeString, Size: 64},
 		{Name: "direction", Type: field.TypeString, Size: 16},
 		{Name: "status", Type: field.TypeString, Size: 16, Default: "DRAFT"},
@@ -829,27 +834,46 @@ var (
 		{Name: "created_by", Type: field.TypeInt},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "refund_of_payment_id", Type: field.TypeInt, Nullable: true},
 	}
 	// FinancePaymentsTable holds the schema information for the "finance_payments" table.
 	FinancePaymentsTable = &schema.Table{
 		Name:       "finance_payments",
 		Columns:    FinancePaymentsColumns,
 		PrimaryKey: []*schema.Column{FinancePaymentsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "finance_payments_finance_payments_refunds",
+				Columns:    []*schema.Column{FinancePaymentsColumns[34]},
+				RefColumns: []*schema.Column{FinancePaymentsColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "financepayment_payment_no",
 				Unique:  true,
-				Columns: []*schema.Column{FinancePaymentsColumns[1]},
+				Columns: []*schema.Column{FinancePaymentsColumns[5]},
 			},
 			{
 				Name:    "financepayment_created_by_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{FinancePaymentsColumns[27], FinancePaymentsColumns[10]},
+				Columns: []*schema.Column{FinancePaymentsColumns[31], FinancePaymentsColumns[14]},
 			},
 			{
 				Name:    "financepayment_counterparty_type_counterparty_id_currency_status",
 				Unique:  false,
-				Columns: []*schema.Column{FinancePaymentsColumns[4], FinancePaymentsColumns[5], FinancePaymentsColumns[7], FinancePaymentsColumns[3]},
+				Columns: []*schema.Column{FinancePaymentsColumns[8], FinancePaymentsColumns[9], FinancePaymentsColumns[11], FinancePaymentsColumns[7]},
+			},
+			{
+				Name:    "financepayment_source_type_source_id",
+				Unique:  false,
+				Columns: []*schema.Column{FinancePaymentsColumns[2], FinancePaymentsColumns[3]},
+			},
+			{
+				Name:    "financepayment_refund_of_payment_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{FinancePaymentsColumns[34], FinancePaymentsColumns[7]},
 			},
 		},
 	}
@@ -5152,14 +5176,16 @@ func init() {
 		"finance_facts_type_allowed":             "fact_type IN ('RECEIVABLE', 'PAYABLE', 'INVOICE', 'RECONCILIATION')",
 		"finance_facts_version_positive":         "version > 0",
 	}
+	FinancePaymentsTable.ForeignKeys[0].RefTable = FinancePaymentsTable
 	FinancePaymentsTable.Annotation = &entsql.Annotation{}
 	FinancePaymentsTable.Annotation.Checks = map[string]string{
 		"finance_payments_amount_positive":      "amount > 0",
 		"finance_payments_counterparty_allowed": "counterparty_type IN ('CUSTOMER', 'SUPPLIER')",
 		"finance_payments_currency_allowed":     "currency IN ('USD', 'CNY', 'HKD')",
 		"finance_payments_direction_allowed":    "direction IN ('RECEIPT', 'DISBURSEMENT')",
-		"finance_payments_direction_party_pair": "((direction = 'RECEIPT' AND counterparty_type = 'CUSTOMER') OR (direction = 'DISBURSEMENT' AND counterparty_type = 'SUPPLIER'))",
+		"finance_payments_direction_party_pair": "((kind <> 'REFUND' AND ((direction = 'RECEIPT' AND counterparty_type = 'CUSTOMER') OR (direction = 'DISBURSEMENT' AND counterparty_type = 'SUPPLIER'))) OR (kind = 'REFUND' AND ((direction = 'DISBURSEMENT' AND counterparty_type = 'CUSTOMER') OR (direction = 'RECEIPT' AND counterparty_type = 'SUPPLIER'))))",
 		"finance_payments_intent_bundle":        "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
+		"finance_payments_kind_source":          "(\n(kind = 'SETTLEMENT' AND source_type IS NULL AND source_id IS NULL AND refund_of_payment_id IS NULL)\nOR (kind = 'ADVANCE' AND source_type IS NOT NULL AND source_id IS NOT NULL AND source_id > 0 AND refund_of_payment_id IS NULL AND\n ((counterparty_type = 'CUSTOMER' AND source_type = 'sales_order') OR\n  (counterparty_type = 'SUPPLIER' AND source_type IN ('purchase_order', 'outsourcing_order'))))\nOR (kind = 'REFUND' AND source_type IS NULL AND source_id IS NULL AND refund_of_payment_id IS NOT NULL AND refund_of_payment_id > 0\n AND refund_of_payment_id <> id AND purpose_note IS NOT NULL AND length(trim(purpose_note)) BETWEEN 1 AND 255))",
 		"finance_payments_lifecycle_audit":      "\n(\n  (status = 'DRAFT'\n    AND approved_at IS NULL AND approved_by IS NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'APPROVED'\n    AND approved_at IS NOT NULL AND approved_by IS NOT NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'REJECTED'\n    AND approved_at IS NULL AND approved_by IS NULL\n    AND rejected_at IS NOT NULL AND rejected_by IS NOT NULL\n    AND reject_reason IS NOT NULL AND length(trim(reject_reason)) BETWEEN 1 AND 255\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'POSTED'\n    AND approved_at IS NOT NULL AND approved_by IS NOT NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n  OR\n  (status = 'REVERSED'\n    AND approved_at IS NOT NULL AND approved_by IS NOT NULL\n    AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL\n    AND posted_at IS NOT NULL AND posted_by IS NOT NULL\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL\n    AND reversed_at IS NOT NULL AND reversed_by IS NOT NULL\n    AND reverse_reason IS NOT NULL AND length(trim(reverse_reason)) BETWEEN 1 AND 255)\n  OR\n  (status = 'CANCELLED'\n    AND (\n      (approved_at IS NULL AND approved_by IS NULL\n        AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL)\n      OR\n      (approved_at IS NOT NULL AND approved_by IS NOT NULL\n        AND rejected_at IS NULL AND rejected_by IS NULL AND reject_reason IS NULL)\n      OR\n      (approved_at IS NULL AND approved_by IS NULL\n        AND rejected_at IS NOT NULL AND rejected_by IS NOT NULL\n        AND reject_reason IS NOT NULL AND length(trim(reject_reason)) BETWEEN 1 AND 255)\n    )\n    AND posted_at IS NULL AND posted_by IS NULL\n    AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL\n    AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255\n    AND reversed_at IS NULL AND reversed_by IS NULL AND reverse_reason IS NULL)\n)",
 		"finance_payments_maker_checker":        "approved_by IS NULL OR approved_by <> created_by",
 		"finance_payments_status_allowed":       "status IN ('DRAFT', 'APPROVED', 'REJECTED', 'POSTED', 'REVERSED', 'CANCELLED')",

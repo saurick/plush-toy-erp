@@ -87,6 +87,8 @@ make dev_restart ARGS='--log-match="request_id=req-42"'
 
 终端与迁移页共用忽略 Git 的 `server/.env`（权限 `0600`），固定版本按白名单读取附件、认证及客户运行配置，仅读取文本，不执行 shell。开发附件必须使用独立桶，配置和恢复边界见 [附件存储](deploy/compose/prod/README.md#附件存储与raid5)。数据库角色凭据保存在同样受保护的 `configs/dev/database-roles.local.json`；应用、迁移、审计分别使用 `plush_dev_app`、`plush_dev_migrator`、`plush_dev_backup`。审计账号无表所有权、写入或角色切换权限，不能以超级用户加默认只读参数替代。角色配置中断后使用 `make dev_database_roles ARGS=--reconcile` 恢复已有凭据对应的权限，不生成新密码。
 
+旧岗位职责迁移的终态任务若缺少办理回执，使用 `cmd/restore-terminal-task-assignees` 从已验证的升级前备份恢复证据。先将原 `database.dump` 恢复到独立的 loopback `plush_erp_ci_*` 数据库，并在当前库的新鲜备份副本上演练；`POSTGRES_DSN` 指向登记共享开发库或隔离演练库，`RECOVERY_BACKUP_DSN` 只接受历史备份恢复库。执行 `go run ./cmd/restore-terminal-task-assignees --backup-dir <原备份目录> --operation <原迁移成功回执.json>` 默认在事务内验证后回滚。确认同一候选后加 `--apply --confirm-backup-sha256 <原备份SHA256>`，再运行正常的 `make migrate_prepare` / `make migrate_execute`。工具核对备份文件、原目标、迁移版本、任务身份与不可变事件；原本未分派的任务保留空办理人并追加备份证据，既有事件不改写，无法精确匹配时整批回滚。此入口只修复该次迁移造成的历史证据缺口，不替代迁移、日常任务分派或数据库整体回滚。
+
 工作台的权限关系只读入口复用上述审计账号，通过 `cmd/dev-permission-relationships` 调用正式 repository 和权限解释，并额外开启数据库只读模式；不执行 `NewData` 的账号 / RBAC 初始化。它仅接受开发服务注入的登记数据库和本地客户配置，不开 HTTP 端口，不调用 ERP 登录，也不提供写命令。入口、访问模式和验证边界见 [开发服务 Bridge](../web/dev-server/README.md)。
 
 主端口不自动顺延。`make dev_stop` / `make dev_restart` 虽按登记端口查找 listener，但停止前会逐个校验进程 cwd 位于本仓库；端口被其他项目占用时会报告 PID、cwd 和命令并拒绝 kill。前后端共用有超时的进程检查；macOS 通过系统端口表定位 PID，再逐个读取 cwd，避免全机 `lsof` 扫描阻塞启动。检查失败或超时时保留服务并退出。整组本机覆盖必须写入 ignored 的 `config/dev-ports.local.env`，且包含完整端口组。
@@ -108,7 +110,7 @@ make run_yoyoosun
 make dev_restart_yoyoosun
 ```
 
-客户选择随每次构建记录到运行制品；更改 `server/.env` 中的 `ERP_CUSTOMER_KEY` 后执行 `make dev_restart`，或在本次重启时显式设置该变量，新配置经业务验证后生效。前端构建复用 `apply-customer-web-config.mjs` 将同一客户的公开配置与素材写入固定制品；客户业务配置仍须在开发控制台显式发布、激活并读回，上述启动目标不会代为操作。未通过本地 Make 入口启动的后端默认拒绝 local-test manifest 及其切换操作；本地 gate 开启时，启动预检和 JSON-RPC dispatcher 会基于同一份启动时配置，按 pgx 最终连接结果把 DSN 固定到 `192.168.0.133:5432` 上的 `plush_erp` 或 `plush_erp_*_dev` 开发库，不会因运行中修改环境变量、query override、multi-host fallback 或 `ERP_ALLOW_TEST_DB_AS_DEV=1` 放行 133 其他实例或 loopback tunnel。人工验收数据 runner 另行把 `local-dev` 精确绑定到当前版本的隔离验收库，不会写共享开发库；production 配置发现该环境开关时也会直接失败。
+客户选择随每次构建记录到运行制品；更改 `server/.env` 中的 `ERP_CUSTOMER_KEY` 后执行 `make dev_restart`，或在本次重启时显式设置该变量，新配置经业务验证后生效。前端构建复用 `apply-customer-web-config.mjs` 将同一客户的公开配置与素材写入固定制品；客户业务配置仍须在开发控制台显式发布、激活并读回，上述启动目标不会代为操作。未通过本地 Make 入口启动的后端默认拒绝 local-test manifest 及其切换操作；本地 gate 开启时，启动预检和 JSON-RPC dispatcher 会基于同一份启动时配置，按 pgx 最终连接结果把 DSN 固定到登记共享开发端点或 [Orb 备用端点](deploy/compose/dev-orb/README.md)上的 `plush_erp` 或 `plush_erp_*_dev` 开发库，并核对各自独立集群身份。运行中修改环境变量、query override、multi-host fallback 或 `ERP_ALLOW_TEST_DB_AS_DEV=1` 都不能放行其他实例或到远端的 loopback tunnel。人工验收数据 runner 另行把 `local-dev` 精确绑定到当前版本的隔离验收库，不会写共享开发库；production 配置发现该环境开关时也会直接失败。
 
 ## 常用命令
 

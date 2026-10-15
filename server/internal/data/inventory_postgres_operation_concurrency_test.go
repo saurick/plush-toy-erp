@@ -127,7 +127,7 @@ func TestInventoryLotPostgresFreezeBeforePosting(t *testing.T) {
 				t.Fatalf("posting after freeze error=%v", err)
 			}
 			assertInventoryOperationLotBalance(t, ctx, uc, f.materialID, f.warehouseID, lot.ID, f.unitID, "10")
-			if count := client.InventoryTxn.Query().Where(inventorytxn.SubjectID(f.materialID)).CountX(ctx); count != 1 {
+			if count := client.InventoryTxn.Query().Where(inventorytxn.SubjectType(biz.InventorySubjectMaterial), inventorytxn.SubjectID(f.materialID), inventorytxn.LotID(lot.ID)).CountX(ctx); count != 1 {
 				t.Fatalf("failed posting left %d transactions", count)
 			}
 			if op != nil {

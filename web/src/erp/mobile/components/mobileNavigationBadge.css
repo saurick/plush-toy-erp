@@ -12,8 +12,8 @@
   top: -6px;
   left: calc(50% + 6px);
   display: inline-flex;
-  min-width: 17px;
-  height: 17px;
+  min-width: 22px;
+  height: 22px;
   align-items: center;
   justify-content: center;
   border: 2px solid var(--erp-surface-bg);
@@ -21,7 +21,7 @@
   padding: 0 4px;
   background: var(--erp-visual-danger-text);
   color: #fff;
-  font-size: 9px;
+  font-size: var(--erp-font-badge);
   font-weight: 750;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -42,7 +42,7 @@
   border: 0;
   background: #fff7ed;
   color: #9a3412;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   cursor: pointer;
 }
 

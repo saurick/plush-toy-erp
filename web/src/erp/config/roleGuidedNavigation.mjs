@@ -245,6 +245,9 @@ export function reconcileRoleNavigationPaths({
       return true
     })
     .slice(0, MAX_ROLE_PRIMARY_LIMIT)
+  if (primary.length === 0 && orderedEffectivePaths.length > 0) {
+    primary.push(orderedEffectivePaths[0])
+  }
   const primaryPathSet = new Set(primary)
   const secondary = normalizeMenuPaths(secondaryMenuPaths).filter(
     (path) => effectivePathSet.has(path) && !primaryPathSet.has(path)

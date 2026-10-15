@@ -1112,16 +1112,20 @@ func init() {
 	financeallocation.Hooks[0] = financeallocationHooks[0]
 	financeallocationFields := schema.FinanceAllocation{}.Fields()
 	_ = financeallocationFields
+	// financeallocationDescReason is the schema descriptor for reason field.
+	financeallocationDescReason := financeallocationFields[0].Descriptor()
+	// financeallocation.ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
+	financeallocation.ReasonValidator = financeallocationDescReason.Validators[0].(func(string) error)
 	// financeallocationDescPaymentID is the schema descriptor for payment_id field.
-	financeallocationDescPaymentID := financeallocationFields[0].Descriptor()
+	financeallocationDescPaymentID := financeallocationFields[1].Descriptor()
 	// financeallocation.PaymentIDValidator is a validator for the "payment_id" field. It is called by the builders before save.
 	financeallocation.PaymentIDValidator = financeallocationDescPaymentID.Validators[0].(func(int) error)
 	// financeallocationDescFinanceFactID is the schema descriptor for finance_fact_id field.
-	financeallocationDescFinanceFactID := financeallocationFields[1].Descriptor()
+	financeallocationDescFinanceFactID := financeallocationFields[2].Descriptor()
 	// financeallocation.FinanceFactIDValidator is a validator for the "finance_fact_id" field. It is called by the builders before save.
 	financeallocation.FinanceFactIDValidator = financeallocationDescFinanceFactID.Validators[0].(func(int) error)
 	// financeallocationDescCurrency is the schema descriptor for currency field.
-	financeallocationDescCurrency := financeallocationFields[3].Descriptor()
+	financeallocationDescCurrency := financeallocationFields[4].Descriptor()
 	// financeallocation.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
 	financeallocation.CurrencyValidator = func() func(string) error {
 		validators := financeallocationDescCurrency.Validators
@@ -1139,7 +1143,7 @@ func init() {
 		}
 	}()
 	// financeallocationDescStatus is the schema descriptor for status field.
-	financeallocationDescStatus := financeallocationFields[4].Descriptor()
+	financeallocationDescStatus := financeallocationFields[5].Descriptor()
 	// financeallocation.DefaultStatus holds the default value on creation for the status field.
 	financeallocation.DefaultStatus = financeallocationDescStatus.Default.(string)
 	// financeallocation.StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -1159,11 +1163,11 @@ func init() {
 		}
 	}()
 	// financeallocationDescReversalOfAllocationID is the schema descriptor for reversal_of_allocation_id field.
-	financeallocationDescReversalOfAllocationID := financeallocationFields[5].Descriptor()
+	financeallocationDescReversalOfAllocationID := financeallocationFields[6].Descriptor()
 	// financeallocation.ReversalOfAllocationIDValidator is a validator for the "reversal_of_allocation_id" field. It is called by the builders before save.
 	financeallocation.ReversalOfAllocationIDValidator = financeallocationDescReversalOfAllocationID.Validators[0].(func(int) error)
 	// financeallocationDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	financeallocationDescIdempotencyKey := financeallocationFields[6].Descriptor()
+	financeallocationDescIdempotencyKey := financeallocationFields[7].Descriptor()
 	// financeallocation.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	financeallocation.IdempotencyKeyValidator = func() func(string) error {
 		validators := financeallocationDescIdempotencyKey.Validators
@@ -1181,11 +1185,11 @@ func init() {
 		}
 	}()
 	// financeallocationDescCreatedBy is the schema descriptor for created_by field.
-	financeallocationDescCreatedBy := financeallocationFields[7].Descriptor()
+	financeallocationDescCreatedBy := financeallocationFields[8].Descriptor()
 	// financeallocation.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	financeallocation.CreatedByValidator = financeallocationDescCreatedBy.Validators[0].(func(int) error)
 	// financeallocationDescCreatedAt is the schema descriptor for created_at field.
-	financeallocationDescCreatedAt := financeallocationFields[8].Descriptor()
+	financeallocationDescCreatedAt := financeallocationFields[9].Descriptor()
 	// financeallocation.DefaultCreatedAt holds the default value on creation for the created_at field.
 	financeallocation.DefaultCreatedAt = financeallocationDescCreatedAt.Default.(func() time.Time)
 	financecreditnoteHooks := schema.FinanceCreditNote{}.Hooks()
@@ -1519,8 +1523,30 @@ func init() {
 	financepayment.Hooks[0] = financepaymentHooks[0]
 	financepaymentFields := schema.FinancePayment{}.Fields()
 	_ = financepaymentFields
+	// financepaymentDescKind is the schema descriptor for kind field.
+	financepaymentDescKind := financepaymentFields[0].Descriptor()
+	// financepayment.DefaultKind holds the default value on creation for the kind field.
+	financepayment.DefaultKind = financepaymentDescKind.Default.(string)
+	// financepayment.KindValidator is a validator for the "kind" field. It is called by the builders before save.
+	financepayment.KindValidator = financepaymentDescKind.Validators[0].(func(string) error)
+	// financepaymentDescSourceType is the schema descriptor for source_type field.
+	financepaymentDescSourceType := financepaymentFields[1].Descriptor()
+	// financepayment.SourceTypeValidator is a validator for the "source_type" field. It is called by the builders before save.
+	financepayment.SourceTypeValidator = financepaymentDescSourceType.Validators[0].(func(string) error)
+	// financepaymentDescSourceID is the schema descriptor for source_id field.
+	financepaymentDescSourceID := financepaymentFields[2].Descriptor()
+	// financepayment.SourceIDValidator is a validator for the "source_id" field. It is called by the builders before save.
+	financepayment.SourceIDValidator = financepaymentDescSourceID.Validators[0].(func(int) error)
+	// financepaymentDescRefundOfPaymentID is the schema descriptor for refund_of_payment_id field.
+	financepaymentDescRefundOfPaymentID := financepaymentFields[3].Descriptor()
+	// financepayment.RefundOfPaymentIDValidator is a validator for the "refund_of_payment_id" field. It is called by the builders before save.
+	financepayment.RefundOfPaymentIDValidator = financepaymentDescRefundOfPaymentID.Validators[0].(func(int) error)
+	// financepaymentDescPurposeNote is the schema descriptor for purpose_note field.
+	financepaymentDescPurposeNote := financepaymentFields[4].Descriptor()
+	// financepayment.PurposeNoteValidator is a validator for the "purpose_note" field. It is called by the builders before save.
+	financepayment.PurposeNoteValidator = financepaymentDescPurposeNote.Validators[0].(func(string) error)
 	// financepaymentDescPaymentNo is the schema descriptor for payment_no field.
-	financepaymentDescPaymentNo := financepaymentFields[0].Descriptor()
+	financepaymentDescPaymentNo := financepaymentFields[5].Descriptor()
 	// financepayment.PaymentNoValidator is a validator for the "payment_no" field. It is called by the builders before save.
 	financepayment.PaymentNoValidator = func() func(string) error {
 		validators := financepaymentDescPaymentNo.Validators
@@ -1538,7 +1564,7 @@ func init() {
 		}
 	}()
 	// financepaymentDescDirection is the schema descriptor for direction field.
-	financepaymentDescDirection := financepaymentFields[1].Descriptor()
+	financepaymentDescDirection := financepaymentFields[6].Descriptor()
 	// financepayment.DirectionValidator is a validator for the "direction" field. It is called by the builders before save.
 	financepayment.DirectionValidator = func() func(string) error {
 		validators := financepaymentDescDirection.Validators
@@ -1556,7 +1582,7 @@ func init() {
 		}
 	}()
 	// financepaymentDescStatus is the schema descriptor for status field.
-	financepaymentDescStatus := financepaymentFields[2].Descriptor()
+	financepaymentDescStatus := financepaymentFields[7].Descriptor()
 	// financepayment.DefaultStatus holds the default value on creation for the status field.
 	financepayment.DefaultStatus = financepaymentDescStatus.Default.(string)
 	// financepayment.StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -1576,7 +1602,7 @@ func init() {
 		}
 	}()
 	// financepaymentDescCounterpartyType is the schema descriptor for counterparty_type field.
-	financepaymentDescCounterpartyType := financepaymentFields[3].Descriptor()
+	financepaymentDescCounterpartyType := financepaymentFields[8].Descriptor()
 	// financepayment.CounterpartyTypeValidator is a validator for the "counterparty_type" field. It is called by the builders before save.
 	financepayment.CounterpartyTypeValidator = func() func(string) error {
 		validators := financepaymentDescCounterpartyType.Validators
@@ -1594,11 +1620,11 @@ func init() {
 		}
 	}()
 	// financepaymentDescCounterpartyID is the schema descriptor for counterparty_id field.
-	financepaymentDescCounterpartyID := financepaymentFields[4].Descriptor()
+	financepaymentDescCounterpartyID := financepaymentFields[9].Descriptor()
 	// financepayment.CounterpartyIDValidator is a validator for the "counterparty_id" field. It is called by the builders before save.
 	financepayment.CounterpartyIDValidator = financepaymentDescCounterpartyID.Validators[0].(func(int) error)
 	// financepaymentDescCurrency is the schema descriptor for currency field.
-	financepaymentDescCurrency := financepaymentFields[6].Descriptor()
+	financepaymentDescCurrency := financepaymentFields[11].Descriptor()
 	// financepayment.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
 	financepayment.CurrencyValidator = func() func(string) error {
 		validators := financepaymentDescCurrency.Validators
@@ -1616,7 +1642,7 @@ func init() {
 		}
 	}()
 	// financepaymentDescAccountRef is the schema descriptor for account_ref field.
-	financepaymentDescAccountRef := financepaymentFields[7].Descriptor()
+	financepaymentDescAccountRef := financepaymentFields[12].Descriptor()
 	// financepayment.AccountRefValidator is a validator for the "account_ref" field. It is called by the builders before save.
 	financepayment.AccountRefValidator = func() func(string) error {
 		validators := financepaymentDescAccountRef.Validators
@@ -1634,7 +1660,7 @@ func init() {
 		}
 	}()
 	// financepaymentDescEvidenceRef is the schema descriptor for evidence_ref field.
-	financepaymentDescEvidenceRef := financepaymentFields[8].Descriptor()
+	financepaymentDescEvidenceRef := financepaymentFields[13].Descriptor()
 	// financepayment.EvidenceRefValidator is a validator for the "evidence_ref" field. It is called by the builders before save.
 	financepayment.EvidenceRefValidator = func() func(string) error {
 		validators := financepaymentDescEvidenceRef.Validators
@@ -1652,7 +1678,7 @@ func init() {
 		}
 	}()
 	// financepaymentDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	financepaymentDescIdempotencyKey := financepaymentFields[9].Descriptor()
+	financepaymentDescIdempotencyKey := financepaymentFields[14].Descriptor()
 	// financepayment.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	financepayment.IdempotencyKeyValidator = func() func(string) error {
 		validators := financepaymentDescIdempotencyKey.Validators
@@ -1670,7 +1696,7 @@ func init() {
 		}
 	}()
 	// financepaymentDescIdempotencyPayloadHash is the schema descriptor for idempotency_payload_hash field.
-	financepaymentDescIdempotencyPayloadHash := financepaymentFields[10].Descriptor()
+	financepaymentDescIdempotencyPayloadHash := financepaymentFields[15].Descriptor()
 	// financepayment.IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
 	financepayment.IdempotencyPayloadHashValidator = func() func(string) error {
 		validators := financepaymentDescIdempotencyPayloadHash.Validators
@@ -1689,57 +1715,57 @@ func init() {
 		}
 	}()
 	// financepaymentDescVersion is the schema descriptor for version field.
-	financepaymentDescVersion := financepaymentFields[11].Descriptor()
+	financepaymentDescVersion := financepaymentFields[16].Descriptor()
 	// financepayment.DefaultVersion holds the default value on creation for the version field.
 	financepayment.DefaultVersion = financepaymentDescVersion.Default.(int)
 	// financepayment.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	financepayment.VersionValidator = financepaymentDescVersion.Validators[0].(func(int) error)
 	// financepaymentDescOccurredAt is the schema descriptor for occurred_at field.
-	financepaymentDescOccurredAt := financepaymentFields[12].Descriptor()
+	financepaymentDescOccurredAt := financepaymentFields[17].Descriptor()
 	// financepayment.DefaultOccurredAt holds the default value on creation for the occurred_at field.
 	financepayment.DefaultOccurredAt = financepaymentDescOccurredAt.Default.(func() time.Time)
 	// financepaymentDescApprovedBy is the schema descriptor for approved_by field.
-	financepaymentDescApprovedBy := financepaymentFields[14].Descriptor()
+	financepaymentDescApprovedBy := financepaymentFields[19].Descriptor()
 	// financepayment.ApprovedByValidator is a validator for the "approved_by" field. It is called by the builders before save.
 	financepayment.ApprovedByValidator = financepaymentDescApprovedBy.Validators[0].(func(int) error)
 	// financepaymentDescRejectedBy is the schema descriptor for rejected_by field.
-	financepaymentDescRejectedBy := financepaymentFields[16].Descriptor()
+	financepaymentDescRejectedBy := financepaymentFields[21].Descriptor()
 	// financepayment.RejectedByValidator is a validator for the "rejected_by" field. It is called by the builders before save.
 	financepayment.RejectedByValidator = financepaymentDescRejectedBy.Validators[0].(func(int) error)
 	// financepaymentDescRejectReason is the schema descriptor for reject_reason field.
-	financepaymentDescRejectReason := financepaymentFields[17].Descriptor()
+	financepaymentDescRejectReason := financepaymentFields[22].Descriptor()
 	// financepayment.RejectReasonValidator is a validator for the "reject_reason" field. It is called by the builders before save.
 	financepayment.RejectReasonValidator = financepaymentDescRejectReason.Validators[0].(func(string) error)
 	// financepaymentDescPostedBy is the schema descriptor for posted_by field.
-	financepaymentDescPostedBy := financepaymentFields[19].Descriptor()
+	financepaymentDescPostedBy := financepaymentFields[24].Descriptor()
 	// financepayment.PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
 	financepayment.PostedByValidator = financepaymentDescPostedBy.Validators[0].(func(int) error)
 	// financepaymentDescCancelledBy is the schema descriptor for cancelled_by field.
-	financepaymentDescCancelledBy := financepaymentFields[21].Descriptor()
+	financepaymentDescCancelledBy := financepaymentFields[26].Descriptor()
 	// financepayment.CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
 	financepayment.CancelledByValidator = financepaymentDescCancelledBy.Validators[0].(func(int) error)
 	// financepaymentDescCancelReason is the schema descriptor for cancel_reason field.
-	financepaymentDescCancelReason := financepaymentFields[22].Descriptor()
+	financepaymentDescCancelReason := financepaymentFields[27].Descriptor()
 	// financepayment.CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
 	financepayment.CancelReasonValidator = financepaymentDescCancelReason.Validators[0].(func(string) error)
 	// financepaymentDescReversedBy is the schema descriptor for reversed_by field.
-	financepaymentDescReversedBy := financepaymentFields[24].Descriptor()
+	financepaymentDescReversedBy := financepaymentFields[29].Descriptor()
 	// financepayment.ReversedByValidator is a validator for the "reversed_by" field. It is called by the builders before save.
 	financepayment.ReversedByValidator = financepaymentDescReversedBy.Validators[0].(func(int) error)
 	// financepaymentDescReverseReason is the schema descriptor for reverse_reason field.
-	financepaymentDescReverseReason := financepaymentFields[25].Descriptor()
+	financepaymentDescReverseReason := financepaymentFields[30].Descriptor()
 	// financepayment.ReverseReasonValidator is a validator for the "reverse_reason" field. It is called by the builders before save.
 	financepayment.ReverseReasonValidator = financepaymentDescReverseReason.Validators[0].(func(string) error)
 	// financepaymentDescCreatedBy is the schema descriptor for created_by field.
-	financepaymentDescCreatedBy := financepaymentFields[26].Descriptor()
+	financepaymentDescCreatedBy := financepaymentFields[31].Descriptor()
 	// financepayment.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	financepayment.CreatedByValidator = financepaymentDescCreatedBy.Validators[0].(func(int) error)
 	// financepaymentDescCreatedAt is the schema descriptor for created_at field.
-	financepaymentDescCreatedAt := financepaymentFields[27].Descriptor()
+	financepaymentDescCreatedAt := financepaymentFields[32].Descriptor()
 	// financepayment.DefaultCreatedAt holds the default value on creation for the created_at field.
 	financepayment.DefaultCreatedAt = financepaymentDescCreatedAt.Default.(func() time.Time)
 	// financepaymentDescUpdatedAt is the schema descriptor for updated_at field.
-	financepaymentDescUpdatedAt := financepaymentFields[28].Descriptor()
+	financepaymentDescUpdatedAt := financepaymentFields[33].Descriptor()
 	// financepayment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	financepayment.DefaultUpdatedAt = financepaymentDescUpdatedAt.Default.(func() time.Time)
 	// financepayment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

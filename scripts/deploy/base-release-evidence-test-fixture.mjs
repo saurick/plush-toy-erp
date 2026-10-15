@@ -95,7 +95,7 @@ webImageDigest=${webDigest}
 | databaseBackupSize | 123456 |
 | databaseBackupHash | sha256:${backupHash} |
 | storageLocationAlias | controlled-backup-store |
-| restoreTestStatus | verified-on-staging |
+| restoreTestStatus | verified |
 | smokeQueryStatus | pass |
 `,
   );

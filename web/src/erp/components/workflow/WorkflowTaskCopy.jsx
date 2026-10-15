@@ -8,6 +8,7 @@ import {
   getWorkflowTaskSourceNo,
 } from '../../utils/dashboardTaskDisplay.mjs'
 import { formatWorkflowTaskCopy } from '../../utils/workflowTaskCopy.mjs'
+import { workflowTaskLinkPath } from '../../utils/workflowTaskLink.mjs'
 import './workflowTaskCopy.css'
 
 export function TaskCopyButton({ text, label, showLabel = false }) {
@@ -60,11 +61,15 @@ export function WorkflowTaskSource({ task, label, copyable = true }) {
 }
 
 export function WorkflowTaskCopySummary({ task, assigneeLabel }) {
+  const path = workflowTaskLinkPath(task?.id)
   return (
-    <TaskCopyButton
-      text={formatWorkflowTaskCopy(task, { assigneeLabel })}
-      label="任务信息"
-      showLabel
-    />
+    <>
+      <TaskCopyButton
+        text={formatWorkflowTaskCopy(task, { assigneeLabel })}
+        label="任务信息"
+        showLabel
+      />
+      {path ? <TaskCopyButton text={new URL(path, window.location.origin).href} label="任务链接" showLabel /> : null}
+    </>
   )
 }

@@ -78,12 +78,7 @@ func (r *inventoryRepo) CreatePurchaseRejectionDisposition(ctx context.Context, 
 		}
 		return nil, err
 	}
-	out := entPurchaseRejectionDispositionToBiz(row)
-	if err := tx.sqlTx.Commit(); err != nil {
-		return nil, err
-	}
-	tx = nil
-	return out, nil
+	return commitPurchaseRejectionDisposition(ctx, tx, row.ID)
 }
 
 func (r *inventoryRepo) resolvePurchaseRejectionReplay(ctx context.Context, client *ent.Client, in *biz.PurchaseRejectionDispositionCreate, hash string) (*biz.PurchaseRejectionDisposition, bool, error) {
@@ -123,6 +118,24 @@ func (r *inventoryRepo) PostPurchaseRejectionDisposition(ctx context.Context, in
 	row, err := tx.client.PurchaseRejectionDisposition.Get(ctx, in.ID)
 	if err != nil {
 		return nil, err
+	}
+	if row.DispositionType == biz.PurchaseRejectionReplace {
+		// A supplier's promised replacement is not a warehouse count. Only
+		// the explicit count can create the new receiving and IQC sources.
+		if in.CountedQuantity == nil || !in.CountedQuantity.IsPositive() || !in.CountedQuantity.Equal(row.Quantity) {
+			return nil, biz.ErrPurchaseRejectionSourceInvalid
+		}
+		if in.WarehouseScope != nil {
+			line, err := tx.client.PurchaseReceiptItem.Get(ctx, row.PurchaseReceiptItemID)
+			if err != nil {
+				return nil, err
+			}
+			if !biz.NormalizeWarehouseDataScope(*in.WarehouseScope).Allows(line.WarehouseID) {
+				return nil, biz.ErrDataScopeForbidden
+			}
+		}
+	} else if in.CountedQuantity != nil {
+		return nil, biz.ErrBadParam
 	}
 	if row.Status == biz.PurchaseRejectionStatusPosted && row.PostedBy != nil && *row.PostedBy == in.ActorID && row.Version == in.ExpectedVersion+1 {
 		return commitPurchaseRejectionDisposition(ctx, tx, row.ID)
@@ -308,6 +321,19 @@ func commitPurchaseRejectionDisposition(ctx context.Context, tx *inventoryDBTx, 
 	out := entPurchaseRejectionDispositionToBiz(row)
 	if err := syncPurchaseReceiptHandoffs(ctx, tx.client, row.PurchaseReceiptID); err != nil {
 		return nil, err
+	}
+	if row.DispositionType == biz.PurchaseRejectionReplace {
+		status, actorID := "ready", row.CreatedBy
+		switch row.Status {
+		case biz.PurchaseRejectionStatusPosted:
+			status, actorID = "done", optionalIntValueOrZero(row.PostedBy)
+		case biz.PurchaseRejectionStatusCancelled:
+			status, actorID = "withdrawn", optionalIntValueOrZero(row.CancelledBy)
+		}
+		path := fmt.Sprintf("/erp/production/quality-inspections?quality_inspection_id=%d", row.QualityInspectionID)
+		if err := syncFulfillmentTask(ctx, tx.client, "receipt_replacement", row.ID, row.DispositionNo, path, status, "", actorID); err != nil {
+			return nil, err
+		}
 	}
 	if row.ReplacementReceiptID != nil {
 		if err := syncPurchaseReceiptHandoffs(ctx, tx.client, *row.ReplacementReceiptID); err != nil {

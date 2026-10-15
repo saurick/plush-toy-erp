@@ -8,6 +8,7 @@ import {
 
 function baseParams(overrides = {}) {
   return {
+    idempotency_key: 'task-create-test-001',
     task_code: 'TASK-001',
     task_group: 'warehouse_inbound',
     task_name: '确认入库',
@@ -94,4 +95,10 @@ test('workflow task public create reserves source-produced groups and task-code 
     ),
     false
   )
+})
+
+test('workflow task public create requires an idempotency key', () => {
+  const params = baseParams()
+  delete params.idempotency_key
+  assert.throws(() => requireWorkflowTaskCreateParams(params), /必填资料/u)
 })

@@ -1,6 +1,6 @@
 # UI 交互设计 / UI Interaction Design
 
-本目录维护 ERP 的界面结构、视觉与操作合同。唯一可交互稿是 [index.html](index.html)，修订由 Git 追踪。
+本目录维护 ERP 的界面结构、视觉与操作合同。效能工作台“UI 交互设计”读取的 [index.html](index.html) 是唯一正式可交互设计稿，修订由 Git 追踪；Figma 仅作设计参考，不维护第二份正式交互稿。参考方案的采纳与维护边界见[设计资产维护](设计依据.md#设计资产维护--design-maintenance)。
 
 | 要核对什么 | 入口 |
 | --- | --- |

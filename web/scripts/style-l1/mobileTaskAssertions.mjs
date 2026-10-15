@@ -75,6 +75,7 @@ export function createMobileTaskAssertions(deps) {
           const primary = buttons.at(-1)
           const result = {
             overflow: root.scrollWidth - root.clientWidth,
+            footerContentWidth: footer.clientWidth - parseFloat(getComputedStyle(footer).paddingLeft) - parseFloat(getComputedStyle(footer).paddingRight),
             footerButtons: buttons.map((button) => ({
               text: button.textContent.trim(),
               width: button.getBoundingClientRect().width,
@@ -151,9 +152,10 @@ export function createMobileTaskAssertions(deps) {
             metrics.primaryColor,
             `${accentName} 单选标记必须跟随主题色`
           )
-          assert.equal(metrics.footerButtons[0].text, '返回任务')
+          await screen.getByRole('button', { name: '返回任务详情', exact: true }).click({ trial: true })
+          assert.equal(metrics.footerButtons.length, 1, '返回位于页头，办理底栏只保留当前主动作')
           assert(
-            metrics.footerButtons[1].width > metrics.footerButtons[0].width * 2,
+            Math.abs(metrics.footerButtons[0].width - metrics.footerContentWidth) <= 1,
             JSON.stringify(metrics)
           )
         } else {
@@ -275,7 +277,7 @@ export function createMobileTaskAssertions(deps) {
     await page.waitForFunction(() => {
       const heading = document.querySelector('.mobile-role-tasks-page h1')
       const counts = Array.from(
-        document.querySelectorAll('.mobile-role-message-tabs__count')
+        document.querySelectorAll('[data-testid="mobile-role-risk-filters"] .mobile-role-task-filter__count')
       ).map((count) => count.textContent?.trim() || '')
       return (
         heading?.textContent?.trim() === '风险' &&
@@ -295,7 +297,7 @@ export function createMobileTaskAssertions(deps) {
         !reminderMetrics.sectionHeadings.includes('超时'),
       `${scenarioName} 超级管理员风险分区默认应显示全局风险: ${JSON.stringify(reminderMetrics)}`
     )
-    await assertMobileTaskMessageTabsSwitch(page, { scenarioName })
+    await assertMobileTaskRiskFiltersSwitch(page, { scenarioName })
     await assertMobileTaskDarkMessagesReadable(page, { scenarioName })
 
     await page.getByTestId('mobile-role-nav-tasks').click()
@@ -582,6 +584,7 @@ export function createMobileTaskAssertions(deps) {
       return {
         cards,
         actionButtons,
+        adminReviewCount: scroll?.querySelectorAll('[aria-label="管理员查看范围"]').length || 0,
         removedMetricCount: document.querySelectorAll(
           '[data-testid^="mobile-role-mine-metric-"]'
         ).length,
@@ -599,7 +602,8 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 我的页不应恢复已删除的重复任务指标: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.cards.length === 5 &&
+      metrics.adminReviewCount <= 1 &&
+        metrics.cards.length === 5 + metrics.adminReviewCount &&
         metrics.cards.some(
           (card) =>
             card.text.includes('账号：') &&
@@ -998,20 +1002,24 @@ export function createMobileTaskAssertions(deps) {
     )
   }
 
-  async function assertMobileTaskMessageTabsSwitch(page, { scenarioName }) {
-    const noticeTab = page.getByTestId('mobile-role-message-tab-notice')
-    const warningTab = page.getByTestId('mobile-role-message-tab-warning')
-
-    await noticeTab.waitFor({ state: 'visible', timeout: 10_000 })
-    await warningTab.waitFor({ state: 'visible', timeout: 10_000 })
-    const initialMetrics = await readMobileTaskMessageTabMetrics(page)
+  async function assertMobileTaskRiskFiltersSwitch(page, { scenarioName }) {
+    const filters = page.getByTestId('mobile-role-risk-filters')
+    const notice = page.getByTestId('mobile-role-risk-filter-notice')
+    const warning = page.getByTestId('mobile-role-risk-filter-warning')
+    await notice.waitFor({ state: 'visible', timeout: 10_000 })
+    await warning.waitFor({ state: 'visible', timeout: 10_000 })
+    assert.equal(await filters.getAttribute('role'), 'group')
+    assert.equal(await filters.getByRole('tab').count(), 0)
+    await assertFilterAffordance(filters.getByRole('button'), 34)
+    const initialMetrics = await readMobileTaskRiskFilterMetrics(page)
+    const riskLabel = initialMetrics.filterItems[0].label
     const initialCountByLabel = Object.fromEntries(
-      initialMetrics.tabItems.map((item) => [item.label, Number(item.count)])
+      initialMetrics.filterItems.map((item) => [item.label, Number(item.count)])
     )
     assert(
-      Number.isSafeInteger(initialCountByLabel['风险']) &&
+      Number.isSafeInteger(initialCountByLabel[riskLabel]) &&
         Number.isSafeInteger(initialCountByLabel['超时']) &&
-        initialCountByLabel['超时'] <= initialCountByLabel['风险'],
+        initialCountByLabel['超时'] <= initialCountByLabel[riskLabel],
       `${scenarioName} 超时必须是风险子集: ${JSON.stringify(initialMetrics)}`
     )
     await assertMobileTaskListToggle(page, {
@@ -1021,45 +1029,27 @@ export function createMobileTaskAssertions(deps) {
       collapsedMax: 8,
       expectServerPagination: true,
     })
-    await noticeTab.click()
-    await page.waitForFunction(() => {
-      const headings = Array.from(
-        document.querySelectorAll('.mobile-role-tasks-page h2')
-      ).map((heading) => heading.textContent?.trim() || '')
-      return headings.includes('超时') && !headings.includes('风险')
-    })
-
-    const noticeMetrics = await readMobileTaskMessageTabMetrics(page)
+    await notice.click()
+    await page.waitForFunction(() =>
+      document.querySelector('[data-testid="mobile-role-risk-filter-notice"]')
+        ?.getAttribute('aria-pressed') === 'true'
+    )
+    await assertFilterAffordance(filters.getByRole('button'), 34)
+    const noticeMetrics = await readMobileTaskRiskFilterMetrics(page)
+    assert.equal(noticeMetrics.activeFilter, '超时')
+    assert.equal(await warning.getAttribute('aria-pressed'), 'false')
+    assert.deepEqual(noticeMetrics.sectionHeadings, ['超时'])
     assert(
-      noticeMetrics.activeTab === '超时',
-      `${scenarioName} 点击超时后未激活超时 tab: ${JSON.stringify(noticeMetrics)}`
+      noticeMetrics.filtersSticky &&
+        noticeMetrics.filters &&
+        noticeMetrics.filters.width > 280 &&
+        noticeMetrics.filters.scrollWidth <= noticeMetrics.filters.clientWidth + 1 &&
+        noticeMetrics.filters.mask === 'none',
+      `${scenarioName} 两项风险筛选完整显示，不应横向滚动或渐隐: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
-      noticeMetrics.tabsClassName.includes('mobile-role-message-tabs--notice'),
-      `${scenarioName} 超时 tab 缺少滑动选中态类名: ${JSON.stringify(noticeMetrics)}`
-    )
-    assert(
-      noticeMetrics.tabsThumbContent !== 'none' &&
-        noticeMetrics.tabsThumbContent !== 'normal' &&
-        String(noticeMetrics.tabsThumbTransitionDuration)
-          .split(',')
-          .some((part) => Number.parseFloat(part) > 0) &&
-        String(noticeMetrics.activeTabTransitionDuration)
-          .split(',')
-          .some((part) => Number.parseFloat(part) > 0),
-      `${scenarioName} 超时 tab 缺少平滑选中态过渡: ${JSON.stringify(noticeMetrics)}`
-    )
-    assert(
-      noticeMetrics.sectionHeadings.length === 1 &&
-        noticeMetrics.sectionHeadings[0] === '超时',
-      `${scenarioName} 超时 tab 不应混入风险列表: ${JSON.stringify(noticeMetrics)}`
-    )
-    assert(
-      noticeMetrics.tabsSticky &&
-        noticeMetrics.tabs &&
-        noticeMetrics.tabs.width > 280 &&
-        noticeMetrics.tabs.scrollWidth <= noticeMetrics.tabs.clientWidth + 1,
-      `${scenarioName} 风险二级 tab 盒模型异常: ${JSON.stringify(noticeMetrics)}`
+      Math.abs(noticeMetrics.filters.height - initialMetrics.filters.height) <= 1,
+      `${scenarioName} 切换筛选不得改变筛选条高度`
     )
     assert(
       noticeMetrics.cards.length > 0 &&
@@ -1074,22 +1064,15 @@ export function createMobileTaskAssertions(deps) {
       itemSelector: '.mobile-role-message-card',
       collapsedMax: 8,
     })
-
-    await warningTab.click()
-    await page.waitForFunction(() => {
-      const headings = Array.from(
-        document.querySelectorAll('.mobile-role-tasks-page h2')
-      ).map((heading) => heading.textContent?.trim() || '')
-      return headings.includes('风险') && !headings.includes('超时')
-    })
-    const warningMetrics = await readMobileTaskMessageTabMetrics(page)
-    assert(
-      warningMetrics.activeTab === '风险' &&
-        warningMetrics.tabsClassName.includes(
-          'mobile-role-message-tabs--warning'
-        ),
-      `${scenarioName} 回到风险 tab 后滑动选中态未恢复: ${JSON.stringify(warningMetrics)}`
+    await warning.click()
+    await page.waitForFunction(() =>
+      document.querySelector('[data-testid="mobile-role-risk-filter-warning"]')
+        ?.getAttribute('aria-pressed') === 'true'
     )
+    const warningMetrics = await readMobileTaskRiskFilterMetrics(page)
+    assert.equal(warningMetrics.activeFilter, riskLabel)
+    assert.deepEqual(warningMetrics.sectionHeadings, [riskLabel])
+    assert.equal(await notice.getAttribute('aria-pressed'), 'false')
   }
 
   async function assertMobileTaskDarkMessagesReadable(page, { scenarioName }) {
@@ -1777,7 +1760,7 @@ export function createMobileTaskAssertions(deps) {
         actionMetrics.flowSteps.find((step) => step.key === 'result')?.state ===
           'locked' &&
         JSON.stringify(actionMetrics.footerButtons) ===
-          JSON.stringify(['返回任务', '确认完成本岗']) &&
+          JSON.stringify(['确认完成本岗']) &&
         actionMetrics.documentScrollWidth <=
           actionMetrics.documentClientWidth + 1,
       `${scenarioName} 独立处理页动作或布局异常: ${JSON.stringify(actionMetrics)}`
@@ -2490,69 +2473,43 @@ export function createMobileTaskAssertions(deps) {
     })
   }
 
-  async function readMobileTaskMessageTabMetrics(page) {
+  async function readMobileTaskRiskFilterMetrics(page) {
     return page.evaluate(() => {
-      const tabs = document.querySelector('.mobile-role-message-tabs')
-      const tabsRect = tabs?.getBoundingClientRect()
-      const tabsStyle =
-        tabs instanceof HTMLElement ? window.getComputedStyle(tabs) : null
-      const tabsBeforeStyle =
-        tabs instanceof HTMLElement
-          ? window.getComputedStyle(tabs, '::before')
-          : null
+      const filters = document.querySelector('[data-testid="mobile-role-risk-filters"]')
+      const rect = filters.getBoundingClientRect()
+      const items = Array.from(filters.querySelectorAll('button'))
+      const activeFilter = items.find((item) => item.getAttribute('aria-pressed') === 'true')
+      const label = (item) => item?.querySelector('.mobile-role-task-filter__label')?.textContent?.trim() || ''
       const sectionHeadings = Array.from(
         document.querySelectorAll('.mobile-role-tasks-page h2')
       ).map((heading) => heading.textContent?.trim() || '')
-      const activeTab = Array.from(
-        document.querySelectorAll('.mobile-role-message-tabs__item')
-      ).find((item) => item.getAttribute('aria-selected') === 'true')
-      const activeTabStyle =
-        activeTab instanceof HTMLElement
-          ? window.getComputedStyle(activeTab)
-          : null
-      const tabItems = Array.from(
-        document.querySelectorAll('.mobile-role-message-tabs__item')
-      ).map((item) => ({
-        label:
-          item.querySelector('span:first-child')?.textContent?.trim() || '',
-        count:
-          item
-            .querySelector('.mobile-role-message-tabs__count')
-            ?.textContent?.trim() || '',
-      }))
       const cards = Array.from(
-        document.querySelectorAll(
-          '.mobile-role-message-card, .mobile-role-message-empty'
-        )
+        document.querySelectorAll('.mobile-role-message-card, .mobile-role-message-empty')
       ).map((card) => {
-        const rect = card.getBoundingClientRect()
+        const box = card.getBoundingClientRect()
         return {
           text: card.textContent?.replace(/\s+/g, ' ').trim() || '',
-          width: rect.width,
-          height: rect.height,
-          clientWidth: card instanceof HTMLElement ? card.clientWidth : 0,
-          scrollWidth: card instanceof HTMLElement ? card.scrollWidth : 0,
+          width: box.width,
+          height: box.height,
+          clientWidth: card.clientWidth,
+          scrollWidth: card.scrollWidth,
         }
       })
-
       return {
-        activeTab: activeTab?.textContent?.replace(/\d+/g, '').trim() || '',
-        tabItems,
-        tabsClassName: tabs?.className || '',
+        activeFilter: label(activeFilter),
+        filterItems: items.map((item) => ({
+          label: label(item),
+          count: item.querySelector('.mobile-role-task-filter__count')?.textContent?.trim() || '',
+        })),
         sectionHeadings,
-        tabsSticky: tabsStyle?.position === 'sticky',
-        tabsThumbContent: tabsBeforeStyle?.content || '',
-        tabsThumbTransform: tabsBeforeStyle?.transform || '',
-        tabsThumbTransitionDuration: tabsBeforeStyle?.transitionDuration || '',
-        activeTabTransitionDuration: activeTabStyle?.transitionDuration || '',
-        tabs: tabsRect
-          ? {
-              width: tabsRect.width,
-              height: tabsRect.height,
-              clientWidth: tabs instanceof HTMLElement ? tabs.clientWidth : 0,
-              scrollWidth: tabs instanceof HTMLElement ? tabs.scrollWidth : 0,
-            }
-          : null,
+        filtersSticky: getComputedStyle(filters.closest('.mobile-task-list-toolbar')).position === 'sticky',
+        filters: {
+          width: rect.width,
+          height: rect.height,
+          clientWidth: filters.clientWidth,
+          scrollWidth: filters.scrollWidth,
+          mask: getComputedStyle(filters).maskImage,
+        },
         cards,
         documentScrollWidth: document.documentElement.scrollWidth,
         documentClientWidth: document.documentElement.clientWidth,
@@ -2592,6 +2549,8 @@ export function createMobileTaskAssertions(deps) {
       ).find((item) => item.getAttribute('aria-pressed') === 'true')
       const scrollRect = scroll?.getBoundingClientRect()
       const tabsRect = tabs?.getBoundingClientRect()
+      const toolbarRect = tabs?.closest('.mobile-task-list-toolbar')?.getBoundingClientRect()
+      const queryRect = document.querySelector('.mobile-role-task-query')?.getBoundingClientRect()
       const tabsStyle =
         tabs instanceof HTMLElement ? window.getComputedStyle(tabs) : null
       const filterItems = Array.from(
@@ -2629,7 +2588,9 @@ export function createMobileTaskAssertions(deps) {
         buttonCount: tabs?.querySelectorAll('button').length || 0,
         filterItems,
         tabsClassName: tabs?.className || '',
-        tabsSticky: tabsStyle?.position === 'sticky',
+        tabsSticky: getComputedStyle(tabs.closest('.mobile-task-list-toolbar')).position === 'sticky',
+        toolbarTop: toolbarRect?.top,
+        queryBottom: queryRect?.bottom,
         gap: Number.parseFloat(tabsStyle?.columnGap || '0'),
         scroll: scrollRect
           ? {
@@ -2744,8 +2705,8 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 待办筛选 tab 未设置 sticky: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.scroll && Math.abs(metrics.tabs.top - metrics.scroll.top) <= 2,
-      `${scenarioName} 待办筛选 tab 滚动后未贴住正文滚动区顶部: ${JSON.stringify(metrics)}`
+      metrics.scroll && Math.abs(metrics.toolbarTop - metrics.scroll.top) <= 2 && metrics.tabs.top >= metrics.queryBottom,
+      `${scenarioName} 搜索与筛选应整体吸顶且互不覆盖: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.tabs.scrollWidth <= metrics.tabs.clientWidth + 1,
@@ -2845,11 +2806,11 @@ export function createMobileTaskAssertions(deps) {
     assertMobileTaskFilterSelected,
     assertMobileTaskListToggle,
     assertMobileTaskScrollTopControl,
-    assertMobileTaskMessageTabsSwitch,
+    assertMobileTaskRiskFiltersSwitch,
     assertMobileTaskDarkMessagesReadable,
     assertMobileTaskDarkDetailReadable,
     readMobileTaskLayoutMetrics,
-    readMobileTaskMessageTabMetrics,
+    readMobileTaskRiskFilterMetrics,
     assertMobileTaskFilterTabsSticky,
     readMobileTaskVisibleListMetrics,
     assertMobileTaskBottomNavLayout,

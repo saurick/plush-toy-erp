@@ -41,6 +41,12 @@ func (r *inventoryRepo) CreatePurchaseReturnFromQualityInspection(
 	if err := lockPurchaseReceipt(ctx, tx, receiptID); err != nil {
 		return nil, err
 	}
+	if scope, scoped := biz.WarehouseDataScopeFromContext(ctx); scoped {
+		if err := validatePurchaseReceiptWarehouseScope(ctx, tx.client, receiptID, &scope); err != nil {
+			return nil, err
+		}
+	}
+
 	inspection, err := getLockedQualityInspection(ctx, tx, in.QualityInspectionID)
 	if err != nil {
 		return nil, err

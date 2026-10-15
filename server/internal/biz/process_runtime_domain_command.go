@@ -8,9 +8,14 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
-func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, in *ProcessDomainCommandExecution, actorID int) (*ProcessNodeInstance, error) {
+func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, in *ProcessDomainCommandExecution, actorID int) (_ *ProcessNodeInstance, err error) {
+	ctx, finish := startBusinessTrace(ctx, "process.execute_domain_command")
+	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
@@ -43,6 +48,14 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 		return nil, ErrBadParam
 	}
 	handler := uc.domainCommandHandlers[nodeCommandKey]
+	// Use the registered command and persisted anchors, never caller payloads,
+	// so execution, stored-result replay and failures share one trace boundary.
+	span := trace.SpanFromContext(ctx)
+	span.SetAttributes(attribute.Int("process.instance_id", instance.ID), attribute.Int("process.node_id", node.ID))
+	if handler != nil {
+		span.SetName("process." + nodeCommandKey)
+		span.SetAttributes(attribute.String("process.command", nodeCommandKey))
+	}
 	if normalizer, ok := handler.(ProcessDomainCommandPayloadNormalizer); ok {
 		normalized.Payload, err = normalizer.NormalizeProcessDomainCommandPayload(normalized.Payload)
 		if err != nil {

@@ -56,6 +56,11 @@ func IDLTE(id int) predicate.FinanceAllocation {
 	return predicate.FinanceAllocation(sql.FieldLTE(FieldID, id))
 }
 
+// Reason applies equality check predicate on the "reason" field. It's identical to ReasonEQ.
+func Reason(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldEQ(FieldReason, v))
+}
+
 // PaymentID applies equality check predicate on the "payment_id" field. It's identical to PaymentIDEQ.
 func PaymentID(v int) predicate.FinanceAllocation {
 	return predicate.FinanceAllocation(sql.FieldEQ(FieldPaymentID, v))
@@ -99,6 +104,81 @@ func CreatedBy(v int) predicate.FinanceAllocation {
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.FinanceAllocation {
 	return predicate.FinanceAllocation(sql.FieldEQ(FieldCreatedAt, v))
+}
+
+// ReasonEQ applies the EQ predicate on the "reason" field.
+func ReasonEQ(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldEQ(FieldReason, v))
+}
+
+// ReasonNEQ applies the NEQ predicate on the "reason" field.
+func ReasonNEQ(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldNEQ(FieldReason, v))
+}
+
+// ReasonIn applies the In predicate on the "reason" field.
+func ReasonIn(vs ...string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldIn(FieldReason, vs...))
+}
+
+// ReasonNotIn applies the NotIn predicate on the "reason" field.
+func ReasonNotIn(vs ...string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldNotIn(FieldReason, vs...))
+}
+
+// ReasonGT applies the GT predicate on the "reason" field.
+func ReasonGT(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldGT(FieldReason, v))
+}
+
+// ReasonGTE applies the GTE predicate on the "reason" field.
+func ReasonGTE(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldGTE(FieldReason, v))
+}
+
+// ReasonLT applies the LT predicate on the "reason" field.
+func ReasonLT(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldLT(FieldReason, v))
+}
+
+// ReasonLTE applies the LTE predicate on the "reason" field.
+func ReasonLTE(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldLTE(FieldReason, v))
+}
+
+// ReasonContains applies the Contains predicate on the "reason" field.
+func ReasonContains(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldContains(FieldReason, v))
+}
+
+// ReasonHasPrefix applies the HasPrefix predicate on the "reason" field.
+func ReasonHasPrefix(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldHasPrefix(FieldReason, v))
+}
+
+// ReasonHasSuffix applies the HasSuffix predicate on the "reason" field.
+func ReasonHasSuffix(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldHasSuffix(FieldReason, v))
+}
+
+// ReasonIsNil applies the IsNil predicate on the "reason" field.
+func ReasonIsNil() predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldIsNull(FieldReason))
+}
+
+// ReasonNotNil applies the NotNil predicate on the "reason" field.
+func ReasonNotNil() predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldNotNull(FieldReason))
+}
+
+// ReasonEqualFold applies the EqualFold predicate on the "reason" field.
+func ReasonEqualFold(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldEqualFold(FieldReason, v))
+}
+
+// ReasonContainsFold applies the ContainsFold predicate on the "reason" field.
+func ReasonContainsFold(v string) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(sql.FieldContainsFold(FieldReason, v))
 }
 
 // PaymentIDEQ applies the EQ predicate on the "payment_id" field.

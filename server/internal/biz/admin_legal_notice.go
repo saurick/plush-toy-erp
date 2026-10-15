@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	legalNoticeAuditEventType     = "legal_notice_acknowledgement"
+	LegalNoticeAuditEventType     = "legal_notice_acknowledgement"
 	legalNoticeReceiptEventPrefix = "legal_notice.ack."
 	legalNoticeAuditAction        = "legal_notice.acknowledged"
 	legalNoticeTargetType         = "legal_notice_bundle"
@@ -65,7 +65,7 @@ func BuildLegalNoticeAcknowledgementAuditEvent(
 		return nil, err
 	}
 	return &RuntimeAuditEventCreate{
-		EventType: legalNoticeAuditEventType,
+		EventType: LegalNoticeAuditEventType,
 		EventKey:  eventKey,
 		Source:    adminControlAuditSource,
 		Payload: map[string]any{
@@ -107,7 +107,7 @@ func (uc *AdminManageUsecase) GetLegalNoticeStatus(
 	}
 	result, err := uc.repo.ListRuntimeAuditEvents(ctx, RuntimeAuditEventListFilter{
 		Source:    adminControlAuditSource,
-		EventType: legalNoticeAuditEventType,
+		EventType: LegalNoticeAuditEventType,
 		EventKey:  eventKey,
 		Limit:     20,
 	})
@@ -160,12 +160,7 @@ func (uc *AdminManageUsecase) AcknowledgeLegalNotice(
 	if err := uc.repo.RecordRuntimeAuditEvent(ctx, event); err != nil {
 		return LegalNoticeStatus{}, err
 	}
-	return LegalNoticeStatus{
-		NoticeVersion:      noticeVersion,
-		ContentFingerprint: contentFingerprint,
-		Acknowledged:       true,
-		AcknowledgedAt:     &acknowledgedAt,
-	}, nil
+	return uc.GetLegalNoticeStatus(ctx, noticeVersion, contentFingerprint)
 }
 
 func legalNoticeAuditEventMatches(
@@ -174,7 +169,7 @@ func legalNoticeAuditEventMatches(
 	noticeVersion string,
 	contentFingerprint string,
 ) bool {
-	if event.EventType != legalNoticeAuditEventType || event.Source != adminControlAuditSource {
+	if event.EventType != LegalNoticeAuditEventType || event.Source != adminControlAuditSource {
 		return false
 	}
 	actor, _ := event.Payload["actor"].(map[string]any)

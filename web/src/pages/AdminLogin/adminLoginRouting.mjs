@@ -11,6 +11,7 @@ import {
   getAllowedMobileRoleKeys,
   hasMobileRolePermission,
 } from '../../erp/utils/mobileRolePermissions.mjs'
+import { workflowTaskLinkLoginReturn } from '../../erp/utils/workflowTaskLink.mjs'
 
 export function resolveAdminPostLoginPath({
   adminProfile,
@@ -25,6 +26,12 @@ export function resolveAdminPostLoginPath({
 } = {}) {
   if (!adminProfile) {
     return ''
+  }
+
+  const taskLinkReturn = workflowTaskLinkLoginReturn(redirectTo)
+  if (taskLinkReturn) {
+    if (shouldRemember && entryTarget) rememberChoice(entryTarget)
+    return taskLinkReturn
   }
 
   const enabledRoleKeys = getEnabledMobileRoleKeys(entryConfig)

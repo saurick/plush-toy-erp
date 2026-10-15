@@ -1,4 +1,9 @@
 import {
+  normalizeNumeric20Scale6,
+  numeric20Scale6Units,
+  compareNumeric20Scale6Values,
+} from './numeric20Scale6.mjs'
+import {
   productionWipStatusMeta,
   productionWipQualityInspectionMeta,
   PRODUCTION_WIP_QUALITY_GATE_LABELS as PRODUCTION_QUALITY_GATE_LABELS,
@@ -51,7 +56,7 @@ function salesDeliveryStatus(row, today) {
   if (!row.progressKnown) {
     return { key: 'unknown', label: '进度待核对', rank: 4 }
   }
-  if (row.remaining <= 0) {
+  if (compareNumeric20Scale6Values(row.remaining, '0') <= 0) {
     return { key: 'delivered', label: '已交付', rank: 6 }
   }
   if (row.lifecycleStatus === 'closed' || row.lineStatus === 'closed') {
@@ -81,11 +86,14 @@ function salesDeliveryStatus(row, today) {
 export function buildSalesDeliveryModel(items = [], options = {}) {
   const today = options.today || currentBusinessDate()
   const rows = (Array.isArray(items) ? items : []).map((item) => {
-    const ordered = decimalNumber(item?.ordered_quantity)
-    const shipped = decimalNumber(item?.shipped_quantity)
-    const remaining = decimalNumber(item?.unshipped_quantity)
+    const ordered = normalizeNumeric20Scale6(item?.ordered_quantity) || null
+    const shipped = normalizeNumeric20Scale6(item?.shipped_quantity) || null
+    const remaining = normalizeNumeric20Scale6(item?.unshipped_quantity) || null
     const progressKnown =
-      ordered !== null && ordered > 0 && shipped !== null && remaining !== null
+      ordered !== null &&
+      compareNumeric20Scale6Values(ordered, '0') > 0 &&
+      shipped !== null &&
+      remaining !== null
     const row = {
       id: Number(item?.id || 0),
       salesOrderID: Number(item?.sales_order_id || 0),
@@ -105,7 +113,14 @@ export function buildSalesDeliveryModel(items = [], options = {}) {
       shipped,
       remaining,
       progressKnown,
-      percent: progressKnown ? clampPercent((shipped / ordered) * 100) : null,
+      percent: progressKnown
+        ? clampPercent(
+            Number(
+              (BigInt(numeric20Scale6Units(shipped)) * 10000n) /
+                BigInt(numeric20Scale6Units(ordered))
+            ) / 100
+          )
+        : null,
     }
     return { ...row, status: salesDeliveryStatus(row, today) }
   })
@@ -329,9 +344,7 @@ function warehouseLabel(warehouse, warehouseID) {
   const name = normalizedText(warehouse?.name)
   const code = normalizedText(warehouse?.code)
   if (name && code) return `${name}（${code}）`
-  return (
-    name || code || (warehouseID ? `仓库 #${warehouseID}（未启用）` : '未分仓')
-  )
+  return name || code || (warehouseID ? '仓库资料未提供' : '未分仓')
 }
 
 export function buildInventoryDistributionModel(
@@ -605,7 +618,7 @@ export function buildProductionProcessModel(aggregate) {
       )
       const hasDownstream = itemBatches.some(
         (batch) =>
-          batch.status !== 'CANCELLED' &&
+          !['CANCELLED', 'SPLIT'].includes(batch.status) &&
           (operationPosition.get(batch.production_order_operation_id) ?? -1) >
             index
       )

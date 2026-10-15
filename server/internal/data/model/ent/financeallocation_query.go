@@ -298,12 +298,12 @@ func (_q *FinanceAllocationQuery) WithPayment(opts ...func(*FinancePaymentQuery)
 // Example:
 //
 //	var v []struct {
-//		PaymentID int `json:"payment_id,omitempty"`
+//		Reason string `json:"reason,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.FinanceAllocation.Query().
-//		GroupBy(financeallocation.FieldPaymentID).
+//		GroupBy(financeallocation.FieldReason).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 func (_q *FinanceAllocationQuery) GroupBy(field string, fields ...string) *FinanceAllocationGroupBy {
@@ -321,11 +321,11 @@ func (_q *FinanceAllocationQuery) GroupBy(field string, fields ...string) *Finan
 // Example:
 //
 //	var v []struct {
-//		PaymentID int `json:"payment_id,omitempty"`
+//		Reason string `json:"reason,omitempty"`
 //	}
 //
 //	client.FinanceAllocation.Query().
-//		Select(financeallocation.FieldPaymentID).
+//		Select(financeallocation.FieldReason).
 //		Scan(ctx, &v)
 func (_q *FinanceAllocationQuery) Select(fields ...string) *FinanceAllocationSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)

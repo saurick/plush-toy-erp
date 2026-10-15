@@ -54,52 +54,52 @@ function hasPassedReportContract(report, { customer, environment }) {
   const verifiedAt = String(report?.verifiedAt || '')
   return Boolean(
     report &&
-      typeof report === 'object' &&
-      report.customerCode === customer &&
-      report.environment === environment &&
-      SHA_PATTERN.test(String(report.releaseVersion || '')) &&
-      BACKUP_ID_PATTERN.test(String(report.backupId || '')) &&
-      String(report.backupId).startsWith(`br-${customer}-`) &&
-      TIMESTAMP_WITH_TIME_ZONE_PATTERN.test(verifiedAt) &&
-      Number.isFinite(Date.parse(verifiedAt)) &&
-      typeof report.restoreTarget === 'string' &&
-      report.restoreTarget.endsWith(':removed-after-run') &&
-      redaction?.containsSecrets === false &&
-      redaction?.containsRawCustomerRows === false &&
-      redaction?.containsDumpContent === false &&
-      redaction?.containsFullDsn === false &&
-      summary?.backupCreated === true &&
-      summary?.restoreCompleted === true &&
-      summary?.migrationStatus === 'ok' &&
-      summary?.populatedUpgradeAuditStatus === 'passed' &&
-      summary?.customerConfigCutoverAuditStatus === 'passed' &&
-      summary?.databaseConstraintAuditStatus === 'passed' &&
-      summary?.smokeQueryStatus === 'passed' &&
-      Number.isSafeInteger(backup?.databaseBackupSize) &&
-      backup.databaseBackupSize > 0 &&
-      HASH_PATTERN.test(String(backup?.databaseBackupHash || '')) &&
-      backup?.sourcePolicy === 'dedicated-backup' &&
-      backup?.sourceRole === 'erp_backup' &&
-      typeof backup?.migrationVersion === 'string' &&
-      backup.migrationVersion !== '' &&
-      backup.migrationVersion !== 'unknown' &&
-      restore?.restoreTestStatus === 'passed-temp-container' &&
-      restore?.migrationBeforeApply === backup.migrationVersion &&
-      typeof restore?.restoreMigrationVersion === 'string' &&
-      restore.restoreMigrationVersion !== '' &&
-      restore.restoreMigrationVersion !== 'unknown' &&
-      String(restore?.pendingFiles || '') === '0' &&
-      restore?.programmability === '0|0|0' &&
-      restore?.permissionReadbackStatus === 'passed' &&
-      restore?.populatedUpgradeAuditStatus === 'passed' &&
-      restore?.customerConfigCutoverAuditStatus === 'passed' &&
-      restore?.databaseConstraintAuditStatus === 'passed' &&
-      HASH_PATTERN.test(String(restore?.schemaReadbackSha256 || '')) &&
-      smoke?.smokeQueryStatus === 'passed' &&
-      Number(smoke?.publicTableCount) > 0 &&
-      smoke?.backendHealthStatus === 'passed' &&
-      smoke?.backendReadyStatus === 'passed' &&
-      smoke?.webSmokeStatus === 'passed'
+    typeof report === 'object' &&
+    report.customerCode === customer &&
+    report.environment === environment &&
+    SHA_PATTERN.test(String(report.releaseId || '')) &&
+    BACKUP_ID_PATTERN.test(String(report.backupId || '')) &&
+    String(report.backupId).startsWith(`br-${customer}-`) &&
+    TIMESTAMP_WITH_TIME_ZONE_PATTERN.test(verifiedAt) &&
+    Number.isFinite(Date.parse(verifiedAt)) &&
+    typeof report.restoreTarget === 'string' &&
+    report.restoreTarget.endsWith(':removed-after-run') &&
+    redaction?.containsSecrets === false &&
+    redaction?.containsRawCustomerRows === false &&
+    redaction?.containsDumpContent === false &&
+    redaction?.containsFullDsn === false &&
+    summary?.backupCreated === true &&
+    summary?.restoreCompleted === true &&
+    summary?.migrationStatus === 'ok' &&
+    summary?.populatedUpgradeAuditStatus === 'passed' &&
+    summary?.customerConfigCutoverAuditStatus === 'passed' &&
+    summary?.databaseConstraintAuditStatus === 'passed' &&
+    summary?.smokeQueryStatus === 'passed' &&
+    Number.isSafeInteger(backup?.databaseBackupSize) &&
+    backup.databaseBackupSize > 0 &&
+    HASH_PATTERN.test(String(backup?.databaseBackupHash || '')) &&
+    backup?.sourcePolicy === 'dedicated-backup' &&
+    backup?.sourceRole === 'erp_backup' &&
+    typeof backup?.migrationVersion === 'string' &&
+    backup.migrationVersion !== '' &&
+    backup.migrationVersion !== 'unknown' &&
+    restore?.restoreTestStatus === 'passed-temp-container' &&
+    restore?.migrationBeforeApply === backup.migrationVersion &&
+    typeof restore?.restoreMigrationVersion === 'string' &&
+    restore.restoreMigrationVersion !== '' &&
+    restore.restoreMigrationVersion !== 'unknown' &&
+    String(restore?.pendingFiles || '') === '0' &&
+    restore?.programmability === '0|0|0' &&
+    restore?.permissionReadbackStatus === 'passed' &&
+    restore?.populatedUpgradeAuditStatus === 'passed' &&
+    restore?.customerConfigCutoverAuditStatus === 'passed' &&
+    restore?.databaseConstraintAuditStatus === 'passed' &&
+    HASH_PATTERN.test(String(restore?.schemaReadbackSha256 || '')) &&
+    smoke?.smokeQueryStatus === 'passed' &&
+    Number(smoke?.publicTableCount) > 0 &&
+    smoke?.backendHealthStatus === 'passed' &&
+    smoke?.backendReadyStatus === 'passed' &&
+    smoke?.webSmokeStatus === 'passed'
   )
 }
 
@@ -120,7 +120,7 @@ function readReceipt(reportPath, context) {
     target: context.target,
     customer: context.customer,
     environment: context.environment,
-    releaseVersion: report.releaseVersion,
+    releaseVersion: report.releaseId,
     verifiedAt,
     backupId: report.backupId,
     reportPath: path

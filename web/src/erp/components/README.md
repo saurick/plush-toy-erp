@@ -11,11 +11,12 @@
 | 分组             | 典型路径                                                                       | 职责                                                           |
 | ---------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------- |
 | 页面壳和通用展示 | `ERPLayout.jsx`、`CommandCenterNav.jsx`、`PageHero.jsx`、`StatusPill.jsx`      | 布局、导航、页头和状态展示                                     |
+| 账号身份 | `AccountIdentity.jsx`、`accountIdentity.css` | 桌面账号入口和手机“我的”共用的默认文字头像、姓名、账号及实际所属岗位；头像颜色按账号固定，完整岗位在账号卡片换行展示 |
 | 业务列表共享层   | `business-list/*`                                                              | 列表壳、表单弹窗、附件、明细行、列顺序、协同任务面板和来源选择 |
 | 主数据和源单据   | `master-data/*`、`sales-orders/*`、`purchase-orders/*`、`outsourcing-orders/*` | 领域列配置、表单、业务动作面板和来源生成入口                   |
 | 事实和质量       | `operational-facts/*`、`quality-inspections/*`、`shipments/*`                  | Operational Fact、质检、出货相关展示和表单入口                 |
 | 工程资料和打印   | `bom/*`、`print/*`                                                             | BOM 头 / 明细、打印模板工作台和纸面预览                        |
-| Workflow 动作    | `workflow/*`                                                                   | 任务动作抽屉和提交前解释合同消费                               |
+| Workflow 展示与动作 | `workflow/*` | 任务动作抽屉、提交前解释合同消费；`WorkflowTaskCalendar.jsx` 供两端共用待办月历、日期列表和跨月逾期 / 无截止入口，读取服务端完整统计并复用现有办理入口 |
 
 ## 边界
 

@@ -395,7 +395,8 @@ function validateBatch(batch, productionOrderID) {
     !Object.hasOwn(batch, 'origin_rework_fact_id') ||
     !optionalPositiveInteger(batch.origin_rework_fact_id) ||
     !optionalPositiveInteger(batch.origin_exception_decision_id) ||
-    (batch.flow_type === PRODUCTION_WIP_FLOW_TYPE.REMAKE && !positiveSafeInteger(batch.origin_exception_decision_id)) ||
+    (batch.flow_type === PRODUCTION_WIP_FLOW_TYPE.REMAKE &&
+      !positiveSafeInteger(batch.origin_exception_decision_id)) ||
     !optionalPositiveInteger(batch.finished_goods_receipt_id) ||
     !requiredText(batch.batch_no) ||
     !Object.hasOwn(PRODUCTION_WIP_FLOW_TYPE, batch.flow_type) ||
@@ -601,11 +602,17 @@ export function validateProductionWipAggregate(data, expected = {}) {
     validateBatch(batch, order.id)
   )
   const finishedGoodsReceipts = data.finished_goods_receipts.map((receipt) => {
-    if (!receipt || !positiveSafeInteger(receipt.id) ||
+    if (
+      !receipt ||
+      !positiveSafeInteger(receipt.id) ||
       !positiveSafeInteger(receipt.production_wip_batch_id) ||
-      !requiredText(receipt.fact_no) || !['DRAFT', 'POSTED', 'CANCELLED'].includes(receipt.status) ||
-      !canonicalQuantity(receipt.quantity) || !canonicalNonNegativeQuantity(receipt.reworked_quantity) ||
-      !batches.some((batch) => batch.id === receipt.production_wip_batch_id)) throw invalidResponse()
+      !requiredText(receipt.fact_no) ||
+      !['DRAFT', 'POSTED', 'CANCELLED'].includes(receipt.status) ||
+      !canonicalQuantity(receipt.quantity) ||
+      !canonicalNonNegativeQuantity(receipt.reworked_quantity) ||
+      !batches.some((batch) => batch.id === receipt.production_wip_batch_id)
+    )
+      { throw invalidResponse() }
     return receipt
   })
   ensureUniqueIDs(finishedGoodsReceipts)
@@ -715,25 +722,29 @@ export function validateProductionWipAggregate(data, expected = {}) {
             allocation.production_order_material_requirement_id
           )
         : null
-      const isNormalFabric =
+      const needsFreshMaterial =
         operation?.operation_code === 'FABRIC_PROCESSING' &&
-        batch?.flow_type === PRODUCTION_WIP_FLOW_TYPE.NORMAL
+        [
+          PRODUCTION_WIP_FLOW_TYPE.NORMAL,
+          PRODUCTION_WIP_FLOW_TYPE.REMAKE,
+        ].includes(batch?.flow_type)
       if (!batch || !operation || !item) return true
       if (allocation.subject_type === 'MATERIAL') {
         return (
-          !isNormalFabric ||
+          !needsFreshMaterial ||
           !requirement ||
           requirement.production_order_item_id !==
             batch.production_order_item_id ||
           allocation.unit_id !== requirement.unit_id ||
-          compareProductionWipQuantity(
-            allocation.allocated_quantity,
-            requirement.planned_quantity
-          ) !== 0
+          (batch.flow_type === PRODUCTION_WIP_FLOW_TYPE.NORMAL &&
+            compareProductionWipQuantity(
+              allocation.allocated_quantity,
+              requirement.planned_quantity
+            ) !== 0)
         )
       }
       return (
-        isNormalFabric ||
+        needsFreshMaterial ||
         allocation.production_order_material_requirement_id != null ||
         allocation.unit_id !== item.unit_id ||
         compareProductionWipQuantity(
@@ -750,7 +761,10 @@ export function validateProductionWipAggregate(data, expected = {}) {
       const operation = operationByID.get(batch.production_order_operation_id)
       if (
         operation?.operation_code === 'FABRIC_PROCESSING' &&
-        batch.flow_type === PRODUCTION_WIP_FLOW_TYPE.NORMAL
+        [
+          PRODUCTION_WIP_FLOW_TYPE.NORMAL,
+          PRODUCTION_WIP_FLOW_TYPE.REMAKE,
+        ].includes(batch.flow_type)
       ) {
         const requirementIDs = materialRequirements
           .filter(
@@ -830,19 +844,57 @@ export function validateProductionWipAggregate(data, expected = {}) {
 export function productionWipPackagingReceiptChoices(aggregate, batch) {
   if (!aggregate || !batch) return []
   return (aggregate.finishedGoodsReceipts || [])
-    .filter((receipt) => receipt.production_wip_batch_id === batch.id && receipt.status === 'POSTED')
+    .filter(
+      (receipt) =>
+        receipt.production_wip_batch_id === batch.id &&
+        receipt.status === 'POSTED'
+    )
     .map((receipt) => {
-      const allocated = aggregate.batches.filter((candidate) => candidate.finished_goods_receipt_id === receipt.id && !['CANCELLED', 'SPLIT'].includes(candidate.status))
-      const remaining = quantityInteger(receipt.quantity, 6) - quantityInteger(receipt.reworked_quantity, 6) - allocated.reduce((total, candidate) => total + quantityInteger(candidate.quantity, 6), 0n)
-      return { ...receipt, remaining_quantity: quantityTextFromInteger(remaining > 0n ? remaining : 0n, 6) }
+      const allocated = aggregate.batches.filter(
+        (candidate) =>
+          candidate.finished_goods_receipt_id === receipt.id &&
+          !['CANCELLED', 'SPLIT'].includes(candidate.status)
+      )
+      const remaining =
+        quantityInteger(receipt.quantity, 6) -
+        quantityInteger(receipt.reworked_quantity, 6) -
+        allocated.reduce(
+          (total, candidate) => total + quantityInteger(candidate.quantity, 6),
+          0n
+        )
+      return {
+        ...receipt,
+        remaining_quantity: quantityTextFromInteger(
+          remaining > 0n ? remaining : 0n,
+          6
+        ),
+      }
     })
-    .filter((receipt) => compareProductionWipQuantity(receipt.remaining_quantity, '0') > 0)
+    .filter(
+      (receipt) =>
+        compareProductionWipQuantity(receipt.remaining_quantity, '0') > 0
+    )
 }
 
-export function productionWipTransferRemainingQuantity(aggregate, batch, nextOperation) {
+export function productionWipTransferRemainingQuantity(
+  aggregate,
+  batch,
+  nextOperation
+) {
   if (!batch || !nextOperation) return '0'
-  const children = (aggregate?.batches || []).filter((candidate) => candidate.source_batch_id === batch.id && candidate.production_order_operation_id === nextOperation.id && candidate.flow_type === 'NORMAL' && candidate.status !== 'CANCELLED')
-  const remaining = quantityInteger(batch.quantity, 6) - children.reduce((total, child) => total + quantityInteger(child.quantity, 6), 0n)
+  const children = (aggregate?.batches || []).filter(
+    (candidate) =>
+      candidate.source_batch_id === batch.id &&
+      candidate.production_order_operation_id === nextOperation.id &&
+      candidate.flow_type === 'NORMAL' &&
+      candidate.status !== 'CANCELLED'
+  )
+  const remaining =
+    quantityInteger(batch.quantity, 6) -
+    children.reduce(
+      (total, child) => total + quantityInteger(child.quantity, 6),
+      0n
+    )
   return quantityTextFromInteger(remaining > 0n ? remaining : 0n, 6)
 }
 
@@ -1111,6 +1163,8 @@ export function productionWipOutsourcingCandidateMatches(
       .trim()
       .toLowerCase() !== 'confirmed' ||
     !productOperationAllowed ||
+    (order.source_wip_batch_id != null &&
+      order.source_wip_batch_id !== batch.id) ||
     !positiveSafeInteger(item.id) ||
     item.outsourcing_order_id !== order.id ||
     String(item.line_status || '')
@@ -1200,10 +1254,18 @@ export function productionWipMaterialOutsourcingCandidateMatches(
   }
   try {
     if (batch.flow_type === PRODUCTION_WIP_FLOW_TYPE.REMAKE) {
-      return positiveSafeInteger(batch.id) && order.source_wip_batch_id === batch.id &&
+      return (
+        positiveSafeInteger(batch.id) &&
+        order.source_wip_batch_id === batch.id &&
         compareProductionWipQuantity(item.outsourcing_quantity, '0') > 0
+      )
     }
-    return compareProductionWipQuantity(item.outsourcing_quantity, requirement.planned_quantity) === 0
+    return (
+      compareProductionWipQuantity(
+        item.outsourcing_quantity,
+        requirement.planned_quantity
+      ) === 0
+    )
   } catch {
     return false
   }
@@ -1279,7 +1341,9 @@ export function buildProductionWipFabricContractOptions(
         })
         .map((source) => {
           const { item } = source
-          const quantity = normalizeProductionWipQuantity(item.outsourcing_quantity)
+          const quantity = normalizeProductionWipQuantity(
+            item.outsourcing_quantity
+          )
           const line = positiveSafeInteger(item.line_no)
             ? `第 ${item.line_no} 行`
             : '合同明细'
@@ -1443,8 +1507,18 @@ export function productionWipQualityInspectionMeta(inspection = {}) {
 }
 
 export function productionWipBatchLineageMeta(batch = {}) {
-  if (batch.flow_type === PRODUCTION_WIP_FLOW_TYPE.REMAKE) return Object.freeze({ key: 'exception-remake', label: '异常补料重做', color: 'volcano' })
-  if (positiveSafeInteger(batch.origin_exception_decision_id)) return Object.freeze({ key: 'exception-rework', label: '异常方案返工', color: 'orange' })
+  if (batch.flow_type === PRODUCTION_WIP_FLOW_TYPE.REMAKE)
+    { return Object.freeze({
+      key: 'exception-remake',
+      label: '异常补料重做',
+      color: 'volcano',
+    }) }
+  if (positiveSafeInteger(batch.origin_exception_decision_id))
+    { return Object.freeze({
+      key: 'exception-rework',
+      label: '异常方案返工',
+      color: 'orange',
+    }) }
   if (positiveSafeInteger(batch.origin_rework_fact_id)) {
     return Object.freeze({
       key: 'finished-goods-rework',
@@ -1656,8 +1730,7 @@ export function partitionProductionCompletionItems(
         eligibility.receivableQuantity
           ? Object.freeze({
               ...item,
-              receivable_quantity:
-                eligibility.receivableQuantity,
+              receivable_quantity: eligibility.receivableQuantity,
               receivable_batches: eligibility.receivableBatches,
             })
           : item

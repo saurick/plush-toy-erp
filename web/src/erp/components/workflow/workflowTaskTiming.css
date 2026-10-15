@@ -4,7 +4,7 @@
   gap: 6px;
   min-width: 0;
   color: var(--erp-text-muted, #64748b);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 20px;
   text-align: left;
 }
@@ -58,7 +58,7 @@
 
 .erp-task-timing--detail {
   margin-top: 12px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 22px;
 }
 
@@ -71,5 +71,5 @@
 }
 
 .mobile-role-tasks-page .erp-task-timing {
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }

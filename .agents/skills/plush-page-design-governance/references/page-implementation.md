@@ -18,6 +18,14 @@ DEV 工作台沿用 `docs/product/自动化测试策略.md` 的浅色桌面 smok
    - A mobile list that presents one continuous result stream keeps server-side batching but appends the next batch as the user nears the bottom. Do not expose previous/next buttons or page numbers. Preserve loaded rows on append failure and retry at the list tail. Grouped or intentionally collapsed sections may still use an explicit show-more control.
    - Tab motion is a shared interaction contract. Use `SlidingTabs` for Ant-style tab navigation, `SlidingSegmented` for compact mutually exclusive views, and `SlidingTabList` for custom tab markup. Keep the tab strip and indicator mounted at a stable DOM position while the active view changes; render the controlled content below it, do not place the switch inside mutually exclusive content branches, and do not change its React `key` per view. Table/visualization switches use `BusinessViewSurface` when that existing shell fits. Do not add local duration/easing or disable indicator animation; `tabs-motion.css` owns motion and `prefers-reduced-motion` is the only global opt-out.
 
+## Visual Finish
+
+简洁是减少不必要的信息和操作，仍需完成对齐、文字层级、留白节奏、状态区分与主题适配。不要用增加装饰或套更多卡片代替这些检查。
+
+日期、标签和紧凑选择器含可选数量或说明时，主标签与选中标记的对齐须在空值、单项和多项下保持稳定；辅助内容不能靠空白占位把主标签挤偏。居中标题以整栏为基准，不能被两侧不等宽的操作推偏。
+
+已确认的视觉缺陷应补到现有浏览器回归中：根据该组件的设计，测量主标签与选中标记中心、标题与整栏中心、重复列的对齐及溢出；居中允许约 1 CSS px 的舍入差异。截图同时核对整体层次与密度，不能只证明按钮能点击或 CSS 写了 `center`。测试范围仍按实际触达的状态、主题与设备选择。
+
 ## Validate as regression, not just screenshot review.
    - Cover default, interaction, recovery, and adjacent-area states.
    - For visible layout or interaction changes, verify the exact changed state and relevant boundaries in the real browser. Use named screenshots or Playwright artifacts for visual review or failure diagnosis; fix and recheck affected states when they expose a product defect.
