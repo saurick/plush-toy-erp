@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Plush GitLab verified local and encrypted offsite backup
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+RandomizedDelaySec=30m
+Unit=plush-gitlab-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,46 @@
+{
+  "scope": "retired-shipment-rpc-and-ordinary-role-workflow-smoke",
+  "status": "pass",
+  "customerKey": "yoyoosun",
+  "retiredMethods": [
+    {
+      "method": "create_shipment",
+      "code": 40020,
+      "unknownMethod": true
+    },
+    {
+      "method": "createShipment",
+      "code": 40020,
+      "unknownMethod": true
+    },
+    {
+      "method": "add_shipment_item",
+      "code": 40020,
+      "unknownMethod": true
+    },
+    {
+      "method": "addShipmentItem",
+      "code": 40020,
+      "unknownMethod": true
+    }
+  ],
+  "atomicCreate": {
+    "recognized": true,
+    "noWriteInvalidProbeCode": 40304
+  },
+  "effectiveSession": {
+    "activeRevision": "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    "roleProjectionUsesCustomerConfig": true
+  },
+  "workflow": {
+    "ordinaryRole": "sales",
+    "visibleTaskCount": 11,
+    "visibleOwnerRoleKeys": [
+      "sales"
+    ],
+    "configRevisions": [],
+    "actionsUseProjectedRole": true,
+    "noBusinessWritePerformed": true
+  },
+  "responseBodyStored": false
+}

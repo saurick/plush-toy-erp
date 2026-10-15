@@ -1,0 +1,7 @@
+[production-preflight] ok: env 必需变量齐全
+[production-preflight] ok: 生产 secret、镜像 tag、debug、后端端口和 PostgreSQL / Jaeger 暴露边界通过
+[production-preflight] ok: Compose、低配部署边界和 migration 脚本通过
+[production-preflight] ok: docker compose config -q 通过
+[production-preflight] ok: Compose 运行服务存在
+[production-preflight] ok: healthz / readyz 通过
+[production-preflight] all checks passed

@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "yoyoosun-runtime-contract/v1",
+  "customerCode": "yoyoosun",
+  "auth": {
+    "sms": {
+      "requiredMode": "provider",
+      "requiredSecretEnvKeys": [
+        "APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID",
+        "APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET",
+        "APP_AUTH_SMS_ALIYUN_SIGN_NAME",
+        "APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE"
+      ],
+      "expectedCapabilities": {
+        "enabled": true,
+        "mode": "provider",
+        "mockDelivery": false
+      }
+    }
+  },
+  "redaction": {
+    "containsSecrets": false,
+    "responseBodyStored": false
+  }
+}

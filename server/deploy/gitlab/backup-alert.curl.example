@@ -1,0 +1,4 @@
+# 复制到 /etc/plush-gitlab/backup-alert.curl，填入实际 HTTPS receiver 后 chmod 0600。
+# 认证 header 可写在该 root-only 文件中；不要放入 systemd 参数、仓库或日志。
+url = "https://replace-with-alert-receiver.invalid/gitlab-backup"
+request = "POST"
