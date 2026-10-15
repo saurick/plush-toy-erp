@@ -1,0 +1,749 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	v1 "server/api/jsonrpc/v1"
+	"server/internal/biz"
+	"server/internal/errcode"
+
+	"google.golang.org/protobuf/types/known/structpb"
+)
+
+func (d *jsonrpcDispatcher) handleAdmin(
+	ctx context.Context,
+	method, id string,
+	params *structpb.Struct,
+) (string, *v1.JsonrpcResult, error) {
+	l := d.log.WithContext(ctx)
+
+	pm := map[string]any{}
+	if params != nil {
+		pm = params.AsMap()
+	}
+
+	if _, res := d.requireAdmin(ctx); res != nil {
+		l.Warnf("[admin] requireAdmin denied method=%s id=%s code=%d msg=%s", method, id, res.Code, res.Message)
+		return id, res, nil
+	}
+	switch method {
+	case "me":
+		if res := rejectUnknownAdminParams(pm); res != nil {
+			return id, res, nil
+		}
+		admin, err := d.adminManageUC.GetCurrent(ctx)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data:    newDataStruct(adminProfileToMap(admin, nil)),
+		}, nil
+
+	case "list":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserRead); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm); res != nil {
+			return id, res, nil
+		}
+		admins, err := d.adminManageUC.List(ctx)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		arr := make([]any, 0, len(admins))
+		for _, admin := range admins {
+			arr = append(arr, adminListItemToMap(admin))
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data:    newDataStruct(map[string]any{"admins": arr}),
+		}, nil
+
+	case "create":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserCreate); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "display_name", "username", "phone", "password", "role_keys"); res != nil {
+			return id, res, nil
+		}
+		displayName := getString(pm, "display_name")
+		username := getString(pm, "username")
+		phone := getString(pm, "phone")
+		password := getString(pm, "password")
+		if biz.ValidateAdminPassword(password) != nil {
+			return id, invalidAdminPasswordResult(), nil
+		}
+		roleKeys, ok := getStrictStringSlice(pm, "role_keys", false)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		if len(biz.NormalizeAdminRoleKeys(roleKeys)) > 0 {
+			if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserRoleAssign); res != nil {
+				return id, res, nil
+			}
+		}
+
+		admin, err := d.adminManageUC.Create(ctx, displayName, username, phone, password, roleKeys)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"admin": adminListItemToMap(admin),
+			}),
+		}, nil
+
+	case "rbac_options", "menu_options":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRoleRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemPermissionRead); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm); res != nil {
+			return id, res, nil
+		}
+		roles, roleAccess, err := d.adminManageUC.ListRolesWithAccess(ctx)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		permissions, err := d.adminManageUC.ListPermissions(ctx)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		warehouseScopeOptions := []any{}
+		if d.masterDataUC != nil {
+			warehouses, _, listErr := d.masterDataUC.ListWarehouses(ctx, biz.MasterDataFilter{Limit: 1000})
+			if listErr != nil {
+				return id, d.mapMasterDataError(ctx, listErr), nil
+			}
+			warehouseScopeOptions = warehousesToAny(warehouses)
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"roles":                   roleOptionsToAny(roles, roleAccess),
+				"permissions":             permissionOptionsToAny(permissions),
+				"menus":                   menuOptionsToAny(biz.BuiltinAdminMenus()),
+				"role_options":            roleOptionsToAny(roles, roleAccess),
+				"permission_options":      permissionOptionsToAny(permissions),
+				"menu_options":            menuOptionsToAny(biz.BuiltinAdminMenus()),
+				"warehouse_scope_options": warehouseScopeOptions,
+			}),
+		}, nil
+
+	case "effective_role_access":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRoleRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemPermissionRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigRead); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "role_key", "permission_keys"); res != nil {
+			return id, res, nil
+		}
+		roleKey := getString(pm, "role_key")
+		_, previewRequested := pm["permission_keys"]
+		var role *biz.AdminRole
+		var err error
+		if previewRequested {
+			permissionKeys, ok := getStrictStringSlice(pm, "permission_keys", true)
+			if !ok {
+				return id, invalidAdminParamResult(), nil
+			}
+			role, err = d.adminManageUC.GetRoleForAccessPreview(ctx, roleKey, permissionKeys)
+		} else {
+			role, err = d.adminManageUC.GetRoleForAccessExplanation(ctx, roleKey)
+		}
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		customerKey, err := runtimeCustomerKey("")
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		explanation, err := d.customerConfigUC.ExplainRoleEffectiveAccess(
+			ctx,
+			customerKey,
+			*role,
+			runtimeCustomerConfigRequiresActiveRevision(),
+		)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		effectiveAccess := roleEffectiveAccessExplanationToMap(explanation)
+		effectiveAccess["is_preview"] = previewRequested
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"effective_access": effectiveAccess,
+			}),
+		}, nil
+
+	case "set_roles":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserRoleAssign); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "id", "role_keys"); res != nil {
+			return id, res, nil
+		}
+		adminID := getInt(pm, "id", 0)
+		roleKeys, ok := getStrictStringSlice(pm, "role_keys", true)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		admin, err := d.adminManageUC.SetRoles(ctx, adminID, roleKeys)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"admin": adminListItemToMap(admin),
+			}),
+		}, nil
+
+	case "set_role_settings":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRolePermissionManage); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(
+			pm,
+			"role_key",
+			"permission_keys",
+			"data_scopes",
+			"navigation_mode",
+			"primary_menu_paths",
+			"secondary_menu_paths",
+			"expected_version",
+		); res != nil {
+			return id, res, nil
+		}
+		permissionKeys, ok := getStrictStringSlice(pm, "permission_keys", true)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		dataScopes, ok := getStrictRoleDataScopes(pm, "data_scopes")
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		primaryMenuPaths, ok := getStrictStringSlice(pm, "primary_menu_paths", true)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		secondaryMenuPaths, ok := getStrictStringSlice(pm, "secondary_menu_paths", true)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		roleKey := getString(pm, "role_key")
+		navigation := biz.RoleNavigationSettings{
+			Mode:               biz.RoleNavigationMode(getString(pm, "navigation_mode")),
+			PrimaryMenuPaths:   primaryMenuPaths,
+			SecondaryMenuPaths: secondaryMenuPaths,
+		}
+		if navigation.Mode == biz.RoleNavigationModeCustom {
+			previewRole, err := d.adminManageUC.GetRoleForAccessPreview(ctx, roleKey, permissionKeys)
+			if err != nil {
+				return id, d.mapAdminManageError(ctx, err), nil
+			}
+			customerKey, err := runtimeCustomerKey("")
+			if err != nil {
+				return id, d.mapCustomerConfigError(ctx, err), nil
+			}
+			explanation, err := d.customerConfigUC.ExplainRoleEffectiveAccess(
+				ctx,
+				customerKey,
+				*previewRole,
+				runtimeCustomerConfigRequiresActiveRevision(),
+			)
+			if err != nil {
+				return id, d.mapCustomerConfigError(ctx, err), nil
+			}
+			if !explanation.IsFinal {
+				return id, d.mapCustomerConfigError(ctx, biz.ErrCustomerConfigActiveRevisionRequired), nil
+			}
+			effectivePagePaths := make([]string, 0, len(explanation.Pages))
+			for _, page := range explanation.Pages {
+				if page.Effective {
+					effectivePagePaths = append(effectivePagePaths, page.Path)
+				}
+			}
+			if err := biz.ValidateRoleNavigationPartition(navigation, effectivePagePaths); err != nil {
+				return id, d.mapAdminManageError(ctx, err), nil
+			}
+		}
+		role, err := d.adminManageUC.SetRoleSettings(
+			ctx,
+			roleKey,
+			permissionKeys,
+			dataScopes,
+			navigation.Mode,
+			primaryMenuPaths,
+			secondaryMenuPaths,
+			expectedVersion,
+		)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"role": adminRoleToMap(*role, true),
+			}),
+		}, nil
+
+	case "set_profile":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "id", "display_name", "phone"); res != nil {
+			return id, res, nil
+		}
+		adminID := getInt(pm, "id", 0)
+		admin, err := d.adminManageUC.SetProfile(ctx, adminID, getString(pm, "display_name"), getString(pm, "phone"))
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"admin": adminListItemToMap(admin),
+			}),
+		}, nil
+
+	case "set_erp_column_order":
+		if res := rejectUnknownAdminParams(pm, "module_key", "order", "hidden_columns"); res != nil {
+			return id, res, nil
+		}
+		moduleKey := getString(pm, "module_key")
+		order, ok := getStrictStringSlice(pm, "order", true)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		hiddenColumns, ok := getStrictStringSlice(pm, "hidden_columns", false)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		admin, err := d.adminManageUC.SetCurrentERPColumnOrder(ctx, moduleKey, order, hiddenColumns)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"erp_preferences": adminERPPreferencesToMap(admin.ERPPreferences),
+			}),
+		}, nil
+
+	case "set_erp_appearance":
+		if res := rejectUnknownAdminParams(pm, "theme_mode", "accent", "density", "tableLines"); res != nil {
+			return id, res, nil
+		}
+		patch := biz.AdminERPAppearancePatch{}
+		for key, target := range map[string]**string{
+			"theme_mode": &patch.ThemeMode, "accent": &patch.Accent, "density": &patch.Density,
+			"tableLines": &patch.TableLines,
+		} {
+			if raw, exists := pm[key]; exists {
+				value, ok := raw.(string)
+				if !ok {
+					return id, invalidAdminParamResult(), nil
+				}
+				*target = &value
+			}
+		}
+		admin, err := d.adminManageUC.SetCurrentERPAppearance(ctx, patch)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code: errcode.OK.Code, Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{"erp_preferences": adminERPPreferencesToMap(admin.ERPPreferences)}),
+		}, nil
+
+	case "legal_notice_status":
+		if res := rejectUnknownAdminParams(pm, "notice_version", "content_fingerprint"); res != nil {
+			return id, res, nil
+		}
+		status, err := d.adminManageUC.GetLegalNoticeStatus(
+			ctx,
+			getString(pm, "notice_version"),
+			getString(pm, "content_fingerprint"),
+		)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"notice_version":      status.NoticeVersion,
+				"content_fingerprint": status.ContentFingerprint,
+				"acknowledged":        status.Acknowledged,
+				"acknowledged_at":     optionalTimeUnix(status.AcknowledgedAt),
+			}),
+		}, nil
+
+	case "acknowledge_legal_notice":
+		if res := rejectUnknownAdminParams(pm, "notice_version", "content_fingerprint"); res != nil {
+			return id, res, nil
+		}
+		status, err := d.adminManageUC.AcknowledgeLegalNotice(
+			ctx,
+			getString(pm, "notice_version"),
+			getString(pm, "content_fingerprint"),
+		)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"notice_version":      status.NoticeVersion,
+				"content_fingerprint": status.ContentFingerprint,
+				"acknowledged":        status.Acknowledged,
+				"acknowledged_at":     optionalTimeUnix(status.AcknowledgedAt),
+			}),
+		}, nil
+
+	case "audit_logs":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemAuditRead); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "source", "event_type", "event_key", "actor_key", "target_type", "target_key", "keyword", "created_from", "created_to", "limit", "offset"); res != nil {
+			return id, res, nil
+		}
+		createdFrom, ok := getOptionalJSONRPCTime(pm, "created_from")
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		createdTo, ok := getOptionalJSONRPCTime(pm, "created_to")
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		var createdFromValue time.Time
+		if createdFrom != nil {
+			createdFromValue = *createdFrom
+		}
+		var createdToValue time.Time
+		if createdTo != nil {
+			createdToValue = *createdTo
+		}
+		result, err := d.adminManageUC.ListRuntimeAuditEvents(ctx, biz.RuntimeAuditEventListFilter{
+			Source:      getString(pm, "source"),
+			EventType:   getString(pm, "event_type"),
+			EventKey:    getString(pm, "event_key"),
+			ActorKey:    getString(pm, "actor_key"),
+			TargetType:  getString(pm, "target_type"),
+			TargetKey:   getString(pm, "target_key"),
+			Keyword:     getString(pm, "keyword"),
+			CreatedFrom: createdFromValue,
+			CreatedTo:   createdToValue,
+			Limit:       getInt(pm, "limit", 50),
+			Offset:      getInt(pm, "offset", 0),
+		})
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"events": runtimeAuditEventsToAny(result.Events),
+				"total":  result.Total,
+				"limit":  result.Limit,
+				"offset": result.Offset,
+			}),
+		}, nil
+
+	case "set_disabled":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserDisable); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "id", "disabled", "reason"); res != nil {
+			return id, res, nil
+		}
+		adminID := getInt(pm, "id", 0)
+		disabled, ok := pm["disabled"].(bool)
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		admin, err := d.adminManageUC.SetDisabled(ctx, adminID, disabled, getString(pm, "reason"))
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"admin": adminListItemToMap(admin),
+			}),
+		}, nil
+
+	case "revoke":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserRevoke); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "id", "reason"); res != nil {
+			return id, res, nil
+		}
+		admin, releasedTaskCount, err := d.adminManageUC.Revoke(ctx, getInt(pm, "id", 0), getString(pm, "reason"))
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code: errcode.OK.Code, Message: "账号已注销",
+			Data: newDataStruct(map[string]any{
+				"admin":               adminListItemToMap(admin),
+				"released_task_count": releasedTaskCount,
+			}),
+		}, nil
+
+	case "change_password":
+		if res := rejectUnknownAdminParams(pm, "old_password", "new_password"); res != nil {
+			return id, res, nil
+		}
+		oldPassword, validOld := pm["old_password"].(string)
+		newPassword, validNew := pm["new_password"].(string)
+		if !validOld || !validNew {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		if err := d.adminManageUC.ChangePassword(ctx, oldPassword, newPassword); err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: "密码已修改，请重新登录"}, nil
+	case "reset_default_password":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "id"); res != nil {
+			return id, res, nil
+		}
+		adminID, validID := strictJSONRPCPositiveInt(pm["id"])
+		if !validID {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		if _, err := d.adminManageUC.ResetDefaultPassword(ctx, adminID); err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: "已重置为默认密码"}, nil
+	case "reset_password":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "id", "password"); res != nil {
+			return id, res, nil
+		}
+		adminID := getInt(pm, "id", 0)
+		password := getString(pm, "password")
+		if adminID <= 0 {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		if biz.ValidateAdminPassword(password) != nil {
+			return id, invalidAdminPasswordResult(), nil
+		}
+		admin, err := d.adminManageUC.ResetPassword(ctx, adminID, password)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: "密码已重置",
+			Data: newDataStruct(map[string]any{
+				"admin": adminListItemToMap(admin),
+			}),
+		}, nil
+
+	default:
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.UnknownMethod.Code,
+			Message: fmt.Sprintf("未知管理员接口 method=%s", method),
+		}, nil
+	}
+}
+
+func invalidAdminPasswordResult() *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{
+		Code: errcode.InvalidParam.Code,
+		Message: fmt.Sprintf(
+			"密码应为 %d 到 %d 位",
+			biz.AdminPasswordMinLength,
+			biz.AdminPasswordMaxLength,
+		),
+	}
+}
+
+func invalidAdminUsernameResult() *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{
+		Code: errcode.InvalidParam.Code,
+		Message: fmt.Sprintf(
+			"员工账号只能包含英文字母、数字和下划线，长度须为 %d 到 %d 个字符",
+			biz.AdminUsernameMinLength,
+			biz.AdminUsernameMaxLength,
+		),
+	}
+}
+
+func invalidAdminParamResult() *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+}
+
+func rejectUnknownAdminParams(pm map[string]any, allowedKeys ...string) *v1.JsonrpcResult {
+	allowed := make(map[string]struct{}, len(allowedKeys))
+	for _, key := range allowedKeys {
+		allowed[key] = struct{}{}
+	}
+	for key := range pm {
+		if _, ok := allowed[key]; !ok {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+		}
+	}
+	return nil
+}
+
+func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) *v1.JsonrpcResult {
+	l := d.log.WithContext(ctx)
+
+	switch {
+	case errors.Is(err, biz.ErrInvalidPassword):
+		return &v1.JsonrpcResult{Code: errcode.AuthInvalidPassword.Code, Message: errcode.AuthInvalidPassword.Message}
+	case errors.Is(err, biz.ErrAdminPasswordUnchanged):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "新密码不能与旧密码相同"}
+	case errors.Is(err, biz.ErrAuthVersionStale):
+		return &v1.JsonrpcResult{Code: errcode.AuthCredentialsChanged.Code, Message: errcode.AuthCredentialsChanged.Message}
+	case errors.Is(err, biz.ErrForbidden), errors.Is(err, biz.ErrNoPermission):
+		l.Warnf("[admin] permission denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	case errors.Is(err, biz.ErrAdminUsernameInvalid):
+		l.Warnf("[admin] invalid username err=%v", err)
+		return invalidAdminUsernameResult()
+	case errors.Is(err, biz.ErrBadParam), errors.Is(err, biz.ErrRoleDataScopeResourceNotFound):
+		l.Warnf("[admin] invalid param err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	case errors.Is(err, biz.ErrInvalidPhoneNumber):
+		l.Warnf("[admin] invalid phone err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.AuthInvalidPhone.Code, Message: errcode.AuthInvalidPhone.Message}
+	case errors.Is(err, biz.ErrAdminNotFound):
+		l.Warnf("[admin] not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.AdminNotFound.Code, Message: errcode.AdminNotFound.Message}
+	case errors.Is(err, biz.ErrRoleNotFound):
+		l.Warnf("[admin] role not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "角色不存在"}
+	case errors.Is(err, biz.ErrPermissionNotFound):
+		l.Warnf("[admin] permission not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "权限不存在"}
+	case errors.Is(err, biz.ErrAdminSelfRoleChangeForbidden):
+		l.Warnf("[admin] self role change denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "不能修改当前登录账号的角色"}
+	case errors.Is(err, biz.ErrAdminSelfRolePermissionForbidden):
+		l.Warnf("[admin] own role permission change denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "不能修改当前登录账号正在使用的角色权限"}
+	case errors.Is(err, biz.ErrPrivilegedRoleAssignmentForbidden):
+		l.Warnf("[admin] privileged role assignment denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "该角色受系统保护，当前账号不能分配"}
+	case errors.Is(err, biz.ErrPrivilegedAdminTargetForbidden):
+		l.Warnf("[admin] privileged admin target denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "该系统账号受保护，只有超级管理员可以维护"}
+	case errors.Is(err, biz.ErrSystemRoleImmutable):
+		l.Warnf("[admin] system role mutation denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "产品系统角色只能查看，不能修改权限"}
+	case errors.Is(err, biz.ErrPermissionNotDelegable):
+		l.Warnf("[admin] permission not delegable err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该权限不能分配给业务角色"}
+	case errors.Is(err, biz.ErrDebugRoleProductionForbidden):
+		l.Warnf("[admin] debug role rejected by environment err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前环境不能分配调试角色"}
+	case errors.Is(err, biz.ErrRoleVersionConflict):
+		l.Warnf("[admin] role version conflict err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "角色权限刚刚发生变化，请刷新后重试"}
+	case errors.Is(err, biz.ErrRoleExists):
+		l.Warnf("[admin] role exists err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "角色已存在"}
+	case errors.Is(err, biz.ErrAdminExists):
+		l.Warnf("[admin] exists err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.AdminExists.Code, Message: errcode.AdminExists.Message}
+	case errors.Is(err, biz.ErrAdminPhoneExists):
+		l.Warnf("[admin] phone exists err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.AdminPhoneExists.Code, Message: errcode.AdminPhoneExists.Message}
+	case errors.Is(err, biz.ErrAdminRevoked):
+		return &v1.JsonrpcResult{Code: errcode.AdminAccountRevoked.Code, Message: errcode.AdminAccountRevoked.Message}
+	case errors.Is(err, biz.ErrWorkflowTaskConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "待办状态刚刚发生变化，请刷新后重试注销"}
+	case errors.Is(err, biz.ErrUserDisabled):
+		l.Warnf("[admin] disabled err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.AdminDisabled.Code, Message: errcode.AdminDisabled.Message}
+	default:
+		l.Errorf("[admin] internal err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+}
+
+func getStrictRoleDataScopes(pm map[string]any, key string) ([]biz.RoleDataScope, bool) {
+	rawItems, ok := pm[key].([]any)
+	if !ok || len(rawItems) != 1 {
+		return nil, false
+	}
+	item, ok := rawItems[0].(map[string]any)
+	if !ok || len(item) < 2 || len(item) > 3 {
+		return nil, false
+	}
+	for itemKey := range item {
+		if itemKey != "resource_type" && itemKey != "mode" && itemKey != "resource_ids" {
+			return nil, false
+		}
+	}
+	ids := []int{}
+	if rawIDs, exists := item["resource_ids"]; exists {
+		values, ok := rawIDs.([]any)
+		if !ok {
+			return nil, false
+		}
+		for _, value := range values {
+			id, ok := strictJSONRPCPositiveInt(value)
+			if !ok {
+				return nil, false
+			}
+			ids = append(ids, id)
+		}
+	}
+	normalized, err := biz.NormalizeRoleDataScope(biz.RoleDataScope{
+		ResourceType: getString(item, "resource_type"),
+		Mode:         getString(item, "mode"),
+		ResourceIDs:  ids,
+	})
+	if err != nil {
+		return nil, false
+	}
+	return []biz.RoleDataScope{normalized}, true
+}
+
+func strictJSONRPCPositiveInt(value any) (int, bool) {
+	number, ok := value.(float64)
+	if !ok || number <= 0 || number != float64(int(number)) {
+		return 0, false
+	}
+	return int(number), true
+}
