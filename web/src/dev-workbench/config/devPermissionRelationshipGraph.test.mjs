@@ -1,0 +1,608 @@
+import assert from 'node:assert/strict'
+import test from 'node:test'
+import {
+  PERMISSION_RELATIONSHIP_ALL_MODULES,
+  PERMISSION_RELATIONSHIP_DETAIL_SCOPE,
+  PERMISSION_RELATIONSHIP_VIEW_MODE,
+  buildPermissionRelationshipDetailRows,
+  buildPermissionRelationshipEvidence,
+  buildPermissionRelationshipModel,
+  buildPermissionRelationshipModuleOptions,
+  buildPermissionRelationshipTargetOptions,
+  getPermissionRelationshipRoleKeys,
+} from './devPermissionRelationshipGraph.mjs'
+
+const accounts = [
+  {
+    id: 11,
+    username: 'sales01',
+    display_name: '小林',
+    phone: '13800000000',
+    account_status: 'active',
+    roles: [{ role_key: 'sales', name: '业务员' }],
+  },
+  {
+    id: 12,
+    username: 'sales02',
+    display_name: '小周',
+    phone: '13900000000',
+    account_status: 'suspended',
+    roles: [{ role_key: 'sales', name: '业务员' }],
+  },
+  {
+    id: 20,
+    username: 'warehouse01',
+    display_name: '小吴',
+    phone: '13700000000',
+    account_status: 'suspended',
+    roles: [
+      { role_key: 'sales', name: '业务员' },
+      { role_key: 'warehouse', name: '仓管员' },
+    ],
+  },
+  {
+    id: 1,
+    username: 'root-admin',
+    display_name: '系统管理员',
+    phone: '13600000000',
+    is_super_admin: true,
+    account_status: 'active',
+    roles: [],
+  },
+]
+
+const roles = [
+  {
+    role_key: 'sales',
+    name: '业务员',
+    disabled: false,
+    permissions: ['sales.order.read', 'sales.order.confirm'],
+    data_scopes: [
+      {
+        resource_type: 'warehouse',
+        mode: 'ASSIGNED',
+        resource_ids: [8],
+      },
+    ],
+  },
+  {
+    role_key: 'warehouse',
+    name: '仓管员',
+    disabled: false,
+    permissions: ['warehouse.inventory.read'],
+    data_scopes: [
+      {
+        resource_type: 'warehouse',
+        mode: 'ALL',
+        resource_ids: [],
+      },
+    ],
+  },
+]
+
+const permissions = [
+  {
+    permission_key: 'sales.order.read',
+    name: '查看销售订单',
+    module: 'sales',
+    module_name: '销售管理',
+    usage: {
+      pages: [
+        {
+          key: 'sales-orders',
+          name: '销售订单',
+          control_name: '查看订单列表',
+        },
+      ],
+    },
+  },
+  {
+    permission_key: 'sales.order.confirm',
+    name: '确认报价 "A" <内部>|',
+    module: 'sales',
+    module_name: '销售管理',
+    usage: {
+      pages: [
+        {
+          key: 'sales-orders',
+          name: '销售订单',
+          control_name: '确认订单',
+        },
+      ],
+    },
+  },
+  {
+    permission_key: 'warehouse.inventory.read',
+    name: '查看库存',
+    module: 'warehouse',
+    module_name: '仓储',
+    usage: {
+      pages: [
+        {
+          key: 'inventory',
+          name: '库存查询',
+          control_name: '查看库存',
+        },
+      ],
+    },
+  },
+]
+
+const accessByRoleKey = {
+  sales: {
+    role_key: 'sales',
+    role_name: '业务员',
+    source: 'active_customer_config_revision',
+    is_final: true,
+    permissions: [
+      {
+        permission_key: 'sales.order.read',
+        effective: true,
+        reasons: [],
+      },
+      {
+        permission_key: 'sales.order.confirm',
+        effective: false,
+        reasons: [{ label: '当前客户未启用确认能力' }],
+      },
+    ],
+    pages: [
+      {
+        key: 'sales-orders',
+        label: '销售订单',
+        effective: true,
+        reasons: [],
+      },
+    ],
+  },
+  warehouse: {
+    role_key: 'warehouse',
+    role_name: '仓管员',
+    source: 'active_customer_config_revision',
+    is_final: true,
+    permissions: [
+      {
+        permission_key: 'warehouse.inventory.read',
+        effective: true,
+        reasons: [],
+      },
+    ],
+    pages: [
+      {
+        key: 'inventory',
+        label: '库存查询',
+        effective: true,
+        reasons: [],
+      },
+    ],
+  },
+}
+
+const approvalSettings = {
+  items: [
+    {
+      approval_key: 'sales_order_review',
+      label: '销售订单审批',
+      configured: true,
+      enabled: true,
+      effective_role_keys: ['sales'],
+      members: [
+        {
+          role_key: 'sales',
+          user_id: 0,
+          enabled: true,
+        },
+      ],
+      blocked_reasons: [],
+    },
+  ],
+}
+
+test('role view connects accounts, role, final permissions, pages, scope and approvals', () => {
+  const model = buildPermissionRelationshipModel({
+    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE,
+    targetKey: 'sales',
+    moduleKey: 'sales',
+    accounts,
+    roles,
+    permissions,
+    warehouseOptions: [{ id: 8, name: '成品仓' }],
+    accessByRoleKey,
+    approvalSettings,
+  })
+
+  assert.deepEqual(model.summary, {
+    accounts: 3,
+    roles: 1,
+    permissions: 2,
+    effectivePermissions: 1,
+    blockedPermissions: 1,
+    pages: 1,
+    approvals: 1,
+  })
+  assert.match(
+    model.chart,
+    /关联账号（3）：小林（sales01）、小周（sales02）、小吴（warehouse01）｜可用 1/u
+  )
+  assert.match(model.chart, /岗位：业务员/u)
+  assert.match(model.chart, /功能：查看销售订单｜最终可用/u)
+  assert.match(model.chart, /功能：确认报价 ”A” ＜内部＞｜｜当前受限/u)
+  assert.match(model.chart, /页面：销售订单｜可进入/u)
+  assert.match(model.chart, /数据范围：指定仓库：成品仓/u)
+  assert.match(model.chart, /审批责任：销售订单审批｜已配置/u)
+  assert.ok(
+    model.rows.some(
+      (row) =>
+        row.target === '确认报价 "A" <内部>|' &&
+        row.result === '当前客户未启用确认能力'
+    )
+  )
+  assert.ok(model.contextRows.every((row) => row.kind !== 'permission'))
+  assert.ok(model.contextRows.some((row) => row.kind === 'approval'))
+  assert.ok(
+    model.rows.some(
+      (row) =>
+        row.source === '小周（sales02）' && row.result === '账号状态阻断使用'
+    )
+  )
+  const visibleOutput = JSON.stringify(model)
+  assert.doesNotMatch(visibleOutput, /sales\.order\.(read|confirm)/u)
+  assert.doesNotMatch(visibleOutput, /13[6789]00000000/u)
+})
+
+test('permission evidence keeps role, customer, product and approval versions together', () => {
+  const evidence = buildPermissionRelationshipEvidence({
+    roleKeys: ['sales'],
+    accessByRoleKey: {
+      sales: {
+        ...accessByRoleKey.sales,
+        role_version: 7,
+        config_revision: 'customer-v7',
+        product_version: 'product-v3',
+      },
+    },
+    approvalSettings: {
+      config_revision: 'approval-v5',
+      product_version: 'product-v3',
+      items: [],
+    },
+  })
+
+  assert.deepEqual(evidence, {
+    sources: ['当前客户已启用设置'],
+    configRevisions: ['customer-v7'],
+    productVersions: ['product-v3'],
+    roleVersions: ['7'],
+    approvalRevision: 'approval-v5',
+    approvalProductVersion: 'product-v3',
+    approvalPartial: false,
+    allFinal: true,
+  })
+})
+
+test('detail rows can include the product permissions and pages not granted to the role', () => {
+  const relatedRows = buildPermissionRelationshipDetailRows({
+    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE,
+    targetKey: 'sales',
+    accounts,
+    roles,
+    permissions,
+    accessByRoleKey,
+  })
+  const completeRows = buildPermissionRelationshipDetailRows({
+    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE,
+    targetKey: 'sales',
+    detailScope: PERMISSION_RELATIONSHIP_DETAIL_SCOPE.ALL,
+    accounts,
+    roles,
+    permissions,
+    accessByRoleKey,
+  })
+
+  assert.equal(
+    relatedRows.some((row) => row.target === '查看库存'),
+    false
+  )
+  assert.ok(
+    completeRows.some(
+      (row) =>
+        row.kind === 'permission' &&
+        row.target === '查看库存' &&
+        row.result === '岗位未授予该功能' &&
+        row.status === '未授予'
+    )
+  )
+  assert.ok(
+    completeRows.some(
+      (row) =>
+        row.kind === 'page' &&
+        row.target === '库存查询' &&
+        row.result === '岗位未授予该页面所需功能' &&
+        row.status === '未授予'
+    )
+  )
+  assert.doesNotMatch(
+    JSON.stringify(completeRows),
+    /warehouse\.inventory\.read/u
+  )
+})
+
+test('blocked approval responsibility explains the business blocker', () => {
+  const model = buildPermissionRelationshipModel({
+    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE,
+    targetKey: 'sales',
+    moduleKey: 'sales',
+    accounts,
+    roles,
+    permissions,
+    accessByRoleKey,
+    approvalSettings: {
+      items: [
+        {
+          approval_key: 'sales_order_review',
+          label: '销售订单审批',
+          enabled: true,
+          effective_role_keys: ['sales'],
+          members: [],
+          blocked_reasons: ['no_eligible_approver'],
+        },
+      ],
+    },
+  })
+
+  assert.ok(
+    model.rows.some(
+      (row) =>
+        row.target === '销售订单审批' &&
+        row.result === '没有符合岗位、账号和责任设置的办理人'
+    )
+  )
+})
+
+test('account view preserves multiple role paths and marks an inactive account as blocked', () => {
+  const model = buildPermissionRelationshipModel({
+    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT,
+    targetKey: '20',
+    moduleKey: PERMISSION_RELATIONSHIP_ALL_MODULES,
+    accounts,
+    roles,
+    permissions,
+    warehouseOptions: [{ id: 8, name: '成品仓' }],
+    accessByRoleKey,
+    approvalSettings,
+  })
+
+  assert.equal(model.summary.accounts, 1)
+  assert.equal(model.summary.roles, 2)
+  assert.equal(model.summary.effectivePermissions, 0)
+  assert.equal(model.summary.blockedPermissions, 3)
+  assert.match(model.chart, /账号：小吴（warehouse01）｜临时停用/u)
+  assert.match(model.chart, /岗位：业务员/u)
+  assert.match(model.chart, /岗位：仓管员/u)
+  assert.match(model.chart, /功能汇总：1 个模块｜可用 0 \/ 已选 2/u)
+  assert.match(model.chart, /功能汇总：1 个模块｜可用 0 \/ 已选 1/u)
+  assert.ok(
+    model.rows.some((row) => row.target === '销售管理') &&
+      model.rows.some((row) => row.target === '仓储')
+  )
+  assert.ok(
+    model.warnings.some((warning) => warning.includes('登录和实际使用'))
+  )
+})
+
+test('account view does not inherit another employee named approval responsibility', () => {
+  const namedApprovalSettings = {
+    items: [
+      {
+        approval_key: 'sales_order_review',
+        label: '销售订单审批',
+        configured: true,
+        enabled: true,
+        effective_role_keys: ['sales'],
+        members: [
+          {
+            role_key: 'sales',
+            user_id: 11,
+            enabled: true,
+          },
+        ],
+        blocked_reasons: [],
+      },
+    ],
+  }
+  const assigned = buildPermissionRelationshipModel({
+    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT,
+    targetKey: '11',
+    accounts,
+    roles,
+    permissions,
+    accessByRoleKey,
+    approvalSettings: namedApprovalSettings,
+  })
+  const unassigned = buildPermissionRelationshipModel({
+    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT,
+    targetKey: '20',
+    accounts,
+    roles,
+    permissions,
+    accessByRoleKey,
+    approvalSettings: namedApprovalSettings,
+  })
+
+  assert.equal(assigned.summary.approvals, 1)
+  assert.match(assigned.chart, /审批责任：销售订单审批｜已配置/u)
+  assert.equal(unassigned.summary.approvals, 0)
+  assert.doesNotMatch(unassigned.chart, /审批责任：销售订单审批/u)
+})
+
+test('super administrator is rendered as a protected system path, not a fabricated role', () => {
+  const model = buildPermissionRelationshipModel({
+    viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT,
+    targetKey: '1',
+    accounts,
+    roles,
+    permissions,
+    accessByRoleKey,
+  })
+
+  assert.equal(model.summary.accounts, 1)
+  assert.equal(model.summary.roles, 0)
+  assert.match(model.chart, /账号：系统管理员（root-admin）｜始终启用/u)
+  assert.match(model.chart, /系统保留：全部权限｜不由岗位汇总/u)
+  assert.doesNotMatch(model.chart, /岗位：超级管理员/u)
+  assert.ok(model.warnings.some((warning) => warning.includes('系统保留账号')))
+})
+
+test('target and module helpers keep stable human-readable choices', () => {
+  assert.deepEqual(
+    getPermissionRelationshipRoleKeys({
+      viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT,
+      targetKey: '20',
+      accounts,
+    }),
+    ['sales', 'warehouse']
+  )
+  assert.deepEqual(
+    buildPermissionRelationshipModuleOptions(permissions).map(
+      (option) => option.label
+    ),
+    ['全部功能模块', '仓储', '销售管理']
+  )
+  assert.deepEqual(
+    buildPermissionRelationshipTargetOptions({
+      viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ROLE,
+      roles,
+    }).map((option) => option.label),
+    ['仓管员', '业务员']
+  )
+  assert.ok(
+    buildPermissionRelationshipTargetOptions({
+      viewMode: PERMISSION_RELATIONSHIP_VIEW_MODE.ACCOUNT,
+      accounts,
+    }).some(
+      (option) => option.label === '系统管理员（root-admin） · 超级管理员'
+    )
+  )
+})
+
+for (const [label, override] of [
+  ['missing', null],
+  ['preview', { ...accessByRoleKey.sales, is_final: false }],
+  ['unsaved draft', { ...accessByRoleKey.sales, is_preview: true }],
+  ['wrong role', { ...accessByRoleKey.sales, role_key: 'warehouse' }],
+]) {
+  test(`unverified ${label} access cannot appear as final permissions, pages or ungranted details`, () => {
+    const input = { targetKey: 'sales', accounts, roles, permissions, accessByRoleKey: { sales: override } }
+    const model = buildPermissionRelationshipModel(input)
+    assert.equal(model.resultState, 'unavailable')
+    assert.equal(model.summary.effectivePermissions, null)
+    assert.equal(model.summary.pages, null)
+    assert.doesNotMatch(model.chart, /最终可用|可进入/u)
+    assert.deepEqual(buildPermissionRelationshipDetailRows({ ...input, detailScope: 'all' }), [])
+  })
+}
+
+test('partial multi-role and mixed customer revisions do not produce a final union', () => {
+  for (const access of [null, { ...accessByRoleKey.warehouse, config_revision: 'new' }]) {
+    const model = buildPermissionRelationshipModel({
+      viewMode: 'account',
+targetKey: '20',
+      accounts: accounts.map((item) => ({ ...item, account_status: 'active' })),
+      roles,
+permissions,
+      accessByRoleKey: { sales: { ...accessByRoleKey.sales, config_revision: 'old' }, warehouse: access },
+    })
+    assert.equal(model.resultState, 'unavailable')
+    assert.equal(model.summary.pages, null)
+    assert.ok(model.warnings.length > 0)
+  }
+})
+
+test('disabled roles and accounts never advertise usable permissions or pages', () => {
+  for (const input of [
+    { targetKey: 'sales', roles: roles.map((role) => ({ ...role, disabled: true })) },
+    { viewMode: 'account', targetKey: '12', roles },
+  ]) {
+    const data = { accounts, permissions, accessByRoleKey, ...input }
+    const model = buildPermissionRelationshipModel(data)
+    assert.equal(model.resultState, 'blocked')
+    assert.equal(model.summary.effectivePermissions, 0)
+    assert.equal(model.summary.pages, 0)
+    assert.ok(buildPermissionRelationshipDetailRows(data).every((row) => row.status !== '已生效'))
+  }
+})
+
+test('ungranted backend page decisions only appear in all-details and keep the correct label', () => {
+  const input = { targetKey: 'sales',
+accounts,
+roles,
+permissions,
+accessByRoleKey: {
+    sales: { ...accessByRoleKey.sales,
+pages: [...accessByRoleKey.sales.pages,
+      { key: 'inventory', label: '库存查询', rbac_granted: false, effective: false }] },
+  } }
+  assert.ok(!buildPermissionRelationshipDetailRows(input).some((row) => row.target === '库存查询'))
+  const row = buildPermissionRelationshipDetailRows({ ...input, detailScope: 'all' }).find((row) => row.target === '库存查询')
+  assert.equal(row.status, '未授予')
+})
+
+test('multi-role totals deduplicate a permission granted by one role and blocked by another', () => {
+  const model = buildPermissionRelationshipModel({ viewMode: 'account',
+targetKey: '20',
+    accounts: accounts.map((item) => ({ ...item, account_status: 'active' })),
+roles,
+permissions,
+    accessByRoleKey: { ...accessByRoleKey,
+warehouse: { ...accessByRoleKey.warehouse,
+      permissions: [{ permission_key: 'sales.order.read', effective: false }] } },
+  })
+  assert.equal(model.resultState, 'projection')
+  assert.equal(model.summary.permissions, 2)
+  assert.equal(model.summary.effectivePermissions, 1)
+  assert.equal(model.summary.blockedPermissions, 1)
+})
+
+test('approval revision drift and partial reads do not advertise a complete responsibility count', () => {
+  for (const approval of [
+    { ...approvalSettings, partial: true },
+    { ...approvalSettings, config_revision: 'other' },
+  ]) {
+    const model = buildPermissionRelationshipModel({ targetKey: 'sales',
+accounts,
+roles,
+permissions,
+      accessByRoleKey: { sales: { ...accessByRoleKey.sales, config_revision: 'current' } },
+      approvalSettings: approval,
+    })
+    assert.equal(model.summary.approvals, null)
+    assert.ok(model.warnings.some((warning) => warning.includes('审批责任')))
+    assert.equal(model.summary.effectivePermissions, 1)
+  }
+})
+
+test('warehouse names retain an explicit gap and empty assignment grants no warehouse', () => {
+  const base = { targetKey: 'sales', accounts, permissions, accessByRoleKey, warehouseOptions: [{ id: 8, name: '成品仓' }] }
+  const partial = buildPermissionRelationshipModel({ ...base,
+    roles: [{ ...roles[0], data_scopes: [{ resource_type: 'warehouse', mode: 'ASSIGNED', resource_ids: [8, 9] }] }],
+  })
+  assert.match(partial.chart, /另有 1 个仓库名称待刷新/u)
+  const empty = buildPermissionRelationshipModel({ ...base,
+    roles: [{ ...roles[0], data_scopes: [{ resource_type: 'warehouse', mode: 'ASSIGNED', resource_ids: [] }] }],
+  })
+  assert.match(empty.chart, /无仓库范围/u)
+})
+
+test('super admin assigned roles remain countable without fabricating zero effective rights', () => {
+  const model = buildPermissionRelationshipModel({ viewMode: 'account',
+targetKey: '1',
+    accounts: [{ id: 1, is_super_admin: true, roles: [roles[0]] }],
+roles,
+permissions,
+accessByRoleKey,
+  })
+  assert.equal(model.summary.roles, 1)
+  assert.equal(model.summary.effectivePermissions, null)
+  assert.equal(model.summary.pages, null)
+  assert.equal(model.summary.approvals, null)
+})
