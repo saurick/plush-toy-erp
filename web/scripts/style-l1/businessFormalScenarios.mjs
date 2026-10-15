@@ -1,0 +1,6445 @@
+import { Buffer } from 'node:buffer'
+import process from 'node:process'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { createBusinessFormPagesScenarios } from './businessFormPagesScenarios.mjs'
+import { createSalesOrderSubmissionScenarios } from './salesOrderSubmissionScenarios.mjs'
+import { createWarehouseClassificationScenarios } from './warehouseClassificationScenarios.mjs'
+import { createOrderEngineeringScenarios } from './orderEngineeringScenarios.mjs'
+import { createBOMTaskActionsScenarios } from './bomTaskActionsScenarios.mjs'
+import { createBOMRevisionScenarios } from './bomRevisionScenarios.mjs'
+import {
+  createBOMMaterialGroupsScenarios,
+  verifyBOMMaterialGroups,
+} from './bomMaterialGroupsScenarios.mjs'
+
+import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+
+import { createBusinessAttachmentAssertions } from './businessAttachmentAssertions.mjs'
+import { createBOMImportWorkbookFixture } from './bomImportWorkbookFixture.mjs'
+import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
+import { createOutsourcingSourceFactScenarios } from './outsourcingSourceFactScenarios.mjs'
+import { createProductionSourceInboundLotScenarios } from './productionSourceInboundLotScenarios.mjs'
+import { createProductionReworkScenarios } from './productionReworkScenarios.mjs'
+import { createProductImageSlotScenarios } from './productImageSlotScenarios.mjs'
+import { createProductionWipScenarios } from './productionWipScenarios.mjs'
+import { createQualitySourceActionScenarios } from './qualitySourceActionScenarios.mjs'
+import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+import { createSalesOrderSkuGrainScenarios } from './salesOrderSkuGrainScenarios.mjs'
+
+export function createBusinessFormalScenarios(deps) {
+  const {
+    assert,
+    assertAntdModalCentered,
+    assertBusinessFormModalKeyboardRecovery,
+    assertBusinessHeaderHasNoSectionTitle,
+    assertBusinessHeaderStatsSingleLine,
+    assertBusinessMainTableHasNoOperationColumn,
+    assertBusinessMainTableInitialSelectionEmpty,
+    assertBusinessMainTableSortableColumns,
+    assertBusinessModuleToolbarControlStyle,
+    assertBusinessPageRefreshEntrypoint,
+    assertERPThemeMode,
+    assertNoHorizontalOverflow,
+    assertOrderLifecycleActionsConsolidated,
+    assertOutsourcingProcessSelectOptions,
+    assertProcessSuggestionOptions,
+    assertTextAbsent,
+    closeBusinessFormModal,
+    expectButton,
+    expectHeading,
+    expectNoButton,
+    expectText,
+    gotoScenarioPath,
+    outputDir,
+    path,
+    verifyBusinessActionFormModal,
+    verifyBusinessModuleColumnOrderDialog,
+    verifyBusinessRowDoubleClickModal,
+    customerRuntimeEffectiveSession,
+  } = deps
+  const compactVisibleText = (value) =>
+    String(value || '').replace(/[\s\p{Cf}]+/gu, '')
+  const createShipmentFinanceApprovalTaskFixture = ({
+    taskID,
+    sourceID,
+    sourceNo,
+    taskName,
+    processInstanceID,
+    processNodeInstanceID,
+  }) => ({
+    id: taskID,
+    version: 1,
+    task_code: `PROC-${processInstanceID}-NODE-${processNodeInstanceID}-A1`,
+    task_group: 'shipment_finance_approval',
+    task_name: taskName,
+    source_type: 'shipment',
+    source_id: sourceID,
+    source_no: sourceNo,
+    business_status_key: 'shipment_pending',
+    task_status_key: 'ready',
+    owner_role_key: 'finance',
+    owner_pool_key: 'finance',
+    required_capability_key: 'workflow.task.approve',
+    process_instance_id: processInstanceID,
+    process_node_instance_id: processNodeInstanceID,
+    assignee_id: '',
+    priority: 2,
+    blocked_reason: '',
+    critical_path: true,
+    due_at: null,
+    payload: {
+      approval_scope: 'shipment_finance_release',
+      entry_path: '/erp/warehouse/shipments',
+      critical_path: true,
+    },
+    created_at: 1_750_000_000,
+    updated_at: 1_750_000_000,
+  })
+  const {
+    assertLineItemAddActionScrollsToNewRow,
+    assertLineItemDuplicateAction,
+    assertLineItemFieldLayout,
+    assertLineAmountCalculation,
+    assertLineQuantityPrecisionBlocksAmount,
+    assertLineQuantityUnitSuffix,
+    assertLineSourceSummaryReadableUnit,
+  } = createLineItemUnitAssertions({
+    assert,
+  })
+  const { assertPageAttachmentModalEntrypoint } =
+    createBusinessAttachmentAssertions({
+      assert,
+      assertAntdModalCentered,
+    })
+
+  const findSelectionActionButton = async (page, actionName) => {
+    const directButtons = page.locator('button').filter({ hasText: actionName })
+    for (let index = 0; index < (await directButtons.count()); index += 1) {
+      const candidate = directButtons.nth(index)
+      if (
+        (await candidate.isVisible()) &&
+        compactVisibleText(await candidate.innerText()) ===
+          compactVisibleText(actionName)
+      ) {
+        return candidate
+      }
+    }
+
+    const moreButtons = page.getByRole('button', { name: /更多操作/u })
+    let moreButton = null
+    for (let index = 0; index < (await moreButtons.count()); index += 1) {
+      const candidate = moreButtons.nth(index)
+      if (await candidate.isVisible()) moreButton = candidate
+    }
+    if (!moreButton) {
+      const metrics = await page.evaluate(() => ({
+        selectedRows: Array.from(
+          document.querySelectorAll('.ant-table-row-selected')
+        ).map((row) =>
+          String(row.textContent || '')
+            .replace(/\s+/gu, ' ')
+            .trim()
+        ),
+        actionBars: Array.from(
+          document.querySelectorAll('.erp-business-module-current-action')
+        ).map((bar) => ({
+          text: String(bar.textContent || '')
+            .replace(/\s+/gu, ' ')
+            .trim(),
+          buttons: Array.from(bar.querySelectorAll('button')).map((button) => ({
+            text: String(button.textContent || '')
+              .replace(/\s+/gu, ' ')
+              .trim(),
+            disabled: button.disabled,
+            visible: Boolean(button.offsetWidth || button.offsetHeight),
+          })),
+        })),
+      }))
+      throw new Error(
+        `未找到可触达的操作“${actionName}”: ${JSON.stringify(metrics)}`
+      )
+    }
+    const actionMenuID = await moreButton.getAttribute('aria-controls')
+    if ((await moreButton.getAttribute('aria-expanded')) !== 'true') {
+      await moreButton.click()
+    }
+    const actionMenu = actionMenuID
+      ? page.locator(`[id=${JSON.stringify(actionMenuID)}]`)
+      : page.locator('.erp-business-selection-action-menu:visible').last()
+    await actionMenu.waitFor({ state: 'visible' })
+    const overflowButtons = actionMenu
+      .locator('button')
+      .filter({ hasText: actionName })
+    for (let index = 0; index < (await overflowButtons.count()); index += 1) {
+      const candidate = overflowButtons.nth(index)
+      if (
+        compactVisibleText(await candidate.innerText()) ===
+        compactVisibleText(actionName)
+      ) {
+        await candidate.waitFor({ state: 'visible' })
+        return candidate
+      }
+    }
+    const menuMetrics = await actionMenu.evaluateAll((menus) =>
+      menus.map((menu) => ({
+        text: String(menu.textContent || '')
+          .replace(/\s+/gu, ' ')
+          .trim(),
+        buttons: Array.from(menu.querySelectorAll('button')).map((button) => ({
+          key: button.getAttribute('data-business-action-key') || '',
+          text: String(button.textContent || '')
+            .replace(/\s+/gu, ' ')
+            .trim(),
+          disabled: button.disabled,
+        })),
+      }))
+    )
+    throw new Error(
+      `更多操作中缺少“${actionName}”: ${JSON.stringify(menuMetrics)}`
+    )
+  }
+
+  const confirmVisiblePopconfirm = async (page) => {
+    const popconfirm = page.locator('.ant-popconfirm:visible').last()
+    await popconfirm.waitFor({ state: 'visible' })
+    const confirmButton = popconfirm
+      .getByRole('button', { name: /^确\s*认$/u })
+      .last()
+    await confirmButton.waitFor({ state: 'visible' })
+    await confirmButton.click()
+  }
+
+  const assertBusinessViewTabSelectedStyle = async (
+    page,
+    { scenarioName, tabName }
+  ) => {
+    const metrics = await page
+      .getByRole('tab', { name: tabName })
+      .evaluate((node) => {
+        const tab = node.closest('.ant-tabs-tab') || node
+        const tabs = tab.closest('.ant-tabs')
+        const list = tab.closest('.ant-tabs-nav-list')
+        const style = window.getComputedStyle(tab)
+        const indicator = list
+          ? window.getComputedStyle(list, '::before')
+          : null
+        return {
+          active: tab.classList.contains('ant-tabs-tab-active'),
+          slidingTabs: Boolean(tabs?.classList.contains('erp-sliding-tabs')),
+          indicatorReady: list?.dataset.slidingReady === 'true',
+          indicatorBackgroundColor: indicator?.backgroundColor || '',
+          indicatorOpacity: indicator?.opacity || '',
+          indicatorWidth: Number.parseFloat(indicator?.width || '0'),
+          indicatorHeight: Number.parseFloat(indicator?.height || '0'),
+          backgroundColor: style.backgroundColor,
+          boxShadow: style.boxShadow,
+        }
+      })
+    const background = String(metrics.indicatorBackgroundColor || '')
+      .replace(/\s/g, '')
+      .toLowerCase()
+    assert(
+      metrics.active &&
+        metrics.slidingTabs &&
+        metrics.indicatorReady &&
+        Number(metrics.indicatorOpacity) > 0 &&
+        metrics.indicatorWidth > 0 &&
+        metrics.indicatorHeight > 0 &&
+        background !== 'rgba(0,0,0,0)' &&
+        background !== 'transparent',
+      `${scenarioName} 主视图 Tab 应显示明确选中背景色: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      !metrics.boxShadow || metrics.boxShadow === 'none',
+      `${scenarioName} 主视图 Tab 不应出现激活阴影: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  const assertLineItemSectionTitleBold = async (
+    modal,
+    { scenarioName, titleText }
+  ) => {
+    const metrics = await modal
+      .locator('.erp-sales-order-lines-form__head strong')
+      .filter({ hasText: titleText })
+      .first()
+      .evaluate((node) => {
+        const style = window.getComputedStyle(node)
+        return {
+          text: node.textContent?.trim() || '',
+          fontWeight: style.fontWeight,
+        }
+      })
+    assert(
+      Number.parseInt(metrics.fontWeight, 10) >= 700,
+      `${scenarioName} ${titleText} 标题应保持加粗: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  const assertNonItemTextareaFullRow = async (
+    modal,
+    { labels, scenarioName }
+  ) => {
+    const metrics = await modal.evaluate((node, expectedLabels) => {
+      const normalizeText = (value) =>
+        String(value || '')
+          .replace(/\s+/gu, '')
+          .trim()
+      const form = node.querySelector('.erp-business-action-form')
+      const formRect = form?.getBoundingClientRect()
+      return expectedLabels.map((label) => {
+        const normalizedLabel = normalizeText(label)
+        const candidates = Array.from(node.querySelectorAll('.ant-form-item'))
+          .filter(
+            (item) =>
+              !item.closest('.erp-line-item-details__fields') &&
+              !item.closest('.erp-contact-editor') &&
+              !item.closest('.erp-purchase-receipt-inline-item-form') &&
+              item.querySelector('textarea')
+          )
+          .filter((item) => {
+            const itemLabel = item.querySelector('.ant-form-item-label')
+            return normalizeText(itemLabel?.textContent) === normalizedLabel
+          })
+        const item = candidates[0]
+        const rect = item?.getBoundingClientRect()
+        const style = item ? window.getComputedStyle(item) : null
+        return {
+          label,
+          found: Boolean(item),
+          className: item?.className || '',
+          gridColumnStart: style?.gridColumnStart || '',
+          gridColumnEnd: style?.gridColumnEnd || '',
+          itemLeft: rect?.left || 0,
+          itemRight: rect?.right || 0,
+          itemWidth: rect?.width || 0,
+          formLeft: formRect?.left || 0,
+          formRight: formRect?.right || 0,
+          formWidth: formRect?.width || 0,
+          scrollWidth: item?.scrollWidth || 0,
+          clientWidth: item?.clientWidth || 0,
+        }
+      })
+    }, labels)
+
+    for (const metric of metrics) {
+      assert(
+        metric.found &&
+          metric.className.includes('erp-business-action-form__field--full') &&
+          metric.gridColumnStart === '1' &&
+          metric.gridColumnEnd === '-1' &&
+          Math.abs(metric.itemLeft - metric.formLeft) <= 2 &&
+          Math.abs(metric.itemRight - metric.formRight) <= 2 &&
+          metric.itemWidth >= metric.formWidth - 2 &&
+          metric.scrollWidth <= metric.clientWidth + 1,
+        `${scenarioName} 非 item 备注应独占表单整行: ${JSON.stringify(metric)}`
+      )
+    }
+  }
+
+  const waitForMasterDataRequest = async (
+    page,
+    masterDataMethods,
+    { method, fromIndex, scenarioName }
+  ) => {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      if (masterDataMethods.slice(fromIndex).includes(method)) {
+        return
+      }
+      await page.waitForTimeout(100)
+    }
+    assert(
+      false,
+      `${scenarioName} 应重新请求 ${method}: ${JSON.stringify(
+        masterDataMethods.slice(fromIndex)
+      )}`
+    )
+  }
+
+  const assertNoMasterDataRequest = async (
+    page,
+    masterDataMethods,
+    { methods, fromIndex, scenarioName }
+  ) => {
+    await page.waitForTimeout(600)
+    const requested = masterDataMethods.slice(fromIndex)
+    const unexpected = requested.filter((method) => methods.includes(method))
+    assert(
+      unexpected.length === 0,
+      `${scenarioName} 不应重复请求 ${methods.join(' / ')}: ${JSON.stringify(
+        requested
+      )}`
+    )
+  }
+
+  const waitForCapturedMethods = async (
+    methods,
+    expectedMethods,
+    { scenarioName }
+  ) => {
+    for (let attempt = 0; attempt < 30; attempt += 1) {
+      if (expectedMethods.every((method) => methods.includes(method))) {
+        return
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100))
+    }
+    assert(
+      false,
+      `${scenarioName} 未捕获预期 RPC 方法: ${JSON.stringify({
+        expectedMethods,
+        methods,
+      })}`
+    )
+  }
+
+  const assertBusinessCollaborationPanelAbsent = async (page, scenarioName) => {
+    assert.equal(
+      await page.locator('.erp-business-collaboration-task-panel').count(),
+      0,
+      `${scenarioName} 不应展示空面板或重复的当前记录任务面板`
+    )
+  }
+
+  const assertUnifiedListToolbarShell = async (
+    page,
+    {
+      scenarioName,
+      exportVisible = true,
+      exportDisabled = false,
+      exportTooltip = '',
+      columnOrderDisabled = false,
+    }
+  ) => {
+    const labels = exportVisible ? ['导出筛选结果', '列设置'] : ['列设置']
+    for (const label of labels) {
+      await expectButton(page, label)
+    }
+    const exportButton = page
+      .getByRole('button', { name: '导出筛选结果' })
+      .first()
+    const columnOrderButton = page
+      .getByRole('button', { name: '列设置' })
+      .first()
+    if (exportVisible) {
+      assert.equal(
+        await exportButton.isDisabled(),
+        exportDisabled,
+        `${scenarioName} 导出筛选结果按钮禁用态不符合当前页面能力边界`
+      )
+    } else {
+      await expectNoButton(page, '导出筛选结果')
+    }
+    assert.equal(
+      await columnOrderButton.isDisabled(),
+      columnOrderDisabled,
+      `${scenarioName} 列顺序按钮禁用态不符合当前页面能力边界`
+    )
+    await expectNoButton(page, '批量删除')
+    await expectNoButton(page, '回收站')
+    await expectNoButton(page, '刷新协同')
+    if (exportVisible && exportTooltip) {
+      await exportButton.locator('xpath=..').hover()
+      await expectText(page, exportTooltip)
+    }
+    await assertCurrentOperationBarCompact(page, { scenarioName })
+  }
+
+  async function assertCurrentOperationBarCompact(page, { scenarioName }) {
+    const metrics = await page.evaluate(() => {
+      const bars = Array.from(
+        document.querySelectorAll('.erp-business-module-current-action')
+      )
+      return bars.map((bar) => {
+        const row = bar.querySelector('.erp-business-selection-action-bar__row')
+        const primary = bar.querySelector(
+          '.erp-business-selection-action-bar__primary'
+        )
+        const actions = bar.querySelector(
+          '.erp-business-selection-action-bar__actions'
+        )
+        const rowBox = row?.getBoundingClientRect()
+        const primaryBox = primary?.getBoundingClientRect()
+        const actionsBox = actions?.getBoundingClientRect()
+        const rowCenter = rowBox ? rowBox.top + rowBox.height / 2 : 0
+        const primaryCenter = primaryBox
+          ? primaryBox.top + primaryBox.height / 2
+          : 0
+        const actionsCenter = actionsBox
+          ? actionsBox.top + actionsBox.height / 2
+          : 0
+        const text = bar.textContent?.replace(/\s+/g, ' ').trim() || ''
+        return {
+          text,
+          hintCount: bar.querySelectorAll(
+            '.erp-business-selection-action-bar__hint'
+          ).length,
+          rowHeight: rowBox?.height || 0,
+          direction: row ? getComputedStyle(row).flexDirection : '',
+          actionsGap: (actionsBox?.top || 0) - (primaryBox?.bottom || 0),
+          actionsBottomOverflow:
+            (actionsBox?.bottom || 0) - (rowBox?.bottom || 0),
+          primaryOffset: Math.abs(primaryCenter - rowCenter),
+          actionsOffset: Math.abs(actionsCenter - rowCenter),
+        }
+      })
+    })
+    assert(metrics.length > 0, `${scenarioName} 应存在当前操作条`)
+    for (const metric of metrics) {
+      assert.equal(
+        metric.hintCount,
+        0,
+        `${scenarioName} 当前操作条不应渲染页面级边界说明: ${JSON.stringify(
+          metric
+        )}`
+      )
+      assert(
+        !/不写|不本地|usecase|只调用|只读；/.test(metric.text),
+        `${scenarioName} 当前操作条不应保留长边界说明: ${JSON.stringify(
+          metric
+        )}`
+      )
+      if (metric.direction === 'column') {
+        assert(
+          metric.actionsGap >= 0 && metric.actionsBottomOverflow <= 1,
+          `${scenarioName} 纵向操作条的标题和按钮应依次排列且不溢出: ${JSON.stringify(metric)}`
+        )
+      } else if (metric.rowHeight <= 96) {
+        assert(
+          metric.primaryOffset <= 2,
+          `${scenarioName} 当前操作标题与选中标签应上下居中: ${JSON.stringify(
+            metric
+          )}`
+        )
+        assert(
+          metric.actionsOffset <= 2,
+          `${scenarioName} 当前操作按钮组应上下居中: ${JSON.stringify(metric)}`
+        )
+      }
+    }
+  }
+
+  const assertWorkflowDueDateRangeFilterLayout = async (
+    page,
+    { scenarioName }
+  ) => {
+    const dialog = page.getByRole('dialog', { name: '筛选条件' })
+    const opened = !(await dialog.isVisible())
+    if (opened) {
+      await page
+        .locator('.erp-business-operation-panel button[aria-haspopup="dialog"]')
+        .click()
+    }
+    await dialog.waitFor()
+    await waitForFiniteAnimations(page)
+    const metrics = await page.evaluate(() => {
+      const panel = document.querySelector(
+        '.erp-business-filter-popover .erp-business-operation-panel__filters'
+      )
+      const range = panel?.querySelector('.erp-business-date-range-filter')
+      const typeLabel = range?.querySelector(
+        '.erp-business-date-range-filter__type-label'
+      )
+      const dateInputs = range
+        ? Array.from(
+            range.querySelectorAll('.erp-business-date-input.ant-picker')
+          )
+        : []
+      const standaloneDateInputs = panel
+        ? Array.from(panel.children).filter((node) =>
+            node.classList?.contains('erp-business-date-input')
+          )
+        : []
+      const panelBox = panel?.getBoundingClientRect()
+      const rangeBox = range?.getBoundingClientRect()
+      const inputBoxes = dateInputs.map((node) => {
+        const box = node.getBoundingClientRect()
+        return {
+          x: box.x,
+          y: box.y,
+          width: box.width,
+          height: box.height,
+          scrollWidth: node.scrollWidth,
+          clientWidth: node.clientWidth,
+        }
+      })
+      return {
+        viewportWidth: document.documentElement.clientWidth,
+        panelWidth: panelBox?.width || 0,
+        rangeWidth: rangeBox?.width || 0,
+        rangeHeight: rangeBox?.height || 0,
+        rangeScrollWidth: range?.scrollWidth || 0,
+        rangeClientWidth: range?.clientWidth || 0,
+        typeLabelText: typeLabel?.textContent?.trim() || '',
+        dateInputCount: dateInputs.length,
+        standaloneDateInputCount: standaloneDateInputs.length,
+        inputBoxes,
+      }
+    })
+    assert.equal(
+      metrics.standaloneDateInputCount,
+      0,
+      `${scenarioName} 到期日期筛选不应使用两个独立 DateInput: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert.equal(
+      metrics.typeLabelText,
+      '到期日期',
+      `${scenarioName} 到期日期筛选应显示日期类型标签: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert.equal(
+      metrics.dateInputCount,
+      2,
+      `${scenarioName} 到期日期筛选应保留开始/结束两个日期输入: ${JSON.stringify(
+        metrics
+      )}`
+    )
+    assert(
+      metrics.rangeWidth > 0 &&
+        metrics.rangeWidth <= Math.max(metrics.panelWidth, 1) + 1,
+      `${scenarioName} 到期日期筛选不应溢出筛选栏: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.rangeScrollWidth <= metrics.rangeClientWidth + 1,
+      `${scenarioName} 到期日期筛选内部不应横向溢出: ${JSON.stringify(metrics)}`
+    )
+    if (metrics.viewportWidth >= 760) {
+      const [startInput, endInput] = metrics.inputBoxes
+      assert(
+        startInput &&
+          endInput &&
+          Math.abs(startInput.y - endInput.y) <= 2 &&
+          startInput.width >= 120 &&
+          endInput.width >= 120,
+        `${scenarioName} 宽屏下开始/结束日期应在同一行且保持可读宽度: ${JSON.stringify(
+          metrics
+        )}`
+      )
+    }
+    if (opened) {
+      await dialog.getByRole('button', { name: '完成', exact: true }).click()
+    }
+  }
+
+  const assertNoListDeleteTrashToolbar = async (page) => {
+    await expectNoButton(page, '批量删除')
+    await expectNoButton(page, '回收站')
+  }
+
+  const assertBusinessTableEmptyState = async (
+    page,
+    { scenarioName, emptyText, staleText }
+  ) => {
+    await page
+      .waitForFunction(
+        ({ expectedEmptyText }) => {
+          const tableCard = document.querySelector(
+            '.erp-business-module-table-card'
+          )
+          const placeholder = tableCard?.querySelector('.ant-table-placeholder')
+          const dataRows = Array.from(
+            tableCard?.querySelectorAll(
+              '.ant-table-tbody > tr.ant-table-row'
+            ) || []
+          ).filter((row) => !row.classList.contains('ant-table-placeholder'))
+          return (
+            placeholder?.textContent?.includes(expectedEmptyText) &&
+            dataRows.length === 0
+          )
+        },
+        { expectedEmptyText: emptyText },
+        { timeout: 10_000 }
+      )
+      .catch((error) => {
+        throw new Error(
+          `${scenarioName} 等待表格空态“${emptyText}”超时: ${error.message}`
+        )
+      })
+    const metrics = await page.evaluate(
+      ({ expectedEmptyText, previousText }) => {
+        const actionBar = document.querySelector(
+          '.erp-business-module-current-action'
+        )
+        const tableCard = document.querySelector(
+          '.erp-business-module-table-card'
+        )
+        const placeholder = tableCard?.querySelector('.ant-table-placeholder')
+        const dataRows = Array.from(
+          tableCard?.querySelectorAll('.ant-table-tbody > tr.ant-table-row') ||
+            []
+        ).filter((row) => !row.classList.contains('ant-table-placeholder'))
+        return {
+          actionText: actionBar?.textContent?.replace(/\s+/g, ' ').trim() || '',
+          actionHasEmptyClass:
+            actionBar?.classList.contains(
+              'erp-business-selection-action-bar--empty'
+            ) || false,
+          actionHasActiveClass:
+            actionBar?.classList.contains(
+              'erp-business-selection-action-bar--active'
+            ) || false,
+          placeholderText:
+            placeholder?.textContent?.replace(/\s+/g, ' ').trim() || '',
+          dataRowCount: dataRows.length,
+          staleTextInAction:
+            actionBar?.textContent?.includes(previousText) || false,
+          staleTextInTable:
+            tableCard?.textContent?.includes(previousText) || false,
+          documentOverflow:
+            document.documentElement.scrollWidth -
+            document.documentElement.clientWidth,
+          expectedEmptyText,
+        }
+      },
+      { expectedEmptyText: emptyText, previousText: staleText }
+    )
+
+    assert(
+      metrics.placeholderText.includes(emptyText),
+      `${scenarioName} 表格空态文案异常: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.dataRowCount,
+      0,
+      `${scenarioName} 空结果时不应保留数据行: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.actionHasEmptyClass && !metrics.actionHasActiveClass,
+      `${scenarioName} 空结果后当前操作条应回到未选中态: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.staleTextInAction,
+      false,
+      `${scenarioName} 空结果后当前操作条不应保留旧选中记录: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.staleTextInTable,
+      false,
+      `${scenarioName} 空结果表格不应保留旧记录文本: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.documentOverflow,
+      0,
+      `${scenarioName} 空结果不应造成页面级横向溢出: ${JSON.stringify(metrics)}`
+    )
+  }
+
+  const installShipmentSourceCandidateContract = async (page) => {
+    let failShipmentSourcesOnce = true
+    const shipmentSourceCandidateParams = []
+    const unscopedSalesOrderItemRequests = []
+    page.on('request', (request) => {
+      if (!request.url().includes('/rpc/sales_order')) return
+      try {
+        const body = request.postDataJSON() || {}
+        if (
+          body.method === 'list_sales_order_items' &&
+          !Number(body.params?.sales_order_id || 0)
+        ) {
+          unscopedSalesOrderItemRequests.push(body.params || {})
+        }
+      } catch {
+        // 非 JSON-RPC 请求不参与来源合同断言。
+      }
+    })
+    await page.route('**/rpc/operational_fact', async (route) => {
+      const body = route.request().postDataJSON() || {}
+      if (body.method === 'list_shipment_source_candidates') {
+        shipmentSourceCandidateParams.push(body.params || {})
+        if (!failShipmentSourcesOnce) {
+          await route.fallback()
+          return
+        }
+        failShipmentSourcesOnce = false
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: body.id || 'business-formal-shipment-source-error',
+            result: {
+              code: 50000,
+              message: '加载销售订单来源失败',
+              data: {},
+            },
+          }),
+        })
+        return
+      }
+      await route.fallback()
+    })
+    return { shipmentSourceCandidateParams, unscopedSalesOrderItemRequests }
+  }
+
+  const verifyShipmentSourceCandidateContract = async (
+    page,
+    modal,
+    { shipmentSourceCandidateParams, unscopedSalesOrderItemRequests }
+  ) => {
+    const sourceTrigger = modal
+      .getByRole('button', { name: '从销售订单导入' })
+      .first()
+    await sourceTrigger.click()
+    const failedPicker = page
+      .locator('.erp-source-import-picker-modal.ant-modal:visible')
+      .last()
+    await failedPicker.waitFor({ state: 'visible', timeout: 10_000 })
+    await expectText(page, '加载销售订单来源失败')
+    await failedPicker.locator('.ant-input').first().fill('SO-STYLE-L1')
+    await failedPicker
+      .getByText('SO-STYLE-L1', { exact: true })
+      .first()
+      .waitFor({ timeout: 10_000 })
+    assert.equal(
+      await failedPicker.isVisible(),
+      true,
+      '出货来源首次加载失败后应保留弹窗，并允许搜索重试'
+    )
+    await failedPicker
+      .getByText('从销售订单导入出货明细', { exact: true })
+      .waitFor({ state: 'visible' })
+    for (const headerText of [
+      '销售订单号',
+      '来源行',
+      '客户',
+      '产品 / SKU',
+      '剩余可出货',
+    ]) {
+      await failedPicker
+        .locator('.ant-table-thead th')
+        .getByText(headerText, { exact: true })
+        .waitFor({ state: 'visible' })
+    }
+    const sourceTable = failedPicker.locator('.ant-table-container')
+    await sourceTable
+      .getByText('SO-STYLE-L1', { exact: true })
+      .first()
+      .waitFor({ state: 'visible' })
+    await sourceTable
+      .getByText('PROD-STYLE-L1-01', { exact: false })
+      .first()
+      .waitFor({ state: 'visible' })
+    const searchInput = failedPicker.locator('.ant-input').first()
+    await searchInput.fill('NO-SOURCE-IMPORT-RESULT')
+    await failedPicker
+      .getByText('暂无可导入销售订单行', { exact: true })
+      .waitFor({ state: 'visible', timeout: 10_000 })
+    await searchInput.fill('')
+    const firstPageSourceRow = failedPicker
+      .locator('.ant-table-row')
+      .filter({ hasText: 'PROD-STYLE-L1-01' })
+      .first()
+    await firstPageSourceRow.waitFor({ state: 'visible', timeout: 10_000 })
+    await firstPageSourceRow
+      .locator('.ant-checkbox-wrapper, .ant-radio-wrapper')
+      .first()
+      .click()
+    await expectText(page, '已选 1 条')
+    await failedPicker.locator('.ant-pagination-item-2').click()
+    const secondPageSourceRow = failedPicker
+      .locator('.ant-table-row')
+      .filter({ hasText: 'PROD-STYLE-L1-21' })
+      .first()
+    await secondPageSourceRow.waitFor({ state: 'visible', timeout: 10_000 })
+    await secondPageSourceRow
+      .locator('.ant-checkbox-wrapper, .ant-radio-wrapper')
+      .first()
+      .click()
+    await expectText(page, '已选 2 条')
+    await failedPicker
+      .locator('.erp-source-import-picker__footer-actions .ant-btn-primary')
+      .last()
+      .click()
+    await failedPicker.waitFor({ state: 'hidden', timeout: 10_000 })
+    await expectText(page, '已导入销售订单来源行和剩余可出货数量')
+    await modal.waitFor({ state: 'visible', timeout: 10_000 })
+    assert.equal(
+      await modal.getByLabel('币种（跟随销售订单）').inputValue(),
+      'USD',
+      '出货单币种应由销售订单带出并保持只读'
+    )
+    assert.equal(
+      await modal.getByRole('combobox', { name: '实际运费币种' }).count(),
+      0,
+      '实际运费不应提供独立币种选择'
+    )
+    await modal.getByLabel('实际运费金额').fill('12.5')
+    assert.equal(
+      (await modal.getByLabel('实际运费币种（自动）').textContent()).trim(),
+      'USD',
+      '实际运费应展示销售订单币种'
+    )
+    assert.equal(
+      await modal
+        .getByLabel('实际运费币种（自动）')
+        .evaluate(
+          (node) =>
+            node.isContentEditable || node.matches('input, textarea, select')
+        ),
+      false,
+      '自动带出的实际运费币种不可编辑'
+    )
+    await expectText(page, '币种：USD')
+    await modal.screenshot({
+      path: path.join(outputDir, 'shipment-source-one-currency-modal.png'),
+    })
+    await modal.locator('.erp-line-item-details > summary').first().click()
+    await expectText(page, '销售订单行追溯')
+    assert.equal(
+      await modal.getByText('销售订单行追溯', { exact: true }).count(),
+      2,
+      '跨页选择的两条销售订单来源行都应导入出货明细'
+    )
+    assert.equal(
+      await modal
+        .getByRole('button', { name: '添加出货明细', exact: true })
+        .isDisabled(),
+      true,
+      '导入销售订单来源后应锁定为同一来源，禁止手工混加无来源明细'
+    )
+    assert.equal(
+      unscopedSalesOrderItemRequests.length,
+      0,
+      `出货来源选择器不得回退无 sales_order_id 的明细列表: ${JSON.stringify(
+        unscopedSalesOrderItemRequests
+      )}`
+    )
+    assert(
+      shipmentSourceCandidateParams.length >= 4,
+      `出货来源选择器应覆盖打开失败、搜索重试、空结果和恢复导入: ${JSON.stringify(
+        shipmentSourceCandidateParams
+      )}`
+    )
+    const allowedSourceKeys = new Set([
+      'keyword',
+      'sales_order_id',
+      'limit',
+      'offset',
+    ])
+    for (const params of shipmentSourceCandidateParams) {
+      assert(
+        Object.keys(params).every((key) => allowedSourceKeys.has(key)),
+        `出货来源候选请求包含非合同字段: ${JSON.stringify(params)}`
+      )
+      assert(
+        Number(params.limit || 0) > 0 &&
+          Number(params.limit || 0) <= 200 &&
+          Number(params.offset || 0) >= 0,
+        `出货来源候选必须使用服务端分页: ${JSON.stringify(params)}`
+      )
+    }
+    assert(
+      shipmentSourceCandidateParams.some(
+        (params) => params.keyword === 'SO-STYLE-L1'
+      ),
+      `出货来源搜索必须发送服务端 keyword: ${JSON.stringify(
+        shipmentSourceCandidateParams
+      )}`
+    )
+    assert(
+      shipmentSourceCandidateParams.some(
+        (params) => params.keyword === 'NO-SOURCE-IMPORT-RESULT'
+      ),
+      `出货来源空结果必须来自服务端搜索: ${JSON.stringify(
+        shipmentSourceCandidateParams
+      )}`
+    )
+    assert(
+      shipmentSourceCandidateParams.some(
+        (params) => Number(params.offset) === 20
+      ),
+      `出货来源第二页必须发送 offset=20: ${JSON.stringify(
+        shipmentSourceCandidateParams
+      )}`
+    )
+    await assertTextAbsent(page, 'sales_order_item_id 追溯')
+  }
+
+  const verifySalesOrderDemandEntry = async (page) => {
+    await gotoScenarioPath(page, '/erp/sales/project-orders/sales-orders', {
+      waitUntil: 'domcontentloaded',
+    })
+    await expectHeading(page, '销售订单')
+    await expectButton(page, '新建订单')
+    await expectText(page, '当前操作')
+    await assertCurrentOperationBarCompact(page, {
+      scenarioName: 'business-formal-sales-orders',
+    })
+    await page.getByText('SO-STYLE-L1', { exact: true }).first().waitFor()
+    await assertBusinessCollaborationPanelAbsent(
+      page,
+      'business-formal-sales-orders'
+    )
+    await assertNoListDeleteTrashToolbar(page)
+    await assertBusinessMainTableInitialSelectionEmpty(page, {
+      scenarioName: 'business-formal-sales-orders',
+    })
+    await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
+    await assertOrderLifecycleActionsConsolidated(page, {
+      scenarioName: 'business-formal-sales-orders',
+      primaryActionLabel: '提交订单',
+      menuActionLabels: ['取消'],
+      absentButtonLabels: ['生效', '关闭', '取消'],
+    })
+    await assertBusinessPageRefreshEntrypoint(page, {
+      scenarioName: 'business-formal-sales-orders',
+    })
+    await assertBusinessHeaderHasNoSectionTitle(page, {
+      scenarioName: 'business-formal-sales-orders',
+    })
+    await assertBusinessModuleToolbarControlStyle(page, {
+      scenarioName: 'business-formal-sales-orders',
+    })
+    await assertBusinessMainTableSortableColumns(page, {
+      scenarioName: 'business-formal-sales-orders',
+    })
+    await assertBusinessFormModalKeyboardRecovery(page, {
+      triggerName: '新建订单',
+      titleText: '新建销售订单',
+      scenarioName: 'business-formal-sales-orders',
+    })
+    await page.getByRole('button', { name: '新建订单' }).click()
+    const draftForm = page.locator('.erp-business-form-page:not([hidden])')
+    await draftForm.getByLabel('客户', { exact: true }).click()
+    await page.getByText('CUS-STYLE-L1 - 暗色客户', { exact: true }).click()
+    const [draftSaved] = await Promise.all([
+      page.waitForRequest(
+        (request) =>
+          request.url().endsWith('/rpc/sales_order') &&
+          request.postDataJSON()?.method === 'save_sales_order_with_items'
+      ),
+      draftForm
+        .locator('.erp-business-form-page__footer .ant-btn-primary')
+        .click(),
+    ])
+    assert.deepEqual(
+      draftSaved.postDataJSON().params.items,
+      [],
+      '草稿不得自动提交空白明细'
+    )
+    await draftForm.waitFor({ state: 'hidden' })
+    await verifyBusinessActionFormModal(page, {
+      buttonName: '新建订单',
+      titleText: '新建销售订单',
+      minFieldCount: 6,
+      screenshotName: 'business-formal-sales-order-form-modal',
+      expectedTexts: ['订货明细', '添加订货明细', '暂无订货明细'],
+      absentTexts: ['产品引用 ID', '单位引用 ID', '从已有规格添加'],
+      afterOpen: async (modal) => {
+        assert.equal(
+          await modal.locator('.erp-sales-order-lines-form__row').count(),
+          0
+        )
+        assert.equal(
+          await modal
+            .getByRole('button', { name: '调整明细顺序', exact: true })
+            .count(),
+          0
+        )
+        await modal
+          .getByRole('button', { name: '添加订货明细', exact: true })
+          .click()
+        await modal
+          .getByLabel('订货产品名称', { exact: true })
+          .fill('客户新款毛绒挂件')
+        await modal.getByLabel('单位', { exact: true }).click()
+        await page
+          .locator(
+            '.ant-select-dropdown:visible .ant-select-item-option-content'
+          )
+          .getByText('个', { exact: true })
+          .click()
+        assert.equal(
+          await modal
+            .getByRole('button', { name: '调整明细顺序', exact: true })
+            .count(),
+          0
+        )
+        await modal
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .click()
+        await modal.getByText('请填写订单数量', { exact: true }).waitFor()
+        assert.equal(
+          await modal.getByLabel('订货产品名称', { exact: true }).inputValue(),
+          '客户新款毛绒挂件',
+          '校验失败应保留已填写的需求'
+        )
+        await modal
+          .getByLabel('订货产品名称', { exact: true })
+          .scrollIntoViewIfNeeded()
+        await assertNonItemTextareaFullRow(modal, {
+          labels: ['报价备注', '备注'],
+          scenarioName: 'business-formal-sales-order-form-modal',
+        })
+        await assertLineQuantityUnitSuffix(modal, {
+          label: '订单数量',
+          expectedText: '个',
+          scenarioName: 'business-formal-sales-order-form-modal-empty-line',
+        })
+        await assertLineItemFieldLayout(modal, {
+          scenarioName: 'business-formal-sales-order-form-modal-empty-line',
+          visibleThroughLabel: '单位',
+          absentLabels: ['产品编号快照', '产品名称快照', '颜色快照'],
+        })
+        const amountInput = modal
+          .locator('.erp-line-item-field--money input[readonly]')
+          .first()
+        await amountInput.scrollIntoViewIfNeeded()
+        assert(
+          await amountInput.evaluate((node) => {
+            const rect = node.getBoundingClientRect()
+            const list = node
+              .closest('.erp-sales-order-lines-form__list')
+              ?.getBoundingClientRect()
+            return Boolean(
+              list && rect.left >= list.left - 1 && rect.right <= list.right + 1
+            )
+          }),
+          '销售订单金额须可通过明细区横向滚动完整查看'
+        )
+        await assertLineQuantityPrecisionBlocksAmount(modal, {
+          quantityLabel: '订单数量',
+          unitPriceLabel: '单价',
+          amountLabel: '金额',
+          quantity: '123.11',
+          unitPrice: '12.11',
+          expectedErrorText: '当前单位只允许整数数量',
+          scenarioName: 'business-formal-sales-order-form-modal-empty-line',
+        })
+        await assertLineAmountCalculation(modal, {
+          quantityLabel: '订单数量',
+          unitPriceLabel: '单价',
+          amountLabel: '金额',
+          quantity: '11',
+          unitPrice: '12.11',
+          expected: '133.21',
+          scenarioName: 'business-formal-sales-order-form-modal-empty-line',
+        })
+        assert.equal(
+          await modal
+            .locator('.erp-line-items-form__stat')
+            .filter({ hasText: '货款金额' })
+            .locator('strong')
+            .innerText(),
+          'CNY 133.21',
+          '数量和单价齐全时，货款应显示真实计算结果'
+        )
+        const demandRow = modal
+          .locator('.erp-sales-order-lines-form__row')
+          .first()
+        const details = demandRow.locator('.erp-line-item-details')
+        assert.equal(await details.evaluate((node) => node.open), false)
+        await details.locator('summary').click()
+        await demandRow.getByLabel('备注', { exact: true }).fill('分两批交货')
+        const sampleQuantity = demandRow.getByLabel('船头版数量', {
+          exact: true,
+        })
+        await sampleQuantity.fill('-1')
+        await details.locator('summary').click()
+        await modal.getByLabel('客户', { exact: true }).click()
+        await page.getByText('CUS-STYLE-L1 - 暗色客户', { exact: true }).click()
+        await modal
+          .locator('.erp-business-form-page__footer .ant-btn-primary')
+          .click()
+        await demandRow
+          .getByText('请填写非负数量', { exact: true })
+          .waitFor()
+        assert.equal(
+          await details.evaluate((node) => node.open),
+          true,
+          '校验应自动展开含错误的补充信息'
+        )
+        assert.equal(
+          await sampleQuantity.evaluate(
+            (node) => document.activeElement === node
+          ),
+          true,
+          '校验应聚焦出错字段'
+        )
+        await sampleQuantity.fill('0')
+        await details.locator('summary').click()
+        assert.equal(
+          await demandRow.getByLabel('备注', { exact: true }).inputValue(),
+          '分两批交货'
+        )
+        const [savedDemand] = await Promise.all([
+          page.waitForRequest(
+            (request) =>
+              request.url().endsWith('/rpc/sales_order') &&
+              request.postDataJSON()?.method === 'save_sales_order_with_items'
+          ),
+          modal
+            .locator('.erp-business-form-page__footer .ant-btn-primary')
+            .click(),
+        ])
+        const savedItems = savedDemand.postDataJSON().params.items
+        assert.equal(savedItems.length, 1)
+        assert.equal(
+          savedItems[0].note,
+          '分两批交货',
+          '收起补充信息不能丢失保存内容'
+        )
+        assert.equal(savedItems[0].requested_product_name, '客户新款毛绒挂件')
+        await modal.waitFor({ state: 'hidden' })
+        await page.getByRole('button', { name: '新建订单' }).click()
+        await modal
+          .getByRole('button', { name: '添加订货明细', exact: true })
+          .click()
+        await modal
+          .getByLabel('订货产品名称', { exact: true })
+          .fill('客户新款毛绒挂件')
+        await modal.getByLabel('订单数量', { exact: true }).fill('11')
+        await modal.getByLabel('单价', { exact: true }).fill('12.11')
+        const linkedRow = modal
+          .locator('.erp-sales-order-lines-form__row')
+          .first()
+        await linkedRow.locator('.erp-line-item-details > summary').click()
+        const skuSelect = linkedRow.getByLabel('已有规格（选填）', {
+          exact: true,
+        })
+        await skuSelect.click()
+        await skuSelect.fill('SKU-STYLE-L1')
+        await page
+          .getByText('SKU-STYLE-L1 / 样式产品 SKU', { exact: true })
+          .click()
+        assert.equal(
+          await linkedRow
+            .getByLabel('订货产品名称', { exact: true })
+            .inputValue(),
+          '客户新款毛绒挂件'
+        )
+        assert.equal(
+          await linkedRow.getByLabel('订单数量', { exact: true }).inputValue(),
+          '11'
+        )
+        assert.equal(
+          await linkedRow.getByLabel('单价', { exact: true }).inputValue(),
+          '12.11'
+        )
+        await assertLineQuantityUnitSuffix(modal, {
+          label: '订单数量',
+          expectedText: '个',
+          scenarioName: 'business-formal-sales-order-form-modal',
+        })
+        await assertLineSourceSummaryReadableUnit(modal, {
+          label: '已关联产品',
+          expectedText: '个',
+          scenarioName: 'business-formal-sales-order-form-modal',
+        })
+        const skuField = linkedRow.locator(
+          '.erp-line-item-field--source .ant-select'
+        )
+        await skuField.hover()
+        await skuField.locator('.ant-select-clear').click()
+        assert.equal(
+          await linkedRow.getByText('已关联产品', { exact: true }).count(),
+          0
+        )
+        assert.equal(
+          await linkedRow.getByLabel('订单数量', { exact: true }).inputValue(),
+          '11'
+        )
+        assert.equal(
+          await linkedRow.getByLabel('单价', { exact: true }).inputValue(),
+          '12.11'
+        )
+        await skuSelect.click()
+        await skuSelect.fill('SKU-STYLE-L1')
+        await page
+          .getByText('SKU-STYLE-L1 / 样式产品 SKU', { exact: true })
+          .click()
+        await modal
+          .getByRole('button', { name: '添加订货明细', exact: true })
+          .click()
+        const readDemandRows = () =>
+          modal
+            .locator('.erp-sales-order-lines-form__row')
+            .evaluateAll((rows) =>
+              rows.map((row) =>
+                [
+                  'requested_product_name',
+                  'product_id',
+                  'product_sku_id',
+                  'ordered_quantity',
+                  'unit_price',
+                ].map(
+                  (field) => row.querySelector(`[id$="_${field}"]`)?.value || ''
+                )
+              )
+            )
+        const beforeOrder = await readDemandRows()
+        assert.equal(
+          beforeOrder.length,
+          2,
+          '行内关联规格不新增明细，添加按钮每次新增一行'
+        )
+        const reorder = modal.getByRole('button', {
+          name: '调整明细顺序',
+          exact: true,
+        })
+        await reorder.click()
+        const orderDialog = page
+          .locator('.erp-business-action-modal--columns')
+          .filter({ hasText: '调整明细顺序' })
+          .last()
+        await orderDialog
+          .getByRole('button', { name: / 上移$/u })
+          .last()
+          .click()
+        await orderDialog.getByRole('button', { name: /^取\s*消$/u }).click()
+        await orderDialog.waitFor({ state: 'hidden' })
+        assert.deepEqual(
+          await readDemandRows(),
+          beforeOrder,
+          '取消排序应保留原始明细及内容'
+        )
+        await reorder.click()
+        await orderDialog
+          .getByRole('button', { name: / 上移$/u })
+          .last()
+          .click()
+        await orderDialog
+          .getByRole('button', { name: '应用顺序', exact: true })
+          .click()
+        await orderDialog.waitFor({ state: 'hidden' })
+        assert.deepEqual(
+          await readDemandRows(),
+          [...beforeOrder].reverse(),
+          '排序应整体移动明细，保持需求、产品、数量与单价的对应关系'
+        )
+        await page.setViewportSize({ width: 760, height: 900 })
+        await assertNoHorizontalOverflow(
+          page,
+          'sales-order-demand-entry-narrow'
+        )
+        await modal
+          .getByLabel('订货产品名称', { exact: true })
+          .first()
+          .scrollIntoViewIfNeeded()
+        await page.screenshot({
+          path: path.join(outputDir, 'sales-order-demand-entry-narrow.png'),
+        })
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await assertLineItemDuplicateAction(modal, {
+          scenarioName: 'business-formal-sales-order-form-modal',
+        })
+        await assertLineItemAddActionScrollsToNewRow(modal, {
+          addButtonName: '添加订货明细',
+          scenarioName: 'business-formal-sales-order-form-modal',
+        })
+        assert.equal(
+          await modal
+            .locator('.erp-line-items-form__stat')
+            .filter({ hasText: '货款金额' })
+            .locator('strong')
+            .innerText(),
+          '待补齐',
+          '存在未填写数量或单价的明细时，货款不能被显示成零'
+        )
+        await page.setViewportSize({ width: 1920, height: 1080 })
+        await modal
+          .locator('.erp-sales-order-lines-form__head')
+          .evaluate((node) => node.scrollIntoView({ block: 'start' }))
+        await page.waitForTimeout(350)
+        await page.screenshot({
+          path: path.join(outputDir, 'sales-order-lines-wide.png'),
+        })
+        await page.setViewportSize({ width: 1440, height: 900 })
+      },
+    })
+    await assertNoHorizontalOverflow(page, 'business-standard-sales-orders')
+    await verifyBusinessRowDoubleClickModal(page, {
+      rowText: 'SO-STYLE-L1',
+      titleText: '编辑销售订单',
+      scenarioName: 'business-formal-sales-orders',
+      afterModalOpen: async () => {
+        await expectText(page, '订货明细')
+        const editedRow = page
+          .locator(
+            '.erp-business-form-page:not([hidden]) .erp-sales-order-lines-form__row'
+          )
+          .first()
+        await editedRow.getByText('已保存', { exact: true }).waitFor()
+        const editedDetails = editedRow.locator('.erp-line-item-details')
+        if (!(await editedDetails.evaluate((node) => node.open))) {
+          await editedDetails.locator('summary').click()
+        }
+        await editedRow
+          .getByLabel('已有规格（选填）', { exact: true })
+          .scrollIntoViewIfNeeded()
+        await expectText(page, '已有规格（选填）')
+        await editedRow
+          .getByText('已关联产品', { exact: true })
+          .scrollIntoViewIfNeeded()
+        await expectText(page, '已关联产品')
+        await assertTextAbsent(page, '产品引用 ID')
+        await assertTextAbsent(page, '单位引用 ID')
+      },
+    })
+  }
+
+  return [
+    {
+      name: 'sales-order-demand-entry',
+      path: '/erp/sales/project-orders/sales-orders',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        try {
+          await verifySalesOrderDemandEntry(page)
+        } catch (error) {
+          await page.screenshot({
+            path: path.join(outputDir, 'sales-order-demand-entry-failed.png'),
+          })
+          throw error
+        }
+      },
+    },
+    ...createSalesOrderSkuGrainScenarios(deps),
+    ...createSalesOrderSubmissionScenarios(deps),
+    ...createBOMMaterialGroupsScenarios(deps),
+    ...createBOMTaskActionsScenarios(deps),
+    ...createBOMRevisionScenarios(deps),
+    ...createBusinessFormPagesScenarios(deps),
+    ...createWarehouseClassificationScenarios(deps),
+    ...createOrderEngineeringScenarios(deps),
+    ...createOutsourcingSourceFactScenarios(deps),
+    ...createProductionSourceInboundLotScenarios(deps),
+    ...createProductionReworkScenarios(deps),
+    ...createProductionWipScenarios(deps),
+    ...createProductImageSlotScenarios(deps),
+    ...createQualitySourceActionScenarios(deps),
+    (() => {
+      let consoleErrors = []
+      let itemReadCalls = 0
+      let pageErrors = []
+      let rpcMethods = []
+      let saveCalls = 0
+      return {
+        name: 'source-document-edit-items-read-failure-fail-closed',
+        path: '/erp/sales/project-orders/sales-orders',
+        auth: 'admin',
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport: { width: 1440, height: 900 },
+        beforeNavigate: async (page) => {
+          consoleErrors = []
+          itemReadCalls = 0
+          pageErrors = []
+          rpcMethods = []
+          saveCalls = 0
+          page.on('console', (message) => {
+            if (message.type() === 'error') consoleErrors.push(message.text())
+          })
+          page.on('pageerror', (error) => pageErrors.push(error.message))
+          await page.route('**/rpc/sales_order', async (route) => {
+            const body = route.request().postDataJSON() || {}
+            const { id = 'mock-id', method } = body
+            if (method) rpcMethods.push(method)
+            if (method === 'list_sales_order_items') {
+              itemReadCalls += 1
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id,
+                  result: {
+                    code: RpcErrorCode.INTERNAL,
+                    message: '销售订单明细暂时无法加载',
+                    data: {},
+                  },
+                }),
+              })
+              return
+            }
+            if (method === 'save_sales_order_with_items') saveCalls += 1
+            await route.fallback()
+          })
+        },
+        verify: async (page) => {
+          await expectHeading(page, '销售订单')
+          await expectText(page, 'SO-STYLE-L1')
+          await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
+          await (await findSelectionActionButton(page, '编辑订单')).click()
+          await expectText(page, '未进入编辑')
+          const failureNotice = page
+            .getByText('未进入编辑', { exact: false })
+            .first()
+          await failureNotice.screenshot({
+            path: path.resolve(
+              outputDir,
+              'source-document-edit-items-read-failure-fail-closed-message.png'
+            ),
+          })
+          await page.screenshot({
+            path: path.resolve(
+              outputDir,
+              'source-document-edit-items-read-failure-fail-closed-visible.png'
+            ),
+            fullPage: true,
+          })
+
+          const metrics = await page.evaluate(() => {
+            const isVisible = (node) => {
+              if (!(node instanceof HTMLElement)) return false
+              const rect = node.getBoundingClientRect()
+              const style = window.getComputedStyle(node)
+              return (
+                rect.width > 0 &&
+                rect.height > 0 &&
+                style.display !== 'none' &&
+                style.visibility !== 'hidden'
+              )
+            }
+            const visibleEditModals = Array.from(
+              document.querySelectorAll(
+                '.ant-modal, .erp-business-form-page:not([hidden])'
+              )
+            ).filter(
+              (node) =>
+                isVisible(node) &&
+                String(node.textContent || '').includes('编辑销售订单')
+            )
+            const visibleLineRows = Array.from(
+              document.querySelectorAll('.erp-sales-order-lines-form__row')
+            ).filter(isVisible)
+            return {
+              visibleEditModalCount: visibleEditModals.length,
+              visibleLineRowCount: visibleLineRows.length,
+            }
+          })
+          const evidence = {
+            ...metrics,
+            consoleErrors,
+            itemReadCalls,
+            pageErrors,
+            rpcMethods,
+            saveCalls,
+          }
+          assert.equal(
+            metrics.visibleEditModalCount,
+            0,
+            `明细读取失败后不得打开编辑弹窗: ${JSON.stringify(evidence)}`
+          )
+          assert.equal(
+            metrics.visibleLineRowCount,
+            0,
+            `明细读取失败后不得生成可保存空行: ${JSON.stringify(evidence)}`
+          )
+          assert.equal(
+            itemReadCalls,
+            1,
+            `编辑入口应且只应读取一次完整明细: ${JSON.stringify(evidence)}`
+          )
+          assert.equal(
+            saveCalls,
+            0,
+            `明细读取失败后不得调用聚合保存: ${JSON.stringify(evidence)}`
+          )
+          assert.deepEqual(
+            consoleErrors,
+            [],
+            `明细读取失败不应产生控制台错误: ${JSON.stringify(evidence)}`
+          )
+          assert.deepEqual(
+            pageErrors,
+            [],
+            `明细读取失败不应产生页面错误: ${JSON.stringify(evidence)}`
+          )
+          process.stdout.write(
+            `[style:l1] source-document-edit-items-read-failure-fail-closed evidence=${JSON.stringify(
+              evidence
+            )}\n`
+          )
+        },
+      }
+    })(),
+    (() => {
+      let consoleErrors = []
+      let itemReadCalls = 0
+      let itemRequestStarted
+      let lateResponseFinished
+      let lateRouteOutcome = ''
+      let pageErrors = []
+      let releaseLateResponse
+      let resolveItemRequestStarted
+      let resolveLateResponseFinished
+      let rpcMethods = []
+      let saveCalls = 0
+      return {
+        name: 'source-document-open-edit-race-new-document-wins',
+        path: '/erp/sales/project-orders/sales-orders',
+        auth: 'admin',
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport: { width: 1440, height: 900 },
+        beforeNavigate: async (page) => {
+          consoleErrors = []
+          itemReadCalls = 0
+          lateRouteOutcome = ''
+          pageErrors = []
+          rpcMethods = []
+          saveCalls = 0
+          itemRequestStarted = new Promise((resolve) => {
+            resolveItemRequestStarted = resolve
+          })
+          const releaseResponse = new Promise((resolve) => {
+            releaseLateResponse = resolve
+          })
+          lateResponseFinished = new Promise((resolve) => {
+            resolveLateResponseFinished = resolve
+          })
+          page.on('console', (message) => {
+            if (message.type() === 'error') consoleErrors.push(message.text())
+          })
+          page.on('pageerror', (error) => pageErrors.push(error.message))
+          await page.route('**/rpc/sales_order', async (route) => {
+            const body = route.request().postDataJSON() || {}
+            const { method } = body
+            if (method) rpcMethods.push(method)
+            if (method === 'list_sales_order_items') {
+              itemReadCalls += 1
+              resolveItemRequestStarted()
+              await releaseResponse
+              try {
+                await route.fallback()
+                lateRouteOutcome = 'fulfilled-after-new'
+              } catch (error) {
+                lateRouteOutcome = `request-canceled-after-new:${String(
+                  error?.message || error
+                )}`
+              } finally {
+                resolveLateResponseFinished()
+              }
+              return
+            }
+            if (method === 'save_sales_order_with_items') saveCalls += 1
+            await route.fallback()
+          })
+        },
+        verify: async (page) => {
+          await expectHeading(page, '销售订单')
+          await expectText(page, 'SO-STYLE-L1')
+          await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
+          await (await findSelectionActionButton(page, '编辑订单')).click()
+          await itemRequestStarted
+
+          await page.getByRole('button', { name: '新建订单' }).click()
+          const newOrderDialog = page
+            .locator('.erp-business-form-page:not([hidden])')
+            .filter({ hasText: '新建销售订单' })
+            .last()
+          await newOrderDialog
+            .getByText('新建销售订单', { exact: true })
+            .waitFor()
+          const retainedNote = '竞态期间填写的新订单备注'
+          await newOrderDialog
+            .getByLabel('备注', { exact: true })
+            .first()
+            .fill(retainedNote)
+
+          releaseLateResponse()
+          await lateResponseFinished
+          await page.waitForTimeout(100)
+
+          const metrics = await newOrderDialog.evaluate((dialog) => {
+            const visibleLineRows = Array.from(
+              dialog.querySelectorAll('.erp-sales-order-lines-form__row')
+            ).filter((node) => {
+              const rect = node.getBoundingClientRect()
+              const style = window.getComputedStyle(node)
+              return (
+                rect.width > 0 &&
+                rect.height > 0 &&
+                style.display !== 'none' &&
+                style.visibility !== 'hidden'
+              )
+            })
+            return {
+              dialogText: String(dialog.textContent || ''),
+              visibleLineRowCount: visibleLineRows.length,
+            }
+          })
+          const noteValue = await newOrderDialog
+            .getByLabel('备注', { exact: true })
+            .first()
+            .inputValue()
+          const staleFailureNotices = await page
+            .getByText('未进入编辑', { exact: false })
+            .count()
+          const evidence = {
+            consoleErrors,
+            itemReadCalls,
+            lateRouteOutcome,
+            noteValue,
+            pageErrors,
+            rpcMethods,
+            saveCalls,
+            staleFailureNotices,
+            visibleLineRowCount: metrics.visibleLineRowCount,
+          }
+
+          assert(
+            metrics.dialogText.includes('新建销售订单') &&
+              !metrics.dialogText.includes('编辑销售订单'),
+            `迟到编辑响应不得覆盖新建身份: ${JSON.stringify(evidence)}`
+          )
+          assert.equal(
+            noteValue,
+            retainedNote,
+            `迟到编辑响应不得覆盖新建表单值: ${JSON.stringify(evidence)}`
+          )
+          assert.equal(
+            metrics.dialogText.includes('样式产品'),
+            false,
+            `迟到编辑响应不得注入旧订单行: ${JSON.stringify(evidence)}`
+          )
+          assert.equal(
+            metrics.visibleLineRowCount,
+            0,
+            `新建草稿应保持无明细，不能被迟到响应注入旧行: ${JSON.stringify(evidence)}`
+          )
+          assert.equal(
+            lateRouteOutcome,
+            'fulfilled-after-new',
+            JSON.stringify(evidence)
+          )
+          assert.equal(itemReadCalls, 1, JSON.stringify(evidence))
+          assert.equal(saveCalls, 0, JSON.stringify(evidence))
+          assert.equal(staleFailureNotices, 0, JSON.stringify(evidence))
+          assert.deepEqual(consoleErrors, [], JSON.stringify(evidence))
+          assert.deepEqual(pageErrors, [], JSON.stringify(evidence))
+
+          await page.screenshot({
+            path: path.resolve(
+              outputDir,
+              'source-document-open-edit-race-new-document-wins-visible.png'
+            ),
+            fullPage: true,
+          })
+          await closeBusinessFormModal(page, newOrderDialog)
+          process.stdout.write(
+            `[style:l1] source-document-open-edit-race-new-document-wins evidence=${JSON.stringify(
+              evidence
+            )}\n`
+          )
+        },
+      }
+    })(),
+    {
+      name: 'shipment-net-weight-desktop',
+      path: '/erp/warehouse/shipments',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectText(page, '出货单')
+        await expectButton(page, '新建出货单')
+        await page
+          .locator('.erp-business-data-table-card .ant-table-content')
+          .first()
+          .evaluate((element) => {
+            element.scrollLeft = element.scrollWidth
+          })
+        await expectText(page, 'SHIP-STYLE-L1')
+        const weightColumnMetrics = await page
+          .locator('.erp-business-data-table-card')
+          .first()
+          .evaluate((element) => ({
+            headers: Array.from(element.querySelectorAll('th')).map((node) =>
+              String(node.textContent || '')
+                .replace(/\s+/gu, '')
+                .trim()
+            ),
+            text: String(element.textContent || '')
+              .replace(/\s+/gu, '')
+              .trim(),
+          }))
+        assert(
+          weightColumnMetrics.headers.includes('实际/最终总净重（克）') &&
+            weightColumnMetrics.text.includes('待确认'),
+          `出货列表应显示总净重列和草稿待确认状态: ${JSON.stringify(
+            weightColumnMetrics
+          )}`
+        )
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建出货单',
+          titleText: '新建出货单',
+          minFieldCount: 12,
+          screenshotName: 'shipment-net-weight-incomplete',
+          expectedTexts: [
+            '出货明细',
+            '从销售订单导入',
+            '预计总净重暂不可计算',
+            '实际总净重（克）',
+          ],
+          afterOpen: async (modal) => {
+            await modal.getByLabel('产品').click()
+            await page.getByText('PROD-STYLE-L1').last().click()
+            await modal.getByLabel('数量').fill('10')
+            await expectText(page, '预计总净重：4250 克')
+            await modal.screenshot({
+              path: path.join(outputDir, 'shipment-net-weight-predicted.png'),
+            })
+            await assertLineItemAddActionScrollsToNewRow(modal, {
+              scenarioName: 'shipment-net-weight-incomplete',
+              targetRowCount: 5,
+              addButtonName: '添加出货明细',
+            })
+          },
+        })
+        await assertNoHorizontalOverflow(page, 'shipment-net-weight-desktop')
+      },
+    },
+    {
+      name: 'product-net-weight-unit-suffix-desktop',
+      path: '/erp/master/products',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/masterdata', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (body.method !== 'list_units') {
+            await route.fallback()
+            return
+          }
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: body.id || 'product-weight-unit-options',
+              result: {
+                code: 0,
+                message: 'OK',
+                data: {
+                  units: [
+                    {
+                      id: 1,
+                      code: 'KG',
+                      name: '千克',
+                      precision: 3,
+                      is_active: true,
+                    },
+                    {
+                      id: 2,
+                      code: 'PCS',
+                      name: '件',
+                      precision: 0,
+                      is_active: true,
+                    },
+                  ],
+                  total: 2,
+                  limit: 100,
+                  offset: 0,
+                },
+              },
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        await expectHeading(page, '产品档案')
+        await page.getByRole('button', { name: '新建产品' }).click()
+        const modal = page
+          .locator(
+            '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+          )
+          .last()
+        await expectText(page, '产品单重（净重）')
+        const suffix = modal.locator('.erp-item-field-unit-suffix').first()
+        await suffix.waitFor()
+        await expectText(modal, '件')
+        await modal.screenshot({
+          path: path.join(
+            outputDir,
+            'product-net-weight-unit-suffix-default.png'
+          ),
+        })
+        const weightInput = modal.getByLabel('产品单重（净重）')
+        await weightInput.fill('425')
+        await modal
+          .locator('#default_unit_id')
+          .locator(
+            'xpath=ancestor::div[contains(@class,"ant-select-selector")]'
+          )
+          .click()
+        await page
+          .locator(
+            '.ant-select-dropdown:visible .ant-select-item-option-content'
+          )
+          .filter({ hasText: '千克' })
+          .click()
+        await page.keyboard.press('Tab')
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .waitFor({ state: 'hidden' })
+        await expectText(modal, '千克')
+        assert.equal(
+          await weightInput.inputValue(),
+          '',
+          '默认单位变更后应清除旧产品单重'
+        )
+        const suffixMetrics = await suffix.evaluate((node) => {
+          const wrapper = node.closest('.ant-input-number-affix-wrapper')
+          const input = wrapper?.querySelector('.ant-input-number')
+          return {
+            text: String(node.textContent || '').trim(),
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+            clientHeight: node.clientHeight,
+            scrollHeight: node.scrollHeight,
+            inputCount: wrapper?.querySelectorAll('input').length,
+            innerBorder: input && getComputedStyle(input).borderLeftWidth,
+            radius: wrapper && getComputedStyle(wrapper).borderRadius,
+            height: wrapper?.getBoundingClientRect().height,
+          }
+        })
+        assert.equal(suffixMetrics.inputCount, 1, '单位不得成为第二个输入框')
+        assert.equal(suffixMetrics.innerBorder, '0px', '数值与单位共用外边框')
+        assert.equal(suffixMetrics.radius, '8px')
+        assert.equal(suffixMetrics.height, 34, '单位框与相邻控件等高')
+        assert.equal(
+          suffixMetrics.text,
+          '克',
+          `产品单重应使用清晰的中文克单位: ${JSON.stringify(suffixMetrics)}`
+        )
+        assert(
+          suffixMetrics.scrollWidth <= suffixMetrics.clientWidth + 1 &&
+            suffixMetrics.scrollHeight <= suffixMetrics.clientHeight + 1,
+          `产品单重单位后缀不得被裁切: ${JSON.stringify(suffixMetrics)}`
+        )
+        await modal.screenshot({
+          path: path.join(outputDir, 'product-net-weight-unit-suffix.png'),
+        })
+        await closeBusinessFormModal(page, modal)
+        await assertNoHorizontalOverflow(
+          page,
+          'product-net-weight-unit-suffix-desktop'
+        )
+      },
+    },
+    {
+      name: 'bom-person-field-labels-desktop',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        configRevision: 'style-l1-bom-person-field-labels',
+        configHash: 'style-l1-bom-person-field-labels-hash',
+        actions: [
+          ...customerRuntimeEffectiveSession.actions,
+          'workflow.task.create',
+          'workflow.task.read',
+        ],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['engineering'],
+        },
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '物料清单（BOM）')
+        await page.getByRole('button', { name: '新建 BOM' }).click()
+        const modal = page
+          .locator(
+            '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+        )
+          .last()
+        await expectText(page, '新建 BOM 草稿')
+        await modal.getByLabel('制表人', { exact: true }).waitFor()
+        await modal.getByLabel('审核人', { exact: true }).waitFor()
+        const labelMetrics = await modal.evaluate((node) => {
+          const normalizeText = (value) =>
+            String(value || '')
+              .replace(/\s+/gu, '')
+              .trim()
+          return ['制表人', '审核人'].map((label) => {
+            const formItem = Array.from(
+              node.querySelectorAll('.ant-form-item')
+            ).find(
+              (item) =>
+                normalizeText(
+                  item.querySelector('.ant-form-item-label')?.textContent
+                ) === label
+            )
+            const labelNode = formItem?.querySelector(
+              '.ant-form-item-label label'
+            )
+            const input = formItem?.querySelector('input')
+            const itemRect = formItem?.getBoundingClientRect()
+            const labelRect = labelNode?.getBoundingClientRect()
+            const inputRect = input?.getBoundingClientRect()
+            return {
+              label,
+              found: Boolean(formItem && labelNode && input),
+              labelWidth: labelRect?.width || 0,
+              inputWidth: inputRect?.width || 0,
+              contained:
+                Boolean(itemRect && inputRect) &&
+                inputRect.left >= itemRect.left - 1 &&
+                inputRect.right <= itemRect.right + 1,
+            }
+          })
+        })
+        assert(
+          labelMetrics.every(
+            (item) =>
+              item.found &&
+              item.labelWidth > 0 &&
+              item.inputWidth > 0 &&
+              item.contained
+          ),
+          `BOM 人员字段标签和值槽应完整可见且保持在字段容器内: ${JSON.stringify(
+            labelMetrics
+          )}`
+        )
+        await modal.screenshot({
+          path: path.join(outputDir, 'bom-person-field-labels-default.png'),
+        })
+
+        const makerInput = modal.getByLabel('制表人', { exact: true })
+        const auditorInput = modal.getByLabel('审核人', { exact: true })
+        await makerInput.fill('工程制表人员姓名边界样例')
+        await auditorInput.fill('工程审核人员姓名边界样例')
+        await auditorInput.focus()
+        assert.equal(
+          await makerInput.inputValue(),
+          '工程制表人员姓名边界样例',
+          'BOM 制表人字段应接受并保留人员姓名'
+        )
+        assert.equal(
+          await auditorInput.inputValue(),
+          '工程审核人员姓名边界样例',
+          'BOM 审核人字段应接受并保留人员姓名'
+        )
+        await modal.screenshot({
+          path: path.join(outputDir, 'bom-person-field-labels-boundary.png'),
+        })
+        await closeBusinessFormModal(page, modal)
+      },
+    },
+    {
+      name: 'bom-xlsx-import-draft-desktop',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const rpcMutations = []
+        page.on('request', (request) => {
+          if (!request.url().includes('/rpc/')) return
+          try {
+            const body = request.postDataJSON() || {}
+            if (
+              /^(?:activate_|create_|save_|update_)/u.test(
+                String(body.method || '')
+              )
+            ) {
+              rpcMutations.push(body)
+            }
+          } catch {
+            // Non-JSON requests are outside the RPC mutation contract.
+          }
+        })
+
+        await expectHeading(page, '物料清单（BOM）')
+        const importButton = page.locator(
+          'button[data-business-action-key="import-bom-xlsx"]'
+        )
+        await importButton.waitFor({ state: 'visible' })
+        await page.waitForFunction(() => {
+          const button = document.querySelector(
+            'button[data-business-action-key="import-bom-xlsx"]'
+          )
+          return button instanceof HTMLButtonElement && !button.disabled
+        })
+        await page.getByLabel('选择 BOM Excel 文件').setInputFiles({
+          name: 'BOM-IMPORT-STYLE-L1.xlsx',
+          mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          buffer: createBOMImportWorkbookFixture(),
+        })
+
+        const modal = page
+          .locator(
+            '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+          )
+          .last()
+        await modal.waitFor({ state: 'visible' })
+        await expectText(page, '检查并保存导入草稿')
+        await expectText(page, '已读取 2 条 BOM 明细')
+        await expectText(page, '请先关联 1 种物料')
+        assert.equal(
+          await modal.getByLabel('来源订单号', { exact: true }).inputValue(),
+          'ORDER-IMPORT-L1',
+          'BOM 导入应带入原表订单号'
+        )
+        assert.equal(
+          await modal.getByLabel('订单数量', { exact: true }).inputValue(),
+          '100',
+          'BOM 导入应保留用于损耗核对的原表订单数量'
+        )
+        assert.equal(
+          (
+            await modal.getByLabel('制表日期', { exact: true }).inputValue()
+          ).replaceAll('/', '-'),
+          '2026-01-19',
+          'BOM 导入应把 Excel 日期序列转换为本地化显示的业务日期'
+        )
+
+        const importMetrics = await modal.evaluate((node) => {
+          const alert = node.querySelector('.erp-bom-import-review')
+          const modalBody = node.querySelector('.erp-business-form-page__body')
+          const rows = Array.from(
+            node.querySelectorAll('tr[data-bom-part-index]')
+          )
+          const statuses = rows.map((row) =>
+            row
+              .querySelector('.erp-bom-import-line-status')
+              ?.getAttribute('data-bom-import-row-status')
+          )
+          const alertRect = alert?.getBoundingClientRect()
+          const bodyRect = modalBody?.getBoundingClientRect()
+          return {
+            issueCount: alert?.getAttribute('data-bom-import-issue-count'),
+            statuses,
+            rowCount: rows.length,
+            alertContained:
+              Boolean(alertRect && bodyRect) &&
+              alertRect.left >= bodyRect.left - 1 &&
+              alertRect.right <= bodyRect.right + 1,
+            documentOverflowX:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+        assert.deepEqual(
+          importMetrics,
+          {
+            issueCount: '1',
+            statuses: ['matched', 'unresolved'],
+            rowCount: 2,
+            alertContained: true,
+            documentOverflowX: 0,
+          },
+          `BOM 导入校对态应清楚区分已匹配与待补全行，且不撑破页面: ${JSON.stringify(
+            importMetrics
+          )}`
+        )
+        await modal.screenshot({
+          path: path.join(outputDir, 'bom-xlsx-import-unresolved.png'),
+        })
+
+        await modal.getByLabel('BOM 版本', { exact: true }).fill('V-IMPORT-L1')
+        await modal.getByRole('button', { name: '保存草稿' }).click()
+        await expectText(page, '暂未保存：请先关联 1 种物料')
+        assert.equal(
+          rpcMutations.filter((item) => item.method === 'save_bom_with_items')
+            .length,
+          0,
+          '待补全的 BOM 导入不得提前写入草稿'
+        )
+
+        const rows = modal.locator('tr[data-bom-part-index]')
+        const unresolvedRow = rows.nth(1)
+        await unresolvedRow.scrollIntoViewIfNeeded()
+        const materialSelect = unresolvedRow
+          .locator('.erp-bom-material-cell .ant-select')
+          .first()
+        await materialSelect.click()
+        await materialSelect.locator('input').fill('MAT-STYLE-L1')
+        await page.keyboard.press('Enter')
+        await modal
+          .locator('.erp-bom-material-group')
+          .first()
+          .locator('.erp-bom-material-cell .ant-select-selection-item')
+          .filter({ hasText: '样式材料' })
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await modal.locator('.erp-bom-material-group').count(),
+          1,
+          '同一物料和单位在补全后应合并身份栏'
+        )
+        await modal
+          .locator('.erp-bom-import-review[data-bom-import-issue-count="0"]')
+          .waitFor({ state: 'visible' })
+        assert.deepEqual(
+          await modal
+            .locator('.erp-bom-import-line-status')
+            .evaluateAll((nodes) =>
+              nodes.map((node) =>
+                node.getAttribute('data-bom-import-row-status')
+              )
+            ),
+          ['matched', 'matched'],
+          '人工选择现有材料后，待补全行应即时变为已匹配'
+        )
+        await unresolvedRow.scrollIntoViewIfNeeded()
+        await modal.screenshot({
+          path: path.join(outputDir, 'bom-xlsx-import-resolved.png'),
+        })
+
+        const saveRequestPromise = page.waitForRequest((request) => {
+          if (!request.url().includes('/rpc/bom')) return false
+          try {
+            return request.postDataJSON()?.method === 'save_bom_with_items'
+          } catch {
+            return false
+          }
+        })
+        await modal.getByRole('button', { name: '保存草稿' }).click()
+        const saveRequest = await saveRequestPromise
+        const saveBody = saveRequest.postDataJSON()
+        assert.equal(saveBody.method, 'save_bom_with_items')
+        assert.equal(saveBody.params.product_id, 1)
+        assert.equal(saveBody.params.version, 'V-IMPORT-L1')
+        assert.equal(saveBody.params.source_order_no, 'ORDER-IMPORT-L1')
+        assert.equal(saveBody.params.print_date, '2026-01-19')
+        assert.equal(saveBody.params.items.length, 2)
+        assert.deepEqual(
+          saveBody.params.items.map((item) => ({
+            materialID: item.material_id,
+            unitID: item.unit_id,
+            quantity: item.quantity,
+            lossRate: item.loss_rate,
+            totalUsage: item.total_usage_snapshot,
+          })),
+          [
+            {
+              materialID: 1,
+              unitID: 1,
+              quantity: '0.5',
+              lossRate: '0.1',
+              totalUsage: '55',
+            },
+            {
+              materialID: 1,
+              unitID: 1,
+              quantity: '1',
+              lossRate: '0',
+              totalUsage: undefined,
+            },
+          ],
+          '导入保存必须使用现有主数据 ID、单位用量和逐行核对后的损耗率'
+        )
+        assert.equal(
+          JSON.stringify(saveBody.params).includes('_import_source'),
+          false,
+          '页面校对元数据不得进入正式 BOM 写入合同'
+        )
+        await modal.waitFor({ state: 'hidden' })
+        await expectText(page, 'BOM 导入草稿已创建')
+        assert.deepEqual(
+          rpcMutations.map((item) => item.method),
+          ['save_bom_with_items'],
+          'BOM Excel 导入只能保存草稿，不得自动创建主数据或激活版本'
+        )
+        await assertNoHorizontalOverflow(page, 'bom-xlsx-import-draft-desktop')
+      },
+    },
+    {
+      name: 'inventory-visible-copy-desktop',
+      path: '/erp/warehouse/inventory',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '库存台账')
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-balance-desktop',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
+        await assertTextAbsent(page, '查看内容')
+        await page.getByRole('tab', { name: '库存批次' }).click()
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-lots-desktop',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
+        await page.getByRole('tab', { name: '库存变动记录' }).click()
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-transactions-desktop',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
+        await expectText(page, '撤销调整')
+        await assertTextAbsent(page, '库存流水')
+        await assertTextAbsent(page, '流水')
+        await assertTextAbsent(page, '冲正')
+        await page.screenshot({
+          path: path.join(outputDir, 'inventory-visible-copy-desktop.png'),
+          fullPage: true,
+        })
+        await assertNoHorizontalOverflow(page, 'inventory-visible-copy-desktop')
+      },
+    },
+    {
+      name: 'inventory-numeric-summary-dark-mobile',
+      path: '/erp/warehouse/inventory?view=balances',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      themeMode: 'dark',
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectHeading(page, '库存台账')
+        await page.getByRole('tab', { name: '库存余额' }).click()
+        await assertERPThemeMode(page, {
+          scenarioName: 'inventory-numeric-summary-dark-mobile',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-dark-mobile',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
+        await assertTextAbsent(page, '查看内容')
+        await page
+          .locator('.erp-admin-content')
+          .evaluate((node) => node.scrollTo({ top: 0, behavior: 'auto' }))
+        const mobileHeaderMetrics = await page.evaluate(() => {
+          const content = document.querySelector('.erp-admin-content')
+          const header = document.querySelector(
+            '.erp-business-page-header-card'
+          )
+          const title = header?.querySelector('h1')
+          const values = Array.from(
+            header?.querySelectorAll(
+              '.erp-business-page-header-card__stat strong'
+            ) || []
+          )
+          const contentRect = content?.getBoundingClientRect()
+          const headerRect = header?.getBoundingClientRect()
+          const titleRect = title?.getBoundingClientRect()
+          return {
+            scrollTop: content?.scrollTop ?? null,
+            content: contentRect?.toJSON() || null,
+            header: headerRect?.toJSON() || null,
+            title: title
+              ? {
+                  text: title.textContent?.trim() || '',
+                  rect: titleRect?.toJSON() || null,
+                  color: window.getComputedStyle(title).color,
+                }
+              : null,
+            values: values.map((value) => ({
+              text: value.textContent?.trim() || '',
+              rect: value.getBoundingClientRect().toJSON(),
+              color: window.getComputedStyle(value).color,
+            })),
+          }
+        })
+        assert.equal(
+          mobileHeaderMetrics.scrollTop,
+          0,
+          `库存暗色手机页头截图前应回到内容顶部: ${JSON.stringify(
+            mobileHeaderMetrics
+          )}`
+        )
+        assert(
+          mobileHeaderMetrics.title?.text === '库存台账' &&
+            mobileHeaderMetrics.values.length === 2 &&
+            mobileHeaderMetrics.values.every(
+              (item) =>
+                item.rect.top >= mobileHeaderMetrics.content.top &&
+                item.rect.bottom <= mobileHeaderMetrics.content.bottom
+            ),
+          `库存暗色手机页头标题和数值应在可视内容区内: ${JSON.stringify(
+            mobileHeaderMetrics
+          )}`
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'inventory-numeric-summary-dark-mobile.png'
+          ),
+          fullPage: true,
+        })
+        await page.locator('.erp-business-page-header-card').screenshot({
+          path: path.join(
+            outputDir,
+            'inventory-numeric-summary-dark-mobile-header.png'
+          ),
+        })
+        await page.getByRole('tab', { name: '库存变动记录' }).click()
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-transactions-dark-mobile',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'inventory-numeric-summary-dark-mobile'
+        )
+      },
+    },
+    {
+      name: 'business-row-double-click-modals-desktop',
+      path: '/erp/warehouse/inventory',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '库存台账')
+        await expectText(page, '12.5')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: '12.5',
+          titleText: '库存余额详情',
+          scenarioName: 'business-row-double-click-inventory',
+          screenshotName: 'business-formal-inventory-double-click-details',
+          afterModalOpen: async () => {
+            await expectText(page, '当前弹窗只用于库存查询和追溯')
+            await expectText(page, 'SKU-STYLE-L1')
+          },
+        })
+
+        await gotoScenarioPath(page, '/erp/production/quality-inspections', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '质量检验')
+        await expectText(page, 'QI-STYLE-L1')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: 'QI-STYLE-L1',
+          titleText: '质量检验详情',
+          scenarioName: 'business-row-double-click-quality-inspection',
+          screenshotName: 'business-formal-quality-inspection-double-click-details',
+          afterModalOpen: async (modal) => {
+            await modal
+              .getByText('PR-STYLE-L1', { exact: false })
+              .first()
+              .waitFor({ state: 'visible' })
+            await modal
+              .getByText('INV-LOT-001', { exact: false })
+              .first()
+              .waitFor({ state: 'visible' })
+            await modal
+              .getByText('质检附件', { exact: false })
+              .first()
+              .waitFor({ state: 'visible' })
+          },
+        })
+
+        await gotoScenarioPath(page, '/erp/warehouse/shipments', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '出货单')
+        await expectText(page, 'SHIP-STYLE-L1')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: 'SHIP-STYLE-L1',
+          titleText: '查看出货明细',
+          scenarioName: 'business-row-double-click-shipment',
+          screenshotName: 'business-formal-shipment-double-click-details',
+          afterModalOpen: async () => {
+            await expectText(page, '已保存出货明细')
+          },
+        })
+      },
+    },
+    {
+      name: 'shipment-source-candidates-desktop',
+      path: '/erp/warehouse/shipments',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '出货单')
+        await expectButton(page, '新建出货单')
+        const shipmentSourceContract =
+          await installShipmentSourceCandidateContract(page)
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建出货单',
+          titleText: '新建出货单',
+          minFieldCount: 12,
+          screenshotName: 'shipment-source-candidates-desktop',
+          expectedTexts: ['出货明细', '从销售订单导入', '产品', '仓库'],
+          afterOpen: async (modal) => {
+            await verifyShipmentSourceCandidateContract(
+              page,
+              modal,
+              shipmentSourceContract
+            )
+          },
+        })
+      },
+    },
+    {
+      name: 'business-production-exception-tabs-desktop',
+      path: '/erp/production/exceptions',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        configRevision: 'style-l1-production-exception-tabs',
+        configHash: 'style-l1-production-exception-tabs-hash',
+        actions: [
+          ...customerRuntimeEffectiveSession.actions,
+          'production.exception.approve',
+          'production.exception.submit',
+          'production.fact.post',
+          'workflow.task.read',
+        ],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['production', 'boss'],
+        },
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const assertProductionExceptionTabGeometry = async (
+          scenarioName,
+          expectedTab
+        ) => {
+          const filterDialog = page.getByRole('dialog', { name: '筛选条件' })
+          if (expectedTab === '异常处理') {
+            await page
+              .locator(
+                '.erp-business-operation-panel button[aria-haspopup="dialog"]'
+              )
+              .click()
+            await filterDialog.waitFor()
+            await waitForFiniteAnimations(page)
+          }
+          const metrics = await page.evaluate(() => {
+            const visibleTables = Array.from(
+              document.querySelectorAll('.ant-table-wrapper')
+            ).filter((node) => {
+              const rect = node.getBoundingClientRect()
+              const style = window.getComputedStyle(node)
+              return (
+                rect.width > 0 &&
+                rect.height > 0 &&
+                style.display !== 'none' &&
+                style.visibility !== 'hidden'
+              )
+            })
+            const tabs = document.querySelector('[aria-label="生产记录工作区"]')
+            const tabList = tabs?.querySelector('[role="tablist"]')
+            const activeTab = tabs?.querySelector(
+              '[role="tab"][aria-selected="true"]'
+            )
+            const tabWorkspace = tabs?.closest(
+              '.erp-production-record-workspace'
+            )
+            const visibleTable = visibleTables[0]
+            const visibleTableCard = visibleTable?.closest(
+              '.erp-business-data-table-card'
+            )
+            const tabRect = tabs?.getBoundingClientRect()
+            const tableRect = visibleTable?.getBoundingClientRect()
+            const currentWorkspace = visibleTableCard?.closest(
+              '.erp-business-page-layout'
+            )
+            const currentOperationPanel = Array.from(
+              currentWorkspace?.children || []
+            ).find((node) => node.matches?.('.erp-business-operation-panel'))
+            const currentOperationPanelRect =
+              currentOperationPanel?.getBoundingClientRect()
+            const currentWorkspaceRowGap = currentWorkspace
+              ? Number.parseFloat(
+                  window.getComputedStyle(currentWorkspace).rowGap
+                )
+              : null
+            const currentWorkspaceRenderedGap =
+              currentOperationPanelRect && visibleTableCard
+                ? visibleTableCard.getBoundingClientRect().top -
+                  currentOperationPanelRect.bottom
+                : null
+            const decisionFilterLabels = [
+              '异常类型',
+              '审批状态',
+              '业务状态',
+            ].filter((label) =>
+              document.querySelector(
+                `.erp-business-filter-popover [aria-label="${label}"]`
+              )
+            )
+            const currentActionVisible = String(
+              currentOperationPanel?.textContent || ''
+            ).includes('当前操作')
+            const clearSelectionButton = Array.from(
+              currentOperationPanel?.querySelectorAll('button') || []
+            ).find(
+              (button) => String(button.textContent || '').trim() === '清空已选'
+            )
+            const selectionActionBar = currentOperationPanel?.querySelector(
+              '.erp-business-selection-action-bar'
+            )
+            const tableToolLabels = Array.from(
+              currentOperationPanel?.querySelectorAll(
+                '.erp-business-operation-panel__toolbar button'
+              ) || []
+            ).map((button) => String(button.textContent || '').trim())
+            const taskWorkspace = document.querySelector(
+              '.erp-workflow-business-page__tab-workspace'
+            )
+            const operationPanel = taskWorkspace?.querySelector(
+              '.erp-business-operation-panel'
+            )
+            const tableCard = taskWorkspace?.querySelector(
+              '.erp-business-data-table-card'
+            )
+            const taskWorkspaceRowGap = taskWorkspace
+              ? Number.parseFloat(window.getComputedStyle(taskWorkspace).rowGap)
+              : null
+            const taskWorkspaceRenderedGap =
+              operationPanel && tableCard
+                ? tableCard.getBoundingClientRect().top -
+                  operationPanel.getBoundingClientRect().bottom
+                : null
+            return {
+              activeTab: String(activeTab?.textContent || '').trim(),
+              tabOutsideCurrentTableCard:
+                Boolean(tabWorkspace) && !visibleTableCard?.contains(tabs),
+              tabBeforeCurrentTable:
+                Boolean(tabRect && tableRect) &&
+                tabRect.bottom <= tableRect.top + 1,
+              tabListClientWidth: tabList?.clientWidth || 0,
+              tabListScrollWidth: tabList?.scrollWidth || 0,
+              currentActionVisible,
+              currentOperationPanelExists: Boolean(currentOperationPanel),
+              currentWorkspaceRenderedGap,
+              currentWorkspaceRowGap,
+              decisionFilterLabels,
+              tableToolLabels,
+              clearSelectionDisabled:
+                clearSelectionButton?.disabled === true ||
+                selectionActionBar?.classList.contains(
+                  'erp-business-selection-action-bar--empty'
+                ) === true,
+              taskWorkspaceRenderedGap,
+              taskWorkspaceRowGap,
+              visibleTableCount: visibleTables.length,
+            }
+          })
+          assert.equal(
+            metrics.activeTab,
+            expectedTab,
+            `${scenarioName} 应只激活目标页签: ${JSON.stringify(metrics)}`
+          )
+          assert.equal(
+            metrics.visibleTableCount,
+            1,
+            `${scenarioName} 不应同时纵向挂载两张业务表: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          assert.equal(
+            metrics.tabOutsideCurrentTableCard,
+            true,
+            `${scenarioName} 页签应由共享工作区承载，不随当前表格重建: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          assert.equal(
+            metrics.tabBeforeCurrentTable,
+            true,
+            `${scenarioName} 页签应位于当前表格上方: ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.tabListScrollWidth <= metrics.tabListClientWidth + 1,
+            `${scenarioName} 页签栏不应横向溢出: ${JSON.stringify(metrics)}`
+          )
+          assert.equal(
+            metrics.currentOperationPanelExists,
+            true,
+            `${scenarioName} 当前工作区应有筛选与操作区域: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          assert.equal(
+            metrics.currentWorkspaceRowGap,
+            0,
+            `${scenarioName} 应复用业务页面标准模块间距: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          assert(
+            Math.abs(metrics.currentWorkspaceRenderedGap - 9) <= 0.5,
+            `${scenarioName} 操作区与表格应保持 9px 间距: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          assert.deepEqual(
+            metrics.tableToolLabels,
+            ['列设置'],
+            `${scenarioName} 应只保留列顺序，不展示业务数据导出: ${JSON.stringify(
+              metrics
+            )}`
+          )
+          if (expectedTab === '异常处理') {
+            assert.deepEqual(
+              metrics.decisionFilterLabels,
+              ['异常类型', '审批状态', '业务状态'],
+              `${scenarioName} 应展示三项真实后端筛选: ${JSON.stringify(
+                metrics
+              )}`
+            )
+            assert.equal(
+              metrics.currentActionVisible,
+              true,
+              `${scenarioName} 应展示当前操作区: ${JSON.stringify(metrics)}`
+            )
+            assert.equal(
+              metrics.clearSelectionDisabled,
+              true,
+              `${scenarioName} 未选择记录时清空选择应禁用: ${JSON.stringify(
+                metrics
+              )}`
+            )
+          }
+          if (expectedTab === '待审批') {
+            assert.equal(
+              metrics.taskWorkspaceRowGap,
+              0,
+              `${scenarioName} 应复用业务页面标准模块间距: ${JSON.stringify(
+                metrics
+              )}`
+            )
+            assert(
+              Math.abs(metrics.taskWorkspaceRenderedGap - 9) <= 0.5,
+              `${scenarioName} 操作区与表格应保持 9px 间距: ${JSON.stringify(
+                metrics
+              )}`
+            )
+          }
+          if (expectedTab === '异常处理') {
+            await filterDialog
+              .getByRole('button', { name: '完成', exact: true })
+              .click()
+          }
+          await assertNoHorizontalOverflow(page, scenarioName)
+        }
+
+        await expectHeading(page, '生产记录')
+        await expectText(page, '暂无生产异常处置申请')
+        await page
+          .locator(
+            '.erp-business-operation-panel button[aria-haspopup="dialog"]'
+          )
+          .click()
+        await expectText(page, '全部异常类型')
+        await expectText(page, '全部审批状态')
+        await expectText(page, '全部业务状态')
+        await page
+          .getByRole('dialog', { name: '筛选条件' })
+          .getByRole('button', { name: '完成', exact: true })
+          .click()
+        await expectText(page, '当前操作')
+        await expectText(page, '请选择一条记录')
+        await assertProductionExceptionTabGeometry(
+          'business-production-exceptions-decisions-tab',
+          '异常处理'
+        )
+        await page.getByRole('button', { name: /列设置/u }).click()
+        const decisionColumnOrderDialog = page.getByRole('dialog', {
+          name: '列设置',
+        })
+        await decisionColumnOrderDialog.waitFor({ state: 'visible' })
+        await expectText(page, '异常单号')
+        await decisionColumnOrderDialog.locator('.ant-modal-close').click()
+        await decisionColumnOrderDialog.waitFor({ state: 'hidden' })
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '异常处理申请已刷新')
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-decisions-tab.png'
+          ),
+          fullPage: true,
+        })
+        await page
+          .getByText('异常处理申请已刷新', { exact: true })
+          .waitFor({ state: 'hidden', timeout: 6_000 })
+
+        await page.getByRole('tab', { name: '待审批' }).click()
+        await expectText(page, '暂无待审批的生产异常处置申请。')
+        await assertTextAbsent(page, '暂无生产异常处置申请')
+        await assertProductionExceptionTabGeometry(
+          'business-production-exceptions-tasks-tab',
+          '待审批'
+        )
+        await page.getByRole('button', { name: /列设置/u }).click()
+        const taskColumnOrderDialog = page.getByRole('dialog', {
+          name: '列设置',
+        })
+        await taskColumnOrderDialog.waitFor({ state: 'visible' })
+        await expectText(page, '任务编号')
+        await taskColumnOrderDialog.locator('.ant-modal-close').click()
+        await taskColumnOrderDialog.waitFor({ state: 'hidden' })
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '异常处理任务已刷新')
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-tasks-tab.png'
+          ),
+          fullPage: true,
+        })
+
+        await page.getByRole('tab', { name: '异常处理' }).click()
+        await expectText(page, '暂无生产异常处置申请')
+        await page.evaluate(() => {
+          window.localStorage.setItem('plush_erp_theme_mode', 'dark')
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectText(page, '暂无生产异常处置申请')
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-production-exceptions-decisions-tab-dark',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertProductionExceptionTabGeometry(
+          'business-production-exceptions-decisions-tab-dark',
+          '异常处理'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-decisions-tab-dark.png'
+          ),
+          fullPage: true,
+        })
+
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page.evaluate(() => {
+          window.localStorage.setItem('plush_erp_theme_mode', 'light')
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectText(page, '暂无生产异常处置申请')
+        await assertProductionExceptionTabGeometry(
+          'business-production-exceptions-decisions-tab-mobile',
+          '异常处理'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-decisions-tab-mobile.png'
+          ),
+          fullPage: true,
+        })
+        await page.getByRole('tab', { name: '待审批' }).click()
+        await expectText(page, '暂无待审批的生产异常处置申请。')
+        await assertProductionExceptionTabGeometry(
+          'business-production-exceptions-tasks-tab-mobile',
+          '待审批'
+        )
+        await page
+          .locator(
+            '.erp-workflow-business-page__tab-workspace .erp-business-data-table-card'
+          )
+          .scrollIntoViewIfNeeded()
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-tasks-tab-mobile.png'
+          ),
+          fullPage: true,
+        })
+      },
+    },
+    {
+      name: 'business-production-orders-refresh-entrypoint',
+      path: '/erp/production/orders',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        configRevision: 'style-l1-business-production-order-refresh',
+        configHash: 'style-l1-business-production-order-refresh-hash',
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '生产订单')
+        await expectText(page, 'MO-STYLE-L1-20260713')
+        await expectButton(page, '新建生产订单')
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'business-production-orders',
+        })
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '当前页面数据已刷新')
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-orders-shell-refresh-only-desktop.png'
+          ),
+          fullPage: true,
+        })
+        await page.setViewportSize({ width: 520, height: 900 })
+        await page.waitForTimeout(160)
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'business-production-orders-narrow',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'business-production-orders-narrow'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-orders-shell-refresh-only-narrow.png'
+          ),
+          fullPage: true,
+        })
+      },
+    },
+    {
+      name: 'supplier-processing-multi-select-layout-desktop',
+      path: '/erp/master/partners/suppliers',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const processFixtures = [
+          ['PROC-EMBROIDERY-L1', '面部电绣', '电脑绣花'],
+          ['PROC-LASER-L1', '耳片激光', '激光裁切'],
+          ['PROC-TRANSFER-L1', '图案热转印', '热转印'],
+          ['PROC-SEWING-L1', '本体车缝', '车缝'],
+          ['PROC-STUFFING-L1', '本体充棉', '充棉'],
+          ['PROC-CUTTING-L1', '面料裁片', '裁床'],
+          ['PROC-INSPECTION-L1', '外观查货', '查货'],
+          ['PROC-PACKAGING-L1', '成品包装', '包装'],
+        ].map(([code, name, category], index) => ({
+          id: index + 101,
+          code,
+          name,
+          category,
+          outsourcing_enabled: true,
+          inhouse_enabled: true,
+          quality_required: false,
+          is_active: true,
+        }))
+
+        await page.route('**/rpc/masterdata', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (body.method !== 'list_processes') {
+            await route.fallback()
+            return
+          }
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: body.id || 'supplier-process-layout',
+              result: {
+                code: 0,
+                message: 'OK',
+                data: {
+                  processes: processFixtures,
+                  total: processFixtures.length,
+                  limit: 100,
+                  offset: 0,
+                },
+              },
+            }),
+          })
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectHeading(page, '供应商与加工厂')
+        await page.getByRole('button', { name: '新建供应商' }).click()
+
+        const modal = page
+          .locator(
+            '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+          )
+          .last()
+        await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        const processField = modal
+          .locator('.ant-form-item')
+          .filter({ hasText: '可加工工序' })
+          .first()
+        await processField.locator('.ant-select').click()
+        const unselectedOptions = page.locator(
+          '.ant-select-dropdown:visible .ant-select-item-option:not(.ant-select-item-option-disabled):not(.ant-select-item-option-selected)'
+        )
+        for (let index = 0; index < processFixtures.length; index += 1) {
+          await unselectedOptions.first().click()
+        }
+        await page.keyboard.press('Escape')
+
+        const readLayout = () =>
+          processField.evaluate((node) => {
+            const toRect = (element) => {
+              const rect = element?.getBoundingClientRect()
+              return rect
+                ? {
+                    top: rect.top,
+                    right: rect.right,
+                    bottom: rect.bottom,
+                    left: rect.left,
+                    width: rect.width,
+                    height: rect.height,
+                  }
+                : null
+            }
+            const selector = node.querySelector('.ant-select-selector')
+            const extra = node.querySelector('.ant-form-item-extra')
+            const tags = Array.from(
+              node.querySelectorAll('.ant-select-selection-item')
+            ).map(toRect)
+            return {
+              field: {
+                clientWidth: node.clientWidth,
+                scrollWidth: node.scrollWidth,
+              },
+              selector: toRect(selector),
+              extra: toRect(extra),
+              tags,
+            }
+          })
+
+        const assertLayout = (metrics, state) => {
+          assert.equal(
+            metrics.tags.length,
+            processFixtures.length,
+            `${state} 应显示全部已选工序: ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.selector && metrics.selector.height > 36,
+            `${state} 多选框应随标签换行增高: ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.tags.every(
+              (tag) =>
+                tag &&
+                tag.left >= metrics.selector.left - 1 &&
+                tag.right <= metrics.selector.right + 1 &&
+                tag.top >= metrics.selector.top - 1 &&
+                tag.bottom <= metrics.selector.bottom + 1
+            ),
+            `${state} 已选标签不得越过多选框边界: ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.extra &&
+              metrics.extra.top >= metrics.selector.bottom - 1 &&
+              metrics.tags.every((tag) => tag.bottom <= metrics.extra.top + 1),
+            `${state} 多选标签不得覆盖字段说明: ${JSON.stringify(metrics)}`
+          )
+          assert(
+            metrics.field.scrollWidth <= metrics.field.clientWidth + 1,
+            `${state} 多选字段不得产生横向溢出: ${JSON.stringify(metrics)}`
+          )
+        }
+
+        const desktopMetrics = await readLayout()
+        assertLayout(desktopMetrics, '供应商多选桌面态')
+        await modal.screenshot({
+          path: path.join(
+            outputDir,
+            'supplier-processing-multi-select-selected-desktop.png'
+          ),
+        })
+
+        await page.setViewportSize({ width: 720, height: 900 })
+        await page.waitForTimeout(180)
+        const narrowMetrics = await readLayout()
+        assertLayout(narrowMetrics, '供应商多选窄屏态')
+        await modal.screenshot({
+          path: path.join(
+            outputDir,
+            'supplier-processing-multi-select-layout-narrow.png'
+          ),
+        })
+        await closeBusinessFormModal(page, modal)
+      },
+    },
+    {
+      name: 'business-table-headers-single-line-desktop',
+      path: '/erp/master/products',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      themeMode: 'dark',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '产品档案')
+        await expectText(page, 'PROD-STYLE-L1')
+        await expectText(page, '产品单重（净重）')
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-table-headers-single-line-desktop',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertBusinessMainTableSortableColumns(page, {
+          scenarioName: 'business-table-headers-single-line-desktop',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'business-table-headers-single-line-desktop'
+        )
+        await page.locator('.erp-business-data-table-card').screenshot({
+          path: path.join(
+            outputDir,
+            'business-table-headers-single-line-dark-desktop.png'
+          ),
+        })
+
+        const firstSortableHeader = page
+          .locator(
+            '.erp-business-data-table-card .ant-table-thead th.ant-table-column-has-sorters'
+          )
+          .first()
+        const beforeSettings =
+          await firstSortableHeader.getAttribute('aria-sort')
+        const settingsTrigger = page.getByRole('button', { name: /列设置$/u })
+        await settingsTrigger.click()
+        const columnDialog = page.getByRole('dialog', { name: /^列设置/u })
+        await columnDialog.waitFor({ state: 'visible' })
+        await page.waitForFunction(() =>
+          Boolean(document.activeElement?.closest('.ant-modal'))
+        )
+        assert.equal(
+          await firstSortableHeader.getAttribute('aria-sort'),
+          beforeSettings,
+          '工具栏列设置不应改变当前排序'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-table-headers-column-settings-dark.png'
+          ),
+        })
+        await page.keyboard.press('Escape')
+        await columnDialog.waitFor({ state: 'hidden' })
+        assert(
+          await settingsTrigger.evaluate(
+            (node) => node === document.activeElement
+          ),
+          '关闭列设置后焦点应回到触发按钮'
+        )
+        await page.mouse.move(0, 0)
+        await page.waitForTimeout(120)
+
+        await page
+          .locator(
+            '.erp-business-data-table-card .ant-table-content, .erp-business-data-table-card .ant-table-body'
+          )
+          .first()
+          .evaluate((node) => {
+            node.scrollLeft = node.scrollWidth - node.clientWidth
+          })
+        await page.waitForTimeout(120)
+        await page.locator('.erp-business-data-table-card').screenshot({
+          path: path.join(
+            outputDir,
+            'business-table-headers-single-line-dark-right-edge.png'
+          ),
+        })
+
+        await page.setViewportSize({ width: 760, height: 900 })
+        await page.waitForTimeout(180)
+        await assertBusinessMainTableSortableColumns(page, {
+          scenarioName: 'business-table-headers-single-line-narrow',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'business-table-headers-single-line-narrow'
+        )
+        const tableScrollableWidth = await page
+          .locator(
+            '.erp-business-data-table-card .ant-table-content, .erp-business-data-table-card .ant-table-body'
+          )
+          .first()
+          .evaluate((node) => node.scrollWidth - node.clientWidth)
+        assert(
+          tableScrollableWidth > 1,
+          `产品档案窄屏态应保留表格内横向滚动: ${tableScrollableWidth}`
+        )
+        await page.locator('.erp-business-data-table-card').screenshot({
+          path: path.join(
+            outputDir,
+            'business-table-headers-single-line-dark-narrow.png'
+          ),
+        })
+      },
+    },
+    {
+      name: 'business-core-pages-desktop',
+      path: '/erp/master/partners/suppliers',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        configRevision: 'style-l1-business-core-pages',
+        configHash: 'style-l1-business-core-pages-hash',
+        actions: [
+          ...customerRuntimeEffectiveSession.actions,
+          'production.fact.cancel',
+          'workflow.task.create',
+          'workflow.task.read',
+        ],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['production', 'warehouse', 'sales', 'finance'],
+        },
+      },
+      workflowTaskFixtures: [
+        createShipmentFinanceApprovalTaskFixture({
+          sourceID: 9101,
+          taskID: 91_01,
+          processInstanceID: 19_101,
+          processNodeInstanceID: 29_101,
+          sourceNo: 'SHIP-REL-L1',
+          taskName: '出货财务审批确认',
+        }),
+        createShipmentFinanceApprovalTaskFixture({
+          sourceID: 9103,
+          taskID: 91_03,
+          processInstanceID: 19_103,
+          processNodeInstanceID: 29_103,
+          sourceNo: 'SHIP-REL-STALE',
+          taskName: '出货财务审批刷新后确认',
+        }),
+      ],
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '供应商与加工厂')
+        await expectButton(page, '新建供应商')
+        await expectText(page, '当前操作')
+        await assertCurrentOperationBarCompact(page, {
+          scenarioName: 'business-formal-suppliers',
+        })
+        await assertBusinessCollaborationPanelAbsent(
+          page,
+          'business-formal-suppliers'
+        )
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'business-formal-suppliers',
+        })
+        await assertBusinessMainTableSortableColumns(page, {
+          scenarioName: 'business-formal-suppliers',
+        })
+        await assertBusinessFormModalKeyboardRecovery(page, {
+          triggerName: '新建供应商',
+          titleText: '新建供应商或加工厂',
+          scenarioName: 'business-formal-suppliers',
+        })
+        await assertNoHorizontalOverflow(page, 'business-standard-suppliers')
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建供应商',
+          titleText: '新建供应商或加工厂',
+          minFieldCount: 5,
+          screenshotName: 'business-formal-suppliers-form-modal',
+          expectedTexts: [
+            '供应商类型',
+            '经营 / 加工地址',
+            '可加工工序',
+            '联系人',
+            '添加联系人',
+          ],
+          expectContactItemsLayout: true,
+          afterOpen: async (modal) => {
+            await assertLineItemAddActionScrollsToNewRow(modal, {
+              scenarioName: 'business-formal-suppliers-contact-form-modal',
+              targetRowCount: 5,
+              addButtonName: '添加联系人',
+              listSelector: '.erp-master-contact-list__items',
+              rowSelector: '.erp-master-contact-list__row',
+            })
+          },
+        })
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: '样式供应商',
+          titleText: '编辑供应商',
+          scenarioName: 'business-formal-suppliers',
+          afterModalOpen: async () => {
+            await expectText(page, '联系人')
+            await page
+              .getByRole('button', { name: '添加联系人', exact: true })
+              .waitFor({ state: 'visible', timeout: 10_000 })
+          },
+        })
+
+        await gotoScenarioPath(page, '/erp/master/partners/customers', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '客户档案')
+        await expectButton(page, '新建客户')
+        await expectText(page, '当前操作')
+        await assertCurrentOperationBarCompact(page, {
+          scenarioName: 'business-formal-customers',
+        })
+        await expectText(page, '暗色客户')
+        await assertBusinessCollaborationPanelAbsent(
+          page,
+          'business-formal-customers'
+        )
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'business-formal-customers',
+        })
+        await assertBusinessHeaderHasNoSectionTitle(page, {
+          scenarioName: 'business-formal-customers',
+        })
+        await assertBusinessMainTableSortableColumns(page, {
+          scenarioName: 'business-formal-customers',
+        })
+        await assertBusinessFormModalKeyboardRecovery(page, {
+          triggerName: '新建客户',
+          titleText: '新建客户档案',
+          scenarioName: 'business-formal-customers',
+        })
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建客户',
+          titleText: '新建客户档案',
+          minFieldCount: 5,
+          screenshotName: 'business-formal-customers-form-modal',
+          expectedTexts: ['联系人', '添加联系人'],
+          expectContactItemsLayout: true,
+          afterOpen: async (modal) => {
+            await assertLineItemAddActionScrollsToNewRow(modal, {
+              scenarioName: 'business-formal-customers-contact-form-modal',
+              targetRowCount: 5,
+              addButtonName: '添加联系人',
+              listSelector: '.erp-master-contact-list__items',
+              rowSelector: '.erp-master-contact-list__row',
+            })
+          },
+        })
+        await assertNoHorizontalOverflow(page, 'business-standard-customers')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: '暗色客户',
+          titleText: '编辑客户',
+          scenarioName: 'business-formal-customers',
+          afterModalOpen: async () => {
+            await expectText(page, '联系人')
+            await page
+              .getByRole('button', { name: '添加联系人', exact: true })
+              .waitFor({ state: 'visible', timeout: 10_000 })
+          },
+        })
+
+        await verifySalesOrderDemandEntry(page)
+
+        const masterDataMethods = []
+        page.on('request', (request) => {
+          if (!request.url().includes('/rpc/masterdata')) return
+          try {
+            const method = request.postDataJSON()?.method
+            if (method) masterDataMethods.push(method)
+          } catch {
+            // 非 JSON-RPC 请求不参与本断言。
+          }
+        })
+
+        await gotoScenarioPath(page, '/erp/master/products', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '产品档案')
+        await expectText(page, '产品基础信息')
+        await expectText(page, '产品规格')
+        await page.getByRole('tab', { name: '产品基础信息' }).waitFor()
+        await page.getByRole('tab', { name: '产品规格' }).waitFor()
+        await assertBusinessViewTabSelectedStyle(page, {
+          scenarioName: 'business-standard-products',
+          tabName: '产品基础信息',
+        })
+        await expectButton(page, '新建产品')
+        await assertNoListDeleteTrashToolbar(page)
+        await expectText(page, 'PROD-STYLE-L1')
+        await expectText(page, 'BEAR-STYLE')
+        await expectText(page, '425 克')
+        await expectText(page, '当前操作')
+        await assertCurrentOperationBarCompact(page, {
+          scenarioName: 'business-standard-products',
+        })
+        await assertBusinessCollaborationPanelAbsent(
+          page,
+          'business-standard-products'
+        )
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'business-standard-products',
+        })
+        await assertBusinessHeaderHasNoSectionTitle(page, {
+          scenarioName: 'business-standard-products',
+        })
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'business-standard-products',
+          expectedLabels: ['总产品', '本页显示', '启用产品'],
+        })
+        await assertBusinessMainTableSortableColumns(page, {
+          scenarioName: 'business-standard-products',
+        })
+        await assertNoListDeleteTrashToolbar(page)
+        await verifyBusinessModuleColumnOrderDialog(page, {
+          moduleKey: 'products',
+          heading: '产品档案',
+        })
+        await assertBusinessFormModalKeyboardRecovery(page, {
+          triggerName: '新建产品',
+          titleText: '新建产品',
+          scenarioName: 'business-standard-products',
+        })
+        await page.getByRole('button', { name: '新建产品' }).click()
+        await expectText(page, '新建产品')
+        await expectText(page, '产品编号')
+        await expectText(page, '默认单位')
+        await expectText(page, '产品单重（净重）')
+        await assertTextAbsent(page, '默认单位 ID')
+        await closeBusinessFormModal(
+          page,
+          page
+            .locator(
+              '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+            )
+            .last()
+        )
+        const beforeProductSKUTabRequests = masterDataMethods.length
+        await page.getByRole('tab', { name: '产品规格' }).click()
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_product_skus',
+          fromIndex: beforeProductSKUTabRequests,
+          scenarioName: 'business-standard-product-skus-tab-refresh',
+        })
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_products',
+          fromIndex: beforeProductSKUTabRequests,
+          scenarioName: 'business-standard-product-skus-reference-refresh',
+        })
+        await assertBusinessViewTabSelectedStyle(page, {
+          scenarioName: 'business-standard-product-skus',
+          tabName: '产品规格',
+        })
+        await expectButton(page, '新建产品规格')
+        await expectText(page, 'SKU-STYLE-L1')
+        await expectText(page, '375 克')
+        await assertBusinessMainTableSortableColumns(page, {
+          scenarioName: 'business-standard-product-skus',
+          unsortableHeaders: ['SKU 单重（净重）'],
+        })
+        await page.getByRole('button', { name: '新建产品规格' }).click()
+        await expectText(page, '新建产品规格')
+        await expectText(page, 'SKU 编号')
+        await expectText(page, '产品')
+        await expectText(page, 'SKU 单重（净重）')
+        await closeBusinessFormModal(
+          page,
+          page
+            .locator(
+              '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+            )
+            .last()
+        )
+        await assertNoHorizontalOverflow(page, 'business-standard-products')
+
+        const beforeProductSKURefreshRequests = masterDataMethods.length
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_product_skus',
+          fromIndex: beforeProductSKURefreshRequests,
+          scenarioName: 'business-standard-product-skus-header-refresh',
+        })
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_products',
+          fromIndex: beforeProductSKURefreshRequests,
+          scenarioName:
+            'business-standard-product-skus-header-reference-refresh',
+        })
+
+        const openModuleFromCatalog = async (label) => {
+          await page.locator('.erp-module-catalog-trigger:visible').click()
+          const catalog = page.getByRole('dialog', {
+            name: '全部模块',
+            exact: true,
+          })
+          await catalog.waitFor({ state: 'visible' })
+          await catalog
+            .getByRole('button', { name: label, exact: true })
+            .click()
+        }
+        const beforeMaterialsMenuRequests = masterDataMethods.length
+        await openModuleFromCatalog('材料档案')
+        await expectHeading(page, '材料档案')
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_materials',
+          fromIndex: beforeMaterialsMenuRequests,
+          scenarioName: 'business-standard-materials-menu-refresh',
+        })
+        await waitForMasterDataRequest(page, masterDataMethods, {
+          method: 'list_units',
+          fromIndex: beforeMaterialsMenuRequests,
+          scenarioName: 'business-standard-materials-menu-unit-refresh',
+        })
+
+        const beforeRepeatedMaterialsMenuRequests = masterDataMethods.length
+        await openModuleFromCatalog('材料档案')
+        await assertNoMasterDataRequest(page, masterDataMethods, {
+          methods: ['list_materials', 'list_units'],
+          fromIndex: beforeRepeatedMaterialsMenuRequests,
+          scenarioName: 'business-standard-materials-current-menu-no-refresh',
+        })
+
+        await gotoScenarioPath(page, '/erp/purchase/material-bom', {
+          waitUntil: 'domcontentloaded',
+        })
+        const bomGroupsModal = await verifyBOMMaterialGroups(page, deps)
+        await closeBusinessFormModal(page, bomGroupsModal)
+        await assertNoHorizontalOverflow(page, 'business-standard-bom')
+
+        await gotoScenarioPath(page, '/erp/warehouse/inventory', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '库存台账')
+        await assertTextAbsent(page, '余额只读')
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'business-standard-inventory',
+          expectedLabels: ['筛选结果', '本页显示'],
+        })
+        await assertTextAbsent(page, '查看内容')
+        await expectText(page, '12.5')
+        await expectText(page, '已预留')
+        await expectText(page, '4')
+        await expectText(page, '可用量')
+        await expectText(page, '8.5')
+        await expectText(page, 'SKU-STYLE-L1')
+        await page
+          .locator(
+            '.erp-business-operation-panel button[aria-haspopup="dialog"]'
+          )
+          .click()
+        await page.getByRole('dialog', { name: '筛选条件' }).waitFor()
+        await waitForFiniteAnimations(page)
+        const inventoryFilterSelects = page.locator(
+          '.erp-business-filter-popover .erp-business-operation-panel__filters .ant-select'
+        )
+        assert.equal(
+          await inventoryFilterSelects.count(),
+          6,
+          '库存余额筛选区应包含存货类型、材料类别、具体对象、产品规格、仓库和批次'
+        )
+        for (const name of [
+          '存货类型',
+          '材料库存类别',
+          '材料或产品',
+          '产品规格',
+          '仓库',
+          '批次',
+        ]) {
+          assert.equal(
+            await page.getByRole('combobox', { name, exact: true }).count(),
+            1
+          )
+        }
+        const inventorySKUFilter = inventoryFilterSelects.filter({
+          has: page.getByRole('combobox', { name: '产品规格', exact: true }),
+        })
+        assert.equal(
+          await inventorySKUFilter
+            .getAttribute('class')
+            .then((value) =>
+              String(value || '').includes('ant-select-disabled')
+            ),
+          true,
+          '未选择成品对象时产品规格筛选应禁用'
+        )
+        assert.equal(
+          await page
+            .getByRole('combobox', { name: '材料库存类别', exact: true })
+            .isDisabled(),
+          false
+        )
+        await inventoryFilterSelects
+          .filter({
+            has: page.getByRole('combobox', { name: '存货类型', exact: true }),
+          })
+          .click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '成品' })
+          .click()
+        await inventorySKUFilter
+          .locator('input:not(:disabled)')
+          .waitFor({ state: 'visible' })
+        assert.equal(
+          await page
+            .getByRole('combobox', { name: '材料库存类别', exact: true })
+            .isDisabled(),
+          true
+        )
+        await inventorySKUFilter.click()
+        await inventorySKUFilter.locator('input').fill('SKU-STYLE-L1')
+        await page.keyboard.press('Enter')
+        await inventorySKUFilter
+          .locator('.ant-select-selection-item')
+          .filter({ hasText: 'SKU-STYLE-L1' })
+          .waitFor({ state: 'visible' })
+        const inventorySKUMetrics = await page.evaluate(() => {
+          const filters = document.querySelector(
+            '.erp-business-filter-popover .erp-business-operation-panel__filters'
+          )
+          const table = document.querySelector(
+            '.erp-inventory-ledger-page .ant-table-content'
+          )
+          const filterRect = filters?.getBoundingClientRect()
+          const controls = Array.from(filters?.children || []).map((node) => {
+            const rect = node.getBoundingClientRect()
+            return {
+              left: rect.left,
+              right: rect.right,
+              top: rect.top,
+              bottom: rect.bottom,
+            }
+          })
+          return {
+            filterOverflowX: filters
+              ? filters.scrollWidth - filters.clientWidth
+              : -1,
+            controlsInsideFilters: controls.every(
+              (rect) =>
+                rect.left >= (filterRect?.left || 0) - 1 &&
+                rect.right <= (filterRect?.right || 0) + 1
+            ),
+            tableOverflowX: table ? table.scrollWidth - table.clientWidth : -1,
+            documentOverflowX:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          inventorySKUMetrics.filterOverflowX <= 1 &&
+            inventorySKUMetrics.controlsInsideFilters &&
+            inventorySKUMetrics.tableOverflowX > 1 &&
+            inventorySKUMetrics.documentOverflowX === 0,
+          `库存 SKU 筛选应在筛选区内换行，宽表只在表格内滚动: ${JSON.stringify(
+            inventorySKUMetrics
+          )}`
+        )
+        await page.screenshot({
+          path: path.join(outputDir, 'business-formal-inventory-sku-grain.png'),
+          fullPage: true,
+        })
+        await page.getByRole('button', { name: '清空筛选' }).click()
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page.waitForTimeout(160)
+        const inventoryNarrowMetrics = await page.evaluate(() => {
+          const filters = document.querySelector(
+            '.erp-business-filter-popover .erp-business-operation-panel__filters'
+          )
+          const table = document.querySelector(
+            '.erp-inventory-ledger-page .ant-table-content'
+          )
+          const filterRect = filters?.getBoundingClientRect()
+          const controls = Array.from(filters?.children || []).map((node) => {
+            const rect = node.getBoundingClientRect()
+            return {
+              left: rect.left,
+              right: rect.right,
+              width: rect.width,
+            }
+          })
+          return {
+            filterWidth: filterRect?.width || 0,
+            filterOverflowX: filters
+              ? filters.scrollWidth - filters.clientWidth
+              : -1,
+            controlsInsideFilters: controls.every(
+              (rect) =>
+                rect.left >= (filterRect?.left || 0) - 1 &&
+                rect.right <= (filterRect?.right || 0) + 1 &&
+                rect.width <= (filterRect?.width || 0) + 1
+            ),
+            tableOverflowX: table ? table.scrollWidth - table.clientWidth : -1,
+            documentOverflowX:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          inventoryNarrowMetrics.filterWidth > 0 &&
+            inventoryNarrowMetrics.filterOverflowX <= 1 &&
+            inventoryNarrowMetrics.controlsInsideFilters &&
+            inventoryNarrowMetrics.tableOverflowX > 1 &&
+            inventoryNarrowMetrics.documentOverflowX === 0,
+          `库存 SKU 筛选在窄视口应留在筛选卡片内，宽表继续内部滚动: ${JSON.stringify(
+            inventoryNarrowMetrics
+          )}`
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-formal-inventory-sku-grain-narrow.png'
+          ),
+          fullPage: true,
+        })
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await page.waitForTimeout(160)
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-standard-inventory',
+        })
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'business-standard-inventory',
+        })
+        await expectNoButton(page, '新建库存')
+        await expectNoButton(page, '新建库存调整')
+        await expectNoButton(page, '生成库存调整')
+        await assertBusinessMainTableHasNoOperationColumn(page, {
+          scenarioName: 'business-standard-inventory',
+        })
+        let forceEmptyInventoryBalances = false
+        await page.route('**/rpc/inventory', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            forceEmptyInventoryBalances &&
+            body.method === 'list_inventory_balances'
+          ) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'business-standard-inventory-empty-search',
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: stylePaginatedRpcData(
+                    [],
+                    'inventory_balances',
+                    body.params || {}
+                  ),
+                },
+              }),
+            })
+            return
+          }
+          await route.fallback()
+        })
+        await page.getByText('12.5', { exact: false }).first().click()
+        forceEmptyInventoryBalances = true
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await assertBusinessTableEmptyState(page, {
+          scenarioName: 'business-standard-inventory-balances-empty-search',
+          emptyText: '暂无库存余额',
+          staleText: '12.5',
+        })
+        forceEmptyInventoryBalances = false
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '12.5')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: '12.5',
+          titleText: '库存余额详情',
+          scenarioName: 'business-standard-inventory-balances',
+          screenshotName: 'business-formal-inventory-double-click-details',
+          afterModalOpen: async () => {
+            await expectText(page, '当前弹窗只用于库存查询和追溯')
+            await expectText(page, 'SKU-STYLE-L1')
+          },
+        })
+
+        await page.getByRole('tab', { name: '库存批次' }).click()
+        await expectText(page, 'INV-LOT-001')
+        await expectText(page, 'SUP-LOT-001')
+        await expectText(page, '冻结')
+        await assertBusinessMainTableHasNoOperationColumn(page, {
+          scenarioName: 'business-standard-inventory-lots',
+        })
+
+        await page.getByRole('tab', { name: '库存变动记录' }).click()
+        await expectText(page, '撤销调整')
+        await expectText(page, '其他来源')
+        await expectText(page, '未提供业务单号')
+        await expectText(page, '已关联来源明细')
+        await expectText(page, '已关联原库存变动记录')
+        await expectText(page, 'ledger seed')
+        await assertTextAbsent(page, 'MANUAL_SEED')
+        await assertTextAbsent(page, 'INV-TXN-001')
+        await assertTextAbsent(page, '9001')
+        await assertTextAbsent(page, '9002')
+        await assertTextAbsent(page, '888500999')
+        await assertBusinessMainTableHasNoOperationColumn(page, {
+          scenarioName: 'business-standard-inventory-txns',
+        })
+        await assertNoHorizontalOverflow(page, 'business-standard-inventory')
+
+        await gotoScenarioPath(page, '/erp/production/quality-inspections', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '质量检验')
+        await expectButton(page, '补建来料质检')
+        await expectButton(page, '导出筛选结果')
+        await expectButton(page, '列设置')
+        await assertNoListDeleteTrashToolbar(page)
+        await assertTextAbsent(page, 'quality_inspections')
+        const qualityDispositionAction = await findSelectionActionButton(
+          page,
+          '不合格处置'
+        )
+        assert.equal(
+          await qualityDispositionAction.isDisabled(),
+          true,
+          '未选择记录时保留岗位入口并提示先选择'
+        )
+        await page.keyboard.press('Escape')
+        await page
+          .locator('.erp-business-selection-action-menu')
+          .waitFor({ state: 'hidden' })
+        await expectText(page, 'QI-STYLE-L1')
+        await expectText(page, 'PR-STYLE-L1')
+        await expectText(page, 'INV-LOT-001')
+        const qualityInspectionHeaderMetrics = await page.evaluate(() => {
+          const headers = Array.from(
+            document.querySelectorAll(
+              '.erp-business-data-table-card .ant-table-thead th .erp-module-column-header-text'
+            )
+          ).map((node) => ({
+            text: String(node.textContent || '').trim(),
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+          }))
+          return {
+            headers,
+            clippedHeaders: headers.filter(
+              (header) => header.scrollWidth > header.clientWidth + 1
+            ),
+          }
+        })
+        assert.deepEqual(
+          qualityInspectionHeaderMetrics.headers.map((header) => header.text),
+          [
+            '质检单号',
+            '状态',
+            '判定',
+            '产品 / 材料 / 在制品',
+            '检验来源',
+            '估算不良比例',
+            '检验信息',
+            '判定备注',
+          ],
+          `质量检验默认表头应合并为可扫读列: ${JSON.stringify(
+            qualityInspectionHeaderMetrics
+          )}`
+        )
+        assert.deepEqual(
+          qualityInspectionHeaderMetrics.clippedHeaders,
+          [],
+          `质量检验默认表头不应出现省略号: ${JSON.stringify(
+            qualityInspectionHeaderMetrics
+          )}`
+        )
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'business-formal-quality-inspections',
+        })
+        await assertBusinessMainTableHasNoOperationColumn(page, {
+          scenarioName: 'business-formal-quality-inspections',
+        })
+        await assertBusinessMainTableSortableColumns(page, {
+          scenarioName: 'business-formal-quality-inspections',
+          unsortableHeaders: ['估算不良比例', '判定备注'],
+        })
+        await assertNoListDeleteTrashToolbar(page)
+        let forceEmptyQualityInspections = false
+        const qualityEmptySearchKeyword =
+          'NO-MATCH-business-formal-quality-inspections-empty-search'
+        await page.route('**/rpc/quality', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            forceEmptyQualityInspections &&
+            body.method === 'list_quality_inspections'
+          ) {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'business-formal-quality-inspections-empty-search',
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: stylePaginatedRpcData(
+                    [],
+                    'quality_inspections',
+                    body.params || {}
+                  ),
+                },
+              }),
+            })
+            return
+          }
+          await route.fallback()
+        })
+        await page.getByText('QI-STYLE-L1', { exact: false }).first().click()
+        forceEmptyQualityInspections = true
+        await page
+          .getByPlaceholder('搜单号、产品、材料、批次')
+          .first()
+          .fill(qualityEmptySearchKeyword)
+        await page.keyboard.press('Enter')
+        await assertBusinessTableEmptyState(page, {
+          scenarioName: 'business-formal-quality-inspections-empty-search',
+          emptyText: '暂无质量检验单',
+          staleText: 'QI-STYLE-L1',
+        })
+        forceEmptyQualityInspections = false
+        await page.getByPlaceholder('搜单号、产品、材料、批次').first().fill('')
+        await page.keyboard.press('Enter')
+        await expectText(page, 'QI-STYLE-L1')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: 'QI-STYLE-L1',
+          titleText: '质量检验详情',
+          scenarioName: 'business-formal-quality-inspections',
+          screenshotName: 'business-formal-quality-inspection-double-click-details',
+          afterModalOpen: async () => {
+            await expectText(page, 'PR-STYLE-L1')
+            await expectText(page, 'INV-LOT-001')
+            await expectText(page, '质检附件')
+          },
+        })
+        await verifyBusinessModuleColumnOrderDialog(page, {
+          moduleKey: 'quality-inspections',
+          heading: '质量检验',
+        })
+        await assertBusinessFormModalKeyboardRecovery(page, {
+          triggerName: '补建来料质检',
+          titleText: '生成来料质检草稿',
+          scenarioName: 'business-formal-quality-inspections',
+        })
+        await page
+          .getByRole('row')
+          .filter({ hasText: 'QI-STYLE-L1' })
+          .getByRole('radio')
+          .check()
+        await expectText(page, 'QI-STYLE-L1 / INV-LOT-001')
+        await findSelectionActionButton(page, '判定合格')
+        await findSelectionActionButton(page, '判定不合格')
+        if (
+          await page
+            .locator('.erp-business-selection-action-menu:visible')
+            .count()
+        ) {
+          await page.keyboard.press('Escape')
+          await page
+            .locator('.erp-business-selection-action-menu')
+            .waitFor({ state: 'hidden' })
+        }
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '补建来料质检',
+          titleText: '生成来料质检草稿',
+          minFieldCount: 4,
+          screenshotName: 'business-formal-quality-inspection-create-form-modal',
+          expectedTexts: [
+            '质检单号（自动）',
+            '采购入库单',
+            '采购入库行',
+            '备注',
+          ],
+          absentTexts: [
+            '采购入库单 ID',
+            '批次 ID',
+            '材料 ID',
+            '仓库 ID',
+            'source_type',
+            'source_id',
+          ],
+          afterOpen: async (modal) => {
+            await assertNonItemTextareaFullRow(modal, {
+              labels: ['备注'],
+              scenarioName: 'business-formal-quality-inspection-create-form-modal',
+            })
+          },
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'business-formal-quality-inspections'
+        )
+
+        await gotoScenarioPath(page, '/erp/warehouse/shipments', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '出货单')
+        await expectButton(page, '新建出货单')
+        for (const headerText of [
+          '实际 / 最终总净重（克）',
+          '计划出货日期 / 实际出货日期',
+        ]) {
+          const header = page
+            .locator(
+              '.erp-shipments-page .erp-business-data-table-card .ant-table-thead th'
+            )
+            .filter({ hasText: headerText })
+            .first()
+          await header.waitFor({ state: 'visible' })
+          const headerLabel = header.getByText(headerText, { exact: true })
+          await headerLabel.waitFor({ state: 'visible' })
+          assert.equal(
+            String(await headerLabel.textContent()).trim(),
+            headerText
+          )
+        }
+        await expectText(page, '待确认')
+        await expectText(page, 'SHIP-STYLE-L1')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-formal-shipments',
+        })
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'business-formal-shipments',
+        })
+        const shipmentDraftRow = page
+          .locator(
+            '.erp-shipments-page .erp-business-data-table-card .ant-table-tbody .ant-table-row'
+          )
+          .filter({ hasText: 'SHIP-STYLE-L1' })
+          .first()
+        await shipmentDraftRow.click()
+        await shipmentDraftRow
+          .and(page.locator('.ant-table-row-selected'))
+          .waitFor({ state: 'visible' })
+        const cancelShipmentDraftButton = await findSelectionActionButton(
+          page,
+          '作废草稿'
+        )
+        assert.equal(await cancelShipmentDraftButton.isDisabled(), false)
+        await cancelShipmentDraftButton.click()
+        await confirmVisiblePopconfirm(page)
+        await expectText(page, '作废出货草稿已完成')
+        await expectText(page, '已取消')
+        let emptiedShipmentsOnce = false
+        await page.route('**/rpc/operational_fact', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            !emptiedShipmentsOnce &&
+            body.method === 'list_shipments' &&
+            String(body.params?.status || '') === 'CANCELLED'
+          ) {
+            emptiedShipmentsOnce = true
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'business-formal-shipments-empty-filter',
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: stylePaginatedRpcData(
+                    [],
+                    'shipments',
+                    body.params || {}
+                  ),
+                },
+              }),
+            })
+            return
+          }
+          await route.fallback()
+        })
+        const shipmentStatusFilters = page.getByRole('group', {
+          name: '出货单状态',
+        })
+        await shipmentStatusFilters
+          .getByRole('button', { name: /^已取消，/u })
+          .click()
+        await assertBusinessTableEmptyState(page, {
+          scenarioName: 'business-formal-shipments-empty-status-filter',
+          emptyText: '暂无出货单',
+          staleText: 'SHIP-STYLE-L1',
+        })
+        await shipmentStatusFilters
+          .getByRole('button', { name: /^全部，/u })
+          .click()
+        await expectText(page, 'SHIP-STYLE-L1')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: 'SHIP-STYLE-L1',
+          titleText: '查看出货明细',
+          scenarioName: 'business-formal-shipments',
+          screenshotName: 'business-formal-shipment-double-click-details',
+          afterModalOpen: async () => {
+            await expectText(page, '已保存出货明细')
+          },
+        })
+        await assertBusinessFormModalKeyboardRecovery(page, {
+          triggerName: '新建出货单',
+          titleText: '新建出货单',
+          scenarioName: 'business-formal-shipments',
+        })
+        const shipmentSourceContract =
+          await installShipmentSourceCandidateContract(page)
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建出货单',
+          titleText: '新建出货单',
+          minFieldCount: 12,
+          screenshotName: 'business-formal-shipment-create-form-modal',
+          expectedTexts: [
+            '出货明细',
+            '从销售订单导入',
+            '产品',
+            '仓库',
+            '预计总净重暂不可计算',
+            '实际总净重（克）',
+          ],
+          afterOpen: async (modal) => {
+            await assertLineItemAddActionScrollsToNewRow(modal, {
+              scenarioName: 'business-formal-shipment-create-form-modal',
+              targetRowCount: 5,
+              addButtonName: '添加出货明细',
+            })
+            await verifyShipmentSourceCandidateContract(
+              page,
+              modal,
+              shipmentSourceContract
+            )
+            await modal.screenshot({
+              path: path.join(
+                outputDir,
+                'business-formal-shipment-create-predicted-weight.png'
+              ),
+            })
+          },
+        })
+        await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
+        await assertBusinessFormModalKeyboardRecovery(page, {
+          triggerName: '查看明细',
+          titleText: '查看出货明细',
+          scenarioName: 'business-formal-shipment-readonly-detail',
+        })
+        const shipmentDetailTrigger = page.getByRole('button', {
+          name: '查看明细',
+        })
+        await shipmentDetailTrigger.click()
+        await expectText(page, '查看出货明细')
+        await expectText(page, '已保存出货明细')
+        await assertTextAbsent(page, '新增出货明细')
+        const shipmentDetailPage = page.locator(
+          '.erp-business-form-page:not([hidden])'
+        )
+        await shipmentDetailPage.waitFor({ state: 'visible' })
+        assert.equal(
+          await shipmentDetailPage
+            .getByRole('button', { name: '保存', exact: true })
+            .count(),
+          0,
+          '出货只读明细页不应提供保存动作'
+        )
+        const editableShipmentDetailControls = await shipmentDetailPage
+          .locator(
+            'input:visible:not([type="hidden"]):not([type="range"]):not([disabled]):not([readonly]), textarea:visible:not([disabled]):not([readonly]), .ant-select:visible:not(.ant-select-disabled)'
+          )
+          .evaluateAll((nodes) =>
+            nodes.map((node) => ({
+              tagName: node.tagName,
+              className: node.className,
+              name: node.getAttribute('name'),
+              placeholder: node.getAttribute('placeholder'),
+              selectClassName: node.closest('.ant-select')?.className || '',
+            }))
+          )
+        assert.deepEqual(
+          editableShipmentDetailControls,
+          [],
+          `出货只读明细页不应暴露可编辑表单控件: ${JSON.stringify(editableShipmentDetailControls)}`
+        )
+        await closeBusinessFormModal(page, shipmentDetailPage)
+        assert.equal(
+          await shipmentDetailTrigger.evaluate(
+            (node) => document.activeElement === node
+          ),
+          true,
+          '返回出货列表后焦点应回到查看明细按钮'
+        )
+        await assertBusinessMainTableHasNoOperationColumn(page, {
+          scenarioName: 'business-formal-shipments',
+        })
+        await verifyBusinessModuleColumnOrderDialog(page, {
+          moduleKey: 'shipments',
+          heading: '出货单',
+          headerMenuTargetLabel: '客户',
+        })
+        await assertBusinessMainTableSortableColumns(page, {
+          scenarioName: 'business-formal-shipments',
+          unsortableHeaders: [
+            '实际 / 最终总净重（克）',
+            '包装 / 毛重 / 体积',
+            '实际运费',
+            '唛头',
+            '备注',
+          ],
+        })
+        await assertNoHorizontalOverflow(page, 'business-formal-shipments')
+
+        await gotoScenarioPath(page, '/erp/engineering/processes', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '加工环节')
+        const processOuterPageHeadCount = await page
+          .locator('.erp-admin-page-head')
+          .count()
+        assert.equal(
+          processOuterPageHeadCount,
+          0,
+          'business-formal-processes 不应同时显示外层页头和内容区页头'
+        )
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-formal-processes',
+        })
+        await expectText(page, '查货')
+        await expectText(page, '手工')
+        await expectText(page, '车缝')
+        await expectText(page, '包装')
+        await expectText(page, '可委外')
+        await expectText(page, '可内制')
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建加工环节',
+          titleText: '新建加工环节',
+          minFieldCount: 8,
+          screenshotName: 'business-formal-process-create-form-modal',
+          expectedTexts: [
+            '环节编号',
+            '环节名称',
+            '环节类别',
+            '可委外',
+            '可内制',
+            '质检参考',
+            '可与“可内制”同时开启',
+            '仅供查阅该工序通常是否需要检验',
+          ],
+          afterOpen: async (modal) => {
+            await assertProcessSuggestionOptions(page, modal, {
+              scenarioName: 'business-formal-processes',
+            })
+          },
+        })
+        await verifyBusinessModuleColumnOrderDialog(page, {
+          moduleKey: 'processes',
+          heading: '加工环节',
+          headerMenuTargetLabel: '环节名称',
+        })
+        await assertNoHorizontalOverflow(page, 'business-formal-processes')
+
+        await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '委外订单')
+        await expectButton(page, '新建加工合同')
+        await expectButton(page, '导出筛选结果')
+        await expectButton(page, '列设置')
+        await assertNoListDeleteTrashToolbar(page)
+        await assertTextAbsent(page, '业务单据：加工合同')
+        await assertTextAbsent(page, '加工合同只表达委外承诺和打印快照')
+        await assertTextAbsent(page, '查货只是工序候选')
+        await assertTextAbsent(page, '判定结果回质检模块')
+        await assertBusinessCollaborationPanelAbsent(
+          page,
+          'business-formal-processing-contracts-unselected'
+        )
+        await assertCurrentOperationBarCompact(page, {
+          scenarioName: 'business-formal-processing-contracts',
+        })
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'business-formal-processing-contracts',
+          expectedLabels: ['符合条件', '本页显示'],
+          allowWrappedStats: true,
+        })
+        await assertNoListDeleteTrashToolbar(page)
+        await verifyBusinessModuleColumnOrderDialog(page, {
+          moduleKey: 'processing-contracts',
+          heading: '委外订单',
+        })
+        await assertBusinessMainTableSortableColumns(page, {
+          scenarioName: 'business-formal-processing-contracts',
+          unsortableHeaders: ['备注'],
+        })
+        await assertTextAbsent(page, '生成委外合同')
+        await expectNoButton(page, '作业指导书打印')
+        await expectNoButton(page, '打印作业指导书')
+        let processingContractPrintButton = await findSelectionActionButton(
+          page,
+          '加工合同打印'
+        )
+        assert(
+          await processingContractPrintButton.isDisabled(),
+          '未选中加工合同前，加工合同打印按钮应保持禁用'
+        )
+        await page.keyboard.press('Escape')
+        const processingContractRow = page
+          .getByRole('row')
+          .filter({ hasText: 'SIM-OUTSOURCE-CONTRACT-L1' })
+          .first()
+        await processingContractRow.click()
+        await processingContractRow
+          .and(page.locator('.ant-table-row-selected'))
+          .waitFor({ state: 'visible' })
+        await assertBusinessCollaborationPanelAbsent(
+          page,
+          'business-formal-processing-contracts-selected-without-tasks'
+        )
+        assert.equal(
+          await page
+            .getByRole('button', { name: /^(关联|相关单据|查看关联)/ })
+            .count(),
+          0,
+          '加工合同页当前操作区不应保留跨模块相关单据下拉，避免加工页承接质检、库存或应付事实'
+        )
+        processingContractPrintButton = await findSelectionActionButton(
+          page,
+          '加工合同打印'
+        )
+        const processingContractActionMetrics = await page
+          .locator('.erp-business-module-current-action')
+          .first()
+          .evaluate((node) => ({
+            text: String(node.textContent || '')
+              .replace(/\s+/gu, ' ')
+              .trim(),
+            selectedTag:
+              node
+                .querySelector('.erp-business-module-selection-tag')
+                ?.textContent?.replace(/\s+/gu, ' ')
+                .trim() || '',
+            actions: Array.from(
+              document.querySelectorAll('[data-business-action-key]')
+            ).map((button) => ({
+              key: button.getAttribute('data-business-action-key'),
+              disabled: button.disabled,
+              visible: Boolean(button.offsetWidth || button.offsetHeight),
+            })),
+          }))
+        assert.equal(
+          await processingContractPrintButton.isDisabled(),
+          false,
+          `选中加工合同后，加工合同打印按钮应启用: ${JSON.stringify(
+            processingContractActionMetrics
+          )}`
+        )
+        await page.keyboard.press('Escape')
+        await assertOrderLifecycleActionsConsolidated(page, {
+          scenarioName: 'business-formal-processing-contracts',
+          primaryActionLabel: '提交合同',
+          menuActionLabels: ['取消'],
+          absentButtonLabels: ['确认下单', '关闭', '取消'],
+        })
+        await page.keyboard.press('Escape')
+        await assertTextAbsent(page, '打印单据')
+        await assertBusinessFormModalKeyboardRecovery(page, {
+          triggerName: '新建加工合同',
+          titleText: '新建加工合同',
+          scenarioName: 'business-formal-processing-contracts',
+        })
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建加工合同',
+          titleText: '新建加工合同',
+          minFieldCount: 6,
+          screenshotName: 'business-formal-outsourcing-order-create-form-modal',
+          expectedTexts: [
+            '加工合同号',
+            '加工厂',
+            '加工明细',
+            '产品订单编号',
+            '加工项目',
+            '工序',
+            '单位',
+            '工序选择电绣、激光等加工方式',
+          ],
+          afterOpen: async (modal) => {
+            await assertNonItemTextareaFullRow(modal, {
+              labels: ['备注'],
+              scenarioName: 'business-formal-processing-contracts-form-modal',
+            })
+            await assertOutsourcingProcessSelectOptions(page, modal, {
+              scenarioName: 'business-formal-processing-contracts',
+            })
+            await assertLineItemSectionTitleBold(modal, {
+              scenarioName: 'business-formal-processing-contracts-form-modal',
+              titleText: '加工明细',
+            })
+            await assertLineItemAddActionScrollsToNewRow(modal, {
+              scenarioName: 'business-formal-processing-contracts-form-modal',
+              addButtonName: '添加加工明细',
+            })
+          },
+        })
+        await assertTextAbsent(page, '销售订单ID')
+        await assertTextAbsent(page, '单位ID')
+        await assertTextAbsent(page, '产品编号快照')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: 'SIM-OUTSOURCE-CONTRACT-L1',
+          titleText: '编辑加工合同',
+          scenarioName: 'business-formal-processing-contracts',
+          afterModalOpen: async () => {
+            await expectText(page, '加工明细')
+            await page
+              .getByRole('button', { name: '添加加工明细', exact: true })
+              .waitFor({ state: 'visible', timeout: 10_000 })
+          },
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'business-formal-processing-contracts'
+        )
+
+        const verifyWorkflowPage = async ({
+          path,
+          heading,
+          absentTexts,
+          scenarioName,
+          refreshMessage,
+          afterPageReady,
+        }) => {
+          await gotoScenarioPath(page, path, {
+            waitUntil: 'domcontentloaded',
+          })
+          await expectHeading(page, heading)
+          await assertTextAbsent(page, '业务处理分开完成')
+          await assertBusinessCollaborationPanelAbsent(page, scenarioName)
+          for (const text of absentTexts) {
+            await assertTextAbsent(page, text)
+          }
+          await assertTextAbsent(page, '导出预览字段')
+          await assertTextAbsent(page, '打印单据')
+          await assertTextAbsent(page, '加工合同打印')
+          if (afterPageReady) {
+            await afterPageReady()
+          }
+          await assertUnifiedListToolbarShell(page, {
+            scenarioName,
+            exportVisible: false,
+          })
+          await page.getByRole('button', { name: '刷新当前页' }).click()
+          const expectedRefreshMessage =
+            refreshMessage || `${heading}任务已刷新`
+          await expectText(page, expectedRefreshMessage)
+          await expectNoButton(page, '删除')
+          await assertNoHorizontalOverflow(page, scenarioName)
+        }
+
+        await gotoScenarioPath(page, '/erp/production/orders', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '生产订单')
+        await expectText(page, 'MO-STYLE-L1-20260713')
+        await expectButton(page, '新建生产订单')
+        await page.getByText('MO-STYLE-L1-20260713', { exact: true }).click()
+        await expectButton(page, '编辑')
+        await expectButton(page, /^发\s*布$/u)
+        await page.getByText('MO-STYLE-L1-20260713', { exact: true }).dblclick()
+        const productionOrderModal = page
+          .locator('.erp-business-form-page:not([hidden])')
+          .filter({ hasText: '编辑生产订单' })
+        await expectText(page, '编辑生产订单')
+        await expectText(page, '销售订单行（可选）')
+        await expectText(page, 'BOM 版本（可选）')
+        assert.equal(
+          await productionOrderModal.locator('.erp-production-order-line').count(),
+          22,
+          '生产订单编辑页应完整加载 22 条生产明细'
+        )
+        await productionOrderModal
+          .locator('.erp-production-order-line[aria-label="生产明细 22"]')
+          .waitFor({ state: 'visible' })
+        await assertNoHorizontalOverflow(page, 'business-production-orders')
+        await closeBusinessFormModal(page, productionOrderModal)
+
+        await verifyWorkflowPage({
+          path: '/erp/production/scheduling',
+          heading: '排产确认',
+          absentTexts: ['发起排程协同', '新建排程单', '生成生产任务'],
+          scenarioName: 'business-workflow-production-scheduling',
+          afterPageReady: async () => {
+            await expectText(page, '暂无排产确认任务。')
+          },
+        })
+
+        await gotoScenarioPath(page, '/erp/production/exceptions', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '生产记录')
+        const productionExceptionDecisionTab = page.getByRole('tab', {
+          name: '异常处理',
+        })
+        const productionExceptionTaskTab = page.getByRole('tab', {
+          name: '待审批',
+        })
+        await productionExceptionDecisionTab.waitFor({ state: 'visible' })
+        assert.equal(
+          await productionExceptionDecisionTab.getAttribute('aria-selected'),
+          'true',
+          '生产异常处置页默认应进入处置申请，不再同时纵向铺开待审批任务'
+        )
+        assert.equal(
+          await productionExceptionTaskTab.getAttribute('aria-selected'),
+          'false',
+          '待审批应作为独立未选中页签'
+        )
+        await expectText(page, '暂无生产异常处置申请')
+        await expectText(page, '异常记录')
+        await expectText(page, '当前显示')
+        assert.equal(
+          await page.getByLabel('搜索待办任务').count(),
+          0,
+          '处置申请页签不应挂载待审批任务筛选区'
+        )
+        await assertBusinessCollaborationPanelAbsent(
+          page,
+          'business-production-exceptions-decisions-tab'
+        )
+        await expectButton(page, '列设置')
+        await expectNoButton(page, '导出筛选结果')
+        for (const text of [
+          '登记异常协同',
+          '新建异常单',
+          '关闭异常单',
+          '生成异常处理',
+          '打印单据',
+        ]) {
+          await assertTextAbsent(page, text)
+        }
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '异常处理申请已刷新')
+        await assertNoHorizontalOverflow(
+          page,
+          'business-production-exceptions-decisions-tab'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-decisions-tab.png'
+          ),
+          fullPage: true,
+        })
+        await page
+          .getByText('异常处理申请已刷新', { exact: true })
+          .waitFor({ state: 'hidden', timeout: 6_000 })
+
+        await productionExceptionTaskTab.click()
+        await expectText(page, '暂无待审批的生产异常处置申请。')
+        assert.equal(
+          await productionExceptionTaskTab.getAttribute('aria-selected'),
+          'true',
+          '待审批页签点击后应成为唯一活动工作区'
+        )
+        await assertTextAbsent(page, '暂无生产异常处置申请')
+        await expectButton(page, '列设置')
+        await expectNoButton(page, '导出筛选结果')
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '异常处理任务已刷新')
+        await expectNoButton(page, '删除')
+        await assertNoHorizontalOverflow(
+          page,
+          'business-production-exceptions-tasks-tab'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-tasks-tab.png'
+          ),
+          fullPage: true,
+        })
+
+        await page.evaluate(async () => {
+          const response = await fetch('/rpc/workflow', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 'formal-shipping-release-other-source-task',
+              method: 'create_task',
+              params: {
+                task_code: 'style-l1-formal-shipping-release-other',
+                task_group: 'customer_followup',
+                task_name: '同来源非放行任务',
+                source_type: 'shipping-release',
+                source_id: 9102,
+                source_no: 'SHIP-REL-OTHER',
+                business_status_key: 'shipment_pending',
+                task_status_key: 'ready',
+                owner_role_key: 'sales',
+                payload: {
+                  shipment_release_page_scope: 'not_for_release_page',
+                },
+              },
+            }),
+          })
+          return response.json()
+        })
+
+        await verifyWorkflowPage({
+          path: '/erp/warehouse/shipping-release',
+          heading: '出货放行',
+          absentTexts: [
+            '发起放行协同',
+            '新建放行单',
+            '生成出货放行',
+            '确认放行',
+          ],
+          scenarioName: 'business-workflow-shipping-release',
+          refreshMessage: '出货放行任务已刷新',
+          afterPageReady: async () => {
+            await assertWorkflowDueDateRangeFilterLayout(page, {
+              scenarioName: 'business-workflow-shipping-release',
+            })
+            const shippingReleaseTaskRow = page
+              .locator(
+                '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+              )
+              .filter({ hasText: 'SHIP-REL-L1' })
+              .first()
+            await shippingReleaseTaskRow.waitFor({ state: 'visible' })
+            await shippingReleaseTaskRow
+              .getByText('可执行', { exact: true })
+              .waitFor({ state: 'visible' })
+            await expectText(page, '出货财务审批确认')
+            await expectText(page, 'SHIP-REL-L1')
+            await assertTextAbsent(page, '同来源非放行任务')
+            await assertTextAbsent(page, 'SHIP-REL-OTHER')
+            await shippingReleaseTaskRow.click()
+            await assertPageAttachmentModalEntrypoint(page, {
+              scenarioName:
+                'business-workflow-shipping-release-attachment-modal',
+              modalTitle: '任务附件',
+              panelTitle: '任务附件',
+            })
+
+            let failedListTasksOnce = false
+            await page.route('**/rpc/workflow', async (route) => {
+              const body = route.request().postDataJSON() || {}
+              if (!failedListTasksOnce && body.method === 'list_tasks') {
+                failedListTasksOnce = true
+                await route.fulfill({
+                  status: 200,
+                  contentType: 'application/json',
+                  body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: body.id || 'formal-shipping-release-list-failed',
+                    result: {
+                      code: 500123,
+                      message: 'shipping release list failed',
+                      data: null,
+                    },
+                  }),
+                })
+                return
+              }
+              await route.fallback()
+            })
+            await page.getByRole('button', { name: '刷新当前页' }).click()
+            await expectText(page, '加载出货放行任务失败')
+            await expectText(page, '暂无出货财务审批任务。')
+            await assertTextAbsent(page, '出货财务审批确认')
+
+            await page.getByRole('button', { name: '刷新当前页' }).click()
+            await expectText(page, '出货财务审批刷新后确认')
+            await expectText(page, 'SHIP-REL-STALE')
+
+            const refreshedTaskRow = page
+              .locator(
+                '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+              )
+              .filter({ hasText: '出货财务审批刷新后确认' })
+              .first()
+            await refreshedTaskRow.click()
+            const viewTaskButton = await findSelectionActionButton(
+              page,
+              '查看任务'
+            )
+            assert.equal(
+              await viewTaskButton.isDisabled(),
+              false,
+              '选中主任务表记录后应允许查看当前任务'
+            )
+            const actionMenu = page.locator(
+              '.erp-business-selection-action-menu:visible'
+            )
+            if (await actionMenu.count()) {
+              await page.keyboard.press('Escape')
+              await actionMenu.waitFor({ state: 'hidden' })
+            }
+            await expectNoButton(page, '处理')
+
+            let emptiedListTasksOnce = false
+            await page.route('**/rpc/workflow', async (route) => {
+              const body = route.request().postDataJSON() || {}
+              if (!emptiedListTasksOnce && body.method === 'list_tasks') {
+                emptiedListTasksOnce = true
+                await route.fulfill({
+                  status: 200,
+                  contentType: 'application/json',
+                  body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: body.id || 'formal-shipping-release-list-empty',
+                    result: {
+                      code: 0,
+                      message: 'OK',
+                      data: {
+                        tasks: [],
+                        total: 0,
+                        limit: 100,
+                        offset: 0,
+                      },
+                    },
+                  }),
+                })
+                return
+              }
+              await route.fallback()
+            })
+            await page.getByRole('button', { name: '刷新当前页' }).click()
+            await expectText(page, '出货放行任务已刷新')
+            await page.waitForFunction(() => {
+              const isVisible = (node) => {
+                if (!(node instanceof HTMLElement)) return false
+                const rect = node.getBoundingClientRect()
+                const style = window.getComputedStyle(node)
+                return (
+                  style.display !== 'none' &&
+                  style.visibility !== 'hidden' &&
+                  rect.width > 0 &&
+                  rect.height > 0
+                )
+              }
+              return Array.from(
+                document.querySelectorAll(
+                  '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+                )
+              )
+                .filter(isVisible)
+                .every(
+                  (node) =>
+                    !String(node.textContent || '').includes(
+                      '出货财务审批刷新后确认'
+                    )
+                )
+            })
+            const staleTaskMetrics = await page.evaluate(() => {
+              const isVisible = (node) => {
+                if (!(node instanceof HTMLElement)) return false
+                const rect = node.getBoundingClientRect()
+                const style = window.getComputedStyle(node)
+                return (
+                  style.display !== 'none' &&
+                  style.visibility !== 'hidden' &&
+                  rect.width > 0 &&
+                  rect.height > 0
+                )
+              }
+              const visibleTaskTexts = Array.from(
+                document.querySelectorAll(
+                  '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+                )
+              )
+                .filter(isVisible)
+                .map((node) =>
+                  String(node.textContent || '')
+                    .replace(/\s+/gu, ' ')
+                    .trim()
+                )
+              return {
+                visibleTaskTexts,
+                staleTaskVisible: visibleTaskTexts.some((text) =>
+                  text.includes('出货财务审批刷新后确认')
+                ),
+              }
+            })
+            assert.equal(
+              staleTaskMetrics.staleTaskVisible,
+              false,
+              `刷新后不应继续显示已消失的协同任务: ${JSON.stringify(staleTaskMetrics)}`
+            )
+          },
+        })
+
+        await gotoScenarioPath(page, '/erp/production/progress', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '生产记录')
+        await expectText(page, 'PROD-FACT-L1')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-formal-production-progress',
+        })
+        await assertTextAbsent(page, '生成生产进度')
+        await assertTextAbsent(page, '登记生产事实')
+        await assertTextAbsent(page, '幂等键')
+        await assertTextAbsent(page, '内部引用')
+        const productionDraftRow = page
+          .locator(
+            '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+          )
+          .filter({ hasText: 'PROD-FACT-L1' })
+          .first()
+        await productionDraftRow.click()
+        await productionDraftRow
+          .and(page.locator('.ant-table-row-selected'))
+          .waitFor({ state: 'visible' })
+        const cancelProductionDraftButton = await findSelectionActionButton(
+          page,
+          '作废完工报告'
+        )
+        assert.equal(await cancelProductionDraftButton.isDisabled(), false)
+        await cancelProductionDraftButton.click()
+        const cancelProductionDraftModal = page
+          .locator('.ant-modal:visible')
+          .filter({ hasText: '作废生产完工报告' })
+        await cancelProductionDraftModal.waitFor({ state: 'visible' })
+        await cancelProductionDraftModal
+          .locator('textarea')
+          .fill('L1 回归：确认未过账生产草稿可追溯作废')
+        await cancelProductionDraftModal
+          .getByRole('button', { name: '作废完工报告' })
+          .click()
+        await expectText(page, '作废生产完工报告已完成')
+        await assertNoHorizontalOverflow(
+          page,
+          'business-formal-production-progress'
+        )
+
+        await page.getByRole('menuitem', { name: /财务管理/u }).click()
+        await page
+          .locator('.erp-business-module-tabs')
+          .getByRole('tab', { name: '对账', exact: true })
+          .click()
+        await expectHeading(page, '对账管理')
+        await expectText(page, 'REC-STYLE-L1')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-formal-production-to-reconciliation-navigation',
+        })
+        await assertTextAbsent(page, '登记对账事实')
+        await assertTextAbsent(page, '生成对账')
+        await assertNoHorizontalOverflow(
+          page,
+          'business-formal-production-to-reconciliation-navigation'
+        )
+
+        await gotoScenarioPath(page, '/erp/warehouse/outbound', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '库存预留')
+        await expectText(page, 'RSV-STYLE-L1')
+        await expectText(page, 'SO-RESERVATION-STYLE-L1')
+        await expectText(page, '第 3 行')
+        await expectText(page, '库存预留毛绒兔')
+        await expectText(page, 'SKU-RESERVATION-STYLE-L1')
+        await expectText(page, '成品仓')
+        await expectText(page, 'LOT-RESERVATION-STYLE-L1')
+        await expectText(page, '件')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-formal-outbound-reservations',
+        })
+        await assertTextAbsent(page, '登记库存预留')
+        await assertTextAbsent(page, '新建出货单')
+        await assertTextAbsent(page, '生成出库')
+        for (const technicalField of [
+          'sales_order_id',
+          'sales_order_item_id',
+          'product_id',
+          'product_sku_id',
+          'warehouse_id',
+          'unit_id',
+          'lot_id',
+        ]) {
+          await assertTextAbsent(page, technicalField)
+        }
+        await expectNoButton(page, '消耗')
+        await assertNoHorizontalOverflow(page, 'business-formal-outbound')
+
+        await gotoScenarioPath(page, '/erp/finance/receivables', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '应收管理')
+        await expectText(page, 'AR-STYLE-L1')
+        await assertTextAbsent(page, 'finance_facts')
+        await assertTextAbsent(page, 'RECEIVABLE')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-formal-receivables',
+        })
+        await assertTextAbsent(page, '登记应收事实')
+        await assertTextAbsent(page, '生成应收')
+        await assertBusinessPageRefreshEntrypoint(page, {
+          scenarioName: 'business-formal-receivables',
+        })
+        await assertNoHorizontalOverflow(page, 'business-formal-receivables')
+
+        await gotoScenarioPath(page, '/erp/finance/payables', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '应付管理')
+        await expectText(page, 'AP-STYLE-L1')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-formal-payables',
+        })
+        await assertTextAbsent(page, '登记应付事实')
+        await assertTextAbsent(page, '生成应付')
+        await assertNoHorizontalOverflow(page, 'business-formal-payables')
+
+        await gotoScenarioPath(page, '/erp/finance/invoices', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '发票管理')
+        await expectText(page, 'INV-STYLE-L1')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-formal-invoices',
+        })
+        await assertTextAbsent(page, '登记发票事实')
+        await assertTextAbsent(page, '生成发票')
+        await assertNoHorizontalOverflow(page, 'business-formal-invoices')
+
+        await gotoScenarioPath(page, '/erp/finance/reconciliation', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '对账管理')
+        await expectText(page, 'REC-STYLE-L1')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-formal-reconciliation',
+        })
+        await assertTextAbsent(page, '登记对账事实')
+        await assertTextAbsent(page, '生成对账')
+        await assertNoHorizontalOverflow(page, 'business-formal-reconciliation')
+
+        await page.evaluate(() => {
+          window.localStorage.setItem('plush_erp_theme_mode', 'dark')
+        })
+        await gotoScenarioPath(page, '/erp/finance/receivables', {
+          waitUntil: 'domcontentloaded',
+        })
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-formal-receivables-dark',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await expectHeading(page, '应收管理')
+        await assertTextAbsent(page, '登记应收事实')
+        await assertTextAbsent(page, '生成应收')
+        await assertNoHorizontalOverflow(page, 'business-formal-receivables-dark')
+
+        await gotoScenarioPath(page, '/erp/production/exceptions', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '生产记录')
+        await expectText(page, '异常处理')
+        await assertBusinessCollaborationPanelAbsent(
+          page,
+          'business-workflow-production-exceptions-dark'
+        )
+        await assertTextAbsent(page, '登记异常协同')
+        await expectText(page, '暂无生产异常处置申请')
+        await assertTextAbsent(page, '新建异常单')
+        await assertTextAbsent(page, '生成异常处理')
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-workflow-production-exceptions-dark',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'business-workflow-production-exceptions-dark'
+        )
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'business-production-exceptions-decisions-tab-dark.png'
+          ),
+          fullPage: true,
+        })
+
+        await page.getByRole('tab', { name: '待审批' }).click()
+        await expectText(page, '暂无待审批的生产异常处置申请。')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-workflow-production-exceptions-tasks-dark',
+          exportVisible: false,
+        })
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-workflow-production-exceptions-tasks-dark',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page.evaluate(() => {
+          window.localStorage.setItem('plush_erp_theme_mode', 'light')
+        })
+        await gotoScenarioPath(page, '/erp/warehouse/shipping-release', {
+          waitUntil: 'domcontentloaded',
+        })
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-formal-shipping-release-mobile',
+          expectedMode: 'light',
+          expectedEffectiveTheme: 'light',
+        })
+        await expectHeading(page, '出货放行')
+        await assertTextAbsent(page, '业务处理分开完成')
+        await assertBusinessCollaborationPanelAbsent(
+          page,
+          'business-workflow-shipping-release-mobile'
+        )
+        await assertTextAbsent(page, '发起放行协同')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName: 'business-workflow-shipping-release-mobile',
+          exportVisible: false,
+        })
+        await assertTextAbsent(page, '新建放行单')
+        await assertTextAbsent(page, '生成出货放行')
+        await assertTextAbsent(page, '导出预览字段')
+        await assertNoHorizontalOverflow(
+          page,
+          'business-workflow-shipping-release-mobile'
+        )
+
+        await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
+          waitUntil: 'domcontentloaded',
+        })
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-formal-outsourcing-mobile',
+          expectedMode: 'light',
+          expectedEffectiveTheme: 'light',
+        })
+        await expectHeading(page, '委外订单')
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'business-formal-outsourcing-mobile',
+          expectedLabels: ['符合条件', '本页显示'],
+          allowWrappedStats: true,
+        })
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建加工合同',
+          titleText: '新建加工合同',
+          minFieldCount: 6,
+          screenshotName: 'business-formal-outsourcing-mobile-modal',
+          expectedTexts: [
+            '加工合同号',
+            '加工厂',
+            '加工明细',
+            '工序',
+            '单位',
+            '工序选择电绣、激光等加工方式',
+          ],
+          requireMultiColumn: false,
+        })
+        await assertTextAbsent(page, '销售订单ID')
+        await assertTextAbsent(page, '单位ID')
+        await assertNoHorizontalOverflow(page, 'business-formal-outsourcing-mobile')
+      },
+    },
+    {
+      name: 'business-formal-shipping-release-no-permission-desktop',
+      path: '/erp/warehouse/shipping-release',
+      auth: 'admin',
+      viewport: { width: 1440, height: 900 },
+      adminProfile: {
+        username: 'style-l1-no-workflow-read',
+        is_super_admin: false,
+        roles: [{ role_key: 'warehouse', name: '仓库' }],
+        permissions: ['erp.workbench.read'],
+        menus: [
+          {
+            key: 'shipping-release',
+            label: '出货放行',
+            path: '/erp/warehouse/shipping-release',
+            required_any: [],
+            required_all: [],
+          },
+        ],
+        erp_preferences: {
+          column_orders: {},
+        },
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: ['shipping-release'],
+        actions: [],
+      },
+      verify: async (page) => {
+        let shippingReleaseListTaskCalls = 0
+        await page.route('**/rpc/workflow', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (
+            body.method === 'list_tasks' &&
+            body.params?.source_type === 'shipping-release'
+          ) {
+            shippingReleaseListTaskCalls += 1
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'formal-shipping-release-no-permission-list',
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: {
+                    tasks: [],
+                    total: 0,
+                    limit: 100,
+                    offset: 0,
+                  },
+                },
+              }),
+            })
+            return
+          }
+          await route.fallback()
+        })
+
+        await expectHeading(page, '出货放行')
+        await assertTextAbsent(page, '业务处理分开完成')
+        await assertBusinessCollaborationPanelAbsent(
+          page,
+          'business-formal-shipping-release-no-permission-desktop'
+        )
+        await assertTextAbsent(page, '发起放行协同')
+        await assertUnifiedListToolbarShell(page, {
+          scenarioName:
+            'business-formal-shipping-release-no-permission-desktop',
+          exportVisible: false,
+        })
+        await expectText(page, '当前账号不能查看此类任务。')
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        assert.equal(
+          shippingReleaseListTaskCalls,
+          0,
+          '无 workflow.task.read 时出货放行页不应调用 list_tasks 拉取审批任务'
+        )
+        await assertTextAbsent(page, '出货放行任务已刷新')
+        await assertTextAbsent(page, '出货财务审批确认')
+        await assertNoHorizontalOverflow(
+          page,
+          'business-formal-shipping-release-no-permission-desktop'
+        )
+      },
+    },
+    {
+      name: 'sales-order-acceptance-submit-action-desktop',
+      path: '/erp/sales/project-orders/sales-orders',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await page.unroute('**/rpc/customer_config')
+        await page.route('**/rpc/customer_config', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          const { id = 'mock-id', method, params = {} } = body
+          let data = {}
+          if (method === 'get_effective_session') {
+            data = { session: customerRuntimeEffectiveSession }
+          } else if (method === 'start_sales_order_acceptance_process') {
+            assert.equal(
+              Number(params.sales_order_id),
+              1,
+              `接单流程启动必须绑定当前销售订单: ${JSON.stringify(params)}`
+            )
+            assert.equal(
+              params.business_ref_no,
+              'SO-STYLE-L1',
+              `接单流程启动必须携带业务编号: ${JSON.stringify(params)}`
+            )
+            data = {
+              process_instance: {
+                id: 101,
+                process_key: 'sales_order_acceptance',
+                business_ref_type: 'sales_order',
+                business_ref_id: 1,
+                business_ref_no: 'SO-STYLE-L1',
+                status: 'active',
+              },
+              started_node: {
+                id: 201,
+                process_instance_id: 101,
+                node_key: 'submit_sales_order',
+                node_type: 'domain_command',
+                version: 7,
+                status: 'active',
+              },
+              nodes: [
+                {
+                  id: 201,
+                  process_instance_id: 101,
+                  node_key: 'submit_sales_order',
+                  node_type: 'domain_command',
+                  version: 7,
+                  status: 'active',
+                },
+              ],
+              runtime_boundary: {
+                fact_boundary: 'no_fact_posting',
+              },
+            }
+          } else if (method === 'execute_sales_order_acceptance_submit') {
+            assert.equal(
+              params.process_instance_id,
+              101,
+              `提交命令必须使用启动返回的流程实例: ${JSON.stringify(params)}`
+            )
+            assert.equal(
+              params.process_node_instance_id,
+              201,
+              `提交命令必须使用启动返回的节点实例: ${JSON.stringify(params)}`
+            )
+            assert.equal(
+              params.expected_version,
+              7,
+              `提交命令必须使用启动返回的节点版本: ${JSON.stringify(params)}`
+            )
+            assert.equal(
+              Number(params.sales_order_id),
+              1,
+              `提交命令必须绑定当前销售订单: ${JSON.stringify(params)}`
+            )
+            data = {
+              completed_node: {
+                id: 201,
+                process_instance_id: 101,
+                node_key: 'submit_sales_order',
+                node_type: 'domain_command',
+                status: 'completed',
+                outcome: 'sales_order.submitted',
+                version: 8,
+              },
+              next_node: {
+                id: 202,
+                node_key: 'order_approval',
+                status: 'active',
+              },
+              linked_task: {
+                id: 301,
+                task_code: 'order_approval',
+                owner_role_key: 'boss',
+              },
+              nodes: [
+                {
+                  id: 201,
+                  process_instance_id: 101,
+                  node_key: 'submit_sales_order',
+                  node_type: 'domain_command',
+                  status: 'completed',
+                  outcome: 'sales_order.submitted',
+                  version: 8,
+                },
+                {
+                  id: 202,
+                  process_instance_id: 101,
+                  node_key: 'order_approval',
+                  node_type: 'approval',
+                  status: 'active',
+                  version: 2,
+                },
+              ],
+            }
+          }
+
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id,
+              result: {
+                code: 0,
+                message: 'OK',
+                data,
+              },
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        const customerConfigMethods = []
+        const salesOrderMethods = []
+        page.on('request', (request) => {
+          try {
+            const method = request.postDataJSON()?.method
+            if (!method) return
+            if (request.url().includes('/rpc/customer_config')) {
+              customerConfigMethods.push(method)
+            }
+            if (request.url().includes('/rpc/sales_order')) {
+              salesOrderMethods.push(method)
+            }
+          } catch {
+            // 非 JSON-RPC 请求不参与本断言。
+          }
+        })
+
+        await expectHeading(page, '销售订单')
+        await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
+        await assertOrderLifecycleActionsConsolidated(page, {
+          scenarioName: 'sales-order-acceptance-submit-action-desktop',
+          primaryActionLabel: '提交订单',
+          menuActionLabels: ['取消'],
+          absentButtonLabels: ['生效', '关闭', '取消'],
+        })
+        await page
+          .locator('.erp-business-module-current-action')
+          .first()
+          .getByRole('button', { name: '提交订单', exact: true })
+          .click()
+        await waitForCapturedMethods(
+          customerConfigMethods,
+          [
+            'start_sales_order_acceptance_process',
+            'execute_sales_order_acceptance_submit',
+          ],
+          { scenarioName: 'sales-order-acceptance-submit-action-desktop' }
+        )
+        await expectText(page, '销售订单已提交，已进入审批流程')
+        assert.equal(
+          salesOrderMethods.includes('submit_sales_order'),
+          false,
+          `正式销售订单页提交不应回退旧 submit_sales_order: ${JSON.stringify({
+            customerConfigMethods,
+            salesOrderMethods,
+          })}`
+        )
+        await expectText(page, 'SO-STYLE-L1')
+        await assertNoHorizontalOverflow(
+          page,
+          'sales-order-acceptance-submit-action-desktop'
+        )
+      },
+    },
+    (() => {
+      let operationalFactMethods = []
+      let reservationCreateParams = []
+      let salesOrderMethods = []
+      return {
+        name: 'sales-order-source-reservation-create-desktop',
+        path: '/erp/sales/project-orders/sales-orders',
+        auth: 'admin',
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport: { width: 1440, height: 900 },
+        adminProfile: {
+          username: 'style-l1-sales-order-reservation',
+          is_super_admin: true,
+          permissions: ['stock.reservation.create'],
+        },
+        beforeNavigate: async (page) => {
+          operationalFactMethods = []
+          reservationCreateParams = []
+          salesOrderMethods = []
+          page.on('request', (request) => {
+            if (request.url().includes('/rpc/sales_order')) {
+              try {
+                const method = request.postDataJSON()?.method
+                if (method) salesOrderMethods.push(method)
+              } catch {
+                // 非 JSON-RPC 请求不参与本断言。
+              }
+            }
+            if (!request.url().includes('/rpc/operational_fact')) return
+            try {
+              const body = request.postDataJSON() || {}
+              if (body.method) operationalFactMethods.push(body.method)
+              if (body.method === 'create_stock_reservation_from_sales_order') {
+                reservationCreateParams.push(body.params || {})
+              }
+            } catch {
+              // 非 JSON-RPC 请求不参与本断言。
+            }
+          })
+
+          await page.route('**/rpc/operational_fact', async (route) => {
+            const body = route.request().postDataJSON() || {}
+            const { id = 'mock-id', method, params = {} } = body
+            const recordKey = {
+              list_stock_reservations: 'stock_reservations',
+              list_shipments: 'shipments',
+            }[method]
+            if (!recordKey) {
+              await route.fallback()
+              return
+            }
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: stylePaginatedRpcData([], recordKey, params),
+                },
+              }),
+            })
+          })
+
+          await page.route('**/rpc/sales_order', async (route) => {
+            const body = route.request().postDataJSON() || {}
+            const { id = 'mock-id', method, params = {} } = body
+            const salesOrder = {
+              id: 1,
+              order_no: 'SO-RESERVE-L1',
+              customer_id: 1,
+              customer_snapshot: {
+                id: 1,
+                code: 'CUS-STYLE-L1',
+                name: '暗色客户',
+              },
+              customer_order_no: 'PO-RESERVE-L1',
+              title: '库存预留样式订单',
+              order_date: 1_784_000_000,
+              expected_ship_date: 1_784_086_400,
+              lifecycle_status: 'active',
+              version: 3,
+              note: '',
+              created_at: 1_784_000_000,
+              updated_at: 1_784_000_000,
+            }
+            const salesOrderItem = {
+              id: 1,
+              sales_order_id: 1,
+              line_no: 1,
+              product_id: 1,
+              product_sku_id: 1,
+              product_code_snapshot: 'PROD-STYLE-L1',
+              product_name_snapshot: '样式产品',
+              sku_code_snapshot: 'SKU-STYLE-L1',
+              color_snapshot: '深棕',
+              ordered_quantity: '10',
+              unit_id: 1,
+              unit_name_snapshot: '只',
+              unit_price: '12.50',
+              amount: '125.00',
+              line_status: 'open',
+              note: '',
+              created_at: 1_784_000_000,
+              updated_at: 1_784_000_000,
+            }
+            let data
+            if (method === 'list_sales_orders') {
+              data = {
+                sales_orders: [salesOrder],
+                total: 1,
+                limit: Number(params.limit || 100),
+                offset: Number(params.offset || 0),
+              }
+            } else if (method === 'get_sales_order') {
+              data = { sales_order: salesOrder }
+            } else if (method === 'list_sales_order_items') {
+              data = {
+                sales_order_items: [salesOrderItem],
+                total: 1,
+                limit: Number(params.limit || 100),
+                offset: Number(params.offset || 0),
+              }
+            } else {
+              await route.fallback()
+              return
+            }
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: { code: 0, message: 'OK', data },
+              }),
+            })
+          })
+        },
+        verify: async (page) => {
+          await expectHeading(page, '销售订单')
+          await page
+            .getByText('SO-RESERVE-L1', { exact: false })
+            .first()
+            .click()
+          const reserveButton = await findSelectionActionButton(
+            page,
+            '预留库存'
+          )
+          await reserveButton.click()
+
+          const modal = page
+            .locator('.ant-modal')
+            .filter({ hasText: '预留销售订单库存' })
+            .last()
+          try {
+            await modal.waitFor({ state: 'visible', timeout: 10_000 })
+          } catch (error) {
+            const bodyText = String(
+              (await page.locator('body').innerText()) || ''
+            ).replace(/\s+/gu, ' ')
+            throw new Error(
+              `库存预留弹窗未打开: ${JSON.stringify({
+                operationalFactMethods,
+                salesOrderMethods,
+                bodyText: bodyText.slice(0, 2000),
+              })}; ${error.message}`
+            )
+          }
+          await modal.getByText('SO-RESERVE-L1', { exact: true }).waitFor()
+          await modal
+            .getByText(/PROD-STYLE-L1.*样式产品/u)
+            .first()
+            .waitFor({ timeout: 10_000 })
+          const modalText = String((await modal.innerText()) || '').replace(
+            /\s+/gu,
+            ' '
+          )
+          assert.match(
+            modalText,
+            /PROD-STYLE-L1.*样式产品/u,
+            `库存预留来源摘要缺少产品: ${modalText}`
+          )
+          assert.match(
+            modalText,
+            /SKU-STYLE-L1.*深棕/u,
+            `库存预留来源摘要缺少 SKU / 规格: ${modalText}`
+          )
+          assert.match(
+            modalText,
+            /单位.*只/u,
+            `库存预留来源摘要缺少单位: ${modalText}`
+          )
+          for (const technicalCopy of [
+            'product_id',
+            'product_sku_id',
+            'unit_id',
+            'idempotency_key',
+          ]) {
+            assert.equal(
+              (await modal.getByText(technicalCopy, { exact: true }).count()) >
+                0,
+              false,
+              `库存预留弹窗不应显示技术字段 ${technicalCopy}`
+            )
+          }
+          await modal.getByLabel('本次预留数量').fill('2')
+          await modal.locator('textarea').fill('订单备货')
+          await modal.screenshot({
+            path: path.resolve(
+              outputDir,
+              'sales-order-source-reservation-create-desktop.png'
+            ),
+          })
+          await modal.getByRole('button', { name: '确认预留' }).click()
+          await expectText(page, '库存预留已创建')
+
+          assert.equal(
+            reservationCreateParams.length,
+            1,
+            `应且只应提交一次来源绑定的库存预留: ${JSON.stringify({
+              operationalFactMethods,
+              reservationCreateParams,
+            })}`
+          )
+          const params = reservationCreateParams[0]
+          const allowedKeys = new Set([
+            'customer_key',
+            'reservation_no',
+            'sales_order_id',
+            'sales_order_item_id',
+            'warehouse_id',
+            'lot_id',
+            'quantity',
+            'reserved_at',
+            'note',
+            'idempotency_key',
+          ])
+          assert(
+            Object.keys(params).every((key) => allowedKeys.has(key)),
+            `库存预留请求包含后端派生字段: ${JSON.stringify(params)}`
+          )
+          assert.equal(params.customer_key, 'yoyoosun')
+          assert.equal(params.sales_order_id, 1)
+          assert.equal(params.sales_order_item_id, 1)
+          assert.equal(params.warehouse_id, 1)
+          assert.equal(params.lot_id, 402)
+          assert.equal(params.quantity, '2')
+          assert.equal(params.note, '订单备货')
+          assert.equal(typeof params.idempotency_key, 'string')
+          assert.equal(params.idempotency_key.length > 0, true)
+          assert.equal(
+            operationalFactMethods.includes('create_stock_reservation'),
+            false,
+            `不得回退旧库存预留 RPC: ${JSON.stringify(operationalFactMethods)}`
+          )
+          for (const serverDerivedField of [
+            'product_id',
+            'product_sku_id',
+            'unit_id',
+          ]) {
+            assert.equal(serverDerivedField in params, false)
+          }
+          await assertNoHorizontalOverflow(
+            page,
+            'sales-order-source-reservation-create-desktop'
+          )
+        },
+      }
+    })(),
+    (() => {
+      let operationalFactMethods = []
+      let requirementListParams = []
+      let materialIssueCreateParams = []
+      let inventoryLotParams = []
+      return {
+        name: 'production-order-source-material-issue-desktop',
+        path: '/erp/production/orders',
+        auth: 'admin',
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport: { width: 1440, height: 900 },
+        adminProfile: {
+          username: 'style-l1-production-material-issue',
+          is_super_admin: true,
+          permissions: [
+            'pmc.plan.read',
+            'pmc.plan.update',
+            'production.fact.read',
+            'production.material_issue.create',
+          ],
+        },
+        beforeNavigate: async (page) => {
+          operationalFactMethods = []
+          requirementListParams = []
+          materialIssueCreateParams = []
+          inventoryLotParams = []
+          page.on('request', (request) => {
+            try {
+              const body = request.postDataJSON() || {}
+              if (
+                request.url().includes('/rpc/inventory') &&
+                body.method === 'list_inventory_lots'
+              ) {
+                inventoryLotParams.push(body.params || {})
+              }
+              if (!request.url().includes('/rpc/operational_fact')) return
+              if (body.method) operationalFactMethods.push(body.method)
+              if (
+                body.method === 'list_production_order_material_requirements'
+              ) {
+                requirementListParams.push(body.params || {})
+              }
+              if (
+                body.method === 'create_production_material_issue_from_order'
+              ) {
+                materialIssueCreateParams.push(body.params || {})
+              }
+            } catch {
+              // 非 JSON-RPC 请求不参与本断言。
+            }
+          })
+        },
+        verify: async (page) => {
+          await expectHeading(page, '生产订单')
+          const orderText = page.getByText('MO-STYLE-L1-20260713', {
+            exact: true,
+          })
+          await orderText.click()
+          const releaseButton = page.getByRole('button', {
+            name: '发布',
+            exact: true,
+          })
+          for (let attempt = 0; attempt < 40; attempt += 1) {
+            if (await releaseButton.isEnabled()) break
+            await page.waitForTimeout(100)
+          }
+          assert.equal(
+            await releaseButton.isEnabled(),
+            true,
+            '生产订单详情读取完成后应允许发布'
+          )
+          await releaseButton.click()
+          await page.getByRole('button', { name: '确认发布' }).click()
+          await expectText(page, '生产订单已发布，排产确认已进入 PMC 待办')
+
+          await page
+            .getByText('MO-STYLE-L1-20260713', { exact: true })
+            .dblclick()
+          const detailModal = page
+            .locator('.erp-business-form-page:not([hidden])')
+            .filter({ hasText: '查看生产订单' })
+            .last()
+          await detailModal.waitFor({ state: 'visible', timeout: 10_000 })
+          await detailModal
+            .getByRole('heading', { name: '物料需求与领料', exact: true })
+            .waitFor()
+          await detailModal
+            .getByText(/物料需求已按发布时的 BOM 冻结/u)
+            .waitFor()
+          await detailModal
+            .getByRole('navigation', { name: '表单分区' })
+            .getByRole('button', { name: '物料需求与领料', exact: true })
+            .click()
+          const requirementWidth = await detailModal
+            .locator('[data-form-section="物料需求与领料"]')
+            .boundingBox()
+          const formBody = await detailModal
+            .locator('.erp-business-form-page__body')
+            .boundingBox()
+          assert(
+            requirementWidth.width >= formBody.width - 40,
+            '冻结物料表应占满表单内容宽度'
+          )
+          const materialRequirementCells = detailModal
+            .locator('.ant-table-cell:visible')
+            .filter({ hasText: 'MAT-STYLE-L1 / 样式短毛绒布' })
+          await materialRequirementCells.first().waitFor()
+          assert(
+            (await materialRequirementCells.allInnerTexts()).every(
+              (text) => text.trim() === 'MAT-STYLE-L1 / 样式短毛绒布'
+            ),
+            '生产订单详情中的物料需求单元格应保持代码与名称完整'
+          )
+          const remainingQuantityCells = detailModal
+            .locator('.ant-table-cell:visible')
+            .filter({ hasText: /^8\.000000$/u })
+          await remainingQuantityCells.first().waitFor()
+          assert(
+            (await remainingQuantityCells.allInnerTexts()).every(
+              (text) => text.trim() === '8.000000'
+            ),
+            '生产订单详情中的剩余可领数量应保持定点小数展示'
+          )
+          if (
+            (await detailModal
+              .getByRole('button', { name: '领料', exact: true })
+              .count()) === 0
+          ) {
+            throw new Error(
+              `生产领料行操作未开放: ${String(
+                (await detailModal.innerText()) || ''
+              ).replace(/\s+/gu, ' ')}`
+            )
+          }
+          await detailModal
+            .getByRole('button', { name: '领料', exact: true })
+            .click()
+
+          const issueModal = page
+            .locator('.ant-modal:visible')
+            .filter({ hasText: '生产领料' })
+            .last()
+          try {
+            await issueModal.waitFor({ state: 'visible', timeout: 10_000 })
+          } catch (error) {
+            const bodyText = String(
+              (await page.locator('body').innerText()) || ''
+            ).replace(/\s+/gu, ' ')
+            throw new Error(
+              `生产领料弹窗未打开: ${JSON.stringify({
+                operationalFactMethods,
+                requirementListParams,
+                inventoryLotParams,
+                bodyText: bodyText.slice(0, 2400),
+              })}; ${error.message}`
+            )
+          }
+          const issueText = String(
+            (await issueModal.innerText()) || ''
+          ).replace(/\s+/gu, ' ')
+          assert.match(issueText, /MO-STYLE-L1-20260713/u)
+          assert.match(issueText, /MAT-STYLE-L1.*样式短毛绒布/u)
+          assert.match(issueText, /计划需求.*10\.200000/u)
+          assert.match(issueText, /已过账领料.*2\.200000/u)
+          assert.match(issueText, /剩余可领.*8\.000000/u)
+          try {
+            await issueModal
+              .getByText('MAT-LOT-STYLE-L1', { exact: false })
+              .waitFor({ timeout: 10_000 })
+          } catch (error) {
+            throw new Error(
+              `生产领料批次未加载: requests=${JSON.stringify(
+                inventoryLotParams
+              )}; modal=${issueText}`,
+              { cause: error }
+            )
+          }
+          for (const technicalCopy of [
+            'material_id',
+            'unit_id',
+            'source_type',
+            'source_id',
+            'idempotency_key',
+            'NEEDS_REVIEW',
+          ]) {
+            assert.equal(
+              (await issueModal
+                .getByText(technicalCopy, { exact: true })
+                .count()) > 0,
+              false,
+              `生产领料弹窗不应显示技术字段 ${technicalCopy}`
+            )
+          }
+          await issueModal.getByLabel('本次领料数量').fill('3')
+          await issueModal.locator('textarea').fill('首批生产领料')
+          await issueModal.screenshot({
+            path: path.resolve(
+              outputDir,
+              'production-order-source-material-issue-modal-desktop.png'
+            ),
+          })
+          await issueModal
+            .getByRole('button', { name: /生\s*成\s*领\s*料\s*记\s*录/u })
+            .click()
+          await expectText(page, '领料记录草稿已生成，请到生产记录核对并过账')
+
+          assert.equal(
+            requirementListParams.length,
+            0,
+            `领料应复用生产订单聚合中的冻结需求，不应重复读取: ${JSON.stringify(requirementListParams)}`
+          )
+          assert.deepEqual(inventoryLotParams, [
+            {
+              subject_type: 'MATERIAL',
+              subject_id: 1,
+              warehouse_id: 1,
+              status: 'ACTIVE',
+              limit: 200,
+              offset: 0,
+            },
+          ])
+          assert.equal(
+            materialIssueCreateParams.length,
+            1,
+            `重复点击保护应只提交一次领料: ${JSON.stringify(materialIssueCreateParams)}`
+          )
+          const params = materialIssueCreateParams[0]
+          const allowedKeys = new Set([
+            'customer_key',
+            'fact_no',
+            'production_order_id',
+            'production_order_item_id',
+            'production_order_material_requirement_id',
+            'warehouse_id',
+            'lot_id',
+            'quantity',
+            'idempotency_key',
+            'occurred_at',
+            'note',
+          ])
+          assert(
+            Object.keys(params).every((key) => allowedKeys.has(key)),
+            `生产领料请求包含后端派生字段: ${JSON.stringify(params)}`
+          )
+          assert.equal(params.customer_key, 'yoyoosun')
+          assert.equal(params.production_order_id, 71)
+          assert.equal(params.production_order_item_id, 7101)
+          assert.equal(params.production_order_material_requirement_id, 7201)
+          assert.equal(params.warehouse_id, 1)
+          assert.equal(params.lot_id, 403)
+          assert.equal(params.quantity, '3')
+          assert.equal(params.note, '首批生产领料')
+          assert.equal(typeof params.idempotency_key, 'string')
+          for (const serverDerivedField of [
+            'material_id',
+            'unit_id',
+            'subject_type',
+            'subject_id',
+            'source_type',
+            'source_id',
+            'source_line_id',
+          ]) {
+            assert.equal(serverDerivedField in params, false)
+          }
+          assert.equal(
+            operationalFactMethods.filter(
+              (method) => method === 'list_production_facts'
+            ).length,
+            1,
+            `创建后应只重新读取一次关联生产记录: ${JSON.stringify(operationalFactMethods)}`
+          )
+          await assertNoHorizontalOverflow(
+            page,
+            'production-order-source-material-issue-desktop'
+          )
+        },
+      }
+    })(),
+    (() => {
+      let shippingReleaseListTaskCalls = 0
+      let workflowWriteCalls = 0
+      const readonlyShipmentReleaseTask =
+        createShipmentFinanceApprovalTaskFixture({
+          sourceID: 9201,
+          taskID: 9201,
+          processInstanceID: 19_201,
+          processNodeInstanceID: 29_201,
+          sourceNo: 'SHIP-REL-READONLY',
+          taskName: '出货财务审批只读确认',
+        })
+      return {
+        name: 'business-formal-shipping-release-readonly-actions-desktop',
+        path: '/erp/warehouse/shipping-release',
+        auth: 'admin',
+        customerKey: 'yoyoosun',
+        viewport: { width: 1440, height: 900 },
+        adminProfile: {
+          username: 'style-l1-workflow-readonly',
+          is_super_admin: false,
+          roles: [{ role_key: 'finance', name: '财务' }],
+          permissions: ['erp.workbench.read', 'workflow.task.read'],
+          menus: [
+            {
+              key: 'shipping-release',
+              label: '出货放行',
+              path: '/erp/warehouse/shipping-release',
+              required_any: [],
+              required_all: [],
+            },
+          ],
+          erp_preferences: {
+            column_orders: {},
+          },
+        },
+        effectiveSession: {
+          ...customerRuntimeEffectiveSession,
+          pages: ['shipping-release'],
+          actions: ['workflow.task.read'],
+        },
+        beforeNavigate: async (page) => {
+          shippingReleaseListTaskCalls = 0
+          workflowWriteCalls = 0
+          await page.unroute('**/rpc/workflow')
+          await page.route('**/rpc/workflow', async (route) => {
+            const body = route.request().postDataJSON() || {}
+            if (body.method === 'list_tasks') {
+              shippingReleaseListTaskCalls += 1
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: body.id || 'formal-shipping-release-readonly-list',
+                  result: {
+                    code: 0,
+                    message: 'OK',
+                    data: stylePaginatedRpcData(
+                      [readonlyShipmentReleaseTask],
+                      'tasks',
+                      body.params || {},
+                      10
+                    ),
+                  },
+                }),
+              })
+              return
+            }
+            if (body.method === 'explain_action_access') {
+              const readonlyReason =
+                '当前账号只有查看任务权限，没有完成、阻塞或催办权限。'
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id:
+                    body.id || 'formal-shipping-release-readonly-action-access',
+                  result: {
+                    code: 0,
+                    message: 'OK',
+                    data: {
+                      source_access: {
+                        applicable: true,
+                        resolved: true,
+                        allowed: false,
+                        reason_code: 'source_read_permission_missing',
+                        reason:
+                          '当前账号不能查看该任务的相关单据，因此不能办理；可催办责任人或联系管理员调整岗位权限。',
+                      },
+                      actions: [
+                        {
+                          action_key: 'complete',
+                          allowed: false,
+                          reason: readonlyReason,
+                          reason_code: 'missing_workflow_write_permission',
+                          required_permission: 'workflow.task.complete',
+                          owner_role_key: 'finance',
+                        },
+                        {
+                          action_key: 'block',
+                          allowed: false,
+                          reason: readonlyReason,
+                          reason_code: 'missing_workflow_write_permission',
+                          required_permission: 'workflow.task.update',
+                          owner_role_key: 'finance',
+                        },
+                        {
+                          action_key: 'reject',
+                          allowed: false,
+                          reason: readonlyReason,
+                          reason_code: 'missing_workflow_write_permission',
+                          required_permission: 'workflow.task.update',
+                          owner_role_key: 'finance',
+                        },
+                        {
+                          action_key: 'urge',
+                          allowed: false,
+                          reason: readonlyReason,
+                          reason_code: 'missing_workflow_write_permission',
+                          required_permission: 'workflow.task.update',
+                          owner_role_key: 'finance',
+                        },
+                      ],
+                    },
+                  },
+                }),
+              })
+              return
+            }
+            if (body.method === 'urge_task') {
+              workflowWriteCalls += 1
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: body.id || 'formal-shipping-release-readonly-write',
+                  result: {
+                    code: 403001,
+                    message: 'readonly workflow user cannot write tasks',
+                    data: null,
+                  },
+                }),
+              })
+              return
+            }
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'formal-shipping-release-readonly-fallback',
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: {},
+                },
+              }),
+            })
+          })
+        },
+        verify: async (page) => {
+          await expectHeading(page, '出货放行')
+          const pageShell = await page.evaluate(() => ({
+            path: location.pathname,
+            workflowPageCount: document.querySelectorAll(
+              '.erp-workflow-business-page'
+            ).length,
+            headings: Array.from(document.querySelectorAll('h1, h2, h3, h4'))
+              .map((node) => String(node.textContent || '').trim())
+              .filter(Boolean),
+            buttons: Array.from(document.querySelectorAll('button'))
+              .map((node) => String(node.textContent || '').trim())
+              .filter(Boolean),
+          }))
+          assert.equal(
+            pageShell.workflowPageCount,
+            1,
+            `只读出货放行场景必须进入正式 Workflow 页面: ${JSON.stringify(pageShell)}`
+          )
+          await assertBusinessCollaborationPanelAbsent(
+            page,
+            'business-formal-shipping-release-readonly-actions-desktop'
+          )
+          await assertUnifiedListToolbarShell(page, {
+            scenarioName:
+              'business-formal-shipping-release-readonly-actions-desktop',
+            exportVisible: false,
+          })
+          await expectText(page, '出货财务审批只读确认')
+          await expectText(page, 'SHIP-REL-READONLY')
+          const readonlyShippingReleaseRow = page
+            .locator('.ant-table-row')
+            .filter({ hasText: '出货财务审批只读确认' })
+            .first()
+          await readonlyShippingReleaseRow
+            .getByText('可执行', { exact: true })
+            .waitFor({ state: 'visible' })
+          await readonlyShippingReleaseRow.click()
+          for (const actionLabel of [
+            '完成任务',
+            '标记阻塞',
+            '退回任务',
+            '催办',
+          ]) {
+            assert.equal(
+              await page.getByRole('button', { name: actionLabel }).count(),
+              0,
+              `只读任务不应展示${actionLabel}动作`
+            )
+          }
+
+          const readonlyMetrics = await page
+            .locator('.ant-table-row')
+            .filter({ hasText: '出货财务审批只读确认' })
+            .first()
+            .evaluate((node) => {
+              const buttons = Array.from(node.querySelectorAll('button')).map(
+                (button) => ({
+                  text: String(button.textContent || '').trim(),
+                  ariaLabel: button.getAttribute('aria-label') || '',
+                  title: button.getAttribute('title') || '',
+                  className: button.className,
+                  actionKey:
+                    button.getAttribute('data-business-action-key') || '',
+                })
+              )
+              return {
+                text: String(node.textContent || '')
+                  .replace(/\s+/gu, ' ')
+                  .trim(),
+                buttons,
+                scrollWidth: node.scrollWidth,
+                clientWidth: node.clientWidth,
+              }
+            })
+          const unexpectedRowButtons = readonlyMetrics.buttons.filter(
+            (button) =>
+              !String(button.className || '').includes(
+                'erp-business-table-copyable-cell__button'
+              )
+          )
+          assert(
+            unexpectedRowButtons.length === 0,
+            `出货放行只读表格行不应直接暴露动作按钮: ${JSON.stringify(
+              readonlyMetrics
+            )}`
+          )
+          assert(
+            readonlyMetrics.scrollWidth <= readonlyMetrics.clientWidth + 1,
+            `只读任务项出现横向溢出: ${JSON.stringify(readonlyMetrics)}`
+          )
+          assert(
+            shippingReleaseListTaskCalls >= 1,
+            '有 workflow.task.read 时出货放行页应允许读取协同任务'
+          )
+          assert.equal(workflowWriteCalls, 0, '只读协同任务不应触发 urge_task')
+          await assertTextAbsent(page, '任务处理')
+          await assertTextAbsent(page, '出货财务审批已完成')
+          await assertNoHorizontalOverflow(
+            page,
+            'business-formal-shipping-release-readonly-actions-desktop'
+          )
+        },
+      }
+    })(),
+    (() => {
+      const retryFileName = 'batch-needs-retry.txt'
+      const pendingRetryFileName = 'pending-needs-retry.txt'
+      const retryFileNames = new Set([retryFileName, pendingRetryFileName])
+      let uploadCalls = []
+      let uploadedAttachments = []
+      let nextAttachmentID = 7000
+
+      return {
+        name: 'business-attachment-partial-failure-retry-desktop',
+        path: '/erp/sales/project-orders/sales-orders',
+        auth: 'admin',
+        effectiveSession: customerRuntimeEffectiveSession,
+        viewport: { width: 1440, height: 900 },
+        beforeNavigate: async (page) => {
+          uploadCalls = []
+          uploadedAttachments = []
+          nextAttachmentID = 7000
+          await page.route('**/rpc/attachment', async (route) => {
+            const body = route.request().postDataJSON() || {}
+            const { id = 'attachment-batch-retry', method, params = {} } = body
+            let code = 0
+            let message = 'OK'
+            let data = {}
+
+            if (method === 'list_attachments') {
+              data = { attachments: uploadedAttachments }
+            } else if (method === 'upload_attachment') {
+              const fileName = String(params.file_name || '')
+              const previousAttempts = uploadCalls.filter(
+                (name) => name === fileName
+              ).length
+              uploadCalls.push(fileName)
+              if (retryFileNames.has(fileName) && previousAttempts === 0) {
+                code = 40010
+                message = '当前附件上传失败，请重试'
+              } else {
+                nextAttachmentID += 1
+                const attachment = {
+                  id: nextAttachmentID,
+                  owner_type: params.owner_type,
+                  owner_id: Number(params.owner_id || 0),
+                  attachment_type: params.attachment_type || 'evidence',
+                  slot_key: params.slot_key || null,
+                  file_name: fileName,
+                  mime_type: params.mime_type || 'text/plain',
+                  file_size: Number(params.file_size || 0),
+                  sha256:
+                    '0000000000000000000000000000000000000000000000000000000000000000',
+                  uploaded_by: 1,
+                  uploaded_by_username: 'demo_boss',
+                  note: null,
+                  withdrawn_at: null,
+                  withdrawn_by: null,
+                  withdrawn_by_username: null,
+                  withdrawal_reason: null,
+                  created_at: 1_750_000_000,
+                }
+                uploadedAttachments = [...uploadedAttachments, attachment]
+                data = { attachment }
+              }
+            } else {
+              code = 40010
+              message = `附件批量重试场景不支持 ${String(method || '')}`
+            }
+
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: { code, message, data },
+              }),
+            })
+          })
+        },
+        verify: async (page) => {
+          await expectHeading(page, '销售订单')
+          await expectText(page, 'SO-STYLE-L1')
+          await page.getByText('SO-STYLE-L1', { exact: false }).first().click()
+          await (await findSelectionActionButton(page, '编辑订单')).click()
+          const orderModal = page
+            .locator('.erp-business-form-page:not([hidden])')
+            .filter({ hasText: '编辑销售订单' })
+            .last()
+          await orderModal.waitFor({ state: 'visible', timeout: 10_000 })
+
+          const attachmentInput = orderModal
+            .locator('.business-attachment-panel input[type="file"]')
+            .first()
+          await attachmentInput.setInputFiles([
+            {
+              name: 'batch-success-a.txt',
+              mimeType: 'text/plain',
+              buffer: Buffer.from('batch-success-a'),
+            },
+            {
+              name: retryFileName,
+              mimeType: 'text/plain',
+              buffer: Buffer.from('batch-needs-retry'),
+            },
+            {
+              name: 'batch-success-c.txt',
+              mimeType: 'text/plain',
+              buffer: Buffer.from('batch-success-c'),
+            },
+          ])
+          assert.equal(uploadCalls.length, 0, '选择文件只进入待上传队列')
+          await orderModal
+            .getByRole('button', { name: '上传 3 个文件', exact: true })
+            .click()
+
+          const retryModal = page
+            .getByRole('dialog', {
+              name: '部分附件上传失败',
+              exact: true,
+            })
+            .last()
+          await retryModal.waitFor({ state: 'visible', timeout: 10_000 })
+          await assertAntdModalCentered(
+            page,
+            retryModal,
+            'business-attachment-partial-failure-retry-desktop'
+          )
+          assert.deepEqual(
+            uploadCalls,
+            ['batch-success-a.txt', retryFileName, 'batch-success-c.txt'],
+            '首轮必须尝试全部附件，不能在单个失败后提前停止'
+          )
+          const retryMetrics = await retryModal.evaluate((node) => ({
+            text: String(node.textContent || '')
+              .replace(/\s+/gu, ' ')
+              .trim(),
+            overflowX: node.scrollWidth - node.clientWidth,
+            retryButtons: Array.from(node.querySelectorAll('button')).filter(
+              (button) =>
+                String(button.textContent || '').replace(/\s+/gu, '') ===
+                '重试失败项（1）'
+            ).length,
+          }))
+          assert(
+            retryMetrics.text.includes('本轮共 3 个附件') &&
+              retryMetrics.text.includes('已成功 2 个') &&
+              retryMetrics.text.includes('未完成 1 个') &&
+              retryMetrics.text.includes(retryFileName) &&
+              !retryMetrics.text.includes('batch-success-a.txt') &&
+              !retryMetrics.text.includes('batch-success-c.txt'),
+            `批量上传应逐项展示失败结果: ${JSON.stringify(retryMetrics)}`
+          )
+          assert.equal(
+            retryMetrics.retryButtons,
+            1,
+            `部分失败弹窗应提供唯一失败项重试入口: ${JSON.stringify(
+              retryMetrics
+            )}`
+          )
+          assert(
+            retryMetrics.overflowX <= 1,
+            `部分失败弹窗不应横向溢出: ${JSON.stringify(retryMetrics)}`
+          )
+          await retryModal.screenshot({
+            path: path.join(
+              outputDir,
+              'business-attachment-partial-failure-retry-modal.png'
+            ),
+          })
+
+          await retryModal
+            .locator('button')
+            .filter({ hasText: '重试失败项（1）' })
+            .click()
+          await retryModal.waitFor({ state: 'hidden', timeout: 10_000 })
+          assert.deepEqual(
+            uploadCalls,
+            [
+              'batch-success-a.txt',
+              retryFileName,
+              'batch-success-c.txt',
+              retryFileName,
+            ],
+            '重试只能再次发送上一轮失败项，成功项不得重复上传'
+          )
+          for (const fileName of [
+            'batch-success-a.txt',
+            retryFileName,
+            'batch-success-c.txt',
+          ]) {
+            await orderModal
+              .getByText(fileName, { exact: true })
+              .waitFor({ state: 'visible', timeout: 10_000 })
+          }
+          assert.equal(
+            await orderModal.getByText('上传失败', { exact: true }).count(),
+            0,
+            '重试成功后不应残留失败项'
+          )
+          assert.equal(
+            await orderModal.getByText('结果待确认', { exact: true }).count(),
+            0,
+            '明确失败重试成功后不应残留待确认状态'
+          )
+          const attachmentPanel = orderModal.locator(
+            '.business-attachment-panel'
+          )
+          await attachmentPanel.scrollIntoViewIfNeeded()
+          const recoveredMetrics = await attachmentPanel.evaluate((node) => ({
+            text: String(node.textContent || '')
+              .replace(/\s+/gu, ' ')
+              .trim(),
+            overflowX: node.scrollWidth - node.clientWidth,
+          }))
+          assert(
+            recoveredMetrics.overflowX <= 1,
+            `重试恢复后的附件面板不应横向溢出: ${JSON.stringify(
+              recoveredMetrics
+            )}`
+          )
+          await attachmentPanel.screenshot({
+            path: path.join(
+              outputDir,
+              'business-attachment-partial-failure-retry-recovered.png'
+            ),
+          })
+          await closeBusinessFormModal(page, orderModal)
+
+          await gotoScenarioPath(
+            page,
+            '/erp/master/products?catalog=product_skus',
+            { waitUntil: 'domcontentloaded' }
+          )
+          await expectHeading(page, '产品档案')
+          await page.getByRole('tab', { name: '产品规格' }).waitFor()
+          await page.getByRole('button', { name: '新建产品规格' }).click()
+          const newSKUProductModal = page
+            .locator(
+              '.erp-business-form-page:not([hidden]), .erp-business-action-modal--form.ant-modal:visible'
+            )
+            .filter({ hasText: '新建产品规格' })
+            .last()
+          await newSKUProductModal.waitFor({
+            state: 'visible',
+            timeout: 10_000,
+          })
+          const productField = newSKUProductModal
+            .locator('.ant-form-item')
+            .filter({ hasText: '所属产品' })
+            .first()
+          await productField.locator('.ant-select').click()
+          await page
+            .locator(
+              '.ant-select-dropdown:visible .ant-select-item-option-content'
+            )
+            .filter({ hasText: 'PROD-STYLE-L1' })
+            .first()
+            .click()
+
+          const pendingAttachmentInput = newSKUProductModal
+            .locator('.business-attachment-panel input[type="file"]')
+            .first()
+          await pendingAttachmentInput.setInputFiles([
+            {
+              name: 'pending-success-a.txt',
+              mimeType: 'text/plain',
+              buffer: Buffer.from('pending-success-a'),
+            },
+            {
+              name: pendingRetryFileName,
+              mimeType: 'text/plain',
+              buffer: Buffer.from('pending-needs-retry'),
+            },
+            {
+              name: 'pending-success-c.txt',
+              mimeType: 'text/plain',
+              buffer: Buffer.from('pending-success-c'),
+            },
+          ])
+          await newSKUProductModal
+            .getByText(pendingRetryFileName, { exact: true })
+            .waitFor({ state: 'visible', timeout: 10_000 })
+          assert.equal(
+            await newSKUProductModal
+              .getByText('保存后上传', { exact: true })
+              .count(),
+            3,
+            '新建表单选择附件后必须先保持待保存状态'
+          )
+
+          const pendingUploadStart = uploadCalls.length
+          await newSKUProductModal
+            .locator('.erp-business-form-page__footer .ant-btn-primary')
+            .click()
+          const pendingRetryModal = page
+            .getByRole('dialog', {
+              name: '部分附件上传失败',
+              exact: true,
+            })
+            .last()
+          await pendingRetryModal.waitFor({
+            state: 'visible',
+            timeout: 10_000,
+          })
+          await assertAntdModalCentered(
+            page,
+            pendingRetryModal,
+            'business-attachment-post-save-partial-failure-retry-desktop'
+          )
+          assert.deepEqual(
+            uploadCalls.slice(pendingUploadStart),
+            [
+              'pending-success-a.txt',
+              pendingRetryFileName,
+              'pending-success-c.txt',
+            ],
+            '保存新记录后绑定附件也必须尝试完全部待上传文件'
+          )
+          await pendingRetryModal.screenshot({
+            path: path.join(
+              outputDir,
+              'business-attachment-post-save-partial-failure-retry-modal.png'
+            ),
+          })
+          await pendingRetryModal
+            .locator('button')
+            .filter({ hasText: '重试失败项（1）' })
+            .click()
+          await pendingRetryModal.waitFor({
+            state: 'hidden',
+            timeout: 10_000,
+          })
+          assert.deepEqual(
+            uploadCalls.slice(pendingUploadStart),
+            [
+              'pending-success-a.txt',
+              pendingRetryFileName,
+              'pending-success-c.txt',
+              pendingRetryFileName,
+            ],
+            '保存后重试只能再次绑定失败附件，成功附件不得重复发送'
+          )
+          await newSKUProductModal.waitFor({
+            state: 'hidden',
+            timeout: 10_000,
+          })
+          await expectText(page, '产品规格已创建')
+        },
+      }
+    })(),
+  ]
+}
