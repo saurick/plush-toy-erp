@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "plush.manual-acceptance-contract/v8",
+  "datasetKey": "yoyoosun-manual-acceptance",
+  "dataVersion": "2026.09.27-v8",
+  "runId": "20260927-V8",
+  "anchorDateUtc": "2026-09-27T12:00:00.000Z",
+  "visiblePrefix": "YS8",
+  "simulatedOnly": true,
+  "realCustomerImport": false,
+  "sourceNormalization": {
+    "trimWhitespace": true,
+    "preserveCase": true,
+    "aliases": {
+      "PCS": "个",
+      "件": "个",
+      "Y": "码",
+      "kg": "千克"
+    },
+    "distinctPairs": [
+      ["个", "套"],
+      ["个", "对"],
+      ["个", "片"],
+      ["个", "条"],
+      ["个", "块"]
+    ]
+  },
+  "primaryUnitKey": "piece",
+  "units": [
+    {
+      "key": "piece",
+      "code": "EA",
+      "name": "个",
+      "sourceLabel": "个",
+      "precision": 0
+    },
+    {
+      "key": "set",
+      "code": "SET",
+      "name": "套",
+      "sourceLabel": "套",
+      "precision": 0
+    },
+    {
+      "key": "pair",
+      "code": "PAIR",
+      "name": "对",
+      "sourceLabel": "对",
+      "precision": 0
+    },
+    {
+      "key": "sheet",
+      "code": "SHEET",
+      "name": "片",
+      "sourceLabel": "片",
+      "precision": 0
+    },
+    {
+      "key": "strip",
+      "code": "STRIP",
+      "name": "条",
+      "sourceLabel": "条",
+      "precision": 0
+    },
+    {
+      "key": "block",
+      "code": "BLOCK",
+      "name": "块",
+      "sourceLabel": "块",
+      "precision": 0
+    },
+    {
+      "key": "yard",
+      "code": "YD",
+      "name": "码",
+      "sourceLabel": "码",
+      "precision": 6
+    },
+    {
+      "key": "kilogram",
+      "code": "KG",
+      "name": "千克",
+      "sourceLabel": "千克",
+      "precision": 3
+    }
+  ],
+  "warehouses": [
+    {
+      "key": "material",
+      "code": "YS8-CK-01",
+      "name": "原料仓",
+      "type": "MATERIAL"
+    },
+    {
+      "key": "product",
+      "code": "YS8-CK-02",
+      "name": "成品仓",
+      "type": "FINISHED_GOODS"
+    },
+    {
+      "key": "qualityHold",
+      "code": "YS8-CK-03",
+      "name": "待检仓",
+      "type": "MATERIAL"
+    },
+    {
+      "key": "workInProcess",
+      "code": "YS8-CK-04",
+      "name": "在制仓",
+      "type": "MATERIAL"
+    }
+  ],
+  "customerTrial133": {
+    "target": "customer-trial-133",
+    "deploymentTarget": "demo-133",
+    "databaseName": "plush_erp_demo_v1",
+    "databaseLifecycle": "long-lived-registered-target",
+    "minimumMigration": "20260927100348"
+  }
+}
