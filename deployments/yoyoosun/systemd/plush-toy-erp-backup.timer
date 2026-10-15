@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Plush Toy ERP PostgreSQL backup daily
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+RandomizedDelaySec=30min
+Persistent=true
+Unit=plush-toy-erp-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,4 @@
+serverImage=待填写
+serverImageDigest=待填写，建议用 scripts/deploy/image-digests-evidence.mjs 生成，必须等于 release-evidence.md serverImageDigest
+webImage=待填写
+webImageDigest=待填写，建议用 scripts/deploy/image-digests-evidence.mjs 生成，必须等于 release-evidence.md webImageDigest
