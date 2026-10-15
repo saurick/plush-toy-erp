@@ -1,0 +1,212 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+function source(relativePath) {
+  return readFileSync(new URL(relativePath, import.meta.url), 'utf8')
+}
+
+function sliceBetween(value, start, end) {
+  const startIndex = value.indexOf(start)
+  const endIndex = value.indexOf(end, startIndex + start.length)
+  assert.notEqual(startIndex, -1, `missing start marker: ${start}`)
+  assert.notEqual(endIndex, -1, `missing end marker: ${end}`)
+  return value.slice(startIndex, endIndex)
+}
+
+function assertOrdered(value, labels) {
+  let cursor = -1
+  for (const label of labels) {
+    const nextIndex = value.indexOf(label, cursor + 1)
+    assert.notEqual(nextIndex, -1, `missing section: ${label}`)
+    assert(nextIndex > cursor, `section is out of order: ${label}`)
+    cursor = nextIndex
+  }
+}
+
+function assertUsesSharedSectionTitle(relativePath) {
+  const value = source(relativePath)
+  assert(value.includes('BusinessFormSectionTitle'))
+  assert.match(value, /<BusinessFormSectionTitle[\s>]/u)
+  assert(!value.includes('className="erp-business-action-form__section-title"'))
+}
+
+test('shared section title exposes heading semantics and a responsive divider', () => {
+  const componentSource = source(
+    '../components/business-list/BusinessFormSectionTitle.jsx'
+  )
+  const modalStyles = source('../styles/app/business-modals.css')
+  const responsiveStyles = source('../styles/app/business-responsive.css')
+
+  assert.match(componentSource, /role="heading"/u)
+  assert.match(componentSource, /aria-level=\{3\}/u)
+  assert.match(componentSource, /section-title-text/u)
+  assert.match(modalStyles, /\.erp-business-action-form__section-title::after/u)
+  assert.match(modalStyles, /--erp-business-action-modal-divider/u)
+  assert.match(responsiveStyles, /section-title[\s\S]*gap: 10px/u)
+})
+
+test('all governed long forms use the shared section-title component', () => {
+  const paths = [
+    '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx',
+    '../pages/FinancePaymentsPage.jsx',
+    '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx',
+    '../components/business-list/BusinessFormSection.jsx',
+  ]
+
+  for (const relativePath of paths) {
+    assertUsesSharedSectionTitle(relativePath)
+  }
+  for (const relativePath of [
+    '../components/purchase-orders/PurchaseOrderForm.jsx',
+    '../components/bom/BOMVersionForms.jsx',
+    '../components/sales-orders/SalesOrderForm.jsx',
+    '../components/master-data/MasterDataForm.jsx',
+    '../components/production-orders/ProductionOrderEditor.jsx',
+    '../components/production-orders/ProductionCompletionModal.jsx',
+    '../components/outsourcing-orders/OutsourcingOrderForm.jsx',
+    '../components/shipments/ShipmentEditor.jsx',
+  ]) {
+    assert.match(source(relativePath), /<BusinessFormSection[\s>]/u)
+  }
+})
+
+test('business form sections stay visible without collapse state', () => {
+  const componentSource = source(
+    '../components/business-list/BusinessFormSection.jsx'
+  )
+  const bodySource = source('../components/business-list/BusinessFormBody.jsx')
+  const bomFormSource = source('../components/bom/BOMVersionForms.jsx')
+  const bomPageSource = source('../pages/BOMVersionsPage.jsx')
+
+  assert.doesNotMatch(
+    componentSource,
+    /<details|<summary|expanded|onExpandedChange/u
+  )
+  assert.doesNotMatch(
+    bodySource,
+    /details:not\(\[open\]\)|querySelector\('summary/u
+  )
+  assert.doesNotMatch(bomFormSource, /detailsOpen|onDetailsOpenChange/u)
+  assert.doesNotMatch(bomPageSource, /headerDetailsOpen|setHeaderDetailsOpen/u)
+})
+
+test('sales order editing puts demand before supplementary commercial and delivery fields', () => {
+  assertOrdered(source('../components/sales-orders/SalesOrderForm.jsx'), [
+    '订单与客户',
+    '{itemsSection}',
+    '联系与交付',
+    '结算与报价',
+    '税费与运费条件',
+    '备注与附件',
+  ])
+})
+
+test('master-data variants expose stable business section order', () => {
+  const masterDataSource = source(
+    '../components/master-data/MasterDataForm.jsx'
+  )
+  const productBlock = sliceBetween(
+    masterDataSource,
+    "if (type === 'products')",
+    "if (type === 'product_skus')"
+  )
+  const skuBlock = sliceBetween(
+    masterDataSource,
+    "if (type === 'product_skus')",
+    "if (type === 'processes')"
+  )
+  const processBlock = sliceBetween(
+    masterDataSource,
+    "if (type === 'processes')",
+    '  return (\n    <>'
+  )
+
+  assertOrdered(productBlock, ['基本资料', '外贸信息', '计量信息'])
+  assertOrdered(skuBlock, ['归属与编号', '规格属性', '计量信息'])
+  assertOrdered(processBlock, ['基本资料', '路线与加工能力'])
+  assertOrdered(
+    masterDataSource.slice(masterDataSource.indexOf('  return (\n    <>')),
+    ['基本资料', '加工能力', '结算方式']
+  )
+})
+
+test('operational long forms expose the audited semantic sections', () => {
+  const purchaseReceiptExceptionSource = source(
+    '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx'
+  )
+  assert.match(
+    purchaseReceiptExceptionSource,
+    /const detailTitle = isReturn \? '退货明细' : '调整明细'/u
+  )
+  assertOrdered(purchaseReceiptExceptionSource, [
+    '整单信息',
+    '<BusinessLineItemsHeader',
+    '整单备注',
+  ])
+
+  const contracts = [
+    [
+      '../components/production-orders/ProductionCompletionModal.jsx',
+      ['完工来源与数量', '入库仓库与批次'],
+    ],
+    ['../pages/FinancePaymentsPage.jsx', ['往来与金额', '账户与凭据']],
+    [
+      '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx',
+      ['仓库与批次', '数量与时间'],
+    ],
+  ]
+
+  for (const [relativePath, labels] of contracts) {
+    assertOrdered(source(relativePath), labels)
+  }
+})
+
+test('document-style long forms follow stable business section order', () => {
+  const contracts = [
+    [
+      '../components/purchase-orders/PurchaseOrderForm.jsx',
+      [
+        '订单与供应商',
+        '采购明细',
+        '交付与结算',
+        '合同订购方信息',
+        '备注与附件',
+      ],
+    ],
+    [
+      '../components/outsourcing-orders/OutsourcingOrderForm.jsx',
+      [
+        '合同与加工厂',
+        '加工明细',
+        '合同双方信息',
+        '加工方信息',
+        '委托方信息',
+        '备注与附件',
+      ],
+    ],
+    [
+      '../components/shipments/ShipmentEditor.jsx',
+      ['单据与客户', '{itemsSection}', '收货信息', '运输与费用', '备注与附件'],
+    ],
+    [
+      '../components/bom/BOMVersionForms.jsx',
+      ['版本信息', '{children}', '订单与制表资料', '备注与附件'],
+    ],
+  ]
+
+  for (const [relativePath, labels] of contracts) {
+    assertOrdered(source(relativePath), labels)
+  }
+})
+
+test('short action and inspection forms intentionally remain flat', () => {
+  const shortFormPaths = [
+    '../components/purchase-orders/PurchaseOrderInboundDraftModal.jsx',
+    '../components/quality-inspections/QualityInspectionForms.jsx',
+  ]
+
+  for (const relativePath of shortFormPaths) {
+    assert(!source(relativePath).includes('<BusinessFormSectionTitle>'))
+  }
+})
