@@ -1,0 +1,7 @@
+backupId=plush-yoyoosun-20260703T1315-c298a2a3-pre-migration
+releaseVersion=yoyoosun-20260703-c298a2a3-amd64
+environment=customer-trial-133
+sourceAlias=133-compose-postgres-loopback
+restoreTarget=isolated-postgres-db-plush_restore_c298a2a3_051446
+steps=pg_dump custom-format backup to 133 compose backups; restore dump into isolated postgres database; atlas migrate apply from 20260612112337 to 20260701152057; smoke query information_schema public table count; drop isolated restore database after evidence capture
+redaction=secret values, full DSN, dump content, raw customer rows, and token values are not stored in this evidence directory

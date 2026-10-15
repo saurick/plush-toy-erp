@@ -1,0 +1,59 @@
+{
+  "customerCode": "yoyoosun",
+  "environment": "customer-trial",
+  "productCommit": "<40-character-git-commit>",
+  "generatedAt": "2026-06-12T00:00:00.000Z",
+  "operatorRole": "deployment-operator",
+  "endpointAlias": "https://erp.example.invalid",
+  "backendEndpointAlias": "http://127.0.0.1:8300",
+  "summary": {
+    "total": 6,
+    "passed": 6,
+    "failed": 0
+  },
+  "checks": [
+    {
+      "name": "web-healthz",
+      "status": "pass",
+      "target": "https://erp.example.invalid/healthz",
+      "httpCode": "200"
+    },
+    {
+      "name": "server-healthz",
+      "status": "pass",
+      "target": "http://127.0.0.1:8300/healthz",
+      "httpCode": "200"
+    },
+    {
+      "name": "server-readyz",
+      "status": "pass",
+      "target": "http://127.0.0.1:8300/readyz",
+      "httpCode": "200"
+    },
+    {
+      "name": "login-page",
+      "status": "pass",
+      "target": "https://erp.example.invalid/admin-login",
+      "httpCode": "200"
+    },
+    {
+      "name": "mobile-role-route",
+      "status": "pass",
+      "target": "https://erp.example.invalid/m/warehouse/tasks",
+      "httpCode": "200"
+    },
+    {
+      "name": "customer-config-effective-session",
+      "status": "pass",
+      "target": "jsonrpc:customer_config.get_effective_session",
+      "expectedRevision": "<approved-runtime-revision>",
+      "tokenSourceEnv": "CUSTOMER_CONFIG_ADMIN_TOKEN",
+      "responseBodyStored": false
+    }
+  ],
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "notes": "Sample only. Replace targets with sanitized aliases before committing real reports."
+  }
+}
