@@ -1,0 +1,433 @@
+import assert from "node:assert/strict";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
+import test from "node:test";
+
+import {
+  DEV_SECONDARY_NAV_ITEMS,
+  DEV_WORKSPACE_NAV_ITEMS,
+} from "../../web/src/dev-workbench/config/devRoutes.mjs";
+
+const repoRoot = path.resolve(import.meta.dirname, "../..");
+
+function read(relativePath) {
+  return readFileSync(path.join(repoRoot, relativePath), "utf8");
+}
+
+function listFiles(relativeDir) {
+  const absoluteDir = path.join(repoRoot, relativeDir);
+  return readdirSync(absoluteDir, { withFileTypes: true }).flatMap((entry) => {
+    const relativePath = path.posix.join(relativeDir, entry.name);
+    return entry.isDirectory() ? listFiles(relativePath) : [relativePath];
+  });
+}
+
+test("dev workbench boundary: product app keeps one DEV-only dynamic bridge", () => {
+  const productFiles = [
+    ...listFiles("web/src/erp"),
+    ...listFiles("web/src/common"),
+    "web/src/App.jsx",
+  ].filter((file) => /\.(?:css|js|jsx|mjs)$/u.test(file));
+  const bridgePath = "web/src/erp/router.jsx";
+
+  for (const file of productFiles) {
+    const source = read(file);
+    const importsWorkbench = /(?:from\s+|import\()['"]@\/dev-workbench\//u.test(
+      source,
+    );
+    if (file === bridgePath) {
+      assert.match(
+        source,
+        /const DevWorkbenchBridge\s*=\s*import\.meta\.env\.DEV[\s\S]{0,180}?import\(['"]@\/dev-workbench\/DevWorkbenchBridge\.jsx['"]\)/u,
+      );
+      assert.match(
+        source,
+        /<Route path="\/__dev\/\*" element=\{<DevWorkbenchBridge \/>\}/u,
+      );
+      assert.match(
+        source,
+        /<DevWorkbenchBridge>\{children\}<\/DevWorkbenchBridge>/u,
+      );
+      assert.equal(
+        source.match(/@\/dev-workbench\//gu)?.length,
+        1,
+        "ERP router must keep exactly one workbench bridge",
+      );
+      continue;
+    }
+    assert.equal(
+      importsWorkbench,
+      false,
+      `${file} must not import the DEV-only workbench`,
+    );
+  }
+
+  const bridge = read("web/src/dev-workbench/DevWorkbenchBridge.jsx");
+  assert.match(bridge, /if \(children !== undefined\)/u);
+  assert.match(
+    bridge,
+    /<DevRuntimeRecoveryBoundary>\{children\}<\/DevRuntimeRecoveryBoundary>/u,
+  );
+  assert.equal(bridge.match(/<DevRuntimeRecoveryBoundary>/gu)?.length, 1);
+  assert.match(bridge, /import\(['"]\.\/DevWorkbenchRoutes\.jsx['"]\)/u);
+});
+
+test("dev workbench boundary: source and styles live outside product directories", () => {
+  for (const legacyPath of [
+    "web/src/erp/config/devRoutes.mjs",
+    "web/src/erp/config/devHub.mjs",
+    "web/src/erp/pages/DevHubPage.jsx",
+    "web/src/erp/components/dev/DevPageNav.jsx",
+    "web/src/erp/styles/app/dev-navigation.css",
+    "web/src/erp/components/PermissionRelationshipGraphModal.jsx",
+    "web/src/erp/utils/permissionRelationshipGraph.mjs",
+    "web/src/erp/styles/app/permission-relationship-graph.css",
+  ]) {
+    assert.equal(
+      existsSync(path.join(repoRoot, legacyPath)),
+      false,
+      legacyPath,
+    );
+  }
+
+  for (const requiredPath of [
+    "web/src/dev-workbench/DevWorkbenchRoutes.jsx",
+    "web/src/dev-workbench/config/devRoutes.mjs",
+    "web/src/dev-workbench/pages/DevHubPage.jsx",
+    "web/src/dev-workbench/pages/DevDataPreparationPage.jsx",
+    "web/src/dev-workbench/pages/DevDatabaseMigrationPage.jsx",
+    "web/src/dev-workbench/pages/DevQualityGatesPage.jsx",
+    "web/src/dev-workbench/pages/DevDrillRecoveryPage.jsx",
+    "web/src/dev-workbench/pages/DevPermissionRelationshipsPage.jsx",
+    "web/src/dev-workbench/components/DevPageNav.jsx",
+    "web/src/dev-workbench/config/devDataPreparation.mjs",
+    "web/src/dev-workbench/config/devDatabaseMigration.mjs",
+    "web/src/dev-workbench/config/devQualityGates.mjs",
+    "web/src/dev-workbench/config/devRecovery.mjs",
+    "web/src/dev-workbench/config/devPermissionRelationshipGraph.mjs",
+    "web/src/dev-workbench/styles/dev-data-preparation.css",
+    "web/src/dev-workbench/styles/dev-database-migration.css",
+    "web/src/dev-workbench/styles/dev-quality-gates.css",
+    "web/src/dev-workbench/styles/dev-drill-recovery.css",
+    "web/src/dev-workbench/styles/dev-permission-relationships.css",
+    "web/src/dev-workbench/styles/index.css",
+  ]) {
+    assert.equal(
+      existsSync(path.join(repoRoot, requiredPath)),
+      true,
+      requiredPath,
+    );
+  }
+
+  const forbiddenProductStyleMarkers = [
+    ".erp-dev-docs",
+    ".erp-dev-capability",
+    ".erp-dev-ui-design",
+    ".erp-dev-hub",
+    ".erp-dev-flow-state",
+    ".erp-dev-data-",
+    ".erp-dev-database-",
+    ".erp-dev-quality-gates",
+    ".erp-dev-workspace-nav",
+    ".erp-dev-permission-relationships",
+    ".erp-permission-relationship",
+  ];
+  const productStyles = listFiles("web/src/erp/styles")
+    .filter((file) => file.endsWith(".css"))
+    .map((file) => read(file))
+    .join("\n");
+  for (const marker of forbiddenProductStyleMarkers) {
+    assert.doesNotMatch(
+      productStyles,
+      new RegExp(marker.replace(".", "\\."), "u"),
+    );
+  }
+
+  const workbenchStyles = listFiles("web/src/dev-workbench/styles")
+    .filter((file) => file.endsWith(".css"))
+    .map((file) => read(file))
+    .join("\n");
+  assert.doesNotMatch(
+    workbenchStyles,
+    /\.erp-login-/u,
+    "formal login styles must not live in the DEV-only workbench bundle",
+  );
+  assert.match(
+    read("web/src/erp/styles/app.css"),
+    /@import '\.\/app\/login\.css';/u,
+    "product app must import the formal login stylesheet",
+  );
+});
+
+test("dev workbench boundary: Node serve bridges are centralized outside browser sources", () => {
+  const rootDevModules = readdirSync(path.join(repoRoot, "web"), {
+    withFileTypes: true,
+  })
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        /^dev[A-Z].*(?:Plugin|Plugins|Runtime).*\.mjs$/u.test(entry.name),
+    )
+    .map((entry) => entry.name);
+  assert.deepEqual(rootDevModules, []);
+
+  for (const requiredPath of [
+    "web/dev-server/README.md",
+    "web/dev-server/devWorkbenchPlugins.mjs",
+    "web/dev-server/devCustomerConfigPlugin.mjs",
+    "web/dev-server/devCustomerImportDryRunPlugin.mjs",
+    "web/dev-server/devDataPreparationPlugin.mjs",
+    "web/dev-server/devDatabaseMigrationPlugin.mjs",
+    "web/dev-server/devDatabaseMigrationRecoveryPlugin.mjs",
+    "web/dev-server/devDatabaseMigrationRuntime.mjs",
+    "web/dev-server/devDeliveryBridgePlugin.mjs",
+    "web/dev-server/devQaCoveragePlugin.mjs",
+    "web/dev-server/devQualityGatePlugin.mjs",
+    "web/dev-server/devServerSecurity.mjs",
+  ]) {
+    assert.equal(
+      existsSync(path.join(repoRoot, requiredPath)),
+      true,
+      requiredPath,
+    );
+  }
+
+  const viteConfig = read("web/vite.shared.mjs");
+  assert.match(
+    viteConfig,
+    /const DEV_WORKBENCH_PLUGIN_MODULE = new URL\(\s*'\.\/dev-server\/devWorkbenchPlugins\.mjs',\s*import\.meta\.url\s*\)\.href/u,
+  );
+  assert.match(viteConfig, /await import\(DEV_WORKBENCH_PLUGIN_MODULE\)/u);
+  assert.match(viteConfig, /isDev && command === 'serve'/u);
+  assert.doesNotMatch(
+    viteConfig,
+    /from '\.\/dev-server\/devWorkbenchPlugins\.mjs'/u,
+  );
+});
+
+test("dev workbench boundary: primary navigation is fixed to four areas", () => {
+  assert.deepEqual(
+    DEV_WORKSPACE_NAV_ITEMS.map(({ key, route }) => ({ key, route })),
+    [
+      { key: "overview", route: "/__dev" },
+      {
+        key: "product-engineering",
+        route: "/__dev/product-engineering",
+      },
+      { key: "quality", route: "/__dev/quality" },
+      { key: "delivery", route: "/__dev/delivery" },
+    ],
+  );
+  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 14);
+  assert(
+    DEV_SECONDARY_NAV_ITEMS.every(
+      (item) =>
+        item.route.startsWith("/__dev/") &&
+        ["product-engineering", "quality", "delivery"].includes(item.areaKey),
+    ),
+  );
+});
+
+const allowedERPImports = new Set([
+  "api/customerConfigApi.mjs",
+  "api/customerConfigTransition.mjs",
+  "api/workflowApi.mjs",
+  "utils/processRuntimePresentation.mjs",
+  "api/approvalSettingsApi.mjs",
+  "utils/approvalSettingsActivation.mjs",
+  "utils/permissionCenterAccess.mjs",
+  "utils/permissionCenterSearch.mjs",
+  "utils/permissionModuleLabels.mjs",
+  "utils/adminIdentity.mjs",
+  "config/printTemplates.mjs",
+  "config/workflowStatus.mjs",
+  "config/businessUsabilityCatalog.mjs",
+  "config/roleHelpContent.mjs",
+]);
+const allowedERPImportsByFile = new Map([
+  [
+    "web/src/dev-workbench/components/DevControlStandards.jsx",
+    new Set(["utils/businessProgress.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/components/flow-state/BusinessChainInstanceView.jsx",
+    new Set(["utils/workflowBusinessChain.mjs", "utils/dashboardTaskDisplay.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/components/flow-state/TaskFulfillmentGuide.jsx",
+    new Set(["utils/workflowFulfillment.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/components/DevUIFeedbackExamples.jsx",
+    new Set([
+      "components/business-list/BusinessFormModal",
+      "components/business-list/BusinessModal",
+      "utils/modalSizes.mjs",
+    ]),
+  ],
+  [
+    "web/src/dev-workbench/components/DevUIFeedbackGuide.jsx",
+    new Set(["utils/modalSizes.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/config/devUIDesign.test.mjs",
+    new Set(["config/helpScenarios.mjs", "config/helpManualCatalog.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",
+    new Set(["config/businessModules.mjs", "config/seedData.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/config/devPermissionNavigation.mjs",
+    new Set([
+      "config/seedData.mjs",
+      "config/roleGuidedNavigation.mjs",
+      "utils/businessModuleGroups.mjs",
+    ]),
+  ],
+  [
+    "web/src/dev-workbench/components/flow-state/WorkflowView.jsx",
+    new Set([
+      "utils/workflowTaskEventPresentation.mjs",
+      "utils/workflowTaskBoard.mjs",
+    ]),
+  ],
+  [
+    "web/src/dev-workbench/components/flow-state/FlowTaskContext.jsx",
+    new Set(["utils/workflowTaskBoard.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/components/flow-state/RuntimeView.jsx",
+    new Set(["utils/workflowTaskBoard.mjs"]),
+  ],
+]);
+
+function isAllowedERPImport(file, specifier) {
+  const resolved = specifier.startsWith("@/")
+    ? path.posix.join("web/src", specifier.slice(2))
+    : path.posix.join(path.posix.dirname(file), specifier);
+  const module = path.posix.relative("web/src/erp", resolved);
+  return (
+    allowedERPImports.has(module) ||
+    allowedERPImportsByFile.get(file)?.has(module) === true
+  );
+}
+
+test("dev workbench boundary: ERP imports stay on explicit adapters and presentation samples", () => {
+  const workbenchSources = listFiles("web/src/dev-workbench")
+    .filter((file) => /\.(?:js|jsx|mjs)$/u.test(file))
+    .map((file) => ({ file, source: read(file) }));
+
+  for (const { file, source } of workbenchSources) {
+    for (const match of source.matchAll(
+      /(?:from\s+|import\()['"]([^'"]*erp\/[^'"]+)['"]/gu,
+    )) {
+      assert(
+        isAllowedERPImport(file, match[1]),
+        `${file} imports non-approved ERP internals: ${match[1]}`,
+      );
+    }
+  }
+});
+
+test("feedback sample modal dependencies remain presentation-only", () => {
+  const allowed = new Set([
+    "react",
+    "antd",
+    "../../utils/modalSizes.mjs",
+    "./BusinessModal.jsx",
+    "../../common/utils/feedbackConfig.mjs",
+  ]);
+  for (const file of [
+    "web/src/erp/components/business-list/BusinessFormModal.jsx",
+    "web/src/erp/components/business-list/BusinessModal.jsx",
+    "web/src/erp/utils/modalSizes.mjs",
+    "web/src/common/utils/feedbackConfig.mjs",
+  ]) {
+    const source = read(file);
+    for (const match of source.matchAll(
+      /(?:from\s+|import\()['"]([^'"]+)['"]/gu,
+    )) {
+      assert(allowed.has(match[1]), `${file} imports a non-presentation dependency`);
+    }
+    assert.doesNotMatch(source, /\b(?:fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage)\b/u);
+  }
+  assert.equal(
+    isAllowedERPImport(
+      "web/src/dev-workbench/pages/DevTestingPage.jsx",
+      "@/erp/components/business-list/BusinessModal",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedERPImport(
+      "web/src/dev-workbench/components/DevUIFeedbackExamples.jsx",
+      "@/erp/pages/PurchaseOrdersPage.jsx",
+    ),
+    false,
+  );
+});
+
+test("dev workbench boundary: resolved imports preserve module and file scope", () => {
+  assert.equal(
+    isAllowedERPImport(
+      "web/src/dev-workbench/config/devUIDesign.test.mjs",
+      "../../erp/config/helpScenarios.mjs",
+    ),
+    true,
+  );
+  assert.equal(
+    isAllowedERPImport(
+      "web/src/dev-workbench/pages/UIDesignPage.jsx",
+      "../../erp/config/helpScenarios.mjs",
+    ),
+    false,
+  );
+  const workflowFile =
+    "web/src/dev-workbench/components/flow-state/WorkflowView.jsx";
+  for (const prefix of ["@/erp/", "../../../erp/"]) {
+    assert.equal(
+      isAllowedERPImport(
+        workflowFile,
+        `${prefix}utils/permissionCenterAccess.mjs`,
+      ),
+      true,
+    );
+    assert.equal(
+      isAllowedERPImport(workflowFile, `${prefix}utils/workflowTaskBoard.mjs`),
+      true,
+    );
+    assert.equal(
+      isAllowedERPImport(
+        workflowFile,
+        `${prefix}utils/workflowTaskMutation.mjs`,
+      ),
+      false,
+    );
+    assert.equal(
+      isAllowedERPImport(
+        workflowFile,
+        `${prefix}pages/PermissionCenterPage.jsx`,
+      ),
+      false,
+    );
+  }
+  assert.equal(
+    isAllowedERPImport(
+      "web/src/dev-workbench/components/flow-state/BusinessChainViews.jsx",
+      "@/erp/utils/workflowTaskBoard.mjs",
+    ),
+    false,
+  );
+  assert.equal(
+    isAllowedERPImport(workflowFile, "@/erp/config/seedData.mjs"),
+    false,
+  );
+  assert.equal(
+    isAllowedERPImport(
+      workflowFile,
+      "@/erp/../dev-workbench/utils/workflowTaskBoard.mjs",
+    ),
+    false,
+  );
+});
