@@ -1,0 +1,261 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      const fixtureNetworkFetch = window.fetch.bind(window)
+      let lastFixtureSnapshot = ''
+      const nativeComposition = { active: false, start: 0, update: 0, end: 0 }
+      let nativeInput = { type: null, isComposing: false }
+      const inputStyles = (element) => {
+        if (!element) return null
+        const style = getComputedStyle(element)
+        return Object.fromEntries(
+          [
+            'fontSize',
+            'lineHeight',
+            'padding',
+            'borderColor',
+            'backgroundColor',
+            'boxShadow',
+            'outline',
+          ].map((key) => [key, style[key]])
+        )
+      }
+      function sendFixtureSnapshot(trigger) {
+        const main = document.querySelector(
+          '.mobile-role-tasks-page__detail-main'
+        )
+        if (!main) return
+        const reason = document.querySelector('textarea')
+        const quantity = document.querySelector('input[inputmode="decimal"]')
+        const rect = (element) => {
+          if (!element) return null
+          const r = element.getBoundingClientRect()
+          return {
+            top: r.top,
+            bottom: r.bottom,
+            left: r.left,
+            right: r.right,
+            width: r.width,
+            height: r.height,
+          }
+        }
+        const output = document.querySelector(
+          '[data-testid="input-submission"]'
+        )
+        let submitted = null
+        try {
+          const result = JSON.parse(output?.textContent || 'null')
+          if (result)
+            submitted = {
+              action: result.action,
+              reasonLength: result.reason?.length,
+              reasonHasHan: /[\u3400-\u9fff]/u.test(result.reason || ''),
+              approvedQuantity: result.approvedQuantity,
+            }
+        } catch {}
+        const data = {
+          browser: navigator.userAgent,
+          theme: document.documentElement.dataset.erpTheme,
+          viewport: {
+            width: innerWidth,
+            height: innerHeight,
+            scale: visualViewport?.scale,
+            visualHeight: visualViewport?.height,
+            visualOffsetTop: visualViewport?.offsetTop,
+          },
+          main: {
+            clientHeight: main.clientHeight,
+            scrollHeight: main.scrollHeight,
+            scrollTop: main.scrollTop,
+            rect: rect(main),
+          },
+          footer: rect(document.querySelector('.mobile-task-action-footer')),
+          reason: {
+            rect: rect(reason),
+            length: reason?.value?.length,
+            hasHan: /[\u3400-\u9fff]/u.test(reason?.value || ''),
+            font: reason ? getComputedStyle(reason).fontSize : null,
+            styles: inputStyles(reason),
+            invalid: reason?.getAttribute('aria-invalid'),
+            focused: document.activeElement === reason,
+          },
+          quantity: {
+            rect: rect(quantity),
+            value: quantity?.value,
+            font: quantity ? getComputedStyle(quantity).fontSize : null,
+            styles: inputStyles(quantity),
+            invalid: quantity?.getAttribute('aria-invalid'),
+            focused: document.activeElement === quantity,
+          },
+          composition: { ...nativeComposition },
+          input: { ...nativeInput },
+          action: document.querySelector('input[type="radio"]:checked')?.value,
+          submitted,
+        }
+        const serialized = JSON.stringify(data)
+        if (trigger === 'snapshot' && serialized === lastFixtureSnapshot) return
+        lastFixtureSnapshot = serialized
+        fixtureNetworkFetch('http://' + location.hostname + ':15296/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ trigger, ...data }),
+        }).catch(() => {})
+      }
+      for (const event of [
+        'wheel',
+        'scroll',
+        'touchstart',
+        'touchend',
+        'focusin',
+        'focusout',
+        'input',
+        'change',
+      ])
+        document.addEventListener(
+          event,
+          () => setTimeout(() => sendFixtureSnapshot(event), 0),
+          { passive: true, capture: true }
+        )
+      for (const event of [
+        'compositionstart',
+        'compositionupdate',
+        'compositionend',
+      ])
+        document.addEventListener(
+          event,
+          () => {
+            nativeComposition[event.slice(11)]++
+            nativeComposition.active = event !== 'compositionend'
+            setTimeout(() => sendFixtureSnapshot(event), 0)
+          },
+          { passive: true, capture: true }
+        )
+      document.addEventListener(
+        'input',
+        (event) => {
+          nativeInput = {
+            type: event.inputType || null,
+            isComposing: event.isComposing === true,
+          }
+        },
+        { passive: true, capture: true }
+      )
+      visualViewport?.addEventListener(
+        'resize',
+        () => sendFixtureSnapshot('viewport-resize'),
+        { passive: true }
+      )
+      setInterval(() => sendFixtureSnapshot('snapshot'), 1000)
+    </script>
+    <script>
+      window.fetch = async (input, init = {}) => {
+        const url = new URL(
+          typeof input === 'string' ? input : input.url,
+          location.href
+        )
+        const request = JSON.parse(init.body || '{}')
+        if (
+          url.pathname !== '/rpc/workflow' ||
+          request.method !== 'get_task_process_context' ||
+          request.params?.task_id !== 98001
+        ) {
+          throw new Error(
+            'This isolated native fixture does not send business requests'
+          )
+        }
+        const result = {
+          jsonrpc: '2.0',
+          id: 'native-fixture',
+          result: {
+            code: 0,
+            data: {
+              process_context: {
+                source: {
+                  type: 'production_report',
+                  id: 98004,
+                  no: 'STYLE-L1-INPUT',
+                },
+                process_instance: {
+                  id: 98002,
+                  process_key: 'production_exception_approval',
+                  process_version: 'v1',
+                  status: 'active',
+                  started_at: 1900000000,
+                },
+                nodes: [
+                  {
+                    id: 98003,
+                    process_instance_id: 98002,
+                    node_key: 'approve_production_exception',
+                    node_type: 'approval',
+                    form_profile_key: 'production_exception_approval',
+                    attempt: 1,
+                    version: 1,
+                    status: 'active',
+                    outcome: '',
+                  },
+                ],
+                current_nodes: [
+                  {
+                    id: 98003,
+                    process_instance_id: 98002,
+                    node_key: 'approve_production_exception',
+                    node_type: 'approval',
+                    form_profile_key: 'production_exception_approval',
+                    attempt: 1,
+                    version: 1,
+                    status: 'active',
+                    outcome: '',
+                  },
+                ],
+                completed_nodes: [],
+                linked_node: {
+                  id: 98003,
+                  process_instance_id: 98002,
+                  node_key: 'approve_production_exception',
+                  node_type: 'approval',
+                  form_profile_key: 'production_exception_approval',
+                  attempt: 1,
+                  version: 1,
+                  status: 'active',
+                  outcome: '',
+                },
+                current_responsibilities: [
+                  { node_instance_id: 98003, owner_role_key: 'boss' },
+                ],
+                approval_form: {
+                  profile_key: 'production_exception_approval',
+                  reason_required: true,
+                  approved_quantity: {
+                    required: false,
+                    precision: 20,
+                    scale: 6,
+                  },
+                },
+              },
+            },
+          },
+        }
+        result.id = request.id
+        return new Response(JSON.stringify(result), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+    </script>
+    <script type="module">
+      import RefreshRuntime from '/@react-refresh'
+      RefreshRuntime.injectIntoGlobalHook(window)
+      window.$RefreshReg$ = () => {}
+      window.$RefreshSig$ = () => (type) => type
+      window.__vite_plugin_react_preamble_installed__ = true
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/scripts/test/MobileInputFixture.jsx"></script>
+  </body>
+</html>
