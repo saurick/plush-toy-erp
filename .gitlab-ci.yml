@@ -1,0 +1,1432 @@
+workflow:
+  auto_cancel:
+    on_new_commit: interruptible
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: "$CI_PIPELINE_SOURCE =~ /^(api|trigger|web)$/ && $RELEASE_SHA && $RELEASE_VERSION && $RELEASE_VERSION_REFERENCE"
+    - if: "$CI_PIPELINE_SOURCE =~ /^(api|web)$/ && $BACKFILL_RELEASE_SOURCE_SHA"
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $PDF_RUNTIME_MONITOR == "1" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "web" && $QA_MODE == "full" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+      variables:
+        CI_QUALITY_SCOPE: full
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && ($QA_MODE == "full" || $CI_COMMIT_BEFORE_SHA == "0000000000000000000000000000000000000000")'
+      variables:
+        CI_QUALITY_SCOPE: full
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      # Kept in sync with CI_FULL_CHANGE_PATTERNS in scripts/qa/ci-plan.mjs.
+      changes:
+        paths:
+          - "**/*[^d]"
+          - "**/*[^m]d"
+          - "**/*[^.]md"
+          - "**/md"
+          - "**/d"
+          - "server/docs/database/**"
+      variables:
+        CI_QUALITY_SCOPE: full
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+      variables:
+        CI_QUALITY_SCOPE: docs
+    - when: never
+
+stages:
+  - plan
+  - prepare
+  - quality
+  - aggregate
+  - gate
+  - release
+
+default:
+  tags:
+    - plush
+    - isolated
+    - amd64
+  interruptible: true
+  before_script:
+    - umask 077
+    - export PNPM_STORE_PATH="$CI_PROJECT_DIR/output/cache/gitlab/pnpm-store"
+    - export npm_config_store_dir="$PNPM_STORE_PATH"
+    - export PLAYWRIGHT_RUNTIME_ARCHIVE_DIR="$CI_PROJECT_DIR/output/cache/gitlab/playwright-runtime"
+    - export PLAYWRIGHT_BROWSERS_PATH="$CI_PROJECT_DIR/output/runtime/gitlab/playwright-$CI_JOB_ID"
+    - export GOTOOLCHAIN="$(awk '$1 == "toolchain" { print $2 }' server/go.mod)"
+    - export PATH="$(go env GOPATH)/bin:$PATH"
+    - test "$(node --version)" = "v$(tr -d '\n' < .n-node-version)"
+    - test "$(go env GOVERSION)" = "$GOTOOLCHAIN"
+    - test "$(go env CGO_ENABLED)" = "1"
+    - test "$(pnpm --version)" = "10.34.5"
+    - test "$(docker buildx version | awk '{print $2; exit}')" = "0.30.1"
+    - test "$(docker compose version --short)" = "2.40.3+ds1-0ubuntu1~24.04.1"
+    - test "$(atlas version 2>/dev/null | sed -n 's/^atlas version \([^ ]*\).*/\1/p')" = "v1.3.0"
+    - test "$(gitleaks version)" = "8.30.1"
+    - test "$CI_PROJECT_PATH" = "saurick/plush-toy-erp"
+    - test "$CI_DEFAULT_BRANCH" = "main"
+
+variables:
+  CI: "true"
+  DISPOSABLE_DATABASE_BASE_URL: "postgres://postgres:ci-local-password@127.0.0.1:55432/postgres?sslmode=disable"
+  RELEASE_CUSTOMER: "yoyoosun"
+  PNPM_INSTALL_REGISTRY: "https://registry.npmmirror.com"
+  GIT_STRATEGY: fetch
+  GIT_DEPTH: "0"
+  # Preserve only verified dependency archives; every job recreates runtime and evidence.
+  GIT_CLEAN_FLAGS: "-ffdx -e output/cache/gitlab/pnpm-store/ -e output/cache/gitlab/playwright-runtime/"
+  FF_USE_FASTZIP: "true"
+  CACHE_COMPRESSION_LEVEL: "fast"
+  FASTZIP_ARCHIVER_CONCURRENCY: "2"
+  FASTZIP_EXTRACTOR_CONCURRENCY: "2"
+  # Shell jobs share the VM; bound both Go runtime and package compilation.
+  GOMAXPROCS: "4"
+  GOFLAGS: "-p=4"
+
+.pnpm_cache_pull: &pnpm_cache_pull
+  cache:
+    - &pnpm_cache_entry
+      key:
+        prefix: plush-ci-node-24.21.0-pnpm-v1
+        files:
+          - web/pnpm-lock.yaml
+      paths:
+        - output/cache/gitlab/pnpm-store/
+      policy: pull
+
+.playwright_cache_pull: &playwright_cache_pull
+  cache:
+    - &playwright_cache_entry
+      key:
+        prefix: plush-ci-node-24.21.0-playwright-v3
+        files:
+          - scripts/qa/ci-playwright-runtime.mjs
+          - web/pnpm-lock.yaml
+      paths:
+        - output/cache/gitlab/playwright-runtime/
+      policy: pull
+
+.browser_cache_pull: &browser_cache_pull
+  cache:
+    - *pnpm_cache_entry
+    - *playwright_cache_entry
+
+.lightweight_setup: &lightweight_setup
+  before_script:
+    - umask 077
+    - test "$(node --version)" = "v$(tr -d '\n' < .n-node-version)"
+    - test "$(gitleaks version)" = "8.30.1"
+    - test "$CI_PROJECT_PATH" = "saurick/plush-toy-erp"
+    - test "$CI_DEFAULT_BRANCH" = "main"
+
+.main_quality_rules: &main_quality_rules
+  rules:
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE =~ /^(push|web)$/ && $CI_QUALITY_SCOPE == "full" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+    - when: never
+
+plan:
+  stage: plan
+  <<: *lightweight_setup
+  rules:
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - when: on_success
+  script:
+    - |
+      set -euo pipefail
+      zero=0000000000000000000000000000000000000000
+      empty_tree="$(git hash-object -t tree /dev/null)"
+      trusted_config_sha=HEAD
+      if [[ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]]; then
+        test -n "$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+        range="$CI_MERGE_REQUEST_DIFF_BASE_SHA...HEAD"
+        history_range="$(git merge-base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" HEAD)..HEAD"
+        trusted_config_sha="$CI_MERGE_REQUEST_DIFF_BASE_SHA"
+        mode=affected
+      elif [[ "$CI_PIPELINE_SOURCE" == "push" ]]; then
+        if [[ "$CI_COMMIT_BEFORE_SHA" == "$zero" ]]; then
+          range="$empty_tree..HEAD"
+          history_range=HEAD
+        else
+          git cat-file -e "$CI_COMMIT_BEFORE_SHA^{commit}"
+          range="$CI_COMMIT_BEFORE_SHA..HEAD"
+          history_range="$range"
+          trusted_config_sha="$CI_COMMIT_BEFORE_SHA"
+        fi
+        mode="$CI_QUALITY_SCOPE"
+      else
+        if git rev-parse --verify 'HEAD^' >/dev/null 2>&1; then
+          range="HEAD^..HEAD"
+          history_range="$range"
+        else
+          range="$empty_tree..HEAD"
+          history_range=HEAD
+        fi
+        mode="${QA_MODE:-full}"
+      fi
+      case "$mode" in affected|docs|full) ;; *) echo "[gitlab-ci] invalid QA mode=$mode"; exit 1 ;; esac
+      git --no-optional-locks -c diff.autoRefreshIndex=false diff --check "$range"
+      git log --check --format= "$history_range"
+      trusted_config="$(mktemp)"
+      trap 'rm -f "$trusted_config"' EXIT
+      git show "$trusted_config_sha:.gitleaks.toml" > "$trusted_config"
+      trusted_config_blob="$(git rev-parse "$trusted_config_sha:.gitleaks.toml")"
+      gitleaks git --config "$trusted_config" --log-opts "$history_range" --no-banner --redact "$CI_PROJECT_DIR"
+      mkdir -p output/ci
+      node scripts/qa/ci-plan.mjs \
+        --range "$range" \
+        --mode "$mode" \
+        --out output/ci/plan.json
+      printf '%s\n' "$range" > output/ci/range.txt
+      protected=false
+      [[ "${CI_COMMIT_REF_PROTECTED:-false}" == "true" ]] && protected=true
+      jq -n \
+        --arg schemaVersion 'plush.gitlab-ci-trust/v1' \
+        --arg repository "$CI_PROJECT_PATH" \
+        --arg gitSha "$CI_COMMIT_SHA" \
+        --arg pipelineId "$CI_PIPELINE_ID" \
+        --arg pipelineIid "$CI_PIPELINE_IID" \
+        --arg pipelineSource "$CI_PIPELINE_SOURCE" \
+        --arg jobId "$CI_JOB_ID" \
+        --arg jobName "$CI_JOB_NAME" \
+        --arg ref "refs/heads/$CI_COMMIT_REF_NAME" \
+        --arg range "$range" \
+        --arg planSha256 "$(sha256sum output/ci/plan.json | awk '{print $1}')" \
+        --arg rangeSha256 "$(sha256sum output/ci/range.txt | awk '{print $1}')" \
+        --arg trustedConfigCommit "$(git rev-parse "$trusted_config_sha")" \
+        --arg trustedConfigBlob "$trusted_config_blob" \
+        --arg gitleaksVersion '8.30.1' \
+        --arg gitleaksStatus passed \
+        --argjson protected "$protected" \
+        '{schemaVersion:$schemaVersion,repository:$repository,gitSha:$gitSha,pipeline:{id:$pipelineId,iid:$pipelineIid,source:$pipelineSource},job:{id:$jobId,name:$jobName},ref:$ref,protectedDefaultBranch:$protected,range:$range,planSha256:$planSha256,rangeSha256:$rangeSha256,trustedConfigCommit:$trustedConfigCommit,trustedConfigBlob:$trustedConfigBlob,gitleaksVersion:$gitleaksVersion,gitleaksStatus:$gitleaksStatus,redaction:{containsSecrets:false,containsCredentials:false,containsRawLogs:false}}' \
+        > output/ci/trust.json
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - output/ci/plan.json
+      - output/ci/range.txt
+      - output/ci/trust.json
+
+prepare:
+  stage: prepare
+  timeout: 1h
+  needs:
+    - job: plan
+      artifacts: false
+  <<: *main_quality_rules
+  cache:
+    - <<: *pnpm_cache_entry
+      policy: pull-push
+    - <<: *playwright_cache_entry
+      policy: pull-push
+  script:
+    - |
+      set -euo pipefail
+      node scripts/qa/ci-runner-capacity-evidence.mjs
+      test "$(stat -c '%U:%G:%a' /usr/local/sbin/plush-chromium-sandbox)" = root:root:755
+      sudo -n /usr/local/sbin/plush-chromium-sandbox preflight "$CI_JOB_ID" >/dev/null
+      env \
+        -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+        -u http_proxy -u https_proxy -u all_proxy \
+        -u npm_config_proxy -u npm_config_https_proxy \
+        -u NPM_CONFIG_PROXY -u NPM_CONFIG_HTTPS_PROXY \
+        npm_config_proxy= npm_config_https_proxy= \
+        pnpm --dir web install --frozen-lockfile --prefer-offline --registry="$PNPM_INSTALL_REGISTRY"
+      node scripts/qa/ci-playwright-runtime.mjs seed
+      (cd server && go mod download)
+      test -d "$PNPM_STORE_PATH"
+      test -d "$PLAYWRIGHT_RUNTIME_ARCHIVE_DIR"
+      test ! -e "$PLAYWRIGHT_BROWSERS_PATH"
+      echo "[gitlab-ci] cache=prepared sha=$CI_COMMIT_SHA"
+  artifacts:
+    expire_in: 30 days
+    paths:
+      - output/ci/runner-capacity-observation.json
+
+.quality_shard: &quality_shard
+  stage: quality
+  <<: *main_quality_rules
+  timeout: 2h
+
+quality_static:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard static
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/shards/static.json
+
+quality_node_release_preflight_a:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-node-test-lane.mjs --lane release_preflight_a
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/node-lanes/release_preflight_a.json
+
+quality_node_release_preflight_b:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-node-test-lane.mjs --lane release_preflight_b
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/node-lanes/release_preflight_b.json
+
+quality_node_release_a:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-node-test-lane.mjs --lane release_a
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/node-lanes/release_a.json
+
+quality_node_release_b:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-node-test-lane.mjs --lane release_b
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/node-lanes/release_b.json
+
+quality_node_release_c:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-node-test-lane.mjs --lane release_c
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/node-lanes/release_c.json
+
+quality_node_core:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-node-test-lane.mjs --lane core
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/node-lanes/core.json
+
+quality_resource_contract_a:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_web
+      artifacts: false
+    - job: quality_server
+      artifacts: false
+  script:
+    - node scripts/qa/ci-resource-test-lane.mjs --lane contract_a
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/resource-lanes/contract_a.json
+
+quality_resource_contract_b:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_web
+      artifacts: false
+    - job: quality_server
+      artifacts: false
+  script:
+    - node scripts/qa/ci-resource-test-lane.mjs --lane contract_b
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/resource-lanes/contract_b.json
+
+quality_resource_runtime_a:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_web
+      artifacts: false
+    - job: quality_server
+      artifacts: false
+  script:
+    - node scripts/qa/ci-resource-test-lane.mjs --lane runtime_a
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/resource-lanes/runtime_a.json
+
+quality_resource_runtime_b:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_web
+      artifacts: false
+    - job: quality_server
+      artifacts: false
+  script:
+    - node scripts/qa/ci-resource-test-lane.mjs --lane runtime_b
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/resource-lanes/runtime_b.json
+
+quality_web_checks:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard web --lane checks
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/web-lanes/checks.json
+
+quality_web_build:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard web --lane build
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/web-lanes/build.json
+      - web/build/
+
+quality_server_schema:
+  <<: *quality_shard
+  resource_group: quality-server-heavy
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane schema
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/server-lanes/schema.json
+
+quality_server_upgrade:
+  <<: *quality_shard
+  # Keep upgrade serial across pipelines while allowing one other server lane.
+  resource_group: quality-server-upgrade
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane upgrade
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/server-lanes/upgrade.json
+
+quality_server_test_build:
+  <<: [*quality_shard, *browser_cache_pull]
+  resource_group: quality-server-heavy
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    # Finish Docker network changes first so Browser can overlap test/build.
+    - job: quality_server_schema
+      artifacts: false
+    - job: quality_server_upgrade
+      artifacts: false
+    - job: quality_server_critical_postgres
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane test_build
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/server-lanes/test_build.json
+
+quality_server_critical_postgres:
+  <<: *quality_shard
+  resource_group: quality-server-heavy
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard server --lane critical_postgres
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/server-lanes/critical_postgres.json
+
+quality_web:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_web_checks
+      artifacts: true
+    - job: quality_web_build
+      artifacts: true
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard web
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/shards/web.json
+
+quality_server:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_server_schema
+      artifacts: true
+    - job: quality_server_upgrade
+      artifacts: true
+    - job: quality_server_test_build
+      artifacts: true
+    - job: quality_server_critical_postgres
+      artifacts: true
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard server
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/shards/server.json
+
+quality_resource:
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_resource_contract_a
+      artifacts: true
+    - job: quality_resource_contract_b
+      artifacts: true
+    - job: quality_resource_runtime_a
+      artifacts: true
+    - job: quality_resource_runtime_b
+      artifacts: true
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard resource
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/shards/resource.json
+
+quality_node:
+  <<: [*quality_shard, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_node_release_preflight_a
+      artifacts: true
+    - job: quality_node_release_preflight_b
+      artifacts: true
+    - job: quality_node_release_a
+      artifacts: true
+    - job: quality_node_release_b
+      artifacts: true
+    - job: quality_node_release_c
+      artifacts: true
+    - job: quality_node_core
+      artifacts: true
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard node
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/shards/node.json
+
+# Keep the Browser execution and fan-in as separate jobs, but use GitLab's
+# numbered-name convention so the pipeline graph can collapse them as one group.
+"quality_browser 1/2":
+  <<: [*quality_shard, *browser_cache_pull]
+  resource_group: quality-browser-boundary-entry-print
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: quality_web_build
+      artifacts: true
+    # Atlas schema checks also start and stop a Docker dev database. Finish all
+    # server network changes before Chromium opens its loopback connections.
+    - job: quality_server_schema
+      artifacts: false
+    - job: quality_server_upgrade
+      artifacts: false
+    - job: quality_server_critical_postgres
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-stage-lane.mjs --shard browser --lane boundary_entry_print
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/browser-lanes/boundary_entry_print.json
+
+"quality_browser 2/2":
+  <<: *quality_shard
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+    - job: "quality_browser 1/2"
+      artifacts: true
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard browser
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/shards/browser.json
+
+quality_security:
+  <<: *quality_shard
+  variables:
+    # Bound the whole-program analysis heap without changing symbol coverage.
+    GOGC: "25"
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: false
+  script:
+    - node scripts/qa/ci-quality-shard.mjs --shard security
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/shards/security.json
+
+quality_aggregate:
+  stage: aggregate
+  <<: *main_quality_rules
+  needs:
+    - job: plan
+      artifacts: true
+    - job: prepare
+      artifacts: true
+    - job: quality_static
+      artifacts: true
+    - job: quality_node
+      artifacts: true
+    - job: quality_web
+      artifacts: true
+    - job: quality_server
+      artifacts: true
+    - job: quality_resource
+      artifacts: true
+    - job: "quality_browser 2/2"
+      artifacts: true
+    - job: quality_security
+      artifacts: true
+  script:
+    - node scripts/qa/ci-quality-aggregate.mjs
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/quality-aggregate.json
+      - output/ci/evidence/
+      - output/qa/exact-sha/
+      - output/dev-workbench/receipts/
+
+quality_docs:
+  stage: quality
+  <<: [*lightweight_setup, *pnpm_cache_pull]
+  needs:
+    - job: plan
+      artifacts: true
+  rules:
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_QUALITY_SCOPE == "docs" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+    - when: never
+  timeout: 10m
+  script:
+    - |
+      set -euo pipefail
+      test "$(jq -r '.effectiveMode' output/ci/plan.json)" = docs
+      test "$(pnpm --version)" = "10.34.5"
+      export PNPM_STORE_PATH="$CI_PROJECT_DIR/output/cache/gitlab/pnpm-store"
+      export npm_config_store_dir="$PNPM_STORE_PATH"
+      if [[ "$(jq -r '.flags.needsWeb' output/ci/plan.json)" == true ]]; then
+        env \
+          -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+          -u http_proxy -u https_proxy -u all_proxy \
+          -u npm_config_proxy -u npm_config_https_proxy \
+          -u NPM_CONFIG_PROXY -u NPM_CONFIG_HTTPS_PROXY \
+          npm_config_proxy= npm_config_https_proxy= \
+          pnpm --dir web install --frozen-lockfile --prefer-offline --registry="$PNPM_INSTALL_REGISTRY"
+      fi
+      range="$(tr -d '\n' < output/ci/range.txt)"
+      [[ "$range" =~ ^[0-9a-f]{40}\.\.HEAD$ ]]
+      bash scripts/qa/affected.sh --base "$range" --run
+      test -z "$(git --no-optional-locks status --porcelain --untracked-files=all)"
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - output/ci/
+      - output/qa/test-gates/
+
+quality_affected:
+  stage: quality
+  <<: *browser_cache_pull
+  needs:
+    - job: plan
+      artifacts: true
+  rules:
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - when: never
+  timeout: 2h
+  script:
+    - |
+      set -euo pipefail
+      plan_file=output/ci/plan.json
+      range_file=output/ci/range.txt
+      test "$(jq -r '.schemaVersion' "$plan_file")" = "plush.ci-plan/v2"
+      effective_mode="$(jq -er '.effectiveMode | select(. == "affected" or . == "full")' "$plan_file")"
+      make_data="$(jq -r '.flags.makeData' "$plan_file")"
+      needs_chromium="$(jq -r '.flags.needsChromium' "$plan_file")"
+      needs_postgres="$(jq -r '.flags.needsPostgres' "$plan_file")"
+      needs_web="$(jq -r '.flags.needsWeb' "$plan_file")"
+      source_archive="$(jq -r '.flags.sourceArchive' "$plan_file")"
+      for boolean_value in "$make_data" "$needs_chromium" "$needs_postgres" "$needs_web" "$source_archive"; do
+        case "$boolean_value" in true|false) ;; *) echo "[gitlab-ci] plan flag is not boolean"; exit 1 ;; esac
+      done
+      range="$(tr -d '\n' < "$range_file")"
+      [[ "$range" =~ ^([0-9a-f]{40}|HEAD\^)\.\.\.?HEAD$ ]]
+      postgres_name="plush-ci-postgres-$CI_PIPELINE_ID-$CI_JOB_ID"
+      sandbox_path=""
+      runtime_materialized=false
+      cleanup() {
+        cleanup_status=0
+        if docker inspect "$postgres_name" >/dev/null 2>&1; then
+          docker rm --force "$postgres_name" >/dev/null || cleanup_status=1
+        fi
+        if [[ -n "$sandbox_path" ]]; then
+          sudo -n /usr/local/sbin/plush-chromium-sandbox remove "$CI_JOB_ID" || cleanup_status=1
+        fi
+        if [[ "$runtime_materialized" == "true" ]]; then
+          node scripts/qa/ci-playwright-runtime.mjs cleanup || cleanup_status=1
+        fi
+        return "$cleanup_status"
+      }
+      trap cleanup EXIT
+      if [[ "$needs_postgres" == "true" ]]; then
+        docker run --detach --rm \
+          --name "$postgres_name" \
+          --env POSTGRES_PASSWORD=ci-local-password \
+          --publish 127.0.0.1::5432 \
+          --health-cmd 'pg_isready -U postgres' \
+          --health-interval 2s \
+          --health-timeout 5s \
+          --health-retries 30 \
+          postgres:18.6
+        for attempt in {1..30}; do
+          health="$(docker inspect --format '{{.State.Health.Status}}' "$postgres_name")"
+          [[ "$health" == "healthy" ]] && break
+          [[ "$health" == "unhealthy" ]] && exit 1
+          sleep 2
+        done
+        test "$(docker inspect --format '{{.State.Health.Status}}' "$postgres_name")" = healthy
+        postgres_port="$(docker port "$postgres_name" 5432/tcp | sed -n 's/^127[.]0[.]0[.]1:\([0-9][0-9]*\)$/\1/p')"
+        [[ "$postgres_port" =~ ^[0-9]+$ ]]
+        export DISPOSABLE_DATABASE_BASE_URL="postgres://postgres:ci-local-password@127.0.0.1:$postgres_port/postgres?sslmode=disable"
+      fi
+      if [[ "$needs_web" == "true" || "$needs_chromium" == "true" ]]; then
+        env \
+          -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+          -u http_proxy -u https_proxy -u all_proxy \
+          -u npm_config_proxy -u npm_config_https_proxy \
+          -u NPM_CONFIG_PROXY -u NPM_CONFIG_HTTPS_PROXY \
+          npm_config_proxy= npm_config_https_proxy= \
+          pnpm --dir web install --frozen-lockfile --prefer-offline --registry="$PNPM_INSTALL_REGISTRY"
+      fi
+      if [[ "$needs_web" == "true" ]]; then
+        pnpm --dir web audit --prod --audit-level high --registry=https://registry.npmjs.org
+      fi
+      if [[ "$needs_chromium" == "true" ]]; then
+        node scripts/qa/ci-playwright-runtime.mjs materialize
+        runtime_materialized=true
+        chrome_path="$(node -e 'const { chromium } = require("./web/node_modules/playwright"); process.stdout.write(chromium.executablePath())')"
+        sandbox_source="$(dirname "$chrome_path")/chrome_sandbox"
+        sandbox_path="/usr/local/sbin/chrome-devel-sandbox-$CI_JOB_ID"
+        test -x "$chrome_path"
+        test -f "$sandbox_source"
+        sudo -n /usr/local/sbin/plush-chromium-sandbox install "$CI_JOB_ID" "$sandbox_source"
+        export CHROME_DEVEL_SANDBOX="$sandbox_path"
+        export ERP_PDF_CHROME_PATH="$chrome_path"
+      fi
+      if [[ "$make_data" == "true" ]]; then
+        (cd server && make data)
+        test -z "$(git --no-optional-locks status --porcelain --untracked-files=all)"
+      fi
+      if [[ "$effective_mode" == "affected" ]]; then
+        bash scripts/qa/affected.sh --base "$range" --run
+      else
+        node scripts/qa/run-gate-with-receipt.mjs --gate full
+      fi
+      if [[ "$source_archive" == "true" ]]; then
+        node scripts/deploy/source-archive-release-check.mjs --light --ref HEAD
+      fi
+      test -z "$(git --no-optional-locks status --porcelain --untracked-files=all)"
+  artifacts:
+    when: always
+    expire_in: 30 days
+    paths:
+      - output/ci/
+      - output/dev-workbench/receipts/
+
+"CI Gate":
+  stage: gate
+  <<: *lightweight_setup
+  needs:
+    - job: plan
+      artifacts: true
+    - job: quality_aggregate
+      artifacts: true
+      optional: true
+    - job: quality_affected
+      artifacts: false
+      optional: true
+    - job: quality_docs
+      artifacts: false
+      optional: true
+  rules:
+    - if: '$RELEASE_SHA || $BACKFILL_RELEASE_SOURCE_SHA || $CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - when: on_success
+  script:
+    - |
+      set -euo pipefail
+      effective_mode="$(jq -er '.effectiveMode | select(. == "affected" or . == "docs" or . == "full")' output/ci/plan.json)"
+      if [[ "$effective_mode" == "docs" ]]; then
+        test "$CI_PIPELINE_SOURCE" = push
+        test "$CI_QUALITY_SCOPE" = docs
+        test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
+        test "$CI_COMMIT_REF_PROTECTED" = true
+        echo "[gitlab-ci] scope=docs release_evidence=not_produced"
+      elif [[ "$CI_PIPELINE_SOURCE" =~ ^(push|web)$ ]]; then
+        test "$effective_mode" = full
+        test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
+        test "$CI_COMMIT_REF_PROTECTED" = true
+        evidence_dir=output/ci/evidence
+        for asset in terminal.json receipt.json evidence-manifest.json; do
+          test -s "$evidence_dir/$asset"
+        done
+        [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,4096}$ ]]
+        job_token_config=output/ci/ci-gate-job-token.curl
+        cleanup_evidence_credentials() {
+          rm -f -- "$job_token_config"
+        }
+        trap cleanup_evidence_credentials EXIT
+        printf 'header = "JOB-TOKEN: %s"\n' "$CI_JOB_TOKEN" > "$job_token_config"
+        chmod 0600 "$job_token_config"
+        package_version="pipeline-$CI_PIPELINE_ID-job-$CI_JOB_ID-$CI_COMMIT_SHA"
+        for asset in terminal.json receipt.json evidence-manifest.json; do
+          curl --config "$job_token_config" \
+            --fail --silent --show-error \
+            --retry 3 --retry-delay 2 --retry-all-errors \
+            --connect-timeout 10 --max-time 300 \
+            --upload-file "$evidence_dir/$asset" \
+            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-ci-evidence/$package_version/$asset"
+        done
+        cleanup_evidence_credentials
+        trap - EXIT
+        test ! -e "$job_token_config"
+        echo "[gitlab-ci] evidence=published package=$package_version"
+      fi
+      echo "[gitlab-ci] status=complete sha=$CI_COMMIT_SHA source=$CI_PIPELINE_SOURCE"
+
+pdf_runtime_monitor:
+  stage: quality
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule" && $PDF_RUNTIME_MONITOR == "1" && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+    - when: never
+  timeout: 30m
+  script:
+    - |
+      set -euo pipefail
+      [[ "${PDF_RUNTIME_IMAGE:-}" =~ ^sha256:[a-f0-9]{64}$ || "${PDF_RUNTIME_IMAGE:-}" =~ @sha256:[a-f0-9]{64}$ ]]
+      bash scripts/qa/pdf-runtime.sh monitor "$PDF_RUNTIME_IMAGE" "output/ci/pdf-runtime/monitor-$CI_JOB_ID"
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/pdf-runtime/
+
+publish_release:
+  stage: release
+  interruptible: false
+  <<: *browser_cache_pull
+  artifacts:
+    when: always
+    expire_in: 90 days
+    paths:
+      - output/ci/release-rehearsal.json
+      - output/ci/pdf-runtime/**/report.json
+      - output/ci/pdf-runtime/**/vulnerabilities.json
+      - output/ci/pdf-runtime/**/pdf-runtime.log
+      - output/ci/pdf-runtime/**/pdfs/
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$RELEASE_SHA && $RELEASE_VERSION && $RELEASE_VERSION_REFERENCE && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true" && $RELEASE_CUSTOMER == "yoyoosun"'
+    - when: never
+  timeout: 4h
+  environment:
+    name: release
+  resource_group: immutable-release-catalog
+  script:
+    - |
+      set -euo pipefail
+      test "$RELEASE_SHA" = "$CI_COMMIT_SHA"
+      test "$RELEASE_SHA" = "$(git rev-parse HEAD)"
+      test "$RELEASE_SHA" = "$(git rev-parse origin/main)"
+      test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
+      test "$CI_COMMIT_REF_PROTECTED" = "true"
+      test "$RELEASE_CUSTOMER" = yoyoosun
+      test -n "$RELEASE_VERSION_REFERENCE"
+      [[ "$RELEASE_VERSION" =~ ^[0-9A-Za-z]([0-9A-Za-z._-]{0,62}[0-9A-Za-z])?$ ]]
+      test -n "${GITHUB_PACKAGES_USER:-}"
+      test -n "${GITHUB_PACKAGES_TOKEN:-}"
+      test -n "${GITLAB_RELEASE_TOKEN:-}"
+      [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,4096}$ ]]
+      [[ "$GITLAB_RELEASE_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
+      mkdir -p output/ci
+      release_args=(
+        --sha "$RELEASE_SHA"
+        --version "$RELEASE_VERSION"
+        --customer "$RELEASE_CUSTOMER"
+      )
+      set +e
+      node scripts/deploy/gitlab-release-candidate.mjs published "${release_args[@]}" --json
+      published_status=$?
+      set -e
+      case "$published_status" in
+        0)
+          echo "[gitlab-ci] release=already-published sha=$RELEASE_SHA version=$RELEASE_VERSION"
+          node scripts/deploy/gitlab-release-candidate.mjs retire-candidate "${release_args[@]}" --json
+          node scripts/deploy/gitlab-runner-images.mjs --sha "$RELEASE_SHA" --execute
+          exit 0
+          ;;
+        3) ;;
+        *) exit "$published_status" ;;
+      esac
+
+      job_token_config=output/ci/publish-release-job-token.curl
+      private_token_config=output/ci/publish-release-private-token.curl
+      docker_config=""
+      cleanup_publish_credentials() {
+        rm -f -- "$job_token_config" "$private_token_config"
+        if [[ -n "$docker_config" ]]; then rm -rf -- "$docker_config"; fi
+      }
+      trap cleanup_publish_credentials EXIT
+      printf 'header = "JOB-TOKEN: %s"\n' "$CI_JOB_TOKEN" > "$job_token_config"
+      printf 'header = "PRIVATE-TOKEN: %s"\n' "$GITLAB_RELEASE_TOKEN" > "$private_token_config"
+      chmod 0600 "$job_token_config" "$private_token_config"
+
+      node scripts/deploy/gitlab-strict-terminal-reuse.mjs \
+        --sha "$RELEASE_SHA" \
+        --out output/ci/reused-evidence \
+        --json
+      mapfile -t terminals < <(find "output/qa/exact-sha/$RELEASE_SHA" -maxdepth 1 -type f -name '*.json' ! -name '*.receipt.json' -print)
+      test "${#terminals[@]}" -eq 1
+      terminal="${terminals[0]}"
+
+      artifact_dir="output/releases/$RELEASE_SHA"
+      candidate_manifest=output/ci/release-candidate.json
+      candidate_archive=output/ci/candidate.tar
+      candidate_args=(
+        "${release_args[@]}"
+        --artifact-dir "$artifact_dir"
+        --manifest-out "$candidate_manifest"
+        --archive "$candidate_archive"
+      )
+      set +e
+      node scripts/deploy/gitlab-release-candidate.mjs recover "${candidate_args[@]}" --json
+      candidate_status=$?
+      set -e
+      case "$candidate_status" in
+        0) ;;
+        3)
+          curl --config "$private_token_config" --fail --silent --show-error \
+            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases?per_page=100&order_by=released_at&sort=desc" \
+            > output/ci/release-version-catalog.json
+          node scripts/deploy/release-version-catalog.mjs verify \
+            --catalog output/ci/release-version-catalog.json \
+            --reference "$RELEASE_VERSION_REFERENCE" \
+            --observed-at "$CI_PIPELINE_CREATED_AT" \
+            --requested "$RELEASE_VERSION" \
+            --json
+          test ! -e "$artifact_dir"
+          env \
+            -u HTTP_PROXY -u HTTPS_PROXY -u ALL_PROXY \
+            -u http_proxy -u https_proxy -u all_proxy \
+            -u npm_config_proxy -u npm_config_https_proxy \
+            -u NPM_CONFIG_PROXY -u NPM_CONFIG_HTTPS_PROXY \
+            npm_config_proxy= npm_config_https_proxy= \
+            pnpm --dir web install --frozen-lockfile --prefer-offline --registry="$PNPM_INSTALL_REGISTRY"
+          node scripts/deploy/release-artifact-bundle.mjs \
+            --execute \
+            --ref "$RELEASE_SHA" \
+            --version "$RELEASE_VERSION" \
+            --customer "$RELEASE_CUSTOMER" \
+            --out "$artifact_dir" \
+            --json
+          node scripts/deploy/gitlab-release-candidate.mjs prepare "${candidate_args[@]}" --json
+          if ! curl --config "$job_token_config" --fail --silent --show-error \
+            --retry 4 --retry-delay 3 --retry-all-errors \
+            --connect-timeout 20 --max-time 7200 \
+            --upload-file "$candidate_archive" \
+            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release-candidate/artifact-$RELEASE_SHA/candidate.tar"; then
+            echo "[gitlab-ci] candidate upload outcome is uncertain; verifying server digest"
+          fi
+          node scripts/deploy/gitlab-release-candidate.mjs verify "${candidate_args[@]}" --json
+          ;;
+        *) exit "$candidate_status" ;;
+      esac
+
+      rehearsal_receipt=output/ci/release-rehearsal.json
+      rehearsal_args=(
+        "${release_args[@]}"
+        --artifact-dir "$artifact_dir"
+        --receipt "$rehearsal_receipt"
+      )
+      set +e
+      node scripts/deploy/gitlab-release-candidate.mjs recover-rehearsal "${rehearsal_args[@]}" --json
+      rehearsal_status=$?
+      set -e
+      case "$rehearsal_status" in
+        0) ;;
+        3)
+          node scripts/deploy/local-release-rehearsal.mjs \
+            --execute \
+            --manifest "$artifact_dir/release-artifact.json" \
+            --receipt "$rehearsal_receipt" \
+            --json
+          node scripts/deploy/gitlab-release-candidate.mjs prepare-rehearsal "${rehearsal_args[@]}" --json
+          if ! curl --config "$job_token_config" --fail --silent --show-error \
+            --retry 4 --retry-delay 3 --retry-all-errors \
+            --connect-timeout 20 --max-time 300 \
+            --upload-file "$rehearsal_receipt" \
+            "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release-rehearsal/artifact-$RELEASE_SHA/receipt.json"; then
+            echo "[gitlab-ci] rehearsal upload outcome is uncertain; verifying server digest"
+          fi
+          node scripts/deploy/gitlab-release-candidate.mjs verify-rehearsal "${rehearsal_args[@]}" --json
+          ;;
+        *) exit "$rehearsal_status" ;;
+      esac
+
+      if [[ -e "$artifact_dir/release-rehearsal.json" ]]; then
+        cmp --silent "$rehearsal_receipt" "$artifact_dir/release-rehearsal.json"
+      else
+        cp -- "$rehearsal_receipt" "$artifact_dir/release-rehearsal.json"
+      fi
+
+      source_archive=output/ci/source.tar
+      git archive --format=tar --output="$source_archive" "$RELEASE_SHA"
+      source_sha="$(jq -er '.sourceArchive.sha256' "$artifact_dir/release-artifact.json")"
+      test "$(sha256sum "$source_archive" | awk '{print $1}')" = "$source_sha"
+
+      docker_config="$(mktemp -d)"
+      export DOCKER_CONFIG="$docker_config"
+      printf '%s' "$GITHUB_PACKAGES_TOKEN" | docker login ghcr.io --username "$GITHUB_PACKAGES_USER" --password-stdin
+      node scripts/deploy/ghcr-image-publisher.mjs \
+        --artifact-dir "$artifact_dir" \
+        --strict-terminal "$terminal" \
+        --rehearsal-receipt "$artifact_dir/release-rehearsal.json" \
+        --version "$RELEASE_VERSION" \
+        --repository "$CI_PROJECT_PATH" \
+        --json
+      node scripts/deploy/github-release-asset-set.mjs finalize \
+        --dir "$artifact_dir" \
+        --sha "$RELEASE_SHA" \
+        --version "$RELEASE_VERSION" \
+        --json > output/ci/release-assets.json
+
+      package_version="artifact-$RELEASE_SHA"
+      package_api="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages"
+      package_catalog=output/ci/release-package-catalog.json
+      package_id_file=output/ci/release-package-id
+      package_files=output/ci/release-package-files.json
+      missing_assets=output/ci/release-missing-assets.txt
+      curl --config "$private_token_config" --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release&package_version=$package_version&per_page=100" \
+        > "$package_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$package_catalog" \
+        --version "$package_version" \
+        --package-id-out "$package_id_file" \
+        --json
+      package_id="$(tr -d '\n' < "$package_id_file")"
+      if [[ -n "$package_id" ]]; then
+        curl --config "$private_token_config" --fail --silent --show-error \
+          "$package_api/$package_id/package_files?per_page=100" \
+          > "$package_files"
+      else
+        printf '[]\n' > "$package_files"
+      fi
+      node scripts/deploy/gitlab-release-publication.mjs plan \
+        --local output/ci/release-assets.json \
+        --remote "$package_files" \
+        --missing-out "$missing_assets" \
+        --json
+      while IFS= read -r asset; do
+        test -n "$asset"
+        curl --config "$job_token_config" --fail --silent --show-error \
+          --retry 4 --retry-delay 3 --retry-all-errors \
+          --connect-timeout 20 --max-time 7200 \
+          --upload-file "$artifact_dir/$asset" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release/$package_version/$asset"
+      done < "$missing_assets"
+
+      curl --config "$private_token_config" --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release&package_version=$package_version&per_page=100" \
+        > "$package_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$package_catalog" \
+        --version "$package_version" \
+        --package-id-out "$package_id_file" \
+        --json
+      package_id="$(tr -d '\n' < "$package_id_file")"
+      test -n "$package_id"
+      curl --config "$private_token_config" --fail --silent --show-error \
+        "$package_api/$package_id/package_files?per_page=100" \
+        > "$package_files"
+      node scripts/deploy/gitlab-release-publication.mjs verify \
+        --local output/ci/release-assets.json \
+        --remote "$package_files" \
+        --json
+
+      source_package_catalog=output/ci/release-source-package-catalog.json
+      source_package_id_file=output/ci/release-source-package-id
+      source_package_files=output/ci/release-source-package-files.json
+      source_missing_assets=output/ci/release-source-missing-assets.txt
+      curl --config "$private_token_config" --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release-source&package_version=$package_version&per_page=100" \
+        > "$source_package_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$source_package_catalog" \
+        --version "$package_version" \
+        --package-name plush-release-source \
+        --package-id-out "$source_package_id_file" \
+        --json
+      source_package_id="$(tr -d '\n' < "$source_package_id_file")"
+      if [[ -n "$source_package_id" ]]; then
+        curl --config "$private_token_config" --fail --silent --show-error \
+          "$package_api/$source_package_id/package_files?per_page=100" \
+          > "$source_package_files"
+      else
+        printf '[]\n' > "$source_package_files"
+      fi
+      node scripts/deploy/gitlab-release-publication.mjs plan-source \
+        --artifact "$artifact_dir/release-artifact.json" \
+        --source "$source_archive" \
+        --version "$package_version" \
+        --remote "$source_package_files" \
+        --missing-out "$source_missing_assets" \
+        --json
+      if [[ -s "$source_missing_assets" ]]; then
+        test "$(cat "$source_missing_assets")" = source.tar
+        curl --config "$job_token_config" --fail --silent --show-error \
+          --retry 4 --retry-delay 3 --retry-all-errors \
+          --connect-timeout 20 --max-time 7200 \
+          --upload-file "$source_archive" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release-source/$package_version/source.tar"
+      fi
+      curl --config "$private_token_config" --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release-source&package_version=$package_version&per_page=100" \
+        > "$source_package_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$source_package_catalog" \
+        --version "$package_version" \
+        --package-name plush-release-source \
+        --package-id-out "$source_package_id_file" \
+        --json
+      source_package_id="$(tr -d '\n' < "$source_package_id_file")"
+      test -n "$source_package_id"
+      curl --config "$private_token_config" --fail --silent --show-error \
+        "$package_api/$source_package_id/package_files?per_page=100" \
+        > "$source_package_files"
+      node scripts/deploy/gitlab-release-publication.mjs verify-source \
+        --artifact "$artifact_dir/release-artifact.json" \
+        --source "$source_archive" \
+        --version "$package_version" \
+        --remote "$source_package_files" \
+        --json
+
+      release_api="$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases/$package_version"
+      release_existing_json=output/ci/release-existing.json
+      release_create_json=output/ci/release-create.json
+      release_code="$(curl --config "$private_token_config" --silent --show-error --output "$release_existing_json" \
+        --write-out '%{http_code}' \
+        "$release_api")"
+      if [[ "$release_code" == "200" ]]; then
+        test "$(jq -r .tag_name "$release_existing_json")" = "$package_version"
+        test "$(jq -r .name "$release_existing_json")" = "$RELEASE_VERSION"
+      elif [[ "$release_code" == "404" ]]; then
+        jq -n \
+          --arg name "$RELEASE_VERSION" \
+          --arg tag "$package_version" \
+          --arg ref "$RELEASE_SHA" \
+          --arg description 'Immutable exact-SHA v2 seven-asset release. The published rehearsal receipt is the same receipt bound into the manifest. Target promotion and customer UAT remain separate evidence.' \
+          '{name:$name,tag_name:$tag,ref:$ref,description:$description}' \
+          > "$release_create_json"
+        curl --config "$private_token_config" --fail --silent --show-error \
+          --request POST \
+          --header 'Content-Type: application/json' \
+          --data-binary @"$release_create_json" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases"
+      else
+        echo "[gitlab-ci] release lookup failed status=$release_code"
+        exit 1
+      fi
+      node scripts/deploy/gitlab-release-candidate.mjs published "${release_args[@]}" --json
+      node scripts/deploy/gitlab-release-candidate.mjs retire-candidate "${release_args[@]}" --json
+      node scripts/deploy/gitlab-runner-images.mjs --sha "$RELEASE_SHA" --execute
+      cleanup_publish_credentials
+      trap - EXIT
+      test ! -e "$job_token_config"
+      test ! -e "$private_token_config"
+      test ! -e "$docker_config"
+
+backfill_release_source:
+  stage: release
+  interruptible: false
+  environment:
+    name: release
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE =~ /^(api|web)$/ && $BACKFILL_RELEASE_SOURCE_SHA && $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+    - when: never
+  timeout: 1h
+  resource_group: immutable-release-catalog
+  script:
+    - |
+      set -euo pipefail
+      [[ "$BACKFILL_RELEASE_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+      test "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH"
+      test "$CI_COMMIT_REF_PROTECTED" = "true"
+      test "$CI_PIPELINE_SOURCE" = api -o "$CI_PIPELINE_SOURCE" = web
+      test "$BACKFILL_RELEASE_SOURCE_SHA" != "$CI_COMMIT_SHA"
+      git cat-file -e "$BACKFILL_RELEASE_SOURCE_SHA^{commit}"
+      git merge-base --is-ancestor "$BACKFILL_RELEASE_SOURCE_SHA" "$CI_COMMIT_SHA"
+      test -n "${GITLAB_RELEASE_TOKEN:-}"
+      [[ "$CI_JOB_TOKEN" =~ ^[A-Za-z0-9_.-]{20,4096}$ ]]
+      [[ "$GITLAB_RELEASE_TOKEN" =~ ^[A-Za-z0-9_.-]{20,512}$ ]]
+
+      package_version="artifact-$BACKFILL_RELEASE_SOURCE_SHA"
+      package_api="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages"
+      work=output/ci/release-source-backfill
+      controls="$work/controls"
+      source_archive="$work/source.tar"
+      formal_catalog="$work/formal-catalog.json"
+      formal_id_file="$work/formal-id"
+      formal_files="$work/formal-files.json"
+      source_catalog="$work/source-catalog.json"
+      source_id_file="$work/source-id"
+      source_files="$work/source-files.json"
+      source_missing="$work/source-missing.txt"
+      job_token_config="$work/job-token.curl"
+      private_token_config="$work/private-token.curl"
+      mkdir -p "$controls"
+      cleanup() {
+        rm -f -- "$job_token_config" "$private_token_config"
+      }
+      trap cleanup EXIT
+      printf 'header = "JOB-TOKEN: %s"\n' "$CI_JOB_TOKEN" > "$job_token_config"
+      printf 'header = "PRIVATE-TOKEN: %s"\n' "$GITLAB_RELEASE_TOKEN" > "$private_token_config"
+      chmod 0600 "$job_token_config" "$private_token_config"
+
+      curl --config "$private_token_config" \
+        --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release&package_version=$package_version&per_page=100" \
+        > "$formal_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$formal_catalog" \
+        --version "$package_version" \
+        --package-id-out "$formal_id_file" \
+        --json
+      formal_id="$(tr -d '\n' < "$formal_id_file")"
+      test -n "$formal_id"
+      curl --config "$private_token_config" \
+        --fail --silent --show-error \
+        "$package_api/$formal_id/package_files?per_page=100" \
+        > "$formal_files"
+      for control in \
+        checksums.sha256 \
+        release-artifact.json \
+        release-manifest.json \
+        release-rehearsal.json; do
+        curl --config "$job_token_config" \
+          --fail --silent --show-error \
+          --connect-timeout 10 --max-time 300 \
+          --output "$controls/$control" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release/$package_version/$control"
+      done
+      git archive --format=tar --output="$source_archive" "$BACKFILL_RELEASE_SOURCE_SHA"
+      node scripts/deploy/gitlab-release-publication.mjs validate-source-backfill \
+        --controls "$controls" \
+        --source "$source_archive" \
+        --version "$package_version" \
+        --formal-remote "$formal_files" \
+        --json
+
+      curl --config "$private_token_config" \
+        --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release-source&package_version=$package_version&per_page=100" \
+        > "$source_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$source_catalog" \
+        --version "$package_version" \
+        --package-name plush-release-source \
+        --package-id-out "$source_id_file" \
+        --json
+      source_id="$(tr -d '\n' < "$source_id_file")"
+      if [[ -n "$source_id" ]]; then
+        curl --config "$private_token_config" \
+          --fail --silent --show-error \
+          "$package_api/$source_id/package_files?per_page=100" \
+          > "$source_files"
+      else
+        printf '[]\n' > "$source_files"
+      fi
+      node scripts/deploy/gitlab-release-publication.mjs plan-source \
+        --artifact "$controls/release-artifact.json" \
+        --source "$source_archive" \
+        --version "$package_version" \
+        --remote "$source_files" \
+        --missing-out "$source_missing" \
+        --json
+      if [[ -s "$source_missing" ]]; then
+        test "$(cat "$source_missing")" = source.tar
+        if ! curl --config "$job_token_config" \
+          --fail --silent --show-error \
+          --retry 4 --retry-delay 3 --retry-all-errors \
+          --connect-timeout 20 --max-time 1800 \
+          --upload-file "$source_archive" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/plush-release-source/$package_version/source.tar"; then
+          echo "[gitlab-ci] source backfill upload outcome is uncertain; verifying server digest"
+        fi
+      fi
+
+      curl --config "$private_token_config" \
+        --fail --silent --show-error \
+        "$package_api?package_type=generic&package_name=plush-release-source&package_version=$package_version&per_page=100" \
+        > "$source_catalog"
+      node scripts/deploy/gitlab-release-publication.mjs select \
+        --catalog "$source_catalog" \
+        --version "$package_version" \
+        --package-name plush-release-source \
+        --package-id-out "$source_id_file" \
+        --json
+      source_id="$(tr -d '\n' < "$source_id_file")"
+      test -n "$source_id"
+      curl --config "$private_token_config" \
+        --fail --silent --show-error \
+        "$package_api/$source_id/package_files?per_page=100" \
+        > "$source_files"
+      node scripts/deploy/gitlab-release-publication.mjs verify-source \
+        --artifact "$controls/release-artifact.json" \
+        --source "$source_archive" \
+        --version "$package_version" \
+        --remote "$source_files" \
+        --json
+      cleanup
+      trap - EXIT
+      test ! -e "$job_token_config"
+      test ! -e "$private_token_config"
+      echo "[gitlab-ci] source-backfill=complete sha=$BACKFILL_RELEASE_SOURCE_SHA"
