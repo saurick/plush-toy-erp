@@ -1,0 +1,226 @@
+package schema
+
+import (
+	"time"
+
+	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
+	"entgo.io/ent/schema/edge"
+	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
+)
+
+type ProcessNodeInstance struct {
+	ent.Schema
+}
+
+func (ProcessNodeInstance) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"process_node_instances_type_allowed":     "node_type IN ('human_task', 'approval', 'domain_command', 'wait_event', 'end')",
+			"process_node_instances_status_allowed":   "status IN ('waiting', 'active', 'completed', 'blocked', 'withdrawn')",
+			"process_node_instances_version_positive": "version > 0",
+			"process_node_instances_lifecycle_bundle": "((status = 'waiting' AND started_at IS NULL AND completed_at IS NULL) OR (status = 'active' AND started_at IS NOT NULL AND completed_at IS NULL) OR (status = 'completed' AND started_at IS NOT NULL AND completed_at IS NOT NULL) OR (status = 'blocked' AND started_at IS NOT NULL AND completed_at IS NULL) OR (status = 'withdrawn' AND completed_at IS NOT NULL))",
+			"process_node_instances_recovery_bundle":  "((domain_command_recovery_decision IS NULL AND domain_command_recovery_hash IS NULL AND domain_command_recovered_at IS NULL AND domain_command_recovered_by IS NULL) OR (domain_command_recovery_decision = 'terminate_and_withdraw_downstream' AND domain_command_recovery_hash IS NOT NULL AND length(domain_command_recovery_hash) = 64 AND domain_command_recovered_at IS NOT NULL AND domain_command_recovered_by IS NOT NULL AND node_type = 'domain_command' AND status = 'completed' AND domain_command_effect_state = 'compensated' AND domain_command_result_hash IS NOT NULL AND domain_command_compensation_hash IS NOT NULL))",
+		}},
+	}
+}
+
+func (ProcessNodeInstance) Fields() []ent.Field {
+	return []ent.Field{
+		field.Int("process_instance_id").
+			Positive(),
+		field.String("node_key").
+			NotEmpty().
+			MaxLen(128),
+		field.String("node_type").
+			NotEmpty().
+			MaxLen(32),
+		field.Int("attempt").
+			Default(1).
+			Positive(),
+		field.String("status").
+			NotEmpty().
+			MaxLen(32).
+			Default("waiting"),
+		field.String("owner_pool_key").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("required_capability_key").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("form_profile_key").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("action_set_key").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.JSON("policy_snapshot", map[string]any{}).
+			Optional(),
+		field.Time("due_at").
+			Optional().
+			Nillable(),
+		field.Time("started_at").
+			Optional().
+			Nillable(),
+		field.Time("completed_at").
+			Optional().
+			Nillable(),
+		field.Int("activated_from_node_instance_id").
+			Optional().
+			Nillable().
+			Positive(),
+		field.Time("routing_completed_at").
+			Optional().
+			Nillable(),
+		field.Int("routing_completed_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("outcome").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("block_kind").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("blocked_reason_code").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("blocked_reason").
+			Optional().
+			Nillable().
+			MaxLen(255),
+		field.Time("blocked_at").
+			Optional().
+			Nillable(),
+		field.Int("blocked_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("resume_reason").
+			Optional().
+			Nillable().
+			MaxLen(255),
+		field.Time("resumed_at").
+			Optional().
+			Nillable(),
+		field.Int("resumed_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("domain_command_fingerprint").
+			Optional().
+			Nillable().
+			MinLen(64).
+			MaxLen(64),
+		field.Int("domain_command_protocol_version").
+			Optional().
+			Nillable().
+			NonNegative(),
+		field.String("domain_command_result_state").
+			Optional().
+			Nillable().
+			MaxLen(32),
+		field.JSON("domain_command_result", map[string]any{}).
+			Optional(),
+		field.String("domain_command_result_hash").
+			Optional().
+			Nillable().
+			MinLen(64).
+			MaxLen(64),
+		field.String("domain_command_effect_state").
+			Optional().
+			Nillable().
+			MaxLen(32),
+		field.String("domain_command_effect_ref_type").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.Int("domain_command_effect_ref_id").
+			Optional().
+			Nillable().
+			Positive(),
+		field.Time("domain_command_result_recorded_at").
+			Optional().
+			Nillable(),
+		field.Int("domain_command_result_recorded_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.JSON("domain_command_compensation", map[string]any{}).
+			Optional(),
+		field.String("domain_command_compensation_hash").
+			Optional().
+			Nillable().
+			MinLen(64).
+			MaxLen(64),
+		field.Time("domain_command_compensated_at").
+			Optional().
+			Nillable(),
+		field.Int("domain_command_compensated_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("domain_command_recovery_decision").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("domain_command_recovery_hash").
+			Optional().
+			Nillable().
+			MinLen(64).
+			MaxLen(64),
+		field.Time("domain_command_recovered_at").
+			Optional().
+			Nillable(),
+		field.Int("domain_command_recovered_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.Int("version").
+			Default(1).
+			Positive(),
+		field.Int("updated_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.Time("created_at").
+			Default(time.Now).
+			Immutable(),
+		field.Time("updated_at").
+			Default(time.Now).
+			UpdateDefault(time.Now),
+	}
+}
+
+func (ProcessNodeInstance) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.From("process_instance", ProcessInstance.Type).
+			Ref("nodes").
+			Field("process_instance_id").
+			Required().
+			Unique(),
+		edge.To("workflow_tasks", WorkflowTask.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+	}
+}
+
+func (ProcessNodeInstance) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("process_instance_id", "node_key", "attempt").Unique(),
+		index.Fields("process_instance_id", "status"),
+		index.Fields("process_instance_id", "activated_from_node_instance_id"),
+		index.Fields("owner_pool_key", "status"),
+		index.Fields("required_capability_key", "status"),
+		index.Fields("domain_command_effect_ref_type", "domain_command_effect_ref_id"),
+		index.Fields("due_at"),
+	}
+}
