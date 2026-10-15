@@ -428,7 +428,7 @@ quality_resource_runtime_b:
       - output/ci/resource-lanes/runtime_b.json
 
 quality_web_checks:
-  <<: [*quality_shard, *pnpm_cache_pull]
+  <<: [*quality_shard, *browser_cache_pull]
   needs:
     - job: plan
       artifacts: true

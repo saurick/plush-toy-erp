@@ -643,7 +643,6 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     "node_release_c",
     "node_core",
     "node",
-    "web_checks",
     "web_build",
   ]) {
     assert.match(
@@ -654,6 +653,10 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       ),
     );
   }
+  assert.match(
+    workflow,
+    /^quality_web_checks:\n  <<: \[\*quality_shard, \*browser_cache_pull\]/mu,
+  );
   assert.match(
     workflow,
     /^quality_server_test_build:\n  <<: \[\*quality_shard, \*browser_cache_pull\]/mu,

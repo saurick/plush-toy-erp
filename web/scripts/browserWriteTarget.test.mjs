@@ -35,7 +35,7 @@ test('browser writes reject remote and unknown database identities before fetchi
 
 test('browser RPC uses the verified backend even when the frontend points elsewhere', async () => {
   let frontendWrites = 0
-    let backendWrites = 0
+  let backendWrites = 0
   const frontend = createServer((req, res) => {
     if (req.url.startsWith('/rpc')) frontendWrites++
     res.end('<html><body>fixture</body></html>')
