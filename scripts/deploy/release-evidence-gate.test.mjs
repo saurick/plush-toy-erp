@@ -1,0 +1,3129 @@
+import { CUSTOMER_TRIAL_133_CONFIG_REVISION } from "../qa/manual-acceptance-target-policy.mjs";
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { validateReleaseEvidenceGate as validateReleaseEvidenceGateImpl } from "./release-evidence-gate.mjs";
+import {
+  loadYoyoosunCredentialContract,
+  selectYoyoosunCredentialTarget,
+} from "../../deployments/yoyoosun/scripts/credential-contract.mjs";
+import { writeCredentialEvidenceTestFixture } from "./credential-evidence-test-fixture.mjs";
+import { writeBaseReleaseEvidenceTestFixture } from "./base-release-evidence-test-fixture.mjs";
+import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "../qa/manual-acceptance-core-contract.mjs";
+import {
+  RELEASE_EVIDENCE_CONTRACT,
+  RELEASE_EVIDENCE_PROFILES,
+} from "./release-evidence-contract.mjs";
+import {
+  PRODUCTION_PREFLIGHT_CHECKS,
+  buildProductionPreflightReceipt,
+} from "./production-preflight-receipt.mjs";
+
+function validateReleaseEvidenceGate(options) {
+  return validateReleaseEvidenceGateImpl({
+    deploymentTarget: "demo-133",
+    profile: RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE,
+    ...options,
+  });
+}
+
+const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+const gateCli = path.join(repoRoot, "scripts/deploy/release-evidence-gate.mjs");
+const credentialContractRaw = fs.readFileSync(
+  path.join(repoRoot, "deployments/yoyoosun/env/credential.contract.json"),
+);
+const credentialContract = JSON.parse(credentialContractRaw.toString("utf8"));
+const credentialContractSha256 = crypto
+  .createHash("sha256")
+  .update(credentialContractRaw)
+  .digest("hex");
+const credentialTarget = selectYoyoosunCredentialTarget(
+  loadYoyoosunCredentialContract(),
+  "demo-133",
+);
+const currentDemoCustomerRevision =
+  CUSTOMER_TRIAL_133_CONFIG_REVISION;
+const releaseGitCommit = "a".repeat(40);
+const migrationAfter = "20260616000000";
+const credentialOperationId = "00000000-0000-4000-8000-000000000001";
+
+function writeValidEvidence(dir, overrides = {}) {
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "release-evidence.md"),
+    `# yoyoosun Release Evidence
+
+| 字段 | 值 |
+| --- | --- |
+| evidenceContract | ${RELEASE_EVIDENCE_CONTRACT} |
+| customerCode | yoyoosun |
+| releaseId | ${overrides.releaseId ?? "20260616T1200-test"} |
+| environment | demo-133 |
+| productCommit | ${releaseGitCommit} |
+| serverImageDigest | sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+| webImageDigest | sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb |
+| migrationBefore | 20260601000000 |
+| migrationAfter | 20260616000000 |
+| backupId | backup-20260616 |
+`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "production-preflight-report.json"),
+    JSON.stringify(
+      buildProductionPreflightReceipt({
+        deploymentTarget: "demo-133",
+        mode: "runtime-env",
+        profile: RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE,
+        productCommit: releaseGitCommit,
+        generatedAt: "2026-06-16T04:15:00Z",
+        checks: Object.values(PRODUCTION_PREFLIGHT_CHECKS),
+      }),
+      null,
+      2,
+    ),
+  );
+  fs.writeFileSync(
+    path.join(dir, "image-digests.txt"),
+    `serverImage=registry.example.invalid/plush/server:20260616T1200-test
+serverImageDigest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+webImage=registry.example.invalid/plush/web:20260616T1200-test
+webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "backup-evidence.md"),
+    `# yoyoosun Backup Evidence
+
+| 字段 | 值 |
+| --- | --- |
+| releaseId | ${overrides.backupReleaseId ?? overrides.releaseId ?? "20260616T1200-test"} |
+| environment | ${overrides.backupEnvironment ?? "demo-133"} |
+| backupId | backup-20260616 |
+| backupTime | 2026-06-16T12:00:00+08:00 |
+| backupPurpose | pre-migration |
+| migrationVersion | ${overrides.backupMigrationVersion ?? "20260601000000"} |
+| databaseBackupSize | ${overrides.databaseBackupSize ?? "123456"} |
+| databaseBackupHash | sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd |
+| storageLocationAlias | controlled-backup-store |
+| restoreTestStatus | ${overrides.restoreTestStatus ?? "verified-on-staging"} |
+| smokeQueryStatus | ${overrides.smokeQueryStatus ?? "pass"} |
+`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "backup-restore-report.json"),
+    JSON.stringify(
+      {
+        customerCode: "yoyoosun",
+        environment: "demo-133",
+        releaseId: overrides.releaseId ?? "20260616T1200-test",
+        backupId: "backup-20260616",
+        verifiedAt: "2026-06-16T04:00:00Z",
+        sourceAlias: "env:SOURCE_POSTGRES_DSN",
+        restoreTarget: "temp-postgres-container:postgres:18:removed-after-run",
+        artifacts: {
+          backupEvidence: "artifacts/backup-evidence.md",
+          preMigrationStatus: "artifacts/migration-status-before-apply.txt",
+          migrationStatus: "artifacts/migration-status.txt",
+          commandSummary: "artifacts/command-summary.txt",
+        },
+        backup: {
+          databaseBackupSize: 123456,
+          databaseBackupHash:
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          storageLocationAlias: "controlled-backup-store",
+          migrationVersion: "20260601000000",
+        },
+        restore: {
+          restoreTestStatus: "passed-temp-container",
+          migrationBeforeApply: "20260601000000",
+          restoreMigrationVersion: "20260616000000",
+          pendingFiles: "0",
+        },
+        smoke: {
+          smokeQueryStatus: "passed",
+          publicTableCount: 12,
+          adminUserCount: 2,
+          backendHealthStatus: "passed",
+          backendReadyStatus: "passed",
+          webSmokeStatus: "passed",
+        },
+        redaction: {
+          containsSecrets: false,
+          containsRawCustomerRows: false,
+          containsDumpContent: false,
+          containsFullDsn: false,
+        },
+        summary: {
+          backupCreated: true,
+          restoreCompleted: true,
+          migrationStatus: "ok",
+          smokeQueryStatus: "passed",
+        },
+      },
+      null,
+      2,
+    ),
+  );
+  fs.mkdirSync(path.join(dir, "artifacts"), { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, "artifacts/backup-evidence.md"),
+    "backupId=backup-20260616\nstorageLocationAlias=controlled-backup-store\n",
+  );
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status-before-apply.txt"),
+    "Current Version: 20260601000000\nPending Files: 1\n",
+  );
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status.txt"),
+    "Current Version: 20260616000000\nPending Files: 0\n",
+  );
+  fs.writeFileSync(
+    path.join(dir, "artifacts/command-summary.txt"),
+    `backupId=backup-20260616
+releaseId=${overrides.releaseId ?? "20260616T1200-test"}
+sourceAlias=env:SOURCE_POSTGRES_DSN
+restoreTarget=temp-postgres-container:postgres:18:removed-after-run
+steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> atlas migrate apply -> post-apply atlas status -> smoke queries
+`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "migration-status.txt"),
+    `Migration Status: OK
+Current Version: 20260616000000
+Pending Files: 0
+`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "smoke-test-report.json"),
+    JSON.stringify(
+      {
+        customerCode: "yoyoosun",
+        deploymentTarget: "demo-133",
+        environment: "demo-133",
+        productCommit: overrides.smokeProductCommit ?? releaseGitCommit,
+        generatedAt: overrides.smokeGeneratedAt ?? "2026-06-16T04:31:00Z",
+        endpointAlias: "https://erp.example.invalid",
+        backendEndpointAlias: "https://api.example.invalid",
+        summary: { total: 8, passed: 8, failed: 0 },
+        checks: [
+          {
+            name: "runtime-identity",
+            status: "pass",
+            target: "/readyz/runtime-identity",
+            httpCode: "200",
+            scope: "release-v1",
+            database: credentialTarget.database,
+            releaseVersion: releaseGitCommit,
+            migrationVersion: migrationAfter,
+            expectedDigestSha256: crypto
+              .createHash("sha256")
+              .update(
+                [
+                  "release-v1",
+                  credentialTarget.database,
+                  releaseGitCommit,
+                  migrationAfter,
+                ].join("\n"),
+              )
+              .digest("hex"),
+            proof: "matched-v1",
+            responseBodyStored: false,
+          },
+          {
+            name: "server-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/healthz",
+            httpCode: "200",
+          },
+          {
+            name: "server-readyz",
+            status: "pass",
+            target: "https://erp.example.invalid/readyz",
+            httpCode: "200",
+          },
+          {
+            name: "web-healthz",
+            status: "pass",
+            target: "https://erp.example.invalid/",
+            httpCode: "200",
+          },
+          {
+            name: "template-pdf-render",
+            status: "pass",
+            target: "/templates/render-pdf",
+            httpCode: "200",
+            contentType: "application/pdf",
+            sha256:
+              "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            sizeBytes: 1024,
+            responseBodyStored: false,
+          },
+          {
+            name: "auth-sms-capabilities",
+            status: "pass",
+            target: "jsonrpc:auth.capabilities",
+            expectedMode: "provider",
+            enabled: true,
+            mode: "provider",
+            mockDelivery: false,
+            responseBodyStored: false,
+          },
+          {
+            name: "credential-login-matrix",
+            status: "pass",
+            target: "jsonrpc:auth.admin_login",
+            adminUsername: "admin",
+            adminAuthenticated: true,
+            adminSuperAdmin: true,
+            phoneConfigured: false,
+            phoneBound: false,
+            nonAdminPolicy: "rotate",
+            loginScope: "admin-plus-uat",
+            nonAdminExpected:
+              credentialContract.credentials.uat.usernames.length,
+            nonAdminAuthenticated:
+              credentialContract.credentials.uat.usernames.length,
+            totalExpected:
+              credentialContract.credentials.uat.usernames.length + 1,
+            totalAuthenticated:
+              credentialContract.credentials.uat.usernames.length + 1,
+            uniqueTokensObserved: true,
+            adminAuthVersion: 2,
+            credentialOperationId,
+            credentialContractSchema: credentialContract.schemaVersion,
+            credentialContractSha256,
+            deploymentTarget: credentialTarget.deploymentTarget,
+            commandTarget: credentialTarget.commandTarget,
+            targetIdentity: credentialTarget.targetIdentity,
+            database: credentialTarget.database,
+            datasetVersion: credentialTarget.datasetVersion,
+            usernames: [
+              "admin",
+              ...credentialContract.credentials.uat.usernames,
+            ],
+            adminPasswordSource:
+              credentialContract.credentials.admin.credentialSource,
+            uatPasswordSource:
+              credentialContract.credentials.uat.credentialSource,
+            smsPhoneSourceEnv: "MANUAL_ACCEPTANCE_SMS_PHONE",
+            responseBodyStored: false,
+          },
+          {
+            name: "customer-config-effective-session",
+            status: "pass",
+            target: "jsonrpc:customer_config.get_effective_session",
+            expectedRevision: currentDemoCustomerRevision,
+            tokenSourceEnv: "CUSTOMER_CONFIG_ADMIN_TOKEN",
+            responseBodyStored: false,
+          },
+        ],
+        redaction: { containsSecrets: false, containsRawCustomerRows: false },
+      },
+      null,
+      2,
+    ),
+  );
+  fs.writeFileSync(
+    path.join(dir, "credential-rotation-report.json"),
+    JSON.stringify(
+      {
+        schemaVersion: "plush.manual-acceptance-credential-rotation-receipt/v1",
+        generatedAt: "2026-06-16T04:30:00Z",
+        deploymentTarget: credentialTarget.deploymentTarget,
+        target: credentialTarget.commandTarget,
+        targetIdentity: credentialTarget.targetIdentity,
+        database: credentialTarget.database,
+        datasetVersion: credentialTarget.datasetVersion,
+        productCommit: releaseGitCommit,
+        migrationVersion: "20260616000000",
+        customerRevision: currentDemoCustomerRevision,
+        operationId: credentialOperationId,
+        rollbackPoint: {
+          backupAlias: `pre-credential-rotation-${releaseGitCommit.slice(0, 12)}-${credentialOperationId}`,
+          backupSha256: "c".repeat(64),
+          backupSizeBytes: 1024,
+          restoreChecked: true,
+        },
+        adminAccounts: 1,
+        accountKind: "customer-uat",
+        roleAccounts: credentialContract.credentials.uat.usernames.length,
+        nonAdminPolicy: "rotate",
+        nonAdminAccounts: credentialContract.credentials.uat.usernames.length,
+        revokedSessions: 1,
+        authVersionIncremented: true,
+        auditSource: "manual_acceptance_password_rotation",
+        phoneBound: false,
+        replayed: false,
+        accounts: [
+          {
+            username: credentialContract.credentials.admin.username,
+            authVersion: 2,
+            revokedSessions: 1,
+            phoneBound: false,
+          },
+          ...credentialContract.credentials.uat.usernames.map(
+            (username, index) => ({
+              username,
+              authVersion: index + 2,
+              revokedSessions: 0,
+              phoneBound: false,
+            }),
+          ),
+        ],
+      },
+      null,
+      2,
+    ),
+  );
+  fs.writeFileSync(
+    path.join(dir, "rollback-forward-fix-plan.md"),
+    `# yoyoosun Rollback / Forward-fix Plan
+
+| 字段 | 值 |
+| --- | --- |
+| rollbackDecision | ${overrides.rollbackDecision ?? "rollback-or-forward-fix-ready"} |
+| rollbackTrigger | smoke failed / migration failed / business confirmation rejected |
+| rollbackTargetRelease | previous-stable-release |
+| rollbackRunbook | deployments/yoyoosun/runbooks/03-rollback.md |
+| forwardFixOwner | release-owner |
+| verificationAfterRollback | healthz / readyz / web smoke / release evidence review |
+
+- [x] rollback target identified
+- [x] forward-fix owner assigned
+- [x] post-action smoke scope defined
+`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "rollback-rehearsal-report.json"),
+    JSON.stringify(
+      {
+        customerCode: "yoyoosun",
+        environment: "demo-133",
+        releaseId: overrides.releaseId ?? "20260616T1200-test",
+        rehearsedAt: "2026-06-16T05:00:00Z",
+        rehearsalType: "rollback-forward-fix",
+        triggerScenario: "smoke failed after activation",
+        rollbackTargetRelease: "previous-stable-release",
+        rollbackRunbook: "deployments/yoyoosun/runbooks/03-rollback.md",
+        steps: [
+          { name: "identify rollback target", status: "pass" },
+          { name: "verify rollback command path", status: "pass" },
+          { name: "verify forward-fix owner path", status: "pass" },
+        ],
+        postCheck: {
+          smokeStatus: "passed",
+          smokeReport:
+            "deployments/yoyoosun/evidence/releases/2026-06-16/smoke-test-report.json",
+          smokeCheckCount: 8,
+          evidenceReviewStatus: "passed",
+          customerConfigEffectiveSession: {
+            status: "verified",
+            target: "jsonrpc:customer_config.get_effective_session",
+            expectedRevision: currentDemoCustomerRevision,
+          },
+        },
+        summary: {
+          rehearsalCompleted: true,
+          rollbackPathStatus: "passed",
+        },
+        redaction: {
+          containsSecrets: false,
+          containsRawCustomerRows: false,
+          containsFullDsn: false,
+        },
+      },
+      null,
+      2,
+    ),
+  );
+  fs.writeFileSync(
+    path.join(dir, "release-signoff-checklist.md"),
+    `# yoyoosun Release Sign-off
+
+| 字段 | 值 |
+| --- | --- |
+| releaseId | ${overrides.releaseId ?? "20260616T1200-test"} |
+| environment | demo-133 |
+| backupId | backup-20260616 |
+| releaseConclusion | customer-trial-approved |
+| deploymentOperator | deployment-operator |
+| evidenceReviewer | reviewer |
+| customerOrBusinessConfirmation | trial-scope-confirmed |
+
+- [x] pre-migration backup evidence verified
+- [x] known limitations reviewed
+`,
+  );
+  writeCustomerConfigManifestEvidence(dir);
+}
+
+function writeCustomerConfigManifestEvidence(
+  dir,
+  revision = currentDemoCustomerRevision,
+) {
+  fs.writeFileSync(
+    path.join(dir, "customer-config-manifest-evidence.json"),
+    JSON.stringify(
+      {
+        customerKey: "yoyoosun",
+        revision,
+        productVersion: "2026.06.test",
+        manifestSha256:
+          "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        reviewStatus: "approved",
+        reviewer: "release-reviewer",
+        generatedAt: "2026-06-16T04:00:00Z",
+        redaction: {
+          containsSecrets: false,
+          containsRawCustomerRows: false,
+          containsRawCustomerFiles: false,
+        },
+        noRawFileUpload: true,
+        noDirectDatabaseWrite: true,
+        noBusinessDataImport: true,
+        noWorkflowFactRuntimeWrite: true,
+      },
+      null,
+      2,
+    ),
+  );
+}
+
+function setMigrationEvidenceRange(dir, migrationBefore, migrationAfter) {
+  const releasePath = path.join(dir, "release-evidence.md");
+  fs.writeFileSync(
+    releasePath,
+    fs
+      .readFileSync(releasePath, "utf8")
+      .replace(
+        "migrationBefore | 20260601000000",
+        `migrationBefore | ${migrationBefore}`,
+      )
+      .replace(
+        "migrationAfter | 20260616000000",
+        `migrationAfter | ${migrationAfter}`,
+      ),
+  );
+
+  const backupPath = path.join(dir, "backup-evidence.md");
+  fs.writeFileSync(
+    backupPath,
+    fs
+      .readFileSync(backupPath, "utf8")
+      .replace(
+        "migrationVersion | 20260601000000",
+        `migrationVersion | ${migrationBefore}`,
+      ),
+  );
+
+  const restorePath = path.join(dir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.backup.migrationVersion = migrationBefore;
+  restoreReport.restore.migrationBeforeApply = migrationBefore;
+  restoreReport.restore.restoreMigrationVersion = migrationAfter;
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status-before-apply.txt"),
+    `Current Version: ${migrationBefore}\nPending Files: 1\n`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status.txt"),
+    `Current Version: ${migrationAfter}\nPending Files: 0\n`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "migration-status.txt"),
+    `Migration Status: OK\nCurrent Version: ${migrationAfter}\nPending Files: 0\n`,
+  );
+  const rotationPath = path.join(dir, "credential-rotation-report.json");
+  const rotationReport = JSON.parse(fs.readFileSync(rotationPath, "utf8"));
+  rotationReport.migrationVersion = migrationAfter;
+  fs.writeFileSync(rotationPath, JSON.stringify(rotationReport, null, 2));
+
+  const smokePath = path.join(dir, "smoke-test-report.json");
+  const smokeReport = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  const runtimeIdentity = smokeReport.checks.find(
+    (check) => check?.name === "runtime-identity",
+  );
+  runtimeIdentity.migrationVersion = migrationAfter;
+  runtimeIdentity.expectedDigestSha256 = crypto
+    .createHash("sha256")
+    .update(
+      [
+        "release-v1",
+        runtimeIdentity.database,
+        runtimeIdentity.releaseVersion,
+        migrationAfter,
+      ].join("\n"),
+    )
+    .digest("hex");
+  fs.writeFileSync(smokePath, JSON.stringify(smokeReport, null, 2));
+}
+
+test("release evidence gate accepts filled yoyoosun evidence", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-"));
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const result = validateReleaseEvidenceGate({
+    repoRoot: root,
+    evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+  });
+
+  assert.equal(result.customer, "yoyoosun");
+  assert.equal(result.evidenceContract, RELEASE_EVIDENCE_CONTRACT);
+  assert.equal(result.requiredFiles.length, 11);
+  assert.deepEqual(result.runtimeIdentity, {
+    scope: "release-v1",
+    database: "plush_erp_demo_v1",
+    productCommit: releaseGitCommit,
+    migrationVersion: migrationAfter,
+    expectedDigestSha256: crypto
+      .createHash("sha256")
+      .update(
+        [
+          "release-v1",
+          "plush_erp_demo_v1",
+          releaseGitCommit,
+          migrationAfter,
+        ].join("\n"),
+      )
+      .digest("hex"),
+  });
+  assert.equal(result.scope.evidenceOnly, true);
+  assert.match(result.scope.readyMeaning, /filled release evidence directory/);
+  assert.ok(
+    result.scope.notProvenByThisGate.includes(
+      "target smoke was run by this gate",
+    ),
+  );
+});
+
+test("base release gate does not require customer acceptance evidence", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-base-"));
+  const relativeEvidenceDir =
+    "deployments/yoyoosun/evidence/releases/2026-06-16";
+  const evidenceDir = path.join(root, relativeEvidenceDir);
+  writeValidEvidence(evidenceDir);
+  fs.rmSync(path.join(evidenceDir, "credential-rotation-report.json"));
+
+  const preflightPath = path.join(
+    evidenceDir,
+    "production-preflight-report.json",
+  );
+  const preflight = JSON.parse(fs.readFileSync(preflightPath, "utf8"));
+  preflight.profile = RELEASE_EVIDENCE_PROFILES.BASE_RELEASE;
+  preflight.checks = preflight.checks.filter(
+    (check) =>
+      ![
+        PRODUCTION_PREFLIGHT_CHECKS.SMS_PROVIDER_RUNTIME,
+        PRODUCTION_PREFLIGHT_CHECKS.PDF_RUNTIME,
+        PRODUCTION_PREFLIGHT_CHECKS.CHROMIUM_RUNTIME,
+      ].includes(check.id),
+  );
+  preflight.summary.total = preflight.checks.length;
+  preflight.summary.passed = preflight.checks.length;
+  fs.writeFileSync(preflightPath, JSON.stringify(preflight, null, 2));
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.checks = smoke.checks.filter(
+    (check) =>
+      ![
+        "template-pdf-render",
+        "auth-sms-capabilities",
+        "credential-login-matrix",
+        "customer-config-effective-session",
+      ].includes(check.name),
+  );
+  smoke.summary = {
+    total: smoke.checks.length,
+    passed: smoke.checks.length,
+    failed: 0,
+  };
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  const rollbackPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
+  const rollback = JSON.parse(fs.readFileSync(rollbackPath, "utf8"));
+  rollback.postCheck.smokeCheckCount = smoke.checks.length;
+  delete rollback.postCheck.customerConfigEffectiveSession;
+  fs.writeFileSync(rollbackPath, JSON.stringify(rollback, null, 2));
+
+  const result = validateReleaseEvidenceGateImpl({
+    repoRoot: root,
+    profile: RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
+    deploymentTarget: "demo-133",
+    evidenceDir: relativeEvidenceDir,
+  });
+  assert.equal(result.profile, RELEASE_EVIDENCE_PROFILES.BASE_RELEASE);
+  assert.equal(
+    result.requiredFiles.includes("credential-rotation-report.json"),
+    false,
+  );
+});
+
+test("unchanged base release needs backup and rollback plan but no repeated rehearsals or signoff", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "release-baseline-"));
+  writeBaseReleaseEvidenceTestFixture(dir, {
+    migrationBefore: "20260628123354",
+    recoveryProcedureChanged: false,
+  });
+  for (const name of [
+    "backup-restore-report.json",
+    "rollback-rehearsal-report.json",
+    "release-signoff-checklist.md",
+    "migration-status-before-apply.txt",
+    "command-summary.txt",
+  ])
+    fs.rmSync(path.join(dir, name));
+  const backupPath = path.join(dir, "backup-evidence.md");
+  fs.writeFileSync(
+    backupPath,
+    fs
+      .readFileSync(backupPath, "utf8")
+      .replace(/^\| (restoreTestStatus|smokeQueryStatus) .*\n/gmu, ""),
+  );
+  const options = {
+    evidenceDir: dir,
+    deploymentTarget: "demo-133",
+    profile: "base-release",
+  };
+  const result = validateReleaseEvidenceGateImpl(options);
+  assert.equal(result.recoveryRehearsalRequired, false);
+  assert.equal(result.requiredFiles.length, 7);
+  fs.rmSync(backupPath);
+  assert.throws(
+    () => validateReleaseEvidenceGateImpl(options),
+    /Missing backup-evidence/u,
+  );
+});
+
+test("migration recovery changes and unknown scope still require rehearsals", async (t) => {
+  for (const [name, overrides] of [
+    ["migration", { recoveryProcedureChanged: false }],
+    [
+      "recovery procedure",
+      { migrationBefore: "20260628123354", recoveryProcedureChanged: true },
+    ],
+    [
+      "unknown",
+      {
+        migrationBefore: "20260628123354",
+        recoveryProcedureChanged: "unknown",
+      },
+    ],
+  ])
+    await t.test(name, () => {
+      const dir = fs.mkdtempSync(
+        path.join(os.tmpdir(), "release-recovery-required-"),
+      );
+      writeBaseReleaseEvidenceTestFixture(dir, overrides);
+      fs.rmSync(path.join(dir, "backup-restore-report.json"));
+      assert.throws(
+        () =>
+          validateReleaseEvidenceGateImpl({
+            evidenceDir: dir,
+            deploymentTarget: "demo-133",
+            profile: "base-release",
+          }),
+        /Missing backup-restore-report/u,
+      );
+    });
+});
+
+test("release evidence gate rejects evidence without a declared contract", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-legacy-"),
+  );
+  const relativeEvidenceDir =
+    "deployments/yoyoosun/evidence/releases/2026-06-16";
+  const evidenceDir = path.join(root, relativeEvidenceDir);
+  writeValidEvidence(evidenceDir);
+  const releasePath = path.join(evidenceDir, "release-evidence.md");
+  fs.writeFileSync(
+    releasePath,
+    fs
+      .readFileSync(releasePath, "utf8")
+      .replace(/^\| evidenceContract \|.*\|\n/mu, ""),
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: relativeEvidenceDir,
+      }),
+    /must declare evidenceContract plush\.release-evidence\/v1/u,
+  );
+});
+
+test("release evidence gate rejects an unsupported evidence contract", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-unsupported-"),
+  );
+  const relativeEvidenceDir =
+    "deployments/yoyoosun/evidence/releases/2026-06-16";
+  const evidenceDir = path.join(root, relativeEvidenceDir);
+  writeValidEvidence(evidenceDir);
+  const releasePath = path.join(evidenceDir, "release-evidence.md");
+  fs.writeFileSync(
+    releasePath,
+    fs
+      .readFileSync(releasePath, "utf8")
+      .replace(RELEASE_EVIDENCE_CONTRACT, "plush.release-evidence/v2"),
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: relativeEvidenceDir,
+      }),
+    /evidenceContract plush\.release-evidence\/v2 is unsupported/u,
+  );
+});
+
+test("release evidence gate CLI supports JSON and text scope output", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-cli-"),
+  );
+  const relativeEvidenceDir =
+    "deployments/yoyoosun/evidence/releases/2026-06-16";
+  const evidenceDir = path.join(root, relativeEvidenceDir);
+  writeValidEvidence(evidenceDir);
+
+  const jsonResult = spawnSync(
+    process.execPath,
+    [
+      gateCli,
+      "--deployment-target",
+      "demo-133",
+      "--profile",
+      "customer-trial-acceptance",
+      "--evidence-dir",
+      relativeEvidenceDir,
+      "--json",
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+  assert.equal(
+    jsonResult.status,
+    0,
+    `${jsonResult.stdout}\n${jsonResult.stderr}`,
+  );
+  const parsed = JSON.parse(jsonResult.stdout);
+  assert.equal(parsed.scope.evidenceOnly, true);
+  assert.match(
+    parsed.scope.readyMeaning,
+    /consistency, redaction, and placeholder checks/,
+  );
+  assert.ok(
+    parsed.scope.notProvenByThisGate.includes(
+      "backup restore rehearsal was performed by this gate",
+    ),
+  );
+
+  const textResult = spawnSync(
+    process.execPath,
+    [
+      gateCli,
+      "--deployment-target",
+      "demo-133",
+      "--profile",
+      "customer-trial-acceptance",
+      "--evidence-dir",
+      relativeEvidenceDir,
+    ],
+    { cwd: root, encoding: "utf8" },
+  );
+  assert.equal(
+    textResult.status,
+    0,
+    `${textResult.stdout}\n${textResult.stderr}`,
+  );
+  assert.match(
+    textResult.stdout,
+    /ready means: filled release evidence directory/,
+  );
+  assert.match(textResult.stdout, /not proven by this gate:/);
+  assert.match(
+    textResult.stdout,
+    /target environment release was executed by this gate/,
+  );
+});
+
+test("release evidence gate accepts customer-test admin-only credential evidence", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-test-"));
+  const relativeEvidenceDir =
+    "deployments/yoyoosun/evidence/releases/2026-06-16";
+  const evidenceDir = path.join(root, relativeEvidenceDir);
+  writeValidEvidence(evidenceDir);
+  writeCredentialEvidenceTestFixture(
+    evidenceDir,
+    "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    "customer-test-133",
+  );
+
+  const result = validateReleaseEvidenceGateImpl({
+    repoRoot: root,
+    profile: RELEASE_EVIDENCE_PROFILES.CUSTOMER_TRIAL_ACCEPTANCE,
+    deploymentTarget: "customer-test-133",
+    evidenceDir: relativeEvidenceDir,
+  });
+  assert.equal(result.deploymentTarget, "customer-test-133");
+  const smoke = JSON.parse(
+    fs.readFileSync(path.join(evidenceDir, "smoke-test-report.json"), "utf8"),
+  );
+  const credentialCheck = smoke.checks.find(
+    (check) => check.name === "credential-login-matrix",
+  );
+  assert.deepEqual(credentialCheck.usernames, ["admin"]);
+  assert.equal(
+    Object.keys(credentialCheck).some((key) =>
+      /(dataset|uat|sms|phone)/iu.test(key),
+    ),
+    false,
+  );
+});
+
+test("release evidence gate rejects invalid product commit", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-git-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const releasePath = path.join(evidenceDir, "release-evidence.md");
+  const release = fs
+    .readFileSync(releasePath, "utf8")
+    .replace(
+      `| productCommit | ${releaseGitCommit} |`,
+      "| productCommit | main |",
+    );
+  fs.writeFileSync(releasePath, release);
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /release-evidence\.md productCommit must be a full 40-character lowercase Git commit/,
+  );
+});
+
+test("release evidence gate rejects invalid release image digest", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-image-digest-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const releasePath = path.join(evidenceDir, "release-evidence.md");
+  const release = fs
+    .readFileSync(releasePath, "utf8")
+    .replace(
+      "| serverImageDigest | sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |",
+      "| serverImageDigest | server:latest |",
+    );
+  fs.writeFileSync(releasePath, release);
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /release-evidence\.md serverImageDigest must be sha256:<64-hex>/,
+  );
+});
+
+test("release evidence gate rejects malformed and descending migration versions", () => {
+  for (const [name, before, after, expected] of [
+    [
+      "malformed-before",
+      "2026-06-01",
+      "20260616000000",
+      /migrationBefore must be a 14-digit Atlas version/,
+    ],
+    [
+      "malformed-after",
+      "20260601000000",
+      "latest",
+      /migrationAfter must be a 14-digit Atlas version/,
+    ],
+    [
+      "descending",
+      "20260616000000",
+      "20260601000000",
+      /migrationBefore must not be newer than migrationAfter/,
+    ],
+  ]) {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), `release-evidence-gate-${name}-`),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+    const releasePath = path.join(evidenceDir, "release-evidence.md");
+    fs.writeFileSync(
+      releasePath,
+      fs
+        .readFileSync(releasePath, "utf8")
+        .replace(
+          "| migrationBefore | 20260601000000 |",
+          `| migrationBefore | ${before} |`,
+        )
+        .replace(
+          "| migrationAfter | 20260616000000 |",
+          `| migrationAfter | ${after} |`,
+        ),
+    );
+
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expected,
+    );
+  }
+});
+
+test("release evidence gate rejects missing production preflight report", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-preflight-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  fs.unlinkSync(path.join(evidenceDir, "production-preflight-report.json"));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /Missing production-preflight-report\.json/,
+  );
+});
+
+test("release evidence gate rejects example-mode production preflight report", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-preflight-example-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  const preflightPath = path.join(
+    evidenceDir,
+    "production-preflight-report.json",
+  );
+  const preflight = JSON.parse(fs.readFileSync(preflightPath, "utf8"));
+  preflight.mode = "example";
+  fs.writeFileSync(preflightPath, JSON.stringify(preflight, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /must come from runtime-env mode/,
+  );
+});
+
+test("release evidence gate binds the production preflight profile", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-preflight-profile-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  const preflightPath = path.join(
+    evidenceDir,
+    "production-preflight-report.json",
+  );
+  const preflight = JSON.parse(fs.readFileSync(preflightPath, "utf8"));
+  preflight.profile = RELEASE_EVIDENCE_PROFILES.BASE_RELEASE;
+  fs.writeFileSync(preflightPath, JSON.stringify(preflight, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /profile must match customer-trial-acceptance/u,
+  );
+});
+
+for (const [label, checkId] of [
+  ["runtime Compose", PRODUCTION_PREFLIGHT_CHECKS.COMPOSE_RUNTIME_SERVICES],
+  ["runtime SMS provider", PRODUCTION_PREFLIGHT_CHECKS.SMS_PROVIDER_RUNTIME],
+  ["runtime PDF warmup", PRODUCTION_PREFLIGHT_CHECKS.PDF_RUNTIME],
+  ["runtime Chromium exact pin", PRODUCTION_PREFLIGHT_CHECKS.CHROMIUM_RUNTIME],
+  [
+    "runtime health and readiness",
+    PRODUCTION_PREFLIGHT_CHECKS.RUNTIME_HEALTH_READY,
+  ],
+]) {
+  test(`release evidence gate rejects preflight without ${label}`, () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "release-evidence-gate-preflight-runtime-bad-"),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+
+    const preflightPath = path.join(
+      evidenceDir,
+      "production-preflight-report.json",
+    );
+    const preflight = JSON.parse(fs.readFileSync(preflightPath, "utf8"));
+    preflight.checks = preflight.checks.filter((check) => check.id !== checkId);
+    preflight.summary.total = preflight.checks.length;
+    preflight.summary.passed = preflight.checks.length;
+    fs.writeFileSync(preflightPath, JSON.stringify(preflight, null, 2));
+
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      new RegExp(`missing passed check: ${checkId}`),
+    );
+  });
+}
+
+test("release evidence gate rejects missing image digest artifact", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-image-digest-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  fs.unlinkSync(path.join(evidenceDir, "image-digests.txt"));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /Missing image-digests\.txt/,
+  );
+});
+
+test("release evidence gate rejects image digest artifact mismatch", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-image-digest-mismatch-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.writeFileSync(
+    path.join(evidenceDir, "image-digests.txt"),
+    `serverImage=registry.example.invalid/plush/server:other
+serverImageDigest=sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+webImage=registry.example.invalid/plush/web:20260616T1200-test
+webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+`,
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /image-digests\.txt serverImageDigest must match release-evidence\.md/,
+  );
+});
+
+test("release evidence gate rejects credentialed image refs in digest artifact", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-image-ref-credential-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.writeFileSync(
+    path.join(evidenceDir, "image-digests.txt"),
+    `serverImage=https://deploy:secret@registry.example.invalid/plush/server:20260616T1200-test
+serverImageDigest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+webImage=registry.example.invalid/plush/web:20260616T1200-test
+webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+`,
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /image-digests\.txt contains a credentialed URL/,
+  );
+});
+
+test("release evidence gate rejects placeholders and failed smoke", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir, {
+    releaseId: "<release-id>",
+    smokeProductCommit: "<product-commit>",
+  });
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.summary.failed = 1;
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /placeholder field: releaseId|summary\.failed must be 0/,
+  );
+});
+
+test("release evidence gate rejects empty smoke checks", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-empty-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.summary = { total: 0, passed: 0, failed: 0 };
+  smoke.checks = [];
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /smoke-test-report\.json checks must not be empty/,
+  );
+});
+
+test("release evidence gate rejects web-only smoke without PDF evidence", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-pdf-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.checks = smoke.checks.filter(
+    (check) => check.name !== "template-pdf-render",
+  );
+  smoke.summary = {
+    total: smoke.checks.length,
+    passed: smoke.checks.length,
+    failed: 0,
+  };
+  const rehearsalPath = path.join(
+    evidenceDir,
+    "rollback-rehearsal-report.json",
+  );
+  const rehearsal = JSON.parse(fs.readFileSync(rehearsalPath, "utf8"));
+  rehearsal.postCheck.smokeCheckCount = smoke.checks.length;
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+  fs.writeFileSync(rehearsalPath, JSON.stringify(rehearsal, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /must include exactly one template-pdf-render check/,
+  );
+});
+
+for (const [field, value, expectedError] of [
+  ["httpCode", "500", /template-pdf-render httpCode must be 200/],
+  [
+    "contentType",
+    "text\/html",
+    /template-pdf-render contentType must be application\/pdf/,
+  ],
+  ["sha256", "not-a-sha", /template-pdf-render sha256 must be 64-hex/],
+  ["sizeBytes", 0, /template-pdf-render sizeBytes must be a positive integer/],
+  [
+    "responseBodyStored",
+    true,
+    /template-pdf-render responseBodyStored must be false/,
+  ],
+]) {
+  test(`release evidence gate rejects invalid PDF ${field}`, () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "release-evidence-gate-smoke-pdf-invalid-"),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+
+    const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+    const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+    const pdfCheck = smoke.checks.find(
+      (check) => check.name === "template-pdf-render",
+    );
+    pdfCheck[field] = value;
+    fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expectedError,
+    );
+  });
+}
+
+test("release evidence gate requires exactly one credential login matrix", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-credential-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.checks = smoke.checks.filter(
+    (check) => check.name !== "credential-login-matrix",
+  );
+  smoke.summary.total = smoke.checks.length;
+  smoke.summary.passed = smoke.checks.length;
+  const rehearsalPath = path.join(
+    evidenceDir,
+    "rollback-rehearsal-report.json",
+  );
+  const rehearsal = JSON.parse(fs.readFileSync(rehearsalPath, "utf8"));
+  rehearsal.postCheck.smokeCheckCount = smoke.checks.length;
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+  fs.writeFileSync(rehearsalPath, JSON.stringify(rehearsal, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /must include exactly one credential-login-matrix check/,
+  );
+});
+
+test("release evidence gate rejects duplicate credential login matrices", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-credential-duplicate-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  const check = smoke.checks.find(
+    (candidate) => candidate.name === "credential-login-matrix",
+  );
+  smoke.checks.push(structuredClone(check));
+  smoke.summary.total = smoke.checks.length;
+  smoke.summary.passed = smoke.checks.length;
+  const rehearsalPath = path.join(
+    evidenceDir,
+    "rollback-rehearsal-report.json",
+  );
+  const rehearsal = JSON.parse(fs.readFileSync(rehearsalPath, "utf8"));
+  rehearsal.postCheck.smokeCheckCount = smoke.checks.length;
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+  fs.writeFileSync(rehearsalPath, JSON.stringify(rehearsal, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /must include exactly one credential-login-matrix check/,
+  );
+});
+
+for (const [name, mutate, expectedError] of [
+  [
+    "missing",
+    (checks) =>
+      checks.filter(
+        (check) => check.name !== "customer-config-effective-session",
+      ),
+    /must include exactly one customer-config-effective-session check for demo-133/,
+  ],
+  [
+    "duplicate",
+    (checks) => {
+      const customerConfigCheck = checks.find(
+        (check) => check.name === "customer-config-effective-session",
+      );
+      return [...checks, structuredClone(customerConfigCheck)];
+    },
+    /must not contain duplicate customer-config-effective-session checks/,
+  ],
+]) {
+  test(`release evidence gate rejects ${name} demo effective-session check`, () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), `release-evidence-gate-config-${name}-`),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+    const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+    const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+    smoke.checks = mutate(smoke.checks);
+    smoke.summary.total = smoke.checks.length;
+    smoke.summary.passed = smoke.checks.length;
+    const rehearsalPath = path.join(
+      evidenceDir,
+      "rollback-rehearsal-report.json",
+    );
+    const rehearsal = JSON.parse(fs.readFileSync(rehearsalPath, "utf8"));
+    rehearsal.postCheck.smokeCheckCount = smoke.checks.length;
+    fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+    fs.writeFileSync(rehearsalPath, JSON.stringify(rehearsal, null, 2));
+
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expectedError,
+    );
+  });
+}
+
+for (const [field, value, expectedError] of [
+  [
+    "nonAdminAuthenticated",
+    9,
+    /credential-login-matrix counts\/scope must match the selected target/,
+  ],
+  [
+    "totalAuthenticated",
+    10,
+    /credential-login-matrix counts\/scope must match the selected target/,
+  ],
+  [
+    "uniqueTokensObserved",
+    false,
+    /credential-login-matrix uniqueTokensObserved must be true/,
+  ],
+  [
+    "phoneConfigured",
+    true,
+    /credential-login-matrix credential sources must match the credential contract/,
+  ],
+  [
+    "responseBodyStored",
+    true,
+    /credential-login-matrix responseBodyStored must be false/,
+  ],
+  [
+    "credentialContractSha256",
+    "0".repeat(64),
+    /contract schema\/hash\/target identity must match credential\.contract\.json/,
+  ],
+  [
+    "smsPhoneSourceEnv",
+    "WRONG_SMS_PHONE_ENV",
+    /credential sources must match the credential contract/,
+  ],
+  [
+    "adminAuthVersion",
+    3,
+    /adminAuthVersion must match credential-rotation-report\.json admin receipt/,
+  ],
+]) {
+  test(`release evidence gate rejects invalid credential matrix ${field}`, () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "release-evidence-gate-credential-invalid-"),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+    const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+    const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+    const check = smoke.checks.find(
+      (candidate) => candidate.name === "credential-login-matrix",
+    );
+    check[field] = value;
+    fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expectedError,
+    );
+  });
+}
+
+test("release evidence gate rejects a runtime identity digest not derived from target release tuple", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-runtime-digest-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.checks.find(
+    (check) => check.name === "runtime-identity",
+  ).expectedDigestSha256 = "0".repeat(64);
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /runtime-identity must prove release-v1 target database\/release\/migration/u,
+  );
+});
+
+test("release evidence gate binds smoke credential operation to rotation receipt", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-operation-bind-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.checks.find(
+    (check) => check.name === "credential-login-matrix",
+  ).credentialOperationId = "00000000-0000-4000-8000-000000000002";
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /credentialOperationId must match credential-rotation-report\.json operationId/u,
+  );
+});
+
+test("release evidence gate rejects smoke generated before credential rotation", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rotation-order-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir, {
+    smokeGeneratedAt: "2026-06-16T04:29:59Z",
+  });
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /generatedAt must not be earlier than credential-rotation-report\.json generatedAt/u,
+  );
+});
+
+test("release evidence gate requires credential rotation report", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rotation-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  fs.rmSync(path.join(evidenceDir, "credential-rotation-report.json"));
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /Missing credential-rotation-report\.json/,
+  );
+});
+
+for (const [name, mutate, expectedError] of [
+  [
+    "product commit",
+    (report) => (report.productCommit = "b".repeat(40)),
+    /productCommit must match release-evidence\.md/,
+  ],
+  [
+    "migration",
+    (report) => (report.migrationVersion = "20260617000000"),
+    /migrationVersion must match release-evidence\.md migrationAfter/,
+  ],
+  [
+    "database",
+    (report) => (report.database = "cross_target_database"),
+    /target identity\/policy must match credential\.contract\.json/,
+  ],
+  [
+    "unexpected top-level field",
+    (report) => (report.debug = true),
+    /must use the exact target-specific receipt shape/,
+  ],
+  [
+    "duplicate account",
+    (report) => (report.accounts[1].username = report.accounts[0].username),
+    /accounts must contain the selected target identities exactly once/,
+  ],
+  [
+    "stale auth version",
+    (report) => (report.accounts[0].authVersion = 1),
+    /every account authVersion must be greater than 1/,
+  ],
+  [
+    "unexpected account field",
+    (report) => (report.accounts[0].debug = true),
+    /accounts must use the exact redacted shape/,
+  ],
+  [
+    "UAT phone binding",
+    (report) => (report.accounts[1].phoneBound = true),
+    /account phoneBound values must follow the optional contracted admin binding/,
+  ],
+  [
+    "secret field",
+    (report) => (report.accounts[0].accessToken = "must-not-be-stored"),
+    /must not contain password\/secret\/token\/phone fields/,
+  ],
+  [
+    "operation id",
+    (report) => (report.operationId = "not-an-operation-id"),
+    /operationId must be a lowercase UUID v4/,
+  ],
+  [
+    "receipt schema",
+    (report) => (report.schemaVersion = "wrong-schema"),
+    /must bind an exact restore-checked operation rollback point/,
+  ],
+  [
+    "rollback alias",
+    (report) => (report.rollbackPoint.backupAlias = "wrong-alias"),
+    /must bind an exact restore-checked operation rollback point/,
+  ],
+  [
+    "rollback hash",
+    (report) => (report.rollbackPoint.backupSha256 = "not-a-sha"),
+    /must bind an exact restore-checked operation rollback point/,
+  ],
+  [
+    "rollback size",
+    (report) => (report.rollbackPoint.backupSizeBytes = 0),
+    /must bind an exact restore-checked operation rollback point/,
+  ],
+  [
+    "rollback restore check",
+    (report) => (report.rollbackPoint.restoreChecked = false),
+    /must bind an exact restore-checked operation rollback point/,
+  ],
+  [
+    "rollback extra key",
+    (report) => (report.rollbackPoint.path = "backup.dump"),
+    /must bind an exact restore-checked operation rollback point/,
+  ],
+  [
+    "stale customer revision",
+    (report) =>
+      (report.customerRevision =
+        "yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1"),
+    /customerRevision must match smoke-test-report\.json customer-config-effective-session expectedRevision/,
+  ],
+  [
+    "absolute path",
+    (report) => (report.customerRevision = "/private/receipt"),
+    /must not contain absolute paths/,
+  ],
+]) {
+  test(`release evidence gate rejects invalid rotation ${name}`, () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "release-evidence-gate-rotation-invalid-"),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+    const reportPath = path.join(
+      evidenceDir,
+      "credential-rotation-report.json",
+    );
+    const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+    mutate(report);
+    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expectedError,
+    );
+  });
+}
+
+test("release evidence gate rejects non-pass smoke check", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-check-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.summary = { total: 4, passed: 4, failed: 0 };
+  smoke.checks[1].status = "skipped";
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /smoke-test-report\.json checks\[1\]\.status must be pass/,
+  );
+});
+
+test("release evidence gate rejects untraceable smoke check target", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-target-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  delete smoke.checks[1].target;
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /smoke-test-report\.json checks\[1\]\.target is missing/,
+  );
+});
+
+test("release evidence gate rejects URL smoke check without HTTP status", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-http-code-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  delete smoke.checks[1].httpCode;
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /smoke-test-report\.json checks\[1\]\.httpCode must be a 100-599 HTTP status for URL targets/,
+  );
+});
+
+test("release evidence gate rejects smoke report without endpoint alias", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-endpoint-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  delete smoke.endpointAlias;
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /smoke-test-report\.json endpointAlias is missing or placeholder/,
+  );
+});
+
+test("release evidence gate rejects credentialed smoke endpoint aliases", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-endpoint-credential-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.endpointAlias = "https://deploy:secret@erp.example.invalid";
+  smoke.backendEndpointAlias = "https://deploy:secret@api.example.invalid";
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /smoke-test-report\.json contains a credentialed URL|smoke-test-report\.json endpointAlias must not contain URL credentials|smoke-test-report\.json backendEndpointAlias must not contain URL credentials/,
+  );
+});
+
+test("release evidence gate rejects credentialed smoke check target", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-smoke-target-credential-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.checks[0].target = "https://deploy:secret@erp.example.invalid/healthz";
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /smoke-test-report\.json contains a credentialed URL|smoke-test-report\.json checks\[0\]\.target must not contain URL credentials/,
+  );
+});
+
+test("release evidence gate rejects missing restore rehearsal success", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.summary.restoreCompleted = false;
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /summary\.restoreCompleted must be true/,
+  );
+});
+
+test("release evidence gate requires populated upgrade audit when migration crosses 20260714055504", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-populated-upgrade-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  const migrationBefore = "20260710150001";
+  const migrationAfter = "20260714055504";
+  writeValidEvidence(evidenceDir);
+  setMigrationEvidenceRange(evidenceDir, migrationBefore, migrationAfter);
+
+  const releasePath = path.join(evidenceDir, "release-evidence.md");
+  fs.writeFileSync(
+    releasePath,
+    fs
+      .readFileSync(releasePath, "utf8")
+      .replace(
+        "migrationBefore | 20260601000000",
+        `migrationBefore | ${migrationBefore}`,
+      )
+      .replace(
+        "migrationAfter | 20260616000000",
+        `migrationAfter | ${migrationAfter}`,
+      ),
+  );
+  const backupPath = path.join(evidenceDir, "backup-evidence.md");
+  fs.writeFileSync(
+    backupPath,
+    fs
+      .readFileSync(backupPath, "utf8")
+      .replace(
+        "migrationVersion | 20260601000000",
+        `migrationVersion | ${migrationBefore}`,
+      ),
+  );
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.backup.migrationVersion = migrationBefore;
+  restoreReport.restore.migrationBeforeApply = migrationBefore;
+  restoreReport.restore.restoreMigrationVersion = migrationAfter;
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+  fs.writeFileSync(
+    path.join(evidenceDir, "artifacts/migration-status-before-apply.txt"),
+    `Current Version: ${migrationBefore}\nPending Files: 1\n`,
+  );
+  fs.writeFileSync(
+    path.join(evidenceDir, "artifacts/migration-status.txt"),
+    `Current Version: ${migrationAfter}\nPending Files: 0\n`,
+  );
+  fs.writeFileSync(
+    path.join(evidenceDir, "migration-status.txt"),
+    `Migration Status: OK\nCurrent Version: ${migrationAfter}\nPending Files: 0\n`,
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /restore\.populatedUpgradeAuditStatus must be passed/,
+  );
+
+  restoreReport.restore.populatedUpgradeAuditStatus = "passed";
+  restoreReport.summary.populatedUpgradeAuditStatus = "passed";
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+  const commandSummaryPath = path.join(
+    evidenceDir,
+    "artifacts/command-summary.txt",
+  );
+  fs.writeFileSync(
+    commandSummaryPath,
+    fs
+      .readFileSync(commandSummaryPath, "utf8")
+      .replace(
+        "steps=pg_dump",
+        "populatedUpgradeAuditStatus=passed\nsteps=populated upgrade read-only audit -> pg_dump",
+      ),
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-evidence\.md populatedUpgradeAuditStatus must be passed/,
+  );
+
+  fs.appendFileSync(backupPath, "| populatedUpgradeAuditStatus | passed |\n");
+
+  assert.doesNotThrow(() =>
+    validateReleaseEvidenceGate({
+      repoRoot: root,
+      evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+    }),
+  );
+});
+
+test("release evidence gate requires every customer config cutover audit surface when migration crosses 20260714055825", () => {
+  const mutations = [
+    {
+      name: "backup-evidence",
+      expected:
+        /backup-evidence\.md customerConfigCutoverAuditStatus must be passed/,
+      mutate(evidenceDir) {
+        const file = path.join(evidenceDir, "backup-evidence.md");
+        fs.writeFileSync(
+          file,
+          fs
+            .readFileSync(file, "utf8")
+            .replace(
+              "| customerConfigCutoverAuditStatus | passed |",
+              "| customerConfigCutoverAuditStatus | failed |",
+            ),
+        );
+      },
+    },
+    {
+      name: "restore-report",
+      expected: /restore\.customerConfigCutoverAuditStatus must be passed/,
+      mutate(evidenceDir) {
+        const file = path.join(evidenceDir, "backup-restore-report.json");
+        const report = JSON.parse(fs.readFileSync(file, "utf8"));
+        delete report.restore.customerConfigCutoverAuditStatus;
+        fs.writeFileSync(file, JSON.stringify(report, null, 2));
+      },
+    },
+    {
+      name: "summary-report",
+      expected: /summary\.customerConfigCutoverAuditStatus must be passed/,
+      mutate(evidenceDir) {
+        const file = path.join(evidenceDir, "backup-restore-report.json");
+        const report = JSON.parse(fs.readFileSync(file, "utf8"));
+        report.summary.customerConfigCutoverAuditStatus = "failed";
+        fs.writeFileSync(file, JSON.stringify(report, null, 2));
+      },
+    },
+    {
+      name: "command-summary-status",
+      expected:
+        /artifacts\.commandSummary customerConfigCutoverAuditStatus must be passed/,
+      mutate(evidenceDir) {
+        const file = path.join(evidenceDir, "artifacts/command-summary.txt");
+        fs.writeFileSync(
+          file,
+          fs
+            .readFileSync(file, "utf8")
+            .replace(
+              "customerConfigCutoverAuditStatus=passed",
+              "customerConfigCutoverAuditStatus=failed",
+            ),
+        );
+      },
+    },
+    {
+      name: "command-summary-step",
+      expected: /steps must mention customer config cutover read-only audit/,
+      mutate(evidenceDir) {
+        const file = path.join(evidenceDir, "artifacts/command-summary.txt");
+        fs.writeFileSync(
+          file,
+          fs
+            .readFileSync(file, "utf8")
+            .replace(
+              "customer config cutover read-only audit",
+              "customer config cutover unavailable",
+            ),
+        );
+      },
+    },
+  ];
+
+  for (const { name, expected, mutate } of mutations) {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), `release-evidence-gate-cutover-${name}-`),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+    setMigrationEvidenceRange(evidenceDir, "20260714055504", "20260714055825");
+
+    fs.appendFileSync(
+      path.join(evidenceDir, "backup-evidence.md"),
+      "| customerConfigCutoverAuditStatus | passed |\n",
+    );
+    const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+    const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+    restoreReport.restore.customerConfigCutoverAuditStatus = "passed";
+    restoreReport.summary.customerConfigCutoverAuditStatus = "passed";
+    fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+    const commandSummaryPath = path.join(
+      evidenceDir,
+      "artifacts/command-summary.txt",
+    );
+    fs.writeFileSync(
+      commandSummaryPath,
+      fs
+        .readFileSync(commandSummaryPath, "utf8")
+        .replace(
+          "steps=pg_dump",
+          "customerConfigCutoverAuditStatus=passed\nsteps=customer config cutover read-only audit -> pg_dump",
+        ),
+    );
+
+    assert.doesNotThrow(() =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    );
+
+    mutate(evidenceDir);
+
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expected,
+    );
+  }
+});
+
+test("release evidence gate rejects invalid backup evidence time", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-time-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const backupPath = path.join(evidenceDir, "backup-evidence.md");
+  const backup = fs
+    .readFileSync(backupPath, "utf8")
+    .replace(
+      "| backupTime | 2026-06-16T12:00:00+08:00 |",
+      "| backupTime | 2026/06/16 12:00 |",
+    );
+  fs.writeFileSync(backupPath, backup);
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-evidence\.md backupTime must be an ISO timestamp/,
+  );
+});
+
+test("release evidence gate rejects invalid backup evidence size", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-size-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir, { databaseBackupSize: "0" });
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-evidence\.md databaseBackupSize must be a positive number/,
+  );
+});
+
+test("release evidence gate rejects failed backup evidence verification statuses", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-status-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir, {
+    restoreTestStatus: "failed",
+    smokeQueryStatus: "skipped",
+  });
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-evidence\.md restoreTestStatus must show a passed restore verification|backup-evidence\.md smokeQueryStatus must show a passed smoke query/,
+  );
+});
+
+test("release evidence gate rejects missing restore target context", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-target-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  delete restoreReport.restoreTarget;
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json restoreTarget is missing or placeholder/,
+  );
+});
+
+test("release evidence gate rejects invalid backup restore hash", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-hash-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.backup.databaseBackupHash = "todo";
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json backup\.databaseBackupHash must be sha256/,
+  );
+});
+
+test("release evidence gate rejects missing backup restore artifact path", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-artifact-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.unlinkSync(path.join(evidenceDir, "artifacts/command-summary.txt"));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json artifacts\.commandSummary file not found in evidence dir/,
+  );
+});
+
+test("release evidence gate rejects backup restore artifact path outside evidence dir", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-artifact-outside-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.artifacts.commandSummary = "../command-summary.txt";
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json artifacts\.commandSummary must stay inside evidence dir/,
+  );
+});
+
+test("release evidence gate rejects missing pre-apply migration artifact", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-pre-apply-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.unlinkSync(
+    path.join(evidenceDir, "artifacts/migration-status-before-apply.txt"),
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json artifacts\.preMigrationStatus file not found in evidence dir/,
+  );
+});
+
+test("release evidence gate rejects mismatched restore migration before apply", () => {
+  const root = fs.mkdtempSync(
+    path.join(
+      os.tmpdir(),
+      "release-evidence-gate-restore-before-migration-bad-",
+    ),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.restore.migrationBeforeApply = "20260501000000";
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json restore\.migrationBeforeApply must match release-evidence\.md migrationBefore/,
+  );
+});
+
+test("release evidence gate rejects mismatched pre-apply migration status content", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-before-status-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.writeFileSync(
+    path.join(evidenceDir, "artifacts/migration-status-before-apply.txt"),
+    "Current Version: 20260501000000\nPending Files: 1\n",
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json artifacts\.preMigrationStatus Current Version must match release-evidence\.md migrationBefore/,
+  );
+});
+
+test("release evidence gate rejects mismatched post-apply migration artifact content", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-after-status-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.writeFileSync(
+    path.join(evidenceDir, "artifacts/migration-status.txt"),
+    "Current Version: 20260615000000\nPending Files: 0\n",
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json artifacts\.migrationStatus Current Version must match release-evidence\.md migrationAfter/,
+  );
+});
+
+test("release evidence gate rejects pending post-apply migration artifact content", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-after-pending-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.writeFileSync(
+    path.join(evidenceDir, "artifacts/migration-status.txt"),
+    "Current Version: 20260616000000\nPending Files: 1\n",
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json artifacts\.migrationStatus Pending Files must be 0/,
+  );
+});
+
+test("release evidence gate rejects full DSN inside backup restore artifacts", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-artifact-dsn-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.writeFileSync(
+    path.join(evidenceDir, "artifacts/command-summary.txt"),
+    "pg_dump postgres://deploy:secret-password@db.internal/plush -> restore\n",
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json artifacts\.commandSummary file must not contain a full DSN|backup-restore-report\.json artifacts\.commandSummary contains a forbidden secret-like pattern/,
+  );
+});
+
+test("release evidence gate rejects mismatched command summary identity", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-command-summary-id-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.writeFileSync(
+    path.join(evidenceDir, "artifacts/command-summary.txt"),
+    `backupId=backup-other
+releaseId=20260616T1200-test
+sourceAlias=env:SOURCE_POSTGRES_DSN
+restoreTarget=temp-postgres-container:postgres:18:removed-after-run
+steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> atlas migrate apply -> post-apply atlas status -> smoke
+`,
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json artifacts\.commandSummary backupId must match release-evidence\.md/,
+  );
+});
+
+test("release evidence gate rejects mismatched command summary restore target", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-command-summary-target-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.writeFileSync(
+    path.join(evidenceDir, "artifacts/command-summary.txt"),
+    `backupId=backup-20260616
+releaseId=20260616T1200-test
+sourceAlias=env:SOURCE_POSTGRES_DSN
+restoreTarget=temp-postgres-container:other:removed-after-run
+steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> atlas migrate apply -> post-apply atlas status -> smoke
+`,
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json artifacts\.commandSummary restoreTarget must match backup-restore-report\.json/,
+  );
+});
+
+test("release evidence gate rejects command summary without migration or smoke steps", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-command-summary-steps-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.writeFileSync(
+    path.join(evidenceDir, "artifacts/command-summary.txt"),
+    `backupId=backup-20260616
+releaseId=20260616T1200-test
+sourceAlias=env:SOURCE_POSTGRES_DSN
+restoreTarget=temp-postgres-container:postgres:18:removed-after-run
+steps=pg_dump source alias -> restore isolated target
+`,
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json artifacts\.commandSummary steps must mention atlas|backup-restore-report\.json artifacts\.commandSummary steps must mention smoke/,
+  );
+});
+
+test("release evidence gate rejects pending restore migrations", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-restore-pending-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.restore.pendingFiles = "1";
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json restore\.pendingFiles must be 0/,
+  );
+});
+
+test("release evidence gate rejects mismatched migration status current version", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-migration-version-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  fs.writeFileSync(
+    path.join(evidenceDir, "migration-status.txt"),
+    `Migration Status: OK
+Current Version: 20260615000000
+Pending Files: 0
+`,
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /migration-status\.txt Current Version must match release-evidence\.md migrationAfter/,
+  );
+});
+
+test("release evidence gate rejects mismatched restore migration version", () => {
+  const root = fs.mkdtempSync(
+    path.join(
+      os.tmpdir(),
+      "release-evidence-gate-restore-migration-version-bad-",
+    ),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.restore.restoreMigrationVersion = "20260615000000";
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json restore\.restoreMigrationVersion must match release-evidence\.md migrationAfter/,
+  );
+});
+
+test("release evidence gate rejects mismatched product commits", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-version-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.productCommit = "b".repeat(40);
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /smoke-test-report\.json productCommit must match release-evidence\.md/,
+  );
+});
+
+test("release evidence gate rejects mismatched backup evidence release id", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-version-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir, {
+    backupReleaseId: "20260617T1200-other",
+  });
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-evidence\.md releaseId must match release-evidence\.md/,
+  );
+});
+
+test("release evidence gate rejects mismatched backup ids", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.backupId = "backup-other";
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json backupId must match release-evidence\.md/,
+  );
+});
+
+test("release evidence gate rejects mismatched backup migration version", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-migration-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir, { backupMigrationVersion: "20260616000000" });
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-evidence\.md migrationVersion must match release-evidence\.md migrationBefore/,
+  );
+});
+
+test("release evidence gate rejects mismatched backup hashes", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-hash-mismatch-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.backup.databaseBackupHash =
+    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-restore-report\.json backup\.databaseBackupHash must match backup-evidence\.md/,
+  );
+});
+
+test("release evidence gate rejects mismatched evidence environments", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-environment-mismatch-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.environment = "staging-other";
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /smoke-test-report\.json environment must match release-evidence\.md/,
+  );
+});
+
+test("release evidence gate rejects mismatched backup evidence environment", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-backup-environment-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir, { backupEnvironment: "staging-other" });
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-evidence\.md environment must match release-evidence\.md/,
+  );
+});
+
+test("release evidence gate rejects mismatched rollback rehearsal release id", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-version-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  report.releaseId = "20260617T1200-other";
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /rollback-rehearsal-report\.json releaseId must match release-evidence\.md/,
+  );
+});
+
+test("release evidence gate rejects mismatched signoff release id", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-signoff-version-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const signoffPath = path.join(evidenceDir, "release-signoff-checklist.md");
+  const signoff = fs
+    .readFileSync(signoffPath, "utf8")
+    .replace(
+      "| releaseId | 20260616T1200-test |",
+      "| releaseId | 20260617T1200-other |",
+    );
+  fs.writeFileSync(signoffPath, signoff);
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /release-signoff-checklist\.md releaseId must match release-evidence\.md/,
+  );
+});
+
+test("release evidence gate rejects missing rollback plan", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  fs.unlinkSync(path.join(evidenceDir, "rollback-forward-fix-plan.md"));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /Missing rollback-forward-fix-plan\.md/,
+  );
+});
+
+test("release evidence gate rejects placeholder rollback plan", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-placeholder-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir, { rollbackDecision: "todo" });
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /rollback-forward-fix-plan\.md missing or placeholder field: rollbackDecision|rollbackDecision must be/,
+  );
+});
+
+test("release evidence gate rejects missing rollback rehearsal report", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-rehearsal-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  fs.unlinkSync(path.join(evidenceDir, "rollback-rehearsal-report.json"));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /Missing rollback-rehearsal-report\.json/,
+  );
+});
+
+test("release evidence gate rejects failed rollback rehearsal step", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-rehearsal-failed-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  report.steps[1].status = "skipped";
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /rollback-rehearsal-report\.json steps\[1\]\.status must be pass/,
+  );
+});
+
+test("release evidence gate rejects rollback rehearsal without traceable post smoke report", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-smoke-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  delete report.postCheck.smokeReport;
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /rollback-rehearsal-report\.json postCheck\.smokeReport is missing or placeholder/,
+  );
+});
+
+test("release evidence gate rejects rollback rehearsal smoke count mismatch", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-smoke-count-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  report.postCheck.smokeCheckCount = 1;
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /rollback-rehearsal-report\.json postCheck\.smokeCheckCount must match smoke-test-report\.json checks length/,
+  );
+});
+
+test("release evidence gate rejects rollback rehearsal smoke report outside current evidence dir", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rollback-smoke-path-bad-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  report.postCheck.smokeReport =
+    "deployments/yoyoosun/evidence/releases/2026-06-15/smoke-test-report.json";
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /rollback-rehearsal-report\.json postCheck\.smokeReport must point to smoke-test-report\.json in the same evidence dir/,
+  );
+});
+
+test("release evidence gate requires rollback rehearsal effective session when smoke has customer config check", () => {
+  const root = fs.mkdtempSync(
+    path.join(
+      os.tmpdir(),
+      "release-evidence-gate-rollback-effective-session-missing-",
+    ),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const reportPath = path.join(evidenceDir, "rollback-rehearsal-report.json");
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  delete report.postCheck.customerConfigEffectiveSession;
+  fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /postCheck\.customerConfigEffectiveSession\.status must be verified/,
+  );
+
+  const updatedReport = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  updatedReport.postCheck.customerConfigEffectiveSession = {
+    status: "verified",
+    expectedRevision: currentDemoCustomerRevision,
+    target: "jsonrpc:customer_config.get_effective_session",
+  };
+  fs.writeFileSync(reportPath, JSON.stringify(updatedReport, null, 2));
+  fs.unlinkSync(
+    path.join(evidenceDir, "customer-config-manifest-evidence.json"),
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /customer-config-manifest-evidence\.json is required when smoke-test-report\.json contains customer-config-effective-session/,
+  );
+
+  writeCustomerConfigManifestEvidence(
+    evidenceDir,
+    "different-runtime-manifest",
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /customer-config-manifest-evidence\.json revision must match smoke-test-report\.json customer-config-effective-session expectedRevision/,
+  );
+
+  writeCustomerConfigManifestEvidence(evidenceDir);
+
+  assert.doesNotThrow(() =>
+    validateReleaseEvidenceGate({
+      repoRoot: root,
+      evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+    }),
+  );
+
+  const previousRevision =
+    "yoyoosun-customer-trial-133-package-v10.runtime-manifest-v1";
+  const driftedSmoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  const effectiveSession = driftedSmoke.checks.find(
+    (check) => check.name === "customer-config-effective-session",
+  );
+  effectiveSession.expectedRevision = previousRevision;
+  fs.writeFileSync(smokePath, JSON.stringify(driftedSmoke, null, 2));
+  const driftedRollback = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  driftedRollback.postCheck.customerConfigEffectiveSession.expectedRevision =
+    previousRevision;
+  fs.writeFileSync(reportPath, JSON.stringify(driftedRollback, null, 2));
+  writeCustomerConfigManifestEvidence(evidenceDir, previousRevision);
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /credential-rotation-report\.json customerRevision must match smoke-test-report\.json customer-config-effective-session expectedRevision/,
+  );
+  const credentialPath = path.join(evidenceDir, "credential-rotation-report.json");
+  const frozenCredential = JSON.parse(fs.readFileSync(credentialPath, "utf8"));
+  frozenCredential.customerRevision = previousRevision;
+  fs.writeFileSync(credentialPath, JSON.stringify(frozenCredential));
+  assert.doesNotThrow(() => validateReleaseEvidenceGate({
+    repoRoot: root,
+    evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+  }));
+});

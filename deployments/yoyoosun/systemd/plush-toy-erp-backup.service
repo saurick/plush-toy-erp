@@ -1,0 +1,20 @@
+[Unit]
+Description=Plush Toy ERP daily PostgreSQL backup
+Requires=docker.service
+After=docker.service
+OnFailure=plush-toy-erp-backup-failure@%n.service
+
+[Service]
+Type=oneshot
+User=plush-erp
+Group=plush-erp
+EnvironmentFile=/etc/plush-toy-erp/backup.env
+ExecStart=/srv/plush-toy-erp/current/scripts/deploy/scheduled-postgres-backup.sh --compose-file ${BACKUP_COMPOSE_FILE} --env-file ${BACKUP_RUNTIME_ENV} --backup-dir ${BACKUP_DIR} --offsite-dir ${BACKUP_OFFSITE_DIR} --age-recipient-file ${BACKUP_AGE_RECIPIENT_FILE} --retention-days ${BACKUP_RETENTION_DAYS}
+TimeoutStartSec=45min
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
