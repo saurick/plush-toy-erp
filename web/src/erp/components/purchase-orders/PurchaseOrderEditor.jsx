@@ -1,0 +1,65 @@
+import React from 'react'
+
+import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
+import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
+import { PurchaseOrderFormFields } from './PurchaseOrderForm.jsx'
+
+export default function PurchaseOrderEditor({
+  open,
+  form,
+  editingOrder,
+  saving,
+  itemsLoading,
+  referenceDataReady,
+  orderAttachmentRef,
+  suppliers,
+  materials,
+  unitOptions,
+  canCreate,
+  canUpdate,
+  onOk,
+  onCancel,
+  onSupplierChange,
+  onMaterialChange,
+}) {
+  return (
+    <BusinessFormPage
+      form={form}
+      open={open}
+      title={editingOrder ? '编辑采购订单' : '新建采购订单'}
+      okText={
+        !editingOrder || editingOrder.lifecycle_status === 'draft'
+          ? '保存草稿'
+          : '保存'
+      }
+      confirmLoading={saving}
+      loading={itemsLoading || !referenceDataReady}
+      okButtonProps={{ disabled: !referenceDataReady }}
+      onOk={onOk}
+      onCancel={onCancel}
+    >
+      <PurchaseOrderFormFields
+        form={form}
+        suppliers={suppliers}
+        materials={materials}
+        unitOptions={unitOptions}
+        referenceDataReady={referenceDataReady}
+        onSupplierChange={onSupplierChange}
+        onMaterialChange={onMaterialChange}
+        attachmentPanel={
+          <BusinessAttachmentPanel
+            ref={orderAttachmentRef}
+            ownerType="purchase_order"
+            ownerId={editingOrder?.id}
+            title="采购附件"
+            description="上传供应商报价、签回采购单、到货要求或价格确认资料；上传附件不会改变采购订单状态。"
+            canUpload={canUpdate || canCreate}
+            canWithdraw={canCreate || canUpdate}
+            variant="inline"
+            compact
+          />
+        }
+      />
+    </BusinessFormPage>
+  )
+}
