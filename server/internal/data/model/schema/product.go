@@ -1,0 +1,89 @@
+package schema
+
+import (
+	"time"
+
+	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
+	"entgo.io/ent/schema/edge"
+	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
+)
+
+type Product struct {
+	ent.Schema
+}
+
+func (Product) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{
+			Checks: map[string]string{
+				"products_unit_net_weight_g_positive": "unit_net_weight_g IS NULL OR unit_net_weight_g > 0",
+			},
+		},
+	}
+}
+
+func (Product) Fields() []ent.Field {
+	return []ent.Field{
+		field.String("code").
+			NotEmpty().
+			MaxLen(64),
+		field.String("name").
+			NotEmpty().
+			MaxLen(255),
+		field.String("style_no").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("customer_style_no").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("english_name").
+			Optional().
+			Nillable().
+			MaxLen(255),
+		field.String("hs_code").
+			Optional().
+			Nillable().
+			MaxLen(32),
+		field.Int("default_unit_id").
+			Positive(),
+		optionalDecimalField("unit_net_weight_g"),
+		field.Bool("is_active").
+			Default(true),
+		field.Time("created_at").
+			Default(time.Now).
+			Immutable(),
+		field.Time("updated_at").
+			Default(time.Now).
+			UpdateDefault(time.Now),
+	}
+}
+
+func (Product) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.From("default_unit", Unit.Type).
+			Ref("products").
+			Field("default_unit_id").
+			Required().
+			Unique(),
+		edge.To("product_skus", ProductSKU.Type),
+		edge.To("bom_headers", BOMHeader.Type),
+		edge.To("outsourcing_order_items", OutsourcingOrderItem.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("shipment_items", ShipmentItem.Type),
+		edge.To("stock_reservations", StockReservation.Type),
+	}
+}
+
+func (Product) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("code").Unique(),
+		index.Fields("style_no"),
+		index.Fields("customer_style_no"),
+		index.Fields("name"),
+	}
+}

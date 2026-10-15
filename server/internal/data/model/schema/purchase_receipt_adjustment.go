@@ -1,0 +1,138 @@
+package schema
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
+	"entgo.io/ent/schema/edge"
+	"entgo.io/ent/schema/field"
+	"entgo.io/ent/schema/index"
+)
+
+type PurchaseReceiptAdjustment struct {
+	ent.Schema
+}
+
+func (PurchaseReceiptAdjustment) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"purchase_receipt_adjustments_status_allowed": "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
+			"purchase_receipt_adjustments_posted_shape":   "((status = 'DRAFT' AND posted_at IS NULL) OR (status = 'POSTED' AND posted_at IS NOT NULL) OR status = 'CANCELLED')",
+			"purchase_receipt_adjustments_idempotency_bundle_complete": `
+(
+  (
+    idempotency_key IS NULL
+    AND idempotency_payload_hash IS NULL
+    AND idempotency_item_count IS NULL
+  )
+  OR
+  (
+    idempotency_key IS NOT NULL
+    AND length(trim(idempotency_key)) BETWEEN 1 AND 128
+    AND idempotency_payload_hash IS NOT NULL
+    AND length(idempotency_payload_hash) = 64
+    AND idempotency_item_count IS NOT NULL
+    AND idempotency_item_count > 0
+  )
+)`,
+		}},
+	}
+}
+
+var purchaseReceiptAdjustmentLockedFields = map[string]struct{}{
+	"adjustment_no":            {},
+	"purchase_receipt_id":      {},
+	"status":                   {},
+	"adjusted_at":              {},
+	"posted_at":                {},
+	"idempotency_key":          {},
+	"idempotency_payload_hash": {},
+	"idempotency_item_count":   {},
+}
+
+func (PurchaseReceiptAdjustment) Hooks() []ent.Hook {
+	return []ent.Hook{
+		func(next ent.Mutator) ent.Mutator {
+			return ent.MutateFunc(func(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+				if m.Op().Is(ent.OpDelete | ent.OpDeleteOne) {
+					return nil, errors.New("purchase_receipt_adjustments are immutable source documents; cancel posted adjustments with reversal instead of deleting them")
+				}
+				if m.Op().Is(ent.OpUpdate|ent.OpUpdateOne) &&
+					(mutationTouchesAny(m, purchaseReceiptAdjustmentLockedFields) || mutationTouchesEdges(m)) {
+					return nil, errors.New("purchase_receipt_adjustment protected fields are immutable; use PostPurchaseReceiptAdjustment or CancelPostedPurchaseReceiptAdjustment for status changes")
+				}
+				return next.Mutate(ctx, m)
+			})
+		},
+	}
+}
+
+func (PurchaseReceiptAdjustment) Fields() []ent.Field {
+	return []ent.Field{
+		field.String("adjustment_no").
+			NotEmpty().
+			MaxLen(64),
+		field.Int("purchase_receipt_id").
+			Positive(),
+		field.String("reason").
+			Optional().
+			Nillable().
+			MaxLen(255),
+		field.String("status").
+			NotEmpty().
+			Default("DRAFT").
+			MaxLen(32),
+		field.Time("adjusted_at"),
+		field.Time("posted_at").
+			Optional().
+			Nillable(),
+		field.String("idempotency_key").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("idempotency_payload_hash").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.Int("idempotency_item_count").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("note").
+			Optional().
+			Nillable().
+			MaxLen(255),
+		field.Time("created_at").
+			Default(time.Now).
+			Immutable(),
+		field.Time("updated_at").
+			Default(time.Now).
+			UpdateDefault(time.Now),
+	}
+}
+
+func (PurchaseReceiptAdjustment) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.From("purchase_receipt", PurchaseReceipt.Type).
+			Ref("purchase_receipt_adjustments").
+			Field("purchase_receipt_id").
+			Required().
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("items", PurchaseReceiptAdjustmentItem.Type),
+	}
+}
+
+func (PurchaseReceiptAdjustment) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("adjustment_no").Unique(),
+		index.Fields("idempotency_key").Unique(),
+		index.Fields("purchase_receipt_id"),
+		index.Fields("status"),
+		index.Fields("adjusted_at"),
+	}
+}
