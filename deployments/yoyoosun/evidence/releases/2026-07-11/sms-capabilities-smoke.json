@@ -1,0 +1,10 @@
+{
+  "scope": "sms-provider-capabilities-smoke",
+  "status": "pass",
+  "enabled": true,
+  "mode": "provider",
+  "mockDelivery": false,
+  "mockFallbackExposed": false,
+  "realSmsSentThisRelease": false,
+  "secretStored": false
+}

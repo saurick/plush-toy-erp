@@ -1,0 +1,18 @@
+{
+  "customerCode": "yoyoosun",
+  "environment": "待填写",
+  "releaseVersion": "20260629T0802-draft",
+  "generatedAt": "2026-06-29T00:02:22Z",
+  "operatorRole": "待填写",
+  "summary": {
+    "total": 0,
+    "passed": 0,
+    "failed": 0
+  },
+  "checks": [],
+  "redaction": {
+    "containsSecrets": false,
+    "containsRawCustomerRows": false,
+    "notes": "待填写"
+  }
+}

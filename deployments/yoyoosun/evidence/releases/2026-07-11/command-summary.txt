@@ -1,0 +1,7 @@
+backupId=predeploy-20c96d38-20260711T052623Z
+releaseVersion=yoyoosun-20260711-20c96d38-amd64
+environment=customer-trial-133
+sourceAlias=plush-133-compose-postgres-loopback
+restoreTarget=isolated-postgres-db-plush_restore_20c96d38-removed
+steps=pg_dump custom-format pre-deploy backup; validate pg_restore catalog; restore into isolated PostgreSQL database; record pre-apply Atlas status at 20260710150001; run atlas migrate apply with pending 0; record post-apply status; run public-table and admin/sales/workflow/shipment smoke counts; drop isolated restore database; load fixed-revision images; restart server/web; run runtime preflight and authenticated smoke
+redaction=secret values, full DSN, dump content, raw customer rows, response bodies, access tokens, and Authorization headers are not stored
