@@ -1,0 +1,1690 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"strings"
+
+	v1 "server/api/jsonrpc/v1"
+	"server/internal/biz"
+	"server/internal/customertrialconfig"
+	"server/internal/errcode"
+
+	"google.golang.org/protobuf/types/known/structpb"
+)
+
+const customerConfigErrorReasonActiveRevisionRequired = "customer_config_active_revision_required"
+
+func localTestCustomerConfigBoundaryResult(productVersion string, compiledSnapshot map[string]any, gateEnabled bool) *v1.JsonrpcResult {
+	applyPurpose := ""
+	if value, ok := compiledSnapshot["applyPurpose"].(string); ok {
+		applyPurpose = strings.TrimSpace(value)
+	}
+	productVersion = strings.TrimSpace(productVersion)
+	isLocalTest := strings.HasPrefix(productVersion, "local-customer-package-test-") ||
+		strings.HasPrefix(applyPurpose, "local_test_")
+	if !isLocalTest {
+		return nil
+	}
+	if productVersion != biz.CustomerConfigLocalTestProductVersion ||
+		(applyPurpose != "" && applyPurpose != biz.CustomerConfigLocalTestApplyPurpose) {
+		return &v1.JsonrpcResult{
+			Code:    errcode.InvalidParam.Code,
+			Message: "本地测试客户配置标识无效",
+		}
+	}
+	if gateEnabled {
+		return nil
+	}
+	return &v1.JsonrpcResult{
+		Code:    errcode.InvalidParam.Code,
+		Message: "当前后端未开放本地测试客户配置应用",
+	}
+}
+
+func (d *jsonrpcDispatcher) handleCustomerConfig(
+	ctx context.Context,
+	method, id string,
+	params *structpb.Struct,
+) (string, *v1.JsonrpcResult, error) {
+	pm := map[string]any{}
+	if params != nil {
+		pm = params.AsMap()
+	}
+	if _, res := d.requireAdmin(ctx); res != nil {
+		return id, res, nil
+	}
+
+	if isCustomerConfigLifecycleMethod(method) {
+		return d.handleCustomerConfigLifecycle(ctx, method, id, pm)
+	}
+	if isCustomerConfigRuntimeAccessMethod(method) {
+		return d.handleCustomerConfigRuntimeAccess(ctx, method, id, pm)
+	}
+
+	switch method {
+	case "get_process_submission_route":
+		return id, d.getProcessSubmissionRoute(ctx, pm), nil
+
+	case "start_finance_payment_approval_process",
+		"get_finance_payment_approval_process",
+		"execute_finance_payment_post",
+		"start_inventory_adjustment_approval_process",
+		"get_inventory_adjustment_approval_process",
+		"execute_inventory_adjustment_submit",
+		"execute_inventory_adjustment_post",
+		"start_production_exception_approval_process",
+		"get_production_exception_approval_process",
+		"execute_production_exception_process":
+		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
+		result := d.handleCustomerConfigExceptionProcess(ctx, method, pm)
+		return id, result, nil
+
+	case "get_sales_order_acceptance_process":
+		return d.handleCustomerConfigGetSalesOrderAcceptanceProcess(ctx, method, id, pm)
+
+	case "start_sales_order_acceptance_process":
+		return d.handleCustomerConfigStartSalesOrderAcceptanceProcess(ctx, method, id, pm)
+
+	case "execute_sales_order_acceptance_submit":
+		return d.handleCustomerConfigExecuteSalesOrderAcceptanceSubmit(ctx, method, id, pm)
+
+	case "start_material_supply_purchase_order_process":
+		return d.handleCustomerConfigStartMaterialSupplyPurchaseOrderProcess(ctx, method, id, pm)
+
+	case "execute_material_supply_purchase_order_submit":
+		return d.handleCustomerConfigExecuteMaterialSupplyPurchaseOrderSubmit(ctx, method, id, pm)
+
+	case "start_finished_goods_delivery_process":
+		return d.handleCustomerConfigStartFinishedGoodsDeliveryProcess(ctx, method, id, pm)
+
+	case "execute_finished_goods_delivery_quality_decide":
+		return d.handleCustomerConfigExecuteFinishedGoodsDeliveryQualityDecide(ctx, method, id, pm)
+
+	case "execute_finished_goods_delivery_shipment_ship":
+		return d.handleCustomerConfigExecuteFinishedGoodsDeliveryShipmentShip(ctx, method, id, pm)
+
+	case "execute_finished_goods_delivery_receivable_lead":
+		return d.handleCustomerConfigExecuteFinishedGoodsDeliveryReceivableLead(ctx, method, id, pm)
+
+	case "execute_material_supply_purchase_receipt_create":
+		return d.handleCustomerConfigExecuteMaterialSupplyPurchaseReceiptCreate(ctx, method, id, pm)
+
+	case "execute_material_supply_quality_gate":
+		return d.handleCustomerConfigExecuteMaterialSupplyQualityGate(ctx, method, id, pm)
+
+	case "execute_material_supply_post_inbound":
+		return d.handleCustomerConfigExecuteMaterialSupplyPostInbound(ctx, method, id, pm)
+
+	default:
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.UnknownMethod.Code,
+			Message: fmt.Sprintf("unknown customer_config method: %s", method),
+		}, nil
+	}
+}
+
+func (d *jsonrpcDispatcher) startOrReplayProcessInstanceFirstNode(
+	ctx context.Context,
+	instance *biz.ProcessInstance,
+	nodes []*biz.ProcessNodeInstance,
+	expectedNodeKey string,
+	expectedNodeType string,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if d == nil || d.processRuntimeUC == nil || instance == nil || instance.ID <= 0 ||
+		len(nodes) == 0 || nodes[0] == nil || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	firstNode := nodes[0]
+	if firstNode.ProcessInstanceID != instance.ID ||
+		firstNode.NodeKey != expectedNodeKey ||
+		firstNode.NodeType != expectedNodeType {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	switch firstNode.Status {
+	case biz.ProcessNodeStatusWaiting, biz.ProcessNodeStatusActive:
+		return d.processRuntimeUC.StartProcessInstance(
+			ctx,
+			&biz.ProcessInstanceStart{ID: instance.ID},
+			actorID,
+		)
+	case biz.ProcessNodeStatusCompleted, biz.ProcessNodeStatusBlocked:
+		// CreateProcessInstanceFromSource has already proved that this request
+		// is the exact same source, definition, and idempotency key. Once the
+		// first node has settled, the public start endpoint is readback-only:
+		// re-running StartProcessInstance can conflict with downstream nodes
+		// that have legitimately advanced.
+		return firstNode, nil
+	default:
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+}
+
+func (d *jsonrpcDispatcher) requireCustomerTrialConfigManifest(in biz.CustomerConfigPublishInput) *v1.JsonrpcResult {
+	trial, err := customertrialconfig.ClassifyManifest(in.CustomerKey, in.Revision, in.ProductVersion, in.CompiledSnapshot)
+	if err != nil {
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	if trial && (d == nil || !d.trialConfigEnabled) {
+		return customerTrialConfigDisabledResult()
+	}
+	return nil
+}
+
+func (d *jsonrpcDispatcher) requireCustomerTrialConfigRevisionProductVersion(ctx context.Context, customerKey, revision, productVersion string) *v1.JsonrpcResult {
+	trial, err := customertrialconfig.ClassifyRevisionProductVersion(customerKey, revision, productVersion)
+	if err != nil {
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	if trial && (d == nil || !d.trialConfigEnabled) {
+		return customerTrialConfigDisabledResult()
+	}
+	if trial {
+		stored, err := d.customerConfigUC.GetCustomerConfigRevision(ctx, customerKey, revision)
+		if err != nil {
+			return d.mapCustomerConfigError(ctx, err)
+		}
+		if stored == nil || stored.CustomerKey != customerKey || stored.Revision != revision || stored.ProductVersion != productVersion {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+		}
+		if valid, err := customertrialconfig.ClassifyActiveManifest(stored.CustomerKey, stored.Revision, stored.ProductVersion, stored.CompiledSnapshot); err != nil || !valid {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+		}
+	}
+	return nil
+}
+
+func customerTrialConfigDisabledResult() *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{
+		Code:    errcode.PermissionDenied.Code,
+		Message: "当前运行环境未开放客户试用配置应用",
+	}
+}
+
+func (d *jsonrpcDispatcher) requireCustomerConfigProcessDomainCommandAllowed(
+	ctx context.Context,
+	requestedCustomerKey string,
+	in *biz.ProcessDomainCommandExecution,
+	admin *biz.AdminUser,
+) (string, *v1.JsonrpcResult) {
+	if d == nil || d.customerConfigUC == nil || d.processRuntimeUC == nil || in == nil || admin == nil {
+		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	instance, err := d.processRuntimeUC.GetProcessInstance(ctx, in.ProcessInstanceID)
+	if err != nil {
+		return "", d.mapCustomerConfigError(ctx, err)
+	}
+	if instance == nil || instance.ID != in.ProcessInstanceID || strings.TrimSpace(instance.ConfigRevision) == "" {
+		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	nodes, err := d.processRuntimeUC.ListProcessNodeInstances(ctx, instance.ID)
+	if err != nil {
+		return "", d.mapCustomerConfigError(ctx, err)
+	}
+	var targetNode *biz.ProcessNodeInstance
+	for _, node := range nodes {
+		if node == nil || node.ID != in.ProcessNodeInstanceID {
+			continue
+		}
+		if targetNode != nil {
+			return "", d.mapCustomerConfigError(ctx, biz.ErrProcessNodeInstanceConflict)
+		}
+		targetNode = node
+	}
+	if targetNode == nil || targetNode.ProcessInstanceID != instance.ID ||
+		targetNode.NodeType != biz.ProcessNodeTypeDomainCommand {
+		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	nodeCommandKey, _ := targetNode.PolicySnapshot["command_key"].(string)
+	if strings.TrimSpace(nodeCommandKey) == "" || strings.TrimSpace(nodeCommandKey) != strings.TrimSpace(in.CommandKey) {
+		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	instanceCustomerKey, _ := instance.ModuleContractSnapshot["customer_key"].(string)
+	instanceCustomerKey = biz.NormalizeCustomerKey(instanceCustomerKey)
+	if instanceCustomerKey == "" {
+		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	resolvedCustomerKey, err := runtimeCustomerKey(instanceCustomerKey)
+	if err != nil {
+		return "", d.mapCustomerConfigError(ctx, err)
+	}
+	requestedCustomerKey = biz.NormalizeCustomerKey(requestedCustomerKey)
+	if requestedCustomerKey != "" && requestedCustomerKey != resolvedCustomerKey {
+		return "", d.mapCustomerConfigError(ctx, biz.ErrForbidden)
+	}
+	if err := d.customerConfigUC.EnsureProcessDomainCommandAllowedAtRevision(
+		ctx,
+		resolvedCustomerKey,
+		instance.ConfigRevision,
+		admin,
+		in.CommandKey,
+	); err != nil {
+		return "", d.mapCustomerConfigError(ctx, err)
+	}
+	ownerPoolKey := ""
+	if targetNode.OwnerPoolKey != nil {
+		ownerPoolKey = strings.TrimSpace(*targetNode.OwnerPoolKey)
+	}
+	if ownerPoolKey != "" {
+		requiredCapabilityKey := ""
+		if targetNode.RequiredCapabilityKey != nil {
+			requiredCapabilityKey = strings.TrimSpace(*targetNode.RequiredCapabilityKey)
+		}
+		if requiredCapabilityKey == "" {
+			return "", d.mapCustomerConfigError(ctx, biz.ErrForbidden)
+		}
+		visibleRoleKeys, err := d.customerConfigUC.WorkflowVisibleOwnerRoleKeysAtRevision(
+			ctx,
+			resolvedCustomerKey,
+			instance.ConfigRevision,
+			admin,
+			requiredCapabilityKey,
+		)
+		if err != nil {
+			return "", d.mapCustomerConfigError(ctx, err)
+		}
+		explanation, err := d.customerConfigUC.WorkflowCandidateOwnerRoleKeysAtRevision(
+			ctx,
+			resolvedCustomerKey,
+			instance.ConfigRevision,
+			ownerPoolKey,
+			requiredCapabilityKey,
+		)
+		if err != nil {
+			return "", d.mapCustomerConfigError(ctx, err)
+		}
+		if explanation == nil ||
+			!workflowRoleKeySetsIntersect(visibleRoleKeys, explanation.CandidateOwnerRoleKeys) {
+			return "", d.mapCustomerConfigError(ctx, biz.ErrForbidden)
+		}
+	}
+	if res := d.requirePurchaseReceiptProcessWarehouseAccess(ctx, in, instance, targetNode); res != nil {
+		return "", res
+	}
+	if in.CommandKey == biz.ProcessDomainCommandProductionExceptionExecute {
+		scope, res := d.currentWarehouseDataScope(ctx)
+		if res != nil {
+			return "", res
+		}
+		in.WarehouseScope = &scope
+	}
+	return instance.ConfigRevision, nil
+}
+
+func workflowRoleKeySetsIntersect(left, right []string) bool {
+	rightSet := make(map[string]struct{}, len(right))
+	for _, roleKey := range biz.NormalizeAdminRoleKeys(right) {
+		rightSet[roleKey] = struct{}{}
+	}
+	for _, roleKey := range biz.NormalizeAdminRoleKeys(left) {
+		if _, ok := rightSet[roleKey]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func customerConfigProcessRuntimeBoundary(revision string, boundary map[string]any) map[string]any {
+	if boundary == nil {
+		boundary = map[string]any{}
+	}
+	boundary["source"] = "process_instance_config_revision"
+	boundary["config_revision"] = strings.TrimSpace(revision)
+	return boundary
+}
+
+func approvalSettingsRevisionInputFromParams(pm map[string]any) (biz.ApprovalSettingsRevisionInput, bool) {
+	if !customerConfigAllowsOnly(
+		pm,
+		"customer_key",
+		"revision",
+		"expected_active_revision",
+		"expected_active_hash",
+		"items",
+	) {
+		return biz.ApprovalSettingsRevisionInput{}, false
+	}
+	rawItems, ok := pm["items"].([]any)
+	if !ok || len(rawItems) == 0 {
+		return biz.ApprovalSettingsRevisionInput{}, false
+	}
+	items := make([]biz.ApprovalSettingItemInput, 0, len(rawItems))
+	for _, rawItem := range rawItems {
+		itemMap, ok := rawItem.(map[string]any)
+		if !ok || !customerConfigAllowsOnly(itemMap, "approval_key", "enabled", "members", "condition") {
+			return biz.ApprovalSettingsRevisionInput{}, false
+		}
+		rawMembers, ok := itemMap["members"].([]any)
+		if !ok {
+			return biz.ApprovalSettingsRevisionInput{}, false
+		}
+		members := make([]biz.ApprovalSettingMemberInput, 0, len(rawMembers))
+		for _, rawMember := range rawMembers {
+			memberMap, ok := rawMember.(map[string]any)
+			if !ok || !customerConfigAllowsOnly(memberMap, "role_key", "user_id", "strategy", "enabled") {
+				return biz.ApprovalSettingsRevisionInput{}, false
+			}
+			enabled, ok := memberMap["enabled"].(bool)
+			if !ok {
+				return biz.ApprovalSettingsRevisionInput{}, false
+			}
+			members = append(members, biz.ApprovalSettingMemberInput{
+				RoleKey:  getString(memberMap, "role_key"),
+				UserID:   getInt(memberMap, "user_id", 0),
+				Strategy: getString(memberMap, "strategy"),
+				Enabled:  enabled,
+			})
+		}
+		enabled, ok := itemMap["enabled"].(bool)
+		if !ok {
+			return biz.ApprovalSettingsRevisionInput{}, false
+		}
+		condition, err := biz.ApprovalConditionFromMap(itemMap["condition"])
+		if err != nil {
+			return biz.ApprovalSettingsRevisionInput{}, false
+		}
+		items = append(items, biz.ApprovalSettingItemInput{
+			Condition:   condition,
+			ApprovalKey: getString(itemMap, "approval_key"),
+			Enabled:     enabled,
+			Members:     members,
+		})
+	}
+	in := biz.ApprovalSettingsRevisionInput{
+		CustomerKey:            getString(pm, "customer_key"),
+		Revision:               getString(pm, "revision"),
+		ExpectedActiveRevision: getString(pm, "expected_active_revision"),
+		ExpectedActiveHash:     getString(pm, "expected_active_hash"),
+		Items:                  items,
+	}
+	if strings.TrimSpace(in.Revision) == "" || strings.TrimSpace(in.ExpectedActiveRevision) == "" || strings.TrimSpace(in.ExpectedActiveHash) == "" {
+		return biz.ApprovalSettingsRevisionInput{}, false
+	}
+	return in, true
+}
+
+func approvalSettingsWouldIncludeActor(items []biz.ApprovalSettingItemInput, admin *biz.AdminUser) bool {
+	if admin == nil {
+		return true
+	}
+	actorRoles := map[string]struct{}{}
+	for _, roleKey := range biz.AdminRoleKeys(admin) {
+		actorRoles[biz.NormalizeRoleKey(roleKey)] = struct{}{}
+	}
+	for _, item := range items {
+		if !item.Enabled {
+			continue
+		}
+		for _, member := range item.Members {
+			if !member.Enabled {
+				continue
+			}
+			if member.UserID == admin.ID {
+				return true
+			}
+			if _, matchesActorRole := actorRoles[biz.NormalizeRoleKey(member.RoleKey)]; matchesActorRole {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (d *jsonrpcDispatcher) validateApprovalSettingsCandidate(
+	ctx context.Context,
+	settings *biz.ApprovalSettingsExplanation,
+	admin *biz.AdminUser,
+) *v1.JsonrpcResult {
+	if settings == nil || settings.PublishInput == nil || admin == nil {
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "审批责任设置不完整"}
+	}
+	for _, item := range settings.Items {
+		if item.Configurable && item.Enabled && len(item.BlockedReasons) > 0 {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "审批责任设置存在无人可办理的事项"}
+		}
+	}
+	if result := d.validateApprovalSettingsMemberEligibility(ctx, settings.PublishInput.WorkPoolMemberships); result != nil {
+		return result
+	}
+	if admin.IsSuperAdmin {
+		return nil
+	}
+	candidateMembership := approvalSettingsActorMembership(settings, admin)
+	hasCandidateMembership := false
+	for _, included := range candidateMembership {
+		hasCandidateMembership = hasCandidateMembership || included
+	}
+	if !hasCandidateMembership {
+		return nil
+	}
+	active, err := d.customerConfigUC.GetApprovalSettings(ctx, settings.CustomerKey)
+	if err != nil {
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "不能通过审批责任给自己增加办理资格"}
+	}
+	activeMembership := approvalSettingsActorMembership(active, admin)
+	for approvalKey, included := range candidateMembership {
+		if included && !activeMembership[approvalKey] {
+			return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "不能通过审批责任给自己增加办理资格"}
+		}
+	}
+	return nil
+}
+
+func (d *jsonrpcDispatcher) validateApprovalSettingsMemberEligibility(
+	ctx context.Context,
+	memberships []biz.WorkPoolMembershipInput,
+) *v1.JsonrpcResult {
+	managedMemberships := make([]biz.WorkPoolMembershipInput, 0, len(memberships))
+	for _, membership := range memberships {
+		if membership.Enabled && biz.IsApprovalSettingsPoolKey(membership.PoolKey) {
+			managedMemberships = append(managedMemberships, membership)
+		}
+	}
+	if len(managedMemberships) == 0 {
+		return nil
+	}
+	if d == nil || d.adminManageUC == nil {
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+	roles, err := d.adminManageUC.ListRoles(ctx)
+	if err != nil {
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+	admins, err := d.adminManageUC.List(ctx)
+	if err != nil {
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+	roleByKey := make(map[string]biz.AdminRole, len(roles))
+	for _, role := range roles {
+		roleKey := biz.NormalizeRoleKey(role.Key)
+		if roleKey != "" {
+			roleByKey[roleKey] = role
+		}
+	}
+	for _, membership := range managedMemberships {
+		roleKey := biz.NormalizeRoleKey(membership.RoleKey)
+		role, exists := roleByKey[roleKey]
+		if !exists {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位不存在"}
+		}
+		if role.Disabled {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位当前已停用"}
+		}
+		if !biz.PermissionSetHasAny(
+			biz.PermissionKeySet(role.Permissions),
+			biz.PermissionWorkflowTaskApprove,
+		) {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位当前未开启审批功能"}
+		}
+		if membership.UserID > 0 {
+			var named *biz.AdminUser
+			for _, admin := range admins {
+				if admin != nil && admin.ID == membership.UserID {
+					named = admin
+					break
+				}
+			}
+			if named == nil || named.AccountStatus() == biz.AdminAccountStatusRevoked {
+				return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "指定员工不存在或已离职"}
+			}
+			if !named.IsActive() {
+				return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "指定员工当前未启用"}
+			}
+			if !biz.AdminHasRole(named, roleKey) {
+				return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "指定员工不属于所选岗位"}
+			}
+			continue
+		}
+		matched := false
+		for _, admin := range admins {
+			if !admin.IsActive() || !biz.AdminHasRole(admin, roleKey) {
+				continue
+			}
+			matched = true
+			break
+		}
+		if !matched {
+			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "所选岗位当前没有可办理员工"}
+		}
+	}
+	return nil
+}
+
+func approvalSettingsActorMembership(
+	settings *biz.ApprovalSettingsExplanation,
+	admin *biz.AdminUser,
+) map[string]bool {
+	out := map[string]bool{}
+	if settings == nil || admin == nil || !admin.IsActive() {
+		return out
+	}
+	for _, item := range settings.Items {
+		if !item.Configurable || !item.Enabled {
+			continue
+		}
+		for _, member := range item.Members {
+			roleKey := biz.NormalizeRoleKey(member.RoleKey)
+			if !member.Enabled {
+				continue
+			}
+			if member.UserID == admin.ID || biz.AdminHasRole(admin, roleKey) {
+				out[item.ApprovalKey] = true
+				break
+			}
+		}
+	}
+	return out
+}
+
+func approvalSettingsExplanationToMap(settings *biz.ApprovalSettingsExplanation) map[string]any {
+	if settings == nil {
+		return map[string]any{}
+	}
+	items := make([]any, 0, len(settings.Items))
+	for _, item := range settings.Items {
+		members := make([]any, 0, len(item.Members))
+		for _, member := range item.Members {
+			members = append(members, map[string]any{
+				"role_key": member.RoleKey,
+				"user_id":  member.UserID,
+				"strategy": member.Strategy,
+				"priority": member.Priority,
+				"enabled":  member.Enabled,
+			})
+		}
+		items = append(items, map[string]any{
+			"approval_key":        item.ApprovalKey,
+			"condition":           item.Condition.Snapshot(),
+			"label":               item.Label,
+			"domain":              item.Domain,
+			"pool_key":            item.PoolKey,
+			"configurable":        item.Configurable,
+			"configured":          item.Configured,
+			"enabled":             item.Enabled,
+			"members":             members,
+			"effective_role_keys": toAnySliceString(item.EffectiveRoleKeys),
+			"effective_strategy":  item.EffectiveStrategy,
+			"blocked_reasons":     toAnySliceString(item.BlockedReasons),
+			"domain_boundary":     item.DomainBoundary,
+			"fact_boundary":       item.FactBoundary,
+		})
+	}
+	return map[string]any{
+		"customer_key":    settings.CustomerKey,
+		"config_revision": settings.ConfigRevision,
+		"config_hash":     settings.ConfigHash,
+		"product_version": settings.ProductVersion,
+		"schema_version":  settings.SchemaVersion,
+		"source":          settings.Source,
+		"items":           items,
+	}
+}
+
+func (d *jsonrpcDispatcher) requireCustomerConfigModulesEnabled(ctx context.Context, customerKey string, moduleKeys ...string) *v1.JsonrpcResult {
+	if d == nil || d.customerConfigUC == nil {
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	resolvedCustomerKey, err := runtimeCustomerKey(customerKey)
+	if err != nil {
+		return d.mapCustomerConfigError(ctx, err)
+	}
+	if err := d.customerConfigUC.EnsureModuleKeysEnabled(ctx, resolvedCustomerKey, moduleKeys...); err != nil {
+		return d.mapCustomerConfigError(ctx, err)
+	}
+	return nil
+}
+
+func (d *jsonrpcDispatcher) requireCustomerConfigModulesReadable(ctx context.Context, moduleKeys ...string) *v1.JsonrpcResult {
+	if d == nil || d.customerConfigUC == nil {
+		return invalidParamResult()
+	}
+	resolvedCustomerKey, err := runtimeCustomerKey("")
+	if err != nil {
+		return d.mapCustomerConfigError(ctx, err)
+	}
+	if err := d.customerConfigUC.EnsureModuleKeysReadable(ctx, resolvedCustomerKey, moduleKeys...); err != nil {
+		return d.mapCustomerConfigError(ctx, err)
+	}
+	return nil
+}
+
+func runtimeCustomerKey(requested string) (string, error) {
+	requested = biz.NormalizeCustomerKey(requested)
+	configured := biz.NormalizeCustomerKey(os.Getenv("ERP_CUSTOMER_KEY"))
+	if configured == "" {
+		if requested == "" {
+			return biz.DefaultCustomerKey, nil
+		}
+		return requested, nil
+	}
+	if requested != "" && requested != configured {
+		return "", biz.ErrForbidden
+	}
+	return configured, nil
+}
+
+func runtimeCustomerConfigRequiresActiveRevision() bool {
+	configured := biz.NormalizeCustomerKey(os.Getenv("ERP_CUSTOMER_KEY"))
+	return configured != "" && configured != biz.DefaultCustomerKey
+}
+
+func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err error) *v1.JsonrpcResult {
+	if result := unitQuantityErrorResult(err); result != nil {
+		return result
+	}
+	l := d.log.WithContext(ctx)
+	switch {
+	case errors.Is(err, biz.ErrWorkflowTaskSourceGeneratedOnly):
+		l.Warnf("[customer_config] source-generated task namespace rejected err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该任务由业务来源生成，请回到对应业务页面办理"}
+	case errors.Is(err, biz.ErrBadParam):
+		l.Warnf("[customer_config] invalid param err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	case errors.Is(err, biz.ErrForbidden), errors.Is(err, biz.ErrNoPermission):
+		l.Warnf("[customer_config] forbidden err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	case errors.Is(err, biz.ErrCustomerConfigNotFound):
+		l.Warnf("[customer_config] revision not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "客户配置版本不存在"}
+	case errors.Is(err, biz.ErrCustomerConfigActiveRevisionRequired):
+		l.Warnf("[customer_config] active revision required for fixed customer runtime err=%v", err)
+		return &v1.JsonrpcResult{
+			Code:    errcode.PermissionDenied.Code,
+			Message: "当前部署客户尚未激活配置，业务权限已关闭",
+			Data: newDataStruct(map[string]any{
+				"reason": customerConfigErrorReasonActiveRevisionRequired,
+			}),
+		}
+	case errors.Is(err, biz.ErrCustomerConfigRevisionImmutable):
+		l.Warnf("[customer_config] immutable revision overwrite rejected err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置版本已存在且内容不同，请使用新版本号发布"}
+	case errors.Is(err, biz.ErrCustomerConfigActiveRevisionChanged):
+		l.Warnf("[customer_config] active revision compare-and-swap rejected err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "当前激活版本已变化，请重新检查后再执行"}
+	case errors.Is(err, biz.ErrCustomerConfigProductVersionMismatch):
+		l.Warnf("[customer_config] expected product version mismatch err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "产品版本已变化，请重新校验后再执行"}
+	case errors.Is(err, biz.ErrCustomerConfigTransitionBlocked):
+		l.Warnf("[customer_config] transition preflight blocked err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置切换存在运行中阻塞，请先查看切换检查结果"}
+	case errors.Is(err, biz.ErrCustomerConfigHashMismatch):
+		l.Warnf("[customer_config] expected config hash mismatch err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置内容已变化，请重新校验后再激活"}
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		l.Warnf("[customer_config] idempotency payload conflict err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrProcessDomainCommandRecoveryRequired):
+		l.Warnf("[customer_config] process domain command recovery required err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.ProcessDomainCommandRecoveryRequired.Code, Message: errcode.ProcessDomainCommandRecoveryRequired.Message}
+	case errors.Is(err, biz.ErrProcessTaskOwnerRoleNotFound):
+		l.Warnf("[customer_config] process task owner role not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前流程节点没有可办理岗位，请联系管理员指定责任岗位后重试"}
+	case errors.Is(err, biz.ErrProcessTaskOwnerRoleAmbiguous):
+		l.Warnf("[customer_config] process task owner role ambiguous err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前流程节点匹配到多个办理岗位，请联系管理员明确唯一责任岗位后重试"}
+	case errors.Is(err, biz.ErrProcessInstanceExists):
+		l.Warnf("[customer_config] process instance exists err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "流程实例已存在"}
+	case errors.Is(err, biz.ErrProcessInstanceNotFound), errors.Is(err, biz.ErrProcessNodeInstanceNotFound):
+		l.Warnf("[customer_config] process runtime target not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "流程运行时对象不存在"}
+	case errors.Is(err, biz.ErrProcessInstanceSettled), errors.Is(err, biz.ErrProcessNodeInstanceConflict), errors.Is(err, biz.ErrProcessNodeInstanceSettled), errors.Is(err, biz.ErrProcessNodeInstanceNotActive):
+		l.Warnf("[customer_config] process runtime state conflict err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "流程运行时状态冲突"}
+	case errors.Is(err, biz.ErrProcessDomainCommandHandlerNotFound):
+		l.Warnf("[customer_config] process domain command handler missing err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "流程领域命令处理器不存在"}
+	case errors.Is(err, biz.ErrSalesOrderNotFound):
+		l.Warnf("[customer_config] sales order not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单不存在"}
+	case errors.Is(err, biz.ErrPurchaseOrderNotFound):
+		l.Warnf("[customer_config] purchase order not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单不存在"}
+	case errors.Is(err, biz.ErrPurchaseReceiptNotFound):
+		l.Warnf("[customer_config] purchase receipt not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库单不存在"}
+	case errors.Is(err, biz.ErrQualityInspectionNotFound):
+		l.Warnf("[customer_config] quality inspection not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "质检单不存在"}
+	case errors.Is(err, biz.ErrPurchaseReceiptQualityPending):
+		l.Warnf("[customer_config] purchase receipt quality gate pending err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料质检尚未逐行完成"}
+	case errors.Is(err, biz.ErrShipmentNotFound), errors.Is(err, biz.ErrShipmentItemNotFound):
+		l.Warnf("[customer_config] shipment not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货单不存在"}
+	case errors.Is(err, biz.ErrShipmentQualityPending):
+		l.Warnf("[customer_config] shipment quality gate pending err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"}
+	case errors.Is(err, biz.ErrShipmentQualityRejected):
+		l.Warnf("[customer_config] shipment quality gate rejected err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单的出货前成品检验不合格，请先完成质量处置"}
+	case errors.Is(err, biz.ErrShipmentPackingPending):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货超过可发数量，请先完成对应成品的检验、查货和包装"}
+	default:
+		if result := d.processBusinessErrorResult(ctx, err); result != nil {
+			return result
+		}
+		l.Errorf("[customer_config] internal err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
+	}
+}
+
+func (d *jsonrpcDispatcher) salesOrderProcessSourceRefNo(ctx context.Context, salesOrderID int) (*string, error) {
+	if d == nil || d.salesOrderUC == nil || salesOrderID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	order, err := d.salesOrderUC.GetSalesOrder(ctx, salesOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil || order.ID != salesOrderID ||
+		(order.LifecycleStatus != biz.SalesOrderStatusDraft &&
+			order.LifecycleStatus != biz.SalesOrderStatusSubmitted &&
+			order.LifecycleStatus != biz.SalesOrderStatusActive) {
+		return nil, biz.ErrBadParam
+	}
+	return requiredProcessSourceRefNo(order.OrderNo)
+}
+
+func (d *jsonrpcDispatcher) purchaseOrderProcessSourceRefNo(ctx context.Context, purchaseOrderID int) (*string, error) {
+	if d == nil || d.purchaseOrderUC == nil || purchaseOrderID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	order, err := d.purchaseOrderUC.GetPurchaseOrder(ctx, purchaseOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil || order.ID != purchaseOrderID ||
+		(order.LifecycleStatus != biz.PurchaseOrderStatusDraft && order.LifecycleStatus != biz.PurchaseOrderStatusSubmitted) {
+		return nil, biz.ErrBadParam
+	}
+	return requiredProcessSourceRefNo(order.PurchaseOrderNo)
+}
+
+func (d *jsonrpcDispatcher) shipmentProcessSourceRefNo(ctx context.Context, shipmentID int) (*string, error) {
+	if d == nil || d.operationalFactUC == nil || shipmentID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	shipment, err := d.operationalFactUC.GetShipment(ctx, shipmentID)
+	if err != nil {
+		return nil, err
+	}
+	if shipment == nil || shipment.ID != shipmentID ||
+		(shipment.Status != biz.ShipmentStatusDraft && shipment.Status != biz.ShipmentStatusShipped) {
+		return nil, biz.ErrBadParam
+	}
+	return requiredProcessSourceRefNo(shipment.ShipmentNo)
+}
+
+func requiredProcessSourceRefNo(value string) (*string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, biz.ErrBadParam
+	}
+	return &value, nil
+}
+
+func salesOrderAcceptanceProcessInputFromParams(pm map[string]any) (biz.ProcessInstanceFromCustomerConfigInput, bool) {
+	salesOrderID := getInt(pm, "sales_order_id", 0)
+	if salesOrderID <= 0 {
+		salesOrderID = getInt(pm, "business_ref_id", 0)
+	}
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if salesOrderID <= 0 || idempotencyKey == "" {
+		return biz.ProcessInstanceFromCustomerConfigInput{}, false
+	}
+	return biz.ProcessInstanceFromCustomerConfigInput{
+		CustomerKey:     getString(pm, "customer_key"),
+		ProcessKey:      biz.ProcessKeySalesOrderAcceptance,
+		ProcessVersion:  getString(pm, "process_version"),
+		BusinessRefType: "sales_order",
+		BusinessRefID:   salesOrderID,
+		CorrelationKey:  optionalRPCStringPointer(getString(pm, "correlation_key")),
+		IdempotencyKey:  idempotencyKey,
+	}, true
+}
+
+func salesOrderAcceptanceSubmitExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+	processInstanceID := getInt(pm, "process_instance_id", 0)
+	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
+	expectedVersion := getInt(pm, "expected_version", 0)
+	salesOrderID := getInt(pm, "sales_order_id", 0)
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || salesOrderID <= 0 || idempotencyKey == "" {
+		return nil, false
+	}
+	return &biz.ProcessDomainCommandExecution{
+		ProcessInstanceID:     processInstanceID,
+		ProcessNodeInstanceID: processNodeInstanceID,
+		ExpectedVersion:       expectedVersion,
+		CommandKey:            biz.ProcessDomainCommandSalesOrderSubmit,
+		IdempotencyKey:        idempotencyKey,
+		Payload: map[string]any{
+			"sales_order_id": salesOrderID,
+		},
+	}, true
+}
+
+func materialSupplyPurchaseOrderProcessInputFromParams(pm map[string]any) (biz.ProcessInstanceFromCustomerConfigInput, bool) {
+	purchaseOrderID := getInt(pm, "purchase_order_id", 0)
+	if purchaseOrderID <= 0 {
+		purchaseOrderID = getInt(pm, "business_ref_id", 0)
+	}
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if purchaseOrderID <= 0 || idempotencyKey == "" {
+		return biz.ProcessInstanceFromCustomerConfigInput{}, false
+	}
+	return biz.ProcessInstanceFromCustomerConfigInput{
+		CustomerKey:     getString(pm, "customer_key"),
+		ProcessKey:      biz.ProcessKeyMaterialSupply,
+		ProcessVersion:  getString(pm, "process_version"),
+		BusinessRefType: "purchase_order",
+		BusinessRefID:   purchaseOrderID,
+		CorrelationKey:  optionalRPCStringPointer(getString(pm, "correlation_key")),
+		IdempotencyKey:  idempotencyKey,
+	}, true
+}
+
+func materialSupplyPurchaseOrderSubmitExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+	processInstanceID := getInt(pm, "process_instance_id", 0)
+	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
+	expectedVersion := getInt(pm, "expected_version", 0)
+	purchaseOrderID := getInt(pm, "purchase_order_id", 0)
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || purchaseOrderID <= 0 || idempotencyKey == "" {
+		return nil, false
+	}
+	return &biz.ProcessDomainCommandExecution{
+		ProcessInstanceID:     processInstanceID,
+		ProcessNodeInstanceID: processNodeInstanceID,
+		ExpectedVersion:       expectedVersion,
+		CommandKey:            biz.ProcessDomainCommandPurchaseOrderSubmit,
+		IdempotencyKey:        idempotencyKey,
+		Payload: map[string]any{
+			"purchase_order_id": purchaseOrderID,
+		},
+	}, true
+}
+
+func finishedGoodsDeliveryProcessInputFromParams(pm map[string]any) (biz.ProcessInstanceFromCustomerConfigInput, bool) {
+	shipmentID := getInt(pm, "shipment_id", 0)
+	if shipmentID <= 0 {
+		shipmentID = getInt(pm, "business_ref_id", 0)
+	}
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if shipmentID <= 0 || idempotencyKey == "" {
+		return biz.ProcessInstanceFromCustomerConfigInput{}, false
+	}
+	return biz.ProcessInstanceFromCustomerConfigInput{
+		CustomerKey:     getString(pm, "customer_key"),
+		ProcessKey:      biz.ProcessKeyFinishedGoodsDelivery,
+		ProcessVersion:  getString(pm, "process_version"),
+		BusinessRefType: "shipment",
+		BusinessRefID:   shipmentID,
+		CorrelationKey:  optionalRPCStringPointer(getString(pm, "correlation_key")),
+		IdempotencyKey:  idempotencyKey,
+	}, true
+}
+
+func finishedGoodsDeliveryQualityDecisionExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+	if !jsonRPCParamsAllowed(pm,
+		"customer_key",
+		"process_instance_id",
+		"process_node_instance_id",
+		"expected_version",
+		"shipment_id",
+		"business_ref_id",
+		"quality_inspection_id",
+		"finished_goods_lot_id",
+		"result",
+		"inspected_at",
+		"defect_rate_operator",
+		"defect_rate_percent",
+		"decision_note",
+		"idempotency_key",
+	) {
+		return nil, false
+	}
+	processInstanceID := getInt(pm, "process_instance_id", 0)
+	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
+	expectedVersion := getInt(pm, "expected_version", 0)
+	shipmentID := getInt(pm, "shipment_id", 0)
+	if shipmentID <= 0 {
+		shipmentID = getInt(pm, "business_ref_id", 0)
+	}
+	result := strings.TrimSpace(getString(pm, "result"))
+	qualityInspectionID := getInt(pm, "quality_inspection_id", 0)
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || shipmentID <= 0 || qualityInspectionID <= 0 || result == "" || idempotencyKey == "" {
+		return nil, false
+	}
+	defectRateOperator, defectRatePercent, ok := qualityInspectionDefectRateFromParams(pm)
+	if !ok {
+		return nil, false
+	}
+	payload := map[string]any{
+		"shipment_id":           shipmentID,
+		"quality_inspection_id": qualityInspectionID,
+		"result":                result,
+	}
+	putPositiveIntPayload(payload, "finished_goods_lot_id", getInt(pm, "finished_goods_lot_id", 0))
+	putStringPayload(payload, "inspected_at", getString(pm, "inspected_at"))
+	if defectRateOperator != nil && defectRatePercent != nil {
+		payload["defect_rate_operator"] = *defectRateOperator
+		payload["defect_rate_percent"] = defectRatePercent.String()
+	}
+	putStringPayload(payload, "decision_note", getString(pm, "decision_note"))
+	return &biz.ProcessDomainCommandExecution{
+		ProcessInstanceID:     processInstanceID,
+		ProcessNodeInstanceID: processNodeInstanceID,
+		ExpectedVersion:       expectedVersion,
+		CommandKey:            biz.ProcessDomainCommandFinishedGoodsQualityDecide,
+		IdempotencyKey:        idempotencyKey,
+		Payload:               payload,
+	}, true
+}
+
+func finishedGoodsDeliveryFinanceReleaseExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+	processInstanceID := getInt(pm, "process_instance_id", 0)
+	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
+	expectedVersion := getInt(pm, "expected_version", 0)
+	shipmentID := getInt(pm, "shipment_id", 0)
+	if shipmentID <= 0 {
+		shipmentID = getInt(pm, "business_ref_id", 0)
+	}
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || shipmentID <= 0 || idempotencyKey == "" {
+		return nil, false
+	}
+	payload := map[string]any{
+		"shipment_id": shipmentID,
+	}
+	return &biz.ProcessDomainCommandExecution{
+		ProcessInstanceID:     processInstanceID,
+		ProcessNodeInstanceID: processNodeInstanceID,
+		ExpectedVersion:       expectedVersion,
+		CommandKey:            biz.ProcessDomainCommandShipmentFinanceRelease,
+		IdempotencyKey:        idempotencyKey,
+		Payload:               payload,
+	}, true
+}
+
+func finishedGoodsDeliveryShipmentShipExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+	processInstanceID := getInt(pm, "process_instance_id", 0)
+	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
+	expectedVersion := getInt(pm, "expected_version", 0)
+	shipmentID := getInt(pm, "shipment_id", 0)
+	if shipmentID <= 0 {
+		shipmentID = getInt(pm, "business_ref_id", 0)
+	}
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || shipmentID <= 0 || idempotencyKey == "" {
+		return nil, false
+	}
+	payload := map[string]any{
+		"shipment_id": shipmentID,
+	}
+	return &biz.ProcessDomainCommandExecution{
+		ProcessInstanceID:     processInstanceID,
+		ProcessNodeInstanceID: processNodeInstanceID,
+		ExpectedVersion:       expectedVersion,
+		CommandKey:            biz.ProcessDomainCommandShipmentShip,
+		IdempotencyKey:        idempotencyKey,
+		Payload:               payload,
+	}, true
+}
+
+func finishedGoodsDeliveryReceivableLeadExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+	processInstanceID := getInt(pm, "process_instance_id", 0)
+	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
+	expectedVersion := getInt(pm, "expected_version", 0)
+	shipmentID := getInt(pm, "shipment_id", 0)
+	if shipmentID <= 0 {
+		shipmentID = getInt(pm, "business_ref_id", 0)
+	}
+	receivableSourceNo := strings.TrimSpace(getString(pm, "receivable_source_no"))
+	expectedAmount := strings.TrimSpace(getString(pm, "expected_amount"))
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || shipmentID <= 0 || receivableSourceNo == "" || expectedAmount == "" || idempotencyKey == "" {
+		return nil, false
+	}
+	payload := map[string]any{
+		"shipment_id":          shipmentID,
+		"receivable_source_no": receivableSourceNo,
+		"expected_amount":      expectedAmount,
+	}
+	putStringPayload(payload, "currency", getString(pm, "currency"))
+	putStringPayload(payload, "lead_note", getString(pm, "lead_note"))
+	return &biz.ProcessDomainCommandExecution{
+		ProcessInstanceID:     processInstanceID,
+		ProcessNodeInstanceID: processNodeInstanceID,
+		ExpectedVersion:       expectedVersion,
+		CommandKey:            biz.ProcessDomainCommandFinanceReceivableLead,
+		IdempotencyKey:        idempotencyKey,
+		Payload:               payload,
+	}, true
+}
+
+func materialSupplyPurchaseReceiptCreateExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+	processInstanceID := getInt(pm, "process_instance_id", 0)
+	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
+	expectedVersion := getInt(pm, "expected_version", 0)
+	purchaseOrderID := getInt(pm, "purchase_order_id", 0)
+	receiptNo := strings.TrimSpace(getString(pm, "receipt_no"))
+	warehouseID := getInt(pm, "warehouse_id", 0)
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	lines, linesOK := purchaseReceiptLinesFromParams(pm)
+	allRemaining, _ := pm["all_remaining"].(bool)
+	if !linesOK || ((len(lines) == 0) == !allRemaining) {
+		return nil, false
+	}
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || receiptNo == "" || (warehouseID <= 0 && len(lines) == 0) || idempotencyKey == "" {
+		return nil, false
+	}
+	payload := map[string]any{
+		"receipt_no":   receiptNo,
+		"warehouse_id": warehouseID,
+	}
+	if len(lines) > 0 {
+		payload["items"] = lines
+		delete(payload, "warehouse_id")
+	} else {
+		payload["all_remaining"] = true
+	}
+	putPositiveIntPayload(payload, "purchase_order_id", purchaseOrderID)
+	putStringPayload(payload, "received_at", getString(pm, "received_at"))
+	putStringPayload(payload, "note", getString(pm, "note"))
+	return &biz.ProcessDomainCommandExecution{
+		ProcessInstanceID:     processInstanceID,
+		ProcessNodeInstanceID: processNodeInstanceID,
+		ExpectedVersion:       expectedVersion,
+		CommandKey:            biz.ProcessDomainCommandPurchaseReceiptCreate,
+		IdempotencyKey:        idempotencyKey,
+		Payload:               payload,
+	}, true
+}
+
+func materialSupplyQualityGateExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+	processInstanceID := getInt(pm, "process_instance_id", 0)
+	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
+	expectedVersion := getInt(pm, "expected_version", 0)
+	purchaseReceiptID := getInt(pm, "purchase_receipt_id", 0)
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || purchaseReceiptID <= 0 || idempotencyKey == "" {
+		return nil, false
+	}
+	payload := map[string]any{
+		"purchase_receipt_id": purchaseReceiptID,
+	}
+	return &biz.ProcessDomainCommandExecution{
+		ProcessInstanceID:     processInstanceID,
+		ProcessNodeInstanceID: processNodeInstanceID,
+		ExpectedVersion:       expectedVersion,
+		CommandKey:            biz.ProcessDomainCommandIncomingQualityGate,
+		IdempotencyKey:        idempotencyKey,
+		Payload:               payload,
+	}, true
+}
+
+func materialSupplyPostInboundExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+	processInstanceID := getInt(pm, "process_instance_id", 0)
+	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
+	expectedVersion := getInt(pm, "expected_version", 0)
+	purchaseReceiptID := getInt(pm, "purchase_receipt_id", 0)
+	if purchaseReceiptID <= 0 {
+		purchaseReceiptID = getInt(pm, "id", 0)
+	}
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || purchaseReceiptID <= 0 || idempotencyKey == "" {
+		return nil, false
+	}
+	payload := map[string]any{
+		"purchase_receipt_id": purchaseReceiptID,
+	}
+	return &biz.ProcessDomainCommandExecution{
+		ProcessInstanceID:     processInstanceID,
+		ProcessNodeInstanceID: processNodeInstanceID,
+		ExpectedVersion:       expectedVersion,
+		CommandKey:            biz.ProcessDomainCommandInventoryPostInbound,
+		IdempotencyKey:        idempotencyKey,
+		Payload:               payload,
+	}, true
+}
+
+func putPositiveIntPayload(payload map[string]any, key string, value int) {
+	if value > 0 {
+		payload[key] = value
+	}
+}
+
+func putStringPayload(payload map[string]any, key string, value string) {
+	value = strings.TrimSpace(value)
+	if value != "" {
+		payload[key] = value
+	}
+}
+
+func optionalRPCStringPointer(value string) *string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return &trimmed
+}
+
+func customerConfigPublishInputFromParams(pm map[string]any) (biz.CustomerConfigPublishInput, bool) {
+	allowedKeys := map[string]struct{}{
+		"manifest_schema_version":  {},
+		"process_contract_version": {},
+		"manifest_status":          {},
+		"runtime_enabled":          {},
+		"publishable":              {},
+		"customer_key":             {},
+		"revision":                 {},
+		"product_version":          {},
+		"compiled_snapshot":        {},
+		"module_states":            {},
+		"role_profiles":            {},
+		"access_entitlements":      {},
+		"work_pools":               {},
+		"work_pool_memberships":    {},
+	}
+	for key := range pm {
+		if _, ok := allowedKeys[key]; !ok {
+			return biz.CustomerConfigPublishInput{}, false
+		}
+	}
+	raw := pm
+	snapshot := getMap(raw, "compiled_snapshot")
+	for _, key := range []string{
+		"manifest_schema_version",
+		"process_contract_version",
+		"manifest_status",
+		"runtime_enabled",
+		"publishable",
+	} {
+		if _, exists := raw[key]; !exists {
+			return biz.CustomerConfigPublishInput{}, false
+		}
+		if _, exists := snapshot[key]; exists {
+			return biz.CustomerConfigPublishInput{}, false
+		}
+	}
+	snapshot = cloneCustomerConfigSnapshot(snapshot)
+	if _, suppliedGraph := snapshot["processDefinitions"]; suppliedGraph {
+		return biz.CustomerConfigPublishInput{}, false
+	}
+	if !mergeCustomerConfigManifestMetadata(raw, snapshot) {
+		return biz.CustomerConfigPublishInput{}, false
+	}
+	if roleProfilesContainRemovedGrants(raw["role_profiles"]) {
+		return biz.CustomerConfigPublishInput{}, false
+	}
+	in := biz.CustomerConfigPublishInput{
+		CustomerKey:         getString(raw, "customer_key"),
+		Revision:            getString(raw, "revision"),
+		ProductVersion:      getString(raw, "product_version"),
+		CompiledSnapshot:    snapshot,
+		ModuleStates:        moduleStatesFromAny(raw["module_states"]),
+		RoleProfiles:        roleProfilesFromAny(raw["role_profiles"]),
+		AccessEntitlements:  accessEntitlementsFromAny(raw["access_entitlements"]),
+		WorkPools:           workPoolsFromAny(raw["work_pools"]),
+		WorkPoolMemberships: workPoolMembershipsFromAny(raw["work_pool_memberships"]),
+	}
+	if in.CustomerKey == "" || in.Revision == "" || strings.TrimSpace(in.ProductVersion) == "" || len(in.CompiledSnapshot) == 0 {
+		return biz.CustomerConfigPublishInput{}, false
+	}
+	return in, true
+}
+
+func cloneCustomerConfigSnapshot(snapshot map[string]any) map[string]any {
+	out := make(map[string]any, len(snapshot)+5)
+	for key, value := range snapshot {
+		out[key] = value
+	}
+	return out
+}
+
+func mergeCustomerConfigManifestMetadata(raw, snapshot map[string]any) bool {
+	for _, key := range []string{
+		"manifest_schema_version",
+		"process_contract_version",
+		"manifest_status",
+	} {
+		value, exists := raw[key]
+		if !exists {
+			continue
+		}
+		text, ok := value.(string)
+		text = strings.TrimSpace(text)
+		if !ok || text == "" {
+			return false
+		}
+		if existing, exists := snapshot[key]; exists && strings.TrimSpace(fmt.Sprint(existing)) != text {
+			return false
+		}
+		snapshot[key] = text
+	}
+	for _, key := range []string{"runtime_enabled", "publishable"} {
+		value, exists := raw[key]
+		if !exists {
+			continue
+		}
+		enabled, ok := value.(bool)
+		if !ok {
+			return false
+		}
+		if existing, exists := snapshot[key]; exists {
+			existingEnabled, ok := existing.(bool)
+			if !ok || existingEnabled != enabled {
+				return false
+			}
+		}
+		snapshot[key] = enabled
+	}
+	return true
+}
+
+func moduleStatesFromAny(value any) []biz.DeploymentModuleStateInput {
+	items := anySlice(value)
+	out := make([]biz.DeploymentModuleStateInput, 0, len(items))
+	for _, item := range items {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		out = append(out, biz.DeploymentModuleStateInput{
+			ModuleKey:       getString(m, "module_key"),
+			ContractVersion: getString(m, "contract_version"),
+			State:           getString(m, "state"),
+			Reason:          getString(m, "reason"),
+		})
+	}
+	return out
+}
+
+func roleProfilesFromAny(value any) []biz.RoleProfileInput {
+	items := anySlice(value)
+	out := make([]biz.RoleProfileInput, 0, len(items))
+	for _, item := range items {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		out = append(out, biz.RoleProfileInput{
+			RoleKey:     getString(m, "role_key"),
+			DisplayName: getString(m, "display_name"),
+			Disabled:    getBool(m, "disabled", false),
+			BundleKeys:  getStringSlice(m, "bundle_keys"),
+			Revokes:     getStringSlice(m, "revokes"),
+		})
+	}
+	return out
+}
+
+func roleProfilesContainRemovedGrants(value any) bool {
+	for _, item := range anySlice(value) {
+		profile, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		if _, exists := profile["grants"]; exists {
+			return true
+		}
+	}
+	return false
+}
+
+func accessEntitlementsFromAny(value any) []biz.AccessEntitlementInput {
+	items := anySlice(value)
+	out := make([]biz.AccessEntitlementInput, 0, len(items))
+	for _, item := range items {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		out = append(out, biz.AccessEntitlementInput{
+			RoleKey:       getString(m, "role_key"),
+			CapabilityKey: getString(m, "capability_key"),
+			ScopeType:     getString(m, "scope_type"),
+			ScopeValue:    getString(m, "scope_value"),
+			Constraints:   getMap(m, "constraints"),
+			Enabled:       getBool(m, "enabled", true),
+		})
+	}
+	return out
+}
+
+func workPoolsFromAny(value any) []biz.WorkPoolInput {
+	items := anySlice(value)
+	out := make([]biz.WorkPoolInput, 0, len(items))
+	for _, item := range items {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		out = append(out, biz.WorkPoolInput{
+			PoolKey:     getString(m, "pool_key"),
+			ModuleKey:   getString(m, "module_key"),
+			DisplayName: getString(m, "display_name"),
+			Description: getString(m, "description"),
+		})
+	}
+	return out
+}
+
+func workPoolMembershipsFromAny(value any) []biz.WorkPoolMembershipInput {
+	items := anySlice(value)
+	out := make([]biz.WorkPoolMembershipInput, 0, len(items))
+	for _, item := range items {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		out = append(out, biz.WorkPoolMembershipInput{
+			PoolKey:  getString(m, "pool_key"),
+			RoleKey:  getString(m, "role_key"),
+			UserID:   getInt(m, "user_id", 0),
+			Strategy: getString(m, "strategy"),
+			Priority: getInt(m, "priority", 0),
+			Enabled:  getBool(m, "enabled", true),
+		})
+	}
+	return out
+}
+
+func anySlice(value any) []any {
+	if value == nil {
+		return []any{}
+	}
+	if items, ok := value.([]any); ok {
+		return items
+	}
+	return []any{}
+}
+
+func customerConfigValidationToMap(result *biz.CustomerConfigValidationResult) map[string]any {
+	if result == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"customer_key":         result.CustomerKey,
+		"revision":             result.Revision,
+		"config_hash":          result.ConfigHash,
+		"config_hash_version":  result.ConfigHashVersion,
+		"module_state_count":   result.ModuleStateCount,
+		"role_profile_count":   result.RoleProfileCount,
+		"entitlement_count":    result.EntitlementCount,
+		"work_pool_count":      result.WorkPoolCount,
+		"membership_count":     result.MembershipCount,
+		"compiled_snapshot_ok": result.CompiledSnapshotOK,
+	}
+}
+
+func customerConfigRevisionToMap(item *biz.CustomerConfigRevision) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"id":                  item.ID,
+		"customer_key":        item.CustomerKey,
+		"revision":            item.Revision,
+		"product_version":     item.ProductVersion,
+		"config_hash":         item.ConfigHash,
+		"config_hash_version": item.ConfigHashVersion,
+		"status":              item.Status,
+		"published_by":        optionalIntValue(item.PublishedBy),
+		"published_at":        optionalTimeUnix(item.PublishedAt),
+		"activated_by":        optionalIntValue(item.ActivatedBy),
+		"activated_at":        optionalTimeUnix(item.ActivatedAt),
+		"created_at":          item.CreatedAt.Unix(),
+		"updated_at":          item.UpdatedAt.Unix(),
+		"compiled_snapshot":   item.CompiledSnapshot,
+	}
+}
+
+func effectiveSessionToMap(session *biz.EffectiveSession) map[string]any {
+	if session == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"configRevision":       session.ConfigRevision,
+		"configHash":           session.ConfigHash,
+		"configHashVersion":    session.ConfigHashVersion,
+		"configProductVersion": session.ConfigProductVersion,
+		"configApplyPurpose":   session.ConfigApplyPurpose,
+		"configDatasetVersion": session.ConfigDatasetVersion,
+		"configTarget":         session.ConfigTarget,
+		"customer": map[string]any{
+			"key":  session.Customer.Key,
+			"name": session.Customer.Name,
+		},
+		"modules":               toAnyMapStringString(session.Modules),
+		"roles":                 toAnySliceString(session.Roles),
+		"pages":                 toAnySliceString(session.Pages),
+		"actions":               toAnySliceString(session.Actions),
+		"workPools":             toAnySliceString(session.WorkPools),
+		"fieldPolicies":         session.FieldPolicies,
+		"printTemplateDefaults": session.PrintTemplateDefaults,
+		"source":                session.Source,
+	}
+}
+
+func customerModuleStatusExplanationToMap(status *biz.CustomerModuleStatusExplanation) map[string]any {
+	if status == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"customer_key":                 status.CustomerKey,
+		"module_key":                   status.ModuleKey,
+		"product_included":             status.ProductIncluded,
+		"product_name":                 status.ProductName,
+		"product_layer":                status.ProductLayer,
+		"product_maturity":             status.ProductMaturity,
+		"config_revision":              status.ConfigRevision,
+		"config_hash":                  status.ConfigHash,
+		"customer_state":               status.CustomerState,
+		"contract_version":             status.ContractVersion,
+		"reason":                       status.Reason,
+		"dependencies":                 toAnySliceString(status.Dependencies),
+		"missing_dependencies":         toAnySliceString(status.MissingDependencies),
+		"dependencies_satisfied":       status.DependenciesSatisfied,
+		"referenced_role_keys":         toAnySliceString(status.ReferencedRoleKeys),
+		"referenced_work_pool_keys":    toAnySliceString(status.ReferencedWorkPoolKeys),
+		"referenced_page_keys":         toAnySliceString(status.ReferencedPageKeys),
+		"referenced_process_keys":      toAnySliceString(status.ReferencedProcessKeys),
+		"in_flight_process_count":      status.InFlightProcessCount,
+		"open_task_count":              status.OpenTaskCount,
+		"open_business_document_count": status.OpenBusinessDocCount,
+		"runtime_count_source":         status.RuntimeCountSource,
+		"can_enable":                   status.CanEnable,
+		"can_disable":                  status.CanDisable,
+		"enable_blocked_reasons":       toAnySliceString(status.EnableBlockedReasons),
+		"disable_blocked_reasons":      toAnySliceString(status.DisableBlockedReasons),
+		"source":                       status.Source,
+	}
+}
+
+func customerProcessDefinitionExplanationToMap(definition *biz.CustomerProcessDefinitionExplanation) map[string]any {
+	if definition == nil {
+		return map[string]any{}
+	}
+	nodes := make([]any, 0, len(definition.Nodes))
+	for _, node := range definition.Nodes {
+		nodes = append(nodes, map[string]any{
+			"node_key":                           node.NodeKey,
+			"node_type":                          node.NodeType,
+			"owner_pool_key":                     node.OwnerPoolKey,
+			"required_capability_key":            node.RequiredCapabilityKey,
+			"command_key":                        node.CommandKey,
+			"runtime_binding_status":             node.RuntimeBindingStatus,
+			"process_runtime_handler_registered": node.ProcessRuntimeHandlerRegistered,
+			"runtime_loader_blockers":            toAnySliceString(node.RuntimeLoaderBlockers),
+			"runtime_execute_blockers":           toAnySliceString(node.RuntimeExecuteBlockers),
+			"writes_fact":                        node.WritesFact,
+		})
+	}
+	return map[string]any{
+		"customer_key":                 definition.CustomerKey,
+		"process_key":                  definition.ProcessKey,
+		"process_version":              definition.ProcessVersion,
+		"variant_key":                  definition.VariantKey,
+		"config_revision":              definition.ConfigRevision,
+		"config_hash":                  definition.ConfigHash,
+		"manifest_status":              definition.ManifestStatus,
+		"runtime_loader_enabled":       definition.RuntimeLoaderEnabled,
+		"business_ref_type":            definition.BusinessRefType,
+		"domain_boundary":              definition.DomainBoundary,
+		"fact_boundary":                definition.FactBoundary,
+		"source_workflow_key":          definition.SourceWorkflowKey,
+		"source_status":                definition.SourceStatus,
+		"nodes":                        nodes,
+		"runtime_loader_blockers":      toAnySliceString(definition.RuntimeLoaderBlockers),
+		"runtime_execute_blockers":     toAnySliceString(definition.RuntimeExecuteBlockers),
+		"start_blocked_reasons":        toAnySliceString(definition.StartBlockedReasons),
+		"execute_blocked_reasons":      toAnySliceString(definition.ExecuteBlockedReasons),
+		"can_start_runtime":            definition.CanStartRuntime,
+		"can_execute_runtime_commands": definition.CanExecuteRuntimeCommands,
+		"source":                       definition.Source,
+	}
+}
+
+func processInstanceToMap(item *biz.ProcessInstance) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"id":                       item.ID,
+		"process_key":              item.ProcessKey,
+		"process_version":          item.ProcessVersion,
+		"variant_key":              optionalStringValue(item.VariantKey),
+		"config_revision":          item.ConfigRevision,
+		"definition_hash":          item.DefinitionHash,
+		"module_contract_snapshot": item.ModuleContractSnapshot,
+		"business_ref_type":        item.BusinessRefType,
+		"business_ref_id":          item.BusinessRefID,
+		"business_ref_no":          optionalStringValue(item.BusinessRefNo),
+		"correlation_key":          optionalStringValue(item.CorrelationKey),
+		"idempotency_key":          item.IdempotencyKey,
+		"status":                   item.Status,
+		"terminal_node_instance_id": optionalIntValue(
+			item.TerminalNodeInstanceID,
+		),
+		"resolution_kind":     optionalStringValue(item.ResolutionKind),
+		"resolution_reason":   optionalStringValue(item.ResolutionReason),
+		"resolved_at":         optionalTimeUnix(item.ResolvedAt),
+		"resolved_by":         optionalIntValue(item.ResolvedBy),
+		"block_kind":          optionalStringValue(item.BlockKind),
+		"blocked_reason_code": optionalStringValue(item.BlockedReasonCode),
+		"blocked_reason":      optionalStringValue(item.BlockedReason),
+		"blocked_at":          optionalTimeUnix(item.BlockedAt),
+		"blocked_by":          optionalIntValue(item.BlockedBy),
+		"started_at":          item.StartedAt.Unix(),
+		"completed_at":        optionalTimeUnix(item.CompletedAt),
+		"created_by":          optionalIntValue(item.CreatedBy),
+		"updated_by":          optionalIntValue(item.UpdatedBy),
+		"created_at":          item.CreatedAt.Unix(),
+		"updated_at":          item.UpdatedAt.Unix(),
+	}
+}
+
+func processNodeInstanceToMap(item *biz.ProcessNodeInstance) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"id":                      item.ID,
+		"process_instance_id":     item.ProcessInstanceID,
+		"node_key":                item.NodeKey,
+		"node_type":               item.NodeType,
+		"attempt":                 item.Attempt,
+		"status":                  item.Status,
+		"owner_pool_key":          optionalStringValue(item.OwnerPoolKey),
+		"required_capability_key": optionalStringValue(item.RequiredCapabilityKey),
+		"form_profile_key":        optionalStringValue(item.FormProfileKey),
+		"action_set_key":          optionalStringValue(item.ActionSetKey),
+		"policy_snapshot":         item.PolicySnapshot,
+		"due_at":                  optionalTimeUnix(item.DueAt),
+		"started_at":              optionalTimeUnix(item.StartedAt),
+		"completed_at":            optionalTimeUnix(item.CompletedAt),
+		"activated_from_node_instance_id": optionalIntValue(
+			item.ActivatedFromNodeInstanceID,
+		),
+		"routing_completed_at": optionalTimeUnix(item.RoutingCompletedAt),
+		"routing_completed_by": optionalIntValue(item.RoutingCompletedBy),
+		"outcome":              optionalStringValue(item.Outcome),
+		"block_kind":           optionalStringValue(item.BlockKind),
+		"blocked_reason_code":  optionalStringValue(item.BlockedReasonCode),
+		"blocked_reason":       optionalStringValue(item.BlockedReason),
+		"blocked_at":           optionalTimeUnix(item.BlockedAt),
+		"blocked_by":           optionalIntValue(item.BlockedBy),
+		"resume_reason":        optionalStringValue(item.ResumeReason),
+		"resumed_at":           optionalTimeUnix(item.ResumedAt),
+		"resumed_by":           optionalIntValue(item.ResumedBy),
+		"domain_command_effect_state": optionalStringValue(
+			item.DomainCommandEffectState,
+		),
+		"domain_command_result_hash": optionalStringValue(
+			item.DomainCommandResultHash,
+		),
+		"domain_command_compensation_hash": optionalStringValue(
+			item.DomainCommandCompensationHash,
+		),
+		"domain_command_compensated_at": optionalTimeUnix(
+			item.DomainCommandCompensatedAt,
+		),
+		"domain_command_compensated_by": optionalIntValue(
+			item.DomainCommandCompensatedBy,
+		),
+		"domain_command_recovery_decision": optionalStringValue(
+			item.DomainCommandRecoveryDecision,
+		),
+		"domain_command_recovered_at": optionalTimeUnix(
+			item.DomainCommandRecoveredAt,
+		),
+		"domain_command_recovered_by": optionalIntValue(
+			item.DomainCommandRecoveredBy,
+		),
+		"version":    item.Version,
+		"updated_by": optionalIntValue(item.UpdatedBy),
+		"created_at": item.CreatedAt.Unix(),
+		"updated_at": item.UpdatedAt.Unix(),
+	}
+}
+
+func processNodeInstancesToMaps(items []*biz.ProcessNodeInstance) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, processNodeInstanceToMap(item))
+	}
+	return out
+}
+
+func toAnyMapStringString(values map[string]string) map[string]any {
+	if len(values) == 0 {
+		return map[string]any{}
+	}
+	out := make(map[string]any, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
+}
+
+func customerConfigAllowsOnly(pm map[string]any, keys ...string) bool {
+	allowed := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		allowed[key] = struct{}{}
+	}
+	for key := range pm {
+		if _, ok := allowed[key]; !ok {
+			return false
+		}
+	}
+	return true
+}
