@@ -1,0 +1,255 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+
+import {
+  installOrderRpcMocks,
+  mockSalesOrderItemsList,
+} from './orderRpcMocks.mjs'
+import { styleRpcResult } from './rpcMockResult.mjs'
+import { validateProductionOrderAggregate } from '../../src/erp/utils/productionOrderModel.mjs'
+
+const salesOrderItem = Object.freeze({
+  id: 7,
+  sales_order_id: 3,
+  line_status: 'open',
+})
+const source = readFileSync(
+  new URL('./orderRpcMocks.mjs', import.meta.url),
+  'utf8'
+)
+
+async function orderMockHarness(routePattern) {
+  const handlers = new Map()
+  const page = {
+    async route(pattern, handler) {
+      handlers.set(pattern, handler)
+    },
+  }
+  await installOrderRpcMocks(page, { nowUnix: () => 1_750_000_000 })
+  const handler = handlers.get(routePattern)
+  assert.equal(typeof handler, 'function')
+
+  return async function call(method, params = {}) {
+    let responseBody = null
+    await handler({
+      request: () => ({
+        postDataJSON: () => ({
+          jsonrpc: '2.0',
+          id: method,
+          method,
+          params,
+        }),
+      }),
+      fulfill: async ({ body }) => {
+        responseBody = JSON.parse(body)
+      },
+    })
+    return responseBody
+  }
+}
+
+test('sales order item L1 mock rejects the old unscoped list request', () => {
+  assert.equal(
+    styleRpcResult(mockSalesOrderItemsList({}, salesOrderItem)).code,
+    40010
+  )
+  assert.equal(
+    styleRpcResult(mockSalesOrderItemsList({ limit: 500 }, salesOrderItem))
+      .code,
+    40010
+  )
+})
+
+test('sales order item L1 mock follows the backend source and paging contract', () => {
+  assert.deepEqual(
+    mockSalesOrderItemsList(
+      { sales_order_id: 3, line_status: 'open', limit: 200, offset: 0 },
+      salesOrderItem
+    ),
+    {
+      sales_order_items: [salesOrderItem],
+      total: 1,
+      limit: 200,
+      offset: 0,
+    }
+  )
+  assert.deepEqual(
+    mockSalesOrderItemsList({ sales_order_id: 4 }, salesOrderItem)
+      .sales_order_items,
+    []
+  )
+})
+
+test('sales order list L1 mock echoes requested paging through the shared helper', () => {
+  const listCase = source.slice(
+    source.indexOf("case 'list_sales_orders'"),
+    source.indexOf("case 'list_sales_order_items'")
+  )
+  assert.match(listCase, /stylePaginatedRpcData/u)
+  assert.match(listCase, /'sales_orders'/u)
+  assert.match(listCase, /params/u)
+  assert.doesNotMatch(listCase, /limit:\s*100|offset:\s*0/u)
+})
+
+test('BOM version list L1 mock echoes requested full-read paging', () => {
+  const listCase = source.slice(
+    source.indexOf("case 'list_bom_versions'"),
+    source.indexOf("case 'get_bom_version'")
+  )
+  assert.match(listCase, /stylePaginatedRpcData/u)
+  assert.match(listCase, /'bom_versions'/u)
+  assert.match(listCase, /params/u)
+  assert.doesNotMatch(listCase, /limit:\s*100|offset:\s*0/u)
+})
+
+test('purchase order mocks preserve filters, total and requested slices', async () => {
+  const call = await orderMockHarness('**/rpc/purchase_order')
+  const firstOrderPage = await call('list_purchase_orders', {
+    limit: 1,
+    offset: 0,
+  })
+  assert.equal(firstOrderPage.result.data.total, 1)
+  assert.equal(firstOrderPage.result.data.limit, 1)
+  assert.equal(firstOrderPage.result.data.offset, 0)
+  assert.equal(firstOrderPage.result.data.purchase_orders.length, 1)
+
+  const exhaustedOrderPage = await call('list_purchase_orders', {
+    limit: 1,
+    offset: 1,
+  })
+  assert.equal(exhaustedOrderPage.result.data.total, 1)
+  assert.equal(exhaustedOrderPage.result.data.offset, 1)
+  assert.deepEqual(exhaustedOrderPage.result.data.purchase_orders, [])
+
+  const firstItemPage = await call('list_purchase_order_items', {
+    purchase_order_id: 1,
+    limit: 1,
+    offset: 0,
+  })
+  assert.equal(firstItemPage.result.data.total, 1)
+  assert.equal(firstItemPage.result.data.purchase_order_items.length, 1)
+
+  const exhaustedItemPage = await call('list_purchase_order_items', {
+    purchase_order_id: 1,
+    limit: 1,
+    offset: 1,
+  })
+  assert.equal(exhaustedItemPage.result.data.total, 1)
+  assert.equal(exhaustedItemPage.result.data.offset, 1)
+  assert.deepEqual(exhaustedItemPage.result.data.purchase_order_items, [])
+
+  const unrelatedItems = await call('list_purchase_order_items', {
+    purchase_order_id: 999,
+    limit: 200,
+    offset: 0,
+  })
+  assert.equal(unrelatedItems.result.data.total, 0)
+  assert.equal(unrelatedItems.result.data.limit, 200)
+})
+
+test('production order list mock accepts the current page filters and returns its fixture', async () => {
+  const call = await orderMockHarness('**/rpc/production_order')
+  const response = await call('list_production_orders', {
+    include_status_counts: true,
+    keyword: '',
+    status: '',
+    lifecycle_scope: 'current',
+    date_field: 'planned_start_at',
+    date_from: null,
+    date_to: null,
+    sort_by: 'updated_at',
+    sort_direction: 'desc',
+    limit: 20,
+    offset: 0,
+  })
+
+  assert.equal(response.result.code, 0)
+  assert.equal(
+    response.result.data.production_orders[0].order_no,
+    'MO-STYLE-L1-20260713'
+  )
+  assert.deepEqual(response.result.data.status_counts, { DRAFT: 1 })
+  const invalid = await call('list_production_orders', {
+    include_status_counts: 'true',
+  })
+  assert.notEqual(invalid.result.code, 0)
+})
+
+test('production reference mock accepts draft sales planning context without relaxing other references', async () => {
+  const call = await orderMockHarness('**/rpc/production_order')
+  const valid = await call('list_production_order_reference_options', {
+    reference_type: 'sales_order_item',
+    production_order_id: 71,
+    selected_ids: [601],
+  })
+  assert.equal(valid.result.code, 0)
+  for (const productionOrderID of [0, -1, 1.5, '71']) {
+    const invalid = await call('list_production_order_reference_options', {
+      reference_type: 'sales_order_item',
+      production_order_id: productionOrderID,
+    })
+    assert.notEqual(invalid.result.code, 0)
+  }
+  const invalidType = await call('list_production_order_reference_options', {
+    reference_type: 'product',
+    production_order_id: 71,
+  })
+  assert.notEqual(invalidType.result.code, 0)
+})
+
+test('production WIP mock always returns the nullable finished-goods rework lineage contract', async () => {
+  const call = await orderMockHarness('**/rpc/production_wip')
+  const initial = await call('get_production_wip', {
+    production_order_id: 71,
+  })
+  assert.equal(initial.result.code, 0)
+  assert.equal(
+    initial.result.data.production_wip_batches.every(
+      (batch) =>
+        Object.hasOwn(batch, 'origin_rework_fact_id') &&
+        (batch.origin_rework_fact_id === null ||
+          (Number.isSafeInteger(batch.origin_rework_fact_id) &&
+            batch.origin_rework_fact_id > 0))
+    ),
+    true
+  )
+
+  const split = await call('execute_production_wip_action', {
+    production_order_id: 71,
+    production_wip_batch_id: 91_012,
+    action: 'SPLIT_BATCH',
+    splits: [{ quantity: '8' }, { quantity: '12' }],
+  })
+  assert.equal(split.result.code, 0)
+  assert.equal(
+    split.result.data.production_wip_batches.every((batch) =>
+      Object.hasOwn(batch, 'origin_rework_fact_id')
+    ),
+    true
+  )
+})
+
+test('production order release mock satisfies the material requirement conservation contract', async () => {
+  const call = await orderMockHarness('**/rpc/production_order')
+  const released = await call('release_production_order', {
+    production_order_id: 71,
+    expected_version: 1,
+    idempotency_key: 'style-l1-production-release',
+  })
+  assert.equal(released.result.code, 0)
+
+  const aggregate = validateProductionOrderAggregate(released.result.data, {
+    id: 71,
+    status: 'RELEASED',
+  })
+  assert.equal(aggregate.materialRequirements.length, 4)
+  assert.equal(
+    aggregate.materialRequirements.every(
+      (requirement) =>
+        typeof requirement.approved_over_issue_quantity === 'string' &&
+        typeof requirement.effective_limit_quantity === 'string'
+    ),
+    true
+  )
+})
