@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      const probeFetch = window.fetch.bind(window)
+      let lastProbe = ''
+      window.fetch = async () => {
+        throw new Error('This fixture does not send business requests')
+      }
+      function nativeControlProbe(trigger, key = null) {
+        const root = document.querySelector(
+          '[data-testid="native-control-state"]'
+        )
+        if (!root) return
+        const focus = document.activeElement
+        const img = document.querySelector('.erp-task-image-preview__stage img')
+        const rect = (e) =>
+          e
+            ? Object.fromEntries(
+                ['left', 'right', 'top', 'bottom', 'width', 'height'].map(
+                  (k) => [k, e.getBoundingClientRect()[k]]
+                )
+              )
+            : null
+        const data = {
+          fixture: 'native-controls',
+          browser: navigator.userAgent,
+          theme: document.documentElement.dataset.erpTheme,
+          viewport: {
+            width: innerWidth,
+            layoutWidth: document.documentElement.clientWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+            height: innerHeight,
+            scale: visualViewport?.scale,
+            visualHeight: visualViewport?.height,
+          },
+          state: JSON.parse(root.textContent),
+          focus: {
+            tag: focus?.tagName,
+            label: focus?.getAttribute('aria-label'),
+            class: focus?.className,
+          },
+          dialogs: [...document.querySelectorAll('[role="dialog"]')]
+            .filter((e) => e.getBoundingClientRect().height)
+            .map((e) => ({
+              label: e.getAttribute('aria-label'),
+              text: e.textContent?.slice(0, 100),
+              rect: rect(e),
+              popup: rect(e.closest('.ant-popover')),
+              close: rect(e.querySelector('[aria-label="关闭筛选"]')),
+            })),
+          image: img
+            ? {
+                naturalWidth: img.naturalWidth,
+                transform: getComputedStyle(img).transform,
+              }
+            : null,
+        }
+        if (key !== null) data.navigationKey = key
+        const serialized = JSON.stringify(data)
+        if (trigger === 'snapshot' && serialized === lastProbe) return
+        lastProbe = serialized
+        probeFetch('http://' + location.hostname + ':15296/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ trigger, ...data }),
+        }).catch(() => {})
+      }
+      for (const ev of [
+        'touchstart',
+        'touchend',
+        'click',
+        'focusin',
+        'focusout',
+        'keydown',
+      ])
+        document.addEventListener(
+          ev,
+          (event) => {
+            const key =
+              ev === 'keydown' &&
+              [
+                'Escape',
+                'Tab',
+                'Enter',
+                ' ',
+                'ArrowLeft',
+                'ArrowRight',
+                'ArrowUp',
+                'ArrowDown',
+              ].includes(event.key)
+                ? event.key
+                : null
+            setTimeout(() => nativeControlProbe(ev, key), 0)
+          },
+          { capture: true, passive: true }
+        )
+      setInterval(() => nativeControlProbe('snapshot'), 1000)
+    </script>
+    <script type="module">
+      import RefreshRuntime from '/@react-refresh'
+      RefreshRuntime.injectIntoGlobalHook(window)
+      window.$RefreshReg$ = () => {}
+      window.$RefreshSig$ = () => (type) => type
+      window.__vite_plugin_react_preamble_installed__ = true
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script
+      type="module"
+      src="/scripts/test/NativeControlsFixture.jsx"
+    ></script>
+  </body>
+</html>
