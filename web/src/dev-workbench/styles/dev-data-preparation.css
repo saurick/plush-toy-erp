@@ -1,0 +1,558 @@
+.erp-dev-data-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.erp-dev-data-preflight {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.erp-dev-data-preflight .ant-card {
+  height: 100%;
+}
+
+.erp-dev-data-environment-contract {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 12px;
+  background: var(--dev-data-surface);
+}
+
+.erp-dev-data-environment-contract > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.erp-dev-data-environment-contract__heading {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.erp-dev-data-environment-contract h2.ant-typography {
+  margin: 0;
+  font-size: 18px;
+}
+
+.erp-dev-data-environment-contract__targets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.erp-dev-data-environment-contract__targets article {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 10px;
+}
+
+.erp-dev-data-environment-contract__targets article > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-dev-data-environment-contract__targets .ant-typography {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-data-profile-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.erp-dev-data-target-choice {
+  width: 100%;
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dev-data-selected) 42%, transparent);
+}
+
+.erp-dev-data-target-choice__heading {
+  display: grid;
+  gap: 3px;
+}
+
+.erp-dev-data-target-choice .ant-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+
+.erp-dev-data-profile--primary {
+  grid-column: 1 / -1;
+  border-color: color-mix(
+    in srgb,
+    var(--dev-data-primary) 46%,
+    var(--dev-data-border)
+  );
+}
+
+.erp-dev-data-profile-heading,
+.erp-dev-data-chain-toolbar,
+.erp-dev-data-stage-timings__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.erp-dev-data-profile-heading {
+  margin: 20px 0 10px;
+}
+
+.erp-dev-data-profile-heading > div,
+.erp-dev-data-chain-toolbar > div,
+.erp-dev-data-stage-timings__head {
+  display: grid;
+  gap: 3px;
+}
+
+.erp-dev-data-acceptance-plan {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--dev-data-selected) 42%, transparent);
+}
+
+.erp-dev-data-plan-counts {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.erp-dev-data-plan-counts > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 10px;
+  background: var(--dev-data-surface);
+}
+
+.erp-dev-data-plan-counts strong {
+  color: var(--dev-data-primary);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.erp-dev-data-plan-counts span {
+  color: var(--dev-data-muted);
+}
+
+.erp-dev-data-chain-toolbar .ant-select {
+  width: min(360px, 100%);
+}
+
+.erp-dev-data-chain-list,
+.erp-dev-data-selected-chain,
+.erp-dev-data-reuse-rules,
+.erp-dev-data-stage-timings {
+  min-width: 0;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 10px;
+  background: var(--dev-data-surface);
+}
+
+.erp-dev-data-chain-list .ant-list-item {
+  align-items: flex-start;
+  padding-inline: 14px;
+}
+
+.erp-dev-data-selected-chain {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+}
+
+.erp-dev-data-selected-chain h3,
+.erp-dev-data-selected-chain p {
+  margin-bottom: 6px;
+}
+
+.erp-dev-data-chain-step {
+  display: grid;
+  gap: 10px;
+}
+
+.erp-dev-data-chain-step .ant-descriptions-view,
+.erp-dev-data-table-wrap {
+  overflow-x: auto;
+}
+
+.erp-dev-data-reuse-rules > summary {
+  padding: 12px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.erp-dev-data-table-wrap {
+  padding: 0 14px 14px;
+}
+
+.erp-dev-data-reuse-diagram {
+  display: grid;
+  gap: 10px;
+  padding: 0 14px 14px;
+}
+
+.erp-dev-data-reuse-diagram__heading {
+  display: grid;
+  gap: 3px;
+}
+
+.erp-dev-data-table-wrap table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+}
+
+.erp-dev-data-table-wrap th,
+.erp-dev-data-table-wrap td {
+  padding: 10px 12px;
+  border: 1px solid var(--dev-data-border);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.erp-dev-data-table-wrap tbody th,
+.erp-dev-data-table-wrap tbody td {
+  height: var(--erp-row-height);
+  padding-block: var(--erp-table-cell-padding-block);
+}
+
+.erp-dev-data-table-wrap thead th {
+  text-align: center;
+  background: color-mix(in srgb, var(--dev-data-selected) 62%, transparent);
+}
+
+.erp-dev-data-stage-timings {
+  padding: 14px;
+}
+
+.erp-dev-data-stage-timings .ant-list-item {
+  padding-inline: 0;
+}
+
+.erp-dev-data-latest-result {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 12px;
+  background: var(--dev-data-surface);
+}
+
+.erp-dev-data-profile {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.erp-dev-data-profile:hover,
+.erp-dev-data-profile:focus-within,
+.erp-dev-data-profile--selected {
+  border-color: var(--dev-data-primary);
+}
+
+.erp-dev-data-profile:focus-within {
+  box-shadow: 0 0 0 2px
+    color-mix(in srgb, var(--dev-data-primary) 18%, transparent);
+}
+
+.erp-dev-data-profile--selected {
+  background: var(--dev-data-selected);
+}
+
+.erp-dev-data-profile__radio-label {
+  font-weight: 700;
+}
+
+.erp-dev-data-profile__head,
+.erp-dev-data-prepare-actions,
+.erp-dev-data-history-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.erp-dev-data-profile__requirements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 22px;
+  margin-top: auto;
+}
+
+.erp-dev-data-prepare-actions {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--dev-data-border);
+}
+
+.erp-dev-data-prepare-actions > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.erp-dev-data-operation-detail {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.erp-dev-data-operation-detail .ant-typography code,
+.erp-dev-data-confirm__value {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-data-step-list {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding-left: 22px;
+}
+
+.erp-dev-data-history-label {
+  justify-content: flex-start;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.erp-dev-data-history-label > :first-child {
+  font-weight: 600;
+}
+
+.erp-dev-data-history-label > :last-child {
+  margin-left: auto;
+}
+
+.erp-dev-data-recovery {
+  margin-top: 16px;
+}
+
+.erp-dev-data-confirm {
+  width: 100%;
+}
+
+.erp-dev-data-readback {
+  width: 100%;
+}
+
+@media (max-width: 1180px) {
+  .erp-dev-data-plan-counts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .erp-dev-data-environment-contract > header {
+    flex-direction: column;
+  }
+
+  .erp-dev-data-environment-contract__targets {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-data-page .erp-dev-data-profile-group {
+    display: grid;
+    grid-template-columns: 1fr;
+    overflow: visible;
+    padding-bottom: 0;
+    white-space: normal;
+    scroll-snap-type: none;
+  }
+
+  .erp-dev-data-page .erp-dev-data-profile-group > .erp-dev-data-profile {
+    width: auto;
+    flex: none;
+  }
+
+  .erp-dev-data-profile--primary {
+    grid-column: auto;
+  }
+
+  .erp-dev-data-plan-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-dev-data-chain-toolbar,
+  .erp-dev-data-profile-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-dev-data-chain-toolbar .ant-select {
+    width: 100%;
+  }
+
+  .erp-dev-data-prepare-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-dev-data-prepare-actions .ant-btn {
+    width: 100%;
+  }
+
+  .erp-dev-data-history-label {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .erp-dev-data-history-label > :last-child {
+    grid-column: 1 / -1;
+    margin-left: 0;
+  }
+
+  .erp-dev-data-operation-detail .ant-descriptions-view {
+    overflow-x: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-dev-data-profile {
+    transition: none;
+  }
+}
+
+.erp-dev-data-context,
+.erp-dev-data-section__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 20px;
+}
+
+.erp-dev-data-workspace,
+.erp-dev-data-section,
+.erp-dev-data-result {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.erp-dev-data-section {
+  padding: 18px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 10px;
+  background: var(--dev-data-surface);
+}
+
+.erp-dev-data-section__head h2.ant-typography {
+  margin: 0;
+  font-size: 18px;
+}
+
+.erp-dev-data-section__head p.ant-typography {
+  margin: 4px 0 0;
+  color: var(--dev-data-muted);
+}
+
+.erp-dev-data-profile-table th:first-child {
+  width: 23%;
+}
+
+.erp-dev-data-profile-table th:nth-child(2) {
+  width: 32%;
+}
+
+.erp-dev-data-profile-table th:nth-child(3) {
+  width: 33%;
+}
+
+.erp-dev-data-profile-table td > .ant-typography,
+.erp-dev-data-profile-table small {
+  display: block;
+}
+
+.erp-dev-data-profile-table small {
+  margin-top: 4px;
+  color: var(--dev-data-muted);
+  font-size: 12px;
+}
+
+.erp-dev-data-selection {
+  padding: 0 16px 12px;
+  border: 1px solid var(--dev-data-border);
+  border-radius: 8px;
+}
+
+.erp-dev-data-selection .erp-dev-data-prepare-actions {
+  margin: 0;
+  padding: 14px 0;
+  border: 0;
+}
+
+.erp-dev-data-blockers {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: var(--dev-data-warning-bg);
+}
+
+.erp-dev-data-blockers > div {
+  display: grid;
+  gap: 3px;
+}
+
+.erp-dev-data-disclosure {
+  min-width: 0;
+  border-top: 1px solid var(--dev-data-border);
+}
+
+.erp-dev-data-disclosure > summary {
+  padding: 12px 0;
+  color: var(--dev-data-muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.erp-dev-data-disclosure[open] > summary {
+  margin-bottom: 8px;
+}
+
+
+.erp-dev-data-profile-row.is-selected {
+  background: var(--dev-data-selected);
+}
+
+.erp-dev-data-profile-row.is-selected > th {
+  box-shadow: inset 3px 0 0 var(--dev-data-primary);
+}

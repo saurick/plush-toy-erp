@@ -1,0 +1,93 @@
+.erp-dev-database-migration-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.erp-dev-database-migration-shell [role='tabpanel'] {
+  display: grid;
+  gap: 12px;
+}
+
+.erp-dev-migration-start {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
+.erp-dev-migration-start > .ant-typography {
+  margin: 0;
+}
+
+.erp-dev-migration-start > .erp-dev-static-guidance {
+  justify-self: stretch;
+}
+
+.erp-dev-database-migration-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.erp-dev-database-migration-summary .ant-card {
+  height: 100%;
+}
+
+.erp-dev-database-migration-ready {
+  margin-top: 20px;
+}
+
+.erp-dev-database-migration-flow {
+  display: grid;
+  gap: 16px;
+}
+
+.erp-dev-database-migration-guide__content {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  border-top: 1px solid var(--erp-border);
+  padding: 16px;
+}
+
+.erp-dev-database-migration-guide__diagram {
+  width: min(100%, 640px);
+  min-width: 0;
+  margin: 0 auto;
+}
+
+.erp-dev-database-migration-guide__diagram figcaption {
+  margin-bottom: 12px;
+  color: var(--erp-text-muted);
+  line-height: 1.6;
+}
+
+.erp-dev-database-migration-guide__notes {
+  display: grid;
+  gap: 8px;
+  color: var(--erp-text-muted);
+  line-height: 1.6;
+}
+
+.erp-dev-database-migration-guide__notes p {
+  margin: 0;
+}
+
+.erp-dev-database-migration-page .ant-steps-item-description {
+  max-width: 190px;
+}
+
+.erp-dev-database-migration-page .ant-typography-danger {
+  display: block;
+  max-width: 520px;
+  white-space: normal;
+}
+
+@media (max-width: 1100px) {
+  .erp-dev-database-migration-summary {
+    grid-template-columns: 1fr;
+  }
+}
