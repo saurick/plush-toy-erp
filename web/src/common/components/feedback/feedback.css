@@ -1,0 +1,15 @@
+.erp-feedback-message .ant-message-notice-content {
+  max-width: min(480px, calc(100vw - 32px));
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.erp-feedback-message .ant-message-custom-content {
+  display: flex;
+  align-items: flex-start;
+}
+
+.erp-feedback-message .ant-message-custom-content > .anticon {
+  flex: none;
+  margin-top: 3px;
+}

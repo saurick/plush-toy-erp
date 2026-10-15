@@ -1,0 +1,109 @@
+.loading-page {
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.loading-page--fullscreen {
+  min-height: 100vh;
+  padding: 32px 24px;
+}
+
+.loading-page--inline {
+  min-height: 320px;
+  padding: 24px;
+}
+
+.loading-page__panel {
+  width: min(100%, 440px);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 28px 32px;
+  border: 1px solid var(--erp-border, #dce4df);
+  border-radius: 10px;
+  background: var(--erp-surface-bg, #fff);
+  box-shadow: var(--erp-surface-shadow);
+}
+
+.loading-page__copy {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.loading-page__title {
+  font-size: 18px;
+  line-height: 1.4;
+  font-weight: 600;
+  color: var(--erp-text, #1f2a24);
+}
+
+.loading-page__description {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--erp-text-muted, #4d5d53);
+}
+
+.loading-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.loading-page__action-button {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--erp-border-strong, #bccbc2);
+  border-radius: 8px;
+  background: var(--erp-surface-bg, #fff);
+  color: var(--erp-primary-strong, #0b4f96);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.loading-page__action-button:hover,
+.loading-page__action-button:focus-visible {
+  border-color: var(--erp-primary, #0a66c2);
+  background: var(--erp-primary-softer);
+  outline: none;
+}
+
+.loading-page__action-button--primary {
+  border-color: var(--erp-primary, #0a66c2);
+  background: var(--erp-primary, #0a66c2);
+  color: var(--erp-on-accent, #fff);
+}
+
+.loading-page__action-button--primary:hover,
+.loading-page__action-button--primary:focus-visible {
+  background: var(--erp-primary-strong, #0b4f96);
+}
+
+.loading-page--erp {
+  background: var(--erp-page-bg, #f2f5f3);
+}
+
+@media screen and (max-width: 768px) {
+  .loading-page--fullscreen {
+    padding: 24px 16px;
+  }
+
+  .loading-page--inline {
+    min-height: 260px;
+    padding: 20px 16px;
+  }
+
+  .loading-page__panel {
+    padding: 22px 20px;
+    border-radius: 10px;
+    gap: 14px;
+  }
+
+  .loading-page__title {
+    font-size: 16px;
+  }
+}
