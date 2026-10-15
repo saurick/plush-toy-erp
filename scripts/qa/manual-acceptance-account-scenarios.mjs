@@ -1,0 +1,1779 @@
+#!/usr/bin/env node
+
+import path from "node:path";
+import process from "node:process";
+import { fileURLToPath } from "node:url";
+
+import {
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  CUSTOMER_TRIAL_133_ORIGIN,
+  CUSTOMER_TRIAL_133_TARGET,
+  LOCAL_DEV_TARGET,
+  SCENARIO_DEMO_TARGET,
+  assertManualAcceptanceCapabilitiesPolicy,
+  assertManualAcceptanceDatabaseIdentity,
+  assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimeIdentityPrecondition,
+  assertManualAcceptanceRuntimePolicy,
+  assertManualAcceptanceTargetAttestation,
+  parseManualAcceptanceTargetAttestation,
+  resolveManualAcceptanceTarget,
+} from "./manual-acceptance-target-policy.mjs";
+import { MANUAL_ACCEPTANCE_CORE_WAREHOUSES } from "./manual-acceptance-core-contract.mjs";
+import {
+  LOCAL_DEMO_ACCOUNT_SET,
+  manualAcceptanceAccountSetForTarget,
+  resolveManualAcceptanceRoleCredential,
+} from "./manual-acceptance-account-identities.mjs";
+import { yoyoosunRoleFlowMatrix } from "../../config/customers/yoyoosun/roleFlowMatrix.mjs";
+
+const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
+const CUSTOMER_KEY = "yoyoosun";
+const GUARD_ADMIN_USERNAME = "admin";
+const CONFIRM_PHRASE = "APPLY_SIMULATED_ACCOUNT_SCENARIOS";
+const FORMAL_ACCOUNT_BOOTSTRAP_CONFIRM_PREFIX =
+  "BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS";
+const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
+const ACCOUNT_DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
+const ACCOUNT_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
+const MANAGED_ROLE_KEYS = new Set(["sales", "purchase"]);
+const MAX_AUDIT_MINIMUM = 200;
+
+export const MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE = Object.freeze(
+  yoyoosunRoleFlowMatrix.roles.map((profile) =>
+    Object.freeze({
+      roleKey: profile.roleKey,
+      capabilityKeys: Object.freeze(
+        [...new Set(profile.capabilityKeys)].sort(),
+      ),
+    }),
+  ),
+);
+
+export const FORMAL_DEMO_ACCOUNTS = LOCAL_DEMO_ACCOUNT_SET.formalUsernames;
+export const FORMAL_DEMO_ACCOUNT_PROFILES =
+  LOCAL_DEMO_ACCOUNT_SET.formalProfiles;
+export const LOCAL_DEMO_ACCOUNT_SCENARIOS = LOCAL_DEMO_ACCOUNT_SET.scenarios;
+
+class CliError extends Error {
+  constructor(message, exitCode = 1) {
+    super(message);
+    this.name = "CliError";
+    this.exitCode = exitCode;
+  }
+}
+
+function optionalText(value) {
+  const text = String(value ?? "").trim();
+  return text || undefined;
+}
+
+function requiredText(value, name) {
+  const text = optionalText(value);
+  if (!text) throw new CliError(`${name} is required`);
+  return text;
+}
+
+function normalizeAuditMinimum(value = 0) {
+  const number = Number(value);
+  if (
+    !Number.isSafeInteger(number) ||
+    number < 0 ||
+    number > MAX_AUDIT_MINIMUM
+  ) {
+    throw new CliError(
+      `--audit-minimum must be an integer between 0 and ${MAX_AUDIT_MINIMUM}`,
+      2,
+    );
+  }
+  return number;
+}
+
+export function normalizeAccountScenarioBackendURL(value) {
+  let url;
+  try {
+    url = new URL(String(value || DEFAULT_BACKEND_URL).trim());
+  } catch {
+    throw new CliError("backend URL is invalid", 2);
+  }
+  if (url.username || url.password) {
+    throw new CliError("backend URL must not contain credentials", 2);
+  }
+  if (!new Set(["http:", "https:"]).has(url.protocol)) {
+    throw new CliError("backend URL must use http or https", 2);
+  }
+  if (
+    !LOCAL_HOSTS.has(url.hostname) &&
+    url.origin !== CUSTOMER_TRIAL_133_ORIGIN
+  ) {
+    throw new CliError(
+      `refuse account scenario writes outside this computer: ${url.origin}`,
+      2,
+    );
+  }
+  url.pathname = url.pathname.replace(/\/+$/u, "");
+  url.search = "";
+  url.hash = "";
+  return url.toString().replace(/\/+$/u, "");
+}
+
+function normalizeRoleKeys(roles, context) {
+  if (!Array.isArray(roles)) {
+    throw new CliError(`${context} response missing roles`);
+  }
+  const keys = roles.map((role, index) => {
+    if (!role || typeof role !== "object" || Array.isArray(role)) {
+      throw new CliError(`${context} roles[${index}] is malformed`);
+    }
+    return requiredText(role.role_key, `${context} roles[${index}].role_key`);
+  });
+  return [...new Set(keys)].sort();
+}
+
+function normalizePermissionKeys(values, context) {
+  if (!Array.isArray(values)) {
+    throw new CliError(`${context} response missing permissions`);
+  }
+  const keys = values.map((value, index) =>
+    requiredText(value, `${context} permissions[${index}]`),
+  );
+  return [...new Set(keys)].sort();
+}
+
+function requireAdminRoleRecord(value, context) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new CliError(`${context} response missing role`);
+  }
+  const roleKey = requiredText(value.role_key, `${context}.role_key`);
+  const version = Number(value.version);
+  if (!Number.isSafeInteger(version) || version <= 0) {
+    throw new CliError(`${context} response missing role version`);
+  }
+  if (typeof value.disabled !== "boolean") {
+    throw new CliError(`${context} response missing role status`);
+  }
+  const roleType = requiredText(value.role_type, `${context}.role_type`);
+  const permissionsEditable =
+    value.permissions_editable_by_current_admin ?? value.permissions_editable;
+  if (typeof permissionsEditable !== "boolean") {
+    throw new CliError(`${context} response missing permission edit status`);
+  }
+  const navigationMode = requiredText(
+    value.navigation_mode,
+    `${context}.navigation_mode`,
+  );
+  if (!["recommended", "custom"].includes(navigationMode)) {
+    throw new CliError(`${context} response has invalid navigation mode`);
+  }
+  const normalizeMenuPaths = (paths, field) => {
+    if (!Array.isArray(paths)) {
+      throw new CliError(`${context} response missing ${field}`);
+    }
+    return paths.map((path, index) =>
+      requiredText(path, `${context}.${field}[${index}]`),
+    );
+  };
+  return {
+    roleKey,
+    roleType,
+    version,
+    disabled: value.disabled,
+    permissionsEditable,
+    permissionKeys: normalizePermissionKeys(value.permissions, context),
+    navigationMode,
+    primaryMenuPaths: normalizeMenuPaths(
+      value.primary_menu_paths,
+      "primary_menu_paths",
+    ),
+    secondaryMenuPaths: normalizeMenuPaths(
+      value.secondary_menu_paths,
+      "secondary_menu_paths",
+    ),
+    dataScopes: Array.isArray(value.data_scopes)
+      ? value.data_scopes.map((scope, index) => ({
+          resourceType: requiredText(
+            scope?.resource_type,
+            `${context}.data_scopes[${index}].resource_type`,
+          ),
+          mode: requiredText(
+            scope?.mode,
+            `${context}.data_scopes[${index}].mode`,
+          ),
+          resourceIds: Array.isArray(scope?.resource_ids)
+            ? [...new Set(scope.resource_ids.map(Number))].sort((a, b) => a - b)
+            : [],
+        }))
+      : [],
+  };
+}
+
+function roleSettingsParams(
+  role,
+  { permissionKeys = role.permissionKeys, dataScopes = role.dataScopes } = {},
+) {
+  const normalizedScopes =
+    dataScopes.length > 0
+      ? dataScopes
+      : [
+          {
+            resourceType: "warehouse",
+            mode: "NONE",
+            resourceIds: [],
+          },
+        ];
+  return {
+    role_key: role.roleKey,
+    permission_keys: permissionKeys,
+    data_scopes: normalizedScopes.map((scope) => ({
+      resource_type: scope.resourceType,
+      mode: scope.mode,
+      resource_ids: scope.resourceIds,
+    })),
+    navigation_mode: role.navigationMode,
+    primary_menu_paths: role.primaryMenuPaths,
+    secondary_menu_paths: role.secondaryMenuPaths,
+    expected_version: role.version,
+  };
+}
+
+function requirePermissionOption(value, context) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new CliError(`${context} response missing permission`);
+  }
+  const permissionKey = requiredText(
+    value.permission_key,
+    `${context}.permission_key`,
+  );
+  const permissionClass = requiredText(value.class, `${context}.class`);
+  if (
+    typeof value.assignable !== "boolean" ||
+    typeof value.non_production_only !== "boolean"
+  ) {
+    throw new CliError(`${context} response missing permission metadata`);
+  }
+  return {
+    permissionKey,
+    permissionClass,
+    assignable: value.assignable,
+    nonProductionOnly: value.non_production_only,
+  };
+}
+
+export function requireAdminAccountRecord(value, context = "admin") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new CliError(`${context} response missing admin account`);
+  }
+  const id = Number(value.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    throw new CliError(`${context} response missing admin id`);
+  }
+  const username = requiredText(value.username, `${context}.username`);
+  const displayName = optionalText(value.display_name) || username;
+  const rawAccountStatus = optionalText(value.account_status);
+  const accountStatusFromDisabled =
+    typeof value.disabled === "boolean"
+      ? value.disabled
+        ? "suspended"
+        : "active"
+      : "";
+  const accountStatus = rawAccountStatus || accountStatusFromDisabled;
+  if (!new Set(["active", "suspended", "revoked"]).has(accountStatus)) {
+    throw new CliError(`${context} response missing valid account status`);
+  }
+  const disabled = accountStatus !== "active";
+  if (typeof value.disabled === "boolean" && value.disabled !== disabled) {
+    throw new CliError(
+      `${context} response contains conflicting account status`,
+    );
+  }
+  if (typeof value.is_super_admin !== "boolean") {
+    throw new CliError(`${context} response missing super-admin status`);
+  }
+  return {
+    id,
+    username,
+    displayName,
+    phone: String(value.phone ?? "").trim(),
+    accountStatus,
+    disabled,
+    isSuperAdmin: value.is_super_admin,
+    roleKeys: normalizeRoleKeys(value.roles, context),
+  };
+}
+
+function sameStringList(left, right) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+function scenarioRoleKeys(scenario) {
+  return [...scenario.roleKeys].sort();
+}
+
+function assertOwnedScenarioAccount(account, scenario) {
+  if (account.username !== scenario.username) {
+    throw new CliError(
+      `${scenario.title}: returned username does not match the requested account`,
+    );
+  }
+  if (account.isSuperAdmin || account.phone) {
+    throw new CliError(
+      `${scenario.title}: same-name account cannot be safely identified as a simulated acceptance account`,
+    );
+  }
+  if (account.accountStatus === "revoked") {
+    throw new CliError(
+      `${scenario.title}: same-name account has been revoked and will not be changed`,
+    );
+  }
+  const unmanagedRole = account.roleKeys.find(
+    (roleKey) => !MANAGED_ROLE_KEYS.has(roleKey),
+  );
+  if (unmanagedRole) {
+    throw new CliError(
+      `${scenario.title}: same-name account has an unrelated position and will not be changed`,
+    );
+  }
+}
+
+function assertScenarioState(account, scenario) {
+  assertOwnedScenarioAccount(account, scenario);
+  if (account.displayName !== scenario.displayName) {
+    throw new CliError(
+      `${scenario.title}: returned employee name was not updated`,
+    );
+  }
+  const expectedRoleKeys = scenarioRoleKeys(scenario);
+  if (!sameStringList(account.roleKeys, expectedRoleKeys)) {
+    throw new CliError(
+      `${scenario.title}: returned positions were not updated`,
+    );
+  }
+  if (account.disabled !== scenario.disabled) {
+    throw new CliError(
+      `${scenario.title}: returned account status was not updated`,
+    );
+  }
+}
+
+function assertPasswordResetAccount(account, beforeReset, scenario) {
+  assertScenarioState(account, scenario);
+  if (account.id !== beforeReset.id) {
+    throw new CliError(
+      `${scenario.title}: password reset returned another account`,
+    );
+  }
+}
+
+function accountSnapshot(account) {
+  return {
+    id: account.id,
+    username: account.username,
+    displayName: account.displayName,
+    accountStatus: account.accountStatus,
+    disabled: account.disabled,
+    isSuperAdmin: account.isSuperAdmin,
+    roleKeys: account.roleKeys,
+  };
+}
+
+function buildFormalAccountSnapshots(accounts, protectedAccounts) {
+  const byUsername = new Map(
+    accounts.map((account) => [account.username, account]),
+  );
+  return protectedAccounts.map((username) => {
+    const account = byUsername.get(username);
+    if (!account) {
+      throw new CliError(
+        `required formal acceptance account is missing: ${username}`,
+      );
+    }
+    return accountSnapshot(account);
+  });
+}
+
+function assertFormalAccountsUnchanged(before, afterAccounts) {
+  const afterByUsername = new Map(
+    afterAccounts.map((account) => [
+      account.username,
+      accountSnapshot(account),
+    ]),
+  );
+  for (const snapshot of before) {
+    const after = afterByUsername.get(snapshot.username);
+    if (!after || JSON.stringify(after) !== JSON.stringify(snapshot)) {
+      throw new CliError(
+        `formal acceptance account changed while preparing acceptance scenarios: ${snapshot.username}`,
+      );
+    }
+  }
+}
+
+export function manualAcceptanceFormalAccountBootstrapConfirmation({
+  target,
+  dataVersion,
+  runId,
+} = {}) {
+  return [
+    FORMAL_ACCOUNT_BOOTSTRAP_CONFIRM_PREFIX,
+    requiredText(target, "target"),
+    requiredText(dataVersion, "dataVersion"),
+    requiredText(runId, "runId"),
+  ].join(":");
+}
+
+function assertOwnedFormalAccount(account, profile) {
+  if (
+    account.username !== profile.username ||
+    account.phone ||
+    account.isSuperAdmin ||
+    account.disabled ||
+    account.accountStatus !== "active" ||
+    !sameStringList(account.roleKeys, profile.roleKeys || [profile.roleKey])
+  ) {
+    throw new CliError(
+      `formal acceptance account does not match the exact registered role profile: ${profile.username}`,
+      2,
+    );
+  }
+}
+
+function assertFormalAccountState(account, profile) {
+  assertOwnedFormalAccount(account, profile);
+  if (account.displayName !== profile.displayName) {
+    throw new CliError(
+      `formal acceptance account employee name was not updated: ${profile.username}`,
+      2,
+    );
+  }
+}
+
+async function bootstrapMissingFormalAccounts({
+  plan,
+  token,
+  password,
+  confirmation,
+  fetchImpl,
+}) {
+  const expectedConfirmation =
+    manualAcceptanceFormalAccountBootstrapConfirmation(plan);
+  if (confirmation !== expectedConfirmation) {
+    throw new CliError(
+      `fresh dedicated manual acceptance database requires MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=${expectedConfirmation}`,
+      2,
+    );
+  }
+  const beforeAccounts = await listAdmins({
+    backendURL: plan.backendURL,
+    token,
+    fetchImpl,
+  });
+  const beforeByUsername = new Map(
+    beforeAccounts.map((account) => [account.username, account]),
+  );
+  for (const profile of plan.formalAccountProfiles) {
+    const existing = beforeByUsername.get(profile.username);
+    if (existing) assertOwnedFormalAccount(existing, profile);
+  }
+
+  const actions = [];
+  for (const profile of plan.formalAccountProfiles) {
+    let account = beforeByUsername.get(profile.username);
+    if (account && account.displayName !== profile.displayName) {
+      const accountID = account.id;
+      account = await mutateAdmin({
+        backendURL: plan.backendURL,
+        token,
+        fetchImpl,
+        method: "set_profile",
+        params: {
+          id: account.id,
+          display_name: profile.displayName,
+          phone: "",
+        },
+        context: `admin.set_profile ${profile.username}`,
+      });
+      if (account.id !== accountID) {
+        throw new CliError(
+          `formal acceptance account profile update returned another account: ${profile.username}`,
+          2,
+        );
+      }
+      assertFormalAccountState(account, profile);
+      actions.push({ username: profile.username, action: "profile-updated" });
+      continue;
+    }
+    if (account) {
+      assertFormalAccountState(account, profile);
+      actions.push({ username: profile.username, action: "verified" });
+      continue;
+    }
+    account = await mutateAdmin({
+      backendURL: plan.backendURL,
+      token,
+      fetchImpl,
+      method: "create",
+      params: {
+        username: profile.username,
+        display_name: profile.displayName,
+        password,
+        phone: "",
+        role_keys: profile.roleKeys || [profile.roleKey],
+      },
+      context: `admin.create ${profile.username}`,
+    });
+    assertFormalAccountState(account, profile);
+    actions.push({ username: profile.username, action: "created" });
+  }
+
+  const afterAccounts = await listAdmins({
+    backendURL: plan.backendURL,
+    token,
+    fetchImpl,
+  });
+  const afterByUsername = new Map(
+    afterAccounts.map((account) => [account.username, account]),
+  );
+  const accounts = plan.formalAccountProfiles.map((profile) => {
+    const account = afterByUsername.get(profile.username);
+    if (!account) {
+      throw new CliError(
+        `formal acceptance account is missing after bootstrap: ${profile.username}`,
+      );
+    }
+    assertFormalAccountState(account, profile);
+    return accountSnapshot(account);
+  });
+  return {
+    mode: `${plan.target}-exact-create-or-verify`,
+    created: actions.filter((item) => item.action === "created").length,
+    profilesUpdated: actions.filter((item) => item.action === "profile-updated")
+      .length,
+    verified: actions.filter((item) => item.action === "verified").length,
+    accounts,
+    actions,
+  };
+}
+
+export async function bootstrapManualAcceptanceFormalAccounts(
+  plan,
+  {
+    password,
+    adminPassword,
+    targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
+    targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    formalAccountConfirmation = process.env
+      .MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM,
+    fetchImpl = fetch,
+  } = {},
+) {
+  const safePlan = buildManualAcceptanceAccountScenarioPlan({
+    backendURL: plan?.backendURL,
+    target: plan?.target,
+    dataVersion: plan?.dataVersion,
+    runId: plan?.runId,
+    databaseName: plan?.databaseName,
+  });
+  const resolvedTarget = assertManualAcceptanceMutationTarget(safePlan, {
+    confirmation: targetConfirmation,
+  });
+  const parsedTargetAttestation =
+    parseManualAcceptanceTargetAttestation(targetAttestation);
+  if (resolvedTarget.external) {
+    assertManualAcceptanceTargetAttestation({
+      policy: safePlan,
+      attestation: parsedTargetAttestation,
+    });
+  } else if (parsedTargetAttestation) {
+    throw new CliError(
+      "target attestation is only valid for customer-trial-133",
+      2,
+    );
+  }
+
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target: safePlan.target,
+    password,
+  });
+  const effectivePassword = requiredText(
+    roleCredential.value,
+    safePlan.passwordEnvironmentVariable,
+  );
+  if ([...effectivePassword].length < 8 || [...effectivePassword].length > 20) {
+    throw new CliError("account password must contain 8-20 characters", 2);
+  }
+  const effectiveAdminPassword = requiredText(
+    adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+  );
+  if (resolvedTarget.external && effectivePassword === effectiveAdminPassword) {
+    throw new CliError(
+      "customer-trial-133 admin and UAT role passwords must be different",
+      2,
+    );
+  }
+
+  const runtimeIdentity =
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy: safePlan,
+      attestation: parsedTargetAttestation,
+      fetchImpl,
+    });
+  const { token: guardToken } = await loginAdmin({
+    backendURL: safePlan.backendURL,
+    username: GUARD_ADMIN_USERNAME,
+    password: effectiveAdminPassword,
+    requireSuperAdmin: true,
+    fetchImpl,
+  });
+  const capabilities = await rpcCall({
+    backendURL: safePlan.backendURL,
+    domain: "debug",
+    method: "capabilities",
+    token: guardToken,
+    fetchImpl,
+  });
+  const databaseIdentity = assertManualAcceptanceDatabaseIdentity({
+    policy: safePlan,
+    capabilities,
+  });
+  const runtimePolicy = assertManualAcceptanceCapabilitiesPolicy({
+    policy: safePlan,
+    capabilities,
+  });
+  const bootstrap = await bootstrapMissingFormalAccounts({
+    plan: safePlan,
+    token: guardToken,
+    password: effectivePassword,
+    confirmation: formalAccountConfirmation,
+    fetchImpl,
+  });
+  return {
+    target: resolvedTarget.target,
+    accountKind: safePlan.accountKind,
+    accountPrefix: safePlan.accountPrefix,
+    rolePasswordSource: roleCredential.source,
+    databaseName: databaseIdentity.databaseName,
+    environment: runtimePolicy.environment,
+    runtimeIdentityProof: runtimeIdentity.proof,
+    ...bootstrap,
+  };
+}
+
+export function buildManualAcceptanceAccountScenarioPlan({
+  backendURL = DEFAULT_BACKEND_URL,
+  auditMinimum = 0,
+  target,
+  dataVersion = ACCOUNT_DATA_VERSION,
+  runId = ACCOUNT_RUN_ID,
+  databaseName,
+} = {}) {
+  const targetPolicy = resolveManualAcceptanceTarget({
+    backendURL: normalizeAccountScenarioBackendURL(backendURL),
+    target,
+    dataVersion,
+    runId,
+    databaseName,
+  });
+  const accountSet = manualAcceptanceAccountSetForTarget(targetPolicy.target);
+  return {
+    mode: "report-only",
+    backendURL: targetPolicy.backendURL,
+    target: targetPolicy.target,
+    datasetKey: targetPolicy.datasetKey,
+    dataVersion: targetPolicy.dataVersion,
+    runId: targetPolicy.runId,
+    databaseName: targetPolicy.databaseName,
+    external: targetPolicy.external,
+    accountKind: accountSet.accountKind,
+    accountPrefix: accountSet.usernamePrefix,
+    passwordEnvironmentVariable: accountSet.passwordEnvironmentVariable,
+    loginAccount: accountSet.businessAdminUsername,
+    simulatedOnly: true,
+    realCustomerImport: false,
+    directSQL: false,
+    auditMinimum: normalizeAuditMinimum(auditMinimum),
+    roleCapabilityBaseline: MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE.map(
+      (item) => ({
+        roleKey: item.roleKey,
+        capabilityKeys: [...item.capabilityKeys],
+      }),
+    ),
+    formalAccountProfiles: accountSet.formalProfiles.map((profile) => ({
+      username: profile.username,
+      displayName: profile.displayName,
+      roleKey: profile.roleKey,
+      ...(profile.roleKeys ? { roleKeys: [...profile.roleKeys] } : {}),
+    })),
+    protectedAccounts: [...accountSet.formalUsernames],
+    scenarios: accountSet.scenarios.map((scenario) => ({
+      key: scenario.key,
+      username: scenario.username,
+      displayName: scenario.displayName,
+      title: scenario.title,
+      instruction: scenario.instruction,
+      disabledReason: scenario.disabledReason || "",
+      positions: [...scenario.positions],
+      roleKeys: [...scenario.roleKeys],
+      disabled: scenario.disabled,
+    })),
+  };
+}
+
+function rpcURL(backendURL, domain) {
+  return new URL(`/rpc/${domain}`, `${backendURL}/`).toString();
+}
+
+let requestSequence = 0;
+
+async function rpcCall({
+  backendURL,
+  domain,
+  method,
+  params = {},
+  token,
+  fetchImpl = fetch,
+}) {
+  const targetURL = rpcURL(backendURL, domain);
+  const response = await fetchImpl(targetURL, {
+    method: "POST",
+    redirect: "error",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: `manual-acceptance-accounts-${++requestSequence}`,
+      method,
+      params:
+        domain === "customer_config"
+          ? { customer_key: CUSTOMER_KEY, ...params }
+          : params,
+    }),
+  });
+  if (response?.redirected) {
+    throw new CliError(`${domain}.${method} refused redirected response`);
+  }
+  if (response?.url) {
+    const expected = new URL(targetURL);
+    const actual = new URL(response.url);
+    if (
+      actual.origin !== expected.origin ||
+      actual.pathname !== expected.pathname
+    ) {
+      throw new CliError(
+        `${domain}.${method} response came from an unexpected URL`,
+      );
+    }
+  }
+  if (!response?.ok) {
+    throw new CliError(
+      `${domain}.${method} HTTP ${response?.status ?? "unknown"}`,
+    );
+  }
+  const json = await response.json();
+  if (json?.result?.code !== 0) {
+    throw new CliError(
+      `${domain}.${method} code=${json?.result?.code ?? "unknown"} message=${json?.result?.message ?? "unknown"}`,
+    );
+  }
+  return json.result.data || {};
+}
+
+async function loginAdmin({
+  backendURL,
+  username,
+  password,
+  requireSuperAdmin = false,
+  fetchImpl,
+}) {
+  const data = await rpcCall({
+    backendURL,
+    domain: "auth",
+    method: "admin_login",
+    params: { username, password },
+    fetchImpl,
+  });
+  const profile = requireAdminAccountRecord(data, `${username} login`);
+  if (profile.username !== username) {
+    throw new CliError(`${username} login returned another account`);
+  }
+  if (requireSuperAdmin && !profile.isSuperAdmin) {
+    throw new CliError(`${username} must be the local super admin`);
+  }
+  const token = optionalText(data.access_token || data.token);
+  if (!token) throw new CliError(`${username} login response missing token`);
+  return { token, profile };
+}
+
+async function assertSafeRuntime({
+  policy,
+  guardToken,
+  sessionToken,
+  fetchImpl,
+}) {
+  const backendURL = policy.backendURL;
+  const capabilities = await rpcCall({
+    backendURL,
+    domain: "debug",
+    method: "capabilities",
+    token: guardToken,
+    fetchImpl,
+  });
+  const sessionData = await rpcCall({
+    backendURL,
+    domain: "customer_config",
+    method: "get_effective_session",
+    token: sessionToken,
+    fetchImpl,
+  });
+  const session = sessionData.session || {};
+  return assertManualAcceptanceRuntimePolicy({
+    policy,
+    capabilities,
+    session,
+    requiredModules: [],
+    customerKey: CUSTOMER_KEY,
+  });
+}
+
+async function listAdmins({ backendURL, token, fetchImpl }) {
+  const data = await rpcCall({
+    backendURL,
+    domain: "admin",
+    method: "list",
+    token,
+    fetchImpl,
+  });
+  if (!Array.isArray(data.admins)) {
+    throw new CliError("admin.list response missing admins");
+  }
+  return data.admins.map((admin, index) =>
+    requireAdminAccountRecord(admin, `admin.list admins[${index}]`),
+  );
+}
+
+async function readRoleControlPlane({ backendURL, token, fetchImpl }) {
+  const data = await rpcCall({
+    backendURL,
+    domain: "admin",
+    method: "rbac_options",
+    token,
+    fetchImpl,
+  });
+  if (!Array.isArray(data.roles) || !Array.isArray(data.permissions)) {
+    throw new CliError("admin.rbac_options response is incomplete");
+  }
+  const roles = new Map();
+  for (const [index, value] of data.roles.entries()) {
+    const role = requireAdminRoleRecord(
+      value,
+      `admin.rbac_options roles[${index}]`,
+    );
+    if (roles.has(role.roleKey)) {
+      throw new CliError(
+        `admin.rbac_options returned duplicate role ${role.roleKey}`,
+      );
+    }
+    roles.set(role.roleKey, role);
+  }
+  const permissions = new Map();
+  for (const [index, value] of data.permissions.entries()) {
+    const permission = requirePermissionOption(
+      value,
+      `admin.rbac_options permissions[${index}]`,
+    );
+    if (permissions.has(permission.permissionKey)) {
+      throw new CliError(
+        `admin.rbac_options returned duplicate permission ${permission.permissionKey}`,
+      );
+    }
+    permissions.set(permission.permissionKey, permission);
+  }
+  const expectedWarehouseCodes = MANUAL_ACCEPTANCE_CORE_WAREHOUSES.map(
+    (item) => item.code,
+  );
+  const expectedWarehouseCodeSet = new Set(expectedWarehouseCodes);
+  const warehouseIDsByCode = new Map();
+  for (const item of Array.isArray(data.warehouse_scope_options)
+    ? data.warehouse_scope_options
+    : []) {
+    const code = optionalText(item?.code);
+    if (!code || !expectedWarehouseCodeSet.has(code)) continue;
+    const id = Number(item?.id);
+    if (!Number.isSafeInteger(id) || id <= 0 || warehouseIDsByCode.has(code)) {
+      throw new CliError(`验收核心仓库 ${code} 的数据范围候选不唯一`, 2);
+    }
+    warehouseIDsByCode.set(code, id);
+  }
+  const missingWarehouseCodes = expectedWarehouseCodes.filter(
+    (code) => !warehouseIDsByCode.has(code),
+  );
+  if (missingWarehouseCodes.length > 0) {
+    throw new CliError(
+      `验收核心仓库数据范围缺少 ${missingWarehouseCodes.join(", ")}`,
+      2,
+    );
+  }
+  const warehouseIds = expectedWarehouseCodes
+    .map((code) => warehouseIDsByCode.get(code))
+    .sort((a, b) => a - b);
+  return { roles, permissions, warehouseIds };
+}
+
+function sameNumberList(left, right) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+async function alignAcceptanceWarehouseScopes({
+  backendURL,
+  token,
+  fetchImpl,
+  allowMutation = true,
+}) {
+  const controlPlane = await readRoleControlPlane({
+    backendURL,
+    token,
+    fetchImpl,
+  });
+  const actions = [];
+  for (const roleKey of ["warehouse", "quality"]) {
+    let role = controlPlane.roles.get(roleKey);
+    if (!role || role.disabled || role.roleType !== "business_default") {
+      throw new CliError(`岗位 ${roleKey} 不能配置验收仓库范围`, 2);
+    }
+    const current = role.dataScopes.find(
+      (scope) => scope.resourceType === "warehouse",
+    );
+    const alreadyAssigned =
+      current?.mode === "ASSIGNED" &&
+      sameNumberList(current.resourceIds, controlPlane.warehouseIds);
+    if (alreadyAssigned) {
+      actions.push({ roleKey, action: "unchanged" });
+      continue;
+    }
+    if (!allowMutation) {
+      throw new CliError(
+        `岗位 ${roleKey} 的仓库数据范围未绑定当前 4 个核心仓库`,
+        2,
+      );
+    }
+    const updatedData = await rpcCall({
+      backendURL,
+      domain: "admin",
+      method: "set_role_settings",
+      params: roleSettingsParams(role, {
+        dataScopes: [
+          {
+            resourceType: "warehouse",
+            mode: "ASSIGNED",
+            resourceIds: controlPlane.warehouseIds,
+          },
+        ],
+      }),
+      token,
+      fetchImpl,
+    });
+    role = requireAdminRoleRecord(
+      updatedData.role,
+      `admin.set_role_settings ${roleKey}`,
+    );
+    const readback = role.dataScopes.find(
+      (scope) => scope.resourceType === "warehouse",
+    );
+    if (
+      readback?.mode !== "ASSIGNED" ||
+      !sameNumberList(readback.resourceIds, controlPlane.warehouseIds)
+    ) {
+      throw new CliError(`岗位 ${roleKey} 的仓库数据范围写入不完整`);
+    }
+    actions.push({ roleKey, action: "updated" });
+  }
+  return {
+    source: "manual-acceptance-core-warehouses",
+    mode: allowMutation ? "reconcile" : "verify-only",
+    warehouseIds: controlPlane.warehouseIds,
+    updated: actions.filter((item) => item.action === "updated").length,
+    unchanged: actions.filter((item) => item.action === "unchanged").length,
+    actions,
+  };
+}
+
+function preflightRoleCapabilityBaseline(controlPlane, baseline) {
+  const roleKeys = new Set();
+  return baseline.map((expected) => {
+    if (roleKeys.has(expected.roleKey)) {
+      throw new CliError(`验收权限基线包含重复岗位 ${expected.roleKey}`);
+    }
+    roleKeys.add(expected.roleKey);
+    const role = controlPlane.roles.get(expected.roleKey);
+    if (
+      !role ||
+      role.disabled ||
+      role.roleType !== "business_default" ||
+      !role.permissionsEditable
+    ) {
+      throw new CliError(
+        `岗位 ${expected.roleKey} 当前不是可维护的预设业务岗位`,
+      );
+    }
+    const desired = [
+      ...new Set([...role.permissionKeys, ...expected.capabilityKeys]),
+    ].sort();
+    for (const key of desired) {
+      const permission = controlPlane.permissions.get(key);
+      if (
+        !permission ||
+        !permission.assignable ||
+        permission.permissionClass !== "business" ||
+        permission.nonProductionOnly
+      ) {
+        throw new CliError(
+          `岗位 ${role.roleKey} 包含不可用于验收的权限 ${key}`,
+        );
+      }
+    }
+    return {
+      role,
+      desired,
+      missing: expected.capabilityKeys.filter(
+        (key) => !role.permissionKeys.includes(key),
+      ),
+    };
+  });
+}
+
+async function alignAcceptanceRoleCapabilities({
+  backendURL,
+  token,
+  fetchImpl,
+  baseline,
+  allowMutation = true,
+}) {
+  const controlPlane = await readRoleControlPlane({
+    backendURL,
+    token,
+    fetchImpl,
+  });
+  const planned = preflightRoleCapabilityBaseline(controlPlane, baseline);
+  const actions = [];
+  for (const item of planned) {
+    let { role } = item;
+    const { desired, missing } = item;
+    if (missing.length === 0) {
+      actions.push({ roleKey: role.roleKey, action: "unchanged", added: [] });
+      continue;
+    }
+    if (!allowMutation) {
+      throw new CliError(
+        `岗位 ${role.roleKey} 缺少验收所需权限 ${missing.join(", ")}；远端账号准备不修改岗位权限`,
+        2,
+      );
+    }
+    const updatedData = await rpcCall({
+      backendURL,
+      domain: "admin",
+      method: "set_role_settings",
+      params: roleSettingsParams(role, { permissionKeys: desired }),
+      token,
+      fetchImpl,
+    });
+    const updated = requireAdminRoleRecord(
+      updatedData.role,
+      `admin.set_role_settings ${role.roleKey}`,
+    );
+    if (
+      updated.roleKey !== role.roleKey ||
+      updated.version <= role.version ||
+      desired.some((key) => !updated.permissionKeys.includes(key))
+    ) {
+      throw new CliError(`岗位 ${role.roleKey} 权限补齐结果不完整`);
+    }
+    role = updated;
+    actions.push({ roleKey: role.roleKey, action: "updated", added: missing });
+  }
+  const readback = await readRoleControlPlane({
+    backendURL,
+    token,
+    fetchImpl,
+  });
+  for (const item of planned) {
+    const role = readback.roles.get(item.role.roleKey);
+    if (
+      !role ||
+      role.disabled ||
+      role.roleType !== "business_default" ||
+      item.desired.some((key) => !role.permissionKeys.includes(key))
+    ) {
+      throw new CliError(`岗位 ${item.role.roleKey} 最终权限读回不完整`);
+    }
+  }
+  return {
+    source: "yoyoosun-role-flow-matrix",
+    mode: allowMutation ? "reconcile" : "verify-only",
+    updated: actions.filter((item) => item.action === "updated").length,
+    unchanged: actions.filter((item) => item.action === "unchanged").length,
+    actions,
+  };
+}
+
+async function mutateAdmin({
+  backendURL,
+  token,
+  fetchImpl,
+  method,
+  params,
+  context,
+}) {
+  const data = await rpcCall({
+    backendURL,
+    domain: "admin",
+    method,
+    params,
+    token,
+    fetchImpl,
+  });
+  return requireAdminAccountRecord(data.admin, context);
+}
+
+async function readAuditTotal({ backendURL, token, fetchImpl }) {
+  const data = await rpcCall({
+    backendURL,
+    domain: "admin",
+    method: "audit_logs",
+    params: { limit: 1, offset: 0 },
+    token,
+    fetchImpl,
+  });
+  const total = Number(data.total);
+  if (!Number.isSafeInteger(total) || total < 0) {
+    throw new CliError("admin.audit_logs response missing total");
+  }
+  return total;
+}
+
+async function fillAuditEvidence({
+  backendURL,
+  token,
+  fetchImpl,
+  account,
+  minimum,
+  total,
+  disabledScenario,
+}) {
+  const expectedRoleKeys = ["sales"];
+  let current = account;
+  let currentTotal = total;
+  let mutations = 0;
+  const mutationLimit = Math.max(4, (minimum - total + 2) * 2);
+  while (currentTotal < minimum && mutations < mutationLimit) {
+    const nextRoleKeys = current.roleKeys.length > 0 ? [] : expectedRoleKeys;
+    current = await mutateAdmin({
+      backendURL,
+      token,
+      fetchImpl,
+      method: "set_roles",
+      params: { id: current.id, role_keys: nextRoleKeys },
+      context: `admin.set_roles audit sample ${current.username}`,
+    });
+    if (!current.disabled || current.isSuperAdmin || current.phone) {
+      throw new CliError("已停用账号在准备审计样例时出现了不安全的状态变化");
+    }
+    const nextTotal = await readAuditTotal({
+      backendURL,
+      token,
+      fetchImpl,
+    });
+    if (nextTotal <= currentTotal) {
+      throw new CliError("账号岗位变更没有生成可读的审计记录");
+    }
+    currentTotal = nextTotal;
+    mutations += 1;
+  }
+  if (!sameStringList(current.roleKeys, expectedRoleKeys)) {
+    current = await mutateAdmin({
+      backendURL,
+      token,
+      fetchImpl,
+      method: "set_roles",
+      params: { id: current.id, role_keys: expectedRoleKeys },
+      context: `admin.set_roles restore ${current.username}`,
+    });
+    currentTotal = await readAuditTotal({
+      backendURL,
+      token,
+      fetchImpl,
+    });
+    mutations += 1;
+  }
+  if (currentTotal < minimum) {
+    throw new CliError(
+      `审计记录只有 ${currentTotal} 条，未达到 ${minimum} 条验收要求`,
+    );
+  }
+  assertScenarioState(current, disabledScenario);
+  return { account: current, total: currentTotal, mutations };
+}
+
+export async function applyManualAcceptanceAccountScenarios(
+  plan,
+  {
+    password,
+    adminPassword,
+    confirmPhrase = process.env.MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM,
+    targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
+    targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    formalAccountConfirmation = process.env
+      .MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM,
+    fetchImpl = fetch,
+  } = {},
+) {
+  const safePlan = buildManualAcceptanceAccountScenarioPlan({
+    backendURL: plan?.backendURL,
+    auditMinimum: plan?.auditMinimum,
+    target: plan?.target,
+    dataVersion: plan?.dataVersion,
+    runId: plan?.runId,
+    databaseName: plan?.databaseName,
+  });
+  const resolvedTarget = assertManualAcceptanceMutationTarget(safePlan, {
+    confirmation: targetConfirmation,
+  });
+  const parsedTargetAttestation =
+    parseManualAcceptanceTargetAttestation(targetAttestation);
+  if (resolvedTarget.external) {
+    assertManualAcceptanceTargetAttestation({
+      policy: safePlan,
+      attestation: parsedTargetAttestation,
+    });
+  } else if (parsedTargetAttestation) {
+    throw new CliError(
+      "target attestation is only valid for customer-trial-133",
+      2,
+    );
+  }
+  if (confirmPhrase !== CONFIRM_PHRASE) {
+    throw new CliError(
+      `apply requires MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=${CONFIRM_PHRASE}`,
+      2,
+    );
+  }
+  const roleCredential = resolveManualAcceptanceRoleCredential({
+    target: safePlan.target,
+    password,
+  });
+  const effectivePassword = requiredText(
+    roleCredential.value,
+    safePlan.passwordEnvironmentVariable,
+  );
+  if ([...effectivePassword].length < 8 || [...effectivePassword].length > 20) {
+    throw new CliError("account password must contain 8-20 characters", 2);
+  }
+  const effectiveAdminPassword = requiredText(
+    adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+  );
+  if (resolvedTarget.external && effectivePassword === effectiveAdminPassword) {
+    throw new CliError(
+      "customer-trial-133 admin and UAT role passwords must be different",
+      2,
+    );
+  }
+
+  await assertManualAcceptanceRuntimeIdentityPrecondition({
+    policy: safePlan,
+    attestation: parsedTargetAttestation,
+    fetchImpl,
+  });
+
+  const { token: guardToken } = await loginAdmin({
+    backendURL: safePlan.backendURL,
+    username: GUARD_ADMIN_USERNAME,
+    password: effectiveAdminPassword,
+    requireSuperAdmin: true,
+    fetchImpl,
+  });
+  const guardRuntime = await assertSafeRuntime({
+    policy: safePlan,
+    guardToken,
+    sessionToken: guardToken,
+    fetchImpl,
+  });
+  const roleCapabilityBaseline = await alignAcceptanceRoleCapabilities({
+    backendURL: safePlan.backendURL,
+    token: guardToken,
+    fetchImpl,
+    baseline: safePlan.roleCapabilityBaseline,
+    allowMutation: !resolvedTarget.external,
+  });
+  const roleDataScopeBaseline = await alignAcceptanceWarehouseScopes({
+    backendURL: safePlan.backendURL,
+    token: guardToken,
+    fetchImpl,
+    // Both registered acceptance targets use the audited admin RPC. The 133
+    // attestation and exact confirmation already exclude production targets;
+    // keeping the remote path verify-only would leave a fresh migrated database
+    // at NONE because its four core warehouses are created after migration.
+    allowMutation: true,
+  });
+  const formalAccountBootstrap = await bootstrapMissingFormalAccounts({
+    plan: safePlan,
+    token: guardToken,
+    password: effectivePassword,
+    confirmation: formalAccountConfirmation,
+    fetchImpl,
+  });
+  const { token, profile } = await loginAdmin({
+    backendURL: safePlan.backendURL,
+    username: safePlan.loginAccount,
+    password: effectivePassword,
+    fetchImpl,
+  });
+  const runtime = await assertSafeRuntime({
+    policy: safePlan,
+    guardToken,
+    sessionToken: token,
+    fetchImpl,
+  });
+  if (
+    guardRuntime.configRevision !== runtime.configRevision ||
+    guardRuntime.configProductVersion !== runtime.configProductVersion
+  ) {
+    throw new CliError(
+      "customer configuration changed while preparing formal accounts",
+      2,
+    );
+  }
+  const beforeAccounts = await listAdmins({
+    backendURL: safePlan.backendURL,
+    token,
+    fetchImpl,
+  });
+  const formalBefore = buildFormalAccountSnapshots(
+    beforeAccounts,
+    safePlan.protectedAccounts,
+  );
+  const beforeByUsername = new Map(
+    beforeAccounts.map((account) => [account.username, account]),
+  );
+  const auditBefore =
+    safePlan.auditMinimum > 0
+      ? await readAuditTotal({
+          backendURL: safePlan.backendURL,
+          token,
+          fetchImpl,
+        })
+      : null;
+
+  for (const scenario of safePlan.scenarios) {
+    const existing = beforeByUsername.get(scenario.username);
+    if (existing) assertOwnedScenarioAccount(existing, scenario);
+  }
+
+  const actions = [];
+  for (const scenario of safePlan.scenarios) {
+    const expectedRoleKeys = scenarioRoleKeys(scenario);
+    let account = beforeByUsername.get(scenario.username);
+    let created = false;
+    if (!account) {
+      account = await mutateAdmin({
+        backendURL: safePlan.backendURL,
+        token,
+        fetchImpl,
+        method: "create",
+        params: {
+          username: scenario.username,
+          display_name: scenario.displayName,
+          password: effectivePassword,
+          phone: "",
+          role_keys: expectedRoleKeys,
+        },
+        context: `admin.create ${scenario.username}`,
+      });
+      assertOwnedScenarioAccount(account, scenario);
+      if (
+        !sameStringList(account.roleKeys, expectedRoleKeys) ||
+        account.disabled
+      ) {
+        throw new CliError(
+          `${scenario.title}: create response did not match the request`,
+        );
+      }
+      created = true;
+      actions.push({ username: scenario.username, action: "created" });
+    }
+
+    if (account.displayName !== scenario.displayName) {
+      const accountID = account.id;
+      account = await mutateAdmin({
+        backendURL: safePlan.backendURL,
+        token,
+        fetchImpl,
+        method: "set_profile",
+        params: {
+          id: account.id,
+          display_name: scenario.displayName,
+          phone: "",
+        },
+        context: `admin.set_profile ${scenario.username}`,
+      });
+      if (account.id !== accountID) {
+        throw new CliError(
+          `${scenario.title}: profile update returned another account`,
+        );
+      }
+      assertOwnedScenarioAccount(account, scenario);
+      if (account.displayName !== scenario.displayName) {
+        throw new CliError(`${scenario.title}: employee name was not updated`);
+      }
+      actions.push({ username: scenario.username, action: "profile-updated" });
+    }
+
+    if (!sameStringList(account.roleKeys, expectedRoleKeys)) {
+      account = await mutateAdmin({
+        backendURL: safePlan.backendURL,
+        token,
+        fetchImpl,
+        method: "set_roles",
+        params: { id: account.id, role_keys: expectedRoleKeys },
+        context: `admin.set_roles ${scenario.username}`,
+      });
+      assertOwnedScenarioAccount(account, scenario);
+      if (!sameStringList(account.roleKeys, expectedRoleKeys)) {
+        throw new CliError(`${scenario.title}: positions were not updated`);
+      }
+      actions.push({
+        username: scenario.username,
+        action: "positions-updated",
+      });
+    }
+
+    if (account.disabled !== scenario.disabled) {
+      account = await mutateAdmin({
+        backendURL: safePlan.backendURL,
+        token,
+        fetchImpl,
+        method: "set_disabled",
+        params: {
+          id: account.id,
+          disabled: scenario.disabled,
+          reason: scenario.disabled ? scenario.disabledReason : "",
+        },
+        context: `admin.set_disabled ${scenario.username}`,
+      });
+      assertScenarioState(account, scenario);
+      actions.push({ username: scenario.username, action: "status-updated" });
+    } else {
+      assertScenarioState(account, scenario);
+    }
+
+    if (
+      !created &&
+      !actions.some((item) => item.username === scenario.username)
+    ) {
+      actions.push({ username: scenario.username, action: "unchanged" });
+    }
+
+    const beforePasswordReset = account;
+    account = await mutateAdmin({
+      backendURL: safePlan.backendURL,
+      token,
+      fetchImpl,
+      method: "reset_password",
+      params: { id: account.id, password: effectivePassword },
+      context: `admin.reset_password ${scenario.username}`,
+    });
+    assertPasswordResetAccount(account, beforePasswordReset, scenario);
+    actions.push({
+      username: scenario.username,
+      action: "password-reset",
+    });
+  }
+
+  let auditAfter = auditBefore;
+  let auditFillMutations = 0;
+  if (safePlan.auditMinimum > 0) {
+    auditAfter = await readAuditTotal({
+      backendURL: safePlan.backendURL,
+      token,
+      fetchImpl,
+    });
+    if (auditAfter < safePlan.auditMinimum) {
+      const disabledScenario = safePlan.scenarios.find(
+        (scenario) => scenario.key === "disabled-account",
+      );
+      const currentAccounts = await listAdmins({
+        backendURL: safePlan.backendURL,
+        token,
+        fetchImpl,
+      });
+      const disabledAccount = currentAccounts.find(
+        (account) => account.username === disabledScenario.username,
+      );
+      if (!disabledAccount) {
+        throw new CliError("已停用账号不存在，不能准备审计样例");
+      }
+      assertScenarioState(disabledAccount, disabledScenario);
+      const filled = await fillAuditEvidence({
+        backendURL: safePlan.backendURL,
+        token,
+        fetchImpl,
+        account: disabledAccount,
+        minimum: safePlan.auditMinimum,
+        total: auditAfter,
+        disabledScenario,
+      });
+      auditAfter = filled.total;
+      auditFillMutations = filled.mutations;
+    }
+  }
+
+  const afterAccounts = await listAdmins({
+    backendURL: safePlan.backendURL,
+    token,
+    fetchImpl,
+  });
+  assertFormalAccountsUnchanged(formalBefore, afterAccounts);
+  const afterByUsername = new Map(
+    afterAccounts.map((account) => [account.username, account]),
+  );
+  const scenarios = safePlan.scenarios.map((scenario) => {
+    const account = afterByUsername.get(scenario.username);
+    if (!account)
+      throw new CliError(`${scenario.title}: account is missing after apply`);
+    assertScenarioState(account, scenario);
+    return {
+      key: scenario.key,
+      username: scenario.username,
+      displayName: scenario.displayName,
+      title: scenario.title,
+      instruction: scenario.instruction,
+      positions: [...scenario.positions],
+      roleKeys: account.roleKeys,
+      disabled: account.disabled,
+      id: account.id,
+      passwordReset: actions.some(
+        (item) =>
+          item.username === scenario.username &&
+          item.action === "password-reset",
+      ),
+    };
+  });
+  const summary = {
+    created: actions.filter((item) => item.action === "created").length,
+    profilesUpdated: actions.filter((item) => item.action === "profile-updated")
+      .length,
+    positionsUpdated: actions.filter(
+      (item) => item.action === "positions-updated",
+    ).length,
+    statusUpdated: actions.filter((item) => item.action === "status-updated")
+      .length,
+    passwordReset: actions.filter((item) => item.action === "password-reset")
+      .length,
+    unchanged: actions.filter((item) => item.action === "unchanged").length,
+  };
+
+  return {
+    mode: "apply",
+    generatedAt: new Date().toISOString(),
+    backendURL: safePlan.backendURL,
+    target: safePlan.target,
+    accountKind: safePlan.accountKind,
+    accountPrefix: safePlan.accountPrefix,
+    rolePasswordSource: roleCredential.source,
+    datasetKey: safePlan.datasetKey,
+    dataVersion: safePlan.dataVersion,
+    runId: safePlan.runId,
+    databaseName: safePlan.databaseName,
+    simulatedOnly: true,
+    realCustomerImport: false,
+    directSQL: false,
+    loginAccount: accountSnapshot(profile),
+    runtime,
+    targetAttestation: parsedTargetAttestation
+      ? {
+          source: "out-of-band",
+          release: parsedTargetAttestation.release,
+          migration: parsedTargetAttestation.migration,
+        }
+      : null,
+    roleCapabilityBaseline,
+    roleDataScopeBaseline,
+    formalAccountBootstrap,
+    protectedAccounts: formalBefore,
+    scenarios,
+    actions,
+    summary,
+    audit:
+      safePlan.auditMinimum > 0
+        ? {
+            minimum: safePlan.auditMinimum,
+            before: auditBefore,
+            after: auditAfter,
+            added: auditAfter - auditBefore,
+            fillMutations: auditFillMutations,
+          }
+        : null,
+    ready: true,
+  };
+}
+
+export function parseManualAcceptanceAccountScenarioArgs(argv) {
+  const options = {
+    backendURL: DEFAULT_BACKEND_URL,
+    apply: false,
+    formalAccountsOnly: false,
+    auditMinimum: 0,
+    target: "",
+    dataVersion: ACCOUNT_DATA_VERSION,
+    runId: ACCOUNT_RUN_ID,
+    databaseName: process.env.MANUAL_ACCEPTANCE_DATABASE_NAME || "",
+    json: false,
+    help: false,
+  };
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = argv[index];
+    if (token === "--apply") options.apply = true;
+    else if (token === "--formal-accounts-only")
+      options.formalAccountsOnly = true;
+    else if (token === "--json") options.json = true;
+    else if (token === "--help" || token === "-h") options.help = true;
+    else if (token === "--backend-url") {
+      options.backendURL = requiredText(argv[++index], "--backend-url");
+    } else if (token === "--audit-minimum") {
+      options.auditMinimum = normalizeAuditMinimum(
+        requiredText(argv[++index], "--audit-minimum"),
+      );
+    } else if (token === "--target") {
+      options.target = requiredText(argv[++index], "--target");
+    } else if (token === "--data-version") {
+      options.dataVersion = requiredText(argv[++index], "--data-version");
+    } else if (token === "--run-id") {
+      options.runId = requiredText(argv[++index], "--run-id");
+    } else if (token === "--database-name") {
+      options.databaseName = requiredText(argv[++index], "--database-name");
+    } else {
+      throw new CliError(`unknown option ${token}`, 2);
+    }
+  }
+  options.backendURL = normalizeAccountScenarioBackendURL(options.backendURL);
+  if (options.formalAccountsOnly && !options.apply) {
+    throw new CliError("--formal-accounts-only requires --apply", 2);
+  }
+  if (options.formalAccountsOnly && options.auditMinimum !== 0) {
+    throw new CliError(
+      "--formal-accounts-only does not accept --audit-minimum",
+      2,
+    );
+  }
+  if (
+    options.target &&
+    !new Set([
+      LOCAL_DEV_TARGET,
+      SCENARIO_DEMO_TARGET,
+      CUSTOMER_TRIAL_133_TARGET,
+    ]).has(options.target)
+  ) {
+    throw new CliError(
+      `--target must be ${LOCAL_DEV_TARGET}, ${SCENARIO_DEMO_TARGET}, or ${CUSTOMER_TRIAL_133_TARGET}`,
+      2,
+    );
+  }
+  return options;
+}
+
+function usage() {
+  return `试用账号场景 / Manual Acceptance Account Scenarios
+
+只读查看：
+  node scripts/qa/manual-acceptance-account-scenarios.mjs --json
+
+fresh 库配置激活前只创建或读回固定十个单岗位账号及一个财务兼采购账号：
+  MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS:<target>:${ACCOUNT_DATA_VERSION}:${ACCOUNT_RUN_ID} \
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM='<exact-target-confirmation>' \
+  <target-role-password-env>='<target-role-password>' \
+  MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<fresh-bootstrap-admin-password>' \
+    node scripts/qa/manual-acceptance-account-scenarios.mjs --apply --formal-accounts-only \
+      --target <target> \
+      --backend-url <registered-loopback-backend-url> \
+      --database-name <registered-database-name> \
+      --data-version ${ACCOUNT_DATA_VERSION} \
+      --run-id ${ACCOUNT_RUN_ID} \
+      --json
+
+写入本机开发环境：
+  MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=${CONFIRM_PHRASE} \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:${ACCOUNT_DATA_VERSION}:${ACCOUNT_RUN_ID}:plush_erp_acceptance_20260728_delivery_dev \\
+  MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
+  MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-super-admin-password>' \\
+    node scripts/qa/manual-acceptance-account-scenarios.mjs --apply \\
+      --target local-dev \\
+      --backend-url http://127.0.0.1:8310 \\
+      --database-name plush_erp_acceptance_20260728_delivery_dev \\
+      --data-version ${ACCOUNT_DATA_VERSION} \\
+      --run-id ${ACCOUNT_RUN_ID} \\
+      --audit-minimum 30 \\
+      --json
+
+本入口保留目标环境的十一个正式验收账号，只准备“已停用”“业务与采购兼任”
+和“未分配岗位”三个补充验收账号。密码必须为 8 到 20 位。
+
+  本地只允许 demo_* 和 MANUAL_ACCEPTANCE_PASSWORD；demo-133 只允许 uat_*，并固定
+  使用 12345678。MANUAL_ACCEPTANCE_UAT_PASSWORD 如提供只能等于该固定值。
+  fresh 本地专用库和 demo-133 都必须设置精确的 MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM，
+  只创建或读回固定十个单岗位账号及一个财务兼采购账号。
+
+  demo 演练造数环境必须通过 https://demo.yoyoosun.net 系统信任 TLS 入口，并显式提供：
+  --target customer-trial-133 --data-version ${ACCOUNT_DATA_VERSION} --run-id ${ACCOUNT_RUN_ID} --database-name plush_erp_demo_v1
+同时设置绑定目标的 MANUAL_ACCEPTANCE_TARGET_CONFIRM 与
+  MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
+远端只核对岗位权限，不修改岗位权限。`;
+}
+
+export async function runManualAcceptanceAccountScenarioCli(argv, deps = {}) {
+  const options = parseManualAcceptanceAccountScenarioArgs(argv);
+  if (options.help) return { text: `${usage()}\n`, exitCode: 0 };
+  const plan = buildManualAcceptanceAccountScenarioPlan(options);
+  const report = options.apply
+    ? options.formalAccountsOnly
+      ? await bootstrapManualAcceptanceFormalAccounts(plan, deps)
+      : await applyManualAcceptanceAccountScenarios(plan, deps)
+    : plan;
+  // The CLI contract is JSON, so return the same JSON-safe object that is
+  // emitted on stdout. Local runtime projections intentionally omit remote-only
+  // fields with undefined; keeping those JavaScript-only values in report made
+  // the dataset receipt fail after the account mutations had already succeeded.
+  const serializedReport = JSON.parse(JSON.stringify(report));
+  return {
+    text: `${JSON.stringify(serializedReport, null, options.json ? 2 : 0)}\n`,
+    exitCode: 0,
+    plan,
+    report: serializedReport,
+  };
+}
+
+const currentFile = fileURLToPath(import.meta.url);
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === path.resolve(currentFile)
+) {
+  runManualAcceptanceAccountScenarioCli(process.argv.slice(2))
+    .then((result) => {
+      process.stdout.write(result.text);
+      process.exitCode = result.exitCode;
+    })
+    .catch((error) => {
+      process.stderr.write(`${error?.stack || error?.message || error}\n`);
+      process.exitCode = error instanceof CliError ? error.exitCode : 1;
+    });
+}
+
+export { CONFIRM_PHRASE as MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE };
