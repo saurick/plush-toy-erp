@@ -1,0 +1,796 @@
+// server/cmd/server/main.go
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"math"
+	"net"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"server/internal/admincredential"
+	"server/internal/biz"
+	"server/internal/conf"
+	"server/internal/customertrialconfig"
+	"server/internal/devdbguard"
+	appserver "server/internal/server"
+	"server/pkg/logger"
+
+	"github.com/go-kratos/kratos/v2"
+	"github.com/go-kratos/kratos/v2/config"
+	"github.com/go-kratos/kratos/v2/config/file"
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/transport/http"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	tracesdk "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	"google.golang.org/protobuf/types/known/durationpb"
+
+	_ "go.uber.org/automaxprocs"
+	"go.uber.org/automaxprocs/maxprocs"
+)
+
+// go build -ldflags "-X main.Version=x.y.z"
+var (
+	// 使用项目专属服务标识，避免与其他项目的日志与链路追踪混淆。
+	Name      string = "plush-toy-erp-server"
+	TraceName string = "plush-toy-erp-server.service"
+	Version   string
+
+	flagconf string
+
+	id, _ = os.Hostname()
+)
+
+func init() {
+	// 自动设置 GOMAXPROCS，关闭它自带的日志
+	_, _ = maxprocs.Set(maxprocs.Logger(nil))
+
+	// 默认给空，真正用的时候再自动探测
+	flag.StringVar(&flagconf, "conf", "", "config path, eg: -conf ./server/configs/dev or -conf ./server/configs/prod")
+}
+
+func newApp(logger log.Logger, hs *http.Server, processRuntimeUC *biz.ProcessRuntimeUsecase) *kratos.App {
+	workflowReconciler := newProcessRuntimeWorkflowReconciler(processRuntimeUC, logger)
+	return kratos.New(
+		kratos.ID(id),
+		kratos.Name(Name),
+		kratos.Version(Version),
+		kratos.Metadata(map[string]string{}),
+		kratos.Logger(logger),
+		kratos.Server(hs),
+		kratos.AfterStart(func(ctx context.Context) error {
+			if err := workflowReconciler.Start(ctx); err != nil {
+				return err
+			}
+			appserver.StartTemplatePDFWarmupAsync(ctx, logger)
+			return nil
+		}),
+		kratos.BeforeStop(workflowReconciler.Stop),
+		kratos.AfterStop(func(context.Context) error {
+			appserver.CleanupTemplatePDFResources()
+			return nil
+		}),
+		kratos.StopTimeout(30*time.Second),
+	)
+}
+
+func shutdownTracerProvider(tp *tracesdk.TracerProvider, baseLogger log.Logger) {
+	if tp == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := tp.Shutdown(ctx); err != nil {
+		log.NewHelper(baseLogger).Warnw(
+			"msg", "trace provider shutdown failed",
+			"error", err,
+		)
+	}
+}
+
+// 既兼容 kratos run（仓库根）又兼容 cd server/go run
+func resolveConfPath(flagVal string) string {
+	if flagVal != "" {
+		return flagVal
+	}
+
+	// 返回的是 config.yaml，而不是目录
+	candidates := []string{
+		"./configs/dev/config.yaml",
+		"./server/configs/dev/config.yaml",
+		"../configs/dev/config.yaml",
+		"../../configs/dev/config.yaml",
+	}
+
+	for _, p := range candidates {
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() {
+			return p
+		}
+	}
+
+	return "./configs/dev/config.yaml"
+}
+
+func resolveLocalConfPath(confPath string) string {
+	ext := filepath.Ext(confPath)
+	if ext == "" {
+		return ""
+	}
+	if strings.HasSuffix(confPath, ".local"+ext) {
+		return ""
+	}
+	localPath := strings.TrimSuffix(confPath, ext) + ".local" + ext
+	if fi, err := os.Stat(localPath); err == nil && !fi.IsDir() {
+		return localPath
+	}
+	return ""
+}
+
+func replaceListenPort(addr, rawPort, envKey string) (string, error) {
+	port, err := strconv.Atoi(strings.TrimSpace(rawPort))
+	if err != nil || port < 1024 || port > 65535 {
+		return "", fmt.Errorf("%s must be an integer between 1024 and 65535", envKey)
+	}
+	host, _, err := net.SplitHostPort(strings.TrimSpace(addr))
+	if err != nil {
+		return "", fmt.Errorf("replace %s in invalid listen address %q: %w", envKey, addr, err)
+	}
+	return net.JoinHostPort(host, strconv.Itoa(port)), nil
+}
+
+// overrideDevServerPorts applies the tracked local port bundle only to a dev
+// config. Production listen addresses continue to come exclusively from the
+// production config and release environment.
+func overrideDevServerPorts(confPath string, serverCfg *conf.Server, getenv func(string) string) error {
+	if !devdbguard.IsDevConfigPath(confPath) {
+		return nil
+	}
+	if serverCfg == nil {
+		return fmt.Errorf("development server config is nil")
+	}
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+
+	rawPort := strings.TrimSpace(getenv("DEV_HTTP_PORT"))
+	if rawPort == "" {
+		return nil
+	}
+	if serverCfg.Http == nil {
+		return fmt.Errorf("DEV_HTTP_PORT cannot override a missing HTTP server config")
+	}
+	addr, err := replaceListenPort(serverCfg.Http.Addr, rawPort, "DEV_HTTP_PORT")
+	if err != nil {
+		return err
+	}
+	serverCfg.Http.Addr = addr
+	return nil
+}
+
+func overridePostgresPoolFromEnv(postgres *conf.Data_Postgres, getenv func(string) string) (bool, error) {
+	if postgres == nil {
+		return false, errors.New("postgres config is required")
+	}
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+
+	overridden := false
+	integerOverrides := []struct {
+		key string
+		set func(int32)
+	}{
+		{key: "POSTGRES_MAX_OPEN_CONNS", set: func(value int32) { postgres.MaxOpenConns = value }},
+		{key: "POSTGRES_MAX_IDLE_CONNS", set: func(value int32) { postgres.MaxIdleConns = value }},
+	}
+	for _, override := range integerOverrides {
+		raw := strings.TrimSpace(getenv(override.key))
+		if raw == "" {
+			continue
+		}
+		value, err := strconv.ParseInt(raw, 10, 32)
+		if err != nil || value < 1 {
+			return false, fmt.Errorf("%s must be a positive 32-bit integer", override.key)
+		}
+		override.set(int32(value))
+		overridden = true
+	}
+
+	durationOverrides := []struct {
+		key string
+		set func(*durationpb.Duration)
+	}{
+		{key: "POSTGRES_CONN_MAX_LIFETIME", set: func(value *durationpb.Duration) { postgres.ConnMaxLifetime = value }},
+		{key: "POSTGRES_CONN_MAX_IDLE_TIME", set: func(value *durationpb.Duration) { postgres.ConnMaxIdleTime = value }},
+		{key: "POSTGRES_STARTUP_TIMEOUT", set: func(value *durationpb.Duration) { postgres.StartupTimeout = value }},
+	}
+	for _, override := range durationOverrides {
+		raw := strings.TrimSpace(getenv(override.key))
+		if raw == "" {
+			continue
+		}
+		value, err := time.ParseDuration(raw)
+		if err != nil || value <= 0 {
+			return false, fmt.Errorf("%s must be a positive Go duration", override.key)
+		}
+		override.set(durationpb.New(value))
+		overridden = true
+	}
+	return overridden, nil
+}
+
+func overrideFromEnv(dataCfg *conf.Data, baseLogger log.Logger) error {
+	if dataCfg == nil {
+		return errors.New("data config is required")
+	}
+	helper := log.NewHelper(baseLogger)
+
+	if dataCfg.Postgres == nil {
+		dataCfg.Postgres = &conf.Data_Postgres{}
+	}
+	if v := strings.TrimSpace(os.Getenv("POSTGRES_DSN")); v != "" {
+		// 关键兜底：只记录覆盖来源，不输出 DSN 明文，避免数据库密码进入日志。
+		dataCfg.Postgres.Dsn = v
+		helper.Info("postgres dsn overridden from env")
+	}
+	poolOverridden, err := overridePostgresPoolFromEnv(dataCfg.Postgres, os.Getenv)
+	if err != nil {
+		return err
+	}
+	if poolOverridden {
+		helper.Info("postgres pool settings overridden from env")
+	}
+
+	if dataCfg.Auth == nil {
+		dataCfg.Auth = &conf.Data_Auth{}
+	}
+	if v := strings.TrimSpace(os.Getenv("APP_JWT_SECRET")); v != "" {
+		// 生产试验口径下，JWT 密钥走运行时 Secret 注入，避免继续写死在 Git 清单里。
+		dataCfg.Auth.JwtSecret = v
+		helper.Info("jwt secret overridden from env")
+	}
+	if dataCfg.Auth.Sms == nil {
+		dataCfg.Auth.Sms = &conf.Data_Auth_SMS{}
+	}
+	if v := strings.TrimSpace(os.Getenv("APP_AUTH_SMS_MODE")); v != "" {
+		dataCfg.Auth.Sms.Mode = v
+		helper.Info("auth sms mode overridden from env")
+	}
+
+	if dataCfg.Auth.Admin == nil {
+		dataCfg.Auth.Admin = &conf.Data_Auth_Admin{}
+	}
+	if v := strings.TrimSpace(os.Getenv("APP_ADMIN_USERNAME")); v != "" {
+		dataCfg.Auth.Admin.Username = v
+		helper.Info("admin username overridden from env")
+	}
+	if v := strings.TrimSpace(os.Getenv("APP_ADMIN_PASSWORD")); v != "" {
+		dataCfg.Auth.Admin.Password = v
+		helper.Info("admin password overridden from env")
+	}
+	return nil
+}
+
+// applyLocalAdminCredentialDefaults only fills missing bootstrap credentials
+// for the registered development database. Production, remote targets and
+// explicitly configured values remain untouched.
+func applyLocalAdminCredentialDefaults(confPath string, dataCfg *conf.Data, getenv func(string) string) {
+	if dataCfg == nil || dataCfg.Postgres == nil || isProductionRuntime(confPath, getenv) || !devdbguard.IsDevConfigPath(confPath) {
+		return
+	}
+	if err := devdbguard.RequireCustomerConfigLocalTestDSN(dataCfg.Postgres.Dsn); err != nil {
+		return
+	}
+	if dataCfg.Auth == nil {
+		dataCfg.Auth = &conf.Data_Auth{}
+	}
+	if dataCfg.Auth.Admin == nil {
+		dataCfg.Auth.Admin = &conf.Data_Auth_Admin{}
+	}
+	if strings.TrimSpace(dataCfg.Auth.Admin.Username) == "" {
+		dataCfg.Auth.Admin.Username = admincredential.DefaultLocalUsername
+	}
+	if strings.TrimSpace(dataCfg.Auth.Admin.Password) == "" {
+		dataCfg.Auth.Admin.Password = admincredential.DefaultLocalPassword
+	}
+}
+
+func isProductionRuntime(confPath string, getenv func(string) string) bool {
+	normalizedPath := filepath.ToSlash(filepath.Clean(strings.TrimSpace(confPath)))
+	if strings.Contains(normalizedPath, "/configs/prod/") || strings.HasPrefix(normalizedPath, "configs/prod/") {
+		return true
+	}
+	if getenv == nil {
+		return false
+	}
+	for _, key := range []string{"APP_ENV", "ERP_ENV", "GO_ENV", "ERP_DEBUG_ENV"} {
+		value := strings.ToLower(strings.TrimSpace(getenv(key)))
+		if value == "prod" || value == "production" {
+			return true
+		}
+	}
+	return false
+}
+
+func containsRuntimePlaceholder(value string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	for _, marker := range []string{"change-this", "placeholder", "replace-with", "<release-tag>"} {
+		if strings.Contains(normalized, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func productionEnvValue(getenv func(string) string, keys ...string) string {
+	if getenv == nil {
+		return ""
+	}
+	for _, key := range keys {
+		if value := strings.TrimSpace(getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func envValueIsExplicitFalse(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "false", "0", "off", "no", "n", "f":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateProductionAuthSMSProviderConfig(getenv func(string) string, dataCfg *conf.Data) error {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	mode := ""
+	if dataCfg != nil && dataCfg.Auth != nil && dataCfg.Auth.Sms != nil {
+		mode = strings.ToLower(strings.TrimSpace(dataCfg.Auth.Sms.Mode))
+	}
+	if mode != "provider" {
+		return nil
+	}
+	required := []string{
+		"APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID",
+		"APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET",
+		"APP_AUTH_SMS_ALIYUN_SIGN_NAME",
+		"APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE",
+	}
+	for _, key := range required {
+		value := strings.TrimSpace(getenv(key))
+		if value == "" {
+			return fmt.Errorf("production preflight failed: %s is required when APP_AUTH_SMS_MODE=provider", key)
+		}
+		if containsRuntimePlaceholder(value) {
+			return fmt.Errorf("production preflight failed: %s still contains placeholder", key)
+		}
+	}
+	return nil
+}
+
+func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, getenv func(string) string) error {
+	if !isProductionRuntime(confPath, getenv) {
+		return nil
+	}
+	if strings.TrimSpace(getenv(biz.CustomerConfigLocalTestAllowEnv)) != "" {
+		return fmt.Errorf("production preflight failed: %s must be unset", biz.CustomerConfigLocalTestAllowEnv)
+	}
+	if dataCfg == nil {
+		return fmt.Errorf("production preflight failed: data config is nil")
+	}
+	if dataCfg.Postgres == nil || strings.TrimSpace(dataCfg.Postgres.Dsn) == "" {
+		return fmt.Errorf("production preflight failed: POSTGRES_DSN is required")
+	}
+	if containsRuntimePlaceholder(dataCfg.Postgres.Dsn) {
+		return fmt.Errorf("production preflight failed: POSTGRES_DSN still contains placeholder")
+	}
+	if err := validateReleaseRehearsalCustomerConfig(dataCfg, getenv); err != nil {
+		return fmt.Errorf("production preflight failed: %w", err)
+	}
+	if dataCfg.Auth == nil || strings.TrimSpace(dataCfg.Auth.JwtSecret) == "" {
+		return fmt.Errorf("production preflight failed: APP_JWT_SECRET is required")
+	}
+	smsMode := "disabled"
+	if dataCfg.Auth.Sms != nil && strings.TrimSpace(dataCfg.Auth.Sms.Mode) != "" {
+		smsMode = strings.ToLower(strings.TrimSpace(dataCfg.Auth.Sms.Mode))
+	}
+	if smsMode != "disabled" && smsMode != "provider" {
+		return fmt.Errorf("production preflight failed: APP_AUTH_SMS_MODE must be disabled or provider")
+	}
+	if err := validateProductionAuthSMSProviderConfig(getenv, dataCfg); err != nil {
+		return err
+	}
+	if containsRuntimePlaceholder(dataCfg.Auth.JwtSecret) {
+		return fmt.Errorf("production preflight failed: APP_JWT_SECRET still contains placeholder")
+	}
+	if len(strings.TrimSpace(dataCfg.Auth.JwtSecret)) < 32 {
+		return fmt.Errorf("production preflight failed: APP_JWT_SECRET must be at least 32 characters")
+	}
+	if dataCfg.Auth.Admin != nil && containsRuntimePlaceholder(dataCfg.Auth.Admin.Password) {
+		return fmt.Errorf("production preflight failed: APP_ADMIN_PASSWORD still contains placeholder")
+	}
+	adminPassword := ""
+	if dataCfg.Auth.Admin != nil {
+		adminPassword = strings.TrimSpace(dataCfg.Auth.Admin.Password)
+	}
+	if adminPassword == admincredential.DefaultLocalPassword {
+		return fmt.Errorf("production preflight failed: APP_ADMIN_PASSWORD must not use the known local development default")
+	}
+	bootstrapAdminOnce := strings.ToLower(strings.TrimSpace(getenv("BOOTSTRAP_ADMIN_ONCE")))
+	if bootstrapAdminOnce != "" && bootstrapAdminOnce != "true" && bootstrapAdminOnce != "false" {
+		return fmt.Errorf("production preflight failed: BOOTSTRAP_ADMIN_ONCE must be true or false")
+	}
+	if adminPassword != "" && bootstrapAdminOnce != "true" {
+		return fmt.Errorf("production preflight failed: APP_ADMIN_PASSWORD requires BOOTSTRAP_ADMIN_ONCE=true")
+	}
+	if adminPassword == "" && bootstrapAdminOnce == "true" {
+		return fmt.Errorf("production preflight failed: BOOTSTRAP_ADMIN_ONCE=true requires APP_ADMIN_PASSWORD")
+	}
+	debugEnvironment := strings.ToLower(productionEnvValue(getenv, "ERP_DEBUG_ENV", "ERP_ENV", "APP_ENV"))
+	if debugEnvironment != "prod" && debugEnvironment != "production" {
+		return fmt.Errorf("production preflight failed: ERP_DEBUG_ENV must be prod")
+	}
+	if !envValueIsExplicitFalse(productionEnvValue(getenv, "ERP_DEBUG_SEED_ENABLED")) {
+		return fmt.Errorf("production preflight failed: ERP_DEBUG_SEED_ENABLED must be false")
+	}
+	if !envValueIsExplicitFalse(productionEnvValue(getenv, "ERP_DEBUG_CLEANUP_ENABLED")) {
+		return fmt.Errorf("production preflight failed: ERP_DEBUG_CLEANUP_ENABLED must be false")
+	}
+	if !envValueIsExplicitFalse(productionEnvValue(getenv, "ERP_DEBUG_BUSINESS_CLEAR_ENABLED")) {
+		return fmt.Errorf("production preflight failed: ERP_DEBUG_BUSINESS_CLEAR_ENABLED must be false")
+	}
+	return nil
+}
+
+func validateReleaseRehearsalCustomerConfig(dataCfg *conf.Data, getenv func(string) string) error {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	allow := strings.TrimSpace(getenv(biz.CustomerConfigReleaseRehearsalAllowEnv))
+	runID := strings.TrimSpace(getenv(biz.CustomerConfigReleaseRehearsalIDEnv))
+	systemIdentifier := strings.TrimSpace(getenv(biz.CustomerConfigReleaseRehearsalSystemIdentifierEnv))
+	if allow == "" || allow == "0" {
+		if runID != "" || systemIdentifier != "" {
+			return fmt.Errorf("release rehearsal identity requires %s=1", biz.CustomerConfigReleaseRehearsalAllowEnv)
+		}
+		return nil
+	}
+	if allow != "1" {
+		return fmt.Errorf("%s must be 0, 1, or unset", biz.CustomerConfigReleaseRehearsalAllowEnv)
+	}
+	if dataCfg == nil || dataCfg.Postgres == nil || strings.TrimSpace(dataCfg.Postgres.Dsn) == "" {
+		return fmt.Errorf("release rehearsal customer config requires POSTGRES_DSN")
+	}
+	expectedDatabase := "plush_erp_release_" + runID
+	if err := devdbguard.RequireCustomerConfigReleaseRehearsalRuntime(
+		dataCfg.Postgres.Dsn,
+		runID,
+		expectedDatabase,
+		systemIdentifier,
+		systemIdentifier,
+	); err != nil {
+		return fmt.Errorf("release rehearsal customer config boundary failed: %w", err)
+	}
+	return nil
+}
+
+func validateCustomerConfigLocalTestDatabase(dataCfg *conf.Data, getenv func(string) string) error {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	localAllow := strings.TrimSpace(getenv(biz.CustomerConfigLocalTestAllowEnv))
+	rehearsalAllow := strings.TrimSpace(getenv(biz.CustomerConfigReleaseRehearsalAllowEnv))
+	if localAllow == "1" && rehearsalAllow == "1" {
+		return fmt.Errorf("customer config local-test and release rehearsal gates cannot both be enabled")
+	}
+	if rehearsalAllow == "1" {
+		if err := validateReleaseRehearsalCustomerConfig(dataCfg, getenv); err != nil {
+			return fmt.Errorf("customer config release rehearsal preflight failed: %w", err)
+		}
+		return nil
+	}
+	if localAllow != "1" {
+		return nil
+	}
+	if dataCfg == nil || dataCfg.Postgres == nil || strings.TrimSpace(dataCfg.Postgres.Dsn) == "" {
+		return fmt.Errorf("customer config local-test preflight failed: POSTGRES_DSN is required")
+	}
+	if err := devdbguard.RequireCustomerConfigLocalTestDSN(dataCfg.Postgres.Dsn); err != nil {
+		return fmt.Errorf("customer config local-test preflight failed: %w", err)
+	}
+	return nil
+}
+
+func validateCustomerTrialConfigRuntime(dataCfg *conf.Data, getenv func(string) string) error {
+	dsn := ""
+	if dataCfg != nil && dataCfg.Postgres != nil {
+		dsn = dataCfg.Postgres.Dsn
+	}
+	_, err := customertrialconfig.ResolveGate(dsn, getenv)
+	return err
+}
+
+func buildConfigSources(confPath string) []config.Source {
+	paths := []string{confPath}
+	// 本地联调兜底：若存在未跟踪的 config.local.yaml，则覆盖公共 dev 配置，避免把私有 DSN 提交进仓库。
+	if localPath := resolveLocalConfPath(confPath); localPath != "" {
+		paths = append(paths, localPath)
+	}
+	sources := make([]config.Source, 0, len(paths))
+	for _, path := range paths {
+		sources = append(sources, file.NewSource(path))
+	}
+	return sources
+}
+
+// 采样率统一夹到 [0,1]，避免配置脏值把 tracing 行为搞成不可预期。
+func normalizeTraceRatio(ratio float64) float64 {
+	switch {
+	case math.IsNaN(ratio), math.IsInf(ratio, 0):
+		return 0
+	case ratio <= 0:
+		return 0
+	case ratio >= 1:
+		return 1
+	default:
+		return ratio
+	}
+}
+
+// 统一走 ParentBased，既保留上游采样决策，也允许当前服务按比例控制根 span。
+func buildTraceSampler(ratio float64) tracesdk.Sampler {
+	ratio = normalizeTraceRatio(ratio)
+	return tracesdk.ParentBased(operationRootSampler{
+		business:   tracesdk.TraceIDRatioBased(ratio),
+		background: tracesdk.TraceIDRatioBased(math.Min(ratio, 0.1)),
+	})
+}
+
+type operationRootSampler struct {
+	business   tracesdk.Sampler
+	background tracesdk.Sampler
+}
+
+func (s operationRootSampler) ShouldSample(p tracesdk.SamplingParameters) tracesdk.SamplingResult {
+	switch p.Name {
+	case "server.http.healthz", "server.http.readyz", "server.http.runtime_identity":
+		return tracesdk.SamplingResult{Decision: tracesdk.Drop}
+	}
+	if strings.HasPrefix(p.Name, "background.process_runtime.") {
+		return s.background.ShouldSample(p)
+	}
+	return s.business.ShouldSample(p)
+}
+
+func (s operationRootSampler) Description() string {
+	return "OperationRoot(" + s.business.Description() + ",background=" + s.background.Description() + ")"
+}
+
+func resolveTraceEnvOverrides(traceEndpoint string, traceRatio float64, getenv func(string) string) (string, float64, error) {
+	if getenv == nil {
+		return traceEndpoint, traceRatio, nil
+	}
+	if v := strings.TrimSpace(getenv("TRACE_ENDPOINT")); v != "" {
+		traceEndpoint = v
+	}
+	if v := strings.TrimSpace(getenv("TRACE_RATIO")); v != "" {
+		ratio, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return traceEndpoint, traceRatio, fmt.Errorf("parse TRACE_RATIO=%q: %w", v, err)
+		}
+		traceRatio = normalizeTraceRatio(ratio)
+	}
+	return traceEndpoint, traceRatio, nil
+}
+
+// 初始化 TracerProvider：优先远端 OTLP（异步 Batch），失败或未配置就本地 provider。
+func initTracerProvider(traceName, traceEndpoint string, traceRatio float64, baseLogger log.Logger) *tracesdk.TracerProvider {
+	helper := log.NewHelper(baseLogger)
+	var tp *tracesdk.TracerProvider
+	normalizedRatio := normalizeTraceRatio(traceRatio)
+	resourceOption := tracesdk.WithResource(resource.NewSchemaless(
+		semconv.ServiceNameKey.String(traceName),
+	))
+	samplerOption := tracesdk.WithSampler(buildTraceSampler(normalizedRatio))
+
+	// 1) 有 endpoint → 尝试 OTLP HTTP exporter
+	if traceEndpoint != "" {
+		exp, err := otlptracehttp.New(
+			context.Background(),
+			otlptracehttp.WithEndpoint(traceEndpoint),
+			otlptracehttp.WithInsecure(),
+		)
+		if err != nil {
+			helper.Warnw(
+				"msg", "init otlp exporter failed, fallback to local tracer",
+				"trace_endpoint", traceEndpoint,
+				"trace_ratio", normalizedRatio,
+				"error", err,
+			)
+		} else {
+			tp = tracesdk.NewTracerProvider(
+				samplerOption,
+				tracesdk.WithBatcher(exp), // 异步批量导出，不阻塞请求。
+				resourceOption,
+			)
+			helper.Infow(
+				"msg", "tracer provider initialized",
+				"mode", "otlp-http",
+				"trace_endpoint", traceEndpoint,
+				"trace_ratio", normalizedRatio,
+			)
+		}
+	}
+
+	// 2) 没配 endpoint 或 exporter 初始化失败 → 本地 provider，仅保留进程内 span 语义。
+	if tp == nil {
+		tp = tracesdk.NewTracerProvider(
+			samplerOption,
+			resourceOption,
+		)
+		helper.Infow(
+			"msg", "tracer provider initialized without remote exporter",
+			"mode", "local",
+			"trace_ratio", normalizedRatio,
+		)
+	}
+
+	otel.SetTracerProvider(tp)
+	// Custom HTTP handlers and clients share W3C trace propagation. Baggage is
+	// deliberately excluded so caller-supplied business fields are not forwarded.
+	otel.SetTextMapPropagator(propagation.TraceContext{})
+	return tp
+}
+
+func main() {
+	flag.Parse()
+
+	confPath := resolveConfPath(flagconf)
+	fmt.Println("using conf path:", confPath)
+
+	// ===== 1. 加载配置文件 =====
+	sources := buildConfigSources(confPath)
+	c := config.New(
+		config.WithSource(
+			sources...,
+		),
+	)
+	defer func() { _ = c.Close() }()
+
+	if err := c.Load(); err != nil {
+		panic(fmt.Errorf("load config failed: %w (conf=%s)", err, confPath))
+	}
+
+	var bc conf.Bootstrap
+	if err := c.Scan(&bc); err != nil {
+		panic(fmt.Errorf("scan bootstrap config failed: %w", err))
+	}
+
+	// ===== 2. 安全地读取 Log 配置 =====
+	debug := false
+	if bc.Log != nil {
+		debug = bc.Log.Debug
+	}
+
+	logger := logger.NewDefaultLogger(id, Name, Version, debug)
+	log.SetLogger(logger) // 设置全局日志
+
+	// ===== 3. 安全地读取 Trace 配置（避免 nil pointer） =====
+	traceName := TraceName
+	traceEndpoint := ""
+	traceRatio := 0.0
+
+	if bc.Trace != nil && bc.Trace.Jaeger != nil {
+		if bc.Trace.Jaeger.TraceName != "" {
+			traceName = bc.Trace.Jaeger.TraceName
+		}
+		traceEndpoint = bc.Trace.Jaeger.Endpoint
+		traceRatio = bc.Trace.Jaeger.Ratio
+	}
+	var traceEnvErr error
+	traceEndpoint, traceRatio, traceEnvErr = resolveTraceEnvOverrides(traceEndpoint, traceRatio, os.Getenv)
+	if traceEnvErr != nil {
+		log.NewHelper(logger).Warnw(
+			"msg", "invalid trace env override ignored",
+			"error", traceEnvErr,
+		)
+	}
+
+	// ===== 4. 初始化 OpenTelemetry（带兜底，不会因为没连上 Jaeger 就阻塞） =====
+	tp := initTracerProvider(traceName, traceEndpoint, traceRatio, logger)
+	var cleanupData func()
+	defer func() {
+		appserver.CleanupTemplatePDFResources()
+		shutdownTracerProvider(tp, logger)
+		if cleanupData != nil {
+			cleanupData()
+		}
+	}()
+
+	// ===== 4.5 启动时打一个 span，方便在 Jaeger 里排查 =====
+	{
+		tr := otel.Tracer("bootstrap")
+		ctx, span := tr.Start(context.Background(), "startup-span")
+		span.SetAttributes(
+			semconv.ServiceNameKey.String(traceName),
+		)
+		span.End()
+		_ = ctx
+	}
+
+	// ===== 5. 严格检查 Server / Data 配置，缺了就直接报错 =====
+	serverCfg := bc.Server
+	if serverCfg == nil {
+		panic(fmt.Errorf("bootstrap server config is nil, please check %s", confPath))
+	}
+	if err := overrideDevServerPorts(confPath, serverCfg, os.Getenv); err != nil {
+		panic(fmt.Errorf("apply development server ports: %w", err))
+	}
+
+	dataCfg := bc.Data
+	if dataCfg == nil {
+		panic(fmt.Errorf("bootstrap data config is nil, please check %s", confPath))
+	}
+	if err := overrideFromEnv(dataCfg, logger); err != nil {
+		panic(fmt.Errorf("apply runtime data config: %w", err))
+	}
+	applyLocalAdminCredentialDefaults(confPath, dataCfg, os.Getenv)
+	if dataCfg.Postgres == nil {
+		panic(fmt.Errorf("bootstrap data postgres config is nil, please check %s", confPath))
+	}
+	if err := devdbguard.RequireLocalDevDSN(confPath, dataCfg.Postgres.Dsn, os.Getenv); err != nil {
+		panic(err)
+	}
+	if devdbguard.IsDevConfigPath(confPath) {
+		if err := devdbguard.VerifyRegisteredDevelopmentRuntime(dataCfg.Postgres.Dsn); err != nil {
+			panic(err)
+		}
+	}
+	if err := validateProductionBootstrapConfig(confPath, dataCfg, os.Getenv); err != nil {
+		panic(err)
+	}
+	if err := validateCustomerConfigLocalTestDatabase(dataCfg, os.Getenv); err != nil {
+		panic(err)
+	}
+	if err := validateCustomerTrialConfigRuntime(dataCfg, os.Getenv); err != nil {
+		panic(err)
+	}
+	customerKey := biz.NormalizeCustomerKey(os.Getenv("ERP_CUSTOMER_KEY"))
+	if customerKey == "" {
+		customerKey = biz.DefaultCustomerKey
+	}
+	log.NewHelper(logger).Infow("msg", "runtime configuration",
+		"config_path", confPath, "local_config_path", resolveLocalConfPath(confPath),
+		"log_debug", debug, "sql_debug", dataCfg.Postgres.Debug, "customer_key", customerKey)
+
+	// ===== 6. 组装应用（wireApp） =====
+	// 这里 wireApp 里用到的 TracerProvider 类型要记得是 *tracesdk.TracerProvider
+	app, cleanup, err := wireApp(serverCfg, dataCfg, logger, tp)
+	if err != nil {
+		panic(fmt.Errorf("wireApp init failed: %w", err))
+	}
+	cleanupData = cleanup
+	if app == nil {
+		panic("wireApp returned nil app")
+	}
+
+	// ===== 7. 启动应用 =====
+	if err := app.Run(); err != nil {
+		panic(fmt.Errorf("app run failed: %w", err))
+	}
+}
