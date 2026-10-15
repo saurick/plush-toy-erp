@@ -1,0 +1,24 @@
+.erp-delivery-address {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+}
+
+.erp-delivery-address--mainland {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+
+.erp-delivery-address .erp-delivery-address__part {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.erp-delivery-address .ant-select {
+  width: 100%;
+}
+
+@media (max-width: 767px) {
+  .erp-delivery-address--mainland {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
