@@ -1,0 +1,16 @@
+scope=pre-post-deploy-lifecycle-count-conservation
+status=passed
+admin_users=12->12
+finance_facts=55->55
+outsourcing_facts=23->23
+production_facts=23->23
+purchase_orders=55->55
+purchase_receipts=30->30
+quality_inspections=30->30
+sales_orders=42->42
+shipment_items=23->23
+shipments=23->23
+stock_reservations=26->26
+workflow_tasks=126->126
+businessWritesPerformedByValidation=0
+containsRawRows=false

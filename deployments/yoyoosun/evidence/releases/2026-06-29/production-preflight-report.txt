@@ -1,0 +1,9 @@
+[production-preflight] 待填写
+
+请在真实运行时 .env 准备后执行：
+
+bash scripts/deploy/production-preflight.sh \
+  --env-file server/deploy/compose/prod/.env \
+  --out "deployments/yoyoosun/evidence/releases/2026-06-29/production-preflight-report.txt"
+
+该文件必须来自非 --example 模式；不要写入真实 .env、secret、token、完整 DSN 或客户 raw data。
