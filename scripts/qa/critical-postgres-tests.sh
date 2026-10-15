@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+# One source of truth for the PostgreSQL integration families executed against
+# the disposable migrated database. Fast/full skip exactly these families
+# because test-critical executes them with real PostgreSQL and rejects skips.
+CRITICAL_POSTGRES_TEST_PATTERN='^(TestBusinessDocumentSearchPostgres|TestAdminManagePostgres|TestDatabaseGovernancePostgres|TestDatabaseGovernanceWorkflowTaskEventHookRejectsMutation|TestPurchaseReceiptPostgres|TestPurchaseReceiptAdjustmentPostgres|TestPurchaseReturnPostgres|TestPurchaseReturnFromQualityInspectionPostgres|TestQualityInspectionPostgres|TestQualityInspectionFromOutsourcingReturnPostgres|TestProductionWIPQualityInspectionPostgres|TestSourceFinanceSnapshotBackfillMigrationPostgres|TestWorkflowPostgres|TestWorkflowSourceTaskBackfillTimePostgres|TestCustomerConfigPostgres|TestMasterDataSchemaPostgres|TestProductionOrderSchemaPostgres|TestProductionOrderPostgres|TestProductionMaterialIssuePostgres|TestProductionReworkPostgres|TestSourceDocumentPostgres|TestSourceOrderLifecyclePostgres|TestInventoryPostgres|TestInventoryLotPostgres|TestInventoryLotStatusPostgres|TestBOMPostgres|TestOperationalFactPostgres|TestOutsourcingFactFromOrderPostgres|TestOutsourcingNormalClosePostgres|TestProcessRuntimePostgres|TestFinanceBusinessSourcesPostgres|TestOperationalFactRepoFinance.*Postgres|TestFinanceFactCancelAuditPostgres|TestFinanceProcessCommandPostgres|TestSalesProcessCommandPostgres)'
+
+CRITICAL_POSTGRES_REQUIRED_PREFIXES=(
+  TestBusinessDocumentSearchPostgres
+  TestAdminManagePostgres
+  TestDatabaseGovernancePostgres
+  TestDatabaseGovernanceWorkflowTaskEventHookRejectsMutation
+  TestPurchaseReceiptPostgres
+  TestPurchaseReceiptAdjustmentPostgres
+  TestPurchaseReturnPostgres
+  TestPurchaseReturnFromQualityInspectionPostgres
+  TestQualityInspectionPostgres
+  TestQualityInspectionFromOutsourcingReturnPostgres
+  TestProductionWIPQualityInspectionPostgres
+  TestSourceFinanceSnapshotBackfillMigrationPostgres
+  TestWorkflowPostgres
+  TestWorkflowSourceTaskBackfillTimePostgres
+  TestCustomerConfigPostgres
+  TestMasterDataSchemaPostgres
+  TestProductionOrderSchemaPostgres
+  TestProductionOrderPostgres
+  TestProductionMaterialIssuePostgres
+  TestProductionReworkPostgres
+  TestSourceDocumentPostgres
+  TestSourceOrderLifecyclePostgres
+  TestInventoryPostgres
+  TestInventoryLotPostgres
+  TestInventoryLotStatusPostgres
+  TestBOMPostgres
+  TestOperationalFactPostgres
+  TestOutsourcingFactFromOrderPostgres
+  TestOutsourcingNormalClosePostgres
+  TestProcessRuntimePostgres
+  TestFinanceBusinessSourcesPostgres
+  TestOperationalFactRepoFinance
+  TestFinanceFactCancelAuditPostgres
+  TestFinanceProcessCommandPostgres
+  TestSalesProcessCommandPostgres
+)
+
+# This file is a source-only contract. ShellCheck also scans it independently,
+# where the readonly exports have no local consumer.
+# shellcheck disable=SC2034
+readonly CRITICAL_POSTGRES_TEST_PATTERN
+# shellcheck disable=SC2034
+readonly -a CRITICAL_POSTGRES_REQUIRED_PREFIXES
