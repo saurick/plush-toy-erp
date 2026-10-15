@@ -1,0 +1,23 @@
+[
+  {"input":"0","rpcAccepted":true,"positiveAccepted":false,"uiNormalized":"0"},
+  {"input":"1","rpcAccepted":true,"positiveAccepted":true,"uiNormalized":"1"},
+  {"input":"0.000001","rpcAccepted":true,"positiveAccepted":true,"uiNormalized":"0.000001"},
+  {"input":"99999999999999.999999","rpcAccepted":true,"positiveAccepted":true,"uiNormalized":"99999999999999.999999"},
+  {"input":"100000000000000","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":""},
+  {"input":"0.0000001","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":""},
+  {"input":"1.0000000","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":""},
+  {"input":"-1","rpcAccepted":true,"positiveAccepted":false,"uiNormalized":""},
+  {"input":"-0","rpcAccepted":true,"positiveAccepted":false,"uiNormalized":""},
+  {"input":"+1","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":""},
+  {"input":"1e3","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":""},
+  {"input":"1.","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":""},
+  {"input":".5","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":""},
+  {"input":"001.230000","rpcAccepted":true,"positiveAccepted":true,"uiNormalized":"1.23"},
+  {"input":"000000000000001","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":"1"},
+  {"input":" 1 ","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":"1"},
+  {"input":"1,234.50","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":"1234.5"},
+  {"input":"","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":""},
+  {"input":"NaN","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":""},
+  {"input":"Infinity","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":""},
+  {"input":"１","rpcAccepted":false,"positiveAccepted":false,"uiNormalized":""}
+]

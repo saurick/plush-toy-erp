@@ -1,0 +1,44 @@
+# server/configs/dev/config.yaml
+server:
+  http:
+    addr: 0.0.0.0:8300
+    timeout: 45s
+log:
+  debug: true
+
+# 链路追踪服务器
+trace:
+  jaeger:
+    traceName: ""
+    # 本机宿主机调试默认连本地 Jaeger VM IP；若本机 IP 变化，请改成当前 Jaeger OTLP HTTP 地址。
+    endpoint: 192.168.0.133:4318
+    # endpoint: http://127.0.0.1:4318/v1/traces
+    # 采集率,ratio>=1表示采集所有
+    ratio: 1
+
+# 数据相关
+data:
+  # 主数据库，保存核心数据
+  postgres:
+    # 日常开发关闭全量 SQL；数据库调试时可在 config.local.yaml 显式开启。
+    debug: false
+    # dev 默认直连共享 PG `192.168.0.133:5432/plush_erp`；若你本机使用其他账号（如 zos_test_user），请通过 POSTGRES_DSN 或 config.local.yaml 覆盖。
+    dsn: "postgres://test_user:change-this-shared-postgres-password@192.168.0.133:5432/plush_erp?sslmode=disable"
+    maxOpenConns: 20
+    maxIdleConns: 5
+    connMaxLifetime: 1800s
+    connMaxIdleTime: 300s
+    startupTimeout: 60s
+
+  etcd:
+    hosts:
+      - etcd:2379
+  # 认证相关：JWT 密钥必须在本地覆盖；管理员留空时由 dev runtime 使用本地开发默认值。
+  auth:
+    jwtSecret: "change-this-dev-jwt-secret"
+    jwtExpireSeconds: 604800 # 7 days
+    sms:
+      mode: "mock"
+    admin:
+      username: ""
+      password: ""
