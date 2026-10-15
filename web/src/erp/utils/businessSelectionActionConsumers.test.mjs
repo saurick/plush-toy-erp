@@ -1,0 +1,234 @@
+import assert from 'node:assert/strict'
+import { readFileSync, readdirSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+
+const currentDirectory = dirname(fileURLToPath(import.meta.url))
+const pagesDirectory = resolve(currentDirectory, '../pages')
+const purchasePanelPath = resolve(
+  currentDirectory,
+  '../components/purchase-orders/PurchaseOrderOperationPanel.jsx'
+)
+const productionExceptionPanelPath = resolve(
+  currentDirectory,
+  '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
+)
+
+const FORMAL_SELECTION_PAGE_CONSUMERS = Object.freeze({
+  'BOMVersionsPage.jsx': 'BOMVersionsPage.jsx',
+  'FinancePaymentsPage.jsx': 'FinancePaymentsPage.jsx',
+  'HistoryRecordsPage.jsx': 'HistoryRecordsPage.jsx',
+  'OperationalFactsPage.jsx': 'OperationalFactsPage.jsx',
+  'ShipmentsPage.jsx': 'ShipmentsPage.jsx',
+  'InventoryLedgerPage.jsx': 'InventoryLedgerPage.jsx',
+  'MasterDataPage.jsx': 'MasterDataPage.jsx',
+  'OutsourcingOrdersPage.jsx': 'OutsourcingOrdersPage.jsx',
+  'ProductionOrdersPage.jsx': 'ProductionOrdersPage.jsx',
+  'PurchaseOrdersPage.jsx': purchasePanelPath,
+  'PurchaseReceiptsPage.jsx': 'PurchaseReceiptsPage.jsx',
+  'QualityInspectionsPage.jsx': 'QualityInspectionsPage.jsx',
+  'SalesOrdersPage.jsx': 'SalesOrdersPage.jsx',
+  'WorkflowBusinessModulePage.jsx': 'WorkflowBusinessModulePage.jsx',
+})
+
+const FORMAL_SELECTION_STABLE_ACTION_EVIDENCE = Object.freeze({
+  'BOMVersionsPage.jsx': /data-business-action-key="activate"/u,
+  'FinancePaymentsPage.jsx': /data-business-action-key="payment-allocation"/u,
+  'HistoryRecordsPage.jsx': /data-business-action-key="history-view-detail"/u,
+  'OperationalFactsPage.jsx':
+    /data-business-action-key="operational-fact-post"/u,
+  'ShipmentsPage.jsx': /data-business-action-key="shipment-ship"/u,
+  'InventoryLedgerPage.jsx': /data-business-action-key="related-records"/u,
+  'MasterDataPage.jsx': /\{canUpdate \? \([\s\S]*?\{canDisable \? \(/u,
+  'OutsourcingOrdersPage.jsx':
+    /disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u,
+  'ProductionOrdersPage.jsx': /data-business-action-key="release"/u,
+  'PurchaseOrdersPage.jsx': /data-business-action-key="generate-inbound"/u,
+  'PurchaseReceiptsPage.jsx': /data-business-action-key="post"/u,
+  'QualityInspectionsPage.jsx': /data-business-action-key="submit"/u,
+  'SalesOrdersPage.jsx':
+    /disabled=\{lifecycleActionStates\[action.key\]\?\.disabled\}/u,
+  'WorkflowBusinessModulePage.jsx':
+    /data-business-action-key="workflow-task-complete"/u,
+})
+
+const CONTEXTUAL_ACTION_EVIDENCE = Object.freeze({
+  'OperationalFactsPage.jsx': /relatedActionAvailability\.visible/u,
+  'OutsourcingOrdersPage.jsx':
+    /relatedOutsourcingFactsAvailability\.visible/u,
+  'ProductionOrdersPage.jsx':
+    /productionReworkProgressAvailability\.visible/u,
+  'PurchaseOrdersPage.jsx': /relatedActionAvailability\.visible/u,
+  'PurchaseReceiptsPage.jsx': /payableViewAvailability\.visible/u,
+  'QualityInspectionsPage.jsx':
+    /outsourcingDispositionViewAvailability\.visible/u,
+  'SalesOrdersPage.jsx': /relatedActionAvailability\.visible/u,
+})
+
+function pageSource(fileName) {
+  return readFileSync(resolve(pagesDirectory, fileName), 'utf8')
+}
+
+function consumerSource(consumerPath) {
+  return readFileSync(
+    consumerPath.startsWith('/')
+      ? consumerPath
+      : resolve(pagesDirectory, consumerPath),
+    'utf8'
+  )
+}
+
+test('正式业务选择页清单完整，新增消费者必须进入共享动作合同', () => {
+  const discoveredPages = readdirSync(pagesDirectory)
+    .filter((fileName) => fileName.endsWith('.jsx'))
+    .filter((fileName) => pageSource(fileName).includes('rowSelection'))
+    .filter(
+      (fileName) => fileName !== 'ProcessingContractPrintWorkspacePage.jsx'
+    )
+    .sort()
+
+  assert.deepEqual(
+    discoveredPages,
+    Object.keys(FORMAL_SELECTION_PAGE_CONSUMERS).sort(),
+    '正式业务页新增或移除 rowSelection 后，必须同步评审共享当前操作合同'
+  )
+})
+
+test('全部正式业务选择页复用稳定动作条、清空入口和禁用原因提示', () => {
+  for (const [pageFile, consumerPath] of Object.entries(
+    FORMAL_SELECTION_PAGE_CONSUMERS
+  )) {
+    const source = consumerSource(consumerPath)
+    assert.match(
+      source,
+      /<SelectionActionBar/u,
+      `${pageFile} 必须复用 SelectionActionBar`
+    )
+    assert.match(
+      source,
+      /<SelectionClearAction/u,
+      `${pageFile} 必须保留稳定的清空选择入口`
+    )
+    assert.match(
+      source,
+      /<BusinessActionTooltip/u,
+      `${pageFile} 必须为临时不可用动作提供统一原因`
+    )
+  }
+})
+
+test('全部正式业务选择页保留动作标识，由能力与记录生命周期控制可见性', () => {
+  assert.deepEqual(
+    Object.keys(FORMAL_SELECTION_STABLE_ACTION_EVIDENCE).sort(),
+    Object.keys(FORMAL_SELECTION_PAGE_CONSUMERS).sort(),
+    '新增正式选择页时必须登记稳定动作键证据'
+  )
+
+  for (const [pageFile, consumerPath] of Object.entries(
+    FORMAL_SELECTION_PAGE_CONSUMERS
+  )) {
+    const source = consumerSource(consumerPath)
+    assert.match(
+      source,
+      FORMAL_SELECTION_STABLE_ACTION_EVIDENCE[pageFile],
+      `${pageFile} 必须保留稳定动作目录证据`
+    )
+  }
+})
+
+test('低频上下文动作通过语义可见性收口，不以无效置灰入口占据操作位', () => {
+  for (const [pageFile, evidence] of Object.entries(
+    CONTEXTUAL_ACTION_EVIDENCE
+  )) {
+    assert.match(
+      consumerSource(FORMAL_SELECTION_PAGE_CONSUMERS[pageFile]),
+      evidence,
+      `${pageFile} 必须显式消费上下文动作可见性`
+    )
+  }
+})
+
+test('生产异常子面板也纳入稳定动作合同', () => {
+  const source = readFileSync(productionExceptionPanelPath, 'utf8')
+  assert.match(source, /<SelectionActionBar/u)
+  assert.match(source, /<SelectionClearAction/u)
+  for (const actionKey of [
+    'production-exception-approval',
+    'production-exception-decide',
+    'production-exception-withdraw',
+    'production-exception-execute',
+    'production-exception-reverse',
+    'production-exception-revoke-quota',
+  ]) {
+    assert.match(
+      source,
+      new RegExp(`data-business-action-key="${actionKey}"`, 'u')
+    )
+  }
+})
+
+test('采购订单页通过唯一操作面板消费共享动作合同', () => {
+  const purchasePage = pageSource('PurchaseOrdersPage.jsx')
+  const purchasePanel = readFileSync(purchasePanelPath, 'utf8')
+
+  assert.match(purchasePage, /<PurchaseOrderOperationPanel/u)
+  assert.equal(
+    (purchasePage.match(/<PurchaseOrderOperationPanel/gu) || []).length,
+    1,
+    '采购订单页只应有一个当前操作面板真源'
+  )
+  assert.match(purchasePanel, /<BusinessLifecyclePrimaryAction/u)
+  assert.match(purchasePanel, /secondaryLifecycleActions\.map/u)
+  assert.match(purchasePanel, /<BusinessLifecycleSecondaryAction/u)
+})
+
+test('共享操作区保留岗位动作入口，桌面和窄屏均限制常驻动作数量', () => {
+  const layout = readFileSync(
+    resolve(
+      currentDirectory,
+      '../components/business-list/BusinessListLayout.jsx'
+    ),
+    'utf8'
+  )
+  assert.match(layout, /DESKTOP_SELECTION_ACTION_LIMIT = 4/u)
+  assert.match(layout, /TABLET_SELECTION_ACTION_LIMIT = 2/u)
+  assert.match(layout, /PHONE_SELECTION_ACTION_LIMIT = 1/u)
+  assert.match(layout, /child\.props\?\.visible !== false/u)
+  assert.match(
+    layout,
+    /recordActions\.length > 0 \? \(\s*<div\s*className="erp-business-selection-action-bar__record-actions"/u
+  )
+  assert.match(layout, /aria-label="当前记录操作"/u)
+  assert.match(layout, /if \(!action\) return null/u)
+})
+
+test('采购和加工合同补齐详情入口，任务页不展示未实现的导出', () => {
+  assert.match(
+    readFileSync(purchasePanelPath, 'utf8'),
+    /data-business-action-key="purchase-details"/u
+  )
+  assert.match(
+    pageSource('OutsourcingOrdersPage.jsx'),
+    /data-business-action-key="outsourcing-details"/u
+  )
+  assert.match(
+    pageSource('WorkflowBusinessModulePage.jsx'),
+    /showExport=\{false\}/u
+  )
+  for (const source of [
+    pageSource('SalesOrdersPage.jsx'),
+    pageSource('OutsourcingOrdersPage.jsx'),
+    readFileSync(purchasePanelPath, 'utf8'),
+  ]) {
+    const toolbar = source.slice(
+      source.indexOf('<BusinessOperationPanel'),
+      source.indexOf('<SelectionActionBar')
+    )
+    assert.doesNotMatch(toolbar, /onClick=\{openLineOrder\}/u)
+    assert.match(
+      source.slice(source.indexOf('<SelectionActionBar')),
+      /data-business-action-key="line-order"/u
+    )
+  }
+})

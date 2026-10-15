@@ -1,0 +1,82 @@
+.erp-audit-records-page__scope {
+  margin: 0;
+  color: var(--ant-color-text-secondary);
+}
+
+.erp-audit-records-page__action {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-audit-detail-drawer .ant-drawer-header,
+.erp-audit-detail-drawer .ant-drawer-footer {
+  padding: 12px;
+}
+
+.erp-audit-detail-drawer .ant-drawer-body {
+  padding: 12px;
+}
+
+.erp-audit-record-detail {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-audit-record-detail__facts {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px 12px;
+  margin: 12px 0 0;
+}
+
+.erp-audit-record-detail__facts dt {
+  color: var(--ant-color-text-secondary);
+}
+
+.erp-audit-record-detail__facts dd {
+  margin: 0;
+}
+
+.erp-audit-record-detail__changes {
+  overflow-x: auto;
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 8px;
+}
+
+.erp-audit-record-detail__changes table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 13px;
+}
+
+.erp-audit-record-detail__changes th,
+.erp-audit-record-detail__changes td {
+  padding: 9px 10px;
+  text-align: left;
+  vertical-align: top;
+  white-space: pre-wrap;
+  border-bottom: 1px solid var(--ant-color-border-secondary);
+}
+
+.erp-audit-record-detail__changes tbody th,
+.erp-audit-record-detail__changes tbody td {
+  height: var(--erp-row-height);
+  padding-block: var(--erp-table-cell-padding-block);
+}
+
+.erp-audit-record-detail__changes thead {
+  background: var(--ant-color-fill-alter);
+}
+
+.erp-audit-record-detail__changes th:first-child {
+  width: 25%;
+}
+
+.erp-audit-record-detail__changes tbody tr:last-child > * {
+  border-bottom: 0;
+}
