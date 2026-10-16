@@ -21,7 +21,7 @@
 
 .erp-dev-business-usability-kicker {
   color: var(--erp-primary-strong);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 720;
 }
 
@@ -141,7 +141,7 @@
 
 .erp-dev-business-usability-page-cell strong {
   color: var(--erp-text);
-  font-size: var(--erp-font-body);
+  font-size: 14px;
 }
 
 .erp-dev-business-usability-page-cell p {

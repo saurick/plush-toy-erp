@@ -1,6 +1,4 @@
 import { getPermissionCenterRoleName } from '../../erp/utils/permissionCenterAccess.mjs'
-import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../common/consts/workflowTaskDiscovery.generated.mjs'
-import { fulfillmentStepMatchesRole } from '../../erp/utils/workflowFulfillment.mjs'
 
 function asArray(value) {
   return Array.isArray(value) ? value : []
@@ -195,6 +193,7 @@ export function describeDevBusinessChainResponsibility(responsibility) {
   if (
     modes.has('human') &&
     (knownLabels.length !== ownerPools.length ||
+      asArray(responsibility.capabilityKeys).length > 0 ||
       ownerPools.length === 0)
   ) {
     result.push('具有对应业务权限的岗位')
@@ -202,64 +201,4 @@ export function describeDevBusinessChainResponsibility(responsibility) {
   if (modes.has('system')) result.push('系统自动处理')
   if (modes.has('derived')) result.push('系统按已生效结果计算')
   return uniqueStrings(result).join('、')
-}
-
-// Reuse the business handoffs where they are registered. Financial follow-through
-// comes from the same topic contracts, rather than a second role/action catalogue.
-export function buildDevBusinessChainRoleGuide(catalog, chainKey) {
-  const chain = exactChain(catalog, chainKey)
-  const fulfillment = taskCatalog.fulfillment_flow.filter(
-    (item) => item.business_chain === chainKey
-  )
-  const happySteps = new Set(
-    chain.acceptanceScenarios
-      .filter((scenario) => scenario.kind === 'happy_path')
-      .flatMap((scenario) => scenario.stepKeys)
-  )
-  const actions = chain.steps.filter((item) => {
-    if (!fulfillment.length) return true
-    const target = chain.nodes.find((node) => node.key === item.toNodeKey)
-    return target.machineKeys.includes('fact.finance')
-  })
-  return Object.freeze([
-    ...fulfillment,
-    ...actions.map((item) => {
-      const description = describeDevBusinessChainStep(catalog, item)
-      const source = chain.nodes.find((node) => node.key === item.fromNodeKey)
-      const target = chain.nodes.find((node) => node.key === item.toNodeKey)
-      return Object.freeze({
-        stage: item.key,
-        stages: [],
-        business_chain: chainKey,
-        nodeKey: source.key,
-        label: item.label,
-        role: describeDevBusinessChainResponsibility(item.responsibility),
-        role_keys: item.responsibility.mode === 'human'
-          ? item.responsibility.ownerPoolKeys
-          : [],
-        result: description.results.join('；') || `核对${target.label}的正式结果；协同完成不代表业务已经入账。`,
-        handoffs: [
-          description.condition,
-          description.preconditions.length
-            ? `开始条件：${description.preconditions.join('；')}`
-            : '',
-          `来源：${source.label}；交接结果：${target.label}。`,
-        ].filter(Boolean),
-        branch: Boolean(item.condition) || !happySteps.has(item.key),
-      })
-    }),
-  ])
-}
-
-export function buildDevBusinessChainTopics(catalog, role = 'all') {
-  const topics = new Map(catalog.businessChains.map((chain) => {
-    const steps = buildDevBusinessChainRoleGuide(catalog, chain.key)
-    const matchingSteps = steps.filter((step) => fulfillmentStepMatchesRole(step, role))
-    return [chain.key, { chain, steps, matchingSteps }]
-  }))
-  return catalog.businessChainOverview.lanes.map((lane) => ({
-    ...lane,
-    topics: lane.chainKeys.map((key) => topics.get(key))
-      .filter((topic) => role === 'all' || topic.matchingSteps.length > 0),
-  })).filter((lane) => lane.topics.length > 0)
 }

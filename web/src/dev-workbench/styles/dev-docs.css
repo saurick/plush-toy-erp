@@ -79,7 +79,7 @@
 }
 
 .erp-dev-docs-lifecycle > .ant-typography {
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-dev-docs-lifecycle__control.ant-segmented {
@@ -88,7 +88,7 @@
 
 .erp-dev-docs-lifecycle__control .ant-segmented-item-label {
   padding-inline: 7px;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-dev-docs-lifecycle__count.ant-typography {
@@ -106,7 +106,7 @@
 
 .erp-dev-docs-search-scope > .ant-typography {
   flex: 0 0 auto;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-dev-docs-search-scope__control.ant-segmented {
@@ -138,7 +138,7 @@
   justify-content: space-between;
   gap: 8px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 
 .erp-dev-docs-sidebar__section-icon {
@@ -214,7 +214,7 @@
 
 .erp-dev-docs-pinned__title {
   color: inherit;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
   overflow: hidden;
@@ -224,7 +224,7 @@
 
 .erp-dev-docs-pinned__path {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-micro);
+  font-size: 11px;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -288,7 +288,7 @@
   min-width: 0;
   align-items: center;
   gap: 8px;
-  font-size: var(--erp-font-body);
+  font-size: 14px;
   font-weight: 700;
   line-height: 1.35;
 }
@@ -305,7 +305,7 @@
 
 .erp-dev-docs-list__path {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -351,7 +351,7 @@
 .erp-dev-docs-tree__folder {
   align-items: center;
   color: var(--erp-text);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -389,7 +389,7 @@
   background: var(--erp-surface-bg);
   padding: 1px 7px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-micro);
+  font-size: 11px;
   font-weight: 600;
   line-height: 18px;
 }
@@ -402,7 +402,7 @@
 
 .erp-dev-docs-tree__doc-title {
   color: inherit;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-weight: 600;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -410,7 +410,7 @@
 
 .erp-dev-docs-tree__doc-path {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-micro);
+  font-size: 11px;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -530,7 +530,7 @@
   background: var(--erp-surface-bg);
   padding: 4px 10px;
   color: var(--erp-text);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   line-height: 1.35;
   overflow-wrap: anywhere;
   text-align: left;
@@ -595,7 +595,7 @@
 .erp-dev-docs-markdown p,
 .erp-dev-docs-markdown li {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-body);
+  font-size: 14px;
   line-height: 1.75;
 }
 
@@ -644,7 +644,7 @@
 
 .erp-dev-docs-markdown blockquote {
   margin-inline: 0;
-  border: 1px solid var(--erp-border);
+  border-left: 4px solid #9bc9a6;
   background: #f4faf5;
   padding: 10px 14px;
 }

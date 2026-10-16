@@ -30,7 +30,7 @@
 
 .erp-dev-version-header-actions > .ant-typography {
   margin: 0;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-dev-version-page > .erp-dev-customer-scope {
@@ -47,7 +47,7 @@
 .erp-dev-version-page > .erp-dev-customer-scope .erp-dev-customer-scope__icon {
   width: 30px;
   height: 30px;
-  font-size: var(--erp-font-emphasis);
+  font-size: 15px;
 }
 
 .erp-dev-version-evidence-alert.ant-alert {
@@ -87,7 +87,7 @@
 
 .erp-dev-version-overview__eyebrow.ant-typography {
   color: var(--ant-color-primary, var(--erp-primary));
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.04em;
 }
@@ -214,7 +214,7 @@
 
 .erp-dev-version-current-operation {
   overflow: hidden;
-  border: 1px solid var(--erp-border);
+  border-left: 3px solid var(--ant-color-primary, var(--erp-primary));
 }
 
 .erp-dev-version-current-operation .ant-card-body {
@@ -609,8 +609,8 @@
   display: grid;
   gap: 4px;
   padding: 12px 14px;
-  border: 1px solid var(--erp-border);
-  border-radius: 8px;
+  border-left: 3px solid var(--ant-color-primary, var(--erp-primary));
+  border-radius: 0 8px 8px 0;
   background: var(--ant-color-primary-bg, #e6f4ff);
 }
 

@@ -2162,25 +2162,25 @@ export default function DevTestingPage() {
             </Title>
           </Space>
         </div>
-        <div
-          className="erp-dev-testing-primary-nav"
-          hidden={isAuxiliaryView}
-        >
-          <Segmented
-            aria-label="质量验证工作区主视图"
-            options={VIEW_OPTIONS}
-            value={isAuxiliaryView ? VIEW_TIERS : view}
-            onChange={selectView}
-          />
-          {isCoverageView ? (
-            <Text type="secondary">当前工作区：{coverageToolbarText}</Text>
-          ) : null}
-        </div>
       </header>
 
       <main className="erp-dev-testing-shell">
         <section className="erp-dev-testing-reader">
           <div className="erp-dev-testing-reader__toolbar">
+            <div
+              className="erp-dev-testing-primary-nav"
+              hidden={isAuxiliaryView}
+            >
+              <Segmented
+                aria-label="质量验证工作区主视图"
+                options={VIEW_OPTIONS}
+                value={isAuxiliaryView ? VIEW_TIERS : view}
+                onChange={selectView}
+              />
+              {isCoverageView ? (
+                <Text type="secondary">当前工作区：{coverageToolbarText}</Text>
+              ) : null}
+            </div>
             <div
               className="erp-dev-testing-auxiliary-nav"
               hidden={!isAuxiliaryView}

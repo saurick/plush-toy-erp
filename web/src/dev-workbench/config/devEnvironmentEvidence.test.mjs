@@ -53,8 +53,10 @@ function dataSummaryFixture() {
         databaseName: 'plush_erp_demo_v1',
         minimumMigration:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
-        configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
-        configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+        configRevision:
+          CUSTOMER_TRIAL_133_CONFIG_REVISION,
+        configProductVersion:
+          CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
       },
     },
     target: {
@@ -110,7 +112,8 @@ function addTrialReadback(summary) {
         release: COMMIT,
         migrationVersion:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
-        customerConfigRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+        customerConfigRevision:
+          CUSTOMER_TRIAL_133_CONFIG_REVISION,
         dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
         runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
         semanticDigest: DIGEST,
@@ -141,8 +144,10 @@ function deliverySummaryFixture() {
         migrationVersion:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
         activeCustomerConfig: {
-          revision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
-          productVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+          revision:
+            CUSTOMER_TRIAL_133_CONFIG_REVISION,
+          productVersion:
+            CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
           datasetVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
         },
         serverHealth: 'passed',
@@ -268,14 +273,14 @@ test('customer test data rebuild is independent from normal deployment readiness
   assert.match(customerTest.rollbackBoundary, /绑定回滚点/u)
 })
 
-test('remote data evidence requires both data and delivery reads', () => {
+test('local and remote target failures remain independent', () => {
   const localFailed = buildDevEnvironmentEvidence({
     dataError: '本地读取失败',
     deliverySummary: deliverySummaryFixture(),
   })
   assert.equal(localFailed.cards[0].status, 'failed')
-  assert.equal(localFailed.cards[1].status, 'failed')
-  assert.equal(localFailed.cards[2].status, 'failed')
+  assert.notEqual(localFailed.cards[1].status, 'failed')
+  assert.notEqual(localFailed.cards[2].status, 'failed')
 
   const remoteFailed = buildDevEnvironmentEvidence({
     dataSummary: dataSummaryFixture(),

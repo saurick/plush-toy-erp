@@ -941,9 +941,6 @@ export default function DevFlowStateObservatoryPage() {
               updateParams({
                 [QUERY_KEYS.chain]: key,
                 [QUERY_KEYS.node]: null,
-                [QUERY_KEYS.exception]: null,
-                [QUERY_KEYS.exceptionDecision]: null,
-                [QUERY_KEYS.exceptionStep]: null,
               })
             }
             onOpenView={openView}
@@ -953,14 +950,13 @@ export default function DevFlowStateObservatoryPage() {
       if (!chain || !node) return null
       return (
         <BusinessChainView
-          key={chain.key}
           catalog={catalog}
           chain={chain}
           node={node}
           taskId={taskId}
           selectedTask={selectedTask}
           onSelectChain={(key) =>
-            updateParams({ [QUERY_KEYS.chain]: key, [QUERY_KEYS.node]: null, [QUERY_KEYS.exception]: null, [QUERY_KEYS.exceptionDecision]: null, [QUERY_KEYS.exceptionStep]: null })
+            updateParams({ [QUERY_KEYS.chain]: key, [QUERY_KEYS.node]: null })
           }
           onSelectNode={(key) => updateParams({ [QUERY_KEYS.node]: key })}
           onOpenView={openView}
@@ -1044,20 +1040,6 @@ export default function DevFlowStateObservatoryPage() {
           <Title level={1}>业务链观察</Title>
           <Link to={`${DEV_BUSINESS_CHAIN_AUDIT_ROUTE}?${new URLSearchParams({ chain: chain?.key || 'all' })}`}>查看链路实测</Link>
         </Space>
-        <section className="erp-dev-flow-nav erp-dev-flow-workspace-nav">
-          <DevTaskNav
-            compact
-            level="primary"
-            ariaLabel="业务链观察方式"
-            items={PRIMARY_VIEWS}
-            value={['tracking', 'workflow', 'runtime'].includes(view) ? 'tracking' : 'chain'}
-            disabled={catalogState.status === 'loading'}
-            onChange={(nextView) => openView(nextView)}
-          />
-          <Tag>{['tracking', 'workflow'].includes(view) ? '运行记录' : view === 'runtime' && taskId ? '流程记录' : '设计结构'}</Tag>
-          {!['chain', 'tracking'].includes(view) ? <span>{VIEW_META[view]?.label}{specialistSelection ? ` · ${specialistSelection}` : ''}</span> : null}
-          {chain ? <span className="erp-dev-flow-context-path">{chain.label}{node && view !== 'chain' ? ` / ${node.label}` : ''}</span> : null}
-        </section>
         <Space className="erp-dev-flow-header-actions">
           <Button onClick={() => setDefinitionSearchOpen(true)}>搜索定义</Button>
           <Dropdown menu={{ items: TECHNICAL_VIEWS.map((item) => ({ key: item.value, label: item.label })), onClick: ({ key }) => openView(key) }} disabled={!valid || !catalog}>
@@ -1068,7 +1050,20 @@ export default function DevFlowStateObservatoryPage() {
           </Dropdown>
         </Space>
       </header>
-
+      <section className="erp-dev-flow-nav erp-dev-flow-workspace-nav">
+        <DevTaskNav
+          compact
+          level="primary"
+          ariaLabel="业务链观察方式"
+          items={PRIMARY_VIEWS}
+          value={['tracking', 'workflow', 'runtime'].includes(view) ? 'tracking' : 'chain'}
+          disabled={catalogState.status === 'loading'}
+          onChange={(nextView) => openView(nextView)}
+        />
+        <Tag>{['tracking', 'workflow'].includes(view) ? '运行记录' : view === 'runtime' && taskId ? '流程记录' : '设计结构'}</Tag>
+        {!['chain', 'tracking'].includes(view) ? <span>{VIEW_META[view]?.label}{specialistSelection ? ` · ${specialistSelection}` : ''}</span> : null}
+        {chain ? <span className="erp-dev-flow-context-path">{chain.label}{node ? ` / ${node.label}` : ''}</span> : null}
+      </section>
       {valid && catalog && ['chain', 'tracking', 'workflow', 'runtime'].includes(view) ? (
         <TaskFinder key={`finder-${sessionRevision}`} draft={taskDraft} onDraftChange={setTaskDraft} onClearTask={clearTask} onSelectTask={(id, task) => selectTask(id, task, 'tracking')} taskId={taskId} />
       ) : null}

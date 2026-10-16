@@ -1369,18 +1369,6 @@ export default function DevDataPreparationPage() {
             </Title>
           </div>
         </div>
-        {summary && (
-          <DevTaskNav
-            compact
-            idPrefix="dev-data"
-            ariaLabel="测试数据视图"
-            items={DATA_VIEW_ITEMS.filter(
-              (item) => item.value !== 'confirm' || currentOperation
-            )}
-            value={dataView}
-            onChange={selectDataView}
-          />
-        )}
         <Space direction="vertical" align="end" size={4}>
           <Button
             icon={<ReloadOutlined aria-hidden="true" />}
@@ -1463,7 +1451,16 @@ export default function DevDataPreparationPage() {
 
         {summary ? (
           <div className="erp-dev-data-workspace">
-
+            <DevTaskNav
+              compact
+              idPrefix="dev-data"
+              ariaLabel="测试数据视图"
+              items={DATA_VIEW_ITEMS.filter(
+                (item) => item.value !== 'confirm' || currentOperation
+              )}
+              value={dataView}
+              onChange={selectDataView}
+            />
             {receiptIssues.length > 0 ? (
               <Alert
                 type="warning"

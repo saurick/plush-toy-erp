@@ -7,25 +7,8 @@ import {
   projectDevBusinessChainRoles,
   describeDevBusinessChainNode,
   describeDevBusinessChainResponsibility,
-  buildDevBusinessChainRoleGuide,
-  buildDevBusinessChainTopics,
 } from './devBusinessChainProjection.mjs'
 import { DEV_FLOW_STATE_CATALOG } from './devFlowStateCatalog.mjs'
-
-test('business topics follow registered role duties and preserve complete handoffs', () => {
-  const all = buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG).flatMap((lane) => lane.topics)
-  assert.deepEqual(new Set(all.map((topic) => topic.chain.key)), new Set(DEV_FLOW_STATE_CATALOG.businessChains.map((chain) => chain.key)))
-  assert.equal(all.length, DEV_FLOW_STATE_CATALOG.businessChains.length)
-  const engineering = buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG, 'engineering').flatMap((lane) => lane.topics)
-  assert.deepEqual(engineering.map((topic) => topic.chain.key), ['sales_to_production'])
-  const warehouse = buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG, 'warehouse').flatMap((lane) => lane.topics)
-  assert(warehouse.some((topic) => topic.chain.key === 'purchase_posting_corrections'))
-  const purchase = warehouse.find((topic) => topic.chain.key === 'purchase_to_inventory')
-  assert(purchase.matchingSteps.every((step) => step.role_keys.includes('warehouse')))
-  assert(purchase.steps.some((step) => step.role_keys.includes('finance')), 'a role entry must retain downstream financial handoffs')
-  assert(purchase.steps.some((step) => step.role_keys.includes('quality')), 'a role entry must retain quality handoffs')
-  assert.deepEqual(buildDevBusinessChainTopics(DEV_FLOW_STATE_CATALOG, 'unregistered-role'), [], 'unknown roles must not acquire duties from a permission or label guess')
-})
 
 test('responsibility labels preserve formal roles and explain unresolved pools without a generic role name', () => {
   const text = describeDevBusinessChainResponsibility({
@@ -149,41 +132,4 @@ test('business chain projection fails closed for unknown chain or node', () => {
       }),
     /unknown business chain node projection/u
   )
-})
-
-test('purchase topic reuses role handoffs and retains both payable draft and posting', () => {
-  const steps = buildDevBusinessChainRoleGuide(DEV_FLOW_STATE_CATALOG, 'purchase_to_inventory')
-  assert.deepEqual(steps.slice(0, 3).map((step) => step.stage), ['purchasing', 'purchase_count', 'incoming_quality'])
-  assert.equal(steps.length, 5)
-  const finance = steps.filter((step) => step.role_keys.includes('finance'))
-  assert.equal(finance.length, 2)
-  assert(finance.every((step) => step.role === '财务'))
-  assert.match(finance[0].result, /草稿/u)
-  assert.match(finance[1].result, /草稿.*已过账/u)
-  assert(finance.every((step) => step.stages.length === 0), 'financial facts must not acquire invented task links')
-  assert(!steps.some((step) => step.stage === 'finished_inbound'))
-})
-
-test('every topic has grounded role guidance, and exception branches retain their conditions', () => {
-  for (const chain of DEV_FLOW_STATE_CATALOG.businessChains) {
-    const steps = buildDevBusinessChainRoleGuide(DEV_FLOW_STATE_CATALOG, chain.key)
-    assert(steps.length > 0, chain.key)
-    assert.equal(new Set(steps.map((step) => step.stage)).size, steps.length)
-    for (const step of steps) {
-      assert.equal(step.business_chain, chain.key)
-      if (step.nodeKey) assert(chain.nodes.some((node) => node.key === step.nodeKey))
-      assert(step.role)
-      assert(!step.role.includes('具有对应业务权限的岗位'), `${chain.key}/${step.stage} needs an explicit registered responsibility`)
-      assert(step.result)
-      assert.doesNotMatch([step.role, step.result, ...(step.handoffs || [])].join(' '), /finance_fact_|orchestration_only|source_document_only/u)
-    }
-  }
-  const exception = buildDevBusinessChainRoleGuide(DEV_FLOW_STATE_CATALOG, 'purchase_quality_disposition')
-  const chain = DEV_FLOW_STATE_CATALOG.businessChains.find((item) => item.key === 'purchase_quality_disposition')
-  for (const step of chain.steps.filter((item) => item.condition)) {
-    const projected = exception.find((item) => item.stage === step.key)
-    assert(projected.handoffs.includes(step.condition))
-    assert.equal(projected.branch, true, 'mutually exclusive outcomes remain conditional even when both have happy-path scenarios')
-  }
-  assert.throws(() => buildDevBusinessChainRoleGuide(DEV_FLOW_STATE_CATALOG, 'missing'), /unknown business chain/u)
 })

@@ -52,7 +52,7 @@
 
 .erp-dev-product-core-eyebrow {
   color: var(--erp-primary-strong);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
 }
@@ -79,7 +79,7 @@
 
 .erp-dev-product-core-header__summary span {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-dev-product-core-shell {
@@ -208,7 +208,7 @@
   text-align: left;
   background: var(--erp-surface-bg-soft);
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -242,7 +242,7 @@
 
 .erp-dev-product-core-table td > strong {
   color: var(--erp-text);
-  font-size: var(--erp-font-body);
+  font-size: 14px;
 }
 
 .erp-dev-product-core-status {
@@ -377,7 +377,7 @@
   .erp-dev-product-core-table td::before {
     color: var(--erp-text-muted);
     content: attr(data-label);
-    font-size: var(--erp-font-caption);
+    font-size: 12px;
     font-weight: 600;
   }
 }

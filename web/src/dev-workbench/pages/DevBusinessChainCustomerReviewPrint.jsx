@@ -2,7 +2,6 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 
 import { MermaidDiagram } from '@/common/components/markdown'
-import { fulfillmentExceptionPath } from '../../erp/utils/workflowFulfillment.mjs'
 
 function formatGeneratedAt(value) {
   return new Intl.DateTimeFormat('zh-CN', {
@@ -108,26 +107,11 @@ function OverviewContent({ overview }) {
         </table>
       </section>
       <section className="erp-dev-flow-customer-review__all-exceptions">
-        <h2>异常来源与闭环条件</h2>
-        {overview.exceptionGuides.map((guide) => (
-          <section key={guide.key} data-customer-review-exception={guide.key}>
-            <h3>{guide.label}</h3><p>{guide.source}</p>
-            {guide.approval ? <p>审批：{guide.approval.condition} 未通过：{guide.approval.rejected}</p> : null}
-            <table>
-              <colgroup><col style={{ width: '18%' }} /><col style={{ width: '38%' }} /><col style={{ width: '44%' }} /></colgroup>
-              <thead><tr><th scope="col">处理方案</th><th scope="col">岗位交接</th><th scope="col">闭环与恢复</th></tr></thead>
-              <tbody>
-                {guide.plans.map((plan) => (
-                  <tr key={plan.key}>
-                    <th scope="row">{plan.label}</th>
-                    <td>{fulfillmentExceptionPath(guide, plan.key).steps.map((step) => `${step.role}：${step.label}`).join(' → ')}</td>
-                    <td><p>{plan.closure}</p><p>{plan.recovery}</p>{guide.approval ? <p>{guide.approval.withdrawal}</p> : null}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        ))}
+        <h2>质量异常处理</h2>
+        <p>{overview.exceptionFlow.join(' → ')}</p>
+        <p>{overview.exceptionApproval.condition}</p>
+        <p>通过：{overview.exceptionApproval.passed}</p>
+        <p>未通过：{overview.exceptionApproval.rejected}</p>
       </section>
       <ReviewDiagram diagram={overview.diagram} label="相关业务专题关系图" />
     </main>

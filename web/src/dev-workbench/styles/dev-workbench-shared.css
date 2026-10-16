@@ -19,6 +19,7 @@
   border-color: #93c5fd;
   background: #fbfdff;
   box-shadow:
+    inset 3px 0 0 var(--erp-primary),
     0 8px 18px rgb(37 99 235 / 0.08);
 }
 
@@ -86,7 +87,7 @@
 .erp-dev-hub-card__source {
   color: var(--erp-text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
@@ -98,7 +99,7 @@
   justify-content: space-between;
   gap: 10px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 
 .erp-dev-hub-card__link {
@@ -215,7 +216,7 @@
 .erp-dev-testing-metric__label,
 .erp-dev-testing-metric__note {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
@@ -295,7 +296,7 @@
 .erp-dev-testing-command-block__path {
   color: var(--erp-text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
@@ -371,6 +372,7 @@
   cursor: pointer;
   padding: 11px 12px;
   text-align: left;
+  box-shadow: inset 3px 0 0 var(--erp-primary-strong);
 }
 
 .erp-dev-testing-preset:hover,
@@ -397,7 +399,7 @@
 
 .erp-dev-testing-preset__desc {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
@@ -474,7 +476,7 @@
   background: #eef7ef;
   color: var(--erp-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
   padding: 3px 7px;
@@ -512,7 +514,7 @@
 
 .erp-dev-testing-command-block :where(code) {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.6;
   white-space: pre;
 }
@@ -556,18 +558,22 @@
   border-radius: 10px;
   background: #f8fbff;
   padding: 10px 11px;
+  box-shadow: inset 3px 0 0 var(--erp-primary);
 }
 
 .erp-dev-testing-coverage-operation--success {
   border-color: #bbf7d0;
+  box-shadow: inset 3px 0 0 #16a34a;
 }
 
 .erp-dev-testing-coverage-operation--warning {
   border-color: #fde68a;
+  box-shadow: inset 3px 0 0 #d97706;
 }
 
 .erp-dev-testing-coverage-operation--danger {
   border-color: #fecaca;
+  box-shadow: inset 3px 0 0 #dc2626;
 }
 
 .erp-dev-testing-coverage-operation__head {
@@ -598,7 +604,7 @@
 .erp-dev-testing-coverage-operation__head small,
 .erp-dev-testing-coverage-operation p {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-dev-testing-coverage-operation p {
@@ -624,7 +630,7 @@
   background: #eef7ef;
   color: var(--erp-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
   padding: 8px 10px;
@@ -633,7 +639,7 @@
 .erp-dev-testing-coverage-boundary.ant-typography {
   margin: 0;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -667,7 +673,7 @@
 .erp-dev-testing-coverage-identity small,
 .erp-dev-testing-coverage-card__metrics small {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -676,7 +682,7 @@
   max-width: 100%;
   color: var(--erp-text-muted);
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
@@ -713,7 +719,7 @@
 .erp-dev-testing-coverage-section__head p.ant-typography {
   margin-top: 4px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -738,10 +744,31 @@
   border-radius: 12px;
   background: var(--erp-surface-bg);
   padding: 11px;
+  box-shadow: inset 3px 0 0 #94a3b8;
+}
+
+.erp-dev-testing-coverage-card--passed {
+  box-shadow: inset 3px 0 0 #16a34a;
+}
+
+.erp-dev-testing-coverage-card--collected {
+  box-shadow: inset 3px 0 0 var(--erp-primary);
 }
 
 .erp-dev-testing-coverage-card--not_applicable {
   border-style: dashed;
+  box-shadow: inset 3px 0 0 #94a3b8;
+}
+
+.erp-dev-testing-coverage-card--partial,
+.erp-dev-testing-coverage-card--stale,
+.erp-dev-testing-coverage-card--skipped {
+  box-shadow: inset 3px 0 0 #d97706;
+}
+
+.erp-dev-testing-coverage-card--failed,
+.erp-dev-testing-coverage-card--blocked {
+  box-shadow: inset 3px 0 0 #dc2626;
 }
 
 .erp-dev-testing-coverage-card__head {
@@ -792,7 +819,7 @@
   border: 1px solid var(--erp-border);
   border-radius: 999px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   padding: 3px 7px;
 }
 
@@ -800,7 +827,7 @@
 .erp-dev-testing-coverage-policy-grid p {
   margin: 0;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }

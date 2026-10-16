@@ -42,7 +42,7 @@
 .erp-dev-customer-scope__copy > .ant-typography:last-child {
   margin: 0;
   color: var(--dev-customer-scope-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.45;
 }
 
@@ -70,7 +70,7 @@
 }
 
 .erp-dev-customer-scope--compact .erp-dev-customer-scope__note {
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.5;
 }
 

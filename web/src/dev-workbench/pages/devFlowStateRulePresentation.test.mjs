@@ -232,10 +232,7 @@ test('related-view projection only creates exact catalog-backed destinations', (
   )
   assert.deepEqual(
     salesTargets.chains.map((item) => [item.chainKey, item.nodeKey]),
-    [
-      ['sales_to_production', 'sales_order'],
-      ['finance_payment_and_reversal', 'payment_order'],
-    ]
+    [['sales_to_production', 'sales_order']]
   )
   assert.deepEqual(salesTargets.facts, [])
   assert.deepEqual(salesTargets.direct, [])

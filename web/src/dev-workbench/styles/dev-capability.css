@@ -37,7 +37,7 @@
   max-width: 760px;
   margin: 4px 0 0;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -61,7 +61,7 @@
 
 .erp-dev-customer-view-switch .ant-segmented-item-label {
   padding-inline: 14px;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-weight: 650;
 }
 
@@ -82,7 +82,7 @@
 .erp-dev-customer-selector__note.ant-typography {
   flex: 1 1 180px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.4;
   overflow-wrap: anywhere;
 }
@@ -96,7 +96,7 @@
   border-radius: 12px;
   background: var(--erp-surface-bg-soft);
   padding: 9px 10px;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
@@ -220,6 +220,7 @@
   border: 1px solid #b7d2f4;
   border-radius: 10px;
   background: #f5f9ff;
+  box-shadow: inset 3px 0 0 var(--erp-primary);
   color: #143b76;
   cursor: pointer;
   padding: 10px;
@@ -370,7 +371,7 @@
 
 .erp-dev-customer-review-item__path {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-dev-customer-asset {
@@ -393,7 +394,7 @@
 
 .erp-dev-customer-asset__value small {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-dev-customer-diff {
@@ -418,7 +419,7 @@
   display: block;
   margin-top: 6px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
@@ -510,6 +511,7 @@
   border-radius: 12px;
   background: var(--erp-surface-bg);
   padding: 12px;
+  box-shadow: inset 3px 0 0 #d7f2ef;
 }
 
 .erp-dev-customer-import-step__index {
@@ -556,6 +558,10 @@
   border-radius: 12px;
   background: var(--erp-surface-bg-soft);
   padding: 12px;
+}
+
+.erp-dev-customer-db-target {
+  box-shadow: inset 3px 0 0 #d7f2ef;
 }
 
 .erp-dev-customer-db-target__body {
@@ -624,7 +630,7 @@
   background: #102016;
   color: #bbf7d0;
   padding: 12px;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -740,7 +746,7 @@
 
 .erp-dev-customer-command :where(code) {
   color: #d9fbe4;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -787,7 +793,7 @@
 
 .erp-dev-hub-summary {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   line-height: 1.35;
 }
 

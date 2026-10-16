@@ -27,7 +27,7 @@
   width: 100%;
   min-width: 720px;
   border-collapse: collapse;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 
 .erp-dev-ci-guide__table-scroll th,
@@ -68,7 +68,7 @@
 
 .erp-dev-ci-diagnostic__text {
   white-space: pre-wrap;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 
 .erp-dev-ci-timeline {
@@ -91,7 +91,7 @@
   width: 100%;
   min-width: 620px;
   border-collapse: collapse;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-dev-ci-timeline th,

@@ -1,8 +1,6 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useMemo } from 'react'
 import { Alert, Button, Empty, Select, Space, Spin, Tag } from 'antd'
-import { useSearchParams } from 'react-router-dom'
 import TaskFulfillmentGuide from './TaskFulfillmentGuide.jsx'
-import BusinessChainTopics from './BusinessChainTopics.jsx'
 import { useRuntimeContext } from './useFlowRuntime.mjs'
 import {
   DEFINITION_SELECT_CLASS_NAMES,
@@ -26,7 +24,6 @@ import {
 } from '@/erp/utils/processRuntimePresentation.mjs'
 import {
   buildDevBusinessChainProjection,
-  buildDevBusinessChainRoleGuide,
   describeDevBusinessChainNode,
   describeDevBusinessChainResponsibility,
 } from '../../config/devBusinessChainProjection.mjs'
@@ -40,6 +37,14 @@ import {
   DEV_FLOW_STATE_OVERVIEW_CHAIN_KEY as ALL_BUSINESS_CHAINS_KEY,
   DEV_FLOW_STATE_QUERY_KEYS as QUERY_KEYS,
 } from '../../pages/devFlowStateQuery.mjs'
+
+const CHAIN_KIND_PRESENTATION = Object.freeze({
+  primary: { label: '业务主链', color: 'green' },
+  supporting: { label: '支撑链', color: 'blue' },
+  exception: { label: '异常链', color: 'volcano' },
+  rework: { label: '返工链', color: 'purple' },
+  reversal: { label: '冲正链', color: 'gold' },
+})
 
 const CHAIN_LAYER_PRESENTATION = Object.freeze({
   source_document: {
@@ -112,6 +117,23 @@ const CHAIN_EDGE_PRESENTATION = Object.freeze({
   reverses: '冲正原影响',
   returns: '退回或回货',
   reworks: '进入返工',
+})
+
+const CHAIN_RELATION_PRESENTATION = Object.freeze({
+  continues: { label: '主线衔接', color: 'green' },
+  supplies: { label: '供给', color: 'blue' },
+  branches_to: { label: '异常分流', color: 'volcano' },
+  returns_to: { label: '返回主路径', color: 'purple' },
+  corrects: { label: '纠正', color: 'gold' },
+  cross_cuts: { label: '横切支撑', color: 'default' },
+  reworks: { label: '返工', color: 'magenta' },
+})
+
+const CHAIN_OVERVIEW_LANE_PRESENTATION = Object.freeze({
+  primary: { color: 'green' },
+  supply: { color: 'blue' },
+  exception: { color: 'volcano' },
+  correction: { color: 'gold' },
 })
 
 function uniqueStrings(values) {
@@ -218,10 +240,10 @@ function BusinessChainSelector({ catalog, value, onChange }) {
   )
   return (
     <div className="erp-dev-flow-chain-selector">
-      <label htmlFor="dev-flow-chain-select">切换业务流程</label>
+      <label htmlFor="dev-flow-chain-select">查看业务专题</label>
       <Select
         id="dev-flow-chain-select"
-        aria-label="切换业务流程"
+        aria-label="查看业务专题"
         showSearch
         virtual={false}
         {...searchProps}
@@ -262,103 +284,243 @@ function BusinessChainOverviewView({
   onOpenView,
 }) {
   const overview = catalog.businessChainOverview
-  const { runtime, matchingChain } = useBusinessChainRuntime(catalog, taskId, selectedTask)
+  const chainByKey = useMemo(
+    () => new Map(catalog.businessChains.map((chain) => [chain.key, chain])),
+    [catalog.businessChains]
+  )
+  const { runtime, matchingChain } = useBusinessChainRuntime(
+    catalog,
+    taskId,
+    selectedTask
+  )
   const mermaid = useMemo(
-    () => buildBusinessChainOverviewMermaid(overview, catalog.businessChains, matchingChain?.key),
+    () =>
+      buildBusinessChainOverviewMermaid(
+        overview,
+        catalog.businessChains,
+        matchingChain?.key
+      ),
     [catalog.businessChains, matchingChain?.key, overview]
   )
+  const connectionCountByChain = useMemo(() => {
+    const counts = new Map(
+      catalog.businessChains.map((chain) => [chain.key, 0])
+    )
+    overview.relations.forEach((relation) => {
+      counts.set(
+        relation.fromChainKey,
+        (counts.get(relation.fromChainKey) || 0) + 1
+      )
+      counts.set(
+        relation.toChainKey,
+        (counts.get(relation.toChainKey) || 0) + 1
+      )
+    })
+    return counts
+  }, [catalog.businessChains, overview.relations])
+
   return (
     <div className="erp-dev-flow-view-stack" data-business-chain-overview>
-      <TaskFulfillmentGuide
-        onExploreStage={onSelectChain}
-        topics={<BusinessChainTopics catalog={catalog} mermaid={mermaid} currentChainKey={matchingChain?.key} onSelectChain={onSelectChain} />}
-      />
-      {taskId ? (
-        <section
-          className="erp-dev-flow-chain-runtime"
-          data-runtime-overlay={runtime.status}
-        >
-          <div className="erp-dev-flow-section-heading">
-            <div>
-              <Text strong>查看一笔任务现在走到哪里</Text>
-              <Text type="secondary">
-                按任务名称、任务编号或来源单号查询；总图最多只高亮这笔任务所属的一条业务链。
-              </Text>
-            </div>
-            <Button onClick={() => onOpenView('runtime')}>
-              查看完整运行路径
-            </Button>
+      <TaskFulfillmentGuide onExploreStage={onSelectChain} />
+
+      <details className="erp-dev-flow-developer-details" data-business-chain-topics>
+        <summary>业务专题与系统衔接</summary>
+        <section className="erp-dev-flow-chain-heading">
+          <div>
+            <Title level={2}>{overview.label}</Title>
+            <Paragraph>{overview.summary}</Paragraph>
           </div>
-          {runtime.status === 'loading' ? (
-            <div className="erp-dev-flow-loading">
-              <Spin />
-              <span>正在定位任务所属业务链…</span>
+          <div className="erp-dev-flow-chain-heading__actions">
+            <BusinessChainSelector
+              catalog={catalog}
+              value={overview.key}
+              onChange={onSelectChain}
+            />
+          </div>
+        </section>
+
+        {taskId ? (
+          <section
+            className="erp-dev-flow-chain-runtime"
+            data-runtime-overlay={runtime.status}
+          >
+            <div className="erp-dev-flow-section-heading">
+              <div>
+                <Text strong>查看一笔任务现在走到哪里</Text>
+                <Text type="secondary">
+                  按任务名称、任务编号或来源单号查询；总图最多只高亮这笔任务所属的一条业务链。
+                </Text>
+              </div>
+              <Button onClick={() => onOpenView('runtime')}>
+                查看完整运行路径
+              </Button>
             </div>
+            {runtime.status === 'loading' ? (
+              <div className="erp-dev-flow-loading">
+                <Spin />
+                <span>正在定位任务所属业务链…</span>
+              </div>
         ) : null}
-          {runtime.status === 'error' ? (
-            <Alert
-              showIcon
-              type="error"
-              message="所属业务链定位失败"
-              description={runtime.error}
-            />
+            {runtime.status === 'error' ? (
+              <Alert
+                showIcon
+                type="error"
+                message="所属业务链定位失败"
+                description={runtime.error}
+              />
         ) : null}
-          {runtime.status === 'unlinked' ? (
-            <Alert
-              showIcon
-              type="info"
-              message="当前任务没有正式流程运行记录"
-              description="页面不会根据任务标题或相似名称猜测它属于哪条业务链。"
-            />
+            {runtime.status === 'unlinked' ? (
+              <Alert
+                showIcon
+                type="info"
+                message="当前任务没有正式流程运行记录"
+                description="页面不会根据任务标题或相似名称猜测它属于哪条业务链。"
+              />
         ) : null}
-          {runtime.status === 'ready' ? (
-            <div className="erp-dev-flow-runtime-proof">
-              {matchingChain ? (
-                <Tag color="orange">当前实例所属链：{matchingChain.label}</Tag>
+            {runtime.status === 'ready' ? (
+              <div className="erp-dev-flow-runtime-proof">
+                {matchingChain ? (
+                  <Tag color="orange">当前实例所属链：{matchingChain.label}</Tag>
             ) : (
               <Tag>当前流程未登记到业务总图</Tag>
             )}
-              <dl>
-                <div>
-                  <dt>流程</dt>
-                  <dd>{getProcessLabel(runtime.context.process_instance)}</dd>
-                </div>
-                <div>
-                  <dt>来源单号</dt>
-                  <dd>{runtime.context.source?.no || '未声明'}</dd>
-                </div>
-                <div>
-                  <dt>查询时间</dt>
-                  <dd>{formatQueryTime(runtime.queriedAt)}</dd>
-                </div>
-              </dl>
-              <strong>
-                只证明定位到所属链；尚未证明上下游完成或业务事实已落账
-              </strong>
-              <details className="erp-dev-flow-developer-details">
-                <summary>查看查询边界与开发者信息</summary>
                 <dl>
                   <div>
-                    <dt>数据来源</dt>
-                    <dd>
-                      <code>workflow.get_task_process_context</code>
-                    </dd>
+                    <dt>流程</dt>
+                    <dd>{getProcessLabel(runtime.context.process_instance)}</dd>
                   </div>
                   <div>
-                    <dt>流程实例 ID</dt>
-                    <dd>
-                      <KeyValue
-                        value={String(runtime.context.process_instance.id)}
-                      />
-                    </dd>
+                    <dt>来源单号</dt>
+                    <dd>{runtime.context.source?.no || '未声明'}</dd>
+                  </div>
+                  <div>
+                    <dt>查询时间</dt>
+                    <dd>{formatQueryTime(runtime.queriedAt)}</dd>
                   </div>
                 </dl>
-              </details>
-            </div>
+                <strong>
+                  只证明定位到所属链；尚未证明上下游完成或业务事实已落账
+                </strong>
+                <details className="erp-dev-flow-developer-details">
+                  <summary>查看查询边界与开发者信息</summary>
+                  <dl>
+                    <div>
+                      <dt>数据来源</dt>
+                      <dd>
+                        <code>workflow.get_task_process_context</code>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>流程实例 ID</dt>
+                      <dd>
+                        <KeyValue
+                          value={String(runtime.context.process_instance.id)}
+                        />
+                      </dd>
+                    </div>
+                  </dl>
+                </details>
+              </div>
         ) : null}
-        </section>
+          </section>
       ) : null}
 
+        <section className="erp-dev-flow-overview-map">
+          <div className="erp-dev-flow-section-heading">
+            <div>
+              <Text strong>业务链总览</Text>
+              <Text type="secondary">
+                {catalog.businessChains.length} 条业务链 · {overview.relations.length}{' '}
+                条关联
+              </Text>
+            </div>
+            <Space wrap>
+              {Object.entries(CHAIN_KIND_PRESENTATION).map(([key, item]) => (
+                <Tag color={item.color} key={key}>
+                  {item.label}
+                </Tag>
+            ))}
+            </Space>
+          </div>
+          <div className="erp-dev-flow-overview-graph erp-dev-docs-markdown">
+            <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
+          </div>
+
+          <div className="erp-dev-flow-overview-lanes">
+            {overview.lanes.map((lane) => {
+            const lanePresentation = CHAIN_OVERVIEW_LANE_PRESENTATION[lane.key]
+            return (
+              <details
+                data-overview-lane={lane.key}
+                key={lane.key}
+                open={lane.key === 'primary'}
+              >
+                <summary>
+                  <span>
+                    <span>
+                      <Tag color={lanePresentation.color}>{lane.label}</Tag>
+                      <small>{lane.summary}</small>
+                    </span>
+                    <strong>{lane.chainKeys.length} 条</strong>
+                  </span>
+                </summary>
+                <ul>
+                  {lane.chainKeys.map((chainKey) => {
+                    const chain = chainByKey.get(chainKey)
+                    const kind = CHAIN_KIND_PRESENTATION[chain.kind]
+                    return (
+                      <li key={chain.key}>
+                        <button
+                          type="button"
+                          aria-label={`查看业务链：${chain.label}`}
+                          data-overview-chain={chain.key}
+                          data-runtime-current={
+                            chain.key === matchingChain?.key || undefined
+                          }
+                          onClick={() => onSelectChain(chain.key)}
+                        >
+                          <span>
+                            <strong>{chain.label}</strong>
+                            <Tag color={kind.color}>{kind.label}</Tag>
+                          </span>
+                          <small>{chain.summary}</small>
+                          <span className="erp-dev-flow-overview-connections">
+                            {connectionCountByChain.get(chain.key)} 条链间衔接
+                            {chain.key === matchingChain?.key
+                              ? ' · 当前实例所属链'
+                              : ''}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </details>
+            )
+          })}
+          </div>
+
+          <details className="erp-dev-flow-overview-relations">
+            <summary>查看全部链间衔接（{overview.relations.length}）</summary>
+            <ul>
+              {overview.relations.map((relation) => {
+              const presentation = CHAIN_RELATION_PRESENTATION[relation.kind]
+              return (
+                <li data-overview-relation={relation.key} key={relation.key}>
+                  <Tag color={presentation.color}>{presentation.label}</Tag>
+                  <strong>{relation.label}</strong>
+                  <span>
+                    {chainByKey.get(relation.fromChainKey)?.label} →{' '}
+                    {chainByKey.get(relation.toChainKey)?.label}
+                  </span>
+                </li>
+              )
+            })}
+            </ul>
+          </details>
+          <EvidenceDisclosure value={overview} label="查看业务总图证据" />
+        </section>
+      </details>
     </div>
   )
 }
@@ -373,14 +535,6 @@ function BusinessChainView({
   onSelectNode,
   onOpenView,
 }) {
-  const [searchParams] = useSearchParams()
-  const returningToTopics = searchParams.get(QUERY_KEYS.roleTab) === 'topics'
-  const technicalRef = useRef(null)
-  const [technicalOpen, setTechnicalOpen] = useState(false)
-  const roleSteps = useMemo(
-    () => buildDevBusinessChainRoleGuide(catalog, chain.key),
-    [catalog, chain.key]
-  )
   const { runtime, runtimeProcessKey, matchingChain } = useBusinessChainRuntime(
     catalog,
     taskId,
@@ -440,12 +594,7 @@ function BusinessChainView({
 
       <section className="erp-dev-flow-chain-heading">
         <div>
-          <div className="erp-dev-flow-chain-title">
-            <Title level={2}>{chain.label}</Title>
-            <Button type="link" onClick={() => onSelectChain(ALL_BUSINESS_CHAINS_KEY)}>
-              {returningToTopics ? '返回业务目录' : '返回订单全流程'}
-            </Button>
-          </div>
+          <Title level={2}>{chain.label}</Title>
           <Paragraph>{chain.summary}</Paragraph>
 
         </div>
@@ -460,15 +609,19 @@ function BusinessChainView({
 
       {taskId ? (
         <section
-          className="erp-dev-flow-chain-runtime erp-dev-flow-chain-runtime--compact"
+          className="erp-dev-flow-chain-runtime"
           data-runtime-overlay={runtime.status}
         >
           <div className="erp-dev-flow-section-heading">
             <div>
-              <Text strong>当前查询任务</Text>
+              <Text strong>查看一笔任务现在走到哪一步</Text>
+              <Text type="secondary">
+                按任务名称、任务编号或来源单号查询；只高亮这笔任务对应的一个流程步骤。
+              </Text>
             </div>
-            <Button onClick={() => onOpenView('tracking')}>查看任务与异常</Button>
-            {runtime.status === 'ready' ? <Button onClick={() => onOpenView('runtime')}>查看已记录路径</Button> : null}
+            <Button onClick={() => onOpenView('runtime')}>
+              查看完整运行路径
+            </Button>
           </div>
           {runtime.status === 'loading' ? (
             <div className="erp-dev-flow-loading">
@@ -493,6 +646,7 @@ function BusinessChainView({
                 ? '模拟展示任务没有正式流程运行记录'
                 : '当前任务没有正式流程运行记录'
             }
+              description="页面不会根据任务标题或相似名称猜测流程位置。"
             />
         ) : null}
           {runtime.status === 'ready' ? (
@@ -548,164 +702,146 @@ function BusinessChainView({
         </section>
       ) : null}
 
-      <TaskFulfillmentGuide
-        scoped
-        steps={roleSteps}
-        onExploreNode={(key) => {
-          onSelectNode(key)
-          setTechnicalOpen(true)
-          requestAnimationFrame(() => technicalRef.current?.scrollIntoView({ block: 'start' }))
-        }}
-      />
-
-      <details
-        className="erp-dev-flow-developer-details"
-        data-business-chain-technical
-        ref={technicalRef}
-        open={technicalOpen}
-        onToggle={(event) => setTechnicalOpen(event.currentTarget.open)}
-      >
-        <summary>单据、状态与系统衔接</summary>
-        <section className="erp-dev-flow-chain-workspace">
-          <div className="erp-dev-flow-chain-map">
-            <div className="erp-dev-flow-section-heading">
-              <div>
-                <Text strong>业务对象与关联</Text>
-                <Text type="secondary">
-                  点击业务对象查看正式动作和状态规则；下图展示关联关系。
-                </Text>
-              </div>
-              <Space wrap className="erp-dev-flow-chain-legend">
-                {Object.entries(CHAIN_LAYER_PRESENTATION).map(([key, item]) => (
-                  <Tag color={item.color} key={key}>
-                    {item.label}
-                  </Tag>
-              ))}
-              </Space>
+      <section className="erp-dev-flow-chain-workspace">
+        <div className="erp-dev-flow-chain-map">
+          <div className="erp-dev-flow-section-heading">
+            <div>
+              <Text strong>按步骤看业务链</Text>
+              <Text type="secondary">
+                点击一个步骤，只在右侧查看这一步的职责、完成条件和异常处理。
+              </Text>
             </div>
-            <ol className="erp-dev-flow-chain-steps" aria-label="业务链分层步骤">
-              {chain.nodes.map((item, index) => (
-                <li key={item.key}>
-                  <button
-                    type="button"
-                    className={item.key === node.key ? 'is-selected' : ''}
-                    aria-current={item.key === node.key ? 'step' : undefined}
-                    data-chain-node={item.key}
-                    data-chain-layer={item.layer}
-                    data-runtime-current={
+            <Space wrap>
+              {Object.entries(CHAIN_LAYER_PRESENTATION).map(([key, item]) => (
+                <Tag color={item.color} key={key}>
+                  {item.label}
+                </Tag>
+              ))}
+            </Space>
+          </div>
+          <ol className="erp-dev-flow-chain-steps" aria-label="业务链分层步骤">
+            {chain.nodes.map((item, index) => (
+              <li key={item.key}>
+                <button
+                  type="button"
+                  className={item.key === node.key ? 'is-selected' : ''}
+                  aria-current={item.key === node.key ? 'step' : undefined}
+                  data-chain-node={item.key}
+                  data-chain-layer={item.layer}
+                  data-runtime-current={
                     item.key === currentRuntimeNode?.key || undefined
                   }
-                    onClick={() => onSelectNode(item.key)}
-                  >
-                    <span>{index + 1}</span>
-                    <span>
-                      <strong>{item.label}</strong>
-                      <small>{CHAIN_LAYER_PRESENTATION[item.layer].label}</small>
-                    </span>
-                    {item.key === currentRuntimeNode?.key ? (
-                      <Tag color="orange">实例所在</Tag>
+                  onClick={() => onSelectNode(item.key)}
+                >
+                  <span>{index + 1}</span>
+                  <span>
+                    <strong>{item.label}</strong>
+                    <small>{CHAIN_LAYER_PRESENTATION[item.layer].label}</small>
+                  </span>
+                  {item.key === currentRuntimeNode?.key ? (
+                    <Tag color="orange">实例所在</Tag>
                   ) : null}
-                  </button>
-                </li>
+                </button>
+              </li>
             ))}
-            </ol>
-            <div className="erp-dev-flow-chain-graph erp-dev-docs-markdown">
-              <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
-            </div>
+          </ol>
+          <div className="erp-dev-flow-chain-graph erp-dev-docs-markdown">
+            <Markdown source={`\`\`\`mermaid\n${mermaid}\n\`\`\``} />
           </div>
-          <aside
-            className="erp-dev-flow-node-detail"
-            data-selected-chain-node={node.key}
-          >
-            <div className="erp-dev-flow-node-detail__title">
-              <Tag color={layer.color}>{layer.label}</Tag>
-              {node.key === currentRuntimeNode?.key ? (
-                <Tag color="orange">真实实例所在区段</Tag>
+        </div>
+        <aside
+          className="erp-dev-flow-node-detail"
+          data-selected-chain-node={node.key}
+        >
+          <div className="erp-dev-flow-node-detail__title">
+            <Tag color={layer.color}>{layer.label}</Tag>
+            {node.key === currentRuntimeNode?.key ? (
+              <Tag color="orange">真实实例所在区段</Tag>
             ) : null}
-              <Title level={2}>{node.label}</Title>
-            </div>
-            <div className="erp-dev-flow-node-answers">
-              <section>
-                <h3>这一步做什么</h3>
-                <p>{nodePurpose}</p>
-              </section>
-              <section>
-                <h3>谁来处理</h3>
-                <p>{responsibilityCopy}</p>
-              </section>
-              <section>
-                <h3>怎样算完成</h3>
-                <p>按所选动作分别核对；拒绝与冲正是独立分支。</p>
-                <ul>
-                  {actionOutcomes.map((outcome) => (
-                    <li key={outcome.key}>
-                      <strong>{outcome.label}</strong>
-                      {outcome.condition ? `（${outcome.condition}）` : ''}：
-                      {outcome.preconditions.length
+            <Title level={2}>{node.label}</Title>
+          </div>
+          <div className="erp-dev-flow-node-answers">
+            <section>
+              <h3>这一步做什么</h3>
+              <p>{nodePurpose}</p>
+            </section>
+            <section>
+              <h3>谁来处理</h3>
+              <p>{responsibilityCopy}</p>
+            </section>
+            <section>
+              <h3>怎样算完成</h3>
+              <p>按所选动作分别核对；拒绝与冲正是独立分支。</p>
+              <ul>
+                {actionOutcomes.map((outcome) => (
+                  <li key={outcome.key}>
+                    <strong>{outcome.label}</strong>
+                    {outcome.condition ? `（${outcome.condition}）` : ''}：
+                    {outcome.preconditions.length
                       ? `前提：${outcome.preconditions.join('；')}；结果：`
                       : ''}
-                      {outcome.results.join('；') ||
+                    {outcome.results.join('；') ||
                       '核对对应领域结果，本动作不直接改变业务状态。'}
-                    </li>
+                  </li>
                 ))}
-                </ul>
-              </section>
-              <section>
-                <h3>异常时怎么办</h3>
-                <p>
-                  {exceptionCopy
+              </ul>
+            </section>
+            <section>
+              <h3>异常时怎么办</h3>
+              <p>
+                {exceptionCopy
                   ? `只执行已登记的${exceptionCopy}场景；未登记组合不生成数据。`
                   : layer.exception}
-                </p>
-              </section>
-            </div>
-            <div className="erp-dev-flow-node-actions">
-              {node.layer === 'workflow_task' ? (
-                <Button type="primary" onClick={() => onOpenView('workflow')}>
-                  查看责任与任务
-                </Button>
+              </p>
+            </section>
+          </div>
+          <div className="erp-dev-flow-node-actions">
+            {node.layer === 'workflow_task' ? (
+              <Button type="primary" onClick={() => onOpenView('workflow')}>
+                查看责任与任务
+              </Button>
             ) : null}
-              {node.processDefinitionKeys.map((key) => (
-                <Button
-                  type="primary"
-                  key={key}
-                  onClick={() =>
+            {node.processDefinitionKeys.map((key) => (
+              <Button
+                type="primary"
+                key={key}
+                onClick={() =>
                   onOpenView('runtime', { [QUERY_KEYS.process]: key })
                 }
-                >
-                  查看 {processByKey.get(key)?.label || key}
-                </Button>
+              >
+                查看 {processByKey.get(key)?.label || key}
+              </Button>
             ))}
-              {node.factKeys.map((key) => (
-                <Button
-                  type="primary"
-                  key={key}
-                  onClick={() => onOpenView('facts', { [QUERY_KEYS.fact]: key })}
-                >
-                  查看{' '}
-                  {catalog.factDefinitions.find((fact) => fact.factKey === key)
+            {node.factKeys.map((key) => (
+              <Button
+                type="primary"
+                key={key}
+                onClick={() => onOpenView('facts', { [QUERY_KEYS.fact]: key })}
+              >
+                查看{' '}
+                {catalog.factDefinitions.find((fact) => fact.factKey === key)
                   ?.label || key}
-                </Button>
+              </Button>
             ))}
-              {node.machineKeys.map((key) => (
-                <Button
-                  key={key}
-                  onClick={() =>
+            {node.machineKeys.map((key) => (
+              <Button
+                key={key}
+                onClick={() =>
                   onOpenView('states', {
                     [QUERY_KEYS.flow]: key,
                     [QUERY_KEYS.state]: null,
                   })
                 }
-                >
-                  查看 {flowByKey.get(key)?.label || key}状态规则
-                </Button>
+              >
+                查看 {flowByKey.get(key)?.label || key}状态规则
+              </Button>
             ))}
-            </div>
-            <section className="erp-dev-flow-node-relations">
-              <h3>这一步与哪些步骤相连</h3>
-              {relations.length > 0 ? (
-                <ul>
-                  {relations.map((edge) => {
+          </div>
+          <section className="erp-dev-flow-node-relations">
+            <h3>这一步与哪些步骤相连</h3>
+            {relations.length > 0 ? (
+              <ul>
+                {relations.map((edge) => {
                   const peerKey = edge.from === node.key ? edge.to : edge.from
                   const peer = chain.nodes.find((item) => item.key === peerKey)
                   return (
@@ -724,48 +860,47 @@ function BusinessChainView({
                     </li>
                   )
                 })}
-                </ul>
+              </ul>
             ) : (
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
                 description="当前节点没有直接关系"
               />
             )}
-            </section>
-            <details className="erp-dev-flow-node-technical">
-              <summary>查看开发者信息</summary>
-              <dl>
-                <div>
-                  <dt>内部分类</dt>
-                  <dd>{layer.technicalLabel}</dd>
-                </div>
-                <div>
-                  <dt>稳定 key</dt>
-                  <dd>
-                    <KeyValue value={node.key} />
-                  </dd>
-                </div>
-              </dl>
-              <EvidenceDisclosure value={node} label="查看完整节点证据" />
-            </details>
-          </aside>
-        </section>
-        <details className="erp-dev-flow-cross-cutting">
-          <summary>
-            查看其他公共规则与特殊情况（
-            {catalog.businessChainCoverage.excludedMachineKeys.length}）
-          </summary>
-          <dl>
-            {catalog.businessChainCoverage.excludedMachineKeys.map((key) => (
-              <div key={key}>
-                <dt>
-                  <KeyValue value={key} />
-                </dt>
-                <dd>{catalog.businessChainCoverage.exclusionReasons[key]}</dd>
+          </section>
+          <details className="erp-dev-flow-node-technical">
+            <summary>查看开发者信息</summary>
+            <dl>
+              <div>
+                <dt>内部分类</dt>
+                <dd>{layer.technicalLabel}</dd>
               </div>
+              <div>
+                <dt>稳定 key</dt>
+                <dd>
+                  <KeyValue value={node.key} />
+                </dd>
+              </div>
+            </dl>
+            <EvidenceDisclosure value={node} label="查看完整节点证据" />
+          </details>
+        </aside>
+      </section>
+      <details className="erp-dev-flow-cross-cutting">
+        <summary>
+          查看其他公共规则与特殊情况（
+          {catalog.businessChainCoverage.excludedMachineKeys.length}）
+        </summary>
+        <dl>
+          {catalog.businessChainCoverage.excludedMachineKeys.map((key) => (
+            <div key={key}>
+              <dt>
+                <KeyValue value={key} />
+              </dt>
+              <dd>{catalog.businessChainCoverage.exclusionReasons[key]}</dd>
+            </div>
           ))}
-          </dl>
-        </details>
+        </dl>
       </details>
     </div>
   )

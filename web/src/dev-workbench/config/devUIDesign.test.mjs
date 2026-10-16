@@ -318,11 +318,11 @@ test('UI design keeps persistent page headings concise like the formal ERP', () 
   assert.match(workbenchHeading[1], /<h1>\$\{area[.]label\}<\/h1>/u)
   assert.ok(viewerHeading)
   assert.doesNotMatch(viewerHeading[1], /<Typography[.]Paragraph\b/u)
-  assert.match(html, /if\(!setup\)return inModule \? '' :/u)
-  assert.match(html, /<div class="module-tabs-row"><h1>\$\{hub.title\}<\/h1>/u)
-  assert.match(html, /view-mode-row--secondary/u)
-  assert.match(viewerHeading[1], /<Tabs/u)
-  assert.match(workbenchHeading[1], /dev-design-tabs/u)
+  assert.match(
+    html,
+    /if\(!setup\)return `<div class=\\"view-mode-row\\"><h1>\$\{viewTitle\}<\/h1><\/div>`/u
+  )
+  assert.match(html, /<h1>\$\{viewTitle\}<\/h1><div class="segment"/u)
   assert.match(
     html,
     /function renderTopbarPageTitle\(\)[\s\S]*contentOwnsPageHeading\(\)[\s\S]*class="crumb"/u

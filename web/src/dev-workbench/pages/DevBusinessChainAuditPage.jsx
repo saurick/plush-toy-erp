@@ -508,17 +508,6 @@ export default function DevBusinessChainAuditPage() {
       <DevPageNav sourcePath={SOURCE_PATH} />
       <header className="erp-dev-chain-audit__header">
         <Title level={1}>链路实测</Title>
-        <DevTaskNav
-          level="primary"
-          compact
-          idPrefix="chain-audit"
-          ariaLabel="链路实测视图"
-          items={CHAIN_AUDIT_TABS}
-          value={view}
-          onChange={(value) =>
-            updateQuery({ view: value === 'chains' ? null : value })
-          }
-        />
         <Space wrap>
           <Link to={chainDefinitionURL(chain)}>业务链观察</Link>
           <Button
@@ -528,7 +517,6 @@ export default function DevBusinessChainAuditPage() {
             重新读取
           </Button>
         </Space>
-
       </header>
       <div className="erp-dev-chain-audit__toolbar">
         <label htmlFor="chain-audit-batch">实跑批次</label>
@@ -555,7 +543,17 @@ export default function DevBusinessChainAuditPage() {
           </>
         ) : null}
       </div>
-
+      <DevTaskNav
+        level="primary"
+        compact
+        idPrefix="chain-audit"
+        ariaLabel="链路实测视图"
+        items={CHAIN_AUDIT_TABS}
+        value={view}
+        onChange={(value) =>
+          updateQuery({ view: value === 'chains' ? null : value })
+        }
+      />
       {catalog.error ? (
         <Alert
           type="error"

@@ -446,13 +446,7 @@ function ContextStrip({ summary, view, summaryError, onReturnLocal }) {
         </div>
         <div>
           <dt>工作区</dt>
-          <dd>
-            {summary?.repository?.dirty === true
-              ? '有未提交改动'
-              : summary?.repository?.dirty === false
-                ? '干净'
-                : '未核实'}
-          </dd>
+          <dd>{summary?.repository?.dirty ? '有未提交改动' : '干净'}</dd>
         </div>
         <div>
           <dt>GitLab CI</dt>
@@ -648,11 +642,11 @@ function qualityGateViewStatus(summary, view, summaryError) {
         ? '优先查看排队耗时、最长执行 Job 与历史退化；未提交改动请切换到“本机诊断”定位。'
         : evidence?.status === 'docs_passed'
           ? '文档检查已经完成；需要发布此 SHA 时，在 GitLab 新建 main 流水线并设置 QA_MODE=full。'
-          : evidence?.status === 'running'
-            ? '等待当前服务器流水线结束；页面不会用本机回执替代服务器结果。'
-            : evidence?.status === 'missing'
-              ? '读取链路无需修复；该提交产生普通 push CI 后，页面才会出现服务器运行结果。'
-              : '先恢复 GitLab 读取链路，再核对当前 SHA 的服务器证据。',
+        : evidence?.status === 'running'
+          ? '等待当前服务器流水线结束；页面不会用本机回执替代服务器结果。'
+          : evidence?.status === 'missing'
+            ? '读取链路无需修复；该提交产生普通 push CI 后，页面才会出现服务器运行结果。'
+            : '先恢复 GitLab 读取链路，再核对当前 SHA 的服务器证据。',
     notProven: evidence?.notProven || [],
   }
 }
@@ -937,8 +931,7 @@ function ServerCiHistory({ evidence, currentCommit }) {
             最近 CI
           </Title>
           <Text type="secondary">
-            GitLab 最近读取到的 push 与手动完整
-            CI；文档通过与完整通过分别标示，历史结果不代表当前提交已通过。
+            GitLab 最近读取到的 push 与手动完整 CI；文档通过与完整通过分别标示，历史结果不代表当前提交已通过。
           </Text>
         </div>
         <Tag>{history.length} 条</Tag>
@@ -1182,76 +1175,21 @@ function ServerJobGuideDrawer({
             </Button>
           </Space>
           <Paragraph type="secondary">
-            以下说明来自当前工作区，历史运行按对应 SHA 的配置核对。CI
-            专用入口只用于定位，不在本机伪造环境执行。
+            以下说明来自当前工作区，历史运行按对应 SHA 的配置核对。CI 专用入口只用于定位，不在本机伪造环境执行。
           </Paragraph>
-          {selectedGuide.diagnostics ? (
-            <Descriptions
-              size="small"
-              column={1}
-              bordered
-              items={[
-                {
-                  key: 'entry',
-                  label: '定义入口',
-                  children: (
-                    <Text code copyable>
-                      {selectedGuide.diagnostics.entry}
-                    </Text>
-                  ),
-                },
-                {
-                  key: 'environment',
-                  label: '环境要求',
-                  children: selectedGuide.diagnostics.environment,
-                },
-                {
-                  key: 'steps',
-                  label: '执行步骤',
-                  children: (
-                    <ol>
-                      {selectedGuide.diagnostics.steps.map((step) => (
-                        <li key={step}>{step}</li>
-                      ))}
-                    </ol>
-                  ),
-                },
-                {
-                  key: 'evidence',
-                  label: '证据位置',
-                  children: (
-                    <ul>
-                      {selectedGuide.diagnostics.evidence.map((file) => (
-                        <li key={file}>
-                          <Text code>{file}</Text>
-                        </li>
-                      ))}
-                    </ul>
-                  ),
-                },
-                {
-                  key: 'triage',
-                  label: '失败排查',
-                  children: (
-                    <ol>
-                      {selectedGuide.diagnostics.triage.map((step) => (
-                        <li key={step}>{step}</li>
-                      ))}
-                    </ol>
-                  ),
-                },
-                {
-                  key: 'sources',
-                  label: '说明来源',
-                  children: selectedGuide.diagnostics.sources.join('、'),
-                },
-              ]}
-            />
-          ) : (
-            <Paragraph type="secondary">
-              详细排查说明尚未登记，请查看该 Job 的完整日志。
-            </Paragraph>
-          )}
+          {selectedGuide.diagnostics ? <Descriptions
+            size="small"
+            column={1}
+            bordered
+            items={[
+              { key: 'entry', label: '定义入口', children: <Text code copyable>{selectedGuide.diagnostics.entry}</Text> },
+              { key: 'environment', label: '环境要求', children: selectedGuide.diagnostics.environment },
+              { key: 'steps', label: '执行步骤', children: <ol>{selectedGuide.diagnostics.steps.map((step) => <li key={step}>{step}</li>)}</ol> },
+              { key: 'evidence', label: '证据位置', children: <ul>{selectedGuide.diagnostics.evidence.map((file) => <li key={file}><Text code>{file}</Text></li>)}</ul> },
+              { key: 'triage', label: '失败排查', children: <ol>{selectedGuide.diagnostics.triage.map((step) => <li key={step}>{step}</li>)}</ol> },
+              { key: 'sources', label: '说明来源', children: selectedGuide.diagnostics.sources.join('、') },
+            ]}
+          /> : <Paragraph type="secondary">详细排查说明尚未登记，请查看该 Job 的完整日志。</Paragraph>}
         </div>
       ) : (
         <div className="erp-dev-quality-job-guide-drawer__catalog">
@@ -1309,18 +1247,10 @@ function ServerJobGuideDrawer({
         </div>
       )}
       <details className="erp-dev-ci-diagnostic">
-        <summary>
-          查看与复制{selectedJob ? '本 Job' : '本次流水线'}排查信息
-        </summary>
+        <summary>查看与复制{selectedJob ? '本 Job' : '本次流水线'}排查信息</summary>
         <Paragraph
           className="erp-dev-ci-diagnostic__text"
-          copyable={{
-            text: buildCiDiagnosticText({
-              repository,
-              evidence,
-              job: selectedJob,
-            }),
-          }}
+          copyable={{ text: buildCiDiagnosticText({ repository, evidence, job: selectedJob }) }}
         >
           {buildCiDiagnosticText({ repository, evidence, job: selectedJob })}
         </Paragraph>
@@ -1380,8 +1310,7 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
             flowchartHtmlLabels={false}
           />
           <Text type="secondary">
-            按真实阶段汇总 {dag.nodeCount} 个 Job；阶段内依赖与单个 Job
-            状态在完整图及下方明细中查看。
+            按真实阶段汇总 {dag.nodeCount} 个 Job；阶段内依赖与单个 Job 状态在完整图及下方明细中查看。
           </Text>
           <details
             className="erp-dev-static-guidance"
@@ -2884,6 +2813,9 @@ export default function DevQualityGatesPage() {
   const activeView = parsed.view
   const activeViewState =
     viewState.view === activeView ? viewState : EMPTY_ASYNC_VIEW_STATE
+  const activeDescription = VIEW_ITEMS.find(
+    (item) => item.value === activeView
+  )?.description
 
   useEffect(() => {
     window.requestAnimationFrame(() => titleRef.current?.focus())
@@ -2943,7 +2875,7 @@ export default function DevQualityGatesPage() {
   const currentOperation = summary?.currentOperation
   const polling = Boolean(
     currentOperation &&
-    DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(currentOperation.status)
+      DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(currentOperation.status)
   )
   useEffect(() => {
     if (!polling) return undefined
@@ -3081,7 +3013,6 @@ export default function DevQualityGatesPage() {
       }
       try {
         const result = await client.start(profile, idempotencyKey)
-        idempotencyRef.current.delete(profile)
         setSummary((current) =>
           mergeOperationIntoSummary(current, result.operation)
         )
@@ -3095,12 +3026,13 @@ export default function DevQualityGatesPage() {
       } catch (error) {
         if (error?.name !== 'AbortError') {
           message.error(
-            '质量门禁请求结果尚未确认，请核对当前状态；再次操作将恢复原请求。'
+            '质量门禁未能启动，请核对当前状态以及本机 Docker 或一次性数据库环境。'
           )
         }
       } finally {
         mutationRef.current = false
         setActionProfile('')
+        idempotencyRef.current.delete(profile)
       }
     },
     [client, loadSummary, parsed.valid, updateViewValues]
@@ -3144,9 +3076,9 @@ export default function DevQualityGatesPage() {
   const busy = summary?.busy?.active || Boolean(actionProfile)
   const canRun = Boolean(
     parsed.valid &&
-    summary?.environment?.disposableDatabaseReady &&
-    !busy &&
-    !initialLoading
+      summary?.environment?.disposableDatabaseReady &&
+      !busy &&
+      !initialLoading
   )
   const displayedStatus = qualityGateViewStatus(
     summary,
@@ -3168,17 +3100,8 @@ export default function DevQualityGatesPage() {
               质量门禁
             </Title>
           </Space>
+
         </div>
-        <DevTaskNav
-          idPrefix="quality-gates"
-          ariaLabel="质量门禁视图"
-          items={VIEW_ITEMS.map(({ value, label }) => ({ value, label }))}
-          value={activeView}
-          onChange={selectView}
-          disabled={!parsed.valid}
-          compact
-          className="erp-dev-quality-tabs"
-        />
         <Button
           type="primary"
           icon={<ReloadOutlined />}
@@ -3250,6 +3173,24 @@ export default function DevQualityGatesPage() {
           }
         />
 
+        <section
+          className="erp-dev-quality-navigation"
+          aria-label="质量门禁操作区"
+        >
+          <DevTaskNav
+            idPrefix="quality-gates"
+            ariaLabel="质量门禁视图"
+            items={VIEW_ITEMS.map(({ value, label }) => ({ value, label }))}
+            value={activeView}
+            onChange={selectView}
+            disabled={!parsed.valid}
+            compact
+            className="erp-dev-quality-tabs"
+          />
+          <Text className="erp-dev-quality-view-description">
+            {activeDescription}
+          </Text>
+        </section>
         <ContextStrip
           summary={summary}
           view={activeView}

@@ -491,7 +491,8 @@ function buildOverviewReview(catalog) {
     detailBoundary:
       '先按实际顺序列岗位交接、审批和异常，再附业务专题关系；不展开每条链的内部步骤、系统规则或开发证据。',
     fulfillmentFlow: taskCatalog.fulfillment_flow,
-    exceptionGuides: taskCatalog.exception_guides,
+    exceptionFlow: taskCatalog.exception_flow,
+    exceptionApproval: taskCatalog.exception_approval,
     lanes: freezeList(lanes),
     diagram: buildOverviewDiagram(catalog),
   })

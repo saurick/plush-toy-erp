@@ -326,16 +326,6 @@ export default function DevDrillRecoveryPage() {
             安全与恢复
           </Title>
         </div>
-        <DevTaskNav
-          compact
-          level="primary"
-          className="erp-dev-delivery-taskbar"
-          idPrefix="dev-recovery"
-          ariaLabel="安全与恢复任务"
-          items={RECOVERY_VIEWS}
-          value={activeView}
-          onChange={selectView}
-        />
         <Space direction="vertical" size={4} align="end">
           <Space wrap>
             <Tag>只读核验</Tag>
@@ -364,7 +354,6 @@ export default function DevDrillRecoveryPage() {
             {statusText}
           </Text>
         </Space>
-
       </header>
 
       <section className="erp-dev-delivery-context" aria-label="安全与恢复范围">
@@ -435,7 +424,16 @@ export default function DevDrillRecoveryPage() {
               : '先补齐目标、版本或公网入口证据'}
           </Text>
         </section>
-
+        <DevTaskNav
+          compact
+          level="primary"
+          className="erp-dev-delivery-taskbar"
+          idPrefix="dev-recovery"
+          ariaLabel="安全与恢复任务"
+          items={RECOVERY_VIEWS}
+          value={activeView}
+          onChange={selectView}
+        />
         <section
           hidden={activeView !== 'security'}
           id="dev-recovery-panel-security"

@@ -553,8 +553,8 @@ function normalizeJobDiagnostics(diagnostics) {
   const result = {
     entry: safeText(diagnostics.entry, 'quality job entry', { max: 240 }),
     environment: safeText(diagnostics.environment, 'quality job environment', {
-      max: 500,
-    }),
+      max: 500
+    })
   }
   for (const field of ['steps', 'evidence', 'sources', 'triage']) {
     if (
@@ -574,15 +574,7 @@ function normalizeJobDiagnostics(diagnostics) {
 function normalizeServerEvidenceJobGuide(guide) {
   assertExactKeys(
     guide,
-    [
-      'checks',
-      'diagnostics',
-      'label',
-      'name',
-      'outcome',
-      'registered',
-      'summary',
-    ],
+    ['checks', 'diagnostics', 'label', 'name', 'outcome', 'registered', 'summary'],
     'quality server evidence job guide'
   )
   if (
@@ -852,15 +844,12 @@ function normalizeServerEvidence(evidence) {
   const jobs = evidence.jobs.map(normalizeServerEvidenceJob)
   const jobGuides = evidence.jobGuides.map(normalizeServerEvidenceJobGuide)
   if (
-    (['passed', 'docs_passed', 'running', 'failed'].includes(evidence.status) &&
-      !pipeline) ||
+    (['passed', 'docs_passed', 'running', 'failed'].includes(evidence.status) && !pipeline) ||
     (['missing', 'unavailable'].includes(evidence.status) && pipeline) ||
     (evidence.coversWorkingTree && evidence.status !== 'passed') ||
     (topology.status === 'available' &&
       (!pipeline || topology.gitSha !== evidence.gitSha)) ||
-    (topology.status === 'missing' &&
-      pipeline &&
-      !(evidence.status === 'running' && jobs.length === 0)) ||
+    (topology.status === 'missing' && pipeline) ||
     (topology.status === 'available' &&
       (topology.jobs.length !== jobs.length ||
         topology.jobs.some(
@@ -1005,7 +994,14 @@ function normalizeStatistics(statistics) {
 export function normalizeDevQualityGateGovernance(value) {
   assertExactKeys(
     value,
-    ['changedCount', 'complexity', 'filter', 'q', 'rows', 'kind'],
+    [
+      'changedCount',
+      'complexity',
+      'filter',
+      'q',
+      'rows',
+      'kind',
+    ],
     'quality governance'
   )
   if (
@@ -1438,9 +1434,7 @@ export function buildQualityGateServerDag(evidence) {
       edgeCount += 1
       const sourceStage = stageByJob.get(dependency)
       if (sourceStage !== job.stage && stageIds.has(sourceStage)) {
-        overviewEdges.add(
-          `  ${stageIds.get(sourceStage)} --> ${stageIds.get(job.stage)}`
-        )
+        overviewEdges.add(`  ${stageIds.get(sourceStage)} --> ${stageIds.get(job.stage)}`)
       }
     }
   }
@@ -1796,8 +1790,8 @@ export function formatQualityGateDuration(durationMs) {
 function operationMatchesCurrentRepository(operation, repository) {
   return Boolean(
     operation?.repository?.commit === repository?.commit &&
-    operation?.repository?.dirty === repository?.dirty &&
-    operation?.repository?.fingerprint === repository?.fingerprint
+      operation?.repository?.dirty === repository?.dirty &&
+      operation?.repository?.fingerprint === repository?.fingerprint
   )
 }
 
