@@ -865,6 +865,7 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, in *biz.O
 		}
 		if row.FactType == biz.OutsourcingFactReturnReceipt {
 			activeInspection, err := tx.client.QualityInspection.Query().Where(
+				qualityinspection.SupersededAtIsNil(),
 				qualityinspection.SourceType(biz.QualityInspectionSourceOutsourcingFact),
 				qualityinspection.SourceID(row.ID),
 				qualityinspection.StatusNEQ(biz.QualityInspectionStatusCancelled),

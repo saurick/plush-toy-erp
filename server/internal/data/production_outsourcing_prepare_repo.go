@@ -90,6 +90,9 @@ func (r *productionOrderRepo) PrepareProductionOutsourcing(ctx context.Context, 
 		return nil, err
 	}
 	item, err := client.ProductionOrderItem.Get(ctx, batch.ProductionOrderItemID)
+	if optionalStringValue(vendor.SupplierType) != "outsourcing" && optionalStringValue(vendor.SupplierType) != "mixed" {
+		return nil, biz.ErrBadParam
+	}
 	if err != nil {
 		return nil, err
 	}
