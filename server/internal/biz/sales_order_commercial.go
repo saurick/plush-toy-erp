@@ -108,6 +108,9 @@ func CalculateSalesOrderAmounts(
 		goods = goods.Add(*amount)
 	}
 	goods = goods.Round(lineAmountScale)
+	if goods.GreaterThan(maxPositiveNumeric20Scale6) {
+		return nil, nil, nil, ErrBadParam
+	}
 	goodsAmount = &goods
 	if freightTerms == nil {
 		return goodsAmount, nil, nil, nil
@@ -129,6 +132,9 @@ func CalculateSalesOrderAmounts(
 		}
 		commercialBase = commercialBase.Add(*normalizedFreight).Round(lineAmountScale)
 	default:
+		return nil, nil, nil, ErrBadParam
+	}
+	if commercialBase.GreaterThan(maxPositiveNumeric20Scale6) {
 		return nil, nil, nil, ErrBadParam
 	}
 	if taxMode == nil {
@@ -153,6 +159,9 @@ func CalculateSalesOrderAmounts(
 		total := commercialBase
 		if mode == SalesOrderTaxModeExclusive {
 			total = commercialBase.Add(tax).Round(lineAmountScale)
+		}
+		if tax.GreaterThan(maxPositiveNumeric20Scale6) || total.GreaterThan(maxPositiveNumeric20Scale6) {
+			return nil, nil, nil, ErrBadParam
 		}
 		return goodsAmount, &tax, &total, nil
 	default:

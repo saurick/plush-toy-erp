@@ -396,6 +396,16 @@ func (r *salesOrderRepo) ApplySalesOrderLifecycleAction(
 		}
 		return nil, err
 	}
+	if replayed, err := resolveSourceOrderLifecycleActionReplay(ctx, tx.Client(), "sales_order", in); err != nil {
+		return nil, err
+	} else if replayed {
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return entSalesOrderToBiz(current), nil
+	}
+
 	if current.Version != in.ExpectedVersion {
 		return nil, biz.ErrSalesOrderConflict
 	}
@@ -618,6 +628,17 @@ func (r *salesOrderRepo) SubmitSalesOrderForProcessCommand(
 		return nil, err
 	}
 	defer func() { rollbackEntTx(ctx, tx, r.log) }()
+	query := tx.SalesOrder.Query().Where(salesorder.ID(salesOrderID))
+	if r.data.sqlDialect == dialect.Postgres {
+		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
+	}
+	if _, err := query.Only(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderNotFound
+		}
+		return nil, err
+	}
+
 	if err := validateSalesOrderCommercialReadinessWithClient(ctx, tx.Client(), salesOrderID); err != nil {
 		return nil, err
 	}
