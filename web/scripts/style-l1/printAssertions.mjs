@@ -827,6 +827,7 @@ export function createPrintAssertions({
   }
 
   async function assertProcessingContractSignatureLayout(page) {
+    await page.evaluate(() => document.fonts.ready)
     const metrics = await page.evaluate(() => {
       return Array.from(
         document.querySelectorAll('.erp-processing-contract-signature__block')
@@ -877,6 +878,31 @@ export function createPrintAssertions({
         `加工合同签章标签与日期间距异常: ${JSON.stringify(metric)}`
       )
     })
+
+    const pagination = await page.evaluate(() => {
+      const paper = document.querySelector('.erp-processing-contract-paper')
+      const signature = document.querySelector(
+        '.erp-processing-contract-signature'
+      )
+      const paperRect = paper.getBoundingClientRect()
+      const zoom =
+        Number(
+          getComputedStyle(paper.closest('.erp-print-shell__stage-wrap')).zoom
+        ) || 1
+
+      return {
+        paperHeight: paperRect.height / zoom,
+        signatureBottom:
+          (signature.getBoundingClientRect().bottom - paperRect.top) / zoom,
+        paddingBottom: Number.parseFloat(getComputedStyle(paper).paddingBottom),
+      }
+    })
+    assert(
+      pagination.paperHeight <= A4_PAGE_HEIGHT_PX + 2 &&
+        pagination.signatureBottom + pagination.paddingBottom <=
+          A4_PAGE_HEIGHT_PX + 2,
+      `加工合同默认样例的完整签字区应连同底部留白排入同一张 A4: ${JSON.stringify(pagination)}`
+    )
   }
 
   async function assertContractTableHeadersStaySingleLine(

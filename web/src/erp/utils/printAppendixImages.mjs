@@ -1,3 +1,5 @@
+import { PRINT_IMAGE_LIMITS } from './printOutputPreflight.mjs'
+
 const PRINT_APPENDIX_IMAGE_DATA_URL_PREFIX = 'data:image/'
 const PRINT_APPENDIX_IMAGE_MAX_WIDTH = 1600
 const PRINT_APPENDIX_IMAGE_JPEG_QUALITY = 0.9
@@ -284,6 +286,11 @@ export function calculatePrintAppendixImageSlices(width, height) {
   const segmentCount = shouldSlice
     ? Math.max(2, Math.ceil(targetHeight / maxSegmentHeight))
     : 1
+  if (segmentCount > PRINT_IMAGE_LIMITS.count) {
+    throw new Error(
+      `图片过长，分页后超过 ${PRINT_IMAGE_LIMITS.count} 张的输出上限，请先裁剪图片`
+    )
+  }
   const baseHeight = Math.floor(targetHeight / segmentCount)
   const remainder = targetHeight % segmentCount
   const segments = []

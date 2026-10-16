@@ -65,11 +65,11 @@ export function createPrintWorkspaceThemeScenario({
             for (const [accent, palette] of Object.entries(ERP_ACCENTS)) {
               await preferences.evaluate(
                 ({ mode, accent }) => {
-                  localStorage.setItem('plush_erp_theme_mode', mode)
-                  localStorage.setItem(
-                    'plush_erp_appearance',
-                    JSON.stringify({ accent, density: 'standard' })
-                  )
+                  const preferences = JSON.parse(localStorage.getItem('admin_erp_preferences') || '{}')
+                  localStorage.setItem('admin_erp_preferences', JSON.stringify({
+                    ...preferences,
+                    appearance: { ...preferences.appearance, theme_mode: mode, accent, density: 'standard' },
+                  }))
                 },
                 { mode, accent }
               )
@@ -94,7 +94,14 @@ export function createPrintWorkspaceThemeScenario({
                   )
                 },
                 { mode, accent, primary, onPrimary }
-              )
+              ).catch(async error => {
+                const actual = await page.evaluate(() => {
+                  const root = document.documentElement
+                  const button = document.querySelector('.erp-print-shell__button--primary')
+                  return { theme: root.dataset.erpTheme, accent: root.dataset.erpAccent, background: button && getComputedStyle(button).backgroundColor, color: button && getComputedStyle(button).color }
+                })
+                throw new Error(`${error.message}; expected=${JSON.stringify({mode,accent,primary,onPrimary})}; actual=${JSON.stringify(actual)}`)
+              })
               const metrics = await page.evaluate(() => {
                 const style = (selector) => {
                   const node = document.querySelector(selector)

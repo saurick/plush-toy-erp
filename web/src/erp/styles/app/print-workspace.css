@@ -37,13 +37,13 @@
   border-radius: 999px;
   background: #e9f3eb;
   color: #2c7b4e;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 700;
 }
 
 .erp-print-workspace__toolbar-status {
   color: #63786c;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-print-workspace__toolbar-actions {
@@ -94,7 +94,7 @@
 
 .erp-print-workspace__field > span {
   color: #5f7468;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 600;
 }
 
@@ -147,7 +147,7 @@
 
 .erp-print-workspace__stage-note {
   color: #617367;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-print-workspace__stage-canvas {
