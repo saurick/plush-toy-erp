@@ -16,6 +16,11 @@ export default function MobileWorkflowExceptionPanel({ accessScope, profile, onO
       view: ['tasks', 'orders'].includes(query?.view) ? query.view : '',
       loadedCount: Number.isSafeInteger(query?.loadedCount) && query.loadedCount > 0 ? query.loadedCount : 20,
       scrollTop: Number.isFinite(query?.scrollTop) && query.scrollTop > 0 ? query.scrollTop : 0,
+      listPosition: query?.listPosition ? {
+        page: 1,
+        loadedCount: Number.isSafeInteger(query.listPosition.loadedCount) && query.listPosition.loadedCount > 0 ? query.listPosition.loadedCount : 20,
+        scrollTop: Number.isFinite(query.listPosition.scrollTop) && query.listPosition.scrollTop > 0 ? query.listPosition.scrollTop : 0,
+      } : null,
     }
   })
   const queryRef = useRef(initialQuery)

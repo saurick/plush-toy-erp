@@ -248,7 +248,9 @@ export default function MobileTaskDetailScreen({
   const actionGuidance = canProcessMaterial
     ? ''
     : canOpenSource
-      ? '进入对应单据办理，保存后相关待办自动更新。'
+      ? canOpenProcess
+        ? `可进入单据核对业务信息；${selectedCanUrge && !selectedCanOperate ? '催办' : '任务处理'}请使用下方“${selectedCanUrge && !selectedCanOperate ? '催办任务' : '处理任务'}”。`
+        : '进入对应单据办理，保存后相关待办自动更新。'
     : actionAccess?.loading
       ? '正在确认当前账号的处理范围，请稍候。'
       : actionAccess?.failed
@@ -632,6 +634,19 @@ export default function MobileTaskDetailScreen({
               disabled
             >
               {processUnavailableLabel}
+            </button>
+          ) : null}
+          {canOpenSource && canOpenProcess && !canProcessMaterial ? (
+            <button
+              type="button"
+              className="mobile-detail-secondary mobile-role-action-bar__button min-h-12 w-full rounded-xl px-4 py-3 text-base"
+              onClick={() =>
+                onOpenAction?.(
+                  selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
+                )
+              }
+            >
+              {selectedCanUrge && !selectedCanOperate ? '催办任务' : '处理任务'}
             </button>
           ) : null}
         </div>

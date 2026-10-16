@@ -11,11 +11,13 @@
 
 .mobile-workspace-task-views,
 .mobile-workspace-tracking-views {
-  margin: 8px 12px 0;
+  margin: 6px 12px 0;
   overflow-x: auto;
 }
-.mobile-workspace-task-views .ant-segmented,
-.mobile-workspace-tracking-views .ant-segmented {
+.mobile-workspace-tracking-views {
+  margin-top: 4px;
+}
+.mobile-workspace-task-views .ant-segmented {
   min-width: 100%;
   width: max-content;
 }
@@ -25,17 +27,41 @@
 }
 .mobile-workspace-task-views .ant-segmented-item-label,
 .mobile-workspace-tracking-views .ant-segmented-item-label {
-  min-height: 34px;
+  min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   padding-inline: 6px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .mobile-workspace-exceptions {
-  margin: 12px;
+  margin: 0 12px 12px;
+}
+
+.mobile-workspace-exceptions .workflow-exceptions {
+  gap: 8px;
+}
+
+.mobile-workspace-navigation {
+  flex: 0 0 auto;
+  padding-bottom: 4px;
+  background: var(--erp-page-bg);
+}
+
+.mobile-workspace-navigation[hidden],
+.mobile-task-list-toolbar[hidden] {
+  display: none;
+}
+
+.mobile-workspace-exceptions .workflow-exceptions__controls,
+.mobile-workspace-exceptions .workflow-exceptions__detail-header {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding-block: 6px;
+  background: var(--erp-page-bg);
 }
 
 .mobile-task-list-row__source {
@@ -61,7 +87,7 @@
     var(--erp-surface-bg)
   );
   color: var(--erp-visual-danger-text);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -105,7 +131,7 @@
 .mobile-task-receipt-outcome p {
   margin: 0;
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.55;
 }
 
@@ -126,9 +152,10 @@
   overflow: hidden;
   color: var(--erp-primary, #16774f);
   overflow-anchor: none;
+  --mobile-pull-return-duration: 260ms;
 }
 .mobile-task-pull-refresh:is([data-state='idle'], [data-state='refreshing']) {
-  transition: height var(--erp-tab-motion-duration) var(--erp-tab-motion-easing);
+  transition: height var(--mobile-pull-return-duration) cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 .mobile-task-pull-refresh__feedback > .anticon {
   transition: transform var(--erp-tab-motion-duration)
@@ -142,7 +169,7 @@
   gap: 12px;
   min-height: 56px;
   text-align: center;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   line-height: 20px;
 }
 
@@ -152,7 +179,7 @@
 
 .mobile-task-pull-refresh__time {
   color: var(--erp-text-subtle, #64748b);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .mobile-task-display-settings .erp-theme-toggle {
@@ -160,6 +187,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .mobile-task-pull-refresh {
+    --mobile-pull-return-duration: 0ms;
+  }
   .mobile-task-pull-refresh .animate-spin {
     animation: none;
   }
@@ -209,32 +239,6 @@
 .mobile-app-layout:has(> .legal-notice-status-banner) .mobile-role-tasks-page {
   height: auto;
   flex: 1 1 auto;
-}
-
-.mobile-admin-review {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--erp-border);
-  background: var(--erp-surface-bg);
-  color: var(--erp-text);
-  font-size: 13px;
-}
-
-.mobile-admin-review .ant-select {
-  min-width: 0;
-  max-width: 220px;
-  height: 44px;
-  flex: 1 1 auto;
-}
-
-.mobile-admin-review__identity {
-  flex-shrink: 0;
-  color: var(--erp-text-subtle);
-  font-size: 12px;
 }
 
 .mobile-role-runtime-boundary {
@@ -293,7 +297,7 @@
 
 .mobile-detail-section h3 {
   margin: 0 0 10px;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   font-weight: 700;
   line-height: 1.45;
 }
@@ -301,7 +305,7 @@
 .mobile-detail-identity {
   margin: 6px 0 0;
   color: var(--erp-text-subtle);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
@@ -325,12 +329,12 @@
   min-height: 44px;
   padding: 8px 11px;
   border-radius: 11px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .mobile-detail-associated {
   margin-top: 10px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .mobile-detail-associated > summary {
@@ -358,7 +362,7 @@
   align-items: start;
   gap: 10px;
   padding: 9px 11px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.55;
 }
 
@@ -391,7 +395,7 @@
   padding: 9px 11px;
   border: 1px solid transparent;
   border-radius: 12px;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   font-weight: 600;
   line-height: 22px;
 }
@@ -446,7 +450,7 @@
   border-radius: 11px;
   background: transparent;
   color: #64748b;
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   font-weight: 650;
   line-height: 1.2;
   cursor: pointer;
@@ -475,10 +479,7 @@
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  padding: 6px 0;
-  position: sticky;
-  top: 0;
-  z-index: 2;
+  padding: 8px 0;
   min-width: 0;
 }
 
@@ -517,7 +518,7 @@
   border-radius: 999px;
   background: rgb(15 23 42 / 0.08);
   padding: 0 7px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   line-height: 1;
@@ -575,55 +576,6 @@
 .mobile-role-tasks-page .business-attachment-panel .ant-btn-primary {
   border-color: #1d4ed8;
   background: #1d4ed8;
-}
-
-.mobile-role-message-tabs {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  padding: 6px;
-  border: 1px solid #dbe6dc;
-  border-radius: 16px;
-  background: var(--erp-surface-bg-soft);
-  box-shadow: 0 8px 18px rgb(15 23 42 / 0.08);
-  backdrop-filter: blur(14px);
-}
-
-.mobile-role-message-tabs__item {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  min-width: 0;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  border: 0;
-  border-radius: 12px;
-  background: transparent;
-  color: #64748b;
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.2;
-  cursor: pointer;
-  transition:
-    color var(--erp-tab-motion-duration, 180ms)
-      var(--erp-tab-motion-easing, cubic-bezier(0.2, 0, 0, 1)),
-    transform var(--erp-tab-motion-duration, 180ms)
-      var(--erp-tab-motion-easing, cubic-bezier(0.2, 0, 0, 1));
-}
-
-.mobile-role-message-tabs__item--active {
-  background: transparent;
-  color: var(--erp-primary-strong);
-}
-
-.mobile-role-message-tabs__item:focus-visible {
-  outline: 2px solid var(--erp-primary);
-  outline-offset: -2px;
 }
 
 .mobile-role-skeleton {
@@ -789,14 +741,6 @@
   --mobile-role-mine-accent-border: rgb(252 211 77);
 }
 
-.mobile-role-mine-metric-button::before {
-  content: '';
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 4px;
-  background: var(--mobile-role-mine-accent);
-}
-
 .mobile-role-mine-metric-button:hover {
   border-color: var(--mobile-role-mine-accent-border);
   box-shadow:
@@ -820,7 +764,7 @@
   justify-content: space-between;
   gap: 4px;
   color: #475569;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 600;
   line-height: 1.2;
 }
@@ -835,7 +779,7 @@
 .mobile-role-mine-metric-button__head .anticon {
   flex: none;
   color: var(--mobile-role-mine-accent);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .mobile-role-mine-metric-button__value {
@@ -844,20 +788,8 @@
 
 .mobile-role-mine-metric-button__hint {
   color: #64748b;
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   line-height: 1.2;
-}
-
-.mobile-role-message-tabs__count {
-  transition:
-    background-color var(--erp-tab-motion-duration, 180ms)
-      var(--erp-tab-motion-easing, cubic-bezier(0.2, 0, 0, 1)),
-    color var(--erp-tab-motion-duration, 180ms)
-      var(--erp-tab-motion-easing, cubic-bezier(0.2, 0, 0, 1));
-}
-
-.mobile-role-message-tabs__item--active .mobile-role-message-tabs__count {
-  background: rgb(4 120 87 / 0.14);
 }
 
 .mobile-role-list-control {
@@ -875,7 +807,7 @@
   border-radius: 12px;
   background: rgb(248 250 252 / 0.86);
   color: var(--erp-primary-strong);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   font-weight: 700;
   line-height: 1.25;
   cursor: pointer;
@@ -965,7 +897,7 @@
   padding: 2px 7px;
   border: 1px solid color-mix(in srgb, currentcolor 25%, transparent);
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   font-weight: 500;
   line-height: 16px;
 }
@@ -1009,7 +941,7 @@
 
 .mobile-task-action-choice strong {
   display: block;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   line-height: 20px;
 }
 
@@ -1017,7 +949,7 @@
   display: block;
   margin-top: 3px;
   color: var(--erp-text-subtle);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.45;
 }
 
@@ -1028,12 +960,12 @@
   border-radius: 12px;
   background: var(--erp-primary-softer);
   color: var(--erp-primary-strong);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
 }
 
 .mobile-task-single-action__value p {
   margin: 4px 0 0;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.45;
 }
 
@@ -1045,7 +977,7 @@
 
 .mobile-task-action-field label {
   color: var(--erp-text);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   font-weight: 650;
 }
 
@@ -1084,13 +1016,13 @@
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .mobile-task-action-hint {
   margin: 10px 0 0;
   color: var(--erp-text-subtle);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
@@ -1229,7 +1161,7 @@
   border-radius: 999px;
   background: var(--erp-border);
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   font-weight: 800;
 }
 
@@ -1253,7 +1185,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 750;
   line-height: 1.25;
 }
@@ -1271,7 +1203,7 @@
 @media (max-width: 420px) {
   .mobile-role-task-filter {
     padding-inline: 10px;
-    font-size: 13px;
+    font-size: var(--erp-font-small);
   }
 
   .mobile-role-task-filter__content {
@@ -1282,7 +1214,7 @@
     min-width: 24px;
     height: 22px;
     padding-inline: 3px;
-    font-size: 12px;
+    font-size: var(--erp-font-caption);
   }
 }
 
@@ -1292,7 +1224,7 @@
   background: #fff7ed;
   padding: 10px 12px;
   color: #9a3412;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   font-weight: 650;
   line-height: 1.45;
 }
@@ -1345,12 +1277,6 @@
   box-shadow: inset 0 0 0 1px var(--erp-border);
 }
 
-[data-erp-theme='dark'] .mobile-role-message-tabs {
-  border-color: var(--erp-border);
-  background: var(--erp-surface-bg-soft);
-  box-shadow: 0 10px 28px rgb(0 0 0 / 0.26);
-}
-
 [data-erp-theme='dark'] .mobile-role-load-error {
   border-color: rgb(248 113 113 / 0.45);
   background: rgb(127 29 29 / 0.28);
@@ -1361,15 +1287,6 @@
   border-color: rgb(248 113 113 / 0.5);
   background: var(--erp-surface-bg);
   color: #fecaca;
-}
-
-[data-erp-theme='dark'] .mobile-role-message-tabs__item {
-  color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark'] .mobile-role-message-tabs__item--active {
-  background: transparent;
-  color: var(--erp-primary-strong);
 }
 
 [data-erp-theme='dark'] .mobile-role-count-tag {
@@ -1425,10 +1342,7 @@
 [data-erp-theme='dark']
   .mobile-role-task-filter--active
   .mobile-role-task-filter__count,
-[data-erp-theme='dark'] .mobile-role-section-count,
-[data-erp-theme='dark']
-  .mobile-role-message-tabs__item--active
-  .mobile-role-message-tabs__count {
+[data-erp-theme='dark'] .mobile-role-section-count {
   background: rgb(110 231 183 / 0.18);
 }
 
@@ -1446,8 +1360,6 @@
   .mobile-role-bottom-nav::before,
   .mobile-role-bottom-nav__item,
   .mobile-role-task-filter,
-  .mobile-role-message-tabs__item,
-  .mobile-role-message-tabs__count,
   .mobile-task-flow-step,
   .mobile-role-skeleton__block {
     animation-duration: 0.01ms;
@@ -1742,8 +1654,8 @@
 .mobile-task-list-toolbar {
   position: sticky;
   top: 0;
-  z-index: 2;
-  margin-top: 8px;
+  z-index: 4;
+  padding-block: 4px;
   pointer-events: auto;
   /* 吸顶时保持页面底色不透出下方卡片；控件各自提供内容面。 */
   background: var(--erp-page-bg);
@@ -1753,8 +1665,39 @@
   margin-top: 0;
 }
 
-.mobile-task-list-toolbar > .mobile-role-message-tabs {
-  margin-inline: 16px;
+.mobile-scroll-edge {
+  position: absolute;
+  inset: 100% 0 auto;
+  height: 10px;
+  pointer-events: none;
+  opacity: 0;
+  background: color-mix(in srgb, var(--erp-page-bg) 25%, transparent);
+  backdrop-filter: blur(3px);
+  mask-image: linear-gradient(#000, transparent);
+  transition: opacity 160ms ease-out;
+}
+
+.mobile-scroll-edge[data-visible='true'] {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-scroll-edge {
+    transition: none;
+  }
+}
+
+/* 短屏时保留主导航，让查询区可滚走以留出正文空间。 */
+@media (max-height: 500px) {
+  .mobile-scroll-edge {
+    display: none;
+  }
+  .mobile-role-tasks-page .mobile-task-list-toolbar,
+  .mobile-role-tasks-page .mobile-progress-controls,
+  .mobile-role-tasks-page .mobile-workflow-tracking-controls,
+  .mobile-role-tasks-page .workflow-exceptions__controls {
+    position: static;
+  }
 }
 
 @media (max-width: 340px) {
@@ -1779,14 +1722,14 @@
   padding: 0;
   background: transparent;
   color: inherit;
-  font-size: 12px;
+  font-size: inherit;
   font-weight: 650;
 }
 
 .mobile-task-list-row__head > :first-child {
   flex: 1;
   min-width: 0;
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
   color: var(--erp-text);
 }
 
@@ -1794,18 +1737,18 @@
   min-width: 0;
   padding: 2px 6px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   font-weight: 500;
   line-height: 16px;
 }
 
 .mobile-task-list-row__footer .erp-task-timing {
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   color: var(--erp-text-subtle);
 }
 
 .mobile-task-list-row__identity .erp-task-identity {
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
 }
 
 .mobile-task-list-row__identity .erp-task-product-image {
@@ -1815,13 +1758,13 @@
 }
 
 .mobile-task-list-row__identity .erp-task-identity__code {
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }
 
 .mobile-task-history-summary {
   padding-top: 12px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   text-align: center;
 }
 
@@ -1830,7 +1773,7 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
-  margin: 8px 12px 0;
+  margin: 6px 12px 0;
 }
 
 .mobile-role-task-query:not(:has(.mobile-filter-trigger)) {

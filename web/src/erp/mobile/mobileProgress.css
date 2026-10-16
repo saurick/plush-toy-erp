@@ -21,9 +21,10 @@
   display: none;
 }
 .mobile-progress-scroll {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: none;
 }
 .mobile-progress-panel button {
   font: inherit;
@@ -31,14 +32,17 @@
 }
 
 .mobile-progress-controls {
-  padding: 8px 12px 0;
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  padding: 6px 12px 0;
   background: var(--mobile-progress-bg);
 }
 .mobile-progress-controls .erp-sliding-segmented {
   max-width: 100%;
 }
 .mobile-progress-controls .ant-segmented-item-label {
-  min-height: 34px;
+  min-height: 44px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -47,7 +51,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 .mobile-progress-risks {
   display: flex;
@@ -57,19 +61,13 @@
   scrollbar-width: none;
 }
 .mobile-progress-risks .erp-filter-chip {
-  min-height: 34px;
+  min-height: 44px;
   padding: 5px 10px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
-.mobile-progress-risk-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-.mobile-progress-risk-options .erp-filter-chip {
-  min-width: 0;
-  min-height: 36px;
-  justify-content: center;
+.mobile-progress-risks .erp-progress-due-options {
+  flex-wrap: nowrap;
+  gap: 6px;
 }
 .mobile-progress-range {
   display: flex;
@@ -78,15 +76,16 @@
   justify-content: center;
   gap: 6px;
   color: var(--mobile-progress-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .mobile-progress-range button {
+  min-height: 44px;
   padding: 0 4px;
 }
 .mobile-progress-applied {
   margin: 0 0 10px;
   color: var(--mobile-progress-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   overflow-wrap: anywhere;
 }
 .mobile-progress-list {
@@ -130,10 +129,10 @@
   gap: 6px;
 }
 .mobile-progress-card-head strong {
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
 }
 .mobile-progress-card-head > span {
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .mobile-progress-product-summary {
   display: grid;
@@ -166,7 +165,7 @@
   padding: 0 4px;
   background: var(--mobile-progress-accent);
   color: var(--erp-on-accent);
-  font-size: 10px;
+  font-size: var(--erp-font-tiny);
   font-weight: 700;
   line-height: 1;
 }
@@ -176,13 +175,13 @@
   gap: 3px;
 }
 .mobile-progress-product {
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   font-weight: 600;
 }
 .mobile-progress-muted,
 .mobile-progress-facts,
 .mobile-progress-task-entry {
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   color: var(--mobile-progress-muted);
 }
 .mobile-progress-execution {
@@ -200,11 +199,11 @@
   min-width: 0;
   margin-left: auto;
   text-align: right;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .mobile-progress-quantity > span {
   color: var(--mobile-progress-muted);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }
 .mobile-progress-track {
   display: block;
@@ -222,7 +221,7 @@
 .mobile-progress-issue,
 .mobile-progress-danger {
   color: var(--mobile-progress-danger);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 .mobile-progress-warning {
   color: var(--mobile-progress-warning);
@@ -248,7 +247,7 @@
   overflow-wrap: anywhere;
 }
 .mobile-progress-task-copy strong {
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   font-weight: 600;
 }
 .mobile-progress-task-copy > span,
@@ -272,7 +271,7 @@
   gap: 12px;
   padding: 0 16px 18px;
   color: var(--mobile-progress-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 .mobile-progress-continuation .erp-control-button {
   min-height: 44px;
@@ -317,14 +316,14 @@
 .mobile-progress-attention-reason {
   margin: 10px 0 0;
   color: var(--erp-visual-danger-text);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.55;
 }
 
 .mobile-progress-stage-list {
   display: grid;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 7px;
+  margin-top: 8px;
 }
 
 .mobile-progress-stage-row {
@@ -333,7 +332,7 @@
   align-items: center;
   gap: 8px;
   min-height: 18px;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.5;
 }
 
@@ -360,14 +359,14 @@
 .mobile-detail-muted {
   margin: 0;
   color: var(--erp-text-subtle);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   overflow-wrap: anywhere;
 }
 
 .mobile-progress-recent-source {
   margin: 0 0 10px;
   color: var(--erp-text-subtle);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   line-height: 1.5;
 }
 
@@ -381,7 +380,7 @@
 .mobile-detail-timeline > li {
   position: relative;
   padding: 0 0 14px 21px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.4;
 }
 
@@ -425,7 +424,7 @@
   display: block;
   margin: 3px 0 0;
   color: var(--erp-text-subtle);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   overflow-wrap: anywhere;
 }
 
@@ -437,7 +436,7 @@
   border-radius: 12px;
   background: var(--erp-surface-bg);
   color: var(--erp-primary-strong);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   cursor: pointer;
 }
 
@@ -449,7 +448,7 @@
 
 .mobile-progress-recent-error {
   color: var(--erp-visual-danger-text);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .mobile-progress-detail-actions {
@@ -513,21 +512,21 @@
 
 .mobile-progress-detail-group-trigger > strong {
   min-width: 0;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   font-weight: 650;
   overflow-wrap: anywhere;
 }
 
 .mobile-progress-detail-group-trigger > span:not(.anticon) {
   color: var(--erp-text-subtle);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.4;
   text-align: right;
 }
 
 .mobile-progress-detail-group-trigger > .anticon {
   justify-self: end;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .mobile-progress-detail-group-body {
@@ -546,7 +545,7 @@
 .mobile-progress-detail-subsection > h3 {
   margin-bottom: 8px;
   color: var(--erp-text-subtle);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 650;
 }
 
