@@ -156,6 +156,8 @@ steady env 必须保持 `BOOTSTRAP_ADMIN_ONCE=false` 且不包含 `APP_ADMIN_PAS
 
 首次初始化的短信配置来自目标宿主 root 持有的 `/etc/plush-toy-erp/sms-provider.env`（`0600`）。`initialization-sms-provider.sh` 是资格检查与初始化共用的数据读取器，只读取四个固定字段，不执行 env 内容，也不从历史容器复制配置。准备与轮换边界见[首次部署](../../deployments/yoyoosun/runbooks/01-first-deploy.md)。
 
+首次初始化的失败回执使用独立 SSH 输出通道，不受迁移命令组的日志重定向影响。已加锁且归属明确的操作失败时，在清理新建目标前，将诊断日志保留到宿主 `/root/ops-backups/plush-target-initialization/<target>/<operation-id>/operation.log`；目录为 `0700`、文件为 `0600`，拒绝符号链接或覆盖已有日志。原始日志只供受控终端排障，不进入工作台回执或浏览器。
+
 ## Release Evidence
 
 正式 evidence 逐层绑定：

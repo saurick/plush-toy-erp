@@ -46,7 +46,7 @@ node scripts/deploy/promotion-controller.mjs \
 ```
 
 2. 在本地版本中心 `/__dev/version-center` 核对目标、固定版本、备份与迁移计划。只有获得明确部署授权后才输入本次完整确认串执行；CLI 精确参数见 `promotion-executor.mjs --help`。执行器只接受 ready operation，目标机只取得、校验和加载原发布包。
-3. 读取 operation 回执与 `target-preflight.mjs --target production-133 --json`。失败或 `not_proven` 时保留现场，不自动重试。初始化管理员密码仅保存在本机受控 access 文件；steady env 不保留 `APP_ADMIN_PASSWORD`。
+3. 读取 operation 回执与 `target-preflight.mjs --target production-133 --json`。失败或 `not_proven` 时保留现场，不自动重试。初始化失败的私有诊断日志保留在宿主 `/root/ops-backups/plush-target-initialization/production-133/<operation-id>/operation.log`，通过受控终端检查，不向浏览器返回原始正文。初始化管理员密码仅保存在本机受控 access 文件；steady env 不保留 `APP_ADMIN_PASSWORD`。
 4. `base-release` 记录基础发布证据；生产不使用 `customer-trial-acceptance` 的固定测试密码或 `uat_*` 登录矩阵。真实岗位与客户签收在固定版本上单独记录，基础健康通过不等于业务验收。
 
 首次初始化后，正式客户配置仍须经过 manifest 编译与评审、发布证据门禁、validate / publish、transition check、activate 和 effective-session 读回；客户配置的激活、就绪和证据状态入口共用部署目标合同，接受显式指定的 `production-133`。生产只使用 `base-release`，不得套用测试账号或模拟数据验收档。

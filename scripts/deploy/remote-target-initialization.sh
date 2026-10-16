@@ -2,6 +2,10 @@
 set -Eeuo pipefail
 umask 077
 
+# Error traps may run inside a command group's log redirection. Keep the
+# machine-readable receipt on the original SSH output channel.
+exec 3>&1
+
 fail() {
   printf '[remote-target-initialization] %s\n' "$1" >&2
   return 1
@@ -401,6 +405,24 @@ cleanup_exact_target() {
   return 1
 }
 
+preserve_failure_diagnostics() {
+  if ! plain_owned_file "$log_file"; then
+    return 0
+  fi
+  local directory=/root
+  local component
+  for component in ops-backups plush-target-initialization "$target" "$operation_id"; do
+    directory=$directory/$component
+    if [[ ! -e "$directory" && ! -L "$directory" ]]; then
+      mkdir -m 700 -- "$directory" || return 1
+    fi
+    plain_owned_directory "$directory" || return 1
+  done
+  [[ ! -e "$directory/operation.log" && ! -L "$directory/operation.log" ]] || return 1
+  cp -- "$log_file" "$directory/operation.log" || return 1
+  chmod 600 "$directory/operation.log"
+}
+
 handle_failure() {
   local exit_code="$1"
   local failure_issue="$2"
@@ -410,7 +432,7 @@ handle_failure() {
   trap - ERR EXIT HUP INT TERM
   if [[ "$cleanup_authorized" -ne 1 ]]; then
     credential_cleanup_proven=false
-    write_receipt_json not_proven initialization_prelock_failure false
+    write_receipt_json not_proven initialization_prelock_failure false >&3
     return 0
   fi
   if [[ "$acquisition_started_epoch_ms" -gt 0 && "$acquisition_duration_ms" -eq 0 ]]; then
@@ -423,11 +445,12 @@ handle_failure() {
   else
     credential_cleanup_proven=false
   fi
+  preserve_failure_diagnostics || printf '%s\n' '[remote-target-initialization] private failure log retention failed' >&2
   if cleanup_exact_target; then
     credential_cleanup_proven=true
-    write_receipt_json failed "$failure_issue" true
+    write_receipt_json failed "$failure_issue" true >&3
   else
-    write_receipt_json not_proven rollback_incomplete false
+    write_receipt_json not_proven rollback_incomplete false >&3
   fi
 }
 

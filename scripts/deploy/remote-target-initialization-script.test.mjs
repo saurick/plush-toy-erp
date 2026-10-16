@@ -114,6 +114,34 @@ test("target initializer keeps bootstrap secrets transient and rollback owner-bo
   assert.doesNotMatch(passed, /cleanup_exact_target|write_receipt_json (?:failed|not_proven)/u);
 });
 
+test("target initializer keeps failure receipts outside redirected command groups", () => {
+  assert.ok(source.indexOf("exec 3>&1") < source.indexOf("trap on_error ERR"));
+  const failureHandler = source.slice(
+    source.indexOf("handle_failure() {"),
+    source.indexOf("on_error() {"),
+  );
+  const receiptCalls = failureHandler.match(/^\s*write_receipt_json .+$/gmu);
+  assert.equal(receiptCalls.length, 3);
+  for (const call of receiptCalls) assert.match(call, / >&3$/u);
+  assert.ok(
+    failureHandler.indexOf("preserve_failure_diagnostics ||") <
+      failureHandler.indexOf("if cleanup_exact_target; then"),
+  );
+});
+
+test("target initializer retains owner-checked private diagnostics before exact cleanup", () => {
+  const retention = source.slice(
+    source.indexOf("preserve_failure_diagnostics() {"),
+    source.indexOf("handle_failure() {"),
+  );
+  assert.match(retention, /plain_owned_file "\$log_file"/u);
+  assert.match(retention, /ops-backups plush-target-initialization "\$target" "\$operation_id"/u);
+  assert.match(retention, /mkdir -m 700/u);
+  assert.match(retention, /plain_owned_directory "\$directory"/u);
+  assert.match(retention, /! -e "\$directory\/operation.log" && ! -L "\$directory\/operation.log"/u);
+  assert.match(retention, /chmod 600 "\$directory\/operation.log"/u);
+});
+
 test("target initializer restores container-readable runtime file modes", () => {
   const extractIndex = source.indexOf("tar --extract");
   const rolesChmodIndex = source.indexOf('chmod 755 "$database_roles_script"');
