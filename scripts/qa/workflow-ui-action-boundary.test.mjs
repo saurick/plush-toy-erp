@@ -1050,7 +1050,7 @@ test("sales order page keeps write buttons behind projected actions", () => {
   );
   assert(
     modalSource.includes("canUpload={canUpdateOrder || canCreateOrder}") &&
-      modalSource.includes("canWithdraw={canCreateOrder || canUpdateOrder}") &&
+      modalSource.includes("canWithdraw={canUpdateOrder}") &&
       modalSource.includes("canCreateItem={canCreateItem}") &&
       modalSource.includes("canUpdateItem={canUpdateItem}") &&
       modalSource.includes("canCancelItem={canCancelItem}"),
@@ -1119,7 +1119,7 @@ test("purchase order page keeps write buttons behind projected actions", () => {
   );
   assert(
     modalSource.includes("canUpload={canUpdate || canCreate}") &&
-      modalSource.includes("canWithdraw={canCreate || canUpdate}"),
+      modalSource.includes("canWithdraw={canUpdate}"),
     "purchase order modal attachments must use projected create/update permissions",
   );
   assert(
@@ -1169,7 +1169,7 @@ test("outsourcing order page keeps write buttons behind projected actions", () =
         pageSource,
       ) &&
       pageSource.includes("canUpload={canUpdate || canCreate}") &&
-      pageSource.includes("canWithdraw={canUpdate || canCreate}"),
+      pageSource.includes("canWithdraw={canUpdate}"),
     "outsourcing order create/edit controls must hide without projected actions while attachment writes keep projected permissions",
   );
   assert(
@@ -1230,11 +1230,11 @@ test("fact pages keep write buttons behind projected actions and status guards",
       relativePath: "web/src/erp/pages/PurchaseReceiptsPage.jsx",
       name: "purchase receipt page",
       tokens: [
-        "const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')",
-        "const canPost = hasActionPermission(adminProfile, 'warehouse.inbound.confirm')",
+        "const canCreate = hasActionPermission(\n    adminProfile,\n    'purchase.receipt.create'\n  )",
+        "const canPost = hasActionPermission(\n    adminProfile,\n    'warehouse.inbound.confirm'\n  )",
         "const canCancelDraft = hasActionPermission(\n    adminProfile,\n    'purchase.receipt.cancel_draft'\n  )",
         "canUpload={canCreate || canPost}",
-        "canWithdraw={canCreate || canPost}",
+        "canWithdraw={canPost}",
         "buildPurchaseReturnFromReceiptPayload(values, receipt)",
         "buildPurchaseReceiptAdjustmentPayload(values, receipt)",
         "{canCreateReturn ? (",
@@ -1263,6 +1263,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
       tokens: [
         "const canCreate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.create'\n  )",
         "const canUpdate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.update'\n  )",
+        "const canHandleQualityException = hasActionPermission(\n    adminProfile,\n    'quality.exception.handle'\n  )",
         "const selectedQualityStatus = String(selectedRow?.status || '').toUpperCase()",
         "primaryAction={\n          canCreate ? (",
         "disabled={referenceDataState !== 'ready'}",
@@ -1275,7 +1276,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
         'data-business-action-key="cancel"',
         "!['DRAFT', 'SUBMITTED'].includes(selectedRow.status)",
         "canUpload={canCreate || canUpdate}",
-        "canWithdraw={canCreate || canUpdate}",
+        "canWithdraw={canUpdate || canHandleQualityException}",
         "不会绕过来源规则直接改写库存数量或生产事实",
       ],
     },

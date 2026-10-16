@@ -75,7 +75,10 @@ test('Alloy healthcheck detects component and downstream faults independently of
 
 test('deployment collection requires the registered host identity', () => {
   const localIdentity = { platform: 'linux', hostname: 'r740xd', username: 'root', addresses: ['192.168.0.133'] }
-  assert.equal(registeredLogSources(root, { requireLocal: true, localIdentity }).length, 2)
+  assert.deepEqual(
+    registeredLogSources(root, { requireLocal: true, localIdentity }).map((source) => source.environment).sort(),
+    ['customer-test-133', 'demo-133', 'production-133']
+  )
   for (const override of [{ hostname: 'another-host' }, { username: 'developer' }, { addresses: ['192.168.0.134'] }]) {
     assert.throws(() => registeredLogSources(root, { requireLocal: true, localIdentity: { ...localIdentity, ...override } }), /目标宿主机/u)
   }

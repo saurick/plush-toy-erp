@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { registerHooks } from 'node:module'
 import test from 'node:test'
 
 import {
@@ -10,14 +10,18 @@ import {
 } from './financePaymentAllocation.mjs'
 import { createSourceBusinessActionAttemptStore } from './sourceBusinessAction.mjs'
 
-test('finance replay keeps payment and allocation status contracts independent', async () => {
-  const contracts = 'export const FinancePaymentStatus={POSTED:"CASH_POSTED"}; export const FinanceAllocationStatus={POSTED:"ALLOCATION_POSTED"};'
-  const contractURL = `data:text/javascript;base64,${Buffer.from(contracts).toString('base64')}`
-  const file = new URL('./financePaymentAllocation.mjs', import.meta.url)
-  const source = readFileSync(file, 'utf8')
-    .replace(/from '[^']*statuses\.generated\.mjs'/u, `from '${contractURL}'`)
-    .replace(/from '(\.[^']+)'/gu, (_, relative) => `from '${new URL(relative, file).href}'`)
-  const consumer = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+test('finance replay keeps payment and allocation status contracts independent', async (t) => {
+  const file = new URL('./financePaymentAllocation.mjs?independent-statuses', import.meta.url)
+  const hook = registerHooks({
+    resolve(specifier, context, nextResolve) {
+      if (context.parentURL === file.href && specifier.endsWith('/statuses.generated.mjs')) {
+        return { url: new URL('../../../scripts/test/statusOwnershipFixture.mjs', import.meta.url).href, shortCircuit: true }
+      }
+      return nextResolve(specifier, context)
+    },
+  })
+  t.after(() => hook.deregister())
+  const consumer = await import(file.href)
   const expected = { id: 7, currency: 'USD', direction: 'RECEIPT', counterparty_type: 'CUSTOMER', counterparty_id: 3, amount: '100' }
   const allocations = [{ finance_fact_id: 11, amount: '100' }]
   const payment = { ...expected, status: 'CASH_POSTED', allocations: [{ ...allocations[0], status: 'ALLOCATION_POSTED' }] }

@@ -1245,7 +1245,6 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
     }
   }
 
-
   assert.match(sources.page, /<DevTaskNav/u)
   assert.match(sources.page, /idPrefix="quality-gates"/u)
   assert.equal((sources.page.match(/setInterval\(/gu) || []).length, 1)

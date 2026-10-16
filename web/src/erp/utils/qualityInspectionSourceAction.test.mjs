@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { readFileSync } from 'node:fs'
+import { registerHooks } from 'node:module'
 
 import {
   buildOutsourcingReturnQualityInspectionPayload,
@@ -16,27 +16,26 @@ import {
   resolveOutsourcingReturnQualityGate,
 } from './qualityInspectionSourceAction.mjs'
 
-test('quality source checks keep receipt, inspection and fact status contracts independent', async () => {
-  const contracts = {
-    OperationalFactStatus: { POSTED: 'FACT_POSTED' },
-    PurchaseReceiptStatus: { POSTED: 'RECEIPT_POSTED' },
-    QualityInspectionStatus: { REJECTED: 'QUALITY_REJECTED' },
-  }
-  const moduleSource = Object.entries(contracts)
-    .map(([name, value]) => `export const ${name} = ${JSON.stringify(value)}`)
-    .join('\n')
-  const contractURL = `data:text/javascript;base64,${Buffer.from(moduleSource).toString('base64')}`
-  const source = readFileSync(new URL('./qualityInspectionSourceAction.mjs', import.meta.url), 'utf8')
-    .replace(/from '[^']*statuses\.generated\.mjs'/u, `from '${contractURL}'`)
-  const consumer = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+test('quality source checks keep receipt, inspection and fact status contracts independent', async (t) => {
+  const file = new URL('./qualityInspectionSourceAction.mjs?independent-statuses', import.meta.url)
+  const hook = registerHooks({
+    resolve(specifier, context, nextResolve) {
+      if (context.parentURL === file.href && specifier.endsWith('/statuses.generated.mjs')) {
+        return { url: new URL('../../../scripts/test/statusOwnershipFixture.mjs', import.meta.url).href, shortCircuit: true }
+      }
+      return nextResolve(specifier, context)
+    },
+  })
+  t.after(() => hook.deregister())
+  const consumer = await import(file.href)
   const inspection = {
     id: 1,
-status: 'QUALITY_REJECTED',
-result: 'REJECT',
-source_type: 'PURCHASE_RECEIPT',
+    status: 'QUALITY_REJECTED',
+    result: 'REJECT',
+    source_type: 'PURCHASE_RECEIPT',
     inspection_type: 'INCOMING',
-purchase_receipt_id: 2,
-purchase_receipt_item_id: 3,
+    purchase_receipt_id: 2,
+    purchase_receipt_item_id: 3,
   }
   assert.equal(consumer.isRejectedIncomingInspection(inspection), true)
   assert.equal(consumer.canCreatePurchaseReturnFromRejectedInspection(inspection, { id: 2, status: 'RECEIPT_POSTED' }), true)

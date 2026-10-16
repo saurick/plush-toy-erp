@@ -17,7 +17,7 @@ const customerPackage = read("config/customers/yoyoosun/customerPackage.mjs");
 test("production route review fixes sewing before handwork and keeps every quality gate distinct", () => {
   assert.match(
     review,
-    /布料加工 → 裁片检验 → 车缝 → 皮套检验 → 手工 → 成品检验 → 针检 → 抽检 →（订单要求时）客户验货 → 最终包装 → 成品入仓/u,
+    /布料加工 → 裁片检验 → 车缝 → 皮套检验 → 手工 → 正式成品入库（待检 \/ 待包装）→ 成品检验 → 针检 → 抽检 →（订单要求时）客户验货 → 查货与包装 → 可发货/u,
   );
   assert.match(review, /`车缝 → 手工` 是前后步骤，不是两个可互换选项/u);
   assert.match(

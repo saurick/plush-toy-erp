@@ -94,6 +94,8 @@ pnpm preview:yoyoosun
 
 `test/reactRuntime.mjs` 为 Node 组件与 hook 行为测试提供 JSX 加载和可恢复的 DOM 环境，不进入产品运行时。
 
+`test/statusOwnershipFixture.mjs` 为状态归属测试提供彼此不同的领域状态值。测试通过 Node 原生模块解析 hook 替换这一依赖，直接导入生产模块文件，并在测试结束后解除 hook；不改写或执行重组后的生产源码。
+
 `global-tab-sliding-light` / `global-tab-sliding-dark` 检查共享页签的逐帧滑动、快速反向切换、尺寸变化、面板重新打开、键盘、禁用项与减少动态效果设置。场景通过浏览器拦截加载 `test/SlidingTabsFixture.jsx`，复用真实组件和样式，不添加产品路由或写入业务数据；输出 `global-tab-sliding-*-frames.json` 留存中间位置。可用 `STYLE_L1_SCENARIOS=global-tab-sliding-light,global-tab-sliding-dark pnpm style:l1` 定向运行。
 
 `global-table-alignment-light` / `global-table-alignment-dark` / `global-table-alignment-mobile` 使用 `test/TableAlignmentFixture.html` 和真实共用表格、材料汇总表、单据编辑明细，验证表头及单元格的对齐、独立序号、长文本、排序、列顺序、复制、展开与收起、明细数量输入及空表恢复；使用模拟数据，不调用业务写入。输出同名 JSON 几何证据与材料表截图。
