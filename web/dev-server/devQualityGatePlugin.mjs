@@ -253,7 +253,8 @@ export function readFixedQualityGateReceipt(projectRoot, profile) {
     throw new Error('quality gate receipt file is invalid')
   }
   const receipt = validateDevWorkbenchReceipt(
-    JSON.parse(readFileSync(file, 'utf8'))
+    JSON.parse(readFileSync(file, 'utf8')),
+    { repoRoot: projectRoot }
   )
   if (receipt.gate !== profile || receipt.profile !== profile) {
     throw new Error('quality gate receipt profile does not match')
@@ -590,7 +591,8 @@ function statusProjection({
       title: '文档检查已通过，完整发布验证未运行',
       description: serverEvidence.message,
       releaseEligible: false,
-      recommendation: '如需发布此 SHA，在 GitLab 新建 main 流水线并设置 QA_MODE=full，等待完整 CI 通过。',
+      recommendation:
+        '如需发布此 SHA，在 GitLab 新建 main 流水线并设置 QA_MODE=full，等待完整 CI 通过。',
       notProven: ['当前版本 GitLab CI 严格门禁', '目标环境发布', '客户 UAT'],
     }
   }
@@ -600,7 +602,8 @@ function statusProjection({
       title: '当前版本 GitLab CI 严格门禁未通过',
       description: '服务器普通 push CI 未形成完整通过证据，不能进入版本发布。',
       releaseEligible: false,
-      recommendation: '先修复 GitLab CI 第一失败阶段，再由新 exact SHA 重新运行。',
+      recommendation:
+        '先修复 GitLab CI 第一失败阶段，再由新 exact SHA 重新运行。',
       notProven: ['当前版本 GitLab CI 严格门禁', '目标环境发布', '客户 UAT'],
     }
   }
@@ -842,9 +845,11 @@ export function projectDevQualityGateServerEvidence(
         (job) => job.status === 'completed' && job.conclusion === 'success'
       )
     const names = new Set(jobs.map((job) => job.name))
-    const passed = succeeded && CI_STRICT_JOB_NAMES.every((name) => names.has(name))
+    const passed =
+      succeeded && CI_STRICT_JOB_NAMES.every((name) => names.has(name))
     const docsPassed =
-      succeeded && jobs.length === 3 &&
+      succeeded &&
+      jobs.length === 3 &&
       ['plan', 'quality_docs', 'CI Gate'].every((name) => names.has(name))
     return { run, jobs, passed, docsPassed }
   }
@@ -915,7 +920,9 @@ export function projectDevQualityGateServerEvidence(
     ? 'passed'
     : selected.docsPassed
       ? 'docs_passed'
-      : active ? 'running' : 'failed'
+      : active
+        ? 'running'
+        : 'failed'
   return {
     kind: DEV_QUALITY_GATE_SERVER_EVIDENCE_KIND,
     status,
@@ -1154,7 +1161,14 @@ export function createDevQualityGateService({
     let operation
     try {
       operation = readDevQualityGateOperation(store, lock.operationId)
-    } catch {
+    } catch (error) {
+      if (
+        error?.code === 'ENOENT' &&
+        !processAlive(lock.ownerPid) &&
+        (lock.childPid === null || !processGroupAlive(lock.childPid))
+      ) {
+        releaseDevQaExecutionLock(store, lock)
+      }
       return null
     }
     if (!DEV_QUALITY_GATE_ACTIVE_STATUSES.includes(operation.status)) {
@@ -1164,7 +1178,7 @@ export function createDevQualityGateService({
     if (processAlive(lock.ownerPid)) {
       return operation
     }
-    if (lock.childPid !== null && processAlive(lock.childPid)) {
+    if (lock.childPid !== null && processGroupAlive(lock.childPid)) {
       if (!orphanStopTimers.has(operation.id)) {
         try {
           killOrphanedProcessGroup(lock.childPid, 'SIGTERM')
@@ -1186,7 +1200,7 @@ export function createDevQualityGateService({
             ) {
               return
             }
-            if (!processAlive(lock.childPid)) return
+            if (!processGroupAlive(lock.childPid)) return
             try {
               killOrphanedProcessGroup(lock.childPid, 'SIGKILL')
             } catch {

@@ -739,8 +739,8 @@ export function createDevDeliveryService({
   const providerName = providerKey === 'gitlab' ? 'GitLab' : 'GitHub'
   const readCredentialConfigured = Boolean(
     provider ||
-      readProvider ||
-      providerEnvironments.readEnvironment.PLUSH_GITLAB_TOKEN
+    readProvider ||
+    providerEnvironments.readEnvironment.PLUSH_GITLAB_TOKEN
   )
   const children = new Map()
   const preflightCache = new Map()
@@ -1027,16 +1027,15 @@ export function createDevDeliveryService({
       })
     }
     let backupRestoreEvidence = null
-    const customerTestPreflight =
-      targetEvidence.get('customer-test-133')?.preflight
-    if (customerTestPreflight?.target && customerTestPreflight?.customer) {
+    const recoveryPreflight = targetEvidence.get('demo-133')?.preflight
+    if (recoveryPreflight?.target && recoveryPreflight?.customer) {
       try {
         backupRestoreEvidence = await Promise.resolve(
           readRecoveryEvidence({
             projectRoot: root,
-            target: customerTestPreflight.target,
-            customer: customerTestPreflight.customer,
-            environment: 'customer-clean-acceptance',
+            target: recoveryPreflight.target,
+            customer: recoveryPreflight.customer,
+            environment: 'customer-trial-133',
           })
         )
       } catch {
@@ -1120,6 +1119,7 @@ export function createDevDeliveryService({
       message: `${providerName} immutable release dispatch started`,
       now: now(),
     })
+    let dispatchAttempted = false
     try {
       const versionReference = now()
       const existing = await Promise.resolve(
@@ -1140,6 +1140,14 @@ export function createDevDeliveryService({
         })
         return presentOperation(operation)
       }
+      if (['running', 'awaiting_release'].includes(existing.status)) {
+        operation = transitionDeliveryOperation(store, operation.id, {
+          status: 'waiting',
+          message: `${providerName} release pipeline already exists; waiting for terminal assets`,
+          now: now(),
+        })
+        return presentOperation(operation)
+      }
       if (retryOfOperationId === null) {
         const policy = assertOfficialReleaseVersion({
           versions: await Promise.resolve(
@@ -1152,6 +1160,7 @@ export function createDevDeliveryService({
           throw new Error('release version catalog changed before dispatch')
         }
       }
+      dispatchAttempted = true
       await Promise.resolve(
         deliveryProvider.dispatchRelease({
           gitSha: operation.gitSha,
@@ -1168,11 +1177,15 @@ export function createDevDeliveryService({
       return presentOperation(operation)
     } catch (error) {
       transitionDeliveryOperation(store, operation.id, {
-        status: 'failed',
-        message: `${providerName} release dispatch failed without starting a target write`,
+        status: dispatchAttempted ? 'waiting' : 'failed',
+        message: dispatchAttempted
+          ? `${providerName} release dispatch result is unknown; waiting for provider readback`
+          : `${providerName} release preflight failed`,
         issues: [
           providerIssue(
-            `${providerName} 发布未启动或身份不一致；未写入任何 demo/test 部署目标`,
+            dispatchAttempted
+              ? `${providerName} 发布请求结果待核对，请先读取流水线状态`
+              : `${providerName} 发布预检未通过`,
             providerKey
           ),
         ],

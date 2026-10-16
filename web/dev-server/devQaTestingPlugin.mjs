@@ -31,7 +31,10 @@ import {
 } from './devServerSecurity.mjs'
 import { resolveProjectNodeRuntime } from './devQaCoveragePlugin.mjs'
 import { pressureDataScale } from '../src/dev-workbench/config/devPressureData.mjs'
-import { readCurrentPressureSource, readDevPressureReports } from './devQaPressureReports.mjs'
+import {
+  readCurrentPressureSource,
+  readDevPressureReports,
+} from './devQaPressureReports.mjs'
 
 export const DEV_QA_TESTING_API_PATH = '/__dev/api/qa/testing'
 export const DEV_QA_TESTING_SESSION_API_PATH = `${DEV_QA_TESTING_API_PATH}/session`
@@ -183,8 +186,15 @@ export function validateDevQaTestingAction(value) {
   if (!DEV_TESTING_ACTIONS.includes(value.action)) {
     throw new Error('testing action is not allowlisted')
   }
-  assertExactKeys(value.payload, value.action.startsWith('pressure-') ? ['idempotencyKey', 'dataScale'] : ['idempotencyKey'], 'testing action payload')
-  if (value.action.startsWith('pressure-')) pressureDataScale(value.payload.dataScale)
+  assertExactKeys(
+    value.payload,
+    value.action.startsWith('pressure-')
+      ? ['idempotencyKey', 'dataScale']
+      : ['idempotencyKey'],
+    'testing action payload'
+  )
+  if (value.action.startsWith('pressure-'))
+    { pressureDataScale(value.payload.dataScale) }
   const match = IDEMPOTENCY_PATTERN.exec(
     String(value.payload.idempotencyKey || '')
   )
@@ -246,10 +256,26 @@ export function buildDevQaTestingCommand({
       'output/qa/yoyoosun-role-jsonrpc-access/report.json',
     ],
     'field-linkage': ['scripts/qa/erp-field-linkage.mjs'],
-    'pressure-quick': ['scripts/qa/pressure-isolated-lifecycle.mjs', '--run', '--profile', 'quick', '--data-scale', dataScale, '--out',
-      `output/qa/pressure/workbench-${operationId}/lifecycle.json`],
-    'pressure-capacity': ['scripts/qa/pressure-isolated-lifecycle.mjs', '--run', '--profile', 'capacity', '--data-scale', dataScale, '--out',
-      `output/qa/pressure/workbench-${operationId}/lifecycle.json`],
+    'pressure-quick': [
+      'scripts/qa/pressure-isolated-lifecycle.mjs',
+      '--run',
+      '--profile',
+      'quick',
+      '--data-scale',
+      dataScale,
+      '--out',
+      `output/qa/pressure/workbench-${operationId}/lifecycle.json`,
+    ],
+    'pressure-capacity': [
+      'scripts/qa/pressure-isolated-lifecycle.mjs',
+      '--run',
+      '--profile',
+      'capacity',
+      '--data-scale',
+      dataScale,
+      '--out',
+      `output/qa/pressure/workbench-${operationId}/lifecycle.json`,
+    ],
   }
   if (!DEV_TESTING_ACTIONS.includes(action)) {
     throw new Error('testing command action is not allowlisted')
@@ -399,7 +425,14 @@ export function createDevQaTestingService({
     let operation = null
     try {
       operation = readDevTestingOperation(store, lock.operationId)
-    } catch {
+    } catch (error) {
+      if (
+        error?.code === 'ENOENT' &&
+        !processAlive(lock.ownerPid) &&
+        (lock.childPid === null || !processAlive(lock.childPid))
+      ) {
+        releaseDevQaExecutionLock(store, lock)
+      }
       return null
     }
     if (!DEV_TESTING_OPERATION_ACTIVE_STATUSES.includes(operation.status)) {
@@ -445,10 +478,15 @@ export function createDevQaTestingService({
         return
       }
       if (code === 0 && operation.action.startsWith('pressure-')) {
-        const evidence = readPressureReports(root, { id: `workbench-${operation.id}` })
-        if (evidence.report?.status !== 'passed' ||
-          evidence.report?.profile !== operation.action.slice('pressure-'.length) ||
-          evidence.report?.dataset?.dataScale !== operation.dataScale) {
+        const evidence = readPressureReports(root, {
+          id: `workbench-${operation.id}`,
+        })
+        if (
+          evidence.report?.status !== 'passed' ||
+          evidence.report?.profile !==
+            operation.action.slice('pressure-'.length) ||
+          evidence.report?.dataset?.dataScale !== operation.dataScale
+        ) {
           code = 1
         }
       }
@@ -547,7 +585,11 @@ export function createDevQaTestingService({
       payload.idempotencyKey
     )
     if (existing) {
-      if (existing.action !== action || existing.dataScale !== payload.dataScale) throw new Error('testing idempotency intent mismatch')
+      if (
+        existing.action !== action ||
+        existing.dataScale !== payload.dataScale
+      )
+        { throw new Error('testing idempotency intent mismatch') }
       return {
         kind: 'plush.dev-qa-testing-action-result',
         action,
@@ -654,7 +696,9 @@ export function createDevQaTestingService({
       const result = readPressureReports(root, { id, currentSource })
       const after = await readRepositoryState(root)
       if (!repositoryIdentitiesEqual(repository, after)) {
-        const error = new Error('repository changed while reading pressure reports')
+        const error = new Error(
+          'repository changed while reading pressure reports'
+        )
         error.code = 'DEV_QA_REPOSITORY_CHANGED'
         throw error
       }
@@ -730,11 +774,23 @@ export function createDevQaTestingMiddleware({
         return
       }
       const operationMatch = OPERATION_PATH_PATTERN.exec(requestPath)
-      if (request.method === 'GET' && requestPath === DEV_QA_PRESSURE_REPORTS_API_PATH) {
-        if ([...requestUrl.searchParams.keys()].some((key) => key !== 'id') || requestUrl.searchParams.getAll('id').length > 1) {
+      if (
+        request.method === 'GET' &&
+        requestPath === DEV_QA_PRESSURE_REPORTS_API_PATH
+      ) {
+        if (
+          [...requestUrl.searchParams.keys()].some((key) => key !== 'id') ||
+          requestUrl.searchParams.getAll('id').length > 1
+        ) {
           throw new Error('pressure report query is unsupported')
         }
-        sendJson(response, 200, await testingService.pressureReports(requestUrl.searchParams.get('id') || ''))
+        sendJson(
+          response,
+          200,
+          await testingService.pressureReports(
+            requestUrl.searchParams.get('id') || ''
+          )
+        )
         return
       }
       if (request.method === 'GET' && operationMatch) {
