@@ -2214,14 +2214,9 @@ func validatePurchaseReceiptLineWarehouses(ctx context.Context, client *ent.Clie
 	if len(lines) == 0 {
 		return biz.ErrBadParam
 	}
-	requested := map[int]decimal.Decimal{}
 	for _, line := range lines {
 		item := valid[line.PurchaseOrderItemID]
 		if item == nil || !remaining[item.ID].IsPositive() || !line.Quantity.IsPositive() {
-			return biz.ErrBadParam
-		}
-		requested[item.ID] = requested[item.ID].Add(line.Quantity)
-		if requested[item.ID].GreaterThan(remaining[item.ID]) {
 			return biz.ErrBadParam
 		}
 		if in.WarehouseScope != nil && !biz.NormalizeWarehouseDataScope(*in.WarehouseScope).Allows(line.WarehouseID) {

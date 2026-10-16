@@ -123,6 +123,13 @@ export function getSingleSelectedPurchaseOrder({
     : null
 }
 
+export function buildPurchaseOrderStats({ orders = [], total = 0 }) {
+  return [
+    { key: 'total', label: '符合条件', value: total },
+    { key: 'current', label: '本页显示', value: orders.length },
+  ]
+}
+
 export function selectedPurchaseOrderDisplayText({
   resolveSupplierName,
   selectedOrders = [],

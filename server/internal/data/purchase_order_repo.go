@@ -590,16 +590,6 @@ func (r *purchaseOrderRepo) ApplyPurchaseOrderLifecycleAction(
 		}
 		return nil, err
 	}
-	if replayed, err := resolveSourceOrderLifecycleActionReplay(ctx, tx.Client(), "purchase_order", in); err != nil {
-		return nil, err
-	} else if replayed {
-		if err := tx.Commit(); err != nil {
-			return nil, err
-		}
-		tx = nil
-		return entPurchaseOrderToBiz(current), nil
-	}
-
 	if current.Version != in.ExpectedVersion {
 		return nil, biz.ErrPurchaseOrderConflict
 	}

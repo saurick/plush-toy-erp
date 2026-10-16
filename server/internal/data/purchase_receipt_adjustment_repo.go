@@ -63,17 +63,6 @@ func (r *inventoryRepo) CreatePurchaseReceiptAdjustmentWithItems(ctx context.Con
 	if in == nil || in.PurchaseReceiptID <= 0 || len(items) == 0 || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
 		return nil, biz.ErrBadParam
 	}
-	warehouseIDs := make([]int, 0, len(items))
-	for _, item := range items {
-		if item == nil {
-			return nil, biz.ErrBadParam
-		}
-		warehouseIDs = append(warehouseIDs, item.WarehouseID)
-	}
-	if err := biz.ValidateContextWarehouseAccess(ctx, warehouseIDs); err != nil {
-		return nil, err
-	}
-
 	if replayed, found, err := resolvePurchaseReceiptAdjustmentReplay(ctx, r.data.postgres, in); err != nil || found {
 		return replayed, err
 	}
@@ -224,15 +213,6 @@ func (r *inventoryRepo) PostPurchaseReceiptAdjustment(ctx context.Context, adjus
 	if err := lockPurchaseReceiptAdjustment(ctx, tx, adjustmentID); err != nil {
 		return nil, err
 	}
-	if _, scoped := biz.WarehouseDataScopeFromContext(ctx); scoped {
-		row, err := tx.client.PurchaseReceiptAdjustment.Get(ctx, adjustmentID)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := purchaseReceiptAdjustmentWithItems(ctx, tx.client, row); err != nil {
-			return nil, err
-		}
-	}
 	adjustment, err := tx.client.PurchaseReceiptAdjustment.Get(ctx, adjustmentID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -355,15 +335,6 @@ func (r *inventoryRepo) CancelPostedPurchaseReceiptAdjustment(ctx context.Contex
 
 	if err := lockPurchaseReceiptAdjustment(ctx, tx, adjustmentID); err != nil {
 		return nil, err
-	}
-	if _, scoped := biz.WarehouseDataScopeFromContext(ctx); scoped {
-		row, err := tx.client.PurchaseReceiptAdjustment.Get(ctx, adjustmentID)
-		if err != nil {
-			return nil, err
-		}
-		if _, err := purchaseReceiptAdjustmentWithItems(ctx, tx.client, row); err != nil {
-			return nil, err
-		}
 	}
 	adjustment, err := tx.client.PurchaseReceiptAdjustment.Get(ctx, adjustmentID)
 	if err != nil {
@@ -497,15 +468,6 @@ func (r *inventoryRepo) GetPurchaseReceiptAdjustment(ctx context.Context, id int
 func (r *inventoryRepo) ListPurchaseReceiptAdjustments(ctx context.Context, filter biz.PurchaseReceiptAdjustmentFilter) (_ []*biz.PurchaseReceiptAdjustment, _ int, resultErr error) {
 	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	query := r.data.postgres.PurchaseReceiptAdjustment.Query()
-	if scope, scoped := biz.WarehouseDataScopeFromContext(ctx); scoped {
-		if scope.Mode == biz.DataScopeModeNone {
-			return []*biz.PurchaseReceiptAdjustment{}, 0, nil
-		}
-		if !scope.IsAll() {
-			query = query.Where(purchasereceiptadjustment.HasItems(), purchasereceiptadjustment.Not(purchasereceiptadjustment.HasItemsWith(purchasereceiptadjustmentitem.WarehouseIDNotIn(scope.WarehouseIDs...))))
-		}
-	}
-
 	if filter.Status != "" {
 		query = query.Where(purchasereceiptadjustment.Status(filter.Status))
 	}
@@ -592,11 +554,6 @@ func resolvePurchaseReceiptAdjustmentReplay(ctx context.Context, client *ent.Cli
 	}
 	if len(items) != *row.IdempotencyItemCount {
 		return nil, true, fmt.Errorf("purchase receipt adjustment %d idempotency result item set is incomplete", row.ID)
-	}
-	if _, scoped := biz.WarehouseDataScopeFromContext(ctx); scoped {
-		if _, err := purchaseReceiptAdjustmentWithItems(ctx, client, row); err != nil {
-			return nil, true, err
-		}
 	}
 	return entPurchaseReceiptAdjustmentToBiz(row, items), true, nil
 }
@@ -977,13 +934,6 @@ func purchaseReceiptAdjustmentWithItems(ctx context.Context, client *ent.Client,
 		Order(ent.Asc(purchasereceiptadjustmentitem.FieldID)).
 		All(ctx)
 	if err != nil {
-		return nil, err
-	}
-	warehouseIDs := make([]int, 0, len(items))
-	for _, item := range items {
-		warehouseIDs = append(warehouseIDs, item.WarehouseID)
-	}
-	if err := biz.ValidateContextWarehouseAccess(ctx, warehouseIDs); err != nil {
 		return nil, err
 	}
 	return entPurchaseReceiptAdjustmentToBiz(adjustment, items), nil

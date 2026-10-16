@@ -4,7 +4,6 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
-import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -49,6 +48,7 @@ import {
   savePurchaseOrderWithItems,
 } from '../api/masterDataOrderApi.mjs'
 import {
+  buildPurchaseOrderStats,
   buildSelectedPurchaseOrderItems,
   canCreateInboundDraftFromPurchaseOrder,
   canEditPurchaseOrderSelection,
@@ -375,7 +375,7 @@ export default function PurchaseOrdersPage() {
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) return false
       setReferenceDataState('error')
-      showPageLoadError(error, '加载采购基础资料失败')
+      message.error(getActionErrorMessage(error, '加载采购基础资料失败'))
       return false
     } finally {
       if (request.isCurrent()) request.finish()
@@ -397,7 +397,7 @@ export default function PurchaseOrdersPage() {
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) return false
       setInboundReferenceDataState('error')
-      showPageLoadError(error, '加载采购入库仓库资料失败')
+      message.error(getActionErrorMessage(error, '加载采购入库仓库资料失败'))
       return false
     } finally {
       if (request.isCurrent()) request.finish()
@@ -509,7 +509,7 @@ export default function PurchaseOrdersPage() {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return false
       }
-      showPageLoadError(error, '加载采购订单失败')
+      message.error(getActionErrorMessage(error, '加载采购订单失败'))
       return false
     } finally {
       if (request.isCurrent()) {
@@ -538,7 +538,9 @@ export default function PurchaseOrdersPage() {
           candidateSourceID === workflowTaskSourceIDRef.current,
         listTasks: listWorkflowTasks,
         onError: (error) =>
-          showPageLoadError(error, '加载当前采购订单任务失败'),
+          message.error(
+            getActionErrorMessage(error, '加载当前采购订单任务失败')
+          ),
         setLoadState: setWorkflowTaskLoadState,
         setTasks: setWorkflowTasks,
         sourceID: requestedSourceID,
@@ -1272,6 +1274,10 @@ export default function PurchaseOrdersPage() {
     [singleSelectedOrder, workflowTasks]
   )
 
+  const stats = buildPurchaseOrderStats({
+    orders,
+    total,
+  })
   const selectedOrderDisplayText = selectedPurchaseOrderDisplayText({
     resolveSupplierName,
     selectedOrders,
@@ -1317,7 +1323,7 @@ export default function PurchaseOrdersPage() {
       if (isResourceVersionConflict(error)) {
         message.warning('采购订单已被其他操作更新，请刷新后重试')
       } else {
-        showPageLoadError(error, '加载采购订单材料顺序')
+        message.error(getActionErrorMessage(error, '加载采购订单材料顺序'))
       }
     } finally {
       if (lineOrderRequestRef.current === requestID) {
@@ -1463,6 +1469,7 @@ export default function PurchaseOrdersPage() {
         viewSwitch={purchaseViewSwitch}
         helpKey="accessories-purchase"
         title="采购订单"
+        stats={stats}
         compact
       />
 

@@ -56,8 +56,6 @@ type PurchaseRejectionDispositionCreate struct {
 type PurchaseRejectionDispositionMutation struct {
 	ID, ExpectedVersion, ActorID int
 	Reason                       string
-	CountedQuantity              *decimal.Decimal
-	WarehouseScope               *WarehouseDataScope
 }
 type PurchaseRejectionDispositionFilter struct {
 	QualityInspectionID, PurchaseReceiptID int

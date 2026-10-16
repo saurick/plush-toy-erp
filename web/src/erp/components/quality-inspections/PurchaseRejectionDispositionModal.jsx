@@ -11,10 +11,6 @@ import {
   Tag,
 } from 'antd'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
-import { sumNumeric20Scale6Values,
-  isPositiveNumeric20Scale6Units,
-  numeric20Scale6Units,
-} from '../../utils/numeric20Scale6.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
@@ -33,6 +29,10 @@ import {
   sourceBusinessActionNo,
   sourceBusinessActionUUID,
 } from '../../utils/sourceBusinessAction.mjs'
+import {
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from '../../utils/numeric20Scale6.mjs'
 
 const STATUS_META = Object.freeze({
   DRAFT: { label: '草稿', color: 'blue' },
@@ -44,7 +44,6 @@ export default function PurchaseRejectionDispositionModal({
   open,
   inspection,
   canPost = false,
-  canReceiveReplacement = false,
   canCancel = false,
   onClose,
   onChanged,
@@ -52,18 +51,12 @@ export default function PurchaseRejectionDispositionModal({
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(false)
   const [record, setRecord] = useState(null)
-  const [postConfirmOpen, setPostConfirmOpen] = useState(false)
   const attemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const onChangedRef = useRef(onChanged)
   useEffect(() => {
     onChangedRef.current = onChanged
   }, [onChanged])
-  const sourceRef = useRef(null)
-  sourceRef.current = open ? Number(inspection?.id || 0) : null
   const [history, setHistory] = useState([])
-  useEffect(() => {
-    setPostConfirmOpen(false)
-  }, [open, record?.id, record?.status])
   useEffect(() => {
     if (!record) return
     form.setFieldsValue({
@@ -72,16 +65,10 @@ export default function PurchaseRejectionDispositionModal({
       quantity: record.quantity,
       reason: record.reason,
       cancel_reason: '',
-      counted_quantity: '',
     })
   }, [form, record])
 
   const remember = useCallback((next) => {
-    if (
-      !sourceRef.current ||
-      Number(next?.quality_inspection_id) !== sourceRef.current
-    )
-      { return }
     setRecord(next || null)
     if (next?.id) {
       setHistory((current) => [
@@ -110,11 +97,8 @@ export default function PurchaseRejectionDispositionModal({
   )
 
   useEffect(() => {
-    setHistory([])
+    if (!open) return
     setRecord(null)
-    if (!open || !inspection?.id) return
-    let active = true
-    const controller = new AbortController()
     form.resetFields()
     form.setFieldsValue({
       disposition_no: sourceBusinessActionNo(
@@ -127,16 +111,12 @@ export default function PurchaseRejectionDispositionModal({
       reason: '首次来料检验不合格',
       cancel_reason: '',
     })
-    listPurchaseRejectionDispositions(
-      {
-        quality_inspection_id: Number(inspection?.id || 0),
-        limit: 50,
-        offset: 0,
-      },
-      { signal: controller.signal }
-    )
+    listPurchaseRejectionDispositions({
+      quality_inspection_id: Number(inspection?.id || 0),
+      limit: 50,
+      offset: 0,
+    })
       .then((data) => {
-        if (!active) return
         const rows = Array.isArray(data?.purchase_rejection_dispositions)
           ? data.purchase_rejection_dispositions
           : []
@@ -145,14 +125,9 @@ export default function PurchaseRejectionDispositionModal({
           rows.find((item) => item?.status === 'DRAFT') || rows[0] || null
         )
       })
-      .catch((error) => {
-        if (active)
-          { message.error(getActionErrorMessage(error, '读取来料处置记录')) }
-      })
-    return () => {
-      active = false
-      controller.abort()
-    }
+      .catch((error) =>
+        message.error(getActionErrorMessage(error, '读取来料处置记录'))
+      )
   }, [form, inspection?.id, inspection?.inspection_no, open, recover])
 
   const create = async () => {
@@ -216,21 +191,6 @@ export default function PurchaseRejectionDispositionModal({
 
   const transition = async (action) => {
     if (!record?.id) return
-    const replacement = record.disposition_type === 'REPLACE'
-    if (
-      action === 'post' &&
-      (!canPost || (replacement && !canReceiveReplacement))
-    )
-      { return }
-    let countedQuantity
-    if (action === 'post' && replacement) {
-      try {
-        const values = await form.validateFields(['counted_quantity'])
-        countedQuantity = String(values.counted_quantity).trim()
-      } catch {
-        return
-      }
-    }
     const cancelReason = String(
       form.getFieldValue('cancel_reason') || ''
     ).trim()
@@ -245,7 +205,6 @@ export default function PurchaseRejectionDispositionModal({
           ? await postPurchaseRejectionDisposition({
               id: record.id,
               expected_version: record.version,
-              ...(replacement ? { counted_quantity: countedQuantity } : {}),
             })
           : await cancelPurchaseRejectionDisposition({
               id: record.id,
@@ -271,17 +230,6 @@ export default function PurchaseRejectionDispositionModal({
     } finally {
       setLoading(false)
     }
-  }
-
-  const changePostConfirmation = async (nextOpen) => {
-    if (nextOpen && record?.disposition_type === 'REPLACE') {
-      try {
-        await form.validateFields(['counted_quantity'])
-      } catch {
-        return
-      }
-    }
-    setPostConfirmOpen(nextOpen)
   }
 
   const status = STATUS_META[record?.status] || null
@@ -323,18 +271,10 @@ export default function PurchaseRejectionDispositionModal({
               </Button>
             </Popconfirm>
           ) : null}
-          {record?.status === 'DRAFT' &&
-          canPost &&
-          (record.disposition_type !== 'REPLACE' || canReceiveReplacement) ? (
+          {record?.status === 'DRAFT' && canPost ? (
             <Popconfirm
               title="确认退厂处置？"
-              open={postConfirmOpen}
-              onOpenChange={changePostConfirmation}
-              description={
-                record.disposition_type === 'REPLACE'
-                  ? '请确认补换实物已到货且已逐项清点。实点数量必须与本笔补换一致，确认后才交 IQC 重新检验。'
-                  : '确认本笔退厂数量及实物交接。原收货未入库，不生成库存退货流水。'
-              }
+              description="确认后登记当前来源行的处置数量；退厂不会生成库存退货流水，补换会生成新的待收与待检记录。"
               okText="确认处置"
               cancelText="返回"
               onConfirm={() => transition('post')}
@@ -350,14 +290,14 @@ export default function PurchaseRejectionDispositionModal({
       <Alert
         type="warning"
         showIcon
-        message="采购按不合格来源行登记退厂或补换方案。补换由仓库实点到货后确认，再交 IQC 重新检验；部分处置不会取消整张收货。"
+        message="该入口按当前不合格来源行和数量办理退厂或供应商补换；部分处置不会取消整张收货，补换确认后会生成新的待收与待检记录。"
       />
       {history.length > 0 ? (
         <Alert
           style={{ marginTop: 12 }}
           type="info"
           showIcon
-          message={`已登记 ${history.length} 笔处置，累计数量 ${sumNumeric20Scale6Values(history.filter((item) => item.status !== 'CANCELLED').map((item) => item.quantity))}`}
+          message={`已登记 ${history.length} 笔处置，累计数量 ${history.filter((item) => item.status !== 'CANCELLED').reduce((sum, item) => sum + Number(item.quantity || 0), 0)}`}
         />
       ) : null}
       {history.length > 0 ? (
@@ -468,35 +408,6 @@ export default function PurchaseRejectionDispositionModal({
             disabled={Boolean(record)}
           />
         </Form.Item>
-        {record?.status === 'DRAFT' && record.disposition_type === 'REPLACE' ? (
-          <Form.Item
-            name="counted_quantity"
-            label="补换实际到货数量"
-            extra={
-              canReceiveReplacement
-                ? '按实物清点填写；数量与本笔方案不符时，先取消本笔并按实际数量重新登记。'
-                : '等待仓库实点并确认，采购登记方案不代表补换已到货。'
-            }
-            rules={[
-              { required: true, message: '请填写补换实际到货数量' },
-              unitQuantityRule(inspection?.unit_precision, { positive: true }),
-              {
-                validator: (_, value) =>
-                  isPositiveNumeric20Scale6Units(numeric20Scale6Units(value)) &&
-                  numeric20Scale6Units(value) ===
-                    numeric20Scale6Units(record.quantity)
-                    ? Promise.resolve()
-                    : Promise.reject(
-                        new Error(
-                          '实点数量须与本笔补换一致；不一致请先调整处置方案'
-                        )
-                      ),
-              },
-            ]}
-          >
-            <Input inputMode="decimal" disabled={!canReceiveReplacement} />
-          </Form.Item>
-        ) : null}
         {record && record.status !== 'CANCELLED' && canCancel ? (
           <Form.Item name="cancel_reason" label="取消原因（取消时必填）">
             <Input.TextArea rows={2} maxLength={255} showCount />
