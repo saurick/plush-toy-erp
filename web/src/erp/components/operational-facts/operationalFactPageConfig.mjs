@@ -765,32 +765,6 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
   return columnsByKey[activeKey] || []
 }
 
-export function buildOperationalFactStats({
-  activeRows = [],
-  activeTotal = 0,
-  showStatusSummary = true,
-}) {
-  if (!showStatusSummary) {
-    return [
-      { key: 'total', label: '符合条件', value: activeTotal },
-      { key: 'current', label: '本页显示', value: activeRows.length },
-    ]
-  }
-  const activeDraftCount = activeRows.filter(
-    (item) => item.status === 'DRAFT'
-  ).length
-  const postedCount = activeRows.filter((item) =>
-    ['POSTED', 'SHIPPED', 'SETTLED', 'CONSUMED'].includes(item.status)
-  ).length
-
-  return [
-    { key: 'total', label: '总记录', value: activeTotal },
-    { key: 'current', label: '本页显示', value: activeRows.length },
-    { key: 'draft', label: '草稿', value: activeDraftCount },
-    { key: 'posted', label: '已生效', value: postedCount },
-  ]
-}
-
 export function getOperationalFactAttachmentOwnerType(activeKey) {
   return (
     {

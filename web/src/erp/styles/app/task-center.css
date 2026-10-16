@@ -4,13 +4,13 @@
 
 .erp-dashboard-task-board-card > .ant-card-body {
   container: task-board / inline-size;
-  padding: 16px;
+  padding: 10px 12px;
 }
 
 .erp-dashboard-task-board-card .erp-dashboard-block {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  gap: 10px;
   align-items: start;
 }
 
@@ -38,56 +38,14 @@
 
 .erp-task-center-summary > .ant-btn {
   flex: 0 0 auto;
-  width: 36px;
-  height: 36px;
+  width: max(36px, var(--erp-touch-target, 0px));
+  height: max(36px, var(--erp-touch-target, 0px));
 }
 
 .erp-task-board-scope-filter {
-  --erp-task-scope-selected-text: #fff;
-
   min-width: 0;
-}
-
-.erp-task-board-scope-filter .ant-segmented {
-  max-width: 100%;
-  padding: 3px;
-}
-
-.erp-task-board-scope-filter .ant-segmented-group {
-  gap: 4px;
-}
-
-.erp-task-board-scope-filter .ant-segmented-item {
-  min-width: 112px;
-}
-
-.erp-task-board-scope-filter .ant-segmented-item-label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
-  padding: 0 12px;
-  font-weight: 600;
-}
-
-.erp-task-board-scope-filter .ant-segmented-item-icon {
-  display: inline-flex;
-  opacity: 0;
-}
-
-.erp-task-board-scope-filter
-  .erp-segmented-item-selected
-  .ant-segmented-item-icon {
-  opacity: 1;
-}
-
-.erp-task-board-scope-filter .ant-segmented:focus-visible,
-.erp-task-board-scope-filter .ant-segmented-item-focused {
-  outline-offset: 2px;
-}
-
-[data-erp-theme='dark'] .erp-task-board-scope-filter {
-  --erp-task-scope-selected-text: #111827;
+  margin-bottom: 0;
+  overflow-x: auto;
 }
 
 .erp-task-board-categories > .ant-tabs-nav {
@@ -105,7 +63,7 @@
   background: var(--erp-surface-bg-soft, #f4f7f5);
   padding: 1px 6px;
   color: var(--erp-text-muted, #667085);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 400;
   font-variant-numeric: tabular-nums;
   line-height: 20px;
@@ -124,11 +82,23 @@
   padding: 0;
 }
 
-@container task-board (max-width: 640px) {
-  .erp-task-board-scope-filter .ant-segmented-item-label {
-    min-height: 42px;
+.erp-task-board-controls .erp-task-progress-rail {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+@container task-board (max-width: 960px) {
+  .erp-task-board-controls .erp-business-operation-panel__quick {
+    flex-basis: 100%;
   }
 
+  .erp-task-board-controls .erp-business-operation-panel__search {
+    flex: 1 1 220px;
+    min-width: min(220px, 100%);
+  }
+}
+
+@container task-board (max-width: 640px) {
   .erp-dashboard-task-board-card .erp-task-tracking-views.ant-segmented .ant-segmented-item-label {
     min-height: 44px;
     padding-inline: 8px;
@@ -213,10 +183,9 @@
 .erp-task-board-lane .ant-card-head {
   min-height: 44px;
   border-bottom-color: var(--erp-task-board-lane-border);
-  /* 标题与色条统一由外层卡片裁切，避免内外圆角形成错位弧线。 */
+  /* 标题背景由外层卡片裁切，保持内外圆角一致。 */
   border-radius: 0;
   background: var(--erp-task-board-lane-head-bg);
-  box-shadow: inset 3px 0 0 var(--erp-task-board-lane-accent);
 }
 
 .erp-task-board-lane > .ant-card-body {
@@ -240,12 +209,6 @@
 
 .erp-task-board-lane-heading > .anticon {
   color: var(--erp-task-board-lane-accent);
-}
-
-.erp-task-board-lane-count {
-  color: var(--erp-text-muted, #667085);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
 }
 
 .erp-task-board-list {
@@ -318,7 +281,7 @@
 .erp-task-board-card-meta.ant-typography {
   display: block;
   margin: 0;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-task-board-card-source.ant-typography {
@@ -412,7 +375,7 @@
 .erp-task-action-drawer__meta-grid span,
 .erp-task-action-drawer__reason span {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.35;
 }
 
@@ -461,7 +424,7 @@
 .erp-task-action-drawer__section-title {
   margin: 0;
   color: var(--erp-text);
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
   font-weight: 700;
   line-height: 1.45;
 }
@@ -493,7 +456,7 @@
 
 .erp-task-action-drawer__meta-grid strong,
 .erp-task-action-drawer__reason strong {
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.45;
 }
 
@@ -525,7 +488,7 @@
 .erp-task-action-drawer__responsibility
   .erp-task-action-drawer__responsibility-role {
   color: var(--erp-text);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   font-weight: 800;
 }
 
@@ -554,7 +517,7 @@
 
 .erp-task-action-drawer__reason-contact {
   color: #7f1d1d;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.5;
 }
 
@@ -568,12 +531,12 @@
 .erp-task-action-drawer__outcome-note {
   display: grid;
   gap: 4px;
-  border-left: 3px solid var(--erp-primary, #2b8a3e);
+  border: 1px solid var(--erp-border);
   border-radius: 6px;
   background: var(--erp-surface-bg-soft, #f7faf7);
   padding: 9px 11px;
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.5;
 }
 
@@ -582,7 +545,7 @@
 }
 
 .erp-task-action-drawer__outcome-note[data-tone='warning'] {
-  border-left-color: #d97706;
+  border-color: color-mix(in srgb, var(--erp-warning-text) 35%, var(--erp-border));
 }
 
 .erp-task-action-drawer__guide {
@@ -606,13 +569,13 @@
   gap: 7px;
   align-items: center;
   min-width: 0;
-  min-height: 38px;
+  min-height: max(38px, var(--erp-touch-target, 0px));
   border: 0;
   background: transparent;
   padding: 6px 8px;
   color: var(--erp-control-text);
   font: inherit;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   text-align: left;
   cursor: pointer;
 }
@@ -635,7 +598,7 @@
   border: 1px solid var(--erp-border-strong);
   border-radius: 999px;
   color: inherit;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 700;
 }
 
@@ -678,7 +641,7 @@
 .erp-task-action-drawer__action-prompt span {
   display: block;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
@@ -697,7 +660,7 @@
 
 .erp-task-action-drawer__assignment > label {
   color: var(--erp-text);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   font-weight: 600;
 }
 
@@ -800,7 +763,7 @@
 .erp-task-action-drawer__action-option small {
   margin-top: 3px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.45;
 }
 
@@ -822,7 +785,7 @@
 .erp-task-action-drawer__confirm-head span,
 .erp-task-action-drawer__confirm-list dt {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-task-action-drawer__confirm-head strong {
@@ -893,5 +856,5 @@
 
 .erp-task-action-drawer .erp-task-timing--detail dt {
   width: auto;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }

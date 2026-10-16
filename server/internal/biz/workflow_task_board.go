@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const (
@@ -45,6 +46,12 @@ var workflowTaskBoardDueFilters = map[string]struct{}{
 	"overdue": {},
 	"dueSoon": {},
 	"noDue":   {},
+}
+
+// Extra list filters use the same contract in the board and role-task views.
+func ValidWorkflowTaskListFilters(due, sourceType string) bool {
+	_, ok := workflowTaskBoardDueFilters[due]
+	return ok && utf8.ValidString(sourceType) && utf8.RuneCountInString(sourceType) <= WorkflowTaskSourceTypeMaxLength && sourceType == strings.TrimSpace(sourceType)
 }
 
 var workflowTaskBoardSortKeys = map[string]struct{}{
@@ -119,6 +126,11 @@ func (uc *WorkflowUsecase) GetTaskBoard(ctx context.Context, query WorkflowTaskB
 }
 
 func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTaskBoardQuery, error) {
+	if query.Calendar != nil {
+		if _, _, err := query.Calendar.Bounds(); err != nil || !query.TodoOnly || query.ApprovalOnly || query.LaneKey != "" || query.Offset != 0 {
+			return WorkflowTaskBoardQuery{}, ErrBadParam
+		}
+	}
 	if query.TodoOnly && query.ApprovalOnly {
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
@@ -160,7 +172,7 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 	if _, ok := workflowTaskBoardFilterStatuses[query.Status]; !ok {
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
-	if _, ok := workflowTaskBoardDueFilters[query.Due]; !ok {
+	if !ValidWorkflowTaskListFilters(query.Due, query.SourceType) {
 		return WorkflowTaskBoardQuery{}, ErrBadParam
 	}
 	if query.LaneKey != "" && !isWorkflowTaskBoardLaneKey(query.LaneKey) {
@@ -185,6 +197,16 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 		query.SnapshotAt = time.Now()
 	}
 	query.SnapshotAt = time.Unix(query.SnapshotAt.Unix(), 0).UTC()
+	if query.Period != "" || query.DateFrom != "" || query.DateTo != "" {
+		if query.LaneKey != WorkflowTaskBoardLaneFinished || query.TodoOnly || query.ApprovalOnly {
+			return WorkflowTaskBoardQuery{}, ErrBadParam
+		}
+	}
+	var dateErr error
+	query.CompletedFrom, query.CompletedBefore, dateErr = WorkflowRoleTaskHistoryDateBounds(query.Period, query.DateFrom, query.DateTo, query.SnapshotAt)
+	if dateErr != nil {
+		return WorkflowTaskBoardQuery{}, dateErr
+	}
 	return query, nil
 }
 

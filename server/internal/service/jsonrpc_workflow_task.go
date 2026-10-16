@@ -27,6 +27,9 @@ const (
 )
 
 type workflowRoleTaskViewRequest struct {
+	Due        string
+	SourceType string
+	Calendar   *biz.WorkflowTaskCalendarQuery
 	biz.WorkflowTaskDiscoveryFilter
 	Keyword              string
 	SortKey              string
@@ -53,6 +56,8 @@ type workflowRoleTaskViewRequest struct {
 }
 
 type workflowRoleTaskViewCursor struct {
+	Due        string `json:"due"`
+	SourceType string `json:"source_type"`
 	biz.WorkflowTaskDiscoveryFilter
 	Keyword        string     `json:"keyword"`
 	SortKey        string     `json:"sort_key"`
@@ -332,11 +337,13 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			"owner_role_key",
 			"due",
 			"source_type",
+			"period", "date_from", "date_to",
 			"module_key", "stage_key", "chain_key", "assignee",
 			"lane_key",
 			"sort",
 			"approval_only",
 			"todo_only",
+			"calendar_month", "calendar_selection", "calendar_offset",
 			"limit",
 			"offset",
 		); res != nil {
@@ -490,13 +497,17 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "due_at 必须是 Unix 秒时间戳"}, nil
 		}
+		sourceID, validSourceID := getRequiredJSONRPCPositiveInt(pm, "source_id")
+		if !validSourceID {
+			return id, invalidParamResult(), nil
+		}
 		task, err := d.workflowUC.CreateTask(ctx, &biz.WorkflowTaskCreate{
 			IdempotencyKey:        idempotencyKey,
 			TaskCode:              getString(pm, "task_code"),
 			TaskGroup:             getString(pm, "task_group"),
 			TaskName:              getString(pm, "task_name"),
 			SourceType:            getString(pm, "source_type"),
-			SourceID:              getInt(pm, "source_id", 0),
+			SourceID:              sourceID,
 			SourceNo:              getWorkflowStringPtr(pm, "source_no"),
 			BusinessStatusKey:     getWorkflowStringPtr(pm, "business_status_key"),
 			TaskStatusKey:         getString(pm, "task_status_key"),
@@ -651,6 +662,10 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 }
 
 func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *v1.JsonrpcResult) {
+	calendar, calendarRes := parseWorkflowTaskCalendar(pm)
+	if calendarRes != nil {
+		return biz.WorkflowTaskBoardQuery{}, calendarRes
+	}
 	discovery, discoveryRes := getWorkflowTaskDiscoveryFilter(pm)
 	if discoveryRes != nil {
 		return biz.WorkflowTaskBoardQuery{}, discoveryRes
@@ -710,7 +725,17 @@ func getWorkflowTaskBoardQuery(pm map[string]any) (biz.WorkflowTaskBoardQuery, *
 	if !ok || offset > workflowTaskBoardMaxOffset {
 		return biz.WorkflowTaskBoardQuery{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "offset 必须是非负整数"}
 	}
+	var period, dateFrom, dateTo string
+	for key, target := range map[string]*string{"period": &period, "date_from": &dateFrom, "date_to": &dateTo} {
+		value, failure := getOptionalWorkflowTaskBoardString(pm, key, 10)
+		if failure != nil {
+			return biz.WorkflowTaskBoardQuery{}, failure
+		}
+		*target = value
+	}
 	return biz.WorkflowTaskBoardQuery{
+		Period: period, DateFrom: dateFrom, DateTo: dateTo,
+		Calendar:                    calendar,
 		WorkflowTaskDiscoveryFilter: discovery,
 		Keyword:                     keyword,
 		Status:                      status,
@@ -815,6 +840,9 @@ func workflowWorkbenchToMap(workbench *biz.WorkflowWorkbenchPage) map[string]any
 func workflowTaskBoardToMap(board *biz.WorkflowTaskBoard) map[string]any {
 	if board == nil {
 		return nil
+	}
+	if board.Calendar != nil {
+		return workflowTaskCalendarToMap(board.Calendar)
 	}
 	lanes := make([]any, 0, len(board.Lanes))
 	for _, lane := range board.Lanes {
@@ -1285,13 +1313,21 @@ func parseWorkflowRoleTaskViewRequest(
 	pm map[string]any,
 	method string,
 ) (workflowRoleTaskViewRequest, *v1.JsonrpcResult) {
-	if res := rejectUnknownWorkflowTaskParams(pm, method, "view_key", "role_key", "limit", "cursor", "keyword", "sort_key", "status_key", "period", "date_from", "date_to", "module_key", "stage_key", "chain_key", "assignee"); res != nil {
+	if res := rejectUnknownWorkflowTaskParams(pm, method, "view_key", "role_key", "limit", "cursor", "keyword", "sort_key", "status_key", "due", "source_type", "period", "date_from", "date_to", "module_key", "stage_key", "chain_key", "assignee", "calendar_month", "calendar_selection", "calendar_offset"); res != nil {
 		return workflowRoleTaskViewRequest{}, res
 	}
+	calendar, calendarRes := parseWorkflowTaskCalendar(pm)
+	if calendarRes != nil {
+		return workflowRoleTaskViewRequest{}, calendarRes
+	}
+	if calendar != nil && (getString(pm, "view_key") != biz.WorkflowRoleTaskViewTodo || pm["cursor"] != nil || method != "list_role_tasks") {
+		return workflowRoleTaskViewRequest{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "待办日历查询条件无效"}
+	}
 	request := workflowRoleTaskViewRequest{
-		Method:  method,
-		ViewKey: strings.TrimSpace(getString(pm, "view_key")),
-		RoleKey: biz.NormalizeRoleKey(getString(pm, "role_key")),
+		Calendar: calendar,
+		Method:   method,
+		ViewKey:  strings.TrimSpace(getString(pm, "view_key")),
+		RoleKey:  biz.NormalizeRoleKey(getString(pm, "role_key")),
 	}
 	if request.ViewKey == "" || request.RoleKey == "" {
 		return workflowRoleTaskViewRequest{}, &v1.JsonrpcResult{
@@ -1306,7 +1342,7 @@ func parseWorkflowRoleTaskViewRequest(
 		}
 		request.Keyword = strings.TrimSpace(value)
 	}
-	for key, target := range map[string]*string{"sort_key": &request.SortKey, "status_key": &request.StatusKey, "period": &request.Period, "date_from": &request.DateFrom, "date_to": &request.DateTo} {
+	for key, target := range map[string]*string{"due": &request.Due, "source_type": &request.SourceType, "sort_key": &request.SortKey, "status_key": &request.StatusKey, "period": &request.Period, "date_from": &request.DateFrom, "date_to": &request.DateTo} {
 		if raw, exists := pm[key]; exists {
 			value, ok := raw.(string)
 			if !ok || value == "" || value != strings.TrimSpace(value) {
@@ -1316,6 +1352,7 @@ func parseWorkflowRoleTaskViewRequest(
 		}
 	}
 	if !biz.ValidWorkflowRoleTaskListOptions(request.ViewKey, request.SortKey, request.StatusKey) ||
+		!biz.ValidWorkflowTaskListFilters(request.Due, request.SourceType) ||
 		(request.ViewKey != biz.WorkflowRoleTaskViewHistory && (request.Period != "" || request.DateFrom != "" || request.DateTo != "")) {
 		return workflowRoleTaskViewRequest{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务筛选或排序无效"}
 	}
@@ -1351,6 +1388,7 @@ func parseWorkflowRoleTaskViewRequest(
 			cursorState.ViewKey != request.ViewKey ||
 			cursorState.RoleKey != request.RoleKey || cursorState.Keyword != request.Keyword ||
 			cursorState.SortKey != request.SortKey || cursorState.StatusKey != request.StatusKey ||
+			cursorState.Due != request.Due || cursorState.SourceType != request.SourceType ||
 			cursorState.Period != request.Period || cursorState.DateFrom != request.DateFrom || cursorState.DateTo != request.DateTo {
 			if cursorRes != nil {
 				return workflowRoleTaskViewRequest{}, cursorRes
@@ -1413,6 +1451,7 @@ func decodeWorkflowRoleTaskViewCursor(cursor string) (workflowRoleTaskViewCursor
 	}
 	if !biz.ValidWorkflowTaskDiscoveryFilter(decoded.WorkflowTaskDiscoveryFilter) || decoded.Version != workflowRoleTaskViewCursorVersion ||
 		!biz.ValidWorkflowRoleTaskListOptions(decoded.ViewKey, decoded.SortKey, decoded.StatusKey) ||
+		!biz.ValidWorkflowTaskListFilters(decoded.Due, decoded.SourceType) ||
 		((decoded.SortKey == biz.WorkflowRoleTaskSortNewest || decoded.SortKey == biz.WorkflowRoleTaskSortOldest) && decoded.BeforeTime == nil) ||
 		(decoded.Method != "list_role_tasks" && decoded.Method != "list_workbench_role_tasks") ||
 		decoded.BeforeID <= 0 ||
@@ -1455,26 +1494,31 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 		return invalidWorkflowRoleTaskViewCursorResult()
 	}
 	page, err := d.workflowUC.ListRoleTaskView(ctx, biz.WorkflowRoleTaskViewQuery{
+		Calendar:                    request.Calendar,
 		WorkflowTaskDiscoveryFilter: request.WorkflowTaskDiscoveryFilter,
 		Keyword:                     request.Keyword,
 		SortKey:                     request.SortKey,
 		StatusKey:                   request.StatusKey,
-		CompletedFrom:               request.CompletedFrom,
-		CompletedBefore:             request.CompletedBefore,
-		BeforeTime:                  request.BeforeTime,
-		ViewKey:                     request.ViewKey,
-		RoleKey:                     request.RoleKey,
-		ReviewRoleKeys:              request.ReviewRoleKeys,
-		Limit:                       request.Limit,
-		BeforeID:                    request.BeforeID,
-		IncludeCounts:               includeCounts,
-		CrossRoleRiskAllowed:        crossRoleRisk,
-		SnapshotAt:                  request.SnapshotAt,
-		VisibilityScope:             visibilityScope,
-		ApprovalVisibilityScopes:    approvalVisibilityScopes,
+		Due:                         request.Due, SourceType: request.SourceType,
+		CompletedFrom:            request.CompletedFrom,
+		CompletedBefore:          request.CompletedBefore,
+		BeforeTime:               request.BeforeTime,
+		ViewKey:                  request.ViewKey,
+		RoleKey:                  request.RoleKey,
+		ReviewRoleKeys:           request.ReviewRoleKeys,
+		Limit:                    request.Limit,
+		BeforeID:                 request.BeforeID,
+		IncludeCounts:            includeCounts,
+		CrossRoleRiskAllowed:     crossRoleRisk,
+		SnapshotAt:               request.SnapshotAt,
+		VisibilityScope:          visibilityScope,
+		ApprovalVisibilityScopes: approvalVisibilityScopes,
 	})
 	if err != nil {
 		return d.mapWorkflowError(ctx, err)
+	}
+	if page.Calendar != nil {
+		return &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(workflowTaskCalendarToMap(page.Calendar))}
 	}
 	if includeCounts && (page.Counts == nil || !page.Counts.IsConserved()) {
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
@@ -1505,19 +1549,20 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 			Keyword:                     request.Keyword,
 			SortKey:                     request.SortKey,
 			StatusKey:                   request.StatusKey,
-			Period:                      request.Period,
-			DateFrom:                    request.DateFrom,
-			DateTo:                      request.DateTo,
-			BeforeTime:                  page.NextTime,
-			Method:                      request.Method,
-			ViewKey:                     request.ViewKey,
-			RoleKey:                     request.RoleKey,
-			BeforeID:                    page.NextID,
-			SnapshotUnix:                page.SnapshotAt.Unix(),
-			ExpectedTotal:               cursorExpectedTotal,
-			SeenTotal:                   seenTotal,
-			RiskScope:                   riskScope,
-			ReviewScopeKey:              request.ReviewScopeKey,
+			Due:                         request.Due, SourceType: request.SourceType,
+			Period:         request.Period,
+			DateFrom:       request.DateFrom,
+			DateTo:         request.DateTo,
+			BeforeTime:     page.NextTime,
+			Method:         request.Method,
+			ViewKey:        request.ViewKey,
+			RoleKey:        request.RoleKey,
+			BeforeID:       page.NextID,
+			SnapshotUnix:   page.SnapshotAt.Unix(),
+			ExpectedTotal:  cursorExpectedTotal,
+			SeenTotal:      seenTotal,
+			RiskScope:      riskScope,
+			ReviewScopeKey: request.ReviewScopeKey,
 		})
 		if nextCursor == "" {
 			return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
@@ -1530,6 +1575,7 @@ func (d *jsonrpcDispatcher) queryWorkflowRoleTaskView(
 		"server_time": page.SnapshotAt.Unix(),
 	}
 	if page.Counts != nil {
+		data["status_counts"] = businessStatusCountsToAny(page.StatusCounts)
 		data["counts"] = map[string]any{
 			"ready":     page.Counts.Ready,
 			"blocked":   page.Counts.Blocked,

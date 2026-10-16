@@ -71,6 +71,14 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 	if client == nil {
 		return nil, biz.ErrBadParam
 	}
+	if query.Calendar != nil {
+		base, err := applyWorkflowTaskBoardFilters(applyWorkflowTaskBoardVisibility(client.WorkflowTask.Query(), query), query)
+		if err != nil {
+			return nil, err
+		}
+		calendar, err := loadWorkflowTaskCalendar(ctx, client, base, query.Calendar, query.Limit, query.SnapshotAt)
+		return &biz.WorkflowTaskBoard{Calendar: calendar}, err
+	}
 
 	roleFacetFilter := query
 	roleFacetFilter.OwnerRoleKey = ""
@@ -259,6 +267,12 @@ func applyWorkflowTaskBoardVisibility(query *ent.WorkflowTaskQuery, filter biz.W
 }
 
 func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.WorkflowTaskBoardQuery) (*ent.WorkflowTaskQuery, error) {
+	if filter.CompletedFrom != nil {
+		query = query.Where(workflowtask.CompletedAtGTE(*filter.CompletedFrom))
+	}
+	if filter.CompletedBefore != nil {
+		query = query.Where(workflowtask.CompletedAtLT(*filter.CompletedBefore))
+	}
 	query = query.Where(workflowTaskDiscoveryPredicate(filter.WorkflowTaskDiscoveryFilter))
 	if filter.TodoOnly {
 		query = query.Where(workflowTaskBoardUnsettledStatusPredicate())

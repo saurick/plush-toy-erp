@@ -39,7 +39,7 @@ export default function WorkflowTaskEventTrail({
             本任务处理记录
           </h3>
         </div>
-        <span>{model.summaryLabel}</span>
+        <span>{model.summaryLabel}{model.items.length > 1 ? ' · 最近在前' : ''}</span>
       </div>
 
       {showResponsibility ? (

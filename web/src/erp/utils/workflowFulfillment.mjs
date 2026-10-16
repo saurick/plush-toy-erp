@@ -16,5 +16,21 @@ export function fulfillmentStepMatchesRole(step, role) {
 
 export function fulfillmentTaskLinks(step) {
   return step.stages.map((key) => catalog.stages.find((stage) => stage.key === key))
-    .filter(Boolean).map((stage) => ({ key: stage.key, label: stage.label, href: `/erp/task-board?stage_key=${encodeURIComponent(stage.key)}` }))
+    .filter(Boolean).map((stage) => ({ key: stage.key, label: stage.label, pathLabel: [stage.group, stage.label].filter(Boolean).join(' · '), href: `/erp/task-board?stage_key=${encodeURIComponent(stage.key)}` }))
+}
+
+export function fulfillmentExceptionPath(guide, planKey) {
+  const plan = guide.plans.find((item) => item.key === planKey) || guide.plans[0]
+  const steps = [
+    ...guide.steps,
+    ...(guide.approval ? [{ key: 'approval', label: guide.approval.label, role: guide.approval.role, role_keys: guide.approval.role_keys, result: guide.approval.condition }] : []),
+    ...plan.steps,
+  ].map((step) => ({ ...step, role: step.role || step.role_keys.map((key) => getRoleDisplayName(key)).join(' / ') }))
+  return { plan, steps }
+}
+
+export function selectFulfillmentExceptionGuide(key, role) {
+  return catalog.exception_guides.find((item) => item.key === key)
+    || catalog.exception_guides.find((guide) => guide.plans.some((plan) => fulfillmentExceptionPath(guide, plan.key).steps.some((step) => fulfillmentStepMatchesRole(step, role))))
+    || catalog.exception_guides[0]
 }

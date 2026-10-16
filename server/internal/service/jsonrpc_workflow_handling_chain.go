@@ -42,9 +42,14 @@ func (d *jsonrpcDispatcher) handleWorkflowHandlingChain(ctx context.Context, id 
 	if err != nil {
 		return id, d.mapWorkflowError(ctx, err), nil
 	}
+	items := workflowHandlingChainItems(chain)
+	return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"items": items, "truncated": chain.Truncated})}, nil
+}
+
+func workflowHandlingChainItems(chain *biz.WorkflowHandlingChain) []any {
 	items := make([]any, 0, len(chain.Items))
 	for _, item := range chain.Items {
 		items = append(items, map[string]any{"discovery": workflowTaskDiscoveryToMap(item.Discovery), "assignee_id": item.AssigneeID, "id": item.ID, "task_name": item.Name, "task_group": item.Group, "task_status_key": item.Status, "owner_role_key": item.OwnerRoleKey, "source_type": item.SourceType, "source_no": item.SourceNo, "process_instance_id": item.ProcessInstanceID, "operation_code": item.OperationCode, "batch_no": item.BatchNo, "exception_id": item.ExceptionID, "exception_no": item.ExceptionNo, "exception_operation_code": item.ExceptionOperationCode})
 	}
-	return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{"items": items, "truncated": chain.Truncated})}, nil
+	return items
 }

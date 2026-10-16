@@ -25,7 +25,6 @@ import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import {
   canReadProductionProcess,
-  PRODUCTION_RECORD_VIEW_KEYS,
 } from '../utils/productionRecordViews.mjs'
 import { useOperationalFactQuery } from '../components/operational-facts/useOperationalFactQuery.mjs'
 import { useOperationalFactMutations } from '../components/operational-facts/useOperationalFactMutations.mjs'
@@ -123,7 +122,6 @@ import {
   FINANCE_STATUS_OPTIONS,
   buildOperationalFactColumns,
   buildOperationalFactRelatedMenuItems,
-  buildOperationalFactStats,
   financeSettlementActionFor,
   getOperationalFactAttachmentOwnerType,
   sourceTypeLabel,
@@ -824,15 +822,6 @@ export function OperationalFactWorkspace({
     linkedKeyword
   )
 
-  const pageStats = useMemo(
-    () =>
-      buildOperationalFactStats({
-        activeRows,
-        activeTotal,
-        showStatusSummary: currentActiveKey !== 'finance',
-      }),
-    [activeRows, activeTotal, currentActiveKey]
-  )
   const tabItems = Object.entries(configs).map(([key, config]) => ({
     key,
     label: config.title,
@@ -882,29 +871,6 @@ export function OperationalFactWorkspace({
     processOrdersData.loading ||
     Boolean(selectedProcessOrderID && processAggregateData.loading)
   const processError = processOrdersData.error || processAggregateData.error
-  const productionRecordViewKey =
-    contentView === 'process'
-      ? PRODUCTION_RECORD_VIEW_KEYS.PROCESS
-      : PRODUCTION_RECORD_VIEW_KEYS.RECORDS
-
-  useEffect(() => {
-    if (
-      toolbarModuleKey !== 'production-progress' ||
-      !productionRecordsWorkspace
-    ) {
-      return
-    }
-    productionRecordsWorkspace.setHeaderStats(
-      productionRecordViewKey,
-      pageStats
-    )
-  }, [
-    pageStats,
-    productionRecordViewKey,
-    productionRecordsWorkspace,
-    toolbarModuleKey,
-  ])
-
   const LayoutRoot = productionRecordsWorkspace
     ? React.Fragment
     : BusinessPageLayout
@@ -920,7 +886,6 @@ export function OperationalFactWorkspace({
           title={pageTitle}
           helpKey={toolbarModuleKey}
           viewSwitch={visualizationHeader}
-          stats={pageStats}
         />
       )}
 
@@ -970,6 +935,7 @@ export function OperationalFactWorkspace({
               />
             ) : (
               <SelectFilter
+                aria-label="单据状态"
                 className="erp-business-filter-control--status"
                 value={statusFilter}
                 options={STATUS_OPTIONS}

@@ -180,7 +180,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
           const controls = {
             header: '.mobile-role-task-query',
             search: '.mobile-role-task-search',
-            tabs: '.mobile-role-task-filters, .mobile-role-message-tabs',
+            tabs: '.mobile-role-task-filters',
             filter: '[data-testid="mobile-task-list-filter-trigger"]',
             navigation: '[data-testid="mobile-role-bottom-nav"]',
           }
@@ -367,6 +367,19 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         await assertRefreshLayout(beforePull, `${width}px取消下拉后`)
       }
       await page.setViewportSize({ width: 390, height: 844 })
+      await top()
+      const dragHeights = []
+      await start()
+      for (const y of [500, 570, 640, 710]) {
+        await move(180, y)
+        await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+        dragHeights.push(await indicator.evaluate((node) => node.getBoundingClientRect().height))
+      }
+      assert(dragHeights.every((height, index) => height < 84 && (index === 0 || height > dragHeights[index - 1])), `持续下拉仍有位移，不突然卡在上限：${dragHeights}`)
+      assert(dragHeights[3] - dragHeights[2] < dragHeights[1] - dragHeights[0], '继续下拉时阻力逐渐增强')
+      await send('touchCancel')
+      await state('idle')
+      await waitForFiniteAnimations(page)
       assert.equal(
         await page.locator('.erp-theme-toggle, .erp-appearance-trigger').count(),
         0
@@ -407,10 +420,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
               .scrollTop > 0
         )
         const after = await refreshLayout()
-        assert(
-          after.controls.header.y < before.controls.header.y,
-          '正常浏览时搜索区仍随列表滚动'
-        )
+        assertControlsStay(before, after, '正常上下浏览')
       }, '上滑浏览列表不请求')
       await noRefresh(async () => {
         await scroll.evaluate((node) => {
@@ -464,7 +474,21 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         path: path.join(outputDir, 'mobile-refresh-pull-ready.png'),
         fullPage: true,
       })
-      await end()
+      const [releaseFrames] = await Promise.all([
+        indicator.evaluate((node) => new Promise((resolve) => {
+          const samples = []
+          const started = performance.now()
+          const sample = () => {
+            samples.push(node.getBoundingClientRect().height)
+            if (performance.now() - started < 320) requestAnimationFrame(sample)
+            else resolve(samples)
+          }
+          requestAnimationFrame(sample)
+        })),
+        end(),
+      ])
+      assert(releaseFrames.every((height) => height >= 55), '松手到刷新中不会先收起再展开')
+      assert(releaseFrames.some((height) => height > 57 && height < 66), '松手后连续收拢到刷新提示高度')
       await state('refreshing')
       await page.waitForFunction(
         () =>
@@ -536,9 +560,9 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
       )
       assert.equal(
         await persistedFilterDropdown
-          .getByRole('radio', { name: '阻塞', exact: true })
-          .isChecked(),
-        true
+          .getByRole('button', { name: /^阻塞/u })
+          .getAttribute('aria-pressed'),
+        'true'
       )
       await persistedFilterDropdown
         .getByRole('button', { name: '关闭筛选', exact: true })
@@ -647,6 +671,9 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         fullPage: true,
       })
       await send('touchCancel')
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)))
+      assert.equal(await indicator.evaluate((node) => node.getBoundingClientRect().height), 0, '减少动态效果时取消下拉直接复位')
+      assert.equal(await indicator.evaluate((node) => getComputedStyle(node).transitionDuration), '0s')
       await page.screenshot({
         path: path.join(outputDir, 'mobile-refresh-list-dark.png'),
         fullPage: true,
@@ -676,7 +703,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
           tab: 'done',
           viewKey: 'history',
           label: '已办',
-          emptyText: '暂无已办任务',
+          emptyText: '当前筛选下暂无已办任务',
         },
         {
           tab: 'messages',
@@ -703,7 +730,7 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
             .tap()
         }
         if (messageTab) {
-          await page.getByTestId(`mobile-role-message-tab-${messageTab}`).tap()
+          await page.getByTestId(`mobile-role-risk-filter-${messageTab}`).tap()
         }
         const listRows = page.locator('[data-mobile-task-id]')
         const listIDs = () =>
@@ -816,8 +843,8 @@ export function mobileTaskRefreshScenario({ assert, path, outputDir }) {
         if (messageTab) {
           assert.equal(
             await page
-              .getByTestId(`mobile-role-message-tab-${messageTab}`)
-              .getAttribute('aria-selected'),
+              .getByTestId(`mobile-role-risk-filter-${messageTab}`)
+              .getAttribute('aria-pressed'),
             'true'
           )
         }

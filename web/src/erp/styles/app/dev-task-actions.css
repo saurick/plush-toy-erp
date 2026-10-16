@@ -25,7 +25,7 @@
 }
 
 .erp-task-action-drawer__action-prompt strong {
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
 }
 
 .erp-task-action-drawer__footer {
@@ -62,10 +62,6 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-product-core-dashboard__metrics {
-    grid-template-columns: repeat(2, minmax(118px, 1fr));
-  }
-
   .erp-workbench-queue-filter {
     flex: 1 1 160px;
   }
@@ -98,10 +94,6 @@
   .erp-workbench-panel-head {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .erp-product-core-dashboard__metrics {
-    grid-template-columns: 1fr;
   }
 
   .erp-workbench-queue-filter-strip {

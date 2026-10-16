@@ -9,6 +9,11 @@
   align-items: center;
   min-width: 0;
 }
+.workflow-exceptions__controls {
+  display: grid;
+  gap: inherit;
+  min-width: 0;
+}
 .workflow-exceptions__query > .ant-input-search,
 .workflow-exceptions__query > .erp-mobile-search {
   min-width: 0;
@@ -28,7 +33,7 @@
 .workflow-exceptions p {
   margin: 4px 0;
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   overflow-wrap: anywhere;
 }
 .workflow-exceptions__states {
@@ -36,28 +41,49 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-.workflow-exceptions__views .ant-segmented-item {
-  min-width: 0;
+.workflow-exceptions__states.erp-horizontal-scroll {
+  flex-wrap: nowrap;
+  gap: 6px;
 }
-.workflow-exceptions__views .ant-segmented-item-label {
+.workflow-exceptions__summary,
+.workflow-exceptions__related-links,
+.workflow-exceptions__detail-header {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 6px 8px;
-  white-space: normal;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
+  flex-wrap: wrap;
+  gap: 4px 12px;
 }
-.workflow-exceptions__views strong {
+.workflow-exceptions__summary {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+}
+.workflow-exceptions__related-links {
+  gap: 4px 8px;
+}
+.workflow-exceptions__related-links > .ant-btn {
+  height: auto;
+  min-height: 32px;
+  padding: 0;
+  gap: 4px;
+}
+.workflow-exceptions__summary strong {
   font-variant-numeric: tabular-nums;
+}
+.workflow-exceptions__detail-heading {
+  margin: 0;
+  font-size: 16px;
+}
+.workflow-exceptions__detail-heading > span {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+  font-weight: 400;
 }
 .workflow-exceptions__more {
   display: grid;
   justify-items: center;
   gap: 8px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .workflow-exceptions__item {
   border: 1px solid var(--erp-border);
@@ -78,7 +104,7 @@
 }
 .workflow-exceptions__pending > span {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .workflow-exceptions__task {
   display: grid;
@@ -104,11 +130,13 @@
 .workflow-exceptions__task small,
 .workflow-exceptions__task > span {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   overflow-wrap: anywhere;
 }
 @media (max-width: 767px) {
-  .workflow-exceptions__query > .ant-btn {
+  .workflow-exceptions__query > .ant-btn,
+  .workflow-exceptions__related-links > .ant-btn,
+  .workflow-exceptions__detail-header > .ant-btn {
     min-height: 44px;
   }
 }

@@ -4,7 +4,6 @@ import WorkflowResponsibilities from './WorkflowResponsibilities.jsx'
 import './workflowProcessStageTrack.css'
 
 const STAGE_MARKERS = Object.freeze({
-  active: '●',
   blocked: '!',
   completed: '✓',
   rejected: '↩',
@@ -30,16 +29,18 @@ export default function WorkflowProcessStageTrack({
         .join(' ')}
       data-testid="workflow-process-stage"
       data-handoff-kind={model.handoffKind}
+      data-direction="top-to-bottom"
     >
       <span className="workflow-process-stage__summary">
         {model.summaryLabel}
+        {model.items.length > 1 ? ' · 自上而下 ↓' : ''}
       </span>
 
       <ol
         className="workflow-process-stage__list"
         aria-label={`${model.processLabel}执行轨迹`}
       >
-        {model.items.map((item) => (
+        {model.items.map((item, index) => (
           <li
             key={item.key}
             className={`workflow-process-stage__item workflow-process-stage__item--${item.tone}`}
@@ -47,7 +48,7 @@ export default function WorkflowProcessStageTrack({
             data-linked-task={item.linked ? 'true' : undefined}
           >
             <span className="workflow-process-stage__marker" aria-hidden="true">
-              {STAGE_MARKERS[item.tone]}
+              {STAGE_MARKERS[item.tone] || index + 1}
             </span>
             <span className="workflow-process-stage__content">
               <span className="workflow-process-stage__label">

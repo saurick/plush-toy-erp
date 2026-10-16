@@ -1,17 +1,7 @@
 .workflow-task-discovery { min-width: 0; display: grid; gap: 8px; }
-.workflow-task-discovery__fields { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); gap: 8px; }
-.workflow-task-discovery__fields > label { display: grid; min-width: 0; gap: 4px; color: var(--erp-text-muted); font-size: 12px; }
-.workflow-task-discovery__fields .ant-select { width: 100%; min-width: 0; }
-.workflow-task-discovery__selected { display: flex; gap: 4px; flex-wrap: wrap; }
-.workflow-task-discovery__selected .ant-tag { white-space: normal; overflow-wrap: anywhere; }
-.workflow-task-discovery--compact .workflow-task-discovery__fields { grid-template-columns: 1fr; }
-.workflow-task-discovery__summary { color: var(--erp-text-muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
-@media (max-width: 900px) { .workflow-task-discovery__fields { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-
-.workflow-task-discovery__auxiliary { display: grid; gap: 4px; font-size: 12px; color: var(--erp-text-muted); }
-
-.workflow-task-saved-views { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.workflow-task-saved-views > .ant-select { min-width: 160px; }
-.workflow-task-saved-views__editor { display: grid; gap: 8px; max-width: 280px; }
-.workflow-task-saved-views__editor > div { display: flex; justify-content: space-between; align-items: center; }
-.workflow-task-saved-views__editor small { color: var(--erp-text-muted); }
+.workflow-task-discovery__person { display: grid; min-width: 0; gap: 4px; color: var(--erp-text-muted); font-size: var(--erp-font-caption); }
+.workflow-task-discovery__person .ant-select { width: 100%; min-width: 0; }
+.workflow-task-discovery__context { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--erp-font-caption); color: var(--erp-text-muted); overflow-wrap: anywhere; }
+.workflow-task-discovery__summary { color: var(--erp-text-muted); font-size: var(--erp-font-caption); line-height: 1.6; overflow-wrap: anywhere; }
+.workflow-task-discovery__auxiliary { display: grid; gap: 4px; font-size: var(--erp-font-caption); color: var(--erp-text-muted); }
+.erp-business-filter-popover .workflow-task-discovery { flex: 1 1 180px; }
