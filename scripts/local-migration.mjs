@@ -11,9 +11,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { evaluateMigrationStatus } from "./local-runtime-preflight-core.mjs";
 import { databaseProgrammabilityReceiptSQL } from "./qa/database-programmability.mjs";
+import { sqlCodeStatements } from "./qa/db-guard.mjs";
 import {
   readLocalDatabaseRoles,
   verifyAuditRole,
+  registeredDevelopmentEndpoint,
+  registeredDatabaseSystemIdentifier,
 } from "./local-database-roles.mjs";
 import {
   readRuntimeSource,
@@ -32,7 +35,6 @@ const migrationDir = path.join(serverRoot, "internal/data/model/migrate");
 const migrationScriptPath = fileURLToPath(import.meta.url);
 const stagedLifecycleVersion = "20260726173924";
 const lifecyclePreflightVersion = "20260726173943";
-const registeredSharedDevSystemIdentifier = "7682605996671565865";
 const targetConfirmPrefixes = Object.freeze({
   local: "TRUST_LOCAL_DATABASE:",
   "shared-dev": "TRUST_SHARED_DEV_DATABASE:",
@@ -340,15 +342,18 @@ export function classifyDevelopmentTarget(databaseURL, source) {
   }
 
   let scope = "untrusted";
-  if (isLoopbackHostname(host) && isIsolatedLocalDatabase(database)) {
-    scope = "local";
-  } else if (
+  if (
     source === "application-config" &&
-    host === "192.168.0.133" &&
-    port === "5432" &&
+    registeredDevelopmentEndpoint(host, port) &&
     isRegisteredDevelopmentDatabase(database)
   ) {
     scope = "shared-dev";
+  } else if (
+    !registeredDevelopmentEndpoint(host, port) &&
+    isLoopbackHostname(host) &&
+    isIsolatedLocalDatabase(database)
+  ) {
+    scope = "local";
   }
 
   return {
@@ -416,34 +421,9 @@ export function classifyFailedApply(before, after) {
     : "committed_unverified";
 }
 
-function maskDollarQuotedBodies(source) {
-  let masked = String(source || "");
-  const delimiterPattern = /\$[A-Za-z_][A-Za-z0-9_]*\$|\$\$/gu;
-  let searchFrom = 0;
-  while (searchFrom < masked.length) {
-    delimiterPattern.lastIndex = searchFrom;
-    const opening = delimiterPattern.exec(masked);
-    if (!opening) break;
-    const delimiter = opening[0];
-    const closingIndex = masked.indexOf(
-      delimiter,
-      opening.index + delimiter.length,
-    );
-    if (closingIndex < 0) break;
-    const end = closingIndex + delimiter.length;
-    masked =
-      masked.slice(0, opening.index) +
-      " ".repeat(end - opening.index) +
-      masked.slice(end);
-    searchFrom = end;
-  }
-  return masked;
-}
-
 export function unsafeRehearsalReason(source) {
-  const visible = maskDollarQuotedBodies(source)
-    .replace(/\/\*[\s\S]*?\*\//gu, " ")
-    .replace(/--[^\n]*/gu, " ");
+  if (/^\s*\\/mu.test(String(source || ""))) return "psql command";
+  const visible = sqlCodeStatements(String(source || "")).join("\n");
   const checks = [
     [/\b(?:CREATE|DROP)\s+INDEX\s+CONCURRENTLY\b/iu, "concurrent index"],
     [/\bVACUUM\b/iu, "VACUUM"],
@@ -456,7 +436,10 @@ export function unsafeRehearsalReason(source) {
       /\b(?:lo_import|lo_export|dblink|pg_notify)\s*\(/iu,
       "external side effect",
     ],
-    [/^\s*(?:COMMIT|ROLLBACK|END\s+TRANSACTION)\b/imu, "transaction control"],
+    [
+      /^\s*(?:COMMIT|ROLLBACK|END|ABORT|BEGIN|(?:START|PREPARE)\s+TRANSACTION)\b/imu,
+      "transaction control",
+    ],
   ];
   return checks.find(([pattern]) => pattern.test(visible))?.[1] || "";
 }
@@ -1225,7 +1208,8 @@ async function prepare(command, receipt) {
   }
   if (
     target.scope === "shared-dev" &&
-    identity.systemIdentifier !== registeredSharedDevSystemIdentifier
+    identity.systemIdentifier !==
+      registeredDatabaseSystemIdentifier(repoRoot, resolved.databaseURL)
   ) {
     throw new MigrationCommandError(
       "登记共享开发库的 PostgreSQL cluster identity 不匹配；未执行 migration，集群重建后必须先专项核验并更新项目登记值",

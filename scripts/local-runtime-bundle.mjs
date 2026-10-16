@@ -7,7 +7,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { promisify, parseEnv } from "node:util";
 import { execFile } from "node:child_process";
-import { databaseQuery } from "./local-database-roles.mjs";
+import {
+  databaseQuery,
+  localDatabaseRuntimeEnvironment,
+} from "./local-database-roles.mjs";
 import { databaseProgrammabilityReceiptSQL } from "./qa/database-programmability.mjs";
 
 const exec = promisify(execFile);
@@ -56,6 +59,7 @@ export function readLocalRuntimeEnvironment(root, env = process.env) {
   // identity checks do not. Normalize the effective value so both entrypoints
   // describe the same runtime configuration.
   result.ERP_CUSTOMER_KEY ||= defaultCustomerKey;
+  Object.assign(result, localDatabaseRuntimeEnvironment(root));
   return result;
 }
 
@@ -636,8 +640,7 @@ export async function buildRuntimeBundle(
     (scope === "full" &&
       (currentInputs.attachment !== inputs.attachment ||
         currentInputs.webDependencies !== inputs.webDependencies ||
-        (workspaceVerification === "full" &&
-          currentInputs.web !== inputs.web)))
+        (workspaceVerification === "full" && currentInputs.web !== inputs.web)))
   )
     throw workspaceRuntimeSourceChanged(
       "构建期间编译输入或工具链发生变化，请重新准备",
