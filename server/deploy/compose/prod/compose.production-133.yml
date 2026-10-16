@@ -1,1 +1,10 @@
 name: plush-toy-erp-production
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.254.244.0/28
+  attachment-private:
+    ipam:
+      config:
+        - subnet: 10.254.244.16/28

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -32,6 +32,15 @@ test("production has isolated resources and is excluded from default deployment 
   const targets = loadDeploymentTargetRegistry().targets;
   assert.equal(new Set(targets.map((item) => item.filesystem.root)).size, 3);
   assert.equal(new Set(targets.map((item) => item.database.name)).size, 3);
+});
+
+test("production networks have dedicated subnets and preserve attachment isolation", () => {
+  const override = readFileSync(path.join(repoRoot, "server/deploy/compose/prod/compose.production-133.yml"), "utf8");
+  const base = readFileSync(path.join(repoRoot, "server/deploy/compose/prod/compose.yml"), "utf8");
+  assert.match(override, /default:\n\s+ipam:\n\s+config:\n\s+- subnet: 10\.254\.244\.0\/28/u);
+  assert.match(override, /attachment-private:\n\s+ipam:\n\s+config:\n\s+- subnet: 10\.254\.244\.16\/28/u);
+  assert.match(base, /attachment-private:\n\s+internal: true/u);
+  assert.doesNotMatch(override, /internal: false|external: true/u);
 });
 
 test("production rebuild fails before a release read, preflight or operation write", () => {

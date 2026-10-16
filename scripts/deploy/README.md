@@ -18,6 +18,8 @@
 
 `production-133` 对应 `erp.yoyoosun.net`，仓库已支持独立初始化、预检、发布和代码回滚，但不能据此宣称服务器已启用。首次生产初始化前须准备独立凭据及异机恢复前提，完整上线清单见 [首次部署](../../deployments/yoyoosun/runbooks/01-first-deploy.md)。根域跳转不是生产启用证明；退役 `admin.yoyoosun.net` 不进入任何目标矩阵。
 
+生产目标 Compose override 固定使用 `10.254.244.0/28` 默认网络与 `10.254.244.16/28` 附件内部网络；附件网络继续继承 `internal: true`。首次创建前核对宿主路由及现有 Docker IPAM 无重叠，避免依赖宿主已耗尽的自动地址池。其它应用、测试及演示网络不由该配置调整，不通过清理他人网络或修改 Docker daemon 地址池取得容量。
+
 运行与初始化的只读预检共用 `target-readonly-execution.mjs`。只有 Linux 平台、短主机名、运行用户和本机 IPv4 地址同时匹配 target registry，才在登记宿主机直接执行同一份固定 stdin 脚本；其它入口使用 `BatchMode`、固定地址/端口和 `StrictHostKeyChecking` 的 SSH。SSH 失败不切换本地执行。此选择不改变部署、迁移、重建或恢复写操作的执行合同。
 
 ## 常用入口
