@@ -31,6 +31,7 @@ func createInventoryTestSKU(t *testing.T, ctx context.Context, client *ent.Clien
 func TestInventorySKUGrainIsolationLotAndReversal(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "inventory_sku_grain_isolation")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 	skuA := createInventoryTestSKU(t, ctx, client, fixtures.productID, fixtures.unitID, "SKU-GRAIN-A")
@@ -117,6 +118,7 @@ func TestInventorySKUGrainIsolationLotAndReversal(t *testing.T) {
 func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "operational_fact_sku_grain")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	logger := log.NewStdLogger(io.Discard)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
@@ -130,7 +132,7 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 	actor := client.AdminUser.Create().SetUsername("sku-fact-actor").SetPasswordHash("test-password-hash").SaveX(ctx)
 	orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
 	order, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{
-		Draft: biz.ProductionOrderDraft{OrderNo: "MO-SKU-GRAIN", Items: []biz.ProductionOrderDraftItem{{
+		Draft: biz.ProductionOrderDraft{OrderNo: "MO-SKU-GRAIN", Items: []biz.ProductionOrderDraftItem{{RouteCode: stringPtr(biz.ProductionWIPRoutePlushSewHandV1),
 			LineNo: 1, ProductID: fixtures.productID, ProductSKUID: &sku.ID, UnitID: fixtures.unitID, PlannedQuantity: decimal.NewFromInt(3),
 		}}},
 		ActorID: actor.ID, IdempotencyKey: "MO-SKU-GRAIN",
@@ -138,6 +140,7 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create SKU production order: %v", err)
 	}
+	markProductionOrderHistoricalUnroutedForTest(t, ctx, client, order.Order.ID)
 	order, err = orderUC.Release(ctx, &biz.ProductionOrderAction{
 		ID: order.Order.ID, ExpectedVersion: order.Order.Version, ActorID: actor.ID, IdempotencyKey: "MO-SKU-GRAIN:RELEASE",
 	})
@@ -201,6 +204,7 @@ func TestOperationalFactsPostAndReverseExactSKUGrain(t *testing.T) {
 func TestShipmentAndReservationUseExactSKUAvailability(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "shipment_reservation_sku_grain")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	logger := log.NewStdLogger(io.Discard)
 	inventoryUC := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
@@ -260,6 +264,7 @@ func TestShipmentAndReservationUseExactSKUAvailability(t *testing.T) {
 func TestProductSKUProductOwnershipCannotDrift(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "product_sku_immutable_product")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	otherProduct := createTestProduct(t, ctx, client, fixtures.unitID, "PRD-SKU-OTHER")
 	masterUC := biz.NewMasterDataUsecase(NewMasterDataRepo(data, log.NewStdLogger(io.Discard)))
