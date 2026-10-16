@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Select } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { Outlet, useNavigate } from 'react-router-dom'
 import { RpcDomain } from '../../common/consts/rpcMethods.generated.mjs'
@@ -48,6 +47,7 @@ import {
   MOBILE_ALL_ROLES_KEY,
 } from '../utils/mobileRolePermissions.mjs'
 import { getRoleDisplayName } from '../utils/roleKeys.mjs'
+import { PageLoadFeedbackBoundary, usePageLoadFeedback } from '../components/PageLoadFeedback.jsx'
 import './mobileRoleTasks.css'
 
 const PROFILE_BOOTSTRAP_RETRY_DELAYS_MS = [200, 600]
@@ -134,6 +134,10 @@ function isCurrentStoredAdmin(profile) {
 }
 
 export default function MobileAppLayout({ legalNotice }) {
+  return <PageLoadFeedbackBoundary><MobileAppContent legalNotice={legalNotice} /></PageLoadFeedbackBoundary>
+}
+
+function MobileAppContent({ legalNotice }) {
   const navigate = useNavigate()
   const { activeRole, activeRoleKey } = useERPWorkspace()
   const [loggingOut, setLoggingOut] = useState(false)
@@ -451,6 +455,12 @@ export default function MobileAppLayout({ legalNotice }) {
   const handleRetry = () =>
     loadProfile({ showLoading: !canMountCustomerRuntime(adminProfile) })
 
+  const connectionFeedback = usePageLoadFeedback({
+    error: profileSyncIssue && canUseCurrentMobileRole,
+    retry: handleRetry,
+    priority: 30,
+  })
+
   const handleLogout = async () => {
     if (loggingOut) {
       return
@@ -478,7 +488,7 @@ export default function MobileAppLayout({ legalNotice }) {
     <AppShell className="px-0 py-0 md:px-8 md:py-4">
       <div
         className={`mobile-app-layout mx-auto min-h-screen w-full max-w-[430px] md:max-w-[920px] ${
-          profileSyncIssue && canUseCurrentMobileRole
+          connectionFeedback.visible
             ? 'mobile-app-layout--sync-issue'
             : ''
         } ${adminProfile?.is_super_admin === true && canUseCurrentMobileRole ? 'mobile-app-layout--review' : ''}`}
@@ -501,41 +511,24 @@ export default function MobileAppLayout({ legalNotice }) {
         ) : canUseCurrentMobileRole ? (
           <>
             {!profileSyncIssue ? legalNotice : null}
-            {profileSyncIssue ? (
+            {connectionFeedback.visible ? (
               <div
                 className="mobile-role-sync-banner mx-3 mt-3 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
-                role="status"
+                role="alert"
               >
-                <span>连接暂未刷新，当前显示上次已确认的工作范围。</span>
+                <span>连接暂未恢复，部分内容可能未更新，请重试。</span>
                 <button
                   type="button"
                   className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold disabled:cursor-wait disabled:opacity-60"
-                  onClick={handleRetry}
-                  disabled={profileSyncing}
+                  onClick={connectionFeedback.retry}
+                  disabled={profileSyncing || connectionFeedback.retrying}
                 >
                   <ReloadOutlined aria-hidden="true" className="text-base" />
-                  <span>{profileSyncing ? '连接中' : '重试'}</span>
+                  <span>{profileSyncing || connectionFeedback.retrying ? '连接中' : '重试'}</span>
                 </button>
               </div>
             ) : null}
-            {adminProfile?.is_super_admin === true ? (
-              <div className="mobile-admin-review" aria-label="管理员查看范围">
-                <label id="mobile-review-role-label">查看岗位</label>
-                <Select
-                  aria-labelledby="mobile-review-role-label"
-                  value={activeRoleKey}
-                  onChange={handleSwitchMobileRole}
-                  options={allowedMobileRoleKeys.map((roleKey) => ({
-                    value: roleKey,
-                    label: roleKey === MOBILE_ALL_ROLES_KEY
-                      ? '全部岗位'
-                      : getRoleDisplayName(roleKey, '岗位'),
-                  }))}
-                  popupMatchSelectWidth={false}
-                />
-                <span className="mobile-admin-review__identity">管理员视角</span>
-              </div>
-            ) : allowedMobileRoleKeys.length > 1 ? (
+            {adminProfile?.is_super_admin !== true && allowedMobileRoleKeys.length > 1 ? (
               <nav
                 className="mx-3 mt-3 flex gap-2 overflow-x-auto rounded-xl border border-slate-200 bg-white p-2"
                 aria-label="切换岗位任务端"
@@ -565,6 +558,13 @@ export default function MobileAppLayout({ legalNotice }) {
                 canEnterDesktop,
                 handleLogout,
                 loggingOut,
+                mobileRoleOptions: allowedMobileRoleKeys.map((roleKey) => ({
+                  value: roleKey,
+                  label: roleKey === MOBILE_ALL_ROLES_KEY
+                    ? '全部岗位'
+                    : getRoleDisplayName(roleKey, '岗位'),
+                })),
+                handleSwitchMobileRole,
               }}
             />
           </>

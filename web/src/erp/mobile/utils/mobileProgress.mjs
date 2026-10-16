@@ -24,27 +24,30 @@ export function mobileProgressDefaultView(role, access) {
     : 'orders'
 }
 
+export function normalizeMobileProgressQuery(values, defaultView) {
+  const params = new URLSearchParams(values || {})
+  if (!params.get('view')) params.set('view', defaultView)
+  const query = progressQueryFromURL(params)
+  return {
+    view: query.view || defaultView,
+    q: query.keyword,
+    owner: query.owner,
+    scope: query.scope,
+    due_status: query.due_status,
+    blocked_only: query.blocked_only,
+    unlinked_only: query.unlinked_only,
+    from: query.date_from,
+    to: query.date_to,
+    // Appended batches are reloaded from the first page when returning.
+    page: 1,
+  }
+}
+
 export function readMobileProgressState(history, scope, defaultView) {
   const saved =
     history?.mobileProgress?.scope === scope ? history.mobileProgress : {}
-  const query = progressQueryFromURL(new URLSearchParams(saved.query || {}))
   return {
-    query: {
-      view: query.view || defaultView,
-      // Older builds exposed a second free-text owner field inside the filter.
-      // Fold it into the primary search so no invisible owner filter survives.
-      q: query.keyword || query.owner,
-      owner: '',
-      scope: query.scope,
-      risk: query.risk,
-      // Mobile progress intentionally omits exact-date inputs. Ignore values
-      // saved by older builds so an invisible date filter cannot survive.
-      from: '',
-      to: '',
-      // The mobile list now appends batches while scrolling. Always resume from
-      // the first batch instead of restoring an obsolete visible page number.
-      page: 1,
-    },
+    query: normalizeMobileProgressQuery(saved.query, defaultView),
     selection:
       saved.selection &&
       Number.isSafeInteger(saved.selection.id) &&
