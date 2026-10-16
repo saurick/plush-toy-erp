@@ -86,6 +86,17 @@ test('unsupported diagrams and quoted diagram keywords are never rewritten', () 
 test('fit all accounts for tall, wide and naturally small diagrams', () => {
   assert.equal(
     fitMermaidZoom({
+      width: 800,
+      height: 600,
+      viewportWidth: 320,
+      viewportHeight: 520,
+      nativeSize: true,
+    }),
+    0.4,
+    '原生字号的窄屏图也能按需适应全图'
+  )
+  assert.equal(
+    fitMermaidZoom({
       width: 500,
       height: 2000,
       viewportWidth: 1200,

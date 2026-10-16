@@ -197,9 +197,14 @@ export function buildWorkflowTaskBoardMock({
     ),
   ].sort((left, right) => left.localeCompare(right))
   const sourceType = normalizeText(params.source_type)
+  const dayStart = Math.floor((normalizedSnapshotAt + 8 * 3600) / 86400) * 86400 - 8 * 3600
+  const periodDays = { today: 1, '7d': 7, '30d': 30 }[params.period]
+  const from = periodDays ? dayStart - (periodDays - 1) * 86400 : params.period === 'custom' ? Date.parse(`${params.date_from}T00:00:00+08:00`) / 1000 : null
+  const before = periodDays ? dayStart + 86400 : params.period === 'custom' ? Date.parse(`${params.date_to}T00:00:00+08:00`) / 1000 + 86400 : null
   const filteredTasks = visibleTasks
     .filter(
       (task) =>
+        (from === null || (task.completed_at >= from && task.completed_at < before)) &&
         (params.todo_only !== true || UNSETTLED_TASK_STATUS_KEYS.has(taskStatus(task))) &&
         matchesKeyword(task, params.keyword) &&
         matchesStatus(task, status, normalizedSnapshotAt) &&

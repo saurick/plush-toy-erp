@@ -8,12 +8,14 @@ export default function useLiveSearch({
   value = '',
   onSearch,
   delay = LIVE_SEARCH_DELAY_MS,
+  resetKey,
 }) {
   const [draft, setDraft] = useState(() => String(value ?? ''))
   const timerRef = useRef(null)
   const composingRef = useRef(false)
   const submittedValueRef = useRef(normalizeSearchValue(value))
   const pendingCommitRef = useRef()
+  const resetKeyRef = useRef(resetKey)
   const onSearchRef = useRef(onSearch)
   onSearchRef.current = onSearch
 
@@ -48,7 +50,10 @@ export default function useLiveSearch({
   useEffect(() => {
     const nextValue = String(value ?? '')
     const normalizedValue = normalizeSearchValue(nextValue)
+    const reset = resetKeyRef.current !== resetKey
+    resetKeyRef.current = resetKey
     if (
+      !reset &&
       pendingCommitRef.current !== undefined &&
       pendingCommitRef.current === normalizedValue
     ) {
@@ -64,7 +69,7 @@ export default function useLiveSearch({
     pendingCommitRef.current = undefined
     submittedValueRef.current = normalizedValue
     setDraft(nextValue)
-  }, [cancelPendingSearch, value])
+  }, [cancelPendingSearch, resetKey, value])
 
   useEffect(() => () => cancelPendingSearch(), [cancelPendingSearch])
 

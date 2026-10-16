@@ -15,18 +15,15 @@ import { startBrowserErrorReporting } from '@/common/runtime/browserErrors.js'
 const rpcMockEnabled =
   import.meta.env.DEV && import.meta.env.VITE_ENABLE_RPC_MOCK === 'true'
 
-if (rpcMockEnabled) {
-  const startMockServer = async () => {
-    const { setupJsonRpcMockServer } = await import('./mocks/jsonRpcMockServer')
-    setupJsonRpcMockServer()
-  }
-  startMockServer()
-}
-
 const redirectedLocalDevHost =
   import.meta.env.DEV && redirectToCanonicalLocalDevHost(window)
 
-if (!redirectedLocalDevHost) {
+async function mountApplication() {
+  if (redirectedLocalDevHost) return
+  if (rpcMockEnabled) {
+    const { setupJsonRpcMockServer } = await import('./mocks/jsonRpcMockServer')
+    await setupJsonRpcMockServer()
+  }
   if (!rpcMockEnabled) startBrowserErrorReporting(window)
   const rootElement = document.getElementById('root')
   if (!rootElement) {
@@ -34,13 +31,10 @@ if (!redirectedLocalDevHost) {
   }
 
   const root = ReactDOM.createRoot(rootElement)
-  const router = createBrowserRouter(
-    [{ path: '*', element: <App /> }],
-    {
-      basename: import.meta.env.BASE_URL,
-      future: { v7_relativeSplatPath: true },
-    }
-  )
+  const router = createBrowserRouter([{ path: '*', element: <App /> }], {
+    basename: import.meta.env.BASE_URL,
+    future: { v7_relativeSplatPath: true },
+  })
 
   const application = (
     <HelmetProvider>
@@ -55,3 +49,5 @@ if (!redirectedLocalDevHost) {
     rpcMockEnabled ? <StrictMode>{application}</StrictMode> : application
   )
 }
+
+mountApplication()

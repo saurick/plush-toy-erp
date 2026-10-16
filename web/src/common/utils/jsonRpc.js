@@ -34,9 +34,10 @@ function isAbortLikeError(error) {
   return error?.name === 'AbortError' || error?.cause?.name === 'AbortError'
 }
 
-function invalidSuccessResponse(httpStatus) {
+function invalidSuccessResponse(httpStatus, requestId) {
   return new RpcError('Invalid JSON-RPC success response from server', {
     httpStatus,
+    requestId,
     isInvalidResponse: true,
   })
 }
@@ -92,7 +93,7 @@ export function requireRpcPage(result, key, message) {
   return data
 }
 
-function validateSuccessResponse(json, expectedId, httpStatus) {
+function validateSuccessResponse(json, expectedId, httpStatus, requestId) {
   if (
     !json ||
     typeof json !== 'object' ||
@@ -104,7 +105,7 @@ function validateSuccessResponse(json, expectedId, httpStatus) {
     typeof json.result !== 'object' ||
     Array.isArray(json.result)
   ) {
-    throw invalidSuccessResponse(httpStatus)
+    throw invalidSuccessResponse(httpStatus, requestId)
   }
   return json.result
 }
@@ -176,11 +177,13 @@ export class JsonRpc {
       })
     }
 
+    const requestId = response.headers?.get('X-Request-Id')
     try {
       json = await response.json()
     } catch (e) {
       throw new RpcError('Invalid JSON response from server', {
         httpStatus: response.status,
+        requestId,
         isInvalidResponse: true,
         cause: e,
       })
@@ -188,14 +191,14 @@ export class JsonRpc {
 
     // 1) HTTP 非 2xx
     if (!response.ok) {
-      const err = RpcError.fromHttp(response.status, json)
+      const err = RpcError.fromHttp(response.status, json, requestId)
       emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       throw err
     }
 
     // 2) Kratos 框架级错误
     if (typeof json?.code === 'number' && json.message) {
-      const err = RpcError.fromKratos(json)
+      const err = RpcError.fromKratos(json, requestId)
       emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       if (receiveError) return err
       throw err
@@ -203,16 +206,16 @@ export class JsonRpc {
 
     // 3) JSON-RPC error 字段
     if (json?.error) {
-      const err = RpcError.fromJsonRpc(json)
+      const err = RpcError.fromJsonRpc(json, requestId)
       emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       if (receiveError) return err
       throw err
     }
 
     // 4) 业务错误 result.code != 0
-    const result = validateSuccessResponse(json, id, response.status)
+    const result = validateSuccessResponse(json, id, response.status, requestId)
     if (result && typeof result.code === 'number' && result.code !== 0) {
-      const err = RpcError.fromBiz(json)
+      const err = RpcError.fromBiz(json, requestId)
       emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       if (receiveError) return err
       throw err

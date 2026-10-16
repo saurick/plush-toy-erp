@@ -2,6 +2,15 @@
   min-width: 0;
 }
 
+.erp-markdown-mermaid [data-mermaid-node-id] {
+  cursor: pointer;
+}
+
+.erp-markdown-mermaid [data-mermaid-node-id]:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 3px;
+}
+
 .erp-markdown-mermaid {
   position: relative;
   box-sizing: border-box;
@@ -99,7 +108,7 @@
 .erp-markdown-mermaid__zoom-label {
   min-width: 44px;
   color: var(--erp-text-muted, #334155);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1;
   text-align: center;
 }
@@ -107,7 +116,7 @@
 .erp-markdown-mermaid--fullscreen .erp-markdown-mermaid__zoom-label {
   min-width: 56px;
   color: #e5edf5;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
 }
 
 .erp-markdown-mermaid__viewport {
@@ -156,6 +165,10 @@
   padding: 28px 0;
 }
 
+.erp-markdown-mermaid[data-mermaid-native-size="true"] .erp-markdown-mermaid__canvas {
+  width: calc(var(--mermaid-zoom, 1) * var(--mermaid-intrinsic-width, 100%));
+}
+
 .erp-markdown-mermaid__canvas svg {
   display: block;
   width: 100%;
@@ -183,7 +196,7 @@
 .erp-markdown-mermaid__loading,
 .erp-markdown-mermaid__error {
   color: var(--erp-text-muted, #334155);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.6;
 }
 
@@ -239,5 +252,5 @@
   width: auto;
   gap: 6px;
   padding: 0 10px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }

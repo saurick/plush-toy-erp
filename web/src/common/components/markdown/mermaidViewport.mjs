@@ -41,6 +41,7 @@ export function fitMermaidZoom({
   height,
   viewportWidth,
   viewportHeight,
+  nativeSize = false,
 }) {
   if (
     ![width, height, viewportWidth, viewportHeight].every(
@@ -49,11 +50,11 @@ export function fitMermaidZoom({
   ) {
     return MERMAID_ZOOM.defaultValue
   }
-  const baseWidth = Math.min(width, viewportWidth)
+  const baseWidth = nativeSize ? width : Math.min(width, viewportWidth)
   const baseHeight = (height * baseWidth) / width
   // Round down so the diagram still fits after the percentage is displayed.
   return Math.max(
     MERMAID_ZOOM.min,
-    Math.floor(Math.min(1, viewportHeight / baseHeight) * 100) / 100
+    Math.floor(Math.min(1, viewportWidth / baseWidth, viewportHeight / baseHeight) * 100) / 100
   )
 }
