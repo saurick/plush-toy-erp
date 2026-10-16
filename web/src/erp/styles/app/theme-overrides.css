@@ -151,6 +151,7 @@
 [data-erp-theme='dark'] .erp-product-core-capability-review__header,
 [data-erp-theme='dark'] .erp-product-core-capability-review__panel,
 [data-erp-theme='dark'] .erp-product-core-capability-review__scope,
+[data-erp-theme='dark'] .erp-product-core-metric,
 [data-erp-theme='dark'] .erp-product-core-panel,
 [data-erp-theme='dark'] .erp-product-core-entry,
 [data-erp-theme='dark'] .erp-dashboard-card.ant-card,
@@ -179,6 +180,7 @@
 
 [data-erp-theme='dark'] .erp-product-core-capability-review__header h2,
 [data-erp-theme='dark'] .erp-product-core-capability-review__panel strong,
+[data-erp-theme='dark'] .erp-product-core-metric strong,
 [data-erp-theme='dark'] .erp-product-core-entry strong {
   color: var(--erp-text);
 }
@@ -187,6 +189,7 @@
   .erp-product-core-capability-review__header
   .ant-typography,
 [data-erp-theme='dark'] .erp-product-core-capability-review__panel span,
+[data-erp-theme='dark'] .erp-product-core-metric span,
 [data-erp-theme='dark'] .erp-product-core-entry span {
   color: var(--erp-muted-text);
 }
@@ -799,6 +802,7 @@
 }
 
 [data-erp-theme='dark'] .erp-business-page-header-card h1,
+[data-erp-theme='dark'] .erp-business-page-header-card__stats strong,
 [data-erp-theme='dark'] .erp-business-list-toolbar__stat strong,
 [data-erp-theme='dark'] .erp-business-column-order-modal__index,
 [data-erp-theme='dark'] .erp-business-column-order-modal__label,
@@ -818,6 +822,7 @@
   color: var(--erp-text-muted);
 }
 
+[data-erp-theme='dark'] .erp-business-page-header-card__stat,
 [data-erp-theme='dark'] .erp-business-list-toolbar__stat,
 [data-erp-theme='dark'] .erp-business-selection-action-bar__summary-item,
 [data-erp-theme='dark'] .erp-business-collaboration-task-panel__summary-item,
@@ -914,6 +919,24 @@
   .erp-business-collaboration-task-panel__resize-handle--dragging
   .erp-business-collaboration-task-panel__grip-bar {
   background: #94a3b8;
+}
+
+[data-erp-theme='dark'] .erp-business-collaboration-task-panel__tab {
+  border-color: var(--erp-border);
+  background: transparent;
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-business-collaboration-task-panel__tab:hover,
+[data-erp-theme='dark']
+  .erp-business-collaboration-task-panel__tab:focus-visible,
+[data-erp-theme='dark'] .erp-business-collaboration-task-panel__tab--active {
+  border-color: var(--erp-interactive-border-hover);
+}
+
+[data-erp-theme='dark'] .erp-business-collaboration-task-panel__tabs {
+  --erp-slider-bg: #172033;
+  --erp-slider-shadow: inset 0 0 0 1px var(--erp-interactive-border-hover);
 }
 
 [data-erp-theme='dark'] .erp-business-collaboration-task-panel__more-note {
@@ -1122,7 +1145,7 @@
 
 .erp-audit-stat span {
   color: #647067;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-audit-stat strong {
@@ -1171,7 +1194,7 @@
 
 .erp-audit-field span {
   color: #647067;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-audit-field .ant-select,
@@ -1242,6 +1265,7 @@
   min-width: 0;
   padding: 12px;
   border: 1px solid #e5ebe6;
+  border-left-width: 4px;
   border-radius: 8px;
   background: var(--erp-surface-bg);
   color: inherit;
@@ -1262,6 +1286,18 @@
   outline: none;
 }
 
+.erp-audit-event--high {
+  border-left-color: #ef4444;
+}
+
+.erp-audit-event--warning {
+  border-left-color: #f59e0b;
+}
+
+.erp-audit-event--normal {
+  border-left-color: #3b82f6;
+}
+
 .erp-audit-event__risk {
   align-self: start;
   width: fit-content;
@@ -1269,7 +1305,7 @@
   border-radius: 999px;
   background: #eef6ef;
   color: #2f5f38;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.6;
   white-space: nowrap;
 }
@@ -1301,13 +1337,13 @@
   flex-wrap: wrap;
   gap: 6px 10px;
   color: #647067;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
 .erp-audit-event__summary {
   color: #4b5563;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   overflow-wrap: anywhere;
 }
 
@@ -1386,7 +1422,7 @@
 
 .erp-audit-facts span {
   color: #647067;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-audit-facts strong {
@@ -1398,7 +1434,7 @@
 .erp-audit-facts em {
   color: #647067;
   font-style: normal;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 @media (max-width: 991px) {

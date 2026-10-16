@@ -113,7 +113,7 @@ test('DEV passive guidance is collapsed while warnings and errors stay prominent
   assert.doesNotMatch(guidance, /<Alert\b/u)
   assert.match(
     densityCSS,
-    /\.erp-dev-static-guidance > summary\s*\{[\s\S]*?font-size: var\(--erp-font-small\);/u
+    /\.erp-dev-static-guidance > summary\s*\{[\s\S]*?font-size: 13px;/u
   )
   assert.doesNotMatch(
     densityCSS,

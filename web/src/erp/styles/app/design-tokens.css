@@ -1,13 +1,4 @@
 :root {
-  --erp-font-badge: 0.5625rem;
-  --erp-font-tiny: 0.625rem;
-  --erp-font-micro: 0.6875rem;
-  --erp-font-caption: 0.75rem;
-  --erp-font-small: 0.8125rem;
-  --erp-font-body: 0.875rem;
-  --erp-font-emphasis: 0.9375rem;
-  --erp-line-caption: 1rem;
-  --erp-line-body: 1.25rem;
   --erp-accent: #0a66c2;
   --erp-accent-strong: #0b4f96;
   --erp-accent-hover: #0858aa;
@@ -54,24 +45,6 @@
   --erp-sidebar-width: 206px;
   --erp-topbar-height: 48px;
   --erp-page-padding: 12px;
-}
-
-/* 手机保持完整的文字层级；小屏密度通过换行和局部滚动处理。 */
-@media screen and (max-width: 767px) {
-  :root {
-    --erp-font-badge: 0.875rem;
-    --erp-font-tiny: 0.875rem;
-    --erp-font-micro: 0.875rem;
-    --erp-font-caption: 0.875rem;
-    --erp-font-small: 0.9375rem;
-    --erp-font-body: 1rem;
-    --erp-font-emphasis: 1rem;
-    --erp-line-caption: 1.375rem;
-    --erp-line-body: 1.5rem;
-    --erp-business-control-height: 46px;
-    --erp-touch-field-height: 46px;
-    --erp-touch-target: 44px;
-  }
 }
 
 [data-erp-density='compact'] {

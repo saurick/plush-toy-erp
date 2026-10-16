@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Space, Tag } from 'antd'
+import { Alert, Button, Tag } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -32,13 +32,11 @@ import {
   BusinessActionTooltip,
   SelectFilter,
 } from '../components/business-list/BusinessListLayout.jsx'
-import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import {
   buildHistoryListParams,
-  resolveHistoryStatusCounts,
   getAvailableHistorySources,
   normalizeHistoryRecords,
 } from '../utils/historyRecordCatalog.mjs'
@@ -70,14 +68,6 @@ function formatHistoryTime(value) {
   const timestamp = Number(value || 0)
   if (!Number.isFinite(timestamp) || timestamp <= 0) return '-'
   return new Date(timestamp * 1000).toLocaleString('zh-CN', { hour12: false })
-}
-
-function HistoryQueryFilters({ children }) {
-  return (
-    <Space wrap size={8}>
-      {children}
-    </Space>
-  )
 }
 
 export default function HistoryRecordsPage() {
@@ -112,7 +102,6 @@ export default function HistoryRecordsPage() {
   const pageSize = [10, 20, 50, 100].includes(sizeValue) ? sizeValue : 20
   const [records, setRecords] = useState([])
   const [total, setTotal] = useState(0)
-  const [statusCounts, setStatusCounts] = useState(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [selectedKey, setSelectedKey] = useState(null)
@@ -165,7 +154,6 @@ export default function HistoryRecordsPage() {
     setLoadError('')
     setRecords([])
     setTotal(0)
-    setStatusCounts(null)
     setSelectedKey(null)
     setDetailRecord(null)
     try {
@@ -174,7 +162,6 @@ export default function HistoryRecordsPage() {
       const data = await loader(
         {
           ...listParams,
-          ...(activeSource.statusCounts ? { include_status_counts: true } : {}),
           limit: pageSize,
           offset: (currentPage - 1) * pageSize,
         },
@@ -185,11 +172,7 @@ export default function HistoryRecordsPage() {
         ? data[activeSource.responseKey]
         : []
       setRecords(normalizeHistoryRecords(activeSource, sourceRows))
-      const nextTotal = Number(data?.total ?? sourceRows.length)
-      setTotal(nextTotal)
-      const lastPage = Math.max(1, Math.ceil(nextTotal / pageSize))
-      if (currentPage > lastPage) updateQuery({ page: lastPage })
-      setStatusCounts(resolveHistoryStatusCounts(activeSource, data))
+      setTotal(Number(data?.total ?? sourceRows.length))
       return true
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) return false
@@ -208,7 +191,6 @@ export default function HistoryRecordsPage() {
     listParams,
     pageSize,
     sourceKey,
-    updateQuery,
   ])
 
   useEffect(() => {
@@ -298,7 +280,28 @@ export default function HistoryRecordsPage() {
 
   return (
     <BusinessPageLayout className="erp-history-records-page">
-      <PageHeaderCard compact title="历史记录中心" />
+      <PageHeaderCard
+        compact
+        title="历史记录中心"
+        viewSwitch={
+          <SelectFilter
+            aria-label="历史记录类型"
+            value={activeSource?.key}
+            options={sourceOptions}
+            placeholder="选择记录类型"
+            disabled={!availableSources.length}
+            onChange={(nextSourceKey) =>
+              updateQuery({
+                source: nextSourceKey,
+                keyword: '',
+                status: '',
+                page: '',
+              })
+            }
+          />
+        }
+        stats={[{ key: 'total', label: '当前类型记录', value: total }]}
+      />
       <BusinessOperationPanel
         compact
         onClearFilters={() =>
@@ -307,37 +310,6 @@ export default function HistoryRecordsPage() {
         clearFiltersDisabled={!hasActiveFilters}
         filters={
           <>
-            <HistoryQueryFilters inline>
-              <SelectFilter
-                aria-label="历史记录类型"
-                prefix="记录类型"
-                value={activeSource?.key}
-                options={sourceOptions}
-                placeholder="选择记录类型"
-                disabled={!availableSources.length}
-                onChange={(nextSourceKey) =>
-                  updateQuery({
-                    source: nextSourceKey,
-                    keyword: '',
-                    status: '',
-                    page: '',
-                  })
-                }
-              />
-              {activeSource?.historyStatusOptions?.length > 1 ? (
-                <BusinessStatusFilter
-                  allLabel="全部历史状态"
-                  counts={statusCounts}
-                  loading={loading}
-                  aria-label="历史状态"
-                  value={status}
-                  options={activeSource.historyStatusOptions}
-                  onChange={(nextStatus) =>
-                    updateQuery({ status: nextStatus || '', page: '' })
-                  }
-                />
-              ) : null}
-            </HistoryQueryFilters>
             <SearchInput
               value={keyword}
               placeholder="搜索历史记录"
@@ -347,6 +319,17 @@ export default function HistoryRecordsPage() {
               }
               onPressEnter={loadRecords}
             />
+            {activeSource?.historyStatusOptions?.length > 1 ? (
+              <SelectFilter
+                inline
+                aria-label="历史状态"
+                value={status}
+                options={activeSource.historyStatusOptions}
+                onChange={(nextStatus) =>
+                  updateQuery({ status: nextStatus || '', page: '' })
+                }
+              />
+            ) : null}
           </>
         }
         actions={

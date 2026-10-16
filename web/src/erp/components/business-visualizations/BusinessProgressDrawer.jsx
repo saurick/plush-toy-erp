@@ -514,7 +514,7 @@ export default function BusinessProgressDrawer({
         ) : (
           <>
             <SlidingTabList
-              className="erp-progress-detail-tabs erp-navigation-tabs"
+              className="erp-progress-detail-tabs"
               aria-label="进度明细分类"
             >
               {items.map((item) => (

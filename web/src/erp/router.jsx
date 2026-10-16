@@ -35,7 +35,6 @@ const LegalDocumentPage = lazyRoute(
   () => import('@/common/legal/LegalDocumentPage')
 )
 const EntrySelectionPage = lazyRoute(() => import('./pages/EntrySelectionPage'))
-const WorkflowTaskLinkEntryPage = lazyRoute(() => import('./pages/WorkflowTaskLinkEntryPage.jsx'))
 const BusinessDashboardPage = lazyRoute(
   () => import('./pages/BusinessDashboardPage')
 )
@@ -385,7 +384,6 @@ export default function ERPRouter() {
           ) : null}
           <Route path="/" element={<RootEntryRedirect />} />
           <Route path="/admin-login" element={<AdminLoginPage />} />
-          <Route path="/task-link/:taskID" element={<AuthGuard requireAdmin><LegalNoticeGate>{() => <WorkflowTaskLinkEntryPage />}</LegalNoticeGate></AuthGuard>} />
           <Route
             path="/legal/privacy"
             element={<LegalDocumentPage documentKey="privacy" />}

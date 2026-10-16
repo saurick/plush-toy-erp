@@ -10,7 +10,6 @@ import React, {
 } from 'react'
 import {
   ArrowRightOutlined,
-  CalendarOutlined,
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   FileTextOutlined,
@@ -22,12 +21,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
-import { WORKFLOW_HISTORY_PERIOD_OPTIONS } from '../utils/workflowRoleTaskHistory.mjs'
-import FilterDateRangePicker from '../components/business-list/FilterDateRangePicker.jsx'
-import WorkflowTaskLinkDrawer from '../components/workflow/WorkflowTaskLinkDrawer.jsx'
 import WorkflowTaskDiscoveryFilters from '../components/workflow/WorkflowTaskDiscoveryFilters.jsx'
-import WorkflowTaskCalendar from '../components/workflow/WorkflowTaskCalendar.jsx'
-import useWorkflowTaskCalendarView from '../hooks/useWorkflowTaskCalendarView.js'
 import WorkflowExceptionPanel from '../components/workflow/WorkflowExceptionPanel.jsx'
 import { TRACKING_VIEW_OPTIONS } from '../utils/workflowTrackingFilters.mjs'
 import useReturnedWorkflowTask from '../hooks/useReturnedWorkflowTask.js'
@@ -56,7 +50,6 @@ import { openWorkflowTaskRow } from '../utils/workflowTaskEntry.mjs'
 import { retainWorkflowTaskIdentity } from '../utils/workflowTaskIdentity.mjs'
 import {
   BusinessOperationPanel,
-  PageHeaderCard,
   SearchInput,
   SelectFilter,
 } from '../components/business-list/BusinessListLayout.jsx'
@@ -169,13 +162,7 @@ function TaskBoardSearch({ value, onSearch }) {
   )
 }
 
-function TaskBoardProgressRail({
-  activeLane,
-  counts,
-  ready,
-  onSelectLane,
-  mode,
-}) {
+function TaskBoardProgressRail({ activeLane, counts, ready, onSelectLane, mode }) {
   return (
     <nav className="erp-task-progress-rail" aria-label="任务分类">
       <FilterChip
@@ -186,19 +173,14 @@ function TaskBoardProgressRail({
       >
         <span className="erp-task-progress-rail__label">概览</span>
       </FilterChip>
-      {TASK_BOARD_LANE_DEFINITIONS.filter(
-        (lane) => mode !== 'todo' || lane.key !== 'finished'
-      ).map((lane) => (
+      {TASK_BOARD_LANE_DEFINITIONS.filter((lane) => mode !== 'todo' || lane.key !== 'finished').map((lane) => (
         <FilterChip
           key={lane.key}
           data-lane={lane.key}
           className={`erp-task-progress-rail__item${activeLane === lane.key ? ' is-active' : ''}`}
           selected={activeLane === lane.key}
-          removable
           aria-label={`${lane.title}，${ready ? `${counts[lane.key]} 项` : '数量读取中'}`}
-          onClick={() =>
-            onSelectLane(activeLane === lane.key ? 'all' : lane.key)
-          }
+          onClick={() => onSelectLane(lane.key)}
         >
           <span className="erp-task-progress-rail__label">{lane.title}</span>
           <strong className="erp-task-progress-rail__value">
@@ -226,6 +208,19 @@ function scrollTaskListToStart(lanesElement) {
     behavior: 'auto',
   })
 }
+
+const PRODUCT_CORE_METRICS = Object.freeze([
+  {
+    label: '业务功能',
+    value: 11,
+    note: '基础资料、销售、采购、物料清单、库存、质检、出货和财务',
+  },
+  {
+    label: '系统设置',
+    value: 4,
+    note: '员工权限、操作记录、打印模板和客户业务设置',
+  },
+])
 
 const PRODUCT_CORE_REVIEW_ENTRIES = Object.freeze([
   {
@@ -309,6 +304,20 @@ function ProductCoreDashboard({ onNavigate }) {
           <Tag color="green">功能预览</Tag>
           <Tag>尚未连接客户环境</Tag>
         </Space>
+      </div>
+
+      <div className="erp-product-core-dashboard__metrics">
+        {PRODUCT_CORE_METRICS.map((metric) => (
+          <section
+            key={metric.label}
+            className="erp-product-core-metric erp-metric-readonly-card"
+            aria-label={`${metric.label} ${metric.value}，只读摘要`}
+          >
+            <Text type="secondary">{metric.label}</Text>
+            <strong>{metric.value}</strong>
+            <span>{metric.note}</span>
+          </section>
+        ))}
       </div>
 
       <div className="erp-product-core-dashboard__grid">
@@ -441,11 +450,7 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
                     task={task}
                     compact
                     renderCompactTitle={(title) => (
-                      <TaskTitleEntry
-                        task={task}
-                        onOpenTask={onOpenTask}
-                        compact
-                      >
+                      <TaskTitleEntry task={task} onOpenTask={onOpenTask} compact>
                         {title}
                       </TaskTitleEntry>
                     )}
@@ -461,16 +466,17 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
               render: (_, task) => (
                 <div className="erp-workbench-task-cell">
                   <WorkflowTaskSource task={task} />
-                  <span className="erp-task-board-card-meta">
-                    {task.discovery?.path}
-                  </span>
+                  <span className="erp-task-board-card-meta">{task.discovery?.path}</span>
                   <WorkflowTaskTiming task={task} />
                 </div>
               ),
             },
             {
               align: 'left',
-              title: lane.key === 'exception' ? '阻塞原因' : '状态与说明',
+              title:
+                lane.key === 'exception'
+                  ? '阻塞原因'
+                  : '状态与说明',
               key: 'reason',
               render: (_, task) => (
                 <div className="erp-workbench-task-cell">
@@ -501,16 +507,9 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
               width: 180,
               render: (_, task) => (
                 <Space direction="vertical" size={4}>
-                  {buildWorkflowTaskResponsibilityItems(task)
-                    .slice(0, 2)
-                    .map((item) => (
-                      <Text
-                        key={item.key}
-                        type={item.key === 'assignee' ? 'secondary' : undefined}
-                      >
-                        {item.value}
-                      </Text>
-                    ))}
+                  {buildWorkflowTaskResponsibilityItems(task).slice(0, 2).map((item) => (
+                    <Text key={item.key} type={item.key === 'assignee' ? 'secondary' : undefined}>{item.value}</Text>
+                  ))}
                 </Space>
               ),
             },
@@ -551,6 +550,7 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
           <span>{lane.title}</span>
         </span>
       }
+      extra={<span className="erp-task-board-lane-count">{lane.count}</span>}
     >
       <Space direction="vertical" size={8} className="erp-task-board-list">
         {lane.tasks.length > 0 ? (
@@ -594,14 +594,11 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
                     {reasonMeta.label}：{reasonMeta.value}
                   </Text>
                 ) : null}
-                <span className="erp-task-board-card-meta">
-                  {task.discovery?.path}
-                </span>
+                <span className="erp-task-board-card-meta">{task.discovery?.path}</span>
                 <WorkflowTaskTiming task={task} />
                 <span className="erp-task-board-card-footer">
                   <Text type="secondary" className="erp-task-board-card-meta">
-                    {getWorkflowTaskOwnerRoleLabel(task)} ·{' '}
-                    {task.discovery?.assignee_name || '岗位待领取'}
+                    {getWorkflowTaskOwnerRoleLabel(task)} · {task.discovery?.assignee_name || '岗位待领取'}
                   </Text>
                 </span>
               </WorkflowTaskCard>
@@ -621,7 +618,7 @@ function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
             iconPosition="end"
             onClick={onViewAll}
           >
-            查看全部
+            查看全部 {lane.count} 项
           </Button>
         </div>
       ) : null}
@@ -680,12 +677,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }, [])
 
   const [loading, setLoading] = useState(false)
-  const [historyDateOpen, setHistoryDateOpen] = useState(false)
-  const [taskFiltersOpen, setTaskFiltersOpen] = useState(false)
-  const openHistoryDate = () => {
-    setTaskFiltersOpen(false)
-    setHistoryDateOpen(true)
-  }
   const [summaryRefreshRevision, setSummaryRefreshRevision] = useState(0)
   const [workbenchResponseState, setWorkbenchResponseState] = useState(null)
   const [workbenchCountsState, setWorkbenchCountsState] = useState(null)
@@ -703,8 +694,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [actionSaving, setActionSaving] = useState(false)
   const selectedTaskRef = useRef(selectedTask)
   selectedTaskRef.current = selectedTask
-  const sharedLinkAutoRef = useRef('')
-  const [sharedHandlingID, setSharedHandlingID] = useState(null)
   const [activeView, setActiveView] = useState(initialView)
   const [workbenchQueueKey, setWorkbenchQueueKey] = useState('actionable')
   const [workbenchQueuePage, setWorkbenchQueuePage] = useState(1)
@@ -727,7 +716,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
-  const calendarState = useWorkflowTaskCalendarView()
   const outletContext = useOutletContext()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -777,19 +765,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [canViewApprovalInbox, requestedFilters]
   )
   const isTaskBoardView = initialView === 'task-board'
-  const calendarView =
-    isTaskBoardView &&
-    filters.mode === 'todo' &&
-    calendarState.layout === 'calendar'
-  const exceptionsView =
-    isTaskBoardView && searchParams.get('view') === 'exceptions'
-  const trackingScope =
-    isTaskBoardView &&
-    ['started', 'participated', 'visible'].includes(
-      searchParams.get('tracking')
-    )
-      ? searchParams.get('tracking')
-      : ''
+  const exceptionsView = isTaskBoardView && searchParams.get('view') === 'exceptions'
+  const trackingScope = isTaskBoardView && ['started', 'participated', 'visible'].includes(searchParams.get('tracking'))
+    ? searchParams.get('tracking') : ''
   const [trackingRefresh, setTrackingRefresh] = useState(0)
   const exceptionQueryRef = useRef(null)
   const taskBoardRequest = useMemo(
@@ -935,6 +913,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             error: errorMessage,
           })
         }
+        message.error(errorMessage)
       }
       return false
     } finally {
@@ -974,28 +953,23 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(() => {
       if (summaryOpen) setSummaryRefreshRevision((value) => value + 1)
-      if (trackingScope || exceptionsView || calendarView)
-        { setTrackingRefresh((value) => value + 1) }
+      if (trackingScope || exceptionsView) setTrackingRefresh((value) => value + 1)
       return loadDashboardStats()
     })
-  }, [
-    loadDashboardStats,
-    outletContext,
-    summaryOpen,
-    trackingScope,
-    exceptionsView,
-    calendarView,
-  ])
+  }, [loadDashboardStats, outletContext, summaryOpen, trackingScope, exceptionsView])
 
   useEffect(() => {
     setActiveView(initialView)
   }, [initialView])
 
   useEffect(() => {
-    const deniedApproval = !canViewApprovalInbox && requestedFilters.mode === 'approval'
-    const retiredFilters = searchParams.has('module_key') || searchParams.has('chain_key') ||
-      (filters.lane === 'finished' && searchParams.has('due'))
-    if (!isTaskBoardView || (!deniedApproval && !retiredFilters)) return
+    if (
+      !isTaskBoardView ||
+      canViewApprovalInbox ||
+      requestedFilters.mode !== 'approval'
+    ) {
+      return
+    }
     setSearchParams(
       writeWorkflowTaskBoardFiltersToSearch(searchParams, filters),
       { replace: true }
@@ -1010,8 +984,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   ])
 
   const hasActiveFilters = useMemo(
-    () => hasActiveWorkflowTaskBoardFilters({ ...filters, due: calendarView ? 'all' : filters.due, keyword: '', mode: 'all' }),
-    [calendarView, filters]
+    () => hasActiveWorkflowTaskBoardFilters({ ...filters, mode: 'all' }),
+    [filters]
   )
   const taskBoardResponse = useMemo(
     () =>
@@ -1078,10 +1052,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ),
     [taskBoardModel.ownerRoleKeys, taskBoardSummaryResponse?.owner_role_keys]
   )
-  const statusOptions = getWorkflowTaskBoardStatusOptions(
-    filters.lane,
-    filters.mode
-  )
+  const statusOptions = getWorkflowTaskBoardStatusOptions(filters.lane, filters.mode)
   const dueOptions = getWorkflowTaskBoardDueOptions(filters.lane)
   const actionMeta = actionMode
     ? getWorkflowTaskActionMeta(selectedTask, actionMode)
@@ -1271,21 +1242,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     task: selectedTask,
     enabled: Boolean(selectedTask),
   })
-  useEffect(() => {
-    if (
-      !sharedHandlingID ||
-      selectedTask?.id !== sharedHandlingID ||
-      actionDrawerAccess.loading ||
-      actionDrawerAccess.source === 'fallback_checking'
-    )
-      { return }
-    setSharedHandlingID(null)
-    if (
-      actionDrawerAccess.source !== 'backend' ||
-      !actionDrawerAccess.canHandle
-    )
-      { setSelectedTask(null) }
-  }, [sharedHandlingID, selectedTask?.id, actionDrawerAccess])
   const actionDrawerEntryPath = selectedTask
     ? resolveWorkflowTaskEntryPath(selectedTask)
     : ''
@@ -1350,10 +1306,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const clearFilters = () => {
     pendingTaskBoardPageScrollRef.current = null
     const nextFilters = {
-      keyword: filters.keyword,
       lane: filters.lane,
       mode: filters.mode,
-      sort: 'smart',
+      sort: filters.sort,
       pageSize: filters.pageSize,
     }
     preserveTaskBoardTransitionHeight(
@@ -1385,10 +1340,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     const isTrackingView = view === 'tracking' || view === 'exceptions'
     const next = isTrackingView
       ? new URLSearchParams(searchParams)
-      : writeWorkflowTaskBoardFiltersToSearch(
-          searchParams,
-          views.filters[view] || { mode: view }
-        )
+      : writeWorkflowTaskBoardFiltersToSearch(searchParams, views.filters[view] || { mode: view })
     if (view === 'exceptions') next.set('view', 'exceptions')
     else next.delete('view')
     if (isTrackingView) next.set('tracking', views.tracking)
@@ -1462,15 +1414,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     if (
       canOpenWorkflowTaskEntry(adminProfile, entryPath, access?.sourceAccess)
     ) {
-      navigate(
-        entryPath,
-        workflowTaskEntryNavigation(
-          task,
-          entryPath,
-          `${location.pathname}${location.search}`,
-          adminProfile?.id
-        )
-      )
+      navigate(entryPath, workflowTaskEntryNavigation(task, entryPath, `${location.pathname}${location.search}`, adminProfile?.id))
     }
   }
 
@@ -1785,6 +1729,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       aria-label={activeView === 'task-board' ? '任务管理' : '工作台'}
       className="erp-dashboard-page erp-command-center-page"
     >
+      <Title level={1} className="erp-sr-only">
+        {activeView === 'task-board' ? '任务管理' : '工作台'}
+      </Title>
       <div
         hidden
         aria-hidden="true"
@@ -1800,36 +1747,29 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         ))}
       </div>
       {shouldShowProductCoreDashboard ? (
-        <>
-          <PageHeaderCard compact title="工作台" />
-          <ProductCoreDashboard onNavigate={openProductCoreEntry} />
-        </>
+        <ProductCoreDashboard onNavigate={openProductCoreEntry} />
       ) : null}
 
       {!shouldShowProductCoreDashboard && activeView === 'workbench' ? (
         <div className="erp-workbench-layout">
-          <PageHeaderCard
-            compact
-            title="工作台"
-            viewSwitch={
-              summaryOptions.length > 0 ? (
-                <Segmented
-                  aria-label="工作台视图"
-                  value={summaryOpen ? 'summary' : 'tasks'}
-                  options={[
-                    { value: 'tasks', label: '待办' },
-                    { value: 'summary', label: '业务汇总' },
-                  ]}
-                  onChange={(value) => {
-                    const next = new URLSearchParams(searchParams)
-                    if (value === 'summary') next.set('view', 'summary')
-                    else next.delete('view')
-                    setSearchParams(next, { replace: true })
-                  }}
-                />
-              ) : null
-            }
-          />
+          {summaryOptions.length > 0 ? (
+            <div className="erp-workbench-view-toolbar">
+              <Segmented
+                aria-label="工作台视图"
+                value={summaryOpen ? 'summary' : 'tasks'}
+                options={[
+                  { value: 'tasks', label: '待办' },
+                  { value: 'summary', label: '业务汇总' },
+                ]}
+                onChange={(value) => {
+                  const next = new URLSearchParams(searchParams)
+                  if (value === 'summary') next.set('view', 'summary')
+                  else next.delete('view')
+                  setSearchParams(next, { replace: true })
+                }}
+              />
+            </div>
+          ) : null}
           <Card
             className="erp-dashboard-card erp-workbench-command-card"
             variant="borderless"
@@ -1882,16 +1822,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         )
                       })}
                     </div>
-                    <Button
-                      type="text"
-                      aria-label="待办日历"
-                      icon={<CalendarOutlined aria-hidden />}
-                      onClick={() =>
-                        navigate('/erp/task-board?mode=todo&layout=calendar')
-                      }
-                    >
-                      待办日历
-                    </Button>
                   </div>
 
                   <div className="erp-workbench-main-grid">
@@ -1960,147 +1890,74 @@ export default function DashboardPage({ initialView = 'workbench' }) {
 
       {activeView === 'task-board' ? (
         <>
-          <PageHeaderCard
-            compact
-            title="任务管理"
-            className="erp-task-management-header erp-task-management-scope"
-            viewSwitch={
-              <Segmented
-                className="erp-task-board-scope-filter"
-                aria-label="任务范围"
-                value={
-                  exceptionsView || trackingScope ? 'tracking' : filters.mode
-                }
-                options={TASK_BOARD_SCOPE_OPTIONS.filter(
-                  (option) =>
-                    canViewApprovalInbox || option.value !== 'approval'
-                )}
-                onChange={(view) => selectTaskView(view, true)}
-              />
-            }
-          />
+          <div className="erp-task-management-scope erp-task-board-scope-filter">
+            <Segmented
+              aria-label="任务范围"
+              value={exceptionsView || trackingScope ? 'tracking' : filters.mode}
+              options={TASK_BOARD_SCOPE_OPTIONS.filter((option) => canViewApprovalInbox || option.value !== 'approval')}
+              onChange={(view) => selectTaskView(view, true)}
+            />
+          </div>
           <Card
             className="erp-dashboard-card erp-dashboard-task-board-card"
             variant="borderless"
-            loading={
-              !trackingScope && !exceptionsView && taskBoardInitialLoading
-            }
+            loading={!trackingScope && !exceptionsView && taskBoardInitialLoading}
             style={
-              !trackingScope &&
-              !exceptionsView &&
-              taskBoardTransitionMinHeight > 0
-                ? { minHeight: taskBoardTransitionMinHeight }
-                : undefined
-            }
+            !trackingScope && !exceptionsView && taskBoardTransitionMinHeight > 0
+              ? { minHeight: taskBoardTransitionMinHeight }
+              : undefined
+          }
           >
             {exceptionsView || trackingScope ? (
               <div className="erp-dashboard-block">
                 <Segmented
                   className="erp-task-tracking-views"
-                  hierarchy="secondary"
                   aria-label="跟踪内容"
                   value={exceptionsView ? 'exceptions' : 'tracking'}
                   options={TRACKING_VIEW_OPTIONS}
                   onChange={selectTaskView}
                 />
-                {exceptionsView ? (
-                  <WorkflowExceptionPanel
-                    key={workflowWorkbenchScopeKey}
-                    profile={adminProfile}
-                    onOpenTask={openTaskDrawer}
-                    refreshKey={trackingRefresh}
-                    initialQuery={
-                      exceptionQueryRef.current?.scope ===
-                      workflowWorkbenchScopeKey
-                        ? exceptionQueryRef.current.query
-                        : {}
-                    }
-                    onQueryChange={(query) => {
-                      exceptionQueryRef.current = {
-                        scope: workflowWorkbenchScopeKey,
-                        query,
-                      }
-                    }}
-                  />
-                ) : (
-                  <WorkflowTrackingPanel
-                    key={`${trackingScope}:${workflowWorkbenchScopeKey}`}
-                    scope={trackingScope}
-                    onScopeChange={selectTrackingScope}
-                    sessionKey={workflowWorkbenchScopeKey}
-                    refreshKey={trackingRefresh}
-                    onOpenTask={openTaskDrawer}
-                    taskHandlingOpen={Boolean(selectedTask)}
-                  />
-                )}
+                {exceptionsView ? <WorkflowExceptionPanel
+                  key={workflowWorkbenchScopeKey}
+                  profile={adminProfile}
+                  onOpenTask={openTaskDrawer}
+                  refreshKey={trackingRefresh}
+                  initialQuery={exceptionQueryRef.current?.scope === workflowWorkbenchScopeKey ? exceptionQueryRef.current.query : {}}
+                  onQueryChange={(query) => { exceptionQueryRef.current = { scope: workflowWorkbenchScopeKey, query } }}
+                /> : <WorkflowTrackingPanel
+                  key={`${trackingScope}:${workflowWorkbenchScopeKey}`}
+                  scope={trackingScope}
+                  onScopeChange={selectTrackingScope}
+                  sessionKey={workflowWorkbenchScopeKey}
+                  refreshKey={trackingRefresh}
+                  onOpenTask={openTaskDrawer}
+                  taskHandlingOpen={Boolean(selectedTask)}
+                />}
               </div>
             ) : (
               <div className="erp-dashboard-block">
-                {filters.mode === 'todo' && (
-                  <div className="workflow-task-calendar-switch">
-                    <Segmented
-                      aria-label="待办显示方式"
-                      hierarchy="secondary"
-                      value={calendarState.layout}
-                      options={[
-                        { value: 'list', label: '列表' },
-                        { value: 'calendar', label: '日历' },
-                      ]}
-                      onChange={(layout) => calendarState.change({ layout })}
-                    />
-                  </div>
-                )}
-                {historyDateOpen && (
-                  <FilterDateRangePicker
-                    title="选择处理日期范围"
-                    dateFrom={filters.dateFrom}
-                    dateTo={filters.dateTo}
-                    onCancel={() => {
-                      setHistoryDateOpen(false)
-                      setTaskFiltersOpen(true)
-                    }}
-                    onApply={(range) => {
-                      updateFilter({ period: 'custom', ...range })
-                      setHistoryDateOpen(false)
-                    }}
-                  />
-                )}
+                <TaskBoardProgressRail
+                  mode={filters.mode}
+                  activeLane={filters.lane}
+                  counts={taskBoardCounts}
+                  ready={taskBoardMetricsReady}
+                  onSelectLane={selectTaskBoardLane}
+                />
+
                 <div className="erp-task-board-controls">
+                  <WorkflowTaskDiscoveryFilters value={filters} profile={adminProfile} people={taskBoardSummaryResponse?.assignees || taskBoardResponse?.assignees} onChange={(next) => updateFilter(next)} />
                   <div className="erp-task-board-filters">
                     <BusinessOperationPanel
                       key={`${filters.mode}:${workflowWorkbenchScopeKey}`}
                       compact
-                      filtersOpen={taskFiltersOpen}
-                      onFiltersOpenChange={setTaskFiltersOpen}
                       onClearFilters={clearFilters}
                       clearFiltersDisabled={!hasActiveFilters}
-                      filters={
+                      filters={(
                         <>
-                          {!calendarView && (
-                            <TaskBoardProgressRail
-                              inline
-                              mode={filters.mode}
-                              activeLane={filters.lane}
-                              counts={taskBoardCounts}
-                              ready={taskBoardMetricsReady}
-                              onSelectLane={selectTaskBoardLane}
-                            />
-                          )}
                           <TaskBoardSearch
                             primarySearch
                             value={filters.keyword}
-                            onSearch={(keyword) =>
-                              updateFilter('keyword', keyword)
-                            }
-                          />
-                          <WorkflowTaskDiscoveryFilters
-                            value={filters}
-                            profile={adminProfile}
-                            people={
-                              taskBoardSummaryResponse?.assignees ||
-                              taskBoardResponse?.assignees
-                            }
-                            onChange={(next) => updateFilter(next)}
+                            onSearch={(keyword) => updateFilter('keyword', keyword)}
                           />
                           {roleOptions.length > 1 ? (
                             <SelectFilter
@@ -2110,166 +1967,86 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                               onChange={(value) => updateFilter('role', value)}
                             />
                           ) : null}
-                          {calendarView ||
-                          filters.lane === 'all' ||
-                          filters.lane === 'finished' ? (
+                          {filters.lane === 'all' || filters.lane === 'finished' ? (
                             <SelectFilter
                               aria-label="任务状态"
                               value={filters.status}
                               options={statusOptions}
-                              onChange={(value) =>
-                                updateFilter('status', value)
-                              }
+                              onChange={(value) => updateFilter('status', value)}
                             />
                           ) : null}
-                          {filters.lane === 'finished' && (
-                            <>
-                              <SelectFilter
-                                aria-label="处理时间"
-                                value={filters.period || ''}
-                                options={[
-                                  ...WORKFLOW_HISTORY_PERIOD_OPTIONS,
-                                  { value: 'custom', label: '自定义日期' },
-                                ]}
-                                onChange={(period) =>
-                                  period === 'custom'
-                                    ? openHistoryDate()
-                                    : updateFilter({
-                                        period,
-                                        dateFrom: '',
-                                        dateTo: '',
-                                      })
-                                }
-                              />
-                              {filters.period === 'custom' && (
-                                <Tag
-                                  closable
-                                  onClose={() =>
-                                    updateFilter({
-                                      period: '',
-                                      dateFrom: '',
-                                      dateTo: '',
-                                    })
-                                  }
-                                >
-                                  <Button type="link" onClick={openHistoryDate}>
-                                    {filters.dateFrom} 至 {filters.dateTo}
-                                  </Button>
-                                </Tag>
-                              )}
-                            </>
-                          )}
-                          {!calendarView && filters.lane !== 'finished' && <SelectFilter
+                          <SelectFilter
                             aria-label="截止时间"
                             value={filters.due}
                             options={dueOptions}
                             onChange={(value) => updateFilter('due', value)}
-                          />}
-                          <SelectFilter
+                          />
+                          <label className="workflow-task-discovery__auxiliary"><span>来源单据</span><SelectFilter
                             aria-label="来源单据"
                             value={filters.sourceType}
                             options={sourceOptions}
-                            onChange={(value) =>
-                              updateFilter('sourceType', value)
-                            }
+                            onChange={(value) => updateFilter('sourceType', value)}
                           />
+                          </label>
                         </>
-                      }
-                      actions={
-                        !calendarView && taskBoardModel.focused ? (
-                          <SelectFilter
-                            aria-label="任务排序"
-                            value={filters.sort}
-                            options={TASK_BOARD_SORT_OPTIONS}
-                            onChange={(value) => updateFilter('sort', value)}
-                          />
-                        ) : null
-                      }
+                      )}
+                      actions={taskBoardModel.focused ? (
+                        <SelectFilter
+                          aria-label="任务排序"
+                          value={filters.sort}
+                          options={TASK_BOARD_SORT_OPTIONS}
+                          onChange={(value) => updateFilter('sort', value)}
+                        />
+                      ) : null}
                     />
                   </div>
                 </div>
-                {calendarView ? (
-                  <WorkflowTaskCalendar
-                    state={calendarState}
-                    query={buildWorkflowTaskBoardRequest({
-                      ...filters,
-                      lane: 'all',
-                      due: 'all',
-                      page: 1,
-                    })}
-                    scopeKey={workflowWorkbenchScopeKey}
-                    refreshKey={trackingRefresh}
-                    onOpenTask={openTaskDrawer}
-                  />
-                ) : taskBoardLoadError ? (
+                {taskBoardLoadError ? (
                   <Alert
                     type="error"
                     showIcon
                     message="任务管理加载失败"
                     description={taskBoardLoadError}
-                    action={
-                      <Button onClick={loadDashboardStats}>重新加载</Button>
-                    }
+                    action={<Button onClick={loadDashboardStats}>重新加载</Button>}
                   />
-                ) : (
-                  <div
-                    ref={taskBoardLanesRef}
-                    className={`erp-task-board-lanes${
-                      taskBoardModel.focused
-                        ? ' erp-task-board-lanes--focused'
-                        : ''
-                    }${filters.mode === 'todo' ? ' erp-task-board-lanes--todo' : ''}`}
-                    aria-label="任务管理分类"
-                    aria-busy={taskBoardUpdating}
-                  >
-                    {taskLanes.map((lane) => (
-                      <TaskLane
-                        key={lane.key}
-                        lane={lane}
-                        loading={taskBoardUpdating}
-                        focused={taskBoardModel.focused}
-                        onOpenTask={openTaskDrawer}
-                        onViewAll={() => selectTaskBoardLane(lane.key)}
-                      />
-                    ))}
-                  </div>
-                )}
-                {!calendarView && taskBoardModel.focused ? (
+            ) : (
+              <div
+                ref={taskBoardLanesRef}
+                className={`erp-task-board-lanes${
+                  taskBoardModel.focused ? ' erp-task-board-lanes--focused' : ''
+                }${filters.mode === 'todo' ? ' erp-task-board-lanes--todo' : ''}`}
+                aria-label="任务管理分类"
+                aria-busy={taskBoardUpdating}
+              >
+                {taskLanes.map((lane) => (
+                  <TaskLane
+                    key={lane.key}
+                    lane={lane}
+                    loading={taskBoardUpdating}
+                    focused={taskBoardModel.focused}
+                    onOpenTask={openTaskDrawer}
+                    onViewAll={() => selectTaskBoardLane(lane.key)}
+                  />
+                ))}
+              </div>
+            )}
+                {taskBoardModel.focused ? (
                   <WorkflowTaskPagination
                     total={taskBoardCounts[filters.lane] || 0}
-                    current={
-                      taskBoardReady ? taskBoardModel.page : filters.page
-                    }
+                    current={taskBoardReady ? taskBoardModel.page : filters.page}
                     pageSize={filters.pageSize}
                     loading={taskBoardUpdating}
                     error={Boolean(taskBoardLoadError)}
                     onChange={selectTaskBoardPage}
                   />
-                ) : null}
+            ) : null}
               </div>
             )}
           </Card>
         </>
       ) : null}
 
-      <WorkflowTaskLinkDrawer
-        profile={adminProfile}
-        taskOpen={Boolean(selectedTask)}
-        autoOpenRef={sharedLinkAutoRef}
-        onOpenTask={(task, handle) => {
-          setSharedHandlingID(handle ? task.id : null)
-          openTaskDrawer(task)
-        }}
-      />
       <WorkflowTaskActionDrawer
-        startHandling={sharedHandlingID === selectedTask?.id}
-        closeLabel={
-          exceptionsView
-            ? exceptionQueryRef.current?.query?.view === 'tasks'
-              ? '返回关联待办'
-              : '返回异常跟踪'
-            : '返回列表'
-        }
         onOpenRelatedTask={openTaskDrawer}
         task={selectedTask}
         profile={adminProfile}
@@ -2334,11 +2111,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         onActionReasonChange={setActionReason}
         onAssignmentTargetChange={setAssignmentTarget}
         onClose={closeTaskDrawer}
-        onReturnToTracking={
-          trackingScope && searchParams.has('track_id')
-            ? closeTaskDrawer
-            : undefined
-        }
+        onReturnToTracking={trackingScope && searchParams.has('track_id') ? closeTaskDrawer : undefined}
         onOpenEntry={(task) => openTaskEntry(task, actionDrawerAccess)}
         onSubmit={submitTaskAction}
       />

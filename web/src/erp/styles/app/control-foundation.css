@@ -83,28 +83,7 @@ body
   font: inherit;
 }
 
-/* 手机输入与组合外壳的字号即时生效，避免 iPhone 聚焦时缩放页面。 */
-@media screen and (max-width: 767px) {
-  #root,
-  body {
-    --erp-form-control-height: var(--erp-touch-field-height);
-  }
-
-  :where(#root, .ant-modal, .ant-drawer, .ant-popover) .ant-input-clear-icon {
-    display: inline-flex;
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
-    align-items: center;
-    justify-content: center;
-  }
-
-  :where(#root, .ant-modal, .ant-drawer, .ant-popover)
-    .ant-input-affix-wrapper:has(.ant-input-clear-icon) {
-    padding-block: 0;
-  }
-}
-
+/* 手机输入与组合外壳保持同一字号，防止 iPhone 聚焦时缩放页面。 */
 @media (max-width: 640px) {
   body
     :is(.erp-task-action-drawer, .erp-business-filter-popover, .erp-sales-order-engineering-form)
@@ -142,7 +121,6 @@ body
       select
     ) {
     font-size: 16px;
-    transition-property: color, background-color, border-color, box-shadow;
   }
 }
 
@@ -276,7 +254,7 @@ body :where(.ant-dropdown) .ant-dropdown-menu-item,
 body :where(.ant-dropdown) .ant-dropdown-menu-submenu-title,
 body .erp-business-selection-action-menu__item .ant-btn {
   height: auto;
-  min-height: max(36px, var(--erp-touch-target, 0px));
+  min-height: 36px;
   align-items: center;
   border-radius: 8px;
   padding: 8px 10px;

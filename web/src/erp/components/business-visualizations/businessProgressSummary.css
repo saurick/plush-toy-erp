@@ -3,7 +3,7 @@
   gap: 16px;
   min-width: 0;
   color: var(--erp-text);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 .erp-progress-overview h2,
 .erp-progress-overview h3,
@@ -16,7 +16,7 @@
   line-height: 1.5;
 }
 .erp-progress-overview h3 {
-  font-size: var(--erp-font-body);
+  font-size: 14px;
 }
 .erp-progress-overview-identity {
   display: grid;
@@ -55,7 +55,7 @@
   justify-content: space-between;
   gap: 4px 12px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 .erp-progress-overview-quantity > strong {
   color: var(--erp-text);
@@ -94,7 +94,7 @@
 }
 .erp-progress-overview-stage-text {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -121,7 +121,7 @@
 }
 .erp-progress-overview-attention > p {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 .erp-progress-overview-attention > button {
   padding: 0;
@@ -135,7 +135,7 @@
 }
 .erp-progress-overview-attention > .erp-progress-overview-more {
   color: var(--erp-primary-strong);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 .erp-progress-overview-stage:disabled {
   cursor: default;

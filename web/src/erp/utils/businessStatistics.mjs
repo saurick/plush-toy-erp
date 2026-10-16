@@ -230,32 +230,6 @@ export function statisticsPaginationFromURL(
   return { limit, offset: (page - 1) * limit }
 }
 
-export function normalizeStatisticsStatus(report, status) {
-  const allowed =
-    report === 'receivables'
-      ? [
-          'all',
-          'overdue',
-          'undated',
-          'not_due',
-          'late_7',
-          'late_30',
-          'late_60',
-          'late_more',
-        ]
-      : [
-          'all',
-          'overdue',
-          'undated',
-          'done',
-          'pending',
-          'pending_not_late',
-          'soon',
-          'closed',
-          'unknown',
-        ]
-  return allowed.includes(status) ? status : 'all'
-}
 export function statisticsQueryFromURL(params) {
   const report =
     params.get('report') === 'receivables' ? 'receivables' : 'delivery'
@@ -278,10 +252,8 @@ export function statisticsQueryFromURL(params) {
     keyword: params.get('sq') || '',
     date_from: period === 'custom' ? params.get('stfrom') || '' : '',
     date_to: period === 'custom' ? params.get('stto') || '' : '',
-    status: normalizeStatisticsStatus(report, params.get('status')),
-    sort: ['count', 'name', 'overdue', 'amount'].includes(params.get('sort'))
-      ? params.get('sort')
-      : 'count',
+    status: params.get('status') || 'all',
+    sort: params.get('sort') || 'count',
     direction: params.get('direction') === 'asc' ? 'asc' : 'desc',
     ...statisticsPaginationFromURL(params),
   }

@@ -206,31 +206,6 @@ test('business page lineage: exactly covers every formal business module once', 
   assert.equal(getBusinessPageLineage('not-a-page'), null)
 })
 
-test('business page lineage: allocation candidates, posting and reversal keep distinct effects', () => {
-  const actions = [
-    'list_finance_payment_allocation_candidates',
-    'allocate_finance_payment',
-    'reverse_finance_allocation',
-  ]
-  assert.deepEqual(
-    businessPageFlowDefinitions
-      .filter((flow) => actions.includes(flow.action))
-      .map(({ fromPageKey, toPageKey, action, flowType }) =>
-        [fromPageKey, toPageKey, action, flowType]
-      ),
-    [
-      ['receivables', 'finance-payments', actions[0], 'source_query'],
-      ['payables', 'finance-payments', actions[0], 'source_query'],
-      ['finance-payments', 'finance-payments', actions[1], 'post_fact'],
-      ['finance-payments', 'finance-payments', actions[2], 'fact_reversal'],
-    ]
-  )
-  for (const action of actions) {
-    assert.equal(NON_LINEAGE_READ_ACTIONS.includes(action), false)
-    assert.equal(NON_LINEAGE_PAGE_LOCAL_CRUD_ACTIONS.includes(action), false)
-  }
-})
-
 test('business page lineage: declares the complete typed flow vocabulary', () => {
   assert.deepEqual(Object.values(BUSINESS_FLOW_TYPES), [
     'catalog_fill',

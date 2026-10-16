@@ -1,11 +1,11 @@
 .erp-business-module-tabs {
-  flex: 0 1 auto;
-  min-width: 0;
-}
-
-.erp-business-module-header {
   flex: 0 0 auto;
+  min-width: 0;
   margin-bottom: 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
 }
 
 .erp-business-module-tabs > .ant-tabs-nav {

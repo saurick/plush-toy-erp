@@ -57,8 +57,8 @@ test('businessPageHeader: 业务页头不提供常驻介绍、标签或底部 su
   )
 
   assert(
-    !/\b(?:stats|summary|description|tags)\b/u.test(pageHeaderSource),
-    'PageHeaderCard 不应再接收统计、常驻介绍、标签或 summary'
+    !/\b(?:summary|description|tags)\b/u.test(pageHeaderSource),
+    'PageHeaderCard 不应再接收常驻介绍、标签或 summary'
   )
   assert(
     !pageHeaderSource.includes('erp-business-page-header-card__summary'),
@@ -74,13 +74,36 @@ test('businessPageHeader: 业务页头不提供常驻介绍、标签或底部 su
   )
 })
 
-test('businessPageHeader: 页面调用点不传统计、常驻介绍、标签或 summary', () => {
+test('businessPageHeader: 共享页头只渲染规范化后的非负整数统计', () => {
+  const layoutPath = resolve(
+    erpSourceRoot,
+    'components/business-list/BusinessListLayout.jsx'
+  )
+  const layoutSource = readFileSync(layoutPath, 'utf8')
+  const pageHeaderSource = layoutSource.slice(
+    layoutSource.indexOf('export function PageHeaderCard'),
+    layoutSource.indexOf('export function BusinessFilterPanel')
+  )
+
+  assert.match(
+    layoutSource,
+    /import \{ normalizeBusinessPageHeaderStats \} from '\.\.\/\.\.\/utils\/businessPageHeader\.mjs'/u
+  )
+  assert.match(
+    pageHeaderSource,
+    /const numericStats = normalizeBusinessPageHeaderStats\(stats\)/u
+  )
+  assert.match(pageHeaderSource, /\{numericStats\.map\(\(item\) =>/u)
+  assert.doesNotMatch(pageHeaderSource, /\{stats\.map\(\(item\) =>/u)
+})
+
+test('businessPageHeader: 页面调用点不传常驻介绍、标签或 summary', () => {
   const offenders = []
 
   for (const filePath of listSourceFiles(erpSourceRoot)) {
     const source = readFileSync(filePath, 'utf8')
     for (const block of collectComponentOpenings(source, 'PageHeaderCard')) {
-      if (/\b(?:stats|summary|description|tags)\s*=/u.test(block)) {
+      if (/\b(?:summary|description|tags)\s*=/u.test(block)) {
         offenders.push(relative(erpSourceRoot, filePath))
       }
     }

@@ -22,7 +22,7 @@
 
 .erp-business-form-page {
   container: business-editor / inline-size;
-  --erp-control-height: max(34px, var(--erp-touch-field-height, 0px));
+  --erp-control-height: 34px;
   --erp-textarea-rows: 3;
   display: grid;
   flex: 1;
@@ -101,7 +101,7 @@
 
 .erp-business-form-page__section-links button {
   width: 100%;
-  min-height: max(38px, var(--erp-touch-target, 0px));
+  min-height: 38px;
   padding: 8px 10px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -128,7 +128,7 @@
   align-items: center;
   gap: 8px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 
 .erp-business-form-page__section-picker select {
@@ -272,7 +272,7 @@
 
 .erp-business-form-page__status {
   color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-business-form-page[data-unsaved='true'] .erp-business-form-page__status {

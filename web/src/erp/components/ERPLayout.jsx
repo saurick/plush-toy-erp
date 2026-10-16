@@ -35,6 +35,7 @@ import {
   SwapOutlined,
   ToolOutlined,
   TruckOutlined,
+  UserOutlined,
 } from '@ant-design/icons'
 import {
   Alert,
@@ -63,9 +64,7 @@ import {
 } from '../utils/businessModuleGroups.mjs'
 import { notifyProductImagesChanged } from '../utils/productImageReferences.mjs'
 import useDesktopTaskCount from '../hooks/useDesktopTaskCount'
-import NavigationCountBadge, {
-  navigationCountDescription,
-} from '@/common/components/navigation/NavigationCountBadge'
+import NavigationCountBadge, { navigationCountDescription } from '@/common/components/navigation/NavigationCountBadge'
 import './desktop-task-badge.css'
 import { isAuthFailureCode } from '@/common/consts/errorCodes'
 import {
@@ -93,7 +92,6 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc, pauseAuthenticatedRpcCalls } from '@/common/utils/jsonRpc'
 import SessionRecoveryDialog from './SessionRecoveryDialog'
 import AccountPasswordModal from './AccountPasswordModal.jsx'
-import AccountIdentity from './AccountIdentity.jsx'
 import {
   getBusinessModule,
   isCustomerBusinessDataPageKey,
@@ -120,7 +118,7 @@ import {
   resolveCurrentNavigationEntry,
   resolveDesktopHomeEntry,
 } from '../utils/currentNavigationEntry.mjs'
-import { getAdminAccountName } from '../utils/adminIdentity.mjs'
+import { formatAdminIdentity } from '../utils/adminIdentity.mjs'
 import {
   CUSTOMER_RUNTIME_GATE,
   attachEffectiveSessionToAdminProfile,
@@ -140,10 +138,7 @@ import {
   shouldGuardCustomerBusinessPageRuntime,
 } from '../utils/adminProfileSync.mjs'
 import { getAllowedMobileRoleKeys } from '../utils/mobileRolePermissions.mjs'
-import {
-  readWorkflowTaskNavigation,
-  workflowTaskReturnNavigation,
-} from '../utils/workflowTaskNavigation.mjs'
+import { readWorkflowTaskNavigation, workflowTaskReturnNavigation } from '../utils/workflowTaskNavigation.mjs'
 
 const { Content, Header, Sider } = Layout
 const { Paragraph, Text } = Typography
@@ -321,11 +316,8 @@ const LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS = new Set([
 ])
 
 export function hasSelfContainedBusinessPageHead(path = '') {
-  return (
-    SELF_CONTAINED_PAGE_HEAD_PATHS.has(path) ||
-    BUSINESS_PAGE_HEAD_PATH_PREFIXES.some((prefix) =>
-      String(path || '').startsWith(prefix)
-    )
+  return BUSINESS_PAGE_HEAD_PATH_PREFIXES.some((prefix) =>
+    String(path || '').startsWith(prefix)
   )
 }
 
@@ -384,27 +376,9 @@ export default function ERPLayout({ legalNotice }) {
   )
   const [taskNavigation, setTaskNavigation] = useState(null)
   useEffect(() => {
-    if (
-      location.state?.clearWorkflowTaskNavigation ||
-      location.state?.workflowTaskReturn
-    ) {
-      setTaskNavigation(null)
-      return
-    }
-    const next = readWorkflowTaskNavigation(
-      location.state,
-      location.pathname,
-      adminProfile?.id
-    )
-    setTaskNavigation(
-      (previous) =>
-        next ||
-        readWorkflowTaskNavigation(
-          { workflowTaskNavigation: previous },
-          location.pathname,
-          adminProfile?.id
-        )
-    )
+    if (location.state?.clearWorkflowTaskNavigation || location.state?.workflowTaskReturn) { setTaskNavigation(null); return }
+    const next = readWorkflowTaskNavigation(location.state, location.pathname, adminProfile?.id)
+    setTaskNavigation((previous) => next || readWorkflowTaskNavigation({ workflowTaskNavigation: previous }, location.pathname, adminProfile?.id))
   }, [location.state, location.pathname, adminProfile?.id])
   useEffect(
     () =>
@@ -434,6 +408,7 @@ export default function ERPLayout({ legalNotice }) {
   const profileSyncGenerationRef = useRef(0)
   const profileSyncActiveRef = useRef(false)
   const profileInitialSyncStartedRef = useRef(false)
+  const profileSyncErrorNotifiedRef = useRef(false)
   const profileSessionUnavailableHandledRef = useRef(false)
   const [refreshingCurrentPage, setRefreshingCurrentPage] = useState(false)
   const refreshingCurrentPageRef = useRef(false)
@@ -691,6 +666,7 @@ export default function ERPLayout({ legalNotice }) {
               : null
           )
           setAdminProfile(nextProfile)
+          profileSyncErrorNotifiedRef.current = false
         } catch (error) {
           if (
             !isCurrentGeneration() ||
@@ -701,6 +677,7 @@ export default function ERPLayout({ legalNotice }) {
           }
           const syncErrorAction = getAdminProfileSyncErrorAction(error, {
             hasCachedProfile: Boolean(adminProfileRef.current),
+            alreadyNotified: profileSyncErrorNotifiedRef.current,
           })
           if (syncErrorAction === 'reauth') {
             if (profileSessionUnavailableHandledRef.current) {
@@ -758,6 +735,12 @@ export default function ERPLayout({ legalNotice }) {
           verifiedAccessKeyRef.current = ''
           if (syncErrorAction === 'keep_cached') {
             console.warn('管理员权限同步失败，缓存授权已停用', error)
+          } else if (
+            syncErrorAction !== 'silent' &&
+            !isAuthFailureCode(error?.code)
+          ) {
+            profileSyncErrorNotifiedRef.current = true
+            message.error(getActionErrorMessage(error, '加载账号权限'))
           }
           const unavailableProfile = buildUnavailableCachedAdminProfile(
             adminProfileRef.current
@@ -1026,21 +1009,16 @@ export default function ERPLayout({ legalNotice }) {
 
   const taskCount = useDesktopTaskCount({
     adminProfile,
-    enabled:
-      customerRuntimeGate === CUSTOMER_RUNTIME_GATE.READY &&
+    enabled: customerRuntimeGate === CUSTOMER_RUNTIME_GATE.READY &&
       !shouldUseProductCoreNavigation &&
-      moduleSidebarSections.some((section) =>
-        section.items.some((item) => item.path === '/erp/task-board')
-      ),
+      moduleSidebarSections.some((section) => section.items.some((item) => item.path === '/erp/task-board')),
     pathname: location.pathname,
   })
 
   const menuItems = useMemo(() => {
     const buildMenuLeaf = (item) => {
       const taskEntry = item.path === '/erp/task-board' && taskCount.enabled
-      const icon = navIconRegistry[item.sidebarKey || item.key] || (
-        <AppstoreOutlined aria-hidden />
-      )
+      const icon = navIconRegistry[item.sidebarKey || item.key] || <AppstoreOutlined aria-hidden />
       return {
         key: item.sidebarKey || item.path,
         icon: taskEntry ? (
@@ -1048,24 +1026,13 @@ export default function ERPLayout({ legalNotice }) {
             <span className="erp-menu-task-glyph">{icon}</span>
             <NavigationCountBadge {...taskCount} />
           </span>
-        ) : (
-          icon
-        ),
+        ) : icon,
         label: taskEntry ? (
-          <span className="erp-menu-task-label">
-            <span>{item.label}</span>
-            <NavigationCountBadge {...taskCount} />
-          </span>
-        ) : (
-          item.label
-        ),
-        title: taskEntry
-          ? `${item.label} · ${navigationCountDescription(taskCount)}`
-          : item.label,
+          <span className="erp-menu-task-label"><span>{item.label}</span><NavigationCountBadge {...taskCount} /></span>
+        ) : item.label,
+        title: taskEntry ? `${item.label} · ${navigationCountDescription(taskCount)}` : item.label,
         'aria-label': item.label,
-        'aria-description': taskEntry
-          ? navigationCountDescription(taskCount)
-          : undefined,
+        'aria-description': taskEntry ? navigationCountDescription(taskCount) : undefined,
       }
     }
     const buildMenuGroup = (section) => ({
@@ -1124,7 +1091,9 @@ export default function ERPLayout({ legalNotice }) {
   const hideCurrentEntryPageHead = hasSelfContainedBusinessPageHead(
     currentEntry?.path
   )
-  const hidePageHead = hideCurrentEntryPageHead
+  const hidePageHead =
+    SELF_CONTAINED_PAGE_HEAD_PATHS.has(currentEntry?.path) ||
+    hideCurrentEntryPageHead
 
   const registerPageRefresh = useCallback((handler) => {
     if (typeof handler !== 'function') {
@@ -1188,7 +1157,6 @@ export default function ERPLayout({ legalNotice }) {
       registerPageRefresh,
       updateAdminERPPreferences,
       pageUIState,
-      moduleWorkspace,
     }),
     [
       adminProfile,
@@ -1201,7 +1169,6 @@ export default function ERPLayout({ legalNotice }) {
       registerPageRefresh,
       updateAdminERPPreferences,
       pageUIState,
-      moduleWorkspace,
     ]
   )
 
@@ -1255,11 +1222,7 @@ export default function ERPLayout({ legalNotice }) {
       setMobileNavOpen(false)
       return
     }
-    if (
-      !navigateOptions?.state?.workflowTaskReturn &&
-      (nextPath === location.pathname ||
-        nextPath === `${location.pathname}${location.search}${location.hash}`)
-    ) {
+    if (!navigateOptions?.state?.workflowTaskReturn && (nextPath === location.pathname || nextPath === `${location.pathname}${location.search}${location.hash}`)) {
       setMobileNavOpen(false)
       return
     }
@@ -1289,10 +1252,7 @@ export default function ERPLayout({ legalNotice }) {
       }
       handleNavigate(
         resolveBusinessModuleMenuTarget(
-          item,
-          location,
-          pageUIState.values,
-          visibleMenuPaths
+          item, location, pageUIState.values, visibleMenuPaths
         )
       )
     }
@@ -1300,6 +1260,9 @@ export default function ERPLayout({ legalNotice }) {
 
   const handleAccountMenuClick = async ({ key }) => {
     if (key === 'change-password') {
+      if (pageLeaveGuard && !(await pageLeaveGuard({ intent: 'logout' }))) {
+        return undefined
+      }
       setPasswordModalOpen(true)
       return undefined
     }
@@ -1391,19 +1354,20 @@ export default function ERPLayout({ legalNotice }) {
     </div>
   )
 
-  const identityProfile = adminProfile || tokenAdmin
-  const renderAccountMenu = useCallback(
-    (menu) => (
-      <div className="erp-account-menu">
-        <div className="erp-account-menu__identity">
-          <AccountIdentity profile={identityProfile} />
-        </div>
-        {menu}
-      </div>
-    ),
-    [identityProfile]
+  const roleLabel = isSuperAdmin
+    ? '超级管理员'
+    : (adminProfile?.roles || [])
+        .map(
+          (role) =>
+            role?.name || (role?.role_key || role?.key ? '已配置岗位' : '')
+        )
+        .filter(Boolean)
+        .slice(0, 2)
+        .join(' / ') || '普通管理员'
+  const displayAdminIdentity = formatAdminIdentity(
+    adminProfile || tokenAdmin || {},
+    { fallback: 'admin' }
   )
-  const displayAdminIdentity = getAdminAccountName(identityProfile)
   const accountMenuItems = [
     {
       key: 'change-password',
@@ -1555,7 +1519,8 @@ export default function ERPLayout({ legalNotice }) {
                       {
                         title: (
                           <strong>
-                            {currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label}
+                            {currentEntry?.label ||
+                              DEFAULT_DESKTOP_ENTRY.label}
                           </strong>
                         ),
                       },
@@ -1573,13 +1538,15 @@ export default function ERPLayout({ legalNotice }) {
                 >
                   <span className="erp-admin-header__refresh-label">刷新</span>
                 </Button>
-                <ERPThemeToggle className="erp-admin-header__theme-toggle" />
+                <ERPThemeToggle
+                  className="erp-admin-header__theme-toggle"
+                />
                 <div className="erp-admin-header__meta">
+                  <Tag color={isSuperAdmin ? 'gold' : 'blue'}>{roleLabel}</Tag>
                   <Dropdown
                     destroyOnHidden
                     placement="bottomRight"
                     trigger={['click']}
-                    popupRender={renderAccountMenu}
                     menu={{
                       items: accountMenuItems,
                       onClick: handleAccountMenuClick,
@@ -1587,11 +1554,14 @@ export default function ERPLayout({ legalNotice }) {
                   >
                     <Button
                       className="erp-admin-header__account"
+                      icon={<UserOutlined />}
                       loading={loggingOut}
                       data-testid="desktop-account-menu-trigger"
                       aria-label={`账号菜单：${displayAdminIdentity}`}
                     >
-                      <AccountIdentity profile={identityProfile} compact />
+                      <span className="erp-admin-header__account-name">
+                        {displayAdminIdentity}
+                      </span>
                       <DownOutlined />
                     </Button>
                   </Dropdown>
@@ -1602,24 +1572,16 @@ export default function ERPLayout({ legalNotice }) {
 
           <Content className="erp-admin-content">
             {taskNavigation ? (
-              <Space
-                wrap
-                className="erp-business-inline-note"
-                data-testid="task-source-return"
-              >
+              <Space wrap className="erp-business-inline-note" data-testid="task-source-return">
                 <strong>{taskNavigation.taskName}</strong>
                 <span>保存业务结果后，相关待办自动更新</span>
                 <Button
                   size="small"
                   onClick={() => {
-                    const target = workflowTaskReturnNavigation(
-                      taskNavigation,
-                      window.history.state?.idx
-                    )
+                    const target = workflowTaskReturnNavigation(taskNavigation, window.history.state?.idx)
                     handleNavigate(target.to, target.options)
                   }}
-                >
-                  返回任务
+                >返回任务
                 </Button>
               </Space>
             ) : null}
@@ -1646,9 +1608,7 @@ export default function ERPLayout({ legalNotice }) {
 
             <div
               className={`erp-admin-outlet${
-                moduleWorkspace &&
-                !shouldBlockOutlet &&
-                !shouldGuardProductCoreBusinessData
+                moduleWorkspace && !shouldBlockOutlet && !shouldGuardProductCoreBusinessData
                   ? ' erp-admin-outlet--module'
                   : ''
               }`}
@@ -1658,7 +1618,6 @@ export default function ERPLayout({ legalNotice }) {
                   workspace={moduleWorkspace}
                   cache={pageUIState.values}
                   onNavigate={handleNavigate}
-                  helpKey={currentEntry?.pageKey || currentEntry?.key}
                 />
               ) : null}
               {shouldBlockOutlet ? (

@@ -1,5 +1,4 @@
 import React from 'react'
-import { useOutletContext } from 'react-router-dom'
 
 import {
   CalendarOutlined,
@@ -31,9 +30,6 @@ import {
 import Table from '@/common/components/table/AppTable'
 import SharedSearchInput from '@/common/components/SearchInput'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
-import FilterChip from '@/common/components/navigation/FilterChip'
-import { countFilterOptions, shouldUseDirectFilterChoices } from '../../utils/businessFilterPresentation.mjs'
-import './businessFilterChoices.css'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
 import { BusinessPageHelpTrigger } from '../help/BusinessContextHelp.jsx'
@@ -49,7 +45,7 @@ import {
   parseDateTimeInputValue,
 } from '../../utils/dateRange.mjs'
 import { selectStableBusinessActionIndexes } from '../../utils/businessActionAvailability.mjs'
-import { formatBusinessPaginationTotal } from '../../utils/businessPagination.mjs'
+import { normalizeBusinessPageHeaderStats } from '../../utils/businessPageHeader.mjs'
 import { filterBusinessListColumns } from '../../utils/moduleTableColumns.mjs'
 import {
   businessTableCopyColumnKey,
@@ -59,7 +55,6 @@ import {
 
 const { Text } = Typography
 export const SelectionActionOverlayContext = React.createContext(null)
-const BusinessFilterPanelContext = React.createContext(false)
 
 export {
   CollaborationPanelResizeHandle,
@@ -818,35 +813,45 @@ export function BusinessPageLayout({ children, className = '' }) {
 export function PageHeaderCard({
   title,
   helpKey = '',
+  stats = [],
   compact = false,
   viewSwitch = null,
-  className = '',
 }) {
-  const { moduleWorkspace } = useOutletContext() || {}
-  const insideModule = Boolean(moduleWorkspace?.tabs.length)
-  if (insideModule && !viewSwitch) return null
+  const numericStats = normalizeBusinessPageHeaderStats(stats)
 
   return (
     <Card
       className={joinClassNames(
         'erp-business-page-header-card erp-business-module-hero',
-        compact ? 'erp-business-page-header-card--compact' : '',
-        insideModule ? 'erp-business-page-header-card--secondary' : '',
-        className
+        compact ? 'erp-business-page-header-card--compact' : ''
       )}
     >
       <div className="erp-business-page-header-card__grid erp-business-module-hero__grid">
-        {!insideModule && (
-          <div className="erp-business-page-header-card__main erp-business-module-hero__main">
-            <div>
-              <div className="erp-business-page-header-card__title-row">
-                <h1>{title}</h1>
-                <BusinessPageHelpTrigger pageKey={helpKey} />
-              </div>
+        <div className="erp-business-page-header-card__main erp-business-module-hero__main">
+          <div>
+            <div className="erp-business-page-header-card__title-row">
+              <h1>{title}</h1>
+              <BusinessPageHelpTrigger pageKey={helpKey} />
             </div>
           </div>
-        )}
+        </div>
         {viewSwitch}
+        {numericStats.length > 0 ? (
+          <div className="erp-business-page-header-card__stats erp-business-module-stats">
+            {numericStats.map((item) => (
+              <div
+                key={item.key || item.label}
+                className="erp-business-page-header-card__stat erp-metric-readonly-card"
+                aria-label={`${item.label} ${item.value}，只读摘要`}
+              >
+                <div className="erp-business-page-header-card__stat-head">
+                  <Text type="secondary">{item.label}</Text>
+                </div>
+                <strong>{item.value}</strong>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </Card>
   )
@@ -931,8 +936,6 @@ export function SelectFilter({
   ...restProps
 }) {
   const selectRef = React.useRef(null)
-  const inFilterPanel = React.useContext(BusinessFilterPanelContext)
-  const filterLabel = restProps['aria-label'] || placeholder || '筛选条件'
   const scrollMobileSelectIntoView = React.useCallback((element) => {
     if (
       typeof window !== 'undefined' &&
@@ -982,29 +985,7 @@ export function SelectFilter({
       />
     )
   }
-  if (inFilterPanel && shouldUseDirectFilterChoices({ options, mode, allowClear, className, ...restProps })) {
-    const choices = allowClear && !options.some((option) => option.value == null || option.value === '')
-      ? [{ value: undefined, label: '全部' }, ...options]
-      : options
-    return (
-      <fieldset role="presentation" className="erp-business-filter-field erp-business-filter-field--choices" disabled={restProps.disabled || restProps.loading}>
-        <legend>{filterLabel}</legend>
-        <div className="erp-business-filter-choices" role="group" aria-label={filterLabel}>
-          {choices.map((option) => (
-            <FilterChip
-              key={option.value ?? '__all'}
-              selected={value === option.value}
-              disabled={restProps.disabled || restProps.loading || option.disabled}
-              onClick={() => onChange?.(option.value, option)}
-            >
-              {option.label}
-            </FilterChip>
-          ))}
-        </div>
-      </fieldset>
-    )
-  }
-  const select = (
+  return (
     <Select
       ref={selectRef}
       className={joinClassNames(
@@ -1020,17 +1001,9 @@ export function SelectFilter({
       maxTagCount={maxTagCount}
       onOpenChange={handleOpenChange}
       onMouseDownCapture={handleMouseDownCapture}
-      showSearch={countFilterOptions(options) > 5}
-      optionFilterProp="label"
       {...restProps}
     />
   )
-  return inFilterPanel ? (
-    <label className="erp-business-filter-field">
-      <span>{filterLabel}</span>
-      {select}
-    </label>
-  ) : select
 }
 
 export function DateRangeFilter({
@@ -1149,18 +1122,11 @@ export function BusinessOperationPanel({
   clearFiltersDisabled,
   children,
   compact = false,
-  filtersOpen: controlledFiltersOpen,
-  onFiltersOpenChange,
 }) {
   const hasToolbar = Boolean(actions || primaryAction)
   const hasClearFilters = typeof onClearFilters === 'function'
   const hasActiveFilters = hasClearFilters && clearFiltersDisabled === false
-  const [internalFiltersOpen, setInternalFiltersOpen] = React.useState(false)
-  const filtersOpen = controlledFiltersOpen ?? internalFiltersOpen
-  const setFiltersOpen = (open) => {
-    if (controlledFiltersOpen === undefined) setInternalFiltersOpen(open)
-    onFiltersOpenChange?.(open)
-  }
+  const [filtersOpen, setFiltersOpen] = React.useState(false)
   const filterTriggerRef = React.useRef(null)
   const filterPanelRef = React.useRef(null)
   const filterPanelId = React.useId()
@@ -1199,7 +1165,6 @@ export function BusinessOperationPanel({
           <Popover
             trigger="click"
             placement="bottomLeft"
-            align={{ overflow: { adjustX: true, adjustY: true, shiftY: true } }}
             open={filtersOpen}
             onOpenChange={setFiltersOpen}
             classNames={{ root: 'erp-business-filter-popover' }}
@@ -1268,19 +1233,14 @@ export function BusinessOperationPanel({
                       type="text"
                       disabled={clearFiltersDisabled}
                       icon={<RollbackOutlined />}
-                      onClick={() => {
-                        onClearFilters()
-                        filterPanelRef.current?.focus({ preventScroll: true })
-                      }}
+                      onClick={onClearFilters}
                     >
                       清空筛选
                     </Button>
                   ) : null}
                 </header>
                 <div className="erp-business-operation-panel__filters">
-                  <BusinessFilterPanelContext.Provider value>
-                    {additionalFilters}
-                  </BusinessFilterPanelContext.Provider>
+                  {additionalFilters}
                 </div>
                 <footer>
                   <Button type="primary" onClick={closeFilters}>
@@ -1706,7 +1666,7 @@ export function BusinessDataTable({
         rowClassName={rowClassName}
         onRow={resolvedOnRow}
         onChange={onChange}
-        pagination={pagination ? { showTotal: formatBusinessPaginationTotal, ...pagination } : pagination}
+        pagination={pagination}
         showSorterTooltip={
           hasPageLocalSorter ? { title: '仅排序当前页' } : undefined
         }

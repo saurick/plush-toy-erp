@@ -12,9 +12,7 @@ import {
   progressStatusLabel,
   progressSourcePath,
   progressStages,
-  progressDueOptions,
-  progressFilterCount,
-  PROGRESS_FILTER_RESET,
+  progressRiskAvailable,
   withProgressFilters,
 } from './businessProgress.mjs'
 
@@ -87,21 +85,19 @@ test('quantities use facts, preserve mixed units and never equate closure to com
 test('URL state preserves filters while bounding paging and ignoring unsupported enums', () => {
   const q = progressQueryFromURL(
     new URLSearchParams(
-      'view=production&q=熊&owner=小陈&due_status=overdue&blocked_only=true&scope=all&page=2&from=2026-09-24'
+      'view=production&q=熊&owner=小陈&risk=blocked&scope=all&page=2&from=2026-09-24'
     )
   )
   assert.equal(q.view, 'production')
   assert.equal(q.offset, 20)
   assert.equal(q.keyword, '熊')
   assert.equal(q.owner, '小陈')
-  assert.equal(q.due_status, 'overdue')
-  assert.equal(q.blocked_only, true)
   assert.equal(q.date_from, '2026-09-24')
   const bad = progressQueryFromURL(
-    new URLSearchParams('view=evil&due_status=other&scope=x&page=-2&from=x')
+    new URLSearchParams('view=evil&risk=other&scope=x&page=-2&from=x')
   )
   assert.equal(bad.view, '')
-  assert.equal(bad.due_status, 'all')
+  assert.equal(bad.risk, 'all')
   assert.equal(bad.scope, 'active')
   assert.equal(bad.offset, 0)
   assert.equal(bad.date_from, '')
@@ -132,54 +128,44 @@ test('source links identify the source record and keep task codes encoded', () =
   )
 })
 
-test('交期与受阻组合，结束范围清理冲突且恢复时不复现', () => {
-  for (const due_status of ['overdue', 'due_soon']) {
-    const active = new URLSearchParams({ view: 'orders', scope: 'active', due_status, blocked_only: 'true', q: '小熊' })
-    assert.equal(progressFilterCount(progressQueryFromURL(active)), 2)
+test('进度范围与关注条件在切换和恢复时排除不可能的组合', () => {
+  for (const risk of ['overdue', 'due_soon', 'blocked']) {
+    const active = new URLSearchParams({ view: 'orders', scope: 'active', risk, q: '小熊' })
     const ended = withProgressFilters(active, { scope: 'ended' })
-    assert.equal(ended.get('due_status'), 'all')
-    assert.equal(ended.has('blocked_only'), false)
+    assert.equal(ended.get('risk'), 'all')
     assert.equal(ended.get('q'), '小熊')
-    assert.deepEqual(progressDueOptions('ended').map(({ value }) => value), ['all', 'undated'])
-    const restored = new URLSearchParams({ scope: 'ended', due_status, blocked_only: 'true' })
-    assert.equal(progressQueryFromURL(restored).due_status, 'all')
-    assert.equal(progressQueryFromURL(restored).blocked_only, false)
-    assert.equal(withProgressFilters(restored, { scope: 'active' }).get('due_status'), 'all')
+    assert.equal(progressRiskAvailable(risk, { scope: 'ended' }), false)
+    assert.equal(progressRiskAvailable(risk, { scope: 'all' }), true)
+    const restored = new URLSearchParams({ scope: 'ended', risk })
+    assert.equal(progressQueryFromURL(restored).risk, 'all')
+    assert.equal(withProgressFilters(restored, { scope: 'active' }).get('risk'), 'all')
   }
-  const production = new URLSearchParams('view=production&unlinked_only=true&blocked_only=true&due_status=undated')
-  const orders = progressQueryFromURL(withProgressFilters(production, { view: 'orders' }))
-  assert.equal(orders.unlinked_only, false)
-  assert.equal(orders.blocked_only, true)
-  assert.equal(orders.due_status, 'undated')
-  assert.equal(progressQueryFromURL(new URLSearchParams('blocked_only=false')).blocked_only, false)
-})
-
-test('两端数量提示计算全部生效条件，搜索不计数，重置保留搜索', () => {
-  const params = new URLSearchParams('view=production&scope=all&due_status=overdue&blocked_only=true&unlinked_only=true&owner=小陈&from=2026-10-01&q=小熊')
-  assert.equal(progressFilterCount(progressQueryFromURL(params)), 6)
-  const reset = withProgressFilters(params, PROGRESS_FILTER_RESET)
-  assert.equal(progressFilterCount(progressQueryFromURL(reset)), 0)
-  assert.equal(reset.get('q'), '小熊')
-  assert.equal(reset.get('view'), 'production')
+  for (const risk of ['all', 'undated', 'unlinked']) {
+    const params = new URLSearchParams({ view: 'production', scope: 'ended', risk })
+    assert.equal(progressQueryFromURL(params).risk, risk)
+  }
+  const production = new URLSearchParams('view=production&risk=unlinked')
+  assert.equal(withProgressFilters(production, { view: 'orders' }).get('risk'), 'all')
+  assert.equal(progressQueryFromURL(new URLSearchParams('view=orders&risk=unlinked')).risk, 'all')
 })
 
 test('未定交期与具体日期互斥，最后选择生效且搜索不受影响', () => {
   const dated = new URLSearchParams('view=orders&q=小熊&owner=小陈&from=2026-10-01&to=2026-10-31')
-  const undated = withProgressFilters(dated, { due_status: 'undated' })
+  const undated = withProgressFilters(dated, { risk: 'undated' })
   assert.equal(undated.has('from'), false)
   assert.equal(undated.has('to'), false)
   assert.equal(undated.get('q'), '小熊')
   assert.equal(undated.get('owner'), '小陈')
   for (const key of ['from', 'to']) {
     const selectedDate = withProgressFilters(undated, { [key]: '2026-10-12' })
-    assert.equal(selectedDate.get('due_status'), 'all')
+    assert.equal(selectedDate.get('risk'), 'all')
     assert.equal(selectedDate.get(key), '2026-10-12')
   }
   const restored = new URLSearchParams(dated)
-  restored.set('due_status', 'undated')
+  restored.set('risk', 'undated')
   assert.equal(progressQueryFromURL(restored).date_from, '')
   assert.equal(progressQueryFromURL(restored).date_to, '')
-  assert.equal(withProgressFilters(restored, { due_status: 'all' }).has('from'), false)
+  assert.equal(withProgressFilters(restored, { risk: 'all' }).has('from'), false)
   assert.equal(withProgressFilters(dated, { q: '' }).has('q'), false)
 })
 

@@ -20,12 +20,10 @@ export function VisualizationPagination({ pagination, onChange }) {
 }
 
 export function BusinessViewSwitch({ value, onChange, options }) {
-  const { moduleWorkspace } = useOutletContext() || {}
   return (
     <div className="erp-business-visual-switch">
       <Segmented
         aria-label="页面展示方式"
-        hierarchy={moduleWorkspace ? 'secondary' : 'primary'}
         value={value}
         options={options}
         onChange={onChange}

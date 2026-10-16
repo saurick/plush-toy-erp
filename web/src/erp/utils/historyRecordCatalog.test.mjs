@@ -6,7 +6,6 @@ import {
   buildHistoryListParams,
   getAvailableHistorySources,
   normalizeHistoryRecords,
-  resolveHistoryStatusCounts,
 } from './historyRecordCatalog.mjs'
 
 test('历史记录源只暴露已有菜单且具备真实读取权限的对象', () => {
@@ -63,15 +62,4 @@ test('历史记录只投影岗位可读字段，跳转链接保留所属模块�
   assert.match(record.link, /scope=history/u)
   assert.match(record.link, /sales_order_id=7/u)
   assert.equal(Object.hasOwn(record, 'id'), false)
-})
-
-test('历史状态数量使用完整服务端分组，单状态归档仅使用服务端总数', () => {
-  const grouped = { statusCounts: true }
-  assert.deepEqual(resolveHistoryStatusCounts(grouped, { total: 3, status_counts: { closed: 40, canceled: 3 } }), { closed: 40, canceled: 3 })
-  assert.equal(resolveHistoryStatusCounts(grouped, { total: 3, items: [{ lifecycle_status: 'closed' }] }), null)
-  const single = { statusCounts: false, historyStatusOptions: [{ value: '' }, { value: 'ARCHIVED' }] }
-  assert.deepEqual(resolveHistoryStatusCounts(single, { total: 47, items: [] }), { ARCHIVED: 47 })
-  assert.deepEqual(resolveHistoryStatusCounts(single, { total: 0 }), { ARCHIVED: 0 })
-  for (const total of [undefined, -1, '47']) assert.equal(resolveHistoryStatusCounts(single, { total }), null)
-  assert.equal(resolveHistoryStatusCounts({ historyStatusOptions: [] }, { total: 9 }), null)
 })

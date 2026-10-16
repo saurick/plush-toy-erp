@@ -424,12 +424,14 @@ test('ERPLayout: 桌面侧栏可收起为图标栏并恢复完整菜单', async 
   }
 })
 
-test('ERPLayout: 工作中心已有页面标题时顶栏不重复名称', async () => {
+test('ERPLayout: 没有独立内容标题的页面保留顶栏名称', async () => {
   const h = await mountRecoveryHarness()
   try {
     const breadcrumb = h.container.querySelector('.erp-admin-breadcrumb')
 
-    assert.equal(breadcrumb, null)
+    assert(breadcrumb)
+    assert.equal(breadcrumb.textContent.trim(), '进度看板')
+    assert.equal(breadcrumb.textContent.includes('业务中心'), false)
   } finally {
     await h.cleanup()
   }
@@ -448,7 +450,7 @@ test('ERPLayout: 自带标题卡的业务页不在顶栏重复页面名称', asy
   )
   assert.equal(
     hasSelfContainedBusinessPageHead('/erp/business-dashboard'),
-    true
+    false
   )
 })
 

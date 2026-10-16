@@ -7,9 +7,9 @@
 }
 
 .erp-business-page-help-trigger.ant-btn {
-  width: max(28px, var(--erp-touch-target, 0px));
-  height: max(28px, var(--erp-touch-target, 0px));
-  min-height: max(28px, var(--erp-touch-target, 0px));
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
   padding: 0;
   border: 0;
   border-radius: 7px;
@@ -43,7 +43,7 @@
 .erp-business-page-help section > .ant-typography-secondary {
   display: block;
   margin-bottom: 4px;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 600;
 }
 
@@ -185,7 +185,7 @@
   margin: 10px 0 0;
   gap: 6px 10px;
   color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 
 .erp-business-help-explanation dt {
@@ -207,9 +207,9 @@
 }
 
 .erp-business-inline-help-trigger.ant-btn {
-  width: max(28px, var(--erp-touch-target, 0px));
-  min-width: max(28px, var(--erp-touch-target, 0px));
-  height: max(28px, var(--erp-touch-target, 0px));
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
   padding: 0;
   color: var(--erp-text-muted, #64748b);
 }

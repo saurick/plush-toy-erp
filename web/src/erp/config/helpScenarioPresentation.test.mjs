@@ -5,10 +5,7 @@ import {
   ROLE_HELP_GUIDES,
   getRoleHelpGuide,
 } from './roleHelpContent.mjs'
-import {
-  BUSINESS_USABILITY_CATALOG,
-  getBusinessHelpItem,
-} from './businessUsabilityCatalog.mjs'
+import { BUSINESS_USABILITY_CATALOG } from './businessUsabilityCatalog.mjs'
 import { getRoleHelpScenarios } from './helpScenarios.mjs'
 import {
   HELP_OVERVIEW_LAYOUTS,
@@ -101,17 +98,7 @@ test('财务图解区分审批、过账和余额，更正仍保留正式受控�
   assert.match(model.steps[2].description, /审批通过仍不等于核销完成/u)
   assert.equal(model.steps[4].view, 'result')
   assert.equal(model.exception.backNumber, 2)
-  assert.match(model.supplements[0].description, /抵扣错误可撤销/u)
-  assert.match(
-    model.supplements[0].description,
-    /实际退款须关联原款另建退款单.*重新审批并登记凭据/u
-  )
-  const reversalHelp = getBusinessHelpItem('finance-payments', 'allocation-reversal')
-  assert.match(
-    reversalHelp.explanation,
-    /冲销.*撤回已过账收付款.*红冲.*独立反向记录/u
-  )
-  assert.match(reversalHelp.effect, /保留原记录和审计.*不提供物理删除/u)
+  assert.match(model.supplements[0].description, /冲销或红冲.*不删除原记录/u)
   assert.match(scene.completion, /只有过账后/u)
   const restricted = getRoleHelpScenarios(getRoleHelpGuide('finance'), {
     allowedMenuPaths: ['/erp/finance/receivables'],

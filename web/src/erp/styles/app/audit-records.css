@@ -51,7 +51,7 @@
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 
 .erp-audit-record-detail__changes th,

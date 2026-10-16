@@ -180,11 +180,6 @@ export default function BusinessFormPage({
     if (loading || baseline === null || focusedRef.current) return undefined
     // Parent initialization can reset and remount fields; focus only after that baseline exists.
     const frame = window.requestAnimationFrame(() => {
-      // A field selected during initialization owns focus; do not redirect typing.
-      if (pageRef.current?.contains(document.activeElement)) {
-        focusedRef.current = true
-        return
-      }
       const firstControl = readOnly
         ? null
         : Array.from(

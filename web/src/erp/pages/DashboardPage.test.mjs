@@ -22,10 +22,18 @@ const desktopTaskActionSource = readFileSync(
   ),
   'utf8'
 )
-test('product core preview shows useful entries without hardcoded feature counts', () => {
-  assert.doesNotMatch(source, /PRODUCT_CORE_METRICS|erp-product-core-metric/u)
+test('product core summary keeps status text outside numeric metric values', () => {
+  const metricStart = source.indexOf('const PRODUCT_CORE_METRICS')
+  const metricEnd = source.indexOf('const PRODUCT_CORE_REVIEW_ENTRIES')
+  const metricSource = source.slice(metricStart, metricEnd)
+
+  assert.ok(metricStart >= 0)
+  assert.ok(metricEnd > metricStart)
+  assert.match(metricSource, /label: '业务功能',\s*value: 11,/u)
+  assert.match(metricSource, /label: '系统设置',\s*value: 4,/u)
+  assert.doesNotMatch(metricSource, /value:\s*['"`]/u)
+  assert.doesNotMatch(metricSource, /label: '业务数据'|value: '未连接'/u)
   assert.match(source, /<Tag>尚未连接客户环境<\/Tag>/u)
-  assert.match(source, /PRODUCT_CORE_REVIEW_ENTRIES\.map/u)
 })
 
 test('desktop workbench uses one bounded server projection for counts and the active page', () => {

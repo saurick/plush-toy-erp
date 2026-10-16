@@ -233,7 +233,7 @@ export default function HelpCenterPage() {
           <SearchInput
             type="search"
             aria-label="搜索操作图解和参考手册"
-            placeholder="搜任务、字段、状态或问题"
+            placeholder="搜任务、字段、状态，或直接输入问题"
             value={query}
             maxLength={200}
             allowClear
