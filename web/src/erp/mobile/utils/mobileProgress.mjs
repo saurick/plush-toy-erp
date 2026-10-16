@@ -1,8 +1,7 @@
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { canMountCustomerRuntime } from '../../utils/adminProfileSync.mjs'
-import { progressQueryFromURL } from '../../utils/businessProgress.mjs'
-import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
+import { progressAttention, progressQueryFromURL } from '../../utils/businessProgress.mjs'
 
 export function mobileProgressAccess(profile) {
   const allowed = (key) => hasActionPermission(profile, key)
@@ -46,8 +45,12 @@ export function normalizeMobileProgressQuery(values, defaultView) {
 export function readMobileProgressState(history, scope, defaultView) {
   const saved =
     history?.mobileProgress?.scope === scope ? history.mobileProgress : {}
+  const query = normalizeMobileProgressQuery(saved.query, defaultView)
   return {
-    query: normalizeMobileProgressQuery(saved.query, defaultView),
+    query,
+    queries: Object.fromEntries(['orders', 'production'].map((view) => [
+      view, normalizeMobileProgressQuery(view === query.view ? query : { ...saved.queries?.[view], view }, view),
+    ])),
     selection:
       saved.selection &&
       Number.isSafeInteger(saved.selection.id) &&
@@ -63,22 +66,11 @@ export function mobileProgressTaskSummary(row, roleLabel) {
   if (!row.open_tasks) {
     return { title: '暂无待处理任务', detail: '', taskID: null }
   }
-  const taskName = getWorkflowTaskDisplayName({ task_name: row.attention_task })
-  const role = row.attention_role ? roleLabel(row.attention_role) : ''
-  const owner = row.attention_owner
-    ? [role, row.attention_owner].filter(Boolean).join(' · ')
-    : role
-      ? `${role}待领取`
-      : '待分配处理岗位'
+  const { title: taskName, detail: owner, taskID } = progressAttention(row, { tasks: true }, roleLabel)
   const singleTask = row.open_tasks === 1
   return {
     title: singleTask ? `任务：${taskName}` : `${row.open_tasks} 项待处理`,
     detail: singleTask ? owner : `首要：${taskName} · ${owner}`,
-    taskID:
-      singleTask &&
-      Number.isSafeInteger(row.attention_task_id) &&
-      row.attention_task_id > 0
-        ? row.attention_task_id
-        : null,
+    taskID,
   }
 }

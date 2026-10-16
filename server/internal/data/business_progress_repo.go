@@ -60,7 +60,7 @@ func loadBusinessProgressRows(ctx context.Context, tx *stdsql.Tx, q biz.Business
  overdue,due_soon,blocked,production_orders,production_closed,material_total,material_pending,in_progress_batches,outsourced_batches,
  waiting_batches,rejected_batches,planned_batches,open_tasks,blocked_tasks,unassigned_tasks,attention_task_id,attention_task,
  attention_reason,attention_owner,attention_role,CAST(completed_quantity AS TEXT),current_operation,operation_count FROM filtered` + (" WHERE " + progressFilterCondition(q)) +
-		fmt.Sprintf(" ORDER BY active DESC,overdue DESC,blocked DESC,CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,due_at,id DESC LIMIT $%d OFFSET $%d", len(args)-1, len(args))
+		fmt.Sprintf(" ORDER BY active DESC,blocked DESC,overdue DESC,CASE WHEN due_at IS NULL THEN 1 ELSE 0 END,due_at,id DESC LIMIT $%d OFFSET $%d", len(args)-1, len(args))
 	rows, err := tx.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err

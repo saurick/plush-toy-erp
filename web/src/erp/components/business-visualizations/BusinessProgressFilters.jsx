@@ -17,6 +17,7 @@ export function ProgressDueFilters({
   counts,
   onChange,
   className = '',
+  compact = false,
 }) {
   return (
     <div
@@ -24,24 +25,25 @@ export function ProgressDueFilters({
       role="group"
       aria-label="交期情况"
     >
-      {progressDueOptions(query.scope).map(({ value, label }) => (
+      {progressDueOptions(query.scope).filter(({ value }) => !compact || value !== 'undated').map(({ value, label }) => (
         <FilterChip
           key={value}
           selected={query.due_status === value}
           removable={value !== 'all'}
           count={countLabel(counts?.[value === 'all' ? 'total' : value])}
+          aria-label={`${label} ${countLabel(counts?.[value === 'all' ? 'total' : value])}`}
           onClick={() =>
             onChange({ due_status: query.due_status === value ? 'all' : value })
           }
         >
-          {label}
+          {compact ? { all: '全部', overdue: '已逾期', due_soon: '7天内' }[value] : label}
         </FilterChip>
       ))}
     </div>
   )
 }
 
-export function ProgressBlockedFilter({ query, counts, taskAccess, onChange }) {
+export function ProgressBlockedFilter({ query, counts, taskAccess, onChange, compact = false }) {
   if (query.scope === 'ended') return null
   return (
     <FilterChip
@@ -50,9 +52,10 @@ export function ProgressBlockedFilter({ query, counts, taskAccess, onChange }) {
       disabled={taskAccess === false}
       count={countLabel(taskAccess === false ? undefined : counts?.blocked)}
       title={taskAccess === false ? '无权查看关联任务' : undefined}
+      aria-label={`仅看任务受阻 ${countLabel(taskAccess === false ? undefined : counts?.blocked)}`}
       onClick={() => onChange({ blocked_only: !query.blocked_only })}
     >
-      仅看任务受阻
+      {compact ? '受阻' : '仅看任务受阻'}
     </FilterChip>
   )
 }

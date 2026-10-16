@@ -74,10 +74,6 @@ const productIdentityStyles = readFileSync(
   ),
   'utf8'
 )
-const progressStyles = readFileSync(
-  fileURLToPath(new URL('../styles/app/progress-board.css', import.meta.url)),
-  'utf8'
-)
 const progressSummaryStyles = readFileSync(
   fileURLToPath(
     new URL(
@@ -112,11 +108,9 @@ test('business dashboard remains valid JSX', async () => {
   })
 })
 
-test('product images keep card actions separate and remain independently previewable', () => {
-  assert.match(
-    source,
-    /<WorkflowTaskCard[\s\S]*?contentClassName="erp-progress-row-select"/u
-  )
+test('compact progress keeps detail images independently previewable without list image requests', () => {
+  assert.match(source, /<table\s+className="erp-progress-table"/u)
+  assert.doesNotMatch(source, /className="erp-progress-summary"/u)
   assert.match(
     mobilePanel,
     /<WorkflowTaskCard[\s\S]*?contentClassName="mobile-progress-card-main"/u
@@ -140,14 +134,14 @@ test('product images keep card actions separate and remain independently preview
   assert.match(taskImage, /aria-haspopup="dialog"/u)
   assert.match(taskImage, /onMouseDown=\{\(event\) =>/u)
   assert.match(taskImage, /closest\('\[role="option"\]'\)/u)
-  assert.match(source, /erp-progress-product-count/u)
+  assert.match(source, /<ProgressIdentity row=\{row\}/u)
   assert.match(summary, /<ProductIdentity productId=\{row\.product_id\}/u)
   assert.match(mobileSummary, /<ProductIdentity productId=\{row\.product_id\}/u)
   assert.match(drawer, /record\.kind === 'sales_line'/u)
   assert.match(drawer, /productId=\{record\.product_id\}/u)
 })
 
-test('product image sizes remain identifiable across dense, standard, and summary contexts', () => {
+test('detail and business product images retain their existing sizes', () => {
   assert.match(
     taskImageStyles,
     /\.erp-task-product-image \{[\s\S]*?width: 64px;/u
@@ -161,16 +155,8 @@ test('product image sizes remain identifiable across dense, standard, and summar
     /\.erp-product-identity--compact \.erp-task-product-image \{[\s\S]*?width: 48px;/u
   )
   assert.match(
-    progressStyles,
-    /\.erp-progress-row-product-image \.erp-task-product-image \{[\s\S]*?width: 56px;/u
-  )
-  assert.match(
     progressSummaryStyles,
     /\.erp-progress-overview-product \.erp-task-product-image \{[\s\S]*?width: 64px;/u
-  )
-  assert.match(
-    mobileProgressStyles,
-    /\.mobile-progress-product-image \.erp-task-product-image \{[\s\S]*?width: 56px;/u
   )
   assert.match(
     mobileTaskStyles,

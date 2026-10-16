@@ -12,11 +12,42 @@ import {
   progressStatusLabel,
   progressSourcePath,
   progressStages,
+  progressAttention,
+  progressDue,
   progressDueOptions,
   progressFilterCount,
   PROGRESS_FILTER_RESET,
   withProgressFilters,
 } from './businessProgress.mjs'
+
+test('compact attention retains the real task, role, reason and exact single-task destination', () => {
+  const row = { ...progressFixtureRow(), open_tasks: 1, attention_task_id: 31, attention_owner: '小陈', attention_task: 'engineering_data' }
+  assert.deepEqual(progressAttention(row, { tasks: true }, () => '工程'), {
+    title: '工程资料', detail: '工程 · 小陈', taskID: 31, taskCount: 1,
+    blocked: true, reason: row.attention_reason,
+  })
+  assert.equal(progressAttention({ ...row, open_tasks: 2 }, { tasks: true }).taskID, null)
+  assert.equal(progressAttention({ ...row, attention_owner: '' }, { tasks: true }, () => '工程').detail, '工程待领取')
+  for (const value of [0, -1, '31', 1.5]) assert.equal(progressAttention({ ...row, attention_task_id: value }, { tasks: true }).taskID, null)
+  const hidden = progressAttention(row, { tasks: false })
+  assert.deepEqual(hidden, { title: '任务无查看权限', detail: '', taskID: null, taskCount: 0, blocked: false, reason: '' })
+  const empty = progressAttention({ ...row, open_tasks: 0 }, { tasks: true })
+  assert.equal(empty.title, '暂无可见待办')
+  assert.equal(empty.detail, '业务负责人：模拟业务员')
+  assert.equal(empty.reason, '')
+  assert.equal(empty.taskID, null)
+})
+
+test('due-day emphasis uses the response snapshot and Chinese business day without inventing risk', () => {
+  const row = { ...progressFixtureRow(), due_date: '2026-10-16' }
+  assert.deepEqual(progressDue(row, '2026-10-16T17:30:00Z'), { label: '逾期 1 天', date: '2026-10-16', tone: 'danger' })
+  assert.equal(progressDue(row).label, '已逾期')
+  assert.equal(progressDue({ ...row, active: false }, '2026-10-16T17:30:00Z').tone, '')
+  assert.equal(progressDue({ ...row, due_date: '' }, '2026-10-16T17:30:00Z').label, '未定交期')
+  assert.equal(progressDue({ ...row, overdue: false, due_soon: true }, '2026-10-16T04:00:00Z').label, '今天到期')
+  assert.equal(progressDue({ ...row, overdue: false, due_soon: true, due_date: '2026-10-19' }, '2026-10-16T04:00:00Z').label, '还有 3 天')
+  assert.equal(progressDue({ ...row, overdue: false, due_soon: false }, '2026-10-17T04:00:00Z').tone, '')
+})
 
 test('progress responses reject missing, malformed and duplicate records instead of showing zero', () => {
   const valid = progressFixtureData()

@@ -2,7 +2,7 @@ import {
   progressDelivery,
   progressStages,
 } from '../../utils/businessProgress.mjs'
-import { getWorkflowTaskOwnerRoleLabel } from '../../utils/workflowTaskBoard.mjs'
+import { ProgressAttention } from '../../components/business-visualizations/ProgressCompactContent.jsx'
 import ProductIdentity from '../../components/master-data/ProductIdentity.jsx'
 import MobileProgressRecentRecords from './MobileProgressRecentRecords.jsx'
 
@@ -10,16 +10,6 @@ export default function MobileProgressSummary({ data }) {
   const { row, access, sections } = data
   const delivery = progressDelivery(row)
   const stages = progressStages(row, access)
-  const owner =
-    row.attention_owner ||
-    (row.attention_role
-      ? getWorkflowTaskOwnerRoleLabel({ owner_role_key: row.attention_role })
-      : '')
-  const attention = !access.tasks
-    ? '无查看权限'
-    : row.open_tasks > 0
-      ? [owner, `${row.open_tasks} 项待处理`].filter(Boolean).join(' · ')
-      : '暂无可见待办'
   const task = access.tasks
     ? sections.tasks?.find((item) => item.label === row.attention_task) ||
       sections.tasks?.[0]
@@ -69,14 +59,9 @@ export default function MobileProgressSummary({ data }) {
           </div>
           <div className="mobile-detail-fact">
             <dt>当前关注</dt>
-            <dd>{attention}</dd>
+            <dd><ProgressAttention row={row} access={access} /></dd>
           </div>
         </dl>
-        {access.tasks && row.attention_reason ? (
-          <p className="mobile-progress-attention-reason">
-            {row.attention_reason}
-          </p>
-        ) : null}
       </section>
       <section className="mobile-detail-section" aria-label="阶段进度">
         <h3>阶段进度</h3>

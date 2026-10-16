@@ -54,12 +54,15 @@ export function createFilterConflictScenarios(deps) {
         if (!quick) return false
         const buttons = [...quick.querySelectorAll('button')]
         if ('blocked_only' in expected && query.scope !== 'ended') {
-          const blocked = buttons.find((node) => node.textContent.includes('仅看任务受阻'))
+          const blocked = buttons.find((node) => node.getAttribute('aria-label')?.startsWith('仅看任务受阻'))
           if (blocked?.getAttribute('aria-pressed') !== String(expected.blocked_only === true)) return false
         }
         if (expected.due_status) {
           const label = { all: '不限交期', overdue: '已逾期', due_soon: '7天内到期', undated: '未定交期' }[expected.due_status]
-          if (buttons.find((node) => node.textContent.includes(label))?.getAttribute('aria-pressed') !== 'true') return false
+          if (expected.due_status === 'undated') {
+            const applied = document.querySelector(phone ? '.mobile-applied-filters' : '.erp-progress-active-filters')
+            if (!applied?.textContent.includes(label)) return false
+          } else if (buttons.find((node) => node.getAttribute('aria-label')?.startsWith(label))?.getAttribute('aria-pressed') !== 'true') return false
         }
         return true
       }, { phone, expected })
@@ -131,9 +134,9 @@ export function createFilterConflictScenarios(deps) {
     await waitQuery({ due_status: 'undated', from: '', to: '' })
     await page.keyboard.press('Escape')
     await page.reload()
-    await due(quick, '未定交期').waitFor()
+    await panel.locator(phone ? '.mobile-applied-filters' : '.erp-progress-active-filters').getByText('未定交期', { exact: true }).waitFor()
     await waitQuery({ due_status: 'undated' })
-    assert.equal(await due(quick, '未定交期').getAttribute('aria-pressed'), 'true')
+    assert.equal(await due(quick, '未定交期').count(), 0, '少用条件留在更多筛选，当前条件持续可见')
     await trigger.click()
     await waitForFilters(page, filters)
     await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
@@ -282,14 +285,14 @@ export function createFilterConflictScenarios(deps) {
     },
     verify: async (page) => {
       const panel = page.getByRole('region', { name: '进度看板', exact: true })
-      await panel.getByRole('button', { name: '查看 MO-0001 进度摘要', exact: true }).waitFor()
+      await panel.getByRole('button', { name: '查看 MO-0001 完整进度', exact: true }).waitFor()
       assert.equal(new URL(page.url()).searchParams.has('view'), false)
       await panel.getByRole('button', { name: /^筛选进度/ }).click()
       await page.getByRole('button', { name: /^仅看未关联销售/ }).click()
       await page.waitForURL((url) => url.searchParams.get('view') === 'production' && url.searchParams.get('unlinked_only') === 'true')
-      await panel.getByRole('button', { name: '查看 MO-0003 进度摘要', exact: true }).waitFor()
+      await panel.getByRole('button', { name: '查看 MO-0003 完整进度', exact: true }).waitFor()
       await page.reload()
-      await panel.getByRole('button', { name: '查看 MO-0003 进度摘要', exact: true }).waitFor()
+      await panel.getByRole('button', { name: '查看 MO-0003 完整进度', exact: true }).waitFor()
       await assertNoHorizontalOverflow(page, '生产进度默认视图筛选')
     },
   }

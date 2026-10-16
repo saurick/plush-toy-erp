@@ -108,6 +108,7 @@ export function createMobileProgressScenarios({
       hasTouch: true,
       themeMode: role === 'pmc' ? 'dark' : 'light',
       viewport: { width: role === 'warehouse' ? 360 : 390, height: 844 },
+      deviceScaleFactor: 3,
       adminProfile: {
         username: `mobile-progress-${role}`,
         is_super_admin: false,
@@ -392,65 +393,11 @@ export function createMobileProgressScenarios({
           calls[0].params.view,
           role === 'pmc' ? 'production' : 'orders'
         )
-        const firstProductImage = panel
-          .locator('.mobile-progress-product-image img')
-          .first()
-        await firstProductImage.waitFor()
-        await page.waitForFunction(
-          () =>
-            document.querySelector(
-              '[data-testid="mobile-progress-panel"] .mobile-progress-product-image img'
-            )?.naturalWidth > 0
-        )
-        const productMetrics = await panel
-          .locator('.mobile-progress-card')
-          .first()
-          .evaluate((card) => {
-            const summary = card.querySelector(
-              '.mobile-progress-product-summary'
-            )
-            const image = card.querySelector('.erp-task-product-image')
-            return {
-              summaryHeight: summary.getBoundingClientRect().height,
-              imageWidth: image.getBoundingClientRect().width,
-              imageHeight: image.getBoundingClientRect().height,
-              overflow: card.scrollWidth - card.clientWidth,
-            }
-          })
-        assert(
-          productMetrics.summaryHeight <= 72 &&
-            Math.abs(productMetrics.imageWidth - 56) < 1 &&
-            Math.abs(productMetrics.imageHeight - 56) < 1 &&
-            productMetrics.overflow <= 1,
-          `产品缩略图应嵌入原信息区且不撑宽卡片：${JSON.stringify(productMetrics)}`
-        )
-        assert(
-          imageCalls.some(
-            ({ method, params }) =>
-              method === 'list_product_image_references' &&
-              params.product_ids?.includes(7)
-          ) &&
-            imageCalls.some(
-              ({ method, params }) =>
-                method === 'download_attachment' &&
-                params.id === 880007 &&
-                params.variant === 'thumbnail'
-            ),
-          '进度卡应通过产品图片引用和缩略图接口读取首款图片'
-        )
-        assert.equal(
-          await panel
-            .locator('.mobile-progress-card')
-            .nth(2)
-            .locator('.mobile-progress-product-count')
-            .textContent(),
-          '+2'
-        )
-        await panel
-          .locator('.mobile-progress-card')
-          .nth(2)
-          .getByText('云朵小熊 等 3 项', { exact: true })
-          .waitFor()
+        assert.equal(await panel.locator('.mobile-progress-list img').count(), 0)
+        assert.equal(imageCalls.length, 0, '紧凑列表不读取产品图片，详情按需加载')
+        await panel.locator('.mobile-progress-card').nth(2).getByText('云朵小熊 等 3 项', { exact: true }).waitFor()
+        const cardGeometry = await panel.locator('.mobile-progress-card').first().evaluate((card) => ({ height: card.getBoundingClientRect().height, overflow: card.scrollWidth - card.clientWidth }))
+        assert(cardGeometry.height < 240 && cardGeometry.overflow <= 1, JSON.stringify(cardGeometry))
         await assertNoHorizontalOverflow(page, role)
         await assertSegmentAffordance(panel.locator('.erp-sliding-segmented'))
         await assertFilterAffordance(
@@ -516,21 +463,21 @@ export function createMobileProgressScenarios({
         const taskEntries = panel.locator('.mobile-progress-task-entry')
         assert.equal(
           await taskEntries.nth(0).locator('strong').textContent(),
-          '2 项待处理'
+          '受阻 · 确认面料交期'
         )
         assert(
           (await taskEntries.nth(0).innerText()).includes(
-            '首要：确认面料交期 · 采购待领取'
+            '采购待领取 · 共 2 项待办'
           )
         )
         assert.equal(
           await taskEntries.nth(1).locator('strong').textContent(),
-          '任务：工程资料'
+          '工程资料'
         )
         assert((await taskEntries.nth(1).innerText()).includes('模拟经办人'))
         const emptyEntry = taskEntries.nth(2)
-        assert.equal(await emptyEntry.textContent(), '暂无待处理任务')
-        assert.equal(await emptyEntry.evaluate((node) => node.tagName), 'P')
+        assert((await emptyEntry.textContent()).includes('暂无可见待办'))
+        assert.equal(await emptyEntry.evaluate((node) => node.tagName), 'DIV')
         assert.equal(await emptyEntry.locator('button, .anticon').count(), 0)
 
         const longTaskEntry = taskEntries.nth(3)
@@ -708,12 +655,10 @@ export function createMobileProgressScenarios({
         await pullToRefresh(page, panel.locator('.mobile-progress-scroll'))
         await page.waitForFunction(
           () =>
-            !document.querySelector(
-              '[data-testid="mobile-progress-panel"] .mobile-progress-task-entry'
-            )
+            document.querySelector('[data-testid="mobile-progress-panel"] .mobile-progress-task-entry')?.textContent.includes('任务无查看权限')
         )
         assert.equal(
-          await panel.locator('.mobile-progress-task-entry').count(),
+          await panel.locator('button.mobile-progress-task-entry').count(),
           0
         )
         hideTaskAccess = false
@@ -739,6 +684,9 @@ export function createMobileProgressScenarios({
           )
           return header && Math.abs(header.getBoundingClientRect().left) <= 1
         })
+        await drawer.locator('.mobile-progress-overview-product img').first().waitFor()
+        await page.waitForFunction(() => document.querySelector('.erp-progress-drawer--mobile .mobile-progress-overview-product img')?.naturalWidth > 0)
+        assert(imageCalls.some(({ method, params }) => method === 'list_product_image_references' && params.product_ids?.includes(7)))
         const detailGeometry = await assertMobileDetailSurface(drawer, assert)
         const stageRegion = drawer.getByRole('region', { name: '阶段进度' })
         assert.equal(
@@ -1309,7 +1257,6 @@ export function createMobileProgressScenarios({
               scrollWidth: document.documentElement.scrollWidth,
               bounds: rect(node),
               panel: rect(panel),
-              header: rect(panel.querySelector('header')),
               footer: rect(panel.querySelector('footer')),
               fields: rect(panel.querySelector('.mobile-filter-fields')),
             }
@@ -1324,20 +1271,18 @@ export function createMobileProgressScenarios({
               narrowFilter.viewportHeight + 1 &&
             narrowFilter.panel.top >= 11 &&
             narrowFilter.panel.bottom <= narrowFilter.viewportHeight - 11 &&
-            narrowFilter.header.top >= narrowFilter.panel.top &&
+            narrowFilter.fields.top >= narrowFilter.panel.top &&
             narrowFilter.footer.bottom <= narrowFilter.panel.bottom &&
             narrowFilter.fields.height > 0 &&
-            narrowFilter.fields.top >= narrowFilter.header.bottom &&
+            narrowFilter.fields.top >= narrowFilter.panel.top &&
             narrowFilter.fields.bottom <= narrowFilter.footer.top,
           `窄屏进度筛选下拉层应保持在视口内：${JSON.stringify(narrowFilter)}`
         )
         const fields = filterPanel.locator('.mobile-filter-fields')
         await fields.evaluate((node) => { node.scrollTop = node.scrollHeight })
         const pinnedActions = await filterPanel.evaluate((node) => ({
-          headerTop: node.querySelector('header').getBoundingClientRect().top,
           footerBottom: node.querySelector('footer').getBoundingClientRect().bottom,
         }))
-        assert.equal(pinnedActions.headerTop, narrowFilter.header.top, '浏览更多条件时关闭入口保持原位')
         assert.equal(pinnedActions.footerBottom, narrowFilter.footer.bottom, '浏览更多条件时重置入口保持原位')
         await filterPanel.getByRole('button', { name: '关闭筛选', exact: true }).click({ trial: true })
         await filterPanel.getByRole('button', { name: '重置筛选', exact: true }).click({ trial: true })
@@ -1637,7 +1582,7 @@ export function createMobileProgressScenarios({
       await panel.getByRole('button', { name: '筛选进度', exact: true }).click()
       const longOwner = '负责人姓名很长用于验证条件自动换行且取消按钮完整显示'
       await filters.getByRole('textbox', { name: '处理人或业务负责人', exact: true }).fill(longOwner)
-      await filters.getByRole('button', { name: '应用', exact: true }).click()
+      await filters.getByRole('textbox', { name: '处理人或业务负责人', exact: true }).press('Enter')
       await filters.getByRole('button', { name: '自定义交期日期', exact: true }).click()
       const dates = page.getByRole('dialog', { name: '选择交期日期范围', exact: true })
       await dates.waitFor()

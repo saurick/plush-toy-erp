@@ -1,13 +1,13 @@
 import React from 'react'
-import { Button, Tag } from 'antd'
+import { Tag } from 'antd'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import {
+  progressAttention,
   progressDelivery,
   progressStages,
   progressStatusLabel,
 } from '../../utils/businessProgress.mjs'
-import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
-import { getWorkflowTaskOwnerRoleLabel } from '../../utils/workflowTaskBoard.mjs'
+import { ProgressAttention } from './ProgressCompactContent.jsx'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import './businessProgressSummary.css'
 
@@ -28,16 +28,9 @@ export default function BusinessProgressSummary({
   sections,
   headingRef,
   onSelectSection,
-  onOpenDetail,
 }) {
   const delivery = progressDelivery(row)
-  const hasTask = access?.tasks && Boolean(row.attention_task)
-  const attention = hasTask
-    ? row.attention_reason ||
-      getWorkflowTaskDisplayName({ task_name: row.attention_task })
-    : access?.tasks
-      ? '暂无可见待办'
-      : '任务无查看权限'
+  const attention = progressAttention(row, access)
   return (
     <div className="erp-progress-overview">
       <header className="erp-progress-overview-identity">
@@ -113,40 +106,13 @@ export default function BusinessProgressSummary({
         aria-label="当前关注"
       >
         <h3>当前关注</h3>
-        {hasTask ? (
+        {attention.taskCount > 0 ? (
           <button type="button" onClick={() => onSelectSection('tasks')}>
-            {attention}
+            <ProgressAttention row={row} access={access} />
           </button>
-        ) : (
-          <p>{attention}</p>
-        )}
-        {hasTask ? (
-          <p>
-            {row.attention_owner || '未分配处理人'} ·{' '}
-            {row.attention_role
-              ? getWorkflowTaskOwnerRoleLabel({
-                  owner_role_key: row.attention_role,
-                })
-              : '未分配岗位'}
-          </p>
-        ) : row.sales_owner ? (
-          <p>业务负责人：{row.sales_owner}</p>
-        ) : null}
-        {hasTask && row.open_tasks > 1 && (
-          <button
-            className="erp-progress-overview-more"
-            type="button"
-            onClick={() => onSelectSection('tasks')}
-          >
-            另有 {row.open_tasks - 1} 项待办
-          </button>
-        )}
+        ) : <ProgressAttention row={row} access={access} />}
+
       </section>
-      {onOpenDetail && (
-        <Button type="primary" block onClick={onOpenDetail}>
-          查看完整进度
-        </Button>
-      )}
     </div>
   )
 }

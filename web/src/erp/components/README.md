@@ -17,6 +17,7 @@
 | 事实和质量       | `operational-facts/*`、`quality-inspections/*`、`shipments/*`                  | Operational Fact、质检、出货相关展示和表单入口                 |
 | 工程资料和打印   | `bom/*`、`print/*`                                                             | BOM 头 / 明细、打印模板工作台和纸面预览                        |
 | Workflow 展示与动作 | `workflow/*` | 任务动作抽屉、提交前解释合同消费；`WorkflowTaskCalendar.jsx` 供两端共用待办月历、日期列表和跨月逾期 / 无截止入口，读取服务端完整统计并复用现有办理入口 |
+| 进度总览与详情 | `business-visualizations/ProgressCompactContent.jsx`、`BusinessProgressDrawer.jsx` | 桌面与手机共用单据身份、快照交期、实际数量及当前关注；完整环节和图片按需下钻 |
 
 ## 边界
 

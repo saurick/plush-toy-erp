@@ -618,22 +618,23 @@
     .dashboard-risk-row span { margin-top: 4px; color: var(--text-2); font-size: 12px; }
     .dashboard-risk-row button { margin-top: 8px; }
 
-    .progress-layout { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.4fr) 330px; gap: 9px; }
-    .progress-list { min-height: 0; overflow: auto; display: grid; align-content: start; gap: 8px; padding: 9px; }
-    .progress-row { width: 100%; text-align: left; color: inherit; font: inherit; cursor: pointer; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
-    .progress-row.is-selected { border-color: var(--brand); background: var(--brand-softer); }
-    .progress-row:hover, .progress-row:focus-within { background: var(--surface-hover); }
-    .progress-row .interactive-image-row__content { display: block; }
-    .progress-row-arrow { margin-left: auto; }
-    .progress-row-head { display: flex; align-items: center; gap: 8px; }
-    .progress-row-head strong { flex: 1; }
-    .progress-row-copy { margin-top: 5px; color: var(--text-3); font-size: 12px; }
+    .progress-list { min-width:0; min-height:0; overflow:auto; padding:0; }
+    .progress-compact-table { width:100%; table-layout:fixed; border-collapse:collapse; }
+    .progress-compact-table th { color:var(--text-3); font-size:12px; font-weight:500; text-align:left; padding:10px 12px; background:var(--surface-muted); }
+    .progress-compact-table th:first-child { width:29%; }
+    .progress-compact-table th:nth-child(2) { width:16%; }
+    .progress-compact-table th:nth-child(3) { width:20%; }
+    .progress-compact-table th:nth-child(4) { width:27%; }
+    .progress-compact-table th:last-child { width:8%; }
+    .progress-compact-table td { padding:10px 12px; border-top:1px solid var(--line); overflow-wrap:anywhere; }
+    .progress-compact-table td > strong, .progress-compact-table td > small { display:block; }
+    .progress-compact-table small { font-size:12px; color:var(--text-3); margin-top:4px; }
+    .progress-compact-table .is-selected { background:var(--brand-softer); }
+    .progress-record-open { display:grid; gap:3px; width:100%; border:0; padding:0; background:transparent; text-align:left; color:var(--text); font:inherit; }
+    .progress-record-open span { font-size:12px; color:var(--text-3); }
+    .progress-record-open:focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
     .progress-bar { height: 7px; margin-top: 11px; overflow: hidden; border-radius: 999px; background: var(--surface-muted); }
     .progress-bar i { height: 100%; display: block; border-radius: inherit; background: var(--brand); }
-    .progress-row-foot { margin-top: 8px; display: flex; align-items: center; gap: 7px; color: var(--text-2); font-size: 12px; }
-    .progress-row-foot button { margin-left: auto; }
-    .progress-summary { min-height: 0; padding: 13px; overflow: auto; }
-    .progress-summary h2 { margin: 0 0 12px; font-size: 15px; }
     .stage-list { display: grid; gap: 8px; }
     .stage-row { display: grid; grid-template-columns: 92px minmax(0, 1fr) 42px; gap: 8px; align-items: center; font-size: 12px; }
     .stage-row .progress-bar { margin: 0; }
@@ -1586,12 +1587,6 @@
     .product-image-preview-stage .product-art { width: min(70vw, 560px); height: min(70vw, 560px); transform: scale(var(--preview-scale, 1)); transition: transform .16s ease; }
     .product-image-preview-tools { display: flex; align-items: center; justify-content: center; gap: 8px; }
     .product-image-preview-tools .data-note { margin-left: 8px; }
-    .progress-row-copy.product-cell { display: flex; align-items: center; gap: 10px; line-height: 1.5; }
-    .progress-row-copy.product-cell .product-thumb { width: 56px; height: 56px; }
-    .progress-row-copy.product-cell > span:last-child, .progress-summary .product-cell > span:last-child { display: grid; gap: 2px; }
-    .progress-row-copy.product-cell strong, .progress-summary .product-cell strong { color: var(--text); font-size: 12px; }
-    .progress-summary .product-cell { margin-bottom: 12px; }
-    .progress-summary .product-thumb { width: 64px; height: 64px; }
     .priority-identity .product-cell { display: flex; align-items: center; gap: 8px; margin-top: 5px; }
     .priority-identity .product-cell > span:last-child { min-width: 0; margin-top: 0; }
     .priority-identity .product-thumb { margin-top: 0; }
@@ -2138,7 +2133,6 @@
       .command-actions .collapse-label span { display: none; }
       .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .catalog-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .progress-layout { grid-template-columns: minmax(0, 1fr) 290px; }
       .workbench-layout { grid-template-columns: minmax(280px, .8fr) minmax(0, 1.2fr); }
       .workbench-attention { grid-template-columns: 1fr; }
       .attention-facts { grid-template-columns: repeat(3, 1fr); }
@@ -2179,8 +2173,8 @@
       .anchor-nav > button { display: none; }
       .form-section-picker { display: flex; }
       .catalog-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .dashboard-grid, .progress-layout { grid-template-columns: 1fr; grid-template-rows: auto; }
-      .dashboard-panel, .progress-summary { min-height: 260px; }
+      .dashboard-grid { grid-template-columns: 1fr; grid-template-rows: auto; }
+      .dashboard-panel { min-height: 260px; }
       .workbench-layout { display: flex; flex-direction: column; overflow: auto; }
       .workbench-left { min-height: 530px; }
       .workbench-visuals { flex: 0 0 auto; grid-template-columns: 1fr 1fr; grid-template-rows: minmax(250px, auto) minmax(230px, auto); overflow: visible; }
@@ -5708,13 +5702,28 @@ return {orders,financeCustomers};})();
     function renderProgressPage() {
       if(state.progressView==='statistics')return renderStatisticsPage();
       const rows = getProgressDesignRows();
-      const selected = rows.find(row => row.id === state.progressSelected) || rows[0];
-      state.progressSelected = selected?.id || '';
-      const operation = `<section class="page-navigation"><div class="navigation-row"><h1>进度看板</h1>${renderProgressTabs()}</div><div class="navigation-row"><div class="segment" aria-label="记录范围">${[['active','未结束'],['all','全部记录'],['ended','已结束']].map(([key,label])=>`<button class="${state.progressScope===key?'active':''}" data-action="progress-scope" data-value="${key}">${label}</button>`).join('')}</div><div class="segment">${renderProgressDesignFilters()}</div><label class="search">${icon('search')}<input id="progress-search" value="${escapeHTML(state.progressSearch)}" placeholder="搜索订单、客户、产品、负责人" /></label><span class="data-note">筛选 ${Number(state.progressScope!=='active')+Number(state.progressDue!=='all')+Number(state.progressBlockedOnly)} 项</span><div class="command-actions"><button class="btn" data-action="export">${icon('export')}导出</button></div></div></section>`;
-      if (state.previewState !== 'data') return `${operation}${renderDataState({title:'进度看板'})}`;
-      return `${operation}<section class="progress-layout"><section class="surface progress-list">${rows.length ? rows.map((row,index)=>`<article class="progress-row interactive-image-row${selected?.id===row.id?' is-selected':''}"><button type="button" class="interactive-image-row__open" aria-pressed="${selected?.id===row.id}" data-action="progress-select" data-id="${row.id}" aria-label="查看 ${row.no} 进度摘要"></button><div class="interactive-image-row__content"><div class="progress-row-head"><strong class="entity-link">${row.no}</strong><span class="badge ${row.badge}">${row.status}</span></div><div class="progress-row-copy product-cell">${renderProductThumb(index,row.product)}<span><strong>${escapeHTML(row.product)}</strong><span>${escapeHTML(row.customer)}</span><span>${row.due} 交付</span></span></div><div class="progress-bar"><i style="width:${row.percent}%"></i></div><div class="progress-row-foot"><strong>${row.stage}</strong><span>${row.quantity}</span><span class="progress-row-arrow">${icon('chevron')}</span></div></div></article>`).join('') : '<div class="empty"><div><strong>当前筛选没有进度记录</strong><span>调整搜索或风险条件后重试</span></div></div>'}</section><aside class="surface progress-summary">${selected?`<h2>${selected.no}</h2><div class="product-cell">${renderProductThumb(Math.max(0,rows.indexOf(selected)),selected.product)}<span><strong>${escapeHTML(selected.product)}</strong><span class="data-note">${escapeHTML(selected.customer)}</span></span></div><div style="margin-top:12px;display:flex;align-items:center;gap:8px"><span class="badge ${selected.badge}">${selected.status}</span><strong>${selected.percent}%</strong><span class="data-note">${selected.due} 交付</span></div><div class="stage-list" style="margin-top:16px">${selected.stages.map(([label,value])=>`<div class="stage-row"><span>${label}</span><div class="progress-bar"><i style="width:${value}%"></i></div><strong>${value}%</strong></div>`).join('')}</div><section class="detail-section" style="margin-top:16px"><h3>当前关注</h3><p style="margin:0;line-height:1.6;color:var(--text-2)">${selected.task}</p></section><button class="btn primary" style="margin-top:12px;width:100%" data-action="progress-open-detail" data-id="${selected.id}">查看完整进度</button>`:'<div class="empty">当前没有可查看的阶段摘要</div>'}</aside></section>`;
+      const operation = `<section class="page-navigation"><div class="navigation-row"><h1>进度看板</h1>${renderProgressTabs()}</div><div class="navigation-row"><div class="segment" aria-label="记录范围">${[['active','未结束'],['all','全部记录'],['ended','已结束']].map(([key,label])=>`<button class="${state.progressScope===key?'active':''}" data-action="progress-scope" data-value="${key}">${label}</button>`).join('')}</div><div class="segment">${renderProgressDesignFilters()}</div><label class="search">${icon('search')}<input id="progress-search" value="${escapeHTML(state.progressSearch)}" placeholder="搜索订单、客户、产品、负责人" /></label></div></section>`;
+      if(state.previewState!=='data')return `${operation}${renderDataState({title:'进度看板'})}`;
+      return `${operation}<section class="surface progress-list"><table class="progress-compact-table" aria-label="进度紧凑总览"><thead><tr><th>订单 / 产品</th><th>${state.progressView==='orders'?'交期':'计划结束'}</th><th>${state.progressView==='orders'?'已出货 / 订购':'有效完工 / 计划'}</th><th>当前关注 / 处理人</th><th>查看</th></tr></thead><tbody>${rows.map(row=>`<tr class="${state.progressSelected===row.id?'is-selected':''}"><td><button class="progress-record-open" data-action="progress-open-detail" data-id="${row.id}"><strong>${escapeHTML(row.product)}</strong><span>${escapeHTML(row.no)}</span><span>${escapeHTML(row.customer)} · ${escapeHTML(row.status)}</span></button></td><td><strong class="${row.risk==='overdue'?'text-danger':''}">${row.risk==='overdue'?'已逾期':row.risk==='due'?'7天内到期':'按交期跟进'}</strong><small>${escapeHTML(row.due)}</small></td><td>${escapeHTML(row.quantity)}</td><td>${renderCompactDesignAttention(row)}</td><td><button class="btn text" data-action="progress-open-detail" data-id="${row.id}" data-section="tasks">${getMobileProgressTasks(row).length?'任务':'详情'}</button></td></tr>`).join('')}</tbody></table>${rows.length?'':'<div class="empty">没有符合条件的进度记录</div>'}</section>`;
     }
 
+    function switchProgressDesignView(view,mobile=false) {
+      const prefix=mobile?'mobileProgress':'progress';
+      const snapshots=state[prefix+'Queries']||(state[prefix+'Queries']={});
+      const old=state[prefix+'View'];
+      const fields=['Search','Due','BlockedOnly','Scope'];
+      if(old!=='statistics')snapshots[old]=Object.fromEntries(fields.map(key=>[key,state[prefix+key]]));
+      const selected=snapshots[view]||{Search:'',Due:'all',BlockedOnly:false,Scope:'active'};
+      if(view!=='statistics')for(const key of fields)state[prefix+key]=selected[key];
+      state[prefix+'View']=view;
+    }
+
+    function renderCompactDesignAttention(row) {
+      const tasks=getMobileProgressTasks(row);
+      if(!tasks.length)return '<span class="data-note">暂无可见待办</span>';
+      const task=tasks[0],blocked=row.stage.includes('阻塞');
+      return `<strong>${blocked?'受阻 · ':''}${escapeHTML(task.title)}</strong>${blocked?`<small class="text-danger">${escapeHTML(row.stage)}</small>`:''}<small>${escapeHTML(task.role)}待领取${tasks.length>1?` · 共 ${tasks.length} 项待办`:''}</small>`;
+    }
     function getPrintProfile(template) {
       const profiles = {
         '采购合同': {
@@ -11356,7 +11365,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const q=(mobile?state.mobileProgressSearch:state.progressSearch).trim().toLowerCase();
       return mobileProgressRows.filter(row=>scope!=='ended'&&row.view===view
         &&(selectedDue==='all'||(selectedDue==='undated'?row.due==='尚未确定':row.risk===selectedDue))
-        &&(!blocked||row.stage.includes('阻塞'))&&(!q||Object.values(row).join(' ').toLowerCase().includes(q)));
+        &&(!blocked||row.stage.includes('阻塞'))&&(!q||Object.values(row).join(' ').toLowerCase().includes(q))).sort((a,b)=>Number(b.stage.includes('阻塞'))-Number(a.stage.includes('阻塞'))||a.due.localeCompare(b.due));
     }
     function getMobileProgressRows(options={}) {return getProgressDesignRows({mobile:true,...options});}
     function progressDesignDueOptions(scope) {
@@ -11387,12 +11396,11 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
 
     function renderMobileProgress() {
-      const rows = getMobileProgressRows();
-      const scopeLabel = {active:'未结束',all:'全部记录',ended:'已结束'}[state.mobileProgressScope];
-      const optionCount = Number(state.mobileProgressScope!=='active')+Number(state.mobileProgressDue!=='all')+Number(state.mobileProgressBlockedOnly);
-      return `<div class="role-mobile-screen"><div class="rm-scroll" id="mobile-task-scroll"><div class="rm-progress-controls"><div class="rm-inline-segment"><button class="${state.mobileProgressView==='orders'?'active':''}" data-action="mobile-progress-view" data-value="orders">订单交付</button><button class="${state.mobileProgressView==='production'?'active':''}" data-action="mobile-progress-view" data-value="production">生产执行</button></div><div class="rm-query" style="padding:0"><label class="rm-search">${icon('search')}<input id="mobile-progress-search" value="${escapeHTML(state.mobileProgressSearch)}" placeholder="单号、名称或负责人" /></label><button class="rm-filter-button ${optionCount?'active':''}" data-action="mobile-options">${icon('filter')}筛选${optionCount?`<span class="rm-filter-count">${optionCount}</span>`:''}</button></div></div><div class="rm-quick-filters" role="group" aria-label="进度快捷筛选">${renderProgressDesignFilters(true)}</div>${renderMobileApplied([['scope',state.mobileProgressScope!=='active'&&`记录范围：${scopeLabel}`]],'mobile-progress-filter-clear')}<section class="rm-progress-list">${rows.length?rows.map(row=>`<article class="rm-progress-card"><button data-action="mobile-progress-open" data-id="${row.id}"><div class="rm-progress-head"><strong>${row.no}</strong><span class="badge ${row.badge}">${row.status}</span>${icon('chevron')}</div><div class="rm-progress-copy">${row.product}<br>${row.customer} · ${row.due} ${state.mobileProgressView==='orders'?'交付':'计划结束'}</div><div class="rm-progress-stage"><span>${row.stage}</span><strong>${row.quantity}</strong></div><div class="progress-bar" role="progressbar" aria-valuenow="${row.percent}"><i style="width:${row.percent}%"></i></div></button>${renderMobileProgressTaskEntry(row)}</article>`).join(''):'<div class="rm-empty"><div><strong>没有符合条件的进度记录</strong><span>调整搜索或筛选条件后重试</span></div></div>'}</section></div>${renderMobileBottomNav()}${state.mobileOptionsOpen?renderMobileProgressOptions():''}</div>`;
+      const rows=getMobileProgressRows();
+      const scopeLabel={active:'未结束',all:'全部记录',ended:'已结束'}[state.mobileProgressScope];
+      const optionCount=Number(state.mobileProgressScope!=='active')+Number(state.mobileProgressDue!=='all')+Number(state.mobileProgressBlockedOnly);
+      return `<div class="role-mobile-screen"><div class="rm-scroll" id="mobile-task-scroll"><div class="rm-progress-controls"><div class="rm-inline-segment"><button class="${state.mobileProgressView==='orders'?'active':''}" data-action="mobile-progress-view" data-value="orders">订单交付</button><button class="${state.mobileProgressView==='production'?'active':''}" data-action="mobile-progress-view" data-value="production">生产执行</button></div><div class="rm-query" style="padding:0"><label class="rm-search">${icon('search')}<input id="mobile-progress-search" value="${escapeHTML(state.mobileProgressSearch)}" placeholder="单号、名称或负责人" /></label><button class="rm-filter-button ${optionCount?'active':''}" data-action="mobile-options">${icon('filter')}筛选${optionCount?`<span class="rm-filter-count">${optionCount}</span>`:''}</button></div></div><div class="rm-quick-filters" role="group" aria-label="进度快捷筛选">${renderProgressDesignFilters(true)}</div>${renderMobileApplied([['scope',state.mobileProgressScope!=='active'&&`记录范围：${scopeLabel}`]],'mobile-progress-filter-clear')}<section class="rm-progress-list">${rows.map(row=>`<article class="rm-progress-card"><button data-action="mobile-progress-open" data-id="${row.id}"><div class="rm-progress-head"><strong>${escapeHTML(row.product)}</strong><span class="badge ${row.badge}">${escapeHTML(row.status)}</span>${icon('chevron')}</div><div class="rm-progress-copy">${escapeHTML(row.no)}<br>${escapeHTML(row.customer)} · ${escapeHTML(row.due)}</div><div class="rm-progress-stage"><span>${state.mobileProgressView==='orders'?'已出货 / 订购':'有效完工 / 计划'}</span><strong>${escapeHTML(row.quantity)}</strong></div>${row.stage.includes('阻塞')?`<span class="text-danger">受阻：${escapeHTML(row.stage)}</span>`:''}</button>${renderMobileProgressTaskEntry(row)}</article>`).join('')}${rows.length?'':'<div class="rm-empty">没有符合条件的进度记录</div>'}</section></div>${renderMobileBottomNav()}${state.mobileOptionsOpen?renderMobileProgressOptions():''}</div>`;
     }
-
     function renderMobileProgressDetail() {
       const row = mobileProgressRows.find(item => item.id === state.mobileProgressId) || mobileProgressRows[0];
       const tasks = getMobileProgressTasks(row);
@@ -12670,7 +12678,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'mobile-tracking-filter-clear') changeMobileTrackingQuery(target.dataset.value==='date'?{from:'',to:''}:{[target.dataset.value]:''});
       else if (action === 'mobile-progress-filter-clear') {if(target.dataset.value==='scope')state.mobileProgressScope='active';else state.mobileProgressDue='all';renderView();}
       else if (action === 'mobile-options-reset') {if(state.mobileMain==='tasks'&&state.mobileTab==='todo'&&taskCalendarDemo.mobile.layout==='calendar'){const view=taskCalendarDemo.mobile;view.selection=view.month==='2026-10'?'2026-10-14':`${view.month}-01`;}Object.keys(mobileTaskDiscoveryDemo()).forEach(key=>delete mobileTaskDiscoveryDemo()[key]); state.mobileSort = 'newest'; state.mobileStatus = ''; state.mobileVisibleCount = 4; renderView(); }
-      else if (action === 'mobile-progress-view') { state.mobileProgressView = target.dataset.value; state.mobileOptionsOpen = false; renderView(); }
+      else if (action === 'mobile-progress-view') { switchProgressDesignView(target.dataset.value,true); state.mobileOptionsOpen = false; renderView(); }
       else if (action === 'mobile-progress-due') { state.mobileProgressDue=state.mobileProgressDue===target.dataset.value?'all':target.dataset.value;renderView(); }
       else if (action === 'mobile-progress-blocked') {state.mobileProgressBlockedOnly=!state.mobileProgressBlockedOnly;renderView();}
       else if (action === 'mobile-progress-scope') { state.mobileProgressScope = target.dataset.value; if(state.mobileProgressScope==='ended'){if(['overdue','due'].includes(state.mobileProgressDue))state.mobileProgressDue='all';state.mobileProgressBlockedOnly=false;} renderView(); }
@@ -12762,7 +12770,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'open-task-filter') { state.overlay='task-filter'; renderFloating(); }
       else if (action === 'task-filter-clear' || action === 'task-filter-clear-direct') { const direct=action==='task-filter-clear-direct'; if(['visible','started','participated'].includes(state.boardMode)) state.trackingFilters[state.boardMode]={}; else {state.boardRole='all';state.boardSearch='';Object.keys(taskDiscoveryDemo).forEach(key=>delete taskDiscoveryDemo[key]);} if(direct) state.overlay=null; renderView(); renderFloating(); if(direct) document.querySelector('[data-action="open-task-filter"]')?.focus(); }
       else if (action === 'board-status') { state.boardStatus = target.dataset.value; renderView(); }
-      else if (action === 'progress-view') { state.progressView = target.dataset.value; state.progressSelected=''; renderView(); }
+      else if (action === 'progress-view') { switchProgressDesignView(target.dataset.value); state.progressSelected=''; renderView(); }
       else if (action === 'statistics-filter') { statisticsDesignState.status=target.dataset.value; statisticsDesignState.selected=''; statisticsDesignState.page=1; statisticsDesignState.sourcePage=1; statisticsDesignState.scroll=0; renderView(); }
       else if (action === 'statistics-display') { statisticsDesignState.display=target.dataset.value;renderView(); }
       else if (action === 'statistics-drill') { statisticsDesignState.selected=target.dataset.name;statisticsDesignState.sourceStatus=target.dataset.status||'all';statisticsDesignState.sourcePage=1;statisticsDesignState.sourcePageSize=statisticsDesignState.pageSize;renderView(); }
@@ -12773,10 +12781,14 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'progress-due') {state.progressDue=state.progressDue===target.dataset.value?'all':target.dataset.value;renderView();}
       else if (action === 'progress-blocked') {state.progressBlockedOnly=!state.progressBlockedOnly;renderView();}
       else if (action === 'progress-scope') {state.progressScope=target.dataset.value;if(state.progressScope==='ended'){if(['overdue','due'].includes(state.progressDue))state.progressDue='all';state.progressBlockedOnly=false;}renderView();}
-      else if (action === 'progress-select') { state.progressSelected = target.dataset.id; renderView(); }
       else if (action === 'progress-open-detail') {
+        state.progressSelected=target.dataset.id;
         const row = mobileProgressRows.find(item=>item.id===target.dataset.id) || mobileProgressRows[0];
         state.infoModal = { title: `${row.no} · 完整进度`, html: `<section class="detail-section"><h3>${row.product}</h3><p style="color:var(--text-2)">${row.customer} · ${row.due} 交付 · ${row.quantity}</p><div class="stage-list">${row.stages.map(([label,value])=>`<div class="stage-row"><span>${label}</span><div class="progress-bar"><i style="width:${value}%"></i></div><strong>${value}%</strong></div>`).join('')}</div></section>` };
+        if(target.dataset.section==='tasks') {
+          const tasks=getMobileProgressTasks(row);
+          state.infoModal.html='<section class="detail-section"><h3>关联任务</h3>'+tasks.map(task=>'<article class="detail-section"><strong>'+escapeHTML(task.title)+'</strong><p>'+escapeHTML(task.role)+'待领取</p></article>').join('')+'</section>';
+        }
         state.overlay = 'info'; renderFloating();
       }
       else if (action === 'select-row') {

@@ -13,6 +13,34 @@ import (
 	"server/internal/data/model/ent"
 )
 
+func TestBusinessProgressBlockedPriorityBeforePaginationRespectsVisibility(t *testing.T) {
+	ctx := context.Background()
+	f := openProductionOrderRepoTest(t, "progress_priority")
+	now := time.Date(2026, 10, 16, 4, 0, 0, 0, time.UTC)
+	overdue := f.client.SalesOrder.Query().OnlyX(ctx)
+	f.client.SalesOrder.UpdateOneID(overdue.ID).SetLifecycleStatus("active").SetPlannedDeliveryDate(now.AddDate(0, 0, -2)).SaveX(ctx)
+	future := f.client.SalesOrder.Create().SetOrderNo("SO-PRIORITY-FUTURE").SetCustomerID(overdue.CustomerID).SetOrderDate(now).SetLifecycleStatus("active").SetPlannedDeliveryDate(now.AddDate(0, 0, 3)).SaveX(ctx)
+	f.client.SalesOrderItem.Create().SetSalesOrderID(future.ID).SetLineNo(1).SetProductID(f.productID).SetUnitID(f.unitID).SetOrderedQuantity(decimal.NewFromInt(8)).SaveX(ctx)
+	f.client.WorkflowTask.Create().SetTaskCode("priority-visible").SetTaskName("面料待确认").SetTaskGroup("test").SetSourceType("sales_order").SetSourceID(future.ID).SetTaskStatusKey("blocked").SetOwnerRoleKey("pmc").SaveX(ctx)
+	f.client.WorkflowTask.Create().SetTaskCode("priority-hidden").SetTaskName("隐藏任务").SetTaskGroup("test").SetSourceType("sales_order").SetSourceID(overdue.ID).SetTaskStatusKey("blocked").SetOwnerRoleKey("finance").SaveX(ctx)
+	uc := biz.NewBusinessProgressUsecase(NewBusinessProgressRepo(f.data))
+	q := biz.BusinessProgressQuery{View: "orders", Limit: 1, SnapshotAt: now, Access: biz.BusinessProgressAccess{Sales: true, Tasks: true}, TaskVisibility: &biz.WorkflowTaskVisibilityScope{StandaloneVisibleOwnerRoleKeys: []string{"pmc"}}}
+	first, err := uc.List(ctx, q)
+	if err != nil || len(first.Rows) != 1 || first.Rows[0].ID != future.ID || !first.Rows[0].Blocked {
+		t.Fatalf("blocked future order must precede the unblocked overdue order: %+v %v", first, err)
+	}
+	q.Offset = 1
+	second, err := uc.List(ctx, q)
+	if err != nil || len(second.Rows) != 1 || second.Rows[0].ID != overdue.ID || second.Rows[0].Blocked {
+		t.Fatalf("pagination must keep priority and hide inaccessible tasks: %+v %v", second, err)
+	}
+	q.Offset, q.Access.Tasks, q.TaskVisibility = 0, false, nil
+	withoutTasks, err := uc.List(ctx, q)
+	if err != nil || len(withoutTasks.Rows) != 1 || withoutTasks.Rows[0].ID != overdue.ID || withoutTasks.Counts.Blocked != 0 {
+		t.Fatalf("task-free view must use dates without disclosing task priority: %+v %v", withoutTasks, err)
+	}
+}
+
 func TestBusinessProgressMaterialTaskUsesRequirementLine(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "progress_material_task", func(ctx context.Context, client *ent.Client, unitID, bomID int) {

@@ -11,7 +11,6 @@ import { Alert, Button, Empty, Spin } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 import { canOpenRelatedDocumentPath } from '../../utils/relatedDocumentNavigation.mjs'
 import { resolveMenuPermissionKey } from '../../config/menuPermissions.mjs'
-import HorizontalScroll from '@/common/components/scroll/HorizontalScroll'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -24,11 +23,9 @@ import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator
 import BusinessProgressFilterFields, { ProgressDueFilters, ProgressBlockedFilter } from '../../components/business-visualizations/BusinessProgressFilters.jsx'
 import BusinessProgressDrawer from '../../components/business-visualizations/BusinessProgressDrawer'
 import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
-import { ProductThumbnail } from '../../components/master-data/ProductIdentity.jsx'
+import { ProgressIdentity, ProgressDue, ProgressDelivery, ProgressAttention } from '../../components/business-visualizations/ProgressCompactContent.jsx'
 import {
-  progressDelivery,
   progressQueryFromURL,
-  progressStatusLabel,
   PROGRESS_SCOPE_OPTIONS,
   progressFilterCount,
   PROGRESS_FILTER_RESET,
@@ -81,6 +78,7 @@ export default function MobileProgressPanel({
     )
   ).current
   const [values, setValues] = useState(initial.query)
+  const queriesRef = useRef(initial.queries)
   const [keyword, setKeyword] = useState(initial.query.q)
   const [selection, setSelection] = useState(initial.selection)
   const [suppressDetailOpenMotion, setSuppressDetailOpenMotion] = useState(
@@ -126,6 +124,7 @@ export default function MobileProgressPanel({
               : {}),
             scope: scopeKey,
             query: latest.current.values,
+            queries: queriesRef.current,
             selection: latest.current.selection,
             scrollTop: scrollRef.current?.scrollTop || 0,
             ...changes,
@@ -159,6 +158,7 @@ export default function MobileProgressPanel({
       )
       setSuppressDetailOpenMotion(Boolean(restored.selection))
       setSelection(restored.selection)
+      queriesRef.current = restored.queries
       setValues(restored.query)
       setKeyword(restored.query.q)
       restoreScroll.current = restored.scrollTop
@@ -169,10 +169,17 @@ export default function MobileProgressPanel({
 
   const update = (changes) => {
     clearTimeout(timer.current)
-    setValues((current) => {
-      const next = withProgressFilters(current, changes)
-      return normalizeMobileProgressQuery(next, mobileProgressDefaultView(roleKey, access))
-    })
+    const current = latest.current.values
+    queriesRef.current[current.view] = current
+    const switching = changes.view && changes.view !== current.view
+    const next = normalizeMobileProgressQuery(
+      switching ? queriesRef.current[changes.view] : withProgressFilters(current, changes),
+      changes.view || mobileProgressDefaultView(roleKey, access)
+    )
+    queriesRef.current[next.view] = next
+    latest.current = { ...latest.current, values: next }
+    setValues(next)
+    if (switching) setKeyword(next.q)
     restoreScroll.current = 0
     scrollRef.current?.scrollTo({ top: 0 })
   }
@@ -451,23 +458,35 @@ export default function MobileProgressPanel({
               />
             </MobileFilterPopover>
           </div>
-          <HorizontalScroll
+          <div
             className="mobile-progress-risks"
             role="group"
             aria-label="进度快捷筛选"
           >
-            <ProgressDueFilters query={query} counts={filterCounts} onChange={update} />
-            <ProgressBlockedFilter query={query} counts={filterCounts} taskAccess={data?.access.tasks} onChange={update} />
-          </HorizontalScroll>
+            <ProgressDueFilters
+              compact
+              query={query}
+              counts={filterCounts}
+              onChange={update}
+            />
+            <ProgressBlockedFilter
+              compact
+              query={query}
+              counts={filterCounts}
+              taskAccess={data?.access.tasks}
+              onChange={update}
+            />
+          </div>
           <MobileAppliedFilters
             label="当前进度筛选"
             items={[
             query.scope !== 'active' && { key: 'scope', label: `记录范围：${PROGRESS_SCOPE_OPTIONS.find(({ value }) => value === query.scope)?.label}` },
+            query.due_status === 'undated' && { key: 'due_status', label: '未定交期' },
             query.unlinked_only && { key: 'unlinked_only', label: '仅看未关联销售' },
             query.owner && { key: 'owner', label: `负责人：${query.owner}` },
             (query.date_from || query.date_to) && { key: 'date', label: `交期：${query.date_from || '不限'} 至 ${query.date_to || '不限'}` },
           ]}
-            onClear={(key) => update(key === 'date' ? { from: '', to: '' } : { [key]: key === 'scope' ? 'active' : key === 'unlinked_only' ? false : '' })}
+            onClear={(key) => update(key === 'date' ? { from: '', to: '' } : { [key]: key === 'scope' ? 'active' : key === 'due_status' ? 'all' : key === 'unlinked_only' ? false : '' })}
           />
           <MobileScrollEdge scrollContainerRef={scrollRef} enabled={active && !selection} />
         </div>
@@ -498,7 +517,6 @@ export default function MobileProgressPanel({
             aria-busy={loading || loadingMore}
           >
             {data?.rows.map((row) => {
-              const delivery = progressDelivery(row)
               const taskSummary = mobileProgressTaskSummary(row, roleLabel)
               const directTaskID = onOpenTask ? taskSummary.taskID : null
               return (
@@ -509,124 +527,39 @@ export default function MobileProgressPanel({
                     label={`查看 ${row.order_no} 进度`}
                     onOpen={() => open(row)}
                   >
-                    <span className="mobile-progress-card-head">
-                      <strong>{row.order_no}</strong>
-                      <span
-                        className={
-                          row.overdue
-                            ? 'mobile-progress-state mobile-progress-danger'
-                            : row.due_soon
-                              ? 'mobile-progress-state mobile-progress-warning'
-                              : 'mobile-progress-state'
-                        }
-                      >
-                        {row.overdue
-                          ? '已逾期'
-                          : row.due_soon
-                            ? '7天内到期'
-                            : progressStatusLabel(row.status)}
-                      </span>
-                      <RightOutlined />
+                    <span className="mobile-progress-card-identity">
+                      <ProgressIdentity row={row} />
+                      <ProgressDue row={row} snapshotAt={data.snapshot_at} />
                     </span>
-                    <span className="mobile-progress-product-summary">
-                      <span className="mobile-progress-product-image">
-                        <ProductThumbnail
-                          productId={row.product_id}
-                          name={row.product}
-                        />
-                        {row.product_count > 1 && (
-                          <span
-                            className="mobile-progress-product-count"
-                            aria-hidden="true"
-                          >
-                            +{row.product_count - 1}
-                          </span>
-                        )}
-                      </span>
-                      <span className="mobile-progress-product-copy">
-                        <span className="mobile-progress-product">
-                          {row.product}
-                          {row.product_count > 1
-                            ? ` 等 ${row.product_count} 项`
-                            : ''}
-                        </span>
-                        <span className="mobile-progress-facts">
-                          {row.customer ? `${row.customer} · ` : ''}
-                          {query.view === 'orders' ? '交期' : '计划结束'}：
-                          {row.due_date || '尚未确定'}
-                          {row.unlinked ? ' · 含未关联销售明细' : ''}
-                        </span>
-                      </span>
-                    </span>
-                    <span className="mobile-progress-execution">
-                      {data.access.wip && (
-                        <span className="mobile-progress-facts">
-                          {row.current_operation
-                            ? `当前工序：${row.current_operation}${row.operation_count > 1 ? ` 等 ${row.operation_count} 道并行工序` : ''}`
-                            : row.production_orders
-                              ? `关联 ${row.production_orders} 张生产单`
-                              : '暂无工序记录'}
-                          {row.waiting_batches > 0
-                            ? ` · ${row.waiting_batches} 批待检`
-                            : ''}
-                          {row.rejected_batches > 0
-                            ? ` · ${row.rejected_batches} 批不合格`
-                            : ''}
-                        </span>
-                      )}
-                      <span className="mobile-progress-quantity">
-                        <span>{delivery.label}</span>
-                        <strong>{delivery.text}</strong>
-                      </span>
-                    </span>
-                    {delivery.percent !== undefined && (
-                      <span
-                        className="mobile-progress-track"
-                        role="progressbar"
-                        aria-label={delivery.label}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={Math.round(delivery.percent)}
-                      >
-                        <i style={{ width: `${delivery.percent}%` }} />
-                      </span>
-                    )}
-                    {row.attention_reason && (
-                      <span className="mobile-progress-issue">
-                        任务受阻：{row.attention_reason}
-                      </span>
-                    )}
+                    <ProgressDelivery
+                      row={row}
+                      onOpenDetails={() => open(row, 'lines')}
+                    />
                   </WorkflowTaskCard>
-                  {data.access.tasks &&
-                    (row.open_tasks > 0 ? (
-                      <button
-                        type="button"
-                        className="mobile-progress-task-entry"
-                        aria-label={
-                          directTaskID
-                            ? `查看 ${row.order_no} 的${taskSummary.title}`
-                            : `查看 ${row.order_no} 的关联任务`
-                        }
-                        onClick={() => {
-                          if (directTaskID) {
-                            remember()
-                            onOpenTask(directTaskID)
-                          } else {
-                            open(row, 'tasks')
-                          }
-                        }}
-                      >
-                        <span className="mobile-progress-task-copy">
-                          <strong>{taskSummary.title}</strong>
-                          <span>{taskSummary.detail}</span>
-                        </span>
-                        <RightOutlined aria-hidden="true" />
-                      </button>
-                    ) : (
-                      <p className="mobile-progress-task-entry mobile-progress-task-entry--empty">
-                        {taskSummary.title}
-                      </p>
-                    ))}
+                  {data.access.tasks && row.open_tasks > 0 ? (
+                    <button
+                      type="button"
+                      className="mobile-progress-task-entry"
+                      aria-label={
+                        directTaskID
+                          ? `查看 ${row.order_no} 的${taskSummary.title}`
+                          : `查看 ${row.order_no} 的关联任务`
+                      }
+                      onClick={() => {
+                        if (directTaskID) {
+                          remember()
+                          onOpenTask(directTaskID)
+                        } else open(row, 'tasks')
+                      }}
+                    >
+                      <ProgressAttention row={row} access={data.access} />
+                      <RightOutlined aria-hidden="true" />
+                    </button>
+                  ) : (
+                    <div className="mobile-progress-task-entry mobile-progress-task-entry--empty">
+                      <ProgressAttention row={row} access={data.access} />
+                    </div>
+                  )}
                 </article>
               )
             })}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { Alert, Button, Drawer, Empty, Spin, Tag } from 'antd'
 import {
   ArrowRightOutlined,
@@ -64,6 +64,7 @@ export default function BusinessProgressDrawer({
   const [tab, setTab] = useState('lines')
   const [mobileRecordsOpen, setMobileRecordsOpen] = useState(false)
   const recordsRef = useRef(null)
+  const headingRef = useRef(null)
   const recordsRequestRef = useRef('')
   const tabID = useId()
   const requestKey = selection ? `${selection.view}:${selection.id}` : ''
@@ -125,6 +126,9 @@ export default function BusinessProgressDrawer({
     state?.key === requestKey && state?.profile === adminProfile
       ? state.data
       : null
+  useLayoutEffect(() => {
+    if (data && !mobile) headingRef.current?.focus({ preventScroll: true })
+  }, [data, mobile])
   const sectionRecords = (section) => data?.sections?.[section] || []
   const items = SECTIONS.filter(
     (item) =>
@@ -421,6 +425,7 @@ export default function BusinessProgressDrawer({
           <BusinessProgressSummary
             row={data.row}
             access={data.access}
+            headingRef={headingRef}
             sections={data.sections}
             onSelectSection={showSection}
           />

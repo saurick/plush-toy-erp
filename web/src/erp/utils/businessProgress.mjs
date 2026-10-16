@@ -1,5 +1,7 @@
 import { parseDateInputValue } from './dateRange.mjs'
-import { TASK_BOARD_PAGE_SIZE_OPTIONS } from './workflowTaskBoard.mjs'
+import { TASK_BOARD_PAGE_SIZE_OPTIONS, getWorkflowTaskOwnerRoleLabel } from './workflowTaskBoard.mjs'
+import { getWorkflowTaskDisplayName } from './processRuntimePresentation.mjs'
+import { formatBusinessDate } from './businessDate.mjs'
 
 const integer = (value) => Number.isSafeInteger(value) && value >= 0
 const decimal = (value) =>
@@ -285,6 +287,37 @@ const statusLabels = {
 export const progressStatusLabel = (status) => statusLabels[status] || '待核对'
 export const progressQuantity = (value) =>
   value === null || value === undefined || value === '' ? '—' : String(value)
+
+export function progressDue(row, snapshotAt) {
+  const date = row.due_date || ''
+  const snapshotDate = snapshotAt ? formatBusinessDate(snapshotAt) : ''
+  const days = date && snapshotDate
+    ? Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${snapshotDate}T00:00:00Z`)) / 86400000)
+    : NaN
+  if (!row.active) return { label: progressStatusLabel(row.status), date, tone: '' }
+  if (!date) return { label: '未定交期', date: '', tone: '' }
+  if (row.overdue) return { label: Number.isFinite(days) && days < 0 ? `逾期 ${-days} 天` : '已逾期', date, tone: 'danger' }
+  if (row.due_soon) return { label: days === 0 ? '今天到期' : Number.isFinite(days) && days > 0 ? `还有 ${days} 天` : '7天内到期', date, tone: 'warning' }
+  return { label: '按交期跟进', date, tone: '' }
+}
+
+export function progressAttention(row, access, roleLabel = (key) => getWorkflowTaskOwnerRoleLabel({ owner_role_key: key })) {
+  const empty = { taskID: null, taskCount: 0, blocked: false, reason: '' }
+  if (!access?.tasks) return { ...empty, title: '任务无查看权限', detail: '' }
+  if (!row.open_tasks) return { ...empty, title: '暂无可见待办', detail: row.sales_owner ? `业务负责人：${row.sales_owner}` : '' }
+  const role = row.attention_role ? roleLabel(row.attention_role) : ''
+  const detail = row.attention_owner
+    ? [role, row.attention_owner].filter(Boolean).join(' · ')
+    : role ? `${role}待领取` : '待分配处理岗位'
+  return {
+    title: getWorkflowTaskDisplayName({ task_name: row.attention_task }),
+    detail,
+    taskID: row.open_tasks === 1 && Number.isSafeInteger(row.attention_task_id) && row.attention_task_id > 0 ? row.attention_task_id : null,
+    taskCount: row.open_tasks,
+    blocked: Boolean(row.blocked),
+    reason: row.blocked ? row.attention_reason : '',
+  }
+}
 
 export function progressStages(row, access = {}) {
   const stages = []
