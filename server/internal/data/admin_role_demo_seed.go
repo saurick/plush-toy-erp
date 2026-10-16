@@ -678,18 +678,38 @@ func SeedRoleDemoAdminAccounts(ctx context.Context, db *sql.DB, opts RoleDemoAdm
 		accounts = DefaultRoleDemoAdminAccounts(opts.IncludeDebug)
 	}
 
+	for _, account := range accounts {
+		if strings.TrimSpace(account.Username) == "" || biz.NormalizeRoleKey(account.RoleKey) == "" {
+			return nil, biz.ErrBadParam
+		}
+		if strings.EqualFold(strings.TrimSpace(account.Username), "admin") {
+			return nil, ErrStableAdminProtected
+		}
+		if _, err := biz.NormalizeAdminDisplayName(account.DisplayName); err != nil {
+			return nil, biz.ErrBadParam
+		}
+	}
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { rollbackSQLTx(ctx, tx, nil) }()
 	result := &RoleDemoAdminSeedResult{Accounts: make([]RoleDemoAdminSeededAccount, 0, len(accounts))}
 	for _, account := range accounts {
-		seeded, err := seedOneRoleDemoAdmin(ctx, db, account, password, opts.ResetPassword)
+		seeded, err := seedOneRoleDemoAdmin(ctx, tx, account, password, opts.ResetPassword)
 		if err != nil {
 			return nil, err
 		}
 		result.Accounts = append(result.Accounts, seeded)
 	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
 	return result, nil
 }
 
-func seedOneRoleDemoAdmin(ctx context.Context, db *sql.DB, account RoleDemoAdminAccountSpec, password string, resetPassword bool) (RoleDemoAdminSeededAccount, error) {
+func seedOneRoleDemoAdmin(ctx context.Context, tx *sql.Tx, account RoleDemoAdminAccountSpec, password string, resetPassword bool) (RoleDemoAdminSeededAccount, error) {
 	username := strings.TrimSpace(account.Username)
 	roleKey := biz.NormalizeRoleKey(account.RoleKey)
 	if username == "" || roleKey == "" {
@@ -707,12 +727,6 @@ func seedOneRoleDemoAdmin(ctx context.Context, db *sql.DB, account RoleDemoAdmin
 	if err != nil {
 		return RoleDemoAdminSeededAccount{}, err
 	}
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return RoleDemoAdminSeededAccount{}, err
-	}
-	defer rollbackSQLTx(ctx, tx, nil)
 
 	var roleID int
 	if err := tx.QueryRowContext(ctx, "SELECT id FROM roles WHERE role_key = $1 AND disabled = FALSE LIMIT 1", roleKey).Scan(&roleID); err != nil {
@@ -774,11 +788,6 @@ VALUES ($1, $2, $3)
 ON CONFLICT (admin_user_id, role_id) DO NOTHING`, adminID, roleID, now); err != nil {
 		return RoleDemoAdminSeededAccount{}, err
 	}
-	if err := tx.Commit(); err != nil {
-		return RoleDemoAdminSeededAccount{}, err
-	}
-	tx = nil
-
 	return RoleDemoAdminSeededAccount{
 		DisplayName:   displayName,
 		Username:      username,
