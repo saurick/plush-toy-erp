@@ -26,7 +26,7 @@ func (r *progressAPIRepo) GetBusinessProgress(_ context.Context, q biz.BusinessP
 
 func TestBusinessProgressJSONRPCPermissionsAndValidation(t *testing.T) {
 	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
-	d, _, _ := newProductionOrderJSONRPCTestData(t, biz.PermissionERPBusinessDashboardRead, biz.PermissionPMCPlanRead)
+	d, _, _, _ := newProductionOrderJSONRPCTestData(t, biz.PermissionERPBusinessDashboardRead, biz.PermissionPMCPlanRead)
 	r := &progressAPIRepo{}
 	d.businessProgressUC = biz.NewBusinessProgressUsecase(r)
 	ctx := workflowJSONRPCAdminContext()
@@ -42,6 +42,13 @@ func TestBusinessProgressJSONRPCPermissionsAndValidation(t *testing.T) {
 		{map[string]any{"limit": 101}, errcode.InvalidParam.Code},
 		{map[string]any{"offset": -1}, errcode.InvalidParam.Code},
 		{map[string]any{"scope": "finished"}, errcode.InvalidParam.Code},
+		{map[string]any{"risk": "blocked"}, errcode.InvalidParam.Code},
+		{map[string]any{"due_status": "blocked"}, errcode.InvalidParam.Code},
+		{map[string]any{"blocked_only": "true"}, errcode.InvalidParam.Code},
+		{map[string]any{"unlinked_only": 1}, errcode.InvalidParam.Code},
+		{map[string]any{"blocked_only": true}, errcode.PermissionDenied.Code},
+		{map[string]any{"scope": "ended", "due_status": "due_soon"}, errcode.InvalidParam.Code},
+		{map[string]any{"due_status": "undated", "date_to": "2026-10-15"}, errcode.InvalidParam.Code},
 		{map[string]any{"date_from": "2026-02-30"}, errcode.InvalidParam.Code},
 		{map[string]any{"access": map[string]any{"sales": true}}, errcode.InvalidParam.Code},
 	} {
@@ -84,13 +91,13 @@ func TestBusinessProgressManagementReadPermissions(t *testing.T) {
 			continue
 		}
 		t.Run(role.Key, func(t *testing.T) {
-			d, _, _ := newProductionOrderJSONRPCTestData(t, role.Permissions...)
+			d, _, _, _ := newProductionOrderJSONRPCTestData(t, role.Permissions...)
 			d.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{role.Key}, role.Permissions...)}
 			r := &progressAPIRepo{}
 			d.businessProgressUC = biz.NewBusinessProgressUsecase(r)
 			for _, view := range []string{"orders", "production"} {
-				_, res, err := d.handleBusiness(workflowJSONRPCAdminContext(), "list_progress", view, newDataStruct(map[string]any{"view": view}))
-				if err != nil || res.Code != errcode.OK.Code || !r.query.Access.Sales || !r.query.Access.Production || !r.query.Access.WIP || !r.query.Access.Tasks || r.query.TaskVisibility == nil {
+				_, res, err := d.handleBusiness(workflowJSONRPCAdminContext(), "list_progress", view, newDataStruct(map[string]any{"view": view, "due_status": "overdue", "blocked_only": true, "unlinked_only": view == "production"}))
+				if err != nil || res.Code != errcode.OK.Code || !r.query.Access.Sales || !r.query.Access.Production || !r.query.Access.WIP || !r.query.Access.Tasks || r.query.TaskVisibility == nil || r.query.DueStatus != "overdue" || !r.query.BlockedOnly || r.query.UnlinkedOnly != (view == "production") {
 					t.Fatalf("%s result=%+v query=%+v err=%v", role.Key, res, r.query, err)
 				}
 			}

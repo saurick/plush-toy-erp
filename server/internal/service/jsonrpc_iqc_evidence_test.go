@@ -2,8 +2,11 @@ package service
 
 import (
 	"context"
+	"io"
 	"testing"
 
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/shopspring/decimal"
 	"server/internal/biz"
 	"server/internal/errcode"
 )
@@ -60,5 +63,65 @@ func TestJsonrpcIncomingAcceptanceRejectsAmbiguousPayload(t *testing.T) {
 	}
 	if _, ok := qualityCheckItemsFromParams(map[string]any{"check_items": []any{map[string]any{"name": "自定义", "automatic_pass": true}}}); ok {
 		t.Fatal("accepted unknown check evidence")
+	}
+}
+
+func TestJsonrpcReplacementRequiresWarehouseCountAndStartsFreshInspection(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "jsonrpc_replacement_handoff")
+	f := createInventoryTestFixtures(t, ctx, client)
+	j := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionPurchaseReturnPost))
+	receipt, err := j.inventoryUC.CreatePurchaseReceiptWithItems(ctx, &biz.PurchaseReceiptCreate{ReceiptNo: "PR-REPLACEMENT-HANDOFF", SupplierName: "模拟补换供应商"}, []*biz.PurchaseReceiptItemCreate{{MaterialID: f.materialID, WarehouseID: f.warehouseID, UnitID: f.unitID, Quantity: decimal.NewFromInt(3)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	rate := decimal.NewFromInt(40)
+	qi, err := j.inventoryUC.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: receipt.QualityInspections[0].ID, Result: biz.QualityInspectionResultReject, CheckItems: rpcIncomingEvidence("FAIL"), DefectRateOperator: stringPtr(biz.QualityInspectionDefectRateOperatorGT), DefectRatePercent: &rate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	draft, err := j.inventoryUC.CreatePurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionCreate{DispositionNo: "RPL-HANDOFF", QualityInspectionID: qi.ID, DispositionType: biz.PurchaseRejectionReplace, Quantity: decimal.NewFromInt(3), Reason: "供应商补换", IdempotencyKey: "rpl-handoff", CreatedBy: 7})
+	if err != nil {
+		t.Fatal(err)
+	}
+	params := map[string]any{"id": draft.ID, "expected_version": draft.Version, "counted_quantity": "3"}
+	invoke := func(want int32) {
+		t.Helper()
+		_, result, err := j.handlePurchase(workflowJSONRPCAdminContext(), "post_purchase_rejection_disposition", "replacement", mustJSONRPCStruct(t, params))
+		if err != nil || result == nil || result.Code != want {
+			t.Fatalf("result=%+v err=%v want=%v", result, err, want)
+		}
+	}
+	invoke(errcode.PermissionDenied.Code)
+	if client.PurchaseReceipt.Query().CountX(ctx) != 1 {
+		t.Fatal("purchase operator created an uncounted arrival")
+	}
+	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionPurchaseReturnPost, biz.PermissionPurchaseReceiptCreate)}
+	scopeRepo := &receiptWarehouseScopeAdminRepo{memAdminManageRepoForData: newMemAdminManageRepoForData(), scope: biz.WarehouseDataScope{Mode: biz.DataScopeModeAll}}
+	j.adminManageUC = biz.NewAdminManageUsecase(scopeRepo, log.NewStdLogger(io.Discard), nil)
+	delete(params, "counted_quantity")
+	invoke(errcode.InvalidParam.Code)
+	params["counted_quantity"] = "2"
+	invoke(errcode.InvalidParam.Code)
+	params["counted_quantity"] = "3"
+	scopeRepo.scope = biz.WarehouseDataScope{Mode: biz.DataScopeModeNone}
+	invoke(errcode.PermissionDenied.Code)
+	scopeRepo.scope = biz.WarehouseDataScope{Mode: biz.DataScopeModeAll}
+	invoke(errcode.OK.Code)
+	invoke(errcode.OK.Code)
+	confirmed, err := j.inventoryUC.GetPurchaseRejectionDisposition(ctx, draft.ID)
+	if err != nil || confirmed.ReplacementReceiptID == nil {
+		t.Fatalf("confirmed=%+v err=%v", confirmed, err)
+	}
+	replacement, err := j.inventoryUC.GetPurchaseReceipt(ctx, *confirmed.ReplacementReceiptID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inspections, _, inspectionErr := j.inventoryUC.ListQualityInspections(ctx, biz.QualityInspectionFilter{PurchaseReceiptID: replacement.ID, Limit: 10})
+	if err != nil || replacement.Status != biz.PurchaseReceiptStatusDraft || inspectionErr != nil || len(inspections) != 1 || inspections[0].Status != biz.QualityInspectionStatusSubmitted {
+		t.Fatalf("fresh arrival=%+v err=%v", replacement, err)
+	}
+	if client.PurchaseReceipt.Query().CountX(ctx) != 2 || client.InventoryTxn.Query().CountX(ctx) != 0 {
+		t.Fatal("count replay duplicated arrival or wrote inventory")
 	}
 }
