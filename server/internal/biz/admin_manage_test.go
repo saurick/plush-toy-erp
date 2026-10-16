@@ -490,7 +490,7 @@ func (r *stubAdminManageRepo) ResetAdminPasswordWithAudit(ctx context.Context, r
 	if !ok {
 		return nil, ErrAdminNotFound
 	}
-	if reset.UseDefaultPassword && !operator.IsSuperAdmin {
+	if reset.UseTemporaryPassword && !operator.IsSuperAdmin {
 		return nil, ErrNoPermission
 	}
 	admin.PasswordHash = reset.PasswordHash

@@ -93,3 +93,23 @@ func sameStringSlice(left, right []string) bool {
 	}
 	return true
 }
+
+func TestFinanceAllocationSourcePermissionsFollowAuthoritativeParty(t *testing.T) {
+	for _, method := range []string{"list_finance_payment_allocation_candidates", "allocate_finance_payment", "reverse_finance_allocation"} {
+		for _, tc := range []struct {
+			condition string
+			want      []string
+		}{
+			{"", []string{PermissionFinancePaymentRead}},
+			{SourceReadConditionFinanceReceivable, []string{PermissionFinancePaymentRead, PermissionFinanceReceivableRead}},
+			{SourceReadConditionFinancePayable, []string{PermissionFinancePaymentRead, PermissionFinancePayableRead}},
+		} {
+			t.Run(method+"/"+tc.condition, func(t *testing.T) {
+				got, ok := SourceActionReadPermissions("operational_fact", method, tc.condition)
+				if !ok || !sameStringSlice(got, tc.want) {
+					t.Fatalf("permissions=%v registered=%v want=%v", got, ok, tc.want)
+				}
+			})
+		}
+	}
+}

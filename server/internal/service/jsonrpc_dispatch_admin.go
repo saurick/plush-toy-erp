@@ -201,7 +201,10 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := rejectUnknownAdminParams(pm, "id", "role_keys"); res != nil {
 			return id, res, nil
 		}
-		adminID := getInt(pm, "id", 0)
+		adminID, validID := strictJSONRPCPositiveInt(pm["id"])
+		if !validID {
+			return id, invalidAdminParamResult(), nil
+		}
 		roleKeys, ok := getStrictStringSlice(pm, "role_keys", true)
 		if !ok {
 			return id, invalidAdminParamResult(), nil
@@ -319,7 +322,10 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := rejectUnknownAdminParams(pm, "id", "display_name", "phone"); res != nil {
 			return id, res, nil
 		}
-		adminID := getInt(pm, "id", 0)
+		adminID, validID := strictJSONRPCPositiveInt(pm["id"])
+		if !validID {
+			return id, invalidAdminParamResult(), nil
+		}
 		admin, err := d.adminManageUC.SetProfile(ctx, adminID, getString(pm, "display_name"), getString(pm, "phone"))
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
@@ -486,7 +492,10 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := rejectUnknownAdminParams(pm, "id", "disabled", "reason"); res != nil {
 			return id, res, nil
 		}
-		adminID := getInt(pm, "id", 0)
+		adminID, validID := strictJSONRPCPositiveInt(pm["id"])
+		if !validID {
+			return id, invalidAdminParamResult(), nil
+		}
 		disabled, ok := pm["disabled"].(bool)
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
@@ -510,7 +519,11 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := rejectUnknownAdminParams(pm, "id", "reason"); res != nil {
 			return id, res, nil
 		}
-		admin, releasedTaskCount, err := d.adminManageUC.Revoke(ctx, getInt(pm, "id", 0), getString(pm, "reason"))
+		adminID, validID := strictJSONRPCPositiveInt(pm["id"])
+		if !validID {
+			return id, invalidAdminParamResult(), nil
+		}
+		admin, releasedTaskCount, err := d.adminManageUC.Revoke(ctx, adminID, getString(pm, "reason"))
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -535,7 +548,7 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: "密码已修改，请重新登录"}, nil
-	case "reset_default_password":
+	case "reset_temporary_password":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
 			return id, res, nil
 		}
@@ -546,10 +559,11 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if !validID {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if _, err := d.adminManageUC.ResetDefaultPassword(ctx, adminID); err != nil {
+		reset, err := d.adminManageUC.ResetTemporaryPassword(ctx, adminID)
+		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
-		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: "已重置为默认密码"}, nil
+		return id, okData(map[string]any{"temporary_password": reset.TemporaryPassword}), nil
 	case "reset_password":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
 			return id, res, nil
@@ -557,7 +571,10 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if res := rejectUnknownAdminParams(pm, "id", "password"); res != nil {
 			return id, res, nil
 		}
-		adminID := getInt(pm, "id", 0)
+		adminID, validID := strictJSONRPCPositiveInt(pm["id"])
+		if !validID {
+			return id, invalidAdminParamResult(), nil
+		}
 		password := getString(pm, "password")
 		if adminID <= 0 {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil

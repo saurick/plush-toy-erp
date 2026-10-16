@@ -251,22 +251,23 @@ func TestJsonrpcDispatcher_AuthSMSLogin_DisabledByConfig(t *testing.T) {
 	}
 }
 
-func TestJsonrpcDispatcher_AuthSMSSendProviderErrorsAreSuppressed(t *testing.T) {
+func TestJsonrpcDispatcher_AuthSMSSendProviderErrorsUsePublicCodes(t *testing.T) {
 	tests := []struct {
 		name string
 		err  error
+		code int32
 	}{
 		{
-			name: "cooldown",
-			err:  fmt.Errorf("wrapped provider error: %w", biz.ErrSMSCodeCooldown),
+			name: "cooldown", code: errcode.AuthSMSCodeTooFrequent.Code,
+			err: fmt.Errorf("wrapped provider error: %w", biz.ErrSMSCodeCooldown),
 		},
 		{
-			name: "quota exceeded",
-			err:  fmt.Errorf("wrapped provider error: %w", biz.ErrSMSServiceQuotaExceeded),
+			name: "quota exceeded", code: errcode.AuthSMSServiceQuotaExceeded.Code,
+			err: fmt.Errorf("wrapped provider error: %w", biz.ErrSMSServiceQuotaExceeded),
 		},
 		{
-			name: "service unavailable",
-			err:  fmt.Errorf("wrapped provider error: %w", biz.ErrSMSServiceUnavailable),
+			name: "service unavailable", code: errcode.AuthSMSServiceUnavailable.Code,
+			err: fmt.Errorf("wrapped provider error: %w", biz.ErrSMSServiceUnavailable),
 		},
 	}
 
@@ -291,13 +292,13 @@ func TestJsonrpcDispatcher_AuthSMSSendProviderErrorsAreSuppressed(t *testing.T) 
 			if err != nil {
 				t.Fatalf("handle auth.send_sms_code: %v", err)
 			}
-			if res == nil || res.Code != errcode.OK.Code || res.Message != "验证码已发送" {
-				t.Fatalf("provider error leaked through public response: %+v", res)
+			if res == nil || res.Code != tt.code {
+				t.Fatalf("provider error result=%+v", res)
 			}
-			data := res.Data.AsMap()
-			if data["mock_delivery"] != false || getNestedString(data, "mock_code") != "" {
-				t.Fatalf("provider response exposed mock details: %+v", data)
+			if res.Data != nil {
+				t.Fatal("failed delivery must not claim a delivery receipt")
 			}
+
 		})
 	}
 }

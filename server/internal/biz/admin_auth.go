@@ -416,8 +416,8 @@ func (uc *AdminAuthUsecase) RequestSMSLoginCode(ctx context.Context, phone, mobi
 		span.RecordError(err)
 		span.SetAttributes(attribute.Int("admin_auth.admin_id", admin.ID), attribute.Bool("admin_auth.sms_delivery_eligible", true))
 		span.SetStatus(codes.Error, "sms delivery failed")
-		l.Warnf("RequestSMSLoginCode suppressed delivery failure admin_id=%d phone=%s err=%v", admin.ID, maskPhone(normalizedPhone), err)
-		return newDecoySMSLoginChallenge(normalizedPhone)
+		l.Warnf("RequestSMSLoginCode delivery failure admin_id=%d phone=%s err=%v", admin.ID, maskPhone(normalizedPhone), err)
+		return nil, err
 	}
 
 	span.SetAttributes(

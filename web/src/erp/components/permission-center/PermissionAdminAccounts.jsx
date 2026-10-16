@@ -53,7 +53,7 @@ import {
   DEFAULT_TABLE_PAGE_SIZE,
   DuplicateAdminNameWarning,
 } from './RoleAssociatedAccounts.jsx'
-import { message } from '@/common/utils/antdApp'
+import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   ADMIN_ACCOUNT_STATUS,
@@ -522,11 +522,11 @@ export default function PermissionAdminAccounts({
     }
   }
 
-  const resetAdminPassword = async (values, useDefaultPassword = false) => {
+  const resetAdminPassword = async (values, useTemporaryPassword = false) => {
     const accountStatus = getAdminAccountStatus(resettingAdmin)
     if (
       passwordResetPendingRef.current ||
-      (useDefaultPassword && currentAdmin?.is_super_admin !== true) ||
+      (useTemporaryPassword && currentAdmin?.is_super_admin !== true) ||
       !resettingAdmin?.id ||
       !accountStatus ||
       accountStatus === ADMIN_ACCOUNT_STATUS.REVOKED
@@ -534,22 +534,39 @@ export default function PermissionAdminAccounts({
       return
     }
     passwordResetPendingRef.current = true
-    setResettingDefaultPassword(useDefaultPassword)
+    setResettingDefaultPassword(useTemporaryPassword)
     setSaving(true)
     try {
-      await adminRpc.call(
-        useDefaultPassword ? 'reset_default_password' : 'reset_password',
-        useDefaultPassword
+      const result = await adminRpc.call(
+        useTemporaryPassword ? 'reset_temporary_password' : 'reset_password',
+        useTemporaryPassword
           ? { id: resettingAdmin.id }
           : { id: resettingAdmin.id, password: values.password }
       )
       message.success(
-        useDefaultPassword
-          ? `已将 ${formatAdminIdentity(resettingAdmin)} 重置为默认密码，请提醒本人登录后修改`
+        useTemporaryPassword
+          ? `已将 ${formatAdminIdentity(resettingAdmin)} 生成临时密码，请提醒本人登录后修改`
           : `已重置 ${formatAdminIdentity(resettingAdmin)} 的密码`
       )
       passwordResetPendingRef.current = false
       closeResetModal()
+      if (useTemporaryPassword) {
+        modal.info({
+          maskClosable: true,
+          title: '临时密码仅显示一次',
+          content: (
+            <>
+              <Typography.Paragraph>
+                请妥善交给本人，并提醒登录后修改。
+              </Typography.Paragraph>
+              <Typography.Paragraph copyable>
+                {result.data.temporary_password}
+              </Typography.Paragraph>
+            </>
+          ),
+          okText: '已保存',
+        })
+      }
       await loadData()
     } catch (err) {
       message.error(getActionErrorMessage(err, '重置员工账号密码'))
@@ -1202,7 +1219,7 @@ export default function PermissionAdminAccounts({
               loading={saving && resettingDefaultPassword}
               onClick={() => resetAdminPassword({}, true)}
             >
-              重置为 12345678
+              生成临时密码
             </Button>
           ) : null,
           <Button

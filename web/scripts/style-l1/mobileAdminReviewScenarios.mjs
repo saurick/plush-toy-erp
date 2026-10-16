@@ -138,6 +138,7 @@ export function createMobileAdminReviewScenarios({
       await expectText(page, '业务全局查看任务')
       await expectText(page, '仓库全局查看任务')
       await assertMobileNavigationFitsViewport(page, assert)
+      assert.equal(await page.getByRole('combobox', { name: '查看岗位' }).count(), 0, '任务页不重复管理员岗位栏')
       assert.equal(
         await page.getByText('未开放的财务任务', { exact: true }).count(),
         0
@@ -163,14 +164,10 @@ export function createMobileAdminReviewScenarios({
           .count(),
         0
       )
-      assert.equal(
-        await page
-          .locator('[data-step-key="process"]')
-          .getAttribute('data-state'),
-        'locked'
-      )
+      assert.equal(await page.getByRole('button', { name: '当前仅供查看', exact: true }).isDisabled(), true)
       await page.goBack()
       await expectText(page, '仓库全局查看任务')
+      await page.getByTestId('mobile-role-nav-mine').click()
       await page.locator('.mobile-admin-review .ant-select-selector').click()
       assert.equal(
         await page
@@ -188,6 +185,7 @@ export function createMobileAdminReviewScenarios({
         .locator('.mobile-admin-review .ant-select-selection-item')
         .filter({ hasText: /^业务$/ })
         .waitFor({ state: 'visible' })
+      await page.getByTestId('mobile-role-nav-tasks').click()
       assert.equal(
         await page.getByText('仓库全局查看任务', { exact: true }).count(),
         0
@@ -196,6 +194,9 @@ export function createMobileAdminReviewScenarios({
       await page.getByText('已办', { exact: true }).click()
       await expectText(page, '业务已办查看记录')
       await page.reload()
+      await expectText(page, '业务已办查看记录')
+      assert.equal(await page.getByRole('combobox', { name: '查看岗位' }).count(), 0)
+      await page.getByTestId('mobile-role-nav-mine').click()
       await expectText(page, '管理员视角')
       await waitForPath(page, '/m/sales/tasks')
       const geometry = await page.evaluate(() => {
@@ -231,6 +232,14 @@ export function createMobileAdminReviewScenarios({
         ),
         true
       )
+      await page.reload()
+      await page.locator('.mobile-admin-review .ant-select-selection-item').filter({ hasText: /^业务$/ }).waitFor()
+      await page.locator('.mobile-admin-review .ant-select-selector').click()
+      await page.locator('.ant-select-dropdown:visible').getByText('全部岗位', { exact: true }).click()
+      await waitForPath(page, '/m/all/tasks')
+      await page.getByTestId('mobile-role-nav-tasks').click()
+      await expectText(page, '业务全局查看任务')
+      await expectText(page, '仓库全局查看任务')
     },
   }))
   return [
@@ -264,7 +273,7 @@ export function createMobileAdminReviewScenarios({
           .getByTestId('mobile-nav-risk-count')
           .getByText('99+', { exact: true })
           .waitFor()
-        const labels = ['进度', '任务', '风险', '我的']
+        const labels = ['进度', '任务管理', '风险', '我的']
         assert.deepEqual(
           await nav.locator('.mobile-role-bottom-nav__label').allTextContents(),
           labels
@@ -304,6 +313,7 @@ export function createMobileAdminReviewScenarios({
           await originalNav.evaluate((element) => element.isConnected),
           true
         )
+        await page.getByTestId('mobile-role-nav-mine').click()
         await page.locator('.mobile-admin-review .ant-select-selector').click()
         await page
           .locator('.ant-select-item-option')
@@ -329,19 +339,67 @@ export function createMobileAdminReviewScenarios({
     {
       name: 'dev-ui-design-admin-mobile-review',
       path: '/__dev/ui-design',
-      viewport: { width: 1440, height: 900 },
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
       verify: async (page) => {
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await frame.getByRole('button', { name: '手机端', exact: true }).click()
-        const selector = frame.getByLabel('查看岗位', { exact: true })
-        await selector.selectOption({ index: 1 })
+        const phone = frame.locator('.role-mobile-device')
+        const identity = frame.getByLabel('预览身份', { exact: true })
+        const role = frame.getByLabel('预览岗位', { exact: true })
+        assert.equal(await identity.inputValue(), 'role')
+        assert.equal(await role.inputValue(), '仓库')
+        assert.equal(await phone.getByText('管理员视角', { exact: true }).count(), 0)
+        assert.equal(await phone.getByLabel('查看岗位', { exact: true }).count(), 0)
+        assert.equal(await role.locator('option[value="all"]').count(), 0)
+        assert.equal(await phone.getByLabel('预览身份', { exact: true }).count(), 0)
+        assert.equal(await phone.getByLabel('预览岗位', { exact: true }).count(), 0)
+        const controls = await frame.getByRole('group', { name: '手机预览场景', exact: true }).boundingBox()
+        const device = await phone.boundingBox()
+        assert(controls.y + controls.height <= device.y)
+        await role.selectOption('销售')
+        assert.equal(await phone.locator('.rm-task-card').count(), 1)
+        await phone.getByRole('button', { name: '查看跟进客供包装到仓', exact: true }).click()
+        await phone.getByRole('heading', { name: '任务信息', exact: true }).waitFor()
+        await role.selectOption('仓库')
+        assert.equal(await phone.getByRole('heading', { name: '任务信息', exact: true }).count(), 0)
+        await phone.locator('#mobile-task-search').fill('无匹配的预览任务')
+        assert.equal(await phone.locator('.rm-task-card').count(), 0)
+
+        await identity.selectOption('admin')
+        assert.equal(await role.count(), 0)
+        assert.equal(await phone.locator('#mobile-task-search').inputValue(), '')
+        assert.equal(await phone.getByLabel('查看岗位', { exact: true }).count(), 0)
+        await phone.locator('[data-action="mobile-main"][data-value="mine"]').click()
+        await phone.getByText('管理员视角', { exact: true }).waitFor()
+        const selector = phone.getByLabel('查看岗位', { exact: true })
+        assert.equal(await selector.inputValue(), 'all')
+        await selector.selectOption('销售')
+        assert.equal(await selector.inputValue(), '销售', '切换岗位后留在我的读回选择')
+        await phone.locator('[data-action="mobile-main"][data-value="tasks"]').click()
+        assert.equal(await selector.count(), 0)
         const scopedCount = await frame.locator('.rm-task-card').count()
-        assert(scopedCount > 0)
+        assert.equal(scopedCount, 1)
+        await phone.locator('[data-action="mobile-main"][data-value="mine"]').click()
         await selector.selectOption('all')
-        assert((await frame.locator('.rm-task-card').count()) >= scopedCount)
+        await phone.locator('[data-action="mobile-main"][data-value="tasks"]').click()
+        assert((await frame.locator('.rm-task-card').count()) > scopedCount)
         const nav = await frame.locator('.rm-bottom-nav').boundingBox()
-        const device = await frame.locator('.role-mobile-device').boundingBox()
         assert(nav.y + nav.height <= device.y + device.height)
+        await phone.locator('[data-action="mobile-main"][data-value="mine"]').click()
+        await selector.selectOption('生产')
+        await identity.selectOption('role')
+        assert.equal(await role.inputValue(), '仓库')
+        assert.equal(await selector.count(), 0)
+        assert.equal(await phone.getByText('管理员视角', { exact: true }).count(), 0)
+        await phone.getByRole('button', { name: '查看确认采购到货差异', exact: true }).waitFor()
+
+        await identity.selectOption('admin')
+        await page.getByRole('button', { name: /重置演示/u }).click()
+        await frame.getByRole('button', { name: '手机端', exact: true }).click()
+        assert.equal(await identity.inputValue(), 'role')
+        assert.equal(await role.inputValue(), '仓库')
+        assert.equal(await phone.getByText('管理员视角', { exact: true }).count(), 0)
       },
     },
   ]

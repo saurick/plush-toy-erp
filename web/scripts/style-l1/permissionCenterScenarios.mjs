@@ -4,6 +4,8 @@ import {
 } from './businessFormPageAssertions.mjs'
 import { createPermissionUnifiedScenarios } from './permissionUnifiedScenarios.mjs'
 import { createPermissionRelationshipScenarios } from './permissionRelationshipScenarios.mjs'
+import { createPermissionAccessLayoutScenarios } from './permissionAccessLayoutScenarios.mjs'
+import { createPermissionRoleSwitchScenarios } from './permissionRoleSwitchScenarios.mjs'
 
 export function createPermissionCenterScenarios({
   expectText,
@@ -76,7 +78,15 @@ export function createPermissionCenterScenarios({
     await tooltip.waitFor({ state: 'hidden', timeout: 10_000 })
   }
   return [
-    ...createPermissionRelationshipScenarios({ assert, assertNoHorizontalOverflow }),
+    ...createPermissionRoleSwitchScenarios(),
+    ...createPermissionAccessLayoutScenarios({
+      openControlledAntSelectDropdown,
+      selectVirtualizedAntOption,
+    }),
+    ...createPermissionRelationshipScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+    }),
     ...createPermissionUnifiedScenarios({ assert, assertNoHorizontalOverflow }),
     ...['light', 'dark'].map((themeMode) => ({
       name: `permission-center-approval-design-${themeMode}`,
@@ -711,7 +721,7 @@ export function createPermissionCenterScenarios({
         await expectText(page, '岗位设置')
         await expectText(page, '员工账号')
         await expectText(page, '项功能已授权')
-        await expectText(page, '仓库范围')
+        await expectText(page, '数据范围')
         await expectText(page, '敏感字段')
         await expectText(page, '岗位导航')
         await assertTextAbsent(page, '先设置岗位，再分配账号')
@@ -748,10 +758,7 @@ export function createPermissionCenterScenarios({
           page.locator('.erp-permission-capability-summary'),
           '项功能'
         )
-        await expectText(
-          page.locator('.erp-role-center-detail__head'),
-          '关联账号'
-        )
+        await expectText(page.locator('.erp-role-center-tools'), '关联账号')
         assert.equal(
           await page.locator('.erp-role-center-metrics').count(),
           0,
@@ -792,6 +799,10 @@ export function createPermissionCenterScenarios({
           permissionHelpPopover,
           '当前调整仅预览，保存岗位设置后生效'
         )
+        // Element screenshots wait for the opening animation to settle before measuring.
+        await permissionHelpPopover.screenshot({
+          path: 'output/playwright/style-l1/permission-center-help-popover-card.png',
+        })
         const permissionHelpBox = await permissionHelpPopover.boundingBox()
         assert(
           permissionHelpBox &&
@@ -799,9 +810,6 @@ export function createPermissionCenterScenarios({
             permissionHelpBox.height >= 90,
           `菜单与操作浮层尺寸异常: ${JSON.stringify(permissionHelpBox)}`
         )
-        await permissionHelpPopover.screenshot({
-          path: 'output/playwright/style-l1/permission-center-help-popover-card.png',
-        })
         await page.screenshot({
           path: 'output/playwright/style-l1/permission-center-help-popover.png',
           fullPage: false,
@@ -1007,10 +1015,13 @@ export function createPermissionCenterScenarios({
         await expectText(page, '放弃未保存的岗位调整？')
         await page.getByRole('button', { name: '放弃修改' }).click()
         await page.getByRole('tab', { name: /岗位设置/u }).click()
-        await page.getByRole('combobox', { name: '仓库范围模式' }).waitFor()
-        await expectText(page, '仓库范围')
+        assert.equal(
+          await page.getByRole('combobox', { name: '仓库范围模式' }).count(),
+          0
+        )
+        await expectText(page, '数据范围')
         await page
-          .getByRole('button', { name: '敏感字段', exact: true })
+          .getByRole('button', { name: '查看敏感字段', exact: true })
           .click()
         await expectText(page, '电话、地址、单价、金额和结算资料由独立权限控制')
         await expectText(page, '销售商业')
@@ -1056,7 +1067,10 @@ export function createPermissionCenterScenarios({
         await expectText(page, '帮助中心')
         await pageAccessTab.click()
         await expectText(page, '已按公司当前启用配置核对')
+        const accessHelp = page.getByRole('button', { name: '页面访问说明', exact: true })
+        await accessHelp.focus()
         await expectText(page, '页面内的操作还会单独校验')
+        await accessHelp.blur()
         await expectText(page, '显示')
         const permissionMapMetrics = await page.evaluate(() => {
           const table = document.querySelector(
@@ -1432,6 +1446,14 @@ export function createPermissionCenterScenarios({
         await expectHeading(page, '权限管理')
         await page.getByRole('tab', { name: /员工账号/u }).click()
         await expectText(page, '共 7 个员工账号')
+        assert.equal(
+          await page
+            .locator('.erp-admin-content')
+            .getAttribute('data-permission-workspace'),
+          null,
+          '离开岗位工作区后应恢复员工列表的滚动边界'
+        )
+        await page.setViewportSize({ width: 1000, height: 640 })
 
         await page.getByRole('button', { name: '创建员工账号' }).click()
         const createModal = page
@@ -1443,7 +1465,35 @@ export function createPermissionCenterScenarios({
           scenarioName: 'permission-center-admin-dialogs-create',
           title: '创建员工账号',
         })
+        const editorScrolling = await createModal.evaluate((editor) => {
+          const body = editor.querySelector('.erp-business-form-page__body')
+          const scrollOwners = []
+          for (let node = body; node; node = node.parentElement) {
+            if (
+              /auto|scroll/.test(getComputedStyle(node).overflowY) &&
+              node.scrollHeight > node.clientHeight + 1
+            ) {
+              scrollOwners.push(node.className)
+            }
+          }
+          return {
+            scrollOwners,
+            outerOverflow: getComputedStyle(
+              editor.closest('.erp-admin-content')
+            ).overflowY,
+          }
+        })
+        assert.equal(
+          editorScrolling.outerOverflow,
+          'hidden',
+          JSON.stringify(editorScrolling)
+        )
+        assert(
+          editorScrolling.scrollOwners.length <= 1,
+          JSON.stringify(editorScrolling)
+        )
         await closeBusinessFormPage(page, createModal)
+        await page.setViewportSize({ width: 1486, height: 1058 })
 
         const assistantRow = page.getByRole('row', { name: /assistant-admin/ })
         await assistantRow.getByRole('button', { name: '分配岗位' }).click()
@@ -1784,7 +1834,8 @@ export function createPermissionCenterScenarios({
         await expectText(page, '当前配置版本')
         await page.keyboard.press('Escape')
         await page
-          .locator('.erp-role-effective-access__toolbar .ant-segmented-item')
+          .getByRole('group', { name: '筛选页面访问' })
+          .getByRole('button')
           .filter({ hasText: '不可进入' })
           .click()
         const blockedRows = await page
@@ -1990,7 +2041,8 @@ export function createPermissionCenterScenarios({
         await page.getByRole('tab', { name: /页面访问/u }).click()
         await expectText(page, '显示')
         await page
-          .locator('.erp-role-effective-access__toolbar .ant-segmented-item')
+          .getByRole('group', { name: '筛选页面访问' })
+          .getByRole('button')
           .filter({ hasText: /^可进入/u })
           .first()
           .click()
@@ -1998,17 +2050,17 @@ export function createPermissionCenterScenarios({
           const nestedTabs = document.querySelector(
             '.erp-role-navigation-workspace-tabs > .ant-tabs-nav'
           )
-          const segmented = document.querySelector(
-            '.erp-role-effective-access__toolbar .ant-segmented'
+          const filters = document.querySelector(
+            '.erp-role-effective-access__filters'
           )
           const table = document.querySelector(
-            '.erp-role-effective-access__table .ant-table-content'
+            '.erp-role-effective-access__table .ant-table-body, .erp-role-effective-access__table .ant-table-content'
           )
           return {
             tabsScrollWidth: nestedTabs?.scrollWidth || 0,
             tabsClientWidth: nestedTabs?.clientWidth || 0,
-            segmentedScrollWidth: segmented?.scrollWidth || 0,
-            segmentedClientWidth: segmented?.clientWidth || 0,
+            filtersScrollWidth: filters?.scrollWidth || 0,
+            filtersClientWidth: filters?.clientWidth || 0,
             tableScrollWidth: table?.scrollWidth || 0,
             tableClientWidth: table?.clientWidth || 0,
             documentScrollWidth: document.documentElement.scrollWidth,
@@ -2018,8 +2070,10 @@ export function createPermissionCenterScenarios({
         assert(
           mobileAccessMetrics.tabsScrollWidth <=
             mobileAccessMetrics.tabsClientWidth + 1 &&
-            mobileAccessMetrics.segmentedScrollWidth <=
-              mobileAccessMetrics.segmentedClientWidth + 1 &&
+            mobileAccessMetrics.filtersClientWidth > 0 &&
+            mobileAccessMetrics.filtersScrollWidth <=
+              mobileAccessMetrics.filtersClientWidth + 1 &&
+            mobileAccessMetrics.tableClientWidth > 0 &&
             mobileAccessMetrics.tableScrollWidth >=
               mobileAccessMetrics.tableClientWidth &&
             mobileAccessMetrics.documentScrollWidth <=
