@@ -411,6 +411,7 @@ func TestBusinessAttachmentRepoProductImageWriteSerializesAndReplacesSlot(t *tes
 			mock.ExpectQuery(regexp.QuoteMeta(tc.ownerQuery)).
 				WithArgs(7).
 				WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
+			mock.ExpectQuery("SELECT EXISTS").WithArgs(7, biz.BusinessAttachmentProductImageSlotPrimary).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 			mock.ExpectExec(regexp.QuoteMeta(tc.deleteQuery)).
 				WithArgs(7, biz.BusinessAttachmentProductImageSlotPrimary).
 				WillReturnResult(sqlmock.NewResult(0, 1))
@@ -457,6 +458,7 @@ func TestBusinessAttachmentRepoClearProductImageLocksOwnerAndDeletesExactSlot(t 
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM products WHERE id = $1 FOR UPDATE")).
 		WithArgs(7).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
+	mock.ExpectQuery("SELECT EXISTS").WithArgs(7, biz.BusinessAttachmentProductImageSlotSecondary).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM business_attachments WHERE owner_type = 'product' AND owner_id = $1 AND attachment_type = 'product_image' AND slot_key = $2")).
 		WithArgs(7, biz.BusinessAttachmentProductImageSlotSecondary).
 		WillReturnResult(sqlmock.NewResult(0, 1))
@@ -608,6 +610,7 @@ func TestBusinessAttachmentStorageFailureKeepsOldProductImage(t *testing.T) {
 	repo := NewBusinessAttachmentRepo(&Data{sqldb: db, sqlDialect: "postgres"}, store, log.NewStdLogger(io.Discard))
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM products WHERE id = $1 FOR UPDATE")).WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
+	mock.ExpectQuery("SELECT EXISTS").WithArgs(7, "primary").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 	mock.ExpectRollback()
 	_, err = repo.CreateBusinessAttachment(context.Background(), productImageAttachmentCreate(7, "primary"))
 	if !errors.Is(err, biz.ErrBusinessAttachmentStorageUnavailable) {
@@ -628,6 +631,7 @@ func TestBusinessAttachmentCommitUncertaintyRetainsObject(t *testing.T) {
 	repo := NewBusinessAttachmentRepo(&Data{sqldb: db, sqlDialect: "postgres"}, store, log.NewStdLogger(io.Discard))
 	mock.ExpectBegin()
 	mock.ExpectQuery(regexp.QuoteMeta("SELECT id FROM products WHERE id = $1 FOR UPDATE")).WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
+	mock.ExpectQuery("SELECT EXISTS").WithArgs(7, "primary").WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
 	mock.ExpectExec("DELETE FROM business_attachments").WillReturnResult(sqlmock.NewResult(0, 1))
 	mock.ExpectQuery("INSERT INTO business_attachments").WillReturnRows(sqlmock.NewRows([]string{"id", "created_at"}).AddRow(101, time.Now()))
 	mock.ExpectCommit().WillReturnError(errors.New("connection lost after commit"))
@@ -639,5 +643,34 @@ func TestBusinessAttachmentCommitUncertaintyRetainsObject(t *testing.T) {
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestBusinessAttachmentReferencedImageCannotBeReplacedOrCleared(t *testing.T) {
+	for _, replace := range []bool{false, true} {
+		db, mock, err := sqlmock.New()
+		if err != nil {
+			t.Fatal(err)
+		}
+		repo := NewBusinessAttachmentRepo(&Data{sqldb: db, sqlDialect: "postgres"}, newAttachmentMemoryStore(), log.NewStdLogger(io.Discard))
+		mock.ExpectBegin()
+		mock.ExpectQuery("SELECT id FROM products").WithArgs(7).WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(7))
+		mock.ExpectQuery("SELECT EXISTS").WithArgs(7, biz.BusinessAttachmentProductImageSlotPrimary).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
+		mock.ExpectRollback()
+		if replace {
+			_, err = repo.CreateBusinessAttachment(context.Background(), productImageAttachmentCreate(7, biz.BusinessAttachmentProductImageSlotPrimary))
+		} else {
+			err = repo.ClearProductImage(context.Background(), 7, biz.BusinessAttachmentProductImageSlotPrimary)
+		}
+		if !errors.Is(err, biz.ErrBusinessAttachmentReferenced) {
+			t.Fatalf("replace=%v err=%v", replace, err)
+		}
+		mock.ExpectClose()
+		if err := db.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

@@ -189,7 +189,7 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		if item.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask && !expectedVersionOK {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := d.requireBusinessAttachmentOwnerAccess(ctx, item.OwnerType, item.OwnerID, true); res != nil {
+		if res := d.requireBusinessAttachmentWithdrawalAccess(ctx, item.OwnerType, item.OwnerID); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), item.OwnerType); res != nil {
@@ -490,6 +490,23 @@ func businessAttachmentReadPermissions(ownerType string) []string {
 	}
 }
 
+func (d *jsonrpcDispatcher) requireBusinessAttachmentWithdrawalAccess(ctx context.Context, ownerType string, ownerID int) *v1.JsonrpcResult {
+	if ownerType == biz.BusinessAttachmentOwnerFinanceFact || ownerType == biz.BusinessAttachmentOwnerWorkflowTask {
+		return d.requireBusinessAttachmentOwnerAccess(ctx, ownerType, ownerID, true)
+	}
+	permissions := businessAttachmentWritePermissions(ownerType)
+	withdrawalPermissions := make([]string, 0, len(permissions))
+	for _, permission := range permissions {
+		if !strings.HasSuffix(permission, ".create") {
+			withdrawalPermissions = append(withdrawalPermissions, permission)
+		}
+	}
+	if len(withdrawalPermissions) == 0 {
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	}
+	return d.RequireAdminAnyPermission(ctx, withdrawalPermissions...)
+}
+
 func businessAttachmentWritePermissions(ownerType string) []string {
 	switch ownerType {
 	case biz.BusinessAttachmentOwnerSalesOrder:
@@ -571,6 +588,8 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "产品图片超过 5MB，请更换或压缩后重试"}
 	case errors.Is(err, biz.ErrBusinessAttachmentTooLarge):
 		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "附件超过 100MB，请压缩后再上传"}
+	case errors.Is(err, biz.ErrBusinessAttachmentReferenced):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "图片已用于订单样品记录，不能替换或清空；请保留原图"}
 	case errors.Is(err, biz.ErrBusinessAttachmentIntegrity):
 		d.log.WithContext(ctx).Errorf("business attachment integrity verification failed: %v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: "附件内容校验失败，请联系管理员"}

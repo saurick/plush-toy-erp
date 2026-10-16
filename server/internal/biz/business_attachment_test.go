@@ -807,3 +807,30 @@ func TestBusinessAttachmentGetContentVerifiesPersistedIntegrity(t *testing.T) {
 		})
 	}
 }
+
+func TestPrintAppendixRejectsInvalidBytesBeforePersistence(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		content []byte
+		valid   bool
+	}{
+		{"text disguised as PNG", []byte("not an image"), false},
+		{"truncated pixel data", truncatedProductImagePNGWithReadableConfig(t), false},
+		{"valid PNG", productImageTestContent(t, "image/png", 4, 4), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &stubBusinessAttachmentRepo{ownerExists: true}
+			_, err := NewBusinessAttachmentUsecase(repo).UploadBusinessAttachment(t.Context(), &BusinessAttachmentUploadInput{
+				OwnerType: BusinessAttachmentOwnerOutsourcingOrder, OwnerID: 7, AttachmentType: BusinessAttachmentTypePrintAppendix,
+				FileName: "appendix.png", MimeType: "image/png", ContentBase64: base64.StdEncoding.EncodeToString(tc.content),
+			})
+			if tc.valid {
+				if err != nil || repo.created == nil {
+					t.Fatalf("valid image rejected: %v", err)
+				}
+			} else if !errors.Is(err, ErrBusinessAttachmentContentInvalid) || repo.created != nil {
+				t.Fatalf("invalid image persisted: %v %#v", err, repo.created)
+			}
+		})
+	}
+}
