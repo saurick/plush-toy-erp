@@ -10,7 +10,6 @@ func scanBusinessStatusCounts(ctx context.Context, scan func(context.Context, an
 	var rows []struct {
 		Status          string `json:"status"`
 		LifecycleStatus string `json:"lifecycle_status"`
-		TaskStatusKey   string `json:"task_status_key"`
 		Count           int    `json:"count"`
 	}
 	if err := scan(ctx, &rows); err != nil {
@@ -21,9 +20,6 @@ func scanBusinessStatusCounts(ctx context.Context, scan func(context.Context, an
 		status := row.Status
 		if status == "" {
 			status = row.LifecycleStatus
-		}
-		if status == "" {
-			status = row.TaskStatusKey
 		}
 		counts[status] = row.Count
 	}

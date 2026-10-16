@@ -16,21 +16,19 @@ type BusinessProgressAccess struct {
 }
 
 type BusinessProgressQuery struct {
-	View, Keyword, Scope, DueStatus, Owner, DateFrom, DateTo string
-	BlockedOnly, UnlinkedOnly                                bool
-	Limit, Offset, ID                                        int
-	SnapshotAt                                               time.Time
-	Access                                                   BusinessProgressAccess
-	TaskVisibility                                           *WorkflowTaskVisibilityScope
+	View, Keyword, Scope, Risk, Owner, DateFrom, DateTo string
+	Limit, Offset, ID                                   int
+	SnapshotAt                                          time.Time
+	Access                                              BusinessProgressAccess
+	TaskVisibility                                      *WorkflowTaskVisibilityScope
 }
 
 type BusinessProgressCounts struct {
-	Total    int `json:"total"`
-	Overdue  int `json:"overdue"`
-	DueSoon  int `json:"due_soon"`
-	Blocked  int `json:"blocked"`
-	Undated  int `json:"undated"`
-	Unlinked int `json:"unlinked"`
+	Total   int `json:"total"`
+	Overdue int `json:"overdue"`
+	DueSoon int `json:"due_soon"`
+	Blocked int `json:"blocked"`
+	Undated int `json:"undated"`
 }
 
 type BusinessProgressRow struct {
@@ -131,18 +129,15 @@ func normalizeBusinessProgressQuery(q BusinessProgressQuery) (BusinessProgressQu
 	if q.Scope == "" {
 		q.Scope = "active"
 	}
-	if q.DueStatus == "" {
-		q.DueStatus = "all"
+	if q.Risk == "" {
+		q.Risk = "all"
 	}
 	if q.Limit == 0 {
 		q.Limit = 20
 	}
 	if q.View != "orders" && q.View != "production" ||
 		q.Scope != "active" && q.Scope != "all" && q.Scope != "ended" ||
-		q.DueStatus != "all" && q.DueStatus != "overdue" && q.DueStatus != "due_soon" && q.DueStatus != "undated" ||
-		q.Scope == "ended" && (q.DueStatus == "overdue" || q.DueStatus == "due_soon" || q.BlockedOnly) ||
-		q.View != "production" && q.UnlinkedOnly ||
-		q.DueStatus == "undated" && (q.DateFrom != "" || q.DateTo != "") ||
+		q.Risk != "all" && q.Risk != "overdue" && q.Risk != "due_soon" && q.Risk != "blocked" && q.Risk != "undated" && q.Risk != "unlinked" ||
 		q.Limit < 1 || q.Limit > 100 || q.Offset < 0 || q.Offset > 1000000 || q.ID < 0 ||
 		len([]rune(q.Keyword)) > 100 || len([]rune(q.Owner)) > 100 {
 		return q, ErrBadParam
@@ -150,7 +145,7 @@ func normalizeBusinessProgressQuery(q BusinessProgressQuery) (BusinessProgressQu
 	if q.View == "orders" && !q.Access.Sales || q.View == "production" && !q.Access.Production {
 		return q, ErrForbidden
 	}
-	if q.Access.Tasks && q.TaskVisibility == nil || q.BlockedOnly && !q.Access.Tasks {
+	if q.Access.Tasks && q.TaskVisibility == nil {
 		return q, ErrForbidden
 	}
 	for _, date := range []string{q.DateFrom, q.DateTo} {
@@ -181,8 +176,7 @@ func (uc *BusinessProgressUsecase) List(ctx context.Context, q BusinessProgressQ
 }
 
 func (uc *BusinessProgressUsecase) Detail(ctx context.Context, q BusinessProgressQuery) (*BusinessProgressDetail, error) {
-	q.Scope, q.DueStatus, q.Keyword, q.Owner, q.DateFrom, q.DateTo, q.Offset, q.Limit = "all", "all", "", "", "", "", 0, 1
-	q.BlockedOnly, q.UnlinkedOnly = false, false
+	q.Scope, q.Risk, q.Keyword, q.Owner, q.DateFrom, q.DateTo, q.Offset, q.Limit = "all", "all", "", "", "", "", 0, 1
 	q, err := normalizeBusinessProgressQuery(q)
 	if err != nil {
 		return nil, err

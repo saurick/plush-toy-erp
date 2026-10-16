@@ -19,11 +19,11 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 	if params != nil {
 		pm = params.AsMap()
 	}
-	if res := rejectUnknownWorkflowTaskParams(pm, method, "view", "keyword", "scope", "due_status", "blocked_only", "unlinked_only", "owner", "date_from", "date_to", "limit", "offset", "id"); res != nil {
+	if res := rejectUnknownWorkflowTaskParams(pm, method, "view", "keyword", "scope", "risk", "owner", "date_from", "date_to", "limit", "offset", "id"); res != nil {
 		return id, res, nil
 	}
 	q := biz.BusinessProgressQuery{}
-	for key, dest := range map[string]*string{"view": &q.View, "keyword": &q.Keyword, "scope": &q.Scope, "due_status": &q.DueStatus, "owner": &q.Owner, "date_from": &q.DateFrom, "date_to": &q.DateTo} {
+	for key, dest := range map[string]*string{"view": &q.View, "keyword": &q.Keyword, "scope": &q.Scope, "risk": &q.Risk, "owner": &q.Owner, "date_from": &q.DateFrom, "date_to": &q.DateTo} {
 		value, res := getOptionalWorkflowTaskBoardString(pm, key, 100)
 		if res != nil {
 			return id, res, nil
@@ -31,13 +31,6 @@ func (d *jsonrpcDispatcher) handleBusinessProgress(ctx context.Context, method, 
 		*dest = value
 	}
 	var ok bool
-	for key, dest := range map[string]*bool{"blocked_only": &q.BlockedOnly, "unlinked_only": &q.UnlinkedOnly} {
-		if value, exists := pm[key]; exists {
-			if *dest, ok = value.(bool); !ok {
-				return id, invalidParamResult(), nil
-			}
-		}
-	}
 	if q.Limit, ok = getOptionalWorkflowTaskBoardInteger(pm, "limit", 20, 1); !ok {
 		return id, invalidParamResult(), nil
 	}

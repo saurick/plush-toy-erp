@@ -28,22 +28,6 @@ func TestBusinessDocumentSearchPostgresProgress(t *testing.T) {
 	if err != nil || board.Total != 1 || board.Rows[0].ProductID != product.ID || board.Rows[0].DueDate != "2026-09-24" || board.Rows[0].Overdue || !board.Rows[0].DueSoon || board.Rows[0].OpenTasks != 1 {
 		t.Fatalf("sales=%+v err=%v", board, err)
 	}
-	combined := q
-	combined.DueStatus, combined.BlockedOnly = "due_soon", true
-	board, err = uc.List(ctx, combined)
-	if err != nil || board.Total != 1 || board.Counts.Total != 1 || board.Counts.DueSoon != 1 || board.Counts.Blocked != 1 || board.Counts.Overdue != 0 {
-		t.Fatalf("combined=%+v err=%v", board, err)
-	}
-	combined.DueStatus = "overdue"
-	board, err = uc.List(ctx, combined)
-	if err != nil || board.Total != 0 || len(board.Rows) != 0 || board.Counts.Total != 1 || board.Counts.DueSoon != 1 || board.Counts.Blocked != 0 {
-		t.Fatalf("empty intersection=%+v err=%v", board, err)
-	}
-	combined.DueStatus, combined.DateFrom, combined.DateTo = "all", "2026-09-25", "2026-09-26"
-	board, err = uc.List(ctx, combined)
-	if err != nil || board.Total != 0 || board.Counts.Total != 0 || board.Counts.Blocked != 0 {
-		t.Fatalf("date intersection=%+v err=%v", board, err)
-	}
 	q.ID = so.ID
 	detail, err := uc.Detail(ctx, q)
 	if err != nil || len(detail.Sections["production"]) != 1 || len(detail.Sections["tasks"]) != 1 || detail.Sections["lines"][0].Date != "2026-09-24" || detail.Sections["lines"][0].ProductID != product.ID {

@@ -91,9 +91,9 @@ func TestBusinessProgressPaginationFactsAndVisibility(t *testing.T) {
 		t.Fatalf("second=%+v err=%v", board, err)
 	}
 	q.Offset = 0
-	q.BlockedOnly = true
+	q.Risk = "blocked"
 	board, err = uc.List(ctx, q)
-	if err != nil || board.Total != 1 || board.Counts.Total != 1 {
+	if err != nil || board.Total != 1 || board.Counts.Total != 2 {
 		t.Fatalf("filter=%+v err=%v", board, err)
 	}
 	q.ID = so.ID
@@ -106,7 +106,7 @@ func TestBusinessProgressPaginationFactsAndVisibility(t *testing.T) {
 	}
 	q.ID = 0
 	q.Keyword = "不存在"
-	q.BlockedOnly, q.UnlinkedOnly = false, false
+	q.Risk = "all"
 	board, err = uc.List(ctx, q)
 	if err != nil || board.Total != 0 || len(board.Rows) != 0 {
 		t.Fatalf("empty=%+v err=%v", board, err)
@@ -136,12 +136,12 @@ func TestBusinessProgressMixedUnitsAndIndependentProduction(t *testing.T) {
 	}
 	q.View = "production"
 	q.Keyword = ""
-	q.UnlinkedOnly = true
+	q.Risk = "unlinked"
 	board, err = uc.List(ctx, q)
 	if err != nil || board.Total != 1 || board.Rows[0].ID != po.ID || board.Rows[0].ProductID != f.productID {
 		t.Fatalf("independent=%+v err=%v", board, err)
 	}
-	q.BlockedOnly, q.UnlinkedOnly = false, false
+	q.Risk = "all"
 	q.Scope = "ended"
 	board, err = uc.List(ctx, q)
 	if err != nil || board.Total != 1 || board.Rows[0].Status != "CLOSED" || board.Rows[0].Active {
@@ -228,21 +228,6 @@ func TestBusinessProgressCompletionReworkAndWIPPermission(t *testing.T) {
 	}
 	uc := biz.NewBusinessProgressUsecase(NewBusinessProgressRepo(f.data))
 	q := biz.BusinessProgressQuery{View: "production", ID: flow.ProductionOrderID, Access: biz.BusinessProgressAccess{Production: true, WIP: true}}
-	for _, unlinkedOnly := range []bool{false, true} {
-		listQuery := q
-		listQuery.ID, listQuery.Limit, listQuery.UnlinkedOnly = 0, 1, unlinkedOnly
-		board, err := uc.List(ctx, listQuery)
-		if err != nil || board.Counts.Unlinked != 0 {
-			t.Fatalf("linked production count=%#v err=%v", board, err)
-		}
-	}
-	f.client.ProductionOrder.Create().SetOrderNo("MO-PROGRESS-UNLINKED").SetCreatedBy(f.actorID).SaveX(ctx)
-	listQuery := q
-	listQuery.ID, listQuery.Limit, listQuery.Offset, listQuery.UnlinkedOnly, listQuery.Scope = 0, 1, 10, true, "all"
-	board, err := uc.List(ctx, listQuery)
-	if err != nil || board.Counts.Unlinked != 1 || board.Total != 1 || len(board.Rows) != 0 {
-		t.Fatalf("unlinked count must survive pagination: %#v err=%v", board, err)
-	}
 	detail, err := uc.Detail(ctx, q)
 	if err != nil || detail.Row.CompletedQuantity == nil || *detail.Row.CompletedQuantity != "6" || len(detail.Sections["batches"]) == 0 {
 		t.Fatalf("completion=%+v err=%v", detail, err)
@@ -286,69 +271,5 @@ func TestBusinessProgressCivilDateAndAllProductSearch(t *testing.T) {
 		if err != nil || board.Total != 1 || board.Rows[0].DueDate != "2026-09-24" || board.Rows[0].Overdue || !board.Rows[0].DueSoon {
 			t.Fatalf("%s board=%+v err=%v", keyword, board, err)
 		}
-	}
-}
-
-func TestBusinessProgressCombinedFiltersAndFacetCounts(t *testing.T) {
-	ctx := context.Background()
-	f := openProductionOrderRepoTest(t, "progress_filter_facets")
-	now := time.Date(2026, 10, 15, 4, 0, 0, 0, time.UTC)
-	original := f.client.SalesOrder.Query().OnlyX(ctx)
-	f.client.SalesOrder.UpdateOneID(original.ID).SetPlannedDeliveryDate(now.AddDate(0, 0, -1)).SetSalesOwner("组合负责人").SaveX(ctx)
-	block := func(id int, code, role string) {
-		f.client.WorkflowTask.Create().SetTaskCode(code).SetTaskName("核对交期").SetTaskGroup("test").SetSourceType("sales_order").SetSourceID(id).SetTaskStatusKey("blocked").SetOwnerRoleKey(role).SetBlockedReason("等待确认").SaveX(ctx)
-	}
-	block(original.ID, "facet-overdue", "pmc")
-	for _, name := range []string{"soon", "undated", "closed"} {
-		create := f.client.SalesOrder.Create().SetOrderNo("FACET-" + name).SetCustomerID(original.CustomerID).SetOrderDate(now).SetLifecycleStatus("active").SetSalesOwner("组合负责人")
-		if name != "undated" {
-			create.SetPlannedDeliveryDate(now.AddDate(0, 0, 2))
-		}
-		if name == "closed" {
-			create.SetLifecycleStatus("closed")
-		}
-		order := create.SaveX(ctx)
-		f.client.SalesOrderItem.Create().SetSalesOrderID(order.ID).SetLineNo(1).SetProductID(f.productID).SetUnitID(f.unitID).SetOrderedQuantity(decimal.NewFromInt(8)).SaveX(ctx)
-		role := "pmc"
-		if name == "soon" {
-			role = "finance"
-		}
-		block(order.ID, "facet-"+name, role)
-	}
-	uc := biz.NewBusinessProgressUsecase(NewBusinessProgressRepo(f.data))
-	base := biz.BusinessProgressQuery{View: "orders", SnapshotAt: now, Access: biz.BusinessProgressAccess{Sales: true, Tasks: true}, TaskVisibility: &biz.WorkflowTaskVisibilityScope{StandaloneVisibleOwnerRoleKeys: []string{"pmc"}}}
-	for _, tc := range []struct {
-		name   string
-		change func(*biz.BusinessProgressQuery)
-		total  int
-		counts biz.BusinessProgressCounts
-	}{
-		{"default", func(q *biz.BusinessProgressQuery) {}, 3, biz.BusinessProgressCounts{Total: 3, Overdue: 1, DueSoon: 1, Blocked: 2, Undated: 1}},
-		{"blocked", func(q *biz.BusinessProgressQuery) { q.BlockedOnly = true }, 2, biz.BusinessProgressCounts{Total: 2, Overdue: 1, Blocked: 2, Undated: 1}},
-		{"overdue-blocked", func(q *biz.BusinessProgressQuery) { q.BlockedOnly = true; q.DueStatus = "overdue" }, 1, biz.BusinessProgressCounts{Total: 2, Overdue: 1, Blocked: 1, Undated: 1}},
-		{"soon-hidden-blocker", func(q *biz.BusinessProgressQuery) { q.BlockedOnly = true; q.DueStatus = "due_soon" }, 0, biz.BusinessProgressCounts{Total: 2, Overdue: 1, Undated: 1}},
-		{"undated-blocked", func(q *biz.BusinessProgressQuery) { q.BlockedOnly = true; q.DueStatus = "undated" }, 1, biz.BusinessProgressCounts{Total: 2, Overdue: 1, Blocked: 1, Undated: 1}},
-		{"date-clears-for-undated-count", func(q *biz.BusinessProgressQuery) { q.DateFrom = "2026-10-16"; q.DateTo = "2026-10-18" }, 1, biz.BusinessProgressCounts{Total: 1, DueSoon: 1, Undated: 1}},
-		{"ended", func(q *biz.BusinessProgressQuery) { q.Scope = "ended" }, 1, biz.BusinessProgressCounts{Total: 1}},
-		{"all", func(q *biz.BusinessProgressQuery) { q.Scope = "all" }, 4, biz.BusinessProgressCounts{Total: 4, Overdue: 1, DueSoon: 1, Blocked: 2, Undated: 1}},
-		{"owner-miss", func(q *biz.BusinessProgressQuery) { q.Owner = "不存在" }, 0, biz.BusinessProgressCounts{}},
-		{"search-miss", func(q *biz.BusinessProgressQuery) { q.Keyword = "不存在" }, 0, biz.BusinessProgressCounts{}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			q := base
-			tc.change(&q)
-			board, err := uc.List(ctx, q)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if board.Total != tc.total || board.Counts != tc.counts || len(board.Rows) != tc.total {
-				t.Fatalf("total=%d counts=%+v rows=%d want total=%d counts=%+v", board.Total, board.Counts, len(board.Rows), tc.total, tc.counts)
-			}
-			q.Offset = 20
-			page, err := uc.List(ctx, q)
-			if err != nil || page.Total != board.Total || page.Counts != board.Counts || len(page.Rows) != 0 {
-				t.Fatalf("pagination=%+v err=%v", page, err)
-			}
-		})
 	}
 }

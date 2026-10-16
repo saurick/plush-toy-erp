@@ -155,32 +155,3 @@ func normalizePositiveIDs(values []int) []int {
 	sort.Ints(out)
 	return out
 }
-
-type warehouseDataScopeContextKey struct{}
-
-// WithWarehouseDataScope carries the authenticated boundary through source-driven
-// correction commands and their idempotent replay, including repository transactions.
-func WithWarehouseDataScope(ctx context.Context, scope WarehouseDataScope) context.Context {
-	return context.WithValue(ctx, warehouseDataScopeContextKey{}, NormalizeWarehouseDataScope(scope))
-}
-
-func WarehouseDataScopeFromContext(ctx context.Context) (WarehouseDataScope, bool) {
-	scope, ok := ctx.Value(warehouseDataScopeContextKey{}).(WarehouseDataScope)
-	return scope, ok
-}
-
-func ValidateContextWarehouseAccess(ctx context.Context, warehouseIDs []int) error {
-	scope, scoped := WarehouseDataScopeFromContext(ctx)
-	if !scoped {
-		return nil
-	}
-	if scope.Mode == DataScopeModeNone || (!scope.IsAll() && len(warehouseIDs) == 0) {
-		return ErrDataScopeForbidden
-	}
-	for _, id := range warehouseIDs {
-		if !scope.Allows(id) {
-			return ErrDataScopeForbidden
-		}
-	}
-	return nil
-}

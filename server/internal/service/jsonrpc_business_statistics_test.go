@@ -32,7 +32,7 @@ func TestBusinessStatisticsJSONRPC(t *testing.T) {
 			permissions = role.Permissions
 		}
 	}
-	d, _, _, _ := newProductionOrderJSONRPCTestData(t, permissions...)
+	d, _, _ := newProductionOrderJSONRPCTestData(t, permissions...)
 	d.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, permissions...)}
 	r := &statisticsAPIRepo{}
 	d.businessStatisticsUC = biz.NewBusinessStatisticsUsecase(r)
@@ -83,7 +83,7 @@ func TestBusinessStatisticsJSONRPC(t *testing.T) {
 func TestBusinessStatisticsQuantityPermissions(t *testing.T) {
 	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
 	permissions := []string{biz.PermissionERPBusinessDashboardRead, biz.PermissionSalesOrderRead, biz.PermissionSalesOrderItemRead}
-	d, _, _, _ := newProductionOrderJSONRPCTestData(t, permissions...)
+	d, _, _ := newProductionOrderJSONRPCTestData(t, permissions...)
 	r := &statisticsAPIRepo{}
 	d.businessStatisticsUC = biz.NewBusinessStatisticsUsecase(r)
 	ctx := workflowJSONRPCAdminContext()
