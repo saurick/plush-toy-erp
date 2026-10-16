@@ -13,9 +13,6 @@ import (
 )
 
 const (
-	FinancePaymentKindSettlement        = "SETTLEMENT"
-	FinancePaymentKindAdvance           = "ADVANCE"
-	FinancePaymentKindRefund            = "REFUND"
 	FinancePaymentDirectionReceipt      = "RECEIPT"
 	FinancePaymentDirectionDisbursement = "DISBURSEMENT"
 	FinancePaymentStatusDraft           = "DRAFT"
@@ -29,16 +26,6 @@ const (
 )
 
 type FinancePayment struct {
-	Kind                   string
-	SourceType             *string
-	SourceID               *int
-	SourceNo               string
-	RefundOfPaymentID      *int
-	RefundOfPaymentNo      string
-	PurposeNote            *string
-	AllocatedAmount        decimal.Decimal
-	RefundedAmount         decimal.Decimal
-	AvailableAmount        decimal.Decimal
 	ID                     int
 	PaymentNo              string
 	Direction              string
@@ -72,7 +59,6 @@ type FinancePayment struct {
 	Allocations            []*FinanceAllocation
 }
 type FinanceAllocation struct {
-	Reason                       *string
 	ID                           int
 	PaymentID                    int
 	FinanceFactID                int
@@ -108,11 +94,6 @@ type FinanceCreditNote struct {
 }
 
 type FinancePaymentCreate struct {
-	Kind                string `json:",omitempty"`
-	SourceType          string `json:",omitempty"`
-	SourceID            int    `json:",omitempty"`
-	RefundOfPaymentID   int    `json:",omitempty"`
-	PurposeNote         string `json:",omitempty"`
 	PaymentNo           string
 	Direction           string
 	CounterpartyType    string
@@ -145,17 +126,13 @@ type FinancePaymentReverse struct {
 	Reason          string
 }
 type FinancePaymentFilter struct {
-	SourceType        string
-	SourceID          int
-	Kind              string
-	RefundOfPaymentID int
-	Keyword           string
-	Status            string
-	Direction         string
-	CounterpartyType  string
-	CounterpartyID    int
-	Limit             int
-	Offset            int
+	Keyword          string
+	Status           string
+	Direction        string
+	CounterpartyType string
+	CounterpartyID   int
+	Limit            int
+	Offset           int
 }
 type FinanceCreditNoteCreate struct {
 	CreditNoteNo   string
@@ -329,13 +306,6 @@ func (uc *OperationalFactUsecase) ListFinancePayments(ctx context.Context, filte
 }
 
 func normalizeFinancePaymentListFilter(filter FinancePaymentFilter) (FinancePaymentFilter, error) {
-	filter.Kind = strings.ToUpper(strings.TrimSpace(filter.Kind))
-	filter.SourceType = strings.TrimSpace(filter.SourceType)
-	if (filter.Kind != "" && filter.Kind != FinancePaymentKindSettlement && filter.Kind != FinancePaymentKindAdvance && filter.Kind != FinancePaymentKindRefund) ||
-		filter.SourceID < 0 || filter.RefundOfPaymentID < 0 || (filter.SourceType == "") != (filter.SourceID == 0) ||
-		(filter.SourceType != "" && filter.SourceType != "sales_order" && filter.SourceType != "purchase_order" && filter.SourceType != "outsourcing_order") {
-		return FinancePaymentFilter{}, ErrBadParam
-	}
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
 	filter.Direction = strings.ToUpper(strings.TrimSpace(filter.Direction))
@@ -373,12 +343,6 @@ func (uc *OperationalFactUsecase) financePaymentRepo() (FinancePaymentRepo, bool
 }
 
 func normalizeFinancePaymentCreate(in FinancePaymentCreate) (FinancePaymentCreate, string, error) {
-	in.Kind = strings.ToUpper(strings.TrimSpace(in.Kind))
-	if in.Kind == "" {
-		in.Kind = FinancePaymentKindSettlement
-	}
-	in.SourceType = strings.TrimSpace(in.SourceType)
-	in.PurposeNote = strings.TrimSpace(in.PurposeNote)
 	in.PaymentNo = strings.TrimSpace(in.PaymentNo)
 	in.Direction = strings.ToUpper(strings.TrimSpace(in.Direction))
 	in.CounterpartyType = strings.ToUpper(strings.TrimSpace(in.CounterpartyType))
@@ -389,42 +353,17 @@ func normalizeFinancePaymentCreate(in FinancePaymentCreate) (FinancePaymentCreat
 	in.Currency, currencyOK = NormalizeFinanceCurrency(in.Currency)
 	validPairing := (in.Direction == FinancePaymentDirectionReceipt && in.CounterpartyType == FinanceCounterpartyCustomer) ||
 		(in.Direction == FinancePaymentDirectionDisbursement && in.CounterpartyType == FinanceCounterpartySupplier)
-	switch in.Kind {
-	case FinancePaymentKindSettlement:
-		if in.SourceType != "" || in.SourceID != 0 || in.RefundOfPaymentID != 0 {
-			return FinancePaymentCreate{}, "", ErrBadParam
-		}
-	case FinancePaymentKindAdvance:
-		validSource := (in.CounterpartyType == FinanceCounterpartyCustomer && in.SourceType == "sales_order") ||
-			(in.CounterpartyType == FinanceCounterpartySupplier && (in.SourceType == "purchase_order" || in.SourceType == "outsourcing_order"))
-		if !validSource || in.SourceID <= 0 || in.RefundOfPaymentID != 0 {
-			return FinancePaymentCreate{}, "", ErrBadParam
-		}
-	case FinancePaymentKindRefund:
-		validPairing = (in.Direction == FinancePaymentDirectionDisbursement && in.CounterpartyType == FinanceCounterpartyCustomer) ||
-			(in.Direction == FinancePaymentDirectionReceipt && in.CounterpartyType == FinanceCounterpartySupplier)
-		if in.RefundOfPaymentID <= 0 || in.SourceType != "" || in.SourceID != 0 || in.PurposeNote == "" {
-			return FinancePaymentCreate{}, "", ErrBadParam
-		}
-	default:
-		return FinancePaymentCreate{}, "", ErrBadParam
-	}
 	if in.PaymentNo == "" || !validPairing || in.CounterpartyID <= 0 || !in.Amount.IsPositive() || !currencyOK || in.AccountRef == "" || in.EvidenceRef == "" || in.IdempotencyKey == "" {
 		return FinancePaymentCreate{}, "", ErrBadParam
 	}
 	if len([]rune(in.PaymentNo)) > 64 || len([]rune(in.AccountRef)) > 128 ||
-		len([]rune(in.EvidenceRef)) > 255 || len([]rune(in.IdempotencyKey)) > 128 || len([]rune(in.PurposeNote)) > 255 {
+		len([]rune(in.EvidenceRef)) > 255 || len([]rune(in.IdempotencyKey)) > 128 {
 		return FinancePaymentCreate{}, "", ErrBadParam
 	}
 	if in.OccurredAtSpecified && in.OccurredAt.IsZero() {
 		return FinancePaymentCreate{}, "", ErrBadParam
 	}
-	// Existing settlement receipts retain their original idempotency identity.
-	hashInput := in
-	if hashInput.Kind == FinancePaymentKindSettlement {
-		hashInput.Kind = ""
-	}
-	raw, err := json.Marshal(hashInput)
+	raw, err := json.Marshal(in)
 	if err != nil {
 		return FinancePaymentCreate{}, "", err
 	}

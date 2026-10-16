@@ -51,7 +51,7 @@ func (h *financePaymentProcessCommandHandler) NormalizeProcessDomainCommandPaylo
 	if h == nil || h.commandKey != ProcessDomainCommandFinancePaymentPost {
 		return payload, nil
 	}
-	if err := validateProcessDomainCommandPayloadKeys(payload, financePaymentProcessPayloadID, financePaymentProcessPayloadAllocations, "cash_only"); err != nil {
+	if err := validateProcessDomainCommandPayloadKeys(payload, financePaymentProcessPayloadID, financePaymentProcessPayloadAllocations); err != nil {
 		return nil, err
 	}
 	id, ok, err := processCommandPositiveIntFromPayload(payload, financePaymentProcessPayloadID)
@@ -69,14 +69,10 @@ func (h *financePaymentProcessCommandHandler) NormalizeProcessDomainCommandPaylo
 			"amount":          allocation.Amount.String(),
 		})
 	}
-	normalized := map[string]any{
+	return map[string]any{
 		financePaymentProcessPayloadID:          id,
 		financePaymentProcessPayloadAllocations: out,
-	}
-	if cashOnly, _ := payload["cash_only"].(bool); cashOnly {
-		normalized["cash_only"] = true
-	}
-	return normalized, nil
+	}, nil
 }
 
 func (h *financePaymentProcessCommandHandler) ValidateProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) error {
@@ -86,7 +82,7 @@ func (h *financePaymentProcessCommandHandler) ValidateProcessDomainCommand(ctx c
 	}
 	allowed := []string{financePaymentProcessPayloadID}
 	if h.commandKey == ProcessDomainCommandFinancePaymentPost {
-		allowed = append(allowed, financePaymentProcessPayloadAllocations, "cash_only")
+		allowed = append(allowed, financePaymentProcessPayloadAllocations)
 	} else {
 		allowed = append(allowed, processDecisionPayloadReason)
 	}
@@ -123,9 +119,7 @@ func (h *financePaymentProcessCommandHandler) ValidateProcessDomainCommand(ctx c
 		for _, allocation := range allocations {
 			total = total.Add(allocation.Amount)
 		}
-		cashOnly, _ := in.Payload["cash_only"].(bool)
-		isCash := item.Kind == FinancePaymentKindAdvance || item.Kind == FinancePaymentKindRefund
-		if cashOnly != isCash || (isCash && len(allocations) != 0) || (!isCash && !total.Equal(item.Amount)) {
+		if !total.Equal(item.Amount) {
 			return ErrBadParam
 		}
 	default:
@@ -182,13 +176,7 @@ func (h *financePaymentProcessCommandHandler) ExecuteProcessDomainCommand(ctx co
 
 func financePaymentAllocationsFromProcessPayload(payload map[string]any) ([]FinancePaymentAllocationInput, error) {
 	raw, ok := payload[financePaymentProcessPayloadAllocations].([]any)
-	cashOnly, _ := payload["cash_only"].(bool)
-	if value, exists := payload["cash_only"]; exists {
-		if _, ok := value.(bool); !ok {
-			return nil, ErrBadParam
-		}
-	}
-	if !ok || (len(raw) == 0 && !cashOnly) || (len(raw) > 0 && cashOnly) {
+	if !ok || len(raw) == 0 {
 		return nil, ErrBadParam
 	}
 	out := make([]FinancePaymentAllocationInput, 0, len(raw))

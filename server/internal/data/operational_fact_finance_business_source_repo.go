@@ -330,7 +330,6 @@ func requireAcceptedOutsourcingReturnQuality(ctx context.Context, client *ent.Cl
 		qualityinspection.SourceType(biz.QualityInspectionSourceOutsourcingFact),
 		qualityinspection.SourceID(outsourcingFactID),
 		qualityinspection.InspectionType(biz.QualityInspectionTypeOutsourcingReturn),
-		qualityinspection.SupersededAtIsNil(),
 		qualityinspection.StatusNEQ(biz.QualityInspectionStatusCancelled),
 	).Order(ent.Asc(qualityinspection.FieldID)).Limit(2).All(ctx)
 	if err != nil {
@@ -574,7 +573,6 @@ func outsourcingReturnPayableAmount(item *ent.OutsourcingOrderItem, quantity dec
 	default:
 		return decimal.Zero, biz.ErrFinanceFactSourceAmountInvalid
 	}
-	amount = amount.Round(6)
 	if !amount.GreaterThan(decimal.Zero) {
 		return decimal.Zero, biz.ErrFinanceFactSourceAmountInvalid
 	}

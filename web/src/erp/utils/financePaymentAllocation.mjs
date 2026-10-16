@@ -10,23 +10,20 @@ export function validateFinanceAllocationDraft({
   allocations = [],
   candidates = [],
   paymentAmount,
-  allowPartial = false,
 } = {}) {
   if (!Array.isArray(allocations) || allocations.length === 0) {
     return { ok: false, reason: 'EMPTY' }
   }
 
-  const seen = new Set()
   let totalUnits = '0'
   for (const allocation of allocations) {
-    const factID = Number(allocation?.finance_fact_id)
-    if (seen.has(factID)) return { ok: false, reason: 'SOURCE_CHANGED' }
-    seen.add(factID)
     const candidate = candidates.find(
       (item) => Number(item?.id) === Number(allocation?.finance_fact_id)
     )
     const amountUnits = numeric20Scale6Units(allocation?.amount)
-    const outstandingUnits = numeric20Scale6Units(candidate?.outstanding_amount)
+    const outstandingUnits = numeric20Scale6Units(
+      candidate?.outstanding_amount
+    )
     if (
       !candidate ||
       !isPositiveNumeric20Scale6Units(amountUnits) ||
@@ -51,9 +48,7 @@ export function validateFinanceAllocationDraft({
   const paymentUnits = numeric20Scale6Units(paymentAmount)
   if (
     paymentUnits === null ||
-    (allowPartial
-      ? compareNumeric20Scale6Units(totalUnits, paymentUnits) === 1
-      : compareNumeric20Scale6Units(totalUnits, paymentUnits) !== 0)
+    compareNumeric20Scale6Units(totalUnits, paymentUnits) !== 0
   ) {
     return {
       ok: false,
@@ -80,39 +75,4 @@ export function validateFinanceCreditDraft({ amount, outstandingAmount } = {}) {
     return { ok: false, reason: 'EXCEEDS_OUTSTANDING' }
   }
   return { ok: true }
-}
-
-export function financePaymentPostMatchesIntent(
-  payment,
-  expected,
-  allocations = []
-) {
-  if (
-    payment?.status !== 'POSTED' ||
-    Number(payment.id) !== Number(expected?.id) ||
-    payment.currency !== expected.currency ||
-    payment.direction !== expected.direction ||
-    Number(payment.counterparty_id) !== Number(expected.counterparty_id) ||
-    payment.counterparty_type !== expected.counterparty_type ||
-    numeric20Scale6Units(payment.amount) === null ||
-    numeric20Scale6Units(payment.amount) !==
-      numeric20Scale6Units(expected.amount) ||
-    !Array.isArray(payment.allocations)
-  )
-    { return false }
-  const actual = payment.allocations.filter((item) => item.status === 'POSTED')
-  if (actual.length !== allocations.length) return false
-  const seen = new Set()
-  return allocations.every((wanted) => {
-    const id = Number(wanted.finance_fact_id)
-    if (!Number.isSafeInteger(id) || id <= 0 || seen.has(id)) return false
-    seen.add(id)
-    const matches = actual.filter((item) => Number(item.finance_fact_id) === id)
-    return (
-      matches.length === 1 &&
-      numeric20Scale6Units(wanted.amount) !== null &&
-      numeric20Scale6Units(matches[0].amount) ===
-        numeric20Scale6Units(wanted.amount)
-    )
-  })
 }

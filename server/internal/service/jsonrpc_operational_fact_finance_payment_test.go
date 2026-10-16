@@ -13,87 +13,9 @@ import (
 
 type financePaymentServiceRepo struct {
 	stubBusinessDashboardOperationalFactRepo
-	item                   *biz.FinancePayment
-	paymentFilter          biz.FinancePaymentFilter
-	creditFilter           biz.FinanceCreditNoteFilter
-	paymentReads           int
-	allocationCalls        int
-	candidateCalls         int
-	reverseAllocationCalls int
-}
-
-func (r *financePaymentServiceRepo) AllocateFinancePayment(_ context.Context, _ *biz.FinancePaymentAllocate, _ int) (*biz.FinancePayment, error) {
-	r.allocationCalls++
-	return r.item, nil
-}
-func (r *financePaymentServiceRepo) ReverseFinanceAllocation(_ context.Context, _ *biz.FinanceAllocationReverse, _ int) (*biz.FinancePayment, error) {
-	r.reverseAllocationCalls++
-	return r.item, nil
-}
-func (r *financePaymentServiceRepo) FinancePaymentAllocationCandidates(_ context.Context, _ int) ([]*biz.FinanceFact, error) {
-	r.candidateCalls++
-	return []*biz.FinanceFact{}, nil
-}
-
-func TestFinanceAdvanceAllocationRPCExactPermissions(t *testing.T) {
-	ctx := workflowJSONRPCAdminContext()
-	for _, direction := range []struct{ party, read string }{{biz.FinanceCounterpartyCustomer, biz.PermissionFinanceReceivableRead}, {biz.FinanceCounterpartySupplier, biz.PermissionFinancePayableRead}} {
-		for _, operation := range []struct {
-			method, permission string
-			params             map[string]any
-		}{
-			{"list_finance_payment_allocation_candidates", biz.PermissionFinancePaymentRead, map[string]any{"id": float64(31)}},
-			{"allocate_finance_payment", biz.PermissionFinancePaymentPost, map[string]any{"id": float64(31), "expected_version": float64(1), "idempotency_key": "test-allocate", "allocations": []any{map[string]any{"finance_fact_id": float64(9), "amount": "1.25"}}}},
-			{"reverse_finance_allocation", biz.PermissionFinancePaymentReverse, map[string]any{"id": float64(31), "expected_version": float64(1), "allocation_id": float64(9), "reason": "分配纠错"}},
-		} {
-			for _, access := range []struct {
-				name, missing string
-				wrongParty    bool
-			}{
-				{name: "complete"},
-				{name: "missing_source", missing: direction.read},
-				{name: "wrong_party_source", missing: direction.read, wrongParty: true},
-				{name: "missing_payment_read", missing: biz.PermissionFinancePaymentRead},
-				{name: "missing_action", missing: operation.permission},
-			} {
-				t.Run(direction.party+"/"+operation.method+"/"+access.name, func(t *testing.T) {
-					permissions := []string{}
-					for _, permission := range []string{biz.PermissionFinancePaymentRead, operation.permission, direction.read} {
-						if permission != access.missing {
-							permissions = append(permissions, permission)
-						}
-					}
-					if access.wrongParty {
-						wrongRead := biz.PermissionFinancePayableRead
-						if direction.party == biz.FinanceCounterpartySupplier {
-							wrongRead = biz.PermissionFinanceReceivableRead
-						}
-						permissions = append(permissions, wrongRead)
-					}
-					repo := &financePaymentServiceRepo{item: &biz.FinancePayment{ID: 31, CounterpartyType: direction.party, Kind: biz.FinancePaymentKindAdvance, Status: biz.FinancePaymentStatusPosted, Version: 1}}
-					d := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, permissions...), repo)
-					_, result, err := d.handleOperationalFact(ctx, operation.method, "finance-permission", mustJSONRPCStruct(t, operation.params))
-					want := errcode.PermissionDenied.Code
-					if access.missing == "" {
-						want = errcode.OK.Code
-					}
-					if err != nil || result == nil || result.Code != want {
-						t.Fatalf("result=%#v err=%v want=%d", result, err, want)
-					}
-					calls := repo.allocationCalls + repo.candidateCalls + repo.reverseAllocationCalls
-					if access.missing != "" && calls != 0 {
-						t.Fatalf("denied action reached repository %d times", calls)
-					}
-					if access.missing == "" && calls != 1 {
-						t.Fatalf("allowed action calls=%d want=1", calls)
-					}
-					if (access.missing == biz.PermissionFinancePaymentRead || access.missing == operation.permission) && repo.paymentReads != 0 {
-						t.Fatal("payment was read before its action and source permissions were checked")
-					}
-				})
-			}
-		}
-	}
+	item          *biz.FinancePayment
+	paymentFilter biz.FinancePaymentFilter
+	creditFilter  biz.FinanceCreditNoteFilter
 }
 
 func (r *financePaymentServiceRepo) CreateFinancePayment(_ context.Context, in *biz.FinancePaymentCreate, actorID int, _ string) (*biz.FinancePayment, error) {
@@ -123,7 +45,6 @@ func (r *financePaymentServiceRepo) ReverseFinanceCreditNote(_ context.Context, 
 	return &biz.FinanceCreditNote{ID: 2}, nil
 }
 func (r *financePaymentServiceRepo) GetFinancePayment(_ context.Context, _ int) (*biz.FinancePayment, error) {
-	r.paymentReads++
 	return r.item, nil
 }
 func (r *financePaymentServiceRepo) ListFinancePayments(_ context.Context, filter biz.FinancePaymentFilter) ([]*biz.FinancePayment, int, error) {
