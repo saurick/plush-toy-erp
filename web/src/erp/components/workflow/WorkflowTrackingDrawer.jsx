@@ -21,7 +21,7 @@ function TrackingExceptions({ trackingRef, onOpenTask, refreshKey }) {
   const [expanded, setExpanded] = useState(false)
   return (
     <details className="erp-workflow-tracking-exceptions" onToggle={(event) => setExpanded(event.currentTarget.open)}>
-      <summary>本流程异常跟踪</summary>
+      <summary>本流程异常记录</summary>
       {expanded ? <WorkflowExceptionPanel trackingRef={trackingRef} onOpenTask={onOpenTask} compact refreshKey={refreshKey} /> : null}
     </details>
   )

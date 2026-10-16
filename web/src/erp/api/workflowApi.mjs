@@ -1,4 +1,3 @@
-import { resolveBusinessStatusCounts, businessStatusCount } from '../utils/businessStatusCounts.mjs'
 import { DISCOVERY_REQUEST_KEYS, normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from '../utils/workflowTaskDiscovery.mjs'
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
@@ -12,8 +11,6 @@ import { notifyWorkflowTasksChanged } from '../utils/workflowTaskChanges.mjs'
 import { isWorkflowApprovalTask } from '../utils/workflowTaskActionContract.mjs'
 import { requireTrackingDetail, requireTrackingPage } from '../utils/workflowTracking.mjs'
 import { isWorkflowHistoryDateFilter } from '../utils/workflowRoleTaskHistory.mjs'
-import { WORKFLOW_TASK_DUE_OPTIONS } from '../utils/workflowTaskListFilters.mjs'
-import { requireTaskCalendarResponse } from '../utils/workflowTaskCalendar.mjs'
 
 import { requireFollowupCreateParams, requireFollowupOptions, requireFollowupReceipt } from '../utils/workflowFollowup.mjs'
 
@@ -53,8 +50,6 @@ const WORKFLOW_ROLE_TASK_QUERY_KEYS = new Set([
   'period',
   'date_from',
   'date_to',
-  'due',
-  'source_type',
 ])
 const WORKFLOW_ROLE_TASK_STATUS_KEYS_BY_VIEW = Object.freeze({
   todo: new Set([WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED]),
@@ -82,7 +77,7 @@ const WORKFLOW_ROLE_TASK_RESPONSE_KEYS = Object.freeze([
   'server_time',
 ])
 const WORKFLOW_ROLE_TASK_INITIAL_RESPONSE_KEYS = Object.freeze(
-  [...WORKFLOW_ROLE_TASK_RESPONSE_KEYS, 'counts', 'risk_scope', 'status_counts'].sort()
+  [...WORKFLOW_ROLE_TASK_RESPONSE_KEYS, 'counts', 'risk_scope'].sort()
 )
 const WORKFLOW_ROLE_TASK_RISK_SCOPES = new Set(['role', 'supervised'])
 const WORKFLOW_WORKBENCH_QUEUE_KEYS = new Set([
@@ -130,16 +125,13 @@ function requireWorkflowRoleTaskQuery(params = {}) {
   }
 
   const discoveryInput = Object.fromEntries(Object.entries(DISCOVERY_REQUEST_KEYS).filter(([, requestKey]) => params[requestKey] !== undefined).map(([key, requestKey]) => [key, params[requestKey]]))
-  // RPC 合同保留明确范围查询；页面只提交仍可操作或带来源提示的条件。
-  const discovery = normalizeTaskDiscoveryFilters(discoveryInput, { includeStage: true, includeClassification: true })
+  const discovery = normalizeTaskDiscoveryFilters(discoveryInput)
   if (Object.keys(discoveryInput).some((key) => typeof discoveryInput[key] !== 'string' || discovery[key] !== discoveryInput[key])) throw new TypeError('任务筛选条件无效，请重新选择')
 
   const viewKey = typeof params.view_key === 'string' ? params.view_key : ''
   const roleKey = typeof params.role_key === 'string' ? params.role_key : ''
   const { cursor } = params
   if (
-    (params.due !== undefined && !WORKFLOW_TASK_DUE_OPTIONS.some(({ value }) => value === params.due)) ||
-    (params.source_type !== undefined && (typeof params.source_type !== 'string' || !params.source_type || params.source_type !== params.source_type.trim() || [...params.source_type].length > 64)) ||
     (params.sort_key !== undefined &&
       !(viewKey === 'history' ? ['completed'] : ['newest', 'oldest', 'due']).includes(params.sort_key)) ||
     (params.status_key !== undefined &&
@@ -165,7 +157,7 @@ function requireWorkflowRoleTaskQuery(params = {}) {
   }
 
   return {
-    ...taskDiscoveryRequest(discovery, { includeStage: true, includeClassification: true }),
+    ...taskDiscoveryRequest(discovery),
     view_key: viewKey,
     role_key: roleKey,
     limit: params.limit,
@@ -175,8 +167,6 @@ function requireWorkflowRoleTaskQuery(params = {}) {
     ...(params.period ? { period: params.period } : {}),
     ...(params.date_from ? { date_from: params.date_from } : {}),
     ...(params.date_to ? { date_to: params.date_to } : {}),
-    ...(params.due ? { due: params.due } : {}),
-    ...(params.source_type ? { source_type: params.source_type } : {}),
     ...(cursor ? { cursor } : {}),
   }
 }
@@ -249,9 +239,6 @@ function requireWorkflowRoleTaskResponse(result, query, method) {
     (response.has_more && response.items.length === 0) ||
     (!response.has_more && response.next_cursor) ||
     (requiresCounts && !isWorkflowRoleTaskCountSummary(response.counts)) ||
-    (requiresCounts && (!resolveBusinessStatusCounts(response) ||
-      Object.keys(response.status_counts).some((status) => !allowedStatusKeys.has(status)) ||
-      businessStatusCount(response.status_counts, query.status_key || '') !== expectedTotal)) ||
     (requiresCounts &&
       !WORKFLOW_ROLE_TASK_RISK_SCOPES.has(response.risk_scope)) ||
     new Set(itemIDs).size !== itemIDs.length ||
@@ -622,19 +609,6 @@ export async function getWorkflowTaskHandlingChain(taskId, { view = 'task', offs
   return data
 }
 
-export async function getWorkflowTaskLink(taskID, { offset = 0, ...options } = {}) {
-  if (!Number.isSafeInteger(taskID) || taskID <= 0 || !Number.isSafeInteger(offset) || offset < 0) throw new Error('任务链接无效')
-  const result = await workflowRpc.call(RpcMethod.workflow.GET_TASK_LINK, { task_id: taskID, ...(offset ? { offset } : {}) }, options)
-  const data = dataOf(result)
-  if (!Array.isArray(data?.items) || (!offset && data.items.length === 0) || data.items.length > 100 || typeof data.truncated !== 'boolean' || (data.truncated && data.items.length !== 100) ||
-      new Set(data.items.map((item) => item?.id)).size !== data.items.length ||
-      !data.items.every((item) => Number.isSafeInteger(item?.id) && item.id > 0 && typeof item.task_name === 'string' &&
-        typeof item.owner_role_key === 'string' && typeof item.can_handle === 'boolean' &&
-        ['ready', 'blocked', 'done', 'rejected', 'withdrawn'].includes(item.task_status_key) &&
-        (!item.can_handle || ['ready', 'blocked'].includes(item.task_status_key)))) throw new Error('任务链暂时无法确认，请重试')
-  return data
-}
-
 async function listWorkflowRoleTaskPage(method, params = {}) {
   const query = requireWorkflowRoleTaskQuery(params)
   const result = await workflowRpc.call(method, query)
@@ -702,12 +676,6 @@ export async function getWorkflowWorkbench(params = {}, options = {}) {
 export async function getWorkflowTaskBoard(params = {}, options = {}) {
   const result = await workflowRpc.call(RpcMethod.workflow.GET_TASK_BOARD, params, options)
   return requireWorkflowTaskBoardResponse(dataOf(result), params)
-}
-
-export async function getWorkflowTaskCalendar(params, options = {}) {
-  const method = params.role_key ? RpcMethod.workflow.LIST_ROLE_TASKS : RpcMethod.workflow.GET_TASK_BOARD
-  const result = await workflowRpc.call(method, params, options)
-  return requireTaskCalendarResponse(dataOf(result), params)
 }
 
 export async function getWorkflowTaskAssignmentOptions(
@@ -807,6 +775,6 @@ export async function createWorkflowFollowupTask(params) {
 export async function listWorkflowExceptions(params = {}, options = {}) {
   const result = await workflowRpc.call(RpcMethod.workflow.LIST_EXCEPTIONS, params, options)
   const data = dataOf(result)
-  if (!Array.isArray(data?.items) || !Array.isArray(data?.tasks) || !Array.isArray(data?.orders) || !['total', 'view_total', 'pending_tasks', 'affected_orders', 'open', 'closed'].every((key) => Number.isSafeInteger(data[key]) && data[key] >= 0) || data.items.some((item) => !item.key || !Array.isArray(item.tasks) || !Array.isArray(item.task_ids) || !Array.isArray(item.orders))) throw new Error('异常跟踪数据不完整，请重试')
+  if (!Array.isArray(data?.items) || !Array.isArray(data?.tasks) || !Array.isArray(data?.orders) || !['total', 'view_total', 'pending_tasks', 'affected_orders', 'open', 'closed'].every((key) => Number.isSafeInteger(data[key]) && data[key] >= 0) || data.items.some((item) => !item.key || !Array.isArray(item.tasks) || !Array.isArray(item.task_ids) || !Array.isArray(item.orders))) throw new Error('异常记录返回不完整，请重试')
   return data
 }

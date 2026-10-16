@@ -322,7 +322,6 @@ test('mobileTaskQueries: 每个岗位视图持有独立初始分页槽', () => {
       has_more: false,
       server_time: 0,
       count_summary: null,
-      status_counts: null,
       loaded: false,
       loading: false,
       error: '',
@@ -475,7 +474,6 @@ test('mobileTaskQueries: 权威总数约束首屏与终页完整闭合', () => {
       has_more: true,
       server_time: 1_720_000_000,
       counts,
-      status_counts: { ready: 3 },
       risk_scope: 'role',
     },
     { viewKey: MOBILE_ROLE_TASK_VIEW_KEYS.TODO }
@@ -492,7 +490,6 @@ test('mobileTaskQueries: 权威总数约束首屏与终页完整闭合', () => {
   )
   assert.equal(terminal.items.length, counts.todo)
   assert.deepEqual(terminal.count_summary, first.count_summary)
-  assert.deepEqual(terminal.status_counts, { ready: 3 })
 })
 
 test('mobileTaskQueries: append 快照漂移时拒绝拼接并保留原分页槽', () => {
@@ -624,7 +621,6 @@ test('mobileTaskQueries: 已确认动作原位更新深分页缓存且保留游�
   assert.equal(updated.slots.todo.loading, false)
   assert.equal(updated.slots.todo.error, '')
   assert.equal(updated.slots.todo.count_summary, null)
-  assert.equal(updated.slots.todo.status_counts, null)
   assert.equal(updated.slots.risk.loaded, false)
   assert.equal(updated.slots.risk.count_summary, null)
   assert.equal(updated.slots.risk.loading, false)

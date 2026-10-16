@@ -33,7 +33,6 @@ test('exception cards keep current work visible and collapse complete task recor
   const root = createRoot(container)
   t.after(async () => { await act(async () => root.unmount()); container.remove(); JsonRpc.prototype.call = original; dom.restore() })
   await act(async () => root.render(createElement(Panel, { compact: true, profile: { id: 1 }, onOpenTask() {} })))
-  assert.deepEqual([...container.querySelectorAll('.erp-filter-chip__count')].map((node) => node.textContent), ['5', '4', '1'])
   const cards = [...container.querySelectorAll('.workflow-exceptions__item')]
   assert.equal(cards[0].querySelector('details').open, false)
   assert.equal(cards[0].querySelectorAll('.workflow-exceptions__pending button').length, 2)
@@ -67,31 +66,23 @@ test('exception statistics drill into server-paginated details and abandon task 
     if (method === 'get_task_board') throw new Error('no people fixture')
     if (method === 'get_task') return new Promise((resolve) => { finishTask = resolve })
     assert.equal(method, 'list_exceptions')
-    return { data: { items: [], total: params.state === 'open' ? 40 : params.state === 'closed' ? 5 : 45, open: 40, closed: 5, pending_tasks: 32, affected_orders: 3, view_total: params.view === 'tasks' ? 32 : params.view === 'orders' ? 3 : params.state === 'open' ? 40 : params.state === 'closed' ? 5 : 45, tasks: params.view === 'tasks' ? [task] : [], orders: params.view === 'orders' ? [{ id: 2, number: 'SO-002' }] : [] } }
+    return { data: { items: [], total: 45, open: 40, closed: 5, pending_tasks: 32, affected_orders: 3, view_total: params.view === 'tasks' ? 32 : 3, tasks: params.view === 'tasks' ? [task] : [], orders: params.view === 'orders' ? [{ id: 2, number: 'SO-002' }] : [] } }
   }
   const container = document.createElement('div')
   document.body.appendChild(container)
   const root = createRoot(container)
   let opened = false
-  const render = (id) => act(async () => root.render(createElement(Panel, { profile: { id }, initialQuery: { page: 2, keyword: '裁片', state: 'open' }, onOpenTask: () => { opened = true } })))
+  const render = (id) => act(async () => root.render(createElement(Panel, { profile: { id }, onOpenTask: () => { opened = true } })))
   const click = async (text) => act(async () => [...container.querySelectorAll('button, .ant-segmented-item')].find((button) => button.textContent.includes(text)).click())
   t.after(async () => { await act(async () => root.unmount()); container.remove(); JsonRpc.prototype.call = original; dom.restore() })
   await render(1)
-  assert.deepEqual([...container.querySelectorAll('.erp-filter-chip__count')].map((node) => node.textContent), ['45', '40', '5'], '全部数量不使用当前选中状态的 total')
-  await click('关联待办')
+  await click('待处理关联任务')
   assert.equal(calls.findLast((call) => call.method === 'list_exceptions').params.view, 'tasks')
   assert.match(container.textContent, /核对裁片异常/u)
-  assert.equal(container.querySelector('.workflow-exceptions__query'), null)
-  assert.equal(container.querySelector('.workflow-exceptions__states'), null)
-  assert.equal(calls.findLast((call) => call.method === 'list_exceptions').params.offset, 0)
-  await click('返回异常跟踪')
-  assert.equal(calls.findLast((call) => call.method === 'list_exceptions').params.offset, 20)
-  assert.equal(calls.findLast((call) => call.method === 'list_exceptions').params.keyword, '裁片')
-  await click('关联订单')
+  await click('受影响订单')
   assert.equal(calls.findLast((call) => call.method === 'list_exceptions').params.view, 'orders')
   assert.match(container.textContent, /SO-002/u)
-  await click('返回异常跟踪')
-  await click('关联待办')
+  await click('待处理关联任务')
   await click('核对裁片异常')
   const pending = calls.findLast((call) => call.method === 'get_task')
   await render(2)
@@ -115,14 +106,14 @@ test('exception refresh and continuous loading preserve results on failure and d
     items: params.state === 'closed' ? [] : items.slice(params.offset, params.offset + params.limit),
     tasks: [],
 orders: [],
-total: params.state === 'closed' ? 0 : 45,
+total: 45,
 view_total: params.state === 'closed' ? 0 : 45,
     open: 45,
 closed: 0,
 pending_tasks: 0,
 affected_orders: 0,
   })
-  let mode = 'pending'
+  let mode = 'success'
   let finish
   JsonRpc.prototype.call = async (method, params, options) => {
     assert.equal(method, 'list_exceptions')
@@ -142,11 +133,6 @@ profile: { id: 1 },
     renderRefreshControl: ({ onRefresh }) => { refresh = onRefresh; return null },
   })))
   const count = () => container.querySelectorAll('.workflow-exceptions__item').length
-  const counts = () => [...container.querySelectorAll('.erp-filter-chip__count')].map((node) => node.textContent)
-  assert.deepEqual(counts(), ['—', '—', '—'], '尚未读回的统计不是零项')
-  await act(async () => finish())
-  mode = 'success'
-  assert.deepEqual(counts(), ['45', '45', '0'])
   assert.equal(count(), 20)
   assert.equal(container.querySelectorAll('.ant-pagination').length, 0)
   mode = 'pending'
@@ -164,7 +150,6 @@ profile: { id: 1 },
   await act(async () => refresh())
   assert.equal(count(), 40)
   assert.match(container.textContent, /已保留上次结果/u)
-  assert.deepEqual(counts(), ['45', '45', '0'], '同一条件刷新失败保留上次统计')
   mode = 'success'
   calls.length = 0
   await act(async () => refresh())
@@ -179,14 +164,10 @@ profile: { id: 1 },
   const stale = calls.at(-1)
   const finishStale = finish
   mode = 'success'
-  await act(async () => [...container.querySelectorAll('button')].find((button) => button.querySelector('.erp-filter-chip__label')?.textContent === '已处理完').click())
+  await act(async () => [...container.querySelectorAll('button')].find((button) => button.textContent === '已闭环').click())
   assert.equal(stale.options.signal.aborted, true)
   assert.equal(count(), 0)
-  assert.match(container.textContent, /当前条件下没有可跟踪的异常/u)
+  assert.match(container.textContent, /当前条件下没有异常记录/u)
   await act(async () => { finishStale(); await pending })
   assert.equal(count(), 0, '过期刷新不能把旧异常带回新筛选')
-  assert.deepEqual(counts(), ['45', '45', '0'], '选中零项状态仍保留其他状态数量')
-  mode = 'failure'
-  await act(async () => [...container.querySelectorAll('button')].find((button) => button.querySelector('.erp-filter-chip__label')?.textContent === '全部异常').click())
-  assert.deepEqual(counts(), ['—', '—', '—'], '新查询读取失败不能沿用其他条件的统计或显示零项')
 })

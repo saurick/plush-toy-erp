@@ -1,5 +1,3 @@
-import { WORKFLOW_TASK_DUE_OPTIONS } from './workflowTaskListFilters.mjs'
-import { isWorkflowHistoryDateFilter } from './workflowRoleTaskHistory.mjs'
 import { DISCOVERY_FILTER_KEYS, DISCOVERY_REQUEST_KEYS, normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from './workflowTaskDiscovery.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { getWorkflowTaskDueStatus } from './workflowDashboardStats.mjs'
@@ -26,10 +24,12 @@ export { getWorkflowTaskActionPermission }
 
 export const TASK_BOARD_STATUS_OPTIONS = Object.freeze([
   { value: 'all', label: '全部状态' },
-  { value: 'ready', label: '待处理' },
+  { value: 'ready', label: '可执行' },
   { value: 'blocked', label: '阻塞' },
-  { value: 'rejected', label: '已驳回' },
-  { value: 'withdrawn', label: '已撤回' },
+  { value: 'rejected', label: '退回' },
+  { value: 'withdrawn', label: '撤回' },
+  { value: 'overdue', label: '已超时' },
+  { value: 'dueSoon', label: '即将到期' },
   { value: 'done', label: '已完成' },
 ])
 
@@ -58,13 +58,18 @@ export function buildWorkflowTaskBoardRoleOptions(ownerRoleKeys = []) {
   return [{ value: 'all', label: '全部可见岗位' }, ...options]
 }
 
-export const TASK_BOARD_DUE_OPTIONS = WORKFLOW_TASK_DUE_OPTIONS
+export const TASK_BOARD_DUE_OPTIONS = Object.freeze([
+  { value: 'all', label: '全部截止时间' },
+  { value: 'overdue', label: '已超时' },
+  { value: 'dueSoon', label: '即将到期' },
+  { value: 'noDue', label: '未设置到期' },
+])
 
 export function getWorkflowTaskBoardStatusOptions(lane = 'all', mode = 'all') {
   const values = {
     actionable: ['all', 'ready'],
-    exception: ['all', 'ready', 'blocked'],
-    due: ['all', 'ready'],
+    exception: ['all', 'ready', 'blocked', 'overdue', 'dueSoon'],
+    due: ['all', 'ready', 'overdue', 'dueSoon'],
     finished: ['all', 'done', 'rejected', 'withdrawn'],
   }[lane]
   return TASK_BOARD_STATUS_OPTIONS.filter(
@@ -78,7 +83,7 @@ export function getWorkflowTaskBoardDueOptions(lane = 'all') {
   const values = {
     actionable: ['all', 'noDue'],
     due: ['all', 'overdue', 'dueSoon'],
-    finished: ['all'],
+    finished: ['all', 'noDue'],
   }[lane]
   return TASK_BOARD_DUE_OPTIONS.filter(
     (option) => !values || values.includes(option.value)
@@ -147,9 +152,6 @@ export const TASK_BOARD_LANE_DEFINITIONS = Object.freeze([
 ])
 
 const FILTER_QUERY_KEYS = Object.freeze({
-  period: 'period',
-  dateFrom: 'date_from',
-  dateTo: 'date_to',
   keyword: 'q',
   status: 'status',
   role: 'role',
@@ -385,8 +387,7 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
   const status = normalizeKnownFilterValue(filters.status, STATUS_FILTER_VALUES)
   const due = normalizeKnownFilterValue(filters.due, DUE_FILTER_VALUES)
   return {
-    ...normalizeTaskDiscoveryFilters(filters, { includeStage: true }),
-    ...(lane === 'finished' && isWorkflowHistoryDateFilter(filters) && filters.period ? { period: filters.period, dateFrom: filters.dateFrom || '', dateTo: filters.dateTo || '' } : {}),
+    ...normalizeTaskDiscoveryFilters(filters),
     keyword: String(filters.keyword || '').trim(),
     status: getWorkflowTaskBoardStatusOptions(lane, mode).some(
       (option) => option.value === status
@@ -394,7 +395,7 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
       ? status
       : 'all',
     role: normalizeKnownFilterValue(filters.role, ROLE_FILTER_VALUES),
-    due: lane !== 'finished' && getWorkflowTaskBoardDueOptions(lane).some(
+    due: getWorkflowTaskBoardDueOptions(lane).some(
       (option) => option.value === due
     )
       ? due
@@ -414,7 +415,6 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
 export function hasActiveWorkflowTaskBoardFilters(filters = {}) {
   const normalized = normalizeWorkflowTaskBoardFilters(filters)
   return (
-    Boolean(normalized.period) ||
     DISCOVERY_FILTER_KEYS.some((key) => Boolean(normalized[key])) ||
     normalized.keyword !== DEFAULT_TASK_BOARD_FILTERS.keyword ||
     normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status ||
@@ -432,9 +432,6 @@ export function readWorkflowTaskBoardFiltersFromSearch(searchParams = '') {
       : new URLSearchParams(searchParams)
   return normalizeWorkflowTaskBoardFilters({
     ...Object.fromEntries(DISCOVERY_FILTER_KEYS.map((key) => [key, params.get(DISCOVERY_REQUEST_KEYS[key])])),
-    period: params.get(FILTER_QUERY_KEYS.period) || '',
-    dateFrom: params.get(FILTER_QUERY_KEYS.dateFrom) || '',
-    dateTo: params.get(FILTER_QUERY_KEYS.dateTo) || '',
     keyword: params.get(FILTER_QUERY_KEYS.keyword),
     status: params.get(FILTER_QUERY_KEYS.status),
     role: params.get(FILTER_QUERY_KEYS.role),
@@ -459,12 +456,8 @@ export function writeWorkflowTaskBoardFiltersToSearch(
   const normalized = normalizeWorkflowTaskBoardFilters(filters)
 
   Object.values(FILTER_QUERY_KEYS).forEach((key) => params.delete(key))
-  for (const key of ['module_key', 'chain_key']) params.delete(key)
   DISCOVERY_FILTER_KEYS.forEach((key) => { params.delete(DISCOVERY_REQUEST_KEYS[key]); if (normalized[key]) params.set(DISCOVERY_REQUEST_KEYS[key], normalized[key]) })
 
-  for (const key of ['period', 'dateFrom', 'dateTo']) {
-    if (normalized[key]) params.set(FILTER_QUERY_KEYS[key], normalized[key])
-  }
   if (normalized.keyword) {
     params.set(FILTER_QUERY_KEYS.keyword, normalized.keyword)
   }
@@ -501,14 +494,11 @@ export function buildWorkflowTaskBoardRequest(filters = {}) {
   const normalized = normalizeWorkflowTaskBoardFilters(filters)
   const focused = normalized.lane !== DEFAULT_TASK_BOARD_FILTERS.lane
   const params = {
-    ...taskDiscoveryRequest(normalized, { includeStage: true }),
+    ...taskDiscoveryRequest(normalized),
     limit: focused ? normalized.pageSize : TASK_BOARD_OVERVIEW_LIMIT,
     offset: focused ? (normalized.page - 1) * normalized.pageSize : 0,
   }
 
-  if (normalized.period) params.period = normalized.period
-  if (normalized.dateFrom) params.date_from = normalized.dateFrom
-  if (normalized.dateTo) params.date_to = normalized.dateTo
   if (normalized.keyword) params.keyword = normalized.keyword
   if (normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status) {
     params.status = normalized.status

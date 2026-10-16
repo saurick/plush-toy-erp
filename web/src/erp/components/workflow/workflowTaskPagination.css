@@ -21,7 +21,7 @@
   align-items: center;
   gap: 12px;
   color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -107,7 +107,7 @@
     min-height: 44px;
     gap: 4px;
     padding-inline: 4px;
-    font-size: var(--erp-font-caption);
+    font-size: 12px;
   }
 
   .erp-task-pagination .ant-pagination-simple-pager > input {

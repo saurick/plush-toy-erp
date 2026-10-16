@@ -7,9 +7,6 @@ type WorkflowHandlingChainView string
 const (
 	WorkflowHandlingChainTaskView  WorkflowHandlingChainView = "task"
 	WorkflowHandlingChainOrderView WorkflowHandlingChainView = "order"
-	// Link view uses the original task only as a relation anchor; returned tasks
-	// remain constrained by the reader's current visibility.
-	WorkflowHandlingChainLinkView WorkflowHandlingChainView = "link"
 )
 
 // The chain is a bounded, permission-scoped read of existing tasks and source
@@ -33,7 +30,7 @@ type WorkflowHandlingChainReader interface {
 }
 
 func (uc *WorkflowUsecase) GetHandlingChain(ctx context.Context, taskID int, view WorkflowHandlingChainView, scope *WorkflowTaskVisibilityScope) (*WorkflowHandlingChain, error) {
-	if uc == nil || taskID <= 0 || scope == nil || (view != WorkflowHandlingChainTaskView && view != WorkflowHandlingChainOrderView && view != WorkflowHandlingChainLinkView) {
+	if uc == nil || taskID <= 0 || scope == nil || (view != WorkflowHandlingChainTaskView && view != WorkflowHandlingChainOrderView) {
 		return nil, ErrBadParam
 	}
 	reader, ok := uc.repo.(WorkflowHandlingChainReader)
@@ -53,7 +50,7 @@ func (uc *WorkflowUsecase) GetHandlingChainPage(ctx context.Context, taskID int,
 	if offset == 0 {
 		return uc.GetHandlingChain(ctx, taskID, view, scope)
 	}
-	if uc == nil || scope == nil || taskID <= 0 || offset < 0 || (view != WorkflowHandlingChainTaskView && view != WorkflowHandlingChainOrderView && view != WorkflowHandlingChainLinkView) {
+	if uc == nil || scope == nil || taskID <= 0 || offset < 0 || (view != WorkflowHandlingChainTaskView && view != WorkflowHandlingChainOrderView) {
 		return nil, ErrBadParam
 	}
 	reader, ok := uc.repo.(WorkflowHandlingChainPageReader)

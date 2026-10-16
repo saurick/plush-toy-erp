@@ -27,7 +27,6 @@ func TestProductionOrderLinkedDraftFactsCancelWithoutInventory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, created.Order.ID)
 		released, err := f.uc.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "mo-completion-draft-cancel-release"})
 		if err != nil {
 			t.Fatal(err)
@@ -81,7 +80,6 @@ func TestProductionOrderLinkedDraftFactsCancelWithoutInventory(t *testing.T) {
 		assertOperationalFactHasZeroInventoryTxns(t, ctx, f.client, biz.ProductionFactSourceType, fact.ID)
 		assertProductionMaterialBalance(t, ctx, f, warehouseID, lotID, decimal.NewFromInt(30))
 		completeProductionSchedulingTaskForTest(t, ctx, f.data, f.client, released.Order.ID, f.actorID)
-		cancelUnstartedProductionWIPForTest(t, ctx, f, released.Order.ID)
 		cancelReason := "领料草稿事实已撤销"
 		cancelledOrder, err := f.uc.Cancel(ctx, &biz.ProductionOrderAction{
 			ID: released.Order.ID, ExpectedVersion: 2, ActorID: f.actorID,
@@ -205,7 +203,6 @@ func TestDraftOperationalFactCancellationRejectsMalformedSourceCoordinates(t *te
 		if err != nil {
 			t.Fatal(err)
 		}
-		markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, created.Order.ID)
 		released, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
 			ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID,
 			IdempotencyKey: "mo-draft-cancel-wrong-source-release",

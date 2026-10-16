@@ -3,14 +3,6 @@ import assert from 'node:assert/strict'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { readContractSource as readFileSync } from '../../../../scripts/test/publicContractSource.mjs'
-import { registerJSXTestLoader } from '../../../../scripts/test/reactRuntime.mjs'
-
-registerJSXTestLoader()
-const {
-  FINANCE_COLLECTION_TYPE_LABELS,
-  FINANCE_PAYMENT_TERM_LABELS,
-  FINANCE_INVOICE_CATEGORY_LABELS,
-} = await import('./OperationalFactForms.jsx')
 
 const source = readFileSync(
   fileURLToPath(new URL('./OperationalFactForms.jsx', import.meta.url)),
@@ -31,6 +23,7 @@ test('OperationalFactForms keeps read-model labels without a generic create payl
     assert.match(source, new RegExp(value))
   }
   for (const label of [
+    '预收款',
     '应收款',
     '发生即到期',
     '月结',
@@ -66,23 +59,6 @@ test('OperationalFactForms keeps read-model labels without a generic create payl
   }
   assert.doesNotMatch(source, /idempotency_key/u)
   assert.doesNotMatch(source, /compactParams|trimOptional/u)
-})
-
-test('finance labels keep advances separate from receivable facts and preserve exact terms', () => {
-  assert.deepEqual(FINANCE_COLLECTION_TYPE_LABELS, {
-    ACCOUNTS_RECEIVABLE: '应收款',
-  })
-  assert.deepEqual(FINANCE_PAYMENT_TERM_LABELS, {
-    DUE_ON_OCCURRENCE: '发生即到期',
-    EOM_DAYS: '月结',
-  })
-  assert.deepEqual(FINANCE_INVOICE_CATEGORY_LABELS, {
-    NONE: '不开票',
-    EXPORT_GENERAL: '出口普票',
-    VAT_GENERAL_1: '1% 普票',
-    VAT_SPECIAL_3: '3% 专票',
-    VAT_SPECIAL_13: '13% 专票',
-  })
 })
 
 test('OperationalFactForms preserves existing business source navigation', () => {

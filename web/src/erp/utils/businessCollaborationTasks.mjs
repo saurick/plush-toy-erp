@@ -5,18 +5,9 @@ import {
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 import { listAllPaginatedRecords } from './referencePagination.mjs'
 
-function canonicalSourceType(value) {
-  const key = String(value || '').trim()
-  return (
-    {
-      'accessories-purchase': 'purchase_order',
-      'processing-contracts': 'outsourcing_order',
-    }[key] || key
-  )
-}
-
 const BLOCKING_TASK_STATUS_KEYS = new Set(['blocked', 'rejected'])
-const BUSINESS_COLLABORATION_TASK_REQUEST_KEY = 'business-collaboration-tasks'
+const BUSINESS_COLLABORATION_TASK_REQUEST_KEY =
+  'business-collaboration-tasks'
 
 function normalizeTaskSourceID(value) {
   const text = String(value ?? '').trim()
@@ -72,7 +63,7 @@ export function filterBusinessCollaborationTasksBySource({
   sourceIDs = [],
 } = {}) {
   const allTasks = Array.isArray(tasks) ? tasks : []
-  const normalizedSourceType = canonicalSourceType(sourceType)
+  const normalizedSourceType = String(sourceType || '').trim()
   const normalizedSourceIDs = new Set(
     (Array.isArray(sourceIDs) ? sourceIDs : [sourceIDs])
       .map(normalizeTaskSourceID)
@@ -112,7 +103,9 @@ export async function loadBusinessCollaborationTasksForSource({
     throw new TypeError('beginLatestRequest must be a function')
   }
 
-  const request = beginLatestRequest(BUSINESS_COLLABORATION_TASK_REQUEST_KEY)
+  const request = beginLatestRequest(
+    BUSINESS_COLLABORATION_TASK_REQUEST_KEY
+  )
   const requestedSourceID = Number(sourceID || 0)
   const requestIsCurrent = () =>
     request.isCurrent() && isCurrentSource(requestedSourceID)
@@ -125,7 +118,10 @@ export async function loadBusinessCollaborationTasksForSource({
       setLoadState('forbidden')
       return { status: 'forbidden', tasks: [] }
     }
-    if (!Number.isSafeInteger(requestedSourceID) || requestedSourceID <= 0) {
+    if (
+      !Number.isSafeInteger(requestedSourceID) ||
+      requestedSourceID <= 0
+    ) {
       setLoadState('idle')
       return { status: 'idle', tasks: [] }
     }
@@ -138,7 +134,7 @@ export async function loadBusinessCollaborationTasksForSource({
       const data = await listAllPaginatedRecords(
         listTasks,
         {
-          source_type: canonicalSourceType(sourceType),
+          source_type: String(sourceType || '').trim(),
           source_id: requestedSourceID,
         },
         'tasks',

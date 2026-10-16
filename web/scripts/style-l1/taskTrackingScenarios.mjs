@@ -37,7 +37,7 @@ export async function assertTrackingExceptionContext(page, assert, drawer, scree
   assert.equal(await details.locator('.workflow-exceptions').count(), 0)
   await summary.click()
   await details.getByText('EX-TRACK-010', { exact: true }).waitFor()
-  assert.equal(await details.locator('.workflow-exceptions__query, .workflow-exceptions__states, .workflow-exceptions__summary').count(), 0)
+  assert.equal(await details.locator('.workflow-exceptions__query, .workflow-exceptions__states, .workflow-exceptions__views').count(), 0)
   assert.equal(await details.getByText('EX-UNRELATED', { exact: true }).count(), 0)
   assert.equal(await details.locator('details[open]').count(), 0)
   assert.equal(await details.locator('.workflow-exceptions__pending').count(), 1)
@@ -168,12 +168,10 @@ approval_form: null,
             if (params.offset === 20) failPage = false
             return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 500, message: '读取暂不可用', data: {} } } })
           } else {
-            const facets = params.keyword ? [] : records
-            const status_counts = { active: facets.filter((row) => !['completed', 'done', 'rejected', 'withdrawn'].includes(row.status)).length, completed: facets.filter((row) => ['completed', 'done', 'rejected', 'withdrawn'].includes(row.status)).length }
-            const filtered = facets.filter((row) => !params.status || (['completed', 'done', 'rejected', 'withdrawn'].includes(row.status) ? 'completed' : 'active') === params.status)
+            const filtered = params.keyword ? [] : records
             const limit = params.limit ?? 20
             const offset = params.offset ?? 0
-            data = { items: filtered.slice(offset, offset + limit), total: filtered.length, status_counts, limit, offset }
+            data = { items: filtered.slice(offset, offset + limit), total: filtered.length, limit, offset }
           }
           return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, message: '', data } } })
         })

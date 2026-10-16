@@ -219,27 +219,18 @@ func trackingPageIDs(d string, q biz.WorkflowTrackingQuery, kind string) *entsql
 }
 
 func (r *workflowRepo) ListWorkflowTracking(ctx context.Context, q biz.WorkflowTrackingQuery) (*biz.WorkflowTrackingPage, error) {
-	page := &biz.WorkflowTrackingPage{Items: []*biz.WorkflowTrackingEntry{}, StatusCounts: map[string]int{}}
+	page := &biz.WorkflowTrackingPage{Items: []*biz.WorkflowTrackingEntry{}}
 	err := r.readTracking(ctx, func(client *ent.Client) error {
 		processes, tasks := trackingProcesses(client, q), trackingStandaloneTasks(client, q)
-		// Reuse the list's visibility and filters in the same read snapshot.
-		// Only the selected status and pagination are excluded from the facets.
-		for _, status := range []string{"active", "completed"} {
-			facet := q
-			facet.Status = status
-			processCount, err := trackingProcesses(client, facet).Count(ctx)
-			if err != nil {
-				return err
-			}
-			taskCount, err := trackingStandaloneTasks(client, facet).Count(ctx)
-			if err != nil {
-				return err
-			}
-			page.StatusCounts[status] = processCount + taskCount
-			if q.Status == "" || q.Status == status {
-				page.Total += page.StatusCounts[status]
-			}
+		processCount, err := processes.Clone().Count(ctx)
+		if err != nil {
+			return err
 		}
+		taskCount, err := tasks.Clone().Count(ctx)
+		if err != nil {
+			return err
+		}
+		page.Total = processCount + taskCount
 		if q.Offset >= page.Total {
 			return nil
 		}

@@ -353,7 +353,6 @@ export default function ApprovalResponsibilityPanel({
   const pageDirty =
     canManage &&
     (draftDirty || Boolean(appliedReceipt) || Boolean(pendingPayload))
-  const canEdit = canManage && !saving && !appliedReceipt && !pendingPayload
 
   useEffect(() => {
     onDirtyChange?.(pageDirty || editorDirty)
@@ -594,7 +593,6 @@ export default function ApprovalResponsibilityPanel({
   }, [selectableRoleOptions, selectedUnavailableRoles])
 
   const openEditor = (item) => {
-    if (!canManage) return
     if (saving || appliedReceipt || pendingPayload) {
       message.info('请先完成当前设置生效，或刷新后重新调整')
       return
@@ -676,12 +674,10 @@ export default function ApprovalResponsibilityPanel({
       })
     )
     const memberIdentities = new Set()
-    for (const member of values.enabled ? members : []) {
+    for (const member of members) {
       const identity = `${member.role_key}:${member.user_id}`
       if (memberIdentities.has(identity)) {
-        message.warning(
-          '同一岗位的“岗位内任一员工”选项或同一指定员工不能重复承担多个责任层级'
-        )
+        message.warning('同一岗位的“岗位内任一员工”选项或同一指定员工不能重复承担多个责任层级')
         return
       }
       memberIdentities.add(identity)
@@ -915,7 +911,9 @@ export default function ApprovalResponsibilityPanel({
         canManage ? (
           <Button
             type="link"
-            disabled={!canEdit}
+            disabled={
+              saving || Boolean(appliedReceipt) || Boolean(pendingPayload)
+            }
             onClick={() => openEditor(item)}
           >
             调整
@@ -1034,25 +1032,6 @@ export default function ApprovalResponsibilityPanel({
             rowKey="approval_key"
             columns={columns}
             dataSource={displayItems}
-            onRow={(item) =>
-              canEdit
-                ? {
-                    title: '双击调整审批责任',
-                    style: { cursor: 'pointer' },
-                    onDoubleClick: (event) => {
-                      if (
-                        event.defaultPrevented ||
-                        event.target.closest(
-                          'button, a, input, textarea, select, label, [role="button"], [role="link"]'
-                        )
-                      ) {
-                        return
-                      }
-                      openEditor(item)
-                    },
-                  }
-                : {}
-            }
             pagination={false}
             scroll={{ x: 980 }}
           />
@@ -1207,7 +1186,6 @@ export default function ApprovalResponsibilityPanel({
                 rules={[
                   ({ getFieldValue }) => ({
                     validator(_, value) {
-                      if (!getFieldValue('enabled')) return Promise.resolve()
                       if (
                         key === 'primary' &&
                         getFieldValue('enabled') &&
@@ -1293,16 +1271,12 @@ export default function ApprovalResponsibilityPanel({
                     <Form.Item
                       name={`${key}_user`}
                       label="指定员工"
-                      dependencies={[
-                        'enabled',
-                        ...EDITOR_MEMBER_FIELDS.filter(
-                          (field) => field !== `${key}_user`
-                        ),
-                      ]}
+                      dependencies={EDITOR_MEMBER_FIELDS.filter(
+                        (field) => field !== `${key}_user`
+                      )}
                       rules={[
                         ({ getFieldValue: getValue }) => ({
                           validator(_, value) {
-                            if (!getValue('enabled')) return Promise.resolve()
                             if (
                               getValue(`${key}_mode`) === 'user' &&
                               !Number(value)

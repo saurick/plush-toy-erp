@@ -92,12 +92,6 @@ type WorkflowTaskFilter struct {
 }
 
 type WorkflowTaskBoardQuery struct {
-	Calendar        *WorkflowTaskCalendarQuery
-	Period          string
-	DateFrom        string
-	DateTo          string
-	CompletedFrom   *time.Time
-	CompletedBefore *time.Time
 	WorkflowTaskDiscoveryFilter
 	Keyword                  string
 	Status                   string
@@ -138,7 +132,6 @@ type WorkflowTaskPerson struct {
 }
 
 type WorkflowTaskBoard struct {
-	Calendar      *WorkflowTaskCalendar
 	Assignees     []WorkflowTaskPerson
 	SnapshotAt    time.Time
 	Total         int
@@ -266,7 +259,6 @@ type WorkflowBusinessState struct {
 }
 
 type WorkflowBusinessStateFilter struct {
-	VisibilityScope   *WorkflowTaskVisibilityScope
 	Limit             int
 	Offset            int
 	SourceType        string

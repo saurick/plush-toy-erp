@@ -31,16 +31,16 @@ type WorkflowTrackingRef struct {
 }
 
 type WorkflowTrackingEntry struct {
-	Ref              WorkflowTrackingRef
-	Instance         *ProcessInstance
-	Task             *WorkflowTask
-	Nodes            []*ProcessNodeInstance
-	Tasks            []*WorkflowTask
-	Events           []*WorkflowTaskEvent
-	EventsTruncated  bool
-	People           map[int]string
+	Ref             WorkflowTrackingRef
+	Instance        *ProcessInstance
+	Task            *WorkflowTask
+	Nodes           []*ProcessNodeInstance
+	Tasks           []*WorkflowTask
+	Events          []*WorkflowTaskEvent
+	EventsTruncated bool
+	People          map[int]string
 	InitiatorRoleKey string
-	DisplayContext   *WorkflowTaskDisplayContext
+	DisplayContext  *WorkflowTaskDisplayContext
 }
 
 func (e *WorkflowTrackingEntry) StartedAt() time.Time {
@@ -51,9 +51,8 @@ func (e *WorkflowTrackingEntry) StartedAt() time.Time {
 }
 
 type WorkflowTrackingPage struct {
-	Items        []*WorkflowTrackingEntry
-	Total        int
-	StatusCounts map[string]int
+	Items []*WorkflowTrackingEntry
+	Total int
 }
 
 type WorkflowTrackingReader interface {

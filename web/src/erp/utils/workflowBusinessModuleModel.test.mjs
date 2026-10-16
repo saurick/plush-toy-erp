@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   buildWorkflowBusinessTaskQuery,
+  buildWorkflowBusinessTaskStats,
   reconcileWorkflowBusinessTaskPage,
   requireWorkflowBusinessTaskPage,
 } from './workflowBusinessModuleModel.mjs'
@@ -109,4 +110,11 @@ test('workflow business page retains only selection visible on the refreshed pag
       selectedTaskKeys: [12],
     }
   )
+})
+
+test('workflow business stats report the server-filtered total and current page only', () => {
+  assert.deepEqual(buildWorkflowBusinessTaskStats({ total: 205, pageCount: 5 }), [
+    { key: 'total', label: '筛选结果', value: 205 },
+    { key: 'page', label: '本页任务', value: 5 },
+  ])
 })

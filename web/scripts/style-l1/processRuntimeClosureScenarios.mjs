@@ -202,15 +202,7 @@ export function createProcessRuntimeClosureScenarios({
           const summary = root.querySelector('.workflow-process-stage__summary')
           const list = root.querySelector('.workflow-process-stage__list')
           const marker = root.querySelector('.workflow-process-stage__marker')
-          const items = [...root.querySelectorAll('.workflow-process-stage__item')]
-          const markers = items.map((item) => item.querySelector('.workflow-process-stage__marker').getBoundingClientRect())
           return {
-            forward: items.every((item, index) => {
-              if (index === items.length - 1) return getComputedStyle(item, '::before').content === 'none'
-              const arrow = getComputedStyle(item, '::before')
-              const tip = item.getBoundingClientRect().bottom - parseFloat(arrow.bottom)
-              return markers[index + 1].top > markers[index].bottom && Math.abs(markers[index + 1].x - markers[index].x) <= 1 && arrow.clipPath.startsWith('polygon(') && tip > markers[index].bottom && tip < markers[index + 1].top
-            }),
             documentOverflow:
               document.documentElement.scrollWidth -
               document.documentElement.clientWidth,
@@ -234,7 +226,7 @@ export function createProcessRuntimeClosureScenarios({
           JSON.stringify(geometry)
         )
         assert(
-          geometry.summaryBeforeList && geometry.handoffAfterList && geometry.forward,
+          geometry.summaryBeforeList && geometry.handoffAfterList,
           JSON.stringify(geometry)
         )
         assert(

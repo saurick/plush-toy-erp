@@ -2,16 +2,7 @@ package data
 
 // Source relations are shared by order progress and task-chain reads. Only
 // persisted foreign keys link records; workflow payloads never supply identity.
-const workflowTaskSourceLinksCTE = `finance_task_sources AS (
- SELECT t.id AS task_id,COALESCE(p.source_type,original.source_type) AS source_type,COALESCE(p.source_id,original.source_id) AS source_id
- FROM visible_tasks t JOIN finance_payments p ON lower(t.source_type)='finance_payment' AND t.source_id=p.id
- LEFT JOIN finance_payments original ON original.id=p.refund_of_payment_id
- UNION
- SELECT t.id,lower(f.source_type),f.source_id FROM visible_tasks t
- JOIN finance_payments p ON lower(t.source_type)='finance_payment' AND t.source_id=p.id
- JOIN finance_allocations a ON a.payment_id=COALESCE(p.refund_of_payment_id,p.id)
- JOIN finance_facts f ON f.id=a.finance_fact_id
-), production_task_lines AS (
+const workflowTaskSourceLinksCTE = `production_task_lines AS (
  SELECT t.id AS task_id,pi.id AS item_id FROM visible_tasks t
  JOIN production_order_items pi ON lower(t.source_type) IN ('production_order','production-orders') AND t.source_id=pi.production_order_id
  UNION
@@ -46,15 +37,6 @@ const workflowTaskSourceLinksCTE = `finance_task_sources AS (
  JOIN outsourcing_orders o ON f.source_type='OUTSOURCING_ORDER' AND o.id=f.source_id
  JOIN production_wip_batches b ON b.id=o.source_wip_batch_id
  UNION
- SELECT x.task_id,b.production_order_item_id FROM finance_task_sources x
- JOIN outsourcing_orders o ON x.source_type='outsourcing_order' AND o.id=x.source_id
- JOIN production_wip_batches b ON b.id=o.source_wip_batch_id
- UNION
- SELECT x.task_id,b.production_order_item_id FROM finance_task_sources x
- JOIN outsourcing_facts f ON x.source_type='outsourcing_fact' AND f.id=x.source_id
- JOIN outsourcing_orders o ON f.source_type='OUTSOURCING_ORDER' AND o.id=f.source_id
- JOIN production_wip_batches b ON b.id=o.source_wip_batch_id
- UNION
  SELECT t.id,b.production_order_item_id FROM visible_tasks t JOIN quality_inspections q
  ON lower(t.source_type)='quality_inspection' AND t.source_id=q.id
  JOIN outsourcing_facts f ON q.source_type='OUTSOURCING_FACT' AND q.source_id=f.id
@@ -72,24 +54,10 @@ purchase_task_orders AS (
  SELECT t.id,pi.purchase_order_id FROM visible_tasks t JOIN quality_inspections q
  ON lower(t.source_type)='quality_inspection' AND t.source_id=q.id
  JOIN purchase_receipt_items r ON r.id=q.purchase_receipt_item_id JOIN purchase_order_items pi ON pi.id=r.purchase_order_item_id
- UNION
- SELECT t.id,pi.purchase_order_id FROM visible_tasks t JOIN purchase_rejection_dispositions d
- ON lower(t.source_type)='purchase_rejection_disposition' AND t.source_id=d.id
- JOIN purchase_receipt_items r ON r.id=d.purchase_receipt_item_id JOIN purchase_order_items pi ON pi.id=r.purchase_order_item_id
- UNION
- SELECT x.task_id,p.id FROM finance_task_sources x JOIN purchase_orders p ON x.source_type='purchase_order' AND x.source_id=p.id
- UNION
- SELECT x.task_id,pi.purchase_order_id FROM finance_task_sources x
- JOIN purchase_receipt_items r ON x.source_type='purchase_receipt' AND r.receipt_id=x.source_id
- JOIN purchase_order_items pi ON pi.id=r.purchase_order_item_id
 ),
 task_sources AS (
  SELECT t.id AS task_id, 'orders' AS view_key, s.id AS board_id FROM visible_tasks t
  JOIN sales_orders s ON lower(t.source_type)='sales_order' AND t.source_id=s.id
- UNION
- SELECT x.task_id,'orders',s.id FROM finance_task_sources x JOIN sales_orders s ON x.source_type='sales_order' AND x.source_id=s.id
- UNION
- SELECT x.task_id,'orders',s.sales_order_id FROM finance_task_sources x JOIN shipments s ON x.source_type='shipment' AND x.source_id=s.id WHERE s.sales_order_id IS NOT NULL
  UNION
  SELECT x.task_id,'purchase',x.purchase_order_id FROM purchase_task_orders x
  UNION

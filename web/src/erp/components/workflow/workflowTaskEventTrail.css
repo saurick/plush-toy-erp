@@ -1,7 +1,6 @@
 .workflow-task-event-trail {
   --workflow-event-marker-size: 12px;
-  --workflow-event-title-height: calc(var(--erp-font-body) * 1.45);
-  --workflow-event-marker-offset: calc((var(--workflow-event-title-height) - var(--workflow-event-marker-size)) / 2);
+  --workflow-event-marker-offset: 4px;
   --workflow-event-marker-color: var(--erp-text-subtle);
   display: grid;
   min-width: 0;
@@ -36,21 +35,21 @@
 
 .workflow-task-event-trail__head h3 {
   color: var(--erp-text);
-  font-size: var(--erp-font-emphasis);
+  font-size: 15px;
   line-height: 1.45;
 }
 
 .workflow-task-event-trail__head p {
   margin-top: 4px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   line-height: 1.55;
 }
 
 .workflow-task-event-trail__head > span {
   flex: 0 0 auto;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.5;
   white-space: nowrap;
 }
@@ -72,14 +71,14 @@
 
 .workflow-task-event-trail__responsibility dt {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-micro);
+  font-size: 11px;
   line-height: 1.4;
 }
 
 .workflow-task-event-trail__responsibility dd {
   margin: 3px 0 0;
   color: var(--erp-text);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -147,8 +146,8 @@
 
 .workflow-task-event-trail__item-head strong {
   color: var(--erp-text);
-  font-size: var(--erp-font-body);
-  line-height: var(--workflow-event-title-height);
+  font-size: 14px;
+  line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
@@ -158,7 +157,7 @@
   border-radius: 999px;
   background: var(--erp-surface-bg-muted);
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-micro);
+  font-size: 11px;
   line-height: 1.45;
 }
 
@@ -166,7 +165,7 @@
 .workflow-task-event-trail__transition {
   margin-top: 3px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -183,11 +182,11 @@
 .workflow-task-event-trail__reason {
   margin-top: 6px;
   padding: 8px 10px;
-  border: 1px solid var(--erp-border);
+  border-left: 3px solid var(--erp-border-strong);
   border-radius: 5px;
   background: var(--erp-surface-bg-soft);
   color: var(--erp-text);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   line-height: 1.55;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -198,7 +197,7 @@
   border-radius: 8px;
   background: var(--erp-surface-bg-soft);
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   line-height: 1.55;
 }
 

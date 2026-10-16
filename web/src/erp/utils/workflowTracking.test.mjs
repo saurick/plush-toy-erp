@@ -91,15 +91,15 @@ test('tracking permissions require one authoritative decision per current task',
 })
 
 test('tracking page validates the requested range, true total and complete page length', () => {
-  const page = { items: [trackingFixture().summary], total: 21, status_counts: { active: 21 }, limit: 20, offset: 20 }
+  const page = { items: [trackingFixture().summary], total: 21, limit: 20, offset: 20 }
   const params = { limit: 20, offset: 20 }
   assert.equal(requireTrackingPage(page, params), page)
   for (const change of [
-    { status_counts: undefined }, { status_counts: { active: -1 } }, { status_counts: { active: 21, secret: 1 } }, { status_counts: { active: 22 } }, { status_counts: { active: '21' } }, { total: undefined }, { total: -1 }, { total: 1.5 }, { total: '21' }, { total: Number.MAX_SAFE_INTEGER + 1 },
+    { total: undefined }, { total: -1 }, { total: 1.5 }, { total: '21' }, { total: Number.MAX_SAFE_INTEGER + 1 },
     { limit: 50 }, { offset: 0 }, { offset: -20 }, { offset: '20' }, { total: 22 }, { total: 20 }, { items: [] },
   ]) assert.throws(() => requireTrackingPage({ ...page, ...change }, params), { isInvalidResponse: true })
-  assert.doesNotThrow(() => requireTrackingPage({ items: [], total: 5, status_counts: { active: 5 }, limit: 20, offset: 40 }, { limit: 20, offset: 40 }))
-  assert.doesNotThrow(() => requireTrackingPage({ items: [], total: 0, status_counts: {}, limit: 20, offset: 0 }))
+  assert.doesNotThrow(() => requireTrackingPage({ items: [], total: 5, limit: 20, offset: 40 }, { limit: 20, offset: 40 }))
+  assert.doesNotThrow(() => requireTrackingPage({ items: [], total: 0, limit: 20, offset: 0 }))
 })
 
 test('tracking identity accepts absent or resolved sources and rejects broken image bindings', () => {

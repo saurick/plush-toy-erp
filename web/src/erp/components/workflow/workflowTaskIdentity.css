@@ -8,7 +8,7 @@
 
 .erp-task-identity {
   text-align: left;
-  font-size: var(--erp-font-body);
+  font-size: 14px;
   line-height: 1.5;
   color: var(--erp-text, inherit);
 }
@@ -30,7 +30,7 @@
 
 .erp-task-identity__task-name {
   color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 400;
   line-height: 1.5;
 }
@@ -43,7 +43,7 @@
 .erp-task-identity__code,
 .erp-task-identity__unavailable {
   color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
@@ -117,7 +117,7 @@
   align-items: center;
   justify-content: center;
   gap: 3px;
-  font-size: var(--erp-font-micro);
+  font-size: 11px;
   line-height: 14px;
   text-align: center;
 }
@@ -163,7 +163,7 @@
   border-radius: 4px;
   background: rgb(15 23 42 / 75%);
   color: #fff;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   opacity: 0;
   transition: opacity 120ms ease;
 }
@@ -185,7 +185,7 @@
   }
 
   .mobile-role-tasks-page .erp-task-identity__code {
-    font-size: var(--erp-font-small);
+    font-size: 13px;
   }
 
   .erp-task-product-image {

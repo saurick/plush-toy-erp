@@ -22,7 +22,7 @@ const tasks = Object.freeze([
     task_name: '采购异常处理',
     task_status_key: 'blocked',
     owner_role_key: 'purchase',
-    source_type: 'purchase_order',
+    source_type: 'accessories-purchase',
     source_id: 1001,
     source_no: 'PO-001',
     payload: { blocked_reason: '供应商未确认回货日期' },
@@ -402,13 +402,13 @@ test('businessCollaborationTasks: 快速切换记录时迟到响应不能覆盖�
 
   assert.deepEqual(requestedParams, [
     {
-      source_type: 'purchase_order',
+      source_type: 'accessories-purchase',
       source_id: 1001,
       limit: 200,
       offset: 0,
     },
     {
-      source_type: 'purchase_order',
+      source_type: 'accessories-purchase',
       source_id: 1002,
       limit: 200,
       offset: 0,

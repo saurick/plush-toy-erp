@@ -612,7 +612,7 @@ func (r *processRuntimeRepo) ListPendingProcessRuntimeNodeReconciliations(
 			),
 			processnodeinstance.And(
 				processnodeinstance.Status(biz.ProcessNodeStatusCompleted),
-				processnodeinstance.NodeTypeIn(biz.ProcessNodeTypeDomainCommand, biz.ProcessNodeTypeEnd, biz.ProcessNodeTypeWaitEvent),
+				processnodeinstance.NodeTypeIn(biz.ProcessNodeTypeDomainCommand, biz.ProcessNodeTypeEnd),
 				processnodeinstance.RoutingCompletedAtIsNil(),
 			),
 		),

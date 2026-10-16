@@ -188,13 +188,8 @@ func validateCustomerProcessContractForPublish(contract customerProcessContract)
 
 func customerProcessSelectionsFromSnapshot(snapshot map[string]any) ([]customerProcessSelection, error) {
 	rawSelections, exists := snapshot["runtimeProcessSelections"]
-	if !exists {
+	if !exists || rawSelections == nil {
 		return []customerProcessSelection{}, nil
-	}
-	switch rawSelections.(type) {
-	case []any, []map[string]any:
-	default:
-		return nil, fmt.Errorf("%w: runtime process selections must be an array", ErrBadParam)
 	}
 	items := anyListValue(rawSelections)
 	if len(items) == 0 {

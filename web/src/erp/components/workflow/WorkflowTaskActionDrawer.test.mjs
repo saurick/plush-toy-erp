@@ -285,9 +285,6 @@ test('drawer uses one header return for its source and prevents leaving during s
   await ui.update({ actionSaving: false, onReturnToTracking: null })
   await ui.click(document.querySelector('.ant-drawer-header button[aria-label="返回列表"]'))
   assert.equal(ui.closed, 1)
-  await ui.update({ closeLabel: '返回异常跟踪' })
-  await ui.click(document.querySelector('.ant-drawer-header button[aria-label="返回异常跟踪"]'))
-  assert.equal(ui.closed, 2)
 })
 
 test('drawer step navigation and keyboard selection never submit an action', async (t) => {

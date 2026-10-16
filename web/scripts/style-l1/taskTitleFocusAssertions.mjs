@@ -14,7 +14,7 @@ export async function assertTaskTitleFocusInteractions(page, row) {
     })
   const closeWithMouse = async () => {
     await drawer.waitFor({ state: 'visible', timeout: 10_000 })
-    await drawer.getByRole('button', { name: '返回列表', exact: true }).click()
+    await drawer.getByRole('button', { name: '关闭', exact: true }).click()
     await drawer.waitFor({ state: 'hidden', timeout: 10_000 })
     assert.deepEqual(
       await readFocus(),

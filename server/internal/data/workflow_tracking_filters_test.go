@@ -27,14 +27,6 @@ func TestWorkflowTrackingFiltersUseCurrentResponsibilityAndBusinessDay(t *testin
 		if err != nil || len(page.Items) != want || page.Total != want {
 			t.Fatalf("query=%#v page=%#v err=%v", q, page, err)
 		}
-		for _, status := range []string{"active", "completed"} {
-			other := q
-			other.Status, other.Offset = status, 100
-			filtered, err := repo.ListWorkflowTracking(ctx, other)
-			if err != nil || filtered.Total != page.StatusCounts[status] || len(filtered.Items) != 0 || filtered.StatusCounts[status] != page.StatusCounts[status] {
-				t.Fatalf("status/pagination changed facets: base=%#v filtered=%#v err=%v", page, filtered, err)
-			}
-		}
 	}
 	for _, tc := range []struct {
 		name   string

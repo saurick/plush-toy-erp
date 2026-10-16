@@ -236,19 +236,6 @@ func lockInventoryBalanceForReservation(ctx context.Context, tx *inventoryDBTx, 
 	if tx == nil || in == nil {
 		return nil
 	}
-	if in.LotID != nil {
-		if err := lockInventoryLots(ctx, tx, []int{*in.LotID}); err != nil {
-			return err
-		}
-		lot, err := tx.client.InventoryLot.Get(ctx, *in.LotID)
-		if err != nil {
-			return err
-		}
-		if lot.Status != biz.InventoryLotActive {
-			return biz.ErrInventoryLotStatusBlocked
-		}
-	}
-
 	return lockInventoryBalanceRow(ctx, tx, biz.InventoryBalanceKey{
 		SubjectType:  biz.InventorySubjectProduct,
 		SubjectID:    in.ProductID,
@@ -437,20 +424,26 @@ func (r *operationalFactRepo) ListStockReservationsForAccess(
 		keywordPredicates := []predicate.StockReservation{
 			stockreservation.ReservationNoContainsFold(filter.Keyword),
 			stockreservation.StatusContainsFold(filter.Keyword),
-
+			stockreservation.IdempotencyKeyContainsFold(filter.Keyword),
 			stockreservation.NoteContainsFold(filter.Keyword),
+			stockreservation.IDEQ(parsePositiveIntOrZero(filter.Keyword)),
 		}
 		numericKeyword := parsePositiveIntOrZero(filter.Keyword)
 		if scope.IncludeSalesOrderReferences {
 			keywordPredicates = append(keywordPredicates,
-
+				stockreservation.SalesOrderIDEQ(numericKeyword),
+				stockreservation.SalesOrderItemIDEQ(numericKeyword),
 				stockreservation.HasSalesOrderWith(salesorder.OrderNoContainsFold(filter.Keyword)),
 				stockreservation.HasSalesOrderItemWith(salesorderitem.LineNoEQ(numericKeyword)),
 			)
 		}
 		if scope.IncludeInventoryReferences {
 			keywordPredicates = append(keywordPredicates,
-
+				stockreservation.ProductIDEQ(numericKeyword),
+				stockreservation.ProductSkuIDEQ(numericKeyword),
+				stockreservation.WarehouseIDEQ(numericKeyword),
+				stockreservation.UnitIDEQ(numericKeyword),
+				stockreservation.LotIDEQ(numericKeyword),
 				stockreservation.HasProductWith(product.Or(
 					product.CodeContainsFold(filter.Keyword),
 					product.NameContainsFold(filter.Keyword),

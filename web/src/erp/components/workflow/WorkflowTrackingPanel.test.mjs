@@ -22,7 +22,6 @@ test('tracking tab and session changes cancel older reads and never restore stal
   const response = (title) => ({ data: {
     items: [{ kind: 'task', id: 1, process_key: '', title, source_type: 'sales_order', source_id: 1, source_no: 'SO-TRACK', display_context: null, status: 'done', resolution_kind: null, started_at: 1791367200, updated_at: 1791367200, completed_at: 1791367200, initiator_name: '业务', initiator_role_key: 'sales', current_tasks: [] }],
     total: 1,
-    status_counts: { completed: 1 },
     limit: 20,
     offset: 0,
   } })
@@ -68,7 +67,6 @@ test('tracking pagination cancels stale pages, retries the requested page and co
   const root = createRoot(node)
   const respond = (call, total, title) => act(async () => call.resolve({ data: {
     total,
-    status_counts: { completed: total },
     limit: call.params.limit,
     offset: call.params.offset,
     items: Array.from({ length: Math.max(0, Math.min(call.params.limit, total - call.params.offset)) }, (_, i) => ({

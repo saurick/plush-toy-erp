@@ -1,4 +1,3 @@
-import { resolveBusinessStatusCounts, businessStatusCount } from './businessStatusCounts.mjs'
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { getProcessLabel, getProcessStatusLabel, getProcessNodeLabel, getProcessNodeStatusLabel, getProcessNodeTone, getWorkflowTaskDisplayName } from './processRuntimePresentation.mjs'
 import { getWorkflowResponsibilityParts } from './workflowTaskLabels.mjs'
@@ -54,9 +53,6 @@ export function requireTrackingPage(value, params = {}) {
     !positive(value.limit) || value.limit > 50 || !Number.isSafeInteger(value.offset) || value.offset < 0 ||
     value.limit !== (params.limit ?? 20) || value.offset !== (params.offset ?? 0) ||
     value.items.length !== Math.max(0, Math.min(value.limit, value.total - value.offset))) invalidTracking()
-  const counts = resolveBusinessStatusCounts(value)
-  if (!counts || Object.keys(counts).some((status) => !['active', 'completed'].includes(status)) ||
-    businessStatusCount(counts, params.status || '') !== value.total) invalidTracking()
   value.items.forEach(requireTrackingSummary)
   if (new Set(value.items.map((item) => `${item.kind}:${item.id}`)).size !== value.items.length) invalidTracking()
   return value

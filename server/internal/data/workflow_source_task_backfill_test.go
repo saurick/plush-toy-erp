@@ -127,7 +127,6 @@ func TestWorkflowSourceTaskBackfillRecreatesReleasedProductionOrderBundle(t *tes
 	}
 	completeProductionSchedulingTaskForTest(t, ctx, f.data, f.client, released.Order.ID, f.actorID)
 	cancelReason := "存量排程任务已完成，订单取消"
-	cancelUnstartedProductionWIPForTest(t, ctx, f, released.Order.ID)
 	cancelled, err := f.uc.Cancel(ctx, &biz.ProductionOrderAction{
 		ID: released.Order.ID, ExpectedVersion: released.Order.Version, ActorID: f.actorID,
 		IdempotencyKey: "source-backfill-cancel", Reason: &cancelReason,

@@ -37,7 +37,7 @@ func TestWorkflowTrackingTaskExposesApprovalTypeWithoutMutationData(t *testing.T
 
 func (r *trackingJSONRPCRepo) ListWorkflowTracking(_ context.Context, q biz.WorkflowTrackingQuery) (*biz.WorkflowTrackingPage, error) {
 	r.query, r.calls = q, r.calls+1
-	return &biz.WorkflowTrackingPage{Items: []*biz.WorkflowTrackingEntry{r.entry}, Total: 1, StatusCounts: map[string]int{"active": 1, "completed": 0}}, nil
+	return &biz.WorkflowTrackingPage{Items: []*biz.WorkflowTrackingEntry{r.entry}, Total: 1}, nil
 }
 
 func (r *trackingJSONRPCRepo) GetWorkflowTracking(_ context.Context, q biz.WorkflowTrackingQuery, _ biz.WorkflowTrackingRef, _ int) (*biz.WorkflowTrackingEntry, error) {
@@ -130,9 +130,6 @@ func TestWorkflowTrackingRPCPermissionAndSummaryBoundary(t *testing.T) {
 				}
 				if method == "list_tracking" {
 					page := result.Data.AsMap()
-					if jsonRPCInt(t, jsonRPCNestedMap(t, result, "status_counts"), "active") != 1 {
-						t.Fatal("missing serialized status counts")
-					}
 					if page["total"] != float64(1) || page["limit"] != float64(20) || page["offset"] != float64(0) || page["has_more"] != nil || page["next_cursor"] != nil {
 						t.Fatalf("invalid pagination contract: %#v", page)
 					}

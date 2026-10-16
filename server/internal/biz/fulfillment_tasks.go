@@ -2,7 +2,6 @@ package biz
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -21,7 +20,6 @@ var fulfillmentTaskSpecs = map[string]FulfillmentTaskSpec{
 	"receipt_quality":               {"办理来料检验", "quality_inspection", QualityRoleKey, PermissionQualityInspectionUpdate, PermissionQualityInspectionRead, "/erp/production/quality-inspections?quality_inspection_id=%d"},
 	"receipt_inbound":               {"确认材料入库", "purchase_receipt", WarehouseRoleKey, PermissionWarehouseInboundConfirm, PermissionPurchaseReceiptRead, "/erp/warehouse/inbound?receipt_id=%d"},
 	"receipt_exception":             {"处理来料不合格", "purchase_receipt", PurchaseRoleKey, PermissionPurchaseReturnCreate, PermissionQualityInspectionRead, "/erp/production/quality-inspections?purchase_receipt_id=%d"},
-	"receipt_replacement":           {"补换到货点数", "purchase_rejection_disposition", WarehouseRoleKey, PermissionPurchaseReceiptCreate, PermissionPurchaseReturnRead, ""},
 	"outsourcing_contract":          {"补价并确认加工合同", "outsourcing_order", FinanceRoleKey, PermissionOutsourcingOrderConfirm, PermissionOutsourcingOrderRead, "/erp/purchase/processing-contracts?outsourcing_order_id=%d"},
 	"outsourcing_issue":             {"办理加工发料", "outsourcing_order", WarehouseRoleKey, PermissionOutsourcingMaterialIssueCreate, PermissionOutsourcingOrderRead, "/erp/purchase/processing-contracts?outsourcing_order_id=%d"},
 	"outsourcing_return":            {"登记加工回货", "outsourcing_order", WarehouseRoleKey, PermissionOutsourcingReturnReceiptCreate, PermissionOutsourcingOrderRead, "/erp/purchase/processing-contracts?outsourcing_order_id=%d"},
@@ -47,17 +45,6 @@ func FulfillmentTaskSpecFor(group string) (FulfillmentTaskSpec, bool) {
 func IsFulfillmentTaskGroup(group string) bool {
 	_, ok := FulfillmentTaskSpecFor(group)
 	return ok
-}
-
-func FulfillmentTaskGroupsForSourceType(sourceType string) []string {
-	groups := []string{}
-	for kind, spec := range fulfillmentTaskSpecs {
-		if spec.SourceType == sourceType {
-			groups = append(groups, "handoff_"+kind)
-		}
-	}
-	sort.Strings(groups)
-	return groups
 }
 
 func BuildFulfillmentTask(kind string, id int, sourceNo, entryPath string) (*WorkflowTaskCreate, error) {

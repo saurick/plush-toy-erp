@@ -213,7 +213,7 @@ func reconcileMissingWorkflowSourceTasksWithClient(
 				result.SourceTimeIntentsNormalized++
 			}
 		}
-		if err := syncShipmentHandoff(ctx, client, full, 0); err != nil {
+		if err := syncShipmentHandoff(ctx, client, full); err != nil {
 			return nil, fmt.Errorf("reconcile sales shipment handoff %d: %w", row.ID, err)
 		}
 		result.FulfillmentShipmentScanned++

@@ -76,26 +76,6 @@ func workflowIdentitySourceBinding(selector *entsql.Selector, source workflowIde
 			sqljson.ValueEQ(selector.C(workflowtask.FieldPayload), producer, sqljson.Path("source_task_producer")),
 		))
 	}
-	for _, group := range biz.FulfillmentTaskGroupsForSourceType(source.kind) {
-		spec, _ := biz.FulfillmentTaskSpecFor(group)
-		code := entsql.P(func(b *entsql.Builder) {
-			b.Ident(selector.C(workflowtask.FieldTaskCode)).WriteString(" = ").Arg(strings.TrimSuffix(biz.WorkflowSourceTaskCode(group, 0), "0"))
-			b.WriteString(" || CAST(").Ident(selector.C(workflowtask.FieldSourceID)).WriteString(" AS TEXT)")
-		})
-		bound = entsql.Or(bound, entsql.And(
-			entsql.IsNull(selector.C(workflowtask.FieldProcessInstanceID)),
-			entsql.EQ(selector.C(workflowtask.FieldTaskGroup), group),
-			entsql.EQ(selector.C(workflowtask.FieldSourceType), spec.SourceType),
-			entsql.EQ(selector.C(workflowtask.FieldOwnerRoleKey), spec.Role),
-			entsql.EQ(selector.C(workflowtask.FieldRequiredCapabilityKey), spec.Capability), code,
-			sqljson.ValueEQ(selector.C(workflowtask.FieldPayload), biz.WorkflowSourceTaskContractV1, sqljson.Path("source_task_contract")),
-			sqljson.ValueEQ(selector.C(workflowtask.FieldPayload), biz.FulfillmentTaskProducer, sqljson.Path("source_task_producer")),
-			entsql.P(func(b *entsql.Builder) {
-				runtimeAuditPayloadText(b, selector.C(workflowtask.FieldPayload), []string{"source_record_id"})
-				b.WriteString(" = CAST(").Ident(selector.C(workflowtask.FieldSourceID)).WriteString(" AS TEXT)")
-			}),
-		))
-	}
 	return entsql.And(entsql.In(selector.C(workflowtask.FieldSourceType), source.types...), bound)
 }
 

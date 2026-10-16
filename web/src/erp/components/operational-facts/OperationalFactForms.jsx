@@ -33,6 +33,7 @@ const STATUS_COLORS = Object.freeze({
 })
 
 const COLLECTION_TYPE_OPTIONS = [
+  { label: '预收款', value: 'ADVANCE_RECEIPT' },
   { label: '应收款', value: 'ACCOUNTS_RECEIVABLE' },
 ]
 

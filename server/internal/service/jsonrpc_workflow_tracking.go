@@ -96,7 +96,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTracking(ctx context.Context, method, 
 	for _, entry := range page.Items {
 		items = append(items, workflowTrackingSummary(entry))
 	}
-	return id, okData(map[string]any{"items": items, "total": page.Total, "status_counts": businessStatusCountsToAny(page.StatusCounts), "limit": q.Limit, "offset": q.Offset}), nil
+	return id, okData(map[string]any{"items": items, "total": page.Total, "limit": q.Limit, "offset": q.Offset}), nil
 }
 
 func workflowTrackingPerson(entry *biz.WorkflowTrackingEntry, id *int) string {

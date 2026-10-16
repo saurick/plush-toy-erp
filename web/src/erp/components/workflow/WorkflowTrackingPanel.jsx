@@ -12,8 +12,6 @@ import { trackingHandoff, trackingResponsibilityParts, trackingStatus, trackingS
 import { WORKFLOW_TASKS_CHANGED } from '../../utils/workflowTaskChanges.mjs'
 import { openWorkflowTaskRow } from '../../utils/workflowTaskEntry.mjs'
 import { getWorkflowTaskSourceNo } from '../../utils/dashboardTaskDisplay.mjs'
-import BusinessStatusFilter from '../business-list/BusinessStatusFilter.jsx'
-import { resolveBusinessStatusCounts } from '../../utils/businessStatusCounts.mjs'
 import WorkflowTrackingDrawer from './WorkflowTrackingDrawer.jsx'
 import WorkflowResponsibilities from './WorkflowResponsibilities.jsx'
 import WorkflowInitiator from './WorkflowInitiator.jsx'
@@ -151,6 +149,7 @@ render: (_, entry) => (
             <>
               {onScopeChange ? <SelectFilter aria-label="跟踪范围" value={scope} options={TRACKING_SCOPE_OPTIONS} onChange={onScopeChange} /> : null}
               <SearchInput placeholder="单号 / 任务 / 产品 / 款号" value={search.value} onChange={search.onChange} onCompositionStart={search.onCompositionStart} onCompositionEnd={search.onCompositionEnd} onPressEnter={search.onPressEnter} />
+              <SelectFilter aria-label="流转状态" value={filters.status} options={TRACKING_STATUS_OPTIONS} onChange={(status) => changeFilters({ status })} />
               <SelectFilter aria-label="当前岗位" value={filters.owner_role_key} disabled={filters.status === 'completed'} options={TRACKING_ROLE_OPTIONS} onChange={(owner_role_key) => changeFilters({ owner_role_key })} />
               {!source.source_id ? <SelectFilter aria-label="单据类型" value={filters.source_type} options={TRACKING_SOURCE_OPTIONS} onChange={(source_type) => changeFilters({ source_type })} /> : null}
               <SelectFilter aria-label="关注事项" value={filters.attention} disabled={filters.status === 'completed'} options={TRACKING_ATTENTION_OPTIONS} onChange={(attention) => changeFilters({ attention })} />
@@ -160,7 +159,6 @@ render: (_, entry) => (
           actions={source.source_id ? <Button onClick={() => { const next = new URLSearchParams(searchParams); next.delete('track_source_type'); next.delete('track_source_id'); for (const view of ['started', 'participated', 'visible']) next.delete(`track_page_${view}`); setSearchParams(next) }}>清除单据范围</Button> : null}
         />
       </div>
-      <BusinessStatusFilter aria-label="流转状态" allLabel="全部状态" value={filters.status} options={TRACKING_STATUS_OPTIONS} counts={resolveBusinessStatusCounts(page)} loading={!current} onChange={(status) => changeFilters({ status })} />
       {scope !== 'visible' ? <p className="erp-workflow-tracking-scope-summary" aria-label="当前跟踪范围">{TRACKING_SCOPE_OPTIONS.find((option) => option.value === scope)?.label}</p> : null}
       {current?.error ? <Alert type="error" showIcon message="任务进度加载失败" action={<Button onClick={() => setReload((value) => value + 1)}>重新读取</Button>} /> : (
         <Table

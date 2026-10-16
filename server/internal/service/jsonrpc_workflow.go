@@ -40,8 +40,6 @@ func (d *jsonrpcDispatcher) handleWorkflow(
 	}
 
 	switch method {
-	case "get_task_link":
-		return d.handleWorkflowTaskLink(ctx, id, pm)
 	case "list_exceptions":
 		return d.handleWorkflowExceptions(ctx, id, pm)
 	case "get_task_handling_chain":

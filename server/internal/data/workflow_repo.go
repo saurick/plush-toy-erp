@@ -1377,17 +1377,6 @@ func (task workflowTaskMutationResultTaskV1) toBiz() (*biz.WorkflowTask, error) 
 
 func (r *workflowRepo) ListWorkflowBusinessStates(ctx context.Context, filter biz.WorkflowBusinessStateFilter) ([]*biz.WorkflowBusinessState, int, error) {
 	query := r.data.postgres.WorkflowBusinessState.Query()
-	if filter.VisibilityScope != nil {
-		query = query.Where(func(s *entsql.Selector) {
-			tasks := entsql.Select(workflowtask.FieldID).From(entsql.Table(workflowtask.Table))
-			workflowTaskRevisionVisibilityPredicate(filter.VisibilityScope, filter.OwnerRoleKey)(tasks)
-			tasks.Where(entsql.And(
-				entsql.ColumnsEQ(tasks.C(workflowtask.FieldSourceType), s.C(workflowbusinessstate.FieldSourceType)),
-				entsql.ColumnsEQ(tasks.C(workflowtask.FieldSourceID), s.C(workflowbusinessstate.FieldSourceID)),
-			))
-			s.Where(entsql.Exists(tasks))
-		})
-	}
 	if filter.SourceType != "" {
 		query = query.Where(workflowbusinessstate.SourceType(filter.SourceType))
 	}

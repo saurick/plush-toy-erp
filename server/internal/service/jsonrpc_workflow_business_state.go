@@ -19,18 +19,9 @@ func (d *jsonrpcDispatcher) handleWorkflowBusinessState(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil
 		}
-		admin, adminResult := d.CurrentAdmin(ctx)
-		if adminResult != nil {
-			return id, adminResult, nil
-		}
-		scope, scopeResult := d.workflowTaskReadVisibilityScope(ctx, admin)
-		if scopeResult != nil {
-			return id, scopeResult, nil
-		}
 		limit := getWorkflowLimit(pm)
 		offset := getWorkflowOffset(pm)
 		states, total, err := d.workflowUC.ListBusinessStates(ctx, biz.WorkflowBusinessStateFilter{
-			VisibilityScope:   scope,
 			Limit:             limit,
 			Offset:            offset,
 			SourceType:        getString(pm, "source_type"),

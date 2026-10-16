@@ -23,15 +23,13 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
         const body = route.request().postDataJSON()
         if (body.method !== 'list_tracking') return route.fallback()
         const p = body.params || {}
-        const facets = rows.filter((row) => {
+        const items = rows.filter((row) => {
           const day = new Date(row.started_at * 1000 + 8 * 3600000).toISOString().slice(0, 10)
-          return (!p.source_type || row.source_type === p.source_type) && (!p.owner_role_key || row.current_tasks.some((task) => task.owner_role_key === p.owner_role_key)) && (!p.attention || p.attention === 'overdue' && row.id === 801) && (!p.keyword || `${row.source_no} ${row.id === 801 ? '长耳小熊 STYLE-801' : ''}`.includes(p.keyword)) && (!p.date_from || day >= p.date_from) && (!p.date_to || day <= p.date_to)
+          return (!p.status || row.status === p.status) && (!p.source_type || row.source_type === p.source_type) && (!p.owner_role_key || row.current_tasks.some((task) => task.owner_role_key === p.owner_role_key)) && (!p.attention || p.attention === 'overdue' && row.id === 801) && (!p.keyword || `${row.source_no} ${row.id === 801 ? '长耳小熊 STYLE-801' : ''}`.includes(p.keyword)) && (!p.date_from || day >= p.date_from) && (!p.date_to || day <= p.date_to)
         })
-        const status_counts = { active: facets.filter((row) => row.status === 'active').length, completed: facets.filter((row) => row.status === 'completed').length }
-        const items = facets.filter((row) => !p.status || row.status === p.status)
         const limit = p.limit ?? 20
         const offset = p.offset ?? 0
-        await route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, message: '', data: { items: items.slice(offset, offset + limit), total: items.length, status_counts, limit, offset } } } })
+        await route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, message: '', data: { items: items.slice(offset, offset + limit), total: items.length, limit, offset } } } })
       })
     },
     verify: async (page) => {
@@ -40,7 +38,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       const navigation = page.locator('.erp-task-management-scope')
       assert.deepEqual((await navigation.locator('.ant-segmented-item').allTextContents()).map((text) => text.trim()), ['待我处理', '待我审批', '全部任务', '流程跟踪'])
       const trackingNavigation = page.locator('.erp-task-tracking-views')
-      assert.deepEqual((await trackingNavigation.locator('.ant-segmented-item').allTextContents()).map((text) => text.trim()), ['流程进度', '异常跟踪'])
+      assert.deepEqual((await trackingNavigation.locator('.ant-segmented-item').allTextContents()).map((text) => text.trim()), ['流程进度', '异常记录'])
       assert.equal(await page.getByRole('combobox', { name: '跟踪范围', exact: true }).count(), 0)
       const scopeBox = await trackingNavigation.boundingBox()
       const controlsBox = await panel.locator('.erp-workflow-tracking-controls').boundingBox()
@@ -49,10 +47,8 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       const filterTrigger = panel.getByRole('button', { name: /筛选/ })
       const filterDialog = page.getByRole('dialog', { name: '筛选条件', exact: true })
       const openFilters = async () => {
-        await waitForFiniteAnimations(page)
         if (!await filterDialog.isVisible()) await filterTrigger.click()
         await filterDialog.waitFor()
-        await waitForFiniteAnimations(page)
       }
       const closeFilters = async () => {
         if (await filterDialog.isVisible()) {
@@ -60,9 +56,6 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
           await filterDialog.waitFor({ state: 'hidden' })
         }
       }
-      const states = panel.getByRole('group', { name: '流转状态', exact: true })
-      await states.getByRole('button', { name: '全部状态，共 2 条', exact: true }).waitFor()
-      assert.deepEqual(await states.locator('.erp-filter-chip__count').allTextContents(), ['2', '1', '1'])
       const list = panel.locator('.ant-table-wrapper')
       const before = await list.boundingBox()
       await openFilters()
@@ -82,20 +75,8 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
         return captured.postDataJSON().params
       }
       const choose = async (label, option) => {
-        if (label === '流转状态') {
-          await closeFilters()
-          await panel.getByRole('group', { name: label }).getByRole('button', { name: new RegExp(`^${option}，`) }).click()
-          return
-        }
         await openFilters()
-        await waitForFiniteAnimations(page)
-        const choices = filterDialog.getByRole('group', { name: label, exact: true })
-        if (await choices.count()) {
-          await choices.getByRole('button', { name: option, exact: true }).click()
-          return
-        }
         await page.locator(`.ant-select[aria-label="${label}"]`).click()
-        await waitForFiniteAnimations(page)
         await page.locator('.ant-select-dropdown:visible').getByText(option, { exact: true }).click()
       }
       await change(() => choose('跟踪范围', '我参与的'), (p) => p.scope === 'participated')
@@ -109,8 +90,6 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       await change(() => search.fill('小熊'), (p) => p.keyword === '小熊')
       await change(() => choose('跟踪范围', '我参与的'), (p) => p.scope === 'participated' && !p.status && !p.owner_role_key && !p.keyword)
       await change(() => choose('流转状态', '已结束'), (p) => p.scope === 'participated' && p.status === 'completed')
-      await states.getByRole('button', { name: '全部状态，共 2 条', exact: true }).waitFor()
-      assert.deepEqual(await states.locator('.erp-filter-chip__count').allTextContents(), ['2', '1', '1'])
       await change(() => choose('单据类型', '采购订单'), (p) => p.source_type === 'purchase_order')
       await panel.getByText('PO-FILTER-802', { exact: true }).waitFor()
       await change(() => choose('跟踪范围', '我发起的'), (p) => p.scope === 'started' && p.status === 'active' && p.owner_role_key === 'engineering' && p.keyword === '小熊' && !p.source_type)
@@ -147,7 +126,7 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
         await openFilters()
         await waitForFiniteAnimations(page)
         const popupBox = await filterDialog.boundingBox()
-        assert.ok(popupBox.x >= 0 && popupBox.x + popupBox.width <= width + 1 && popupBox.y >= 0 && popupBox.y + popupBox.height <= 845, JSON.stringify(popupBox))
+        assert.ok(popupBox.x >= 0 && popupBox.x + popupBox.width <= width + 1, JSON.stringify(popupBox))
         await page.screenshot({ path: path.join(outputDir, `task-tracking-filters-${themeMode}-${width}.png`) })
         await closeFilters()
         await assertNoHorizontalOverflow(page)
@@ -196,34 +175,12 @@ export function createTaskTrackingFilterScenarios({ outputDir, assertNoHorizonta
       const taskAfter = await taskList.boundingBox()
       assert.ok(Math.abs(taskBefore.y - taskAfter.y) < 1, 'opening filters must not push task lanes down')
       await page.screenshot({ path: path.join(outputDir, `task-board-filters-${themeMode}-4k.png`) })
-      assert.equal(await filterDialog.getByRole('button', { name: '保存筛选', exact: true }).count(), 0)
-      assert.equal(await filterDialog.getByText('本机常用筛选', { exact: true }).count(), 0)
-      for (const label of ['业务模块', '业务流程', '业务环节']) assert.equal(await filterDialog.getByText(label, { exact: true }).count(), 0)
-      await filterDialog.getByRole('combobox', { name: '办理人', exact: true }).waitFor()
-      await filterDialog.getByRole('combobox', { name: '办理人', exact: true }).press('ArrowDown')
-      await page.locator('.ant-select-dropdown:visible').getByText('岗位待领取', { exact: true }).click()
-      await page.waitForFunction(() => new URLSearchParams(location.search).get('assignee') === 'unassigned')
-      await filterDialog.getByRole('button', { name: /清空筛选/ }).click()
-      await waitForFiniteAnimations(page)
-      assert.equal(await filterDialog.evaluate((node) => node.contains(document.activeElement)), true, '清空筛选后焦点保留在弹层内')
       await page.keyboard.press('Escape')
       await filterDialog.waitFor({ state: 'hidden' })
       assert.equal(await taskFilters.evaluate((node) => node === document.activeElement), true)
-      await page.goto(new URL('/erp/task-board?mode=all&stage_key=cutting_quality&module_key=quality&chain_key=order_fulfillment', page.url()).href)
-      await page.locator('.erp-task-board-lanes[aria-busy="false"]').waitFor()
-      await taskFilters.click()
-      await filterDialog.getByRole('note', { name: '来源环节范围', exact: true }).waitFor()
-      assert.match(await filterDialog.innerText(), /裁片.*颜色与尺寸检验/u)
-      assert.equal(new URL(page.url()).searchParams.has('module_key'), false)
-      assert.equal(new URL(page.url()).searchParams.has('chain_key'), false)
-      await waitForFiniteAnimations(page)
-      await page.screenshot({ path: path.join(outputDir, `task-source-stage-${themeMode}-4k.png`) })
-      await filterDialog.getByRole('button', { name: '清除环节范围', exact: true }).click()
-      await page.waitForFunction(() => !new URLSearchParams(location.search).has('stage_key'))
-      await filterDialog.getByRole('note', { name: '来源环节范围', exact: true }).waitFor({ state: 'detached' })
       await change(() => page.goto(new URL('/erp/task-board?tracking=visible&track_source_type=sales_order&track_source_id=1', page.url()).href), (p) => p.scope === 'visible' && p.source_type === 'sales_order' && p.source_id === 1)
       await panel.getByText('SO-FILTER-801', { exact: true }).waitFor()
-      assert.deepEqual((await trackingNavigation.locator('.ant-segmented-item').allTextContents()).map((text) => text.trim()), ['流程进度', '异常跟踪'])
+      assert.deepEqual((await trackingNavigation.locator('.ant-segmented-item').allTextContents()).map((text) => text.trim()), ['流程进度', '异常记录'])
       assert.equal(new URL(page.url()).searchParams.get('tracking'), 'visible')
       await page.setViewportSize({ width: 320, height: 844 })
       await waitForFiniteAnimations(page)

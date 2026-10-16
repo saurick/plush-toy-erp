@@ -4,7 +4,6 @@ import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertTaskCopy } from './taskCopyAssertions.mjs'
 import { pullToRefresh } from './mobileGestureAssertions.mjs'
-import { assertMobileFilterConsistency } from './mobileFilterConsistencyAssertions.mjs'
 
 export function createMobileWorkflowTrackingScenarios(deps) {
   const { assert, path, outputDir, assertNoHorizontalOverflow } = deps
@@ -32,7 +31,7 @@ export function createMobileWorkflowTrackingScenarios(deps) {
           if (body.method === 'list_tracking') calls.push(body.params)
           if (body.method === 'list_tracking' && body.params.keyword === 'PO-MR-25-221') {
             const items = body.params.scope === 'visible' ? [{ kind: 'task', id: 99122, process_key: '', title: '采购到货点数', source_type: 'purchase_order', source_id: 221, source_no: 'PO-MR-25-221', status: 'ready', started_at: 1791367200, updated_at: 1791367200, completed_at: null, resolution_kind: null, initiator_name: '', initiator_role_key: '', current_tasks: [{ task_id: 99122, task_name: '采购到货点数', node_instance_id: null, owner_role_key: 'warehouse', assignee_name: '', status: 'ready', created_at: 1791367200, completed_at: null, due_at: null }], display_context: null }] : []
-            return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, message: '', data: { items, total: items.length, status_counts: { active: items.length, completed: 0 }, limit: body.params.limit, offset: 0 } } } })
+            return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, message: '', data: { items, total: items.length, limit: body.params.limit, offset: 0 } } } })
           }
           if (body.method === 'list_tracking' && failRefresh) {
             failRefresh = false
@@ -46,8 +45,8 @@ export function createMobileWorkflowTrackingScenarios(deps) {
         const chooseScope = async (label) => {
           await panel.getByRole('button', { name: /^筛选流程/u }).click()
           const filters = page.getByRole('dialog', { name: '筛选流程', exact: true })
-          await waitForFiniteAnimations(page)
-          await filters.getByRole('group', { name: '跟踪范围', exact: true }).getByRole('button', { name: label, exact: true }).click()
+          await filters.locator('.ant-select[aria-label="跟踪范围"]').click()
+          await page.locator('.ant-select-dropdown:visible').getByText(label, { exact: true }).click()
           await filters.waitFor({ state: 'hidden' })
         }
         await page.locator(tabs).getByText('流程跟踪', { exact: true }).waitFor()
@@ -58,19 +57,10 @@ export function createMobileWorkflowTrackingScenarios(deps) {
         await panel.getByRole('button', { name: '重新读取', exact: true }).click()
         await panel.getByText('任务分页记录 1', { exact: true }).waitFor()
         assert.equal(calls[0].scope, 'visible', '默认查询权限内相关流程')
-        const statusCounts = () => panel.getByRole('group', { name: '流转状态', exact: true }).locator('.erp-filter-chip__count').allTextContents()
-        assert.deepEqual(await statusCounts(), ['161', '1', '160'])
-        const quick = panel.getByRole('group', { name: '流转状态', exact: true })
-        const activeStatus = quick.getByRole('button', { name: /^进行中/ })
-        await activeStatus.click()
-        await activeStatus.locator('.erp-filter-chip__clear').waitFor()
-        await activeStatus.click()
-        assert.equal(await activeStatus.getAttribute('aria-pressed'), 'false', '再次点击流程状态恢复全部')
         const sourceSearch = panel.getByRole('searchbox', { name: '搜索流转记录' })
         await sourceSearch.fill('PO-MR-25-221')
         await sourceSearch.press('Enter')
         await panel.locator('[data-mobile-tracking-entry="task:99122"]').waitFor()
-        assert.deepEqual(await statusCounts(), ['1', '1', '0'])
         assert.match(await panel.locator('[data-mobile-tracking-entry="task:99122"]').innerText(), /采购订单 · PO-MR-25-221/u)
         for (const label of ['我发起的', '我参与的']) {
           await chooseScope(label)
@@ -160,10 +150,9 @@ export function createMobileWorkflowTrackingScenarios(deps) {
         await panel.getByText('当前筛选下没有匹配记录', { exact: true }).waitFor()
         await panel.getByRole('button', { name: '筛选流程', exact: true }).click()
         const filters = page.getByRole('dialog', { name: '筛选流程', exact: true })
-        await waitForFiniteAnimations(page)
-        await filters.getByRole('group', { name: '当前岗位', exact: true }).getByRole('button', { name: '老板', exact: true }).click()
+        await filters.locator('.ant-select[aria-label="当前岗位"]').click()
+        await page.locator('.ant-select-dropdown:visible').getByText('老板', { exact: true }).click()
         await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
-        await assertMobileFilterConsistency({ assert, quick, applied: panel.getByLabel('当前流程筛选') })
         await chooseScope('我发起的')
         assert.equal(await search.inputValue(), '')
         await panel.getByText('任务分页记录 1', { exact: true }).waitFor()
@@ -173,8 +162,6 @@ export function createMobileWorkflowTrackingScenarios(deps) {
         await chooseScope('我参与的')
         assert.equal(await search.inputValue(), '不存在的单据')
         await panel.getByRole('button', { name: '筛选流程，已应用 1 项', exact: true }).click()
-        await filters.waitFor({ state: 'visible' })
-        await waitForFiniteAnimations(page)
         assert.match(await filters.innerText(), /老板/)
         await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
         await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
@@ -200,37 +187,6 @@ export function createMobileWorkflowTrackingScenarios(deps) {
         await panel.getByRole('button', { name: '重新读取', exact: true }).waitFor({ state: 'hidden' })
         await pullToRefresh(page, scroll)
         await page.getByText('任务进度已刷新', { exact: true }).waitFor()
-        await panel.getByRole('button', { name: '筛选流程', exact: true }).click()
-        await filters.getByRole('button', { name: '自定义发起日期', exact: true }).click()
-        const calendar = page.getByRole('dialog', { name: '选择发起日期范围', exact: true })
-        await calendar.waitFor()
-        const dates = calendar.locator('.erp-filter-date-days > button')
-        const dateFrom = await dates.nth(10).getAttribute('aria-label')
-        const dateTo = await dates.nth(12).getAttribute('aria-label')
-        await dates.nth(10).click()
-        assert.equal(await calendar.getByRole('button', { name: '应用日期', exact: true }).isEnabled(), false)
-        await calendar.getByRole('button', { name: '取消', exact: true }).click()
-        await filters.waitFor()
-        assert(!calls.some((query) => query.date_from), '取消未完成日期不发送日期条件')
-        await filters.getByRole('button', { name: '自定义发起日期', exact: true }).click()
-        await calendar.waitFor()
-        await dates.nth(10).click()
-        await dates.nth(12).click()
-        await Promise.all([
-          page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.postDataJSON()?.method === 'list_tracking' && request.postDataJSON()?.params.date_from === dateFrom && request.postDataJSON()?.params.date_to === dateTo),
-          calendar.getByRole('button', { name: '应用日期', exact: true }).click(),
-        ])
-        await panel.getByRole('button', { name: '筛选流程，已应用 1 项', exact: true }).waitFor()
-        await chooseScope('我参与的')
-        assert.equal(await panel.getByRole('button', { name: /^清除发起日期：/ }).count(), 0)
-        await chooseScope('我发起的')
-        const clearDate = panel.getByRole('button', { name: `清除发起日期：${dateFrom} 至 ${dateTo}`, exact: true })
-        await clearDate.waitFor()
-        await page.reload()
-        await clearDate.waitFor()
-        await clearDate.click()
-        await panel.getByRole('button', { name: '筛选流程', exact: true }).waitFor()
-        assert.equal(await clearDate.count(), 0)
         await assertNoHorizontalOverflow(page, '手机任务管理')
         assert.equal(await scroll.count(), 1)
       },

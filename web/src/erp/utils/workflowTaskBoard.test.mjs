@@ -41,7 +41,7 @@ test('workflowTaskBoard: 待我处理保留网址范围，清除结束状态并�
   assert.deepEqual(readWorkflowTaskBoardFiltersFromSearch(writeWorkflowTaskBoardFiltersToSearch('', filters)), filters)
   assert.equal(buildWorkflowTaskBoardRequest({ mode: 'approval' }).todo_only, undefined)
   assert.equal(buildWorkflowTaskBoardRequest({ mode: 'todo' }).approval_only, undefined)
-  assert.deepEqual(getWorkflowTaskBoardStatusOptions('all', 'todo').map((item) => item.value), ['all', 'ready', 'blocked'])
+  assert.deepEqual(getWorkflowTaskBoardStatusOptions('all', 'todo').map((item) => item.value), ['all', 'ready', 'blocked', 'overdue', 'dueSoon'])
   const response = {
     snapshot_at: now,
 total: 6,
@@ -96,11 +96,11 @@ test('workflowTaskBoard: 分类只提供可以匹配的状态和日期条件', (
     buildWorkflowTaskBoardRequest({ lane: 'exception', due: 'overdue' }).due,
     'overdue'
   )
-  for (const due of ['overdue', 'dueSoon']) {
+  for (const status of ['overdue', 'dueSoon']) {
     assert.equal(
-      buildWorkflowTaskBoardRequest({ lane: 'exception', due }).due,
-      due,
-      '截止时间只使用独立到期条件，切换到阻塞分类后仍保留'
+      buildWorkflowTaskBoardRequest({ lane: 'exception', status }).status,
+      status,
+      '从到期状态筛选进入阻塞分类时，应保留仍然适用的条件'
     )
   }
 })
