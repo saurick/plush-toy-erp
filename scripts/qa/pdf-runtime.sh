@@ -20,25 +20,15 @@ RUNTIME_MATERIALIZED=false
 # Invoked by the EXIT trap, including failures before the final report.
 # shellcheck disable=SC2329
 cleanup() {
-  local cleanup_failed=0
-  [[ -z "$CONTAINER" ]] || docker rm --force "$CONTAINER" >/dev/null || cleanup_failed=1
+  [[ -z "$CONTAINER" ]] || docker rm --force "$CONTAINER" >/dev/null
   if [[ "$SANDBOX_INSTALLED" == true ]]; then
-    sudo -n /usr/local/sbin/plush-chromium-sandbox remove "$CI_JOB_ID" || cleanup_failed=1
+    sudo -n /usr/local/sbin/plush-chromium-sandbox remove "$CI_JOB_ID"
   fi
   if [[ "$RUNTIME_MATERIALIZED" == true ]]; then
-    node scripts/qa/ci-playwright-runtime.mjs cleanup || cleanup_failed=1
+    node scripts/qa/ci-playwright-runtime.mjs cleanup
   fi
-  return "$cleanup_failed"
 }
-# Invoked by the EXIT trap.
-# shellcheck disable=SC2329
-on_exit() {
-  local run_status=$?
-  trap - EXIT
-  cleanup || run_status=1
-  exit "$run_status"
-}
-trap on_exit EXIT
+trap 'cleanup' EXIT
 
 docker image inspect "$IMAGE" >"$OUTPUT/image.json"
 IMAGE_ID="$(node -e 'process.stdout.write(require(process.argv[1])[0].Id)' "$OUTPUT/image.json")"

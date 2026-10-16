@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, renameSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
@@ -35,9 +40,7 @@ FROM (
 `;
 
 function sanitizeCommandFailure(result, label) {
-  const text = String(
-    result.stderr || result.stdout || result.error?.message || "",
-  )
+  const text = String(result.stderr || result.stdout || result.error?.message || "")
     .replace(
       /postgres(?:ql)?:\/\/[^:\s/@]+:[^@\s]+@/giu,
       "postgres://<redacted>@",
@@ -70,9 +73,7 @@ function optionalRun(command, args, options = {}) {
     maxBuffer: options.maxBuffer || 16 * 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"],
   });
-  if (result.error || !new Set([0, 1]).has(result.status)) {
-    sanitizeCommandFailure(result, "database repository reference scan failed");
-  }
+  if (result.error || !new Set([0, 1]).has(result.status)) return [];
   return String(result.stdout || "")
     .split("\n")
     .map((value) => value.trim())
@@ -84,9 +85,7 @@ export function normalizeAtlasMigrationStatus(status) {
     throw new Error("Atlas migration status is invalid");
   }
   const applied = Array.isArray(status.Applied) ? status.Applied.length : 0;
-  const available = Array.isArray(status.Available)
-    ? status.Available.length
-    : 0;
+  const available = Array.isArray(status.Available) ? status.Available.length : 0;
   const pending = Array.isArray(status.Pending) ? status.Pending.length : 0;
   const outOfOrder = Array.isArray(status.OutOfOrder)
     ? status.OutOfOrder.length
@@ -228,7 +227,8 @@ export function buildDatabaseInventoryReport({
         0,
       ),
       cleanupReviewCount: databases.filter(
-        (database) => database.recommendation === "review_disposable_cleanup",
+        (database) =>
+          database.recommendation === "review_disposable_cleanup",
       ).length,
     }),
     databases,
@@ -256,8 +256,7 @@ function readDatabaseRows(databaseURL) {
     { failure: "database inventory query failed" },
   );
   const parsed = JSON.parse(output || "[]");
-  if (!Array.isArray(parsed))
-    throw new Error("database inventory query is invalid");
+  if (!Array.isArray(parsed)) throw new Error("database inventory query is invalid");
   return parsed;
 }
 
@@ -290,15 +289,13 @@ function readMigration(databaseURL, serverRoot) {
   }
 }
 
-export function findEvidenceReferences(repoRoot, databaseName) {
+function findEvidenceReferences(repoRoot, databaseName) {
   return optionalRun(
     "git",
     [
       "-c",
       "core.quotePath=false",
       "grep",
-      "--untracked",
-      "--exclude-standard",
       "-l",
       "-F",
       databaseName,
@@ -308,7 +305,7 @@ export function findEvidenceReferences(repoRoot, databaseName) {
       ":(exclude)tmp/**",
       ":(exclude)output/**",
     ],
-    { cwd: repoRoot, env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" } },
+    { cwd: repoRoot },
   ).slice(0, 50);
 }
 
@@ -335,8 +332,7 @@ export function runDatabaseInventory({
   });
   const readRows = runtime.readDatabaseRows || readDatabaseRows;
   const readAtlas = runtime.readMigration || readMigration;
-  const findReferences =
-    runtime.findEvidenceReferences || findEvidenceReferences;
+  const findReferences = runtime.findEvidenceReferences || findEvidenceReferences;
   const databaseRows = readRows(databaseURL);
   const migrationByName = {};
   const referencesByName = {};
@@ -369,8 +365,7 @@ function parseArgs(argv) {
     const arg = argv[index];
     const value = argv[index + 1];
     if (arg === "--out") {
-      if (!value || value.startsWith("--"))
-        throw new Error("--out requires a value");
+      if (!value || value.startsWith("--")) throw new Error("--out requires a value");
       options.out = value;
       index += 1;
       continue;

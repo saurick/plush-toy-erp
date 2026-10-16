@@ -114,9 +114,9 @@ function discoverIdentity(entry, receiptName) {
     SHA_PATTERN.test(entry.name) ? entry.name : "",
   ];
   const gitSha =
-    candidates
-      .map((value) => String(value || ""))
-      .find((value) => SHA_PATTERN.test(value)) || "";
+    candidates.map((value) => String(value || "")).find((value) =>
+      SHA_PATTERN.test(value),
+    ) || "";
   return {
     status: normalizeStatus(receipt?.status),
     gitSha,
@@ -186,7 +186,10 @@ function chooseProtectedEntries(entries, keepNewest, protectedShas) {
 
 export function buildOutputRetentionPreview(
   repoRoot,
-  { protectedShas = [], generatedAt = new Date().toISOString() } = {},
+  {
+    protectedShas = [],
+    generatedAt = new Date().toISOString(),
+  } = {},
 ) {
   const root = realpathSync(repoRoot);
   const explicitShas = protectedShas.map(String);
@@ -215,26 +218,22 @@ export function buildOutputRetentionPreview(
     if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) {
       throw new Error(`managed output root is invalid: ${group.relativeRoot}`);
     }
-    const entries = readdirSync(absoluteRoot, { withFileTypes: true }).map(
-      (entry) => {
+    const entries = readdirSync(absoluteRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !entry.isSymbolicLink())
+      .map((entry) => {
         const absolute = path.join(absoluteRoot, entry.name);
-        const stat = lstatSync(absolute);
-        let size = {
-          bytes: stat.isFile() ? stat.size : 0,
-          files: stat.isFile() ? 1 : 0,
-        };
-        let hasSymbolicLink =
-          stat.isSymbolicLink() || (!stat.isFile() && !stat.isDirectory());
-        if (stat.isDirectory()) {
-          try {
-            size = directorySize(absolute);
-          } catch {
-            hasSymbolicLink = true;
-          }
+        const stat = statSync(absolute);
+        let size = { bytes: 0, files: 0 };
+        let hasSymbolicLink = false;
+        try {
+          size = directorySize(absolute);
+        } catch {
+          hasSymbolicLink = true;
         }
-        const identity = stat.isDirectory()
-          ? discoverIdentity({ absolute, name: entry.name }, group.receipt)
-          : { status: "unknown", gitSha: "", metadataStatus: "missing" };
+        const identity = discoverIdentity(
+          { absolute, name: entry.name },
+          group.receipt,
+        );
         return {
           name: entry.name,
           relativePath: path.posix.join(group.relativeRoot, entry.name),
@@ -245,8 +244,7 @@ export function buildOutputRetentionPreview(
           hasSymbolicLink,
           ...identity,
         };
-      },
-    );
+      });
     const protectedEntries = chooseProtectedEntries(
       entries,
       group.keepNewest,

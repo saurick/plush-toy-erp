@@ -11,49 +11,15 @@ export function runGit(root, args, options = {}) {
   // Name-only worktree diffs need a content comparison when stat refresh is disabled.
   const verifyContents =
     args[0] === "diff" &&
-    args.some((arg) =>
-      ["--name-only", "--name-status", "--raw"].includes(arg),
-    ) &&
+    args.some((arg) => ["--name-only", "--name-status", "--raw"].includes(arg)) &&
     !args.some((arg) =>
       ["--cached", "--staged", "--exit-code", "--quiet"].includes(arg),
     );
-  let queryArgs = args;
-  if (verifyContents) {
-    // --numstat computes content on Git versions where --name-only remains stat-based.
-    const contentArgs = args.filter(
-      (arg) => !["--name-only", "--name-status", "--raw", "-z"].includes(arg),
-    );
-    const raw = runGit(root, [
-      contentArgs[0],
-      "--numstat",
-      "-z",
-      ...contentArgs.slice(1),
-    ]);
-    const records = String(raw).split("\0");
-    const paths = [];
-    for (let i = 0; i < records.length; i += 1) {
-      const match = /^[^\t]*\t[^\t]*\t(.*)$/su.exec(records[i]);
-      if (!match) continue;
-      if (match[1]) paths.push(match[1]);
-      else paths.push(records[++i], records[++i]);
-    }
-    if (!paths.length) return options.encoding === null ? Buffer.alloc(0) : "";
-    const separator = args.indexOf("--");
-    queryArgs = [
-      ...(separator < 0 ? args : args.slice(0, separator)),
-      "--",
-      ...paths.map((value) => `:(literal)${value}`),
-    ];
-  }
+  const queryArgs = verifyContents ? ["diff", "--exit-code", ...args.slice(1)] : args;
   try {
     return execFileSync(
       "git",
-      [
-        "--no-optional-locks",
-        "-c",
-        "diff.autoRefreshIndex=false",
-        ...queryArgs,
-      ],
+      ["--no-optional-locks", "-c", "diff.autoRefreshIndex=false", ...queryArgs],
       {
         cwd: root,
         encoding: options.encoding ?? "utf8",
@@ -62,6 +28,8 @@ export function runGit(root, args, options = {}) {
       },
     );
   } catch (error) {
+    // --exit-code returns 1 for a valid diff; operational errors still fail closed.
+    if (verifyContents && error.status === 1 && !error.signal) return error.stdout;
     throw commandFailure(error, args);
   }
 }
@@ -94,12 +62,7 @@ export function resolveDefaultRange(root) {
   } catch (error) {
     let branch = "";
     try {
-      branch = runGit(root, [
-        "symbolic-ref",
-        "--quiet",
-        "--short",
-        "HEAD",
-      ]).trim();
+      branch = runGit(root, ["symbolic-ref", "--quiet", "--short", "HEAD"]).trim();
     } catch {
       // Detached HEAD without an explicit QA_BASE_RANGE may use the local fallback below.
     }
@@ -107,16 +70,8 @@ export function resolveDefaultRange(root) {
       let configuredRemote = "";
       let configuredMerge = "";
       try {
-        configuredRemote = runGit(root, [
-          "config",
-          "--get",
-          `branch.${branch}.remote`,
-        ]).trim();
-        configuredMerge = runGit(root, [
-          "config",
-          "--get",
-          `branch.${branch}.merge`,
-        ]).trim();
+        configuredRemote = runGit(root, ["config", "--get", `branch.${branch}.remote`]).trim();
+        configuredMerge = runGit(root, ["config", "--get", `branch.${branch}.merge`]).trim();
       } catch {
         // No configured upstream: a local-only branch may use the previous commit.
       }

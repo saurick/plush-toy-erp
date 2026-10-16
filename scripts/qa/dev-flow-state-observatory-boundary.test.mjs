@@ -114,17 +114,13 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(page, /items=\{PRIMARY_VIEWS\}/u);
   assert.equal(DEV_FLOW_STATE_DEFAULT_VIEW, "chain");
   assert.equal(DEV_FLOW_STATE_CATALOG.businessChainOverview.label, "订单全流程（销售到出货）");
-  assert.match(page, /topics=\{<BusinessChainTopics/u);
-  assert.doesNotMatch(page, /<details[^>]*data-business-chain-topics/u);
-  assert.match(guide, /按业务查阅/u);
-  assert.doesNotMatch(guide, /aria-label="履约流程视图"/u);
-  assert.match(guide, /onClick=\{closeException\}>返回\{current.label\}/u);
+  assert.match(page, /<TaskFulfillmentGuide[\s\S]*?<details[^>]*data-business-chain-topics/u);
   assert.match(guide, /关注岗位/u);
   assert.match(guide, /fulfillmentStepMatchesRole/u);
   assert.match(guide, /fulfillmentTaskLinks/u);
   assert.match(guide, /完整流程/u);
   assert.match(guide, /异常处理/u);
-  assert.match(guide, /<ol className="erp-dev-fulfillment-guide__steps"/u, "main fulfillment stages retain their direct overview");
+  assert.doesNotMatch(guide, /<details/u, "main fulfillment stages must stay visible");
   for (const copy of [
     "Workflow 管“人”", "ProcessRuntime 管“路”", "Fact / Ledger 管“账”",
     "状态机管“规则”", "业务链负责串起来", "基础资料提供标准",
@@ -268,12 +264,6 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
     "fact",
     "task_id",
     "flow_role",
-    "flow_stage",
-    "flow_substep",
-    "flow_tab",
-    "flow_exception",
-    "flow_decision",
-    "flow_exception_step",
   ]);
   const canonical = canonicalizeDevFlowStateSearchParams(
     new URLSearchParams(
@@ -318,8 +308,8 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
   assert.match(page, /data-business-chain-overview/u);
   assert.match(page, /data-overview-chain/u);
   assert.match(page, /data-overview-relation/u);
-  assert.match(page, /buildDevBusinessChainTopics\(catalog, role\)/u);
-  assert.match(page, /<Drawer title="系统衔接图"/u);
+  assert.match(page, /<details[\s\S]{0,140}?data-overview-lane/u);
+  assert.match(page, /open=\{lane\.key === 'primary'\}/u);
 });
 
 test("dev flow state observatory: customer review print is generated from the shared catalog and contains no second flow catalog", () => {

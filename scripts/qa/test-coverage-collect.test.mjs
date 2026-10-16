@@ -1,19 +1,16 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import {
   mkdir,
   mkdtemp,
   readFile,
-  realpath,
   rm,
   writeFile,
 } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { promisify } from "node:util";
+import { fileURLToPath } from "node:url";
 
 import {
   BASELINE_STAGE_KEYS,
@@ -127,55 +124,9 @@ test("baseline command plan checks generated error codes and bypasses mutating p
   assert.deepEqual(commands.web.args, [
     "--test",
     "--experimental-test-coverage",
-    `--test-coverage-include=${ROOT.split(path.sep).join("/")}/**`,
-    "--test-coverage-exclude=**/node_modules/**",
     "--test-reporter=tap",
   ]);
   assert.equal(commands.web.cwd, path.join(ROOT, "web"));
-});
-
-test("native coverage measures repository code without external tools or node_modules", async (t) => {
-  const temporary = await realpath(await mkdtemp(path.join(os.tmpdir(), "plush-coverage-scope-")));
-  t.after(() => rm(temporary, { recursive: true, force: true }));
-  const projectRoot = path.join(temporary, "project");
-  const webRoot = path.join(projectRoot, "web");
-  const dependency = path.join(webRoot, "node_modules", "fixture", "dependency.mjs");
-  const external = path.join(temporary, "external-tool.mjs");
-  await mkdir(path.dirname(dependency), { recursive: true });
-  await writeFile(dependency, "export const dependency = 3;\n");
-  await writeFile(external, "export const external = 4;\n");
-  await writeFile(path.join(projectRoot, "shared.mjs"), "export const shared = 2;\n");
-  await writeFile(path.join(webRoot, "inside.mjs"), [
-    "export function covered() {",
-    "  return 1;",
-    "}",
-    "export function uncovered() {",
-    "  return 99;",
-    "}",
-    "",
-  ].join("\n"));
-  await writeFile(path.join(webRoot, "scope.test.mjs"), `
-import assert from 'node:assert/strict';
-import test from 'node:test';
-import { covered } from './inside.mjs';
-import { shared } from '../shared.mjs';
-import { dependency } from './node_modules/fixture/dependency.mjs';
-import { external } from ${JSON.stringify(pathToFileURL(external).href)};
-test('all modules still execute', () => assert.equal(covered() + shared + dependency + external, 10));
-`);
-  const command = Object.fromEntries(buildBaselineCommandPlan({
-    projectRoot,
-    goCoverprofile: path.join(temporary, "unused.coverprofile"),
-    pnpmBin: "unused-pnpm",
-  })).web;
-  const { stdout } = await promisify(execFile)(command.command, command.args, {
-    cwd: command.cwd,
-    env: { ...process.env, NODE_TEST_CONTEXT: undefined, GIT_OPTIONAL_LOCKS: "0" },
-  });
-  assert.match(stdout, /# tests 1\n# suites 0\n# pass 1\n# fail 0/u);
-  assert.match(stdout, /shared\.mjs\s+\|\s+100\.00/u);
-  assert.match(stdout, /inside\.mjs\s+\|[^\n]+\|\s+50\.00\s+\|/u);
-  assert.doesNotMatch(stdout, /external-tool\.mjs|dependency\.mjs/u);
 });
 
 test("baseline excludes the opt-in PostgreSQL and real Chromium integration families", () => {

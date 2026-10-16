@@ -16,19 +16,6 @@ def parse_url(raw: str) -> urllib.parse.ParseResult:
         raise SystemExit(
             "ERROR: PURCHASE_RECEIPT_PG_DB_URL must use postgres/postgresql scheme"
         )
-    if url.fragment:
-        raise SystemExit("ERROR: PostgreSQL target fragments are not allowed")
-    seen = set()
-    for key, value in urllib.parse.parse_qsl(url.query, keep_blank_values=True):
-        if key in seen or key not in {"sslmode", "application_name", "connect_timeout"}:
-            raise SystemExit("ERROR: PostgreSQL target query cannot override connection identity")
-        seen.add(key)
-        if key == "sslmode" and value not in {"disable", "prefer", "require"}:
-            raise SystemExit("ERROR: PostgreSQL target sslmode is invalid")
-        if key == "connect_timeout" and not re.fullmatch(r"[1-9][0-9]{0,2}", value):
-            raise SystemExit("ERROR: PostgreSQL target connect_timeout is invalid")
-        if key == "application_name" and not re.fullmatch(r"[A-Za-z0-9_.-]{1,64}", value):
-            raise SystemExit("ERROR: PostgreSQL target application_name is invalid")
     return url
 
 

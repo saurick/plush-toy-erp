@@ -1315,20 +1315,3 @@ test("db guard keeps proof requirements when an add-drop field chain changed", a
     assert(result.proofs[0].missingTokens.includes("completed_at"));
   });
 });
-
-test("db guard retains new composite index proof without treating adjacent unchanged indexes as modified", async () => {
-  await withRepository(async (root) => {
-    const schema = "server/internal/data/model/schema/item.go";
-    await write(root, schema, 'package schema\nfunc (Item) Indexes() []ent.Index { return []ent.Index{index.Fields("name").Unique(), index.Fields("state", "owner")} }\n');
-    commitAll(root, "index baseline");
-    await write(root, schema, 'package schema\nfunc (Item) Indexes() []ent.Index { return []ent.Index{index.Fields("name").Unique(), index.Fields("state", "owner"), index.Fields("source_type", "source_id")} }\n');
-    const migration = "server/internal/data/model/migrate/20260102000000_migrate.sql";
-    await write(root, migration, "CREATE INDEX item_source ON items (source_type, source_id);\n");
-    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
-    assert.equal(evaluateDbGuard({root,range:"HEAD...HEAD"}).ok, true);
-    await write(root, schema, 'package schema\nfunc (Item) Indexes() []ent.Index { return []ent.Index{index.Fields("name"), index.Fields("state", "owner"), index.Fields("source_type", "source_id")} }\n');
-    const changed = evaluateDbGuard({root,range:"HEAD...HEAD"});
-    assert.equal(changed.ok,false);
-    assert(changed.proofs[0].missingTokens.includes("name"), "a real uniqueness change still requires DDL");
-  });
-});

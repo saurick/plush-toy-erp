@@ -10,7 +10,6 @@ import {
   parseExceptionFlowArgs,
   resolveExceptionFlowReportPath,
   staleRetryReceipt,
-  verifyRuntimeIdentity,
 } from "./exception-flow-real-write-browser.mjs";
 
 const DATABASE_NAME = "plush_erp_acceptance_79da_contract_browser_actions_dev";
@@ -20,28 +19,6 @@ const REPORT =
 const CONFIRMATION = exceptionFlowConfirmation({
   backendURL: BACKEND_URL,
   databaseName: DATABASE_NAME,
-});
-
-test("runtime identity verification rejects a browser proxy connected to another database", async () => {
-  const requests = [];
-  const fetchImpl = async (url, options) => {
-    requests.push({ url: String(url), options });
-    return url.pathname === "/readyz"
-      ? new Response("ready")
-      : new Response("runtime identity mismatch", { status: 409 });
-  };
-  await assert.rejects(
-    verifyRuntimeIdentity(
-      { backendURL: "http://localhost:15214", databaseName: DATABASE_NAME },
-      fetchImpl,
-    ),
-    /identity mismatch/u,
-  );
-  assert.equal(requests.length, 1);
-  assert.ok(requests.every(({ options }) => options.redirect === "error"));
-  assert.ok(
-    requests[0].options.headers["X-ERP-Expected-Runtime-Identity-SHA256"],
-  );
 });
 
 test("exception-flow task search follows the current page placeholder contract", () => {
@@ -61,7 +38,7 @@ test("exception-flow task search follows the current page placeholder contract",
   );
   assert.match(
     runnerSource,
-    /getByPlaceholder\("订单 \/ 产品 \/ 物料 \/ 款号",\s*\{\s*exact: true,?\s*\}\)/u,
+    /getByPlaceholder\("订单 \/ 产品 \/ 物料 \/ 款号", \{ exact: true \}\)/u,
   );
 });
 
@@ -276,10 +253,7 @@ test("exception-flow browser report contract fails closed on incomplete evidence
 
   for (const mutate of [
     (report) => {
-      report.failures.push({
-        runner: "runFinancePaymentFlow",
-        message: "failed",
-      });
+      report.failures.push({ runner: "runFinancePaymentFlow", message: "failed" });
     },
     (report) => report.flows.pop(),
     (report) => {

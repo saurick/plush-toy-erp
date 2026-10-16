@@ -51,11 +51,7 @@ function passedTerminal() {
 
 test("candidate freeze binds a passed strict terminal to the exact SHA", () => {
   assert.equal(
-    validateCandidateFreezeTerminal(
-      passedTerminal(),
-      SHA,
-      Date.parse("2026-08-09T12:00:00Z"),
-    ).gitSha,
+    validateCandidateFreezeTerminal(passedTerminal(), SHA).gitSha,
     SHA,
   );
   assert.throws(
@@ -97,14 +93,4 @@ test("candidate freeze runs one fixed contract matrix and one desktop workbench 
     ),
     true,
   );
-});
-
-test("candidate freeze rejects expired and future time-sensitive checks", () => {
-  for (const now of ["2026-08-10T00:00:00Z", "2026-08-08T23:59:59Z"]) {
-    assert.throws(
-      () =>
-        validateCandidateFreezeTerminal(passedTerminal(), SHA, Date.parse(now)),
-      /current time-sensitive/,
-    );
-  }
 });

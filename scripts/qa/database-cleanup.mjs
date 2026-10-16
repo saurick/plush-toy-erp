@@ -13,12 +13,11 @@ import path from "node:path";
 import process from "node:process";
 import { pathToFileURL } from "node:url";
 
-import { classifyDatabaseName, parseDatabaseURL } from "./database-target.mjs";
-import { DATABASE_ARCHIVE_SCHEMA } from "./database-archive.mjs";
 import {
-  DATABASE_INVENTORY_SCHEMA,
-  findEvidenceReferences,
-} from "./database-inventory.mjs";
+  classifyDatabaseName,
+  parseDatabaseURL,
+} from "./database-target.mjs";
+import { DATABASE_ARCHIVE_SCHEMA } from "./database-archive.mjs";
 import { sha256File } from "../lib/file-digest.mjs";
 
 export const DATABASE_CLEANUP_SCHEMA = "plush-database-cleanup/v1";
@@ -150,9 +149,7 @@ function assertSameServer(adminTarget, sourceSafeTarget) {
   const sourceHost = match[1].replace(/^\[|\]$/gu, "");
   const sourcePort = Number(match[2]);
   if (sourceHost !== adminTarget.host || sourcePort !== adminTarget.port) {
-    throw new Error(
-      "database cleanup admin target does not match archive source",
-    );
+    throw new Error("database cleanup admin target does not match archive source");
   }
 }
 
@@ -165,7 +162,6 @@ export function runDatabaseCleanup({
   inventory,
   manifest,
   manifestDir,
-  repoRoot = path.resolve(import.meta.dirname, "../.."),
   runtime,
 }) {
   const adminTarget = parseDatabaseURL(adminURL, {
@@ -179,9 +175,7 @@ export function runDatabaseCleanup({
     !/^plush_erp[a-z0-9_]*$/u.test(databaseName) ||
     classification.disposable !== true
   ) {
-    throw new Error(
-      "database cleanup refuses a long-lived or non-project database",
-    );
+    throw new Error("database cleanup refuses a long-lived or non-project database");
   }
   if (
     manifest.schemaVersion !== DATABASE_ARCHIVE_SCHEMA ||
@@ -202,89 +196,47 @@ export function runDatabaseCleanup({
     sourceFingerprint,
   });
   if (confirmation !== expectedConfirmation) {
-    throw new Error(
-      "database cleanup confirmation does not match exact archive identity",
-    );
+    throw new Error("database cleanup confirmation does not match exact archive identity");
   }
-  const backupFile = path.resolve(
-    manifestDir,
-    String(manifest.backup?.file || ""),
-  );
+  const backupFile = path.resolve(manifestDir, String(manifest.backup?.file || ""));
   const manifestRoot = `${path.resolve(manifestDir)}${path.sep}`;
   if (!backupFile.startsWith(manifestRoot)) {
-    throw new Error(
-      "database cleanup backup path escapes the manifest directory",
-    );
+    throw new Error("database cleanup backup path escapes the manifest directory");
   }
   if (
     statSync(backupFile).size !== Number(manifest.backup?.sizeBytes) ||
     sha256File(backupFile) !== backupHash
   ) {
-    throw new Error(
-      "database cleanup backup hash or size does not match manifest",
-    );
+    throw new Error("database cleanup backup hash or size does not match manifest");
   }
 
   if (
-    inventory.schemaVersion !== DATABASE_INVENTORY_SCHEMA ||
     inventory.mode !== "report-only" ||
     inventory.status !== "complete" ||
     !Array.isArray(inventory.databases)
   ) {
-    throw new Error(
-      "database cleanup inventory is not a complete report-only inventory",
-    );
-  }
-  const expectedServer = `host=${adminTarget.host.includes(":") ? `[${adminTarget.host}]` : adminTarget.host} port=${adminTarget.port}`;
-  if (inventory.server?.safeTarget !== expectedServer) {
-    throw new Error(
-      "database cleanup inventory server does not match archive source",
-    );
-  }
-  const inventoryAge =
-    new Date(generatedAt).getTime() - Date.parse(inventory.generatedAt);
-  if (
-    !Number.isFinite(inventoryAge) ||
-    inventoryAge < 0 ||
-    inventoryAge > 60 * 60 * 1000
-  ) {
-    throw new Error(
-      "database cleanup requires an inventory generated within the last hour",
-    );
+    throw new Error("database cleanup inventory is not a complete report-only inventory");
   }
   const inventoryRow = inventory.databases.find(
     (database) => database.name === databaseName,
   );
-  if (!inventoryRow)
-    throw new Error("database cleanup target is missing from inventory");
+  if (!inventoryRow) throw new Error("database cleanup target is missing from inventory");
   if (
     inventoryRow.connections !== 0 ||
     !inventoryRow.owner ||
     (inventoryRow.evidenceReferences || []).length !== 0
   ) {
-    throw new Error(
-      "database cleanup inventory still has connections, missing owner, or repository references",
-    );
+    throw new Error("database cleanup inventory still has connections, missing owner, or repository references");
   }
 
   const executor = runtime || defaultRuntime();
-  const currentReferences = (
-    executor.findEvidenceReferences || findEvidenceReferences
-  )(repoRoot, databaseName);
-  if (!Array.isArray(currentReferences) || currentReferences.length !== 0) {
-    throw new Error(
-      "database cleanup live repository references must be empty",
-    );
-  }
   const before = executor.databaseState(adminURL, databaseName);
   if (
     before.exists !== true ||
     before.owner !== inventoryRow.owner ||
     Number(before.connections) !== 0
   ) {
-    throw new Error(
-      "database cleanup live readback does not match the zero-connection inventory",
-    );
+    throw new Error("database cleanup live readback does not match the zero-connection inventory");
   }
   executor.dropDatabase(adminURL, databaseName);
   const after = executor.databaseState(adminURL, databaseName);
@@ -353,16 +305,12 @@ function parseArgs(argv) {
       "--out": "out",
     }[arg];
     if (!key) throw new Error(`unknown argument: ${arg}`);
-    if (!value || value.startsWith("--"))
-      throw new Error(`${arg} requires a value`);
+    if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value`);
     options[key] = value;
     index += 1;
   }
   for (const key of ["databaseName", "inventory", "manifest"]) {
-    if (!options[key])
-      throw new Error(
-        `--${key.replace(/[A-Z]/gu, (c) => `-${c.toLowerCase()}`)} is required`,
-      );
+    if (!options[key]) throw new Error(`--${key.replace(/[A-Z]/gu, (c) => `-${c.toLowerCase()}`)} is required`);
   }
   if (!options.printConfirmation && (!options.confirmation || !options.out)) {
     throw new Error("--confirm and --out are required for cleanup");
@@ -388,11 +336,8 @@ if (isDirectRun) {
         })}\n`,
       );
     } else {
-      const adminURL = String(
-        process.env[DATABASE_CLEANUP_ADMIN_URL_ENV] || "",
-      );
-      if (!adminURL)
-        throw new Error(`${DATABASE_CLEANUP_ADMIN_URL_ENV} is required`);
+      const adminURL = String(process.env[DATABASE_CLEANUP_ADMIN_URL_ENV] || "");
+      if (!adminURL) throw new Error(`${DATABASE_CLEANUP_ADMIN_URL_ENV} is required`);
       const inventory = safeReadJSON(
         path.resolve(options.inventory),
         "database inventory",

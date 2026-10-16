@@ -48,7 +48,7 @@ const forbiddenRuntimeFactReferences = [
 const factReadProjections = new Map([
   ["server/internal/data/workflow_task_display_context.go", []],
   ["server/internal/data/workflow_task_identity_search.go", ["production_facts", "shipment_items"]],
-  ["server/internal/data/workflow_task_source_links.go", ["production_facts", "outsourcing_facts", "finance_facts"]],
+  ["server/internal/data/workflow_task_source_links.go", ["production_facts", "outsourcing_facts"]],
   ["server/internal/data/workflow_task_discovery.go", ["production_facts", "outsourcing_facts"]],
   ["server/internal/data/workflow_handling_chain.go", ["production_facts", "outsourcing_facts"]],
   ["server/internal/data/workflow_exceptions.go", ["outsourcing_facts"]],

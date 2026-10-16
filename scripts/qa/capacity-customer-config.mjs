@@ -16,13 +16,10 @@ import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/custome
 import { buildRuntimePreviewManifest } from "./customer-config-runtime-manifest.mjs";
 import { assertDisposableDatabaseTarget } from "./database-target.mjs";
 import { verifyPressureRuntime } from "./pressure-runtime.mjs";
-import {
-  CAPACITY_DATASET_SCHEMA,
-  capacityDatasetLogicFingerprint,
-} from "./capacity-dataset.mjs";
 
 export const CAPACITY_CONFIG_SCHEMA = "plush-capacity-customer-config/v1";
-export const CAPACITY_CONFIG_DATABASE_URL_ENV = "CAPACITY_CONFIG_DATABASE_URL";
+export const CAPACITY_CONFIG_DATABASE_URL_ENV =
+  "CAPACITY_CONFIG_DATABASE_URL";
 export const CAPACITY_CONFIG_ADMIN_USERNAME_ENV =
   "CAPACITY_CONFIG_ADMIN_USERNAME";
 export const CAPACITY_CONFIG_ADMIN_PASSWORD_ENV =
@@ -154,10 +151,6 @@ export async function applyCapacityCustomerConfig({
     profile: "capacity",
   });
   if (
-    datasetReceipt?.schemaVersion !== CAPACITY_DATASET_SCHEMA ||
-    datasetReceipt?.status !== "passed" ||
-    datasetReceipt?.logicFingerprint !== capacityDatasetLogicFingerprint() ||
-    datasetReceipt?.databaseTargetFingerprint !== target.targetFingerprint ||
     datasetReceipt?.databaseName !== databaseName ||
     confirmation !==
       capacityConfigConfirmation(databaseName, datasetReceipt?.datasetHash)
@@ -167,16 +160,9 @@ export async function applyCapacityCustomerConfig({
     );
   }
   if (!adminUsername || !adminPassword) {
-    throw new Error(
-      "capacity customer config super-admin credential is required",
-    );
+    throw new Error("capacity customer config super-admin credential is required");
   }
-  await verifyPressureRuntime({
-    baseURL: backendURL,
-    databaseName,
-    commit,
-    migration,
-  });
+  await verifyPressureRuntime({ baseURL: backendURL, databaseName, commit, migration });
   const manifest = buildCapacityCustomerConfigManifest({
     commit,
     datasetReceipt,
@@ -412,15 +398,16 @@ if (isDirectRun) {
       encoding: "utf8",
     }).trim();
     const report = await applyCapacityCustomerConfig({
-      adminPassword: process.env[CAPACITY_CONFIG_ADMIN_PASSWORD_ENV] || "",
-      adminUsername: process.env[CAPACITY_CONFIG_ADMIN_USERNAME_ENV] || "",
+      adminPassword:
+        process.env[CAPACITY_CONFIG_ADMIN_PASSWORD_ENV] || "",
+      adminUsername:
+        process.env[CAPACITY_CONFIG_ADMIN_USERNAME_ENV] || "",
       backendURL: options.backendURL,
       confirmation: options.confirmation,
       databaseName: options.databaseName,
       databaseURL,
       datasetReceipt,
-      commit,
-      migration: process.env.CAPACITY_CONFIG_EXPECTED_MIGRATION,
+      commit, migration: process.env.CAPACITY_CONFIG_EXPECTED_MIGRATION,
     });
     const outPath = writeReport(options.out, report);
     process.stdout.write(

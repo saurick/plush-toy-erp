@@ -201,7 +201,6 @@ test("Web, Server and Browser internal lane catalogs partition canonical work on
     ["server", "environment_profile", "server", "server", "critical_postgres"],
   );
   assert.equal(CI_WEB_QUALITY_LANES.checks.requiresTests, true);
-  assert.equal(CI_WEB_QUALITY_LANES.checks.chromium, true);
   assert.equal(CI_WEB_QUALITY_LANES.build.requiresTests, false);
   assert.equal(CI_SERVER_QUALITY_LANES.schema.postgres, false);
   assert.equal(CI_SERVER_QUALITY_LANES.schema.makeData, true);

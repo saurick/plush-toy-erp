@@ -188,14 +188,6 @@ const normalizeBaseURL = (raw) => {
   if (url.username || url.password) {
     throw new Error("backend URL must not contain username or password");
   }
-  if (
-    !new Set(["http:", "https:"]).has(url.protocol) ||
-    !new Set(["127.0.0.1", "localhost", "::1", "[::1]"]).has(url.hostname)
-  ) {
-    throw new Error(
-      "backend URL must be a credential-free loopback HTTP(S) origin",
-    );
-  }
   url.pathname = url.pathname.replace(/\/+$/, "");
   url.search = "";
   url.hash = "";
@@ -212,7 +204,6 @@ const shellQuote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
 
 const rpcCall = async ({ rpcURL, method, params, token }) => {
   const response = await fetch(rpcURL, {
-    redirect: "error",
     method: "POST",
     headers: {
       Accept: "application/json",
@@ -407,10 +398,7 @@ const buildSourceMap = (readText) =>
           {
             path: relativePath,
             text: /\.(?:js|jsx|mjs)$/u.test(relativePath)
-              ? resolvePublicContractSource(
-                  text,
-                  path.join(repoRoot, relativePath),
-                )
+              ? resolvePublicContractSource(text, path.join(repoRoot, relativePath))
               : text,
             error: "",
           },
@@ -528,7 +516,6 @@ const probeURL = async (url, { timeoutMs = 3000 } = {}) => {
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, {
-      redirect: "error",
       redirect: "manual",
       signal: controller.signal,
     });

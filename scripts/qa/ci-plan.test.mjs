@@ -6,16 +6,6 @@ import { buildCIPlan, CI_FULL_CHANGE_PATTERNS, isDocumentationOnlyCIChange } fro
 
 const ROOT = path.resolve(import.meta.dirname, "../..");
 
-function matchesGitLabChangePattern(file, pattern) {
-  if (pattern === "server/docs/database/**") {
-    return file.startsWith("server/docs/database/");
-  }
-  assert(pattern.startsWith("**/"));
-  const basenamePattern = pattern.slice(3);
-  const expression = basenamePattern.replaceAll("*", ".*");
-  return new RegExp(`^${expression}$`, "u").test(path.posix.basename(file));
-}
-
 test("docs CI prepares locked Mermaid dependencies without database or browser tooling", () => {
   const plan = buildCIPlan({
     files: ["progress.md", "docs/customers/yoyoosun/客户交付矩阵.md", "web/README.md", "server/README.md"],
@@ -42,7 +32,10 @@ test("GitLab full-path patterns match the conservative documentation classifier"
     paths.push(...names.flatMap((name) => [name, `nested/${name}`]));
   }
   for (const file of paths.filter((value) => ![".", "..", "nested/.", "nested/.."].includes(value))) {
-    assert.equal(CI_FULL_CHANGE_PATTERNS.some((pattern) => matchesGitLabChangePattern(file, pattern)), !isDocumentationOnlyCIChange([file]), file);
+    // Node's glob hides dotfiles; Ruby/GitLab enables FNM_DOTMATCH. Prefix hidden
+    // segments here without altering the extension or database-docs prefix.
+    const visiblePath = file.replace(/(^|\/)\./gu, "$1x.");
+    assert.equal(CI_FULL_CHANGE_PATTERNS.some((pattern) => path.matchesGlob(visiblePath, pattern)), !isDocumentationOnlyCIChange([file]), file);
   }
 });
 

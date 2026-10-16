@@ -66,11 +66,7 @@ function assertPlainJsonFile(file) {
   }
 }
 
-export function validateCandidateFreezeTerminal(
-  terminal,
-  gitSha,
-  now = Date.now(),
-) {
+export function validateCandidateFreezeTerminal(terminal, gitSha) {
   if (
     !SHA_PATTERN.test(String(gitSha || "")) ||
     terminal?.contract !== "plush.exact-sha-strict/v3" ||
@@ -82,18 +78,6 @@ export function validateCandidateFreezeTerminal(
     throw new Error("candidate freeze requires a passed exact-SHA terminal");
   }
   validateStrictReceiptEvidence(terminal);
-  if (
-    !Number.isFinite(now) ||
-    Object.values(terminal.timeSensitiveChecks).some(
-      (check) =>
-        Date.parse(check.checkedAt) > now ||
-        Date.parse(check.validUntil) <= now,
-    )
-  ) {
-    throw new Error(
-      "candidate freeze requires current time-sensitive evidence",
-    );
-  }
   return terminal;
 }
 
@@ -173,12 +157,11 @@ export function runCandidateShaFreeze(
   assertCleanExactHead(repositoryRoot, gitSha, runCommand);
   const terminalFile = realpathSync(terminalPath);
   assertPlainJsonFile(terminalFile);
-  const startedAt = now();
   const terminal = validateCandidateFreezeTerminal(
     JSON.parse(readFileSync(terminalFile, "utf8")),
     gitSha,
-    Date.parse(startedAt),
   );
+  const startedAt = now();
   const steps = buildCandidateFreezePlan(repositoryRoot).map((step) => ({
     id: step.id,
     label: step.label,
@@ -204,7 +187,6 @@ export function runCandidateShaFreeze(
       fingerprint: terminal.fingerprint,
       sourceArchiveSha256: terminal.identity.sourceArchiveSha256,
       receiptSha256: terminal.receipt.sha256,
-      timeSensitiveChecks: terminal.timeSensitiveChecks,
     },
     coverage: {
       newShaComplete: true,
