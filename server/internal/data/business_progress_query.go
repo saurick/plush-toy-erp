@@ -185,10 +185,18 @@ func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []an
 	cte, args := progressCTE(q)
 	bind := func(v any) string { args = append(args, v); return fmt.Sprintf("$%d", len(args)) }
 	local := q.SnapshotAt.In(time.FixedZone("Asia/Shanghai", 8*3600))
-	dayArg, soonArg := bind(local.Format("2006-01-02")), bind(local.AddDate(0, 0, 7).Format("2006-01-02"))
+	dayArg, soonArg := bind(local.Format("2006-01-02")), bind(local.AddDate(0, 0, 6).Format("2006-01-02"))
 	dueDate := progressDateSQL("b.due_at", sqlDialect)
+	dateConditions := []string{"1=1"}
+	if q.DateFrom != "" {
+		dateConditions = append(dateConditions, dueDate+">="+bind(q.DateFrom))
+	}
+	if q.DateTo != "" {
+		dateConditions = append(dateConditions, dueDate+"<="+bind(q.DateTo))
+	}
 	cte += ", base AS (" + progressBase(q) + `), joined AS (
  SELECT b.*,` + dueDate + ` AS due_date,
+ CASE WHEN ` + strings.Join(dateConditions, " AND ") + ` THEN 1 ELSE 0 END AS in_date_range,
  CASE WHEN b.active=1 AND ` + dueDate + `<` + dayArg + ` THEN 1 ELSE 0 END AS overdue,
  CASE WHEN b.active=1 AND ` + dueDate + `>=` + dayArg + ` AND ` + dueDate + `<=` + soonArg + ` THEN 1 ELSE 0 END AS due_soon,
  CASE WHEN b.active=1 AND COALESCE(t.blocked_tasks,0)>0 THEN 1 ELSE 0 END AS blocked,
@@ -215,12 +223,6 @@ func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []an
 	}
 	if q.Scope == "ended" {
 		cte += " AND j.active=0"
-	}
-	if q.DateFrom != "" {
-		cte += " AND j.due_date>=" + bind(q.DateFrom)
-	}
-	if q.DateTo != "" {
-		cte += " AND j.due_date<=" + bind(q.DateTo)
 	}
 	like := func(value string) string {
 		return bind("%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(strings.ToLower(value)) + "%")
@@ -258,17 +260,43 @@ func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []an
 	return cte + ")", args
 }
 
-func progressRiskWhere(q biz.BusinessProgressQuery) string {
-	switch q.Risk {
-	case "overdue", "due_soon", "blocked":
-		return " WHERE " + q.Risk + "=1"
-	case "undated":
-		return " WHERE due_at IS NULL"
-	case "unlinked":
-		return " WHERE unlinked=1"
-	default:
-		return ""
+// Each facet count is the result of selecting that option while retaining the
+// other dimensions. Undated selection clears the date range in both clients.
+func progressFilterCondition(q biz.BusinessProgressQuery) string {
+	conditions := []string{"1=1"}
+	if q.DueStatus != "undated" {
+		conditions = append(conditions, "in_date_range=1")
 	}
+	switch q.DueStatus {
+	case "overdue", "due_soon":
+		conditions = append(conditions, q.DueStatus+"=1")
+	case "undated":
+		conditions = append(conditions, "due_at IS NULL")
+	}
+	if q.BlockedOnly {
+		conditions = append(conditions, "blocked=1")
+	}
+	if q.UnlinkedOnly {
+		conditions = append(conditions, "unlinked=1")
+	}
+	return strings.Join(conditions, " AND ")
+}
+
+func progressCountsSQL(q biz.BusinessProgressQuery) string {
+	columns := []string{}
+	for _, due := range []string{"all", "overdue", "due_soon", "undated", "blocked", "unlinked"} {
+		candidate := q
+		switch due {
+		case "blocked":
+			candidate.BlockedOnly = true
+		case "unlinked":
+			candidate.UnlinkedOnly = true
+		default:
+			candidate.DueStatus = due
+		}
+		columns = append(columns, "COALESCE(SUM(CASE WHEN "+progressFilterCondition(candidate)+" THEN 1 ELSE 0 END),0)")
+	}
+	return " SELECT " + strings.Join(columns, ",") + " FROM filtered"
 }
 
 // Dates entered by business users follow the deployment's China civil day;

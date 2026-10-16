@@ -15,11 +15,15 @@ func requestedBusinessStatusCounts(params map[string]any, load func() (map[strin
 	if err != nil {
 		return nil, err
 	}
+	return businessStatusCountsToAny(counts), nil
+}
+
+func businessStatusCountsToAny(counts map[string]int) map[string]any {
 	values := make(map[string]any, len(counts))
 	for status, count := range counts {
 		values[status] = count
 	}
-	return values, nil
+	return values
 }
 
 func withBusinessStatusCounts(fields map[string]any, counts map[string]any) map[string]any {

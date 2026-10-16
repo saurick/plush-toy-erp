@@ -99,3 +99,20 @@ func TestSensitiveFieldMutationPermissionFailsClosed(t *testing.T) {
 		t.Fatalf("field permission should allow mutation precondition, got %#v", allowed)
 	}
 }
+
+func TestSensitiveFieldOrderCurrencyFollowsCommercialPermission(t *testing.T) {
+	for _, domain := range []string{"sales", "procurement"} {
+		value := map[string]any{"currency": "USD", "currency_snapshot": "USD", "payment_term_days": 30, "bank_account": "private", "paid_amount": "20"}
+		policy := sensitiveFieldReadPolicy{salesCommercial: domain == "sales", procurementCommercial: domain == "procurement"}
+		redactSensitiveFieldMap(value, domain, policy)
+		if value["currency"] != "USD" || value["currency_snapshot"] != "USD" || value["payment_term_days"] != 30 {
+			t.Fatalf("contract fields lost: %v", value)
+		}
+		if _, ok := value["paid_amount"]; ok {
+			t.Fatal("finance settlement leaked")
+		}
+		if _, ok := value["bank_account"]; ok {
+			t.Fatal("private bank data leaked")
+		}
+	}
+}
