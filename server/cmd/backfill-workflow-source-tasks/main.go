@@ -48,6 +48,13 @@ func main() {
 	if err := db.PingContext(ctx); err != nil {
 		fail("ping PostgreSQL: %v", err)
 	}
+	var connectedDatabase string
+	if err := db.QueryRowContext(ctx, "SELECT current_database()").Scan(&connectedDatabase); err != nil {
+		fail("read connected PostgreSQL database: %v", err)
+	}
+	if err := validateConnectedDatabase(databaseName, connectedDatabase, *confirmDatabase, *apply); err != nil {
+		fail("%v", err)
+	}
 	result, err := data.BackfillMissingWorkflowSourceTasks(ctx, db, *apply)
 	if err != nil {
 		fail("workflow source-task backfill failed: %v", err)
@@ -69,6 +76,13 @@ func main() {
 	if err := encoder.Encode(payload); err != nil {
 		fail("encode result: %v", err)
 	}
+}
+
+func validateConnectedDatabase(declared, connected, confirmation string, apply bool) error {
+	if connected != declared || (apply && strings.TrimSpace(confirmation) != connected) {
+		return fmt.Errorf("connected PostgreSQL database does not match the declared and confirmed target")
+	}
+	return nil
 }
 
 func postgresDatabaseName(raw string) (string, error) {

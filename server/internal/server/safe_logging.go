@@ -52,8 +52,10 @@ func safeServerLogging(logger log.Logger) middleware.Middleware {
 				"latency", time.Since(start).Seconds(),
 			}
 			failed := err != nil
-			if _, ok := req.(*v1.PostJsonrpcRequest); ok {
+			if rpcReq, ok := req.(*v1.PostJsonrpcRequest); ok {
 				response, _ := reply.(*v1.PostJsonrpcReply)
+				route, method := rpcTraceOperation(rpcReq, reply)
+				fields = append(fields, "rpc.service", route, "rpc.method", method)
 				outcome := requestOutcome(req, reply, err)
 				switch outcome {
 				case "error":
@@ -84,7 +86,8 @@ func safeRequestSummary(req any) string {
 		if value == nil {
 			return "jsonrpc.post"
 		}
-		return fmt.Sprintf("jsonrpc.post url=%s method=%s id=%s", value.GetUrl(), value.GetMethod(), value.GetId())
+		route, method := rpcTraceOperation(value, nil)
+		return fmt.Sprintf("jsonrpc.post url=%s method=%s id=%s", route, method, safeRequestID(value.GetId()))
 	default:
 		return fmt.Sprintf("type=%T", req)
 	}
