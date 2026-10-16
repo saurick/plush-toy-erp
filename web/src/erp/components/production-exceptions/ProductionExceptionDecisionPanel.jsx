@@ -124,7 +124,6 @@ function mutationReceiptMatches(item, action, reason, actorID) {
 export default function ProductionExceptionDecisionPanel({
   adminProfile,
   onRefreshReady,
-  onSummaryChange,
 }) {
   const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -185,7 +184,6 @@ export default function ProductionExceptionDecisionPanel({
         setTotal(0)
         setSelectedID(null)
         setLoading(false)
-        onSummaryChange?.({ total: 0, pageCount: 0 })
         request.finish()
       }
       return []
@@ -207,7 +205,6 @@ export default function ProductionExceptionDecisionPanel({
         setRows([exactRecord])
         setTotal(1)
         setSelectedID(exactRecord.id)
-        onSummaryChange?.({ total: 1, pageCount: 1 })
         return [exactRecord]
       }
 
@@ -251,17 +248,12 @@ export default function ProductionExceptionDecisionPanel({
           current: pageState.current,
         }))
       }
-      onSummaryChange?.({
-        total: page.total,
-        pageCount: pageState.records.length,
-      })
       return pageState.records
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) return null
       setRows([])
       setTotal(0)
       setSelectedID(null)
-      onSummaryChange?.({ total: 0, pageCount: 0 })
       message.error(getActionErrorMessage(error, '读取生产异常处置申请'))
       return null
     } finally {
@@ -278,8 +270,7 @@ export default function ProductionExceptionDecisionPanel({
     hasExactContext,
     hasRouteProductionOrder,
     linkedProductionExceptionID,
-    onSummaryChange,
-    pagination,
+      pagination,
     routeProductionOrderID,
     statusFilter,
   ])
