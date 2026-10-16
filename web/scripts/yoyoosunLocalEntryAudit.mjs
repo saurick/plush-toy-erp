@@ -13,14 +13,15 @@ const execFileAsync = promisify(execFile)
 const webRoot = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webRoot, '..')
 const devPorts = loadDevPorts(repoRoot)
-export const defaultYoyoosunEntryAuditPorts = Object.freeze([
-  ...new Set([
+export const defaultYoyoosunEntryAuditPorts = Object.freeze(
+  [...new Set([
     ...Array.from({ length: 5 }, (_, offset) => String(devPorts.web + offset)),
-    ...Array.from({ length: 5 }, (_, offset) =>
-      String(devPorts.auxStart + offset)
+    ...Array.from(
+      { length: 5 },
+      (_, offset) => String(devPorts.auxStart + offset)
     ),
-  ]),
-])
+  ])]
+)
 const defaultBackendHealthURL = `http://127.0.0.1:${devPorts.http}/healthz`
 
 function parseArgs(argv) {
@@ -126,9 +127,6 @@ function normalizeSafeURL(raw, label) {
     throw new Error(`${label} is required`)
   }
   const url = new URL(value)
-  if (!['http:', 'https:'].includes(url.protocol)) {
-    throw new Error(`${label} must use HTTP or HTTPS`)
-  }
   if (url.username || url.password) {
     throw new Error(`${label} must not include username or password`)
   }
@@ -219,12 +217,7 @@ export function classifyAssetResponse({ ok, status, contentType }) {
 
 export async function buildYoyoosunLocalEntryAudit(options = {}, runtime = {}) {
   const customer = normalizeDevCustomerKey(options.customer || 'yoyoosun')
-  const externalURL = options.baseURL
-    ? new URL(normalizeSafeURL(options.baseURL, 'frontend URL'))
-    : null
-  const ports = externalURL
-    ? [externalURL.port || (externalURL.protocol === 'https:' ? '443' : '80')]
-    : parsePorts(options.ports || defaultYoyoosunEntryAuditPorts)
+  const ports = parsePorts(options.ports || defaultYoyoosunEntryAuditPorts)
   const backendHealthURL = normalizeSafeURL(
     options.backendHealthURL || defaultBackendHealthURL,
     'backend health URL'
@@ -235,12 +228,9 @@ export async function buildYoyoosunLocalEntryAudit(options = {}, runtime = {}) {
 
   const portReports = []
   for (const port of ports) {
-    const baseURL = externalURL?.origin || `http://localhost:${port}`
-    const local =
-      !externalURL ||
-      ['localhost', '127.0.0.1', '[::1]'].includes(externalURL.hostname)
+    const baseURL = `http://localhost:${port}`
     const [processInfo, configResponse, assetResponse] = await Promise.all([
-      local ? getPortProcess(port) : Promise.resolve({}),
+      getPortProcess(port),
       fetchText(`${baseURL}/customer-config.js`),
       fetchHead(
         `${baseURL}/customer-assets/${customer}/favicon-${customer}.svg`

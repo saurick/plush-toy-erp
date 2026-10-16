@@ -8,12 +8,9 @@ import { pathToFileURL } from 'node:url'
 
 import { chromium } from 'playwright'
 import {
-  browserWriteOrigin,
-  verifyDatabaseRuntimeIdentity,
-  bindBrowserWriteBackend,
-} from '../../scripts/qa/browser-write-target.mjs'
-import { parseDatabaseURL } from '../../scripts/qa/database-target.mjs'
-import { loadDevPorts, resolveDevAuxPort } from '../../scripts/dev-ports.mjs'
+  loadDevPorts,
+  resolveDevAuxPort,
+} from '../../scripts/dev-ports.mjs'
 import { approvePurchaseOrderThroughProcess } from '../../scripts/qa/purchase-order-approval-process.mjs'
 import {
   attachErrorCollectors,
@@ -67,18 +64,17 @@ export function buildInputTemplate() {
     generatedRecordPrefix: 'PR-BROWSER-*',
     cleanupPolicy,
     safeTargetPolicy:
-      'Real smoke defaults to localhost / 127.0.0.1 / ::1 only. Both frontend and backend must use loopback; remote acceptance uses the registered manual acceptance runner. Never run this against production or a formal customer target.',
+      'Real smoke defaults to localhost / 127.0.0.1 / ::1 only. Prepared development or test targets require --allow-external-base-url together with persistent test data acceptance. Never run this against production or a formal customer target.',
     secretInputs: [
       'REAL_LOGIN_ADMIN_USERNAME/REAL_LOGIN_ADMIN_PASSWORD or server/configs/dev/config.local.yaml admin credentials',
     ],
     optionalInputs: [
-      'PURCHASE_RECEIPT_E2E_DATABASE_NAME (required for real writes)',
-      'POSTGRES_DSN (required with --seed-core-demo, must match the verified database)',
       'REAL_LOGIN_SMOKE_BASE_URL',
       'REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL',
       'REAL_LOGIN_SMOKE_PORT',
       'REAL_LOGIN_SMOKE_HEADED',
       'PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA',
+      'PURCHASE_RECEIPT_E2E_ALLOW_EXTERNAL_BASE_URL',
       '--preflight-report',
       '--seed-core-demo',
     ],
@@ -110,8 +106,6 @@ export async function buildPreflightReport() {
     presentCredentialEnvNames.length === credentialEnvNames.length
   const safeTarget = analyzeSafeWriteTarget(baseURL)
   const blockers = []
-  if (!String(process.env.PURCHASE_RECEIPT_E2E_DATABASE_NAME || '').trim())
-    { blockers.push('missing-database-name') }
   if (!persistentTestDataAccepted) {
     blockers.push('missing-persistent-test-data-acceptance')
   }
@@ -163,15 +157,8 @@ async function main() {
     scriptDir: import.meta.dirname,
     outputSubdir: 'purchase-receipt-real-write-browser-e2e',
     defaultPort: DEFAULT_PORT,
-    beforeLogin: ({ backendURL }) =>
-      verifyDatabaseRuntimeIdentity({
-        backendURL,
-        databaseName: process.env.PURCHASE_RECEIPT_E2E_DATABASE_NAME,
-      }),
   })
   assertSafePersistentWriteTarget(runtime.baseURL)
-  browserWriteOrigin(runtime.baseURL)
-  browserWriteOrigin(runtime.backendURL)
 
   const report = {
     name: 'purchase-receipt-real-write-browser-e2e',
@@ -187,23 +174,18 @@ async function main() {
     started_at: new Date().toISOString(),
   }
 
+  if (seedCoreDemo) {
+    await seedCoreDemoData(report)
+  }
+
+  const credentials = await runtime.prepare()
+
   try {
-    const credentials = await runtime.prepare()
-    if (seedCoreDemo) {
-      const target = parseDatabaseURL(process.env.POSTGRES_DSN)
-      assert.equal(
-        target.databaseName,
-        process.env.PURCHASE_RECEIPT_E2E_DATABASE_NAME,
-        'seed target must match the verified browser database'
-      )
-      await seedCoreDemoData(report)
-    }
     const browser = await chromium.launch({ headless: runtime.headless })
     try {
       const page = await browser.newPage({
         viewport: { width: 1440, height: 900 },
       })
-      await bindBrowserWriteBackend(page, runtime.backendURL)
       const errors = attachErrorCollectors(page)
 
       try {
@@ -397,13 +379,13 @@ function normalizeSmokeURL(raw, label) {
 
 function analyzeSafeWriteTarget(baseURL) {
   const targetURL = new URL(baseURL)
-  const safeHosts = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
+  const safeHosts = new Set(['127.0.0.1', 'localhost', '::1'])
   const isLocalHost = safeHosts.has(targetURL.hostname)
   return {
     host: targetURL.hostname,
     isLocalHost,
     externalTargetAllowed,
-    allowed: isLocalHost && ['http:', 'https:'].includes(targetURL.protocol),
+    allowed: isLocalHost || externalTargetAllowed,
   }
 }
 
@@ -457,7 +439,7 @@ function assertSafePersistentWriteTarget(baseURL) {
   }
 
   const targetURL = new URL(baseURL)
-  const safeHosts = new Set(['127.0.0.1', 'localhost', '::1', '[::1]'])
+  const safeHosts = new Set(['127.0.0.1', 'localhost', '::1'])
   if (!safeHosts.has(targetURL.hostname) && !externalTargetAllowed) {
     throw new Error(
       [

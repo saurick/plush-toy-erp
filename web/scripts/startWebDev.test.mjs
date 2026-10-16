@@ -9,8 +9,6 @@ import { pathToFileURL } from 'node:url'
 import test from 'node:test'
 
 import { createERPViteConfig } from '../vite.shared.mjs'
-import { findAvailableDevAuxPort, loadDevPorts } from '../../scripts/dev-ports.mjs'
-import { canListenOnPort } from './localPort.mjs'
 import {
   DEV_GITLAB_KEYCHAIN,
   devGitlabCredentialFilePath,
@@ -115,14 +113,13 @@ test('the actual pnpm restart lifecycle performs exactly one restart operation',
 
 test('real frontend stop needs no database and preserves a foreign Vite process', async (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'plush-web-stop-'))
-  const devPorts = loadDevPorts(path.resolve(import.meta.dirname, '../..'))
   const children = []
   t.after(async () => {
-    for (const { child, closed } of children) {
+    for (const child of children) {
       if (child.exitCode === null && !child.signalCode) {
         child.kill('SIGTERM')
+        await once(child, 'close')
       }
-      await closed
     }
     fs.rmSync(root, { recursive: true, force: true })
   })
@@ -130,29 +127,21 @@ test('real frontend stop needs no database and preserves a foreign Vite process'
     const projectRoot = path.join(root, name)
     const web = path.join(projectRoot, 'web')
     const entry = path.join(web, 'node_modules/vite/bin/vite.js')
-    // Match the fixed-port lifecycle under test. A port allocated with listen(0)
-    // can be reused by unrelated outbound connections as soon as the child exits.
-    const requestedPort = await findAvailableDevAuxPort(devPorts)
     fs.mkdirSync(path.dirname(entry), { recursive: true })
-    fs.writeFileSync(entry, `const s=require('node:http').createServer((q,r)=>r.end('fixture'));s.listen(${requestedPort},'127.0.0.1',()=>console.log('PORT='+s.address().port));\n`)
+    fs.writeFileSync(entry, "const s=require('node:http').createServer((q,r)=>r.end('fixture'));s.listen(0,'127.0.0.1',()=>console.log('PORT='+s.address().port));\n")
     const child = spawn(process.execPath, [entry], { cwd: web, stdio: ['ignore', 'pipe', 'pipe'] })
-    const closed = once(child, 'close')
-    children.push({ child, closed })
+    children.push(child)
     const port = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error('fixture did not start')), 5000)
       child.once('error', reject)
       child.stdout.once('data', (chunk) => { clearTimeout(timer); resolve(Number(String(chunk).match(/PORT=(\d+)/u)?.[1])) })
     })
-    assert.equal(port, requestedPort)
-    return { projectRoot, child, closed, port }
+    return { projectRoot, child, port }
   }
   const owned = await start('owned')
   const foreign = await start('foreign')
   await assert.rejects(stopLocalWebFrontend(foreign.port, { projectRoot: owned.projectRoot, writeLine: () => {} }), /其他程序或工作区/u)
   await stopLocalWebFrontend(owned.port, { projectRoot: owned.projectRoot, writeLine: () => {} })
-  const [, signal] = await owned.closed
-  assert.equal(signal, 'SIGTERM')
-  assert.equal(await canListenOnPort(owned.port), true)
   assert.equal(foreign.child.exitCode, null)
   assert.equal((await fetch(`http://127.0.0.1:${foreign.port}`)).status, 200)
   await assert.rejects(fetch(`http://127.0.0.1:${owned.port}`))

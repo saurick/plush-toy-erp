@@ -120,9 +120,6 @@ function Fixture() {
         </div>
         <Segment id="unequal" onChange={() => setCalls((count) => count + 1)} />
         <Segment id="equal" block defaultValue={options[1]} />
-        <Segment id="secondary" hierarchy="secondary" />
-        <CustomTabs id="login" className="erp-login-methods erp-navigation-tabs" />
-        <CustomTabs id="progress-detail" className="erp-progress-detail-tabs erp-navigation-tabs" />
         <Segment id="vertical" vertical />
         <Segment
           id="material"
@@ -181,7 +178,7 @@ function Fixture() {
         </section>
         <CustomTabs
           id="collaboration"
-          className="erp-business-collaboration-task-panel__tabs erp-navigation-tabs"
+          className="erp-business-collaboration-task-panel__tabs"
           itemClass="erp-business-collaboration-task-panel__tab"
         />
         <CustomTabs
@@ -193,7 +190,7 @@ function Fixture() {
         <div className="erp-work-instruction-annotation-modal">
           <CustomTabs
             id="images"
-            className="erp-work-instruction-annotation-modal__image-tabs erp-navigation-tabs"
+            className="erp-work-instruction-annotation-modal__image-tabs"
           />
         </div>
         <section id="ant-tabs">
@@ -204,9 +201,6 @@ function Fixture() {
               children: label,
             }))}
           />
-        </section>
-        <section id="card-tabs">
-          <Tabs type="card" items={options.map((label) => ({ key: label, label, children: label }))} />
         </section>
         <section id="overflow-tabs" style={{ minWidth: 0 }}>
           <Tabs

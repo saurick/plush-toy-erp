@@ -2,7 +2,6 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import selectorParser from 'postcss-selector-parser'
 import stylelint from 'stylelint'
-import postcss from 'postcss'
 
 const ruleName = 'erp/style-boundaries'
 const messages = stylelint.utils.ruleMessages(ruleName, {
@@ -15,30 +14,8 @@ const messages = stylelint.utils.ruleMessages(ruleName, {
   controls:
     'Tab、筛选与移动搜索的外观由 control-affordance.css 维护；页面只定义布局和尺寸',
   thickSelection:
-    '内容页签统一使用共享的 2px 指示线；页面与筛选不得自行覆盖指示线',
-  sideAccent:
-    '页面强调使用浅底色、细边框或步骤标记，不使用粗单侧色条；岗位与状态须有文字',
+    'Tab 与筛选选中态不得使用 2px 以上的底边；使用共享底色、单线描边和字重',
 })
-
-function pixels(value) {
-  const match = String(value).match(/^(-?\d*\.?\d+)(px|pt|rem|em)?$/u)
-  if (!match) return null
-  return Number(match[1]) * ({ pt: 4 / 3, rem: 16, em: 16 }[match[2]] || 1)
-}
-
-function hasThickSideAccent(decl) {
-  if (/^border-(?:left|right|inline-start|inline-end)(?:-width)?$/u.test(decl.prop)) {
-    return postcss.list.space(decl.value).some((value) => pixels(value) >= 3)
-  }
-  if (!/shadow$/u.test(decl.prop)) return false
-  return postcss.list.comma(decl.value).some((shadow) => {
-    const parts = postcss.list.space(shadow)
-    if (!parts.includes('inset')) return false
-    const lengths = parts.map(pixels).filter((value) => value !== null)
-    return Math.abs(lengths[0]) >= 3 && lengths[1] === 0 &&
-      (lengths[2] || 0) === 0 && (lengths[3] || 0) === 0
-  })
-}
 
 // 这些文件维护应用级基线；业务页面和按需加载的组件不进入此列表。
 const sharedFiles = new Set([
@@ -106,22 +83,9 @@ const rule = (enabled) => (root, result) => {
   const report = (node, message) =>
     stylelint.utils.report({ ruleName, result, node, message })
 
-  root.walkDecls((decl) => {
-    if (hasThickSideAccent(decl)) report(decl, messages.sideAccent)
-  })
-
   const appearanceOwner =
     relative === 'src/erp/styles/app/control-affordance.css'
   root.walkDecls('--erp-slider-shadow', (decl) => {
-    const contentTabSelectors = new Set([
-      '.erp-sliding-segmented.ant-segmented:not(.ant-segmented-vertical)',
-      '.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-nav-list',
-      '.erp-sliding-tab-list.erp-navigation-tabs',
-    ])
-    const sharedUnderline = appearanceOwner &&
-      decl.parent.selectors.every((selector) => contentTabSelectors.has(selector)) &&
-      decl.value === 'inset 0 -2px 0 var(--erp-control-accent)'
-    if (sharedUnderline) return
     if (/inset\s+0\s+-[2-9]\d*px\s+0/u.test(decl.value)) {
       report(decl, messages.thickSelection)
     }

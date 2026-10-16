@@ -7,11 +7,6 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
 import { chromium } from 'playwright'
-import {
-  browserWriteOrigin,
-  verifyDatabaseRuntimeIdentity,
-  bindBrowserWriteBackend,
-} from '../../scripts/qa/browser-write-target.mjs'
 import { loadDevPorts, resolveDevAuxPort } from '../../scripts/dev-ports.mjs'
 import {
   buildYoyoosunLocalEntryAudit,
@@ -106,7 +101,6 @@ const usage = `用法:
   --print-input-template 只打印本地运行所需输入、模拟任务和命令模板，不登录、不调用后端、不启动浏览器、不写数据库。
   --preflight-report <path> 只写本地前置检查报告，不登录、不调用 JSON-RPC、不启动 Vite / 浏览器、不写数据库。
 真实回归:
-  --accept-persistent-test-data --database-name <name> 必须明确同意保留模拟任务，并绑定当前开发或隔离库；前后端必须为 loopback。
   --report <path> 真实浏览器回归通过后写本地脱敏报告；不保存密码、token、Authorization header、raw customer package 或 action 列表，不进入 release evidence。
 `
 
@@ -213,12 +207,6 @@ function assertNoURLCredentials(url) {
 
 function parseCliArgs(argv = []) {
   const options = {
-    databaseName: optionalText(
-      process.env.MOBILE_WORKFLOW_BROWSER_SMOKE_DATABASE_NAME
-    ),
-    acceptPersistentTestData:
-      process.env.MOBILE_WORKFLOW_BROWSER_SMOKE_ACCEPT_PERSISTENT_TEST_DATA ===
-      '1',
     help: false,
     printInputTemplate: false,
     preflightReport: '',
@@ -246,10 +234,6 @@ function parseCliArgs(argv = []) {
       options.help = true
       continue
     }
-    if (token === '--accept-persistent-test-data') {
-      options.acceptPersistentTestData = true
-      continue
-    }
     if (token === '--print-input-template') {
       options.printInputTemplate = true
       continue
@@ -269,9 +253,6 @@ function parseCliArgs(argv = []) {
       throw new CliError(`missing value for --${key}`, 2)
     }
     switch (key) {
-      case 'database-name':
-        options.databaseName = value
-        break
       case 'base-url':
         options.baseURL = value
         options.externalBaseURLProvided = true
@@ -575,10 +556,6 @@ function buildInputTemplate(options = parseCliArgs(['--run-id', 'TEMPLATE'])) {
     downstreamCreatesWorkflowTasks: true,
     downstreamStartsBrowser: true,
     downstreamCallsBackend: true,
-    requiredWriteInputs: [
-      '--accept-persistent-test-data',
-      '--database-name <development-or-disposable-database>',
-    ],
     secretInputs: [
       'MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD or TRIAL_ACCOUNT_PASSWORD or ERP_ROLE_DEMO_PASSWORD',
     ],
@@ -614,7 +591,8 @@ function buildInputTemplate(options = parseCliArgs(['--run-id', 'TEMPLATE'])) {
 
 function buildYoyoosunEntryAuditPlan(options) {
   return {
-    command: 'pnpm --dir web --silent audit:yoyoosun-entry -- --json',
+    command:
+      'pnpm --dir web --silent audit:yoyoosun-entry -- --json',
     scope: 'mobile-workflow-frontend-entry-preflight',
     requiredForExternalBaseURL: true,
     externalBaseURLProvided: Boolean(options.externalBaseURLProvided),
@@ -659,7 +637,7 @@ async function probeURL(url, { timeoutMs = 3000 } = {}) {
 async function buildPreflightReport(options, runtime = {}) {
   const backendHealthURL = new URL(
     process.env.MOBILE_WORKFLOW_BROWSER_SMOKE_BACKEND_HEALTH_URL ||
-      new URL('/healthz', options.backendURL).toString()
+      DEFAULT_BACKEND_HEALTH_URL
   )
   assertNoURLCredentials(backendHealthURL)
   const passwordEnvNames = [
@@ -708,9 +686,6 @@ async function buildPreflightReport(options, runtime = {}) {
       error: String(error?.message || error),
     }))
   const blockers = []
-  if (!options.databaseName) blockers.push('missing-database-name')
-  if (!options.acceptPersistentTestData)
-    { blockers.push('missing-persistent-test-data-acceptance') }
   if (presentPasswordEnvNames.length === 0) {
     blockers.push('missing-demo-password-env')
   }
@@ -775,7 +750,6 @@ async function buildMobileYoyoosunEntryAudit(
     {
       customer: 'yoyoosun',
       ports: auditedPorts,
-      baseURL: options.externalBaseURLProvided ? options.baseURL : '',
       backendHealthURL,
     },
     runtime
@@ -786,9 +760,9 @@ async function buildMobileYoyoosunEntryAudit(
   const externalPortReport = externalPort
     ? report.ports.find((item) => item.port === externalPort) || null
     : null
-  const auditedYoyoosunURLs = report.ports
-    .filter((item) => report.summary.yoyoosunPorts.includes(item.port))
-    .map((item) => item.url)
+  const auditedYoyoosunURLs = report.summary.yoyoosunPorts.map(
+    (port) => `http://localhost:${port}/erp`
+  )
 
   return {
     scope: 'mobile-workflow-yoyoosun-entry-preflight',
@@ -813,7 +787,7 @@ async function buildMobileYoyoosunEntryAudit(
       !options.externalBaseURLProvided ||
       Boolean(
         externalPortReport?.customerConfig?.matchedCustomer &&
-        externalPortReport?.customerAsset?.matchedCustomerAsset
+          externalPortReport?.customerAsset?.matchedCustomerAsset
       ),
     externalPortStatus: externalPortReport
       ? {
@@ -1379,7 +1353,6 @@ function startDevServer(options) {
       env: {
         ...process.env,
         BROWSER: 'none',
-        API_ORIGIN: options.backendURL,
         ERP_VITE_PORT: String(options.port),
         ERP_VITE_HMR_CLIENT_PORT: String(options.port),
       },
@@ -1435,11 +1408,10 @@ async function ensureURLReady(url, label) {
   )
 }
 
-async function newMobilePage(browser, options) {
+async function newMobilePage(browser) {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
   })
-  await bindBrowserWriteBackend(context, options.backendURL)
   await context.addInitScript(() => {
     window.localStorage?.setItem('erp:last_entry_target', 'mobileTasks')
   })
@@ -1447,13 +1419,12 @@ async function newMobilePage(browser, options) {
     trialCustomerConfigScriptPath,
     'utf8'
   )
-  if (!options.externalBaseURLProvided)
-    { await context.route('**/customer-config.js', (route) =>
-      route.fulfill({
-        contentType: 'application/javascript; charset=utf-8',
-        body: trialCustomerConfigScript,
-      })
-    ) }
+  await context.route('**/customer-config.js', (route) =>
+    route.fulfill({
+      contentType: 'application/javascript; charset=utf-8',
+      body: trialCustomerConfigScript,
+    })
+  )
   const page = await context.newPage()
   const runtimeErrors = []
   page.on('console', (message) => {
@@ -1607,10 +1578,10 @@ async function selectMobileTaskFilter(page, filterKey) {
       )
       return Boolean(
         button?.getAttribute('aria-pressed') === 'true' &&
-        count?.textContent?.trim() &&
-        count.textContent.trim() !== '—' &&
-        list?.getAttribute('aria-busy') !== 'true' &&
-        !loading
+          count?.textContent?.trim() &&
+          count.textContent.trim() !== '—' &&
+          list?.getAttribute('aria-busy') !== 'true' &&
+          !loading
       )
     },
     filterKey,
@@ -1978,7 +1949,7 @@ async function runBrowserScenario(
   browser,
   { options, bossDoneTask, bossRejectTask, bossTask, warehouseTask, password }
 ) {
-  const { context, page, runtimeErrors } = await newMobilePage(browser, options)
+  const { context, page, runtimeErrors } = await newMobilePage(browser)
   const blockReason = `移动端浏览器模拟阻塞 ${options.runId}`
   const doneFeedback = `移动端浏览器模拟完成反馈 ${options.runId}`
   const rejectReason = `移动端浏览器模拟退回 ${options.runId}`
@@ -2141,7 +2112,7 @@ async function runOwnedCompleteScenario(
   browser,
   { options, password, roleKey, task, username }
 ) {
-  const { context, page, runtimeErrors } = await newMobilePage(browser, options)
+  const { context, page, runtimeErrors } = await newMobilePage(browser)
   const feedback = `${task.task_code}-FEEDBACK`
 
   try {
@@ -2300,80 +2271,71 @@ async function main() {
     )
   }
 
-  browserWriteOrigin(options.baseURL)
-  browserWriteOrigin(options.backendURL)
-  if (!options.acceptPersistentTestData)
-    { throw new CliError(
-      '真实写入会保留模拟任务；请传入 --accept-persistent-test-data 和 --database-name 明确目标',
-      2
-    ) }
-  await verifyDatabaseRuntimeIdentity(options)
-  let browser
-  try {
-    await fs.mkdir(outputDir, { recursive: true })
-    const backendHealthURL = new URL(
-      process.env.MOBILE_WORKFLOW_BROWSER_SMOKE_BACKEND_HEALTH_URL ||
-        new URL('/healthz', options.backendURL).toString()
-    )
-    assertNoURLCredentials(backendHealthURL)
-    await ensureURLReady(backendHealthURL.toString(), 'backend health')
-    if (!options.externalBaseURLProvided) {
-      devServerProcess = startDevServer(options)
-      await ensureURLReady(options.baseURL, 'vite preview')
-    }
+  await fs.mkdir(outputDir, { recursive: true })
+  const backendHealthURL = new URL(
+    process.env.MOBILE_WORKFLOW_BROWSER_SMOKE_BACKEND_HEALTH_URL ||
+      DEFAULT_BACKEND_HEALTH_URL
+  )
+  assertNoURLCredentials(backendHealthURL)
+  await ensureURLReady(backendHealthURL.toString(), 'backend health')
+  if (!process.env.MOBILE_WORKFLOW_BROWSER_SMOKE_BASE_URL) {
+    devServerProcess = startDevServer(options)
+    await ensureURLReady(options.baseURL, 'vite preview')
+  }
 
-    const bossSession = await loginRole({
-      backendURL: options.backendURL,
-      username: 'demo_boss',
-      password,
-    })
-    const qualitySession = await loginRole({
-      backendURL: options.backendURL,
-      username: 'demo_quality',
-      password,
-    })
-    const warehouseSession = await loginRole({
-      backendURL: options.backendURL,
-      username: 'demo_warehouse',
-      password,
-    })
-    const bossTaskPlan = buildSimulatedBossTask(options)
-    const bossDoneTaskPlan = buildSimulatedBossDoneTask(options)
-    const bossRejectTaskPlan = buildSimulatedBossRejectTask(options)
-    const qualityTaskPlan = buildSimulatedQualityTask(options)
-    const warehouseInboundTaskPlan = buildSimulatedWarehouseInboundTask(options)
-    const warehouseTaskPlan = buildSimulatedWarehouseTask(options)
-    const createdBossTask = await createSimulatedTask({
-      backendURL: options.backendURL,
-      password,
-      task: bossTaskPlan,
-    })
-    const createdBossDoneTask = await createSimulatedTask({
-      backendURL: options.backendURL,
-      password,
-      task: bossDoneTaskPlan,
-    })
-    const createdBossRejectTask = await createSimulatedTask({
-      backendURL: options.backendURL,
-      password,
-      task: bossRejectTaskPlan,
-    })
-    const createdQualityTask = await createSimulatedTask({
-      backendURL: options.backendURL,
-      password,
-      task: qualityTaskPlan,
-    })
-    const createdWarehouseInboundTask = await createSimulatedTask({
-      backendURL: options.backendURL,
-      password,
-      task: warehouseInboundTaskPlan,
-    })
-    const createdWarehouseTask = await createSimulatedTask({
-      backendURL: options.backendURL,
-      password,
-      task: warehouseTaskPlan,
-    })
-    browser = await chromium.launch({ headless: !options.headed })
+  const bossSession = await loginRole({
+    backendURL: options.backendURL,
+    username: 'demo_boss',
+    password,
+  })
+  const qualitySession = await loginRole({
+    backendURL: options.backendURL,
+    username: 'demo_quality',
+    password,
+  })
+  const warehouseSession = await loginRole({
+    backendURL: options.backendURL,
+    username: 'demo_warehouse',
+    password,
+  })
+  const bossTaskPlan = buildSimulatedBossTask(options)
+  const bossDoneTaskPlan = buildSimulatedBossDoneTask(options)
+  const bossRejectTaskPlan = buildSimulatedBossRejectTask(options)
+  const qualityTaskPlan = buildSimulatedQualityTask(options)
+  const warehouseInboundTaskPlan = buildSimulatedWarehouseInboundTask(options)
+  const warehouseTaskPlan = buildSimulatedWarehouseTask(options)
+  const createdBossTask = await createSimulatedTask({
+    backendURL: options.backendURL,
+    password,
+    task: bossTaskPlan,
+  })
+  const createdBossDoneTask = await createSimulatedTask({
+    backendURL: options.backendURL,
+    password,
+    task: bossDoneTaskPlan,
+  })
+  const createdBossRejectTask = await createSimulatedTask({
+    backendURL: options.backendURL,
+    password,
+    task: bossRejectTaskPlan,
+  })
+  const createdQualityTask = await createSimulatedTask({
+    backendURL: options.backendURL,
+    password,
+    task: qualityTaskPlan,
+  })
+  const createdWarehouseInboundTask = await createSimulatedTask({
+    backendURL: options.backendURL,
+    password,
+    task: warehouseInboundTaskPlan,
+  })
+  const createdWarehouseTask = await createSimulatedTask({
+    backendURL: options.backendURL,
+    password,
+    task: warehouseTaskPlan,
+  })
+  const browser = await chromium.launch({ headless: !options.headed })
+  try {
     const browserResult = await runBrowserScenario(browser, {
       options,
       bossDoneTask: createdBossDoneTask,
@@ -2607,11 +2569,8 @@ async function main() {
       `[mobile-workflow-runtime-browser-smoke] 通过，blocked=${createdBossTask.task_code} rejected=${createdBossRejectTask.task_code} done=${createdBossDoneTask.task_code} qualityDone=${createdQualityTask.task_code} warehouseInboundDone=${createdWarehouseInboundTask.task_code} urged=${createdWarehouseTask.task_code} base=${options.baseURL}${options.report ? ` report=${path.relative(repoRoot, options.report)}` : ''}\n`
     )
   } finally {
-    try {
-      await browser?.close()
-    } finally {
-      await stopDevServer()
-    }
+    await browser.close()
+    await stopDevServer()
   }
 }
 

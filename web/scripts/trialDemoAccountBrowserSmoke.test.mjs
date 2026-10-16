@@ -848,7 +848,7 @@ test('trial demo account browser smoke source keeps no-write template before run
   assert.match(source, /openModuleCatalog/u)
   assert.match(source, /erp-module-catalog__entry/u)
   assert.match(source, /actualVisibleMenus,[\s\S]*?expectedVisibleLeafMenus/u)
-  assert.match(source, /actualSidebarLabels,\s*expectedSidebarLabels/u)
+  assert.match(source, /actualSidebarLabels, expectedSidebarLabels/u)
   assert.match(source, /getBusinessModuleGroup\(definition.path\)/u)
   assert.match(source, /data-navigation-presentation/u)
   assert.doesNotMatch(source, /ant-menu-submenu-open|更多功能/u)
