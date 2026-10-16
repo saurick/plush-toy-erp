@@ -311,7 +311,7 @@ export default function OutsourcingReturnRecordsModal({
           ) : null}
           {canViewDisposition && selectedPostedReturn ? (
             <Button onClick={() => onViewDisposition?.(selected)}>
-              返厂处置
+              返厂 / 返工处置
             </Button>
           ) : null}
           {canViewPayable ? (

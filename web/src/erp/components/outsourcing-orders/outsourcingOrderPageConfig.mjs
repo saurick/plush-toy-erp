@@ -127,3 +127,10 @@ export function canEditOutsourcingOrder(record) {
 export function getOutsourcingOrderDisplayNo(record = {}) {
   return record?.outsourcing_order_no || OUTSOURCING_ORDER_UNNUMBERED_LABEL
 }
+
+export function buildOutsourcingOrderStats({ rows = [], total = 0 }) {
+  return [
+    { key: 'total', label: '符合条件', value: total },
+    { key: 'current', label: '本页显示', value: rows.length },
+  ]
+}

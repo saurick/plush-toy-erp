@@ -8,7 +8,6 @@ import (
 	"sort"
 	"time"
 
-	"github.com/shopspring/decimal"
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/inventorytxn"
@@ -23,9 +22,6 @@ import (
 var _ biz.OutsourcingReturnDispositionRepo = (*operationalFactRepo)(nil)
 
 func (r *operationalFactRepo) CreateOutsourcingReturnDisposition(ctx context.Context, in *biz.OutsourcingReturnDispositionCreate, hash string) (*biz.OutsourcingReturnDisposition, error) {
-	if in.DispositionType != biz.OutsourcingDispositionReturnToVendor {
-		return nil, biz.ErrProcessRuntimeRequired
-	}
 	if replay, found, err := findOutsourcingDispositionReplay(ctx, r.data.postgres, in, hash); err != nil || found {
 		return replay, err
 	}
@@ -84,7 +80,7 @@ func (r *operationalFactRepo) CreateOutsourcingReturnDisposition(ctx context.Con
 	if err != nil || lockedBatchID != batchID {
 		return nil, biz.ErrOutsourcingDispositionSourceInvalid
 	}
-	inspection, fact, err := validateOutsourcingDispositionSource(ctx, tx.client, in, 0)
+	inspection, fact, err := validateOutsourcingDispositionSource(ctx, tx.client, in)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +113,7 @@ func findOutsourcingDispositionReplay(ctx context.Context, client *ent.Client, i
 	return entOutsourcingDispositionToBiz(row), true, nil
 }
 
-func validateOutsourcingDispositionSource(ctx context.Context, client *ent.Client, in *biz.OutsourcingReturnDispositionCreate, excludeID int) (*ent.QualityInspection, *ent.OutsourcingFact, error) {
+func validateOutsourcingDispositionSource(ctx context.Context, client *ent.Client, in *biz.OutsourcingReturnDispositionCreate) (*ent.QualityInspection, *ent.OutsourcingFact, error) {
 	inspection, err := client.QualityInspection.Get(ctx, in.QualityInspectionID)
 	if err != nil || inspection.SupersededAt != nil || inspection.SourceType == nil || *inspection.SourceType != biz.QualityInspectionSourceOutsourcingFact || inspection.SourceID == nil || inspection.Status != biz.QualityInspectionStatusRejected || inspection.Result == nil || *inspection.Result != biz.QualityInspectionResultReject {
 		return nil, nil, biz.ErrOutsourcingDispositionSourceInvalid
@@ -131,21 +127,6 @@ func validateOutsourcingDispositionSource(ctx context.Context, client *ent.Clien
 	}
 	batch, err := client.ProductionWIPBatch.Get(ctx, *in.ProductionWIPBatchID)
 	if err != nil || batch.Status != biz.ProductionWIPStatusRejected || in.Quantity.GreaterThan(batch.Quantity) {
-		return nil, nil, biz.ErrOutsourcingDispositionSourceInvalid
-	}
-	active, err := client.OutsourcingReturnDisposition.Query().Where(
-		outsourcingreturndisposition.OutsourcingReturnFactID(fact.ID),
-		outsourcingreturndisposition.StatusNEQ(biz.OutsourcingDispositionCancelled),
-		outsourcingreturndisposition.IDNEQ(excludeID),
-	).All(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	allocated := decimal.Zero
-	for _, disposition := range active {
-		allocated = allocated.Add(disposition.Quantity)
-	}
-	if allocated.Add(in.Quantity).GreaterThan(fact.Quantity) || allocated.Add(in.Quantity).GreaterThan(batch.Quantity) {
 		return nil, nil, biz.ErrOutsourcingDispositionSourceInvalid
 	}
 	linked, err := client.ProductionWIPOutsourcingAllocation.Query().Where(productionwipoutsourcingallocation.ProductionWipBatchID(batch.ID), productionwipoutsourcingallocation.OutsourcingOrderItemID(*fact.SourceLineID)).Exist(ctx)
@@ -274,33 +255,101 @@ func (r *operationalFactRepo) PostOutsourcingReturnDisposition(ctx context.Conte
 	if row.Status != biz.OutsourcingDispositionDraft {
 		return nil, biz.ErrOutsourcingDispositionState
 	}
-	if row.DispositionType != biz.OutsourcingDispositionReturnToVendor {
-		return nil, biz.ErrProcessRuntimeRequired
-	}
 	create := &biz.OutsourcingReturnDispositionCreate{QualityInspectionID: row.QualityInspectionID, DispositionType: row.DispositionType, Quantity: row.Quantity, ProductionWIPBatchID: row.ProductionWipBatchID}
-	_, fact, err := validateOutsourcingDispositionSource(ctx, tx.client, create, row.ID)
+	_, fact, err := validateOutsourcingDispositionSource(ctx, tx.client, create)
 	if err != nil {
 		return nil, err
 	}
-	activePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.OutsourcingFactSourceType, fact.ID)
-	if err != nil {
-		return nil, err
-	}
-	if activePayable {
-		return nil, biz.ErrOutsourcingReturnFinanceDependency
-	}
-	actor, sourceID, lineID := in.ActorID, row.ID, row.QualityInspectionID
-	_, err = r.inv.applyInventoryTxnAndUpdateBalanceInTx(ctx, tx, &biz.InventoryTxnCreate{SubjectType: fact.SubjectType, SubjectID: fact.SubjectID, ProductSkuID: fact.ProductSkuID, WarehouseID: fact.WarehouseID, LotID: fact.LotID, TxnType: biz.InventoryTxnOut, Direction: -1, Quantity: row.Quantity, UnitID: fact.UnitID, SourceType: biz.OutsourcingDispositionSourceType, SourceID: &sourceID, SourceLineID: &lineID, IdempotencyKey: fmt.Sprintf("OUTSOURCING_DISPOSITION:%d:OUT", row.ID), OccurredAt: time.Now(), CreatedBy: &actor, Note: &row.Reason})
-	if err != nil {
-		return nil, err
+	if row.DispositionType == biz.OutsourcingDispositionReturnToVendor {
+		activePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.OutsourcingFactSourceType, fact.ID)
+		if err != nil {
+			return nil, err
+		}
+		if activePayable {
+			return nil, biz.ErrOutsourcingReturnFinanceDependency
+		}
+		actor, sourceID, lineID := in.ActorID, row.ID, row.QualityInspectionID
+		_, err = r.inv.applyInventoryTxnAndUpdateBalanceInTx(ctx, tx, &biz.InventoryTxnCreate{SubjectType: fact.SubjectType, SubjectID: fact.SubjectID, ProductSkuID: fact.ProductSkuID, WarehouseID: fact.WarehouseID, LotID: fact.LotID, TxnType: biz.InventoryTxnOut, Direction: -1, Quantity: row.Quantity, UnitID: fact.UnitID, SourceType: biz.OutsourcingDispositionSourceType, SourceID: &sourceID, SourceLineID: &lineID, IdempotencyKey: fmt.Sprintf("OUTSOURCING_DISPOSITION:%d:OUT", row.ID), OccurredAt: time.Now(), CreatedBy: &actor, Note: &row.Reason})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		resultID, err := postOutsourcingDispositionRework(ctx, tx, row, in.ActorID)
+		if err != nil {
+			return nil, err
+		}
+		row.ResultWipBatchID = &resultID
 	}
 	now := time.Now()
 	update := tx.client.OutsourcingReturnDisposition.Update().Where(outsourcingreturndisposition.ID(row.ID), outsourcingreturndisposition.StatusEQ(biz.OutsourcingDispositionDraft), outsourcingreturndisposition.Version(in.ExpectedVersion)).SetStatus(biz.OutsourcingDispositionPosted).SetPostedAt(now).SetPostedBy(in.ActorID).AddVersion(1)
+	if row.ResultWipBatchID != nil {
+		update.SetResultWipBatchID(*row.ResultWipBatchID)
+	}
 	affected, err := update.Save(ctx)
 	if err != nil || affected != 1 {
 		return nil, biz.ErrOutsourcingDispositionConflict
 	}
 	return commitOutsourcingDisposition(ctx, tx, row.ID)
+}
+
+func postOutsourcingDispositionRework(ctx context.Context, tx *inventoryDBTx, row *ent.OutsourcingReturnDisposition, actorID int) (int, error) {
+	if row.ProductionWipBatchID == nil {
+		return 0, biz.ErrOutsourcingDispositionSourceInvalid
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", *row.ProductionWipBatchID, biz.ErrOutsourcingDispositionSourceInvalid); err != nil {
+		return 0, err
+	}
+	batchRow, err := tx.client.ProductionWIPBatch.Get(ctx, *row.ProductionWipBatchID)
+	if err != nil {
+		return 0, err
+	}
+	operationRow, err := tx.client.ProductionOrderOperation.Get(ctx, batchRow.ProductionOrderOperationID)
+	if err != nil {
+		return 0, err
+	}
+	children, err := tx.client.ProductionWIPBatch.Query().Where(productionwipbatch.SourceBatchID(batchRow.ID), productionwipbatch.FlowType(biz.ProductionWIPFlowRework), productionwipbatch.StatusNEQ(biz.ProductionWIPStatusCancelled)).All(ctx)
+	if err != nil {
+		return 0, err
+	}
+	batch, operation := entProductionWIPBatchToBiz(batchRow), entProductionOrderOperationToBiz(operationRow)
+	if err := biz.ValidateProductionWIPRework(batch, operation, operation, sumProductionWIPBatchQuantity(children), row.Quantity, row.Reason); err != nil {
+		return 0, err
+	}
+	batchNo, err := biz.BuildProductionWIPLineageBatchNo(batch.BatchNo, biz.ProductionWIPActionRework, 0, len(children)+1)
+	if err != nil {
+		return 0, err
+	}
+	affected, err := tx.client.ProductionWIPBatch.Update().Where(
+		productionwipbatch.ID(batchRow.ID),
+		productionwipbatch.StatusEQ(biz.ProductionWIPStatusRejected),
+		productionwipbatch.VersionEQ(batchRow.Version),
+	).AddVersion(1).Save(ctx)
+	if err != nil || affected != 1 {
+		return 0, biz.ErrOutsourcingDispositionConflict
+	}
+	child, err := createProductionWIPChildBatch(ctx, tx.client, batchRow, operationRow.ID, batchNo, biz.ProductionWIPFlowRework, row.Quantity, actorID, &row.Reason)
+	if err != nil {
+		return 0, err
+	}
+	updatedParent, err := tx.client.ProductionWIPBatch.Get(ctx, batchRow.ID)
+	if err != nil {
+		return 0, err
+	}
+	if err := appendOutsourcingDispositionWIPEvent(
+		ctx,
+		tx,
+		row,
+		updatedParent,
+		biz.ProductionWIPStatusRejected,
+		biz.ProductionWIPStatusRejected,
+		actorID,
+		biz.ProductionWIPEventActionOutsourceRework,
+		row.Reason,
+		child.ID,
+	); err != nil {
+		return 0, err
+	}
+	return child.ID, nil
 }
 
 func (r *operationalFactRepo) CancelOutsourcingReturnDisposition(ctx context.Context, in *biz.OutsourcingReturnDispositionMutation) (*biz.OutsourcingReturnDisposition, error) {
@@ -312,7 +361,7 @@ func (r *operationalFactRepo) CancelOutsourcingReturnDisposition(ctx context.Con
 	if row.Status == biz.OutsourcingDispositionCancelled && row.CancelledBy != nil && *row.CancelledBy == in.ActorID && row.CancelReason != nil && *row.CancelReason == in.Reason && row.Version == in.ExpectedVersion+1 {
 		return commitOutsourcingDisposition(ctx, tx, row.ID)
 	}
-	if order.Status != biz.ProductionOrderStatusReleased && (order.Status != biz.ProductionOrderStatusClosed || row.Status != biz.OutsourcingDispositionPosted || row.DispositionType != biz.OutsourcingDispositionReturnToVendor) {
+	if order.Status != biz.ProductionOrderStatusReleased {
 		return nil, biz.ErrOutsourcingDispositionState
 	}
 	if row.Version != in.ExpectedVersion {

@@ -85,7 +85,7 @@ export default function ProductionOutsourcingPrepareModal({
           label="加工厂"
           rules={[{ required: true, message: '请选择加工厂' }]}
         >
-          <MaterialSupplierSelect outsourcingOnly />
+          <MaterialSupplierSelect />
         </Form.Item>
         {fabric ? (
           <Form.Item
