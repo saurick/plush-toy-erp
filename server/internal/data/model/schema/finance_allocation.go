@@ -23,7 +23,6 @@ func (FinanceAllocation) Annotations() []schema.Annotation {
 }
 func (FinanceAllocation) Fields() []ent.Field {
 	return []ent.Field{
-		field.String("reason").Optional().Nillable().MaxLen(255).Immutable(),
 		field.Int("payment_id").Positive().Immutable(), field.Int("finance_fact_id").Positive().Immutable(), immutableDecimalQuantityField("amount"),
 		field.String("currency").NotEmpty().MaxLen(16).Immutable(), field.String("status").NotEmpty().Default("POSTED").MaxLen(16).Immutable(),
 		field.Int("reversal_of_allocation_id").Optional().Nillable().Positive().Immutable(), field.String("idempotency_key").NotEmpty().MaxLen(128).Immutable(),

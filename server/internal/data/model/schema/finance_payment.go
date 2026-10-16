@@ -20,14 +20,7 @@ func (FinancePayment) Annotations() []schema.Annotation {
 		"finance_payments_direction_allowed":    "direction IN ('RECEIPT', 'DISBURSEMENT')",
 		"finance_payments_status_allowed":       "status IN ('DRAFT', 'APPROVED', 'REJECTED', 'POSTED', 'REVERSED', 'CANCELLED')",
 		"finance_payments_counterparty_allowed": "counterparty_type IN ('CUSTOMER', 'SUPPLIER')",
-		"finance_payments_direction_party_pair": "((kind <> 'REFUND' AND ((direction = 'RECEIPT' AND counterparty_type = 'CUSTOMER') OR (direction = 'DISBURSEMENT' AND counterparty_type = 'SUPPLIER'))) OR (kind = 'REFUND' AND ((direction = 'DISBURSEMENT' AND counterparty_type = 'CUSTOMER') OR (direction = 'RECEIPT' AND counterparty_type = 'SUPPLIER'))))",
-		"finance_payments_kind_source": `(
-(kind = 'SETTLEMENT' AND source_type IS NULL AND source_id IS NULL AND refund_of_payment_id IS NULL)
-OR (kind = 'ADVANCE' AND source_type IS NOT NULL AND source_id IS NOT NULL AND source_id > 0 AND refund_of_payment_id IS NULL AND
- ((counterparty_type = 'CUSTOMER' AND source_type = 'sales_order') OR
-  (counterparty_type = 'SUPPLIER' AND source_type IN ('purchase_order', 'outsourcing_order'))))
-OR (kind = 'REFUND' AND source_type IS NULL AND source_id IS NULL AND refund_of_payment_id IS NOT NULL AND refund_of_payment_id > 0
- AND refund_of_payment_id <> id AND purpose_note IS NOT NULL AND length(trim(purpose_note)) BETWEEN 1 AND 255))`,
+		"finance_payments_direction_party_pair": "((direction = 'RECEIPT' AND counterparty_type = 'CUSTOMER') OR (direction = 'DISBURSEMENT' AND counterparty_type = 'SUPPLIER'))",
 		"finance_payments_amount_positive":      "amount > 0", "finance_payments_currency_allowed": "currency IN ('USD', 'CNY', 'HKD')",
 		"finance_payments_version_positive": "version > 0", "finance_payments_intent_bundle": "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
 		"finance_payments_maker_checker": "approved_by IS NULL OR approved_by <> created_by",
@@ -91,11 +84,6 @@ OR (kind = 'REFUND' AND source_type IS NULL AND source_id IS NULL AND refund_of_
 }
 func (FinancePayment) Fields() []ent.Field {
 	return []ent.Field{
-		field.String("kind").Default("SETTLEMENT").MaxLen(16).Immutable(),
-		field.String("source_type").Optional().Nillable().MaxLen(32).Immutable(),
-		field.Int("source_id").Optional().Nillable().Positive().Immutable(),
-		field.Int("refund_of_payment_id").Optional().Nillable().Positive().Immutable(),
-		field.String("purpose_note").Optional().Nillable().MaxLen(255).Immutable(),
 		field.String("payment_no").NotEmpty().MaxLen(64).Immutable(), field.String("direction").NotEmpty().MaxLen(16).Immutable(), field.String("status").NotEmpty().Default("DRAFT").MaxLen(16),
 		field.String("counterparty_type").NotEmpty().MaxLen(16).Immutable(), field.Int("counterparty_id").Positive().Immutable(),
 		immutableDecimalQuantityField("amount"), field.String("currency").NotEmpty().MaxLen(16).Immutable(),
@@ -111,8 +99,8 @@ func (FinancePayment) Fields() []ent.Field {
 	}
 }
 func (FinancePayment) Edges() []ent.Edge {
-	return []ent.Edge{edge.To("allocations", FinanceAllocation.Type), edge.To("refunds", FinancePayment.Type), edge.From("refund_source", FinancePayment.Type).Ref("refunds").Field("refund_of_payment_id").Unique().Immutable()}
+	return []ent.Edge{edge.To("allocations", FinanceAllocation.Type)}
 }
 func (FinancePayment) Indexes() []ent.Index {
-	return []ent.Index{index.Fields("payment_no").Unique(), index.Fields("created_by", "idempotency_key").Unique(), index.Fields("counterparty_type", "counterparty_id", "currency", "status"), index.Fields("source_type", "source_id"), index.Fields("refund_of_payment_id", "status")}
+	return []ent.Index{index.Fields("payment_no").Unique(), index.Fields("created_by", "idempotency_key").Unique(), index.Fields("counterparty_type", "counterparty_id", "currency", "status")}
 }
