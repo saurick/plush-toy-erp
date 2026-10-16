@@ -32,6 +32,8 @@ const state = (machineKey, stateKey, phase) =>
 const processNode = (processDefinitionKey, nodeKey) =>
   Object.freeze({ processDefinitionKey, nodeKey })
 
+// Responsibility references follow the business handoff map and existing RBAC
+// roles. They describe the design; actual task assignment remains runtime-owned.
 const step = (options = {}) =>
   Object.freeze({
     responsibilityMode: options.responsibilityMode || 'system',
@@ -91,6 +93,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     steps: Object.freeze({
       'sales_order:starts_process:sales_acceptance': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['sales'],
         stateTransitionRefs: [
           transition('source.sales_order', 'draft->submitted'),
         ],
@@ -129,6 +132,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'effective_bom:creates_source:production_order': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['pmc'],
         stateTransitionRefs: [
           transition('source.production_order', 'DRAFT->RELEASED'),
         ],
@@ -136,6 +140,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'sales_tasks:returns:sales_order': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['boss', 'engineering', 'pmc'],
         stateTransitionRefs: [
           transition('workflow.task', 'ready->rejected'),
           transition('source.sales_order', 'submitted->canceled'),
@@ -185,6 +190,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     steps: Object.freeze({
       'purchase_order:starts_process:purchase_approval': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['purchase'],
         stateTransitionRefs: [
           transition('source.purchase_order', 'draft->submitted'),
         ],
@@ -256,6 +262,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'purchase_task:returns:purchase_order': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['boss'],
         stateTransitionRefs: [
           transition('workflow.task', 'ready->rejected'),
           transition('source.purchase_order', 'submitted->canceled'),
@@ -315,6 +322,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     steps: Object.freeze({
       'released_production_order:posts_fact:wip_batch': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['pmc', 'production'],
         stateTransitionRefs: [
           transition('source.production_order', 'DRAFT->RELEASED'),
         ],
@@ -337,6 +345,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'finished_quality:requires:packaging_confirmation': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['sales'],
         capabilityKeys: [PermissionCode.PRODUCTION_PACKAGING_MATERIAL_CONFIRM],
         stateTransitionRefs: [transition('fact.production_packaging_confirmation', 'PENDING->CONFIRMED')],
       }),
@@ -388,6 +397,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     steps: Object.freeze({
       'outsourcing_order:posts_fact:outsourcing_issue': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['purchase', 'warehouse'],
         stateTransitionRefs: [
           transition('source.outsourcing_order', 'draft->submitted'),
           transition('source.outsourcing_order', 'submitted->confirmed'),
@@ -396,6 +406,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'outsourcing_issue:returns:outsourcing_return': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['warehouse'],
         capabilityKeys: [PermissionCode.OUTSOURCING_RETURN_RECEIPT_CREATE],
         stateRefs: [
           state('source.outsourcing_order', 'confirmed', 'precondition'),
@@ -404,11 +415,13 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'outsourcing_return:creates_fact_draft:outsourcing_quality': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['quality'],
         capabilityKeys: [PermissionCode.QUALITY_INSPECTION_CREATE],
         stateRefs: [state('fact.quality_inspection', 'DRAFT', 'result')],
       }),
       'outsourcing_quality:posts_fact:outsourcing_lot': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['quality', 'warehouse'],
         stateTransitionRefs: [
           transition('fact.quality_inspection', 'SUBMITTED->PASSED'),
           transition('fact.outsourcing', 'DRAFT->POSTED'),
@@ -493,6 +506,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
           state('fact.shipment_finance_release', 'APPROVED', 'precondition'),
         ],
         responsibilityMode: 'human',
+        ownerPoolKeys: ['sales'],
         stateTransitionRefs: [transition('fact.shipment', 'DRAFT->SHIPPED')],
       }),
       'shipped:creates_fact_draft:receivable_draft': step({
@@ -511,12 +525,14 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'shipped:reverses:shipment_cancelled': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['sales'],
         stateTransitionRefs: [
           transition('fact.shipment', 'SHIPPED->CANCELLED'),
         ],
       }),
       'shipment_release_task:returns:shipment_release': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['finance'],
         stateTransitionRefs: [transition('workflow.task', 'ready->rejected')],
         stateRefs: [
           state('fact.shipment_finance_release', 'REJECTED', 'result'),
@@ -565,6 +581,27 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
 
   finance_payment_and_reversal: Object.freeze({
     steps: Object.freeze({
+      'payment_order:starts_process:finance_payment_process': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['finance'],
+        capabilityKeys: [PermissionCode.FINANCE_PAYMENT_CREATE],
+        stateRefs: [state('fact.finance_payment', 'DRAFT', 'result')],
+        processNodeRefs: [processNode(FINANCE_PAYMENT_APPROVAL, 'finance_payment_approval')],
+      }),
+      'finance_payment:starts_process:finance_payment_process': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['finance'],
+        capabilityKeys: [PermissionCode.FINANCE_PAYMENT_CREATE],
+        stateRefs: [state('fact.finance_payment', 'POSTED', 'precondition'), state('fact.finance_payment', 'DRAFT', 'result')],
+        processNodeRefs: [processNode(FINANCE_PAYMENT_APPROVAL, 'finance_payment_approval')],
+      }),
+      'finance_allocation:reverses:finance_payment': step({
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['finance'],
+        capabilityKeys: [PermissionCode.FINANCE_PAYMENT_REVERSE],
+        stateRefs: [state('fact.finance_allocation', 'REVERSED', 'result')],
+      }),
+
       'open_finance_fact:starts_process:finance_payment_process': step({
         responsibilityMode: 'human',
         stateRefs: [
@@ -587,7 +624,9 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         ],
       }),
       'finance_payment:posts_fact:finance_allocation': step({
-        responsibilityMode: 'system',
+        responsibilityMode: 'human',
+        ownerPoolKeys: ['finance'],
+        capabilityKeys: [PermissionCode.FINANCE_PAYMENT_POST],
         stateRefs: [
           state('fact.finance_payment', 'POSTED', 'precondition'),
           state('fact.finance_allocation', 'POSTED', 'result'),
@@ -599,6 +638,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'finance_payment:reverses:open_finance_fact': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['finance'],
         stateTransitionRefs: [
           transition('fact.finance_payment', 'POSTED->REVERSED'),
         ],
@@ -606,6 +646,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'open_finance_fact:posts_fact:finance_credit_note': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['finance'],
         capabilityKeys: [PermissionCode.FINANCE_CREDIT_NOTE_CREATE],
         stateRefs: [
           state('fact.finance', 'POSTED', 'precondition'),
@@ -614,10 +655,12 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'finance_credit_note:posts_fact:settled_finance_fact': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['finance'],
         stateTransitionRefs: [transition('fact.finance', 'POSTED->SETTLED')],
       }),
       'finance_credit_note:reverses:open_finance_fact': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['finance'],
         capabilityKeys: [PermissionCode.FINANCE_CREDIT_NOTE_REVERSE],
         stateRefs: [
           state('fact.finance_credit_note', 'POSTED', 'precondition'),
@@ -642,6 +685,8 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     }),
     profile: profile({
       happyStepKeys: [
+        'payment_order:starts_process:finance_payment_process',
+        'finance_payment:starts_process:finance_payment_process',
         'open_finance_fact:starts_process:finance_payment_process',
         'finance_payment_process:calls_domain_command:finance_payment',
         'finance_payment:posts_fact:finance_allocation',
@@ -656,6 +701,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       ],
       interruptionKinds: ['blocked', 'rejected', 'resume'],
       correctionStepKeys: [
+        'finance_allocation:reverses:finance_payment',
         'finance_payment:reverses:open_finance_fact',
         'finance_credit_note:reverses:open_finance_fact',
       ],
@@ -689,6 +735,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     steps: Object.freeze({
       'inventory_operation:starts_process:inventory_adjustment_process': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['warehouse'],
         stateTransitionRefs: [
           transition('fact.inventory_operation', 'DRAFT->SUBMITTED'),
         ],
@@ -713,6 +760,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       'inventory_adjustment_task:calls_domain_command:inventory_adjustment_process':
         step({
           responsibilityMode: 'human',
+          ownerPoolKeys: ['boss'],
           stateTransitionRefs: [
             transition('workflow.task', 'ready->done'),
             transition('fact.inventory_operation', 'SUBMITTED->APPROVED'),
@@ -739,6 +787,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'inventory_adjustment_task:returns:inventory_operation': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['boss'],
         stateTransitionRefs: [
           transition('workflow.task', 'ready->rejected'),
           transition('fact.inventory_operation', 'SUBMITTED->REJECTED'),
@@ -896,6 +945,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         }),
       'production_exception_execution:reworks:affected_wip': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['production', 'warehouse'],
         capabilityKeys: [PermissionCode.PRODUCTION_EXCEPTION_EXECUTE],
         stateRefs: [
           state(
@@ -979,6 +1029,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       'rejected_purchase_quality:creates_fact_draft:purchase_disposition': step(
         {
           responsibilityMode: 'human',
+          ownerPoolKeys: ['purchase'],
           capabilityKeys: [PermissionCode.PURCHASE_RETURN_CREATE],
           stateRefs: [
             state('fact.quality_inspection', 'REJECTED', 'precondition'),
@@ -989,6 +1040,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       ),
       'purchase_disposition:returns:vendor_return_result': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['purchase', 'warehouse'],
         stateTransitionRefs: [
           transition('fact.purchase_rejection_disposition', 'DRAFT->POSTED'),
         ],
@@ -996,6 +1048,8 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'purchase_disposition:creates_fact_draft:replacement_receipt': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['warehouse'],
+        capabilityKeys: [PermissionCode.PURCHASE_RETURN_POST, PermissionCode.PURCHASE_RECEIPT_CREATE],
         stateTransitionRefs: [
           transition('fact.purchase_rejection_disposition', 'DRAFT->POSTED'),
         ],
@@ -1051,6 +1105,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       'rejected_outsourcing_quality:creates_fact_draft:outsourcing_disposition':
         step({
           responsibilityMode: 'human',
+          ownerPoolKeys: ['quality'],
           stateTransitionRefs: [
             transition('fact.quality_inspection', 'SUBMITTED->REJECTED'),
           ],
@@ -1060,6 +1115,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
         }),
       'outsourcing_disposition:returns:outsourcing_correction': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['warehouse'],
         stateTransitionRefs: [
           transition('fact.outsourcing_return_disposition', 'DRAFT->POSTED'),
         ],
@@ -1114,6 +1170,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
     steps: Object.freeze({
       'posted_purchase_receipt:returns:purchase_return_correction': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['purchase', 'warehouse'],
         stateRefs: [state('fact.purchase_receipt', 'POSTED', 'precondition')],
         stateTransitionRefs: [
           transition('fact.purchase_return', 'DRAFT->POSTED'),
@@ -1122,6 +1179,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       'posted_purchase_receipt:creates_fact_draft:purchase_adjustment_correction':
         step({
           responsibilityMode: 'human',
+          ownerPoolKeys: ['purchase', 'warehouse'],
           stateRefs: [state('fact.purchase_receipt', 'POSTED', 'precondition')],
           stateTransitionRefs: [
             transition('fact.purchase_receipt_adjustment', 'DRAFT->POSTED'),
@@ -1130,6 +1188,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       'purchase_return_correction:posts_fact:corrected_purchase_inventory':
         step({
           responsibilityMode: 'human',
+          ownerPoolKeys: ['purchase', 'warehouse'],
           stateTransitionRefs: [
             transition('fact.purchase_return', 'DRAFT->POSTED'),
           ],
@@ -1138,6 +1197,7 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       'purchase_adjustment_correction:posts_fact:corrected_purchase_inventory':
         step({
           responsibilityMode: 'human',
+          ownerPoolKeys: ['purchase', 'warehouse'],
           stateTransitionRefs: [
             transition('fact.purchase_receipt_adjustment', 'DRAFT->POSTED'),
           ],
@@ -1149,12 +1209,14 @@ export const DEV_BUSINESS_CHAIN_STEP_CONTRACT_DEFINITIONS = Object.freeze({
       }),
       'purchase_return_correction:reverses:posted_purchase_receipt': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['purchase', 'warehouse'],
         stateTransitionRefs: [
           transition('fact.purchase_return', 'POSTED->CANCELLED'),
         ],
       }),
       'purchase_adjustment_correction:reverses:posted_purchase_receipt': step({
         responsibilityMode: 'human',
+        ownerPoolKeys: ['purchase', 'warehouse'],
         stateTransitionRefs: [
           transition('fact.purchase_receipt_adjustment', 'POSTED->CANCELLED'),
         ],

@@ -476,6 +476,15 @@ export default function DevDatabaseMigrationPage() {
             数据库迁移
           </Title>
         </div>
+        <DevTaskNav
+          compact
+          idPrefix="dev-migration"
+          ariaLabel="数据库迁移视图"
+          className="erp-dev-delivery-taskbar"
+          items={MIGRATION_VIEW_ITEMS}
+          value={activeView}
+          onChange={selectView}
+        />
         <Space direction="vertical" size={4}>
           <Space wrap>
             <Button
@@ -527,6 +536,7 @@ export default function DevDatabaseMigrationPage() {
             {refreshStatusText}
           </Text>
         </Space>
+
       </header>
 
       <main className="erp-dev-hub-shell erp-dev-database-migration-shell">
@@ -623,15 +633,7 @@ export default function DevDatabaseMigrationPage() {
             </Button>
           </div>
         ) : null}
-        <DevTaskNav
-          compact
-          idPrefix="dev-migration"
-          ariaLabel="数据库迁移视图"
-          className="erp-dev-delivery-taskbar"
-          items={MIGRATION_VIEW_ITEMS}
-          value={activeView}
-          onChange={selectView}
-        />
+
         <section
           hidden={activeView !== 'migration'}
           id="dev-migration-panel-migration"

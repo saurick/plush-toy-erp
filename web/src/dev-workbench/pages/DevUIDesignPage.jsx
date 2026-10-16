@@ -142,12 +142,13 @@ export default function DevUIDesignPage() {
       <DevPageNav sourcePath="docs/product/ui-design/README.md" />
       <header className="erp-dev-ui-design-header">
         <Typography.Title level={1}>UI 交互设计</Typography.Title>
+        <Tabs
+          activeKey={view}
+          items={VIEWS}
+          onChange={(key) => updateQuery('view', key === 'preview' ? '' : key)}
+        />
       </header>
-      <Tabs
-        activeKey={view}
-        items={VIEWS}
-        onChange={(key) => updateQuery('view', key === 'preview' ? '' : key)}
-      />
+
       <section
         ref={readerRef}
         className={`erp-dev-ui-design-reader${fullscreen ? ' is-fullscreen' : ''}`}

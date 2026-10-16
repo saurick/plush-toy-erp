@@ -11,7 +11,7 @@
 .erp-dev-testing-validation__eyebrow,
 .erp-dev-data-header__eyebrow {
   color: var(--erp-primary-strong);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 800;
   letter-spacing: 0.05em;
 }
@@ -39,7 +39,7 @@
   width: fit-content;
   color: var(--erp-text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 700;
 }
 
@@ -148,7 +148,6 @@
   border-color: #c9d9ee;
   border-radius: 12px;
   background: #fbfdff;
-  box-shadow: inset 3px 0 0 var(--erp-primary);
 }
 
 .erp-dev-testing-validation__action-intro {
@@ -212,7 +211,7 @@
 .erp-dev-testing-disclosure > summary > span:last-child {
   margin-left: auto;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-dev-testing-disclosure > summary small {
@@ -378,7 +377,7 @@
 
 .erp-dev-testing-closeout-step__title h4.ant-typography {
   color: var(--erp-text);
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
 }
 
 .erp-dev-testing-closeout-step__copy p {
@@ -404,7 +403,7 @@
 .erp-dev-testing-closeout-commands code {
   min-width: 0;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   overflow-wrap: anywhere;
 }
 
@@ -514,7 +513,7 @@
 .erp-dev-testing-validation-plan__map small,
 .erp-dev-testing-validation-plan__map em {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-style: normal;
   line-height: 1.4;
 }
@@ -543,7 +542,7 @@
   width: fit-content;
   color: var(--erp-text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 700;
 }
 
@@ -601,7 +600,7 @@
   border-radius: 999px;
   background: #e8f7f4;
   color: var(--erp-primary-strong);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-dev-testing-command-guide li > span {
@@ -612,12 +611,12 @@
 
 .erp-dev-testing-command-guide li strong {
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-dev-testing-command-guide li small {
   color: var(--erp-text-muted);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   line-height: 1.35;
 }
 
@@ -637,7 +636,7 @@
   border-radius: 12px 12px 0 0;
   background: #f4f8f5;
   color: var(--erp-text-muted);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   font-weight: 800;
   letter-spacing: 0.04em;
   padding: 8px 12px;
@@ -677,13 +676,13 @@
 .erp-dev-testing-command-block__source > span,
 .erp-dev-testing-command-block__scope > span {
   color: var(--erp-text-muted);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   line-height: 1.4;
 }
 
 .erp-dev-testing-command-block__scope strong {
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-dev-testing-command-block__actions {
@@ -730,7 +729,7 @@
   border-radius: 8px;
   background: #f4f8f5;
   color: var(--erp-text-muted);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   padding: 6px 8px;
 }
 
@@ -755,7 +754,7 @@
   border-radius: 12px 12px 0 0;
   background: #f4f8f5;
   color: var(--erp-text-muted);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   font-weight: 800;
   letter-spacing: 0.04em;
   padding: 8px 14px;
@@ -793,7 +792,7 @@
 .erp-dev-testing-closeout-command-disclosure > summary small,
 .erp-dev-testing-closeout-command-disclosure > summary > span:last-child {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-dev-testing-closeout-command-disclosure[open] > summary {
@@ -847,7 +846,7 @@
 
 .erp-dev-testing-coverage-tabs .ant-tag {
   margin-inline-end: 0;
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }
 
 .erp-dev-testing-coverage-panel {
@@ -877,7 +876,7 @@
   width: 100%;
   min-width: 720px;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-dev-testing-coverage-domain-table th,
@@ -949,7 +948,7 @@
   margin: 6px 0 0;
   padding-left: 18px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.45;
 }
 
@@ -960,7 +959,7 @@
 .erp-dev-testing-coverage-boundary .ant-typography {
   margin: 8px 0 0;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.55;
 }
 
@@ -1009,7 +1008,7 @@
 .erp-dev-testing-coverage-policy-list p {
   margin: 0;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.5;
 }
 
@@ -1030,7 +1029,7 @@
   border-radius: 10px 10px 0 0;
   background: #f4f8f5;
   color: var(--erp-text-muted);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   font-weight: 800;
   letter-spacing: 0.04em;
   padding: 8px 12px;
@@ -1086,13 +1085,13 @@
 }
 
 .erp-dev-testing-coverage-card__metrics b {
-  font-size: 14px;
+  font-size: var(--erp-font-body);
 }
 
 .erp-dev-testing-coverage-card__no-reading,
 .erp-dev-testing-coverage-card__no-evidence {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.45;
 }
 
@@ -1136,7 +1135,7 @@
   vertical-align: top;
   border-bottom: 1px solid var(--erp-border);
   padding: 8px;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   overflow-wrap: anywhere;
 }
 
@@ -1196,13 +1195,13 @@
   align-items: center;
   gap: 7px;
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-dev-data-local-boundary p.ant-typography {
   margin: 8px 0 0 22px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.5;
 }
 
@@ -1277,7 +1276,7 @@
 .erp-dev-data-workflow-step__head p.ant-typography {
   margin-top: 4px;
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.5;
 }
 
@@ -1340,7 +1339,7 @@
 .erp-dev-data-profile:focus-within,
 .erp-dev-data-profile--selected {
   border-color: var(--dev-data-border);
-  box-shadow: inset 3px 0 0 var(--dev-data-primary);
+  background: var(--dev-data-selected);
 }
 
 .erp-dev-data-profile__details {

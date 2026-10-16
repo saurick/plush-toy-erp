@@ -41,7 +41,7 @@
 .erp-feedback-anatomy figcaption {
   margin-bottom: 14px;
   color: var(--erp-text-secondary, #53635c);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-feedback-modal-sketch {
@@ -94,7 +94,7 @@
   height: 24px;
   border: 1px solid currentcolor;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-feedback-sketch-field {
@@ -102,7 +102,7 @@
   grid-template-columns: 70px minmax(0, 1fr);
   gap: 12px;
   align-items: start;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-feedback-sketch-field i {
@@ -119,7 +119,7 @@
 .erp-feedback-ruler,
 .erp-feedback-scroll-note {
   color: var(--erp-primary, #237443);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-feedback-sketch-actions b {
@@ -131,7 +131,7 @@
 
 .erp-feedback-rule-cards > div {
   padding: 16px;
-  border-inline-start: 3px solid var(--erp-primary, #237443);
+  border: 1px solid var(--erp-border);
   background: var(--erp-surface-bg-soft, #f5f7f6);
 }
 
@@ -204,7 +204,7 @@
   margin-top: 16px;
   background: var(--erp-surface-bg-soft, #f1f4f2);
   border: 1px solid var(--erp-border, #dce4df);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-feedback-container-picture > * {

@@ -31,7 +31,7 @@
 }
 .erp-dev-overview-library__count {
   margin-inline-start: auto;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 .erp-dev-overview-view-tabs.erp-dev-task-nav {
   width: fit-content;
@@ -42,7 +42,7 @@
   align-items: center;
   gap: 8px;
   padding: 12px 14px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 .erp-dev-tool-table__identity {
   display: flex;
@@ -55,7 +55,7 @@
 }
 .erp-dev-tool-table__source {
   max-width: min(420px, 75vw);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   overflow-wrap: anywhere;
 }
 .erp-dev-tool-table__group,

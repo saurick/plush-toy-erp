@@ -1,10 +1,29 @@
 /* DEV 页面与业务桌面共用主题；这里只统一工作台的页面几何与阅读密度。 */
+/* 包含挂载到 body 的工作台弹出层。 */
+body:has(.erp-dev-workspace-page) {
+  --erp-font-badge: 0.875rem;
+  --erp-font-tiny: 0.875rem;
+  --erp-font-micro: 0.875rem;
+  --erp-font-caption: 0.875rem;
+  --erp-font-small: 0.875rem;
+  --erp-font-body: 0.875rem;
+  --erp-font-emphasis: 0.9375rem;
+  --erp-line-caption: 1.25rem;
+  --erp-line-body: 1.375rem;
+}
+
 .erp-dev-workspace-page {
   min-height: 100vh;
   padding: 0 16px 16px 0;
   background: var(--erp-page-bg);
   color: var(--erp-text);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
+  line-height: 1.5;
+}
+
+body:has(.erp-dev-workspace-page) small,
+body:has(.erp-dev-workspace-page) .ant-typography code {
+  font-size: var(--erp-font-caption);
 }
 
 .erp-dev-workspace-page > :not(.erp-dev-workspace-nav) {
@@ -15,26 +34,48 @@
 
 .erp-dev-workspace-page > header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-start;
+  gap: 10px 16px;
+  min-width: 0;
   min-height: 52px;
-  width: calc(100% + 28px);
-  margin: 0 0 0 -12px;
-  padding: 8px 16px;
-  border: 0;
-  border-bottom: 1px solid var(--erp-border);
-  border-radius: 0;
+  width: 100%;
+  margin: 0 0 9px;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
   background: var(--erp-surface-bg);
   box-shadow: none;
 }
 
 .erp-dev-workspace-page > header h1.ant-typography {
   margin: 0;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
-  line-height: 1.5;
+  line-height: 1.25;
   letter-spacing: 0;
+}
+
+.erp-dev-workspace-page > header > :is(
+  .erp-sliding-tabs,
+  .erp-dev-task-nav,
+  .erp-dev-overview-library__navigation,
+  .erp-dev-testing-primary-nav,
+  .erp-dev-flow-workspace-nav
+) {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.erp-dev-workspace-page > header .erp-sliding-tabs > .ant-tabs-nav {
+  margin: 0;
+}
+
+.erp-dev-workspace-page > header .erp-dev-flow-header-actions {
+  margin-left: auto;
 }
 
 .erp-dev-workspace-page > header [class$='header__icon'] {
@@ -79,7 +120,7 @@
 .erp-dev-workspace-nav__route {
   min-height: 32px;
   padding: 5px 10px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-dev-workspace-nav__route span {
@@ -87,7 +128,7 @@
 }
 
 .erp-dev-workspace-nav__secondary-route {
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 20px;
 }
 
@@ -109,7 +150,7 @@
 .erp-dev-workspace-nav__actions .ant-btn {
   height: 30px;
   box-shadow: none;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-dev-workspace-page :is(.erp-dev-hub-shell, .erp-dev-testing-shell) {
@@ -141,7 +182,7 @@
   gap: 8px;
   padding: 10px 12px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-dev-static-guidance > summary small {
@@ -153,7 +194,7 @@
   margin: 0;
   border-top: 1px solid var(--erp-border);
   padding: 10px 12px;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-dev-docs-shell {
@@ -173,7 +214,7 @@
 .erp-dev-workspace-page .ant-card-head {
   min-height: 42px;
   padding-inline: 14px;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
 }
 
 .erp-dev-workspace-page .ant-card-body {

@@ -78,9 +78,11 @@ test('devDocs: 只通过开发态独立路径暴露', () => {
     devDocsPageSource,
     /const archiveMarkdownModules = import\.meta\.glob/u
   )
-  assert.match(
-    devDocsPageSource,
-    /const archiveMarkdownModules = import\.meta\.glob\([\s\S]*?eager: true/u
+  assert.doesNotMatch(
+    devDocsPageSource.match(
+      /const archiveMarkdownModules = import\.meta\.glob\([\s\S]*?\n\)/u
+    )?.[0] || '',
+    /eager: true/u
   )
   assert.match(
     devDocsPageSource,
@@ -95,11 +97,11 @@ test('devDocs: 搜索空结果不保留越界选中项或阅读动作', () => {
   )
   assert.match(
     devDocsPageSource,
-    /isSearching[\s\S]*?visibleDocs\.find\(\(item\) => item\.key === selectedKey\)/u
+    /\(isSearching \? visibleDocs : lifecycleDocs\)\.find\(/u
   )
   assert.match(
     devDocsPageSource,
-    /visibleDocs\[0\] \|\|[\s\S]*?\(isSearching \? undefined : lifecycleDocs\[0\]\)/u
+    /isSearching \? undefined : visibleDocs\[0\] \|\| lifecycleDocs\[0\]/u
   )
   assert.match(devDocsPageSource, /<DevPageNav \/>/u)
   assert.doesNotMatch(devDocsPageSource, /<DevPageNav sourcePath=/u)

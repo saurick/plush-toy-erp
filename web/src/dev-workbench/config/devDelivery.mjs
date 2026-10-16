@@ -1222,7 +1222,11 @@ export function createDeliveryIdempotencyKey(
   action,
   randomUuid = () => createDevOperationUUID()
 ) {
-  if (!['release', 'promote', 'rollback', 'retry'].includes(action)) {
+  if (
+    !['release', 'promote', 'rollback', 'retry', 'rebuild-database'].includes(
+      action
+    )
+  ) {
     throw new Error('delivery idempotency action is invalid')
   }
   const uuid = String(randomUuid())
@@ -1657,17 +1661,17 @@ export function isDevInitialCustomerConfigActivationReady(
   const activeConfig = runtime?.activeCustomerConfig
   return Boolean(
     actionKind === 'promote' &&
-      target?.status === 'blocked' &&
-      Array.isArray(target?.blockers) &&
-      target.blockers.length === 1 &&
-      target.blockers[0] === 'target_customer_config_readback_failed' &&
-      runtime?.customerConfigState === 'absent' &&
-      runtime?.database === 'blocked' &&
-      SHA_PATTERN.test(String(runtime?.serverSha || '')) &&
-      runtime.serverSha === runtime.webSha &&
-      activeConfig?.revision === 'unknown' &&
-      activeConfig?.productVersion === 'unknown' &&
-      activeConfig?.datasetVersion === 'unknown'
+    target?.status === 'blocked' &&
+    Array.isArray(target?.blockers) &&
+    target.blockers.length === 1 &&
+    target.blockers[0] === 'target_customer_config_readback_failed' &&
+    runtime?.customerConfigState === 'absent' &&
+    runtime?.database === 'blocked' &&
+    SHA_PATTERN.test(String(runtime?.serverSha || '')) &&
+    runtime.serverSha === runtime.webSha &&
+    activeConfig?.revision === 'unknown' &&
+    activeConfig?.productVersion === 'unknown' &&
+    activeConfig?.datasetVersion === 'unknown'
   )
 }
 

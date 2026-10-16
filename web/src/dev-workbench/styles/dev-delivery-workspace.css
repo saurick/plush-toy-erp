@@ -15,7 +15,7 @@
 
 .erp-dev-delivery-context__note,
 .erp-dev-delivery-boundary {
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.5;
 }
 
@@ -35,7 +35,7 @@
 
 .erp-dev-delivery-facts dt {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-dev-delivery-facts dd {

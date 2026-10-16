@@ -18,7 +18,7 @@ import { getERPSurfaceTokens } from '@/common/theme/erpThemePalette.mjs'
 import DevUIFeedbackExamples from './DevUIFeedbackExamples.jsx'
 import {
   PROGRESS_SCOPE_OPTIONS,
-  progressRiskAvailable,
+  progressQueryFromURL,
 } from '../../erp/utils/businessProgress.mjs'
 import '../styles/dev-ui-controls.css'
 
@@ -56,19 +56,22 @@ const TOPICS = [
     summary: '切换内容，保留当前对象',
     guide: 'type',
     description:
-      '两种切换共享底轨与滑块，区别在于切换的是同级内容还是观察视角。',
+      '内容页签统一使用透明底、选中字重 650 与 2px 主题色下划线；未选中字重 500。一级与二级采用同一外观。',
     rules: [
       ['产品明细 / 关联任务', '页签', '同一对象下有不同内容区域。'],
       ['订单交付 / 生产执行', '分段切换', '少量互斥视角，按内容宽度排列。'],
-      ['当前项', '浅色滑块 + 字重', '保留统一细边框，避免每项都争夺注意力。'],
+      ['当前项', '650 字重 + 2px 下划线', '主题色标明当前位置，未选项使用 500 字重；不叠加选中底块。'],
+      ['一级与二级导航', '共用内容 Tab 样式', '透明底，1px 中性基线，指示线仅覆盖选中项；电脑与手机使用同一线宽。'],
+      ['手机顶部', '层间留白 4–8px', '主次页签间 4px、页签至搜索 6px、搜索至状态 8px；触摸区域至少 44px。'],
+      ['管理员查看岗位', '我的 → 管理员视角', '保留所选岗位与查看权限，任务、风险和进度顶部不重复岗位栏。'],
       ['内容切换', '导航持续挂载', '指示条连续移动，不随正文重新出现。'],
     ],
     checks: [
       '切到关联任务：订单身份保持不变。',
-      '快速反向切换：滑块从当前位置继续。',
+      '快速反向切换：下划线从当前位置继续。',
       '用方向键切换，核对禁用项与减少动态效果。',
     ],
-    source: 'SlidingTabs · SlidingSegmented · tabs-motion.css',
+    source: 'SlidingTabs · SlidingSegmented · SlidingTabList · control-affordance.css',
   },
   {
     key: 'filters',
@@ -250,6 +253,7 @@ function CountExample() {
 
 function NavigationExample() {
   const [view, setView] = useState('orders')
+  const [trackingView, setTrackingView] = useState('progress')
   return (
     <div className="erp-control-example-stack">
       <div>
@@ -329,8 +333,37 @@ function NavigationExample() {
           ))}
         </dl>
       </div>
+      <div>
+        <h3>③ 第二层导航，沿用同一选中样式</h3>
+        <SlidingSegmented
+          aria-label="二级页签样例"
+          hierarchy="secondary"
+          value={trackingView}
+          onChange={setTrackingView}
+          options={[
+            { label: '流程进度', value: 'progress' },
+            { label: '异常跟踪', value: 'exceptions' },
+          ]}
+        />
+        <p>
+          当前查看：{trackingView === 'progress' ? '流程进度' : '异常跟踪'}。
+          选中字重 650、未选中 500；下划线统一为 2px，使用主题色，随页签连续滑动。
+          手机页面左右保留 12px，层间留白 4–8px，点击区域至少 44px；
+          完整布局与“我的”岗位切换见移动端任务样例。
+        </p>
+      </div>
     </div>
   )
+}
+
+function demoRiskAvailable(risk, scope) {
+  const due = risk === 'due' ? 'due_soon' : risk
+  const query = progressQueryFromURL(new URLSearchParams({
+    scope,
+    due_status: risk === 'blocked' ? 'all' : due,
+    blocked_only: String(risk === 'blocked'),
+  }))
+  return risk === 'blocked' ? query.blocked_only : query.due_status === due
 }
 
 function FiltersExample() {
@@ -361,7 +394,7 @@ function FiltersExample() {
             key={key}
             selected={risk === key}
             disabled={
-              !progressRiskAvailable(key === 'due' ? 'due_soon' : key, { scope })
+              !demoRiskAvailable(key, scope)
             }
             count={
               key === 'all'
@@ -403,9 +436,7 @@ function FiltersExample() {
                   onChange={(nextScope) => {
                     setScope(nextScope)
                     if (
-                      !progressRiskAvailable(risk === 'due' ? 'due_soon' : risk, {
-                        scope: nextScope,
-                      })
+                      !demoRiskAvailable(risk, nextScope)
                     ) setRisk('all')
                   }}
                   options={PROGRESS_SCOPE_OPTIONS}

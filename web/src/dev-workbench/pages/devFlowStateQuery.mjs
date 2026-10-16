@@ -8,6 +8,12 @@ export const DEV_FLOW_STATE_QUERY_KEYS = Object.freeze({
   fact: 'fact',
   taskId: 'task_id',
   role: 'flow_role',
+  roleStage: 'flow_stage',
+  roleSubstep: 'flow_substep',
+  roleTab: 'flow_tab',
+  exception: 'flow_exception',
+  exceptionDecision: 'flow_decision',
+  exceptionStep: 'flow_exception_step',
 })
 
 export const DEV_FLOW_STATE_DEFAULT_VIEW = 'chain'
