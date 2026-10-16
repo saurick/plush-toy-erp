@@ -566,28 +566,38 @@ func (r *inventoryRepo) listInventoryBalances(ctx context.Context, filter biz.In
 	if err != nil {
 		return nil, 0, err
 	}
+	keys := make([]biz.InventoryBalanceKey, 0, len(rows))
+	for _, row := range rows {
+		if row.SubjectType == biz.InventorySubjectProduct {
+			keys = append(keys, biz.InventoryBalanceKey{SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, LotID: row.LotID, UnitID: row.UnitID})
+		}
+	}
+	reservations, err := activeReservedQuantitiesForInventoryKeys(ctx, r.data.postgres, keys)
+	if err != nil {
+		return nil, 0, err
+	}
+	readinessByKey, err := productionFinishedGoodsReadinessForKeys(ctx, r.data.postgres, keys)
+	if err != nil {
+		return nil, 0, err
+	}
 	out := make([]*biz.InventoryBalance, 0, len(rows))
 	for _, row := range rows {
 		item := entInventoryBalanceToBiz(row)
 		if row.SubjectType == biz.InventorySubjectMaterial {
 			item.StockCategory = categories[row.SubjectID]
 		}
-		activeReserved, err := activeReservedQuantityForBalance(ctx, r.data.postgres, row)
-		if err != nil {
-			return nil, 0, err
+		key := inventoryProductGrain(biz.InventoryBalanceKey{SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, LotID: row.LotID, UnitID: row.UnitID})
+		activeReserved := decimal.Zero
+		readiness := finishedGoodsReadiness{}
+		if row.SubjectType == biz.InventorySubjectProduct {
+			activeReserved = reservations[key]
+			readiness = readinessByKey[key]
 		}
 		item.ActiveReservedQuantity = activeReserved
 		item.AvailableQuantity = calc.InventoryAvailableQuantity(item.Quantity, activeReserved)
-		readiness, err := productionFinishedGoodsReadiness(ctx, r.data.postgres, biz.InventoryBalanceKey{
-			SubjectType: row.SubjectType, SubjectID: row.SubjectID, ProductSkuID: row.ProductSkuID,
-			WarehouseID: row.WarehouseID, LotID: row.LotID, UnitID: row.UnitID,
-		})
-		if err != nil {
-			return nil, 0, err
-		}
 		item.PendingInspectionQuantity = readiness.PendingInspection
 		item.PendingPackagingQuantity = readiness.PendingPackaging
-		item.ReadyToShipQuantity = decimal.Max(decimal.Zero, decimal.Min(item.AvailableQuantity, item.Quantity.Sub(readiness.blocked())))
+		item.ReadyToShipQuantity = decimal.Max(decimal.Zero, item.AvailableQuantity.Sub(readiness.blocked()))
 		if row.SubjectType != biz.InventorySubjectProduct || (row.Edges.InventoryLot != nil && row.Edges.InventoryLot.Status != corestatus.InventoryLotActive) {
 			item.ReadyToShipQuantity = decimal.Zero
 		}
@@ -1854,7 +1864,11 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (_ *biz.
 	}
 	defer func() { rollbackEntTx(ctx, tx, r.log) }()
 
-	target, err := tx.BOMHeader.Get(ctx, id)
+	targetQuery := tx.BOMHeader.Query().Where(bomheader.ID(id))
+	if r.data.sqlDialect != dialect.SQLite {
+		targetQuery.Where(func(s *entsql.Selector) { s.ForUpdate() })
+	}
+	target, err := targetQuery.Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrBOMHeaderNotFound
@@ -1873,6 +1887,9 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (_ *biz.
 	}
 	if len(items) == 0 {
 		return nil, biz.ErrBadParam
+	}
+	if err := validateBOMActivationReferences(ctx, tx.Client(), target, items, r.data.sqlDialect != dialect.SQLite); err != nil {
+		return nil, err
 	}
 	if target.Status != biz.BOMStatusActive {
 		if _, err := tx.BOMHeader.Update().

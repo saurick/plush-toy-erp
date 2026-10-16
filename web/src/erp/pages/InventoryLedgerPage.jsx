@@ -20,10 +20,8 @@ import {
   Space,
   Tag,
 } from 'antd'
-import {
-  useOutletContext,
-  useSearchParams,
-} from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
@@ -59,11 +57,11 @@ import {
   startInventoryAdjustmentApprovalProcess,
 } from '../api/customerConfigApi.mjs'
 import {
-  listProductSKUs,
-  listUnits,
-  listMaterials,
-  listProducts,
-  listWarehouses,
+  listAllProductSKUs,
+  listAllUnits,
+  listAllMaterials,
+  listAllProducts,
+  listAllWarehouses,
 } from '../api/masterDataOrderApi.mjs'
 import {
   BusinessActionTooltip,
@@ -479,8 +477,14 @@ export default function InventoryLedgerPage() {
     adminProfile,
     PermissionCode.WAREHOUSE_INVENTORY_READ
   )
-  const canReadMaterials = hasActionPermission(adminProfile, PermissionCode.MATERIAL_READ)
-  const canReadProducts = hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
+  const canReadMaterials = hasActionPermission(
+    adminProfile,
+    PermissionCode.MATERIAL_READ
+  )
+  const canReadProducts = hasActionPermission(
+    adminProfile,
+    PermissionCode.PRODUCT_READ
+  )
   const canReadProductSKUs = hasActionPermission(
     adminProfile,
     PermissionCode.PRODUCT_SKU_READ
@@ -536,7 +540,7 @@ export default function InventoryLedgerPage() {
   )
 
   const recoverInventoryOperation = useCallback(
-    async (operationID, { quiet = false } = {}) => {
+    async (operationID) => {
       const id = Number(operationID || 0)
       if (!id) return null
       try {
@@ -547,7 +551,6 @@ export default function InventoryLedgerPage() {
       } catch (error) {
         const text = getActionErrorMessage(error, '恢复最近库存作业')
         setOperationRecoveryError(text)
-        if (!quiet) message.error(text)
         return null
       }
     },
@@ -560,7 +563,7 @@ export default function InventoryLedgerPage() {
       window.sessionStorage.getItem(operationSessionKey) || 0
     )
     if (operationID > 0) {
-      recoverInventoryOperation(operationID, { quiet: true })
+      recoverInventoryOperation(operationID)
     }
   }, [operationSessionKey, recoverInventoryOperation])
   useEffect(() => {
@@ -707,7 +710,7 @@ export default function InventoryLedgerPage() {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return
       }
-      message.error(getActionErrorMessage(error, '加载库存台账'))
+      showPageLoadError(error, '加载库存台账')
     } finally {
       if (request.isCurrent()) {
         setLoading(false)
@@ -862,31 +865,22 @@ export default function InventoryLedgerPage() {
         lotResult,
       ] = await Promise.all([
         canReadMaterials
-          ? listMaterials(
-              { limit: 500, active_only: true },
-              { signal: request.signal }
-            )
+          ? listAllMaterials({ active_only: true }, { signal: request.signal })
           : Promise.resolve({ materials: [] }),
         canReadProducts
-          ? listProducts(
-              { limit: 500, active_only: true },
-              { signal: request.signal }
-            )
+          ? listAllProducts({ active_only: true }, { signal: request.signal })
           : Promise.resolve({ products: [] }),
         canReadProductSKUs
-          ? listProductSKUs({ limit: 500 }, { signal: request.signal })
+          ? listAllProductSKUs({}, { signal: request.signal })
           : Promise.resolve({ product_skus: [] }),
-        canReadMaterials
-          ? listUnits({ limit: 500 }, { signal: request.signal })
+        canReadMaterials || canReadProducts || canReadInventory
+          ? listAllUnits({}, { signal: request.signal })
           : Promise.resolve({ units: [] }),
         canReadInventory
-          ? listWarehouses(
-              { limit: 500, active_only: true },
-              { signal: request.signal }
-            )
+          ? listAllWarehouses({ active_only: true }, { signal: request.signal })
           : Promise.resolve({ warehouses: [] }),
         canReadInventory
-          ? listInventoryLots({ limit: 500 }, { signal: request.signal })
+          ? listAllInventoryLots({}, { signal: request.signal })
           : Promise.resolve({ inventory_lots: [] }),
       ])
       if (!request.isCurrent()) {
@@ -916,7 +910,7 @@ export default function InventoryLedgerPage() {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return
       }
-      message.error(getActionErrorMessage(error, '加载库存筛选资料'))
+      showPageLoadError(error, '加载库存筛选资料')
       setMaterials([])
       setProducts([])
       setProductSKUs([])
@@ -1052,6 +1046,7 @@ export default function InventoryLedgerPage() {
       })
       const scope = `${operationType}:${selectedRow.subject_type}:${selectedRow.subject_id}:${selectedRow.product_sku_id || 0}:${selectedRow.warehouse_id}:${selectedRow.lot_id || 0}`
       const attempt = operationAttemptsRef.current.prepare(scope, payload)
+      let createdReceipt = null
       setOperationLoading(true)
       try {
         const created = await createInventoryOperation(attempt.params)
@@ -1060,6 +1055,7 @@ export default function InventoryLedgerPage() {
             isInvalidResponse: true,
           })
         }
+        createdReceipt = created
         let operation = created
         let submittedProcess
         if (operationType === 'MANUAL_ADJUSTMENT') {
@@ -1112,20 +1108,23 @@ export default function InventoryLedgerPage() {
         rememberInventoryOperation(operation)
         setOperationType('')
         if (operationType === 'MANUAL_ADJUSTMENT') {
-          showProcessSubmissionReceipt({ result: submittedProcess, title: '人工库存调整已提交审批' })
+          showProcessSubmissionReceipt({
+            result: submittedProcess,
+            title: '人工库存调整已提交审批',
+          })
         } else {
           message.success('库存作业草稿已生成，请核对后过账')
         }
       } catch (error) {
-        const retained = operationAttemptsRef.current.settle(
-          scope,
-          attempt,
-          error
-        )
+        const retained =
+          Boolean(createdReceipt) ||
+          operationAttemptsRef.current.settle(scope, attempt, error)
         message[retained ? 'warning' : 'error'](
-          retained
-            ? '提交结果暂时无法确认，请保持填写内容不变后重试'
-            : getActionErrorMessage(error, '生成库存作业')
+          createdReceipt
+            ? '草稿已生成，审批提交未完成；保持填写内容不变后重试将继续处理原草稿'
+            : retained
+              ? '提交结果暂时无法确认，请保持填写内容不变后重试'
+              : getActionErrorMessage(error, '生成库存作业')
         )
       } finally {
         setOperationLoading(false)
@@ -1168,7 +1167,7 @@ export default function InventoryLedgerPage() {
         return true
       } catch (error) {
         if (isRpcAbortError(error) || !request.isCurrent()) return false
-        message.error(getActionErrorMessage(error, '读取库存作业草稿'))
+        showPageLoadError(error, '读取库存作业草稿')
         return false
       } finally {
         if (request.isCurrent()) {
@@ -1266,13 +1265,18 @@ export default function InventoryLedgerPage() {
         if (action === 'submit') {
           showProcessSubmissionReceipt({
             title: '人工库存调整已提交审批',
-            loadProcess: () => getInventoryAdjustmentApprovalProcess({
-              ...(customerKey ? { customer_key: customerKey } : {}),
-              inventory_operation_id: operation.id,
-            }),
+            loadProcess: () =>
+              getInventoryAdjustmentApprovalProcess({
+                ...(customerKey ? { customer_key: customerKey } : {}),
+                inventory_operation_id: operation.id,
+              }),
           })
         } else {
-          message.success(result.recovered ? '已重新读取库存作业结果' : { post: '库存作业已过账', cancel: '库存作业已取消' }[action])
+          message.success(
+            result.recovered
+              ? '已重新读取库存作业结果'
+              : { post: '库存作业已过账', cancel: '库存作业已取消' }[action]
+          )
         }
       } catch (error) {
         message.error(getActionErrorMessage(error, '处理库存作业'))
@@ -1368,14 +1372,6 @@ export default function InventoryLedgerPage() {
       renderUnitReference,
       renderWarehouseReference,
     ]
-  )
-
-  const stats = useMemo(
-    () => [
-      { key: 'total', label: '筛选结果', value: total },
-      { key: 'current', label: '本页显示', value: rows.length },
-    ],
-    [rows.length, total]
   )
 
   const columns = useMemo(() => {
@@ -1807,13 +1803,15 @@ export default function InventoryLedgerPage() {
         ['ready_to_ship_quantity', '可发货数量'],
       ].map(([key, title]) => ({
         title,
-exportTitle: title,
-dataIndex: key,
-width: 130,
-align: 'right',
-defaultPriority: 45,
-        render: (value, record) => record.subject_type === 'PRODUCT' ? formatQuantity(value) : '—',
-        exportValue: (record) => record.subject_type === 'PRODUCT' ? formatQuantity(record[key]) : '',
+        exportTitle: title,
+        dataIndex: key,
+        width: 130,
+        align: 'right',
+        defaultPriority: 45,
+        render: (value, record) =>
+          record.subject_type === 'PRODUCT' ? formatQuantity(value) : '—',
+        exportValue: (record) =>
+          record.subject_type === 'PRODUCT' ? formatQuantity(record[key]) : '',
       })),
     ]
   }, [
@@ -1957,7 +1955,16 @@ defaultPriority: 45,
         compact
         helpKey="inventory"
         title="库存台账"
-        stats={stats}
+        viewSwitch={
+          <div className="erp-inventory-ledger-view-bar">
+            <Tabs
+              activeKey={activeView}
+              items={VIEW_ITEMS}
+              onChange={handleViewChange}
+            />
+            {activeView === VIEW_BALANCES ? inventoryBalanceSwitch : null}
+          </div>
+        }
       />
 
       {currentOperation || operationRecoveryError ? (
@@ -2079,7 +2086,14 @@ defaultPriority: 45,
                     核对并取消
                   </Button>
                 ) : null}
-                {currentOperation.operation_type === 'MANUAL_ADJUSTMENT' ? <WorkflowSourceProgressButton sourceType="inventory_operation" sourceID={currentOperation.id} profile={adminProfile} disabled={operationLoading} /> : null}
+                {currentOperation.operation_type === 'MANUAL_ADJUSTMENT' ? (
+                  <WorkflowSourceProgressButton
+                    sourceType="inventory_operation"
+                    sourceID={currentOperation.id}
+                    profile={adminProfile}
+                    disabled={operationLoading}
+                  />
+                ) : null}
                 <ExceptionProcessRecoveryButton
                   canRecover={
                     canRecoverProcess &&
@@ -2235,6 +2249,7 @@ defaultPriority: 45,
             />
             {activeView === VIEW_LOTS ? (
               <SelectFilter
+                aria-label="批次状态"
                 className="erp-business-filter-control--status"
                 value={lotStatus}
                 options={LOT_STATUS_OPTIONS}
@@ -2247,6 +2262,7 @@ defaultPriority: 45,
             {activeView === VIEW_TXNS ? (
               <>
                 <SelectFilter
+                  aria-label="出入库类型"
                   className="erp-business-filter-control--status"
                   value={txnType}
                   options={TXN_TYPE_OPTIONS}
@@ -2256,6 +2272,7 @@ defaultPriority: 45,
                   }}
                 />
                 <SelectFilter
+                  aria-label="来源单据"
                   className="erp-business-filter-control--status"
                   value={sourceType}
                   options={SOURCE_TYPE_OPTIONS}
@@ -2312,7 +2329,10 @@ defaultPriority: 45,
         }
         actions={
           <Space size={8} wrap>
-            {hasActionPermission(adminProfile, PermissionCode.WAREHOUSE_MANAGE) ? (
+            {hasActionPermission(
+              adminProfile,
+              PermissionCode.WAREHOUSE_MANAGE
+            ) ? (
               <Button onClick={() => setWarehouseSettingsOpen(true)}>
                 仓库设置
               </Button>
@@ -2431,14 +2451,6 @@ defaultPriority: 45,
       </BusinessOperationPanel>
 
       <Card className="erp-business-data-table-card erp-business-module-table-card">
-        <div className="erp-business-data-table-card__header erp-inventory-ledger-view-bar">
-          <Tabs
-            activeKey={activeView}
-            items={VIEW_ITEMS}
-            onChange={handleViewChange}
-          />
-          {activeView === VIEW_BALANCES ? inventoryBalanceSwitch : null}
-        </div>
         {activeView === VIEW_BALANCES && balanceDisplay === 'distribution' ? (
           <InventoryDistributionOverview
             balances={distributionData.rows}
