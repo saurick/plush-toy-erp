@@ -71,8 +71,9 @@ export async function exerciseTableScrollPagination(
     const scroller = node.querySelector('.ant-table-content, .ant-table-body')
     const ancestors = []
     for (let parent = node; parent; parent = parent.parentElement) {
-      if (/auto|scroll/.test(getComputedStyle(parent).overflowY))
+      if (/auto|scroll/.test(getComputedStyle(parent).overflowY)) {
         ancestors.push(parent)
+      }
     }
     const frames = []
     let frame = 0
@@ -187,8 +188,9 @@ export async function exerciseTableScrollPagination(
         '少行末页必须恢复实际高度，不能残留加载占位'
       )
       const positions = visible.reduce((values, frame) => {
-        if (!values.length || Math.abs(values.at(-1) - frame.y) > 1)
+        if (!values.length || Math.abs(values.at(-1) - frame.y) > 1) {
           values.push(frame.y)
+        }
         return values
       }, [])
       assert(
@@ -247,8 +249,9 @@ export async function exerciseTableScrollSettling(page, wrapper, scroller) {
       if (
         parent.scrollHeight > parent.clientHeight + 100 &&
         /auto|scroll/.test(getComputedStyle(parent).overflowY)
-      )
+      ) {
         return parent
+      }
     }
     return null
   })
@@ -270,20 +273,66 @@ export async function exerciseTableScrollSettling(page, wrapper, scroller) {
     32,
     (direction > 0 ? initial.max - initial.top : initial.top) / 6
   )
-  for (let index = 0; index < 4; index += 1) {
-    const before = await vertical.evaluate((node) => node.scrollTop)
-    await page.mouse.wheel(0, direction * distance)
-    await page.waitForFunction(
-      ({ node, before }) => node.scrollTop !== before,
-      { node: vertical, before }
+  const monitor = await vertical.evaluateHandle(
+    (node, dock) => {
+      let lastScroll = -Infinity
+      let events = 0
+      let hiddenObserved = false
+      let prematureReveals = 0
+      const onScroll = () => {
+        lastScroll = performance.now()
+        events += 1
+      }
+      const observer = new MutationObserver(() => {
+        const visible = getComputedStyle(dock).visibility === 'visible'
+        if (!visible) hiddenObserved = true
+        // Measure in the browser's clock. A delayed automation round trip may
+        // arrive after legitimate idle recovery, even when it requested 60 ms.
+        if (visible && hiddenObserved && performance.now() - lastScroll < 120) {
+          prematureReveals += 1
+        }
+      })
+      node.addEventListener('scroll', onScroll, { passive: true })
+      observer.observe(dock, { attributes: true, attributeFilter: ['style'] })
+      return {
+        read: () => ({
+          events,
+          hiddenObserved,
+          prematureReveals,
+          connected: dock.isConnected,
+        }),
+        stop: () => {
+          node.removeEventListener('scroll', onScroll)
+          observer.disconnect()
+        },
+      }
+    },
+    await dock.elementHandle()
+  )
+  try {
+    for (let index = 0; index < 4; index += 1) {
+      const before = await vertical.evaluate((node) => node.scrollTop)
+      await page.mouse.wheel(0, direction * distance)
+      await page.waitForFunction(
+        ({ node, before }) => node.scrollTop !== before,
+        { node: vertical, before }
+      )
+      await dock.waitFor({ state: 'hidden' })
+      await page.waitForTimeout(60)
+    }
+    const observed = await monitor.evaluate((monitor) => monitor.read())
+    assert(
+      observed.connected && observed.events >= 4 && observed.hiddenObserved,
+      '滚动观测必须覆盖实际滚动和隐藏状态'
     )
-    await dock.waitFor({ state: 'hidden' })
-    await page.waitForTimeout(60)
     assert.equal(
-      await dock.isVisible(),
-      false,
+      observed.prematureReveals,
+      0,
       '连续纵向滚动期间不能反复闪现横向条'
     )
+  } finally {
+    await monitor.evaluate((monitor) => monitor.stop())
+    await monitor.dispose()
   }
   await dock.waitFor({ state: 'visible' })
   assert.equal(
