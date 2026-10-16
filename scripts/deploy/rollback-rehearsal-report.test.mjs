@@ -356,7 +356,7 @@ test("buildReport rejects smoke reports without traceable target or HTTP status"
 
   assert.throws(
     () => buildReport(baseOptions(root)),
-    /post smoke report checks\[1\]\.httpCode must be a 100-599 HTTP status for URL targets/,
+    /post smoke report checks\[1\]\.httpCode must be HTTP 200 for URL targets/,
   );
 });
 
