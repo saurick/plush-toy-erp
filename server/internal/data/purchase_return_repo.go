@@ -64,6 +64,17 @@ func (r *inventoryRepo) CreatePurchaseReturnWithItems(ctx context.Context, in *b
 	if in == nil || in.PurchaseReceiptID == nil || *in.PurchaseReceiptID <= 0 || len(items) == 0 || in.IdempotencyKey == "" || in.IdempotencyPayloadHash == "" {
 		return nil, biz.ErrBadParam
 	}
+	warehouseIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			return nil, biz.ErrBadParam
+		}
+		warehouseIDs = append(warehouseIDs, item.WarehouseID)
+	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, warehouseIDs); err != nil {
+		return nil, err
+	}
+
 	if replayed, found, err := resolvePurchaseReturnReplay(ctx, r.data.postgres, in); err != nil || found {
 		return replayed, err
 	}
@@ -216,6 +227,15 @@ func (r *inventoryRepo) PostPurchaseReturn(ctx context.Context, returnID int) (_
 	if err := lockPurchaseReturn(ctx, tx, returnID); err != nil {
 		return nil, err
 	}
+	if _, scoped := biz.WarehouseDataScopeFromContext(ctx); scoped {
+		row, err := tx.client.PurchaseReturn.Get(ctx, returnID)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := purchaseReturnWithItems(ctx, tx.client, row); err != nil {
+			return nil, err
+		}
+	}
 	purchaseReturn, err := tx.client.PurchaseReturn.Get(ctx, returnID)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -335,6 +355,15 @@ func (r *inventoryRepo) CancelPostedPurchaseReturn(ctx context.Context, returnID
 
 	if err := lockPurchaseReturn(ctx, tx, returnID); err != nil {
 		return nil, err
+	}
+	if _, scoped := biz.WarehouseDataScopeFromContext(ctx); scoped {
+		row, err := tx.client.PurchaseReturn.Get(ctx, returnID)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := purchaseReturnWithItems(ctx, tx.client, row); err != nil {
+			return nil, err
+		}
 	}
 	purchaseReturn, err := tx.client.PurchaseReturn.Get(ctx, returnID)
 	if err != nil {
@@ -481,6 +510,15 @@ func (r *inventoryRepo) GetPurchaseReturn(ctx context.Context, id int) (_ *biz.P
 func (r *inventoryRepo) ListPurchaseReturns(ctx context.Context, filter biz.PurchaseReturnFilter) (_ []*biz.PurchaseReturn, _ int, resultErr error) {
 	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
 	query := r.data.postgres.PurchaseReturn.Query()
+	if scope, scoped := biz.WarehouseDataScopeFromContext(ctx); scoped {
+		if scope.Mode == biz.DataScopeModeNone {
+			return []*biz.PurchaseReturn{}, 0, nil
+		}
+		if !scope.IsAll() {
+			query = query.Where(purchasereturn.HasItems(), purchasereturn.Not(purchasereturn.HasItemsWith(purchasereturnitem.WarehouseIDNotIn(scope.WarehouseIDs...))))
+		}
+	}
+
 	if filter.Status != "" {
 		query = query.Where(purchasereturn.Status(filter.Status))
 	}
@@ -570,6 +608,11 @@ func resolvePurchaseReturnReplay(ctx context.Context, client *ent.Client, in *bi
 	}
 	if len(items) != *row.IdempotencyItemCount {
 		return nil, true, fmt.Errorf("purchase return %d idempotency result item set is incomplete", row.ID)
+	}
+	if _, scoped := biz.WarehouseDataScopeFromContext(ctx); scoped {
+		if _, err := purchaseReturnWithItems(ctx, client, row); err != nil {
+			return nil, true, err
+		}
 	}
 	return entPurchaseReturnToBiz(row, items), true, nil
 }
@@ -764,6 +807,13 @@ func purchaseReturnWithItems(ctx context.Context, client *ent.Client, purchaseRe
 		Order(ent.Asc(purchasereturnitem.FieldID)).
 		All(ctx)
 	if err != nil {
+		return nil, err
+	}
+	warehouseIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		warehouseIDs = append(warehouseIDs, item.WarehouseID)
+	}
+	if err := biz.ValidateContextWarehouseAccess(ctx, warehouseIDs); err != nil {
 		return nil, err
 	}
 	return entPurchaseReturnToBiz(purchaseReturn, items), nil

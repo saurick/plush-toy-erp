@@ -177,6 +177,7 @@ export default function PurchaseOrderOperationPanel({
             }}
           />
           <SelectFilter
+            aria-label="供应商"
             className="erp-business-filter-control--status"
             value={supplierFilter}
             options={[{ label: '全部供应商', value: '' }, ...supplierOptions]}
@@ -207,6 +208,7 @@ export default function PurchaseOrderOperationPanel({
             }}
           />
           <SelectFilter
+            aria-label="排序方式"
             className="erp-business-filter-control--sort"
             value={sortValue}
             options={PURCHASE_ORDER_SORT_OPTIONS}

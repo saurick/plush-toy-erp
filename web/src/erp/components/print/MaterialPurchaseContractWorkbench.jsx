@@ -176,13 +176,11 @@ export default function MaterialPurchaseContractWorkbench({
         : PDF_ACTION_UI_STALE_TIMEOUT_MS
     const remainingMs = Math.max(0, PDF_ACTION_UI_STALE_TIMEOUT_MS - elapsed)
     const timeoutID = window.setTimeout(() => {
-      setPdfAction('')
-      setPdfActionStartedAt(0)
       reportFeedback(
         'output',
         pdfAction === 'download'
-          ? 'PDF 下载等待超时，请重新点击下载 PDF。'
-          : 'PDF 预览等待超时，请重新点击在线预览 PDF。',
+          ? 'PDF 下载用时较长，正在等待请求结束，请稍候。'
+          : 'PDF 预览用时较长，正在等待请求结束，请稍候。',
         'error'
       )
     }, remainingMs)
