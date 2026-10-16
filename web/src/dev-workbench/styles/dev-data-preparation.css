@@ -282,6 +282,7 @@
 .erp-dev-data-profile:focus-within,
 .erp-dev-data-profile--selected {
   border-color: var(--dev-data-primary);
+  background: var(--dev-data-selected);
 }
 
 .erp-dev-data-profile:focus-within {
@@ -503,7 +504,7 @@
 .erp-dev-data-profile-table small {
   margin-top: 4px;
   color: var(--dev-data-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-dev-data-selection {
@@ -551,8 +552,4 @@
 
 .erp-dev-data-profile-row.is-selected {
   background: var(--dev-data-selected);
-}
-
-.erp-dev-data-profile-row.is-selected > th {
-  box-shadow: inset 3px 0 0 var(--dev-data-primary);
 }

@@ -22,6 +22,22 @@ function resolveTimestamp(value, unit) {
   ) {
     return null
   }
+  const [year, month, day, hour, minute, second] = value
+    .slice(0, 19)
+    .split(/[-T:]/u)
+    .map(Number)
+  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)
+  const days = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > days[month - 1] ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  )
+    { return null }
   const date = new Date(value)
   if (!Number.isFinite(date.getTime())) return null
   return { date, dateTime: value }

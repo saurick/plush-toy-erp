@@ -100,21 +100,21 @@ export default function DevHubPage() {
         <Title level={1} className="erp-dev-hub-title">
           总览
         </Title>
-        <Text type="secondary">开发工具</Text>
+        <div className="erp-dev-overview-library__navigation">
+          <DevTaskNav
+            className="erp-dev-overview-view-tabs"
+            ariaLabel="总览视图"
+            idPrefix="dev-overview"
+            compact
+            items={VIEW_ITEMS}
+            value={activeView}
+            onChange={(value) => selectParam('view', value)}
+          />
+        </div>
       </header>
       <main className="erp-dev-hub-shell">
         <section className="erp-dev-overview-library">
-          <div className="erp-dev-overview-library__navigation">
-            <DevTaskNav
-              className="erp-dev-overview-view-tabs"
-              ariaLabel="总览视图"
-              idPrefix="dev-overview"
-              compact
-              items={VIEW_ITEMS}
-              value={activeView}
-              onChange={(value) => selectParam('view', value)}
-            />
-          </div>
+
           <section
             id={`dev-overview-panel-${activeView === 'pinned' ? 'pinned' : 'tools'}`}
             role="tabpanel"

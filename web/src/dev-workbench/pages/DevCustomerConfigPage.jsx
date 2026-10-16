@@ -1000,12 +1000,33 @@ function OverviewPanel({ overview }) {
         </div>
         <div className="erp-dev-tool-table-wrap">
           <table className="erp-dev-tool-table" aria-label="客户配置可用操作">
-            <thead><tr><th scope="col">操作</th><th scope="col">状态</th><th scope="col">范围与后续处理</th></tr></thead>
-            <tbody>{consoleSummary.decisionCards.map((item) => <tr key={item.key}><th scope="row">{item.label}</th><td><StatusTag status={item.status} /><span>{item.outcome}</span></td><td>{item.note}<p className="erp-dev-customer-panel__hint">{item.nextAction}</p></td></tr>)}</tbody>
+            <thead>
+              <tr>
+                <th scope="col">操作</th>
+                <th scope="col">状态</th>
+                <th scope="col">范围与后续处理</th>
+              </tr>
+            </thead>
+            <tbody>
+              {consoleSummary.decisionCards.map((item) => (
+                <tr key={item.key}>
+                  <th scope="row">{item.label}</th>
+                  <td>
+                    <StatusTag status={item.status} />
+                    <span>{item.outcome}</span>
+                  </td>
+                  <td>
+                    {item.note}
+                    <p className="erp-dev-customer-panel__hint">
+                      {item.nextAction}
+                    </p>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </div>
       </section>
-
     </div>
   )
 }
@@ -1767,6 +1788,7 @@ function ImportPanel({
             <div className="erp-dev-customer-release-primary">
               <Select
                 aria-label="选择发布证据批次"
+                disabled={releaseState.status === 'checking'}
                 value={releaseBatch || undefined}
                 placeholder="选择已登记发布批次"
                 loading={releaseBatchesState.status === 'loading'}
@@ -1847,7 +1869,7 @@ function ImportPanel({
               <div className="erp-dev-customer-formal-gates">
                 {importSummary.versionAuditSupport.map((item) => (
                   <FormalGateItem item={item} key={item.key} />
-              ))}
+                ))}
               </div>
             </div>
           </details>
@@ -1865,7 +1887,7 @@ function ImportPanel({
                       {item.valueLabel}
                     </Tag>
                   </div>
-              ))}
+                ))}
               </div>
               <CommandBlock command={importSummary.qaCommand} />
             </div>
@@ -1883,10 +1905,12 @@ function ImportPanel({
                       <Text strong>{tool.title}</Text>
                       <StatusTag status={tool.status} />
                     </div>
-                    {tool.note ? <Text type="secondary">{tool.note}</Text> : null}
+                    {tool.note ? (
+                      <Text type="secondary">{tool.note}</Text>
+                    ) : null}
                     <CommandBlock command={tool.command} />
                   </article>
-              ))}
+                ))}
               </div>
             </div>
           </details>
@@ -2355,7 +2379,9 @@ export default function DevCustomerConfigPage() {
         return
       }
       if (!response.ok) {
-        throw new Error('未能生成试跑结果，请查看开发服务日志，修复后重新试跑。')
+        throw new Error(
+          '未能生成试跑结果，请查看开发服务日志，修复后重新试跑。'
+        )
       }
       setDryRunState({ status: 'success', result: payload })
       message.success('试跑证据已生成')
@@ -2721,9 +2747,25 @@ export default function DevCustomerConfigPage() {
             </Title>
           </Space>
         </div>
+        {isMissingCustomer ? null : (
+          <DevTaskNav
+            compact
+            level="primary"
+            idPrefix="dev-customer"
+            className="erp-dev-delivery-taskbar erp-dev-customer-view-switch erp-dev-customer-journey"
+            ariaLabel="客户配置工作任务"
+            items={VIEW_NAV_OPTIONS}
+            value={activeView}
+            onChange={handleViewChange}
+            disabled={isMutationRunning}
+          />
+        )}
       </header>
 
-      <section className="erp-dev-delivery-context erp-dev-customer-context" aria-label="客户配置范围">
+      <section
+        className="erp-dev-delivery-context erp-dev-customer-context"
+        aria-label="客户配置范围"
+      >
         <CustomerPackageSelector
           overview={overview}
           onChange={handleCustomerChange}
@@ -2736,25 +2778,14 @@ export default function DevCustomerConfigPage() {
           </Text>
         </details>
       </section>
-      {isMissingCustomer ? null : (
-        <DevTaskNav
-          compact
-          level="primary"
-          idPrefix="dev-customer"
-          className="erp-dev-delivery-taskbar erp-dev-customer-view-switch erp-dev-customer-journey"
-          ariaLabel="客户配置工作任务"
-          items={VIEW_NAV_OPTIONS}
-          value={activeView}
-          onChange={handleViewChange}
-          disabled={isMutationRunning}
-        />
-      )}
 
       <section
         className="erp-dev-customer-workspace"
         id={isMissingCustomer ? undefined : `dev-customer-panel-${activeView}`}
         role={isMissingCustomer ? undefined : 'tabpanel'}
-        aria-labelledby={isMissingCustomer ? undefined : `dev-customer-tab-${activeView}`}
+        aria-labelledby={
+          isMissingCustomer ? undefined : `dev-customer-tab-${activeView}`
+        }
       >
         {isMissingCustomer ? (
           <MissingCustomerPanel overview={overview} />

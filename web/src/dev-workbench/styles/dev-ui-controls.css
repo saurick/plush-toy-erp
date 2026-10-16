@@ -57,14 +57,14 @@
 .erp-control-library-directory small {
   margin-top: 5px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.5;
 }
 
 .erp-control-library-note,
 .erp-control-library-source {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 1.7;
 }
 
@@ -115,7 +115,7 @@
 
 .erp-control-library-theme > span {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-control-library-layout {
@@ -145,7 +145,7 @@
 
 .erp-control-library-caption span {
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-control-library-stage {
@@ -168,7 +168,7 @@
 
 .erp-control-library h3 {
   margin: 0 0 12px;
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   font-weight: 600;
 }
 
@@ -202,7 +202,7 @@
 .erp-control-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.7;
 }
 
@@ -249,7 +249,7 @@
 .erp-control-example-context {
   margin-bottom: 12px;
   color: var(--erp-text-muted);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
 }
 
 .erp-control-example-values {
@@ -262,7 +262,7 @@
 .erp-control-example-values dt {
   margin-bottom: 6px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-control-example-values dd {
@@ -325,7 +325,7 @@
   flex-wrap: wrap;
   gap: 20px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-control-empty-stage {

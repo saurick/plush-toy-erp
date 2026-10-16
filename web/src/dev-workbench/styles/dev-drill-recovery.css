@@ -33,7 +33,7 @@
 }
 
 .erp-dev-recovery-status > .ant-typography {
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-dev-recovery-recommendation {
@@ -50,7 +50,7 @@
 
 .erp-dev-recovery-recommendation h3.ant-typography {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
   line-height: 1.5;
 }
 
