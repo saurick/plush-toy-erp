@@ -49,7 +49,7 @@ test('shared section title exposes heading semantics and a responsive divider', 
 test('all governed long forms use the shared section-title component', () => {
   const paths = [
     '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx',
-    '../pages/FinancePaymentsPage.jsx',
+    '../components/finance/FinancePaymentEditor.jsx',
     '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx',
     '../components/business-list/BusinessFormSection.jsx',
   ]
@@ -150,7 +150,7 @@ test('operational long forms expose the audited semantic sections', () => {
       '../components/production-orders/ProductionCompletionModal.jsx',
       ['完工来源与数量', '入库仓库与批次'],
     ],
-    ['../pages/FinancePaymentsPage.jsx', ['往来与金额', '账户与凭据']],
+    ['../components/finance/FinancePaymentEditor.jsx', ['往来与金额', '账户与凭据']],
     [
       '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx',
       ['仓库与批次', '数量与时间'],

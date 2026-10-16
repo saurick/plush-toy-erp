@@ -1,3 +1,5 @@
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+
 async function verifyStableMermaidScroll(page, diagram, assert, action) {
   const watcher = await diagram.evaluateHandle((root) => {
     const scrollers = new Set([document.scrollingElement])
@@ -68,6 +70,7 @@ export async function switchMermaidLayout(
   assert,
   { rapid = false, advanceFocus = false } = {}
 ) {
+  await waitForFiniteAnimations(page)
   const button = diagram.locator('[data-mermaid-layout-action="toggle"]')
   await button.scrollIntoViewIfNeeded()
   const svg = diagram.locator('.erp-markdown-mermaid__canvas > svg')

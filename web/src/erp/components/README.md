@@ -15,6 +15,7 @@
 | 业务列表共享层   | `business-list/*`                                                              | 列表壳、表单弹窗、附件、明细行、列顺序、协同任务面板和来源选择 |
 | 主数据和源单据   | `master-data/*`、`sales-orders/*`、`purchase-orders/*`、`outsourcing-orders/*` | 领域列配置、表单、业务动作面板和来源生成入口                   |
 | 事实和质量       | `operational-facts/*`、`quality-inspections/*`、`shipments/*`                  | Operational Fact、质检、出货相关展示和表单入口                 |
+| 收付款与核销 | `finance/useFinancePayment*`、`useFinanceCreditActions.mjs`、`Finance*Editor.jsx` | 列表读取和恢复、付款创建、核销、冲销、红冲及导出各自管理状态与请求；表单只消费所属 hook 的 form 实例与动作，共享页面级提交状态和防重尝试记录 |
 | 工程资料和打印   | `bom/*`、`print/*`                                                             | BOM 头 / 明细、打印模板工作台和纸面预览                        |
 | Workflow 展示与动作 | `workflow/*` | 任务动作抽屉、提交前解释合同消费；`WorkflowTaskCurrentSummary.jsx` 供电脑和手机共用当前责任、原因与时间摘要，当前责任优先呈现，前序步骤及记录默认展开并保留手动收起；`WorkflowTaskCalendar.jsx` 供两端共用待办月历、日期列表和跨月逾期 / 无截止入口，读取服务端完整统计并复用现有办理入口 |
 | 进度总览与详情 | `business-visualizations/ProgressCompactContent.jsx`、`BusinessProgressDrawer.jsx` | 桌面与手机共用单据身份、快照交期、实际数量及当前关注；完整环节和图片按需下钻 |

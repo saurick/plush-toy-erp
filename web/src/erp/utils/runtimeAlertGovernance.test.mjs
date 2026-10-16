@@ -76,6 +76,13 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
   const permissionCenter = read('web/src/erp/pages/PermissionCenterPage.jsx')
   const shipment = read('web/src/erp/components/shipments/ShipmentEditor.jsx')
   const finance = read('web/src/erp/pages/FinancePaymentsPage.jsx')
+  const financeViews = [
+    'FinancePaymentEditor',
+    'FinanceAllocationEditor',
+    'FinancePaymentAdjustmentModals',
+    'FinanceCreditEditor',
+    'FinancePaymentDetails',
+  ].map((name) => read(`web/src/erp/components/finance/${name}.jsx`))
 
   assert(occurrenceCount(production, '<Alert') <= 10)
   const permissionViews = [
@@ -91,7 +98,12 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
     ) <= 15
   )
   assert(occurrenceCount(shipment, '<Alert') <= 2)
-  assert(occurrenceCount(finance, '<Alert') <= 2)
+  assert(
+    [finance, ...financeViews].reduce(
+      (total, view) => total + occurrenceCount(view, '<Alert'),
+      0
+    ) <= 2
+  )
 
   assert.match(production, /message="请先选择本次外发的材料/u)
   assert.match(
@@ -99,7 +111,7 @@ test('high-density business surfaces keep only action-relevant alert volume', ()
     /message="部分已保存页面当前不可进入"/u
   )
   assert.match(shipment, /message="预计总净重暂不可计算"/u)
-  assert.match(finance, /message="当前没有可核销的应收或应付记录"/u)
+  assert.match(financeViews[1], /message="当前没有可核销的应收或应付记录"/u)
 })
 
 test('DEV passive guidance is collapsed while warnings and errors stay prominent', () => {

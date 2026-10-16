@@ -1,63 +1,29 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Button, Form, Input, Select, Tag } from 'antd'
+import React, { useRef, useState } from 'react'
+import { Button } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
+
 import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
 import {
   FinanceAllocationStatus,
-  FinancePaymentDirection,
   FinancePaymentKind,
   FinancePaymentStatus,
-  OperationalFactStatus,
-  ProcessStatus,
 } from '../../common/consts/statuses.generated.mjs'
-import FinancePaymentSourceFields from '../components/finance/FinancePaymentSourceFields.jsx'
-import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
-import ProcessSubmissionRoute from '../components/workflow/ProcessSubmissionRoute.jsx'
+
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
-import BusinessCompactFieldTable, {
-  BusinessCompactFieldRow,
-} from '../components/business-list/BusinessCompactFieldTable.jsx'
+
 import useBusinessPageState from '../hooks/useBusinessPageState.js'
-import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
+
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
-import { message } from '@/common/utils/antdApp'
-import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { isRpcAbortError } from '@/common/utils/jsonRpc'
 
-import BusinessFormSectionTitle from '../components/business-list/BusinessFormSectionTitle.jsx'
-import {
-  allocateFinancePayment,
-  reverseFinanceAllocation,
-  listFinancePaymentAllocationCandidates,
-  cancelFinancePayment,
-  createFinancePayment,
-  getFinancePayment,
-  listAllFinanceCreditNotes,
-  listAllFinanceFacts,
-  listAllFinancePayments,
-  listFinanceCreditNotes,
-  listFinancePayments,
-  reverseFinancePayment,
-} from '../api/operationalFactApi.mjs'
-import {
-  executeFinancePaymentPost,
-  findExceptionProcessActiveNode,
-  getFinancePaymentApprovalProcess,
-  startFinancePaymentApprovalProcess,
-} from '../api/customerConfigApi.mjs'
-import {
-  listAllCustomers,
-  listAllSuppliers,
-} from '../api/masterDataOrderApi.mjs'
+import { getFinancePaymentApprovalProcess } from '../api/customerConfigApi.mjs'
+
 import {
   BusinessActionTooltip,
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  DateTimeInput,
   PageHeaderCard,
   SelectFilter,
   SearchInput,
@@ -67,138 +33,47 @@ import {
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   BusinessListToolbarActions,
-  downloadBusinessListCSV,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
-import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
-import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
-import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
-import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
+
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
+import { createBusinessTablePagination } from '../utils/businessPagination.mjs'
+import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
+
+import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
 import {
-  createBusinessTablePagination,
-  getBusinessPaginationParams,
-} from '../utils/businessPagination.mjs'
-import {
-  BUSINESS_CURRENCY_OPTIONS,
-  formatUnixDateTime,
-  hasActionPermission,
-} from '../utils/masterDataOrderView.mjs'
-import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
-import {
-  createSourceBusinessActionAttemptStore,
-  isSourceBusinessActionResultUnknown,
-  sourceBusinessActionNo,
-  sourceBusinessActionUUID,
-} from '../utils/sourceBusinessAction.mjs'
-import {
-  compareNumeric20Scale6Units,
   isPositiveNumeric20Scale6Units,
   numeric20Scale6Units,
 } from '../utils/numeric20Scale6.mjs'
-import { currentBusinessDate } from '../utils/businessDate.mjs'
-import {
-  buildFinanceCreditCommand,
-  executeFinanceCreditCommand,
-} from '../utils/financeCreditSubmission.mjs'
-import {
-  validateFinanceAllocationDraft,
-  financePaymentPostMatchesIntent,
-  pendingFinanceAllocationAttempt,
-} from '../utils/financePaymentAllocation.mjs'
+
 import { resolveFinancePaymentActionAvailability } from '../utils/operationalActionAvailability.mjs'
-
-const PAYMENT_STORAGE_PREFIX = 'plush-erp:finance-payment:last:v1:'
-const FINANCE_PAYMENT_COLUMN_ORDER_KEY = 'finance-payments-records'
-const FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY = 'finance-credit-notes-records'
-const PAYMENT_STATUS_META = Object.freeze({
-  [FinancePaymentStatus.DRAFT]: ['待审批', 'blue'],
-  [FinancePaymentStatus.APPROVED]: ['已批准待核销', 'gold'],
-  [FinancePaymentStatus.REJECTED]: ['已退回', 'red'],
-  [FinancePaymentStatus.CANCELLED]: ['已取消', 'default'],
-  [FinancePaymentStatus.POSTED]: ['已核销', 'green'],
-  [FinancePaymentStatus.REVERSED]: ['已冲销', 'magenta'],
-})
-const PAYMENT_STATUS_OPTIONS = [
-  { value: '', label: '全部状态' },
-  ...Object.entries(PAYMENT_STATUS_META).map(([value, [label]]) => ({
-    value,
-    label,
-  })),
-]
-const PAYMENT_DIRECTION_OPTIONS = [
-  { value: '', label: '全部方向' },
-  { value: FinancePaymentDirection.RECEIPT, label: '收款' },
-  { value: FinancePaymentDirection.DISBURSEMENT, label: '付款' },
-]
-const CREDIT_STATUS_OPTIONS = [
-  { value: '', label: '全部状态' },
-  { value: FinanceAllocationStatus.POSTED, label: '已红冲' },
-  { value: FinanceAllocationStatus.REVERSED, label: '冲销记录' },
-]
-const FINANCE_VIEW_ITEMS = [
-  { key: 'payments', label: '收付款记录' },
-  { key: 'credits', label: '红冲记录' },
-]
-
-function paymentStatus(value) {
-  const [label, color] = PAYMENT_STATUS_META[value] || ['状态待核对', 'default']
-  return <Tag color={color}>{label}</Tag>
-}
-
-function paymentStatusLabel(value) {
-  return PAYMENT_STATUS_META[value]?.[0] || '状态待核对'
-}
-
-function creditStatusLabel(value) {
-  return value === FinanceAllocationStatus.REVERSED ? '冲销记录' : '已红冲'
-}
-
-function financeFactTypeLabel(value) {
-  return value === 'RECEIVABLE' ? '应收' : '应付'
-}
-
-function paymentAllocationExportValue(record) {
-  const allocations = Array.isArray(record?.allocations)
-    ? record.allocations
-    : []
-  if (allocations.length === 0) return '0 笔'
-
-  return allocations
-    .map((item, index) => {
-      const factNo = item?.finance_fact_no || `核销明细 ${index + 1}`
-      const currency = item?.currency || record?.currency || ''
-      const amount = item?.amount || '-'
-      const status = item?.status === FinanceAllocationStatus.REVERSED ? '已冲销' : '已过账'
-      return `${factNo} / ${amount}${currency ? ` ${currency}` : ''} / ${status}`
-    })
-    .join('；')
-}
-
-function partyOption(record, fallback) {
-  const code = String(
-    record?.customer_code || record?.supplier_code || ''
-  ).trim()
-  const name = String(
-    record?.name || record?.customer_name || record?.supplier_name || ''
-  ).trim()
-  return {
-    value: Number(record?.id),
-    label: [code, name].filter(Boolean).join(' / ') || fallback,
-  }
-}
-
-function paymentSourceReference(record) {
-  if (record?.kind === FinancePaymentKind.REFUND) {
-    return record.refund_of_payment_no || '原收付款单待核对'
-  }
-  if (record?.kind === FinancePaymentKind.ADVANCE) {
-    return record.source_no || '关联订单待核对'
-  }
-  const allocations = Array.isArray(record?.allocations) ? record.allocations : []
-  return allocations.length ? `${allocations.length} 笔核销记录` : '—'
-}
+import {
+  PAYMENT_STORAGE_PREFIX,
+  FINANCE_PAYMENT_COLUMN_ORDER_KEY,
+  FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY,
+  PAYMENT_STATUS_META,
+  PAYMENT_STATUS_OPTIONS,
+  PAYMENT_DIRECTION_OPTIONS,
+  CREDIT_STATUS_OPTIONS,
+  FINANCE_VIEW_ITEMS,
+} from '../components/finance/financePaymentPresentation.jsx'
+import useFinancePaymentCreation from '../components/finance/useFinancePaymentCreation.mjs'
+import useFinancePaymentAllocation from '../components/finance/useFinancePaymentAllocation.mjs'
+import useFinancePaymentAdjustments from '../components/finance/useFinancePaymentAdjustments.mjs'
+import useFinanceCreditActions from '../components/finance/useFinanceCreditActions.mjs'
+import useFinancePaymentColumns from '../components/finance/useFinancePaymentColumns.jsx'
+import useFinancePaymentExports from '../components/finance/useFinancePaymentExports.mjs'
+import useFinancePaymentRecords from '../components/finance/useFinancePaymentRecords.mjs'
+import { FinancePaymentEditor } from '../components/finance/FinancePaymentEditor.jsx'
+import { FinanceAllocationEditor } from '../components/finance/FinanceAllocationEditor.jsx'
+import {
+  FinanceAllocationReversalModal,
+  FinancePaymentCancelModal,
+  FinancePaymentReversalModal,
+} from '../components/finance/FinancePaymentAdjustmentModals.jsx'
+import { FinanceCreditEditor } from '../components/finance/FinanceCreditEditor.jsx'
+import { FinancePaymentDetails } from '../components/finance/FinancePaymentDetails.jsx'
 
 export default function FinancePaymentsPage() {
   const [searchParams] = useSearchParams()
@@ -216,67 +91,15 @@ export default function FinancePaymentsPage() {
     'activeTab',
     'payments'
   )
-  const [currentPayment, setCurrentPayment] = useState(null)
-  const [currentCredit, setCurrentCredit] = useState(null)
-  const [payments, setPayments] = useState([])
-  const [creditNotes, setCreditNotes] = useState([])
-  const [financeFacts, setFinanceFacts] = useState([])
-  const [customers, setCustomers] = useState([])
-  const [suppliers, setSuppliers] = useState([])
+
   const [loading, setLoading] = useState(false)
-  const [exportingTab, setExportingTab] = useState('')
-  const [tableLoading, setTableLoading] = useState({
-    payments: false,
-    credits: false,
-  })
-  const [referenceLoading, setReferenceLoading] = useState(false)
-  const [paymentTotal, setPaymentTotal] = useState(0)
-  const [paymentStatusCounts, setPaymentStatusCounts] = useState(null)
-  const [creditTotal, setCreditTotal] = useState(0)
-  const [creditStatusCounts, setCreditStatusCounts] = useState(null)
-  const [paymentPagination, setPaymentPagination] = useBusinessPageState(
-    'paymentPagination',
-    { current: 1, pageSize: 20 }
-  )
-  const [creditPagination, setCreditPagination] = useBusinessPageState(
-    'creditPagination',
-    { current: 1, pageSize: 20 }
-  )
-  const [paymentKeyword, setPaymentKeyword] = useBusinessPageState(
-    'paymentKeyword',
-    ''
-  )
-  const [creditKeyword, setCreditKeyword] = useBusinessPageState(
-    'creditKeyword',
-    ''
-  )
-  const [paymentStatusFilter, setPaymentStatusFilter] = useBusinessPageState(
-    'paymentStatusFilter',
-    ''
-  )
-  const [paymentDirectionFilter, setPaymentDirectionFilter] =
-    useBusinessPageState('paymentDirectionFilter', '')
-  const [creditStatusFilter, setCreditStatusFilter] = useBusinessPageState(
-    'creditStatusFilter',
-    ''
-  )
+
   const [paymentDetail, setPaymentDetail] = useState(null)
   const [creditDetail, setCreditDetail] = useState(null)
-  const [paymentOpen, setPaymentOpen] = useState(false)
-  const [allocationOpen, setAllocationOpen] = useState(false)
-  const [unallocateOpen, setUnallocateOpen] = useState(false)
-  const [unallocateForm] = Form.useForm()
-  const [refundSource, setRefundSource] = useState(null)
-  const [cancelOpen, setCancelOpen] = useState(false)
-  const [reverseOpen, setReverseOpen] = useState(false)
-  const [creditOpen, setCreditOpen] = useState(false)
-  const [paymentForm] = Form.useForm()
-  const [allocationForm] = Form.useForm()
-  const [cancelForm] = Form.useForm()
-  const [reverseForm] = Form.useForm()
-  const [creditForm] = Form.useForm()
+
+  // 未确认的提交尝试归页面持有，关闭表单或切换页签后仍可恢复。
   const attemptsRef = useRef(createSourceBusinessActionAttemptStore())
-  const exportInFlightRef = useRef(false)
+
   const beginLatestRequest = useLatestRequestCoordinator()
 
   const canCreatePayment = hasActionPermission(
@@ -305,1043 +128,134 @@ export default function FinancePaymentsPage() {
     PermissionCode.PROCESS_RUNTIME_RECOVER
   )
 
-  const rememberPayment = useCallback(
-    (payment) => {
-      setCurrentPayment(payment || null)
-      if (storageKey && payment?.id) {
-        window.sessionStorage.setItem(storageKey, String(payment.id))
-      }
-    },
-    [storageKey]
-  )
-  const clearPaymentSelection = useCallback(() => {
-    setCurrentPayment(null)
-    if (storageKey) window.sessionStorage.removeItem(storageKey)
-  }, [storageKey])
-
-  const recoverPayment = useCallback(
-    async (id, quiet = false) => {
-      try {
-        const payment = await getFinancePayment({ id: Number(id) })
-        if (!payment?.id) {
-          throw new Error('收付款回执不完整')
-        }
-        rememberPayment(payment)
-        return payment
-      } catch (error) {
-        if (!quiet) {
-          message.error(getActionErrorMessage(error, '恢复收付款记录'))
-        }
-        return null
-      }
-    },
-    [rememberPayment]
-  )
-
-  const loadPaymentRows = useCallback(async () => {
-    const request = beginLatestRequest('finance-payment-list')
-    setTableLoading((current) => ({ ...current, payments: true }))
-    setPaymentStatusCounts(null)
-    try {
-      const result = await listFinancePayments(
-        compactParams({
-          include_status_counts: true,
-          status: paymentStatusFilter,
-          keyword: paymentKeyword.trim(),
-          direction: paymentDirectionFilter,
-          ...getBusinessPaginationParams(paymentPagination),
-        }),
-        { signal: request.signal }
-      )
-      if (!request.isCurrent()) return
-      const nextRows = Array.isArray(result?.payments) ? result.payments : []
-      setPayments(nextRows)
-      setPaymentTotal(Number(result?.total || 0))
-      setPaymentStatusCounts(resolveBusinessStatusCounts(result))
-      setCurrentPayment((current) =>
-        current?.id
-          ? nextRows.find((item) => Number(item.id) === Number(current.id)) ||
-            current
-          : null
-      )
-    } catch (error) {
-      if (!request.isCurrent() || isRpcAbortError(error)) return
-      showPageLoadError(error, '加载收付款记录')
-    } finally {
-      if (request.isCurrent()) {
-        setTableLoading((current) => ({ ...current, payments: false }))
-      }
-      request.finish()
-    }
-  }, [
-    beginLatestRequest,
-    paymentDirectionFilter,
+  const {
+    currentPayment,
+    currentCredit,
+    setCurrentCredit,
+    payments,
+    creditNotes,
+    financeFacts,
+    setFinanceFacts,
+    customers,
+    suppliers,
+    tableLoading,
+    referenceLoading,
+    setReferenceLoading,
+    paymentTotal,
+    paymentStatusCounts,
+    creditTotal,
+    creditStatusCounts,
     paymentPagination,
-    paymentStatusFilter,
+    setPaymentPagination,
+    creditPagination,
+    setCreditPagination,
     paymentKeyword,
-  ])
+    setPaymentKeyword,
+    creditKeyword,
+    setCreditKeyword,
+    paymentStatusFilter,
+    setPaymentStatusFilter,
+    paymentDirectionFilter,
+    setPaymentDirectionFilter,
+    creditStatusFilter,
+    setCreditStatusFilter,
+    rememberPayment,
+    clearPaymentSelection,
+    recoverPayment,
+    loadFinanceFactReferences,
+    loadReferences,
+    allocationCandidates,
+  } = useFinancePaymentRecords({
+    outletContext,
+    storageKey,
+    linkedFinancePaymentID,
+    setActiveTab,
+    beginLatestRequest,
+  })
 
-  const loadCreditRows = useCallback(async () => {
-    const request = beginLatestRequest('finance-credit-list')
-    setTableLoading((current) => ({ ...current, credits: true }))
-    setCreditStatusCounts(null)
-    try {
-      const result = await listFinanceCreditNotes(
-        compactParams({
-          include_status_counts: true,
-          status: creditStatusFilter,
-          keyword: creditKeyword.trim(),
-          ...getBusinessPaginationParams(creditPagination),
-        }),
-        { signal: request.signal }
-      )
-      if (!request.isCurrent()) return
-      const nextRows = Array.isArray(result?.credit_notes)
-        ? result.credit_notes
-        : []
-      setCreditNotes(nextRows)
-      setCreditTotal(Number(result?.total || 0))
-      setCreditStatusCounts(resolveBusinessStatusCounts(result))
-      setCurrentCredit((current) =>
-        current?.id
-          ? nextRows.find((item) => Number(item.id) === Number(current.id)) ||
-            current
-          : null
-      )
-    } catch (error) {
-      if (!request.isCurrent() || isRpcAbortError(error)) return
-      showPageLoadError(error, '加载红冲记录')
-    } finally {
-      if (request.isCurrent()) {
-        setTableLoading((current) => ({ ...current, credits: false }))
-      }
-      request.finish()
-    }
-  }, [beginLatestRequest, creditPagination, creditStatusFilter, creditKeyword])
+  const {
+    paymentOpen,
+    setPaymentOpen,
+    refundSource,
+    paymentForm,
+    paymentKind,
+    partyIsCustomer,
+    partyOptions,
+    openPayment,
+    createPayment,
+    openRefund,
+  } = useFinancePaymentCreation({
+    customerKey,
+    currentPayment,
+    customers,
+    suppliers,
+    setLoading,
+    attemptsRef,
+    rememberPayment,
+    loadReferences,
+  })
 
-  const loadPartyReferences = useCallback(async () => {
-    const request = beginLatestRequest('finance-party-references')
-    setReferenceLoading(true)
-    try {
-      const [customerResult, supplierResult] = await Promise.allSettled([
-        listAllCustomers({ active_only: true }, { signal: request.signal }),
-        listAllSuppliers({ active_only: true }, { signal: request.signal }),
-      ])
-      if (!request.isCurrent()) return
-      if (customerResult.status === 'fulfilled') {
-        setCustomers(
-          Array.isArray(customerResult.value?.customers)
-            ? customerResult.value.customers
-            : []
-        )
-      }
-      if (supplierResult.status === 'fulfilled') {
-        setSuppliers(
-          Array.isArray(supplierResult.value?.suppliers)
-            ? supplierResult.value.suppliers
-            : []
-        )
-      }
-      const errorResult = [customerResult, supplierResult].find(
-        (result) =>
-          result.status === 'rejected' && !isRpcAbortError(result.reason)
-      )
-      if (errorResult) {
-        message.warning(
-          getActionErrorMessage(
-            errorResult.reason,
-            '部分客户或供应商资料暂未加载'
-          )
-        )
-      }
-    } finally {
-      if (request.isCurrent()) setReferenceLoading(false)
-      request.finish()
-    }
-  }, [beginLatestRequest])
+  const {
+    allocationOpen,
+    setAllocationOpen,
+    allocationForm,
+    ensurePaymentApprovalProcess,
+    openAllocation,
+    initializeAllocationForm,
+    postPayment,
+  } = useFinancePaymentAllocation({
+    customerKey,
+    currentPayment,
+    setFinanceFacts,
+    setLoading,
+    setReferenceLoading,
+    attemptsRef,
+    rememberPayment,
+    recoverPayment,
+    loadReferences,
+    allocationCandidates,
+  })
 
-  const loadFinanceFactReferences = useCallback(
-    async ({ factType, counterpartyID, currency } = {}) => {
-      const request = beginLatestRequest('finance-fact-references')
-      setReferenceLoading(true)
-      const factTypes = factType ? [factType] : ['RECEIVABLE', 'PAYABLE']
-      try {
-        const results = await Promise.all(
-          factTypes.map((currentFactType) =>
-            listAllFinanceFacts(
-              compactParams({
-                fact_type: currentFactType,
-                status: OperationalFactStatus.POSTED,
-                counterparty_id: counterpartyID,
-              }),
-              { signal: request.signal }
-            )
-          )
-        )
-        if (!request.isCurrent()) return null
-        const rows = results.flatMap((result) =>
-          Array.isArray(result?.finance_facts) ? result.finance_facts : []
-        )
-        const scopedRows = currency
-          ? rows.filter((item) => item?.currency === currency)
-          : rows
-        setFinanceFacts(scopedRows)
-        return scopedRows
-      } catch (error) {
-        if (request.isCurrent() && !isRpcAbortError(error)) {
-          showPageLoadError(error, '加载可核销财务记录')
-        }
-        return null
-      } finally {
-        if (request.isCurrent()) setReferenceLoading(false)
-        request.finish()
-      }
-    },
-    [beginLatestRequest]
-  )
+  const {
+    unallocateOpen,
+    setUnallocateOpen,
+    unallocateForm,
+    cancelOpen,
+    setCancelOpen,
+    reverseOpen,
+    setReverseOpen,
+    cancelForm,
+    reverseForm,
+    reverseAllocation,
+    openCancel,
+    cancelPayment,
+    reversePayment,
+  } = useFinancePaymentAdjustments({
+    customerKey,
+    currentPayment,
+    setLoading,
+    rememberPayment,
+    recoverPayment,
+    loadReferences,
+  })
 
-  const loadReferences = useCallback(
-    () =>
-      Promise.allSettled([
-        loadPaymentRows(),
-        loadCreditRows(),
-        loadPartyReferences(),
-      ]),
-    [loadCreditRows, loadPartyReferences, loadPaymentRows]
-  )
-
-  useEffect(() => {
-    loadPaymentRows()
-  }, [loadPaymentRows])
-  useEffect(() => {
-    loadCreditRows()
-  }, [loadCreditRows])
-  useEffect(() => {
-    loadPartyReferences()
-  }, [loadPartyReferences])
-  useEffect(() => {
-    if (
-      Number.isSafeInteger(linkedFinancePaymentID) &&
-      linkedFinancePaymentID > 0
-    ) {
-      setActiveTab('payments')
-      recoverPayment(linkedFinancePaymentID)
-    } else if (storageKey) {
-      const paymentID = Number(window.sessionStorage.getItem(storageKey) || 0)
-      if (paymentID > 0) recoverPayment(paymentID, true)
-    }
-  }, [linkedFinancePaymentID, recoverPayment, setActiveTab, storageKey])
-  useEffect(
-    () => outletContext?.registerPageRefresh?.(loadReferences),
-    [loadReferences, outletContext]
-  )
-
-  const direction = Form.useWatch('direction', paymentForm)
-  const paymentKind = Form.useWatch('kind', paymentForm)
-  const partyIsCustomer =
-    paymentKind === FinancePaymentKind.REFUND
-      ? direction === 'DISBURSEMENT'
-      : direction === 'RECEIPT'
-  const partyOptions = useMemo(() => {
-    const options = partyIsCustomer
-      ? customers.map((item) => partyOption(item, '客户已关联'))
-      : suppliers.map((item) => partyOption(item, '供应商已关联'))
-    if (
-      refundSource &&
-      !options.some(
-        (item) => Number(item.value) === Number(refundSource.counterparty_id)
-      )
-    ) {
-      options.push({
-        value: refundSource.counterparty_id,
-        label: partyIsCustomer ? '原收款关联的客户' : '原付款关联的供应商',
-      })
-    }
-    return options
-  }, [customers, partyIsCustomer, suppliers, refundSource])
-
-  const allocationCandidates = useMemo(() => {
-    if (!currentPayment) return []
-    const factType =
-      currentPayment.direction === 'RECEIPT' ? 'RECEIVABLE' : 'PAYABLE'
-    return financeFacts.filter(
-      (fact) =>
-        fact.fact_type === factType &&
-        fact.status === OperationalFactStatus.POSTED &&
-        Number(fact.counterparty_id || 0) ===
-          Number(currentPayment.counterparty_id || 0) &&
-        fact.currency === currentPayment.currency &&
-        isPositiveNumeric20Scale6Units(
-          numeric20Scale6Units(fact.outstanding_amount)
-        )
-    )
-  }, [currentPayment, financeFacts])
-
-  const openPayment = () => {
-    paymentForm.resetFields()
-    setRefundSource(null)
-    paymentForm.setFieldsValue({
-      kind: FinancePaymentKind.SETTLEMENT,
-      direction: 'RECEIPT',
-      currency: 'CNY',
+  const { creditOpen, setCreditOpen, creditForm, submitCredit, openCredit } =
+    useFinanceCreditActions({
+      customerKey,
+      currentCredit,
+      setCurrentCredit,
+      financeFacts,
+      setLoading,
+      attemptsRef,
+      loadFinanceFactReferences,
+      loadReferences,
     })
-    setPaymentOpen(true)
-  }
-  const createPayment = async () => {
-    let values
-    try {
-      values = await paymentForm.validateFields()
-    } catch {
-      return
-    }
-    const payload = {
-      ...(customerKey ? { customer_key: customerKey } : {}),
-      payment_no: trimOptional(values.payment_no),
-      direction: values.direction,
-      kind: values.kind,
-      ...(values.kind === FinancePaymentKind.ADVANCE
-        ? {
-            source_type: values.source_type,
-            source_id: Number(values.source_id),
-          }
-        : {}),
-      ...(values.kind === FinancePaymentKind.REFUND
-        ? { refund_of_payment_id: refundSource?.id }
-        : {}),
-      purpose_note: trimOptional(values.purpose_note),
-      counterparty_type: partyIsCustomer ? 'CUSTOMER' : 'SUPPLIER',
-      counterparty_id: Number(values.counterparty_id),
-      amount: String(values.amount).trim(),
-      currency: values.currency,
-      account_ref: trimOptional(values.account_ref),
-      evidence_ref: trimOptional(values.evidence_ref),
-      ...(values.occurred_at
-        ? { occurred_at: new Date(values.occurred_at).toISOString() }
-        : {}),
-    }
-    const scope = `finance-payment:${payload.direction}:${payload.counterparty_id}`
-    const attempt = attemptsRef.current.prepare(scope, payload)
-    setLoading(true)
-    try {
-      const created = await createFinancePayment(attempt.params)
-      if (!created?.id || created.status !== FinancePaymentStatus.DRAFT) {
-        throw Object.assign(new Error('收付款结果暂时无法确认'), {
-          isInvalidResponse: true,
-        })
-      }
-      let processData
-      try {
-        processData = await startFinancePaymentApprovalProcess({
-          ...(customerKey ? { customer_key: customerKey } : {}),
-          finance_payment_id: created.id,
-          idempotency_key: `finance-payment-approval/${created.id}`,
-        })
-      } catch (error) {
-        if (!isSourceBusinessActionResultUnknown(error)) throw error
-        processData = await getFinancePaymentApprovalProcess({
-          ...(customerKey ? { customer_key: customerKey } : {}),
-          finance_payment_id: created.id,
-        })
-        if (!processData?.process_context) throw error
-      }
-      const payment = processData.source_readback
-      attemptsRef.current.settle(scope, attempt, null)
-      rememberPayment(payment)
-      setPaymentOpen(false)
-      await loadReferences()
-      showProcessSubmissionReceipt({
-        result: processData,
-        title:
-          values.kind === FinancePaymentKind.SETTLEMENT
-            ? '收付款记录已创建，审批通过后可选择应收或应付核销'
-            : '收付款记录已创建，审批通过后由财务确认实际收付',
-      })
-    } catch (error) {
-      const retained = attemptsRef.current.settle(scope, attempt, error)
-      message[retained ? 'warning' : 'error'](
-        retained
-          ? '提交结果暂时无法确认，请保持填写内容不变后重试'
-          : getActionErrorMessage(error, '创建收付款记录')
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const ensurePaymentApprovalProcess = async () => {
-    if (!currentPayment?.id || currentPayment.status !== FinancePaymentStatus.DRAFT) return
-    setLoading(true)
-    try {
-      let processData = await getFinancePaymentApprovalProcess({
-        ...(customerKey ? { customer_key: customerKey } : {}),
-        finance_payment_id: currentPayment.id,
-      })
-      const alreadyStarted = Boolean(processData?.process_context)
-      if (!alreadyStarted) {
-        try {
-          processData = await startFinancePaymentApprovalProcess({
-            ...(customerKey ? { customer_key: customerKey } : {}),
-            finance_payment_id: currentPayment.id,
-            idempotency_key: `finance-payment-approval/${currentPayment.id}`,
-          })
-        } catch (error) {
-          if (!isSourceBusinessActionResultUnknown(error)) throw error
-          processData = await getFinancePaymentApprovalProcess({
-            ...(customerKey ? { customer_key: customerKey } : {}),
-            finance_payment_id: currentPayment.id,
-          })
-          if (!processData?.process_context) throw error
-        }
-      }
-      if (!processData?.process_context || !processData?.source_readback?.id) {
-        throw Object.assign(new Error('收付款审批流结果暂时无法确认'), {
-          isInvalidResponse: true,
-        })
-      }
-      rememberPayment(processData.source_readback)
-      await loadReferences()
-      showProcessSubmissionReceipt({
-        result: processData,
-        title: alreadyStarted ? '收付款审批流已存在' : '收付款审批流已恢复发起',
-      })
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '核对收付款审批流'))
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { paymentColumns, creditColumns } = useFinancePaymentColumns({
+    customers,
+    suppliers,
+  })
 
-  const openAllocation = async () => {
-    if (!currentPayment) return
-    setReferenceLoading(true)
-    try {
-      const rows = await listFinancePaymentAllocationCandidates({
-        id: currentPayment.id,
-      })
-      setFinanceFacts(rows)
-      setAllocationOpen(true)
-    } catch (error) {
-      showPageLoadError(error, '加载可抵扣的应收应付')
-    } finally {
-      setReferenceLoading(false)
-    }
-  }
-  const openRefund = () => {
-    if (!currentPayment || currentPayment.kind === FinancePaymentKind.REFUND) {
-      return
-    }
-    setRefundSource(currentPayment)
-    paymentForm.resetFields()
-    paymentForm.setFieldsValue({
-      kind: FinancePaymentKind.REFUND,
-      direction:
-        currentPayment.direction === 'RECEIPT' ? 'DISBURSEMENT' : 'RECEIPT',
-      counterparty_id: currentPayment.counterparty_id,
-      currency: currentPayment.currency,
-    })
-    setPaymentOpen(true)
-  }
-  const reverseAllocation = async () => {
-    let values
-    try {
-      values = await unallocateForm.validateFields()
-    } catch {
-      return
-    }
-    setLoading(true)
-    try {
-      const payment = await reverseFinanceAllocation({
-        ...(customerKey ? { customer_key: customerKey } : {}),
-        id: currentPayment.id,
-        expected_version: currentPayment.version,
-        allocation_id: Number(values.allocation_id),
-        reason: values.reason.trim(),
-      })
-      rememberPayment(payment)
-      setUnallocateOpen(false)
-      await loadReferences()
-      message.success('抵扣已撤销，款项保留，可重新抵扣或按审批办理退款')
-    } catch (error) {
-      await recoverPayment(currentPayment.id, true)
-      message.error(getActionErrorMessage(error, '撤销抵扣'))
-    } finally {
-      setLoading(false)
-    }
-  }
-  const initializeAllocationForm = (visible) => {
-    if (!visible) return
-    allocationForm.resetFields()
-    const pending = attemptsRef.current.peek(`finance-allocation:${currentPayment?.id}`)
-    if (pending) {
-      allocationForm.setFieldsValue({
-        allocations: pending.params.allocations.map((item) => ({
-          ...item,
-          label: allocationCandidates.find((fact) => fact.id === item.finance_fact_id)?.fact_no || '上次抵扣来源',
-        })),
-      })
-      return
-    }
-    allocationForm.setFieldsValue({
-      allocations: allocationCandidates.map((fact) => ({
-        finance_fact_id: fact.id,
-        label: `${fact.fact_no || '财务记录'} / 原金额 ${fact.amount || '-'} ${fact.currency || ''}`,
-        outstanding_amount: fact.outstanding_amount,
-        amount: '',
-      })),
-    })
-  }
-
-  const openCancel = async () => {
-    if (!currentPayment?.id) return
-    setLoading(true)
-    try {
-      const processData = await getFinancePaymentApprovalProcess({
-        ...(customerKey ? { customer_key: customerKey } : {}),
-        finance_payment_id: currentPayment.id,
-      })
-      const payment = processData.source_readback
-      rememberPayment(payment)
-      const processStatus =
-        processData.process_context?.process_instance?.status || ''
-      const allowed =
-        (payment.status === FinancePaymentStatus.DRAFT && !processData.process_context) ||
-        (payment.status === FinancePaymentStatus.APPROVED && processStatus === ProcessStatus.BLOCKED)
-      if (!allowed) {
-        message.warning(
-          payment.status === FinancePaymentStatus.DRAFT
-            ? '该收付款已进入审批，请先在任务中心驳回或阻塞流程'
-            : payment.status === FinancePaymentStatus.APPROVED
-              ? '只有流程受阻且尚未过账的收付款可以取消'
-              : '当前状态不能取消收付款'
-        )
-        return
-      }
-      cancelForm.resetFields()
-      setCancelOpen(true)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '核对收付款取消条件'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const cancelPayment = async () => {
-    let values
-    try {
-      values = await cancelForm.validateFields(['reason'])
-    } catch {
-      return
-    }
-    setLoading(true)
-    try {
-      const payment = await cancelFinancePayment({
-        ...(customerKey ? { customer_key: customerKey } : {}),
-        id: currentPayment.id,
-        expected_version: currentPayment.version,
-        reason: trimOptional(values.reason),
-      })
-      rememberPayment(payment)
-      setCancelOpen(false)
-      await loadReferences()
-      message.success(
-        '收付款已取消；如流程已有审批效果，系统会保留恢复记录，供管理员继续核对处理'
-      )
-    } catch (error) {
-      if (isSourceBusinessActionResultUnknown(error)) {
-        const recovered = await recoverPayment(currentPayment.id, true)
-        if (recovered?.status === FinancePaymentStatus.CANCELLED) {
-          setCancelOpen(false)
-          message.success('已重新读取收付款取消结果')
-          return
-        }
-      }
-      message.error(getActionErrorMessage(error, '取消收付款'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const postPayment = async (cashOnly = false) => {
-    const existingCash = currentPayment?.status === FinancePaymentStatus.POSTED
-    let values
-    try {
-      values = cashOnly
-        ? { allocations: [] }
-        : await allocationForm.validateFields()
-    } catch {
-      return
-    }
-    const allocations = (values.allocations || [])
-      .filter((item) => String(item.amount || '').trim())
-      .map((item) => ({
-        finance_fact_id: Number(item.finance_fact_id),
-        amount: String(item.amount).trim(),
-      }))
-    const allocationScope = `finance-allocation:${currentPayment.id}`
-    const allocationPayload = {
-      id: currentPayment.id,
-      expected_version: currentPayment.version,
-      allocations,
-      ...(customerKey ? { customer_key: customerKey } : {}),
-    }
-    let pendingAttempt
-    try {
-      pendingAttempt = existingCash
-        ? pendingFinanceAllocationAttempt(attemptsRef.current, allocationScope, allocationPayload)
-        : null
-    } catch {
-      message.warning('上次抵扣结果尚未确认，请保留原抵扣内容并重新确认后再办理新的抵扣')
-      return
-    }
-    const allocationCheck = pendingAttempt ? { ok: true } : validateFinanceAllocationDraft({
-      allocations,
-      candidates: allocationCandidates,
-      paymentAmount: existingCash
-        ? currentPayment?.available_amount
-        : currentPayment?.amount,
-      allowPartial: existingCash,
-    })
-    if (!cashOnly && allocationCheck.reason === 'EMPTY') {
-      message.warning('请至少填写一笔核销金额')
-      return
-    }
-    if (!cashOnly && allocationCheck.reason === 'SOURCE_CHANGED') {
-      message.error('核销来源或未核销金额已变化，请重新打开核销窗口')
-      return
-    }
-    if (!cashOnly && allocationCheck.reason === 'EXCEEDS_OUTSTANDING') {
-      message.warning(
-        `${
-          allocationCheck.financeFactNo || '财务记录'
-        }的本次核销金额超过未核销金额`
-      )
-      return
-    }
-    if (!cashOnly && allocationCheck.reason === 'TOTAL_MISMATCH') {
-      message.warning(
-        existingCash
-          ? `抵扣合计不能超过可用余额 ${currentPayment?.available_amount || '0'}`
-          : `核销合计 ${allocationCheck.total || '0'} 必须等于本次收付款金额 ${currentPayment?.amount || '-'}`
-      )
-      return
-    }
-    setLoading(true)
-    try {
-      if (existingCash) {
-        const scope = allocationScope
-        const attempt = pendingAttempt || attemptsRef.current.prepare(scope, allocationPayload)
-        try {
-          const payment = await allocateFinancePayment(attempt.params)
-          attemptsRef.current.settle(scope, attempt, null)
-          rememberPayment(payment)
-          setAllocationOpen(false)
-          await loadReferences()
-          message.success('已抵扣应收应付，剩余款项继续保留')
-        } catch (error) {
-          attemptsRef.current.settle(scope, attempt, error)
-          throw error
-        }
-        return
-      }
-      const processData = await getFinancePaymentApprovalProcess({
-        ...(customerKey ? { customer_key: customerKey } : {}),
-        finance_payment_id: currentPayment.id,
-      })
-      const node = findExceptionProcessActiveNode(
-        processData,
-        'post_finance_payment'
-      )
-      const execution = await executeFinancePaymentPost({
-        ...(customerKey ? { customer_key: customerKey } : {}),
-        process_instance_id: processData.process_context.process_instance.id,
-        process_node_instance_id: node.id,
-        expected_version: node.version,
-        finance_payment_id: currentPayment.id,
-        idempotency_key: `finance-payment-post/${currentPayment.id}/${node.id}`,
-        allocations,
-        ...(cashOnly ? { cash_only: true } : {}),
-      })
-      const payment = execution.source_readback
-      rememberPayment(payment)
-      setAllocationOpen(false)
-      await loadReferences()
-      message.success(
-        cashOnly ? '实际收付已确认，款项余额已更新' : '收付款已过账并完成核销'
-      )
-    } catch (error) {
-      if (!existingCash && isSourceBusinessActionResultUnknown(error)) {
-        try {
-          const processData = await getFinancePaymentApprovalProcess({
-            ...(customerKey ? { customer_key: customerKey } : {}),
-            finance_payment_id: currentPayment.id,
-          })
-          const payment = processData.source_readback
-          rememberPayment(payment)
-          if (
-            financePaymentPostMatchesIntent(
-              payment,
-              currentPayment,
-              allocations
-            )
-          ) {
-            setAllocationOpen(false)
-            await loadReferences()
-            message.success(
-              cashOnly
-                ? '已重新读取实际收付结果'
-                : '已重新读取收付款过账与核销结果'
-            )
-            return
-          }
-        } catch {
-          await recoverPayment(currentPayment.id, true)
-        }
-      } else {
-        await recoverPayment(currentPayment.id, true)
-      }
-      message.error(
-        getActionErrorMessage(
-          error,
-          existingCash
-            ? '抵扣应收应付'
-            : cashOnly
-              ? '确认实际收付'
-              : '过账并核销收付款'
-        )
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const reversePayment = async () => {
-    let values
-    try {
-      values = await reverseForm.validateFields(['reason'])
-    } catch {
-      return
-    }
-    setLoading(true)
-    try {
-      const payment = await reverseFinancePayment({
-        ...(customerKey ? { customer_key: customerKey } : {}),
-        id: currentPayment.id,
-        expected_version: currentPayment.version,
-        reason: trimOptional(values.reason),
-      })
-      rememberPayment(payment)
-      setReverseOpen(false)
-      await loadReferences()
-      message.success('收付款已冲销，原核销金额已恢复')
-    } catch (error) {
-      if (isSourceBusinessActionResultUnknown(error)) {
-        const recovered = await recoverPayment(currentPayment.id, true)
-        if (recovered?.status === FinancePaymentStatus.REVERSED) {
-          setReverseOpen(false)
-          message.success('已重新读取收付款冲销结果')
-          return
-        }
-      }
-      message.error(getActionErrorMessage(error, '冲销收付款'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const submitCredit = async (reverse = false) => {
-    let values
-    try {
-      values = await creditForm.validateFields()
-    } catch {
-      return
-    }
-    const source = financeFacts.find(
-      (fact) => Number(fact.id) === Number(values.finance_fact_id)
-    )
-    let command
-    try {
-      command = buildFinanceCreditCommand({
-        reverse,
-        values,
-        source,
-        currentCredit,
-        customerKey,
-      })
-    } catch (error) {
-      message[error.isCreditAmountWarning ? 'warning' : 'error'](
-        getActionErrorMessage(error, '准备红冲记录')
-      )
-      return
-    }
-    setLoading(true)
-    try {
-      const result = await executeFinanceCreditCommand({
-        command,
-        attemptStore: attemptsRef.current,
-      })
-      if (result.outcome === 'unconfirmed') {
-        message[result.retained ? 'warning' : 'error'](
-          result.retained
-            ? '红冲结果暂时无法确认，请保持内容不变后重试'
-            : getActionErrorMessage(
-                result.error,
-                reverse ? '冲销红冲记录' : '登记红冲'
-              )
-        )
-        return
-      }
-      setCurrentCredit({
-        ...result.credit,
-        source_no: source?.fact_no || currentCredit?.source_no,
-      })
-      setCreditOpen(false)
-      await loadReferences()
-      message.success(
-        result.recovered
-          ? '已重新读取红冲冲销结果'
-          : reverse
-            ? '红冲记录已冲销'
-            : '红冲已登记'
-      )
-    } catch (error) {
-      message.error(
-        getActionErrorMessage(error, reverse ? '冲销红冲记录' : '登记红冲')
-      )
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const isCreatingCredit = creditOpen !== 'reverse'
-  const CreditEditor = isCreatingCredit ? BusinessFormPage : BusinessFormModal
-  const openCredit = async (reverse = false) => {
-    if (!reverse) {
-      const rows = await loadFinanceFactReferences()
-      if (rows === null) return
-    }
-    creditForm.resetFields()
-    creditForm.setFieldsValue({
-      credit_note_no: sourceBusinessActionNo(
-        reverse ? 'CR-REV' : 'CR',
-        currentCredit?.credit_note_no || 'FINANCE',
-        sourceBusinessActionUUID()
-      ),
-      reason: '',
-    })
-    setCreditOpen(reverse ? 'reverse' : 'create')
-  }
-
-  const paymentColumns = useMemo(() => {
-    const counterpartyLabel = (record) => {
-      const source =
-        record?.counterparty_type === 'CUSTOMER' ? customers : suppliers
-      return (
-        source.find(
-          (item) => Number(item.id) === Number(record?.counterparty_id)
-        )?.name || '往来方已关联'
-      )
-    }
-
-    return [
-      {
-        defaultPriority: 10,
-        title: '收付款单号',
-        dataIndex: 'payment_no',
-        copyable: { label: '收付款单号' },
-        detailCopyable: true,
-        width: 200,
-      },
-      {
-        defaultPriority: 40,
-        title: '方向',
-        dataIndex: 'direction',
-        width: 100,
-        render: (value) => (value === 'RECEIPT' ? '收款' : '付款'),
-        exportValue: (record) =>
-          record?.direction === 'RECEIPT' ? '收款' : '付款',
-      },
-      {
-        align: 'right',
-        defaultPriority: 50,
-        title: '金额',
-        dataIndex: 'amount',
-        width: 140,
-      },
-      { defaultPriority: 60, title: '币种', dataIndex: 'currency', width: 90 },
-      {
-        defaultPriority: 65,
-        title: '款项用途',
-        dataIndex: 'kind',
-        width: 150,
-        render: (value) =>
-          ({
-            SETTLEMENT: '结算款',
-            ADVANCE: '订单预收 / 预付',
-            REFUND: '实际退款',
-          })[value] || '用途待核对',
-        exportValue: (row) =>
-          ({
-            SETTLEMENT: '结算款',
-            ADVANCE: '订单预收 / 预付',
-            REFUND: '实际退款',
-          })[row.kind] || '用途待核对',
-      },
-      {
-        defaultPriority: 66,
-        title: '关联来源',
-        dataIndex: 'source_no',
-        width: 190,
-        render: (_value, record) => paymentSourceReference(record),
-        exportValue: paymentSourceReference,
-      },
-      { defaultHidden: true, title: '原收付款单', dataIndex: 'refund_of_payment_no', width: 190 },
-      {
-        defaultHidden: true,
-        title: '已抵扣',
-        dataIndex: 'allocated_amount',
-        width: 130,
-        align: 'right',
-      },
-      {
-        defaultHidden: true,
-        title: '已退款',
-        dataIndex: 'refunded_amount',
-        width: 130,
-        align: 'right',
-      },
-      {
-        defaultPriority: 67,
-        title: '待抵扣 / 可退余额',
-        dataIndex: 'available_amount',
-        width: 170,
-        align: 'right',
-      },
-      { defaultHidden: true, title: '款项说明', dataIndex: 'purpose_note', width: 220 },
-      {
-        align: 'left',
-        defaultPriority: 30,
-        title: '往来方',
-        key: 'counterparty',
-        copyable: {
-          label: '往来方',
-          resolveValue: (_value, record) => counterpartyLabel(record),
-        },
-        width: 200,
-        detailValue: counterpartyLabel,
-        render: (_, record) => counterpartyLabel(record),
-        exportValue: counterpartyLabel,
-      },
-      {
-        defaultPriority: 20,
-        title: '状态',
-        dataIndex: 'status',
-        width: 110,
-        render: paymentStatus,
-        exportValue: (record) => paymentStatusLabel(record?.status),
-      },
-      {
-        align: 'left',
-        defaultPriority: 80,
-        defaultHidden: true,
-        title: '核销明细',
-        dataIndex: 'allocations',
-        width: 110,
-        render: (items) => `${Array.isArray(items) ? items.length : 0} 笔`,
-        exportValue: paymentAllocationExportValue,
-      },
-      {
-        align: 'left',
-        defaultHidden: true,
-        title: '账户摘要',
-        dataIndex: 'account_ref',
-        copyable: { label: '账户摘要' },
-        width: 200,
-      },
-      {
-        align: 'left',
-        defaultHidden: true,
-        title: '业务凭据',
-        dataIndex: 'evidence_ref',
-        copyable: { label: '业务凭据' },
-        width: 200,
-      },
-      {
-        defaultPriority: 70,
-        title: '发生时间',
-        dataIndex: 'occurred_at',
-        width: 170,
-        render: formatUnixDateTime,
-        exportValue: (record) => formatUnixDateTime(record?.occurred_at),
-      },
-    ]
-  }, [customers, suppliers])
-  const creditColumns = useMemo(
-    () => [
-      {
-        defaultPriority: 10,
-        title: '红冲单号',
-        dataIndex: 'credit_note_no',
-        copyable: { label: '红冲单号' },
-        detailCopyable: true,
-        width: 200,
-      },
-      {
-        defaultPriority: 30,
-        title: '来源财务记录',
-        dataIndex: 'finance_fact_no',
-        copyable: { label: '来源财务记录' },
-        detailCopyable: true,
-        width: 190,
-        render: (value) => value || '已关联财务记录',
-        exportValue: (record) => record?.finance_fact_no || '已关联财务记录',
-      },
-      {
-        defaultPriority: 40,
-        title: '来源类型',
-        dataIndex: 'finance_fact_type',
-        width: 110,
-        render: financeFactTypeLabel,
-        exportValue: (record) =>
-          financeFactTypeLabel(record?.finance_fact_type),
-      },
-      {
-        align: 'right',
-        defaultPriority: 50,
-        title: '红冲金额',
-        dataIndex: 'amount',
-        width: 140,
-      },
-      { defaultPriority: 60, title: '币种', dataIndex: 'currency', width: 90 },
-      {
-        align: 'right',
-        defaultPriority: 80,
-        title: '来源原金额',
-        dataIndex: 'finance_fact_original_amount',
-        width: 140,
-      },
-      {
-        align: 'right',
-        defaultPriority: 70,
-        title: '红冲后未核销',
-        dataIndex: 'finance_fact_outstanding_amount',
-        width: 150,
-      },
-      {
-        defaultPriority: 20,
-        title: '状态',
-        dataIndex: 'status',
-        width: 110,
-        render: (value) => (
-          <Tag color={value === FinanceAllocationStatus.REVERSED ? 'magenta' : 'gold'}>
-            {creditStatusLabel(value)}
-          </Tag>
-        ),
-        exportValue: (record) => creditStatusLabel(record?.status),
-      },
-      { align: 'left', title: '原因', dataIndex: 'reason', width: 260 },
-    ],
-    []
-  )
   const {
     tableColumns: paymentTableColumns,
     exportColumns: paymentExportColumns,
@@ -1364,135 +278,18 @@ export default function FinancePaymentsPage() {
     moduleTitle: '收付款与核销 / 红冲记录',
     columns: creditColumns,
   })
-  const exportPaymentRows = useCallback(async () => {
-    if (exportInFlightRef.current) return
-    exportInFlightRef.current = true
-    setExportingTab('payments')
-    const request = beginLatestRequest('finance-payment-export')
-    try {
-      const result = await listAllFinancePayments(
-        compactParams({
-          status: paymentStatusFilter,
-          keyword: paymentKeyword.trim(),
-          direction: paymentDirectionFilter,
-        }),
-        { signal: request.signal }
-      )
-      if (!request.isCurrent()) return
-      const rows = Array.isArray(result?.payments) ? result.payments : []
-      if (rows.length === 0) {
-        message.info('当前筛选没有可导出的收付款记录')
-        return
-      }
-      downloadBusinessListCSV({
-        filename: `收付款记录-${currentBusinessDate()}.csv`,
-        columns: paymentExportColumns,
-        rows,
-      })
-      message.success(`已导出 ${rows.length} 条收付款记录`)
-    } catch (error) {
-      if (!request.isCurrent() || isRpcAbortError(error)) return
-      message.error(getActionErrorMessage(error, '导出收付款记录'))
-    } finally {
-      if (request.isCurrent()) setExportingTab('')
-      exportInFlightRef.current = false
-      request.finish()
-    }
-  }, [
-    beginLatestRequest,
-    paymentDirectionFilter,
-    paymentExportColumns,
-    paymentStatusFilter,
-    paymentKeyword,
-  ])
-  const exportCreditRows = useCallback(async () => {
-    if (exportInFlightRef.current) return
-    exportInFlightRef.current = true
-    setExportingTab('credits')
-    const request = beginLatestRequest('finance-credit-export')
-    try {
-      const result = await listAllFinanceCreditNotes(
-        compactParams({
-          status: creditStatusFilter,
-          keyword: creditKeyword.trim(),
-        }),
-        { signal: request.signal }
-      )
-      if (!request.isCurrent()) return
-      const rows = Array.isArray(result?.credit_notes)
-        ? result.credit_notes
-        : []
-      if (rows.length === 0) {
-        message.info('当前筛选没有可导出的红冲记录')
-        return
-      }
-      downloadBusinessListCSV({
-        filename: `红冲记录-${currentBusinessDate()}.csv`,
-        columns: creditExportColumns,
-        rows,
-      })
-      message.success(`已导出 ${rows.length} 条红冲记录`)
-    } catch (error) {
-      if (!request.isCurrent() || isRpcAbortError(error)) return
-      message.error(getActionErrorMessage(error, '导出红冲记录'))
-    } finally {
-      if (request.isCurrent()) setExportingTab('')
-      exportInFlightRef.current = false
-      request.finish()
-    }
-  }, [
-    beginLatestRequest,
-    creditExportColumns,
-    creditStatusFilter,
-    creditKeyword,
-  ])
-  const paymentDetailLineItems = {
-    title: '核销明细',
-    items: Array.isArray(paymentDetail?.allocations)
-      ? paymentDetail.allocations
-      : [],
-    emptyDescription: '当前收付款尚未形成核销明细',
-    getItemKey: (item) => item?.id,
-    getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
-    getItemFields: (item) => [
-      {
-        key: 'source',
-        label: '来源单号',
-        value: item?.finance_fact_no,
-        strong: true,
-        wide: true,
-      },
-      {
-        key: 'type',
-        label: '来源类型',
-        value: item?.finance_fact_type === 'RECEIVABLE' ? '应收' : '应付',
-      },
-      {
-        key: 'status',
-        label: '核销状态',
-        value: item?.status === FinanceAllocationStatus.REVERSED ? '已冲销' : '已过账',
-      },
-      { key: 'amount', label: '核销金额', value: item?.amount },
-      { key: 'currency', label: '币种', value: item?.currency },
-      {
-        key: 'reason',
-        label: '撤销原因',
-        value: item?.reason || '-',
-        wide: true,
-      },
-      {
-        key: 'original',
-        label: '来源原金额',
-        value: item?.finance_fact_original_amount || '-',
-        rowStart: true,
-      },
-      {
-        key: 'outstanding',
-        label: '当前未核销',
-        value: item?.finance_fact_outstanding_amount ?? '-',
-      },
-    ],
-  }
+  const { exportingTab, exportPaymentRows, exportCreditRows } =
+    useFinancePaymentExports({
+      paymentKeyword,
+      creditKeyword,
+      paymentStatusFilter,
+      paymentDirectionFilter,
+      creditStatusFilter,
+      beginLatestRequest,
+      paymentExportColumns,
+      creditExportColumns,
+    })
+
   const currentCreditHasReversal =
     Boolean(currentCredit?.id) &&
     creditNotes.some(
@@ -1516,7 +313,9 @@ export default function FinancePaymentsPage() {
       action: 'allocation',
       authorized: canPostPayment,
       payment: currentPayment,
-      pendingAllocation: Boolean(attemptsRef.current.peek(`finance-allocation:${currentPayment?.id}`)),
+      pendingAllocation: Boolean(
+        attemptsRef.current.peek(`finance-allocation:${currentPayment?.id}`)
+      ),
       busy: loading,
       referenceLoading,
     }),
@@ -1685,7 +484,8 @@ export default function FinancePaymentsPage() {
                     data-business-action-key="payment-allocation"
                     disabled={paymentActionAvailability.allocation.disabled}
                     onClick={() =>
-                      currentPayment?.status === FinancePaymentStatus.APPROVED &&
+                      currentPayment?.status ===
+                        FinancePaymentStatus.APPROVED &&
                       [
                         FinancePaymentKind.ADVANCE,
                         FinancePaymentKind.REFUND,
@@ -1965,7 +765,8 @@ export default function FinancePaymentsPage() {
                       ? '请先选择一条红冲记录'
                       : currentCredit.reversal_of_credit_note_id
                         ? '冲销记录不能再次冲销'
-                        : currentCredit.status !== FinanceAllocationStatus.POSTED
+                        : currentCredit.status !==
+                            FinanceAllocationStatus.POSTED
                           ? '只有已红冲记录可以冲销'
                           : currentCreditHasReversal
                             ? '当前红冲记录已经完成冲销'
@@ -2017,525 +818,74 @@ export default function FinancePaymentsPage() {
       {paymentColumnOrderModal}
       {creditColumnOrderModal}
 
-      <BusinessFormPage
-        form={paymentForm}
-        title="登记收付款"
-        open={paymentOpen}
-        loading={referenceLoading}
-        okText="创建收付款记录"
-        confirmLoading={loading}
-        onCancel={() => !loading && setPaymentOpen(false)}
-        onOk={createPayment}
-      >
-        <Form
-          form={paymentForm}
-          name="finance-payment-create"
-          className="erp-business-action-form"
-          layout="vertical"
-          preserve={false}
-          disabled={loading}
-        >
-          <Form.Item>
-            <ProcessSubmissionRoute
-              processKey="finance_payment_approval"
-              customerKey={customerKey}
-              open={paymentOpen}
-            />
-          </Form.Item>
-          <BusinessFormSectionTitle>往来与金额</BusinessFormSectionTitle>
-          {refundSource ? (
-            <p className="erp-business-inline-note">
-              退回原款 {refundSource.payment_no}；当前可退{' '}
-              {refundSource.available_amount} {refundSource.currency}
-              。实际退款须保留独立凭据。
-            </p>
-          ) : null}
-          <Form.Item name="kind" label="款项用途" rules={[{ required: true }]}>
-            <Select
-              disabled={Boolean(refundSource)}
-              options={
-                refundSource
-                  ? [{ value: FinancePaymentKind.REFUND, label: '实际退款' }]
-                  : [
-                      {
-                        value: FinancePaymentKind.SETTLEMENT,
-                        label: '应收应付结算',
-                      },
-                      {
-                        value: FinancePaymentKind.ADVANCE,
-                        label: '订单预收 / 预付（首款、分期款、发货前尾款）',
-                      },
-                    ]
-              }
-              onChange={() =>
-                paymentForm.setFieldsValue({
-                  source_type: undefined,
-                  source_id: undefined,
-                  currency: undefined,
-                  purpose_note: undefined,
-                })
-              }
-            />
-          </Form.Item>
-          <Form.Item
-            name="direction"
-            label="收付款方向"
-            rules={[{ required: true }]}
-          >
-            <Select
-              options={[
-                { value: 'RECEIPT', label: '收款' },
-                { value: 'DISBURSEMENT', label: '付款' },
-              ]}
-              disabled={Boolean(refundSource)}
-              onChange={() =>
-                paymentForm.setFieldsValue({
-                  counterparty_id: undefined,
-                  source_type: undefined,
-                  source_id: undefined,
-                  currency: undefined,
-                })
-              }
-            />
-          </Form.Item>
-          <Form.Item
-            name="counterparty_id"
-            label={partyIsCustomer ? '客户' : '供应商'}
-            rules={[{ required: true, message: '请选择往来方' }]}
-          >
-            <Select
-              showSearch
-              optionFilterProp="label"
-              loading={referenceLoading}
-              disabled={Boolean(refundSource)}
-              onChange={() =>
-                paymentForm.setFieldsValue({
-                  source_id: undefined,
-                  currency: undefined,
-                })
-              }
-              options={partyOptions}
-            />
-          </Form.Item>
-          <FinancePaymentSourceFields
-            form={paymentForm}
-            profile={adminProfile}
-            open={paymentOpen}
-          />
-          <Form.Item
-            name="purpose_note"
-            label={refundSource ? '退款原因' : '款项说明'}
-            rules={
-              refundSource
-                ? [
-                    {
-                      required: true,
-                      whitespace: true,
-                      message: '请填写退款原因',
-                    },
-                  ]
-                : []
-            }
-          >
-            <Input
-              maxLength={255}
-              placeholder={
-                refundSource
-                  ? '说明取消、退货或多收多付的原因'
-                  : '例如：订单首款、第二期款或发货前尾款'
-              }
-            />
-          </Form.Item>
-          <Form.Item
-            name="payment_no"
-            label="收付款单号"
-            rules={[
-              { required: true, whitespace: true, message: '请填写单号' },
-            ]}
-          >
-            <Input maxLength={64} />
-          </Form.Item>
-          <Form.Item
-            name="amount"
-            label="实收 / 实付金额"
-            rules={[
-              { required: true, message: '请填写金额' },
-              {
-                validator: (_, value) =>
-                  !isPositiveNumeric20Scale6Units(numeric20Scale6Units(value))
-                    ? Promise.reject(new Error('金额必须大于 0，最多六位小数'))
-                    : refundSource &&
-                        compareNumeric20Scale6Units(
-                          numeric20Scale6Units(value),
-                          numeric20Scale6Units(refundSource.available_amount)
-                        ) === 1
-                      ? Promise.reject(
-                          new Error('退款金额不能超过原款可用余额')
-                        )
-                      : Promise.resolve(),
-              },
-            ]}
-          >
-            <Input inputMode="decimal" />
-          </Form.Item>
-          <Form.Item name="currency" label="币种" rules={[{ required: true }]}>
-            <Select
-              disabled={paymentKind !== FinancePaymentKind.SETTLEMENT}
-              options={BUSINESS_CURRENCY_OPTIONS}
-            />
-          </Form.Item>
-          <Form.Item name="occurred_at" label="发生时间">
-            <DateTimeInput />
-          </Form.Item>
-          <BusinessFormSectionTitle>账户与凭据</BusinessFormSectionTitle>
-          <Form.Item
-            name="account_ref"
-            label="收付款账户摘要"
-            rules={[
-              { required: true, whitespace: true, message: '请填写账户摘要' },
-            ]}
-          >
-            <Input maxLength={128} />
-          </Form.Item>
-          <Form.Item
-            name="evidence_ref"
-            label="业务凭据"
-            rules={[
-              {
-                required: true,
-                whitespace: true,
-                message: '请填写回单或凭据摘要',
-              },
-            ]}
-          >
-            <Input maxLength={255} />
-          </Form.Item>
-        </Form>
-      </BusinessFormPage>
-
-      <BusinessFormModal
-        title="撤销抵扣"
-        open={unallocateOpen}
-        confirmLoading={loading}
-        onCancel={() => !loading && setUnallocateOpen(false)}
-        onOk={reverseAllocation}
-        okText="确认撤销抵扣"
-      >
-        <p className="erp-business-inline-note">
-          只恢复应收应付和款项可用余额；实际退款另行登记并审批。
-        </p>
-        <Form form={unallocateForm} layout="vertical" preserve={false}>
-          <Form.Item
-            name="allocation_id"
-            label="已抵扣记录"
-            rules={[{ required: true }]}
-          >
-            <Select
-              options={(currentPayment?.allocations || [])
-                .filter(
-                  (a) =>
-                    a.status === FinanceAllocationStatus.POSTED &&
-                    !(currentPayment?.allocations || []).some(
-                      (r) => r.reversal_of_allocation_id === a.id
-                    )
-                )
-                .map((a) => ({
-                  value: a.id,
-                  label: `${a.finance_fact_no} · ${a.amount} ${a.currency}`,
-                }))}
-            />
-          </Form.Item>
-          <Form.Item
-            name="reason"
-            label="撤销原因"
-            rules={[{ required: true, whitespace: true }]}
-          >
-            <Input.TextArea maxLength={255} />
-          </Form.Item>
-        </Form>
-      </BusinessFormModal>
-
-      <BusinessFormModal
-        className="erp-business-action-modal--operational-fact"
-        title="选择核销记录"
-        description={
-          currentPayment?.status === FinancePaymentStatus.POSTED
-            ? `可抵扣余额 ${currentPayment.available_amount} ${currentPayment.currency}；可分批抵扣，剩余款项继续保留。`
-            : '本次核销合计必须精确等于收付款金额，且每笔不得超过来源记录的当前未核销金额。'
-        }
-        open={allocationOpen}
-        size="localAction"
-        okText={currentPayment?.status === FinancePaymentStatus.POSTED ? '确认抵扣' : '过账并核销'}
-        cancelText="取消"
-        confirmLoading={loading}
-        maskClosable={!loading}
-        okButtonProps={{ disabled: allocationCandidates.length === 0 && !attemptsRef.current.peek(`finance-allocation:${currentPayment?.id}`) }}
-        afterOpenChange={initializeAllocationForm}
-        onCancel={() => !loading && setAllocationOpen(false)}
-        onOk={() => postPayment(false)}
-      >
-        <div className="erp-business-inline-note" role="note">
-          仅显示与当前收付款方向、往来方和币种一致的已过账记录；提交时会再次核对可核销余额。
-        </div>
-        {allocationCandidates.length === 0 ? (
-          <Alert
-            type="warning"
-            showIcon
-            message="当前没有可核销的应收或应付记录"
-          />
-        ) : null}
-        <Form
-          form={allocationForm}
-          name="finance-payment-allocation"
-          className="erp-business-action-form"
-          layout="vertical"
-          disabled={loading}
-        >
-          <Form.List name="allocations">
-            {(fields) => (
-              <BusinessCompactFieldTable
-                label="核销明细"
-                showSequence
-                columns={[
-                  { label: '应收 / 应付' },
-                  { label: '未核销余额', width: 180 },
-                  {
-                    label: (
-                      <BusinessHelpLabel
-                        itemKey="allocation-amount"
-                        label="本次核销金额"
-                        pageKey="finance-payments"
-                      />
-                    ),
-                    width: 180,
-                  },
-                ]}
-              >
-                {fields.map((field) => (
-                  <BusinessCompactFieldRow
-                    key={field.key}
-                    label={`核销明细 ${field.name + 1}`}
-                    sequence={field.name + 1}
-                    cells={[
-                      <>
-                        <Form.Item
-                          name={[field.name, 'finance_fact_id']}
-                          hidden
-                        >
-                          <Input />
-                        </Form.Item>
-                        <Form.Item
-                          name={[field.name, 'label']}
-                          label="应收 / 应付"
-                        >
-                          <Input disabled />
-                        </Form.Item>
-                      </>,
-                      <Form.Item
-                        name={[field.name, 'outstanding_amount']}
-                        label="未核销余额"
-                      >
-                        <Input disabled />
-                      </Form.Item>,
-                      <Form.Item
-                        name={[field.name, 'amount']}
-                        label="本次核销金额"
-                        rules={[
-                          {
-                            validator: (_, value) =>
-                              !String(value || '').trim() ||
-                              isPositiveNumeric20Scale6Units(
-                                numeric20Scale6Units(value)
-                              )
-                                ? Promise.resolve()
-                                : Promise.reject(new Error('金额必须大于 0')),
-                          },
-                        ]}
-                      >
-                        <Input inputMode="decimal" />
-                      </Form.Item>,
-                    ]}
-                  />
-                ))}
-              </BusinessCompactFieldTable>
-            )}
-          </Form.List>
-        </Form>
-      </BusinessFormModal>
-
-      <BusinessFormModal
-        title="取消收付款"
-        size="confirm"
-        description="取消不会删除收付款记录；已发生的流程效果仍保留恢复审计。"
-        open={cancelOpen}
-        okText="确认取消"
-        cancelText="返回"
-        okButtonProps={{ danger: true }}
-        confirmLoading={loading}
-        maskClosable={!loading}
-        onCancel={() => !loading && setCancelOpen(false)}
-        onOk={cancelPayment}
-      >
-        <Alert
-          type="warning"
-          showIcon
-          message="取消不会删除收付款记录；已发生的流程效果会保留补偿和恢复审计。"
-        />
-        <Form
-          form={cancelForm}
-          name="finance-payment-cancel"
-          className="erp-business-action-form"
-          layout="vertical"
-          preserve={false}
-          style={{ marginTop: 16 }}
-        >
-          <Form.Item
-            name="reason"
-            label="取消原因"
-            rules={[
-              { required: true, whitespace: true, message: '请填写取消原因' },
-            ]}
-          >
-            <Input.TextArea rows={3} maxLength={255} showCount />
-          </Form.Item>
-        </Form>
-      </BusinessFormModal>
-
-      <BusinessFormModal
-        title="冲销收付款"
-        size="confirm"
-        description="冲销会恢复原核销金额并保留原收付款及核销记录。"
-        open={reverseOpen}
-        okText="确认冲销"
-        cancelText="返回"
-        okButtonProps={{ danger: true }}
-        confirmLoading={loading}
-        maskClosable={!loading}
-        onCancel={() => !loading && setReverseOpen(false)}
-        onOk={reversePayment}
-      >
-        <Form
-          form={reverseForm}
-          name="finance-payment-reverse"
-          className="erp-business-action-form"
-          layout="vertical"
-          preserve={false}
-        >
-          <Form.Item
-            name="reason"
-            label="冲销原因"
-            rules={[
-              { required: true, whitespace: true, message: '请填写冲销原因' },
-            ]}
-          >
-            <Input.TextArea rows={3} maxLength={255} showCount />
-          </Form.Item>
-        </Form>
-      </BusinessFormModal>
-
-      <CreditEditor
-        {...(isCreatingCredit
-          ? { form: creditForm }
-          : {
-              size: 'localAction',
-              cancelText: '取消',
-              description: '冲销会恢复该红冲对未核销金额的影响。',
-            })}
-        title={creditOpen === 'reverse' ? '冲销红冲记录' : '登记红冲'}
-        open={Boolean(creditOpen)}
-        okText={creditOpen === 'reverse' ? '确认冲销' : '确认红冲'}
-        confirmLoading={loading}
-        onCancel={() => !loading && setCreditOpen(false)}
-        onOk={() => submitCredit(creditOpen === 'reverse')}
-      >
-        <Form
-          form={creditForm}
-          name="finance-credit-note"
-          className="erp-business-action-form"
-          layout="vertical"
-          preserve={false}
-          disabled={loading}
-        >
-          {creditOpen !== 'reverse' ? (
-            <Form.Item
-              name="finance_fact_id"
-              label="来源应收 / 应付"
-              rules={[{ required: true, message: '请选择来源财务记录' }]}
-            >
-              <Select
-                showSearch
-                optionFilterProp="label"
-                loading={referenceLoading}
-                options={financeFacts
-                  .filter(
-                    (fact) =>
-                      fact.status === OperationalFactStatus.POSTED &&
-                      isPositiveNumeric20Scale6Units(
-                        numeric20Scale6Units(fact.outstanding_amount)
-                      )
-                  )
-                  .map((fact) => ({
-                    value: fact.id,
-                    label: `${fact.fact_no || '财务记录'} / 未核销 ${
-                      fact.outstanding_amount || '0'
-                    } / 原金额 ${fact.amount || '-'} ${fact.currency || ''}`,
-                  }))}
-              />
-            </Form.Item>
-          ) : null}
-          <Form.Item
-            name="credit_note_no"
-            label={creditOpen === 'reverse' ? '冲销单号' : '红冲单号'}
-            rules={[
-              { required: true, whitespace: true, message: '请填写单号' },
-            ]}
-          >
-            <Input maxLength={64} />
-          </Form.Item>
-          {creditOpen !== 'reverse' ? (
-            <Form.Item
-              name="amount"
-              label="红冲金额"
-              rules={[
-                { required: true, message: '请填写红冲金额' },
-                {
-                  validator: (_, value) =>
-                    isPositiveNumeric20Scale6Units(numeric20Scale6Units(value))
-                      ? Promise.resolve()
-                      : Promise.reject(new Error('金额必须大于 0')),
-                },
-              ]}
-            >
-              <Input inputMode="decimal" />
-            </Form.Item>
-          ) : null}
-          <Form.Item
-            name="reason"
-            label="原因"
-            rules={[
-              { required: true, whitespace: true, message: '请填写原因' },
-            ]}
-          >
-            <Input.TextArea rows={3} maxLength={255} showCount />
-          </Form.Item>
-        </Form>
-      </CreditEditor>
-      <BusinessDetailsModal
-        open={Boolean(paymentDetail)}
-        title="收付款详情"
-        description="收付款来源、核销明细与当前状态均以系统最新记录为准。"
-        record={paymentDetail}
-        columns={paymentColumns}
-        lineItems={paymentDetailLineItems}
-        onClose={() => setPaymentDetail(null)}
+      <FinancePaymentEditor
+        adminProfile={adminProfile}
+        customerKey={customerKey}
+        loading={loading}
+        referenceLoading={referenceLoading}
+        paymentOpen={paymentOpen}
+        setPaymentOpen={setPaymentOpen}
+        refundSource={refundSource}
+        paymentForm={paymentForm}
+        paymentKind={paymentKind}
+        partyIsCustomer={partyIsCustomer}
+        partyOptions={partyOptions}
+        createPayment={createPayment}
       />
-      <BusinessDetailsModal
-        open={Boolean(creditDetail)}
-        title="红冲详情"
-        description="红冲保留来源应收或应付、原金额和当前未核销金额。"
-        record={creditDetail}
-        columns={creditColumns}
-        onClose={() => setCreditDetail(null)}
+
+      <FinanceAllocationReversalModal
+        currentPayment={currentPayment}
+        loading={loading}
+        unallocateOpen={unallocateOpen}
+        setUnallocateOpen={setUnallocateOpen}
+        unallocateForm={unallocateForm}
+        reverseAllocation={reverseAllocation}
+      />
+
+      <FinanceAllocationEditor
+        currentPayment={currentPayment}
+        loading={loading}
+        allocationOpen={allocationOpen}
+        setAllocationOpen={setAllocationOpen}
+        allocationForm={allocationForm}
+        attemptsRef={attemptsRef}
+        allocationCandidates={allocationCandidates}
+        initializeAllocationForm={initializeAllocationForm}
+        postPayment={postPayment}
+      />
+
+      <FinancePaymentCancelModal
+        loading={loading}
+        cancelOpen={cancelOpen}
+        setCancelOpen={setCancelOpen}
+        cancelForm={cancelForm}
+        cancelPayment={cancelPayment}
+      />
+
+      <FinancePaymentReversalModal
+        loading={loading}
+        reverseOpen={reverseOpen}
+        setReverseOpen={setReverseOpen}
+        reverseForm={reverseForm}
+        reversePayment={reversePayment}
+      />
+
+      <FinanceCreditEditor
+        financeFacts={financeFacts}
+        loading={loading}
+        referenceLoading={referenceLoading}
+        creditOpen={creditOpen}
+        setCreditOpen={setCreditOpen}
+        creditForm={creditForm}
+        submitCredit={submitCredit}
+      />
+      <FinancePaymentDetails
+        paymentDetail={paymentDetail}
+        setPaymentDetail={setPaymentDetail}
+        creditDetail={creditDetail}
+        setCreditDetail={setCreditDetail}
+        paymentColumns={paymentColumns}
+        creditColumns={creditColumns}
       />
     </BusinessPageLayout>
   )

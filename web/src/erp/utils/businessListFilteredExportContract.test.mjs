@@ -130,7 +130,7 @@ test('config-driven lists expose strict complete-pagination readers', () => {
 })
 
 test('finance keeps complete filtered export and production exceptions stay non-exportable', () => {
-  const finance = readSource('../pages/FinancePaymentsPage.jsx')
+  const finance = readSource('../components/finance/useFinancePaymentExports.mjs')
   const workflowModule = readSource('../pages/WorkflowBusinessModulePage.jsx')
   const productionException = readSource(
     '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'

@@ -75,7 +75,7 @@ test('formal business main tables register useful text columns explicitly', () =
       "copyable: { label: '单号' }",
     ],
     ['pages/PurchaseReceiptsPage.jsx', "dataIndex: 'receipt_no'"],
-    ['pages/FinancePaymentsPage.jsx', "dataIndex: 'payment_no'"],
+    ['components/finance/useFinancePaymentColumns.jsx', "dataIndex: 'payment_no'"],
     ['pages/WorkflowBusinessModulePage.jsx', "dataIndex: 'task_code'"],
     ['pages/ProductionOrdersPage.jsx', "dataIndex: 'order_no'"],
     ['pages/HistoryRecordsPage.jsx', "dataIndex: 'primary'"],

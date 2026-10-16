@@ -84,6 +84,8 @@ pnpm preview:yoyoosun
 
 `style-l1/scenarios.mjs` 只组合场景工厂和共享输入。登录、客户权限、工作台、移动任务、权限中心、打印和业务表单分别位于同目录对应的 `*Scenarios.mjs`。物料明细、色卡和作业指导书编辑各有独立的 `*InteractionScenario.mjs`，按命名交互步骤调用断言，每个场景使用自己的页面和 PDF 请求记录。场景名称、顺序与请求计数的生命周期保持独立；通过 `STYLE_L1_SCENARIOS` 选择受影响场景，完整运行遵循 QA 的高成本授权规则。
 
+`businessFormalScenarios.mjs` 组合主数据、订单、库存、生产、出货及附件恢复的领域场景；共享断言位于 `businessFormalAssertions.mjs`。跨业务页的 `businessCorePagesScenarios.mjs` 按固定顺序调用各领域的 `businessCore*Checks.mjs`，请求记录与局部夹具归对应检查持有，保留场景名称、顺序、分页及权限断言。
+
 `printWorkspaceItemScenarios.mjs` 覆盖两套合同与采购批量条款的增删、调序、编号、空组隐藏和刷新恢复，以及明细、色卡和作业行的调序与清空。场景同时核对留白数量、结构变化后从首处定位、输出请求排除操作控件和打印入口可用；其中 PDF 请求使用受控响应，真实 PDF 内容和落盘下载仍需另做服务验证。
 
 `printWorkspaceGroupScenarios.mjs` 覆盖采购、加工与采购批量窗口的自定义分组新增、双向改名、调序、删除、空组恢复及全部删空后的刷新恢复，并核对名称留白、条目留白、纸面顺序导航、长名称换行和批量隔离。输出请求与打印入口同样使用受控探针；真实 PDF 服务、下载落盘及打印页面内容另行验证。

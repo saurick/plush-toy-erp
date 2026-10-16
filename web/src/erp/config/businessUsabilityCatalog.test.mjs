@@ -191,7 +191,7 @@ test('businessUsabilityCatalog: 关键字段问号可悬停、聚焦和点击且
       'web/src/erp/components/outsourcing-orders/OutsourcingOrderForm.jsx',
       'outsourcing-line-amount',
     ],
-    ['web/src/erp/pages/FinancePaymentsPage.jsx', 'allocation-amount'],
+    ['web/src/erp/components/finance/FinanceAllocationEditor.jsx', 'allocation-amount'],
   ]
   inlineSources.forEach(([sourcePath, itemKey]) => {
     const source = read(sourcePath)

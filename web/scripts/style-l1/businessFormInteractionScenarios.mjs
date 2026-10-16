@@ -1663,7 +1663,6 @@ export function createBusinessFormInteractionScenarios({
       verify: async (page) => {
         await expectHeading(page, '收付款')
         await expectText(page, 'PAY-STYLE-L1')
-        await expectText(page, '回单 STYLE-L1')
         await expectText(page, '暗色客户')
         await expectButton(page, '登记收付款')
         await expectButton(page, '导出筛选结果')
@@ -1874,6 +1873,7 @@ export function createBusinessFormInteractionScenarios({
           .filter({ hasText: '收付款详情' })
         await detailDialog.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(detailDialog, '银行账户尾号 6688')
+        await expectText(detailDialog, '回单 STYLE-L1')
         await expectText(detailDialog, '当前收付款尚未形成核销明细')
         await assertAntdModalCentered(
           page,

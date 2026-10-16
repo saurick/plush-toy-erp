@@ -3,6 +3,7 @@ import { installAdminRpcMocks } from './adminRpcMocks.mjs'
 import { assertButtonSpacing } from './buttonSpacingAssertions.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { expectHeading } from './pageAssertions.mjs'
 
 const SALES_ORDER_PATH = '/erp/sales/project-orders/sales-orders'
 const PURCHASE_ORDER_PATH = '/erp/purchase/accessories'
@@ -490,10 +491,7 @@ async function installActionStabilityRpcRows(
 }
 
 async function waitForBusinessPage(page, heading) {
-  await page.getByRole('heading', { name: heading }).waitFor({
-    state: 'visible',
-    timeout: 10_000,
-  })
+  await expectHeading(page, heading)
   await page
     .locator('.erp-business-module-current-action')
     .first()
@@ -619,11 +617,11 @@ async function assertDesktopActionState(
     `${key} 可见性应为 ${visible ? '显示' : '隐藏'}`
   )
   if (visible && typeof disabled === 'boolean')
-    assert.equal(
+    { assert.equal(
       await action.isDisabled(),
       disabled,
       `${key} 禁用态应为 ${disabled}`
-    )
+    ) }
   if (opened) await closeActionMenu(page)
 }
 
@@ -760,7 +758,7 @@ async function openActionMenu(page) {
     .locator('.erp-business-selection-action-bar__compact-more')
   await waitForFiniteAnimations(page)
   if ((await button.getAttribute('aria-expanded')) !== 'true')
-    await button.click()
+    { await button.click() }
   await page
     .locator('.erp-business-selection-action-menu')
     .waitFor({ state: 'visible', timeout: 10_000 })
@@ -911,7 +909,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         await page.route('**/rpc/sales_order', async (route) => {
           const { id, method } = route.request().postDataJSON()
           if (method !== 'get_engineering_material_request')
-            return route.fallback()
+            { return route.fallback() }
           return fulfillRpc(route, id, {
             id: 5,
             sales_order_id: 1103,
@@ -1031,7 +1029,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         await page.route('**/rpc/sales_order', async (route) => {
           const { id, method } = route.request().postDataJSON()
           if (method !== 'get_engineering_material_request')
-            return route.fallback()
+            { return route.fallback() }
           return fulfillRpc(route, id, {
             id: 5,
             sales_order_id: 1103,
@@ -1072,7 +1070,7 @@ export function createBusinessActionStabilityScenarios(deps) {
             method !== 'list_purchase_order_items' ||
             Number(params.purchase_order_id) !== 1202
           )
-            return route.fallback()
+            { return route.fallback() }
           return fulfillRpc(route, id, {
             purchase_order_items: [
               {
@@ -1198,7 +1196,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         })
       },
       verify: async (page) => {
-        await waitForBusinessPage(page, '收付款与核销')
+        await waitForBusinessPage(page, '收付款')
         await assertERPThemeMode(page, {
           scenarioName: `button-spacing-${themeMode}`,
           expectedMode: themeMode,
@@ -1487,7 +1485,7 @@ export function createBusinessActionStabilityScenarios(deps) {
             .locator('.erp-business-selection-action-menu:visible')
             .count()
         )
-          await closeActionMenu(page)
+          { await closeActionMenu(page) }
         await page.setViewportSize({ width: 1440, height: 900 })
 
         await page
@@ -1684,7 +1682,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         await waitForBusinessPage(page, '采购订单')
         await assertUnselectedActions(page, assert)
         for (const status of ['DRAFT', 'APPROVED', 'CLOSED']) {
-          await selectBusinessRow(page, 'PO-ACTION-' + status)
+          await selectBusinessRow(page, `PO-ACTION-${status}`)
           await assertDesktopActionState(page, assert, 'purchase-details', {
             visible: true,
             disabled: false,
@@ -1714,7 +1712,7 @@ export function createBusinessActionStabilityScenarios(deps) {
               disabled: false,
             }
           )
-          await assertNoHorizontalOverflow(page, '采购订单 ' + status)
+          await assertNoHorizontalOverflow(page, `采购订单 ${status}`)
         }
         await gotoScenarioPath(page, PURCHASE_RECEIPT_PATH)
         await waitForBusinessPage(page, '采购入库')
@@ -1725,7 +1723,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           disabled: false,
         })
         for (const key of ['create-return', 'create-adjustment'])
-          await assertDesktopActionState(page, assert, key, { visible: false })
+          { await assertDesktopActionState(page, assert, key, { visible: false }) }
         await selectBusinessRow(page, 'PR-STYLE-L1-CANCELLED')
         for (const key of [
           'create-return',
@@ -1734,21 +1732,21 @@ export function createBusinessActionStabilityScenarios(deps) {
           'post',
           'cancel',
         ])
-          await assertDesktopActionState(page, assert, key, { visible: false })
+          { await assertDesktopActionState(page, assert, key, { visible: false }) }
         await gotoScenarioPath(page, QUALITY_INSPECTION_PATH)
         await waitForBusinessPage(page, '质量检验')
         await assertUnselectedActions(page, assert)
         for (const status of ['DRAFT', 'SUBMITTED', 'CANCELLED']) {
-          await selectBusinessRow(page, 'QI-ACTION-' + status)
+          await selectBusinessRow(page, `QI-ACTION-${status}`)
           await assertDesktopActionState(page, assert, 'submit', {
             visible: status === 'DRAFT',
             disabled: false,
           })
           for (const key of ['pass', 'reject'])
-            await assertDesktopActionState(page, assert, key, {
+            { await assertDesktopActionState(page, assert, key, {
               visible: status !== 'CANCELLED',
               disabled: status !== 'SUBMITTED',
-            })
+            }) }
           await assertDesktopActionState(page, assert, 'quality-disposition', {
             visible: status !== 'CANCELLED',
             disabled: true,
@@ -1757,7 +1755,7 @@ export function createBusinessActionStabilityScenarios(deps) {
             visible: status !== 'CANCELLED',
             disabled: false,
           })
-          await assertNoHorizontalOverflow(page, '质检 ' + status)
+          await assertNoHorizontalOverflow(page, `质检 ${status}`)
         }
         await selectBusinessRow(page, 'QI-ACTION-PRODUCTION-WIP')
         await assertDesktopActionState(page, assert, 'related-records', {
@@ -1776,7 +1774,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           'shipment-receivable',
           'shipment-invoice',
         ])
-          await assertDesktopActionState(page, assert, key, { visible: false })
+          { await assertDesktopActionState(page, assert, key, { visible: false }) }
         await assertNoHorizontalOverflow(page, '取消出货')
         await screenshot(
           page,
@@ -1816,7 +1814,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         })
       },
       verify: async (page) => {
-        await waitForBusinessPage(page, '收付款与核销')
+        await waitForBusinessPage(page, '收付款')
         await assertUnselectedActions(page, assert)
         const states = {
           DRAFT: {
@@ -1831,14 +1829,14 @@ export function createBusinessActionStabilityScenarios(deps) {
           CANCELLED: {},
         }
         for (const [status, actions] of Object.entries(states)) {
-          await selectBusinessRow(page, 'PAY-ACTION-' + status)
+          await selectBusinessRow(page, `PAY-ACTION-${status}`)
           for (const action of [
             'allocation',
             'approval',
             'cancel',
             'reverse',
           ]) {
-            await assertDesktopActionState(page, assert, 'payment-' + action, {
+            await assertDesktopActionState(page, assert, `payment-${action}`, {
               visible: Object.hasOwn(actions, action),
               disabled: actions[action],
             })
@@ -1847,7 +1845,7 @@ export function createBusinessActionStabilityScenarios(deps) {
             visible: true,
             disabled: false,
           })
-          await assertNoHorizontalOverflow(page, '收付款 ' + status)
+          await assertNoHorizontalOverflow(page, `收付款 ${status}`)
         }
         await selectBusinessRow(page, 'PAY-ACTION-DRAFT')
         if (
@@ -1925,7 +1923,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         })
       },
       verify: async (page) => {
-        await waitForBusinessPage(page, '收付款与核销')
+        await waitForBusinessPage(page, '收付款')
         await selectBusinessRow(page, 'PAY-ACTION-DRAFT')
         for (const key of [
           'payment-allocation',
@@ -1975,7 +1973,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           ['SHIPPED', false],
           ['CANCELLED', false],
         ]) {
-          await selectBusinessRow(page, 'SHIP-ACTION-' + suffix)
+          await selectBusinessRow(page, `SHIP-ACTION-${suffix}`)
           await assertDesktopActionState(page, assert, 'shipment-ship', {
             visible,
             disabled,
@@ -1997,7 +1995,7 @@ export function createBusinessActionStabilityScenarios(deps) {
               visible: false,
             })
           }
-          await assertNoHorizontalOverflow(page, '仓库出货 ' + suffix)
+          await assertNoHorizontalOverflow(page, `仓库出货 ${suffix}`)
         }
         await screenshot(
           page,
@@ -2035,7 +2033,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           'CANCELLED-SCRAP': {},
         }
         for (const [suffix, actions] of Object.entries(cases)) {
-          await selectBusinessRow(page, 'PEX-ACTION-' + suffix)
+          await selectBusinessRow(page, `PEX-ACTION-${suffix}`)
           for (const action of [
             'approval',
             'withdraw',
@@ -2047,14 +2045,14 @@ export function createBusinessActionStabilityScenarios(deps) {
             await assertDesktopActionState(
               page,
               assert,
-              'production-exception-' + action,
+              `production-exception-${action}`,
               {
                 visible: Object.hasOwn(actions, action),
                 disabled: actions[action],
               }
             )
           }
-          await assertNoHorizontalOverflow(page, '生产异常 ' + suffix)
+          await assertNoHorizontalOverflow(page, `生产异常 ${suffix}`)
         }
         await screenshot(
           page,
@@ -2123,7 +2121,7 @@ export function createBusinessActionStabilityScenarios(deps) {
           'lifecycle-short_close',
           'lifecycle-cancel',
         ])
-          await assertDesktopActionState(page, assert, key, { visible: false })
+          { await assertDesktopActionState(page, assert, key, { visible: false }) }
         await assertDesktopActionState(page, assert, 'view-details', {
           visible: true,
           disabled: false,

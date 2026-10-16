@@ -10,6 +10,18 @@ const helpSource = readFileSync(
   new URL('../config/businessUsabilityCatalog.mjs', import.meta.url),
   'utf8'
 )
+const presentationSource = readFileSync(
+  new URL('../components/finance/financePaymentPresentation.jsx', import.meta.url),
+  'utf8'
+)
+const columnSource = readFileSync(
+  new URL('../components/finance/useFinancePaymentColumns.jsx', import.meta.url),
+  'utf8'
+)
+const exportSource = readFileSync(
+  new URL('../components/finance/useFinancePaymentExports.mjs', import.meta.url),
+  'utf8'
+)
 
 test('finance payments: routes reversal terms through the shared page help', () => {
   assert.match(source, /helpKey="finance-payments"/u)
@@ -25,9 +37,15 @@ test('finance payments: both fact tabs expose independent column-order tools', (
   assert.equal(source.match(/<BusinessListToolbarActions/gu)?.length, 2)
   assert.equal(source.match(/useBusinessColumnOrder\(\{/gu)?.length, 2)
 
+  assert.match(
+    presentationSource,
+    /const FINANCE_PAYMENT_COLUMN_ORDER_KEY =\s*'finance-payments-records'/u
+  )
+  assert.match(
+    presentationSource,
+    /const FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY =\s*'finance-credit-notes-records'/u
+  )
   for (const text of [
-    "const FINANCE_PAYMENT_COLUMN_ORDER_KEY = 'finance-payments-records'",
-    "const FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY = 'finance-credit-notes-records'",
     'columns={paymentTableColumns}',
     'columns={creditTableColumns}',
     '{paymentColumnOrderModal}',
@@ -45,11 +63,11 @@ test('finance payments: both fact tabs expose independent column-order tools', (
 
 test('finance payments: exports complete active-tab filters with readable values', () => {
   assert.match(
-    source,
+    exportSource,
     /const exportPaymentRows = useCallback\([\s\S]*?listAllFinancePayments\([\s\S]*?status: paymentStatusFilter,[\s\S]*?direction: paymentDirectionFilter,[\s\S]*?downloadBusinessListCSV\(\{[\s\S]*?columns: paymentExportColumns,[\s\S]*?rows,/u
   )
   assert.match(
-    source,
+    exportSource,
     /const exportCreditRows = useCallback\([\s\S]*?listAllFinanceCreditNotes\([\s\S]*?status: creditStatusFilter[\s\S]*?downloadBusinessListCSV\(\{[\s\S]*?columns: creditExportColumns,[\s\S]*?rows,/u
   )
 
@@ -59,13 +77,17 @@ test('finance payments: exports complete active-tab filters with readable values
     'formatUnixDateTime(record?.occurred_at)',
     'financeFactTypeLabel(record?.finance_fact_type)',
     'creditStatusLabel(record?.status)',
-    '当前筛选没有可导出的收付款记录',
-    '当前筛选没有可导出的红冲记录',
   ]) {
     assert.equal(
-      source.includes(text),
+      columnSource.includes(text),
       true,
       `finance exports should preserve readable filtered output: ${text}`
     )
+  }
+  for (const text of [
+    '当前筛选没有可导出的收付款记录',
+    '当前筛选没有可导出的红冲记录',
+  ]) {
+    assert.equal(exportSource.includes(text), true, text)
   }
 })

@@ -1218,63 +1218,90 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
     new URL('../components/DevTaskNav.jsx', import.meta.url),
     'utf8'
   )
+  const sources = {
+    page: pageSource,
+    presentation: readFileSync(new URL('./qualityGatePresentation.mjs', import.meta.url), 'utf8'),
+    execution: readFileSync(new URL('../components/quality-gates/QualityGateExecutionFlow.jsx', import.meta.url), 'utf8'),
+    charts: readFileSync(new URL('../components/quality-gates/QualityGateEvidenceCharts.jsx', import.meta.url), 'utf8'),
+    server: readFileSync(new URL('../components/quality-gates/ServerCiEvidencePanel.jsx', import.meta.url), 'utf8'),
+    pipeline: readFileSync(new URL('../components/quality-gates/ServerCiPipelineFlow.jsx', import.meta.url), 'utf8'),
+    guide: readFileSync(new URL('../components/quality-gates/ServerCiJobGuideDrawer.jsx', import.meta.url), 'utf8'),
+    history: readFileSync(new URL('../components/quality-gates/ServerCiHistory.jsx', import.meta.url), 'utf8'),
+    performance: readFileSync(new URL('../components/quality-gates/ServerCiPerformance.jsx', import.meta.url), 'utf8'),
+    run: readFileSync(new URL('../components/quality-gates/QualityGateRunView.jsx', import.meta.url), 'utf8'),
+    governance: readFileSync(new URL('../components/quality-gates/QualityGateGovernanceViews.jsx', import.meta.url), 'utf8'),
+    context: readFileSync(new URL('../components/quality-gates/QualityGateContextStrip.jsx', import.meta.url), 'utf8'),
+  }
+  const assertNoSourceMatches = (pattern) => {
+    for (const moduleSource of Object.values(sources)) assert.doesNotMatch(moduleSource, pattern)
+  }
+  for (const [name, moduleSource] of Object.entries(sources)) {
+    if (name !== 'page') {
+      assert.doesNotMatch(
+        moduleSource,
+        /\b(?:setInterval|createDevQualityGateClient)\s*\(/u,
+        `${name} keeps requests and polling with the page owner`
+      )
+    }
+  }
 
-  assert.match(pageSource, /<DevTaskNav/u)
-  assert.match(pageSource, /idPrefix="quality-gates"/u)
-  assert.equal((pageSource.match(/setInterval\(/gu) || []).length, 1)
-  assert.match(pageSource, /AbortController/u)
-  assert.match(pageSource, /viewState\.view === activeView/u)
-  assert.match(pageSource, /data=\{activeViewState\.data\}/u)
-  assert.match(pageSource, /selectDisplayedQualityGateOperation/u)
-  assert.match(pageSource, /getQualityGateFlowSegments/u)
-  assert.match(pageSource, /<ol/u)
-  assert.match(pageSource, /aria-current=/u)
-  assert.match(pageSource, /chart=\{dag\.overviewChart\}/u)
-  assert.match(pageSource, /fullDagOpen \? \(/u)
-  assert.match(pageSource, /查看完整 Job 依赖图/u)
-  assert.match(pageSource, /静态工作原理，不代表当前运行状态/u)
-  assert.match(pageSource, /buildQualityGateStageDurationComposition/u)
-  assert.match(pageSource, /buildQualityGateHistoryTrend/u)
-  assert.match(pageSource, /buildQualityGateCoverageMatrix/u)
-  assert.match(pageSource, /当前正式回执/u)
-  assert.match(pageSource, /GitLab CI 门禁/u)
-  assert.match(pageSource, /正式主路径/u)
+
+  assert.match(sources.page, /<DevTaskNav/u)
+  assert.match(sources.page, /idPrefix="quality-gates"/u)
+  assert.equal((sources.page.match(/setInterval\(/gu) || []).length, 1)
+  assert.match(sources.page, /AbortController/u)
+  assert.match(sources.page, /viewState\.view === activeView/u)
+  assert.match(sources.page, /data=\{activeViewState\.data\}/u)
+  assert.match(sources.page, /selectDisplayedQualityGateOperation/u)
+  assert.match(sources.presentation, /getQualityGateFlowSegments/u)
+  assert.match(sources.execution, /<ol/u)
+  assert.match(sources.execution, /aria-current=/u)
+  assert.match(sources.pipeline, /chart=\{dag\.overviewChart\}/u)
+  assert.match(sources.pipeline, /fullDagOpen \? \(/u)
+  assert.match(sources.pipeline, /查看完整 Job 依赖图/u)
+  assert.match(sources.execution, /静态工作原理，不代表当前运行状态/u)
+  assert.match(sources.execution, /buildQualityGateStageDurationComposition/u)
+  assert.match(sources.charts, /buildQualityGateHistoryTrend/u)
+  assert.match(sources.charts, /buildQualityGateCoverageMatrix/u)
+  assert.match(sources.execution, /当前正式回执/u)
+  assert.match(sources.server, /GitLab CI 门禁/u)
+  assert.match(sources.server, /正式主路径/u)
   assert.match(
-    pageSource,
-    /状态与耗时来自实际 Pipeline/u
+    sources.pipeline,
+    /状态与耗时来自实际\s+Pipeline/u
   )
-  assert.match(pageSource, /依赖不可读时不绘制推测连线/u)
-  assert.match(pageSource, /aria-label="服务器门禁详情"/u)
-  assert.match(pageSource, /<Drawer/u)
-  assert.match(pageSource, />\s*Job 说明\s*</u)
-  assert.match(pageSource, /aria-label=\{`查看 \$\{job\.name\} 说明`\}/u)
-  assert.match(pageSource, /先看阶段，再按需查看单个 Job/u)
-  assert.match(pageSource, /核对子 Job 回执并形成领域结论/u)
-  assert.match(pageSource, /data-server-view="performance"/u)
-  assert.match(pageSource, /data-server-view="history"/u)
-  assert.doesNotMatch(pageSource, /serverJobLocalStageLabels/u)
-  assert.doesNotMatch(pageSource, /本机阶段与 GitLab CI Job 对照/u)
-  assert.doesNotMatch(pageSource, /CI：\{ciJob\.label\}/u)
-  assert.equal((pageSource.match(/label: '本次流水线'/gu) || []).length, 1)
-  assert.equal((pageSource.match(/label: 'Job 性能'/gu) || []).length, 1)
-  assert.equal((pageSource.match(/label: 'CI 历史'/gu) || []).length, 1)
-  assert.match(pageSource, /pending: '等待运行'/u)
-  assert.match(pageSource, /missing: '未产生 CI 记录'/u)
-  assert.match(pageSource, /unavailable: '读取失败'/u)
-  assert.match(pageSource, /连接正常 · 当前提交无 CI/u)
-  assert.match(pageSource, /GitLab 读取正常/u)
-  assert.match(pageSource, /GitLab CI 正在读取服务器证据/u)
-  assert.match(pageSource, /最近 CI/u)
-  assert.match(pageSource, /历史结果不代表当前提交已通过/u)
-  assert.match(pageSource, /最近 GitLab CI 历史/u)
-  assert.match(pageSource, /serverHistoryFailureLabel/u)
-  assert.doesNotMatch(pageSource, /missing: '暂无当前 CI'/u)
-  assert.doesNotMatch(pageSource, /unavailable: '待读取'/u)
-  assert.match(pageSource, /本机诊断（按需）/u)
-  assert.match(pageSource, /本机最近诊断/u)
-  assert.doesNotMatch(pageSource, /严格门禁：发版前验证/u)
-  assert.match(pageSource, /\? '预计剩余'[\s\S]*?: '运行状态'/u)
-  assert.doesNotMatch(pageSource, /Fixed quality evidence/u)
+  assert.match(sources.pipeline, /依赖不可读时不绘制推测连线/u)
+  assert.match(sources.server, /aria-label="服务器门禁详情"/u)
+  assert.match(sources.guide, /<Drawer/u)
+  assert.match(sources.server, />\s*Job 说明\s*</u)
+  assert.match(sources.pipeline, /aria-label=\{`查看 \$\{job\.name\} 说明`\}/u)
+  assert.match(sources.guide, /先看阶段，再按需查看单个 Job/u)
+  assert.match(sources.presentation, /核对子 Job 回执并形成领域结论/u)
+  assert.match(sources.server, /data-server-view="performance"/u)
+  assert.match(sources.server, /data-server-view="history"/u)
+  assertNoSourceMatches(/serverJobLocalStageLabels/u)
+  assertNoSourceMatches(/本机阶段与 GitLab CI Job 对照/u)
+  assertNoSourceMatches(/CI：\{ciJob\.label\}/u)
+  assert.equal((sources.presentation.match(/label: '本次流水线'/gu) || []).length, 1)
+  assert.equal((sources.presentation.match(/label: 'Job 性能'/gu) || []).length, 1)
+  assert.equal((sources.presentation.match(/label: 'CI 历史'/gu) || []).length, 1)
+  assert.match(sources.presentation, /pending: '等待运行'/u)
+  assert.match(sources.presentation, /missing: '未产生 CI 记录'/u)
+  assert.match(sources.presentation, /unavailable: '读取失败'/u)
+  assert.match(sources.presentation, /连接正常 · 当前提交无 CI/u)
+  assert.match(sources.server, /GitLab 读取正常/u)
+  assert.match(sources.presentation, /GitLab CI 正在读取服务器证据/u)
+  assert.match(sources.history, /最近 CI/u)
+  assert.match(sources.history, /历史结果不代表当前提交已通过/u)
+  assert.match(sources.history, /最近 GitLab CI 历史/u)
+  assert.match(sources.presentation, /serverHistoryFailureLabel/u)
+  assertNoSourceMatches(/missing: '暂无当前 CI'/u)
+  assertNoSourceMatches(/unavailable: '待读取'/u)
+  assert.match(sources.run, /本机诊断（按需）/u)
+  assert.match(sources.run, /本机最近诊断/u)
+  assertNoSourceMatches(/严格门禁：发版前验证/u)
+  assert.match(sources.run, /\? '预计剩余'[\s\S]*?: '运行状态'/u)
+  assertNoSourceMatches(/Fixed quality evidence/u)
   assert.match(taskNavSource, /aria-controls/u)
   assert.match(taskNavSource, /-panel-/u)
 })

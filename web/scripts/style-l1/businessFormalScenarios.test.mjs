@@ -2,12 +2,13 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-const source = readFileSync(
-  new URL('./businessFormalScenarios.mjs', import.meta.url),
-  'utf8'
-)
+function readScenarioSource(name) {
+  return readFileSync(new URL(`./${name}.mjs`, import.meta.url), 'utf8')
+}
 
 test('shipment source L1 keeps selection across the 20-row server page boundary', () => {
+  const source = readScenarioSource('shipmentPresentationScenarios')
+
   assert.match(source, /PROD-STYLE-L1-01/u)
   assert.match(source, /ant-pagination-item-2/u)
   assert.match(source, /PROD-STYLE-L1-21/u)
@@ -46,6 +47,8 @@ test('formal empty-state overrides keep requested paging metadata', () => {
     ],
     ['let emptiedShipmentsOnce', 'list_shipments', 'shipments'],
   ]) {
+const source = readScenarioSource({ inventory_balances: 'businessCoreInventoryChecks', quality_inspections: 'businessCoreQualityChecks', shipments: 'businessCoreShipmentChecks' }[recordKey])
+
     const startIndex = source.indexOf(start)
     const override = source.slice(startIndex, startIndex + 1_800)
     assert.ok(startIndex >= 0, start)
@@ -58,6 +61,8 @@ test('formal empty-state overrides keep requested paging metadata', () => {
 })
 
 test('inventory SKU filter selects through its searchable control', () => {
+  const source = readScenarioSource('businessCoreInventoryChecks')
+
   const startIndex = source.indexOf('await inventorySKUFilter.click()')
   const endIndex = source.indexOf('const inventorySKUMetrics', startIndex)
   const interaction = source.slice(startIndex, endIndex)
@@ -71,6 +76,8 @@ test('inventory SKU filter selects through its searchable control', () => {
 })
 
 test('inventory transaction lineage assertions use the visible business labels', () => {
+  const source = readScenarioSource('businessCoreInventoryChecks')
+
   assert.match(source, /expectText\(page, '已关联来源明细'\)/u)
   assert.match(source, /expectText\(page, '已关联原库存变动记录'\)/u)
   assert.doesNotMatch(source, /expectText\(page, '已关联来源行'\)/u)
@@ -78,6 +85,8 @@ test('inventory transaction lineage assertions use the visible business labels',
 })
 
 test('inventory header keeps navigation compact without duplicate counts', () => {
+  const source = readScenarioSource('inventoryPresentationScenarios')
+
   const startIndex = source.indexOf("name: 'inventory-visible-copy-desktop'")
   const interaction = source.slice(startIndex, startIndex + 2_600)
 
@@ -94,6 +103,8 @@ test('inventory header keeps navigation compact without duplicate counts', () =>
 })
 
 test('product table headers keep the shared single-line browser regression', () => {
+  const source = readScenarioSource('businessListPresentationScenarios')
+
   const startIndex = source.indexOf(
     "name: 'business-table-headers-single-line-desktop'"
   )
@@ -122,11 +133,15 @@ test('product table headers keep the shared single-line browser regression', () 
 })
 
 test('workflow list failure assertion follows the current module title', () => {
-  assert.match(source, /expectText\(page, '加载出货放行任务失败'\)/u)
+  const source = readScenarioSource('shipmentReleaseScenarios')
+
+  assert.match(readScenarioSource('businessCoreProductionChecks'), /expectText\(page, '加载出货放行任务失败'\)/u)
   assert.doesNotMatch(source, /加载出货放行协同任务失败/u)
 })
 
 test('production exception workflow scenario follows the current approval empty state', () => {
+  const source = readScenarioSource('productionRecordScenarios')
+
   assert.match(source, /expectText\(page, '暂无待审批的生产异常处置申请。'\)/u)
   assert.doesNotMatch(source, /expectText\(page, '暂无生产异常任务。'\)/u)
   assert.match(source, /getByRole\('tab', \{\s*name: '异常处理'/u)
@@ -164,6 +179,8 @@ test('production exception workflow scenario follows the current approval empty 
 })
 
 test('read-only shipment release mock preserves requested paging metadata', () => {
+  const source = readScenarioSource('shipmentReleaseScenarios')
+
   const startIndex = source.indexOf('const readonlyShipmentReleaseTask')
   const routeCase = source.slice(startIndex, startIndex + 6_000)
 
@@ -175,19 +192,10 @@ test('read-only shipment release mock preserves requested paging metadata', () =
 })
 
 test('shipping release L1 scenarios use the formal finance approval process task', () => {
-  const fixture = source.slice(
-    source.indexOf('const createShipmentFinanceApprovalTaskFixture'),
-    source.indexOf(
-      'const {',
-      source.indexOf('const createShipmentFinanceApprovalTaskFixture')
-    )
-  )
-  const currentScenarios = source.slice(
-    source.indexOf("name: 'business-core-pages-desktop'"),
-    source.indexOf(
-      "name: 'business-formal-shipping-release-readonly-actions-desktop'"
-    ) + 7_000
-  )
+  const source = readScenarioSource('shipmentReleaseScenarios')
+
+  const fixture = readScenarioSource('shipmentApprovalFixtures')
+  const currentScenarios = source
   const readonlyScenario = source.slice(
     source.indexOf(
       "name: 'business-formal-shipping-release-readonly-actions-desktop'"
@@ -216,32 +224,36 @@ test('shipping release L1 scenarios use the formal finance approval process task
 })
 
 test('business-core detail and lineage checks are scoped to their surfaces', () => {
-  assert.match(source, /afterModalOpen: async \(modal\)/u)
-  assert.match(source, /modal[\s\S]{0,120}getByText\('PR-STYLE-L1'/u)
+  const source = readScenarioSource('businessCoreShipmentChecks')
+
+  assert.match(readScenarioSource('businessListPresentationScenarios'), /afterModalOpen: async \(modal\)/u)
+  assert.match(readScenarioSource('businessListPresentationScenarios'), /modal[\s\S]{0,120}getByText\('PR-STYLE-L1'/u)
   assert.match(
-    source,
+    readScenarioSource('businessCoreProductionChecks'),
     /shippingReleaseTaskRow[\s\S]{0,220}getByText\('可执行'/u
   )
   assert.match(
-    source,
+    readScenarioSource('shipmentReleaseScenarios'),
     /readonlyShippingReleaseRow[\s\S]{0,220}getByText\('可执行'/u
   )
   assert.match(
-    source,
+    readScenarioSource('businessCoreProductionChecks'),
     /business-workflow-shipping-release-attachment-modal[\s\S]{0,180}modalTitle: '任务附件',[\s\S]{0,80}panelTitle: '任务附件'/u
   )
   assert.match(
-    source,
+    readScenarioSource('businessCoreProductionChecks'),
     /const viewTaskButton = await findSelectionActionButton\([\s\S]{0,80}'查看任务'[\s\S]{0,180}viewTaskButton\.isDisabled\(\)/u
   )
   assert.match(
-    source,
+    readScenarioSource('businessCoreQualityChecks'),
     /erp-business-selection-action-menu:visible[\s\S]{0,180}keyboard\.press\('Escape'\)/u
   )
   assert.doesNotMatch(source, /协同任务附件/u)
 })
 
 test('shipment table assertions lock the combined visible headers', () => {
+  const source = readScenarioSource('businessCoreShipmentChecks')
+
   assert.match(source, /实际 \/ 最终总净重（克）/u)
   assert.match(source, /计划出货日期 \/ 实际出货日期/u)
   assert.match(source, /ant-table-thead th/u)
@@ -250,12 +262,14 @@ test('shipment table assertions lock the combined visible headers', () => {
     source,
     /unsortableHeaders:\s*\[\s*'实际 \/ 最终总净重（克）',\s*'包装 \/ 毛重 \/ 体积',\s*'实际运费',\s*'唛头',\s*'备注',?\s*\]/u
   )
-  assert.match(source, /unsortableHeaders: \['SKU 单重（净重）'\]/u)
+  assert.match(readScenarioSource('businessCoreMasterDataChecks'), /unsortableHeaders: \['SKU 单重（净重）'\]/u)
   assert.doesNotMatch(source, /expectText\(page, '总净重（克）'\)/u)
   assert.doesNotMatch(source, /unsortableHeaders: \['总净重（克）'/u)
 })
 
 test('shipment cancellation selects the business row before invoking the action', () => {
+  const source = readScenarioSource('businessCoreShipmentChecks')
+
   const startIndex = source.indexOf('const shipmentDraftRow')
   const interaction = source.slice(startIndex, startIndex + 1_100)
 
@@ -271,6 +285,8 @@ test('shipment cancellation selects the business row before invoking the action'
 })
 
 test('business-core selection actions remain reachable through responsive overflow', () => {
+  const source = readScenarioSource('businessFormalAssertions')
+
   assert.match(source, /const findSelectionActionButton/u)
   assert.match(
     source,
@@ -282,13 +298,15 @@ test('business-core selection actions remain reachable through responsive overfl
 })
 
 test('business-core destructive draft actions confirm through visible popconfirm content', () => {
-  assert.match(source, /actions: \[[\s\S]{0,120}'production\.fact\.cancel'/u)
+  const source = readScenarioSource('businessFormalAssertions')
+
+  assert.match(readScenarioSource('businessCorePagesScenarios'), /actions: \[[\s\S]{0,120}'production\.fact\.cancel'/u)
   assert.match(source, /const confirmVisiblePopconfirm/u)
   assert.match(source, /getByRole\('button', \{ name: \/\^确\\s\*认\$\/u \}\)/u)
   assert.match(source, /confirmButton\.waitFor\(\{ state: 'visible' \}\)/u)
   assert.match(source, /confirmButton\.click\(\)/u)
   assert.match(source, /ant-popconfirm:visible/u)
-  assert.match(source, /confirmVisiblePopconfirm\(page\)/u)
+  assert.match(readScenarioSource('businessCoreShipmentChecks'), /confirmVisiblePopconfirm\(page\)/u)
   assert.doesNotMatch(
     source,
     /\.locator\('\.ant-popover:visible'\)[\s\S]{0,160}getByRole\('button', \{ name: '确认'/u
@@ -296,6 +314,8 @@ test('business-core destructive draft actions confirm through visible popconfirm
 })
 
 test('production completion report cancellation uses the current reason-required modal', () => {
+  const source = readScenarioSource('businessCoreProductionChecks')
+
   const startIndex = source.indexOf('const cancelProductionDraftButton')
   const interaction = source.slice(startIndex, startIndex + 1_300)
 
@@ -313,6 +333,8 @@ test('production completion report cancellation uses the current reason-required
 })
 
 test('quality table assertion includes defect-rate and WIP lineage columns', () => {
+  const source = readScenarioSource('businessCoreQualityChecks')
+
   assert.match(source, /'估算不良比例'/u)
   assert.match(source, /'产品 \/ 材料 \/ 在制品'/u)
   assert.match(source, /unsortableHeaders: \['估算不良比例', '判定备注'\]/u)
@@ -320,12 +342,9 @@ test('quality table assertion includes defect-rate and WIP lineage columns', () 
 })
 
 test('production material issue scenario follows release and reference paging contracts', () => {
-  const scenario = source.slice(
-    source.indexOf("name: 'production-order-source-material-issue-desktop'"),
-    source.indexOf(
-      "name: 'business-formal-shipping-release-readonly-actions-desktop'"
-    )
-  )
+  const source = readScenarioSource('productionMaterialIssueScenarios')
+
+  const scenario = source.slice(source.indexOf("name: 'production-order-source-material-issue-desktop'"))
   assert.match(scenario, /生产订单已发布，排产确认已进入 PMC 待办/u)
   assert.doesNotMatch(scenario, /生产订单发布成功/u)
   assert.match(

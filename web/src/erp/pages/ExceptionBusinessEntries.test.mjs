@@ -17,6 +17,13 @@ const rejectionModal = read(
   '../components/quality-inspections/PurchaseRejectionDispositionModal.jsx'
 )
 const financePaymentsPage = read('./FinancePaymentsPage.jsx')
+const financeRecords = read('../components/finance/useFinancePaymentRecords.mjs')
+const financeAllocation = read('../components/finance/useFinancePaymentAllocation.mjs')
+const financeAllocationEditor = read('../components/finance/FinanceAllocationEditor.jsx')
+const financeAdjustments = read('../components/finance/useFinancePaymentAdjustments.mjs')
+const financeCreditActions = read('../components/finance/useFinanceCreditActions.mjs')
+const financeCreation = read('../components/finance/useFinancePaymentCreation.mjs')
+const financeDetails = read('../components/finance/FinancePaymentDetails.jsx')
 const financeCreditSubmission = read('../utils/financeCreditSubmission.mjs')
 const productionExceptionPanel = read(
   '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
@@ -53,47 +60,59 @@ test('first incoming rejection: keeps draft, post and cancellation distinct from
   assert.match(rejectionModal, /expected_version: record\.version/u)
 })
 
-test('finance V1: lists real payments, allocates multiple facts and preserves reversal audit', () => {
-  assert.match(financePaymentsPage, /listFinancePayments/u)
-  assert.match(financePaymentsPage, /listAllFinanceFacts/u)
-  assert.match(financePaymentsPage, /Promise\.allSettled/u)
+test('finance payments: lists real payments, allocates multiple facts and preserves reversal audit', () => {
+  assert.match(financeRecords, /listFinancePayments/u)
+  assert.match(financeRecords, /listAllFinanceFacts/u)
+  assert.match(financeRecords, /Promise\.allSettled/u)
   assert.match(financePaymentsPage, /BusinessOperationPanel/u)
   assert.match(financePaymentsPage, /BusinessDataTable/u)
-  assert.match(financePaymentsPage, /BusinessFormModal/u)
-  assert.match(financePaymentsPage, /BusinessDetailsModal/u)
+  assert.match(financeAllocationEditor, /BusinessFormModal/u)
+  assert.match(financeDetails, /BusinessDetailsModal/u)
   assert.match(financePaymentsPage, /createBusinessTablePagination/u)
-  assert.match(financePaymentsPage, /outstanding_amount/u)
-  assert.match(financePaymentsPage, /validateFinanceAllocationDraft/u)
-  assert.match(financePaymentsPage, /command = buildFinanceCreditCommand\(/u)
-  assert.match(financePaymentsPage, /await executeFinanceCreditCommand\(/u)
+  assert.match(financeRecords, /outstanding_amount/u)
+  assert.match(financeAllocation, /validateFinanceAllocationDraft/u)
+  assert.match(financeCreditActions, /command = buildFinanceCreditCommand\(/u)
+  assert.match(financeCreditActions, /await executeFinanceCreditCommand\(/u)
   assert.match(financeCreditSubmission, /validateFinanceCreditDraft/u)
   assert.match(financeCreditSubmission, /compareNumeric20Scale6Values/u)
   assert.doesNotMatch(
     financeCreditSubmission,
     /Number\(credit\?\.amount\)\s*===\s*Number\(payload\.amount\)/u
   )
-  assert.match(financePaymentsPage, /Form\.List name="allocations"/u)
+  assert.match(financeAllocationEditor, /Form\.List name="allocations"/u)
   assert.match(
-    financePaymentsPage,
-    /const initializeAllocationForm = \(visible\) => \{[\s\S]*if \(!visible\) return[\s\S]*allocationForm\.resetFields\(\)[\s\S]*allocationForm\.setFieldsValue\([\s\S]*afterOpenChange=\{initializeAllocationForm\}/u
+    financeAllocation,
+    /const initializeAllocationForm = \(visible\) => \{[\s\S]*if \(!visible\) return[\s\S]*allocationForm\.resetFields\(\)[\s\S]*allocationForm\.setFieldsValue\(/u
+  )
+  assert.match(
+    financeAllocationEditor,
+    /afterOpenChange=\{initializeAllocationForm\}/u
   )
   assert.doesNotMatch(
-    financePaymentsPage,
+    financeAllocation,
     /const openAllocation = \(\) => \{[^}]*allocationForm\.setFieldsValue/u
   )
   assert.doesNotMatch(
-    financePaymentsPage,
+    financeAllocationEditor,
     /form=\{allocationForm\}[\s\S]{0,100}preserve=\{false\}/u
   )
-  assert.match(financePaymentsPage, /expected_version:/u)
-  assert.match(financePaymentsPage, /reverseFinancePayment/u)
+  assert.match(financeAdjustments, /expected_version:/u)
+  assert.match(financeAdjustments, /reverseFinancePayment/u)
   assert.match(financeCreditSubmission, /createFinanceCreditNote/u)
   assert.match(financeCreditSubmission, /reverseFinanceCreditNote/u)
   assert.match(financePaymentsPage, /不(?:会)?删除原记录/u)
   assert.match(financePaymentsPage, /getFinancePaymentApprovalProcess/u)
-  assert.match(financePaymentsPage, /startFinancePaymentApprovalProcess/u)
+  assert.match(financeCreation, /startFinancePaymentApprovalProcess/u)
   assert.match(financePaymentsPage, />\s*核对审批流\s*</u)
-  assert.doesNotMatch(financePaymentsPage, /客户ID|供应商ID|财务记录ID/u)
+  for (const source of [
+    financePaymentsPage,
+    financeAllocationEditor,
+    financeDetails,
+    read('../components/finance/FinancePaymentEditor.jsx'),
+    read('../components/finance/FinanceCreditEditor.jsx'),
+  ]) {
+    assert.doesNotMatch(source, /客户ID|供应商ID|财务记录ID/u)
+  }
 })
 
 test('production exception: requester can reconcile a submitted source whose process start was not confirmed', () => {

@@ -250,11 +250,11 @@ source_dsn=""
 unset "$source_env"
 
 if [[ "$source_policy" == "shared-dev-dedicated-backup" ]]; then
-  if [[ "$environment" != "shared-dev" || "$source_pg_database" != "plush_erp" ]] || ! node --input-type=module -e '
+  if ! { [[ "$environment" == "shared-dev" && "$source_pg_database" == "plush_erp" ]] && node --input-type=module -e '
       import { pathToFileURL } from "node:url";
       const { registeredDevelopmentEndpoint } = await import(pathToFileURL(process.argv[1] + "/scripts/local-database-roles.mjs"));
       if (!registeredDevelopmentEndpoint(process.argv[2], process.argv[3])) process.exit(1);
-    ' "$repo_root" "$source_pg_host" "$source_pg_port"; then
+    ' "$repo_root" "$source_pg_host" "$source_pg_port"; }; then
     echo "[backup-restore-rehearsal] shared-dev-dedicated-backup 只允许已登记的共享或 Orb 开发库" >&2
     exit 1
   fi

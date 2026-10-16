@@ -1271,6 +1271,7 @@ export function BusinessOperationPanel({
                     <strong>筛选条件</strong>
                     {hasClearFilters ? (
                       <Button
+                        aria-label="清空筛选"
                         size="small"
                         type="text"
                         disabled={clearFiltersDisabled}
