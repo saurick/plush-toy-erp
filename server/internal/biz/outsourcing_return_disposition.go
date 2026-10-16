@@ -93,10 +93,10 @@ func (uc *OperationalFactUsecase) CreateOutsourcingReturnDisposition(ctx context
 	if n.DispositionType == OutsourcingDispositionReturnToVendor && n.ProductionWIPBatchID != nil {
 		return nil, ErrOutsourcingDispositionSourceInvalid
 	}
-	if n.DispositionType == OutsourcingDispositionRework && n.ProductionWIPBatchID != nil && *n.ProductionWIPBatchID <= 0 {
-		return nil, ErrOutsourcingDispositionSourceInvalid
+	if n.DispositionType == OutsourcingDispositionRework {
+		return nil, ErrProcessRuntimeRequired
 	}
-	if n.DispositionType != OutsourcingDispositionReturnToVendor && n.DispositionType != OutsourcingDispositionRework {
+	if n.DispositionType != OutsourcingDispositionReturnToVendor {
 		return nil, ErrBadParam
 	}
 	payload, err := json.Marshal(n)
