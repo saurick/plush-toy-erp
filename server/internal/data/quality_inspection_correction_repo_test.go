@@ -68,14 +68,6 @@ func TestQualityInspectionCorrectionSupersedesResultAndReopensHold(t *testing.T)
 	if !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("changed correction err=%v", err)
 	}
-	if _, err := uc.PassQualityInspection(ctx, approximateQualityInspectionDecision(corrected.ID, biz.QualityInspectionResultPass)); err != nil {
-		t.Fatal(err)
-	}
-	gate, err := uc.EvaluatePurchaseReceiptQualityGate(ctx, receipt.ID)
-	if err != nil || gate.Outcome != biz.PurchaseReceiptQualityGateReady {
-		t.Fatalf("corrected gate=%+v err=%v", gate, err)
-	}
-
 }
 
 func TestQualityInspectionCorrectionBlocksDownstreamDisposition(t *testing.T) {

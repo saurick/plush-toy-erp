@@ -22,8 +22,10 @@ import {
   Tag,
   Typography,
 } from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
+import {
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -430,10 +432,7 @@ export default function QualityInspectionsPage() {
     adminProfile,
     PermissionCode.WAREHOUSE_INVENTORY_READ
   )
-  const canReadShipment = hasActionPermission(
-    adminProfile,
-    PermissionCode.SHIPMENT_READ
-  )
+  const canReadShipment = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_READ)
   const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const selectedSourceType = String(
     selectedRow?.source_type || ''
@@ -536,7 +535,7 @@ export default function QualityInspectionsPage() {
     )
   const selectedRowCanCreateRejectionDisposition = Boolean(
     isRejectedIncomingInspection(selectedRow) &&
-    String(selectedRowPurchaseReceipt?.status || '').toUpperCase() === 'DRAFT'
+      String(selectedRowPurchaseReceipt?.status || '').toUpperCase() === 'DRAFT'
   )
   const selectedQualityStatus = String(selectedRow?.status || '').toUpperCase()
   const selectedInspectionType = String(
@@ -750,9 +749,9 @@ export default function QualityInspectionsPage() {
             linkedKeyword,
             hasExactContext: Boolean(
               routeQualityInspectionID ||
-              routePurchaseOrderID ||
-              routePurchaseReceiptID ||
-              (routeSourceType && routeSourceID)
+                routePurchaseOrderID ||
+                routePurchaseReceiptID ||
+                (routeSourceType && routeSourceID)
             ),
           })
         ),
@@ -788,10 +787,7 @@ export default function QualityInspectionsPage() {
           { signal }
         )
       }
-      if (
-        inspectionTypeFilter === 'FINISHED_GOODS' ||
-        routeSourceType === 'SHIPMENT'
-      ) {
+      if (inspectionTypeFilter === 'FINISHED_GOODS') {
         const list = all
           ? listAllFinishedGoodsQualityInspections
           : listFinishedGoodsQualityInspections
@@ -882,20 +878,15 @@ export default function QualityInspectionsPage() {
           : null
       })
       setTotal(exactPage.total)
-      setStatusCounts(
-        resolveBusinessStatusCounts(data, {
-          hasExactContext:
-            routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE',
-          exactRecord: selectedRouteInspection,
-          statusField: 'status',
-        })
-      )
+      setStatusCounts(resolveBusinessStatusCounts(data, {
+        hasExactContext: routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE', exactRecord: selectedRouteInspection, statusField: 'status',
+      }))
       return true
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return false
       }
-      showPageLoadError(error, '加载质量检验单')
+      message.error(getActionErrorMessage(error, '加载质量检验单'))
       return false
     } finally {
       if (request.isCurrent()) {
@@ -925,21 +916,11 @@ export default function QualityInspectionsPage() {
         productResult,
         warehouseResult,
       ] = await Promise.all([
-        canReadPurchaseReceipt
-          ? listAllPurchaseReceipts({}, { signal: request.signal })
-          : Promise.resolve({}),
-        canReadInventory
-          ? listAllInventoryLots({}, { signal: request.signal })
-          : Promise.resolve({}),
-        hasActionPermission(adminProfile, PermissionCode.MATERIAL_READ)
-          ? listAllMaterials({ active_only: true }, { signal: request.signal })
-          : Promise.resolve({}),
-        hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
-          ? listAllProducts({ active_only: true }, { signal: request.signal })
-          : Promise.resolve({}),
-        canReadInventory
-          ? listAllWarehouses({ active_only: true }, { signal: request.signal })
-          : Promise.resolve({}),
+        listAllPurchaseReceipts({}, { signal: request.signal }),
+        listAllInventoryLots({}, { signal: request.signal }),
+        listAllMaterials({ active_only: true }, { signal: request.signal }),
+        listAllProducts({ active_only: true }, { signal: request.signal }),
+        listAllWarehouses({ active_only: true }, { signal: request.signal }),
       ])
       if (!request.isCurrent()) return false
       setPurchaseReceipts(
@@ -965,7 +946,7 @@ export default function QualityInspectionsPage() {
       return true
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) return false
-      showPageLoadError(error, '加载质检相关资料')
+      message.error(getActionErrorMessage(error, '加载质检相关资料'))
       setPurchaseReceipts([])
       setInventoryLots([])
       setMaterials([])
@@ -976,12 +957,7 @@ export default function QualityInspectionsPage() {
     } finally {
       if (request.isCurrent()) request.finish()
     }
-  }, [
-    beginLatestRequest,
-    canReadPurchaseReceipt,
-    canReadInventory,
-    adminProfile,
-  ])
+  }, [beginLatestRequest])
 
   useEffect(() => {
     const receiptID = positiveInt(selectedRow?.purchase_receipt_id)
@@ -1560,21 +1536,21 @@ export default function QualityInspectionsPage() {
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
-    statusFilter ||
-    resultFilter ||
-    inspectionTypeFilter ||
-    purchaseReceiptFilter ||
-    materialFilter ||
-    warehouseFilter ||
-    lotFilter ||
-    dateFilterStart ||
-    dateFilterEnd ||
-    routePurchaseOrderID ||
-    routePurchaseReceiptID ||
-    routeQualityInspectionID ||
-    routeSourceType ||
-    routeSourceID ||
-    linkedKeyword
+      statusFilter ||
+      resultFilter ||
+      inspectionTypeFilter ||
+      purchaseReceiptFilter ||
+      materialFilter ||
+      warehouseFilter ||
+      lotFilter ||
+      dateFilterStart ||
+      dateFilterEnd ||
+      routePurchaseOrderID ||
+      routePurchaseReceiptID ||
+      routeQualityInspectionID ||
+      routeSourceType ||
+      routeSourceID ||
+      linkedKeyword
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -1593,7 +1569,15 @@ export default function QualityInspectionsPage() {
 
   return (
     <BusinessPageLayout className="erp-quality-inspections-page">
-      <PageHeaderCard compact helpKey="quality-inspections" title="质量检验" />
+      <PageHeaderCard
+        compact
+        helpKey="quality-inspections"
+        title="质量检验"
+        stats={[
+          { key: 'total', label: '符合条件', value: total },
+          { key: 'current', label: '本页显示', value: rows.length },
+        ]}
+      />
 
       <BusinessOperationPanel
         compact
@@ -1625,10 +1609,7 @@ export default function QualityInspectionsPage() {
               aria-label="质检状态"
               counts={statusCounts}
               loading={loading}
-              exact={
-                Boolean(routeQualityInspectionID) &&
-                inspectionTypeFilter !== 'PRODUCTION_STAGE'
-              }
+              exact={Boolean(routeQualityInspectionID) && inspectionTypeFilter !== 'PRODUCTION_STAGE'}
               className="erp-business-filter-control--status"
               value={statusFilter}
               options={QUALITY_STATUS_OPTIONS}
@@ -1638,7 +1619,6 @@ export default function QualityInspectionsPage() {
               }}
             />
             <SelectFilter
-              aria-label="检验结果"
               className="erp-business-filter-control--status"
               value={resultFilter}
               options={QUALITY_RESULT_FILTER_OPTIONS}
@@ -1648,7 +1628,6 @@ export default function QualityInspectionsPage() {
               }}
             />
             <SelectFilter
-              aria-label="检验类型"
               className="erp-business-filter-control--status"
               value={inspectionTypeFilter}
               options={QUALITY_INSPECTION_TYPE_FILTER_OPTIONS}
@@ -1685,7 +1664,6 @@ export default function QualityInspectionsPage() {
               }}
             />
             <SelectFilter
-              aria-label="入库单"
               className="erp-business-filter-control--status"
               value={purchaseReceiptFilter}
               options={[
@@ -1704,7 +1682,6 @@ export default function QualityInspectionsPage() {
               }}
             />
             <SelectFilter
-              aria-label="材料"
               className="erp-business-filter-control--status"
               value={materialFilter}
               options={[{ label: '全部材料', value: '' }, ...materialOptions]}
@@ -1720,7 +1697,6 @@ export default function QualityInspectionsPage() {
               }}
             />
             <SelectFilter
-              aria-label="仓库"
               className="erp-business-filter-control--status"
               value={warehouseFilter}
               options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
@@ -1734,7 +1710,6 @@ export default function QualityInspectionsPage() {
               }}
             />
             <SelectFilter
-              aria-label="批次"
               className="erp-business-filter-control--status"
               value={lotFilter}
               options={[
@@ -1816,7 +1791,10 @@ export default function QualityInspectionsPage() {
             >
               导出筛选结果
             </ToolbarButton>
-            <ToolbarButton icon={<SettingOutlined />} onClick={openColumnOrder}>
+            <ToolbarButton
+              icon={<SettingOutlined />}
+              onClick={openColumnOrder}
+            >
               列设置
             </ToolbarButton>
           </Space>
@@ -1851,11 +1829,7 @@ export default function QualityInspectionsPage() {
             selectionLabel="质检记录"
             onClear={() => setSelectedRow(null)}
           />
-          <BusinessTaskActions
-            sourceType="quality_inspection"
-            record={selectedRow}
-            adminProfile={adminProfile}
-          />
+          <BusinessTaskActions sourceType="quality_inspection" record={selectedRow} adminProfile={adminProfile} />
           {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
               disabled={relatedActionAvailability.disabled}
@@ -2132,10 +2106,6 @@ export default function QualityInspectionsPage() {
         open={rejectionDispositionOpen}
         inspection={selectedRow}
         canPost={canPostPurchaseReturn}
-        canReceiveReplacement={hasActionPermission(
-          adminProfile,
-          PermissionCode.PURCHASE_RECEIPT_CREATE
-        )}
         canCancel={canCancelPurchaseReturn}
         onClose={() => setRejectionDispositionOpen(false)}
         onChanged={() => loadRows()}
