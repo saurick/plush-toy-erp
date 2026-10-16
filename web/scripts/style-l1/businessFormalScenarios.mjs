@@ -32,7 +32,7 @@ export function createBusinessFormalScenarios(deps) {
     assertAntdModalCentered,
     assertBusinessFormModalKeyboardRecovery,
     assertBusinessHeaderHasNoSectionTitle,
-    assertBusinessHeaderCompact,
+    assertBusinessHeaderStatsSingleLine,
     assertBusinessMainTableHasNoOperationColumn,
     assertBusinessMainTableInitialSelectionEmpty,
     assertBusinessMainTableSortableColumns,
@@ -2250,17 +2250,20 @@ export function createBusinessFormalScenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '库存台账')
-        await assertBusinessHeaderCompact(page, {
-          scenarioName: 'inventory-compact-header-balance-desktop',
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-balance-desktop',
+          expectedLabels: ['筛选结果', '本页显示'],
         })
         await assertTextAbsent(page, '查看内容')
         await page.getByRole('tab', { name: '库存批次' }).click()
-        await assertBusinessHeaderCompact(page, {
-          scenarioName: 'inventory-compact-header-lots-desktop',
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-lots-desktop',
+          expectedLabels: ['筛选结果', '本页显示'],
         })
         await page.getByRole('tab', { name: '库存变动记录' }).click()
-        await assertBusinessHeaderCompact(page, {
-          scenarioName: 'inventory-compact-header-transactions-desktop',
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-transactions-desktop',
+          expectedLabels: ['筛选结果', '本页显示'],
         })
         await expectText(page, '撤销调整')
         await assertTextAbsent(page, '库存流水')
@@ -2274,7 +2277,7 @@ export function createBusinessFormalScenarios(deps) {
       },
     },
     {
-      name: 'inventory-compact-header-dark-mobile',
+      name: 'inventory-numeric-summary-dark-mobile',
       path: '/erp/warehouse/inventory?view=balances',
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
@@ -2284,12 +2287,13 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '库存台账')
         await page.getByRole('tab', { name: '库存余额' }).click()
         await assertERPThemeMode(page, {
-          scenarioName: 'inventory-compact-header-dark-mobile',
+          scenarioName: 'inventory-numeric-summary-dark-mobile',
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
-        await assertBusinessHeaderCompact(page, {
-          scenarioName: 'inventory-compact-header-dark-mobile',
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-dark-mobile',
+          expectedLabels: ['筛选结果', '本页显示'],
         })
         await assertTextAbsent(page, '查看内容')
         await page
@@ -2301,9 +2305,9 @@ export function createBusinessFormalScenarios(deps) {
             '.erp-business-page-header-card'
           )
           const title = header?.querySelector('h1')
-          const tabs = Array.from(
+          const values = Array.from(
             header?.querySelectorAll(
-              '.erp-business-module-tabs [role="tab"]'
+              '.erp-business-page-header-card__stat strong'
             ) || []
           )
           const contentRect = content?.getBoundingClientRect()
@@ -2320,7 +2324,7 @@ export function createBusinessFormalScenarios(deps) {
                   color: window.getComputedStyle(title).color,
                 }
               : null,
-            tabs: tabs.map((value) => ({
+            values: values.map((value) => ({
               text: value.textContent?.trim() || '',
               rect: value.getBoundingClientRect().toJSON(),
               color: window.getComputedStyle(value).color,
@@ -2335,37 +2339,38 @@ export function createBusinessFormalScenarios(deps) {
           )}`
         )
         assert(
-          mobileHeaderMetrics.title?.text === '库存管理' &&
-            mobileHeaderMetrics.tabs.length === 2 &&
-            mobileHeaderMetrics.tabs.every(
+          mobileHeaderMetrics.title?.text === '库存台账' &&
+            mobileHeaderMetrics.values.length === 2 &&
+            mobileHeaderMetrics.values.every(
               (item) =>
                 item.rect.top >= mobileHeaderMetrics.content.top &&
                 item.rect.bottom <= mobileHeaderMetrics.content.bottom
             ),
-          `库存暗色手机页头标题和页签应在可视内容区内: ${JSON.stringify(
+          `库存暗色手机页头标题和数值应在可视内容区内: ${JSON.stringify(
             mobileHeaderMetrics
           )}`
         )
         await page.screenshot({
           path: path.join(
             outputDir,
-            'inventory-compact-header-dark-mobile.png'
+            'inventory-numeric-summary-dark-mobile.png'
           ),
           fullPage: true,
         })
-        await page.locator('.erp-business-module-header').screenshot({
+        await page.locator('.erp-business-page-header-card').screenshot({
           path: path.join(
             outputDir,
-            'inventory-compact-header-dark-mobile-header.png'
+            'inventory-numeric-summary-dark-mobile-header.png'
           ),
         })
         await page.getByRole('tab', { name: '库存变动记录' }).click()
-        await assertBusinessHeaderCompact(page, {
-          scenarioName: 'inventory-compact-header-transactions-dark-mobile',
+        await assertBusinessHeaderStatsSingleLine(page, {
+          scenarioName: 'inventory-numeric-summary-transactions-dark-mobile',
+          expectedLabels: ['筛选结果', '本页显示'],
         })
         await assertNoHorizontalOverflow(
           page,
-          'inventory-compact-header-dark-mobile'
+          'inventory-numeric-summary-dark-mobile'
         )
       },
     },
@@ -3342,8 +3347,9 @@ export function createBusinessFormalScenarios(deps) {
         await assertBusinessHeaderHasNoSectionTitle(page, {
           scenarioName: 'business-standard-products',
         })
-        await assertBusinessHeaderCompact(page, {
+        await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-standard-products',
+          expectedLabels: ['总产品', '本页显示', '启用产品'],
         })
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'business-standard-products',
@@ -3469,8 +3475,9 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '库存台账')
         await assertTextAbsent(page, '余额只读')
-        await assertBusinessHeaderCompact(page, {
+        await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-standard-inventory',
+          expectedLabels: ['筛选结果', '本页显示'],
         })
         await assertTextAbsent(page, '查看内容')
         await expectText(page, '12.5')
@@ -4209,8 +4216,10 @@ export function createBusinessFormalScenarios(deps) {
         await assertCurrentOperationBarCompact(page, {
           scenarioName: 'business-formal-processing-contracts',
         })
-        await assertBusinessHeaderCompact(page, {
+        await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-formal-processing-contracts',
+          expectedLabels: ['符合条件', '本页显示'],
+          allowWrappedStats: true,
         })
         await assertNoListDeleteTrashToolbar(page)
         await verifyBusinessModuleColumnOrderDialog(page, {
@@ -4966,8 +4975,10 @@ export function createBusinessFormalScenarios(deps) {
           expectedEffectiveTheme: 'light',
         })
         await expectHeading(page, '委外订单')
-        await assertBusinessHeaderCompact(page, {
+        await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-formal-outsourcing-mobile',
+          expectedLabels: ['符合条件', '本页显示'],
+          allowWrappedStats: true,
         })
         await verifyBusinessActionFormModal(page, {
           buttonName: '新建加工合同',

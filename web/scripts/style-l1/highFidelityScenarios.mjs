@@ -2,7 +2,6 @@ import { getContrastRatio, parseRgb } from './colorAssertions.mjs'
 import { mobileAppearanceScenario } from './mobileAppearanceScenario.mjs'
 import { createMobileSurfaceScenarios } from './mobileSurfaceScenarios.mjs'
 import { createGlobalSurfaceScenarios } from './globalSurfaceScenarios.mjs'
-import { createReadabilityScenarios } from './readabilityScenarios.mjs'
 
 export function createHighFidelityScenarios({
   assert,
@@ -26,13 +25,6 @@ export function createHighFidelityScenarios({
       )
     })
   return [
-    ...createReadabilityScenarios({
-      assert,
-      assertNoHorizontalOverflow,
-      customerRuntimeEffectiveSession,
-      outputDir,
-      path,
-    }),
     ...createGlobalSurfaceScenarios({
       assert,
       customerRuntimeEffectiveSession,

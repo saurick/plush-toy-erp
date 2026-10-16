@@ -1060,18 +1060,10 @@ async function assertVisibleBusinessFormControlHeight(page, scenarioName) {
     for (const form of forms) {
       if (!(form instanceof HTMLElement)) continue
       if (!isVisible(form)) continue
-      // Custom properties preserve max()/calc(); let the browser resolve the token in the form's scope.
-      const heightProbe = document.createElement('div')
-      heightProbe.style.cssText =
-        'position:absolute;visibility:hidden;pointer-events:none;box-sizing:content-box;padding:0;border:0;min-height:0;max-height:none;height:var(--erp-control-height, 36px)'
-      form.append(heightProbe)
-      const expectedHeight = Number.parseFloat(
-        window.getComputedStyle(heightProbe).height
-      )
-      heightProbe.remove()
-      if (!Number.isFinite(expectedHeight) || expectedHeight <= 0) {
-        throw new Error('业务表单控件高度 token 未解析为正数')
-      }
+      const formStyle = window.getComputedStyle(form)
+      const expectedHeight =
+        Number.parseFloat(formStyle.getPropertyValue('--erp-control-height')) ||
+        36
       const candidates = Array.from(form.querySelectorAll(candidateSelector))
       for (const node of candidates) {
         if (!(node instanceof HTMLElement)) continue

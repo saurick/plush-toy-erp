@@ -67,59 +67,139 @@ export async function assertMobileSearchAffordance(locator, action) {
   return metrics
 }
 
-export async function assertContentTabAffordance(locator) {
-  await waitForFiniteAnimations(locator.page())
+export async function assertTabsAffordance(locator) {
   const metric = await locator.evaluate((root) => {
-    const group = root.matches('.erp-sliding-tab-list')
-      ? root
-      : root.querySelector('.ant-tabs-nav-list, .ant-segmented-group')
-    const selected = group.querySelector('.ant-tabs-tab-active, .erp-segmented-item-selected, [aria-selected="true"]')
-    const other = group.querySelector('.ant-tabs-tab:not(.ant-tabs-tab-active, .ant-tabs-tab-disabled), .ant-segmented-item:not(.erp-segmented-item-selected, .ant-segmented-item-disabled), [role="tab"][aria-selected="false"]:not(:disabled)')
-    const read = (item) => {
-      if (!item) return null
-      const label = item.querySelector('.ant-tabs-tab-btn, .ant-segmented-item-label') || item
-      const style = getComputedStyle(label)
-      return { weight: Number(style.fontWeight), color: style.color, height: item.getBoundingClientRect().height }
-    }
-    const track = root.matches('.ant-segmented') ? root : group
-    const style = getComputedStyle(track)
-    const indicator = getComputedStyle(group, '::before')
-    let surface = track
-    let background = 'rgb(255, 255, 255)'
-    while (surface) {
-      const value = getComputedStyle(surface).backgroundColor
-      if (value !== 'rgba(0, 0, 0, 0)' && value !== 'transparent') {
-        background = value
-        break
+    const track = root.querySelector('.ant-tabs-nav-list')
+    const trackStyle = getComputedStyle(track)
+    const indicator = getComputedStyle(track, '::before')
+    const selected = root.querySelector('.ant-tabs-tab-active')
+    const other = root.querySelector(
+      '.ant-tabs-tab:not(.ant-tabs-tab-active):not(.ant-tabs-tab-disabled)'
+    )
+    const read = (tab) => {
+      const style = getComputedStyle(tab)
+      return {
+        background: style.backgroundColor,
+        height: tab.getBoundingClientRect().height,
+        color: getComputedStyle(tab.querySelector('.ant-tabs-tab-btn')).color,
       }
-      surface = surface.parentElement
     }
     return {
       selected: read(selected),
       other: read(other),
-      background,
-      trackBackground: style.backgroundColor,
-      indicatorBackground: indicator.backgroundColor,
+      border: trackStyle.borderColor,
+      expectedBorder: trackStyle
+        .getPropertyValue('--erp-control-tab-border')
+        .trim(),
+      borderWidth: parseFloat(trackStyle.borderWidth),
+      background: trackStyle.backgroundColor,
+      radius: trackStyle.borderRadius,
+      indicatorColor: indicator.backgroundColor,
+      indicatorHeight: parseFloat(indicator.height),
       shadow: indicator.boxShadow,
-      expectedSelectedText: style.getPropertyValue('--erp-control-selected-text').trim(),
+    }
+  })
+  assert(
+    Math.abs(metric.indicatorHeight - metric.selected.height) < 1,
+    `页签使用覆盖选项的连续滑块: ${JSON.stringify(metric)}`
+  )
+  assert.equal(
+    metric.selected.background,
+    'rgba(0, 0, 0, 0)',
+    '选中底色由持久滑块绘制，不能叠加独立白底'
+  )
+  assert.equal(
+    metric.other.background,
+    'rgba(0, 0, 0, 0)',
+    '未选项延续底轨背景'
+  )
+  assert(metric.borderWidth >= 1)
+  assert.equal(metric.radius, '9px')
+  assert.notEqual(metric.indicatorColor, metric.background)
+  assert.ok(metric.shadow.includes('0px 0px 0px 1px inset'))
+  assert.deepEqual(
+    parseRgb(metric.border),
+    parseRgb(metric.expectedBorder),
+    `底轨使用当前主题的中性边框: ${JSON.stringify(metric)}`
+  )
+  for (const [item, background] of [
+    [metric.selected, metric.indicatorColor],
+    [metric.other, metric.background],
+  ]) {
+    assert(
+      getContrastRatio(parseRgb(item.color), parseRgb(background)) >= 4.5,
+      JSON.stringify(metric)
+    )
+  }
+}
+
+export async function assertSegmentAffordance(locator) {
+  const metric = await locator.evaluate((root) => {
+    const track = getComputedStyle(root)
+    const indicator = getComputedStyle(
+      root.querySelector('.ant-segmented-group'),
+      '::before'
+    )
+    const selected = root.querySelector('.erp-segmented-item-selected')
+    const unselected = root.querySelector(
+      '.ant-segmented-item:not(.erp-segmented-item-selected):not(.ant-segmented-item-disabled)'
+    )
+    return {
+      border: track.borderColor,
+      expectedBorder: track
+        .getPropertyValue('--erp-control-tab-border')
+        .trim(),
+      borderWidth: parseFloat(track.borderWidth),
+      background: track.backgroundColor,
+      selectedBackground: indicator.backgroundColor,
+      shadow: indicator.boxShadow,
+      selectedText: getComputedStyle(selected).color,
+      text: unselected ? getComputedStyle(unselected).color : null,
       width: root.clientWidth,
       scrollWidth: root.scrollWidth,
     }
   })
-  assert.equal(metric.selected.weight, 650, JSON.stringify(metric))
-  if (metric.other) assert.equal(metric.other.weight, 500, JSON.stringify(metric))
-  assert.equal(metric.trackBackground, 'rgba(0, 0, 0, 0)', '内容 Tab 使用透明底')
-  assert.equal(metric.indicatorBackground, 'rgba(0, 0, 0, 0)', '下划线不叠加选中底块')
-  assert(metric.shadow.includes('0px -2px 0px 0px inset'), `内容 Tab 必须有 2px 下划线: ${JSON.stringify(metric)}`)
-  assert.deepEqual(parseRgb(metric.selected.color), parseRgb(metric.expectedSelectedText))
-  for (const item of [metric.selected, metric.other].filter(Boolean)) {
-    assert(getContrastRatio(parseRgb(item.color), parseRgb(metric.background)) >= 4.5, `文字对比度不足: ${JSON.stringify(metric)}`)
+  assert(
+    metric.borderWidth >= 1,
+    `视图切换必须有分组边界: ${JSON.stringify(metric)}`
+  )
+  assert.deepEqual(
+    parseRgb(metric.border),
+    parseRgb(metric.expectedBorder),
+    `分组沿用当前主题的中性边框: ${JSON.stringify(metric)}`
+  )
+  assert.notEqual(
+    metric.selectedBackground,
+    metric.background,
+    '滑块和轨道应有不同底色'
+  )
+  assert.ok(
+    metric.shadow.includes('0px 0px 0px 1px inset'),
+    '滑块与页签共用中性细描边'
+  )
+  assert(
+    !metric.shadow.includes('-3px'),
+    `选中态不应绘制粗底边: ${JSON.stringify(metric)}`
+  )
+  assert(
+    getContrastRatio(
+      parseRgb(metric.selectedText),
+      parseRgb(metric.selectedBackground)
+    ) >= 4.5,
+    `选中文字对比度不足: ${JSON.stringify(metric)}`
+  )
+  if (metric.text) {
+    assert(
+      getContrastRatio(parseRgb(metric.text), parseRgb(metric.background)) >=
+        4.5
+    )
   }
-  assert(metric.scrollWidth <= metric.width + 1, `页签不能撑宽容器: ${JSON.stringify(metric)}`)
+  assert(
+    metric.scrollWidth <= metric.width + 1,
+    `视图切换溢出: ${JSON.stringify(metric)}`
+  )
+  return metric
 }
-
-export const assertTabsAffordance = assertContentTabAffordance
-export const assertSegmentAffordance = assertContentTabAffordance
 
 export async function assertFilterAffordance(locator, minHeight = 32) {
   const metrics = await locator.evaluateAll((buttons) =>

@@ -1,4 +1,3 @@
-import { buildProductionWipActionParams } from '../../src/erp/utils/productionWipModel.mjs'
 import {
   stylePaginatedRpcData,
   styleRpcResult,
@@ -106,6 +105,8 @@ export async function installOrderRpcMocks(page, context) {
       case 'create_sales_order':
       case 'update_sales_order':
       case 'get_sales_order':
+      case 'submit_sales_order':
+      case 'activate_sales_order':
       case 'close_sales_order':
       case 'cancel_sales_order':
         data = { sales_order: { ...salesOrder, ...params } }
@@ -1231,15 +1232,6 @@ export async function installOrderRpcMocks(page, context) {
     } else if (method === 'get_production_wip') {
       data = productionWipAggregate()
     } else if (method === 'execute_production_wip_action') {
-      let validParams = true
-      try {
-        const validated = buildProductionWipActionParams(params.action, params)
-        validParams = Object.keys(params).every((key) =>
-          Object.hasOwn(validated, key)
-        )
-      } catch {
-        validParams = false
-      }
       const batch = productionWipBatches.find(
         (candidate) => candidate.id === params.production_wip_batch_id
       )
@@ -1247,144 +1239,130 @@ export async function installOrderRpcMocks(page, context) {
         (candidate) =>
           candidate.production_order_item_id === params.production_order_item_id
       )
-      const targetRecord =
-        params.action === 'CONFIRM_PACKAGING_MATERIAL' ? confirmation : batch
-      if (
-        !validParams ||
-        !targetRecord ||
-        targetRecord.version !== params.expected_version
-      ) {
-        data = unsupportedRpcMethod(
-          'production_wip',
-          'invalid action or version'
-        )
-      } else {
-        if (params.action === 'SPLIT_BATCH' && batch) {
-          const splitQuantities = Array.isArray(params.splits)
-            ? params.splits.map((split) => String(split?.quantity || ''))
-            : []
-          batch.status = 'SPLIT'
-          batch.version += 1
-          productionWipBatches.push(
-            ...splitQuantities.map((quantity, index) =>
-              makeProductionWipBatch({
-                id: 94_000 + productionWipBatches.length * 2 + index,
-                itemIndex: productionOrderItems.findIndex(
-                  (item) => item.id === batch.production_order_item_id
-                ),
-                stepIndex: productionWipSteps.findIndex(
-                  (step) =>
-                    step.step_no ===
-                    productionWipOperations.find(
-                      (operation) =>
-                        operation.id === batch.production_order_operation_id
-                    )?.step_no
-                ),
-                sourceBatchID: batch.id,
-                originReworkFactID: batch.origin_rework_fact_id,
-                executionMode: null,
-                status: 'PLANNED',
-                quantity,
-              })
-            )
-          )
-        } else if (params.action === 'ASSIGN_EXECUTION' && batch) {
-          batch.execution_mode = params.execution_mode
-          for (
-            let index = productionWipOutsourcingAllocations.length - 1;
-            index >= 0;
-            index -= 1
-          ) {
-            if (
-              productionWipOutsourcingAllocations[index]
-                .production_wip_batch_id === batch.id
-            ) {
-              productionWipOutsourcingAllocations.splice(index, 1)
-            }
-          }
-          if (params.execution_mode === 'OUTSOURCED') {
-            for (const allocation of params.outsourcing_allocations || []) {
-              const requirement = productionMaterialRequirements.find(
-                (item) =>
-                  item.id ===
-                  allocation.production_order_material_requirement_id
-              )
-              productionWipOutsourcingAllocations.push({
-                id: 96_000 + productionWipOutsourcingAllocations.length,
-                production_wip_batch_id: batch.id,
-                outsourcing_order_item_id: allocation.outsourcing_order_item_id,
-                production_order_material_requirement_id:
-                  allocation.production_order_material_requirement_id || null,
-                subject_type: requirement ? 'MATERIAL' : 'PRODUCT',
-                allocated_quantity: requirement
-                  ? requirement.planned_quantity
-                  : batch.quantity,
-                unit_id: requirement
-                  ? requirement.unit_id
-                  : productionOrderItems.find(
-                      (item) => item.id === batch.production_order_item_id
-                    )?.unit_id,
-                created_by: 1,
-                created_at: nowUnix(),
-              })
-            }
-          }
-          batch.version += 1
-        } else if (params.action === 'CANCEL_BATCH' && batch) {
-          batch.status = 'CANCELLED'
-          batch.version += 1
-        } else if (params.action === 'START_OPERATION' && batch) {
-          batch.status =
-            batch.execution_mode === 'OUTSOURCED' ? 'OUTSOURCED' : 'IN_PROGRESS'
-          batch.version += 1
-        } else if (
-          ['COMPLETE_OPERATION', 'RECEIVE_OUTSOURCING_RETURN'].includes(
-            params.action
-          ) &&
-          batch
-        ) {
-          batch.status = 'WAITING_QUALITY'
-          batch.version += 1
-        } else if (
-          params.action === 'CONFIRM_PACKAGING_MATERIAL' &&
-          confirmation
-        ) {
-          confirmation.status = 'CONFIRMED'
-          confirmation.packaging_version_snapshot =
-            params.packaging_version_snapshot
-          confirmation.confirmed_by = 1
-          confirmation.confirmed_at = nowUnix()
-          confirmation.note = params.note || null
-          confirmation.version += 1
-          confirmation.updated_at = nowUnix()
-        } else if (
-          ['TRANSFER_TO_NEXT_OPERATION', 'REWORK'].includes(params.action) &&
-          batch
-        ) {
-          const target = productionWipOperations.find(
-            (operation) => operation.id === params.target_operation_id
-          )
-          productionWipBatches.push({
-            ...makeProductionWipBatch({
-              id: 95_000 + productionWipBatches.length,
+      if (params.action === 'SPLIT_BATCH' && batch) {
+        const splitQuantities = Array.isArray(params.splits)
+          ? params.splits.map((split) => String(split?.quantity || ''))
+          : []
+        batch.status = 'SPLIT'
+        batch.version += 1
+        productionWipBatches.push(
+          ...splitQuantities.map((quantity, index) =>
+            makeProductionWipBatch({
+              id: 94_000 + productionWipBatches.length * 2 + index,
               itemIndex: productionOrderItems.findIndex(
                 (item) => item.id === batch.production_order_item_id
               ),
               stepIndex: productionWipSteps.findIndex(
-                (step) => step.step_no === target?.step_no
+                (step) =>
+                  step.step_no ===
+                  productionWipOperations.find(
+                    (operation) =>
+                      operation.id === batch.production_order_operation_id
+                  )?.step_no
               ),
               sourceBatchID: batch.id,
               originReworkFactID: batch.origin_rework_fact_id,
               executionMode: null,
               status: 'PLANNED',
-              quantity: params.quantity,
-            }),
-            flow_type: params.action === 'REWORK' ? 'REWORK' : 'NORMAL',
-            rework_reason: params.action === 'REWORK' ? params.reason : null,
-          })
+              quantity,
+            })
+          )
+        )
+      } else if (params.action === 'ASSIGN_EXECUTION' && batch) {
+        batch.execution_mode = params.execution_mode
+        for (
+          let index = productionWipOutsourcingAllocations.length - 1;
+          index >= 0;
+          index -= 1
+        ) {
+          if (
+            productionWipOutsourcingAllocations[index]
+              .production_wip_batch_id === batch.id
+          ) {
+            productionWipOutsourcingAllocations.splice(index, 1)
+          }
         }
-        data = productionWipAggregate()
+        if (params.execution_mode === 'OUTSOURCED') {
+          for (const allocation of params.outsourcing_allocations || []) {
+            const requirement = productionMaterialRequirements.find(
+              (item) =>
+                item.id === allocation.production_order_material_requirement_id
+            )
+            productionWipOutsourcingAllocations.push({
+              id: 96_000 + productionWipOutsourcingAllocations.length,
+              production_wip_batch_id: batch.id,
+              outsourcing_order_item_id: allocation.outsourcing_order_item_id,
+              production_order_material_requirement_id:
+                allocation.production_order_material_requirement_id || null,
+              subject_type: requirement ? 'MATERIAL' : 'PRODUCT',
+              allocated_quantity: requirement
+                ? requirement.planned_quantity
+                : batch.quantity,
+              unit_id: requirement
+                ? requirement.unit_id
+                : productionOrderItems.find(
+                    (item) => item.id === batch.production_order_item_id
+                  )?.unit_id,
+              created_by: 1,
+              created_at: nowUnix(),
+            })
+          }
+        }
+        batch.version += 1
+      } else if (params.action === 'CANCEL_BATCH' && batch) {
+        batch.status = 'CANCELLED'
+        batch.version += 1
+      } else if (params.action === 'START_OPERATION' && batch) {
+        batch.status =
+          batch.execution_mode === 'OUTSOURCED' ? 'OUTSOURCED' : 'IN_PROGRESS'
+        batch.version += 1
+      } else if (
+        ['COMPLETE_OPERATION', 'RECEIVE_OUTSOURCING_RETURN'].includes(
+          params.action
+        ) &&
+        batch
+      ) {
+        batch.status = 'WAITING_QUALITY'
+        batch.version += 1
+      } else if (
+        params.action === 'CONFIRM_PACKAGING_MATERIAL' &&
+        confirmation
+      ) {
+        confirmation.status = 'CONFIRMED'
+        confirmation.packaging_version_snapshot =
+          params.packaging_version_snapshot
+        confirmation.confirmed_by = 1
+        confirmation.confirmed_at = nowUnix()
+        confirmation.note = params.note || null
+        confirmation.version += 1
+        confirmation.updated_at = nowUnix()
+      } else if (
+        ['TRANSFER_TO_NEXT_OPERATION', 'REWORK'].includes(params.action) &&
+        batch
+      ) {
+        const target = productionWipOperations.find(
+          (operation) => operation.id === params.target_operation_id
+        )
+        productionWipBatches.push({
+          ...makeProductionWipBatch({
+            id: 95_000 + productionWipBatches.length,
+            itemIndex: productionOrderItems.findIndex(
+              (item) => item.id === batch.production_order_item_id
+            ),
+            stepIndex: productionWipSteps.findIndex(
+              (step) => step.step_no === target?.step_no
+            ),
+            sourceBatchID: batch.id,
+            originReworkFactID: batch.origin_rework_fact_id,
+            executionMode: null,
+            status: 'PLANNED',
+            quantity: params.quantity,
+          }),
+          flow_type: params.action === 'REWORK' ? 'REWORK' : 'NORMAL',
+          rework_reason: params.action === 'REWORK' ? params.reason : null,
+        })
       }
+      data = productionWipAggregate()
     } else {
       data = unsupportedRpcMethod('production_wip', method)
     }

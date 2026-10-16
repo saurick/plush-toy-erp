@@ -335,7 +335,7 @@ export function createHelpCenterScenarios({
         await selectRole('仓库')
         assert.deepEqual(
           await root.getByRole('navigation', { name: '参考目录' }).getByRole('button').allTextContents(),
-          ['材料档案', '采购入库', '库存台账', '生产订单', '生产记录', '出货放行', '库存预留']
+          ['材料档案', '采购入库', '库存台账', '生产记录', '出货单', '出货放行', '库存预留']
         )
         await search.fill('月结')
         await root.getByText('找到 0 条操作图解和参考说明', { exact: true }).waitFor()
@@ -987,7 +987,7 @@ export function createHelpCenterScenarios({
           )
           .waitFor()
         await page
-          .getByRole('heading', { name: '财务管理', exact: true })
+          .getByRole('heading', { name: '应收管理', exact: true })
           .click()
         await waitForHelpPopoverClosed(page)
         await assertNoHorizontalOverflow(page, '手机账期问号')
@@ -1165,12 +1165,10 @@ export function createHelpCenterScenarios({
           await page.locator('.erp-help-center-role-picker').count(),
           0
         )
-        const checkReceipt = article.getByRole('button', {
-          name: '查看步骤 2：核对实收与批次',
-        })
-        await checkReceipt.click()
         assert.equal(
-          await checkReceipt.getAttribute('aria-pressed'),
+          await article
+            .getByRole('button', { name: '查看步骤 2：核对实收与批次' })
+            .getAttribute('aria-pressed'),
           'true'
         )
         const confirm = article.getByRole('button', {
@@ -1185,7 +1183,7 @@ export function createHelpCenterScenarios({
           .waitFor()
         await article.getByText('遇到异常', { exact: true }).click()
         await article
-          .getByText('处理后回到同一收仓记录重新核对', { exact: false })
+          .getByText('处理后回到同一报告重新核对', { exact: false })
           .waitFor()
         await assertFlowFits(page)
         await page.getByText('怎么做', { exact: true }).click()
@@ -1195,7 +1193,7 @@ export function createHelpCenterScenarios({
           .click()
         assert.equal(
           await article
-            .getByRole('button', { name: '查看步骤 1：登记手工成品收仓' })
+            .getByRole('button', { name: '查看步骤 1：提交完工报告' })
             .getAttribute('aria-pressed'),
           'true'
         )
@@ -1268,7 +1266,7 @@ export function createHelpCenterScenarios({
         await article.waitFor()
         assert.equal(
           await article
-            .getByRole('button', { name: '查看步骤 1：登记手工成品收仓' })
+            .getByRole('button', { name: '查看步骤 2：核对实收与批次' })
             .getAttribute('aria-pressed'),
           'true'
         )

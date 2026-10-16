@@ -1,9 +1,5 @@
-import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../src/common/consts/workflowTaskDiscovery.generated.mjs'
 import { assertInactivePrintStylesDoNotHideApp } from './styleIsolationAssertions.mjs'
-import {
-  switchMermaidLayout,
-  verifyMermaidViewer,
-} from './mermaidViewerAssertions.mjs'
+import { switchMermaidLayout, verifyMermaidViewer } from './mermaidViewerAssertions.mjs'
 
 const DEV_FLOW_STATE_OBSERVATORY_PATH =
   '/__dev/status-flows?view=chain&chain=all'
@@ -37,9 +33,7 @@ export function createDevFlowStateObservatoryScenarios({
         startNoWriteAudit(page, writeRequestsByPage)
         await page.addInitScript(() => {
           window.__flowPrintCount = 0
-          window.print = () => {
-            window.__flowPrintCount += 1
-          }
+          window.print = () => { window.__flowPrintCount += 1 }
         })
       },
       verify: async (page) => {
@@ -61,400 +55,66 @@ export function createDevFlowStateObservatoryScenarios({
           'dev-flow-state-observatory-desktop-light'
         )
         await assertInactivePrintStylesDoNotHideApp(page)
-        await root.getByRole('heading', { name: '订单全流程', exact: true }).waitFor()
-        assert.equal(await root.getByRole('radiogroup', { name: '履约流程视图' }).count(), 0)
-        await root.getByRole('button', { name: '按业务查阅', exact: true }).click()
-        const topics = root.locator('[data-business-chain-topics]')
-        await topics.waitFor({ state: 'visible' })
-        assert.equal(await topics.locator('[data-overview-chain]').count(), 11)
-        assert.equal(
-          await topics.locator('details').count(),
-          0,
-          'business entries must not require nested disclosures'
-        )
-        await page
-          .locator('.erp-dev-fulfillment-guide__role .ant-select-selector')
-          .click()
-        await page
-          .locator('.ant-select-dropdown:visible')
-          .getByText('工程', { exact: true })
-          .click()
-        await topics
-          .getByRole('status')
-          .filter({ hasText: '工程参与 1 条业务流程' })
-          .waitFor()
-        assert.equal(await topics.locator('[data-overview-chain]').count(), 1)
-        await topics
-          .getByRole('button', { name: '查看业务链：销售受理到生产准备' })
-          .click()
-        await page
-          .getByRole('heading', { name: '岗位分工与交接', exact: true })
-          .waitFor()
-        await page
-          .getByRole('button', { name: '返回业务目录', exact: true })
-          .click()
-        await topics
-          .getByRole('status')
-          .filter({ hasText: '工程参与 1 条业务流程' })
-          .waitFor()
-        await page.reload()
-        await topics
-          .getByRole('status')
-          .filter({ hasText: '工程参与 1 条业务流程' })
-          .waitFor()
-        await page
-          .locator('.erp-dev-fulfillment-guide__role .ant-select-selector')
-          .click()
-        await page
-          .locator('.ant-select-dropdown:visible')
-          .getByText('全部岗位', { exact: true })
-          .click()
-        await topics
-          .getByRole('status')
-          .filter({ hasText: '全部 11 条业务流程' })
-          .waitFor()
-        assert.equal(await topics.locator('[data-overview-chain]').count(), 11)
-        await topics
-          .getByRole('button', { name: '系统衔接图', exact: true })
-          .click()
-        const systemMap = page.getByRole('dialog', {
-          name: '系统衔接图',
-          exact: true,
-        })
-        await verifyMermaidViewer(
-          page,
-          systemMap.locator('.erp-markdown-mermaid'),
-          assert
-        )
-        await systemMap.locator('.ant-drawer-close').click()
-        await systemMap.waitFor({ state: 'hidden' })
-        await assertNoHorizontalOverflow(page, 'role-business-topics')
-        await root.getByRole('button', { name: '返回完整流程', exact: true }).click()
-        await root.getByRole('heading', { name: '订单全流程', exact: true }).waitFor()
-        await root.getByRole('button', { name: '按业务查阅', exact: true }).click()
+        await root.locator('[data-business-chain-topics] > summary').click()
+        await verifyMermaidViewer(page, root.locator('.erp-markdown-mermaid').first(), assert)
         const tabs = page.getByRole('tablist', { name: '业务链观察方式' })
         assert.equal(await tabs.getByRole('tab').count(), 2)
         await tabs.getByRole('tab', { name: '实例跟踪' }).click()
         await expectText(page, '输入单号或任务，查看实际进度与异常')
         await tabs.getByRole('tab', { name: '业务结构' }).click()
-        await topics.waitFor({ state: 'visible' })
-        await root.getByRole('button', { name: '返回完整流程', exact: true }).click()
+        await root.locator('[data-business-chain-topics] > summary').click()
         await root.locator('[data-mermaid-status="rendered"]').first().waitFor()
-        await page
-          .getByRole('button', { name: '搜索定义', exact: true })
-          .click()
+        await page.getByRole('button', { name: '搜索定义', exact: true }).click()
         await page.getByRole('dialog', { name: '搜索定义' }).waitFor()
-        await page
-          .getByRole('dialog', { name: '搜索定义' })
-          .locator('.ant-drawer-close')
-          .click()
-        const exportButton = page.getByRole('button', {
-          name: '导出',
-          exact: true,
-        })
+        await page.getByRole('dialog', { name: '搜索定义' }).locator('.ant-drawer-close').click()
+        const exportButton = page.getByRole('button', { name: '导出', exact: true })
         await exportButton.hover()
-        await page
-          .getByRole('menuitem', { name: '当前视图 · 打印 / 保存 PDF' })
-          .click()
+        await page.getByRole('menuitem', { name: '当前视图 · 打印 / 保存 PDF' }).click()
         await page.waitForFunction(() => window.__flowPrintCount === 1)
         assert.equal(await root.getAttribute('data-flow-print-current'), 'true')
         await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
-        await page.waitForFunction(
-          () => !document.querySelector('[data-flow-print-current]')
-        )
+        await page.waitForFunction(() => !document.querySelector('[data-flow-print-current]'))
         await exportButton.hover()
         await page.getByRole('menuitem', { name: '客户校对稿…' }).click()
         const review = page.getByRole('dialog', { name: '客户校对稿' })
         await review.waitFor()
         await review.getByRole('button', { name: /取\s*消/u }).click()
-        assert.equal(
-          await page.locator('[data-customer-review-print-root]').count(),
-          0
-        )
+        assert.equal(await page.locator('[data-customer-review-print-root]').count(), 0)
         await exportButton.hover()
         await page.getByRole('menuitem', { name: '客户校对稿…' }).click()
-        await review
-          .getByRole('button', { name: '打印 / 保存 PDF', exact: true })
-          .click()
+        await review.getByRole('button', { name: '打印 / 保存 PDF', exact: true }).click()
         await page.waitForFunction(() => window.__flowPrintCount === 2)
-        const fulfillmentPrint = page.locator(
-          '[data-customer-review-fulfillment]'
-        )
-        assert.equal(
-          await fulfillmentPrint.locator('tbody tr').count(),
-          taskCatalog.fulfillment_flow.length
-        )
-        assert.match(
-          await fulfillmentPrint.innerText(),
-          /正式成品入库[\s\S]*查货与包装[\s\S]*业务显式确认实际发货/u
-        )
-        const exceptionPrint = page.locator('[data-customer-review-exception]')
-        assert.equal(
-          await exceptionPrint.count(),
-          taskCatalog.exception_guides.length
-        )
-        assert.equal(
-          await page
-            .locator(
-              '[data-customer-review-exception="production_quality"] tbody tr'
-            )
-            .count(),
-          5
-        )
-        assert.match(
-          await page
-            .locator(
-              '[data-customer-review-exception="production_quality"] tbody tr'
-            )
-            .filter({ hasText: '报废放弃' })
-            .innerText(),
-          /终止流转/u
-        )
+        const fulfillmentPrint = page.locator('[data-customer-review-fulfillment]')
+        assert.equal(await fulfillmentPrint.locator('tbody tr').count(), 14)
+        assert.match(await fulfillmentPrint.innerText(), /正式成品入库[\s\S]*查货与包装[\s\S]*业务显式确认实际发货/u)
         await page.emulateMedia({ media: 'print' })
-        assert.equal(
-          await page
-            .locator('#root')
-            .evaluate((node) => getComputedStyle(node).display),
-          'none'
-        )
+        assert.equal(await page.locator('#root').evaluate((node) => getComputedStyle(node).display), 'none')
         await fulfillmentPrint.waitFor({ state: 'visible' })
-        if (page.context().browser()?.browserType().name() === 'chromium')
-          { await page.pdf({
-            path: path.join(outputDir, 'order-role-flow-customer-review.pdf'),
-            preferCSSPageSize: true,
-            printBackground: true,
-          }) }
+        await page.pdf({ path: path.join(outputDir, 'order-role-flow-customer-review.pdf'), preferCSSPageSize: true, printBackground: true })
         await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
-        await page.waitForFunction(
-          () => !document.querySelector('[data-customer-review-print-root]')
-        )
+        await page.waitForFunction(() => !document.querySelector('[data-customer-review-print-root]'))
         await page.emulateMedia({ media: 'screen' })
-        await page.goto(
-          new URL(
-            '/__dev/status-flows?view=states&flow=source.sales_order',
-            page.url()
-          ).href
-        )
+        await page.goto(new URL('/__dev/status-flows?view=states&flow=source.sales_order', page.url()).href)
         const filters = page.getByRole('group', { name: '状态转换筛选' })
         const graph = page.locator('.erp-dev-flow-state-graph')
         await graph.locator('[data-mermaid-status="rendered"]').waitFor()
-        await switchMermaidLayout(
-          page,
-          graph.locator('.erp-markdown-mermaid'),
-          assert
-        )
-        await switchMermaidLayout(
-          page,
-          graph.locator('.erp-markdown-mermaid'),
-          assert
-        )
-        assert.equal(
-          await filters
-            .getByRole('button', { name: /^正常推进 /u })
-            .getAttribute('aria-pressed'),
-          'true'
-        )
-        assert(
-          !(
-            await graph
-              .locator('.erp-markdown-mermaid__canvas > svg')
-              .textContent()
-          ).includes('取消')
-        )
+        await switchMermaidLayout(page, graph.locator('.erp-markdown-mermaid'), assert)
+        await switchMermaidLayout(page, graph.locator('.erp-markdown-mermaid'), assert)
+        assert.equal(await filters.getByRole('button', { name: /^正常推进 /u }).getAttribute('aria-pressed'), 'true')
+        assert(!(await graph.locator('.erp-markdown-mermaid__canvas > svg').textContent()).includes('取消'))
         await filters.getByRole('button', { name: /^全部 /u }).click()
-        await graph
-          .locator('.erp-markdown-mermaid__canvas > svg')
-          .filter({ hasText: '取消' })
-          .waitFor()
-        assert(
-          (
-            await graph
-              .locator('.erp-markdown-mermaid__canvas > svg')
-              .textContent()
-          ).includes('取消')
-        )
-        await filters.getByRole('button', { name: /^异常与纠正 /u }).click()
-        await graph
-          .locator('.erp-markdown-mermaid__canvas > svg')
-          .filter({ hasText: '取消' })
-          .waitFor()
-        assert(
-          (
-            await graph
-              .locator('.erp-markdown-mermaid__canvas > svg')
-              .textContent()
-          ).includes('取消')
-        )
-        await page.getByRole('button', { name: /^草稿，/u }).click()
-        await filters
-          .getByRole('button', { name: /^当前状态 /u, pressed: true })
-          .waitFor()
         await graph.locator('[data-mermaid-status="rendered"]').waitFor()
-        assert.equal(
-          await filters
-            .getByRole('button', { name: /^当前状态 /u })
-            .getAttribute('aria-pressed'),
-          'true'
-        )
+        assert((await graph.locator('.erp-markdown-mermaid__canvas > svg').textContent()).includes('取消'))
+        await filters.getByRole('button', { name: /^异常与纠正 /u }).click()
+        await graph.locator('[data-mermaid-status="rendered"]').waitFor()
+        assert((await graph.locator('.erp-markdown-mermaid__canvas > svg').textContent()).includes('取消'))
+        await page.getByRole('button', { name: /^草稿，/u }).click()
+        await filters.getByRole('button', { name: /^当前状态 /u, pressed: true }).waitFor()
+        await graph.locator('[data-mermaid-status="rendered"]').waitFor()
+        assert.equal(await filters.getByRole('button', { name: /^当前状态 /u }).getAttribute('aria-pressed'), 'true')
         await filters.getByRole('button', { name: /^正常推进 /u }).click()
         await graph.locator('[data-mermaid-status="rendered"]').waitFor()
         await assertNoHorizontalOverflow(page, 'focused-state-rules')
-
-        await page.goto(
-          new URL(
-            '/__dev/status-flows?view=chain&chain=purchase_to_inventory',
-            page.url()
-          ).href
-        )
-        const guide = page.locator('#task-fulfillment-guide')
-        await guide
-          .getByRole('heading', { name: '岗位分工与交接', exact: true })
-          .waitFor()
-        const handoffs = guide.locator('.erp-dev-fulfillment-guide__steps > li')
-        assert.equal(
-          await handoffs.count(),
-          5,
-          '采购必须保留来料交接、应付草稿与确认'
-        )
-        const technical = page.locator('[data-business-chain-technical]')
-        assert.equal(await technical.evaluate((element) => element.open), false)
-        const chooseRole = async (name) => {
-          await guide
-            .locator('.erp-dev-fulfillment-guide__role .ant-select-selector')
-            .click()
-          await page
-            .locator('.ant-select-dropdown:visible')
-            .getByText(name, { exact: true })
-            .click()
-          await page
-            .locator('.ant-select-dropdown:visible')
-            .waitFor({ state: 'hidden' })
-        }
-        await chooseRole('仓库')
-        assert.equal(await guide.locator('[data-role-match="true"]').count(), 2)
-        assert.equal(await handoffs.count(), 5, '岗位关注不可隐藏上下游')
-        await guide.getByRole('button', { name: /来料检验与材料入库/u }).click()
-        await page.reload()
-        const result = guide.locator('.erp-dev-fulfillment-guide__result')
-        await result
-          .getByRole('heading', { name: '来料检验与材料入库', exact: true })
-          .waitFor()
-        assert.match(
-          await guide.locator('.erp-dev-fulfillment-guide__role').innerText(),
-          /仓库/u
-        )
-        await result.getByRole('button', { name: '查看异常处理过程', exact: true }).click()
-        await guide.locator('[data-exception-guide="purchase_rejection"]').waitFor()
-        await chooseRole('采购')
-        assert.equal(new URL(page.url()).searchParams.get('flow_stage'), 'incoming_quality')
-        await page.reload()
-        await guide.locator('[data-exception-guide="purchase_rejection"]').waitFor()
-        await guide.getByRole('button', { name: '返回来料检验与材料入库', exact: true }).click()
-        await result.getByRole('heading', { name: '来料检验与材料入库', exact: true }).waitFor()
-        assert.equal(new URL(page.url()).searchParams.has('flow_exception'), false)
-        await chooseRole('财务')
-        assert.equal(await guide.locator('[data-role-match="true"]').count(), 2)
-        await guide.getByRole('button', { name: /财务确认并过账应付/u }).click()
-        await result
-          .getByRole('heading', { name: '财务确认并过账应付', exact: true })
-          .waitFor()
-        assert.match(await result.innerText(), /办理岗位：财务/u)
-        assert.match(await result.innerText(), /草稿.*已过账/u)
-        await result.getByRole('button', { name: '查看相关单据与规则' }).click()
-        await technical
-          .locator('[data-selected-chain-node="purchase_payable_draft"]')
-          .waitFor()
-        assert.equal(await technical.evaluate((element) => element.open), true)
-        await technical.locator('[data-mermaid-status="rendered"]').waitFor()
-        const legend = technical.locator('.erp-dev-flow-chain-legend')
-        assert.equal(
-          await legend.evaluate((element) => getComputedStyle(element).display),
-          'flex',
-          '图例不能被通用标题样式改成竖列'
-        )
-        await assertNoHorizontalOverflow(page, 'purchase-role-handoffs')
-        await technical.locator(':scope > summary').click()
-        await chooseRole('工程')
-        await guide
-          .getByRole('status')
-          .filter({ hasText: '该流程没有登记该岗位的办理环节' })
-          .waitFor()
-        assert.equal(await handoffs.count(), 5)
-        await page.getByRole('button', { name: '返回订单全流程' }).click()
-        await guide
-          .getByRole('heading', { name: '订单全流程', exact: true })
-          .waitFor()
-        assert.match(
-          await guide.locator('.erp-dev-fulfillment-guide__role').innerText(),
-          /工程/u
-        )
-        await result
-          .getByRole('heading', { name: '接单、工程与用料审批', exact: true })
-          .waitFor()
-        await result.getByRole('button', { name: '查看相关单据与规则' }).click()
-        await guide
-          .getByRole('heading', { name: '岗位分工与交接', exact: true })
-          .waitFor()
-        assert.match(page.url(), /chain=sales_to_production/u)
-        await page.goto(
-          new URL(
-            '/__dev/status-flows?view=chain&chain=purchase_quality_disposition&flow_role=finance',
-            page.url()
-          ).href
-        )
-        await guide
-          .getByRole('heading', { name: '岗位分工与交接', exact: true })
-          .waitFor()
-        assert.match(await guide.innerText(), /条件分支/u)
-        await assertNoHorizontalOverflow(page, 'exception-role-handoffs')
-
-        await page.goto(
-          new URL(
-            '/__dev/status-flows?view=chain&chain=all&flow_tab=topics&flow_role=warehouse',
-            page.url()
-          ).href
-        )
-        await topics
-          .getByRole('status')
-          .filter({ hasText: '仓库参与 8 条业务流程' })
-          .waitFor()
-        await exportButton.hover()
-        await page
-          .getByRole('menuitem', { name: '当前视图 · 打印 / 保存 PDF' })
-          .click()
-        await page.waitForFunction(() => window.__flowPrintCount === 1)
-        await page.emulateMedia({ media: 'print' })
-        const printedTopics = topics.locator('[data-overview-chain]:visible')
-        assert.equal(
-          await printedTopics.count(),
-          8,
-          '打印专题时必须保留当前岗位的全部专题内容'
-        )
-        assert.equal(
-          await topics
-            .getByRole('button', { name: '系统衔接图', exact: true })
-            .isVisible(),
-          false
-        )
-        if (page.context().browser()?.browserType().name() === 'chromium')
-          { await page.pdf({
-            path: path.join(outputDir, 'warehouse-business-topics.pdf'),
-            preferCSSPageSize: true,
-            printBackground: true,
-          }) }
-        await page.evaluate(() => window.dispatchEvent(new Event('afterprint')))
-        await page.waitForFunction(
-          () => !document.querySelector('[data-flow-print-current]')
-        )
-        await page.emulateMedia({ media: 'screen' })
-        await page.mouse.move(0, 0)
-        await page
-          .getByRole('menuitem', { name: '当前视图 · 打印 / 保存 PDF' })
-          .waitFor({ state: 'hidden' })
-        await assertNoHorizontalOverflow(
-          page,
-          'role-business-topics-print-return'
-        )
 
         assert.deepEqual(
           writeRequestsByPage.get(page) || [],

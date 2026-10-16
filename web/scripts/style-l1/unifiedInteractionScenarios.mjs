@@ -2,7 +2,6 @@ import { assertProductionRecordTabMotion, createProductionTabStabilityScenarios 
 import { currentBusinessDate } from '../../src/erp/utils/businessDate.mjs'
 import { moveBusinessDate } from '../../src/erp/utils/businessVisualizationModels.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
-import { expectHeading } from './pageAssertions.mjs'
 import {
   assertBusinessViewMotion,
   captureBusinessView,
@@ -118,7 +117,9 @@ export function createUnifiedInteractionScenarios({
       name: 'unified-inventory-distribution-details',
       path: '/erp/warehouse/inventory?view=balances',
       verify: async (page) => {
-        await expectHeading(page, '库存台账')
+        await page
+          .getByRole('heading', { name: '库存台账', exact: true })
+          .waitFor()
         await assertBusinessViewMotion(
           page,
           'inventory-distribution',

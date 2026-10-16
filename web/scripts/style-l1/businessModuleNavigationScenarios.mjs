@@ -129,20 +129,18 @@ export function createBusinessModuleNavigationScenarios({
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         const search = () => page.locator('.erp-admin-outlet input.ant-input').first()
-        await moduleTabs(page).getByRole('tab', { name: firstHeading, exact: true, selected: true }).waitFor()
+        await page.getByRole('heading', { name: firstHeading, exact: true }).waitFor()
         assert.deepEqual(await moduleTabs(page).getByRole('tab').allTextContents(), labels)
-        const moduleName = { master: '基础资料', engineering: '产品工程', warehouse: '库存管理' }[key]
-        assert.equal(await page.locator('.erp-business-module-header').getByRole('heading', { name: moduleName, exact: true }).count(), 1)
         await search().fill(`${key}第一页面查询`)
         await switchTab(page, labels[1])
-        await moduleTabs(page).getByRole('tab', { name: secondHeading, exact: true, selected: true }).waitFor()
+        await page.getByRole('heading', { name: secondHeading, exact: true }).waitFor()
         assert.equal(await search().inputValue(), '')
         await search().fill(`${key}第二页面查询`)
         await switchTab(page, labels[0])
-        await moduleTabs(page).getByRole('tab', { name: firstHeading, exact: true, selected: true }).waitFor()
+        await page.getByRole('heading', { name: firstHeading, exact: true }).waitFor()
         assert.equal(await search().inputValue(), `${key}第一页面查询`)
         await verifyModuleMotion(page, labels[1])
-        await moduleTabs(page).getByRole('tab', { name: secondHeading, exact: true, selected: true }).waitFor()
+        await page.getByRole('heading', { name: secondHeading, exact: true }).waitFor()
         assert.equal(await search().inputValue(), `${key}第二页面查询`)
         await verifyModuleMotion(page, labels[0], true)
         await assertNoHorizontalOverflow(page)
@@ -166,7 +164,7 @@ export function createBusinessModuleNavigationScenarios({
         menus: ['/erp/master/materials'],
       },
       verify: async (page) => {
-        await moduleTabs(page).getByRole('tab', { name: '材料档案', exact: true, selected: true }).waitFor()
+        await page.getByRole('heading', { name: '材料档案', exact: true }).waitFor()
         assert.deepEqual(await moduleTabs(page).getByRole('tab').allTextContents(), ['材料档案'])
         const menu = page.locator('.erp-admin-sider .erp-admin-menu')
         assert.equal(await menu.getByRole('menuitem').filter({ hasText: /^基础资料$/u }).count(), 1)
@@ -178,7 +176,7 @@ export function createBusinessModuleNavigationScenarios({
         await page.keyboard.press('Escape')
         await page.goto(new URL('/erp/master/partners/customers', page.url()).href)
         await page.waitForURL('**/erp/master/materials')
-        await moduleTabs(page).getByRole('tab', { name: '材料档案', exact: true, selected: true }).waitFor()
+        await page.getByRole('heading', { name: '材料档案', exact: true }).waitFor()
       },
     },
     ...['light', 'dark'].map((themeMode) => ({
@@ -551,8 +549,8 @@ export function createBusinessModuleNavigationScenarios({
         )
         await search.fill('出货导航查询')
         await switchTab(page, '库存预留')
-        await moduleTabs(page)
-          .getByRole('tab', { name: '库存预留', exact: true, selected: true })
+        await page
+          .getByRole('heading', { name: '库存预留', exact: true })
           .waitFor()
         assert.equal(
           await page
@@ -561,8 +559,8 @@ export function createBusinessModuleNavigationScenarios({
           0
         )
         await switchTab(page, '放行审批')
-        await moduleTabs(page)
-          .getByRole('tab', { name: '放行审批', exact: true, selected: true })
+        await page
+          .getByRole('heading', { name: '出货放行', exact: true })
           .waitFor()
         const approvalSearch = page.getByRole('textbox', {
           name: '搜索待办任务', exact: true,

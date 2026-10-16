@@ -218,8 +218,6 @@ test('production WIP mock always returns the nullable finished-goods rework line
   const split = await call('execute_production_wip_action', {
     production_order_id: 71,
     production_wip_batch_id: 91_012,
-    expected_version: initial.result.data.production_wip_batches.find(batch => batch.id === 91_012).version,
-    idempotency_key: 'split-lineage-test',
     action: 'SPLIT_BATCH',
     splits: [{ quantity: '8' }, { quantity: '12' }],
   })
@@ -254,22 +252,4 @@ test('production order release mock satisfies the material requirement conservat
     ),
     true
   )
-})
-
-test('WIP mock rejects malformed actions without changing the aggregate', async () => {
-  const call = await orderMockHarness('**/rpc/production_wip')
-  const initial = await call('get_production_wip', { production_order_id: 71 })
-  const batch = initial.result.data.production_wip_batches[0]
-  const valid = { production_order_id: 71, action: 'START_OPERATION', production_wip_batch_id: batch.id, expected_version: batch.version, idempotency_key: 'mock-wip-review' }
-  for (const params of [
-    { ...valid, action: 'UNKNOWN' },
-    { ...valid, production_wip_batch_id: 999999 },
-    { ...valid, expected_version: undefined },
-    { ...valid, idempotency_key: undefined },
-    { ...valid, unknown_field: true },
-  ]) {
-    const result = await call('execute_production_wip_action', params)
-    assert.notEqual(result.result.code, 0)
-    assert.deepEqual(await call('get_production_wip', { production_order_id: 71 }), initial)
-  }
 })

@@ -5,13 +5,6 @@ export async function assertMobileBackToTop(
   scroll,
   { screenshotPath, keyboard = false } = {}
 ) {
-  // 等待打开分组后的定位效果落定，再测量独立的回顶滚动；不能与页面的定位帧竞争。
-  await page.evaluate(
-    () =>
-      new Promise((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(resolve))
-      )
-  )
   const button = scroll.locator('..').getByTestId('mobile-back-to-top')
   const focused = await page.evaluateHandle(() => document.activeElement)
   const before = await scroll.evaluate((node) => {
@@ -21,19 +14,13 @@ export async function assertMobileBackToTop(
     return { top, maximum: node.scrollHeight - node.clientHeight }
   })
   const restore = async () => {
-    await scroll.evaluate((node, top) => {
-      node.scrollTop = top
-    }, before.top)
-    await focused.evaluate((node) => {
-      if (node?.isConnected) node.focus({ preventScroll: true })
-    })
+    await scroll.evaluate((node, top) => { node.scrollTop = top }, before.top)
+    await focused.evaluate((node) => { if (node?.isConnected) node.focus({ preventScroll: true }) })
     await focused.dispose()
   }
   await button.waitFor({ state: 'hidden' })
   if (before.maximum < 280) {
-    await scroll.evaluate((node) => {
-      node.scrollTop = node.scrollHeight
-    })
+    await scroll.evaluate((node) => { node.scrollTop = node.scrollHeight })
     await page.waitForTimeout(50)
     assert.equal(await button.count(), 0, '短内容滚到底部也保持隐藏')
     await restore()
@@ -48,11 +35,7 @@ export async function assertMobileBackToTop(
     node.scrollTop = 279
   })
   await page.waitForTimeout(50)
-  assert.equal(
-    await button.count(),
-    0,
-    `未达到回顶距离时保持隐藏: ${JSON.stringify(await scroll.evaluate((node) => ({ top: node.scrollTop, height: node.scrollHeight, client: node.clientHeight, focus: document.activeElement?.tagName })))}`
-  )
+  assert.equal(await button.count(), 0, '未达到回顶距离时保持隐藏')
   await scroll.evaluate((node) => {
     node.scrollTop = 280
   })

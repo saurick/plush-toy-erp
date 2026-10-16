@@ -180,59 +180,29 @@ export function containsGreenDominantColor(value) {
   return false
 }
 
-export function getContrastRatio(
-  foreground,
-  background,
-  canvas = [255, 255, 255]
-) {
-  const composite = (color, surface) =>
-    color
-      .slice(0, 3)
-      .map(
-        (channel, index) =>
-          channel * (color[3] ?? 1) + surface[index] * (1 - (color[3] ?? 1))
-      )
-  const resolvedBackground = composite(background, canvas)
-  const resolvedForeground = composite(foreground, resolvedBackground)
-  const lighter = Math.max(
-    getLuminance(resolvedForeground),
-    getLuminance(resolvedBackground)
-  )
-  const darker = Math.min(
-    getLuminance(resolvedForeground),
-    getLuminance(resolvedBackground)
-  )
+export function getContrastRatio(foreground, background) {
+  const lighter = Math.max(getLuminance(foreground), getLuminance(background))
+  const darker = Math.min(getLuminance(foreground), getLuminance(background))
   return (lighter + 0.05) / (darker + 0.05)
 }
 
 export function parseRgb(value) {
   const hex = String(value || '').match(/^#([0-9a-f]{6})$/i)
   if (hex) {
-    return [
-      ...[0, 2, 4].map((offset) =>
-        parseInt(hex[1].slice(offset, offset + 2), 16)
-      ),
-      1,
-    ]
+    return [0, 2, 4].map((offset) =>
+      parseInt(hex[1].slice(offset, offset + 2), 16)
+    )
   }
   const srgb = String(value || '').match(
-    /^color\(srgb\s+([.\d]+)\s+([.\d]+)\s+([.\d]+)(?:\s*\/\s*([.\d]+))?\)/
+    /^color\(srgb\s+([.\d]+)\s+([.\d]+)\s+([.\d]+)/
   )
-  if (srgb)
-    { return [
-      ...srgb.slice(1, 4).map((channel) => Number(channel) * 255),
-      srgb[4] === undefined ? 1 : Number(srgb[4]),
-    ] }
+  if (srgb) return srgb.slice(1).map((channel) => Number(channel) * 255)
   const match = String(value || '').match(
     /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([0-9.]+))?\)/
   )
   if (!match) return null
-  return [
-    Number(match[1]),
-    Number(match[2]),
-    Number(match[3]),
-    match[4] === undefined ? 1 : Number(match[4]),
-  ]
+  if (match[4] !== undefined && Number(match[4]) === 0) return null
+  return [Number(match[1]), Number(match[2]), Number(match[3])]
 }
 
 export function getLuminance([red, green, blue]) {

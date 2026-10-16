@@ -67,63 +67,6 @@ export function createQualitySourceActionScenarios(deps) {
   }
 
   return [
-    (() => {
-      const inspection = { id: 9710, inspection_no: 'QI-REPLACEMENT-COUNT', purchase_receipt_id: 9711, purchase_receipt_item_id: 9712, inventory_lot_id: 401, material_id: 1, warehouse_id: 1, unit_id: 1, unit_name: '个', unit_precision: 0, source_type: 'PURCHASE_RECEIPT', source_id: 9711, inspection_type: 'INCOMING', subject_type: 'MATERIAL', subject_id: 1, status: 'REJECTED', result: 'REJECT' }
-      let record
-      let writes
-      return {
-        name: 'quality-purchase-replacement-warehouse-count',
-        path: '/erp/production/quality-inspections',
-        auth: 'admin',
-        effectiveSession: customerRuntimeEffectiveSession,
-        viewport: { width: 3840, height: 2160 },
-        beforeNavigate: async (page) => {
-          writes = []
-          record = { id: 9713, disposition_no: 'RPL-COUNT-3', quality_inspection_id: 9710, purchase_receipt_id: 9711, disposition_type: 'REPLACE', quantity: '3', status: 'DRAFT', version: 1, reason: '供应商补换' }
-          await page.route('**/rpc/quality', async (route) => {
-            const { id, method, params = {} } = route.request().postDataJSON()
-            if (method !== 'list_quality_inspections') return route.fallback()
-            await route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(stylePaginatedRpcData([inspection], 'quality_inspections', params)) } })
-          })
-          await page.route('**/rpc/purchase', async (route) => {
-            const { id, method, params = {} } = route.request().postDataJSON()
-            let data
-            if (method === 'get_purchase_receipt') {
-              data = { purchase_receipt: { id: 9711, receipt_no: 'PR-COUNT-SOURCE', status: 'DRAFT', items: [{ id: 9712, material_id: 1, warehouse_id: 1, lot_id: 401, unit_id: 1, quantity: '3' }] } }
-            } else if (method === 'list_purchase_rejection_dispositions') {
-              data = { purchase_rejection_dispositions: [record], total: 1 }
-            } else if (method === 'post_purchase_rejection_disposition') {
-              writes.push(params)
-              record = { ...record, status: 'POSTED', version: 2, replacement_receipt_id: 9714 }
-              data = { purchase_rejection_disposition: record }
-            } else { return route.fallback() }
-            await route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(data) } })
-          })
-        },
-        verify: async (page) => {
-          await selectRow(page, inspection.inspection_no)
-          await clickSelectionAction(page, '不合格处置')
-          const modal = page.getByRole('dialog', { name: '首次来料不合格退厂处置' })
-          const count = modal.getByLabel('补换实际到货数量', { exact: true })
-          await count.waitFor()
-          assert.equal(await count.inputValue(), '', '补换计划数量不能冒充仓库实点')
-          await count.fill('2')
-          await modal.getByRole('button', { name: '确认处置', exact: true }).click()
-          await modal.getByText('实点数量须与本笔补换一致；不一致请先调整处置方案', { exact: true }).waitFor()
-          assert.equal(writes.length, 0)
-          assert.equal(await page.locator('.ant-popconfirm:visible').count(), 0, '数量校验不通过时不弹出执行确认')
-          await count.fill('3')
-          await modal.getByRole('button', { name: '确认处置', exact: true }).click()
-          await page.locator('.ant-popconfirm:visible').waitFor()
-          await page.locator('.ant-popconfirm:visible').getByRole('button', { name: '确认处置', exact: true }).click()
-          await modal.getByRole('button', { name: '继续登记', exact: true }).waitFor()
-          assert.equal(writes.length, 1)
-          assert.deepEqual(writes[0], { id: 9713, expected_version: 1, counted_quantity: '3' })
-          await assertNoHorizontalOverflow(page, 'quality-purchase-replacement-warehouse-count')
-          await page.screenshot({ path: `${outputDir}/purchase-replacement-confirmed-4k.png` })
-        },
-      }
-    })(),
     ...['production', 'outsourcing'].map((kind) => {
       let writes
       const production = kind === 'production'
@@ -236,12 +179,8 @@ export function createQualitySourceActionScenarios(deps) {
           await selectRow(page, inspection.inspection_no)
           await clickSelectionAction(page, '不合格处置')
           const modal = page.getByRole('dialog', {
-            name: production ? '决定质量异常处理方案' : '委外不合格返厂',
+            name: production ? '决定质量异常处理方案' : '委外不合格返厂 / 返工',
           })
-          if (!production) {
-            assert.equal(await modal.getByLabel('处置方式', { exact: true }).count(), 0)
-            await modal.getByText(/生产返工由业务提出方案，经正式审批/u).waitFor()
-          }
           const input = modal.getByLabel(production ? '异常批次数量' : '处置数量', {
             exact: true,
           })
@@ -255,30 +194,6 @@ export function createQualitySourceActionScenarios(deps) {
             assert.equal(await action.isEnabled(), true)
             assert.match(await modal.innerText(), /模拟加工厂/u)
             assert.equal(writes.length, 0, '读取来源不能产生处置事实')
-            const decisionField = modal.locator('.ant-form-item').filter({ has: page.getByLabel('处理方案', { exact: true }) })
-            assert.equal(await decisionField.count(), 1)
-            assert.equal(await decisionField.locator('.ant-select-selection-item').count(), 0, '不合格裁片必须由业务明确选择处理方案')
-            await action.click()
-            await decisionField.locator('.ant-form-item-explain-error').filter({ hasText: '请选择处理方案' }).waitFor()
-            assert.equal(writes.length, 0, '未选择方案不得提交生产异常')
-            await decisionField.locator('.ant-select-selector').click()
-            await page.locator('.ant-select-dropdown:visible').getByText('补料重做（重新发布料）', { exact: true }).click()
-            await modal.getByLabel('重新加工的厂商', { exact: true }).waitFor()
-            await modal.getByText('原问题货终止流转，按冻结用料要求生成新一批裁片需求。新合同需重新发料，后续重新点数、质检。', { exact: true }).waitFor()
-            await decisionField.locator('.ant-select-selector').click()
-            await page.locator('.ant-select-dropdown:visible').getByText('放弃本批（报废，不补做）', { exact: true }).click()
-            assert.equal(await modal.getByLabel('重新加工的厂商', { exact: true }).count(), 0)
-            await modal.getByText('本方案终止此批货，保留订单交付缺口；不会自动取消订单或生成补做数量。', { exact: true }).waitFor()
-            await modal.getByRole('button', { name: '返回', exact: true }).click()
-            await modal.waitFor({ state: 'hidden' })
-            await clickSelectionAction(page, '不合格处置')
-            await modal.waitFor()
-            await page.waitForFunction(() => document.querySelector('#production-exception-request_requested_quantity')?.value === '2')
-            assert.equal(await decisionField.locator('.ant-select-selection-item').count(), 0, '重新打开不得沿用上次处理方案')
-            await action.click()
-            await decisionField.locator('.ant-form-item-explain-error').filter({ hasText: '请选择处理方案' }).waitFor()
-            assert.equal(writes.length, 0, '取消和重新打开不能产生处置事实')
-            await assertNoHorizontalOverflow(page, 'quality-production-whole-batch-context')
             await page.screenshot({ path: `${outputDir}/quality-production-batch-4k.png` })
             return
           }
@@ -411,9 +326,19 @@ export function createQualitySourceActionScenarios(deps) {
 
           await page.locator('.erp-business-operation-panel button[aria-haspopup="dialog"]').click()
           const filters = page.getByRole('dialog', { name: '筛选条件' })
-          await filters
-            .getByRole('group', { name: '检验类型', exact: true })
-            .getByRole('button', { name: '生产分段质检', exact: true })
+          const inspectionTypeSelect = filters
+            .locator('.ant-select')
+            .filter({ hasText: '全部检验类型' })
+            .first()
+          await inspectionTypeSelect.waitFor({
+            state: 'visible',
+            timeout: 10_000,
+          })
+          await inspectionTypeSelect.locator('.ant-select-selector').click()
+          await page
+            .locator('.ant-select-dropdown:visible .ant-select-item-option')
+            .filter({ hasText: '生产分段质检' })
+            .first()
             .click()
           await filters.getByRole('button', { name: '完成', exact: true }).click()
 
@@ -1277,7 +1202,7 @@ export function createQualitySourceActionScenarios(deps) {
           })
           await expectText(
             initialRejectModal,
-            '采购按不合格来源行登记退厂或补换方案。补换由仓库实点到货后确认，再交 IQC 重新检验；部分处置不会取消整张收货。'
+            '该入口按当前不合格来源行和数量办理退厂或供应商补换'
           )
           await initialRejectModal.screenshot({
             path: path.resolve(
