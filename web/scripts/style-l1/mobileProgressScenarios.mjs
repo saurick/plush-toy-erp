@@ -12,6 +12,8 @@ import {
 } from './controlAffordanceAssertions.mjs'
 import { progressFixtureData } from './businessProgressFixtures.mjs'
 import { assertMobileFilterOutsideDismissal } from './mobileFilterPopoverAssertions.mjs'
+import { createMobileFilterScrollScenarios } from './mobileFilterScrollScenarios.mjs'
+import { assertMobileFilterConsistency } from './mobileFilterConsistencyAssertions.mjs'
 
 async function assertMobileDetailSurface(root, assert) {
   await root.locator('.mobile-task-flow-back').click({ trial: true })
@@ -67,7 +69,7 @@ export function createMobileProgressScenarios({
   customerRuntimeEffectiveSession,
   outputDir,
 }) {
-  return ['boss', 'pmc', 'warehouse'].map((role) => {
+  const scenarios = ['boss', 'pmc', 'warehouse'].map((role) => {
     let fail = false
     let failDetail = false
     let longDetail = false
@@ -352,7 +354,7 @@ export function createMobileProgressScenarios({
                 (item) => item.getAttribute('aria-label')?.split('，')[0]
               )
             ),
-          allowed ? ['进度', '任务管理', '风险', '我的'] : ['任务', '风险', '我的']
+          allowed ? ['进度', '任务管理', '风险', '我的'] : ['任务管理', '风险', '我的']
         )
         if (!allowed) {
           assert.equal(calls.length, 0)
@@ -697,7 +699,7 @@ export function createMobileProgressScenarios({
         await singleEntry.waitFor()
         assert.equal(
           await page.evaluate(
-            () => window.history.state.mobileProgress.query.risk
+            () => window.history.state.mobileProgress.query.due_status
           ),
           'due_soon'
         )
@@ -717,7 +719,7 @@ export function createMobileProgressScenarios({
         hideTaskAccess = false
         await pullToRefresh(page, panel.locator('.mobile-progress-scroll'))
         await singleEntry.waitFor()
-        await panel.getByRole('button', { name: /在执行/ }).click()
+        await panel.getByRole('button', { name: /^不限交期/ }).click()
         await panel
           .getByRole('button', { name: '清除搜索', exact: true })
           .click()
@@ -1261,6 +1263,7 @@ export function createMobileProgressScenarios({
           name: '筛选进度',
           exact: true,
         })
+        await panel.getByLabel('搜索进度').focus()
         await assertMobileFilterOutsideDismissal({
           page,
           assert,
@@ -1291,21 +1294,26 @@ export function createMobileProgressScenarios({
         assert.equal(
           await filterPanel.locator('.ant-picker, input[type="date"]').count(),
           0,
-          '移动进度不显示精确日期输入'
+          '移动进度通过独立日期窗口选择，不使用两个小日期输入框'
         )
         await page.setViewportSize({ width: 320, height: 568 })
         await page.waitForTimeout(200)
         const narrowFilter = await page
           .locator('.mobile-filter-popover')
-          .evaluate((node) => ({
-            viewportHeight: document.documentElement.clientHeight,
-            viewportWidth: document.documentElement.clientWidth,
-            scrollWidth: document.documentElement.scrollWidth,
-            bounds: node.getBoundingClientRect().toJSON(),
-            panelHeight: node
-              .querySelector('.mobile-filter-panel')
-              .getBoundingClientRect().height,
-          }))
+          .evaluate((node) => {
+            const panel = node.querySelector('.mobile-filter-panel')
+            const rect = (element) => element.getBoundingClientRect().toJSON()
+            return {
+              viewportHeight: document.documentElement.clientHeight,
+              viewportWidth: document.documentElement.clientWidth,
+              scrollWidth: document.documentElement.scrollWidth,
+              bounds: rect(node),
+              panel: rect(panel),
+              header: rect(panel.querySelector('header')),
+              footer: rect(panel.querySelector('footer')),
+              fields: rect(panel.querySelector('.mobile-filter-fields')),
+            }
+          })
         assert(
           narrowFilter.scrollWidth <= 320 &&
             narrowFilter.bounds.x >= 0 &&
@@ -1314,9 +1322,26 @@ export function createMobileProgressScenarios({
               narrowFilter.viewportWidth + 1 &&
             narrowFilter.bounds.y + narrowFilter.bounds.height <=
               narrowFilter.viewportHeight + 1 &&
-            narrowFilter.panelHeight <= narrowFilter.viewportHeight * 0.52 + 2,
+            narrowFilter.panel.top >= 11 &&
+            narrowFilter.panel.bottom <= narrowFilter.viewportHeight - 11 &&
+            narrowFilter.header.top >= narrowFilter.panel.top &&
+            narrowFilter.footer.bottom <= narrowFilter.panel.bottom &&
+            narrowFilter.fields.height > 0 &&
+            narrowFilter.fields.top >= narrowFilter.header.bottom &&
+            narrowFilter.fields.bottom <= narrowFilter.footer.top,
           `窄屏进度筛选下拉层应保持在视口内：${JSON.stringify(narrowFilter)}`
         )
+        const fields = filterPanel.locator('.mobile-filter-fields')
+        await fields.evaluate((node) => { node.scrollTop = node.scrollHeight })
+        const pinnedActions = await filterPanel.evaluate((node) => ({
+          headerTop: node.querySelector('header').getBoundingClientRect().top,
+          footerBottom: node.querySelector('footer').getBoundingClientRect().bottom,
+        }))
+        assert.equal(pinnedActions.headerTop, narrowFilter.header.top, '浏览更多条件时关闭入口保持原位')
+        assert.equal(pinnedActions.footerBottom, narrowFilter.footer.bottom, '浏览更多条件时重置入口保持原位')
+        await filterPanel.getByRole('button', { name: '关闭筛选', exact: true }).click({ trial: true })
+        await filterPanel.getByRole('button', { name: '重置筛选', exact: true }).click({ trial: true })
+        await fields.evaluate((node) => { node.scrollTop = 0 })
         await page.screenshot({
           path: path.join(
             outputDir,
@@ -1330,16 +1355,16 @@ export function createMobileProgressScenarios({
           '筛选进度，已应用 1 项'
         )
         assert.equal(
-          await panel.locator('.mobile-progress-applied').count(),
-          0,
-          '全部范围不单独显示提示或保留空白占位'
+          await panel.getByLabel('当前进度筛选').getByRole('button', { name: '清除记录范围：全部记录', exact: true }).count(),
+          1,
+          '非默认范围具名显示，关闭筛选后仍可核对'
         )
-        await filterPanel.getByText('在执行', { exact: true }).click()
+        await filterPanel.getByText('未结束', { exact: true }).click()
         await page.setViewportSize({ width: 390, height: 844 })
         assert.equal(
-          await filterPanel.getByRole('textbox').count(),
-          0,
-          '筛选下拉层不应要求用户二次搜索'
+          await filterPanel.getByRole('textbox', { name: '处理人或业务负责人' }).count(),
+          1,
+          '负责人条件与电脑端保留独立的组合筛选语义'
         )
         await filterPanel
           .getByRole('button', { name: '关闭筛选', exact: true })
@@ -1575,4 +1600,80 @@ export function createMobileProgressScenarios({
       },
     }
   })
+  return [...scenarios, ...createMobileFilterScrollScenarios({ scenarios, assert, outputDir }), {
+    ...scenarios.find((scenario) => scenario.name === 'mobile-progress-pmc'),
+    name: 'mobile-progress-status-counts',
+    verify: async (page) => {
+      const panel = page.getByTestId('mobile-progress-panel')
+      await panel.getByRole('button', { name: '查看 MO-0001 进度', exact: true }).waitFor()
+      await panel.getByRole('button', { name: '筛选进度', exact: true }).click()
+      const filters = page.getByRole('dialog', { name: '筛选进度', exact: true })
+      const conditions = filters.locator('.erp-progress-filter-fields')
+      const counts = () => conditions.locator('.erp-filter-chip__count').allTextContents()
+      const original = await counts()
+      assert.equal(original.length, 6)
+      assert(original.every((count) => /^\d[\d,]*$/.test(count)), original.join(','))
+      assert.equal(await conditions.getByRole('button', { name: /^仅看未关联销售/ }).locator('.erp-filter-chip__count').innerText(), '1')
+      await conditions.getByRole('button', { name: /^仅看未关联销售/ }).click()
+      await panel.getByRole('button', { name: '查看 MO-0003 进度', exact: true }).waitFor()
+      assert.deepEqual(await counts(), ['1', '0', '0', '0', '0', '1'], '数量保留未关联销售条件计算')
+      for (const width of [320, 390, 430]) {
+        await page.setViewportSize({ width, height: 844 })
+        await assertNoHorizontalOverflow(page, `mobile-progress-counts-${width}`)
+        const geometry = await conditions.evaluate((node) => ({ width: node.clientWidth, scroll: node.scrollWidth }))
+        assert(geometry.scroll <= geometry.width + 1)
+      }
+      await page.screenshot({ path: path.join(outputDir, 'mobile-progress-state-counts.png') })
+      await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+      await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
+      const quick = panel.getByRole('group', { name: '进度快捷筛选', exact: true })
+      const dueSoon = quick.getByRole('button', { name: /7天内到期/ })
+      await dueSoon.click()
+      assert.equal(await dueSoon.getAttribute('aria-pressed'), 'true')
+      assert.equal(await dueSoon.locator('.erp-filter-chip__clear').count(), 1)
+      assert.equal(await panel.getByLabel('当前进度筛选').count(), 0, '快捷筛选不重复生成摘要标签')
+      await dueSoon.click()
+      assert.equal(await dueSoon.getAttribute('aria-pressed'), 'false')
+      await panel.getByRole('button', { name: '筛选进度', exact: true }).click()
+      const longOwner = '负责人姓名很长用于验证条件自动换行且取消按钮完整显示'
+      await filters.getByRole('textbox', { name: '处理人或业务负责人', exact: true }).fill(longOwner)
+      await filters.getByRole('button', { name: '应用', exact: true }).click()
+      await filters.getByRole('button', { name: '自定义交期日期', exact: true }).click()
+      const dates = page.getByRole('dialog', { name: '选择交期日期范围', exact: true })
+      await dates.waitFor()
+      const dayNames = await dates.getByRole('group', { name: '选择日期范围' }).getByRole('button').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label')))
+      const start = dayNames[26]
+      await dates.getByRole('button', { name: start, exact: true }).click()
+      assert.equal(await dates.getByRole('button', { name: '应用日期', exact: true }).isEnabled(), false)
+      await dates.getByRole('button', { name: '下个月', exact: true }).click()
+      const after = await dates.getByRole('group', { name: '选择日期范围' }).getByRole('button').evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label')))
+      const end = after.find((value) => value > start && value.endsWith('-10'))
+      assert(end, '可选择跨月结束日期')
+      await dates.getByRole('button', { name: end, exact: true }).click()
+      await dates.getByRole('button', { name: '应用日期', exact: true }).click()
+      const applied = panel.getByLabel('当前进度筛选')
+      await applied.getByRole('button', { name: new RegExp(start) }).waitFor()
+      for (const width of [320, 390, 430]) {
+        await page.setViewportSize({ width, height: 568 })
+        await assertMobileFilterConsistency({ assert, quick, applied })
+        const boxes = await applied.evaluate((node) => {
+          const bounds = node.getBoundingClientRect()
+          return { overflow: node.scrollWidth - node.clientWidth, buttons: [...node.querySelectorAll('button')].map((button) => ({ left: button.getBoundingClientRect().left - bounds.left, right: button.getBoundingClientRect().right - bounds.right, overflow: button.scrollWidth - button.clientWidth })) }
+        })
+        assert(boxes.overflow <= 1 && boxes.buttons.every((button) => button.left >= -1 && button.right <= 1 && button.overflow <= 1), JSON.stringify(boxes))
+      }
+      await page.screenshot({ path: path.join(outputDir, 'mobile-progress-wrapped-filters.png') })
+      await panel.locator('.mobile-filter-trigger').click()
+      await filters.getByRole('button', { name: `${start} 至 ${end}`, exact: true }).click()
+      await dates.waitFor()
+      await dates.getByRole('button', { name: start, exact: true }).click()
+      await dates.getByRole('button', { name: '取消', exact: true }).click()
+      await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
+      assert.match(await applied.innerText(), new RegExp(`${start} 至 ${end}`), '取消草稿保留已应用范围')
+      await applied.getByRole('button', { name: new RegExp(start) }).click()
+      assert.equal(await applied.getByRole('button', { name: new RegExp(start) }).count(), 0)
+      assert.match(await applied.innerText(), new RegExp(longOwner), '单独清日期保留其他筛选')
+
+    },
+  }]
 }

@@ -471,6 +471,7 @@ async function assertBusinessHeaderHasNoSectionTitle(page, { scenarioName }) {
             (node) =>
               isVisible(node) &&
               node.children.length === 0 &&
+              !node.closest('h1') &&
               forbiddenLabels.includes(
                 String(node.textContent || '')
                   .replace(/\s+/g, ' ')
@@ -507,228 +508,31 @@ async function assertBusinessHeaderHasNoSectionTitle(page, { scenarioName }) {
   )
 }
 
-async function assertBusinessHeaderStatsSingleLine(
-  page,
-  {
-    scenarioName,
-    expectedLabels = ['总记录', '本页显示', '待处理'],
-    allowWrappedStats = false,
-  }
-) {
-  await page
-    .locator('.erp-business-page-header-card .erp-business-module-stats')
-    .waitFor({ state: 'visible', timeout: 20000 })
+async function assertBusinessHeaderCompact(page, { scenarioName }) {
+  await page.locator('.erp-business-page-header-card').first().waitFor()
   const metrics = await page.evaluate(() => {
-    const header = document.querySelector('.erp-business-page-header-card')
-    const headerRect = header?.getBoundingClientRect()
-    const grid = document.querySelector('.erp-business-page-header-card__grid')
-    const gridStyle = grid ? window.getComputedStyle(grid) : null
-    const main = document.querySelector('.erp-business-page-header-card__main')
-    const mainRect = main?.getBoundingClientRect()
-    const stats = document.querySelector('.erp-business-module-stats')
-    const statsRect = stats?.getBoundingClientRect()
-    const statsStyle = stats ? window.getComputedStyle(stats) : null
-    const tiles = Array.from(
-      document.querySelectorAll(
-        '.erp-business-module-stats .erp-business-page-header-card__stat'
-      )
-    ).map((tile) => {
-      const rect = tile.getBoundingClientRect()
-      const label = tile.querySelector('.ant-typography')
-      const value = tile.querySelector('strong')
-      const labelRect = label?.getBoundingClientRect()
-      const labelStyle = label ? window.getComputedStyle(label) : null
-      const tileStyle = window.getComputedStyle(tile)
-      return {
-        tagName: tile.tagName,
-        role: tile.getAttribute('role'),
-        cursor: tileStyle.cursor,
-        text: tile.textContent?.replace(/\s+/g, ' ').trim() || '',
-        labelText: label?.textContent?.replace(/\s+/g, ' ').trim() || '',
-        valueText: value?.textContent?.replace(/\s+/g, ' ').trim() || '',
-        ariaLabel: tile.getAttribute('aria-label') || '',
-        hasButton: Boolean(tile.querySelector('button')),
-        top: rect.top,
-        bottom: rect.bottom,
-        left: rect.left,
-        right: rect.right,
-        width: rect.width,
-        height: rect.height,
-        labelWidth: labelRect?.width || 0,
-        labelScrollWidth: label?.scrollWidth || 0,
-        labelWhiteSpace: labelStyle?.whiteSpace || '',
-        labelTextOverflow: labelStyle?.textOverflow || '',
-        labelOverflow: labelStyle?.overflow || '',
-      }
-    })
+    const visible = (node) => node.getBoundingClientRect().width > 0 && node.getBoundingClientRect().height > 0
+    const headers = [...document.querySelectorAll('.erp-business-page-header-card')].filter(visible)
+    const primary = headers.filter((node) => !node.classList.contains('erp-business-page-header-card--secondary'))
     return {
-      viewportWidth: window.innerWidth,
-      bodyScrollWidth: document.body.scrollWidth,
-      docScrollWidth: document.documentElement.scrollWidth,
-      headerSummaryCount: document.querySelectorAll(
-        '.erp-business-page-header-card__summary, .erp-business-module-hero__footer'
-      ).length,
-      header: headerRect
-        ? {
-            left: headerRect.left,
-            right: headerRect.right,
-            width: headerRect.width,
-          }
-        : null,
-      grid: gridStyle
-        ? {
-            gridTemplateColumns: gridStyle.gridTemplateColumns,
-            alignItems: gridStyle.alignItems,
-          }
-        : null,
-      main: mainRect
-        ? {
-            top: mainRect.top,
-            bottom: mainRect.bottom,
-            left: mainRect.left,
-            right: mainRect.right,
-            width: mainRect.width,
-          }
-        : null,
-      stats: statsRect
-        ? {
-            top: statsRect.top,
-            bottom: statsRect.bottom,
-            left: statsRect.left,
-            right: statsRect.right,
-            width: statsRect.width,
-            scrollWidth: stats?.scrollWidth || 0,
-            clientWidth: stats?.clientWidth || 0,
-            display: statsStyle?.display || '',
-            flexWrap: statsStyle?.flexWrap || '',
-            gridAutoFlow: statsStyle?.gridAutoFlow || '',
-            gridTemplateColumns: statsStyle?.gridTemplateColumns || '',
-            justifySelf: statsStyle?.justifySelf || '',
-            justifyContent: statsStyle?.justifyContent || '',
-          }
-        : null,
-      tiles,
+      primaryCount: primary.length,
+      titles: headers.flatMap((node) => [...node.querySelectorAll('h1')].map((title) => title.textContent)),
+      redundantStats: headers.reduce((count, node) => count + node.querySelectorAll('.erp-business-module-stats, .erp-business-page-header-card__stat, .erp-business-page-header-card__summary').length, 0),
+      headers: headers.map((node) => {
+        const rect = node.getBoundingClientRect()
+        return { left: rect.left, right: rect.right, height: rect.height, empty: !node.textContent.trim() }
+      }),
+      viewportWidth: innerWidth,
+      pageWidth: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
+      pagination: [...document.querySelectorAll('.ant-pagination-total-text')].filter(visible).map((node) => node.textContent),
     }
   })
-
-  assert(
-    metrics.stats,
-    `${scenarioName} 缺少业务页头部统计区: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.header,
-    `${scenarioName} 缺少业务页头部卡片: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.headerSummaryCount,
-    0,
-    `${scenarioName} 业务页头不应再渲染底部 summary 区域: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.tiles.length,
-    expectedLabels.length,
-    `${scenarioName} formal 业务页统计项数量不符合当前口径: ${JSON.stringify(metrics)}`
-  )
-  assert.deepEqual(
-    metrics.tiles.map((tile) => tile.labelText),
-    expectedLabels,
-    `${scenarioName} 业务页头部统计项不符合当前口径: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.tiles.every((tile) => /^(0|[1-9]\d*)$/u.test(tile.valueText)),
-    `${scenarioName} 业务页头部统计主值必须是非负整数，文字上下文应放在页签、标签或说明中: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.tiles.every(
-      (tile) =>
-        tile.tagName === 'DIV' &&
-        tile.role === null &&
-        tile.cursor === 'default' &&
-        /只读摘要/u.test(tile.ariaLabel) &&
-        tile.hasButton === false
-    ),
-    `${scenarioName} 业务页头部统计应保持只读摘要，不应伪装成按钮: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.grid?.gridTemplateColumns &&
-      ['center', 'start'].includes(metrics.grid?.alignItems),
-    `${scenarioName} 业务页头部应使用共享 grid 布局: ${JSON.stringify(metrics)}`
-  )
-  const statsBesideMain =
-    metrics.main &&
-    metrics.stats &&
-    metrics.stats.left >= metrics.main.right + 8 &&
-    metrics.stats.top < metrics.main.bottom &&
-    metrics.stats.bottom > metrics.main.top
-  const statsBelowMain =
-    metrics.main &&
-    metrics.stats &&
-    metrics.stats.top >= metrics.main.bottom + 6 &&
-    metrics.stats.left >= metrics.header.left - 1 &&
-    metrics.stats.right <= metrics.header.right + 1
-  assert(
-    statsBesideMain || statsBelowMain,
-    `${scenarioName} 业务页头部摘要组不应覆盖标题说明区: ${JSON.stringify(metrics)}`
-  )
-  assert.equal(
-    metrics.stats.display,
-    'flex',
-    `${scenarioName} 业务页头部摘要使用紧凑横向布局: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    statsBelowMain ||
-      (metrics.header.right - metrics.stats.right <= 24 &&
-        metrics.stats.justifyContent === 'flex-end'),
-    `${scenarioName} 桌面业务页头部摘要组应在空间足够时右对齐: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.stats.scrollWidth <= metrics.stats.clientWidth + 1,
-    `${scenarioName} 业务页头部统计区内部不应横向溢出: ${JSON.stringify(metrics)}`
-  )
-  const compactViewport = metrics.viewportWidth <= 768
-  if (!compactViewport) {
-    assert.equal(
-      metrics.stats.flexWrap,
-      'nowrap',
-      `${scenarioName} 桌面业务页头部摘要应横向排列，不能竖排占用高度: ${JSON.stringify(metrics)}`
-    )
-  }
-  if (!allowWrappedStats && !compactViewport) {
-    assert(
-      metrics.tiles.every(
-        (tile) => Math.abs(tile.top - metrics.tiles[0].top) <= 1
-      ),
-      `${scenarioName} 业务页头部统计卡不应掉到第二行: ${JSON.stringify(metrics)}`
-    )
-  }
-  assert(
-    metrics.tiles.every(
-      (tile) =>
-        tile.width >= 50 &&
-        tile.width <= 190 &&
-        tile.height >= 30 &&
-        tile.height <= 34
-    ),
-    `${scenarioName} 业务页头部统计卡尺寸异常: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.tiles.every(
-      (tile) =>
-        ['normal', 'nowrap'].includes(tile.labelWhiteSpace) &&
-        tile.labelTextOverflow !== 'ellipsis' &&
-        tile.labelOverflow === 'visible'
-    ),
-    `${scenarioName} 业务页头部统计标签不应再用省略号裁切: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.tiles.every((tile) => !tile.text.includes('...')),
-    `${scenarioName} 业务页头部统计标签不应出现省略号: ${JSON.stringify(metrics)}`
-  )
-  assert(
-    metrics.bodyScrollWidth <= metrics.viewportWidth + 2 &&
-      metrics.docScrollWidth <= metrics.viewportWidth + 2,
-    `${scenarioName} 业务页头部统计修复后不应产生页面横向溢出: ${JSON.stringify(metrics)}`
-  )
+  assert.equal(metrics.primaryCount, 1, `${scenarioName} 应仅显示一个主页面标题: ${JSON.stringify(metrics)}`)
+  assert.equal(metrics.titles.length, 1, `${scenarioName} 不应重复显示模块与当前页标题: ${JSON.stringify(metrics)}`)
+  assert.equal(metrics.redundantStats, 0, `${scenarioName} 页头不应保留重复统计: ${JSON.stringify(metrics)}`)
+  assert(metrics.headers.every((item) => !item.empty && item.left >= -1 && item.right <= metrics.viewportWidth + 1), `${scenarioName} 页头应有内容且不溢出: ${JSON.stringify(metrics)}`)
+  assert(metrics.pageWidth <= metrics.viewportWidth + 2, `${scenarioName} 页面不应横向溢出: ${JSON.stringify(metrics)}`)
+  assert(metrics.pagination.every((text) => /第.*条.*共.*条/u.test(text)), `${scenarioName} 分页应保留当前范围和查询总数: ${JSON.stringify(metrics)}`)
 }
 
 export {
@@ -736,5 +540,5 @@ export {
   assertBusinessMainTableInitialSelectionEmpty,
   assertBusinessMainTableSortableColumns,
   assertBusinessHeaderHasNoSectionTitle,
-  assertBusinessHeaderStatsSingleLine,
+  assertBusinessHeaderCompact,
 }

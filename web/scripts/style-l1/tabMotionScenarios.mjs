@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import {
+  assertContentTabAffordance,
   assertSegmentAffordance,
   assertTabsAffordance,
   assertFilterAffordance,
@@ -77,6 +78,13 @@ async function sampleMotion(
         }
         requestAnimationFrame(frame)
       })
+      // The selected font weight can change glyph widths. Verify alignment
+      // against the rendered selected item, not its former unselected box.
+      if (!config.reverse) {
+        target.x = targetItem.offsetLeft
+        target.y = targetItem.offsetTop
+        target.width = targetItem.offsetWidth
+      }
       return { first, target, samples }
     },
     { reverse, targetIndex }
@@ -228,6 +236,9 @@ export function createTabMotionScenarios({ outputDir }) {
         }
         await assertSegmentAffordance(page.locator('#unequal .ant-segmented'))
         await assertTabsAffordance(page.locator('#ant-tabs .ant-tabs'))
+        for (const id of ['secondary', 'login', 'progress-detail', 'collaboration', 'images', 'card-tabs']) {
+          await assertContentTabAffordance(page.locator(`#${id} .erp-sliding-segmented, #${id} .erp-sliding-tab-list, #${id} .erp-sliding-tabs`))
+        }
         for (let index = 0; index < 3; index += 1) {
           assertActionBarRemountStable(
             await sampleActionBarRemount(page),
@@ -237,6 +248,9 @@ export function createTabMotionScenarios({ outputDir }) {
         await assertAligned(page, 'equal')
         for (const id of [
           'unequal',
+          'secondary',
+          'login',
+          'progress-detail',
           'vertical',
           'material',
           'scope',
@@ -449,7 +463,9 @@ export function createTabMotionScenarios({ outputDir }) {
           assert.equal(await search.inputValue(), '')
           await search.fill('搜索')
           await directory.getByRole('button', { name: /弹窗与反馈/ }).waitFor({ state: 'hidden' })
-          assert.equal(await directory.getByRole('button').count(), 1)
+          await directory.getByRole('button', { name: /页签与视图/ }).waitFor()
+          await directory.getByRole('button', { name: /筛选与搜索/ }).waitFor()
+          assert.equal(await directory.getByRole('button').count(), 2)
           await choose('筛选与搜索')
           assert.equal(await search.inputValue(), '')
           assert.equal(new URL(page.url()).searchParams.get('control'), 'filters')

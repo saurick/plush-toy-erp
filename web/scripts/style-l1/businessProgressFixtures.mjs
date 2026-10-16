@@ -160,23 +160,26 @@ export function progressFixtureData(
           row.attention_owner,
           row.attention_role,
         ].some((s) => s.includes(params.keyword))) &&
-      (!params.owner || row.sales_owner.includes(params.owner)) &&
-      (!params.date_from || row.due_date >= params.date_from) &&
-      (!params.date_to || (row.due_date && row.due_date <= params.date_to))
+      (!params.owner || row.sales_owner.includes(params.owner))
+  )
+  const matching = (candidate) => base.filter((row) =>
+    (!candidate.blocked_only || (!restricted && row.blocked)) &&
+    (!candidate.unlinked_only || row.unlinked) &&
+    (candidate.due_status === 'undated'
+      ? !row.due_date
+      : (!candidate.due_status || candidate.due_status === 'all' || row[candidate.due_status]) &&
+        (!candidate.date_from || row.due_date >= candidate.date_from) &&
+        (!candidate.date_to || (row.due_date && row.due_date <= candidate.date_to)))
   )
   const counts = {
-    total: base.length,
-    overdue: base.filter((r) => r.overdue).length,
-    due_soon: base.filter((r) => r.due_soon).length,
-    blocked: restricted ? 0 : base.filter((r) => r.blocked).length,
-    undated: base.filter((r) => !r.due_date).length,
+    ...Object.fromEntries(['all', 'overdue', 'due_soon', 'undated'].map((due_status) => [
+      due_status === 'all' ? 'total' : due_status,
+      matching({ ...params, due_status }).length,
+    ])),
+    blocked: matching({ ...params, blocked_only: true }).length,
+    unlinked: matching({ ...params, unlinked_only: true }).length,
   }
-  const matches = base.filter(
-    (r) =>
-      !params.risk ||
-      params.risk === 'all' ||
-      (params.risk === 'undated' ? !r.due_date : r[params.risk])
-  )
+  const matches = matching(params)
   const rows = matches
     .slice(params.offset || 0, (params.offset || 0) + (params.limit || 20))
     .map((r) =>

@@ -131,8 +131,11 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           ? Array.from(document.querySelectorAll('.erp-task-board-lane'))
               .filter(isVisible)
               .map((node) => ({
+                repeatedCount: node.querySelectorAll('.erp-task-board-lane-count').length,
                 count: Number(
-                  node.querySelector('.erp-task-board-lane-count')?.textContent
+                  [...document.querySelectorAll('.erp-task-progress-rail__item[data-lane]')]
+                    .find((item) => node.classList.contains(`erp-task-board-lane--${item.dataset.lane}`))
+                    ?.querySelector('.erp-task-progress-rail__value')?.textContent
                 ),
                 entries: [
                   ...node.querySelectorAll(
@@ -186,9 +189,10 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       )
       for (const lane of metrics.taskMetrics) {
         assert.equal(lane.oldMetrics, 0, '概览不应重复渲染四个大指标')
+        assert.equal(lane.repeatedCount, 0, '分类标题不重复筛选数量')
         assert(
           Number.isInteger(lane.count) && lane.count >= 0,
-          '分类标题应显示真实数量'
+          '分类筛选应显示真实数量'
         )
         assert.equal(lane.entries.length, lane.count > 0 ? 1 : 0)
         for (const entry of lane.entries) {
@@ -617,8 +621,10 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           tone: tone || '',
           cardBorderRadius: laneStyle.borderRadius,
           cardOverflow: laneStyle.overflow,
+          cardBorderColor: laneStyle.borderTopColor,
+          cardBorderWidth: Number.parseFloat(laneStyle.borderTopWidth),
           headBackgroundColor: headStyle?.backgroundColor || '',
-          headBoxShadow: headStyle?.boxShadow || '',
+          headBorderColor: headStyle?.borderBottomColor || '',
         }
       })
       const overlappingLanePairs = []
@@ -706,10 +712,12 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     )
     assert(
       metrics.laneVisuals.every(
-        ({ headBoxShadow }) => headBoxShadow && headBoxShadow !== 'none'
+        ({ cardBorderWidth, cardBorderColor, headBorderColor }) =>
+          cardBorderWidth >= 1 && cardBorderColor === headBorderColor
       ),
-      `${scenarioName} 任务管理泳道标题应保留轻量语义色条: ${JSON.stringify(metrics)}`
+      `${scenarioName} 任务管理泳道标题分隔线应沿用卡片的语义边框: ${JSON.stringify(metrics)}`
     )
+    assert.equal(new Set(metrics.laneVisuals.map(({ cardBorderColor }) => cardBorderColor)).size, 4, `${scenarioName} 四个泳道边框应可区分`)
     assert(
       metrics.laneVisuals.every(
         ({ cardBorderRadius, cardOverflow }) =>

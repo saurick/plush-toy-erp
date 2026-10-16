@@ -5,6 +5,8 @@ import { progressFixtureData } from './businessProgressFixtures.mjs'
 import { createTaskTrackingScenarios } from './taskTrackingScenarios.mjs'
 import { createMobileWorkflowTrackingScenarios } from './mobileWorkflowTrackingScenarios.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
+import { assertMobileFilterDensity } from './mobileFilterPopoverAssertions.mjs'
 
 async function waitForFilters(page, filters) {
   await filters.waitFor({ state: 'visible' })
@@ -20,6 +22,11 @@ async function waitForFilters(page, filters) {
 }
 
 async function choose(page, root, label, value) {
+  const choices = root.getByRole('group', { name: label, exact: true })
+  if (await choices.count()) {
+    await choices.getByRole('button', { name: value, exact: true }).click()
+    return
+  }
   const control = root.getByRole('combobox', { name: label, exact: true })
   if (await control.evaluate((node) => node.tagName === 'SELECT')) {
     await control.selectOption({ label: value })
@@ -32,102 +39,148 @@ async function choose(page, root, label, value) {
 
 export function createFilterConflictScenarios(deps) {
   const { assert, path, outputDir, assertNoHorizontalOverflow } = deps
+  const verifyProgress = (phone, name) => async (page) => {
+    if (phone) await page.getByTestId('mobile-role-nav-progress').click()
+    const panel = page.getByRole('region', { name: phone ? '手机进度看板' : '进度看板', exact: true })
+    const quick = panel.getByRole('group', { name: '进度快捷筛选', exact: true })
+    const filters = page.getByRole('dialog', { name: '筛选进度', exact: true })
+    const trigger = panel.getByRole('button', { name: /^筛选进度/ })
+    const search = panel.getByLabel(phone ? '搜索进度' : '搜索订单、客户或产品', { exact: true })
+    const waitQuery = async (expected) => {
+      await page.waitForFunction(({ phone, expected }) => {
+        const query = phone ? window.history.state?.mobileProgress?.query : Object.fromEntries(new URLSearchParams(location.search))
+        if (!query || !Object.entries(expected).every(([key, value]) => String(query[key] ?? '') === String(value))) return false
+        const quick = document.querySelector('[aria-label="进度快捷筛选"]')
+        if (!quick) return false
+        const buttons = [...quick.querySelectorAll('button')]
+        if ('blocked_only' in expected && query.scope !== 'ended') {
+          const blocked = buttons.find((node) => node.textContent.includes('仅看任务受阻'))
+          if (blocked?.getAttribute('aria-pressed') !== String(expected.blocked_only === true)) return false
+        }
+        if (expected.due_status) {
+          const label = { all: '不限交期', overdue: '已逾期', due_soon: '7天内到期', undated: '未定交期' }[expected.due_status]
+          if (buttons.find((node) => node.textContent.includes(label))?.getAttribute('aria-pressed') !== 'true') return false
+        }
+        return true
+      }, { phone, expected })
+      await page.waitForFunction(() => {
+        const quick = document.querySelector('[aria-label="进度快捷筛选"]')
+        return quick && !quick.textContent.includes('—')
+      })
+    }
+    const due = (root, label) => root.getByRole('group', { name: '交期情况', exact: true }).getByRole('button', { name: new RegExp(`^${label}`) })
+    await due(quick, '不限交期').waitFor()
+    await trigger.click()
+    await waitForFilters(page, filters)
+    if (phone) await assertMobileFilterDensity({ assert, dialog: filters })
+    const owner = filters.getByRole('textbox', { name: '处理人或业务负责人', exact: true })
+    assert.equal(await filters.getByRole('button', { name: '应用', exact: true }).count(), 0)
+    await owner.fill('业务')
+    await waitQuery({ owner: '业务' })
+    await owner.fill('')
+    await waitQuery({ owner: '' })
+    await owner.fill('待重置姓名')
+    await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+    await page.waitForTimeout(400)
+    await waitQuery({ owner: '' })
+    assert.equal(await owner.inputValue(), '', 'reset cancels pending owner search')
+    await due(filters, '已逾期').click()
+    await filters.getByRole('button', { name: /^仅看任务受阻/ }).click()
+    await waitQuery({ due_status: 'overdue', blocked_only: true })
+    assert.equal(await due(quick, '已逾期').getAttribute('aria-pressed'), 'true')
+    assert.equal(await quick.getByRole('button', { name: /^仅看任务受阻/ }).getAttribute('aria-pressed'), 'true')
+    assert.equal(await trigger.getAttribute('aria-label'), '筛选进度，已应用 2 项')
+    assert.match(await due(filters, '已逾期').innerText(), /1/u)
+    assert.match(await due(filters, '7天内到期').innerText(), /0/u)
+    await due(filters, '7天内到期').click()
+    await waitQuery({ due_status: 'due_soon', blocked_only: true })
+    assert.equal(await panel.locator(phone ? '.mobile-progress-card' : '.erp-progress-row').count(), 0)
+    assert.match(await filters.getByRole('button', { name: /^仅看任务受阻/ }).innerText(), /0/u)
+    await filters.getByLabel('记录范围', { exact: true }).getByText('已结束', { exact: true }).click()
+    await waitQuery({ scope: 'ended', due_status: 'all', blocked_only: phone ? false : '' })
+    for (const root of [quick, filters]) {
+      for (const label of ['已逾期', '7天内到期', '仅看任务受阻']) {
+        assert.equal(await root.getByRole('button', { name: new RegExp(`^${label}`) }).count(), 0)
+      }
+    }
+    assert.equal(await trigger.getAttribute('aria-label'), '筛选进度，已应用 1 项')
+    await filters.getByLabel('记录范围', { exact: true }).getByText('全部记录', { exact: true }).click()
+    await waitQuery({ scope: 'all' })
+    assert.equal(await due(quick, '不限交期').getAttribute('aria-pressed'), 'true')
+    await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+    await waitQuery({ scope: 'active' })
+    await page.keyboard.press('Escape')
+    await filters.waitFor({ state: 'hidden' })
+    await search.fill('云朵')
+    await search.press('Enter')
+    await trigger.click()
+    await waitForFilters(page, filters)
+    await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+    assert.equal(await search.inputValue(), '云朵')
+    assert.equal(await trigger.getAttribute('aria-label'), '筛选进度')
+    await filters.getByRole('button', { name: '自定义交期日期', exact: true }).click()
+    const dates = page.getByRole('dialog', { name: '选择交期日期范围', exact: true })
+    const day = dates.getByRole('group', { name: '选择日期范围' }).getByRole('button').nth(15)
+    await day.click(); await day.click()
+    await dates.getByRole('button', { name: '应用日期', exact: true }).click()
+    await trigger.click()
+    await waitForFilters(page, filters)
+    await page.waitForFunction(() => !document.querySelector('[aria-label="进度快捷筛选"]').textContent.includes('—'))
+    assert.match(await due(filters, '未定交期').innerText(), /1/u, '未定交期数量按清除日期后的结果计算')
+    await due(filters, '未定交期').click()
+    await waitQuery({ due_status: 'undated', from: '', to: '' })
+    await page.keyboard.press('Escape')
+    await page.reload()
+    await due(quick, '未定交期').waitFor()
+    await waitQuery({ due_status: 'undated' })
+    assert.equal(await due(quick, '未定交期').getAttribute('aria-pressed'), 'true')
+    await trigger.click()
+    await waitForFilters(page, filters)
+    await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
+    if (!phone) assert.equal(new URL(page.url()).searchParams.get('due_status'), 'all', '重置后立即清除交期条件')
+    await page.keyboard.press('Escape')
+    await search.fill(''); await search.press('Enter')
+    if (!phone) assert.equal(new URL(page.url()).searchParams.get('due_status'), 'all', '清空搜索不能恢复重置前的交期条件')
+    await waitQuery({ due_status: 'all', q: '' })
+    const views = panel.getByLabel(phone ? '进度视图' : '进度查看方式', { exact: true })
+    await views.getByText('生产执行', { exact: true }).click()
+    await trigger.click()
+    await waitForFilters(page, filters)
+    await filters.getByRole('button', { name: /^仅看未关联销售/ }).click()
+    await waitQuery({ unlinked_only: true })
+    await page.keyboard.press('Escape')
+    await views.getByText('订单交付', { exact: true }).click()
+    await waitQuery({ unlinked_only: phone ? false : '', due_status: 'all' })
+    await page.reload()
+    await due(quick, '不限交期').waitFor()
+    await trigger.click()
+    await waitForFilters(page, filters)
+    await page.screenshot({ path: path.join(outputDir, `${name}-filter.png`) })
+    if (phone) {
+      await page.setViewportSize({ width: 320, height: 568 })
+      await waitForFiniteAnimations(page)
+    }
+    await assertNoHorizontalOverflow(page, `${name} 筛选`)
+    const geometry = await filters.evaluate((node) => {
+      const box = node.getBoundingClientRect()
+      return { left: box.left, right: box.right, bottom: box.bottom, width: innerWidth, height: innerHeight }
+    })
+    assert(geometry.left >= 0 && geometry.right <= geometry.width + 1 && geometry.bottom <= geometry.height + 1, JSON.stringify(geometry))
+  }
   const mobile = createMobileProgressScenarios(deps).slice(0, 2).map((base) => ({
     ...base,
     name: `${base.name}-filter-conflicts`,
     viewport: { width: 422, height: 844 },
     deviceScaleFactor: 3840 / 844,
-    verify: async (page) => {
-      await page.getByTestId('mobile-role-nav-progress').click()
-      const panel = page.getByRole('region', { name: '手机进度看板', exact: true })
-      const quick = panel.getByRole('group', { name: '进度快捷筛选', exact: true })
-      await quick.getByRole('button', { name: /^在执行/ }).waitFor()
-      await panel.getByRole('button', { name: '筛选进度', exact: true }).click()
-      const filters = page.getByRole('dialog', { name: '筛选进度', exact: true })
-      await waitForFilters(page, filters)
-      const attention = filters.getByRole('group', { name: '关注条件', exact: true })
-      await attention.getByRole('button', { name: '已逾期', exact: true }).click()
-      assert.equal(await quick.getByRole('button', { name: /已逾期/ }).getAttribute('aria-pressed'), 'true')
-      assert.equal(await attention.locator('[aria-pressed="true"]').count(), 1)
-      await attention.getByRole('button', { name: '未定交期', exact: true }).click()
-      assert.equal(await quick.locator('[aria-pressed="true"]').count(), 0)
-      await attention.getByRole('button', { name: '已逾期', exact: true }).click()
-      await filters.getByText('已结束', { exact: true }).click()
-      await page.waitForFunction(() => window.history.state.mobileProgress.query.scope === 'ended' && window.history.state.mobileProgress.query.risk === 'all')
-      for (const label of ['已逾期', '7天内到期', '任务受阻']) {
-        assert.equal(await attention.getByRole('button', { name: label, exact: true }).isDisabled(), true)
-        assert.equal(await quick.getByRole('button', { name: new RegExp(label) }).isDisabled(), true)
-      }
-      assert.equal(await attention.getByRole('button', { name: '不限', exact: true }).getAttribute('aria-pressed'), 'true')
-      await waitForFiniteAnimations(page)
-      await page.screenshot({ path: path.join(outputDir, `${base.name}-ended-filter.png`) })
-      await filters.getByText('全部记录', { exact: true }).click()
-      await quick.getByRole('button', { name: /^全部记录/ }).waitFor()
-      await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
-      await panel.getByLabel('搜索进度').fill('云朵')
-      await panel.getByLabel('搜索进度').press('Enter')
-      await panel.getByRole('button', { name: /筛选进度/ }).click()
-      await filters.getByRole('button', { name: '重置筛选', exact: true }).click()
-      assert.equal(await panel.getByLabel('搜索进度').inputValue(), '云朵')
-      await page.keyboard.press('Escape')
-      await filters.waitFor({ state: 'hidden' })
-      await panel.getByRole('button', { name: '清除搜索', exact: true }).click()
-      await panel.getByLabel('进度视图').getByText('生产执行', { exact: true }).click()
-      await panel.getByRole('button', { name: /筛选进度/ }).click()
-      await attention.getByRole('button', { name: '未关联销售', exact: true }).click()
-      await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
-      await panel.getByLabel('进度视图').getByText('订单交付', { exact: true }).click()
-      await page.waitForFunction(() => window.history.state.mobileProgress.query.risk === 'all')
-      await page.reload()
-      await quick.getByRole('button', { name: /^在执行/ }).waitFor()
-      await panel.getByRole('button', { name: /筛选进度/ }).click()
-      await waitForFilters(page, filters)
-      await page.screenshot({ path: path.join(outputDir, `${base.name}-filter.png`) })
-      await page.setViewportSize({ width: 320, height: 568 })
-      await assertNoHorizontalOverflow(page, `${base.name} 筛选`)
-      const geometry = await filters.evaluate((node) => {
-        const box = node.getBoundingClientRect()
-        return { left: box.left, right: box.right, bottom: box.bottom, width: innerWidth, height: innerHeight }
-      })
-      assert(geometry.left >= 0 && geometry.right <= geometry.width + 1 && geometry.bottom <= geometry.height + 1, JSON.stringify(geometry))
-    },
+    verify: verifyProgress(true, base.name),
   }))
   const desktop = createBusinessProgressScenarios(deps)[0]
   const progress = {
     ...desktop,
     name: 'erp-progress-filter-conflicts',
-    verify: async (page) => {
-      const panel = page.getByRole('region', { name: '进度看板', exact: true })
-      await panel.getByRole('button', { name: /已逾期/ }).click()
-      await choose(page, panel, '记录范围', '已结束')
-      await page.waitForURL((url) => url.searchParams.get('risk') === 'all' && url.searchParams.get('scope') === 'ended')
-      await panel.getByRole('group', { name: '按风险筛选进度', exact: true }).getByRole('button', { name: /^已结束/ }).waitFor()
-      for (const label of ['已逾期', '7天内到期', '任务受阻']) {
-        assert.equal(await panel.getByRole('button', { name: new RegExp(label) }).isDisabled(), true)
-      }
-      await choose(page, panel, '记录范围', '在执行')
-      await panel.getByRole('button', { name: '筛选', exact: true }).click()
-      const from = page.getByRole('textbox', { name: '开始日期', exact: true })
-      await from.click()
-      await page.locator('.ant-picker-dropdown:visible .ant-picker-cell-today .ant-picker-cell-inner').click()
-      await page.waitForURL((url) => Boolean(url.searchParams.get('from')))
-      await page.keyboard.press('Escape')
-      await panel.getByRole('button', { name: /未定交期/ }).click()
-      await page.waitForURL((url) => url.searchParams.get('risk') === 'undated' && !url.searchParams.has('from'))
-      await page.reload()
-      await panel.getByRole('button', { name: /未定交期/ }).waitFor()
-      await panel.getByRole('button', { name: '筛选', exact: true }).click()
-      assert.equal(await from.inputValue(), '')
-      await from.click()
-      await page.locator('.ant-picker-dropdown:visible .ant-picker-cell-today .ant-picker-cell-inner').click()
-      await page.waitForURL((url) => url.searchParams.get('risk') === 'all' && Boolean(url.searchParams.get('from')))
-      await page.keyboard.press('Escape')
-      await panel.getByRole('button', { name: '清空筛选', exact: true }).click()
-      await panel.getByRole('button', { name: '下一页', exact: true }).click()
-      await page.waitForURL((url) => url.searchParams.get('page') === '2')
-      await waitForFiniteAnimations(page)
-      await assertNoHorizontalOverflow(page, '桌面进度筛选')
-    },
+    viewport: { width: 1920, height: 1080 },
+    deviceScaleFactor: 2,
+    verify: verifyProgress(false, 'erp-progress'),
   }
   const tracking = [
     ...createTaskTrackingScenarios(deps).slice(0, 2).map((base) => ({ base, phone: false })),
@@ -156,32 +209,35 @@ export function createFilterConflictScenarios(deps) {
       if (phone) {
         await filters.getByText('只看逾期', { exact: true }).click()
         await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
-        await panel.getByRole('button', { name: '已结束', exact: true }).click()
+        await panel.getByRole('button', { name: '清除当前岗位：工程', exact: true }).click()
+        await panel.getByRole('button', { name: '清除关注事项：只看逾期', exact: true }).waitFor()
+        assert.equal(await panel.getByRole('button', { name: '清除当前岗位：工程', exact: true }).count(), 0)
+        await panel.getByRole('button', { name: /^已结束，/ }).click()
         await panel.getByRole('button', { name: /筛选流程/ }).click()
       } else {
         await choose(page, filters, '关注事项', '只看逾期')
-        await choose(page, filters, '流转状态', '已结束')
+        await filters.getByRole('button', { name: '完成', exact: true }).click()
+        await panel.getByRole('button', { name: /^已结束，/ }).click()
+        await panel.getByRole('button', { name: /筛选/ }).click()
       }
       await endedRequest
-      assert.equal(await filters.getByRole('combobox', { name: '当前岗位', exact: true }).isDisabled(), true)
+      await waitForFilters(page, filters)
+      if (!phone) assert.equal(await filters.getByRole('combobox', { name: '当前岗位', exact: true }).isDisabled(), true)
+      else assert.equal(await filters.getByRole('group', { name: '当前岗位', exact: true }).getByRole('button', { name: '工程', exact: true }).isDisabled(), true)
       if (phone) {
-        assert.equal(await filters.getByLabel('关注事项', { exact: true }).locator('input').evaluateAll((inputs) => inputs.length > 0 && inputs.every((input) => input.disabled)), true)
+        assert.equal(await filters.getByRole('group', { name: '关注事项', exact: true }).getByRole('button').evaluateAll((buttons) => buttons.length > 0 && buttons.every((button) => button.disabled)), true)
         await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
-      } else assert.equal(await filters.getByRole('combobox', { name: '关注事项', exact: true }).isDisabled(), true)
+      } else {
+        assert.equal(await filters.getByRole('group', { name: '关注事项', exact: true }).getByRole('button').evaluateAll((buttons) => buttons.length > 0 && buttons.every((button) => button.disabled)), true)
+        await filters.getByRole('button', { name: '完成', exact: true }).click()
+      }
       assert(requests.some((query) => query.status === 'completed' && !query.attention && !query.owner_role_key))
       await page.reload()
-      if (!phone) {
-        await panel.getByRole('button', { name: /筛选/ }).click()
-        await waitForFilters(page, filters)
-      }
       await Promise.all([
         page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.postDataJSON()?.method === 'list_tracking' && request.postDataJSON()?.params.status === 'active'),
-        phone
-          ? panel.getByRole('button', { name: '进行中', exact: true }).click()
-          : choose(page, filters, '流转状态', '进行中'),
+        panel.getByRole('button', { name: /^进行中，/ }).click(),
       ])
       assert(requests.filter((query) => query.status === 'active').every((query) => !query.attention && !query.owner_role_key))
-      if (!phone) await filters.getByRole('button', { name: '完成', exact: true }).click()
       await waitForFiniteAnimations(page)
       await assertNoHorizontalOverflow(page, `${base.name} 筛选`)
     },
@@ -203,7 +259,7 @@ export function createFilterConflictScenarios(deps) {
       await root.getByText('SO-DEMO-04', { exact: true }).waitFor()
       await page.getByRole('button', { name: '重置筛选', exact: true }).click()
       await root.getByRole('heading', { name: '筛选与搜索', exact: true }).click()
-      assert.equal(await root.getByRole('button', { name: /^在执行/ }).getAttribute('aria-pressed'), 'true')
+      assert.equal(await root.getByRole('button', { name: /^未结束/ }).getAttribute('aria-pressed'), 'true')
       await assertNoHorizontalOverflow(page, '控件筛选示例')
     },
   }
@@ -228,9 +284,9 @@ export function createFilterConflictScenarios(deps) {
       const panel = page.getByRole('region', { name: '进度看板', exact: true })
       await panel.getByRole('button', { name: '查看 MO-0001 进度摘要', exact: true }).waitFor()
       assert.equal(new URL(page.url()).searchParams.has('view'), false)
-      await panel.getByRole('button', { name: '筛选', exact: true }).click()
-      await page.getByRole('button', { name: '查看未关联销售的生产单', exact: true }).click()
-      await page.waitForURL((url) => url.searchParams.get('view') === 'production' && url.searchParams.get('risk') === 'unlinked')
+      await panel.getByRole('button', { name: /^筛选进度/ }).click()
+      await page.getByRole('button', { name: /^仅看未关联销售/ }).click()
+      await page.waitForURL((url) => url.searchParams.get('view') === 'production' && url.searchParams.get('unlinked_only') === 'true')
       await panel.getByRole('button', { name: '查看 MO-0003 进度摘要', exact: true }).waitFor()
       await page.reload()
       await panel.getByRole('button', { name: '查看 MO-0003 进度摘要', exact: true }).waitFor()
@@ -305,5 +361,55 @@ export function createFilterConflictScenarios(deps) {
       await assertNoHorizontalOverflow(page, `${config.key} 记录范围恢复`)
     },
   }))
-  return [...mobile, progress, productionOnly, ...tracking, controls, ...lifecycle]
+  const taskDates = {
+    ...createDashboardTaskScenarios(deps).find((scenario) => scenario.name === 'erp-task-board-desktop'),
+    name: 'erp-task-filter-date-parity',
+    path: '/erp/task-board?lane=finished',
+    verify: async (page) => {
+      const panel = page.getByRole('region', { name: '任务管理', exact: true })
+      const trigger = panel.locator('.erp-task-board-filters').getByRole('button', { name: /筛选/ })
+      const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
+      const dates = page.getByRole('dialog', { name: '选择处理日期范围', exact: true })
+      await trigger.click()
+      await waitForFilters(page, filters)
+      await choose(page, filters, '处理时间', '自定义日期')
+      await dates.waitFor()
+      await filters.waitFor({ state: 'hidden' })
+      const day = dates.getByRole('group', { name: '选择日期范围' }).getByRole('button').nth(15)
+      const selectedDate = await day.getAttribute('aria-label')
+      await day.click()
+      assert.equal(await dates.getByRole('button', { name: '应用日期', exact: true }).isEnabled(), false)
+      await dates.getByRole('button', { name: '取消', exact: true }).click()
+      await filters.waitFor()
+      assert.equal(new URL(page.url()).searchParams.has('period'), false)
+      await choose(page, filters, '处理时间', '自定义日期')
+      await day.click()
+      await day.click()
+      await dates.getByRole('button', { name: '应用日期', exact: true }).click()
+      await page.waitForURL((url) => url.searchParams.get('period') === 'custom' && url.searchParams.get('date_from') === selectedDate && url.searchParams.get('date_to') === selectedDate)
+      await trigger.click()
+      await filters.getByRole('button', { name: `${selectedDate} 至 ${selectedDate}`, exact: true }).click()
+      await dates.waitFor()
+      await dates.getByRole('button', { name: '下个月', exact: true }).click()
+      await dates.getByRole('group', { name: '选择日期范围' }).getByRole('button').nth(18).click()
+      await dates.getByRole('button', { name: '取消', exact: true }).click()
+      assert.equal(new URL(page.url()).searchParams.get('date_from'), selectedDate, '取消草稿保留已应用日期')
+      await filters.getByRole('button', { name: '完成', exact: true }).click()
+      const search = panel.getByPlaceholder('订单 / 产品 / 物料 / 款号')
+      await search.fill('保留搜索条件')
+      await search.press('Enter')
+      await page.waitForURL((url) => url.searchParams.get('q') === '保留搜索条件')
+      await trigger.click()
+      await waitForFilters(page, filters)
+      await filters.getByRole('button', { name: /清空筛选/ }).click()
+      await page.waitForURL((url) => !url.searchParams.has('period') && !url.searchParams.has('date_from') && url.searchParams.get('q') === '保留搜索条件')
+      await filters.getByRole('button', { name: '完成', exact: true }).click()
+      const finished = panel.getByRole('button', { name: /已结束/, pressed: true })
+      assert.equal(await finished.locator('.erp-filter-chip__clear').count(), 1)
+      await finished.click()
+      await page.waitForURL((url) => !url.searchParams.has('lane') || url.searchParams.get('lane') === 'all')
+      await assertNoHorizontalOverflow(page, '桌面任务日期筛选')
+    },
+  }
+  return [...mobile, progress, taskDates, productionOnly, ...tracking, controls, ...lifecycle]
 }

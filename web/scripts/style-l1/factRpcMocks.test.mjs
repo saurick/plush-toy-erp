@@ -1192,6 +1192,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
   assert.equal(unknownMethod.result.code, 40010)
   assert.match(unknownMethod.result.message, /unknown_workflow_method/u)
   const validCreateParams = {
+    idempotency_key: 'style-create-required',
     task_code: 'STYLE-L1-CREATE-REQUIRED',
     task_group: 'workflow-contract',
     task_name: '创建合同必填测试',
@@ -1204,7 +1205,6 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
   })
   const beforeInvalidCreateCount = beforeInvalidCreates.result.data.total
   for (const key of [
-    'idempotency_key',
     'expected_version',
     'command_key',
     'intent_hash',
@@ -1212,6 +1212,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
     'unexpected',
   ]) {
     const invalidCreate = await call('create_task', {
+      idempotency_key: crypto.randomUUID(),
       task_code: `STYLE-L1-CREATE-STRICT-${key}`,
       task_group: 'workflow-contract',
       task_name: '创建合同测试',
@@ -1253,6 +1254,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
     assert.equal(invalidCreate.result.code, 40010)
   }
   for (const requiredKey of [
+    'idempotency_key',
     'task_code',
     'task_group',
     'task_name',
@@ -1266,6 +1268,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
     assert.equal(invalidCreate.result.code, 40010)
   }
   for (const requiredStringKey of [
+    'idempotency_key',
     'task_code',
     'task_group',
     'task_name',
@@ -1273,6 +1276,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
     'owner_role_key',
   ]) {
     const invalidCreate = await call('create_task', {
+      idempotency_key: crypto.randomUUID(),
       ...validCreateParams,
       [requiredStringKey]: '   ',
     })
@@ -1280,6 +1284,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
   }
   for (const invalidSourceID of [0, -1, 1.5, '1']) {
     const invalidCreate = await call('create_task', {
+      idempotency_key: crypto.randomUUID(),
       ...validCreateParams,
       source_id: invalidSourceID,
     })
@@ -1294,6 +1299,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
     9_224_318_016_000,
   ]) {
     const invalidCreate = await call('create_task', {
+      idempotency_key: crypto.randomUUID(),
       ...validCreateParams,
       due_at: invalidDueAt,
     })
@@ -1309,6 +1315,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
   assert.equal(defaultStatusCreated.result.data.task.task_status_key, 'ready')
 
   const created = await call('create_task', {
+      idempotency_key: crypto.randomUUID(),
     task_code: 'STYLE-L1-EXPLAIN-CONTRACT',
     task_group: 'workflow-contract',
     task_name: '动作权限合同测试',
@@ -1418,6 +1425,7 @@ test('style-l1 workflow mock rejects source-produced task groups and code namesp
     ['trial_production_work', 'source-production-exception-81'],
   ]) {
     const rejected = await call('create_task', {
+      idempotency_key: crypto.randomUUID(),
       task_code: taskCode,
       task_group: taskGroup,
       task_name: '不允许手工伪造来源任务',
@@ -1668,6 +1676,7 @@ test('style-l1 workflow role task view mock applies role, view and cursor bounda
   })
   const createTask = (params) =>
     call('create_task', {
+      idempotency_key: crypto.randomUUID(),
       task_group: 'workflow-contract',
       source_type: 'workflow-contract',
       priority: 1,
@@ -1831,6 +1840,7 @@ test('style-l1 workflow role task view mock keeps approval projection capability
     }
   )
   const createdApproval = await call('create_task', {
+      idempotency_key: crypto.randomUUID(),
     task_code: 'STYLE-L1-APPROVAL-PAYMENT',
     task_group: 'finance_payment_approval',
     task_name: '付款审批',
@@ -1884,6 +1894,7 @@ test('style-l1 workflow mock serves the dedicated task board projection', async 
   const call = await workflowMockHarness()
   for (let index = 1; index <= 10; index += 1) {
     const created = await call('create_task', {
+      idempotency_key: crypto.randomUUID(),
       task_code: `STYLE-L1-BOARD-${index}`,
       task_group: 'trial_warehouse_work',
       task_name: `任务管理分页 ${index}`,
@@ -1933,6 +1944,7 @@ test('style-l1 workflow explain mock fails closed on permission and owner mismat
     },
   })
   const missingPermissionTask = await missingPermissionCall('create_task', {
+      idempotency_key: crypto.randomUUID(),
     task_code: 'STYLE-L1-MISSING-PERMISSION',
     task_group: 'workflow-contract',
     task_name: '权限缺失测试',
@@ -1985,6 +1997,7 @@ test('style-l1 workflow explain mock fails closed on permission and owner mismat
     },
   })
   const wrongOwnerTask = await wrongOwnerCall('create_task', {
+      idempotency_key: crypto.randomUUID(),
     task_code: 'STYLE-L1-WRONG-OWNER',
     task_group: 'workflow-contract',
     task_name: '责任角色不匹配测试',
@@ -2035,6 +2048,7 @@ test('style-l1 workflow explain mock fails closed on permission and owner mismat
   const missingEffectiveActionTask = await missingEffectiveActionCall(
     'create_task',
     {
+      idempotency_key: crypto.randomUUID(),
       task_code: 'STYLE-L1-MISSING-EFFECTIVE-SESSION',
       task_group: 'workflow-contract',
       task_name: '生效权限缺失测试',
@@ -2086,6 +2100,7 @@ test('style-l1 workflow mutation routes enforce the same permission, owner and a
     },
   })
   const assignedOther = await ownerCall('create_task', {
+      idempotency_key: crypto.randomUUID(),
     task_code: 'STYLE-L1-ASSIGNED-OTHER',
     task_group: 'workflow-contract',
     task_name: '已指派给其他人',
@@ -2108,6 +2123,7 @@ test('style-l1 workflow mutation routes enforce the same permission, owner and a
   assert.equal(deniedAssignedOther.result.code, 40010)
 
   const assignedSelf = await ownerCall('create_task', {
+      idempotency_key: crypto.randomUUID(),
     task_code: 'STYLE-L1-ASSIGNED-SELF',
     task_group: 'workflow-contract',
     task_name: '已指派给当前处理人',
@@ -2149,6 +2165,7 @@ test('style-l1 workflow mutation routes enforce the same permission, owner and a
     },
   })
   const warehouseTask = await superCall('create_task', {
+      idempotency_key: crypto.randomUUID(),
     task_code: 'STYLE-L1-SUPER-NON-OWNER',
     task_group: 'workflow-contract',
     task_name: 'super admin 非责任岗位',
@@ -2342,6 +2359,7 @@ test('style-l1 workflow mutations replay exact receipts before terminal and CAS 
   for (const [index, item] of cases.entries()) {
     const call = await workflowMockHarness()
     const created = await call('create_task', {
+      idempotency_key: crypto.randomUUID(),
       task_code: `STYLE-L1-REPLAY-${index}`,
       task_group: 'workflow-contract',
       task_name: `精确重放 ${item.method}`,
@@ -2384,6 +2402,7 @@ test('style-l1 workflow mutations replay exact receipts before terminal and CAS 
 test('style-l1 workflow resume is a reasoned blocked-to-ready mutation with exact replay', async () => {
   const call = await workflowMockHarness()
   const created = await call('create_task', {
+      idempotency_key: crypto.randomUUID(),
     task_code: 'STYLE-L1-RESUME-REPLAY',
     task_group: 'workflow-contract',
     task_name: '解除阻塞精确重放',
@@ -2450,6 +2469,7 @@ test('style-l1 workflow mutation accepts action capability without read capabili
   }
   const call = await workflowMockHarness(admin)
   const created = await call('create_task', {
+      idempotency_key: crypto.randomUUID(),
     task_code: 'STYLE-L1-ACTION-ONLY',
     task_group: 'workflow-contract',
     task_name: '动作权限独立于读取权限',

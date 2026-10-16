@@ -73,6 +73,7 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
                 current_tasks: [],
               }],
               total: 1,
+              status_counts: { active: 1, completed: 0 },
               limit: params.limit,
               offset: params.offset,
             }
@@ -389,7 +390,7 @@ export function createBusinessFollowupScenarios({ assert, outputDir, path, asser
             assert.equal(params.scope, 'visible')
             assert.equal(params.source_type, sourceType)
             assert.equal(params.source_id, sourceID)
-            return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data: { items: [], total: 0, limit: params.limit, offset: params.offset } } } })
+            return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: 'OK', data: { items: [], total: 0, status_counts: {}, limit: params.limit, offset: params.offset } } } })
           }
           if (method !== 'list_tasks' || !params.source_id || params.source_type !== sourceType) return route.fallback()
           assert.equal(params.source_type, sourceType)

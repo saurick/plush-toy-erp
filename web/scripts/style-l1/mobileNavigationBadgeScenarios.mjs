@@ -99,6 +99,7 @@ export function createMobileNavigationBadgeScenarios({
                       next_cursor: hasMore ? 'badge-next-page' : '',
                       has_more: hasMore,
                       counts: currentCounts,
+                      status_counts: { ready: currentCounts.ready, blocked: currentCounts.blocked },
                       risk_scope: 'role',
                       server_time: Math.floor(Date.now() / 1000),
                     },
