@@ -967,7 +967,7 @@ test("business collaboration panel is limited to selected purchase and outsourci
   );
   assert.match(
     collaborationTaskSource,
-    /listAllPaginatedRecords\(\s*listTasks,\s*\{\s*source_type:\s*String\(sourceType[\s\S]*?source_id:\s*requestedSourceID,?\s*\},\s*['"]tasks['"],\s*\{\s*signal:\s*request\.signal\s*\}/u,
+    /listAllPaginatedRecords\(\s*listTasks,\s*\{\s*source_type:\s*canonicalSourceType\(sourceType\),\s*source_id:\s*requestedSourceID,?\s*\},\s*['"]tasks['"],\s*\{\s*signal:\s*request\.signal\s*\}/u,
     "shared collaboration loader must exhaust every page for the exact current source record and preserve request cancellation",
   );
   assert.doesNotMatch(
@@ -1016,9 +1016,7 @@ test("sales order page keeps write buttons behind projected actions", () => {
   const formSource = readFileSync(formPath, "utf8");
 
   assert(
-    pageSource.includes(
-      "const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')",
-    ),
+    /const canCreateOrder = hasActionPermission\(\s*adminProfile,\s*'sales_order\.create'\s*\)/u.test(pageSource),
     "sales order page must derive create permission through projected action helper",
   );
   assert(
@@ -1208,9 +1206,9 @@ test("fact pages keep write buttons behind projected actions and status guards",
       relativePath: "web/src/erp/pages/ShipmentsPage.jsx",
       name: "shipment page",
       tokens: [
-        "const canCreate = hasActionPermission(adminProfile, 'shipment.create')",
-        "const canShip = hasActionPermission(adminProfile, 'shipment.ship')",
-        "const canCancel = hasActionPermission(adminProfile, 'shipment.cancel')",
+        "const canCreate = hasActionPermission(\n    adminProfile,\n    'shipment.create'\n  )",
+        "const canShip = hasActionPermission(\n    adminProfile,\n    'shipment.ship'\n  )",
+        "const canCancel = hasActionPermission(\n    adminProfile,\n    'shipment.cancel'\n  )",
         "primaryAction={\n          canCreate ? (",
         "disabled={!selectedRow || saving}",
         "onClick={() => openShipmentDetails(selectedRow)}",

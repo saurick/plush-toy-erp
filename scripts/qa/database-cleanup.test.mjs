@@ -17,11 +17,11 @@ const backupHash = "a".repeat(64);
 const sourceFingerprint = "b".repeat(64);
 
 function fixture() {
-  const manifestDir = fs.mkdtempSync(path.join(os.tmpdir(), "plush-db-cleanup-"));
+  const manifestDir = fs.mkdtempSync(
+    path.join(os.tmpdir(), "plush-db-cleanup-"),
+  );
   const backup = Buffer.from("archive");
-  const actualHash = createHash("sha256")
-    .update(backup)
-    .digest("hex");
+  const actualHash = createHash("sha256").update(backup).digest("hex");
   fs.writeFileSync(path.join(manifestDir, "database.dump"), backup);
   const manifest = {
     schemaVersion: DATABASE_ARCHIVE_SCHEMA,
@@ -43,6 +43,9 @@ function fixture() {
     deletionAuthorizedByReceipt: false,
   };
   const inventory = {
+    schemaVersion: "plush-database-inventory/v1",
+    generatedAt: new Date().toISOString(),
+    server: { safeTarget: "host=127.0.0.1 port=55432" },
     mode: "report-only",
     status: "complete",
     databases: [
@@ -70,11 +73,12 @@ test("cleanup requires exact archive-bound confirmation and verifies disappearan
       "postgres://postgres:secret@127.0.0.1:55432/postgres?sslmode=disable",
     confirmation,
     databaseName,
-    generatedAt: new Date("2026-07-28T00:00:00Z"),
+    generatedAt: new Date(inventory.generatedAt),
     inventory,
     manifest,
     manifestDir,
     runtime: {
+      findEvidenceReferences: () => [],
       databaseState: () =>
         exists
           ? { exists: true, owner: "postgres", connections: 0 }
@@ -107,6 +111,7 @@ test("cleanup fails closed on references, active connections, bad backup, and lo
     manifest: base.manifest,
     manifestDir: base.manifestDir,
     runtime: {
+      findEvidenceReferences: () => [],
       databaseState: () => ({
         exists: true,
         owner: "postgres",
@@ -137,9 +142,7 @@ test("cleanup fails closed on references, active connections, bad backup, and lo
         ...common,
         inventory: {
           ...base.inventory,
-          databases: [
-            { ...base.inventory.databases[0], connections: 1 },
-          ],
+          databases: [{ ...base.inventory.databases[0], connections: 1 }],
         },
       }),
     /connections/u,
@@ -183,7 +186,10 @@ test("cleanup requires an explicit flag for the registered development cluster",
       "postgres://postgres:secret@192.168.0.133:5432/postgres?sslmode=disable",
     confirmation,
     databaseName,
-    inventory: base.inventory,
+    inventory: {
+      ...base.inventory,
+      server: { safeTarget: "host=192.168.0.133 port=5432" },
+    },
     manifest: remoteManifest,
     manifestDir: base.manifestDir,
   };
@@ -192,6 +198,7 @@ test("cleanup requires an explicit flag for the registered development cluster",
       runDatabaseCleanup({
         ...request,
         runtime: {
+          findEvidenceReferences: () => [],
           databaseState: () => ({
             exists: true,
             owner: "postgres",
@@ -208,6 +215,7 @@ test("cleanup requires an explicit flag for the registered development cluster",
     ...request,
     allowRegisteredDevelopment: true,
     runtime: {
+      findEvidenceReferences: () => [],
       databaseState: () =>
         exists
           ? { exists: true, owner: "postgres", connections: 0 }
@@ -218,4 +226,74 @@ test("cleanup requires an explicit flag for the registered development cluster",
     },
   });
   assert.equal(report.dropped, true);
+});
+
+test("cleanup rejects stale or foreign inventory and newly added references before dropping", () => {
+  const base = fixture();
+  let drops = 0;
+  const common = {
+    ...base,
+    adminURL: "postgres://postgres@127.0.0.1:55432/postgres",
+    databaseName,
+    confirmation: databaseCleanupConfirmation({
+      backupHash: base.actualHash,
+      databaseName,
+      sourceFingerprint,
+    }),
+    runtime: {
+      findEvidenceReferences: () => [],
+      databaseState: () => ({
+        exists: true,
+        owner: "postgres",
+        connections: 0,
+      }),
+      dropDatabase: () => {
+        drops++;
+      },
+    },
+  };
+  assert.throws(
+    () =>
+      runDatabaseCleanup({
+        ...common,
+        inventory: { ...base.inventory, generatedAt: "2020-01-01T00:00:00Z" },
+      }),
+    /last hour/,
+  );
+  assert.throws(
+    () =>
+      runDatabaseCleanup({
+        ...common,
+        inventory: {
+          ...base.inventory,
+          server: { safeTarget: "host=127.0.0.1 port=5432" },
+        },
+      }),
+    /server/,
+  );
+  assert.throws(
+    () =>
+      runDatabaseCleanup({
+        ...common,
+        runtime: {
+          ...common.runtime,
+          findEvidenceReferences: () => ["docs/current.md"],
+        },
+      }),
+    /live repository references/,
+  );
+  assert.throws(
+    () =>
+      runDatabaseCleanup({
+        ...common,
+        runtime: {
+          ...common.runtime,
+          findEvidenceReferences: () => {
+            throw new Error("scan failed");
+          },
+        },
+      }),
+    /scan failed/,
+  );
+  assert.equal(drops, 0);
 });

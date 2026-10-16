@@ -258,6 +258,26 @@ const allowedERPImportsByFile = new Map([
     new Set(["utils/workflowFulfillment.mjs"]),
   ],
   [
+    "web/src/dev-workbench/components/flow-state/BusinessChainTopics.jsx",
+    new Set(["utils/workflowFulfillment.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/config/devBusinessChainProjection.mjs",
+    new Set(["utils/workflowFulfillment.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/config/devFulfillmentSubflow.mjs",
+    new Set(["utils/roleKeys.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/config/devFulfillmentSubflow.test.mjs",
+    new Set(["utils/roleKeys.mjs", "utils/workflowFulfillment.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/pages/DevBusinessChainCustomerReviewPrint.jsx",
+    new Set(["utils/workflowFulfillment.mjs"]),
+  ],
+  [
     "web/src/dev-workbench/components/DevUIFeedbackExamples.jsx",
     new Set([
       "components/business-list/BusinessFormModal",

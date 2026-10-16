@@ -273,7 +273,10 @@ export function buildDevWorkbenchReceipt({
   return Object.freeze(receipt);
 }
 
-export function validateDevWorkbenchReceipt(receipt) {
+export function validateDevWorkbenchReceipt(
+  receipt,
+  { repoRoot = path.resolve(import.meta.dirname, "../..") } = {},
+) {
   if (!receipt || receipt.schemaVersion !== DEV_WORKBENCH_RECEIPT_SCHEMA) {
     throw new Error("unsupported dev workbench receipt schema");
   }
@@ -342,6 +345,11 @@ export function validateDevWorkbenchReceipt(receipt) {
   ) {
     throw new Error("receipt artifacts and digests do not match");
   }
+  for (const artifactPath of receipt.artifacts) {
+    const artifact = resolveArtifact(repoRoot, artifactPath);
+    if (artifact.digest !== receipt.artifactDigests[artifactPath])
+      throw new Error(`receipt artifact digest changed: ${artifactPath}`);
+  }
   buildDevWorkbenchReceipt({
     artifactPaths: [],
     databaseRunIdentity: receipt.databaseRunIdentity,
@@ -370,8 +378,8 @@ export function validateDevWorkbenchReceipt(receipt) {
   return receipt;
 }
 
-export function writeDevWorkbenchReceipt(outPath, receipt) {
-  validateDevWorkbenchReceipt(receipt);
+export function writeDevWorkbenchReceipt(outPath, receipt, options = {}) {
+  validateDevWorkbenchReceipt(receipt, options);
   const absolutePath = path.resolve(outPath);
   mkdirSync(path.dirname(absolutePath), { recursive: true });
   const temporaryPath = `${absolutePath}.tmp-${process.pid}`;

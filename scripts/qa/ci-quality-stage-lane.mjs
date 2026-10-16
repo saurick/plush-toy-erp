@@ -49,7 +49,7 @@ export const CI_WEB_QUALITY_LANES = Object.freeze({
     substeps: Object.freeze(["eslint", "stylelint", "web_test"]),
     requiresTests: true,
     pnpm: true,
-    chromium: false,
+    chromium: true,
     postgres: false,
     makeData: false,
     webBuild: false,

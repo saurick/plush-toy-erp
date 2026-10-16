@@ -135,6 +135,41 @@ test("CI uses the module toolchain and keeps release and Runner pins aligned", (
   );
 });
 
+test("Node declarations and build images follow the single n version pin", () => {
+  assert.match(nodeVersion, /^24\.21\.\d+$/u);
+  const pkg = JSON.parse(
+    readFileSync(new URL("../../web/package.json", import.meta.url), "utf8"),
+  );
+  assert.equal(pkg.engines.node, nodeVersion.replace(/\.\d+$/u, ".x"));
+  for (const name of [".nvmrc", ".node-version"]) {
+    assert.equal(existsSync(new URL(`../../${name}`, import.meta.url)), false);
+  }
+  for (const name of [
+    "server/Dockerfile",
+    "web/Dockerfile",
+    "server/Makefile",
+  ]) {
+    const source = readFileSync(
+      new URL(`../../${name}`, import.meta.url),
+      "utf8",
+    );
+    const imageVersions = [...source.matchAll(/node:(\d+\.\d+\.\d+)/gu)].map(
+      (match) => match[1],
+    );
+    assert(imageVersions.length > 0);
+    assert(
+      imageVersions.every((version) => version === nodeVersion),
+      name,
+    );
+  }
+  assert(runnerCloudInit.includes(`node_version=${nodeVersion}\n`));
+  for (const match of runnerCloudInit.matchAll(
+    /test "\$\(node --version\)" = v(\d+\.\d+\.\d+)/gu,
+  )) {
+    assert.equal(match[1], nodeVersion);
+  }
+});
+
 test("documentation routing is guarded by the shared complete non-Markdown path set", () => {
   const rules = workflow.split("\nstages:")[0];
   const paths = [...rules.matchAll(/^          - "([^"]+)"$/gmu)].map((match) => match[1]);
@@ -608,7 +643,6 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     "node_release_c",
     "node_core",
     "node",
-    "web_checks",
     "web_build",
   ]) {
     assert.match(
@@ -619,6 +653,10 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
       ),
     );
   }
+  assert.match(
+    workflow,
+    /^quality_web_checks:\n  <<: \[\*quality_shard, \*browser_cache_pull\]/mu,
+  );
   assert.match(
     workflow,
     /^quality_server_test_build:\n  <<: \[\*quality_shard, \*browser_cache_pull\]/mu,
@@ -1352,7 +1390,7 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
   const runcmdEntries =
     runnerCloudInit.match(/^  - \[bash, -lc, .+\]$/gmu) ?? [];
 
-  assert.equal(downloadCalls.length, 5);
+  assert.equal(downloadCalls.length, 6);
   assert.equal(rawCurlCalls.length, 2);
   assert.ok(resumableDownload);
   assert.match(resumableDownload, /--continue-at -/u);
@@ -1431,22 +1469,26 @@ test("Runner VM bootstrap retries pinned downloads and fails closed", () => {
 
 test("Runner VM bootstrap skips only exact base toolchain state", () => {
   assert.match(runnerCloudInit, /symlink_target_is\(\) \{/u);
-  assert.match(runnerCloudInit, /\[\[ -x \/opt\/node\/bin\/node \]\]/u);
+  assert.match(runnerCloudInit, /n_version=10[.]2[.]0/u);
   assert.match(
     runnerCloudInit,
-    /symlink_target_is \/usr\/local\/bin\/node \/opt\/node\/bin\/node/u,
+    /\[\[ -x "\$node_cache\/bin\/node" && ! -L \/usr\/local\/bin\/node \]\]/u,
   );
   assert.match(
     runnerCloudInit,
-    /symlink_target_is \/usr\/local\/bin\/npm \/opt\/node\/bin\/npm/u,
+    /cmp -s "\$node_cache\/bin\/node" \/usr\/local\/bin\/node/u,
   );
   assert.match(
     runnerCloudInit,
-    /symlink_target_is \/usr\/local\/bin\/npx \/opt\/node\/bin\/npx/u,
+    /symlink_target_is \/usr\/local\/bin\/npm [.]\.\/lib\/node_modules\/npm\/bin\/npm-cli[.]js/u,
   );
   assert.match(
     runnerCloudInit,
-    /symlink_target_is \/usr\/local\/bin\/corepack \/opt\/node\/bin\/corepack/u,
+    /symlink_target_is \/usr\/local\/bin\/npx [.]\.\/lib\/node_modules\/npm\/bin\/npx-cli[.]js/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /symlink_target_is \/usr\/local\/bin\/corepack [.]\.\/lib\/node_modules\/corepack\/dist\/corepack[.]js/u,
   );
   assert.match(
     runnerCloudInit,
@@ -1477,7 +1519,7 @@ test("Runner VM bootstrap skips only exact base toolchain state", () => {
   );
   assert.match(
     runnerCloudInit,
-    /if ! node_ready; then\n\s+node_archive=[\s\S]+?sha256sum --check --strict[\s\S]+?\n\s+fi\n\s+if ! pnpm_ready; then/u,
+    /if ! node_ready; then\n\s+node_archive=[\s\S]+?sha256sum --check --strict[\s\S]+?\n\s+fi\n\s+# [^\n]+\n\s+rm -rf \/opt\/node\n\s+if ! pnpm_ready; then/u,
   );
   assert.match(
     runnerCloudInit,
@@ -1487,6 +1529,19 @@ test("Runner VM bootstrap skips only exact base toolchain state", () => {
     runnerCloudInit,
     /if ! go_ready; then\n\s+go_archive=[\s\S]+?sha256sum --check --strict[\s\S]+?\n\s+fi\n\s+if ! govulncheck_ready; then\n\s+retry_command env GOPROXY=/u,
   );
+  assert.match(
+    runnerCloudInit,
+    /if ! n_ready; then\n\s+n_archive=[\s\S]+?sha512sum --check --strict[\s\S]+?install -o root -g root -m 0755[\s\S]+?\n\s+n_ready\n\s+fi/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /owned_executable_is \/usr\/local\/bin\/n &&[\s\S]+?e4f5baa2e912d3a39b50d9f617de03acf2b4eeb3590f0a4181123f8393da1a19[\s\S]+?sha256sum --check --status/u,
+  );
+  assert.match(
+    runnerCloudInit,
+    /N_PREFIX=\/usr\/local N_CACHE_PREFIX=\/usr\/local N_PRESERVE_NPM="" N_PRESERVE_COREPACK="" \/usr\/local\/bin\/n --offline "\$node_version"\n\s+node_ready/u,
+  );
+  assert.doesNotMatch(runnerCloudInit, /ln -sfn \/opt\/node/u);
   assert.doesNotMatch(
     runnerCloudInit,
     /command -v (?:node|npm|npx|corepack|pnpm|pnpx|go)/u,

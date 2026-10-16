@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import {
+  verifyDatabaseRuntimeIdentity,
+  bindBrowserWriteBackend,
+  browserRPCURL,
+} from "./browser-write-target.mjs";
 import { createRequire } from "node:module";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -334,7 +338,11 @@ export function staleRetryReceipt(response, service, method) {
 }
 
 export function assertExceptionFlowEvidenceContract(report) {
-  assert.deepEqual(report?.failures, [], "exception flows must have no failures");
+  assert.deepEqual(
+    report?.failures,
+    [],
+    "exception flows must have no failures",
+  );
   assert.equal(report?.flows?.length, 3, "three exception flows must execute");
   for (const flow of report.flows) {
     assert.equal(flow?.passed, true, `${String(flow?.key)} must pass`);
@@ -417,10 +425,13 @@ async function installLostMutationResponse(page, service, method) {
       request = null;
     }
     if (state.injected || request?.method !== method) {
-      await route.continue();
+      await route.fallback();
       return;
     }
-    const response = await route.fetch();
+    const response = await route.fetch({
+      url: browserRPCURL(page.verifiedBackendURL, route.request().url()),
+      maxRedirects: 0,
+    });
     let json = null;
     try {
       json = await response.json();
@@ -438,12 +449,14 @@ async function installLostMutationResponse(page, service, method) {
   };
 }
 
-async function login(browser, { baseURL, password, roleKey }) {
+async function login(browser, { baseURL, backendURL, password, roleKey }) {
   const account = accountForRole(roleKey);
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
   });
+  await bindBrowserWriteBackend(context, backendURL);
   const page = await context.newPage();
+  page.verifiedBackendURL = backendURL;
   const httpFailures = attachUnexpectedHTTPFailureCollector(page);
   page.setDefaultTimeout(PAGE_TIMEOUT_MS);
   try {
@@ -586,7 +599,9 @@ async function actOnTaskInBrowser(
   const session = await login(browser, { ...options, roleKey });
   try {
     await goto(session.page, options.baseURL, "/erp/task-board", "任务管理");
-    const search = session.page.getByPlaceholder("订单 / 产品 / 物料 / 款号", { exact: true });
+    const search = session.page.getByPlaceholder("订单 / 产品 / 物料 / 款号", {
+      exact: true,
+    });
     await search.fill(sourceNo);
     await search.press("Enter");
     const card = session.page
@@ -659,36 +674,8 @@ function findRecord(items, predicate, label) {
   return item;
 }
 
-async function verifyRuntimeIdentity({ backendURL, databaseName }) {
-  const ready = await fetch(new URL("/readyz", `${backendURL}/`));
-  if (!ready.ok || String(await ready.text()).trim() !== "ready") {
-    throw new AcceptanceError("isolated action backend is not ready");
-  }
-  const digest = createHash("sha256")
-    .update(`database-v1\n${databaseName}`)
-    .digest("hex");
-  const response = await fetch(
-    new URL("/readyz/runtime-identity", `${backendURL}/`),
-    {
-      redirect: "error",
-      headers: {
-        Accept: "text/plain",
-        "X-ERP-Runtime-Identity-Scope": "database-v1",
-        "X-ERP-Expected-Runtime-Identity-SHA256": digest,
-      },
-    },
-  );
-  const body = String(await response.text()).trim();
-  if (
-    !response.ok ||
-    body !== "runtime identity matched" ||
-    response.headers.get("X-ERP-Runtime-Identity-Proof") !== "matched-v1"
-  ) {
-    throw new AcceptanceError(
-      "isolated action database runtime identity mismatch",
-    );
-  }
-  return { databaseName, proof: "matched-v1", scope: "database-v1" };
+export async function verifyRuntimeIdentity(options, fetchImpl = fetch) {
+  return verifyDatabaseRuntimeIdentity(options, fetchImpl);
 }
 
 async function runFinancePaymentFlow(browser, options, report) {
@@ -954,9 +941,7 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
     const modal = await visibleModal(session.page, "登记人工库存调整");
     await modal.getByLabel("作业单号").fill(operationNo);
     await modal.getByLabel("业务原因").fill("真实浏览器异常流验收");
-    await modal
-      .getByLabel("调整数量（增加填正数，扣减填负数）")
-      .fill("1");
+    await modal.getByLabel("调整数量（增加填正数，扣减填负数）").fill("1");
     await modal.locator("summary").filter({ hasText: "明细备注" }).click();
     await modal.getByLabel("明细备注").fill("真实浏览器创建与审批");
     const createResponse = waitForRpcResponse(
@@ -975,8 +960,13 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
       .locator(".ant-notification-notice")
       .filter({ hasText: "人工库存调整已提交审批" });
     await submissionReceipt.waitFor({ state: "visible" });
-    await submissionReceipt.getByRole("status").filter({ hasText: "当前去向：" }).waitFor({ state: "visible" });
-    await submissionReceipt.getByRole("link", { name: "流程跟踪", exact: true }).waitFor({ state: "visible" });
+    await submissionReceipt
+      .getByRole("status")
+      .filter({ hasText: "当前去向：" })
+      .waitFor({ state: "visible" });
+    await submissionReceipt
+      .getByRole("link", { name: "流程跟踪", exact: true })
+      .waitFor({ state: "visible" });
     const submitted = (
       await browserRpc(session.page, "inventory", "get_inventory_operation", {
         id: operation.id,
@@ -1525,7 +1515,9 @@ async function runProductionExceptionFlow(browser, options, report) {
       .locator('[data-business-action-key="operational-fact-cancel"]')
       .filter({ visible: true });
     if (!(await cancelAction.count())) {
-      await session.page.getByRole("button", { name: /^更多操作，共/u }).click();
+      await session.page
+        .getByRole("button", { name: /^更多操作，共/u })
+        .click();
     }
     await cancelAction.click();
     const cancelModal = await visibleModal(session.page, "取消已过账业务记录");
