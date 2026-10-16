@@ -70,7 +70,7 @@ function buildSalesOrderContactFormValues(source = {}) {
   const snapshot = source?.contact_snapshot || source || {}
   return {
     contact_name: snapshot.name || '',
-    contact_phone: snapshot.mobile || snapshot.phone || '',
+    contact_phone: snapshot.phone || '',
     contact_mobile: snapshot.mobile || '',
     contact_email: snapshot.email || '',
     contact_title: snapshot.title || '',
