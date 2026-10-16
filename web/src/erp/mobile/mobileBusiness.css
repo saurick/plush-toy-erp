@@ -38,7 +38,7 @@
 .mobile-business-layout__hint {
   margin: 0 0 12px;
   color: var(--erp-text-secondary, #64748b);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .mobile-business-layout__content[data-business-form-editing='true']

@@ -1,90 +1,148 @@
-import React, { useState } from 'react'
-import { Button } from 'antd'
-import MobileTaskExtraFilters from './MobileTaskExtraFilters.jsx'
-import BusinessStatusFilter from '../../components/business-list/BusinessStatusFilter.jsx'
-import MobileFilterChoices from './MobileFilterChoices.jsx'
+import React, { useCallback, useState } from 'react'
+import { Button, Calendar } from 'antd'
+import { LeftOutlined, RightOutlined } from '@ant-design/icons'
+import dayjs from 'dayjs'
+import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import MobileFilterPopover from './MobileFilterPopover.jsx'
 import WorkflowTaskDiscoveryFilters from '../../components/workflow/WorkflowTaskDiscoveryFilters.jsx'
 import { taskDiscoveryFilterLabels } from '../../utils/workflowTaskDiscovery.mjs'
-import FilterDateRangePicker from '../../components/business-list/FilterDateRangePicker.jsx'
+import { currentBusinessDate } from '../../utils/businessDate.mjs'
 import {
   WORKFLOW_HISTORY_PERIOD_OPTIONS,
   WORKFLOW_HISTORY_STATUS_OPTIONS,
 } from '../../utils/workflowRoleTaskHistory.mjs'
 import './mobileTaskHistoryOptions.css'
 
-export default function MobileTaskHistoryOptions({ options, onChange, profile, roleKey, people, sourceTypes, peopleError, onRetryPeople, counts, loading }) {
+function renderCalendarHeader({ value, onChange }) {
+  return (
+    <div className="mobile-history-calendar-month">
+      <Button
+        aria-label="上个月"
+        icon={<LeftOutlined />}
+        onClick={() => onChange(value.subtract(1, 'month'))}
+      />
+      <span>{value.format('YYYY 年 M 月')}</span>
+      <Button
+        aria-label="下个月"
+        icon={<RightOutlined />}
+        onClick={() => onChange(value.add(1, 'month'))}
+      />
+    </div>
+  )
+}
+
+export default function MobileTaskHistoryOptions({ options, onChange, profile, roleKey }) {
   const { period = '', dateFrom = '', dateTo = '', statusKey = '' } = options
   const [open, setOpen] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
+  const [startDate, setStartDate] = useState('')
+  const [month, setMonth] = useState(() =>
+    dayjs(dateFrom || currentBusinessDate())
+  )
+  const renderCalendarDay = useCallback(
+    (date) => {
+      const value = date.format('YYYY-MM-DD')
+      const selected = startDate
+        ? value === startDate
+        : period === 'custom' && value >= dateFrom && value <= dateTo
+      return (
+        <div
+          className="mobile-history-calendar-day"
+          data-selected={Boolean(selected)}
+        >
+          {date.date()}
+        </div>
+      )
+    },
+    [dateFrom, dateTo, period, startDate]
+  )
+  const selectDate = (date, { source }) => {
+    if (source !== 'date') return
+    const value = date.format('YYYY-MM-DD')
+    if (!startDate || value < startDate) {
+      setStartDate(value)
+      return
+    }
+    onChange({ period: 'custom', dateFrom: startDate, dateTo: value })
+    setStartDate('')
+    setCalendarOpen(false)
+  }
 
   return (
-    <>
-      <MobileFilterPopover
-        contextLabel="已办"
-        title="已办筛选"
-        open={open}
-        onOpenChange={setOpen}
-        count={Number(period === 'custom') + Number(Boolean(statusKey)) + taskDiscoveryFilterLabels(options).length + Number(Boolean(options.sourceType))}
-        testId="mobile-history-filter-trigger"
-        onReset={() => {
+    <MobileFilterPopover
+      contextLabel="已办"
+      title="已办筛选"
+      open={open}
+      onOpenChange={setOpen}
+      count={Number(Boolean(period)) + Number(Boolean(statusKey)) + taskDiscoveryFilterLabels(options).length}
+      testId="mobile-history-filter-trigger"
+      onReset={() => {
         setCalendarOpen(false)
-        onChange({ period: '', dateFrom: '', dateTo: '', statusKey: '', sourceType: '', assignee: '' })
+        setStartDate('')
+        onChange({ period: '', dateFrom: '', dateTo: '', statusKey: '', moduleKey: '', chainKey: '', stageKey: '', assignee: '' })
       }}
-      >
-        <fieldset role="presentation">
-          <legend className="mobile-filter-legend-action">
-            <span>处理时间</span>
-            <Button
-              type="text"
-              className="mobile-history-custom-date"
-              aria-expanded={calendarOpen}
-              onClick={() => { setOpen(false); setCalendarOpen(true) }}
-            >
-              {period === 'custom' ? `${dateFrom} 至 ${dateTo}` : '自定义日期'}
-            </Button>
-          </legend>
-          <MobileFilterChoices
-            label="处理时间筛选"
-            options={WORKFLOW_HISTORY_PERIOD_OPTIONS}
-            value={period === 'custom' ? null : period}
-            onChange={(value) => {
+    >
+      <fieldset>
+        <legend>处理时间</legend>
+        <SlidingSegmented
+          block
+          aria-label="处理时间筛选"
+          options={WORKFLOW_HISTORY_PERIOD_OPTIONS}
+          value={period === 'custom' ? null : period}
+          onChange={(value) => {
             setCalendarOpen(false)
-                onChange({ period: value, dateFrom: '', dateTo: '' })
+            setStartDate('')
+            onChange({ period: value, dateFrom: '', dateTo: '' })
           }}
-          />
-        </fieldset>
-        <fieldset role="presentation">
-          <legend>处理结果</legend>
-          <BusinessStatusFilter
-            counts={counts}
-            loading={loading}
-            allLabel="全部结果"
-            aria-label="处理结果筛选"
-            value={statusKey}
-            options={WORKFLOW_HISTORY_STATUS_OPTIONS}
-            onChange={(value) => onChange({ statusKey: value })}
-          />
-        </fieldset>
-        <MobileTaskExtraFilters options={options} sourceTypes={sourceTypes} history onChange={onChange} />
-        <WorkflowTaskDiscoveryFilters
-          compact
-          value={options}
-          onChange={onChange}
-          profile={profile}
-          roleKey={roleKey}
-          people={people}
-          peopleError={peopleError}
-          onRetryPeople={onRetryPeople}
         />
-      </MobileFilterPopover>
-      {calendarOpen && <FilterDateRangePicker
-        title="选择处理日期范围"
-        dateFrom={period === 'custom' ? dateFrom : ''}
-        dateTo={period === 'custom' ? dateTo : ''}
-        onCancel={() => { setCalendarOpen(false); setOpen(true) }}
-        onApply={(range) => { onChange({ period: 'custom', ...range }); setCalendarOpen(false) }}
-      />}
-    </>
+        <Button
+          block
+          className="mobile-history-custom-date"
+          aria-expanded={calendarOpen}
+          onClick={() => {
+            setStartDate('')
+            setMonth(dayjs(dateFrom || currentBusinessDate()))
+            setCalendarOpen(!calendarOpen)
+          }}
+        >
+          {period === 'custom' ? `${dateFrom} 至 ${dateTo}` : '自定义日期'}
+        </Button>
+        {calendarOpen && (
+          <div
+            className="mobile-history-calendar"
+            aria-label="选择处理日期范围"
+          >
+            <p role="status">
+              {startDate ? `${startDate} 起，请选择结束日期` : '请选择开始日期'}
+            </p>
+            <Calendar
+              fullscreen={false}
+              value={month}
+              onPanelChange={setMonth}
+              onSelect={selectDate}
+              headerRender={renderCalendarHeader}
+              fullCellRender={renderCalendarDay}
+            />
+          </div>
+        )}
+      </fieldset>
+      <fieldset>
+        <legend>处理结果</legend>
+        <SlidingSegmented
+          block
+          aria-label="处理结果筛选"
+          value={statusKey}
+          options={WORKFLOW_HISTORY_STATUS_OPTIONS}
+          onChange={(value) => onChange({ statusKey: value })}
+        />
+      </fieldset>
+      <WorkflowTaskDiscoveryFilters
+        compact
+        value={options}
+        onChange={onChange}
+        profile={profile}
+        roleKey={roleKey}
+      />
+    </MobileFilterPopover>
   )
 }

@@ -7,8 +7,6 @@ import React, {
   useState,
 } from 'react'
 import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
-import { normalizeTaskListFilters } from '../../utils/workflowTaskListFilters.mjs'
-import WorkflowTaskLinkDrawer from '../../components/workflow/WorkflowTaskLinkDrawer.jsx'
 import { normalizeTaskDiscoveryFilters } from '../../utils/workflowTaskDiscovery.mjs'
 import { readWorkflowTaskReturn, consumeWorkflowTaskReturn } from '../../utils/workflowTaskNavigation.mjs'
 import { readMobileTrackingSource } from '../utils/mobileWorkflowTracking.mjs'
@@ -55,7 +53,6 @@ import MobileTaskActionScreen from '../components/MobileTaskActionScreen.jsx'
 import { mobileProgressAccess } from '../utils/mobileProgress.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
 import MobileTaskListScreen from '../components/MobileTaskListScreen.jsx'
-import useWorkflowTaskCalendarView from '../../hooks/useWorkflowTaskCalendarView.js'
 import MobileTaskReceiptScreen from '../components/MobileTaskReceiptScreen.jsx'
 import useMobileRoleTaskActions from '../hooks/useMobileRoleTaskActions'
 import useWorkflowTaskActionAccess from '../../hooks/useWorkflowTaskActionAccess'
@@ -256,13 +253,10 @@ function createMobileRoleTaskViewCounters() {
 }
 
 export default function MobileRoleTasksPage() {
-  const calendarState = useWorkflowTaskCalendarView()
   const location = useLocation()
-  const sharedLinkAutoRef = useRef('')
-  const [sharedHandlingID, setSharedHandlingID] = useState(null)
   const navigate = useNavigate()
   const { activeRoleKey } = useERPWorkspace()
-  const { adminProfile, canEnterDesktop, handleLogout, loggingOut, mobileRoleOptions, handleSwitchMobileRole } =
+  const { adminProfile, canEnterDesktop, handleLogout, loggingOut } =
     useOutletContext() || {}
   const returnedTaskID = readWorkflowTaskReturn(location.state, adminProfile?.id)?.taskID
   const progressAccess = useMemo(
@@ -300,7 +294,7 @@ export default function MobileRoleTasksPage() {
         Object.values(MOBILE_MAIN_TAB_KEYS),
         defaultMainTabKey
       )
-    : calendarState.layout === 'calendar' ? MOBILE_MAIN_TAB_KEYS.TODO : defaultMainTabKey
+    : defaultMainTabKey
   const [requestedMainTabKey, setActiveMainTabKey] = useState(initialMainTabKey)
   const activeMainTabKey =
     (requestedMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS && !progressAccess.enabled)
@@ -796,7 +790,6 @@ export default function MobileRoleTasksPage() {
           buildMobileRoleTaskQuery({
             roleKey: activeRoleKey,
             ...normalizeTaskDiscoveryFilters(taskQueryOptions),
-            ...normalizeTaskListFilters(taskQueryOptions),
             keyword: taskKeyword,
             sortKey: taskSortKey,
             statusKey: taskStatusKey,
@@ -866,6 +859,12 @@ export default function MobileRoleTasksPage() {
         taskScopeStateRef.current = settledState
         setTaskScopeState(settledState)
         if (rejectOnError) throw error
+        if (feedbackScope === taskFeedbackScopeRef.current) {
+          message.error({
+            key: 'mobile-role-task-load',
+            content: errorMessage,
+          })
+        }
         return false
       }
     },
@@ -1504,7 +1503,7 @@ export default function MobileRoleTasksPage() {
         [MOBILE_TASK_HISTORY_STATUS_KEY]: taskStatusKey,
         [MOBILE_TASK_HISTORY_DATES_KEY]: { period: taskPeriod, dateFrom: taskDateFrom, dateTo: taskDateTo },
         [MOBILE_TASK_HISTORY_QUERY_PAGES_KEY]: taskQueryOptionsByPage,
-        mobileRoleTasksDiscovery: { ...normalizeTaskDiscoveryFilters(taskQueryOptions), ...normalizeTaskListFilters(taskQueryOptions) },
+        mobileRoleTasksDiscovery: normalizeTaskDiscoveryFilters(taskQueryOptions),
         [MOBILE_TASK_HISTORY_SCROLL_TOP_KEY]: listScrollTopRef.current,
         [MOBILE_TASK_HISTORY_LIST_LIMITS_KEY]: visibleListLimitsByKey,
         [MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY]: loadedCounts,
@@ -1703,12 +1702,6 @@ export default function MobileRoleTasksPage() {
       currentTaskScreenRef.current = ''
     })
   }, [clearActionReceipt, handleScreenBack, selectedTaskID, taskScopeKey])
-  useEffect(() => {
-    if (!sharedHandlingID || selectedTask?.id !== sharedHandlingID || selectedTaskActionAccess.loading || selectedTaskActionAccess.source === 'fallback_checking') return
-    setSharedHandlingID(null)
-    if (selectedTaskActionAccess.source === 'backend' && selectedTaskActionAccess.canHandle) handleOpenSelectedTaskAction()
-    else handleDetailBack()
-  }, [sharedHandlingID, selectedTask?.id, selectedTaskActionAccess, handleOpenSelectedTaskAction, handleDetailBack])
   const handleActionBack = useCallback(() => {
     if (materialBusyRef.current) return
     flushMobileTaskDraftHistory()
@@ -2011,12 +2004,11 @@ export default function MobileRoleTasksPage() {
     const focusTarget =
       taskCard?.querySelector('.erp-task-card__open') ||
       scrollContainer.querySelector('[data-testid="mobile-role-list-heading"]')
-    // 条件重读只恢复列表位置，保留搜索框或筛选面板内的操作焦点。
+    // 搜索重读也会恢复列表位置，输入过程中保留键盘焦点。
     const searchHasFocus = scrollContainer
       .querySelector('[role="search"]')
       ?.contains(document.activeElement)
-    const filterHasFocus = document.activeElement?.closest('.mobile-filter-panel')
-    if (!searchHasFocus && !filterHasFocus) focusTarget?.focus({ preventScroll: true })
+    if (!searchHasFocus) focusTarget?.focus({ preventScroll: true })
     restoreListStateRef.current = false
   }, [
     actionReceipt,
@@ -2040,14 +2032,13 @@ export default function MobileRoleTasksPage() {
         [MOBILE_TASK_HISTORY_STATUS_KEY]: taskStatusKey,
         [MOBILE_TASK_HISTORY_DATES_KEY]: { period: taskPeriod, dateFrom: taskDateFrom, dateTo: taskDateTo },
         [MOBILE_TASK_HISTORY_QUERY_PAGES_KEY]: taskQueryOptionsByPage,
-        mobileRoleTasksDiscovery: { ...normalizeTaskDiscoveryFilters(taskQueryOptions), ...normalizeTaskListFilters(taskQueryOptions) },
+        mobileRoleTasksDiscovery: normalizeTaskDiscoveryFilters(taskQueryOptions),
       },
       ''
     )
   }, [
     activeMainTabKey,
     taskScopeKey,
-    location.search,
     taskKeyword,
     taskSortKey,
     taskStatusKey,
@@ -2062,9 +2053,7 @@ export default function MobileRoleTasksPage() {
 
   const taskDetailBackLabel =
     activeMainTabKey === MOBILE_MAIN_TAB_KEYS.EXCEPTIONS
-      ? window.history.state?.mobileWorkflowExceptions?.query?.view === 'tasks'
-        ? '返回关联待办'
-        : '返回异常跟踪'
+      ? '返回异常记录'
       : activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TRACKING
       ? '返回流程跟踪'
       : activeMainTabKey === MOBILE_MAIN_TAB_KEYS.PROGRESS
@@ -2251,83 +2240,68 @@ export default function MobileRoleTasksPage() {
   }
 
   return (
-    <>
-      <WorkflowTaskLinkDrawer
-        profile={adminProfile}
-        autoOpenRef={sharedLinkAutoRef}
-        onOpenTask={(task, handle) => {
-        setSharedHandlingID(handle ? task.id : null)
-        setLinkedTaskState({ scope: taskAccessScopeKey, id: task.id, task })
-        handleSelectTaskID(task.id, { linked: true })
-      }}
-      />
-      <MobileTaskListScreen
-        calendarState={calendarState}
-        key={taskAccessScopeKey}
-        progressAccess={progressAccess}
-        accessScopeKey={taskAccessScopeKey}
-        activeRoleKey={activeRoleKey}
-        onOpenLinkedTask={(taskID) => handleSelectTaskID(taskID, { linked: true })}
-        activeFilterKey={visibleActiveFilterKey}
-        activeMainTabKey={activeMainTabKey}
-        activeMessageTabKey={activeMessageTabKey}
-        activeViewHasData={activeTaskSlot.items.length > 0}
-        activeViewHasMore={activeTaskSlot.has_more}
-        activeTasks={activeTasks}
-        adminProfile={adminProfile}
-        approvalTasks={approvalTasks}
-        authoritativeTaskCounts={authoritativeTaskCounts}
-        taskStatusCounts={activeTaskSlot.error ? null : activeTaskSlot.status_counts}
-        canViewApprovalInbox={canViewApprovalInbox}
-        canViewTracking={canViewTracking}
-        canEnterDesktop={canEnterDesktop === true}
-        doneTasks={doneTasks}
-        filterItems={filterItems}
-        filteredTasks={filteredTasks}
-        handleLogout={handleLogout}
-        mobileRoleOptions={mobileRoleOptions}
-        handleSwitchMobileRole={handleSwitchMobileRole}
-        handleOpenLegalNotice={() =>
+    <MobileTaskListScreen
+      key={taskAccessScopeKey}
+      progressAccess={progressAccess}
+      accessScopeKey={taskAccessScopeKey}
+      activeRoleKey={activeRoleKey}
+      onOpenLinkedTask={(taskID) => handleSelectTaskID(taskID, { linked: true })}
+      activeFilterKey={visibleActiveFilterKey}
+      activeMainTabKey={activeMainTabKey}
+      activeMessageTabKey={activeMessageTabKey}
+      activeViewHasData={activeTaskSlot.items.length > 0}
+      activeViewHasMore={activeTaskSlot.has_more}
+      activeTasks={activeTasks}
+      adminProfile={adminProfile}
+      approvalTasks={approvalTasks}
+      authoritativeTaskCounts={authoritativeTaskCounts}
+      canViewApprovalInbox={canViewApprovalInbox}
+      canViewTracking={canViewTracking}
+      canEnterDesktop={canEnterDesktop === true}
+      doneTasks={doneTasks}
+      filterItems={filterItems}
+      filteredTasks={filteredTasks}
+      handleLogout={handleLogout}
+      handleOpenLegalNotice={() =>
         navigate('/legal/privacy', {
           state: {
             from: `${location.pathname}${location.search}${location.hash}`,
           },
         })
       }
-        handleMainScroll={handleMainScroll}
-        handleSwitchEntry={() => navigate('/entry')}
-        initialLoading={initialLoading}
-        loadError={activeTaskSlot.error}
-        loadTasks={loadTasks}
-        loadMoreActiveView={loadMoreActiveTaskView}
-        loading={loading}
-        loadingMore={loading && activeTaskSlot.items.length > 0}
-        loggingOut={loggingOut}
-        overdueTasks={overdueTasks}
-        riskTasks={riskTasks}
-        riskScope={riskScope}
-        roleLabel={roleLabel}
-        runtimeBuildIdentity={runtimeBuildIdentity}
-        serverDataTime={serverDataTime}
-        refreshScopeKey={`${taskScopeKey}|${activeTaskViewKey}`}
-        scrollContainerRef={scrollContainerRef}
-        selectedTask={selectedTask}
-        setActiveFilterKey={setActiveFilterKey}
-        setActiveMainTabKey={setActiveMainTabKey}
-        setActiveMessageTabKey={setActiveMessageTabKey}
-        setDetailAction={setDetailAction}
-        setSelectedTaskID={handleSelectTaskID}
-        setVisibleListLimitsByKey={setVisibleListLimitsByKey}
-        taskKeyword={taskKeyword}
-        taskSortKey={taskSortKey}
-        taskStatusKey={taskStatusKey}
-        taskHistoryOptions={taskQueryOptions}
-        onTaskListOptionsChange={(options) =>
+      handleMainScroll={handleMainScroll}
+      handleSwitchEntry={() => navigate('/entry')}
+      initialLoading={initialLoading}
+      loadError={activeTaskSlot.error}
+      loadTasks={loadTasks}
+      loadMoreActiveView={loadMoreActiveTaskView}
+      loading={loading}
+      loadingMore={loading && activeTaskSlot.items.length > 0}
+      loggingOut={loggingOut}
+      overdueTasks={overdueTasks}
+      riskTasks={riskTasks}
+      riskScope={riskScope}
+      roleLabel={roleLabel}
+      runtimeBuildIdentity={runtimeBuildIdentity}
+      serverDataTime={serverDataTime}
+      refreshScopeKey={`${taskScopeKey}|${activeTaskViewKey}`}
+      scrollContainerRef={scrollContainerRef}
+      selectedTask={selectedTask}
+      setActiveFilterKey={setActiveFilterKey}
+      setActiveMainTabKey={setActiveMainTabKey}
+      setActiveMessageTabKey={setActiveMessageTabKey}
+      setDetailAction={setDetailAction}
+      setSelectedTaskID={handleSelectTaskID}
+      setVisibleListLimitsByKey={setVisibleListLimitsByKey}
+      taskKeyword={taskKeyword}
+      taskSortKey={taskSortKey}
+      taskStatusKey={taskStatusKey}
+      taskHistoryOptions={taskQueryOptions}
+      onTaskListOptionsChange={(options) =>
         updateActiveTaskQueryOptions((current) => ({ ...current, ...options }))
       }
-        onSearchTasks={setTaskKeyword}
-        visibleListLimitsByKey={visibleListLimitsByKey}
-      />
-    </>
+      onSearchTasks={setTaskKeyword}
+      visibleListLimitsByKey={visibleListLimitsByKey}
+    />
   )
 }

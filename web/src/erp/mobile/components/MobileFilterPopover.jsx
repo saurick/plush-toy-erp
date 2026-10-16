@@ -1,8 +1,7 @@
-import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Button, Popover, theme } from 'antd'
-import { LeftOutlined, FilterOutlined, UpOutlined, ReloadOutlined } from '@ant-design/icons'
-import MobileFilterViewContext from './MobileFilterViewContext.js'
+import { CloseOutlined, FilterOutlined } from '@ant-design/icons'
 import './mobileFilterPopover.css'
 
 export default function MobileFilterPopover({
@@ -19,35 +18,6 @@ export default function MobileFilterPopover({
   const { token } = theme.useToken()
   const trigger = useRef(null)
   const panel = useRef(null)
-  const fields = useRef(null)
-  const returnTo = useRef(null)
-  const scrollPosition = useRef(0)
-  const [view, setView] = useState(null)
-  const [host, setHost] = useState(null)
-  const closeView = useCallback(() => {
-    setView(null)
-  }, [])
-  useLayoutEffect(() => {
-    if (!open) return
-    if (view) {
-      panel.current?.querySelector('.mobile-filter-back')?.focus({ preventScroll: true })
-    } else if (returnTo.current) {
-      if (fields.current) fields.current.scrollTop = scrollPosition.current
-      returnTo.current.focus({ preventScroll: true })
-      returnTo.current = null
-    }
-  }, [open, view])
-  const navigation = useMemo(() => ({
-    view,
-    host,
-    closeView,
-    openView: (next, target) => {
-      scrollPosition.current = fields.current?.scrollTop || 0
-      returnTo.current = target
-      setView(next)
-    },
-  }), [closeView, host, view])
-  useEffect(() => { if (!open) setView(null) }, [open])
   const close = () => onOpenChange(false)
   const onKeyDown = useCallback(
     (event) => {
@@ -55,11 +25,10 @@ export default function MobileFilterPopover({
       if (event.key === 'Escape') {
         event.preventDefault()
         event.stopPropagation()
-        if (view) closeView()
-        else onOpenChange(false)
+        onOpenChange(false)
       }
     },
-    [closeView, onOpenChange, open, view]
+    [onOpenChange, open]
   )
   useEffect(() => {
     if (!open) return undefined
@@ -72,8 +41,7 @@ export default function MobileFilterPopover({
       trigger={[]}
       placement="bottomRight"
       arrow={false}
-      align={{ offset: [0, 0] }}
-      autoAdjustOverflow={{ shiftX: true, shiftY: true }}
+      autoAdjustOverflow={{ shiftX: true }}
       open={open}
       zIndex={token.zIndexPopupBase + 1}
       onOpenChange={onOpenChange}
@@ -93,8 +61,6 @@ export default function MobileFilterPopover({
         }
       }}
       classNames={{ root: 'mobile-filter-popover erp-mobile-controls' }}
-      // 横向按视口居中，纵向仍由 Popover 跟随入口并避让屏幕边缘。
-      styles={{ root: { left: 8, right: 8 } }}
       content={
         <section
           className="mobile-filter-panel"
@@ -104,22 +70,22 @@ export default function MobileFilterPopover({
           ref={panel}
           tabIndex={-1}
           data-filter-context={contextLabel}
-          data-filter-view={view ? 'search' : 'main'}
           onKeyDownCapture={onKeyDown}
         >
-          <MobileFilterViewContext.Provider value={navigation}>
-            {view && (
-              <header>
-                <Button type="text" className="mobile-filter-back" icon={<LeftOutlined aria-hidden />} aria-label="返回筛选" onClick={closeView} />
-                <strong>{view.title}</strong>
-              </header>
-            )}
-            <div className="mobile-filter-fields" ref={fields} hidden={Boolean(view)} aria-label={title}>{children}</div>
-            <div className="mobile-filter-detail" ref={setHost} hidden={!view} />
-          </MobileFilterViewContext.Provider>
-          <footer hidden={Boolean(view)}>
-            <Button type="text" icon={<ReloadOutlined aria-hidden />} onClick={onReset}>重置筛选</Button>
-            <Button type="text" icon={<UpOutlined aria-hidden />} aria-label="关闭筛选" onClick={close}>收起</Button>
+          <header>
+            <strong>{title}</strong>
+            <Button
+              type="text"
+              icon={<CloseOutlined />}
+              aria-label="关闭筛选"
+              onClick={close}
+            />
+          </header>
+          {children}
+          <footer>
+            <Button block onClick={onReset}>
+              重置筛选
+            </Button>
           </footer>
         </section>
       }
@@ -138,11 +104,7 @@ export default function MobileFilterPopover({
         aria-expanded={open}
         data-active={count > 0}
         data-testid={testId}
-        onClick={(event) => {
-          // Safari 点击按钮不会可靠地转移焦点，先明确入口以便开场后移入浮层。
-          event.currentTarget.focus({ preventScroll: true })
-          onOpenChange(!open)
-        }}
+        onClick={() => onOpenChange(!open)}
         onKeyDown={onKeyDown}
       >
         <FilterOutlined aria-hidden="true" />

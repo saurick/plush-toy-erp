@@ -14,8 +14,26 @@
 }
 .mobile-mine-card h2 {
   margin: 0 0 12px;
-  font-size: var(--erp-font-emphasis);
+  font-size: 15px;
   font-weight: 650;
+}
+.mobile-mine-identity {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.mobile-mine-identity > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.mobile-mine-identity strong {
+  font-size: 17px;
+}
+.mobile-mine-identity span:not(.mobile-mine-avatar, .anticon) {
+  color: var(--erp-text-muted);
+  font-size: 12px;
 }
 .mobile-mine-facts {
   display: grid;
@@ -31,32 +49,17 @@
 }
 .mobile-mine-facts dt {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 .mobile-mine-facts dd {
   margin: 4px 0 0;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 .mobile-mine-actions {
   display: grid;
   gap: 8px;
-}
-.mobile-admin-review {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-size: var(--erp-font-small);
-}
-.mobile-admin-review > label {
-  flex-shrink: 0;
-}
-.mobile-admin-review .ant-select {
-  min-width: 0;
-  height: 44px;
-  flex: 1 1 auto;
 }
 .mobile-mine-action {
   display: flex;
@@ -69,7 +72,7 @@
   border-radius: 8px;
   color: var(--erp-text);
   background: var(--erp-surface-bg);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   text-align: left;
   transition:
     background var(--erp-tab-motion-duration) var(--erp-tab-motion-easing),
@@ -98,7 +101,19 @@
   border-radius: 8px;
   background: var(--erp-surface-bg-soft);
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
+}
+.mobile-mine-avatar {
+  display: inline-flex;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: var(--erp-primary-softer);
+  color: var(--erp-primary-strong);
+  font-size: 26px;
 }
 .erp-appearance-settings--mobile {
   gap: 12px;
@@ -121,7 +136,7 @@
   min-height: 54px;
   padding: 6px 2px;
   gap: 5px;
-  font-size: var(--erp-font-micro);
+  font-size: 11px;
 }
 .erp-appearance-settings--mobile .ant-segmented-item-label {
   display: flex;

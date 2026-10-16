@@ -52,17 +52,8 @@ test('mobile entry session: 后台瞬时失败保留有效客户投影并暴露�
   assert.match(source, /profileSyncing \? '重新连接中' : '重新连接'/u)
   assert.match(
     source,
-    /attachEffectiveSessionToAdminProfile\(\s*nextProfile,\s*cachedSession\s*\)/u
+    /\u5f53\u524d\u663e\u793a\u4e0a\u6b21\u5df2\u786e\u8ba4\u7684\u5de5\u4f5c\u8303\u56f4/u
   )
-  assert.match(source, /<PageLoadFeedbackBoundary><MobileAppContent/u)
-  assert.match(
-    source,
-    /const connectionFeedback = usePageLoadFeedback\(\{\s*error: profileSyncIssue && canUseCurrentMobileRole,\s*retry: handleRetry,\s*priority: 30,/u
-  )
-  assert.match(source, /connectionFeedback\.visible \? \([\s\S]*?role="alert"/u)
-  assert.match(source, /连接暂未恢复，部分内容可能未更新，请重试。/u)
-  assert.match(source, /onClick=\{connectionFeedback\.retry\}/u)
-  assert.match(source, /disabled=\{profileSyncing \|\| connectionFeedback\.retrying\}/u)
 })
 
 test('mobile entry session: 岗位入口按账号权限直达且可退出', () => {

@@ -39,7 +39,7 @@ test('tracking history cannot cross account or permission scopes', () => {
 
 test('mobile filters restore only supported visible controls', () => {
   assert.deepEqual(normalizeMobileTrackingQuery({ keyword: ' SO-01 ', status: 'active', owner_role_key: 'not-a-role', attention: 'overdue', source_type: 'sales_order', date_from: '2026-01-01' }), {
-    keyword: 'SO-01', status: 'active', owner_role_key: '', attention: 'overdue', source_type: 'sales_order', date_from: '2026-01-01', date_to: '',
+    keyword: 'SO-01', status: 'active', owner_role_key: '', attention: 'overdue', source_type: 'sales_order',
   })
   const value = readMobileTrackingState({ mobileWorkflowTracking: { accessScope: 'a', scope: 'invalid', selection: { kind: 'raw', id: -1 }, scopes: { started: { loadedCount: 100000, scrollTop: -20 } } } }, 'a')
   assert.equal(value.scope, 'visible')
@@ -57,24 +57,8 @@ test('continuous batches distinguish task and process ids and refresh repeated r
 })
 
 test('手机结束状态清除当前岗位和关注条件，保留搜索及单据类型', () => {
-  const query = normalizeMobileTrackingQuery({ status: 'completed', owner_role_key: 'boss', attention: 'blocked', keyword: '小熊', source_type: 'sales_order', date_from: '', date_to: '' })
-  assert.deepEqual(query, { status: 'completed', owner_role_key: '', attention: '', keyword: '小熊', source_type: 'sales_order', date_from: '', date_to: '' })
+  const query = normalizeMobileTrackingQuery({ status: 'completed', owner_role_key: 'boss', attention: 'blocked', keyword: '小熊', source_type: 'sales_order' })
+  assert.deepEqual(query, { status: 'completed', owner_role_key: '', attention: '', keyword: '小熊', source_type: 'sales_order' })
   const saved = { mobileWorkflowTracking: { accessScope: 'alice', scopes: { started: { query: { ...query, attention: 'overdue', owner_role_key: 'engineering' } } } } }
   assert.deepEqual(readMobileTrackingState(saved, 'alice').scopes.started.query, query)
-})
-
-test('发起日期与桌面共用字段并随各范围恢复，非法日期不进入请求', () => {
-  const query = normalizeMobileTrackingQuery({ date_from: '2026-09-30', date_to: '2026-10-01', owner_role_key: 'engineering' })
-  const saved = { mobileWorkflowTracking: { accessScope: 'alice', scope: 'started', scopes: { started: { query } } } }
-  const restored = readMobileTrackingState(saved, 'alice')
-  assert.equal(restored.scopes.started.query.date_from, '2026-09-30')
-  assert.equal(restored.scopes.started.query.date_to, '2026-10-01')
-  assert.equal(restored.scopes.participated.query.date_from, '')
-  assert.equal(readMobileTrackingState(saved, 'bob').scopes.started.query.date_from, '')
-  assert.equal(normalizeMobileTrackingQuery({ date_from: '2026-02-30', date_to: 'bad' }).date_from, '')
-  assert.equal(normalizeMobileTrackingQuery({ date_from: '2026-02-30', date_to: 'bad' }).date_to, '')
-  const cleared = normalizeMobileTrackingQuery({ ...query, date_from: '', date_to: '' })
-  assert.equal(cleared.owner_role_key, 'engineering')
-  assert.equal(cleared.date_from, '')
-  assert.equal(cleared.date_to, '')
 })

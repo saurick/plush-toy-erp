@@ -11,7 +11,7 @@ export const mobileTheme = {
     'erp-mobile-progress-track h-2 overflow-hidden rounded-full bg-slate-200',
   progressFill: 'h-full rounded-full bg-emerald-600 transition-all',
   progressStat:
-    'erp-mobile-card erp-mobile-strong min-w-0 rounded-xl bg-white px-2 py-2 text-center text-sm font-semibold text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.04)] [&>span]:mt-1 [&>span]:block [&>span]:text-xs [&>span]:font-normal [&>span]:text-slate-500',
+    'erp-mobile-card erp-mobile-strong min-w-0 rounded-xl bg-white px-2 py-2 text-center text-sm font-semibold text-slate-900 shadow-[0_4px_14px_rgba(15,23,42,0.04)] [&>span]:mt-1 [&>span]:block [&>span]:text-[11px] [&>span]:font-normal [&>span]:text-slate-500',
   highlightCard:
     'erp-mobile-card erp-mobile-highlight-card min-w-0 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 shadow-[0_8px_20px_rgba(15,23,42,0.04)]',
   highlightNote:

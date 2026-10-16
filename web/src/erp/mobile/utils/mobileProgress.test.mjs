@@ -5,9 +5,7 @@ import {
   mobileProgressDefaultView,
   readMobileProgressState,
   mobileProgressTaskSummary,
-  normalizeMobileProgressQuery,
 } from './mobileProgress.mjs'
-import { withProgressFilters } from '../../utils/businessProgress.mjs'
 
 const permissions = [
   'erp.business_dashboard.read',
@@ -25,25 +23,6 @@ const profile = {
     actions: permissions,
   },
 }
-test('进度更新、详情返回和刷新使用相同日期状态形态', () => {
-  let query = normalizeMobileProgressQuery({}, 'production')
-  for (const changes of [
-    { q: '模拟客户' },
-    { from: '2026-10-16', to: '2026-10-18', owner: '负责人' },
-    { from: '', to: '' },
-    { from: '2026-10-16', to: '2026-10-18' },
-    { due_status: 'undated' },
-    { scope: 'active', due_status: 'all', owner: '', from: '', to: '' },
-  ]) {
-    query = normalizeMobileProgressQuery(withProgressFilters(query, changes), 'production')
-    const restored = readMobileProgressState({ mobileProgress: { scope: 'test', query } }, 'test', 'production')
-    assert.deepEqual(restored.query, query)
-    assert.equal(typeof query.from, 'string')
-    assert.equal(typeof query.to, 'string')
-  }
-  assert.equal(query.q, '模拟客户')
-  assert.equal(query.owner, '')
-})
 test('进度入口由真实读取权限决定，普通老板无需管理员身份', () => {
   assert.equal(mobileProgressAccess(profile).enabled, true)
   assert.equal(
@@ -107,29 +86,29 @@ test('返回和刷新恢复查询与选择，账号、权限或岗位改变不�
   const restored = readMobileProgressState(history, 'user7|boss|v1', 'orders')
   assert.equal(restored.query.q, 'SO-0025')
   assert.equal(restored.query.page, 1)
-  assert.equal(restored.query.from, '2026-09-01')
-  assert.equal(restored.query.to, '2026-09-30')
+  assert.equal(restored.query.from, '')
+  assert.equal(restored.query.to, '')
   assert.equal(restored.selection.id, 25)
   assert.equal(restored.scrollTop, 340)
   const ended = readMobileProgressState(
-    { mobileProgress: { ...history.mobileProgress, query: { scope: 'ended', due_status: 'overdue' } } },
+    { mobileProgress: { ...history.mobileProgress, query: { scope: 'ended', risk: 'overdue' } } },
     'user7|boss|v1',
     'orders'
   )
   assert.equal(ended.query.scope, 'ended')
-  assert.equal(ended.query.due_status, 'all')
-  const ownerFilter = readMobileProgressState(
+  assert.equal(ended.query.risk, 'all')
+  const legacyOwner = readMobileProgressState(
     {
       mobileProgress: {
         scope: 'user7|boss|v1',
-        query: { owner: '负责人条件' },
+        query: { owner: '旧负责人条件' },
       },
     },
     'user7|boss|v1',
     'orders'
   )
-  assert.equal(ownerFilter.query.q, '')
-  assert.equal(ownerFilter.query.owner, '负责人条件')
+  assert.equal(legacyOwner.query.q, '旧负责人条件')
+  assert.equal(legacyOwner.query.owner, '')
   for (const scope of [
     'user8|boss|v1',
     'user7|warehouse|v1',

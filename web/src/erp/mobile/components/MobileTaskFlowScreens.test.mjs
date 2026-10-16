@@ -217,7 +217,7 @@ test('mobile task overview, list heading and loaded counts stay concise', () => 
   assert.match(listScreenSource, /搜索订单、产品、物料或款号/u)
   const donePanelSource = listScreenSource.slice(
     listScreenSource.indexOf('const renderDonePanel'),
-    listScreenSource.indexOf('const renderRiskFilters')
+    listScreenSource.indexOf('const renderMessageTabs')
   )
   assert.ok(donePanelSource)
   assert.doesNotMatch(donePanelSource, /renderLoadedTaskOverview/u)
@@ -228,11 +228,10 @@ test('mobile task overview, list heading and loaded counts stay concise', () => 
   )
   assert.match(listScreenSource, /countAvailable \? `共 \$\{item\.count\} 条`/u)
   assert.match(listScreenSource, /'数量暂不可用'/u)
-  const riskFiltersSource = listScreenSource.slice(
-    listScreenSource.indexOf('const renderRiskFilters'),
-    listScreenSource.indexOf('const renderWarningMessages')
+  assert.match(
+    listScreenSource,
+    /mobile-role-count-tag mobile-role-message-tabs__count/u
   )
-  assert.match(riskFiltersSource, /mobile-role-count-tag mobile-role-task-filter__count/u)
   assert.doesNotMatch(listScreenSource, /\(\{item\.count\}\)/u)
   assert.doesNotMatch(listScreenSource, /const renderTabSummary/u)
   assert.doesNotMatch(listScreenSource, /renderTabSummary\(\)/u)

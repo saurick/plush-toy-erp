@@ -32,12 +32,8 @@ export default function MobileTaskPullRefresh({
     let height = 0
     let inFlight = false
     let disposed = false
-    let frame = 0
-    let finishTimer = 0
 
     const cancel = () => {
-      cancelAnimationFrame(frame)
-      frame = 0
       gesture = null
       height = 0
       setPullHeight(0)
@@ -85,19 +81,8 @@ export default function MobileTaskPullRefresh({
       }
       // 只接管列表顶部的向下手势，保留正常滚动、横向手势与表单操作。
       event.preventDefault()
-      const distance = Math.max(0, dy - 8) * 0.5
-      // 达到释放距离后逐渐增加阻力，避免拖到上限突然停住。
-      height =
-        distance <= RELEASE_HEIGHT
-          ? distance
-          : RELEASE_HEIGHT +
-            28 * (1 - Math.exp(-(distance - RELEASE_HEIGHT) / 28))
-      if (!frame) {
-        frame = requestAnimationFrame(() => {
-          frame = 0
-          setPullHeight(height)
-        })
-      }
+      height = Math.round(Math.min(84, Math.max(0, dy) * 0.5))
+      setPullHeight(height)
     }
     const end = () => {
       const shouldRefresh =
@@ -106,22 +91,13 @@ export default function MobileTaskPullRefresh({
       if (!shouldRefresh) return
       inFlight = true
       setRefreshing(true)
-      const startedAt = performance.now()
       const finish = () => {
-        if (disposed) return
-        // 只让指示器走完松手收拢；请求和数据呈现不等待动画。
-        const hold = window.matchMedia('(prefers-reduced-motion: reduce)')
-          .matches
-          ? 0
-          : Math.max(0, 260 - (performance.now() - startedAt))
-        finishTimer = window.setTimeout(() => {
-          inFlight = false
-          if (!disposed) setRefreshing(false)
-        }, hold)
+        inFlight = false
+        if (!disposed) setRefreshing(false)
       }
       // 列表入口负责数据、错误提示与过期请求保护；手势组件只控制局部反馈。
-      Promise.resolve()
-        .then(() => latest.current.onRefresh({ showRefreshFeedback: true }))
+      latest.current
+        .onRefresh({ showRefreshFeedback: true })
         .then(finish, finish)
     }
 
@@ -131,8 +107,6 @@ export default function MobileTaskPullRefresh({
     container.addEventListener('touchcancel', cancel)
     return () => {
       disposed = true
-      cancelAnimationFrame(frame)
-      clearTimeout(finishTimer)
       container.removeEventListener('touchstart', start)
       container.removeEventListener('touchmove', move)
       container.removeEventListener('touchend', end)
@@ -140,25 +114,21 @@ export default function MobileTaskPullRefresh({
     }
   }, [enabled, scrollContainerRef])
 
-  // Keep the zero-height host in the layout when a filter disables gestures.
+  if (!enabled) return null
   const ready = pullHeight >= RELEASE_HEIGHT
-  const state = !enabled
-    ? 'idle'
-    : refreshing
-      ? 'refreshing'
-      : ready
-        ? 'ready'
-        : pullHeight
-          ? 'pulling'
-          : 'idle'
+  const state = refreshing
+    ? 'refreshing'
+    : ready
+      ? 'ready'
+      : pullHeight
+        ? 'pulling'
+        : 'idle'
   return (
     <div
       className="mobile-task-pull-refresh"
       data-testid="mobile-task-pull-refresh"
       data-state={state}
-      style={{
-        height: enabled ? (refreshing ? RELEASE_HEIGHT : pullHeight) : 0,
-      }}
+      style={{ height: refreshing ? RELEASE_HEIGHT : pullHeight }}
       aria-hidden={state === 'idle'}
     >
       <div

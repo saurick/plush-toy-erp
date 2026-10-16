@@ -11,7 +11,7 @@ import { Alert, Button, Empty, Spin } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 import { canOpenRelatedDocumentPath } from '../../utils/relatedDocumentNavigation.mjs'
 import { resolveMenuPermissionKey } from '../../config/menuPermissions.mjs'
-import HorizontalScroll from '@/common/components/scroll/HorizontalScroll'
+import FilterChip from '@/common/components/navigation/FilterChip'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -21,7 +21,6 @@ import {
 } from '@/common/consts/errorCodes'
 import { listBusinessProgress } from '../../api/businessProgressApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
-import BusinessProgressFilterFields, { ProgressDueFilters, ProgressBlockedFilter } from '../../components/business-visualizations/BusinessProgressFilters.jsx'
 import BusinessProgressDrawer from '../../components/business-visualizations/BusinessProgressDrawer'
 import WorkflowTaskCard from '../../components/workflow/WorkflowTaskCard.jsx'
 import { ProductThumbnail } from '../../components/master-data/ProductIdentity.jsx'
@@ -30,25 +29,20 @@ import {
   progressQueryFromURL,
   progressStatusLabel,
   PROGRESS_SCOPE_OPTIONS,
-  progressFilterCount,
-  PROGRESS_FILTER_RESET,
+  PROGRESS_RISK_OPTIONS,
+  progressRiskAvailable,
   withProgressFilters,
 } from '../../utils/businessProgress.mjs'
 import { getWorkflowTaskOwnerRoleLabel } from '../../utils/workflowTaskBoard.mjs'
 import {
   mobileProgressDefaultView,
   mobileProgressTaskSummary,
-  normalizeMobileProgressQuery,
   readMobileProgressState,
 } from '../utils/mobileProgress.mjs'
 import MobileTaskPullRefresh from './MobileTaskPullRefresh'
-import MobileScrollEdge from './MobileScrollEdge.jsx'
 import MobileFilterPopover from './MobileFilterPopover'
-import MobileAppliedFilters from './MobileAppliedFilters.jsx'
-import FilterDateRangePicker from '../../components/business-list/FilterDateRangePicker.jsx'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
-import { usePageLoadFeedback } from '../../components/PageLoadFeedback.jsx'
 import '../../styles/app/progress-board.css'
 import '../mobileProgress.css'
 
@@ -93,8 +87,6 @@ export default function MobileProgressPanel({
   const [loadMoreError, setLoadMoreError] = useState('')
   const [endReached, setEndReached] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [filterResetKey, setFilterResetKey] = useState(0)
-  const [dateOpen, setDateOpen] = useState(false)
   const scrollRef = useRef(null)
   const loadMoreRef = useRef(null)
   const loadMorePending = useRef(false)
@@ -148,7 +140,7 @@ export default function MobileProgressPanel({
     return () => cancelAnimationFrame(frame)
   }, [suppressDetailOpenMotion])
   useEffect(() => {
-    if (!active) { setFiltersOpen(false); setDateOpen(false) }
+    if (!active) setFiltersOpen(false)
   }, [active])
   useEffect(() => {
     const pop = () => {
@@ -171,7 +163,14 @@ export default function MobileProgressPanel({
     clearTimeout(timer.current)
     setValues((current) => {
       const next = withProgressFilters(current, changes)
-      return normalizeMobileProgressQuery(next, mobileProgressDefaultView(roleKey, access))
+      return {
+        ...Object.fromEntries(next),
+        q: next.get('q') || '',
+        owner: '',
+        from: '',
+        to: '',
+        page: 1,
+      }
     })
     restoreScroll.current = 0
     scrollRef.current?.scrollTo({ top: 0 })
@@ -265,17 +264,12 @@ export default function MobileProgressPanel({
     [active, begin, query, queryKey, scopeKey]
   )
   const refresh = useCallback(() => load(), [load])
-  const loadFeedback = usePageLoadFeedback({
-    error: error || loadMoreError,
-    retry: error ? refresh : () => load({ append: true }),
-    enabled: active && !selection,
-  })
   const loadMore = useCallback(() => {
-    if (!active || loading || loadingMore || error || loadMoreError || !hasMore) {
+    if (!active || loading || loadingMore || loadMoreError || !hasMore) {
       return Promise.resolve(false)
     }
     return load({ append: true })
-  }, [active, error, hasMore, load, loadMoreError, loading, loadingMore])
+  }, [active, hasMore, load, loadMoreError, loading, loadingMore])
   useEffect(() => {
     refresh()
     return () => {
@@ -358,9 +352,25 @@ export default function MobileProgressPanel({
       ? [{ value: 'production', label: '生产执行' }]
       : []),
   ]
-  const filterCount = progressFilterCount(query)
-  const filtered = values.q || filterCount > 0
-  const filterCounts = loading ? undefined : counts
+  const filtered =
+    values.q || query.scope !== 'active' || query.risk !== 'all'
+  const hiddenFilterCount = [
+    query.scope !== 'active',
+    query.risk !== 'all',
+  ].filter(Boolean).length
+  const riskOptions = [
+    [
+      'all',
+      PROGRESS_SCOPE_OPTIONS.find(({ value }) => value === query.scope)?.label,
+      counts?.total,
+    ],
+    ['overdue', '已逾期', counts?.overdue],
+    ['due_soon', '7天内到期', counts?.due_soon],
+    ['blocked', '任务受阻', counts?.blocked],
+  ]
+  const riskDisabled = (risk) =>
+    !progressRiskAvailable(risk, query) ||
+    (risk === 'blocked' && data?.access.tasks === false)
   return (
     <section
       hidden={!active}
@@ -369,13 +379,6 @@ export default function MobileProgressPanel({
       aria-label="手机进度看板"
       data-testid="mobile-progress-panel"
     >
-      {dateOpen && active && <FilterDateRangePicker
-        title="选择交期日期范围"
-        dateFrom={query.date_from}
-        dateTo={query.date_to}
-        onCancel={() => { setDateOpen(false); setFiltersOpen(true) }}
-        onApply={({ dateFrom, dateTo }) => { update({ from: dateFrom, to: dateTo }); setDateOpen(false) }}
-      />}
       <div
         className="mobile-progress-scroll"
         ref={scrollRef}
@@ -388,7 +391,7 @@ export default function MobileProgressPanel({
             aria-label="进度视图"
             options={options}
             value={query.view}
-            onChange={(view) => update({ view })}
+            onChange={(view) => update({ view, risk: 'all' })}
           />
           <div className="mobile-progress-search">
             <MobileSearchInput
@@ -434,42 +437,76 @@ export default function MobileProgressPanel({
             />
             <MobileFilterPopover
               contextLabel="进度"
-              title="进度筛选"
+              title="更多进度筛选"
               open={filtersOpen && active}
               onOpenChange={setFiltersOpen}
-              count={filterCount}
-              onReset={() => { setFilterResetKey((value) => value + 1); update(PROGRESS_FILTER_RESET) }}
+              count={hiddenFilterCount}
+              onReset={() => update({ scope: 'active', risk: 'all' })}
             >
-              <BusinessProgressFilterFields
-                compact
-                query={query}
-                counts={filterCounts}
-                taskAccess={data?.access.tasks}
-                resetKey={filterResetKey}
-                onChange={update}
-                onDateRange={() => { setFiltersOpen(false); setDateOpen(true) }}
-              />
+              <fieldset>
+                <legend>记录范围</legend>
+                <SlidingSegmented
+                  block
+                  aria-label="记录范围"
+                  value={query.scope}
+                  options={PROGRESS_SCOPE_OPTIONS}
+                  onChange={(scope) => update({ scope })}
+                />
+              </fieldset>
+              <fieldset>
+                <legend>关注条件（单选）</legend>
+                <div
+                  className="mobile-progress-risk-options"
+                  role="group"
+                  aria-label="关注条件"
+                >
+                  {PROGRESS_RISK_OPTIONS.filter(
+                    ({ value }) =>
+                      value !== 'unlinked' || query.view === 'production'
+                  ).map(({ value, label }) => (
+                    <FilterChip
+                      key={value}
+                      selected={query.risk === value}
+                      disabled={riskDisabled(value)}
+                      onClick={() => update({ risk: value })}
+                    >
+                      {label}
+                    </FilterChip>
+                  ))}
+                </div>
+              </fieldset>
             </MobileFilterPopover>
           </div>
-          <HorizontalScroll
+          <div
             className="mobile-progress-risks"
             role="group"
             aria-label="进度快捷筛选"
           >
-            <ProgressDueFilters query={query} counts={filterCounts} onChange={update} />
-            <ProgressBlockedFilter query={query} counts={filterCounts} taskAccess={data?.access.tasks} onChange={update} />
-          </HorizontalScroll>
-          <MobileAppliedFilters
-            label="当前进度筛选"
-            items={[
-            query.scope !== 'active' && { key: 'scope', label: `记录范围：${PROGRESS_SCOPE_OPTIONS.find(({ value }) => value === query.scope)?.label}` },
-            query.unlinked_only && { key: 'unlinked_only', label: '仅看未关联销售' },
-            query.owner && { key: 'owner', label: `负责人：${query.owner}` },
-            (query.date_from || query.date_to) && { key: 'date', label: `交期：${query.date_from || '不限'} 至 ${query.date_to || '不限'}` },
-          ]}
-            onClear={(key) => update(key === 'date' ? { from: '', to: '' } : { [key]: key === 'scope' ? 'active' : key === 'unlinked_only' ? false : '' })}
-          />
-          <MobileScrollEdge scrollContainerRef={scrollRef} enabled={active && !selection} />
+            {riskOptions.map(([key, label, count]) => (
+              <FilterChip
+                key={key}
+                selected={query.risk === key}
+                count={count ?? '—'}
+                disabled={riskDisabled(key)}
+                onClick={() => update({ risk: key })}
+              >
+                {label}
+              </FilterChip>
+            ))}
+          </div>
+          {(values.scope === 'ended' ||
+            query.risk === 'undated' ||
+            query.risk === 'unlinked') && (
+            <p className="mobile-progress-applied">
+              {[
+                values.scope === 'ended' && '已结束',
+                query.risk === 'undated' && '未定交期',
+                query.risk === 'unlinked' && '含未关联销售的生产明细',
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          )}
         </div>
         <MobileTaskPullRefresh
           key={`${scopeKey}|${queryKey}`}
@@ -479,14 +516,14 @@ export default function MobileProgressPanel({
           onRefresh={refresh}
           lastUpdated={timeLabel(data?.snapshot_at)}
         />
-        {error && loadFeedback.visible ? (
+        {error ? (
           <Alert
             className="mobile-progress-error"
             type="error"
             showIcon
             message={error}
             action={
-              <Button onClick={loadFeedback.retry} loading={loading || loadFeedback.retrying} aria-label="重试">
+              <Button onClick={refresh} aria-label="重试">
                 重试
               </Button>
             }
@@ -651,19 +688,19 @@ export default function MobileProgressPanel({
                 role="status"
                 aria-live="polite"
               >
-                {loadMoreError ? loadFeedback.visible && !error ? (
+                {loadMoreError ? (
                   <>
                     <span>继续加载失败</span>
                     <button
                       type="button"
                       className="erp-control-button"
-                      disabled={loadingMore || loadFeedback.retrying}
-                      onClick={loadFeedback.retry}
+                      disabled={loadingMore}
+                      onClick={() => load({ append: true })}
                     >
                       重试
                     </button>
                   </>
-                ) : null : loadingMore ? (
+                ) : loadingMore ? (
                   <span>正在加载更多…</span>
                 ) : hasMore ? (
                   <span>继续下滑加载</span>

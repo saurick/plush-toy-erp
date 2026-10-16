@@ -1,7 +1,7 @@
 .mobile-workflow-tracking {
   display: grid;
-  gap: 8px;
-  margin: 0 12px;
+  gap: 12px;
+  margin: 8px 12px 0;
   padding-bottom: 16px;
   color: var(--erp-text);
 }
@@ -13,32 +13,17 @@
   gap: 8px;
 }
 
-.mobile-workflow-tracking-controls {
-  position: sticky;
-  top: 0;
-  z-index: 4;
-  display: grid;
-  gap: 8px;
-  padding-block: 6px;
-  background: var(--erp-page-bg);
-}
-
 .mobile-workflow-tracking-status {
   display: flex;
-  min-width: 0;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-}
-
-.mobile-workflow-tracking-status .erp-business-status-filters {
-  flex-wrap: nowrap;
   gap: 6px;
 }
 
 .mobile-workflow-tracking-count,
 .mobile-workflow-tracking-more {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .mobile-workflow-tracking-list {
@@ -71,7 +56,7 @@
 .mobile-workflow-tracking-heading strong {
   min-width: 0;
   flex: 1;
-  font-size: var(--erp-font-body);
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 
@@ -82,12 +67,12 @@
 .mobile-workflow-tracking-owner {
   padding-top: 9px;
   border-top: 1px solid var(--erp-border);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 
 .mobile-workflow-tracking-origin {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-micro);
+  font-size: 11px;
 }
 
 .mobile-workflow-tracking-more {
