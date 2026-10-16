@@ -266,6 +266,14 @@ func runOutsourcingReturnPayable(t *testing.T, ctx context.Context, data *Data, 
 	if _, err := data.sqldb.ExecContext(ctx, `UPDATE outsourcing_facts SET product_sku_id = $1 WHERE id = $2`, productSKU.ID, returnFact.ID); err != nil {
 		t.Fatalf("restore outsourcing return SKU: %v", err)
 	}
+
+	replacement, err := inventoryUC.CorrectQualityInspectionResult(ctx, &biz.QualityInspectionCorrectionCreate{InspectionID: inspection.ID, CorrectionInspectionNo: "QI-AP-CORRECTED-" + suffix, Reason: "复核更正"}, actor.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := inventoryUC.PassQualityInspection(ctx, approximateQualityInspectionDecision(replacement.ID, biz.QualityInspectionResultPass)); err != nil {
+		t.Fatal(err)
+	}
 	payable, err := operationalUC.CreatePayableFromOutsourcingReturn(ctx, payableInput)
 	if err != nil {
 		t.Fatalf("create payable from outsourcing return: %v", err)
@@ -414,4 +422,16 @@ func createFinanceBusinessSourceFixtures(t *testing.T, ctx context.Context, clie
 	warehouse := createTestWarehouse(t, ctx, client, "FIN-W-"+suffix)
 	finished := createTestProductWarehouse(t, ctx, client, "FIN-FG-"+suffix)
 	return inventoryTestFixtures{productWarehouseID: finished.ID, unitID: unit.ID, materialID: material.ID, productID: product.ID, warehouseID: warehouse.ID}
+}
+
+func TestOutsourcingReturnPayableAmountUsesStoredPrecision(t *testing.T) {
+	price := decimal.RequireFromString("1.234567")
+	amount, err := outsourcingReturnPayableAmount(&ent.OutsourcingOrderItem{UnitPrice: &price, OutsourcingQuantity: decimal.NewFromInt(10)}, decimal.RequireFromString("0.1234"))
+	if err != nil || !amount.Equal(decimal.RequireFromString("0.152346")) {
+		t.Fatalf("amount=%s err=%v", amount, err)
+	}
+	tiny := decimal.RequireFromString("0.000001")
+	if _, err := outsourcingReturnPayableAmount(&ent.OutsourcingOrderItem{UnitPrice: &tiny, OutsourcingQuantity: decimal.NewFromInt(10)}, decimal.RequireFromString("0.0001")); !errors.Is(err, biz.ErrFinanceFactSourceAmountInvalid) {
+		t.Fatalf("rounded zero accepted: %v", err)
+	}
 }
