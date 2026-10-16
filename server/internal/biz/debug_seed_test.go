@@ -284,7 +284,6 @@ func TestDebugUsecase_ClearBusinessDataRequiresExactConfirmationForDeletion(t *t
 			BusinessDataClearEnabled: true,
 		})
 		_, err := uc.ClearBusinessData(context.Background(), DebugBusinessDataClearInput{
-			ActorID:      1,
 			DryRun:       false,
 			Confirmation: confirmation,
 		})
@@ -302,7 +301,6 @@ func TestDebugUsecase_ClearBusinessDataRequiresExactConfirmationForDeletion(t *t
 		BusinessDataClearEnabled: true,
 	})
 	result, err := uc.ClearBusinessData(context.Background(), DebugBusinessDataClearInput{
-		ActorID:      1,
 		Confirmation: DebugBusinessDataClearConfirmation,
 	})
 	if err != nil {

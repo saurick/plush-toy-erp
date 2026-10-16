@@ -509,7 +509,6 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 	mock.ExpectQuery("INSERT INTO bom_headers").
 		WithArgs(31, "SIM-TEST-BOM-V1", "ACTIVE", sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(51))
-	mock.ExpectExec(regexp.QuoteMeta("DELETE FROM bom_items WHERE bom_header_id = $1 AND material_id NOT IN ($2)")).WithArgs(51, 21).WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectQuery("SELECT id\nFROM bom_items").
 		WithArgs(51, 21).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))

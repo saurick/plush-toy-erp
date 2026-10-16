@@ -624,19 +624,6 @@ func SeedCoreDemoData(ctx context.Context, db *sql.DB, dataset CoreDemoSeedDatas
 			return nil, err
 		}
 		result.BOMHeaderIDs[bom.ProductCode] = headerID
-		keepArgs := []any{headerID}
-		keepPlaceholders := make([]string, 0, len(bom.Items))
-		for _, item := range bom.Items {
-			keepArgs = append(keepArgs, result.MaterialIDs[item.MaterialCode])
-			keepPlaceholders = append(keepPlaceholders, fmt.Sprintf("$%d", len(keepArgs)))
-		}
-		deleteQuery := "DELETE FROM bom_items WHERE bom_header_id = $1"
-		if len(keepPlaceholders) > 0 {
-			deleteQuery += " AND material_id NOT IN (" + strings.Join(keepPlaceholders, ", ") + ")"
-		}
-		if _, err := tx.ExecContext(ctx, deleteQuery, keepArgs...); err != nil {
-			return nil, err
-		}
 		for _, item := range bom.Items {
 			materialID := result.MaterialIDs[item.MaterialCode]
 			unitID := result.UnitIDs[item.UnitCode]

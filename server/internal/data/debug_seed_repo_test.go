@@ -175,7 +175,6 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 	}
 
 	result, err := uc.ClearBusinessData(ctx, biz.DebugBusinessDataClearInput{
-		ActorID:      1,
 		Confirmation: biz.DebugBusinessDataClearConfirmation,
 	})
 	if err != nil {
