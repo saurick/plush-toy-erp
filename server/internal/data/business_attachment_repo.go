@@ -166,11 +166,6 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 		}
 		return nil, err
 	}
-	if productImageWrite {
-		if err := requireUnreferencedProductImage(ctx, tx, in.OwnerID, *in.SlotKey); err != nil {
-			return nil, err
-		}
-	}
 	// Keep the owner lock through the bounded object write. The SQL transaction
 	// still owns slot replacement and reference publication; it never deletes blobs.
 	objectKey := attachmentstore.NewKey()
@@ -401,27 +396,10 @@ func (r *businessAttachmentRepo) ClearProductImage(ctx context.Context, productI
 		}
 		return err
 	}
-	if err := requireUnreferencedProductImage(ctx, tx, productID, slotKey); err != nil {
-		return err
-	}
 	if _, err := tx.ExecContext(ctx, businessAttachmentProductImageDeleteSQL(r.data.sqlDialect), productID, slotKey); err != nil {
 		return err
 	}
 	return tx.Commit()
-}
-
-func requireUnreferencedProductImage(ctx context.Context, tx *stdsql.Tx, productID int, slotKey string) error {
-	var referenced bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (
- SELECT 1 FROM business_attachments a JOIN sales_order_items i ON i.sample_image_attachment_id = a.id
- WHERE a.owner_type = 'product' AND a.owner_id = $1 AND a.attachment_type = 'product_image' AND a.slot_key = $2
- )`, productID, slotKey).Scan(&referenced); err != nil {
-		return err
-	}
-	if referenced {
-		return biz.ErrBusinessAttachmentReferenced
-	}
-	return nil
 }
 
 func businessAttachmentProductImageDeleteSQL(sqlDialect string) string {

@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/gif"
 	"image/jpeg"
 	"image/png"
 	"path/filepath"
@@ -59,7 +58,6 @@ var (
 	ErrBusinessAttachmentOwnerInvalid                = errors.New("business attachment owner invalid")
 	ErrBusinessAttachmentContentInvalid              = errors.New("business attachment content invalid")
 	ErrBusinessAttachmentStorageUnavailable          = errors.New("business attachment storage unavailable")
-	ErrBusinessAttachmentReferenced                  = errors.New("business attachment is referenced")
 	ErrBusinessAttachmentIntegrity                   = errors.New("business attachment integrity check failed")
 	ErrBusinessAttachmentTooLarge                    = errors.New("business attachment too large")
 	ErrBusinessAttachmentMimeNotAllowed              = errors.New("business attachment mime type not allowed")
@@ -319,11 +317,6 @@ func (uc *BusinessAttachmentUsecase) UploadBusinessAttachment(ctx context.Contex
 	if normalized.AttachmentType == BusinessAttachmentTypeProductImage {
 		if err := validateBusinessAttachmentProductImageContent(content, normalized.MimeType); err != nil {
 			return nil, err
-		}
-	}
-	if normalized.AttachmentType == BusinessAttachmentTypePrintAppendix {
-		if err := validateBusinessAttachmentProductImageContent(content, normalized.MimeType); err != nil {
-			return nil, ErrBusinessAttachmentContentInvalid
 		}
 	}
 	sum := sha256.Sum256(content)
@@ -589,8 +582,6 @@ func validateBusinessAttachmentProductImageContent(content []byte, mimeType stri
 		config, err = jpeg.DecodeConfig(bytes.NewReader(content))
 	case "image/webp":
 		config, err = webp.DecodeConfig(bytes.NewReader(content))
-	case "image/gif":
-		config, err = gif.DecodeConfig(bytes.NewReader(content))
 	default:
 		return ErrBusinessAttachmentProductImageMimeNotAllowed
 	}
@@ -607,8 +598,6 @@ func validateBusinessAttachmentProductImageContent(content []byte, mimeType stri
 		_, err = jpeg.Decode(bytes.NewReader(content))
 	case "image/webp":
 		_, err = webp.Decode(bytes.NewReader(content))
-	case "image/gif":
-		_, err = gif.Decode(bytes.NewReader(content))
 	}
 	if err != nil {
 		return ErrBusinessAttachmentProductImageContentInvalid

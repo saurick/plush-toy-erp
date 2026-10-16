@@ -8,7 +8,7 @@
   max-width: 100%;
   padding: 8px;
   color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   line-height: 1.4;
   text-align: center;
   white-space: normal;
@@ -21,7 +21,7 @@
 .erp-image-placeholder--compact {
   gap: 3px;
   padding: 0;
-  font-size: var(--erp-font-tiny);
+  font-size: 10px;
 }
 
 .erp-image-placeholder--compact > .anticon {
