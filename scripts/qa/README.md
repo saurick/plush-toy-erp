@@ -10,7 +10,7 @@
 
 主机 Docker 默认地址池耗尽时，可为该夹具设置 `ATTACHMENT_CONSOLE_FIXTURE_SUBNET`，值须为已核对不冲突、地址对齐的私有 IPv4 `/27`；夹具拆为两个 `/28`，分别用于内部附件网络和本机浏览器入口，结束后检查网络与卷均已清理。该配置只影响一次性测试，不改变正式 Compose 或主机 Docker 配置。
 
-终态来源任务办理人的前向修复使用 [terminal-task-assignee-preflight.sql](terminal-task-assignee-preflight.sql) 核查旧职责迁移与原始回执。没有可证明的原始分派记录时阻断升级，必须核对升级前备份；事件操作人不能替代任务办理人。备份恢复入口及 dry-run / apply 边界见 [服务端开发说明](../../server/README.md)，对应 PostgreSQL 回归覆盖真实分派、原本未分派、备份不匹配拒绝与重复执行。
+终态来源任务办理人的前向修复使用 [terminal-task-assignee-preflight.sql](terminal-task-assignee-preflight.sql) 核查旧职责迁移与原始回执。没有可证明的原始分派记录时阻断升级，必须核对升级前备份；事件操作人不能替代任务办理人。职责迁移尚未执行的演示目标可通过受控 Go 维护命令保全当前原始快照；已经执行的登记开发目标则从原备份恢复。两类入口及 dry-run / apply 边界见 [服务端开发说明](../../server/README.md)，对应 PostgreSQL 回归覆盖真实分派、原本未分派、备份不匹配拒绝与重复执行。
 
 ## 目录职责
 
