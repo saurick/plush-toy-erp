@@ -21,7 +21,7 @@
   max-width: calc(100% - 40px);
   margin: 0;
   color: var(--erp-textarea-count-color, #7a838d);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   line-height: 1.35;
   pointer-events: none;
   text-align: end;

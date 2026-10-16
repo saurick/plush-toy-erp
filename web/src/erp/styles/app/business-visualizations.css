@@ -46,6 +46,8 @@
 
 .erp-inventory-ledger-view-bar {
   display: flex;
+  min-width: 0;
+  flex: 1;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
@@ -93,7 +95,7 @@
   border-radius: 8px;
   background: var(--erp-surface-bg-soft, #f8faf8);
   color: var(--erp-text-muted, #52627a);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }
 
 .erp-business-visual-metric strong {
@@ -148,7 +150,7 @@
   border-top: 1px solid var(--erp-border, #e5ece7);
   border-bottom: 1px solid var(--erp-border, #e5ece7);
   color: var(--erp-text-muted, #52627a);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 600;
 }
 
@@ -190,7 +192,7 @@
 .erp-business-visual-identity small,
 .erp-business-visual-progress small {
   color: var(--erp-text-muted, #52627a);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
 }
 
 .erp-business-visual-identity > .erp-product-identity {
@@ -234,7 +236,7 @@
   border-radius: 999px;
   background: #eef2ef;
   color: #52625a;
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   white-space: nowrap;
 }
 
@@ -311,7 +313,7 @@
 .erp-arrival-calendar__weekdays span {
   padding: 6px;
   color: var(--erp-text-muted, #52627a);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
   text-align: center;
 }
 
@@ -345,11 +347,11 @@
 
 .erp-arrival-calendar__day-label small {
   color: var(--erp-text-muted, #52627a);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }
 
 .erp-arrival-calendar__day-number {
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   line-height: 21px;
 }
 
@@ -357,7 +359,7 @@
   display: block;
   margin-top: 5px;
   color: var(--erp-text, #17251d);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }
 
 .erp-arrival-calendar__day--muted {
@@ -438,7 +440,7 @@
 .erp-arrival-calendar__order-source,
 .erp-arrival-calendar__empty {
   color: var(--erp-text-muted, #52627a);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }
 
 .erp-arrival-calendar__unscheduled {
@@ -509,7 +511,7 @@
 
 .erp-finance-due-list__amount small {
   color: var(--erp-text-muted, #52627a);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }
 
 .erp-finance-due-list__amount strong {
@@ -574,7 +576,7 @@
 .erp-inventory-distribution-grid__fact-label {
   overflow: hidden;
   color: var(--erp-text-muted, #52627a);
-  font-size: 10px;
+  font-size: var(--erp-font-tiny);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -703,7 +705,7 @@
   border-top: 1px solid var(--erp-border, #e5ece7);
   border-bottom: 1px solid var(--erp-border, #e5ece7);
   color: var(--erp-text-muted, #52627a);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 600;
 }
 
@@ -727,7 +729,7 @@
 
 .erp-production-overview__schedule {
   color: var(--erp-text-muted, #52627a);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-variant-numeric: tabular-nums;
 }
 
@@ -753,7 +755,7 @@
 
 .erp-production-process__toolbar-label {
   color: var(--erp-text-muted, #52627a);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }
 
 .erp-production-process__toolbar .ant-select {
@@ -801,7 +803,7 @@
 .erp-production-process__identity span,
 .erp-production-process__identity small {
   color: var(--erp-text-muted, #52627a);
-  font-size: 11px;
+  font-size: var(--erp-font-micro);
 }
 
 .erp-production-process__steps {
@@ -838,7 +840,7 @@
     transparent
   );
   color: var(--erp-text-muted, #52627a);
-  font-size: 10px;
+  font-size: var(--erp-font-tiny);
   font-variant-numeric: tabular-nums;
 }
 
@@ -852,7 +854,7 @@
 .erp-production-process__step > b {
   grid-column: 1 / -1;
   color: var(--erp-text, #17251d);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 600;
 }
 
@@ -862,7 +864,7 @@
   grid-column: 1 / -1;
   overflow: hidden;
   color: var(--erp-text-muted, #52627a);
-  font-size: 10px;
+  font-size: var(--erp-font-tiny);
   font-style: normal;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -927,7 +929,7 @@
 
 .erp-management-glance__hint {
   color: var(--erp-text-muted, #52627a);
-  font-size: 10px;
+  font-size: var(--erp-font-tiny);
 }
 
 .erp-management-glance__item {
@@ -995,7 +997,7 @@
 }
 
 .erp-task-progress-rail__value {
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
@@ -1214,7 +1216,7 @@
   }
 
   .erp-arrival-calendar__day > strong {
-    font-size: 9px;
+    font-size: var(--erp-font-badge);
   }
 
   .erp-inventory-distribution-grid__facts {

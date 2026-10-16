@@ -2,6 +2,7 @@
   flex: none;
   padding: 8px 9px;
   border-top: 1px solid var(--erp-border);
+  background: var(--erp-surface-bg-muted);
 }
 
 .erp-module-catalog-trigger.ant-btn {
@@ -9,7 +10,7 @@
   justify-content: flex-start;
   gap: 14px;
   width: 100%;
-  min-height: 38px;
+  min-height: max(38px, var(--erp-touch-target, 0px));
   padding-inline: 24px;
   color: var(--erp-text-muted);
 }
@@ -44,7 +45,7 @@
 .erp-module-catalog__group-title {
   margin: 0 0 8px;
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 600;
   overflow-wrap: anywhere;
 }

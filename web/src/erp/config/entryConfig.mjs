@@ -135,8 +135,8 @@ export function isMobileRoleEntryEnabled(roleKey, config = getEntryConfig()) {
   }
   return Boolean(
     isMobileTasksEntryEnabled(config) &&
-      normalizedRoleKey &&
-      config?.mobileRoles?.[normalizedRoleKey] === true
+    normalizedRoleKey &&
+    config?.mobileRoles?.[normalizedRoleKey] === true
   )
 }
 
@@ -213,39 +213,43 @@ export function detectEntryDeviceType({ userAgent, maxTouchPoints } = {}) {
 }
 
 function storageGet(key) {
-  if (typeof window === 'undefined' || !window.localStorage) {
+  try {
+    return typeof window === 'undefined'
+      ? ''
+      : window.localStorage.getItem(key) || ''
+  } catch {
     return ''
   }
-  return window.localStorage.getItem(key) || ''
 }
-
 function storageSet(key, value) {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return
-  }
-  if (value) {
-    window.localStorage.setItem(key, value)
-  } else {
-    window.localStorage.removeItem(key)
+  try {
+    if (typeof window === 'undefined') return
+    if (value) window.localStorage.setItem(key, value)
+    else window.localStorage.removeItem(key)
+  } catch {
+    /* Entry selection remains usable without browser storage. */
   }
 }
-
-export function getLastEntryTarget() {
+export function getLastEntryTarget(config = getEntryConfig()) {
+  if (!config.rememberLastEntry) {
+    storageSet(LAST_ENTRY_TARGET_KEY, '')
+    return ''
+  }
   return normalizeEntryTarget(storageGet(LAST_ENTRY_TARGET_KEY))
 }
-
-export function rememberEntryChoice(target) {
-  const normalizedTarget = normalizeEntryTarget(target)
-  if (!normalizedTarget) {
+export function rememberEntryChoice(target, config = getEntryConfig()) {
+  if (!config.rememberLastEntry) {
+    storageSet(LAST_ENTRY_TARGET_KEY, '')
     return
   }
-  storageSet(LAST_ENTRY_TARGET_KEY, normalizedTarget)
+  const normalizedTarget = normalizeEntryTarget(target)
+  if (normalizedTarget) storageSet(LAST_ENTRY_TARGET_KEY, normalizedTarget)
 }
 
 export function resolveDefaultEntryTarget({
   pathname = '',
   config = getEntryConfig(),
-  lastTarget = getLastEntryTarget(),
+  lastTarget = getLastEntryTarget(config),
   deviceType = detectEntryDeviceType(),
 } = {}) {
   if (parseMobileRoleFromPath(pathname)) {

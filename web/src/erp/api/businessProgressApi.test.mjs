@@ -41,12 +41,13 @@ test('progress API forwards cancellation and filters to authoritative list/detai
     }
   })
   const { signal } = new AbortController()
-  await api.listBusinessProgress({ view: 'production', offset: 20 }, { signal })
+  const filters = { view: 'production', due_status: 'overdue', blocked_only: true, unlinked_only: true, offset: 20 }
+  await api.listBusinessProgress(filters, { signal })
   await api.getBusinessProgress({ view: 'orders', id: 3 }, { signal })
   assert.deepEqual(calls, [
     {
       method: 'list_progress',
-      params: { view: 'production', offset: 20 },
+      params: filters,
       options: { signal },
     },
     {
