@@ -22,6 +22,31 @@ async function warnings(code, file = 'src/erp/styles/app/example.css') {
   )
 }
 
+test('page emphasis uses subtle surfaces instead of thick side accents', async () => {
+  for (const declaration of [
+    'border-left: 3px solid var(--erp-primary)',
+    'border-inline-start-width: 4px',
+    'border-right: .25rem solid blue',
+    'border-left: 3pt solid blue',
+    'box-shadow: inset 3px 0 var(--erp-primary)',
+    'box-shadow: 0 3px 8px #0002, inset 4px 0 0 blue',
+    '--erp-slider-shadow: inset 3px 0 0 blue, inset 0 0 0 1px blue',
+  ]) {
+    assert.match((await warnings(`.erp-page { ${declaration}; }`))[0], /粗单侧色条/u)
+  }
+  for (const declaration of [
+    'border: 1px solid var(--erp-primary)',
+    'border-left: 1px solid var(--erp-border)',
+    'outline: 3px solid blue',
+    'box-shadow: inset 0 0 0 1px blue',
+    'box-shadow: inset 0 -2px 0 blue',
+    'box-shadow: 3px 0 8px #0002',
+    'box-shadow: inset 3px 0 12px #0002',
+  ]) {
+    assert.deepEqual(await warnings(`.erp-page { ${declaration}; }`), [])
+  }
+})
+
 test('module scope must cover every selector and positive alternative', async () => {
   for (const selector of [
     '.ant-input',
@@ -81,12 +106,30 @@ test('shared tabs and filter chips keep one appearance owner while allowing page
     (
       await warnings('.erp-page { --erp-slider-shadow: inset 0 -3px 0 green; }')
     )[0],
-    /不得使用 2px 以上的底边/u
+    /内容页签统一使用共享的 2px 指示线/u
   )
   assert.deepEqual(
     await warnings('.erp-page { --erp-slider-shadow: inset 0 0 0 1px green; }'),
     []
   )
+})
+
+test('only shared content tab owners define the 2px underline', async () => {
+  const selector = [
+    '.erp-sliding-segmented.ant-segmented:not(.ant-segmented-vertical)',
+    '.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-nav-list',
+    '.erp-sliding-tab-list.erp-navigation-tabs',
+  ].join(', ')
+  const file = 'src/erp/styles/app/control-affordance.css'
+  const declaration = '--erp-slider-shadow: inset 0 -2px 0 var(--erp-control-accent);'
+  assert.deepEqual(await warnings(`${selector} { ${declaration} }`, file), [])
+  for (const [css, source] of [
+    [`${selector} { ${declaration} }`, 'src/erp/styles/app/example.css'],
+    [`.erp-page { ${declaration} }`, file],
+    [`${selector} { ${declaration.replace('-2px', '-3px')} }`, file],
+  ]) {
+    assert.match((await warnings(css, source))[0], /内容页签统一/u)
+  }
 })
 
 test('mobile search layout and excluded fields do not claim shared appearance', async () => {

@@ -6,10 +6,7 @@ import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 
-import {
-  loadDevPorts,
-  resolveDevAuxPort,
-} from '../../scripts/dev-ports.mjs'
+import { loadDevPorts, resolveDevAuxPort } from '../../scripts/dev-ports.mjs'
 
 const INPUT_TEMPLATE_SCOPE = 'real-login-smoke-shared-input-template'
 const PREFLIGHT_SCOPE = 'real-login-smoke-shared-preflight-report'
@@ -73,6 +70,7 @@ export function createRealLoginSmokeRuntime({
   scriptDir,
   outputSubdir,
   defaultPort = defaultRealLoginSmokePort,
+  beforeLogin,
 } = {}) {
   const webDir = path.resolve(scriptDir, '..')
   const repoDir = path.resolve(webDir, '..')
@@ -99,6 +97,10 @@ export function createRealLoginSmokeRuntime({
   async function prepare() {
     await fs.mkdir(outputDir, { recursive: true })
     await ensureBackendReady(backendHealthURL)
+    await beforeLogin?.({
+      backendURL: new URL(backendHealthURL).origin,
+      baseURL,
+    })
     const credentials = await resolveAdminCredentials({
       serverDir,
       backendAuthURL,
@@ -108,6 +110,7 @@ export function createRealLoginSmokeRuntime({
       devServerProcess = startDevServer({
         webDir,
         devServerPort,
+        backendURL: new URL(backendHealthURL).origin,
         onLog: (chunk) => {
           devServerLogs += chunk
         },
@@ -135,6 +138,7 @@ export function createRealLoginSmokeRuntime({
 
   return {
     baseURL,
+    backendURL: new URL(backendHealthURL).origin,
     headless,
     outputDir,
     prepare,
@@ -160,7 +164,7 @@ export async function buildRealLoginSmokePreflightReport({
   const baseURL = externalBaseURL || `http://127.0.0.1:${devServerPort}`
   const credentialEnvPresent = Boolean(
     String(process.env.REAL_LOGIN_ADMIN_USERNAME || '').trim() &&
-      String(process.env.REAL_LOGIN_ADMIN_PASSWORD || '').trim()
+    String(process.env.REAL_LOGIN_ADMIN_PASSWORD || '').trim()
   )
   const configCandidates = await Promise.all(
     [
@@ -527,7 +531,7 @@ async function ensureBackendReady(backendHealthURL) {
   }
 }
 
-function startDevServer({ webDir, devServerPort, onLog }) {
+function startDevServer({ webDir, devServerPort, backendURL, onLog }) {
   const child = spawn(
     'pnpm',
     [
@@ -546,6 +550,7 @@ function startDevServer({ webDir, devServerPort, onLog }) {
       env: {
         ...process.env,
         BROWSER: 'none',
+        API_ORIGIN: backendURL,
         ERP_VITE_PORT: String(devServerPort),
         ERP_VITE_HMR_CLIENT_PORT: String(devServerPort),
       },

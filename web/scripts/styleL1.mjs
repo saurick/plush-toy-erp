@@ -53,7 +53,7 @@ import {
   assertBusinessMainTableInitialSelectionEmpty,
   assertBusinessMainTableSortableColumns,
   assertBusinessHeaderHasNoSectionTitle,
-  assertBusinessHeaderStatsSingleLine,
+  assertBusinessHeaderCompact,
 } from './style-l1/businessTableAssertions.mjs'
 import {
   assertVisibleInputControlRadius,
@@ -305,7 +305,7 @@ function getScenarios() {
     assertAppAlertDialogLayout,
     assertBusinessCollaborationPanelCollapsedByDefault,
     assertBusinessHeaderHasNoSectionTitle,
-    assertBusinessHeaderStatsSingleLine,
+    assertBusinessHeaderCompact,
     assertBusinessListEmptySearchState,
     assertBusinessMainTableHasNoOperationColumn,
     assertBusinessMainTableInitialSelectionEmpty,
