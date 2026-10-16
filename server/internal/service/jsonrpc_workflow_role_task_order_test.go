@@ -81,32 +81,3 @@ func TestWorkflowRoleTaskHistoryCursorBindsDatesAndResult(t *testing.T) {
 		}
 	}
 }
-
-func TestWorkflowRoleTaskCursorBindsDueAndSource(t *testing.T) {
-	anchor := time.Date(2026, 10, 16, 0, 0, 0, 0, time.UTC)
-	cursor := encodeWorkflowRoleTaskViewCursor(workflowRoleTaskViewCursor{
-		Method: "list_role_tasks", ViewKey: "todo", RoleKey: "sales", SortKey: "newest", Due: "noDue", SourceType: "sales_order", BeforeTime: &anchor, BeforeID: 17, SnapshotUnix: anchor.Unix(), ExpectedTotal: 4, SeenTotal: 2, RiskScope: "role",
-	})
-	params := map[string]any{"view_key": "todo", "role_key": "sales", "sort_key": "newest", "due": "noDue", "source_type": "sales_order", "cursor": cursor}
-	request, failure := parseWorkflowRoleTaskViewRequest(params, "list_role_tasks")
-	if failure != nil || request.Due != "noDue" || request.SourceType != "sales_order" {
-		t.Fatalf("filters lost: %+v %+v", request, failure)
-	}
-	for _, key := range []string{"due", "source_type"} {
-		saved := params[key]
-		delete(params, key)
-		if _, failure := parseWorkflowRoleTaskViewRequest(params, "list_role_tasks"); failure == nil {
-			t.Fatalf("cursor survived clearing %s", key)
-		}
-		params[key] = saved
-	}
-	for _, extra := range []map[string]any{{"due": "tomorrow"}, {"due": true}, {"source_type": 17}, {"source_type": " sales_order "}} {
-		input := map[string]any{"view_key": "todo", "role_key": "sales"}
-		for k, v := range extra {
-			input[k] = v
-		}
-		if _, failure := parseWorkflowRoleTaskViewRequest(input, "list_role_tasks"); failure == nil {
-			t.Fatalf("invalid filters accepted: %+v", input)
-		}
-	}
-}

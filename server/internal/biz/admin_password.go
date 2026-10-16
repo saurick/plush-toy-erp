@@ -1,15 +1,12 @@
 package biz
 
-import (
-	"crypto/rand"
-	"encoding/base64"
-	"unicode/utf8"
-)
+import "unicode/utf8"
 
 const (
-	AdminPasswordMinLength = 8
-	AdminPasswordMaxLength = 20
-	AdminPasswordMaxBytes  = 72
+	AdminPasswordMinLength    = 8
+	AdminPasswordMaxLength    = 20
+	AdminPasswordMaxBytes     = 72
+	AdminDefaultResetPassword = "12345678"
 )
 
 // ValidateAdminPassword keeps every administrator credential creation path
@@ -20,17 +17,4 @@ func ValidateAdminPassword(password string) error {
 		return ErrBadParam
 	}
 	return nil
-}
-
-type AdminTemporaryPasswordReset struct {
-	Admin             *AdminUser
-	TemporaryPassword string
-}
-
-func generateAdminTemporaryPassword() (string, error) {
-	var secret [15]byte
-	if _, err := rand.Read(secret[:]); err != nil {
-		return "", err
-	}
-	return base64.RawURLEncoding.EncodeToString(secret[:]), nil
 }

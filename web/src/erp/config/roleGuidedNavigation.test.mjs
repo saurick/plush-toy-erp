@@ -688,24 +688,3 @@ test('roleGuidedNavigation: 客户扩展、工具和帮助保持各自 Admin 菜
     ['/erp/help-center']
   )
 })
-
-test('removed primary permissions promote one surviving entry without duplicates', () => {
-  const input = {
-    effectivePaths: ['/erp/warehouse/inventory'],
-    primaryMenuPaths: ['/erp/sales/orders'],
-    secondaryMenuPaths: ['/erp/warehouse/inventory'],
-  }
-  const result = reconcileRoleNavigationPaths(input)
-  assert.deepEqual(result, {
-    primaryMenuPaths: ['/erp/warehouse/inventory'],
-    secondaryMenuPaths: [],
-  })
-  assert.deepEqual(
-    reconcileRoleNavigationPaths({ ...input, ...result }),
-    result
-  )
-  assert.deepEqual(reconcileRoleNavigationPaths(), {
-    primaryMenuPaths: [],
-    secondaryMenuPaths: [],
-  })
-})

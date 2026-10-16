@@ -1,8 +1,8 @@
-import { Alert } from 'antd'
-import React, { useCallback, useEffect, useLayoutEffect, useState } from 'react'
+import { Typography, Alert } from 'antd'
+import React, { useCallback, useEffect, useState } from 'react'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import SearchInput from '@/common/components/SearchInput.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
-import { PageHeaderCard } from '../components/business-list/BusinessListLayout.jsx'
 import { usePermissionRoleSettings } from '../components/permission-center/usePermissionRoleSettings.jsx'
 import PermissionAdminAccounts from '../components/permission-center/PermissionAdminAccounts.jsx'
 import { usePermissionCenterData } from '../components/permission-center/usePermissionCenterData.mjs'
@@ -60,17 +60,6 @@ export default function PermissionCenterPage() {
       ? searchParams.get('tab')
       : PERMISSION_CENTER_TAB_KEYS.ROLES
   )
-  const roleView = [
-    PERMISSION_CENTER_TAB_KEYS.ROLES,
-    PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
-  ].includes(activeTabKey)
-
-  useLayoutEffect(() => {
-    if (!roleView || !editorContainer) return undefined
-    const scroller = editorContainer.closest('.erp-admin-content')
-    scroller?.setAttribute('data-permission-workspace', 'true')
-    return () => scroller?.removeAttribute('data-permission-workspace')
-  }, [editorContainer, roleView])
 
   const [approvalResponsibilityDirty, setApprovalResponsibilityDirty] =
     useState(false)
@@ -97,9 +86,7 @@ export default function PermissionCenterPage() {
     onOpenNavigation: () =>
       setActiveTabKey(PERMISSION_CENTER_TAB_KEYS.NAVIGATION),
     navigationMode: activeTabKey === PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
-    settingsVisible: activeTabKey === PERMISSION_CENTER_TAB_KEYS.ROLES,
     searchKeyword: permissionSearch,
-    onSearchChange: setPermissionSearch,
     setSaving,
     saving,
   })
@@ -338,16 +325,19 @@ export default function PermissionCenterPage() {
     {
       key: PERMISSION_CENTER_TAB_KEYS.ROLES,
       label: '岗位设置',
+      count: roles.length,
     },
     {
       key: PERMISSION_CENTER_TAB_KEYS.ADMINS,
       label: '员工账号',
+      count: canReadUsers ? admins.length : null,
     },
     ...(canReadApprovalResponsibilities
       ? [
           {
             key: PERMISSION_CENTER_TAB_KEYS.APPROVALS,
             label: '审批责任',
+            count: 3,
           },
         ]
       : []),
@@ -356,43 +346,16 @@ export default function PermissionCenterPage() {
       label: '岗位导航',
     },
   ]
+  const roleView = [
+    PERMISSION_CENTER_TAB_KEYS.ROLES,
+    PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
+  ].includes(activeTabKey)
   return (
-    <div
-      className="erp-business-page-layout erp-permission-page-layout"
-      data-permission-workspace={roleView}
-      ref={setEditorContainer}
-    >
+    <div className="erp-business-page-layout" ref={setEditorContainer}>
       <div className="erp-permission-page">
-        <PageHeaderCard
-          compact
-          title="权限管理"
-          viewSwitch={
-            <SlidingTabList
-              className="erp-permission-tabs erp-navigation-tabs"
-              aria-label="权限管理"
-            >
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTabKey === tab.key}
-                  aria-controls={
-                    [
-                      PERMISSION_CENTER_TAB_KEYS.ROLES,
-                      PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
-                    ].includes(tab.key)
-                      ? 'permission-roles-panel'
-                      : `permission-${tab.key}-panel`
-                  }
-                  onClick={() => changePermissionCenterTab(tab.key)}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </SlidingTabList>
-          }
-        />
+        <Title level={1} className="erp-permission-page__title">
+          权限管理
+        </Title>
         {permissionWarningMessages.length > 0 ? (
           <Alert
             type="warning"
@@ -403,10 +366,46 @@ export default function PermissionCenterPage() {
             )}。超级管理员账号只能由超级管理员维护。`}
           />
         ) : null}
-        <div
-          className="erp-permission-toolbar"
-          hidden={activeTabKey !== PERMISSION_CENTER_TAB_KEYS.ADMINS}
-        >
+        <div className="erp-permission-toolbar">
+          <SlidingTabList
+            className="erp-permission-tabs erp-navigation-tabs"
+            aria-label="权限管理"
+          >
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                role="tab"
+                aria-selected={activeTabKey === tab.key}
+                aria-controls={
+                  [
+                    PERMISSION_CENTER_TAB_KEYS.ROLES,
+                    PERMISSION_CENTER_TAB_KEYS.NAVIGATION,
+                  ].includes(tab.key)
+                    ? 'permission-roles-panel'
+                    : `permission-${tab.key}-panel`
+                }
+                onClick={() => changePermissionCenterTab(tab.key)}
+              >
+                {tab.label}
+                {tab.count !== null ? (
+                  <span className="erp-permission-tabs__count">
+                    {tab.count}
+                  </span>
+                ) : null}
+              </button>
+            ))}
+          </SlidingTabList>
+          {activeTabKey === PERMISSION_CENTER_TAB_KEYS.ROLES ? (
+            <SearchInput
+              className="erp-permission-toolbar__search"
+              aria-label="搜索功能或页面"
+              placeholder="搜索功能名称或页面"
+              allowClear
+              value={permissionSearch}
+              onChange={(event) => setPermissionSearch(event.target.value)}
+            />
+          ) : null}
           <div
             className="erp-permission-toolbar__account"
             ref={setToolbarContainer}
@@ -447,3 +446,4 @@ export default function PermissionCenterPage() {
     </div>
   )
 }
+const { Title } = Typography

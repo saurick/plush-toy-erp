@@ -577,9 +577,6 @@ func runtimeAuditSummary(event RuntimeAuditEvent) string {
 	}
 	switch event.EventKey {
 	case "admin_user.password.reset":
-		if boolValue(after["reset_to_temporary"]) {
-			return actor + " 为 " + target + " 生成了临时密码"
-		}
 		if boolValue(after["reset_to_default"]) {
 			return actor + " 将 " + target + " 的密码重置为默认密码"
 		}
@@ -1256,23 +1253,15 @@ func (uc *AdminManageUsecase) ResetPassword(
 	return uc.resetPassword(ctx, adminID, password, false)
 }
 
-func (uc *AdminManageUsecase) ResetTemporaryPassword(ctx context.Context, adminID int) (*AdminTemporaryPasswordReset, error) {
-	password, err := generateAdminTemporaryPassword()
-	if err != nil {
-		return nil, err
-	}
-	admin, err := uc.resetPassword(ctx, adminID, password, true)
-	if err != nil {
-		return nil, err
-	}
-	return &AdminTemporaryPasswordReset{Admin: admin, TemporaryPassword: password}, nil
+func (uc *AdminManageUsecase) ResetDefaultPassword(ctx context.Context, adminID int) (*AdminUser, error) {
+	return uc.resetPassword(ctx, adminID, AdminDefaultResetPassword, true)
 }
 
 func (uc *AdminManageUsecase) resetPassword(
 	ctx context.Context,
 	adminID int,
 	password string,
-	useTemporaryPassword bool,
+	useDefaultPassword bool,
 ) (updated *AdminUser, err error) {
 	ctx, span := uc.Tracer().Start(ctx, "admin_manage.reset_password",
 		trace.WithAttributes(attribute.Int("admin.id", adminID)),
@@ -1285,7 +1274,7 @@ func (uc *AdminManageUsecase) resetPassword(
 		span.SetStatus(codes.Error, err.Error())
 		return nil, err
 	}
-	if useTemporaryPassword && !operator.IsSuperAdmin {
+	if useDefaultPassword && !operator.IsSuperAdmin {
 		return nil, ErrNoPermission
 	}
 	if adminID <= 0 || ValidateAdminPassword(password) != nil {
@@ -1316,7 +1305,7 @@ func (uc *AdminManageUsecase) resetPassword(
 
 	updated, err = uc.repo.ResetAdminPasswordWithAudit(ctx, &AdminPasswordReset{
 		AdminID: adminID, OperatorID: operator.ID, PasswordHash: string(hash),
-		UseTemporaryPassword: useTemporaryPassword,
+		UseDefaultPassword: useDefaultPassword,
 	})
 	if err != nil {
 		span.RecordError(err)

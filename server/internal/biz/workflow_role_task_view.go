@@ -67,9 +67,6 @@ func WorkflowRoleTaskHistoryDateBounds(period, dateFrom, dateTo string, snapshot
 }
 
 type WorkflowRoleTaskViewQuery struct {
-	Due        string
-	SourceType string
-	Calendar   *WorkflowTaskCalendarQuery
 	WorkflowTaskDiscoveryFilter
 	Keyword                  string
 	SortKey                  string
@@ -149,14 +146,12 @@ func (counts WorkflowRoleTaskViewCounts) ViewTotal(viewKey string) (int, bool) {
 }
 
 type WorkflowRoleTaskViewPage struct {
-	Calendar     *WorkflowTaskCalendar
-	Items        []*WorkflowTask
-	NextID       int
-	NextTime     *time.Time
-	HasMore      bool
-	SnapshotAt   time.Time
-	Counts       *WorkflowRoleTaskViewCounts
-	StatusCounts map[string]int
+	Items      []*WorkflowTask
+	NextID     int
+	NextTime   *time.Time
+	HasMore    bool
+	SnapshotAt time.Time
+	Counts     *WorkflowRoleTaskViewCounts
 }
 
 type WorkflowRoleTaskViewRepo interface {
@@ -164,11 +159,6 @@ type WorkflowRoleTaskViewRepo interface {
 }
 
 func (uc *WorkflowUsecase) ListRoleTaskView(ctx context.Context, query WorkflowRoleTaskViewQuery) (*WorkflowRoleTaskViewPage, error) {
-	if query.Calendar != nil {
-		if _, _, err := query.Calendar.Bounds(); err != nil || query.ViewKey != WorkflowRoleTaskViewTodo || query.BeforeID != 0 {
-			return nil, ErrBadParam
-		}
-	}
 	if !ValidWorkflowTaskDiscoveryFilter(query.WorkflowTaskDiscoveryFilter) {
 		return nil, ErrBadParam
 	}
@@ -198,7 +188,6 @@ func (uc *WorkflowUsecase) ListRoleTaskView(ctx context.Context, query WorkflowR
 	query.ApprovalVisibilityScopes = NormalizeWorkflowApprovalVisibilityScopes(query.ApprovalVisibilityScopes)
 	if query.RoleKey == "" || query.BeforeID < 0 ||
 		!ValidWorkflowRoleTaskListOptions(query.ViewKey, query.SortKey, query.StatusKey) ||
-		!ValidWorkflowTaskListFilters(query.Due, query.SourceType) ||
 		(query.ViewKey != WorkflowRoleTaskViewHistory && (query.CompletedFrom != nil || query.CompletedBefore != nil)) ||
 		(query.CompletedFrom != nil && query.CompletedBefore != nil && !query.CompletedFrom.Before(*query.CompletedBefore)) ||
 		(query.BeforeID > 0 && (query.SortKey == WorkflowRoleTaskSortNewest || query.SortKey == WorkflowRoleTaskSortOldest) && query.BeforeTime == nil) {

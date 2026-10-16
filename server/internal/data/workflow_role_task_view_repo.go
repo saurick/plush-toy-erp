@@ -75,23 +75,11 @@ func loadWorkflowRoleTaskView(ctx context.Context, client *ent.Client, query biz
 		return nil, biz.ErrBadParam
 	}
 	dbQuery := buildWorkflowRoleTaskEntQuery(client, query, query.ViewKey, query.BeforeID)
-	if query.Calendar != nil {
-		calendar, err := loadWorkflowTaskCalendar(ctx, client, dbQuery, query.Calendar, query.Limit, query.SnapshotAt)
-		return &biz.WorkflowRoleTaskViewPage{Calendar: calendar}, err
-	}
 
 	var counts *biz.WorkflowRoleTaskViewCounts
-	var statusCounts map[string]int
 	if query.IncludeCounts {
 		var err error
 		counts, err = countWorkflowRoleTaskViews(ctx, client, query)
-		if err != nil {
-			return nil, err
-		}
-		facet := query
-		facet.StatusKey = ""
-		statusCounts, err = scanBusinessStatusCounts(ctx, buildWorkflowRoleTaskEntQuery(client, facet, query.ViewKey, 0).
-			GroupBy(workflowtask.FieldTaskStatusKey).Aggregate(ent.Count()).Scan)
 		if err != nil {
 			return nil, err
 		}
@@ -131,13 +119,12 @@ func loadWorkflowRoleTaskView(ctx context.Context, client *ent.Client, query biz
 		}
 	}
 	return &biz.WorkflowRoleTaskViewPage{
-		Items:        items,
-		NextID:       nextID,
-		NextTime:     nextTime,
-		HasMore:      hasMore,
-		SnapshotAt:   query.SnapshotAt,
-		Counts:       counts,
-		StatusCounts: statusCounts,
+		Items:      items,
+		NextID:     nextID,
+		NextTime:   nextTime,
+		HasMore:    hasMore,
+		SnapshotAt: query.SnapshotAt,
+		Counts:     counts,
 	}, nil
 }
 
@@ -241,16 +228,6 @@ func buildWorkflowRoleTaskVisibilityEntQuery(
 	viewKey string,
 ) *ent.WorkflowTaskQuery {
 	dbQuery := client.WorkflowTask.Query().Where(workflowTaskDiscoveryPredicate(query.WorkflowTaskDiscoveryFilter))
-	if query.SourceType != "" {
-		dbQuery = dbQuery.Where(workflowtask.SourceType(query.SourceType))
-	}
-	duePredicate, dueErr := workflowTaskBoardDueFilterPredicate(biz.WorkflowTaskBoardQuery{Due: query.Due, SnapshotAt: query.SnapshotAt})
-	if dueErr != nil {
-		return dbQuery.Where(workflowtask.ID(0))
-	}
-	if duePredicate != nil {
-		dbQuery = dbQuery.Where(duePredicate)
-	}
 	if query.CompletedFrom != nil {
 		dbQuery = dbQuery.Where(workflowtask.CompletedAtGTE(*query.CompletedFrom))
 	}

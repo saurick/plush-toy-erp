@@ -1,15 +1,8 @@
 import { Typography, Button, Checkbox, Empty, Popover, Switch } from 'antd'
 
 import React, { useEffect, useMemo, useState } from 'react'
-import {
-  DownOutlined,
-  RightOutlined,
-  ExpandAltOutlined,
-  ShrinkOutlined,
-  ClearOutlined,
-} from '@ant-design/icons'
+import { DownOutlined, RightOutlined } from '@ant-design/icons'
 import TableScrollRegion from '@/common/components/table/TableScrollRegion.jsx'
-import SearchInput from '@/common/components/SearchInput.jsx'
 import {
   normalizeStringList,
   getPermissionLabel,
@@ -116,8 +109,7 @@ function describePermission({
       : ''
     summary = [
       '菜单入口',
-      entryMenu.label +
-        (!accessVerified ? '待核对' : effective ? '显示' : '不显示'),
+      entryMenu.label + (!accessVerified ? '待核对' : effective ? '显示' : '不显示'),
       placement,
     ]
       .filter(Boolean)
@@ -160,9 +152,6 @@ function PermissionRow({ item, presentation, compact = false, change = '' }) {
 function PermissionChecklist({
   groups,
   searchKeyword = '',
-  onSearchChange,
-  fullscreenAction,
-  changeSummaryPopoverProps,
   access = null,
   accessLoading = false,
   placementByPath = new Map(),
@@ -271,47 +260,6 @@ function PermissionChecklist({
 
   return (
     <div className="erp-permission-checklist-shell" aria-busy={accessLoading}>
-      <div
-        className="erp-permission-checklist-toolbar"
-        role="group"
-        aria-label="筛选岗位功能"
-      >
-        <SearchInput
-          className="erp-permission-checklist-search"
-          aria-label="搜索功能或页面"
-          placeholder="搜索功能名称或页面"
-          allowClear
-          value={searchKeyword}
-          onChange={(event) => onSearchChange(event.target.value)}
-        />
-        <label className="erp-permission-checklist-filter">
-          <Switch
-            size="small"
-            checked={showSelectedOnly}
-            onChange={setShowSelectedOnly}
-          />
-          <span>只看已选</span>
-        </label>
-        <div className="erp-permission-expand-actions">
-          <Button
-            size="small"
-            icon={<ExpandAltOutlined aria-hidden="true" />}
-            onClick={() => setCollapsedGroups(new Set())}
-          >
-            全部展开
-          </Button>
-          <Button
-            size="small"
-            icon={<ShrinkOutlined aria-hidden="true" />}
-            onClick={() =>
-              setCollapsedGroups(new Set(groups.map((group) => group.key)))
-            }
-          >
-            全部收起
-          </Button>
-          {fullscreenAction}
-        </div>
-      </div>
       <div className="erp-permission-capability-toolbar">
         <div className="erp-permission-capability-summary">
           <span>
@@ -319,10 +267,17 @@ function PermissionChecklist({
             {groups.reduce((sum, group) => sum + group.items.length, 0)}{' '}
             项功能已授权 · {groups.length} 个业务域
           </span>
+          <label className="erp-permission-checklist-filter">
+            <Switch
+              size="small"
+              checked={showSelectedOnly}
+              onChange={setShowSelectedOnly}
+            />
+            <span>只看已选</span>
+          </label>
         </div>
         {changedItems.length > 0 ? (
           <Popover
-            {...changeSummaryPopoverProps}
             trigger="click"
             title="本次功能调整"
             content={
@@ -338,11 +293,29 @@ function PermissionChecklist({
               </ul>
             }
           >
-            <Button size="small">
+            <Button type="link" size="small">
               新增 {addedCount} 项 · 撤销 {changedItems.length - addedCount} 项
             </Button>
           </Popover>
         ) : null}
+        <div className="erp-permission-expand-actions">
+          <Button
+            type="text"
+            size="small"
+            onClick={() => setCollapsedGroups(new Set())}
+          >
+            全部展开
+          </Button>
+          <Button
+            type="text"
+            size="small"
+            onClick={() =>
+              setCollapsedGroups(new Set(groups.map((group) => group.key)))
+            }
+          >
+            全部收起
+          </Button>
+        </div>
       </div>
       <TableScrollRegion className="erp-permission-checklist">
         {visibleGroups.length > 0 ? (
@@ -443,8 +416,8 @@ function PermissionChecklist({
                             {filtered ? '全选结果' : '全选本组'}
                           </Checkbox>
                           <Button
+                            type="text"
                             size="small"
-                            icon={<ClearOutlined aria-hidden="true" />}
                             disabled={disabled || selectedKeys.length === 0}
                             onClick={() => handleSectionChange(sectionKeys, [])}
                           >

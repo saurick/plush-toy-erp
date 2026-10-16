@@ -13,7 +13,6 @@ const fieldLabelMap = {
   password_reset: '密码',
   password_changed: '密码',
   reset_to_default: '重置方式',
-  reset_to_temporary: '重置方式',
   session_revoke_reason: '登录状态',
   status_reason: '状态说明',
   version: '岗位信息',
@@ -76,7 +75,6 @@ function compactValue(value, key) {
   if (key === 'password_changed') {
     return value ? '本人已修改' : '修改前'
   }
-  if (key === 'reset_to_temporary') return value ? '随机临时密码' : '指定新密码'
   if (key === 'reset_to_default') {
     return value ? '默认密码' : '指定新密码'
   }

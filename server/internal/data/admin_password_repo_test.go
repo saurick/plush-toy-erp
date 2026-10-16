@@ -50,11 +50,7 @@ func TestAdminPasswordChangeAndDefaultResetInvalidateSessions(t *testing.T) {
 			if mode == "default reset" {
 				newPassword, eventKey, reason = "12345678", "admin_user.password.reset", adminSessionRevokeReasonPasswordReset
 				ctx := biz.NewContextWithClaims(fx.ctx, &biz.AuthClaims{UserID: fx.operator.ID, Role: biz.RoleAdmin, AuthVersion: 1})
-				var reset *biz.AdminTemporaryPasswordReset
-				reset, err = uc.ResetTemporaryPassword(ctx, admin.ID)
-				if err == nil {
-					newPassword = reset.TemporaryPassword
-				}
+				_, err = uc.ResetDefaultPassword(ctx, admin.ID)
 			} else {
 				err = uc.ChangePassword(biz.NewContextWithClaims(fx.ctx, claims), "old-password", newPassword)
 			}
@@ -83,7 +79,7 @@ func TestAdminPasswordChangeAndDefaultResetInvalidateSessions(t *testing.T) {
 					t.Fatal("audit contains credential material")
 				}
 			}
-			if mode == "default reset" && !strings.Contains(event.Payload, `"reset_to_temporary":true`) {
+			if mode == "default reset" && !strings.Contains(event.Payload, `"reset_to_default":true`) {
 				t.Fatal("default reset is not distinguishable in audit")
 			}
 		})
@@ -145,7 +141,7 @@ func TestAdminPasswordChangeRollsBackWhenAuditFails(t *testing.T) {
 func TestAdminDefaultPasswordResetRechecksSuperAdminInsideTransaction(t *testing.T) {
 	fx := newAdminManageAtomicFixture(t)
 	fx.client.AdminUser.UpdateOneID(fx.operator.ID).SetIsSuperAdmin(false).SaveX(fx.ctx)
-	_, err := fx.repo.ResetAdminPasswordWithAudit(fx.ctx, &biz.AdminPasswordReset{AdminID: fx.target.ID, OperatorID: fx.operator.ID, PasswordHash: "candidate-default-hash", UseTemporaryPassword: true})
+	_, err := fx.repo.ResetAdminPasswordWithAudit(fx.ctx, &biz.AdminPasswordReset{AdminID: fx.target.ID, OperatorID: fx.operator.ID, PasswordHash: "candidate-default-hash", UseDefaultPassword: true})
 	if !errors.Is(err, biz.ErrNoPermission) {
 		t.Fatalf("error = %v, want ErrNoPermission", err)
 	}

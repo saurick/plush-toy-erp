@@ -55,15 +55,15 @@ test('inventory optional reference dictionaries cannot fail the whole page for a
   )
   assert.match(
     inventoryPage,
-    /canReadMaterials\s*\?\s*listAllMaterials\([\s\S]*:\s*Promise\.resolve\(\{ materials: \[\] \}\)/u
+    /canReadMaterials\s*\?\s*listMaterials\([\s\S]*:\s*Promise\.resolve\(\{ materials: \[\] \}\)/u
   )
   assert.match(
     inventoryPage,
-    /canReadProducts\s*\?\s*listAllProducts\([\s\S]*:\s*Promise\.resolve\(\{ products: \[\] \}\)/u
+    /canReadProducts\s*\?\s*listProducts\([\s\S]*:\s*Promise\.resolve\(\{ products: \[\] \}\)/u
   )
   assert.match(
     inventoryPage,
-    /canReadProductSKUs\s*\?\s*listAllProductSKUs\([\s\S]*:\s*Promise\.resolve\(\{ product_skus: \[\] \}\)/u
+    /canReadProductSKUs\s*\?\s*listProductSKUs\([\s\S]*:\s*Promise\.resolve\(\{ product_skus: \[\] \}\)/u
   )
   assert.match(
     inventoryPage,

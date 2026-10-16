@@ -1,5 +1,5 @@
 import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
-import { isCompleteDateRange } from './filterDateRange.mjs'
+import { parseDateInputValue } from './dateRange.mjs'
 
 export const WORKFLOW_HISTORY_STATUS_OPTIONS = Object.freeze([
   { value: '', label: '全部结果' },
@@ -27,7 +27,11 @@ export function isWorkflowHistoryDateFilter({
       dateTo === ''
     )
   }
-  return isCompleteDateRange({ dateFrom, dateTo })
+  const validDate = (value) =>
+    typeof value === 'string' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+    Boolean(parseDateInputValue(value))
+  return validDate(dateFrom) && validDate(dateTo) && dateFrom <= dateTo
 }
 
 export function workflowHistoryFilterSummary({

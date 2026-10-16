@@ -335,7 +335,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 			menuPermissionSurface("task-board", "task-actions", "协同任务", controlKey, controlLabel, controlType, effect, methods, workflowUsageConditions),
 		}
 	}
-	workflowTaskReadSurfaces := workflowSurfaces("task-list", "任务列表、看板和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "get_task", "list_tasks", "get_task_board", "metadata", "list_business_states", "explain_action_access", "explain_task_assignment", "get_task_process_context", "get_task_handling_chain", "get_task_link", "list_exceptions", "list_task_events"))
+	workflowTaskReadSurfaces := workflowSurfaces("task-list", "任务列表、看板和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "get_task", "list_tasks", "get_task_board", "metadata", "list_business_states", "explain_action_access", "explain_task_assignment", "get_task_process_context", "get_task_handling_chain", "list_exceptions", "list_task_events"))
 	for index := range workflowTaskReadSurfaces {
 		if workflowTaskReadSurfaces[index].PageKey == "global-dashboard" {
 			workflowTaskReadSurfaces[index].BackendMethods = append(
@@ -374,7 +374,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	purchaseOrderReceiptProgressMethods := permissionMethods("purchase_order", "get_purchase_order_receipt_progress")
 	add(PermissionPurchaseOrderRead,
 		menuPermissionSurface("accessories-purchase", "purchase-orders", "采购订单", "purchase-order-list", "采购订单列表和详情", permissionControlPage, "允许进入并查看", append(permissionMethods("purchase_order", "get_purchase_order", "list_purchase_orders", "list_purchase_order_items"), purchaseOrderReceiptProgressMethods...), businessUsageConditions),
-		menuPermissionSurface("inbound", "purchase-order-source", "采购订单来源", "purchase-receipt-source-reference", "采购入库可读取的采购订单与明细", permissionControlSection, "允许查看", append(permissionMethods("purchase", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item", "post_purchase_rejection_disposition"), permissionMethods("customer_config", "start_material_supply_purchase_order_process")...), businessUsageConditions),
+		menuPermissionSurface("inbound", "purchase-order-source", "采购订单来源", "purchase-receipt-source-reference", "采购入库可读取的采购订单与明细", permissionControlSection, "允许查看", append(permissionMethods("purchase", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item"), permissionMethods("customer_config", "start_material_supply_purchase_order_process")...), businessUsageConditions),
 	)
 	addMenu(PermissionPurchaseOrderCreate, "accessories-purchase", "purchase-orders", "采购订单", "create-purchase-order", "新建采购订单和表单", permissionControlButton, "显示并允许创建", permissionMethods("purchase_order", "save_purchase_order_with_items"), businessUsageConditions)
 	purchaseOrderUpdateMethods := permissionMethods("purchase_order", "save_purchase_order_with_items", "reorder_purchase_order_items")
@@ -397,7 +397,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionOutsourcingFactCancel, "processing-contracts", "outsourcing-fact-actions", "委外动作", "cancel-outsourcing-fact", "取消委外记录", permissionControlButton, "显示并允许取消", permissionMethods("operational_fact", "cancel_outsourcing_fact", "cancel_outsourcing_return_disposition"), businessUsageConditions)
 
 	addMenu(PermissionPurchaseReceiptRead, "inbound", "purchase-receipts", "采购入库", "purchase-receipt-list", "采购入库列表和详情", permissionControlPage, "允许进入并查看", append(permissionMethods("purchase", "get_purchase_receipt", "list_purchase_receipts"), purchaseOrderReceiptProgressMethods...), businessUsageConditions)
-	purchaseReceiptCreateMethods := append(permissionMethods("purchase", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item", "post_purchase_rejection_disposition"), permissionMethods("customer_config", "execute_material_supply_purchase_receipt_create")...)
+	purchaseReceiptCreateMethods := append(permissionMethods("purchase", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item"), permissionMethods("customer_config", "execute_material_supply_purchase_receipt_create")...)
 	addMenu(PermissionPurchaseReceiptCreate, "accessories-purchase", "purchase-order-actions", "采购到货", "create-purchase-receipt", "登记来料实点数量", permissionControlForm, "显示并允许登记", purchaseReceiptCreateMethods, businessUsageConditions)
 	addMenu(PermissionPurchaseReceiptCancelDraft, "inbound", "purchase-receipt-actions", "采购到货", "cancel-purchase-receipt-draft", "取消未入库到货登记", permissionControlButton, "显示并允许取消未入库记录", permissionMethods("purchase", "cancel_purchase_receipt_draft"), businessUsageConditions)
 	addBackend(PermissionPurchaseReceiptAdjustmentRead, permissionMethods("purchase", "get_purchase_receipt_adjustment", "list_purchase_receipt_adjustments"), businessUsageConditions)
@@ -466,7 +466,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionQualityInspectionUpdate, "quality-inspections", "quality-actions", "质检动作", "decide-quality-inspection", "提交、判定或取消质检", permissionControlButton, "显示并允许处理", permissionMethods("quality", "submit_quality_inspection", "pass_quality_inspection", "reject_quality_inspection", "cancel_quality_inspection"), businessUsageConditions)
 	add(PermissionQualityExceptionHandle,
 		menuPermissionSurface("production-exceptions", "quality-exceptions", "品质异常", "handle-quality-exception", "处理品质异常", permissionControlButton, "显示并允许处理", permissionMethods("quality", "correct_quality_inspection_result"), append(append([]string{}, businessUsageConditions...), "仅允许撤销无已生效下游事实的判定，并生成新的待检单")),
-		menuPermissionSurface("processing-contracts", "outsourcing-related-records", "委外订单", "create-outsourcing-return-disposition", "登记委外不合格返厂处置", permissionControlButton, "显示并允许处理", permissionMethods("operational_fact", "create_outsourcing_return_disposition"), businessUsageConditions),
+		menuPermissionSurface("processing-contracts", "outsourcing-related-records", "委外订单", "create-outsourcing-return-disposition", "登记委外不合格返厂或返工处置", permissionControlButton, "显示并允许处理", permissionMethods("operational_fact", "create_outsourcing_return_disposition"), businessUsageConditions),
 	)
 	addMenu(PermissionProductionExceptionExecute, "production-exceptions", "production-risks", "异常处理", "execute-production-exception", "执行或冲正已批准的异常方案", permissionControlButton, "显示并允许办理", append(permissionMethods("operational_fact", "reverse_production_exception"), permissionMethods("customer_config", "execute_production_exception_process")...), businessUsageConditions)
 	addMenu(PermissionProductionExceptionSubmit, "production-exceptions", "production-risks", "异常处理", "submit-production-exception", "发起或撤回返工、补做、报废、超领和让步申请", permissionControlButton, "显示并允许处理", append(permissionMethods("operational_fact", "get_production_exception", "list_production_exceptions", "get_production_exception_context", "submit_production_exception", "cancel_production_exception"), permissionMethods("customer_config", "start_production_exception_approval_process")...), businessUsageConditions)
@@ -490,14 +490,14 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionFinanceReconciliationConfirm, "reconciliation", "reconciliation-actions", "对账动作", "confirm-reconciliation", "从已过账财务记录生成、确认、完成或取消单笔核对", permissionControlButton, "显示并允许处理", permissionMethods("operational_fact", "create_reconciliation_from_finance_fact", "post_finance_fact", "settle_finance_fact", "cancel_finance_fact"), businessUsageConditions)
 	addBackend(PermissionFinanceReportRead, nil, append(append([]string{}, businessUsageConditions...), "报表权限不直接开放应收、应付、发票或对账明细"))
 	financePaymentReadMethods := append(
-		permissionMethods("operational_fact", "list_finance_payments", "get_finance_payment", "list_finance_credit_notes", "get_finance_credit_note", "list_finance_payment_allocation_candidates"),
+		permissionMethods("operational_fact", "list_finance_payments", "get_finance_payment", "list_finance_credit_notes", "get_finance_credit_note"),
 		permissionMethods("customer_config", "start_finance_payment_approval_process", "get_finance_payment_approval_process", "execute_finance_payment_post")...,
 	)
 	addMenu(PermissionFinancePaymentRead, "finance-payments", "finance-payments", "收付款核销", "finance-payment-list", "收付款单与红冲记录列表、详情", permissionControlPage, "允许进入并查看", financePaymentReadMethods, businessUsageConditions)
 	addMenu(PermissionFinancePaymentCreate, "finance-payments", "finance-payment-actions", "收付款动作", "create-finance-payment", "创建真实收付款单、启动审批或按生命周期约束取消", permissionControlButton, "显示并允许创建或取消", append(permissionMethods("operational_fact", "create_finance_payment", "cancel_finance_payment"), permissionMethods("customer_config", "start_finance_payment_approval_process")...), businessUsageConditions)
 	addMenu(PermissionFinancePaymentApprove, "finance-payments", "finance-payment-actions", "收付款动作", "approve-finance-payment", "审批或驳回收付款", permissionControlButton, "显示并允许审批", permissionMethods("workflow", "complete_task_action"), businessUsageConditions)
-	addMenu(PermissionFinancePaymentPost, "finance-payments", "finance-payment-actions", "收付款动作", "post-finance-payment", "审批后确认实收实付，并抵扣应收应付", permissionControlButton, "显示并允许处理", append(permissionMethods("customer_config", "execute_finance_payment_post"), permissionMethods("operational_fact", "allocate_finance_payment")...), businessUsageConditions)
-	addMenu(PermissionFinancePaymentReverse, "finance-payments", "finance-payment-actions", "收付款动作", "reverse-finance-payment", "冲正已过账收付款", permissionControlButton, "显示并允许处理", permissionMethods("operational_fact", "reverse_finance_payment", "reverse_finance_allocation"), businessUsageConditions)
+	addMenu(PermissionFinancePaymentPost, "finance-payments", "finance-payment-actions", "收付款动作", "post-finance-payment", "审批后过账并进行多单核销", permissionControlButton, "显示并允许处理", permissionMethods("customer_config", "execute_finance_payment_post"), businessUsageConditions)
+	addMenu(PermissionFinancePaymentReverse, "finance-payments", "finance-payment-actions", "收付款动作", "reverse-finance-payment", "冲正已过账收付款", permissionControlButton, "显示并允许处理", permissionMethods("operational_fact", "reverse_finance_payment"), businessUsageConditions)
 	addMenu(PermissionFinanceCreditNoteCreate, "finance-payments", "finance-credit-note-actions", "财务红冲", "create-finance-credit-note", "创建应收应付红冲单", permissionControlButton, "显示并允许创建", permissionMethods("operational_fact", "create_finance_credit_note"), businessUsageConditions)
 	addMenu(PermissionFinanceCreditNoteReverse, "finance-payments", "finance-credit-note-actions", "财务红冲", "reverse-finance-credit-note", "反向红冲错误红冲单", permissionControlButton, "显示并允许处理", permissionMethods("operational_fact", "reverse_finance_credit_note"), businessUsageConditions)
 
@@ -533,7 +533,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 
 	// Mobile role entry permissions use explicit routes, not string-derived paths.
 	addMobile := func(permissionKey string, roleKey string, pageLabel string, path string) {
-		add(permissionKey, explicitPermissionSurface("mobile-"+roleKey+"-tasks", pageLabel, path, "mobile-tasks", "岗位任务", "mobile-task-entry", pageLabel, permissionControlMobileEntry, "允许进入岗位任务端", permissionMethods("workflow", "list_tasks", "get_task_board", "explain_action_access", "get_task_process_context", "get_task_handling_chain", "get_task_link", "list_exceptions", "list_task_events"), []string{permissionKey}, nil, mobileUsageConditions))
+		add(permissionKey, explicitPermissionSurface("mobile-"+roleKey+"-tasks", pageLabel, path, "mobile-tasks", "岗位任务", "mobile-task-entry", pageLabel, permissionControlMobileEntry, "允许进入岗位任务端", permissionMethods("workflow", "list_tasks", "get_task_board", "explain_action_access", "get_task_process_context", "get_task_handling_chain", "list_exceptions", "list_task_events"), []string{permissionKey}, nil, mobileUsageConditions))
 	}
 	addMobile(PermissionMobileBossAccess, BossRoleKey, "老板岗位任务端", "/m/boss/tasks")
 	addMobile(PermissionMobileSalesAccess, SalesRoleKey, "业务岗位任务端", "/m/sales/tasks")

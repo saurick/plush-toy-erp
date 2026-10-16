@@ -42,24 +42,16 @@ test('audit logs preserve drawer focus return, request recovery and honest page-
   assert.match(source, /清空本页风险条件后，可导出完整筛选结果/u)
 })
 
-test('audit logs visible summary uses registered labels and safe business copy', () => {
+test('audit logs visible summary uses registered business copy and never renders raw event summary', () => {
   const pageSource = readSource('../pages/AuditLogsPage.jsx')
 
   assert.match(
     pageSource,
     /const registeredMeta = actionMetaMap\[event\.event_key\]/u
   )
-  assert.match(
-    pageSource,
-    /label: getVisibleAuditText\(event\.action_label, '其他系统操作'\)/u
-  )
-  assert.match(
-    pageSource,
-    /return summarizeChange\(event\.payload\)/u
-  )
-  assert.doesNotMatch(pageSource, /event\.summary/u)
+  assert.match(pageSource, /label: '其他系统操作'/u)
+  assert.match(pageSource, /intent: '系统记录了一项管理操作'/u)
   for (const eventKey of [
-    'role.settings.set',
     'admin_user.revoked',
     'customer_config.publish',
     'customer_config.activate',
@@ -83,5 +75,6 @@ test('audit logs visible summary uses registered labels and safe business copy',
     /admin_bootstrap\.blocked'[\s\S]{0,180}event\.payload\?\.reason/u
   )
   assert.doesNotMatch(pageSource, /payload\.reason/u)
+  assert.doesNotMatch(pageSource, /getVisibleAuditText\(event\.summary/u)
   assert.doesNotMatch(pageSource, /return event\.summary/u)
 })

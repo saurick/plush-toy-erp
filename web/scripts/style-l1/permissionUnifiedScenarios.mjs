@@ -79,296 +79,6 @@ export function createPermissionUnifiedScenarios({
         .sort()
     )
   return [
-    ...[
-      {
-        name: 'permission-center-fullscreen-desktop',
-        viewport: { width: 1440, height: 900 },
-        themeMode: 'light',
-      },
-      {
-        name: 'permission-center-fullscreen-short-dark',
-        viewport: { width: 1024, height: 640 },
-        themeMode: 'dark',
-      },
-      {
-        name: 'permission-center-fullscreen-mobile',
-        viewport: { width: 390, height: 844 },
-        themeMode: 'light',
-      },
-    ].map((variant) => ({
-      ...variant,
-      path: '/erp/system/permissions',
-      auth: 'admin',
-      verify: async (page) => {
-        await page
-          .locator('.erp-role-template-card')
-          .filter({ hasText: '财务' })
-          .click()
-        const table = page.locator('.erp-permission-checklist')
-        const search = page.getByRole('textbox', { name: '搜索功能或页面' })
-        const enter = page.getByRole('button', {
-          name: '全屏编辑',
-          exact: true,
-        })
-        const exit = page.getByRole('button', { name: '退出全屏', exact: true })
-        const save = page.getByRole('button', {
-          name: '保存岗位设置',
-          exact: true,
-        })
-        const fullscreen = page.getByRole('dialog', {
-          name: '财务岗位设置',
-          exact: true,
-        })
-        await table.waitFor()
-        const initialSelection = await readSelection(page)
-        const normal = await table.evaluate((node) => {
-          node.scrollTop = 150
-          node.dataset.fullscreenIdentity = 'same-editor'
-          return {
-            width: node.clientWidth,
-            height: node.clientHeight,
-            top: node.scrollTop,
-          }
-        })
-        await enter.click()
-        await fullscreen.waitFor()
-        const geometry = await fullscreen.evaluate((workspace) => {
-          const table = workspace.querySelector('.erp-permission-checklist')
-          const scrollOwners = []
-          for (let node = table; node; node = node.parentElement) {
-            if (
-              /auto|scroll/.test(getComputedStyle(node).overflowY) &&
-              node.scrollHeight > node.clientHeight + 1
-            ) {
-              scrollOwners.push(
-                [...node.classList]
-                  .filter((name) => name.startsWith('erp-'))
-                  .join(' ')
-              )
-            }
-          }
-          return {
-            box: workspace.getBoundingClientRect().toJSON(),
-            viewport: { width: innerWidth, height: innerHeight },
-            table: { width: table.clientWidth, height: table.clientHeight },
-            scrollOwners,
-            backgroundInert: document.querySelector('.erp-role-center-sidebar')
-              .inert,
-            focusedExit:
-              document.activeElement.textContent.includes('退出全屏'),
-          }
-        })
-        assert.equal(geometry.box.x, 0, JSON.stringify(geometry))
-        assert.equal(geometry.box.y, 0, JSON.stringify(geometry))
-        assert.equal(geometry.box.width, geometry.viewport.width)
-        assert.equal(geometry.box.height, geometry.viewport.height)
-        assert(
-          geometry.backgroundInert && geometry.focusedExit,
-          JSON.stringify(geometry)
-        )
-        assert.deepEqual(geometry.scrollOwners, ['erp-permission-checklist'])
-        assert(geometry.table.height >= 260, JSON.stringify(geometry))
-        if (variant.viewport.width > 800) {
-          assert(
-            geometry.table.width > normal.width + 200,
-            JSON.stringify({ normal, geometry })
-          )
-          assert(
-            geometry.table.height > normal.height + 30,
-            JSON.stringify({ normal, geometry })
-          )
-        }
-        assert.equal(
-          await table.getAttribute('data-fullscreen-identity'),
-          'same-editor'
-        )
-        assert.deepEqual(await readSelection(page), initialSelection)
-        await assertNoHorizontalOverflow(page, variant.name)
-
-        // Nested dialogs and help close before the fullscreen workspace.
-        await page
-          .getByRole('button', { name: '配置数据范围', exact: true })
-          .click()
-        const scope = page.getByRole('dialog', {
-          name: '数据范围 · 财务',
-          exact: true,
-        })
-        await scope.waitFor()
-        await scope.getByRole('combobox', { name: '仓库范围模式' }).focus()
-        await page.keyboard.press('ArrowDown')
-        await page.locator('.ant-select-dropdown:visible').waitFor()
-        await page.keyboard.press('Escape')
-        await page
-          .locator('.ant-select-dropdown:visible')
-          .waitFor({ state: 'hidden' })
-        assert(await scope.isVisible())
-        await page.keyboard.press('Escape')
-        await scope.waitFor({ state: 'hidden' })
-        assert(await fullscreen.isVisible())
-        await page
-          .getByRole('button', { name: '菜单与操作说明', exact: true })
-          .click()
-        await page.locator('.ant-popover:visible').waitFor()
-        await page.keyboard.press('Escape')
-        await page
-          .locator('.ant-popover:visible')
-          .first()
-          .waitFor({ state: 'hidden' })
-        assert(await fullscreen.isVisible())
-
-        const controls = fullscreen.locator('button, input, [tabindex]')
-        const endpoints = await controls.evaluateAll((nodes) => {
-          const visible = nodes.filter(
-            (node) =>
-              !node.disabled &&
-              node.tabIndex >= 0 &&
-              node.getClientRects().length
-          )
-          visible[0].dataset.focusEndpoint = 'first'
-          visible.at(-1).dataset.focusEndpoint = 'last'
-          return visible.length
-        })
-        assert(endpoints > 10)
-        await fullscreen.locator('[data-focus-endpoint="first"]').focus()
-        await page.keyboard.press('Shift+Tab')
-        assert.equal(
-          await page.evaluate(
-            () => document.activeElement.dataset.focusEndpoint
-          ),
-          'last'
-        )
-        await page.keyboard.press('Tab')
-        assert.equal(
-          await page.evaluate(
-            () => document.activeElement.dataset.focusEndpoint
-          ),
-          'first'
-        )
-        await exit.focus()
-        await exit.hover()
-        await page
-          .locator('.ant-popover:visible')
-          .first()
-          .waitFor({ state: 'hidden' })
-        await page.screenshot({
-          path: `output/playwright/style-l1/${variant.name}.png`,
-          fullPage: true,
-        })
-        await page.keyboard.press('Escape')
-        await fullscreen.waitFor({ state: 'hidden' })
-        await page.waitForFunction(() =>
-          document.activeElement.textContent.includes('全屏编辑')
-        )
-        assert.equal(await table.evaluate((node) => node.scrollTop), normal.top)
-        assert.equal(
-          await page
-            .locator('.erp-role-center-sidebar')
-            .evaluate((node) => node.inert),
-          false
-        )
-
-        // Filters and group expansion survive both directions without remounting.
-        await search.fill('对账')
-        await page.getByRole('switch', { name: '只看已选' }).click()
-        await page
-          .getByRole('button', { name: '全部收起', exact: true })
-          .click()
-        const collapsed = await page
-          .locator('.erp-permission-checklist__toggle[aria-expanded="false"]')
-          .count()
-        assert(collapsed > 0)
-        await enter.click()
-        assert.equal(await search.inputValue(), '对账')
-        assert.equal(
-          await page
-            .getByRole('switch', { name: '只看已选' })
-            .getAttribute('aria-checked'),
-          'true'
-        )
-        assert.equal(
-          await page
-            .locator('.erp-permission-checklist__toggle[aria-expanded="false"]')
-            .count(),
-          collapsed
-        )
-        await exit.click()
-        assert.equal(await search.inputValue(), '对账')
-        assert.equal(
-          await page
-            .locator('.erp-permission-checklist__toggle[aria-expanded="false"]')
-            .count(),
-          collapsed
-        )
-        await search.fill('')
-        await page.getByRole('switch', { name: '只看已选' }).click()
-        await enter.click()
-        await page
-          .getByRole('checkbox', { name: '处理对账', exact: true })
-          .uncheck()
-        const changed = await readSelection(page)
-        assert.equal(changed.length, initialSelection.length - 1)
-        await exit.click()
-        assert.deepEqual(await readSelection(page), changed)
-        assert.equal(await save.isDisabled(), false)
-        await enter.click()
-        const request = page.waitForRequest(
-          (req) =>
-            req.url().includes('/rpc/admin') &&
-            req.postDataJSON()?.method === 'set_role_settings'
-        )
-        await save.click()
-        const payload = (await request).postDataJSON().params
-        assert.deepEqual([...payload.permission_keys].sort(), changed)
-        assert.deepEqual(payload.data_scopes, [
-          { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
-        ])
-        await page
-          .getByText('岗位设置已更新，相关账号刷新后生效', { exact: true })
-          .waitFor()
-        await page.waitForFunction(
-          () =>
-            !document
-              .querySelector('.erp-role-center-save-status')
-              .textContent.includes('未保存')
-        )
-        assert(await fullscreen.isVisible())
-        assert.deepEqual(await readSelection(page), changed)
-        assert.equal(await save.isDisabled(), true)
-
-        // Leaving for the role navigation releases background locks.
-        await page
-          .locator('.erp-role-settings-row')
-          .getByRole('button', { name: '岗位导航', exact: true })
-          .click()
-        await fullscreen.waitFor({ state: 'hidden' })
-        assert.equal(
-          await page
-            .locator('.erp-role-center-sidebar')
-            .evaluate((node) => node.inert),
-          false
-        )
-        assert.equal(
-          await page.evaluate(() => document.body.style.overflow),
-          ''
-        )
-        await page.getByRole('tab', { name: '岗位设置', exact: true }).click()
-        await page
-          .locator('.erp-role-template-card')
-          .filter({ hasText: '系统管理员' })
-          .click()
-        await page
-          .getByRole('button', { name: '全屏查看', exact: true })
-          .click()
-        assert.equal(await save.isDisabled(), true)
-        assert.equal(
-          await page
-            .locator('.erp-permission-row input:not(:disabled)')
-            .count(),
-          0
-        )
-        await exit.click()
-      },
-    })),
     ...['light', 'dark'].map((themeMode) => ({
       name: `permission-navigation-ui-design-${themeMode}`,
       path: '/__dev/ui-design',
@@ -433,12 +143,14 @@ export function createPermissionUnifiedScenarios({
         assert.equal(
           await frame
             .locator(
-              '.permission-access-table tbody tr:not(.permission-access-group)'
+              '.permission-access-table tbody tr:not(.permission-group-row)'
             )
             .count(),
           5
         )
-        await frame.getByRole('button', { name: /^不可进入\s*0$/u }).click()
+        await frame
+          .getByRole('button', { name: '不可进入 0', exact: true })
+          .click()
         await frame.getByText('此筛选下暂无页面', { exact: true }).waitFor()
         await frame.getByRole('tab', { name: '菜单排列', exact: true }).click()
         assert.equal(await defaultPage.inputValue(), 'payments')
@@ -486,11 +198,6 @@ export function createPermissionUnifiedScenarios({
         viewport: { width: 1280, height: 720 },
         themeMode: 'light',
       },
-      {
-        name: 'permission-center-matrix-compact-desktop-dark',
-        viewport: { width: 1024, height: 640 },
-        themeMode: 'dark',
-      },
     ].map((variant) => ({
       ...variant,
       path: '/erp/system/permissions',
@@ -502,116 +209,16 @@ export function createPermissionUnifiedScenarios({
           .click()
         const matrix = page.getByRole('table', { name: '岗位功能权限' })
         await matrix.waitFor()
-        if (variant.viewport.width > 800) {
+        if (variant.viewport.height < 800) {
           const tableHeight = await page
             .locator('.erp-permission-checklist')
             .evaluate((node) => node.clientHeight)
           assert(tableHeight >= 220, `权限表被压缩到 ${tableHeight}px`)
-          const readScrollGeometry = () =>
-            page.locator('.erp-permission-checklist').evaluate((table) => {
-              const scrollOwners = []
-              for (let node = table; node; node = node.parentElement) {
-                if (
-                  /auto|scroll/.test(getComputedStyle(node).overflowY) &&
-                  node.scrollHeight > node.clientHeight + 1
-                ) {
-                  scrollOwners.push(node.className)
-                }
-              }
-              const box = (selector) =>
-                document
-                  .querySelector(selector)
-                  .getBoundingClientRect()
-                  .toJSON()
-              return {
-                scrollOwners,
-                tableTop: table.scrollTop,
-                outerTop:
-                  document.querySelector('.erp-admin-content').scrollTop,
-                save: box('.erp-role-center-actions'),
-                search: box('.erp-permission-checklist-toolbar'),
-                settings: box('.erp-role-settings-row'),
-                viewport: innerHeight,
-              }
-            })
-          const beforeScroll = await readScrollGeometry()
-          assert.equal(
-            beforeScroll.scrollOwners.length,
-            1,
-            JSON.stringify(beforeScroll)
-          )
-          assert(
-            beforeScroll.scrollOwners[0].includes('erp-permission-checklist')
-          )
-          await page.locator('.erp-permission-checklist').evaluate((table) => {
-            table.scrollTop = table.scrollHeight
-          })
-          await page.locator('.erp-permission-checklist').hover()
-          await page.mouse.wheel(0, 600)
-          await page.evaluate(
-            () =>
-              new Promise((resolve) =>
-                requestAnimationFrame(() => requestAnimationFrame(resolve))
-              )
-          )
-          const afterScroll = await readScrollGeometry()
-          assert(afterScroll.tableTop > 0, JSON.stringify(afterScroll))
-          assert.equal(afterScroll.outerTop, 0, JSON.stringify(afterScroll))
-          assert.equal(afterScroll.save.y, beforeScroll.save.y)
-          assert.equal(afterScroll.search.y, beforeScroll.search.y)
-          assert(
-            afterScroll.settings.bottom <= afterScroll.viewport,
-            JSON.stringify(afterScroll)
-          )
-          await page.locator('.erp-permission-checklist').evaluate((table) => {
-            table.scrollTop = 0
-          })
-        } else {
-          const scrollOwners = await page
-            .locator('.erp-permission-checklist')
-            .evaluate((table) => {
-              const owners = []
-              for (let node = table; node; node = node.parentElement) {
-                if (
-                  /auto|scroll/.test(getComputedStyle(node).overflowY) &&
-                  node.scrollHeight > node.clientHeight + 1
-                ) {
-                  owners.push(node.className)
-                }
-              }
-              return owners
-            })
-          assert.equal(scrollOwners.length, 1, JSON.stringify(scrollOwners))
-          assert(
-            scrollOwners[0].includes('erp-admin-content'),
-            JSON.stringify(scrollOwners)
-          )
+          await page
+            .locator('.erp-role-settings-row')
+            .getByText('仓库范围', { exact: true })
+            .scrollIntoViewIfNeeded()
         }
-        const auxiliaryButtons = await page
-          .locator('.erp-role-center-tools .ant-btn')
-          .evaluateAll((buttons) =>
-            buttons.map((button) => ({
-              label: button.textContent,
-              border: getComputedStyle(button).borderTopStyle,
-              borderWidth: parseFloat(getComputedStyle(button).borderTopWidth),
-              icon: Boolean(button.querySelector('.anticon')),
-            }))
-          )
-        assert.equal(auxiliaryButtons.length, 3)
-        assert(
-          auxiliaryButtons.every(
-            (button) =>
-              button.border === 'solid' &&
-              button.borderWidth >= 1 &&
-              button.icon
-          ),
-          JSON.stringify(auxiliaryButtons)
-        )
-        assert.equal(
-          await page.getByRole('combobox', { name: '仓库范围模式' }).count(),
-          0,
-          '仓库范围默认不应常驻页面'
-        )
         const settingsHeight = await page
           .locator('.erp-role-settings-row')
           .evaluate((node) => node.getBoundingClientRect().height)
@@ -717,67 +324,16 @@ export function createPermissionUnifiedScenarios({
           changed,
           '保存读回应保留本次结果'
         )
-        assert.deepEqual(
-          payload.data_scopes,
-          [{ resource_type: 'warehouse', mode: 'ALL', resource_ids: [] }],
-          '只保存功能权限应保留原仓库范围'
-        )
-        const scopeTrigger = page.getByRole('button', {
-          name: '配置数据范围',
-          exact: true,
-        })
-        const scopeDialog = page.getByRole('dialog', {
-          name: '数据范围 · 财务',
-          exact: true,
-        })
-        const closeScope = async () => {
-          await scopeDialog
-            .locator('.ant-modal-footer')
-            .getByRole('button', { name: '关闭', exact: true })
-            .click()
-          await scopeDialog.waitFor({ state: 'hidden' })
-        }
-        const chooseScopeMode = async (label) => {
-          await scopeDialog
-            .locator('.erp-role-scope-mode .ant-select-selector')
-            .click()
-          await page
-            .locator('.ant-select-dropdown:visible')
-            .getByText(label, { exact: true })
-            .click()
-        }
-        const saveScope = async (mode, ids) => {
-          const savedRequest = page.waitForRequest(
-            (req) =>
-              req.url().includes('/rpc/admin') &&
-              req.postDataJSON()?.method === 'set_role_settings'
-          )
-          await page
-            .getByRole('button', { name: '保存岗位设置', exact: true })
-            .click()
-          const { params } = (await savedRequest).postDataJSON()
-          assert.deepEqual(params.data_scopes, [
-            { resource_type: 'warehouse', mode, resource_ids: ids },
-          ])
-          assert.deepEqual(
-            [...params.permission_keys].sort(),
-            changed,
-            '调整范围不得覆盖功能权限'
-          )
-          await page.getByText('当前设置已保存', { exact: true }).waitFor()
-        }
-        await scopeTrigger.click()
-        await scopeDialog.getByText('全部仓库', { exact: true }).waitFor()
-        await chooseScopeMode('指定仓库')
-        await scopeDialog
-          .getByRole('alert')
-          .getByText('请选择至少一个允许的仓库', { exact: true })
-          .waitFor()
-        const allowedWarehouses = scopeDialog.getByRole('combobox', {
+        await page.locator('.erp-role-scope-mode .ant-select-selector').click()
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .getByText('指定仓库', { exact: true })
+          .click()
+        const allowedWarehouses = page.getByRole('combobox', {
           name: '允许的仓库',
           exact: true,
         })
-        await scopeDialog
+        await page
           .locator('.erp-role-scope-warehouses .ant-select-selector')
           .click()
         await page
@@ -789,145 +345,42 @@ export function createPermissionUnifiedScenarios({
           .getByText(/成品仓/)
           .click()
         await allowedWarehouses.press('Escape')
+        const selectedScopeHeight = await page
+          .locator('.erp-role-settings-row')
+          .evaluate((node) => node.getBoundingClientRect().height)
+        assert(
+          selectedScopeHeight <= (variant.viewport.width < 800 ? 140 : 54),
+          `指定仓库也应紧凑显示：${selectedScopeHeight}px`
+        )
+        await page.locator('.erp-role-scope-mode .ant-select-selector').click()
         await page
           .locator('.ant-select-dropdown:visible')
-          .waitFor({ state: 'hidden' })
-        const modalGeometry = await scopeDialog.evaluate((node) => {
-          const box = node.getBoundingClientRect()
-          return {
-            left: box.left,
-            right: box.right,
-            top: box.top,
-            bottom: box.bottom,
-            overflow: node.scrollWidth - node.clientWidth,
-            width: innerWidth,
-            height: innerHeight,
-          }
-        })
-        assert(
-          modalGeometry.left >= 0 &&
-            modalGeometry.right <= modalGeometry.width + 1 &&
-            modalGeometry.top >= 0 &&
-            modalGeometry.bottom <= modalGeometry.height + 1 &&
-            modalGeometry.overflow <= 1,
-          JSON.stringify(modalGeometry)
-        )
-        await page.screenshot({
-          path: `output/playwright/style-l1/warehouse-scope-${variant.name}.png`,
-        })
-        await closeScope()
-        await page.waitForFunction(
-          () => document.activeElement?.textContent?.trim() === '配置数据范围'
-        )
-        await scopeTrigger.click()
-        await scopeDialog.getByText('指定仓库', { exact: true }).waitFor()
-        await scopeDialog
-          .locator('.ant-select-selection-item')
-          .filter({ hasText: '原料仓' })
-          .waitFor()
-        await scopeDialog
-          .locator('.ant-select-selection-item')
-          .filter({ hasText: '成品仓' })
-          .waitFor()
-        assert.equal(
-          await scopeDialog
-            .locator('.ant-select-selection-item')
-            .filter({ hasText: /原料仓|成品仓/ })
-            .count(),
-          2,
-          '关闭并重新打开应保留仓库草稿'
-        )
-        await scopeDialog
-          .locator('.ant-modal-footer')
-          .getByRole('button', { name: '关闭', exact: true })
-          .focus()
-        await page.keyboard.press('Escape')
-        await scopeDialog.waitFor({ state: 'hidden' })
-        if (variant.name === 'permission-center-matrix-desktop') {
-          const failSave = async (route) => {
-            const body = route.request().postDataJSON()
-            if (body?.method !== 'set_role_settings') return route.fallback()
-            await route.fulfill({
-              contentType: 'application/json',
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: body.id,
-                result: { code: 50000, message: 'temporary failure', data: {} },
-              }),
-            })
-          }
-          await page.route('**/rpc/admin', failSave)
-          await page
-            .getByRole('button', { name: '保存岗位设置', exact: true })
-            .click()
-          await page.locator('.ant-message-error').last().waitFor()
-          await page.getByText('有未保存调整', { exact: true }).waitFor()
-          await scopeTrigger.click()
-          await scopeDialog.getByText('指定仓库', { exact: true }).waitFor()
-          await scopeDialog
-            .locator('.ant-select-selection-item')
-            .filter({ hasText: '原料仓' })
-            .waitFor()
-          await scopeDialog
-            .locator('.ant-select-selection-item')
-            .filter({ hasText: '成品仓' })
-            .waitFor()
-          assert.equal(
-            await scopeDialog
-              .locator('.ant-select-selection-item')
-              .filter({ hasText: /原料仓|成品仓/ })
-              .count(),
-            2,
-            '保存失败应保留仓库草稿'
-          )
-          await closeScope()
-          await page.unroute('**/rpc/admin', failSave)
-        }
-        await saveScope('ASSIGNED', [1, 2])
-        await scopeTrigger.click()
-        await scopeDialog.getByText('指定仓库', { exact: true }).waitFor()
-        await scopeDialog
-          .locator('.ant-select-selection-item')
-          .filter({ hasText: '原料仓' })
-          .waitFor()
-        await scopeDialog
-          .locator('.ant-select-selection-item')
-          .filter({ hasText: '成品仓' })
-          .waitFor()
-        assert.equal(
-          await scopeDialog
-            .locator('.ant-select-selection-item')
-            .filter({ hasText: /原料仓|成品仓/ })
-            .count(),
-          2,
-          '保存读回应保留指定仓库'
-        )
-        await chooseScopeMode('不允许查看')
+          .getByText('全部仓库', { exact: true })
+          .click()
         assert.equal(await allowedWarehouses.count(), 0)
-        await closeScope()
-        await saveScope('NONE', [])
-        await scopeTrigger.click()
-        await scopeDialog.getByText('不允许查看', { exact: true }).waitFor()
-        await chooseScopeMode('指定仓库')
+        await page.locator('.erp-role-scope-mode .ant-select-selector').click()
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .getByText('指定仓库', { exact: true })
+          .click()
         assert.equal(
-          await scopeDialog
+          await page
             .locator('.erp-role-scope-warehouses .ant-select-selection-item')
             .count(),
           0,
           '范围切换应清空旧仓库'
         )
-        await closeScope()
-        await page.getByText('请配置允许的仓库', { exact: true }).waitFor()
         assert.equal(
           await page
             .getByRole('button', { name: '保存岗位设置', exact: true })
             .isEnabled(),
           false
         )
-        await scopeTrigger.click()
-        await chooseScopeMode('全部仓库')
-        await closeScope()
-        await saveScope('ALL', [])
+        await page.locator('.erp-role-scope-mode .ant-select-selector').click()
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .getByText('全部仓库', { exact: true })
+          .click()
         await search.fill('财务')
         const geometry = await matrix.evaluate((table) => {
           const rows = [
@@ -1000,9 +453,7 @@ export function createPermissionUnifiedScenarios({
             }
           }
           return {
-            toolbar: box('.erp-permission-checklist-toolbar'),
-            tools: box('.erp-role-center-tools'),
-            head: box('.erp-role-center-detail__head'),
+            toolbar: box('.erp-permission-toolbar'),
             sidebar: box('.erp-role-center-sidebar'),
             groups: box('.erp-permission-checklist'),
             matrix: box('.erp-permission-matrix'),
@@ -1010,6 +461,7 @@ export function createPermissionUnifiedScenarios({
               '.erp-permission-matrix thead th'
             ).length,
             settings: box('.erp-role-settings-row'),
+            footer: box('.erp-role-center-footer'),
             viewport: innerHeight,
             outerHeight: document.documentElement.scrollHeight,
           }
@@ -1021,9 +473,8 @@ export function createPermissionUnifiedScenarios({
         assert.equal(geometry.matrixColumns, 5)
         assert(geometry.matrix.width <= geometry.groups.width + 1)
         assert(
-          geometry.head.bottom <= geometry.tools.y + 1 &&
-            geometry.tools.bottom <= geometry.toolbar.y + 1 &&
-            geometry.settings.bottom <= geometry.viewport,
+          geometry.settings.bottom <= geometry.footer.y + 1 &&
+            geometry.footer.bottom <= geometry.viewport,
           JSON.stringify(geometry)
         )
         assert.equal(await page.locator('.erp-role-policy-tabs').count(), 0)
@@ -1158,21 +609,6 @@ export function createPermissionUnifiedScenarios({
           .filter({ hasText: '系统管理员' })
           .click()
         await page.getByText('系统内置岗位只能查看', { exact: true }).waitFor()
-        await page
-          .getByRole('button', { name: '配置数据范围', exact: true })
-          .click()
-        const readOnlyScope = page.getByRole('dialog', { name: /数据范围/ })
-        assert.equal(
-          await readOnlyScope
-            .getByRole('combobox', { name: '仓库范围模式' })
-            .isDisabled(),
-          true
-        )
-        await readOnlyScope
-          .locator('.ant-modal-footer')
-          .getByRole('button', { name: '关闭', exact: true })
-          .click()
-        await readOnlyScope.waitFor({ state: 'hidden' })
         assert.equal(
           await page
             .getByRole('button', { name: '保存岗位设置', exact: true })
@@ -1192,8 +628,6 @@ export function createPermissionUnifiedScenarios({
       path: '/__dev/ui-design',
       viewport: { width: 1280, height: 720 },
       verify: async (page) => {
-        // Measure the product at this viewport, without the surrounding workbench.
-        await page.getByRole('button', { name: /全屏预览/ }).click()
         const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
         await frame
           .getByRole('button', { name: '全部模块', exact: true })
@@ -1218,84 +652,40 @@ export function createPermissionUnifiedScenarios({
           })
         assert(geometry.height >= 220, JSON.stringify(geometry))
         assert(geometry.firstRowVisible, JSON.stringify(geometry))
-        assert.equal(await frame.locator('#permission-scope-type').count(), 0)
-        const settingsGeometry = await frame
-          .locator('.permission-settings-row')
-          .evaluate((node) => ({
-            height: node.getBoundingClientRect().height,
-            width: node.getBoundingClientRect().width,
-          }))
+        const scopeMode = frame.locator('#permission-scope-type')
+        const settingsGeometry = await scopeMode.evaluate((node) => {
+          const row = node
+            .closest('.permission-settings-row')
+            .getBoundingClientRect()
+          return {
+            height: row.height,
+            width: row.width,
+            controlHeight: node.getBoundingClientRect().height,
+          }
+        })
+        assert(
+          settingsGeometry.controlHeight >= 32,
+          JSON.stringify(settingsGeometry)
+        )
         assert(
           settingsGeometry.height <= (settingsGeometry.width < 640 ? 92 : 54),
           JSON.stringify(settingsGeometry)
         )
-        await frame
-          .getByRole('button', { name: '全屏编辑', exact: true })
-          .click()
-        const fullWorkspace = frame.locator('.permission-workspace--fullscreen')
-        const fullGeometry = await fullWorkspace.evaluate((node) => {
-          const box = node.getBoundingClientRect()
-          const table = node.querySelector('.permission-groups')
-          return {
-            x: box.x,
-            y: box.y,
-            width: box.width,
-            height: box.height,
-            viewport: [innerWidth, innerHeight],
-            tableHeight: table.clientHeight,
-          }
+        await scopeMode.scrollIntoViewIfNeeded()
+        const scopeVisible = await scopeMode.evaluate((node) => {
+          const scope = node.getBoundingClientRect()
+          const workspace = node
+            .closest('.permission-settings-workspace')
+            .getBoundingClientRect()
+          return scope.top >= workspace.top && scope.bottom <= workspace.bottom
         })
-        assert.deepEqual([fullGeometry.x, fullGeometry.y], [0, 0])
-        assert.deepEqual(
-          [fullGeometry.width, fullGeometry.height],
-          fullGeometry.viewport
-        )
-        assert(fullGeometry.tableHeight > geometry.height)
-        await frame
-          .getByRole('button', { name: '配置数据范围', exact: true })
-          .click()
-        const scopeDialog = frame.getByRole('dialog', { name: /数据范围/ })
-        const scopeMode = scopeDialog.getByRole('combobox', {
-          name: '仓库范围模式',
-        })
-        await scopeMode.selectOption('warehouses')
-        await scopeDialog
-          .getByRole('checkbox', { name: '原料仓', exact: true })
-          .check()
-        await scopeDialog
-          .locator('.modal-foot')
-          .getByRole('button', { name: '关闭', exact: true })
-          .click()
-        await frame
-          .getByRole('button', { name: '配置数据范围', exact: true })
-          .click()
-        assert.equal(
-          await scopeDialog
-            .getByRole('checkbox', { name: '原料仓', exact: true })
-            .isChecked(),
-          true
-        )
+        assert(scopeVisible, '小窗口下仓库范围控件必须能滚动到可见位置')
         await scopeMode.selectOption('all')
         assert.equal(await frame.locator('#permission-scope-value').count(), 0)
-        await scopeDialog
-          .locator('.modal-foot')
-          .getByRole('button', { name: '关闭', exact: true })
-          .click()
         await frame
           .getByRole('button', { name: '保存岗位设置', exact: true })
           .click()
         await frame.getByText('当前设置已保存', { exact: true }).waitFor()
-        assert(await fullWorkspace.isVisible())
-        await frame
-          .getByRole('button', { name: '退出全屏', exact: true })
-          .click()
-        await fullWorkspace.waitFor({ state: 'hidden' })
-        assert.equal(
-          await frame
-            .locator('.permission-roles')
-            .evaluate((node) => node.inert),
-          false
-        )
         await frame
           .getByRole('button', { name: '全部展开', exact: true })
           .click()
@@ -1418,37 +808,24 @@ export function createPermissionUnifiedScenarios({
           .getByRole('tab', { name: '菜单排列', exact: true })
           .waitFor()
         await tabs.getByRole('tab', { name: /岗位设置/ }).click()
-        const scopeTrigger = frame.getByRole('button', {
-          name: '配置数据范围',
-          exact: true,
-        })
-        await scopeTrigger.click()
-        const scopeDialog = frame.getByRole('dialog', { name: /数据范围/ })
-        await scopeDialog.waitFor()
+        await frame.locator('#permission-scope-type').waitFor()
         assert.equal(
           await frame.getByText('本人及下属', { exact: true }).count(),
           0
         )
-        const scopeMode = scopeDialog.getByRole('combobox', {
-          name: '仓库范围模式',
-        })
+        const scopeMode = frame.locator('#permission-scope-type')
+        const warehouses = frame.locator('#permission-scope-value')
         await scopeMode.selectOption('all')
-        assert.equal(
-          await scopeDialog.locator('#permission-scope-value').count(),
-          0
-        )
+        assert.equal(await warehouses.count(), 0)
         await scopeMode.selectOption('warehouses')
-        await scopeDialog
-          .getByRole('alert')
+        await frame
+          .getByRole('button', { name: '保存岗位设置', exact: true })
+          .click()
+        await frame
           .getByText('请选择至少一个允许的仓库', { exact: true })
           .waitFor()
-        assert.equal(
-          await frame
-            .getByRole('button', { name: '保存岗位设置', exact: true })
-            .isDisabled(),
-          true
-        )
-        const warehousePicker = scopeDialog.getByRole('group', {
+        await warehouses.click()
+        const warehousePicker = frame.getByRole('group', {
           name: '允许的仓库',
           exact: true,
         })
@@ -1456,20 +833,22 @@ export function createPermissionUnifiedScenarios({
         await warehousePicker
           .getByRole('checkbox', { name: '原料仓', exact: true })
           .check()
-        const closeScope = () =>
-          scopeDialog
-            .locator('.modal-foot')
-            .getByRole('button', { name: '关闭', exact: true })
-            .click()
-        await closeScope()
-        await scopeTrigger.click()
         assert.equal(
-          await scopeDialog
+          await warehousePicker
             .getByRole('checkbox', { name: '原料仓', exact: true })
             .isChecked(),
           true
         )
-        await closeScope()
+        await warehousePicker
+          .getByRole('checkbox', { name: '原料仓', exact: true })
+          .press('Escape')
+        assert.equal(
+          await warehouses.evaluate(
+            (node) => node === node.ownerDocument.activeElement
+          ),
+          true
+        )
+        assert.match(await warehouses.innerText(), /原料仓/)
         await frame
           .getByRole('button', { name: '保存岗位设置', exact: true })
           .click()

@@ -345,7 +345,7 @@ func TestAdminAuthUsecase_SMSRequestDoesNotExposeAccountEligibility(t *testing.T
 	}
 }
 
-func TestAdminAuthUsecase_SMSRequestReturnsDeliveryFailures(t *testing.T) {
+func TestAdminAuthUsecase_SMSRequestSuppressesDeliveryFailures(t *testing.T) {
 	repo := newMemAdminAuthRepo()
 	admin := &AdminUser{
 		ID: 1, Username: "eligible", Phone: "13800138000", AuthVersion: 1, IsSuperAdmin: true,
@@ -363,8 +363,8 @@ func TestAdminAuthUsecase_SMSRequestReturnsDeliveryFailures(t *testing.T) {
 	)
 
 	challenge, err := uc.RequestSMSLoginCode(context.Background(), admin.Phone, "purchase")
-	if !errors.Is(err, ErrSMSServiceUnavailable) || challenge != nil {
-		t.Fatalf("delivery failure challenge=%#v err=%v", challenge, err)
+	if err != nil || challenge == nil || len(challenge.MockCode) != smsLoginCodeDigits {
+		t.Fatalf("suppressed delivery failure challenge=%#v err=%v", challenge, err)
 	}
 }
 

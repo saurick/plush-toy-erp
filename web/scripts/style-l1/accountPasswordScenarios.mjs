@@ -294,8 +294,7 @@ export function createAccountPasswordScenarios({
         const calls = []
         await page.route('**/rpc/admin', async (route) => {
           const body = route.request().postDataJSON()
-          if (body.method !== 'reset_temporary_password')
-            { return route.fallback() }
+          if (body.method !== 'reset_default_password') return route.fallback()
           calls.push(body.params)
           assert.deepEqual(
             Object.keys(body.params),
@@ -307,11 +306,7 @@ export function createAccountPasswordScenarios({
             body,
             calls.length === 1
               ? { code: RpcErrorCode.INTERNAL, message: 'Internal' }
-              : {
-                  code: 0,
-                  message: '已生成临时密码',
-                  data: { temporary_password: 'fixture-only-1_Secret' },
-                }
+              : { code: 0, message: '已重置为默认密码' }
           )
         })
         const accountTab = page.getByRole('tab', { name: /员工账号/u })
@@ -331,9 +326,8 @@ export function createAccountPasswordScenarios({
           .getByRole('button', { name: '重置密码', exact: true })
           .click()
         const dialog = page.getByRole('dialog', { name: /重置密码：/u })
-        await dialog.waitFor({ state: 'visible' })
         const defaultReset = dialog.getByRole('button', {
-          name: '生成临时密码',
+          name: '重置为 12345678',
           exact: true,
         })
         if (!superAdmin) {
@@ -368,9 +362,7 @@ export function createAccountPasswordScenarios({
         })
         await defaultReset.click()
         await dialog.waitFor({ state: 'hidden' })
-        await expectText(page, '生成临时密码，请提醒本人登录后修改')
-        await expectText(page, 'fixture-only-1_Secret')
-        await page.getByRole('button', { name: '已保存', exact: true }).click()
+        await expectText(page, '重置为默认密码，请提醒本人登录后修改')
         assert.equal(calls.length, 2)
         assert.equal(calls[0].id, calls[1].id)
         await assertNoHorizontalOverflow(page, 'default-password-reset')
