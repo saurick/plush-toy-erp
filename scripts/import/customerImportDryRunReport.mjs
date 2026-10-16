@@ -1,8 +1,15 @@
-import { mkdir, writeFile } from 'node:fs/promises'
-import path from 'node:path'
+import { mkdir } from "node:fs/promises";
+import path from "node:path";
+import {
+  resolveSafeEvidenceOutputDirectory,
+  writePrivateEvidenceFile,
+} from "./customerSourceManifestCheck.mjs";
 
 async function writeJson(filePath, data) {
-  await writeFile(filePath, `${JSON.stringify(data, null, 2)}\n`, 'utf8')
+  await writePrivateEvidenceFile(
+    filePath,
+    `${JSON.stringify(data, null, 2)}\n`,
+  );
 }
 
 export async function writeDryRunPackage({
@@ -13,20 +20,54 @@ export async function writeDryRunPackage({
   command,
   data,
 }) {
-  await mkdir(outDir, { recursive: true })
-  if (formats.has('json')) {
-    await writeJson(path.join(outDir, 'source-references.json'), data.sourceReferences)
-    await writeJson(path.join(outDir, 'normalized-rows.json'), data.normalizedRows)
-    await writeJson(path.join(outDir, 'candidates.json'), data.candidates)
-    await writeJson(path.join(outDir, 'unresolved-queue.json'), data.unresolvedQueue)
-    await writeJson(path.join(outDir, 'duplicates.json'), data.duplicates)
-    await writeJson(path.join(outDir, 'conflicts.json'), data.conflicts)
-    await writeJson(path.join(outDir, 'forbidden-auto-import.json'), data.forbiddenAutoImport)
-    await writeJson(path.join(outDir, 'validation-summary.json'), data.validationSummary)
+  outDir = await resolveSafeEvidenceOutputDirectory({
+    outputDir: outDir,
+    protectedInputPaths: [sourcePath, existingPath],
+    outputFiles: [
+      ...(formats.has("json")
+        ? [
+            "source-references.json",
+            "normalized-rows.json",
+            "candidates.json",
+            "unresolved-queue.json",
+            "duplicates.json",
+            "conflicts.json",
+            "forbidden-auto-import.json",
+            "validation-summary.json",
+          ]
+        : []),
+      ...(formats.has("md") ? ["dry-run-report.md"] : []),
+    ],
+  });
+  await mkdir(outDir, { recursive: true });
+  if (formats.has("json")) {
+    await writeJson(
+      path.join(outDir, "source-references.json"),
+      data.sourceReferences,
+    );
+    await writeJson(
+      path.join(outDir, "normalized-rows.json"),
+      data.normalizedRows,
+    );
+    await writeJson(path.join(outDir, "candidates.json"), data.candidates);
+    await writeJson(
+      path.join(outDir, "unresolved-queue.json"),
+      data.unresolvedQueue,
+    );
+    await writeJson(path.join(outDir, "duplicates.json"), data.duplicates);
+    await writeJson(path.join(outDir, "conflicts.json"), data.conflicts);
+    await writeJson(
+      path.join(outDir, "forbidden-auto-import.json"),
+      data.forbiddenAutoImport,
+    );
+    await writeJson(
+      path.join(outDir, "validation-summary.json"),
+      data.validationSummary,
+    );
   }
-  if (formats.has('md')) {
-    await writeFile(
-      path.join(outDir, 'dry-run-report.md'),
+  if (formats.has("md")) {
+    await writePrivateEvidenceFile(
+      path.join(outDir, "dry-run-report.md"),
       renderMarkdownReport({
         sourcePath,
         existingPath,
@@ -34,53 +75,58 @@ export async function writeDryRunPackage({
         command,
         data,
       }),
-      'utf8'
-    )
+    );
   }
 }
 
-function renderMarkdownReport({ sourcePath, existingPath, outDir, command, data }) {
-  const summary = data.validationSummary
+function renderMarkdownReport({
+  sourcePath,
+  existingPath,
+  outDir,
+  command,
+  data,
+}) {
+  const summary = data.validationSummary;
   const candidateRows = Object.entries(summary.candidateCountsByAction)
     .map(([action, count]) => `| ${action} | ${count} |`)
-    .join('\n')
+    .join("\n");
   const unresolvedRows = Object.entries(summary.unresolvedCountsBySeverity)
     .map(([severity, count]) => `| ${severity} | ${count} |`)
-    .join('\n')
+    .join("\n");
   const forbiddenList =
     data.forbiddenAutoImport.length === 0
-      ? '- None'
+      ? "- None"
       : data.forbiddenAutoImport
           .slice(0, 20)
           .map(
             (item) =>
-              `- ${item.sourceReference}: ${item.forbiddenTarget} (${item.boundary})`
+              `- ${item.sourceReference}: ${item.forbiddenTarget} (${item.boundary})`,
           )
-          .join('\n')
+          .join("\n");
   const duplicateList =
     data.duplicates.length === 0
-      ? '- None'
+      ? "- None"
       : data.duplicates
           .slice(0, 20)
           .map(
             (item) =>
-              `- ${item.targetModel} ${item.duplicateType} ${item.key}: ${item.reason}`
+              `- ${item.targetModel} ${item.duplicateType} ${item.key}: ${item.reason}`,
           )
-          .join('\n')
+          .join("\n");
   const conflictList =
     data.conflicts.length === 0
-      ? '- None'
+      ? "- None"
       : data.conflicts
           .slice(0, 20)
           .map((item) => `- ${item.targetModel} ${item.key}: ${item.reason}`)
-          .join('\n')
+          .join("\n");
 
   return `# Yoyoosun Customer Import Dry-run Report
 
 ## Command
 
 \`\`\`bash
-${command ?? 'node scripts/import/customerImportDryRun.mjs ...'}
+${command ?? "node scripts/import/customerImportDryRun.mjs ..."}
 \`\`\`
 
 ## Inputs
@@ -136,5 +182,5 @@ No real import is executed by this dry-run package. The tool does not connect to
 2. Review \`duplicates.json\` and \`conflicts.json\` before any future loader design.
 3. Confirm \`forbidden-auto-import.json\` remains excluded from real import.
 4. Only a separate future implementation task may design or implement real import execution with backup, rollback, idempotency, validation, and customer sign-off.
-`
+`;
 }

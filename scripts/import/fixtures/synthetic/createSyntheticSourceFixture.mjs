@@ -1,12 +1,12 @@
-import { createHash } from 'node:crypto'
+import { createHash } from "node:crypto";
 
-const ZIP_LOCAL_SIGNATURE = 0x04034b50
-const ZIP_CENTRAL_SIGNATURE = 0x02014b50
-const ZIP_EOCD_SIGNATURE = 0x06054b50
+const ZIP_LOCAL_SIGNATURE = 0x04034b50;
+const ZIP_CENTRAL_SIGNATURE = 0x02014b50;
+const ZIP_EOCD_SIGNATURE = 0x06054b50;
 
 const XLSX_ENTRIES = [
   [
-    '[Content_Types].xml',
+    "[Content_Types].xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -17,21 +17,21 @@ const XLSX_ENTRIES = [
 </Types>`,
   ],
   [
-    '_rels/.rels',
+    "_rels/.rels",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 </Relationships>`,
   ],
   [
-    'xl/workbook.xml',
+    "xl/workbook.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets><sheet name="材料分析明细表" sheetId="1" r:id="rId1"/></sheets>
 </workbook>`,
   ],
   [
-    'xl/_rels/workbook.xml.rels',
+    "xl/_rels/workbook.xml.rels",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
@@ -39,7 +39,7 @@ const XLSX_ENTRIES = [
 </Relationships>`,
   ],
   [
-    'xl/sharedStrings.xml',
+    "xl/sharedStrings.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="19" uniqueCount="19">
   <si><t>产品编号</t></si><si><t>SYN-P-001</t></si>
@@ -52,7 +52,7 @@ const XLSX_ENTRIES = [
 </sst>`,
   ],
   [
-    'xl/worksheets/sheet1.xml',
+    "xl/worksheets/sheet1.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <sheetData>
@@ -64,11 +64,11 @@ const XLSX_ENTRIES = [
   </sheetData>
 </worksheet>`,
   ],
-]
+];
 
 const PURCHASE_XLSX_ENTRIES = [
   [
-    '[Content_Types].xml',
+    "[Content_Types].xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
@@ -79,21 +79,21 @@ const PURCHASE_XLSX_ENTRIES = [
 </Types>`,
   ],
   [
-    '_rels/.rels',
+    "_rels/.rels",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 </Relationships>`,
   ],
   [
-    'xl/workbook.xml',
+    "xl/workbook.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets>
 </workbook>`,
   ],
   [
-    'xl/_rels/workbook.xml.rels',
+    "xl/_rels/workbook.xml.rels",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
@@ -101,7 +101,7 @@ const PURCHASE_XLSX_ENTRIES = [
 </Relationships>`,
   ],
   [
-    'xl/sharedStrings.xml',
+    "xl/sharedStrings.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="14" uniqueCount="14">
   <si><t>产品订单编号</t></si><si><t>产品编号</t></si><si><t>产品名称</t></si><si><t>材料品名</t></si>
@@ -111,7 +111,7 @@ const PURCHASE_XLSX_ENTRIES = [
 </sst>`,
   ],
   [
-    'xl/worksheets/sheet1.xml',
+    "xl/worksheets/sheet1.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <sheetData>
@@ -120,19 +120,35 @@ const PURCHASE_XLSX_ENTRIES = [
   </sheetData>
 </worksheet>`,
   ],
-]
+];
 
 export function createSyntheticSourceFixture(options = {}) {
-  const customerKey = options.customerKey ?? 'synthetic-customer'
-  const relativePath = options.relativePath ?? 'minimal-material-detail.xlsx'
-  const xlsx = createStoredZip(XLSX_ENTRIES)
+  const customerKey = options.customerKey ?? "synthetic-customer";
+  const relativePath = options.relativePath ?? "minimal-material-detail.xlsx";
+  const paddingBytes = options.paddingBytes ?? 0;
+  if (
+    !Number.isSafeInteger(paddingBytes) ||
+    paddingBytes < 0 ||
+    paddingBytes > 4_500_000
+  )
+    throw new Error("invalid fixture padding size");
+  const entries = XLSX_ENTRIES.map(([name, text]) => [
+    name,
+    name === "xl/worksheets/sheet1.xml" && paddingBytes > 0
+      ? text.replace(
+          "</worksheet>",
+          `<!--${"A".repeat(paddingBytes)}--></worksheet>`,
+        )
+      : text,
+  ]);
+  const xlsx = createStoredZip(entries);
   return {
     relativePath,
     xlsx,
     manifest: {
       version: 2,
       customerKey,
-      description: 'Synthetic customer source fixture for Product Core tests.',
+      description: "Synthetic customer source fixture for Product Core tests.",
       boundaries: {
         noRealImport: true,
         canExecuteRealImport: false,
@@ -144,36 +160,37 @@ export function createSyntheticSourceFixture(options = {}) {
         {
           sourceId: `${customerKey}-minimal-material-detail`,
           relativePath,
-          sha256: createHash('sha256').update(xlsx).digest('hex'),
+          sha256: createHash("sha256").update(xlsx).digest("hex"),
           sizeBytes: xlsx.length,
-          mediaType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          sourceKind: 'xlsx_workbook',
-          sourceTypes: ['Synthetic Test Fixture'],
-          domains: ['materials', 'bom', 'products', 'units'],
-          classification: 'synthetic-test-data',
-          usage: 'Product Core contract and parser tests only.',
+          mediaType:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          sourceKind: "xlsx_workbook",
+          sourceTypes: ["Synthetic Test Fixture"],
+          domains: ["materials", "bom", "products", "units"],
+          classification: "synthetic-test-data",
+          usage: "Product Core contract and parser tests only.",
           sensitiveReviewRequired: false,
           structuredExtract: {
             enabled: true,
-            mode: 'xlsx_workbook',
-            parser: 'scripts/import/customerSourceExtract.mjs',
+            mode: "xlsx_workbook",
+            parser: "scripts/import/customerSourceExtract.mjs",
           },
           storage: {
-            provider: 'minio',
-            bucketAlias: 'synthetic-private',
+            provider: "minio",
+            bucketAlias: "synthetic-private",
             objectKey: `sources/${customerKey}-minimal-material-detail/v0001/original.xlsx`,
           },
         },
       ],
     },
-  }
+  };
 }
 
 export function createSyntheticPurchaseSourceFixture(options = {}) {
-  const customerKey = options.customerKey ?? 'synthetic-customer'
-  const relativePath = options.relativePath ?? 'synthetic-辅材-purchase.xlsx'
-  const sourceId = `${customerKey}-minimal-purchase-summary`
-  const xlsx = createStoredZip(PURCHASE_XLSX_ENTRIES)
+  const customerKey = options.customerKey ?? "synthetic-customer";
+  const relativePath = options.relativePath ?? "synthetic-辅材-purchase.xlsx";
+  const sourceId = `${customerKey}-minimal-purchase-summary`;
+  const xlsx = createStoredZip(PURCHASE_XLSX_ENTRIES);
   return {
     relativePath,
     xlsx,
@@ -187,75 +204,76 @@ export function createSyntheticPurchaseSourceFixture(options = {}) {
         {
           sourceId,
           relativePath,
-          sha256: createHash('sha256').update(xlsx).digest('hex'),
+          sha256: createHash("sha256").update(xlsx).digest("hex"),
           sizeBytes: xlsx.length,
-          mediaType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          sourceKind: 'xlsx_workbook',
-          classification: 'synthetic-test-data',
+          mediaType:
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          sourceKind: "xlsx_workbook",
+          classification: "synthetic-test-data",
           structuredExtract: {
             enabled: true,
-            mode: 'xlsx_workbook',
+            mode: "xlsx_workbook",
           },
           storage: {
-            provider: 'minio',
-            bucketAlias: 'synthetic-private',
+            provider: "minio",
+            bucketAlias: "synthetic-private",
             objectKey: `sources/${sourceId}/v0001/original.xlsx`,
           },
         },
       ],
     },
-  }
+  };
 }
 
 function createStoredZip(entries) {
-  const localParts = []
-  const centralParts = []
-  let localOffset = 0
+  const localParts = [];
+  const centralParts = [];
+  let localOffset = 0;
 
   for (const [name, text] of entries) {
-    const nameBuffer = Buffer.from(name, 'utf8')
-    const data = Buffer.from(text, 'utf8')
-    const checksum = crc32(data)
-    const localHeader = Buffer.alloc(30)
-    localHeader.writeUInt32LE(ZIP_LOCAL_SIGNATURE, 0)
-    localHeader.writeUInt16LE(20, 4)
-    localHeader.writeUInt32LE(checksum, 14)
-    localHeader.writeUInt32LE(data.length, 18)
-    localHeader.writeUInt32LE(data.length, 22)
-    localHeader.writeUInt16LE(nameBuffer.length, 26)
-    localParts.push(localHeader, nameBuffer, data)
+    const nameBuffer = Buffer.from(name, "utf8");
+    const data = Buffer.from(text, "utf8");
+    const checksum = crc32(data);
+    const localHeader = Buffer.alloc(30);
+    localHeader.writeUInt32LE(ZIP_LOCAL_SIGNATURE, 0);
+    localHeader.writeUInt16LE(20, 4);
+    localHeader.writeUInt32LE(checksum, 14);
+    localHeader.writeUInt32LE(data.length, 18);
+    localHeader.writeUInt32LE(data.length, 22);
+    localHeader.writeUInt16LE(nameBuffer.length, 26);
+    localParts.push(localHeader, nameBuffer, data);
 
-    const centralHeader = Buffer.alloc(46)
-    centralHeader.writeUInt32LE(ZIP_CENTRAL_SIGNATURE, 0)
-    centralHeader.writeUInt16LE(20, 4)
-    centralHeader.writeUInt16LE(20, 6)
-    centralHeader.writeUInt32LE(checksum, 16)
-    centralHeader.writeUInt32LE(data.length, 20)
-    centralHeader.writeUInt32LE(data.length, 24)
-    centralHeader.writeUInt16LE(nameBuffer.length, 28)
-    centralHeader.writeUInt32LE(localOffset, 42)
-    centralParts.push(centralHeader, nameBuffer)
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(ZIP_CENTRAL_SIGNATURE, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt32LE(checksum, 16);
+    centralHeader.writeUInt32LE(data.length, 20);
+    centralHeader.writeUInt32LE(data.length, 24);
+    centralHeader.writeUInt16LE(nameBuffer.length, 28);
+    centralHeader.writeUInt32LE(localOffset, 42);
+    centralParts.push(centralHeader, nameBuffer);
 
-    localOffset += localHeader.length + nameBuffer.length + data.length
+    localOffset += localHeader.length + nameBuffer.length + data.length;
   }
 
-  const centralDirectory = Buffer.concat(centralParts)
-  const end = Buffer.alloc(22)
-  end.writeUInt32LE(ZIP_EOCD_SIGNATURE, 0)
-  end.writeUInt16LE(entries.length, 8)
-  end.writeUInt16LE(entries.length, 10)
-  end.writeUInt32LE(centralDirectory.length, 12)
-  end.writeUInt32LE(localOffset, 16)
-  return Buffer.concat([...localParts, centralDirectory, end])
+  const centralDirectory = Buffer.concat(centralParts);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(ZIP_EOCD_SIGNATURE, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(centralDirectory.length, 12);
+  end.writeUInt32LE(localOffset, 16);
+  return Buffer.concat([...localParts, centralDirectory, end]);
 }
 
 function crc32(buffer) {
-  let crc = 0xffffffff
+  let crc = 0xffffffff;
   for (const byte of buffer) {
-    crc ^= byte
+    crc ^= byte;
     for (let bit = 0; bit < 8; bit += 1) {
-      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1))
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
     }
   }
-  return (crc ^ 0xffffffff) >>> 0
+  return (crc ^ 0xffffffff) >>> 0;
 }
