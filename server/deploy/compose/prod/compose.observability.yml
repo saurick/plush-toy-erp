@@ -99,19 +99,11 @@ services:
       GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
       GF_ALERTING_ENABLED: "false"
       GF_UNIFIED_ALERTING_ENABLED: "true"
-      GF_SMTP_ENABLED: "${GRAFANA_SMTP_ENABLED:-false}"
-      GF_SMTP_HOST: "${GRAFANA_SMTP_HOST:-}"
-      GF_SMTP_USER: "${GRAFANA_SMTP_USER:-}"
-      GF_SMTP_PASSWORD__FILE: /etc/grafana/smtp-password
-      GF_SMTP_FROM_ADDRESS: "${GRAFANA_SMTP_FROM_ADDRESS:-}"
-      GF_SMTP_FROM_NAME: ERP 告警
-      GF_SMTP_SKIP_VERIFY: "false"
-      GF_SMTP_STARTTLS_POLICY: MandatoryStartTLS
+      GF_SMTP_ENABLED: "false"
       GF_FEATURE_TOGGLES_ENABLE: jaegerEnableGrpcEndpoint
       GOMEMLIMIT: 256MiB
     volumes:
       - grafana-data:/var/lib/grafana
-      - "${OBS_RUNTIME_DIR:?OBS_RUNTIME_DIR is required}/smtp-password:/etc/grafana/smtp-password:ro"
       - "${OBS_RUNTIME_DIR:?OBS_RUNTIME_DIR is required}/provisioning:/etc/grafana/provisioning:ro"
       - "${OBS_RUNTIME_DIR:?OBS_RUNTIME_DIR is required}/dashboards:/var/lib/grafana/dashboards:ro"
     ports:

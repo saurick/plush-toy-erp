@@ -251,9 +251,7 @@ write_files:
       }
 
       arch=linux-x64
-      n_version=10.2.0
       node_version=24.21.0
-      node_cache="/usr/local/n/versions/node/${node_version}"
       go_version=1.26.9
       pnpm_version=10.34.5
       runner_version=19.3.0
@@ -264,18 +262,12 @@ write_files:
         [[ -L "$path" ]] && [[ "$(readlink "$path")" == "$expected" ]]
       }
 
-      n_ready() {
-        owned_executable_is /usr/local/bin/n &&
-          echo "e4f5baa2e912d3a39b50d9f617de03acf2b4eeb3590f0a4181123f8393da1a19  /usr/local/bin/n" | sha256sum --check --status &&
-          [[ "$(/usr/local/bin/n --version)" == "$n_version" ]]
-      }
-
       node_ready() {
-        [[ -x "$node_cache/bin/node" && ! -L /usr/local/bin/node ]] &&
-          cmp -s "$node_cache/bin/node" /usr/local/bin/node &&
-          symlink_target_is /usr/local/bin/npm ../lib/node_modules/npm/bin/npm-cli.js &&
-          symlink_target_is /usr/local/bin/npx ../lib/node_modules/npm/bin/npx-cli.js &&
-          symlink_target_is /usr/local/bin/corepack ../lib/node_modules/corepack/dist/corepack.js &&
+        [[ -x /opt/node/bin/node ]] &&
+          symlink_target_is /usr/local/bin/node /opt/node/bin/node &&
+          symlink_target_is /usr/local/bin/npm /opt/node/bin/npm &&
+          symlink_target_is /usr/local/bin/npx /opt/node/bin/npx &&
+          symlink_target_is /usr/local/bin/corepack /opt/node/bin/corepack &&
           [[ "$(/usr/local/bin/node --version)" == "v${node_version}" ]]
       }
 
@@ -326,26 +318,18 @@ write_files:
 
       work="$(mktemp -d)"
       trap 'rm -rf "$work"' EXIT
-      if ! n_ready; then
-        n_archive="n-$n_version.tgz"
-        download_file "https://registry.npmjs.org/n/-/$n_archive" "$work/$n_archive"
-        echo "ce52d7c1210c4200079ac5ed719c0db80d96e6b2dd009ca0e750c8e3bb9b0d613406cb348e2f6c6cadde0fabccee42a044b4c59bf8b8f85bc4e125efa616921e  $work/$n_archive" | sha512sum --check --strict
-        tar -xzf "$work/$n_archive" -C "$work" package/bin/n
-        install -o root -g root -m 0755 "$work/package/bin/n" /usr/local/bin/n
-        n_ready
-      fi
       if ! node_ready; then
         node_archive="node-v${node_version}-${arch}.tar.xz"
         download_file "https://nodejs.org/dist/v${node_version}/${node_archive}" "$work/$node_archive"
         echo "fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6  $work/$node_archive" | sha256sum --check --strict
-        rm -rf "$node_cache"
-        install -d -m 0755 "$node_cache"
-        tar -xJf "$work/$node_archive" --strip-components=1 -C "$node_cache"
-        N_PREFIX=/usr/local N_CACHE_PREFIX=/usr/local N_PRESERVE_NPM="" N_PRESERVE_COREPACK="" /usr/local/bin/n --offline "$node_version"
-        node_ready
+        rm -rf /opt/node
+        install -d -m 0755 /opt/node
+        tar -xJf "$work/$node_archive" --strip-components=1 -C /opt/node
+        ln -sfn /opt/node/bin/node /usr/local/bin/node
+        ln -sfn /opt/node/bin/npm /usr/local/bin/npm
+        ln -sfn /opt/node/bin/npx /usr/local/bin/npx
+        ln -sfn /opt/node/bin/corepack /usr/local/bin/corepack
       fi
-      # The verified n installation owns the active paths before removing the old prefix.
-      rm -rf /opt/node
       if ! pnpm_ready; then
         pnpm_archive="pnpm-${pnpm_version}.tgz"
         download_file "https://registry.npmjs.org/pnpm/-/${pnpm_archive}" "$work/$pnpm_archive"

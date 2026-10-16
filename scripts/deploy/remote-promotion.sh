@@ -1018,18 +1018,6 @@ for image_ref in "${required_runtime_images[@]}"; do
     fail "required runtime dependency image is unavailable or incompatible"
 done
 
-enter_stage maintenance_window
-runtime_stop_started=1
-for service in app-server web-desktop; do
-  service_cids="$(docker ps -q --filter "label=com.docker.compose.project=$project" --filter "label=com.docker.compose.service=$service")"
-  if [[ -n "$service_cids" ]]; then
-    while IFS= read -r service_cid; do
-      docker stop "$service_cid" >>"$log_file" 2>&1
-    done <<<"$service_cids"
-  fi
-  [[ -z "$(docker ps -q --filter "label=com.docker.compose.project=$project" --filter "label=com.docker.compose.service=$service")" ]] || fail "target writer did not stop before backup"
-done
-
 enter_stage fresh_backup_and_restore_check
 postgres_cid="$(docker ps -q \
   --filter "label=com.docker.compose.project=$project" \
@@ -1180,6 +1168,7 @@ compose=(
   --compose-override "$compose_override" \
   >>"$log_file" 2>&1
 
+enter_stage maintenance_window
 runtime_stop_started=1
 "${clean_env[@]}" "${compose[@]}" stop app-server web-desktop \
   >>"$log_file" 2>&1

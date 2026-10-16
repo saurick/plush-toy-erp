@@ -323,9 +323,6 @@ cleanup_transient_credentials() {
     ! -e "$incoming/.acquire-$operation_id" && ! -L "$incoming/.acquire-$operation_id" ]]
 }
 
-attachment_dir=""
-attachment_dir_created=0
-
 cleanup_exact_target() {
   trap - ERR
   local cleanup_container="${project}-initialization-cleanup"
@@ -356,20 +353,6 @@ cleanup_exact_target() {
       --security-opt no-new-privileges --user 0:0 \
       --volume "$data_dir:/target" --entrypoint sh postgres:18.6 \
       -ceu 'find /target -mindepth 1 -depth -delete' >/dev/null 2>&1 || return 1
-  fi
-  if [[ "$attachment_dir_created" -eq 1 ]]; then
-    [[ "$attachment_dir" == "/srv/raid5/plush-toy-erp/$target/attachments" &&
-      "$(realpath -m "$attachment_dir")" == "$attachment_dir" &&
-      -d "$attachment_dir" && ! -L "$attachment_dir" ]] || return 1
-    docker run --rm --pull never --name "$cleanup_container" \
-      --network none --read-only --pids-limit 64 --memory 64m \
-      --cap-drop ALL --cap-add DAC_OVERRIDE --cap-add FOWNER \
-      --security-opt no-new-privileges --user 0:0 \
-      --volume "$attachment_dir:/target" --entrypoint sh postgres:18.6 \
-      -ceu 'find /target -mindepth 1 -depth -delete' >/dev/null 2>&1 || return 1
-    rmdir -- "$attachment_dir" || return 1
-    [[ ! -e "$attachment_dir" && ! -L "$attachment_dir" ]] || return 1
-    attachment_dir_created=0
   fi
   rm -rf -- "$root"
   if [[ ! -e "$root" && ! -L "$root" ]] &&
@@ -656,7 +639,6 @@ attachment_dir="/srv/raid5/plush-toy-erp/$target/attachments"
 [[ "$(findmnt -rn --mountpoint /srv/raid5 -o TARGET)" == /srv/raid5 ]] || fail "RAID5 must be mounted before initializing attachment storage"
 [[ "$(realpath -m "$attachment_dir")" == "$attachment_dir" && ! -e "$attachment_dir" ]] || fail "attachment directory must be new and contain no symlinks"
 mkdir -p "$attachment_dir"
-attachment_dir_created=1
 chmod 700 "$attachment_dir"
 bash "$release_dir/server/deploy/compose/prod/attachment_raid_preflight.sh" /srv/raid5 "$attachment_dir"
 attachment_access_key=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')

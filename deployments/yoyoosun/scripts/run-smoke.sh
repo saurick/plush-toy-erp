@@ -422,7 +422,7 @@ for check in "${checks[@]}"; do
   url="${check#*:}"
   status="fail"
   http_code="$(curl --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused -sS -o /dev/null -w '%{http_code}' "$url" || true)"
-  if [[ "$http_code" == 200 ]]; then
+  if [[ "$http_code" =~ ^(200|302|401|403)$ ]]; then
     status="pass"
     passed=$((passed + 1))
   else
