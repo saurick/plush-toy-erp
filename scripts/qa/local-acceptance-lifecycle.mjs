@@ -276,7 +276,8 @@ export async function runLocalAcceptanceLifecycle({
     } catch (error) {
       if (error instanceof LocalAcceptanceLifecycleError) throw error;
       const failure = new LocalAcceptanceLifecycleError(name, safeError(error));
-      if (error?.datasetEvidence) failure.datasetEvidence = error.datasetEvidence;
+      if (error?.datasetEvidence)
+        failure.datasetEvidence = error.datasetEvidence;
       throw failure;
     }
   };
@@ -307,8 +308,8 @@ export async function runLocalAcceptanceLifecycle({
     });
 
     await stage("acceptance-create", async () => {
-      await runtime.createDatabase(identity.acceptanceDatabase);
       created.add(identity.acceptanceDatabase);
+      await runtime.createDatabase(identity.acceptanceDatabase);
     });
     await stage(
       "acceptance-migrate",
@@ -402,11 +403,11 @@ export async function runLocalAcceptanceLifecycle({
       }),
     );
     await stage("browser-actions-clone", async () => {
+      created.add(identity.browserActionsDatabase);
       await runtime.cloneDatabase(
         identity.acceptanceDatabase,
         identity.browserActionsDatabase,
       );
-      created.add(identity.browserActionsDatabase);
     });
     await stage("backend-start-browser-actions", async () => {
       await runtime.startBackend(identity.browserActionsDatabase);

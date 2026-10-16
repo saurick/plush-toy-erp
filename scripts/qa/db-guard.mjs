@@ -52,8 +52,7 @@ const PROGRAMMABILITY_SCAN_EXCLUSIONS = new Set([
 ]);
 const CREATE_PROGRAMMABILITY_OBJECT =
   /\bcreate\s+(?:or\s+replace\s+)?(?:(?:constraint|event)\s+)?(function|procedure|trigger)\s+"?([a-z_][a-z0-9_]*)"?/giu;
-const EXECUTE_PROGRAMMABILITY_OBJECT =
-  /\bexecute\s+(?:function|procedure)\b/iu;
+const EXECUTE_PROGRAMMABILITY_OBJECT = /\bexecute\s+(?:function|procedure)\b/iu;
 const ENT_RUNTIME_METADATA_FILE =
   "server/internal/data/model/ent/runtime/runtime.go";
 const ENT_RUNTIME_METADATA_CHANGE =
@@ -95,14 +94,13 @@ function createdProgrammabilityObjects(source) {
 function sameProgrammabilityObjects(actual, expected) {
   const normalize = (values) =>
     values.map(([kind, name]) => `${kind}:${name}`).sort();
-  return JSON.stringify(normalize(actual)) === JSON.stringify(normalize(expected));
+  return (
+    JSON.stringify(normalize(actual)) === JSON.stringify(normalize(expected))
+  );
 }
 
 function legacyProgrammabilityRetired(root) {
-  const migrationDir = path.join(
-    root,
-    "server/internal/data/model/migrate",
-  );
+  const migrationDir = path.join(root, "server/internal/data/model/migrate");
   const cleanupSource = readdirSync(migrationDir, { withFileTypes: true })
     .filter(
       (entry) =>
@@ -137,10 +135,7 @@ export function evaluateDatabaseProgrammabilityPolicy(root) {
       readFileSync(legacyPath, "utf8"),
     );
     if (
-      !sameProgrammabilityObjects(
-        legacyObjects,
-        LEGACY_PROGRAMMABILITY_OBJECTS,
-      )
+      !sameProgrammabilityObjects(legacyObjects, LEGACY_PROGRAMMABILITY_OBJECTS)
     ) {
       return {
         ok: false,
@@ -186,7 +181,7 @@ export function evaluateDatabaseProgrammabilityPolicy(root) {
 function parseNameStatus(buffer) {
   const values = readNullDelimited(buffer);
   const entries = [];
-  for (let index = 0; index < values.length; ) {
+  for (let index = 0; index < values.length;) {
     const status = values[index++];
     const firstPath = values[index++];
     if (!status || !firstPath) {
@@ -486,24 +481,26 @@ function dropUnchangedColumnOperations(
   for (const [key, item] of addAndDropColumns) {
     const baseline = baselineChains.get(item.token);
     const current = currentChains.get(item.token);
-    if (baseline && current && baseline === current) tokenOperations.delete(key);
+    if (baseline && current && baseline === current)
+      tokenOperations.delete(key);
   }
 }
 
 function schemaTableName(source, file) {
   const explicit = source.match(/\bTable:\s*"([a-z0-9_]+)"/u)?.[1];
   if (explicit) return explicit;
-  const typeName = source.match(/\btype\s+([A-Za-z][A-Za-z0-9]*)\s+struct\s*\{/u)?.[1];
+  const typeName = source.match(
+    /\btype\s+([A-Za-z][A-Za-z0-9]*)\s+struct\s*\{/u,
+  )?.[1];
   const fallbackName = path.basename(file, path.extname(file));
   const schemaName = typeName ? toSnakeCase(typeName) : fallbackName;
-  if (!schemaName) throw new Error(`[qa:db-guard] cannot derive Ent schema from ${file}`);
+  if (!schemaName)
+    throw new Error(`[qa:db-guard] cannot derive Ent schema from ${file}`);
   return pluralizeTableName(schemaName);
 }
 
 function changedSchemaLines(diff) {
-  return diff
-    .split("\n")
-    .filter((line) => /^[+-](?![+-]{2})/u.test(line));
+  return diff.split("\n").filter((line) => /^[+-](?![+-]{2})/u.test(line));
 }
 
 function diffHunks(diff) {
@@ -523,7 +520,8 @@ function diffHunks(diff) {
 
 function physicalTokenRequirements(source) {
   const requirements = new Map();
-  const add = (token, kind) => requirements.set(`${kind}:${token}`, { token, kind });
+  const add = (token, kind) =>
+    requirements.set(`${kind}:${token}`, { token, kind });
   for (const match of source.matchAll(
     /\bfield\.[A-Za-z][A-Za-z0-9]*\(\s*"([a-z0-9_]+)"/gu,
   )) {
@@ -532,9 +530,7 @@ function physicalTokenRequirements(source) {
   for (const match of source.matchAll(/\.Field\(\s*"([a-z0-9_]+)"/gu)) {
     add(match[1], "column");
   }
-  for (const match of source.matchAll(
-    /\bedge\.Column\(\s*"([a-z0-9_]+)"/gu,
-  )) {
+  for (const match of source.matchAll(/\bedge\.Column\(\s*"([a-z0-9_]+)"/gu)) {
     add(match[1], "column");
   }
   for (const indexMatch of source.matchAll(/\bindex\.Fields\(([^)]*)\)/gsu)) {
@@ -546,7 +542,9 @@ function physicalTokenRequirements(source) {
 }
 
 function physicalTokens(source) {
-  return [...new Set(physicalTokenRequirements(source).map(({ token }) => token))];
+  return [
+    ...new Set(physicalTokenRequirements(source).map(({ token }) => token)),
+  ];
 }
 
 function namedCheckTokens(source) {
@@ -557,7 +555,11 @@ function namedCheckTokens(source) {
 
 function builderStartIndex(hunk, changedIndex) {
   let start = -1;
-  for (let index = changedIndex; index >= 0 && changedIndex - index <= 24; index -= 1) {
+  for (
+    let index = changedIndex;
+    index >= 0 && changedIndex - index <= 24;
+    index -= 1
+  ) {
     const code = hunk[index].slice(1);
     if (BUILDER_START.test(code)) {
       start = index;
@@ -572,7 +574,11 @@ function builderChain(hunk, changedIndex) {
   if (start < 0) return "";
 
   let end = changedIndex;
-  for (let index = changedIndex + 1; index < hunk.length && index - start <= 24; index += 1) {
+  for (
+    let index = changedIndex + 1;
+    index < hunk.length && index - start <= 24;
+    index += 1
+  ) {
     const code = hunk[index].slice(1);
     if (BUILDER_START.test(code)) break;
     end = index;
@@ -641,7 +647,10 @@ function publicationEquivalentSchemaRequirements(
       return publishedFields.get(token) !== currentFields.get(token);
     }
     if (requirement.kind === "index" && indexesUnchanged) return false;
-    if (requirement.kind === "table" && requirement.operation === "rename-table") {
+    if (
+      requirement.kind === "table" &&
+      requirement.operation === "rename-table"
+    ) {
       return publishedTable !== currentTable;
     }
     return true;
@@ -680,12 +689,53 @@ function dropUnchangedCheckOperations(
 function indexFieldGroups(source) {
   const groups = [];
   for (const indexMatch of source.matchAll(/\bindex\.Fields\(([^)]*)\)/gsu)) {
-    const fields = [
-      ...indexMatch[1].matchAll(/"([a-z0-9_]+)"/gu),
-    ].map((match) => match[1]);
+    const fields = [...indexMatch[1].matchAll(/"([a-z0-9_]+)"/gu)].map(
+      (match) => match[1],
+    );
     if (fields.length > 0) groups.push(fields);
   }
   return groups;
+}
+
+function dropUnchangedIndexOperations(
+  root,
+  baselineFile,
+  currentFile,
+  range,
+  tokenOperations,
+) {
+  const chainsByField = (source) => {
+    const result = new Map();
+    for (const match of source.matchAll(/\bindex\.Fields\(([^)]*)\)/gsu)) {
+      const chain = normalizeGoBuilderChain(
+        fieldBuilderExpression(source, match.index),
+      );
+      for (const field of match[1].matchAll(/"([a-z0-9_]+)"/gu)) {
+        result.set(field[1], [...(result.get(field[1]) || []), chain]);
+      }
+    }
+    return result;
+  };
+  const before = chainsByField(baselineSource(root, baselineFile, range));
+  const after = chainsByField(
+    readFileSync(path.join(root, currentFile), "utf8"),
+  );
+  for (const [key, item] of tokenOperations) {
+    if (
+      item.kind !== "index" ||
+      !item.operations.has("add") ||
+      !item.operations.has("drop")
+    )
+      continue;
+    const previous = before.get(item.token);
+    const current = after.get(item.token);
+    if (
+      previous &&
+      current &&
+      JSON.stringify(previous.sort()) === JSON.stringify(current.sort())
+    )
+      tokenOperations.delete(key);
+  }
 }
 
 function removedIndexFieldGroups(baseline, current) {
@@ -840,6 +890,13 @@ function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
       range,
       tokenOperations,
     );
+    dropUnchangedIndexOperations(
+      root,
+      baselineFile,
+      file,
+      range,
+      tokenOperations,
+    );
     dropIndexesRemovedWithDroppedColumns(
       root,
       baselineFile,
@@ -890,7 +947,10 @@ function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
   )) {
     const { token, kind, operations } = item;
     let operation;
-    if (operations.has("modify") || (operations.has("add") && operations.has("drop"))) {
+    if (
+      operations.has("modify") ||
+      (operations.has("add") && operations.has("drop"))
+    ) {
       operation = "modify";
     } else if (operations.has("add")) {
       operation = "add";
@@ -915,7 +975,7 @@ function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
   return requirements;
 }
 
-function sqlCodeStatements(source) {
+export function sqlCodeStatements(source) {
   const statements = [];
   let current = "";
   let index = 0;
@@ -1004,7 +1064,9 @@ function sqlCodeStatements(source) {
       continue;
     }
     if (char === "$") {
-      const match = source.slice(index).match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/u);
+      const match = source
+        .slice(index)
+        .match(/^\$[A-Za-z_][A-Za-z0-9_]*\$|^\$\$/u);
       if (match) {
         dollarTag = match[0];
         state = "dollar-quote";
@@ -1031,7 +1093,8 @@ const HIGH_GROWTH_TABLE =
   /\b(?:inventory_txns|workflow_task_events|production_order_events|production_wip_events|runtime_audit_events)\b/iu;
 const MIGRATION_DDL =
   /\b(?:create|alter|drop|truncate|comment\s+on|grant|revoke)\b/iu;
-const MIGRATION_DML = /\b(?:insert\s+into|update|delete\s+from|merge\s+into)\b/iu;
+const MIGRATION_DML =
+  /\b(?:insert\s+into|update|delete\s+from|merge\s+into)\b/iu;
 const REQUIRED_RISK_METADATA = Object.freeze([
   "migration-risk",
   "affected-table",
@@ -1109,7 +1172,11 @@ export function evaluateMigrationRiskPolicy({ root, files }) {
     if (!existsSync(target)) continue;
     const source = readFileSync(target, "utf8");
     const statements = sqlCodeStatements(source);
-    if (statements.some((statement) => TRANSACTION_INCOMPATIBLE_MIGRATION_SQL.test(statement))) {
+    if (
+      statements.some((statement) =>
+        TRANSACTION_INCOMPATIBLE_MIGRATION_SQL.test(statement),
+      )
+    ) {
       transactionIncompatible.push(file);
       continue;
     }
@@ -1180,7 +1247,8 @@ function containsSqlIdentifier(source, identifier) {
 }
 
 function matchesDdlOperation(statement, { operation, kind }) {
-  if (operation === "create-table") return /\bcreate\s+table\b/u.test(statement);
+  if (operation === "create-table")
+    return /\bcreate\s+table\b/u.test(statement);
   if (operation === "drop-table") return /\bdrop\s+table\b/u.test(statement);
   if (operation === "rename-table") return /\brename\s+to\b/u.test(statement);
   if (operation === "add") {
@@ -1212,7 +1280,9 @@ function matchesDdlOperation(statement, { operation, kind }) {
   }
   if (operation === "modify") {
     if (kind === "index") {
-      return /\b(?:create\s+(?:unique\s+)?index|drop\s+index)\b/u.test(statement);
+      return /\b(?:create\s+(?:unique\s+)?index|drop\s+index)\b/u.test(
+        statement,
+      );
     }
     if (kind === "check") {
       return /\b(?:add\s+constraint|drop\s+constraint)\b/u.test(statement);
@@ -1244,7 +1314,9 @@ export function evaluateDbGuard({ root, range = "", indexTransition = false }) {
     throw new Error(`[qa:db-guard] repository check failed: ${error.message}`);
   }
   if (!existsSync(modelDir)) {
-    throw new Error(`[qa:db-guard] required model directory is missing: ${modelDir}`);
+    throw new Error(
+      `[qa:db-guard] required model directory is missing: ${modelDir}`,
+    );
   }
 
   const effectiveRange = range || resolveDefaultRange(root);
@@ -1322,7 +1394,10 @@ export function evaluateDbGuard({ root, range = "", indexTransition = false }) {
   for (const entry of entries) {
     const paths = [entry.path, entry.oldPath].filter(Boolean);
     if (!paths.some(isMigrationSql)) continue;
-    if (entry.status === "A" && paths.some((file) => addedMigrations.has(file))) {
+    if (
+      entry.status === "A" &&
+      paths.some((file) => addedMigrations.has(file))
+    ) {
       continue;
     }
     if (
@@ -1334,7 +1409,9 @@ export function evaluateDbGuard({ root, range = "", indexTransition = false }) {
     }
     if (/^[MDRCT]/u.test(entry.status)) {
       immutableMigrationChanges.push(
-        entry.oldPath ? `${entry.status}:${entry.oldPath}->${entry.path}` : `${entry.status}:${entry.path}`,
+        entry.oldPath
+          ? `${entry.status}:${entry.oldPath}->${entry.path}`
+          : `${entry.status}:${entry.path}`,
       );
     }
   }
@@ -1350,7 +1427,9 @@ export function evaluateDbGuard({ root, range = "", indexTransition = false }) {
   const schemaFiles = [...changedFiles].filter(isSchemaFile);
   const schemaRequirements = new Map();
   const structuralSchemaFiles = schemaFiles.filter((file) => {
-    if (!schemaDiffRequiresMigration(root, file, transitionRange, untrackedFiles)) {
+    if (
+      !schemaDiffRequiresMigration(root, file, transitionRange, untrackedFiles)
+    ) {
       return false;
     }
     const requirements = schemaDdlRequirements(
@@ -1384,7 +1463,9 @@ export function evaluateDbGuard({ root, range = "", indexTransition = false }) {
     );
   const generatedEntChanged = generatedEntProofFiles.length > 0;
   const schemaRequiresMigration = structuralSchemaFiles.length > 0;
-  const needsMigration = schemaRequiresMigration || (generatedEntChanged && schemaFiles.length === 0);
+  const needsMigration =
+    schemaRequiresMigration ||
+    (generatedEntChanged && schemaFiles.length === 0);
 
   if (needsMigration && newMigrations.size === 0) {
     return {
@@ -1423,7 +1504,9 @@ export function evaluateDbGuard({ root, range = "", indexTransition = false }) {
         .map((file) => {
           const target = path.join(root, file);
           if (!existsSync(target)) {
-            throw new Error(`[qa:db-guard] new migration is missing from worktree: ${file}`);
+            throw new Error(
+              `[qa:db-guard] new migration is missing from worktree: ${file}`,
+            );
           }
           return readFileSync(target, "utf8");
         })
@@ -1514,14 +1597,19 @@ function main() {
   const indexTransition = args.includes("--index-transition");
   const unsupported = args.filter((arg) => arg !== "--index-transition");
   if (unsupported.length > 0) {
-    throw new Error(`[qa:db-guard] unsupported arguments: ${unsupported.join(" ")}`);
+    throw new Error(
+      `[qa:db-guard] unsupported arguments: ${unsupported.join(" ")}`,
+    );
   }
   if (process.env.SKIP_DB_GUARD === "1") {
     console.log("[qa:db-guard] SKIP_DB_GUARD=1，跳过");
     return;
   }
 
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+  const root = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "../..",
+  );
   const result = evaluateDbGuardWithMigrationRisk({
     root,
     range: process.env.QA_BASE_RANGE || "",
@@ -1529,7 +1617,9 @@ function main() {
   });
   if (!result.ok) {
     if (result.reason === "base-migration-modified") {
-      console.error("[qa:db-guard] base 中已有 migration 不可修改、删除或重命名:");
+      console.error(
+        "[qa:db-guard] base 中已有 migration 不可修改、删除或重命名:",
+      );
     } else if (result.reason === "database-programmability-forbidden") {
       console.error(
         "[qa:db-guard] 禁止新增数据库 Function、Procedure、非内部 Trigger 或其执行语句:",
@@ -1550,7 +1640,9 @@ function main() {
         "[qa:db-guard] 默认 tx-mode=all 禁止直接加入非事务 migration；请拆成专项执行合同:",
       );
     } else if (result.reason === "migration-risk-metadata-missing") {
-      console.error("[qa:db-guard] 风险 migration 缺少完整的锁、预检和恢复元数据:");
+      console.error(
+        "[qa:db-guard] 风险 migration 缺少完整的锁、预检和恢复元数据:",
+      );
       for (const violation of result.violations || []) {
         console.error(`  - ${violation.file}`);
         console.error(`    risks: ${violation.reasons.join(", ")}`);
@@ -1570,18 +1662,27 @@ function main() {
       process.exitCode = 1;
       return;
     } else if (result.reason === "generated-ent-without-schema-proof") {
-      console.error("[qa:db-guard] generated Ent 发生变化，但没有对应 schema proof:");
+      console.error(
+        "[qa:db-guard] generated Ent 发生变化，但没有对应 schema proof:",
+      );
     } else {
-      console.error("[qa:db-guard] 检测到 schema/ent 结构变更但没有新增 migration:");
+      console.error(
+        "[qa:db-guard] 检测到 schema/ent 结构变更但没有新增 migration:",
+      );
     }
     for (const file of result.files || []) console.error(`  - ${file}`);
     process.exitCode = 1;
     return;
   }
-  console.log(result.skipped ? "[qa:db-guard] 未检测到变更，跳过" : "[qa:db-guard] 通过");
+  console.log(
+    result.skipped ? "[qa:db-guard] 未检测到变更，跳过" : "[qa:db-guard] 通过",
+  );
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
   try {
     main();
   } catch (error) {

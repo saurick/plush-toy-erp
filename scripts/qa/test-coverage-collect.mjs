@@ -164,6 +164,54 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
   ]),
   "fact-inventory": Object.freeze([
     goScenario(
+      "inventory-invalid-movement-intent",
+      "server/internal/biz",
+      "TestInventoryUsecaseTransactionRejectsInvalidIntentBeforeWriting",
+      "非法库存变动在写入前拒绝",
+    ),
+    goScenario(
+      "inventory-movement-retry-precision",
+      "server/internal/biz",
+      "TestInventoryUsecaseTransactionPreservesPrecisionRetryAndRepositoryFailure",
+      "库存变动精度与失败重试",
+    ),
+    goScenario(
+      "inventory-warehouse-write-access",
+      "server/internal/biz",
+      "TestInventoryUsecaseWarehouseScopeRejectsWritesBeforeRepository",
+      "仓库写入范围校验",
+    ),
+    goScenario(
+      "inventory-scoped-adapter-required",
+      "server/internal/biz",
+      "TestInventoryUsecaseScopedListsRequireScopedRepository",
+      "库存读取缺少范围适配时拒绝",
+    ),
+    goScenario(
+      "inventory-lot-named-action-retry",
+      "server/internal/biz",
+      "TestInventoryUsecaseNamedLotActionsBindTheirIntentAndSafeRetry",
+      "批次具名动作与重试意图",
+    ),
+    goScenario(
+      "inventory-lot-action-audit-intent",
+      "server/internal/biz",
+      "TestInventoryUsecaseLotActionRequiresVersionActorReasonAndRetryKey",
+      "批次动作版本与审计条件",
+    ),
+    goScenario(
+      "inventory-scoped-read-results",
+      "server/internal/biz",
+      "TestInventoryUsecaseScopedReadsPreserveWarehouseRestrictionsAndResults",
+      "库存范围与查询结果保留",
+    ),
+    goScenario(
+      "inventory-scoped-read-rejection",
+      "server/internal/biz",
+      "TestInventoryUsecaseScopedReadsRejectOtherWarehousesAndInvalidFilters",
+      "拒绝越权仓库与非法查询",
+    ),
+    goScenario(
       "stock-reservation-input",
       "server/internal/biz",
       "TestOperationalFactUsecaseCreateStockReservationFromSalesOrderNormalizesPublicIntent",
@@ -180,6 +228,11 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
     ),
   ]),
   "fact-purchase": Object.freeze([
+    goScenario(
+      "purchase-replacement-warehouse-handoff",
+      "server/internal/service",
+      "TestJsonrpcReplacementRequiresWarehouseCountAndStartsFreshInspection",
+    ),
     goScenario(
       "iqc-partial-arrival-evidence",
       "server/internal/data",
@@ -207,6 +260,48 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
     ),
   ]),
   "fact-quality": Object.freeze([
+    goScenario(
+      "quality-purchase-source-identity",
+      "server/internal/biz",
+      "TestQualityInspectionUsecasePurchaseSourceRejectsIncompleteIdentity",
+      "质检必须使用完整采购来源",
+    ),
+    goScenario(
+      "quality-incoming-source-consistency",
+      "server/internal/biz",
+      "TestQualityInspectionUsecaseIncomingDraftRejectsMixedSourceFacts",
+      "来料质检来源与物料一致",
+    ),
+    goScenario(
+      "quality-finished-goods-source-reset",
+      "server/internal/biz",
+      "TestQualityInspectionUsecaseFinishedGoodsClearsIncomingOnlyFields",
+      "成品质检清除来料专属字段",
+    ),
+    goScenario(
+      "quality-contradictory-evidence",
+      "server/internal/biz",
+      "TestQualityInspectionUsecaseDecisionsRejectContradictoryEvidence",
+      "质检拒绝矛盾或未完成证据",
+    ),
+    goScenario(
+      "quality-decision-retry-evidence",
+      "server/internal/biz",
+      "TestQualityInspectionUsecaseDecisionPreservesFailureRetryAndEvidenceTime",
+      "质检判定失败重试与检验时间",
+    ),
+    goScenario(
+      "quality-list-kind-isolation",
+      "server/internal/biz",
+      "TestQualityInspectionUsecaseListsKeepInspectionKindsSeparate",
+      "各类质检查询保持来源边界",
+    ),
+    goScenario(
+      "quality-submit-cancel-state",
+      "server/internal/biz",
+      "TestQualityInspectionUsecaseSubmissionAndCancellationPreserveStateGuards",
+      "质检提交取消保留状态约束",
+    ),
     goScenario(
       "quality-filter-default-boundary",
       "server/internal/biz",
@@ -242,6 +337,11 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
   ]),
   "fact-outsourcing": Object.freeze([
     goScenario(
+      "outsourcing-rework-approval-boundary",
+      "server/internal/data",
+      "TestOutsourcingRejectedReturnReworkRequiresApproval",
+    ),
+    goScenario(
       "outsourcing-subject-boundary",
       "server/internal/data",
       "TestOutsourcingOrderRepoProductAndMaterialSubjects",
@@ -276,6 +376,36 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
   ]),
   "fact-finance": Object.freeze([
     goScenario(
+      "payment-create-retry-intent",
+      "server/internal/biz",
+      "TestFinancePaymentUsecaseCreationKeepsNormalizedIntentStableAcrossRetry",
+      "收付款创建失败后保留重试意图",
+    ),
+    goScenario(
+      "payment-kind-direction-source",
+      "server/internal/biz",
+      "TestFinancePaymentUsecasePaymentKindsBindDirectionAndSource",
+      "结算预收付退款的方向与来源",
+    ),
+    goScenario(
+      "payment-process-posting-boundary",
+      "server/internal/biz",
+      "TestFinancePaymentUsecasePostingCannotBypassProcessRuntime",
+      "过账必须经过受控流程",
+    ),
+    goScenario(
+      "payment-allocation-amount-guard",
+      "server/internal/biz",
+      "TestFinancePaymentUsecaseAllocationRejectsInvalidAmountsBeforeStorage",
+      "核销金额精度与重复明细校验",
+    ),
+    goScenario(
+      "payment-cancel-reverse-audit",
+      "server/internal/biz",
+      "TestFinancePaymentUsecaseCancellationAndReversalKeepAuditBoundary",
+      "收付款取消冲正的审计边界",
+    ),
+    goScenario(
       "receivable-shipment-customer-truth",
       "server/internal/biz",
       "TestFinanceProcessDomainCommandReceivableLeadRequiresShipmentCustomerTruth",
@@ -292,6 +422,42 @@ export const GO_BUSINESS_SCENARIOS = Object.freeze({
     ),
   ]),
   workflow: Object.freeze([
+    goScenario(
+      "workflow-task-link-paging",
+      "server/internal/service",
+      "TestWorkflowTaskLinkContinuesCurrentVisibilityPage",
+      "分享任务链继续读取权限内的下一页",
+    ),
+    goScenario(
+      "workflow-task-link-relations",
+      "server/internal/data",
+      "TestWorkflowHandlingChainUsesSourceRelationsAndVisibility",
+      "原链接沿真实关联追踪流转且不扩大可见范围",
+    ),
+    goScenario(
+      "workflow-task-link-current-access",
+      "server/internal/service",
+      "TestWorkflowTaskLinkUsesCurrentTaskPermissions",
+      "分享链接按当前责任与权限进入办理",
+    ),
+    goScenario(
+      "workflow-task-link-recipient-roles",
+      "server/internal/service",
+      "TestWorkflowTaskLinkRecipientRoleMatrix",
+      "同一分享链接按接收岗位限制可见范围和办理权限",
+    ),
+    goScenario(
+      "workflow-task-link-source-access",
+      "server/internal/service",
+      "TestWorkflowTaskLinkFormalTaskRequiresSourceAccess",
+      "分享办理仍要求相关单据权限及有效流程关联",
+    ),
+    goScenario(
+      "workflow-task-link-invalid-access",
+      "server/internal/service",
+      "TestWorkflowTaskLinkRejectsUnauthorizedAndForgedInput",
+      "分享链接拒绝未授权账号及伪造条件",
+    ),
     goScenario(
       "workflow-status-permissions",
       "server/internal/biz",
@@ -426,8 +592,7 @@ function readCriticalPostgresTestPattern() {
   return pattern;
 }
 
-export const CRITICAL_POSTGRES_TEST_PATTERN =
-  readCriticalPostgresTestPattern();
+export const CRITICAL_POSTGRES_TEST_PATTERN = readCriticalPostgresTestPattern();
 export const BASELINE_GO_SKIP_PATTERN = `${CRITICAL_POSTGRES_TEST_PATTERN}|^TestTemplatePDFChromium(?:Security|Lifecycle)Integration$`;
 
 const IMPORT_TEST_FILES = Object.freeze([
@@ -614,14 +779,11 @@ export async function assertProjectNodeRuntime(
   runtimeVersion = process.version,
 ) {
   const expected = (
-    await readFile(path.join(projectRoot, ".node-version"), "utf8")
+    await readFile(path.join(projectRoot, ".n-node-version"), "utf8")
   ).trim();
-  if (
-    !/^\d+\.\d+\.\d+$/u.test(expected) ||
-    runtimeVersion !== `v${expected}`
-  ) {
+  if (!/^\d+\.\d+\.\d+$/u.test(expected) || runtimeVersion !== `v${expected}`) {
     throw new Error(
-      `coverage collector requires Node ${expected}; run scripts/doctor.sh and fix the local runtime`,
+      `coverage collector requires Node ${expected}; run n auto from the repository root, then scripts/doctor.sh`,
     );
   }
   return expected;
@@ -820,7 +982,11 @@ function parseGoTestTerminals(content) {
 
 export function goFailureScenarios(content) {
   let terminals;
-  try { terminals = parseGoTestTerminals(content); } catch { return []; }
+  try {
+    terminals = parseGoTestTerminals(content);
+  } catch {
+    return [];
+  }
   const resourceFailures = new Set();
   for (const line of String(content).split(/\r?\n/u)) {
     try {
@@ -832,19 +998,21 @@ export function goFailureScenarios(content) {
       // Parsing terminals already decides whether the execution log is valid.
     }
   }
-  return terminals.filter((entry) => entry.terminal === "fail").map((entry) => {
-    return {
-      id: entry.package + ":" + entry.test,
-      label: entry.test,
-      package: entry.package,
-      testPrefix: entry.test,
-      status: "failed",
-      note: resourceFailures.has(entry.package + ":" + entry.test)
-        ? "文件监听或文件描述符资源不足（too many open files）。"
-        : "该用例执行失败，请核对对应测试日志。",
-      matchedTests: [entry.test],
-    };
-  });
+  return terminals
+    .filter((entry) => entry.terminal === "fail")
+    .map((entry) => {
+      return {
+        id: entry.package + ":" + entry.test,
+        label: entry.test,
+        package: entry.package,
+        testPrefix: entry.test,
+        status: "failed",
+        note: resourceFailures.has(entry.package + ":" + entry.test)
+          ? "文件监听或文件描述符资源不足（too many open files）。"
+          : "该用例执行失败，请核对对应测试日志。",
+        matchedTests: [entry.test],
+      };
+    });
 }
 
 export function classifyGoBusinessDomains(
@@ -1042,7 +1210,7 @@ export function receiptIsCurrent({
   repoRoot,
 }) {
   try {
-    validateDevWorkbenchReceipt(receipt);
+    validateDevWorkbenchReceipt(receipt, { repoRoot });
   } catch {
     return false;
   }
@@ -1419,7 +1587,13 @@ export function buildBaselineCommandPlan({
       "t0-static",
       {
         command: "git",
-        args: ["--no-optional-locks", "-c", "diff.autoRefreshIndex=false", "diff", "--check"],
+        args: [
+          "--no-optional-locks",
+          "-c",
+          "diff.autoRefreshIndex=false",
+          "diff",
+          "--check",
+        ],
         cwd: projectRoot,
       },
     ],
@@ -1483,6 +1657,8 @@ export function buildBaselineCommandPlan({
         args: [
           "--test",
           "--experimental-test-coverage",
+          `--test-coverage-include=${path.resolve(projectRoot).split(path.sep).join("/")}/**`,
+          "--test-coverage-exclude=**/node_modules/**",
           "--test-reporter=tap",
         ],
         cwd: path.join(projectRoot, "web"),
@@ -1557,9 +1733,7 @@ export async function collectBaselineEvidence({
     })) {
       run(key, command);
     }
-    process.stderr.write(
-      "[qa:test-coverage-collect] stage=field-linkage\n",
-    );
+    process.stderr.write("[qa:test-coverage-collect] stage=field-linkage\n");
     try {
       await executeFieldLinkage({
         repositoryReader,
@@ -1619,9 +1793,7 @@ export async function collectBaselineEvidence({
     const receiptAdapter = adaptCurrentReceipts(
       await currentReceipts(projectRoot, expectedRepository),
     );
-    process.stderr.write(
-      "[qa:test-coverage-collect] stage=identity-check\n",
-    );
+    process.stderr.write("[qa:test-coverage-collect] stage=identity-check\n");
     assertRepositoryIdentityEqual(expectedRepository, await repositoryReader());
 
     return buildCoverageEvidence({
@@ -1739,8 +1911,7 @@ export async function publishBaselineEvidence({
     await readFile(staging.candidateReport, "utf8"),
   );
   if (
-    candidateReadback.schemaVersion !==
-      "plush-test-coverage-report/v1" ||
+    candidateReadback.schemaVersion !== "plush-test-coverage-report/v1" ||
     !repositoryIdentitiesEqual(
       candidateReadback.repository,
       evidence.repository,

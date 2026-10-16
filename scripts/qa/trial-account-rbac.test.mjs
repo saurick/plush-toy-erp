@@ -19,6 +19,17 @@ const adminSpec = ["demo_admin", "admin", ""];
 const scriptPath = path.resolve(import.meta.dirname, "trial-account-rbac.mjs");
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 
+test("RBAC login probe rejects remote and credential-bearing targets", () => {
+  for (const url of [
+    "https://example.com",
+    "http://127.0.0.1.example.com",
+    "ftp://127.0.0.1",
+  ]) {
+    assert.throws(() => normalizeBaseURL(url), /loopback/u);
+  }
+  assert.equal(normalizeBaseURL("http://[::1]:8300"), "http://[::1]:8300");
+});
+
 test("trial account RBAC shape requires one expected role and mobile permission", () => {
   assert.deepEqual(
     collectAccountFailures(

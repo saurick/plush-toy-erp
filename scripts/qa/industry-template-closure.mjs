@@ -55,7 +55,9 @@ function countByClassification(items = []) {
 
 function createReport(config) {
   const desktopSections = config.desktopMenuTemplate.sections || [];
-  const desktopMenuItems = desktopSections.flatMap((section) => section.items || []);
+  const desktopMenuItems = desktopSections.flatMap(
+    (section) => section.items || [],
+  );
   const fieldModules = config.fieldDisplayTemplate || [];
   const numberingRules = config.numberingRuleTemplate || [];
   const mobilePatterns = config.mobileTaskPatternTemplate || [];
@@ -92,14 +94,17 @@ function createReport(config) {
       noTenant: config.boundaries.createsTenant === false,
       noSchemaChange: config.boundaries.changesSchema === false,
       noMigrationChange: config.boundaries.changesMigration === false,
-      noRuntimeMenuLoaderChange: config.boundaries.changesRuntimeMenuLoader === false,
-      noWorkflowFactChange: config.boundaries.changesWorkflowFactRules === false,
+      noRuntimeMenuLoaderChange:
+        config.boundaries.changesRuntimeMenuLoader === false,
+      noWorkflowFactChange:
+        config.boundaries.changesWorkflowFactRules === false,
       noFactWrite: config.boundaries.writesFacts === false,
     },
     roleKeys: config.defaultRoles.map((role) => role.key),
     desktopMenuSections: desktopSections.map((section) => ({
       title: section.title,
-      classification: section.classification || config.desktopMenuTemplate.classification,
+      classification:
+        section.classification || config.desktopMenuTemplate.classification,
       items: section.items,
     })),
     deferredItems: config.deferredItems,
@@ -162,6 +167,11 @@ export function runIndustryTemplateClosure(options) {
   fs.writeFileSync(jsonPath, `${JSON.stringify(report, null, 2)}\n`);
   fs.writeFileSync(mdPath, renderMarkdown(report));
 
+  if (
+    !Object.values(report.simulatedAcceptance).every((value) => value === true)
+  ) {
+    throw new Error("industry template closure boundary checks failed");
+  }
   return {
     outDir,
     jsonPath,
