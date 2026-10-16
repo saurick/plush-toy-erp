@@ -139,17 +139,13 @@
   .erp-processing-contract-table th,
   .erp-processing-contract-table td,
   .erp-processing-contract-table__cell,
+  .erp-processing-contract-clauses,
   .erp-processing-contract-clauses__group,
   .erp-processing-contract-clauses__item,
   .erp-processing-contract-signature,
   .erp-processing-contract-signature__block {
     break-inside: avoid-page;
     page-break-inside: avoid;
-  }
-
-  .erp-processing-contract-signature {
-    break-before: avoid-page;
-    page-break-before: avoid;
   }
 
   .erp-material-contract-editable,

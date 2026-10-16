@@ -64,7 +64,7 @@
   gap: 6px;
   margin-bottom: 10px;
   color: var(--erp-primary-strong);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -76,7 +76,7 @@
 
 .erp-print-center-nav-title {
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -103,7 +103,7 @@
 .erp-print-center-workbench-note {
   display: block;
   margin-bottom: 14px;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 
 .erp-print-center-workbench {
@@ -190,7 +190,7 @@
 
 .erp-print-center-template-meta {
   color: var(--erp-primary-strong);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -209,13 +209,13 @@
   align-items: center;
   gap: 5px;
   color: var(--erp-primary-strong);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 700;
   line-height: 1.4;
 }
 
 .erp-print-center-template-action .anticon {
-  font-size: var(--erp-font-micro);
+  font-size: 11px;
 }
 
 .erp-print-center-note-list {
@@ -272,7 +272,7 @@
   margin-bottom: 8px;
   padding: 6px 8px;
   border-bottom: 1px solid #e5e7eb;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 
 .erp-print-center-paper-section {
@@ -288,7 +288,7 @@
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   background: #f9fafb;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   overflow-wrap: anywhere;
 }
 
@@ -297,7 +297,7 @@
   right: 20px;
   bottom: 18px;
   color: #9ca3af;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   letter-spacing: 0.16em;
 }
 
@@ -388,11 +388,11 @@
   border-radius: 999px;
   background: var(--erp-primary-soft);
   color: var(--erp-primary-strong);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-print-shell__toolbar-status {
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   color: var(--erp-text-muted);
 }
 
@@ -420,10 +420,9 @@
 
 .erp-print-shell__button {
   height: 32px;
-  min-height: var(--erp-touch-target, 32px);
   padding: 0 14px;
   border-radius: 6px;
-  font-size: var(--erp-font-body);
+  font-size: 14px;
   cursor: pointer;
   transition:
     border-color 160ms ease,
@@ -472,7 +471,7 @@
   border: 1px solid var(--erp-border);
   border-radius: 16px;
   background: var(--erp-surface-bg-soft);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   color: var(--erp-text-muted);
   white-space: nowrap;
 }
@@ -485,7 +484,7 @@
   border: 1px solid var(--erp-border);
   border-radius: 8px;
   background: var(--erp-surface-bg-soft);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.6;
   color: var(--erp-text);
 }
@@ -542,7 +541,7 @@
 
 .erp-print-shell__record-panel p {
   margin: 8px 0 10px;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.6;
   color: var(--erp-text-muted);
 }
@@ -564,7 +563,7 @@
 .erp-print-shell__tool-section h3 {
   margin: 0 0 8px;
   color: var(--erp-text);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 20px;
 }
 
@@ -744,7 +743,7 @@
 .erp-print-shell__record-panel .erp-print-shell__tool-feedback {
   margin: 8px 0 0;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
@@ -881,7 +880,7 @@
   display: block;
   margin-top: 4px;
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 400;
 }
 
@@ -889,9 +888,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: max(32px, var(--erp-touch-target, 0px));
+  min-height: 32px;
   color: var(--erp-text);
-  font-size: var(--erp-font-body);
+  font-size: 14px;
   font-weight: 600;
   line-height: 20px;
   list-style: none;
@@ -926,7 +925,7 @@
 
 .erp-print-shell__tool-count {
   color: var(--erp-text-subtle);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 400;
 }
 
@@ -1014,7 +1013,7 @@
 }
 
 .erp-print-image-tool__copy strong {
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-weight: 500;
   overflow-wrap: anywhere;
 }
@@ -1050,7 +1049,7 @@
 }
 
 .erp-print-shell__record-panel > .erp-print-shell__tool-section > h3 {
-  font-size: var(--erp-font-body);
+  font-size: 14px;
   font-weight: 600;
 }
 

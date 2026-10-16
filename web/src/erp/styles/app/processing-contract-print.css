@@ -102,10 +102,10 @@
 
 .erp-processing-contract-clauses {
   display: grid;
-  gap: 2.2mm;
+  gap: 3mm;
   margin-top: 3mm;
   font-size: 3.9mm;
-  line-height: 1.5;
+  line-height: 1.62;
 }
 
 .erp-processing-contract-clauses__group ol {
@@ -422,12 +422,4 @@
   font-size: 1.8rem;
   font-weight: 600;
   letter-spacing: 0.08em;
-}
-
-@media print {
-  .erp-processing-contract-table__cell-selected,
-  .erp-processing-contract-table__cell-selected-anchor {
-    background: transparent;
-    box-shadow: none;
-  }
 }

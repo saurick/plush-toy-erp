@@ -223,11 +223,13 @@ export default function ProcessingContractPrintWorkspacePage() {
         : PDF_ACTION_UI_STALE_TIMEOUT_MS
     const remainingMs = Math.max(0, PDF_ACTION_UI_STALE_TIMEOUT_MS - elapsed)
     const timeoutID = window.setTimeout(() => {
+      setBusyAction('')
+      setBusyActionStartedAt(0)
       reportFeedback(
         'output',
         busyAction === 'download'
-          ? 'PDF 下载用时较长，正在等待请求结束，请稍候。'
-          : 'PDF 预览用时较长，正在等待请求结束，请稍候。',
+          ? 'PDF 下载等待超时，请重新点击下载 PDF。'
+          : 'PDF 预览等待超时，请重新点击在线预览 PDF。',
         'error'
       )
     }, remainingMs)
@@ -462,20 +464,13 @@ export default function ProcessingContractPrintWorkspacePage() {
   }, [busyAction, contractRef, customerKey, template])
 
   useEffect(() => {
-    let active = true
-    const cancel = schedulePdfPreviewWarmup(() => {
-      const pending = pdfPreviewPreloadRef.current
-      if (pending)
-        { pending.finally(() => {
-          if (active) warmupPreviewPdf()
-        }) }
-      else warmupPreviewPdf()
-    })
-    return () => {
-      active = false
-      cancel?.()
-    }
-  }, [contract, warmupPreviewPdf])
+    pdfPreviewPreloadRef.current = null
+  }, [contract])
+
+  useEffect(
+    () => schedulePdfPreviewWarmup(warmupPreviewPdf),
+    [contract, warmupPreviewPdf]
+  )
 
   useEffect(
     () => () => {

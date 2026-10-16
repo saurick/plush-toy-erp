@@ -41,10 +41,6 @@ const SERVER_PDF_PRESERVE_RESOLUTION_ATTRIBUTE =
   'data-server-pdf-preserve-resolution'
 const SERVER_PDF_SELECTION_CLASS_NAMES = [
   'erp-material-contract-table__row-selected',
-  'erp-material-contract-table__cell-selected',
-  'erp-material-contract-table__cell-selected-anchor',
-  'erp-processing-contract-table__cell-selected',
-  'erp-processing-contract-table__cell-selected-anchor',
   'erp-processing-contract-table__row--selected',
 ]
 const SERVER_PDF_PRINT_PREPARING_CLASS_NAMES = ['erp-print-shell--preparing']
