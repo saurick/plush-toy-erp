@@ -1,6 +1,6 @@
-import { spawn } from 'node:child_process'
+import { execFileSync, spawn } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
-import { constants, readFileSync } from 'node:fs'
+import { accessSync, constants, readFileSync } from 'node:fs'
 import { open } from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
@@ -44,7 +44,8 @@ import {
 export { buildRepositoryFingerprint }
 
 export const DEV_QA_COVERAGE_API_PATH = '/__dev/api/qa/coverage'
-export const DEV_QA_COVERAGE_SNAPSHOT_API_PATH = `${DEV_QA_COVERAGE_API_PATH}/snapshot`
+export const DEV_QA_COVERAGE_SNAPSHOT_API_PATH =
+  DEV_QA_COVERAGE_API_PATH + '/snapshot'
 export const DEV_QA_COVERAGE_SESSION_API_PATH = `${DEV_QA_COVERAGE_API_PATH}/session`
 export const DEV_QA_COVERAGE_ACTION_API_PATH = `${DEV_QA_COVERAGE_API_PATH}/actions`
 export const DEV_QA_COVERAGE_OPERATION_API_PREFIX = `${DEV_QA_COVERAGE_API_PATH}/operations`
@@ -78,19 +79,35 @@ const COVERAGE_STAGE_MESSAGES = Object.freeze({
 
 export function resolveProjectNodeRuntime(projectRoot) {
   const root = path.resolve(projectRoot || process.cwd())
-  const expected = readFileSync(
-    path.join(root, '.n-node-version'),
-    'utf8'
-  ).trim()
+  const expected = readFileSync(path.join(root, '.node-version'), 'utf8').trim()
   if (!/^\d+\.\d+\.\d+$/u.test(expected)) {
     throw new Error('project Node version lock is invalid')
   }
-  if (process.version !== `v${expected}`) {
-    throw new Error(
-      `coverage requires Node ${expected}; run n auto from the repository root and restart the frontend`
-    )
+  const pathCandidates = String(process.env.PATH || '')
+    .split(path.delimiter)
+    .filter(Boolean)
+    .map((directory) => path.join(directory, 'node'))
+  const candidates = [
+    ...new Set([
+      process.execPath,
+      ...pathCandidates,
+      `/usr/local/n/versions/node/${expected}/bin/node`,
+      '/opt/homebrew/bin/node',
+      '/usr/local/bin/node',
+    ]),
+  ]
+  for (const candidate of candidates) {
+    try {
+      accessSync(candidate, constants.X_OK)
+      const version = execFileSync(candidate, ['--version'], {
+        encoding: 'utf8',
+      }).trim()
+      if (version === `v${expected}`) return candidate
+    } catch {
+      // Continue until the repository-pinned runtime is found.
+    }
   }
-  return process.execPath
+  throw new Error('repository-pinned Node runtime is unavailable')
 }
 
 export function resolveDevQaCoverageReportPath(projectRoot) {
@@ -781,9 +798,8 @@ export function createDevQaCoverageMiddleware({
             resolveDevQaCoverageSnapshotPath(root),
             maxReportBytes
           )
-          if (report.snapshot?.kind !== 'isolated') {
+          if (report.snapshot?.kind !== 'isolated')
             throw new Error('isolated snapshot marker is required')
-          }
           sendJson(response, 200, { status: 'snapshot', report })
         } catch (error) {
           sendJson(response, error?.code === 'ENOENT' ? 404 : 500, {

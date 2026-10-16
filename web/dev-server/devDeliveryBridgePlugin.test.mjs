@@ -260,7 +260,7 @@ function backupRestoreReport(overrides = {}) {
   const report = {
     customerCode: 'yoyoosun',
     environment: 'customer-trial-133',
-    releaseId: SHA,
+    releaseVersion: SHA,
     backupId: 'br-yoyoosun-20260814T225613+0800',
     verifiedAt: '2026-08-14T14:56:26Z',
     restoreTarget: 'temp-postgres-container:postgres:18.6:removed-after-run',
@@ -671,7 +671,7 @@ test('delivery summary binds a recovery receipt to registered target identity', 
         targetKey === 'customer-test-133'
           ? 'customer-clean-acceptance'
           : 'project-demo-simulated',
-      ...(targetKey === 'demo-133'
+      ...(targetKey === 'customer-test-133'
         ? {
             customer: 'yoyoosun',
             trialTarget: 'customer-trial-133',
@@ -693,9 +693,9 @@ test('delivery summary binds a recovery receipt to registered target identity', 
   assert.deepEqual(contexts, [
     {
       projectRoot: root,
-      target: 'demo-133',
+      target: 'customer-test-133',
       customer: 'yoyoosun',
-      environment: 'customer-trial-133',
+      environment: 'customer-clean-acceptance',
     },
   ])
 })
@@ -1013,7 +1013,7 @@ test('release dispatch is idempotent and never writes the target', async (t) => 
   assert.equal(dispatchedVersionReference, '2026-07-29T01:00:00.000Z')
 })
 
-test('ambiguous release dispatch requires readback and refuses a duplicate retry', async (t) => {
+test('failed release can create one linked explicit retry attempt', async (t) => {
   const { root, store } = createProject(t)
   let dispatchCount = 0
   const service = createDevDeliveryService({
@@ -1049,19 +1049,22 @@ test('ambiguous release dispatch requires readback and refuses a duplicate retry
     }),
     /temporary dispatch failure/u
   )
-  const pending = listDeliveryOperations(store)[0]
-  assert.equal(pending.status, 'waiting')
-  await assert.rejects(
-    service.act({
-      action: 'retry-operation',
-      payload: {
-        operationId: pending.id,
-        idempotencyKey: 'version-center:retry:fixed-0002',
-      },
-    })
-  )
-  assert.equal(dispatchCount, 1)
-  assert.equal(listDeliveryOperations(store).length, 1)
+  const failed = listDeliveryOperations(store)[0]
+  assert.equal(failed.status, 'failed')
+  const retried = await service.act({
+    action: 'retry-operation',
+    payload: {
+      operationId: failed.id,
+      idempotencyKey: 'version-center:retry:fixed-0002',
+    },
+  })
+  assert.equal(retried.operation.status, 'waiting')
+  assert.equal(retried.operation.idempotency.attempt, 2)
+  assert.equal(retried.operation.idempotency.retryOfOperationId, failed.id)
+  assert.equal(retried.operation.retry.allowed, false)
+  assert.equal(dispatchCount, 2)
+  assert.equal(listDeliveryOperations(store).length, 2)
+  assert.equal(readDeliveryOperation(store, failed.id).status, 'failed')
 })
 
 test('workbench retry refuses an unknown target outcome', async (t) => {

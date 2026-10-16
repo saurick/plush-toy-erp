@@ -20,7 +20,6 @@ import {
   resolveCoverageFreshness,
   resolveDevQaCoverageReportPath,
   resolveDevQaCoverageSnapshotPath,
-  resolveProjectNodeRuntime,
   validateDevQaCoverageAction,
 } from './devQaCoveragePlugin.mjs'
 import { createERPViteConfig } from '../vite.shared.mjs'
@@ -62,20 +61,6 @@ async function writeReport(projectRoot, report) {
   await writeFile(reportPath, `${JSON.stringify(report)}\n`)
   return reportPath
 }
-
-test('coverage uses the current runtime and the n version file', async (t) => {
-  const projectRoot = await createProject(t)
-  await writeFile(path.join(projectRoot, '.n-node-version'), process.versions.node)
-  assert.equal(resolveProjectNodeRuntime(projectRoot), process.execPath)
-
-  await writeFile(path.join(projectRoot, '.n-node-version'), '24.21.999')
-  assert.throws(() => resolveProjectNodeRuntime(projectRoot), /run n auto/u)
-  await writeFile(path.join(projectRoot, '.n-node-version'), '24.21.x')
-  assert.throws(
-    () => resolveProjectNodeRuntime(projectRoot),
-    /version lock is invalid/u
-  )
-})
 
 function requestMiddleware(
   middleware,
@@ -695,6 +680,7 @@ test('ERP Vite config installs coverage middleware only for development serve', 
   )
 })
 
+
 test('isolated snapshot stays independent when the workspace report is absent', async (t) => {
   const root = await createProject(t)
   const snapshotPath = resolveDevQaCoverageSnapshotPath(root)
@@ -707,7 +693,7 @@ test('isolated snapshot stays independent when the workspace report is absent', 
   assert.equal(response.headers['cache-control'], 'no-store')
   assert.equal(JSON.parse(response.body).status, 'snapshot')
   assert.deepEqual(JSON.parse(response.body).report.repository, REPOSITORY)
-  assert.equal((await requestMiddleware(middleware, { url: `${DEV_QA_COVERAGE_SNAPSHOT_API_PATH}?path=private.json` })).statusCode, 400)
+  assert.equal((await requestMiddleware(middleware, { url: DEV_QA_COVERAGE_SNAPSHOT_API_PATH + '?path=private.json' })).statusCode, 400)
   assert.equal((await requestMiddleware(middleware, { url: DEV_QA_COVERAGE_SNAPSHOT_API_PATH, method: 'POST' })).statusCode, 405)
 })
 

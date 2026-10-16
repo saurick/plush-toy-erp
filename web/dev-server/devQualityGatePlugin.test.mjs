@@ -331,43 +331,16 @@ test('documentation success is visible without granting strict proof or release 
       queueMs: 0,
     })),
   }
-  const projectEvidence = (value) =>
-    projectDevQualityGateServerEvidence(
-      { schemaVersion: 'plush.delivery-pipeline-timings/v1', runs: [value] },
-      repository
-    )
+  const projectEvidence = (value) => projectDevQualityGateServerEvidence({ schemaVersion: 'plush.delivery-pipeline-timings/v1', runs: [value] }, repository)
   const evidence = projectEvidence(run)
   assert.equal(evidence.status, 'docs_passed')
   assert.equal(evidence.coversWorkingTree, false)
   assert.equal(evidence.history[0].result, 'docs_passed')
   assert.match(evidence.message, /QA_MODE=full/u)
   assert(evidence.jobGuides.every((guide) => guide.registered))
-  assert.equal(
-    projectEvidence({
-      ...run,
-      jobs: run.jobs.filter((job) => job.name !== 'quality_docs'),
-    }).status,
-    'failed'
-  )
-  assert.equal(
-    projectEvidence({
-      ...run,
-      jobs: run.jobs.map((job) =>
-        job.name === 'quality_docs' ? { ...job, conclusion: 'failure' } : job
-      ),
-    }).status,
-    'failed'
-  )
-  const fullRun = {
-    ...run,
-    event: 'web',
-    jobs: CI_STRICT_JOB_NAMES.map((name, index) => ({
-      id: index + 200,
-      name,
-      status: 'completed',
-      conclusion: 'success',
-    })),
-  }
+  assert.equal(projectEvidence({ ...run, jobs: run.jobs.filter((job) => job.name !== 'quality_docs') }).status, 'failed')
+  assert.equal(projectEvidence({ ...run, jobs: run.jobs.map((job) => job.name === 'quality_docs' ? { ...job, conclusion: 'failure' } : job) }).status, 'failed')
+  const fullRun = { ...run, event: 'web', jobs: CI_STRICT_JOB_NAMES.map((name, index) => ({ id: index + 200, name, status: 'completed', conclusion: 'success' })) }
   assert.equal(projectEvidence(fullRun).status, 'passed')
   assert.equal(projectEvidence({ ...fullRun, event: 'api' }).status, 'missing')
   const root = await project(t)
@@ -1162,8 +1135,7 @@ test('quality gate recovery stops an orphaned process group and then fails close
     projectRoot: root,
     env: DATABASE_ENV,
     readRepositoryState: async () => REPOSITORY,
-    processAlive: () => false,
-    processGroupAlive: (pid) => pid === 43217 && childAlive,
+    processAlive: (pid) => pid === 43217 && childAlive,
     killOrphanedProcessGroup(pid, signal) {
       killed.push([pid, signal])
       if (signal === 'SIGKILL') childAlive = false
@@ -1300,43 +1272,21 @@ test('Vite development config registers the quality gate plugin', async () => {
   )
 })
 
+
 test('server Job timeline preserves upstream timestamps for the latest retry', () => {
   const startedAt = '2026-10-02T00:00:00.000Z'
   const finishedAt = '2026-10-02T00:00:05.000Z'
-  const result = projectDevQualityGateServerEvidence(
-    {
-      schemaVersion: 'plush.delivery-pipeline-timings/v1',
-      runs: [
-        {
-          id: 91,
-          workflow: 'ci',
-          event: 'push',
-          gitSha: REPOSITORY.commit,
-          status: 'completed',
-          conclusion: 'success',
-          jobs: [
-            {
-              id: 1,
-              name: 'quality_node_core',
-              status: 'completed',
-              conclusion: 'failure',
-              startedAt: '2026-10-01T00:00:00.000Z',
-              finishedAt: '2026-10-01T00:00:01.000Z',
-            },
-            {
-              id: 2,
-              name: 'quality_node_core',
-              status: 'completed',
-              conclusion: 'success',
-              startedAt,
-              finishedAt,
-            },
-          ],
-        },
+  const result = projectDevQualityGateServerEvidence({
+    schemaVersion: 'plush.delivery-pipeline-timings/v1',
+    runs: [{
+      id: 91, workflow: 'ci', event: 'push', gitSha: REPOSITORY.commit,
+      status: 'completed', conclusion: 'success',
+      jobs: [
+        { id: 1, name: 'quality_node_core', status: 'completed', conclusion: 'failure', startedAt: '2026-10-01T00:00:00.000Z', finishedAt: '2026-10-01T00:00:01.000Z' },
+        { id: 2, name: 'quality_node_core', status: 'completed', conclusion: 'success', startedAt, finishedAt },
       ],
-    },
-    REPOSITORY
-  )
+    }],
+  }, REPOSITORY)
   assert.equal(result.jobs.length, 1)
   assert.equal(result.jobs[0].attemptCount, 2)
   assert.equal(result.jobs[0].startedAt, startedAt)
