@@ -11,6 +11,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -575,7 +576,7 @@ export default function PurchaseReceiptsPage() {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return
       }
-      message.error(getActionErrorMessage(error, '加载采购入库单'))
+      showPageLoadError(error, '加载采购入库单')
     } finally {
       if (request.isCurrent()) {
         setLoading(false)
@@ -651,7 +652,7 @@ export default function PurchaseReceiptsPage() {
         Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
       )
     } catch (error) {
-      message.error(getActionErrorMessage(error, '加载入库相关资料'))
+      showPageLoadError(error, '加载入库相关资料')
       setMaterials([])
       setSuppliers([])
       setUnits([])
@@ -1057,20 +1058,6 @@ export default function PurchaseReceiptsPage() {
         compact
         helpKey="inbound"
         title="采购入库"
-        stats={[
-          { key: 'total', label: '总入库单', value: total },
-          { key: 'current', label: '本页显示', value: rows.length },
-          {
-            key: 'draft',
-            label: '草稿',
-            value: rows.filter((item) => item.status === 'DRAFT').length,
-          },
-          {
-            key: 'posted',
-            label: '已过账',
-            value: rows.filter((item) => item.status === 'POSTED').length,
-          },
-        ]}
       />
 
       <BusinessOperationPanel
@@ -1097,6 +1084,7 @@ export default function PurchaseReceiptsPage() {
               onPressEnter={loadRows}
             />
             <SelectFilter
+              aria-label="单据状态"
               className="erp-business-filter-control--status"
               value={statusFilter}
               options={STATUS_OPTIONS}
@@ -1106,6 +1094,7 @@ export default function PurchaseReceiptsPage() {
               }}
             />
             <SelectFilter
+              aria-label="供应商"
               className="erp-business-filter-control--status"
               value={supplierFilter}
               options={[{ label: '全部供应商', value: '' }, ...supplierOptions]}
@@ -1118,6 +1107,7 @@ export default function PurchaseReceiptsPage() {
               }}
             />
             <SelectFilter
+              aria-label="材料"
               className="erp-business-filter-control--status"
               value={materialFilter}
               options={[{ label: '全部材料', value: '' }, ...materialOptions]}
@@ -1130,6 +1120,7 @@ export default function PurchaseReceiptsPage() {
               }}
             />
             <SelectFilter
+              aria-label="仓库"
               className="erp-business-filter-control--status"
               value={warehouseFilter}
               options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
@@ -1142,6 +1133,7 @@ export default function PurchaseReceiptsPage() {
               }}
             />
             <SelectFilter
+              aria-label="批次"
               className="erp-business-filter-control--status"
               value={lotFilter}
               options={[

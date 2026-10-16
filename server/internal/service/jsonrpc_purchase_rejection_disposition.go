@@ -38,10 +38,32 @@ func (d *jsonrpcDispatcher) handlePurchaseRejectionDisposition(ctx context.Conte
 		item, err := d.inventoryUC.CreatePurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionCreate{DispositionNo: getString(pm, "disposition_no"), QualityInspectionID: getInt(pm, "quality_inspection_id", 0), DispositionType: getString(pm, "disposition_type"), Quantity: quantity, Reason: getString(pm, "reason"), IdempotencyKey: getString(pm, "idempotency_key"), CreatedBy: actorID})
 		return id, purchaseRejectionResult(ctx, d, item, err), nil
 	case "post_purchase_rejection_disposition":
-		if !purchaseRejectionAllowsOnly(pm, "id", "expected_version") {
+		if !purchaseRejectionAllowsOnly(pm, "id", "expected_version", "counted_quantity") {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.inventoryUC.PostPurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionMutation{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), ActorID: actorID})
+		mutation := &biz.PurchaseRejectionDispositionMutation{ID: getInt(pm, "id", 0), ExpectedVersion: getInt(pm, "expected_version", 0), ActorID: actorID}
+		source, err := d.inventoryUC.GetPurchaseRejectionDisposition(ctx, mutation.ID)
+		if err != nil {
+			return id, d.mapPurchaseError(ctx, err), nil
+		}
+		if source.DispositionType == biz.PurchaseRejectionReplace {
+			if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
+				return id, res, nil
+			}
+			quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "counted_quantity")
+			if !ok {
+				return id, invalidParamResult(), nil
+			}
+			mutation.CountedQuantity = &quantity
+			scope, res := d.currentWarehouseDataScope(ctx)
+			if res != nil {
+				return id, res, nil
+			}
+			mutation.WarehouseScope = &scope
+		} else if _, exists := pm["counted_quantity"]; exists {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.inventoryUC.PostPurchaseRejectionDisposition(ctx, mutation)
 		return id, purchaseRejectionResult(ctx, d, item, err), nil
 	case "cancel_purchase_rejection_disposition":
 		if !purchaseRejectionAllowsOnly(pm, "id", "expected_version", "reason") {

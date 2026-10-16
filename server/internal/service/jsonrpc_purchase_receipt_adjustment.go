@@ -12,6 +12,11 @@ func (d *jsonrpcDispatcher) handlePurchaseReceiptAdjustment(
 	method, id string,
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
+	scope, scopeResult := d.currentWarehouseDataScope(ctx)
+	if scopeResult != nil {
+		return id, scopeResult, nil
+	}
+	ctx = biz.WithWarehouseDataScope(ctx, scope)
 	switch method {
 	case "create_purchase_receipt_adjustment_from_receipt":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptAdjustmentCreate); res != nil {

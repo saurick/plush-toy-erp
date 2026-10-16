@@ -25,7 +25,9 @@ func ValidatePurchaseReceiptWarehouseAccess(scope WarehouseDataScope, items []*P
 	return nil
 }
 
-func (uc *InventoryUsecase) PostPurchaseReceiptForAccess(ctx context.Context, receiptID int, scope WarehouseDataScope) (*PurchaseReceipt, error) {
+func (uc *InventoryUsecase) PostPurchaseReceiptForAccess(ctx context.Context, receiptID int, scope WarehouseDataScope) (_ *PurchaseReceipt, err error) {
+	ctx, finish := startBusinessTrace(ctx, "inventory.post_purchase_receipt")
+	defer func() { finish(err) }()
 	if uc == nil || receiptID <= 0 {
 		return nil, ErrBadParam
 	}
