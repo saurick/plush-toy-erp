@@ -216,12 +216,12 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   );
   assertIncludes(
     devPermissionRelationshipsPageSource,
-    "本地开发只读查询，无需登录 ERP；修改授权请进入正式权限配置",
+    "本页只读。",
     "permission relationship page read-only boundary",
   );
   assertIncludes(
     devPermissionRelationshipsPageSource,
-    "也不在这里保存权限配置",
+    "修改权限请进入权限配置",
     "permission relationship page must not provide permission writes",
   );
   assertIncludes(
@@ -248,7 +248,7 @@ test("dev entry boundary: dev routes stay under /__dev and disabled outside DEV"
   assert.doesNotMatch(docsItem?.description || "", /tracked Markdown/);
   assertIncludes(
     devDocsPageSource,
-    "当前工作区内已匹配的 Markdown",
+    "只读加载当前工作区的 Markdown",
     "dev docs workspace source copy",
   );
   assert(
