@@ -204,9 +204,7 @@ func (r *salesOrderRepo) SaveSalesOrderEngineering(ctx context.Context, in *biz.
 			} else if item.EngineeringStatus == biz.SalesOrderEngineeringConfirmed && (current.SampleBomFingerprint == nil || *current.SampleBomFingerprint != fingerprint || current.SampleImageAttachmentID == nil || *current.SampleImageAttachmentID != imageID) {
 				return nil, biz.ErrSalesOrderEngineeringNotReady
 			}
-			if statusChanged || sourceChanged || item.ReuseConfirmedSample {
-				update.SetSampleBomFingerprint(fingerprint).SetSampleImageAttachmentID(imageID)
-			}
+			update.SetSampleBomFingerprint(fingerprint).SetSampleImageAttachmentID(imageID)
 		} else {
 			update.ClearSampleBomFingerprint().ClearSampleImageAttachmentID().ClearSampleReusedFromItemID()
 		}

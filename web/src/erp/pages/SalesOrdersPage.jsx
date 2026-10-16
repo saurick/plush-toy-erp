@@ -15,7 +15,6 @@ import {
   useLocation,
   useSearchParams,
 } from 'react-router-dom'
-import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -121,7 +120,9 @@ import {
   deliverySnapshotFormValues,
 } from '../utils/sourcePartySnapshots.mjs'
 import { filterColumnsByEffectiveFieldPolicy } from '../utils/adminProfileSync.mjs'
-import { parseBusinessSortValue } from '../utils/businessTableActions.mjs'
+import {
+  parseBusinessSortValue,
+} from '../utils/businessTableActions.mjs'
 import { isDraftSourceDocument } from '../utils/sourceDocumentEditing.mjs'
 import {
   canReorderSourceDocumentItems,
@@ -210,19 +211,15 @@ function enrichReservationBalances(balances = [], warehouses = [], lots = []) {
   const lotsByID = new Map(
     (Array.isArray(lots) ? lots : []).map((lot) => [Number(lot?.id || 0), lot])
   )
-  return (Array.isArray(balances) ? balances : [])
-    .filter(
-      (balance) => !balance?.lot_id || lotsByID.has(Number(balance.lot_id))
-    )
-    .map((balance) => {
-      const warehouse = warehousesByID.get(Number(balance?.warehouse_id || 0))
-      const lot = lotsByID.get(Number(balance?.lot_id || 0))
-      return {
-        ...balance,
-        warehouse_name: warehouse?.name || warehouse?.code || '',
-        lot_no: lot?.lot_no || lot?.production_lot_no || '',
-      }
-    })
+  return (Array.isArray(balances) ? balances : []).map((balance) => {
+    const warehouse = warehousesByID.get(Number(balance?.warehouse_id || 0))
+    const lot = lotsByID.get(Number(balance?.lot_id || 0))
+    return {
+      ...balance,
+      warehouse_name: warehouse?.name || warehouse?.code || '',
+      lot_no: lot?.lot_no || lot?.production_lot_no || '',
+    }
+  })
 }
 
 async function loadReservationStockForItem(item = {}) {
@@ -317,14 +314,7 @@ export default function SalesOrdersPage() {
   useEffect(() => {
     if (consumedEngineeringReturn.current === location.key) return
     const returned = readEngineeringBOMReturn(location.state, adminProfile?.id)
-    if (
-      !returned ||
-      !hasActionPermission(
-        adminProfile,
-        PermissionCode.SALES_ORDER_ENGINEERING_UPDATE
-      )
-    )
-      { return }
+    if (!returned || !hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_ENGINEERING_UPDATE)) return
     consumedEngineeringReturn.current = location.key
     setReturnedEngineeringBOM(returned)
     setEngineeringOrderID(returned.orderID)
@@ -403,14 +393,8 @@ export default function SalesOrdersPage() {
     [beginLatestRequest]
   )
 
-  const canCreateOrder = hasActionPermission(
-    adminProfile,
-    PermissionCode.SALES_ORDER_CREATE
-  )
-  const canUpdateOrder = hasActionPermission(
-    adminProfile,
-    PermissionCode.SALES_ORDER_UPDATE
-  )
+  const canCreateOrder = hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_CREATE)
+  const canUpdateOrder = hasActionPermission(adminProfile, PermissionCode.SALES_ORDER_UPDATE)
   const canReadOrderItems = hasActionPermission(
     adminProfile,
     PermissionCode.SALES_ORDER_ITEM_READ
@@ -526,19 +510,22 @@ export default function SalesOrdersPage() {
     ],
     [unitOptions]
   )
-  const loadSalesOrderDetailsItems = useCallback(async (order, { signal }) => {
-    const data = await listAllSalesOrderItems(
-      {
-        sales_order_id: order.id,
-        expected_version: order.version,
-      },
-      { signal }
-    )
-    return {
-      items: data?.sales_order_items,
-      total: data?.total,
-    }
-  }, [])
+  const loadSalesOrderDetailsItems = useCallback(
+    async (order, { signal }) => {
+      const data = await listAllSalesOrderItems(
+        {
+          sales_order_id: order.id,
+          expected_version: order.version,
+        },
+        { signal }
+      )
+      return {
+        items: data?.sales_order_items,
+        total: data?.total,
+      }
+    },
+    []
+  )
   const {
     applyCustomerPaymentDefaults,
     applyPaymentMethodTermDays,
@@ -660,7 +647,7 @@ export default function SalesOrdersPage() {
       )
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
     } catch (error) {
-      showPageLoadError(error, '加载客户、SKU 和单位选项')
+      message.error(getActionErrorMessage(error, '加载客户、SKU 和单位选项'))
     } finally {
       setReferencesLoading(false)
     }
@@ -779,13 +766,9 @@ export default function SalesOrdersPage() {
       const nextOrders = exactPage.records
       setOrders(nextOrders)
       setTotal(exactPage.total)
-      setStatusCounts(
-        resolveBusinessStatusCounts(result, {
-          hasExactContext: routeSelectedID > 0,
-          exactRecord: routeOrder,
-          statusField: 'lifecycle_status',
-        })
-      )
+      setStatusCounts(resolveBusinessStatusCounts(result, {
+        hasExactContext: routeSelectedID > 0, exactRecord: routeOrder, statusField: 'lifecycle_status',
+      }))
       setSelectedOrder((current) => {
         if (routeSelectedID > 0) {
           return routeOrder || null
@@ -798,7 +781,7 @@ export default function SalesOrdersPage() {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return false
       }
-      showPageLoadError(error, '加载销售订单')
+      message.error(getActionErrorMessage(error, '加载销售订单'))
       return false
     } finally {
       if (request.isCurrent()) {
@@ -853,7 +836,7 @@ export default function SalesOrdersPage() {
       } catch (error) {
         if (reservationBalanceRequestRef.current === requestID) {
           setReservationContext((current) => ({ ...current, balances: [] }))
-          showPageLoadError(error, '加载可用库存')
+          message.error(getActionErrorMessage(error, '加载可用库存'))
         }
       } finally {
         if (reservationBalanceRequestRef.current === requestID) {
@@ -961,7 +944,7 @@ export default function SalesOrdersPage() {
       setReservationOpen(true)
     } catch (error) {
       if (reservationContextRequestRef.current === requestID) {
-        showPageLoadError(error, '加载库存预留详情')
+        message.error(getActionErrorMessage(error, '加载库存预留详情'))
       }
     } finally {
       if (reservationContextRequestRef.current === requestID) {
@@ -1192,7 +1175,7 @@ export default function SalesOrdersPage() {
       if (isResourceVersionConflict(error)) {
         message.warning('销售订单已被其他操作更新，请刷新后重试')
       } else {
-        showPageLoadError(error, '加载销售订单明细顺序')
+        message.error(getActionErrorMessage(error, '加载销售订单明细顺序'))
       }
     } finally {
       if (lineOrderRequestRef.current === requestID) {
@@ -1381,10 +1364,7 @@ export default function SalesOrdersPage() {
         )
       }
       if (action.key === 'submit') {
-        showProcessSubmissionReceipt({
-          result: updated,
-          title: orderSubmissionSuccessMessage('sales_order', updated),
-        })
+        showProcessSubmissionReceipt({ result: updated, title: orderSubmissionSuccessMessage('sales_order', updated) })
       } else {
         message.success(action.successMessage || `销售订单已${action.label}`)
       }
@@ -1408,7 +1388,9 @@ export default function SalesOrdersPage() {
         message.error(
           getActionErrorMessage(
             error,
-            action.key === 'submit' ? '提交销售订单' : `${action.label}销售订单`
+            action.key === 'submit'
+              ? '提交销售订单'
+              : `${action.label}销售订单`
           )
         )
       }
@@ -1644,6 +1626,10 @@ export default function SalesOrdersPage() {
         helpKey="sales-orders"
         title="销售订单"
         viewSwitch={salesViewSwitch}
+        stats={[
+          { key: 'total', label: '符合条件', value: total },
+          { key: 'current', label: '本页显示', value: orders.length },
+        ]}
       />
 
       <BusinessOperationPanel
@@ -1700,7 +1686,6 @@ export default function SalesOrdersPage() {
               }}
             />
             <SelectFilter
-              aria-label="客户"
               className="erp-business-filter-control--status"
               options={[{ label: '全部客户', value: '' }, ...customerOptions]}
               value={customerFilter}
@@ -1731,7 +1716,6 @@ export default function SalesOrdersPage() {
               }}
             />
             <SelectFilter
-              aria-label="排序方式"
               className="erp-business-filter-control--sort"
               options={SALES_ORDER_SORT_FILTER_OPTIONS}
               value={sortFilter}
@@ -1764,7 +1748,10 @@ export default function SalesOrdersPage() {
             >
               导出
             </ToolbarButton>
-            <ToolbarButton icon={<SettingOutlined />} onClick={openColumnOrder}>
+            <ToolbarButton
+              icon={<SettingOutlined />}
+              onClick={openColumnOrder}
+            >
               列设置
             </ToolbarButton>
           </Space>
@@ -1862,20 +1849,14 @@ export default function SalesOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          {hasActionPermission(
-            adminProfile,
-            PermissionCode.ENGINEERING_MATERIAL_READ
-          ) ? (
+          {hasActionPermission(adminProfile, PermissionCode.ENGINEERING_MATERIAL_READ) ? (
             <Button
               data-business-action-key="engineering-material"
               size="small"
               disabled={!selectedOrder || saving}
               onClick={() => setMaterialRequestOrderID(selectedOrder.id)}
             >
-              {hasActionPermission(
-                adminProfile,
-                PermissionCode.ENGINEERING_MATERIAL_SUBMIT
-              )
+              {hasActionPermission(adminProfile, PermissionCode.ENGINEERING_MATERIAL_SUBMIT)
                 ? '提交用料汇总'
                 : hasActionPermission(
                       adminProfile,
@@ -2020,12 +2001,7 @@ export default function SalesOrdersPage() {
               }
             />
           ))}
-          <BusinessTaskActions
-            sourceType="sales_order"
-            record={selectedOrder}
-            adminProfile={adminProfile}
-            disabled={saving}
-          />
+          <BusinessTaskActions sourceType="sales_order" record={selectedOrder} adminProfile={adminProfile} disabled={saving} />
         </SelectionActionBar>
       </BusinessOperationPanel>
 
@@ -2121,10 +2097,7 @@ export default function SalesOrdersPage() {
         key={`${engineeringOrderID}:${returnedEngineeringBOM?.bomID || ''}`}
         orderID={engineeringOrderID}
         returnedBOM={returnedEngineeringBOM}
-        onCancel={() => {
-          setEngineeringOrderID(null)
-          setReturnedEngineeringBOM(null)
-        }}
+        onCancel={() => { setEngineeringOrderID(null); setReturnedEngineeringBOM(null) }}
         onSaved={() => {
           setEngineeringOrderID(null)
           setReturnedEngineeringBOM(null)
