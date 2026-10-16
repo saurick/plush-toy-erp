@@ -250,18 +250,9 @@ const BUSINESS_DASHBOARD_PROJECTION_BATCH_EVIDENCE = new Set([
 ]);
 
 function businessDashboardRequirements(catalog) {
-  const sales = catalog.technicalManifest.desktopPages.find(
-    (item) => item.key === "sales-orders",
-  );
+  const sales = catalog.technicalManifest.desktopPages.find(item => item.key === "sales-orders");
   if (!sales) throw new BrowserAcceptanceError("进度看板缺少销售订单数据合同");
-  return [
-    {
-      key: "orders",
-      label: "订单",
-      minimumRecords: sales.minimumRecords,
-      probeId: "sales-orders",
-    },
-  ];
+  return [{ key: "orders", label: "订单", minimumRecords: sales.minimumRecords, probeId: "sales-orders" }];
 }
 
 export function buildManualAcceptanceBrowserPlan({
@@ -847,9 +838,6 @@ async function loginFormalAccountAttempt(
           visibleText.includes(SYSTEM_NAME),
       },
     };
-  } catch (error) {
-    error.runtimeErrors = events.map((item) => ({ ...item }));
-    throw error;
   } finally {
     await context.close();
   }
@@ -952,19 +940,11 @@ export function evaluatePrintSourceMinimumEvidence({
   const currentBatchRowsOnly =
     renderedRows > 0 && matchingRows === renderedRows;
   const paginationTotal = largestTotalFromTexts(paginationTexts);
-  const hasFilteredTotal =
-    Number.isSafeInteger(filteredTotal) && filteredTotal >= 0;
-  const totalsAgree =
-    !hasFilteredTotal ||
-    paginationTotal === 0 ||
-    filteredTotal === paginationTotal;
-  const observedTotal =
-    currentBatchRowsOnly && totalsAgree
-      ? Math.max(
-          renderedRows,
-          hasFilteredTotal ? filteredTotal : paginationTotal,
-        )
-      : 0;
+  const hasFilteredTotal = Number.isSafeInteger(filteredTotal) && filteredTotal >= 0;
+  const totalsAgree = !hasFilteredTotal || paginationTotal === 0 || filteredTotal === paginationTotal;
+  const observedTotal = currentBatchRowsOnly && totalsAgree
+    ? Math.max(renderedRows, hasFilteredTotal ? filteredTotal : paginationTotal)
+    : 0;
   const minimumSatisfied =
     currentBatchRowsOnly && observedTotal >= Number(minimumRecords);
   return {
@@ -1122,72 +1102,26 @@ export function evaluateGlobalDashboardEvidence(
 }
 
 export function evaluateBusinessDashboardEvidence(metrics, requirements) {
-  const actual =
-    Number.isSafeInteger(metrics?.total) && metrics.total >= 0
-      ? metrics.total
-      : null;
+  const actual = Number.isSafeInteger(metrics?.total) && metrics.total >= 0 ? metrics.total : null;
   const ids = Array.isArray(metrics?.ids) ? metrics.ids : [];
-  const sources = requirements.map((item) => ({
-    ...item,
-    actual,
-    minimumSatisfied:
-      actual !== null && actual >= item.minimumRecords && ids.length > 0,
+  const sources = requirements.map(item => ({...item, actual,
+    minimumSatisfied: actual !== null && actual >= item.minimumRecords && ids.length > 0,
   }));
-  const minimumSatisfied =
-    sources.length > 0 && sources.every((item) => item.minimumSatisfied);
-  return {
-    status: minimumSatisfied ? "minimum_proven" : "not_proven",
-    evidenceSource: "progress table and filtered total",
-    sources,
-    observedTotal: actual ?? 0,
-    sampleOrderIDs: ids,
-    minimumRecords: requirements[0]?.minimumRecords ?? 0,
-    minimumSatisfied,
-  };
+  const minimumSatisfied = sources.length > 0 && sources.every(item => item.minimumSatisfied);
+  return { status: minimumSatisfied ? "minimum_proven" : "not_proven", evidenceSource: "progress table and filtered total",
+    sources, observedTotal: actual ?? 0, sampleOrderIDs: ids, minimumRecords: requirements[0]?.minimumRecords ?? 0, minimumSatisfied };
 }
 
-export function evaluateBusinessDashboardCurrentBatchEvidence({
-  evidence,
-  currentBatch,
-  baselineProven = false,
-}) {
-  const probes = new Map(
-    (currentBatch?.probes || []).map((probe) => [probe.id, probe]),
-  );
+export function evaluateBusinessDashboardCurrentBatchEvidence({evidence, currentBatch, baselineProven = false}) {
+  const probes = new Map((currentBatch?.probes || []).map(probe => [probe.id,probe]));
   const projection = probes.get(BUSINESS_DASHBOARD_PROJECTION_PROBE_ID);
-  const projectionProven =
-    baselineProven &&
-    projection?.status === "pass" &&
-    BUSINESS_DASHBOARD_PROJECTION_BATCH_EVIDENCE.has(projection?.batchEvidence);
-  const projectionCountSatisfied =
-    projectionProven &&
-    projection.progressCounts?.total === evidence.observedTotal;
-  const idsBound =
-    evidence.sampleOrderIDs.length > 0 &&
-    evidence.sampleOrderIDs.every((id) =>
-      projection?.sampleOrderIDs?.includes(id),
-    );
-  const sources = evidence.sources.map((source) => ({
-    ...source,
-    batchProven:
-      probes.get(source.probeId)?.status === "pass" &&
-      probes.get(source.probeId)?.batchEvidence !== "not_proven",
-    projectionCountSatisfied,
-  }));
-  const currentBatchBound =
-    currentBatch?.dataStatus === "pass" &&
-    projectionCountSatisfied &&
-    idsBound &&
-    sources.every((source) => source.batchProven);
+  const projectionProven = baselineProven && projection?.status === "pass" && BUSINESS_DASHBOARD_PROJECTION_BATCH_EVIDENCE.has(projection?.batchEvidence);
+  const projectionCountSatisfied = projectionProven && projection.progressCounts?.total === evidence.observedTotal;
+  const idsBound = evidence.sampleOrderIDs.length > 0 && evidence.sampleOrderIDs.every(id => projection?.sampleOrderIDs?.includes(id));
+  const sources = evidence.sources.map(source => ({...source, batchProven: probes.get(source.probeId)?.status === "pass" && probes.get(source.probeId)?.batchEvidence !== "not_proven", projectionCountSatisfied }));
+  const currentBatchBound = currentBatch?.dataStatus === "pass" && projectionCountSatisfied && idsBound && sources.every(source => source.batchProven);
   const minimumSatisfied = evidence.minimumSatisfied && currentBatchBound;
-  return {
-    ...evidence,
-    sources,
-    projectionProven,
-    currentBatchBound,
-    minimumSatisfied,
-    status: minimumSatisfied ? "minimum_proven" : "not_proven",
-  };
+  return {...evidence, sources, projectionProven, currentBatchBound, minimumSatisfied, status: minimumSatisfied ? "minimum_proven" : "not_proven"};
 }
 
 export function evaluateDashboardTaskCurrentBatchEvidence({
@@ -1278,9 +1212,7 @@ async function readDashboardEvidence(page, target, datasetBinding) {
         }, 0);
         return (
           total > 0 &&
-          document.querySelector(
-            ".erp-workbench-queue-panel .erp-task-table-row",
-          )
+          document.querySelector(".erp-workbench-queue-panel .erp-task-table-row")
         );
       },
       null,
@@ -1336,9 +1268,7 @@ async function readDashboardEvidence(page, target, datasetBinding) {
           ),
         ].map((node) => node.getAttribute("aria-label") || ""),
         visibleRows: [
-          ...document.querySelectorAll(
-            ".erp-workbench-queue-panel .erp-task-table-row",
-          ),
+          ...document.querySelectorAll(".erp-workbench-queue-panel .erp-task-table-row"),
         ].filter((node) => {
           const rect = node.getBoundingClientRect();
           return rect.width > 0 && rect.height > 0;
@@ -1386,54 +1316,23 @@ async function readDashboardEvidence(page, target, datasetBinding) {
     const url = new URL(page.url());
     url.search = "view=orders&scope=all";
     await page.goto(url.toString());
-    await page
-      .locator(".erp-progress-order")
-      .first()
-      .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
-    const metrics = await page
-      .locator(".erp-progress-board")
-      .evaluate((root) => ({
-        total: Number(
-          root
-            .querySelector(".erp-progress-metric .erp-filter-chip__count")
-            ?.textContent.replaceAll(",", ""),
-        ),
-        ids: [...root.querySelectorAll("[data-progress-order-id]")].map(
-          (node) => Number(node.dataset.progressOrderId),
-        ),
-      }));
+    await page.locator(".erp-progress-order").first().waitFor({state:"visible",timeout:PAGE_TIMEOUT_MS});
+    const metrics = await page.locator(".erp-progress-board").evaluate(root => ({
+      total: Number(root.querySelector(".erp-progress-metric .erp-filter-chip__count")?.textContent.replaceAll(",","")),
+      ids: [...root.querySelectorAll("[data-progress-order-id]")].map(node => Number(node.dataset.progressOrderId)),
+    }));
     const evidence = evaluateBusinessDashboardCurrentBatchEvidence({
-      evidence: evaluateBusinessDashboardEvidence(
-        metrics,
-        target.dataEvidenceRequirements,
-      ),
-      currentBatch,
-      baselineProven:
-        datasetBinding?.dataset?.baseline?.exactEmptyBusinessBaseline === true,
+      evidence: evaluateBusinessDashboardEvidence(metrics,target.dataEvidenceRequirements),currentBatch,
+      baselineProven: datasetBinding?.dataset?.baseline?.exactEmptyBusinessBaseline === true,
     });
     await page.locator("button[data-progress-order-id]").first().click();
-    await page
-      .getByLabel("当前订单阶段摘要", { exact: true })
-      .getByRole("button", { name: "查看完整进度", exact: true })
-      .click();
+    await page.getByLabel("当前订单阶段摘要", { exact: true }).getByRole("button", { name: "查看完整进度", exact: true }).click();
     const drawer = page.getByRole("dialog");
-    await drawer.getByRole("tab", { name: "产品明细", exact: true }).waitFor();
+    await drawer.getByRole("tab",{name:"产品明细",exact:true}).waitFor();
     const expectedPath = "/erp/sales/project-orders/sales-orders";
-    await Promise.all([
-      page.waitForURL((url) => url.pathname === expectedPath, {
-        timeout: PAGE_TIMEOUT_MS,
-      }),
-      drawer.getByRole("button", { name: "打开原单", exact: true }).click(),
-    ]);
+    await Promise.all([page.waitForURL(url => url.pathname === expectedPath,{timeout:PAGE_TIMEOUT_MS}),drawer.getByRole("button",{name:"打开原单",exact:true}).click()]);
     await waitForReadablePage(page);
-    return {
-      ...evidence,
-      navigationProof: {
-        expectedPath,
-        actualPath: new URL(page.url()).pathname,
-        passed: new URL(page.url()).pathname === expectedPath,
-      },
-    };
+    return {...evidence,navigationProof:{expectedPath,actualPath:new URL(page.url()).pathname,passed:new URL(page.url()).pathname === expectedPath}};
   }
   throw new BrowserAcceptanceError(`${target.title} 缺少页面数据证据读取器`);
 }
@@ -1540,22 +1439,16 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
       { timeout: PAGE_TIMEOUT_MS },
     );
   await waitForActiveViewLoaded();
-  const taskSearch = page.getByLabel("搜索订单、产品、物料或款号", {
-    exact: true,
-  });
+  const taskSearch = page.getByLabel("搜索订单、产品、物料或款号", { exact: true });
   await taskSearch.fill(taskCodePrefix);
   await taskSearch.press("Enter");
   await page.waitForFunction(
     (prefix) => {
       const root = document.querySelector('[data-testid="mobile-role-scroll"]');
-      return (
-        root?.getAttribute("data-refreshing") === "false" &&
-        [
-          ...root.querySelectorAll(".erp-mobile-list-item[data-task-code]"),
-        ].some((node) =>
-          (node.getAttribute("data-task-code") || "").startsWith(`${prefix}-`),
-        )
-      );
+      return root?.getAttribute("data-refreshing") === "false" &&
+        [...root.querySelectorAll(".erp-mobile-list-item[data-task-code]")].some(
+          (node) => (node.getAttribute("data-task-code") || "").startsWith(`${prefix}-`),
+        );
     },
     taskCodePrefix,
     { timeout: PAGE_TIMEOUT_MS },
@@ -1590,9 +1483,7 @@ async function readMobileTaskEvidence(page, target, datasetBinding) {
     .getByLabel("任务状态", { exact: true })
     .getByText("已办", { exact: true })
     .click();
-  await page
-    .getByTestId("mobile-role-done-count")
-    .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+  await page.getByTestId("mobile-role-done-count").waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
   await waitForActiveViewLoaded();
   await page.waitForFunction(
     ({ todoTotal, requiredMinimum }) => {
@@ -1719,12 +1610,9 @@ async function filterVisibleListToCurrentBatch(page, target, filter) {
         timeout: PAGE_TIMEOUT_MS,
       });
     } else {
-      search = page
-        .locator(
-          'input[aria-label^="可搜索："],input[placeholder*="搜"],input[placeholder^="操作人"]',
-        )
-        .filter({ visible: true })
-        .first();
+      search = page.locator(
+        'input[aria-label^="可搜索："],input[placeholder*="搜"],input[placeholder^="操作人"]',
+      ).filter({ visible: true }).first();
       await search.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     }
     if (!search) {
@@ -1836,7 +1724,6 @@ export function evaluateCurrentBatchListEvidence({
   pageReportedTotal,
   minimumRecords,
   exactEvidencePassed = true,
-  pageSize = 20,
 }) {
   const currentBatchBound =
     currentBatch?.dataStatus === "pass" &&
@@ -1845,13 +1732,12 @@ export function evaluateCurrentBatchListEvidence({
   const currentBatchVisible =
     currentBatchDOM?.mode === "bound_catalog"
       ? Number(renderedItems) >= minimumRecords
-      : Number(currentBatchDOM?.matchingCurrentBatchItems) >=
-          Math.min(minimumRecords, pageSize) && Number(renderedItems) > 0;
+      : currentBatchDOM?.currentBatchVisible === true;
   const minimumSatisfied =
     currentBatchBound &&
     currentBatchVisible &&
     exactEvidencePassed &&
-    (currentBatchDOM?.mode === "bound_catalog" ||
+    (currentBatchDOM?.mode !== "exact_task_prefix" ||
       Number(pageReportedTotal) === currentBatch.actual);
   return {
     status: minimumSatisfied
@@ -2011,14 +1897,10 @@ async function readListEvidence(page, target, datasetBinding) {
   }
   if (target.key === "inventory") {
     await page.getByRole("tab", { name: "库存批次", exact: true }).click();
-    await page
-      .getByPlaceholder(BUSINESS_SEARCH_SCOPES.lots.placeholder, {
-        exact: true,
-      })
-      .waitFor({
-        state: "visible",
-        timeout: PAGE_TIMEOUT_MS,
-      });
+    await page.getByPlaceholder(BUSINESS_SEARCH_SCOPES.lots.placeholder, { exact: true }).waitFor({
+      state: "visible",
+      timeout: PAGE_TIMEOUT_MS,
+    });
   }
   if (target.key === "shipments") {
     if (
@@ -2114,10 +1996,7 @@ async function readListEvidence(page, target, datasetBinding) {
         `出货页面必须精确显示 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单，当前为 ${pageReportedTotal}`,
       );
     }
-    const search = page.getByPlaceholder(
-      BUSINESS_SEARCH_SCOPES.shipment.placeholder,
-      { exact: true },
-    );
+    const search = page.getByPlaceholder(BUSINESS_SEARCH_SCOPES.shipment.placeholder, { exact: true });
     await search.fill(expected.longShipmentNo);
     await page.keyboard.press("Enter");
     const row = page
@@ -2127,10 +2006,7 @@ async function readListEvidence(page, target, datasetBinding) {
     await row.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     await row.click();
     await page.getByRole("button", { name: /查看明细/u }).click();
-    const modal = page.getByRole("region", {
-      name: "查看出货明细",
-      exact: true,
-    });
+    const modal = page.getByRole("region", { name: "查看出货明细", exact: true });
     await modal.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     const lineTag = modal.getByText(
       `${MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT} 行`,
@@ -3499,15 +3375,10 @@ async function readPrintSourceMinimumEvidence(
         ),
       ].map((node) => node.textContent || ""),
       filteredTotal: (() => {
-        const label =
-          document
-            .querySelector(
-              '.erp-business-page-header-card__stat[aria-label^="符合条件 "],.erp-business-page-header-card__stat[aria-label^="物料清单总数 "]',
-            )
-            ?.getAttribute("aria-label") || "";
-        const match = label.match(
-          /^(?:符合条件|物料清单总数) (\d+)，只读摘要$/u,
-        );
+        const label = document.querySelector(
+          '.erp-business-page-header-card__stat[aria-label^="符合条件 "],.erp-business-page-header-card__stat[aria-label^="物料清单总数 "]',
+        )?.getAttribute("aria-label") || "";
+        const match = label.match(/^(?:符合条件|物料清单总数) (\d+)，只读摘要$/u);
         return match ? Number(match[1]) : null;
       })(),
     };
@@ -3595,7 +3466,7 @@ async function verifyBusinessPrintTemplate(browser, options) {
     let selectionStable = false;
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       await search.fill(recordQuery);
-      const filteredRowsReady = await page
+          const filteredRowsReady = await page
         .waitForFunction(
           (query) => {
             const rows = [
@@ -3931,10 +3802,7 @@ async function verifyBusinessPrintEvidence(
         await verifyBusinessPrintTemplate(browser, {
           baseURL,
           storageState: login.storageState,
-          sourcePrefix: sourceDocumentSearchPrefix(
-            printInput.sourcePrefix,
-            recordQuery,
-          ),
+          sourcePrefix: sourceDocumentSearchPrefix(printInput.sourcePrefix, recordQuery),
           sourceRoute,
           actionLabel,
           templateKey,

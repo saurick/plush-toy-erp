@@ -3,7 +3,6 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { createSyntheticSourceFixture } from "../import/fixtures/synthetic/createSyntheticSourceFixture.mjs";
 
 import {
   CUSTOMER_TRIAL_133_TARGET,
@@ -135,7 +134,7 @@ export function buildAttachmentFixtures({ includeNearLimit = true } = {}) {
     fixture(
       "数量交期表.xlsx",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      createSyntheticSourceFixture().xlsx,
+      Buffer.from("PK\u0003\u0004simulated-xlsx-acceptance-sheet"),
     ),
   ];
   if (includeNearLimit) {
@@ -143,7 +142,10 @@ export function buildAttachmentFixtures({ includeNearLimit = true } = {}) {
       fixture(
         "补充说明-云朵小熊大号礼盒装数量与交期.xlsx",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        createSyntheticSourceFixture({ paddingBytes: 4_490_000 }).xlsx,
+        Buffer.concat([
+          Buffer.from("PK\u0003\u0004"),
+          Buffer.alloc(4_500_000, 0x41),
+        ]),
         "near-limit",
       ),
     );

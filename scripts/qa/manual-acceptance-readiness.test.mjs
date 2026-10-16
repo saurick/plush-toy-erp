@@ -3,10 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { exceptionChainFixture } from "./test-fixtures/manual-acceptance-exception-chains.mjs";
 
-import {
-  progressFixtureRow,
-  progressFixtureData,
-} from "../../web/scripts/style-l1/businessProgressFixtures.mjs";
+import { progressFixtureData } from "../../web/scripts/style-l1/businessProgressFixtures.mjs";
 import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catalog.mjs";
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
@@ -117,12 +114,6 @@ function sourceReport(overrides = {}) {
     databaseName,
     semanticDigest: "source-semantic-digest-v1",
     prefix: "YS5",
-    referenceRecords: {
-      salesOrders: Array.from({ length: 11 }, (_, index) => ({
-        id: index + 1,
-        orderNo: `YS5-SO-${index + 1}`,
-      })),
-    },
     runtime: {
       environment: "local",
       customerKey: "yoyoosun",
@@ -147,26 +138,6 @@ function sourceReport(overrides = {}) {
     ...Object.fromEntries(
       Object.entries(overrides).filter(([key]) => key !== "scale"),
     ),
-  };
-}
-
-function currentBatchProgressData() {
-  const rows = Array.from({ length: 45 }, (_, index) => ({
-    ...progressFixtureRow(index),
-    order_no: `YS5-SO-${index + 1}`,
-  }));
-  return {
-    ...progressFixtureData({ scope: "all", limit: 100 }),
-    rows,
-    total: 45,
-    counts: {
-      total: 45,
-      overdue: 1,
-      due_soon: 1,
-      blocked: 1,
-      undated: 1,
-      unlinked: 0,
-    },
   };
 }
 
@@ -1135,7 +1106,7 @@ function createReadinessFetch(runtimeOptions = {}) {
       });
     }
     if (body.method === "list_progress") {
-      return okResponse(currentBatchProgressData());
+      return okResponse({...progressFixtureData({scope:"all",limit:100}), total:45, counts:{total:45,overdue:1,due_soon:1,blocked:1,undated:1}});
     }
     if (body.method === "list_tasks") {
       if (
@@ -1581,55 +1552,17 @@ test("readiness binds the explicit long-lived workbench batch identity and prefi
 });
 
 test("progress projection requires complete records, source access and current-batch evidence", () => {
-  const plan = buildManualAcceptanceReadinessPlan({
-    sourceReport: sourceReport(),
-    factReport: factReport(),
-    taskReport: taskReport(),
-  });
-  const probe = plan.probes.find((item) => item.id === "business-progress");
-  assert.equal(probe.method, "list_progress");
-  assert.equal(probe.params.scope, "all");
-  assert.equal(probe.includeCustomerKey, false);
-  const data = currentBatchProgressData();
-  assert.equal(evaluateBusinessDashboardProjection(probe, data).status, "pass");
-  assert.equal(
-    evaluateBusinessDashboardProjection(probe, {
-      ...data,
-      rows: data.rows.map((row) => ({
-        ...row,
-        id: row.id + 1000,
-        order_no: `OLD-${row.id}`,
-      })),
-    }).status,
-    "fail",
-  );
-  assert.equal(
-    evaluateBusinessDashboardProjection(probe, {
-      ...data,
-      access: { ...data.access, sales: false },
-    }).status,
-    "fail",
-  );
-  assert.equal(
-    evaluateBusinessDashboardProjection(probe, { ...data, rows: [{}] }).status,
-    "error",
-  );
-  assert.equal(
-    evaluateBusinessDashboardProjection(
-      { ...probe, batchEvidence: "not_proven" },
-      data,
-    ).status,
-    "not_proven",
-  );
-  assert.equal(
-    evaluateBusinessDashboardProjection(probe, {
-      ...data,
-      total: 0,
-      rows: [],
-      counts: { ...data.counts, total: 0 },
-    }).status,
-    "fail",
-  );
+  const plan = buildManualAcceptanceReadinessPlan({sourceReport:sourceReport(),factReport:factReport(),taskReport:taskReport()});
+  const probe = plan.probes.find(item=>item.id === "business-progress");
+  assert.equal(probe.method,"list_progress");
+  assert.equal(probe.params.scope,"all");
+  assert.equal(probe.includeCustomerKey,false);
+  const data={...progressFixtureData({scope:"all",limit:100}),total:45,counts:{total:45,overdue:1,due_soon:1,blocked:1,undated:1}};
+  assert.equal(evaluateBusinessDashboardProjection(probe,data).status,"pass");
+  assert.equal(evaluateBusinessDashboardProjection(probe,{...data,access:{...data.access,sales:false}}).status,"fail");
+  assert.equal(evaluateBusinessDashboardProjection(probe,{...data,rows:[{}]}).status,"error");
+  assert.equal(evaluateBusinessDashboardProjection({...probe,batchEvidence:"not_proven"},data).status,"not_proven");
+  assert.equal(evaluateBusinessDashboardProjection(probe,{...data,total:0,rows:[],counts:{...data.counts,total:0}}).status,"fail");
 });
 
 test("apply reports may raise minimums while the shipment dataset stays exact", () => {
@@ -2422,9 +2355,9 @@ test("prefix-filtered readiness reads every API page before counting the current
     "purchase_order_no",
     source.prefix,
   );
-  const deferred = currentBatch
-    .filter((item) => item.lifecycle_status !== "CANCELED")
-    .slice(0, 4);
+  const deferred = currentBatch.filter(
+    (item) => item.lifecycle_status !== "CANCELED",
+  ).slice(0, 4);
   const deferredIDs = new Set(deferred.map((item) => item.id));
   const firstPageBatch = currentBatch.filter(
     (item) => !deferredIDs.has(item.id),

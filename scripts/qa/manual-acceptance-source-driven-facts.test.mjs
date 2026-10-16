@@ -261,8 +261,6 @@ function createRPC({
               id: 602,
               material_id: 201,
               unit_id: 105,
-              effective_limit_quantity: "2",
-              issued_quantity: "0",
               remaining_quantity: "2",
             },
           ],
@@ -387,9 +385,7 @@ function createRPC({
         return createRecord("production_fact", {}, method);
       case "create_production_completion_from_order": {
         if (params.production_wip_batch_id != null) {
-          const batch = productionWIPBatches.find(
-            (item) => item.id === params.production_wip_batch_id,
-          );
+          const batch = productionWIPBatches.find((item) => item.id === params.production_wip_batch_id);
           assert.equal(batch?.production_order_operation_id, 703);
           assert.equal(batch.status, "WAITING_QUALITY");
         }
@@ -476,13 +472,8 @@ function createRPC({
           );
           const gates = qualityGatesByOperation.get(operation.operation_code);
           if (operation.operation_code === "HANDWORK") {
-            assert.ok(
-              [...records.values()].some(
-                ({ item }) =>
-                  item.production_wip_batch_id === batch.id &&
-                  item.status === "POSTED",
-              ),
-            );
+            assert.ok([...records.values()].some(({ item }) =>
+              item.production_wip_batch_id === batch.id && item.status === "POSTED"));
           }
           const nextGate = gates[inspections.length];
           if (nextGate) {
@@ -953,34 +944,16 @@ test("phase-scoped apply executes the formal production chain and returns exact 
     ],
   );
   assert.deepEqual(
-    calls
-      .filter((call) => call.method === "execute_production_wip_action")
-      .map((call) => call.actor),
+    calls.filter((call) => call.method === "execute_production_wip_action").map((call) => call.actor),
     [
-      "production",
-      "warehouse",
-      "warehouse",
-      "production",
-      "production",
-      "production",
-      "production",
-      "production",
-      "production",
-      "production",
-      "production",
-      "warehouse",
-      "sales",
-      "warehouse",
-      "warehouse",
-      "warehouse",
+      "production", "warehouse", "warehouse", "production",
+      "production", "production", "production", "production",
+      "production", "production", "production", "warehouse",
+      "sales", "warehouse", "warehouse", "warehouse",
     ],
   );
-  const receiptIndex = calls.findIndex(
-    (call) => call.method === "create_production_completion_from_order",
-  );
-  const packagingIndex = calls.findIndex(
-    (call) => call.params.finished_goods_receipt_id != null,
-  );
+  const receiptIndex = calls.findIndex((call) => call.method === "create_production_completion_from_order");
+  const packagingIndex = calls.findIndex((call) => call.params.finished_goods_receipt_id != null);
   assert.ok(receiptIndex > 0 && receiptIndex < packagingIndex);
   assert.equal(
     calls.filter(

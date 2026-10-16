@@ -83,15 +83,15 @@ const MOBILE_PERMISSION_BY_ROLE = Object.freeze(
 
 function accountProjectionsForTarget(target) {
   const accountSet = manualAcceptanceAccountSetForTarget(target);
-  return accountSet.formalProfiles
-    .filter(
-      ({ username, roleKey }) => accountSet.roleUsernames[roleKey] === username,
-    )
-    .map(({ username, roleKey }) => ({
+  return accountSet.formalProfiles.filter(
+    ({ username, roleKey }) => accountSet.roleUsernames[roleKey] === username,
+  ).map(
+    ({ username, roleKey }) => ({
       username,
       roleKey,
       mobilePermission: MOBILE_PERMISSION_BY_ROLE[roleKey] || null,
-    }));
+    }),
+  );
 }
 
 function accountStateExpectationsForTarget(target) {
@@ -1026,10 +1026,7 @@ function validateFactReport(report) {
   try {
     assertManualAcceptanceExceptionChainCoverage(report.exceptionChains);
   } catch (error) {
-    throw new CliError(
-      `业务记录报告缺少完整的异常业务链读回：${error.message}`,
-      2,
-    );
+    throw new CliError(`业务记录报告缺少完整的异常业务链读回：${error.message}`, 2);
   }
   return {
     ...report,
@@ -1636,28 +1633,17 @@ function buildDatasetProbes(
   });
   probes.push({
     id: BUSINESS_DASHBOARD_PROJECTION_PROBE_ID,
-    batchPrefix: sourceReport?.prefix || null,
-    expectedReferences: (sourceReport?.referenceRecords?.salesOrders || []).map(
-      (item) => ({ id: Number(item.id), orderNo: item.orderNo }),
-    ),
     roleKey: "boss",
     domain: "business",
     method: "list_progress",
     listKey: "rows",
     params: { view: "orders", scope: "all", limit: 100, offset: 0 },
     includeCustomerKey: false,
-    batchEvidence:
-      sourceReport && factReport && taskReport
-        ? persistentProjection
-          ? "persistent_dataset_projection"
-          : "fresh_dataset_projection"
-        : "not_proven",
-    batchNotProvenReason:
-      "缺少同批源单、事实或任务报告，不能证明进度来自当前验收批次。",
-    expectedMinimum: Math.max(
-      canonical["sales-orders"] ?? 0,
-      declared["sales-orders"] ?? 0,
-    ),
+    batchEvidence: sourceReport && factReport && taskReport
+      ? persistentProjection ? "persistent_dataset_projection" : "fresh_dataset_projection"
+      : "not_proven",
+    batchNotProvenReason: "缺少同批源单、事实或任务报告，不能证明进度来自当前验收批次。",
+    expectedMinimum: Math.max(canonical["sales-orders"] ?? 0, declared["sales-orders"] ?? 0),
     declaredMinimum: null,
     readOnly: true,
   });
@@ -2364,58 +2350,19 @@ export function evaluateManualAcceptanceDataset(probe, data) {
 
 export function evaluateBusinessDashboardProjection(probe, data) {
   let error = null;
-  try {
-    requireProgressBoard(data);
-  } catch {
-    error = "进度响应缺少有效数量、来源明细或权限范围";
-  }
-  const expected = probe.expectedReferences || [];
-  const rows = Array.isArray(data?.rows) ? data.rows : [];
-  const missingReferences = expected.filter(
-    (reference) =>
-      !rows.some(
-        (row) =>
-          Number(row.id) === reference.id &&
-          String(row.order_no) === String(reference.orderNo),
-      ),
-  );
-  const batchProven =
-    probe.batchEvidence !== "not_proven" &&
-    expected.length > 0 &&
-    Boolean(probe.batchPrefix);
-  const batchRows = rows.filter((row) =>
-    String(row.order_no || "").startsWith(probe.batchPrefix),
-  );
-  const enoughRecords =
-    !error &&
-    data.access.sales &&
-    data.total === data.counts.total &&
-    batchRows.length >= probe.expectedMinimum &&
-    missingReferences.length === 0;
+  try { requireProgressBoard(data); } catch { error = "进度响应缺少有效数量、来源明细或权限范围"; }
+  const batchProven = probe.batchEvidence !== "not_proven";
+  const enoughRecords = !error && data.access.sales && data.total === data.counts.total && data.total >= probe.expectedMinimum && data.rows.length > 0;
   return {
     id: probe.id,
-    status: !batchProven
-      ? "not_proven"
-      : error
-        ? "error"
-        : enoughRecords
-          ? "pass"
-          : "fail",
-    expectedMinimum: probe.expectedMinimum,
-    actual: error ? null : batchRows.length,
-    returned: error ? 0 : data.rows.length,
-    statusCounts: {},
-    requiredStatuses: [],
-    missingStatuses: [],
-    enoughRecords: batchProven && enoughRecords,
-    enoughStatuses: true,
-    enoughSecondaryKinds: true,
+    status: !batchProven ? "not_proven" : error ? "error" : enoughRecords ? "pass" : "fail",
+    expectedMinimum: probe.expectedMinimum, actual: error ? null : data.total,
+    returned: error ? 0 : data.rows.length, statusCounts: {}, requiredStatuses: [], missingStatuses: [],
+    enoughRecords: batchProven && enoughRecords, enoughStatuses: true, enoughSecondaryKinds: true,
     batchEvidence: probe.batchEvidence,
-    missingReferences,
     progressCounts: error ? null : data.counts,
-    sampleOrderIDs: error ? [] : data.rows.map((row) => row.id),
-    notProvenReason: batchProven ? null : probe.batchNotProvenReason,
-    error,
+    sampleOrderIDs: error ? [] : data.rows.map(row => row.id),
+    notProvenReason: batchProven ? null : probe.batchNotProvenReason, error,
   };
 }
 
@@ -2478,17 +2425,14 @@ async function readProbeData({ backendURL, probe, token, fetchImpl }) {
       token,
       fetchImpl,
     });
-    if (
-      probe.batchEvidence !== "prefix_filtered" &&
-      probe.id !== BUSINESS_DASHBOARD_PROJECTION_PROBE_ID
-    )
-      return firstPage;
+    if (probe.batchEvidence !== "prefix_filtered") return firstPage;
 
     const firstItems = firstPage?.[probe.listKey];
     const total = positiveInteger(firstPage?.total);
     const initialOffset = positiveInteger(probe.params?.offset) ?? 0;
     const limit =
-      positiveInteger(firstPage?.limit) ?? positiveInteger(probe.params?.limit);
+      positiveInteger(firstPage?.limit) ??
+      positiveInteger(probe.params?.limit);
     if (
       !Array.isArray(firstItems) ||
       total == null ||

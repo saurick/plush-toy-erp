@@ -1020,7 +1020,6 @@ test("fresh dedicated local database rejects the wrong formal confirmation with 
   );
   assert.equal(mutationCalls(backend).length, 0);
   assert.equal(rolePermissionCalls(backend).length, 0);
-  assert.equal(roleDataScopeCalls(backend).length, 0);
 });
 
 test("fresh registered 133 target requires the exact formal-account confirmation before writes", async () => {

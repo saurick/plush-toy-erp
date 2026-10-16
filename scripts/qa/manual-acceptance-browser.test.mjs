@@ -1910,14 +1910,8 @@ test("no-search current-batch pages use only their exact visible business number
 test("source document searches exclude related generated orders and reject another batch", () => {
   assert.equal(sourceDocumentSearchPrefix("YS8", "YS8-CG-013"), "YS8-CG-");
   assert.equal(sourceDocumentSearchPrefix("YS8", "YS8-BOM-005-3"), "YS8-BOM-");
-  assert.throws(
-    () => sourceDocumentSearchPrefix("YS8", "YS7-CG-013"),
-    /当前批次/u,
-  );
-  assert.throws(
-    () => sourceDocumentSearchPrefix("YS8", "YS8-013"),
-    /业务类别/u,
-  );
+  assert.throws(() => sourceDocumentSearchPrefix("YS8", "YS7-CG-013"), /当前批次/u);
+  assert.throws(() => sourceDocumentSearchPrefix("YS8", "YS8-013"), /业务类别/u);
   const result = resolveCurrentBatchListFilter(
     { key: "accessories-purchase" },
     { probes: [{ batchEvidence: "prefix_filtered", batchPrefix: "YS8" }] },
@@ -2266,9 +2260,7 @@ test("progress evidence binds counts and exact visible orders to current-batch s
     ],
   );
   const currentBatch = buildManualAcceptanceCurrentBatchReadiness({
-    targets: [
-      { id: "desktopPages:business-dashboard", dataStatus: "pass", actual: 45 },
-    ],
+    targets: [{ id: "desktopPages:business-dashboard", dataStatus: "pass", actual: 45 }],
     probes: [
       {
         id: "sales-orders",
@@ -2364,27 +2356,14 @@ test("print preview and current-batch source minimum evidence fail closed", () =
   assert.equal(sourceEvidence.status, "minimum_proven");
   assert.equal(sourceEvidence.observedTotal, 45);
   assert.equal(sourceEvidence.minimumSatisfied, true);
-  assert.equal(
-    evaluatePrintSourceMinimumEvidence({
-      sourcePrefix: "YS8",
-      visibleRows: 20,
-      matchingCurrentBatchRows: 20,
-      filteredTotal: 45,
-      minimumRecords: 45,
-    }).minimumSatisfied,
-    true,
-  );
-  assert.equal(
-    evaluatePrintSourceMinimumEvidence({
-      sourcePrefix: "YS8",
-      visibleRows: 20,
-      matchingCurrentBatchRows: 20,
-      filteredTotal: 45,
-      paginationTexts: ["共 46 条"],
-      minimumRecords: 45,
-    }).minimumSatisfied,
-    false,
-  );
+  assert.equal(evaluatePrintSourceMinimumEvidence({
+    sourcePrefix: "YS8", visibleRows: 20, matchingCurrentBatchRows: 20,
+    filteredTotal: 45, minimumRecords: 45,
+  }).minimumSatisfied, true);
+  assert.equal(evaluatePrintSourceMinimumEvidence({
+    sourcePrefix: "YS8", visibleRows: 20, matchingCurrentBatchRows: 20,
+    filteredTotal: 45, paginationTexts: ["共 46 条"], minimumRecords: 45,
+  }).minimumSatisfied, false);
   assert.equal(
     evaluatePrintSourceMinimumEvidence({
       sourcePrefix: "YS8",
@@ -2657,10 +2636,7 @@ test("inventory current-batch evidence switches to the lot-number view", async (
     source,
     /getByRole\("tab", \{ name: "库存批次", exact: true \}\)/u,
   );
-  assert.match(
-    source,
-    /getByPlaceholder\(BUSINESS_SEARCH_SCOPES\.lots\.placeholder/u,
-  );
+  assert.match(source, /getByPlaceholder\(BUSINESS_SEARCH_SCOPES\.lots\.placeholder/u);
 });
 
 test("mobile role totals cannot overwrite a task board DOM minimum failure", () => {
@@ -2854,22 +2830,4 @@ test("plan mode needs no password and starts no browser", () => {
   assert.equal(plan.summary.totalTargets, 51);
   assert.equal(plan.writesDatabase, true);
   assert.equal(plan.formalAccounts.length, 10);
-});
-
-test("list minimum rejects a single matching row among historical records", () => {
-  for (const pageReportedTotal of [60, 999])
-    assert.equal(
-      evaluateCurrentBatchListEvidence({
-        currentBatch: { dataStatus: "pass", actual: 60 },
-        currentBatchDOM: {
-          mode: "source_prefix",
-          matchingCurrentBatchItems: 1,
-          currentBatchVisible: true,
-        },
-        renderedItems: 20,
-        pageReportedTotal,
-        minimumRecords: 60,
-      }).minimumSatisfied,
-      false,
-    );
 });

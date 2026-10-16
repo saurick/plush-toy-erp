@@ -150,9 +150,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "expected_version",
     "idempotency_key",
   ]),
-  "production_order.get_production_order": Object.freeze([
-    "production_order_id",
-  ]),
+  "production_order.get_production_order": Object.freeze(["production_order_id"]),
   "operational_fact.create_production_material_issue_from_order": Object.freeze(
     [
       "customer_key",
@@ -634,10 +632,7 @@ function normalizeProduction(source) {
     );
   }
   const fabricBudgets = materialIssues.filter(
-    (record) =>
-      record.materialId ===
-        Number(source.fabricOutsourcing?.item?.materialId) &&
-      record.unitId === Number(source.fabricOutsourcing?.item?.unitId),
+    (record) => record.materialId === Number(source.fabricOutsourcing?.item?.materialId) && record.unitId === Number(source.fabricOutsourcing?.item?.unitId),
   );
   let fabricOutsourcing;
   if (route) {
@@ -715,9 +710,7 @@ function normalizeProduction(source) {
   }
   const directMaterialIssues = fabricOutsourcing
     ? materialIssues.filter(
-        (record) =>
-          record.materialId !== fabricOutsourcing.item.materialId ||
-          record.unitId !== fabricOutsourcing.item.unitId,
+        (record) => record.materialId !== fabricOutsourcing.item.materialId || record.unitId !== fabricOutsourcing.item.unitId,
       )
     : materialIssues;
   let rework;
@@ -1409,12 +1402,7 @@ async function invoke(rpc, domain, method, params, actor) {
     throw new SourceDrivenFactError("rpc dependency is required");
   }
   assertAllowedParams(domain, method, params);
-  const raw = await rpc({
-    domain,
-    method,
-    params,
-    ...(actor ? { actor } : {}),
-  });
+  const raw = await rpc({ domain, method, params, ...(actor ? { actor } : {}) });
   const envelope = raw?.result ?? raw;
   if (
     envelope &&
@@ -2046,7 +2034,7 @@ function matchProductionRequirements(data, source) {
     }
     if (
       quantityUnits(
-        String(requirement.effective_limit_quantity ?? ""),
+        String(requirement.remaining_quantity ?? ""),
         `production requirement ${key}`,
       ) !== quantityUnits(budget.quantity, `production budget ${key}`)
     ) {
@@ -2139,15 +2127,9 @@ async function executeProductionWIPAction(rpc, params, operationCode) {
   const actor =
     params.action === "CONFIRM_PACKAGING_MATERIAL"
       ? "sales"
-      : warehouseAction
-        ? "warehouse"
-        : "production";
+      : warehouseAction ? "warehouse" : "production";
   return invoke(
-    rpc,
-    "production_wip",
-    "execute_production_wip_action",
-    params,
-    actor,
+    rpc, "production_wip", "execute_production_wip_action", params, actor,
   );
 }
 
@@ -2240,33 +2222,28 @@ async function advanceProductionWIPRoute({
           `production WIP ${previous.operation_code} must be accepted before transfer`,
         );
       }
-      await executeProductionWIPAction(
-        rpc,
-        {
-          action: "TRANSFER_TO_NEXT_OPERATION",
-          production_order_id: orderID,
-          production_wip_batch_id: sourceBatch.id,
-          target_operation_id: operation.id,
-          ...(operation.operation_code === "PACKAGING"
-            ? {
-                finished_goods_receipt_id: positiveID(
-                  finishedGoodsReceipt?.id,
-                  "packaging finished goods receipt",
-                ),
-              }
-            : {}),
-          quantity: sourceBatch.quantity,
-          expected_version: positiveID(
-            sourceBatch.version,
-            "production WIP transfer version",
-          ),
-          idempotency_key: productionWIPIdempotencyKey(
-            identity,
-            `${previous.operation_code}:${operation.operation_code}:transfer`,
-          ),
-        },
-        previous.operation_code,
-      );
+      await executeProductionWIPAction(rpc, {
+        action: "TRANSFER_TO_NEXT_OPERATION",
+        production_order_id: orderID,
+        production_wip_batch_id: sourceBatch.id,
+        target_operation_id: operation.id,
+        ...(operation.operation_code === "PACKAGING"
+          ? {
+              finished_goods_receipt_id: positiveID(
+                finishedGoodsReceipt?.id, "packaging finished goods receipt",
+              ),
+            }
+          : {}),
+        quantity: sourceBatch.quantity,
+        expected_version: positiveID(
+          sourceBatch.version,
+          "production WIP transfer version",
+        ),
+        idempotency_key: productionWIPIdempotencyKey(
+          identity,
+          `${previous.operation_code}:${operation.operation_code}:transfer`,
+        ),
+      }, previous.operation_code);
       state = await readProductionWIP(rpc, orderID);
       batch = exactNormalProductionWIPBatch(state, operation.id);
     }
@@ -2286,25 +2263,21 @@ async function advanceProductionWIPRoute({
         confirmation?.status || "",
       ).toUpperCase();
       if (confirmationStatus === "PENDING") {
-        await executeProductionWIPAction(
-          rpc,
-          {
-            action: "CONFIRM_PACKAGING_MATERIAL",
-            production_order_id: orderID,
-            production_order_item_id: itemID,
-            expected_version: positiveID(
-              confirmation.version,
-              "packaging confirmation version",
-            ),
-            idempotency_key: productionWIPIdempotencyKey(
-              identity,
-              "packaging:confirm",
-            ),
-            packaging_version_snapshot: source.route.packagingVersionSnapshot,
-            note: SIMULATED_NOTE,
-          },
-          operation.operation_code,
-        );
+        await executeProductionWIPAction(rpc, {
+          action: "CONFIRM_PACKAGING_MATERIAL",
+          production_order_id: orderID,
+          production_order_item_id: itemID,
+          expected_version: positiveID(
+            confirmation.version,
+            "packaging confirmation version",
+          ),
+          idempotency_key: productionWIPIdempotencyKey(
+            identity,
+            "packaging:confirm",
+          ),
+          packaging_version_snapshot: source.route.packagingVersionSnapshot,
+          note: SIMULATED_NOTE,
+        }, operation.operation_code);
         state = await readProductionWIP(rpc, orderID);
         batch = exactNormalProductionWIPBatch(state, operation.id);
       } else if (confirmationStatus !== "CONFIRMED") {
@@ -2336,96 +2309,80 @@ async function advanceProductionWIPRoute({
             "FABRIC_PROCESSING is missing its registered outsourcing allocation",
           );
         }
-        await executeProductionWIPAction(
-          rpc,
-          {
-            action: "ASSIGN_EXECUTION",
-            production_order_id: orderID,
-            production_wip_batch_id: batch.id,
-            execution_mode: fabricOperation ? "OUTSOURCED" : "IN_HOUSE",
-            ...(fabricOperation
-              ? {
-                  outsourcing_allocations: [
-                    {
-                      outsourcing_order_item_id:
-                        fabricAllocation.outsourcingOrderItemId,
-                      production_order_material_requirement_id:
-                        fabricAllocation.productionMaterialRequirementId,
-                    },
-                  ],
-                }
-              : {}),
-            expected_version: positiveID(
-              batch.version,
-              "production WIP assignment version",
-            ),
-            idempotency_key: productionWIPIdempotencyKey(
-              identity,
-              `${operation.operation_code}:assign`,
-            ),
-          },
-          operation.operation_code,
-        );
+        await executeProductionWIPAction(rpc, {
+          action: "ASSIGN_EXECUTION",
+          production_order_id: orderID,
+          production_wip_batch_id: batch.id,
+          execution_mode: fabricOperation ? "OUTSOURCED" : "IN_HOUSE",
+          ...(fabricOperation
+            ? {
+                outsourcing_allocations: [
+                  {
+                    outsourcing_order_item_id:
+                      fabricAllocation.outsourcingOrderItemId,
+                    production_order_material_requirement_id:
+                      fabricAllocation.productionMaterialRequirementId,
+                  },
+                ],
+              }
+            : {}),
+          expected_version: positiveID(
+            batch.version,
+            "production WIP assignment version",
+          ),
+          idempotency_key: productionWIPIdempotencyKey(
+            identity,
+            `${operation.operation_code}:assign`,
+          ),
+        }, operation.operation_code);
       } else if (
         status === "PLANNED" &&
         new Set(["IN_HOUSE", "OUTSOURCED"]).has(
           String(batch.execution_mode || "").toUpperCase(),
         )
       ) {
-        await executeProductionWIPAction(
-          rpc,
-          {
-            action: "START_OPERATION",
-            production_order_id: orderID,
-            production_wip_batch_id: batch.id,
-            expected_version: positiveID(
-              batch.version,
-              "production WIP start version",
-            ),
-            idempotency_key: productionWIPIdempotencyKey(
-              identity,
-              `${operation.operation_code}:start`,
-            ),
-          },
-          operation.operation_code,
-        );
+        await executeProductionWIPAction(rpc, {
+          action: "START_OPERATION",
+          production_order_id: orderID,
+          production_wip_batch_id: batch.id,
+          expected_version: positiveID(
+            batch.version,
+            "production WIP start version",
+          ),
+          idempotency_key: productionWIPIdempotencyKey(
+            identity,
+            `${operation.operation_code}:start`,
+          ),
+        }, operation.operation_code);
       } else if (status === "IN_PROGRESS") {
-        await executeProductionWIPAction(
-          rpc,
-          {
-            action: "COMPLETE_OPERATION",
-            production_order_id: orderID,
-            production_wip_batch_id: batch.id,
-            expected_version: positiveID(
-              batch.version,
-              "production WIP completion version",
-            ),
-            idempotency_key: productionWIPIdempotencyKey(
-              identity,
-              `${operation.operation_code}:complete`,
-            ),
-          },
-          operation.operation_code,
-        );
+        await executeProductionWIPAction(rpc, {
+          action: "COMPLETE_OPERATION",
+          production_order_id: orderID,
+          production_wip_batch_id: batch.id,
+          expected_version: positiveID(
+            batch.version,
+            "production WIP completion version",
+          ),
+          idempotency_key: productionWIPIdempotencyKey(
+            identity,
+            `${operation.operation_code}:complete`,
+          ),
+        }, operation.operation_code);
       } else if (status === "OUTSOURCED") {
-        await executeProductionWIPAction(
-          rpc,
-          {
-            action: "RECEIVE_OUTSOURCING_RETURN",
-            quantity: batch.quantity,
-            production_order_id: orderID,
-            production_wip_batch_id: batch.id,
-            expected_version: positiveID(
-              batch.version,
-              "production WIP outsourcing return version",
-            ),
-            idempotency_key: productionWIPIdempotencyKey(
-              identity,
-              `${operation.operation_code}:return`,
-            ),
-          },
-          operation.operation_code,
-        );
+        await executeProductionWIPAction(rpc, {
+          action: "RECEIVE_OUTSOURCING_RETURN",
+          quantity: batch.quantity,
+          production_order_id: orderID,
+          production_wip_batch_id: batch.id,
+          expected_version: positiveID(
+            batch.version,
+            "production WIP outsourcing return version",
+          ),
+          idempotency_key: productionWIPIdempotencyKey(
+            identity,
+            `${operation.operation_code}:return`,
+          ),
+        }, operation.operation_code);
       } else if (status === "WAITING_QUALITY") {
         await passCurrentProductionWIPQualityGate(rpc, batch.id);
       } else {
@@ -2486,30 +2443,24 @@ async function applyProduction(plan, rpc) {
     "DRAFT",
     "create_production_order",
   );
-  const current = await invoke(
-    rpc,
-    "production_order",
-    "get_production_order",
-    { production_order_id: order.id },
-  );
+  const current = await invoke(rpc, "production_order", "get_production_order", { production_order_id: order.id });
   const currentOrder = current.production_order;
-  if (
-    Number(currentOrder?.id) !== Number(order.id) ||
-    !["DRAFT", "RELEASED"].includes(currentOrder.status)
-  ) {
+  if (Number(currentOrder?.id) !== Number(order.id) || !["DRAFT", "RELEASED"].includes(currentOrder.status)) {
     throw new SourceDrivenFactError("production order changed before release");
   }
-  const release =
-    currentOrder.status === "RELEASED"
-      ? current
-      : await invoke(rpc, "production_order", "release_production_order", {
-          production_order_id: order.id,
-          expected_version: positiveID(
-            currentOrder.version,
-            "get_production_order.production_order.version",
-          ),
-          idempotency_key: identity.release.idempotencyKey,
-        });
+  const release = currentOrder.status === "RELEASED" ? current : await invoke(
+    rpc,
+    "production_order",
+    "release_production_order",
+    {
+      production_order_id: order.id,
+      expected_version: positiveID(
+        currentOrder.version,
+        "get_production_order.production_order.version",
+      ),
+      idempotency_key: identity.release.idempotencyKey,
+    },
+  );
   requireResult(
     release,
     "production_order",
@@ -2555,10 +2506,7 @@ async function applyProduction(plan, rpc) {
   let fabricAllocation;
   if (source.fabricOutsourcing) {
     const fabricBudget = source.materialIssues.find(
-      (record) =>
-        record.materialId ===
-          Number(source.fabricOutsourcing?.item?.materialId) &&
-        record.unitId === Number(source.fabricOutsourcing?.item?.unitId),
+      (record) => record.materialId === Number(source.fabricOutsourcing?.item?.materialId) && record.unitId === Number(source.fabricOutsourcing?.item?.unitId),
     );
     const requirement = matched.requirements.find(
       (entry) =>
