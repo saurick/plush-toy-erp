@@ -1079,8 +1079,10 @@ func (r *masterDataRepo) UpdateContact(ctx context.Context, id int, in *biz.Cont
 	}
 	defer func() { rollbackMasterDataEntTx(ctx, tx, r.log) }()
 
-	if err := ensureContactOwner(ctx, tx.Client(), id, in.OwnerType, in.OwnerID); err != nil {
+	if exists, err := tx.Contact.Query().Where(contact.ID(id)).Exist(ctx); err != nil {
 		return nil, err
+	} else if !exists {
+		return nil, biz.ErrContactNotFound
 	}
 	if in.IsPrimary {
 		if _, err := tx.Contact.Update().
@@ -1091,6 +1093,8 @@ func (r *masterDataRepo) UpdateContact(ctx context.Context, id int, in *biz.Cont
 		}
 	}
 	update := tx.Contact.UpdateOneID(id).
+		SetOwnerType(in.OwnerType).
+		SetOwnerID(in.OwnerID).
 		SetName(in.Name).
 		SetIsPrimary(in.IsPrimary)
 	if in.Phone == nil {

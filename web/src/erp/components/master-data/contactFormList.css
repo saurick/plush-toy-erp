@@ -36,7 +36,7 @@
   padding: 7px 6px;
   color: var(--erp-text-muted, #64748b);
   background: var(--erp-sales-order-lines-bg, #f8fbf9);
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -106,7 +106,7 @@
   background: transparent;
   color: var(--erp-text-muted, #64748b);
   font: inherit;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;

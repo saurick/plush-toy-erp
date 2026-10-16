@@ -3,10 +3,7 @@ import { Button, Select, Space } from 'antd'
 import { listAllSuppliers } from '../../api/masterDataOrderApi.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
-export default function MaterialSupplierSelect({
-  outsourcingOnly = false,
-  ...props
-}) {
+export default function MaterialSupplierSelect(props) {
   const [options, setOptions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -19,17 +16,11 @@ export default function MaterialSupplierSelect({
       .then(({ suppliers }) => {
         if (controller.signal.aborted) return
         setOptions(
-          suppliers
-            .filter(
-              (item) =>
-                !outsourcingOnly ||
-                ['outsourcing', 'mixed'].includes(item.supplier_type)
-            )
-            .map((item) => ({
-              value: item.id,
-              label: `${item.code} / ${item.name}`,
-              disabled: !item.is_active,
-            }))
+          suppliers.map((item) => ({
+            value: item.id,
+            label: `${item.code} / ${item.name}`,
+            disabled: !item.is_active,
+          }))
         )
       })
       .catch((err) => {
@@ -41,7 +32,7 @@ export default function MaterialSupplierSelect({
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [retry, outsourcingOnly])
+  }, [retry])
   return (
     <Space direction="vertical" style={{ width: '100%' }}>
       <Select

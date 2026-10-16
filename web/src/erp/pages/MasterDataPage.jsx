@@ -17,7 +17,6 @@ import {
 } from '@ant-design/icons'
 import { Button, Form, Popconfirm, Space } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState'
 import Tabs from '@/common/components/navigation/SlidingTabs'
@@ -55,9 +54,9 @@ import {
 import ProductImageSlots from '../components/master-data/ProductImageSlots.jsx'
 import {
   listContactsByOwner,
-  listAllProcesses,
-  listAllProducts,
-  listAllUnits,
+  listProcesses,
+  listProducts,
+  listUnits,
 } from '../api/masterDataOrderApi.mjs'
 import {
   buildMaterialDraftCode,
@@ -121,26 +120,14 @@ export default function MasterDataPage({ type }) {
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
-  const canReadProducts = hasActionPermission(
-    adminProfile,
-    PermissionCode.PRODUCT_READ
-  )
+  const canReadProducts = hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
   const canReadProductSKUs = hasActionPermission(
     adminProfile,
     PermissionCode.PRODUCT_SKU_READ
   )
-  const canReadMaterials = hasActionPermission(
-    adminProfile,
-    PermissionCode.MATERIAL_READ
-  )
-  const canReadProcesses = hasActionPermission(
-    adminProfile,
-    PermissionCode.PROCESS_READ
-  )
-  const canReadContacts = hasActionPermission(
-    adminProfile,
-    PermissionCode.CONTACT_READ
-  )
+  const canReadMaterials = hasActionPermission(adminProfile, PermissionCode.MATERIAL_READ)
+  const canReadProcesses = hasActionPermission(adminProfile, PermissionCode.PROCESS_READ)
+  const canReadContacts = hasActionPermission(adminProfile, PermissionCode.CONTACT_READ)
   const requestedProductCatalogType = searchParams.get('catalog')
   const initialProductCatalogType =
     requestedProductCatalogType === 'product_skus' && canReadProductSKUs
@@ -218,7 +205,11 @@ export default function MasterDataPage({ type }) {
     config.permissions.read
   )
   const canMaintainReferences =
-    effectiveType === 'product_skus' ? canReadProducts : true
+    effectiveType === 'products'
+      ? canReadMaterials
+      : effectiveType === 'product_skus'
+        ? canReadMaterials && canReadProducts
+        : true
   const canCreate =
     canReadCurrentRecord &&
     canMaintainReferences &&
@@ -418,7 +409,7 @@ export default function MasterDataPage({ type }) {
         if (isRpcAbortError(error) || !request.isCurrent()) {
           return null
         }
-        showPageLoadError(error, '加载联系人')
+        message.error(getActionErrorMessage(error, '加载联系人'))
         setContacts([])
         return null
       } finally {
@@ -433,10 +424,7 @@ export default function MasterDataPage({ type }) {
 
   const loadUnits = useCallback(async () => {
     const request = beginLatestRequest('units')
-    if (
-      !needsUnitDictionary(effectiveType) ||
-      !(canReadMaterials || canReadProducts)
-    ) {
+    if (!needsUnitDictionary(effectiveType) || !canReadMaterials) {
       if (request.isCurrent()) {
         setUnits([])
       }
@@ -445,7 +433,7 @@ export default function MasterDataPage({ type }) {
     }
     setUnitLoading(true)
     try {
-      const result = await listAllUnits({}, { signal: request.signal })
+      const result = await listUnits({ limit: 500 }, { signal: request.signal })
       if (!request.isCurrent()) {
         return false
       }
@@ -456,7 +444,7 @@ export default function MasterDataPage({ type }) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return false
       }
-      showPageLoadError(error, '加载单位字典')
+      message.error(getActionErrorMessage(error, '加载单位字典'))
       setUnits([])
       return false
     } finally {
@@ -465,7 +453,7 @@ export default function MasterDataPage({ type }) {
         request.finish()
       }
     }
-  }, [beginLatestRequest, canReadMaterials, canReadProducts, effectiveType])
+  }, [beginLatestRequest, canReadMaterials, effectiveType])
 
   const loadProductReferences = useCallback(async () => {
     const request = beginLatestRequest('productReferences')
@@ -477,8 +465,8 @@ export default function MasterDataPage({ type }) {
       return true
     }
     try {
-      const result = await listAllProducts(
-        { active_only: true },
+      const result = await listProducts(
+        { limit: 500, active_only: true },
         { signal: request.signal }
       )
       if (!request.isCurrent()) {
@@ -492,7 +480,7 @@ export default function MasterDataPage({ type }) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return false
       }
-      showPageLoadError(error, '加载产品字典')
+      message.error(getActionErrorMessage(error, '加载产品字典'))
       setProductReferences([])
       return false
     } finally {
@@ -512,7 +500,10 @@ export default function MasterDataPage({ type }) {
       return true
     }
     try {
-      const result = await listAllProcesses({}, { signal: request.signal })
+      const result = await listProcesses(
+        { limit: 500 },
+        { signal: request.signal }
+      )
       if (!request.isCurrent()) {
         return false
       }
@@ -524,7 +515,7 @@ export default function MasterDataPage({ type }) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return false
       }
-      showPageLoadError(error, '加载可加工工序')
+      message.error(getActionErrorMessage(error, '加载可加工工序'))
       setProcessReferences([])
       return false
     } finally {
@@ -585,7 +576,7 @@ export default function MasterDataPage({ type }) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return false
       }
-      showPageLoadError(error, `加载${config.title}`)
+      message.error(getActionErrorMessage(error, `加载${config.title}`))
       return false
     } finally {
       if (request.isCurrent()) {
@@ -673,15 +664,7 @@ export default function MasterDataPage({ type }) {
     nextParams.delete('supplier_type')
     setSearchParams(nextParams, { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-  }, [
-    searchParams,
-    setKeyword,
-    setLifecycleScope,
-    setPagination,
-    setSearchParams,
-    setStockCategory,
-    setSupplierTypeFilter,
-  ])
+  }, [searchParams, setKeyword, setLifecycleScope, setPagination, setSearchParams, setStockCategory, setSupplierTypeFilter])
 
   const handleProductCatalogTabChange = useCallback(
     (nextType) => {
@@ -956,6 +939,10 @@ export default function MasterDataPage({ type }) {
     recordLabel: `${entityLabel}记录`,
   })
 
+  const activeRecordCount = useMemo(
+    () => records.filter((record) => record.is_active !== false).length,
+    [records]
+  )
   const productCatalogTabItems = useMemo(
     () =>
       [
@@ -980,15 +967,18 @@ export default function MasterDataPage({ type }) {
         compact
         title={config.title}
         helpKey={isProductCatalogPage ? 'products' : moduleKey}
-        viewSwitch={
-          isProductCatalogPage ? (
-            <Tabs
-              aria-label="产品档案视图"
-              activeKey={effectiveType}
-              onChange={handleProductCatalogTabChange}
-              items={productCatalogTabItems}
-            />
-          ) : null
+        stats={
+          isProcessDictionaryPage
+            ? []
+            : [
+                { key: 'total', label: `总${entityLabel}`, value: total },
+                { key: 'current', label: '本页显示', value: records.length },
+                {
+                  key: 'active',
+                  label: `启用${entityLabel}`,
+                  value: activeRecordCount,
+                },
+              ]
         }
       />
 
@@ -1174,6 +1164,16 @@ export default function MasterDataPage({ type }) {
       </BusinessOperationPanel>
 
       <BusinessDataTable
+        tableHeader={
+          isProductCatalogPage ? (
+            <Tabs
+              aria-label="产品档案视图"
+              activeKey={effectiveType}
+              onChange={handleProductCatalogTabChange}
+              items={productCatalogTabItems}
+            />
+          ) : null
+        }
         rowKey="id"
         loading={loading}
         columns={orderedRecordColumns}

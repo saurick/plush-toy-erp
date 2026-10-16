@@ -40,13 +40,7 @@ export function useSourceOrderWorkflowActions({
     async (task, { reason = '', processDecision = null } = {}) => {
       const scope = `${task.id}:complete`
       const operation = 'complete'
-      const params = buildDesktopWorkflowTaskActionParams({
-        task,
-        actionMode: operation,
-        reason,
-        processDecision,
-        surfaceKey,
-      })
+      const params = buildDesktopWorkflowTaskActionParams({ task, actionMode: operation, reason, processDecision, surfaceKey })
       return runMutationInFlight(task.id, async () => {
         const accessVerified = await verifyNewWorkflowTaskMutationAttempt({
           attemptStore: mutationAttemptsRef.current,
@@ -289,64 +283,31 @@ export function useSourceOrderWorkflowActions({
     [loadWorkflowTasks, runMutationInFlight, surfaceKey]
   )
 
-  const assignWorkflowTask = useCallback(
-    async (task, { reason = '', assignmentTarget } = {}) => {
-      const scope = `${task.id}:assign`
-      const params = buildDesktopWorkflowTaskActionParams({
-        task,
-        actionMode: 'assign',
-        assignmentTarget,
-        reason,
-        surfaceKey,
+  const assignWorkflowTask = useCallback(async (task, { reason = '', assignmentTarget } = {}) => {
+    const scope = `${task.id}:assign`
+    const params = buildDesktopWorkflowTaskActionParams({ task, actionMode: 'assign', assignmentTarget, reason, surfaceKey })
+    return runMutationInFlight(task.id, async () => {
+      const verified = await verifyNewWorkflowTaskMutationAttempt({
+        attemptStore: mutationAttemptsRef.current,
+scope,
+operation: 'assign',
+params,
+        verify: async () => {
+          const access = await getWorkflowTaskAssignmentOptions({ task_id: task.id })
+          const allowed = assignmentTarget === 'pool' ? access.can_return_to_pool : access.candidates.some((item) => item.admin_id === assignmentTarget)
+          if (access.task_version !== task.version || !access.can_reassign || !allowed) {
+            message.warning(access.reason || '转交去向已失效，请重新选择')
+            return false
+          }
+          return true
+        },
       })
-      return runMutationInFlight(task.id, async () => {
-        const verified = await verifyNewWorkflowTaskMutationAttempt({
-          attemptStore: mutationAttemptsRef.current,
-          scope,
-          operation: 'assign',
-          params,
-          verify: async () => {
-            const access = await getWorkflowTaskAssignmentOptions({
-              task_id: task.id,
-            })
-            const allowed =
-              assignmentTarget === 'pool'
-                ? access.can_return_to_pool
-                : access.candidates.some(
-                    (item) => item.admin_id === assignmentTarget
-                  )
-            if (
-              access.task_version !== task.version ||
-              !access.can_reassign ||
-              !allowed
-            ) {
-              message.warning(access.reason || '转交去向已失效，请重新选择')
-              return false
-            }
-            return true
-          },
-        })
-        if (!verified) return false
-        const updated = await runWorkflowTaskMutationWithFailureRefresh(
-          () =>
-            mutationAttemptsRef.current.run({
-              scope,
-              operation: 'assign',
-              mutate: reassignWorkflowTask,
-              params,
-            }),
-          loadWorkflowTasks
-        )
-        try {
-          await loadWorkflowTasks()
-        } catch {
-          message.warning('转交已成功但列表刷新失败，请手动刷新')
-        }
-        return updated
-      })
-    },
-    [loadWorkflowTasks, runMutationInFlight, surfaceKey]
-  )
+      if (!verified) return false
+      const updated = await runWorkflowTaskMutationWithFailureRefresh(() => mutationAttemptsRef.current.run({ scope, operation: 'assign', mutate: reassignWorkflowTask, params }), loadWorkflowTasks)
+      await loadWorkflowTasks()
+      return updated
+    })
+  }, [loadWorkflowTasks, runMutationInFlight, surfaceKey])
 
   return {
     assignWorkflowTask,
