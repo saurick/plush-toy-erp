@@ -1175,10 +1175,7 @@ function resolveCustomerId(row, existingIndex, context) {
     SALES_ORDER_ALIASES.customerId,
   );
   if (directId) {
-    const matches = existingIndex.customers.filter((customer) =>
-      sameText(customer.id, directId),
-    );
-    return matches.length === 1 ? matches[0].id : null;
+    return directId;
   }
   const code = pickFirst(
     row.normalizedFields,
@@ -1243,49 +1240,7 @@ function evaluateSalesOrderItem(row, existingIndex, context) {
     row.normalizedFields,
     SALES_ORDER_ITEM_ALIASES.quantity,
   );
-  const parent = resolveSimpleExisting(
-    row,
-    existingIndex.salesOrders,
-    { code: ["order_no", "orderNo", "document_no"], name: [] },
-    ["sales_order_id", "salesOrderId"],
-    ["order_no", "orderNo", "sales_order_no"],
-    [],
-  );
-  const lineValue = pickFirst(row.normalizedFields, ["line_no", "lineNo"]);
-  const lineNo = Number(lineValue);
-  let blocked =
-    parent.status !== "matched" || !Number.isSafeInteger(lineNo) || lineNo < 1;
-  if (blocked) {
-    addUnresolved(context, row, {
-      unresolvedType: "missing parent order or line number",
-      sourceField: "sales_order_id / line_no",
-      sourceValue: parent.key ?? lineValue ?? null,
-      targetCandidate: "sales_order_items",
-      severity: "block",
-      ownerRole: "Sales / Data Import",
-      resolution:
-        "match one existing sales order and supply a positive integer line number",
-      reason: "Each sales order item must identify its parent order and line.",
-    });
-  }
-  const existingItems = existingIndex.salesOrderItems.filter(
-    (item) =>
-      sameText(item.sales_order_id ?? item.salesOrderId, parent.id) &&
-      Number(item.line_no ?? item.lineNo) === lineNo,
-  );
-  if (existingItems.length > 1) {
-    blocked = true;
-    addUnresolved(context, row, {
-      unresolvedType: "duplicate order line",
-      sourceField: "sales_order_id / line_no",
-      sourceValue: lineValue,
-      targetCandidate: "sales_order_items",
-      severity: "block",
-      ownerRole: "Sales / Data Import",
-      resolution: "resolve the duplicate existing order line",
-      reason: "A source line must match at most one existing order item.",
-    });
-  }
+  let blocked = false;
 
   if (product.status !== "matched") {
     blocked = true;
@@ -1339,25 +1294,20 @@ function evaluateSalesOrderItem(row, existingIndex, context) {
       confidence: "Low",
       matchedExistingId: null,
       targetFields: {
-        salesOrderId: parent.id ?? null,
-        lineNo: Number.isSafeInteger(lineNo) && lineNo > 0 ? lineNo : null,
         productId: product.id ?? null,
         unitId: unit.id ?? null,
         orderedQuantity: quantityValue ?? null,
       },
-      reason:
-        "Sales order item is missing a unique parent/line, product, unit, or valid quantity.",
+      reason: "Sales order item is missing product, unit, or valid quantity.",
       warnings: row.normalizationWarnings,
     });
   }
   return buildCandidate(row, {
     targetModel: "sales_order_items",
-    actionCandidate: existingItems.length === 1 ? "update" : "create",
+    actionCandidate: "create",
     confidence: "Medium",
-    matchedExistingId: existingItems[0]?.id ?? null,
+    matchedExistingId: null,
     targetFields: {
-      salesOrderId: parent.id ?? null,
-      lineNo: Number.isSafeInteger(lineNo) && lineNo > 0 ? lineNo : null,
       productId: product.id,
       unitId: unit.id,
       orderedQuantity: String(quantityValue),
@@ -1489,26 +1439,7 @@ function evaluateBom(row, existingIndex, context) {
     UNIT_ALIASES.code,
     UNIT_ALIASES.name,
   );
-  const quantity = pickFirst(row.normalizedFields, [
-    "unit_quantity",
-    "quantity",
-    "unitQuantity",
-  ]);
-  let blocked = !quantityMatchesUnitPrecision(quantity, 6);
-  if (blocked) {
-    addUnresolved(context, row, {
-      unresolvedType: "invalid quantity",
-      sourceField: "unit_quantity / quantity",
-      sourceValue: quantity ?? null,
-      targetCandidate: "bom_items.quantity",
-      severity: "block",
-      ownerRole: "Engineering / Data Import",
-      resolution:
-        "provide a positive BOM quantity with at most six decimal places",
-      reason:
-        "BOM quantities are required and must be preserved without rounding.",
-    });
-  }
+  let blocked = false;
   for (const [label, result] of [
     ["product", product],
     ["material", material],
@@ -1538,7 +1469,6 @@ function evaluateBom(row, existingIndex, context) {
       productId: product.id ?? null,
       materialId: material.id ?? null,
       unitId: unit.id ?? null,
-      quantity: quantity == null ? null : String(quantity),
     },
     reason: blocked
       ? "BOM candidate requires manual review before any future import."
