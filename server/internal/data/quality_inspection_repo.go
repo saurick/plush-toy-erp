@@ -661,6 +661,7 @@ func evaluatePurchaseReceiptQualityGateInTx(
 	}
 
 	inspections, err := tx.client.QualityInspection.Query().Where(
+		qualityinspection.SupersededAtIsNil(),
 		qualityinspection.PurchaseReceiptID(receipt.ID),
 		qualityinspection.SourceType(biz.QualityInspectionSourcePurchaseReceipt),
 		qualityinspection.InspectionType(biz.QualityInspectionTypeIncoming),
