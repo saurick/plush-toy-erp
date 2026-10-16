@@ -451,6 +451,16 @@ function assertFormalAccountState(account, profile) {
   }
 }
 
+function assertFormalAccountConfirmation(plan, confirmation) {
+  const expected = manualAcceptanceFormalAccountBootstrapConfirmation(plan);
+  if (confirmation !== expected) {
+    throw new CliError(
+      `fresh dedicated manual acceptance database requires MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=${expected}`,
+      2,
+    );
+  }
+}
+
 async function bootstrapMissingFormalAccounts({
   plan,
   token,
@@ -458,14 +468,7 @@ async function bootstrapMissingFormalAccounts({
   confirmation,
   fetchImpl,
 }) {
-  const expectedConfirmation =
-    manualAcceptanceFormalAccountBootstrapConfirmation(plan);
-  if (confirmation !== expectedConfirmation) {
-    throw new CliError(
-      `fresh dedicated manual acceptance database requires MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=${expectedConfirmation}`,
-      2,
-    );
-  }
+  assertFormalAccountConfirmation(plan, confirmation);
   const beforeAccounts = await listAdmins({
     backendURL: plan.backendURL,
     token,
@@ -602,7 +605,11 @@ export async function bootstrapManualAcceptanceFormalAccounts(
     roleCredential.value,
     safePlan.passwordEnvironmentVariable,
   );
-  if ([...effectivePassword].length < 8 || [...effectivePassword].length > 20) {
+  if (
+    [...effectivePassword].length < 8 ||
+    [...effectivePassword].length > 20 ||
+    Buffer.byteLength(effectivePassword, "utf8") > 72
+  ) {
     throw new CliError("account password must contain 8-20 characters", 2);
   }
   const effectiveAdminPassword = requiredText(
@@ -1274,7 +1281,11 @@ export async function applyManualAcceptanceAccountScenarios(
     roleCredential.value,
     safePlan.passwordEnvironmentVariable,
   );
-  if ([...effectivePassword].length < 8 || [...effectivePassword].length > 20) {
+  if (
+    [...effectivePassword].length < 8 ||
+    [...effectivePassword].length > 20 ||
+    Buffer.byteLength(effectivePassword, "utf8") > 72
+  ) {
     throw new CliError("account password must contain 8-20 characters", 2);
   }
   const effectiveAdminPassword = requiredText(
@@ -1307,6 +1318,7 @@ export async function applyManualAcceptanceAccountScenarios(
     sessionToken: guardToken,
     fetchImpl,
   });
+  assertFormalAccountConfirmation(safePlan, formalAccountConfirmation);
   const roleCapabilityBaseline = await alignAcceptanceRoleCapabilities({
     backendURL: safePlan.backendURL,
     token: guardToken,

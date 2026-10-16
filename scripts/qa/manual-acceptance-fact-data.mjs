@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+import { numeric20Scale6Units } from "../../web/src/erp/utils/numeric20Scale6.mjs";
 import { roundRequiredMaterialQuantity } from "./lib/unit-quantity.mjs";
 
 import {
@@ -767,8 +768,11 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
   if (domain === "inventory") return "warehouse";
   if (
     domain === "operational_fact" &&
-    ["create_shipment_with_items", "get_shipment", "ship_shipment"].includes(method)
-  ) return "sales";
+    ["create_shipment_with_items", "get_shipment", "ship_shipment"].includes(
+      method,
+    )
+  )
+    return "sales";
   if (domain === "production_wip") {
     if (params.action === "CONFIRM_PACKAGING_MATERIAL") return "sales";
     if (params.action === "RECEIVE_OUTSOURCING_RETURN") return "warehouse";
@@ -782,7 +786,8 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
     if (
       surfaceKey.includes("shipment_release") ||
       surfaceKey.includes("shipment-release")
-    ) return "sales";
+    )
+      return "sales";
     if (
       surfaceKey.includes("shipment_finance_approval") ||
       surfaceKey.includes("shipment-finance-approval")
@@ -1425,6 +1430,50 @@ async function createOrReadReceiptSourcePurchaseOrder(rpc, receiptPlan, plan) {
   return order;
 }
 
+export function assertReceiptMatchesPlan(receipt, receiptPlan, sourceOrder) {
+  assertRecordGrain(receiptPlan.receiptNo, receipt, {
+    receipt_no: receiptPlan.receiptNo,
+    purchase_order_id: positiveID(sourceOrder?.id, "receipt source order"),
+    purchase_order_no: receiptPlan.sourcePurchaseOrderNo,
+    supplier_id: receiptPlan.supplierId,
+  });
+  const expected = receiptPlan.linkedPurchaseOrder
+    ? receiptPlan.linkedPurchaseOrder.items.map((item) => ({
+        purchase_order_item_id: item.id,
+        material_id: item.material_id,
+        unit_id: item.unit_id,
+        quantity: item.purchased_quantity,
+        warehouse_id: receiptPlan.warehouseId,
+      }))
+    : receiptPlan.items.map((item) => ({
+        material_id: item.materialId,
+        unit_id: item.unitId,
+        quantity: item.quantity,
+        warehouse_id: receiptPlan.warehouseId,
+      }));
+  const items = Array.isArray(receipt.items) ? [...receipt.items] : [];
+  if (!expected.length || items.length !== expected.length)
+    throw new CliError(
+      `${receiptPlan.receiptNo} source item count conflicts with plan`,
+    );
+  for (const grain of expected) {
+    const index = items.findIndex((item) =>
+      Object.entries(grain).every(([field, value]) =>
+        field === "quantity"
+          ? numeric20Scale6Units(item[field]) !== null &&
+            numeric20Scale6Units(item[field]) === numeric20Scale6Units(value) &&
+            BigInt(numeric20Scale6Units(value)) > 0n
+          : Number(item[field]) === Number(value) && Number(value) > 0,
+      ),
+    );
+    if (index < 0)
+      throw new CliError(
+        `${receiptPlan.receiptNo} source item grain conflicts with plan`,
+      );
+    items.splice(index, 1);
+  }
+}
+
 async function createOrReadReceipt(rpc, receiptPlan, plan) {
   let receipt = await exactByBusinessNo({
     rpc,
@@ -1469,6 +1518,17 @@ async function createOrReadReceipt(rpc, receiptPlan, plan) {
     }
   }
   receipt = await getReceipt(rpc, receipt.id);
+  const expectedSourceOrder =
+    receiptPlan.linkedPurchaseOrder ||
+    (await exactByBusinessNo({
+      rpc,
+      domain: "purchase_order",
+      method: "list_purchase_orders",
+      listKey: "purchase_orders",
+      businessField: "purchase_order_no",
+      businessNo: receiptPlan.sourcePurchaseOrderNo,
+    }));
+  assertReceiptMatchesPlan(receipt, receiptPlan, expectedSourceOrder);
   let status = String(receipt.status || "").toUpperCase();
   if (status === "CANCELLED" && receiptPlan.status !== "CANCELLED") {
     throw new CliError(
@@ -3329,7 +3389,10 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
     "warehouse_exception_end",
   ]) {
     requireProductionExceptionProcessNode(
-      processData, nodeKey, ["waiting"], `${decisionNo} approval readback`,
+      processData,
+      nodeKey,
+      ["waiting"],
+      `${decisionNo} approval readback`,
     );
   }
   const nodes = productionExceptionProcessNodes(
