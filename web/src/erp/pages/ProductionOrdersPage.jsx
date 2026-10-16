@@ -1719,6 +1719,18 @@ export default function ProductionOrdersPage() {
           setQuery(DEFAULT_QUERY)
           setSearchParams(new URLSearchParams(), { replace: true })
         }}
+        clearFiltersDisabled={
+          !(
+            resolvedRouteKeyword ||
+            linkedKeyword ||
+            routeProductionOrderID ||
+            query.keyword.trim() ||
+            query.scope !== DEFAULT_QUERY.scope ||
+            query.status ||
+            query.date_from ||
+            query.date_to
+          )
+        }
       >
         <SelectionActionBar
           embedded

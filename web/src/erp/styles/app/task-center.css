@@ -105,7 +105,8 @@
   }
 
   .erp-task-center-summary > .ant-btn,
-  .erp-dashboard-task-board-card .erp-business-operation-panel__command > .ant-btn {
+  .erp-dashboard-task-board-card .erp-business-operation-panel__command > .ant-btn,
+  .erp-dashboard-task-board-card .erp-business-filter-trigger-group > .ant-btn {
     min-height: 44px;
   }
 }

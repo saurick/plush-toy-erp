@@ -202,7 +202,7 @@ export function createFilterConflictScenarios(deps) {
       })
       const filters = page.getByRole('dialog', { name: phone ? '筛选流程' : '筛选条件', exact: true })
       if (phone) await panel.getByRole('button', { name: /筛选流程/ }).click()
-      else await panel.getByRole('button', { name: /筛选/ }).click()
+      else await panel.getByRole('button', { name: /^筛选/ }).click()
       await waitForFilters(page, filters)
       await choose(page, filters, '当前岗位', '工程')
       const endedRequest = page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.postDataJSON()?.method === 'list_tracking' && request.postDataJSON()?.params.status === 'completed')
@@ -218,7 +218,7 @@ export function createFilterConflictScenarios(deps) {
         await choose(page, filters, '关注事项', '只看逾期')
         await filters.getByRole('button', { name: '完成', exact: true }).click()
         await panel.getByRole('button', { name: /^已结束，/ }).click()
-        await panel.getByRole('button', { name: /筛选/ }).click()
+        await panel.getByRole('button', { name: /^筛选/ }).click()
       }
       await endedRequest
       await waitForFilters(page, filters)
@@ -358,6 +358,14 @@ export function createFilterConflictScenarios(deps) {
         await filters.getByRole('button', { name: '完成', exact: true }).click()
       }
       await waitForFiniteAnimations(page)
+      const directClear = operation.getByRole('button', { name: '清空筛选', exact: true })
+      assert.equal(await directClear.count(), 1, `${config.key} 非默认筛选显示直接清空入口`)
+      await Promise.all([response(), directClear.click()])
+      await waitForFiniteAnimations(page)
+      assert.equal(await filters.isVisible(), false)
+      assert.equal(await directClear.count(), 0, `${config.key} 清空后恢复默认筛选状态`)
+      assert.equal(page.filterQueries.at(-1)[config.field] || '', '')
+      assert.equal(await operation.locator('button[aria-haspopup="dialog"]').evaluate((node) => node === document.activeElement), true)
       await assertNoHorizontalOverflow(page, `${config.key} 记录范围恢复`)
     },
   }))
@@ -367,7 +375,7 @@ export function createFilterConflictScenarios(deps) {
     path: '/erp/task-board?lane=finished',
     verify: async (page) => {
       const panel = page.getByRole('region', { name: '任务管理', exact: true })
-      const trigger = panel.locator('.erp-task-board-filters').getByRole('button', { name: /筛选/ })
+      const trigger = panel.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ })
       const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
       const dates = page.getByRole('dialog', { name: '选择处理日期范围', exact: true })
       await trigger.click()

@@ -156,7 +156,7 @@ snapshot_at: now,
         await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
         assert(calls.every((call) => !call.due), 'calendar requests do not retain list deadline conditions')
         if (!mobile) {
-          await page.locator('.erp-task-board-filters').getByRole('button', { name: /筛选/ }).click()
+          await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
           const filters = page.getByRole('dialog', { name: '筛选条件', exact: true })
           assert.equal(await filters.getByText('截止时间', { exact: true }).count(), 0, 'desktop calendar has one date condition')
           await filters.getByRole('button', { name: '完成', exact: true }).click()

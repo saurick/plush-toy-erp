@@ -3595,7 +3595,7 @@ export function createBusinessFormalScenarios(deps) {
           path: path.join(outputDir, 'business-formal-inventory-sku-grain.png'),
           fullPage: true,
         })
-        await page.getByRole('button', { name: '清空筛选' }).click()
+        await page.getByRole('dialog', { name: '筛选条件', exact: true }).getByRole('button', { name: '清空筛选', exact: true }).click()
         await page.setViewportSize({ width: 390, height: 844 })
         await page.waitForTimeout(160)
         const inventoryNarrowMetrics = await page.evaluate(() => {

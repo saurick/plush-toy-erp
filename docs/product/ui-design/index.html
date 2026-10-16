@@ -2092,6 +2092,13 @@
     .login-demo-entry { display: block; margin: 12px auto 0; padding: 4px 8px; border: 0; background: transparent; color: var(--text-2); font-size: 12px; }
 
     .filter-active { border-color: color-mix(in srgb, var(--brand) 45%, var(--line)); color: var(--brand-strong); background: var(--brand-softer); }
+    .filter-trigger-group { display:inline-flex; flex:0 0 auto; align-items:stretch; }
+    .filter-trigger-group .control { position:relative; }
+    .filter-trigger-group .filter-active { border-color:var(--brand); background:var(--surface); }
+    .filter-trigger-group .filter-active:hover { background:var(--brand-softer); }
+    .filter-trigger-group:has(.filter-trigger-clear) > .control:first-child { border-top-right-radius:0; border-bottom-right-radius:0; }
+    .filter-trigger-group .filter-trigger-clear { width:var(--control-h); padding:0; margin-left:-1px; border-top-left-radius:0; border-bottom-left-radius:0; border-left-color:color-mix(in srgb,var(--brand) 35%,var(--surface)); }
+    @media(max-width:767px) { .filter-trigger-group > .control { min-height:44px; } .filter-trigger-group .filter-trigger-clear { min-width:44px; } }
     .filter-active b { min-width: 17px; height: 17px; padding: 0 5px; display: inline-grid; place-items: center; border-radius: 999px; color: var(--on-brand); background: var(--brand); font-size: 10px; }
     .task-result-field { margin-top: 14px; }
     .task-result-field .error-text { display: block; margin-top: 5px; color: var(--danger); font-size: 11px; }
@@ -5458,7 +5465,7 @@
           <div class="segment" role="group" aria-label="状态筛选">${countedStatuses.map(([key, label, count]) => `<button type="button" aria-pressed="${state.status === key}" class="${state.status === key ? 'active' : ''}" data-action="status" data-value="${key}">${label}${count===null?'':`<b>${count}</b>`}</button>`).join('')}</div>
           <label class="search">${icon('search')}<input id="list-search" value="${escapeHTML(state.search)}" placeholder="搜索${config.entity}、${config.party}、${config.item}" aria-label="搜索" /></label>
           <div class="command-actions">
-            <button class="control ${activeFilterCount()?'filter-active':''}" data-action="open-filter">${icon('filter')}<span>筛选</span>${activeFilterCount()?`<b>${activeFilterCount()}</b>`:''}</button>
+            ${renderFilterTrigger(activeFilterCount()>0,'open-filter','clear-filter')}
             <button class="btn desktop-only collapse-label" data-action="export" aria-label="导出">${icon('export')}<span>导出</span></button>
             <button class="btn desktop-optional" data-action="open-columns">${icon('columns')}<span>列设置</span></button>
             ${config.primary ? `<button class="btn primary" data-action="new-record">${icon('plus')}<span>${config.primary}</span></button>` : ''}
@@ -10346,6 +10353,10 @@ return {orders,financeCustomers};})();
     function renderDirectFilterChoices(label, value, options, action, field, disabled=false) {
       return `<div class="filter-choice-field"><span>${label}</span><div class="filter-choice-options" role="group" aria-label="${label}">${options.map(([key,text])=>`<button class="filter-chip" data-action="${action}" data-field="${field}" data-value="${key}" aria-pressed="${String(value||'')===String(key)}" ${disabled?'disabled':''}>${text}</button>`).join('')}</div></div>`;
     }
+    function renderFilterTrigger(active, openAction='open-task-filter', clearAction='task-filter-clear-direct') {
+      const expanded=state.overlay===(openAction==='open-filter'?'filter':'task-filter');
+      return `<span class="filter-trigger-group" role="group" aria-label="筛选操作"><button class="control ${active?'filter-active':''}" data-action="${openAction}" aria-haspopup="dialog" aria-expanded="${expanded}">${icon('filter')}筛选${active?' · 已应用':''}</button>${active?`<button class="control filter-active filter-trigger-clear" data-action="${clearAction}" aria-label="清空筛选" title="清空筛选">${icon('close')}</button>`:''}</span>`;
+    }
     function renderTaskFilterPopover() {
       const tracking = ['visible','started','participated'].includes(state.boardMode);
       const f = state.trackingFilters[state.boardMode] || {};
@@ -10690,7 +10701,7 @@ return {orders,financeCustomers};})();
       if (tracking) {
         const f = state.trackingFilters[state.boardMode] || {};
         const filters = `<label class="search">${icon('search')}<input data-tracking-filter="keyword" aria-label="搜索流转记录" value="${escapeHTML(f.keyword || '')}" placeholder="单号 / 任务 / 产品 / 款号" /></label>
-          <button class="control ${Object.values(f).some(Boolean)?'filter-active':''}" data-action="open-task-filter">${icon('filter')}筛选${Object.values(f).some(Boolean)?' · 已应用':''}</button>`;
+          ${renderFilterTrigger(Object.values(f).some(Boolean))}`;
         const matches = (!f.status || f.status==='active') && trackingDemoMatches(f);
         const pageSize = state.trackingPageSizes[state.boardMode] || 20;
         const pager = `<nav class="statistics-pagination erp-task-pagination" aria-label="流转记录分页"><div class="erp-task-pagination__summary"><span role="status">第 ${matches?'1–1':'0–0'} 条，共 ${matches?1:0} 条</span><select data-tracking-page-size aria-label="每页流转记录数">${[8,20,50].map(value=>`<option value="${value}" ${value===pageSize?'selected':''}>${value} 条 / 页</option>`).join('')}</select></div><div class="statistics-pager"><button class="btn" aria-label="上一页" disabled>← 上一页</button><button class="btn is-current" aria-current="page" disabled>1</button><button class="btn" aria-label="下一页" disabled>下一页 →</button></div></nav>`;
@@ -10706,7 +10717,7 @@ return {orders,financeCustomers};})();
       if(taskHandlingPreview) {
         const categories=[['all','全部'],['normal','常规待办'],['blocked','阻塞'],['due','到期提醒'],...(state.boardMode==='all'?[['done','已结束']]:[])];
         const rows=filtered.map(task=>`<tr data-lane="${task.lane}" data-action="open-task" data-id="${task.id}"><td><div class="product-cell">${renderProductThumb(0,getTaskListSubject(task))}<div><button class="workbench-task-entry" data-action="open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}详情">${renderTaskHeading(task)}</button><small>${escapeHTML(task.object)}</small><small>${escapeHTML(demoTaskPath(task))}</small></div></div></td><td>${escapeHTML(listConfig[task.sourcePage]?.title||'业务单据')} · ${copyValue(getTaskListSource(task)?.no||task.object)}<small>${escapeHTML(task.time)}</small></td><td><span class="badge ${task.badge}">${escapeHTML(task.state)}</span><div class="task-reason">${escapeHTML(task.reason||'打开任务查看办理依据与处理记录。')}</div></td><td>${escapeHTML(task.role)}<small>由岗位人员处理</small></td></tr>`).join('');
-        return `${header}<section class="surface board-surface task-handling-board">${calendarSwitch}<div class="task-handling-toolbar"><div class="segment" aria-label="任务分类">${categories.map(([key,label])=>`<button class="${state.boardStatus===key?'active':''}" data-action="board-status" data-value="${key}" aria-pressed="${state.boardStatus===key}">${label}<b>${inScope.filter(task=>key==='all'||task.lane===key).length}</b></button>`).join('')}</div><label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="订单 / 产品 / 物料 / 款号" aria-label="搜索任务" /></label><button class="control ${state.boardRole!=='all'||Object.values(taskDiscoveryDemo).some(Boolean)?'filter-active':''}" data-action="open-task-filter">${icon('filter')}筛选${state.boardRole!=='all'||Object.values(taskDiscoveryDemo).some(Boolean)?' · 已应用':''}</button></div><div class="task-handling-table"><table class="task-board-table"><thead><tr><th>任务与关联内容</th><th>关联单据 / 时间</th><th>状态与说明</th><th>负责岗位 / 处理人</th></tr></thead><tbody>${rows||'<tr><td colspan="4"><div class="empty">当前分类暂无匹配任务</div></td></tr>'}</tbody></table></div><nav class="statistics-pagination erp-task-pagination" aria-label="任务分页"><span role="status">第 ${filtered.length?'1–'+filtered.length:'0–0'} 项，共 ${filtered.length} 项</span><div class="statistics-pager"><button class="btn" disabled>← 上一页</button><button class="btn is-current" disabled>1</button><button class="btn" disabled>下一页 →</button></div></nav></section>`;
+        return `${header}<section class="surface board-surface task-handling-board">${calendarSwitch}<div class="task-handling-toolbar"><div class="segment" aria-label="任务分类">${categories.map(([key,label])=>`<button class="${state.boardStatus===key?'active':''}" data-action="board-status" data-value="${key}" aria-pressed="${state.boardStatus===key}">${label}<b>${inScope.filter(task=>key==='all'||task.lane===key).length}</b></button>`).join('')}</div><label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="订单 / 产品 / 物料 / 款号" aria-label="搜索任务" /></label>${renderFilterTrigger(state.boardRole!=='all'||Object.values(taskDiscoveryDemo).some(Boolean))}</div><div class="task-handling-table"><table class="task-board-table"><thead><tr><th>任务与关联内容</th><th>关联单据 / 时间</th><th>状态与说明</th><th>负责岗位 / 处理人</th></tr></thead><tbody>${rows||'<tr><td colspan="4"><div class="empty">当前分类暂无匹配任务</div></td></tr>'}</tbody></table></div><nav class="statistics-pagination erp-task-pagination" aria-label="任务分页"><span role="status">第 ${filtered.length?'1–'+filtered.length:'0–0'} 项，共 ${filtered.length} 项</span><div class="statistics-pager"><button class="btn" disabled>← 上一页</button><button class="btn is-current" disabled>1</button><button class="btn" disabled>下一页 →</button></div></nav></section>`;
       }
       const lanes = [
         ['normal','常规待办',''], ['blocked','阻塞','blocked'], ['due','到期提醒','due'], ['done','已结束','']
@@ -10723,7 +10734,7 @@ return {orders,financeCustomers};})();
           <div class="command-row">
             <div class="segment" aria-label="任务分类">${[['all','概览'],...lanes].map(([key,label]) => { const count=inScope.filter(t=>key==='all'||t.lane===key).length; return `<button class="${state.boardStatus === key ? 'active' : ''}" data-action="board-status" data-value="${key}" aria-pressed="${state.boardStatus === key}">${label}<b>${count}</b></button>`; }).join('')}</div>
             <label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="搜索订单、产品、任务" /></label>
-            <button class="control ${state.boardRole!=='all'||state.boardSearch||Object.values(taskDiscoveryDemo).some(Boolean)?'filter-active':''}" data-action="open-task-filter">${icon('filter')}筛选${state.boardRole!=='all'||state.boardSearch||Object.values(taskDiscoveryDemo).some(Boolean)?' · 已应用':''}</button>
+            ${renderFilterTrigger(Boolean(state.boardRole!=='all'||state.boardSearch||Object.values(taskDiscoveryDemo).some(Boolean)))}
           </div>
         </section>
         <section class="surface board-surface">${calendarSwitch}${content}</section>`;
@@ -12027,6 +12038,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     let floatingReturnFocus = null;
     function renderFloating() {
       const root = document.querySelector('#floating');
+      document.querySelectorAll('.filter-trigger-group [aria-haspopup="dialog"]').forEach(button => button.setAttribute('aria-expanded', String(state.overlay===(button.dataset.action==='open-filter'?'filter':'task-filter'))));
       const previousFocus = root.contains(document.activeElement) ? document.activeElement : null;
       let html = '';
       if (state.overlay === 'filter') html += renderFilterPopover();
@@ -12748,7 +12760,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'board-mode') { state.boardMode=target.dataset.value==='tracking'?(state.trackingLastView==='exceptions'?'exceptions':state.trackingLastScope||'visible'):target.dataset.value; state.boardStatus='all'; state.overlay=null; renderView(); renderFloating(); }
       else if (action === 'tracking-view') { state.trackingLastView=target.dataset.value;state.boardMode=target.dataset.value==='tracking'?(state.trackingLastScope||'visible'):'exceptions';state.overlay=null;renderView();renderFloating(); }
       else if (action === 'open-task-filter') { state.overlay='task-filter'; renderFloating(); }
-      else if (action === 'task-filter-clear') { if(['visible','started','participated'].includes(state.boardMode)) state.trackingFilters[state.boardMode]={}; else {state.boardRole='all';state.boardSearch='';Object.keys(taskDiscoveryDemo).forEach(key=>delete taskDiscoveryDemo[key]);} renderView(); renderFloating(); }
+      else if (action === 'task-filter-clear' || action === 'task-filter-clear-direct') { const direct=action==='task-filter-clear-direct'; if(['visible','started','participated'].includes(state.boardMode)) state.trackingFilters[state.boardMode]={}; else {state.boardRole='all';state.boardSearch='';Object.keys(taskDiscoveryDemo).forEach(key=>delete taskDiscoveryDemo[key]);} if(direct) state.overlay=null; renderView(); renderFloating(); if(direct) document.querySelector('[data-action="open-task-filter"]')?.focus(); }
       else if (action === 'board-status') { state.boardStatus = target.dataset.value; renderView(); }
       else if (action === 'progress-view') { state.progressView = target.dataset.value; state.progressSelected=''; renderView(); }
       else if (action === 'statistics-filter') { statisticsDesignState.status=target.dataset.value; statisticsDesignState.selected=''; statisticsDesignState.page=1; statisticsDesignState.sourcePage=1; statisticsDesignState.scroll=0; renderView(); }
@@ -12820,7 +12832,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'sort') { const key = target.dataset.key; if (state.sortKey === key) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc'; else { state.sortKey = key; state.sortDir = 'asc'; } state.pageNo = 1; renderView(); }
       else if (action === 'open-filter') { state.overlay = 'filter'; renderFloating(); }
       else if (action === 'toggle-summary') { state.summaryOpen = !state.summaryOpen; renderView(); }
-      else if (action === 'clear-filter') { resetListFilters(); state.overlay=null; state.selected.clear(); renderAll(); toast('附加筛选已重置'); }
+      else if (action === 'clear-filter') { resetListFilters(); state.overlay=null; state.selected.clear(); renderAll(); document.querySelector('[data-action="open-filter"]')?.focus(); toast('附加筛选已重置'); }
       else if (action === 'page-prev') { state.pageNo=Math.max(1,state.pageNo-1);renderView(); }
       else if (action === 'page-number') { state.pageNo=Number(target.dataset.value)||1;renderView(); }
       else if (action === 'page-next') { if(state.previewState==='stress'){state.pageNo=Math.min(1285,state.pageNo+1);renderView();}else{const config=currentPageConfig();if(config){const page=getPageSlice(getFilteredRows(config));state.pageNo=Math.min(page.pageCount,state.pageNo+1);renderView();}} }

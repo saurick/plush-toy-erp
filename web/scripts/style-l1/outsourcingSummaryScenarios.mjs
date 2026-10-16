@@ -229,6 +229,16 @@ export function createOutsourcingSummaryScenarios({
           filteredCSV.includes('MAT-SUM-205') &&
             !filteredCSV.includes('模拟产品 1')
         )
+        const directClear = region.getByRole('button', { name: '清空筛选', exact: true })
+        await directClear.click()
+        await region.getByText('模拟产品 1', { exact: true }).waitFor()
+        await page.getByRole('dialog', { name: '筛选条件', exact: true }).waitFor({ state: 'hidden' })
+        assert.equal(await search.inputValue(), '')
+        assert.equal(await directClear.count(), 0)
+        assert.equal(await page.getByRole('dialog', { name: '筛选条件', exact: true }).isVisible(), false)
+        assert.equal(await region.locator('button[aria-haspopup="dialog"]').evaluate((node) => node === document.activeElement), true)
+        await search.fill('耳*2')
+        await region.getByText('模拟筛选布料', { exact: true }).waitFor()
         await region
           .getByRole('button', {
             name: 'SIM-OUTSOURCE-CONTRACT-L1',

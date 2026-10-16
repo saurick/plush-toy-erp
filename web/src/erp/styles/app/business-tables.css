@@ -438,10 +438,21 @@
   padding: 10px 0 0;
 }
 
-.erp-business-filter-trigger--active.ant-btn {
+.erp-business-filter-trigger-group {
+  flex: 0 0 auto;
+}
+
+.erp-business-filter-trigger--active.ant-btn,
+.erp-business-filter-clear.ant-btn {
   color: var(--erp-primary-strong);
   border-color: var(--erp-primary);
-  background: var(--erp-primary-softer);
+  background: var(--erp-surface-bg);
+}
+
+.erp-business-filter-clear.ant-btn {
+  border-inline-start-color: color-mix(
+    in srgb, var(--erp-primary) 35%, var(--erp-surface-bg)
+  );
 }
 
 @media (max-width: 1100px) {
@@ -455,6 +466,11 @@
 }
 
 @media (max-width: 767px) {
+  .erp-business-filter-trigger-group > .ant-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
   .erp-business-operation-panel__search {
     flex-basis: 100%;
   }

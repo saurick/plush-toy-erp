@@ -5,6 +5,7 @@ import {
   CalendarOutlined,
   CheckCircleOutlined,
   CheckSquareOutlined,
+  CloseOutlined,
   CopyOutlined,
   DownOutlined,
   FilterOutlined,
@@ -1196,113 +1197,132 @@ export function BusinessOperationPanel({
           {searchControls}
         </div>
         {additionalFilters.length > 0 ? (
-          <Popover
-            trigger="click"
-            placement="bottomLeft"
-            align={{ overflow: { adjustX: true, adjustY: true, shiftY: true } }}
-            open={filtersOpen}
-            onOpenChange={setFiltersOpen}
-            classNames={{ root: 'erp-business-filter-popover' }}
-            afterOpenChange={(open) => {
-              // Opening motion must not take focus back from a field already in use.
-              if (
-                open &&
-                (document.activeElement === filterTriggerRef.current ||
-                  document.activeElement === document.body)
-              ) {
-                filterPanelRef.current?.focus({ preventScroll: true })
-              }
-            }}
-            content={
-              <section
-                className="erp-business-filter-popover__content"
-                aria-label="筛选条件"
-                role="dialog"
-                id={filterPanelId}
-                ref={filterPanelRef}
-                tabIndex={-1}
-                onKeyDownCapture={(event) => {
-                  if (
-                    event.defaultPrevented ||
-                    document.querySelector(
-                      '.ant-select-dropdown:not(.ant-select-dropdown-hidden), .ant-picker-dropdown:not(.ant-picker-dropdown-hidden)'
-                    )
-                  ) {
-                    return
-                  }
-                  if (event.key === 'Escape') {
-                    event.preventDefault()
-                    event.stopPropagation()
-                    closeFilters()
-                  }
-                  if (event.key === 'Tab') {
-                    const controls = [
-                      ...event.currentTarget.querySelectorAll(
-                        'button:not(:disabled), input:not(:disabled), [tabindex="0"]'
-                      ),
-                    ].filter((node) => node.getClientRects().length)
-                    const first = controls[0]
-                    const last = controls.at(-1)
-                    if (
-                      event.shiftKey &&
-                      (document.activeElement === first ||
-                        document.activeElement === event.currentTarget)
-                    ) {
-                      event.preventDefault()
-                      last?.focus()
-                    } else if (
-                      !event.shiftKey &&
-                      document.activeElement === last
-                    ) {
-                      event.preventDefault()
-                      first?.focus()
-                    }
-                  }
-                }}
-              >
-                <header>
-                  <strong>筛选条件</strong>
-                  {hasClearFilters ? (
-                    <Button
-                      size="small"
-                      type="text"
-                      disabled={clearFiltersDisabled}
-                      icon={<RollbackOutlined />}
-                      onClick={() => {
-                        onClearFilters()
-                        filterPanelRef.current?.focus({ preventScroll: true })
-                      }}
-                    >
-                      清空筛选
-                    </Button>
-                  ) : null}
-                </header>
-                <div className="erp-business-operation-panel__filters">
-                  <BusinessFilterPanelContext.Provider value>
-                    {additionalFilters}
-                  </BusinessFilterPanelContext.Provider>
-                </div>
-                <footer>
-                  <Button type="primary" onClick={closeFilters}>
-                    完成
-                  </Button>
-                </footer>
-              </section>
-            }
+          <Space.Compact
+            className="erp-business-filter-trigger-group"
+            role="group"
+            aria-label="筛选操作"
           >
-            <Button
-              ref={filterTriggerRef}
-              icon={<FilterOutlined />}
-              aria-haspopup="dialog"
-              aria-controls={filtersOpen ? filterPanelId : undefined}
-              aria-expanded={filtersOpen}
-              className={
-                hasActiveFilters ? 'erp-business-filter-trigger--active' : ''
+            <Popover
+              trigger="click"
+              placement="bottomLeft"
+              align={{ overflow: { adjustX: true, adjustY: true, shiftY: true } }}
+              open={filtersOpen}
+              onOpenChange={setFiltersOpen}
+              classNames={{ root: 'erp-business-filter-popover' }}
+              afterOpenChange={(open) => {
+                // Opening motion must not take focus back from a field already in use.
+                if (
+                  open &&
+                  (document.activeElement === filterTriggerRef.current ||
+                    document.activeElement === document.body)
+                ) {
+                  filterPanelRef.current?.focus({ preventScroll: true })
+                }
+              }}
+              content={
+                <section
+                  className="erp-business-filter-popover__content"
+                  aria-label="筛选条件"
+                  role="dialog"
+                  id={filterPanelId}
+                  ref={filterPanelRef}
+                  tabIndex={-1}
+                  onKeyDownCapture={(event) => {
+                    if (
+                      event.defaultPrevented ||
+                      document.querySelector(
+                        '.ant-select-dropdown:not(.ant-select-dropdown-hidden), .ant-picker-dropdown:not(.ant-picker-dropdown-hidden)'
+                      )
+                    ) {
+                      return
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      closeFilters()
+                    }
+                    if (event.key === 'Tab') {
+                      const controls = [
+                        ...event.currentTarget.querySelectorAll(
+                          'button:not(:disabled), input:not(:disabled), [tabindex="0"]'
+                        ),
+                      ].filter((node) => node.getClientRects().length)
+                      const first = controls[0]
+                      const last = controls.at(-1)
+                      if (
+                        event.shiftKey &&
+                        (document.activeElement === first ||
+                          document.activeElement === event.currentTarget)
+                      ) {
+                        event.preventDefault()
+                        last?.focus()
+                      } else if (
+                        !event.shiftKey &&
+                        document.activeElement === last
+                      ) {
+                        event.preventDefault()
+                        first?.focus()
+                      }
+                    }
+                  }}
+                >
+                  <header>
+                    <strong>筛选条件</strong>
+                    {hasClearFilters ? (
+                      <Button
+                        size="small"
+                        type="text"
+                        disabled={clearFiltersDisabled}
+                        icon={<RollbackOutlined />}
+                        onClick={() => {
+                          onClearFilters()
+                          filterPanelRef.current?.focus({ preventScroll: true })
+                        }}
+                      >
+                        清空筛选
+                      </Button>
+                    ) : null}
+                  </header>
+                  <div className="erp-business-operation-panel__filters">
+                    <BusinessFilterPanelContext.Provider value>
+                      {additionalFilters}
+                    </BusinessFilterPanelContext.Provider>
+                  </div>
+                  <footer>
+                    <Button type="primary" onClick={closeFilters}>
+                      完成
+                    </Button>
+                  </footer>
+                </section>
               }
             >
-              筛选{hasActiveFilters ? ' · 已应用' : ''}
-            </Button>
-          </Popover>
+              <Button
+                ref={filterTriggerRef}
+                icon={<FilterOutlined aria-hidden />}
+                aria-haspopup="dialog"
+                aria-controls={filtersOpen ? filterPanelId : undefined}
+                aria-expanded={filtersOpen}
+                className={
+                  hasActiveFilters ? 'erp-business-filter-trigger--active' : ''
+                }
+              >
+                筛选{hasActiveFilters ? ' · 已应用' : ''}
+              </Button>
+            </Popover>
+            {hasActiveFilters ? (
+              <Tooltip title="清空筛选">
+                <Button
+                  className="erp-business-filter-clear"
+                  aria-label="清空筛选"
+                  icon={<CloseOutlined aria-hidden />}
+                  onClick={() => {
+                    onClearFilters()
+                    closeFilters()
+                  }}
+                />
+              </Tooltip>
+            ) : null}
+          </Space.Compact>
         ) : null}
         {hasToolbar ? (
           <div className="erp-business-operation-panel__toolbar">

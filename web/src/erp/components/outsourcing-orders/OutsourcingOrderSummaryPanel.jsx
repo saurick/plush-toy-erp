@@ -279,6 +279,16 @@ export default forwardRef((
     <section aria-label="委外加工明细汇总">
       <BusinessOperationPanel
         compact
+        clearFiltersDisabled={
+          !(
+            filters.keyword ||
+            filters.supplier_id ||
+            filters.process_id ||
+            filters.lifecycle_status ||
+            filters.date_from ||
+            filters.date_to
+          )
+        }
         filters={
           <>
             <SearchInput

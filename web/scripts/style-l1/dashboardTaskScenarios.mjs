@@ -241,7 +241,7 @@ export function createDashboardTaskScenarios({
         )
         const moreFilters = page
           .locator('.erp-task-board-filters')
-          .getByRole('button', { name: /筛选/ })
+          .getByRole('button', { name: /^筛选/ })
         await moreFilters.click()
         const extraFilters = page.getByRole('dialog', { name: '筛选条件', exact: true })
         const statusChoices = extraFilters.getByRole('group', { name: '任务状态', exact: true })
@@ -1540,7 +1540,7 @@ export function createDashboardTaskScenarios({
         await page
           .getByRole('region', { name: '任务管理', exact: true })
           .waitFor({ state: 'visible' })
-        await page.locator('.erp-task-board-filters').getByRole('button', { name: /筛选/ }).click()
+        await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
         await page.getByRole('dialog', { name: '筛选条件', exact: true })
           .getByRole('group', { name: '负责岗位', exact: true })
           .getByRole('button', { name: '仓库', exact: true }).click()
@@ -1839,7 +1839,7 @@ export function createDashboardTaskScenarios({
           .inputValue()
         assert.equal(restoredKeyword, 'OUT-DASH-NAV')
         const taskBoardFilters = page.locator('.erp-task-board-controls')
-        await taskBoardFilters.getByRole('button', { name: /筛选/ }).click()
+        await taskBoardFilters.getByRole('button', { name: /^筛选/ }).click()
         const clearFiltersButton = page.getByRole('dialog', { name: '筛选条件', exact: true })
           .getByRole('button', { name: /清空筛选/ })
         assert.equal(
@@ -2169,7 +2169,7 @@ export function createDashboardTaskScenarios({
             .count(),
           0
         )
-        await page.locator('.erp-task-board-filters').getByRole('button', { name: /筛选/ }).click()
+        await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
         assert.equal(
           await page
             .getByRole('dialog', { name: '筛选条件', exact: true })
@@ -2356,7 +2356,7 @@ export function createDashboardTaskScenarios({
             mobileFilterMetrics
           )}`
         )
-        await page.locator('.erp-task-board-filters').getByRole('button', { name: /筛选/ }).click()
+        await page.locator('.erp-task-board-filters').getByRole('button', { name: /^筛选/ }).click()
         const extraFilters = page.getByRole('dialog', { name: '筛选条件', exact: true })
         await extraFilters.waitFor({ state: 'visible' })
         assert.equal(await extraFilters.getByRole('combobox').count(), 3)

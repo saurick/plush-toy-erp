@@ -345,7 +345,7 @@ approval_form: null,
           await Promise.all([
             page.waitForRequest((request) => request.url().endsWith('/rpc/workflow') && request.method() === 'POST' && request.postDataJSON().method === 'list_tracking' && request.postDataJSON().params.scope === scope),
             (async () => {
-              await panel.getByRole('button', { name: /筛选/u }).click()
+              await panel.getByRole('button', { name: /^筛选/u }).click()
               await page.locator('.ant-select[aria-label="跟踪范围"]').click()
               await page.locator('.ant-select-dropdown:visible .ant-select-item-option').filter({ hasText: label }).click()
               assert.equal(new URL(page.url()).searchParams.get('tracking'), scope, '跟踪范围应立即更新 URL')
