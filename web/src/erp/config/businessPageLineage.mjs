@@ -216,6 +216,8 @@ export const businessPageFlowDefinitions = Object.freeze(
           'get_purchase_order_receipt_progress',
         ],
         ['sales-orders', 'shipments', 'list_shipment_source_candidates'],
+        ['receivables', 'finance-payments', 'list_finance_payment_allocation_candidates'],
+        ['payables', 'finance-payments', 'list_finance_payment_allocation_candidates'],
         ['quality-inspections', 'production-exceptions', 'get_production_exception_context'],
         ['production-orders', 'production-exceptions', 'get_production_exception_context'],
         ['material-bom', 'sales-orders', 'get_engineering_material_request'],
@@ -726,6 +728,7 @@ export const businessPageFlowDefinitions = Object.freeze(
     .concat(
       [
         ['inventory', 'inventory', 'post_inventory_operation'],
+        ['finance-payments', 'finance-payments', 'allocate_finance_payment'],
         [
           'finance-payments',
           'finance-payments',
@@ -749,6 +752,7 @@ export const businessPageFlowDefinitions = Object.freeze(
     .concat(
       [
         ['finance-payments', 'finance-payments', 'reverse_finance_payment'],
+        ['finance-payments', 'finance-payments', 'reverse_finance_allocation'],
         ['finance-payments', 'finance-payments', 'reverse_finance_credit_note'],
       ].map(([fromPageKey, toPageKey, action]) =>
         businessFlow({

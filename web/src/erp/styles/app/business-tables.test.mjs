@@ -7,15 +7,12 @@ const stylesheet = readFileSync(
   'utf8'
 )
 
-test('business header stat labels can use the full tile width', () => {
-  const rule = stylesheet.match(
-    /\.erp-business-page-header-card__stats \.ant-typography\s*\{([^}]*)\}/
-  )
-
-  assert.ok(rule, 'expected the business header stat label rule')
-  assert.match(rule[1], /max-width:\s*100%\s*;/)
-  assert.doesNotMatch(rule[1], /calc\(100%\s*-\s*46px\)/)
-  assert.match(rule[1], /word-break:\s*keep-all\s*;/)
+test('business page headers share compact layout without decorative count tiles', () => {
+  assert.doesNotMatch(stylesheet, /erp-business-page-header-card__stat/u)
+  const rule = stylesheet.match(/\.erp-business-page-header-card__grid\s*\{([^}]*)\}/u)
+  assert.ok(rule)
+  assert.match(rule[1], /display:\s*flex/u)
+  assert.match(rule[1], /flex-wrap:\s*wrap/u)
 })
 
 test('copyable table cells reveal a real button on hover and keyboard focus', () => {

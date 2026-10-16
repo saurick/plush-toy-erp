@@ -9,12 +9,14 @@ export default function BusinessStatusFilter({
   counts = null,
   loading = false,
   exact = false,
+  removable = false,
+  allLabel = '不限状态',
   onChange,
   'aria-label': label = '业务状态',
 }) {
   const statusOptions = options.some((option) => option.value === '')
     ? options
-    : [{ value: '', label: '不限状态' }, ...options]
+    : [{ value: '', label: allLabel }, ...options]
   return (
     <div
       className="erp-business-status-filters"
@@ -24,12 +26,13 @@ export default function BusinessStatusFilter({
     >
       {statusOptions.map((option) => {
         const count = loading ? null : businessStatusCount(counts, option.value)
-        const text = option.value === '' ? '不限状态' : option.label
+        const text = option.value === '' ? allLabel : option.label
         const countText = count === null ? '—' : count.toLocaleString('zh-CN')
         return (
           <FilterChip
             key={option.value}
             selected={value === option.value}
+            removable={removable && option.value !== ''}
             disabled={loading || exact || option.disabled}
             count={countText}
             aria-label={`${text}，${count === null ? '数量暂不可用' : `共 ${count} 条`}`}
@@ -39,7 +42,9 @@ export default function BusinessStatusFilter({
                 : `${text}：当前查询范围内${count === null ? '数量暂不可用' : `共 ${count} 条记录`}`
             }
             onClick={() => {
-              if (value !== option.value) onChange?.(option.value)
+              if (removable && value === option.value && option.value !== '') {
+                onChange?.('')
+              } else if (value !== option.value) onChange?.(option.value)
             }}
           >
             {text}

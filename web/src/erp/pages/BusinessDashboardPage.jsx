@@ -11,7 +11,6 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
-import FilterChip from '@/common/components/navigation/FilterChip'
 import SearchInput from '@/common/components/SearchInput'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
@@ -26,24 +25,22 @@ import {
   progressDelivery,
   progressStages,
   PROGRESS_SCOPE_OPTIONS,
-  progressRiskAvailable,
+  progressFilterCount,
+  PROGRESS_FILTER_RESET,
   withProgressFilters,
 } from '../utils/businessProgress.mjs'
 import useBusinessStatistics from '../components/business-visualizations/useBusinessStatistics.jsx'
+import BusinessProgressFilterFields, { ProgressDueFilters, ProgressBlockedFilter } from '../components/business-visualizations/BusinessProgressFilters.jsx'
 import BusinessProgressDrawer from '../components/business-visualizations/BusinessProgressDrawer.jsx'
 import BusinessProgressSummary, {
   ProgressBadges,
 } from '../components/business-visualizations/BusinessProgressSummary.jsx'
 import WorkflowTaskCard from '../components/workflow/WorkflowTaskCard.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
-import { DateRangeFilter } from '../components/business-list/BusinessListLayout.jsx'
+import { PageHeaderCard } from '../components/business-list/BusinessListLayout.jsx'
 import { ProductThumbnail } from '../components/master-data/ProductIdentity.jsx'
+import FilterDateRangePicker from '../components/business-list/FilterDateRangePicker.jsx'
 import '../styles/app/progress-board.css'
-
-const count = (value) =>
-  Number.isSafeInteger(value)
-    ? new Intl.NumberFormat('zh-CN').format(value)
-    : '—'
 
 function Delivery({ row }) {
   const delivery = progressDelivery(row)
@@ -77,7 +74,7 @@ export default function BusinessDashboardPage() {
   const statisticsActive = params.get('view') === 'statistics'
   const queryKey = JSON.stringify(progressQueryFromURL(params))
   const query = useMemo(() => JSON.parse(queryKey), [queryKey])
-  const [owner, setOwner] = useState(query.owner)
+  const [dateOpen, setDateOpen] = useState(false)
   const [state, setState] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -96,18 +93,36 @@ export default function BusinessDashboardPage() {
       : 'orders')
   const access = data?.access
   const [moreOpen, setMoreOpen] = useState(false)
+  const [filterResetKey, setFilterResetKey] = useState(0)
+  const filterTriggerRef = useRef(null)
+  useEffect(() => {
+    if (!moreOpen) return undefined
+    const closeOnEscape = (event) => {
+      if (event.defaultPrevented || event.key !== 'Escape') return
+      event.preventDefault()
+      setMoreOpen(false)
+      filterTriggerRef.current?.focus()
+    }
+    document.addEventListener('keydown', closeOnEscape)
+    return () => document.removeEventListener('keydown', closeOnEscape)
+  }, [moreOpen])
   const update = useCallback(
     (changes) => {
-      setParams((previous) => {
-        return withProgressFilters(previous, {
+      // Route rendering can lag behind the URL during consecutive filter actions.
+      const previous = new URLSearchParams(window.location.search)
+      setParams(
+        withProgressFilters(previous, {
           page: '',
           selected: '',
+          view:
+            progressQueryFromURL(previous).view ||
+            (view === 'statistics' ? '' : view),
           ...changes,
         })
-      })
+      )
       setSelection(null)
     },
-    [setParams]
+    [setParams, view]
   )
   const progressSearch = useLiveSearch({
     value: query.keyword,
@@ -155,9 +170,6 @@ export default function BusinessDashboardPage() {
     return undefined
   }, [load, outlet, statisticsActive])
   useEffect(() => {
-    setOwner(query.owner)
-  }, [query.owner])
-  useEffect(() => {
     setSelection(null)
   }, [adminProfile])
   const openDetail = useCallback(
@@ -201,35 +213,27 @@ export default function BusinessDashboardPage() {
     canOpen,
     navigate,
   })
-  const metrics = [
-    {
-      key: 'all',
-      label:
-        PROGRESS_SCOPE_OPTIONS.find((item) => item.value === query.scope)
-          ?.label || '在执行',
-      number: data?.counts.total,
-    },
-    { key: 'overdue', label: '已逾期', number: data?.counts.overdue },
-    { key: 'due_soon', label: '7天内到期', number: data?.counts.due_soon },
-    {
-      key: 'blocked',
-      label: '任务受阻',
-      number: access?.tasks === false ? undefined : data?.counts.blocked,
-    },
-    { key: 'undated', label: '未定交期', number: data?.counts.undated },
-  ]
+  const filterCount = progressFilterCount(query)
+  const filterCounts = loading ? undefined : data?.counts
+  const filterQuery = { ...query, view }
   const extraFilters = [
-    query.owner && `处理人：${query.owner}`,
-    query.date_from && `从 ${query.date_from}`,
-    query.date_to && `至 ${query.date_to}`,
+    query.owner && {
+      key: 'owner',
+      label: `负责人：${query.owner}`,
+      clear: { owner: '' },
+    },
+    (query.date_from || query.date_to) && {
+      key: 'date',
+      label: `交期：${query.date_from || '不限'} 至 ${query.date_to || '不限'}`,
+      clear: { from: '', to: '' },
+    },
+    query.unlinked_only && {
+      key: 'unlinked_only',
+      label: '仅看未关联销售',
+      clear: { unlinked_only: false },
+    },
   ].filter(Boolean)
-  const hasFilters =
-    query.keyword ||
-    query.owner ||
-    query.date_from ||
-    query.date_to ||
-    query.risk !== 'all' ||
-    query.scope !== 'active'
+  const hasFilters = query.keyword || filterCount > 0
   const selectedRow =
     data?.rows.find(
       (row) => `${row.view}:${row.id}` === params.get('selected')
@@ -268,12 +272,26 @@ export default function BusinessDashboardPage() {
       className={`erp-progress-board${statisticsActive ? ' erp-progress-board--statistics' : ''}`}
       aria-label="进度看板"
     >
-      <div className="erp-progress-controls">
-        <div className="erp-progress-toolbar">
+      {dateOpen && (
+        <FilterDateRangePicker
+          title="选择交期日期范围"
+          dateFrom={query.date_from}
+          dateTo={query.date_to}
+          onCancel={() => { setDateOpen(false); setMoreOpen(true) }}
+          onApply={({ dateFrom, dateTo }) => {
+            update({ from: dateFrom, to: dateTo })
+            setDateOpen(false)
+          }}
+        />
+      )}
+      <PageHeaderCard
+        compact
+        title="进度看板"
+        viewSwitch={
           <SlidingSegmented
             aria-label="进度查看方式"
             value={view}
-            onChange={(next) => update({ view: next, risk: 'all' })}
+            onChange={(next) => update({ view: next })}
             options={[
               {
                 label: '经营统计',
@@ -292,10 +310,25 @@ export default function BusinessDashboardPage() {
               },
             ]}
           />
+        }
+      />
+      <div className="erp-progress-controls">
+        <div className="erp-progress-toolbar">
           {statisticsActive ? (
             statistics.toolbar
           ) : (
             <>
+              <Select
+                aria-label="记录范围"
+                value={query.scope}
+                options={PROGRESS_SCOPE_OPTIONS}
+                onChange={(scope) => update({ scope })}
+                className="erp-progress-scope"
+              />
+              <div className="erp-progress-metric-row" role="group" aria-label="进度快捷筛选">
+                <ProgressDueFilters query={filterQuery} counts={filterCounts} onChange={update} />
+                <ProgressBlockedFilter query={filterQuery} counts={filterCounts} taskAccess={access?.tasks} onChange={update} />
+              </div>
               <SearchInput
                 className="erp-progress-search"
                 aria-label="搜索订单、客户或产品"
@@ -308,67 +341,27 @@ export default function BusinessDashboardPage() {
                 onCompositionEnd={progressSearch.onCompositionEnd}
                 onPressEnter={progressSearch.onPressEnter}
               />
-              <Select
-                aria-label="记录范围"
-                value={query.scope}
-                options={PROGRESS_SCOPE_OPTIONS}
-                onChange={(value) => update({ scope: value })}
-                className="erp-progress-scope"
-              />
               <Popover
                 trigger="click"
                 open={moreOpen}
                 onOpenChange={setMoreOpen}
                 placement="bottom"
                 content={
-                  <div className="erp-progress-filters">
-                    <label htmlFor="progress-owner">处理人或业务负责人</label>
-                    <SearchInput
-                      id="progress-owner"
-                      value={owner}
-                      placeholder="输入姓名"
-                      allowClear
-                      onChange={(event) => setOwner(event.target.value)}
-                      onPressEnter={(event) => {
-                        update({ owner: event.target.value.trim() })
-                        setMoreOpen(false)
-                      }}
-                      suffix={
-                        <Button
-                          type="text"
-                          size="small"
-                          onClick={() => {
-                            update({ owner: owner.trim() })
-                            setMoreOpen(false)
-                          }}
-                        >
-                          应用
-                        </Button>
-                      }
-                      maxLength={100}
+                  <section className="erp-progress-filters" role="dialog" aria-label="筛选进度">
+                    <BusinessProgressFilterFields
+                      query={filterQuery}
+                      counts={filterCounts}
+                      taskAccess={access?.tasks}
+                      resetKey={filterResetKey}
+                      onChange={update}
+                      onDateRange={() => { setMoreOpen(false); setDateOpen(true) }}
                     />
-                    <span>交期范围</span>
-                    <DateRangeFilter
-                      startValue={query.date_from}
-                      endValue={query.date_to}
-                      onStartChange={(value) => update({ from: value })}
-                      onEndChange={(value) => update({ to: value })}
-                    />
-                    {view === 'production' && (
-                      <Button
-                        onClick={() => {
-                          update({ view: 'production', risk: 'unlinked' })
-                          setMoreOpen(false)
-                        }}
-                      >
-                        查看未关联销售的生产单
-                      </Button>
-                    )}
-                  </div>
+                    <Button block onClick={() => { setFilterResetKey((value) => value + 1); update(PROGRESS_FILTER_RESET) }}>重置筛选</Button>
+                  </section>
                 }
               >
-                <Button icon={<FilterOutlined />} aria-label="筛选">
-                  筛选{extraFilters.length ? ` · ${extraFilters.length}` : ''}
+                <Button ref={filterTriggerRef} icon={<FilterOutlined />} aria-haspopup="dialog" aria-expanded={moreOpen} aria-label={filterCount ? `筛选进度，已应用 ${filterCount} 项` : '筛选进度'}>
+                  筛选{filterCount ? ` · ${filterCount}` : ''}
                 </Button>
               </Popover>
               {canOpen('/erp/task-board') && (
@@ -388,7 +381,7 @@ export default function BusinessDashboardPage() {
                       领料按计划用量与已登记领料核对，不代表库存齐套。生产和质检展示批次状态，有效完工会扣除已登记返工量。
                     </p>
                     <p>
-                      顶部统计对应当前搜索及范围，风险分类可重叠；关联任务仅包含当前账号可见内容。
+                      选项数量表示保留其他条件时，选择该项可查到的记录数；交期与任务受阻可以组合。筛选数量统计非默认范围、交期情况、任务受阻、销售关联、负责人和日期范围，不含搜索词。关联任务仅包含当前账号可见内容。
                     </p>
                   </div>
                 }
@@ -399,35 +392,6 @@ export default function BusinessDashboardPage() {
                   aria-label="查看进度计算说明"
                 />
               </Popover>
-            </>
-          )}
-        </div>
-        {statisticsActive ? (
-          statistics.controls
-        ) : (
-          <>
-            <div
-              className="erp-progress-metric-row"
-              role="group"
-              aria-label="按风险筛选进度"
-            >
-              {metrics.map((metric) => (
-                <FilterChip
-                  className="erp-progress-metric"
-                  key={metric.key}
-                  selected={query.risk === metric.key}
-                  count={count(loading ? undefined : metric.number)}
-                  disabled={
-                    loading ||
-                    !data ||
-                    !progressRiskAvailable(metric.key, query) ||
-                    (metric.key === 'blocked' && access?.tasks === false)
-                  }
-                  onClick={() => update({ risk: metric.key })}
-                >
-                  {metric.label}
-                </FilterChip>
-              ))}
               <div className="erp-progress-freshness">
                 {data
                   ? `更新于 ${dayjs(data.snapshot_at).format('HH:mm')}`
@@ -435,35 +399,20 @@ export default function BusinessDashboardPage() {
                     ? '正在查询…'
                     : '等待查询'}
               </div>
-            </div>
-            {(extraFilters.length > 0 || hasFilters) && (
-              <div className="erp-progress-active-filters">
-                {query.keyword && <Tag>搜索：{query.keyword}</Tag>}
-                {extraFilters.map((item) => (
-                  <Tag key={item}>{item}</Tag>
-                ))}
-                {query.risk === 'unlinked' && <Tag>含未关联销售的生产明细</Tag>}
-                <Button
-                  type="link"
-                  size="small"
-                  onClick={() => {
-                    setOwner('')
-                    update({
-                      q: '',
-                      owner: '',
-                      from: '',
-                      to: '',
-                      risk: '',
-                      scope: '',
-                    })
-                  }}
-                >
-                  清空筛选
-                </Button>
-              </div>
-            )}
-          </>
-        )}
+            </>
+          )}
+        </div>
+        {statisticsActive ? (
+          statistics.controls
+        ) : extraFilters.length > 0 ? (
+          <div className="erp-progress-active-filters">
+            {extraFilters.map((item) => (
+              <Tag key={item.key} closable onClose={() => update(item.clear)}>
+                {item.label}
+              </Tag>
+            ))}
+          </div>
+        ) : null}
       </div>
       {statisticsActive ? (
         statistics.content

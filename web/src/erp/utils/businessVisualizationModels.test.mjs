@@ -197,7 +197,7 @@ test('inventory distribution identifies historical warehouses missing from activ
     },
   ])
 
-  assert.equal(model.rows[0].warehouseName, '仓库 #99（未启用）')
+  assert.equal(model.rows[0].warehouseName, '仓库资料未提供')
 })
 
 test('production overview ranks plan risk without inventing completion progress', () => {
