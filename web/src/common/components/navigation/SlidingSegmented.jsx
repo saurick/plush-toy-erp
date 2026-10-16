@@ -13,7 +13,6 @@ const SlidingSegmented = forwardRef(
       defaultValue,
       onChange,
       className = '',
-      hierarchy = 'primary',
       style,
       ...props
     },
@@ -41,7 +40,7 @@ const SlidingSegmented = forwardRef(
       <Segmented
         {...props}
         ref={setRef}
-        className={`erp-sliding-segmented ${hierarchy === 'secondary' ? 'erp-sliding-segmented--secondary' : ''} ${className}`}
+        className={`erp-sliding-segmented ${className}`}
         style={style}
         options={options.map((option) => {
           const normalized =

@@ -22,19 +22,14 @@ function LegalPageHeader({ activeDocument, bundle }) {
     ? { from: configuredFrom }
     : undefined
   const fallbackPath = getStoredAdminProfile() ? '/entry' : '/admin-login'
-  const handleReturn = () => {
-    // 回到原历史记录，保留手机页签、筛选及来源页面状态。
-    if (configuredFrom && window.history.state?.idx > 0) {
-      navigate(-1)
-      return
-    }
-    navigate(configuredFrom || fallbackPath)
-  }
 
   return (
     <header className="legal-document-header">
       <div className="legal-document-toolbar">
-        <Button icon={<ArrowLeftOutlined />} onClick={handleReturn}>
+        <Button
+          icon={<ArrowLeftOutlined />}
+          onClick={() => navigate(configuredFrom || fallbackPath)}
+        >
           返回系统
         </Button>
         <ERPThemeToggle />
@@ -54,7 +49,6 @@ function LegalPageHeader({ activeDocument, bundle }) {
       <nav className="legal-document-tabs" aria-label="规则文档">
         <Link
           to={PRIVACY_PATH}
-          replace
           state={preservedLocationState}
           className={activeDocument === 'privacy' ? 'is-active' : ''}
           aria-current={activeDocument === 'privacy' ? 'page' : undefined}
@@ -63,7 +57,6 @@ function LegalPageHeader({ activeDocument, bundle }) {
         </Link>
         <Link
           to={SYSTEM_RULES_PATH}
-          replace
           state={preservedLocationState}
           className={activeDocument === 'system-rules' ? 'is-active' : ''}
           aria-current={activeDocument === 'system-rules' ? 'page' : undefined}

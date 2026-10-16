@@ -34,10 +34,9 @@ function isAbortLikeError(error) {
   return error?.name === 'AbortError' || error?.cause?.name === 'AbortError'
 }
 
-function invalidSuccessResponse(httpStatus, requestId) {
+function invalidSuccessResponse(httpStatus) {
   return new RpcError('Invalid JSON-RPC success response from server', {
     httpStatus,
-    requestId,
     isInvalidResponse: true,
   })
 }
@@ -93,7 +92,7 @@ export function requireRpcPage(result, key, message) {
   return data
 }
 
-function validateSuccessResponse(json, expectedId, httpStatus, requestId) {
+function validateSuccessResponse(json, expectedId, httpStatus) {
   if (
     !json ||
     typeof json !== 'object' ||
@@ -105,7 +104,7 @@ function validateSuccessResponse(json, expectedId, httpStatus, requestId) {
     typeof json.result !== 'object' ||
     Array.isArray(json.result)
   ) {
-    throw invalidSuccessResponse(httpStatus, requestId)
+    throw invalidSuccessResponse(httpStatus)
   }
   return json.result
 }
@@ -177,13 +176,11 @@ export class JsonRpc {
       })
     }
 
-    const requestId = response.headers?.get('X-Request-Id')
     try {
       json = await response.json()
     } catch (e) {
       throw new RpcError('Invalid JSON response from server', {
         httpStatus: response.status,
-        requestId,
         isInvalidResponse: true,
         cause: e,
       })
@@ -191,14 +188,14 @@ export class JsonRpc {
 
     // 1) HTTP 非 2xx
     if (!response.ok) {
-      const err = RpcError.fromHttp(response.status, json, requestId)
+      const err = RpcError.fromHttp(response.status, json)
       emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       throw err
     }
 
     // 2) Kratos 框架级错误
     if (typeof json?.code === 'number' && json.message) {
-      const err = RpcError.fromKratos(json, requestId)
+      const err = RpcError.fromKratos(json)
       emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       if (receiveError) return err
       throw err
@@ -206,16 +203,16 @@ export class JsonRpc {
 
     // 3) JSON-RPC error 字段
     if (json?.error) {
-      const err = RpcError.fromJsonRpc(json, requestId)
+      const err = RpcError.fromJsonRpc(json)
       emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       if (receiveError) return err
       throw err
     }
 
     // 4) 业务错误 result.code != 0
-    const result = validateSuccessResponse(json, id, response.status, requestId)
+    const result = validateSuccessResponse(json, id, response.status)
     if (result && typeof result.code === 'number' && result.code !== 0) {
-      const err = RpcError.fromBiz(json, requestId)
+      const err = RpcError.fromBiz(json)
       emitAuthFailureIfNeeded(err, this.authScope, withAuth, token)
       if (receiveError) return err
       throw err

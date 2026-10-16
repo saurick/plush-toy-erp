@@ -1,6 +1,6 @@
 // web/src/App.jsx
 import React, { Suspense, useEffect } from 'react'
-import { App as AntdApp, ConfigProvider, Empty, Grid, theme } from 'antd'
+import { App as AntdApp, ConfigProvider, Empty, theme } from 'antd'
 import zhCN from 'antd/locale/zh_CN'
 import dayjs from 'dayjs'
 import 'dayjs/locale/zh-cn'
@@ -106,11 +106,6 @@ function AppContent() {
 
 function ThemedApp() {
   const { isDark, accent, appearance } = useERPTheme()
-  const location = useLocation()
-  const isDevWorkbenchRoute =
-    import.meta.env.DEV && /^\/__dev(?:\/|$)/u.test(location.pathname)
-  const screens = Grid.useBreakpoint()
-  const isPhoneViewport = !isDevWorkbenchRoute && screens.md === false
   const tableCellPaddingBlock = appearance.density === 'compact' ? 4 : 9
 
   return (
@@ -125,7 +120,6 @@ function ThemedApp() {
         algorithm: isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
         components: {
           Button: {
-            controlHeight: isPhoneViewport ? 44 : 34,
             paddingInline: 12,
             paddingInlineSM: 12,
             paddingInlineLG: 16,
@@ -148,11 +142,8 @@ function ThemedApp() {
           colorInfo: isDark ? '#75b9ff' : '#3275c7',
           colorLink: isDark ? accent.dark : accent.strong,
           borderRadius: 8,
-          fontSize: isPhoneViewport ? 16 : 14,
-          fontSizeSM: isPhoneViewport || isDevWorkbenchRoute ? 14 : 12,
-          controlHeight: isPhoneViewport ? 46 : 34,
-          controlHeightSM: isPhoneViewport ? 44 : 28,
-          controlHeightLG: isPhoneViewport ? 48 : 40,
+          controlHeight: 34,
+          controlHeightSM: 28,
           fontFamily:
             '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
           ...getERPSurfaceTokens(isDark),

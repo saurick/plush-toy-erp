@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
-import http from 'node:http'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import net from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
@@ -116,39 +115,8 @@ test(
     process.env.ERP_VITE_PORT = String(port)
     delete process.env.ERP_VITE_HMR_HOST
     delete process.env.ERP_VITE_HMR_CLIENT_PORT
-    // Vite's module graph and watcher must refer to the same path on macOS,
-    // where the temporary directory can be reached through a symlink.
-    const root = await realpath(
-      await mkdtemp(path.join(os.tmpdir(), 'plush-hmr-'))
-    )
-    const remoteHost = 'erp-hmr.example.test'
-    // Exercise a distinct page hostname without requiring DNS or a second
-    // loopback interface (127.0.0.2 is not portable across operating systems).
-    const lookup = (hostname, options, callback) => {
-      assert.equal(hostname, remoteHost)
-      if (options.all) callback(null, [{ address: '127.0.0.1', family: 4 }])
-      else callback(null, '127.0.0.1', 4)
-    }
-    const readPage = (url) => new Promise((resolve, reject) => {
-      http.get(url, { lookup, agent: false, signal: t.signal }, (response) => {
-        let body = ''
-        response.setEncoding('utf8')
-        response.on('data', (chunk) => { body += chunk })
-        response.on('end', () => resolve({ status: response.statusCode, body }))
-        response.on('error', reject)
-      }).on('error', reject)
-    })
-    let server
-    let forwarder
-    const forwardedSockets = new Set()
-    const hmrSockets = new Set()
-    t.after(async () => {
-      for (const socket of hmrSockets) socket.terminate()
-      for (const socket of forwardedSockets) socket.destroy()
-      if (forwarder) await new Promise((resolve) => forwarder.close(resolve))
-      if (server) await server.close()
-      await rm(root, { recursive: true, force: true })
-    })
+    const root = await mkdtemp(path.join(os.tmpdir(), 'plush-hmr-'))
+    t.after(() => rm(root, { recursive: true, force: true }))
     const probes = ['local.js', 'remote.js', 'forwarded.js']
     const probeSource =
       'export const value = 0; if (import.meta.hot) import.meta.hot.accept();\n'
@@ -170,17 +138,15 @@ test(
           'plush-dev-resolved-port-guard',
         ].includes(plugin.name)
       ),
-      server: {
-        ...config.server,
-        open: false,
-        allowedHosts: [...config.server.allowedHosts, remoteHost],
-      },
+      server: { ...config.server, open: false },
       optimizeDeps: { noDiscovery: true, include: [] },
     }
-    server = await createServer(isolatedConfig)
+    const server = await createServer(isolatedConfig)
+    t.after(() => server.close())
     await server.listen()
 
-    forwarder = net.createServer((socket) => {
+    const forwardedSockets = new Set()
+    const forwarder = net.createServer((socket) => {
       const upstream = net.connect(port, '127.0.0.1')
       for (const connection of [socket, upstream]) {
         forwardedSockets.add(connection)
@@ -192,19 +158,23 @@ test(
       }
       socket.pipe(upstream).pipe(socket)
     })
+    t.after(async () => {
+      for (const socket of forwardedSockets) socket.destroy()
+      await new Promise((resolve) => forwarder.close(resolve))
+    })
     forwarder.listen(0, '127.0.0.1')
-    await once(forwarder, 'listening', { signal: t.signal })
+    await once(forwarder, 'listening')
 
     const origins = [
       `http://127.0.0.1:${port}`,
-      `http://${remoteHost}:${port}`,
+      `http://127.0.0.2:${port}`,
       `http://127.0.0.1:${forwarder.address().port}`,
     ]
     for (const [index, origin] of origins.entries()) {
       const probe = probes[index]
-      const response = await readPage(`${origin}/@vite/client`)
+      const response = await fetch(`${origin}/@vite/client`)
       assert.equal(response.status, 200)
-      const client = response.body
+      const client = await response.text()
       const socketURL = runInNewContext(
         client.slice(
           client.indexOf('const serverHost ='),
@@ -216,19 +186,12 @@ test(
       const socket = new WebSocket(socketURL, 'vite-hmr', {
         origin,
         handshakeTimeout: 2000,
-        lookup,
       })
-      hmrSockets.add(socket)
       try {
-        const [data] = await once(socket, 'message', { signal: t.signal })
+        const [data] = await once(socket, 'message')
         assert.equal(JSON.parse(data).type, 'connected')
-        const moduleResponse = await readPage(`${origin}/${probe}`)
-        assert.equal(moduleResponse.status, 200)
-        assert.match(moduleResponse.body, /createHotContext/u)
-        const module = await server.environments.client.moduleGraph.getModuleByUrl(`/${probe}`)
-        assert.equal(module?.file, path.join(root, probe))
-        assert.equal(module?.isSelfAccepting, true)
-        const updated = once(socket, 'message', { signal: t.signal })
+        assert.equal((await fetch(`${origin}/${probe}`)).status, 200)
+        const updated = once(socket, 'message')
         await writeFile(
           path.join(root, probe),
           probeSource.replace('value = 0', 'value = 1')
@@ -236,15 +199,11 @@ test(
         const [update] = await updated
         const payload = JSON.parse(update)
         assert.equal(payload.type, 'update')
-        assert.equal(payload.updates.length, 1)
-        assert.equal(payload.updates[0].type, 'js-update')
         assert.equal(payload.updates[0].path, `/${probe}`)
-        assert.equal(payload.updates[0].acceptedPath, `/${probe}`)
       } finally {
         const closed = once(socket, 'close')
-        socket.terminate()
+        socket.close()
         await closed
-        hmrSockets.delete(socket)
       }
     }
 

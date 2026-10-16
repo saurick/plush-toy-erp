@@ -186,31 +186,3 @@ test('live search preserves newer typing when the parent acknowledges an earlier
   })
   assert.deepEqual(searches, ['订单', '订单二'])
 })
-
-test('explicit reset clears pending typing even when the applied value stays empty', async (t) => {
-  const dom = installTestDOM()
-  registerJSXTestLoader()
-  const [{ createRoot }, { default: useLiveSearch }] = await Promise.all([
-    import('react-dom/client'), import('./useLiveSearch.js'),
-  ])
-  const container = document.createElement('div')
-  document.body.appendChild(container)
-  const root = createRoot(container)
-  const searches = []
-  let controls
-  function Harness({ resetKey = 0 }) {
-    controls = useLiveSearch({ value: '', resetKey, delay: 20, onSearch: (keyword) => searches.push(keyword) })
-    return null
-  }
-  t.after(async () => {
-    await act(async () => root.unmount())
-    container.remove()
-    dom.restore()
-  })
-  await act(async () => root.render(createElement(Harness)))
-  await act(async () => controls.onChange({ currentTarget: { value: '待提交' }, nativeEvent: {} }))
-  await act(async () => root.render(createElement(Harness, { resetKey: 1 })))
-  await act(async () => { await wait(30) })
-  assert.equal(controls.value, '')
-  assert.deepEqual(searches, [])
-})

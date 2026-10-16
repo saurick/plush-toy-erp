@@ -54,7 +54,7 @@
 
 .legal-document-eyebrow {
   color: #2b7d3d;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.12em;
 }
@@ -147,7 +147,7 @@
 .legal-document-section p,
 .legal-document-section li {
   color: #405149;
-  font-size: var(--erp-font-emphasis);
+  font-size: 15px;
   line-height: 1.85;
 }
 
@@ -179,7 +179,7 @@
 
 .legal-document-facts dt {
   color: #718078;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -218,13 +218,13 @@
   text-align: center;
   background: #f4f8f5;
   color: #2b4532;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
   font-weight: 700;
 }
 
 .legal-document-table-wrap td {
   color: #405149;
-  font-size: var(--erp-font-body);
+  font-size: 14px;
 }
 
 .legal-document-empty {
@@ -241,7 +241,7 @@
   border-top: 1px solid #e5ece7;
   background: #f8faf9;
   color: #65736a;
-  font-size: var(--erp-font-small);
+  font-size: 13px;
 }
 
 .legal-notice-status-banner.ant-alert {
