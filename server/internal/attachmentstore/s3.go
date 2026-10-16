@@ -144,9 +144,7 @@ func (s *S3) Put(ctx context.Context, key string, content []byte) (err error) {
 	}
 	// A timed-out PUT or a conditional-write replay can already have persisted the
 	// object. Prove the exact bytes before treating that outcome as success.
-	reconcileCtx, reconcileCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-	defer reconcileCancel()
-	stored, readErr := s.Get(reconcileCtx, key, int64(len(content)))
+	stored, readErr := s.Get(ctx, key, int64(len(content)))
 	if readErr == nil && bytes.Equal(stored, content) {
 		return nil
 	}

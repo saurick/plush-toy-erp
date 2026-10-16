@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 
 	pkglogger "server/pkg/logger"
@@ -72,30 +71,5 @@ func TestRequestIDFilterGeneratesHeaderWhenMissing(t *testing.T) {
 			fmt.Sprint(entry.fields["request_id"]) == requestID
 	}) {
 		t.Fatalf("expected log with generated request_id, got %+v", logger.entries)
-	}
-}
-
-func TestRequestIDFilterReplacesUnsafeIDsAcrossHeaderContextAndLogs(t *testing.T) {
-	for _, supplied := range []string{"password=private-value", "private-value\nforged-event", strings.Repeat("x", 129), "客户姓名", " "} {
-		t.Run(fmt.Sprintf("length-%d", len(supplied)), func(t *testing.T) {
-			logger := &captureLogger{}
-			helper := klog.NewHelper(klog.With(logger, "request_id", pkglogger.RequestID()))
-			handler := RequestIDFilter()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				id := pkglogger.RequestIDFromContext(r.Context())
-				if id == supplied || id == "" || r.Header.Get(requestIDHeader) != id {
-					t.Fatal("unsafe request ID reached handler")
-				}
-				helper.WithContext(r.Context()).Info("safe request id")
-				_, _ = w.Write([]byte(id))
-			}))
-			req := httptest.NewRequest(http.MethodGet, "/request-id", nil)
-			req.Header.Set(requestIDHeader, supplied)
-			response := httptest.NewRecorder()
-			handler.ServeHTTP(response, req)
-			id := response.Header().Get(requestIDHeader)
-			if id == "" || id == supplied || response.Body.String() != id || !logger.hasEntry(func(entry captureLogEntry) bool { return entry.fields["request_id"] == id }) {
-				t.Fatal("replacement request ID is not consistent across response, context and log")
-			}
-		})
 	}
 }

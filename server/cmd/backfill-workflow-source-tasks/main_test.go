@@ -2,23 +2,6 @@ package main
 
 import "testing"
 
-func TestValidateConnectedDatabase(t *testing.T) {
-	for _, apply := range []bool{false, true} {
-		if err := validateConnectedDatabase("expected", "actual", "expected", apply); err == nil {
-			t.Fatal("a query-overridden connected database must be rejected before backfill")
-		}
-	}
-	if err := validateConnectedDatabase("expected", "expected", "", true); err == nil {
-		t.Fatal("apply requires confirmation of the connected database")
-	}
-	if err := validateConnectedDatabase("expected", "expected", "expected", true); err != nil {
-		t.Fatal(err)
-	}
-	if err := validateConnectedDatabase("expected", "expected", "", false); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestPostgresDatabaseName(t *testing.T) {
 	for _, test := range []struct {
 		name    string

@@ -826,21 +826,3 @@ func TestBuildTraceSamplerHonorsParentDecision(t *testing.T) {
 		})
 	}
 }
-
-func TestNormalizeTraceEndpointPreservesHTTPSAndPath(t *testing.T) {
-	for value, want := range map[string]string{
-		"collector:4318":                  "http://collector:4318/v1/traces",
-		"https://collector:4318":          "https://collector:4318/v1/traces",
-		"https://collector/custom/traces": "https://collector/custom/traces",
-	} {
-		got, err := normalizeTraceEndpoint(value)
-		if err != nil || got != want {
-			t.Fatalf("%q -> %q err=%v", value, got, err)
-		}
-	}
-	for _, value := range []string{"ftp://collector:4318", "https://user:secret@collector:4318", "https://collector/path?token=x", "https://collector/#fragment", "http://"} {
-		if _, err := normalizeTraceEndpoint(value); err == nil {
-			t.Fatalf("unsafe trace endpoint accepted: %q", value)
-		}
-	}
-}

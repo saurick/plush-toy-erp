@@ -16,9 +16,12 @@ import (
 const AllowTestDBEnv = "ERP_ALLOW_TEST_DB_AS_DEV"
 
 const (
-	localDevelopmentDatabaseName       = "plush_erp"
-	customerConfigReleaseRehearsalHost = "postgres"
-	customerConfigReleaseRehearsalPort = uint16(5432)
+	CustomerConfigLocalTestHost             = "192.168.0.133"
+	CustomerConfigLocalTestPort             = uint16(5432)
+	CustomerConfigLocalTestSystemIdentifier = "7682605996671565865"
+	localDevelopmentDatabaseName            = "plush_erp"
+	customerConfigReleaseRehearsalHost      = "postgres"
+	customerConfigReleaseRehearsalPort      = uint16(5432)
 )
 
 var customerConfigReleaseRehearsalIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_]{7,44}$`)
@@ -40,7 +43,9 @@ func RequireLocalDevDSN(confPath string, dsn string, getenv func(string) string)
 	if getenv == nil {
 		getenv = func(string) string { return "" }
 	}
-	allowTestTarget := strings.TrimSpace(getenv(AllowTestDBEnv)) == "1"
+	if strings.TrimSpace(getenv(AllowTestDBEnv)) == "1" {
+		return nil
+	}
 
 	cfg, err := pgconn.ParseConfig(strings.TrimSpace(dsn))
 	if err != nil {
@@ -58,17 +63,8 @@ func RequireLocalDevDSN(confPath string, dsn string, getenv func(string) string)
 		if u.Hostname() != cfg.Host || port != fmt.Sprint(cfg.Port) || strings.TrimPrefix(u.Path, "/") != cfg.Database {
 			return fmt.Errorf("development database URL cannot override its declared target")
 		}
-		for key := range u.Query() {
-			switch strings.ToLower(key) {
-			case "host", "hostaddr", "port", "dbname", "database", "service", "servicefile":
-				return fmt.Errorf("development database URL cannot override its declared target")
-			}
-		}
 	}
 	check := func(host string, port uint16) error {
-		if allowTestTarget && host == CustomerConfigLocalTestHost && port == 5435 && cfg.Database == localDevelopmentDatabaseName {
-			return nil
-		}
 		if host == "192.168.0.106" || host == CustomerConfigLocalTestHost || port == 5435 {
 			if host != CustomerConfigLocalTestHost || port != CustomerConfigLocalTestPort || !isLocalDevelopmentDatabaseName(cfg.Database) {
 				return fmt.Errorf("dev config must use registered development PostgreSQL %s:%d/plush_erp or plush_erp_*_dev; other 133 instances and the retired source are not development targets", CustomerConfigLocalTestHost, CustomerConfigLocalTestPort)
@@ -84,26 +80,19 @@ func RequireLocalDevDSN(confPath string, dsn string, getenv func(string) string)
 			return fmt.Errorf("development database must not use a fallback target")
 		}
 	}
-	registered := registeredDevelopmentEndpoint(cfg.Host, cfg.Port) && isLocalDevelopmentDatabaseName(cfg.Database)
-	loopback := cfg.Host == "127.0.0.1" || cfg.Host == "localhost" || cfg.Host == "::1"
-	localDatabase := isLocalDevelopmentDatabaseName(cfg.Database) || strings.HasPrefix(cfg.Database, "plush_erp_ci_") || strings.HasPrefix(cfg.Database, "plush_erp_release_")
-	testTarget := allowTestTarget && cfg.Host == CustomerConfigLocalTestHost && cfg.Port == 5435 && cfg.Database == localDevelopmentDatabaseName
-	if !registered && !(loopback && localDatabase) && !testTarget {
-		return fmt.Errorf("development database must use a registered target or a local disposable database")
-	}
 
 	return nil
 }
 
 // VerifyRegisteredDevelopmentRuntime checks the live cluster before application
 // startup. Explicit loopback test databases and deployment instances retain their
-// own lifecycle; registered development targets must prove their cluster identity.
+// own lifecycle; the registered shared development target has a fixed identity.
 func VerifyRegisteredDevelopmentRuntime(dsn string) error {
 	cfg, err := pgconn.ParseConfig(strings.TrimSpace(dsn))
 	if err != nil {
 		return fmt.Errorf("invalid development database configuration")
 	}
-	if !registeredDevelopmentEndpoint(cfg.Host, cfg.Port) {
+	if cfg.Host != CustomerConfigLocalTestHost || cfg.Port != CustomerConfigLocalTestPort {
 		return nil
 	}
 	if err := RequireCustomerConfigLocalTestDSN(dsn); err != nil {
@@ -124,7 +113,7 @@ func VerifyRegisteredDevelopmentRuntime(dsn string) error {
 }
 
 // RequireCustomerConfigLocalTestDSN binds local-test customer-config writes to
-// the registered shared or Orb development database family. It deliberately ignores
+// the registered 133 development database family. It deliberately ignores
 // ERP_ALLOW_TEST_DB_AS_DEV so that an explicit test-server operation cannot
 // enable this revision class on another instance or database family.
 func RequireCustomerConfigLocalTestDSN(dsn string) error {
@@ -153,8 +142,7 @@ func RequireCustomerConfigLocalTestRuntime(dsn string, currentDatabase string, s
 			currentDatabase,
 		)
 	}
-	expected := expectedDevelopmentSystemIdentifier(config.Host, config.Port)
-	if expected == "" || strings.TrimSpace(systemIdentifier) != expected {
+	if strings.TrimSpace(systemIdentifier) != CustomerConfigLocalTestSystemIdentifier {
 		return fmt.Errorf("customer config local-test runtime PostgreSQL cluster identity mismatch")
 	}
 	return nil
@@ -232,14 +220,6 @@ func allDecimalDigits(value string) bool {
 }
 
 func requireCustomerConfigLocalTestConfig(dsn string) (*pgconn.Config, error) {
-	declared, parseErr := url.Parse(strings.TrimSpace(dsn))
-	if parseErr == nil && (declared.Scheme == "postgres" || declared.Scheme == "postgresql") {
-		for key := range declared.Query() {
-			if key != "sslmode" && key != "application_name" && key != "connect_timeout" {
-				return nil, fmt.Errorf("customer config local-test URL must not override its declared target")
-			}
-		}
-	}
 	config, err := pgconn.ParseConfig(strings.TrimSpace(dsn))
 	if err != nil {
 		return nil, fmt.Errorf("parse postgres dsn for customer config local-test guard failed: %w", err)
@@ -256,7 +236,7 @@ func requireCustomerConfigLocalTestConfig(dsn string) (*pgconn.Config, error) {
 func RequireCustomerConfigLocalTestTarget(host string, port uint16, database string) error {
 	host = strings.TrimSpace(host)
 	database = strings.TrimSpace(database)
-	if !registeredDevelopmentEndpoint(host, port) || !isLocalDevelopmentDatabaseName(database) {
+	if host != CustomerConfigLocalTestHost || port != CustomerConfigLocalTestPort || !isLocalDevelopmentDatabaseName(database) {
 		return customerConfigLocalTestDSNError(host, port, database)
 	}
 	return nil
@@ -264,7 +244,7 @@ func RequireCustomerConfigLocalTestTarget(host string, port uint16, database str
 
 func customerConfigLocalTestDSNError(host string, port uint16, dbName string) error {
 	return fmt.Errorf(
-		"customer config local-test gate requires registered development PostgreSQL %s:%d or Orb 127.0.0.1:15432, database %s or %s_*_dev with no fallback; got %s:%d/%s",
+		"customer config local-test gate requires development PostgreSQL %s:%d/%s or %s_*_dev with no fallback; got %s:%d/%s",
 		CustomerConfigLocalTestHost,
 		CustomerConfigLocalTestPort,
 		localDevelopmentDatabaseName,
@@ -276,7 +256,7 @@ func customerConfigLocalTestDSNError(host string, port uint16, dbName string) er
 }
 
 // RequireLocalAdminResetDSN keeps the stable local admin recovery command on
-// the registered development database family. Callers still apply their
+// the registered 133 development database family. Callers still apply their
 // own account-selection rules; this guard only constrains the database target.
 func RequireLocalAdminResetDSN(dsn string) error {
 	return RequireCustomerConfigLocalTestDSN(dsn)

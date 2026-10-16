@@ -14,28 +14,20 @@ import (
 	"server/internal/errcode"
 	pkglogger "server/pkg/logger"
 
-	kratoserrors "github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	httpx "github.com/go-kratos/kratos/v2/transport/http"
-	"go.opentelemetry.io/otel/codes"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 type observedRPCService struct {
 	panics bool
 	code   int32
 	calls  int
-	err    error
 }
 
 func (s *observedRPCService) PostJsonrpc(context.Context, *v1.PostJsonrpcRequest) (*v1.PostJsonrpcReply, error) {
 	s.calls++
 	if s.panics {
 		panic("private-panic-password-and-token")
-	}
-	if s.err != nil {
-		return nil, s.err
 	}
 	return &v1.PostJsonrpcReply{Result: &v1.JsonrpcResult{Code: s.code}}, nil
 }
@@ -48,13 +40,9 @@ func TestRequestLoggingCoversEarlyFailuresAndPanicOnce(t *testing.T) {
 		panics              bool
 		code                int32
 		calls, errors       uint64
-		transportErr        error
 	}{
 		{name: "success", body: `{ "method": "ping", "params": {} }`, outcome: "success", status: 200, calls: 1},
 		{name: "business rejection", body: `{ "method": "ping", "params": {} }`, outcome: "rejected", status: 200, code: errcode.PermissionDenied.Code, calls: 1},
-		{name: "HTTP permission rejection", body: `{ "method": "ping" }`, outcome: "rejected", status: 403, transportErr: kratoserrors.Forbidden("FORBIDDEN", "private-message"), calls: 1},
-		{name: "HTTP rate limit", body: `{ "method": "ping" }`, outcome: "rejected", status: 429, transportErr: kratoserrors.New(429, "RATE_LIMIT", "private-message"), calls: 1},
-		{name: "HTTP unavailable", body: `{ "method": "ping" }`, outcome: "error", status: 503, transportErr: kratoserrors.ServiceUnavailable("UNAVAILABLE", "private-message"), calls: 1, errors: 1},
 		{name: "malformed JSON", body: `{ "password": "private-invalid-body"`, outcome: "rejected", status: 400},
 		{name: "known oversized", body: `{}`, outcome: "rejected", status: 413, oversized: true},
 		{name: "chunked oversized", outcome: "rejected", status: 413, chunked: true},
@@ -63,15 +51,12 @@ func TestRequestLoggingCoversEarlyFailuresAndPanicOnce(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var output bytes.Buffer
 			logger := log.With(log.NewStdLogger(&output), "request_id", pkglogger.RequestID())
-			spans := tracetest.NewSpanRecorder()
-			tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(spans))
-			defer func() { _ = tp.Shutdown(context.Background()) }()
 			srv := httpx.NewServer(
 				httpx.Filter(RequestIDFilter(), JSONRPCFailureLoggingFilter(logger), JSONRPCBodyLimitFilter()),
 				httpx.RequestDecoder(BoundedRequestDecoder),
-				httpx.Middleware(safeServerTracing(tp), safeServerLogging(logger), safeServerRecovery(logger)),
+				httpx.Middleware(safeServerLogging(logger), safeServerRecovery(logger)),
 			)
-			service := &observedRPCService{panics: tc.panics, code: tc.code, err: tc.transportErr}
+			service := &observedRPCService{panics: tc.panics, code: tc.code}
 			v1.RegisterJsonrpcHTTPServer(srv, service)
 			req := httptest.NewRequest(stdhttp.MethodPost, "/rpc/system?access_token=private-query", strings.NewReader(tc.body))
 			req.Header.Set("Content-Type", "application/json")
@@ -107,28 +92,6 @@ func TestRequestLoggingCoversEarlyFailuresAndPanicOnce(t *testing.T) {
 			}
 			if got := sharedRuntimeMetricCounters.rpcErrors.Load() - beforeErrors; got != tc.errors {
 				t.Fatalf("error counter=%d, want %d", got, tc.errors)
-			}
-			if response.Header().Get(requestIDHeader) != "req-log-integration" {
-				t.Fatal("failure response lost its request ID")
-			}
-			if uint64(len(spans.Ended())) != tc.calls {
-				t.Fatalf("unexpected request span count: %d", len(spans.Ended()))
-			}
-			for _, span := range spans.Ended() {
-				wantStatus := codes.Ok
-				if tc.outcome == "error" {
-					wantStatus = codes.Error
-				}
-				if span.Status().Code != wantStatus {
-					t.Fatal("trace status disagrees with log and error counter")
-				}
-				attrs := make(map[string]string)
-				for _, attr := range span.Attributes() {
-					attrs[string(attr.Key)] = attr.Value.AsString()
-				}
-				if attrs["outcome"] != tc.outcome || attrs["http.request_id"] != "req-log-integration" {
-					t.Fatal("trace lost request correlation or result classification")
-				}
 			}
 		})
 	}

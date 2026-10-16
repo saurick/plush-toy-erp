@@ -451,7 +451,6 @@ func collect(root string) (catalog, error) {
 		{"core/status/posting_document.go", "PurchaseReceipt", "PurchaseReceiptStatus"},
 		{"core/status/posting_document.go", "PurchaseReturn", "PurchaseReturnStatus"},
 		{"biz/operational_fact.go", "OperationalFactStatus", "OperationalFactStatus"},
-		{"biz/finance_payment.go", "FinancePaymentKind", "FinancePaymentKind"},
 		{"biz/operational_fact.go", "StockReservationStatus", "StockReservationStatus"},
 		{"biz/outsourcing_order.go", "OutsourcingOrderStatus", "OutsourcingOrderStatus"},
 		{"biz/production_order.go", "ProductionOrderStatus", "ProductionOrderStatus"},

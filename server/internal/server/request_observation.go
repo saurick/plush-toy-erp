@@ -5,17 +5,12 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/errcode"
-
-	kratoserrors "github.com/go-kratos/kratos/v2/errors"
 )
 
 // Logs, metrics and spans must classify the JSON-RPC envelope the same way,
 // because a failed RPC can still be a successful HTTP exchange.
 func requestOutcome(req, reply any, err error) string {
 	if err != nil {
-		if code := kratoserrors.Code(err); code >= 400 && code < 500 {
-			return "rejected"
-		}
 		return "error"
 	}
 	if _, ok := req.(*v1.PostJsonrpcRequest); !ok {
