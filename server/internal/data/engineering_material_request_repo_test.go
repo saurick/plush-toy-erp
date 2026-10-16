@@ -306,12 +306,13 @@ func TestSourceDocumentPostgresEngineeringMaterialConcurrentApproval(t *testing.
 func TestProductionReleaseRequiresMaterialApprovalAndCurrentSample(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "production_engineering_gate")
+	createProductionWIPRouteProcesses(t, ctx, client)
 	defer mustCloseEntClient(t, client)
 	actor := client.AdminUser.Create().SetUsername("engineering-gate-actor").SetPasswordHash("test-hash").SaveX(ctx)
 	f := prepareMaterialRequestFixture(t, ctx, data, "ENGINEERING-GATE")
 	line := client.SalesOrderItem.GetX(ctx, f.line.ID)
 	production := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, log.NewStdLogger(io.Discard)))
-	created, err := production.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: biz.ProductionOrderDraft{OrderNo: "MO-ENGINEERING-GATE", Items: []biz.ProductionOrderDraftItem{{LineNo: 1, ProductID: line.ProductID, UnitID: line.UnitID, SalesOrderItemID: &line.ID, BOMHeaderID: &f.bom.ID, PlannedQuantity: decimal.NewFromInt(10)}}}, ActorID: actor.ID, IdempotencyKey: "engineering-gate-create"})
+	created, err := production.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: biz.ProductionOrderDraft{OrderNo: "MO-ENGINEERING-GATE", Items: []biz.ProductionOrderDraftItem{{RouteCode: stringPtr(biz.ProductionWIPRoutePlushSewHandV1), LineNo: 1, ProductID: line.ProductID, UnitID: line.UnitID, SalesOrderItemID: &line.ID, BOMHeaderID: &f.bom.ID, PlannedQuantity: decimal.NewFromInt(10)}}}, ActorID: actor.ID, IdempotencyKey: "engineering-gate-create"})
 	if err != nil {
 		t.Fatal(err)
 	}

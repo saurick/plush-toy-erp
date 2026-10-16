@@ -906,9 +906,11 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const uploadImage = async (slotKey, file) => {
+    const sourceImages = draftRef.current.images
     clearFeedback()
     try {
       const snapshot = await createImageSnapshot(file)
+      if (draftRef.current.images !== sourceImages) return
       setDraft((current) => ({
         ...current,
         images: { ...current.images, [slotKey]: snapshot },
@@ -1001,6 +1003,12 @@ export default function EngineeringPrintWorkspacePage() {
       for (const file of acceptedFiles) {
         snapshots.push(await createImageSnapshot(file))
       }
+      if (
+        getInstructionRowsForTarget(draftRef.current, normalizedTarget)[
+          normalizedTarget.rowIndex
+        ] !== row
+      )
+        { return }
       setDraft((current) =>
         updateInstructionRowByTarget(current, normalizedTarget, (row) => {
           const baseRow =
@@ -1062,6 +1070,12 @@ export default function EngineeringPrintWorkspacePage() {
     clearFeedback()
     try {
       const snapshot = await createImageSnapshot(file)
+      if (
+        getInstructionRowsForTarget(draftRef.current, normalizedTarget)[
+          normalizedTarget.rowIndex
+        ] !== row
+      )
+        { return }
       setDraft((current) =>
         updateInstructionRowByTarget(current, normalizedTarget, (row) => {
           const baseRow =
