@@ -154,6 +154,8 @@ APP_ADMIN_PASSWORD='<ephemeral-secret>' \
 
 steady env 必须保持 `BOOTSTRAP_ADMIN_ONCE=false` 且不包含 `APP_ADMIN_PASSWORD`。成功只证明管理员、marker、audit 和 RBAC 初始化，不证明客户配置、数据、健康或验收。
 
+首次初始化的短信配置来自目标宿主 root 持有的 `/etc/plush-toy-erp/sms-provider.env`（`0600`）。`initialization-sms-provider.sh` 是资格检查与初始化共用的数据读取器，只读取四个固定字段，不执行 env 内容，也不从历史容器复制配置。准备与轮换边界见[首次部署](../../deployments/yoyoosun/runbooks/01-first-deploy.md)。
+
 ## Release Evidence
 
 正式 evidence 逐层绑定：

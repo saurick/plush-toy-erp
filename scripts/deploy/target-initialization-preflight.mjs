@@ -1,5 +1,6 @@
 import process from "node:process";
 import { spawn, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 import { resolveTargetReadOnlyExecution } from "./target-readonly-execution.mjs";
 
@@ -32,6 +33,8 @@ const REPORT_KEYS = Object.freeze([
 const REMOTE_SCRIPT_TEMPLATE = String.raw`#!/usr/bin/env bash
 set -euo pipefail
 umask 077
+
+__SMS_PROVIDER_HELPER__
 
 target=__TARGET__
 expected_hostname=__HOSTNAME__
@@ -87,6 +90,13 @@ if [[ ! -x /usr/local/bin/atlas ]] ||
   atlas_status=blocked
   block initialization_atlas_unavailable
 fi
+
+declare -A initialization_sms_provider=()
+if ! read_initialization_sms_provider /etc/plush-toy-erp/sms-provider.env initialization_sms_provider; then
+  tooling_status=blocked
+  block initialization_sms_provider_unprepared
+fi
+unset initialization_sms_provider
 
 if [[ "$target" == production-133 ]]; then
   if ! command -v age >/dev/null 2>&1 ||
@@ -236,6 +246,10 @@ export function buildRemoteTargetInitializationPreflightScript(target) {
       safeTemplateValue(value, placeholder),
     );
   }
+  script = script.replace(
+    "__SMS_PROVIDER_HELPER__",
+    () => readFileSync(new URL("./initialization-sms-provider.sh", import.meta.url), "utf8"),
+  );
   if (/__[A-Z0-9_]+__/u.test(script)) {
     throw new Error("initialization preflight template is incomplete");
   }

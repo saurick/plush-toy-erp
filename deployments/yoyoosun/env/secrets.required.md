@@ -35,3 +35,5 @@ node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun
 ```
 
 真实 env 校验必须在受控服务器或受控工作站执行；命令输出不得包含 secret 明文。
+
+新目标初始化前，将四个 `APP_AUTH_SMS_ALIYUN_*` 字段按 `sms-provider.env.example` 写入目标宿主 `/etc/plush-toy-erp/sms-provider.env`，由 root 持有且权限为 `0600`。初始化只从此受控文件读取，不依赖业务容器；文件不进入源码包、工作台静态资源或公开日志，已运行目标的凭据轮换仍按各自运行配置执行。

@@ -648,21 +648,17 @@ for key in POSTGRES_PASSWORD POSTGRES_APP_PASSWORD POSTGRES_MIGRATOR_PASSWORD PO
 done
 [[ "${secret_values[APP_ADMIN_PASSWORD]}" =~ ^[A-Za-z0-9!._~-]{8,20}$ ]] || fail "generated administrator secret shape is invalid"
 
-provider_container=plush-toy-erp-server
-[[ "$(docker inspect --format '{{.State.Running}}' "$provider_container" 2>/dev/null || true)" == true ]] || fail "existing yoyoosun provider runtime is unavailable"
-provider_env="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$provider_container")"
-provider_value() {
-  local key="$1"
-  printf '%s\n' "$provider_env" | awk -F= -v key="$key" '$1 == key {sub(/^[^=]*=/, ""); print; count++} END {if (count != 1) exit 1}'
-}
-sms_access_key_id="$(provider_value APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID)"
-sms_access_key_secret="$(provider_value APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET)"
-sms_sign_name="$(provider_value APP_AUTH_SMS_ALIYUN_SIGN_NAME)"
-sms_template_code="$(provider_value APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE)"
-for value in "$sms_access_key_id" "$sms_access_key_secret" "$sms_sign_name" "$sms_template_code"; do
-  [[ -n "$value" && "$value" != *$'\n'* ]] || fail "provider credential contract is unavailable"
-done
-unset provider_env
+sms_provider_helper=$release_dir/scripts/deploy/initialization-sms-provider.sh
+plain_owned_file "$sms_provider_helper" || fail "SMS provider reader is unavailable"
+# shellcheck source=/dev/null
+source "$sms_provider_helper"
+declare -A initialization_sms_provider=()
+read_initialization_sms_provider /etc/plush-toy-erp/sms-provider.env initialization_sms_provider || fail "SMS provider credential file is unavailable or invalid"
+sms_access_key_id="${initialization_sms_provider[APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID]}"
+sms_access_key_secret="${initialization_sms_provider[APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET]}"
+sms_sign_name="${initialization_sms_provider[APP_AUTH_SMS_ALIYUN_SIGN_NAME]}"
+sms_template_code="${initialization_sms_provider[APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE]}"
+unset initialization_sms_provider
 
 [[ ! -e "$data_dir" && ! -L "$data_dir" ]] || fail "database data directory must be absent before initialization"
 # Keep the same ownership contract as the green release rehearsal: Docker creates

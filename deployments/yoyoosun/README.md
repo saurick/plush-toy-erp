@@ -19,7 +19,7 @@
 | 首次上线与准备清单 | [首次部署](runbooks/01-first-deploy.md) |
 | 升级、回滚和故障 | [运行说明](runbooks/00-overview.md) |
 | 备份、附件和恢复 | [备份恢复](runbooks/04-backup-restore.md)、[systemd 安装](systemd/README.md) |
-| 凭据与样例 | [必需秘密](env/secrets.required.md)、`env/.env.example`、`env/backup.env.example` |
+| 凭据与样例 | [必需秘密](env/secrets.required.md)、`env/.env.example`、`env/backup.env.example`、`env/sms-provider.env.example` |
 | 客户 env、凭据和公网切流适配 | [运维适配](scripts/README.md) |
 | 发布证据与客户验收边界 | [证据说明](evidence/README.md) |
 | 固定制品、操作执行器、smoke 与采证 | [仓库部署脚本](../../scripts/deploy/README.md) |

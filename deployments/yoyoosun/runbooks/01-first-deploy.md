@@ -28,6 +28,8 @@
 
 生产首次初始化的只读资格检查会要求 `age`、权限为 `root:0600` 的 `/etc/plush-toy-erp/backup.env` 和 `/mnt/plush-toy-erp-offsite/database` 的独立文件系统及固定挂载标记；配置准备见 [systemd 安装说明](../systemd/README.md)。这些前提不证明备份任务已启用、异机真实归属或恢复已经演练，仍须完成清单第 9 项。
 
+所有新目标还需要 `/etc/plush-toy-erp/sms-provider.env`，格式见 [`sms-provider.env.example`](../env/sms-provider.env.example)。由 root 在受控终端写入真实四项短信配置并设置 `0600`，不通过网页参数、命令行值或仓库传递秘密。资格检查与初始化共用同一数据读取器，拒绝缺项、重复项、占位值、符号链接和宽松权限；不依赖某个正在运行或已退役的业务容器。该文件只提供初始化配置，不热更新已运行目标；供应商凭据轮换须走各目标的运行配置流程。
+
 容量预检按实际部署目录及其最近存在的父目录定位文件系统，另保留系统根盘原有安全线；两个磁盘都须达到 registry 的最低可用空间，不能用 RAID5 余量代替系统盘余量。
 
 附件正文位于 S3，PG 只存元数据。新目标默认使用独立 managed SeaweedFS；使用已部署的 external 存储时也必须独立 bucket 与凭据，并按其维护窗口验证。存储和恢复步骤见 [附件合同](../../../server/deploy/compose/prod/README.md#附件存储与raid5)与[备份恢复](04-backup-restore.md)。

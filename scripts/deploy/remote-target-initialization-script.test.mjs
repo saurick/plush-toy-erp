@@ -18,15 +18,22 @@ function shellArray(name) {
     .filter(Boolean);
 }
 
-test("target initializer is valid Bash and accepts only demo and customer test", () => {
+test("target initializer is valid Bash and accepts registered targets", () => {
   const syntax = spawnSync("bash", ["-n", scriptPath.pathname], {
     encoding: "utf8",
   });
   assert.equal(syntax.status, 0, syntax.stderr);
   assert.match(source, /case "\$target" in\s+demo-133\)/u);
   assert.match(source, /customer-test-133\)/u);
+  assert.match(source, /production-133\)/u);
   assert.doesNotMatch(source, /admin\.yoyoosun\.net|admin-133/u);
   assert.match(source, /\*\) fail "unsupported target"/u);
+});
+
+test("target initializer reads the protected provider contract without a retired runtime dependency", () => {
+  assert.match(source, /source "\$sms_provider_helper"/u);
+  assert.match(source, /read_initialization_sms_provider \/etc\/plush-toy-erp\/sms-provider[.]env initialization_sms_provider/u);
+  assert.doesNotMatch(source, /provider_container=plush-toy-erp-server|provider_env=/u);
 });
 
 test("target initializer preserves isolated target identities and first-cutover contract", () => {

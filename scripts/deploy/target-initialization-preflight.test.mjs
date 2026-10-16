@@ -58,6 +58,8 @@ test("initialization preflight source binds only the registered target and parse
   );
   assert.doesNotMatch(script, /admin\.yoyoosun\.net/u);
   assert.doesNotMatch(script, /__[A-Z0-9_]+__/u);
+  assert.match(script, /read_initialization_sms_provider \/etc\/plush-toy-erp\/sms-provider[.]env initialization_sms_provider/u);
+  assert.match(script, /block initialization_sms_provider_unprepared/u);
 });
 
 test("initialization preflight accepts one pristine eligible report", () => {
