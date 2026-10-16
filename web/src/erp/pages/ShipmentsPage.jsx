@@ -8,30 +8,16 @@ import {
   LinkOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
+import { Button, Dropdown, Form, Popconfirm, Space, Tag, Typography } from 'antd'
 import {
-  Button,
-  Dropdown,
-  Form,
-  Popconfirm,
-  Space,
-  Tag,
-  Typography,
-} from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { sourceBusinessActionUUID,
-  createSourceBusinessActionAttemptStore,
-  isSourceBusinessActionResultUnknown,
-  sourceBusinessActionNo,
-} from '../utils/sourceBusinessAction.mjs'
-import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import ProcessSubmissionRoute from '../components/workflow/ProcessSubmissionRoute.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
-import {
-  ShipmentStatus,
-  OperationalFactStatus,
-} from '../../common/consts/statuses.generated.mjs'
+import { ShipmentStatus, OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
@@ -97,6 +83,7 @@ import {
   SHIPMENTS_MODULE_KEY,
 } from '../components/shipments/shipmentColumns.jsx'
 import {
+  buildSequentialDraftCode,
   hasActionPermission,
   BUSINESS_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
@@ -168,6 +155,11 @@ import {
   buildShipmentFinanceSourcePayload,
   shipmentFinanceSourceActionConfig,
 } from '../utils/shipmentFinanceSourceAction.mjs'
+import {
+  createSourceBusinessActionAttemptStore,
+  isSourceBusinessActionResultUnknown,
+  sourceBusinessActionNo,
+} from '../utils/sourceBusinessAction.mjs'
 import {
   buildShipmentQualityInspectionPayload,
   buildShipmentQualityInspectionSources,
@@ -274,10 +266,7 @@ export default function ShipmentsPage() {
   const [total, setTotal] = useState(0)
   const [statusCounts, setStatusCounts] = useState(null)
   const [keyword, setKeyword] = useBusinessPageState('keyword', '')
-  const [statusFilter, setStatusFilter] = useBusinessPageState(
-    'statusFilter',
-    ''
-  )
+  const [statusFilter, setStatusFilter] = useBusinessPageState('statusFilter', '')
   const [customerFilter, setCustomerFilter] = useBusinessPageState(
     'customerFilter',
     ''
@@ -298,10 +287,7 @@ export default function ShipmentsPage() {
     'dateFilterStart',
     ''
   )
-  const [dateFilterEnd, setDateFilterEnd] = useBusinessPageState(
-    'dateFilterEnd',
-    ''
-  )
+  const [dateFilterEnd, setDateFilterEnd] = useBusinessPageState('dateFilterEnd', '')
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
     pageSize: 20,
@@ -370,27 +356,12 @@ export default function ShipmentsPage() {
 
   const beginLatestRequest = useLatestRequestCoordinator()
 
-  const canRead = hasActionPermission(
-    adminProfile,
-    PermissionCode.SHIPMENT_READ
-  )
-  const canCreate = hasActionPermission(
-    adminProfile,
-    PermissionCode.SHIPMENT_CREATE
-  )
-  const canUpdate = hasActionPermission(
-    adminProfile,
-    PermissionCode.SHIPMENT_UPDATE
-  )
+  const canRead = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_READ)
+  const canCreate = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_CREATE)
+  const canUpdate = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_UPDATE)
   const canSubmitShipmentRelease = canRead && canCreate
-  const canShip = hasActionPermission(
-    adminProfile,
-    PermissionCode.SHIPMENT_SHIP
-  )
-  const canCancel = hasActionPermission(
-    adminProfile,
-    PermissionCode.SHIPMENT_CANCEL
-  )
+  const canShip = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_SHIP)
+  const canCancel = hasActionPermission(adminProfile, PermissionCode.SHIPMENT_CANCEL)
   const canCreateReceivable = canConfirmFinanceFact(adminProfile, 'RECEIVABLE')
   const canCreateInvoice = canConfirmFinanceFact(adminProfile, 'INVOICE')
   const canViewQualityInspections = hasActionPermission(
@@ -676,18 +647,14 @@ export default function ShipmentsPage() {
           : null
       })
       setTotal(exactPage.total)
-      setStatusCounts(
-        resolveBusinessStatusCounts(data, {
-          hasExactContext: routeSelectedID > 0,
-          exactRecord: routeShipment,
-          statusField: 'status',
-        })
-      )
+      setStatusCounts(resolveBusinessStatusCounts(data, {
+        hasExactContext: routeSelectedID > 0, exactRecord: routeShipment, statusField: 'status',
+      }))
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return
       }
-      showPageLoadError(error, '加载出货单')
+      message.error(getActionErrorMessage(error, '加载出货单'))
     } finally {
       if (request.isCurrent()) {
         setLoading(false)
@@ -746,7 +713,7 @@ export default function ShipmentsPage() {
       )
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
     } catch (error) {
-      showPageLoadError(error, '加载出货相关资料')
+      message.error(getActionErrorMessage(error, '加载出货相关资料'))
       setCustomers([])
       setInventoryLots([])
       setProducts([])
@@ -919,7 +886,7 @@ export default function ShipmentsPage() {
         setSalesOrderSources([])
         setSalesOrderSourceTotal(0)
         setSalesOrderSourceLoadFailed(true)
-        showPageLoadError(error, '加载销售订单来源')
+        message.error(getActionErrorMessage(error, '加载销售订单来源'))
         return false
       } finally {
         if (request.isCurrent()) {
@@ -1071,7 +1038,10 @@ export default function ShipmentsPage() {
     resetShipmentSourceSelectionState()
     shipmentForm.resetFields()
     shipmentForm.setFieldsValue({
-      shipment_no: `SHIP-${sourceBusinessActionUUID().replaceAll('-', '').toUpperCase()}`,
+      shipment_no: buildSequentialDraftCode(rows, {
+        prefix: 'SHIP',
+        field: 'shipment_no',
+      }),
       sales_order_id: undefined,
       customer_id: undefined,
       customer_snapshot: '',
@@ -1254,10 +1224,7 @@ export default function ShipmentsPage() {
         id: selectedRow.id,
         shipment_no: selectedRow.shipment_no,
       })
-      showProcessSubmissionReceipt({
-        result,
-        title: '财务审批已提交；成品质检仍由品质检验单独判定',
-      })
+      showProcessSubmissionReceipt({ result, title: '财务审批已提交；成品质检仍由品质检验单独判定' })
       await loadRows()
     } catch (error) {
       message.error(getActionErrorMessage(error, '提交出货放行'))
@@ -1314,7 +1281,7 @@ export default function ShipmentsPage() {
       })
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) return
-      showPageLoadError(error, '加载出货前检验来源')
+      message.error(getActionErrorMessage(error, '加载出货前检验来源'))
     } finally {
       if (request.isCurrent()) {
         setQualitySourceLoading(false)
@@ -1385,11 +1352,7 @@ export default function ShipmentsPage() {
   const openShipmentFinanceSource = (action) => {
     const allowed =
       action === 'receivable' ? canCreateReceivable : canCreateInvoice
-    if (
-      !allowed ||
-      !selectedRow ||
-      selectedRow.status !== ShipmentStatus.SHIPPED
-    ) {
+    if (!allowed || !selectedRow || selectedRow.status !== ShipmentStatus.SHIPPED) {
       message.warning('请先选择已确认出货的出货单')
       return
     }
@@ -1505,15 +1468,15 @@ export default function ShipmentsPage() {
   })
   const hasActiveFilters = Boolean(
     keyword.trim() ||
-    statusFilter ||
-    customerFilter ||
-    productFilter ||
-    warehouseFilter ||
-    dateFilterStart ||
-    dateFilterEnd ||
-    routeSalesOrderID ||
-    routeShipmentID ||
-    linkedKeyword
+      statusFilter ||
+      customerFilter ||
+      productFilter ||
+      warehouseFilter ||
+      dateFilterStart ||
+      dateFilterEnd ||
+      routeSalesOrderID ||
+      routeShipmentID ||
+      linkedKeyword
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -1588,7 +1551,15 @@ export default function ShipmentsPage() {
 
   return (
     <BusinessPageLayout className="erp-shipments-page">
-      <PageHeaderCard compact helpKey="shipments" title="出货单" />
+      <PageHeaderCard
+        compact
+        helpKey="shipments"
+        title="出货单"
+        stats={[
+          { key: 'total', label: '符合条件', value: total },
+          { key: 'current', label: '本页显示', value: rows.length },
+        ]}
+      />
 
       <BusinessOperationPanel
         compact
@@ -1623,7 +1594,6 @@ export default function ShipmentsPage() {
               }}
             />
             <SelectFilter
-              aria-label="客户"
               className="erp-business-filter-control--status"
               value={customerFilter}
               options={[{ label: '全部客户', value: '' }, ...customerOptions]}
@@ -1636,7 +1606,6 @@ export default function ShipmentsPage() {
               }}
             />
             <SelectFilter
-              aria-label="产品"
               className="erp-business-filter-control--status"
               value={productFilter}
               options={[{ label: '全部产品', value: '' }, ...productOptions]}
@@ -1649,7 +1618,6 @@ export default function ShipmentsPage() {
               }}
             />
             <SelectFilter
-              aria-label="仓库"
               className="erp-business-filter-control--status"
               value={warehouseFilter}
               options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
@@ -1761,9 +1729,7 @@ export default function ShipmentsPage() {
             <BusinessActionTooltip
               visible={!selectedRow || canEditShipmentDraft(selectedRow)}
               disabled={
-                !selectedRow ||
-                saving ||
-                selectedRow?.status !== ShipmentStatus.DRAFT
+                !selectedRow || saving || selectedRow?.status !== ShipmentStatus.DRAFT
               }
               disabledReason={
                 saving
@@ -1780,9 +1746,7 @@ export default function ShipmentsPage() {
                 icon={<EditOutlined />}
                 data-business-action-key="shipment-edit"
                 disabled={
-                  !selectedRow ||
-                  saving ||
-                  selectedRow?.status !== ShipmentStatus.DRAFT
+                  !selectedRow || saving || selectedRow?.status !== ShipmentStatus.DRAFT
                 }
                 onClick={() => openEdit(selectedRow)}
               >
@@ -1841,14 +1805,8 @@ export default function ShipmentsPage() {
                 title="确认提交出货审批？"
                 description={
                   <Space direction="vertical" size={8}>
-                    <ProcessSubmissionRoute
-                      processKey="finished_goods_delivery"
-                      customerKey={activeCustomerKey}
-                      open={releaseConfirmOpen}
-                    />
-                    <span>
-                      品质检验仍由质检单独判定；审批通过也不等于已出货，还需办理实际出货。
-                    </span>
+                    <ProcessSubmissionRoute processKey="finished_goods_delivery" customerKey={activeCustomerKey} open={releaseConfirmOpen} />
+                    <span>品质检验仍由质检单独判定；审批通过也不等于已出货，还需办理实际出货。</span>
                   </Space>
                 }
                 onOpenChange={setReleaseConfirmOpen}
@@ -1924,9 +1882,7 @@ export default function ShipmentsPage() {
                   data-business-action-key="shipment-cancel"
                   disabled={shipmentActionAvailability.cancel.disabled}
                 >
-                  {selectedRow?.status === ShipmentStatus.DRAFT
-                    ? '作废草稿'
-                    : '撤销已出货'}
+                  {selectedRow?.status === ShipmentStatus.DRAFT ? '作废草稿' : '撤销已出货'}
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>
@@ -1963,12 +1919,7 @@ export default function ShipmentsPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
-          <BusinessTaskActions
-            sourceType="shipment"
-            record={selectedRow}
-            adminProfile={adminProfile}
-            disabled={saving}
-          />
+          <BusinessTaskActions sourceType="shipment" record={selectedRow} adminProfile={adminProfile} disabled={saving} />
         </SelectionActionBar>
       </BusinessOperationPanel>
 

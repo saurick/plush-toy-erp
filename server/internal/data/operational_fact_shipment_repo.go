@@ -90,7 +90,7 @@ func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, 
 			return nil, err
 		}
 	}
-	return commitShipment(ctx, tx, row, 0)
+	return commitShipment(ctx, tx, row)
 }
 
 func (r *operationalFactRepo) SaveShipmentDraftWithItems(ctx context.Context, in *biz.ShipmentDraftSave) (*biz.Shipment, error) {
@@ -164,7 +164,7 @@ func (r *operationalFactRepo) SaveShipmentDraftWithItems(ctx context.Context, in
 	if err != nil {
 		return nil, err
 	}
-	return commitShipment(ctx, tx, updated, 0)
+	return commitShipment(ctx, tx, updated)
 }
 
 func shipmentDraftSaveDependency(ctx context.Context, tx *inventoryDBTx, row *ent.Shipment) error {
@@ -1102,7 +1102,7 @@ func (r *operationalFactRepo) shipShipment(
 					return nil, err
 				}
 			}
-			return commitShipment(ctx, tx, parent, actorID)
+			return commitShipment(ctx, tx, parent)
 		}
 		cancelledShippedFact = parent.Status == biz.ShipmentStatusShipped
 		if err := validateShipmentCancellationDependencies(ctx, tx, parent.ID); err != nil {
@@ -1168,7 +1168,7 @@ func (r *operationalFactRepo) shipShipment(
 					return nil, err
 				}
 			}
-			return commitShipment(ctx, tx, parent, actorID)
+			return commitShipment(ctx, tx, parent)
 		}
 		if parent.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusApproved {
 			return nil, biz.ErrShipmentFinanceReleaseRequired
@@ -1220,7 +1220,7 @@ func (r *operationalFactRepo) shipShipment(
 			return nil, err
 		}
 	}
-	return commitShipment(ctx, tx, parent, actorID)
+	return commitShipment(ctx, tx, parent)
 }
 
 func validateShipmentCancellationDependencies(ctx context.Context, tx *inventoryDBTx, shipmentID int) error {
@@ -1865,7 +1865,6 @@ func prepareShipmentReservationsAndAvailability(ctx context.Context, tx *invento
 		if err != nil {
 			return err
 		}
-		freeQuantity = freeQuantity.Sub(readiness.blocked())
 		demandTotal := decimal.Zero
 		for _, item := range itemsByGrain[grain] {
 			demandTotal = demandTotal.Add(item.Quantity)
@@ -2068,12 +2067,12 @@ func (r *operationalFactRepo) applyShipmentItemInventory(ctx context.Context, tx
 	})
 }
 
-func commitShipment(ctx context.Context, tx *inventoryDBTx, row *ent.Shipment, actorID int) (*biz.Shipment, error) {
+func commitShipment(ctx context.Context, tx *inventoryDBTx, row *ent.Shipment) (*biz.Shipment, error) {
 	out, err := shipmentWithItems(ctx, tx.client, row)
 	if err != nil {
 		return nil, err
 	}
-	if err := syncShipmentHandoff(ctx, tx.client, out, actorID); err != nil {
+	if err := syncShipmentHandoff(ctx, tx.client, out); err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
@@ -2083,7 +2082,7 @@ func commitShipment(ctx context.Context, tx *inventoryDBTx, row *ent.Shipment, a
 	return out, nil
 }
 
-func syncShipmentHandoff(ctx context.Context, client *ent.Client, row *biz.Shipment, actorID int) error {
+func syncShipmentHandoff(ctx context.Context, client *ent.Client, row *biz.Shipment) error {
 	status := ""
 	if len(row.Items) > 0 {
 		status = "ready"
@@ -2094,7 +2093,7 @@ func syncShipmentHandoff(ctx context.Context, client *ent.Client, row *biz.Shipm
 	if row.Status == biz.ShipmentStatusCancelled {
 		status = "withdrawn"
 	}
-	return syncFulfillmentTask(ctx, client, "shipment_execute", row.ID, row.ShipmentNo, "", status, "", actorID)
+	return syncFulfillmentTask(ctx, client, "shipment_execute", row.ID, row.ShipmentNo, "", status, "", 0)
 }
 
 func shipmentWithItems(ctx context.Context, client *ent.Client, row *ent.Shipment) (*biz.Shipment, error) {
