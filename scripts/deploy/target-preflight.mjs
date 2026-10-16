@@ -1,4 +1,4 @@
-import { realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import process from "node:process";
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -68,6 +68,11 @@ const REPORT_KEYS = Object.freeze([
   "RETAINED_OPERATION_COUNT",
   "STOPPED_PUBLIC_CONTAINER_COUNT",
   "RETENTION_MODE",
+  "RETENTION_PROTECTION_STATUS",
+  "ROLLBACK_RELEASE_SHAS",
+  "CACHE_CANDIDATE_COUNT",
+  "CACHE_CANDIDATE_BYTES",
+  "STOPPED_PUBLIC_CONTAINER_CANDIDATE_COUNT",
   "BLOCKERS",
 ]);
 
@@ -438,97 +443,8 @@ else
   block target_public_entry_container_invalid
 fi
 
-# Retention is deliberately preview-only. A candidate is merely absent from
-# current runtime, retained cache, container and operation JSON references; it
-# is never deleted by preflight and still requires a fresh manual readback.
-protected_release_shas="$(printf '%s\n' "$server_sha" "$web_sha" "$public_sha")"
-all_public_containers="$({
-  docker ps -a --format '{{.Names}}' 2>/dev/null || true
-} | grep -E "^\${public_container_prefix}[0-9a-f]{8}$" || true)"
-while IFS= read -r container_name; do
-  [[ -n "$container_name" ]] || continue
-  container_sha="$(read_git_sha "$container_name")"
-  if [[ "$container_sha" =~ ^[0-9a-f]{40}$ ]]; then
-    protected_release_shas="$protected_release_shas
-$container_sha"
-  fi
-  if [[ "$(docker inspect "$container_name" --format '{{.State.Running}}' 2>/dev/null || true)" == false ]]; then
-    stopped_public_container_count=$((stopped_public_container_count + 1))
-  fi
-done <<<"$all_public_containers"
-
-for cache_root in "\${cache_roots[@]}"; do
-  if ! plain_directory "$cache_root"; then
-    continue
-  fi
-  shopt -s nullglob
-  for cache_dir in "$cache_root"/*; do
-    [[ -d "$cache_dir" && ! -L "$cache_dir" ]] || continue
-    cache_name="$(basename "$cache_dir")"
-    cache_artifact="$cache_dir/release-artifact.json"
-    if [[ "$cache_name" =~ ^[0-9a-f]{64}$ ]] && plain_file "$cache_artifact"; then
-      cache_sha="$(jq -er '
-        select(.schemaVersion == "plush-release-artifact/v1") |
-        .git.commit |
-        select(type == "string" and test("^[0-9a-f]{40}$"))
-      ' "$cache_artifact" 2>/dev/null || true)"
-      if [[ "$cache_sha" =~ ^[0-9a-f]{40}$ ]]; then
-        formal_cache_count=$((formal_cache_count + 1))
-        protected_release_shas="$protected_release_shas
-$cache_sha"
-      fi
-    fi
-  done
-done
-
-if plain_directory "$operations_root"; then
-  operation_directory_count="$(find "$operations_root" -mindepth 1 -maxdepth 1 -type d ! -lname '*' -printf '.' 2>/dev/null | wc -c | tr -d ' ')"
-  operation_shas="$({
-    find "$operations_root" -mindepth 2 -maxdepth 2 -type f -name '*.json' -print0 2>/dev/null |
-      xargs -0r jq -r '.. | strings | select(test("^[0-9a-f]{40}$"))' 2>/dev/null || true
-  } | sort -u)"
-  protected_release_shas="$protected_release_shas
-$operation_shas"
-fi
-if plain_directory "$incoming_root"; then
-  retained_operation_count="$(find "$incoming_root" -mindepth 1 -maxdepth 1 -type d ! -lname '*' -printf '.' 2>/dev/null | wc -c | tr -d ' ')"
-fi
-
-candidate_shas=""
-if plain_directory "$releases"; then
-  shopt -s nullglob
-  for release_dir in "$releases"/*; do
-    [[ -d "$release_dir" && ! -L "$release_dir" ]] || continue
-    release_directory_count=$((release_directory_count + 1))
-    release_sha="$(basename "$release_dir")"
-    release_identity="$release_dir/.plush-release-identity.json"
-    if [[ ! "$release_sha" =~ ^[0-9a-f]{40}$ ]] ||
-      ! plain_file "$release_identity" ||
-      ! jq -e --arg sha "$release_sha" '
-        .schemaVersion == "plush.target-release-identity/v1" and
-        .gitSha == $sha and
-        (.sourceArchiveSha256 | type == "string" and test("^[0-9a-f]{64}$")) and
-        (.releaseManifestSha256 | type == "string" and test("^[0-9a-f]{64}$"))
-      ' "$release_identity" >/dev/null 2>&1; then
-      manual_review_release_count=$((manual_review_release_count + 1))
-      continue
-    fi
-    identified_release_count=$((identified_release_count + 1))
-    if printf '%s\n' "$protected_release_shas" | grep -Fxq "$release_sha"; then
-      protected_release_count=$((protected_release_count + 1))
-      continue
-    fi
-    retention_candidate_count=$((retention_candidate_count + 1))
-    release_bytes="$(du -sb "$release_dir" 2>/dev/null | awk '{print $1}' || true)"
-    [[ "$release_bytes" =~ ^[0-9]+$ ]] || release_bytes=0
-    retention_candidate_bytes=$((retention_candidate_bytes + release_bytes))
-    candidate_shas="$candidate_shas
-$release_sha"
-  done
-fi
-if [[ -n "$(printf '%s\n' "$candidate_shas" | sed '/^$/d')" ]]; then
-  retention_candidate_shas="$(printf '%s\n' "$candidate_shas" | sed '/^$/d' | sort -u | paste -sd, -)"
-fi
+__TARGET_RELEASE_RETENTION_SCRIPT__
+preview_target_release_retention
 
 if [[ -e "$migration_lock" ]]; then
   if command -v lslocks >/dev/null 2>&1 &&
@@ -660,6 +576,11 @@ printf '%s\n' \
   "RETAINED_OPERATION_COUNT=$retained_operation_count" \
   "STOPPED_PUBLIC_CONTAINER_COUNT=$stopped_public_container_count" \
   "RETENTION_MODE=$retention_mode" \
+  "RETENTION_PROTECTION_STATUS=$retention_protection_status" \
+  "ROLLBACK_RELEASE_SHAS=$rollback_release_shas" \
+  "CACHE_CANDIDATE_COUNT=$cache_candidate_count" \
+  "CACHE_CANDIDATE_BYTES=$cache_candidate_bytes" \
+  "STOPPED_PUBLIC_CONTAINER_CANDIDATE_COUNT=$stopped_public_container_candidate_count" \
   "BLOCKERS=$blockers_csv"
 `.replaceAll("\\${", "${");
 
@@ -712,7 +633,14 @@ export function buildRemoteTargetPreflightScript(target) {
     __SERVER_ENDPOINT__: target.endpoints.server,
     __WEB_ENDPOINT__: target.endpoints.web,
   };
-  let script = REMOTE_TARGET_PREFLIGHT_SCRIPT_TEMPLATE;
+  let script = REMOTE_TARGET_PREFLIGHT_SCRIPT_TEMPLATE.replace(
+    "__TARGET_RELEASE_RETENTION_SCRIPT__",
+    () =>
+      readFileSync(
+        new URL("./target-release-retention.sh", import.meta.url),
+        "utf8",
+      ),
+  );
   for (const [placeholder, value] of Object.entries(replacements)) {
     script = script.replaceAll(
       placeholder,
@@ -904,6 +832,20 @@ export function parseRemoteTargetPreflight(
   ) {
     throw new Error("retention candidate identity is invalid");
   }
+  const rollbackReleaseShas =
+    values.ROLLBACK_RELEASE_SHAS === "none"
+      ? []
+      : values.ROLLBACK_RELEASE_SHAS.split(",");
+  if (
+    rollbackReleaseShas.length > 2 ||
+    rollbackReleaseShas.some(
+      (value) =>
+        !SHA_PATTERN.test(value) || retentionCandidateShas.includes(value),
+    ) ||
+    new Set(rollbackReleaseShas).size !== rollbackReleaseShas.length
+  ) {
+    throw new Error("retention rollback identity is invalid");
+  }
   const report = {
     schemaVersion: REMOTE_TARGET_PREFLIGHT_CONTRACT,
     status,
@@ -984,6 +926,12 @@ export function parseRemoteTargetPreflight(
       zstdRequired: true,
     },
     retention: {
+      protectionStatus: assertEnum(
+        values.RETENTION_PROTECTION_STATUS,
+        ["complete", "manual_review"],
+        "retention protection status",
+      ),
+      rollbackReleaseShas,
       mode: assertEnum(
         values.RETENTION_MODE,
         ["preview_only"],
@@ -1014,6 +962,18 @@ export function parseRemoteTargetPreflight(
       formalCacheCount: parseSafeInteger(
         values.FORMAL_CACHE_COUNT,
         "formal cache count",
+      ),
+      cacheCandidateCount: parseSafeInteger(
+        values.CACHE_CANDIDATE_COUNT,
+        "cache candidate count",
+      ),
+      cacheCandidateBytes: parseSafeInteger(
+        values.CACHE_CANDIDATE_BYTES,
+        "cache candidate bytes",
+      ),
+      stoppedPublicContainerCandidateCount: parseSafeInteger(
+        values.STOPPED_PUBLIC_CONTAINER_CANDIDATE_COUNT,
+        "stopped container candidate count",
       ),
       operationDirectoryCount: parseSafeInteger(
         values.OPERATION_DIRECTORY_COUNT,
@@ -1069,6 +1029,15 @@ export function parseRemoteTargetPreflight(
     report.retention.identifiedReleaseCount +
       report.retention.manualReviewReleaseCount !==
       report.retention.releaseDirectoryCount ||
+    report.retention.cacheCandidateCount > report.retention.formalCacheCount ||
+    report.retention.stoppedPublicContainerCandidateCount >
+      report.retention.stoppedPublicContainerCount ||
+    (report.retention.protectionStatus === "manual_review" &&
+      (report.retention.candidateCount !== 0 ||
+        report.retention.candidateBytes !== 0 ||
+        report.retention.cacheCandidateCount !== 0 ||
+        report.retention.cacheCandidateBytes !== 0 ||
+        report.retention.stoppedPublicContainerCandidateCount !== 0)) ||
     (report.publicEntry.container !== "unknown" &&
       !new RegExp(
         `^${target.publicEntry.containerPrefix.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}[0-9a-f]{8}$`,

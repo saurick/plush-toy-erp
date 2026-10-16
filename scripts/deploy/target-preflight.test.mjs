@@ -97,6 +97,11 @@ function remoteReport(overrides = {}) {
     RETAINED_OPERATION_COUNT: "0",
     STOPPED_PUBLIC_CONTAINER_COUNT: "4",
     RETENTION_MODE: "preview_only",
+    RETENTION_PROTECTION_STATUS: "complete",
+    ROLLBACK_RELEASE_SHAS: `${"b".repeat(40)},${"c".repeat(40)}`,
+    CACHE_CANDIDATE_COUNT: "1",
+    CACHE_CANDIDATE_BYTES: "2048",
+    STOPPED_PUBLIC_CONTAINER_CANDIDATE_COUNT: "2",
     BLOCKERS: "none",
     ...overrides,
   };
@@ -146,6 +151,8 @@ test("target preflight parser returns bounded redacted evidence", () => {
     zstdRequired: true,
   });
   assert.deepEqual(report.retention, {
+    protectionStatus: "complete",
+    rollbackReleaseShas: ["b".repeat(40), "c".repeat(40)],
     mode: "preview_only",
     releaseDirectoryCount: 20,
     identifiedReleaseCount: 13,
@@ -155,6 +162,9 @@ test("target preflight parser returns bounded redacted evidence", () => {
     candidateShas: RETENTION_CANDIDATE_SHAS,
     manualReviewReleaseCount: 7,
     formalCacheCount: 2,
+    cacheCandidateCount: 1,
+    cacheCandidateBytes: 2048,
+    stoppedPublicContainerCandidateCount: 2,
     operationDirectoryCount: 25,
     retainedOperationCount: 0,
     stoppedPublicContainerCount: 4,
@@ -179,6 +189,21 @@ test("customer test preflight treats the trial dataset identity as not applicabl
   assert.match(script, /trial_target=none/u);
   assert.match(script, /active_dataset_version=not_applicable/u);
   assert.doesNotMatch(script, /__[A-Z0-9_]+__/u);
+});
+
+test("retention parser refuses ambiguous protection and contradictory candidate totals", () => {
+  for (const overrides of [
+    { RETENTION_PROTECTION_STATUS: "unknown" },
+    { RETENTION_PROTECTION_STATUS: "manual_review" },
+    { CACHE_CANDIDATE_COUNT: "3" },
+    { STOPPED_PUBLIC_CONTAINER_CANDIDATE_COUNT: "5" },
+    { ROLLBACK_RELEASE_SHAS: RETENTION_CANDIDATE_SHAS[0] },
+    { ROLLBACK_RELEASE_SHAS: `${"b".repeat(40)},${"b".repeat(40)}` },
+  ])
+    assert.throws(
+      () => parseRemoteTargetPreflight(remoteReport(overrides)),
+      /retention|contradicts/u,
+    );
 });
 
 test("target preflight rejects dataset identity drift between demo and customer test", () => {

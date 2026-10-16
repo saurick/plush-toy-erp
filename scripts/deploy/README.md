@@ -69,6 +69,14 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 `/__dev/delivery` 首屏显示最近 operation、最严重阻断、最后核对时间和完整记录入口；`/__dev/version-center?view=history` 读取同一持久化 store，并明确显示加载、正常、空、失败和过期状态。
 
+## 制品保留预览
+
+`target-preflight.mjs` 将 `target-release-retention.sh` 嵌入同一固定目标只读脚本，目标宿主无需安装 Node.js。预览保护当前前后端与公网运行版本、仍在运行的入口容器、按成功回执完成时间选出的最近两个不同恢复版本，以及失败、运行中或结果尚未收敛的操作所引用的版本。恢复版本表示已有运行证据，代码回滚仍需通过迁移和客户配置兼容性校验。
+
+历史成功操作、旧缓存和已停止入口容器不再永久锁住其全部历史版本；operation、备份、数据库、附件、env 和审计记录不进入清理候选。`retention` 分别返回源码目录候选数量 / 字节、`cacheCandidateCount / cacheCandidateBytes` 和 `stoppedPublicContainerCandidateCount`，字节是逻辑大小，不能直接当作实际可释放磁盘。`rollbackReleaseShas` 给出本次保护的恢复版本。
+
+无法识别的源码目录与符号链接单独保留；保护信息不明、未知操作合同、损坏 / 多份 JSON、目标不符、缓存符号链接或盘点失败时，`protectionStatus=manual_review`，不输出可清理候选。预览不执行删除；实际清理前仍须逐项核对当前版本、恢复输入、容器 / 镜像引用与容量，并在授权范围内操作。
+
 ## Promotion 与传输
 
 两个 target 的 promotion、rollback 和首次初始化使用固定 SSH 与 `rsync 3.x`，但 Mac 只向 operation 专属 `incoming` 目录传输 operation manifest、固定执行脚本、`target-release-fetch.json` 和控制校验表；legacy v1 代码回滚额外传输小型 `checksums.sha256` 作为既有目标缓存的校验目录。Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/release/rehearsal JSON 与 fetch descriptor 控制证据，但 SBOM、两个 image tar 与 `source.tar` 大型 payload 不经过 Mac；目标宿主固定把 `gitlab.saurick.me` 解析到同机内网地址，经系统信任 TLS 直接从 `plush-release` 与 `plush-release-source` Package 取得，并在物化前逐项核对名称、大小、SHA-256、v2 manifest、rehearsal、source binding 和 image content ID。专用 `read_package_registry` deploy token 只保存在工作台进程内存，并且只注入确实可能冷取件的唯一 executor 子进程；子进程在任何预检前立即从环境移除，再仅通过唯一 SSH 标准输入进入已加锁的远端执行器。它不进入其他子进程、参数、控制包或目标 secret 文件；下载期间只允许存在 `0600` curl 配置，结束或失败清理后必须证明不存在。不存在静默回退到 Mac 大文件中转的路径。

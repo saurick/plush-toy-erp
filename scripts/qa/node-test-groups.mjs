@@ -212,6 +212,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/deploy/target-readonly-execution.test.mjs",
     "scripts/deploy/target-release-cache.test.mjs",
     "scripts/deploy/target-release-fetch.test.mjs",
+    "scripts/deploy/target-release-retention.test.mjs",
     "scripts/qa/capacity-customer-config.test.mjs",
     "scripts/qa/capacity-dataset.test.mjs",
     "scripts/qa/customer-trial-133-data.test.mjs",
