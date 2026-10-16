@@ -2,7 +2,9 @@ package data
 
 import (
 	"context"
+	"crypto/rand"
 	stdsql "database/sql"
+	"encoding/binary"
 	"fmt"
 	"strings"
 	"time"
@@ -119,12 +121,16 @@ func (r *debugSeedRepo) SeedBusinessChainDebugData(ctx context.Context, plan biz
 
 	recordsByRef := make(map[string]biz.DebugCreatedRecord, len(plan.Records))
 	createdRecords := make([]biz.DebugCreatedRecord, 0, len(plan.Records))
-	for index, recordPlan := range plan.Records {
+	for _, recordPlan := range plan.Records {
 		if !biz.IsDebugPayloadForRun(recordPlan.Payload, plan.DebugRunID, plan.ScenarioKey) {
 			return nil, biz.ErrDebugPayloadMarkerMissing
 		}
+		sourceID, err := allocateDebugSourceID(ctx, tx.Client(), recordPlan.ModuleKey)
+		if err != nil {
+			return nil, err
+		}
 		record := biz.DebugCreatedRecord{
-			ID:                index + 1,
+			ID:                sourceID,
 			ModuleKey:         recordPlan.ModuleKey,
 			DocumentNo:        recordPlan.DocumentNo,
 			Title:             recordPlan.Title,
@@ -215,6 +221,25 @@ func (r *debugSeedRepo) SeedBusinessChainDebugData(ctx context.Context, plan biz
 	}, nil
 }
 
+// Debug source identities stay within JavaScript's exact integer range and do not reuse real low-numbered records.
+func allocateDebugSourceID(ctx context.Context, client *ent.Client, sourceType string) (int, error) {
+	for attempt := 0; attempt < 8; attempt++ {
+		var raw [8]byte
+		if _, err := rand.Read(raw[:]); err != nil {
+			return 0, err
+		}
+		id := int((binary.BigEndian.Uint64(raw[:]) & ((1 << 52) - 1)) | (1 << 52))
+		exists, err := client.WorkflowBusinessState.Query().Where(workflowbusinessstate.SourceType(sourceType), workflowbusinessstate.SourceID(id)).Exist(ctx)
+		if err != nil {
+			return 0, err
+		}
+		if !exists {
+			return id, nil
+		}
+	}
+	return 0, fmt.Errorf("could not allocate debug source identity")
+}
+
 func createDebugWorkflowTask(ctx context.Context, tx *ent.Tx, plan biz.DebugTaskPlan, record biz.DebugCreatedRecord, actorID int) (*ent.WorkflowTask, error) {
 	builder := tx.WorkflowTask.Create().
 		SetTaskCode(plan.TaskCode).
@@ -230,6 +255,9 @@ func createDebugWorkflowTask(ctx context.Context, tx *ent.Tx, plan biz.DebugTask
 		SetNillableDueAt(plan.DueAt).
 		SetNillableBlockedReason(plan.BlockedReason).
 		SetPayload(plan.Payload)
+	if biz.IsTerminalWorkflowTaskStatus(plan.TaskStatusKey) {
+		builder.SetCompletedAt(time.Now())
+	}
 	if actorID > 0 {
 		builder.SetCreatedBy(actorID).SetUpdatedBy(actorID)
 	}
@@ -463,6 +491,18 @@ func (r *debugSeedRepo) ClearBusinessData(ctx context.Context, in biz.DebugBusin
 		result.Warnings = append(result.Warnings, "dryRun=true，仅统计全量业务清空范围，没有删除数据。")
 	}
 
+	if !in.DryRun {
+		if in.ActorID <= 0 {
+			return nil, biz.ErrBadParam
+		}
+		payload, err := runtimeAuditPayload(map[string]any{"actor_user_id": in.ActorID, "matched_counts": result.MatchedCounts, "deleted_counts": result.DeletedCounts, "deleted_total": result.DeletedTotal, "cleared_tables": result.ClearedTableNames})
+		if err != nil {
+			return nil, err
+		}
+		if _, err := tx.ExecContext(ctx, "INSERT INTO runtime_audit_events (event_type, event_key, source, payload, created_at) VALUES ($1, $2, $3, $4, $5)", "debug.business_data.cleared", "business-data-clear", "debug", payload, time.Now()); err != nil {
+			return nil, err
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
