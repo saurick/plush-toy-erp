@@ -611,7 +611,6 @@ function matchProduct(context, products) {
     if (codeMatches.length > 1) {
       return { status: 'ambiguous', by: '产品编号', record: null }
     }
-    return { status: 'missing', by: '产品编号', record: null }
   }
   if (context.name) {
     const nameMatches = records.filter((record) =>
@@ -639,7 +638,6 @@ function matchMaterial(source, materials) {
     if (codeMatches.length > 1) {
       return { status: 'ambiguous', by: '材料编号', record: null }
     }
-    return { status: 'missing', by: '材料编号', record: null }
   }
 
   let matches = records.filter((record) =>

@@ -150,7 +150,7 @@ export function createBOMTaskActionsScenarios({
             assert.equal(params.source_type, 'sales_order')
             assert.equal(params.source_id, relatedOrder.id)
             trackingReads += 1
-            return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult({ items: [], total: 0, status_counts: {}, limit: params.limit, offset: params.offset }) } })
+            return route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult({ items: [], total: 0, limit: params.limit, offset: params.offset }) } })
           }
           if (method === 'list_tasks') {
             assert.equal(params.source_type, 'sales_order')

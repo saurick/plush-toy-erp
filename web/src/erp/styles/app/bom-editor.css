@@ -22,7 +22,7 @@
 .erp-bom-material-groups__count,
 .erp-bom-material-cell__context {
   color: var(--erp-text-muted, #64748b);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-bom-parts-scroll {
@@ -59,7 +59,7 @@
   padding: 7px 8px;
   border-color: var(--erp-border-strong);
   color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
   font-weight: 650;
   text-align: center;
   vertical-align: middle;
@@ -153,7 +153,7 @@
   gap: 12px;
   flex-wrap: wrap;
   padding: 3px 0;
-  font-size: var(--erp-font-caption);
+  font-size: 12px;
 }
 
 .erp-bom-material-group__footer > span {
