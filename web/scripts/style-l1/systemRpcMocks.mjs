@@ -64,7 +64,7 @@ export async function installSystemRpcMocks(page, context) {
   }
   const roleByKey = new Map(availableRoles.map((role) => [role.role_key, role]))
   const roleForParams = (params = {}) =>
-    roleByKey.get(String(params?.role_key || '').trim()) || salesRole
+    roleByKey.get(String(params?.role_key || '').trim())
   const legalNoticeAcknowledgements = new Map()
   const legalNoticeReceipt = (params = {}) => {
     const noticeVersion = String(params.notice_version || '').trim()
@@ -273,6 +273,10 @@ export async function installSystemRpcMocks(page, context) {
         break
       case 'set_role_settings': {
         const role = roleForParams(params)
+        if (!role) {
+          data = unsupportedRpcMethod('admin', 'unknown role_key')
+          break
+        }
         role.version += 1
         role.permissions = Array.isArray(params.permission_keys)
           ? params.permission_keys
@@ -347,6 +351,10 @@ export async function installSystemRpcMocks(page, context) {
         break
       case 'effective_role_access': {
         const role = roleForParams(params)
+        if (!role) {
+          data = unsupportedRpcMethod('admin', 'unknown role_key')
+          break
+        }
         const permissionKeys = Array.isArray(params.permission_keys)
           ? params.permission_keys
               .map((permissionKey) => String(permissionKey || '').trim())

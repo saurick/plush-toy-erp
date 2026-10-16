@@ -1647,7 +1647,7 @@ export function createBusinessActionStabilityScenarios(deps) {
         assert.equal(
           await actionBar
             .getByRole('button', {
-              name: '委外返厂 / 返工',
+              name: '委外返厂',
             })
             .count(),
           0,

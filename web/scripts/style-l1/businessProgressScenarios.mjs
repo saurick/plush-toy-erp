@@ -5,7 +5,7 @@ import { assertBusinessModalViewport } from './modalAssertions.mjs'
 
 async function verifyProgressMotion(page, assert, reduced) {
   if (reduced) await page.emulateMedia({ reducedMotion: 'reduce' })
-  const root = page.locator('.erp-progress-toolbar .erp-sliding-segmented')
+  const root = page.locator('[aria-label="进度查看方式"]')
   if (reduced) {
     await root.getByText('订单交付', { exact: true }).click()
     await page.waitForTimeout(100)
@@ -166,10 +166,25 @@ export function createBusinessProgressScenarios({
         if (failed) {
           const retry = board.getByRole('button', { name: '重试', exact: true })
           await retry.waitFor()
+          assert((await board.getByRole('group', { name: '交期情况', exact: true }).locator('.erp-filter-chip__count').allTextContents()).every((count) => count === '—'), '读取失败不能显示为零条')
           failNext = false
           await retry.click()
         }
         await progressCard('SO-0001').waitFor()
+        const selectedPaint = await board.locator('.erp-progress-row.is-selected').evaluate((node) => {
+          const style = getComputedStyle(node)
+          const peer = node.parentElement.querySelector('.erp-progress-row:not(.is-selected)')
+          return {
+            left: style.borderLeftWidth,
+            right: style.borderRightWidth,
+            shadow: style.boxShadow,
+            background: style.backgroundColor,
+            peerBackground: peer ? getComputedStyle(peer).backgroundColor : null,
+          }
+        })
+        assert.equal(selectedPaint.left, selectedPaint.right)
+        assert.equal(selectedPaint.shadow, 'none')
+        if (selectedPaint.peerBackground) assert.notEqual(selectedPaint.background, selectedPaint.peerBackground)
         assert.equal(
           await page.locator('.erp-business-board-source-count').count(),
           0
@@ -210,6 +225,7 @@ export function createBusinessProgressScenarios({
           assert(
             await board.getByRole('button', { name: /任务受阻/ }).isDisabled()
           )
+          assert.equal(await board.getByRole('button', { name: /任务受阻/ }).locator('.erp-filter-chip__count').innerText(), '—')
           return
         }
         const summary = board.getByRole('complementary', {
@@ -320,7 +336,7 @@ export function createBusinessProgressScenarios({
           assert.equal(new URL(page.url()).searchParams.get('page'), '2')
           await board.locator('.ant-pagination-prev button').click()
           await progressCard('SO-0001').waitFor()
-          await board.getByRole('button', { name: '筛选', exact: true }).click()
+          await board.getByRole('button', { name: /^筛选进度/ }).click()
           await page.getByPlaceholder('输入姓名').fill('查无负责人')
           await page.getByRole('button', { name: '应用', exact: true }).click()
           await board.getByText('没有符合条件的记录').waitFor()
@@ -328,9 +344,8 @@ export function createBusinessProgressScenarios({
             new URL(page.url()).searchParams.get('owner'),
             '查无负责人'
           )
-          await board
-            .getByRole('button', { name: '清空筛选', exact: true })
-            .click()
+          await page.getByRole('button', { name: '重置筛选', exact: true }).click()
+          await page.keyboard.press('Escape')
           await progressCard('SO-0001').waitFor()
         }
         await board.getByRole('button', { name: /已逾期/ }).click()
@@ -342,7 +357,7 @@ export function createBusinessProgressScenarios({
         assert(
           (
             await board
-              .getByRole('group', { name: '按风险筛选进度' })
+              .getByRole('group', { name: '进度快捷筛选' })
               .textContent()
           ).includes('24')
         )
@@ -419,7 +434,7 @@ export function createBusinessProgressScenarios({
             .getByRole('button', { name: /已逾期/ })
             .getAttribute('aria-pressed')) === 'true'
         )
-        await board.getByRole('button', { name: '清空筛选' }).click()
+        await board.getByRole('button', { name: /^不限交期/ }).click()
         await page.waitForFunction(
           () =>
             document.querySelectorAll('.erp-progress-list .erp-progress-row')
@@ -462,7 +477,7 @@ export function createBusinessProgressScenarios({
         await board.getByText('没有符合条件的记录').waitFor()
         assert.equal(await summary.getByRole('heading').count(), 0)
         await summary.getByText('暂无可查看的阶段摘要').waitFor()
-        await board.getByRole('button', { name: '清空筛选' }).click()
+        await search.fill('')
         await progressCard('SO-0001').waitFor()
         await verifyProgressMotion(page, assert, false)
         await progressCard('MO-0001').waitFor()
@@ -471,7 +486,7 @@ export function createBusinessProgressScenarios({
           path: path.join(outputDir, `${name}-production.png`),
           fullPage: false,
         })
-        await board.getByRole('button', { name: '筛选', exact: true }).click()
+        await board.getByRole('button', { name: /^筛选进度/ }).click()
         await page.getByPlaceholder('输入姓名').waitFor()
         await page.waitForTimeout(250)
         await assertNoHorizontalOverflow(page, `${name}-filters-open`)
@@ -487,7 +502,7 @@ export function createBusinessProgressScenarios({
               }),
             }
           })
-        assert(filterGeometry.height < 260, JSON.stringify(filterGeometry))
+        assert(filterGeometry.height <= 640, JSON.stringify(filterGeometry))
         assert(
           filterGeometry.inputs.every(
             (input) =>
@@ -498,27 +513,21 @@ export function createBusinessProgressScenarios({
           JSON.stringify(filterGeometry)
         )
         if (mobile) {
-          await page
-            .locator('.erp-progress-filters .ant-picker-input input')
-            .first()
-            .click()
-          await page
-            .locator('.ant-picker-dropdown:not(.ant-picker-dropdown-hidden)')
-            .waitFor()
-          await page.waitForTimeout(300)
+          await page.getByRole('button', { name: '自定义交期日期', exact: true }).click()
+          const dates = page.getByRole('dialog', { name: '选择交期日期范围', exact: true })
+          await dates.waitFor()
           await page.screenshot({
             path: path.join(outputDir, `${name}-date-filter.png`),
             fullPage: false,
           })
           await assertNoHorizontalOverflow(page, `${name}-date-filter`)
-          await page.keyboard.press('Escape')
+          await dates.getByRole('button', { name: '取消', exact: true }).click()
         }
         await page
-          .getByRole('button', { name: '查看未关联销售的生产单', exact: true })
+          .getByRole('button', { name: /^仅看未关联销售/ })
           .click()
-        await page
-          .locator('.ant-popover:has(.erp-progress-filters)')
-          .waitFor({ state: 'hidden' })
+        await board.getByRole('button', { name: /^筛选进度/ }).click()
+        await page.locator('.ant-popover:has(.erp-progress-filters)').waitFor({ state: 'hidden' })
         await progressCard('MO-0003').waitFor()
         await page.waitForFunction(
           () =>
@@ -529,7 +538,7 @@ export function createBusinessProgressScenarios({
           calls.some(
             (call) =>
               call.params.view === 'production' &&
-              call.params.risk === 'unlinked'
+              call.params.unlinked_only === true
           )
         )
         await assertNoHorizontalOverflow(page, `${name}-production`)
@@ -559,7 +568,7 @@ export function createBusinessProgressScenarios({
           )
           await page.goBack()
           await progressCard('MO-0003').waitFor()
-          assert(new URL(page.url()).searchParams.get('risk') === 'unlinked')
+          assert(new URL(page.url()).searchParams.get('unlinked_only') === 'true')
         }
       },
     }

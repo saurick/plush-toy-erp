@@ -59,13 +59,13 @@ export function mobileAppearanceScenario({
             .evaluate((card) => {
               const css = getComputedStyle(card)
               const avatar = getComputedStyle(
-                card.querySelector('.mobile-mine-avatar')
+                card.querySelector('.erp-account-avatar')
               )
               return {
                 color: css.color,
                 background: css.backgroundColor,
                 avatar: avatar.color,
-                expected: css.getPropertyValue('--erp-primary-strong'),
+                avatarBackground: avatar.backgroundColor,
               }
             })
           assert.ok(
@@ -75,10 +75,9 @@ export function mobileAppearanceScenario({
             ) >= 4.5,
             `${mode}/${color}资料文字可读`
           )
-          assert.deepEqual(
-            parseRgb(paint.avatar),
-            parseRgb(paint.expected),
-            `${mode}/${color}头像跟随主题`
+          assert.ok(
+            getContrastRatio(parseRgb(paint.avatar), parseRgb(paint.avatarBackground)) >= 4.5,
+            `${mode}/${color}账号固定头像文字可读`
           )
           await page.screenshot({
             path: path.join(

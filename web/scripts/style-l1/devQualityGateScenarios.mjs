@@ -883,10 +883,10 @@ export function createDevQualityGateScenarios({
         await page.getByText('GitLab 普通 CI 已通过', { exact: true }).waitFor()
         assert.equal(
           await page
-            .getByRole('region', { name: '质量门禁操作区' })
+            .locator('.erp-dev-quality-header')
             .evaluate((node) => getComputedStyle(node).backgroundColor),
           'rgb(255, 255, 255)',
-          '质量门禁导航和视图说明由同一白色操作区承载'
+          '质量门禁标题与主导航由同一白色页头承载'
         )
 
         const serverPanel = page.getByRole('region', {

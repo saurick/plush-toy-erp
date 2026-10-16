@@ -295,7 +295,7 @@ export function createMobileSurfaceScenarios({
           '--canvas',
           '设计稿进度数据区'
         )
-        await frame.getByRole('button', { name: /任务，/ }).click()
+        await frame.getByRole('button', { name: /^任务管理，/ }).click()
         await frame.locator('.rm-task-card').first().click()
         await assertSurface(
           frame.locator('.rm-flow-scroll'),

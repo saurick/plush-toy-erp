@@ -325,10 +325,7 @@ export function createBusinessStatusCountsScenarios({
               name: '筛选条件',
               exact: true,
             })
-            const selector = panel
-              .locator('.ant-select')
-              .filter({ hasText: '全部检验类型' })
-            await selector.click()
+            const types = panel.getByRole('group', { name: '检验类型', exact: true })
             for (const [type, rpc] of [
               ['委外回货', 'list_outsourcing_return_quality_inspections'],
               ['成品检验', 'list_finished_goods_quality_inspections'],
@@ -337,20 +334,13 @@ export function createBusinessStatusCountsScenarios({
               const response = page.waitForResponse(
                 (res) => res.request().postDataJSON()?.method === rpc
               )
-              await page
-                .locator('.ant-select-dropdown:visible')
-                .getByText(type, { exact: true })
+              await types
+                .getByRole('button', { name: type, exact: true })
                 .click()
               await response
               await filter
                 .getByRole('button', { name: '不限状态，共 0 条' })
                 .waitFor()
-              if (type !== '生产分段质检') {
-                await panel
-                  .locator('.ant-select')
-                  .filter({ hasText: type })
-                  .click()
-              }
             }
             await page.keyboard.press('Escape')
           }

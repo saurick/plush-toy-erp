@@ -877,6 +877,25 @@ export async function installFactRpcMocks(page, context) {
         data = { production_fact: { ...productionFact } }
         break
       case 'cancel_production_fact':
+        if (
+          Object.keys(params).some(
+            (key) =>
+              !['customer_key', 'id', 'expected_version', 'reason'].includes(
+                key
+              )
+          ) ||
+          params.id !== productionFact.id ||
+          params.expected_version !== productionFact.version ||
+          !['DRAFT', 'POSTED'].includes(productionFact.status) ||
+          typeof params.reason !== 'string' ||
+          !params.reason.trim()
+        ) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            'cancel_production_fact invalid mutation'
+          )
+          break
+        }
         productionFact = {
           ...productionFact,
           status: 'CANCELLED',
@@ -1087,14 +1106,7 @@ export async function installFactRpcMocks(page, context) {
         break
       case 'list_shipments':
         {
-          const shipmentForQuery =
-            params.status === 'SHIPPED'
-              ? {
-                  ...shipment,
-                  status: 'SHIPPED',
-                  shipped_at: shipment.shipped_at || nowUnix(),
-                }
-              : shipment
+          const shipmentForQuery = shipment
           const shipments =
             (params.status && params.status !== shipmentForQuery.status) ||
             (params.source_id &&
@@ -1193,12 +1205,16 @@ export async function installFactRpcMocks(page, context) {
           }
         }
         break
+      case 'list_finance_payment_allocation_candidates':
+        data = { facts: [financeFact] }
+        break
       case 'list_finance_payments':
         data = {
           payments: [
             {
               id: 41,
               payment_no: 'PAY-STYLE-L1',
+              kind: 'SETTLEMENT',
               direction: 'RECEIPT',
               status: 'APPROVED',
               counterparty_type: 'CUSTOMER',
@@ -1585,13 +1601,17 @@ export async function installFactRpcMocks(page, context) {
             () => {
               const receiptId = nextPurchaseReceiptId
               nextPurchaseReceiptId += 1
-              const arrivalLines = params.items || (params.all_remaining ? [purchaseReceiptItem] : [])
+              const arrivalLines =
+                params.items ||
+                (params.all_remaining ? [purchaseReceiptItem] : [])
               const items = arrivalLines.map((line) => ({
                 ...purchaseReceiptItem,
                 ...line,
                 id: nextPurchaseReceiptItemId++,
                 receipt_id: receiptId,
-                warehouse_id: Number(line.warehouse_id || params.warehouse_id || 1),
+                warehouse_id: Number(
+                  line.warehouse_id || params.warehouse_id || 1
+                ),
               }))
               const receipt = {
                 ...purchaseReceipts[1],
@@ -2188,7 +2208,20 @@ export async function installFactRpcMocks(page, context) {
     let data = {}
     switch (method) {
       case 'list_progress':
-        data = { rows: [], total: 0, counts: { total: 0, overdue: 0, due_soon: 0, blocked: 0, undated: 0 }, snapshot_at: new Date().toISOString(), access: { sales: true, production: true, tasks: true, wip: true } }
+        data = {
+          rows: [],
+          total: 0,
+          counts: {
+            total: 0,
+            overdue: 0,
+            due_soon: 0,
+            blocked: 0,
+            undated: 0,
+            unlinked: 0,
+          },
+          snapshot_at: new Date().toISOString(),
+          access: { sales: true, production: true, tasks: true, wip: true },
+        }
         break
       default:
         data = unsupportedRpcMethod('business', method)
@@ -2246,7 +2279,15 @@ export async function installFactRpcMocks(page, context) {
         break
       case 'get_task': {
         const task = workflowTasks.find((item) => item.id === params.task_id)
-        if (!workflowMockPermissionAllowed(adminProfile, effectiveSession, 'workflow.task.read') || !task || !workflowMockCanViewTask(adminProfile, effectiveSession, task)) {
+        if (
+          !workflowMockPermissionAllowed(
+            adminProfile,
+            effectiveSession,
+            'workflow.task.read'
+          ) ||
+          !task ||
+          !workflowMockCanViewTask(adminProfile, effectiveSession, task)
+        ) {
           fail('当前账号不能查看此任务')
         } else data = { task }
         break
@@ -2326,12 +2367,39 @@ export async function installFactRpcMocks(page, context) {
         break
       }
       case 'get_task_handling_chain': {
-        const task = workflowTasks.find((item) => Number(item.id) === Number(params.task_id))
-        if (!task || !workflowMockCanViewTask(adminProfile, effectiveSession, task)) {
+        const task = workflowTasks.find(
+          (item) => Number(item.id) === Number(params.task_id)
+        )
+        if (
+          !task ||
+          !workflowMockCanViewTask(adminProfile, effectiveSession, task)
+        ) {
           fail('当前账号不能查看该任务链')
           break
         }
-        data = { items: workflowTasks.filter((item) => item.source_type === task.source_type && item.source_id === task.source_id && workflowMockCanViewTask(adminProfile, effectiveSession, item)).map((item) => ({ id: item.id, task_name: item.task_name, task_group: item.task_group, task_status_key: item.task_status_key, owner_role_key: item.owner_role_key, source_type: item.source_type, source_no: item.source_no || '', process_instance_id: item.process_instance_id || 0, operation_code: '', batch_no: '', exception_id: 0 })), truncated: false }
+        data = {
+          items: workflowTasks
+            .filter(
+              (item) =>
+                item.source_type === task.source_type &&
+                item.source_id === task.source_id &&
+                workflowMockCanViewTask(adminProfile, effectiveSession, item)
+            )
+            .map((item) => ({
+              id: item.id,
+              task_name: item.task_name,
+              task_group: item.task_group,
+              task_status_key: item.task_status_key,
+              owner_role_key: item.owner_role_key,
+              source_type: item.source_type,
+              source_no: item.source_no || '',
+              process_instance_id: item.process_instance_id || 0,
+              operation_code: '',
+              batch_no: '',
+              exception_id: 0,
+            })),
+          truncated: false,
+        }
         break
       }
       case 'get_task_process_context': {
@@ -2470,11 +2538,22 @@ export async function installFactRpcMocks(page, context) {
           .toLowerCase()
         const roleKey = String(params.role_key || '').trim()
         const viewKey = String(params.view_key || '').trim()
-        const mobileReview = method === 'list_role_tasks' && adminProfile?.is_super_admin === true
+        const mobileReview =
+          method === 'list_role_tasks' && adminProfile?.is_super_admin === true
         const reviewRoles = mobileReview
-          ? getAllowedMobileRoleKeys({ ...adminProfile, effective_session: effectiveSession }, effectiveSession?.roles || []).filter((role) => role !== 'all' && (roleKey === 'all' || role === roleKey))
+          ? getAllowedMobileRoleKeys(
+              { ...adminProfile, effective_session: effectiveSession },
+              effectiveSession?.roles || []
+            ).filter(
+              (role) =>
+                role !== 'all' && (roleKey === 'all' || role === roleKey)
+            )
           : []
-        if (method === 'list_role_tasks' && ((roleKey === 'all' && !mobileReview) || (mobileReview && reviewRoles.length === 0))) {
+        if (
+          method === 'list_role_tasks' &&
+          ((roleKey === 'all' && !mobileReview) ||
+            (mobileReview && reviewRoles.length === 0))
+        ) {
           fail('当前账号缺少查看该岗位权限')
           break
         }
@@ -2482,19 +2561,26 @@ export async function installFactRpcMocks(page, context) {
         const statusKey = params.status_key || ''
         const limit = Math.min(Math.max(Number(params.limit || 50), 1), 100)
         const cursor = String(params.cursor || '').trim()
-        const historyDatesKey = `${params.period || ''}|${params.date_from || ''}|${params.date_to || ''}`
+        const historyDatesKey = `${params.period || ''}|${params.date_from || ''}|${params.date_to || ''}|${params.due || ''}|${params.source_type || ''}`
         const cursorSnapshotKey = `${viewKey}|${roleKey}|${keyword}|${sortKey}|${statusKey}|${historyDatesKey}|${cursor}`
         const snapshotAt = cursor
           ? workflowRoleTaskSnapshotByCursor.get(cursorSnapshotKey) ||
             Number(nowUnix())
           : Number(nowUnix())
         const beforeID = cursor ? Number(cursor) : 0
-        const businessDayStart = Math.floor((snapshotAt + 8 * 3600) / 86400) * 86400 - 8 * 3600
+        const businessDayStart =
+          Math.floor((snapshotAt + 8 * 3600) / 86400) * 86400 - 8 * 3600
         const periodDays = { today: 1, '7d': 7, '30d': 30 }[params.period]
-        const completedFrom = periodDays ? businessDayStart - (periodDays - 1) * 86400
-          : params.period === 'custom' ? Date.parse(`${params.date_from}T00:00:00+08:00`) / 1000 : null
-        const completedBefore = periodDays ? businessDayStart + 86400
-          : params.period === 'custom' ? Date.parse(`${params.date_to}T00:00:00+08:00`) / 1000 + 86400 : null
+        const completedFrom = periodDays
+          ? businessDayStart - (periodDays - 1) * 86400
+          : params.period === 'custom'
+            ? Date.parse(`${params.date_from}T00:00:00+08:00`) / 1000
+            : null
+        const completedBefore = periodDays
+          ? businessDayStart + 86400
+          : params.period === 'custom'
+            ? Date.parse(`${params.date_to}T00:00:00+08:00`) / 1000 + 86400
+            : null
         const terminalStatuses = new Set(['done', 'rejected', 'withdrawn'])
         const isRiskTask = (task) =>
           task.task_status_key === 'blocked' ||
@@ -2504,16 +2590,46 @@ export async function installFactRpcMocks(page, context) {
           Number(task.urge_count || 0) > 0 ||
           Boolean(task.escalated_at) ||
           task.payload?.critical_path === true
-        const supervisorRiskAllowed =
-          mobileReview ? roleKey === 'all' : adminProfile?.is_super_admin === true ||
-          workflowMockPermissionAllowed(
-            adminProfile,
-            effectiveSession,
-            'workflow.task.supervise'
+        const supervisorRiskAllowed = mobileReview
+          ? roleKey === 'all'
+          : adminProfile?.is_super_admin === true ||
+            workflowMockPermissionAllowed(
+              adminProfile,
+              effectiveSession,
+              'workflow.task.supervise'
+            )
+        const matchesView = (
+          task,
+          targetViewKey,
+          selectedStatus = statusKey
+        ) => {
+          if (params.source_type && task.source_type !== params.source_type)
+            { return false }
+          if (params.due === 'noDue' && task.due_at) return false
+          if (
+            params.due === 'overdue' &&
+            (terminalStatuses.has(task.task_status_key) ||
+              !task.due_at ||
+              task.due_at >= snapshotAt)
           )
-        const matchesView = (task, targetViewKey) => {
-          if (statusKey && task.task_status_key !== statusKey) return false
-          if (completedFrom !== null && (!task.completed_at || task.completed_at < completedFrom || task.completed_at >= completedBefore)) return false
+            { return false }
+          if (
+            params.due === 'dueSoon' &&
+            (terminalStatuses.has(task.task_status_key) ||
+              !task.due_at ||
+              task.due_at < snapshotAt ||
+              task.due_at > snapshotAt + 86400)
+          )
+            { return false }
+          if (selectedStatus && task.task_status_key !== selectedStatus)
+            { return false }
+          if (
+            completedFrom !== null &&
+            (!task.completed_at ||
+              task.completed_at < completedFrom ||
+              task.completed_at >= completedBefore)
+          )
+            { return false }
           if (
             keyword &&
             ![
@@ -2531,11 +2647,11 @@ export async function installFactRpcMocks(page, context) {
           const assignedToCurrentAdmin =
             Number(task.assignee_id || 0) > 0 &&
             Number(task.assignee_id) === Number(adminProfile?.id || 0)
-          const roleMatched =
-            mobileReview ? reviewRoles.includes(task.owner_role_key) :
-            (targetViewKey === 'risk' && supervisorRiskAllowed) ||
-            task.owner_role_key === roleKey ||
-            assignedToCurrentAdmin
+          const roleMatched = mobileReview
+            ? reviewRoles.includes(task.owner_role_key)
+            : (targetViewKey === 'risk' && supervisorRiskAllowed) ||
+              task.owner_role_key === roleKey ||
+              assignedToCurrentAdmin
           const viewMatched =
             targetViewKey === 'history'
               ? terminal
@@ -2560,18 +2676,23 @@ export async function installFactRpcMocks(page, context) {
           .filter((task) => matchesView(task, viewKey))
           .sort((left, right) => {
             if (viewKey === 'history') {
-              const delta = Number(right.completed_at || 0) - Number(left.completed_at || 0)
+              const delta =
+                Number(right.completed_at || 0) - Number(left.completed_at || 0)
               if (delta) return delta
             } else if (sortKey === 'due') {
-              const delta = (left.due_at || Infinity) - (right.due_at || Infinity)
+              const delta =
+                (left.due_at || Infinity) - (right.due_at || Infinity)
               if (delta) return delta
             } else if (sortKey === 'newest' || sortKey === 'oldest') {
-              const delta = Number(left.created_at || 0) - Number(right.created_at || 0)
+              const delta =
+                Number(left.created_at || 0) - Number(right.created_at || 0)
               if (delta) return sortKey === 'newest' ? -delta : delta
             }
             return right.id - left.id
           })
-        const startIndex = beforeID ? matchingTasks.findIndex((task) => task.id === beforeID) + 1 : 0
+        const startIndex = beforeID
+          ? matchingTasks.findIndex((task) => task.id === beforeID) + 1
+          : 0
         const items = matchingTasks.slice(startIndex, startIndex + limit)
         const hasMore = matchingTasks.length > startIndex + limit
         const nextCursor =
@@ -2589,6 +2710,13 @@ export async function installFactRpcMocks(page, context) {
           server_time: snapshotAt,
           ...(method === 'list_role_tasks' && !cursor
             ? {
+                status_counts: workflowTasks
+                  .filter((task) => matchesView(task, viewKey, ''))
+                  .reduce((counts, task) => {
+                    counts[task.task_status_key] =
+                      (counts[task.task_status_key] || 0) + 1
+                    return counts
+                  }, {}),
                 counts: (() => {
                   const todoTasks = workflowTasks.filter((task) =>
                     matchesView(task, 'todo')
@@ -2664,7 +2792,12 @@ export async function installFactRpcMocks(page, context) {
           fail('协同概览暂不可用')
           break
         }
-        if (params.todo_only !== true && Number(params.limit) === 1 && Number(params.offset || 0) === 0) {
+        if (
+          params.todo_only !== true &&
+          !params.owner_role_key &&
+          Number(params.limit) === 1 &&
+          Number(params.offset || 0) === 0
+        ) {
           const counts = {
             actionable: 55,
             exception: 27,

@@ -13,7 +13,9 @@ async function waitForPath(page, expectedPath) {
 }
 
 async function expectHeading(page, text) {
-  const locator = page.getByRole('heading', { name: text }).first()
+  // 模块页以主标题和选中的页签共同标识位置。
+  const moduleTab = page.locator('.erp-business-module-header').getByRole('tab', { name: text, exact: true, selected: true })
+  const locator = page.getByRole('heading', { name: text }).or(moduleTab).first()
   try {
     await locator.waitFor({ state: 'visible', timeout: 20_000 })
   } catch (error) {
