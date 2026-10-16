@@ -254,11 +254,15 @@ test("Runner checkout retains only dependency caches and clears stale runtime ev
   const keep = [
     "output/cache/gitlab/pnpm-store/v10/files/package",
     "output/cache/gitlab/playwright-runtime/chrome-linux64.zip",
+    "output/cache/pdf-runtime/trivy-0.67.2/trivy.tar.gz",
+    "output/cache/pdf-runtime/trivy-db/db/metadata.json",
   ];
   const discard = [
     "output/cache/gitlab/pnpm-store-stale/package",
     "output/cache/gitlab/playwright-runtime-stale/archive.zip",
     "output/cache/gitlab/.playwright-runtime-123-staging/archive.zip",
+    "output/cache/pdf-runtime-stale/trivy-db/metadata.json",
+    "output/ci/pdf-runtime/old/vulnerabilities.json",
     "output/ci/plan.json",
     "output/ci/server-lanes/test_build.json",
     "output/qa/old-result.json",
@@ -300,6 +304,32 @@ test("Runner checkout retains only dependency caches and clears stale runtime ev
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("PDF jobs share download caches with one serialized release writer", () => {
+  assert.match(
+    workflow,
+    /^[.]pdf_runtime_cache_pull: &pdf_runtime_cache_pull\n  cache:\n    - &pdf_runtime_cache_entry\n      key:\n        prefix: plush-ci-pdf-runtime-v1\n        files:\n          - scripts\/qa\/pdf-runtime-policy[.]json\n      paths:\n        - output\/cache\/pdf-runtime\/\n      policy: pull/mu,
+  );
+  const release = yamlJobBlock("publish_release");
+  assert.match(
+    release,
+    /cache:\n    - \*pnpm_cache_entry\n    - \*playwright_cache_entry\n    - <<: \*pdf_runtime_cache_entry\n      policy: pull-push/u,
+  );
+  assert.match(release, /resource_group: immutable-release-catalog/u);
+  assert.match(
+    yamlJobBlock("pdf_runtime_monitor"),
+    /<<: \*pdf_runtime_cache_pull/u,
+  );
+  assert.equal(
+    (
+      workflow.match(
+        /<<: \*pdf_runtime_cache_entry\n      policy: pull-push/gu,
+      ) || []
+    ).length,
+    1,
+  );
+  assert.doesNotMatch(yamlJobBlock("prepare"), /pdf_runtime_cache/u);
 });
 
 test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", () => {

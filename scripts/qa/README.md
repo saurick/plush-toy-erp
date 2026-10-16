@@ -640,7 +640,7 @@ bash scripts/qa/affected.sh --file web/src/erp/utils/dateRange.mjs --run
 
 GitLab 的 Server lane 使用两个互斥资源组：Schema、关键 PostgreSQL 和 Go 测试/构建共享 `quality-server-heavy`，存量升级独占 `quality-server-upgrade`。每组同时只运行一个 Job，使服务端重任务最多并行两路；各 Job 仍使用独立 checkout、数据库、随机 loopback 端口和清理读回，Go 运行及包编译并发继续限制为 4。`quality_server_test_build` 显式等待 Schema、升级与关键 PostgreSQL 三个 Job；数据库与 Docker 网络清理完成后，Go 测试/构建和浏览器即可分别就绪，浏览器还需同一 SHA 的 Web 制品。该顺序由 `needs` 保证，不依赖 YAML 排列或资源锁的抢占顺序。四个 Bootstrap 资源敏感分片仍在 `quality_web` 和 `quality_server` 完成后运行，避开依赖安装、构建和数据库测试的磁盘读写峰值；夹具的进程超时、短 marker deadline、身份校验与清理断言保持独立约束。浏览器回执按计划顺序保存每个场景的真实耗时和重试次数，执行日志可以采用场景目录顺序，但场景集合必须与计划完全一致且不得重复。
 
-Runner 的 checkout 只保留 `output/cache/gitlab/pnpm-store/` 与 `output/cache/gitlab/playwright-runtime/` 两类依赖缓存，减少大量缓存文件的重复删除；`node_modules`、Web 构建、临时运行目录、计划与回执仍由 Git 清理并按本次 SHA 重建。pnpm 继续使用 frozen lockfile 和内容完整性校验，Playwright 继续校验固定文件清单、长度与 SHA-256；缓存缺失或损坏沿用正式补齐路径，不把文件存在当作验证成功。缓存使用 Runner 内置 Fastzip 的 `fast` 级别，兼顾打包耗时和存储体积，压缩与解压各限制为 2 路；`prepare` 保持唯一共享缓存写入者，完整历史、测试范围与制品身份不变。
+Runner 的 checkout 保留 `output/cache/gitlab/pnpm-store/`、`output/cache/gitlab/playwright-runtime/` 和 `output/cache/pdf-runtime/` 三类下载缓存，减少重复删除与下载；`node_modules`、Web 构建、临时运行目录、计划与回执仍由 Git 清理并按本次 SHA 重建。pnpm 继续使用 frozen lockfile 和内容完整性校验，Playwright 继续校验固定文件清单、长度与 SHA-256；缓存缺失或损坏沿用正式补齐路径，不把文件存在当作验证成功。缓存使用 Runner 内置 Fastzip 的 `fast` 级别，兼顾打包耗时和存储体积，压缩与解压各限制为 2 路；普通质量链的 pnpm / Playwright 缓存仍由 `prepare` 唯一写入；PDF 下载缓存由已串行的 `publish_release` 唯一写回，定时 monitor 只读取缓存归档，完整历史、测试范围与制品身份不变。
 
 ### CI 变更与提速 / CI Change Safety
 
@@ -854,6 +854,8 @@ go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJson
 ## 打印引擎验证 · PDF Runtime
 
 打印运行时采用“固定、验证后升级”：`server/Dockerfile` 是 Chromium、Debian snapshot 和基础镜像 digest 的唯一版本真源，禁止构建时解析浮动 latest。`pdf-runtime-policy.json` 只保存体积观察基线、允许增长和 Trivy 工具校验值。安全检查阻断有修复版本的 HIGH / CRITICAL 系统包漏洞，同时保留其余发现；上游有新稳定版本时报告需要评审，不自动修改代码或发布。
+
+`pdf-runtime-trivy.sh` 只复用按 policy SHA-256 校验的 Trivy 工具包和扫描器漏洞库，不缓存扫描结果。缓存目录不接受符号链接；损坏工具包只从固定来源重新下载并校验后原子替换。扫描分析仅使用内存缓存（`--cache-backend memory`）；每次都对当前 image ID 完整扫描，沿用漏洞库正常更新，不设置离线或跳过更新参数；下载、更新或扫描失败即阻断，报告只在本次扫描成功后原子替换。日志区分工具缓存命中与漏洞库已有文件，后者不表示漏洞库已经更新或检查通过。
 
 Server 镜像切换到固定 Debian snapshot 后，先升级基础镜像已有的系统包，再安装固定 Chromium；仅安装新依赖可能保留已有包的旧漏洞版本。最终镜像的实际包清单和扫描结果决定是否可发布。
 

@@ -98,23 +98,9 @@ fi
 
 test "$(uname -s)" = Linux
 test "$(uname -m)" = x86_64
-TRIVY_VERSION="$(node -e 'process.stdout.write(require("./scripts/qa/pdf-runtime-policy.json").trivyVersion)')"
-TRIVY_SHA="$(node -e 'process.stdout.write(require("./scripts/qa/pdf-runtime-policy.json").trivyLinuxAMD64ArchiveSHA256)')"
-TRIVY_DIR="$ROOT_DIR/output/cache/pdf-runtime/trivy-$TRIVY_VERSION"
-mkdir -p "$TRIVY_DIR"
-TRIVY_ARCHIVE="$TRIVY_DIR/trivy.tar.gz"
-if [[ ! -f "$TRIVY_ARCHIVE" ]] || [[ "$(sha256sum "$TRIVY_ARCHIVE" | cut -d ' ' -f 1)" != "$TRIVY_SHA" ]]; then
-  curl --fail --location --retry 2 --connect-timeout 15 --max-time 900 \
-    "https://github.com/aquasecurity/trivy/releases/download/v$TRIVY_VERSION/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
-    --output "$TRIVY_ARCHIVE"
-fi
-test "$(sha256sum "$TRIVY_ARCHIVE" | cut -d ' ' -f 1)" = "$TRIVY_SHA"
-tar -xzf "$TRIVY_ARCHIVE" -C "$TRIVY_DIR" trivy
-GODEBUG=http2client=0 "$TRIVY_DIR/trivy" image --image-src docker --scanners vuln --list-all-pkgs --skip-version-check \
-  --db-repository public.ecr.aws/aquasecurity/trivy-db:2 \
-  --db-repository ghcr.io/aquasecurity/trivy-db:2 \
-  --cache-dir "$ROOT_DIR/output/cache/pdf-runtime/trivy-db" --timeout 30m --parallel 2 \
-  --format json --output "$OUTPUT/vulnerabilities.json" "$IMAGE_ID"
+# shellcheck source=scripts/qa/pdf-runtime-trivy.sh
+source "$ROOT_DIR/scripts/qa/pdf-runtime-trivy.sh"
+scan_pdf_runtime_image "$ROOT_DIR" "$IMAGE_ID" "$OUTPUT"
 RESULT=0
 node scripts/qa/pdf-runtime.mjs report "$OUTPUT" || RESULT=1
 if [[ "$MODE" == monitor ]]; then
