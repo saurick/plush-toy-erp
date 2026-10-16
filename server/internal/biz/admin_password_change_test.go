@@ -94,27 +94,36 @@ func TestAdminManageUsecaseChangePasswordRejectsInvalidAttempts(t *testing.T) {
 	}
 }
 
-func TestAdminManageUsecaseResetDefaultPasswordRequiresSuperAdmin(t *testing.T) {
+func TestAdminManageUsecaseResetTemporaryPasswordRequiresSuperAdmin(t *testing.T) {
 	uc, repo, ctx := passwordChangeUsecaseFixture(t)
 	repo.adminsByID[1].Permissions = []string{PermissionSystemUserUpdate}
-	if _, err := uc.ResetDefaultPassword(ctx, 2); !errors.Is(err, ErrNoPermission) {
+	if _, err := uc.ResetTemporaryPassword(ctx, 2); !errors.Is(err, ErrNoPermission) {
 		t.Fatalf("ordinary manager error = %v, want ErrNoPermission", err)
 	}
 	if repo.adminsByID[2].PasswordHash != "other-hash" || len(repo.auditEvents) != 0 {
 		t.Fatal("unauthorized reset wrote data")
 	}
 	repo.adminsByID[1].IsSuperAdmin = true
-	if _, err := uc.ResetDefaultPassword(ctx, 2); err != nil {
+	reset, err := uc.ResetTemporaryPassword(ctx, 2)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := bcrypt.CompareHashAndPassword([]byte(repo.adminsByID[2].PasswordHash), []byte("12345678")); err != nil {
-		t.Fatal("default reset must use exactly 12345678")
+	if ValidateAdminPassword(reset.TemporaryPassword) != nil || reset.TemporaryPassword == "12345678" {
+		t.Fatal("invalid temporary password")
 	}
-	if _, err := uc.ResetDefaultPassword(ctx, 1); !errors.Is(err, ErrNoPermission) {
+	if err := bcrypt.CompareHashAndPassword([]byte(repo.adminsByID[2].PasswordHash), []byte(reset.TemporaryPassword)); err != nil {
+		t.Fatal(err)
+	}
+	second, err := uc.ResetTemporaryPassword(ctx, 2)
+	if err != nil || second.TemporaryPassword == reset.TemporaryPassword {
+		t.Fatal("every reset must generate a fresh credential")
+	}
+
+	if _, err := uc.ResetTemporaryPassword(ctx, 1); !errors.Is(err, ErrNoPermission) {
 		t.Fatalf("super admin target error = %v, want ErrNoPermission", err)
 	}
 	repo.adminsByID[2].RevokedAt = new(time.Time)
-	if _, err := uc.ResetDefaultPassword(ctx, 2); !errors.Is(err, ErrAdminRevoked) {
+	if _, err := uc.ResetTemporaryPassword(ctx, 2); !errors.Is(err, ErrAdminRevoked) {
 		t.Fatalf("revoked target error = %v, want ErrAdminRevoked", err)
 	}
 }

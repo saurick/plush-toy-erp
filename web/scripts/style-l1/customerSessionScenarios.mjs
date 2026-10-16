@@ -244,13 +244,8 @@ export function createCustomerSessionScenarios({
         assert.equal(productCoreMetrics.hasTable, false)
         assert.deepEqual(
           productCoreMetrics.metrics,
-          [
-            { label: '业务功能', value: '11' },
-            { label: '系统设置', value: '4' },
-          ],
-          `Product Core 首页摘要应只保留数值指标: ${JSON.stringify(
-            productCoreMetrics
-          )}`
+          [],
+          '功能预览保留业务入口，不显示硬编码功能数量'
         )
         assert(
           productCoreMetrics.entries.some((item) =>

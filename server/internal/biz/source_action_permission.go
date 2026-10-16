@@ -106,6 +106,18 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 		Rules: sourceReadRules(PermissionSalesOrderRead, PermissionSalesOrderItemRead),
 	},
 	{
+		Domain: "operational_fact", Method: "list_finance_payment_allocation_candidates",
+		Rules: financeAllocationSourceReadRules(),
+	},
+	{
+		Domain: "operational_fact", Method: "allocate_finance_payment",
+		Rules: financeAllocationSourceReadRules(),
+	},
+	{
+		Domain: "operational_fact", Method: "reverse_finance_allocation",
+		Rules: financeAllocationSourceReadRules(),
+	},
+	{
 		Domain: "operational_fact", Method: "create_shipment_with_items",
 		Rules: []SourceActionReadPermissionRule{
 			{PermissionKey: PermissionSalesOrderRead, Condition: SourceReadConditionShipmentSalesOrder},
@@ -197,6 +209,14 @@ func productionOrderSourceReadRules() []SourceActionReadPermissionRule {
 		{PermissionKey: PermissionSalesOrderRead, Condition: SourceReadConditionProductionSalesOrderItem},
 		{PermissionKey: PermissionSalesOrderItemRead, Condition: SourceReadConditionProductionSalesOrderItem},
 		{PermissionKey: PermissionBOMRead, Condition: SourceReadConditionProductionBOMHeader},
+	}
+}
+
+func financeAllocationSourceReadRules() []SourceActionReadPermissionRule {
+	return []SourceActionReadPermissionRule{
+		{PermissionKey: PermissionFinancePaymentRead},
+		{PermissionKey: PermissionFinanceReceivableRead, Condition: SourceReadConditionFinanceReceivable},
+		{PermissionKey: PermissionFinancePayableRead, Condition: SourceReadConditionFinancePayable},
 	}
 }
 

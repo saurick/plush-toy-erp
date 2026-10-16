@@ -9,9 +9,10 @@ import {
   Tag,
 } from 'antd'
 import React, { useState } from 'react'
+import { QuestionCircleOutlined } from '@ant-design/icons'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import Table from '@/common/components/table/AppTable'
-import Segmented from '@/common/components/navigation/SlidingSegmented'
+import FilterChip from '@/common/components/navigation/FilterChip'
 import { normalizeStringList } from '../../utils/permissionCenterAccess.mjs'
 import {
   getPermissionPageAccessReason,
@@ -185,19 +186,29 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
   const pageCell = (row) => ({ colSpan: row.group ? 0 : 1 })
 
   return (
-    <Space
-      className="erp-role-effective-access"
-      direction="vertical"
-      size={12}
-      style={{ width: '100%' }}
-    >
+    <div className="erp-role-effective-access">
       <div className="erp-role-effective-access__summary">
-        <div>
-          <Text strong>{sourceLabel}</Text>
-          <Paragraph type="secondary">
-            岗位授权与公司启用范围共同决定能否进入页面；页面内的操作还会单独校验。
-            {access?.is_preview === true ? '当前调整保存后生效。' : ''}
-          </Paragraph>
+        <div className="erp-role-effective-access__source">
+          <Text type="secondary">{sourceLabel}</Text>
+          <Popover
+            title="页面访问说明"
+            content={
+              <div className="erp-permission-help">
+                岗位授权与公司启用范围共同决定能否进入页面；页面内的操作还会单独校验。
+              </div>
+            }
+            trigger={['hover', 'focus', 'click']}
+          >
+            <Button
+              type="text"
+              size="small"
+              icon={<QuestionCircleOutlined />}
+              aria-label="页面访问说明"
+            />
+          </Popover>
+          {access?.is_preview === true ? (
+            <Text type="secondary">当前调整保存后生效</Text>
+          ) : null}
         </div>
         {access?.config_revision ? (
           <Popover
@@ -211,7 +222,9 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
             }
             trigger="click"
           >
-            <Button size="small">查看配置版本</Button>
+            <Button type="link" size="small">
+              查看配置版本
+            </Button>
           </Popover>
         ) : null}
       </div>
@@ -219,7 +232,9 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
         <Alert
           type="warning"
           showIcon
-          message={loading ? '正在核对页面访问结果' : '页面访问结果尚未完成核对'}
+          message={
+            loading ? '正在核对页面访问结果' : '页面访问结果尚未完成核对'
+          }
           description="当前不展示未经公司启用配置核对的可进入页面；读取完成后再确认访问范围。"
         />
       ) : null}
@@ -236,95 +251,114 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
             })),
           ]}
         />
-        <Segmented
+        <div
+          className="erp-role-effective-access__filters"
+          role="group"
           aria-label="筛选页面访问"
-          value={pageFilter}
-          onChange={setPageFilter}
-          options={[
+        >
+          {[
             {
-              label: `全部 ${selectedPages.length}`,
+              label: '全部',
+              count: selectedPages.length,
               value: ROLE_PAGE_ACCESS_FILTERS.ALL,
             },
             {
-              label: `可进入 ${effectiveCount}`,
+              label: '可进入',
+              count: effectiveCount,
               value: ROLE_PAGE_ACCESS_FILTERS.EFFECTIVE,
             },
             {
-              label: `不可进入 ${blockedCount}`,
+              label: '不可进入',
+              count: blockedCount,
               value: ROLE_PAGE_ACCESS_FILTERS.BLOCKED,
+            },
+          ].map(({ label, count, value }) => (
+            <FilterChip
+              key={value}
+              selected={pageFilter === value}
+              count={count}
+              onClick={() => setPageFilter(value)}
+            >
+              {label}
+            </FilterChip>
+          ))}
+        </div>
+        <Text type="secondary" className="erp-role-effective-access__count">
+          显示 {visibleCount} 页
+        </Text>
+      </div>
+      <div
+        className="erp-role-effective-access__results"
+        role="region"
+        aria-label="页面访问结果"
+      >
+        <Table
+          rowKey="rowID"
+          className="erp-role-effective-access__table"
+          size="small"
+          loading={loading}
+          pagination={false}
+          dataSource={pageRows}
+          sticky
+          scroll={{ x: 720 }}
+          rowClassName={(row) =>
+            row.group
+              ? 'erp-role-effective-access__module'
+              : 'erp-role-effective-access__page'
+          }
+          locale={{ emptyText: <Empty description="此筛选下暂无页面" /> }}
+          columns={[
+            {
+              align: 'left',
+              title: '模块 / 页面',
+              dataIndex: 'label',
+              width: 190,
+              onCell: (row) => ({ colSpan: row.group ? 4 : 1 }),
+              render: (label, row) =>
+                row.group ? (
+                  <Space size={8}>
+                    <Text strong>{label}</Text>
+                    <Text type="secondary">{row.count} 页</Text>
+                  </Space>
+                ) : (
+                  label
+                ),
+            },
+            {
+              align: 'left',
+              title: '岗位授权',
+              dataIndex: 'rbac_granted',
+              width: 104,
+              onCell: pageCell,
+              render: (value) => (
+                <Text type="secondary">
+                  {value === true ? '已授权' : '未授权'}
+                </Text>
+              ),
+            },
+            {
+              align: 'left',
+              title: '页面访问',
+              dataIndex: 'effective',
+              width: 112,
+              onCell: pageCell,
+              render: (value) =>
+                value === true ? (
+                  <Tag color="green">可进入</Tag>
+                ) : (
+                  <Tag color="red">不可进入</Tag>
+                ),
+            },
+            {
+              align: 'left',
+              title: '受限原因 / 核对方向',
+              onCell: pageCell,
+              render: (_, page) => getPermissionPageAccessReason(page),
             },
           ]}
         />
-        <Text type="secondary">
-          显示 {visibleCount} / {pages.length} 个页面
-        </Text>
       </div>
-      <Table
-        rowKey="rowID"
-        className="erp-role-effective-access__table"
-        size="small"
-        loading={loading}
-        pagination={false}
-        dataSource={pageRows}
-        scroll={{ x: 720 }}
-        rowClassName={(row) =>
-          row.group
-            ? 'erp-role-effective-access__module'
-            : 'erp-role-effective-access__page'
-        }
-        locale={{ emptyText: <Empty description="此筛选下暂无页面" /> }}
-        columns={[
-          {
-            align: 'left',
-            title: '模块 / 页面',
-            dataIndex: 'label',
-            width: 190,
-            onCell: (row) => ({ colSpan: row.group ? 4 : 1 }),
-            render: (label, row) =>
-              row.group ? (
-                <Space size={8}>
-                  <Text strong>{label}</Text>
-                  <Text type="secondary">{row.count} 页</Text>
-                </Space>
-              ) : (
-                label
-              ),
-          },
-          {
-            align: 'left',
-            title: '岗位授权',
-            dataIndex: 'rbac_granted',
-            width: 120,
-            onCell: pageCell,
-            render: (value) =>
-              value === true ? (
-                <Tag color="blue">已授权</Tag>
-              ) : (
-                <Tag>未授权</Tag>
-              ),
-          },
-          {
-            align: 'left',
-            title: '页面访问',
-            dataIndex: 'effective',
-            width: 120,
-            onCell: pageCell,
-            render: (value) =>
-              value === true ? (
-                <Tag color="green">可进入</Tag>
-              ) : (
-                <Tag color="red">不可进入</Tag>
-              ),
-          },
-          {
-            align: 'left',
-            title: '受限原因 / 核对方向',
-            onCell: pageCell,
-            render: (_, page) => getPermissionPageAccessReason(page),
-          },
-        ]}
-      />
-    </Space>
+    </div>
   )
 }
 
@@ -452,7 +486,6 @@ function NavigationPlacementOverview({
 }
 
 function DataScopeOverview({
-  compact = false,
   mode,
   warehouseIds,
   warehouseOptions,
@@ -461,61 +494,56 @@ function DataScopeOverview({
   onWarehouseIdsChange,
 }) {
   return (
-    <div
-      className={`erp-role-policy-boundary${compact ? ' erp-role-policy-boundary--compact' : ''}`}
-    >
-      {!compact ? (
-        <Paragraph type="secondary" className="erp-business-inline-note">
-          库存范围可设为全部仓库、指定仓库或不允许查看；选择指定仓库时必须勾选具体仓库。
-        </Paragraph>
-      ) : null}
-      <div className="erp-role-policy-boundary__grid">
-        <div className="erp-role-scope-mode">
-          <Text strong>{compact ? '仓库范围' : '仓库范围模式'}</Text>
+    <div className="erp-role-policy-boundary">
+      <Paragraph type="secondary" className="erp-business-inline-note">
+        设置本岗位可查看和办理的仓库，仍需相应功能权限。
+        {disabled ? '当前设置只读。' : '关闭后保留调整，保存岗位设置后生效。'}
+      </Paragraph>
+      <Space
+        direction="vertical"
+        className="erp-role-scope-mode"
+        style={{ width: '100%' }}
+      >
+        <Text strong>仓库范围</Text>
+        <Select
+          aria-label="仓库范围模式"
+          value={mode}
+          disabled={disabled}
+          style={{ width: '100%' }}
+          options={[
+            { value: 'ALL', label: '全部仓库' },
+            { value: 'ASSIGNED', label: '指定仓库' },
+            { value: 'NONE', label: '不允许查看' },
+          ]}
+          onChange={onModeChange}
+        />
+      </Space>
+      {mode === 'ASSIGNED' ? (
+        <Space
+          direction="vertical"
+          className="erp-role-scope-warehouses"
+          style={{ width: '100%' }}
+        >
+          <Text strong>允许的仓库</Text>
           <Select
-            aria-label="仓库范围模式"
-            value={mode}
+            aria-label="允许的仓库"
+            mode="multiple"
+            maxTagCount="responsive"
+            value={warehouseIds}
             disabled={disabled}
+            status={warehouseIds.length === 0 ? 'error' : undefined}
             style={{ width: '100%' }}
-            options={[
-              { value: 'ALL', label: '全部仓库' },
-              { value: 'ASSIGNED', label: '指定仓库' },
-              { value: 'NONE', label: '不允许查看' },
-            ]}
-            onChange={onModeChange}
+            placeholder="请选择仓库"
+            options={warehouseOptions}
+            onChange={onWarehouseIdsChange}
           />
-        </div>
-        {!compact || mode === 'ASSIGNED' ? (
-          <div className="erp-role-scope-warehouses">
-            {!compact ? <Text strong>允许的仓库</Text> : null}
-            <Select
-              aria-label="允许的仓库"
-              mode="multiple"
-              maxTagCount={compact ? 'responsive' : undefined}
-              value={warehouseIds}
-              disabled={disabled || mode !== 'ASSIGNED'}
-              style={{ width: '100%' }}
-              placeholder="请选择仓库"
-              options={warehouseOptions}
-              onChange={onWarehouseIdsChange}
-            />
-          </div>
-        ) : null}
-        {!compact ? (
-          <div>
-            <Text strong>任务范围</Text>
-            <Tag color="green">按负责人限制</Tag>
-            <Text type="secondary">继续由责任岗位、责任池或指定处理人控制</Text>
-          </div>
-        ) : null}
-        {!compact ? (
-          <div>
-            <Text strong>其他业务单据</Text>
-            <Tag color="gold">按可用功能</Tag>
-            <Text type="secondary">本轮不虚构本人、部门或客户集合范围</Text>
-          </div>
-        ) : null}
-      </div>
+          {warehouseIds.length === 0 ? (
+            <Text type="danger" role="alert">
+              请选择至少一个允许的仓库
+            </Text>
+          ) : null}
+        </Space>
+      ) : null}
     </div>
   )
 }

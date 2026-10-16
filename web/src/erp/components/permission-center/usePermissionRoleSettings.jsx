@@ -13,6 +13,11 @@ import {
   QuestionCircleOutlined,
   ReloadOutlined,
   SaveOutlined,
+  BankOutlined,
+  SafetyCertificateOutlined,
+  TeamOutlined,
+  FullscreenOutlined,
+  FullscreenExitOutlined,
 } from '@ant-design/icons'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import BusinessModal from '../business-list/BusinessModal.jsx'
@@ -58,6 +63,7 @@ import {
   SensitiveFieldOverview,
 } from './PermissionAccessOverview.jsx'
 import { PermissionChecklist } from './PermissionChecklist.jsx'
+import { usePermissionFullscreen } from './usePermissionFullscreen.jsx'
 import { RoleNavigationEditor } from './RoleNavigationEditor.jsx'
 import { RpcErrorCode } from '@/common/consts/errorCodes'
 import { message, modal } from '@/common/utils/antdApp'
@@ -97,11 +103,42 @@ export function usePermissionRoleSettings({
   onOpenRoleAccounts,
   onOpenNavigation,
   navigationMode = false,
+  settingsVisible = true,
   searchKeyword = '',
+  onSearchChange,
   setSaving,
   saving,
 }) {
   const [detailView, setDetailView] = useState(null)
+  const [openPopover, setOpenPopover] = useState(null)
+  const {
+    fullscreen,
+    setFullscreen,
+    enterFullscreen,
+    workspaceRef,
+    enterRef,
+    exitRef,
+  } = usePermissionFullscreen({
+    enabled: settingsVisible,
+    dismissPopup: () => {
+      if (detailView) {
+        setDetailView(null)
+        return true
+      }
+      if (openPopover) {
+        setOpenPopover(null)
+        return true
+      }
+      return false
+    },
+  })
+  const popoverProps = (key) => ({
+    open: openPopover === key,
+    onOpenChange: (open) =>
+      setOpenPopover((current) =>
+        open ? key : current === key ? null : current
+      ),
+  })
   const [effectiveRoleAccess, setEffectiveRoleAccess] = useState(null)
 
   const [effectiveRoleAccessLoading, setEffectiveRoleAccessLoading] =
@@ -673,7 +710,9 @@ export function usePermissionRoleSettings({
   ])
 
   useEffect(() => {
+    // Loading current access must not turn a saved layout into an edited draft.
     if (
+      (!rolePermissionsDirty && !roleNavigationDirty) ||
       selectedRoleNavigationMode !== ROLE_NAVIGATION_MODES.CUSTOM ||
       roleAccessForCurrentDraft?.is_final !== true
     ) {
@@ -741,6 +780,8 @@ export function usePermissionRoleSettings({
     recommendedRolePrimaryMenuPaths,
     recommendedRoleSecondaryMenuPaths,
     roleNavigationOptions,
+    roleNavigationDirty,
+    rolePermissionsDirty,
     selectedRoleKey,
     selectedRoleNavigationMode,
     selectedRolePrimaryMenuPaths,
@@ -901,6 +942,7 @@ export function usePermissionRoleSettings({
         {
           key: ROLE_NAVIGATION_VIEW_KEYS.LAYOUT,
           label: '菜单排列',
+          className: 'erp-role-navigation-layout-tab',
           children: (
             <Space direction="vertical" size={20} style={{ width: '100%' }}>
               {roleAccessForCurrentDraft?.is_final !== true ? (
@@ -1019,8 +1061,9 @@ export function usePermissionRoleSettings({
         {
           key: ROLE_NAVIGATION_VIEW_KEYS.ACCESS,
           label: '页面访问',
+          className: 'erp-role-access-tab',
           children: (
-            <Space direction="vertical" size={20} style={{ width: '100%' }}>
+            <div className="erp-role-access-workspace">
               <EffectiveRoleAccessOverview
                 access={roleAccessForCurrentDraft}
                 loading={roleAccessForCurrentDraftLoading}
@@ -1035,7 +1078,7 @@ export function usePermissionRoleSettings({
                   permissionKeys={selectedRolePermissionKeys}
                 />
               </details>
-            </Space>
+            </div>
           ),
         },
       ]}
@@ -1087,18 +1130,27 @@ export function usePermissionRoleSettings({
           )}
         </aside>
 
-        <section className="erp-role-center-detail">
+        <section
+          ref={workspaceRef}
+          className={`erp-role-center-detail${fullscreen ? ' erp-role-center-detail--fullscreen' : ''}`}
+          role={fullscreen ? 'dialog' : undefined}
+          aria-modal={fullscreen ? 'true' : undefined}
+          aria-label={
+            fullscreen
+              ? `${getRoleVisibleName(selectedRole)}岗位设置`
+              : undefined
+          }
+        >
           {selectedRole ? (
             <>
               <div className="erp-role-center-detail__head">
                 <div className="erp-role-center-detail__identity">
                   <Title level={5}>{getRoleVisibleName(selectedRole)}</Title>
                   <Text type="secondary">{getRoleTypeLabel(selectedRole)}</Text>
-                </div>
-                <div className="erp-role-center-actions">
                   <Popover
+                    {...popoverProps('help')}
                     placement="bottomRight"
-                    trigger={['hover', 'focus', 'click']}
+                    trigger={['hover', 'focus']}
                     rootClassName="erp-permission-help-popover"
                     content={
                       <div className="erp-permission-help">
@@ -1134,21 +1186,28 @@ export function usePermissionRoleSettings({
                       className="erp-permission-help-trigger"
                     />
                   </Popover>
-                  <Button
-                    type="text"
-                    size="small"
-                    onClick={() => setDetailView('fields')}
+                </div>
+                <div className="erp-role-center-actions">
+                  <Text
+                    className="erp-role-center-save-status"
+                    type={roleDataScopeInvalid ? 'danger' : 'secondary'}
+                    role="status"
                   >
-                    敏感字段
-                  </Button>
-                  <Button
-                    type="text"
-                    size="small"
-                    onClick={() => setDetailView('accounts')}
-                  >
-                    关联账号
-                    {canReadUsers ? `（${selectedRoleAdmins.length}）` : ''}
-                  </Button>
+                    {roleDataScopeInvalid
+                      ? '请配置允许的仓库'
+                      : roleConfigurationDirty
+                        ? '有未保存调整'
+                        : '当前设置已保存'}
+                  </Text>
+                  {fullscreen ? (
+                    <Button
+                      ref={exitRef}
+                      icon={<FullscreenExitOutlined aria-hidden="true" />}
+                      onClick={() => setFullscreen(false)}
+                    >
+                      退出全屏
+                    </Button>
+                  ) : null}
                   <Button
                     icon={<SaveOutlined aria-hidden="true" />}
                     type="primary"
@@ -1167,6 +1226,31 @@ export function usePermissionRoleSettings({
                     保存岗位设置
                   </Button>
                 </div>
+              </div>
+              <div
+                className="erp-role-center-tools"
+                role="group"
+                aria-label="岗位辅助设置"
+              >
+                <Button
+                  icon={<BankOutlined aria-hidden="true" />}
+                  onClick={() => setDetailView('scope')}
+                >
+                  配置数据范围
+                </Button>
+                <Button
+                  icon={<SafetyCertificateOutlined aria-hidden="true" />}
+                  onClick={() => setDetailView('fields')}
+                >
+                  查看敏感字段
+                </Button>
+                <Button
+                  icon={<TeamOutlined aria-hidden="true" />}
+                  onClick={() => setDetailView('accounts')}
+                >
+                  关联账号
+                  {canReadUsers ? `（${selectedRoleAdmins.length}）` : ''}
+                </Button>
               </div>
 
               {selectedRoleConflict ? (
@@ -1223,7 +1307,23 @@ export function usePermissionRoleSettings({
                       />
                     ) : null}
                     <PermissionChecklist
+                      fullscreenAction={
+                        !fullscreen ? (
+                          <Button
+                            ref={enterRef}
+                            size="small"
+                            icon={<FullscreenOutlined aria-hidden="true" />}
+                            onClick={enterFullscreen}
+                          >
+                            {selectedRoleReadOnly || !canManageRolePermissions
+                              ? '全屏查看'
+                              : '全屏编辑'}
+                          </Button>
+                        ) : null
+                      }
+                      changeSummaryPopoverProps={popoverProps('changes')}
                       searchKeyword={searchKeyword}
+                      onSearchChange={onSearchChange}
                       groups={permissionGroups}
                       access={roleAccessForCurrentDraft}
                       accessLoading={roleAccessForCurrentDraftLoading}
@@ -1242,7 +1342,7 @@ export function usePermissionRoleSettings({
                   <div
                     className="erp-role-settings-row"
                     role="group"
-                    aria-label="岗位入口与仓库范围"
+                    aria-label="岗位页面入口"
                   >
                     <div className="erp-role-settings-links">
                       <Button
@@ -1270,8 +1370,9 @@ export function usePermissionRoleSettings({
                         岗位导航
                       </Button>
                       <Popover
+                        {...popoverProps('entry')}
                         content="页面入口按最终可访问范围显示；隐藏菜单不会撤销权限。"
-                        trigger={['hover', 'focus', 'click']}
+                        trigger={['hover', 'focus']}
                       >
                         <Button
                           type="text"
@@ -1280,22 +1381,6 @@ export function usePermissionRoleSettings({
                         />
                       </Popover>
                     </div>
-                    <DataScopeOverview
-                      compact
-                      mode={selectedWarehouseScopeMode}
-                      warehouseIds={selectedWarehouseScopeIDs}
-                      warehouseOptions={warehouseScopeSelectOptions}
-                      disabled={
-                        !canManageRolePermissions || selectedRoleReadOnly
-                      }
-                      onModeChange={(nextMode) => {
-                        setSelectedWarehouseScopeMode(nextMode)
-                        if (nextMode !== 'ASSIGNED') {
-                          setSelectedWarehouseScopeIDs([])
-                        }
-                      }}
-                      onWarehouseIdsChange={setSelectedWarehouseScopeIDs}
-                    />
                   </div>
                 </div>
               )}
@@ -1308,24 +1393,37 @@ export function usePermissionRoleSettings({
           )}
         </section>
       </div>
-      <footer className="erp-role-center-footer">
-        <Text type="secondary">
-          {roleConfigurationDirty ? '有未保存调整' : '当前设置已保存'}
-        </Text>
-        <Text type="secondary">菜单可见 ≠ 数据权限 ≠ 状态动作权限</Text>
-      </footer>
       <BusinessModal
         title={
-          detailView === 'fields'
-            ? '敏感字段'
-            : `关联账号 · ${getRoleVisibleName(selectedRole || {})}`
+          detailView === 'scope'
+            ? `数据范围 · ${getRoleVisibleName(selectedRole || {})}`
+            : detailView === 'fields'
+              ? '敏感字段'
+              : `关联账号 · ${getRoleVisibleName(selectedRole || {})}`
         }
         open={Boolean(detailView)}
         onCancel={() => setDetailView(null)}
         footer={<Button onClick={() => setDetailView(null)}>关闭</Button>}
-        width={960}
+        width={detailView === 'scope' ? 560 : 960}
+        destroyOnHidden
       >
-        {detailView === 'fields' ? (
+        {detailView === 'scope' ? (
+          <DataScopeOverview
+            mode={selectedWarehouseScopeMode}
+            warehouseIds={selectedWarehouseScopeIDs}
+            warehouseOptions={warehouseScopeSelectOptions}
+            disabled={
+              !canManageRolePermissions || selectedRoleReadOnly || saving
+            }
+            onModeChange={(nextMode) => {
+              setSelectedWarehouseScopeMode(nextMode)
+              if (nextMode !== 'ASSIGNED') {
+                setSelectedWarehouseScopeIDs([])
+              }
+            }}
+            onWarehouseIdsChange={setSelectedWarehouseScopeIDs}
+          />
+        ) : detailView === 'fields' ? (
           <SensitiveFieldOverview permissionKeys={selectedRolePermissionKeys} />
         ) : detailView === 'accounts' ? (
           <RoleAssociatedAccounts

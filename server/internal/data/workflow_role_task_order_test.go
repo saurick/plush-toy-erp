@@ -65,6 +65,9 @@ func TestWorkflowRoleTaskOrderingAndStatusAcrossPages(t *testing.T) {
 				if pageIndex == 0 && (page.Counts == nil || !page.Counts.IsConserved() || page.Counts.Todo != len(tt.positions)) {
 					t.Fatalf("counts do not match filtered scope: %#v", page.Counts)
 				}
+				if pageIndex == 0 && !reflect.DeepEqual(page.StatusCounts, map[string]int{"ready": 4, "blocked": 2}) {
+					t.Fatalf("status facets must ignore selected status and pagination, preserving role/search: %#v", page.StatusCounts)
+				}
 				for _, task := range page.Items {
 					got = append(got, task.ID)
 				}
@@ -130,6 +133,18 @@ func TestWorkflowRoleTaskHistoryFiltersAndCompletedOrder(t *testing.T) {
 				page, err := repo.ListWorkflowRoleTaskView(ctx, q)
 				if err != nil {
 					t.Fatal(err)
+				}
+				if i == 0 {
+					wantFacets := map[string]int{"done": 5, "rejected": 2, "withdrawn": 1}
+					if tt.from == &start {
+						wantFacets = map[string]int{"done": 2, "rejected": 1, "withdrawn": 1}
+					}
+					if tt.from == &before {
+						wantFacets = map[string]int{"done": 1}
+					}
+					if !reflect.DeepEqual(page.StatusCounts, wantFacets) {
+						t.Fatalf("history facets=%#v want=%#v", page.StatusCounts, wantFacets)
+					}
 				}
 				if i == 0 && (page.Counts == nil || !page.Counts.IsConserved() || page.Counts.History != len(want)) {
 					t.Fatalf("filtered count: %#v, want %d", page.Counts, len(want))
