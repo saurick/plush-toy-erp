@@ -78,6 +78,7 @@ func TestProductionOrderReleaseFreezesMaterialRequirementsAndKeepsNoBOMExplicit(
 	if err != nil {
 		t.Fatalf("create no-BOM production order: %v", err)
 	}
+	markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, createdWithoutBOM.Order.ID)
 	releasedWithoutBOM, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
 		ID: createdWithoutBOM.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "mo-material-no-bom-release",
 	})

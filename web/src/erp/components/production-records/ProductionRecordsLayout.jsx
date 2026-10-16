@@ -21,19 +21,6 @@ import {
 } from '../../utils/productionRecordViews.mjs'
 import './productionRecords.css'
 
-function sameHeaderStats(current = [], next = []) {
-  return (
-    current === next ||
-    (current.length === next.length &&
-      current.every(
-        (item, index) =>
-          item?.key === next[index]?.key &&
-          item?.label === next[index]?.label &&
-          item?.value === next[index]?.value
-      ))
-  )
-}
-
 export default function ProductionRecordsLayout() {
   const context = useOutletContext()
   const location = useLocation()
@@ -49,21 +36,12 @@ export default function ProductionRecordsLayout() {
     searchParams,
     availableKeys
   )
-  const [headerStatsByView, setHeaderStatsByView] = React.useState({})
-  const setHeaderStats = React.useCallback((viewKey, stats) => {
-    if (!viewKey) return
-    const nextStats = Array.isArray(stats) ? stats : []
-    setHeaderStatsByView((current) => {
-      if (sameHeaderStats(current[viewKey], nextStats)) return current
-      return { ...current, [viewKey]: nextStats }
-    })
-  }, [])
   const workspaceContext = React.useMemo(
     () => ({
       ...context,
-      productionRecordsWorkspace: { setHeaderStats },
+      productionRecordsWorkspace: true,
     }),
-    [context, setHeaderStats]
+    [context]
   )
 
   return (
@@ -77,19 +55,20 @@ export default function ProductionRecordsLayout() {
             ? 'production-exceptions'
             : 'production-progress'
         }
-        stats={headerStatsByView[activeKey] || []}
         viewSwitch={
-          <ProductionRecordsNavigation
-            activeKey={activeKey}
-            availableKeys={availableKeys}
-            onChange={(nextView) => {
-              if (nextView !== activeKey && availableKeys.includes(nextView)) {
-                navigate(
-                  productionRecordViewPath(pathname, searchParams, nextView)
-                )
-              }
-            }}
-          />
+          availableKeys.length > 1 && (
+            <ProductionRecordsNavigation
+              activeKey={activeKey}
+              availableKeys={availableKeys}
+              onChange={(nextView) => {
+                if (nextView !== activeKey && availableKeys.includes(nextView)) {
+                  navigate(
+                    productionRecordViewPath(pathname, searchParams, nextView)
+                  )
+                }
+              }}
+            />
+          )
         }
       />
       <Suspense fallback={<Loading />}>
