@@ -5,7 +5,23 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const exec = promisify(execFile);
-const SYSTEM = "7682605996671565865";
+export const DEVELOPMENT_TARGETS = Object.freeze(
+  JSON.parse(
+    fs.readFileSync(
+      new URL(
+        "../server/internal/devdbguard/development-targets.json",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+  ),
+);
+export function registeredDevelopmentEndpoint(host, port) {
+  return Object.values(DEVELOPMENT_TARGETS).some(
+    (target) =>
+      target.host === host && String(target.port) === String(port || "5432"),
+  );
+}
 export const LOCAL_DATABASE_ROLE_PREFIX = "plush_dev";
 const roleFile = (root) =>
   path.join(root, "server/configs/dev/database-roles.local.json");
@@ -14,15 +30,14 @@ export function assertRegisteredDatabase(dsn) {
   const url = new URL(dsn);
   if (
     !["postgres:", "postgresql:"].includes(url.protocol) ||
-    url.hostname !== "192.168.0.133" ||
-    (url.port || "5432") !== "5432" ||
+    !registeredDevelopmentEndpoint(url.hostname, url.port) ||
     url.pathname !== "/plush_erp" ||
     [...url.searchParams.keys()].some(
       (key) =>
         !["sslmode", "application_name", "connect_timeout"].includes(key),
     )
   ) {
-    throw new Error("数据库角色配置只适用于登记共享开发库");
+    throw new Error("数据库角色配置只适用于登记开发库");
   }
   return url;
 }
@@ -41,7 +56,49 @@ export async function configuredDatabaseURL(root) {
   });
   const dsn = stdout.trim();
   assertRegisteredDatabase(dsn);
+  if (new URL(dsn).hostname === DEVELOPMENT_TARGETS.orb.host) {
+    const expected = registeredDatabaseSystemIdentifier(root, dsn);
+    if (
+      (await databaseQuery(
+        dsn,
+        "SELECT system_identifier::text FROM pg_control_system()",
+      )) !== expected
+    )
+      throw new Error("Orb 开发数据库集群身份不匹配");
+  }
   return dsn;
+}
+
+function readRoleConfig(root) {
+  const file = roleFile(root);
+  const stat = fs.lstatSync(file);
+  if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0)
+    throw new Error("本地数据库角色配置必须是仅当前用户可读的普通文件");
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+export function registeredDatabaseSystemIdentifier(root, dsn) {
+  const url = assertRegisteredDatabase(dsn);
+  if (url.hostname === DEVELOPMENT_TARGETS.shared.host)
+    return DEVELOPMENT_TARGETS.shared.systemIdentifier;
+  const identity = readRoleConfig(root).systemIdentifier;
+  if (
+    typeof identity !== "string" ||
+    !/^[1-9][0-9]{0,19}$/u.test(identity) ||
+    identity === DEVELOPMENT_TARGETS.shared.systemIdentifier
+  )
+    throw new Error("Orb 数据库角色配置缺少独立集群身份");
+  return identity;
+}
+
+export function localDatabaseRuntimeEnvironment(root) {
+  if (!fs.existsSync(roleFile(root))) return {};
+  const config = readRoleConfig(root);
+  const url = assertRegisteredDatabase(config.app);
+  readLocalDatabaseRoles(root, config.app);
+  return url.hostname === DEVELOPMENT_TARGETS.orb.host
+    ? { [DEVELOPMENT_TARGETS.orb.systemIdentifierEnv]: config.systemIdentifier }
+    : {};
 }
 
 export async function databaseQuery(dsn, sql, { readonly = true } = {}) {
@@ -74,14 +131,12 @@ export function readLocalDatabaseRoles(root, configuredDSN) {
     throw new Error(
       "共享开发库尚未完成应用、迁移和只读账号配置，请先运行 make dev_database_roles",
     );
-  const stat = fs.lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0)
-    throw new Error("本地数据库角色配置必须是仅当前用户可读的普通文件");
-  const config = JSON.parse(fs.readFileSync(file, "utf8"));
+  const config = readRoleConfig(root);
   const configured = assertRegisteredDatabase(configuredDSN);
   if (
     config.schemaVersion !== "plush.local-database-roles/v1" ||
-    config.systemIdentifier !== SYSTEM
+    config.systemIdentifier !==
+      registeredDatabaseSystemIdentifier(root, configuredDSN)
   )
     throw new Error("本地数据库角色配置身份无效");
   const result = {};
@@ -130,7 +185,7 @@ export async function provisionLocalDatabaseRoles(
     (await databaseQuery(
       admin,
       "SELECT system_identifier::text FROM pg_control_system()",
-    )) !== SYSTEM
+    )) !== registeredDatabaseSystemIdentifier(root, admin)
   )
     throw new Error("共享数据库集群身份不匹配");
   const file = roleFile(root);
@@ -174,7 +229,7 @@ export async function provisionLocalDatabaseRoles(
   if (!existing)
     fs.writeFileSync(
       file,
-      `${JSON.stringify({ schemaVersion: "plush.local-database-roles/v1", systemIdentifier: SYSTEM, ...roles }, null, 2)}\n`,
+      `${JSON.stringify({ schemaVersion: "plush.local-database-roles/v1", systemIdentifier: registeredDatabaseSystemIdentifier(root, admin), ...roles }, null, 2)}\n`,
       { mode: 0o600, flag: "wx" },
     );
   const env = {
@@ -224,7 +279,7 @@ export async function setLocalDatabaseMaintenance(root, enabled) {
     (await databaseQuery(
       admin,
       "SELECT system_identifier::text FROM pg_control_system()",
-    )) !== SYSTEM
+    )) !== registeredDatabaseSystemIdentifier(root, admin)
   )
     throw new Error("维护目标身份不匹配");
   await databaseQuery(
