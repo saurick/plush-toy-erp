@@ -12,12 +12,20 @@ import {
   UploadOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Form, Popconfirm, Select, Space } from 'antd'
-import { useLocation, useOutletContext, useSearchParams } from 'react-router-dom'
+import {
+  useLocation,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
+import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessModal from '../components/business-list/BusinessModal.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import useBusinessPageState from '../hooks/useBusinessPageState'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
-import { engineeringBOMReturnState, readBOMPreparation } from '../utils/bomPreparationNavigation.mjs'
+import {
+  engineeringBOMReturnState,
+  readBOMPreparation,
+} from '../utils/bomPreparationNavigation.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -227,7 +235,10 @@ export default function BOMVersionsPage() {
     () => adminProfile?.effective_session?.customer?.key || '',
     [adminProfile]
   )
-  const preparation = useMemo(() => readBOMPreparation(location.state, adminProfile?.id), [location.state, adminProfile?.id])
+  const preparation = useMemo(
+    () => readBOMPreparation(location.state, adminProfile?.id),
+    [location.state, adminProfile?.id]
+  )
   const preparedEntry = useRef(null)
   const [preparedBOMID, setPreparedBOMID] = useState(null)
   const [preparationError, setPreparationError] = useState('')
@@ -254,9 +265,11 @@ export default function BOMVersionsPage() {
   useEffect(() => {
     if (savedStatus !== status) setStatus(status)
     if (
-      !lifecycleScopeIncludesStatus(lifecycleScope, searchParams.get('status'), [
-        'ARCHIVED',
-      ])
+      !lifecycleScopeIncludesStatus(
+        lifecycleScope,
+        searchParams.get('status'),
+        ['ARCHIVED']
+      )
     ) {
       const next = new URLSearchParams(searchParams)
       next.delete('status')
@@ -284,7 +297,10 @@ export default function BOMVersionsPage() {
     pageSize: 20,
   })
   const [selectedVersion, setSelectedVersion] = useState(null)
-  const [taskContext, setTaskContext] = useBusinessPageState('bomTaskContext', null)
+  const [taskContext, setTaskContext] = useBusinessPageState(
+    'bomTaskContext',
+    null
+  )
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
   const headerAttachmentRef = useRef(null)
@@ -315,16 +331,29 @@ export default function BOMVersionsPage() {
   })
 
   const canRead = hasActionPermission(adminProfile, PermissionCode.BOM_READ)
-  const canReadTasks = hasActionPermission(adminProfile, PermissionCode.WORKFLOW_TASK_READ)
+  const canReadTasks = hasActionPermission(
+    adminProfile,
+    PermissionCode.WORKFLOW_TASK_READ
+  )
   const canCreate = hasActionPermission(adminProfile, PermissionCode.BOM_CREATE)
   const canUpdate = hasActionPermission(adminProfile, PermissionCode.BOM_UPDATE)
-  const canActivate = hasActionPermission(adminProfile, PermissionCode.BOM_ACTIVATE)
-  const canPrint = hasActionPermission(adminProfile, PermissionCode.ERP_PRINT_TEMPLATE_READ)
+  const canActivate = hasActionPermission(
+    adminProfile,
+    PermissionCode.BOM_ACTIVATE
+  )
+  const canPrint = hasActionPermission(
+    adminProfile,
+    PermissionCode.ERP_PRINT_TEMPLATE_READ
+  )
   const printPermissionHint = canPrint
     ? undefined
     : '当前账号没有打印模板的权限。'
   const productOptions = useMemo(
-    () => uniqueReferenceOptions(products, productOption),
+    () =>
+      uniqueReferenceOptions(products, (item) => ({
+        ...productOption(item),
+        disabled: item.is_active === false,
+      })),
     [products]
   )
   const lifecycleStatusOptions = useMemo(
@@ -335,7 +364,11 @@ export default function BOMVersionsPage() {
     [lifecycleScope]
   )
   const materialOptions = useMemo(
-    () => uniqueReferenceOptions(materials, materialOption),
+    () =>
+      uniqueReferenceOptions(materials, (item) => ({
+        ...materialOption(item),
+        disabled: item.is_active === false,
+      })),
     [materials]
   )
   const materialByID = useMemo(() => {
@@ -386,7 +419,7 @@ export default function BOMVersionsPage() {
         if (isRpcAbortError(error) || !request.isCurrent()) {
           return null
         }
-        message.error(getActionErrorMessage(error, '加载 BOM 详情'))
+        showPageLoadError(error, '加载 BOM 详情')
         return null
       } finally {
         if (request.isCurrent()) {
@@ -453,7 +486,7 @@ export default function BOMVersionsPage() {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return false
       }
-      message.error(getActionErrorMessage(error, '加载 BOM 版本'))
+      showPageLoadError(error, '加载 BOM 版本')
       return false
     } finally {
       if (request.isCurrent()) {
@@ -474,8 +507,8 @@ export default function BOMVersionsPage() {
     setReferenceOptionsState({ loading: true, loaded: false })
     try {
       const [productResult, materialResult, unitResult] = await Promise.all([
-        listAllProducts({ active_only: true }),
-        listAllMaterials({ active_only: true }),
+        listAllProducts({ active_only: false }),
+        listAllMaterials({ active_only: false }),
         listAllUnits(),
       ])
       setProducts(
@@ -487,7 +520,7 @@ export default function BOMVersionsPage() {
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
       setReferenceOptionsState({ loading: false, loaded: true })
     } catch (error) {
-      message.error(getActionErrorMessage(error, '加载物料清单相关资料'))
+      showPageLoadError(error, '加载物料清单相关资料')
       setProducts([])
       setMaterials([])
       setUnits([])
@@ -538,6 +571,17 @@ export default function BOMVersionsPage() {
     listAllBOMVersions({ product_id: nextProductID })
       .then((result) => {
         if (cancelled) return
+        if (
+          headerMode === 'copy' &&
+          !String(headerForm.getFieldValue('version') || '').trim()
+        ) {
+          headerForm.setFieldsValue({
+            version: suggestNextBOMVersion(
+              result?.bom_versions || [],
+              nextProductID
+            ),
+          })
+        }
         setHeaderVersionCandidates({
           productID: nextProductID,
           versions: Array.isArray(result?.bom_versions)
@@ -561,7 +605,7 @@ export default function BOMVersionsPage() {
     return () => {
       cancelled = true
     }
-  }, [headerModalOpen, headerMode, headerProductIDForSuggestion])
+  }, [headerForm, headerModalOpen, headerMode, headerProductIDForSuggestion])
 
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadVersions)
@@ -715,52 +759,70 @@ export default function BOMVersionsPage() {
     if (file) openImportedDraft(file)
   }
 
-  const openCreate = useCallback((prefill = {}) => {
-    headerAttachmentRef.current?.clearPendingAttachments()
-    setImportReview(null)
-    setHeaderMode('create')
-    headerForm.resetFields()
-    headerForm.setFieldsValue({
-      effective_from: '',
-      effective_to: '',
-      source_order_no: '',
-      quantity_text: '',
-      spare_text: '',
-      print_date: '',
-      designer: '',
-      maker: '',
-      auditor: '',
-      hair_direction: '',
-      items: [],
-      product_id: prefill.productID,
-      ...(prefill.orderNo ? { source_order_no: prefill.orderNo, quantity_text: prefill.quantityText } : {}),
-    })
-    setHeaderProductIDForSuggestion(prefill.productID)
-    setHeaderModalOpen(true)
-  }, [headerForm])
+  const openCreate = useCallback(
+    (prefill = {}) => {
+      headerAttachmentRef.current?.clearPendingAttachments()
+      setImportReview(null)
+      setHeaderMode('create')
+      headerForm.resetFields()
+      headerForm.setFieldsValue({
+        effective_from: '',
+        effective_to: '',
+        source_order_no: '',
+        quantity_text: '',
+        spare_text: '',
+        print_date: '',
+        designer: '',
+        maker: '',
+        auditor: '',
+        hair_direction: '',
+        items: [],
+        product_id: prefill.productID,
+        ...(prefill.orderNo
+          ? {
+              source_order_no: prefill.orderNo,
+              quantity_text: prefill.quantityText,
+            }
+          : {}),
+      })
+      setHeaderProductIDForSuggestion(prefill.productID)
+      setHeaderModalOpen(true)
+    },
+    [headerForm]
+  )
 
-  const fillHeaderForm = useCallback((record) => {
-    headerForm.resetFields()
-    headerForm.setFieldsValue({
-      product_id: record.product_id,
-      version: record.version,
-      effective_from: unixToDateInputValue(record.effective_from),
-      effective_to: unixToDateInputValue(record.effective_to),
-      source_order_no: record.source_order_no || '',
-      quantity_text: record.quantity_text || '',
-      spare_text: record.spare_text || '',
-      print_date: unixToDateInputValue(record.print_date),
-      designer: record.designer || '',
-      maker: record.maker || '',
-      auditor: record.auditor || '',
-      hair_direction: record.hair_direction || '',
-      note: record.note || '',
-      items: normalizeBOMLinesForForm(record.id, record.items),
-    })
-  }, [headerForm])
+  const fillHeaderForm = useCallback(
+    (record) => {
+      headerForm.resetFields()
+      headerForm.setFieldsValue({
+        product_id: record.product_id,
+        version: record.version,
+        effective_from: unixToDateInputValue(record.effective_from),
+        effective_to: unixToDateInputValue(record.effective_to),
+        source_order_no: record.source_order_no || '',
+        quantity_text: record.quantity_text || '',
+        spare_text: record.spare_text || '',
+        print_date: unixToDateInputValue(record.print_date),
+        designer: record.designer || '',
+        maker: record.maker || '',
+        auditor: record.auditor || '',
+        hair_direction: record.hair_direction || '',
+        note: record.note || '',
+        items: normalizeBOMLinesForForm(record.id, record.items),
+      })
+    },
+    [headerForm]
+  )
 
   useEffect(() => {
-    if (!preparation || preparedEntry.current === location.key || !canRead || loading || !referenceOptionsState.loaded) return undefined
+    if (
+      !preparation ||
+      preparedEntry.current === location.key ||
+      !canRead ||
+      loading ||
+      !referenceOptionsState.loaded
+    )
+      { return undefined }
     const controller = new AbortController()
     setPreparationError('')
     setPreparedBOMID(null)
@@ -775,33 +837,61 @@ export default function BOMVersionsPage() {
       return undefined
     }
     setDetailLoading(true)
-    getBOMVersion({ id: preparation.bomID }, { signal: controller.signal }).then((detail) => {
-      if (controller.signal.aborted) return
-      if (detail.product_id !== preparation.productID || !Array.isArray(detail.items)) {
-        setPreparationError('此 BOM 与所选产品不一致，请返回工程资料重新选择。')
-        return
-      }
-      preparedEntry.current = location.key
-      setPreparedBOMID(detail.id)
-      setSelectedVersion(detail)
-      applySelectedRowKeys([detail.id])
-      setHeaderMode(preparation.mode === 'edit' && canUpdate && canEditBOM(detail) ? 'edit' : 'view')
-      fillHeaderForm(detail)
-      setHeaderProductIDForSuggestion(undefined)
-      setHeaderModalOpen(true)
-    }).catch((error) => {
-      if (!controller.signal.aborted) setPreparationError(getActionErrorMessage(error, '打开订单关联 BOM'))
-    }).finally(() => {
-      if (!controller.signal.aborted) setDetailLoading(false)
-    })
+    getBOMVersion({ id: preparation.bomID }, { signal: controller.signal })
+      .then((detail) => {
+        if (controller.signal.aborted) return
+        if (
+          detail.product_id !== preparation.productID ||
+          !Array.isArray(detail.items)
+        ) {
+          setPreparationError(
+            '此 BOM 与所选产品不一致，请返回工程资料重新选择。'
+          )
+          return
+        }
+        preparedEntry.current = location.key
+        setPreparedBOMID(detail.id)
+        setSelectedVersion(detail)
+        applySelectedRowKeys([detail.id])
+        setHeaderMode(
+          preparation.mode === 'edit' && canUpdate && canEditBOM(detail)
+            ? 'edit'
+            : 'view'
+        )
+        fillHeaderForm(detail)
+        setHeaderProductIDForSuggestion(undefined)
+        setHeaderModalOpen(true)
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted)
+          { setPreparationError(getActionErrorMessage(error, '打开订单关联 BOM')) }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDetailLoading(false)
+      })
     return () => controller.abort()
-  }, [preparation, location.key, canRead, canCreate, canUpdate, openCreate, fillHeaderForm, applySelectedRowKeys, preparationRetry, loading, referenceOptionsState.loaded])
+  }, [
+    preparation,
+    location.key,
+    canRead,
+    canCreate,
+    canUpdate,
+    openCreate,
+    fillHeaderForm,
+    applySelectedRowKeys,
+    preparationRetry,
+    loading,
+    referenceOptionsState.loaded,
+  ])
 
   const returnToEngineering = () => {
     if (saving || !preparation) return
     navigate(preparation.returnPath, {
       replace: true,
-      state: engineeringBOMReturnState(preparation, preparedBOMID || preparation.bomID),
+      state: engineeringBOMReturnState(
+        preparation,
+        preparedBOMID || preparation.bomID
+      ),
     })
   }
 
@@ -817,7 +907,11 @@ export default function BOMVersionsPage() {
     setHeaderModalOpen(true)
   }
 
-  const openEdit = async (record = selectedVersion, revision = false, prepared = false) => {
+  const openEdit = async (
+    record = selectedVersion,
+    revision = false,
+    prepared = false
+  ) => {
     if (!record?.id || !canEditBOM(record)) return
     headerAttachmentRef.current?.clearPendingAttachments()
     setImportReview(null)
@@ -843,15 +937,11 @@ export default function BOMVersionsPage() {
     headerAttachmentRef.current?.clearPendingAttachments()
     setImportReview(null)
     applySelectedRowKeys([record.id])
-    const nextVersionSuggestion = suggestNextBOMVersion(
-      versions,
-      record.product_id
-    )
     setHeaderMode('copy')
     headerForm.resetFields()
     headerForm.setFieldsValue({
       product_id: record.product_id,
-      version: nextVersionSuggestion || `${record.version || 'V'}-COPY`,
+      version: '',
       effective_from: '',
       effective_to: '',
       source_order_no: record.source_order_no || '',
@@ -975,12 +1065,7 @@ export default function BOMVersionsPage() {
   }
 
   const activateSelected = async (record = activeActionVersion) => {
-    if (
-      !record?.id ||
-      !canActivate ||
-      saving ||
-      !canActivateBOM(record)
-    ) {
+    if (!record?.id || !canActivate || saving || !canActivateBOM(record)) {
       return
     }
     setSaving(true)
@@ -1067,9 +1152,9 @@ export default function BOMVersionsPage() {
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
-      productID ||
-      lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
-      status
+    productID ||
+    lifecycleScope !== LIFECYCLE_SCOPE.CURRENT ||
+    status
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -1078,35 +1163,33 @@ export default function BOMVersionsPage() {
     setStatus('')
     setSearchParams(new URLSearchParams(), { replace: true })
     resetBusinessPaginationCurrent(setPagination)
-  }, [setKeyword, setLifecycleScope, setPagination, setProductID, setSearchParams, setStatus])
+  }, [
+    setKeyword,
+    setLifecycleScope,
+    setPagination,
+    setProductID,
+    setSearchParams,
+    setStatus,
+  ])
 
-  const preparationLoadError = preparationError || (
-    preparation && !referenceOptionsState.loading && !referenceOptionsState.loaded
+  const preparationLoadError =
+    preparationError ||
+    (preparation &&
+    !referenceOptionsState.loading &&
+    !referenceOptionsState.loaded
       ? 'BOM 相关资料未读取成功，请重新读取后继续编制。'
-      : ''
-  )
+      : '')
 
   return (
     <BusinessPageLayout>
-      <PageHeaderCard
-        compact
-        helpKey="material-bom"
-        title="物料清单（BOM）"
-        stats={[
-          { key: 'total', label: '物料清单总数', value: total },
-          { key: 'current', label: '本页显示', value: versions.length },
-          {
-            key: 'active',
-            label: '已生效',
-            value: versions.filter((item) => item.status === 'ACTIVE').length,
-          },
-        ]}
-      />
+      <PageHeaderCard compact helpKey="material-bom" title="物料清单（BOM）" />
 
       {preparation ? (
         <Space wrap className="erp-business-inline-note">
           <span>工程与打样 · {preparation.orderNo}</span>
-          <Button size="small" disabled={saving} onClick={returnToEngineering}>返回工程与打样</Button>
+          <Button size="small" disabled={saving} onClick={returnToEngineering}>
+            返回工程与打样
+          </Button>
         </Space>
       ) : null}
       {preparationLoadError ? (
@@ -1173,6 +1256,7 @@ export default function BOMVersionsPage() {
               }}
             />
             <SelectFilter
+              aria-label="BOM 状态"
               value={status}
               options={lifecycleStatusOptions}
               onChange={(nextStatus) => {
@@ -1223,10 +1307,7 @@ export default function BOMVersionsPage() {
             >
               导出筛选结果
             </ToolbarButton>
-            <ToolbarButton
-              icon={<SettingOutlined />}
-              onClick={openColumnOrder}
-            >
+            <ToolbarButton icon={<SettingOutlined />} onClick={openColumnOrder}>
               列设置
             </ToolbarButton>
           </Space>
@@ -1323,13 +1404,18 @@ export default function BOMVersionsPage() {
               size="small"
               icon={<UnorderedListOutlined />}
               data-business-action-key="related-tasks"
-              disabled={selectedRowKeys.length !== 1 || !activeActionVersion || saving}
-              onClick={() => setTaskContext({ bomID: activeActionVersion.id, page: 1 })}
+              disabled={
+                selectedRowKeys.length !== 1 || !activeActionVersion || saving
+              }
+              onClick={() =>
+                setTaskContext({ bomID: activeActionVersion.id, page: 1 })
+              }
             >
               相关任务
             </Button>
           ) : null}
-          {canCreate && (!canUpdate || activeActionVersion?.status !== 'ACTIVE') ? (
+          {canCreate &&
+          (!canUpdate || activeActionVersion?.status !== 'ACTIVE') ? (
             <BusinessActionTooltip
               disabled={
                 selectedRowKeys.length !== 1 ||
@@ -1547,7 +1633,11 @@ export default function BOMVersionsPage() {
         }}
       />
 
-      <BOMTaskPanel context={taskContext} onContextChange={setTaskContext} adminProfile={adminProfile} />
+      <BOMTaskPanel
+        context={taskContext}
+        onContextChange={setTaskContext}
+        adminProfile={adminProfile}
+      />
 
       <BusinessModal
         title="BOM 草稿已保存"
@@ -1555,11 +1645,24 @@ export default function BOMVersionsPage() {
         closable={!saving}
         maskClosable={!saving}
         keyboard={!saving}
-        onCancel={() => { if (!saving) setSavedRevision(null) }}
+        onCancel={() => {
+          if (!saving) setSavedRevision(null)
+        }}
         footer={
           <Space wrap>
-            <Button disabled={saving} onClick={() => setSavedRevision(null)}>返回列表</Button>
-            <Button disabled={saving} onClick={() => { const draft = savedRevision; setSavedRevision(null); openEdit(draft, true) }}>继续编辑草稿</Button>
+            <Button disabled={saving} onClick={() => setSavedRevision(null)}>
+              返回列表
+            </Button>
+            <Button
+              disabled={saving}
+              onClick={() => {
+                const draft = savedRevision
+                setSavedRevision(null)
+                openEdit(draft, true)
+              }}
+            >
+              继续编辑草稿
+            </Button>
             {canActivate ? (
               <Popconfirm
                 title="启用新版本？原版本会设为历史版本，已有订单引用保持不变。"
@@ -1567,7 +1670,9 @@ export default function BOMVersionsPage() {
                 cancelText="取消"
                 onConfirm={() => activateSelected(savedRevision)}
               >
-                <Button type="primary" loading={saving}>启用此版本</Button>
+                <Button type="primary" loading={saving}>
+                  启用此版本
+                </Button>
               </Popconfirm>
             ) : null}
           </Space>
@@ -1607,8 +1712,17 @@ export default function BOMVersionsPage() {
       >
         {preparation ? (
           <Space wrap className="erp-business-inline-note">
-            <span>{preparation.orderNo} · 保存草稿后返回工程资料关联，启用与任务提交仍需分别办理。</span>
-            <Button size="small" disabled={saving} onClick={returnToEngineering}>返回工程与打样</Button>
+            <span>
+              {preparation.orderNo} ·
+              保存草稿后返回工程资料关联，启用与任务提交仍需分别办理。
+            </span>
+            <Button
+              size="small"
+              disabled={saving}
+              onClick={returnToEngineering}
+            >
+              返回工程与打样
+            </Button>
           </Space>
         ) : null}
         <Form
@@ -1643,7 +1757,9 @@ export default function BOMVersionsPage() {
           }}
         >
           {headerMode === 'edit' ? (
-            <p className="erp-business-source-summary erp-business-inline-note">正在修改草稿，尚未生效。保存后需启用，已有订单仍使用原 BOM。</p>
+            <p className="erp-business-source-summary erp-business-inline-note">
+              正在修改草稿，尚未生效。保存后需启用，已有订单仍使用原 BOM。
+            </p>
           ) : null}
           {headerMode === 'view' && canUpdate ? (
             <BOMRevisionAction
@@ -1657,7 +1773,9 @@ export default function BOMVersionsPage() {
           {headerMode === 'view' && canReadTasks ? (
             <Button
               icon={<UnorderedListOutlined />}
-              onClick={() => setTaskContext({ bomID: modalActionVersion.id, page: 1 })}
+              onClick={() =>
+                setTaskContext({ bomID: modalActionVersion.id, page: 1 })
+              }
             >
               相关任务
             </Button>
