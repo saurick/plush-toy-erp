@@ -98,3 +98,29 @@ func TestJSONLoggerReportsShortWrite(t *testing.T) {
 		t.Fatalf("got %v, want short write", err)
 	}
 }
+
+func TestFormattedDiagnosticLogsRedactCredentials(t *testing.T) {
+	for _, level := range []string{"error", "warn", "info", "debug"} {
+		t.Run(level, func(t *testing.T) {
+			var output bytes.Buffer
+			helper := log.NewHelper(NewStdColorLogger(&output, true, true))
+			write := helper.Errorf
+			switch level {
+			case "warn":
+				write = helper.Warnf
+			case "info":
+				write = helper.Infof
+			case "debug":
+				write = helper.Debugf
+			}
+			write("dependency failed err=%v", errors.New("connect postgres://user:private-password@db/app?access_token=private-token; Authorization: Bearer private-bearer; password=private-password"))
+			var event map[string]any
+			if err := json.Unmarshal(output.Bytes(), &event); err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(output.String(), "private-") || !strings.Contains(fmt.Sprint(event["msg"]), "dependency failed err=connect postgres://[redacted]@db/app") {
+				t.Fatalf("formatted log bypassed credential redaction: %s", output.String())
+			}
+		})
+	}
+}

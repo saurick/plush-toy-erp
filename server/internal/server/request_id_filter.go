@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	stdhttp "net/http"
+	"regexp"
 	"time"
 
 	pkglogger "server/pkg/logger"
@@ -12,6 +13,15 @@ import (
 )
 
 const requestIDHeader = "X-Request-Id"
+
+var requestIDPattern = regexp.MustCompile(`^[A-Za-z0-9._:-]{1,128}$`)
+
+func safeRequestID(value string) string {
+	if requestIDPattern.MatchString(value) {
+		return value
+	}
+	return ""
+}
 
 func newRequestID() string {
 	var buf [16]byte
@@ -26,7 +36,7 @@ func newRequestID() string {
 func RequestIDFilter() httpx.FilterFunc {
 	return func(next stdhttp.Handler) stdhttp.Handler {
 		return stdhttp.HandlerFunc(func(w stdhttp.ResponseWriter, r *stdhttp.Request) {
-			requestID := requestIDFromRequest(r)
+			requestID := safeRequestID(requestIDFromRequest(r))
 			if requestID == "" {
 				requestID = newRequestID()
 			}

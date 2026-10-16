@@ -10,6 +10,10 @@ var diagnosticBearerToken = regexp.MustCompile(`(?i)\bBearer\s+[A-Za-z0-9._~+/=-
 var diagnosticSecretValue = regexp.MustCompile(`(?i)\b(password|passwd|pwd|access_token|refresh_token|api_key|secret(?:_key)?)["']?\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s&,;]+)`)
 
 func diagnosticLogValue(value any) any {
+	if text, ok := value.(string); ok {
+		// Log helpers format Errorf/Warnf arguments before calling the logger.
+		return redactDiagnosticText(text)
+	}
 	err, ok := value.(error)
 	if !ok {
 		return value
@@ -23,7 +27,11 @@ func diagnosticLogValue(value any) any {
 	}
 	// Preserve the error's diagnostic text, never its arbitrary internal fields.
 	// This guards common credential formats; callers still omit payloads and PII.
-	text := diagnosticURLCredentials.ReplaceAllString(err.Error(), `${1}[redacted]@`)
+	return redactDiagnosticText(err.Error())
+}
+
+func redactDiagnosticText(text string) string {
+	text = diagnosticURLCredentials.ReplaceAllString(text, `${1}[redacted]@`)
 	text = diagnosticBearerToken.ReplaceAllString(text, "Bearer [redacted]")
 	return diagnosticSecretValue.ReplaceAllString(text, `${1}=[redacted]`)
 }
