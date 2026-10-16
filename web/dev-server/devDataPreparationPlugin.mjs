@@ -72,7 +72,6 @@ const OPERATION_PATH_PATTERN = new RegExp(
 )
 const REGISTERED_DEVELOPMENT_HOST = '192.168.0.133'
 const REGISTERED_DEVELOPMENT_PORT = 5432
-const CORE_DEMO_DATABASES = new Set(['plush_erp', 'plush_erp_simon_dev'])
 const SCENARIO_DEMO_DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION
 const SCENARIO_DEMO_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID
 const SCENARIO_DEMO_CATALOG_TARGET_COUNT = 51
@@ -130,10 +129,8 @@ const MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT = Object.freeze({
       MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.databaseLifecycle,
     minimumMigration:
       MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
-    configRevision:
-      CUSTOMER_TRIAL_133_CONFIG_REVISION,
-    configProductVersion:
-      CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+    configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
   }),
 })
 
@@ -357,7 +354,7 @@ export function coreDemoTargetCommand(projectRoot) {
 export function coreDemoExecutionCommands(projectRoot, databaseName) {
   const root = path.resolve(projectRoot)
   const database = String(databaseName || '').trim()
-  if (!CORE_DEMO_DATABASES.has(database)) {
+  if (!isRegisteredDevelopmentDatabaseName(database)) {
     throw new Error('core demo database is not a registered development target')
   }
   const confirmation = [
@@ -1344,10 +1341,8 @@ export function createDevDataPreparationService({
       !/^20[0-9]{12}$/u.test(String(runtime?.migrationVersion || '')) ||
       runtime.migrationVersion <
         MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration ||
-      config?.revision !==
-        CUSTOMER_TRIAL_133_CONFIG_REVISION ||
-      config?.productVersion !==
-        CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION ||
+      config?.revision !== CUSTOMER_TRIAL_133_CONFIG_REVISION ||
+      config?.productVersion !== CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION ||
       config?.datasetVersion !== CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION ||
       runtime?.serverHealth !== 'passed' ||
       runtime?.serverReady !== 'passed' ||
@@ -1545,10 +1540,8 @@ export function createDevDataPreparationService({
         databaseName: CUSTOMER_TRIAL_133_DATABASE,
         migrationVersion:
           MANUAL_ACCEPTANCE_CORE_CONTRACT.customerTrial133.minimumMigration,
-        customerConfigRevision:
-          CUSTOMER_TRIAL_133_CONFIG_REVISION,
-        customerConfigProductVersion:
-          CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+        customerConfigRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+        customerConfigProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
         targetFingerprint: hashDataPreparationPlan({
           target: CUSTOMER_TRIAL_133_TARGET,
           databaseName: CUSTOMER_TRIAL_133_DATABASE,
@@ -1667,7 +1660,9 @@ export function createDevDataPreparationService({
       repository: repositoryResult,
       datasetContract: MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT,
       target,
-      acceptancePlan: projectDataPreparationAcceptancePlan(MANUAL_ACCEPTANCE_REVIEW_PLAN),
+      acceptancePlan: projectDataPreparationAcceptancePlan(
+        MANUAL_ACCEPTANCE_REVIEW_PLAN
+      ),
       profiles: DEV_DATA_PREPARATION_PROFILES,
       currentOperations: currentOperations.slice(0, 50).map(publicOperation),
       historicalOperations: historicalOperations
