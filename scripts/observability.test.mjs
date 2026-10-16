@@ -5,7 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import http from 'node:http'
 import { spawn } from 'node:child_process'
-import { composeArgs, notificationEnv, observabilityHealth, prepareSmtpPassword, provisionAlerts, provisionDashboard, provisionDatasources, registeredLogSources, renderAlloyConfig, renderDockgeCompose, supplementalLogSources, validateBindAddress, verifyTraceDatasources } from './observability.mjs'
+import { composeArgs, observabilityHealth, provisionAlerts, provisionDashboard, provisionDatasources, registeredLogSources, renderAlloyConfig, renderDockgeCompose, supplementalLogSources, validateBindAddress, verifyTraceDatasources } from './observability.mjs'
 
 const root = new URL('../', import.meta.url).pathname
 const template = fs.readFileSync(new URL('../server/deploy/compose/prod/observability/alloy.alloy', import.meta.url), 'utf8')
@@ -142,64 +142,6 @@ test('alerts classify system failures, handle idle periods and mute external del
   assert.deepEqual(config.policies[0].routes[0].mute_time_intervals, [config.muteTimes[0].name])
 })
 
-const mailSettings = {
-  GRAFANA_SMTP_ENABLED: 'true', GRAFANA_SMTP_HOST: 'smtp.example.com:465',
-  GRAFANA_SMTP_USER: 'sender@example.com', GRAFANA_SMTP_FROM_ADDRESS: 'sender@example.com',
-  GRAFANA_ALERT_EMAIL_TO: 'recipient@example.com', GRAFANA_ALERT_EMAIL_ENABLED: 'false',
-}
-
-test('configured mail remains muted until explicitly enabled and retains recovery notifications', () => {
-  const muted = provisionAlerts(mailSettings)
-  assert.equal(muted.policies[0].receiver, 'plush-email')
-  assert.deepEqual(muted.policies[0].routes[0].mute_time_intervals, ['plush-no-external-notifications'])
-  const enabled = provisionAlerts({ ...mailSettings, GRAFANA_ALERT_EMAIL_ENABLED: 'true' })
-  const contact = enabled.contactPoints.find((item) => item.name === 'plush-email').receivers[0]
-  assert.equal(contact.settings.addresses, mailSettings.GRAFANA_ALERT_EMAIL_TO)
-  assert.equal(contact.disableResolveMessage, false)
-  assert.equal(enabled.policies[0].routes[0].receiver, 'plush-email')
-  assert.equal(enabled.policies[0].routes[0].mute_time_intervals, undefined)
-  assert.deepEqual(enabled.groups, provisionAlerts().groups)
-  assert.deepEqual(provisionAlerts({ ...mailSettings, GRAFANA_ALERT_EMAIL_ENABLED: 'false' }), muted)
-})
-
-test('mail configuration rejects incomplete, malformed and unencrypted settings without echoing values', () => {
-  assert.deepEqual(notificationEnv(mailSettings), mailSettings)
-  assert.equal(notificationEnv().GRAFANA_SMTP_ENABLED, 'false')
-  for (const override of [
-    { GRAFANA_SMTP_ENABLED: 'yes' }, { GRAFANA_ALERT_EMAIL_ENABLED: 'yes' },
-    { GRAFANA_SMTP_ENABLED: 'false', GRAFANA_ALERT_EMAIL_ENABLED: 'true' },
-    { GRAFANA_SMTP_HOST: 'smtp.example.com:25' }, { GRAFANA_SMTP_USER: '' },
-    { GRAFANA_SMTP_FROM_ADDRESS: 'sender@example.com\nBcc:other@example.com' },
-    { GRAFANA_ALERT_EMAIL_TO: 'one@example.com;two@example.com' },
-  ]) assert.throws(() => notificationEnv({ ...mailSettings, ...override }))
-  assert.throws(() => notificationEnv({ ...mailSettings, GRAFANA_ALERT_EMAIL_TO: 'private-invalid-value' }), (error) => !error.message.includes('private-invalid-value'))
-})
-
-test('SMTP credentials stay in a private parent and a readonly container mount, and survive prepare', () => {
-  const runtime = fs.mkdtempSync(path.join(os.tmpdir(), 'observability-smtp-'))
-  const file = path.join(runtime, 'smtp-password')
-  try {
-    assert.throws(() => prepareSmtpPassword(runtime, true), /smtp-password/u)
-    prepareSmtpPassword(runtime, false)
-    assert.throws(() => prepareSmtpPassword(runtime, true), /为空/u)
-    const password = 'test-only-$literal-secret'
-    fs.writeFileSync(file, password)
-    prepareSmtpPassword(runtime, true)
-    prepareSmtpPassword(runtime, false)
-    assert.equal(fs.readFileSync(file, 'utf8'), password)
-    assert.equal(fs.statSync(runtime).mode & 0o777, 0o700)
-    assert.equal(fs.statSync(file).mode & 0o777, 0o644)
-    fs.unlinkSync(file)
-    fs.symlinkSync(path.join(root, 'package.json'), file)
-    assert.throws(() => prepareSmtpPassword(runtime, true), /普通文件/u)
-    const compose = fs.readFileSync(path.join(root, 'server/deploy/compose/prod/compose.observability.yml'), 'utf8')
-    assert.match(compose, /GF_SMTP_PASSWORD__FILE: \/etc\/grafana\/smtp-password/u)
-    assert.match(compose, /smtp-password:\/etc\/grafana\/smtp-password:ro/u)
-    assert.match(compose, /GF_SMTP_SKIP_VERIFY: "false"/u)
-    assert.match(compose, /GF_SMTP_STARTTLS_POLICY: MandatoryStartTLS/u)
-  } finally { fs.rmSync(runtime, { recursive: true, force: true }) }
-})
-
 test('Dockge adoption retains the project, log mounts and existing volumes without writing the password to Compose', () => {
   const project = 'plush-erp-observability-local'
   const source = { name: project, services: { grafana: { environment: { GF_SECURITY_ADMIN_PASSWORD: 'test-only-password', GF_SECURITY_ADMIN_USER: 'admin' } }, alloy: { volumes: [{ source: '/test/logs', target: '/logs/backend' }] } }, volumes: { 'loki-data': { name: `${project}_loki-data` } }, networks: { default: { name: `${project}_default` } } }
@@ -210,10 +152,6 @@ test('Dockge adoption retains the project, log mounts and existing volumes witho
   assert.deepEqual(result.networks, source.networks)
   assert.doesNotMatch(JSON.stringify(result), /test-only-password/u)
   assert.equal(source.services.grafana.environment.GF_SECURITY_ADMIN_PASSWORD, 'test-only-password')
-  assert.equal(result.services.grafana.environment.GF_SMTP_ENABLED, '${GRAFANA_SMTP_ENABLED:-false}')
-  const unsafe = structuredClone(source)
-  unsafe.services.grafana.environment.GF_SMTP_PASSWORD = 'test-only-mail-password'
-  assert.throws(() => renderDockgeCompose(unsafe), /只读文件/u)
   assert.throws(() => renderDockgeCompose({ ...source, name: 'another-project' }), /身份/u)
   assert.throws(() => renderDockgeCompose({ ...source, volumes: { 'loki-data': { name: 'another-volume' } } }), /身份/u)
 })

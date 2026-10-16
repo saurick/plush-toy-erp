@@ -112,43 +112,7 @@ export function provisionDashboard(template, environments) {
   return dashboard
 }
 
-export function notificationEnv(previous = {}) {
-  const env = Object.fromEntries([
-    'GRAFANA_SMTP_ENABLED', 'GRAFANA_SMTP_HOST', 'GRAFANA_SMTP_USER',
-    'GRAFANA_SMTP_FROM_ADDRESS', 'GRAFANA_ALERT_EMAIL_TO', 'GRAFANA_ALERT_EMAIL_ENABLED',
-  ].map((key) => [key, previous[key] || (key.endsWith('_ENABLED') ? 'false' : '')]))
-  for (const key of ['GRAFANA_SMTP_ENABLED', 'GRAFANA_ALERT_EMAIL_ENABLED']) {
-    if (!['true', 'false'].includes(env[key])) throw new Error(`${key} 必须为 true 或 false`)
-  }
-  if (env.GRAFANA_ALERT_EMAIL_ENABLED === 'true' && env.GRAFANA_SMTP_ENABLED !== 'true') throw new Error('启用邮件告警前必须配置 SMTP')
-  if (env.GRAFANA_SMTP_ENABLED === 'true') {
-    if (!/^[A-Za-z0-9.-]+:(465|587)$/u.test(env.GRAFANA_SMTP_HOST)) throw new Error('SMTP 须使用明确主机及 TLS 端口 465 或 587')
-    for (const key of ['GRAFANA_SMTP_USER', 'GRAFANA_SMTP_FROM_ADDRESS', 'GRAFANA_ALERT_EMAIL_TO']) {
-      if (!/^[A-Za-z0-9.!#%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/u.test(env[key])) throw new Error(`${key} 须为单个有效邮箱地址`)
-    }
-  }
-  return env
-}
-
-export function prepareSmtpPassword(runtime, enabled) {
-  // 宿主机父目录保持私有；文件只读挂载后，Grafana 的独立 UID 仍须能读取。
-  fs.chmodSync(runtime, 0o700)
-  const file = path.join(runtime, 'smtp-password')
-  const info = fs.lstatSync(file, { throwIfNoEntry: false })
-  if (info && !info.isFile()) throw new Error('smtp-password 必须是运行目录内的普通文件')
-  if (!info) {
-    if (enabled) throw new Error('启用 SMTP 前须在私有运行目录配置 smtp-password')
-    fs.writeFileSync(file, '', { mode: 0o644, flag: 'wx' })
-  }
-  if (enabled && !fs.readFileSync(file, 'utf8').trim()) throw new Error('SMTP 授权码文件为空')
-  fs.chmodSync(file, 0o644)
-}
-
-export function provisionAlerts(settings = {}) {
-  const env = notificationEnv(settings)
-  const emailConfigured = env.GRAFANA_SMTP_ENABLED === 'true'
-  const receiver = emailConfigured ? 'plush-email' : 'plush-notifications-disabled'
-  const muted = env.GRAFANA_ALERT_EMAIL_ENABLED !== 'true'
+export function provisionAlerts() {
   const signals = [
     { uid: 'plush-system-errors', title: 'ERP 系统错误持续出现', filter: 'outcome="error"', summary: '系统错误事件' },
     { uid: 'plush-dependency-errors', title: 'ERP 依赖调用持续失败', filter: 'dependency_outcome="error"', summary: '依赖调用失败' },
@@ -169,12 +133,10 @@ export function provisionAlerts(settings = {}) {
   return {
     apiVersion: 1,
     groups: [{ orgId: 1, name: 'ERP logs', folder: 'ERP observability', interval: '1m', rules }],
-    contactPoints: [
-      { orgId: 1, name: 'plush-notifications-disabled', receivers: [{ uid: 'plush-notifications-disabled', type: 'email', settings: { addresses: 'notifications-disabled@localhost' }, disableResolveMessage: false }] },
-      ...(emailConfigured ? [{ orgId: 1, name: 'plush-email', receivers: [{ uid: 'plush-email', type: 'email', settings: { addresses: env.GRAFANA_ALERT_EMAIL_TO }, disableResolveMessage: false }] }] : []),
-    ],
+    // 初始规则保留评估状态；通知渠道由操作者配置后再解除此静默窗口。
+    contactPoints: [{ orgId: 1, name: 'plush-notifications-disabled', receivers: [{ uid: 'plush-notifications-disabled', type: 'email', settings: { addresses: 'notifications-disabled@localhost' }, disableResolveMessage: false }] }],
     muteTimes: [{ orgId: 1, name: 'plush-no-external-notifications', time_intervals: [{ times: [{ start_time: '00:00', end_time: '24:00' }] }] }],
-    policies: [{ orgId: 1, receiver, group_by: ['grafana_folder', 'alertname', 'environment', 'service'], group_wait: '30s', group_interval: '5m', repeat_interval: '4h', routes: [{ receiver, object_matchers: [['alertname', '=~', '.*']], ...(muted ? { mute_time_intervals: ['plush-no-external-notifications'] } : {}) }] }],
+    policies: [{ orgId: 1, receiver: 'plush-notifications-disabled', group_by: ['grafana_folder', 'alertname', 'environment', 'service'], group_wait: '30s', group_interval: '5m', repeat_interval: '4h', routes: [{ receiver: 'plush-notifications-disabled', object_matchers: [['alertname', '=~', '.*']], mute_time_intervals: ['plush-no-external-notifications'] }] }],
   }
 }
 
@@ -188,10 +150,6 @@ export function renderDockgeCompose(config) {
   if (result.name !== PROJECT) throw new Error('Dockge 日志堆栈的 project 身份不一致')
   result.services.grafana.environment.GF_SECURITY_ADMIN_PASSWORD = '${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required}'
   result.services.grafana.environment.GF_SECURITY_ADMIN_USER = '${GRAFANA_ADMIN_USER:-admin}'
-  if ('GF_SMTP_PASSWORD' in result.services.grafana.environment) throw new Error('SMTP 授权码必须通过只读文件提供，不能写入 Compose')
-  for (const key of ['ENABLED', 'HOST', 'USER', 'FROM_ADDRESS']) {
-    result.services.grafana.environment[`GF_SMTP_${key}`] = '${GRAFANA_SMTP_' + key + ':-' + (key === 'ENABLED' ? 'false' : '') + '}'
-  }
   for (const [key, volume] of Object.entries(result.volumes || {})) {
     if (volume.name !== `${PROJECT}_${key}`) throw new Error('日志数据 volume 身份不一致')
     result.volumes[key] = { external: true, name: volume.name }
@@ -230,10 +188,8 @@ export function prepareObservability(root, { includeTargets = false, bindAddress
   fs.mkdirSync(runtime, { recursive: true, mode: 0o700 })
   const envFile = path.join(runtime, '.env')
   const previous = fs.existsSync(envFile) ? readRuntimeEnv(envFile) : {}
-  const notifications = notificationEnv(previous)
   const stackDirectory = dockgeDir || previous.OBS_STACK_DIR
   if (stackDirectory) validateDockgeDirectory(stackDirectory, envFile)
-  prepareSmtpPassword(runtime, notifications.GRAFANA_SMTP_ENABLED === 'true')
   const address = validateBindAddress(bindAddress || previous.GRAFANA_BIND_ADDR || '127.0.0.1')
   const sources = includeTargets ? registeredLogSources(root, { requireLocal: true }) : []
   const supplemental = supplementalLogSources(root, { includeTargets })
@@ -257,7 +213,7 @@ export function prepareObservability(root, { includeTargets = false, bindAddress
   writeConfig(path.join(runtime, 'provisioning/datasources/erp.yaml'), provisionDatasources(environments, jaegers))
   const dashboard = JSON.parse(fs.readFileSync(path.join(root, CONFIG, 'dashboards/erp-logs.json'), 'utf8'))
   writeConfig(path.join(runtime, 'dashboards/erp-logs.json'), provisionDashboard(dashboard, environments))
-  writeConfig(path.join(runtime, 'provisioning/alerting/erp.yaml'), provisionAlerts(notifications))
+  writeConfig(path.join(runtime, 'provisioning/alerting/erp.yaml'), provisionAlerts())
   fs.mkdirSync(path.join(runtime, 'provisioning/plugins'), { recursive: true, mode: 0o755 })
   writeConfig(path.join(runtime, 'provisioning/dashboards/erp.yaml'), { apiVersion: 1, providers: [{ name: 'ERP observability', orgId: 1, folder: 'ERP observability', type: 'file', disableDeletion: false, allowUiUpdates: false, options: { path: '/var/lib/grafana/dashboards' } }] })
   const env = {
@@ -274,7 +230,6 @@ export function prepareObservability(root, { includeTargets = false, bindAddress
     GRAFANA_ROOT_URL: previous.GRAFANA_ROOT_URL || 'http://localhost:3000/',
     GRAFANA_COOKIE_SECURE: previous.GRAFANA_COOKIE_SECURE || 'false',
     GRAFANA_ALLOWED_ORIGINS: previous.GRAFANA_ALLOWED_ORIGINS || '',
-    ...notifications,
     ...(stackDirectory ? { OBS_STACK_DIR: stackDirectory } : {}),
   }
   fs.writeFileSync(envFile, Object.entries(env).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join('\n') + '\n', { mode: 0o600 })

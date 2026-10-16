@@ -10,10 +10,10 @@ print_help() {
   检查本地开发环境是否满足仓库脚本与门禁运行要求
 
 检查项:
-  - 必需命令: git / bash / n / node / pnpm / go / lsof
+  - 必需命令: git / bash / node / pnpm / go
   - 可选命令: gitleaks / shellcheck / golangci-lint / yamllint / shfmt / govulncheck
   - hooks 路径与关键脚本存在性
-  - n 管理的 Node 与 .n-node-version、web/package.json engines.node 一致性
+  - Node 版本与版本文件（.n-node-version/.node-version/.nvmrc）一致性
   - pnpm 版本与 web/package.json packageManager 一致性
   - Go 版本满足 server/go.mod toolchain / go directive
   - 仓库扫描脚本存在性（scripts/project-scan.sh）
@@ -55,9 +55,6 @@ print_cmd_version() {
     ;;
   node)
     node -v
-    ;;
-  n)
-    n --version
     ;;
   pnpm)
     pnpm -v
@@ -121,7 +118,7 @@ semver_ge() {
 }
 
 echo "[doctor] 检查必需命令"
-for cmd in git bash n node pnpm go lsof; do
+for cmd in git bash node pnpm go; do
   if command -v "$cmd" >/dev/null 2>&1; then
     printf "  - [OK] %s: " "$cmd"
     print_cmd_version "$cmd"
@@ -135,39 +132,30 @@ echo "[doctor] 检查必需版本"
 if ! require_project_bash doctor; then
   missing=1
 fi
+node_version_files=()
 expected_node=""
-if [[ ! -f .n-node-version ]]; then
-  echo "  - [缺失] Node 版本锁文件 .n-node-version"
-  missing=1
-else
-  expected_node="$(read_trimmed_file .n-node-version)"
-  if [[ ! "$expected_node" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-    echo "  - [错误] .n-node-version 必须固定完整的 Node 版本"
-    missing=1
-  elif command -v node >/dev/null 2>&1; then
-    current_node="$(node -p 'process.versions.node')"
-    if [[ "$current_node" == "$expected_node" ]]; then
-      echo "  - [OK] Node: ${current_node}（n / .n-node-version）"
-    else
-      echo "  - [错误] Node 当前 ${current_node}，期望 ${expected_node}；请在仓库根目录运行 n auto 后重新检查"
+for f in .n-node-version .node-version .nvmrc; do
+  if [[ -f "$f" ]]; then
+    node_version_files+=("$f")
+    file_node="$(normalize_version "$(read_trimmed_file "$f")")"
+    if [[ -z "$expected_node" ]]; then
+      expected_node="$file_node"
+    elif [[ "$file_node" != "$expected_node" ]]; then
+      echo "  - [错误] Node 版本锁不一致：${f}=${file_node}，期望 ${expected_node}"
       missing=1
     fi
   fi
-fi
-
-for f in .node-version .nvmrc; do
-  if [[ -e "$f" ]]; then
-    echo "  - [错误] 存在重复的 Node 版本配置 ${f}；项目只使用 n 与 .n-node-version"
-    missing=1
-  fi
 done
 
-if [[ -n "$expected_node" && -f web/package.json ]] && command -v node >/dev/null 2>&1; then
-  node_engine="$(node -p 'require("./web/package.json").engines?.node || ""')"
-  if [[ "$node_engine" == "${expected_node%.*}.x" ]]; then
-    echo "  - [OK] Node engines: ${node_engine}（web/package.json）"
+if [[ "${#node_version_files[@]}" -eq 0 ]]; then
+  echo "  - [缺失] Node 版本锁文件（.n-node-version/.node-version/.nvmrc）"
+  missing=1
+elif command -v node >/dev/null 2>&1; then
+  current_node="$(normalize_version "$(node -v)")"
+  if [[ "$current_node" == "$expected_node" ]]; then
+    echo "  - [OK] Node: ${current_node}（${node_version_files[*]}）"
   else
-    echo "  - [错误] web/package.json engines.node=${node_engine}，期望 ${expected_node%.*}.x"
+    echo "  - [错误] Node 当前 ${current_node}，版本锁期望 ${expected_node}（${node_version_files[*]}）"
     missing=1
   fi
 fi
@@ -250,6 +238,8 @@ required_files=(
   .githooks/pre-push
   .githooks/commit-msg
   .n-node-version
+  .node-version
+  .nvmrc
   scripts/lib/bash.sh
   web/package.json
   server/go.mod

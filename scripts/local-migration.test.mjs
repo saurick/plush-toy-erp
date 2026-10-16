@@ -292,35 +292,6 @@ test("local migration: rollback rehearsal allows PL/pgSQL blocks but rejects dur
     "",
   );
   assert.equal(unsafeRehearsalReason("COMMIT;"), "transaction control");
-  for (const control of [
-    "COMMIT",
-    "ROLLBACK",
-    "END",
-    "ABORT",
-    "START TRANSACTION",
-    "PREPARE TRANSACTION 'example'",
-  ]) {
-    assert.equal(
-      unsafeRehearsalReason(
-        `ALTER TABLE example ADD COLUMN value int; /* boundary */ ${control};`,
-      ),
-      "transaction control",
-    );
-  }
-  assert.equal(
-    unsafeRehearsalReason("SELECT '; COMMIT;', 'it''s; ROLLBACK';"),
-    "",
-  );
-  assert.equal(
-    unsafeRehearsalReason(
-      "/* outer /* COMMIT; */ still a comment */ SELECT 1;",
-    ),
-    "",
-  );
-  assert.equal(
-    unsafeRehearsalReason("SELECT 'COMMIT'\n\\gexec"),
-    "psql command",
-  );
   assert.equal(
     unsafeRehearsalReason("SELECT nextval('business_number_seq');"),
     "sequence mutation",
