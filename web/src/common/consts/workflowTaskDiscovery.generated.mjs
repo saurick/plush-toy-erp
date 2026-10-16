@@ -14,14 +14,372 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     key: 'collaboration',
     label: '协同跟进',
   })]),
-  exception_approval: Object.freeze({
-    condition: '业务提出方案，按正式生产异常流程交审批责任人；申请人与审批人分离。',
-    label: '质量异常方案审批',
-    passed: '仓库或生产执行获批方案，返工或重做完成后重新清点与 IQC 复检。',
-    rejected: '交业务重新决定方案，原不合格批次继续受阻。',
-  }),
-  exception_flow: Object.freeze(['IQC 记录不合格', '业务决定处置方案', '按规则审批', '仓库 / 生产执行', '回货点数与 IQC 复检', '合格后回到原环节继续主链']),
-  exception_options: Object.freeze(['原厂返工', '换厂返工', '补料重做', '报废放弃']),
+  exception_guides: Object.freeze([Object.freeze({
+    business_chain: 'purchase_quality_disposition',
+    entry_stages: Object.freeze(['incoming_quality']),
+    key: 'purchase_rejection',
+    label: '首次来料不合格',
+    plans: Object.freeze([Object.freeze({
+      closure: '退厂记录生效且实物交接完成；全部拒收量处置后，采购异常待办结束。退厂不形成合格入库。',
+      key: 'return_to_vendor',
+      label: '退厂',
+      recovery: '部分处置后剩余量仍待处理。撤销处置会恢复相关待办；不会抹掉原拒收结论。',
+      steps: Object.freeze([Object.freeze({
+        key: 'arrange',
+        label: '采购登记退厂范围',
+        result: '联系供应商并按拒收来源行登记退厂数量和原因；累计处置量不得超过来源。',
+        role_keys: Object.freeze(['purchase']),
+      }), Object.freeze({
+        key: 'return',
+        label: '仓库隔离与实物交接',
+        result: '按退厂记录交接问题材料，保留原拒收和处置记录。',
+        role_keys: Object.freeze(['warehouse']),
+      })]),
+    }), Object.freeze({
+      closure: '仓库实点确认后，原拒收量才计入已处置；新货检验通过并正式入库才完成补换业务。原异常待办结束不表示新货已入库。',
+      key: 'replacement',
+      label: '供应商补换',
+      recovery: '未到货保持仓库待办；实点与本笔数量不符时先取消本笔，按实际数量重新登记。再次不合格按新收货来源处理；保留每轮来源、数量和检验结果。',
+      steps: Object.freeze([Object.freeze({
+        key: 'arrange',
+        label: '采购登记补换',
+        result: '采购明确补换数量与交期并登记方案，自动交仓库办理补换到货点数；此时不生成新收货或待检记录。',
+        role_keys: Object.freeze(['purchase']),
+      }), Object.freeze({
+        key: 'arrival',
+        label: '仓库登记新到货',
+        result: '补换实物到货后，仓库填写实点数量并确认；数量须与本笔方案一致，随后建立新收货、批次和 IQC 待检记录。',
+        role_keys: Object.freeze(['warehouse']),
+      }), Object.freeze({
+        key: 'reinspect',
+        label: 'IQC 重新检验',
+        result: '新到货重新判定质量；原拒收记录不覆盖。',
+        role_keys: Object.freeze(['quality']),
+      }), Object.freeze({
+        key: 'inbound',
+        label: '仓库确认合格入库',
+        result: '新收货满足检验门禁后，独立办理正式入库，库存才增加。',
+        role_keys: Object.freeze(['warehouse']),
+      })]),
+    })]),
+    source: '采购到货已经检验不合格，尚未正式入库。采购与仓库按精确来源行和数量处理；未处置部分继续保留。',
+    source_refs: Object.freeze(['docs/workflow/业务与协同流程地图.md', 'server/internal/data/purchase_rejection_disposition_repo.go']),
+    stages: Object.freeze(['incoming_exception', 'purchase_count']),
+    steps: Object.freeze([Object.freeze({
+      key: 'inspect',
+      label: 'IQC 登记拒收',
+      result: '保留来料检查结果与原因，阻断原收货入库；采购收到来料异常待办。',
+      role_keys: Object.freeze(['quality']),
+    })]),
+  }), Object.freeze({
+    approval: Object.freeze({
+      condition: '核对来源、方案、数量和原因；申请人与审批人分离，实际责任人以有效流程配置为准。批准只形成处置决定，执行结果由后续动作记录。',
+      label: '方案审批',
+      rejected: '拒绝后本次审批结束，原问题与不合格记录保留；业务按原因重新提出方案，不能直接执行被拒绝的方案。',
+      role: '有效流程指定的审批人',
+      role_keys: Object.freeze(['boss']),
+      withdrawal: '申请人仅可按异常单当前状态取消；已执行或已有下游依赖时，由正式规则决定是否允许冲正，不能直接撤销已发生的业务结果。',
+    }),
+    business_chain: 'production_exception',
+    entry_stages: Object.freeze(['cutting_quality', 'shell_quality', 'finished_quality']),
+    key: 'production_quality',
+    label: '裁片、皮套与成品不合格',
+    plans: Object.freeze([Object.freeze({
+      closure: '返工批次完成、点数和所需复检通过后，继续后续主链。',
+      key: 'original_rework',
+      label: '原厂 / 本厂返工',
+      recovery: '复检再次不合格时，由业务针对新一轮问题重新提出方案。',
+      steps: Object.freeze([Object.freeze({
+        key: 'execute',
+        label: '使用原货建立返工批次',
+        result: '批准后由执行岗位建立关联返工子批；沿用原厂商和原工序，不能重开原不合格记录。',
+        role: '生产 / 仓库（按库存状态分派）',
+        role_keys: Object.freeze(['production', 'warehouse']),
+      }), Object.freeze({
+        key: 'count',
+        label: '回货或完工点数',
+        result: '外发回货由仓库按整批实点，内制由生产记录完工；保留与原异常批次的关联。',
+        role_keys: Object.freeze(['warehouse', 'production']),
+      }), Object.freeze({
+        key: 'reinspect',
+        label: 'IQC 重新检验',
+        result: '形成新的检验记录；合格后才进入原工序之后的后续主链，原不合格证据保留。',
+        role_keys: Object.freeze(['quality']),
+      })]),
+    }), Object.freeze({
+      closure: '接手厂商返工后的回货点数与复检通过，才继续后续主链。',
+      key: 'switch_rework',
+      label: '换厂返工',
+      recovery: '接手厂商必须不同于原厂；复检失败重新提方案，不覆盖上一轮处理。',
+      steps: Object.freeze([Object.freeze({
+        key: 'execute',
+        label: '交其他厂商使用原货返工',
+        result: '业务选定其他加工厂，批准后交接原货并建立关联返工子批；保留原厂商与接手厂商来源。',
+        role: '生产 / 仓库（按库存状态分派）',
+        role_keys: Object.freeze(['production', 'warehouse']),
+      }), Object.freeze({
+        key: 'count',
+        label: '回货或完工点数',
+        result: '外发回货由仓库按整批实点，内制由生产记录完工；保留与原异常批次的关联。',
+        role_keys: Object.freeze(['warehouse', 'production']),
+      }), Object.freeze({
+        key: 'reinspect',
+        label: 'IQC 重新检验',
+        result: '形成新的检验记录；合格后才进入原工序之后的后续主链，原不合格证据保留。',
+        role_keys: Object.freeze(['quality']),
+      })]),
+    }), Object.freeze({
+      closure: '新批次完成相应生产、点数和检验后继续主链；原问题批次保持终止记录。',
+      key: 'remake',
+      label: '补料重做',
+      recovery: '重新用料、加工和检验分别留痕；新批再次不合格时另提方案。',
+      steps: Object.freeze([Object.freeze({
+        key: 'execute',
+        label: '终止原批并建立重做需求',
+        result: '按获批方案终止原问题批次，依冻结用料要求生成新的裁片需求，保留原异常关联。',
+        role: '生产 / 仓库（按库存状态分派）',
+        role_keys: Object.freeze(['production', 'warehouse']),
+      }), Object.freeze({
+        key: 'issue',
+        label: '重新安排合同与发料',
+        result: '明确重做厂商，办理新合同与新发料；从裁片开始重新生产，不能只把原批改为合格。',
+        role_keys: Object.freeze(['production', 'purchase', 'warehouse']),
+      }), Object.freeze({
+        key: 'count',
+        label: '回货或完工点数',
+        result: '外发回货由仓库按整批实点，内制由生产记录完工；保留与原异常批次的关联。',
+        role_keys: Object.freeze(['warehouse', 'production']),
+      }), Object.freeze({
+        key: 'reinspect',
+        label: 'IQC 重新检验',
+        result: '形成新的检验记录；合格后才进入原工序之后的后续主链，原不合格证据保留。',
+        role_keys: Object.freeze(['quality']),
+      })]),
+    }), Object.freeze({
+      closure: '本批报废执行成功后终止流转，不再安排本批回货、复检或恢复生产。订单交付缺口保留，由业务另行决定是否补做。',
+      key: 'scrap',
+      label: '报废放弃',
+      recovery: '批准不等于已报废。若执行错误，按正式冲正与下游依赖检查处理；不能用任务完成或直接改质量结论恢复本批。',
+      steps: Object.freeze([Object.freeze({
+        key: 'execute',
+        label: '实际执行报废',
+        result: '对批准范围执行报废，记录原批次、数量、原因和执行结果；涉及库存时由仓库办理对应库存处置。',
+        role: '生产 / 仓库（按库存状态分派）',
+        role_keys: Object.freeze(['production', 'warehouse']),
+      })]),
+    }), Object.freeze({
+      closure: '获批让步已正式执行；后续必需的工序、其他检验关口与包装仍按原规则办理。',
+      key: 'concession',
+      label: '在制品让步',
+      recovery: '让步不是补录合格。未批准或未执行时继续受阻；有下游依赖时不得直接撤销结果。',
+      steps: Object.freeze([Object.freeze({
+        key: 'execute',
+        label: '执行获批让步',
+        result: '按批准范围显式执行让步并保留原不合格结论与原因；只有执行成功后才能解除对应在制批次门禁。',
+        role: '生产 / 仓库（按库存状态分派）',
+        role_keys: Object.freeze(['production', 'warehouse']),
+      })]),
+    })]),
+    source: '生产工序或路线回货的批次检验不合格。业务提出方案，审批后按是否涉及已入库库存，交生产或仓库执行。',
+    source_refs: Object.freeze(['docs/workflow/业务与协同流程地图.md', 'server/internal/biz/production_exception_decision.go', 'server/internal/data/production_exception_decision_repo.go', 'server/internal/biz/exception_approval_branch_policy.go']),
+    stages: Object.freeze(['cutting_exception', 'sewing_exception', 'handwork_exception', 'production_exception']),
+    steps: Object.freeze([Object.freeze({
+      key: 'inspect',
+      label: '记录不合格批次',
+      result: 'IQC 保留原批次、工序、数量、检查结果与原因；不合格批次停止进入后续工序。',
+      role_keys: Object.freeze(['quality']),
+    }), Object.freeze({
+      key: 'propose',
+      label: '业务提出处理方案',
+      result: '选择返工、重做、报废或在制品让步，明确来源、数量与原因；换厂和重做还需明确接手厂商。',
+      role_keys: Object.freeze(['sales']),
+    })]),
+  }), Object.freeze({
+    business_chain: 'outsourcing_quality_disposition',
+    entry_stages: Object.freeze([]),
+    key: 'outsourcing_rejection',
+    label: '委外产品回货拒收',
+    plans: Object.freeze([Object.freeze({
+      closure: '全部拒收数量均已完成有效处置，正式出库与实物交接完成；部分退回不关闭整笔异常，后续新回货仍须独立检验与入库。',
+      key: 'return_to_vendor',
+      label: '返厂处置',
+      recovery: '撤销已生效返厂必须按正式冲正和依赖检查恢复库存；后续回货继续独立登记、检验。',
+      steps: Object.freeze([Object.freeze({
+        key: 'register',
+        label: '登记返厂数量与原因',
+        result: '引用原拒收记录登记返厂范围；累计有效处置不能超过原回货数量，部分退回仍保留剩余待处置量。',
+        role_keys: Object.freeze(['quality']),
+      }), Object.freeze({
+        key: 'return',
+        label: '仓库办理返厂出库',
+        result: '确认处置后形成正式库存出库流水；有有效应付依赖时须先处理财务影响，不能直接返厂。',
+        role_keys: Object.freeze(['warehouse']),
+      })]),
+    })]),
+    source: '已过账的委外产品回货被检验拒收，且能够追溯到受影响批次。生产路线回货的返工、重做与报废，使用“裁片、皮套与成品不合格”方案。',
+    source_refs: Object.freeze(['server/internal/biz/outsourcing_return_disposition.go', 'server/internal/data/outsourcing_return_disposition_repo.go']),
+    stages: Object.freeze([]),
+    steps: Object.freeze([Object.freeze({
+      key: 'inspect',
+      label: '品质确认拒收来源',
+      result: '核对已过账回货、正式拒收检验与受影响批次；来源不完整时不能登记处置。',
+      role_keys: Object.freeze(['quality']),
+    })]),
+  }), Object.freeze({
+    business_chain: 'purchase_posting_corrections',
+    entry_stages: Object.freeze([]),
+    key: 'posted_purchase',
+    label: '已入库后的退货与纠正',
+    plans: Object.freeze([Object.freeze({
+      closure: '采购退货已过账，库存和相关财务影响核对完成；每项结果以正式记录为准。',
+      key: 'return',
+      label: '已入库退货',
+      recovery: '退货取消走正式反向处理，受下游与库存门禁约束；不把首次到料拒收用于抵销已入库事实。',
+      steps: Object.freeze([Object.freeze({
+        key: 'execute',
+        label: '采购与仓库办理正式退货',
+        result: '从原入库来源建立并确认退货，形成可追溯的反向库存流水；不得删除原入库。',
+        role_keys: Object.freeze(['purchase', 'warehouse']),
+      }), Object.freeze({
+        key: 'finance',
+        label: '财务核对后续影响',
+        result: '按来源核对已有应付及关联业务，分别办理财务所需纠正。',
+        role_keys: Object.freeze(['finance']),
+      })]),
+    }), Object.freeze({
+      closure: '入库调整正式生效，库存变化与相关业务核对一致；原入库记录保留。',
+      key: 'adjust',
+      label: '入库数量调整',
+      recovery: '取消调整须按正式规则生成对应反向结果；已有下游依赖时不能直接改回原数量。',
+      steps: Object.freeze([Object.freeze({
+        key: 'execute',
+        label: '采购与仓库办理入库调整',
+        result: '按原来源行登记调整数量与原因，通过检查后形成独立调整流水。',
+        role_keys: Object.freeze(['purchase', 'warehouse']),
+      }), Object.freeze({
+        key: 'finance',
+        label: '财务核对调整影响',
+        result: '核对调整后的来源与已有应付，分别处理财务影响。',
+        role_keys: Object.freeze(['finance']),
+      })]),
+    })]),
+    source: '原采购入库已经正式过账。数量或质量问题通过来源退货或入库调整纠正，原入库和历史检验继续保留。',
+    source_refs: Object.freeze(['server/internal/data/purchase_return_repo.go', 'server/internal/data/purchase_receipt_adjustment_repo.go', 'docs/workflow/业务与协同流程地图.md']),
+    stages: Object.freeze([]),
+    steps: Object.freeze([Object.freeze({
+      key: 'confirm',
+      label: '核对原入库与影响范围',
+      result: '定位已过账入库、来源行、批次、剩余数量与当前依赖，明确退货还是数量调整。',
+      role_keys: Object.freeze(['purchase', 'warehouse']),
+    })]),
+  }), Object.freeze({
+    approval: Object.freeze({
+      condition: '核对原物料需求、超领数量和原因；申请人与审批人分离，实际责任人以有效流程配置为准。批准只形成可用额度，不直接发料或扣减库存。',
+      label: '方案审批',
+      rejected: '拒绝后不形成超领额度，原用料范围不变；需要补充原因或调整数量时重新申请。',
+      role: '有效流程指定的审批人',
+      role_keys: Object.freeze(['boss']),
+      withdrawal: '申请人按异常单当前状态取消；额度已经用于正式领料时，不能直接取消或冲正批准。',
+    }),
+    business_chain: 'production_exception',
+    entry_stages: Object.freeze([]),
+    key: 'over_issue',
+    label: '生产超领材料',
+    plans: Object.freeze([Object.freeze({
+      closure: '本次实际领料成功且额度消费有记录；审批通过不等于已经发料，未用额度仍按原决定管理。',
+      key: 'allowance',
+      label: '审批额度后领料',
+      recovery: '额度已被使用时不能直接取消批准；领料纠错遵循原领料与库存的正式规则。',
+      steps: Object.freeze([Object.freeze({
+        key: 'issue',
+        label: '仓库按获批额度办理领料',
+        result: '批准只增加可用额度，实际领料仍走正常生产领料入口，按来源物料需求消费额度并记录库存出库。',
+        role_keys: Object.freeze(['warehouse']),
+      })]),
+    })]),
+    source: '生产用料超过原核定范围。先申请超领额度，再通过正常领料办理实际库存出库。',
+    source_refs: Object.freeze(['server/internal/biz/production_exception_decision.go', 'server/internal/biz/exception_approval_branch_policy.go']),
+    stages: Object.freeze(['production_exception']),
+    steps: Object.freeze([Object.freeze({
+      key: 'request',
+      label: '生产提出超领申请',
+      result: '引用原物料需求，说明超领数量和原因；不能以质量批次代替物料需求来源。',
+      role_keys: Object.freeze(['production']),
+    })]),
+  }), Object.freeze({
+    business_chain: 'finance_payment_and_reversal',
+    entry_stages: Object.freeze(['customer_advance', 'supplier_advance', 'financial_settlement']),
+    key: 'finance_settlement',
+    label: '款项、抵扣与退款异常',
+    plans: Object.freeze([Object.freeze({
+      closure: '退款已确认，原款、抵扣和剩余应收应付分别核清；部分退款继续保留余额。',
+      key: 'refund',
+      label: '取消 / 多收多付退款',
+      recovery: '退款登记错误时冲销该退款单，恢复原款可用余额并保留审计。',
+      steps: Object.freeze([Object.freeze({
+        key: 'release_balance',
+        label: '财务核对可退余额',
+        result: '已抵扣金额不能直接退款；需要退货或调减时，先撤销对应抵扣，再分别办理应收应付纠正。',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        key: 'refund_request',
+        label: '财务登记退款并提交审批',
+        result: '关联原款，说明原因、金额、账户与实际退款凭据；方向与原款相反，往来方及币种不变。',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        key: 'refund_approve',
+        label: '有效审批人审核退款',
+        result: '登记人与审批人分离，实际审批岗位以有效配置为准；驳回不减少余额。',
+        role_keys: Object.freeze(['boss']),
+      }), Object.freeze({
+        key: 'refund_execute',
+        label: '财务确认实际退款',
+        result: '完成执行待办后显式确认，服务端重新核对可退余额；确认后记录已退款并减少可用余额。',
+        role_keys: Object.freeze(['finance']),
+      })]),
+    }), Object.freeze({
+      closure: '正确来源抵扣完成，原错误与更正均可追溯。',
+      key: 'allocation',
+      label: '抵扣来源或金额错误',
+      recovery: '撤销或抵扣结果不明时重新读回原记录，同一请求不重复记账。',
+      steps: Object.freeze([Object.freeze({
+        key: 'unallocate',
+        label: '财务撤销原抵扣',
+        result: '填写原因，追加反向抵扣，恢复应收应付与款项可用余额；不改变实际收付。',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        key: 'reallocate',
+        label: '财务重新抵扣正确来源',
+        result: '只能抵扣同往来方、币种和订单的正式来源；禁止重复和超额抵扣。',
+        role_keys: Object.freeze(['finance']),
+      })]),
+    }), Object.freeze({
+      closure: '错误记录已冲销，真实收付有正确凭据及正式记录。',
+      key: 'cash_record',
+      label: '实际收付登记错误',
+      recovery: '冲销用于纠正登记，真实资金退回必须单独登记退款。',
+      steps: Object.freeze([Object.freeze({
+        key: 'cash_reverse',
+        label: '财务核对并冲销错误款项',
+        result: '填写原因，恢复关联应收应付余额；有待处理或已确认退款时先处理退款依赖。',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        key: 'cash_correct',
+        label: '财务按真实凭据重新登记',
+        result: '正确款项重新经过有效审批与执行，保留原错误记录。',
+        role_keys: Object.freeze(['finance']),
+      })]),
+    })]),
+    source: '客户或供应商款项已经登记，发生订单取消、退货、多收多付或抵扣错误。先核对原款及余额，再按对应业务动作处理。',
+    source_refs: Object.freeze(['docs/finance/财务业务与核销.md', 'server/internal/data/finance_payment_balance_repo.go']),
+    stages: Object.freeze(['payment']),
+    steps: Object.freeze([Object.freeze({
+      key: 'review',
+      label: '业务或采购提供差异，财务核对原款',
+      result: '核对原订单、实际收付款、已抵扣与已退款，区分真实退款和登记错误。',
+      role_keys: Object.freeze(['sales', 'purchase', 'finance']),
+    })]),
+  })]),
   fulfillment_flow: Object.freeze([Object.freeze({
     approvals: Object.freeze([Object.freeze({
       condition: '按有效配置的审批人及金额条件办理。',
@@ -42,6 +400,189 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['sales', 'engineering', 'boss', 'finance']),
     stage: 'sales_order',
     stages: Object.freeze(['sales_order', 'engineering', 'engineering_data']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'prepare',
+        to: 'order_approval',
+      }), Object.freeze({
+        from: 'prepare',
+        label: '可并行',
+        to: 'engineering',
+      }), Object.freeze({
+        from: 'order_approval',
+        label: '通过，订单生效',
+        to: 'ready',
+      }), Object.freeze({
+        from: 'engineering',
+        label: '样品确认、BOM 启用',
+        to: 'ready',
+      }), Object.freeze({
+        from: 'ready',
+        to: 'material_submit',
+      }), Object.freeze({
+        from: 'material_submit',
+        to: 'boss_review',
+      }), Object.freeze({
+        from: 'boss_review',
+        label: '通过',
+        to: 'finance_review',
+      }), Object.freeze({
+        from: 'finance_review',
+        label: '通过',
+        to: 'purchase',
+      }), Object.freeze({
+        from: 'order_approval',
+        label: '未通过',
+        to: 'reject_order',
+      }), Object.freeze({
+        from: 'boss_review',
+        label: '未通过',
+        to: 'revise',
+      }), Object.freeze({
+        from: 'finance_review',
+        label: '未通过',
+        to: 'revise',
+      }), Object.freeze({
+        from: 'revise',
+        label: '重新申请',
+        to: 'material_submit',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'prepare',
+        label: '接单与资料准备',
+        role_keys: Object.freeze(['sales', 'engineering']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval:0']),
+        key: 'order_approval',
+        label: '销售订单审批',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'engineering',
+        label: '工程资料、BOM 与打样',
+        role_keys: Object.freeze(['engineering']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'ready',
+        label: '订单、样品、BOM 就绪',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'material_submit',
+        label: '工程提交用料',
+        role_keys: Object.freeze(['engineering']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval:1']),
+        key: 'boss_review',
+        label: '老板审核用料',
+        role_keys: Object.freeze(['boss']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval:1']),
+        key: 'finance_review',
+        label: '另一位财务复核',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_passed:1']),
+        key: 'purchase',
+        label: '按厂商生成采购单',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_rejected:0']),
+        key: 'reject_order',
+        label: '取消本次已提交订单',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_rejected:1']),
+        key: 'revise',
+        label: '工程修改并重新提交',
+        role_keys: Object.freeze(['engineering']),
+      })]),
+      summary: '订单审批与工程准备可并行；订单、样品和 BOM 满足条件后，再提交工程用料审核。',
+    }),
+  }), Object.freeze({
+    approvals: Object.freeze([Object.freeze({
+      condition: '财务按订单、金额、账户摘要和凭据登记并发起；交有效流程指定的审批人，登记人与审批人分离。',
+      label: '收付款审批',
+      passed: '交财务执行岗位，完成执行待办后显式确认实际收付。',
+      rejected: '保留拒绝原因，不登记实际收付；核对后重新申请。',
+    })]),
+    branch: true,
+    business_chain: 'finance_payment_and_reversal',
+    exception: '未到账继续跟进；订单取消后由财务办理实际退款，不能靠取消订单或完成任务消掉首款。',
+    handoffs: Object.freeze(['订单约定需提前收付时办理；业务记录订单付款约定并跟进客户；财务核实实际到账凭据，关联已生效销售订单登记预收款。', '有效审批人通过后，财务完成执行待办并确认实际收款；订单条件、原表定金标记不代表已经到账。', '待抵扣余额保留在原订单；是否允许生产或发货按订单约定和正式放行审批核对。']),
+    label: '客户首款与分期收款',
+    result: '已到账的首款、分期款或发货前尾款形成订单预收余额，实际出货后再抵扣应收。',
+    role: '业务 / 财务 / 审批责任人',
+    role_keys: Object.freeze(['sales', 'finance', 'boss']),
+    stage: 'customer_advance',
+    stages: Object.freeze(['payment']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'basis',
+        label: '约定需要首款',
+        to: 'register',
+      }), Object.freeze({
+        from: 'register',
+        to: 'approval',
+      }), Object.freeze({
+        from: 'approval',
+        label: '通过',
+        to: 'execute',
+      }), Object.freeze({
+        from: 'execute',
+        label: '显式确认',
+        to: 'actual',
+      }), Object.freeze({
+        from: 'actual',
+        to: 'balance',
+      }), Object.freeze({
+        from: 'approval',
+        label: '未通过',
+        to: 'rejected',
+      }), Object.freeze({
+        from: 'rejected',
+        label: '重新申请',
+        to: 'register',
+      }), Object.freeze({
+        from: 'balance',
+        label: '发生退款或错误',
+        to: 'exception',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'basis',
+        label: '核对客户付款约定',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'register',
+        label: '登记订单预收款',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval:0']),
+        key: 'approval',
+        label: '有效审批人审批',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_passed:0']),
+        key: 'execute',
+        label: '财务办理执行待办',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1', 'result']),
+        key: 'actual',
+        label: '确认实际收款',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['result', 'handoff:2']),
+        key: 'balance',
+        label: '保留订单预收余额',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_rejected:0']),
+        key: 'rejected',
+        label: '核对原因后重新申请',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['exception']),
+        key: 'exception',
+        label: '退款与登记纠正',
+      })]),
+      summary: '按订单约定办理首款；审批、实际收付和后续抵扣分别核对。',
+    }),
   }), Object.freeze({
     approvals: Object.freeze([Object.freeze({
       condition: '仅独立人工采购单按有效审批配置办理；用料生成的已批准采购单不重复审批。',
@@ -57,6 +598,140 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['purchase', 'boss']),
     stage: 'purchasing',
     stages: Object.freeze(['purchasing']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'source',
+        label: '用料生成',
+        to: 'generated',
+      }), Object.freeze({
+        from: 'source',
+        label: '独立人工单',
+        to: 'approval',
+      }), Object.freeze({
+        from: 'generated',
+        label: '不重复审批',
+        to: 'follow',
+      }), Object.freeze({
+        from: 'approval',
+        label: '通过',
+        to: 'follow',
+      }), Object.freeze({
+        from: 'approval',
+        label: '未通过',
+        to: 'rejected',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'source',
+        label: '核对采购单来源',
+        role_keys: Object.freeze(['purchase']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'generated',
+        label: '用料生成：已批准',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval:0']),
+        key: 'approval',
+        label: '独立采购订单审批',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:0', 'result']),
+        key: 'follow',
+        label: '采购下单与到货跟进',
+        role_keys: Object.freeze(['purchase']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_rejected:0']),
+        key: 'rejected',
+        label: '取消本次已提交采购单',
+      })]),
+      summary: '用料生成的采购单已经批准；只有独立人工采购单进入采购审批。',
+    }),
+  }), Object.freeze({
+    approvals: Object.freeze([Object.freeze({
+      condition: '财务按订单、金额、账户摘要和凭据登记并发起；交有效流程指定的审批人，登记人与审批人分离。',
+      label: '收付款审批',
+      passed: '交财务执行岗位，完成执行待办后显式确认实际收付。',
+      rejected: '保留拒绝原因，不登记实际收付；核对后重新申请。',
+    })]),
+    branch: true,
+    business_chain: 'finance_payment_and_reversal',
+    exception: '未付款、未到货、退货或取消分别跟进；供应商退回款项须由财务登记实际退款到账。',
+    handoffs: Object.freeze(['订单约定需提前收付时办理；采购或合同经办人提供付款依据，生产提供加工安排；财务关联采购订单或委外合同登记预付款。', '有效审批人核对付款用途、金额及凭据；通过后交财务确认实际付款。', '仓库与品质继续按到货、检验、入库或回货办理；预付款不代表物料已经到达，也不直接形成应付。']),
+    label: '采购及委外首付款',
+    result: '实际预付款关联已批准采购订单或已确认委外合同，到货或回货形成应付后分批抵扣。',
+    role: '采购 / 生产 / 财务 / 审批责任人',
+    role_keys: Object.freeze(['purchase', 'production', 'finance', 'boss']),
+    stage: 'supplier_advance',
+    stages: Object.freeze(['payment']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'basis',
+        label: '约定需要首款',
+        to: 'register',
+      }), Object.freeze({
+        from: 'register',
+        to: 'approval',
+      }), Object.freeze({
+        from: 'approval',
+        label: '通过',
+        to: 'execute',
+      }), Object.freeze({
+        from: 'execute',
+        label: '显式确认',
+        to: 'actual',
+      }), Object.freeze({
+        from: 'actual',
+        to: 'balance',
+      }), Object.freeze({
+        from: 'approval',
+        label: '未通过',
+        to: 'rejected',
+      }), Object.freeze({
+        from: 'rejected',
+        label: '重新申请',
+        to: 'register',
+      }), Object.freeze({
+        from: 'balance',
+        label: '发生退款或错误',
+        to: 'exception',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'basis',
+        label: '核对采购或委外约定',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'register',
+        label: '登记订单预付款',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval:0']),
+        key: 'approval',
+        label: '有效审批人审批',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_passed:0']),
+        key: 'execute',
+        label: '财务办理执行待办',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1', 'result']),
+        key: 'actual',
+        label: '确认实际付款',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['result', 'handoff:2']),
+        key: 'balance',
+        label: '后续按订单抵扣',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_rejected:0']),
+        key: 'rejected',
+        label: '核对原因后重新申请',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['exception']),
+        key: 'exception',
+        label: '退款与登记纠正',
+      })]),
+      summary: '按订单约定办理首款；审批、实际收付和后续抵扣分别核对。',
+    }),
   }), Object.freeze({
     business_chain: 'purchase_to_inventory',
     label: '到货点数',
@@ -75,6 +750,38 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['quality', 'warehouse', 'purchase']),
     stage: 'incoming_quality',
     stages: Object.freeze(['incoming_quality', 'material_inbound']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'inspect',
+        label: '合格',
+        to: 'inbound',
+      }), Object.freeze({
+        from: 'inspect',
+        label: '不合格',
+        to: 'exception',
+      }), Object.freeze({
+        from: 'exception',
+        label: '补换后重新点数送检',
+        to: 'inspect',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'inspect',
+        label: 'IQC 来料检验',
+        role_keys: Object.freeze(['quality']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1', 'result']),
+        key: 'inbound',
+        label: '仓库确认材料入库',
+        role_keys: Object.freeze(['warehouse']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['exception']),
+        key: 'exception',
+        label: '采购退厂或补换',
+        role_keys: Object.freeze(['purchase', 'warehouse']),
+      })]),
+      summary: '合格后由仓库确认入库；不合格进入采购退厂或补换，补换材料重新点数和检验。',
+    }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     handoffs: Object.freeze(['PMC 安排排期，生产经理提出加工材料、厂商及回货要求。', '有合同权限的财务兼采购经办人确认加工合同。', '仓库核对可用材料、批次和数量，实际发料至委外厂商裁片。']),
@@ -84,6 +791,33 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['pmc', 'production', 'finance', 'purchase', 'warehouse']),
     stage: 'cutting_issue',
     stages: Object.freeze(['production_schedule', 'outsourcing_contract', 'cutting_execute', 'cutting_issue']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'plan',
+        to: 'contract',
+      }), Object.freeze({
+        from: 'contract',
+        label: '合同与材料满足条件',
+        to: 'issue',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'plan',
+        label: '安排加工与回货要求',
+        role_keys: Object.freeze(['pmc', 'production']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'contract',
+        label: '确认加工合同',
+        role_keys: Object.freeze(['finance', 'purchase']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:2', 'result']),
+        key: 'issue',
+        label: '仓库核对并实际发料',
+        role_keys: Object.freeze(['warehouse']),
+      })]),
+      summary: '排期、合同与材料准备满足后，由仓库实际发料至委外厂商裁片。',
+    }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     label: '裁片回货点数',
@@ -101,6 +835,33 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['quality', 'sales']),
     stage: 'cutting_quality',
     stages: Object.freeze(['cutting_quality']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'inspect',
+        label: '合格',
+        to: 'continue',
+      }), Object.freeze({
+        from: 'inspect',
+        label: '不合格',
+        to: 'exception',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['result']),
+        key: 'inspect',
+        label: 'IQC 检验并记录结论',
+        role_keys: Object.freeze(['quality']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['result']),
+        key: 'continue',
+        label: '合格：进入车缝',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['exception']),
+        key: 'exception',
+        label: '业务提出异常处置方案',
+        role_keys: Object.freeze(['sales']),
+      })]),
+      summary: '检验合格才继续；不合格暂停后续工序，按正式异常方案办理。',
+    }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     handoffs: Object.freeze(['生产经理选择本厂或委外车缝。', '本厂办理内部工序交接；委外先确认合同，仓库发出并在回货时实点。', '完成或回货后交 IQC 做皮套检验。']),
@@ -110,6 +871,63 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['production', 'warehouse', 'purchase', 'finance']),
     stage: 'sewing_execute',
     stages: Object.freeze(['sewing_execute', 'sewing_issue', 'sewing_return']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'route',
+        label: '本厂',
+        to: 'internal',
+      }), Object.freeze({
+        from: 'route',
+        label: '委外',
+        to: 'contract',
+      }), Object.freeze({
+        from: 'contract',
+        to: 'issue',
+      }), Object.freeze({
+        from: 'issue',
+        label: '委外完成回货',
+        to: 'return',
+      }), Object.freeze({
+        from: 'internal',
+        label: '完成',
+        to: 'next',
+      }), Object.freeze({
+        from: 'return',
+        label: '实点完成',
+        to: 'next',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'route',
+        label: '生产经理安排车缝',
+        role_keys: Object.freeze(['production']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'internal',
+        label: '本厂工序办理与交接',
+        role_keys: Object.freeze(['production']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'contract',
+        label: '确认委外合同',
+        role_keys: Object.freeze(['purchase', 'finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'issue',
+        label: '仓库发出',
+        role_keys: Object.freeze(['warehouse']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1', 'result']),
+        key: 'return',
+        label: '回货按整批实点',
+        role_keys: Object.freeze(['warehouse']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:2']),
+        key: 'next',
+        label: '交 IQC 做皮套检验',
+      })]),
+      summary: '本厂与委外是二选一的办理路径；车缝按本次安排独立选择。',
+    }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     exception: '皮套不合格暂停进入手工，由业务提出处置方案，审批、执行并复检后再继续。',
@@ -119,6 +937,33 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['quality', 'sales']),
     stage: 'shell_quality',
     stages: Object.freeze(['shell_quality']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'inspect',
+        label: '合格',
+        to: 'continue',
+      }), Object.freeze({
+        from: 'inspect',
+        label: '不合格',
+        to: 'exception',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['result']),
+        key: 'inspect',
+        label: 'IQC 检验并记录结论',
+        role_keys: Object.freeze(['quality']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['result']),
+        key: 'continue',
+        label: '合格：进入手工',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['exception']),
+        key: 'exception',
+        label: '业务提出异常处置方案',
+        role_keys: Object.freeze(['sales']),
+      })]),
+      summary: '检验合格才继续；不合格暂停后续工序，按正式异常方案办理。',
+    }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     handoffs: Object.freeze(['生产经理独立选择本厂或委外手工，不直接沿用车缝选择。', '委外按已确认合同收发，本厂按工序办理。', '手工完成后交仓库收仓，生成规定质量关口的待检记录。']),
@@ -128,6 +973,63 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['production', 'warehouse', 'purchase', 'finance']),
     stage: 'handwork_execute',
     stages: Object.freeze(['handwork_execute', 'handwork_issue', 'handwork_return']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'route',
+        label: '本厂',
+        to: 'internal',
+      }), Object.freeze({
+        from: 'route',
+        label: '委外',
+        to: 'contract',
+      }), Object.freeze({
+        from: 'contract',
+        to: 'issue',
+      }), Object.freeze({
+        from: 'issue',
+        label: '委外完成回货',
+        to: 'return',
+      }), Object.freeze({
+        from: 'internal',
+        label: '完成',
+        to: 'next',
+      }), Object.freeze({
+        from: 'return',
+        label: '实点完成',
+        to: 'next',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'route',
+        label: '生产经理安排手工',
+        role_keys: Object.freeze(['production']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'internal',
+        label: '本厂工序办理与交接',
+        role_keys: Object.freeze(['production']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'contract',
+        label: '确认委外合同',
+        role_keys: Object.freeze(['purchase', 'finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'issue',
+        label: '仓库发出',
+        role_keys: Object.freeze(['warehouse']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1', 'result']),
+        key: 'return',
+        label: '回货按整批实点',
+        role_keys: Object.freeze(['warehouse']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:2']),
+        key: 'next',
+        label: '交仓库正式收仓',
+      })]),
+      summary: '本厂与委外是二选一的办理路径；手工按本次安排独立选择。',
+    }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     handoffs: Object.freeze(['仓库清点手工产出并正式入成品仓，记录库存。', '入库后仍可待检、待包装；条件未满足时禁止发货。']),
@@ -137,6 +1039,32 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['warehouse']),
     stage: 'finished_inbound',
     stages: Object.freeze(['finished_inbound', 'finished_goods_inbound']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'count',
+        to: 'inbound',
+      }), Object.freeze({
+        from: 'inbound',
+        label: '入库不等于可发货',
+        to: 'gate',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'count',
+        label: '仓库清点手工产出',
+        role_keys: Object.freeze(['warehouse']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:0', 'result']),
+        key: 'inbound',
+        label: '正式成品入库',
+        role_keys: Object.freeze(['warehouse']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'gate',
+        label: '继续核对质量与包装',
+      })]),
+      summary: '手工完成后正式入库；待检或待包装仍是不可发货库存。',
+    }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     exception: '成品不合格进入正式处置，涉及已入库数量由仓库执行获批方案；保留原质检和库存轨迹。',
@@ -147,6 +1075,57 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['quality', 'sales']),
     stage: 'finished_quality',
     stages: Object.freeze(['finished_quality', 'finished_goods_qc', 'needle_quality', 'sampling_quality', 'customer_quality']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'route',
+        label: '按冻结路线',
+        to: 'quality',
+      }), Object.freeze({
+        from: 'route',
+        label: '订单要求时',
+        to: 'customer',
+      }), Object.freeze({
+        from: 'quality',
+        label: '规定关口通过',
+        to: 'passed',
+      }), Object.freeze({
+        from: 'customer',
+        label: '要求验货时通过',
+        to: 'passed',
+      }), Object.freeze({
+        from: 'quality',
+        label: '不合格',
+        to: 'exception',
+      }), Object.freeze({
+        from: 'customer',
+        label: '不合格',
+        to: 'exception',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'route',
+        label: '核对冻结工艺路线',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:0', 'result']),
+        key: 'quality',
+        label: '成品检验与规定关口',
+        role_keys: Object.freeze(['quality']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'customer',
+        label: '客户验货',
+        role_keys: Object.freeze(['sales', 'quality']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['result']),
+        key: 'passed',
+        label: '适用质量关口全部通过',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['exception']),
+        key: 'exception',
+        label: '正式质量异常处置',
+      })]),
+      summary: '图中是需核对的关口，不固定它们的先后顺序；按冻结工艺路线及订单要求办理，不补造通过记录。',
+    }),
   }), Object.freeze({
     business_chain: 'production_to_inventory',
     exception: '查货或包装有问题先处理，满足条件后再办理发货。',
@@ -157,6 +1136,45 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['warehouse', 'sales']),
     stage: 'packaging',
     stages: Object.freeze(['packaging', 'packaging_version']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'version',
+        label: '版本已确认',
+        to: 'pack',
+      }), Object.freeze({
+        from: 'quality',
+        label: '质量条件已满足',
+        to: 'pack',
+      }), Object.freeze({
+        from: 'pack',
+        label: '发现问题',
+        to: 'exception',
+      }), Object.freeze({
+        from: 'exception',
+        label: '处理后重新核对',
+        to: 'pack',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'version',
+        label: '业务确认包装版本',
+        role_keys: Object.freeze(['sales']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'quality',
+        label: '规定质量关口通过',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1', 'result']),
+        key: 'pack',
+        label: '仓库查货与包装',
+        role_keys: Object.freeze(['warehouse']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['exception']),
+        key: 'exception',
+        label: '处理查货或包装问题',
+      })]),
+      summary: '包装版本可提前确认；质量与包装条件都满足后，才进入后续发货。',
+    }),
   }), Object.freeze({
     approvals: Object.freeze([Object.freeze({
       condition: '业务准备出货，交有效配置指定的财务审批责任人。',
@@ -173,6 +1191,155 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     role_keys: Object.freeze(['sales', 'finance']),
     stage: 'shipment',
     stages: Object.freeze(['shipment']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'prepare',
+        to: 'approval',
+      }), Object.freeze({
+        from: 'approval',
+        label: '通过且发货条件满足',
+        to: 'actual',
+      }), Object.freeze({
+        from: 'actual',
+        label: '实际发货后',
+        to: 'fact',
+      }), Object.freeze({
+        from: 'approval',
+        label: '未通过或条件不足',
+        to: 'blocked',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'prepare',
+        label: '业务准备出货单',
+        role_keys: Object.freeze(['sales']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval:0']),
+        key: 'approval',
+        label: '财务审批放行',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_passed:0', 'handoff:1']),
+        key: 'actual',
+        label: '业务确认实际发货',
+        role_keys: Object.freeze(['sales']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:2', 'result']),
+        key: 'fact',
+        label: '减少库存并形成应收来源',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_rejected:0', 'exception']),
+        key: 'blocked',
+        label: '保持禁止出货',
+      })]),
+      summary: '财务放行后，仍需业务显式确认实际发货；库存和应收来源以真实发货为准。',
+    }),
+  }), Object.freeze({
+    approvals: Object.freeze([Object.freeze({
+      condition: '财务按订单、金额、账户摘要和凭据登记并发起；交有效流程指定的审批人，登记人与审批人分离。',
+      label: '收付款审批',
+      passed: '交财务执行岗位，完成执行待办后显式确认实际收付。',
+      rejected: '保留拒绝原因，不登记实际收付；核对后重新申请。',
+    })]),
+    business_chain: 'finance_payment_and_reversal',
+    exception: '少收少付保留未结余额；多收多付按可退余额申请实际退款。错误抵扣先撤销，错误款项登记才办理冲销。',
+    handoffs: Object.freeze(['真实发货形成应收来源；正式采购入库或合格委外回货形成应付来源，由财务核对并过账。', '财务把已确认预收预付抵扣到同一订单、往来方和币种的应收应付；支持分批抵扣，剩余款项保留。', '业务跟进客户尾款，采购跟进供应商对账；财务登记后续收付款并按审批核销，差额和逾期继续跟进。', '发票、对账、出货完成都不代表款项结清；实际退款、登记冲销和撤销抵扣各自保留记录。']),
+    label: '尾款、对账与结清',
+    result: '应收应付、预收预付及退款分别有正式结果；余额核清后结束本次结算。',
+    role: '业务 / 采购 / 财务 / 审批责任人',
+    role_keys: Object.freeze(['sales', 'purchase', 'finance', 'boss']),
+    stage: 'financial_settlement',
+    stages: Object.freeze(['payment']),
+    subflow: Object.freeze({
+      edges: Object.freeze([Object.freeze({
+        from: 'fact',
+        label: '有已确认预收预付时',
+        to: 'offset',
+      }), Object.freeze({
+        from: 'fact',
+        label: '核对未结款项',
+        to: 'follow',
+      }), Object.freeze({
+        from: 'offset',
+        to: 'follow',
+      }), Object.freeze({
+        from: 'follow',
+        label: '需要后续收付',
+        to: 'approval',
+      }), Object.freeze({
+        from: 'approval',
+        label: '通过',
+        to: 'actual',
+      }), Object.freeze({
+        from: 'actual',
+        to: 'balance',
+      }), Object.freeze({
+        from: 'follow',
+        label: '无须继续收付',
+        to: 'balance',
+      }), Object.freeze({
+        from: 'balance',
+        label: '余额已核清',
+        to: 'settled',
+      }), Object.freeze({
+        from: 'balance',
+        label: '仍有差额',
+        to: 'follow',
+      }), Object.freeze({
+        from: 'approval',
+        label: '未通过',
+        to: 'rejected',
+      }), Object.freeze({
+        from: 'rejected',
+        label: '重新核对',
+        to: 'follow',
+      }), Object.freeze({
+        from: 'balance',
+        label: '发生多付、退款或错误',
+        to: 'exception',
+      })]),
+      nodes: Object.freeze([Object.freeze({
+        detail_refs: Object.freeze(['handoff:0']),
+        key: 'fact',
+        label: '确认应收应付来源',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:1']),
+        key: 'offset',
+        label: '预收预付按订单抵扣',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:2']),
+        key: 'follow',
+        label: '核对余额并跟进尾款',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval:0']),
+        key: 'approval',
+        label: '后续收付款审批',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_passed:0', 'handoff:2']),
+        key: 'actual',
+        label: '财务执行并确认收付',
+        role_keys: Object.freeze(['finance']),
+      }), Object.freeze({
+        detail_refs: Object.freeze(['handoff:3']),
+        key: 'balance',
+        label: '核对剩余未结余额',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['result']),
+        key: 'settled',
+        label: '余额核清后结算结束',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['approval_rejected:0']),
+        key: 'rejected',
+        label: '核对原因后重新申请',
+      }), Object.freeze({
+        detail_refs: Object.freeze(['exception']),
+        key: 'exception',
+        label: '退款、撤销抵扣或冲销',
+      })]),
+      summary: '按真实出货、采购入库或委外回货核对应收应付，抵扣与后续收付分别保留记录。',
+    }),
   })]),
   modules: Object.freeze([Object.freeze({
     key: 'sales',
@@ -267,7 +1434,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
   }), Object.freeze({
     chain: 'fulfillment',
     group: '采购与来料',
-    groups: Object.freeze(['handoff_purchase_arrival']),
+    groups: Object.freeze(['handoff_purchase_arrival', 'handoff_receipt_replacement']),
     key: 'purchase_count',
     label: '到货点数',
     module: 'warehouse',

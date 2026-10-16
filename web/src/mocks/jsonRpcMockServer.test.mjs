@@ -14,6 +14,7 @@ async function workflowCall(method, params) {
 
 async function createTask(code) {
   const response = await workflowCall('create_task', {
+    idempotency_key: `create-${code}`,
     task_code: code,
     task_group: 'mock-cas',
     task_name: 'Mock CAS 合同测试',
@@ -125,6 +126,7 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
     )
 
     const validCreateParams = {
+      idempotency_key: 'mock-create-required',
       task_code: 'MOCK-CREATE-REQUIRED',
       task_group: 'mock-cas',
       task_name: 'Mock create 必填测试',
@@ -132,12 +134,21 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
       source_id: 101,
       owner_role_key: 'sales',
     }
+    const originalCreate = await workflowCall('create_task', validCreateParams)
+    const replayCreate = await workflowCall('create_task', {
+      ...validCreateParams,
+    })
+    assert.deepEqual(replayCreate.result, originalCreate.result)
+    const conflictingCreate = await workflowCall('create_task', {
+      ...validCreateParams,
+      task_name: '不同的创建意图',
+    })
+    assert.equal(conflictingCreate.result.code, 40920)
     const beforeInvalidCreates = await workflowCall('list_tasks', {
       source_type: 'mock-cas',
     })
     const beforeInvalidCreateCount = beforeInvalidCreates.result.data.total
     for (const key of [
-      'idempotency_key',
       'expected_version',
       'command_key',
       'intent_hash',
@@ -186,6 +197,7 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
       assert.equal(invalidCreate.result.code, 40010)
     }
     for (const requiredKey of [
+      'idempotency_key',
       'task_code',
       'task_group',
       'task_name',
@@ -199,6 +211,7 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
       assert.equal(invalidCreate.result.code, 40010)
     }
     for (const requiredStringKey of [
+      'idempotency_key',
       'task_code',
       'task_group',
       'task_name',

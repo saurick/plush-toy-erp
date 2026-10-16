@@ -8,7 +8,18 @@ export default {
     './src/**/*.{js,jsx,ts,tsx}', // 扫描src目录下的所有文件
   ],
   theme: {
-    extend: {}, // 扩展主题
+    extend: {
+      fontSize: {
+        xs: [
+          'var(--erp-font-caption, 0.75rem)',
+          { lineHeight: 'var(--erp-line-caption, 1rem)' },
+        ],
+        sm: [
+          'var(--erp-font-body, 0.875rem)',
+          { lineHeight: 'var(--erp-line-body, 1.25rem)' },
+        ],
+      },
+    },
   },
   plugins: [
     formsPlugin({ strategy: 'class' }), // 原生表单显式使用 form-*，不重置 AntD 内层输入。

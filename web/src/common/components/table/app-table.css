@@ -35,7 +35,7 @@
   border-bottom: 1px solid var(--erp-border-strong);
   background: var(--erp-surface-bg-muted);
   color: var(--erp-text-muted);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   font-weight: 650;
   line-height: 20px;
   vertical-align: middle;

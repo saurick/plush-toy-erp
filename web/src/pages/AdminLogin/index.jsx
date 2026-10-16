@@ -88,6 +88,7 @@ function pickSupportedEntryTarget(defaultTarget, supportedTargets) {
 export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   const navigate = useNavigate()
   const location = useLocation()
+  const legalReturnState = { from: buildLocationPath(location, '/admin-login') }
   const [form] = Form.useForm()
   const { isDesktopApp } = useERPWorkspace()
   const entryConfig = useMemo(() => getEntryConfig(), [])
@@ -442,7 +443,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
             />
           ) : null}
           {loginModeOptions.length > 1 ? (
-            <SlidingTabList className="erp-login-methods" aria-label="登录方式">
+            <SlidingTabList className="erp-login-methods erp-navigation-tabs" aria-label="登录方式">
               {loginModeOptions.map(({ label, value }) => (
                 <button
                   key={value}
@@ -623,9 +624,13 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
           </Button>
         </Form>
         <nav className="erp-login-legal-links" aria-label="隐私与使用规则">
-          <Link to="/legal/privacy">个人信息处理规则</Link>
+          <Link to="/legal/privacy" state={legalReturnState}>
+            个人信息处理规则
+          </Link>
           <span aria-hidden="true">·</span>
-          <Link to="/legal/system-rules">系统使用规则</Link>
+          <Link to="/legal/system-rules" state={legalReturnState}>
+            系统使用规则
+          </Link>
         </nav>
       </Card>
     </main>

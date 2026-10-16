@@ -25,14 +25,8 @@ export default function MobileBackToTop({
     let frame = 0
     const update = () => {
       frame = 0
-      const editing =
-        target.contains(document.activeElement) &&
-        document.activeElement?.matches(
-          'input, textarea, select, [contenteditable="true"]'
-        )
       if (
         (mobileOnly && !narrow.matches) ||
-        editing ||
         target.scrollTop < 280 ||
         !target.getClientRects().length
       ) {
@@ -46,7 +40,9 @@ export default function MobileBackToTop({
         ? window.visualViewport.offsetTop + window.visualViewport.height
         : window.innerHeight
       const bottom = Math.min(rect.bottom, viewportBottom)
-      if (bottom - Math.max(rect.top, 0) < 72 || rect.width < 72) {
+      const viewportTop = window.visualViewport?.offsetTop || 0
+      // 键盘和浏览器工具栏以实际可视区域避让；保留输入焦点不代表仍在输入。
+      if (bottom - Math.max(rect.top, viewportTop) < 72 || rect.width < 72) {
         setPosition(null)
         return
       }
