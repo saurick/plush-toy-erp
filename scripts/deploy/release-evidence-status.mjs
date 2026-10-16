@@ -14,7 +14,10 @@ import {
   normalizeReleaseEvidenceProfile,
   releaseEvidenceRequiredFiles,
 } from "./release-evidence-contract.mjs";
-import { getDeploymentTarget } from "./deployment-targets.mjs";
+import {
+  getDeploymentTarget,
+  SUPPORTED_DEPLOYMENT_TARGET_KEYS,
+} from "./deployment-targets.mjs";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
 const CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE =
@@ -24,7 +27,7 @@ const USAGE = `Release evidence status
 
 Usage:
   node scripts/deploy/release-evidence-status.mjs \\
-    --deployment-target <demo-133|customer-test-133> \\
+    --deployment-target <demo-133|customer-test-133|production-133> \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\
     [--profile <base-release|customer-trial-acceptance>]
 
@@ -759,9 +762,9 @@ export function buildReleaseEvidenceStatus({
   } catch (error) {
     throw new CliError(error.message, 2);
   }
-  if (!["demo-133", "customer-test-133"].includes(deploymentTarget)) {
+  if (!SUPPORTED_DEPLOYMENT_TARGET_KEYS.includes(deploymentTarget)) {
     throw new CliError(
-      "Missing or invalid --deployment-target (demo-133|customer-test-133)",
+      `Missing or invalid --deployment-target (${SUPPORTED_DEPLOYMENT_TARGET_KEYS.join("|")})`,
       2,
     );
   }

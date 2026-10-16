@@ -47,6 +47,8 @@ node scripts/deploy/promotion-controller.mjs \
 3. 读取 operation 回执与 `target-preflight.mjs --target production-133 --json`。失败或 `not_proven` 时保留现场，不自动重试。初始化管理员密码仅保存在本机受控 access 文件；steady env 不保留 `APP_ADMIN_PASSWORD`。
 4. `base-release` 记录基础发布证据；生产不使用 `customer-trial-acceptance` 的固定测试密码或 `uat_*` 登录矩阵。真实岗位与客户签收在固定版本上单独记录，基础健康通过不等于业务验收。
 
+首次初始化后，正式客户配置仍须经过 manifest 编译与评审、发布证据门禁、validate / publish、transition check、activate 和 effective-session 读回；客户配置的激活、就绪和证据状态入口共用部署目标合同，接受显式指定的 `production-133`。生产只使用 `base-release`，不得套用测试账号或模拟数据验收档。
+
 ## 失败与恢复
 
 首次初始化前没有“上一版生产”，必须保留本次资源、初始化回执和恢复身份。首次上线之后的代码回滚只接受 migration 序列和客户配置源指纹相同的已验证旧版本；不自动 down migration 或恢复数据库。结构不兼容时先评审 forward-fix 或配套数据库、附件恢复，见[回滚流程](03-rollback.md)。

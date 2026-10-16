@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { validateRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
 import { validateCustomerConfigActivationGate } from "./customer-config-activation-gate.mjs";
 import { buildReleaseEvidenceStatus } from "./release-evidence-status.mjs";
+import { SUPPORTED_DEPLOYMENT_TARGET_KEYS } from "./deployment-targets.mjs";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
 
@@ -15,7 +16,7 @@ const USAGE = `Customer config release readiness gate
 Usage:
   node scripts/deploy/customer-config-release-readiness.mjs \\
     --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \\
-    --deployment-target <demo-133|customer-test-133> \\
+    --deployment-target <demo-133|customer-test-133|production-133> \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 
 With release executor report:
@@ -183,11 +184,11 @@ export function buildInputTemplate(customer = DEFAULT_CUSTOMER) {
       "post-rollback readback evidence check with --require-rollback",
     ],
     commands: [
-      "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133> --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>",
-      "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133> --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --require-executed",
-      "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133> --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --require-executed --require-activated",
-      "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133> --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --require-executed --require-rollback",
-      "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133> --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --readback-preflight-report output/customers/yoyoosun/customer-config-readback-preflight.json",
+      "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133|production-133> --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>",
+      "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133|production-133> --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --require-executed",
+      "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133|production-133> --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --require-executed --require-activated",
+      "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133|production-133> --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --require-executed --require-rollback",
+      "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133|production-133> --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json --readback-preflight-report output/customers/yoyoosun/customer-config-readback-preflight.json",
     ],
     requiredReadbackEvidence: [
       "release report effectiveSessionVerification.status=verified",
@@ -547,7 +548,7 @@ export async function buildCustomerConfigReadbackPreflightReport(
     blockers,
     nextCommand: blockers.length
       ? "Resolve blockers, then run readiness with --require-activated or --require-rollback when real readback evidence exists."
-      : "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133> --manifest <manifest> --evidence-dir <evidence-dir> --release-report <release-report> --require-executed --require-activated",
+      : "node scripts/deploy/customer-config-release-readiness.mjs --deployment-target <demo-133|customer-test-133|production-133> --manifest <manifest> --evidence-dir <evidence-dir> --release-report <release-report> --require-executed --require-activated",
   };
 }
 
@@ -817,12 +818,9 @@ export async function validateCustomerConfigReleaseReadiness(
   requireOption(options, "manifest");
   requireOption(options, "evidenceDir");
   requireOption(options, "deploymentTarget");
-  if (![
-    "demo-133",
-    "customer-test-133",
-  ].includes(options.deploymentTarget)) {
+  if (!SUPPORTED_DEPLOYMENT_TARGET_KEYS.includes(options.deploymentTarget)) {
     throw new CliError(
-      "--deployment-target must be demo-133 or customer-test-133",
+      `--deployment-target must be ${SUPPORTED_DEPLOYMENT_TARGET_KEYS.join(", ")}`,
       2,
     );
   }

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { validateRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
 import { validateReleaseEvidenceGate } from "./release-evidence-gate.mjs";
 import { buildReleaseEvidenceStatus } from "./release-evidence-status.mjs";
+import { SUPPORTED_DEPLOYMENT_TARGET_KEYS } from "./deployment-targets.mjs";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
 const MANIFEST_EVIDENCE_FILE = "customer-config-manifest-evidence.json";
@@ -53,7 +54,7 @@ function printHelp() {
   console.log(`Usage:
   node scripts/deploy/customer-config-activation-gate.mjs \\
     --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \\
-    --deployment-target <demo-133|customer-test-133> \\
+    --deployment-target <demo-133|customer-test-133|production-133> \\
     --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \\
     [--customer yoyoosun] \\
     [--json]
@@ -164,8 +165,8 @@ export function validateCustomerConfigActivationGate({
   assert(Boolean(manifest), "--manifest is required", errors);
   assert(Boolean(evidenceDir), "--evidence-dir is required", errors);
   assert(
-    deploymentTarget === "demo-133" || deploymentTarget === "customer-test-133",
-    "--deployment-target must be demo-133 or customer-test-133",
+    SUPPORTED_DEPLOYMENT_TARGET_KEYS.includes(deploymentTarget),
+    `--deployment-target must be ${SUPPORTED_DEPLOYMENT_TARGET_KEYS.join(", ")}`,
     errors,
   );
 

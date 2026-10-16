@@ -144,7 +144,7 @@ fresh 数据库完成 Atlas migration 后、常驻 `app-server` 启动前，使�
 ```bash
 APP_ADMIN_PASSWORD='<ephemeral-secret>' \
   bash scripts/deploy/bootstrap-production-admin.sh \
-    --deployment-target '<demo-133|customer-test-133>' \
+    --deployment-target '<demo-133|customer-test-133|production-133>' \
     --env-file '<absolute-runtime-env>' \
     --expected-database '<exact-database>' \
     --expected-migration '<14-digit-atlas-version>' \
@@ -165,6 +165,8 @@ steady env 必须保持 `BOOTSTRAP_ADMIN_ONCE=false` 且不包含 `APP_ADMIN_PAS
 - target-specific rollback point。
 
 `release-evidence-gate.mjs` 通过只说明 evidence 文件满足合同，不替代目标实时运行、数据身份、客户 UAT 或签收。
+
+客户配置激活、发布就绪和证据状态入口共用 `deployment-targets.mjs` 的目标合同，包含显式选择的 `production-133`。正式配置仍须完成 manifest 评审、发布证据、validate / publish、transition check、activate 和 effective-session 读回；生产只接受 `base-release`，不使用固定测试凭据验收档。
 
 普通发布和客户验收使用两个 profile；无迁移且确认恢复流程未变的普通发布不重复要求恢复 / 回滚演练或客户签收，但保留当前备份和固定回滚路径。详细条件见 [发布证据](../../deployments/yoyoosun/evidence/releases/README.md)。目标机预检、能力核验和 JSON 回执复用已有 Shell、jq 与 SHA-256 工具，不需要宿主 Node.js、Go 或 Python；回执继续使用 `release-evidence-contract.json`，由本地 Node.js 合同测试核对结构、脱敏和原子写入。
 
