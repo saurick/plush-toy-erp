@@ -5,7 +5,6 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
-import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
@@ -574,7 +573,7 @@ export default function ProductionOrdersPage() {
       }
     } catch (error) {
       if (!isRpcAbortError(error) && request.isCurrent()) {
-        showPageLoadError(error, '加载生产订单')
+        message.error(getActionErrorMessage(error, '加载生产订单'))
       }
     } finally {
       if (request.isCurrent()) setLoading(false)
@@ -672,7 +671,7 @@ export default function ProductionOrdersPage() {
       setFormValues(aggregateToForm(nextAggregate))
       setFormMode(detailAccess.mode)
     } catch (error) {
-      showPageLoadError(error, '加载生产订单详情')
+      message.error(getActionErrorMessage(error, '加载生产订单详情'))
     } finally {
       setDetailLoading(false)
     }
@@ -692,7 +691,7 @@ export default function ProductionOrdersPage() {
       }
     } catch (error) {
       if (!isRpcAbortError(error) && request.isCurrent()) {
-        showPageLoadError(error, '加载生产订单详情')
+        message.error(getActionErrorMessage(error, '加载生产订单详情'))
       }
     } finally {
       request.finish()
@@ -780,7 +779,7 @@ export default function ProductionOrdersPage() {
       setReworkProgressOpen(true)
     } catch (error) {
       if (!isRpcAbortError(error) && request.isCurrent()) {
-        showPageLoadError(error, '加载成品返工进度')
+        message.error(getActionErrorMessage(error, '加载成品返工进度'))
       }
     } finally {
       if (request.isCurrent()) setReworkProgressLoading(false)
@@ -957,7 +956,7 @@ export default function ProductionOrdersPage() {
       setMaterialIssueOpen(true)
     } catch (error) {
       if (!isRpcAbortError(error) && request.isCurrent()) {
-        showPageLoadError(error, '加载生产领料详情')
+        message.error(getActionErrorMessage(error, '加载生产领料详情'))
       }
     } finally {
       if (
@@ -1009,7 +1008,7 @@ export default function ProductionOrdersPage() {
       }
     } catch (error) {
       if (request.isCurrent() && !isRpcAbortError(error)) {
-        showPageLoadError(error, '加载可用材料批次')
+        message.error(getActionErrorMessage(error, '加载可用材料批次'))
       }
     } finally {
       if (
@@ -1268,7 +1267,7 @@ export default function ProductionOrdersPage() {
       setCompletionOpen(true)
     } catch (error) {
       if (completionContextRequestRef.current === requestID) {
-        showPageLoadError(error, '加载成品收仓详情')
+        message.error(getActionErrorMessage(error, '加载成品收仓详情'))
       }
     } finally {
       if (completionContextRequestRef.current === requestID) {
@@ -1634,6 +1633,7 @@ export default function ProductionOrdersPage() {
         viewSwitch={productionViewSwitch}
         helpKey="production-orders"
         title="生产订单"
+        stats={[{ key: 'total', label: '符合条件', value: total }]}
       />
       <BusinessOperationPanel
         filters={

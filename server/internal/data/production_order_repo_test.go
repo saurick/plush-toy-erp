@@ -73,7 +73,6 @@ func openProductionOrderRepoTest(t *testing.T, name string, prepare ...func(cont
 		setup(ctx, client, unitRow.ID, bom.ID)
 	}
 	prepareProductionEngineeringFixture(t, ctx, data, salesItem.ID, bom.ID)
-	createProductionWIPRouteProcesses(t, ctx, client)
 	repo := NewProductionOrderRepo(data, log.NewStdLogger(io.Discard))
 	return productionOrderTestFixture{
 		uc: biz.NewProductionOrderUsecase(repo), data: data, client: client, actorID: actor.ID,
@@ -85,7 +84,7 @@ func (f productionOrderTestFixture) draft(orderNo string, quantity int64) biz.Pr
 	return biz.ProductionOrderDraft{
 		OrderNo: orderNo,
 		Items: []biz.ProductionOrderDraftItem{{
-			LineNo: 1, ProductID: f.productID, ProductSKUID: &f.skuID, UnitID: f.unitID, RouteCode: stringPtr(biz.ProductionWIPRoutePlushSewHandV1),
+			LineNo: 1, ProductID: f.productID, ProductSKUID: &f.skuID, UnitID: f.unitID,
 			PlannedQuantity: decimal.NewFromInt(quantity), SalesOrderItemID: &f.salesItemID, BOMHeaderID: &f.bomID,
 		}},
 	}
@@ -252,7 +251,6 @@ func TestProductionOrderRepoAggregateLifecycleCASAndExactReplay(t *testing.T) {
 	}, f.actorID, biz.PMCRoleKey); err != nil {
 		t.Fatalf("complete scheduling task: %v", err)
 	}
-	cancelUnstartedProductionWIPForTest(t, ctx, f, created.Order.ID)
 	if _, err := f.uc.Close(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 3, ActorID: f.actorID, IdempotencyKey: "close-incomplete-without-reason"}); !errors.Is(err, biz.ErrProductionOrderCloseReasonRequired) {
 		t.Fatalf("incomplete close without reason error = %v", err)
 	}
@@ -416,7 +414,7 @@ func TestProductionOrderRepoGetAndListUseControlledAggregateRead(t *testing.T) {
 		t.Fatalf("create first: %v", err)
 	}
 	secondDraft := f.draft("MO-READ-002", 10)
-	secondDraft.Items = append(secondDraft.Items, biz.ProductionOrderDraftItem{RouteCode: stringPtr(biz.ProductionWIPRoutePlushSewHandV1),
+	secondDraft.Items = append(secondDraft.Items, biz.ProductionOrderDraftItem{
 		LineNo: 2, ProductID: f.productID, UnitID: f.unitID, PlannedQuantity: decimal.NewFromInt(1),
 	})
 	note := "第二张生产订单"

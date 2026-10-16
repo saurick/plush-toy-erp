@@ -885,7 +885,7 @@ export default function WorkInstructionImageAnnotationEditor({
           {imageEntries.length > 1 ? (
             <SlidingTabList
               aria-label="选择要标注的图片"
-              className="erp-work-instruction-annotation-modal__image-tabs erp-navigation-tabs"
+              className="erp-work-instruction-annotation-modal__image-tabs"
               role="tablist"
             >
               {imageEntries.map(({ image, imageIndex }, visibleIndex) => (

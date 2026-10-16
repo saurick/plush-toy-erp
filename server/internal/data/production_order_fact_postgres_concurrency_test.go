@@ -26,7 +26,6 @@ func (f productionOrderPGFixture) createReleasedOrder(t *testing.T, ctx context.
 	if err != nil {
 		t.Fatalf("create production order: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, created.Order.ID)
 	released, err := f.uc.Release(ctx, &biz.ProductionOrderAction{
 		ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID,
 		IdempotencyKey: "mo-pf-release-" + label + "-" + f.suffix,
@@ -445,7 +444,6 @@ func TestProductionOrderPostgresCloseChecksEveryLineIndependently(t *testing.T) 
 	if err != nil {
 		t.Fatalf("create multi-line order: %v", err)
 	}
-	markProductionOrderHistoricalUnroutedForTest(t, ctx, f.client, created.Order.ID)
 	order, err := f.uc.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "close-multi-release-" + f.suffix})
 	if err != nil {
 		t.Fatalf("release multi-line order: %v", err)

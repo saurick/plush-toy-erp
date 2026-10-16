@@ -757,14 +757,10 @@ func validateProductionReworkQuantity(ctx context.Context, client *ent.Client, s
 	if err != nil {
 		return err
 	}
-	reserved := decimal.Zero
 	for _, batch := range packaging {
-		if batch.Status != biz.ProductionWIPStatusAccepted {
-			reserved = reserved.Add(batch.Quantity)
+		if batch.Status != biz.ProductionWIPStatusAccepted && total.Add(sumProductionWIPBatchQuantity(packaging)).GreaterThan(source.Quantity) {
+			return biz.ErrProductionReworkExecutionDependency
 		}
-	}
-	if total.Add(reserved).GreaterThan(source.Quantity) {
-		return biz.ErrProductionReworkExecutionDependency
 	}
 	return nil
 }

@@ -949,11 +949,7 @@ func applyProductionWIPBatchMutation(
 		if err != nil {
 			return nil, err
 		}
-		validateTransfer := biz.ValidateProductionWIPTransferAllocation
-		if target.OperationCode == biz.ProductionWIPOperationPackaging {
-			validateTransfer = biz.ValidateProductionPackagingTransferAllocation
-		}
-		if err := validateTransfer(batch.Quantity, sumActiveProductionWIPBatchQuantity(children), in.Quantity); err != nil {
+		if err := biz.ValidateProductionWIPTransferAllocation(batch.Quantity, sumActiveProductionWIPBatchQuantity(children), in.Quantity); err != nil {
 			return nil, err
 		}
 		affected, err := client.ProductionWIPBatch.Update().Where(

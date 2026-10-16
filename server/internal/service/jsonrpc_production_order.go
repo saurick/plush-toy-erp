@@ -7,7 +7,6 @@ import (
 	"math"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -443,7 +442,7 @@ func productionOrderAllowsOnly(pm map[string]any, keys ...string) bool {
 func productionOrderRequiredString(pm map[string]any, key string, maxLen int) (string, bool) {
 	raw, exists := pm[key]
 	value, ok := raw.(string)
-	if !exists || !ok || value != strings.TrimSpace(value) || value == "" || utf8.RuneCountInString(value) > maxLen {
+	if !exists || !ok || value != strings.TrimSpace(value) || value == "" || len(value) > maxLen {
 		return "", false
 	}
 	return value, true
@@ -455,7 +454,7 @@ func productionOrderOptionalString(pm map[string]any, key string, maxLen int) (*
 		return nil, true
 	}
 	value, ok := raw.(string)
-	if !ok || value != strings.TrimSpace(value) || value == "" || utf8.RuneCountInString(value) > maxLen {
+	if !ok || value != strings.TrimSpace(value) || value == "" || len(value) > maxLen {
 		return nil, false
 	}
 	return &value, true

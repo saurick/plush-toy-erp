@@ -43,6 +43,7 @@ export default function ProductionExceptionRequestModal({
         inspection?.inspection_no || 'QUALITY',
         sourceBusinessActionUUID()
       ),
+      decision_type: 'REWORK_ORIGINAL',
       requested_quantity: '',
       reason: '生产在制品检验不合格',
     })
@@ -174,10 +175,9 @@ export default function ProductionExceptionRequestModal({
         <Form.Item
           name="decision_type"
           label="处理方案"
-          rules={[{ required: true, message: '请选择处理方案' }]}
+          rules={[{ required: true }]}
         >
           <Select
-            placeholder="请选择处理方案"
             onChange={() => form.setFieldsValue({ target_supplier_id: undefined })}
             options={[
               { value: 'REWORK_ORIGINAL', label: context?.original_supplier_id ? '原厂返工（使用原货）' : '本厂返工（使用原货）' },

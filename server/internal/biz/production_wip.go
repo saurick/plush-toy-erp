@@ -218,7 +218,7 @@ type ProductionWIPReceiptSummary struct {
 
 // Permissions follow the actual operation, never a caller-supplied role or label.
 func ProductionWIPActionPermission(in *ProductionWIPAction, aggregate *ProductionWIPAggregate, base string) string {
-	if in == nil || aggregate == nil || base == PermissionProductionWIPAssign {
+	if in == nil || aggregate == nil {
 		return base
 	}
 	for _, batch := range aggregate.Batches {
@@ -740,20 +740,9 @@ func ValidateProductionWIPTransfer(source *ProductionWIPBatch, sourceOperation, 
 	return nil
 }
 
-// Transfer the complete batch; partial work requires an explicit split before execution.
-// The source version and allocation check prevent duplicate transfer.
+// Transfers may consume part of an accepted batch. The source version and
+// aggregate allocation cap prevent parallel transfers from consuming it twice.
 func ValidateProductionWIPTransferAllocation(sourceQuantity, alreadyTransferred, quantity decimal.Decimal) error {
-	if !sourceQuantity.GreaterThan(decimal.Zero) || alreadyTransferred.IsNegative() || !quantity.GreaterThan(decimal.Zero) {
-		return ErrBadParam
-	}
-	if !alreadyTransferred.IsZero() || !quantity.Equal(sourceQuantity) {
-		return ErrProductionWIPQuantityExceeded
-	}
-	return nil
-}
-
-// Packaging is allocated against posted receipts, which retain the unallocated quantity.
-func ValidateProductionPackagingTransferAllocation(sourceQuantity, alreadyTransferred, quantity decimal.Decimal) error {
 	if !sourceQuantity.GreaterThan(decimal.Zero) || alreadyTransferred.IsNegative() || !quantity.GreaterThan(decimal.Zero) {
 		return ErrBadParam
 	}

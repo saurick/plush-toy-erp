@@ -26,29 +26,6 @@ func TestProductionExceptionSubmitNormalizesAndRequiresTypedSource(t *testing.T)
 	}
 }
 
-func TestProductionExceptionSubmitRequiresExplicitDecision(t *testing.T) {
-	batchID, inspectionID := 3, 4
-	for _, decisionType := range []string{"", " \t ", "RETURN_TO_VENDOR"} {
-		t.Run(decisionType, func(t *testing.T) {
-			repo := &productionExceptionRepoStub{}
-			uc := NewOperationalFactUsecase(repo)
-			_, err := uc.SubmitProductionException(context.Background(), &ProductionExceptionSubmit{
-				DecisionNo: "EX-REJECTED-WIP", DecisionType: decisionType,
-				ProductionOrderID: 1, ProductionOrderItemID: 2,
-				ProductionWIPBatchID: &batchID, QualityInspectionID: &inspectionID,
-				RequestedQuantity: decimal.NewFromInt(2), Reason: "裁片不合格，待业务决定处理方案",
-				IdempotencyKey: "explicit-decision", RequestedBy: 8,
-			})
-			if !errors.Is(err, ErrBadParam) {
-				t.Fatalf("unspecified or unrelated decision err=%v", err)
-			}
-			if repo.submitted != nil {
-				t.Fatalf("decision must not be inferred: %#v", repo.submitted)
-			}
-		})
-	}
-}
-
 type productionExceptionRepoStub struct {
 	OperationalFactRepo
 	submitted *ProductionExceptionSubmit

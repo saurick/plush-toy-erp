@@ -10,7 +10,6 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
-	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
 	"server/internal/data/model/ent/productionorderoperation"
 	"server/internal/data/model/ent/productionpackagingconfirmation"
@@ -26,9 +25,6 @@ import (
 func createProductionWIPRouteProcesses(t *testing.T, ctx context.Context, client *ent.Client) map[string]*ent.Process {
 	t.Helper()
 	create := func(code, name, category, operationCode string, inhouse, outsourced bool, sortOrder int) *ent.Process {
-		if existing, err := client.Process.Query().Where(process.Code(code)).Only(ctx); err == nil {
-			return existing
-		}
 		builder := client.Process.Create().
 			SetCode(code).
 			SetName(name).
@@ -184,7 +180,6 @@ func TestProductionWIPReleaseFreezesExactRouteAndRollsBackInvalidResolution(t *t
 	t.Run("missing semantic process", func(t *testing.T) {
 		ctx := context.Background()
 		f := openProductionOrderRepoTest(t, "production_wip_release_missing_semantic")
-		f.client.Process.Delete().ExecX(ctx)
 		route := biz.ProductionWIPRoutePlushSewHandV1
 		draft := f.draft("MO-WIP-ROLLBACK-MISSING", 10)
 		draft.Items[0].RouteCode = &route
