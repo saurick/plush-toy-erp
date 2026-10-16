@@ -4,6 +4,11 @@ import {
 } from './businessUsabilityCatalog.mjs'
 import { ENGINEERING_MATERIAL_HELP } from './engineeringMaterialHelp.mjs'
 import { HELP_VISUAL_EXAMPLES } from './helpScenarioPresentation.mjs'
+import { getRoleHelpScenarios } from './helpScenarios.mjs'
+import {
+  getBusinessHandbookIntroductions,
+  getBusinessPageHandbookSections,
+} from './businessHandbook.mjs'
 
 export const HELP_REFERENCE_PAGES = Object.freeze([
   ...BUSINESS_USABILITY_CATALOG,
@@ -58,11 +63,49 @@ export function getHelpReferenceDocuments(pages) {
   ])
 }
 
+export function getHelpReadingCatalog(guides, options = {}) {
+  const pages = new Map()
+  const scenarios = new Map()
+  for (const guide of guides) {
+    for (const page of getHelpReferencePages(guide, options)) {
+      pages.set(page.key, page)
+    }
+    for (const scenario of getRoleHelpScenarios(guide, options)) {
+      const saved = scenarios.get(scenario.key)
+      if (saved) saved.roleKeys.push(guide.key)
+      else scenarios.set(scenario.key, { ...scenario, roleKeys: [guide.key] })
+    }
+  }
+  const referencePages = HELP_REFERENCE_PAGES.filter((page) =>
+    pages.has(page.key)
+  ).map((page) => pages.get(page.key))
+  return {
+    scenarios: [...scenarios.values()],
+    referencePages,
+    references: [
+      ...getBusinessHandbookIntroductions(guides),
+      ...getHelpReferenceDocuments(referencePages),
+    ],
+  }
+}
+
 const normalize = (value) =>
   String(value || '')
     .normalize('NFKC')
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, '')
+
+const sectionText = (sections) =>
+  sections
+    .map((section) =>
+      [
+        section.title,
+        ...(section.paragraphs || []),
+        ...(section.steps || []),
+        ...(section.rows || []).flat(),
+      ].join(' ')
+    )
+    .join(' ')
 
 export function searchHelpDocuments(
   { scenarios = [], references = [] },
@@ -93,24 +136,21 @@ export function searchHelpDocuments(
     })),
     ...references.map((reference) => ({
       ...reference,
-      body: reference.item
-        ? [
-            reference.page.title,
-            reference.item.source,
-            reference.item.updateRule,
-            reference.item.example,
-            reference.item.effect,
-            ...(reference.item.aliases || []),
-          ].join(' ')
-        : [
-            reference.page.flowSteps.join(' '),
-            reference.page.completion,
-            reference.page.handoff,
-            reference.page.boundary,
-            ...reference.page.items.map(
-              (item) => `${item.title} ${item.explanation}`
-            ),
-          ].join(' '),
+      body:
+        reference.kind === 'chapter'
+          ? sectionText(reference.sections)
+          : reference.item
+            ? [
+                reference.page.title,
+                reference.item.source,
+                reference.item.updateRule,
+                reference.item.example,
+                reference.item.effect,
+                ...(reference.item.aliases || []),
+              ].join(' ')
+            : [
+                sectionText(getBusinessPageHandbookSections(reference.page)),
+              ].join(' '),
     })),
   ]
   return documents
@@ -139,11 +179,13 @@ export function searchHelpDocuments(
 }
 
 export function getHelpDocumentKindLabel(kind) {
-  return kind === 'guide'
-    ? '操作图解'
-    : kind === 'page'
-      ? '页面说明'
-      : BUSINESS_HELP_TYPE_PRESENTATION[kind]?.label || '参考词条'
+  return kind === 'chapter'
+    ? '手册章节'
+    : kind === 'guide'
+      ? '操作图解'
+      : kind === 'page'
+        ? '页面说明'
+        : BUSINESS_HELP_TYPE_PRESENTATION[kind]?.label || '参考词条'
 }
 
 export function getHelpCenterHref({

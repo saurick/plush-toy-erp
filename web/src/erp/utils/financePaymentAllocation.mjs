@@ -1,3 +1,4 @@
+import { FinanceAllocationStatus, FinancePaymentStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   addNumeric20Scale6Units,
   compareNumeric20Scale6Units,
@@ -5,6 +6,23 @@ import {
   numeric20Scale6TextFromUnits,
   numeric20Scale6Units,
 } from './numeric20Scale6.mjs'
+import { sourceBusinessActionSignature } from './sourceBusinessAction.mjs'
+
+export function pendingFinanceAllocationAttempt(store, scope, payload) {
+  const pending = store.peek(scope)
+  if (!pending) return null
+  const intent = (params) => {
+    const values = { ...params }
+    delete values.expected_version
+    return sourceBusinessActionSignature(values)
+  }
+  if (intent(pending.params) !== intent(payload)) {
+    throw new Error(
+      '上次抵扣结果尚未确认，请保留原抵扣内容并重新确认后再办理新的抵扣'
+    )
+  }
+  return pending
+}
 
 export function validateFinanceAllocationDraft({
   allocations = [],
@@ -88,7 +106,7 @@ export function financePaymentPostMatchesIntent(
   allocations = []
 ) {
   if (
-    payment?.status !== 'POSTED' ||
+    payment?.status !== FinancePaymentStatus.POSTED ||
     Number(payment.id) !== Number(expected?.id) ||
     payment.currency !== expected.currency ||
     payment.direction !== expected.direction ||
@@ -98,9 +116,10 @@ export function financePaymentPostMatchesIntent(
     numeric20Scale6Units(payment.amount) !==
       numeric20Scale6Units(expected.amount) ||
     !Array.isArray(payment.allocations)
-  )
-    { return false }
-  const actual = payment.allocations.filter((item) => item.status === 'POSTED')
+  ) {
+    return false
+  }
+  const actual = payment.allocations.filter((item) => item.status === FinanceAllocationStatus.POSTED)
   if (actual.length !== allocations.length) return false
   const seen = new Set()
   return allocations.every((wanted) => {

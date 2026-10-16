@@ -13,6 +13,7 @@ export default function EngineeringMaterialTaskSummaryEntry({
   task,
   profile,
   mobile = false,
+  compact = true,
 }) {
   const context =
     getEngineeringMaterialTaskContext(task) ||
@@ -28,12 +29,12 @@ export default function EngineeringMaterialTaskSummaryEntry({
   if (!canRead) return null
 
   return (
-    <div className="erp-material-task-summary-entry">
+    <div className={`erp-material-task-summary-entry${compact ? ' erp-material-task-summary-entry--compact' : ''}`}>
       <Button
         ref={entryRef}
-        block
+        block={!compact}
         icon={<FileTextOutlined aria-hidden="true" />}
-        size={mobile ? 'large' : 'middle'}
+        size={mobile && !compact ? 'large' : 'middle'}
         onClick={(event) => {
           entryRef.current = event.currentTarget
           setView('summary')
@@ -45,8 +46,8 @@ export default function EngineeringMaterialTaskSummaryEntry({
       {task.task_group === 'engineering_material_revision' &&
       task.task_status_key === 'ready' ? (
         <Button
-          block
-          size={mobile ? 'large' : 'middle'}
+          block={!compact}
+          size={mobile && !compact ? 'large' : 'middle'}
           onClick={(event) => {
             entryRef.current = event.currentTarget
             setView('preview')

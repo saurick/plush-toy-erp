@@ -10,6 +10,7 @@ const SKIP_PARTS = new Set([
   "node_modules",
   "dist",
   "build",
+  "web/build-workbench",
   "coverage",
   "docs/archive",
   "docs/customers/yoyoosun/raw-source-files",

@@ -1,12 +1,13 @@
+import { MaterialRequestStatus } from '../../common/consts/statuses.generated.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 
 export const ENGINEERING_MATERIAL_STATUS = Object.freeze({
   PREVIEW: '待提交',
-  SUBMITTED: '待老板审核',
-  BOSS_APPROVED: '待财务审核',
-  APPROVED: '已批准采购',
-  REJECTED: '已退回',
+  [MaterialRequestStatus.SUBMITTED]: '待老板审核',
+  [MaterialRequestStatus.BOSS_APPROVED]: '待财务审核',
+  [MaterialRequestStatus.APPROVED]: '已批准采购',
+  [MaterialRequestStatus.REJECTED]: '已退回',
 })
 
 export function canReadEngineeringMaterial(profile) {

@@ -1,4 +1,11 @@
-import { FinancePaymentKind } from '../../common/consts/statuses.generated.mjs'
+import {
+  FinancePaymentKind,
+  FinancePaymentStatus,
+  ProductionExceptionExecutionStatus,
+  ProductionExceptionStatus,
+  ShipmentFinanceReleaseStatus,
+  ShipmentStatus,
+} from '../../common/consts/statuses.generated.mjs'
 import {
   resolveBusinessActionAvailability,
   resolveContextualBusinessActionAvailability,
@@ -38,10 +45,15 @@ export function resolveFinancePaymentActionAvailability({
   payment = null,
   busy = false,
   referenceLoading = false,
+  pendingAllocation = false,
 } = {}) {
   const status = payment?.status
+  const canResumeAllocation =
+    pendingAllocation &&
+    status === FinancePaymentStatus.POSTED &&
+    payment?.kind !== FinancePaymentKind.REFUND
   const canAllocateBalance =
-    status === 'POSTED' &&
+    status === FinancePaymentStatus.POSTED &&
     payment?.kind !== FinancePaymentKind.REFUND &&
     isPositiveNumeric20Scale6Units(
       numeric20Scale6Units(payment?.available_amount)
@@ -56,10 +68,10 @@ export function resolveFinancePaymentActionAvailability({
     case 'allocation':
       return resolveAction({
         ...common,
-        relevant: ['DRAFT', 'APPROVED'].includes(status) || canAllocateBalance,
+        relevant: [FinancePaymentStatus.DRAFT, FinancePaymentStatus.APPROVED].includes(status) || canAllocateBalance || canResumeAllocation,
         completed:
-          (status === 'POSTED' && !canAllocateBalance) || status === 'REVERSED',
-        applicable: status === 'APPROVED' || canAllocateBalance,
+          (status === FinancePaymentStatus.POSTED && !canAllocateBalance && !canResumeAllocation) || status === FinancePaymentStatus.REVERSED,
+        applicable: status === FinancePaymentStatus.APPROVED || canAllocateBalance || canResumeAllocation,
         busy: busy || referenceLoading,
         unavailableReason: '审批通过后可选择应收 / 应付核销',
         busyReason: referenceLoading
@@ -69,8 +81,8 @@ export function resolveFinancePaymentActionAvailability({
     case 'approval':
       return resolveAction({
         ...common,
-        relevant: status === 'DRAFT',
-        applicable: status === 'DRAFT',
+        relevant: status === FinancePaymentStatus.DRAFT,
+        applicable: status === FinancePaymentStatus.DRAFT,
         busy,
         unavailableReason: '只有待审批收付款可以核对审批流',
         busyReason: '当前操作完成后可核对审批流',
@@ -78,8 +90,8 @@ export function resolveFinancePaymentActionAvailability({
     case 'cancel':
       return resolveAction({
         ...common,
-        relevant: ['DRAFT', 'APPROVED'].includes(status),
-        applicable: ['DRAFT', 'APPROVED'].includes(status),
+        relevant: [FinancePaymentStatus.DRAFT, FinancePaymentStatus.APPROVED].includes(status),
+        applicable: [FinancePaymentStatus.DRAFT, FinancePaymentStatus.APPROVED].includes(status),
         busy,
         unavailableReason: '只有尚未过账的收付款可以核对取消',
         busyReason: '当前操作完成后可核对取消',
@@ -87,9 +99,9 @@ export function resolveFinancePaymentActionAvailability({
     case 'reverse':
       return resolveAction({
         ...common,
-        relevant: ['DRAFT', 'APPROVED', 'POSTED'].includes(status),
-        completed: status === 'REVERSED',
-        applicable: status === 'POSTED',
+        relevant: [FinancePaymentStatus.DRAFT, FinancePaymentStatus.APPROVED, FinancePaymentStatus.POSTED].includes(status),
+        completed: status === FinancePaymentStatus.REVERSED,
+        applicable: status === FinancePaymentStatus.POSTED,
         busy,
         unavailableReason: '完成核销后可冲销收付款',
         busyReason: '当前操作完成后可冲销收付款',
@@ -102,8 +114,8 @@ export function resolveFinancePaymentActionAvailability({
 // The server also checks related inspections and workflow records before saving.
 export function canEditShipmentDraft(shipment) {
   return Boolean(
-    shipment?.status === 'DRAFT' &&
-    shipment.finance_release_status === 'PENDING' &&
+    shipment?.status === ShipmentStatus.DRAFT &&
+    shipment.finance_release_status === ShipmentFinanceReleaseStatus.PENDING &&
     shipment.finance_release_version === 1 &&
     !shipment.finance_release_process_instance_id &&
     !shipment.finance_release_process_node_id &&
@@ -129,8 +141,8 @@ export function resolveShipmentActionAvailability({
     case 'quality':
       return resolveAction({
         ...common,
-        relevant: status === 'DRAFT' && releaseStatus === 'PENDING',
-        applicable: status === 'DRAFT' && releaseStatus === 'PENDING',
+        relevant: status === ShipmentStatus.DRAFT && releaseStatus === ShipmentFinanceReleaseStatus.PENDING,
+        applicable: status === ShipmentStatus.DRAFT && releaseStatus === ShipmentFinanceReleaseStatus.PENDING,
         busy,
         unavailableReason: '只有尚未财务放行的出货草稿可以发起检验',
         busyReason: '当前操作完成后可发起检验',
@@ -138,8 +150,8 @@ export function resolveShipmentActionAvailability({
     case 'release':
       return resolveAction({
         ...common,
-        relevant: status === 'DRAFT' && releaseStatus === 'PENDING',
-        applicable: status === 'DRAFT' && releaseStatus === 'PENDING',
+        relevant: status === ShipmentStatus.DRAFT && releaseStatus === ShipmentFinanceReleaseStatus.PENDING,
+        applicable: status === ShipmentStatus.DRAFT && releaseStatus === ShipmentFinanceReleaseStatus.PENDING,
         busy,
         unavailableReason: '只有待放行的出货草稿可以核对审批',
         busyReason: '当前操作完成后可核对出货审批',
@@ -148,9 +160,9 @@ export function resolveShipmentActionAvailability({
       return resolveAction({
         ...common,
         relevant:
-          status === 'DRAFT' && ['PENDING', 'APPROVED'].includes(releaseStatus),
-        completed: status === 'SHIPPED',
-        applicable: status === 'DRAFT' && releaseStatus === 'APPROVED',
+          status === ShipmentStatus.DRAFT && [ShipmentFinanceReleaseStatus.PENDING, ShipmentFinanceReleaseStatus.APPROVED].includes(releaseStatus),
+        completed: status === ShipmentStatus.SHIPPED,
+        applicable: status === ShipmentStatus.DRAFT && releaseStatus === ShipmentFinanceReleaseStatus.APPROVED,
         busy,
         unavailableReason: '财务审批通过后可确认出货',
         busyReason: '当前操作完成后可确认出货',
@@ -158,9 +170,9 @@ export function resolveShipmentActionAvailability({
     case 'cancel':
       return resolveAction({
         ...common,
-        relevant: ['DRAFT', 'SHIPPED'].includes(status),
-        completed: status === 'CANCELLED',
-        applicable: ['DRAFT', 'SHIPPED'].includes(status),
+        relevant: [ShipmentStatus.DRAFT, ShipmentStatus.SHIPPED].includes(status),
+        completed: status === ShipmentStatus.CANCELLED,
+        applicable: [ShipmentStatus.DRAFT, ShipmentStatus.SHIPPED].includes(status),
         busy,
         unavailableReason: '当前出货状态不能取消',
         busyReason: '当前操作完成后可继续',
@@ -169,10 +181,10 @@ export function resolveShipmentActionAvailability({
       return resolveAction({
         ...common,
         relevant:
-          status === 'SHIPPED' ||
-          (status === 'DRAFT' &&
-            ['PENDING', 'APPROVED'].includes(releaseStatus)),
-        applicable: status === 'SHIPPED',
+          status === ShipmentStatus.SHIPPED ||
+          (status === ShipmentStatus.DRAFT &&
+            [ShipmentFinanceReleaseStatus.PENDING, ShipmentFinanceReleaseStatus.APPROVED].includes(releaseStatus)),
+        applicable: status === ShipmentStatus.SHIPPED,
         busy,
         unavailableReason: '确认出货后可生成应收',
         busyReason: '当前操作完成后可生成应收',
@@ -181,10 +193,10 @@ export function resolveShipmentActionAvailability({
       return resolveAction({
         ...common,
         relevant:
-          status === 'SHIPPED' ||
-          (status === 'DRAFT' &&
-            ['PENDING', 'APPROVED'].includes(releaseStatus)),
-        applicable: status === 'SHIPPED',
+          status === ShipmentStatus.SHIPPED ||
+          (status === ShipmentStatus.DRAFT &&
+            [ShipmentFinanceReleaseStatus.PENDING, ShipmentFinanceReleaseStatus.APPROVED].includes(releaseStatus)),
+        applicable: status === ShipmentStatus.SHIPPED,
         busy,
         unavailableReason: '确认出货后可生成开票记录',
         busyReason: '当前操作完成后可生成开票记录',
@@ -214,8 +226,8 @@ export function resolveProductionExceptionActionAvailability({
     case 'approval':
       return resolveAction({
         ...common,
-        relevant: status === 'SUBMITTED' && requesterOwned,
-        applicable: status === 'SUBMITTED' && requesterOwned,
+        relevant: status === ProductionExceptionStatus.SUBMITTED && requesterOwned,
+        applicable: status === ProductionExceptionStatus.SUBMITTED && requesterOwned,
         busy,
         unavailableReason: '只有本人提交且待审批的申请可以核对审批流',
         busyReason: '当前操作完成后可核对审批流',
@@ -223,8 +235,8 @@ export function resolveProductionExceptionActionAvailability({
     case 'decide':
       return resolveAction({
         ...common,
-        relevant: status === 'SUBMITTED',
-        applicable: status === 'SUBMITTED',
+        relevant: status === ProductionExceptionStatus.SUBMITTED,
+        applicable: status === ProductionExceptionStatus.SUBMITTED,
         busy,
         unavailableReason: '只有待审批申请可以前往任务中心审批',
         busyReason: '当前操作完成后可前往审批',
@@ -232,8 +244,8 @@ export function resolveProductionExceptionActionAvailability({
     case 'withdraw':
       return resolveAction({
         ...common,
-        relevant: status === 'SUBMITTED' && requesterOwned,
-        applicable: status === 'SUBMITTED' && requesterOwned,
+        relevant: status === ProductionExceptionStatus.SUBMITTED && requesterOwned,
+        applicable: status === ProductionExceptionStatus.SUBMITTED && requesterOwned,
         busy,
         unavailableReason: '只有本人提交且待审批的申请可以撤回',
         busyReason: '当前操作完成后可核对撤回条件',
@@ -241,9 +253,9 @@ export function resolveProductionExceptionActionAvailability({
     case 'execute':
       return resolveAction({
         ...common,
-        relevant: !isQuota && ['SUBMITTED', 'APPROVED'].includes(status),
-        completed: ['APPLIED', 'REVERSED'].includes(executionStatus),
-        applicable: status === 'APPROVED' && executionStatus === 'PENDING',
+        relevant: !isQuota && [ProductionExceptionStatus.SUBMITTED, ProductionExceptionStatus.APPROVED].includes(status),
+        completed: [ProductionExceptionExecutionStatus.APPLIED, ProductionExceptionExecutionStatus.REVERSED].includes(executionStatus),
+        applicable: status === ProductionExceptionStatus.APPROVED && executionStatus === ProductionExceptionExecutionStatus.PENDING,
         busy,
         unavailableReason: '审批通过后可确认执行报废或在制品让步',
         busyReason: '当前操作完成后可确认执行',
@@ -253,10 +265,10 @@ export function resolveProductionExceptionActionAvailability({
         ...common,
         relevant:
           !isQuota &&
-          ['SUBMITTED', 'APPROVED'].includes(status) &&
-          ['PENDING', 'APPLIED'].includes(executionStatus),
-        completed: executionStatus === 'REVERSED',
-        applicable: status === 'APPROVED' && executionStatus === 'APPLIED',
+          [ProductionExceptionStatus.SUBMITTED, ProductionExceptionStatus.APPROVED].includes(status) &&
+          [ProductionExceptionExecutionStatus.PENDING, ProductionExceptionExecutionStatus.APPLIED].includes(executionStatus),
+        completed: executionStatus === ProductionExceptionExecutionStatus.REVERSED,
+        applicable: status === ProductionExceptionStatus.APPROVED && executionStatus === ProductionExceptionExecutionStatus.APPLIED,
         busy,
         unavailableReason: '业务执行后可确认冲正',
         busyReason: '当前操作完成后可确认冲正',
@@ -266,10 +278,10 @@ export function resolveProductionExceptionActionAvailability({
         ...common,
         relevant:
           isQuota &&
-          ['SUBMITTED', 'APPROVED'].includes(status) &&
-          executionStatus === 'PENDING',
-        completed: executionStatus === 'REVERSED',
-        applicable: status === 'APPROVED' && executionStatus === 'PENDING',
+          [ProductionExceptionStatus.SUBMITTED, ProductionExceptionStatus.APPROVED].includes(status) &&
+          executionStatus === ProductionExceptionExecutionStatus.PENDING,
+        completed: executionStatus === ProductionExceptionExecutionStatus.REVERSED,
+        applicable: status === ProductionExceptionStatus.APPROVED && executionStatus === ProductionExceptionExecutionStatus.PENDING,
         busy,
         unavailableReason: '审批通过后可撤销未使用的超领额度',
         busyReason: '当前操作完成后可撤销额度',

@@ -1,6 +1,8 @@
-const DECIMAL_SCALE = 6
-const MAX_NET_WEIGHT_SCALED = '99999999999999999999'
-const HALF_DECIMAL_FACTOR_TEXT = '500000'
+import { NumericContract } from '../../common/consts/numeric.generated.mjs'
+
+const DECIMAL_SCALE = NumericContract.scale
+const MAX_NET_WEIGHT_SCALED = NumericContract.maxUnits
+const HALF_DECIMAL_FACTOR_TEXT = '5'.padEnd(DECIMAL_SCALE, '0')
 const POSITIVE_DECIMAL_PATTERN =
   /^\+?(?:(\d+)(?:\.(\d*))?|\.(\d+))(?:[eE]([+-]?\d+))?$/u
 const SHIPMENT_WEIGHT_REFERENCE_PAGE_SIZE = 200

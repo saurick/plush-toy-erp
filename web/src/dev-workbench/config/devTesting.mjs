@@ -361,7 +361,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       'node scripts/qa/customer-config-effective-session-probe.mjs --json --report output/customers/yoyoosun/customer-config-effective-session-probe/current.json',
       'node scripts/deploy/customer-config-release-execute.mjs --print-input-template',
       'node scripts/deploy/customer-config-release-readiness.mjs --print-input-template',
-      'bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template',
+      'bash scripts/deploy/run-smoke.sh --print-input-template',
     ],
   },
   {

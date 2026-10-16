@@ -1,10 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  ArrowUpOutlined,
   CopyOutlined,
   DeleteOutlined,
   FolderOpenOutlined,
-  OrderedListOutlined,
 } from '@ant-design/icons'
 import { Button, Form, Input, InputNumber, Select, Space } from 'antd'
 import {
@@ -20,7 +18,6 @@ import FieldWithUnitSuffix, {
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
 import SourceImportPickerModal from '../business-list/SourceImportPickerModal.jsx'
-import BusinessLineItemOrderModal from '../business-list/BusinessLineItemOrderModal.jsx'
 import BusinessLineItemsSummaryValue from '../business-list/BusinessLineItemsSummaryValue.jsx'
 import BusinessLineItemsSection from '../business-list/BusinessLineItemsSection.jsx'
 import { BusinessHelpLabel } from '../help/BusinessContextHelp.jsx'
@@ -160,18 +157,6 @@ export function normalizePurchaseLineFormValue(item = {}) {
   }
 }
 
-export function purchaseOrderLineOrderLabel(item = {}, index = 0) {
-  return (
-    [
-      item.material_code_snapshot,
-      item.material_name_snapshot,
-      item.color_snapshot,
-    ]
-      .filter(Boolean)
-      .join(' / ') || `第 ${index + 1} 行（未选择材料）`
-  )
-}
-
 export function PurchaseOrderFormFields({
   form,
   suppliers,
@@ -183,8 +168,6 @@ export function PurchaseOrderFormFields({
   onMaterialChange,
 }) {
   const [materialImportOpen, setMaterialImportOpen] = useState(false)
-  const [lineOrderOpen, setLineOrderOpen] = useState(false)
-  const [lineOrderItems, setLineOrderItems] = useState([])
   useEffect(() => {
     if (!referenceDataReady) setMaterialImportOpen(false)
   }, [referenceDataReady])
@@ -354,7 +337,7 @@ export function PurchaseOrderFormFields({
           title="采购明细"
           description="同一个采购订单内维护多条供应商承诺明细。"
           emptyDescription="暂无采购明细"
-          renderBeforeHeader={({ add, fields }) => (
+          renderBeforeHeader={({ add }) => (
             <>
               <div className="erp-line-items-form__import-row">
                 <div className="erp-line-items-form__import-copy">
@@ -377,30 +360,8 @@ export function PurchaseOrderFormFields({
                   >
                     从材料库添加
                   </Button>
-                  <Button
-                    icon={<OrderedListOutlined />}
-                    disabled={!referenceDataReady || fields.length < 2}
-                    onClick={() => {
-                      const currentLines = form.getFieldValue('items') || []
-                      setLineOrderItems([...currentLines])
-                      setLineOrderOpen(true)
-                    }}
-                  >
-                    材料顺序
-                  </Button>
                 </Space>
               </div>
-              <BusinessLineItemOrderModal
-                getItemLabel={purchaseOrderLineOrderLabel}
-                itemNoun="采购明细"
-                items={lineOrderItems}
-                onApply={(orderedItems) =>
-                  form.setFieldsValue({ items: orderedItems })
-                }
-                onClose={() => setLineOrderOpen(false)}
-                open={lineOrderOpen}
-                title="调整材料顺序"
-              />
               <SourceImportPickerModal
                 open={materialImportOpen}
                 title="选择材料添加采购明细"
@@ -453,7 +414,7 @@ export function PurchaseOrderFormFields({
               />
             </>
           )}
-          renderRow={({ add, field, fields, index, remove, move }) => (
+          renderRow={({ add, field, fields, index, remove }) => (
             <BusinessLineItemRow
               key={field.key}
               index={index}
@@ -474,19 +435,6 @@ export function PurchaseOrderFormFields({
                   size={4}
                   wrap
                 >
-                  <Button
-                    aria-label={`上移第 ${index + 1} 行`}
-                    size="small"
-                    type="text"
-                    icon={<ArrowUpOutlined />}
-                    disabled={index === 0}
-                    onClick={() => {
-                      move(field.name, field.name - 1)
-                      requestLineItemScroll(index - 1)
-                    }}
-                  >
-                    上移
-                  </Button>
                   <Button
                     aria-label={`复制第 ${index + 1} 行`}
                     type="text"

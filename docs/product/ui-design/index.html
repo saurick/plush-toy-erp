@@ -856,18 +856,6 @@
     .action-choice:disabled { background: var(--surface-muted); }
 
     .board-surface { flex: 1 1 auto; min-height: 0; padding: 9px; overflow: auto; }
-    .lanes { min-width: 980px; height: 100%; display: grid; grid-template-columns: repeat(4, minmax(230px, 1fr)); gap: 8px; }
-    .lane { min-height: 0; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-muted); overflow: hidden; }
-    .lane.blocked { border-color: color-mix(in srgb, var(--danger) 30%, var(--line)); }
-    .lane.due { border-color: color-mix(in srgb, var(--warning) 36%, var(--line)); }
-    .lane-head { min-height: 40px; padding: 0 10px; display: flex; align-items: center; gap: 7px; border-bottom: 1px solid var(--line); background: var(--surface); font-weight: 650; }
-    .lane-head span:last-child { margin-left: auto; color: var(--text-3); }
-    .lane-body { min-height: 0; padding: 8px; overflow: auto; display: grid; align-content: start; gap: 7px; }
-    .task-card { padding: 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); text-align: left; transition: .15s var(--ease); }
-    .task-card:hover { transform: translateY(-1px); border-color: var(--brand); box-shadow: 0 6px 16px rgba(24, 55, 34, .08); }
-    .task-card-title { display: flex; align-items: flex-start; gap: 7px; }
-    .task-card-title > .task-identity-heading { flex: 1; }
-    .task-card-title > .badge { flex-shrink: 0; }
     .task-identity-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; line-height: 1.45; overflow-wrap: anywhere; }
     .task-identity-heading strong, .task-identity-type { min-width: 0; }
     .task-identity-type { color: var(--text-2); font-size: 12px; font-weight: 400; }
@@ -941,7 +929,6 @@
     @media(max-width:600px) { .fulfillment-chain-node { gap:6px; } .fulfillment-chain-stage { margin-left:32px; } }
 
     .task-handling-result { padding:12px; border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface-muted); }
-    .lane-more { margin: 0 8px 8px; }
     .task-object { margin-top: 8px; color: var(--text-2); line-height: 1.45; }
     .task-reason { margin-top: 7px; color: var(--danger); font-size: 12px; line-height: 1.45; }
     .task-initiator { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 4px; max-width: 100%; overflow-wrap: anywhere; }
@@ -953,6 +940,16 @@
     .form-head { min-height: 50px; padding: 8px 15px; border-bottom: 1px solid color-mix(in srgb, var(--brand) 28%, var(--line-strong)); display: flex; align-items: center; gap: 12px; background: linear-gradient(180deg, color-mix(in srgb, var(--brand) 14%, var(--surface)) 0%, color-mix(in srgb, var(--brand) 8%, var(--surface)) 100%); }
     .form-head h1 { margin: 0; font-size: 19px; }
     .form-head .badge { margin-left: auto; }
+    .form-fullscreen-trigger { margin-left:auto; flex:none; }
+    .form-head:has(.form-fullscreen-trigger) .badge { margin-left:0; }
+    @media (min-width:768px) {
+      body.form-fullscreen .app { grid-template-columns:minmax(0,1fr); transition:none; }
+      body.form-fullscreen .sidebar,body.form-fullscreen .topbar,body.form-fullscreen .view > :not(.form-view) { display:none; }
+      body.form-fullscreen .shell { grid-template-rows:minmax(0,1fr); }
+      body.form-fullscreen .main { padding:0; }
+      body.form-fullscreen .view { gap:0; }
+      body.form-fullscreen .form-view { border:0; border-radius:0; }
+    }
     .form-main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 170px minmax(0, 1fr); }
     .form-main > .form-scroll:only-child { grid-column: 1 / -1; }
     .anchor-nav { padding: 12px 9px; border-right: 1px solid var(--line); background: var(--surface-muted); overflow: auto; }
@@ -1380,7 +1377,7 @@
     .rm-filter-popover > .rm-sheet-head .rm-icon-button { position: absolute; right: 0; }
     .rm-filter-fields { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
     .rm-filter-popover .rm-sheet-group { margin-top: 13px; }
-    .rm-filter-popover .rm-sheet-options {display:flex;flex-wrap:wrap;gap:0 6px}.rm-filter-popover .rm-sheet-options button {min-height:44px;padding:4px 8px;border-block:4px solid transparent;border-inline:0;border-radius:6px;background-clip:padding-box;background-color:var(--subtle);font-size:13px}.rm-filter-popover .rm-sheet-options button.active {background-color:var(--brand-soft)}.rm-filter-popover .rm-sheet-group>span{text-align:left;margin-bottom:2px}.rm-filter-popover .rm-legend-action{display:flex;justify-content:space-between;align-items:center;gap:8px}.rm-filter-popover .rm-legend-action button{min-height:44px;border:0;background:none;color:var(--brand-strong)}.rm-filter-popover:not([aria-label$="日期范围"]):not(.rm-search-picker)>.rm-sheet-head{display:none}.rm-search-picker input{min-height:44px;width:100%;margin-block:8px}.rm-search-picker .rm-picker-list{display:grid;gap:4px}.rm-search-picker .rm-picker-list button{min-height:44px;padding:8px;text-align:left;background:var(--subtle);border:0;border-radius:6px}.rm-picker-entry{display:flex;align-items:center;justify-content:space-between;min-height:44px;width:100%;text-align:left;white-space:normal}.rm-history-results .rm-sheet-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.rm-history-results .rm-sheet-options button{padding-inline:2px;font-size:12px}
+    .rm-filter-popover .rm-sheet-options {display:flex;flex-wrap:wrap;gap:0 6px}.rm-filter-popover .rm-sheet-options button {min-height:44px;padding:4px 8px;border-block:4px solid transparent;border-inline:0;border-radius:6px;background-clip:padding-box;background-color:var(--subtle);font-size:13px}.rm-filter-popover .rm-sheet-options button.active {background-color:var(--brand-soft)}.rm-filter-popover .rm-sheet-group>span{text-align:left;margin-bottom:2px}.rm-filter-popover .rm-legend-action{display:flex;justify-content:space-between;align-items:center;gap:8px}.rm-filter-popover .rm-legend-action button{min-height:44px;border:0;background:none;color:var(--brand-strong)}.rm-filter-popover:not([aria-label$="日期范围"])>.rm-sheet-head{display:none}.rm-sheet-group input[data-mobile-option-search]{min-height:44px;width:100%;margin-block:4px}.rm-sheet-group [data-mobile-option-empty]{margin:0;color:var(--muted);font-size:13px}.rm-sheet-options button[hidden]{display:none}.rm-history-results .rm-sheet-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}.rm-history-results .rm-sheet-options button{padding-inline:2px;font-size:12px}
     .rm-filter-popover .rm-sheet-foot {flex-shrink:0;margin-top:8px;padding-top:4px;border-top:1px solid var(--line);display:flex;gap:8px}
     .rm-filter-popover .rm-sheet-foot .btn { width: 100%; }
     .rm-history-calendar { display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-top:8px; }
@@ -2261,8 +2258,6 @@
       .drawer { width: 100%; }
       .detail-grid { grid-template-columns: 90px 1fr; }
       .action-choice-grid { grid-template-columns: 1fr; }
-      .lanes { min-width: 0; height: auto; grid-template-columns: 1fr; }
-      .lane-body { max-height: none; }
       .board-surface { overflow: visible; }
       .form-view { height: calc(100vh - 58px); }
       .form-head { min-height: 48px; padding: 7px 10px; }
@@ -2427,9 +2422,6 @@
     .role-help-preview .business-chain{padding:14px 16px 12px;border-bottom:1px solid var(--line)}
     .role-help-preview .chain-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
     .role-help-preview .chain-heading h3{font-size:14px;font-weight:600}.role-help-preview .chain-heading span{font-size:12px;color:var(--muted)}
-    .role-help-preview .chain-note{display:flex;align-items:baseline;gap:12px;line-height:1.7;margin-top:8px;font-size:13px}
-    .role-help-preview .chain-note[hidden]{display:none}
-    .role-help-preview .chain-note strong{font-weight:600;white-space:nowrap}.role-help-preview .chain-note span{color:var(--muted)}
 .role-help-preview{container-name:role-help-shell;container-type:inline-size}
 .role-help-preview .layout{width:100%;max-width:none;flex:1;min-height:0;margin:0;grid-template-columns:180px minmax(0,1fr);gap:0;padding:0}
 .role-help-preview .help-sidebar{display:block;min-height:0;overflow:auto;padding:14px 12px;background:var(--surface);border:0;border-right:1px solid var(--line);z-index:auto}
@@ -2446,7 +2438,7 @@
 .role-help-preview .note-list{display:block}.role-help-preview .note-list li+li{margin-top:6px}.role-help-preview .note-button{flex-direction:row;height:auto}
 .role-help-preview .action-demo,.role-help-preview .point-hit span,.role-help-preview .note-number{font-size:12px}
 [data-mode="dark"] .role-help-preview .entry-button,[data-mode="dark"] .role-help-preview .action-demo,[data-mode="dark"] .role-help-preview .region[data-selected="true"] .point-hit span,[data-mode="dark"] .role-help-preview .note-button[aria-pressed="true"] .note-number{color:var(--on-brand)}
-@container role-help (max-width:720px){.role-help-preview .guide-grid,.role-help-preview .result-grid{grid-template-columns:minmax(0,1fr)}.role-help-preview .note-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.role-help-preview .note-list li+li{margin:0}.role-help-preview .note-button{flex-direction:column;height:100%}.role-help-preview .chain-note{display:block}.role-help-preview .chain-note strong{margin-right:8px}}
+@container role-help (max-width:720px){.role-help-preview .guide-grid,.role-help-preview .result-grid{grid-template-columns:minmax(0,1fr)}.role-help-preview .note-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.role-help-preview .note-list li+li{margin:0}.role-help-preview .note-button{flex-direction:column;height:100%}}
 @container role-help-shell (max-width:1000px){.role-help-preview .layout{display:flex;flex-direction:column}.role-help-preview .help-sidebar{flex:none;display:grid;grid-template-columns:160px minmax(0,1fr);gap:12px;padding:12px 14px;margin:0;border-right:0;border-bottom:1px solid var(--line);overflow:visible}.role-help-preview .help-sidebar nav,.role-help-preview .sidebar-note{display:none}.role-help-preview .mobile-scenes{display:block}.role-help-preview .help-main{flex:1;padding:14px}.role-help-preview .entry-button span{display:inline}}
 @media(max-width:640px){.role-help-preview .help-sidebar{grid-template-columns:minmax(0,1fr) minmax(0,1.3fr)}.role-help-preview .guide-grid,.role-help-preview .result-grid{grid-template-columns:1fr}.role-help-preview .note-list{display:flex;flex-direction:column}.role-help-preview .note-button{flex-direction:row}.role-help-preview .entry-button span{display:none}.role-help-preview .entry-button{min-height:38px}.role-help-preview .help-main{overflow:visible;container-type:normal}.role-help-preview .layout{overflow:visible}.role-help-preview .page-description{font-size:13px}}
 
@@ -2477,7 +2469,7 @@
 .role-help-preview .manual-results p{margin:8px 0 18px;color:var(--muted)}
 @container role-help-shell (max-width:1000px){.role-help-preview .manual-toolbar{align-items:stretch;flex-direction:column;gap:10px}.role-help-preview .manual-search{flex:none;width:100%;max-width:none}.role-help-preview .manual-toolbar .help-picker{width:100%}.role-help-preview .help-sidebar{display:block;max-height:45vh;overflow:auto}.role-help-preview .help-sidebar nav{display:block}.role-help-preview .manual-reference{padding:16px}.role-help-preview .manual-reference dl>div{grid-template-columns:minmax(0,1fr);gap:2px}}
 .role-help-preview{--help-accent:var(--brand-strong)}
-.role-help-preview .chain-note strong,.role-help-preview .note-button[aria-pressed="true"] .note-copy strong,.role-help-preview .scene-link[aria-current="page"],.role-help-preview .view-tab[aria-pressed="true"],.role-help-preview .good-note,.role-help-preview .delta .after strong,.role-help-preview .delta .delta-arrow{color:var(--help-accent)}
+.role-help-preview .note-button[aria-pressed="true"] .note-copy strong,.role-help-preview .scene-link[aria-current="page"],.role-help-preview .view-tab[aria-pressed="true"],.role-help-preview .good-note,.role-help-preview .delta .after strong,.role-help-preview .delta .delta-arrow{color:var(--help-accent)}
 [data-mode="dark"] .role-help-preview{--help-accent:color-mix(in srgb,var(--brand) 38%,white);--focus:var(--help-accent)}
 
 .role-help-preview .help-picker{min-width:0}
@@ -2662,6 +2654,13 @@
     .dev-design-table small { display: block; color: var(--text-3); line-height: 1.6; }
     .dev-design-pending { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--brand-softer); }
     .dev-design-operation { padding: 12px; border-top: 1px solid var(--line); }
+    .dev-flow-preview-phase { display:grid; gap:10px; padding:12px 0; border-top:1px solid var(--line); }
+    .dev-flow-preview-stages { display:flex; gap:10px; flex-wrap:wrap; }
+    .dev-flow-preview-stages .btn { flex:1 1 130px; display:flex; gap:8px; min-height:54px; white-space:normal; text-align:left; }
+    .dev-flow-preview-stages.is-conditional .btn { border-style:dashed; min-height:40px; }
+    .dev-flow-preview-stages [data-role-match="true"] { background:var(--brand-softer); color:var(--brand); }
+    .dev-flow-preview-stages [aria-pressed="true"] { outline:2px solid var(--brand); outline-offset:2px; }
+    .dev-flow-preview-detail { padding:12px; background:var(--surface-2); border-radius:var(--radius); }
     .dev-design-steps { display: flex; flex-wrap: wrap; gap: 12px 24px; padding-left: 20px; color: var(--text-2); }
     .dev-design-evidence { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; line-height: 1.6; }
     .dev-design-evidence dt { color: var(--text-3); }
@@ -3069,7 +3068,6 @@
 
     .dev-rule-preview-edge { display:grid; grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr); align-items:center; gap:8px; margin-block:8px; text-align:center; }
     [data-dev-rule-preview] button[aria-pressed="true"] { border-color:var(--brand); color:var(--brand-strong); background:var(--brand-soft); }
-    @media (min-width: 1200px) { .lanes.lanes--todo { grid-template-columns: repeat(3, minmax(0,1fr)); } }
 
     .task-calendar-switch { margin-bottom: 12px; }
     .task-calendar-demo { display:grid; grid-template-columns:minmax(280px,420px) minmax(0,1fr);gap:24px;align-items:start;padding-top:12px; }
@@ -3102,7 +3100,28 @@
     .role-mobile-screen .task-calendar-switch { margin-left:12px; }
     @media(min-width:360px){.task-calendar-demo--mobile .task-calendar-demo-head strong{font-size:20px;}}
     @media(max-width:760px){.task-calendar-demo{grid-template-columns:minmax(0,1fr);}}
-  </style>
+
+    .task-overview-heading { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+    .task-overview-heading h3 { margin:0; font-size:23px; }
+    .task-current-summary { display:grid; gap:6px; margin:18px 0 16px; padding:14px 16px; border-radius:8px; background:var(--brand-soft); }
+    .task-current-summary p { margin:0; }
+    .task-copy-menu { position:relative; flex-shrink:0; }
+    .task-return-head:has(> .task-copy-menu) { position:relative; padding-right:52px; }
+    .task-return-head > .task-copy-menu { position:absolute; top:50%; right:14px; transform:translateY(-50%); }
+    .task-copy-menu > summary { display:grid; width:32px; min-height:32px; place-items:center; border:0; border-radius:6px; padding:4px; background:transparent; list-style:none; font-size:20px; cursor:pointer; }
+    .task-copy-menu > summary::-webkit-details-marker { display:none; }
+    .task-copy-options { position:absolute; z-index:10; top:calc(100% + 6px); right:0; display:grid; width:180px; padding:5px; border:1px solid var(--line); border-radius:7px; background:var(--surface); box-shadow:var(--shadow); }
+    .task-copy-options .btn { display:flex; align-items:center; justify-content:flex-start; min-height:40px; gap:8px; padding:10px 9px; border:0; border-radius:4px; background:transparent; box-shadow:none; white-space:nowrap; }
+    .task-focus-content .detail-section { padding:0; border:0; border-radius:0; box-shadow:none; }
+    .task-focus-flow { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:10px 0; }
+    .task-focus-resources > .detail-section { display:contents; }
+    .task-focus-resources { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:0 0 16px; }
+    .task-focus-content .task-history-summary { border-top:1px solid var(--line); }
+    .task-history-summary { margin-top:14px; }
+    .task-history-summary > summary { min-height:36px; padding:8px 0; cursor:pointer; }
+  .role-help-preview .manual-home{max-width:1100px;padding:8px 0}.role-help-preview .manual-home>p{color:var(--muted);margin:8px 0 18px}.role-help-preview .manual-home nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.role-help-preview .manual-home nav button{padding:18px;border:1px solid var(--line);border-radius:10px;background:var(--surface,Canvas);color:var(--text);text-align:left;font:inherit}.role-help-preview .manual-home nav strong,.role-help-preview .manual-home nav span{display:block}.role-help-preview .manual-home nav span{color:var(--muted);margin-top:8px}.role-help-preview .manual-home>h3{margin:24px 0 10px}.role-help-preview .manual-home>button{display:block;width:100%;padding:14px 0;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--text);text-align:left;font:inherit}@media(max-width:700px){.role-help-preview .manual-home nav{grid-template-columns:minmax(0,1fr)}}
+.role-help-preview .help-step-checks{padding-top:18px;border-top:1px solid var(--line);margin-top:18px}.role-help-preview .help-step-checks h3{margin-top:12px}.role-help-preview .help-step-checks p{margin:8px 0 14px}
+</style>
 </head>
 <body data-mode="light" data-density="standard">
   <div class="app">
@@ -4655,21 +4674,42 @@
       delivery: {label:'交付运行', icon:'shipping', description:'按作用范围进入配置、迁移、发布与恢复任务。', views:[['config','客户配置'],['migration','数据库迁移'],['versions','版本发布'],['recovery','安全与恢复']]}
     };
     const devDesignRecords = [
-      {key:'core', area:'engineering', title:'产品内核', source:'产品能力与领域边界', status:'已核对', detail:'主数据、采购、库存、质检、生产、出货和财务分别保留唯一事实真源。', path:'docs/architecture/'},
-      {key:'permissions', area:'engineering', title:'权限关系', source:'岗位、账号与正式菜单', status:'已核对', detail:'选择岗位或账号，核对实际菜单、功能与数据范围；配置变更回正式权限管理。', path:'/__dev/permission-relationships'},
-      {key:'flows', area:'engineering', title:'业务链观察', source:'流程定义与运行实例', status:'待核对', detail:'业务结构看链路，实例跟踪查任务与异常；技术详情按需查看，导出集中在一个入口。', path:'/__dev/status-flows'},
-      {key:'usability', area:'quality', title:'页面说明检查', source:'业务页面说明目录', status:'已核对', detail:'只读核对任务说明、完成标准、交接和字段解释；说明覆盖不代表员工体验或客户验收。', path:'/__dev/business-usability'},
-      {key:'docs', area:'engineering', title:'开发文档', source:'仓库当前正式文档', status:'已核对', detail:'按关键词查找正式文档，保留目录、标题与当前来源路径。', path:'/__dev/docs'},
-      {key:'design', area:'engineering', title:'UI 交互设计', source:'同一份可交互 HTML', status:'已核对', detail:'业务界面、手机界面、登录、帮助与效能工作台在同一设计稿核对。', path:'docs/product/ui-design/index.html'},
-      {key:'affected', area:'quality', title:'改动验证', source:'当前改动的受影响范围', status:'已核对', detail:'样例：空状态样式、手机任务列表和设计查看器；检查组件、页面恢复与窄屏。', path:'scripts/qa/affected.sh'},
-      {key:'chain-audit', area:'quality', title:'链路实测', source:'本地实跑批次与证据清单', status:'未复验', detail:'按批次查看链路结果、问题与复验、执行与证据三个 Tab；区分历史源码和当前工作区，登记场景不等于全部实跑通过。', path:'/__dev/business-chain-audit'},
-      {key:'gates', area:'quality', title:'质量门禁', source:'固定版本的 CI 结果', status:'待核对', detail:'流程与并发原理可按需展开；样例版本尚缺完整 CI 终态，局部测试通过不代表发布资格。', path:'/__dev/quality-gates'},
-      {key:'data', area:'quality', title:'测试数据', source:'隔离样例与验证资料', status:'已核对', detail:'按用途选择基础数据、业务场景或完整回归；就近处理阻断，准备后确认批次，执行记录单独查看。', path:'/__dev/data-preparation'},
-      {key:'config', area:'delivery', title:'客户配置', source:'配置快照与固定版本', status:'已核对', detail:'核对客户配置和当前版本的关系；不把配置选择当成部署完成。', path:'/__dev/customer-config'},
-      {key:'versions', area:'delivery', title:'版本发布', source:'不可变制品与目标读回', status:'待核对', detail:'选择版本后核对目标、门禁与回滚点。未完成目标读回前，保持未证明。', path:'/__dev/version-center'},
-      {key:'migration', area:'delivery', title:'数据库迁移', source:'迁移计划、备份与恢复验证', status:'待核对', detail:'计划准备就绪后才允许确认；失败保留恢复入口，不自动执行或重试迁移。', path:'/__dev/database-migration'},
-      {key:'recovery', area:'delivery', title:'安全与恢复', source:'安全合同、恢复点与演练回执', status:'未核验', detail:'只读核对应用、入口身份、异常监测及备份隔离；数据库恢复不能代替完整抗勒索核验。', path:'/__dev/drill-recovery'}
+      {key:'core', purpose:'能力范围与当前边界', area:'engineering', title:'产品内核', source:'产品能力与领域边界', status:'已核对', detail:'主数据、采购、库存、质检、生产、出货和财务分别保留唯一事实真源。', path:'docs/architecture/'},
+      {key:'permissions', purpose:'岗位权限、实际侧栏与数据范围', area:'engineering', title:'权限关系', source:'岗位、账号与正式菜单', status:'已核对', detail:'选择岗位或账号，核对实际菜单、功能与数据范围；配置变更回正式权限管理。', path:'/__dev/permission-relationships'},
+      {key:'flows', purpose:'业务交接与运行路径', area:'engineering', title:'业务链观察', source:'流程定义与运行实例', status:'待核对', detail:'业务结构看链路，实例跟踪查任务与异常；技术详情按需查看，导出集中在一个入口。', path:'/__dev/status-flows'},
+      {key:'usability', purpose:'业务页面的说明缺口', area:'quality', title:'页面说明检查', source:'业务页面说明目录', status:'已核对', detail:'只读核对任务说明、完成标准、交接和字段解释；说明覆盖不代表员工体验或客户验收。', path:'/__dev/business-usability'},
+      {key:'docs', purpose:'搜索与阅读正式依据', area:'engineering', title:'开发文档', source:'仓库当前正式文档', status:'已核对', detail:'按关键词查找正式文档，保留目录、标题与当前来源路径。', path:'/__dev/docs'},
+      {key:'design', purpose:'交互稿、设计说明与依据', area:'engineering', title:'UI 交互设计', source:'同一份可交互 HTML', status:'已核对', detail:'业务界面、手机界面、登录、帮助与效能工作台在同一设计稿核对。', path:'docs/product/ui-design/index.html'},
+      {key:'affected', purpose:'验证计划与检查结果', area:'quality', title:'改动验证', source:'当前改动的受影响范围', status:'已核对', detail:'样例：空状态样式、手机任务列表和设计查看器；检查组件、页面恢复与窄屏。', path:'scripts/qa/affected.sh'},
+      {key:'chain-audit', purpose:'实跑批次、问题与逐步证据', area:'quality', title:'链路实测', source:'本地实跑批次与证据清单', status:'未复验', detail:'按批次查看链路结果、问题与复验、执行与证据三个 Tab；区分历史源码和当前工作区，登记场景不等于全部实跑通过。', path:'/__dev/business-chain-audit'},
+      {key:'gates', purpose:'固定版本 CI 与本机诊断', area:'quality', title:'质量门禁', source:'固定版本的 CI 结果', status:'待核对', detail:'流程与并发原理可按需展开；样例版本尚缺完整 CI 终态，局部测试通过不代表发布资格。', path:'/__dev/quality-gates'},
+      {key:'data', purpose:'模拟数据、复用与批次结果', area:'quality', title:'测试数据', source:'隔离样例与验证资料', status:'已核对', detail:'按用途选择基础数据、业务场景或完整回归；就近处理阻断，准备后确认批次，执行记录单独查看。', path:'/__dev/data-preparation'},
+      {key:'config', purpose:'配置包预检、差异与测试应用', area:'delivery', title:'客户配置', source:'配置快照与固定版本', status:'已核对', detail:'核对客户配置和当前版本的关系；不把配置选择当成部署完成。', path:'/__dev/customer-config'},
+      {key:'versions', purpose:'制品、部署与回滚', area:'delivery', title:'版本发布', source:'不可变制品与目标读回', status:'待核对', detail:'选择版本后核对目标、门禁与回滚点。未完成目标读回前，保持未证明。', path:'/__dev/version-center'},
+      {key:'migration', purpose:'备份恢复、升级计划与结果', area:'delivery', title:'数据库迁移', source:'迁移计划、备份与恢复验证', status:'待核对', detail:'计划准备就绪后才允许确认；失败保留恢复入口，不自动执行或重试迁移。', path:'/__dev/database-migration'},
+      {key:'recovery', purpose:'目标安全、备份与恢复证据', area:'delivery', title:'安全与恢复', source:'安全合同、恢复点与演练回执', status:'未核验', detail:'只读核对应用、入口身份、异常监测及备份隔离；数据库恢复不能代替完整抗勒索核验。', path:'/__dev/drill-recovery'}
     ];
+    function renderDevExceptionPreview(key='',planKey='') {
+      const guide=taskDiscoveryCatalog.exception_guides.find(item=>item.key===key);
+      if(!guide)return `<div><h4>全部异常流程</h4>${taskDiscoveryCatalog.exception_guides.map(item=>`<button class="btn" data-action="dev-flow-exception-source" data-value="${item.key}"><strong>${escapeHTML(item.label)}</strong> · ${item.plans.map(plan=>escapeHTML(plan.label)).join(' / ')}</button>`).join('')}</div>`;
+      const plan=guide.plans.find(item=>item.key===planKey)||guide.plans[0];
+      const nodes=[...guide.steps,...(guide.approval?[guide.approval]:[]),...plan.steps];
+      return `<div data-preview-exception-source="${guide.key}"><button class="btn" data-action="dev-flow-exception-source" data-value="">返回全部异常</button><h4>${escapeHTML(guide.label)}</h4><p>${escapeHTML(guide.source)}</p><div class="dev-design-toolbar">${guide.plans.map(item=>`<button class="btn" data-action="dev-flow-exception-plan" data-value="${item.key}" aria-pressed="${item.key===plan.key}">${escapeHTML(item.label)}</button>`).join('')}</div><ol class="dev-design-steps">${nodes.map(node=>`<li>${escapeHTML(node.label)} · ${escapeHTML(node.role||node.role_keys?.map(permissionRoleName).join(' / ')||'按有效配置分派')}</li>`).join('')}</ol><h4>结束条件</h4><p>${escapeHTML(plan.closure)}</p><h4>撤销与恢复</h4><p>${escapeHTML(plan.recovery)}</p></div>`;
+    }
+
+    function renderDevFulfillmentPreview(role='all',stage='') {
+      const roles=[['all','全部岗位'],['warehouse','仓库'],['production','生产经理']];
+      const flow=taskDiscoveryCatalog.fulfillment_flow;
+      const current=flow.find(step=>step.stage===stage);
+      const matches=step=>role==='all'||step.role_keys?.includes(role);
+      const roleName=roles.find(([key])=>key===role)[1];
+      const groups=[['接单与备料',[0,2,4,5],[1,3]],['加工生产',[6,7,8,9,10,11],[]],['入库与交付',[12,13,14,15,16],[]]];
+      const nodes=(indices,branch=false)=>`<div class="dev-flow-preview-stages${branch?' is-conditional':''}">${indices.map(index=>{const step=flow[index];return `<button class="btn" data-action="dev-flow-stage" data-value="${step.stage}" data-role-match="${role!=='all'&&matches(step)}" aria-pressed="${stage===step.stage}"><span>${index+1}</span><span>${escapeHTML(step.label)}</span></button>`;}).join('')}</div>`;
+      const subflow=current?.subflow;
+      const duties=subflow?.nodes.filter(matches)||[];
+      return `<div data-flow-role="${role}" data-flow-stage="${stage}"><div class="dev-design-toolbar"><h4>订单全流程</h4><button class="btn" data-action="dev-flow-design-view" data-value="exception">异常流程</button><button class="btn" data-action="dev-flow-design-view" data-value="topics">按业务查阅</button></div><div class="dev-design-toolbar" aria-label="关注岗位示例">${roles.map(([key,label])=>`<button class="btn" data-action="dev-flow-role" data-value="${key}" aria-pressed="${role===key}">${label}</button>`).join('')}</div><p role="status">${role==='all'?'全部 17 个环节':`${roleName}参与 ${flow.filter(matches).length} / 17 个环节`}</p>${groups.map(([label,main,branches])=>`<section class="dev-flow-preview-phase"><h4>${label}</h4>${nodes(main)}${branches.length?nodes(branches,true):''}</section>`).join('')}<p class="data-note">虚线：按约定穿插办理首款 / 分期；序号只用于总链定位。</p>${current?`<section class="dev-flow-preview-detail"><div class="dev-design-toolbar"><h4>第 ${flow.indexOf(current)+1} / 17 环节 · ${escapeHTML(current.label)}</h4><button class="btn" data-action="dev-flow-stage" data-value="">收起环节</button></div><p>${role==='all'?`办理岗位：${escapeHTML(current.role)}`:duties.length?`${roleName}负责：${duties.map(node=>escapeHTML(node.label)).join('、')}`:matches(current)?`办理岗位：${escapeHTML(current.role)}`:`本环节未登记${roleName}职责，保留交接上下文。`}</p>${subflow?`<p>${escapeHTML(subflow.summary)}</p><details><summary>子流程与关键交接</summary><ul>${subflow.edges.map(edge=>`<li>${escapeHTML(subflow.nodes.find(node=>node.key===edge.from).label)} → ${escapeHTML(subflow.nodes.find(node=>node.key===edge.to).label)}${edge.label?` · ${escapeHTML(edge.label)}`:''}</li>`).join('')}</ul></details>`:`<p>${escapeHTML(current.result)}</p>`}${subflow?`<details><summary>环节完成条件</summary><p>${escapeHTML(current.result)}</p></details>`:''}${stage==='incoming_quality'?'<button class="btn" data-action="dev-flow-exception-source" data-value="purchase_rejection">本环节异常</button>':''}</section>`:'<p class="data-note">点开一个环节，查看职责、分支与交接。</p>'}</div>`;
+    }
+
     function renderDevVisualizationPreview(key) {
       const steps=(label,nodes)=>`<div class="dev-git-lock-flow" role="img" aria-label="${label}">${nodes.map((node,index)=>`${index?'<span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span>':''}<div class="dev-git-lock-flow__node">${escapeHTML(node)}</div>`).join('')}</div>`;
       if(key==='chain-audit') return `<section aria-label="链路实测页面说明"><h3>批次与源码身份常驻</h3><p>顶部选择批次，显示报告生成时间、模拟环境和报告源码。历史失败保留，没有复验回执时显示未复验。</p><table class="dev-tool-table"><thead><tr><th>Tab</th><th>查看内容</th></tr></thead><tbody><tr><th>链路结果</th><td>实跑路径图、链路汇总、逐步读回与登记场景矩阵；按链路、状态、关键词筛选</td></tr><tr><th>问题与复验</th><td>优先级、触发路径、影响和证据；不提供人工改通过</td></tr><tr><th>执行与证据</th><td>创建编辑、协同、浏览器、数据库、打印与证据下载</td></tr></tbody></table><p>业务链观察按同一链路互跳。总图从执行时冻结定义生成并叠加本批次结果，连线不代表逐单已发生流转。</p><details><summary>与当前业务链定义核对</summary><p>逐链列出定义变化和本批次未记录步骤；旧报告缺少快照时显示无法判定一致，不补写历史。</p></details><p>Tab 切换只替换内容，批次切换忽略旧请求；下载完整证据包后打开 HTML。</p><p class="data-note">只读页面说明，不读取本地报告或执行业务。</p></section>`;
@@ -4677,14 +4717,13 @@
       if(key==='data') return `<section data-dev-data-preview><h3>测试数据 · 操作示例</h3><div class="dev-design-toolbar" role="group" aria-label="测试数据视图示例"><button class="btn" data-action="dev-data-view" data-value="scope" aria-pressed="true">准备数据</button><button class="btn" data-action="dev-data-view" data-value="confirm" aria-pressed="false" hidden>当前批次</button><button class="btn" data-action="dev-data-view" data-value="receipts" aria-pressed="false">执行记录</button></div><div data-data-panel="scope"><table class="dev-tool-table" aria-label="数据准备方式示例"><thead><tr><th>准备范围</th><th>用途与保留</th><th>当前条件</th></tr></thead><tbody><tr><th>长期业务场景数据（默认）</th><td>固定批次补齐模拟业务数据，长期保留</td><td>本地开发 · 样例可准备</td></tr><tr><th>本地基础数据</th><td>演示账号、单位和仓库，长期保留</td><td>样例可准备</td></tr><tr><th>完整回归</th><td>新建隔离库，完成后清理</td><td>待处理：样例有未提交改动</td></tr></tbody></table><p>默认选择长期业务场景数据与本地开发；demo 演练环境需手动切换。核对所选范围后准备计划，确认后才执行。</p><button class="btn primary" data-action="dev-data-prepare">演示准备业务场景</button></div><div data-data-panel="confirm" hidden><h4>当前批次 · 业务场景样例</h4><p>固定目标：本地开发；内容：固定批次的模拟业务场景；保留：长期使用。</p><button class="btn" data-action="dev-data-view" data-value="scope">返回准备数据</button></div><div data-data-panel="receipts" hidden><p>尚无执行记录。准备计划不代表已经生成数据。</p></div><p class="data-note">仅演示查看与计划，不执行数据写入。</p></section><details><summary>复用判断与模块依赖</summary><h3>是否复用已有数据</h3>${steps('样例复用判断',['核对目标与旧回执','比较数据合同及逻辑指纹','按变化复用、重验或刷新','只读 readiness 与回执读回'])}<h3>哪些模块一起刷新</h3><div class="dev-git-lock-flow" role="img" aria-label="样例模块依赖"><div class="dev-git-lock-flow__node">来源单</div><span aria-hidden="true">↓</span><div class="dev-git-lock-flow__branches"><article>协同任务 → 附件</article><article>业务结果 → 采购质检与附件</article></div></div><p class="data-note">这里只演示分图阅读；实际范围由当前登记依赖和本次回执确定。</p></details>`;
 
       if(key!=='flows') return '';
-      const exceptionGuidePreview = taskDiscoveryCatalog.exception_guides.map(guide=>`<h4>${escapeHTML(guide.label)}</h4><p>${escapeHTML(guide.source)}</p><table class="dev-tool-table"><thead><tr><th>方案</th><th>怎样结束</th></tr></thead><tbody>${guide.plans.map(plan=>`<tr><td>${escapeHTML(plan.label)}</td><td>${escapeHTML(plan.closure)}</td></tr>`).join('')}</tbody></table>`).join('');
       const transitions=[
         {from:'草稿',to:'待审批',kind:'standard',condition:'资料完整并提交'},
         {from:'待审批',to:'已批准',kind:'standard',condition:'审批通过'},
         {from:'待审批',to:'草稿',kind:'exceptional',condition:'退回后补齐资料'},
       ];
       const modes=[['standard','正常推进'],['all','全部'],['exceptional','异常与纠正']];
-      return `<section data-dev-flow-preview aria-label="业务链观察交互样例"><h3>业务链观察 · 虚构样例</h3><div class="dev-design-toolbar"><div class="segment" role="tablist" aria-label="观察方式示例"><button role="tab" aria-selected="true" class="active" data-action="dev-flow-view" data-value="chain">业务结构</button><button role="tab" aria-selected="false" data-action="dev-flow-view" data-value="tracking">实例跟踪</button></div><details><summary>导出</summary><button class="btn" data-action="dev-flow-export" data-value="当前视图">当前视图 · 打印 / PDF</button><button class="btn" data-action="dev-flow-export" data-value="客户校对稿">客户校对稿</button></details></div><div class="dev-design-toolbar"><label class="search"><input aria-label="示例来源单号" placeholder="示例单号 SO-DEMO-001" value="SO-DEMO-001" /></label><button class="btn primary" data-action="dev-flow-find">定位</button></div><div data-flow-panel="chain"><div data-flow-design-panel="main"><div class="dev-design-toolbar"><h4>订单全流程</h4><span>关注岗位：仓库（示例）</span><button class="btn" data-action="dev-flow-design-view" data-value="topics">按业务查阅</button></div>${steps('业务主链示例',['仓库清点来料','IQC 质检','裁片、车缝与手工','成品正式入库','查货与包装','业务发货'])}<p>每道规定检验通过后才能继续；成品入库仍需查货包装才能发货。</p><section><h4>来料检验与材料入库</h4><p>仓库接收品质检验结果，检验允许接收后确认入库。</p><button class="btn" data-action="dev-flow-design-view" data-value="exception">查看异常处理过程</button></section></div><div data-flow-design-panel="topics" hidden><button class="btn" data-action="dev-flow-design-view" data-value="main">返回完整流程</button><h4>按业务查阅 · 采购流程示例</h4><p>仓库：到货点数、来料检验与材料入库。进入业务保留上下游；岗位与目录可刷新、返回恢复。</p><table class="dev-tool-table"><thead><tr><th>环节</th><th>办理岗位</th><th>交接结果</th></tr></thead><tbody><tr><td>采购与到货安排</td><td>采购 / 审批责任人</td><td>已批准订单，交仓库清点</td></tr><tr><td>到货点数</td><td>仓库</td><td>实际数量与来源，交 IQC</td></tr><tr><td>检验与入库</td><td>IQC / 仓库</td><td>检验允许接收后正式入库</td></tr><tr><td>应付草稿与确认</td><td>财务</td><td>按已过账来源生成草稿，再确认应付</td></tr></tbody></table><details><summary>系统衔接图</summary>${steps('专题关联示例',['采购入库','生产执行','出货结算'])}<p>图示业务关联，不代表实际业务已完成。</p></details></div><div data-flow-design-panel="exception" hidden><button class="btn" data-action="dev-flow-design-view" data-value="main">返回来料检验与材料入库</button><h4>异常处理 · 来源与方案示例</h4><p>先选异常来源，再选处理方案。关注岗位突出当前方案的步骤；点击步骤查看交接、闭环与恢复，链接保留当前选择。</p>${exceptionGuidePreview}</div></div><div data-flow-panel="tracking" hidden><p data-flow-empty>输入示例单号，定位关联任务。</p><div data-flow-example hidden><h4>SO-DEMO-001 · 关联任务</h4><table class="dev-tool-table"><thead><tr><th>业务环节</th><th>负责岗位</th><th>任务状态</th></tr></thead><tbody><tr><th>采购与来料 · 清点</th><td>仓库</td><td>已完成</td></tr><tr><th>外发裁片 · 回货质检</th><td>IQC</td><td>已完成，发现色差</td></tr></tbody></table><h4>异常分支 · 外发裁片</h4><p><span class="badge warning">待处理</span> 业务决定补料返工、改换厂商或放弃本批次。</p><p class="data-note">任务状态不代替业务结果；此处仅为虚构界面样例。</p></div></div><p data-flow-export-result hidden role="status"></p></section><details><summary>技术详情 · 状态规则示例</summary><section data-dev-rule-preview><h3>状态规则 · 筛选示例</h3><div class="dev-design-toolbar" role="group" aria-label="状态转换筛选示例">${modes.map(([mode,label])=>`<button class="btn" data-action="dev-rule-view" data-value="${mode}" aria-pressed="${mode==='standard'}">${label}</button>`).join('')}</div>${modes.map(([mode,label])=>{const visible=transitions.filter(item=>mode==='all'||item.kind===mode);return `<div data-rule-panel="${mode}"${mode==='standard'?'':' hidden'}><p>当前显示 ${visible.length} / ${transitions.length} 条；图与条件清单同步。</p><div role="img" aria-label="${label}状态图示">${visible.map(item=>`<div class="dev-rule-preview-edge"><span class="dev-git-lock-flow__node">${item.from}</span><span aria-hidden="true">→</span><span class="dev-git-lock-flow__node">${item.to}</span></div>`).join('')}</div><ul>${visible.map(item=>`<li>${item.from} → ${item.to}：${item.condition}</li>`).join('')}</ul></div>`;}).join('')}</section></details>`;
+      return `<section data-dev-flow-preview aria-label="业务链观察交互样例"><h3>业务链观察 · 虚构样例</h3><div class="dev-design-toolbar"><div class="segment" role="tablist" aria-label="观察方式示例"><button role="tab" aria-selected="true" class="active" data-action="dev-flow-view" data-value="chain">业务结构</button><button role="tab" aria-selected="false" data-action="dev-flow-view" data-value="tracking">实例跟踪</button></div><details><summary>导出</summary><button class="btn" data-action="dev-flow-export" data-value="当前视图">当前视图 · 打印 / PDF</button><button class="btn" data-action="dev-flow-export" data-value="客户校对稿">客户校对稿</button></details></div><div class="dev-design-toolbar"><label class="search"><input aria-label="示例来源单号" placeholder="示例单号 SO-DEMO-001" value="SO-DEMO-001" /></label><button class="btn primary" data-action="dev-flow-find">定位</button></div><div data-flow-panel="chain"><div data-flow-design-panel="main">${renderDevFulfillmentPreview()}</div><div data-flow-design-panel="topics" hidden><button class="btn" data-action="dev-flow-design-view" data-value="main">返回完整流程</button><h4>按业务查阅 · 采购流程示例</h4><p>仓库：到货点数、来料检验与材料入库。进入业务保留上下游；岗位与目录可刷新、返回恢复。</p><table class="dev-tool-table"><thead><tr><th>环节</th><th>办理岗位</th><th>交接结果</th></tr></thead><tbody><tr><td>采购与到货安排</td><td>采购 / 审批责任人</td><td>已批准订单，交仓库清点</td></tr><tr><td>到货点数</td><td>仓库</td><td>实际数量与来源，交 IQC</td></tr><tr><td>检验与入库</td><td>IQC / 仓库</td><td>检验允许接收后正式入库</td></tr><tr><td>应付草稿与确认</td><td>财务</td><td>按已过账来源生成草稿，再确认应付</td></tr></tbody></table><details><summary>系统衔接图</summary>${steps('专题关联示例',['采购入库','生产执行','出货结算'])}<p>图示业务关联，不代表实际业务已完成。</p></details></div><div data-flow-design-panel="exception" hidden><button class="btn" data-action="dev-flow-design-view" data-value="main">返回完整流程</button><div data-flow-exception-preview>${renderDevExceptionPreview()}</div></div></div><div data-flow-panel="tracking" hidden><p data-flow-empty>输入示例单号，定位关联任务。</p><div data-flow-example hidden><h4>SO-DEMO-001 · 关联任务</h4><table class="dev-tool-table"><thead><tr><th>业务环节</th><th>负责岗位</th><th>任务状态</th></tr></thead><tbody><tr><th>采购与来料 · 清点</th><td>仓库</td><td>已完成</td></tr><tr><th>外发裁片 · 回货质检</th><td>IQC</td><td>已完成，发现色差</td></tr></tbody></table><h4>异常分支 · 外发裁片</h4><p><span class="badge warning">待处理</span> 业务决定补料返工、改换厂商或放弃本批次。</p><p class="data-note">任务状态不代替业务结果；此处仅为虚构界面样例。</p></div></div><p data-flow-export-result hidden role="status"></p></section><details><summary>技术详情 · 状态规则示例</summary><section data-dev-rule-preview><h3>状态规则 · 筛选示例</h3><div class="dev-design-toolbar" role="group" aria-label="状态转换筛选示例">${modes.map(([mode,label])=>`<button class="btn" data-action="dev-rule-view" data-value="${mode}" aria-pressed="${mode==='standard'}">${label}</button>`).join('')}</div>${modes.map(([mode,label])=>{const visible=transitions.filter(item=>mode==='all'||item.kind===mode);return `<div data-rule-panel="${mode}"${mode==='standard'?'':' hidden'}><p>当前显示 ${visible.length} / ${transitions.length} 条；图与条件清单同步。</p><div role="img" aria-label="${label}状态图示">${visible.map(item=>`<div class="dev-rule-preview-edge"><span class="dev-git-lock-flow__node">${item.from}</span><span aria-hidden="true">→</span><span class="dev-git-lock-flow__node">${item.to}</span></div>`).join('')}</div><ul>${visible.map(item=>`<li>${item.from} → ${item.to}：${item.condition}</li>`).join('')}</ul></div>`;}).join('')}</section></details>`;
     }
     function renderDevCiGuidePreview(initialSection='overview') {
       const flow=(label,nodes)=>`<div class="dev-git-lock-flow" role="img" aria-label="${label}">${nodes.map((node,index)=>`${index?'<span class="dev-git-lock-flow__arrow" aria-hidden="true">↓</span>':''}<div class="dev-git-lock-flow__node">${node}</div>`).join('')}</div>`;
@@ -4770,7 +4809,7 @@
       }
       panel.setAttribute('aria-busy', String(state.devState === 'loading'));
       if (state.devArea === 'overview' && state.devViews.overview === 'next') {
-        panel.innerHTML = devDesignReadState() || `<section class="surface dev-tool-library"><div class="dev-design-toolbar">按当前任务选择工具，运行结果以工具内的实际记录为准。</div><div class="dev-tool-list"><table class="dev-tool-table" aria-label="开发工具使用指南"><thead><tr><th>任务</th><th>检查重点</th><th>工具入口</th></tr></thead><tbody>${devDesignGuide.map(step=>`<tr><th>${step.title}</th><td>${step.completion}</td><td><button class="btn" data-action="dev-evidence" data-value="${step.tool}">查看相关工具</button></td></tr>`).join('')}</tbody></table></div></section>`;
+        panel.innerHTML = devDesignReadState() || `<section class="surface dev-tool-library"><div class="dev-tool-list"><table class="dev-tool-table" aria-label="开发工具使用指南"><thead><tr><th>任务</th><th>检查重点</th><th>工具入口</th></tr></thead><tbody>${devDesignGuide.map(step=>`<tr><th>${step.title}</th><td>${step.completion}</td><td><button class="btn" data-action="dev-evidence" data-value="${step.tool}">查看相关工具</button></td></tr>`).join('')}</tbody></table></div></section>`;
       } else if (state.devArea === 'overview') {
         panel.innerHTML = devDesignReadState() || renderDevToolLibrary();
       } else {
@@ -4801,7 +4840,7 @@
       const query = state.devSearch[area] || '', filter = state.devFilter[area] || 'all';
       const records = Object.keys(devDesignAreas).flatMap(key => devDesignRecords.filter(row => row.area === key)).filter(row => (area === 'overview' || row.area === area) && (state.devViews.overview !== 'pinned' || area !== 'overview' || state.devPinned.includes(row.key)));
       const rows = records.filter(row => (filter === 'all' || row.area === filter) && `${row.title}${row.source}${row.detail}`.toLowerCase().includes(query.trim().toLowerCase()));
-      return `<section class="surface dev-tool-library" aria-label="工作台工具库"><div class="dev-design-toolbar"><label class="search">${icon('search')}<input id="dev-design-search" aria-label="搜索工作台条目" placeholder="搜索工具名称或用途" value="${escapeHTML(query)}" /></label><div class="filter-chips">${[['all','全部领域'],['engineering','产品工程'],['quality','质量验证'],['delivery','交付运行']].filter(([key])=>area==='overview'||key==='all').map(([key,label])=>`<button class="btn ${filter===key?'active':''}" data-action="dev-filter" data-value="${key}">${label}</button>`).join('')}</div><span class="data-note">${rows.length} 个工具</span></div><div class="dev-tool-list">${rows.length ? `<table class="dev-tool-table" aria-label="开发工具对照"><thead><tr><th scope="col">工具</th><th scope="col">所属领域</th><th scope="col">用途</th><th scope="col">常用</th></tr></thead><tbody>${rows.map(row=>`<tr><th scope="row"><button class="btn dev-tool-link" data-action="dev-evidence" data-value="${row.key}">${row.title}</button></th><td>${devDesignAreas[row.area].label}</td><td>${row.detail}</td><td><button class="btn icon-btn" data-action="dev-pin" data-value="${row.key}" aria-label="${state.devPinned.includes(row.key)?'取消置顶':'置顶'}${row.title}" aria-pressed="${state.devPinned.includes(row.key)}">${state.devPinned.includes(row.key)?'★':'☆'}</button></td></tr>`).join('')}</tbody></table>` : devDesignEmpty('没有匹配的工具', '<button class="btn" data-action="dev-clear">清除筛选</button>')}</div></section>`;
+      return `<section class="surface dev-tool-library" aria-label="工作台工具库"><div class="dev-design-toolbar"><label class="search">${icon('search')}<input id="dev-design-search" aria-label="搜索工作台条目" placeholder="搜索工具名称或用途" value="${escapeHTML(query)}" /></label><div class="filter-chips">${[['all','全部领域'],['engineering','产品工程'],['quality','质量验证'],['delivery','交付运行']].filter(([key])=>area==='overview'||key==='all').map(([key,label])=>`<button class="btn ${filter===key?'active':''}" data-action="dev-filter" data-value="${key}">${label}</button>`).join('')}</div><span class="data-note">${rows.length} 个工具</span></div><div class="dev-tool-list">${rows.length ? `<table class="dev-tool-table" aria-label="开发工具对照"><thead><tr><th scope="col">工具</th><th scope="col">所属领域</th><th scope="col">用来做什么</th><th scope="col">常用</th></tr></thead><tbody>${rows.map(row=>`<tr><th scope="row"><button class="btn dev-tool-link" data-action="dev-evidence" data-value="${row.key}">${row.title}</button></th><td>${devDesignAreas[row.area].label}</td><td>${row.purpose}</td><td><button class="btn icon-btn" data-action="dev-pin" data-value="${row.key}" aria-label="${state.devPinned.includes(row.key)?'取消置顶':'置顶'}${row.title}" aria-pressed="${state.devPinned.includes(row.key)}">${state.devPinned.includes(row.key)?'★':'☆'}</button></td></tr>`).join('')}</tbody></table>` : devDesignEmpty('没有匹配的工具', '<button class="btn" data-action="dev-clear">清除筛选</button>')}</div></section>`;
     }
     function renderDevDeliveryTaskMap(view) {
       const tasks = {
@@ -4834,8 +4873,23 @@
         for(const panel of scope.querySelectorAll('[data-data-panel]')) panel.hidden=panel.dataset.dataPanel!==view;
         return true;
       }
+      if(action==='dev-flow-role'||action==='dev-flow-stage') {
+        const panel=target.closest('[data-flow-design-panel="main"]');
+        const view=panel.querySelector('[data-flow-role]');
+        panel.innerHTML=renderDevFulfillmentPreview(action==='dev-flow-role'?target.dataset.value:view.dataset.flowRole,action==='dev-flow-stage'?target.dataset.value:view.dataset.flowStage);
+        return true;
+      }
+      if(action==='dev-flow-exception-source'||action==='dev-flow-exception-plan') {
+        const scope=target.closest('[data-dev-flow-preview]');
+        const preview=scope.querySelector('[data-flow-exception-preview]');
+        const key=action==='dev-flow-exception-source'?target.dataset.value:preview.querySelector('[data-preview-exception-source]').dataset.previewExceptionSource;
+        preview.innerHTML=renderDevExceptionPreview(key,action==='dev-flow-exception-plan'?target.dataset.value:'');
+        for(const panel of scope.querySelectorAll('[data-flow-design-panel]'))panel.hidden=panel.dataset.flowDesignPanel!=='exception';
+        return true;
+      }
       if(action==='dev-flow-design-view') {
         const scope=target.closest('[data-dev-flow-preview]');
+        if(target.dataset.value==='exception')scope.querySelector('[data-flow-exception-preview]').innerHTML=renderDevExceptionPreview();
         for(const panel of scope.querySelectorAll('[data-flow-design-panel]')) panel.hidden=panel.dataset.flowDesignPanel!==target.dataset.value;
         return true;
       }
@@ -5410,7 +5464,7 @@
 
     function renderSalesDeliveryView(config) {
       const all=visualRows(config.key);const attention=['overdue','due','unknown','undated','closed'];const counts={all:all.length,attention:all.filter(row=>attention.includes(row.status)).length,delivered:all.filter(row=>row.status==='delivered').length};
-      const chips=[['all','全部'],['attention','需跟进'],['delivered','已交付']].map(([value,label])=>visualChip('delivery-filter',value,label,counts[value],state.deliveryFilter===value)).join('');
+      const chips='<span class="data-note">交付明细</span>'+[['all','全部明细'],['attention','需跟进'],['delivered','已交付']].map(([value,label])=>visualChip('delivery-filter',value,label,`${counts[value]} 条`,state.deliveryFilter===value)).join('');
       const operation=renderVisualToolbar(config,null,chips,'搜索订单、客户、产品或负责人');const empty=visibleDataState(operation,'销售交付进度');if(empty)return empty;
       const rank={overdue:0,closed:1,due:2,undated:3,unknown:4,progress:5,delivered:6,cancelled:7};const rows=all.filter(row=>state.deliveryFilter==='all'||(state.deliveryFilter==='attention'?attention.includes(row.status):row.status==='delivered')).sort((a,b)=>rank[a.status]-rank[b.status]||(a.date||'9999').localeCompare(b.date||'9999'));const p=visualPage(rows,config.key);
       return `${operation}<section class="surface data-surface priority-visual-surface"><div class="priority-list-scroll"><div class="priority-list"><div class="priority-list-head delivery-columns"><span>订单 / 客户 / 产品行</span><span>计划交付</span><span>已出货 / 订购</span><span>剩余待交</span><span>交付状态</span></div>${p.rows.map((item,index)=>`<article class="priority-list-row interactive-image-row"><button type="button" class="interactive-image-row__open" data-action="delivery-open" data-id="${item.id}" aria-label="打开销售订单 ${item.order}"></button><div class="delivery-columns interactive-image-row__content"><span class="priority-identity"><strong>${item.order}</strong><span title="${escapeHTML(item.customer)}">${escapeHTML(item.customer)}</span><span class="product-cell">${renderProductThumb(index,item.product)}<span title="${escapeHTML(item.product)}">${escapeHTML(item.product)}</span></span></span><span>${displayDate(item.date)}</span><span class="delivery-progress-copy">${item.percent===null?'<span class="unknown-progress">待核对出货数量</span>':`<span class="delivery-progress-track"><i class="${item.status==='overdue'?'danger':item.status==='delivered'?'success':''}" style="width:${item.percent}%"></i></span><small>${item.shipped.toLocaleString('zh-CN')} / ${item.ordered.toLocaleString('zh-CN')} ${item.unit}</small>`}</span><strong>${item.remaining===null?'待核对':`${item.remaining.toLocaleString('zh-CN')} ${item.unit}`}</strong><span class="badge ${item.badge}">${item.statusText}</span></div></article>`).join('')||'<div class="empty">没有匹配的交付记录</div>'}</div></div>${renderVisualPager(p,config.key)}</section>`;
@@ -10090,14 +10144,14 @@ return {orders,financeCustomers};})();
       const c=overviewFor(r,s), all=[...c.steps,c.result,c.exception];
       const selected=all.find(step=>step.id===input.step&&step.view===view)||all.find(step=>step.id===c.default&&step.view===view)||all.find(step=>step.view===view);
       const point=input.point!==undefined&&input.point!==''&&Number.isInteger(Number(input.point))?Number(input.point):selected.point;
-      const docs = referenceDocsForRole(r.key);
+      const docs = readableReferenceDocuments();
       const ref = docs.find(doc=>doc.id===input.reference)||docs.find(doc=>doc.id===s.pageKey)||docs[0];
-      return {role:r.key,scene:s.key,view,point:Math.min(count-1,Math.max(0,point)),step:selected.id,manual:input.manual==='reference'?'reference':'guide',reference:ref?.id||'',query:String(input.query||'').slice(0,200),directory:Boolean(input.directory)};
+      return {role:r.key,scene:s.key,view,point:Math.min(count-1,Math.max(0,point)),step:selected.id,manual:input.manual==='reference'?'reference':'guide',reference:ref?.id||'',query:String(input.query||'').slice(0,200),directory:Boolean(input.directory),home:input.home!==false};
     }
     function transition(patch){
       closePicker();
       const changedScene=(patch.role!==undefined&&patch.role!==state.role)||(patch.scene!==undefined&&patch.scene!==state.scene);
-      if(changedScene){patch.step='';patch.point=undefined;patch.reference='';if(patch.role===undefined)patch.query='';}
+      if(changedScene){patch.step='';patch.point=undefined;if(patch.role===undefined)patch.reference='';if(patch.role===undefined)patch.query='';}
       else if(patch.view!==undefined&&patch.view!==state.view&&patch.step===undefined){patch.step='';patch.point=undefined;}
       state=normalize({...state,...patch});render();
     }
@@ -10109,10 +10163,8 @@ return {orders,financeCustomers};})();
     }
     function paintPoints(){root().querySelectorAll('[data-point]').forEach(el=>{const active=Number(el.dataset.point)===state.point;el.setAttribute('aria-pressed',String(active));});root().querySelectorAll('.region[data-region]').forEach(el=>el.dataset.selected=String(Number(el.dataset.region)===state.point));paintChain();}
     function paintChain(){
-      const c=chain(), selected=[...c.steps,c.result,c.exception].find(item=>item.id===state.step);
+      const c=chain();
       byId('businessChain').querySelectorAll('[data-step]').forEach(el=>el.setAttribute('aria-pressed',String(el.dataset.step===state.step)));
-      byId('chainNote').hidden=!custom[state.scene] || state.view!=='guide';
-      byId('chainNote').innerHTML=`<strong>${selected.number?'第 '+selected.number+' 步':'查看说明'} · ${esc(selected.owner)}</strong><span>${esc(selected.detail)}</span>`;
     }
     function overviewStep(step, extraClass='', style='') {
       return `<button class="overview-step ${extraClass}" type="button" data-step="${step.id}" style="${style}" aria-pressed="${step.id===state.step}" aria-controls="viewBody" aria-label="流程第 ${step.number} 步：${esc(step.title)}（${esc(step.owner)}）"><strong><span class="overview-number">${step.number}</span>${esc(step.title)}</strong><small>${esc(step.owner)}</small></button>`;
@@ -10134,7 +10186,7 @@ return {orders,financeCustomers};})();
       const c=chain(), labels={chain:'业务交接',steps:'操作步骤',path:'查询路径'};
       const container=byId('businessChain');
       container.hidden=false;container.dataset.layout=c.kind;
-      container.innerHTML=namespace(`<div class="chain-heading"><h3>办理概览</h3><span>${labels[c.kind]} · 非实际进度</span></div>${c.kind==='chain'?overviewDiagram(c):`<ol class="overview-steps" data-kind="${c.kind}" style="--overview-count:${c.steps.length}">${c.steps.map(step=>`<li>${overviewStep(step)}</li>`).join('')}</ol>`}<p class="chain-note" id="chainNote" aria-live="polite"></p>`);
+      container.innerHTML=namespace(`<div class="chain-heading"><h3>办理概览</h3><span>${labels[c.kind]} · 非实际进度</span></div>${c.kind==='chain'?overviewDiagram(c):`<ol class="overview-steps" data-kind="${c.kind}" style="--overview-count:${c.steps.length}">${c.steps.map(step=>`<li>${overviewStep(step)}</li>`).join('')}</ol>`}`);
     }
     function selectStep(id){
       const c=chain(), step=[...c.steps,c.result,c.exception].find(item=>item.id===id);if(!step)return;
@@ -10225,8 +10277,8 @@ return {orders,financeCustomers};})();
       closePicker(true);
       if (value === pickerValue(id)) return;
       transition(id === 'roleSelect'
-        ? {role:value,scene:defaults[value] || '',view:'guide',point:0}
-        : {scene:value,view:'guide',point:0});
+        ? {role:value,scene:defaults[value] || '',view:'guide',point:0,home:true}
+        : {scene:value,view:'guide',point:0,home:false});
     }
     function mountPicker(id) {
       const trigger = byId(id), menu = byId(id+'List');
@@ -10269,47 +10321,1397 @@ return {orders,financeCustomers};})();
       renderPicker('sceneSelect');
       byId('sceneList').parentElement.setAttribute('aria-label',state.manual==='guide'?'办事场景':'参考目录');
       byId('sceneList').parentElement.querySelector('.nav-title').textContent=state.manual==='guide'?'我要办什么':'按业务查阅';
-      byId('sceneList').innerHTML = state.manual==='guide'?role().scenes.map(s=>`<button class="scene-link" type="button" data-scene="${esc(s.key)}" aria-current="${s.key===state.scene?'page':'false'}"><span>${esc(custom[s.key]?.title||s.title)}</span>${icon('chevron')}</button>`).join(''):referencePagesForRole(state.role).map(page=>`<button class="scene-link" type="button" data-manual-reference="${esc(page.key)}" aria-current="${page.key===referenceDoc()?.page.key?'page':'false'}">${esc(page.title)}</button>`).join('');
+      byId('sceneList').innerHTML = state.manual==='guide'?role().scenes.map(s=>`<button class="scene-link" type="button" data-scene="${esc(s.key)}" aria-current="${s.key===state.scene?'page':'false'}"><span>${esc(custom[s.key]?.title||s.title)}</span>${icon('chevron')}</button>`).join(''):readableReferencePages().map(page=>`<button class="scene-link" type="button" data-manual-reference="${esc(page.key)}" aria-current="${page.key===referenceDoc()?.page.key?'page':'false'}">${esc(page.title)}</button>`).join('');
     }
-    const referenceDocs = helpReferencePages.flatMap(page=>[{id:page.key,title:page.title+'怎么用',page,item:null},...page.items.map(item=>({id:page.key+':'+item.key,title:item.title,page,item}))]);
-    const referencePagesForRole = key => helpReferencePages.filter(page=>page.roleHelpKeys.includes(key));
-    const referenceDocsForRole = key => referenceDocs.filter(doc=>doc.page.roleHelpKeys.includes(key));
-    const referenceDoc = () => referenceDocsForRole(state.role).find(doc=>doc.id===state.reference);
+    const handbookIntroductions = [
+  {
+    "id": "handbook:start",
+    "kind": "chapter",
+    "title": "开始使用",
+    "summary": "从登录、工作台到第一次办理，先认识资料、单据和业务结果。",
+    "sectionTitle": "通用操作与岗位交接",
+    "sections": [
+      {
+        "key": "scope",
+        "title": "这本手册怎样用",
+        "paragraphs": [
+          "本手册说明当前产品已经提供的操作。公司启用范围、账号岗位、数据范围和当前业务状态共同决定实际可见内容与可用动作。",
+          "需要马上办事时，在帮助首页按岗位找操作图解；需要系统学习时，按手册目录阅读。业务页的“这页怎么用”和字段问号可直接进入对应图解、章节或词条。",
+          "在线手册只包含当前账号可阅读的帮助。下载的是当前可阅读范围的离线 HTML，可直接用浏览器阅读、查找和打印为 PDF。"
+        ]
+      },
+      {
+        "key": "login",
+        "title": "登录与找到入口",
+        "paragraphs": [],
+        "steps": [
+          "使用管理员已开通的账号登录；遇到账号停用、密码或验证码提示时，按页面提示处理。",
+          "先在工作台查看当前重点，再从任务管理进入需要自己处理的事项。",
+          "按业务模块打开资料或单据；菜单中没有入口时，联系管理员核对公司启用范围和账号权限。",
+          "办理后回到原记录重新查看状态与结果。退出账号后，不把其他账号的数据当作当前账号的工作内容。"
+        ]
+      },
+      {
+        "key": "objects",
+        "title": "先分清资料、单据和事实",
+        "paragraphs": [],
+        "rows": [
+          [
+            "基础资料",
+            "客户、供应商、产品、材料和加工环节等资料提供业务引用；先搜索已有资料，确认后再新建。"
+          ],
+          [
+            "来源单据",
+            "销售、采购、委外和生产订单表达本次业务需求或承诺。草稿、提交、批准和生效含义分别核对。"
+          ],
+          [
+            "业务结果",
+            "入库、库存、检验、实际出货、应收应付和实际收付款，须在对应正式业务记录中核对。"
+          ],
+          [
+            "协同任务",
+            "记录谁办理、何时交接和处理结论；任务完成不能替代对应业务结果。"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "handbook:work",
+    "kind": "chapter",
+    "title": "工作台、任务与进度",
+    "summary": "找到当前工作，判断轮到谁，办理后回来源核对结果。",
+    "sectionTitle": "通用操作与岗位交接",
+    "sections": [
+      {
+        "key": "workbench",
+        "title": "工作台与任务管理",
+        "paragraphs": [
+          "工作台用于查看当前重点；任务管理按当前账号权限查看待处理与历史事项。先核对单据、环节、办理人、时间和受阻原因，再进入实际办理页面。",
+          "审批前核对来源、数量或金额、交期和必要附件。资料不完整时写清退回原因与补充要求，不替来源岗位补造资料。",
+          "完成任务后检查处理记录和交接结果，再回来源单据核对状态；任务显示完成不表示订单已生效或库存、出货、财务已经完成。"
+        ]
+      },
+      {
+        "key": "tracking",
+        "title": "跟踪进度与异常",
+        "paragraphs": [
+          "进度看板用于查询订单及生产交付进度。结合筛选范围、当前阶段、阻塞原因和办理人阅读，不能把没有关联的任务当作同一条前后依赖。",
+          "查看任务或业务记录中的流程、异常与历史记录，核对同一来源和本次对象。有差异时保留来源单号，交对应责任岗位处理。"
+        ]
+      },
+      {
+        "key": "mobile",
+        "title": "手机办理",
+        "paragraphs": [
+          "公司和账号已开放手机岗位入口时，可进入对应岗位的手机待办。是否允许办理仍取决于同一套账号权限、业务状态和服务端校验。",
+          "手机中先找任务，再查看详情、来源、追踪和可用动作。无入口、加载失败或无权限时按明确提示处理，不能把空列表当作业务已经结束。"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "handbook:roles",
+    "kind": "chapter",
+    "title": "岗位责任与交接",
+    "summary": "按当前帮助岗位核对工作顺序、完成标准、交接与异常责任。",
+    "sectionTitle": "通用操作与岗位交接",
+    "sections": [
+      {
+        "key": "boss",
+        "title": "老板 / 管理层",
+        "paragraphs": [
+          "先办审批和退回，再处理今天最重要的风险。",
+          "审批结论和退回原因可查，下一岗位已经收到事项；具体业务是否完成仍以对应业务页面状态为准。",
+          "管理层负责定优先级和协调责任人；具体入库、出货、质检和财务记录仍由对应岗位办理。",
+          "任务完成不等于入库、出货或收付款已经完成。"
+        ],
+        "steps": [
+          "从任务管理打开待审批事项，并进入对应来源记录。",
+          "核对客户或供应商、金额、交期、明细和补充说明。",
+          "资料完整时通过；资料不足时退回并写清要补什么。",
+          "确认审批结论已保存、下一岗位已收到事项，再查看其他风险。"
+        ],
+        "rows": [
+          [
+            "遇到异常",
+            "金额、交期、规格、附件或来源说明无法支持当前审批时。"
+          ],
+          [
+            "交给谁",
+            "退回实际来源岗位，例如销售、采购或财务。"
+          ],
+          [
+            "怎样恢复",
+            "退回原因、补充要求和责任岗位均可查，原审批没有继续向下流转。"
+          ],
+          [
+            "处理 1",
+            "先停止审批通过，不替经办岗位补造资料。"
+          ],
+          [
+            "处理 2",
+            "选择退回并写清缺少内容、责任岗位和期望补充时间。"
+          ],
+          [
+            "处理 3",
+            "补充后从新的待办重新核对，不沿用旧判断。"
+          ]
+        ]
+      },
+      {
+        "key": "sales",
+        "title": "销售",
+        "paragraphs": [
+          "从客户和销售订单开始，持续跟进交期、出货和回款。",
+          "订单号、客户、收货信息、数量、单价、货款、报价运费、税额、总额和提交状态可查，审批事项已经生成；后续岗位完成评审后，必须回销售订单页面核对是否已生效，未生效时不得继续当作已批准订单使用。",
+          "订单确认后把明确的产品、数量和交期交给 PMC；出货后把应收和开票信息交给财务。",
+          "任务链完成不等于订单已经生效，必须回销售订单核对状态。"
+        ],
+        "steps": [
+          "确认客户、联系人和默认收货信息完整；本单有变化时直接调整本单收货信息。",
+          "创建或更新销售订单，核对产品规格、数量、单价、计税方式、报价是否含运费、另计报价运费和交期。",
+          "提交订单后查看老板审批、工程资料和 PMC 评审进度。",
+          "IQC 发现生产质量异常后，由业务选择原厂返工、换厂返工、补料重做或报废，提交审批。",
+          "检验、查货包装及放行完成后，由业务办理实际发货。"
+        ],
+        "rows": [
+          [
+            "遇到异常",
+            "审批退回，或客户在订单生效前修改规格、数量、价格或交期时。"
+          ],
+          [
+            "交给谁",
+            "修正完成后重新交给老板审批，并通知受影响的工程和 PMC。"
+          ],
+          [
+            "怎样恢复",
+            "旧订单不再继续流转，新订单内容与客户要求一致并重新进入审批。"
+          ],
+          [
+            "处理 1",
+            "停止继续向生产或出货交接，并保留退回原因。"
+          ],
+          [
+            "处理 2",
+            "核对客户最新要求；当前订单已无法正确表达时，取消后重新建立。"
+          ],
+          [
+            "处理 3",
+            "重新提交并等待新的审批和资料评审事项。"
+          ]
+        ]
+      },
+      {
+        "key": "purchase",
+        "title": "采购",
+        "paragraphs": [
+          "把采购承诺、到料、检验和入库衔接清楚。",
+          "采购订单、供应商、材料、数量、付款 / 开票条件、收货地址和到货日期可查，提交状态明确；到料后已形成可供品质和仓库核对的来源记录。",
+          "到料后把实收与异常情况交给品质和仓库；确认入库后把应付来源交给财务。",
+          "采购订单只表示采购承诺，不等于已经到货或入库。"
+        ],
+        "steps": [
+          "先核对供应商付款 / 开票默认值、材料、单位和物料清单。",
+          "创建采购订单，核对付款方式、是否需要发票、收货地址和到货日期后提交审核。",
+          "跟催已批准采购订单；实际到货交仓库登记，检验交品质办理。",
+          "入库过账后再衔接应付；委外回货要先完成合格或让步判定。"
+        ],
+        "rows": [
+          [
+            "遇到异常",
+            "首次来料检验不合格，或实收数量、材料规格与采购来源不一致时。"
+          ],
+          [
+            "交给谁",
+            "需要供应商处理的由采购承接，检验交品质，实物状态交仓库。"
+          ],
+          [
+            "怎样恢复",
+            "差异原因、处置方向和责任人可查，本次不合格来料没有被误入库。"
+          ],
+          [
+            "处理 1",
+            "停止确认本次入库，不用修改来源数量掩盖差异。"
+          ],
+          [
+            "处理 2",
+            "与品质确认判定，与仓库确认实收和隔离数量。"
+          ],
+          [
+            "处理 3",
+            "记录退厂、补货或换货方向，并跟进新的到料结果。"
+          ]
+        ]
+      },
+      {
+        "key": "production",
+        "title": "生产 / 委外",
+        "paragraphs": [
+          "围绕生产和委外来源推进工序、检验、领料和完工。",
+          "工序执行结果、数量和当前状态可查；手工成品已交仓库清点并办理正式收仓。",
+          "缺料交 PMC 和采购，检验交 IQC；手工成品交给仓库核对实收并确认入库，质量异常方案由业务确定。",
+          "生产订单发布、工序完成或任务完成都不等于库存已经变化。"
+        ],
+        "steps": [
+          "确认生产订单已发布，物料需求和工序路线正确。",
+          "仓库外发裁片并清点回货，生产经理分别安排车缝和手工的本厂或委外加工。",
+          "工序完成或仓库确认回货后送 IQC，检验不合格交业务确定异常方案。",
+          "手工完成后交仓库正式收仓，再完成检验和查货包装，由业务发货。"
+        ],
+        "rows": [
+          [
+            "遇到异常",
+            "物料不足、工序检验不合格，或委外回货数量和质量不符合来源要求时。"
+          ],
+          [
+            "交给谁",
+            "缺料交 PMC / 采购，质量问题交品质，委外供方问题交采购或委外经办。"
+          ],
+          [
+            "怎样恢复",
+            "异常来源、责任人和下一步可查，受影响数量没有进入错误的完工或库存状态。"
+          ],
+          [
+            "处理 1",
+            "停止继续推进受影响批次，不把异常数量当作完工。"
+          ],
+          [
+            "处理 2",
+            "在来源记录中写明异常数量、原因和当前责任人。"
+          ],
+          [
+            "处理 3",
+            "业务提交异常方案并获批后，按固定厂商和工序执行返工或补料重做，再送 IQC 复检。"
+          ]
+        ]
+      },
+      {
+        "key": "warehouse",
+        "title": "仓库",
+        "paragraphs": [
+          "按来源清点到货、外发裁片、正式入库并查货包装。",
+          "收仓能看到正式库存变化；查货包装能看到可发货数量变化，包装不再次增加库存。",
+          "采购收货异常交给采购和品质，成品实收差异退回生产核对；可用库存、备货和实际发货结果及时反馈给 PMC 与销售。",
+          "仓库登记成品收仓草稿不等于成品已经入库；出货放行不等于已经出库，出货单实际运费也不等于已经形成应付或付款。"
+        ],
+        "steps": [
+          "核对采购来源、实收数量、仓库和批次。",
+          "需要检验的到料先等待品质判定，再确认入库。",
+          "手工成品由仓库登记并确认正式入库；未检或待包装库存禁止发货。",
+          "备货时查看已预留和可用量，不只看库存总数。",
+          "对确切入库记录查货包装，完成后交业务核对放行并实际发货。"
+        ],
+        "rows": [
+          [
+            "遇到异常",
+            "实收与来源不符、尚未检验、判定不合格，或出货可用量不足时。"
+          ],
+          [
+            "交给谁",
+            "到料问题交采购 / 品质，出货来源问题交销售，库存安排交 PMC。"
+          ],
+          [
+            "怎样恢复",
+            "差异和责任人可查，未满足条件的记录没有过账或发货。"
+          ],
+          [
+            "处理 1",
+            "采购未检不得入库；手工成品可先入库，未通过检验或包装时停止发货交接。"
+          ],
+          [
+            "处理 2",
+            "记录差异数量、批次、原因和当前实物位置。"
+          ],
+          [
+            "处理 3",
+            "通知对应岗位处理后，再从同一来源重新核对。"
+          ]
+        ]
+      },
+      {
+        "key": "finance",
+        "title": "财务",
+        "paragraphs": [
+          "先核对老板已审核的工程用料并生成采购单，再按真实业务结果办理收付款和对账。",
+          "应收、应付或发票记录的来源、往来方、金额和状态可查；这不等于银行收付款或税控开票已经完成。",
+          "采购与仓库提供已入库来源，业务与仓库提供已出货来源；金额或往来方异常先退回来源岗位核对。",
+          "系统发票记录不等于税控开票，结清必须以正式核销结果为准。"
+        ],
+        "steps": [
+          "在材料汇总中核对部位用料，审核通过后按应需数量、按厂商自动生成采购订单。",
+          "先核对来源单号、往来方、金额和业务状态。",
+          "从符合条件的入库、委外回货或出货记录生成财务记录。",
+          "确认无误后过账；应收应付通过正式收付款核销或红冲派生结清，不能直接改成已结清。",
+          "发现差异时到对账页面记录并退回来源岗位核对。"
+        ],
+        "rows": [
+          [
+            "遇到异常",
+            "财务记录与采购入库、委外回货或出货来源无法一一核对时。"
+          ],
+          [
+            "交给谁",
+            "采购来源退采购 / 仓库，销售来源退销售 / 仓库，生产或委外来源退对应经办岗位。"
+          ],
+          [
+            "怎样恢复",
+            "差异原因和责任人可查，错误记录没有过账，正确来源可以重新核对。"
+          ],
+          [
+            "处理 1",
+            "停止过账，不通过修改财务金额掩盖来源差异。"
+          ],
+          [
+            "处理 2",
+            "记录差异项目、金额和来源单号。"
+          ],
+          [
+            "处理 3",
+            "退回来源岗位修正或补充依据，再重新生成或核对财务记录。"
+          ]
+        ]
+      },
+      {
+        "key": "pmc",
+        "title": "PMC",
+        "paragraphs": [
+          "把订单、物料、排产、生产和出货节奏连起来。",
+          "计划、优先级、责任人和预计日期可查，排产事项已经交给生产；这不等于领料、完工或库存已更新。",
+          "缺料交给采购，工序与完工交给生产，检验交给品质，备货与出货交给仓库，并向业务反馈交期变化。",
+          "排产确认完成不等于领料、完工或库存已经更新。"
+        ],
+        "steps": [
+          "从销售订单和交期判断当前优先级。",
+          "核对物料清单、库存可用量和采购到料进度。",
+          "维护计划并完成生产订单发布后生成的排产确认待办。",
+          "持续跟进生产、委外、质检、仓库和出货异常。"
+        ],
+        "rows": [
+          [
+            "遇到异常",
+            "可用库存、采购到料、工程资料或产能无法支持当前交期时。"
+          ],
+          [
+            "交给谁",
+            "缺料交采购，资料交工程，产能交生产，客户交期变更交销售。"
+          ],
+          [
+            "怎样恢复",
+            "风险、责任人、处理日期和下一步可查，相关岗位已经收到事项。"
+          ],
+          [
+            "处理 1",
+            "停止把风险订单继续排成可执行计划。"
+          ],
+          [
+            "处理 2",
+            "记录缺口、影响订单、责任岗位和期望处理日期。"
+          ],
+          [
+            "处理 3",
+            "协调补料、资料或交期方案，并同步销售。"
+          ]
+        ]
+      },
+      {
+        "key": "quality",
+        "title": "品质",
+        "paragraphs": [
+          "从真实来源发起检验，给出清晰判定并交回下一岗位。",
+          "质检记录中的来源、数量、判定和原因可查，并已交给下游岗位继续办理；任务状态不能代替质检单状态。",
+          "来料结果交给采购和仓库，过程结果交给生产，出货前结果交给仓库和业务。",
+          "任务完成不等于检验记录已经完成，最终以质检单状态为准。"
+        ],
+        "steps": [
+          "确认检验来自采购到料、委外回货、生产批次或出货单。",
+          "核对产品或材料、批次、数量和检验要求。",
+          "记录合格、让步接收或不合格判定及原因。",
+          "把判定结果交回采购、生产、仓库或出货岗位继续办理。"
+        ],
+        "rows": [
+          [
+            "遇到异常",
+            "检验不合格，或来源、批次、数量和实物无法对应时。"
+          ],
+          [
+            "交给谁",
+            "来料问题交采购 / 仓库，生产质量异常交业务，出货前问题交仓库 / 业务。"
+          ],
+          [
+            "怎样恢复",
+            "不合格结果和后续责任可查，相关批次没有被误放行。"
+          ],
+          [
+            "处理 1",
+            "停止放行，并保留样本、批次和来源信息。"
+          ],
+          [
+            "处理 2",
+            "记录不合格数量、原因和判定依据。"
+          ],
+          [
+            "处理 3",
+            "生产质量异常交业务选择原厂返工、换厂返工、补料重做或报废；批准执行后重新送检。"
+          ]
+        ]
+      },
+      {
+        "key": "engineering",
+        "title": "工程",
+        "paragraphs": [
+          "从客户订单需求开始，建产品图样、按材料填写部位明细，再打样和提交用料审批。",
+          "产品、规格、材料、加工环节和当前生效的物料清单版本可查，采购、PMC 和生产能够读取。",
+          "产品和物料清单交给业务、采购与 PMC 使用；加工环节交给委外、生产和品质引用。",
+          "物料清单生效不会自动生成采购需求、生产任务或库存。"
+        ],
+        "steps": [
+          "先在销售订单的工程资料中查看客户需求，再建立产品、图样和规格。",
+          "材料名称、厂商和料号色号、规格、单位只建一次；同料的各部位连续填写用量和损耗。",
+          "打样确认后启用量产 BOM，在销售订单提交用料汇总，由老板审核、财务审核。",
+          "生产负责人决定材料加工和车缝、手工的本厂或委外安排；工程资料变更须重新核对样品和用料。"
+        ],
+        "rows": [
+          [
+            "遇到异常",
+            "客户新要求与当前产品、材料或物料清单不一致，且已有订单正在办理时。"
+          ],
+          [
+            "交给谁",
+            "客户规格问题交销售确认，计划影响交 PMC 确认。"
+          ],
+          [
+            "怎样恢复",
+            "新旧适用范围和受影响订单可查，未完成单据没有误用新资料。"
+          ],
+          [
+            "处理 1",
+            "停止直接覆盖当前生效资料。"
+          ],
+          [
+            "处理 2",
+            "列出受影响订单、版本和需要确认的差异。"
+          ],
+          [
+            "处理 3",
+            "确认新版本适用范围后再更新，并通知相关岗位重新核对。"
+          ]
+        ]
+      },
+      {
+        "key": "admin",
+        "title": "系统管理员",
+        "paragraphs": [
+          "维护账号、岗位和可用页面，并通过操作记录核对变更。",
+          "员工重新登录后看到的岗位、页面和手机待办与实际职责一致，相关设置变更可在操作记录中核对。",
+          "账号设置完成后由对应岗位本人验证；业务数据和单据问题交给实际业务负责人处理。",
+          "系统管理员不会自动获得采购、生产、库存、出货或财务办理权限。"
+        ],
+        "steps": [
+          "先确认员工实际岗位和需要使用的页面。",
+          "创建或更新账号，并按最小需要分配岗位和页面。",
+          "让员工重新登录后核对菜单和手机待办入口。",
+          "出现账号或设置争议时，通过操作记录核对变更。"
+        ],
+        "rows": [
+          [
+            "遇到异常",
+            "员工登录后的岗位、菜单或手机待办与已确认职责不一致时。"
+          ],
+          [
+            "交给谁",
+            "职责定义不清时退回部门负责人确认，不由系统管理员代替决定。"
+          ],
+          [
+            "怎样恢复",
+            "员工本人验证通过，设置和操作记录可查，无关入口已收回。"
+          ],
+          [
+            "处理 1",
+            "先核对账号是否启用、岗位是否正确和页面是否已分配。"
+          ],
+          [
+            "处理 2",
+            "只调整完成工作所需的岗位和页面，不临时授予无关业务能力。"
+          ],
+          [
+            "处理 3",
+            "让员工重新登录并由本人验证。"
+          ]
+        ]
+      }
+    ]
+  },
+  {
+    "id": "handbook:entry",
+    "kind": "chapter",
+    "title": "填写、保存与状态",
+    "summary": "理解自动带值、金额数量、草稿、提交和受控更正。",
+    "sectionTitle": "通用操作与岗位交接",
+    "sections": [
+      {
+        "key": "fields",
+        "title": "自动带入的资料仍需核对",
+        "paragraphs": [
+          "选择客户、供应商、产品、规格、材料或来源单据后，核对本单带出的联系人、地址、单位、数量、价格和交易条件。切换或清空来源时，重新检查原值是否仍适用。",
+          "已有订单和已冻结资料按该记录保存的内容办理；修改档案不表示旧单据已重新确认。来源缺失时先核实，不把空值当作零或默认事实。"
+        ]
+      },
+      {
+        "key": "quantities",
+        "title": "数量、金额和日期",
+        "paragraphs": [
+          "数量按对应单位允许的精度填写，金额按当前单据币种核对；不同币种不直接相加。页面展示的公式、来源和变更影响可从字段问号查阅。",
+          "销售订单每行金额由订购数量与单价计算；运费和计税条件另行核对。账期与到期日按来源单据冻结条件计算，缺失条件不能当作 0 天。具体计算见对应业务章节。"
+        ]
+      },
+      {
+        "key": "save",
+        "title": "草稿、提交与生效",
+        "paragraphs": [],
+        "steps": [
+          "先核对必填项与来源，保存后重新查看当前记录。",
+          "需要审批的单据按页面提交，检查提交状态和对应任务。",
+          "被退回时先查看原因，再按当前允许动作修改或重建并重新提交。",
+          "只有来源单据达到相应业务状态，才向下游交接；不能把保存成功、提交成功或任务完成当作全部业务已完成。"
+        ]
+      },
+      {
+        "key": "correction",
+        "title": "取消、停用与更正",
+        "paragraphs": [
+          "主数据通常使用启用或停用；来源单据使用当前允许的取消、关闭或归档。已生效、已过账或被引用的记录不能按普通草稿随意删除。",
+          "已过账业务使用对应页面提供的取消、冲正、调整或受控更正，保留原记录与追踪。不要重复建单或直接改余额来掩盖差异。"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "handbook:tools",
+    "kind": "chapter",
+    "title": "打印、附件与历史记录",
+    "summary": "在业务办理之外核对输出、文件和可追踪记录。",
+    "sectionTitle": "通用操作与岗位交接",
+    "sections": [
+      {
+        "key": "print",
+        "title": "模板与打印",
+        "paragraphs": [],
+        "steps": [
+          "从业务记录或模板打印中心进入对应打印工作区，核对当前单据、模板、内容及可用资料。",
+          "在预览中核对明细、分页、签字区和必要图片；有缺值或输出提示时先回来源核实。",
+          "按当前工作区提供的打印或 PDF 动作输出；多份、批量和模板编辑以该工作区实际提供的功能为准。",
+          "打印后仍以正式业务记录判断是否已批准、出货或收付；打印和导出本身不改变业务状态。"
+        ]
+      },
+      {
+        "key": "attachments",
+        "title": "附件和图片",
+        "paragraphs": [
+          "仅在对应页面提供附件入口时上传业务所需资料，遵守页面提示的类型、大小和数量限制。上传后确认列表或预览可重新打开。",
+          "不要把暂时上传、预览缓存或本机文件当作业务已保存；保存后重新查看关联记录。上传失败时保留当前输入并按提示重试。"
+        ]
+      },
+      {
+        "key": "history",
+        "title": "业务历史与系统操作记录",
+        "paragraphs": [
+          "历史记录中心用于查看已提供的业务历史；任务事件、来源记录和业务审计应结合单号与对象核对。",
+          "系统操作记录供获授权人员查询系统动作。操作日志帮助排查问题，不能代替入库、出货、财务等正式业务记录。"
+        ]
+      }
+    ]
+  },
+  {
+    "id": "handbook:problems",
+    "kind": "chapter",
+    "title": "常见问题与恢复",
+    "summary": "遇到看不到、不能操作、失败或结果不确定时，知道下一步找谁。",
+    "sectionTitle": "通用操作与岗位交接",
+    "sections": [
+      {
+        "key": "access",
+        "title": "看不到菜单或按钮",
+        "paragraphs": [
+          "先确认当前账号、公司启用范围和页面位置，再请管理员核对岗位、菜单、数据范围和敏感操作权限。能阅读帮助不表示有权办理对应业务。",
+          "按钮不可用时查看当前状态、来源、余额或数量、审批、检验、包装等前置条件。切换设备和刷新页面不会绕过这些条件。"
+        ]
+      },
+      {
+        "key": "uncertain",
+        "title": "点击后失败或没有明确结果",
+        "paragraphs": [],
+        "steps": [
+          "保留当前输入、来源单号与页面提示，不连续重复提交。",
+          "重新查询同一记录，核对状态、明细和任务，确认操作是否已经成功。",
+          "确认未成功且页面允许时再重试；仍无法确定时交管理员或对应责任岗位核对。",
+          "恢复后回同一来源和本次对象继续，检查是否出现重复单据或重复办理。"
+        ]
+      },
+      {
+        "key": "report",
+        "title": "怎样提供有效的问题信息",
+        "paragraphs": [
+          "说明当前页面、来源单号、本次对象、想做的动作、页面提示和已查询到的结果；截图只保留问题相关内容。",
+          "不要提供密码、完整令牌或无关客户隐私。涉及业务差异先找来源责任岗位，涉及账号、运行或文件不可用再找管理员。"
+        ]
+      }
+    ]
+  }
+];
+    const handbookPageAdditions = {
+  "customers": [
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "后续业务",
+          "销售订单"
+        ]
+      ]
+    }
+  ],
+  "suppliers": [
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "后续业务",
+          "采购订单、委外订单"
+        ]
+      ]
+    }
+  ],
+  "products": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "SKU 编号、条码、客户 SKU、颜色、色号、尺码、包装版本；SKU 归属产品和可选默认单位；SKU 状态启停"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "后续业务",
+          "销售订单、物料清单（BOM）、委外订单、生产订单、出货单"
+        ]
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "材料编号、名称、分类、规格、颜色；默认单位和启停状态；采购、库存、质检和物料清单使用这里的材料资料"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "后续业务",
+          "物料清单（BOM）、采购订单、委外订单、采购入库、库存台账"
+        ]
+      ]
+    }
+  ],
+  "sales-orders": [
+    {
+      "key": "excel-drafts",
+      "title": "从 Excel 辅助新建订单草稿",
+      "paragraphs": [
+        "在销售订单页面选择支持的 .xlsx 汇总表，按订单编号分组，选择本次要处理的候选订单，核对客户、产品需求、数量、单位、币种及原表行证据和嵌入图片。",
+        "确认后逐单保存为新草稿。出现部分成功时保留已保存结果，核对失败项后再继续，不重复建立已经保存的订单。",
+        "辅助录入不覆盖已有订单，不自动新建产品或 SKU，不自动审批、工程分配或形成出货与财务事实。客户真实资料仍遵循授权和受控保存要求，不等于通用客户数据批量导入。"
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "客户档案、产品档案"
+        ],
+        [
+          "后续业务",
+          "生产订单、库存预留、出货单"
+        ]
+      ]
+    }
+  ],
+  "material-bom": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "产品结构版本；材料用量和损耗率；物料清单状态和生效规则"
+        ]
+      ]
+    },
+    {
+      "key": "excel-drafts",
+      "title": "从 Excel 材料分析表辅助新建 BOM 草稿",
+      "paragraphs": [
+        "在 BOM 页面选择支持的 .xlsx 材料分析表，先复核内容，再使用系统中已有产品、规格、材料和单位完成映射。未识别项先核实，不按名称猜测。",
+        "确认后只新建 BOM 草稿，不创建主数据或 SKU，不覆盖或启用已有版本，不自动写采购、生产或库存事实。"
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "产品档案、材料档案"
+        ],
+        [
+          "后续业务",
+          "生产订单"
+        ]
+      ]
+    }
+  ],
+  "processes": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "环节编号和名称；环节类别文本；委外 / 内制适用标记；质检参考和启停状态"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "后续业务",
+          "委外订单"
+        ]
+      ]
+    }
+  ],
+  "accessories-purchase": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "采购订单和供应商信息；采购订单明细、材料、数量、单价和预计到货日期；提交、审核、关闭、取消等状态操作；采购入库行可选关联采购订单行做追溯"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "供应商与加工厂、材料档案"
+        ],
+        [
+          "后续业务",
+          "采购入库、质量检验、库存台账"
+        ]
+      ]
+    }
+  ],
+  "inbound": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "仓库从已审核采购订单登记到货；待收货；待质检；已入库；退货 / 调整追溯"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "采购订单、质量检验"
+        ],
+        [
+          "后续业务",
+          "质量检验、库存台账、应付管理"
+        ]
+      ]
+    }
+  ],
+  "quality-inspections": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "采购来料检验；委外回货检验；生产 WIP 分段质检；出货前成品检验；质检判定；来源单据级估算不良比例（档位 / 自定义）；批次冻结 / 可用 / 不合格状态"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "采购订单、采购入库、委外订单、生产记录、出货单"
+        ],
+        [
+          "后续业务",
+          "采购入库、库存台账、生产记录、异常处理、出货单、应付管理"
+        ]
+      ]
+    }
+  ],
+  "inventory": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "库存余额；已预留 / 可用量只读；库存批次；库存变动记录；按来源单据和业务记录追溯；盘点差异、仓间调拨和受控人工调整；调整草稿过账、取消和记录版本校验"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "采购订单、采购入库、委外订单、生产订单、生产记录、库存预留、出货单"
+        ]
+      ]
+    }
+  ],
+  "processing-contracts": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "加工合同；工序明细；草稿 / 提交 / 确认 / 关闭 / 取消状态；加工合同打印内容；导出筛选结果 / 列设置 / 当前记录任务；选择计量单位；从已确认合同行生成委外发料 / 回货草稿；从已过账回货发起质检 / 合格后生成应付"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "供应商与加工厂、产品档案、材料档案、加工环节"
+        ],
+        [
+          "后续业务",
+          "生产记录、质量检验、库存台账、应付管理"
+        ]
+      ]
+    }
+  ],
+  "production-orders": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "生产计划草稿与明细；发布、关闭和取消等状态操作；发布时生成 PMC 排产确认待办；销售来源与当前生效 BOM 可读选择；固定路线：布料加工 → 车缝 → 手工 → 包装；按在制批次办理拆分、内外发安排与车间移交；布料整单外发与车缝 / 手工逐工序独立决策；裁片、皮套、成品分段质检与包材确认；从冻结物料需求生成领料草稿；从已发布订单行生成完工入库草稿"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "销售订单、物料清单（BOM）、产品档案"
+        ],
+        [
+          "后续业务",
+          "排产确认、生产记录、库存台账"
+        ]
+      ]
+    }
+  ],
+  "production-scheduling": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "生产订单发布生成的排程任务；负责岗位；到期跟进；完成 / 阻塞 / 催办；返回来源生产订单"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "生产订单"
+        ]
+      ]
+    }
+  ],
+  "production-progress": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "从已发布生产订单生成领料草稿 / 待入库成品收仓草稿；生产发料；仓库核对并确认成品入库；返工；返工记录过账时生成生产异常待办；仓库确认入库后更新成品库存，撤销后生成冲正记录"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "生产订单、委外订单"
+        ],
+        [
+          "后续业务",
+          "异常处理、库存台账"
+        ]
+      ]
+    }
+  ],
+  "production-exceptions": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "报废、在制让步和超领处置申请；提交审批、通过、退回、阻塞和恢复；执行、冲正与来源记录核对；处置申请生成正式审批任务，审批结果与执行结果核对"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "生产订单、质量检验"
+        ],
+        [
+          "后续业务",
+          "生产记录"
+        ]
+      ]
+    }
+  ],
+  "shipments": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "出货单列表和明细维护；新建出货单并填写商品明细，可关联销售订单；确认出货和取消追溯；从已出货记录生成应收 / 开票记录"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "销售订单、产品档案"
+        ],
+        [
+          "后续业务",
+          "库存预留、质量检验、出货放行、库存台账、应收管理、发票管理"
+        ]
+      ]
+    }
+  ],
+  "shipping-release": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "出货单启动交付流程后生成的财务审批任务；审批 / 退回 / 阻塞 / 恢复 / 催办；核对流程轨迹、财务放行结果和来源出货单"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "出货单"
+        ],
+        [
+          "后续业务",
+          "出货单"
+        ]
+      ]
+    }
+  ],
+  "outbound": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "按销售订单、仓库和批次核对库存预留；查看预留数量、单位和状态；按权限释放尚未消耗的库存预留"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "销售订单"
+        ],
+        [
+          "后续业务",
+          "库存台账、出货单"
+        ]
+      ]
+    }
+  ],
+  "receivables": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "从已出货出货单生成应收；过账；读取收款核销或红冲后的结清状态；取消"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "出货单"
+        ],
+        [
+          "后续业务",
+          "对账管理"
+        ]
+      ]
+    }
+  ],
+  "payables": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "从已过账采购入库生成应付；从合格 / 让步委外回货生成应付；过账；读取付款核销或红冲后的结清状态；取消"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "采购入库、委外订单"
+        ],
+        [
+          "后续业务",
+          "对账管理"
+        ]
+      ]
+    }
+  ],
+  "finance-payments": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "真实收款和付款登记；同一往来方和币种的多单核销；已过账收付款冲销；应收 / 应付红冲及红冲撤销"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "应付管理、应收管理"
+        ]
+      ]
+    }
+  ],
+  "reconciliation": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "从已过账应收 / 应付 / 发票生成单笔核对；过账；完成核对；取消"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "应付管理、应收管理、发票管理"
+        ]
+      ]
+    }
+  ],
+  "invoices": [
+    {
+      "key": "capabilities",
+      "title": "当前办理范围",
+      "paragraphs": [
+        "实际可用动作还须满足当前账号权限、来源与业务状态。"
+      ],
+      "rows": [
+        [
+          "可办理内容",
+          "从已出货出货单生成发票记录；过账；取消"
+        ]
+      ]
+    },
+    {
+      "key": "relations",
+      "title": "相关资料与后续业务",
+      "paragraphs": [
+        "以下是相关业务范围，实际办理仍须核对本次对象的真实关联和允许动作。"
+      ],
+      "rows": [
+        [
+          "相关来源",
+          "出货单"
+        ],
+        [
+          "后续业务",
+          "对账管理"
+        ]
+      ]
+    }
+  ],
+  "engineering-material-request": []
+};
+    const referenceDocs = [...handbookIntroductions.map(doc=>({...doc,page:{key:doc.id,title:doc.title,sectionTitle:doc.sectionTitle,task:doc.summary,items:[],flowSteps:[]},item:null})),...helpReferencePages.flatMap(page=>[{id:page.key,title:page.title+'怎么用',page,item:null},...page.items.map(item=>({id:page.key+':'+item.key,title:item.title,page,item}))])];
+    const readableReferencePages = () => [...handbookIntroductions.map(doc=>({key:doc.id,title:doc.title})),...helpReferencePages];
+    const readableReferenceDocuments = () => referenceDocs;
+    const referenceDoc = () => readableReferenceDocuments().find(doc=>doc.id===state.reference);
     const searchNormalize = value => String(value||'').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,'');
     function referenceDetails(item){return `<p>${esc(item.explanation)}</p><dl>${[['数据来源',item.source],['变化时注意',item.updateRule],['举个例子',item.example],['会影响什么',item.effect]].filter(([,value])=>value).map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>`;}
     function referenceLinks(page){return page.items.map(item=>`<button type="button" data-manual-reference="${esc(page.key+':'+item.key)}">${esc(item.title)}</button>`).join('');}
+    function renderHandbookSections(sections){return sections.map(section=>`<section><h3>${esc(section.title)}</h3>${(section.paragraphs||[]).map(p=>`<p>${esc(p)}</p>`).join('')}${section.steps?.length?`<ol>${section.steps.map(step=>`<li>${esc(step)}</li>`).join('')}</ol>`:''}${section.rows?.length?`<dl>${section.rows.map(([label,text])=>`<div><dt>${esc(label)}</dt><dd>${esc(text)}</dd></div>`).join('')}</dl>`:''}</section>`).join('');}
     function renderManual(){
-      const ref=referenceDoc(),isReference=state.manual==='reference',searching=Boolean(state.query.trim());
-      const layout=byId('manualLayout');layout.dataset.directoryOpen=String(state.directory);layout.querySelector('.help-sidebar').hidden=!state.directory;
+      const ref=referenceDoc(),isReference=state.manual==='reference',searching=Boolean(state.query.trim()),home=state.manual==='guide'&&state.home&&!searching;
+      const layout=byId('manualLayout');layout.dataset.directoryOpen=String(state.directory&&!home&&!searching);layout.querySelector('.help-sidebar').hidden=!state.directory||home||searching;
       const strip=byId('manualTabs');strip.querySelectorAll('[data-manual-view]').forEach(button=>{button.setAttribute('aria-selected',String(button.dataset.manualView===state.manual));button.tabIndex=button.dataset.manualView===state.manual?0:-1;});
       const active=strip.querySelector('[aria-selected="true"]');strip.style.setProperty('--manual-left',active.offsetLeft+'px');strip.style.setProperty('--manual-width',active.offsetWidth+'px');
-      byId('manualDirectory').setAttribute('aria-expanded',String(state.directory));
+      byId('manualDirectory').setAttribute('aria-expanded',String(state.directory));byId('manualDirectory').hidden=home||searching;byId('manualDownload').hidden=!isReference||searching;byId('manualHome').hidden=!home;if(home)byId('manualHome').innerHTML=`<h2>你想完成什么？</h2><p>按${esc(role().label)}常用工作推荐</p><nav aria-label="推荐办事场景">${role().scenes.map(s=>`<button type="button" data-scene="${esc(s.key)}"><strong>${esc(custom[s.key]?.title||s.title)}</strong><span>${esc(s.description)}</span></button>`).join('')}</nav><h3>从这里系统了解</h3>${handbookIntroductions.filter(c=>['handbook:start','handbook:roles','handbook:problems'].includes(c.id)).map(c=>`<button type="button" data-manual-reference="${c.id}">${esc(c.title)} →</button>`).join('')}`;
       if(byId('manualSearch').value!==state.query)byId('manualSearch').value=state.query;
-      byId('businessChain').hidden=isReference||searching;root().querySelector('.view-tabs').hidden=isReference||searching;byId('viewBody').hidden=isReference||searching;
-      byId('manualReference').hidden=!isReference||searching;byId('manualResults').hidden=!searching;byId('manualGuideLinks').hidden=isReference||searching;byId('entryButton').hidden=searching;
-      root().querySelector('.page-heading').hidden=searching;root().querySelector('.article').hidden=searching;
-      byId('manualGuidePicker').hidden=isReference;byId('manualReferencePicker').hidden=!isReference;
-      const docs=referenceDocsForRole(state.role);byId('manualReferenceSelect').innerHTML=docs.map(doc=>`<option value="${esc(doc.id)}">${esc(doc.page.title+' / '+doc.title)}</option>`).join('');byId('manualReferenceSelect').disabled=!docs.length;byId('manualReferenceSelect').value=state.reference;
+      byId('businessChain').hidden=isReference||searching||home;root().querySelector('.view-tabs').hidden=isReference||searching||home;byId('viewBody').hidden=isReference||searching||home;
+      byId('manualReference').hidden=!isReference||searching;byId('manualResults').hidden=!searching;byId('manualGuideLinks').hidden=isReference||searching||home;byId('entryButton').hidden=searching||home||Boolean(ref?.sections&&isReference);
+      root().querySelector('.page-heading').hidden=searching||home;root().querySelector('.article').hidden=searching||home;
+      byId('manualGuidePicker').hidden=isReference||home;byId('manualReferencePicker').hidden=!isReference||home;
+      const docs=readableReferenceDocuments();byId('manualReferenceSelect').innerHTML=docs.map(doc=>`<option value="${esc(doc.id)}">${esc(doc.page.title+' / '+doc.title)}</option>`).join('');byId('manualReferenceSelect').disabled=!docs.length;byId('manualReferenceSelect').value=state.reference;
       if(isReference&&ref){byId('sceneTitle').textContent=ref.title;byId('sceneDescription').textContent=ref.page.sectionTitle+' / '+ref.page.title;
         const related=role().scenes.find(s=>s.pageKey===ref.page.key);
-        byId('manualReference').innerHTML=`<nav class="manual-related">${ref.item?`<button type="button" data-manual-reference="${esc(ref.page.key)}">查看完整章节</button>`:''}${related?`<button type="button" data-scene="${esc(related.key)}">查看相关操作图解 →</button>`:''}</nav>${ref.item?referenceDetails(ref.item):`<p>${esc(ref.page.task)}</p><nav class="manual-related">${referenceLinks(ref.page)}</nav><section><h3>办理顺序</h3><ol>${ref.page.flowSteps.map(step=>`<li>${esc(step)}</li>`).join('')}</ol></section><section><h3>完成标准与交接</h3><p>${esc(ref.page.completion)}</p><p>${esc(ref.page.handoff)}</p></section>${ref.page.items.map(item=>`<section><h3>${esc(item.title)}</h3>${referenceDetails(item)}</section>`).join('')}`}<section><h3>业务边界</h3><p>${esc(ref.page.boundary)}</p></section><nav class="manual-related">${referenceLinks(ref.page)}</nav>`;
-      }else if(isReference){byId('sceneTitle').textContent='操作参考手册';byId('sceneDescription').textContent='';byId('manualReference').innerHTML='<p>当前岗位暂无业务参考章节，可先查看岗位操作图解。</p>';byId('entryButton').hidden=true;}
-      const page=referencePagesForRole(state.role).find(page=>page.key===scene().pageKey);byId('manualGuideLinks').innerHTML=page?`<button type="button" data-manual-reference="${esc(page.key)}">查看完整参考章节</button>${referenceLinks(page)}`:'';
+        byId('manualReference').innerHTML=ref.sections?renderHandbookSections(ref.sections):`<nav class="manual-related">${ref.item?`<button type="button" data-manual-reference="${esc(ref.page.key)}">查看完整章节</button>`:''}${related?`<button type="button" data-scene="${esc(related.key)}">查看相关操作图解 →</button>`:''}</nav>${ref.item?referenceDetails(ref.item):`<p>${esc(ref.page.task)}</p><nav class="manual-related">${referenceLinks(ref.page)}</nav><section><h3>办理顺序</h3><ol>${ref.page.flowSteps.map(step=>`<li>${esc(step)}</li>`).join('')}</ol></section><section><h3>完成标准与交接</h3><p>${esc(ref.page.completion)}</p><p>${esc(ref.page.handoff)}</p></section>${renderHandbookSections(handbookPageAdditions[ref.page.key]||[])}${ref.page.items.map(item=>`<section><h3>${esc(item.title)}</h3>${referenceDetails(item)}</section>`).join('')}`}<section><h3>业务边界</h3><p>${esc(ref.page.boundary)}</p></section><nav class="manual-related">${referenceLinks(ref.page)}</nav>`;
+      }
+      const page=readableReferencePages().find(page=>page.key===scene().pageKey);byId('manualGuideLinks').innerHTML=page?`<button type="button" data-manual-reference="${esc(page.key)}">查看完整参考章节</button>${referenceLinks(page)}`:'';
       if(searching){
         const words=state.query.trim().split(/\s+/u).map(searchNormalize).filter(Boolean);
-        const searchableDocs=[...role().scenes.map(s=>({id:s.key,kind:'guide',title:custom[s.key]?.title||s.title,summary:s.description,body:[...s.steps.map(step=>step.description),s.completion,s.handoff].join(' ')})),...docs.map(doc=>({...doc,kind:'reference',summary:doc.item?.explanation||doc.page.task,body:JSON.stringify(doc.item||doc.page)}))];
+        const searchableDocs=[...roles.flatMap(r=>r.scenes).filter((s,i,a)=>a.findIndex(x=>x.key===s.key)===i).map(s=>({id:s.key,kind:'guide',title:custom[s.key]?.title||s.title,summary:s.description,body:[...s.steps.map(step=>step.description),s.completion,s.handoff].join(' ')})),...docs.map(doc=>({...doc,kind:'reference',summary:doc.summary||doc.item?.explanation||doc.page.task,body:JSON.stringify([doc.sections||doc.item||doc.page,doc.item?null:handbookPageAdditions[doc.page.key]])}))];
         const found=searchableDocs.filter(doc=>words.every(word=>searchNormalize(doc.title+doc.summary+doc.body).includes(word))).sort((a,b)=>Number(words.every(word=>searchNormalize(b.title).includes(word)))-Number(words.every(word=>searchNormalize(a.title).includes(word))));
         byId('manualResults').innerHTML=`<h3>搜索“${esc(state.query.trim())}”</h3><p role="status">找到 ${found.length} 条操作图解和参考说明</p>${found.length?found.map(doc=>`<button type="button" ${doc.kind==='guide'?'data-scene':'data-manual-reference'}="${esc(doc.id)}"><small>${doc.kind==='guide'?'操作图解':'参考手册'}</small><strong>${esc(doc.title)}</strong><span>${esc(doc.summary)}</span></button>`).join(''):'<p>没有找到相关说明。可尝试单据名称、字段名称，或打开目录查阅。</p>'}`;
       }
     }
-    function render(){const p=specification();renderNavigation();byId('sceneTitle').textContent=p.title;byId('sceneDescription').textContent=p.description;root().querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view===state.view)));byId('viewBody').innerHTML=namespace(state.view==='result'?resultView():state.view==='exception'?exceptionView():guideView());byId('viewBody').dataset.scene=state.scene;byId('viewBody').dataset.view=state.view;renderChain();paintPoints();renderManual();}
+    function render(){const p=specification();renderNavigation();byId('sceneTitle').textContent=p.title;byId('sceneDescription').textContent=p.description;root().querySelectorAll('[data-view]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.view===state.view)));byId('viewBody').innerHTML=namespace((state.view==='result'?resultView():state.view==='exception'?exceptionView():guideView())+(state.view==='guide'?`<section class="help-step-checks"><h3>怎样算办成了</h3><p>${esc(scene().completion)}</p><h3>完成后交给谁</h3><p>${esc(scene().handoff)}</p><details><summary>卡住时看这里</summary><p>${esc(scene().exception.trigger)}</p><p>${esc(scene().exception.action)}</p></details></section>`:''));byId('viewBody').dataset.scene=state.scene;byId('viewBody').dataset.view=state.view;renderChain();paintPoints();renderManual();}
 
       state=normalize({});
       return {
         unmount: closePicker,
         html: () => '<section class="surface data-surface role-help-preview" id="role-help-preview">'+namespace(`
-    <div class="manual-toolbar">${pickerMarkup('roleSelect','查看岗位')}<input id="manualSearch" class="manual-search" type="search" aria-label="搜索操作图解和参考手册" placeholder="搜任务、字段、状态，或直接输入问题" maxlength="200" /></div>
-    <div class="manual-navigation"><div class="manual-tabs" id="manualTabs" role="tablist" aria-label="手册类型"><button type="button" role="tab" data-manual-view="guide" aria-selected="true">岗位操作图解</button><button type="button" role="tab" data-manual-view="reference" aria-selected="false">操作参考手册</button></div><button type="button" id="manualDirectory" class="manual-directory" aria-controls="manualLayout" aria-expanded="false">目录</button></div>
+    <div class="manual-toolbar">${pickerMarkup('roleSelect','推荐岗位')}<input id="manualSearch" class="manual-search" type="search" aria-label="搜索操作图解和参考手册" placeholder="搜任务、字段、状态，或直接输入问题" maxlength="200" /></div>
+    <div class="manual-navigation"><div class="manual-tabs" id="manualTabs" role="tablist" aria-label="手册类型"><button type="button" role="tab" data-manual-view="guide" aria-selected="true">找操作</button><button type="button" role="tab" data-manual-view="reference" aria-selected="false">完整手册</button></div><button type="button" id="manualDirectory" class="manual-directory" aria-controls="manualLayout" aria-expanded="false">目录</button><button type="button" id="manualDownload" class="manual-directory">下载离线手册</button></div>
     <div class="layout" id="manualLayout">
     <aside class="help-sidebar" aria-label="岗位与场景">
       <nav aria-label="办事场景"><p class="nav-title">我要办什么</p><div class="scene-list" id="sceneList"></div></nav>
@@ -10317,7 +11719,7 @@ return {orders,financeCustomers};})();
     </aside>
     <section class="help-main" aria-label="岗位帮助正文">
       <div class="mobile-scenes"><div id="manualGuidePicker">${pickerMarkup('sceneSelect','我要办什么')}</div><label id="manualReferencePicker" class="select-label" for="manualReferenceSelect">查阅章节与词条<select id="manualReferenceSelect" class="scene-select"></select></label></div>
-      <div class="page-heading"><div><h2 id="sceneTitle" tabindex="-1"></h2><p class="page-description" id="sceneDescription"></p></div><button class="entry-button" id="entryButton" type="button" aria-label="查看办理入口"><span>办理入口</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div>
+      <section class="manual-home" id="manualHome" aria-label="帮助首页"></section><div class="page-heading"><div><h2 id="sceneTitle" tabindex="-1"></h2><p class="page-description" id="sceneDescription"></p></div><button class="entry-button" id="entryButton" type="button" aria-label="查看办理入口"><span>办理入口</span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button></div>
       <section class="manual-results" id="manualResults" aria-label="帮助搜索结果" hidden></section>
       <article class="article" aria-labelledby="sceneTitle">
         <section class="business-chain" id="businessChain" aria-label="办理概览"></section>
@@ -10334,12 +11736,13 @@ return {orders,financeCustomers};})();
         mount() {
     mountPicker('roleSelect');
     mountPicker('sceneSelect');
+    byId('manualDownload').addEventListener('click',()=>{const body=referenceDocs.filter(doc=>!doc.item).map(doc=>`<h2>${esc(doc.title)}</h2>${doc.sections?renderHandbookSections(doc.sections):`<p>${esc(doc.page.task)}</p><ol>${doc.page.flowSteps.map(step=>`<li>${esc(step)}</li>`).join('')}</ol><p>${esc(doc.page.completion)}</p><p>${esc(doc.page.handoff)}</p>${doc.page.items.map(item=>`<h3>${esc(item.title)}</h3>${referenceDetails(item)}`).join('')}<p>${esc(doc.page.boundary)}</p>`}`).join('');const url=URL.createObjectURL(new Blob(['<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>业务使用手册 · 交互稿示例</title><h1>业务使用手册 · 交互稿示例</h1>'+body+'</html>'],{type:'text/html;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='业务使用手册-交互稿示例.html';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);});
     byId('manualSearch').addEventListener('input',event=>transition({query:event.target.value}));
     byId('manualDirectory').addEventListener('click',()=>transition({directory:!state.directory}));
-    byId('manualTabs').addEventListener('click',event=>{const button=event.target.closest('[data-manual-view]');if(button)transition({manual:button.dataset.manualView});});
-    byId('manualTabs').addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const manual=event.key==='Home'?'guide':event.key==='End'?'reference':state.manual==='guide'?'reference':'guide';transition({manual});byId('manualTabs').querySelector('[aria-selected="true"]').focus();});
+    byId('manualTabs').addEventListener('click',event=>{const button=event.target.closest('[data-manual-view]');if(button)transition({manual:button.dataset.manualView,home:button.dataset.manualView==='guide',reference:button.dataset.manualView==='reference'?'handbook:start':state.reference,query:'',directory:button.dataset.manualView==='reference'});});
+    byId('manualTabs').addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const manual=event.key==='Home'?'guide':event.key==='End'?'reference':state.manual==='guide'?'reference':'guide';transition({manual,home:manual==='guide',reference:manual==='reference'?'handbook:start':state.reference,query:'',directory:manual==='reference'});byId('manualTabs').querySelector('[aria-selected="true"]').focus();});
     byId('manualReferenceSelect').addEventListener('change',event=>{transition({manual:'reference',reference:event.target.value,query:''});byId('sceneTitle').focus();});
-    root().addEventListener('click',event=>{const ref=event.target.closest('[data-manual-reference]');const guide=event.target.closest('[data-scene]');if(ref){transition({manual:'reference',reference:ref.dataset.manualReference,query:''});byId('sceneTitle').focus();}else if(guide){transition({manual:'guide',scene:guide.dataset.scene,view:'guide',point:0,query:''});byId('sceneTitle').focus();}});
+    root().addEventListener('click',event=>{const ref=event.target.closest('[data-manual-reference]');const guide=event.target.closest('[data-scene]');if(ref){transition({manual:'reference',reference:ref.dataset.manualReference,query:'',home:false,directory:true});byId('sceneTitle').focus();}else if(guide){const owner=role().scenes.some(s=>s.key===guide.dataset.scene)?role():roles.find(r=>r.scenes.some(s=>s.key===guide.dataset.scene));transition({role:owner.key,manual:'guide',scene:guide.dataset.scene,view:'guide',point:0,query:'',home:false});byId('sceneTitle').focus();}});
     root().querySelector('.view-tabs').addEventListener('click',e=>{const button=e.target.closest('[data-view]');if(button&&button.dataset.view!==state.view)transition({view:button.dataset.view});});
     byId('viewBody').addEventListener('click',e=>{const button=e.target.closest('[data-point]');if(button)selectPoint(Number(button.dataset.point),button.classList.contains('point-hit'));});
     byId('businessChain').addEventListener('click',e=>{const node=e.target.closest('[data-step]');if(node)selectStep(node.dataset.step);});
@@ -10369,7 +11772,7 @@ return {orders,financeCustomers};})();
     function renderTaskFilterPopover() {
       const tracking = ['visible','started','participated'].includes(state.boardMode);
       const f = state.trackingFilters[state.boardMode] || {};
-      const select = (key, label, options) => options.length<=5 ? renderDirectFilterChoices(label,f[key],options,'demo-tracking-choice',key,f.status==='completed'&&['role','attention'].includes(key)) : `<label class="control"><span>${label}</span><select data-tracking-filter="${key}" aria-label="${label}" ${f.status==='completed'&&['role','attention'].includes(key)?'disabled':''}>${options.map(([value,text])=>`<option value="${value}" ${f[key]===value?'selected':''}>${text}</option>`).join('')}</select></label>`;
+      const select = (key, label, options) => renderDirectFilterChoices(label,f[key],options,'demo-tracking-choice',key,f.status==='completed'&&['role','attention'].includes(key));
       const fields = tracking ? `
           ${renderDirectFilterChoices('跟踪范围',state.boardMode,[['visible','相关流程'],['started','我发起的'],['participated','我参与的']],'demo-tracking-scope','scope')}
           ${select('role','当前岗位',[['','全部当前岗位'],['老板','老板'],['业务','业务'],['采购','采购'],['工程','工程'],['生产','生产'],['仓库','仓库'],['财务','财务'],['PMC','PMC'],['品质','品质']])}
@@ -10465,13 +11868,13 @@ return {orders,financeCustomers};})();
       }
     }
 
-    function renderTaskReturnHeader(title, badge='') {
+    function renderTaskReturnHeader(title, badge='', controls='') {
       const label=state.floatingStack.at(-1)?.drawer?.type==='tracking'?'返回流程':state.page==='tasks'&&state.boardMode==='exceptions'?(state.exceptionView==='tasks'?'返回关联待办':'返回异常跟踪'):'返回列表';
-      return `<header class="drawer-head task-return-head"><button class="btn ghost icon-btn" data-action="close-drawer" aria-label="${label}">${icon('left')}</button><strong>${title} ${badge}</strong></header>`;
+      return `<header class="drawer-head task-return-head"><button class="btn ghost icon-btn" data-action="close-drawer" aria-label="${label}">${icon('left')}</button><strong>${title} ${badge}</strong>${controls}</header>`;
     }
 
-    function renderTaskShareControl() {
-      return '<button class="btn" data-action="copy-value" data-value="https://erp.example/task-link/301" title="原型示例链接">复制任务链接</button><p class="data-note">接收人登录后，轮到本人时进入办理，否则查看权限内的任务链。</p>';
+    function renderTaskShareControl(task) {
+      return `<details class="task-copy-menu"><summary aria-label="更多操作"><span aria-hidden="true">⋯</span></summary><div class="task-copy-options"><button class="btn" data-action="copy-value" data-value="${escapeHTML([task.title,task.object,task.role].join(' · '))}">${icon('copy')}复制任务信息</button><button class="btn" data-action="copy-value" data-value="https://erp.example/task-link/${task.id}">${icon('link')}复制任务链接</button>${getTaskListSubject(task)?`<button class="btn" data-action="copy-value" data-value="${escapeHTML(getTaskListSubject(task))}">${icon('copy')}复制产品信息</button>`:''}</div></details>`;
     }
 
     function renderTaskHandlingDrawer(task) {
@@ -10502,7 +11905,7 @@ return {orders,financeCustomers};})();
         body=`<section class="detail-section"><h3>跟进要求</h3><p>${escapeHTML(task.reason)}</p><div class="field"><label for="handling-note">处理结果</label><textarea id="handling-note" data-handling-field="note" rows="5" placeholder="记录已确认内容与仍需协调的事项">${escapeHTML(task.note||'')}</textarea></div><p class="data-note">本次完成跟进记录；包装确认仍按对应业务办理。</p></section>`;
         actions='<button class="btn primary" data-action="handling-followup">记录并完成跟进</button>';
       }
-      return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer task-handling-drawer" role="dialog" aria-modal="true" aria-label="任务办理">${renderTaskReturnHeader(task.lane==='done'?'办理结果':'任务办理')}<div class="drawer-body">${context}${renderTaskShareControl()}${renderFulfillmentChain(task)}${body}${state.handlingError&&state.overlay!=='handling-confirm'?`<p class="task-handling-error" role="alert">${escapeHTML(state.handlingError)}</p>`:''}</div><footer class="drawer-foot"><button class="btn" data-action="task-context-open" data-page="${task.sourcePage}" data-id="${task.sourceRecordId}">查看来源单据</button>${actions}</footer></aside></div>`;
+      return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer task-handling-drawer" role="dialog" aria-modal="true" aria-label="任务办理">${renderTaskReturnHeader(task.lane==='done'?'办理结果':'任务办理','',renderTaskShareControl(task))}<div class="drawer-body">${context}${renderFulfillmentChain(task)}${body}${state.handlingError&&state.overlay!=='handling-confirm'?`<p class="task-handling-error" role="alert">${escapeHTML(state.handlingError)}</p>`:''}</div><footer class="drawer-foot"><button class="btn" data-action="task-context-open" data-page="${task.sourcePage}" data-id="${task.sourceRecordId}">查看来源单据</button>${actions}</footer></aside></div>`;
     }
 
     function renderHandlingConfirmation() {
@@ -10612,7 +12015,6 @@ return {orders,financeCustomers};})();
       state.overlay=null;state.handlingConfirmation=null;renderFloating();
     }
 
-    document.addEventListener('input',event=>{if(!event.target.matches('[data-mobile-option-search]'))return;const q=event.target.value.trim().toLocaleLowerCase();let count=0;document.querySelectorAll('.rm-picker-list button').forEach(button=>{const visible=!button.dataset.value||q.split(/\s+/u).every(word=>(button.dataset.search||button.textContent).toLocaleLowerCase().includes(word));button.hidden=!visible;if(visible&&button.dataset.value)count++;});const empty=document.querySelector('[data-mobile-option-empty]');if(empty)empty.hidden=count>0;});
     document.addEventListener('input',event=>{
       if(event.target.dataset.formField==='print-title'){const title=document.querySelector('.print-paper h1');if(title)title.textContent=event.target.value;}
       const task=handlingTask();
@@ -10642,10 +12044,8 @@ return {orders,financeCustomers};})();
     function taskDiscoveryFields(mobile=false) {
       return [['person','办理人',[...new Set((mobile?mobileTasks:tasks).map(demoAssignee))].map(person=>[person,person])]];
     }
-    let mobileDiscoveryPicker=null;
-    function renderTaskDiscoveryControls(mobile=false) {
-      const filters=mobile?mobileTaskDiscoveryDemo():taskDiscoveryDemo, fields=taskDiscoveryFields(mobile);
-      if(mobile) return `<div class="task-discovery-controls">${fields.map(([key,label,options])=>`<div class="rm-sheet-group"><span>${label}</span><button class="btn rm-picker-entry" data-action="mobile-discovery-open" data-value="${key}">${escapeHTML(options.find(([value])=>value===filters[key])?.[1]||`全部${label}`)} ›</button></div>`).join('')}</div>`;
+    function renderTaskDiscoveryControls() {
+      const filters=taskDiscoveryDemo, fields=taskDiscoveryFields();
       return `<div class="task-handling-toolbar task-discovery-controls">${fields.map(([key,label,options])=>`<label class="control"><span>${label}</span><select data-task-discovery="${key}" data-discovery-device="desktop" aria-label="${label}"><option value="">全部${label}</option>${options.map(([value,text])=>`<option value="${value}" ${filters[key]===value?'selected':''}>${escapeHTML(text)}</option>`).join('')}</select></label>`).join('')}<button class="btn" data-action="task-discovery-clear" data-device="desktop">清除条件</button></div>`;
     }
     function renderExceptionStates(mobile, matches) {
@@ -10719,24 +12119,21 @@ return {orders,financeCustomers};})();
       const q = state.boardSearch.trim().toLowerCase();
       const inScope = tasks.filter(t => matchTaskDiscovery(t) && (!['todo','approval'].includes(state.boardMode) || t.lane !== 'done') && (state.boardMode !== 'approval' || t.approval) && (state.boardRole === 'all' || t.role === state.boardRole) && (!q || Object.values(t).join(' ').toLowerCase().includes(q)));
       const filtered = inScope.filter(task => state.boardStatus === 'all' || task.lane === state.boardStatus);
+      const displayedTasks = state.boardStatus === 'all' ? ['blocked','due','normal'].flatMap(key=>filtered.filter(task=>task.lane===key).slice(0,2)) : filtered;
       if(state.boardMode==='todo'&&taskCalendarDemo.desktop.layout==='calendar') {
         const rows=tasks.filter(task=>matchTaskDiscovery(task)&&task.lane!=='done'&&(state.boardRole==='all'||task.role===state.boardRole)&&(!q||Object.values(task).join(' ').toLowerCase().includes(q)));
         return `${header}<section class="surface board-surface"><div class="command-row">${calendarSwitch}</div>${renderTaskCalendarDemo(rows)}</section>`;
       }
       if(taskHandlingPreview) {
         const categories=[['all','全部'],['normal','常规待办'],['blocked','阻塞'],['due','到期提醒'],...(state.boardMode==='all'?[['done','已结束']]:[])];
-        const rows=filtered.map(task=>`<tr data-lane="${task.lane}" data-action="open-task" data-id="${task.id}"><td><div class="product-cell">${renderProductThumb(0,getTaskListSubject(task))}<div><button class="workbench-task-entry" data-action="open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}详情">${renderTaskHeading(task)}</button><small>${escapeHTML(task.object)}</small><small>${escapeHTML(demoTaskPath(task))}</small></div></div></td><td>${escapeHTML(listConfig[task.sourcePage]?.title||'业务单据')} · ${copyValue(getTaskListSource(task)?.no||task.object)}<small>${escapeHTML(task.time)}</small></td><td><span class="badge ${task.badge}">${escapeHTML(task.state)}</span><div class="task-reason">${escapeHTML(task.reason||'打开任务查看办理依据与处理记录。')}</div></td><td>${escapeHTML(task.role)}<small>由岗位人员处理</small></td></tr>`).join('');
+        const rows=displayedTasks.map(task=>`<tr data-lane="${task.lane}" data-action="open-task" data-id="${task.id}"><td><div class="product-cell">${renderProductThumb(0,getTaskListSubject(task))}<div><button class="workbench-task-entry" data-action="open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}详情">${renderTaskHeading(task)}</button><small>${escapeHTML(task.object)}</small><small>${escapeHTML(demoTaskPath(task))}</small></div></div></td><td>${escapeHTML(listConfig[task.sourcePage]?.title||'业务单据')} · ${copyValue(getTaskListSource(task)?.no||task.object)}<small>${escapeHTML(task.time)}</small></td><td><span class="badge ${task.badge}">${escapeHTML(task.state)}</span><div class="task-reason">${escapeHTML(task.reason||'打开任务查看办理依据与处理记录。')}</div></td><td>${escapeHTML(task.role)}<small>由岗位人员处理</small></td></tr>`).join('');
         return `${header}<section class="surface board-surface task-handling-board">${calendarSwitch}<div class="task-handling-toolbar"><div class="segment" aria-label="任务分类">${categories.map(([key,label])=>`<button class="${state.boardStatus===key?'active':''}" data-action="board-status" data-value="${key}" aria-pressed="${state.boardStatus===key}">${label}<b>${inScope.filter(task=>key==='all'||task.lane===key).length}</b></button>`).join('')}</div><label class="search">${icon('search')}<input id="board-search" value="${escapeHTML(state.boardSearch)}" placeholder="订单 / 产品 / 物料 / 款号" aria-label="搜索任务" /></label>${renderFilterTrigger(state.boardRole!=='all'||Object.values(taskDiscoveryDemo).some(Boolean))}</div><div class="task-handling-table"><table class="task-board-table"><thead><tr><th>任务与关联内容</th><th>关联单据 / 时间</th><th>状态与说明</th><th>负责岗位 / 处理人</th></tr></thead><tbody>${rows||'<tr><td colspan="4"><div class="empty">当前分类暂无匹配任务</div></td></tr>'}</tbody></table></div><nav class="statistics-pagination erp-task-pagination" aria-label="任务分页"><span role="status">第 ${filtered.length?'1–'+filtered.length:'0–0'} 项，共 ${filtered.length} 项</span><div class="statistics-pager"><button class="btn" disabled>← 上一页</button><button class="btn is-current" disabled>1</button><button class="btn" disabled>下一页 →</button></div></nav></section>`;
       }
       const lanes = [
         ['normal','常规待办',''], ['blocked','阻塞','blocked'], ['due','到期提醒','due'], ['done','已结束','']
       ].filter(([key])=>state.boardMode!=='todo'||key!=='done');
-      const content = state.boardStatus !== 'all'
-        ? `<table class="task-board-table"><thead><tr><th>任务与关联内容</th><th>关联单据 / 时间</th><th>状态与说明</th><th>负责岗位 / 承接方式</th></tr></thead><tbody>${filtered.length ? filtered.map(renderTaskBoardRow).join('') : '<tr><td colspan="4"><div class="empty">当前分类暂无匹配任务</div></td></tr>'}</tbody></table>`
-        : `<div class="lanes${state.boardMode==='todo'?' lanes--todo':''}">${lanes.map(([key,label,cls]) => {
-          const rows = filtered.filter(t => t.lane === key);
-          return `<div class="lane ${cls}"><div class="lane-head"><span>${label}</span></div><div class="lane-body">${rows.length ? rows.map(renderTaskCard).join('') : '<div class="empty"><div><strong>暂无任务</strong><span>当前筛选下没有记录</span></div></div>'}</div>${rows.length ? `<button class="btn lane-more" data-action="board-status" data-value="${key}">查看${label}列表</button>` : ''}</div>`;
-        }).join('')}</div>`;
+      const content = `${state.boardStatus==='all'?'<p class="data-note"><strong>待处理预览</strong> · 优先查看异常、临近到期任务；完整任务可切换上方分类查看。</p>':''}<table class="task-board-table"><thead><tr><th>任务与关联内容</th><th>关联单据 / 时间</th><th>状态与说明</th><th>负责岗位 / 承接方式</th></tr></thead><tbody>${displayedTasks.length ? displayedTasks.map(renderTaskBoardRow).join('') : `<tr><td colspan="4"><div class="empty">${state.boardStatus==='all'?'当前范围暂无待处理任务':'当前分类暂无匹配任务'}</div></td></tr>`}</tbody></table>`;
+
       return `
         ${header}
         <section class="surface operation-surface">
@@ -10753,9 +12150,6 @@ return {orders,financeCustomers};})();
       return `<tr data-action="open-task" data-id="${task.id}"><td><button class="workbench-task-entry" data-action="open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}详情">${renderTaskHeading(task)}</button></td><td>${escapeHTML(getTaskListSource(task)?.no || task.object)}<small>${escapeHTML(task.time)}</small></td><td><span class="badge ${task.badge}">${escapeHTML(task.state)}</span>${task.reason ? `<div class="task-reason">${escapeHTML(task.reason)}</div>` : ''}</td><td>${escapeHTML(task.role)}<small>由岗位人员处理</small></td></tr>`;
     }
 
-    function renderTaskCard(task) {
-      return `<button class="task-card" data-action="open-task" data-id="${task.id}" aria-label="查看${escapeHTML(task.title)}详情"><div class="task-card-title">${renderTaskHeading(task)}<span class="badge ${task.badge}">${task.state}</span></div><div class="task-object">${escapeHTML(getTaskListSource(task)?.no || task.object)}</div>${task.reason ? `<div class="task-reason">${task.reason}</div>` : ''}<div class="task-meta"><span>${task.role}</span><span>·</span><span>${task.time}</span></div></button>`;
-    }
 
     function renderDeliveryAddressFields(defaults = {}) {
       const country = state.formValues.region ?? defaults.country ?? (state.formMode === 'edit' ? '' : '中国');
@@ -10847,7 +12241,7 @@ return {orders,financeCustomers};})();
               <div class="field required"><label>${isSales?'订单日期':'采购日期'}</label><input type="date" value="2026-09-25" data-form-field="order-date" /></div>
               ${isSales?'<div class="field"><label>销售负责人</label><select data-form-field="owner"><option>何敏</option><option>林晓</option></select></div>':'<div class="field"><label>采购负责人</label><select data-form-field="owner"><option>陈强</option><option>林晓</option></select></div>'}
             <div class="field required"><label>${isSales?'计划交付日期':'预计到货日期'}</label><input type="date" value="2026-10-10" data-form-field="date" /></div></div></section>
-<section class="form-section" id="items"><h2 class="section-title">${isSales?'订货明细':'采购明细'} ${renderLineAddButton(isSales?'添加订货明细':'添加采购明细')}</h2>
+<section class="form-section" id="items"><h2 class="section-title">${isSales?'订货明细':'采购明细'} ${!isSales||state.lineCount?renderLineAddButton(isSales?'添加订货明细':'添加采购明细'):''}</h2>
               ${renderDocumentLines(type)}
               ${renderLineAddContinuation(isSales?'添加订货明细':'添加采购明细')}
             </section>
@@ -11097,24 +12491,22 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function renderMobileTracking() {
       const f = mobileTrackingQuery();
       const matches = (!f.status || f.status==='active') && trackingDemoMatches(f);
-      const count = ['role','source','attention'].filter(key=>f[key]).length+Number(Boolean(f.from||f.to));
+      const count = ['role','attention'].filter(key=>f[key]).length;
       const handled = mobileTrackingTask.status === 'done';
       return `<section class="rm-tracking" aria-label="流程跟踪"><div class="rm-list-controls">
         <div class="rm-query"><label class="rm-search">${icon('search')}<input id="mobile-tracking-search" aria-label="搜索流转记录" placeholder="单号/任务/产品/款号" value="${escapeHTML(f.keyword||'')}" /></label><button class="rm-filter-button ${count?'active':''}" data-action="mobile-options" aria-expanded="${state.mobileOptionsOpen}">${icon('filter')}筛选${count?`<span class="rm-filter-count">${count}</span>`:''}</button></div>
-        ${renderTrackingStates(f,true)}${renderMobileApplied([['role',f.role&&`当前岗位：${f.role}`],['source',f.source&&`单据类型：${({sales_order:'销售订单',purchase_order:'采购订单',production_order:'生产订单',shipment:'出货单'})[f.source]}`],['attention',f.attention&&({overdue:'只看逾期',blocked:'只看受阻'})[f.attention]],['date',(f.from||f.to)&&`发起日期：${f.from||'不限'} 至 ${f.to||'不限'}`]],'mobile-tracking-filter-clear')}</div>
+        ${renderTrackingStates(f,true)}${renderMobileApplied([['role',f.role&&`当前岗位：${f.role}`],['attention',f.attention&&({overdue:'只看逾期',blocked:'只看受阻'})[f.attention]]],'mobile-tracking-filter-clear')}</div>
         ${matches?`<article class="rm-tracking-card"><button class="rm-tracking-open" data-action="mobile-tracking-open" aria-label="流程跟踪：销售订单受理"></button><div class="rm-card-head"><strong>销售订单受理</strong><span class="badge info">办理中</span></div><div class="data-note">SO-20260925-001</div><div class="product-cell">${renderProductThumb(0,'浅棕小熊')}<div><strong>浅棕小熊（共 2 项关联内容）</strong><small>产品编号 P-BEAR-01</small><small>内部款号 BEAR-01</small></div></div><div class="rm-tracking-owner">${handled?'等待后续业务处理':'<strong class="task-responsibility-role">岗位：工程</strong> · 待处理'}</div><div class="rm-tracking-origin"><div class="task-initiator"><strong>业务小李</strong><small><strong class="task-responsibility-role">发起岗位：业务</strong></small></div><span>今天 09:00</span></div></article><p class="data-note rm-list-summary" role="status">已显示全部 1 条</p>`:'<div class="rm-empty">当前筛选下没有匹配记录</div>'}
       </section>`;
     }
 
     function renderMobileTrackingFilters() {
-      if(state.mobileFilterDateKind==='tracking'&&state.mobileHistory.calendar)return renderMobileHistoryOptions();
       const f=mobileTrackingQuery();
       const select=(key,label,options)=>`<div class="rm-sheet-group"><span>${label}</span><div class="rm-sheet-options" role="group" aria-label="${label}">${options.map(([value,text])=>`<button class="${(f[key]||'')===value?'active':''}" data-action="mobile-tracking-choice" data-field="${key}" data-value="${value}" ${f.status==='completed'&&key==='role'?'disabled':''}>${text}</button>`).join('')}</div></div>`;
       return `<div class="rm-popover-layer" data-action="mobile-options-bg"><section class="rm-filter-popover rm-tracking-filters" role="dialog" aria-label="流转筛选"><div class="rm-sheet-head"><strong>流转筛选</strong><button class="rm-icon-button" data-action="mobile-options-close" aria-label="关闭筛选">${icon('close')}</button></div><div class="rm-filter-fields">
         <div class="rm-sheet-group"><span>跟踪范围</span><div class="rm-sheet-options">${[['visible','相关流程'],['started','我发起的'],['participated','我参与的']].map(([key,label])=>`<button class="${state.mobileTrackingScope===key?'active':''}" data-action="mobile-tracking-scope" data-value="${key}">${label}</button>`).join('')}</div></div>
         ${select('role','当前岗位',[['','全部当前岗位'],['业务','业务'],['老板','老板'],['工程','工程'],['PMC','PMC'],['采购','采购'],['仓库','仓库'],['质量','质量'],['财务','财务']])}
-        ${select('source','单据类型',[['','全部单据类型'],['sales_order','销售订单'],['purchase_order','采购订单'],['production_order','生产订单'],['shipment','出货单']])}
-        <div class="rm-sheet-group"><span>关注事项</span><div class="rm-sheet-options">${[['','全部情况'],['overdue','只看逾期'],['blocked','只看受阻']].map(([key,label])=>`<button class="${(f.attention||'')===key?'active':''}" data-action="mobile-tracking-attention" data-value="${key}" ${f.status==='completed'?'disabled':''}>${label}</button>`).join('')}</div></div><div class="rm-legend-action"><span>发起日期</span><button data-action="mobile-tracking-calendar">${f.from||f.to?`${f.from||'不限'} 至 ${f.to||'不限'}`:'自定义发起日期'}</button></div></div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-tracking-reset">重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div></section></div>`;
+        <div class="rm-sheet-group"><span>关注事项</span><div class="rm-sheet-options">${[['','全部情况'],['overdue','只看逾期'],['blocked','只看受阻']].map(([key,label])=>`<button class="${(f.attention||'')===key?'active':''}" data-action="mobile-tracking-attention" data-value="${key}" ${f.status==='completed'?'disabled':''}>${label}</button>`).join('')}</div></div></div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-tracking-reset">重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div></section></div>`;
     }
 
     function renderMobileApplied(items, action) {
@@ -11128,7 +12520,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function renderMobileTaskApplied() {
       const history=state.mobileMain==='tasks'&&state.mobileTab==='done', calendar=state.mobileMain==='tasks'&&state.mobileTab==='todo'&&taskCalendarDemo.mobile.layout==='calendar';
       const f=state.mobileHistory;
-      return renderMobileApplied([...mobileDiscoveryApplied(),
+      return renderMobileApplied([
         ['status',!history&&state.mobileStatus&&`任务状态：${state.mobileStatus==='blocked'?'受阻':'待处理'}`],
         ['sort',!history&&!calendar&&state.mobileSort!=='newest'&&`排序：${state.mobileSort==='oldest'?'等待最久':'截止最早'}`],
         ['period',history&&f.period==='custom'&&`处理时间：${f.from} 至 ${f.to}`],
@@ -11185,7 +12577,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       const selected=matches&&state.mobileExceptionState!=='closed';
       const visible=selected&&(view!=='tasks'||task.lane!=='done');
       const content=view==='orders'?`<strong>${escapeHTML(task.source)}</strong>`:view==='tasks'?`<strong>${escapeHTML(task.title)}</strong><p>${escapeHTML(demoTaskPath(task))} · ${demoAssignee(task)}</p><button class="btn primary" data-action="mobile-open-task" data-id="H07">查看异常关联任务</button>`:`<strong>裁片颜色与尺寸异常 · ${task.decisionPlan?'方案待审批':'待定方案'}</strong><p>${escapeHTML(demoTaskPath(task))}</p><p>${escapeHTML(task.reason)}</p><p>当前待办 · ${escapeHTML(task.role)} · ${demoAssignee(task)}</p><button class="btn primary" data-action="mobile-open-task" data-id="H07">查看异常关联任务</button>`;
-      return `<section class="rm-tracking" aria-label="异常跟踪">${view?'':`<div class="rm-list-controls"><div class="rm-query"><label class="rm-search">${icon('search')}<input id="mobile-exception-search" aria-label="搜索异常单号、订单、批次或原因" placeholder="单号/订单/批次/原因" value="${escapeHTML(query)}" /></label><button class="rm-filter-button ${count?'active':''}" data-action="mobile-options">${icon('filter')}筛选${count?` ${count}`:''}</button></div>${renderExceptionStates(true,matches)}${renderMobileApplied(mobileDiscoveryApplied(),'mobile-filter-clear')}</div>`}${renderExceptionSummary(true,selected,task.lane!=='done')}${visible?`<div class="rm-section">${content}</div>`:'<div class="rm-empty">当前条件下没有匹配记录</div>'}</section>`;
+      return `<section class="rm-tracking" aria-label="异常跟踪">${view?'':`<div class="rm-list-controls"><div class="rm-query"><label class="rm-search">${icon('search')}<input id="mobile-exception-search" aria-label="搜索异常单号、订单、批次或原因" placeholder="单号/订单/批次/原因" value="${escapeHTML(query)}" /></label></div>${renderExceptionStates(true,matches)}</div>`}${renderExceptionSummary(true,selected,task.lane!=='done')}${visible?`<div class="rm-section">${content}</div>`:'<div class="rm-empty">当前条件下没有匹配记录</div>'}</section>`;
     }
 
     function renderMobileProfile() {
@@ -11238,7 +12630,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         <main class="rm-flow-scroll">
           <section class="rm-section">
             <h2>${escapeHTML(task.title)}</h2>
-            ${renderTaskShareControl()}
+            ${renderTaskShareControl(task)}
             <div class="rm-identity">${task.source} · ${task.object}</div>
             <dl class="rm-facts"><div class="rm-fact"><dt>负责岗位</dt><dd>${task.role}</dd></div><div class="rm-fact"><dt>截止时间</dt><dd>${task.deadline}</dd></div></dl>
             ${task.reason ? `<div class="rm-callout danger"><strong>阻塞原因</strong><br>${task.reason}</div>` : ''}
@@ -11325,27 +12717,15 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     }
     function renderMobileHistoryOptions() {
       const f=state.mobileHistory;
-      const month=new Date(`${f.month}-01T12:00:00`), count=new Date(month.getFullYear(),month.getMonth()+1,0).getDate();
-      const days=Array.from({length:month.getDay()},()=>'<span></span>').join('')+Array.from({length:count},(_,i)=>{
-        const value=`${f.month}-${String(i+1).padStart(2,'0')}`;
-        return `<button aria-label="${value}" class="${f.start===value||f.end&&value>=f.start&&value<=f.end?'active':''}" data-action="mobile-history-day" data-value="${value}">${i+1}</button>`;
-      }).join('');
-      if(f.calendar) return `<div class="rm-popover-layer"><section class="rm-filter-popover" role="dialog" aria-label="选择${state.mobileFilterDateKind==='tracking'?'发起':'处理'}日期范围" style="max-height:calc(100% - 24px)"><div class="rm-sheet-head"><strong>选择${state.mobileFilterDateKind==='tracking'?'发起':'处理'}日期范围</strong><button class="rm-icon-button" data-action="mobile-history-date-cancel" aria-label="关闭日期选择">${icon('close')}</button></div><div class="rm-filter-fields"><p class="data-note">${f.end?`${f.start} 至 ${f.end}`:f.start?`${f.start} 起，请选择结束日期`:'请选择开始日期'}</p><div class="rm-sheet-head"><button class="btn" data-action="mobile-history-month" data-value="-1" aria-label="上个月">‹</button><strong>${f.month}</strong><button class="btn" data-action="mobile-history-month" data-value="1" aria-label="下个月">›</button></div><div class="rm-history-calendar">${days}</div></div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-history-date-cancel">取消</button><button class="btn" data-action="mobile-history-date-apply" ${f.start&&f.end?'':'disabled'}>应用日期</button></div></section></div>`;
       return `<div class="rm-popover-layer" data-action="mobile-options-bg"><section class="rm-filter-popover" role="dialog" aria-label="已办筛选">
         <div class="rm-sheet-head"><strong>已办筛选</strong><button class="rm-icon-button" data-action="mobile-options-close" aria-label="关闭筛选">${icon('close')}</button></div><div class="rm-filter-fields">
-        <div class="rm-sheet-group"><div class="rm-legend-action"><span>处理时间</span><button data-action="mobile-history-calendar">${f.period==='custom'?`${f.from} 至 ${f.to}`:'自定义日期'}</button></div><div class="rm-sheet-options">${[['','全部时间'],['today','今天'],['7d','近 7 天'],['30d','近 30 天']].map(([key,label])=>`<button class="${f.period===key?'active':''}" data-action="mobile-history-period" data-value="${key}">${label}</button>`).join('')}</div>
+        <div class="rm-sheet-group"><span>处理时间</span><div class="rm-sheet-options">${[['','全部时间'],['today','今天'],['7d','近 7 天'],['30d','近 30 天']].map(([key,label])=>`<button class="${f.period===key?'active':''}" data-action="mobile-history-period" data-value="${key}">${label}</button>`).join('')}</div>
         </div>
         <div class="rm-sheet-group rm-history-results"><span>处理结果</span><div class="rm-sheet-options">${[['','全部结果'],['done','已完成'],['rejected','已驳回'],['withdrawn','已撤回']].map(([key,label])=>`<button class="${f.result===key?'active':''}" data-action="mobile-history-result" data-value="${key}" aria-pressed="${f.result===key}">${label}<span class="filter-chip-count">${getMobileFilteredTasks({ignoreStatus:true}).filter(task=>!key||task.result===key).length}</span></button>`).join('')}</div></div>
-        ${renderTaskDiscoveryControls(true)}</div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-history-reset">重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div></section></div>`;
-    }
-    function renderMobileDiscoveryPicker() {
-      const [key,label,options]=taskDiscoveryFields(true).find(([key])=>key===mobileDiscoveryPicker.key);
-            return `<div class="rm-popover-layer"><section class="rm-filter-popover rm-search-picker" role="dialog" aria-label="选择${label}"><header class="rm-sheet-head"><button class="btn" data-action="mobile-discovery-back">‹ 返回筛选</button><strong>${label}</strong></header><input aria-label="搜索${label}" placeholder="搜索${label}" data-mobile-option-search><div class="rm-filter-fields rm-picker-list">${[['',`全部${label}`],...options].map(([value,text])=>`<button data-action="mobile-discovery-select" data-field="${key}" data-value="${value}" aria-pressed="${value===(mobileTaskDiscoveryDemo()[key]||'')}">${escapeHTML(text)}</button>`).join('')}<p data-mobile-option-empty hidden>没有匹配的选项，请换个关键词</p></div></section></div>`;
+        </div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-history-reset">重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div></section></div>`;
     }
     function renderMobileOptionsSheet() {
-      if(mobileDiscoveryPicker) return renderMobileDiscoveryPicker();
       if(state.mobileMain==='tasks'&&state.mobileTab==='done') return renderMobileHistoryOptions();
-      if(state.mobileMain==='tasks'&&state.mobileTab==='exceptions') return `<div class="rm-popover-layer" data-action="mobile-options-bg"><section class="rm-filter-popover" role="dialog" aria-label="筛选异常跟踪"><div class="rm-sheet-head"><strong>筛选异常跟踪</strong><button class="rm-icon-button" data-action="mobile-options-close" aria-label="关闭筛选">${icon('close')}</button></div><div class="rm-filter-fields">${renderTaskDiscoveryControls(true)}</div><div class="rm-sheet-foot"><button class="btn" data-action="task-discovery-clear" data-device="mobile">重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div></section></div>`;
       const calendar=state.mobileMain==='tasks'&&state.mobileTab==='todo'&&taskCalendarDemo.mobile.layout==='calendar';
       const statusOptions = [['','全部状态'],['actionable','待处理'],['blocked','阻塞']];
       return `<div class="rm-popover-layer" data-action="mobile-options-bg"><section class="rm-filter-popover" role="dialog" aria-modal="false" aria-label="任务筛选">
@@ -11353,7 +12733,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         ${calendar?`<div class="rm-sheet-group"><span>任务截止</span><div class="rm-sheet-options">${[['date','按日期'],['overdue','已逾期'],['undated','未设置截止']].map(([key,label])=>`<button class="${(['overdue','undated'].includes(taskCalendarDemo.mobile.selection)?taskCalendarDemo.mobile.selection:'date')===key?'active':''}" data-action="mobile-calendar-filter" data-value="${key}">${label}</button>`).join('')}</div></div>`:''}
         ${calendar?'':`<div class="rm-sheet-group"><span>排序</span><div class="rm-sheet-options"><button class="${state.mobileSort === 'newest' ? 'active' : ''}" data-action="mobile-sort" data-value="newest">最新进入</button><button class="${state.mobileSort === 'oldest' ? 'active' : ''}" data-action="mobile-sort" data-value="oldest">较早进入</button></div></div>`}
         <div class="rm-sheet-group"><span>任务状态</span><div class="rm-sheet-options">${statusOptions.map(([key,label]) => `<button class="${state.mobileStatus === key ? 'active' : ''}" data-action="mobile-status" data-value="${key}" aria-pressed="${state.mobileStatus===key}">${label}${calendar?'':`<span class="filter-chip-count">${getMobileFilteredTasks({ignoreStatus:true}).filter(task=>!key||(key==='blocked'?task.state==='阻塞':task.access==='actionable')).length}</span>`}</button>`).join('')}</div></div>
-        ${renderTaskDiscoveryControls(true)}</div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-options-reset">重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div>
+        </div><div class="rm-sheet-foot"><button class="btn" data-action="mobile-options-reset">重置筛选</button><button class="btn" data-action="mobile-options-close" aria-label="关闭筛选">收起</button></div>
       </section></div>`;
     }
 
@@ -11501,7 +12881,53 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     document.addEventListener('focusin', updateMobileBackToTop);
     document.addEventListener('focusout', () => requestAnimationFrame(updateMobileBackToTop));
 
+    let formFullscreen = false;
+    let formFullscreenScroll = [];
+    function syncFormFullscreen() {
+      const form = document.querySelector('#view .form-view');
+      if (!form || !matchMedia('(min-width:768px)').matches) formFullscreen = false;
+      document.body.classList.toggle('form-fullscreen', formFullscreen);
+      const button = form?.querySelector('.form-fullscreen-trigger');
+      if (button) {
+        button.textContent = formFullscreen ? '退出全屏' : '全屏编辑';
+        button.setAttribute('aria-pressed', String(formFullscreen));
+      }
+    }
+    function setFormFullscreen(next) {
+      const form = document.querySelector('#view .form-view');
+      const previous = new Map(formFullscreenScroll.map(position => [position.node, position]));
+      formFullscreenScroll = [...(form?.querySelectorAll('*') || [])].filter(node => previous.has(node) || node.scrollTop || node.scrollLeft).map(node => {
+        const last = previous.get(node);
+        return { node, top:last && node.scrollTop === last.actualTop ? last.top : node.scrollTop, left:last && node.scrollLeft === last.actualLeft ? last.left : node.scrollLeft };
+      });
+      formFullscreen = next;
+      syncFormFullscreen();
+      formFullscreenScroll.forEach(position => {
+        position.node.scrollTop = position.top;
+        position.node.scrollLeft = position.left;
+        position.actualTop = position.node.scrollTop;
+        position.actualLeft = position.node.scrollLeft;
+      });
+    }
+    function mountFormFullscreen() {
+      const header = document.querySelector('#view .form-head');
+      if (header && matchMedia('(min-width:768px)').matches && !header.querySelector('.form-fullscreen-trigger')) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn form-fullscreen-trigger';
+        button.dataset.action = 'form-fullscreen';
+        header.append(button);
+      }
+      syncFormFullscreen();
+    }
+    matchMedia('(min-width:768px)').addEventListener('change', () => {
+      document.querySelector('.form-fullscreen-trigger')?.remove();
+      formFullscreen = false;
+      mountFormFullscreen();
+    });
+
     function renderView() {
+      if (state.page !== 'entity-form') { formFullscreen = false; syncFormFullscreen(); }
       if(state.page!=='permissions'&&state.permissionFullscreen){state.permissionFullscreen=false;syncPermissionFullscreen();}
       roleHelpPreview.unmount();
       const view = document.querySelector('#view');
@@ -11534,6 +12960,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         else view.innerHTML = renderGenericForm(config);
       }
       else view.innerHTML = renderDataState({title:titleForPage()});
+      mountFormFullscreen();
       view.querySelectorAll('[data-permission-mixed]').forEach(input=>{input.indeterminate=input.dataset.permissionMixed==='true';});
       if(state.page==='progress'){preserveProgressDesignTabs(view,progressTabs);bindStatisticsDesignInputs();}
       if(state.page==='tasks' && taskScope){
@@ -12414,11 +13841,11 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       if(task.handling)return renderTaskHandlingDrawer(task);
       if (task.lane === 'done') {
         const receipt = task.receipt || { action:'完成本岗', feedback:'该任务已完成并保留办理记录。', status:task.state };
-        return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true">${renderTaskReturnHeader('任务结果',`<span class="badge ${task.badge}">${receipt.status}</span>`)}<div class="drawer-body"><section class="detail-section"><h3>${escapeHTML(task.title)}</h3>${renderTaskShareControl()}<dl class="detail-grid"><dt>业务对象</dt><dd>${task.object}</dd><dt>责任岗位</dt><dd>${task.role}</dd><dt>办理动作</dt><dd>${receipt.action}</dd><dt>完成时间</dt><dd>${task.time}</dd></dl><div class="rm-callout" style="margin-top:12px"><strong>办理说明</strong><div style="margin-top:5px">${escapeHTML(receipt.feedback)}</div></div></section>${task.manualFollowup?`<section class="detail-section"><h3>任务要求</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.description)}</p>${task.receipt&&task.lane==='done'?`<h3>处理结果</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.receipt.feedback)}</p>`:''}</section>`:''}${renderTaskSourceSummary(task)}<section class="detail-section"><h3>结果与业务边界</h3><p style="margin:0;color:var(--text-2);line-height:1.65">任务结果只证明当前岗位已完成责任；对应库存、生产、出货或财务事实仍从业务单据查看。</p></section></div><footer class="drawer-foot"><button class="btn" data-action="detail-attachments" data-value="任务附件">${icon('paperclip')}查看附件</button><button class="btn primary" data-action="close-drawer">完成</button></footer></aside></div>`;
+        return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true">${renderTaskReturnHeader('任务结果',`<span class="badge ${task.badge}">${receipt.status}</span>`,renderTaskShareControl(task))}<div class="drawer-body"><section class="detail-section"><h3>${escapeHTML(task.title)}</h3><dl class="detail-grid"><dt>业务对象</dt><dd>${task.object}</dd><dt>责任岗位</dt><dd>${task.role}</dd><dt>办理动作</dt><dd>${receipt.action}</dd><dt>完成时间</dt><dd>${task.time}</dd></dl><div class="rm-callout" style="margin-top:12px"><strong>办理说明</strong><div style="margin-top:5px">${escapeHTML(receipt.feedback)}</div></div></section>${task.manualFollowup?`<section class="detail-section"><h3>任务要求</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.description)}</p>${task.receipt&&task.lane==='done'?`<h3>处理结果</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.receipt.feedback)}</p>`:''}</section>`:''}${renderTaskSourceSummary(task)}<section class="detail-section"><h3>结果与业务边界</h3><p style="margin:0;color:var(--text-2);line-height:1.65">任务结果只证明当前岗位已完成责任；对应库存、生产、出货或财务事实仍从业务单据查看。</p></section></div><footer class="drawer-foot"><button class="btn" data-action="detail-attachments" data-value="任务附件">${icon('paperclip')}查看附件</button><button class="btn primary" data-action="close-drawer">完成</button></footer></aside></div>`;
       }
-      if(task.sourceAction)return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true" aria-label="任务办理">${renderTaskReturnHeader('任务办理')}<div class="drawer-body">${renderTaskStep(task)}</div><footer class="drawer-foot"><button class="btn primary" data-action="task-context-open" data-page="${task.sourcePage}" data-id="${task.sourceRecordId}">${task.sourceAction}</button></footer></aside></div>`;
+      if(task.sourceAction)return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true" aria-label="任务办理">${renderTaskReturnHeader('任务详情','',renderTaskShareControl(task))}<div class="drawer-body">${renderTaskStep(task)}</div><footer class="drawer-foot"><button class="btn primary" data-action="task-context-open" data-page="${task.sourcePage}" data-id="${task.sourceRecordId}">${task.sourceAction}</button></footer></aside></div>`;
       const step = state.taskStep;
-      return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true">${renderTaskReturnHeader('任务办理',`<span class="badge ${task.badge}">${task.state}</span>`)}<div class="task-steps"${step===1?' hidden':''}>${[['1','核对任务'],['2','选择处理'],['3','确认与结果']].map(([n,label]) => { const number=Number(n); const enabled=number<=state.taskMaxStep||number===step+1; return `<button type="button" class="task-step ${step===number?'active':''} ${number<=state.taskMaxStep?'visited':''}" data-action="task-step" data-value="${number}" ${step===number?'aria-current="step"':''} ${enabled?'':'disabled'}><i>${n}</i><span>${label}</span></button>`; }).join('')}</div><div class="drawer-body">${renderTaskStep(task)}</div><footer class="drawer-foot"><button class="btn" data-action="detail-attachments" data-value="任务附件">${icon('paperclip')}查看附件</button>${step>1?'<button class="btn" data-action="task-prev">上一步</button>':''}<button class="btn primary" data-action="task-next">${step===3?'确认办理':'下一步'}</button></footer></aside></div>`;
+      return `<div class="drawer-layer" data-action="drawer-bg"><aside class="drawer" role="dialog" aria-modal="true">${renderTaskReturnHeader(step===1?'任务详情':'任务办理','',renderTaskShareControl(task))}<div class="task-steps"${step===1?' hidden':''}>${[['1','核对任务'],['2','选择处理'],['3','确认与结果']].map(([n,label]) => { const number=Number(n); const enabled=number<=state.taskMaxStep||number===step+1; return `<button type="button" class="task-step ${step===number?'active':''} ${number<=state.taskMaxStep?'visited':''}" data-action="task-step" data-value="${number}" ${step===number?'aria-current="step"':''} ${enabled?'':'disabled'}><i>${n}</i><span>${label}</span></button>`; }).join('')}</div><div class="drawer-body">${renderTaskStep(task)}</div><footer class="drawer-foot">${step>1?'<button class="btn" data-action="detail-attachments" data-value="任务附件">查看附件</button>':''}${step>1?'<button class="btn" data-action="task-prev">上一步</button>':''}<button class="btn primary" data-action="task-next">${step===3?'确认办理':step===1?'选择处理方式':'下一步'}</button></footer></aside></div>`;
     }
 
     function taskActions(task) {
@@ -12477,7 +13904,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function renderTaskStep(task) {
       if (state.taskStep === 1 || task.sourceAction) {
         const source = listConfig[task.sourcePage]?.rows.find(row=>row.id===task.sourceRecordId);
-        return `<section class="detail-section"><h3>${escapeHTML(task.title)}</h3>${renderTaskShareControl()}<dl class="detail-grid"><dt>业务对象</dt><dd>${task.object}</dd><dt>当前岗位</dt><dd>${task.role}</dd><dt>时间</dt><dd>${task.time}</dd></dl>${task.reason?`<div class="rm-callout" style="margin-top:13px"><strong>当前原因</strong><div>${escapeHTML(task.reason)}</div></div>`:''}</section>${task.manualFollowup?`<section class="detail-section"><h3>任务要求</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.description)}</p>${task.receipt&&task.lane==='done'?`<h3>处理结果</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.receipt.feedback)}</p>`:''}</section>`:''}${renderTaskSourceSummary(task)}<section class="detail-section"><h3>来源与处理记录</h3>${source?`<button class="btn" data-action="task-context-open" data-page="${task.sourcePage}" data-id="${source.id}">查看来源单据 ${source.no}</button>`:'<span class="data-note">来源记录待核对</span>'}${task.sourceAction?`<p>${task.sourceAction}，在来源业务中提交并查看结果。</p>`:''}${task.history?.length?`<div class="timeline" style="margin-top:12px">${task.history.map(([label,time])=>`<div class="timeline-item"><strong>${escapeHTML(label)}</strong><small>${escapeHTML(time)}</small></div>`).join('')}</div>`:''}</section>`;
+        return `<div class="task-focus-content"><section class="detail-section"><div class="task-overview-heading"><h3>${escapeHTML(task.title)}</h3><span class="badge ${task.badge}">${escapeHTML(task.state)}</span></div><p>${source?`<button class="text-btn" data-action="task-context-open" data-page="${task.sourcePage}" data-id="${source.id}">${escapeHTML(task.object)} ${icon('external')}</button>`:escapeHTML(task.object)}</p><div class="task-current-summary"><strong>${task.lane==='done'?'本任务处理结果':task.reason?'当前卡点':'当前办理'}</strong><p><b>${task.role}</b></p><small>进入岗位 ${task.time}</small></div>${task.reason?`<div class="rm-callout" style="margin-top:13px"><strong>当前原因</strong><div>${escapeHTML(task.reason)}</div></div>`:''}</section>${task.manualFollowup?`<section class="detail-section"><h3>任务要求</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.description)}</p>${task.receipt&&task.lane==='done'?`<h3>处理结果</h3><p style="white-space:pre-wrap;overflow-wrap:anywhere">${escapeHTML(task.receipt.feedback)}</p>`:''}</section>`:''}<div class="task-focus-flow"><span>本任务处理进度</span>${source?`<button class="text-btn" data-action="open-source-tracking" data-page="${task.sourcePage}" data-id="${source.id}">查看订单全流程 ${icon('right')}</button>`:''}</div><div class="task-focus-resources">${renderTaskSourceSummary(task)}<button class="btn" data-action="detail-attachments" data-value="任务附件">${icon('paperclip')}附件</button></div><section class="detail-section">${task.sourceAction?`<p>${task.sourceAction}，在来源业务中提交并查看结果。</p>`:''}${task.history?.length?`<details class="task-history-summary" open><summary>本任务处理记录（${task.history.length}）</summary><div class="timeline" style="margin-top:12px">${task.history.map(([label,time])=>`<div class="timeline-item"><strong>${escapeHTML(label)}</strong><small>${escapeHTML(time)}</small></div>`).join('')}</div></details>`:''}</section></div>`;
       }
       if (state.taskStep === 2) {
         const actions = taskActions(task);
@@ -12538,6 +13965,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function openEntityForm(configKey, mode = 'create', recordId = null, taskId = null) {
       const config = listConfig[configKey];
       if (!config || config.readOnly || config.workflow) return;
+      formFullscreen = false;
+      formFullscreenScroll = [];
       state.handlingTaskId=taskId;
       rememberEntity();
       state.formReturnPage = state.page === 'entity-form' ? state.formReturnPage : state.page;
@@ -12652,8 +14081,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'demo-tracking-choice') {state.trackingFilters[state.boardMode]=normalizeTrackingDemoFilters({...state.trackingFilters[state.boardMode],[target.dataset.field]:target.dataset.value});renderView();renderFloating();}
       else if (action === 'demo-tracking-scope') {state.boardMode=target.dataset.value;state.trackingLastScope=target.dataset.value;renderView();renderFloating();}
       else if (action === 'demo-filter-choice') {state[target.dataset.field]=target.dataset.field==='filterIncludeEnded'?target.dataset.value==='yes':target.dataset.value;state.pageNo=1;state.selected.clear();renderView();renderFloating();}
-      else if (action === 'mobile-discovery-open') {mobileDiscoveryPicker={key:target.dataset.value,scroll:document.querySelector('.rm-filter-fields')?.scrollTop||0};renderView();}
-      else if (action === 'mobile-discovery-back' || action === 'mobile-discovery-select') {const saved=mobileDiscoveryPicker?.scroll ?? document.querySelector('.rm-filter-fields')?.scrollTop ?? 0;if(action==='mobile-discovery-select'){const f=mobileTaskDiscoveryDemo(),key=target.dataset.field;f[key]=target.dataset.value;}mobileDiscoveryPicker=null;renderView();requestAnimationFrame(()=>{const area=document.querySelector('.rm-filter-fields');if(area)area.scrollTop=saved;});}
+      else if (action === 'mobile-discovery-select') {const saved=document.querySelector('.rm-filter-fields')?.scrollTop||0;mobileTaskDiscoveryDemo()[target.dataset.field]=target.dataset.value;renderView();requestAnimationFrame(()=>{const area=document.querySelector('.rm-filter-fields');if(area)area.scrollTop=saved;});}
       else if (action === 'mobile-tracking-choice') changeMobileTrackingQuery({[target.dataset.field]:target.dataset.value});
       else if (action === 'mobile-options') { state.mobileOptionsOpen = !state.mobileOptionsOpen; renderView(); }
       else if (action === 'mobile-options-close') { state.mobileOptionsOpen = false; renderView(); }
@@ -12867,6 +14295,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'set-table-lines') { state.tableLines = target.dataset.value; applyTheme(); renderFloating(); }
       else if (action === 'toggle-density') { state.density = state.density === 'compact' ? 'standard' : 'compact'; applyTheme(); renderView(); }
       else if (action === 'new-record') openEntityForm(currentPageConfig()?.key,'create');
+      else if (action === 'form-fullscreen') setFormFullscreen(!formFullscreen);
       else if (action === 'back-list') navigate(state.formReturnPage || state.formSourcePage);
       else if (action === 'confirm-nav') { const next = state.pendingNav || state.formReturnPage || state.formSourcePage; state.formDirty = false; state.pendingNav = null; state.overlay = null; navigate(next); }
       else if (['contact-add','contact-copy','contact-remove','contact-note'].includes(action)) {
@@ -13129,6 +14558,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
         if (state.overlay) dismissOverlay();
         else if (state.drawer) closeLinkedDrawer();
         else if (state.permissionFullscreen) setPermissionFullscreen(false);
+        else if (formFullscreen) setFormFullscreen(false);
         else if (state.page==='mobile-tasks' && state.mobileTrackingOpen) {state.mobileTrackingOpen=false;renderView();requestAnimationFrame(()=>document.querySelector('.rm-tracking-open')?.focus());}
         else if (state.page === 'mobile-tasks' && state.mobileOptionsOpen) { state.mobileOptionsOpen = false; renderView(); }
         else if (state.page === 'mobile-tasks' && state.mobileScreen === 'progress-detail') { state.mobileScreen = 'list'; state.mobileProgressId = null; renderView(); }
@@ -13326,7 +14756,7 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
     function visibleDataState(operation,title) {return state.previewState!=='data'?`${operation}${renderDataState({title})}`:null;}
     function arrivalSelectionMatches(item,selection) { const delta=dayDelta(item.date);if(selection==='overdue')return item.status==='overdue';return selection==='all'?true:selection==='today'?delta===0:selection==='week'?delta!==null&&delta>=0&&delta<=7:selection==='undated'?!item.date:item.date===selection; }
     function renderProductionOverview(config,hub) {
-      const all=visualRows(config.key);const options=[['all','全部订单'],['overdue','计划逾期'],['due','7 天内结束'],['undated','未排结束日']];const chips=options.map(([value,label])=>visualChip('production-overview-filter',value,label,all.filter(row=>productionOverviewMatches(row,value)).length,state.productionOverviewFilter===value)).join('');const operation=renderVisualToolbar(config,hub,chips,'搜索生产订单、产品或负责人');const empty=visibleDataState(operation,'生产总览');if(empty)return empty;const p=visualPage(all.filter(row=>productionOverviewMatches(row,state.productionOverviewFilter)),config.key);
+      const all=visualRows(config.key);const options=[['all','不限提醒'],['overdue','计划逾期'],['due','7 天内结束'],['undated','未排结束日']];const chips='<span class="data-note">计划提醒</span>'+options.map(([value,label])=>visualChip('production-overview-filter',value,label,`${all.filter(row=>productionOverviewMatches(row,value)).length} 张`,state.productionOverviewFilter===value)).join('');const operation=renderVisualToolbar(config,hub,chips,'搜索生产订单、产品或负责人');const empty=visibleDataState(operation,'生产总览');if(empty)return empty;const p=visualPage(all.filter(row=>productionOverviewMatches(row,state.productionOverviewFilter)),config.key);
       return `${operation}<section class="surface data-surface"><div class="priority-list-scroll"><div class="production-overview-list">${p.rows.map(({record})=>`<article class="production-overview-row"><button class="overview-identity" data-action="overview-open" data-id="${record.id}"><strong>${record.no}</strong><span>${escapeHTML(rowItem(record,config))}</span></button><span>计划结束 ${rowDate(record)}</span><span class="badge">${record.statusText}</span><button class="btn" data-action="overview-process" data-value="${record.no}" ${productionRouteRows.some(row=>row.order===record.no)?'':'disabled title="此样例尚未发布工序路线"'}>查看工序 →</button></article>`).join('')||'<div class="empty">没有匹配的生产订单</div>'}</div></div>${renderVisualPager(p,config.key)}</section>`;
     }
     function productionOverviewMatches(row,filter) {

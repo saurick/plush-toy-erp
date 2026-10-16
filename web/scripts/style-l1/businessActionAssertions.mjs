@@ -297,7 +297,7 @@ export function createBusinessActionAssertions({ outputDir }) {
         })
       const controlHeight =
         Number.parseFloat(
-          formStyle?.getPropertyValue('--erp-control-height') || ''
+          formStyle?.getPropertyValue('--erp-form-control-height') || ''
         ) || 36
       return {
         className: String(node.className || ''),

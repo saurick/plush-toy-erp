@@ -115,8 +115,8 @@ const TARGET_INITIALIZATION_STAGE_IDS = Object.freeze([
   "compose_start",
   "runtime_verified",
   "basic_smoke",
-  "public_entry_switch",
   "backup_restore_check",
+  "public_entry_switch",
   "current_source_switch",
   "passed",
 ]);
@@ -503,6 +503,7 @@ target="$2"
 case "$target" in
   demo-133) root=/root/deploy/plush-toy-erp-demo-v1 ;;
   customer-test-133) root=/root/deploy/plush-toy-erp-test-v1 ;;
+  production-133) root=/root/deploy/plush-toy-erp-production ;;
   *) exit 64 ;;
 esac
 [[ "$operation_id" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]]
@@ -536,6 +537,7 @@ target="$2"
 case "$target" in
   demo-133) root=/root/deploy/plush-toy-erp-demo-v1 ;;
   customer-test-133) root=/root/deploy/plush-toy-erp-test-v1 ;;
+  production-133) root=/root/deploy/plush-toy-erp-production ;;
   *) exit 64 ;;
 esac
 marker=$root/.initialization-owner.json

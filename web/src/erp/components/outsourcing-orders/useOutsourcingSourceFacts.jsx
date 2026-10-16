@@ -1,6 +1,7 @@
 import { ExportOutlined, ImportOutlined } from '@ant-design/icons'
 import React, { useCallback, useRef, useState } from 'react'
 import { Button, Input, Space } from 'antd'
+import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { useOutsourcingReturnPayable } from './useOutsourcingReturnPayable.mjs'
 import { message, modal } from '@/common/utils/antdApp'
@@ -251,10 +252,10 @@ export function useOutsourcingSourceFacts({
       const currentStatus = String(fact?.status || '').toUpperCase()
       const isPost = action === 'post'
       const allowed = isPost
-        ? canPostOutsourcingFact && currentStatus === 'DRAFT'
+        ? canPostOutsourcingFact && currentStatus === OperationalFactStatus.DRAFT
         : action === 'cancel' &&
           canCancelOutsourcingFact &&
-          ['DRAFT', 'POSTED'].includes(currentStatus)
+          [OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(currentStatus)
       if (
         returnRecordActionInFlightRef.current ||
         !allowed ||
@@ -267,7 +268,7 @@ export function useOutsourcingSourceFacts({
         return
       }
 
-      const expectedStatus = isPost ? 'POSTED' : 'CANCELLED'
+      const expectedStatus = isPost ? OperationalFactStatus.POSTED : OperationalFactStatus.CANCELLED
       const command = isPost ? postOutsourcingFact : cancelOutsourcingFact
       const actionLabel = isPost ? '过账委外记录' : '取消委外记录'
       const attempt = Object.freeze({
@@ -345,7 +346,7 @@ export function useOutsourcingSourceFacts({
         message.success(
           isPost
             ? '委外记录已过账'
-            : currentStatus === 'DRAFT'
+            : currentStatus === OperationalFactStatus.DRAFT
               ? '委外草稿已作废，库存未发生变动'
               : '委外记录已取消，库存已恢复至过账前状态'
         )
@@ -373,11 +374,11 @@ export function useOutsourcingSourceFacts({
   const cancelSelectedOutsourcingFact = useCallback(
     (fact) => {
       const status = String(fact?.status || '').toUpperCase()
-      if (!canCancelOutsourcingFact || !['DRAFT', 'POSTED'].includes(status)) {
+      if (!canCancelOutsourcingFact || ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(status)) {
         message.warning('当前委外记录状态或账号权限不允许取消')
         return
       }
-      const isDraft = status === 'DRAFT'
+      const isDraft = status === OperationalFactStatus.DRAFT
       let cancelReason = ''
       modal.confirm({
         maskClosable: true,
@@ -422,7 +423,7 @@ export function useOutsourcingSourceFacts({
         qualityInspectionByFactID?.[fact?.id] || []
       ).some(
         (inspection) =>
-          String(inspection?.status || '').toUpperCase() !== 'CANCELLED'
+          String(inspection?.status || '').toUpperCase() !== OperationalFactStatus.CANCELLED
       )
       if (!canCreateQualityInspection || !isPostedOutsourcingReturn(fact)) {
         message.warning('请先选择已过账的委外回货记录')
@@ -657,7 +658,7 @@ export function useOutsourcingSourceFacts({
           : actionType === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
             ? canCreateReturnReceipt
             : false
-      if (!allowed || fact?.status !== 'DRAFT' || !returnRecordsOrder?.id) {
+      if (!allowed || fact?.status !== OperationalFactStatus.DRAFT || !returnRecordsOrder?.id) {
         message.warning('当前委外草稿状态或权限已变化，请刷新后重试')
         return
       }
@@ -674,7 +675,7 @@ export function useOutsourcingSourceFacts({
         )
         if (
           !fresh ||
-          fresh.status !== 'DRAFT' ||
+          fresh.status !== OperationalFactStatus.DRAFT ||
           String(fresh.source_type || '').toUpperCase() !==
             'OUTSOURCING_ORDER' ||
           Number(fresh.source_id || 0) !== Number(returnRecordsOrder.id)

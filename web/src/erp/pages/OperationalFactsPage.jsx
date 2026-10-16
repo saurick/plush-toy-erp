@@ -15,6 +15,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { OperationalFactStatus, ShipmentStatus, StockReservationStatus } from '../../common/consts/statuses.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { operationalFactTaskContext } from '../utils/workflowFollowup.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -23,9 +24,7 @@ import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
-import {
-  canReadProductionProcess,
-} from '../utils/productionRecordViews.mjs'
+import { canReadProductionProcess } from '../utils/productionRecordViews.mjs'
 import { useOperationalFactQuery } from '../components/operational-facts/useOperationalFactQuery.mjs'
 import { useOperationalFactMutations } from '../components/operational-facts/useOperationalFactMutations.mjs'
 import {
@@ -223,7 +222,10 @@ export function OperationalFactWorkspace({
   )
 
   const activeSelectedRow = selectedByKey[currentActiveKey] || null
-  const taskContext = operationalFactTaskContext(currentActiveKey, activeSelectedRow)
+  const taskContext = operationalFactTaskContext(
+    currentActiveKey,
+    activeSelectedRow
+  )
   const {
     activeCustomerKey,
     saving,
@@ -338,7 +340,7 @@ export function OperationalFactWorkspace({
     )
     return (
       Array.isArray(data?.production_orders) ? data.production_orders : []
-    ).filter((order) => ['RELEASED', 'CLOSED'].includes(order?.status))
+    ).filter((order) => [StockReservationStatus.RELEASED, 'CLOSED'].includes(order?.status))
   }, [])
   const processOrdersData = useBusinessVisualizationData({
     enabled: contentView === 'process' && canUseProductionProcessView,
@@ -423,7 +425,7 @@ export function OperationalFactWorkspace({
     reloadFinanceDueData,
   ])
   const selectedProductionDraftSaveAction =
-    currentActiveKey === 'production' && activeSelectedRow?.status === 'DRAFT'
+    currentActiveKey === 'production' && activeSelectedRow?.status === OperationalFactStatus.DRAFT
       ? productionDraftSaveActionFor(activeSelectedRow)
       : ''
   const canEditSelectedProductionDraft = Boolean(
@@ -542,11 +544,11 @@ export function OperationalFactWorkspace({
       : false
   const financeDraftTransitionBlocked =
     currentActiveKey === 'finance' &&
-    activeSelectedRow?.status === 'DRAFT' &&
+    activeSelectedRow?.status === OperationalFactStatus.DRAFT &&
     !hasValidFinanceTransitionSource(activeSelectedRow)
   const sourceBoundDraftTransitionBlocked =
     ['production', 'outsourcing'].includes(currentActiveKey) &&
-    activeSelectedRow?.status === 'DRAFT' &&
+    activeSelectedRow?.status === OperationalFactStatus.DRAFT &&
     !hasRequiredOperationalFactDraftSource(currentActiveKey, activeSelectedRow)
   const canViewOutsourcingPayable =
     hasActionPermission(adminProfile, PermissionCode.FINANCE_PAYABLE_READ) &&
@@ -567,7 +569,7 @@ export function OperationalFactWorkspace({
   const selectedCanViewProductionReworkProgress =
     currentActiveKey === 'production' &&
     String(activeSelectedRow?.fact_type || '').toUpperCase() === 'REWORK' &&
-    ['POSTED', 'CANCELLED'].includes(
+    [OperationalFactStatus.POSTED, OperationalFactStatus.CANCELLED].includes(
       String(activeSelectedRow?.status || '').toUpperCase()
     ) &&
     Number.isSafeInteger(Number(activeSelectedRow?.production_order_id)) &&
@@ -614,7 +616,7 @@ export function OperationalFactWorkspace({
       ? financeSettlementActionFor('RECONCILIATION')
       : null
   const selectedCanSettleFinance = Boolean(
-    activeSelectedRow?.status === 'POSTED' &&
+    activeSelectedRow?.status === OperationalFactStatus.POSTED &&
     financeSettlementActionFor(activeSelectedRow?.fact_type)
   )
   const selectedLabel = selectedLabelForKey(currentActiveKey, activeSelectedRow)
@@ -628,18 +630,18 @@ export function OperationalFactWorkspace({
     ? '确认实收并增加成品库存？'
     : '确认过账？'
   const cancelButtonLabel = selectedIsProductionCompletion
-    ? activeSelectedRow?.status === 'DRAFT'
+    ? activeSelectedRow?.status === OperationalFactStatus.DRAFT
       ? '作废完工报告'
       : '撤销成品入库'
-    : activeSelectedRow?.status === 'DRAFT'
+    : activeSelectedRow?.status === OperationalFactStatus.DRAFT
       ? '作废草稿'
       : '取消'
   const shipmentCancelButtonLabel =
-    activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消发货'
+    activeSelectedRow?.status === ShipmentStatus.DRAFT ? '作废草稿' : '取消发货'
   const shipmentCancelActionLabel =
-    activeSelectedRow?.status === 'DRAFT' ? '作废出货草稿' : '取消发货'
+    activeSelectedRow?.status === ShipmentStatus.DRAFT ? '作废出货草稿' : '取消发货'
   const shipmentCancelConfirmTitle =
-    activeSelectedRow?.status === 'DRAFT'
+    activeSelectedRow?.status === ShipmentStatus.DRAFT
       ? '确认作废出货草稿？草稿尚未出库，不会变更库存。'
       : '确认取消出库并恢复相应库存？'
   const activeAttachmentOwnerType =
@@ -1037,7 +1039,12 @@ export function OperationalFactWorkspace({
             selectionLabel="业务记录"
             onClear={clearActiveSelection}
           />
-          <BusinessTaskActions sourceType={taskContext.sourceType} record={taskContext.record} adminProfile={adminProfile} allowCreate={false} />
+          <BusinessTaskActions
+            sourceType={taskContext.sourceType}
+            record={taskContext.record}
+            adminProfile={adminProfile}
+            allowCreate={false}
+          />
           {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
               disabled={relatedActionAvailability.disabled}
@@ -1086,11 +1093,11 @@ export function OperationalFactWorkspace({
             <BusinessActionTooltip
               visible={
                 !activeSelectedRow ||
-                (activeSelectedRow.status === 'DRAFT' && canPostSelected)
+                (activeSelectedRow.status === OperationalFactStatus.DRAFT && canPostSelected)
               }
               disabled={
                 !activeSelectedRow ||
-                activeSelectedRow.status !== 'DRAFT' ||
+                activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
                 !canPostSelected ||
                 sourceBoundDraftTransitionBlocked ||
                 saving
@@ -1098,7 +1105,7 @@ export function OperationalFactWorkspace({
               disabledReason={
                 !activeSelectedRow
                   ? '请先选择一条业务记录'
-                  : activeSelectedRow.status !== 'DRAFT'
+                  : activeSelectedRow.status !== OperationalFactStatus.DRAFT
                     ? '只有业务草稿可以过账'
                     : !canPostSelected
                       ? selectedIsProductionCompletion
@@ -1132,7 +1139,7 @@ export function OperationalFactWorkspace({
                   data-business-action-key="operational-fact-post"
                   disabled={
                     !activeSelectedRow ||
-                    activeSelectedRow.status !== 'DRAFT' ||
+                    activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
                     !canPostSelected ||
                     sourceBoundDraftTransitionBlocked ||
                     saving
@@ -1147,13 +1154,13 @@ export function OperationalFactWorkspace({
             <BusinessActionTooltip
               visible={
                 !activeSelectedRow ||
-                (activeSelectedRow.status === 'DRAFT' &&
+                (activeSelectedRow.status === OperationalFactStatus.DRAFT &&
                   Boolean(selectedProductionDraftSaveAction) &&
                   canEditSelectedProductionDraft)
               }
               disabled={
                 !activeSelectedRow ||
-                activeSelectedRow.status !== 'DRAFT' ||
+                activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
                 !selectedProductionDraftSaveAction ||
                 !canEditSelectedProductionDraft ||
                 productionDraftEditLoading
@@ -1161,7 +1168,7 @@ export function OperationalFactWorkspace({
               disabledReason={
                 !activeSelectedRow
                   ? '请先选择一条生产记录'
-                  : activeSelectedRow.status !== 'DRAFT'
+                  : activeSelectedRow.status !== OperationalFactStatus.DRAFT
                     ? '只有未过账草稿可以编辑'
                     : !selectedProductionDraftSaveAction
                       ? '该记录来源不支持直接编辑，请作废后重新办理'
@@ -1176,7 +1183,7 @@ export function OperationalFactWorkspace({
                 data-business-action-key="production-fact-edit-draft"
                 disabled={
                   !activeSelectedRow ||
-                  activeSelectedRow.status !== 'DRAFT' ||
+                  activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
                   !selectedProductionDraftSaveAction ||
                   !canEditSelectedProductionDraft ||
                   productionDraftEditLoading
@@ -1246,18 +1253,18 @@ export function OperationalFactWorkspace({
           {currentActiveKey === 'finance' && canFinanceAction ? (
             <BusinessActionTooltip
               visible={
-                !activeSelectedRow || activeSelectedRow.status === 'DRAFT'
+                !activeSelectedRow || activeSelectedRow.status === OperationalFactStatus.DRAFT
               }
               disabled={
                 !activeSelectedRow ||
-                activeSelectedRow.status !== 'DRAFT' ||
+                activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
                 financeDraftTransitionBlocked ||
                 saving
               }
               disabledReason={
                 !activeSelectedRow
                   ? '请先选择一条财务记录'
-                  : activeSelectedRow.status !== 'DRAFT'
+                  : activeSelectedRow.status !== OperationalFactStatus.DRAFT
                     ? '只有财务草稿可以确认'
                     : financeDraftTransitionBlocked
                       ? '该历史草稿缺少可核对来源，不能确认或作废'
@@ -1282,7 +1289,7 @@ export function OperationalFactWorkspace({
                   data-business-action-key="finance-fact-confirm"
                   disabled={
                     !activeSelectedRow ||
-                    activeSelectedRow.status !== 'DRAFT' ||
+                    activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
                     financeDraftTransitionBlocked ||
                     saving
                   }
@@ -1335,18 +1342,18 @@ export function OperationalFactWorkspace({
             <BusinessActionTooltip
               visible={
                 !activeSelectedRow ||
-                ['DRAFT', 'POSTED'].includes(activeSelectedRow.status)
+                [OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status)
               }
               disabled={
                 !activeSelectedRow ||
-                !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
+                ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status) ||
                 financeDraftTransitionBlocked ||
                 saving
               }
               disabledReason={
                 !activeSelectedRow
                   ? '请先选择一条财务记录'
-                  : !['DRAFT', 'POSTED'].includes(activeSelectedRow.status)
+                  : ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status)
                     ? '当前财务状态不能取消'
                     : financeDraftTransitionBlocked
                       ? '该历史草稿缺少可核对来源，不能确认或作废'
@@ -1363,7 +1370,7 @@ export function OperationalFactWorkspace({
                 data-business-action-key="finance-fact-cancel"
                 disabled={
                   !activeSelectedRow ||
-                  !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
+                  ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status) ||
                   financeDraftTransitionBlocked ||
                   saving
                 }
@@ -1415,7 +1422,24 @@ export function OperationalFactWorkspace({
               panelTitle={`${activeConfig.title}附件`}
               description="上传与当前记录相关的图片、票据、对账或确认资料；附件只作为证据，不改变当前记录状态。"
               canUpload={canWriteActive || canConfirmActive}
-              canWithdraw={canWriteActive || canConfirmActive}
+              canWithdraw={
+                activeAttachmentOwnerType === 'finance_fact'
+                  ? canWriteActive || canConfirmActive
+                  : activeAttachmentOwnerType === 'outsourcing_fact'
+                    ? hasActionPermission(
+                        adminProfile,
+                        PermissionCode.OUTSOURCING_ORDER_UPDATE
+                      )
+                    : activeAttachmentOwnerType === 'shipment'
+                      ? hasAnyPermission(adminProfile, [
+                          PermissionCode.SHIPMENT_UPDATE,
+                          PermissionCode.SHIPMENT_SHIP,
+                        ])
+                      : hasAnyPermission(adminProfile, [
+                          PermissionCode.PRODUCTION_FACT_POST,
+                          PermissionCode.PRODUCTION_FACT_CANCEL,
+                        ])
+              }
               disabled={!activeSelectedRow}
               disabledReason="请先选择一条记录"
               buttonProps={{
@@ -1426,17 +1450,17 @@ export function OperationalFactWorkspace({
           {currentActiveKey === 'shipments' && canPostActive ? (
             <BusinessActionTooltip
               visible={
-                !activeSelectedRow || activeSelectedRow.status === 'DRAFT'
+                !activeSelectedRow || activeSelectedRow.status === OperationalFactStatus.DRAFT
               }
               disabled={
                 !activeSelectedRow ||
-                activeSelectedRow.status !== 'DRAFT' ||
+                activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
                 saving
               }
               disabledReason={
                 !activeSelectedRow
                   ? '请先选择一张出货单'
-                  : activeSelectedRow.status !== 'DRAFT'
+                  : activeSelectedRow.status !== OperationalFactStatus.DRAFT
                     ? '只有出货草稿可以发货'
                     : saving
                       ? '当前操作完成后可发货'
@@ -1459,7 +1483,7 @@ export function OperationalFactWorkspace({
                   data-business-action-key="shipment-post"
                   disabled={
                     !activeSelectedRow ||
-                    activeSelectedRow.status !== 'DRAFT' ||
+                    activeSelectedRow.status !== OperationalFactStatus.DRAFT ||
                     saving
                   }
                 >
@@ -1471,17 +1495,17 @@ export function OperationalFactWorkspace({
           {currentActiveKey === 'reservations' && canReleaseActive ? (
             <BusinessActionTooltip
               visible={
-                !activeSelectedRow || activeSelectedRow.status === 'ACTIVE'
+                !activeSelectedRow || activeSelectedRow.status === StockReservationStatus.ACTIVE
               }
               disabled={
                 !activeSelectedRow ||
-                activeSelectedRow.status !== 'ACTIVE' ||
+                activeSelectedRow.status !== StockReservationStatus.ACTIVE ||
                 saving
               }
               disabledReason={
                 !activeSelectedRow
                   ? '请先选择一条库存预留'
-                  : activeSelectedRow.status !== 'ACTIVE'
+                  : activeSelectedRow.status !== StockReservationStatus.ACTIVE
                     ? '只有有效库存预留可以释放'
                     : saving
                       ? '当前操作完成后可释放'
@@ -1508,7 +1532,7 @@ export function OperationalFactWorkspace({
                   data-business-action-key="reservation-release"
                   disabled={
                     !activeSelectedRow ||
-                    activeSelectedRow.status !== 'ACTIVE' ||
+                    activeSelectedRow.status !== StockReservationStatus.ACTIVE ||
                     saving
                   }
                 >
@@ -1528,7 +1552,7 @@ export function OperationalFactWorkspace({
                   ? '请先选择一条财务记录'
                   : !financeSettlementActionFor(activeSelectedRow.fact_type)
                     ? '只有对账记录可以完成核对'
-                    : activeSelectedRow.status !== 'POSTED'
+                    : activeSelectedRow.status !== OperationalFactStatus.POSTED
                       ? '对账记录确认后可完成核对'
                       : saving
                         ? '当前操作完成后可继续'
@@ -1567,12 +1591,12 @@ export function OperationalFactWorkspace({
             <BusinessActionTooltip
               visible={
                 !activeSelectedRow ||
-                (['DRAFT', 'POSTED'].includes(activeSelectedRow.status) &&
+                ([OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status) &&
                   canCancelSelected)
               }
               disabled={
                 !activeSelectedRow ||
-                !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
+                ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status) ||
                 !canCancelSelected ||
                 sourceBoundDraftTransitionBlocked ||
                 saving
@@ -1580,11 +1604,11 @@ export function OperationalFactWorkspace({
               disabledReason={
                 !activeSelectedRow
                   ? '请先选择一条业务记录'
-                  : !['DRAFT', 'POSTED'].includes(activeSelectedRow.status)
+                  : ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status)
                     ? '当前业务记录状态不能取消'
                     : !canCancelSelected
                       ? selectedIsProductionCompletion &&
-                        activeSelectedRow.status === 'POSTED'
+                        activeSelectedRow.status === OperationalFactStatus.POSTED
                         ? '只有仓库岗位可以撤销已确认的成品入库'
                         : '当前账号没有取消该类生产记录的权限'
                       : sourceBoundDraftTransitionBlocked
@@ -1602,7 +1626,7 @@ export function OperationalFactWorkspace({
                 data-business-action-key="operational-fact-cancel"
                 disabled={
                   !activeSelectedRow ||
-                  !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
+                  ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED].includes(activeSelectedRow.status) ||
                   !canCancelSelected ||
                   sourceBoundDraftTransitionBlocked ||
                   saving
@@ -1620,17 +1644,17 @@ export function OperationalFactWorkspace({
             <BusinessActionTooltip
               visible={
                 !activeSelectedRow ||
-                ['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status)
+                [ShipmentStatus.DRAFT, ShipmentStatus.SHIPPED].includes(activeSelectedRow.status)
               }
               disabled={
                 !activeSelectedRow ||
-                !['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status) ||
+                ![ShipmentStatus.DRAFT, ShipmentStatus.SHIPPED].includes(activeSelectedRow.status) ||
                 saving
               }
               disabledReason={
                 !activeSelectedRow
                   ? '请先选择一张出货单'
-                  : !['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status)
+                  : ![ShipmentStatus.DRAFT, ShipmentStatus.SHIPPED].includes(activeSelectedRow.status)
                     ? '当前出货状态不能取消'
                     : saving
                       ? '当前操作完成后可取消'
@@ -1658,7 +1682,7 @@ export function OperationalFactWorkspace({
                   data-business-action-key="shipment-cancel"
                   disabled={
                     !activeSelectedRow ||
-                    !['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status) ||
+                    ![ShipmentStatus.DRAFT, ShipmentStatus.SHIPPED].includes(activeSelectedRow.status) ||
                     saving
                   }
                 >
@@ -1866,14 +1890,14 @@ export function OperationalFactWorkspace({
         size="confirm"
         title={
           currentActiveKey === 'finance'
-            ? activeSelectedRow?.status === 'DRAFT'
+            ? activeSelectedRow?.status === OperationalFactStatus.DRAFT
               ? '作废财务草稿'
               : '取消财务记录'
             : selectedIsProductionCompletion
-              ? activeSelectedRow?.status === 'DRAFT'
+              ? activeSelectedRow?.status === OperationalFactStatus.DRAFT
                 ? '作废生产完工报告'
                 : '撤销成品入库'
-              : activeSelectedRow?.status === 'DRAFT'
+              : activeSelectedRow?.status === OperationalFactStatus.DRAFT
                 ? '作废业务草稿'
                 : '取消已过账业务记录'
         }
@@ -1891,7 +1915,7 @@ export function OperationalFactWorkspace({
         }}
       >
         <p>
-          {activeSelectedRow?.status === 'DRAFT'
+          {activeSelectedRow?.status === OperationalFactStatus.DRAFT
             ? currentActiveKey === 'finance'
               ? '草稿尚未确认，作废不会生成过账或库存变更；系统会记录操作人、时间和原因。'
               : selectedIsProductionCompletion

@@ -6,13 +6,14 @@
 
 | 类型 | 入口 | 用途 | 边界 |
 | --- | --- | --- | --- |
-| 样式边界检查 | `pnpm css` / `stylelint/` | 在现有 Stylelint 中检查模块作用域和共享控件样式归属；同目录行为测试由 `pnpm test` 自动发现 | 规则与职责见[共享控件样式边界](../../docs/product/业务数据生命周期与页面动作规则.md#共享控件样式边界--shared-control-style-boundary)，浏览器仍需验证实际层叠结果 |
+| 样式边界检查 | `pnpm css` / `stylelint/` | 在现有 Stylelint 中检查模块作用域和共享控件样式归属；同目录行为测试由 `pnpm test` 自动发现 | 规则与职责见[共享控件样式边界](../../docs/engineering/前端实现与交互约定.md#共享控件样式边界--shared-control-style-boundary)，浏览器仍需验证实际层叠结果 |
 | 页面级浏览器回归（Style L1） | `pnpm style:l1` / `styleL1.mjs` / `style-l1/` | 启动前端并用 Playwright 覆盖登录、业务页、暗色、打印、移动端和局部页面交互 | 默认使用 mock / 前端态验证；失败要先分清页面回归、mock wiring 和浏览器基础设施问题 |
 | 真实登录 smoke | `realLoginSmokeShared.mjs --print-input-template` / `--preflight-report <path>`、`mobileAuthLoginRouteSmoke.mjs --print-input-template` / `--preflight-report <path>`、`purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template` / `--preflight-report <path>`、`pnpm smoke:purchase-contract-real-login`、`pnpm smoke:processing-contract-real-login`、`pnpm smoke:mobile-auth-login-route` | 先打印共享登录、移动端认证回跳或采购入库真实写入前置，再验证合同编辑联动、在线预览、下载 PDF、浏览器打印入口、岗位任务端入口和认证回跳 | 输入模板不读配置、不调后端、不启动浏览器、不登录、不写库；shared preflight 只探测 backend health 和凭据来源候选；mobile-auth preflight 只写本地角色路由 / 视口计划；采购入库 preflight 只探测 health、显式管理员凭据 env、持久测试数据确认和页面目标安全性；合同 smoke 依赖本地后端和开发账号，验证预览 / 下载 / 打印入口但不替代 PDF 版式坐标审阅、RBAC / usecase 单测或目标环境 evidence；mobile-auth route smoke 使用 mock RPC 验证生产单端口岗位路由 |
 | 移动端 Workflow smoke | `pnpm smoke:mobile-workflow-runtime-browser` / `mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template` / `mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report <path>` | 创建 `simulated_only` workflow 任务，用真实浏览器验证 任务列表进入详情页查看 / 处理 / 可信回执、完成反馈校验、阻塞 / 退回 / 完成、跨角色催办及返回列表状态恢复 | 输入模板不登录、不调用后端、不启动浏览器、不写库；preflight 只探测 health、前置缺口和模拟任务动作计划 coverage；真实 smoke 只写本地 / 试用模拟 workflow 证据，不能替代真实岗位账号视觉验收、目标环境 smoke 或客户 UAT |
 | 真实写入 e2e | `purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template` / `--preflight-report <path>` / `pnpm smoke:purchase-receipt-real-write` | 先打印持久测试数据确认和真实写入前置，再写 no-write 前置报告，最后准备采购入库测试草稿并通过浏览器过账和取消模拟单据 | 输入模板和 preflight 不启动浏览器、不调 JSON-RPC、不写库；真实命令会写本地 / 开发库模拟采购入库事实，只能按脚本显式参数和 README 边界执行，禁止跑生产或客户正式环境 |
 | 本地服务 | `pnpm start`、`pnpm start:frontend-only`、`pnpm start:yoyoosun`、`pnpm audit:yoyoosun-entry`、`pnpm serve:prod`、`pnpm preview:yoyoosun` | 默认前端入口、永绅 yoyoosun 热更新开发、端口审计和静态包预览 | `pnpm start` 与 `start:yoyoosun` 启动 Vite 前共用 schema / migration / backend health / ready 只读预检；已分类的本机可恢复阻断只开放迁移页，其它路径 fail closed。`start:frontend-only` 是不验证登录 / RPC 的显式降级模式；`start:yoyoosun` 另检查永绅静态客户配置与公开资源；`preview:yoyoosun` 构建并预览生产包形态；`audit:yoyoosun-entry` 只读检查端口归属、customer-config、asset 和 health。所有开发入口都不 apply migration，不 publish / activate 后端 customer config |
 | QA 报告生成 | `buildFieldLinkageCoverageReport.mjs` | 由顶层 `scripts/qa/erp-field-linkage.mjs` runner 调用，生成字段联动结构化证据到 ignored `output/qa/coverage/field-linkage.latest.json` | 要求 runner 传入当前 repository identity；只证明字段联动专项，不写 `public/qa`、不进入生产构建，也不等于整仓代码、业务场景、目标环境或 UAT 覆盖 |
+| 公共契约源码检查 | `test/publicContractSource.mjs` | 将真实生成模块的静态成员解析为源码合同测试的公开值，覆盖状态、权限、RPC、附件、数值与密码 / 打印限制 | 不执行页面代码，不改写源码；测试继续保留独立的预期值，规范见[跨层公共契约](../../docs/engineering/跨层公共契约与生成规范.md) |
 
 ## 常用命令
 
@@ -83,6 +84,12 @@ pnpm preview:yoyoosun
 
 `style-l1/scenarios.mjs` 只组合场景工厂和共享输入。登录、客户权限、工作台、移动任务、权限中心、打印和业务表单分别位于同目录对应的 `*Scenarios.mjs`。物料明细、色卡和作业指导书编辑各有独立的 `*InteractionScenario.mjs`，按命名交互步骤调用断言，每个场景使用自己的页面和 PDF 请求记录。场景名称、顺序与请求计数的生命周期保持独立；通过 `STYLE_L1_SCENARIOS` 选择受影响场景，完整运行遵循 QA 的高成本授权规则。
 
+`printWorkspaceItemScenarios.mjs` 覆盖两套合同与采购批量条款的增删、调序、编号、空组隐藏和刷新恢复，以及明细、色卡和作业行的调序与清空。场景同时核对留白数量、结构变化后从首处定位、输出请求排除操作控件和打印入口可用；其中 PDF 请求使用受控响应，真实 PDF 内容和落盘下载仍需另做服务验证。
+
+`printWorkspaceGroupScenarios.mjs` 覆盖采购、加工与采购批量窗口的自定义分组新增、双向改名、调序、删除、空组恢复及全部删空后的刷新恢复，并核对名称留白、条目留白、纸面顺序导航、长名称换行和批量隔离。输出请求与打印入口同样使用受控探针；真实 PDF 服务、下载落盘及打印页面内容另行验证。
+
+帮助目录的岗位范围由 `help-manual-role-filter-desktop-light` 覆盖，包括切岗搜索、深链恢复和手机章节选择；全部模块的搜索、权限与内部深链边界由 `moduleCatalogScenarios.mjs` 覆盖。移动导航在短屏下实际滚动菜单后核对底部入口位置，再恢复标准手机视口检查目录尺寸与跳转；导航与岗位预期按[菜单与正式入口合同](../../docs/product/菜单与正式入口合同.md)和当前配置维护。
+
 `test/reactRuntime.mjs` 为 Node 组件与 hook 行为测试提供 JSX 加载和可恢复的 DOM 环境，不进入产品运行时。
 
 `global-tab-sliding-light` / `global-tab-sliding-dark` 检查共享页签的逐帧滑动、快速反向切换、尺寸变化、面板重新打开、键盘、禁用项与减少动态效果设置。场景通过浏览器拦截加载 `test/SlidingTabsFixture.jsx`，复用真实组件和样式，不添加产品路由或写入业务数据；输出 `global-tab-sliding-*-frames.json` 留存中间位置。可用 `STYLE_L1_SCENARIOS=global-tab-sliding-light,global-tab-sliding-dark pnpm style:l1` 定向运行。
@@ -119,7 +126,9 @@ Codex 会话通过 `CODEX_THREAD_ID` / `CODEX_CI` 自动选择辅助端口；人
 
 HMR 默认跟随浏览器加载页面模块的协议、主机和端口，因此从服务器 IP、域名或转发端口访问时无需单独配置；端口转发或反向代理须同时转发 WebSocket upgrade。需要显式覆盖时可设置 `ERP_VITE_HMR_HOST` 和 `ERP_VITE_HMR_CLIENT_PORT`；显式客户端端口仍须与 `ERP_VITE_PORT` 一致。普通和客户开发启动器只固定监听端口，不自动注入 HMR 地址。
 
-Windows / WSL 下的 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:yoyoosun` 通过同一受管浏览器入口打开页面。它只在 Chrome、Edge 或 Brave 中检查标题属于本项目的候选标签，并在地址栏精确匹配 `127.0.0.1` / `localhost` 与实际端口后激活、刷新该标签；窗口保持原有最大化或普通状态，只有已最小化时才恢复。未命中或 Windows UI Automation 不可用时回退到系统默认的新标签页。它不会输出浏览地址、关闭历史重复标签或读取其他标题标签的地址栏；显式 `BROWSER=none` 或自定义 `BROWSER` 始终优先。macOS 与有图形桌面的原生 Linux 保留 Vite 的平台默认打开行为；无图形桌面的 Linux 只输出访问地址，不调用 `xdg-open`。
+Codex（`CODEX_THREAD_ID` / `CODEX_CI`）、CI、`NODE_ENV=test` 或 Node 测试进程启动 Vite 时，只输出服务地址，不自动打开系统浏览器；普通入口、客户入口和直接运行 Vite 共用此策略。需要实际页面验证时，由浏览器工具按会话创建和回收标签，不以系统自动开页代替。
+
+人工终端在 Windows / WSL 下运行 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:yoyoosun` 时，通过同一受管浏览器入口打开页面。它只在 Chrome、Edge 或 Brave 中检查标题属于本项目的候选标签，并在地址栏精确匹配 `127.0.0.1` / `localhost` 与实际端口后激活、刷新该标签；窗口保持原有最大化或普通状态，只有已最小化时才恢复。未命中或 Windows UI Automation 不可用时回退到系统默认的新标签页。它不会输出浏览地址、关闭历史重复标签或读取其他标题标签的地址栏；显式 `BROWSER=none` 或自定义 `BROWSER` 始终优先。macOS 与有图形桌面的原生 Linux 保留 Vite 的平台默认打开行为；无图形桌面的 Linux 只输出访问地址，不调用 `xdg-open`。
 
 `pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查当前工作区 schema / migration 与开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过并核对运行制品身份；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。本地预检最多等待 15 秒；pending、数据库配置或连接、db-guard、Atlas、安全检查及后端异常或超时时，启动器保留 Vite，业务入口在原地址显示服务不可用提示，业务组件和 `/rpc`、`/templates` 保持关闭。受限模式保留 `/__dev/database-migration` 恢复页、固定恢复 API、只读实例摘要与同源 GET `/__dev/api/runtime-status`；其它 DEV API 继续阻断。等待页每次检查结束后等待 3 秒再读取状态，并发读取共用同一检查；健康恢复后重新通过完整启动检查和同目标 health / ready，才能自动继续打开原业务页面。恢复操作仍须显式执行，不自动迁移、启动后端或重放业务请求。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，也不进入本机恢复模式，仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 

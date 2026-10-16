@@ -8,19 +8,102 @@ import {
   validateDeploymentPackage,
 } from "./deployment-package-lint.mjs";
 
+function copyDeploymentFixture(root, targetPackage) {
+  fs.cpSync(path.join(process.cwd(), "deployments/yoyoosun"), targetPackage, {
+    recursive: true,
+  });
+  for (const relativePath of [
+    "server/deploy/compose/prod/compose.yml",
+    ...[
+      "collect-evidence.sh",
+      "collect-evidence.mjs",
+      "run-smoke.sh",
+      "run-smoke-support.mjs",
+      "run-backup-restore-rehearsal.sh",
+      "verify-backup-restore.sh",
+    ].map((name) => `scripts/deploy/${name}`),
+  ]) {
+    const destination = path.join(root, relativePath);
+    fs.mkdirSync(path.dirname(destination), { recursive: true });
+    fs.copyFileSync(path.join(process.cwd(), relativePath), destination);
+  }
+}
+
 test("yoyoosun deployment package passes lint", () => {
   const result = validateDeploymentPackage({ customer: "yoyoosun" });
 
   assert.equal(result.customer, "yoyoosun");
-  assert(result.requiredFiles > 30);
   assert(result.checkedFiles >= result.requiredFiles);
+});
+
+test("deployment package lint requires shared Compose and execution sources", async (t) => {
+  for (const relativePath of [
+    "server/deploy/compose/prod/compose.yml",
+    "scripts/deploy/run-smoke-support.mjs",
+    "scripts/deploy/collect-evidence.mjs",
+    "scripts/deploy/run-backup-restore-rehearsal.sh",
+  ]) {
+    await t.test(relativePath, (t) => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-shared-source-"));
+      t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+      copyDeploymentFixture(root, path.join(root, "deployments/yoyoosun"));
+      fs.unlinkSync(path.join(root, relativePath));
+      assert.throws(
+        () => validateDeploymentPackage({ repoRoot: root, customer: "yoyoosun" }),
+        { message: `deployment package lint failed:\n- Missing shared deployment source: ${relativePath}` },
+      );
+    });
+  }
+});
+
+test("deployment package lint rejects duplicated configuration and execution sources", async (t) => {
+  for (const relativePath of [
+    "compose/docker-compose.example.yml",
+    "compose/docker-compose.override.example.yml",
+    "env/server.config.example.yaml",
+    "env/web.config.example.json",
+    "scripts/run-smoke.sh",
+    "scripts/collect-evidence.sh",
+    "scripts/run-backup-restore-rehearsal.sh",
+  ]) {
+    await t.test(relativePath, (t) => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-duplicate-source-"));
+      t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+      const targetPackage = path.join(root, "deployments/yoyoosun");
+      copyDeploymentFixture(root, targetPackage);
+      const duplicate = path.join(targetPackage, relativePath);
+      fs.mkdirSync(path.dirname(duplicate), { recursive: true });
+      fs.writeFileSync(duplicate, "# duplicate deployment source\n");
+      assert.throws(
+        () => validateDeploymentPackage({ repoRoot: root, customer: "yoyoosun" }),
+        /must not duplicate shared deployment sources/,
+      );
+    });
+  }
+});
+
+test("deployment package lint retains rollback decisions, execution and data recovery coverage", async (t) => {
+  for (const heading of ["## 回滚检查", "## 代码回滚", "## 数据库与附件恢复"]) {
+    await t.test(heading, (t) => {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-rollback-coverage-"));
+      t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+      const targetPackage = path.join(root, "deployments/yoyoosun");
+      copyDeploymentFixture(root, targetPackage);
+      const runbook = path.join(targetPackage, "runbooks/03-rollback.md");
+      fs.writeFileSync(runbook, fs.readFileSync(runbook, "utf8").replace(heading, "## 检查"));
+      assert.throws(
+        () => validateDeploymentPackage({ repoRoot: root, customer: "yoyoosun" }),
+        { message: `deployment package lint failed:\n- runbooks/03-rollback.md missing ${heading}` },
+      );
+    });
+  }
 });
 
 test("deployment package lint retains inspection coverage after checklist consolidation", (t) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "deploy-package-inspection-lint-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(path.join(process.cwd(), "deployments/yoyoosun"), targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
   const runbook = path.join(targetPackage, "runbooks/08-daily-ops.md");
   fs.writeFileSync(runbook, fs.readFileSync(runbook, "utf8").replace("## 每周", "## 检查"));
   assert.throws(
@@ -34,9 +117,8 @@ test("deployment package lint keeps the 100 MiB attachment upload envelope", (t)
     path.join(os.tmpdir(), "deploy-package-attachment-limit-lint-"),
   );
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const configPath = path.join(targetPackage, "compose/nginx.example.conf");
   const config = fs
@@ -55,9 +137,8 @@ test("deployment package lint keeps the temporary root redirect", (t) => {
     path.join(os.tmpdir(), "deploy-package-domain-lint-"),
   );
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const configPath = path.join(targetPackage, "compose/nginx.example.conf");
   const config = fs
@@ -79,9 +160,8 @@ test("deployment package lint rejects restoring the retired admin route", (t) =>
     path.join(os.tmpdir(), "deploy-package-admin-lint-"),
   );
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const configPath = path.join(targetPackage, "compose/nginx.example.conf");
   fs.appendFileSync(
@@ -99,9 +179,8 @@ test("deployment package lint rejects enabled business data clear", () => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-debug-clear-lint-"),
   );
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const envPath = path.join(targetPackage, "env/.env.example");
   const env = fs
@@ -138,9 +217,8 @@ test("deployment package lint rejects release evidence template missing backup i
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-template-lint-"),
   );
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const templatePath = path.join(
     targetPackage,
@@ -161,9 +239,8 @@ test("deployment package lint rejects backup evidence template missing hash", ()
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-backup-template-lint-"),
   );
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const templatePath = path.join(
     targetPackage,
@@ -184,9 +261,8 @@ test("deployment package lint rejects migration evidence template missing pendin
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-migration-template-lint-"),
   );
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const templatePath = path.join(
     targetPackage,
@@ -208,9 +284,8 @@ test("deployment package lint rejects release signoff template missing conclusio
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-signoff-template-lint-"),
   );
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const templatePath = path.join(
     targetPackage,
@@ -234,9 +309,8 @@ test("deployment package lint rejects rollback forward-fix template missing runb
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-rollback-template-lint-"),
   );
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const templatePath = path.join(
     targetPackage,
@@ -260,9 +334,8 @@ test("deployment package lint rejects smoke report example summary mismatch", ()
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-smoke-example-lint-"),
   );
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const examplePath = path.join(
     targetPackage,
@@ -282,9 +355,8 @@ test("deployment package lint rejects smoke report example URL target without ht
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-smoke-example-http-code-lint-"),
   );
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const examplePath = path.join(
     targetPackage,
@@ -304,9 +376,8 @@ test("deployment package lint rejects smoke report example without endpoint alia
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-smoke-example-endpoint-lint-"),
   );
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const examplePath = path.join(
     targetPackage,
@@ -326,9 +397,8 @@ test("deployment package lint rejects smoke report example credentialed URL", ()
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "deploy-package-smoke-example-credential-lint-"),
   );
-  const sourcePackage = path.join(process.cwd(), "deployments/yoyoosun");
   const targetPackage = path.join(root, "deployments/yoyoosun");
-  fs.cpSync(sourcePackage, targetPackage, { recursive: true });
+  copyDeploymentFixture(root, targetPackage);
 
   const examplePath = path.join(
     targetPackage,

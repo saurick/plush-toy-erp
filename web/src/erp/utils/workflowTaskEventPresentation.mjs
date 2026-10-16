@@ -1,11 +1,12 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { getRoleDisplayName, ROLE_DISPLAY_NAMES } from './roleKeys.mjs'
 
 const TASK_STATUS_LABELS = Object.freeze({
-  ready: '待处理',
-  blocked: '已阻塞',
-  done: '已完成',
-  rejected: '已退回',
-  withdrawn: '已撤回',
+  [WorkflowTaskStatus.READY]: '待处理',
+  [WorkflowTaskStatus.BLOCKED]: '已阻塞',
+  [WorkflowTaskStatus.DONE]: '已完成',
+  [WorkflowTaskStatus.REJECTED]: '已退回',
+  [WorkflowTaskStatus.WITHDRAWN]: '已撤回',
 })
 
 const EVENT_PRESENTATIONS = Object.freeze({
@@ -268,9 +269,9 @@ export function buildWorkflowTaskResponsibilityItems(task = {}) {
     items.push({
       key: 'current-reason',
       label:
-        normalizedText(task.task_status_key) === 'rejected'
+        normalizedText(task.task_status_key) === WorkflowTaskStatus.REJECTED
           ? '当前退回原因'
-          : normalizedText(task.task_status_key) === 'withdrawn'
+          : normalizedText(task.task_status_key) === WorkflowTaskStatus.WITHDRAWN
             ? '当前撤回原因'
             : '当前阻塞原因',
       value: currentReason,

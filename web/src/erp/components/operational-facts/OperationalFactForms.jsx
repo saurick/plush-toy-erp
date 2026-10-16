@@ -1,5 +1,6 @@
 import React from 'react'
 import { Tag } from 'antd'
+import { OperationalFactStatus, ShipmentStatus, StockReservationStatus } from '../../../common/consts/statuses.generated.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
@@ -11,25 +12,25 @@ export {
 } from '../../utils/businessSourceNavigation.mjs'
 
 const STATUS_LABELS = Object.freeze({
-  DRAFT: '草稿',
-  POSTED: '已过账',
-  SHIPPED: '已发货',
-  SETTLED: '已结清',
-  ACTIVE: '生效中',
-  RELEASED: '已释放',
-  CONSUMED: '已消耗',
-  CANCELLED: '已取消',
+  [OperationalFactStatus.DRAFT]: '草稿',
+  [OperationalFactStatus.POSTED]: '已过账',
+  [ShipmentStatus.SHIPPED]: '已发货',
+  [OperationalFactStatus.SETTLED]: '已结清',
+  [StockReservationStatus.ACTIVE]: '生效中',
+  [StockReservationStatus.RELEASED]: '已释放',
+  [StockReservationStatus.CONSUMED]: '已消耗',
+  [OperationalFactStatus.CANCELLED]: '已取消',
 })
 
 const STATUS_COLORS = Object.freeze({
-  DRAFT: 'default',
-  POSTED: 'green',
-  SHIPPED: 'blue',
-  SETTLED: 'purple',
-  ACTIVE: 'cyan',
-  RELEASED: 'gold',
-  CONSUMED: 'geekblue',
-  CANCELLED: 'red',
+  [OperationalFactStatus.DRAFT]: 'default',
+  [OperationalFactStatus.POSTED]: 'green',
+  [ShipmentStatus.SHIPPED]: 'blue',
+  [OperationalFactStatus.SETTLED]: 'purple',
+  [StockReservationStatus.ACTIVE]: 'cyan',
+  [StockReservationStatus.RELEASED]: 'gold',
+  [StockReservationStatus.CONSUMED]: 'geekblue',
+  [OperationalFactStatus.CANCELLED]: 'red',
 })
 
 const COLLECTION_TYPE_OPTIONS = [
@@ -109,7 +110,7 @@ export function productionFactCancelPermissions(record) {
   const status = String(record?.status || '')
     .trim()
     .toUpperCase()
-  return isFinishedGoodsReceipt(record) && status === 'POSTED'
+  return isFinishedGoodsReceipt(record) && status === OperationalFactStatus.POSTED
     ? [PermissionCode.WAREHOUSE_INBOUND_CONFIRM]
     : [PermissionCode.PRODUCTION_FACT_CANCEL]
 }

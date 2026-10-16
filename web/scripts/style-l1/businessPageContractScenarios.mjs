@@ -439,7 +439,7 @@ export function createBusinessPageContractScenarios({
       verify: async (page) => {
         await expectHeading(page, '任务管理')
         const assignmentTaskCard = page
-          .locator('.erp-task-board-card')
+          .locator('.erp-task-table-row')
           .filter({ hasText: '下拉分类只读验收任务' })
           .first()
         await assignmentTaskCard.waitFor({ state: 'visible', timeout: 10_000 })

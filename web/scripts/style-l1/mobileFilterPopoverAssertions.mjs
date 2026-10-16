@@ -15,8 +15,17 @@ export async function assertMobileFilterDensity({ assert, dialog }) {
       })),
     })),
     overflow: node.scrollWidth > node.clientWidth + 1,
+    inputs: node.querySelectorAll('input, textarea, select, .ant-select').length,
+    secondaryEntries: node.querySelectorAll('.mobile-filter-search-entry, .mobile-filter-detail, .ant-select, select, details').length,
+    nestedScroll: [...node.querySelectorAll('.mobile-filter-fields *')].filter((child) => {
+      const style = getComputedStyle(child)
+      return ['auto', 'scroll'].includes(style.overflowY) && child.scrollHeight > child.clientHeight + 1
+    }).length,
   }))
   assert.equal(layout.overflow, false, '筛选面板不横向溢出')
+  assert.equal(layout.inputs, 0, '手机筛选只保留直接点选，不要求输入或二次选择')
+  assert.equal(layout.secondaryEntries, 0, '手机筛选选项直接呈现，不再二次打开')
+  assert.equal(layout.nestedScroll, 0, '全部条件共用一处连续滚动')
   for (const legend of layout.legends) assert.equal(legend.align, 'left', `筛选标题左对齐：${legend.text}`)
   for (const group of layout.groups) {
     assert.equal(group.display, 'flex', `短选项紧凑换行：${group.label}`)

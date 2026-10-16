@@ -1,4 +1,5 @@
 import React from 'react'
+import { ArrowRightOutlined, ForkOutlined } from '@ant-design/icons'
 import { Button } from 'antd'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { getEngineeringMaterialRequest } from '../../api/masterDataOrderApi.mjs'
@@ -32,6 +33,8 @@ export default function WorkflowTaskHandlingChain({
   processContextState = 'idle',
   onRetryProcess,
   variant = 'desktop',
+  focused = false,
+  resources,
 }) {
   const source = getEngineeringMaterialTaskContext(task)
   const processLinked = Boolean(task?.process_instance_id)
@@ -84,10 +87,33 @@ export default function WorkflowTaskHandlingChain({
   const retry = processLinked
     ? onRetryProcess
     : () => setReload((value) => value + 1)
+  if (
+    !processLinked &&
+    !materialTask &&
+    model?.handoffKind === 'task' &&
+    model.items.length === 1
+  ) {
+    return (
+      <>
+        {resources}
+        <p
+          className="erp-task-handling-note"
+          aria-label="任务处理链"
+          data-testid={
+            variant === 'mobile'
+              ? 'mobile-task-process-context'
+              : 'workflow-task-handling-chain'
+          }
+        >
+          {model.handoffLabel}
+        </p>
+      </>
+    )
+  }
   return (
     <section
       className={
-        variant === 'mobile'
+        focused ? 'workflow-task-detail-flow' : variant === 'mobile'
           ? 'erp-mobile-card mobile-detail-section'
           : 'erp-task-action-drawer__summary'
       }
@@ -97,17 +123,21 @@ export default function WorkflowTaskHandlingChain({
           ? 'mobile-task-process-context'
           : 'workflow-task-handling-chain'
       }
+      data-process-state={state}
     >
       <div className="workflow-business-chain__heading">
-        <h3 className="erp-task-action-drawer__section-title">{showOrderChain ? '订单全流程' : '本任务处理进度'}</h3>
-        {canShowOrderChain ? <Button size="small" onClick={() => setOrderChainTaskID(showOrderChain ? null : task.id)}>{showOrderChain ? '返回本任务' : '查看订单全流程'}</Button> : null}
+        {focused && !showOrderChain ? (
+          <span className="workflow-task-detail-flow__label" aria-label="业务流程"><ForkOutlined aria-hidden="true" />{processContext ? getProcessLabel(processContext.process_instance) : model?.processLabel || '本任务处理进度'}</span>
+        ) : <h3 className="erp-task-action-drawer__section-title">{showOrderChain ? '订单全流程' : '本任务处理进度'}</h3>}
+        {canShowOrderChain ? <Button type={focused ? 'link' : 'default'} size="small" onClick={() => setOrderChainTaskID(showOrderChain ? null : task.id)}>{showOrderChain ? '返回本任务' : '查看订单全流程'}{focused ? <ArrowRightOutlined aria-hidden="true" /> : null}</Button> : null}
       </div>
+      {!showOrderChain ? resources : null}
       {showOrderChain ? (
         <WorkflowBusinessChain task={task} profile={profile} view="order" onOpenTask={onOpenTask} />
-      ) : (
-        <>
-          {state === 'loading' || state === 'idle' ? (
-            <p role="status">正在读取任务处理链</p>
+      ) : null}
+      <div className="workflow-task-handling-current" hidden={showOrderChain}>
+        {state === 'loading' || state === 'idle' ? (
+          <p role="status">正在读取任务处理链</p>
           ) : state === 'error' ? (
             <div role="alert">
               <p>暂时无法读取任务处理链，请重新读取。</p>
@@ -119,57 +149,47 @@ export default function WorkflowTaskHandlingChain({
             </div>
           ) : processLinked && processContext ? (
             <>
-              <div className="erp-task-action-drawer__meta-grid erp-task-action-drawer__process-meta">
-                <div>
-                  <span>业务流程</span>
-                  <strong>
-                    {getProcessLabel(processContext.process_instance)}
-                  </strong>
+              {!focused ? (
+                <div className="erp-task-process-overview" aria-label="业务流程">
+                  <span>{getProcessLabel(processContext.process_instance)}</span>
+                  <span aria-label="流程状态">{getProcessStatusLabel(processContext.process_instance)}</span>
                 </div>
-                <div>
-                  <span>发起时间</span>
-                  <strong>
-                    {formatProcessStartedAt(
-                      processContext.process_instance.started_at
-                    )}
-                  </strong>
-                </div>
-                <div>
-                  <span>流程状态</span>
-                  <strong>
-                    {getProcessStatusLabel(processContext.process_instance)}
-                  </strong>
-                </div>
-              </div>
+              ) : null}
               <WorkflowProcessStageTrack
+                key={task.id}
                 context={processContext}
                 variant={variant}
+                focusCurrent
+                compact={focused}
+                hideLinkedCurrent={focused}
               />
-              <Button size="small" onClick={onOpenTracking || (() => setTrackingOpen(true))}>流程跟踪</Button>
+              <div className="erp-task-process-footer">
+                <span>{getProcessStatusLabel(processContext.process_instance)} · 发起于 {formatProcessStartedAt(processContext.process_instance.started_at)}</span>
+                <Button size="small" type="link" onClick={onOpenTracking || (() => setTrackingOpen(true))}>流程跟踪</Button>
+              </div>
               {!onOpenTracking ? <WorkflowTrackingDrawer trackingRef={trackingOpen ? { kind: 'process', id: task.process_instance_id } : null} onClose={() => setTrackingOpen(false)} refreshKey={task.version} closeLabel="返回任务" /> : null}
             </>
           ) : model ? (
-            <WorkflowProcessStageTrack model={model} variant={variant} />
+            <WorkflowProcessStageTrack key={task.id} model={model} variant={variant} focusCurrent compact={focused} hideLinkedCurrent={focused} />
           ) : !processLinked && !materialTask ? (
             <WorkflowBusinessChain task={task} profile={profile} onOpenTask={onOpenTask} />
           ) : null}
-          {state === 'ready' && current?.model ? (
-            <EngineeringMaterialPurchaseOrders
-              request={current.request}
-              canOpen={hasActionPermission(profile, PermissionCode.PURCHASE_ORDER_READ)}
-              task={task}
-              adminID={profile?.id}
-            />
+        {state === 'ready' && current?.model ? (
+          <EngineeringMaterialPurchaseOrders
+            request={current.request}
+            canOpen={hasActionPermission(profile, PermissionCode.PURCHASE_ORDER_READ)}
+            task={task}
+            adminID={profile?.id}
+          />
           ) : null}
-          {materialTask && !processLinked && (!source || !canRead) ? (
-            <p className="erp-material-summary-hint">
-              {source
+        {materialTask && !processLinked && (!source || !canRead) ? (
+          <p className="erp-material-summary-hint">
+            {source
                 ? '当前账号未开放用料审批记录查看。'
                 : '用料来源无法核对，请刷新任务。'}
-            </p>
+          </p>
           ) : null}
-        </>
-      )}
+      </div>
     </section>
   )
 }

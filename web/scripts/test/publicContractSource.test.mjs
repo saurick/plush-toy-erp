@@ -21,3 +21,9 @@ test('contract source inspection preserves comments and locally shadowed objects
 test('contract source inspection rejects undefined references instead of hiding drift', () => {
   assert.throws(() => resolvePublicContractSource(`${imports}const value = PermissionCode.UNKNOWN`, filename), /Unknown public contract member/u)
 })
+
+test('contract source inspection resolves application aliases, namespaces and public limits', () => {
+  const source = resolvePublicContractSource(`import * as C from '@/common/consts/statuses.generated.mjs'; import { PrintPolicy as P } from '@/common/consts/policies.generated.mjs'; const value = [C.FinancePaymentStatus.APPROVED, P.imageCount]`, filename)
+  assert.match(source, /\['APPROVED', 32\]/u)
+  assert.throws(() => resolvePublicContractSource(`import * as C from '@/common/consts/statuses.generated.mjs'; const value = C.FinancePaymentStatus.UNKNOWN`, filename), /Unknown public contract member/u)
+})

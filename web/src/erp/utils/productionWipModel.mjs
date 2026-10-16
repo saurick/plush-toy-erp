@@ -1,3 +1,5 @@
+import { NumericContract } from '../../common/consts/numeric.generated.mjs'
+import { OperationalFactStatus, OutsourcingOrderItemStatus, OutsourcingOrderStatus, ProductionOrderStatus, ProductionPackagingConfirmationStatus, ProductionWIPStatus, QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   addNumeric20Scale6Units,
   numeric20Scale6Units,
@@ -27,14 +29,14 @@ export const PRODUCTION_WIP_EXECUTION_MODE_META = Object.freeze({
 })
 
 export const PRODUCTION_WIP_STATUS_META = Object.freeze({
-  PLANNED: Object.freeze({ label: '待安排', color: 'blue' }),
-  IN_PROGRESS: Object.freeze({ label: '本厂生产中', color: 'processing' }),
-  OUTSOURCED: Object.freeze({ label: '外发加工中', color: 'gold' }),
-  WAITING_QUALITY: Object.freeze({ label: '待品质检验', color: 'gold' }),
-  ACCEPTED: Object.freeze({ label: '检验合格', color: 'green' }),
-  REJECTED: Object.freeze({ label: '检验不合格', color: 'red' }),
-  SPLIT: Object.freeze({ label: '已拆分', color: 'default' }),
-  CANCELLED: Object.freeze({ label: '已取消', color: 'default' }),
+  [ProductionWIPStatus.PLANNED]: Object.freeze({ label: '待安排', color: 'blue' }),
+  [ProductionWIPStatus.IN_PROGRESS]: Object.freeze({ label: '本厂生产中', color: 'processing' }),
+  [ProductionWIPStatus.OUTSOURCED]: Object.freeze({ label: '外发加工中', color: 'gold' }),
+  [ProductionWIPStatus.WAITING_QUALITY]: Object.freeze({ label: '待品质检验', color: 'gold' }),
+  [ProductionWIPStatus.ACCEPTED]: Object.freeze({ label: '检验合格', color: 'green' }),
+  [ProductionWIPStatus.REJECTED]: Object.freeze({ label: '检验不合格', color: 'red' }),
+  [ProductionWIPStatus.SPLIT]: Object.freeze({ label: '已拆分', color: 'default' }),
+  [ProductionWIPStatus.CANCELLED]: Object.freeze({ label: '已取消', color: 'default' }),
 })
 
 export const PRODUCTION_WIP_FLOW_TYPE = Object.freeze({
@@ -43,10 +45,7 @@ export const PRODUCTION_WIP_FLOW_TYPE = Object.freeze({
   REMAKE: 'REMAKE',
 })
 
-export const PRODUCTION_PACKAGING_CONFIRMATION_STATUS = Object.freeze({
-  PENDING: 'PENDING',
-  CONFIRMED: 'CONFIRMED',
-})
+export const PRODUCTION_PACKAGING_CONFIRMATION_STATUS = ProductionPackagingConfirmationStatus
 
 export const PRODUCTION_WIP_OPERATION_LABELS = Object.freeze({
   FABRIC_PROCESSING: '布料加工',
@@ -72,11 +71,11 @@ export const PRODUCTION_WIP_QUALITY_GATE_LABELS = Object.freeze({
 })
 
 export const PRODUCTION_WIP_QUALITY_STATUS_META = Object.freeze({
-  DRAFT: Object.freeze({ label: '质检草稿', color: 'default' }),
-  SUBMITTED: Object.freeze({ label: '检验中', color: 'processing' }),
-  PASSED: Object.freeze({ label: '已判定', color: 'green' }),
-  REJECTED: Object.freeze({ label: '不合格', color: 'red' }),
-  CANCELLED: Object.freeze({ label: '已取消', color: 'default' }),
+  [QualityInspectionStatus.DRAFT]: Object.freeze({ label: '质检草稿', color: 'default' }),
+  [QualityInspectionStatus.SUBMITTED]: Object.freeze({ label: '检验中', color: 'processing' }),
+  [QualityInspectionStatus.PASSED]: Object.freeze({ label: '已判定', color: 'green' }),
+  [QualityInspectionStatus.REJECTED]: Object.freeze({ label: '不合格', color: 'red' }),
+  [QualityInspectionStatus.CANCELLED]: Object.freeze({ label: '已取消', color: 'default' }),
 })
 
 const QUALITY_RESULT_META = Object.freeze({
@@ -88,9 +87,9 @@ const QUALITY_RESULT_META = Object.freeze({
 const MAX_KEY_LENGTH = 128
 const MAX_REASON_LENGTH = 255
 const NON_NEGATIVE_QUANTITY_PATTERN = /^(?:0*\d+(?:\.\d+)?|0*\.\d+)$/u
-export const PRODUCTION_WIP_QUANTITY_MAX_LENGTH = 21
-const PRODUCTION_WIP_QUANTITY_MAX_INTEGER_DIGITS = 14
-const PRODUCTION_WIP_QUANTITY_MAX_FRACTION_DIGITS = 6
+export const PRODUCTION_WIP_QUANTITY_MAX_LENGTH = NumericContract.integerDigits + 1 + NumericContract.scale
+const PRODUCTION_WIP_QUANTITY_MAX_INTEGER_DIGITS = NumericContract.integerDigits
+const PRODUCTION_WIP_QUANTITY_MAX_FRACTION_DIGITS = NumericContract.scale
 
 function invalidResponse() {
   const error = new Error('服务器返回的生产工序信息不完整，请刷新后重试')
@@ -510,9 +509,9 @@ function validateQualityInspection(inspection) {
     (inspection.result != null &&
       !Object.hasOwn(QUALITY_RESULT_META, String(inspection.result || ''))) ||
     !optionalText(inspection.inspection_no) ||
-    (inspection.status === 'PASSED' && inspection.result !== 'PASS') ||
-    (inspection.status === 'REJECTED' && inspection.result !== 'REJECT') ||
-    (['DRAFT', 'SUBMITTED'].includes(inspection.status) &&
+    (inspection.status === QualityInspectionStatus.PASSED && inspection.result !== 'PASS') ||
+    (inspection.status === QualityInspectionStatus.REJECTED && inspection.result !== 'REJECT') ||
+    ([QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(inspection.status) &&
       inspection.result != null)
   ) {
     throw invalidResponse()
@@ -538,9 +537,9 @@ function validatePackagingConfirmation(value, productionOrderID) {
     !optionalPositiveInteger(value.confirmed_at) ||
     !positiveSafeInteger(value.created_at) ||
     !positiveSafeInteger(value.updated_at) ||
-    (value.status === 'PENDING' &&
+    (value.status === ProductionPackagingConfirmationStatus.PENDING &&
       (value.confirmed_by != null || value.confirmed_at != null)) ||
-    (value.status === 'CONFIRMED' &&
+    (value.status === ProductionPackagingConfirmationStatus.CONFIRMED &&
       (!requiredText(value.packaging_version_snapshot) ||
         !positiveSafeInteger(value.confirmed_by) ||
         !positiveSafeInteger(value.confirmed_at)))
@@ -607,7 +606,7 @@ export function validateProductionWipAggregate(data, expected = {}) {
       !positiveSafeInteger(receipt.id) ||
       !positiveSafeInteger(receipt.production_wip_batch_id) ||
       !requiredText(receipt.fact_no) ||
-      !['DRAFT', 'POSTED', 'CANCELLED'].includes(receipt.status) ||
+      ![OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED, OperationalFactStatus.CANCELLED].includes(receipt.status) ||
       !canonicalQuantity(receipt.quantity) ||
       !canonicalNonNegativeQuantity(receipt.reworked_quantity) ||
       !batches.some((batch) => batch.id === receipt.production_wip_batch_id)
@@ -637,7 +636,7 @@ export function validateProductionWipAggregate(data, expected = {}) {
   ensureUniqueIDs(packagingConfirmations)
 
   const activeQualityGateKeys = qualityInspections
-    .filter((inspection) => inspection.status !== 'CANCELLED')
+    .filter((inspection) => inspection.status !== QualityInspectionStatus.CANCELLED)
     .map(
       (inspection) =>
         `${inspection.production_wip_batch_id}:${inspection.gate_code}`
@@ -847,13 +846,13 @@ export function productionWipPackagingReceiptChoices(aggregate, batch) {
     .filter(
       (receipt) =>
         receipt.production_wip_batch_id === batch.id &&
-        receipt.status === 'POSTED'
+        receipt.status === OperationalFactStatus.POSTED
     )
     .map((receipt) => {
       const allocated = aggregate.batches.filter(
         (candidate) =>
           candidate.finished_goods_receipt_id === receipt.id &&
-          !['CANCELLED', 'SPLIT'].includes(candidate.status)
+          ![ProductionWIPStatus.CANCELLED, ProductionWIPStatus.SPLIT].includes(candidate.status)
       )
       const remaining =
         quantityInteger(receipt.quantity, 6) -
@@ -887,7 +886,7 @@ export function productionWipTransferRemainingQuantity(
       candidate.source_batch_id === batch.id &&
       candidate.production_order_operation_id === nextOperation.id &&
       candidate.flow_type === 'NORMAL' &&
-      candidate.status !== 'CANCELLED'
+      candidate.status !== ProductionWIPStatus.CANCELLED
   )
   const remaining =
     quantityInteger(batch.quantity, 6) -
@@ -1161,7 +1160,7 @@ export function productionWipOutsourcingCandidateMatches(
     !requiredText(order.outsourcing_order_no) ||
     String(order.lifecycle_status || '')
       .trim()
-      .toLowerCase() !== 'confirmed' ||
+      .toLowerCase() !== OutsourcingOrderStatus.CONFIRMED ||
     !productOperationAllowed ||
     (order.source_wip_batch_id != null &&
       order.source_wip_batch_id !== batch.id) ||
@@ -1169,7 +1168,7 @@ export function productionWipOutsourcingCandidateMatches(
     item.outsourcing_order_id !== order.id ||
     String(item.line_status || '')
       .trim()
-      .toLowerCase() !== 'open' ||
+      .toLowerCase() !== OutsourcingOrderItemStatus.OPEN ||
     String(item.subject_type || '')
       .trim()
       .toUpperCase() !== 'PRODUCT' ||
@@ -1231,13 +1230,13 @@ export function productionWipMaterialOutsourcingCandidateMatches(
     !requiredText(order.outsourcing_order_no) ||
     String(order.lifecycle_status || '')
       .trim()
-      .toLowerCase() !== 'confirmed' ||
+      .toLowerCase() !== OutsourcingOrderStatus.CONFIRMED ||
     String(operation.operation_code || '').trim() !== 'FABRIC_PROCESSING' ||
     !positiveSafeInteger(item.id) ||
     item.outsourcing_order_id !== order.id ||
     String(item.line_status || '')
       .trim()
-      .toLowerCase() !== 'open' ||
+      .toLowerCase() !== OutsourcingOrderItemStatus.OPEN ||
     String(item.subject_type || '')
       .trim()
       .toUpperCase() !== 'MATERIAL' ||
@@ -1545,14 +1544,14 @@ export function productionWipActionAllowedForOrder(
   const orderStatus = String(order?.status || '')
     .trim()
     .toUpperCase()
-  if (orderStatus === 'RELEASED') {
+  if (orderStatus === ProductionOrderStatus.RELEASED) {
     return !(
       positiveSafeInteger(batch?.origin_rework_fact_id) &&
       action === PRODUCTION_WIP_ACTION.CANCEL_BATCH
     )
   }
   if (
-    orderStatus !== 'CLOSED' ||
+    orderStatus !== ProductionOrderStatus.CLOSED ||
     !positiveSafeInteger(batch?.origin_rework_fact_id)
   ) {
     return false
@@ -1579,40 +1578,40 @@ export function productionWipActionRelevant({
     return false
   }
   const { status, execution_mode: mode } = batch
-  if (['SPLIT', 'CANCELLED'].includes(status)) return false
+  if ([ProductionWIPStatus.SPLIT, ProductionWIPStatus.CANCELLED].includes(status)) return false
   switch (action) {
     case PRODUCTION_WIP_ACTION.SPLIT_BATCH:
       return (
-        status === 'PLANNED' && operation.operation_code !== 'FABRIC_PROCESSING'
+        status === ProductionWIPStatus.PLANNED && operation.operation_code !== 'FABRIC_PROCESSING'
       )
     case PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION:
-      return status === 'PLANNED' && !mode
+      return status === ProductionWIPStatus.PLANNED && !mode
     case PRODUCTION_WIP_ACTION.CANCEL_BATCH:
     case PRODUCTION_WIP_ACTION.START_OPERATION:
-      return status === 'PLANNED'
+      return status === ProductionWIPStatus.PLANNED
     case PRODUCTION_WIP_ACTION.COMPLETE_OPERATION:
       return (
-        ['PLANNED', 'IN_PROGRESS'].includes(status) &&
+        [ProductionWIPStatus.PLANNED, ProductionWIPStatus.IN_PROGRESS].includes(status) &&
         mode === PRODUCTION_WIP_EXECUTION_MODE.IN_HOUSE
       )
     case PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN:
       return (
-        ['PLANNED', 'OUTSOURCED'].includes(status) &&
+        [ProductionWIPStatus.PLANNED, ProductionWIPStatus.OUTSOURCED].includes(status) &&
         mode === PRODUCTION_WIP_EXECUTION_MODE.OUTSOURCED
       )
     case PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION:
       return (
         Boolean(nextOperation) &&
         [
-          'PLANNED',
-          'IN_PROGRESS',
-          'OUTSOURCED',
-          'WAITING_QUALITY',
-          'ACCEPTED',
+          ProductionWIPStatus.PLANNED,
+          ProductionWIPStatus.IN_PROGRESS,
+          ProductionWIPStatus.OUTSOURCED,
+          ProductionWIPStatus.WAITING_QUALITY,
+          ProductionWIPStatus.ACCEPTED,
         ].includes(status)
       )
     case PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL:
-      return packagingConfirmation?.status === 'PENDING'
+      return packagingConfirmation?.status === ProductionPackagingConfirmationStatus.PENDING
     default:
       return false
   }
@@ -1630,7 +1629,7 @@ export function productionWipCompletionEligibility(
     .toUpperCase()
   const selectedBatchID = Number(options?.productionWipBatchID || 0)
   if (item.route_code !== PRODUCTION_WIP_ROUTE_CODE) {
-    if (orderStatus === 'CLOSED') {
+    if (orderStatus === ProductionOrderStatus.CLOSED) {
       return Object.freeze({
         eligible: false,
         reason: '已关闭订单只能登记成品返工补制批次的完工入库',
@@ -1667,15 +1666,15 @@ export function productionWipCompletionEligibility(
     (batch) =>
       batch.production_order_item_id === item.id &&
       batch.production_order_operation_id === handworkOperation.id &&
-      ['WAITING_QUALITY', 'ACCEPTED', 'REJECTED'].includes(batch.status) &&
-      (orderStatus !== 'CLOSED' ||
+      [ProductionWIPStatus.WAITING_QUALITY, ProductionWIPStatus.ACCEPTED, ProductionWIPStatus.REJECTED].includes(batch.status) &&
+      (orderStatus !== ProductionOrderStatus.CLOSED ||
         positiveSafeInteger(batch.origin_rework_fact_id))
   )
   if (receivableBatches.length === 0) {
     return Object.freeze({
       eligible: false,
       reason:
-        orderStatus === 'CLOSED'
+        orderStatus === ProductionOrderStatus.CLOSED
           ? '成品返工补制尚未完成手工，暂不能登记补完工'
           : '手工完成或回货后可登记成品收仓，查货与包装完成后才可发货',
       receivableBatches: Object.freeze([]),
@@ -1817,7 +1816,7 @@ export function productionWipQualitySummary(aggregate, batch) {
         (candidate) => candidate.gate_code === gateCode
       )
       const inspection =
-        matching.find((candidate) => candidate.status !== 'CANCELLED') ||
+        matching.find((candidate) => candidate.status !== QualityInspectionStatus.CANCELLED) ||
         matching.at(-1)
       const state = inspection
         ? productionWipQualityInspectionMeta(inspection).label

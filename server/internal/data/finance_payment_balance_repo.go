@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -423,6 +424,9 @@ func (r *operationalFactRepo) FinancePaymentAllocationCandidates(ctx context.Con
 		}
 		if payment.Kind == biz.FinancePaymentKindAdvance {
 			typ, id, err := financeFactOrderRef(ctx, r.data.postgres, row)
+			if errors.Is(err, biz.ErrFinanceFactSourceInvalid) {
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}

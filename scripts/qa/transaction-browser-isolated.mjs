@@ -53,11 +53,12 @@ export function verifyTransactionRequestLogs(
   const calls = [
     ...browser.browserRPC,
     ...browser.fixtureRPC,
-    ...browser.flows.flatMap(({ transportFault }) =>
-      transportFault
-        ? [{ ...transportFault, code: transportFault.backendCode }]
-        : [],
-    ),
+    ...[
+      ...browser.flows.flatMap(({ transportFault, saveFault, submitFault }) =>
+        [transportFault, saveFault, submitFault].filter(Boolean),
+      ),
+      ...(browser.engineering ?? []).map(({ financeFault }) => financeFault).filter(Boolean),
+    ].map((fault) => ({ ...fault, code: fault.backendCode })),
   ];
   assert.ok(calls.length > 0, "request correlation needs real RPC evidence");
   const counts = { matched: 0, success: 0, rejected: 0 };
@@ -149,7 +150,9 @@ async function snapshot(source, destination) {
 export async function runIsolatedTransactionBrowser({
   outputDir,
   signal,
+  sourceOrdersOnly = false,
 } = {}) {
+  assert.equal(typeof sourceOrdersOnly, "boolean");
   const out = path.resolve(
     outputDir ||
       path.join(root, "output/qa/transaction-browser", Date.now().toString()),
@@ -168,6 +171,7 @@ export async function runIsolatedTransactionBrowser({
     steps: [],
     outputDir: out,
     simulatedOnly: true,
+    scope: sourceOrdersOnly ? "source-orders" : "transactions-and-source-orders",
   };
   const runID = randomBytes(6).toString("hex"),
     operationId = randomUUID();
@@ -208,12 +212,14 @@ export async function runIsolatedTransactionBrowser({
       });
       return stdout.trim();
     } catch (error) {
-      if (error.stdout)
-        await fs.writeFile(
-          path.join(out, "command-failure.log"),
-          redact(error.stdout.slice(-64000)),
-          { mode: 0o600 },
-        );
+      if (error.stdout) {
+        report.commandFailures ??= [];
+        const evidence = `command-failure-${report.commandFailures.length + 1}.log`;
+        report.commandFailures.push({ program: path.basename(file), evidence });
+        const diagnostic = redact(error.stdout);
+        await fs.writeFile(path.join(out, evidence), diagnostic, { mode: 0o600 });
+        await fs.writeFile(path.join(out, "command-failure.log"), diagnostic, { mode: 0o600 });
+      }
       throw new Error(
         `${file} failed: ${redact(error.stderr || error.message)}`,
         { cause: undefined },
@@ -273,6 +279,11 @@ export async function runIsolatedTransactionBrowser({
         requiredNode,
         "use the repository's pinned Node version",
       );
+      if (!sourceOrdersOnly) {
+        await Promise.all(["pdfinfo", "pdffonts", "pdftotext"].map((tool) =>
+          command(tool, ["-v"], { cwd: root, timeout: 10000 }),
+        ));
+      }
       report.source = await readRepositoryIdentity(root);
       await snapshot(root, source);
       assertRepositoryIdentityEqual(
@@ -282,6 +293,18 @@ export async function runIsolatedTransactionBrowser({
       assertRepositoryIdentityEqual(
         report.source,
         await readRepositoryIdentity(root),
+      );
+    });
+    await stage("schema-documentation", async () => {
+      const summary = await command(
+        "go",
+        ["run", "./cmd/schema-doc", "--check"],
+        { cwd: path.join(source, "server") },
+      );
+      await fs.writeFile(
+        path.join(out, "schema-documentation.log"),
+        summary + "\n",
+        { mode: 0o600 },
       );
     });
     const binary = path.join(directory, "backend");
@@ -537,6 +560,8 @@ export async function runIsolatedTransactionBrowser({
       );
       await ready(`${baseURL}/customer-config.js`, vite);
     });
+    let sourceOrderBrowserFailure;
+    try {
     await stage("browser-real-backend-postgres", async () => {
       const environmentPath = path.join(directory, "browser-environment.json");
       await fs.writeFile(
@@ -557,14 +582,14 @@ export async function runIsolatedTransactionBrowser({
       await command(
         process.execPath,
         [
-          path.join(source, "scripts/qa/transaction-real-backend-browser.mjs"),
+          path.join(source, sourceOrdersOnly ? "scripts/qa/transaction-source-orders-browser.mjs" : "scripts/qa/transaction-real-backend-browser.mjs"),
           "--environment",
           environmentPath,
         ],
         { timeout: 480000 },
       );
       const browser = JSON.parse(
-        await fs.readFile(path.join(out, "browser/report.json"), "utf8"),
+        await fs.readFile(path.join(out, sourceOrdersOnly ? "browser/source-orders/report.json" : "browser/report.json"), "utf8"),
       );
       assert.equal(browser.status, "passed");
       report.flows = browser.flows.map(({ key, passed }) => ({ key, passed }));
@@ -573,6 +598,18 @@ export async function runIsolatedTransactionBrowser({
         await fs.readFile(path.join(directory, "backend.log"), "utf8"),
         Object.values(secrets),
       );
+    });
+    } catch (error) {
+      if (!sourceOrdersOnly) throw error;
+      sourceOrderBrowserFailure = error;
+      report.steps.push({ key: "browser-real-backend-postgres", passed: false });
+    }
+    if (!sourceOrdersOnly) await stage("source-order-procurement-browser", async () => {
+      await command(process.execPath, [path.join(source, "scripts/qa/transaction-source-orders-browser.mjs"), "--environment", path.join(directory, "browser-environment.json")], { timeout: 300000 });
+      const orders = JSON.parse(await fs.readFile(path.join(out, "browser/source-orders/report.json"), "utf8"));
+      assert.equal(orders.status, "passed");
+      report.sourceOrders = orders.flows.map(({ key, passed }) => ({ key, passed }));
+      report.sourceOrderRequestLogs = verifyTransactionRequestLogs(orders, await fs.readFile(path.join(directory, "backend.log"), "utf8"), Object.values(secrets));
     });
     await stage("logging-trace-contracts", async () => {
       const stdout = await command(
@@ -657,6 +694,77 @@ export async function runIsolatedTransactionBrowser({
         "0",
         "disposable PostgreSQL gate must remove its database",
       );
+    });
+    if (sourceOrderBrowserFailure) throw sourceOrderBrowserFailure;
+    if (!sourceOrdersOnly) await stage("shared-list-filter-print", async () => {
+      await command(
+        process.execPath,
+        [
+          path.join(
+            source,
+            "scripts/qa/transaction-shared-surfaces-browser.mjs",
+          ),
+          "--environment",
+          path.join(directory, "browser-environment.json"),
+        ],
+        { timeout: 180000 },
+      );
+      const shared = JSON.parse(
+        await fs.readFile(
+          path.join(out, "browser/shared-surfaces/report.json"),
+          "utf8",
+        ),
+      );
+      assert.equal(shared.status, "passed");
+      report.sharedSurfaces = {
+        filters: shared.filters,
+        prints: shared.prints,
+        factsUnchanged: shared.factsUnchanged,
+        factTablesChecked: shared.factTablesChecked,
+        freshTemplatesClearedBusinessSources:
+          shared.freshTemplatesClearedBusinessSources,
+        materialOnlyInstructionBlocked: shared.materialOnlyInstructionBlocked,
+        printFixtureCreatedThroughAPI: shared.printFixtureCreatedThroughAPI,
+        fixtureDidNotPostFacts: shared.fixtureDidNotPostFacts,
+        ownedPrintWindowsClosed: shared.ownedPrintWindowsClosed,
+      };
+      report.sharedRequestLogs = verifyTransactionRequestLogs(
+        shared,
+        await fs.readFile(path.join(directory, "backend.log"), "utf8"),
+        Object.values(secrets),
+      );
+      const pdfLogs = (
+        await fs.readFile(path.join(directory, "backend.log"), "utf8")
+      )
+        .split("\n")
+        .flatMap((line) => {
+          try {
+            return [JSON.parse(line)];
+          } catch {
+            return [];
+          }
+        });
+      for (const pdf of shared.prints) {
+        const matching = pdfLogs.filter(
+          (record) =>
+            record.msg === "template pdf render success" &&
+            record.request_id === pdf.requestID,
+        );
+        assert.equal(
+          matching.length,
+          1,
+          "every download needs one real PDF completion log",
+        );
+        assert.equal(matching[0].template_key, pdf.templateKey);
+        assert.equal(matching[0].pdf_bytes, pdf.bytes);
+        assert.match(matching[0]["trace.id"], /^[a-f0-9]{32}$/u);
+        assert.match(matching[0]["span.id"], /^[a-f0-9]{16}$/u);
+      }
+      report.pdfRequestLogs = {
+        matched: shared.prints.length,
+        byteCountsMatched: true,
+        traceIDsPresent: true,
+      };
     });
     assertRepositoryIdentityEqual(
       report.source,
@@ -773,12 +881,13 @@ if (
   const args = process.argv.slice(2);
   if (!args.length || args[0] === "--help") {
     process.stdout.write(
-      "Usage: node scripts/qa/transaction-browser-isolated.mjs --run [--out output/qa/transaction-browser/<run>]\nCreates and removes an isolated source copy, PostgreSQL, storage, backend and browser. Requires pinned Node, Go, Atlas, psql, installed web dependencies, Chromium, postgres:18.6 and chrislusf/seaweedfs:4.46.\n",
+      "Usage: node scripts/qa/transaction-browser-isolated.mjs --run [--source-orders] [--out output/qa/transaction-browser/<run>]\nCreates and removes an isolated source copy, PostgreSQL, storage, backend and browser. --source-orders selects sales, purchase and outsourcing browser flows with the same real PostgreSQL and logging gates; it does not attest the other browser or print flows. Requires pinned Node, Go, Atlas, psql, installed web dependencies, Chromium, postgres:18.6 and chrislusf/seaweedfs:4.46. The default print scope also requires pdfinfo, pdffonts and pdftotext.\n",
     );
   } else {
+    const selected = args.filter(arg => arg !== "--source-orders");
     assert.ok(
-      args[0] === "--run" &&
-        (args.length === 1 || (args.length === 3 && args[1] === "--out")),
+      args.filter(arg => arg === "--source-orders").length <= 1 && selected[0] === "--run" &&
+        (selected.length === 1 || (selected.length === 3 && selected[1] === "--out")),
       "unknown arguments",
     );
     const controller = new AbortController();
@@ -791,7 +900,8 @@ if (
     process.once("SIGTERM", () => controller.abort());
     try {
       const report = await runIsolatedTransactionBrowser({
-        outputDir: args[2],
+        outputDir: selected[2],
+        sourceOrdersOnly: args.includes("--source-orders"),
         signal: controller.signal,
       });
       if (report.status !== "passed") process.exitCode = 1;

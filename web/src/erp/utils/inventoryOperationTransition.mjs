@@ -1,3 +1,4 @@
+import { InventoryOperationStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   cancelInventoryOperation,
   getInventoryOperation,
@@ -14,15 +15,15 @@ import { isSourceBusinessActionResultUnknown } from './sourceBusinessAction.mjs'
 
 const INVENTORY_OPERATION_MUTATION_RECEIPTS = Object.freeze({
   submit: {
-    status: 'SUBMITTED',
+    status: InventoryOperationStatus.SUBMITTED,
     actorField: 'submitted_by',
   },
   post: {
-    status: 'POSTED',
+    status: InventoryOperationStatus.POSTED,
     actorField: 'posted_by',
   },
   cancel: {
-    status: 'CANCELLED',
+    status: InventoryOperationStatus.CANCELLED,
     actorField: 'cancelled_by',
     reasonField: 'cancel_reason',
   },
@@ -76,7 +77,7 @@ async function executeManualAdjustmentTransition({
       processData = await getInventoryAdjustmentApprovalProcess(sourceParams)
       if (!processData.process_context) throw error
     }
-    if (processData.source_readback.status !== 'DRAFT') {
+    if (processData.source_readback.status !== InventoryOperationStatus.DRAFT) {
       return processData.source_readback
     }
   } else {

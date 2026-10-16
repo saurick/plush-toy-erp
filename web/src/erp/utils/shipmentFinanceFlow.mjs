@@ -1,3 +1,5 @@
+import { WorkflowBusinessStatus } from '../../common/consts/statuses.generated.mjs'
+
 export const PRODUCTION_PROGRESS_MODULE_KEY = 'production-progress'
 
 export const SHIPPING_RELEASE_MODULE_KEY = 'shipping-release'
@@ -12,11 +14,11 @@ export const RECEIVABLE_REGISTRATION_TASK_GROUP = 'receivable_registration'
 
 export const INVOICE_REGISTRATION_TASK_GROUP = 'invoice_registration'
 
-export const SHIPPED_STATUS_KEY = 'shipped'
+export const SHIPPED_STATUS_KEY = WorkflowBusinessStatus.SHIPPED
 
-export const RECONCILING_STATUS_KEY = 'reconciling'
+export const RECONCILING_STATUS_KEY = WorkflowBusinessStatus.RECONCILING
 
-export const BLOCKED_STATUS_KEY = 'blocked'
+export const BLOCKED_STATUS_KEY = WorkflowBusinessStatus.BLOCKED
 
 const FINANCE_SOURCE_TYPE_KEYS = new Set([
   'shipment',

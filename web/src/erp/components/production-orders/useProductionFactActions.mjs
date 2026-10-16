@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -131,7 +132,7 @@ export function useProductionFactActions({
     const action = productionDraftSaveActionFor(record)
     if (
       !action ||
-      record?.status !== 'DRAFT' ||
+      record?.status !== OperationalFactStatus.DRAFT ||
       !hasAnyPermission(adminProfile, productionDraftEditPermissions(action))
     ) {
       message.warning('当前记录状态或权限已变化，请刷新后重试')
@@ -150,7 +151,7 @@ export function useProductionFactActions({
       )
       if (
         !fresh ||
-        fresh.status !== 'DRAFT' ||
+        fresh.status !== OperationalFactStatus.DRAFT ||
         productionDraftSaveActionFor(fresh) !== action
       ) {
         message.warning('草稿状态或来源已变化，请刷新后重试')
@@ -417,7 +418,7 @@ export function useProductionFactActions({
     }
     if (
       String(source?.fact_type || '').toUpperCase() !== 'REWORK' ||
-      !['POSTED', 'CANCELLED'].includes(
+      ![OperationalFactStatus.POSTED, OperationalFactStatus.CANCELLED].includes(
         String(source?.status || '').toUpperCase()
       ) ||
       !Number.isSafeInteger(orderID) ||

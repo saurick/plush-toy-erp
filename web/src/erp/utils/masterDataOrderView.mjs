@@ -1,3 +1,11 @@
+import {
+  OutsourcingOrderItemStatus,
+  OutsourcingOrderStatus,
+  PurchaseOrderItemStatus,
+  PurchaseOrderStatus,
+  SalesOrderItemStatus,
+  SalesOrderStatus,
+} from '../../common/consts/statuses.generated.mjs'
 import { unitOption, sortUnitOptions } from './referenceSelectOptions.mjs'
 import {
   OUTSOURCING_ORDER_SUBJECT_TYPES,
@@ -34,25 +42,25 @@ export const BUSINESS_ROUTE_PATHS = Object.freeze({
 })
 
 export const SALES_ORDER_STATUS_LABELS = Object.freeze({
-  draft: '草稿',
-  submitted: '已提交',
-  active: '已生效',
-  closed: '已关闭',
-  canceled: '已取消',
+  [SalesOrderStatus.DRAFT]: '草稿',
+  [SalesOrderStatus.SUBMITTED]: '已提交',
+  [SalesOrderStatus.ACTIVE]: '已生效',
+  [SalesOrderStatus.CLOSED]: '已关闭',
+  [SalesOrderStatus.CANCELED]: '已取消',
 })
 
 export const SALES_ORDER_STATUS_COLORS = Object.freeze({
-  draft: 'default',
-  submitted: 'blue',
-  active: 'green',
-  closed: 'purple',
-  canceled: 'red',
+  [SalesOrderStatus.DRAFT]: 'default',
+  [SalesOrderStatus.SUBMITTED]: 'blue',
+  [SalesOrderStatus.ACTIVE]: 'green',
+  [SalesOrderStatus.CLOSED]: 'purple',
+  [SalesOrderStatus.CANCELED]: 'red',
 })
 
 export const SALES_ORDER_ITEM_STATUS_LABELS = Object.freeze({
-  open: '未关闭',
-  closed: '已关闭',
-  canceled: '已取消',
+  [SalesOrderItemStatus.OPEN]: '未关闭',
+  [SalesOrderItemStatus.CLOSED]: '已关闭',
+  [SalesOrderItemStatus.CANCELED]: '已取消',
 })
 
 export const SOURCE_DOCUMENT_ITEM_STATUS_TONES = Object.freeze({
@@ -134,65 +142,65 @@ export function purchaseInvoicePreferenceText(required, category) {
 }
 
 export const PURCHASE_ORDER_STATUS_LABELS = Object.freeze({
-  draft: '草稿',
-  submitted: '已提交',
-  approved: '已审核',
-  closed: '已关闭',
-  canceled: '已取消',
+  [PurchaseOrderStatus.DRAFT]: '草稿',
+  [PurchaseOrderStatus.SUBMITTED]: '已提交',
+  [PurchaseOrderStatus.APPROVED]: '已审核',
+  [PurchaseOrderStatus.CLOSED]: '已关闭',
+  [PurchaseOrderStatus.CANCELED]: '已取消',
 })
 
 export const PURCHASE_ORDER_STATUS_COLORS = Object.freeze({
-  draft: 'default',
-  submitted: 'blue',
-  approved: 'green',
-  closed: 'purple',
-  canceled: 'red',
+  [PurchaseOrderStatus.DRAFT]: 'default',
+  [PurchaseOrderStatus.SUBMITTED]: 'blue',
+  [PurchaseOrderStatus.APPROVED]: 'green',
+  [PurchaseOrderStatus.CLOSED]: 'purple',
+  [PurchaseOrderStatus.CANCELED]: 'red',
 })
 
 export const PURCHASE_ORDER_ITEM_STATUS_LABELS = Object.freeze({
-  open: '未关闭',
-  closed: '已关闭',
-  canceled: '已取消',
+  [PurchaseOrderItemStatus.OPEN]: '未关闭',
+  [PurchaseOrderItemStatus.CLOSED]: '已关闭',
+  [PurchaseOrderItemStatus.CANCELED]: '已取消',
 })
 
 export const OUTSOURCING_ORDER_STATUS_LABELS = Object.freeze({
-  draft: '草稿',
-  submitted: '已提交',
-  confirmed: '已确认',
-  closed: '已关闭',
-  canceled: '已取消',
+  [OutsourcingOrderStatus.DRAFT]: '草稿',
+  [OutsourcingOrderStatus.SUBMITTED]: '已提交',
+  [OutsourcingOrderStatus.CONFIRMED]: '已确认',
+  [OutsourcingOrderStatus.CLOSED]: '已关闭',
+  [OutsourcingOrderStatus.CANCELED]: '已取消',
 })
 
 export const OUTSOURCING_ORDER_STATUS_COLORS = Object.freeze({
-  draft: 'default',
-  submitted: 'blue',
-  confirmed: 'green',
-  closed: 'purple',
-  canceled: 'red',
+  [OutsourcingOrderStatus.DRAFT]: 'default',
+  [OutsourcingOrderStatus.SUBMITTED]: 'blue',
+  [OutsourcingOrderStatus.CONFIRMED]: 'green',
+  [OutsourcingOrderStatus.CLOSED]: 'purple',
+  [OutsourcingOrderStatus.CANCELED]: 'red',
 })
 
 export const OUTSOURCING_ORDER_ITEM_STATUS_LABELS = Object.freeze({
-  open: '未关闭',
-  closed: '已关闭',
-  canceled: '已取消',
+  [OutsourcingOrderItemStatus.OPEN]: '未关闭',
+  [OutsourcingOrderItemStatus.CLOSED]: '已关闭',
+  [OutsourcingOrderItemStatus.CANCELED]: '已取消',
 })
 
 const SALES_ORDER_LIFECYCLE_ACTIONS = Object.freeze({
-  draft: Object.freeze(['submitted', 'canceled']),
-  submitted: Object.freeze(['active', 'canceled']),
-  active: Object.freeze(['closed', 'canceled']),
+  [SalesOrderStatus.DRAFT]: Object.freeze([SalesOrderStatus.SUBMITTED, SalesOrderStatus.CANCELED]),
+  [SalesOrderStatus.SUBMITTED]: Object.freeze([SalesOrderStatus.ACTIVE, SalesOrderStatus.CANCELED]),
+  [SalesOrderStatus.ACTIVE]: Object.freeze([SalesOrderStatus.CLOSED, SalesOrderStatus.CANCELED]),
 })
 
 const PURCHASE_ORDER_LIFECYCLE_ACTIONS = Object.freeze({
-  draft: Object.freeze(['submitted', 'canceled']),
-  submitted: Object.freeze(['approved', 'canceled']),
-  approved: Object.freeze(['closed', 'canceled']),
+  [PurchaseOrderStatus.DRAFT]: Object.freeze([PurchaseOrderStatus.SUBMITTED, PurchaseOrderStatus.CANCELED]),
+  [PurchaseOrderStatus.SUBMITTED]: Object.freeze([PurchaseOrderStatus.APPROVED, PurchaseOrderStatus.CANCELED]),
+  [PurchaseOrderStatus.APPROVED]: Object.freeze([PurchaseOrderStatus.CLOSED, PurchaseOrderStatus.CANCELED]),
 })
 
 const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = Object.freeze({
-  draft: Object.freeze(['submitted', 'canceled']),
-  submitted: Object.freeze(['confirmed', 'canceled']),
-  confirmed: Object.freeze(['closed', 'canceled']),
+  [OutsourcingOrderStatus.DRAFT]: Object.freeze([OutsourcingOrderStatus.SUBMITTED, OutsourcingOrderStatus.CANCELED]),
+  [OutsourcingOrderStatus.SUBMITTED]: Object.freeze([OutsourcingOrderStatus.CONFIRMED, OutsourcingOrderStatus.CANCELED]),
+  [OutsourcingOrderStatus.CONFIRMED]: Object.freeze([OutsourcingOrderStatus.CLOSED, OutsourcingOrderStatus.CANCELED]),
 })
 
 function normalizeLifecycleStatus(value) {

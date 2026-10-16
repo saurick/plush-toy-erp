@@ -178,6 +178,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
           exact: true,
         })
         await dropdown.waitFor({ state: 'visible' })
+        assert.equal(await dropdown.getByRole('textbox', { name: '搜索办理人', exact: true }).count(), 0, '少量办理人直接点选')
         return dropdown
       }
       const tapCloseFilter = async (dropdown) => {
@@ -204,8 +205,10 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       assert.match(await range.innerText(), /已显示 12 项.*共 64 项/u)
       assert.equal(await filterTrigger.getAttribute('aria-label'), '筛选任务')
 
+      await page.getByTestId('mobile-role-filter-overdue').click()
       const deadlineFilters = await openFilters()
       await deadlineFilters.getByRole('group', { name: '截止时间', exact: true }).getByRole('button', { name: '未设置到期', exact: true }).click()
+      assert.equal(await page.getByTestId('mobile-role-filter-overdue').getAttribute('aria-pressed'), 'false', '具体截止条件替换超时快捷范围')
       await page.waitForFunction(() => document.querySelector('[data-testid="mobile-task-list-range"]')?.textContent.includes('共 13 项'))
       const sourceOption = deadlineFilters.getByRole('group', { name: '来源单据', exact: true }).getByRole('button', { name: '来源待核对', exact: true })
       await sourceOption.waitFor({ timeout: 5000 })
@@ -469,6 +472,19 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await waitSearchValue('')
       assert.equal(await search.inputValue(), '', '风险页使用自己的搜索词')
       await assertRiskFilters('light')
+      const overdueRisk = page.getByTestId('mobile-role-risk-filter-notice')
+      await overdueRisk.click()
+      const riskDates = await openFilters('风险')
+      await riskDates.getByRole('group', { name: '截止时间', exact: true }).getByRole('button', { name: '未设置到期', exact: true }).click()
+      await page.waitForFunction(() => document.querySelector('[data-testid="mobile-role-risk-filter-notice"]')?.getAttribute('aria-pressed') === 'false')
+      await riskDates.getByRole('button', { name: '关闭筛选', exact: true }).click()
+      await riskDates.waitFor({ state: 'hidden' })
+      await page.evaluate(() => window.history.replaceState({ ...window.history.state, mobileRoleTasksMessageTab: 'notice' }, ''))
+      await page.reload()
+      await overdueRisk.waitFor()
+      assert.equal(await overdueRisk.getAttribute('aria-pressed'), 'false', '恢复旧查询时丢弃冲突的超时快捷范围')
+      await page.getByRole('button', { name: '清除截止时间：未设置到期', exact: true }).click()
+      assert.equal(await overdueRisk.getAttribute('aria-pressed'), 'false', '清空截止条件不恢复旧超时范围')
       await applyFilters({ sort: '截止最早', contextLabel: '风险' })
       await search.fill('SORT-6')
       await search.press('Enter')

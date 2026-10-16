@@ -13,6 +13,8 @@ import { buildPrintWorkspaceDraftStorageKey } from '../../src/erp/utils/printWor
 import { createPrintPolishScenarios } from './printPolishScenarios.mjs'
 import { createPrintWorkspaceControlScenarios } from './printWorkspaceControlScenarios.mjs'
 import { createPrintWorkspaceFeedbackScenarios } from './printWorkspaceFeedbackScenarios.mjs'
+import { createPrintWorkspaceItemScenarios } from './printWorkspaceItemScenarios.mjs'
+import { createPrintWorkspaceGroupScenarios } from './printWorkspaceGroupScenarios.mjs'
 import { createPrintWorkspaceThemeScenario } from './printWorkspaceThemeScenario.mjs'
 import { expandPrintToolSection } from './printToolHelpers.mjs'
 import {
@@ -114,6 +116,7 @@ export function createPrintWorkspaceScenarios({
               }
             : null
         const neighboringText = []
+        const neighboringRects = []
         const neighbors = document.createTreeWalker(
           element.closest('.erp-print-shell__stage-wrap'),
           NodeFilter.SHOW_TEXT
@@ -142,6 +145,7 @@ export function createPrintWorkspaceScenarios({
               Math.max(box.top - outset, rect.top)
             if (overlapX > 0.5 * scale && overlapY > 0.5 * scale) {
               neighboringText.push(node.textContent.trim().slice(0, 40))
+              neighboringRects.push({ text: node.textContent.trim().slice(0, 40), rect: rect.toJSON() })
             }
           }
         }
@@ -166,6 +170,14 @@ export function createPrintWorkspaceScenarios({
           textClearance: clearance(text),
           caretClearance: clearance(caret),
           neighboringText,
+          neighboringRects,
+          frameBox: box.toJSON(),
+          frameRects: [...frame.getClientRects()].map((rect) => rect.toJSON()),
+          outlineOffset: frameStyle.outlineOffset,
+          scale,
+          outset,
+          display: frameStyle.display,
+          scroll: { x: window.scrollX, y: window.scrollY },
         }
       })
     assert(
@@ -669,11 +681,74 @@ export function createPrintWorkspaceScenarios({
     )
   }
   return [
+    {
+      name: 'engineering-image-independent-uploads',
+      path: '/erp/print-workspace/engineering-material-detail?draft=fresh',
+      auth: 'admin',
+      viewport: { width: 3840, height: 2160 },
+      beforeNavigate: async (page) => {
+        await page.addInitScript(() => {
+          const NativeReader = window.FileReader
+          window.__engineeringImageReads = []
+          window.FileReader = class extends NativeReader {
+            readAsDataURL(file) {
+              window.__engineeringImageReads.push({ reader: this, file })
+            }
+          }
+          window.__releaseEngineeringImage = (name) => {
+            const item = window.__engineeringImageReads.find((read) => read.file.name === name)
+            NativeReader.prototype.readAsDataURL.call(item.reader, item.file)
+          }
+        })
+      },
+      verify: async (page) => {
+        const tools = page.locator('.erp-print-image-tool')
+        await tools.nth(1).waitFor()
+        const file = (name, color) => ({ name, mimeType: 'image/svg+xml', buffer: Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="${color}"/></svg>`) })
+        const first = file('first.svg', 'blue')
+        const second = file('second.svg', 'green')
+        const release = (name) => page.evaluate((value) => window.__releaseEngineeringImage(value), name)
+        const matches = (tool, input) => page.waitForFunction(({ index, dataURL }) => document.querySelectorAll('.erp-print-image-tool')[index]?.querySelector('img')?.getAttribute('src') === dataURL, { index: tool, dataURL: `data:image/svg+xml;base64,${input.buffer.toString('base64')}` })
+        await tools.nth(0).locator('input[type="file"]').setInputFiles(first)
+        await tools.nth(1).locator('input[type="file"]').setInputFiles(second)
+        await release(first.name); await matches(0, first)
+        await release(second.name); await matches(1, second)
+        await page.screenshot({ path: path.join(outputDir, 'engineering-image-parallel-4k.png'), fullPage: false })
+        const earlier = file('earlier.svg', 'orange')
+        const later = file('later.svg', 'red')
+        await tools.nth(0).locator('input[type="file"]').setInputFiles(earlier)
+        await tools.nth(0).locator('input[type="file"]').setInputFiles(later)
+        await release(later.name); await matches(0, later)
+        await release(earlier.name); await matches(0, later)
+        const cleared = file('cleared.svg', 'purple')
+        await tools.nth(0).locator('input[type="file"]').setInputFiles(cleared)
+        await tools.nth(0).getByRole('button', { name: /^清空/u }).click()
+        await release(cleared.name)
+        await page.waitForFunction(() => !document.querySelectorAll('.erp-print-image-tool')[0]?.querySelector('img'))
+        await matches(1, second)
+        await assertNoHorizontalOverflow(page, '并发图片上传与清空')
+      },
+    },
     ...createPrintWorkspaceFeedbackScenarios({
       assert,
       path,
       outputDir,
       gotoScenarioPath,
+      assertPrintPreviewPopup,
+    }),
+    ...createPrintWorkspaceGroupScenarios({
+      assert,
+      path,
+      outputDir,
+      gotoScenarioPath,
+      assertPrintPreviewPopup,
+    }),
+    ...createPrintWorkspaceItemScenarios({
+      assert,
+      path,
+      outputDir,
+      gotoScenarioPath,
+      assertPrintPreviewPopup,
     }),
     ...createPrintWorkspaceControlScenarios({
       assert,
@@ -2297,9 +2372,129 @@ export function createPrintWorkspaceScenarios({
           2
         )
         assert.ok((await page.locator('[contenteditable="true"]').count()) > 0)
-        await page
-          .getByText('待补：第 1 行单价', { exact: true })
-          .waitFor({ state: 'visible' })
+        assert.equal(await page.locator('[data-incomplete="true"]').count(), 0)
+        const price = page
+          .locator(
+            '[data-purchase-order-no="PO-BATCH-002"] .erp-material-contract-table tbody tr'
+          )
+          .first()
+          .locator('td')
+          .nth(8)
+          .locator('[contenteditable="true"]')
+        assert.equal((await price.innerText()).trim(), '')
+        const blankNotice = page.locator('[data-print-blank-notice]')
+        await blankNotice.waitFor()
+        await blankNotice.getByText(/^当前有 32 处留白，/u).waitFor()
+        await blankNotice
+          .getByRole('button', { name: '查看留白', exact: true })
+          .click()
+        assert(
+          await page
+            .locator('.erp-material-contract-paper')
+            .first()
+            .locator('.erp-material-contract-meta__value')
+            .nth(1)
+            .evaluate(
+              (node) =>
+                new Promise((resolve) =>
+                  requestAnimationFrame(() =>
+                    resolve(node === document.activeElement)
+                  )
+                )
+            ),
+          '批量窗口先定位第一份合同表头的下单日期留白'
+        )
+        const firstBlank = page
+          .locator('.erp-material-contract-paper')
+          .first()
+          .locator('.erp-material-contract-meta__value')
+          .nth(1)
+        const lastBlank = page
+          .locator('.erp-material-contract-paper')
+          .last()
+          .locator('.erp-material-contract-table tbody tr')
+          .first()
+          .locator('td')
+          .last()
+          .locator('[contenteditable="true"]')
+        for (const [name, editor] of [
+          ['最后一处', lastBlank],
+          ['下一处', firstBlank],
+          ['上一处', lastBlank],
+          ['第一处', firstBlank],
+        ]) {
+          await blankNotice.getByRole('button', { name, exact: true }).click()
+          assert(
+            await editor.evaluate(
+              (node) =>
+                new Promise((resolve) =>
+                  requestAnimationFrame(() =>
+                    resolve(node === document.activeElement)
+                  )
+                )
+            ),
+            '批量窗口跨合同双向循环和首尾直达'
+          )
+        }
+        await blankNotice
+          .getByRole('button', { name: '下一处', exact: true })
+          .click()
+        assert(
+          await page
+            .locator('.erp-material-contract-paper')
+            .first()
+            .locator('.erp-material-contract-meta__value')
+            .nth(2)
+            .evaluate(
+              (node) =>
+                new Promise((resolve) =>
+                  requestAnimationFrame(() =>
+                    resolve(node === document.activeElement)
+                  )
+                )
+            ),
+          '批量窗口随后按同行顺序定位回货日期'
+        )
+        const blankPayloads = []
+        const captureBlankPayload = (request) => {
+          if (request.url().includes('/templates/render-pdf')) {
+            blankPayloads.push(request.postDataJSON())
+          }
+        }
+        page.on('request', captureBlankPayload)
+        try {
+          const download = page.waitForEvent('download')
+          await page
+            .getByRole('button', { name: '下载 PDF', exact: true })
+            .click()
+          await download
+        } finally {
+          page.off('request', captureBlankPayload)
+        }
+        assert.equal(blankPayloads.length, 1, '部分单价留白仍输出完整批次')
+        const blankOutput = await page.evaluate((html) => {
+          const document = new DOMParser().parseFromString(html, 'text/html')
+          return {
+            count: document.querySelectorAll(
+              '.erp-material-contract-batch__document'
+            ).length,
+            firstContract: document.querySelector(
+              '[data-purchase-order-no="PO-BATCH-001"]'
+            ).textContent,
+            price: document
+              .querySelector(
+                '[data-purchase-order-no="PO-BATCH-002"] .erp-material-contract-table tbody tr'
+              )
+              .children[8].textContent.trim(),
+          }
+        }, blankPayloads[0].html)
+        assert.equal(blankOutput.count, 2)
+        assert.match(blankOutput.firstContract, /批量材料一/)
+        assert.equal(blankOutput.price, '')
+        assert(!blankPayloads[0].html.includes('data-print-blank-notice'))
+        await price.fill('-1')
+        await price.press('Tab')
+        await page.getByText(/^待检查：第 1 行单价/).waitFor()
         let rejectedPdfRequests = 0
         const countRejectedPdf = (request) => {
           if (request.url().includes('/templates/render-pdf')) {
@@ -2315,17 +2510,10 @@ export function createPrintWorkspaceScenarios({
           .filter({ hasText: '第 1 行单价' })
           .waitFor({ state: 'visible' })
         page.off('request', countRejectedPdf)
-        assert.equal(rejectedPdfRequests, 0, '缺资料时不能发起 PDF 输出')
-        const price = page
-          .locator(
-            '[data-purchase-order-no="PO-BATCH-002"] .erp-material-contract-table tbody tr'
-          )
-          .first()
-          .locator('td')
-          .nth(8)
-          .locator('[contenteditable="true"]')
+        assert.equal(rejectedPdfRequests, 0, '已填单价非法时不能发起 PDF 输出')
         await price.fill('2.50')
         await price.press('Tab')
+        await blankNotice.getByText(/^当前有 30 处留白，/u).waitFor()
         await page
           .getByRole('checkbox', { name: '选择合同 PO-BATCH-001', exact: true })
           .uncheck()
@@ -2463,6 +2651,8 @@ export function createPrintWorkspaceScenarios({
         await page
           .getByText('共 21 份，已选 21 份', { exact: true })
           .waitFor({ state: 'visible' })
+        const blankNotice = page.locator('[data-print-blank-notice]')
+        await blankNotice.getByText(/^当前有 300 处留白，/u).waitFor()
         assert.equal(
           await page.locator('.erp-material-contract-batch__document').count(),
           20
@@ -2478,8 +2668,43 @@ export function createPrintWorkspaceScenarios({
           .locator('td')
           .nth(8)
           .locator('[contenteditable="true"]')
+        await blankNotice.getByText(/^当前有 17 处留白，/u).waitFor()
+        await blankNotice
+          .getByRole('button', { name: '查看留白', exact: true })
+          .click()
+        await blankNotice
+          .getByRole('button', { name: '下一处', exact: true })
+          .waitFor()
+        await page
+          .getByRole('combobox', { name: '输出批次', exact: true })
+          .selectOption('0')
+        await blankNotice.getByText(/^当前有 300 处留白，/u).waitFor()
+        await page
+          .getByRole('combobox', { name: '输出批次', exact: true })
+          .selectOption('1')
+        await blankNotice.getByText(/^当前有 17 处留白，/u).waitFor()
+        await blankNotice
+          .getByRole('button', { name: '查看留白', exact: true })
+          .click()
+        assert(
+          await page
+            .locator(
+              '[data-purchase-order-no="PO-MANY-21"] .erp-material-contract-meta__value'
+            )
+            .nth(1)
+            .evaluate(
+              (node) =>
+                new Promise((resolve) =>
+                  requestAnimationFrame(() =>
+                    resolve(node === document.activeElement)
+                  )
+                )
+            ),
+          '切换批次后重新从当前合同表头的首个留白定位'
+        )
         await price.fill('3.50')
         await price.press('Tab')
+        await blankNotice.getByText(/^当前有 15 处留白，/u).waitFor()
         await page
           .getByText('本窗口内容已保存', { exact: true })
           .waitFor({ state: 'visible' })

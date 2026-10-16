@@ -1,3 +1,4 @@
+import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   numeric20Scale6Units,
   normalizePositiveNumeric20Scale6,
@@ -223,7 +224,7 @@ export function validateOperationalFactDraftSaveResult(
   )
   const valid =
     positiveID(result?.id) === positiveID(original?.id) &&
-    String(result?.status || '').toUpperCase() === 'DRAFT' &&
+    String(result?.status || '').toUpperCase() === OperationalFactStatus.DRAFT &&
     positiveID(result?.version) === positiveID(request.expected_version) + 1 &&
     String(result?.fact_type || '').toUpperCase() ===
       String(original?.fact_type || '').toUpperCase() &&

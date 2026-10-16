@@ -82,9 +82,9 @@ func NewLocalSMSLoginCodeProvider(scope string) SMSLoginCodeProvider {
 
 func (p *localSMSLoginCodeProvider) Request(_ context.Context, phone string) (*SMSLoginChallenge, error) {
 	if p == nil {
-		return NewSMSLoginCodeManager().Request("admin", phone)
+		return NewSMSLoginCodeManager().request("admin", phone, true)
 	}
-	return p.manager.Request(p.scope, phone)
+	return p.manager.request(p.scope, phone, true)
 }
 
 func (p *localSMSLoginCodeProvider) Verify(_ context.Context, phone, code string) (string, error) {
@@ -122,6 +122,10 @@ func NormalizeLoginPhone(raw string) (string, error) {
 }
 
 func (m *SMSLoginCodeManager) Request(scope, phone string) (*SMSLoginChallenge, error) {
+	return m.request(scope, phone, false)
+}
+
+func (m *SMSLoginCodeManager) request(scope, phone string, replayCooldown bool) (*SMSLoginChallenge, error) {
 	if m == nil {
 		m = NewSMSLoginCodeManager()
 	}
@@ -137,6 +141,9 @@ func (m *SMSLoginCodeManager) Request(scope, phone string) (*SMSLoginChallenge, 
 	defer m.mu.Unlock()
 
 	if entry, ok := m.entries[key]; ok && now.Before(entry.resendAfter) && now.Before(entry.expiresAt) {
+		if replayCooldown {
+			return smsLoginChallengeFromEntry(normalizedPhone, entry), nil
+		}
 		return nil, ErrSMSCodeCooldown
 	}
 
@@ -153,13 +160,17 @@ func (m *SMSLoginCodeManager) Request(scope, phone string) (*SMSLoginChallenge, 
 	}
 	m.entries[key] = entry
 
+	return smsLoginChallengeFromEntry(normalizedPhone, entry), nil
+}
+
+func smsLoginChallengeFromEntry(phone string, entry smsLoginCodeEntry) *SMSLoginChallenge {
 	return &SMSLoginChallenge{
-		Phone:        normalizedPhone,
+		Phone:        phone,
 		ExpiresAt:    entry.expiresAt,
 		ResendAfter:  entry.resendAfter,
 		MockDelivery: true,
-		MockCode:     code,
-	}, nil
+		MockCode:     entry.code,
+	}
 }
 
 func (m *SMSLoginCodeManager) Verify(scope, phone, code string) (string, error) {

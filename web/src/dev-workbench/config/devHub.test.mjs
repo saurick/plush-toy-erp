@@ -276,7 +276,7 @@ test('devHub: product engineering directly compares registered tools without a v
     /devRelationshipPerspectives|产品工程查看方式/u
   )
   assert.match(devToolTableSource, /DEV_PAGE_TITLE_BY_ROUTE\[item.route\]/u)
-  assert.match(devToolTableSource, /<th scope="col">使用时机<\/th>/u)
+  assert.match(devToolTableSource, /<th scope="col">用来做什么<\/th>/u)
 })
 
 test('devHub: tools share one area registry without duplicate overview stage inventories', () => {
@@ -523,8 +523,8 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
   assert.match(dataPreparationItem?.truthSource || '', /Source \/ Fact API/)
   assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /本机系统边界/)
   assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /只向前补齐/)
-  assert.match(dataPreparationItem?.description || '', /业务场景固定批次/)
-  assert.match(dataPreparationItem?.description || '', /长期保留/)
+  assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /业务场景固定批次/)
+  assert.match(dataPreparationItem?.guardrails?.join(' ') || '', /长期保留/)
 
   const databaseMigrationItem = DEV_HUB_ITEMS.find(
     (item) => item.key === 'database-migration'
@@ -535,7 +535,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     databaseMigrationItem?.guardrails?.join(' ') || '',
     /No retry when unknown/
   )
-  assert.match(databaseMigrationItem?.description || '', /无关工作区变化/)
+  assert.match(databaseMigrationItem?.guardrails?.join(' ') || '', /无关工作区变化/)
 
   const drillRecoveryItem = DEV_HUB_ITEMS.find(
     (item) => item.key === 'drill-recovery'
@@ -547,7 +547,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
     drillRecoveryItem?.guardrails?.join(' ') || '',
     /Fault injection disabled/
   )
-  assert.match(drillRecoveryItem?.description || '', /未核验/)
+  assert.match(drillRecoveryItem?.guardrails?.join(' ') || '', /未核验/)
 })
 
 test('devHub: summary records dev-only boundary', () => {

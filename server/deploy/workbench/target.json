@@ -1,0 +1,12 @@
+{
+  "key": "workbench-test-133",
+  "hostname": "r740xd",
+  "sshHost": "ubuntu133",
+  "root": "/root/deploy/plush-workbench-test",
+  "bindAddress": "10.252.70.2",
+  "port": 15300,
+  "httpsOrigin": "https://workbench.saurick.me",
+  "trustedProxyAddress": "10.252.70.1",
+  "edgeSshHost": "hk-netmaker",
+  "businessTarget": "customer-test-133"
+}

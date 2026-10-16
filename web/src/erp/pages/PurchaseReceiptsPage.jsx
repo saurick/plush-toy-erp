@@ -7,10 +7,8 @@ import {
   LinkOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Popconfirm, Tag } from 'antd'
-import {
-  useOutletContext,
-  useSearchParams,
-} from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { PurchaseReceiptAdjustmentStatus, PurchaseReceiptStatus, PurchaseReturnStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
@@ -121,21 +119,21 @@ import useBusinessListExport from '../hooks/useBusinessListExport.js'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
-  { label: '草稿', value: 'DRAFT' },
-  { label: '已过账', value: 'POSTED' },
-  { label: '已取消', value: 'CANCELLED' },
+  { label: '草稿', value: PurchaseReceiptStatus.DRAFT },
+  { label: '已过账', value: PurchaseReceiptStatus.POSTED },
+  { label: '已取消', value: PurchaseReceiptStatus.CANCELLED },
 ]
 
 const STATUS_LABELS = Object.freeze({
-  DRAFT: '草稿',
-  POSTED: '已过账',
-  CANCELLED: '已取消',
+  [PurchaseReceiptStatus.DRAFT]: '草稿',
+  [PurchaseReceiptStatus.POSTED]: '已过账',
+  [PurchaseReceiptStatus.CANCELLED]: '已取消',
 })
 
 const STATUS_COLORS = Object.freeze({
-  DRAFT: 'default',
-  POSTED: 'blue',
-  CANCELLED: 'red',
+  [PurchaseReceiptStatus.DRAFT]: 'default',
+  [PurchaseReceiptStatus.POSTED]: 'blue',
+  [PurchaseReceiptStatus.CANCELLED]: 'red',
 })
 const DATE_FILTER_OPTIONS = [{ label: '入库日期', value: 'received_at' }]
 const REFERENCE_LOAD_RETRY_DELAYS_MS = [500, 1000]
@@ -263,8 +261,14 @@ export default function PurchaseReceiptsPage() {
 
   const beginLatestRequest = useLatestRequestCoordinator()
 
-  const canCreate = hasActionPermission(adminProfile, PermissionCode.PURCHASE_RECEIPT_CREATE)
-  const canPost = hasActionPermission(adminProfile, PermissionCode.WAREHOUSE_INBOUND_CONFIRM)
+  const canCreate = hasActionPermission(
+    adminProfile,
+    PermissionCode.PURCHASE_RECEIPT_CREATE
+  )
+  const canPost = hasActionPermission(
+    adminProfile,
+    PermissionCode.WAREHOUSE_INBOUND_CONFIRM
+  )
   const canCancelDraft = hasActionPermission(
     adminProfile,
     PermissionCode.PURCHASE_RECEIPT_CANCEL_DRAFT
@@ -344,7 +348,7 @@ export default function PurchaseReceiptsPage() {
   const payableViewAvailability = resolveContextualBusinessActionAvailability({
     authorized: canViewPayable,
     selected: Boolean(selectedRow),
-    relevant: selectedRow?.status === 'POSTED',
+    relevant: selectedRow?.status === PurchaseReceiptStatus.POSTED,
     busy: saving || financeSourceLoading,
     busyReason: '当前操作完成后可查看应付',
   })
@@ -726,7 +730,8 @@ export default function PurchaseReceiptsPage() {
           Number(createdRecord?.id || 0) <= 0 ||
           Number(createdRecord?.purchase_receipt_id || 0) !==
             Number(receipt.id) ||
-          String(createdRecord?.status || '').toUpperCase() !== 'DRAFT'
+          String(createdRecord?.status || '').toUpperCase() !==
+            (mode === 'return' ? PurchaseReturnStatus.DRAFT : PurchaseReceiptAdjustmentStatus.DRAFT)
         ) {
           const error = new Error('采购异常记录返回结果无法确认')
           error.isInvalidResponse = true
@@ -790,7 +795,7 @@ export default function PurchaseReceiptsPage() {
       if (
         !canCreatePayable ||
         !receipt?.id ||
-        String(receipt.status || '').toUpperCase() !== 'POSTED'
+        String(receipt.status || '').toUpperCase() !== PurchaseReceiptStatus.POSTED
       ) {
         message.warning('请先选择已过账的采购入库单')
         return
@@ -1054,11 +1059,7 @@ export default function PurchaseReceiptsPage() {
 
   return (
     <BusinessPageLayout className="erp-purchase-receipts-page">
-      <PageHeaderCard
-        compact
-        helpKey="inbound"
-        title="采购入库"
-      />
+      <PageHeaderCard compact helpKey="inbound" title="采购入库" />
 
       <BusinessOperationPanel
         compact
@@ -1217,7 +1218,11 @@ export default function PurchaseReceiptsPage() {
             selectionLabel="入库记录"
             onClear={() => setSelectedRow(null)}
           />
-          <BusinessTaskActions sourceType="purchase_receipt" record={selectedRow} adminProfile={adminProfile} />
+          <BusinessTaskActions
+            sourceType="purchase_receipt"
+            record={selectedRow}
+            adminProfile={adminProfile}
+          />
           {relatedActionAvailability.visible ? (
             <BusinessActionTooltip
               disabled={relatedActionAvailability.disabled}
@@ -1268,7 +1273,7 @@ export default function PurchaseReceiptsPage() {
             panelTitle="入库附件"
             description="上传送货单、物流单、仓库收货照片或异常说明；附件不能代替入库确认。"
             canUpload={canCreate || canPost}
-            canWithdraw={canCreate || canPost}
+            canWithdraw={canPost}
             disabled={!selectedRow}
             disabledReason="请先选择一条入库记录"
             buttonProps={{ 'data-business-action-key': 'attachments' }}
@@ -1292,14 +1297,14 @@ export default function PurchaseReceiptsPage() {
           ) : null}
           {canCreateReturn ? (
             <BusinessActionTooltip
-              visible={!selectedRow || selectedRow.status === 'POSTED'}
+              visible={!selectedRow || selectedRow.status === PurchaseReceiptStatus.POSTED}
               disabled={
-                !selectedRow || selectedRow.status !== 'POSTED' || saving
+                !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
               }
               disabledReason={
                 !selectedRow
                   ? '请先选择一条入库记录'
-                  : selectedRow.status !== 'POSTED'
+                  : selectedRow.status !== PurchaseReceiptStatus.POSTED
                     ? '入库记录过账后可生成采购退货'
                     : saving
                       ? '当前操作完成后可生成采购退货'
@@ -1310,7 +1315,7 @@ export default function PurchaseReceiptsPage() {
                 data-business-action-key="create-return"
                 size="small"
                 disabled={
-                  !selectedRow || selectedRow.status !== 'POSTED' || saving
+                  !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
                 }
                 onClick={() => setReceiptExceptionMode('return')}
               >
@@ -1320,14 +1325,14 @@ export default function PurchaseReceiptsPage() {
           ) : null}
           {canCreateAdjustment ? (
             <BusinessActionTooltip
-              visible={!selectedRow || selectedRow.status === 'POSTED'}
+              visible={!selectedRow || selectedRow.status === PurchaseReceiptStatus.POSTED}
               disabled={
-                !selectedRow || selectedRow.status !== 'POSTED' || saving
+                !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
               }
               disabledReason={
                 !selectedRow
                   ? '请先选择一条入库记录'
-                  : selectedRow.status !== 'POSTED'
+                  : selectedRow.status !== PurchaseReceiptStatus.POSTED
                     ? '入库记录过账后可登记入库调整'
                     : saving
                       ? '当前操作完成后可登记入库调整'
@@ -1338,7 +1343,7 @@ export default function PurchaseReceiptsPage() {
                 data-business-action-key="create-adjustment"
                 size="small"
                 disabled={
-                  !selectedRow || selectedRow.status !== 'POSTED' || saving
+                  !selectedRow || selectedRow.status !== PurchaseReceiptStatus.POSTED || saving
                 }
                 onClick={() => setReceiptExceptionMode('adjustment')}
               >
@@ -1364,18 +1369,18 @@ export default function PurchaseReceiptsPage() {
           {canCreatePayable ? (
             <BusinessActionTooltip
               visible={
-                !selectedRow || ['DRAFT', 'POSTED'].includes(selectedRow.status)
+                !selectedRow || [PurchaseReceiptStatus.DRAFT, PurchaseReceiptStatus.POSTED].includes(selectedRow.status)
               }
               disabled={
                 !selectedRow ||
-                selectedRow.status !== 'POSTED' ||
+                selectedRow.status !== PurchaseReceiptStatus.POSTED ||
                 saving ||
                 financeSourceLoading
               }
               disabledReason={
                 !selectedRow
                   ? '请先选择一条入库记录'
-                  : selectedRow.status !== 'POSTED'
+                  : selectedRow.status !== PurchaseReceiptStatus.POSTED
                     ? '入库记录过账后可生成应付'
                     : '当前操作完成后可生成应付'
               }
@@ -1385,7 +1390,7 @@ export default function PurchaseReceiptsPage() {
                 size="small"
                 disabled={
                   !selectedRow ||
-                  selectedRow.status !== 'POSTED' ||
+                  selectedRow.status !== PurchaseReceiptStatus.POSTED ||
                   saving ||
                   financeSourceLoading
                 }
@@ -1397,14 +1402,14 @@ export default function PurchaseReceiptsPage() {
           ) : null}
           {canPost ? (
             <BusinessActionTooltip
-              visible={!selectedRow || selectedRow.status === 'DRAFT'}
+              visible={!selectedRow || selectedRow.status === PurchaseReceiptStatus.DRAFT}
               disabled={
-                !selectedRow || selectedRow.status !== 'DRAFT' || saving
+                !selectedRow || selectedRow.status !== PurchaseReceiptStatus.DRAFT || saving
               }
               disabledReason={
                 !selectedRow
                   ? '请先选择一条入库记录'
-                  : selectedRow.status !== 'DRAFT'
+                  : selectedRow.status !== PurchaseReceiptStatus.DRAFT
                     ? '只有入库草稿可以过账'
                     : saving
                       ? '当前操作完成后可过账'
@@ -1430,7 +1435,7 @@ export default function PurchaseReceiptsPage() {
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   disabled={
-                    !selectedRow || selectedRow.status !== 'DRAFT' || saving
+                    !selectedRow || selectedRow.status !== PurchaseReceiptStatus.DRAFT || saving
                   }
                 >
                   确认材料入库
@@ -1442,13 +1447,13 @@ export default function PurchaseReceiptsPage() {
             <BusinessActionTooltip
               visible={
                 !selectedRow ||
-                (canPost ? ['DRAFT', 'POSTED'] : ['DRAFT']).includes(
+                (canPost ? [PurchaseReceiptStatus.DRAFT, PurchaseReceiptStatus.POSTED] : [PurchaseReceiptStatus.DRAFT]).includes(
                   selectedRow.status
                 )
               }
               disabled={
                 !selectedRow ||
-                !(canPost ? ['DRAFT', 'POSTED'] : ['DRAFT']).includes(
+                !(canPost ? [PurchaseReceiptStatus.DRAFT, PurchaseReceiptStatus.POSTED] : [PurchaseReceiptStatus.DRAFT]).includes(
                   selectedRow.status
                 ) ||
                 saving
@@ -1456,7 +1461,7 @@ export default function PurchaseReceiptsPage() {
               disabledReason={
                 !selectedRow
                   ? '请先选择一条入库记录'
-                  : !(canPost ? ['DRAFT', 'POSTED'] : ['DRAFT']).includes(
+                  : !(canPost ? [PurchaseReceiptStatus.DRAFT, PurchaseReceiptStatus.POSTED] : [PurchaseReceiptStatus.DRAFT]).includes(
                         selectedRow.status
                       )
                     ? '已取消入库记录不能再次取消'
@@ -1467,17 +1472,17 @@ export default function PurchaseReceiptsPage() {
             >
               <Popconfirm
                 title={
-                  selectedRow?.status === 'DRAFT'
+                  selectedRow?.status === PurchaseReceiptStatus.DRAFT
                     ? '确认作废采购入库草稿？草稿尚未过账，不会变更库存。'
                     : '确认取消已过账入库并恢复相应库存？'
                 }
                 onConfirm={() =>
                   runReceiptAction(
                     selectedRow,
-                    selectedRow?.status === 'DRAFT' && canCancelDraft
+                    selectedRow?.status === PurchaseReceiptStatus.DRAFT && canCancelDraft
                       ? cancelPurchaseReceiptDraft
                       : cancelPurchaseReceipt,
-                    selectedRow?.status === 'DRAFT'
+                    selectedRow?.status === PurchaseReceiptStatus.DRAFT
                       ? '采购入库草稿已作废，未更新库存'
                       : '采购入库已取消，库存已恢复'
                   )
@@ -1493,13 +1498,13 @@ export default function PurchaseReceiptsPage() {
                   icon={<CloseCircleOutlined />}
                   disabled={
                     !selectedRow ||
-                    !(canPost ? ['DRAFT', 'POSTED'] : ['DRAFT']).includes(
+                    !(canPost ? [PurchaseReceiptStatus.DRAFT, PurchaseReceiptStatus.POSTED] : [PurchaseReceiptStatus.DRAFT]).includes(
                       selectedRow.status
                     ) ||
                     saving
                   }
                 >
-                  {selectedRow?.status === 'DRAFT' ? '作废草稿' : '取消入库'}
+                  {selectedRow?.status === PurchaseReceiptStatus.DRAFT ? '作废草稿' : '取消入库'}
                 </Button>
               </Popconfirm>
             </BusinessActionTooltip>

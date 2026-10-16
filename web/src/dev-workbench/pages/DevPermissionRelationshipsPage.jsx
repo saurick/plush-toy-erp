@@ -24,6 +24,7 @@ import { MermaidDiagram } from '@/common/components/markdown'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { readPermissionRelationshipSnapshot } from '../config/devPermissionRelationshipApi.mjs'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import DevPermissionNavigationOverview from '../components/DevPermissionNavigationOverview.jsx'
 import { buildPermissionRelationshipNavigationModel } from '../config/devPermissionNavigation.mjs'
 import {
@@ -124,7 +125,7 @@ export default function DevPermissionRelationshipsPage() {
     requestedTabKey
   )
     ? requestedTabKey
-    : PERMISSION_RELATIONSHIP_TAB.MENU
+    : PERMISSION_RELATIONSHIP_TAB.GRAPH
   const requestedDetailScope = normalizedQueryValue(searchParams.get('scope'))
   const detailScope = Object.values(
     PERMISSION_RELATIONSHIP_DETAIL_SCOPE
@@ -265,7 +266,7 @@ export default function DevPermissionRelationshipsPage() {
     } else {
       next.set('module', moduleKey)
     }
-    if (tabKey === PERMISSION_RELATIONSHIP_TAB.MENU) {
+    if (tabKey === PERMISSION_RELATIONSHIP_TAB.GRAPH) {
       next.delete('tab')
     } else {
       next.set('tab', tabKey)
@@ -409,7 +410,7 @@ export default function DevPermissionRelationshipsPage() {
 
   const changeTab = (nextTab) => {
     updateSearch({
-      tab: nextTab === PERMISSION_RELATIONSHIP_TAB.MENU ? '' : nextTab,
+      tab: nextTab === PERMISSION_RELATIONSHIP_TAB.GRAPH ? '' : nextTab,
       module: nextTab === PERMISSION_RELATIONSHIP_TAB.MENU ? '' : moduleKey,
       scope:
         nextTab === PERMISSION_RELATIONSHIP_TAB.DETAILS &&
@@ -441,7 +442,10 @@ export default function DevPermissionRelationshipsPage() {
     },
     {
       key: 'pages',
-      label: globalModel.resultState === 'projection' ? '岗位合并页面' : '可进入页面',
+      label:
+        globalModel.resultState === 'projection'
+          ? '岗位合并页面'
+          : '可进入页面',
       value: globalModel.summary.pages,
     },
     {
@@ -475,8 +479,12 @@ export default function DevPermissionRelationshipsPage() {
     },
   ]
 
+  const relationshipWarnings = [
+    ...new Set([accessError, ...globalModel.warnings].filter(Boolean)),
+  ]
+
   return (
-    <div className="erp-dev-permission-relationships-page erp-dev-workspace-page">
+    <div className="erp-dev-permission-relationships-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav sourcePath="docs/product/配置与权限策略.md" />
       <header className="erp-dev-permission-relationships-header">
         <div className="erp-dev-permission-relationships-header__copy">
@@ -488,7 +496,6 @@ export default function DevPermissionRelationshipsPage() {
           </span>
           <div>
             <Title level={1}>权限关系</Title>
-
           </div>
         </div>
         <Space
@@ -503,39 +510,18 @@ export default function DevPermissionRelationshipsPage() {
             刷新结果
           </Button>
           <Button
-            type="primary"
             icon={<SettingOutlined />}
             href="/erp/system/permissions"
             target="_blank"
             rel="noreferrer"
           >
-            打开正式权限配置
+            配置权限
           </Button>
         </Space>
       </header>
 
       <main className="erp-dev-permission-relationships-shell">
         <section className="erp-permission-relationship">
-          <div className="erp-permission-relationship__intro">
-            <div>
-              <Title level={2}>从账号到最终可用范围，一页看清</Title>
-              <Paragraph>
-                菜单、图和明细使用同一份最终页面结果；停用账号、停用岗位、超级管理员和部分读取失败会明确标识。
-              </Paragraph>
-            </div>
-            <Tag color="blue">只读结果</Tag>
-          </div>
-
-          <div
-            className="erp-permission-relationship__boundary-note"
-            role="note"
-          >
-            <Text type="secondary">
-              本地开发只读查询，无需登录 ERP；修改授权请进入正式权限配置。本页核对“岗位权限 ×
-              当前启用配置”的只读结果；不代表某张单据在当前状态一定可操作，也不在这里保存权限配置。
-            </Text>
-          </div>
-
           {baseError ? (
             <Alert
               type="error"
@@ -553,10 +539,7 @@ export default function DevPermissionRelationshipsPage() {
           ) : null}
 
           {baseLoading ? (
-            <Loading
-              title="正在汇聚权限关系"
-              description="正在读取账号、岗位和最终生效结果，请稍候..."
-            />
+            <Loading title="正在读取权限关系" description={null} />
           ) : null}
 
           {!baseLoading && !baseError ? (
@@ -612,34 +595,26 @@ export default function DevPermissionRelationshipsPage() {
                 </div>
               </div>
 
-              {accessError ? (
+              {relationshipWarnings.length > 0 ? (
                 <Alert
                   type="warning"
                   showIcon
-                  message={accessError}
+                  message={relationshipWarnings[0]}
+                  description={
+                    relationshipWarnings.length > 1
+                      ? relationshipWarnings.slice(1).join('；')
+                      : undefined
+                  }
                   action={
-                    <Button size="small" onClick={loadBaseData}>
-                      重新读取
-                    </Button>
+                    accessError ? (
+                      <Button size="small" onClick={loadBaseData}>
+                        重新读取
+                      </Button>
+                    ) : undefined
                   }
                 />
               ) : null}
 
-              {globalModel.warnings.map((warning) => (
-                <Alert
-                  key={warning}
-                  type="warning"
-                  showIcon
-                  message={warning}
-                />
-              ))}
-
-              <div className="erp-permission-relationship__summary-head">
-                <Text strong>当前对象全局结果</Text>
-                <Text type="secondary">
-                  始终按全部功能统计，不随关系图或明细中的模块筛选变化。
-                </Text>
-              </div>
               <div
                 className="erp-permission-relationship__summary"
                 aria-label="权限关系汇总"
@@ -653,69 +628,72 @@ export default function DevPermissionRelationshipsPage() {
                 ))}
               </div>
 
-              <section
-                className="erp-permission-relationship__evidence"
-                aria-label="当前权限证据版本"
-              >
-                <div>
-                  <Text type="secondary">结果性质</Text>
-                  <Text strong>
-                    {{
-                      ready: '最终生效结果',
-                      blocked: '当前不可使用',
-                      projection: '多岗位合并参考',
-                      special: '系统保留账号，未读取独立会话',
-                    }[globalModel.resultState] || '预览或读取不完整'}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">权限结果来源</Text>
-                  <Text strong>
-                    {evidenceValue(
-                      relationshipEvidence.sources,
-                      '最终结果尚未读取'
-                    )}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">客户配置版本</Text>
-                  <Text strong>
-                    {evidenceValue(relationshipEvidence.configRevisions)}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">产品版本</Text>
-                  <Text strong>
-                    {evidenceValue([
-                      ...new Set(
-                        [
-                          ...relationshipEvidence.productVersions,
-                          relationshipEvidence.approvalProductVersion,
-                        ].filter(Boolean)
-                      ),
-                    ])}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">岗位版本</Text>
-                  <Text strong>
-                    {evidenceValue(relationshipEvidence.roleVersions)}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">审批设置版本</Text>
-                  <Text strong>
-                    {relationshipEvidence.approvalRevision ||
-                      (relationshipEvidence.approvalPartial
-                        ? '读取不完整'
-                        : '未绑定')}
-                  </Text>
-                </div>
-                <div>
-                  <Text type="secondary">最近读取时间</Text>
-                  <Text strong>{formatReadTime(currentReadAt)}</Text>
-                </div>
-              </section>
+              <div className="erp-dev-permission-result">
+                <Text type="secondary">结果性质</Text>
+                <Text strong>
+                  {{
+                    ready: '最终生效结果',
+                    blocked: '当前不可使用',
+                    projection: '多岗位合并参考',
+                    special: '系统保留账号，未读取独立会话',
+                  }[globalModel.resultState] || '预览或读取不完整'}
+                </Text>
+              </div>
+              <details className="erp-dev-permission-evidence-disclosure">
+                <summary>来源与版本</summary>
+                <section
+                  className="erp-permission-relationship__evidence"
+                  aria-label="当前权限证据版本"
+                >
+                  <div>
+                    <Text type="secondary">权限结果来源</Text>
+                    <Text strong>
+                      {evidenceValue(
+                        relationshipEvidence.sources,
+                        '最终结果尚未读取'
+                      )}
+                    </Text>
+                  </div>
+                  <div>
+                    <Text type="secondary">客户配置版本</Text>
+                    <Text strong>
+                      {evidenceValue(relationshipEvidence.configRevisions)}
+                    </Text>
+                  </div>
+                  <div>
+                    <Text type="secondary">产品版本</Text>
+                    <Text strong>
+                      {evidenceValue([
+                        ...new Set(
+                          [
+                            ...relationshipEvidence.productVersions,
+                            relationshipEvidence.approvalProductVersion,
+                          ].filter(Boolean)
+                        ),
+                      ])}
+                    </Text>
+                  </div>
+                  <div>
+                    <Text type="secondary">岗位版本</Text>
+                    <Text strong>
+                      {evidenceValue(relationshipEvidence.roleVersions)}
+                    </Text>
+                  </div>
+                  <div>
+                    <Text type="secondary">审批设置版本</Text>
+                    <Text strong>
+                      {relationshipEvidence.approvalRevision ||
+                        (relationshipEvidence.approvalPartial
+                          ? '读取不完整'
+                          : '未绑定')}
+                    </Text>
+                  </div>
+                  <div>
+                    <Text type="secondary">最近读取时间</Text>
+                    <Text strong>{formatReadTime(currentReadAt)}</Text>
+                  </div>
+                </section>
+              </details>
 
               <Tabs
                 className="erp-permission-relationship__tabs"
@@ -724,16 +702,6 @@ export default function DevPermissionRelationshipsPage() {
                 onChange={changeTab}
                 destroyOnHidden
                 items={[
-                  {
-                    key: PERMISSION_RELATIONSHIP_TAB.MENU,
-                    label: '实际菜单',
-                    children: (
-                      <DevPermissionNavigationOverview
-                        model={navigationModel}
-                        loading={accessLoading}
-                      />
-                    ),
-                  },
                   {
                     key: PERMISSION_RELATIONSHIP_TAB.GRAPH,
                     label: '关系图',
@@ -757,9 +725,6 @@ export default function DevPermissionRelationshipsPage() {
                               }
                             />
                           </div>
-                          <Text type="secondary">
-                            只缩小关系图，顶部统计和实际菜单保持全局口径。
-                          </Text>
                         </div>
                         <div className="erp-permission-relationship__legend">
                           <Text type="secondary">图例</Text>
@@ -774,25 +739,9 @@ export default function DevPermissionRelationshipsPage() {
                         </div>
                         <section
                           className="erp-permission-relationship__graph"
-                          aria-labelledby="permission-relationship-graph-title"
+                          aria-label="权限生效关系图"
                           aria-busy={accessLoading}
                         >
-                          <div className="erp-permission-relationship__section-head">
-                            <div>
-                              <Title
-                                id="permission-relationship-graph-title"
-                                level={5}
-                              >
-                                有向关系图
-                              </Title>
-                              <Text type="secondary">
-                                箭头表示“分配、约束、获得、影响或承担”；可用右上角工具放大和全屏查看。
-                              </Text>
-                            </div>
-                            {accessLoading ? (
-                              <Tag color="processing">正在核对</Tag>
-                            ) : null}
-                          </div>
                           {targetOptions.length === 0 ? (
                             <Empty
                               image={<ApartmentOutlined />}
@@ -807,6 +756,16 @@ export default function DevPermissionRelationshipsPage() {
                           )}
                         </section>
                       </div>
+                    ),
+                  },
+                  {
+                    key: PERMISSION_RELATIONSHIP_TAB.MENU,
+                    label: '实际菜单',
+                    children: (
+                      <DevPermissionNavigationOverview
+                        model={navigationModel}
+                        loading={accessLoading}
+                      />
                     ),
                   },
                   {
@@ -909,6 +868,16 @@ export default function DevPermissionRelationshipsPage() {
             </>
           ) : null}
         </section>
+        <DevStaticGuidance title="查看与配置">
+          <div role="note">
+            <Paragraph>
+              统计按当前对象的全部功能计算，模块筛选只影响图与明细。图、菜单和明细使用同一份权限结果。
+            </Paragraph>
+            <Paragraph>
+              本页只读。修改权限请进入权限配置；单据能否操作还需满足业务状态与责任条件。
+            </Paragraph>
+          </div>
+        </DevStaticGuidance>
       </main>
     </div>
   )

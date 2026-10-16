@@ -11,6 +11,7 @@ import {
 } from '../../utils/detailCellMerge.mjs'
 import { runSilentPrintWorkspaceDraftUpdate } from '../../utils/usePersistentPrintWorkspaceDraft.js'
 import { PrintAppendixImages } from './PrintAppendixImages.jsx'
+import { visibleContractClauseGroups } from '../../utils/contractClauseEditor.mjs'
 import { renderPrintValue } from './printValue.mjs'
 
 function normalizeEditableText(value, multiline = false) {
@@ -120,7 +121,10 @@ function EditableText({
 
 function ContractMetaRow({ label, value, onCommit, disabled = false }) {
   return (
-    <div className="erp-processing-contract-meta__row">
+    <div
+      className="erp-processing-contract-meta__row"
+      data-print-blank-field=""
+    >
       <span className="erp-processing-contract-meta__label">{label}</span>
       <EditableText
         value={value}
@@ -168,12 +172,15 @@ export default function ProcessingContractPaper({
   onFieldChange,
   onLineFieldChange,
   onClauseChange,
+  onClauseTitleChange,
+  onClauseFocus,
 }) {
   const printableLines = Array.isArray(contract?.lines) ? contract.lines : []
   const totals = calculateProcessingContractTotals(contract?.lines || [], {
     merges: contract?.merges,
   })
   const templateModesActive = lineSelectionMode || cellSelectionMode
+  const clauseGroups = visibleContractClauseGroups(contract.clauses)
 
   return (
     <div className="erp-processing-contract-paper" ref={paperRef}>
@@ -181,7 +188,10 @@ export default function ProcessingContractPaper({
         <div className="erp-processing-contract-paper__title">加工合同</div>
       </header>
 
-      <section className="erp-processing-contract-meta">
+      <section
+        className="erp-processing-contract-meta"
+        data-print-blank-region=""
+      >
         <div className="erp-processing-contract-meta__column">
           <ContractMetaRow
             label="合同编号："
@@ -286,6 +296,7 @@ export default function ProcessingContractPaper({
             return (
               <tr
                 key={`line-${index}`}
+                data-print-blank-row=""
                 className={
                   isSelected
                     ? 'erp-processing-contract-table__row--selected'
@@ -323,6 +334,11 @@ export default function ProcessingContractPaper({
                   return (
                     <td
                       key={`${column.key}-${index}`}
+                      data-print-blank-field={
+                        column.readOnly || isPlaceholderLine
+                          ? undefined
+                          : column.key
+                      }
                       rowSpan={
                         merge ? merge.rowEnd - merge.rowStart + 1 : undefined
                       }
@@ -391,85 +407,59 @@ export default function ProcessingContractPaper({
         </tbody>
       </table>
 
-      <section className="erp-processing-contract-clauses">
-        <div className="erp-processing-contract-clauses__group">
-          <div className="erp-processing-contract-clauses__title">
-            一、来货要求：
-          </div>
-          <ol>
-            {contract.clauses.delivery.map((item, index) => (
-              <li
-                key={`delivery-${index}`}
-                className="erp-processing-contract-clauses__item"
-              >
-                <span className="erp-processing-contract-clauses__item-index">
-                  {index + 1}、
+      {clauseGroups.length > 0 ? (
+        <section className="erp-processing-contract-clauses">
+          {clauseGroups.map((group) => (
+            <div
+              className="erp-processing-contract-clauses__group"
+              key={group.key}
+              data-print-clause-group={group.key}
+            >
+              <div className="erp-processing-contract-clauses__title">
+                {group.number}、
+                <span
+                  data-print-blank-field=""
+                  onFocusCapture={() => onClauseFocus?.(group.key, null)}
+                >
+                  <EditableText
+                    as="span"
+                    value={group.label}
+                    className="erp-contract-clause-title__value"
+                    disabled={templateModesActive}
+                    onCommit={(value) => onClauseTitleChange(group.key, value)}
+                  />
                 </span>
-                <EditableText
-                  as="span"
-                  value={item}
-                  className="erp-processing-contract-clauses__editable"
-                  multiline
-                  disabled={templateModesActive}
-                  onCommit={(value) => onClauseChange('delivery', index, value)}
-                />
-              </li>
-            ))}
-          </ol>
-        </div>
-        <div className="erp-processing-contract-clauses__group">
-          <div className="erp-processing-contract-clauses__title">
-            二、合同约定：
-          </div>
-          <ol>
-            {contract.clauses.contract.map((item, index) => (
-              <li
-                key={`contract-${index}`}
-                className="erp-processing-contract-clauses__item"
-              >
-                <span className="erp-processing-contract-clauses__item-index">
-                  {index + 1}、
-                </span>
-                <EditableText
-                  as="span"
-                  value={item}
-                  className="erp-processing-contract-clauses__editable"
-                  multiline
-                  disabled={templateModesActive}
-                  onCommit={(value) => onClauseChange('contract', index, value)}
-                />
-              </li>
-            ))}
-          </ol>
-        </div>
-        <div className="erp-processing-contract-clauses__group">
-          <div className="erp-processing-contract-clauses__title">
-            三、结算方式：
-          </div>
-          <ol>
-            {contract.clauses.settlement.map((item, index) => (
-              <li
-                key={`settlement-${index}`}
-                className="erp-processing-contract-clauses__item"
-              >
-                <span className="erp-processing-contract-clauses__item-index">
-                  {index + 1}、
-                </span>
-                <EditableText
-                  as="span"
-                  value={item}
-                  className="erp-processing-contract-clauses__editable"
-                  multiline
-                  disabled={templateModesActive}
-                  onCommit={(value) =>
-                    onClauseChange('settlement', index, value)
-                  }
-                />
-              </li>
-            ))}
-          </ol>
-        </div>
-      </section>
+                ：
+              </div>
+              <ol>
+                {group.items.map((item, index) => (
+                  <li
+                    key={`${group.key}-${index}`}
+                    className="erp-processing-contract-clauses__item"
+                    data-print-blank-field=""
+                    data-print-clause-index={index}
+                    onFocusCapture={() => onClauseFocus?.(group.key, index)}
+                  >
+                    <span className="erp-processing-contract-clauses__item-index">
+                      {index + 1}、
+                    </span>
+                    <EditableText
+                      as="span"
+                      value={item}
+                      className="erp-processing-contract-clauses__editable"
+                      multiline
+                      disabled={templateModesActive}
+                      onCommit={(value) =>
+                        onClauseChange(group.key, index, value)
+                      }
+                    />
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ))}
+        </section>
+      ) : null}
 
       <section className="erp-processing-contract-signature">
         <div className="erp-processing-contract-signature__block">

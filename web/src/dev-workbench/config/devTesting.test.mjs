@@ -1393,7 +1393,7 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /DevCustomerScopeSelector/u)
   assert.match(testingPageSource, /useDevCustomerScope/u)
   assert.match(testingPageSource, /normalize: view === VIEW_TIERS/u)
-  assert.match(testingPageSource, /label="岗位权限检查甲方"/u)
+  assert.match(testingPageSource, /label="权限检查客户"/u)
   assert.match(
     testingPageSource,
     /action\.key === 'role-access' && !customerReady/u
@@ -1408,7 +1408,7 @@ test('devTesting: 页面提供独立的 P0/P1 固定动作与覆盖基线边界'
   assert.match(testingPageSource, /复制备用命令/)
   assert.match(testingPageSource, /本页证明/)
   assert.match(testingPageSource, /本页不证明/)
-  assert.match(testingPageSource, /证据分层，不合并总分/)
+  assert.match(testingPageSource, /buildDevTestingCoverageSectionSummaries\(report\)/u)
   assert.match(testingPageSource, /查看采集、覆盖目标与判定规则/)
   assert.match(testingPageSource, /erp-dev-testing-coverage-matrix__head/)
   assert.match(testingPageSource, /查看完整报告身份/)

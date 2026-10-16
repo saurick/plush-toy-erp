@@ -192,47 +192,10 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       await dialog
         .getByRole('button', { name: '重置筛选', exact: true })
         .click()
-      await dialog
-        .getByRole('button', { name: '自定义日期', exact: true })
-        .click()
-      const yesterday = formatBusinessDate((today - 86400) * 1000)
-      const calendar = page.getByRole('dialog', { name: '选择处理日期范围', exact: true })
-      await calendar.waitFor()
-      if (yesterday.slice(0, 7) !== formatBusinessDate(today * 1000).slice(0, 7)) await calendar.getByRole('button', { name: '上个月', exact: true }).click()
-      const day = calendar.getByRole('button', { name: yesterday, exact: true })
-      await day.click()
-      assert.equal(await calendar.getByRole('button', { name: '应用日期', exact: true }).isEnabled(), false)
+      assert.equal(await dialog.getByRole('button', { name: '自定义日期', exact: true }).count(), 0)
+      assert.equal(await dialog.locator('input, select, textarea').count(), 0)
+      await close()
       await waitCount(66)
-      await calendar.getByRole('button', { name: '取消', exact: true }).click()
-      await dialog.waitFor()
-      await dialog.getByRole('button', { name: '自定义日期', exact: true }).click()
-      await calendar.waitFor()
-      if (yesterday.slice(0, 7) !== formatBusinessDate(today * 1000).slice(0, 7)) await calendar.getByRole('button', { name: '上个月', exact: true }).click()
-      await day.click()
-      await day.click()
-      await waitCount(66)
-      for (const width of [320, 390, 430]) {
-        await page.setViewportSize({ width, height: 568 })
-        await waitForFiniteAnimations(page)
-        const geometry = await calendar.evaluate((node) => {
-          const content = node.querySelector('.ant-modal-content').getBoundingClientRect()
-          const footer = node.querySelector('.ant-modal-footer').getBoundingClientRect()
-          const closeButton = node.querySelector('.ant-modal-close').getBoundingClientRect()
-          const days = [...node.querySelectorAll('.erp-filter-date-days button')]
-          return { content: content.toJSON(), footer: footer.toJSON(), close: closeButton.toJSON(), dayCount: days.length, minDayHeight: Math.min(...days.map((day) => day.getBoundingClientRect().height)), viewport: innerWidth, height: innerHeight, overflow: document.documentElement.scrollWidth - innerWidth }
-        })
-        assert.equal(geometry.dayCount, 42)
-        assert(geometry.minDayHeight >= 44 && geometry.close.height >= 44, JSON.stringify(geometry))
-        assert(geometry.content.left >= 0 && geometry.content.right <= geometry.viewport && geometry.content.top >= 0 && geometry.footer.bottom <= geometry.height && geometry.overflow <= 1, JSON.stringify(geometry))
-      }
-      await page.screenshot({ path: path.join(outputDir, 'mobile-history-date-range.png') })
-      await calendar.getByRole('button', { name: '应用日期', exact: true }).click()
-      await page.setViewportSize({ width: 390, height: 844 })
-      await waitCount(64)
-      assert.match(
-        await page.getByLabel('当前已办筛选').innerText(),
-        new RegExp(yesterday)
-      )
       await page
         .getByLabel('任务状态', { exact: true })
         .getByText('待办', { exact: true })
@@ -243,7 +206,7 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
         .getByLabel('任务状态', { exact: true })
         .getByText('已办', { exact: true })
         .click()
-      await waitCount(64)
+      await waitCount(66)
       assert.equal(await search.inputValue(), '历史筛选')
       for (const width of [320, 390, 430]) {
         await page.setViewportSize({ width, height: 844 })
@@ -289,16 +252,7 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       await page.screenshot({
         path: path.join(outputDir, 'mobile-history-filters-dark.png'),
       })
-      await dialog.getByRole('button', { name: `${yesterday} 至 ${yesterday}`, exact: true }).click()
-      await calendar.waitFor()
-      await dialog.waitFor({ state: 'hidden' })
-      await waitForFiniteAnimations(page)
-      await page.waitForFunction(() => {
-        const modal = document.querySelector('.erp-filter-date-dialog')
-        return modal && getComputedStyle(modal).opacity === '1' && !/-(appear|enter|leave)(-|\s|$)/u.test(modal.className)
-      })
-      await page.screenshot({ path: path.join(outputDir, 'mobile-history-date-range-dark.png') })
-      await calendar.getByRole('button', { name: '取消', exact: true }).click()
+      assert.equal(await dialog.locator('input, select, textarea').count(), 0)
       await close()
     },
   }

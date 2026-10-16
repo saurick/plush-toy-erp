@@ -20,7 +20,22 @@ const EXTERNAL_LINK_SCHEMES = new Set([
 ]);
 
 export function stripFencedCode(markdown) {
-  return markdown.replace(/^\s*(```|~~~)[\s\S]*?^\s*\1\s*$/gmu, "");
+  let fence = null;
+  return markdown.split(/\r?\n/u).map((line) => {
+    if (fence) {
+      const closing = line.match(/^[\t ]*(`+|~+)[\t ]*$/u);
+      if (closing && closing[1][0] === fence[0] && closing[1].length >= fence.length) {
+        fence = null;
+      }
+      return "";
+    }
+    const opening = line.match(/^[\t ]*(`{3,}|~{3,})(.*)$/u);
+    if (opening && (opening[1][0] !== "`" || !opening[2].includes("`"))) {
+      fence = opening[1];
+      return "";
+    }
+    return line;
+  }).join("\n");
 }
 
 export function markdownLinkTargets(markdown) {

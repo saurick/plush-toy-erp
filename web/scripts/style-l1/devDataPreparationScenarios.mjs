@@ -427,13 +427,16 @@ export function createDevDataPreparationScenarios({
         await page
           .getByText('预检读取失败', { exact: true })
           .waitFor({ state: 'hidden' })
+        await page.waitForFunction(() => [...document.querySelectorAll('button')].some((button) => button.textContent.trim() === '确认执行' && !button.disabled))
         assert.equal(
           await page
             .getByRole('button', { name: '确认执行', exact: true })
             .isDisabled(),
           false
         )
+        const readsBeforeScopeView = fixture.reads.length
         await page.getByRole('tab', { name: '准备数据', exact: true }).click()
+        assert.equal(fixture.reads.length, readsBeforeScopeView, '切换视图不能重复预检或短暂锁住已有计划')
         assert.equal(
           await prepare.isDisabled(),
           false,

@@ -1,6 +1,5 @@
 import React from 'react'
 import MobileFilterChoices from './MobileFilterChoices.jsx'
-import MobileFilterSearchField from './MobileFilterSearchField.jsx'
 import { WORKFLOW_TASK_DUE_OPTIONS } from '../../utils/workflowTaskListFilters.mjs'
 import { getWorkflowTaskSourceTypeLabel } from '../../utils/dashboardTaskDisplay.mjs'
 
@@ -30,24 +29,15 @@ export default function MobileTaskExtraFilters({
       {sources.length > 0 && (
         <fieldset role="presentation">
           <legend>来源单据</legend>
-          {sources.length > 4 ? (
-            <MobileFilterSearchField
-              label="来源单据"
-              value={options.sourceType || ''}
-              options={sources.map((value) => ({ value, label: getWorkflowTaskSourceTypeLabel(value) }))}
-              onChange={(sourceType) => onChange({ sourceType })}
-            />
-          ) : (
-            <MobileFilterChoices
-              label="来源单据"
-              value={options.sourceType || ''}
-              options={[{ value: '', label: '全部' }, ...sources.map((value) => ({
-                value,
-                label: getWorkflowTaskSourceTypeLabel(value),
-              }))]}
-              onChange={(sourceType) => onChange({ sourceType: sourceType || '' })}
-            />
-          )}
+          <MobileFilterChoices
+            label="来源单据"
+            value={options.sourceType || ''}
+            options={[{ value: '', label: '全部' }, ...sources.map((value) => ({
+              value,
+              label: getWorkflowTaskSourceTypeLabel(value),
+            }))]}
+            onChange={(sourceType) => onChange({ sourceType: sourceType || '' })}
+          />
         </fieldset>
       )}
     </>

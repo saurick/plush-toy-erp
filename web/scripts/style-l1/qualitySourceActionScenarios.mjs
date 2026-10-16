@@ -67,6 +67,50 @@ export function createQualitySourceActionScenarios(deps) {
   }
 
   return [
+    {
+      name: 'quality-correction-cannot-cancel-desktop',
+      path: '/erp/production/quality-inspections',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 3840, height: 2160 },
+      beforeNavigate: async (page) => {
+        const inspection = {
+          source_type: 'SHIPMENT',
+          source_id: 9700,
+          inspection_type: 'FINISHED_GOODS',
+          subject_type: 'PRODUCT',
+          subject_id: 1,
+          inventory_lot_id: 401,
+          warehouse_id: 1,
+          unit_id: 1,
+          unit_name: '个',
+          status: 'SUBMITTED',
+          result: null,
+        }
+        const inspections = [
+          { ...inspection, id: 9701, inspection_no: 'QI-CORRECTION-OPEN', correction_of_inspection_id: 9700 },
+          { ...inspection, id: 9702, inspection_no: 'QI-REGULAR-OPEN', correction_of_inspection_id: null },
+        ]
+        await page.route('**/rpc/quality', async (route) => {
+          const { id, method, params = {} } = route.request().postDataJSON()
+          if (method !== 'list_quality_inspections') return route.fallback()
+          await route.fulfill({ json: { jsonrpc: '2.0', id, result: styleRpcResult(stylePaginatedRpcData(inspections, 'quality_inspections', params)) } })
+        })
+      },
+      verify: async (page) => {
+        await selectRow(page, 'QI-REGULAR-OPEN')
+        const cancel = await findSelectionActionButton(page, '取消质检')
+        assert(await cancel.isVisible(), 'ordinary submitted inspections retain cancellation')
+        await page.getByRole('heading', { name: '质量检验', exact: true }).click()
+        await selectRow(page, 'QI-CORRECTION-OPEN')
+        await page.locator('[data-business-action-key="cancel"]').waitFor({ state: 'hidden' })
+        const more = page.getByRole('button', { name: /更多操作/u }).first()
+        if (await more.isVisible().catch(() => false)) await more.click()
+        const visibleCancellation = await page.locator('[data-business-action-key="cancel"]').evaluateAll((nodes) => nodes.filter((node) => node.getBoundingClientRect().height > 0).length)
+        assert.equal(visibleCancellation, 0, 'correction inspections cannot cancel through direct or overflow actions')
+        await page.screenshot({ path: path.join(outputDir, 'quality-correction-cannot-cancel-4k.png'), fullPage: false })
+      },
+    },
     (() => {
       const inspection = { id: 9710, inspection_no: 'QI-REPLACEMENT-COUNT', purchase_receipt_id: 9711, purchase_receipt_item_id: 9712, inventory_lot_id: 401, material_id: 1, warehouse_id: 1, unit_id: 1, unit_name: '个', unit_precision: 0, source_type: 'PURCHASE_RECEIPT', source_id: 9711, inspection_type: 'INCOMING', subject_type: 'MATERIAL', subject_id: 1, status: 'REJECTED', result: 'REJECT' }
       let record

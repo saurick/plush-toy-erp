@@ -15,7 +15,7 @@ import path from "node:path";
 
 import { validateReleaseManifest } from "./release-catalog.mjs";
 import { validateGitAncestryRelation } from "./git-ancestry-relation.mjs";
-import { getDeploymentTarget } from "./deployment-targets.mjs";
+import { getDeploymentTarget, assertDatabaseRebuildAllowed } from "./deployment-targets.mjs";
 
 export const DATABASE_REBUILD_MANIFEST_CONTRACT =
   "plush.database-rebuild-manifest/v1";
@@ -74,7 +74,7 @@ export function databaseRebuildPreflightBlockers(targetPreflight) {
 
 export function validateDatabaseRebuildManifest(manifest) {
   const ancestry = validateGitAncestryRelation(manifest?.ancestry);
-  const target = getDeploymentTarget(manifest?.target?.key);
+  const target = assertDatabaseRebuildAllowed(getDeploymentTarget(manifest?.target?.key));
   if (
     manifest?.schemaVersion !== DATABASE_REBUILD_MANIFEST_CONTRACT ||
     !["eligible", "blocked"].includes(manifest?.status) ||
@@ -153,7 +153,7 @@ export function buildDatabaseRebuildManifest({
   ) {
     throw new Error("fixed target preflight is required");
   }
-  const target = getDeploymentTarget(targetPreflight.target);
+  const target = assertDatabaseRebuildAllowed(getDeploymentTarget(targetPreflight.target));
 
   const runtimeSha =
     targetPreflight.remote?.runtime?.serverSha || "unknown";

@@ -4,11 +4,10 @@ import {
   FullscreenOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
-import { Button, Space, Typography } from 'antd'
+import { Button, Select, Space, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { TaskFulfillmentGuideButton } from '../components/flow-state/TaskFulfillmentGuide.jsx'
 import Tabs from '@/common/components/navigation/SlidingTabs'
-import Segmented from '@/common/components/navigation/SlidingSegmented'
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevControlStandards from '../components/DevControlStandards.jsx'
 import DevUIDesignDocument from '../components/DevUIDesignDocument.jsx'
@@ -138,7 +137,7 @@ export default function DevUIDesignPage() {
   }
 
   return (
-    <div ref={pageRef} className="erp-dev-ui-design-page erp-dev-workspace-page">
+    <div ref={pageRef} className="erp-dev-ui-design-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav sourcePath="docs/product/ui-design/README.md" />
       <header className="erp-dev-ui-design-header">
         <Typography.Title level={1}>UI 交互设计</Typography.Title>
@@ -158,7 +157,8 @@ export default function DevUIDesignPage() {
         aria-label={fullscreen ? 'UI 交互设计全屏预览' : '最新可交互设计'}
       >
         <div className="erp-dev-ui-design-toolbar">
-          <Segmented
+          <Select
+            className="erp-dev-ui-design-page-select"
             aria-label="设计预览入口"
             value={previewPage}
             options={[

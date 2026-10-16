@@ -1,9 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import {
+  PrintItemOrderTools,
   PrintToolButton,
   PrintImageSlotTool,
 } from '../components/print/PrintWorkspaceTools.jsx'
+import { getPrintRowBlock } from '../utils/printItemOperations.mjs'
 import usePrintWorkspaceFeedback from '../utils/usePrintWorkspaceFeedback.js'
 import { getPrintOutputProblem } from '../utils/printOutputPreflight.mjs'
 import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
@@ -68,6 +70,11 @@ import {
 } from '../utils/usePersistentPrintWorkspaceDraft.js'
 import {
   ENGINEERING_PRINT_LIMITS,
+  editMaterialDetailLine,
+  editColorCardBlock,
+  editColorCardLine,
+  editInstructionRow,
+  getColorCardBlockMoveTarget,
   applyMaterialDetailCellMerge,
   createBlankEngineeringDraft,
   insertColorCardBlock,
@@ -363,6 +370,12 @@ export default function EngineeringPrintWorkspacePage() {
   const stageWrapRef = useRef(null)
   const pdfPreviewPreloadRef = useRef(null)
   const instructionRowImageInputRefs = useRef({})
+  const imageUploadRequestsRef = useRef(new Map())
+  useEffect(() => {
+    const requests = imageUploadRequestsRef.current
+    requests.clear()
+    return () => requests.clear()
+  }, [draftStorageKey])
   const [pdfAction, setPdfAction] = useState('')
   const [pdfActionStartedAt, setPdfActionStartedAt] = useState(0)
   const { feedback, reportFeedback, clearFeedback } =
@@ -584,8 +597,9 @@ export default function EngineeringPrintWorkspacePage() {
 
   const applyMaterialLineAction = (action, position = 'after') => {
     setDraft((current) => {
-      const result =
-        action === 'remove'
+      const result = ['up', 'down', 'clear'].includes(action)
+        ? editMaterialDetailLine(current, selectedMaterialLineIndex, action)
+        : action === 'remove'
           ? removeMaterialDetailLine(current, selectedMaterialLineIndex)
           : insertMaterialDetailLine(
               current,
@@ -705,8 +719,9 @@ export default function EngineeringPrintWorkspacePage() {
 
   const applyColorBlockAction = (action, position = 'after') => {
     setDraft((current) => {
-      const result =
-        action === 'remove'
+      const result = ['up', 'down', 'clear'].includes(action)
+        ? editColorCardBlock(current, selectedColorBlockIndex, action)
+        : action === 'remove'
           ? removeColorCardBlock(current, selectedColorBlockIndex)
           : insertColorCardBlock(current, selectedColorBlockIndex, position)
       if (!showEditorMessage('blocks', result, '色卡块操作失败')) return current
@@ -770,8 +785,9 @@ export default function EngineeringPrintWorkspacePage() {
       return
     }
     setDraft((current) => {
-      const result =
-        action === 'remove'
+      const result = ['up', 'down', 'clear'].includes(action)
+        ? editColorCardLine(current, blockIndex, lineIndex, action)
+        : action === 'remove'
           ? removeColorCardLine(current, blockIndex, lineIndex)
           : insertColorCardLine(current, blockIndex, lineIndex, position)
       if (!showEditorMessage('rows', result, '色卡行操作失败')) return current
@@ -807,8 +823,9 @@ export default function EngineeringPrintWorkspacePage() {
     const target = normalizeInstructionRowTarget(selectedInstructionRowTarget)
     setDraft((current) => {
       if (!target) return current
-      const result =
-        target.pageIndex === null
+      const result = ['up', 'down', 'clear'].includes(action)
+        ? editInstructionRow(current, target.rowIndex, action, target.pageIndex)
+        : target.pageIndex === null
           ? action === 'remove'
             ? removeInstructionRow(current, target.rowIndex)
             : insertInstructionRow(current, target.rowIndex, position)
@@ -906,26 +923,39 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const uploadImage = async (slotKey, file) => {
-    const sourceImages = draftRef.current.images
+    const sourceSlot = draftRef.current.images?.[slotKey]
+    const request = {}
+    imageUploadRequestsRef.current.set(slotKey, request)
     clearFeedback()
     try {
       const snapshot = await createImageSnapshot(file)
-      if (draftRef.current.images !== sourceImages) return
+      if (
+        imageUploadRequestsRef.current.get(slotKey) !== request ||
+        draftRef.current.images?.[slotKey] !== sourceSlot
+      ) {
+        return
+      }
       setDraft((current) => ({
         ...current,
         images: { ...current.images, [slotKey]: snapshot },
       }))
       reportFeedback('images', '图片已更新，打印和 PDF 会使用当前图片。')
     } catch (error) {
+      if (imageUploadRequestsRef.current.get(slotKey) !== request) return
       reportFeedback(
         'images',
         getActionErrorMessage(error, '上传图片失败'),
         'error'
       )
+    } finally {
+      if (imageUploadRequestsRef.current.get(slotKey) === request) {
+        imageUploadRequestsRef.current.delete(slotKey)
+      }
     }
   }
 
   const clearImage = (slotKey) => {
+    imageUploadRequestsRef.current.delete(slotKey)
     setDraft((current) => ({
       ...current,
       images: {
@@ -1007,8 +1037,9 @@ export default function EngineeringPrintWorkspacePage() {
         getInstructionRowsForTarget(draftRef.current, normalizedTarget)[
           normalizedTarget.rowIndex
         ] !== row
-      )
-        { return }
+      ) {
+        return
+      }
       setDraft((current) =>
         updateInstructionRowByTarget(current, normalizedTarget, (row) => {
           const baseRow =
@@ -1074,8 +1105,9 @@ export default function EngineeringPrintWorkspacePage() {
         getInstructionRowsForTarget(draftRef.current, normalizedTarget)[
           normalizedTarget.rowIndex
         ] !== row
-      )
-        { return }
+      ) {
+        return
+      }
       setDraft((current) =>
         updateInstructionRowByTarget(current, normalizedTarget, (row) => {
           const baseRow =
@@ -1533,6 +1565,7 @@ export default function EngineeringPrintWorkspacePage() {
                 {materialLineSelectionMode ? '返回编辑' : '选择明细行'}
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="up"
                 type="button"
                 className={getToolbarButtonClassName()}
@@ -1542,6 +1575,7 @@ export default function EngineeringPrintWorkspacePage() {
                 上插一行
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="down"
                 type="button"
                 className={getToolbarButtonClassName()}
@@ -1551,6 +1585,7 @@ export default function EngineeringPrintWorkspacePage() {
                 下插一行
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="remove"
                 wide
                 type="button"
@@ -1562,6 +1597,22 @@ export default function EngineeringPrintWorkspacePage() {
               >
                 移除当前行
               </PrintToolButton>
+              <PrintItemOrderTools
+                index={selectedMaterialLineIndex}
+                count={draft.lines.length}
+                canMoveUp={
+                  selectedMaterialLineIndex !== null &&
+                  getPrintRowBlock(draft.merges, selectedMaterialLineIndex)
+                    .start > 0
+                }
+                canMoveDown={
+                  selectedMaterialLineIndex !== null &&
+                  getPrintRowBlock(draft.merges, selectedMaterialLineIndex)
+                    .end <
+                    draft.lines.length - 1
+                }
+                onAction={applyMaterialLineAction}
+              />
               <span className="erp-print-shell__counter">
                 物料行: {draft.lines.length}/
                 {ENGINEERING_PRINT_LIMITS.materialRows}
@@ -1630,6 +1681,7 @@ export default function EngineeringPrintWorkspacePage() {
                 {colorBlockSelectionMode ? '返回编辑' : '选择色卡块'}
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="up"
                 type="button"
                 className={getToolbarButtonClassName()}
@@ -1639,6 +1691,7 @@ export default function EngineeringPrintWorkspacePage() {
                 上插色卡块
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="down"
                 type="button"
                 className={getToolbarButtonClassName()}
@@ -1648,6 +1701,7 @@ export default function EngineeringPrintWorkspacePage() {
                 下插色卡块
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="remove"
                 wide
                 type="button"
@@ -1659,6 +1713,27 @@ export default function EngineeringPrintWorkspacePage() {
               >
                 移除当前块
               </PrintToolButton>
+              <PrintItemOrderTools
+                index={selectedColorBlockIndex}
+                count={draft.blocks.length}
+                canMoveUp={
+                  getColorCardBlockMoveTarget(
+                    draft,
+                    selectedColorBlockIndex,
+                    'up'
+                  ) !== null
+                }
+                canMoveDown={
+                  getColorCardBlockMoveTarget(
+                    draft,
+                    selectedColorBlockIndex,
+                    'down'
+                  ) !== null
+                }
+                onAction={applyColorBlockAction}
+                moveLabel="色卡块"
+                clearLabel="清空当前块"
+              />
               <span className="erp-print-shell__counter">
                 色卡块: {draft.blocks.length}/
                 {ENGINEERING_PRINT_LIMITS.colorBlocks}
@@ -1683,6 +1758,7 @@ export default function EngineeringPrintWorkspacePage() {
                 {colorLineSelectionMode ? '返回编辑' : '选择色卡行'}
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="up"
                 type="button"
                 className={getToolbarButtonClassName()}
@@ -1692,6 +1768,7 @@ export default function EngineeringPrintWorkspacePage() {
                 上插一行
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="down"
                 type="button"
                 className={getToolbarButtonClassName()}
@@ -1701,6 +1778,7 @@ export default function EngineeringPrintWorkspacePage() {
                 下插一行
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="remove"
                 wide
                 type="button"
@@ -1712,6 +1790,15 @@ export default function EngineeringPrintWorkspacePage() {
               >
                 移除当前行
               </PrintToolButton>
+              <PrintItemOrderTools
+                index={selectedColorLine?.lineIndex}
+                count={
+                  draft.blocks[selectedColorLine?.blockIndex]?.lines?.length ||
+                  0
+                }
+                disabled={selectedColorLine?.persisted === false}
+                onAction={applyColorLineAction}
+              />
             </div>
           </PrintWorkspaceToolSection>
         </>
@@ -1737,6 +1824,7 @@ export default function EngineeringPrintWorkspacePage() {
             {instructionRowSelectionMode ? '返回编辑' : '选择行'}
           </PrintToolButton>
           <PrintToolButton
+            data-print-structure-action
             icon="up"
             type="button"
             className={getToolbarButtonClassName()}
@@ -1748,6 +1836,7 @@ export default function EngineeringPrintWorkspacePage() {
             上插一行
           </PrintToolButton>
           <PrintToolButton
+            data-print-structure-action
             icon="down"
             type="button"
             className={getToolbarButtonClassName()}
@@ -1759,6 +1848,7 @@ export default function EngineeringPrintWorkspacePage() {
             下插一行
           </PrintToolButton>
           <PrintToolButton
+            data-print-structure-action
             icon="remove"
             wide
             type="button"
@@ -1771,6 +1861,11 @@ export default function EngineeringPrintWorkspacePage() {
           >
             移除当前行
           </PrintToolButton>
+          <PrintItemOrderTools
+            index={selectedWorkInstructionRowTarget?.rowIndex}
+            count={selectedInstructionRows.length}
+            onAction={applySelectedWorkInstructionRowAction}
+          />
           {selectedInstructionRow ? (
             <>
               {[
@@ -1919,6 +2014,7 @@ export default function EngineeringPrintWorkspacePage() {
         wide
         type="button"
         className={getToolbarButtonClassName()}
+        data-print-structure-action
         onClick={handleResetDraft}
       >
         恢复样例
@@ -1928,6 +2024,7 @@ export default function EngineeringPrintWorkspacePage() {
         wide
         type="button"
         className={getToolbarButtonClassName()}
+        data-print-structure-action
         onClick={handleBlankDraft}
       >
         空白模板

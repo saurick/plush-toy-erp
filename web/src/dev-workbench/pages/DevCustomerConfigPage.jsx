@@ -490,15 +490,15 @@ function DryRunSummary({ dryRunState }) {
       </div>
       <div className="erp-dev-customer-dry-run-metrics">
         <div>
-          <Text type="secondary">来源行 / Sources</Text>
+          <Text type="secondary">来源行</Text>
           <Text strong>{summary.totalSources}</Text>
         </div>
         <div>
-          <Text type="secondary">候选创建 / Creates</Text>
+          <Text type="secondary">候选创建</Text>
           <Text strong>{actionCounts.create || 0}</Text>
         </div>
         <div>
-          <Text type="secondary">阻塞 / Blockers</Text>
+          <Text type="secondary">阻塞</Text>
           <Text strong>{summary.blockerCount}</Text>
         </div>
         <div>
@@ -509,11 +509,11 @@ function DryRunSummary({ dryRunState }) {
         </div>
       </div>
       <div className="erp-dev-customer-dry-run-paths">
-        <Text type="secondary">输出目录 / Output</Text>
+        <Text type="secondary">输出目录</Text>
         <Text code>{result.outputPath}</Text>
-        <Text type="secondary">报告 / Report</Text>
+        <Text type="secondary">报告</Text>
         <Text code>{result.reportPath}</Text>
-        <Text type="secondary">未决队列 / Unresolved</Text>
+        <Text type="secondary">未决队列</Text>
         <Text>
           block {unresolvedCounts.block || 0} / defer{' '}
           {unresolvedCounts.defer || 0} / review {unresolvedCounts.review || 0}
@@ -618,23 +618,23 @@ function TestApplySummary({
       </div>
       <div className="erp-dev-customer-test-apply-facts">
         <div>
-          <Text type="secondary">配置版本 / Revision</Text>
+          <Text type="secondary">配置版本</Text>
           <Text strong>{manifestSummary.revision || '-'}</Text>
         </div>
         <div>
-          <Text type="secondary">页面投影 / Pages</Text>
+          <Text type="secondary">页面投影</Text>
           <Text strong>{manifestSummary.pageCount ?? '-'}</Text>
         </div>
         <div>
-          <Text type="secondary">角色画像 / Roles</Text>
+          <Text type="secondary">角色画像</Text>
           <Text strong>{manifestSummary.roleProfileCount ?? '-'}</Text>
         </div>
         <div>
-          <Text type="secondary">责任池 / Work Pools</Text>
+          <Text type="secondary">责任池</Text>
           <Text strong>{manifestSummary.workPoolCount ?? '-'}</Text>
         </div>
         <div>
-          <Text type="secondary">模块状态 / Module States</Text>
+          <Text type="secondary">模块状态</Text>
           <Text strong>{manifestSummary.moduleStateCount ?? '-'}</Text>
         </div>
         <div>
@@ -769,23 +769,23 @@ function ReleaseApplySummary({ releaseState, releaseBatch }) {
       </div>
       <div className="erp-dev-customer-release-facts">
         <div>
-          <Text type="secondary">发布批次 / Release Batch</Text>
+          <Text type="secondary">发布批次</Text>
           <Text strong>{result.releaseBatch || releaseBatch || '-'}</Text>
         </div>
         <div>
-          <Text type="secondary">证据目录 / Evidence</Text>
+          <Text type="secondary">证据目录</Text>
           <Text strong>{result.evidenceDir || '-'}</Text>
         </div>
         <div>
-          <Text type="secondary">配置版本 / Revision</Text>
+          <Text type="secondary">配置版本</Text>
           <Text strong>{summary.revision || '-'}</Text>
         </div>
         <div>
-          <Text type="secondary">页面投影 / Pages</Text>
+          <Text type="secondary">页面投影</Text>
           <Text strong>{summary.pageCount ?? '-'}</Text>
         </div>
         <div>
-          <Text type="secondary">模块状态 / Module States</Text>
+          <Text type="secondary">模块状态</Text>
           <Text strong>{summary.moduleStateCount ?? '-'}</Text>
         </div>
       </div>
@@ -827,9 +827,9 @@ function DatabaseTargetCard({ item }) {
         </Space>
       </div>
       <div className="erp-dev-customer-db-target__body">
-        <Text type="secondary">目标 / Target</Text>
+        <Text type="secondary">目标</Text>
         <Text strong>{item.target}</Text>
-        <Text type="secondary">写入 / Writes</Text>
+        <Text type="secondary">写入</Text>
         <Text>{item.writesLabel || item.writes}</Text>
       </div>
       <Text type="secondary">{item.reason}</Text>
@@ -912,19 +912,23 @@ function CustomerPackageSelector({ overview, onChange, disabled = false }) {
   return (
     <div className="erp-dev-customer-selector">
       <Text strong>当前客户包</Text>
-      <Select
-        aria-label="客户包选择"
-        value={matched ? overview.customerKey : undefined}
-        placeholder="选择已登记客户包 / Select registered package"
-        options={options}
-        onChange={onChange}
-        disabled={disabled}
-      />
-      <Text type="secondary" className="erp-dev-customer-selector__note">
-        {disabled
-          ? '配置写操作进行中，客户包已锁定。离开页面不会撤销已经发出的写请求。'
-          : '切换只更新本页地址，不会应用配置。'}
-      </Text>
+      {matched && options.length === 1 ? (
+        <Text strong>{options[0].label}</Text>
+      ) : (
+        <Select
+          aria-label="客户包选择"
+          value={matched ? overview.customerKey : undefined}
+          placeholder="选择已登记客户包"
+          options={options}
+          onChange={onChange}
+          disabled={disabled}
+        />
+      )}
+      {disabled ? (
+        <Text type="secondary" className="erp-dev-customer-selector__note">
+          配置操作进行中，客户包已锁定；离开页面不会撤销操作。
+        </Text>
+      ) : null}
     </div>
   )
 }
@@ -964,7 +968,7 @@ function MissingCustomerPanel({ overview }) {
         description={missingDescription}
       />
       <div className="erp-dev-customer-registered-list">
-        <Text type="secondary">已登记客户包 / Registered Packages</Text>
+        <Text type="secondary">已登记客户包</Text>
         <Space wrap>
           {(overview.registeredCustomers || []).map((item) => (
             <Tag key={item.customerKey}>{item.label}</Tag>
@@ -1058,7 +1062,7 @@ function AssetsPanel({
         <div className="erp-dev-customer-panel__head">
           <ApartmentOutlined />
           <div>
-            <Text strong>菜单分组 / Menu Groups</Text>
+            <Text strong>菜单分组</Text>
             <Text type="secondary" className="erp-dev-customer-panel__hint">
               先看业务名称；展开后可查看对应内部键。
             </Text>
@@ -1126,7 +1130,7 @@ function AssetsPanel({
         <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
           <SettingOutlined />
           <div>
-            <Text strong>字段显示候选 / Field Candidates</Text>
+            <Text strong>字段显示候选</Text>
             <Text type="secondary" className="erp-dev-customer-panel__hint">
               {fieldNumberingSummary.fieldCandidates.length}{' '}
               个候选字段，点击查看
@@ -1161,7 +1165,7 @@ function AssetsPanel({
         <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
           <CodeOutlined />
           <div>
-            <Text strong>编号规则候选 / Numbering Candidates</Text>
+            <Text strong>编号规则候选</Text>
             <Text type="secondary" className="erp-dev-customer-panel__hint">
               {fieldNumberingSummary.numberingRules.length}{' '}
               项待确认规则，点击查看
@@ -1190,7 +1194,7 @@ function AssetsPanel({
         <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
           <FileTextOutlined />
           <div>
-            <Text strong>打印模板字段 / Print Template Fields</Text>
+            <Text strong>打印模板字段</Text>
             <Text type="secondary" className="erp-dev-customer-panel__hint">
               {printTemplateSummary.templates.length} 套模板，点击查看字段真源
             </Text>
@@ -1356,7 +1360,7 @@ function PreflightPanel({
           <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--module-states">
             <div className="erp-dev-customer-panel__head">
               <DeploymentUnitOutlined />
-              <Text strong>模块状态投影 / Module States</Text>
+              <Text strong>模块状态投影</Text>
             </div>
             <Alert
               type="info"
@@ -1383,7 +1387,7 @@ function PreflightPanel({
           <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-panel--print-template-defaults">
             <div className="erp-dev-customer-panel__head">
               <FileTextOutlined />
-              <Text strong>打印默认方信息 / Print Party Defaults</Text>
+              <Text strong>打印默认方信息</Text>
             </div>
             <Alert
               type="info"
@@ -1419,7 +1423,7 @@ function PreflightPanel({
         <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
           <div className="erp-dev-customer-panel__head">
             <SafetyCertificateOutlined />
-            <Text strong>人工评审清单 / Review Checklist</Text>
+            <Text strong>人工评审清单</Text>
           </div>
           <div className="erp-dev-customer-review-list">
             {consoleSummary.reviewChecklist.map((item) => (
@@ -1432,7 +1436,7 @@ function PreflightPanel({
         <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
           <div className="erp-dev-customer-panel__head">
             <SafetyCertificateOutlined />
-            <Text strong>校验结果 / Validation Checks</Text>
+            <Text strong>校验结果</Text>
           </div>
           <div className="erp-dev-customer-tool-list">
             {consoleSummary.validationChecks.map((check) => (
@@ -1604,32 +1608,26 @@ function DiffPanel({ consoleSummary }) {
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
         <div className="erp-dev-customer-panel__head">
           <ApartmentOutlined />
-          <Text strong>差异对比 / Diff Preview</Text>
+          <Text strong>配置变化</Text>
         </div>
-        <div className="erp-dev-customer-diff-list">
-          {consoleSummary.diffItems.map((item) => (
-            <article className="erp-dev-customer-diff" key={item.key}>
-              <div className="erp-dev-customer-diff__type">
-                <Tag>{item.type}</Tag>
-                <StatusTag status={item.status} />
-              </div>
-              <div className="erp-dev-customer-diff__value">
-                <Text type="secondary">当前值 / Current</Text>
-                <Text strong>{item.current}</Text>
-              </div>
-              <div className="erp-dev-customer-diff__value">
-                <Text type="secondary">候选配置 / Candidate</Text>
-                <Text strong>{item.incoming}</Text>
-              </div>
-              <Paragraph>{item.impact}</Paragraph>
-            </article>
-          ))}
+        <div className="erp-dev-tool-table-wrap">
+          <table className="erp-dev-tool-table" aria-label="客户配置变化对比">
+            <thead><tr><th scope="col">配置项</th><th scope="col">当前</th><th scope="col">候选</th><th scope="col">影响</th></tr></thead>
+            <tbody>
+              {consoleSummary.diffItems.map((item) => (
+                <tr key={item.key}>
+                  <th scope="row">{item.type}<StatusTag status={item.status} /></th>
+                  <td>{item.current}</td><td>{item.incoming}</td><td>{item.impact}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
       <section className="erp-dev-customer-panel">
         <div className="erp-dev-customer-panel__head">
           <DeploymentUnitOutlined />
-          <Text strong>版本门禁 / Version Gates</Text>
+          <Text strong>版本检查</Text>
         </div>
         <div className="erp-dev-customer-guard-list">
           {consoleSummary.versionGates.map((gate) => (
@@ -1645,7 +1643,7 @@ function DiffPanel({ consoleSummary }) {
       <section className="erp-dev-customer-panel">
         <div className="erp-dev-customer-panel__head">
           <ExclamationCircleOutlined />
-          <Text strong>发布边界 / Release Boundary</Text>
+          <Text strong>发布限制</Text>
         </div>
         <Alert
           type="warning"
@@ -1728,7 +1726,7 @@ function ImportPanel({
           <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
             <div className="erp-dev-customer-panel__head">
               <DeploymentUnitOutlined />
-              <Text strong>当前代理后端应用 / Current Proxy Apply</Text>
+              <Text strong>当前代理后端应用</Text>
             </div>
             <Paragraph type="secondary">
               {importSummary.canApplyTestConfig
@@ -1762,7 +1760,7 @@ function ImportPanel({
           <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
             <div className="erp-dev-customer-panel__head">
               <DatabaseOutlined />
-              <Text strong>写库目标 / Database Target</Text>
+              <Text strong>写库目标</Text>
             </div>
             <div className="erp-dev-customer-db-targets">
               {importSummary.databaseTargets.map((target) => (
@@ -1777,7 +1775,7 @@ function ImportPanel({
           <section className="erp-dev-customer-panel erp-dev-customer-panel--wide">
             <div className="erp-dev-customer-panel__head">
               <ExclamationCircleOutlined />
-              <Text strong>正式版发布 / Release Apply</Text>
+              <Text strong>正式版发布</Text>
             </div>
             <Alert
               type="warning"
@@ -1876,7 +1874,7 @@ function ImportPanel({
           <details className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure">
             <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
               <DatabaseOutlined />
-              <Text strong>执行边界 / Execution Boundary</Text>
+              <Text strong>执行边界</Text>
             </summary>
             <div className="erp-dev-customer-disclosure__body">
               <div className="erp-dev-customer-import-flags">
@@ -1895,7 +1893,7 @@ function ImportPanel({
           <details className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-disclosure">
             <summary className="erp-dev-customer-panel__head erp-dev-customer-disclosure__summary">
               <DeploymentUnitOutlined />
-              <Text strong>备用命令 / Command Fallback</Text>
+              <Text strong>备用命令</Text>
             </summary>
             <div className="erp-dev-customer-disclosure__body">
               <div className="erp-dev-customer-tool-list">
@@ -2734,7 +2732,7 @@ export default function DevCustomerConfigPage() {
   }[activeView]
 
   return (
-    <main className="erp-dev-customer-page erp-dev-workspace-page erp-dev-delivery-workspace">
+    <main className="erp-dev-customer-page erp-dev-workspace-page erp-dev-tool-page erp-dev-delivery-workspace">
       <DevPageNav
         sourcePath={overview.sourcePath || DEV_CUSTOMER_CONFIG_SOURCE_PATH}
       />

@@ -1,3 +1,9 @@
+import {
+  ProcessKey,
+  ProcessNodeStatus,
+  ProcessNodeType,
+  ProcessStatus,
+} from '../../common/consts/statuses.generated.mjs'
 import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import { AUTH_SCOPE } from '../../common/auth/auth.js'
 import { ADMIN_BASE_PATH } from '../../common/utils/adminRpc.js'
@@ -118,10 +124,10 @@ function requireSalesOrderAcceptanceStart(data, salesOrderID) {
   const validInstance =
     Number.isSafeInteger(instance?.id) &&
     instance.id > 0 &&
-    instance.process_key === 'sales_order_acceptance' &&
+    instance.process_key === ProcessKey.SALES_ORDER_ACCEPTANCE &&
     instance.business_ref_type === 'sales_order' &&
     instance.business_ref_id === salesOrderID &&
-    instance.status === 'active'
+    instance.status === ProcessStatus.ACTIVE
   const validNode =
     Number.isSafeInteger(node?.id) &&
     node.id > 0 &&
@@ -129,8 +135,8 @@ function requireSalesOrderAcceptanceStart(data, salesOrderID) {
     node.version > 0 &&
     node.process_instance_id === instance?.id &&
     node.node_key === 'submit_sales_order' &&
-    node.node_type === 'domain_command' &&
-    (node.status === 'active' || node.status === 'completed')
+    node.node_type === ProcessNodeType.DOMAIN_COMMAND &&
+    (node.status === ProcessNodeStatus.ACTIVE || node.status === ProcessNodeStatus.COMPLETED)
   const matchingNode = Array.isArray(nodes)
     ? nodes.find(
         (item) =>
@@ -151,7 +157,7 @@ function requireSalesOrderAcceptanceStart(data, salesOrderID) {
     throw new Error(PROCESS_RESULT_INVALID_MESSAGE)
   }
   if (
-    node.status === 'completed' &&
+    node.status === ProcessNodeStatus.COMPLETED &&
     ![
       'sales_order.submitted',
       'sales_order.submitted_without_approval',
@@ -175,7 +181,7 @@ function salesOrderAcceptanceStartFromContext(data, salesOrderID) {
   const candidates = nodes.filter(
     (node) =>
       node?.node_key === 'submit_sales_order' &&
-      node.node_type === 'domain_command' &&
+      node.node_type === ProcessNodeType.DOMAIN_COMMAND &&
       node.process_instance_id === context?.process_instance?.id
   )
   if (
@@ -203,9 +209,9 @@ function requireExemptOrderActivation(data, node, kind, message) {
     !data.nodes.some(
       (item) =>
         item.node_key === effectiveKey &&
-        item.node_type === 'domain_command' &&
+        item.node_type === ProcessNodeType.DOMAIN_COMMAND &&
         item.process_instance_id === node.process_instance_id &&
-        item.status === 'completed' &&
+        item.status === ProcessNodeStatus.COMPLETED &&
         item.outcome === effectiveOutcome
     )
   ) {
@@ -222,8 +228,8 @@ function requireSalesOrderAcceptanceExecution(data, expected) {
           item?.id === node?.id &&
           item.process_instance_id === expected.instanceID &&
           item.node_key === 'submit_sales_order' &&
-          item.node_type === 'domain_command' &&
-          item.status === 'completed' &&
+          item.node_type === ProcessNodeType.DOMAIN_COMMAND &&
+          item.status === ProcessNodeStatus.COMPLETED &&
           item.version === node?.version
       )
     : null
@@ -232,8 +238,8 @@ function requireSalesOrderAcceptanceExecution(data, expected) {
     node.id !== expected.nodeID ||
     node.process_instance_id !== expected.instanceID ||
     node.node_key !== 'submit_sales_order' ||
-    node.node_type !== 'domain_command' ||
-    node.status !== 'completed' ||
+    node.node_type !== ProcessNodeType.DOMAIN_COMMAND ||
+    node.status !== ProcessNodeStatus.COMPLETED ||
     ![
       'sales_order.submitted',
       'sales_order.submitted_without_approval',
@@ -280,7 +286,7 @@ export async function submitSalesOrderAcceptanceProcess(params = {}) {
     existing || (await startSalesOrderAcceptanceProcess(startPayload))
   const { instance: processInstance, node: startedNode } =
     requireSalesOrderAcceptanceStart(startData, salesOrderID)
-  if (startedNode.status === 'completed') {
+  if (startedNode.status === ProcessNodeStatus.COMPLETED) {
     return startData
   }
   const executeData = await executeSalesOrderAcceptanceSubmit({
@@ -329,10 +335,10 @@ function requireMaterialSupplyPurchaseStart(data, purchaseOrderID) {
   const validInstance =
     Number.isSafeInteger(instance?.id) &&
     instance.id > 0 &&
-    instance.process_key === 'material_supply' &&
+    instance.process_key === ProcessKey.MATERIAL_SUPPLY &&
     instance.business_ref_type === 'purchase_order' &&
     instance.business_ref_id === purchaseOrderID &&
-    instance.status === 'active'
+    instance.status === ProcessStatus.ACTIVE
   const validNode =
     Number.isSafeInteger(node?.id) &&
     node.id > 0 &&
@@ -340,8 +346,8 @@ function requireMaterialSupplyPurchaseStart(data, purchaseOrderID) {
     node.version > 0 &&
     node.process_instance_id === instance?.id &&
     node.node_key === 'submit_purchase_order' &&
-    node.node_type === 'domain_command' &&
-    (node.status === 'active' || node.status === 'completed')
+    node.node_type === ProcessNodeType.DOMAIN_COMMAND &&
+    (node.status === ProcessNodeStatus.ACTIVE || node.status === ProcessNodeStatus.COMPLETED)
   const matchingNode = Array.isArray(nodes)
     ? nodes.find(
         (item) =>
@@ -362,7 +368,7 @@ function requireMaterialSupplyPurchaseStart(data, purchaseOrderID) {
     throw new Error(PURCHASE_PROCESS_RESULT_INVALID_MESSAGE)
   }
   if (
-    node.status === 'completed' &&
+    node.status === ProcessNodeStatus.COMPLETED &&
     ![
       'purchase_order.submitted',
       'purchase_order.submitted_without_approval',
@@ -388,8 +394,8 @@ function requireMaterialSupplyPurchaseExecution(data, expected) {
           item?.id === node?.id &&
           item.process_instance_id === expected.instanceID &&
           item.node_key === 'submit_purchase_order' &&
-          item.node_type === 'domain_command' &&
-          item.status === 'completed' &&
+          item.node_type === ProcessNodeType.DOMAIN_COMMAND &&
+          item.status === ProcessNodeStatus.COMPLETED &&
           item.version === node?.version
       )
     : null
@@ -398,8 +404,8 @@ function requireMaterialSupplyPurchaseExecution(data, expected) {
     node.id !== expected.nodeID ||
     node.process_instance_id !== expected.instanceID ||
     node.node_key !== 'submit_purchase_order' ||
-    node.node_type !== 'domain_command' ||
-    node.status !== 'completed' ||
+    node.node_type !== ProcessNodeType.DOMAIN_COMMAND ||
+    node.status !== ProcessNodeStatus.COMPLETED ||
     ![
       'purchase_order.submitted',
       'purchase_order.submitted_without_approval',
@@ -436,7 +442,7 @@ export async function submitPurchaseOrderApprovalProcess(params = {}) {
   })
   const { instance: processInstance, node: startedNode } =
     requireMaterialSupplyPurchaseStart(startData, purchaseOrderID)
-  if (startedNode.status === 'completed') {
+  if (startedNode.status === ProcessNodeStatus.COMPLETED) {
     return startData
   }
   const executeData = await executeMaterialSupplyPurchaseOrderSubmit({
@@ -549,7 +555,7 @@ function requireExceptionProcessNode(node, instanceID) {
   const recoveryDecision = node?.domain_command_recovery_decision
   const hasValidDomainResult =
     (effectState == null && resultHash == null) ||
-    (node?.node_type === 'domain_command' &&
+    (node?.node_type === ProcessNodeType.DOMAIN_COMMAND &&
       ['unknown', 'none', 'applied', 'compensated'].includes(effectState) &&
       typeof resultHash === 'string' &&
       SHA256_HEX_PATTERN.test(resultHash))
@@ -577,10 +583,10 @@ function requireExceptionProcessNode(node, instanceID) {
     node.process_instance_id !== instanceID ||
     typeof node.node_key !== 'string' ||
     !node.node_key.trim() ||
-    !['human_task', 'approval', 'domain_command', 'end'].includes(
+    ![ProcessNodeType.HUMAN_TASK, ProcessNodeType.APPROVAL, ProcessNodeType.DOMAIN_COMMAND, ProcessNodeType.END].includes(
       node.node_type
     ) ||
-    !['waiting', 'active', 'blocked', 'completed'].includes(node.status) ||
+    ![ProcessNodeStatus.WAITING, ProcessNodeStatus.ACTIVE, ProcessNodeStatus.BLOCKED, ProcessNodeStatus.COMPLETED].includes(node.status) ||
     !Number.isSafeInteger(node.version) ||
     node.version <= 0 ||
     !hasValidDomainResult ||
@@ -613,7 +619,7 @@ function requireExceptionProcessContext(
       ) ||
     instance.business_ref_type !== contract.businessRefType ||
     instance.business_ref_id !== sourceID ||
-    !['active', 'blocked', 'completed'].includes(instance.status) ||
+    ![ProcessStatus.ACTIVE, ProcessStatus.BLOCKED, ProcessStatus.COMPLETED].includes(instance.status) ||
     !Array.isArray(nodes) ||
     !Array.isArray(activeNodes) ||
     !Array.isArray(settledNodes)
@@ -627,12 +633,12 @@ function requireExceptionProcessContext(
   if (
     nodeIDs.size !== nodes.length ||
     !activeNodes.every(
-      (node) => nodeIDs.has(node.id) && node.status === 'active'
+      (node) => nodeIDs.has(node.id) && node.status === ProcessNodeStatus.ACTIVE
     ) ||
     !settledNodes.every(
       (node) =>
         nodeIDs.has(node.id) &&
-        (node.status === 'completed' || node.status === 'blocked')
+        (node.status === ProcessNodeStatus.COMPLETED || node.status === ProcessNodeStatus.BLOCKED)
     )
   ) {
     throw exceptionProcessResultInvalid()
@@ -712,8 +718,8 @@ async function executeExceptionProcess(processKey, method, params = {}) {
   )
   if (
     !(Array.isArray(expectedNodeKey) ? expectedNodeKey : [expectedNodeKey]).includes(completedNode.node_key) ||
-    completedNode.node_type !== 'domain_command' ||
-    completedNode.status !== 'completed' ||
+    completedNode.node_type !== ProcessNodeType.DOMAIN_COMMAND ||
+    completedNode.status !== ProcessNodeStatus.COMPLETED ||
     !context.nodes.some(
       (node) =>
         node.id === completedNode.id &&
@@ -773,7 +779,7 @@ export function findExceptionProcessRecoveryCandidate(data) {
   const instance = context.process_instance
   const { nodes } = context
   if (
-    !['active', 'blocked'].includes(instance?.status) ||
+    ![ProcessStatus.ACTIVE, ProcessStatus.BLOCKED].includes(instance?.status) ||
     !Array.isArray(nodes)
   ) {
     return null
@@ -781,8 +787,8 @@ export function findExceptionProcessRecoveryCandidate(data) {
   for (let index = nodes.length - 1; index >= 0; index -= 1) {
     const node = nodes[index]
     const recoverable =
-      node?.node_type === 'domain_command' &&
-      node.status === 'completed' &&
+      node?.node_type === ProcessNodeType.DOMAIN_COMMAND &&
+      node.status === ProcessNodeStatus.COMPLETED &&
       node.domain_command_effect_state === 'compensated' &&
       SHA256_HEX_PATTERN.test(node.domain_command_result_hash || '') &&
       SHA256_HEX_PATTERN.test(node.domain_command_compensation_hash || '') &&
@@ -792,7 +798,7 @@ export function findExceptionProcessRecoveryCandidate(data) {
       .slice(index + 1)
       .every(
         (downstream) =>
-          downstream?.status !== 'completed' &&
+          downstream?.status !== ProcessNodeStatus.COMPLETED &&
           downstream?.domain_command_result_hash == null &&
           downstream?.domain_command_effect_state == null &&
           downstream?.domain_command_compensation_hash == null

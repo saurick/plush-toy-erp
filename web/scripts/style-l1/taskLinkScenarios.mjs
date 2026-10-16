@@ -1,5 +1,5 @@
 import { createTaskTrackingScenarios } from './taskTrackingScenarios.mjs'
-import { assertTaskCopy } from './taskCopyAssertions.mjs'
+import { assertTaskCopy, assertTaskMenuCopy } from './taskCopyAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export function createTaskLinkScenarios(deps) {
@@ -101,12 +101,12 @@ export function createTaskLinkScenarios(deps) {
             await handling.getByRole('button', { name: '返回任务详情', exact: true }).click()
             const detail = page.getByTestId('mobile-task-detail-screen')
             await detail.waitFor()
-            await assertTaskCopy(page, detail.getByRole('button', { name: '复制任务链接', exact: true }), `${new URL(page.url()).origin}/task-link/${openedID}`)
+            await assertTaskMenuCopy(page, detail, '任务链接', `${new URL(page.url()).origin}/task-link/${openedID}`)
             await detail.getByRole('button', { name: '返回任务列表', exact: true }).click()
           } else {
             await handling.locator('.erp-task-action-drawer__action-prompt').getByText('选择处理方式', { exact: true }).waitFor()
             await handling.getByRole('tab', { name: /核对任务/u }).click()
-            await assertTaskCopy(page, handling.getByRole('button', { name: '复制任务链接', exact: true }), `${new URL(page.url()).origin}/task-link/${openedID}`)
+            await assertTaskMenuCopy(page, handling, '任务链接', `${new URL(page.url()).origin}/task-link/${openedID}`)
             await handling.getByRole('button', { name: '返回列表', exact: true }).click()
           }
           await chain.getByRole('heading', { name: '当前待办', exact: true }).waitFor()

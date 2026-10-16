@@ -1,3 +1,4 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   currentBusinessDate,
   unixSecondsToBusinessDate,
@@ -77,11 +78,17 @@ export function requireTaskCalendarResponse(data, query) {
       isInvalidResponse: true,
     })
   }
+  const restarted = Boolean(
+    query.calendar_revision &&
+    calendar?.revision !== query.calendar_revision &&
+    calendar?.offset === 0
+  )
   if (
     !calendar ||
     calendar.month !== query.calendar_month ||
     calendar.selection !== query.calendar_selection ||
-    calendar.offset !== (query.calendar_offset || 0) ||
+    (!restarted && calendar.offset !== (query.calendar_offset || 0)) ||
+    !/^[a-f0-9]{64}$/u.test(calendar.revision || '') ||
     calendar.limit !== query.limit ||
     !count(calendar.total) ||
     !count(calendar.overdue) ||
@@ -99,8 +106,9 @@ export function requireTaskCalendarResponse(data, query) {
     !Array.isArray(calendar.items) ||
     calendar.items.length !==
       Math.min(calendar.limit, Math.max(0, calendar.total - calendar.offset))
-  )
-    { return invalid() }
+  ) {
+    return invalid()
+  }
   const expected =
     calendar.selection === 'overdue'
       ? calendar.overdue
@@ -111,17 +119,19 @@ export function requireTaskCalendarResponse(data, query) {
     calendar.total !== expected ||
     new Set(calendar.items.map((task) => task?.id)).size !==
       calendar.items.length
-  )
-    { return invalid() }
+  ) {
+    return invalid()
+  }
   for (const task of calendar.items) {
     if (
       !Number.isSafeInteger(task?.id) ||
       task.id <= 0 ||
       !Number.isSafeInteger(task.version) ||
       task.version < 1 ||
-      !['ready', 'blocked'].includes(task.task_status_key)
-    )
-      { return invalid() }
+      ![WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(task.task_status_key)
+    ) {
+      return invalid()
+    }
     if (
       calendar.selection === 'undated'
         ? task.due_at !== null && task.due_at !== undefined
@@ -129,8 +139,9 @@ export function requireTaskCalendarResponse(data, query) {
           ? !Number.isSafeInteger(task.due_at) ||
             task.due_at >= calendar.snapshot_at
           : unixSecondsToBusinessDate(task.due_at) !== calendar.selection
-    )
-      { return invalid() }
+    ) {
+      return invalid()
+    }
   }
   return calendar
 }

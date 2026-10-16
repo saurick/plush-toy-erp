@@ -1,3 +1,4 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { getWorkflowTaskOwnerRoleLabel, getWorkflowTaskStatusMeta } from './workflowTaskBoard.mjs'
 import { getWorkflowTaskDisplayName } from './processRuntimePresentation.mjs'
 import { workflowTaskDiscoveryCatalog as catalog } from './workflowTaskDiscovery.mjs'
@@ -20,7 +21,7 @@ function taskPresentation(task) {
   const personLabel = String(task.discovery?.assignee_name || '').trim()
   const assigned = task.assignee_id > 0 || Boolean(personLabel)
   const statusLabel = getWorkflowTaskStatusMeta(task).label
-  const responsibilityLabel = task.task_status_key === 'ready'
+  const responsibilityLabel = task.task_status_key === WorkflowTaskStatus.READY
     ? assigned ? [roleLabel, personLabel || '已分配', '待办理'].join(' · ') : `待${roleLabel}领取`
     : [roleLabel, personLabel, statusLabel].filter(Boolean).join(' · ')
   const seen = new Set()
@@ -63,9 +64,9 @@ export function buildWorkflowBusinessChain(data, currentTaskID) {
   }
   const decorate = (group) => ({ ...group,
     current: group.tasks.some((task) => task.current),
-    open: group.tasks.filter((task) => ['ready', 'blocked'].includes(task.task_status_key)).length,
-    blocked: group.tasks.some((task) => task.task_status_key === 'blocked'),
-    tasks: [...group.tasks].sort((a, b) => Number(b.current) - Number(a.current) || Number(b.task_status_key === 'blocked') - Number(a.task_status_key === 'blocked') || Number(b.task_status_key === 'ready') - Number(a.task_status_key === 'ready') || a.id - b.id),
+    open: group.tasks.filter((task) => [WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(task.task_status_key)).length,
+    blocked: group.tasks.some((task) => task.task_status_key === WorkflowTaskStatus.BLOCKED),
+    tasks: [...group.tasks].sort((a, b) => Number(b.current) - Number(a.current) || Number(b.task_status_key === WorkflowTaskStatus.BLOCKED) - Number(a.task_status_key === WorkflowTaskStatus.BLOCKED) || Number(b.task_status_key === WorkflowTaskStatus.READY) - Number(a.task_status_key === WorkflowTaskStatus.READY) || a.id - b.id),
   })
   const mainGroups = [...main.values()].map(decorate)
   const exceptionGroups = [...exceptions.values()].map(decorate)
@@ -73,8 +74,8 @@ export function buildWorkflowBusinessChain(data, currentTaskID) {
   const unknownGroups = mainGroups.filter((group) => !knownStages.has(group.key))
   const summarize = (key, label, groups) => {
     const group = decorate({ key, label, groups, tasks: groups.flatMap((item) => item.tasks) })
-    const blocked = group.tasks.filter((item) => item.task_status_key === 'blocked').length
-    const ended = group.tasks.every((item) => ['done', 'rejected', 'withdrawn'].includes(item.task_status_key))
+    const blocked = group.tasks.filter((item) => item.task_status_key === WorkflowTaskStatus.BLOCKED).length
+    const ended = group.tasks.every((item) => [WorkflowTaskStatus.DONE, WorkflowTaskStatus.REJECTED, WorkflowTaskStatus.WITHDRAWN].includes(item.task_status_key))
     return { ...group,
       tone: blocked ? 'blocked' : group.open ? 'active' : 'neutral',
       statusLabel: !group.tasks.length ? '暂无可见任务' : blocked ? `${blocked} 项受阻` : group.open ? `${group.open} 项待处理` : ended ? '可见任务已结束' : '状态待核对',

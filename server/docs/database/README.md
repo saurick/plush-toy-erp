@@ -9,6 +9,7 @@
 - 数据结构真源仍是 [`server/internal/data/model/schema`](../../internal/data/model/schema) 与 [Atlas migration](../../internal/data/model/migrate)；本目录是生成投影，不是第三套 schema。
 - 业务语义由 [`table-catalog.json`](table-catalog.json) 维护；生成 Markdown 不接受手工修改。
 - Ent 的 Go 侧 `Default(time.Now)`、`UpdateDefault`、`Immutable`、`Sensitive` 和 validators 不一定进入 generated migration descriptor；重要边界仍应回到链接的 schema/usecase/正式文档核对。
+- 字符串类型遵循 Ent 的 Atlas PostgreSQL 映射：普通 `Size` / `MaxLen` 不产生数据库 `varchar(n)`，只有显式 `SchemaType[postgres]` 才声明物理长度；Go 校验与数据库类型分别核对。
 - 目标数据库是否已 apply、是否有漂移或人工 `COMMENT`，必须通过目标环境 migration status 与结构读回单独证明。
 
 ```bash

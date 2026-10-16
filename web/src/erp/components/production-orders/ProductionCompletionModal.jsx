@@ -8,6 +8,7 @@ import {
   Select,
   Typography,
 } from 'antd'
+import { ProductionOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { warehouseAcceptsSubject } from '../../utils/warehouseClassification.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
@@ -162,7 +163,7 @@ export default function ProductionCompletionModal({
       title={
         editing
           ? '核对成品收仓草稿'
-          : order?.status === 'CLOSED'
+          : order?.status === ProductionOrderStatus.CLOSED
             ? '登记返工成品收仓'
             : '登记成品收仓'
       }
@@ -177,7 +178,7 @@ export default function ProductionCompletionModal({
         type="info"
         showIcon
         message={
-          order?.status === 'CLOSED'
+          order?.status === ProductionOrderStatus.CLOSED
             ? '当前订单已关闭，只能按已完成手工的返工补制批次登记收仓；仓库确认入库后增加库存，检验与查货包装完成前禁止发货。'
             : editing
               ? '生产明细和完工来源批次保持不变；可修正拟入库仓库、批次、数量、时间和备注，保存后仍是待入库草稿，不会更新库存。'
@@ -229,9 +230,9 @@ export default function ProductionCompletionModal({
             key: 'status',
             label: '来源状态',
             children:
-              order?.status === 'RELEASED'
+              order?.status === ProductionOrderStatus.RELEASED
                 ? '已发布'
-                : order?.status === 'CLOSED'
+                : order?.status === ProductionOrderStatus.CLOSED
                   ? '已关闭，仅登记返工成品收仓'
                   : '待核对',
           },

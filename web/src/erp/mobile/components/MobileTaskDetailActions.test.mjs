@@ -143,11 +143,15 @@ test('mobile source navigation preserves authorized task handling and urge actio
     })
     assert.ok(button('进入单据办理'), 'the source document remains reachable')
     assert.ok(
-      button('处理任务'),
+      button('选择处理方式'),
       `${owner} must be able to open the authorized workflow action`
     )
+    assert.deepEqual(
+      buttons().map((node) => node.textContent.trim()),
+      ['进入单据办理', '选择处理方式']
+    )
     const before = actions.length
-    await act(async () => button('处理任务').click())
+    await act(async () => button('选择处理方式').click())
     assert.equal(actions.length, before + 1)
     assert.equal(actions.at(-1), undefined)
     assert.equal(
@@ -156,10 +160,19 @@ test('mobile source navigation preserves authorized task handling and urge actio
     )
   }
 
+  await render({ selectedTask: { ...task, assignee_id: 9, discovery: { assignee_name: '林工' } } })
+  assert.match(container.querySelector('.workflow-task-current').textContent, /林工/u)
+  await render({ selectedTask: { ...task, id: 8, assignee_id: null } })
+  assert.doesNotMatch(container.querySelector('.workflow-task-current').textContent, /林工/u, 'the current assignee is shown without carrying it to a new task')
+
   await render({ selectedCanOperate: false, selectedCanUrge: true })
   assert.ok(button('进入单据办理'))
-  assert.equal(button('处理任务'), undefined)
+  assert.equal(button('选择处理方式'), undefined)
   assert.ok(button('催办任务'))
+  assert.deepEqual(
+    buttons().map((node) => node.textContent.trim()),
+    ['进入单据办理', '催办任务']
+  )
   await act(async () => button('催办任务').click())
   assert.equal(actions.at(-1), 'urge')
 
@@ -169,7 +182,7 @@ test('mobile source navigation preserves authorized task handling and urge actio
     { failed: true },
   ]) {
     await render({ selectedCanUrge: false, actionAccess: access })
-    assert.equal(button('处理任务'), undefined)
+    assert.equal(button('选择处理方式'), undefined)
     assert.equal(button('催办任务'), undefined)
   }
   await render({

@@ -143,7 +143,7 @@ export function createDesktopNavigationBadgeScenarios({
         await menu.click()
         await page.waitForURL('**/erp/task-board?mode=todo')
         await page
-          .locator('.erp-task-board-lanes--todo .erp-task-board-card')
+          .locator('.erp-task-board-lane--overview .erp-task-table-row')
           .first()
           .waitFor()
         assert.equal(
@@ -157,7 +157,7 @@ export function createDesktopNavigationBadgeScenarios({
             '.erp-task-board-scope-filter .erp-sliding-segmented',
             1
           )
-          await page.locator('.erp-task-board-lane--finished').waitFor()
+          await page.locator('.erp-task-progress-rail__item[data-lane="finished"]').waitFor()
           await verifyMobileNavigationMotion(
             page,
             assert,
@@ -204,7 +204,7 @@ export function createDesktopNavigationBadgeScenarios({
         })
         if (themeMode === 'light') {
           const card = page
-            .locator('.erp-task-board-card')
+            .locator('.erp-task-table-row')
             .filter({ hasText: '核对样品尺寸' })
             .first()
           await card.click()

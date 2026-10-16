@@ -20,6 +20,9 @@ func TestTerminalAssigneeRecoveryTargetBoundaries(t *testing.T) {
 		allow                    bool
 	}{
 		{"shared", shared, history, true},
+		{"orb", "postgres://plush_dev_migrator@127.0.0.1:15432/plush_erp?sslmode=disable", history, true},
+		{"unregistered loopback", "postgres://postgres@127.0.0.1:15433/plush_erp?sslmode=disable", history, false},
+		{"orb override", "postgres://postgres@127.0.0.1:15432/plush_erp?host=192.0.2.1", history, false},
 		{"rehearsal", "postgres://postgres@127.0.0.1:55499/plush_erp_ci_target?sslmode=disable", history, true},
 		{"customer test", "postgres://postgres@" + devdbguard.CustomerConfigLocalTestHost + ":5435/plush_erp?sslmode=disable", history, false},
 		{"another database", "postgres://postgres@" + devdbguard.CustomerConfigLocalTestHost + ":5432/another?sslmode=disable", history, false},

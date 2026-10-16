@@ -1,40 +1,47 @@
+import {
+  ProcessKey,
+  ProcessNodeStatus,
+  ProcessNodeType,
+  ProcessResolution,
+  ProcessStatus,
+} from '../../common/consts/statuses.generated.mjs'
 import { getRoleDisplayName } from './roleKeys.mjs'
 
 const PROCESS_STATUS_LABELS = Object.freeze({
-  active: '办理中',
-  blocked: '流程受阻',
-  completed: '已结束',
+  [ProcessStatus.ACTIVE]: '办理中',
+  [ProcessStatus.BLOCKED]: '流程受阻',
+  [ProcessStatus.COMPLETED]: '已结束',
 })
 
 const PROCESS_RESOLUTION_LABELS = Object.freeze({
-  succeeded: '正常结束',
-  rejected: '已退回结束',
-  cancelled: '已取消',
-  compensated: '已补偿结束',
+  [ProcessResolution.SUCCEEDED]: '正常结束',
+  [ProcessResolution.REJECTED]: '已退回结束',
+  [ProcessResolution.CANCELLED]: '已取消',
+  [ProcessResolution.COMPENSATED]: '已补偿结束',
 })
 
 const PROCESS_RESOLUTION_HANDOFF_LABELS = Object.freeze({
-  succeeded: '流程正常结束。',
-  rejected: '流程已退回结束。',
-  cancelled: '来源单据已取消，流程已结束。',
-  compensated: '流程已补偿结束。',
+  [ProcessResolution.SUCCEEDED]: '流程正常结束。',
+  [ProcessResolution.REJECTED]: '流程已退回结束。',
+  [ProcessResolution.CANCELLED]: '来源单据已取消，流程已结束。',
+  [ProcessResolution.COMPENSATED]: '流程已补偿结束。',
 })
 
 const PROCESS_LABELS = Object.freeze({
-  sales_order_acceptance: '销售订单受理',
-  material_supply: '采购订单提交与审批',
-  finished_goods_delivery: '出货财务放行',
-  finance_payment_approval: '收付款审批',
-  inventory_adjustment_approval: '人工库存调整',
-  production_exception_approval: '生产异常处置',
+  [ProcessKey.SALES_ORDER_ACCEPTANCE]: '销售订单受理',
+  [ProcessKey.MATERIAL_SUPPLY]: '采购订单提交与审批',
+  [ProcessKey.FINISHED_GOODS_DELIVERY]: '出货财务放行',
+  [ProcessKey.FINANCE_PAYMENT_APPROVAL]: '收付款审批',
+  [ProcessKey.INVENTORY_ADJUSTMENT_APPROVAL]: '人工库存调整',
+  [ProcessKey.PRODUCTION_EXCEPTION_APPROVAL]: '生产异常处置',
 })
 
 const NODE_STATUS_LABELS = Object.freeze({
-  waiting: '等待中',
-  active: '办理中',
-  blocked: '受阻',
-  completed: '已完成',
-  withdrawn: '已撤回',
+  [ProcessNodeStatus.WAITING]: '等待中',
+  [ProcessNodeStatus.ACTIVE]: '办理中',
+  [ProcessNodeStatus.BLOCKED]: '受阻',
+  [ProcessNodeStatus.COMPLETED]: '已完成',
+  [ProcessNodeStatus.WITHDRAWN]: '已撤回',
 })
 
 const NODE_LABELS = Object.freeze({
@@ -79,9 +86,9 @@ const NODE_LABELS = Object.freeze({
 })
 
 const APPROVAL_FORM_PROFILE_KEYS = new Set([
-  'finance_payment_approval',
-  'inventory_adjustment_approval',
-  'production_exception_approval',
+  ProcessKey.FINANCE_PAYMENT_APPROVAL,
+  ProcessKey.INVENTORY_ADJUSTMENT_APPROVAL,
+  ProcessKey.PRODUCTION_EXCEPTION_APPROVAL,
 ])
 
 const PROCESS_STATUS_KEYS = new Set(Object.keys(PROCESS_STATUS_LABELS))
@@ -89,11 +96,11 @@ const PROCESS_RESOLUTION_KEYS = new Set(Object.keys(PROCESS_RESOLUTION_LABELS))
 const PROCESS_KEYS = new Set(Object.keys(PROCESS_LABELS))
 const NODE_STATUS_KEYS = new Set(Object.keys(NODE_STATUS_LABELS))
 const NODE_TYPE_KEYS = new Set([
-  'human_task',
-  'approval',
-  'domain_command',
-  'wait_event',
-  'end',
+  ProcessNodeType.HUMAN_TASK,
+  ProcessNodeType.APPROVAL,
+  ProcessNodeType.DOMAIN_COMMAND,
+  ProcessNodeType.WAIT_EVENT,
+  ProcessNodeType.END,
 ])
 
 function invalidProcessContext() {
@@ -137,7 +144,7 @@ export function requireWorkflowProcessContext(value) {
     instance.started_at <= 0 ||
     (instance.resolution_kind != null &&
       (!PROCESS_RESOLUTION_KEYS.has(instance.resolution_kind) ||
-        instance.status !== 'completed')) ||
+        instance.status !== ProcessStatus.COMPLETED)) ||
     (instance.resolution_reason != null &&
       typeof instance.resolution_reason !== 'string') ||
     (instance.resolved_at != null &&
@@ -188,14 +195,14 @@ export function requireWorkflowProcessContext(value) {
         validateNode(node) &&
         nodeIDs.has(node.id) &&
         matchesCanonicalNode(node) &&
-        ['active', 'blocked'].includes(node.status)
+        [ProcessNodeStatus.ACTIVE, ProcessNodeStatus.BLOCKED].includes(node.status)
     ) ||
     !completedNodes.every(
       (node) =>
         validateNode(node) &&
         nodeIDs.has(node.id) &&
         matchesCanonicalNode(node) &&
-        node.status === 'completed'
+        node.status === ProcessNodeStatus.COMPLETED
     )
   ) {
     invalidProcessContext()
@@ -214,7 +221,7 @@ export function requireWorkflowProcessContext(value) {
         keys[0] !== 'node_instance_id' ||
         keys[1] !== 'owner_role_key' ||
         !node ||
-        !['human_task', 'approval'].includes(node.node_type) ||
+        ![ProcessNodeType.HUMAN_TASK, ProcessNodeType.APPROVAL].includes(node.node_type) ||
         responsibilityNodeIDs.has(item.node_instance_id) ||
         typeof item.owner_role_key !== 'string' ||
         !item.owner_role_key.trim() ||
@@ -241,7 +248,7 @@ export function requireWorkflowProcessContext(value) {
     const approvedQuantity = approvalForm.approved_quantity
     if (
       !linkedNode ||
-      linkedNode.node_type !== 'approval' ||
+      linkedNode.node_type !== ProcessNodeType.APPROVAL ||
       !APPROVAL_FORM_PROFILE_KEYS.has(approvalForm.profile_key) ||
       approvalForm.profile_key !== linkedNode.form_profile_key ||
       approvalForm.reason_required !== true ||
@@ -278,7 +285,7 @@ export function getWorkflowTaskDisplayName(task = {}) {
 }
 
 export function getProcessNodeStatusLabel(node = {}) {
-  if (node.status === 'withdrawn') return NODE_STATUS_LABELS.withdrawn
+  if (node.status === ProcessNodeStatus.WITHDRAWN) return NODE_STATUS_LABELS[ProcessNodeStatus.WITHDRAWN]
   if (
     [
       'sales_order.submitted_without_approval',
@@ -292,7 +299,7 @@ export function getProcessNodeStatusLabel(node = {}) {
 }
 
 export function getProcessStatusLabel(instance = {}) {
-  if (instance.status === 'completed' && instance.resolution_kind != null) {
+  if (instance.status === ProcessStatus.COMPLETED && instance.resolution_kind != null) {
     return (
       PROCESS_RESOLUTION_LABELS[instance.resolution_kind] || '结束结果待确认'
     )
@@ -301,11 +308,11 @@ export function getProcessStatusLabel(instance = {}) {
 }
 
 export function getProcessNodeTone(node = {}) {
-  if (node.status === 'withdrawn') return 'withdrawn'
+  if (node.status === ProcessNodeStatus.WITHDRAWN) return 'withdrawn'
   if (node.outcome === 'rejected') return 'rejected'
-  if (node.status === 'completed') return 'completed'
-  if (node.status === 'blocked') return 'blocked'
-  if (node.status === 'active') return 'active'
+  if (node.status === ProcessNodeStatus.COMPLETED) return 'completed'
+  if (node.status === ProcessNodeStatus.BLOCKED) return 'blocked'
+  if (node.status === ProcessNodeStatus.ACTIVE) return 'active'
   return 'waiting'
 }
 
@@ -322,7 +329,7 @@ export function buildWorkflowProcessStageModel(value) {
   const linkedNodeID = Number(context.linked_node?.id || 0)
   const items = [...context.nodes]
     .sort((left, right) => left.id - right.id)
-    .filter((node) => node.status !== 'waiting')
+    .filter((node) => node.status !== ProcessNodeStatus.WAITING)
     .map((node) => ({
       id: node.id,
       key: `${node.id}:${node.version}`,
@@ -335,8 +342,8 @@ export function buildWorkflowProcessStageModel(value) {
       linked: linkedNodeID > 0 && linkedNodeID === node.id,
     }))
   const hasUndecidedRoute =
-    context.process_instance.status !== 'completed' &&
-    context.nodes.some((node) => node.status === 'waiting')
+    context.process_instance.status !== ProcessStatus.COMPLETED &&
+    context.nodes.some((node) => node.status === ProcessNodeStatus.WAITING)
   const counts = items.reduce(
     (result, item) => {
       if (item.completed) result.completed += 1
@@ -352,11 +359,11 @@ export function buildWorkflowProcessStageModel(value) {
     .filter((item) => item.current)
     .map((item) => item.label)
   const currentHumanNodes = context.current_nodes.filter((node) =>
-    ['human_task', 'approval'].includes(node.node_type)
+    [ProcessNodeType.HUMAN_TASK, ProcessNodeType.APPROVAL].includes(node.node_type)
   )
   const currentHumanLabels = currentHumanNodes.map(getProcessNodeLabel)
   const currentSystemLabels = context.current_nodes
-    .filter((node) => node.node_type === 'domain_command')
+    .filter((node) => node.node_type === ProcessNodeType.DOMAIN_COMMAND)
     .map(getProcessNodeLabel)
   const responsibilityByNodeID = new Map(
     context.current_responsibilities.map((item) => [
@@ -400,7 +407,7 @@ export function buildWorkflowProcessStageModel(value) {
   } else if (currentSystemLabels.length > 0) {
     handoffKind = 'system'
     handoffLabel = `系统正在自动处理：${currentSystemLabels.join('、')}。`
-  } else if (context.process_instance.status === 'completed') {
+  } else if (context.process_instance.status === ProcessStatus.COMPLETED) {
     handoffKind = 'end'
     handoffLabel =
       PROCESS_RESOLUTION_HANDOFF_LABELS[

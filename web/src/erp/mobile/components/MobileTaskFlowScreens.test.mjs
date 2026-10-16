@@ -199,7 +199,7 @@ test('mobile task flow exposes one shared three-step navigation contract', () =>
   assert.match(detailScreenSource, /data-testid="mobile-task-detail-screen"/u)
   assert.match(
     detailScreenSource,
-    /selectedCanUrge && !selectedCanOperate[\s\S]*?\? '催办任务'[\s\S]*?: '处理任务'/u
+    /selectedCanUrge && !selectedCanOperate[\s\S]*?\? '催办任务'[\s\S]*?: '选择处理方式'/u
   )
   assert.doesNotMatch(
     detailScreenSource,
@@ -305,38 +305,16 @@ test('mobile task processing explains business boundaries before submit without 
   )
 })
 
-test('mobile task detail keeps one compact task summary and leaves completion feedback to the receipt', () => {
-  assert.match(detailScreenSource, /mobile-task-detail-summary/u)
-  assert.match(detailScreenSource, /<dt>负责岗位<\/dt>[\s\S]*?<dd>\{ownerRoleLabel\}<\/dd>/u)
-  assert.match(
-    detailScreenSource,
-    /getWorkflowTaskTiming\(selectedTask,\s*\{\s*detail: true/u
-  )
-  assert.match(detailScreenSource, />\s*业务信息\s*</u)
-  assert.doesNotMatch(detailScreenSource, />\s*当前任务\s*</u)
-  assert.doesNotMatch(detailScreenSource, />\s*当前办理状态\s*</u)
-  assert.doesNotMatch(
-    detailScreenSource,
-    /resolveMobileTaskCompletionFeedback/u
-  )
+test('mobile detail shares current responsibility and keeps feedback in the receipt', () => {
+  assert.match(detailScreenSource, /WorkflowTaskCurrentSummary/u)
+  assert.match(detailScreenSource, /roleLabel=\{ownerRoleLabel\}/u)
+  assert.match(detailScreenSource, /assigneeLabel=\{assigneeLabel\}/u)
+  assert.match(detailScreenSource, /getWorkflowTaskExceptionContactPresentation/u)
+  assert.match(detailScreenSource, /reason=\{isTaskRisk\(selectedTask\) \? taskReason : ''\}/u)
+  assert.match(detailScreenSource, /contact=\{exceptionContact\}/u)
+  assert.doesNotMatch(detailScreenSource, /resolveMobileTaskCompletionFeedback/u)
   assert.doesNotMatch(detailScreenSource, />\s*完成反馈\s*</u)
-  assert.doesNotMatch(detailScreenSource, />\s*返回列表\s*</u)
-  assert.match(
-    detailScreenSource,
-    /getWorkflowTaskExceptionContactPresentation/u
-  )
-  assert.match(detailScreenSource, /mobile-task-exception-contact/u)
-  assert.match(detailScreenSource, /mobile-task-exception-contact__role/u)
-  assert.match(
-    detailScreenSource,
-    /mobile-task-exception-contact__role font-extrabold/u
-  )
-  assert.match(detailScreenSource, /part\.kind === 'role'/u)
-  assert.doesNotMatch(detailScreenSource, /<strong>异常处理：<\/strong>/u)
-  assert.match(
-    detailScreenSource,
-    /\(isTaskRisk\(selectedTask\) && taskReason\) \|\| exceptionContactHint/u
-  )
+  assert.match(detailScreenSource, />\s*业务信息\s*</u)
 })
 
 test('mobile task detail loads formal process position without QA-only banners', () => {
@@ -346,7 +324,7 @@ test('mobile task detail loads formal process position without QA-only banners',
   assert.match(handlingChainSource, /本任务处理进度/u)
   assert.match(handlingChainSource, /查看订单全流程/u)
   assert.match(handlingChainSource, /业务流程/u)
-  assert.match(handlingChainSource, /发起时间/u)
+  assert.match(handlingChainSource, /formatProcessStartedAt/u)
   assert.match(handlingChainSource, /流程状态/u)
   assert.match(detailScreenSource, /WorkflowTaskHandlingChain/u)
   assert.match(processStageSource, /data-testid="workflow-process-stage"/u)

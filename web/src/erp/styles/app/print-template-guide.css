@@ -47,11 +47,6 @@
   color: var(--erp-primary, #238348);
 }
 
-.erp-template-center .erp-print-center-template-btn:hover {
-  border-color: var(--erp-primary, #238348);
-  background: var(--erp-interactive-bg-hover, #f1f8f3);
-}
-
 .erp-template-center .erp-print-center-template-btn:focus-visible {
   outline: 2px solid var(--erp-primary, #238348);
   outline-offset: 2px;

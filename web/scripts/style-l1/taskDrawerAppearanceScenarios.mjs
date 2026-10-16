@@ -72,17 +72,30 @@ export function createTaskDrawerAppearanceScenarios({
         exact: true,
       })
       await trigger.waitFor()
-      const card = page.locator('.erp-task-card').filter({ has: trigger })
-      const openDrawer = () => clickTaskCardContent(card, card.getByText(taskName, { exact: true }))
+      const openDrawer = () => trigger.click()
       const drawer = page.locator('.erp-task-action-drawer')
       const tabs = '.erp-task-action-drawer__guide-steps'
-      const shot = (suffix) =>
-        page.screenshot({
+      const waitForDrawer = async () => {
+        await drawer.waitFor({ state: 'visible' })
+        await waitForFiniteAnimations(page)
+        await page.waitForFunction(() => {
+          const element = document.querySelector('.erp-task-action-drawer')
+          if (!element) return false
+          const rect = element.getBoundingClientRect()
+          return rect.width > 0 && rect.height > 0 && rect.left >= -1 &&
+            Math.abs(rect.right - innerWidth) <= 1 &&
+            rect.top >= -1 && rect.bottom <= innerHeight + 1
+        })
+      }
+      const shot = async (suffix) => {
+        await waitForDrawer()
+        await page.screenshot({
           path: path.resolve(
             outputDir,
             `task-drawer-${themeMode}-${suffix}.png`
           ),
         })
+      }
 
       for (const [label, key] of [
         ['蓝色', 'blue'],
@@ -110,7 +123,7 @@ export function createTaskDrawerAppearanceScenarios({
         await appearance.waitFor({ state: 'hidden' })
         await openDrawer()
         await drawer.getByRole('region', { name: '本任务处理记录' }).waitFor()
-        await waitForFiniteAnimations(page)
+        await waitForDrawer()
         const geometry = await drawer.evaluate((root) => {
           const rect = (selector) =>
             root.querySelector(selector).getBoundingClientRect()
@@ -118,14 +131,16 @@ export function createTaskDrawerAppearanceScenarios({
             getComputedStyle(root.querySelector(selector))
           const meta = [
             ...root.querySelectorAll(
-              '.erp-task-action-drawer__task-meta > div'
+              '.workflow-task-current__responsibility > *'
             ),
           ]
           const marker = '.erp-task-action-drawer__step--active > span'
-          const stage = '.workflow-process-stage__marker'
           const primary = '.ant-drawer-footer .ant-btn-primary'
           const body = root.querySelector('.ant-drawer-body')
           return {
+            drawerLeft: root.getBoundingClientRect().left,
+            drawerRight: root.getBoundingClientRect().right,
+            viewportWidth: innerWidth,
             headerHeight: rect('.ant-drawer-header').height,
             stepHeight: rect('.erp-task-action-drawer__guide-steps').height,
             cardRadius: style('.erp-task-action-drawer__summary').borderRadius,
@@ -134,38 +149,41 @@ export function createTaskDrawerAppearanceScenarios({
             closeRight: rect('.ant-drawer-close').right,
             closeWidth: rect('.ant-drawer-close').width,
             titleLeft: rect('.erp-task-action-drawer__heading').left,
-            metaTopDelta:
-              meta[0].getBoundingClientRect().y -
-              meta[1].getBoundingClientRect().y,
+            responsibilityGap:
+              meta[1].getBoundingClientRect().left -
+              meta[0].getBoundingClientRect().right,
             markerBackground: style(marker).backgroundColor,
             markerForeground: style(marker).color,
             primaryBackground: style(primary).backgroundColor,
-            stageBorder: style(stage).borderTopColor,
+            chainNodes: root.querySelectorAll('.workflow-process-stage__marker').length,
+            noteColor: style('.erp-task-handling-note').color,
             surface: style('.erp-task-action-drawer__summary').backgroundColor,
             pageBackground: getComputedStyle(body).backgroundColor,
             expectedPageBackground: getComputedStyle(body)
-              .getPropertyValue('--erp-page-bg')
+              .getPropertyValue('--erp-surface-bg')
               .trim(),
-            stageHeight: rect('.workflow-process-stage__list').height,
+            noteHeight: rect('.erp-task-handling-note').height,
             bodyOverflow: body.scrollWidth - body.clientWidth,
           }
         })
         const context = `${themeMode}/${key}: ${JSON.stringify(geometry)}`
+        assert(geometry.drawerLeft >= -1 && Math.abs(geometry.drawerRight - geometry.viewportWidth) <= 1, context)
         assert(
           geometry.headerHeight <= 56 && geometry.stepHeight <= 40,
           context
         )
-        assert.equal(geometry.cardRadius, '10px', context)
-        assert.equal(geometry.recordRadius, '10px', context)
-        assert.equal(geometry.titleSize, '16px', context)
+        assert.equal(geometry.cardRadius, '0px', context)
+        assert.equal(geometry.recordRadius, '0px', context)
+        assert.equal(geometry.titleSize, '23px', context)
         assert(geometry.closeRight < geometry.titleLeft && geometry.closeWidth >= 44, context)
-        assert(Math.abs(geometry.metaTopDelta) < 1, context)
+        assert(geometry.responsibilityGap >= 0 && geometry.responsibilityGap <= 12, context)
         assert.equal(
           geometry.markerBackground,
           geometry.primaryBackground,
           context
         )
-        assert.equal(geometry.stageBorder, geometry.primaryBackground, context)
+        assert.equal(geometry.chainNodes, 0, context)
+        assert(getContrastRatio(parseRgb(geometry.noteColor), parseRgb(geometry.pageBackground)) >= 4.5, context)
         assert.deepEqual(
           parseRgb(geometry.pageBackground),
           parseRgb(geometry.expectedPageBackground),
@@ -178,7 +196,7 @@ export function createTaskDrawerAppearanceScenarios({
           ) >= 4.5,
           context
         )
-        assert(geometry.stageHeight < 80 && geometry.bodyOverflow <= 1, context)
+        assert(geometry.noteHeight <= 48 && geometry.bodyOverflow <= 1, context)
         if (key === 'pink' || key === 'yellow') await shot(`${key}-context`)
 
         await drawer.getByRole('button', { name: '选择处理方式', exact: true }).click()
@@ -325,13 +343,14 @@ export function createTaskDrawerAppearanceScenarios({
         const paint = await history.evaluate((root) => {
           const style = getComputedStyle(root)
           const title = getComputedStyle(root.querySelector('h3'))
+          const surface = getComputedStyle(root.closest('.mobile-detail-content'))
           return {
             radius: style.borderRadius,
             peerRadius: getComputedStyle(
               document.querySelector('.mobile-task-detail-hero')
             ).borderRadius,
             foreground: title.color,
-            background: style.backgroundColor,
+            background: surface.backgroundColor,
             expectedBackground: style
               .getPropertyValue('--erp-surface-bg')
               .trim(),
@@ -357,7 +376,7 @@ export function createTaskDrawerAppearanceScenarios({
         await detail.screenshot({
           path: path.join(outputDir, 'task-detail-shared-mobile-dark.png'),
         })
-        await detail.locator('.mobile-role-action-bar').getByRole('button', { name: '处理任务', exact: true }).click()
+        await detail.locator('.mobile-role-action-bar').getByRole('button', { name: '选择处理方式', exact: true }).click()
         const action = page.getByTestId('mobile-task-action-screen')
         await action.waitFor()
         assert.deepEqual(

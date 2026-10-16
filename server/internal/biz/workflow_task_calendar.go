@@ -1,6 +1,9 @@
 package biz
 
-import "time"
+import (
+	"encoding/hex"
+	"time"
+)
 
 // Calendar is a read projection of active tasks, grouped by their processing
 // deadline in the business timezone. It does not schedule or create tasks.
@@ -8,6 +11,7 @@ type WorkflowTaskCalendarQuery struct {
 	Month     string
 	Selection string
 	Offset    int
+	Revision  string
 }
 
 type WorkflowTaskCalendar struct {
@@ -20,6 +24,7 @@ type WorkflowTaskCalendar struct {
 	Offset     int
 	Limit      int
 	SnapshotAt time.Time
+	Revision   string
 	Tasks      []*WorkflowTask
 }
 
@@ -28,6 +33,11 @@ var workflowCalendarZone = time.FixedZone("Asia/Shanghai", 8*3600)
 func (q *WorkflowTaskCalendarQuery) Bounds() (time.Time, time.Time, error) {
 	if q == nil || q.Offset < 0 || q.Offset > 2_147_483_647 {
 		return time.Time{}, time.Time{}, ErrBadParam
+	}
+	if q.Revision != "" || q.Offset > 0 {
+		if decoded, err := hex.DecodeString(q.Revision); err != nil || len(decoded) != 32 {
+			return time.Time{}, time.Time{}, ErrBadParam
+		}
 	}
 	month, err := time.ParseInLocation("2006-01", q.Month, workflowCalendarZone)
 	if err != nil || month.Year() < 1900 || month.Year() > 9998 || month.Format("2006-01") != q.Month {

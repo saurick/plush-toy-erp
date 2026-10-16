@@ -9,6 +9,23 @@ import {
   installDeliverySummaryRoute,
 } from './devVersionCenterScenarios.mjs'
 import { installDrillRecoveryRoutes } from './devDrillRecoveryScenarios.mjs'
+import { DEV_DELIVERY_TARGETS } from '../../src/dev-workbench/config/devDelivery.mjs'
+
+test('delivery fixture covers the target catalog and keeps unverified targets blocked', () => {
+  const summary = createVersionCenterSummary()
+  const keys = DEV_DELIVERY_TARGETS.map(({ key }) => key)
+  assert.deepEqual(summary.targets.map(({ key }) => key), keys)
+  assert.deepEqual(summary.boundaries.targets, keys)
+  for (const version of summary.versions) {
+    assert.deepEqual(Object.keys(version.actionsByTarget), keys)
+    for (const target of summary.targets.filter(({ preflight }) => preflight === null)) {
+      assert.deepEqual(version.actionsByTarget[target.key], {
+        actionClass: 'blocked',
+        actionReason: 'target_identity_unavailable',
+      })
+    }
+  }
+})
 
 test('shared DEV delivery route serves the validated fixture without live target reads', async () => {
   let registeredPattern = ''

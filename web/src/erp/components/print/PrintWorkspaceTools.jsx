@@ -29,6 +29,48 @@ const TOOL_ICON_PATHS = {
   back: 'm9 4-6 6 6 6M3 10h12a6 6 0 0 1 6 6v4',
 }
 
+export function PrintItemOrderTools({
+  index,
+  count,
+  onAction,
+  disabled = false,
+  canMoveUp,
+  canMoveDown,
+  moveLabel = '一行',
+  clearLabel = '清空当前行',
+}) {
+  const selected = Number.isInteger(index) && index >= 0 && index < count
+  return (
+    <>
+      <PrintToolButton
+        icon="up"
+        disabled={disabled || !selected || !(canMoveUp ?? index > 0)}
+        data-print-structure-action
+        onClick={() => onAction('up')}
+      >
+        上移{moveLabel}
+      </PrintToolButton>
+      <PrintToolButton
+        icon="down"
+        disabled={disabled || !selected || !(canMoveDown ?? index < count - 1)}
+        data-print-structure-action
+        onClick={() => onAction('down')}
+      >
+        下移{moveLabel}
+      </PrintToolButton>
+      <PrintToolButton
+        icon="clear"
+        wide
+        disabled={disabled || !selected}
+        data-print-structure-action
+        onClick={() => onAction('clear')}
+      >
+        {clearLabel}
+      </PrintToolButton>
+    </>
+  )
+}
+
 export function PrintToolIcon({ name }) {
   const path = TOOL_ICON_PATHS[name]
   return path ? (

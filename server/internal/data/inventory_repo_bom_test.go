@@ -125,6 +125,18 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	if replayed, err := uc.ActivateBOMVersion(ctx, header.ID); err != nil || replayed.Header.ID != header.ID || replayed.Header.Status != biz.BOMStatusActive {
 		t.Fatalf("expected activating ACTIVE BOM to be idempotent, detail=%#v err=%v", replayed, err)
 	}
+	for _, toggle := range []func(bool){
+		func(active bool) { client.Product.UpdateOneID(fixtures.productID).SetIsActive(active).ExecX(ctx) },
+		func(active bool) { client.Material.UpdateOneID(fixtures.materialID).SetIsActive(active).ExecX(ctx) },
+		func(active bool) { client.Unit.UpdateOneID(fixtures.unitID).SetIsActive(active).ExecX(ctx) },
+	} {
+		toggle(false)
+		replayed, err := uc.ActivateBOMVersion(ctx, header.ID)
+		toggle(true)
+		if err != nil || replayed.Header.ID != header.ID || replayed.Header.Status != biz.BOMStatusActive {
+			t.Fatalf("inactive reference changed an already successful activation: %+v %v", replayed, err)
+		}
+	}
 	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
 		BOMHeaderID: header.ID,
 		MaterialID:  fixtures.materialID,

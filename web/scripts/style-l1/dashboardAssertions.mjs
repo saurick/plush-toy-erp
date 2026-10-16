@@ -128,25 +128,13 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           }
         }
         const taskMetrics = expectTaskCategories
-          ? Array.from(document.querySelectorAll('.erp-task-board-lane'))
+          ? Array.from(document.querySelectorAll('.erp-task-progress-rail__item[data-lane]'))
               .filter(isVisible)
               .map((node) => ({
-                repeatedCount: node.querySelectorAll('.erp-task-board-lane-count').length,
-                count: Number(
-                  [...document.querySelectorAll('.erp-task-progress-rail__item[data-lane]')]
-                    .find((item) => node.classList.contains(`erp-task-board-lane--${item.dataset.lane}`))
-                    ?.querySelector('.erp-task-progress-rail__value')?.textContent
-                ),
-                entries: [
-                  ...node.querySelectorAll(
-                    '.erp-task-board-lane-footer button'
-                  ),
-                ].map((button) => ({
-                  ...describeNode(button),
-                  accessibleName: button.getAttribute('aria-label'),
-                })),
-                oldMetrics: document.querySelectorAll('.erp-task-center-metric')
-                  .length,
+                repeatedCount: document.querySelectorAll('.erp-task-board-lane-count').length,
+                count: Number(node.querySelector('.erp-task-progress-rail__value')?.textContent),
+                entries: [{ ...describeNode(node), accessibleName: node.getAttribute('aria-label') || node.textContent }],
+                oldMetrics: document.querySelectorAll('.erp-task-center-metric').length,
               }))
           : []
         const businessAttention = expectBusinessAttention
@@ -194,11 +182,11 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
           Number.isInteger(lane.count) && lane.count >= 0,
           '分类筛选应显示真实数量'
         )
-        assert.equal(lane.entries.length, lane.count > 0 ? 1 : 0)
+        assert.equal(lane.entries.length, 1)
         for (const entry of lane.entries) {
           assert.equal(entry.tagName, 'BUTTON')
           assert(
-            entry.contentFits && entry.accessibleName?.includes('查看全部')
+            entry.contentFits && Boolean(entry.accessibleName?.trim())
           )
         }
       }
@@ -607,26 +595,9 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       )
         .map((node) => rectOf(node))
         .filter(Boolean)
-      const laneVisuals = Array.from(
-        document.querySelectorAll('.erp-task-board-lane')
-      ).map((node) => {
-        const head = node.querySelector('.ant-card-head')
-        const laneStyle = window.getComputedStyle(node)
-        const headStyle =
-          head instanceof HTMLElement ? window.getComputedStyle(head) : null
-        const tone = Array.from(node.classList)
-          .find((className) => className.startsWith('erp-task-board-lane--'))
-          ?.replace('erp-task-board-lane--', '')
-        return {
-          tone: tone || '',
-          cardBorderRadius: laneStyle.borderRadius,
-          cardOverflow: laneStyle.overflow,
-          cardBorderColor: laneStyle.borderTopColor,
-          cardBorderWidth: Number.parseFloat(laneStyle.borderTopWidth),
-          headBackgroundColor: headStyle?.backgroundColor || '',
-          headBorderColor: headStyle?.borderBottomColor || '',
-        }
-      })
+      const nestedCards = document.querySelectorAll('.erp-task-board-lane.ant-card').length
+      const tableCount = document.querySelectorAll('.erp-task-board-lane .ant-table').length
+      const rowKeys = Array.from(document.querySelectorAll('.erp-task-board-lane tr[data-row-key]')).map((row) => row.dataset.rowKey)
       const overlappingLanePairs = []
       for (let i = 0; i < laneRects.length; i += 1) {
         for (let j = i + 1; j < laneRects.length; j += 1) {
@@ -655,7 +626,9 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
         currentTaskPanelCount,
         filters,
         laneRects,
-        laneVisuals,
+        nestedCards,
+        tableCount,
+        rowKeys,
         overlappingLanePairs,
         tableCard,
         visiblePageHeads,
@@ -677,54 +650,20 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       `${scenarioName} 分类区域应使用全部内容宽度: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.laneRects.length === 4,
-      `${scenarioName} 任务管理应渲染四个泳道: ${JSON.stringify(metrics)}`
+      metrics.laneRects.length === 1,
+      `${scenarioName} 任务管理应展示一张待处理预览表: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.laneRects.every((lane) => lane.width >= 180 && lane.height > 0),
       `${scenarioName} 任务管理泳道尺寸异常: ${JSON.stringify(metrics)}`
     )
-    const expectedColumns =
-      metrics.lanes.width >= 1200 ? 4 : metrics.lanes.width >= 600 ? 2 : 1
-    assert.equal(
-      new Set(metrics.laneRects.map((rect) => Math.round(rect.top))).size,
-      4 / expectedColumns,
-      `${scenarioName} 应按可用宽度显示 ${expectedColumns} 列`
-    )
+    assert.equal(metrics.tableCount, 1, `${scenarioName} 概览与分类复用同一任务表格`)
+    assert.equal(metrics.nestedCards, 0, `${scenarioName} 任务表内不叠加分类卡片`)
+    assert.equal(new Set(metrics.rowKeys).size, metrics.rowKeys.length, `${scenarioName} 概览预览不重复任务`)
     assert(
       metrics.lanes.top - metrics.boardContent.top <=
         (metrics.viewport.width < 768 ? 280 : 140),
       `${scenarioName} 默认顶部不应占满首屏: ${JSON.stringify(metrics)}`
-    )
-    assert.deepEqual(
-      metrics.laneVisuals.map(({ tone }) => tone).sort(),
-      ['actionable', 'due', 'exception', 'finished'],
-      `${scenarioName} 任务管理四个泳道应保留稳定语义色调: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(
-      new Set(
-        metrics.laneVisuals.map(
-          ({ headBackgroundColor }) => headBackgroundColor
-        )
-      ).size,
-      4,
-      `${scenarioName} 任务管理四个泳道标题背景应可区分: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.laneVisuals.every(
-        ({ cardBorderWidth, cardBorderColor, headBorderColor }) =>
-          cardBorderWidth >= 1 && cardBorderColor === headBorderColor
-      ),
-      `${scenarioName} 任务管理泳道标题分隔线应沿用卡片的语义边框: ${JSON.stringify(metrics)}`
-    )
-    assert.equal(new Set(metrics.laneVisuals.map(({ cardBorderColor }) => cardBorderColor)).size, 4, `${scenarioName} 四个泳道边框应可区分`)
-    assert(
-      metrics.laneVisuals.every(
-        ({ cardBorderRadius, cardOverflow }) =>
-          Number.parseFloat(cardBorderRadius || '0') === 10 &&
-          cardOverflow === 'hidden'
-      ),
-      `${scenarioName} 任务管理泳道内容应按卡片外圆角裁切: ${JSON.stringify(metrics)}`
     )
     assert(
       metrics.overlappingLanePairs.length === 0,
@@ -848,7 +787,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
             ? rectOf(activeStepPanel.querySelector(selector))
             : null
         const summary = rectInDrawer('.erp-task-action-drawer__summary--task')
-        const metaGrid = rectInDrawer('.erp-task-action-drawer__task-meta')
+        const metaGrid = rectInDrawer('.workflow-task-current, .erp-task-action-drawer__receipt-context')
         const guide = rectInDrawer('.erp-task-action-drawer__guide')
         const guideSteps = rectInDrawer('.erp-task-action-drawer__guide-steps')
         const guideNoteCount =
@@ -864,7 +803,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
         const textArea = rectInActiveStepPanel('textarea')
         const metaItems =
           drawerElement?.querySelectorAll(
-            '.erp-task-action-drawer__task-meta > div'
+            '.workflow-task-current__responsibility strong, .workflow-task-current__responsibility > span, .erp-task-action-drawer__receipt-context > span'
           ).length || 0
         const stepItems =
           drawerElement?.querySelectorAll('.erp-task-action-drawer__step')
@@ -951,8 +890,8 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
     }
     if (isContext || metrics.hasActionReceipt) {
       assert(
-        metrics.metaGrid?.height > 0 && metrics.metaItems === 2,
-        `${scenarioName} 核对任务和办理回执应展示来源与责任岗位: ${JSON.stringify(metrics)}`
+        metrics.metaGrid?.height > 0 && metrics.metaItems >= 1,
+        `${scenarioName} 核对任务和办理回执应直接显示责任岗位与当前处理信息: ${JSON.stringify(metrics)}`
       )
       assert(
         metrics.timingKeys.includes('arrived') &&

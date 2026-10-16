@@ -9,10 +9,11 @@
 | `web/` | Vite + React 前端，包含桌面后台统一入口、登录入口选择和生产单端口 `/m/<role>/tasks` 岗位任务端路径，内部目录职责见 [`web/README.md`](web/README.md) |
 | `server/` | Kratos + Ent + Atlas 后端，当前承载管理员账号、鉴权、错误码、工作流协同、领域 usecase、进度看板 `list_progress / get_progress`、客户配置版本 `customer_config` JSON-RPC 域、采购订单 `purchase_order` JSON-RPC 域、采购入库与采购更正 `purchase` JSON-RPC 域、库存台账只读 `inventory` JSON-RPC 域、质量检验 `quality` JSON-RPC 域、业务事实 `operational_fact` JSON-RPC 域、`/healthz`、`/readyz` 与 JSON-RPC 基线 |
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
+| `.vscode/` | 项目编辑器设置；Tailwind CSS IntelliSense 排除 `output/` 内的测试、运行产物和源码快照，使用正式前端配置 |
 | [`.agents/skills/`](.agents/skills/README.md) | Codex 项目专项 SOP：代码审查、文档、领域边界、页面、打印模板、seed/import、测试与 operations；Git 改动按项目约定留下被动 handoff record，复杂 commit/push 仅在明确授权后使用全局 skill |
 | `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
 | `config/` | 行业模板、客户配置包、客户配置 catalog / schema 和私有化复制模板落点；`demo` 是最小 smoke fixture，`reference-customer` 是 draft/preview 工程参考，`yoyoosun` 是当前真实客户配置；默认产品前端包不静态打包具体客户配置，后端只接收受控编译后的 revision 并生成 effective session，不代表 SaaS tenant，也不改变 Workflow / Fact 真源，内部目录职责见 [`config/README.md`](config/README.md) |
-| `deployments/` | 客户私有化部署实例资料落点；当前唯一部署真源仍在 `server/deploy/compose/prod`，私有化模板不创建第二套部署主路径 |
+| `deployments/` | 客户运行合同、配置差异、运维适配和脱敏证据；复用 `server/deploy/compose/prod` 运行定义与 `scripts/deploy` 共用执行逻辑 |
 
 ## 当前边界
 

@@ -1,3 +1,5 @@
+import { ShipmentStatus } from '../../common/consts/statuses.generated.mjs'
+
 const ACTIONS = Object.freeze({
   receivable: Object.freeze({
     key: 'receivable',
@@ -59,7 +61,7 @@ export function buildShipmentFinanceSourcePayload(
   action = 'receivable'
 ) {
   const config = shipmentFinanceSourceActionConfig(action)
-  if (String(shipment?.status || '').toUpperCase() !== 'SHIPPED') {
+  if (String(shipment?.status || '').toUpperCase() !== ShipmentStatus.SHIPPED) {
     throw new Error('仅已确认出货的出货单可以生成财务记录')
   }
   const shipmentID = positiveID(shipment?.id)

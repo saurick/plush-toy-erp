@@ -71,6 +71,9 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease;
 }
 
 .erp-module-catalog__entry > span:first-child {
@@ -86,10 +89,22 @@
   color: var(--erp-text-muted);
 }
 
-.erp-module-catalog__entry:hover,
 .erp-module-catalog__entry[aria-current='page'] {
   border-color: var(--erp-primary);
   background: var(--erp-primary-softer);
+}
+
+@media (hover: hover) {
+  .erp-module-catalog__entry:not(:disabled, [aria-current='page']):hover {
+    border-color: var(--erp-interactive-border-hover);
+    background: var(--erp-interactive-bg-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-module-catalog__entry {
+    transition: none;
+  }
 }
 
 .erp-module-catalog__entry:focus-visible {

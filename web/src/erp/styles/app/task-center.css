@@ -1,4 +1,4 @@
-.erp-task-board-lane--focused .ant-table-cell {
+.erp-task-board-lane .ant-table-cell {
   overflow-wrap: anywhere;
 }
 
@@ -99,6 +99,10 @@
 }
 
 @container task-board (max-width: 640px) {
+  .erp-task-board-controls .erp-business-operation-panel__search {
+    flex-basis: 100%;
+  }
+
   .erp-dashboard-task-board-card .erp-task-tracking-views.ant-segmented .ant-segmented-item-label {
     min-height: 44px;
     padding-inline: 8px;
@@ -111,184 +115,23 @@
   }
 }
 
-.erp-task-board-card-source-text {
+.erp-task-board-lanes,
+.erp-task-board-lane {
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
-.erp-task-board-card-footer {
+.erp-task-board-overview-heading {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 12px;
-  margin-top: 4px;
+  gap: 6px 16px;
+  padding: 4px 0 12px;
 }
 
-.erp-task-board-lanes {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-  min-width: 0;
-}
-
-@container task-board (min-width: 600px) {
-  .erp-task-board-lanes:not(.erp-task-board-lanes--focused) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@container task-board (min-width: 1200px) {
-  .erp-task-board-lanes:not(.erp-task-board-lanes--focused) {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
-  }
-
-  .erp-task-board-lanes--todo:not(.erp-task-board-lanes--focused) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-.erp-task-board-lanes--focused {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.erp-task-board-lane.ant-card {
-  --erp-task-board-lane-accent: #4f7194;
-  --erp-task-board-lane-border: #d7e1eb;
-  --erp-task-board-lane-head-bg: #f6f9fc;
-
-  border: 1px solid var(--erp-task-board-lane-border);
-  overflow: hidden;
-  background: var(--erp-surface-bg);
-  box-shadow: 0 1px 2px rgb(31 64 104 / 0.04);
-}
-
-.erp-task-board-lane--exception.ant-card {
-  --erp-task-board-lane-accent: #c2413b;
-  --erp-task-board-lane-border: #efcfcc;
-  --erp-task-board-lane-head-bg: #fff7f6;
-}
-
-.erp-task-board-lane--due.ant-card {
-  --erp-task-board-lane-accent: #b7791f;
-  --erp-task-board-lane-border: #ecd9b7;
-  --erp-task-board-lane-head-bg: #fffaf1;
-}
-
-.erp-task-board-lane--finished.ant-card {
-  --erp-task-board-lane-accent: #667085;
-  --erp-task-board-lane-border: #dfe3e8;
-  --erp-task-board-lane-head-bg: #f8f9fb;
-}
-
-.erp-task-board-lane .ant-card-head {
-  min-height: 44px;
-  border-bottom-color: var(--erp-task-board-lane-border);
-  /* 标题背景由外层卡片裁切，保持内外圆角一致。 */
-  border-radius: 0;
-  background: var(--erp-task-board-lane-head-bg);
-}
-
-.erp-task-board-lane > .ant-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: calc(100% - 44px);
-  padding: 12px;
-}
-
-.erp-task-board-lane--focused > .ant-card-body {
-  display: block;
-  height: auto;
-}
-
-.erp-task-board-lane-heading {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.erp-task-board-lane-heading > .anticon {
-  color: var(--erp-task-board-lane-accent);
-}
-
-.erp-task-board-list {
-  width: 100%;
-}
-
-.erp-task-board-lane-footer {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: auto;
-  border-top: 1px solid #edf2ee;
-  padding-top: 10px;
-}
-
-.erp-task-board-card {
-  display: grid;
-  gap: 7px;
-  width: 100%;
-  min-width: 0;
-  border: 1px solid #e6eee9;
-  border-radius: 10px;
-  background: var(--erp-surface-bg);
-  padding: 10px;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease,
-    box-shadow 0.18s ease;
-}
-
-.erp-task-board-card:hover,
-.erp-task-board-card:focus-visible {
-  border-color: #9bb8d5;
-  background: #f8fbff;
-  box-shadow: 0 8px 18px rgb(31 64 104 / 0.08);
-}
-
-.erp-task-board-card:focus-visible {
-  outline: 2px solid var(--erp-control-focus-border);
-  outline-offset: 2px;
-}
-
-.erp-task-board-card-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
-}
-
-.erp-task-board-card-head .ant-tag {
-  flex: 0 0 auto;
-}
-
-.erp-task-board-card-title {
-  flex: 1;
-  min-width: 0;
-}
-
-.erp-task-board-card-head .ant-typography,
-.erp-task-board-card-meta.ant-typography {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.erp-task-board-card-meta.ant-typography {
-  display: block;
-  margin: 0;
+.erp-task-board-card-meta {
+  color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
-}
-
-.erp-task-board-card-source.ant-typography {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+  overflow-wrap: anywhere;
 }
 
 .erp-task-board-action-panel.ant-card {
@@ -313,8 +156,17 @@
 }
 
 .erp-task-action-drawer .ant-drawer-header {
+  position: relative;
   min-height: 56px;
   padding: 6px 12px;
+}
+
+.erp-task-action-drawer .ant-drawer-extra {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  margin: 0;
+  transform: translateY(-50%);
 }
 
 .erp-task-action-drawer .ant-drawer-header-title {
@@ -419,7 +271,86 @@
 }
 
 .erp-task-action-drawer__summary--task {
-  gap: 12px;
+  gap: 10px;
+}
+
+.erp-task-action-drawer__source,
+.erp-task-action-drawer__receipt-context {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+}
+
+.erp-task-action-drawer__receipt-context {
+  display: grid;
+  gap: 6px;
+}
+
+.erp-task-action-drawer__summary--task .erp-task-product-image {
+  flex-basis: 48px;
+  width: 48px;
+  height: 48px;
+}
+
+.erp-task-action-drawer__resources {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-task-action-drawer__resources .erp-material-task-summary-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.erp-task-action-drawer__resources .ant-btn {
+  box-shadow: none;
+}
+
+.erp-task-action-drawer__resources .erp-material-task-summary-entry > .ant-btn {
+  width: auto;
+}
+
+
+
+.erp-task-action-drawer--context .ant-drawer-body {
+  background: var(--erp-surface-bg);
+}
+
+.erp-task-action-drawer--context .erp-task-action-drawer__body {
+  gap: 0;
+  padding: 20px 22px;
+}
+
+.erp-task-action-drawer--context .erp-task-action-drawer__summary--task {
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+
+
+.erp-task-action-drawer--context .erp-task-copy-heading > .ant-tag {
+  margin: 0;
+  font-weight: 400;
+}
+
+.erp-task-action-drawer--context .erp-task-action-drawer__source {
+  margin-bottom: 6px;
+}
+
+.erp-task-action-drawer--context .workflow-task-current {
+  margin-bottom: 10px;
+}
+
+.erp-task-handling-note {
+  margin: 0;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  line-height: 1.6;
 }
 
 .erp-task-action-drawer__section-title {
@@ -710,9 +641,8 @@
   text-align: left;
   cursor: pointer;
   transition:
-    border-color 0.16s ease,
-    background 0.16s ease,
-    box-shadow 0.16s ease;
+    background-color 0.16s ease,
+    border-color 0.16s ease;
 }
 
 .erp-task-action-drawer__action-option:disabled {
@@ -721,12 +651,22 @@
   opacity: 0.64;
 }
 
-.erp-task-action-drawer__action-option:focus-visible:not(:disabled),
-.erp-task-action-drawer__action-option:hover:not(:disabled) {
-  border-color: var(--erp-primary);
-  background: var(--erp-control-hover);
-  outline: none;
-  box-shadow: 0 0 0 3px var(--erp-focus-ring);
+.erp-task-action-drawer__action-option:focus-visible:not(:disabled) {
+  outline: 2px solid var(--erp-interactive-border-focus);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) {
+  .erp-task-action-drawer__action-option:not(:disabled, .erp-task-action-drawer__action-option--selected):hover {
+    border-color: var(--erp-interactive-border-hover);
+    background: var(--erp-interactive-bg-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-task-action-drawer__action-option {
+    transition: none;
+  }
 }
 
 .erp-task-action-drawer__action-option--selected {
@@ -858,4 +798,9 @@
 .erp-task-action-drawer .erp-task-timing--detail dt {
   width: auto;
   font-size: var(--erp-font-caption);
+}
+
+.erp-task-action-drawer--context .erp-task-action-drawer__task-title.ant-typography {
+  font-size: 23px;
+  font-weight: 600;
 }

@@ -122,6 +122,7 @@ function printPlan(options) {
   process.stdout.write(
     [
       `[${label}] customer=${options.customer}`,
+      ...(options.port !== options.requestedPort ? [`[${label}] port=${options.port}`] : []),
       portNote,
       `[${label}] url=http://localhost:${options.port}/erp`,
       `[${label}] backend=${options.apiOrigin}`,

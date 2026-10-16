@@ -7,6 +7,7 @@ import {
 } from '@ant-design/icons'
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Space, Tag } from 'antd'
+import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 
@@ -18,15 +19,15 @@ import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDispla
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 const STATUS_LABELS = Object.freeze({
-  DRAFT: '草稿',
-  POSTED: '已过账',
-  CANCELLED: '已取消',
+  [OperationalFactStatus.DRAFT]: '草稿',
+  [OperationalFactStatus.POSTED]: '已过账',
+  [OperationalFactStatus.CANCELLED]: '已取消',
 })
 
 const STATUS_COLORS = Object.freeze({
-  DRAFT: 'default',
-  POSTED: 'blue',
-  CANCELLED: 'red',
+  [OperationalFactStatus.DRAFT]: 'default',
+  [OperationalFactStatus.POSTED]: 'blue',
+  [OperationalFactStatus.CANCELLED]: 'red',
 })
 
 const FACT_TYPE_LABELS = Object.freeze({
@@ -85,7 +86,7 @@ function normalizedFactStatus(fact) {
 function isPostedReturnReceipt(fact) {
   return (
     normalizedFactType(fact) === 'RETURN_RECEIPT' &&
-    normalizedFactStatus(fact) === 'POSTED'
+    normalizedFactStatus(fact) === OperationalFactStatus.POSTED
   )
 }
 
@@ -137,14 +138,14 @@ export default function OutsourcingReturnRecordsModal({
   }, [open, order?.id, orderFacts])
 
   const selectedStatus = normalizedFactStatus(selected)
-  const selectedDraft = selectedStatus === 'DRAFT'
+  const selectedDraft = selectedStatus === OperationalFactStatus.DRAFT
   const selectedDraftEditable =
     selectedDraft &&
     ((normalizedFactType(selected) === 'MATERIAL_ISSUE' &&
       canEditMaterialIssue) ||
       (normalizedFactType(selected) === 'RETURN_RECEIPT' &&
         canEditReturnReceipt))
-  const selectedPosted = selectedStatus === 'POSTED'
+  const selectedPosted = selectedStatus === OperationalFactStatus.POSTED
   const selectedPostedReturn = isPostedReturnReceipt(selected)
   const selectedQualityInspections =
     selectedPostedReturn && selected?.id
@@ -152,12 +153,12 @@ export default function OutsourcingReturnRecordsModal({
       : []
   const hasActiveQualityInspection = selectedQualityInspections.some(
     (inspection) =>
-      String(inspection?.status || '').toUpperCase() !== 'CANCELLED'
+      String(inspection?.status || '').toUpperCase() !== OperationalFactStatus.CANCELLED
   )
   const selectedQualityInspection =
     selectedQualityInspections.find(
       (inspection) =>
-        String(inspection?.status || '').toUpperCase() !== 'CANCELLED'
+        String(inspection?.status || '').toUpperCase() !== OperationalFactStatus.CANCELLED
     ) || selectedQualityInspections[0]
   const selectedQualityGate = resolveOutsourcingReturnQualityGate(
     selectedQualityInspections
@@ -302,7 +303,7 @@ export default function OutsourcingReturnRecordsModal({
                 onViewQualityInspection?.(selectedQualityInspection)
               }
             >
-              {['DRAFT', 'SUBMITTED'].includes(
+              {[OperationalFactStatus.DRAFT, 'SUBMITTED'].includes(
                 String(selectedQualityInspection.status || '').toUpperCase()
               )
                 ? '继续质检'

@@ -8,6 +8,11 @@ import {
   splitTableCellMerge,
 } from './detailCellMerge.mjs'
 import { normalizePrintAppendixImages } from './printAppendixImages.mjs'
+import { editPrintTableRow } from './printItemOperations.mjs'
+import {
+  editContractClauseGroup,
+  normalizeContractClauseGroups,
+} from './contractClauseEditor.mjs'
 import {
   formatNumeric20Scale6Summary,
   multiplyNumeric20Scale6Values,
@@ -251,17 +256,8 @@ const createEmptyMaterialPurchaseLine = () => ({
   remark: '',
 })
 
-const normalizeClauses = (rawClauses = {}) => ({
-  delivery: Array.isArray(rawClauses.delivery)
-    ? rawClauses.delivery.map((item) => toText(item))
-    : [...DEFAULT_CLAUSES.delivery],
-  contract: Array.isArray(rawClauses.contract)
-    ? rawClauses.contract.map((item) => toText(item))
-    : [...DEFAULT_CLAUSES.contract],
-  settlement: Array.isArray(rawClauses.settlement)
-    ? rawClauses.settlement.map((item) => toText(item))
-    : [...DEFAULT_CLAUSES.settlement],
-})
+const normalizeClauses = (rawClauses) =>
+  normalizeContractClauseGroups(rawClauses, DEFAULT_CLAUSES)
 
 export const buildMaterialPurchaseContractDraft = (sample = {}) => {
   const normalizedLines = Array.isArray(sample?.lines)
@@ -448,21 +444,36 @@ export const updateMaterialPurchaseField = (draft, fieldKey, rawValue) => ({
     .trim(),
 })
 
+export const editMaterialPurchaseRow = ({
+  lines,
+  merges,
+  selectedRowIndex,
+  action,
+}) => {
+  const result = editPrintTableRow({
+    lines,
+    merges,
+    rowIndex: selectedRowIndex,
+    action,
+    createBlankLine: createEmptyMaterialPurchaseLine,
+  })
+  return result.ok
+    ? { ...result, selectedRowIndex: result.selectedIndex }
+    : result
+}
+
 export const updateMaterialPurchaseClause = (
   clauses,
   sectionKey,
   clauseIndex,
   rawValue
 ) => {
-  const safeClauses = normalizeClauses(clauses)
-  safeClauses[sectionKey] = safeClauses[sectionKey].map((item, index) =>
-    index === clauseIndex
-      ? String(rawValue ?? '')
-          .replaceAll('\r', '')
-          .trim()
-      : item
-  )
-  return safeClauses
+  return editContractClauseGroup(normalizeClauses(clauses), {
+    groupKey: sectionKey,
+    index: clauseIndex,
+    action: 'update',
+    value: rawValue,
+  }).clauses
 }
 
 export const applyDetailCellMerge = ({ lines = [], merges = [], selection }) =>

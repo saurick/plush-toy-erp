@@ -1,3 +1,4 @@
+import { InventoryLotStatus, OperationalFactStatus, ProductionOrderStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   positiveSafeInteger,
   PRODUCTION_MATERIAL_REQUIREMENTS_STATE,
@@ -120,7 +121,7 @@ export function isProductionMaterialIssueEligible(
   requirement = {}
 ) {
   return Boolean(
-    String(order?.status || '').toUpperCase() === 'RELEASED' &&
+    String(order?.status || '').toUpperCase() === ProductionOrderStatus.RELEASED &&
       materialRequirementsState ===
         PRODUCTION_MATERIAL_REQUIREMENTS_STATE.READY &&
       positiveSafeInteger(order?.id) &&
@@ -141,7 +142,7 @@ export function filterProductionMaterialIssueLots(requirement = {}, lots = []) {
     (lot) =>
       String(lot?.subject_type || '').toUpperCase() === 'MATERIAL' &&
       Number(lot?.subject_id || 0) === materialID &&
-      String(lot?.status || '').toUpperCase() === 'ACTIVE' &&
+      String(lot?.status || '').toUpperCase() === InventoryLotStatus.ACTIVE &&
       positiveSafeInteger(Number(lot?.id || 0))
   )
 }
@@ -202,7 +203,7 @@ export function validateProductionMaterialIssueResult(
   if (
     !result ||
     !positiveSafeInteger(result.id) ||
-    String(result.status || '').toUpperCase() !== 'DRAFT' ||
+    String(result.status || '').toUpperCase() !== OperationalFactStatus.DRAFT ||
     String(result.fact_type || '').toUpperCase() !== 'MATERIAL_ISSUE' ||
     String(result.subject_type || '').toUpperCase() !== 'MATERIAL' ||
     !positiveSafeInteger(result.subject_id) ||

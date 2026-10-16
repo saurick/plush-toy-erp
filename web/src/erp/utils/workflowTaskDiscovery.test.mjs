@@ -5,13 +5,12 @@ import { buildMobileRoleTaskQuery, mobileTaskQueryScope } from './mobileTaskQuer
 import { buildWorkflowTaskBoardRequest, readWorkflowTaskBoardFiltersFromSearch, writeWorkflowTaskBoardFiltersToSearch } from './workflowTaskBoard.mjs'
 import { businessTaskSource, followupSource, operationalFactTaskContext } from './workflowFollowup.mjs'
 
-test('岗位筛选丢弃通用业务分类和旧环节，办理人保留', () => {
+test('通用分类不进入请求，电脑保留办理人而手机清除隐藏人员条件', () => {
   const old = { moduleKey: 'quality', chainKey: 'fulfillment', stageKey: 'cutting_quality', assignee: '12' }
   assert.deepEqual(normalizeTaskDiscoveryFilters(old), { assignee: '12' })
   const mobile = buildMobileRoleTaskQuery({ roleKey: 'quality', viewKey: 'todo', ...old })
-  for (const key of ['module_key', 'chain_key', 'stage_key']) assert.equal(mobile[key], undefined)
-  assert.equal(mobile.assignee, '12')
-  assert.equal(mobileTaskQueryScope('scope', old), mobileTaskQueryScope('scope', { assignee: '12' }))
+  assert.deepEqual(mobile, { view_key: 'todo', role_key: 'quality', limit: 50 })
+  assert.equal(mobileTaskQueryScope('scope', old), mobileTaskQueryScope('scope', {}))
   assert.deepEqual(taskDiscoveryRequest(old), { assignee: '12' })
 })
 

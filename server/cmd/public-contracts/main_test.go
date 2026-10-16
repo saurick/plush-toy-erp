@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"server/internal/biz"
@@ -34,6 +35,40 @@ func TestPublicPermissionCatalogMatchesRegisteredPermissions(t *testing.T) {
 	}
 	if got.Attachments["maxBytes"] != int64(biz.BusinessAttachmentMaxBytes) {
 		t.Fatal("attachment limit differs")
+	}
+	for name, want := range map[string]map[string]string{
+		"FinancePaymentStatus":    {"DRAFT": biz.FinancePaymentStatusDraft, "APPROVED": biz.FinancePaymentStatusApproved, "REJECTED": biz.FinancePaymentStatusRejected, "POSTED": biz.FinancePaymentStatusPosted, "REVERSED": biz.FinancePaymentStatusReversed, "CANCELLED": biz.FinancePaymentStatusCancelled},
+		"FinanceAllocationStatus": {"POSTED": biz.FinanceAllocationStatusPosted, "REVERSED": biz.FinanceAllocationStatusReversed},
+		"FinancePaymentDirection": {"RECEIPT": biz.FinancePaymentDirectionReceipt, "DISBURSEMENT": biz.FinancePaymentDirectionDisbursement},
+		"ProcessStatus":           {"ACTIVE": biz.ProcessStatusActive, "BLOCKED": biz.ProcessStatusBlocked, "COMPLETED": biz.ProcessStatusCompleted},
+		"ProcessNodeStatus":       {"WAITING": biz.ProcessNodeStatusWaiting, "ACTIVE": biz.ProcessNodeStatusActive, "COMPLETED": biz.ProcessNodeStatusCompleted, "BLOCKED": biz.ProcessNodeStatusBlocked, "WITHDRAWN": biz.ProcessNodeStatusWithdrawn},
+		"ProcessNodeType":         {"HUMAN_TASK": biz.ProcessNodeTypeHumanTask, "APPROVAL": biz.ProcessNodeTypeApproval, "DOMAIN_COMMAND": biz.ProcessNodeTypeDomainCommand, "WAIT_EVENT": biz.ProcessNodeTypeWaitEvent, "END": biz.ProcessNodeTypeEnd},
+	} {
+		if !reflect.DeepEqual(got.States[name], want) {
+			t.Fatalf("%s differs from domain declarations", name)
+		}
+	}
+	if !reflect.DeepEqual(got.Policies["AdminPasswordPolicy"], map[string]int64{"minCharacters": int64(biz.AdminPasswordMinLength), "maxCharacters": int64(biz.AdminPasswordMaxLength), "maxBytes": int64(biz.AdminPasswordMaxBytes)}) {
+		t.Fatal("password limits differ from domain validation")
+	}
+	if !reflect.DeepEqual(got.Policies["PrintPolicy"], map[string]int64{"imageCount": 32, "imageBytes": 5 << 20, "imageTotalBytes": 16 << 20, "htmlBytes": 24 << 20, "fontCount": 128, "fontBytes": 256 << 10, "fontTotalBytes": 2 << 20}) {
+		t.Fatal("print limits differ from public PDF boundaries")
+	}
+}
+
+func TestPublicLimitsRejectMissingOrUnsupportedDeclarations(t *testing.T) {
+	for _, source := range []string{
+		`package example; const Other = 8`,
+		`package example; const Limit = external.Value`,
+		`package example; const Limit = 0`,
+	} {
+		file, err := parser.ParseFile(token.NewFileSet(), "test.go", source, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := integerConstants(file, map[string]string{"Limit": "maximum"}); err == nil {
+			t.Fatalf("accepted unsupported public limit: %s", source)
+		}
 	}
 }
 
@@ -101,5 +136,35 @@ func TestPublicAttachmentRejectsDuplicateTypes(t *testing.T) {
 		if _, err := fileTypes(expr); err == nil {
 			t.Fatalf("accepted invalid file types: %s", source)
 		}
+	}
+}
+
+func TestPublicRPCRejectsUnrecognizedMethodDelegation(t *testing.T) {
+	for _, branch := range []string{
+		`if isWrite(method) { println(method); return d.handleWrite(method) }`,
+		`if isWrite(method) { if ready { return d.handleWrite(method) } }`,
+		`if isWrite(method) { return d.handleWrite(method) } else { return nil }`,
+		`if ready { return wrap(d.handleWrite(method)) }`,
+		`return d.handleWrite(method)`,
+	} {
+		t.Run(branch, func(t *testing.T) {
+			root := t.TempDir()
+			directory := filepath.Join(root, "server/internal/service")
+			if err := os.MkdirAll(directory, 0755); err != nil {
+				t.Fatal(err)
+			}
+			source := `package example
+func (d *jsonrpcDispatcher) Handle(url, method string) { switch url { case "orders": return d.handleOrders(method) } }
+func (d *jsonrpcDispatcher) handleOrders(method string) { ` + branch + `; switch method { case "list": return nil } }
+func isWrite(method string) bool { switch method { case "save": return true; default: return false } }
+func (d *jsonrpcDispatcher) handleWrite(method string) { switch method { case "save": return nil } }
+`
+			if err := os.WriteFile(filepath.Join(directory, "jsonrpc.go"), []byte(source), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := rpcMethods(root); err == nil || !strings.Contains(err.Error(), "unsupported conditional dispatch") {
+				t.Fatalf("unsupported forwarding must fail instead of dropping methods: %v", err)
+			}
+		})
 	}
 }

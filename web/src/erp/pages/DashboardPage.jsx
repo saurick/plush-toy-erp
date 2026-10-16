@@ -8,13 +8,7 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import {
-  ArrowRightOutlined,
-  CalendarOutlined,
-  ClockCircleOutlined,
-  ExclamationCircleOutlined,
-  FileTextOutlined,
-} from '@ant-design/icons'
+import { ArrowRightOutlined, CalendarOutlined } from '@ant-design/icons'
 import { Alert, Button, Card, Empty, Space, Tag, Typography } from 'antd'
 import {
   useLocation,
@@ -47,7 +41,6 @@ import WorkflowTaskActionDrawer, {
   getWorkflowTaskActionMeta,
 } from '../components/workflow/WorkflowTaskActionDrawer.jsx'
 import WorkflowTaskIdentity from '../components/workflow/WorkflowTaskIdentity.jsx'
-import WorkflowTaskCard from '../components/workflow/WorkflowTaskCard.jsx'
 import { WorkflowTaskSource } from '../components/workflow/WorkflowTaskCopy.jsx'
 import WorkflowTaskTiming from '../components/workflow/WorkflowTaskTiming.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
@@ -93,6 +86,7 @@ import {
   TASK_BOARD_SORT_OPTIONS,
   buildWorkflowTaskBoardRoleOptions,
   buildWorkflowTaskBoardModel,
+  buildWorkflowTaskOverviewTasks,
   buildWorkflowTaskBoardRequest,
   getWorkflowTaskBoardRequestKey,
   getWorkflowTaskBoardSummaryRequestKey,
@@ -102,7 +96,6 @@ import {
   getWorkflowTaskReason,
   getWorkflowTaskReasonMeta,
   getWorkflowTaskReadonlyReason,
-  getWorkflowTaskStatusMeta,
   getWorkflowTaskStatusRiskTags,
   hasActiveWorkflowTaskBoardFilters,
   normalizeWorkflowTaskPageSize,
@@ -413,219 +406,128 @@ function openTaskTableRow(event, task, onOpenTask) {
   openWorkflowTaskRow(event, () => onOpenTask(task))
 }
 
-function TaskLane({ lane, loading = false, focused, onOpenTask, onViewAll }) {
-  if (focused) {
-    return (
-      <Card
-        size="small"
-        variant="borderless"
-        className={`erp-task-board-lane erp-task-board-lane--${lane.key} erp-task-board-lane--focused`}
-        aria-busy={loading}
-      >
-        <Table
-          size="middle"
-          rowKey={getWorkflowTaskStableKey}
-          loading={loading}
-          dataSource={lane.tasks}
-          scroll={{ x: 900 }}
-          rowClassName="erp-task-table-row"
-          columns={[
-            {
-              align: 'left',
-              title: '任务与关联内容',
-              key: 'identity',
-              width: '36%',
-              render: (_, task) => (
-                <div className="erp-workbench-task-cell">
-                  <WorkflowTaskIdentity
-                    task={task}
-                    compact
-                    renderCompactTitle={(title) => (
-                      <TaskTitleEntry
-                        task={task}
-                        onOpenTask={onOpenTask}
-                        compact
-                      >
-                        {title}
-                      </TaskTitleEntry>
-                    )}
-                  />
-                </div>
-              ),
-            },
-            {
-              align: 'left',
-              title: '关联单据 / 时间',
-              key: 'source',
-              width: '27%',
-              render: (_, task) => (
-                <div className="erp-workbench-task-cell">
-                  <WorkflowTaskSource task={task} />
-                  <span className="erp-task-board-card-meta">
-                    {task.discovery?.path}
-                  </span>
-                  <WorkflowTaskTiming task={task} />
-                </div>
-              ),
-            },
-            {
-              align: 'left',
-              title: lane.key === 'exception' ? '阻塞原因' : '状态与说明',
-              key: 'reason',
-              render: (_, task) => (
-                <div className="erp-workbench-task-cell">
-                  <Space size={[4, 4]} wrap>
-                    {getWorkflowTaskStatusRiskTags(task).map((tag) => (
-                      <Tag key={tag.key} color={tag.color}>
-                        {tag.label}
-                      </Tag>
-                    ))}
-                  </Space>
-                  {getWorkflowTaskReason(task) ? (
-                    <Text
-                      type={
-                        task.task_status_key === 'blocked'
-                          ? 'danger'
-                          : undefined
-                      }
-                    >
-                      {getWorkflowTaskReason(task)}
-                    </Text>
-                  ) : null}
-                </div>
-              ),
-            },
-            {
-              title: '负责岗位 / 处理人',
-              key: 'responsibility',
-              width: 180,
-              render: (_, task) => (
-                <Space direction="vertical" size={4}>
-                  {buildWorkflowTaskResponsibilityItems(task)
-                    .slice(0, 2)
-                    .map((item) => (
-                      <Text
-                        key={item.key}
-                        type={item.key === 'assignee' ? 'secondary' : undefined}
-                      >
-                        {item.value}
-                      </Text>
-                    ))}
-                </Space>
-              ),
-            },
-          ]}
-          onRow={(task) => ({
-            'data-task-code': task.task_code,
-            'data-task-group': task.task_group,
-            onClick: (event) => openTaskTableRow(event, task, onOpenTask),
-          })}
-          pagination={false}
-          locale={{
-            emptyText: (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description="当前分类暂无匹配任务"
-              />
-            ),
-          }}
-        />
-      </Card>
-    )
-  }
+function TaskLane({ lane, loading = false, focused, onOpenTask }) {
   return (
-    <Card
-      size="small"
-      variant="borderless"
-      className={`erp-task-board-lane erp-task-board-lane--${lane.key}`}
-      loading={loading}
+    <section
+      className={`erp-task-board-lane erp-task-board-lane--${lane.key}${focused ? ' erp-task-board-lane--focused' : ''}`}
+      aria-label={focused ? lane.title : '待处理预览'}
       aria-busy={loading}
-      title={
-        <span className="erp-task-board-lane-heading" title={lane.description}>
-          {lane.key === 'exception' ? (
-            <ExclamationCircleOutlined aria-hidden="true" />
-          ) : null}
-          {lane.key === 'due' ? (
-            <ClockCircleOutlined aria-hidden="true" />
-          ) : null}
-          <span>{lane.title}</span>
-        </span>
-      }
     >
-      <Space direction="vertical" size={8} className="erp-task-board-list">
-        {lane.tasks.length > 0 ? (
-          lane.tasks.map((task) => {
-            const statusMeta = getWorkflowTaskStatusMeta(task)
-            const reasonMeta = getWorkflowTaskReasonMeta(task)
-            const taskId = getWorkflowTaskStableKey(task)
-            return (
-              <WorkflowTaskCard
-                className="erp-task-board-card"
-                key={`${lane.key}-${taskId || task.id}`}
-                data-task-code={task.task_code || undefined}
-                data-task-group={task.task_group || undefined}
-                label={`查看${getWorkflowTaskDisplayName(task)}详情`}
-                onOpen={() => onOpenTask(task)}
-              >
-                <span className="erp-task-board-card-head">
-                  <span className="erp-task-board-card-title">
-                    <WorkflowTaskIdentity task={task} compact showTaskName />
-                  </span>
-                  <Tag color={statusMeta.color}>{statusMeta.label}</Tag>
-                </span>
-                <Text
-                  type="secondary"
-                  className="erp-task-board-card-meta erp-task-board-card-source"
-                >
-                  <FileTextOutlined aria-hidden="true" />
-                  <span className="erp-task-board-card-source-text">
-                    <WorkflowTaskSource task={task} />
-                  </span>
-                </Text>
-                {reasonMeta.value ? (
-                  <Text
-                    type={
-                      ['blocked', 'rejected'].includes(reasonMeta.kind)
-                        ? 'danger'
-                        : 'secondary'
-                    }
-                    className="erp-task-board-card-meta"
-                  >
-                    {reasonMeta.label}：{reasonMeta.value}
-                  </Text>
-                ) : null}
+      {!focused ? (
+        <div className="erp-task-board-overview-heading">
+          <strong>待处理预览</strong>
+          <Text type="secondary">
+            优先查看异常、临近到期任务；完整任务可切换上方分类查看。
+          </Text>
+        </div>
+      ) : null}
+      <Table
+        size="middle"
+        rowKey={getWorkflowTaskStableKey}
+        loading={loading}
+        dataSource={lane.tasks}
+        scroll={{ x: 900 }}
+        rowClassName="erp-task-table-row"
+        columns={[
+          {
+            align: 'left',
+            title: '任务与关联内容',
+            key: 'identity',
+            width: '36%',
+            render: (_, task) => (
+              <div className="erp-workbench-task-cell">
+                <WorkflowTaskIdentity
+                  task={task}
+                  compact
+                  renderCompactTitle={(title) => (
+                    <TaskTitleEntry task={task} onOpenTask={onOpenTask} compact>
+                      {title}
+                    </TaskTitleEntry>
+                  )}
+                />
+              </div>
+            ),
+          },
+          {
+            align: 'left',
+            title: '关联单据 / 时间',
+            key: 'source',
+            width: '27%',
+            render: (_, task) => (
+              <div className="erp-workbench-task-cell">
+                <WorkflowTaskSource task={task} />
                 <span className="erp-task-board-card-meta">
                   {task.discovery?.path}
                 </span>
                 <WorkflowTaskTiming task={task} />
-                <span className="erp-task-board-card-footer">
-                  <Text type="secondary" className="erp-task-board-card-meta">
-                    {getWorkflowTaskOwnerRoleLabel(task)} ·{' '}
-                    {task.discovery?.assignee_name || '岗位待领取'}
+              </div>
+            ),
+          },
+          {
+            align: 'left',
+            title: lane.key === 'exception' ? '阻塞原因' : '状态与说明',
+            key: 'reason',
+            render: (_, task) => (
+              <div className="erp-workbench-task-cell">
+                <Space size={[4, 4]} wrap>
+                  {getWorkflowTaskStatusRiskTags(task).map((tag) => (
+                    <Tag key={tag.key} color={tag.color}>
+                      {tag.label}
+                    </Tag>
+                  ))}
+                </Space>
+                {getWorkflowTaskReason(task) ? (
+                  <Text
+                    type={
+                      task.task_status_key === 'blocked' ? 'danger' : undefined
+                    }
+                  >
+                    {getWorkflowTaskReason(task)}
                   </Text>
-                </span>
-              </WorkflowTaskCard>
-            )
-          })
-        ) : (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无任务" />
-        )}
-      </Space>
-      {lane.count > 0 ? (
-        <div className="erp-task-board-lane-footer">
-          <Button
-            type="link"
-            size="small"
-            aria-label={`${lane.actionLabel}，${lane.count} 项`}
-            icon={<ArrowRightOutlined aria-hidden="true" />}
-            iconPosition="end"
-            onClick={onViewAll}
-          >
-            查看全部
-          </Button>
-        </div>
-      ) : null}
-    </Card>
+                ) : null}
+              </div>
+            ),
+          },
+          {
+            title: '负责岗位 / 处理人',
+            key: 'responsibility',
+            width: 180,
+            render: (_, task) => (
+              <Space direction="vertical" size={4}>
+                {buildWorkflowTaskResponsibilityItems(task)
+                  .slice(0, 2)
+                  .map((item) => (
+                    <Text
+                      key={item.key}
+                      type={item.key === 'assignee' ? 'secondary' : undefined}
+                    >
+                      {item.value}
+                    </Text>
+                  ))}
+              </Space>
+            ),
+          },
+        ]}
+        onRow={(task) => ({
+          'data-task-code': task.task_code,
+          'data-task-group': task.task_group,
+          onClick: (event) => openTaskTableRow(event, task, onOpenTask),
+        })}
+        pagination={false}
+        locale={{
+          emptyText: (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={
+                lane.key === 'overview'
+                  ? '当前范围暂无待处理任务'
+                  : '当前分类暂无匹配任务'
+              }
+            />
+          ),
+        }}
+      />
+    </section>
   )
 }
 
@@ -1057,6 +959,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       })),
     [taskBoardCounts, taskBoardMetricsReady, taskBoardModel.visibleLanes]
   )
+  const overviewTasks = useMemo(
+    () => buildWorkflowTaskOverviewTasks(taskLanes),
+    [taskLanes]
+  )
   const sourceOptions = useMemo(
     () =>
       buildSourceOptions([
@@ -1414,6 +1320,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       lane,
       sort: 'smart',
       page: 1,
+      status: lane === 'all' && isTerminalWorkflowTask({ task_status_key: filters.status })
+        ? 'all'
+        : filters.status,
     }
     pendingTaskBoardPageScrollRef.current = null
     preserveTaskBoardTransitionHeight(
@@ -2218,18 +2127,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       taskBoardModel.focused
                         ? ' erp-task-board-lanes--focused'
                         : ''
-                    }${filters.mode === 'todo' ? ' erp-task-board-lanes--todo' : ''}`}
+                    }`}
                     aria-label="任务管理分类"
                     aria-busy={taskBoardUpdating}
                   >
-                    {taskLanes.map((lane) => (
+                    {(taskBoardModel.focused
+                      ? taskLanes
+                      : [{ key: 'overview', tasks: overviewTasks }]
+                    ).map((lane) => (
                       <TaskLane
                         key={lane.key}
                         lane={lane}
                         loading={taskBoardUpdating}
                         focused={taskBoardModel.focused}
                         onOpenTask={openTaskDrawer}
-                        onViewAll={() => selectTaskBoardLane(lane.key)}
                       />
                     ))}
                   </div>

@@ -893,20 +893,11 @@ export function createDevQualityGateScenarios({
           name: 'GitLab CI 质量证据',
         })
         await serverPanel.waitFor()
-        await serverPanel
-          .getByText(
-            '全部 Job 的状态、运行与等待直接来自当前 GitLab 流水线。',
-            {
-              exact: true,
-            }
-          )
-          .waitFor()
-        await serverPanel
-          .getByText(
-            '工作台不复制 CI DAG；依赖不可读时失败关闭，不画推测连线。',
-            { exact: true }
-          )
-          .waitFor()
+        await serverPanel.locator('#gitlab-pipeline-flow-title').waitFor()
+        const dependencySource = serverPanel.locator('.erp-dev-tool-disclosure')
+        await dependencySource.locator('summary').click()
+        await dependencySource.getByText('依赖来自同一 SHA 的 CI 配置，状态与耗时来自实际 Pipeline。依赖不可读时不绘制推测连线。', { exact: true }).waitFor()
+        await dependencySource.locator('summary').click()
         assert.equal(
           await serverPanel
             .getByRole('table', {
@@ -950,7 +941,8 @@ export function createDevQualityGateScenarios({
         const pipelineNodes = serverPanel.locator(
           '.erp-dev-quality-server-pipeline__node'
         )
-        await pipelineNodes.first().waitFor()
+        await serverPanel.locator('.erp-dev-quality-server-pipeline__node:visible').first().waitFor()
+        assert((await serverPanel.locator('.erp-dev-quality-server-pipeline__phase:not([open])').count()) > 0, '正常分组默认收起，异常与最慢执行组直接可见')
         assert.deepEqual(
           (await pipelineNodes.locator('code').allTextContents()).sort(),
           SERVER_JOB_TIMINGS.map(([jobName]) => jobName).sort()
@@ -975,7 +967,7 @@ export function createDevQualityGateScenarios({
         const nodePhase = serverPanel
           .locator('.erp-dev-quality-server-pipeline__phase')
           .filter({ hasText: 'Node 合同' })
-        await nodePhase.locator('summary').click()
+        if (await nodePhase.getAttribute('open') !== null) await nodePhase.locator('summary').click()
         assert.equal(await nodePhase.evaluate((node) => node.open), false)
         assert.equal(
           await nodePhase
@@ -1290,6 +1282,8 @@ export function createDevQualityGateScenarios({
         const coreGuideButton = serverPanel.getByRole('button', {
           name: '查看 quality_node_core 说明',
         })
+        const corePhase = serverPanel.locator('.erp-dev-quality-server-pipeline__phase').filter({ has: page.locator('button[aria-label="查看 quality_node_core 说明"]') })
+        if (await corePhase.getAttribute('open') === null) await corePhase.locator('summary').click()
         await coreGuideButton.click()
         await jobGuideDrawer
           .getByText('Node 核心测试', { exact: true })

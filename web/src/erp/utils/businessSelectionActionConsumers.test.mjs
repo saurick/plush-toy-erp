@@ -226,9 +226,6 @@ test('采购和加工合同补齐详情入口，任务页不展示未实现的�
       source.indexOf('<SelectionActionBar')
     )
     assert.doesNotMatch(toolbar, /onClick=\{openLineOrder\}/u)
-    assert.match(
-      source.slice(source.indexOf('<SelectionActionBar')),
-      /data-business-action-key="line-order"/u
-    )
+    assert.doesNotMatch(source, /data-business-action-key="line-order"/u)
   }
 })

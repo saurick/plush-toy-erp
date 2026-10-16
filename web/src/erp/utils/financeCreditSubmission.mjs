@@ -1,3 +1,4 @@
+import { FinanceAllocationStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   createFinanceCreditNote,
   getFinanceCreditNote,
@@ -56,13 +57,13 @@ function matchesFinanceCreditReceipt(credit, command) {
   if (command.action === 'reverse') {
     return (
       Number(credit.reversal_of_credit_note_id) ===
-        Number(command.payload.credit_note_id) && credit.status === 'REVERSED'
+        Number(command.payload.credit_note_id) && credit.status === FinanceAllocationStatus.REVERSED
     )
   }
   return (
     Number(credit.finance_fact_id) ===
       Number(command.payload.finance_fact_id) &&
-    credit.status === 'POSTED' &&
+    credit.status === FinanceAllocationStatus.POSTED &&
     compareNumeric20Scale6Values(credit.amount, command.payload.amount) === 0
   )
 }
@@ -79,7 +80,7 @@ async function readFinanceCreditReversal(creditID) {
       (history?.credit_notes || []).find(
         (item) =>
           Number(item?.reversal_of_credit_note_id) === Number(creditID) &&
-          item.status === 'REVERSED'
+          item.status === FinanceAllocationStatus.REVERSED
       ) || null
     )
   } catch {

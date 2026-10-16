@@ -7,12 +7,7 @@ import {
 } from '../../utils/materialPurchaseContractEditor.mjs'
 import { runSilentPrintWorkspaceDraftUpdate } from '../../utils/usePersistentPrintWorkspaceDraft.js'
 import { PrintAppendixImages } from './PrintAppendixImages.jsx'
-
-const CLAUSE_SECTIONS = [
-  { key: 'delivery', title: '一、来货要求' },
-  { key: 'contract', title: '二、合同约定' },
-  { key: 'settlement', title: '三、结算方式' },
-]
+import { visibleContractClauseGroups } from '../../utils/contractClauseEditor.mjs'
 
 function EditableText({
   value,
@@ -128,7 +123,10 @@ function MetaField({
   className = '',
 }) {
   return (
-    <div className={`erp-material-contract-meta__row ${className}`}>
+    <div
+      className={`erp-material-contract-meta__row ${className}`}
+      data-print-blank-field=""
+    >
       <span className="erp-material-contract-meta__label">{label}</span>
       <EditableText
         value={value}
@@ -153,16 +151,45 @@ function MetaPair({ left, right }) {
   )
 }
 
-function ClauseBlock({ title, items, onCommit, disabled = false }) {
+function ClauseBlock({
+  groupKey,
+  number,
+  label,
+  items,
+  onCommit,
+  onTitleCommit,
+  onSelect,
+  disabled = false,
+}) {
   return (
-    <section className="erp-material-contract-clause-block">
-      <div className="erp-material-contract-clause-block__title">{title}：</div>
+    <section
+      className="erp-material-contract-clause-block"
+      data-print-clause-group={groupKey}
+    >
+      <div className="erp-material-contract-clause-block__title">
+        {number}、
+        <span
+          data-print-blank-field=""
+          onFocusCapture={() => onSelect?.(groupKey, null)}
+        >
+          <EditableText
+            value={label}
+            onCommit={onTitleCommit}
+            disabled={disabled}
+            className="erp-contract-clause-title__value"
+          />
+        </span>
+        ：
+      </div>
       <ol className="erp-material-contract-clause-block__list">
         {items.map((item, index) => (
           <li
-            key={`${title}-${index}`}
+            key={`${groupKey}-${index}`}
             className="erp-material-contract-clause-block__item"
             data-print-focus-group=""
+            data-print-blank-field=""
+            data-print-clause-index={index}
+            onFocusCapture={() => onSelect?.(groupKey, index)}
           >
             <span className="erp-material-contract-clause-block__index">
               {index + 1}、
@@ -188,6 +215,8 @@ export default function MaterialPurchaseContractPaper({
   handleFieldCommit,
   handleLineCommit,
   handleClauseCommit,
+  onClauseTitleChange,
+  onClauseFocus,
   selectedRowIndex,
   rowSelectionMode,
   setSelectedRowIndex,
@@ -197,11 +226,15 @@ export default function MaterialPurchaseContractPaper({
   handleSelectCell,
   totals,
 }) {
+  const clauseGroups = visibleContractClauseGroups(draft.clauses)
   return (
     <div className="erp-material-contract-paper" ref={paperRef}>
       <div className="erp-material-contract-paper__title">合同订单</div>
 
-      <section className="erp-material-contract-meta">
+      <section
+        className="erp-material-contract-meta"
+        data-print-blank-region=""
+      >
         <MetaPair
           left={
             <MetaField
@@ -352,6 +385,7 @@ export default function MaterialPurchaseContractPaper({
           {draft.lines.map((line, rowIndex) => (
             <tr
               key={`line-${rowIndex}`}
+              data-print-blank-row=""
               className={
                 selectedRowIndex === rowIndex
                   ? 'erp-material-contract-table__row-selected'
@@ -383,6 +417,9 @@ export default function MaterialPurchaseContractPaper({
                 return (
                   <td
                     key={`${column.key}-${rowIndex}`}
+                    data-print-blank-field={
+                      column.editable ? column.key : undefined
+                    }
                     rowSpan={
                       merge ? merge.rowEnd - merge.rowStart + 1 : undefined
                     }
@@ -441,19 +478,25 @@ export default function MaterialPurchaseContractPaper({
         </tbody>
       </table>
 
-      <div className="erp-material-contract-clauses">
-        {CLAUSE_SECTIONS.map((section) => (
-          <ClauseBlock
-            key={section.key}
-            title={section.title}
-            items={draft.clauses[section.key] || []}
-            onCommit={(clauseIndex, nextValue) =>
-              handleClauseCommit(section.key, clauseIndex, nextValue)
-            }
-            disabled={templateModesActive}
-          />
-        ))}
-      </div>
+      {clauseGroups.length > 0 ? (
+        <div className="erp-material-contract-clauses">
+          {clauseGroups.map((section) => (
+            <ClauseBlock
+              key={section.key}
+              groupKey={section.key}
+              number={section.number}
+              label={section.label}
+              items={section.items}
+              onSelect={onClauseFocus}
+              onTitleCommit={(value) => onClauseTitleChange(section.key, value)}
+              onCommit={(clauseIndex, nextValue) =>
+                handleClauseCommit(section.key, clauseIndex, nextValue)
+              }
+              disabled={templateModesActive}
+            />
+          ))}
+        </div>
+      ) : null}
 
       <div className="erp-material-contract-signature">
         <div className="erp-material-contract-signature__block">

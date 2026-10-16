@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo } from 'react'
 import { Alert, Descriptions, Form, Input, Select, Typography } from 'antd'
+import { SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
@@ -169,7 +170,7 @@ export default function SalesOrderReservationModal({
             key: 'status',
             label: '来源状态',
             children:
-              String(order?.lifecycle_status || '').toLowerCase() === 'active'
+              String(order?.lifecycle_status || '').toLowerCase() === SalesOrderStatus.ACTIVE
                 ? '履约中'
                 : '待核对',
           },

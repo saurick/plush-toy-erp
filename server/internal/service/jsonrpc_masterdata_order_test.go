@@ -302,7 +302,6 @@ type stubSalesOrderJSONRPCRepo struct {
 	cancelActorID        int
 	lastSalesOrderFilter biz.SalesOrderFilter
 	saveErr              error
-	reorderedItemIDs     []int
 }
 
 func (s *stubSalesOrderJSONRPCRepo) CreateSalesOrder(_ context.Context, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
@@ -415,26 +414,6 @@ func (s *stubSalesOrderJSONRPCRepo) SaveSalesOrderWithItems(_ context.Context, i
 		})
 	}
 	return out, nil
-}
-
-func (s *stubSalesOrderJSONRPCRepo) ReorderSalesOrderItems(_ context.Context, id, expectedVersion int, itemIDs []int) (*biz.SalesOrderWithItems, error) {
-	s.reorderedItemIDs = append([]int(nil), itemIDs...)
-	items := make([]*biz.SalesOrderItem, 0, len(itemIDs))
-	for _, itemID := range itemIDs {
-		items = append(items, &biz.SalesOrderItem{
-			ID:              itemID,
-			SalesOrderID:    id,
-			LineNo:          itemID,
-			ProductID:       1,
-			UnitID:          1,
-			OrderedQuantity: decimal.NewFromInt(1),
-			LineStatus:      biz.SalesOrderItemStatusOpen,
-		})
-	}
-	return &biz.SalesOrderWithItems{
-		Order: &biz.SalesOrder{ID: id, OrderNo: "SO001", CustomerID: 1, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.SalesOrderStatusDraft, Version: expectedVersion + 1},
-		Items: items,
-	}, nil
 }
 
 func (s *stubSalesOrderJSONRPCRepo) CustomerIsActive(context.Context, int) (bool, error) {
@@ -1902,29 +1881,17 @@ func TestJsonrpcDispatcher_SaveExistingSalesOrderDoesNotRequireRemovedItemWriteP
 	}
 }
 
-func TestJsonrpcDispatcher_ReorderSalesOrderItemsUsesUpdatePermissionAndStableIDs(t *testing.T) {
+func TestJsonrpcDispatcher_SalesOrderStandaloneReorderIsUnavailable(t *testing.T) {
 	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
 	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
 		[]string{biz.SalesRoleKey},
 		biz.PermissionSalesOrderUpdate,
 	))
-	_, res, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "reorder_sales_order_items", "reorder", mustJSONRPCStruct(t, map[string]any{
-		"id":               float64(1),
-		"expected_version": float64(1),
-		"item_ids":         []any{float64(3), float64(1), float64(2)},
+	_, res, err := j.handleSalesOrder(workflowJSONRPCAdminContext(), "reorder_sales_order_items", "removed-order-action", mustJSONRPCStruct(t, map[string]any{
+		"id": float64(1), "expected_version": float64(1), "item_ids": []any{float64(3), float64(1), float64(2)},
 	}))
-	if err != nil || res == nil || res.Code != errcode.OK.Code {
-		t.Fatalf("reorder sales order items: res=%#v err=%v", res, err)
-	}
-	if fmt.Sprint(repo.reorderedItemIDs) != "[3 1 2]" {
-		t.Fatalf("stable item order not forwarded: %#v", repo.reorderedItemIDs)
-	}
-	if version := jsonRPCInt(t, jsonRPCNestedMap(t, res, "sales_order"), "version"); version != 2 {
-		t.Fatalf("reordered sales order version = %d, want 2", version)
-	}
-	items := res.Data.AsMap()["sales_order_items"].([]any)
-	if len(items) != 3 || fmt.Sprint(items[0].(map[string]any)["id"]) != "3" {
-		t.Fatalf("reordered sales item response = %#v", items)
+	if err != nil || res == nil || res.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("standalone item ordering must be unavailable: res=%#v err=%v", res, err)
 	}
 }
 

@@ -1,3 +1,4 @@
+import { getDeploymentTarget } from "./deployment-targets.mjs";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -426,23 +427,24 @@ function configureRegisteredDemoFixture(fixture, replacements = {}) {
 
 const configureCustomerTrialFixture = configureRegisteredDemoFixture;
 
-function configureRegisteredCustomerTestFixture(fixture) {
-  const targetRoot = path.join(fixture.root, "plush-toy-erp-test-v1");
+function configureRegisteredCustomerTestFixture(fixture, targetKey = "customer-test-133") {
+  const target = getDeploymentTarget(targetKey);
+  const targetRoot = path.join(fixture.root, target.compose.projectName);
   const postgresDataDir = path.join(targetRoot, "data/postgres");
   const migrationLockFile = path.join(targetRoot, "run/atlas-migrate.lock");
   const composeOverrideFile = path.join(
     fixture.root,
-    "compose.customer-test-133.yml",
+    target.compose.overrideFile,
   );
   const composeEnvFile = path.join(
     fixture.root,
     "runtime",
-    ".env.customer-test-133",
+    `.env.${target.key}`,
   );
   const productionRootContract =
-    "TARGET_ROOT=/root/deploy/plush-toy-erp-test-v1";
+    `TARGET_ROOT=${target.filesystem.root}`;
   const productionEnvContract =
-    "TARGET_COMPOSE_ENV_FILE=$TARGET_ROOT/runtime/.env.customer-test-133";
+    `TARGET_COMPOSE_ENV_FILE=$TARGET_ROOT/runtime/.env.${target.key}`;
   const source = fs
     .readFileSync(fixture.migrateScript, "utf8")
     .replace(productionRootContract, `TARGET_ROOT=${targetRoot}`)
@@ -456,9 +458,9 @@ function configureRegisteredCustomerTestFixture(fixture) {
   fixture.composeOverrideFile = composeOverrideFile;
   fixture.composeEnvFile = composeEnvFile;
   const values = new Map([
-    ["PROJECT_SLUG", "plush-toy-erp-test-v1"],
+    ["PROJECT_SLUG", target.compose.projectName],
     ["ERP_CUSTOMER_KEY", "yoyoosun"],
-    ["POSTGRES_DB", "plush_erp_customer_test_v1"],
+    ["POSTGRES_DB", target.database.name],
     ["POSTGRES_USER", "postgres"],
     ["POSTGRES_PASSWORD", "test-postgres-password"],
     ["POSTGRES_APP_PASSWORD", "test-app-password-12345"],
@@ -469,24 +471,24 @@ function configureRegisteredCustomerTestFixture(fixture) {
     ["POSTGRES_BIND_ADDR", "127.0.0.1"],
     ["APP_HTTP_BIND_ADDR", "127.0.0.1"],
     ["WEB_DESKTOP_BIND_ADDR", "127.0.0.1"],
-    ["POSTGRES_PORT", "55437"],
-    ["APP_HTTP_PORT", "8335"],
-    ["WEB_DESKTOP_PORT", "5205"],
-    ["JAEGER_6831_PORT", "62002"],
-    ["JAEGER_6832_PORT", "62003"],
-    ["JAEGER_UI_PORT", "62005"],
-    ["JAEGER_14268_PORT", "62006"],
-    ["JAEGER_14250_PORT", "62007"],
-    ["JAEGER_9411_PORT", "62008"],
-    ["JAEGER_OTLP_GRPC_PORT", "62009"],
-    ["JAEGER_OTLP_HTTP_PORT", "62010"],
+    ["POSTGRES_PORT", String(target.runtime.postgres.hostPort)],
+    ["APP_HTTP_PORT", String(target.runtime.app.hostPort)],
+    ["WEB_DESKTOP_PORT", String(target.runtime.web.hostPort)],
+    ["JAEGER_6831_PORT", String(target.runtime.jaeger.ports.agentThriftCompact)],
+    ["JAEGER_6832_PORT", String(target.runtime.jaeger.ports.agentThriftBinary)],
+    ["JAEGER_UI_PORT", String(target.runtime.jaeger.ports.ui)],
+    ["JAEGER_14268_PORT", String(target.runtime.jaeger.ports.collectorHttp)],
+    ["JAEGER_14250_PORT", String(target.runtime.jaeger.ports.collectorGrpc)],
+    ["JAEGER_9411_PORT", String(target.runtime.jaeger.ports.zipkin)],
+    ["JAEGER_OTLP_GRPC_PORT", String(target.runtime.jaeger.ports.otlpGrpc)],
+    ["JAEGER_OTLP_HTTP_PORT", String(target.runtime.jaeger.ports.otlpHttp)],
     ["ERP_ALLOW_CUSTOMER_TRIAL_CONFIG", "0"],
     ["ERP_CUSTOMER_TRIAL_TARGET", ""],
   ]);
 
   fs.writeFileSync(
     composeOverrideFile,
-    "name: plush-toy-erp-test-v1\n",
+    `name: ${target.compose.projectName}\n`,
     "utf8",
   );
   fs.writeFileSync(
@@ -524,12 +526,12 @@ function configureRegisteredCustomerTestFixture(fixture) {
   Object.assign(fixture.env, {
     COMPOSE_OVERRIDE_FILE: composeOverrideFile,
     COMPOSE_ENV_FILE: composeEnvFile,
-    DEPLOYMENT_TARGET_KEY: "customer-test-133",
+    DEPLOYMENT_TARGET_KEY: target.key,
     FAKE_POSTGRES_DATA_DIR: postgresDataDir,
-    FAKE_POSTGRES_DB: "plush_erp_customer_test_v1",
-    FAKE_POSTGRES_PROJECT: "plush-toy-erp-test-v1",
-    FAKE_POSTGRES_NAME: "plush-toy-erp-test-v1-postgres",
-    FAKE_POSTGRES_BINDING: "127.0.0.1|55437",
+    FAKE_POSTGRES_DB: target.database.name,
+    FAKE_POSTGRES_PROJECT: target.compose.projectName,
+    FAKE_POSTGRES_NAME: `${target.compose.projectName}-postgres`,
+    FAKE_POSTGRES_BINDING: `127.0.0.1|${target.runtime.postgres.hostPort}`,
   });
   return { values, postgresDataDir, migrationLockFile };
 }
@@ -726,6 +728,36 @@ test("migrate_online customer-test 使用独立 env、project、端口和数据�
   }
 });
 
+test("migrate_online production 使用独立 env、project、端口和数据库", () => {
+  const fixture = createFixture();
+  try {
+    configureRegisteredCustomerTestFixture(fixture, "production-133");
+    const result = runMigration(fixture, ["--status-only"]);
+
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    const composePrefix = `compose --env-file ${fixture.composeEnvFile} -p plush-toy-erp-production -f ${fixture.composeFile} -f ${fixture.composeOverrideFile}`;
+    assert.deepEqual(readLines(fixture.composeLog), [
+      `${composePrefix} ps -q app-server`,
+      `${composePrefix} ps -q postgres`,
+    ]);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), [
+      "validate",
+      "status",
+      "schema-readback",
+    ]);
+    assert.deepEqual(readLines(fixture.psqlLog), [
+      "host=127.0.0.1|port=55438|database=plush_erp_production|user=erp_migrator|password_present=1|sslmode=disable",
+      "host=127.0.0.1|port=55438|database=plush_erp_production|user=erp_migrator|password_present=1|sslmode=disable",
+    ]);
+    assert.match(result.stdout, /deployment target: production-133/u);
+    assert.match(result.stdout, /compose project: plush-toy-erp-production/u);
+    assert.doesNotMatch(result.stdout, /test-postgres-password/u);
+    assert.doesNotMatch(result.stderr, /test-postgres-password/u);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
 test("migrate_online 在任何 Compose、Atlas 或数据库动作前排除 admin 和未启用环境", async (t) => {
   for (const targetKey of ["admin", "admin-133", "erp", "test-133"]) {
     await t.test(targetKey, () => {
@@ -738,7 +770,7 @@ test("migrate_online 在任何 Compose、Atlas 或数据库动作前排除 admin
         assert.notEqual(result.status, 0);
         assert.match(
           result.stderr,
-          /只允许 demo-133 或 customer-test-133；admin 不是部署环境/u,
+          /只允许 demo-133、customer-test-133 或 production-133；admin 不是部署环境/u,
         );
         assert.deepEqual(readLines(fixture.composeLog), []);
         assert.deepEqual(atlasPhases(fixture.atlasLog), []);

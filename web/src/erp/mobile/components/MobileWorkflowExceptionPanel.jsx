@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import WorkflowExceptionPanel from '../../components/workflow/WorkflowExceptionPanel.jsx'
-import { normalizeTaskDiscoveryFilters } from '../../utils/workflowTaskDiscovery.mjs'
 import MobileTaskPullRefresh from './MobileTaskPullRefresh.jsx'
 
 const HISTORY_KEY = 'mobileWorkflowExceptions'
@@ -10,7 +9,6 @@ export default function MobileWorkflowExceptionPanel({ accessScope, profile, onO
     const saved = window.history.state?.[HISTORY_KEY]
     const query = saved?.accessScope === accessScope ? saved.query : null
     return {
-      filters: normalizeTaskDiscoveryFilters(query?.filters || {}),
       keyword: String(query?.keyword || '').trim().slice(0, 100),
       state: ['open', 'closed'].includes(query?.state) ? query.state : '',
       view: ['tasks', 'orders'].includes(query?.view) ? query.view : '',

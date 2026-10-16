@@ -21,7 +21,7 @@ const scriptPath = path.join(
 );
 const collectEvidencePath = path.join(
   repoRoot,
-  "deployments/yoyoosun/scripts/collect-evidence.sh",
+  "scripts/deploy/collect-evidence.sh",
 );
 
 const VALID_INPUT = {

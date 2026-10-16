@@ -3,7 +3,9 @@ import { AppstoreOutlined, FileTextOutlined } from '@ant-design/icons'
 import { Alert, Button, Empty, Tag, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
+import FilterChip from '@/common/components/navigation/FilterChip'
 import DevPageNav from '../components/DevPageNav.jsx'
+import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import {
   DEV_PRODUCT_CORE_DOCS_HREF,
   DEV_PRODUCT_CORE_MEMBERSHIP_ALL,
@@ -63,7 +65,6 @@ function CapabilityRow({ item }) {
           <Tag color={STATUS_COLOR_BY_MEMBERSHIP[item.membershipKey]}>
             {item.membership}
           </Tag>
-          <small>台账：{item.status}</small>
         </div>
       </td>
       <td data-label="当前可用范围">{item.availableScope}</td>
@@ -142,7 +143,7 @@ export default function DevProductCorePage() {
     membership !== DEV_PRODUCT_CORE_MEMBERSHIP_ALL || Boolean(keyword.trim())
 
   return (
-    <div className="erp-dev-product-core-page erp-dev-workspace-page">
+    <div className="erp-dev-product-core-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav sourcePath={DEV_PRODUCT_CORE_SOURCE_PATH} />
 
       <header className="erp-dev-product-core-header">
@@ -180,7 +181,7 @@ export default function DevProductCorePage() {
             type="error"
             showIcon
             message="暂时无法读取产品能力台账"
-            description="页面没有解析到能力状态。请查看能力台账核对 Markdown 表格结构，不要在页面里补造状态。"
+            description="请打开能力台账，核对表格格式与状态。"
             action={
               <Button href={DEV_PRODUCT_CORE_DOCS_HREF}>查看能力台账</Button>
             }
@@ -192,11 +193,8 @@ export default function DevProductCorePage() {
           >
             <div className="erp-dev-product-core-toolbar">
               <div>
-                <Title level={2} id="product-core-inventory-title">
-                  能力清单
-                </Title>
-                <Text type="secondary" aria-live="polite">
-                  当前显示 {filteredCapabilities.length} / {summary.total} 项
+                <Text id="product-core-inventory-title" type="secondary" aria-live="polite">
+                  {filteredCapabilities.length} / {summary.total} 项能力
                 </Text>
               </div>
               <div className="erp-dev-product-core-toolbar__actions">
@@ -222,18 +220,14 @@ export default function DevProductCorePage() {
               {filterOptions.map((option) => {
                 const isActive = membership === option.key
                 return (
-                  <button
+                  <FilterChip
                     key={option.key}
-                    type="button"
-                    className={`erp-dev-product-core-filter${
-                      isActive ? ' erp-dev-product-core-filter--active' : ''
-                    }`}
-                    aria-pressed={isActive}
+                    selected={isActive}
+                    count={option.count}
                     onClick={() => handleMembershipChange(option.key)}
                   >
-                    <strong>{option.count}</strong>
-                    <span>{option.label}</span>
-                  </button>
+                    {option.label}
+                  </FilterChip>
                 )
               })}
             </div>
@@ -270,13 +264,9 @@ export default function DevProductCorePage() {
           </section>
         )}
 
-        <Alert
-          className="erp-dev-product-core-boundary"
-          type="info"
-          showIcon
-          message="进入 Product Core 不等于已发布或已验收"
-          description={summary.boundary}
-        />
+        <DevStaticGuidance title="进入 Product Core 不等于已发布或已验收">
+          <Text>{summary.boundary}</Text>
+        </DevStaticGuidance>
       </main>
     </div>
   )

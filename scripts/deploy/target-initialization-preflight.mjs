@@ -70,7 +70,7 @@ if [[ -e "$root" || -L "$root" ]]; then
   block initialization_root_not_absent
 fi
 
-for command_name in docker jq curl python3 zstd tar sha256sum openssl rsync ss psql flock; do
+for command_name in docker jq curl zstd tar sha256sum openssl rsync ss psql flock; do
   command -v "$command_name" >/dev/null 2>&1 || {
     tooling_status=blocked
     block initialization_tooling_unavailable
@@ -86,6 +86,23 @@ if [[ ! -x /usr/local/bin/atlas ]] ||
     grep -Eq '(^|[[:space:]])v1[.]3[.]0([[:space:]]|$)'; then
   atlas_status=blocked
   block initialization_atlas_unavailable
+fi
+
+if [[ "$target" == production-133 ]]; then
+  if ! command -v age >/dev/null 2>&1 ||
+    [[ ! -f /etc/plush-toy-erp/backup.env || -L /etc/plush-toy-erp/backup.env ||
+       "$(stat -c '%u:%a' /etc/plush-toy-erp/backup.env 2>/dev/null)" != 0:600 ]]; then
+    tooling_status=blocked
+    block initialization_production_backup_unprepared
+  fi
+  offsite=/mnt/plush-toy-erp-offsite/database
+  if [[ ! -d "$offsite" || -L "$offsite" ||
+        ! -f "$offsite/.plush-toy-erp-offsite-target" ]] ||
+    [[ "$(cat "$offsite/.plush-toy-erp-offsite-target" 2>/dev/null)" != plush-toy-erp-offsite-v1 ]] ||
+    [[ "$(stat -c '%d' "$offsite" 2>/dev/null)" == "$(stat -c '%d' /root/deploy 2>/dev/null)" ]]; then
+    tooling_status=blocked
+    block initialization_production_offsite_unproven
+  fi
 fi
 
 for image in postgres:18.6 jaegertracing/jaeger:2.21.0@sha256:3d0ac795ff98aa04d1be04311d2dac6c25b4bfc8322dc02e53bc5b170c5018c3 chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882; do
@@ -124,7 +141,16 @@ for port in "\${udp_ports[@]}"; do
 done
 [[ "$udp_conflict_count" == 0 ]] || block initialization_udp_port_conflict
 
-root_available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
+system_available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
+if [[ ! "$system_available_bytes" =~ ^[0-9]+$ ]] || (( system_available_bytes < minimum_available_bytes )); then
+  block initialization_system_disk_capacity_low
+fi
+
+capacity_path="$root"
+while [[ ! -d "$capacity_path" ]]; do
+  capacity_path="$(dirname "$capacity_path")"
+done
+root_available_bytes="$(df -B1 --output=avail "$capacity_path" | awk 'NR==2 {print $1}')"
 if [[ ! "$root_available_bytes" =~ ^[0-9]+$ ]]; then
   root_available_bytes=0
   block initialization_capacity_unknown

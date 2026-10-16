@@ -53,20 +53,3 @@ export const DEV_WORKBENCH_GUIDE = Object.freeze(
     },
   ].map((item) => Object.freeze(item))
 )
-
-export const DEV_TOOL_USAGE = Object.freeze({
-  'product-core': '确认能力范围',
-  'permission-relationships': '核对岗位与权限',
-  'status-flows': '核对业务交接',
-  docs: '查正式依据',
-  'ui-design': '实现前走操作',
-  testing: '验证当前改动',
-  'business-chain-audit': '核对链路实跑与逐步证据',
-  'quality-gates': '核对正式门禁',
-  'business-usability': '检查页面说明',
-  'data-preparation': '用例缺少数据时',
-  'customer-config': '核对客户差异',
-  'database-migration': '数据库结构变化时',
-  'version-center': '发布、部署与读回',
-  'drill-recovery': '安全核验、演练或恢复时',
-})

@@ -33,6 +33,6 @@ description: 项目文档治理（plush-toy-erp）。Use to review or maintain p
 
 ## Validation and Output
 
-运行 `git diff --check` 和定向路径 / 锚点 / 旧术语扫描；改 Skills 运行 `node scripts/qa/skill-health.mjs` 和 validator，改文档清单或消费者时运行对应检查。Mermaid 变化检查语法与标签。纯治理不执行 migration 或无关全量 QA。
+运行 scoped diff 格式及定向路径 / 锚点 / 旧术语检查；改项目 Skills 时运行 `node scripts/qa/skill-health.mjs`，这是[维护与验证](../README.md#skill-validation)定义的项目 validator。改文档清单或消费者时运行对应检查，Mermaid 变化检查语法与标签。纯治理不执行 migration 或无关全量 QA。
 
 报告关键修改、AGENTS 是否变化、必要同步、验证及盲区；未涉及的图表、metadata、目录或运行层不逐项填报。

@@ -7,6 +7,7 @@ import {
   resolvePrintTemplateTotals,
 } from './printTemplateRendererModel.mjs'
 import { coalescePrintValues, renderPrintValue } from './printValue.mjs'
+import { visibleContractClauseGroups } from '../../utils/contractClauseEditor.mjs'
 
 function PrintMetaGrid({ leftItems, rightItems }) {
   return (
@@ -65,6 +66,7 @@ function ContractTemplate({ data: rawData, kind }) {
   const isMaterial = kind === 'material'
   const columns = getPrintTemplateLineColumns(kind)
   const { lines, merges } = data
+  const clauseGroups = visibleContractClauseGroups(data.clauses)
   const totals = resolvePrintTemplateTotals(data, kind)
 
   if (isMaterial) {
@@ -247,68 +249,35 @@ function ContractTemplate({ data: rawData, kind }) {
           </tbody>
         </table>
 
-        <div className="erp-material-contract-clauses">
-          <section className="erp-material-contract-clause-block">
-            <div className="erp-material-contract-clause-block__title">
-              一、来货要求：
-            </div>
-            <ol className="erp-material-contract-clause-block__list">
-              {data.clauses.delivery.map((item, index) => (
-                <li
-                  key={item}
-                  className="erp-material-contract-clause-block__item"
-                >
-                  <span className="erp-material-contract-clause-block__index">
-                    {index + 1}、
-                  </span>
-                  <span className="erp-material-contract-clause-block__value">
-                    {item}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </section>
-          <section className="erp-material-contract-clause-block">
-            <div className="erp-material-contract-clause-block__title">
-              二、合同约定：
-            </div>
-            <ol className="erp-material-contract-clause-block__list">
-              {data.clauses.contract.map((item, index) => (
-                <li
-                  key={item}
-                  className="erp-material-contract-clause-block__item"
-                >
-                  <span className="erp-material-contract-clause-block__index">
-                    {index + 1}、
-                  </span>
-                  <span className="erp-material-contract-clause-block__value">
-                    {item}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </section>
-          <section className="erp-material-contract-clause-block">
-            <div className="erp-material-contract-clause-block__title">
-              三、结算方式：
-            </div>
-            <ol className="erp-material-contract-clause-block__list">
-              {data.clauses.settlement.map((item, index) => (
-                <li
-                  key={item}
-                  className="erp-material-contract-clause-block__item"
-                >
-                  <span className="erp-material-contract-clause-block__index">
-                    {index + 1}、
-                  </span>
-                  <span className="erp-material-contract-clause-block__value">
-                    {item}
-                  </span>
-                </li>
-              ))}
-            </ol>
-          </section>
-        </div>
+        {clauseGroups.length > 0 ? (
+          <div className="erp-material-contract-clauses">
+            {clauseGroups.map((group) => (
+              <section
+                className="erp-material-contract-clause-block"
+                key={group.key}
+              >
+                <div className="erp-material-contract-clause-block__title">
+                  {group.title}：
+                </div>
+                <ol className="erp-material-contract-clause-block__list">
+                  {group.items.map((item, index) => (
+                    <li
+                      key={`${group.key}-${index}`}
+                      className="erp-material-contract-clause-block__item"
+                    >
+                      <span className="erp-material-contract-clause-block__index">
+                        {index + 1}、
+                      </span>
+                      <span className="erp-material-contract-clause-block__value">
+                        {item}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            ))}
+          </div>
+        ) : null}
 
         <div className="erp-material-contract-signature">
           <div className="erp-material-contract-signature__block">
@@ -425,20 +394,16 @@ function ContractTemplate({ data: rawData, kind }) {
         </tbody>
       </table>
 
-      <div className="erp-print-clauses">
-        <div className="erp-print-clauses__section">
-          <div className="erp-print-clauses__title">一、来货要求</div>
-          <ol>{renderClauseItems('delivery', data.clauses.delivery)}</ol>
+      {clauseGroups.length > 0 ? (
+        <div className="erp-print-clauses">
+          {clauseGroups.map((group) => (
+            <div className="erp-print-clauses__section" key={group.key}>
+              <div className="erp-print-clauses__title">{group.title}</div>
+              <ol>{renderClauseItems(group.key, group.items)}</ol>
+            </div>
+          ))}
         </div>
-        <div className="erp-print-clauses__section">
-          <div className="erp-print-clauses__title">二、合同约定</div>
-          <ol>{renderClauseItems('contract', data.clauses.contract)}</ol>
-        </div>
-        <div className="erp-print-clauses__section">
-          <div className="erp-print-clauses__title">三、结算方式</div>
-          <ol>{renderClauseItems('settlement', data.clauses.settlement)}</ol>
-        </div>
-      </div>
+      ) : null}
 
       <div className="erp-print-signature">
         <div className="erp-print-signature__block">

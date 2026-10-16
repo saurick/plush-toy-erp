@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 export async function assertTaskCopy(
   page,
   button,
   expected,
-  { keyboard = false, failure = false, fallback = false } = {}
+  { keyboard = false, failure = false, fallback = false, returnFocus = button } = {}
 ) {
   const details = page.locator(
     '.erp-task-action-drawer:visible, [data-testid="mobile-task-detail-screen"]'
@@ -75,7 +76,7 @@ export async function assertTaskCopy(
     )
     if (keyboard) {
       assert.equal(
-        await button.evaluate((node) => node === document.activeElement),
+        await returnFocus.evaluate((node) => node === document.activeElement),
         true,
         '键盘复制后保留焦点'
       )
@@ -83,6 +84,17 @@ export async function assertTaskCopy(
   } finally {
     await page.evaluate(() => window.__taskCopyProbe.restore())
   }
+}
+
+export async function assertTaskMenuCopy(page, surface, label, expected, options = {}) {
+  const trigger = surface.getByRole('button', { name: '更多操作', exact: true })
+  await trigger.click()
+  const item = page.getByRole('menu').getByRole('menuitem', { name: `复制${label}`, exact: true })
+  await item.waitFor()
+  await waitForFiniteAnimations(page)
+  await assertTaskCopy(page, item, expected, { ...options, returnFocus: trigger })
+  await item.waitFor({ state: 'hidden' })
+  await waitForFiniteAnimations(page)
 }
 
 export async function clickTaskCardContent(card, target) {

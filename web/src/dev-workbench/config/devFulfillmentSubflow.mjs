@@ -1,4 +1,6 @@
 import { getRoleDisplayName } from '../../erp/utils/roleKeys.mjs'
+import { fulfillmentStepMatchesRole } from '../../erp/utils/workflowFulfillment.mjs'
+import { getFulfillmentSubstepCopy } from './devFulfillmentPresentation.mjs'
 
 const escapeLabel = (value) => String(value)
   .replaceAll('&', '#amp;')
@@ -37,19 +39,26 @@ export function buildFulfillmentSubflow(step) {
     summary: step.subflow.summary,
     nodes: step.subflow.nodes.map((node) => ({
       ...node,
-      role: node.role_keys?.map(getRoleDisplayName).join(' / '),
-      details: node.detail_refs.flatMap((reference) => resolveDetail(step, reference)),
+      role: node.role_keys?.map(getRoleDisplayName).join(' / ') || (/审批/u.test(node.label) ? '按有效配置分派' : ''),
+      details: node.detail_refs.flatMap((reference) => resolveDetail(step, reference).map((detail) => ({ ...detail, reference }))),
       exception: node.detail_refs.includes('exception'),
     })),
     edges: step.subflow.edges,
   }
 }
 
-export function buildSubflowMermaid(flow) {
+export function buildSubflowMermaid(flow, { role = 'all', compact = false, direction = 'TB' } = {}) {
   const ids = new Map(flow.nodes.map((node, index) => [node.key, `N${index}`]))
   if (ids.size !== flow.nodes.length) throw new Error('Duplicate subflow nodes')
-  const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 24', '    rankSpacing: 28', '---', 'flowchart TB']
-  for (const node of flow.nodes) lines.push(`  ${ids.get(node.key)}["${escapeLabel(node.label)}"]`)
+  const lines = ['---', 'config:', '  flowchart:', '    nodeSpacing: 24', '    rankSpacing: 28', '---', `flowchart ${direction === 'LR' ? 'LR' : 'TB'}`]
+  for (const node of flow.nodes) {
+    const label = compact ? getFulfillmentSubstepCopy(node) : node.label
+    const owner = compact && node.role ? `<br/>${escapeLabel(node.role)}` : ''
+    lines.push(`  ${ids.get(node.key)}["${escapeLabel(label)}${owner}"]`)
+    if (role !== 'all' && fulfillmentStepMatchesRole(node, role)) {
+      lines.push(`  class ${ids.get(node.key)} fulfillmentRoleMatch`)
+    }
+  }
   for (const edge of flow.edges) {
     if (!ids.has(edge.from) || !ids.has(edge.to)) throw new Error('Unknown subflow edge endpoint')
     lines.push(`  ${ids.get(edge.from)} -->${edge.label ? `|"${escapeLabel(edge.label)}"|` : ''} ${ids.get(edge.to)}`)

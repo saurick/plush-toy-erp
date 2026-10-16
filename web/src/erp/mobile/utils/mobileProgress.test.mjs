@@ -25,7 +25,7 @@ const profile = {
     actions: permissions,
   },
 }
-test('进度更新、详情返回和刷新使用相同日期状态形态', () => {
+test('手机进度更新和恢复只保留常用条件，姓名与精确日期不再参与查询', () => {
   let query = normalizeMobileProgressQuery({}, 'production')
   for (const changes of [
     { q: '模拟客户' },
@@ -38,11 +38,11 @@ test('进度更新、详情返回和刷新使用相同日期状态形态', () =>
     query = normalizeMobileProgressQuery(withProgressFilters(query, changes), 'production')
     const restored = readMobileProgressState({ mobileProgress: { scope: 'test', query } }, 'test', 'production')
     assert.deepEqual(restored.query, query)
-    assert.equal(typeof query.from, 'string')
-    assert.equal(typeof query.to, 'string')
+    assert.equal(query.from, undefined)
+    assert.equal(query.to, undefined)
   }
   assert.equal(query.q, '模拟客户')
-  assert.equal(query.owner, '')
+  assert.equal(query.owner, undefined)
 })
 test('进度入口由真实读取权限决定，普通老板无需管理员身份', () => {
   assert.equal(mobileProgressAccess(profile).enabled, true)
@@ -107,8 +107,8 @@ test('返回和刷新恢复查询与选择，账号、权限或岗位改变不�
   const restored = readMobileProgressState(history, 'user7|boss|v1', 'orders')
   assert.equal(restored.query.q, 'SO-0025')
   assert.equal(restored.query.page, 1)
-  assert.equal(restored.query.from, '2026-09-01')
-  assert.equal(restored.query.to, '2026-09-30')
+  assert.equal(restored.query.from, undefined)
+  assert.equal(restored.query.to, undefined)
   assert.equal(restored.selection.id, 25)
   assert.equal(restored.scrollTop, 340)
   const ended = readMobileProgressState(
@@ -129,7 +129,7 @@ test('返回和刷新恢复查询与选择，账号、权限或岗位改变不�
     'orders'
   )
   assert.equal(ownerFilter.query.q, '')
-  assert.equal(ownerFilter.query.owner, '负责人条件')
+  assert.equal(ownerFilter.query.owner, undefined)
   for (const scope of [
     'user8|boss|v1',
     'user7|warehouse|v1',

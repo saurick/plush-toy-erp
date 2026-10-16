@@ -106,7 +106,7 @@ func validateTargets(targetDSN, historicalDSN string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("invalid restored backup connection")
 	}
-	shared := t.Host == devdbguard.CustomerConfigLocalTestHost && t.Port == devdbguard.CustomerConfigLocalTestPort && t.Database == "plush_erp"
+	shared := t.Database == "plush_erp" && devdbguard.RequireCustomerConfigLocalTestDSN(targetDSN) == nil
 	isolated := t.Host == "127.0.0.1" && strings.HasPrefix(t.Database, "plush_erp_ci_") && len(t.Fallbacks) == 0
 	if !shared && !isolated {
 		return "", fmt.Errorf("recovery only accepts the registered shared development database or a loopback disposable rehearsal")
@@ -163,14 +163,15 @@ func run(ctx context.Context, args []string, out io.Writer, getenv func(string) 
 		return fmt.Errorf("cannot verify target identity")
 	}
 	cfg, _ := pgconn.ParseConfig(targetDSN)
-	if cfg.Host == devdbguard.CustomerConfigLocalTestHost {
+	registered := cfg.Database == "plush_erp" && devdbguard.RequireCustomerConfigLocalTestDSN(targetDSN) == nil
+	if registered {
 		if err = devdbguard.RequireCustomerConfigLocalTestRuntime(targetDSN, database, identity); err != nil {
 			return err
 		}
 	} else if database != cfg.Database || identity == devdbguard.CustomerConfigLocalTestSystemIdentifier {
 		return fmt.Errorf("disposable target identity mismatch")
 	}
-	if err = historical.QueryRowContext(ctx, `SELECT system_identifier::text FROM pg_control_system()`).Scan(&historicalIdentity); err != nil || historicalIdentity == devdbguard.CustomerConfigLocalTestSystemIdentifier {
+	if err = historical.QueryRowContext(ctx, `SELECT system_identifier::text FROM pg_control_system()`).Scan(&historicalIdentity); err != nil || historicalIdentity == devdbguard.CustomerConfigLocalTestSystemIdentifier || (registered && historicalIdentity == identity) {
 		return fmt.Errorf("restored backup must have an independent cluster identity")
 	}
 	result, err := data.RestoreTerminalTaskAssignees(ctx, target, historical, proof, *apply)

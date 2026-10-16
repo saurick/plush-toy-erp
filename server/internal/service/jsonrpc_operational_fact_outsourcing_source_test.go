@@ -31,6 +31,8 @@ func TestOutsourcingFactFromOrderParamsRejectDerivedFields(t *testing.T) {
 		"source_type",
 		"source_id",
 		"source_line_id",
+		"unit_price",
+		"amount",
 	} {
 		t.Run(derived, func(t *testing.T) {
 			params := make(map[string]any, len(base)+1)
@@ -40,6 +42,59 @@ func TestOutsourcingFactFromOrderParamsRejectDerivedFields(t *testing.T) {
 			params[derived] = "forged"
 			if _, ok := outsourcingFactFromOrderCreateFromParams(params); ok {
 				t.Fatalf("derived field %s must be rejected", derived)
+			}
+		})
+	}
+}
+
+func TestOutsourcingWarehouseCommandsThroughDispatcherWithoutPricePermission(t *testing.T) {
+	for _, tc := range []struct {
+		method     string
+		permission string
+	}{
+		{"create_outsourcing_material_issue_from_order", biz.PermissionOutsourcingMaterialIssueCreate},
+		{"create_outsourcing_return_receipt_from_order", biz.PermissionOutsourcingReturnReceiptCreate},
+	} {
+		t.Run(tc.method, func(t *testing.T) {
+			for _, permitted := range []bool{false, true} {
+				permissions := []string{biz.PermissionOutsourcingOrderRead}
+				if permitted {
+					permissions = append(permissions, tc.permission)
+				}
+				admin := workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, permissions...)
+				repo := &outsourcingModuleGateOperationalFactRepo{}
+				dispatcher := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+				activateOperationalFactTestCustomerConfig(t, dispatcher, customerConfigPublishParamsWithRevisionAndModuleState(
+					t, customerConfigPublishParams(t), "warehouse-fact-commands", "outsourcing_orders", "enabled",
+				))
+				params := outsourcingFactModuleGateParams(t).AsMap()
+				params["lot_id"] = float64(1)
+				_, result, err := dispatcher.Handle(workflowJSONRPCAdminContext(), "operational_fact", "2.0", tc.method, "warehouse-fact", mustJSONRPCStruct(t, params))
+				want := errcode.PermissionDenied.Code
+				wantCalls := 0
+				if permitted {
+					want = errcode.OK.Code
+					wantCalls = 1
+				}
+				calls := repo.createOutsourcingMaterialIssueCalls + repo.createOutsourcingReturnReceiptCalls
+				if err != nil || result == nil || result.Code != want || calls != wantCalls {
+					t.Fatalf("permitted=%v result=%#v calls=%d err=%v", permitted, result, calls, err)
+				}
+				for _, field := range []string{"unit_price", "amount"} {
+					params[field] = "1"
+					_, rejected, err := dispatcher.Handle(workflowJSONRPCAdminContext(), "operational_fact", "2.0", tc.method, "forged-commercial", mustJSONRPCStruct(t, params))
+					delete(params, field)
+					wantRejected := errcode.PermissionDenied.Code
+					if permitted {
+						wantRejected = errcode.InvalidParam.Code
+					}
+					if err != nil || rejected == nil || rejected.Code != wantRejected {
+						t.Fatalf("client commercial field %s must be rejected: result=%#v err=%v", field, rejected, err)
+					}
+				}
+				if got := repo.createOutsourcingMaterialIssueCalls + repo.createOutsourcingReturnReceiptCalls; got != calls {
+					t.Fatalf("forged commercial values reached repository: calls=%d want=%d", got, calls)
+				}
 			}
 		})
 	}

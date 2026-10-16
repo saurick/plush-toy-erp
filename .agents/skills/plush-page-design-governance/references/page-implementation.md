@@ -43,4 +43,4 @@ DEV 工作台沿用 `docs/product/自动化测试策略.md` 的浅色桌面 smok
      (cd web && pnpm lint && pnpm css && pnpm test)
      (cd web && STYLE_L1_SCENARIOS=... pnpm style:l1)
      ```
-   - For a narrow page change, select `STYLE_L1_SCENARIOS` from the current scenario registry and report coverage/risks. Full Style L1 or wider acceptance still requires the explicit authorization defined by `$plush-test-governance`.
+   - 小范围页面改动从当前场景 registry 选择 `STYLE_L1_SCENARIOS`，说明覆盖与盲区。当前目标必要的验证沿用实施授权；全量 Style L1 或更广验收按 `$plush-test-governance` 的目标、风险与资源预算判断，显著超出任务范围或预算时才说明新增范围、开销与停止条件并确认。

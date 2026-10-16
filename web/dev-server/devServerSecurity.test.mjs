@@ -88,6 +88,26 @@ test('HTTPS proxy trust requires explicit configuration, loopback sockets and an
   assert.equal(isSameOriginRequest(customPort), true)
 })
 
+test('standalone proxy trust pins one encrypted private peer and does not expand local Vite access', () => {
+  const origin = 'https://workbench.example.test'
+  const request = {
+    method: 'POST',
+    headers: { host: 'workbench.example.test', 'x-forwarded-proto': 'https',
+      'x-forwarded-for': '203.0.113.10', origin, 'sec-fetch-site': 'same-origin' },
+    socket: { localAddress: '10.252.70.2', remoteAddress: '10.252.70.1' },
+  }
+  createDevHttpsProxyMiddleware(origin)(request, {}, () => {})
+  assert.equal(isDevWorkbenchRequest(request), false)
+  const proxy = createDevHttpsProxyMiddleware(origin, { allowPublicClients: true, trustedProxyAddress: '10.252.70.1' })
+  proxy(request, {}, () => {})
+  assert.equal(isDevWorkbenchRequest(request), true)
+  assert.equal(isSameOriginRequest(request), true)
+  request.socket.remoteAddress = '10.252.70.3'
+  proxy(request, {}, () => {})
+  assert.equal(isDevWorkbenchRequest(request), false)
+  assert.throws(() => createDevHttpsProxyMiddleware(origin, { trustedProxyAddress: '8.8.8.8' }), /private IPv4/u)
+})
+
 test('loopback checks accept IPv4, IPv6, and IPv4-mapped remotes only', () => {
   for (const address of [
     '127.0.0.1',

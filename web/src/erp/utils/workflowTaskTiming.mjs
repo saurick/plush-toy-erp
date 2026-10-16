@@ -1,3 +1,4 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { getWorkflowTaskDueStatus } from './workflowDashboardStats.mjs'
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 import { getRoleDisplayName } from './roleKeys.mjs'
@@ -82,7 +83,7 @@ export function formatWorkflowTaskTime(
 }
 
 export function getWorkflowTaskBlockedAt(task = {}, events = []) {
-  if (task.task_status_key !== 'blocked' || !(Number(task.id) > 0)) return null
+  if (task.task_status_key !== WorkflowTaskStatus.BLOCKED || !(Number(task.id) > 0)) return null
   const taskEvents = (Array.isArray(events) ? events : []).filter(
     (event) => Number(event?.task_id) === Number(task.id)
   )

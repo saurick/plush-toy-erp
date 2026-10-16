@@ -29,6 +29,35 @@ function selectedTests(plan) {
     .sort();
 }
 
+test("affected: backend public declarations select readonly generation and consumer checks", () => {
+  for (const file of [
+    "server/internal/biz/rbac.go",
+    "server/internal/core/status/shipment.go",
+    "server/internal/service/jsonrpc_dispatch.go",
+    "server/internal/biz/workflow_task_catalog.json",
+    "server/internal/biz/admin_password.go",
+    "server/internal/server/template_pdf_security.go",
+    "web/src/common/consts/statuses.generated.mjs",
+    "scripts/qa/public-contract-consumers.mjs",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    assert(ids(plan).includes("public-contracts-sync"), file);
+    assert(ids(plan).includes("public-contract-consumers"), file);
+    assert(selectedTests(plan).includes("scripts/gen-public-contracts.test.mjs"), file);
+    assert(selectedTests(plan).includes("web/src/erp/utils/businessStatusCoverage.test.mjs"), file);
+    assert(plan.commands.find((item) => item.id === "public-contracts-sync").args.includes("--check"));
+  }
+  const unrelated = buildAffectedPlan(["server/internal/biz/admin_legal_notice.go"], { root: ROOT });
+  assert(!ids(unrelated).includes("public-contracts-sync"));
+});
+
+test("affected: directly shared JSON retains its Web validation", () => {
+  for (const [file, consumer] of [
+    ["server/internal/biz/admin_erp_appearance.json", "web/src/common/theme/erpAppearance.test.mjs"],
+    ["server/internal/unitpolicy/units.json", "web/src/erp/utils/unitQuantity.test.mjs"],
+  ]) assert(selectedTests(buildAffectedPlan([file], { root: ROOT })).includes(consumer), file);
+});
+
 async function withSourceFixture(files, callback) {
   const root = await mkdtemp(path.join(os.tmpdir(), "plush-affected-source-"));
   try {
@@ -163,6 +192,7 @@ test("affected: docs-only changes stay at T1", () => {
     "diff-check",
     "phase-labels:affected",
     "docs-inventory",
+    "skill-health",
   ]);
   const docsCommand = plan.commands.find(
     (item) => item.id === "docs-inventory",
@@ -181,6 +211,16 @@ test("affected: docs-only changes stay at T1", () => {
   ]);
   assert.equal(plan.maxAffectedScope, "T1");
   assert.equal(plan.localGate, "focused");
+});
+
+test("affected: edits to linked documents also validate project skill references", () => {
+  for (const file of ["scripts/qa/README.md", "server/README.md", "docs/engineering/跨层公共契约与生成规范.md"]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    assert(ids(plan).includes("skill-health"), file);
+    assert.equal(plan.maxAffectedScope, "T1");
+    assert.equal(plan.localGate, "focused");
+    assert(!ids(plan).includes("full"));
+  }
 });
 
 test("affected: phase-label gate scans only this change set", () => {

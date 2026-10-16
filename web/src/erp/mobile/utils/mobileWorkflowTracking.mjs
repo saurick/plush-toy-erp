@@ -1,4 +1,3 @@
-import { parseDateInputValue } from '../../utils/dateRange.mjs'
 import {
   TRACKING_STATUS_OPTIONS,
   TRACKING_SCOPE_OPTIONS,
@@ -21,9 +20,6 @@ export function normalizeMobileTrackingQuery(value = {}) {
     status: allowedValue(TRACKING_STATUS_OPTIONS, query.status),
     owner_role_key: allowedValue(TRACKING_ROLE_OPTIONS, query.owner_role_key),
     attention: allowedValue(TRACKING_ATTENTION_OPTIONS, query.attention),
-    source_type: allowedValue(TRACKING_SOURCE_OPTIONS, query.source_type),
-    date_from: parseDateInputValue(query.date_from)?.format('YYYY-MM-DD') || '',
-    date_to: parseDateInputValue(query.date_to)?.format('YYYY-MM-DD') || '',
   })
 }
 

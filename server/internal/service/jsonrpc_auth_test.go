@@ -77,10 +77,20 @@ func TestJsonrpcDispatcher_AuthSMSLogin_AdminOK(t *testing.T) {
 	if code == "" {
 		t.Fatalf("expected mock sms code in response, got %+v", sendRes.Data.AsMap())
 	}
+	_, retryRes, err := d.handleAuth(context.Background(), "send_sms_code", "retry", mustAuthStruct(t, map[string]any{
+		"phone": "13800138000",
+		"scope": "admin",
+	}))
+	if err != nil || retryRes == nil || retryRes.Code != errcode.OK.Code {
+		t.Fatalf("mock cooldown retry failed: %v %+v", err, retryRes)
+	}
+	if retryRes.Data.AsMap()["mock_code"] != code || retryRes.Data.AsMap()["expires_at"] != sendRes.Data.AsMap()["expires_at"] || retryRes.Data.AsMap()["resend_after"] != sendRes.Data.AsMap()["resend_after"] {
+		t.Fatal("mock cooldown retry replaced the registered challenge")
+	}
 
 	_, loginRes, err := d.handleAuth(context.Background(), "sms_login", "2", mustAuthStruct(t, map[string]any{
 		"phone": "13800138000",
-		"code":  code,
+		"code":  retryRes.Data.AsMap()["mock_code"],
 		"scope": "admin",
 	}))
 	if err != nil {
@@ -251,7 +261,7 @@ func TestJsonrpcDispatcher_AuthSMSLogin_DisabledByConfig(t *testing.T) {
 	}
 }
 
-func TestJsonrpcDispatcher_AuthSMSSendProviderErrorsUsePublicCodes(t *testing.T) {
+func TestJsonrpcDispatcher_AuthSMSSendProviderErrorsDoNotExposeEligibility(t *testing.T) {
 	tests := []struct {
 		name string
 		err  error
@@ -292,11 +302,12 @@ func TestJsonrpcDispatcher_AuthSMSSendProviderErrorsUsePublicCodes(t *testing.T)
 			if err != nil {
 				t.Fatalf("handle auth.send_sms_code: %v", err)
 			}
-			if res == nil || res.Code != tt.code {
+			if res == nil || res.Code != errcode.OK.Code {
 				t.Fatalf("provider error result=%+v", res)
 			}
-			if res.Data != nil {
-				t.Fatal("failed delivery must not claim a delivery receipt")
+			data := res.Data.AsMap()
+			if res.Message != "验证码请求已受理" || data["mock_delivery"] != false || data["mock_code"] != "" || data["resend_after"] == nil {
+				t.Fatalf("unexpected public acceptance result=%+v", res)
 			}
 
 		})
@@ -380,7 +391,7 @@ func TestAdminPasswordLoginAccountEnumerationAndLegitimateControl(t *testing.T) 
 
 func assertExactSMSSendAcceptedResponse(t *testing.T, result *v1.JsonrpcResult, phone string) {
 	t.Helper()
-	if result == nil || result.Code != errcode.OK.Code || result.Message != "验证码已发送" || result.Data == nil {
+	if result == nil || result.Code != errcode.OK.Code || result.Message != "验证码请求已受理" || result.Data == nil {
 		t.Fatalf("unexpected send response: %#v", result)
 	}
 	data := result.Data.AsMap()

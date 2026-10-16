@@ -82,9 +82,13 @@ export async function pullToRefresh(page, scroll) {
         .state === 'idle' &&
       root.scrollTop === 0 &&
       root.closest('[data-refreshing]')?.getAttribute('data-refreshing') !==
-        'true',
+        'true' &&
+      !Array.from(root.querySelectorAll('[aria-busy="true"]')).some(
+        (region) => region.getClientRects().length > 0
+      ),
     node
   )
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))))
   const bounds = await scroll.boundingBox()
   const x = Math.round(bounds.x + bounds.width / 2)
   const y = Math.round(Math.min(bounds.y + 300, bounds.y + bounds.height - 180))

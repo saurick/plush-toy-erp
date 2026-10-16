@@ -150,16 +150,27 @@
   background: var(--erp-surface-bg);
   cursor: pointer;
   transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease;
+    background-color 0.16s ease,
+    border-color 0.16s ease;
 }
 
-.erp-print-center-template-btn:hover,
 .erp-print-center-template-btn--active {
   border-color: var(--erp-primary);
   background: var(--erp-primary-softer);
   box-shadow: var(--erp-surface-shadow);
+}
+
+@media (hover: hover) {
+  .erp-print-center-template-btn:not(:disabled, [aria-pressed='true']):hover {
+    border-color: var(--erp-interactive-border-hover);
+    background: var(--erp-interactive-bg-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-print-center-template-btn {
+    transition: none;
+  }
 }
 
 .erp-print-center-template-btn:disabled {
@@ -354,10 +365,15 @@
   background: var(--erp-page-bg);
 }
 
-.erp-print-shell__toolbar {
+.erp-print-shell__header {
   position: sticky;
   top: 0;
   z-index: 20;
+  padding-bottom: 12px;
+  background: var(--erp-page-bg);
+}
+
+.erp-print-shell__toolbar {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -494,8 +510,75 @@
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
   gap: 12px;
-  margin-top: 12px;
   align-items: start;
+}
+
+@media screen and (min-width: 1024px) {
+  .erp-print-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  .erp-print-shell__header {
+    flex: 0 0 auto;
+  }
+
+  .erp-print-shell__content {
+    flex: 1 1 auto;
+    min-height: 0;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+  }
+
+  .erp-print-shell__panel {
+    height: 100%;
+    min-height: 0;
+  }
+}
+
+.erp-print-shell__blank-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 0 14px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  line-height: 1.6;
+}
+
+.erp-print-shell__blank-notice > .anticon {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+.erp-print-shell__blank-notice-text {
+  flex: 1 1 260px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-print-shell__blank-actions {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px 12px;
+  max-width: 100%;
+  margin-left: auto;
+}
+
+.erp-print-shell__blank-actions > button {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--erp-primary-strong);
+  font: inherit;
+  cursor: pointer;
 }
 
 .erp-print-shell--preparing::before {
@@ -516,6 +599,7 @@
 }
 
 .erp-print-shell--preparing .erp-print-shell__toolbar,
+.erp-print-shell--preparing .erp-print-shell__blank-notice,
 .erp-print-shell--preparing .erp-print-shell__formula-panel,
 .erp-print-shell--preparing .erp-print-shell__content {
   visibility: hidden;
@@ -526,7 +610,7 @@
 }
 
 .erp-print-shell__record-panel {
-  max-height: calc(100vh - 96px);
+  max-height: 100%;
   padding: 12px;
   overflow: auto;
   border: 1px solid var(--erp-border);
@@ -673,6 +757,38 @@
   cursor: pointer;
 }
 
+.erp-print-clause-tools__field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 10px;
+  color: var(--erp-text-muted);
+}
+
+.erp-print-shell .erp-print-clause-tools__field select,
+.erp-print-shell .erp-print-clause-tools__field input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--erp-border-strong);
+  border-radius: 6px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  font: inherit;
+}
+
+.erp-contract-clause-title__value {
+  --erp-print-clause-title-min-width: 4em;
+  display: inline-block;
+  min-width: var(--erp-print-clause-title-min-width);
+  max-width: calc(100% - 3em);
+  vertical-align: top;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .erp-print-shell .print-zoom-select select:hover {
   border-color: var(--erp-primary);
 }
@@ -785,6 +901,13 @@
     --erp-print-focus-outset: 5px;
   }
 
+  .erp-print-shell .erp-contract-clause-title__value {
+    --erp-print-focus-outset: 3px;
+    min-width: var(--erp-print-clause-title-min-width);
+    max-width: calc(100% - 3em - 2 * (var(--erp-print-focus-outset) + 1px));
+    margin-inline: calc(var(--erp-print-focus-outset) + 1px);
+  }
+
   /* The focus frame includes the font's caret bounds without changing paper layout. */
   .erp-print-shell__stage [contenteditable='true']:focus,
   .erp-print-shell__stage
@@ -853,13 +976,17 @@
 }
 
 @media print {
+  .erp-print-shell [data-print-editor-only],
+  .erp-print-shell__header,
+  .erp-print-shell__blank-notice,
   .erp-print-shell__feedback {
     display: none;
   }
 }
 
 .erp-print-shell__stage {
-  max-height: calc(100vh - 96px);
+  max-height: 100%;
+  min-height: 0;
   padding: 24px;
   overflow: auto;
   border: 1px solid var(--erp-border);

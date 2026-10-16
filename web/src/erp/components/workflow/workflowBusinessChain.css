@@ -5,11 +5,21 @@
 .workflow-business-chain__group { position: relative; min-width: 0; }
 .workflow-business-chain__main > .workflow-business-chain__group:not(:last-child)::before { position: absolute; top: 31px; bottom: -9px; left: 12px; width: 2px; background: var(--erp-border); content: ''; }
 .workflow-business-chain__main > .workflow-business-chain__group:not(:last-child)::after { position: absolute; bottom: -8px; left: 9px; width: 8px; height: 6px; background: var(--erp-text-subtle); clip-path: polygon(0 0, 100% 0, 50% 100%); content: ''; }
-.workflow-business-chain__node { position: relative; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto 12px; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 0; border: 0; background: transparent; color: var(--erp-text); text-align: left; cursor: pointer; }
+.workflow-business-chain__node { position: relative; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto 12px; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 8px 0; border: 0; border-radius: 6px; background: transparent; color: var(--erp-text); text-align: left; cursor: pointer; transition: background-color 0.16s ease; }
 .workflow-business-chain__node > strong { font-size: var(--erp-font-small); overflow-wrap: anywhere; }
 .workflow-business-chain__task-heading > strong { color: var(--erp-text); }
 .workflow-business-chain__node:focus-visible { outline: 2px solid var(--erp-primary); outline-offset: 2px; border-radius: 6px; }
-.workflow-business-chain__node:hover > strong, .workflow-business-chain__group[data-current] .workflow-business-chain__node > strong { color: var(--erp-primary-strong); }
+.workflow-business-chain__group[data-current] .workflow-business-chain__node > strong { color: var(--erp-primary-strong); }
+@media (hover: hover) {
+  .workflow-business-chain__node:not(:disabled, [aria-current='step']):hover {
+    background: var(--erp-interactive-bg-hover);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workflow-business-chain__node {
+    transition: none;
+  }
+}
 .workflow-business-chain__stage-status { max-width: 112px; font-size: var(--erp-font-caption); color: var(--erp-text-muted); overflow-wrap: anywhere; }
 .workflow-business-chain__group[data-tone='blocked'] .workflow-business-chain__stage-status { color: var(--erp-warning-text); }
 .workflow-business-chain__chevron { font-size: 18px; color: var(--erp-text-muted); }

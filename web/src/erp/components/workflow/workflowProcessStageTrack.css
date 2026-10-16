@@ -169,6 +169,37 @@
   overflow-wrap: anywhere;
 }
 
+.workflow-process-stage--compact {
+  gap: 8px;
+}
+
+.workflow-process-stage--compact .workflow-process-stage__item {
+  min-height: 46px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 0 7px;
+  padding-bottom: 12px;
+}
+
+.workflow-process-stage--compact .workflow-process-stage__item:last-child {
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+.workflow-process-stage--compact .workflow-process-stage__marker {
+  width: 22px;
+  height: 22px;
+  font-size: var(--erp-font-micro);
+}
+
+.workflow-process-stage--compact .workflow-process-stage__item::after {
+  top: 22px;
+  left: 10px;
+}
+
+.workflow-process-stage--compact .workflow-process-stage__item::before {
+  left: 7px;
+}
+
 .workflow-process-stage--desktop .workflow-process-stage__item:only-child {
   min-width: 0;
   grid-template-areas: 'marker content';
@@ -219,4 +250,103 @@
   .workflow-process-stage__item--rejected
   .workflow-process-stage__label {
   color: var(--erp-visual-danger-text);
+}
+.workflow-task-handling-current:not([hidden]) {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.workflow-task-handling-current[hidden] {
+  display: none;
+}
+
+.erp-task-process-overview,
+.erp-task-process-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.workflow-process-stage__history {
+  border-top: 1px solid var(--erp-border);
+}
+
+.workflow-process-stage__history > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 0;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+  cursor: pointer;
+}
+
+.workflow-process-stage__history > summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workflow-process-stage__history > summary::-webkit-details-marker {
+  display: none;
+}
+
+.workflow-process-stage__history[open] > summary > .anticon {
+  transform: rotate(180deg);
+}
+
+.workflow-task-detail-flow {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.workflow-task-detail-flow > .workflow-business-chain__heading {
+  gap: 6px 12px;
+}
+
+.workflow-task-detail-flow > .workflow-business-chain__heading > .ant-btn {
+  min-height: 32px;
+  height: auto;
+  padding: 4px 0;
+  font-size: var(--erp-font-caption);
+}
+
+.workflow-task-detail-flow__label {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.workflow-task-detail-flow .erp-task-process-footer {
+  margin: 0 0 12px;
+  font-size: var(--erp-font-micro);
+}
+
+.workflow-task-detail-flow .erp-task-process-footer > .ant-btn {
+  font-size: var(--erp-font-caption);
+}
+
+.workflow-process-stage--focused .workflow-process-stage__handoff {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+@media (pointer: coarse) {
+  .workflow-process-stage__history > summary {
+    min-height: 44px;
+  }
 }

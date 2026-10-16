@@ -23,7 +23,6 @@ import {
 import {
   normalizeTaskDiscoveryFilters,
   taskDiscoveryRequest,
-  taskDiscoveryFilterLabels,
 } from '../../utils/workflowTaskDiscovery.mjs'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import {
@@ -33,8 +32,6 @@ import {
 import WorkflowTaskDiscoveryFilters from './WorkflowTaskDiscoveryFilters.jsx'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
 import useWorkflowTaskAssignees from '../../hooks/useWorkflowTaskAssignees'
-import MobileFilterPopover from '../../mobile/components/MobileFilterPopover.jsx'
-import MobileAppliedFilters from '../../mobile/components/MobileAppliedFilters.jsx'
 import MobileScrollEdge from '../../mobile/components/MobileScrollEdge.jsx'
 import { usePageLoadFeedback } from '../PageLoadFeedback.jsx'
 import './workflowExceptions.css'
@@ -69,9 +66,8 @@ export default function WorkflowExceptionPanel({
   renderRefreshControl,
   trackingRef,
 }) {
-  const [filters, setFilters] = React.useState(() => normalizeTaskDiscoveryFilters(initialQuery.filters))
-  const [filterOpen, setFilterOpen] = React.useState(false)
-  const assignees = useWorkflowTaskAssignees(profile, roleKey)
+  const [filters, setFilters] = React.useState(() => compact ? {} : normalizeTaskDiscoveryFilters(initialQuery.filters))
+  const assignees = useWorkflowTaskAssignees(profile, roleKey, !compact)
   const [keyword, setKeyword] = React.useState(initialQuery.keyword || '')
   const [state, setState] = React.useState(initialQuery.state || '')
   const [view, setView] = React.useState(initialQuery.view || '')
@@ -95,7 +91,7 @@ export default function WorkflowExceptionPanel({
   loadedCountRef.current = loadedCount
   const access = `${profile?.id}:${JSON.stringify(profile?.effective_session || profile?.permissions || [])}`
   const request = JSON.stringify({
-    ...taskDiscoveryRequest(filters),
+    ...(compact ? {} : taskDiscoveryRequest(filters)),
     ...(roleKey ? { owner_role_key: roleKey } : {}),
     ...(keyword.trim() ? { keyword: keyword.trim() } : {}),
     ...(state ? { state } : {}),
@@ -107,8 +103,8 @@ export default function WorkflowExceptionPanel({
   const key = `${access}:${request}`
   const listField = view === 'tasks' ? 'tasks' : view === 'orders' ? 'orders' : 'items'
   React.useEffect(() => {
-    onQueryChange?.({ filters, keyword, state, view, page, loadedCount, listPosition })
-  }, [filters, keyword, state, view, page, loadedCount, listPosition, onQueryChange])
+    onQueryChange?.({ ...(compact ? {} : { filters }), keyword, state, view, page, loadedCount, listPosition })
+  }, [compact, filters, keyword, state, view, page, loadedCount, listPosition, onQueryChange])
   React.useEffect(() => () => taskRead.current?.abort(), [key, refreshKey])
   const load = React.useCallback(async ({ append = false, showRefreshFeedback = false } = {}) => {
     const previous = resultRef.current?.key === key ? resultRef.current : null
@@ -176,13 +172,13 @@ export default function WorkflowExceptionPanel({
     }
   }, [current, scrollContainerRef])
   React.useEffect(() => {
-    if (!compact || !scrollContainerRef?.current || !sentinel.current || !current?.hasMore || current.appendError || current.refreshError || loading || filterOpen) return undefined
+    if (!compact || !scrollContainerRef?.current || !sentinel.current || !current?.hasMore || current.appendError || current.refreshError || loading) return undefined
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) load({ append: true })
     }, { root: scrollContainerRef.current, rootMargin: '0px 0px 180px 0px' })
     observer.observe(sentinel.current)
     return () => observer.disconnect()
-  }, [compact, current, filterOpen, load, loading, scrollContainerRef])
+  }, [compact, current, load, loading, scrollContainerRef])
   const resetPosition = () => {
     restoreScroll.current = null
     setPage(1)
@@ -248,7 +244,6 @@ export default function WorkflowExceptionPanel({
   )
   const filterControls = (
     <WorkflowTaskDiscoveryFilters
-      compact={compact}
       profile={profile}
       roleKey={roleKey}
       value={filters}
@@ -298,18 +293,6 @@ export default function WorkflowExceptionPanel({
                 onCompositionEnd={search.onCompositionEnd}
                 onPressEnter={search.onPressEnter}
               />}
-              {compact ? (
-                <MobileFilterPopover
-                  contextLabel="异常跟踪"
-                  title="异常跟踪筛选"
-                  open={filterOpen}
-                  onOpenChange={setFilterOpen}
-                  count={Object.keys(taskDiscoveryRequest(filters)).length}
-                  onReset={() => { setFilters({}); resetPosition() }}
-                >
-                  {filterControls}
-                </MobileFilterPopover>
-              ) : null}
             </div>
             <StateFilters className="workflow-exceptions__states" role="group" aria-label="异常处理状态">
               {[
@@ -318,14 +301,6 @@ export default function WorkflowExceptionPanel({
                 { label: '已处理完', value: 'closed', count: current?.data?.closed ?? '—' },
               ].map((option) => <FilterChip key={option.value} count={option.count} selected={state === option.value} removable={compact && Boolean(option.value)} onClick={() => selectState(compact && state === option.value ? '' : option.value)}>{option.label}</FilterChip>)}
             </StateFilters>
-            {compact && <MobileAppliedFilters
-              label="当前异常筛选"
-              items={taskDiscoveryFilterLabels(filters, assignees.people)}
-              onClear={(key) => {
-              setFilters((current) => ({ ...current, [key]: '' }))
-              resetPosition()
-            }}
-            />}
             {compact && <MobileScrollEdge scrollContainerRef={scrollContainerRef} />}
           </div>
           <div className="workflow-exceptions__summary" aria-label="异常关联入口">
@@ -342,7 +317,7 @@ export default function WorkflowExceptionPanel({
           </div>
         </>
         ) : null}
-      {renderRefreshControl?.({ key, onRefresh: load, busy: loading, enabled: !filterOpen && opening?.key !== key, lastUpdated: current?.updatedAt })}
+      {renderRefreshControl?.({ key, onRefresh: load, busy: loading, enabled: opening?.key !== key, lastUpdated: current?.updatedAt })}
       {actionError ? (
         <Alert type="error" showIcon message={actionError} />
         ) : null}

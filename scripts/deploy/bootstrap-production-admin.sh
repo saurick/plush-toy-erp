@@ -7,7 +7,7 @@ print_help() {
   printf '%s\n' \
     '用法:' \
     "  APP_ADMIN_PASSWORD='<ephemeral-secret>' bash scripts/deploy/bootstrap-production-admin.sh \\" \
-    "    --deployment-target <demo-133|customer-test-133> \\" \
+    "    --deployment-target <demo-133|customer-test-133|production-133> \\" \
     "    --env-file <path> --compose-override <path> \\" \
     "    --expected-database <database> --expected-migration <atlas-version> \\" \
     "    --expected-release <40-sha> --confirm 'BOOTSTRAP_PRODUCTION_ADMIN:<project>:<database>:<username>:<migration>:<release>'" \
@@ -18,7 +18,7 @@ print_help() {
     '同一 project/database 由私有文件锁和 PostgreSQL advisory lock 串行；已有锁或身份/清理不确定时停止，不自动重试。' \
     '' \
     '参数：' \
-    '  --deployment-target <key>      仅允许 demo-133 或 customer-test-133' \
+    '  --deployment-target <key>      仅允许 demo-133、customer-test-133 或 production-133' \
     '  --env-file <path>              steady target env，必须 once=false 且无 password key' \
     '  --compose-dir <path>           默认 server/deploy/compose/prod' \
     '  --compose-override <path>      必须精确匹配登记目标 override' \
@@ -597,7 +597,14 @@ customer-test-133)
   target_trial_enabled=0
   target_trial_marker=""
   ;;
-*) fail "--deployment-target 只允许 demo-133 或 customer-test-133；admin 不是部署环境" ;;
+production-133)
+  target_project=plush-toy-erp-production
+  target_database=plush_erp_production
+  target_override_name=compose.production-133.yml
+  target_trial_enabled=0
+  target_trial_marker=""
+  ;;
+*) fail "--deployment-target 只允许 demo-133、customer-test-133 或 production-133；admin 不是部署环境" ;;
 esac
 [[ -f "$env_file" ]] || fail "env 文件不存在或不是普通文件"
 [[ ! -L "$env_file" ]] || fail "env 文件不得是符号链接"

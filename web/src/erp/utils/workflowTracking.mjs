@@ -1,5 +1,11 @@
 import { resolveBusinessStatusCounts, businessStatusCount } from './businessStatusCounts.mjs'
-import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
+import {
+  ProcessNodeStatus,
+  ProcessNodeType,
+  ProcessResolution,
+  ProcessStatus,
+  WorkflowTaskStatus,
+} from '../../common/consts/statuses.generated.mjs'
 import { getProcessLabel, getProcessStatusLabel, getProcessNodeLabel, getProcessNodeStatusLabel, getProcessNodeTone, getWorkflowTaskDisplayName } from './processRuntimePresentation.mjs'
 import { getWorkflowResponsibilityParts } from './workflowTaskLabels.mjs'
 import { isWorkflowApprovalTask } from './workflowTaskActionContract.mjs'
@@ -9,8 +15,8 @@ const positive = (value) => Number.isSafeInteger(value) && value > 0
 const nullableTime = (value) => value === null || positive(value)
 const nullableText = (value) => value === null || typeof value === 'string'
 const taskStatuses = new Set(Object.values(WorkflowTaskStatus))
-const processStatuses = new Set(['active', 'blocked', 'completed'])
-const nodeStatuses = new Set(['waiting', 'active', 'completed', 'blocked', 'withdrawn'])
+const processStatuses = new Set([ProcessStatus.ACTIVE, ProcessStatus.BLOCKED, ProcessStatus.COMPLETED])
+const nodeStatuses = new Set([ProcessNodeStatus.WAITING, ProcessNodeStatus.ACTIVE, ProcessNodeStatus.COMPLETED, ProcessNodeStatus.BLOCKED, ProcessNodeStatus.WITHDRAWN])
 
 function invalidTracking() {
   throw Object.assign(new Error('任务进度暂时无法读取，请重新读取'), { isInvalidResponse: true })
@@ -44,7 +50,7 @@ export function requireTrackingSummary(value) {
     (value.initiator_role_key != null && typeof value.initiator_role_key !== 'string') ||
     !(value.kind === 'process' ? processStatuses : taskStatuses).has(value.status) ||
     !Array.isArray(value.current_tasks) || !value.current_tasks.every(validTask) ||
-    value.current_tasks.some((task) => !['ready', 'blocked'].includes(task.status)) ||
+    value.current_tasks.some((task) => ![WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(task.status)) ||
     new Set(value.current_tasks.map((task) => task.task_id)).size !== value.current_tasks.length) invalidTracking()
   return value
 }
@@ -80,7 +86,7 @@ export function requireTrackingDetail(value, ref) {
   if (nodeIDs.size !== value.nodes.length || taskIDs.size !== value.tasks.length ||
     value.nodes.some((node) => !positive(node.id) || node.process_instance_id !== ref.id ||
       typeof node.node_key !== 'string' || !nodeStatuses.has(node.status) ||
-      !['human_task', 'approval', 'domain_command', 'wait_event', 'end'].includes(node.node_type) ||
+      ![ProcessNodeType.HUMAN_TASK, ProcessNodeType.APPROVAL, ProcessNodeType.DOMAIN_COMMAND, ProcessNodeType.WAIT_EVENT, ProcessNodeType.END].includes(node.node_type) ||
       !nullableTime(node.started_at) || !nullableTime(node.completed_at) || typeof node.completed_by_name !== 'string') ||
     value.tasks.some((task) => ref.kind === 'process' ? !nodeIDs.has(task.node_instance_id) : task.task_id !== ref.id || task.node_instance_id !== null) ||
     value.summary.current_tasks.some((task) => !taskIDs.has(task.task_id)) ||
@@ -101,23 +107,24 @@ export function trackingStatus(summary) {
 }
 
 export function trackingStatusColor(summary) {
-  if (summary.status === 'blocked') return 'error'
   if (summary.kind === 'process') {
-    if (summary.status === 'active') return 'blue'
-    if (summary.status === 'completed') {
-      if (summary.resolution_kind === 'succeeded') return 'green'
-      if (summary.resolution_kind === 'rejected') return 'orange'
+    if (summary.status === ProcessStatus.BLOCKED) return 'error'
+    if (summary.status === ProcessStatus.ACTIVE) return 'blue'
+    if (summary.status === ProcessStatus.COMPLETED) {
+      if (summary.resolution_kind === ProcessResolution.SUCCEEDED) return 'green'
+      if (summary.resolution_kind === ProcessResolution.REJECTED) return 'orange'
     }
   } else {
-    if (summary.status === 'ready') return 'blue'
-    if (summary.status === 'done') return 'green'
-    if (summary.status === 'rejected') return 'orange'
+    if (summary.status === WorkflowTaskStatus.BLOCKED) return 'error'
+    if (summary.status === WorkflowTaskStatus.READY) return 'blue'
+    if (summary.status === WorkflowTaskStatus.DONE) return 'green'
+    if (summary.status === WorkflowTaskStatus.REJECTED) return 'orange'
   }
   return 'default'
 }
 
 export function trackingResponsibilityParts(task) {
-  return getWorkflowResponsibilityParts({ roleKey: task.owner_role_key, assigneeName: task.assignee_name, pending: ['ready', 'blocked'].includes(task.status), approval: isWorkflowApprovalTask(task) })
+  return getWorkflowResponsibilityParts({ roleKey: task.owner_role_key, assigneeName: task.assignee_name, pending: [WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(task.status), approval: isWorkflowApprovalTask(task) })
 }
 
 export function trackingResponsibility(task) {
@@ -126,12 +133,12 @@ export function trackingResponsibility(task) {
 
 export function trackingHandoff(summary) {
   if (summary.current_tasks.length) return [...new Set(summary.current_tasks.map(trackingResponsibility))].join('；')
-  if (summary.kind === 'task' || summary.status === 'completed') return trackingStatus(summary)
-  return summary.status === 'blocked' ? '流程受阻，等待处理' : '等待后续业务处理'
+  if (summary.kind === 'task' || summary.status === ProcessStatus.COMPLETED) return trackingStatus(summary)
+  return summary.status === ProcessStatus.BLOCKED ? '流程受阻，等待处理' : '等待后续业务处理'
 }
 
 export function buildTrackingStageModel(detail) {
-  const nodes = detail.nodes.filter((node) => node.status !== 'waiting').toSorted((left, right) => left.id - right.id)
+  const nodes = detail.nodes.filter((node) => node.status !== ProcessNodeStatus.WAITING).toSorted((left, right) => left.id - right.id)
   return {
     processLabel: trackingTitle(detail.summary),
     summaryLabel: `${nodes.length} 个已发生步骤`,

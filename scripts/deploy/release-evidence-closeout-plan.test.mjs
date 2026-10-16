@@ -26,7 +26,7 @@ const scriptPath = path.join(
 );
 const collectEvidencePath = path.join(
   repoRoot,
-  "deployments/yoyoosun/scripts/collect-evidence.sh",
+  "scripts/deploy/collect-evidence.sh",
 );
 
 const VALID_ENV = {
@@ -91,11 +91,11 @@ function updateReleaseEvidenceField(evidenceDir, field, value) {
 function writeToolScripts(root) {
   const backupScript = path.join(
     root,
-    "deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh",
+    "scripts/deploy/run-backup-restore-rehearsal.sh",
   );
   const smokeScript = path.join(
     root,
-    "deployments/yoyoosun/scripts/run-smoke.sh",
+    "scripts/deploy/run-smoke.sh",
   );
   fs.mkdirSync(path.dirname(backupScript), { recursive: true });
   fs.writeFileSync(backupScript, "#!/usr/bin/env bash\n");

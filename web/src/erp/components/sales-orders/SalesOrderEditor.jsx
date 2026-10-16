@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Alert, Button, Form } from 'antd'
+import { SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import { getActionErrorMessage } from '../../../common/utils/errorMessage.js'
 import { listBusinessAttachments } from '../../api/attachmentApi.mjs'
 
@@ -73,7 +74,7 @@ export default function SalesOrderEditor({
       form={form}
       title={editingOrder?.id ? '编辑销售订单' : '新建销售订单'}
       okText={
-        !editingOrder || editingOrder.lifecycle_status === 'draft'
+        !editingOrder || editingOrder.lifecycle_status === SalesOrderStatus.DRAFT
           ? '保存草稿'
           : '保存'
       }
@@ -128,7 +129,7 @@ export default function SalesOrderEditor({
               title="订单附件"
               description="上传客户 PO、合同、样品图或确认截图；附件不改变订单状态。"
               canUpload={canUpdateOrder || canCreateOrder}
-              canWithdraw={canCreateOrder || canUpdateOrder}
+              canWithdraw={canUpdateOrder}
               variant="inline"
               compact
             />

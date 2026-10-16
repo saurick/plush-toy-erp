@@ -109,7 +109,7 @@ test('devProductCore: filters distinguish membership and readable keywords', () 
 test('devProductCore: page consumes the searchable read-only capability projection', () => {
   assert.match(pageSource, /searchParams\.get\('status'\)/u)
   assert.match(pageSource, /searchParams\.get\('q'\)/u)
-  assert.match(pageSource, /aria-pressed=\{isActive\}/u)
+  assert.match(pageSource, /selected=\{isActive\}/u)
   assert.match(pageSource, /进入 Product Core 不等于已发布或已验收/u)
   assert.doesNotMatch(pageSource, /parseProductCoreEvidenceEntries/u)
 })

@@ -3,7 +3,6 @@ import test from 'node:test'
 
 import {
   buildSourceDocumentItemSaveParams,
-  canReorderSourceDocumentItems,
   commitSourceDocumentSaveResult,
   createSourceDocumentOpenEditController,
   isMutationResultUnknown,
@@ -78,81 +77,6 @@ test('source document mutation keeps uncertain transport and response results di
   }
   assert.equal(isMutationResultUnknown({ code: 40922 }), false)
   assert.equal(isMutationResultUnknown({ httpStatus: 400 }), false)
-})
-
-test('source document item order is available throughout valid nonterminal lifecycles', () => {
-  for (const [documentType, statuses] of Object.entries({
-    sales_order: ['draft', 'submitted', 'active'],
-    purchase_order: ['draft', 'submitted', 'approved'],
-    outsourcing_order: ['draft', 'submitted', 'confirmed'],
-  })) {
-    for (const lifecycle_status of statuses) {
-      assert.equal(
-        canReorderSourceDocumentItems(documentType, { lifecycle_status }),
-        true,
-        `${documentType}:${lifecycle_status}`
-      )
-    }
-  }
-})
-
-test('source document item order fails closed for terminal or mismatched lifecycles', () => {
-  for (const documentType of [
-    'sales_order',
-    'purchase_order',
-    'outsourcing_order',
-  ]) {
-    for (const lifecycle_status of ['closed', 'canceled', '', 'unknown']) {
-      assert.equal(
-        canReorderSourceDocumentItems(documentType, { lifecycle_status }),
-        false,
-        `${documentType}:${lifecycle_status}`
-      )
-    }
-  }
-  assert.equal(
-    canReorderSourceDocumentItems('sales_order', {
-      lifecycle_status: 'approved',
-    }),
-    false
-  )
-  assert.equal(
-    canReorderSourceDocumentItems('unknown_document', {
-      lifecycle_status: 'draft',
-    }),
-    false
-  )
-})
-
-test('单行或空单据不提供明细排序，未知条数仍由打开时的完整明细校验', () => {
-  for (const documentType of [
-    'sales_order',
-    'purchase_order',
-    'outsourcing_order',
-  ]) {
-    for (const item_count of [0, 1]) {
-      assert.equal(
-        canReorderSourceDocumentItems(documentType, {
-          lifecycle_status: 'draft',
-          item_count,
-        }),
-        false
-      )
-    }
-    assert.equal(
-      canReorderSourceDocumentItems(documentType, {
-        lifecycle_status: 'draft',
-        item_count: 2,
-      }),
-      true
-    )
-    assert.equal(
-      canReorderSourceDocumentItems(documentType, {
-        lifecycle_status: 'draft',
-      }),
-      true
-    )
-  }
 })
 
 for (const scenario of [

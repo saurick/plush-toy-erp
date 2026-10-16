@@ -340,6 +340,13 @@
   margin-top: 12px;
 }
 
+.erp-material-task-summary-entry--compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0;
+}
+
 .erp-material-task-summary-entry .ant-btn-lg {
   min-height: 44px;
 }

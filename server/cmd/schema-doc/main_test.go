@@ -77,7 +77,9 @@ func TestPostgresColumnType(t *testing.T) {
 		{name: "int64", column: &sqlschema.Column{Type: field.TypeInt64}, want: "bigint"},
 		{name: "json", column: &sqlschema.Column{Type: field.TypeJSON}, want: "jsonb"},
 		{name: "time", column: &sqlschema.Column{Type: field.TypeTime}, want: "timestamp with time zone"},
-		{name: "bounded string", column: &sqlschema.Column{Type: field.TypeString, Size: 64}, want: "varchar(64)"},
+		{name: "string size metadata is not a PostgreSQL limit", column: &sqlschema.Column{Type: field.TypeString, Size: 64}, want: "varchar"},
+		{name: "physical varchar limit requires schema override", column: &sqlschema.Column{Type: field.TypeString, Size: 64, SchemaType: map[string]string{dialect.Postgres: "varchar(64)"}}, want: "varchar(64)"},
+		{name: "enum size does not change PostgreSQL type", column: &sqlschema.Column{Type: field.TypeEnum, Size: postgresMaxVarchar + 1}, want: "varchar"},
 		{name: "large string", column: &sqlschema.Column{Type: field.TypeString, Size: postgresMaxVarchar + 1}, want: "text"},
 		{name: "other requires override", column: &sqlschema.Column{Type: field.TypeOther}, wantErr: "requires SchemaType"},
 	}

@@ -42,7 +42,7 @@ export function createDevWorkbenchServePlugins({
   recoveryMode = '',
   recoveryReason = '',
   runtimeChecks = false,
-  workbenchAccess = 'operator',
+  workbenchAccess = 'local',
   workbenchHttpsOrigin = '',
 } = {}) {
   if (command !== 'serve' || mode !== 'development') return []

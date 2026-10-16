@@ -1267,6 +1267,7 @@ func validateShipmentFinishedGoodsQualityGate(ctx context.Context, tx *inventory
 		return biz.ErrBadParam
 	}
 	inspections, err := tx.client.QualityInspection.Query().Where(
+		qualityinspection.SupersededAtIsNil(),
 		qualityinspection.SourceType(biz.QualityInspectionSourceShipment),
 		qualityinspection.SourceID(shipmentID),
 		qualityinspection.InspectionType(biz.QualityInspectionTypeFinishedGoods),

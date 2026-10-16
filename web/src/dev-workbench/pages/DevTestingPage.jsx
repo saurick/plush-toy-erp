@@ -851,16 +851,13 @@ function CoverageOperationPanel({ operation, error }) {
   )
 }
 
-function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
+function ValidationPlanPanel({ plan, tiers, loading, error, busy, onGenerate }) {
   const shortCommit = plan?.repository?.commit?.slice(0, 12) || '未生成'
   return (
     <section className="erp-dev-testing-validation-plan">
       <div className="erp-dev-testing-validation-plan__head">
         <div>
           <Title level={3}>验证计划</Title>
-          <Paragraph>
-            只读分析当前改动，给出建议检查和待补证据；不会运行测试或写入数据。
-          </Paragraph>
         </div>
         <Button
           type="primary"
@@ -892,19 +889,16 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
             <span role="listitem">
               <small>改动输入</small>
               <b>{plan.changedCount} 个文件</b>
-              <em>读取当前工作区</em>
             </span>
             <span role="listitem">
               <small>建议范围</small>
-              <b>{plan.affectedScopes.join(' · ')}</b>
-              <em>T0–T8 只表示选测范围</em>
+              <b>{plan.affectedScopes.map((scope) => tiers.find((tier) => tier.key === scope)?.label.replace(/^T[0-8]\s*/u, '') || scope).join('、')}</b>
             </span>
             <span role="listitem">
               <small>后续判断</small>
               <b>
                 {plan.commands.length} 项命令 · {plan.followUps.length} 项补证
               </b>
-              <em>每项证据分别收口</em>
             </span>
           </div>
           {plan.localGate === 'full' ? (
@@ -917,6 +911,7 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
           ) : null}
           <details className="erp-dev-testing-validation-plan__details">
             <summary>查看建议命令、待补证据与计划身份</summary>
+            <p>T0–T8 只表示选测范围，不表示检查已执行。</p>
             <div className="erp-dev-testing-validation-plan__identity">
               <span>
                 <small>最广受影响范围</small>
@@ -982,7 +977,7 @@ function ValidationPlanPanel({ plan, loading, error, busy, onGenerate }) {
         </div>
       ) : (
         <p className="erp-dev-testing-validation-plan__empty">
-          尚未生成；该动作不运行测试、不写数据库，也不启动浏览器。
+          尚未生成计划
         </p>
       )}
     </section>
@@ -1049,6 +1044,7 @@ function ValidationActionRow({ action, operation, disabled, starting, onRun }) {
 
 function ValidationWorkspace({
   plan,
+  tiers,
   planLoading,
   planError,
   summary,
@@ -1078,6 +1074,7 @@ function ValidationWorkspace({
     >
       <ValidationPlanPanel
         plan={plan}
+        tiers={tiers}
         loading={planLoading}
         error={planError}
         busy={busy}
@@ -1095,16 +1092,17 @@ function ValidationWorkspace({
         <div>
           <Text strong>可运行检查</Text>
           <Text type="secondary">
-            三项检查互相独立；若不匹配本轮改动，可以不运行。
+            按本轮改动选择，结果分别保留。
           </Text>
         </div>
       </div>
       <DevCustomerScopeSelector
+        compact
         scope={customerScope}
         onChange={customerScope.selectCustomer}
         disabled={customerSelectorDisabled}
-        label="岗位权限检查甲方"
-        note="仅“岗位权限与任务可见性巡检”按甲方选择；当前永绅对应固定 yoyoosun 九岗位检查。"
+        label="权限检查客户"
+        note="仅影响岗位权限与任务可见性检查。"
         invalidDescription="岗位权限与任务可见性巡检已停止；开发门禁与字段联动专项仍可独立运行。"
       />
       <div className="erp-dev-testing-validation__actions erp-dev-tool-table-wrap">
@@ -1174,13 +1172,8 @@ function CoverageReportView({
     >
       <div className="erp-dev-testing-coverage-heading">
         <div>
-          <Text className="erp-dev-testing-validation__eyebrow">
-            证据分层，不合并总分
-          </Text>
           <Title level={2}>证据与覆盖</Title>
-          <Paragraph>按证据类型查看读数、缺口与执行结果。</Paragraph>
         </div>
-        <Tag>分项判断</Tag>
       </div>
       <div className="erp-dev-testing-coverage-overview">
         <div className="erp-dev-testing-coverage-toolbar">
@@ -2147,7 +2140,7 @@ export default function DevTestingPage() {
       ? `${hookReadyCount}/${hookCheckCount} 项接线完整`
       : '正在读取 Hook 接线…'
   return (
-    <div className="erp-dev-testing-page erp-dev-workspace-page">
+    <div className="erp-dev-testing-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav sourcePath={DEV_TESTING_STRATEGY_SOURCE_PATH} />
       <header className="erp-dev-testing-header">
         <div className="erp-dev-testing-header__copy">
@@ -2210,6 +2203,7 @@ export default function DevTestingPage() {
             <div className="erp-dev-testing-tier-view">
               <ValidationWorkspace
                 plan={testingPlan}
+                tiers={tiers}
                 planLoading={testingPlanLoading}
                 planError={testingPlanError}
                 summary={testingSummary}

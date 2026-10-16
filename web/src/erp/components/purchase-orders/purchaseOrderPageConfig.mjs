@@ -1,3 +1,4 @@
+import { PurchaseOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import {
   cancelPurchaseOrder,
@@ -160,5 +161,5 @@ export function canCreateInboundDraftFromPurchaseOrder({
   canCreatePurchaseReceipt = false,
   order,
 }) {
-  return canCreatePurchaseReceipt && order?.lifecycle_status === 'approved'
+  return canCreatePurchaseReceipt && order?.lifecycle_status === PurchaseOrderStatus.APPROVED
 }

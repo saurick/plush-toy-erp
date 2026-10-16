@@ -44,6 +44,7 @@ export function createBusinessFormalScenarios(deps) {
     assertOutsourcingProcessSelectOptions,
     assertProcessSuggestionOptions,
     assertTextAbsent,
+    clickERPThemeOption,
     closeBusinessFormModal,
     expectButton,
     expectHeading,
@@ -1003,9 +1004,16 @@ export function createBusinessFormalScenarios(deps) {
       scenarioName: 'business-formal-sales-orders',
     })
     await page.getByRole('button', { name: '新建订单' }).click()
+    const completeCommercialTerms = async (form) => {
+      for (const [label, value] of [['计税方式', '不计税'], ['报价是否含运费', '报价含运费']]) {
+        await form.getByLabel(label, { exact: true }).click()
+        await page.locator('.ant-select-dropdown:visible').getByText(value, { exact: true }).click()
+      }
+    }
     const draftForm = page.locator('.erp-business-form-page:not([hidden])')
     await draftForm.getByLabel('客户', { exact: true }).click()
     await page.getByText('CUS-STYLE-L1 - 暗色客户', { exact: true }).click()
+    await completeCommercialTerms(draftForm)
     const [draftSaved] = await Promise.all([
       page.waitForRequest(
         (request) =>
@@ -1030,6 +1038,7 @@ export function createBusinessFormalScenarios(deps) {
       expectedTexts: ['订货明细', '添加订货明细', '暂无订货明细'],
       absentTexts: ['产品引用 ID', '单位引用 ID', '从已有规格添加'],
       afterOpen: async (modal) => {
+        await completeCommercialTerms(modal)
         assert.equal(
           await modal.locator('.erp-sales-order-lines-form__row').count(),
           0
@@ -1119,15 +1128,15 @@ export function createBusinessFormalScenarios(deps) {
           expected: '133.21',
           scenarioName: 'business-formal-sales-order-form-modal-empty-line',
         })
+        assert.equal(await modal.locator('.erp-line-items-form__stat--emphasis strong').innerText(), 'CNY 133.21', '订单总额在汇总区保持可见并沿用税费运费计算')
+        await modal.getByRole('button', { name: '金额明细', exact: true }).click()
+        const amountDetails = page.locator('.erp-line-items-form__amount-details:visible')
         assert.equal(
-          await modal
-            .locator('.erp-line-items-form__stat')
-            .filter({ hasText: '货款金额' })
-            .locator('strong')
-            .innerText(),
+          await amountDetails.locator('div').filter({ hasText: '货款金额' }).locator('dd').innerText(),
           'CNY 133.21',
           '数量和单价齐全时，货款应显示真实计算结果'
         )
+        await modal.getByRole('button', { name: '金额明细', exact: true }).click()
         const demandRow = modal
           .locator('.erp-sales-order-lines-form__row')
           .first()
@@ -1277,40 +1286,23 @@ export function createBusinessFormalScenarios(deps) {
           2,
           '行内关联规格不新增明细，添加按钮每次新增一行'
         )
-        const reorder = modal.getByRole('button', {
-          name: '调整明细顺序',
-          exact: true,
-        })
-        await reorder.click()
-        const orderDialog = page
-          .locator('.erp-business-action-modal--columns')
-          .filter({ hasText: '调整明细顺序' })
-          .last()
-        await orderDialog
-          .getByRole('button', { name: / 上移$/u })
-          .last()
-          .click()
-        await orderDialog.getByRole('button', { name: /^取\s*消$/u }).click()
-        await orderDialog.waitFor({ state: 'hidden' })
+        assert.equal(
+          await modal.getByRole('button', { name: '调整明细顺序', exact: true }).count(),
+          0,
+          '多条明细不提供独立排序弹窗'
+        )
+        assert.equal(
+          await modal.getByRole('button', { name: /^上移第 /u }).count(),
+          0,
+          '订货明细不提供行内排序操作'
+        )
         assert.deepEqual(
           await readDemandRows(),
           beforeOrder,
-          '取消排序应保留原始明细及内容'
+          '明细保持录入顺序与原有内容'
         )
-        await reorder.click()
-        await orderDialog
-          .getByRole('button', { name: / 上移$/u })
-          .last()
-          .click()
-        await orderDialog
-          .getByRole('button', { name: '应用顺序', exact: true })
-          .click()
-        await orderDialog.waitFor({ state: 'hidden' })
-        assert.deepEqual(
-          await readDemandRows(),
-          [...beforeOrder].reverse(),
-          '排序应整体移动明细，保持需求、产品、数量与单价的对应关系'
-        )
+        await modal.getByRole('button', { name: '添加订货明细', exact: true }).focus()
+        await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
         await page.setViewportSize({ width: 760, height: 900 })
         await assertNoHorizontalOverflow(
           page,
@@ -1331,15 +1323,13 @@ export function createBusinessFormalScenarios(deps) {
           addButtonName: '添加订货明细',
           scenarioName: 'business-formal-sales-order-form-modal',
         })
+        await modal.getByRole('button', { name: '金额明细', exact: true }).click()
         assert.equal(
-          await modal
-            .locator('.erp-line-items-form__stat')
-            .filter({ hasText: '货款金额' })
-            .locator('strong')
-            .innerText(),
+          await page.locator('.erp-line-items-form__amount-details:visible').locator('div').filter({ hasText: '货款金额' }).locator('dd').innerText(),
           '待补齐',
           '存在未填写数量或单价的明细时，货款不能被显示成零'
         )
+        await modal.getByRole('button', { name: '金额明细', exact: true }).click()
         await page.setViewportSize({ width: 1920, height: 1080 })
         await modal
           .locator('.erp-sales-order-lines-form__head')
@@ -2772,8 +2762,11 @@ export function createBusinessFormalScenarios(deps) {
 
         await page.getByRole('tab', { name: '异常处理' }).click()
         await expectText(page, '暂无生产异常处置申请')
-        await page.evaluate(() => {
-          window.localStorage.setItem('plush_erp_theme_mode', 'dark')
+        await clickERPThemeOption(page, '暗色')
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-production-exceptions-saved-dark',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
         })
         await page.reload({ waitUntil: 'domcontentloaded' })
         await expectText(page, '暂无生产异常处置申请')
@@ -2794,12 +2787,20 @@ export function createBusinessFormalScenarios(deps) {
           fullPage: true,
         })
 
-        await page.setViewportSize({ width: 390, height: 844 })
-        await page.evaluate(() => {
-          window.localStorage.setItem('plush_erp_theme_mode', 'light')
+        await clickERPThemeOption(page, '浅色')
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-production-exceptions-saved-light',
+          expectedMode: 'light',
+          expectedEffectiveTheme: 'light',
         })
+        await page.setViewportSize({ width: 390, height: 844 })
         await page.reload({ waitUntil: 'domcontentloaded' })
         await expectText(page, '暂无生产异常处置申请')
+        await assertERPThemeMode(page, {
+          scenarioName: 'business-production-exceptions-mobile-light',
+          expectedMode: 'light',
+          expectedEffectiveTheme: 'light',
+        })
         await assertProductionExceptionTabGeometry(
           'business-production-exceptions-decisions-tab-mobile',
           '异常处理'

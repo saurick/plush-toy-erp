@@ -17,6 +17,8 @@ import {
   shiftMergesAfterInsert,
   splitTableCellMerge,
 } from './detailCellMerge.mjs'
+import { editPrintTableRow, movePrintItem } from './printItemOperations.mjs'
+import { splitColorCardBlocks } from './colorCardLayout.mjs'
 
 export const ENGINEERING_PRINT_LIMITS = Object.freeze({
   materialRows: 80,
@@ -82,6 +84,162 @@ export function createBlankMaterialDetailLine() {
     processBase: '',
     processMethod: '',
     remark: '',
+  }
+}
+
+export function editMaterialDetailLine(draft, selectedIndex, action) {
+  const result = editPrintTableRow({
+    lines: draft.lines,
+    merges: draft.merges,
+    rowIndex: selectedIndex,
+    action,
+    createBlankLine: createBlankMaterialDetailLine,
+  })
+  return result.ok
+    ? {
+        ...result,
+        draft: { ...draft, lines: result.lines, merges: result.merges },
+      }
+    : result
+}
+
+export function getColorCardBlockMoveTarget(draft, selectedIndex, action) {
+  const columns = splitColorCardBlocks(draft.blocks)
+  const column = columns.find((items) =>
+    items.some(({ blockIndex }) => blockIndex === selectedIndex)
+  )
+  if (!column || (action !== 'up' && action !== 'down')) return null
+  const position = column.findIndex(
+    ({ blockIndex }) => blockIndex === selectedIndex
+  )
+  return column[position + (action === 'up' ? -1 : 1)]?.blockIndex ?? null
+}
+
+export function editColorCardBlock(draft, selectedIndex, action) {
+  const blocks = draft.blocks || []
+  if (!Number.isInteger(selectedIndex) || !blocks[selectedIndex]) {
+    return { ok: false, message: '请先选择色卡块。' }
+  }
+  let next = [...blocks]
+  let nextIndex = selectedIndex
+  if (action === 'clear') {
+    const block = blocks[selectedIndex]
+    next[selectedIndex] = {
+      ...block,
+      materialName: '',
+      vendor: '',
+      lines: (block.lines || []).map(createBlankColorCardLine),
+    }
+  } else if (action === 'up' || action === 'down') {
+    const columns = splitColorCardBlocks(blocks)
+    nextIndex = getColorCardBlockMoveTarget(draft, selectedIndex, action)
+    if (nextIndex === null) {
+      return { ok: false, message: '当前色卡块已在本栏边界。' }
+    }
+    // 固定本次纸面左右栏，调序只改变当前栏内的位置。
+    const sideByIndex = new Map(
+      columns.flatMap((items, index) =>
+        items.map(({ blockIndex }) => [
+          blockIndex,
+          index === 0 ? 'left' : 'right',
+        ])
+      )
+    )
+    next = next.map((block, index) => ({
+      ...block,
+      side: sideByIndex.get(index),
+    }))
+    ;[next[selectedIndex], next[nextIndex]] = [
+      next[nextIndex],
+      next[selectedIndex],
+    ]
+  } else return { ok: false, message: '请选择有效的色卡块操作。' }
+  return {
+    ok: true,
+    draft: { ...draft, blocks: next },
+    selectedIndex: nextIndex,
+    message:
+      action === 'clear'
+        ? '已清空当前色卡块，块和明细行保留。'
+        : '已在当前栏内调整色卡块顺序。',
+  }
+}
+
+export function editColorCardLine(draft, blockIndex, lineIndex, action) {
+  const block = draft.blocks?.[blockIndex]
+  const lines = block?.lines || []
+  if (!Number.isInteger(lineIndex) || !lines[lineIndex]) {
+    return { ok: false, message: '请先选择已存在的色卡行。' }
+  }
+  const result =
+    action === 'clear'
+      ? {
+          ok: true,
+          items: lines.map((line, index) =>
+            index === lineIndex ? createBlankColorCardLine() : line
+          ),
+          selectedIndex: lineIndex,
+        }
+      : movePrintItem(lines, lineIndex, action)
+  if (!result.ok) return result
+  return {
+    ok: true,
+    draft: {
+      ...draft,
+      blocks: draft.blocks.map((item, index) =>
+        index === blockIndex ? { ...item, lines: result.items } : item
+      ),
+    },
+    selectedBlockIndex: blockIndex,
+    selectedLineIndex: result.selectedIndex,
+    message:
+      action === 'clear'
+        ? '已清空当前色卡行，行位置保留。'
+        : '已调整当前色卡行顺序。',
+  }
+}
+
+export function editInstructionRow(draft, rowIndex, action, pageIndex = null) {
+  const rows =
+    pageIndex === null ? draft.rows : draft.continuationPages?.[pageIndex]?.rows
+  if (!Array.isArray(rows) || !Number.isInteger(rowIndex) || !rows[rowIndex]) {
+    return { ok: false, message: '请先选择作业行。' }
+  }
+  const result =
+    action === 'clear'
+      ? {
+          ok: true,
+          items: rows.map((row, index) =>
+            index === rowIndex
+              ? {
+                  ...createBlankInstructionRow(),
+                  type: row.type,
+                  heightMm: row.heightMm,
+                  fontSizePt: row.fontSizePt,
+                }
+              : row
+          ),
+          selectedIndex: rowIndex,
+        }
+      : movePrintItem(rows, rowIndex, action)
+  if (!result.ok) return result
+  const nextRows = renumberInstructionRows(result.items)
+  return {
+    ok: true,
+    draft:
+      pageIndex === null
+        ? { ...draft, rows: nextRows }
+        : {
+            ...draft,
+            continuationPages: draft.continuationPages.map((page, index) =>
+              index === pageIndex ? { ...page, rows: nextRows } : page
+            ),
+          },
+    selectedIndex: result.selectedIndex,
+    message:
+      action === 'clear'
+        ? '已清空当前作业行，行类型和位置保留。'
+        : '已调整作业行顺序，编号已更新。',
   }
 }
 

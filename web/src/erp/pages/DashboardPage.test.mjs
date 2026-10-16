@@ -109,9 +109,9 @@ test('related document entry is gated by backend source access and menu projecti
 })
 
 test('task surfaces expose the batch task code only as non-visible evidence metadata', () => {
-  assert.equal(source.match(/data-task-code(?:=|['"]:)/gu)?.length, 4)
-  assert.equal(source.match(/data-task-group(?:=|['"]:)/gu)?.length, 4)
-  assert.match(source, /data-task-code=\{task\.task_code \|\| undefined\}/u)
+  assert.equal(source.match(/data-task-code(?:=|['"]:)/gu)?.length, 3)
+  assert.equal(source.match(/data-task-group(?:=|['"]:)/gu)?.length, 3)
+  assert.match(source, /['"]data-task-code['"]:\s*task\.task_code/u)
   assert.match(
     source,
     /['"]data-task-code['"]:\s*record\.task_code \|\| undefined/u

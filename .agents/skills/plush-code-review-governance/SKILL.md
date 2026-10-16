@@ -67,7 +67,7 @@ GIT_OPTIONAL_LOCKS=0 git -c diff.autoRefreshIndex=false diff --stat
 
 - 先看已有测试是否覆盖改动的 happy path、非法状态、权限、幂等、事务失败、旧数据或页面状态。
 - 前端样式/布局默认至少要求目标页面浏览器级回归；共享组件或全局样式按影响面升级。
-- 文档/skill-only 改动至少运行 `git diff --check` 和对应 skill validator。
+- 文档/Skill-only 改动检查 scoped diff 格式与相关引用；触达项目 Skills 时按[维护与验证](../README.md#skill-validation)运行项目 validator。
 - 不要为 docs-only 或 skill-only 改动机械运行迁移、全量 UI 回归或重型服务端测试，除非 touched path 需要。
 
 ## 输出要求 Output

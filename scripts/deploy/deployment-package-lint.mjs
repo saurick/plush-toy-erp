@@ -6,14 +6,28 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
 
+const CANONICAL_COMPOSE = "server/deploy/compose/prod/compose.yml";
+const SHARED_SCRIPTS = [
+  "collect-evidence.sh",
+  "collect-evidence.mjs",
+  "run-smoke.sh",
+  "run-smoke-support.mjs",
+  "run-backup-restore-rehearsal.sh",
+  "verify-backup-restore.sh",
+];
+const UNUSED_CONFIGURATION_FILES = [
+  "compose/docker-compose.example.yml",
+  "compose/docker-compose.override.example.yml",
+  "env/server.config.example.yaml",
+  "env/web.config.example.json",
+];
+
 const REQUIRED_FILES = [
   "README.md",
   "env/.env.example",
   "env/secrets.required.md",
-  "env/server.config.example.yaml",
-  "env/web.config.example.json",
-  "compose/docker-compose.example.yml",
-  "compose/docker-compose.override.example.yml",
+  "env/runtime.contract.json",
+  "env/credential.contract.json",
   "compose/nginx.example.conf",
   "runbooks/00-overview.md",
   "runbooks/01-first-deploy.md",
@@ -39,10 +53,6 @@ const REQUIRED_FILES = [
   "reports/README.md",
   "scripts/README.md",
   "scripts/verify-env.sh",
-  "scripts/run-smoke.sh",
-  "scripts/collect-evidence.sh",
-  "scripts/verify-backup-restore.sh",
-  "scripts/run-backup-restore-rehearsal.sh",
 ];
 
 const REQUIRED_ENV_KEYS = [
@@ -162,7 +172,11 @@ function assert(condition, message, errors) {
 function validateRunbookCoverage(packageDir, errors) {
   const sections = {
     "runbooks/02-upgrade.md": ["## 升级检查"],
-    "runbooks/03-rollback.md": ["## 回滚检查"],
+    "runbooks/03-rollback.md": [
+      "## 回滚检查",
+      "## 代码回滚",
+      "## 数据库与附件恢复",
+    ],
     "runbooks/08-daily-ops.md": ["## 每周", "## 每月"],
   };
   for (const [relativePath, headings] of Object.entries(sections)) {
@@ -218,33 +232,53 @@ function validateEnvExample(packageDir, errors) {
   );
 }
 
-function validateCompose(packageDir, errors) {
-  const composePath = path.join(
-    packageDir,
-    "compose/docker-compose.example.yml",
-  );
+function validateDeploymentBoundary(repoRoot, packageDir, errors) {
+  for (const relativePath of [
+    CANONICAL_COMPOSE,
+    ...SHARED_SCRIPTS.map((name) => `scripts/deploy/${name}`),
+  ]) {
+    assert(
+      fs.existsSync(path.join(repoRoot, relativePath)),
+      `Missing shared deployment source: ${relativePath}`,
+      errors,
+    );
+  }
+  for (const relativePath of [
+    ...UNUSED_CONFIGURATION_FILES,
+    ...SHARED_SCRIPTS.map((name) => `scripts/${name}`),
+  ]) {
+    assert(
+      !fs.existsSync(path.join(packageDir, relativePath)),
+      `${relativePath} must not duplicate shared deployment sources; use ${CANONICAL_COMPOSE} and scripts/deploy`,
+      errors,
+    );
+  }
+}
+
+function validateCompose(repoRoot, errors) {
+  const composePath = path.join(repoRoot, CANONICAL_COMPOSE);
   if (!fs.existsSync(composePath)) {
     return;
   }
   const content = readText(composePath);
   assert(
     /healthcheck:/m.test(content),
-    "compose example must include healthcheck",
+    "canonical compose must include healthcheck",
     errors,
   );
   assert(
     /restart:\s+always/m.test(content),
-    "compose example must include restart policy",
+    "canonical compose must include restart policy",
     errors,
   );
   assert(
     /web-desktop:/m.test(content),
-    "compose example must use single web-desktop entry",
+    "canonical compose must use single web-desktop entry",
     errors,
   );
   assert(
     !/web-mobile-/m.test(content),
-    "compose example must not restore old web-mobile services",
+    "canonical compose must not restore old web-mobile services",
     errors,
   );
 }
@@ -699,7 +733,8 @@ export function validateDeploymentPackage({
   }
 
   validateEnvExample(packageDir, errors);
-  validateCompose(packageDir, errors);
+  validateDeploymentBoundary(repoRoot, packageDir, errors);
+  validateCompose(repoRoot, errors);
   validateNginxRouting(packageDir, errors);
   validateRunbookCoverage(packageDir, errors);
   validateContent(packageDir, errors);

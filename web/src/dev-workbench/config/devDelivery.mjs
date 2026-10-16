@@ -44,6 +44,14 @@ export const DEV_DELIVERY_TARGETS = Object.freeze([
     endpoint: 'https://test.yoyoosun.net',
     dataBoundary: '普通部署默认保留现有数据；需要时独立清空并重建测试数据',
   }),
+  Object.freeze({
+    key: 'production-133',
+    label: 'erp 正式业务',
+    shortLabel: '正式环境',
+    purpose: 'customer-production',
+    endpoint: 'https://erp.yoyoosun.net',
+    dataBoundary: '独立正式数据；仅显式部署，不提供测试数据重建',
+  }),
 ])
 const DEV_DELIVERY_TARGET_KEYS = Object.freeze(
   DEV_DELIVERY_TARGETS.map((target) => target.key)
@@ -1006,7 +1014,9 @@ export function validateDevDeliverySummary(summary) {
     const prefix =
       definition.key === 'demo-133'
         ? 'plush-toy-erp-demo-web-public-'
-        : 'plush-toy-erp-test-web-public-'
+        : definition.key === 'production-133'
+          ? 'plush-toy-erp-production-web-public-'
+          : 'plush-toy-erp-test-web-public-'
     if (
       target?.target !== definition.key ||
       target?.purpose !== definition.purpose ||

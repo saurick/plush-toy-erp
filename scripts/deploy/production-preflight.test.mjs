@@ -1,3 +1,4 @@
+import { getDeploymentTarget } from "./deployment-targets.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -301,11 +302,45 @@ const deploymentTargetFixtures = Object.freeze({
   }),
 });
 
+const productionTarget = getDeploymentTarget("production-133");
+const productionTargetFixture = {
+  key: productionTarget.key,
+  project: productionTarget.compose.projectName,
+  database: productionTarget.database.name,
+  root: productionTarget.filesystem.root,
+  override: productionTarget.compose.overrideFile,
+  trialEnabled: "0",
+  trialTarget: "",
+  ports: {
+    POSTGRES_PORT: String(productionTarget.runtime.postgres.hostPort),
+    APP_HTTP_PORT: String(productionTarget.runtime.app.hostPort),
+    WEB_DESKTOP_PORT: String(productionTarget.runtime.web.hostPort),
+    ...Object.fromEntries(
+      Object.entries({
+        JAEGER_6831_PORT: "agentThriftCompact",
+        JAEGER_6832_PORT: "agentThriftBinary",
+        JAEGER_UI_PORT: "ui",
+        JAEGER_14268_PORT: "collectorHttp",
+        JAEGER_14250_PORT: "collectorGrpc",
+        JAEGER_9411_PORT: "zipkin",
+        JAEGER_OTLP_GRPC_PORT: "otlpGrpc",
+        JAEGER_OTLP_HTTP_PORT: "otlpHttp",
+      }).map(([key, field]) => [
+        key,
+        String(productionTarget.runtime.jaeger.ports[field]),
+      ]),
+    ),
+  },
+};
+
 function configureExactDeploymentTargetFixture(
   fixture,
   { targetKey = "demo-133", dsn } = {},
 ) {
-  const target = deploymentTargetFixtures[targetKey];
+  const target =
+    targetKey === "production-133"
+      ? productionTargetFixture
+      : deploymentTargetFixtures[targetKey];
   assert.ok(target, `unknown fixture deployment target: ${targetKey}`);
   const exactDsn =
     dsn ??
@@ -612,6 +647,7 @@ set -euo pipefail
 url="\${@: -1}"
 if [[ "$url" == */rpc/auth ]]; then
   printf '%s\n' '{"result":{"code":0,"data":{"sms_login":{"enabled":true,"mode":"provider","mock_delivery":false,"disabled_reason":""}}}}'
+  if [[ "\${FAKE_AUTH_APPEND_JSON:-0}" == 1 ]]; then printf '{}\n'; fi
 fi
 exit 0
 `,
@@ -1057,14 +1093,16 @@ test("production preflight rejects missing out directory before writing report",
   assert.equal(fs.existsSync(reportPath), false);
 });
 
-test("production preflight writes a contract receipt without host Node.js", () => {
+test("production preflight writes a contract receipt without host Node.js, Go or Python", () => {
   const fixture = writeFixture();
   const fakeBin = createFakeRuntimeBin(fixture.root);
-  fs.writeFileSync(
-    path.join(fakeBin, "node"),
-    "#!/bin/sh\necho unexpected-node >&2\nexit 127\n",
-    { mode: 0o755 },
-  );
+  for (const interpreter of ["node", "go", "python", "python3"]) {
+    fs.writeFileSync(
+      path.join(fakeBin, interpreter),
+      `#!/bin/sh\necho unexpected-${interpreter} >&2\nexit 127\n`,
+      { mode: 0o755 },
+    );
+  }
   const reportPath = path.join(fixture.root, "receipt.json");
   const result = runPreflight(fixture, ["--out", reportPath], {
     env: { PATH: `${fakeBin}:${process.env.PATH ?? ""}` },
@@ -1082,7 +1120,84 @@ test("production preflight writes a contract receipt without host Node.js", () =
       checks: report.checks.map((check) => check.id),
     }),
   );
-  assert.doesNotMatch(result.stderr, /unexpected-node/u);
+  assert.doesNotMatch(result.stderr, /unexpected-(node|go|python)/u);
+});
+
+test("production preflight preserves an existing receipt when generation fails", () => {
+  const fixture = writeFixture();
+  const packageDir = path.join(fixture.root, "receipt-tools");
+  fs.mkdirSync(packageDir);
+  const packagedScript = path.join(packageDir, "production-preflight.sh");
+  fs.copyFileSync(scriptPath, packagedScript);
+  const reportPath = path.join(fixture.root, "receipt.json");
+  const contract = fs.readFileSync(
+    path.join(repoRoot, "scripts/deploy/release-evidence-contract.json"),
+    "utf8",
+  );
+  for (const invalid of ["{invalid-json", `${contract}\n{}`]) {
+    fs.writeFileSync(
+      path.join(packageDir, "release-evidence-contract.json"),
+      invalid,
+    );
+    fs.writeFileSync(reportPath, "existing-evidence\n");
+    const result = spawnSync(
+      "bash",
+      [
+        packagedScript,
+        "--env-file",
+        fixture.envFile,
+        "--compose-dir",
+        fixture.composeDir,
+        "--out",
+        reportPath,
+      ],
+      {
+        cwd: repoRoot,
+        encoding: "utf8",
+        env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+      },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /生成脱敏回执失败/u);
+    assert.equal(fs.readFileSync(reportPath, "utf8"), "existing-evidence\n");
+    assert.deepEqual(
+      fs
+        .readdirSync(fixture.root)
+        .filter((name) => name.startsWith(".production-preflight.")),
+      [],
+    );
+  }
+});
+
+test("production preflight rejects multiple JSON authentication responses", () => {
+  const fixture = writeFixture();
+  configureExactCustomerTrialFixture(fixture);
+  const result = runTrialPreflight(
+    fixture,
+    [
+      ...trialOverrideArgs(fixture),
+      "--profile",
+      "customer-trial-acceptance",
+      "--runtime",
+    ],
+    {
+      env: { FAKE_AUTH_APPEND_JSON: "1" },
+    },
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /auth.capabilities 未匹配/u);
+});
+
+test("production preflight rejects a receipt symlink without changing its target", () => {
+  const fixture = writeFixture();
+  const target = path.join(fixture.root, "existing.json");
+  const reportPath = path.join(fixture.root, "receipt.json");
+  fs.writeFileSync(target, "existing-evidence\n");
+  fs.symlinkSync(target, reportPath);
+  const result = runPreflight(fixture, ["--out", reportPath]);
+  assert.notEqual(result.status, 0);
+  assert.equal(fs.readFileSync(target, "utf8"), "existing-evidence\n");
+  assert.equal(fs.lstatSync(reportPath).isSymbolicLink(), true);
 });
 
 test("production preflight rejects floating app image tags", () => {
@@ -1813,7 +1928,10 @@ test("production preflight excludes admin and undeclared environment names", asy
       const result = runPreflight(fixture, ["--deployment-target", targetKey]);
 
       assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /只允许 demo-133 或 customer-test-133/u);
+      assert.match(
+        result.stderr,
+        /只允许 demo-133、customer-test-133 或 production-133/u,
+      );
     });
   }
 });
@@ -1963,13 +2081,6 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
     path.join(repoRoot, "deployments/yoyoosun/env/.env.example"),
     "utf8",
   );
-  const customerCompose = fs.readFileSync(
-    path.join(
-      repoRoot,
-      "deployments/yoyoosun/compose/docker-compose.example.yml",
-    ),
-    "utf8",
-  );
   const productionCompose = fs.readFileSync(
     path.join(repoRoot, "server/deploy/compose/prod/compose.yml"),
     "utf8",
@@ -2109,10 +2220,7 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
     );
     assert.doesNotMatch(envExample, /ERP_PDF_WARMUP_ENABLED/);
   }
-  assert.match(
-    customerCompose,
-    /ERP_PDF_WARMUP: "\$\{ERP_PDF_WARMUP:-async\}"/,
-  );
+  assert.match(productionCompose, /ERP_PDF_WARMUP: "\$\{ERP_PDF_WARMUP:-\}"/);
 });
 
 test("production preflight rejects a missing RAID mount, network storage and public S3", async (t) => {
@@ -2203,8 +2311,19 @@ test("external storage validates endpoint and avoids starting a second file stor
   for (const [endpoint, valid] of [
     ["http://192.168.0.133:8333", true],
     ["https://storage.example.net", true],
+    ["http://[::1]:8333/", true],
+    ["http://[0:0:0:0:0:0:0:1]", true],
+    ["https://[2001:db8::1]:443", true],
+    ["https://[::ffff:192.0.2.1]", true],
     ["http://8.8.8.8:8333", false],
     ["http://169.254.169.254", false],
+    ["http://[1::]", false],
+    ["https://[1::2::3]", false],
+    ["https://storage.example.net:0", false],
+    ["https://storage.example.net:65536", false],
+    ["https://storage.example.net?key=value", false],
+    ["https://storage.example.net#fragment", false],
+    ["http://192.168.001.1", false],
     ["https://user:password@storage.example.net", false],
     ["http://192.168.0.133:8333/buckets/files", false],
   ])
@@ -2248,4 +2367,23 @@ test("external storage validates endpoint and avoids starting a second file stor
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /不能同时启动/u);
   });
+});
+
+test("production preflight accepts only the exact isolated production resources", () => {
+  const fixture = writeFixture();
+  try {
+    configureExactDeploymentTargetFixture(fixture, {
+      targetKey: "production-133",
+    });
+    const passed = runDeploymentTargetPreflight(fixture);
+    assert.equal(passed.status, 0, passed.stdout + passed.stderr);
+    fs.appendFileSync(
+      fixture.envFile,
+      "\nPOSTGRES_DB=plush_erp_customer_test_v1\n",
+    );
+    const drift = runDeploymentTargetPreflight(fixture);
+    assert.notEqual(drift.status, 0);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
 });

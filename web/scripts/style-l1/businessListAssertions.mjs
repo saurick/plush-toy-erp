@@ -1665,7 +1665,8 @@ export function createBusinessListAssertions({ outputDir }) {
   }
 
   async function readLineCounter(page, label) {
-    const counter = page.locator('.erp-print-shell__counter')
+    const counter = page.locator('.erp-print-shell__counter').filter({ hasText: `${label}:` })
+    assert.equal(await counter.count(), 1, `${label} 明细计数必须唯一`)
     const text = (await counter.textContent()) || ''
     const match = text.match(new RegExp(`${label}:\\s*(\\d+)\\/300`))
 

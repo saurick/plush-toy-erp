@@ -1,3 +1,4 @@
+import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   normalizeOperationalFactLifecycleRequest,
   validateOperationalFactLifecycleResult,
@@ -28,7 +29,7 @@ export function validateFinanceCancellationResult(task, request) {
 }
 
 export function financeCancelAuditText(record, formatUnixDate) {
-  if (record?.status !== 'CANCELLED') {
+  if (record?.status !== OperationalFactStatus.CANCELLED) {
     return '-'
   }
   const actor = String(record?.cancelled_by_name || '').trim()

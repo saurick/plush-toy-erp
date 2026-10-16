@@ -12,6 +12,7 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { ShipmentStatus } from '../../../common/consts/statuses.generated.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import Table from '@/common/components/table/AppTable'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
@@ -564,7 +565,7 @@ function ShipmentWeightDetailSummary({ shipment, products, productSKUs }) {
       </div>
     )
   }
-  if (status === 'DRAFT') {
+  if (status === ShipmentStatus.DRAFT) {
     const preview = resolveShipmentWeightPreview({
       items: shipment?.items || [],
       products,

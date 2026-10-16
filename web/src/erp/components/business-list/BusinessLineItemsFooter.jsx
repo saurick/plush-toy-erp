@@ -1,6 +1,6 @@
 import React, { forwardRef } from 'react'
 import { PlusOutlined } from '@ant-design/icons'
-import { Button } from 'antd'
+import { Button, Popover } from 'antd'
 
 function classNames(...values) {
   return values.filter(Boolean).join(' ')
@@ -84,10 +84,13 @@ function BusinessLineItemsFooter(
     addButtonProps,
     onAdd,
     stats = [],
+    detailsLabel = '金额明细',
   },
   ref
 ) {
   const normalizedStats = Array.isArray(stats) ? stats.filter(Boolean) : []
+  const summaryStats = normalizedStats.filter((stat) => !stat.detail)
+  const detailStats = normalizedStats.filter((stat) => stat.detail)
 
   return (
     <div className="erp-line-items-form__footer" ref={ref}>
@@ -103,8 +106,14 @@ function BusinessLineItemsFooter(
       </div>
       {normalizedStats.length > 0 ? (
         <div className="erp-line-items-form__stats">
-          {normalizedStats.map((stat) => (
-            <span className="erp-line-items-form__stat" key={stat.key}>
+          {summaryStats.map((stat) => (
+            <span
+              className={classNames(
+                'erp-line-items-form__stat',
+                stat.emphasis && 'erp-line-items-form__stat--emphasis'
+              )}
+              key={stat.key}
+            >
               {stat.label}
               <strong className="erp-line-items-form__stat-value">
                 {stat.value}
@@ -112,6 +121,30 @@ function BusinessLineItemsFooter(
               {stat.suffix}
             </span>
           ))}
+          {detailStats.length > 0 ? (
+            <Popover
+              trigger="click"
+              placement="topRight"
+              title={detailsLabel}
+              content={
+                <dl className="erp-line-items-form__amount-details">
+                  {detailStats.map((stat) => (
+                    <div key={stat.key}>
+                      <dt>{stat.label}</dt>
+                      <dd>
+                        {stat.value}
+                        {stat.suffix}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              }
+            >
+              <Button type="link" size="small">
+                {detailsLabel}
+              </Button>
+            </Popover>
+          ) : null}
         </div>
       ) : null}
     </div>

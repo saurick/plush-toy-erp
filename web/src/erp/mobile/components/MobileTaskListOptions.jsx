@@ -3,8 +3,6 @@ import MobileTaskExtraFilters from './MobileTaskExtraFilters.jsx'
 import BusinessStatusFilter from '../../components/business-list/BusinessStatusFilter.jsx'
 import MobileFilterChoices from './MobileFilterChoices.jsx'
 import MobileFilterPopover from './MobileFilterPopover'
-import WorkflowTaskDiscoveryFilters from '../../components/workflow/WorkflowTaskDiscoveryFilters.jsx'
-import { taskDiscoveryFilterLabels } from '../../utils/workflowTaskDiscovery.mjs'
 import { TASK_CALENDAR_SELECTION_OPTIONS, taskCalendarSelectionMode, defaultTaskCalendarDate } from '../../utils/workflowTaskCalendar.mjs'
 import {
   MOBILE_TASK_SORT_OPTIONS,
@@ -19,12 +17,7 @@ export default function MobileTaskListOptions({
   sortKey,
   statusKey,
   options = {},
-  profile,
-  roleKey,
-  people,
   sourceTypes,
-  peopleError,
-  onRetryPeople,
   calendarState,
   onChange,
 }) {
@@ -35,9 +28,9 @@ export default function MobileTaskListOptions({
       title={showSort ? '筛选与排序' : '任务筛选'}
       open={open}
       onOpenChange={setOpen}
-      count={Number(showSort && sortKey !== 'newest') + Number(Boolean(statusKey)) + taskDiscoveryFilterLabels(options).length + Number(!calendarState && Boolean(options.due)) + Number(Boolean(options.sourceType)) + Number(Boolean(calendarState && taskCalendarSelectionMode(calendarState.selection) !== 'date'))}
+      count={Number(showSort && sortKey !== 'newest') + Number(Boolean(statusKey)) + Number(!calendarState && Boolean(options.due)) + Number(Boolean(options.sourceType)) + Number(Boolean(calendarState && taskCalendarSelectionMode(calendarState.selection) !== 'date'))}
       onReset={() => {
-        onChange({ sortKey: showSort ? 'newest' : sortKey, statusKey: '', due: '', sourceType: '', assignee: '' })
+        onChange({ sortKey: showSort ? 'newest' : sortKey, statusKey: '', due: '', sourceType: '' })
         if (calendarState) calendarState.change({ selection: defaultTaskCalendarDate(calendarState.month) })
       }}
       testId="mobile-task-list-filter-trigger"
@@ -77,16 +70,6 @@ export default function MobileTaskListOptions({
         />}
       </fieldset>
       <MobileTaskExtraFilters options={options} sourceTypes={sourceTypes} showDue={!calendarState} onChange={onChange} />
-      <WorkflowTaskDiscoveryFilters
-        compact
-        value={options}
-        onChange={onChange}
-        profile={profile}
-        roleKey={roleKey}
-        people={people}
-        peopleError={peopleError}
-        onRetryPeople={onRetryPeople}
-      />
     </MobileFilterPopover>
   )
 }

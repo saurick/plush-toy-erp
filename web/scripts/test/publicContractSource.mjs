@@ -7,11 +7,19 @@ import * as states from '../../src/common/consts/statuses.generated.mjs'
 import * as rpc from '../../src/common/consts/rpcMethods.generated.mjs'
 import * as attachments from '../../src/common/consts/attachments.generated.mjs'
 import * as numeric from '../../src/common/consts/numeric.generated.mjs'
+import * as policies from '../../src/common/consts/policies.generated.mjs'
 
 const modules = new Map([
   ['permissions', permissions], ['statuses', states], ['rpcMethods', rpc],
-  ['attachments', attachments], ['numeric', numeric],
+  ['attachments', attachments], ['numeric', numeric], ['policies', policies],
 ].map(([name, values]) => [fileURLToPath(new URL(`../../src/common/consts/${name}.generated.mjs`, import.meta.url)), values]))
+const webSourceRoot = fileURLToPath(new URL('../../src/', import.meta.url))
+
+function importTarget(filename, source) {
+  return source.startsWith('@/')
+    ? path.resolve(webSourceRoot, source.slice(2))
+    : path.resolve(path.dirname(filename), source)
+}
 
 // Static boundary assertions inspect public values even when the source uses
 // generated constants. Resolve only actual imports and immutable member reads;
@@ -32,8 +40,9 @@ export function resolvePublicContractSource(source, filename) {
             if (variable) {
               if (variable.defs.length !== 1 || variable.defs[0].type !== 'ImportBinding') return null
               const { node: specifier, parent } = variable.defs[0]
-              const values = modules.get(path.resolve(path.dirname(filename), parent.source.value))
+              const values = modules.get(importTarget(filename, parent.source.value))
               if (!values) return null
+              if (specifier.type === 'ImportNamespaceSpecifier') return { value: values }
               const name = specifier.imported?.name
               if (!Object.hasOwn(values, name)) throw new Error(`Unknown public contract import: ${name}`)
               return { value: values[name] }
@@ -52,7 +61,7 @@ export function resolvePublicContractSource(source, filename) {
       }
       return {
         ImportDeclaration(node) {
-          const target = path.resolve(path.dirname(filename), node.source.value)
+          const target = importTarget(filename, node.source.value)
           if (modules.has(target)) edits.push({ start: node.source.range[0], end: node.source.range[1], text: literal(pathToFileURL(target).href) })
         },
         MemberExpression(node) {

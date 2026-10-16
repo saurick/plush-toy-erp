@@ -23,7 +23,6 @@ export default function ProductionOrderOverview({
   onRetry,
   onOpen,
   onShowProcess,
-  onFilterStatus,
   switcher,
   viewState = {},
   onViewStateChange,
@@ -34,11 +33,7 @@ export default function ProductionOrderOverview({
   )
   const filter = viewState.filter || 'all'
   const filtered = model.rows.filter(
-    (row) =>
-      filter === 'all' ||
-      (filter === 'active'
-        ? row.orderStatus === 'RELEASED'
-        : row.scheduleStatus.key === filter)
+    (row) => filter === 'all' || row.scheduleStatus.key === filter
   )
   const pagination = paginateVisualizationRows(filtered, viewState.page)
   const { rows } = pagination
@@ -50,19 +45,15 @@ export default function ProductionOrderOverview({
       className="erp-production-overview"
       switcher={switcher}
       title="生产总览"
+      metricsLabel="计划提醒"
+      countUnit="张"
       loading={loading}
       error={error}
       metrics={[
         {
           key: 'all',
-          label: '全部',
+          label: '不限提醒',
           value: model.counts.total,
-          tone: 'neutral',
-        },
-        {
-          key: 'active',
-          label: '生产中',
-          value: model.counts.active,
           tone: 'neutral',
         },
         {
@@ -95,30 +86,8 @@ export default function ProductionOrderOverview({
         empty={!loading && !error && filtered.length === 0}
         onRetry={onRetry}
       />
-      {!loading && !error && model.rows.length > 0 ? (
+      {!loading && !error && rows.length > 0 ? (
         <>
-          <div
-            className="erp-production-overview__status-rail"
-            aria-label="生产订单状态分布"
-          >
-            {model.statusGroups.map((group) => (
-              <button
-                key={group.key}
-                type="button"
-                className={`erp-production-overview__status erp-production-overview__status--${group.tone}`}
-                onClick={() => onFilterStatus?.(group.key)}
-              >
-                <span>{group.label}</span>
-                <strong>{group.count}</strong>
-                <i
-                  aria-hidden="true"
-                  style={{
-                    width: `${group.count > 0 ? Math.max(8, group.percent) : 0}%`,
-                  }}
-                />
-              </button>
-            ))}
-          </div>
           <div className="erp-production-overview__columns" aria-hidden="true">
             <span>生产订单</span>
             <span>计划周期</span>

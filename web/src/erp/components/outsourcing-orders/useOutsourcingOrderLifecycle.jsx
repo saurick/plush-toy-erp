@@ -1,5 +1,6 @@
 import React, { useRef } from 'react'
 import { Alert, Descriptions } from 'antd'
+import { OutsourcingOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import SourceOrderLifecycleConfirmContent from '../business-list/SourceOrderLifecycleConfirmContent.jsx'
@@ -108,9 +109,9 @@ export function useOutsourcingOrderLifecycle({
             />
           ),
           okText:
-            selectedRow.lifecycle_status === 'draft' ? '返回补充' : '我知道了',
+            selectedRow.lifecycle_status === OutsourcingOrderStatus.DRAFT ? '返回补充' : '我知道了',
           onOk:
-            selectedRow.lifecycle_status === 'draft'
+            selectedRow.lifecycle_status === OutsourcingOrderStatus.DRAFT
               ? () => openEdit(selectedRow)
               : undefined,
         })

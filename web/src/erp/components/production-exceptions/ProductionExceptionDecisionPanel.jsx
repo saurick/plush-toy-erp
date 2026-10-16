@@ -2,6 +2,7 @@ import { AuditOutlined, RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Input, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import { ProcessStatus, ProductionExceptionExecutionStatus, ProductionExceptionStatus } from '../../../common/consts/statuses.generated.mjs'
 import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import WorkflowSourceProgressButton from '../workflow/WorkflowSourceProgressButton.jsx'
 import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
@@ -61,15 +62,15 @@ const TYPE_LABELS = {
   WIP_CONCESSION: '在制品让步',
 }
 const STATUS_LABELS = {
-  SUBMITTED: '待审批',
-  APPROVED: '已批准',
-  REJECTED: '已拒绝',
-  CANCELLED: '已取消',
+  [ProductionExceptionStatus.SUBMITTED]: '待审批',
+  [ProductionExceptionStatus.APPROVED]: '已批准',
+  [ProductionExceptionStatus.REJECTED]: '已拒绝',
+  [ProductionExceptionStatus.CANCELLED]: '已取消',
 }
 const EXECUTION_LABELS = {
-  PENDING: '待业务办理',
-  APPLIED: '业务已执行',
-  REVERSED: '业务已冲正',
+  [ProductionExceptionExecutionStatus.PENDING]: '待业务办理',
+  [ProductionExceptionExecutionStatus.APPLIED]: '业务已执行',
+  [ProductionExceptionExecutionStatus.REVERSED]: '业务已冲正',
 }
 const TYPE_FILTER_OPTIONS = [
   { label: '全部异常类型', value: '' },
@@ -79,16 +80,16 @@ const TYPE_FILTER_OPTIONS = [
 ]
 const STATUS_FILTER_OPTIONS = [
   { label: '全部审批状态', value: '' },
-  { label: STATUS_LABELS.SUBMITTED, value: 'SUBMITTED' },
-  { label: STATUS_LABELS.APPROVED, value: 'APPROVED' },
-  { label: STATUS_LABELS.REJECTED, value: 'REJECTED' },
-  { label: STATUS_LABELS.CANCELLED, value: 'CANCELLED' },
+  { label: STATUS_LABELS.SUBMITTED, value: ProductionExceptionStatus.SUBMITTED },
+  { label: STATUS_LABELS.APPROVED, value: ProductionExceptionStatus.APPROVED },
+  { label: STATUS_LABELS.REJECTED, value: ProductionExceptionStatus.REJECTED },
+  { label: STATUS_LABELS.CANCELLED, value: ProductionExceptionStatus.CANCELLED },
 ]
 const EXECUTION_FILTER_OPTIONS = [
   { label: '全部业务状态', value: '' },
-  { label: '待办理 / 额度生效', value: 'PENDING' },
-  { label: EXECUTION_LABELS.APPLIED, value: 'APPLIED' },
-  { label: EXECUTION_LABELS.REVERSED, value: 'REVERSED' },
+  { label: '待办理 / 额度生效', value: ProductionExceptionExecutionStatus.PENDING },
+  { label: EXECUTION_LABELS.APPLIED, value: ProductionExceptionExecutionStatus.APPLIED },
+  { label: EXECUTION_LABELS.REVERSED, value: ProductionExceptionExecutionStatus.REVERSED },
 ]
 function mutationReceiptMatches(item, action, reason, actorID) {
   const record = action?.record
@@ -291,12 +292,12 @@ export default function ProductionExceptionDecisionPanel({
       })
       const latest = processData.source_readback
       if (
-        latest?.status !== 'SUBMITTED' ||
+        latest?.status !== ProductionExceptionStatus.SUBMITTED ||
         (processData.process_context &&
-          processData.process_context.process_instance.status !== 'blocked')
+          processData.process_context.process_instance.status !== ProcessStatus.BLOCKED)
       ) {
         message.warning(
-          latest?.status === 'SUBMITTED'
+          latest?.status === ProductionExceptionStatus.SUBMITTED
             ? '该异常审批仍在办理，请先在任务中心驳回或阻塞流程'
             : '当前状态不能撤回生产异常申请'
         )
@@ -322,7 +323,7 @@ export default function ProductionExceptionDecisionPanel({
   const ensureApprovalProcess = async (record) => {
     if (
       !record?.id ||
-      record.status !== 'SUBMITTED' ||
+      record.status !== ProductionExceptionStatus.SUBMITTED ||
       Number(record.requested_by) !== adminID
     ) {
       return
@@ -469,7 +470,7 @@ export default function ProductionExceptionDecisionPanel({
         render: (value, record) => (
           <Tag>
             {record.decision_type === 'OVER_ISSUE' &&
-            record.status === 'APPROVED' &&
+            record.status === ProductionExceptionStatus.APPROVED &&
             value === 'PENDING'
               ? '超领额度生效'
               : EXECUTION_LABELS[value] || '待业务办理'}

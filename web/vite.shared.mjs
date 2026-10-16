@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+import { existsSync, realpathSync } from 'node:fs'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
@@ -110,6 +111,34 @@ const createDevResolvedPortGuard = (serverPort) => ({
   },
 })
 
+const createDevLinkedDependencyAssets = () => ({
+  name: 'plush-dev-linked-dependency-assets',
+  apply: 'serve',
+  configResolved(config) {
+    // 隔离源码副本可链接已安装依赖；字体等静态资源仍受 Vite 的 strict / deny 规则保护。
+    const dependencies = [
+      resolve(config.root, 'node_modules'),
+      resolve(config.root, '../node_modules'),
+    ].filter(existsSync).map((directory) => realpathSync(directory))
+    config.server.fs.allow = [...new Set([
+      ...config.server.fs.allow,
+      ...dependencies,
+    ])]
+  },
+})
+
+const createDevArchiveMarkdownAssets = () => ({
+  name: 'plush-dev-archive-markdown-assets',
+  apply: 'serve',
+  configResolved(config) {
+    const directory = resolve(PROJECT_ROOT, 'docs/archive')
+    if (!existsSync(directory) || realpathSync(directory) !== directory) return
+    // Lazy imports need admission before Vite has transformed the source module.
+    // Keep access scoped to the product's archive; Vite's deny rules still apply.
+    config.server.fs.allow = [...new Set([...config.server.fs.allow, directory])]
+  },
+})
+
 export function createERPViteConfig(appId) {
   const app = getAppDefinition(appId)
   const apiOrigin = normalizeAPIOrigin(
@@ -175,6 +204,8 @@ export function createERPViteConfig(appId) {
         // 本机开发统一用 IPv4 origin，避免 localhost 解析或代理链路导致源模块加载抖动。
         isDev ? createDevLocalhostOriginNormalizer(serverPort) : null,
         isDev ? createDevResolvedPortGuard(serverPort) : null,
+        isDev ? createDevLinkedDependencyAssets() : null,
+        isDev ? createDevArchiveMarkdownAssets() : null,
         react(),
         ...devWorkbenchServePlugins,
       ].filter(Boolean),
@@ -222,7 +253,14 @@ export function createERPViteConfig(appId) {
           : [],
         port: serverPort,
         strictPort: true,
-        open: createDevOrigin(serverPort),
+        // 自动化页面由会话浏览器工具管理，避免系统 opener 留下无法归属的标签。
+        open:
+          isCodexDevSession() ||
+          ['1', 'true'].includes(process.env.CI) ||
+          process.env.NODE_ENV === 'test' ||
+          Boolean(process.env.NODE_TEST_CONTEXT)
+            ? false
+            : createDevOrigin(serverPort),
         // 默认跟随浏览器加载模块的地址，让远程访问和端口转发共用同源 HMR。
         hmr: {
           host: process.env.ERP_VITE_HMR_HOST?.trim() || undefined,

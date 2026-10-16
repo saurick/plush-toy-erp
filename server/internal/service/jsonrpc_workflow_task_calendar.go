@@ -10,15 +10,17 @@ func parseWorkflowTaskCalendar(pm map[string]any) (*biz.WorkflowTaskCalendarQuer
 	_, hasMonth := pm["calendar_month"]
 	_, hasSelection := pm["calendar_selection"]
 	_, hasOffset := pm["calendar_offset"]
-	if !hasMonth && !hasSelection && !hasOffset {
+	_, hasRevision := pm["calendar_revision"]
+	if !hasMonth && !hasSelection && !hasOffset && !hasRevision {
 		return nil, nil
 	}
 	invalid := &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "待办日历日期无效，请重新选择"}
 	month, monthOK := pm["calendar_month"].(string)
 	selection, selectionOK := pm["calendar_selection"].(string)
 	offset, offsetOK := getOptionalWorkflowTaskBoardInteger(pm, "calendar_offset", 0, 0)
-	query := &biz.WorkflowTaskCalendarQuery{Month: month, Selection: selection, Offset: offset}
-	if !monthOK || !selectionOK || !offsetOK {
+	revision, revisionOK := pm["calendar_revision"].(string)
+	query := &biz.WorkflowTaskCalendarQuery{Month: month, Selection: selection, Offset: offset, Revision: revision}
+	if !monthOK || !selectionOK || !offsetOK || (hasRevision && !revisionOK) {
 		return nil, invalid
 	}
 	if _, _, err := query.Bounds(); err != nil {
@@ -37,5 +39,6 @@ func workflowTaskCalendarToMap(calendar *biz.WorkflowTaskCalendar) map[string]an
 		"overdue": calendar.Overdue, "undated": calendar.Undated,
 		"total": calendar.Total, "offset": calendar.Offset, "limit": calendar.Limit,
 		"snapshot_at": calendar.SnapshotAt.Unix(), "items": workflowTasksToAny(calendar.Tasks),
+		"revision": calendar.Revision,
 	}}
 }

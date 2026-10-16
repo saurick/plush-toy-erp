@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 import { Button, Space, Typography } from 'antd'
 import { Link, useLocation, useOutletContext } from 'react-router-dom'
+import { MaterialRequestStatus } from '../../../common/consts/statuses.generated.mjs'
 import { usePurchaseOrderContractPrint } from '../purchase-orders/usePurchaseOrderContractPrint.mjs'
 import { getEffectivePrintTemplateDefaults } from '../../utils/adminProfileSync.mjs'
 import { MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY } from '../../utils/printWorkspace.js'
@@ -36,7 +37,7 @@ export default function EngineeringMaterialPurchaseOrders({
       configRevision: adminProfile?.effective_session?.config_revision || '',
     })
   const orders = request?.purchase_orders || []
-  if (request?.status !== 'APPROVED' || orders.length === 0) return null
+  if (request?.status !== MaterialRequestStatus.APPROVED || orders.length === 0) return null
   return (
     <Space
       direction="vertical"

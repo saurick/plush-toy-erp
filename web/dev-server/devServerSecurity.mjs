@@ -26,23 +26,29 @@ export function normalizeDevHttpsOrigin(value) {
   }
 }
 
-export function createDevHttpsProxyMiddleware(value) {
+export function createDevHttpsProxyMiddleware(value, { allowPublicClients = false, trustedProxyAddress = '' } = {}) {
   const origin = normalizeDevHttpsOrigin(value)
   const host = origin ? new URL(origin).host : ''
+  if (trustedProxyAddress && !privateIPv4Address(trustedProxyAddress)) {
+    throw new Error('The standalone HTTPS proxy must have one private IPv4 address')
+  }
   return (request, response, next) => {
     delete request[TRUSTED_HTTPS_ORIGIN]
-    // The configured local proxy must overwrite both headers and restrict its
-    // clients to the private network. Remote callers cannot assert proxy trust.
+    // Only the standalone authenticated workbench accepts public clients. Both
+    // modes require an exact origin. Remote proxy trust is pinned to the
+    // standalone deployment's encrypted private-network peer.
     if (
       origin &&
-      isLoopbackRemoteAddress(request.socket?.remoteAddress) &&
-      isLoopbackRemoteAddress(request.socket?.localAddress) &&
+      ((isLoopbackRemoteAddress(request.socket?.remoteAddress) &&
+        isLoopbackRemoteAddress(request.socket?.localAddress)) ||
+        (trustedProxyAddress && request.socket?.remoteAddress === trustedProxyAddress &&
+          privateIPv4Address(request.socket?.localAddress))) &&
       typeof request.headers?.host === 'string' &&
       request.headers.host.toLowerCase() === host &&
       request.headers?.['x-forwarded-proto'] === 'https' &&
       typeof request.headers?.['x-forwarded-for'] === 'string' &&
-      privateIPv4Address(request.headers['x-forwarded-for']) &&
-      hasSameOriginMetadata(request, origin)
+      (privateIPv4Address(request.headers['x-forwarded-for']) ||
+        (allowPublicClients && net.isIP(request.headers['x-forwarded-for'])))
     ) {
       request[TRUSTED_HTTPS_ORIGIN] = origin
     }
@@ -53,6 +59,10 @@ export function createDevHttpsProxyMiddleware(value) {
 function isTrustedHttpsProxyRequest(request) {
   const origin = request[TRUSTED_HTTPS_ORIGIN]
   return Boolean(origin && hasSameOriginMetadata(request, origin))
+}
+
+export function isDevWorkbenchProxyTransportRequest(request) {
+  return Boolean(request[TRUSTED_HTTPS_ORIGIN])
 }
 
 export function isDevWorkbenchHttpsRequest(request) {

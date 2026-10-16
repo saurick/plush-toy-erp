@@ -1,0 +1,90 @@
+.workflow-task-current {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+  margin: 18px 0 16px;
+  border-radius: 8px;
+  background: var(--erp-primary-soft);
+  padding: 13px 14px;
+  color: var(--erp-text);
+}
+
+.workflow-task-current h3 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  color: var(--erp-text);
+  font-size: var(--erp-font-caption);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.workflow-task-current h3 > .anticon {
+  color: var(--erp-primary);
+  font-size: 16px;
+}
+
+.workflow-task-current__responsibility {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 6px;
+  font-size: var(--erp-font-body);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.workflow-task-current__responsibility strong {
+  font-weight: 700;
+}
+
+.workflow-task-current__responsibility > span {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+}
+
+.workflow-task-current p {
+  margin: 0;
+  font-size: var(--erp-font-small);
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.workflow-task-current__reason,
+.workflow-task-current__contact {
+  color: var(--erp-visual-danger-text);
+}
+
+.workflow-task-current--blocked {
+  background: color-mix(in srgb, var(--erp-visual-danger-text) 9%, var(--erp-surface-bg));
+}
+
+.workflow-task-current--blocked h3 > .anticon {
+  color: var(--erp-visual-danger-text);
+}
+
+.workflow-task-current--done {
+  background: #edf9f0;
+}
+
+.workflow-task-current--done h3 > .anticon {
+  color: #287a40;
+}
+
+[data-erp-theme='dark'] .workflow-task-current--done {
+  background: color-mix(in srgb, #86c89c 12%, var(--erp-surface-bg));
+}
+
+[data-erp-theme='dark'] .workflow-task-current--done h3 > .anticon {
+  color: #86c89c;
+}
+
+.workflow-task-current__guidance {
+  color: var(--erp-text-muted);
+}
+
+.workflow-task-current__contact strong {
+  color: var(--erp-text);
+  font-weight: 600;
+}

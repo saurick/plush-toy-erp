@@ -251,7 +251,6 @@ export const RpcMethod = Object.freeze({
     LIST_OUTSOURCING_ORDER_ITEMS: 'list_outsourcing_order_items',
     LIST_OUTSOURCING_ORDER_SUMMARY: 'list_outsourcing_order_summary',
     LIST_OUTSOURCING_ORDERS: 'list_outsourcing_orders',
-    REORDER_OUTSOURCING_ORDER_ITEMS: 'reorder_outsourcing_order_items',
     SAVE_OUTSOURCING_ORDER_WITH_ITEMS: 'save_outsourcing_order_with_items',
     SUBMIT_OUTSOURCING_ORDER: 'submit_outsourcing_order',
   }),
@@ -302,7 +301,6 @@ export const RpcMethod = Object.freeze({
     GET_PURCHASE_ORDER_RECEIPT_PROGRESS: 'get_purchase_order_receipt_progress',
     LIST_PURCHASE_ORDER_ITEMS: 'list_purchase_order_items',
     LIST_PURCHASE_ORDERS: 'list_purchase_orders',
-    REORDER_PURCHASE_ORDER_ITEMS: 'reorder_purchase_order_items',
     SAVE_PURCHASE_ORDER_WITH_ITEMS: 'save_purchase_order_with_items',
   }),
   quality: Object.freeze({
@@ -331,7 +329,6 @@ export const RpcMethod = Object.freeze({
     LIST_SALES_ORDER_ITEMS: 'list_sales_order_items',
     LIST_SALES_ORDER_SUMMARY: 'list_sales_order_summary',
     LIST_SALES_ORDERS: 'list_sales_orders',
-    REORDER_SALES_ORDER_ITEMS: 'reorder_sales_order_items',
     SAVE_SALES_ORDER_ENGINEERING: 'save_sales_order_engineering',
     SAVE_SALES_ORDER_WITH_ITEMS: 'save_sales_order_with_items',
     SUBMIT_ENGINEERING_MATERIAL_REQUEST: 'submit_engineering_material_request',

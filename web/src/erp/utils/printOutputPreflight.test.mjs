@@ -9,6 +9,10 @@ import {
   assertPrintSnapshotBudget,
 } from './printOutputPreflight.mjs'
 import { unicodeRangeContainsText } from './printFonts.mjs'
+import {
+  CONTRACT_CLAUSES_PER_GROUP_MAX,
+  CONTRACT_CLAUSE_GROUPS_MAX,
+} from './contractClauseEditor.mjs'
 
 test('缺图可输出，已有图片加载中、损坏或仅为单像素时必须更换或清空', () => {
   const image = { complete: false, naturalWidth: 0, naturalHeight: 0 }
@@ -39,28 +43,129 @@ test('缺图可输出，已有图片加载中、损坏或仅为单像素时必�
 const purchase = printTemplateCatalog.find(
   (item) => item.key === 'material-purchase-contract'
 )
-test('合同缺值逐项提示，零价、选填项和明确空表均可输出', () => {
-  const draft = {
-    contractNo: 'PO-1',
-    supplierName: '供应方',
-    buyerCompany: '订货单位',
-    lines: [{ materialName: '面料', quantity: 1, unitPrice: 0, unit: '码' }],
+test('合同条款删空与保留空条均可输出，超限不会截断现有条目', () => {
+  for (const key of ['material-purchase-contract', 'processing-contract']) {
+    const template = printTemplateCatalog.find((item) => item.key === key)
+    for (const delivery of [
+      [],
+      [''],
+      Array(CONTRACT_CLAUSES_PER_GROUP_MAX).fill(''),
+    ]) {
+      assert.equal(
+        getPrintOutputProblem(template, { clauses: { delivery } }),
+        ''
+      )
+    }
+    const draft = {
+      clauses: {
+        delivery: Array(CONTRACT_CLAUSES_PER_GROUP_MAX + 1).fill('保留条目'),
+      },
+    }
+    const before = structuredClone(draft)
+    assert.match(
+      getPrintOutputProblem(template, draft),
+      /来货要求.*超过 100 条/u
+    )
+    assert.deepEqual(draft, before)
   }
-  assert.deepEqual(getPrintDraftProblems(purchase, draft), [])
-  assert(
-    getPrintDraftProblems(purchase, {
-      ...draft,
-      supplierName: '',
-      lines: [],
-    }).includes('供应方名称')
+})
+
+test('自定义分组名称和条目可留白，分组超限明确提示且不截断', () => {
+  for (const key of ['material-purchase-contract', 'processing-contract']) {
+    const template = printTemplateCatalog.find((item) => item.key === key)
+    for (const clauses of [
+      [],
+      [{ key: 'custom', label: '', items: [''] }],
+      [{ key: 'empty', label: '空组', items: [] }],
+    ]) {
+      assert.equal(getPrintOutputProblem(template, { clauses }), '')
+    }
+    const clauses = Array.from(
+      { length: CONTRACT_CLAUSE_GROUPS_MAX + 1 },
+      (_, index) => ({ key: `group-${index}`, label: '', items: [''] })
+    )
+    assert.match(
+      getPrintOutputProblem(template, { clauses }),
+      /超过 20 个分组/u
+    )
+    assert.equal(clauses.length, CONTRACT_CLAUSE_GROUPS_MAX + 1)
+  }
+})
+
+test('全部模板允许字段、部分明细和整行留白，无需切换空白模式且不改写已有内容', () => {
+  for (const template of printTemplateCatalog) {
+    for (const draft of [
+      {},
+      { lines: [] },
+      {
+        contractNo: '',
+        supplierName: '',
+        buyerCompany: '保留的订货单位',
+        lines: [
+          { materialName: '保留的材料', processingItem: '保留的加工项目' },
+          { quantity: '1', unit: '', unitPrice: '0' },
+          { unit: '码', quantity: ' ', unitPrice: '' },
+          ...Array.from({ length: 10 }, () => ({})),
+        ],
+      },
+      { printMode: 'blank', lines: [{}] },
+    ]) {
+      const original = structuredClone(draft)
+      assert.deepEqual(getPrintDraftProblems(template, draft), [], template.key)
+      assert.equal(getPrintOutputProblem(template, draft), '', template.key)
+      assert.deepEqual(draft, original)
+    }
+  }
+})
+
+test('留白不绕过已填数字的精度检查，清空错误值后可以输出', () => {
+  for (const printMode of ['normal', 'blank']) {
+    const draft = {
+      printMode,
+      lines: [{ unit: '个', quantity: '1.5', unitPrice: '-1' }],
+    }
+    assert.deepEqual(getPrintDraftProblems(purchase, draft), [
+      '第 1 行数量（个最多 0 位小数）',
+      '第 1 行单价（须为非负数，最多 6 位小数）',
+    ])
+    assert.match(getPrintOutputProblem(purchase, draft), /请检查：/)
+    draft.lines[0].quantity = ''
+    draft.lines[0].unitPrice = ''
+    assert.equal(getPrintOutputProblem(purchase, draft), '')
+    draft.lines[0].quantity = '2'
+    draft.lines[0].unitPrice = '0'
+    assert.equal(getPrintOutputProblem(purchase, draft), '')
+  }
+})
+
+test('单位留白不强制补齐，已填写数量仍检查数字格式', () => {
+  const draft = { lines: [{ quantity: '1.234567', unit: '' }] }
+  assert.equal(getPrintOutputProblem(purchase, draft), '')
+  for (const quantity of ['abc', '-1', '0', '1.2345678']) {
+    draft.lines[0].quantity = quantity
+    assert.match(getPrintOutputProblem(purchase, draft), /第 1 行数量/)
+  }
+  draft.lines[0].quantity = ''
+  assert.equal(getPrintOutputProblem(purchase, draft), '')
+})
+
+test('部分内容留白时仍检查损坏图片和说明框溢出', () => {
+  const draft = { lines: [{}] }
+  assert.match(
+    getPrintOutputProblem(purchase, draft, {
+      querySelector: () => ({}),
+    }),
+    /有图片无法使用/
   )
-  assert(
-    getPrintDraftProblems(purchase, {
-      ...draft,
-      lines: [{ quantity: 1 }],
-    }).includes('第 1 行材料品名')
+  assert.match(
+    getPrintOutputProblem(purchase, draft, {
+      querySelectorAll: (selector) =>
+        selector.includes('annotation-kind')
+          ? [{ clientHeight: 40, scrollHeight: 80 }]
+          : [],
+    }),
+    /超出说明框/
   )
-  assert.deepEqual(getPrintDraftProblems(purchase, { printMode: 'blank' }), [])
 })
 
 test('长图展开的每段均计数，图片边界与服务端预算相同', () => {

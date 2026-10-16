@@ -498,13 +498,14 @@ func postgresColumnType(column *sqlschema.Column) (string, error) {
 		return "jsonb", nil
 	case field.TypeTime:
 		return "timestamp with time zone", nil
-	case field.TypeString, field.TypeEnum:
+	case field.TypeString:
 		if column.Size > postgresMaxVarchar {
 			return "text", nil
 		}
-		if column.Size > 0 {
-			return fmt.Sprintf("varchar(%d)", column.Size), nil
-		}
+		// Ent's Atlas PostgreSQL mapping does not turn Size into a varchar limit.
+		// A physical limit must be explicit in SchemaType[postgres].
+		return "varchar", nil
+	case field.TypeEnum:
 		return "varchar", nil
 	case field.TypeOther:
 		return "", errors.New("other type requires SchemaType[postgres]")
@@ -844,6 +845,7 @@ func renderReadme(db databaseSchema, value catalog, index catalogIndex) ([]byte,
 	output.WriteString("- 数据结构真源仍是 [`server/internal/data/model/schema`](../../internal/data/model/schema) 与 [Atlas migration](../../internal/data/model/migrate)；本目录是生成投影，不是第三套 schema。\n")
 	output.WriteString("- 业务语义由 [`table-catalog.json`](table-catalog.json) 维护；生成 Markdown 不接受手工修改。\n")
 	output.WriteString("- Ent 的 Go 侧 `Default(time.Now)`、`UpdateDefault`、`Immutable`、`Sensitive` 和 validators 不一定进入 generated migration descriptor；重要边界仍应回到链接的 schema/usecase/正式文档核对。\n")
+	output.WriteString("- 字符串类型遵循 Ent 的 Atlas PostgreSQL 映射：普通 `Size` / `MaxLen` 不产生数据库 `varchar(n)`，只有显式 `SchemaType[postgres]` 才声明物理长度；Go 校验与数据库类型分别核对。\n")
 	output.WriteString("- 目标数据库是否已 apply、是否有漂移或人工 `COMMENT`，必须通过目标环境 migration status 与结构读回单独证明。\n\n")
 	output.WriteString("```bash\n")
 	output.WriteString("cd \"$(git rev-parse --show-toplevel)/server\"\n")

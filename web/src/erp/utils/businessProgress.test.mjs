@@ -23,8 +23,12 @@ import {
 test('compact attention retains the real task, role, reason and exact single-task destination', () => {
   const row = { ...progressFixtureRow(), open_tasks: 1, attention_task_id: 31, attention_owner: '小陈', attention_task: 'engineering_data' }
   assert.deepEqual(progressAttention(row, { tasks: true }, () => '工程'), {
-    title: '工程资料', detail: '工程 · 小陈', taskID: 31, taskCount: 1,
-    blocked: true, reason: row.attention_reason,
+    title: '工程资料',
+detail: '工程 · 小陈',
+taskID: 31,
+taskCount: 1,
+    blocked: true,
+reason: row.attention_reason,
   })
   assert.equal(progressAttention({ ...row, open_tasks: 2 }, { tasks: true }).taskID, null)
   assert.equal(progressAttention({ ...row, attention_owner: '' }, { tasks: true }, () => '工程').detail, '工程待领取')

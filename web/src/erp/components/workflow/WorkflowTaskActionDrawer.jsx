@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import {
   CheckCircleOutlined,
   LeftOutlined,
-  LinkOutlined,
+  ExportOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Drawer, Input, Select, Tag, Typography } from 'antd'
@@ -11,6 +11,7 @@ import WorkflowFollowupDetails from './WorkflowFollowupDetails.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
+import WorkflowTaskCurrentSummary from './WorkflowTaskCurrentSummary.jsx'
 import {
   WorkflowTaskCopySummary,
   WorkflowTaskSource,
@@ -253,7 +254,6 @@ export default function WorkflowTaskActionDrawer({
   const exceptionContact = task
     ? getWorkflowTaskExceptionContactPresentation(task)
     : { parts: [], text: '' }
-  const exceptionContactHint = exceptionContact.text
   const actionOutcomeHint = task
     ? getWorkflowTaskActionOutcomeHint({ task, actionMode })
     : ''
@@ -573,6 +573,28 @@ export default function WorkflowTaskActionDrawer({
         canViewAttachments ||
         canChooseActions)
   )
+  const taskResources = task && showTaskContext ? (
+    <div className="erp-task-action-drawer__resources">
+      {sourceSummary}
+      {canViewAttachments ? (
+        <BusinessAttachmentModalButton
+          ownerType="workflow_task"
+          ownerId={task.id}
+          ownerVersion={task.version}
+          buttonText="任务附件"
+          modalTitle="任务附件"
+          panelTitle="附件内容"
+          description={canManageAttachments ? '上传照片、异常截图或处理凭证。' : '查看照片、异常截图或处理凭证。'}
+          canUpload={canManageAttachments}
+          canWithdraw={canManageAttachments}
+          disabled={actionSaving}
+          disabledReason="任务正在提交，请稍候"
+          showAttachmentCount
+          buttonProps={{ 'data-testid': 'workflow-task-attachment-action', size: 'middle' }}
+        />
+      ) : null}
+    </div>
+  ) : null
 
   // 外壳预先挂载，避免入场动画尚未结束就关闭时 Portal 被移除、跳过焦点恢复。
   // 任务内容仍随 task 清空，不在关闭状态读取任务或附件。
@@ -587,13 +609,9 @@ export default function WorkflowTaskActionDrawer({
                 ? '审批详情'
                 : '任务详情'}
           </strong>
-          {task ? (
-            <Tag color={statusMeta?.color}>
-              {actionReceipt?.statusLabel || statusMeta?.label}
-            </Tag>
-          ) : null}
         </div>
       }
+      extra={task ? <WorkflowTaskCopySummary task={taskWithSource} assigneeLabel={hasActionReceipt ? '' : currentAssigneeLabel} compact /> : null}
       width="min(640px, calc(100vw - 24px))"
       open={Boolean(task)}
       forceRender
@@ -604,7 +622,7 @@ export default function WorkflowTaskActionDrawer({
       onClose={() => {
         if (!actionSaving) (onReturnToTracking || onClose)?.()
       }}
-      className="erp-workflow-drawer erp-task-action-drawer"
+      className={`erp-workflow-drawer erp-task-action-drawer${activeStepKey === 'context' ? ' erp-task-action-drawer--context' : ''}`}
       footer={
         showFooter ? (
           <div className="erp-task-action-drawer__footer">
@@ -639,37 +657,14 @@ export default function WorkflowTaskActionDrawer({
               ) : null}
               {showTaskContext && canOpenRelatedEntry ? (
                 <Button
-                  icon={<LinkOutlined />}
+                  icon={<ExportOutlined aria-hidden="true" />}
                   disabled={actionSaving}
                   onClick={() => onOpenEntry(task)}
                 >
-                  进入单据办理
+                  {isTerminalWorkflowTask(task) ? '查看单据' : '进入单据办理'}
                 </Button>
               ) : null}
-              {showTaskContext && canViewAttachments ? (
-                <BusinessAttachmentModalButton
-                  ownerType="workflow_task"
-                  ownerId={task.id}
-                  ownerVersion={task.version}
-                  buttonText="任务附件"
-                  modalTitle="任务附件"
-                  panelTitle="附件内容"
-                  description={
-                    canManageAttachments
-                      ? '上传照片、异常截图或处理凭证。'
-                      : '查看照片、异常截图或处理凭证。'
-                  }
-                  canUpload={canManageAttachments}
-                  canWithdraw={canManageAttachments}
-                  disabled={actionSaving}
-                  disabledReason="任务正在提交，请稍候"
-                  showAttachmentCount
-                  buttonProps={{
-                    'data-testid': 'workflow-task-attachment-action',
-                    size: 'middle',
-                  }}
-                />
-              ) : null}
+
             </div>
             <div className="erp-task-action-drawer__footer-primary">
               {hasActionReceipt ? (
@@ -801,89 +796,29 @@ export default function WorkflowTaskActionDrawer({
         <div className="erp-task-action-drawer__body" aria-busy={actionSaving}>
           <section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">
             <div className="erp-task-copy-heading">
-              <Title level={4} className="erp-task-action-drawer__task-title">
-                {taskDisplayName}
-              </Title>
-              <WorkflowTaskCopySummary
-                task={taskWithSource}
-                assigneeLabel={hasActionReceipt ? '' : currentAssigneeLabel}
-              />
+              <Title level={2} className="erp-task-action-drawer__task-title">{taskDisplayName}</Title>
+              <Tag color={statusMeta?.color}>{actionReceipt?.statusLabel || statusMeta?.label}</Tag>
             </div>
+            {!hasActionReceipt || showTaskContext ? (
+              <div className="erp-task-action-drawer__source"><WorkflowTaskSource task={taskWithSource} copyable={false} onOpen={canOpenRelatedEntry && !actionSaving ? () => onOpenEntry(task) : undefined} /></div>
+            ) : null}
+            {showTaskContext ? <WorkflowTaskIdentity task={task} copyable={false} detailView /> : null}
             <WorkflowFollowupDetails task={task} />
-            {showTaskContext ? <WorkflowTaskIdentity task={task} /> : !hasActionReceipt ? (
-              <WorkflowTaskSource task={taskWithSource} />
-            ) : null}
-            {showTaskContext || hasActionReceipt ? (
-              <div className="erp-task-action-drawer__meta-grid erp-task-action-drawer__task-meta">
-                <div>
-                  <span>来源单据</span>
-                  <strong>
-                    <WorkflowTaskSource task={taskWithSource} />
-                  </strong>
-                </div>
-                <div>
-                  <span>{hasActionReceipt ? '本次责任岗位' : '负责人'}</span>
-                  <strong className="erp-task-action-drawer__responsibility">
-                    {ownerRoleLabel ? (
-                      <span className="erp-task-action-drawer__responsibility-role">
-                        {ownerRoleLabel}
-                      </span>
-                  ) : null}
-                    {!hasActionReceipt &&
-                  ownerRoleLabel &&
-                  currentAssigneeLabel ? (
-                    <span
-                      className="erp-task-action-drawer__responsibility-separator"
-                      aria-hidden="true"
-                    >
-                      ·
-                    </span>
-                  ) : null}
-                    {!hasActionReceipt && currentAssigneeLabel ? (
-                      <span className="erp-task-action-drawer__responsibility-person">
-                        {currentAssigneeLabel}
-                      </span>
-                  ) : null}
-                    {!ownerRoleLabel &&
-                  (!currentAssigneeLabel || hasActionReceipt)
-                    ? '-'
-                    : null}
-                  </strong>
-                </div>
-              </div>
-            ) : null}
-            {activeStepKey === 'context' ? sourceSummary : null}
-            {showTaskContext || hasActionReceipt ? (
-              <WorkflowTaskTiming
+            {showTaskContext ? (
+              <WorkflowTaskCurrentSummary
                 task={task}
-                detail
+                roleLabel={ownerRoleLabel}
+                assigneeLabel={currentAssigneeLabel}
                 events={taskEventsState === 'ready' ? taskEvents : []}
+                reason={taskReason}
+                contact={exceptionContact}
+                guidance={actionAvailabilityLoading ? '正在确认可用的处理方式' : !canChooseActions ? readonlyReason || '当前账号不能直接处理该任务。' : ''}
               />
-            ) : null}
-            {showTaskContext && (taskReason || exceptionContactHint) ? (
-              <div className="erp-task-action-drawer__reason">
-                <span>{taskReason ? '当前原因' : '处理建议'}</span>
-                {taskReason ? <strong>{taskReason}</strong> : null}
-                {exceptionContactHint ? (
-                  <span className="erp-task-action-drawer__reason-contact">
-                    {exceptionContact.parts.map((part, index) =>
-                      part.kind === 'role' ? (
-                        <strong
-                          className="erp-task-action-drawer__reason-contact-role"
-                          key={`${part.kind}-${part.text}-${index}`}
-                        >
-                          {part.text}
-                        </strong>
-                      ) : (
-                        <React.Fragment
-                          key={`${part.kind}-${part.text}-${index}`}
-                        >
-                          {part.text}
-                        </React.Fragment>
-                      )
-                    )}
-                  </span>
-                ) : null}
+            ) : hasActionReceipt ? (
+              <div className="erp-task-action-drawer__receipt-context">
+                <WorkflowTaskSource task={taskWithSource} copyable={false} />
+                <span>本次责任岗位：{ownerRoleLabel || '待确认'}</span>
+                <WorkflowTaskTiming task={task} detail compact events={taskEventsState === 'ready' ? taskEvents : []} />
               </div>
             ) : null}
           </section>
@@ -894,6 +829,8 @@ export default function WorkflowTaskActionDrawer({
               onOpenTask={onOpenRelatedTask}
               task={task}
               profile={profile}
+              focused
+              resources={taskResources}
               processContext={processContext}
               processContextState={processContextState}
               onRetryProcess={() => setProcessContextReloadKey((current) => current + 1)}
@@ -907,18 +844,6 @@ export default function WorkflowTaskActionDrawer({
             hidden={activeStepKey !== 'context'}
             className="erp-task-action-drawer__step-panel"
           >
-            {actionAvailabilityLoading ? (
-              <Text type="secondary" role="status">
-                正在确认可用的处理方式
-              </Text>
-            ) : !canChooseActions ? (
-              <Alert
-                type="warning"
-                showIcon
-                message="当前只能查看任务"
-                description={readonlyReason || '当前账号不能直接处理该任务。'}
-              />
-            ) : null}
             <WorkflowTaskEventTrail
               approvalTask={approvalTask}
               errorMessage={taskEventsError}
@@ -927,6 +852,7 @@ export default function WorkflowTaskActionDrawer({
               task={task}
               truncated={taskEventsTruncated}
               showResponsibility={false}
+              collapsible
             />
           </section>
 

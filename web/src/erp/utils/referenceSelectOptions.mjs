@@ -3,6 +3,19 @@ import {
   standardUnitForLabel,
   standardUnitLabels,
 } from './unitQuantity.mjs'
+import { InventoryLotStatus } from '../../common/consts/statuses.generated.mjs'
+
+const INVENTORY_LOT_STATUS_LABELS = Object.freeze({
+  [InventoryLotStatus.ACTIVE]: '可用',
+  [InventoryLotStatus.HOLD]: '冻结',
+  [InventoryLotStatus.REJECTED]: '不合格',
+  [InventoryLotStatus.DISABLED]: '停用',
+})
+
+export function inventoryLotStatusLabel(status) {
+  const key = String(status || '').trim()
+  return INVENTORY_LOT_STATUS_LABELS[key] || (key ? '批次状态待核对' : '')
+}
 
 function positiveID(value) {
   const id = Number(value || 0)
@@ -233,7 +246,7 @@ export function inventoryLotOption(lot = {}) {
     label: compactParts([
       lot.lot_no || '批次已关联',
       lot.supplier_lot_no,
-      lot.status,
+      inventoryLotStatusLabel(lot.status),
     ]),
   }
 }

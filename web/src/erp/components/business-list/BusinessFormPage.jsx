@@ -5,14 +5,33 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { Button, Form, Spin } from 'antd'
+import { Button, Form, Grid, Spin } from 'antd'
+import { FullscreenExitOutlined, FullscreenOutlined } from '@ant-design/icons'
 import { createPortal } from 'react-dom'
-import { useBlocker, useOutletContext } from 'react-router-dom'
+import { useBlocker, useLocation, useOutletContext } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { businessFormSnapshot } from '../../utils/businessFormSnapshot.mjs'
 import { BusinessFormPendingAttachmentsContext } from './BusinessFormPageContext.js'
 import BusinessFormBody from './BusinessFormBody.jsx'
 import '../../styles/app/business-form-page.css'
+
+function captureFormScroll(page, previous) {
+  const remembered = new Map(previous.map((position) => [position.node, position]))
+  return Array.from(page?.querySelectorAll('*') || [])
+    .filter((node) =>
+      remembered.has(node) || node.scrollTop || node.scrollLeft ||
+      node.scrollHeight > node.clientHeight || node.scrollWidth > node.clientWidth
+    )
+    .map((node) => {
+      const last = remembered.get(node)
+      return {
+        node,
+        // Retain the requested position when a larger viewport temporarily clamps it.
+        top: last && node.scrollTop === last.actualTop ? last.top : node.scrollTop,
+        left: last && node.scrollLeft === last.actualLeft ? last.left : node.scrollLeft,
+      }
+    })
+}
 
 function FormChangeObserver({ form, baselineRef, onChange }) {
   const change = Form.useWatch(
@@ -76,6 +95,13 @@ export default function BusinessFormPage({
   children,
 }) {
   const outletContext = useOutletContext()
+  const { pathname } = useLocation()
+  const screens = Grid.useBreakpoint()
+  const canFullscreen = Boolean(screens.md && !pathname.startsWith('/m/'))
+  const [fullscreen, setFullscreen] = useState(false)
+  const fullscreenActive = open && canFullscreen && fullscreen
+  const fullscreenLabel = fullscreenActive ? '退出全屏' : readOnly ? '全屏查看' : '全屏编辑'
+  const fullscreenScrollRef = useRef([])
   const registerPageLeaveGuard = outletContext?.registerPageLeaveGuard
   const [baseline, setBaseline] = useState(null)
   const baselineRef = useRef({ snapshot: null, revision: 0 })
@@ -109,6 +135,70 @@ export default function BusinessFormPage({
       businessFormSnapshot(form?.getFieldsValue(true)) !== baseline)
   )
   currentRef.current = { dirty, saving: busy, attachmentBusy, onCancel }
+
+  useEffect(() => {
+    if (!open || !canFullscreen) {
+      setFullscreen(false)
+      fullscreenScrollRef.current = []
+    }
+  }, [canFullscreen, open])
+
+  useLayoutEffect(() => {
+    const shell = pageRef.current?.closest('.erp-admin-shell')
+    if (fullscreenActive) shell?.setAttribute('data-business-form-fullscreen', 'true')
+    if (open) {
+      fullscreenScrollRef.current.forEach((position) => {
+        if (!position.node.isConnected) return
+        position.node.scrollTop = position.top
+        position.node.scrollLeft = position.left
+        position.actualTop = position.node.scrollTop
+        position.actualLeft = position.node.scrollLeft
+      })
+    }
+    return fullscreenActive
+      ? () => shell?.removeAttribute('data-business-form-fullscreen')
+      : undefined
+  }, [fullscreenActive, open])
+
+  const changeFullscreen = useCallback((next) => {
+    fullscreenScrollRef.current = captureFormScroll(
+      pageRef.current,
+      fullscreenScrollRef.current
+    )
+    setFullscreen(next)
+  }, [])
+
+  useEffect(() => {
+    if (!fullscreenActive || busy || loading) return undefined
+    let popupEscape = null
+    // Observe field overlays before their own Escape handlers close them.
+    const capturePopupEscape = (event) => {
+      if (
+        event.key === 'Escape' && (
+          pageRef.current?.querySelector('[aria-expanded="true"]') ||
+          Array.from(document.querySelectorAll(
+            '.ant-select-dropdown:not(.ant-select-dropdown-hidden), .ant-picker-dropdown:not(.ant-picker-dropdown-hidden)'
+          )).some((node) => node.getClientRects().length > 0)
+        )
+      ) popupEscape = event
+    }
+    const exitOnEscape = (event) => {
+      if (
+        event.key === 'Escape' && event !== popupEscape &&
+        !event.defaultPrevented && !event.isComposing &&
+        pageRef.current?.contains(event.target)
+      ) {
+        event.preventDefault()
+        changeFullscreen(false)
+      }
+    }
+    window.addEventListener('keydown', capturePopupEscape, true)
+    window.addEventListener('keydown', exitOnEscape)
+    return () => {
+      window.removeEventListener('keydown', capturePopupEscape, true)
+      window.removeEventListener('keydown', exitOnEscape)
+    }
+  }, [busy, changeFullscreen, fullscreenActive, loading])
 
   // The form remains mounted so each business page can initialize its own fields before opening.
   useEffect(() => {
@@ -302,6 +392,7 @@ export default function BusinessFormPage({
       aria-label={title}
       aria-busy={busy || loading}
       data-business-form-page="true"
+      data-fullscreen={fullscreenActive ? 'true' : undefined}
       data-unsaved={dirty ? 'true' : 'false'}
     >
       {form ? (
@@ -321,6 +412,18 @@ export default function BusinessFormPage({
       ) : null}
       <header className="erp-business-form-page__header">
         <h1 tabIndex={-1}>{title}</h1>
+        {canFullscreen ? (
+          <Button
+            size="small"
+            icon={fullscreenActive ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+            aria-label={fullscreenLabel}
+            aria-pressed={fullscreenActive}
+            disabled={busy || loading}
+            onClick={() => changeFullscreen(!fullscreenActive)}
+          >
+            {fullscreenLabel}
+          </Button>
+        ) : null}
       </header>
       <BusinessFormBody open={open} loading={loading} busy={busy}>
         <Spin spinning={loading}>

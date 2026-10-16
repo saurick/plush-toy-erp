@@ -1,5 +1,4 @@
 import React, { useMemo, useState } from 'react'
-import { BookOutlined } from '@ant-design/icons'
 import { Button, Select, Typography } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
@@ -94,7 +93,7 @@ export default function DevHubPage() {
   }
 
   return (
-    <div className="erp-dev-hub-page erp-dev-hub-page--index erp-dev-overview-page erp-dev-workspace-page">
+    <div className="erp-dev-hub-page erp-dev-hub-page--index erp-dev-overview-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav />
       <header className="erp-dev-hub-header">
         <Title level={1} className="erp-dev-hub-title">
@@ -152,7 +151,7 @@ export default function DevHubPage() {
                   activeView === 'pinned' ? '常用开发工具' : '全部开发工具'
                 }
                 items={items}
-                showGroup
+                showGroup={group === 'all'}
                 pinnedRoutes={pinnedRoutes}
                 onTogglePinned={handleTogglePinned}
                 onReset={keyword || group !== 'all' ? resetFilters : undefined}
@@ -170,12 +169,6 @@ export default function DevHubPage() {
             aria-labelledby="dev-overview-tab-path"
             hidden={activeView !== 'path'}
           >
-            <div className="erp-dev-overview-guide-intro">
-              <BookOutlined />
-              <Text type="secondary">
-                按当前任务选择工具，运行结果以工具内的实际记录为准。
-              </Text>
-            </div>
             <div className="erp-dev-tool-table-wrap">
               <table
                 className="erp-dev-tool-table"

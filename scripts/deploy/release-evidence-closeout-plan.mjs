@@ -534,7 +534,7 @@ function buildChecksForAction({
         checkFile({
           repoRoot,
           filePath:
-            "deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh",
+            "scripts/deploy/run-backup-restore-rehearsal.sh",
           id: "backup-restore-script",
           label: "backup restore rehearsal script",
         }),
@@ -563,7 +563,7 @@ function buildChecksForAction({
         checkRuntimeUrl({ env, key: "SMOKE_ENDPOINT" }),
         checkFile({
           repoRoot,
-          filePath: "deployments/yoyoosun/scripts/run-smoke.sh",
+          filePath: "scripts/deploy/run-smoke.sh",
           id: "run-smoke-script",
           label: "target smoke script",
         }),

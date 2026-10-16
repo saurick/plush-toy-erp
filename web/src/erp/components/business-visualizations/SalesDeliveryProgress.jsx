@@ -41,12 +41,14 @@ export default function SalesDeliveryProgress({
       className="erp-sales-delivery-visual"
       switcher={switcher}
       title="销售交付进度"
+      metricsLabel="交付明细"
+      countUnit="条"
       loading={loading}
       error={error}
       metrics={[
         {
           key: 'all',
-          label: '全部',
+          label: '全部明细',
           value: model.counts.total,
           tone: 'neutral',
         },

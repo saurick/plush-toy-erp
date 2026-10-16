@@ -8,7 +8,7 @@ import test from "node:test";
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const scriptPath = path.join(
   repoRoot,
-  "deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh",
+  "scripts/deploy/run-backup-restore-rehearsal.sh",
 );
 
 function runScript(args = [], env = {}) {
@@ -202,10 +202,10 @@ test("backup restore rehearsal keeps credentials private and uses the full migra
     source,
     /PGHOST="\$source_pg_host" PGPORT="\$source_pg_port"[\s\S]*PGDATABASE="\$source_pg_database" PGUSER="\$source_pg_user"[\s\S]*PGPASSWORD="\$source_pg_password" PGSSLMODE="\$source_pg_sslmode"[\s\S]*"\$pg_dump_bin"[\s\S]*--format=custom/,
   );
-  assert.match(source, /BACKUP_SOURCE_POSTGRES_DSN="\$source_dsn" python3/);
+  assert.match(source, /BACKUP_SOURCE_POSTGRES_DSN="\$source_dsn" node/);
   assert.doesNotMatch(
     source,
-    /source_pg_settings="\$\([\s\S]*?python3\s+-\s+<<['"]?PY/u,
+    /source_pg_settings="\$\([\s\S]*?node\s+[^\n]*<</u,
   );
   assert.match(source, /mapfile -d '' -t source_pg_settings/u);
   assert.doesNotMatch(source, /eval "\$source_pg_settings"/u);

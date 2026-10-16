@@ -612,6 +612,7 @@ export function createLineItemUnitAssertions({ assert }) {
       scenarioName,
       targetRowCount = 6,
       addButtonName = '添加条目',
+      headerAddWhenEmpty = true,
       maxAverageAddMs = 900,
       maxSingleAddMs = 1800,
       maxAverageScrollFrameMs = 24,
@@ -629,7 +630,12 @@ export function createLineItemUnitAssertions({ assert }) {
       exact: true,
     })
     await addButton.waitFor({ state: 'visible', timeout: 5_000 })
-    await headerAddButton.waitFor({ state: 'visible', timeout: 5_000 })
+    const initialRowCount = await modal.locator(rowSelector).count()
+    if (initialRowCount === 0 && !headerAddWhenEmpty) {
+      assert.equal(await headerAddButton.count(), 0, `${scenarioName} 空明细仅保留底部添加入口`)
+    } else {
+      await headerAddButton.waitFor({ state: 'visible', timeout: 5_000 })
+    }
     assert.equal(
       await addButton.evaluate((button) =>
         Boolean(button.closest('.erp-line-items-form__footer'))
@@ -637,14 +643,6 @@ export function createLineItemUnitAssertions({ assert }) {
       true,
       `${scenarioName} 连续新增入口应位于明细底部`
     )
-    assert.equal(
-      await headerAddButton.evaluate((button) =>
-        Boolean(button.closest('.erp-sales-order-lines-form__head'))
-      ),
-      true,
-      `${scenarioName} 首次新增入口应位于明细标题行`
-    )
-
     const addDurations = []
     let rowCount = await modal.locator(rowSelector).count()
     while (rowCount < targetRowCount) {
@@ -663,6 +661,15 @@ export function createLineItemUnitAssertions({ assert }) {
       const endedAt = await modal.evaluate(() => performance.now())
       addDurations.push(Math.round(endedAt - startedAt))
     }
+    await headerAddButton.waitFor({ state: 'visible', timeout: 5_000 })
+    assert.equal(await headerAddButton.count(), 1)
+    assert.equal(
+      await headerAddButton.evaluate((button) =>
+        Boolean(button.closest('.erp-sales-order-lines-form__head'))
+      ),
+      true,
+      `${scenarioName} 非空明细的顶部添加入口应位于标题行`
+    )
 
     await new Promise((resolve) => {
       setTimeout(resolve, 450)

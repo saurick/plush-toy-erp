@@ -7,6 +7,7 @@ import { getBusinessUsabilityEntry } from '../../erp/config/businessUsabilityCat
 import { getRoleHelpScenarios } from '../../erp/config/helpScenarios.mjs'
 import { ROLE_HELP_GUIDES } from '../../erp/config/roleHelpContent.mjs'
 import { HELP_REFERENCE_PAGES } from '../../erp/config/helpManualCatalog.mjs'
+import { getBusinessHandbookIntroductions, getBusinessPageHandbookSections } from '../../erp/config/businessHandbook.mjs'
 import {
   DEV_UI_DESIGN_ROUTE,
   UI_DESIGN_ASSET,
@@ -204,6 +205,11 @@ test('reference design snapshot shares the formal chapters, items and engineerin
       Object.fromEntries(fields.map((field) => [field, page[field]]))
     )
   )
+})
+
+test('help design uses the same complete handbook introductions and role responsibilities', () => {
+  assert.deepEqual(helpDefinition('handbookIntroductions'), getBusinessHandbookIntroductions())
+  assert.deepEqual(helpDefinition('handbookPageAdditions'), Object.fromEntries(HELP_REFERENCE_PAGES.map((page) => [page.key, getBusinessPageHandbookSections(page).filter((section) => ['capabilities', 'excel-drafts', 'relations'].includes(section.key))])))
 })
 
 test('every help scenario has an overview and valid exception return steps', () => {

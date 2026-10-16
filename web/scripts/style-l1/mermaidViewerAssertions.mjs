@@ -10,12 +10,17 @@ async function verifyStableMermaidScroll(page, diagram, assert, action) {
       node,
       top: node.scrollTop,
       left: node.scrollLeft,
+      clientHeight: node.clientHeight,
+      scrollHeight: node.scrollHeight,
     }))
     const toolbar = root.querySelector('.erp-markdown-mermaid__toolbar')
     let maxScrollDelta = 0
     let toolbarDetached = false
+    let largestShift = null
     const sample = () => {
-      for (const { node, top, left } of positions) {
+      for (const { node, top, left, clientHeight, scrollHeight } of positions) {
+        const delta = Math.max(Math.abs(node.scrollTop - top), Math.abs(node.scrollLeft - left))
+        if (delta > maxScrollDelta) largestShift = { tag: node.tagName, className: String(node.className), top, currentTop: node.scrollTop, clientHeight, currentHeight: node.clientHeight, scrollHeight, currentScrollHeight: node.scrollHeight }
         maxScrollDelta = Math.max(
           maxScrollDelta,
           Math.abs(node.scrollTop - top),
@@ -39,7 +44,7 @@ async function verifyStableMermaidScroll(page, diagram, assert, action) {
         cancelAnimationFrame(frame)
         observer.disconnect()
         document.removeEventListener('scroll', sample, true)
-        return { maxScrollDelta, toolbarDetached }
+        return { maxScrollDelta, toolbarDetached, largestShift }
       },
     }
   })

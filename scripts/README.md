@@ -6,6 +6,7 @@
 
 | 任务 | 操作真源 |
 | --- | --- |
+| 业务手册同步、三册离线 HTML / PDF 导出 | [手册脚本](docs/README.md) |
 | 选择验证、fast / full / strict、CI 与推送门禁 | [QA 脚本](qa/README.md) |
 | 模拟账号、长期场景与隔离完整验收 | [QA 数据准备](qa/README.md#全页面试用验收数据)、[岗位登录核验](qa/README.md#角色演示账号与登录核验) |
 | 核心业务隔离压力测试、容量与恢复 | [压力测试](qa/README.md#pressure-testing) |
@@ -27,6 +28,7 @@
 | `local-runtime-bundle.mjs`、`local-runtime-build-inputs.mjs`、`local-runtime-start.mjs`、`local-runtime-control.mjs`、`local-runtime-preflight.mjs` | 日常后端按需构建、运行 / 停止互斥与只读状态；迁移完整候选和恢复边界见 [服务端入口](../server/README.md#快速开始) |
 | `local-runtime-console.mjs` | 将 Kratos JSON 转为紧凑终端日志，按级别和关键词筛选，回放启动记录并跟随重启；人工终端常驻，macOS 非交互启动打开日志终端，参数与运行边界见 [服务端入口](../server/README.md#快速开始) |
 | `terminal-log.mjs` | 前后端启动与日志共用的终端高亮、无颜色输出和 PostgreSQL 凭据脱敏 |
+| `lib/postgres-url.mjs` | 本地数据库创建与备份源连接解析，凭据通过环境传入；一次性 PostgreSQL 测试目标由 `qa/postgres-target-contract.mjs` 限制 |
 | `local-database-roles.mjs`、`local-runtime-rehearsal.mjs` | 复用部署角色策略，使用独立只读账号审计，并在临时恢复库验证固定候选版本 |
 | `local-orb.mjs` | 查看、启动 Orb 备用中间件及显式切换开发连接；拒绝覆盖运行中的开发任务，见 [Orb 备用环境](../server/deploy/compose/dev-orb/README.md) |
 | `local-migration-workflow.mjs`、`local-migration.mjs` | 迁移高层编排与低层受控实现，通过 Make / 迁移页使用 |
@@ -96,4 +98,4 @@ bash scripts/doctor.sh
 
 ## 公共契约生成 / Public Contracts
 
-`node scripts/gen-public-contracts.mjs` 从后端正式声明生成 Web 权限、状态、附件约束、RPC 标识和数值边界；`--check` 只读检查漂移。维护步骤与边界见[跨层公共契约与生成规范](../docs/engineering/跨层公共契约与生成规范.md)，错误码继续使用 `gen-error-codes.mjs`。
+`node scripts/gen-public-contracts.mjs` 从后端正式声明生成 Web 权限、业务及流程状态、附件约束、RPC 标识、数值、密码和打印限制，并同步任务目录的 Web 模块与交互稿片段；`--check` 只读检查漂移。`node scripts/qa/public-contract-consumers.mjs` 检查 Web 引用和发布脚本的静态 RPC；契约源变化由 affected 自动选择同步及消费者检查。维护步骤与边界见[跨层公共契约与生成规范](../docs/engineering/跨层公共契约与生成规范.md)，错误码继续使用 `gen-error-codes.mjs`。

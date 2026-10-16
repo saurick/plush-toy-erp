@@ -73,6 +73,12 @@ test('all normal and exception diagrams parse without inventing exception steps'
       assert.equal(parsed.db.getVertices().size, flow.nodes.length)
       assert.equal(parsed.db.getEdges().length, flow.edges.length)
     }
+    for (const flow of catalog.fulfillment_flow.map(buildFulfillmentSubflow).filter(Boolean)) {
+      const graph = buildSubflowMermaid(flow, { role: 'warehouse', compact: true, direction: 'LR' })
+      const parsed = await mermaid.mermaidAPI.getDiagramFromText(graph.chart)
+      assert.equal(parsed.db.getVertices().size, flow.nodes.length)
+      assert.equal(parsed.db.getEdges().length, flow.edges.length)
+    }
     const hostile = buildSubflowMermaid({ nodes: [{ key: 'safe', label: '"]; click N0 callback <script>alert(1)</script>' }], edges: [] })
     assert.equal((await mermaid.mermaidAPI.getDiagramFromText(hostile.chart)).db.getVertices().size, 1)
     assert.doesNotMatch(hostile.chart, /<script>/u)

@@ -1241,9 +1241,9 @@ test('quality gates page contract reuses DevTaskNav and a single page polling ow
   assert.match(pageSource, /正式主路径/u)
   assert.match(
     pageSource,
-    /全部 Job 的状态、运行与等待直接来自当前 GitLab 流水线/u
+    /状态与耗时来自实际 Pipeline/u
   )
-  assert.match(pageSource, /工作台不复制 CI DAG/u)
+  assert.match(pageSource, /依赖不可读时不绘制推测连线/u)
   assert.match(pageSource, /aria-label="服务器门禁详情"/u)
   assert.match(pageSource, /<Drawer/u)
   assert.match(pageSource, />\s*Job 说明\s*</u)

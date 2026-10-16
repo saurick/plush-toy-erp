@@ -28,7 +28,6 @@ import {
   TRACKING_SCOPE_OPTIONS,
   TRACKING_ROLE_OPTIONS,
   TRACKING_ATTENTION_OPTIONS,
-  TRACKING_SOURCE_OPTIONS,
 } from '../../utils/workflowTrackingFilters.mjs'
 import { formatWorkflowTaskEventTime } from '../../utils/workflowTaskEventPresentation.mjs'
 import { WORKFLOW_TASKS_CHANGED } from '../../utils/workflowTaskChanges.mjs'
@@ -42,7 +41,6 @@ import {
 } from '../utils/mobileWorkflowTracking.mjs'
 import MobileFilterPopover from './MobileFilterPopover.jsx'
 import MobileFilterChoices from './MobileFilterChoices.jsx'
-import FilterDateRangePicker from '../../components/business-list/FilterDateRangePicker.jsx'
 import MobileAppliedFilters from './MobileAppliedFilters.jsx'
 import MobileTaskPullRefresh from './MobileTaskPullRefresh.jsx'
 import MobileScrollEdge from './MobileScrollEdge.jsx'
@@ -110,7 +108,6 @@ function MobileTrackingContent({
   )
   const [result, setResult] = useState(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [dateOpen, setDateOpen] = useState(false)
   const [revision, setRevision] = useState(0)
   const [loading, setLoading] = useState(false)
   const stateRef = useRef(state)
@@ -370,20 +367,18 @@ function MobileTrackingContent({
       detailEntry: false,
     })
   }
-  const filterCount = ['owner_role_key', 'source_type', 'attention'].filter(
+  const filterCount = ['owner_role_key', 'attention'].filter(
     (field) => query[field]
-  ).length + Number(Boolean(query.date_from || query.date_to))
+  ).length
   const appliedFilters = [
     ['owner_role_key', '当前岗位', TRACKING_ROLE_OPTIONS],
-    ['source_type', '单据类型', TRACKING_SOURCE_OPTIONS],
     ['attention', '关注事项', TRACKING_ATTENTION_OPTIONS],
   ]
-    .filter(([field]) => query[field] && (field !== 'source_type' || !source))
+    .filter(([field]) => query[field])
     .map(([key, label, options]) => ({
       key,
       label: `${label}：${options.find(({ value }) => value === query[key])?.label}`,
     }))
-  if (query.date_from || query.date_to) appliedFilters.push({ key: 'date', label: `发起日期：${query.date_from || '不限'} 至 ${query.date_to || '不限'}` })
 
   return (
     <section className="mobile-workflow-tracking" aria-label="流程跟踪">
@@ -411,10 +406,7 @@ function MobileTrackingContent({
             onReset={() =>
               updateQuery({
                 owner_role_key: '',
-                source_type: '',
                 attention: '',
-                date_from: '',
-                date_to: '',
               })
             }
           >
@@ -439,17 +431,6 @@ function MobileTrackingContent({
                 onChange={(owner_role_key) => updateQuery({ owner_role_key })}
               />
             </fieldset>
-            {!source ? (
-              <fieldset role="presentation">
-                <legend>单据类型</legend>
-                <MobileFilterChoices
-                  label="单据类型"
-                  value={query.source_type}
-                  options={TRACKING_SOURCE_OPTIONS}
-                  onChange={(source_type) => updateQuery({ source_type })}
-                />
-              </fieldset>
-            ) : null}
             <fieldset role="presentation">
               <legend>关注事项</legend>
               <MobileFilterChoices
@@ -460,22 +441,8 @@ function MobileTrackingContent({
                 onChange={(attention) => updateQuery({ attention })}
               />
             </fieldset>
-            <fieldset role="presentation">
-              <legend className="mobile-filter-legend-action">
-                <span>发起日期</span>
-                <Button type="text" onClick={() => { setFiltersOpen(false); setDateOpen(true) }}>
-                  {query.date_from || query.date_to ? `${query.date_from || '不限'} 至 ${query.date_to || '不限'}` : '自定义发起日期'}
-                </Button>
-              </legend>
-            </fieldset>
           </MobileFilterPopover>
-          {dateOpen && <FilterDateRangePicker
-            title="选择发起日期范围"
-            dateFrom={query.date_from}
-            dateTo={query.date_to}
-            onCancel={() => { setDateOpen(false); setFiltersOpen(true) }}
-            onApply={({ dateFrom, dateTo }) => { updateQuery({ date_from: dateFrom, date_to: dateTo }); setDateOpen(false) }}
-          />}
+
         </div>
         {!source && scope !== 'visible' ? (
           <p
@@ -507,14 +474,14 @@ function MobileTrackingContent({
         <MobileAppliedFilters
           label="当前流程筛选"
           items={appliedFilters}
-          onClear={(key) => updateQuery(key === 'date' ? { date_from: '', date_to: '' } : { [key]: '' })}
+          onClear={(key) => updateQuery({ [key]: '' })}
         />
         <MobileScrollEdge scrollContainerRef={scrollContainerRef} />
       </div>
       <MobileTaskPullRefresh
         key={paramsKey}
         scrollContainerRef={scrollContainerRef}
-        enabled={!filtersOpen && !dateOpen && !state.selection}
+        enabled={!filtersOpen && !state.selection}
         busy={loading}
         onRefresh={load}
         lastUpdated={current?.updatedAt}

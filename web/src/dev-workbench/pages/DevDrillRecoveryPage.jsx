@@ -315,7 +315,7 @@ export default function DevDrillRecoveryPage() {
             ? `显示 ${formatDevSummaryCheckedAt(checkedAt)} 的上次结果`
             : '尚未取得状态'
   return (
-    <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-recovery-page erp-dev-delivery-workspace">
+    <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page erp-dev-recovery-page erp-dev-delivery-workspace">
       <DevPageNav sourcePath={DEV_DRILL_RECOVERY_SOURCE_PATH} />
       <header className="erp-dev-hub-header">
         <div className="erp-dev-hub-header__copy">
@@ -357,7 +357,7 @@ export default function DevDrillRecoveryPage() {
               disabled={!customerReady}
               onClick={refresh}
             >
-              刷新交付证据
+              核验目标
             </Button>
           </Space>
           <Text type="secondary" role="status" aria-live="polite">
@@ -370,9 +370,10 @@ export default function DevDrillRecoveryPage() {
       <section className="erp-dev-delivery-context" aria-label="安全与恢复范围">
         <DevCustomerScopeSelector
           compact
+          label="客户"
+          note=""
           scope={customerScope}
           onChange={customerScope.selectCustomer}
-          note="本页只读，核对固定目标的安全与恢复证据。"
           invalidDescription="当前甲方没有登记交付目标；演练状态读取与版本中心跳转均已停止。"
         />
 
@@ -457,8 +458,7 @@ export default function DevDrillRecoveryPage() {
               type="secondary"
               className="erp-dev-security-checks__scope"
             >
-              核验范围：{overview.target.key} · 运行版本{' '}
-              {shortGitSha(overview.currentSha)}。交付预检通过不代表安全检查通过。
+              安全项以各自核验记录为准，目标预检不能代替安全核验。
             </Paragraph>
             <div className="erp-dev-tool-table-wrap">
               <table

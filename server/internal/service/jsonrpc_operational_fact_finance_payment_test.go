@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -33,6 +34,35 @@ func (r *financePaymentServiceRepo) ReverseFinanceAllocation(_ context.Context, 
 func (r *financePaymentServiceRepo) FinancePaymentAllocationCandidates(_ context.Context, _ int) ([]*biz.FinanceFact, error) {
 	r.candidateCalls++
 	return []*biz.FinanceFact{}, nil
+}
+
+func TestFinancePaymentRPCRejectsNonIntegerIdentifiers(t *testing.T) {
+	for _, field := range []string{"id", "expected_version", "allocation_id", "finance_fact_id"} {
+		for _, value := range []any{9.8, -1, 0, 9007199254740992.0, "9", nil} {
+			t.Run(fmt.Sprintf("%s/%v", field, value), func(t *testing.T) {
+				repo := &financePaymentServiceRepo{item: &biz.FinancePayment{ID: 31, CounterpartyType: biz.FinanceCounterpartySupplier, Kind: biz.FinancePaymentKindAdvance, Status: biz.FinancePaymentStatusPosted, Version: 1}}
+				admin := workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, biz.PermissionFinancePaymentRead, biz.PermissionFinancePaymentPost, biz.PermissionFinancePaymentReverse, biz.PermissionFinancePayableRead)
+				d := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+				method := "allocate_finance_payment"
+				params := map[string]any{"id": float64(31), "expected_version": float64(1), "idempotency_key": "strict-id", "allocations": []any{map[string]any{"finance_fact_id": float64(9), "amount": "1"}}}
+				switch field {
+				case "finance_fact_id":
+					params["allocations"].([]any)[0].(map[string]any)[field] = value
+				case "allocation_id":
+					method = "reverse_finance_allocation"
+					delete(params, "allocations")
+					delete(params, "idempotency_key")
+					params[field], params["reason"] = value, "分配纠错"
+				default:
+					params[field] = value
+				}
+				_, result, err := d.handleOperationalFact(workflowJSONRPCAdminContext(), method, "strict-id", mustJSONRPCStruct(t, params))
+				if err != nil || result == nil || result.Code != errcode.InvalidParam.Code || repo.allocationCalls+repo.reverseAllocationCalls != 0 {
+					t.Fatalf("invalid identifier reached write: result=%+v err=%v calls=%d", result, err, repo.allocationCalls+repo.reverseAllocationCalls)
+				}
+			})
+		}
+	}
 }
 
 func TestFinanceAdvanceAllocationRPCExactPermissions(t *testing.T) {

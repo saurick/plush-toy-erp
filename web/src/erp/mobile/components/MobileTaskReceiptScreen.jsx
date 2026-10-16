@@ -6,6 +6,7 @@ import {
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
+import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
 import {
@@ -163,7 +164,7 @@ export default function MobileTaskReceiptScreen({
         title="结果回执"
         trailing={
           <span
-            className={`mobile-task-flow-status ${confirmed ? (task?.task_status_key === 'done' ? 'bg-emerald-50 text-emerald-600' : getTaskSeverityView(task || {}).badgeClass) : outcomeMeta.iconClass}`}
+            className={`mobile-task-flow-status ${confirmed ? (task?.task_status_key === WorkflowTaskStatus.DONE ? 'bg-emerald-50 text-emerald-600' : getTaskSeverityView(task || {}).badgeClass) : outcomeMeta.iconClass}`}
             data-outcome={outcome}
           >
             {confirmed

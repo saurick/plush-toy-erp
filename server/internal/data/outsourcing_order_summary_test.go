@@ -51,10 +51,9 @@ func TestOutsourcingOrderSummaryPaginationFiltersAndSnapshots(t *testing.T) {
 	second := save("OUT-SUM-2", supplier2.ID, productLine(1))
 	canceled := save("OUT-SUM-CANCELED", supplier.ID, productLine(1))
 	client.OutsourcingOrder.UpdateOneID(canceled.Order.ID).SetLifecycleStatus(biz.OutsourcingOrderStatusCanceled).SaveX(ctx)
-	_, err := uc.ReorderOutsourcingOrderItems(ctx, order.Order.ID, &biz.SourceDocumentItemOrderMutation{ExpectedVersion: order.Order.Version, ItemIDs: []int{order.Items[1].ID, order.Items[0].ID}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	// Saved positions remain authoritative for existing documents.
+	client.OutsourcingOrderItem.UpdateOneID(order.Items[0].ID).SetDisplayOrder(2).SaveX(ctx)
+	client.OutsourcingOrderItem.UpdateOneID(order.Items[1].ID).SetDisplayOrder(1).SaveX(ctx)
 	// Queries must keep source snapshots after master-data edits.
 	client.Supplier.UpdateOneID(supplier.ID).SetName("改名后加工厂").SaveX(ctx)
 	client.Product.UpdateOneID(product.ID).SetName("改名后产品").SaveX(ctx)
@@ -109,7 +108,7 @@ func TestOutsourcingOrderSummaryPaginationFiltersAndSnapshots(t *testing.T) {
 	clearedLine := productLine(1)
 	clearedLine.ID = second.Items[0].ID
 	clearedLine.UnitPrice = nil
-	_, err = uc.SaveOutsourcingOrderWithItems(ctx, second.Order.ID, &biz.OutsourcingOrderMutation{
+	_, err := uc.SaveOutsourcingOrderWithItems(ctx, second.Order.ID, &biz.OutsourcingOrderMutation{
 		OutsourcingOrderNo: second.Order.OutsourcingOrderNo, SupplierID: supplier2.ID,
 		Currency: second.Order.Currency, PaymentTermDays: second.Order.PaymentTermDays,
 		OrderDate: date(1), ExpectedVersion: second.Order.Version, SupplierSnapshot: second.Order.SupplierSnapshot,

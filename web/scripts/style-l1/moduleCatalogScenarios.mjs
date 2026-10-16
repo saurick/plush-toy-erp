@@ -153,8 +153,12 @@ export function createModuleCatalogScenarios({
           path: `${outputDir}/module-catalog-sidebar.png`,
         })
         let dialog = await openCatalog(page)
+        // 异常从生产记录的来源深链进入，授权路径不代表独立目录入口。
+        const routeOnlyKeys = new Set(['production-exceptions'])
         const expected = [
-          ...sales.adminProfile.menus.map((item) => item.label),
+          ...sales.adminProfile.menus
+            .filter((item) => !routeOnlyKeys.has(item.key))
+            .map((item) => item.label),
           '历史记录中心',
           '帮助中心',
         ].sort()
@@ -166,7 +170,7 @@ export function createModuleCatalogScenarios({
         assert.deepEqual(
           labels.sort(),
           expected,
-          '目录必须完整复用当前账号的已授权页面'
+          '目录应完整保留获准的导航页面，内部深链不单列入口'
         )
         assert.equal(
           await dialog
@@ -187,7 +191,7 @@ export function createModuleCatalogScenarios({
         await search.fill('基础资料')
         assert.deepEqual(
           await dialog.locator('.erp-module-catalog__entry').allTextContents(),
-          ['客户档案', '产品档案']
+          ['客户档案', '供应商与加工厂', '产品档案']
         )
         await search.fill('  产品  ')
         assert.equal(
@@ -236,16 +240,27 @@ export function createModuleCatalogScenarios({
       verify: async (page) => {
         await page.getByRole('button', { name: '打开导航菜单' }).click()
         const drawer = page.locator('.erp-admin-drawer:visible')
-        await drawer.locator('.ant-menu-submenu-title').click()
+        const menu = drawer.locator('.erp-admin-menu')
+        await menu.getByRole('menuitem', { name: '工作台', exact: true }).waitFor()
+        assert.equal(
+          await menu.locator('.ant-menu-submenu').count(),
+          0,
+          '岗位导航应平铺显示各组入口'
+        )
+        await page.setViewportSize({ width: 390, height: 480 })
         await waitForFiniteAnimations(page)
         const trigger = drawer.locator('.erp-module-catalog-trigger')
         const before = await trigger.boundingBox()
-        await drawer.locator('.erp-admin-menu').evaluate((node) => {
+        const scrollTop = await menu.evaluate((node) => {
           node.scrollTop = node.scrollHeight
+          return node.scrollTop
         })
+        assert(scrollTop > 0, '短屏菜单必须实际滚动，才能验证底部入口固定')
         const after = await trigger.boundingBox()
         assert.equal(after.y, before.y, '滚动菜单时全部模块应固定在底部')
-        assert(after.y + after.height <= 844)
+        assert(after.y + after.height <= 480)
+        await page.setViewportSize({ width: 390, height: 844 })
+        await waitForFiniteAnimations(page)
         const dialog = await openCatalog(page)
         const bounds = await dialog.boundingBox()
         assert(

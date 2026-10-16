@@ -2139,8 +2139,16 @@ export function validateReleaseEvidenceGate({
   );
   assert(Boolean(evidenceDir), "--evidence-dir is required", errors);
   assert(
-    deploymentTarget === "demo-133" || deploymentTarget === "customer-test-133",
-    "--deployment-target must be demo-133 or customer-test-133",
+    ["demo-133", "customer-test-133", "production-133"].includes(
+      deploymentTarget,
+    ),
+    "--deployment-target must be demo-133, customer-test-133 or production-133",
+    errors,
+  );
+  assert(
+    deploymentTarget !== "production-133" ||
+      normalizedProfile === RELEASE_EVIDENCE_PROFILES.BASE_RELEASE,
+    "production does not use the fixed test credential acceptance profile",
     errors,
   );
   if (errors.length === 0) {

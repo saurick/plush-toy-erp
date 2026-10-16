@@ -4,8 +4,34 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { browserRPCURL } from "./browser-write-target.mjs";
+import {
+  businessURL,
+  flowKey,
+  openMobileTaskCard,
+  openDesktopTaskRow,
+  assertMobileLayout,
+  selectOption,
+  selectRow,
+  pageAction,
+  modal,
+  navigate,
+  closePage,
+  clickRPC,
+  login,
+  captureFailure,
+  dropRealResponse,
+  faultEvidence,
+} from "./transaction-browser-ui.mjs";
 import { resolveMobileActionLabel } from "../../web/src/erp/mobile/utils/mobileRoleTaskModel.mjs";
+import {
+  captureTransactionFlowFields,
+  captureTransactionFieldResults,
+  assertFlowFieldAuditEvidence,
+} from "./transaction-flow-fields-browser.mjs";
+import {
+  productionShipmentFlow,
+  assertProductionShipmentEvidence,
+} from "./transaction-production-shipment-browser.mjs";
 import {
   createTransactionClient,
   prepareTransactionFixture,
@@ -23,6 +49,10 @@ const { expect } = require("playwright/test");
 export const TRANSACTION_FLOW_KEYS = Object.freeze([
   "quality",
   "inventory",
+  "production",
+  "shipment",
+  "mobile_production",
+  "mobile_shipment",
   "finance_disbursement",
   "finance_receipt",
   "finance_receivable",
@@ -45,6 +75,26 @@ export const TRANSACTION_FLOW_KEYS = Object.freeze([
 ]);
 
 export function assertTransactionBrowserReport(report) {
+  assertFlowFieldAuditEvidence(report.fieldAudit);
+  assert.equal(report.fieldResults.optionalColumnsRestored, true);
+  assert.equal(report.fieldResults.detailsPreserved, true);
+  assert.deepEqual(
+    report.fieldResults.exports.map(({ key }) => key),
+    ["quality", "payments"],
+  );
+  assert.deepEqual(
+    report.fieldResults.pages.map(({ key }) => key),
+    [
+      "quality-populated",
+      "quality-all-columns",
+      "quality-restored",
+      "payments-populated",
+      "payments-all-columns",
+      "payments-restored",
+      "payment-details",
+      "inventory-populated",
+    ],
+  );
   assert.deepEqual(
     report.flows.map(({ key }) => key),
     TRANSACTION_FLOW_KEYS,
@@ -90,293 +140,7 @@ export function assertTransactionBrowserReport(report) {
   assert.equal(payments.size, 8);
   for (const roles of payments.values())
     assert.deepEqual(roles.sort(), ["boss", "finance"]);
-}
-
-function businessURL(options, role, route) {
-  return `${options.baseURL}${options.mobile ? `/m/${role}/handle/${route}` : `/erp/${route}`}`;
-}
-
-function flowKey(options, key) {
-  return `${options.mobile ? "mobile_" : ""}${key}`;
-}
-
-async function assertMobileLayout(page, options) {
-  if (!options.mobile) return;
-  await expect(
-    page.locator('[data-mobile-business-page="true"]'),
-  ).toBeVisible();
-  const metrics = await page.evaluate(() => ({
-    width: window.innerWidth,
-    document: document.documentElement.scrollWidth,
-    touch: navigator.maxTouchPoints,
-  }));
-  assert.equal(metrics.width, 390);
-  assert.ok(metrics.touch > 0);
-  assert.ok(
-    metrics.document <= metrics.width + 1,
-    `mobile document overflow: ${JSON.stringify(metrics)}`,
-  );
-}
-
-async function selectOption(page, control, label) {
-  await control
-    .locator("xpath=ancestor::div[contains(@class,'ant-select-selector')][1]")
-    .click();
-  await page
-    .locator(".ant-select-dropdown:visible")
-    .getByText(label, { exact: true })
-    .click();
-}
-async function selectRow(page, id) {
-  const row = page.locator(`.ant-table-row[data-row-key="${id}"]:visible`);
-  await expect(row).toHaveCount(1);
-  const radio = row.getByRole("radio");
-  await radio.check();
-  await expect(radio).toBeChecked();
-}
-async function pageAction(page, label) {
-  const direct = page.locator("button:visible").filter({ hasText: label });
-  if (await direct.isVisible()) return direct.click();
-  await page
-    .getByRole("button", { name: /^更多操作(?:，共 \d+ 项)?$/u })
-    .click();
-  await expect(direct).toHaveCount(1);
-  await direct.click();
-}
-async function modal(page, title) {
-  const dialog = page
-    .getByRole("dialog")
-    .filter({ has: page.getByText(title, { exact: true }) });
-  await expect(dialog).toBeVisible();
-  return dialog;
-}
-async function navigate(page, url) {
-  await page.waitForLoadState("networkidle");
-  await expect.poll(() => page.pendingRPC.size).toBe(0);
-  await Promise.all([...page.rpcResponses]);
-  await page.goto(url);
-  await page.waitForLoadState("networkidle");
-}
-async function closePage(page, context) {
-  await page.waitForLoadState("networkidle");
-  await expect.poll(() => page.pendingRPC.size).toBe(0);
-  await context.unrouteAll({ behavior: "wait" });
-  await Promise.all([...page.rpcResponses]);
-  await context.close();
-}
-async function clickRPC(page, method, action, code = 0) {
-  const pending = page.waitForResponse(
-    (response) => {
-      if (!response.url().includes("/rpc/")) return false;
-      return response.request().postDataJSON()?.method === method;
-    },
-    { timeout: 30000 },
-  );
-  const [response] = await Promise.all([pending, action()]);
-  assert.equal(response.status(), 200);
-  const { result } = await response.json();
-  assert.equal(result?.code, code, `${method}: ${result?.message}`);
-  return result.data;
-}
-async function login(browser, options, role, report) {
-  const context = await browser.newContext({
-    viewport: options.mobile
-      ? { width: 390, height: 844 }
-      : { width: 1600, height: 1000 },
-    isMobile: Boolean(options.mobile),
-    hasTouch: Boolean(options.mobile),
-    deviceScaleFactor: 1,
-  });
-  // The authenticated proxy probe proves that Vite forwards to this isolated backend.
-  const page = await context.newPage();
-  page.rpcResponses = new Set();
-  page.pendingRPC = new Set();
-  page.expectedRPCFailures = new Map();
-  page.setDefaultTimeout(30000);
-  page.on("pageerror", (error) =>
-    report.pageErrors.push({ role, message: error.message }),
-  );
-  page.on("request", (request) => {
-    if (request.url().includes("/rpc/")) page.pendingRPC.add(request);
-  });
-  page.on("requestfailed", (request) => {
-    page.pendingRPC.delete(request);
-    if (!request.url().includes("/rpc/")) return;
-    const { method, params } = request.postDataJSON();
-    const injected = page.expectedRPCFailures.get(method);
-    if (
-      injected?.injected &&
-      injected.backendCode === 0 &&
-      JSON.stringify(injected.params) === JSON.stringify(params)
-    )
-      return;
-    report.pageErrors.push({
-      role,
-      method,
-      message: "Unexpected RPC transport failure",
-      failure: request.failure(),
-    });
-  });
-  page.on("requestfinished", (request) => {
-    if (!request.url().includes("/rpc/")) return;
-    const collected = (async () => {
-      try {
-        const response = await request.response();
-        const body = request.postDataJSON();
-        const data = await response.json();
-        report.browserRPC.push({
-          role,
-          surface: options.mobile ? "mobile" : "desktop",
-          method: body.method,
-          code: data.result?.code,
-          http: response.status(),
-          requestID: response.headers()["x-request-id"],
-        });
-      } catch (error) {
-        report.pageErrors.push({
-          role,
-          message: `Unreadable RPC response: ${error.message}`,
-          method: request.postDataJSON()?.method,
-          failure: request.failure(),
-        });
-      } finally {
-        page.pendingRPC.delete(request);
-      }
-    })();
-    page.rpcResponses.add(collected);
-    void collected.finally(() => page.rpcResponses.delete(collected));
-  });
-  await navigate(page, `${options.baseURL}/admin-login`);
-  if (options.mobile)
-    await page
-      .locator(".ant-segmented-item")
-      .filter({ hasText: "手机版" })
-      .click();
-  await page.getByLabel("账号", { exact: true }).fill(`demo_${role}`);
-  await page.getByLabel("密码", { exact: true }).fill(options.rolePassword);
-  const legalStatus = page.waitForResponse(
-    (response) =>
-      response.url().includes("/rpc/") &&
-      response.request().postDataJSON()?.method === "legal_notice_status",
-  );
-  const effectiveSession = page
-    .waitForResponse(
-      (response) =>
-        response.url().includes("/rpc/") &&
-        response.request().postDataJSON()?.method === "get_effective_session",
-    )
-    .then((response) => response.json());
-  const mobileTaskList = options.mobile
-    ? page
-        .waitForResponse(
-          (response) =>
-            response.url().includes("/rpc/") &&
-            response.request().postDataJSON()?.method === "list_role_tasks",
-        )
-        .then(async (response) => {
-          assert.equal(response.status(), 200);
-          const body = await response.json();
-          assert.equal(body.result?.code, 0);
-        })
-    : null;
-  await clickRPC(page, "admin_login", () =>
-    page.getByRole("button", { name: /登\s*录/u }).click(),
-  );
-  await page.waitForURL((url) => !url.pathname.includes("admin-login"));
-  const acknowledge = page.getByTestId("legal-notice-acknowledge");
-  const legal = (await (await legalStatus).json()).result;
-  assert.equal(legal.code, 0);
-  if (!legal.data.acknowledged) {
-    await expect(acknowledge).toBeVisible();
-    await clickRPC(page, "acknowledge_legal_notice", () => acknowledge.click());
-  }
-  await expect(page.getByTestId("legal-notice-gate")).toBeHidden();
-  const effective = (await effectiveSession).result;
-  assert.equal(effective.code, 0);
-  assert.equal(
-    effective.data.session.source,
-    "active_customer_config_revision",
-  );
-  if (options.mobile) {
-    await expect(page).toHaveURL(`${options.baseURL}/m/${role}/tasks`);
-    await mobileTaskList;
-    await page.waitForLoadState("networkidle");
-    await expect.poll(() => page.pendingRPC.size).toBe(0);
-    await page.getByTestId("mobile-role-nav-tasks").click();
-    await expect(page.getByTestId("mobile-role-task-list")).toHaveAttribute(
-      "aria-busy",
-      "false",
-    );
-    await page.waitForLoadState("networkidle");
-    await expect.poll(() => page.pendingRPC.size).toBe(0);
-    await Promise.all([...page.rpcResponses]);
-  }
-  return { page, context };
-}
-async function captureFailure(page, options, report, error) {
-  report.failures ??= [];
-  const failure = {
-    error: error?.stack,
-    url: page.url(),
-    pendingRPC: [...page.pendingRPC].map((request) => ({
-      method: request.postDataJSON()?.method,
-      timing: request.timing(),
-    })),
-    visibleText: (
-      await page
-        .locator("body")
-        .innerText()
-        .catch(() => "")
-    ).slice(0, 20000),
-  };
-  report.failures.push(failure);
-  await page
-    .screenshot({
-      path: path.join(
-        options.outputDir,
-        `failure-${report.failures.length}.png`,
-      ),
-      fullPage: true,
-    })
-    .catch(() => {});
-  report.visibleText = (
-    await page
-      .locator("body")
-      .innerText()
-      .catch(() => "")
-  ).slice(0, 20000);
-  report.buttons = await page.locator("button:visible").evaluateAll((nodes) =>
-    nodes.map((node) => ({
-      text: node.textContent,
-      role: node.getAttribute("role"),
-      label: node.getAttribute("aria-label"),
-    })),
-  );
-}
-async function dropRealResponse(page, options, domain, method) {
-  const state = { method, injected: false, backendCode: null };
-  page.expectedRPCFailures.set(method, state);
-  const pattern = `**/rpc/${domain}`;
-  const handler = async (route) => {
-    if (state.injected || route.request().postDataJSON()?.method !== method)
-      return route.fallback();
-    const response = await route.fetch({
-      url: browserRPCURL(options.backendURL, route.request().url()),
-      maxRedirects: 0,
-    });
-    const body = await response.json();
-    state.params = route.request().postDataJSON().params;
-    state.backendCode = body.result?.code;
-    state.requestID = response.headers()["x-request-id"];
-    state.injected = true;
-    await route.abort("failed");
-  };
-  await page.route(pattern, handler);
-  return { state, remove: () => page.unroute(pattern, handler) };
-}
-
-function faultEvidence({ method, injected, backendCode, requestID }) {
-  return { method, injected, backendCode, requestID };
+  assertProductionShipmentEvidence(report);
 }
 
 export async function completePaymentTask(
@@ -399,18 +163,14 @@ export async function completePaymentTask(
   const { page, context } = await login(browser, options, role, report);
   try {
     if (options.mobile) {
-      const taskCard = page.locator(`[data-mobile-task-id="${task.id}"]`);
-      await expect(taskCard).toHaveCount(1);
-      await taskCard
-        .locator("button.erp-task-card__open")
-        .tap({ position: { x: 16, y: 16 } });
+      await openMobileTaskCard(page, task.id);
       const detail = page.getByTestId("mobile-task-detail-screen");
       await expect(detail).toBeVisible();
       await expect(
         detail.getByRole("button", { name: "进入单据办理", exact: true }),
       ).toBeVisible();
       await expect(
-        detail.getByRole("button", { name: "处理任务", exact: true }),
+        detail.getByRole("button", { name: "选择处理方式", exact: true }),
       ).toBeVisible();
       const entryLayout = await detail.evaluate((element) => ({
         width: window.innerWidth,
@@ -426,6 +186,7 @@ export async function completePaymentTask(
             y: box.y,
             right: box.right,
             bottom: box.bottom,
+            width: box.width,
             height: box.height,
           };
         }),
@@ -443,7 +204,14 @@ export async function completePaymentTask(
             button.bottom <= entryLayout.height,
         ),
       );
-      assert.ok(entryLayout.buttons[0].bottom <= entryLayout.buttons[1].y);
+      assert.deepEqual(entryLayout.buttons.map(({ label }) => label), [
+        "进入单据办理", "选择处理方式",
+      ]);
+      const [sourceButton, processButton] = entryLayout.buttons;
+      assert.equal(sourceButton.y, processButton.y, JSON.stringify(entryLayout));
+      assert.equal(sourceButton.height, processButton.height, JSON.stringify(entryLayout));
+      assert.equal(sourceButton.width, processButton.width, JSON.stringify(entryLayout));
+      assert.equal(processButton.x - sourceButton.right, 8, JSON.stringify(entryLayout));
       await page.screenshot({
         path: path.join(
           options.outputDir,
@@ -451,7 +219,7 @@ export async function completePaymentTask(
         ),
       });
       await detail
-        .getByRole("button", { name: "处理任务", exact: true })
+        .getByRole("button", { name: "选择处理方式", exact: true })
         .click();
       const action = page.getByTestId("mobile-task-action-screen");
       await expect(action).toBeVisible();
@@ -517,11 +285,7 @@ export async function completePaymentTask(
     });
     await search.fill(payment.payment_no);
     await search.press("Enter");
-    const card = page
-      .locator(".erp-task-board-card")
-      .filter({ hasText: payment.payment_no });
-    await expect(card).toHaveCount(1);
-    await card.locator("button.erp-task-card__open").press("Enter");
+    await openDesktopTaskRow(page, task, payment.payment_no);
     const drawer = page.locator(".erp-task-action-drawer:visible");
     await drawer
       .getByRole("button", { name: "选择处理方式", exact: true })
@@ -1485,11 +1249,15 @@ export async function runTransactionBrowser(options, preparedFixture) {
     if (fixture)
       for (const role of [
         "admin",
+        "purchase",
         "quality",
         "warehouse",
         "finance",
         "boss",
         "sales",
+        "production",
+        "pmc",
+        "engineering",
       ])
         await client.login(role);
     else fixture = await prepareTransactionFixture(client, options);
@@ -1504,8 +1272,17 @@ export async function runTransactionBrowser(options, preparedFixture) {
     );
     report.frontendIdentity = await client.verifyFrontend();
     browser = await chromium.launch({ headless: true });
+    await captureTransactionFlowFields(browser, options, client, report);
     await qualityFlow(browser, options, client, fixture, report);
     await inventoryFlow(browser, options, client, fixture, report);
+    for (const mobile of [false, true])
+      await productionShipmentFlow(
+        browser,
+        { ...options, mobile },
+        client,
+        fixture,
+        report,
+      );
     fixture.salesOrder ??= await prepareTransactionSalesOrder(
       client,
       options,
@@ -1591,6 +1368,7 @@ export async function runTransactionBrowser(options, preparedFixture) {
         );
       }
     }
+    await captureTransactionFieldResults(browser, options, client, report);
     assertTransactionBrowserReport(report);
     report.status = "passed";
   } catch (error) {

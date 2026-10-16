@@ -18,12 +18,12 @@ if [ -z "$PURCHASE_RECEIPT_PG_DB_URL" ]; then
   exit 2
 fi
 
-postgres_target_helper="$script_dir/qa/postgres-target-contract.py"
+postgres_target_helper="$script_dir/qa/postgres-target-contract.mjs"
 base_target_fields=()
 while IFS= read -r -d '' target_field; do
   base_target_fields+=("$target_field")
 done < <(
-  python3 "$postgres_target_helper" base purchase-receipt "$PURCHASE_RECEIPT_PG_DB_URL" "$cmd"
+  node "$postgres_target_helper" base purchase-receipt "$cmd" <<<"$PURCHASE_RECEIPT_PG_DB_URL"
 )
 unset target_field
 if [[ "${#base_target_fields[@]}" -ne 5 || "${base_target_fields[4]}" != 'ok' ]]; then
@@ -59,7 +59,7 @@ run_disposable_critical_gate() {
   while IFS= read -r -d '' target_field; do
     critical_target_fields+=("$target_field")
   done < <(
-    python3 "$postgres_target_helper" critical "$PURCHASE_RECEIPT_PG_DB_URL" "$$"
+    node "$postgres_target_helper" critical "$$" <<<"$PURCHASE_RECEIPT_PG_DB_URL"
   )
   if [[ "${#critical_target_fields[@]}" -ne 3 || "${critical_target_fields[2]}" != 'ok' ]]; then
     echo "ERROR: disposable critical PostgreSQL target validation failed" >&2
@@ -185,8 +185,8 @@ test-populated-upgrade)
   while IFS= read -r -d '' target_field; do
     populated_target_fields+=("$target_field")
   done < <(
-    python3 "$postgres_target_helper" populated \
-      "$PURCHASE_RECEIPT_PG_DB_URL" "$PURCHASE_RECEIPT_PG_DB_NAME" "$$" "$RANDOM"
+    node "$postgres_target_helper" populated \
+      "$PURCHASE_RECEIPT_PG_DB_NAME" "$$" "$RANDOM" <<<"$PURCHASE_RECEIPT_PG_DB_URL"
   )
   unset target_field
   if [[ "${#populated_target_fields[@]}" -ne 3 || "${populated_target_fields[2]}" != 'ok' ]]; then

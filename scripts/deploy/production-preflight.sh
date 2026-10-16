@@ -17,7 +17,7 @@ print_help() {
 参数:
   --env-file <path>      生产运行时 env 文件；该模式阻断 placeholder
   --compose-dir <path>   Compose 目录，默认 server/deploy/compose/prod
-  --deployment-target <demo-133|customer-test-133>
+  --deployment-target <demo-133|customer-test-133|production-133>
                          登记的非生产部署目标；admin 不是部署环境
   --profile <base-release|customer-trial-acceptance>
                          默认 base-release；验收档才检查 SMS、PDF 与 Chromium 运行能力
@@ -45,17 +45,20 @@ ok() {
   echo "[production-preflight] ok: $*"
 }
 
-sha256_file() {
-  local path="$1"
+sha256_input() {
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$path" | awk '{print $1}'
+    sha256sum | awk '{print $1}'
     return
   fi
   if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$path" | awk '{print $1}'
+    shasum -a 256 | awk '{print $1}'
     return
   fi
   fail "缺少 sha256sum / shasum，无法执行 SHA-256 完整性校验"
+}
+
+sha256_file() {
+  sha256_input <"$1"
 }
 
 utf8_codepoint_count() {
@@ -236,6 +239,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 cd "$root_dir"
+command -v jq >/dev/null 2>&1 || fail "发布预检需要 jq"
 
 case "$profile" in
 base-release | customer-trial-acceptance) ;;
@@ -289,8 +293,28 @@ customer-test-133)
     JAEGER_OTLP_GRPC_PORT=62009 JAEGER_OTLP_HTTP_PORT=62010
   )
   ;;
-*) fail "不支持的部署目标；只允许 demo-133 或 customer-test-133" ;;
+production-133)
+  registered_target_mode=1
+  target_project=plush-toy-erp-production
+  target_database=plush_erp_production
+  target_data_dir=/root/deploy/plush-toy-erp-production/data/postgres
+  target_lock_file=/root/deploy/plush-toy-erp-production/run/atlas-migrate.lock
+  target_override_name=compose.production-133.yml
+  target_trial_enabled=0
+  target_trial_target=""
+  target_ports=(
+    POSTGRES_PORT=55438 APP_HTTP_PORT=8345 WEB_DESKTOP_PORT=5215
+    JAEGER_6831_PORT=63002 JAEGER_6832_PORT=63003
+    JAEGER_UI_PORT=63005 JAEGER_14268_PORT=63006
+    JAEGER_14250_PORT=63007 JAEGER_9411_PORT=63008
+    JAEGER_OTLP_GRPC_PORT=63009 JAEGER_OTLP_HTTP_PORT=63010
+  )
+  ;;
+*) fail "不支持的部署目标；只允许 demo-133、customer-test-133 或 production-133" ;;
 esac
+if [[ "$deployment_target" == production-133 && "$profile" != base-release ]]; then
+  fail "生产环境不使用固定测试凭据验收 profile"
+fi
 target_compose_override="$compose_dir/$target_override_name"
 
 [[ -n "$env_file" ]] || fail "必须传入 --env-file，或使用 --example 只检查样例结构"
@@ -482,19 +506,37 @@ else
     done
   else
     [[ -z "$attachment_profiles" ]] || fail "外部存储不能同时启动本机附件服务或其他 profile"
-    python3 - "$(value_of ATTACHMENT_S3_ENDPOINT)" <<'PY_ENDPOINT' || fail "外部 S3 必须使用 HTTPS 或局域网 HTTP origin"
-import ipaddress, sys, urllib.parse
-try:
-    u = urllib.parse.urlsplit(sys.argv[1])
-    assert u.scheme in ('http', 'https') and u.hostname and not u.username and not u.password
-    assert u.path in ('', '/') and not u.query and not u.fragment
-    assert u.port is None or 0 < u.port <= 65535
-    if u.scheme == 'http':
-        ip = ipaddress.ip_address(u.hostname)
-        assert any(ip in ipaddress.ip_network(n) for n in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '::1/128'))
-except (ValueError, AssertionError):
-    sys.exit(1)
-PY_ENDPOINT
+    jq -en --arg endpoint "$(value_of ATTACHMENT_S3_ENDPOINT)" '
+      def ipv4:
+        split(".") as $parts |
+        ($parts | length) == 4 and
+        all($parts[]; test("^(0|[1-9][0-9]{0,2})$") and (tonumber <= 255));
+      def ipv6:
+        split("::") as $halves |
+        [$halves[] | select(. != "") | split(":")[]] as $groups |
+        (($groups | length) + (if ($groups[-1] // "" | contains(".")) then 1 else 0 end)) as $count |
+        ($halves | length) <= 2 and
+        all($groups[]; test("^[a-fA-F0-9]{1,4}$") or ipv4) and
+        all($groups[0:-1][]; contains(".") | not) and
+        (if ($halves | length) == 1 then $count == 8 else $count < 8 end);
+      $endpoint | capture("^(?<scheme>https?)://(?<host>\\[[a-fA-F0-9:.]+\\]|[a-zA-Z0-9_.-]+)(:(?<port>[0-9]{1,5}))?/?$"; "i") |
+      .host as $authority | ($authority | ltrimstr("[") | rtrimstr("]")) as $host |
+      ((.port == null) or ((.port | tonumber) > 0 and (.port | tonumber) <= 65535)) and
+      (if ($authority | startswith("[")) then ($host | ipv6) else true end) and
+      ((.scheme | ascii_downcase) == "https" or
+        (if ($host | contains(":")) then
+          ($host | split(":") | map(select(. != ""))) as $groups |
+          ($host | endswith(":") | not) and
+          ($groups[-1] | test("^0{0,3}1$")) and all($groups[0:-1][]; test("^0{1,4}$"))
+        else
+          if ($host | ipv4) then
+            ($host | split(".") | map(tonumber)) as $octets |
+            $octets[0] == 10 or $octets[0] == 127 or
+            ($octets[0] == 172 and $octets[1] >= 16 and $octets[1] <= 31) or
+            ($octets[0] == 192 and $octets[1] == 168)
+          else false end
+        end))
+    ' >/dev/null 2>&1 || fail "外部 S3 必须使用 HTTPS 或局域网 HTTP origin"
   fi
   app_jwt_secret="$(value_of APP_JWT_SECRET)"
   app_image="$(value_of APP_IMAGE)"
@@ -548,33 +590,17 @@ PY_ENDPOINT
   [[ "$erp_customer_key" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "ERP_CUSTOMER_KEY 必须是稳定小写 customer key"
   [[ "$erp_customer_key" != "current" ]] || fail "ERP_CUSTOMER_KEY 不能使用旧 current 别名"
   if [[ "$profile" == "customer-trial-acceptance" && "$erp_customer_key" == "yoyoosun" ]]; then
-    command -v python3 >/dev/null 2>&1 || fail "yoyoosun 运行合同校验需要 python3"
     [[ -f "$runtime_contract_file" && ! -L "$runtime_contract_file" ]] || fail "缺少 yoyoosun 运行合同: $runtime_contract_file"
-    expected_auth_sms_mode="$(python3 -c '
-import json
-import sys
-
-with open(sys.argv[1], "r", encoding="utf-8") as handle:
-    contract = json.load(handle)
-sms = contract.get("auth", {}).get("sms", {})
-expected = sms.get("expectedCapabilities", {})
-valid = (
-    contract.get("schemaVersion") == "yoyoosun-runtime-contract/v1"
-    and contract.get("customerCode") == "yoyoosun"
-    and sms.get("requiredMode") == "provider"
-    and sms.get("requiredSecretEnvKeys") == [
-        "APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID",
-        "APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET",
-        "APP_AUTH_SMS_ALIYUN_SIGN_NAME",
-        "APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE",
-    ]
-    and expected == {"enabled": True, "mode": "provider", "mockDelivery": False}
-    and contract.get("redaction") == {"containsSecrets": False, "responseBodyStored": False}
-)
-if not valid:
-    raise SystemExit(1)
-print(sms["requiredMode"])
-' "$runtime_contract_file")" || fail "yoyoosun 运行合同结构不合法"
+    expected_auth_sms_mode="$(jq -ser '
+      if length == 1 then .[0] else error("invalid runtime contract JSON") end |
+      .auth.sms as $sms |
+      select(.schemaVersion == "yoyoosun-runtime-contract/v1" and .customerCode == "yoyoosun" and
+        $sms.requiredMode == "provider" and
+        $sms.requiredSecretEnvKeys == ["APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID", "APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET", "APP_AUTH_SMS_ALIYUN_SIGN_NAME", "APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE"] and
+        $sms.expectedCapabilities == {enabled: true, mode: "provider", mockDelivery: false} and
+        .redaction == {containsSecrets: false, responseBodyStored: false}) |
+      $sms.requiredMode
+    ' "$runtime_contract_file")" || fail "yoyoosun 运行合同结构不合法"
     [[ "$app_auth_sms_mode" == "$expected_auth_sms_mode" ]] || fail "yoyoosun SMS 模式必须匹配运行合同: expected=$expected_auth_sms_mode actual=${app_auth_sms_mode:-missing}"
     ok "yoyoosun SMS 运行合同已绑定: mode=$expected_auth_sms_mode contract_sha256=$(sha256_file "$runtime_contract_file")"
   fi
@@ -719,28 +745,17 @@ if grep -Eq 'seccomp[=:][[:space:]]*unconfined|apparmor[=:][[:space:]]*unconfine
   fail "Compose app-server 不得关闭 seccomp / AppArmor、启用 privileged 或授予 SYS_ADMIN"
 fi
 [[ -f "$chromium_seccomp_profile" ]] || fail "缺少 Chromium seccomp profile: $chromium_seccomp_profile"
-command -v python3 >/dev/null 2>&1 || fail "Chromium seccomp profile 校验需要 python3"
-python3 - "$chromium_seccomp_profile" <<'PY_SECCOMP' || fail "Chromium seccomp profile 缺少默认拒绝或已改变受审查的安全规则"
-import hashlib
-import json
-import sys
-
-with open(sys.argv[1], "r", encoding="utf-8") as handle:
-    profile = json.load(handle)
-
-def normalize(value):
-    if isinstance(value, dict):
-        return {key: normalize(item) for key, item in value.items() if key != "comment"}
-    if isinstance(value, list):
-        return sorted((normalize(item) for item in value), key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":")))
-    return value
-
-# Pin security semantics, not file bytes: formatting, comments and rule order
-# do not change permissions. Any effective policy change requires review.
-canonical = json.dumps(normalize(profile), sort_keys=True, separators=(",", ":")).encode()
-expected = "90cdabf9e0e329b3a80f8fa2bd9f64439f58623745aed0c4bdac31617147c6cc"
-raise SystemExit(0 if hashlib.sha256(canonical).hexdigest() == expected else 1)
-PY_SECCOMP
+# Formatting, comments and rule order do not change the reviewed permissions.
+canonical_seccomp="$(jq -ce '
+  def normalize:
+    if type == "object" then
+      to_entries | map(select(.key != "comment") | .value |= normalize) | sort_by(.key) | from_entries
+    elif type == "array" then map(normalize) | sort_by(tojson)
+    else . end;
+  normalize
+' "$chromium_seccomp_profile")" || fail "Chromium seccomp profile 缺少默认拒绝或已改变受审查的安全规则"
+[[ "$(printf '%s' "$canonical_seccomp" | sha256_input)" == "90cdabf9e0e329b3a80f8fa2bd9f64439f58623745aed0c4bdac31617147c6cc" ]] || fail "Chromium seccomp profile 缺少默认拒绝或已改变受审查的安全规则"
+unset canonical_seccomp
 grep -q '/usr/local/bin/atlas' "$migrate_script" || fail "migration 脚本必须使用宿主机 /usr/local/bin/atlas"
 grep -q 'flock' "$migrate_script" || fail "migration 脚本必须使用 flock 串行化"
 grep -q '^umask 077$' "$migrate_script" || fail "migration 脚本必须使用 umask 077 创建私有锁"
@@ -1051,19 +1066,11 @@ if [[ "$runtime_check" -eq 1 ]]; then
         -H 'Content-Type: application/json' \
         -d '{"jsonrpc":"2.0","id":"production-preflight","method":"capabilities","params":{}}' \
         "http://127.0.0.1:${app_port}/rpc/auth" || true)"
-      if ! printf '%s' "$auth_capabilities_response" | python3 -c '
-import json
-import sys
-parsed = json.load(sys.stdin)
-sms = parsed.get("result", {}).get("data", {}).get("sms_login", {})
-ok = parsed.get("result", {}).get("code") == 0 and sms == {
-    "enabled": True,
-    "mode": "provider",
-    "mock_delivery": False,
-    "disabled_reason": "",
-}
-raise SystemExit(0 if ok else 1)
-'; then
+      if ! printf '%s' "$auth_capabilities_response" | jq -se '
+        length == 1 and (.[0] | .result.code == 0 and .result.data.sms_login == {
+          enabled: true, mode: "provider", mock_delivery: false, disabled_reason: ""
+        })
+      ' >/dev/null; then
         fail "auth.capabilities 未匹配 yoyoosun provider 运行合同"
       fi
       unset auth_capabilities_response
@@ -1077,64 +1084,40 @@ fi
 
 assert_env_source_unchanged
 if [[ -n "$out_file" ]]; then
-  receipt_args=(
-    --out "$out_file"
-    --deployment-target "${deployment_target:-unregistered}"
-    --mode "$mode"
-    --profile "$profile"
+  receipt_checks=()
+  [[ "$env_required_keys_checked" -eq 1 ]] && receipt_checks+=(env-required-keys)
+  [[ "$production_boundaries_checked" -eq 1 ]] && receipt_checks+=(production-boundaries)
+  [[ "$compose_and_migration_checked" -eq 1 ]] && receipt_checks+=(compose-and-migration)
+  [[ "$compose_runtime_services_checked" -eq 1 ]] && receipt_checks+=(compose-runtime-services)
+  [[ "$runtime_health_ready_checked" -eq 1 ]] && receipt_checks+=(runtime-health-ready)
+  [[ "$sms_provider_runtime_checked" -eq 1 ]] && receipt_checks+=(sms-provider-runtime)
+  [[ "$pdf_runtime_checked" -eq 1 ]] && receipt_checks+=(pdf-runtime)
+  [[ "$chromium_runtime_checked" -eq 1 ]] && receipt_checks+=(chromium-runtime)
+  (
+    [[ ! -L "$out_file" && ! -d "$out_file" ]] || fail "--out 必须是普通文件路径且不能是符号链接"
+    receipt_temporary="$(mktemp "$(dirname "$out_file")/.production-preflight.XXXXXX")" || fail "无法准备回执临时文件"
+    trap 'rm -f -- "$receipt_temporary"' EXIT
+    jq -en --slurpfile contract "$script_dir/release-evidence-contract.json" \
+      --arg target "${deployment_target:-unregistered}" --arg mode "$mode" \
+      --arg profile "$profile" --arg commit "$expected_release" \
+      --arg generated "$(date -u '+%Y-%m-%dT%H:%M:%S.000Z')" \
+      --args '
+        (if ($contract | length) == 1 then $contract[0] else error("invalid receipt contract JSON") end) as $contract |
+        (reduce $ARGS.positional[] as $check ([]; if index($check) == null then . + [$check] else . end)) as $checks |
+        if (($contract.profiles | [.[]] | index($profile)) == null or
+            ($checks | length) == 0 or
+            any($checks[]; . as $check | ($contract.preflightChecks | [.[]] | index($check)) == null))
+        then error("invalid preflight receipt contract") else
+          {evidenceContract: $contract.evidenceContract, kind: "production-preflight",
+           generatedAt: $generated, deploymentTarget: $target, mode: $mode, profile: $profile,
+           productCommit: (if $commit == "" then null else $commit end),
+           checks: [$checks[] | {id: ., status: "passed"}],
+           summary: {total: ($checks | length), passed: ($checks | length), failed: 0},
+           redaction: {containsSecrets: false, containsRawCustomerRows: false, containsFullDsn: false}}
+        end
+      ' "${receipt_checks[@]}" >"$receipt_temporary" || fail "生成脱敏回执失败"
+    mv -f -- "$receipt_temporary" "$out_file" || fail "原子写入脱敏回执失败"
   )
-  if [[ -n "$expected_release" ]]; then
-    receipt_args+=(--product-commit "$expected_release")
-  fi
-  [[ "$env_required_keys_checked" -eq 1 ]] && receipt_args+=(--check env-required-keys)
-  [[ "$production_boundaries_checked" -eq 1 ]] && receipt_args+=(--check production-boundaries)
-  [[ "$compose_and_migration_checked" -eq 1 ]] && receipt_args+=(--check compose-and-migration)
-  [[ "$compose_runtime_services_checked" -eq 1 ]] && receipt_args+=(--check compose-runtime-services)
-  [[ "$runtime_health_ready_checked" -eq 1 ]] && receipt_args+=(--check runtime-health-ready)
-  [[ "$sms_provider_runtime_checked" -eq 1 ]] && receipt_args+=(--check sms-provider-runtime)
-  [[ "$pdf_runtime_checked" -eq 1 ]] && receipt_args+=(--check pdf-runtime)
-  [[ "$chromium_runtime_checked" -eq 1 ]] && receipt_args+=(--check chromium-runtime)
-  python3 - "$script_dir/release-evidence-contract.json" "${receipt_args[@]}" <<'PY_RECEIPT'
-import argparse
-import datetime
-import json
-import os
-import sys
-import tempfile
-
-with open(sys.argv[1], encoding="utf-8") as handle:
-    contract = json.load(handle)
-parser = argparse.ArgumentParser()
-for field in ("out", "deployment-target", "mode", "profile"):
-    parser.add_argument("--" + field, required=True)
-parser.add_argument("--product-commit", default="")
-parser.add_argument("--check", action="append", default=[])
-args = parser.parse_args(sys.argv[2:])
-checks = list(dict.fromkeys(args.check))
-assert args.profile in contract["profiles"].values()
-assert checks and set(checks).issubset(contract["preflightChecks"].values())
-receipt = {
-    "evidenceContract": contract["evidenceContract"], "kind": "production-preflight",
-    "generatedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="milliseconds"),
-    "deploymentTarget": args.deployment_target, "mode": args.mode, "profile": args.profile,
-    "productCommit": args.product_commit or None,
-    "checks": [{"id": check, "status": "passed"} for check in checks],
-    "summary": {"total": len(checks), "passed": len(checks), "failed": 0},
-    "redaction": {"containsSecrets": False, "containsRawCustomerRows": False, "containsFullDsn": False},
-}
-destination = os.path.abspath(args.out)
-assert not os.path.islink(destination), "--out must not be a symbolic link"
-temporary = None
-try:
-    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=os.path.dirname(destination), delete=False) as handle:
-        temporary = handle.name
-        json.dump(receipt, handle, indent=2)
-        handle.write("\n")
-    os.replace(temporary, destination)
-finally:
-    if temporary and os.path.exists(temporary):
-        os.unlink(temporary)
-PY_RECEIPT
   ok "脱敏 JSON 回执已写入: $out_file"
 fi
 echo "[production-preflight] all checks passed"

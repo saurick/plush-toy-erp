@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Descriptions, Form, Input } from 'antd'
+import { ProductionExceptionStatus } from '../../../common/consts/statuses.generated.mjs'
 import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
 import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
@@ -82,7 +83,7 @@ export default function ProductionOverIssueRequestModal({
       if (
         !created?.id ||
         created.decision_type !== 'OVER_ISSUE' ||
-        created.status !== 'SUBMITTED'
+        created.status !== ProductionExceptionStatus.SUBMITTED
       ) {
         throw Object.assign(new Error('超领申请结果暂时无法确认'), {
           isInvalidResponse: true,

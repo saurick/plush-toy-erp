@@ -1,5 +1,6 @@
 import { getPrintDraftProblems } from './printOutputPreflight.mjs'
 import { MATERIAL_PURCHASE_MAX_ROWS } from './materialPurchaseContractEditor.mjs'
+import { normalizeContractClauseGroups } from './contractClauseEditor.mjs'
 
 export const MATERIAL_PURCHASE_CONTRACT_BATCH_KIND =
   'material-purchase-contract-batch'
@@ -51,9 +52,10 @@ function contractConditions({ record, draft }) {
     ],
     [
       '合同条款',
-      ['delivery', 'contract', 'settlement'].map(
-        (key) => draft.clauses?.[key] || []
-      ),
+      normalizeContractClauseGroups(draft.clauses).map(({ label, items }) => [
+        label,
+        items,
+      ]),
     ],
   ].map(([label, value]) => [label, JSON.stringify(value)])
 }
@@ -191,10 +193,10 @@ export function getMaterialPurchaseContractOutputBatches(batchDraft) {
 export function isMaterialPurchaseContractBatchDraft(value) {
   return Boolean(
     value &&
-      typeof value === 'object' &&
-      value.kind === MATERIAL_PURCHASE_CONTRACT_BATCH_KIND &&
-      Number(value.version) === MATERIAL_PURCHASE_CONTRACT_BATCH_VERSION &&
-      Array.isArray(value.contracts)
+    typeof value === 'object' &&
+    value.kind === MATERIAL_PURCHASE_CONTRACT_BATCH_KIND &&
+    Number(value.version) === MATERIAL_PURCHASE_CONTRACT_BATCH_VERSION &&
+    Array.isArray(value.contracts)
   )
 }
 
@@ -252,7 +254,7 @@ export function formatMaterialPurchaseContractBatchProblems(problems = []) {
   const hiddenContractCount = Math.max(0, normalized.length - visible.length)
   return `${visible.join('；')}${
     hiddenContractCount > 0
-      ? `；另有 ${hiddenContractCount} 份合同需要补充`
+      ? `；另有 ${hiddenContractCount} 份合同需要检查`
       : ''
-  }。请在本窗口补齐后再打印，或取消选择本次不打印的合同。`
+  }。请调整后再打印，或取消选择本次不打印的合同。`
 }

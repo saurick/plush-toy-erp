@@ -62,5 +62,5 @@
 - Performance / quality 要检查本轮最高风险 bound：image count / size、DOM node growth、localStorage snapshot size、image load 后 layout settling、无 repeated measurement loop、编辑区域无明显 lag。
 - Source provenance 输出 manifest / checksum 结果、workbook / PDF 结构证据、real used range decision，涉及图片时输出 image-anchor provenance。
 - Official template coverage 要确认 `printTemplates.mjs`、server PDF module gate、docs、tests、页面级浏览器回归场景（Style L1）和 blind-spot notes 对齐。
-- Skill-only / docs-only changes 运行 skill validator、YAML / metadata / 引用检查与 `git diff --check`；progress 只在命中 `AGENTS.md` 的过程记录条件时更新。
+- Skill-only / docs-only 改动检查相关文档与 scoped diff；触达项目 Skills 时按[维护与验证](../../README.md#skill-validation)运行项目 validator。progress 只在命中 `AGENTS.md` 的过程记录条件时更新。
 - Runtime implementation changes 按 plush docs 和 touched files 选择检查；page / style work 通常需要相关 `style:l1` browser-level regression。

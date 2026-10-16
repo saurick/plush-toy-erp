@@ -1,11 +1,12 @@
 import React from 'react'
 import { Space, Tag, Typography } from 'antd'
+import { QualityInspectionStatus } from '../../../common/consts/statuses.generated.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import { formatQualityDefectRate } from '../../utils/qualityDefectRate.mjs'
-import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
+import { referenceLabel, inventoryLotStatusLabel } from '../../utils/referenceSelectOptions.mjs'
 
 const { Text } = Typography
 
@@ -13,11 +14,11 @@ export const QUALITY_INSPECTIONS_MODULE_KEY = 'quality-inspections'
 
 export const QUALITY_STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
-  { label: '草稿', value: 'DRAFT' },
-  { label: '已提交', value: 'SUBMITTED' },
-  { label: '合格', value: 'PASSED' },
-  { label: '不合格', value: 'REJECTED' },
-  { label: '已取消', value: 'CANCELLED' },
+  { label: '草稿', value: QualityInspectionStatus.DRAFT },
+  { label: '已提交', value: QualityInspectionStatus.SUBMITTED },
+  { label: '合格', value: QualityInspectionStatus.PASSED },
+  { label: '不合格', value: QualityInspectionStatus.REJECTED },
+  { label: '已取消', value: QualityInspectionStatus.CANCELLED },
 ]
 
 export const QUALITY_RESULT_FILTER_OPTIONS = [
@@ -56,19 +57,19 @@ export const QUALITY_DATE_FILTER_OPTIONS = [
 ]
 
 export const QUALITY_STATUS_LABELS = Object.freeze({
-  DRAFT: '草稿',
-  SUBMITTED: '已提交',
-  PASSED: '合格',
-  REJECTED: '不合格',
-  CANCELLED: '已取消',
+  [QualityInspectionStatus.DRAFT]: '草稿',
+  [QualityInspectionStatus.SUBMITTED]: '已提交',
+  [QualityInspectionStatus.PASSED]: '合格',
+  [QualityInspectionStatus.REJECTED]: '不合格',
+  [QualityInspectionStatus.CANCELLED]: '已取消',
 })
 
 const QUALITY_STATUS_COLORS = Object.freeze({
-  DRAFT: 'default',
-  SUBMITTED: 'gold',
-  PASSED: 'green',
-  REJECTED: 'red',
-  CANCELLED: 'default',
+  [QualityInspectionStatus.DRAFT]: 'default',
+  [QualityInspectionStatus.SUBMITTED]: 'gold',
+  [QualityInspectionStatus.PASSED]: 'green',
+  [QualityInspectionStatus.REJECTED]: 'red',
+  [QualityInspectionStatus.CANCELLED]: 'default',
 })
 
 const QUALITY_RESULT_LABELS = Object.freeze({
@@ -83,16 +84,8 @@ const QUALITY_RESULT_COLORS = Object.freeze({
   REJECT: 'red',
 })
 
-const LOT_STATUS_LABELS = Object.freeze({
-  ACTIVE: '可用',
-  HOLD: '冻结',
-  REJECTED: '不合格',
-  DISABLED: '停用',
-})
-
 function lotStatusText(status) {
-  const key = String(status || '').trim()
-  return LOT_STATUS_LABELS[key] || (key ? '批次状态' : '')
+  return inventoryLotStatusLabel(status)
 }
 
 function qualityStatusTag(status) {
@@ -112,6 +105,20 @@ function qualityResultTag(result) {
       {QUALITY_RESULT_LABELS[key] || '质检结果'}
     </Tag>
   )
+}
+
+export function qualityInspectionListStatusText(record) {
+  if (record?.status === QualityInspectionStatus.PASSED) {
+    return QUALITY_RESULT_LABELS[record?.result] || '判定待核对'
+  }
+  return QUALITY_STATUS_LABELS[record?.status] || (record?.status ? '质检状态' : '-')
+}
+
+function qualityInspectionListStatusTag(_value, record) {
+  const color = record?.status === QualityInspectionStatus.PASSED
+    ? QUALITY_RESULT_COLORS[record?.result]
+    : QUALITY_STATUS_COLORS[record?.status]
+  return <Tag color={color || 'default'}>{qualityInspectionListStatusText(record)}</Tag>
 }
 
 function renderStackCell(primary, secondaryItems = []) {
@@ -452,17 +459,17 @@ export function buildQualityInspectionDataColumns({
     },
     {
       defaultPriority: 20,
-      title: '状态',
-      exportTitle: '状态',
+      title: '状态 / 判定',
+      exportTitle: '状态 / 判定',
       dataIndex: 'status',
-      width: 110,
-      exportValue: (record) =>
-        QUALITY_STATUS_LABELS[record?.status] ||
-        (record?.status ? '质检状态' : ''),
-      render: qualityStatusTag,
+      width: 130,
+      sortValue: qualityInspectionListStatusText,
+      exportValue: qualityInspectionListStatusText,
+      render: qualityInspectionListStatusTag,
     },
     {
       defaultPriority: 30,
+      defaultHidden: true,
       title: '判定',
       exportTitle: '判定',
       dataIndex: 'result',

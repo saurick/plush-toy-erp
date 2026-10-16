@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Form, Input, Select, Spin } from 'antd'
+import { ProductionExceptionStatus } from '../../../common/consts/statuses.generated.mjs'
 import MaterialSupplierSelect from '../master-data/MaterialSupplierSelect.jsx'
 import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
 import ProcessSubmissionRoute from '../workflow/ProcessSubmissionRoute.jsx'
@@ -89,7 +90,7 @@ export default function ProductionExceptionRequestModal({
     setLoading(true)
     try {
       const created = await submitProductionException(attempt.params)
-      if (!created?.id || created.status !== 'SUBMITTED') {
+      if (!created?.id || created.status !== ProductionExceptionStatus.SUBMITTED) {
         throw Object.assign(new Error('生产异常申请结果暂时无法确认'), {
           isInvalidResponse: true,
         })

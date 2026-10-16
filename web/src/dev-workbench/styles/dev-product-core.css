@@ -133,43 +133,8 @@
 .erp-dev-product-core-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-block: 14px;
-}
-
-.erp-dev-product-core-filter {
-  display: inline-flex;
-  min-height: 34px;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid var(--erp-border);
-  border-radius: 6px;
-  background: var(--erp-surface-bg-soft);
-  padding: 5px 12px;
-  color: var(--erp-text);
-  cursor: pointer;
-}
-
-.erp-dev-product-core-filter strong {
-  color: var(--erp-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.erp-dev-product-core-filter:hover {
-  border-color: var(--erp-primary);
-  background: var(--erp-interactive-bg-hover);
-}
-
-.erp-dev-product-core-filter:focus-visible {
-  outline: 2px solid var(--erp-primary);
-  outline-offset: 2px;
-}
-
-.erp-dev-product-core-filter--active {
-  border-color: var(--erp-primary);
-  background: var(--erp-interactive-bg-hover);
-  color: var(--erp-primary);
-  box-shadow: none;
+  gap: 6px;
+  margin-block: 12px;
 }
 
 .erp-dev-product-core-table-wrap {
@@ -264,11 +229,6 @@
   padding: 28px 16px;
 }
 
-.erp-dev-product-core-boundary.ant-alert {
-  border-color: var(--erp-border);
-  background: var(--erp-surface-bg-soft);
-}
-
 @media (max-width: 767px) {
   .erp-dev-product-core-header {
     align-items: stretch;
@@ -326,11 +286,6 @@
   .erp-dev-product-core-filters {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .erp-dev-product-core-filter {
-    justify-content: center;
-    border-radius: 10px;
   }
 
   .erp-dev-product-core-table-wrap {

@@ -235,10 +235,6 @@ type SalesOrderLifecycleActionRepo interface {
 	ApplySalesOrderLifecycleAction(ctx context.Context, in *SourceOrderLifecycleAction, lifecycleStatus string) (*SalesOrder, error)
 }
 
-type SalesOrderItemOrderRepo interface {
-	ReorderSalesOrderItems(ctx context.Context, id, expectedVersion int, itemIDs []int) (*SalesOrderWithItems, error)
-}
-
 type SalesOrderUsecase struct {
 	repo SalesOrderRepo
 }
@@ -515,31 +511,6 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 	}
 
 	return uc.repo.SaveSalesOrderWithItems(ctx, id, &normalizedOrder, normalizedItems)
-}
-
-func (uc *SalesOrderUsecase) ReorderSalesOrderItems(ctx context.Context, id int, in *SourceDocumentItemOrderMutation) (*SalesOrderWithItems, error) {
-	if uc == nil || uc.repo == nil {
-		return nil, ErrBadParam
-	}
-	normalized, err := normalizeSourceDocumentItemOrderMutation(id, in)
-	if err != nil {
-		return nil, err
-	}
-	current, err := uc.repo.GetSalesOrder(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if !CanReorderSalesOrderItems(current.LifecycleStatus) {
-		return nil, ErrBadParam
-	}
-	if current.Version != normalized.ExpectedVersion {
-		return nil, ErrSalesOrderConflict
-	}
-	repo, ok := uc.repo.(SalesOrderItemOrderRepo)
-	if !ok {
-		return nil, ErrBadParam
-	}
-	return repo.ReorderSalesOrderItems(ctx, id, normalized.ExpectedVersion, normalized.ItemIDs)
 }
 
 func (uc *SalesOrderUsecase) ListSalesOrderItems(ctx context.Context, filter SalesOrderItemFilter) ([]*SalesOrderItem, int, error) {
@@ -836,15 +807,6 @@ func IsValidSalesOrderStatus(value string) bool {
 
 func IsValidSalesOrderItemStatus(value string) bool {
 	return corestatus.IsSalesOrderItemStatus(value)
-}
-
-func CanReorderSalesOrderItems(status string) bool {
-	switch corestatus.NormalizeSalesOrderStatus(status) {
-	case SalesOrderStatusDraft, SalesOrderStatusSubmitted, SalesOrderStatusActive:
-		return true
-	default:
-		return false
-	}
 }
 
 func IsSalesOrderLifecycleTransitionAllowed(current string, next string) bool {

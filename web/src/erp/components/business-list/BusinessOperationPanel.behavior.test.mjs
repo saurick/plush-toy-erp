@@ -36,15 +36,14 @@ test('直接清空只调用一次原回调、恢复结果与焦点，重新筛�
       onClearFilters() { cleared += 1; setStatus('') },
       clearFiltersDisabled: !status,
       onFiltersOpenChange(open) { opens.push(open) },
-      filters: createElement(React.Fragment, null,
-        createElement(SearchInput, { value: '小熊', onChange() {} }),
-        createElement(SelectFilter, {
-          'aria-label': '任务状态', value: status, onChange: setStatus,
+      filters: createElement(React.Fragment, null, createElement(SearchInput, { value: '小熊', onChange() {} }), createElement(SelectFilter, {
+          'aria-label': '任务状态',
+value: status,
+onChange: setStatus,
           options: [{ value: '', label: '全部' }, { value: 'ready', label: '待处理' }],
         })
       ),
-      children: createElement('output', null, status ? '共 1 条' : '共 2 条'),
-    })
+    }, createElement('output', null, status ? '共 1 条' : '共 2 条'))
   }
   await harness.render(createElement(Example))
   const trigger = () => document.querySelector('button[aria-haspopup="dialog"]')
@@ -78,7 +77,9 @@ test('受控面板直接清空会关闭并恢复焦点，面板内清空保留�
       clearFiltersDisabled: !value,
       onClearFilters() { cleared += 1; setValue('') },
       filters: createElement(SelectFilter, {
-        'aria-label': '任务状态', value, onChange: setValue,
+        'aria-label': '任务状态',
+value,
+onChange: setValue,
         options: [{ value: '', label: '全部' }, { value: 'ready', label: '待处理' }],
       }),
     })

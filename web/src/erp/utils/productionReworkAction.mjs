@@ -1,3 +1,4 @@
+import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   addNumeric20Scale6Units,
   compareNumeric20Scale6Units,
@@ -69,7 +70,7 @@ function sameQuantity(left, right) {
 export function isPostedProductionCompletion(fact = {}) {
   return Boolean(
     positiveID(fact?.id) > 0 &&
-      normalizedUpperText(fact?.status) === 'POSTED' &&
+      normalizedUpperText(fact?.status) === OperationalFactStatus.POSTED &&
       normalizedUpperText(fact?.fact_type) === 'FINISHED_GOODS_RECEIPT' &&
       normalizedUpperText(fact?.subject_type) === 'PRODUCT' &&
       positiveID(fact?.warehouse_id) > 0 &&
@@ -88,7 +89,7 @@ export function productionReworkQuantitySummary(source = {}, facts = []) {
     (total, fact) => {
       if (
         normalizedUpperText(fact?.fact_type) !== 'REWORK' ||
-        normalizedUpperText(fact?.status) !== 'POSTED' ||
+        normalizedUpperText(fact?.status) !== OperationalFactStatus.POSTED ||
         normalizedUpperText(fact?.source_type) !== 'PRODUCTION_FACT' ||
         positiveID(fact?.source_id) !== positiveID(source?.id)
       ) {
@@ -205,7 +206,7 @@ export function normalizeProductionReworkRequest(params = {}) {
 export function validateProductionReworkResult(result, request = {}) {
   const valid =
     positiveID(result?.id) > 0 &&
-    normalizedUpperText(result?.status) === 'DRAFT' &&
+    normalizedUpperText(result?.status) === OperationalFactStatus.DRAFT &&
     normalizedUpperText(result?.fact_type) === 'REWORK' &&
     normalizedUpperText(result?.subject_type) === 'PRODUCT' &&
     positiveID(result?.warehouse_id) > 0 &&

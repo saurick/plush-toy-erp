@@ -4,6 +4,7 @@ import {
   closeBusinessFormPage,
 } from './businessFormPageAssertions.mjs'
 import { createBusinessFormPageDraftScenarios } from './businessFormPageDraftScenarios.mjs'
+import { createBusinessFormFullscreenScenarios } from './businessFormFullscreenScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { assertBusinessFormSections } from './businessFormSectionAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.js'
@@ -73,6 +74,23 @@ export function createBusinessFormPagesScenarios(deps) {
       const editor = page.locator('.erp-business-form-page:not([hidden])')
       await editor.getByRole('heading', { name: title, exact: true }).waitFor()
       await assertBusinessFormPage(page, editor)
+      if (page.viewportSize().width >= 768 && !new URL(page.url()).pathname.startsWith('/m/')) {
+        const normal = await editor.boundingBox()
+        await editor.getByRole('button', { name: '全屏编辑', exact: true }).click()
+        const full = await editor.boundingBox()
+        const viewport = page.viewportSize()
+        deps.assert.ok(
+          Math.abs(full.x) <= 1 && Math.abs(full.y) <= 1 &&
+          Math.abs(full.width - viewport.width) <= 1 &&
+          Math.abs(full.height - viewport.height) <= 1,
+          `${key}: fullscreen fills the browser workspace ${JSON.stringify(full)}`
+        )
+        await editor.getByRole('button', { name: '退出全屏', exact: true }).click()
+        const restored = await editor.boundingBox()
+        for (const dimension of ['x', 'y', 'width', 'height']) {
+          deps.assert.ok(Math.abs(restored[dimension] - normal[dimension]) <= 1, `${key}: restores ${dimension}`)
+        }
+      }
       if (page.viewportSize().width <= 767) {
         await assertMobileBackToTop(page, editor.locator('.erp-business-form-page__body'), { keyboard: true })
       }
@@ -238,6 +256,7 @@ export function createBusinessFormPagesScenarios(deps) {
     },
   }))
   return [
+    ...createBusinessFormFullscreenScenarios(deps, scenarios),
     ...createBusinessFormPageDraftScenarios(deps),
     ...scenarios,
     ...['create', 'edit'].map((mode) => {
@@ -275,7 +294,7 @@ export function createBusinessFormPagesScenarios(deps) {
             ) {
               return route.fallback()
             }
-            const params = request.params
+            const { params } = request
             requests.push(params)
             const editing = params.production_order_id === 71
             const options = [
@@ -516,7 +535,7 @@ export function createBusinessFormPagesScenarios(deps) {
           await assertLineItemAddActionScrollsToNewRow(editor, {
             scenarioName: name,
             targetRowCount: 10,
-            ...(key === 'sales' ? { addButtonName: '添加订货明细' } : {}),
+            ...(key === 'sales' ? { addButtonName: '添加订货明细', headerAddWhenEmpty: false } : {}),
             ...(key === 'purchase'
               ? { addButtonName: '添加采购明细' }
               : {}),
@@ -687,16 +706,16 @@ export function createBusinessFormPagesScenarios(deps) {
                 .nth(1)
                 .getByLabel(nameLabel, { exact: true })
                 .fill('独立修改的复制行')
+              deps.assert.equal(await valueAt(0), '尚未保存的明细甲')
+              deps.assert.equal(await valueAt(1), '独立修改的复制行')
+              deps.assert.equal(await valueAt(2), '相邻明细乙')
+              deps.assert.equal(await editor.getByRole('button', { name: /^(上移|下移)第 \d+ 行$/u }).count(), 0)
               await rows
                 .nth(1)
-                .getByRole('button', { name: '上移第 2 行', exact: true })
-                .click()
-              deps.assert.equal(await valueAt(0), '独立修改的复制行')
-              deps.assert.equal(await valueAt(1), '尚未保存的明细甲')
-              await rows
-                .first()
                 .getByRole('button', { name: /移除行/ })
                 .click()
+              await rows.nth(count).waitFor({ state: 'detached' })
+              deps.assert.equal(await rows.count(), count)
               deps.assert.equal(await valueAt(0), '尚未保存的明细甲')
               deps.assert.equal(await valueAt(1), '相邻明细乙')
             }
@@ -1017,6 +1036,17 @@ export function createBusinessFormPagesScenarios(deps) {
         await attachmentInput.setInputFiles(file)
         await editor.getByText(file.name, { exact: true }).waitFor()
         deps.assert.equal(await editor.getAttribute('data-unsaved'), 'true')
+        const inputHandle = await attachmentInput.elementHandle()
+        const body = editor.locator('.erp-business-form-page__body')
+        await body.evaluate((node) => { node.scrollTop = node.scrollHeight })
+        const top = await body.evaluate((node) => node.scrollTop)
+        for (const label of ['全屏编辑', '退出全屏']) {
+          await editor.getByRole('button', { name: label, exact: true }).click()
+          deps.assert.equal(await inputHandle.evaluate((node) => node.isConnected), true)
+          await editor.getByText(file.name, { exact: true }).waitFor()
+          deps.assert.equal(await editor.getAttribute('data-unsaved'), 'true')
+        }
+        deps.assert.equal(await body.evaluate((node) => node.scrollTop), top, 'returning restores the scroll position clipped by fullscreen')
         await editor
           .getByRole('button', { name: '返回列表', exact: true })
           .click()

@@ -118,19 +118,28 @@ function yamlJobBlock(name) {
 }
 
 test("CI uses the module toolchain and keeps release and Runner pins aligned", () => {
-  const module = readFileSync(new URL("../../server/go.mod", import.meta.url), "utf8");
+  const module = readFileSync(
+    new URL("../../server/go.mod", import.meta.url),
+    "utf8",
+  );
   const toolchain = module.match(/^toolchain (go\d+\.\d+\.\d+)$/mu)?.[1];
   assert(toolchain);
   const version = toolchain.slice(2);
-  const dockerfile = readFileSync(new URL("../../server/Dockerfile", import.meta.url), "utf8");
-  assert.match(workflow, /export GOTOOLCHAIN="\$\(awk '\$1 == "toolchain" \{ print \$2 \}' server\/go\.mod\)"/u);
+  const dockerfile = readFileSync(
+    new URL("../../server/Dockerfile", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    workflow,
+    /export GOTOOLCHAIN="\$\(awk '\$1 == "toolchain" \{ print \$2 \}' server\/go\.mod\)"/u,
+  );
   assert.match(workflow, /test "\$\(go env GOVERSION\)" = "\$GOTOOLCHAIN"/u);
   assert(dockerfile.includes(`ARG GO_BUILDER_IMAGE=golang:${version}\n`));
   assert(runnerCloudInit.includes(`go_version=${version}\n`));
   assert.equal(
-    runnerCloudInit.match(/test "\$\(go env GOVERSION\)" = go\d+\.\d+\.\d+/gu)?.every(
-      (line) => line.endsWith(toolchain),
-    ),
+    runnerCloudInit
+      .match(/test "\$\(go env GOVERSION\)" = go\d+\.\d+\.\d+/gu)
+      ?.every((line) => line.endsWith(toolchain)),
     true,
   );
 });
@@ -172,7 +181,9 @@ test("Node declarations and build images follow the single n version pin", () =>
 
 test("documentation routing is guarded by the shared complete non-Markdown path set", () => {
   const rules = workflow.split("\nstages:")[0];
-  const paths = [...rules.matchAll(/^          - "([^"]+)"$/gmu)].map((match) => match[1]);
+  const paths = [...rules.matchAll(/^          - "([^"]+)"$/gmu)].map(
+    (match) => match[1],
+  );
   assert.deepEqual(paths, [...CI_FULL_CHANGE_PATTERNS]);
   assert.match(rules, /CI_PIPELINE_SOURCE == "web" && \$QA_MODE == "full"/u);
   assert.match(rules, /CI_COMMIT_BEFORE_SHA == "0{40}"/u);
@@ -180,7 +191,10 @@ test("documentation routing is guarded by the shared complete non-Markdown path 
   const docs = yamlJobBlock("quality_docs");
   assert.match(docs, /\$CI_QUALITY_SCOPE == "docs"/u);
   assert.match(docs, /bash scripts\/qa\/affected.sh --base "\$range" --run/u);
-  assert.match(docs, /pnpm --dir web install --frozen-lockfile --prefer-offline/u);
+  assert.match(
+    docs,
+    /pnpm --dir web install --frozen-lockfile --prefer-offline/u,
+  );
   assert.match(docs, /\.flags.needsWeb/u);
   assert.doesNotMatch(docs, /docker|atlas|ci-playwright-runtime/u);
   const gate = yamlJobBlock("CI Gate");
@@ -419,9 +433,10 @@ test("GitLab is the canonical CI with one fixed exact-SHA DAG and stable gate", 
     for (const lane of lanes) {
       assert.match(workflow, new RegExp(`^quality_${shard}_${lane}:`, "mu"));
       if (shard === "server") {
-        const resourceGroup = lane === "upgrade"
-          ? "quality-server-upgrade"
-          : "quality-server-heavy";
+        const resourceGroup =
+          lane === "upgrade"
+            ? "quality-server-upgrade"
+            : "quality-server-heavy";
         assert.match(
           yamlJobBlock(`quality_${shard}_${lane}`),
           new RegExp(`^  resource_group: ${resourceGroup}$`, "mu"),
@@ -922,7 +937,7 @@ test("GitLab definitions pin identity, separate SSD data and require exact execu
   assert.match(compose, /^name: plush-gitlab-control$/mu);
   assert.match(
     compose,
-    /gitlab\/gitlab-ce@sha256:8c6ede6b1334738123feba0d248e81a14fc3db7065dc6e1f0a753c0d0332fee8/u,
+    /gitlab\/gitlab-ce@sha256:9f5beb6b69859c4e9896985022cef582360529128428cf3e4ca358ed47ead8aa/u,
   );
   assert.match(compose, /127[.]0[.]0[.]1:\$\{GITLAB_HTTP_PORT:-8929\}:8929/u);
   assert.match(compose, /\/srv\/gitlab\/data/u);
@@ -1084,7 +1099,10 @@ test("Runner provisioning and capacity stay explicit and fail closed", () => {
   assert.match(runnerVm, /SOURCE_CAPACITY_FILE/u);
   assert.equal(runnerCapacityPolicy, "RUNNER_CONCURRENT_SLOTS=19\n");
   assert.match(runnerVm, /EXPECTED_CONTROL_HOSTNAME=r740xd/u);
-  assert.match(runnerVm, /PROVISION_PLUSH_RUNNER:\$EXPECTED_CONTROL_HOSTNAME:/u);
+  assert.match(
+    runnerVm,
+    /PROVISION_PLUSH_RUNNER:\$EXPECTED_CONTROL_HOSTNAME:/u,
+  );
   assert.match(runnerVm, /BASE_VOLUME_SHA256/u);
   assert.match(runnerVm, /timeout 600 sha256sum/u);
   assert.match(runnerVm, /TEMPLATE_SHA256/u);
@@ -1140,10 +1158,7 @@ test("Runner provisioning and capacity stay explicit and fail closed", () => {
   );
   assert.match(runnerCapacity, /flock -n/u);
   assert.match(runnerCapacity, /--expect-slots/u);
-  assert.match(
-    runnerCapacity,
-    /SET_RUNNER_CAPACITY:\$EXPECTED_RUNNER_NAME:/u,
-  );
+  assert.match(runnerCapacity, /SET_RUNNER_CAPACITY:\$EXPECTED_RUNNER_NAME:/u);
   assert.match(runnerCapacity, /CURRENT_SLOTS.*EXPECTED_SLOTS/u);
   assert.match(runnerCapacity, /LIMIT_VALUES\[0\].*SLOTS/u);
   assert.match(runnerCapacity, /status=rollback_incomplete/u);

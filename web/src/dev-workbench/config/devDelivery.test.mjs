@@ -170,6 +170,7 @@ function summaryFixture() {
         actionClass: 'blocked',
         actionReason: 'target_identity_unavailable',
         actionsByTarget: {
+          'production-133': { actionClass: 'blocked', actionReason: 'target_identity_unavailable' },
           'customer-test-133': {
             actionClass: 'blocked',
             actionReason: 'target_identity_unavailable',
@@ -250,7 +251,7 @@ function summaryFixture() {
       provider: 'gitlab',
       releaseDispatchAllowed: true,
       target: 'demo-133',
-      targets: ['demo-133', 'customer-test-133'],
+      targets: ['demo-133', 'customer-test-133', 'production-133'],
       browserShellAccess: false,
       targetBuildAllowed: false,
       automaticRetryAllowed: false,
@@ -677,7 +678,7 @@ test('delivery client reuses one CSRF session and posts only the fixed action en
           kind: 'plush.dev-delivery-session',
           csrfToken: 'c'.repeat(43),
           target: 'demo-133',
-          targets: ['demo-133', 'customer-test-133'],
+          targets: ['demo-133', 'customer-test-133', 'production-133'],
         })
       }
       if (url === DEV_DELIVERY_SUMMARY_API_PATH) {
@@ -1265,7 +1266,7 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /先发布制品，不会直接部署到任一目标/u)
   assert.match(source, /“准备部署”和“确认部署”/u)
   assert.match(source, /trigger=\{\['hover', 'click'\]\}/u)
-  assert.match(source, /手动操作指引/u)
+  assert.match(source, /操作指引/u)
   assert.match(source, /手动与应急发布指引/u)
   assert.match(source, /四处操作各管什么/u)
   assert.match(source, /Codex \/ 本地终端/u)

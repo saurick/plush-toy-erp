@@ -1,6 +1,7 @@
 import { standardUnitForLabel } from '../utils/unitQuantity.mjs'
 import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
 import { unixSecondsToBusinessDate } from '../utils/businessDate.mjs'
+import { normalizeContractClauseGroups } from '../utils/contractClauseEditor.mjs'
 import {
   multiplyNumeric20Scale6Values,
   normalizeNumeric20Scale6,
@@ -325,14 +326,7 @@ function resolveProcessingAppendixImages(draft = {}) {
 }
 
 export function normalizeProcessingContractClauses(clauses = {}) {
-  const source = clauses && typeof clauses === 'object' ? clauses : {}
-
-  return Object.keys(defaultClauses).reduce((state, groupKey) => {
-    state[groupKey] = Array.isArray(source[groupKey])
-      ? source[groupKey].map((item) => normalizeText(item))
-      : [...defaultClauses[groupKey]]
-    return state
-  }, {})
+  return normalizeContractClauseGroups(clauses, defaultClauses)
 }
 
 function isProcessingContractCellHiddenByMerge(merges, rowIndex, columnKey) {

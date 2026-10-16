@@ -654,3 +654,23 @@ test("remote target preflight script is read-only and contains no build command"
     /jsonb_extract_path_text\(compiled_snapshot, 'datasetVersion'\)/u,
   );
 });
+
+test("production runtime readback uses the non-trial config and exact public identity", () => {
+  const target = getDeploymentTarget("production-133");
+  const report = parseRemoteTargetPreflight(
+    customerTestRemoteReport({
+      TARGET: target.key,
+      DATABASE_NAME: target.database.name,
+      ACTIVE_CONFIG_REVISION: "yoyoosun-production.runtime-manifest",
+      ACTIVE_CONFIG_PRODUCT_VERSION: "production-candidate",
+      PUBLIC_CONTAINER: `${target.publicEntry.containerPrefix}${SHA.slice(0, 8)}`,
+    }),
+    target,
+  );
+  assert.equal(report.status, "passed");
+  assert.equal(
+    report.runtime.activeCustomerConfig.datasetVersion,
+    ACTIVE_DATASET_VERSION_NOT_APPLICABLE,
+  );
+  assert.equal(report.publicEntry.gitSha, SHA);
+});

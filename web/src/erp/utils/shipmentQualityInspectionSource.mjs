@@ -1,3 +1,4 @@
+import { InventoryLotStatus, QualityInspectionStatus, ShipmentStatus } from '../../common/consts/statuses.generated.mjs'
 import { normalizeShipmentQuantity } from './shipmentWeight.mjs'
 
 const FINISHED_GOODS_SOURCE_TYPE = 'SHIPMENT'
@@ -94,7 +95,7 @@ function existingInspectionForSource(qualityInspections, source) {
     (Array.isArray(qualityInspections) ? qualityInspections : []).find(
       (inspection) =>
         positiveID(inspection?.id) &&
-        normalizedStatus(inspection?.status) !== 'CANCELLED' &&
+        normalizedStatus(inspection?.status) !== QualityInspectionStatus.CANCELLED &&
         normalizedStatus(inspection?.source_type) ===
           FINISHED_GOODS_SOURCE_TYPE &&
         positiveID(inspection?.source_id) === source.shipmentID &&
@@ -113,7 +114,7 @@ function shipmentUnavailableReason(shipment) {
   if (!positiveID(shipment?.id)) {
     return '出货单尚未保存，不能发起成品检验'
   }
-  if (normalizedStatus(shipment?.status) !== 'DRAFT') {
+  if (normalizedStatus(shipment?.status) !== ShipmentStatus.DRAFT) {
     return '只有待出货草稿可以发起成品检验'
   }
   return ''
@@ -148,10 +149,10 @@ function sourceUnavailableReason(
     return '所选批次与产品规格不一致，请先核对出货明细'
   }
   if (existingInspection) return '该送检批次已有未取消的成品检验'
-  if (normalizedStatus(inventoryLot.status) === 'DISABLED') {
+  if (normalizedStatus(inventoryLot.status) === InventoryLotStatus.DISABLED) {
     return '该成品批次已停用，不能发起检验'
   }
-  if (normalizedStatus(inventoryLot.status) === 'REJECTED') {
+  if (normalizedStatus(inventoryLot.status) === InventoryLotStatus.REJECTED) {
     return '该成品批次已判定不合格，不能再次发起出货前检验'
   }
   return ''
@@ -311,7 +312,7 @@ export function isMatchingShipmentQualityInspectionDraft(
       productID &&
       warehouseID &&
       lotID &&
-      normalizedStatus(inspection?.status) === 'DRAFT' &&
+      normalizedStatus(inspection?.status) === ShipmentStatus.DRAFT &&
       normalizedStatus(inspection?.source_type) ===
         FINISHED_GOODS_SOURCE_TYPE &&
       positiveID(inspection?.source_id) === shipmentID &&

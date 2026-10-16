@@ -1,3 +1,4 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { requireWorkflowTaskIdempotencyKey } from './workflowTaskMutation.mjs'
 
 export const FOLLOWUP_SOURCE_TYPES = Object.freeze([
@@ -76,7 +77,7 @@ export function requireFollowupReceipt(data, params) {
       task.task_name !== params.task_name || task.owner_role_key !== params.owner_role_key ||
       task.assignee_id !== params.assignee_id || task.due_at !== params.due_at || task.priority !== params.priority ||
       task.payload?.description !== params.description || task.process_instance_id != null || task.config_revision != null ||
-      task.task_status_key !== 'ready') {
+      task.task_status_key !== WorkflowTaskStatus.READY) {
     const error = new Error('创建结果暂未确认，请使用原内容重试')
     error.isInvalidResponse = true
     throw error

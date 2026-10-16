@@ -116,3 +116,48 @@ func TestSensitiveFieldOrderCurrencyFollowsCommercialPermission(t *testing.T) {
 		}
 	}
 }
+
+func TestSensitiveFieldWarehouseCommandsKeepCommercialMutationsProtected(t *testing.T) {
+	admin := workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey})
+	dispatcher := &jsonrpcDispatcher{}
+	for _, method := range []string{
+		"create_outsourcing_material_issue_from_order",
+		"create_outsourcing_return_receipt_from_order",
+		"save_outsourcing_material_issue_draft",
+		"save_outsourcing_return_receipt_draft",
+	} {
+		ctx := biz.WithCurrentAdmin(workflowJSONRPCAdminContext(), admin)
+		if got := dispatcher.requireSensitiveFieldMutationPermission(withAdminPermissionCache(ctx), "operational_fact", method); got != nil {
+			t.Errorf("warehouse command %s must use its own business permission, got %#v", method, got)
+		}
+	}
+	for _, command := range [][2]string{
+		{"outsourcing_order", "save_outsourcing_order_with_items"},
+		{"operational_fact", "create_payable_from_outsourcing_return"},
+		{"operational_fact", "create_outsourcing_unknown_command"},
+	} {
+		ctx := biz.WithCurrentAdmin(workflowJSONRPCAdminContext(), admin)
+		if got := dispatcher.requireSensitiveFieldMutationPermission(withAdminPermissionCache(ctx), command[0], command[1]); got == nil || got.Code != errcode.PermissionDenied.Code {
+			t.Errorf("commercial command %s must retain the field permission, got %#v", command[1], got)
+		}
+	}
+}
+
+func TestOutsourcingWarehouseDraftSaveRejectsClientCommercialFields(t *testing.T) {
+	for _, method := range []string{"save_outsourcing_material_issue_draft", "save_outsourcing_return_receipt_draft"} {
+		params := map[string]any{
+			"id": float64(21), "expected_version": float64(1), "warehouse_id": float64(2),
+			"lot_id": float64(3), "quantity": "2", "occurred_at": "2026-10-16T10:00:00Z",
+		}
+		if _, ok := outsourcingFactDraftSaveFromParams(params, method); !ok {
+			t.Fatalf("valid warehouse draft %s rejected", method)
+		}
+		for _, field := range []string{"unit_price", "amount"} {
+			params[field] = "1"
+			if _, ok := outsourcingFactDraftSaveFromParams(params, method); ok {
+				t.Fatalf("%s must reject client commercial field %s", method, field)
+			}
+			delete(params, field)
+		}
+	}
+}

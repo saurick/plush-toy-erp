@@ -70,7 +70,7 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
   }
 
   return (
-    <div className={`erp-dev-hub-page erp-dev-hub-page--area erp-dev-workspace-page erp-dev-area-page${isDelivery ? ' erp-dev-delivery-workspace' : ''}`}>
+    <div className={`erp-dev-hub-page erp-dev-hub-page--area erp-dev-workspace-page erp-dev-tool-page erp-dev-area-page${isDelivery ? ' erp-dev-delivery-workspace' : ''}`}>
       <DevPageNav />
       <header className="erp-dev-hub-header">
         <div className="erp-dev-hub-header__copy">
@@ -119,27 +119,20 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             aria-label={`${presentation.title}工具`}
           >
             <div className="erp-dev-area-tools__heading">
-              <strong>
-                {isQuality
-                  ? '按需要选择检查'
-                  : isDelivery
-                    ? '按任务准备与核对'
-                    : '产品工程工具'}
-              </strong>
+              <strong>{isDelivery ? '交付任务' : '工具'}</strong>
               <Text type="secondary">{items.length} 个工具</Text>
             </div>
             {isDelivery ? (
               <div className="erp-dev-tool-table-wrap">
                 <table className="erp-dev-tool-table erp-dev-delivery-task-table" aria-label="交付运行任务">
                   <thead>
-                    <tr><th scope="col">任务</th><th scope="col">作用范围</th><th scope="col">核对与结果</th><th scope="col">入口</th></tr>
+                    <tr><th scope="col">任务</th><th scope="col">作用范围</th><th scope="col">入口</th></tr>
                   </thead>
                   <tbody>
-                    {items.map((item, index) => (
+                    {items.map((item) => (
                       <tr key={item.key}>
-                        <th scope="row"><span className="erp-dev-delivery-task-number">{index + 1}</span>{item.title.split(' / ')[0]}</th>
+                        <th scope="row">{item.title.split(' / ')[0]}</th>
                         <td>{DELIVERY_TASK_SCOPE[item.key].scope}</td>
-                        <td>{item.description}</td>
                         <td><Link to={item.route}>{DELIVERY_TASK_SCOPE[item.key].action}</Link></td>
                       </tr>
                     ))}
@@ -158,9 +151,6 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
               <Link to={`${DEV_TESTING_ROUTE}?view=closeout`}>
                 核对 Git 收口
               </Link>
-              <Text type="secondary">
-                交付前核对当前改动的检查与提交证据。环境运行状态在“环境证据”中查看。
-              </Text>
             </div>
           ) : null}
         </div>

@@ -66,20 +66,23 @@ test('FL_processing_contract_table_headers__paper_uses_shared_subject_aware_colu
 test('processingContractTemplate: 默认条款保留 B 类加工合同源表固定文本', () => {
   const draft = createProcessingContractDraft()
 
-  assert.deepEqual(draft.clauses.delivery, [
+  assert.deepEqual(draft.clauses.find(({ key }) => key === 'delivery').items, [
     '按订单明细分别打包（1k/包，不足1K单独包装），并标明产品编号、工序名称。',
     '请严格按定单规定，准时足量送（发）货。',
     '必须保证产品的品质，按BOM表要求的生产艺生产。未达要求的产品，委托方有权要求返工，无法返工的，承担赔偿责任；因返工造成委托方延误工期的，加工方承担违约责任。（因委托方原因导致的，免除加工方的责任）。',
   ])
-  assert.deepEqual(draft.clauses.contract, [
+  assert.deepEqual(draft.clauses.find(({ key }) => key === 'contract').items, [
     '在订单约定日期前交货。如因货期延误，影响到我司正常生产计划的，委托方将对加工方收取违约金。实际交货日期比合同货期延误一天以上的，每延误一天，按100元/款来处罚，直接从货款扣除。',
     '在交货中，如因特殊原因不能按期交货务必提前与委托方采购沟通确认，经同意后方可延期， 否则加工厂承担违约金，赔偿损失；',
     '违约责任和解决合同纠纷的方式：按《经济合同法》和《购销合同条例》规定需承担的责任，进行友好协商或按《合同法》办理。',
   ])
-  assert.deepEqual(draft.clauses.settlement, [
-    '按委托方仓库确认收到货物日期，次月开始对账，每月15号之前完成对账。',
-    '对完账后，次月支付货款，加工厂开具等额增值税专用发票。',
-  ])
+  assert.deepEqual(
+    draft.clauses.find(({ key }) => key === 'settlement').items,
+    [
+      '按委托方仓库确认收到货物日期，次月开始对账，每月15号之前完成对账。',
+      '对完账后，次月支付货款，加工厂开具等额增值税专用发票。',
+    ]
+  )
 })
 
 test('processingContractTemplate: 草稿恢复保留空条款及后续条款位置', () => {
@@ -89,10 +92,16 @@ test('processingContractTemplate: 草稿恢复保留空条款及后续条款位�
     settlement: [],
   }
   const restored = normalizeProcessingContractDraft({ clauses })
-  assert.deepEqual(restored.clauses, clauses)
-  restored.clauses.delivery[1] = '重新填写'
+  assert.deepEqual(restored.clauses, [
+    { key: 'delivery', label: '来货要求', items: ['第一条', '', '第三条'] },
+    { key: 'contract', label: '合同约定', items: ['', ''] },
+    { key: 'settlement', label: '结算方式', items: [] },
+  ])
+  restored.clauses.find(({ key }) => key === 'delivery').items[1] = '重新填写'
   assert.deepEqual(
-    normalizeProcessingContractDraft(restored).clauses.delivery,
+    normalizeProcessingContractDraft(restored).clauses.find(
+      ({ key }) => key === 'delivery'
+    ).items,
     ['第一条', '重新填写', '第三条']
   )
   assert.deepEqual(clauses.delivery, ['第一条', '', '第三条'])
@@ -137,9 +146,18 @@ test('processingContractTemplate: 空白模板清空字段明细和末尾附图�
     amount: '',
     remark: '',
   })
-  assert.deepEqual(blankDraft.clauses.delivery, ['保留来货要求'])
-  assert.deepEqual(blankDraft.clauses.contract, ['保留合同约定'])
-  assert.deepEqual(blankDraft.clauses.settlement, ['保留结算方式'])
+  assert.deepEqual(
+    blankDraft.clauses.find(({ key }) => key === 'delivery').items,
+    ['保留来货要求']
+  )
+  assert.deepEqual(
+    blankDraft.clauses.find(({ key }) => key === 'contract').items,
+    ['保留合同约定']
+  )
+  assert.deepEqual(
+    blankDraft.clauses.find(({ key }) => key === 'settlement').items,
+    ['保留结算方式']
+  )
   assert.deepEqual(blankDraft.appendixImages, [])
   assert.deepEqual(blankDraft.merges, [])
 })
@@ -179,7 +197,9 @@ test('FL_processing_contract_business_draft__does_not_fill_missing_business_fiel
   assert.equal(draft.lines[0].productName, '')
   assert.equal(draft.lines[0].supplierAlias, '')
   assert.equal(draft.lines[0].amount, '30')
-  assert.deepEqual(draft.clauses.delivery, ['保留业务来货要求'])
+  assert.deepEqual(draft.clauses.find(({ key }) => key === 'delivery').items, [
+    '保留业务来货要求',
+  ])
   assert.deepEqual(draft.appendixImages, [])
   assert.deepEqual(draft.merges, [])
 })

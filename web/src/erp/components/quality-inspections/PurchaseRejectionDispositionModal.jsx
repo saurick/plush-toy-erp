@@ -10,6 +10,7 @@ import {
   Space,
   Tag,
 } from 'antd'
+import { PurchaseRejectionStatus } from '../../../common/consts/statuses.generated.mjs'
 import { unitQuantityRule } from '../../utils/unitQuantity.mjs'
 import { sumNumeric20Scale6Values,
   isPositiveNumeric20Scale6Units,
@@ -35,9 +36,9 @@ import {
 } from '../../utils/sourceBusinessAction.mjs'
 
 const STATUS_META = Object.freeze({
-  DRAFT: { label: '草稿', color: 'blue' },
-  POSTED: { label: '已确认', color: 'green' },
-  CANCELLED: { label: '已取消', color: 'default' },
+  [PurchaseRejectionStatus.DRAFT]: { label: '草稿', color: 'blue' },
+  [PurchaseRejectionStatus.POSTED]: { label: '已确认', color: 'green' },
+  [PurchaseRejectionStatus.CANCELLED]: { label: '已取消', color: 'default' },
 })
 
 export default function PurchaseRejectionDispositionModal({
@@ -142,7 +143,7 @@ export default function PurchaseRejectionDispositionModal({
           : []
         setHistory(rows)
         setRecord(
-          rows.find((item) => item?.status === 'DRAFT') || rows[0] || null
+          rows.find((item) => item?.status === PurchaseRejectionStatus.DRAFT) || rows[0] || null
         )
       })
       .catch((error) => {
@@ -179,7 +180,7 @@ export default function PurchaseRejectionDispositionModal({
     setLoading(true)
     try {
       const next = await createPurchaseRejectionDisposition(attempt.params)
-      if (!next?.id || next.status !== 'DRAFT') {
+      if (!next?.id || next.status !== PurchaseRejectionStatus.DRAFT) {
         throw Object.assign(new Error('退厂处置结果暂时无法确认'), {
           isInvalidResponse: true,
         })
@@ -306,12 +307,12 @@ export default function PurchaseRejectionDispositionModal({
               生成处置草稿
             </Button>
           ) : null}
-          {record && record.status !== 'DRAFT' ? (
+          {record && record.status !== PurchaseRejectionStatus.DRAFT ? (
             <Button disabled={loading} onClick={prepareNew}>
               继续登记
             </Button>
           ) : null}
-          {record && record.status !== 'CANCELLED' && canCancel ? (
+          {record && record.status !== PurchaseRejectionStatus.CANCELLED && canCancel ? (
             <Popconfirm
               title="确认取消这笔处置？"
               okText="确认取消"
@@ -323,7 +324,7 @@ export default function PurchaseRejectionDispositionModal({
               </Button>
             </Popconfirm>
           ) : null}
-          {record?.status === 'DRAFT' &&
+          {record?.status === PurchaseRejectionStatus.DRAFT &&
           canPost &&
           (record.disposition_type !== 'REPLACE' || canReceiveReplacement) ? (
             <Popconfirm
@@ -357,7 +358,7 @@ export default function PurchaseRejectionDispositionModal({
           style={{ marginTop: 12 }}
           type="info"
           showIcon
-          message={`已登记 ${history.length} 笔处置，累计数量 ${sumNumeric20Scale6Values(history.filter((item) => item.status !== 'CANCELLED').map((item) => item.quantity))}`}
+          message={`已登记 ${history.length} 笔处置，累计数量 ${sumNumeric20Scale6Values(history.filter((item) => item.status !== PurchaseRejectionStatus.CANCELLED).map((item) => item.quantity))}`}
         />
       ) : null}
       {history.length > 0 ? (
@@ -468,7 +469,7 @@ export default function PurchaseRejectionDispositionModal({
             disabled={Boolean(record)}
           />
         </Form.Item>
-        {record?.status === 'DRAFT' && record.disposition_type === 'REPLACE' ? (
+        {record?.status === PurchaseRejectionStatus.DRAFT && record.disposition_type === 'REPLACE' ? (
           <Form.Item
             name="counted_quantity"
             label="补换实际到货数量"
@@ -497,7 +498,7 @@ export default function PurchaseRejectionDispositionModal({
             <Input inputMode="decimal" disabled={!canReceiveReplacement} />
           </Form.Item>
         ) : null}
-        {record && record.status !== 'CANCELLED' && canCancel ? (
+        {record && record.status !== PurchaseRejectionStatus.CANCELLED && canCancel ? (
           <Form.Item name="cancel_reason" label="取消原因（取消时必填）">
             <Input.TextArea rows={2} maxLength={255} showCount />
           </Form.Item>

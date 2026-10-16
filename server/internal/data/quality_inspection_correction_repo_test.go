@@ -13,6 +13,88 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+func TestShipmentQualityGatesUseOnlyCurrentInspections(t *testing.T) {
+	for _, result := range []string{biz.QualityInspectionResultReject, biz.QualityInspectionResultPass} {
+		t.Run(result, func(t *testing.T) {
+			ctx := t.Context()
+			data, client := openInventoryRepoTestData(t, "shipment_current_quality_"+result)
+			f := createInventoryTestFixtures(t, ctx, client)
+			inv := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+			uc := biz.NewInventoryUsecase(inv)
+			op := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+			lot := createTestInventoryLot(t, ctx, uc, biz.InventorySubjectProduct, f.productID, "SHIP-QC-LOT")
+			shipment, err := op.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{Shipment: &biz.ShipmentCreate{ShipmentNo: "SHIP-QC", IdempotencyKey: "ship-qc"}, Items: []*biz.ShipmentItemCreate{{ProductID: f.productID, WarehouseID: f.productWarehouseID, UnitID: f.unitID, LotID: &lot.ID, Quantity: decimal.NewFromInt(1)}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertGates := func(want error) {
+				t.Helper()
+				tx, err := inv.beginInventoryDBTx(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = validateShipmentFinishedGoodsQualityGate(ctx, tx, shipment.ID)
+				_ = tx.sqlTx.Rollback()
+				if !errors.Is(err, want) {
+					t.Fatalf("direct gate: got=%v want=%v", err, want)
+				}
+				processTx, err := client.Tx(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				err = validateProcessShipmentQualityGate(ctx, processTx, shipment.ID)
+				_ = processTx.Rollback()
+				if !errors.Is(err, want) {
+					t.Fatalf("process gate: got=%v want=%v", err, want)
+				}
+			}
+			draft, err := uc.CreateFinishedGoodsQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{InspectionNo: "SHIP-QC-OLD", SourceID: shipment.ID, InventoryLotID: lot.ID, WarehouseID: f.productWarehouseID, SubjectID: f.productID})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err = uc.SubmitQualityInspection(ctx, draft.ID); err != nil {
+				t.Fatal(err)
+			}
+			var original *biz.QualityInspection
+			if result == biz.QualityInspectionResultReject {
+				original, err = uc.RejectQualityInspection(ctx, approximateQualityInspectionDecision(draft.ID, result))
+			} else {
+				original, err = uc.PassQualityInspection(ctx, approximateQualityInspectionDecision(draft.ID, result))
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if result == biz.QualityInspectionResultReject {
+				assertGates(biz.ErrShipmentQualityRejected)
+			} else {
+				assertGates(nil)
+			}
+			corrected, err := uc.CorrectQualityInspectionResult(ctx, &biz.QualityInspectionCorrectionCreate{InspectionID: original.ID, CorrectionInspectionNo: "SHIP-QC-NEW", Reason: "重新校准后复检"}, 17)
+			if err != nil {
+				t.Fatal(err)
+			}
+			assertGates(biz.ErrShipmentQualityPending)
+			if _, err := uc.CancelQualityInspection(ctx, corrected.ID, stringPtr("取消复检")); !errors.Is(err, biz.ErrBadParam) {
+				t.Fatalf("correction cancellation must be rejected: %v", err)
+			}
+			current, err := uc.GetQualityInspection(ctx, corrected.ID)
+			if err != nil || current.Status != biz.QualityInspectionStatusSubmitted || !current.UpdatedAt.Equal(corrected.UpdatedAt) {
+				t.Fatalf("denied cancellation changed correction: %+v %v", current, err)
+			}
+			assertLotStatus(t, ctx, uc, lot.ID, biz.InventoryLotHold)
+			assertGates(biz.ErrShipmentQualityPending)
+			_, created, err := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)).SubmitShipmentRelease(ctx, shipment.ID, 17)
+			if !errors.Is(err, biz.ErrShipmentQualityPending) || created {
+				t.Fatalf("unresolved correction allowed shipment release: created=%t err=%v", created, err)
+			}
+			if _, err = uc.PassQualityInspection(ctx, approximateQualityInspectionDecision(corrected.ID, biz.QualityInspectionResultPass)); err != nil {
+				t.Fatal(err)
+			}
+			assertGates(nil)
+		})
+	}
+}
+
 func TestQualityInspectionCorrectionSupersedesResultAndReopensHold(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "quality_inspection_correction")

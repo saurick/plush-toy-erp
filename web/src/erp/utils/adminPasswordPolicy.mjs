@@ -1,6 +1,8 @@
-export const ADMIN_PASSWORD_MIN_CHARACTERS = 8
-export const ADMIN_PASSWORD_MAX_CHARACTERS = 20
-export const ADMIN_PASSWORD_MAX_BYTES = 72
+import { AdminPasswordPolicy } from '../../common/consts/policies.generated.mjs'
+
+export const ADMIN_PASSWORD_MIN_CHARACTERS = AdminPasswordPolicy.minCharacters
+export const ADMIN_PASSWORD_MAX_CHARACTERS = AdminPasswordPolicy.maxCharacters
+export const ADMIN_PASSWORD_MAX_BYTES = AdminPasswordPolicy.maxBytes
 
 export function getAdminPasswordPolicyError(password) {
   const value = typeof password === 'string' ? password : ''

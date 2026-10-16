@@ -94,11 +94,15 @@ export function BusinessVisualizationFrame({
   switcher,
   title,
   metrics = [],
+  metricsLabel = '',
+  countUnit = '',
   loading = false,
   error = '',
   children,
   className = '',
 }) {
+  const formatCount = (value) =>
+    loading || error ? '—' : countUnit ? `${value} ${countUnit}` : value
   return (
     <section
       className={`erp-business-visual-frame ${className}`.trim()}
@@ -108,13 +112,21 @@ export function BusinessVisualizationFrame({
       {switcher}
       {metrics.length > 0 ? (
         <div className="erp-business-visual-frame__heading">
-          <div className="erp-business-visual-metrics" aria-label="概览数字">
+          {metricsLabel ? (
+            <span className="erp-business-visual-frame__metrics-label">
+              {metricsLabel}
+            </span>
+          ) : null}
+          <div
+            className="erp-business-visual-metrics"
+            aria-label={metricsLabel || '概览数字'}
+          >
             {metrics.map((metric) =>
               metric.onClick ? (
                 <FilterChip
                   key={metric.key}
                   selected={metric.selected}
-                  count={loading || error ? '—' : metric.value}
+                  count={formatCount(metric.value)}
                   disabled={loading || Boolean(error)}
                   onClick={metric.onClick}
                   className={`erp-business-visual-filter erp-business-visual-metric--${metric.tone || 'neutral'}`}
@@ -127,7 +139,7 @@ export function BusinessVisualizationFrame({
                   className={`erp-business-visual-metric erp-business-visual-metric--${metric.tone || 'neutral'}`}
                 >
                   <span>{metric.label}</span>
-                  <strong>{loading || error ? '—' : metric.value}</strong>
+                  <strong>{formatCount(metric.value)}</strong>
                 </div>
               )
             )}

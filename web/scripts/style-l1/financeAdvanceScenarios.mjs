@@ -9,10 +9,16 @@ export function createFinanceAdvanceScenarios({
   assertNoHorizontalOverflow,
 }) {
   return [
-    {
-      name: 'finance-order-advance-refund-desktop',
+    { name: 'finance-order-advance-refund-desktop', amount: '200', reopen: false },
+    { name: 'finance-full-balance-unknown-reopen-desktop', amount: '1000', reopen: true },
+  ].map(({ name, amount, reopen }) => {
+    const allocationRequests = []
+    const remaining = reopen ? '0' : '800'
+    return {
+      name,
       path: '/erp/finance/payments',
       auth: 'admin',
+      expectedConsoleErrorPatterns: [/net::ERR_FAILED.*\/rpc\/operational_fact/u],
       viewport: { width: 3840, height: 2160 },
       effectiveSession: {
         ...customerRuntimeEffectiveSession,
@@ -28,6 +34,7 @@ export function createFinanceAdvanceScenarios({
         ],
       },
       beforeNavigate: async (page) => {
+        allocationRequests.length = 0
         let payment = {
           id: 41,
           payment_no: 'ADVANCE-ORDER-01',
@@ -58,8 +65,8 @@ export function createFinanceAdvanceScenarios({
           counterparty_type: 'CUSTOMER',
           counterparty_id: 1,
           currency: 'CNY',
-          amount: '2000',
-          outstanding_amount: '2000',
+          amount: reopen ? '1000' : '2000',
+          outstanding_amount: reopen ? '1000' : '2000',
         }
         await page.route('**/rpc/operational_fact', async (route) => {
           const body = route.request().postDataJSON()
@@ -74,18 +81,26 @@ export function createFinanceAdvanceScenarios({
               break
             case 'list_finance_payment_allocation_candidates':
               assert.equal(params.id, 41)
-              data = { facts: [fact] }
+              data = { facts: Number(fact.outstanding_amount) > 0 ? [fact] : [] }
               break
             case 'allocate_finance_payment':
+              allocationRequests.push(params)
               assert.equal(params.expected_version, 3)
               assert.deepEqual(params.allocations, [
-                { finance_fact_id: 71, amount: '600' },
+                { finance_fact_id: 71, amount },
               ])
               assert(params.idempotency_key)
+              if (allocationRequests.length > 1) {
+                assert.equal(allocationRequests.length, 2)
+                assert.equal(params.idempotency_key, allocationRequests[0].idempotency_key)
+                data = { payment }
+                break
+              }
+              fact.outstanding_amount = String(Number(fact.amount) - Number(amount))
               payment = {
                 ...payment,
-                allocated_amount: '600',
-                available_amount: '400',
+                allocated_amount: amount,
+                available_amount: remaining,
                 version: 4,
                 allocations: [
                   {
@@ -93,15 +108,16 @@ export function createFinanceAdvanceScenarios({
                     payment_id: 41,
                     finance_fact_id: 71,
                     finance_fact_no: fact.fact_no,
-                    amount: '600',
+                    amount,
                     currency: 'CNY',
                     status: 'POSTED',
                   },
                 ],
               }
-              data = { payment }
-              break
+              await route.abort('failed')
+              return
             case 'reverse_finance_allocation':
+              fact.outstanding_amount = fact.amount
               assert.equal(params.allocation_id, 91)
               assert.equal(params.expected_version, 4)
               assert.equal(params.reason, '调整抵扣批次')
@@ -117,7 +133,7 @@ export function createFinanceAdvanceScenarios({
                     reversal_of_allocation_id: 91,
                     finance_fact_id: 71,
                     finance_fact_no: fact.fact_no,
-                    amount: '600',
+                    amount,
                     currency: 'CNY',
                     status: 'REVERSED',
                     reason: params.reason,
@@ -207,14 +223,24 @@ export function createFinanceAdvanceScenarios({
         await allocation.waitFor({ state: 'visible' })
         await allocation
           .getByRole('textbox', { name: /本次核销金额/u })
-          .fill('600')
+          .fill(amount)
         await allocation
           .getByRole('button', { name: '确认抵扣', exact: true })
           .click()
+        await allocation.getByText(new RegExp(`可抵扣余额 ${remaining} CNY`, 'u')).waitFor()
+        if (reopen) {
+          await allocation.getByRole('button', { name: '取消', exact: true }).click()
+          await allocation.waitFor({ state: 'hidden' })
+          await action('抵扣应收 / 应付')
+          await allocation.waitFor({ state: 'visible' })
+          assert.equal(await allocation.getByRole('textbox', { name: /本次核销金额/u }).inputValue(), amount)
+          await allocation.getByText('当前没有可核销的应收或应付记录', { exact: true }).waitFor()
+        }
+        await allocation.getByRole('button', { name: '确认抵扣', exact: true }).click()
         await allocation.waitFor({ state: 'hidden' })
         await expectText(page, '已抵扣应收应付，剩余款项继续保留')
         await page.screenshot({
-          path: path.join(outputDir, 'finance-advance-balance-4k.png'),
+          path: path.join(outputDir, reopen ? 'finance-full-balance-recovery-4k.png' : 'finance-advance-balance-4k.png'),
           fullPage: false,
         })
         await action('撤销抵扣')
@@ -222,7 +248,7 @@ export function createFinanceAdvanceScenarios({
           name: '撤销抵扣',
           exact: true,
         })
-        await choose('已抵扣记录', 'AR-ADVANCE-01 · 600 CNY')
+        await choose('已抵扣记录', `AR-ADVANCE-01 · ${amount} CNY`)
         await reversal.getByLabel('撤销原因').fill('调整抵扣批次')
         await reversal
           .getByRole('button', { name: '确认撤销抵扣', exact: true })
@@ -283,6 +309,6 @@ export function createFinanceAdvanceScenarios({
           ''
         )
       },
-    },
-  ]
+    }
+  })
 }

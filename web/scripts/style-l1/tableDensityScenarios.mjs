@@ -133,12 +133,20 @@ export function createTableDensityScenarios(deps) {
       verify: async (page) => {
         await page.getByRole('button', { name: '新建订单' }).click()
         const form = page.locator('.erp-business-form-page:not([hidden])')
+        assert.equal(await form.getByRole('button', { name: /添加订货明细/ }).count(), 1, '空明细只显示一个添加入口')
+        assert.equal(await form.locator('.erp-line-items-form__stat').count(), 3)
+        assert.match(await form.locator('.erp-line-items-form__stat--emphasis').textContent(), /订单总额/u)
         await form
           .getByRole('button', { name: '添加订货明细', exact: true })
           .click()
         await form
           .getByLabel('订货产品名称', { exact: true })
           .fill('长文本产品名称，切换密度后应保留已填写内容')
+        await form.getByRole('button', { name: '金额明细', exact: true }).click()
+        const details = page.locator('.erp-line-items-form__amount-details:visible')
+        assert.equal(await details.locator('div').count(), 3)
+        assert.match(await details.textContent(), /货款金额.*待补齐.*报价运费.*税额/u)
+        await form.getByRole('button', { name: '金额明细', exact: true }).click()
         await roundTrip(
           page,
           '.erp-line-item-table tbody tr:not(.erp-line-item-table__more-row)',

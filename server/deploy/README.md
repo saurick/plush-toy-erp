@@ -1,8 +1,12 @@
 # server/deploy 说明
 
+研发效能工作台的独立测试部署、登录与域名入口见 [workbench/README.md](workbench/README.md)，与 ERP 业务 Compose 和本地 Vite 开发服务分离。
+
 GitLab 宿主上的自建 GitLab、隔离 Runner、备份与 GitHub 单向镜像定义见 [`gitlab/README.md`](gitlab/README.md)。它与业务服务部署分离，不会由生产 Compose 自动启动。
 
 正式部署主路径为 `server/deploy/compose/prod`。开发机的独立备用中间件见 [Orb 本地开发备用环境](compose/dev-orb/README.md)，它不承担 demo / test 发布。
+
+本目录维护服务运行定义和配套配置；通用发布、smoke、采证与备份恢复执行逻辑见 [`scripts/deploy`](../../scripts/deploy/README.md)，客户运行合同、配置差异、运维适配和脱敏证据见 [`deployments`](../../deployments/README.md)。客户资料复用同一份生产 Compose。
 
 该目录的 `compose.observability.yml` 是可选独立日志工作台，采集当前工作区和显式启用的登记环境，不推进业务版本或数据库。入口与边界见[集中日志接入与运维](../../docs/observability/集中日志接入与运维.md)。
 

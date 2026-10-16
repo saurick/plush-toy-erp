@@ -53,6 +53,38 @@ function sourceEntry(id, record = {}, draft = {}) {
   }
 }
 
+test('自定义分组的名称、顺序和条目参与新窗口归并条件，分组身份不改变业务语义', () => {
+  const groups = [
+    { key: 'pack', label: '包装要求', items: ['独立装箱', ''] },
+    { key: 'check', label: '验收要求', items: ['核对数量'] },
+  ]
+  const same = groups.map((group) => ({ ...group, key: `other-${group.key}` }))
+  assert.equal(
+    groupMaterialPurchaseContracts([
+      sourceEntry(1, {}, { clauses: groups }),
+      sourceEntry(2, {}, { clauses: same }),
+    ]).length,
+    1
+  )
+  for (const clauses of [
+    [...groups].reverse(),
+    groups.map((group, index) =>
+      index === 0 ? { ...group, label: '配送要求' } : group
+    ),
+    groups.map((group, index) =>
+      index === 0 ? { ...group, items: ['另行装箱'] } : group
+    ),
+    [],
+  ]) {
+    const result = groupMaterialPurchaseContracts([
+      sourceEntry(1, {}, { clauses: groups }),
+      sourceEntry(2, {}, { clauses }),
+    ])
+    assert.equal(result.length, 2)
+    assert(result[1].splitReasons.includes('合同条款'))
+  }
+})
+
 test('同一供应商及合同条件的三张采购单归并为一份，逐行保留来源和金额', () => {
   const entries = [sourceEntry(1), sourceEntry(2), sourceEntry(3)]
   const original = JSON.stringify(entries)
@@ -159,25 +191,55 @@ test('合并日期保留所有来源，明细超限明确报告且不截断', ()
   )
 })
 
-test('采购合同批量预检按订单指出缺失字段', () => {
+test('采购合同批量允许缺字段、空单价和整行留白，保留原内容', () => {
   const batch = buildMaterialPurchaseContractBatchDraft([
     { orderNo: 'PO-001', draft: validDraft() },
     {
       orderNo: 'PO-002',
       draft: validDraft({
         supplierName: '',
-        lines: [{ materialName: '示例材料', unit: '码', quantity: '10', unitPrice: '' }],
+        lines: [
+          {
+            materialName: '示例材料',
+            unit: '码',
+            quantity: '10',
+            unitPrice: '',
+          },
+          {},
+        ],
+      }),
+    },
+  ])
+  const original = structuredClone(batch)
+  assert.deepEqual(
+    getMaterialPurchaseContractBatchProblems(template, batch),
+    []
+  )
+  assert.deepEqual(batch, original)
+  assert.equal(batch.contracts[1].draft.supplierName, '')
+  assert.equal(batch.contracts[1].draft.lines[0].unitPrice, '')
+})
+
+test('采购合同批量预检按订单指出已填数字的错误', () => {
+  const batch = buildMaterialPurchaseContractBatchDraft([
+    { orderNo: 'PO-001', draft: validDraft() },
+    {
+      orderNo: 'PO-002',
+      draft: validDraft({
+        lines: [{ unit: '码', quantity: '10', unitPrice: '-1' }],
       }),
     },
   ])
   const problems = getMaterialPurchaseContractBatchProblems(template, batch)
-
   assert.deepEqual(problems, [
-    { orderNo: 'PO-002', fields: ['供应方名称', '第 1 行单价'] },
+    {
+      orderNo: 'PO-002',
+      fields: ['第 1 行单价（须为非负数，最多 6 位小数）'],
+    },
   ])
   assert.match(
     formatMaterialPurchaseContractBatchProblems(problems),
-    /PO-002：供应方名称、第 1 行单价/u
+    /PO-002：第 1 行单价/u
   )
 })
 
@@ -253,7 +315,7 @@ test('排除缺资料合同只影响输出范围，恢复选择后仍保留修�
   assert.equal(getMaterialPurchaseContractOutputBatches(restored)[0].length, 2)
   assert.equal(
     getMaterialPurchaseContractBatchProblems(template, restored).length,
-    1
+    0
   )
   restored.contracts.forEach((contract) => {
     contract.included = false

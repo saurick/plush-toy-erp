@@ -5,7 +5,13 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
+import {
+  findBrokenLocalMarkdownLinks,
+  stripFencedCode,
+} from "./lib/markdown-links.mjs";
+
 const SKILL_NAME_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const PROJECT_SKILL_PREFIX = "plush-";
 const FRONTMATTER_KEYS = new Set(["name", "description"]);
 const INTERFACE_KEYS = new Set([
   "display_name",
@@ -31,7 +37,19 @@ function parseScalar(raw, source, lineNumber) {
     }
   }
   if (value.startsWith("'") && value.endsWith("'")) {
+    if (!/^'(?:[^']|'')*'$/u.test(value)) {
+      throw new Error(`${source}:${lineNumber}: invalid single-quoted string`);
+    }
     return value.slice(1, -1).replaceAll("''", "'");
+  }
+  if (
+    /^[\[\]{}&*!|>@`%']/u.test(value) ||
+    /^[?:-](?:\s|$)/u.test(value) ||
+    /(?:^|\s)#|:(?:\s|$)/u.test(value) ||
+    /^(?:null|~|true|false|\.nan|[-+]?\.inf)$/iu.test(value) ||
+    !Number.isNaN(Number(value))
+  ) {
+    throw new Error(`${source}:${lineNumber}: expected a plain or quoted YAML string`);
   }
   return value;
 }
@@ -48,11 +66,11 @@ function parseFlatMapping(text, source, { indent = "" } = {}) {
       throw new Error(`${source}:${index + 1}: unexpected YAML indentation`);
     }
     const body = line.slice(indent.length);
-    const match = body.match(/^([a-z_]+):\s*(.*)$/u);
+    const match = body.match(/^([a-z_]+):(?:[\t ]+(.*))?$/u);
     if (!match) {
       throw new Error(`${source}:${index + 1}: unsupported YAML line`);
     }
-    const [, key, rawValue] = match;
+    const [, key, rawValue = ""] = match;
     if (mapping.has(key)) {
       throw new Error(`${source}:${index + 1}: duplicate key ${key}`);
     }
@@ -105,22 +123,32 @@ export function parseOpenAIYaml(content, source = "agents/openai.yaml") {
   return Object.fromEntries(mapping);
 }
 
-function validateRelativeLinks(content, skillDir, source, errors) {
-  for (const match of content.matchAll(/\[[^\]]*\]\(([^)]+)\)/gu)) {
-    const target = match[1].trim().split("#", 1)[0];
-    if (
-      !target ||
-      target.startsWith("#") ||
-      target.startsWith("/") ||
-      /^[a-z][a-z0-9+.-]*:/iu.test(target) ||
-      target.includes("<") ||
-      target.includes(">")
-    ) {
-      continue;
-    }
-    const resolved = path.resolve(skillDir, decodeURIComponent(target));
-    if (!fs.existsSync(resolved)) {
-      errors.push(`${source}: missing relative link target ${target}`);
+function collectMarkdownFiles(directory) {
+  return fs
+    .readdirSync(directory, { withFileTypes: true })
+    .flatMap((entry) => {
+      const entryPath = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        return collectMarkdownFiles(entryPath);
+      }
+      return entry.isFile() && entry.name.endsWith(".md") ? [entryPath] : [];
+    })
+    .sort();
+}
+
+function validateInstructions(content, source, skillNames, errors) {
+  const instructions = stripFencedCode(content);
+  if (/^[ ]{0,3}\[TODO:[^\n]*\][ \t]*$/mu.test(instructions)) {
+    errors.push(`${source}: unfinished TODO placeholder`);
+  }
+  const referenced = new Set(
+    [...instructions.matchAll(/\$([a-z0-9]+(?:-[a-z0-9]+)+)/gu)].map(
+      (match) => match[1],
+    ),
+  );
+  for (const name of referenced) {
+    if (name.startsWith(PROJECT_SKILL_PREFIX) && !skillNames.has(name)) {
+      errors.push(`${source}: unknown project skill $${name}`);
     }
   }
 }
@@ -139,6 +167,7 @@ export function validateSkillRoot(rootDir) {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
+  const knownSkills = new Set(skillNames);
 
   for (const skillName of skillNames) {
     const skillDir = path.join(skillsRoot, skillName);
@@ -171,10 +200,12 @@ export function validateSkillRoot(rootDir) {
       if (/[<>]/u.test(frontmatter.description)) {
         errors.push(`${skillPath}: description must not contain angle brackets`);
       }
+      if (frontmatter.description.startsWith("[TODO:")) {
+        errors.push(`${skillPath}: description contains an unfinished TODO placeholder`);
+      }
     } catch (error) {
       errors.push(error.message);
     }
-    validateRelativeLinks(skillContent, skillDir, skillPath, errors);
 
     try {
       const metadata = parseOpenAIYaml(
@@ -195,27 +226,33 @@ export function validateSkillRoot(rootDir) {
           `${metadataPath}: default_prompt must mention $${skillName}`,
         );
       }
+      for (const value of Object.values(metadata)) {
+        validateInstructions(value, metadataPath, knownSkills, errors);
+      }
     } catch (error) {
       errors.push(error.message);
     }
   }
 
+  const markdownFiles = collectMarkdownFiles(skillsRoot)
+    .filter((file) => path.relative(skillsRoot, file).split(path.sep)[1] !== "assets")
+    .map((file) => path.relative(root, file));
+  errors.push(
+    ...findBrokenLocalMarkdownLinks({ rootDir: root, sourceFiles: markdownFiles }),
+  );
+  for (const source of markdownFiles) {
+    validateInstructions(
+      fs.readFileSync(path.join(root, source), "utf8"),
+      source,
+      knownSkills,
+      errors,
+    );
+  }
+
   const readme = fs.readFileSync(readmePath, "utf8");
-  const commonPrefix = skillNames.reduce((prefix, skillName) => {
-    let index = 0;
-    while (
-      index < prefix.length &&
-      index < skillName.length &&
-      prefix[index] === skillName[index]
-    ) {
-      index += 1;
-    }
-    return prefix.slice(0, index);
-  }, skillNames[0] || "");
-  const projectPrefix = commonPrefix.slice(0, commonPrefix.lastIndexOf("-") + 1);
-  const listed = [...readme.matchAll(/\$([a-z0-9]+(?:-[a-z0-9]+)+)/gu)]
+  const listed = [...stripFencedCode(readme).matchAll(/\$([a-z0-9]+(?:-[a-z0-9]+)+)/gu)]
     .map((match) => match[1])
-    .filter((name) => name.startsWith(projectPrefix));
+    .filter((name) => name.startsWith(PROJECT_SKILL_PREFIX));
   for (const skillName of skillNames) {
     const count = listed.filter((name) => name === skillName).length;
     if (count !== 1) {

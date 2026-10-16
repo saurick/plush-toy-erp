@@ -7,13 +7,16 @@ const LOGIN_MODE_STORAGE_KEY = 'erp:admin_login_mode'
 const SMS_LOGIN_SESSION_KEY = 'erp:admin_login_sms_state'
 
 const memoryStorage = { local: new Map(), session: new Map() }
+const unpersistedStorage = { local: new Set(), session: new Set() }
 function safeStorage(type) {
   if (typeof window === 'undefined') return null
   const memory = memoryStorage[type]
+  const unpersisted = unpersistedStorage[type]
   const storage = () =>
     type === 'session' ? window.sessionStorage : window.localStorage
   return {
     getItem(key) {
+      if (unpersisted.has(key)) return memory.get(key) ?? null
       try {
         return storage().getItem(key)
       } catch {
@@ -24,16 +27,18 @@ function safeStorage(type) {
       memory.set(key, value)
       try {
         storage().setItem(key, value)
+        unpersisted.delete(key)
       } catch {
-        /* Preferences may stay in memory. */
+        unpersisted.add(key)
       }
     },
     removeItem(key) {
       memory.delete(key)
       try {
         storage().removeItem(key)
+        unpersisted.delete(key)
       } catch {
-        /* Preferences may stay in memory. */
+        unpersisted.add(key)
       }
     },
   }

@@ -9,8 +9,27 @@ import { fileURLToPath } from "node:url";
 import {
   extractMarkdownAnchorIds,
   findBrokenLocalMarkdownLinks,
+  markdownLinkTargets,
   slugifyMarkdownHeading,
 } from "./lib/markdown-links.mjs";
+
+test("Markdown links ignore variable-length fences and preserve following prose", () => {
+  const backtick = "`";
+  const source = [
+    "[before](before.md)",
+    backtick.repeat(4) + "markdown",
+    backtick.repeat(3),
+    "[nested](nested.md)",
+    backtick.repeat(3),
+    "[still inside](inside.md)",
+    backtick.repeat(5),
+    "[after](after.md)",
+  ].join("\n");
+  assert.deepEqual(markdownLinkTargets(source), ["before.md", "after.md"]);
+  assert.deepEqual(markdownLinkTargets([
+    "~".repeat(5), "[example](hidden.md)", "~".repeat(6), "[after](after.md)",
+  ].join("\r\n")), ["after.md"]);
+});
 
 const ROOT_DIR = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

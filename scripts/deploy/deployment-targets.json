@@ -150,6 +150,81 @@
       "capacity": {
         "minimumAvailableBytes": 32212254720
       }
+    },
+    {
+      "key": "production-133",
+      "enabled": true,
+      "purpose": "customer-production",
+      "customer": "yoyoosun",
+      "trialTarget": "none",
+      "ssh": {
+        "host": "192.168.0.133",
+        "port": 22,
+        "user": "root",
+        "expectedHostname": "r740xd"
+      },
+      "filesystem": {
+        "root": "/root/deploy/plush-toy-erp-production",
+        "current": "/root/deploy/plush-toy-erp-production/current",
+        "releases": "/root/deploy/plush-toy-erp-production/releases",
+        "runtimeEnv": "/root/deploy/plush-toy-erp-production/runtime/.env.production-133",
+        "operationRoot": "/root/deploy/plush-toy-erp-production/operations"
+      },
+      "compose": {
+        "projectName": "plush-toy-erp-production",
+        "directory": "server/deploy/compose/prod",
+        "baseFile": "compose.yml",
+        "overrideFile": "compose.production-133.yml",
+        "serverService": "app-server",
+        "webService": "web-desktop",
+        "postgresService": "postgres"
+      },
+      "database": {
+        "name": "plush_erp_production",
+        "migrationLock": "/root/deploy/plush-toy-erp-production/run/atlas-migrate.lock"
+      },
+      "runtime": {
+        "postgres": {
+          "bindAddress": "127.0.0.1",
+          "hostPort": 55438,
+          "dataDirectory": "/root/deploy/plush-toy-erp-production/data/postgres"
+        },
+        "app": {
+          "bindAddress": "127.0.0.1",
+          "hostPort": 8345
+        },
+        "web": {
+          "bindAddress": "127.0.0.1",
+          "hostPort": 5215
+        },
+        "jaeger": {
+          "bindAddress": "127.0.0.1",
+          "ports": {
+            "agentThriftCompact": 63002,
+            "agentThriftBinary": 63003,
+            "ui": 63005,
+            "collectorHttp": 63006,
+            "collectorGrpc": 63007,
+            "zipkin": 63008,
+            "otlpGrpc": 63009,
+            "otlpHttp": 63010
+          }
+        }
+      },
+      "endpoints": {
+        "web": "http://127.0.0.1:5215",
+        "server": "http://127.0.0.1:8345"
+      },
+      "publicEntry": {
+        "endpoint": "https://erp.yoyoosun.net",
+        "containerPrefix": "plush-toy-erp-production-web-public-",
+        "network": "plush-toy-erp-production_default",
+        "hostPort": 5178,
+        "apiOrigin": "http://app-server:8300"
+      },
+      "capacity": {
+        "minimumAvailableBytes": 32212254720
+      }
     }
   ]
 }

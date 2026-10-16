@@ -68,6 +68,9 @@ const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-page-database-migration-desktop-light",
 ]);
 const SCHEMA_DOCS_TEST = "scripts/qa/schema-docs.test.mjs";
+const PUBLIC_CONTRACTS_TEST = "scripts/gen-public-contracts.test.mjs";
+const PUBLIC_STATUS_COVERAGE_TEST = "web/src/erp/utils/businessStatusCoverage.test.mjs";
+const PUBLIC_CONTRACT_SOURCE = /^server\/(?:cmd\/public-contracts\/|internal\/(?:core\/(?:status\/|value\/numeric\.go$)|biz\/(?:rbac|workflow_metadata|workflow_task_catalog|business_attachment|finance_payment|process_runtime|inventory_operation|purchase_rejection_disposition|engineering_material_request|production_wip|production_exception_decision|operational_fact|outsourcing_order|production_order|admin_password)\.(?:go|json)$|server\/template_pdf(?:_security)?\.go$))/u;
 const PRIVATE_SOURCE_EXTENSIONS = new Set([
   ".doc",
   ".docx",
@@ -131,6 +134,18 @@ const FIXED_COMMANDS = {
   dbGuard: command("db-guard", "T2", "检查 schema 与 migration 同步", "bash", [
     "scripts/qa/db-guard.sh",
   ]),
+  publicContracts: command(
+    "public-contracts-sync", "T3", "只读检查公共契约及交互稿生成同步", "node",
+    ["scripts/gen-public-contracts.mjs", "--check"],
+  ),
+  publicContractConsumers: command(
+    "public-contract-consumers", "T3", "检查公共契约消费者引用", "node",
+    ["scripts/qa/public-contract-consumers.mjs"],
+  ),
+  serverUnitPolicy: command(
+    "server-unit-policy", "T3", "检查共享标准单位目录", "go",
+    ["test", "-count=1", "./internal/unitpolicy"], "server",
+  ),
   migrationContracts: command(
     "migration-contracts",
     "T2",
@@ -727,6 +742,29 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   );
 
   for (const file of changedFiles) {
+    if (
+      PUBLIC_CONTRACT_SOURCE.test(file) ||
+      /^server\/internal\/service\/jsonrpc[^/]*\.go$/u.test(file) && !file.endsWith("_test.go") ||
+      /^web\/src\/common\/consts\/[^/]+\.generated\.mjs$/u.test(file) ||
+      file === "scripts/gen-public-contracts.mjs" ||
+      file === "scripts/qa/public-contract-consumers.mjs"
+    ) {
+      addFixed(state, "publicContracts", file);
+      addFixed(state, "publicContractConsumers", file);
+      directTests.add(PUBLIC_CONTRACTS_TEST);
+      directTests.add(PUBLIC_STATUS_COVERAGE_TEST);
+    }
+    if (file === "server/internal/biz/admin_erp_appearance.json") {
+      directTests.add("web/src/common/theme/erpAppearance.test.mjs");
+    }
+    if (file === "server/internal/unitpolicy/units.json") {
+      directTests.add("web/src/erp/utils/unitQuantity.test.mjs");
+      addFixed(state, "serverUnitPolicy", file);
+      continue;
+    }
+    if (file === "scripts/gen-public-contracts.mjs" || file === "scripts/qa/public-contract-consumers.mjs") {
+      continue;
+    }
     if (MIGRATION_CONTRACT_PATHS.has(file)) {
       addFixed(state, "migrationContracts", file);
     }
@@ -746,11 +784,9 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     }
     if (isDocumentation(file)) {
       addFixed(state, "docs", file);
+      addFixed(state, "skillHealth", file);
       if (file.startsWith("server/docs/database/")) {
         directTests.add(SCHEMA_DOCS_TEST);
-      }
-      if (file.startsWith(".agents/skills/")) {
-        addFixed(state, "skillHealth", file);
       }
       continue;
     }

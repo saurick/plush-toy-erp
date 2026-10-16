@@ -534,7 +534,6 @@
 .erp-engineering-print-image-slot--readonly.erp-engineering-print-image-slot--empty {
   border-style: solid;
   background: #fff;
-  color: transparent;
 }
 
 .erp-engineering-print-image-slot input {
@@ -1270,6 +1269,10 @@
 }
 
 @media print {
+  .erp-engineering-print-image-slot [data-print-editor-only] {
+    display: none;
+  }
+
   .erp-work-instruction-annotation-modal-root {
     display: none;
   }

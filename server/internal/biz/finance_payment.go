@@ -24,8 +24,9 @@ const (
 	FinancePaymentStatusPosted          = "POSTED"
 	FinancePaymentStatusReversed        = "REVERSED"
 	FinancePaymentStatusCancelled       = "CANCELLED"
-	FinanceAllocationStatusPosted       = "POSTED"
-	FinanceAllocationStatusReversed     = "REVERSED"
+	// 核销与红冲记录共用过账、冲销标记，区别于收付款源单的生命周期。
+	FinanceAllocationStatusPosted   = "POSTED"
+	FinanceAllocationStatusReversed = "REVERSED"
 )
 
 type FinancePayment struct {
@@ -297,7 +298,7 @@ func (uc *OperationalFactUsecase) ListFinanceCreditNotes(ctx context.Context, fi
 func normalizeFinanceCreditNoteListFilter(filter FinanceCreditNoteFilter) (FinanceCreditNoteFilter, error) {
 	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
-	if filter.Status != "" && filter.Status != "POSTED" && filter.Status != "REVERSED" {
+	if filter.Status != "" && filter.Status != FinanceAllocationStatusPosted && filter.Status != FinanceAllocationStatusReversed {
 		return FinanceCreditNoteFilter{}, ErrBadParam
 	}
 	if filter.FinanceFactID < 0 || filter.Offset < 0 {

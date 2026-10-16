@@ -303,7 +303,7 @@ export function createPrintWorkspaceControlScenarios({
           report.restored = await measureEmptyEditorHints(editors)
           assert(
             report.restored.every((state) => state.textFits),
-            `${template.key} 恢复后的空值提示必须完整显示`
+            `${template.key} 恢复后的空值提示必须完整显示: ${JSON.stringify(report.restored.filter((state) => !state.textFits))}`
           )
           reports.push(report)
           console.log(

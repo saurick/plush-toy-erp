@@ -1,71 +1,33 @@
 # yoyoosun 回滚 / Rollback Runbook
 
-## 回滚类型
-
-| 类型           | 适用场景                       | 优先策略                                                             |
-| --- | --- | --- |
-| 应用版本回滚   | 新镜像启动失败、页面严重异常   | 恢复上一版 `APP_IMAGE` / `WEB_IMAGE`                                 |
-| 配置回滚       | `.env` 或网关配置错误          | 恢复上一版受控配置                                                   |
-| migration 回滚 | migration 导致结构或数据不可用 | 优先恢复升级前备份；必要时走 forward-fix                             |
-| 导入回滚       | 导入批次错误                   | 当前 yoyoosun 真实导入未开放；未来必须按 import batch 和反向事实处理 |
-
-## 决策前检查
-
-1. 是否已经保留现场 evidence。
-2. 是否有升级前备份和 image digest。
-3. 是否发生 schema/migration 变更。
-4. 是否已有客户业务写入。
-5. 回滚是否比 forward-fix 风险更低。
-
-## 应用版本回滚
-
-只有确认本轮没有执行 migration，或数据库仍与旧镜像合同一致时，才允许单独回滚应用版本。migration 已成功 apply 后，旧镜像可能写入已删除字段或违反新约束，必须恢复升级前数据库备份并同时恢复旧镜像，或走已评审的 forward-fix；不得 image-only rollback。
-
-```bash
-cd /opt/plush-toy-erp/current/server/deploy/compose/prod
-# 在受控 .env 中恢复上一版 APP_IMAGE / WEB_IMAGE
-docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env up -d --remove-orphans
-docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env ps
-```
-
-回滚后执行 smoke，并记录 rollback evidence。
-
-## 数据库恢复
-
-附件外置后的恢复必须同时选择配套 PG dump 和附件文件备份，按 [备份恢复流程](04-backup-restore.md#恢复步骤) 验证新 bucket；仅恢复数据库不能证明文件可用。
-
-只有在 migration 或数据写入已经破坏当前库，且已有明确备份时才恢复数据库。恢复动作必须在客户使用窗口内明确通知，并记录：
-
-- backup id、hash、大小和存储别名。
-- 恢复目标库。
-- 恢复后 migration version。
-- 恢复后 smoke 结果。
-
-恢复期间保持 `app-server` 和 Web 停止。恢复完成后先核对 migration version 与旧镜像合同。若这是客户试用验收，按 `credential.contract.json` 恢复 admin 与目标适用账号、撤销旧会话并运行登录矩阵：`demo-133` 为 admin 加 11 个 `uat_*`，`customer-test-133` 只处理 admin。不得把新 schema 与旧镜像混用，也不得使用备份中恢复出的旧 token 或旧密码签收。
-
-## 禁止
-
-- 禁止直接删除库存、出货、财务事实流水来“回滚”。
-- 禁止在没有备份 evidence 时继续 destructive 操作。
-- 禁止把真实 dump、真实 `.env` 或未脱敏日志提交到本目录。
-
-## Evidence
-
-回滚 evidence 至少包含：原因、影响范围、决策人角色、使用的镜像 / 备份、执行时间、结果、后续处理和客户通知摘要。
+代码回滚、配置恢复与数据库恢复是不同动作。代码回滚仅允许 migration 序列和客户配置源指纹完全相同的已验证旧版本，复用正式 rollback controller / executor；不手工切 `.env` 后直接启动，也不自动 down migration。
 
 ## 回滚检查
 
-- [ ] 回滚原因已记录。
-- [ ] 影响范围已确认。
-- [ ] 是否保留现场 evidence 已确认。
-- [ ] 使用哪个旧镜像已确认。
-- [ ] 使用哪个配置版本已确认。
-- [ ] 使用哪个备份已确认，如涉及数据库恢复。
-- [ ] migration 回滚或 forward-fix 策略已确认。
-- [ ] 客户通知方式已确认。
-- [ ] 回滚命令、目标、影响范围及执行授权已核对。
-- [ ] 回滚后 server health / ready 通过。
-- [ ] 回滚后 web health 通过。
-- [ ] 回滚后关键页面 smoke 通过。
-- [ ] rollback evidence 已生成。
-- [ ] 后续 root cause 分析责任人已记录。
+| 现场 | 处理 |
+| --- | --- |
+| 应用失败且结构、配置兼容 | 准备固定目标的代码与镜像回滚计划 |
+| schema / 数据或存储不兼容 | 先评审 forward-fix 或配套 PG、附件及配置恢复 |
+| 执行结果未知 | 保留现场，先只读核对实际版本与 operation，不自动重试 |
+| 首次生产初始化 | 没有旧生产版本可回退；使用本次初始化和备份恢复身份 |
+
+## 代码回滚
+
+1. 核对当前与目标 manifest、目标运行 SHA、客户写入、回滚理由和恢复点。
+2. 只读准备计划：
+
+```bash
+node scripts/deploy/rollback-controller.mjs \
+  --current-manifest <当前发布包>/release-manifest.json \
+  --target-manifest <回滚发布包>/release-manifest.json \
+  --target production-133 --idempotency-key <稳定随机键> --json
+```
+
+3. 获明确回滚授权后，通过版本中心或 `rollback-executor.mjs --help` 对应入口提交完整确认串。
+4. 回滚后核对代码、镜像、health / ready、公网、客户配置和业务 smoke；保留原因、操作身份及恢复回执。
+
+## 数据库与附件恢复
+
+按[备份恢复流程](04-backup-restore.md#恢复步骤)，明确停写及可能的数据损失，选择配套 PG dump、附件备份、release、migration 和配置身份，在隔离目标恢复、校验后再切连接。不能用新 schema 配旧镜像，也不能删除库存、出货或财务事实当作回滚。
+
+生产恢复后的账号与会话按正式账号治理处理，不执行 demo/test 的固定密码合同。客户验收资料、真实备份、凭据和未脱敏日志各按受控存储边界保存，不进入 Git。

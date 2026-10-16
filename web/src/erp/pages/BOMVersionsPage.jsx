@@ -821,8 +821,9 @@ export default function BOMVersionsPage() {
       !canRead ||
       loading ||
       !referenceOptionsState.loaded
-    )
-      { return undefined }
+    ) {
+      return undefined
+    }
     const controller = new AbortController()
     setPreparationError('')
     setPreparedBOMID(null)
@@ -863,8 +864,9 @@ export default function BOMVersionsPage() {
         setHeaderModalOpen(true)
       })
       .catch((error) => {
-        if (!controller.signal.aborted)
-          { setPreparationError(getActionErrorMessage(error, '打开订单关联 BOM')) }
+        if (!controller.signal.aborted) {
+          setPreparationError(getActionErrorMessage(error, '打开订单关联 BOM'))
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setDetailLoading(false)
@@ -1806,7 +1808,8 @@ export default function BOMVersionsPage() {
                 }
                 canWithdraw={
                   headerMode !== 'view' &&
-                  (headerMode === 'edit' ? modalActionCanEdit : canCreate)
+                  canUpdate &&
+                  (headerMode !== 'edit' || modalActionCanEdit)
                 }
                 variant="inline"
                 compact

@@ -22,6 +22,9 @@ func (d *jsonrpcDispatcher) handleFinancePayment(ctx context.Context, method, id
 	} else if res := d.requireCustomerConfigModulesReadable(ctx, "finance", "finance_payments"); res != nil {
 		return id, res, nil
 	}
+	if !financePaymentIntegerParamsValid(method, pm) {
+		return id, invalidParamResult(), nil
+	}
 	switch method {
 	case "create_finance_payment":
 		if !jsonRPCParamsAllowed(pm, "customer_key", "payment_no", "direction", "counterparty_type", "counterparty_id", "amount", "currency", "account_ref", "evidence_ref", "idempotency_key", "occurred_at", "kind", "source_type", "source_id", "refund_of_payment_id", "purpose_note") {
@@ -109,7 +112,11 @@ func (d *jsonrpcDispatcher) handleFinancePayment(ctx context.Context, method, id
 			if !ok {
 				return id, invalidParamResult(), nil
 			}
-			allocations = append(allocations, biz.FinancePaymentAllocationInput{FinanceFactID: getInt(row, "finance_fact_id", 0), Amount: amount})
+			factID, ok := getRequiredJSONRPCPositiveInt(row, "finance_fact_id")
+			if !ok {
+				return id, invalidParamResult(), nil
+			}
+			allocations = append(allocations, biz.FinancePaymentAllocationInput{FinanceFactID: factID, Amount: amount})
 		}
 		out, err := d.operationalFactUC.AllocateFinancePayment(ctx, &biz.FinancePaymentAllocate{ID: paymentID, ExpectedVersion: getInt(pm, "expected_version", 0), IdempotencyKey: getString(pm, "idempotency_key"), Allocations: allocations}, actorID)
 		return id, financePaymentResult(d, ctx, out, err), nil
@@ -240,6 +247,39 @@ func (d *jsonrpcDispatcher) handleFinancePayment(ctx context.Context, method, id
 	}
 	return id, unknownOperationalFactResult(method), nil
 }
+func financePaymentIntegerParamsValid(method string, pm map[string]any) bool {
+	var required []string
+	switch method {
+	case "create_finance_payment":
+		required = []string{"counterparty_id"}
+	case "allocate_finance_payment", "cancel_finance_payment", "reverse_finance_payment":
+		required = []string{"id", "expected_version"}
+	case "reverse_finance_allocation":
+		required = []string{"id", "expected_version", "allocation_id"}
+	case "get_finance_payment", "get_finance_credit_note", "list_finance_payment_allocation_candidates":
+		required = []string{"id"}
+	case "create_finance_credit_note":
+		required = []string{"finance_fact_id"}
+	case "reverse_finance_credit_note":
+		required = []string{"credit_note_id"}
+	}
+	for _, key := range required {
+		if _, ok := getRequiredJSONRPCPositiveInt(pm, key); !ok {
+			return false
+		}
+	}
+	for _, key := range []string{"source_id", "refund_of_payment_id", "counterparty_id", "finance_fact_id", "offset"} {
+		if _, ok := getOptionalJSONRPCNonNegativeInt(pm, key); !ok {
+			return false
+		}
+	}
+	if _, exists := pm["limit"]; exists {
+		_, ok := getRequiredJSONRPCPositiveInt(pm, "limit")
+		return ok
+	}
+	return true
+}
+
 func financePaymentResult(d *jsonrpcDispatcher, ctx context.Context, item *biz.FinancePayment, err error) *v1.JsonrpcResult {
 	if err != nil {
 		return d.mapOperationalFactError(ctx, err)

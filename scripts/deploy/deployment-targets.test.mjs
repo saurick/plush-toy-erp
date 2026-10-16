@@ -27,12 +27,12 @@ test("remote deployment writers enforce the registered host identity", () => {
   }
 });
 
-test("deployment registry exposes only the isolated demo and customer-test targets", () => {
+test("deployment registry exposes isolated demo, customer-test and production targets", () => {
   const registry = loadDeploymentTargetRegistry();
   assert.equal(registry.schemaVersion, DEPLOYMENT_TARGET_REGISTRY_CONTRACT);
   assert.deepEqual(
     registry.targets.map((target) => target.key),
-    ["demo-133", "customer-test-133"],
+    ["demo-133", "customer-test-133", "production-133"],
   );
   assert.doesNotMatch(JSON.stringify(registry), /admin\.yoyoosun\.net/u);
   const demo = getDeploymentTarget("demo-133", registry);

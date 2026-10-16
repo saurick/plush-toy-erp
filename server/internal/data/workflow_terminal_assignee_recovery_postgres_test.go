@@ -104,3 +104,37 @@ func TestProductionOrderPostgresTerminalAssigneeBackupRecovery(t *testing.T) {
 		})
 	}
 }
+
+func TestProductionOrderPostgresTerminalAssigneeNullReceiptConfirmation(t *testing.T) {
+	db, _ := openPurchaseReceiptPostgresTestData(t)
+	tx := terminalRecoveryFixture(t, db.sqldb, true)
+	ctx := t.Context()
+	_, err := tx.ExecContext(ctx, `UPDATE workflow_task_events SET actor_id=99,
+idempotency_key='original-receipt-'||task_id::text,intent_hash=repeat('a',64),command_key='complete',
+mutation_result=jsonb_build_object('contract','workflow.task-mutation-result/v1','task',
+  jsonb_strip_nulls(jsonb_build_object('id',task_id,'task_status_key','done','assignee_id',CASE WHEN task_id=1 THEN 17 ELSE NULL END)))
+WHERE task_version=2 AND task_id IN (1,2)`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"20261015082400_restore_terminal_task_assignees.sql", "20261016150000_confirm_terminal_task_unassigned.sql", "20261016150000_confirm_terminal_task_unassigned.sql"} {
+		migration, err := os.ReadFile(filepath.Join("model", "migrate", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = tx.ExecContext(ctx, string(migration)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var events, version, assigned int
+	var unassigned bool
+	if err = tx.QueryRowContext(ctx, `SELECT count(*) FROM workflow_task_events WHERE payload->>'source'='terminal_task_assignee_restoration'`).Scan(&events); err != nil || events != 2 {
+		t.Fatalf("confirmation events=%d err=%v", events, err)
+	}
+	if err = tx.QueryRowContext(ctx, `SELECT assignee_id FROM workflow_tasks WHERE id=1`).Scan(&assigned); err != nil || assigned != 17 {
+		t.Fatalf("original assignment lost: %d %v", assigned, err)
+	}
+	if err = tx.QueryRowContext(ctx, `SELECT assignee_id IS NULL,version FROM workflow_tasks WHERE id=2`).Scan(&unassigned, &version); err != nil || !unassigned || version != 4 {
+		t.Fatalf("unassigned confirmation was missing or replayed: null=%t version=%d err=%v", unassigned, version, err)
+	}
+}

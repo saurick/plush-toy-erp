@@ -1,3 +1,9 @@
+import {
+  OutsourcingOrderStatus,
+  ProductionOrderStatus,
+  PurchaseOrderStatus,
+  SalesOrderStatus,
+} from '../../common/consts/statuses.generated.mjs'
 import { resolveBusinessStatusCounts } from './businessStatusCounts.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 
@@ -7,23 +13,23 @@ const MASTER_HISTORY_STATUS = Object.freeze({
 })
 
 const SALES_ORDER_STATUS = Object.freeze({
-  closed: '已关闭',
-  canceled: '已取消',
+  [SalesOrderStatus.CLOSED]: '已关闭',
+  [SalesOrderStatus.CANCELED]: '已取消',
 })
 
 const PURCHASE_ORDER_STATUS = Object.freeze({
-  closed: '已关闭',
-  canceled: '已取消',
+  [PurchaseOrderStatus.CLOSED]: '已关闭',
+  [PurchaseOrderStatus.CANCELED]: '已取消',
 })
 
 const OUTSOURCING_ORDER_STATUS = Object.freeze({
-  closed: '已关闭',
-  canceled: '已取消',
+  [OutsourcingOrderStatus.CLOSED]: '已关闭',
+  [OutsourcingOrderStatus.CANCELED]: '已取消',
 })
 
 const PRODUCTION_ORDER_STATUS = Object.freeze({
-  CLOSED: '已关闭',
-  CANCELLED: '已取消',
+  [ProductionOrderStatus.CLOSED]: '已关闭',
+  [ProductionOrderStatus.CANCELLED]: '已取消',
 })
 
 const BOM_STATUS = Object.freeze({ ARCHIVED: '已归档' })

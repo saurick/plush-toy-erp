@@ -19,11 +19,43 @@ function read(relativePath) {
   return readFileSync(path.join(repoRoot, relativePath), "utf8");
 }
 
+function invokeTargetHelper(args) {
+  const publicArgs = [...args];
+  const [input] = publicArgs.splice(args[0] === "base" ? 2 : 1, 1);
+  return spawnSync(process.execPath, [path.join(repoRoot, "scripts/qa/postgres-target-contract.mjs"), ...publicArgs], {
+    input,
+    encoding: "utf8",
+  });
+}
+
+test("repository execution tools do not depend on Python", () => {
+  const sources = ["server/Makefile"];
+  for (const directory of [
+    "scripts",
+    "deployments/yoyoosun/scripts",
+    "web/dev-server",
+  ]) {
+    sources.push(
+      ...readdirSync(path.join(repoRoot, directory), { recursive: true })
+        .filter(
+          (file) => /\.(?:mjs|sh|py)$/u.test(file) && !file.includes(".test"),
+        )
+        .map((file) => path.join(directory, file)),
+    );
+  }
+  for (const file of sources) {
+    assert.ok(!file.endsWith(".py"), `${file} requires an extra interpreter`);
+    assert.doesNotMatch(
+      read(file),
+      /\bpython(?:[23](?:\.\d+)*)?\b/iu,
+      `${file} must use the existing toolchain`,
+    );
+  }
+});
+
 test("PostgreSQL target helper rejects connection overrides before any command", () => {
-  const helper = path.join(repoRoot, "scripts/qa/postgres-target-contract.py");
   const url = "postgres://postgres:unused@127.0.0.1/plush_erp_ci_target";
-  const invoke = (args) =>
-    spawnSync("python3", [helper, ...args], { encoding: "utf8" });
+  const invoke = invokeTargetHelper;
   for (const profile of [
     "inventory",
     "bom-lot",
@@ -65,6 +97,221 @@ test("PostgreSQL target helper rejects connection overrides before any command",
     ],
   ]) {
     assert.notEqual(invoke(args).status, 0);
+  }
+});
+
+test("PostgreSQL target helper preserves safe targets, credentials and disposable ownership", () => {
+  const invoke = (...args) => invokeTargetHelper(args);
+  const fields = (result) => {
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(result.stdout.endsWith("\0"));
+    return result.stdout.slice(0, -1).split("\0");
+  };
+  for (const host of ["127.0.0.1", "[::1]", "inventory-postgres"]) {
+    const source = `postgresql://fixture:encoded%40secret@${host}:55432/plush_erp_ci_fixture?sslmode=require`;
+    const [actualHost, database, safeURL, adminURL, ok] = fields(
+      invoke("base", "inventory", source, "apply"),
+    );
+    assert.equal(actualHost, host.replace(/^\[|\]$/gu, ""));
+    assert.equal(database, "plush_erp_ci_fixture");
+    assert.equal(ok, "ok");
+    assert.equal(new URL(safeURL).password, "");
+    assert.doesNotMatch(safeURL, /secret/u);
+    assert.equal(new URL(adminURL).password, "encoded%40secret");
+    assert.equal(new URL(adminURL).pathname, "/postgres");
+    assert.equal(new URL(adminURL).host, new URL(source).host);
+  }
+  const base =
+    "postgres://fixture:private-password@127.0.0.1/plush_erp_ci_fixture";
+  for (const source of [
+    base.replace("127.0.0.1", "192.0.2.1"),
+    base.replace("plush_erp_ci_fixture", "plush_erp"),
+    `${base}#private-fragment`,
+    `${base}?connect_timeout=0`,
+    `${base}?application_name=invalid%0Avalue`,
+    base.replace("plush_erp_ci_fixture", "production/../plush_erp_ci_fixture"),
+    base.replace(
+      "plush_erp_ci_fixture",
+      "production/%2e%2e/plush_erp_ci_fixture",
+    ),
+    ` ${base.replace("plush_erp_ci_fixture", "production/../plush_erp_ci_fixture")}`,
+    `${base} `,
+  ]) {
+    const result = invoke("base", "inventory", source, "apply");
+    assert.notEqual(result.status, 0);
+    assert.equal(result.stdout, "");
+    assert.doesNotMatch(result.stderr, /private-password|private-fragment/u);
+  }
+  const admin = base.replace("plush_erp_ci_fixture", "postgres");
+  assert.notEqual(invoke("base", "inventory", admin, "apply").status, 0);
+  fields(invoke("base", "purchase-receipt", admin, "test-critical-disposable"));
+  const longBase = base.replace(
+    "plush_erp_ci_fixture",
+    `plush_erp_ci_${"a".repeat(50)}`,
+  );
+  const first = fields(invoke("critical", longBase, "123"));
+  const second = fields(invoke("critical", longBase, "123"));
+  assert.notEqual(first[0], second[0]);
+  assert.equal(first[0].length, 63);
+  assert.match(first[0], /^plush_erp_ci_.*_critical_123_[a-f0-9]{8}$/u);
+  assert.equal(new URL(first[1]).pathname, `/${first[0]}`);
+  assert.equal(new URL(first[1]).password, "private-password");
+  const populated = fields(
+    invoke("populated", admin, "postgres", "123", "456"),
+  );
+  assert.equal(populated[0], "plush_erp_ci_populated_123_456");
+  assert.equal(populated[2], "ok");
+});
+
+test("PostgreSQL script callers pass helper connection input through stdin", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "plush-target-input-"));
+  const bin = path.join(root, "bin");
+  const log = path.join(root, "helper-arguments.log");
+  mkdirSync(bin);
+  writeFileSync(path.join(bin, "node"), '#!/bin/sh\nprintf "%s\\n" "$@" >"$TARGET_ARGUMENT_LOG"\nexec "$REAL_TEST_NODE" "$@"\n', { mode: 0o755 });
+  writeFileSync(path.join(bin, "atlas"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  writeFileSync(path.join(bin, "psql"), "#!/bin/sh\nexit 98\n", { mode: 0o755 });
+  const source = "postgres://fixture:private-password@127.0.0.1/plush_erp_ci_transport";
+  try {
+    for (const [profile, variable] of [
+      ["inventory", "INVENTORY_PG_DB_URL"],
+      ["bom-lot", "BOM_LOT_PG_DB_URL"],
+      ["purchase-return", "PURCHASE_RETURN_PG_DB_URL"],
+      ["purchase-receipt", "PURCHASE_RECEIPT_PG_DB_URL"],
+    ]) {
+      writeFileSync(log, "");
+      const result = spawnSync("bash", [path.join(repoRoot, `scripts/${profile}-pg.sh`), "status"], {
+        cwd: path.join(repoRoot, "server"),
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${bin}${path.delimiter}${process.env.PATH || ""}`,
+          REAL_TEST_NODE: process.execPath,
+          TARGET_ARGUMENT_LOG: log,
+          GIT_OPTIONAL_LOCKS: "0",
+          [variable]: source,
+        },
+      });
+      assert.equal(result.status, 0, `${profile}: ${result.stderr}`);
+      const argumentsSeen = readFileSync(log, "utf8");
+      assert.match(argumentsSeen, /postgres-target-contract\.mjs/u);
+      assert(argumentsSeen.split("\n").includes(profile));
+      assert.doesNotMatch(argumentsSeen, /private-password|postgres(?:ql)?:/u);
+      assert.doesNotMatch(result.stdout + result.stderr, /private-password/u);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("backup source parser uses private environment input and rejects unsafe connection values", () => {
+  const helper = path.join(repoRoot, "scripts/lib/postgres-url.mjs");
+  const invoke = (source) =>
+    spawnSync(process.execPath, [helper, "backup-source"], {
+      encoding: "utf8",
+      env: { ...process.env, BACKUP_SOURCE_POSTGRES_DSN: source },
+    });
+  const source =
+    "postgresql://backup%2Duser:private%40secret%3A%2F%25@[::1]:55432/fixture%2Ddb?sslmode=verify-full";
+  const result = invoke(source);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.stdout.split("\0"), [
+    "::1",
+    "55432",
+    "fixture-db",
+    "backup-user",
+    "private@secret:/%",
+    "verify-full",
+    "",
+  ]);
+  for (const invalid of [
+    source.replace("verify-full", "unexpected"),
+    `${source}&sslmode=disable`,
+    `${source}&host=production`,
+    `${source}#fragment`,
+    source.replace("private%40secret%3A%2F%25", "private%00secret"),
+    source.replace("private%40secret%3A%2F%25", "private%GGsecret"),
+    source.replace("55432", "65536"),
+    source.replace("private%40secret%3A%2F%25", ""),
+    source.replace("fixture%2Ddb", "production/../fixture-db"),
+  ]) {
+    const rejected = invoke(invalid);
+    assert.notEqual(rejected.status, 0);
+    assert.equal(rejected.stdout, "");
+    assert.doesNotMatch(rejected.stderr, /private|postgresql:\/\//u);
+  }
+  const missing = invoke("");
+  assert.notEqual(missing.status, 0);
+  assert.equal(missing.stdout, "");
+});
+
+test("database creation parser preserves the administrator target and rejects unsafe names", () => {
+  const helper = path.join(repoRoot, "scripts/lib/postgres-url.mjs");
+  const invoke = (source) =>
+    spawnSync(process.execPath, [helper, "create"], {
+      encoding: "utf8",
+      env: { ...process.env, DB_URL: source },
+    });
+  const source =
+    "postgres://fixture:private%40secret@[::1]:55432/plush_erp_ci_fixture?sslmode=require";
+  const result = invoke(source);
+  assert.equal(result.status, 0, result.stderr);
+  const [database, adminURL] = result.stdout.trim().split("\n");
+  assert.equal(database, "plush_erp_ci_fixture");
+  assert.equal(new URL(adminURL).pathname, "/postgres");
+  assert.equal(new URL(adminURL).password, "private%40secret");
+  assert.equal(new URL(adminURL).host, "[::1]:55432");
+  for (const invalid of [
+    source.replace("plush_erp_ci_fixture", "invalid%27name"),
+    `${source}&dbname=production`,
+  ]) {
+    const rejected = invoke(invalid);
+    assert.notEqual(rejected.status, 0);
+    assert.equal(rejected.stdout, "");
+    assert.doesNotMatch(rejected.stderr, /private/u);
+  }
+});
+
+test("database creation stops before psql when its URL parser fails", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "plush-db-create-parser-"));
+  const bin = path.join(root, "bin");
+  const log = path.join(root, "psql.log");
+  mkdirSync(bin);
+  writeFileSync(
+    path.join(bin, "psql"),
+    '#!/bin/sh\nprintf "called\\n" >>"$FAKE_CREATE_LOG"\n',
+    { mode: 0o755 },
+  );
+  try {
+    const source =
+      "postgres://fixture:private-secret@127.0.0.1/plush_erp_ci_create";
+    for (const [url, valid] of [
+      [source, true],
+      [`${source}?dbname=production`, false],
+      [` ${source.replace("plush_erp_ci_create", "production/../plush_erp_ci_create")}`, false],
+      [source.replace("plush_erp_ci_create", "bad%27name"), false],
+    ]) {
+      writeFileSync(log, "");
+      const result = spawnSync("make", ["--no-print-directory", "db_create"], {
+        cwd: path.join(repoRoot, "server"),
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          GIT_OPTIONAL_LOCKS: "0",
+          DB_URL: url,
+          PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+          FAKE_CREATE_LOG: log,
+        },
+      });
+      assert.equal(result.status === 0, valid, result.stderr);
+      assert.equal(readFileSync(log, "utf8").includes("called"), valid);
+      assert.doesNotMatch(
+        `${result.stdout}\n${result.stderr}`,
+        /private-secret/u,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 
@@ -133,7 +380,6 @@ test("full and strict require the isolated PostgreSQL critical transaction gate"
   const strict = read("scripts/qa/strict.sh");
   const makefile = read("server/Makefile");
   const pgScript = read("scripts/purchase-receipt-pg.sh");
-  const targetContract = read("scripts/qa/postgres-target-contract.py");
   const disposableRunner = read("scripts/qa/disposable-database-runner.mjs");
   const criticalTestConfig = read("scripts/qa/critical-postgres-tests.sh");
   const workflowConcurrency = read(
@@ -209,12 +455,6 @@ test("full and strict require the isolated PostgreSQL critical transaction gate"
     "strict must not repeat the full vulnerability scan",
   );
 
-  assert.match(
-    targetContract,
-    /re\.fullmatch\(r"plush_erp_ci_\[a-z0-9_\]\+"/u,
-    "the shared target contract must reject fixed or non-CI database names",
-  );
-
   for (const name of [
     "INVENTORY",
     "BOM_LOT",
@@ -240,7 +480,7 @@ test("full and strict require the isolated PostgreSQL critical transaction gate"
       ),
       `${helper} must require an explicit generated database DSN`,
     );
-    assert.match(read(helper), /postgres-target-contract\.py/u);
+    assert.match(read(helper), /postgres-target-contract\.mjs/u);
   }
   const returnHelper = read("scripts/purchase-return-pg.sh");
   assert.match(returnHelper, /file:\/\/internal\/data\/model\/migrate/u);
@@ -255,10 +495,6 @@ test("full and strict require the isolated PostgreSQL critical transaction gate"
     /DROP DATABASE "\$\{databaseName\}" WITH \(FORCE\)/u,
   );
   assert.match(disposableRunner, /cleanup-readback/u);
-  assert.match(
-    targetContract,
-    /_critical_\{process_id\}_\{secrets\.token_hex\(4\)\}/u,
-  );
   assert.match(pgScript, /CREATE DATABASE \\"\$\{CRITICAL_DATABASE_NAME\}\\"/u);
   assert.match(
     pgScript,
@@ -427,7 +663,6 @@ test("full and strict require the fail-closed populated upgrade PostgreSQL gate"
   const strict = read("scripts/qa/strict.sh");
   const makefile = read("server/Makefile");
   const pgScript = read("scripts/purchase-receipt-pg.sh");
-  const targetContract = read("scripts/qa/postgres-target-contract.py");
   const populatedContract = read(
     "scripts/qa/fixtures/populated-upgrade-contract.sql",
   );
@@ -475,7 +710,6 @@ test("full and strict require the fail-closed populated upgrade PostgreSQL gate"
   assert.match(makefile, /^populated_upgrade_pg_test:/mu);
   assert.match(makefile, /purchase-receipt-pg\.sh test-populated-upgrade/u);
   assert.match(pgScript, /test-populated-upgrade\)/u);
-  assert.match(targetContract, /_populated_\{process_id\}_\{random_value\}/u);
   assert(pgScript.includes("CREATE DATABASE"));
   assert(pgScript.includes("DROP DATABASE IF EXISTS"));
   assert(pgScript.includes("WITH (FORCE)"));
@@ -693,8 +927,12 @@ test("full and strict require the fail-closed populated upgrade PostgreSQL gate"
 });
 
 test("PostgreSQL entrypoints avoid Bash heredoc preprocessing deadlocks", () => {
+  const heredocOperator = /(?<!<)<<(?!<)/u;
+  for (const example of ["cat <<EOF", "cat <<-EOF", "cat <<'EOF'"]) {
+    assert.match(example, heredocOperator);
+  }
+  assert.doesNotMatch('node helper.mjs <<<"$DATABASE_URL"', heredocOperator);
   const pgScript = read("scripts/purchase-receipt-pg.sh");
-  const targetContract = read("scripts/qa/postgres-target-contract.py");
   const sqlContract = read(
     "scripts/qa/fixtures/populated-upgrade-contract.sql",
   );
@@ -708,10 +946,10 @@ test("PostgreSQL entrypoints avoid Bash heredoc preprocessing deadlocks", () => 
     const source = read(entrypoint);
     assert.doesNotMatch(
       source,
-      /<</u,
+      heredocOperator,
       `${entrypoint} must not preprocess heredocs before its selected command`,
     );
-    assert.match(source, /postgres-target-contract\.py/u);
+    assert.match(source, /postgres-target-contract\.mjs/u);
     assert.doesNotMatch(
       source,
       /mapfile\s+-[^\n]*\bd\b/u,
@@ -720,9 +958,6 @@ test("PostgreSQL entrypoints avoid Bash heredoc preprocessing deadlocks", () => 
     assert.match(source, /read -r -d '' target_field/u);
   }
   assert.match(pgScript, /populated-upgrade-contract\.sql/u);
-  for (const mode of ["base", "critical", "populated"]) {
-    assert.match(targetContract, new RegExp(`mode == "${mode}"`, "u"));
-  }
   for (const action of [
     "plush_snapshot",
     "plush_net_weight_kg",
@@ -861,6 +1096,9 @@ printf '{"Action":"pass","Test":"TestPurchaseReceiptPostgresSynthetic"}\n'
 `,
     node: `#!/usr/bin/env bash
 set -euo pipefail
+if [[ "$1" == */postgres-target-contract.mjs ]]; then
+  exec "${process.execPath}" "$@"
+fi
 printf 'node:%s\n' "$*" >> "\${FAKE_PG_LOG:?}"
 `,
   };

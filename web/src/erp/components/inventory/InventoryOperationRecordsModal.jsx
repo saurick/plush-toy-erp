@@ -1,6 +1,7 @@
 import { EditOutlined, ReloadOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Checkbox, Select, Space, Tag } from 'antd'
+import { InventoryOperationStatus } from '../../../common/consts/statuses.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import Table from '@/common/components/table/AppTable'
 
@@ -17,21 +18,21 @@ const TYPE_LABELS = Object.freeze({
 })
 
 const STATUS_LABELS = Object.freeze({
-  DRAFT: '草稿',
-  SUBMITTED: '待审批',
-  APPROVED: '已批准待过账',
-  REJECTED: '已驳回',
-  POSTED: '已过账',
-  CANCELLED: '已取消',
+  [InventoryOperationStatus.DRAFT]: '草稿',
+  [InventoryOperationStatus.SUBMITTED]: '待审批',
+  [InventoryOperationStatus.APPROVED]: '已批准待过账',
+  [InventoryOperationStatus.REJECTED]: '已驳回',
+  [InventoryOperationStatus.POSTED]: '已过账',
+  [InventoryOperationStatus.CANCELLED]: '已取消',
 })
 
 const STATUS_COLORS = Object.freeze({
-  DRAFT: 'default',
-  SUBMITTED: 'gold',
-  APPROVED: 'cyan',
-  REJECTED: 'red',
-  POSTED: 'blue',
-  CANCELLED: 'default',
+  [InventoryOperationStatus.DRAFT]: 'default',
+  [InventoryOperationStatus.SUBMITTED]: 'gold',
+  [InventoryOperationStatus.APPROVED]: 'cyan',
+  [InventoryOperationStatus.REJECTED]: 'red',
+  [InventoryOperationStatus.POSTED]: 'blue',
+  [InventoryOperationStatus.CANCELLED]: 'default',
 })
 
 const TYPE_OPTIONS = [
@@ -206,7 +207,7 @@ export default function InventoryOperationRecordsModal({
         render: (_, record) => {
           const canEdit =
             canCreate &&
-            record?.status === 'DRAFT' &&
+            record?.status === InventoryOperationStatus.DRAFT &&
             Number(record?.created_by || 0) === Number(currentAdminID || 0)
           return (
             <Space size="small">

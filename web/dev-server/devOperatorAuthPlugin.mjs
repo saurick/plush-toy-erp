@@ -22,7 +22,7 @@ function operatorCredentials() {
 
 export function createDevOperatorAuthMiddleware({
   readCredentials = operatorCredentials,
-  readAccessMode = () => process.env.PLUSH_DEV_WORKBENCH_ACCESS ?? 'operator',
+  readAccessMode = () => process.env.PLUSH_DEV_WORKBENCH_ACCESS ?? 'local',
 } = {}) {
   return (request, response, next) => {
     let pathname
@@ -56,6 +56,15 @@ export function createDevOperatorAuthMiddleware({
       return
     }
     const accessMode = readAccessMode()
+    const loopback =
+      isLoopbackRemoteAddress(request.socket?.remoteAddress) &&
+      isLoopbackHostHeader(request.headers?.host)
+    if (accessMode === 'local') {
+      if (loopback) return next()
+      response.statusCode = 403
+      response.end('请使用本机开发地址，内网共享需单独配置访问方式')
+      return
+    }
     // Personal development can explicitly trust the checked private network;
     // each operation still enforces its own Origin, CSRF and confirmation.
     if (accessMode === 'private-network') return next()
@@ -64,9 +73,6 @@ export function createDevOperatorAuthMiddleware({
       response.end('开发工作台访问方式配置无效')
       return
     }
-    const loopback =
-      isLoopbackRemoteAddress(request.socket?.remoteAddress) &&
-      isLoopbackHostHeader(request.headers?.host)
     if (!loopback && !isDevWorkbenchHttpsRequest(request)) {
       response.statusCode = 403
       response.end('请通过受控的安全连接访问开发工作台')

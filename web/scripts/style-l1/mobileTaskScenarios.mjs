@@ -6,7 +6,7 @@ import { mobileTaskListOptionsScenario } from './mobileTaskListOptionsScenario.m
 import { mobileTaskRefreshScenario } from './mobileTaskRefreshScenario.mjs'
 import { mobileTaskHistoryFiltersScenario } from './mobileTaskHistoryFiltersScenario.mjs'
 import { mobileTaskDiscoveryScenario } from './mobileTaskDiscoveryScenario.mjs'
-import { assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
+import { assertTaskMenuCopy, assertTaskCopy, clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import { assertTaskEventTrailMarkers } from './taskEventTrailAssertions.mjs'
 import { assertMobileEditableInputSize } from './inputControlAssertions.mjs'
@@ -437,37 +437,11 @@ export function createMobileTaskScenarios({
         await copyDetail.screenshot({
           path: path.join(outputDir, 'mobile-task-product-detail.png'),
         })
-        await copyDetail.getByText('查看产品与来源', { exact: true }).click()
-        const copyStyle = copyDetail
-          .getByRole('button', { name: '复制产品编号', exact: true })
-          .first()
-        await assertTaskCopy(page, copyStyle, 'PRODUCT-7')
-        await assertTaskCopy(
-          page,
-          copyDetail
-            .getByRole('button', { name: '复制单据编号', exact: true })
-            .first(),
-          'SO-IMAGE-0'
-        )
-        const copySize = await copyStyle.boundingBox()
-        assert.ok(
-          copySize.width >= 44 && copySize.height >= 44,
-          '详情复制按钮保持可触控范围'
-        )
-        await assertTaskCopy(
-          page,
-          copyDetail.getByRole('button', { name: '复制产品信息', exact: true }),
-          [
-            '产品：图片识别模拟产品',
-            '产品编号：PRODUCT-7',
-            '内部款号：唯一款号-RB018',
-          ]
-        )
-        await assertTaskCopy(
-          page,
-          copyDetail.getByRole('button', { name: '复制任务信息', exact: true }),
-          ['任务：确认兔子样品', 'SO-IMAGE-0', '进入岗位：工程 · 2026年']
-        )
+        const more = copyDetail.getByRole('button', { name: '更多操作', exact: true })
+        const moreSize = await more.boundingBox()
+        assert.ok(moreSize.width >= 44 && moreSize.height >= 44, '更多操作保持可触控范围')
+        await assertTaskMenuCopy(page, copyDetail, '产品信息', ['产品：图片识别模拟产品', '产品编号：PRODUCT-7', '内部款号：唯一款号-RB018'])
+        await assertTaskMenuCopy(page, copyDetail, '任务信息', ['任务：确认兔子样品', 'SO-IMAGE-0', '进入岗位：工程 · 2026年'])
         await page
           .getByRole('button', { name: '查看图片识别模拟产品大图' })
           .first()
@@ -588,7 +562,6 @@ export function createMobileTaskScenarios({
             'mobile-task-detail-screen'
           )
           await placeholderDetail.waitFor({ state: 'visible' })
-          await placeholderDetail.getByText('查看产品与来源', { exact: true }).click()
           await placeholderDetail
             .locator(`.erp-task-product-image[data-image-state="${state}"]`)
             .first()
@@ -624,22 +597,11 @@ export function createMobileTaskScenarios({
         )
         const materialDetail = page.getByTestId('mobile-task-detail-screen')
         await materialDetail.waitFor({ state: 'visible' })
-        await materialDetail.getByText('查看产品与来源', { exact: true }).click()
-        await assertTaskCopy(
+        assert.equal(await materialDetail.getByRole('button', { name: '复制款号', exact: true }).count(), 0)
+        await assertTaskMenuCopy(
           page,
-          materialDetail.getByRole('button', {
-            name: '复制款号',
-            exact: true,
-          }),
-          '示例织造AB-001#-02#米白'
-        )
-
-        await assertTaskCopy(
-          page,
-          materialDetail.getByRole('button', {
-            name: '复制物料信息',
-            exact: true,
-          }),
+          materialDetail,
+          '物料信息',
           ['款号：示例织造AB-001#-02#米白', '系统物料编号：MAT-95002']
         )
         await page.screenshot({
@@ -1168,7 +1130,6 @@ export function createMobileTaskScenarios({
             roleTaskCard.getByText(role.taskName, { exact: true })
           )
           await expectText(page, role.taskName)
-          await page.getByText('查看产品与来源', { exact: true }).click()
           const identity = page.locator('[aria-label="任务关联内容"]')
           await expectText(
             identity,
@@ -1366,6 +1327,7 @@ export function createMobileTaskScenarios({
           timeout: 10_000,
         })
         await expectText(mobileTaskEventTrail, '本任务处理记录')
+        await mobileTaskEventTrail.locator('summary').click()
         await expectText(mobileTaskEventTrail, '任务已创建')
         assert.equal(
           await mobileTaskEventTrail.locator('dl').count(),
@@ -1381,6 +1343,7 @@ export function createMobileTaskScenarios({
         )
         await expectText(processContextCard, '任务处理链')
         await assertTextAbsent(mobileExecutionTrail, '执行轨迹')
+        await mobileExecutionTrail.locator('details > summary').click()
         await expectText(mobileExecutionTrail, '提交销售订单')
         await expectText(mobileExecutionTrail, '订单审批')
         await expectText(mobileExecutionTrail, '工程资料')
@@ -1407,7 +1370,7 @@ export function createMobileTaskScenarios({
           page.getByTestId('mobile-task-detail-screen').evaluate((screen) => {
             const sections = [...screen.querySelectorAll('section')]
             const taskSummary = screen.querySelector(
-              '[data-testid="mobile-task-detail-summary"]'
+              '.workflow-task-current'
             )
             const processContext = screen.querySelector(
               '[data-testid="mobile-task-process-context"]'
@@ -2559,7 +2522,7 @@ export function createMobileTaskScenarios({
           row,
           row.getByText('确认重点订单排期', { exact: true })
         )
-        await page.getByRole('button', { name: '处理任务', exact: true }).click()
+        await page.getByRole('button', { name: '选择处理方式', exact: true }).click()
         const action = page.getByTestId('mobile-task-action-screen')
         assert.deepEqual(
           await action.locator('input[type="radio"]').evaluateAll((nodes) =>
@@ -2577,7 +2540,7 @@ export function createMobileTaskScenarios({
         const reason = action.getByRole('textbox', { name: /阻塞解除说明/ })
         await reason.fill('排期已核对，继续由老板岗位确认订单。')
         await action.getByRole('button', { name: '返回任务详情', exact: true }).click()
-        await page.getByRole('button', { name: '处理任务', exact: true }).click()
+        await page.getByRole('button', { name: '选择处理方式', exact: true }).click()
         assert.equal(
           await reason.inputValue(),
           '排期已核对，继续由老板岗位确认订单。',
@@ -3194,7 +3157,7 @@ export function createMobileTaskScenarios({
           .waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '请联系 业务岗位，确认卡点和恢复条件。')
         const mobileContactRoleMetrics = await page
-          .locator('.mobile-task-exception-contact__role')
+          .locator('.workflow-task-current__contact strong')
           .first()
           .evaluate((node) => {
             const contactStyle = node.parentElement
@@ -3224,6 +3187,7 @@ export function createMobileTaskScenarios({
           .getByTestId('workflow-task-event-trail')
           .locator('.workflow-task-event-trail__meta')
           .first()
+        await page.getByTestId('workflow-task-event-trail').locator('summary').click()
         await mobileEventMeta.waitFor({ state: 'visible', timeout: 10_000 })
         await assertTaskEventTrailMarkers(
           page.getByTestId('workflow-task-event-trail'),
@@ -3274,14 +3238,14 @@ export function createMobileTaskScenarios({
         )
         assert.equal(
           await page
-            .getByTestId('mobile-task-exception-contact')
+            .getByTestId('workflow-task-exception-contact')
             .getByText('异常处理：', { exact: true })
             .count(),
           0,
           '移动端紧凑异常区不应重复“异常处理”前缀'
         )
         assert.equal(
-          await page.locator('.mobile-role-detail-risk').count(),
+          await page.locator('.workflow-task-current--blocked').count(),
           1,
           '阻塞原因和异常处理应合并为一个紧凑区域'
         )
@@ -3410,7 +3374,7 @@ export function createMobileTaskScenarios({
         await expectText(page, taskName)
         const processButton = page
           .locator('.mobile-role-action-bar')
-          .getByRole('button', { name: '处理任务', exact: true })
+          .getByRole('button', { name: '选择处理方式', exact: true })
         await processButton.waitFor({ state: 'visible', timeout: 10_000 })
         await processButton.click()
         await page

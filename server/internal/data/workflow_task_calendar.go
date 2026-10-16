@@ -2,6 +2,9 @@ package data
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"time"
 
 	"server/internal/biz"
@@ -53,12 +56,32 @@ func loadWorkflowTaskCalendar(ctx context.Context, client *ent.Client, base *ent
 		day, _ := time.ParseInLocation("2006-01-02", query.Selection, from.Location())
 		selected = selected.Where(workflowtask.DueAtGTE(day.UTC()), workflowtask.DueAtLT(day.AddDate(0, 0, 1).UTC()))
 	}
-	result.Total, err = selected.Clone().Count(ctx)
+	var revisionRows []struct {
+		ID      int        `json:"id"`
+		Version int        `json:"version"`
+		DueAt   *time.Time `json:"due_at"`
+	}
+	err = selected.Clone().Order(ent.Asc(workflowtask.FieldID)).
+		Select(workflowtask.FieldID, workflowtask.FieldVersion, workflowtask.FieldDueAt).Scan(ctx, &revisionRows)
 	if err != nil {
 		return nil, err
 	}
+	hash := sha256.New()
+	for _, row := range revisionRows {
+		deadline := ""
+		if row.DueAt != nil {
+			deadline = row.DueAt.UTC().Format(time.RFC3339Nano)
+		}
+		// hash.Hash.Write never returns an error.
+		_, _ = fmt.Fprintf(hash, "%d:%d:%s\n", row.ID, row.Version, deadline)
+	}
+	result.Total = len(revisionRows)
+	result.Revision = hex.EncodeToString(hash.Sum(nil))
+	if query.Revision != "" && query.Revision != result.Revision {
+		result.Offset = 0
+	}
 	rows, err := selected.Order(workflowtask.ByDueAt(sql.OrderNullsLast()), ent.Asc(workflowtask.FieldID)).
-		Offset(query.Offset).Limit(limit).All(ctx)
+		Offset(result.Offset).Limit(limit).All(ctx)
 	if err != nil {
 		return nil, err
 	}

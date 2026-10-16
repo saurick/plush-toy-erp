@@ -100,9 +100,9 @@ func TestPurchaseOrderEngineeringSnapshotGroupsProductsAndPreservesManualOrders(
 	if item.ProductNoSnapshot == nil || *item.ProductNoSnapshot != "A#\nB#" || item.ProductNameSnapshot == nil || *item.ProductNameSnapshot != "产品 A\n"+longName || item.Note == nil || *item.Note != "按样板\n单独包装" {
 		t.Fatalf("grouped fields lost, duplicated or crossed material/unit: %+v", item)
 	}
-	reordered, err := repo.ReorderPurchaseOrderItems(ctx, order.ID, order.Version, []int{line.ID})
-	if err != nil || reordered.Items[0].Note == nil || *reordered.Items[0].Note != *item.Note {
-		t.Fatalf("reordering lost the approved display source: %v %+v", err, reordered)
+	listed, _, err := repo.ListPurchaseOrderItems(ctx, biz.PurchaseOrderItemFilter{PurchaseOrderID: order.ID})
+	if err != nil || len(listed) != 1 || listed[0].Note == nil || *listed[0].Note != *item.Note {
+		t.Fatalf("listing lost the approved display source: %v %+v", err, listed)
 	}
 	client.EngineeringMaterialRequest.UpdateOneID(request.ID).SetSourceSnapshot([]map[string]any{{"material_id": line.MaterialID, "unit_id": line.UnitID}}).SaveX(ctx)
 	empty, err := repo.GetPurchaseOrderItem(ctx, line.ID)

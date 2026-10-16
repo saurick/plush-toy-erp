@@ -1,3 +1,5 @@
+import { WorkflowBusinessStatus } from '../../common/consts/statuses.generated.mjs'
+
 export const ACCESSORIES_PURCHASE_MODULE_KEY = 'accessories-purchase'
 
 export const PROCESSING_CONTRACTS_MODULE_KEY = 'processing-contracts'
@@ -18,13 +20,13 @@ export const PURCHASE_RECONCILIATION_TASK_GROUP = 'purchase_reconciliation'
 
 export const OUTSOURCE_RECONCILIATION_TASK_GROUP = 'outsource_reconciliation'
 
-export const INBOUND_DONE_STATUS_KEY = 'inbound_done'
+export const INBOUND_DONE_STATUS_KEY = WorkflowBusinessStatus.INBOUND_DONE
 
-export const RECONCILING_STATUS_KEY = 'reconciling'
+export const RECONCILING_STATUS_KEY = WorkflowBusinessStatus.RECONCILING
 
-export const SETTLED_STATUS_KEY = 'settled'
+export const SETTLED_STATUS_KEY = WorkflowBusinessStatus.SETTLED
 
-export const BLOCKED_STATUS_KEY = 'blocked'
+export const BLOCKED_STATUS_KEY = WorkflowBusinessStatus.BLOCKED
 
 const PAYABLE_SOURCE_TYPE_KEYS = new Set([
   ACCESSORIES_PURCHASE_MODULE_KEY,

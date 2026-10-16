@@ -9,6 +9,8 @@
 | `base-release` | 普通代码发布与客户配置激活前底线 | 运行身份、health / ready、镜像、迁移状态、当前备份、基础 smoke 和回滚方案；迁移或恢复流程变更时追加演练 |
 | `customer-trial-acceptance` | 客户试用或交付前验收 | 恢复与回滚演练、客户签收、凭据轮换、岗位登录、SMS、PDF 和客户配置读回 |
 
+生产 `production-133` 使用 `base-release`；客户岗位验收另绑定同一固定版本记录，不调用固定测试凭据轮换。`customer-trial-acceptance` 仅适用于 demo/test；生产提交该 profile 会在生成或读取凭据前被拒绝。
+
 ## 可以记录
 
 - `releaseId`、完整 `productCommit`、image digest。
@@ -44,8 +46,8 @@
 发布 evidence 草稿可用资料包脚本生成：
 
 ```bash
-bash deployments/yoyoosun/scripts/collect-evidence.sh \
-  --deployment-target <demo-133|customer-test-133> \
+bash scripts/deploy/collect-evidence.sh \
+  --deployment-target <demo-133|customer-test-133|production-133> \
   --profile <base-release|customer-trial-acceptance> \
   --release-id <release-id> \
   --output deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
@@ -55,7 +57,7 @@ bash deployments/yoyoosun/scripts/collect-evidence.sh \
 
 ```bash
 node scripts/deploy/release-evidence-status.mjs \
-  --deployment-target <demo-133|customer-test-133> \
+  --deployment-target <demo-133|customer-test-133|production-133> \
   --profile <base-release|customer-trial-acceptance> \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
@@ -71,14 +73,14 @@ status 不执行发布、不读取真实 `.env`、不恢复备份、不跑 migra
 ```bash
 bash scripts/deploy/production-preflight.sh \
   --profile <base-release|customer-trial-acceptance> \
-  --deployment-target <demo-133|customer-test-133> \
+  --deployment-target <demo-133|customer-test-133|production-133> \
   --env-file server/deploy/compose/prod/.env \
   --out deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/production-preflight-report.json
 ```
 
 ```bash
 SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
-  bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
+  bash scripts/deploy/run-backup-restore-rehearsal.sh \
     --release-id <release-id> \
     --environment <environment> \
     --out output/customers/yoyoosun/backup-restore-rehearsal
@@ -87,7 +89,7 @@ SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
 ```bash
 node scripts/deploy/release-evidence-gate.mjs \
   --customer yoyoosun \
-  --deployment-target <demo-133|customer-test-133> \
+  --deployment-target <demo-133|customer-test-133|production-133> \
   --profile <base-release|customer-trial-acceptance> \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
@@ -98,7 +100,7 @@ node scripts/deploy/release-evidence-gate.mjs \
 
 ```bash
 node scripts/deploy/customer-config-activation-gate.mjs \
-  --deployment-target <demo-133|customer-test-133> \
+  --deployment-target <demo-133|customer-test-133|production-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
@@ -124,7 +126,7 @@ node scripts/deploy/customer-config-manifest-evidence.mjs \
 
 ```bash
 node scripts/deploy/customer-config-release-readiness.mjs \
-  --deployment-target <demo-133|customer-test-133> \
+  --deployment-target <demo-133|customer-test-133|production-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
@@ -133,7 +135,7 @@ node scripts/deploy/customer-config-release-readiness.mjs \
 
 ```bash
 node scripts/deploy/customer-config-release-readiness.mjs \
-  --deployment-target <demo-133|customer-test-133> \
+  --deployment-target <demo-133|customer-test-133|production-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
   --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json \
@@ -146,7 +148,7 @@ readiness gate 只聚合脱敏证据和 report，不访问后端、不执行 mig
 
 ```bash
 node scripts/deploy/customer-config-release-execute.mjs \
-  --deployment-target <demo-133|customer-test-133> \
+  --deployment-target <demo-133|customer-test-133|production-133> \
   --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
   --out output/customers/yoyoosun/customer-config-release

@@ -682,20 +682,53 @@
   align-items: baseline;
   gap: 4px;
   min-height: 30px;
-  border: 1px solid var(--erp-line-items-stat-border, #cfe0ff);
-  border-radius: 999px;
-  background: var(--erp-line-items-stat-bg, #f3f8ff);
-  color: var(--erp-line-items-stat-text, #6b7788);
+  color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
-  font-weight: 650;
-  padding: 4px 10px;
+  padding: 4px 6px;
 }
 
 .erp-line-items-form__stat-value {
-  color: var(--erp-line-items-stat-value, #2563eb);
+  color: var(--erp-text);
+  font-size: var(--erp-font-body);
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.erp-line-items-form__stat--emphasis {
+  margin-left: 6px;
+  padding-left: 14px;
+  border-left: 1px solid var(--erp-border);
+}
+
+.erp-line-items-form__stat--emphasis .erp-line-items-form__stat-value {
+  color: var(--erp-primary-strong);
   font-size: var(--erp-font-emphasis);
-  font-weight: 780;
-  line-height: 1;
+  font-weight: 700;
+}
+
+.erp-line-items-form__amount-details {
+  display: grid;
+  gap: 10px;
+  min-width: 220px;
+  max-width: min(340px, calc(100vw - 64px));
+  margin: 0;
+}
+
+.erp-line-items-form__amount-details > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.erp-line-items-form__amount-details dt {
+  color: var(--erp-text-muted);
+}
+
+.erp-line-items-form__amount-details dd {
+  margin: 0;
+  color: var(--erp-text);
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 /* 明细随编辑页纵向展开，宽表只在整块明细区横向滚动。 */
@@ -1523,9 +1556,8 @@
   cursor: pointer;
   appearance: none;
   transition:
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    background 0.16s ease;
+    background-color 0.16s ease,
+    border-color 0.16s ease;
   padding: 8px 12px;
   gap: 2px;
   min-height: 60px;
@@ -1533,17 +1565,21 @@
   align-content: center;
 }
 
-.erp-role-template-card:hover,
-.erp-role-template-card:focus-visible {
-  border-color: var(--erp-border);
-  background: var(--erp-interactive-bg-hover);
-  box-shadow: none;
-  outline: 2px solid transparent;
+@media (hover: hover) {
+  .erp-role-template-card:not(:disabled, [aria-pressed='true']):hover {
+    background: var(--erp-interactive-bg-hover);
+  }
 }
 
 .erp-role-template-card:focus-visible {
-  outline-color: var(--erp-primary);
+  outline: 2px solid var(--erp-interactive-border-focus);
   outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-role-template-card {
+    transition: none;
+  }
 }
 
 .erp-role-template-card--active {
@@ -2154,10 +2190,6 @@
   color: var(--erp-sales-order-lines-title, #172033);
   font-size: var(--erp-font-emphasis);
   font-weight: 780;
-}
-
-.erp-sales-order-demand-toolbar__reorder {
-  margin-inline-start: auto;
 }
 
 .erp-business-line-items-flow {

@@ -593,7 +593,6 @@ test('database migration runtime requires every supporting command before prepar
       'awk',
       'date',
       'jq',
-      'python3',
     ]) {
       if (command !== missing) {
         symlinkSync(process.execPath, path.join(bin, command))

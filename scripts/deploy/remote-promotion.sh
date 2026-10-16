@@ -5,7 +5,7 @@ umask 077
 print_help() {
   cat <<'USAGE'
 Usage:
-  bash remote-promotion.sh promote <demo-133|customer-test-133> \
+  bash remote-promotion.sh promote <demo-133|customer-test-133|production-133> \
     <operation-id> <40-sha> <version> <release-manifest-sha256> \
     <release-rehearsal-sha256> <promotion-fingerprint> <confirmation>
 
@@ -58,6 +58,20 @@ customer-test-133)
   compose_override_name=compose.customer-test-133.yml
   server_endpoint=http://127.0.0.1:8335
   web_endpoint=http://127.0.0.1:5205
+  ;;
+production-133)
+  root=/root/deploy/plush-toy-erp-production
+  runtime_env=$root/runtime/.env.production-133
+  public_endpoint=https://erp.yoyoosun.net
+  public_network=plush-toy-erp-production_default
+  public_container_prefix=plush-toy-erp-production-web-public-
+  public_host_port=5178
+  public_candidate_port=15178
+  project=plush-toy-erp-production
+  database=plush_erp_production
+  compose_override_name=compose.production-133.yml
+  server_endpoint=http://127.0.0.1:8345
+  web_endpoint=http://127.0.0.1:5215
   ;;
 *)
   printf '[remote-promotion] unsupported target\n' >&2
@@ -847,7 +861,7 @@ web_archive_manifest_digest="$(
 )"
 
 enter_stage capacity_recheck
-available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
+available_bytes="$(df -B1 --output=avail "$root" | awk 'NR==2 {print $1}')"
 [[ "$available_bytes" =~ ^[0-9]+$ &&
   "$available_bytes" -ge "$minimum_available_bytes" ]] ||
   fail "target disk capacity is below the fixed minimum"

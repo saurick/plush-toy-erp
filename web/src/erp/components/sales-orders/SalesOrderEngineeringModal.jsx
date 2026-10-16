@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { App, Button, Checkbox, Form, Input, Select, Space, Spin, Tag } from 'antd'
 import { useLocation, useOutletContext } from 'react-router-dom'
+import { SalesOrderItemStatus, SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import EngineeringBOMAction from './EngineeringBOMAction.jsx'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
@@ -237,7 +238,7 @@ export default function SalesOrderEngineeringModal({
       .then(([{ order, detail }, products, skus, boms]) => {
         if (controller.signal.aborted) return
         const items = detail.sales_order_items.filter(
-          (item) => item.line_status === 'open'
+          (item) => item.line_status === SalesOrderItemStatus.OPEN
         )
         setContext({
           order,
@@ -366,7 +367,7 @@ export default function SalesOrderEngineeringModal({
         disabled:
           loading ||
           !context ||
-          !['draft', 'submitted', 'active'].includes(
+          ![SalesOrderStatus.DRAFT, SalesOrderStatus.SUBMITTED, SalesOrderStatus.ACTIVE].includes(
             context.order.lifecycle_status
           ),
       }}

@@ -1,6 +1,7 @@
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { switchMermaidLayout } from './mermaidViewerAssertions.mjs'
 import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../src/common/consts/workflowTaskDiscovery.generated.mjs'
+import { getFulfillmentSupplement } from '../../src/dev-workbench/config/devFulfillmentPresentation.mjs'
 
 export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
   return [false, true].map((mobile) => ({
@@ -13,8 +14,10 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       await guide.getByRole('heading', { name: '订单全流程', exact: true }).waitFor()
       const subflow = guide.locator('.erp-dev-fulfillment-guide__subflow')
       const subflowDiagram = subflow.locator('.erp-markdown-mermaid')
-      const verifySubflowFits = async () => {
+      const stageButton = (stage) => guide.locator(`[data-fulfillment-stage="${stage}"] > button`)
+      const verifySubflowPreview = async ({ fit = false } = {}) => {
         await subflow.locator('[data-mermaid-status="rendered"]').waitFor()
+        if (fit) await subflowDiagram.locator('[data-mermaid-zoom-action="fit"]').click()
         const metrics = await subflowDiagram.evaluate((root) => {
           const viewport = root.querySelector('.erp-markdown-mermaid__viewport')
           const svg = root.querySelector('.erp-markdown-mermaid__canvas > svg')
@@ -29,57 +32,75 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
             top: diagram.top - bounds.top,
             right: diagram.right - bounds.left,
             bottom: diagram.bottom - bounds.top,
+            overflowX: getComputedStyle(viewport).overflowX,
+            overflowY: getComputedStyle(viewport).overflowY,
+            documentWidth: document.documentElement.scrollWidth,
+            viewportWidth: innerWidth,
           }
         })
         assert(metrics.width > 0 && metrics.height > 0, '子流程画布必须可见')
-        assert(metrics.scrollWidth <= metrics.width + 2 && metrics.scrollHeight <= metrics.height + 2 && metrics.left >= -1 && metrics.top >= -1 && metrics.right <= metrics.width + 2 && metrics.bottom <= metrics.height + 2, `子流程首次展示应完整，无需切换布局: ${JSON.stringify(metrics)}`)
+        assert(metrics.documentWidth <= metrics.viewportWidth + 1, `子流程溢出必须留在图内: ${JSON.stringify(metrics)}`)
+        if (fit) assert(metrics.scrollWidth <= metrics.width + 2 && metrics.scrollHeight <= metrics.height + 2 && metrics.left >= -1 && metrics.top >= -1 && metrics.right <= metrics.width + 2 && metrics.bottom <= metrics.height + 2, `主动适配后完整展示子流程: ${JSON.stringify(metrics)}`)
+        else {
+          if (metrics.scrollWidth > metrics.width + 2) assert.match(metrics.overflowX, /^(auto|scroll)$/u)
+          if (metrics.scrollHeight > metrics.height + 2) assert.match(metrics.overflowY, /^(auto|scroll)$/u)
+        }
       }
-      await verifySubflowFits()
       const nodes = guide.locator('.erp-dev-fulfillment-guide__steps > li')
       const count = await nodes.count()
       assert.equal(count, 17, '完整流程必须包含全部 17 个环节')
-      const verifyOverview = async ({ firstScreen = !mobile } = {}) => {
+      assert.equal(await guide.locator('.erp-dev-fulfillment-guide__phase').count(), 3)
+      assert.equal(await guide.locator('.erp-dev-fulfillment-guide__conditional-steps > li').count(), 2)
+      assert.equal(await guide.locator('.erp-dev-fulfillment-guide__result').count(), 0, '总图初始不展开详情')
+      for (const [index, step] of taskCatalog.fulfillment_flow.entries()) {
+        assert.equal(await stageButton(step.stage).getAttribute('aria-label'), `${index + 1} ${step.label}`)
+        assert.equal(await stageButton(step.stage).getAttribute('aria-expanded'), 'false')
+      }
+      const verifyOverview = async ({ firstScreen = !mobile && page.viewportSize().width >= 1920 } = {}) => {
         const layout = await guide.evaluate((element) => {
-          const overview = element.querySelector('.erp-dev-fulfillment-guide__steps')
+          const overview = element.querySelector('.erp-dev-fulfillment-guide__overview') || element.querySelector('.erp-dev-fulfillment-guide__steps').parentElement
           const detail = element.querySelector('.erp-dev-fulfillment-guide__result')
-          const steps = [...overview.children].map((item) => {
+          const steps = [...element.querySelectorAll('.erp-dev-fulfillment-guide__steps > li')].map((item) => {
             const button = item.querySelector('button')
             const title = item.querySelector('strong')
             const rect = button.getBoundingClientRect()
             return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right, font: parseFloat(getComputedStyle(title).fontSize), clipped: title.scrollHeight > title.clientHeight + 1 || button.scrollWidth > button.clientWidth + 1 }
           })
-          return { steps, width: innerWidth, height: innerHeight, overviewBottom: overview.getBoundingClientRect().bottom, detailTop: detail.getBoundingClientRect().top }
+          return { steps, width: innerWidth, height: innerHeight, overviewBottom: overview.getBoundingClientRect().bottom, detailTop: detail?.getBoundingClientRect().top }
         })
         assert(layout.steps.every((step) => step.font >= 14 && !step.clipped), '流程名称保持正常字号并完整显示')
         assert(layout.steps.every((step) => step.left >= 0 && step.right <= layout.width), '全部环节不能横向溢出')
-        assert(layout.detailTop >= layout.overviewBottom, '步骤详情必须位于完整总览下方')
+        if (layout.detailTop !== undefined) assert(layout.detailTop >= layout.overviewBottom, '步骤详情必须位于完整总览下方')
         if (firstScreen) assert(layout.steps.every((step) => step.top >= 0 && step.bottom <= layout.height), `桌面首屏必须看完全部 17 个环节: ${JSON.stringify(layout)}`)
         return layout
       }
       await page.evaluate(() => document.fonts.ready)
       await verifyOverview()
       await page.screenshot({ path: path.join(outputDir, `order-flow-overview-${mobile ? 'mobile' : 'desktop'}-4k.png`), fullPage: mobile, scale: 'device' })
+      await stageButton('sales_order').click()
+      await verifySubflowPreview()
       if (!mobile) {
         for (const viewport of [{ width: 1440, height: 900 }, { width: 1366, height: 768 }]) {
           await page.setViewportSize(viewport)
           await page.reload()
-          await verifySubflowFits()
+          await verifySubflowPreview()
           await verifyOverview()
           await page.screenshot({ path: path.join(outputDir, `order-flow-overview-${viewport.width}.png`), scale: 'device' })
         }
         await page.setViewportSize({ width: 1920, height: 1080 })
         await page.reload()
-        await verifySubflowFits()
+        await verifySubflowPreview()
       }
-      const overviewBeforeSelection = await guide.locator('.erp-dev-fulfillment-guide__steps').boundingBox()
-      await guide.getByRole('button', { name: /来料检验与材料入库/u }).click()
+      const overviewPosition = () => guide.locator('.erp-dev-fulfillment-guide__overview').evaluate((node) => ({ top: node.getBoundingClientRect().top + scrollY, height: node.getBoundingClientRect().height }))
+      const overviewBeforeSelection = await overviewPosition()
+      await stageButton('incoming_quality').click()
       await page.waitForURL(/flow_stage=incoming_quality/u)
       await guide.locator('.erp-dev-fulfillment-guide__result').getByRole('heading', { name: '来料检验与材料入库', exact: true }).waitFor()
-      if (!mobile) assert.deepEqual(await guide.locator('.erp-dev-fulfillment-guide__steps').boundingBox(), overviewBeforeSelection, '切换详情不改变流程总览的位置')
+      if (!mobile) assert.deepEqual(await overviewPosition(), overviewBeforeSelection, '切换详情不改变流程总览的位置')
       await page.reload()
       await guide.getByRole('button', { name: /来料检验与材料入库/u, pressed: true }).waitFor()
-      assert.equal(await guide.locator('.ant-segmented-item-selected').innerText(), '完整流程')
-      await verifySubflowFits()
+      assert.equal(new URL(page.url()).searchParams.has('flow_view'), false)
+      await verifySubflowPreview()
       const verifyDiagramFont = async () => {
         const fontSizes = await subflowDiagram.locator('svg .nodeLabel').evaluateAll((labels) => labels.map((label) => {
           const scale = label.ownerSVGElement?.getScreenCTM() || label.closest('svg').getScreenCTM()
@@ -96,10 +117,9 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       assert.equal(await selectedShape.evaluate((node) => getComputedStyle(node).strokeWidth), '2px')
       await page.reload()
       await subflowDiagram.getByRole('button', { name: '仓库确认材料入库', exact: true, pressed: true }).waitFor()
-      await verifySubflowFits()
+      await verifySubflowPreview()
       if (mobile) {
-        await subflowDiagram.locator('[data-mermaid-zoom-action="fit"]').click()
-        assert(await subflowDiagram.locator('.erp-markdown-mermaid__viewport').evaluate((node) => node.scrollWidth <= node.clientWidth + 2), '窄屏仍可主动适配图宽')
+        await verifySubflowPreview({ fit: true })
         await subflowDiagram.locator('[data-mermaid-zoom-action="reset"]').click()
         await verifyDiagramFont()
         await subflow.scrollIntoViewIfNeeded()
@@ -107,9 +127,9 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       }
       if (!mobile) {
         await switchMermaidLayout(page, subflowDiagram, assert)
-        await verifySubflowFits()
+        await verifySubflowPreview()
         await switchMermaidLayout(page, subflowDiagram, assert)
-        await verifySubflowFits()
+        await verifySubflowPreview()
         await subflowDiagram.getByRole('button', { name: 'IQC 来料检验', exact: true }).click()
         await subflow.locator('[data-selected-substep="inspect"]').waitFor()
       }
@@ -134,9 +154,9 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
         const button = item.querySelector('button')
         const style = getComputedStyle(button)
         return {
+          stage: item.dataset.fulfillmentStage,
           selected: button.getAttribute('aria-pressed') === 'true',
           matchesRole: item.dataset.roleMatch === 'true',
-          roleLabel: item.querySelector('.erp-dev-fulfillment-guide__role-match')?.textContent,
           background: style.backgroundColor,
           shadow: style.boxShadow,
           left: style.borderLeftWidth,
@@ -146,12 +166,13 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       }))
       assert.equal(emphasis.filter((item) => item.selected).length, 1)
       assert(emphasis.every((item) => item.left === item.right && item.shadow === 'none' && !item.overflow))
-      assert(emphasis.filter((item) => item.matchesRole).every((item) => item.roleLabel === '所选岗位'))
+      assert.deepEqual(emphasis.filter((item) => item.matchesRole).map((item) => item.stage).sort(), taskCatalog.fulfillment_flow.filter((step) => step.role_keys.includes('warehouse')).map((step) => step.stage).sort())
       assert.notEqual(emphasis.find((item) => item.selected).background, emphasis.find((item) => !item.selected).background)
       await page.reload()
       await guide.getByRole('combobox', { name: '关注岗位' }).waitFor()
       assert.match(await guide.locator('.erp-dev-fulfillment-guide__role').innerText(), /仓库/u)
       await chooseRole('财务')
+      assert.equal(new URL(page.url()).searchParams.get('flow_stage'), 'incoming_quality', '切换岗位保留当前环节')
       if (!mobile) {
         await page.evaluate(() => window.scrollTo(0, 0))
         await page.setViewportSize({ width: 1366, height: 768 })
@@ -160,23 +181,47 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       }
       const result = guide.locator('.erp-dev-fulfillment-guide__result')
       const openInstructions = async () => {
-        const details = result.locator('.erp-dev-fulfillment-guide__instructions')
-        if (await details.count() && !await details.evaluate((node) => node.open)) await details.locator('summary').click()
+        const details = result.locator('.erp-dev-fulfillment-guide__detail-content > .erp-dev-fulfillment-guide__instructions')
+        const stage = new URL(page.url()).searchParams.get('flow_stage')
+        const step = taskCatalog.fulfillment_flow.find((item) => item.stage === stage)
+        assert(step, `必须能从正式目录定位当前环节：${stage}`)
+        const supplement = getFulfillmentSupplement(step)
+        const hasSupplement = Boolean(supplement.handoffs.length || supplement.approvals.length || supplement.exception)
+        if (!hasSupplement) {
+          assert.equal(await details.count(), 0, '已归属子步骤的说明不重复展示')
+          return
+        }
+        await details.waitFor()
+        assert.equal(await details.count(), 1)
+        if (!await details.evaluate((node) => node.open)) await details.locator('summary').click()
+        assert.equal(await details.evaluate((node) => node.open), true)
       }
+      await stageButton('sales_order').click()
+      await result.getByRole('heading', { name: '接单、工程与用料审批', exact: true }).waitFor()
       await openInstructions()
-      await result.getByText('工程用料两级审核', { exact: true }).waitFor()
+      await result.getByRole('region', { name: '当前环节的子流程', exact: true }).getByText('工程用料两级审核', { exact: true }).waitFor()
       assert.match(await result.innerText(), /重新经过老板和财务审核/u)
       assert.equal(await result.locator('a[href$="stage_key=engineering"]').count(), 1)
-      await guide.getByRole('button', { name: /放行与实际发货/u }).click()
+      await stageButton('shipment').click()
       await result.getByRole('heading', { name: '放行与实际发货', exact: true }).waitFor()
-      await openInstructions()
-      await result.getByText('出货财务放行', { exact: true }).waitFor()
+      assert.equal(await result.locator('.erp-dev-fulfillment-guide__detail-content > .erp-dev-fulfillment-guide__instructions').count(), 0, '交接条件已全部归属子步骤时，不重复展示交接说明')
+      await result.getByRole('region', { name: '当前环节的子流程', exact: true }).getByText('出货财务放行', { exact: true }).waitFor()
       assert.match(await result.innerText(), /不算已经发货/u)
-      await guide.locator('.ant-segmented-item').filter({ hasText: /^异常处理$/u }).click()
+      await stageButton('incoming_quality').click()
+      await result.getByRole('button', { name: '本环节异常：首次来料不合格', exact: true }).click()
       const exception = guide.locator('[data-exception-guide]')
-      const exceptionSteps = exception.locator('.erp-dev-fulfillment-guide__exception-steps > li')
       const exceptionDiagram = exception.locator('.erp-markdown-mermaid')
+      const exceptionSteps = exceptionDiagram.locator('[data-mermaid-node-id]')
       const exceptionDetail = exception.locator('.erp-dev-fulfillment-guide__exception-detail')
+      const expectSelectedStep = async (name) => {
+        const selection = exceptionDetail.locator('.ant-select-selection-item').filter({ hasText: name })
+        await selection.waitFor()
+        assert.equal(await selection.innerText(), name)
+      }
+      const expectExceptionStepCount = async (count) => {
+        await page.waitForFunction((expected) => document.querySelectorAll('[data-exception-guide] [data-mermaid-node-id]').length === expected, count)
+        assert.equal(await exceptionSteps.count(), count)
+      }
       const chooseSource = async (name) => {
         await exception.locator('.erp-dev-fulfillment-guide__exception-source .ant-select-selector').click()
         await page.locator('.ant-select-dropdown:visible').getByText(name, { exact: true }).click()
@@ -184,66 +229,78 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       }
       await chooseSource('首次来料不合格')
       await chooseRole('采购')
-      await exceptionDetail.getByRole('heading', { name: '采购登记退厂范围', exact: true }).waitFor()
-      assert.equal(await exceptionSteps.count(), 3)
-      assert.equal(await exception.locator('li[data-role-match="true"]').count(), 1)
+      await expectSelectedStep('采购登记退厂范围')
+      await expectExceptionStepCount(3)
+      await exceptionDiagram.getByRole('button', { name: / · 所选岗位$/u }).waitFor()
+      assert.equal(await exceptionDiagram.getByRole('button', { name: / · 所选岗位$/u }).count(), 1)
       assert.equal(await exception.getByText('方案审批', { exact: true }).count(), 0)
       await verifyMobileNavigationMotion(page, assert, '[aria-label="异常处理方案"]', 1)
       await page.waitForURL(/flow_decision=replacement/u)
-      assert.equal(await exceptionSteps.count(), 5)
+      await expectExceptionStepCount(5)
       await exceptionDiagram.getByRole('button', { name: /仓库登记新到货/u }).click()
-      await exceptionDetail.getByRole('heading', { name: '仓库登记新到货', exact: true }).waitFor()
+      await expectSelectedStep('仓库登记新到货')
       await page.reload()
-      await exceptionDetail.getByRole('heading', { name: '仓库登记新到货', exact: true }).waitFor()
+      await expectSelectedStep('仓库登记新到货')
       assert.match(await exceptionDetail.innerText(), /不表示新货已入库/u)
       await chooseSource('裁片、皮套与成品不合格')
       await chooseRole('业务')
-      await exceptionDetail.getByRole('heading', { name: '业务提出处理方案', exact: true }).waitFor()
+      await expectSelectedStep('业务提出处理方案')
       await verifyMobileNavigationMotion(page, assert, '[aria-label="异常处理方案"]', 3)
       await page.waitForURL(/flow_decision=scrap/u)
-      assert.equal(await exceptionSteps.count(), 4)
-      assert.doesNotMatch((await exceptionSteps.allInnerTexts()).join(' '), /回货|重新检验/u)
+      await expectExceptionStepCount(4)
+      const scrapLabels = await exceptionSteps.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label')))
+      assert(scrapLabels.every((label) => typeof label === 'string' && label.length > 0))
+      assert.doesNotMatch(scrapLabels.join(' '), /回货|重新检验/u)
       assert.match(await exceptionDetail.innerText(), /不再安排本批回货、复检或恢复生产/u)
       assert.match(await exceptionDetail.innerText(), /本次审批结束/u)
       await exceptionDiagram.getByRole('button', { name: /实际执行报废/u }).click()
-      await exceptionDetail.getByRole('heading', { name: '实际执行报废', exact: true }).waitFor()
+      await expectSelectedStep('实际执行报废')
       await verifyMobileNavigationMotion(page, assert, '[aria-label="异常处理方案"]', 0, true)
-      assert.equal(await exceptionSteps.count(), 6)
+      await expectExceptionStepCount(6)
       await exceptionDiagram.getByRole('button', { name: /IQC 重新检验/u }).waitFor()
       await chooseRole('财务')
-      await exception.getByRole('status').filter({ hasText: '本方案没有固定登记给该岗位' }).waitFor()
+      await exception.getByRole('status').getByText('本方案未登记财务的固定职责，保留完整流程。', { exact: true }).waitFor()
       assert.equal(await exception.getAttribute('data-exception-guide'), 'production_quality')
       await chooseSource('生产超领材料')
-      assert.equal(await exceptionSteps.count(), 3)
+      await expectExceptionStepCount(3)
       assert.match(await exceptionDetail.innerText(), /审批通过不等于已经发料/u)
       await chooseSource('已入库后的退货与纠正')
-      await exceptionDetail.getByRole('heading', { name: '财务核对后续影响', exact: true }).waitFor()
+      await expectSelectedStep('财务核对后续影响')
       await chooseSource('委外产品回货拒收')
-      assert.equal(await exceptionSteps.count(), 3)
+      await expectExceptionStepCount(3)
       assert.match(await exceptionDetail.innerText(), /正式冲正/u)
       await chooseSource('款项、抵扣与退款异常')
-      assert.equal(await exceptionSteps.count(), 5)
+      await expectExceptionStepCount(5)
       await exceptionDiagram.getByRole('button', { name: /财务确认实际退款/u }).click()
-      await exceptionDetail.getByRole('heading', { name: '财务确认实际退款', exact: true }).waitFor()
+      await expectSelectedStep('财务确认实际退款')
       assert.match(await exceptionDetail.innerText(), /可退余额/u)
       await verifyMobileNavigationMotion(page, assert, '[aria-label="异常处理方案"]', 1)
-      assert.equal(await exceptionSteps.count(), 3)
+      await expectExceptionStepCount(3)
       await exceptionDiagram.getByRole('button', { name: /财务撤销原抵扣/u }).click()
-      await exceptionDetail.getByRole('heading', { name: '财务撤销原抵扣', exact: true }).waitFor()
+      await expectSelectedStep('财务撤销原抵扣')
       assert.match(await exceptionDetail.innerText(), /不改变实际收付/u)
-      await guide.locator('.ant-segmented-item').filter({ hasText: /^完整流程$/u }).click()
-      await guide.getByRole('button', {name: /客户首款与分期收款/u}).click()
-      await result.getByRole('heading', {name: '客户首款与分期收款', exact:true}).waitFor()
+      await guide.getByRole('button', { name: '返回来料检验与材料入库', exact: true }).click()
+      assert.equal(new URL(page.url()).searchParams.has('flow_view'), false)
+      assert.equal(new URL(page.url()).searchParams.has('flow_exception'), false)
+      assert.equal(new URL(page.url()).searchParams.has('flow_decision'), false)
+      await stageButton('customer_advance').click()
+      await result.getByRole('heading', { name: '客户首款与分期收款', exact: true }).waitFor()
       await openInstructions()
       assert.match(await result.innerText(), /关联已生效销售订单/u)
-      await guide.getByRole('button', {name: /尾款、对账与结清/u}).click()
-      await result.getByRole('heading', {name: '尾款、对账与结清', exact:true}).waitFor()
+      await stageButton('financial_settlement').click()
+      await result.getByRole('heading', { name: '尾款、对账与结清', exact: true }).waitFor()
       await openInstructions()
+      await subflowDiagram.getByRole('button', { name: '核对剩余未结余额', exact: true }).click()
+      await subflow.locator('[data-selected-substep="balance"]').waitFor()
       assert.match(await result.innerText(), /发票、对账、出货完成都不代表款项结清/u)
       if (mobile) {
-        await result.getByRole('button', { name: '返回全部环节', exact: true }).click()
-        await page.waitForFunction(() => document.querySelector('.erp-dev-fulfillment-guide__steps').getBoundingClientRect().top >= 0)
-        assert.equal(await nodes.getByRole('button', { name: /尾款、对账与结清/u }).getAttribute('aria-pressed'), 'true')
+        await result.getByRole('button', { name: '收起环节', exact: true }).click()
+        await result.waitFor({ state: 'detached' })
+        await page.waitForFunction(() => document.activeElement?.closest('[data-fulfillment-stage]')?.dataset.fulfillmentStage === 'financial_settlement')
+        assert.equal(await result.count(), 0)
+        assert.equal(await stageButton('financial_settlement').getAttribute('aria-expanded'), 'false')
+        assert.equal(await stageButton('financial_settlement').evaluate((node) => document.activeElement === node), true, '收起后焦点返回原环节')
+        assert.equal(new URL(page.url()).searchParams.get('flow_role'), 'finance')
       } else {
         await page.evaluate(() => window.scrollTo(0, 0))
         await verifyOverview()
@@ -260,9 +317,20 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
             assert.equal(await subflow.count(), 0, '简单点数环节直接显示办理说明')
             continue
           }
-          await verifySubflowFits()
+          await verifySubflowPreview()
           for (const node of step.subflow.nodes) {
             await subflowDiagram.getByRole('button', { name: node.label, exact: true }).click()
+            const exceptionGuide = taskCatalog.exception_guides.find((item) => item.entry_stages.includes(step.stage))
+            if (node.detail_refs.includes('exception') && exceptionGuide) {
+              await exception.waitFor()
+              assert.equal(await exception.getAttribute('data-exception-guide'), exceptionGuide.key)
+              assert.equal(new URL(page.url()).searchParams.get('flow_stage'), step.stage)
+              assert.equal(new URL(page.url()).searchParams.get('flow_substep'), node.key)
+              await guide.getByRole('button', { name: `返回${step.label}`, exact: true }).click()
+              await exception.waitFor({ state: 'detached' })
+              assert.equal(new URL(page.url()).searchParams.has('flow_exception'), false)
+              assert.equal(await exception.count(), 0)
+            }
             await subflow.locator(`[data-selected-substep="${node.key}"]`).waitFor()
           }
           assert.equal(await subflowDiagram.locator('[data-mermaid-node-id]').count(), step.subflow.nodes.length)
@@ -302,9 +370,11 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
           return drawer && Math.abs(drawer.getBoundingClientRect().right - innerWidth) < 1 && !drawer.getAnimations({ subtree: true }).some((animation) => animation.playState === 'running')
         })
         assert.equal(await nodes.count(), 17)
-        await verifySubflowFits()
-        await verifyOverview()
-        await guide.getByRole('button', { name: /尾款、对账与结清/u }).click()
+        assert.equal(await result.count(), 0)
+        await verifyOverview({ firstScreen: false })
+        await stageButton('sales_order').click()
+        await verifySubflowPreview()
+        await stageButton('financial_settlement').click()
         await result.getByRole('heading', { name: '尾款、对账与结清', exact: true }).waitFor()
         await page.screenshot({ path: path.join(outputDir, 'order-flow-overview-drawer-4k.png'), scale: 'device' })
       }

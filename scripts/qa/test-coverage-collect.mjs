@@ -1656,6 +1656,7 @@ export function buildBaselineCommandPlan({
         command: process.execPath,
         args: [
           "--test",
+          "--test-concurrency=4",
           "--experimental-test-coverage",
           `--test-coverage-include=${path.resolve(projectRoot).split(path.sep).join("/")}/**`,
           "--test-coverage-exclude=**/node_modules/**",

@@ -6,6 +6,7 @@ import {
   TASK_BOARD_OVERVIEW_LIMIT,
   TASK_BOARD_SORT_OPTIONS,
   buildWorkflowTaskBoardModel,
+  buildWorkflowTaskOverviewTasks,
   buildWorkflowTaskBoardRequest,
   buildWorkflowTaskBoardRoleOptions,
   getWorkflowTaskBoardRequestKey,
@@ -31,6 +32,42 @@ import {
 } from './workflowTaskBoard.mjs'
 
 const now = Math.floor(Date.now() / 1000)
+
+test('task overview prioritizes exceptions and due work, deduplicates overlapping previews and leaves finished work in its category', () => {
+  const blocked = { id: 1, task_status_key: 'blocked' }
+  const due = { id: 2, task_status_key: 'ready' }
+  const ready = { id: 3, task_status_key: 'ready' }
+  const finished = { id: 4, task_status_key: 'done' }
+  const lanes = [
+    { key: 'actionable', tasks: [due, ready] },
+    { key: 'finished', tasks: [finished] },
+    { key: 'due', tasks: [blocked, due] },
+    { key: 'exception', tasks: [blocked] },
+  ]
+  assert.deepEqual(buildWorkflowTaskOverviewTasks(lanes), [blocked, due, ready])
+  assert.deepEqual(lanes[0].tasks, [due, ready])
+  assert.deepEqual(buildWorkflowTaskOverviewTasks([{ key: 'finished', tasks: [finished] }]), [])
+  assert.deepEqual(buildWorkflowTaskOverviewTasks(), [])
+})
+
+test('terminal status filters focus the finished category and survive URL restoration', () => {
+  for (const status of ['done', 'rejected', 'withdrawn']) {
+    const filters = readWorkflowTaskBoardFiltersFromSearch(`status=${status}&q=包装&role=warehouse&due=overdue`)
+    assert.equal(filters.lane, 'finished')
+    assert.equal(filters.status, status)
+    assert.equal(filters.due, 'all')
+    const request = buildWorkflowTaskBoardRequest(filters)
+    assert.equal(request.lane_key, 'finished')
+    assert.equal(request.status, status)
+    assert.equal(request.keyword, '包装')
+    assert.equal(request.owner_role_key, 'warehouse')
+    assert.equal(request.limit, TASK_BOARD_FOCUS_PAGE_SIZE)
+    assert.deepEqual(readWorkflowTaskBoardFiltersFromSearch(writeWorkflowTaskBoardFiltersToSearch('', filters)), filters)
+    assert.equal(buildWorkflowTaskBoardRequest({ mode: 'approval', status }).lane_key, 'finished')
+  }
+  assert.equal(readWorkflowTaskBoardFiltersFromSearch('status=ready').lane, 'all')
+  assert.equal(readWorkflowTaskBoardFiltersFromSearch('lane=exception&status=done').status, 'all')
+})
 
 test('workflowTaskBoard: 待我处理保留网址范围，清除结束状态并使用专属查询', () => {
   const filters = readWorkflowTaskBoardFiltersFromSearch('mode=todo&lane=finished&status=done&q=包装')

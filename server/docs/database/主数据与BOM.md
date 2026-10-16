@@ -34,19 +34,19 @@
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>version</code> | <code>varchar(64)</code> | <code>string</code> | 非空 | — | — | 并发控制版本；写动作通常使用 CAS 校验，不能由调用方任意跳号。 |
-| <code>status</code> | <code>varchar(32)</code> | <code>string</code> | 非空 | <code>&#39;DRAFT&#39;</code> | — | 对象生命周期状态；允许值和组合约束见本表 CHECK 与生命周期说明。 |
+| <code>version</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 并发控制版本；写动作通常使用 CAS 校验，不能由调用方任意跳号。 |
+| <code>status</code> | <code>varchar</code> | <code>string</code> | 非空 | <code>&#39;DRAFT&#39;</code> | — | 对象生命周期状态；允许值和组合约束见本表 CHECK 与生命周期说明。 |
 | <code>effective_from</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>effective_to</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>source_order_no</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>quantity_text</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>spare_text</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>source_order_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| <code>quantity_text</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>spare_text</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>print_date</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>designer</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>maker</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>auditor</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>hair_direction</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| <code>designer</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>maker</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>auditor</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>hair_direction</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 | <code>product_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 外键，关联 `products`。 |
@@ -111,12 +111,12 @@ status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
 | <code>quantity</code> | <code>numeric(20,6)</code> | <code>other</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>loss_rate</code> | <code>numeric(20,6)</code> | <code>other</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>position</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>piece_count</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>total_usage_snapshot</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务发生时冻结的显示快照，不回写上游主数据。 |
-| <code>process_base</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>process_method</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| <code>position</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>piece_count</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>total_usage_snapshot</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务发生时冻结的显示快照，不回写上游主数据。 |
+| <code>process_base</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>process_method</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 | <code>bom_header_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 外键，关联 `bom_headers`。 |
@@ -183,16 +183,16 @@ quantity > 0
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>owner_type</code> | <code>varchar(16)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>owner_type</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>owner_id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar(128)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>phone</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | 敏感 | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>mobile</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | 敏感 | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>email</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | 敏感 | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>title</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>phone</code> | <code>varchar</code> | <code>string</code> | 可空 | — | 敏感 | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>mobile</code> | <code>varchar</code> | <code>string</code> | 可空 | — | 敏感 | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>email</code> | <code>varchar</code> | <code>string</code> | 可空 | — | 敏感 | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>title</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_primary</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>false</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 
@@ -249,18 +249,18 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar(64)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar(255)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>short_name</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_payment_method</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>short_name</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_payment_method</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>default_payment_term_days</code> | <code>bigint</code> | <code>int</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>tax_no</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | 敏感 | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>country_region</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_delivery_recipient</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_delivery_phone</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_delivery_address</code> | <code>varchar(512)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>tax_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | 敏感 | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| <code>country_region</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_delivery_recipient</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_delivery_phone</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_delivery_address</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 
@@ -312,13 +312,13 @@ owner_type IN ('CUSTOMER', 'SUPPLIER')
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar(64)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar(255)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>supplier_item_no</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>category</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>stock_category</code> | <code>varchar(32)</code> | <code>string</code> | 非空 | <code>&#39;UNCLASSIFIED&#39;</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>spec</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>color</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>supplier_item_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| <code>category</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>stock_category</code> | <code>varchar</code> | <code>string</code> | 非空 | <code>&#39;UNCLASSIFIED&#39;</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>spec</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>color</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
@@ -384,15 +384,15 @@ stock_category IN ('MAIN', 'AUXILIARY', 'PACKAGING', 'OTHER', 'UNCLASSIFIED')
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar(64)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar(255)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>category</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>production_route_operation_code</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>category</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>production_route_operation_code</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>outsourcing_enabled</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>false</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>inhouse_enabled</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>quality_required</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>false</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>sort_order</code> | <code>bigint</code> | <code>int</code> | 非空 | <code>0</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
@@ -457,14 +457,14 @@ sort_order >= 0
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>sku_code</code> | <code>varchar(64)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>sku_name</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>barcode</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>customer_sku</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>color</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>color_no</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>size</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>packaging_version</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>sku_code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>sku_name</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>barcode</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>customer_sku</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>color</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>color_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| <code>size</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>packaging_version</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>unit_net_weight_g</code> | <code>numeric(20,6)</code> | <code>other</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
@@ -536,12 +536,12 @@ unit_net_weight_g IS NULL OR default_unit_id IS NOT NULL
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar(64)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar(255)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>style_no</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>customer_style_no</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
-| <code>english_name</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>hs_code</code> | <code>varchar(32)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>style_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| <code>customer_style_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| <code>english_name</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>hs_code</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>unit_net_weight_g</code> | <code>numeric(20,6)</code> | <code>other</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
@@ -651,18 +651,18 @@ unit_net_weight_g IS NULL OR unit_net_weight_g > 0
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar(64)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar(255)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>short_name</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>supplier_type</code> | <code>varchar(32)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>address</code> | <code>varchar(512)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>tax_no</code> | <code>varchar(64)</code> | <code>string</code> | 可空 | — | 敏感 | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
+| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>short_name</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>supplier_type</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>address</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>tax_no</code> | <code>varchar</code> | <code>string</code> | 可空 | — | 敏感 | 业务编号；唯一性和生成规则见索引与领域 usecase。 |
 | <code>default_payment_term_days</code> | <code>bigint</code> | <code>int</code> | 非空 | <code>0</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_payment_method</code> | <code>varchar(128)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_payment_method</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>default_invoice_required</code> | <code>boolean</code> | <code>bool</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>default_invoice_category</code> | <code>varchar(32)</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>default_invoice_category</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>note</code> | <code>varchar(255)</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
+| <code>note</code> | <code>varchar</code> | <code>string</code> | 可空 | — | — | 业务备注；不替代状态原因、审批意见或正式审计字段。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |
 
@@ -730,8 +730,8 @@ supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service',
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar(32)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar(64)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>precision</code> | <code>bigint</code> | <code>int</code> | 非空 | <code>0</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
@@ -785,9 +785,9 @@ precision BETWEEN 0 AND 6
 | 字段 | PostgreSQL 类型 | Ent 类型 | NULL | 数据库默认值 | 结构属性 | 说明 |
 | --- | --- | --- | --- | --- | --- | --- |
 | <code>id</code> | <code>bigint</code> | <code>int</code> | 非空 | — | 主键；identity | 数据库主键；只用于内部关联，不等同于业务编号。 |
-| <code>code</code> | <code>varchar(64)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>name</code> | <code>varchar(128)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
-| <code>type</code> | <code>varchar(32)</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>code</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>name</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
+| <code>type</code> | <code>varchar</code> | <code>string</code> | 非空 | — | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>is_active</code> | <code>boolean</code> | <code>bool</code> | 非空 | <code>true</code> | — | 业务含义以字段名、表用途、约束和链接的 schema/usecase 为准。 |
 | <code>created_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录创建时间；大量表由 Ent client 的 Go 侧默认值赋值，不应据此推断数据库存在 DEFAULT。 |
 | <code>updated_at</code> | <code>timestamp with time zone</code> | <code>time.Time</code> | 非空 | — | — | 记录最近更新时间；大量表由 Ent client 的 UpdateDefault 维护。 |

@@ -61,7 +61,7 @@ test('dev permission relationship page reads existing truth sources without writ
     source + navigationSource + navigationComponentSource,
     /set_roles|set_role_settings|publishApprovalSettings|applyApprovalSettings/u
   )
-  assert.match(source, /不代表某张单据在当前状态一定可操作/u)
+  assert.match(source, /单据能否操作还需满足业务状态与责任条件/u)
   assert.equal(source.match(/role="note"/gu)?.length, 1)
   assert.doesNotMatch(source, /type="info"/u)
 })
@@ -114,7 +114,7 @@ test('permission graph exposes only permission-adjacent relationships', () => {
   ]) {
     assert.match(source + modelSource, new RegExp(label, 'u'))
   }
-  assert.match(source, /不代表某张单据在当前状态一定可操作/u)
+  assert.match(source, /单据能否操作还需满足业务状态与责任条件/u)
   assert.match(navigationSource, /getPermissionRelationshipContext/u)
   assert.match(modelSource, /access\.is_final !== true/u)
   assert.match(navigationSource, /不推导可能失真的完整菜单/u)

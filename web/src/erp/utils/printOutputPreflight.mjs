@@ -3,12 +3,15 @@ import {
   isQuantityTextWithinUnitPrecision,
 } from './unitQuantity.mjs'
 import { isUsableImageDimensions } from './imageDisplay.mjs'
+import { getContractClauseLimitProblems } from './contractClauseEditor.mjs'
+import { NumericContract } from '../../common/consts/numeric.generated.mjs'
+import { PrintPolicy } from '../../common/consts/policies.generated.mjs'
 
 export const PRINT_IMAGE_LIMITS = Object.freeze({
-  count: 32,
-  eachBytes: 5 * 1024 * 1024,
-  totalBytes: 16 * 1024 * 1024,
-  htmlBytes: 24 * 1024 * 1024,
+  count: PrintPolicy.imageCount,
+  eachBytes: PrintPolicy.imageBytes,
+  totalBytes: PrintPolicy.imageTotalBytes,
+  htmlBytes: PrintPolicy.htmlBytes,
 })
 
 export function rasterDataURLBytes(value) {
@@ -32,9 +35,9 @@ export function inspectPrintImageBudget(root) {
   if (sources.length > PRINT_IMAGE_LIMITS.count) {
     problem = `正文和附图展开后共 ${sources.length} 张图片，单次最多 ${PRINT_IMAGE_LIMITS.count} 张。请减少图片或长图分段后再输出。`
   } else if (sizes.some((size) => size > PRINT_IMAGE_LIMITS.eachBytes)) {
-    problem = '有图片超过 5 MB，请缩小图片后再输出。'
+    problem = `有图片超过 ${PRINT_IMAGE_LIMITS.eachBytes / (1024 * 1024)} MB，请缩小图片后再输出。`
   } else if (totalBytes > PRINT_IMAGE_LIMITS.totalBytes) {
-    problem = '图片合计超过 16 MB，请减少或缩小图片后再输出。'
+    problem = `图片合计超过 ${PRINT_IMAGE_LIMITS.totalBytes / (1024 * 1024)} MB，请减少或缩小图片后再输出。`
   }
   return { count: sources.length, totalBytes, problem }
 }
@@ -43,48 +46,38 @@ const missing = (value) =>
   !String(value ?? '').trim() || /^未(?:维护|配置|关联)/.test(String(value))
 
 export function getPrintDraftProblems(template, draft = {}) {
-  if (draft.printMode === 'blank') return []
-  const contract = template?.runtime
-  const problems = (contract?.requiredFields || [])
-    .filter(([key]) => missing(draft[key]))
-    .map(([, label]) => label)
-  if (contract?.requiredLineFields?.length) {
-    const lines = Array.isArray(draft.lines) ? draft.lines : []
-    if (!lines.length) problems.push('至少一行明细')
-    lines.forEach((line, index) => {
-      if (contract.family === 'contract') {
-        const unit = standardUnitForLabel(line.unit)
-        if (!unit) problems.push(`第 ${index + 1} 行单位（请选择标准单位）`)
-        if (
-          unit &&
-          !missing(line.quantity) &&
-          (!isQuantityTextWithinUnitPrecision(line.quantity, unit.precision) ||
-            !(Number(line.quantity) > 0))
-        ) {
-          problems.push(
-            `第 ${index + 1} 行数量（${unit.name}最多 ${unit.precision} 位小数）`
-          )
-        }
-        if (
-          !missing(line.unitPrice) &&
-          (!isQuantityTextWithinUnitPrecision(line.unitPrice, 6) ||
-            Number(line.unitPrice) < 0)
-        ) {
-          problems.push(`第 ${index + 1} 行单价（须为非负数，最多 6 位小数）`)
-        }
-      }
-      for (const [key, label] of contract.requiredLineFields) {
-        if (missing(line[key])) problems.push(`第 ${index + 1} 行${label}`)
-      }
-    })
-  }
+  if (template?.runtime?.family !== 'contract') return []
+  const problems = getContractClauseLimitProblems(draft.clauses)
+  const lines = Array.isArray(draft.lines) ? draft.lines : []
+  lines.forEach((line, index) => {
+    const unit = standardUnitForLabel(line.unit)
+    const quantityPrecision = unit?.precision ?? NumericContract.scale
+    if (
+      !missing(line.quantity) &&
+      (!isQuantityTextWithinUnitPrecision(line.quantity, quantityPrecision) ||
+        !(Number(line.quantity) > 0))
+    ) {
+      problems.push(
+        unit
+          ? `第 ${index + 1} 行数量（${unit.name}最多 ${quantityPrecision} 位小数）`
+          : `第 ${index + 1} 行数量（须为正数，最多 ${quantityPrecision} 位小数）`
+      )
+    }
+    if (
+      !missing(line.unitPrice) &&
+      (!isQuantityTextWithinUnitPrecision(line.unitPrice, NumericContract.scale) ||
+        Number(line.unitPrice) < 0)
+    ) {
+      problems.push(`第 ${index + 1} 行单价（须为非负数，最多 ${NumericContract.scale} 位小数）`)
+    }
+  })
   return problems
 }
 
 export function getPrintOutputProblem(template, draft, paper) {
   const fields = getPrintDraftProblems(template, draft)
   if (fields.length) {
-    return `请先补充：${fields.slice(0, 8).join('、')}${fields.length > 8 ? `等 ${fields.length} 项` : ''}。需要打印空表时，请选择“空白模板”。`
+    return `请检查：${fields.slice(0, 8).join('、')}${fields.length > 8 ? `等 ${fields.length} 项` : ''}。内容可以留白，请调整上述问题后再输出。`
   }
   if (paper?.querySelector?.('[data-print-image-error]')) {
     return '有图片无法使用，请更换或清空后再输出。'

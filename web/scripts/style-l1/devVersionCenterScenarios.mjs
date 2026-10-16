@@ -1,4 +1,4 @@
-import { validateDevDeliverySummary } from '../../src/dev-workbench/config/devDelivery.mjs'
+import { DEV_DELIVERY_TARGETS, validateDevDeliverySummary } from '../../src/dev-workbench/config/devDelivery.mjs'
 import { createQualityGateStyleSummary } from './devQualityGateScenarios.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { switchMermaidLayout } from './mermaidViewerAssertions.mjs'
@@ -111,16 +111,12 @@ export function createVersionCenterSummary() {
       version.actionClass = 'rollback'
       version.actionReason = 'candidate_is_ancestor_of_current'
     }
-    version.actionsByTarget = {
-      'customer-test-133': {
-        actionClass: version.actionClass,
-        actionReason: version.actionReason,
-      },
-      'demo-133': {
-        actionClass: version.actionClass,
-        actionReason: version.actionReason,
-      },
-    }
+    version.actionsByTarget = Object.fromEntries(DEV_DELIVERY_TARGETS.map(({ key }) => [
+      key,
+      ['demo-133', 'customer-test-133'].includes(key)
+        ? { actionClass: version.actionClass, actionReason: version.actionReason }
+        : { actionClass: 'blocked', actionReason: 'target_identity_unavailable' },
+    ]))
   })
   const readyVersion = versions[6]
   const openOperation = {
@@ -288,22 +284,13 @@ export function createVersionCenterSummary() {
     },
     versions,
     target: demoTarget,
-    targets: [
-      {
-        key: 'demo-133',
-        purpose: 'project-demo-simulated',
-        endpoint: 'https://demo.yoyoosun.net',
-        preflight: demoTarget,
-        initializationPreflight: null,
-      },
-      {
-        key: 'customer-test-133',
-        purpose: 'customer-clean-acceptance',
-        endpoint: 'https://test.yoyoosun.net',
-        preflight: customerTestTarget,
-        initializationPreflight: null,
-      },
-    ],
+    targets: DEV_DELIVERY_TARGETS.map(({ key, purpose, endpoint }) => ({
+      key,
+      purpose,
+      endpoint,
+      preflight: key === 'demo-133' ? demoTarget : key === 'customer-test-133' ? customerTestTarget : null,
+      initializationPreflight: null,
+    })),
     operations: [openOperation, ...historyOperations],
     timings: {
       schemaVersion: 'plush.delivery-pipeline-timings/v1',
@@ -382,7 +369,7 @@ export function createVersionCenterSummary() {
       provider: 'github',
       releaseDispatchAllowed: true,
       target: 'demo-133',
-      targets: ['demo-133', 'customer-test-133'],
+      targets: DEV_DELIVERY_TARGETS.map(({ key }) => key),
       browserShellAccess: false,
       targetBuildAllowed: false,
       automaticRetryAllowed: false,
@@ -597,7 +584,7 @@ export function createDevVersionCenterScenarios({
         )
 
         const takeoverTrigger = page.getByRole('button', {
-          name: /手动操作指引/u,
+          name: /操作指引/u,
         })
         await takeoverTrigger.click()
         const takeoverDialog = page.getByRole('dialog', {
@@ -674,7 +661,7 @@ export function createDevVersionCenterScenarios({
         await takeoverDialog.getByRole('button', { name: '我知道了' }).click()
         await takeoverDialog.waitFor({ state: 'hidden' })
         await page.waitForFunction(
-          () => document.activeElement?.textContent?.includes('手动操作指引')
+          () => document.activeElement?.textContent?.includes('操作指引')
         )
         assert.equal(
           await takeoverTrigger.evaluate(

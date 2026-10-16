@@ -118,13 +118,18 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.doesNotMatch(page, /<details[^>]*data-business-chain-topics/u);
   assert.match(guide, /按业务查阅/u);
   assert.doesNotMatch(guide, /aria-label="履约流程视图"/u);
-  assert.match(guide, /onClick=\{closeException\}>返回\{current.label\}/u);
+  assert.match(guide, /onClick=\{closeException\}>返回\{returnLabel\}/u);
+  assert.match(guide, /<ExceptionFlowDirectory/u);
+  assert.match(guide, /data-exception-entry=\{guide.key\}/u);
+  assert.doesNotMatch(guide, /完整交接与审批说明|按文字选择子步骤/u);
   assert.match(guide, /关注岗位/u);
   assert.match(guide, /fulfillmentStepMatchesRole/u);
   assert.match(guide, /fulfillmentTaskLinks/u);
   assert.match(guide, /完整流程/u);
   assert.match(guide, /异常处理/u);
-  assert.match(guide, /<ol className="erp-dev-fulfillment-guide__steps"/u, "main fulfillment stages retain their direct overview");
+  assert.match(guide, /<FulfillmentStageOverview steps=\{steps\}/u, "main fulfillment stages retain their direct overview");
+  assert.match(guide, /buildFulfillmentOverview\(steps\)\.map/u, "the total flow groups the same source stages");
+  assert.match(guide, /data-fulfillment-stage=\{step\.stage\}/u, "each stage retains its canonical identity");
   for (const copy of [
     "Workflow 管“人”", "ProcessRuntime 管“路”", "Fact / Ledger 管“账”",
     "状态机管“规则”", "业务链负责串起来", "基础资料提供标准",

@@ -40,6 +40,11 @@ import usePrintWorkspaceFeedback from '../../utils/usePrintWorkspaceFeedback.js'
 import MaterialPurchaseContractPaper from './MaterialPurchaseContractPaper.jsx'
 import PrintWorkspaceShell from './PrintWorkspaceShell.jsx'
 import { PrintToolButton } from './PrintWorkspaceTools.jsx'
+import ContractClauseTools from './ContractClauseTools.jsx'
+import {
+  editContractClauseGroup,
+  editContractClauseGroups,
+} from '../../utils/contractClauseEditor.mjs'
 
 const noop = () => {}
 
@@ -85,6 +90,11 @@ export default function MaterialPurchaseContractBatchWorkbench({
   const stageWrapRef = useRef(null)
   const outputBusy = useRef(false)
   const [revealKey, setRevealKey] = useState('')
+  const [clauseSelection, setClauseSelection] = useState({
+    contractKey: '',
+    groupKey: 'delivery',
+    index: 0,
+  })
   const batches = useMemo(
     () => getMaterialPurchaseContractOutputBatches(batchDraft),
     [batchDraft]
@@ -98,7 +108,7 @@ export default function MaterialPurchaseContractBatchWorkbench({
     (count, batch) => count + batch.length,
     0
   )
-  const missingFields = useMemo(
+  const draftProblems = useMemo(
     () =>
       new Map(
         batchDraft.contracts.map((contract) => [
@@ -110,6 +120,10 @@ export default function MaterialPurchaseContractBatchWorkbench({
   )
   const contractKey = (contract) =>
     String(contract.purchaseOrderID || contract.orderNo)
+  const clauseContract =
+    currentContracts.find(
+      (contract) => contractKey(contract) === clauseSelection.contractKey
+    ) || currentContracts[0]
 
   const updateContract = (key, update) => {
     if (outputBusy.current) return
@@ -128,6 +142,10 @@ export default function MaterialPurchaseContractBatchWorkbench({
     if (nextBatch < 0 || outputBusy.current) return
     setBatchDraft((current) => ({ ...current, batchIndex: nextBatch }))
     setRevealKey(contractKey(contract))
+    setClauseSelection((current) => ({
+      ...current,
+      contractKey: contractKey(contract),
+    }))
   }
 
   useEffect(() => {
@@ -370,6 +388,40 @@ export default function MaterialPurchaseContractBatchWorkbench({
       onRetrySave={flushDraft}
       workspaceClassName="erp-material-contract-batch-workbench"
       prepareSignature={`${draftStorageKey}:batch:${batchIndex}`}
+      clauseActions={
+        clauseContract ? (
+          <ContractClauseTools
+            clauses={clauseContract.draft.clauses}
+            selection={clauseSelection}
+            onGroupAction={(request) =>
+              updateContract(contractKey(clauseContract), (draft) => ({
+                ...draft,
+                clauses: editContractClauseGroups(draft.clauses, request)
+                  .clauses,
+              }))
+            }
+            onSelect={(next) =>
+              setClauseSelection({
+                ...next,
+                contractKey: contractKey(clauseContract),
+              })
+            }
+            onAction={(request) =>
+              updateContract(contractKey(clauseContract), (draft) => ({
+                ...draft,
+                clauses: editContractClauseGroup(draft.clauses, request)
+                  .clauses,
+              }))
+            }
+            paperRef={batchRootRef}
+            contractKey={contractKey(clauseContract)}
+            contractLabel={clauseContract.orderNo}
+            disabled={pdfAction !== ''}
+            feedback={feedback}
+            reportFeedback={reportFeedback}
+          />
+        ) : null
+      }
       draftActions={
         <div className="erp-material-contract-batch-summary">
           {batchDraft.sourceLabel ? (
@@ -386,7 +438,7 @@ export default function MaterialPurchaseContractBatchWorkbench({
             )}{' '}
             张采购单
           </p>
-          <p>可直接在右侧补齐内容；修改仅保存在本窗口。</p>
+          <p>可直接在右侧编辑，内容允许留白；修改仅保存在本窗口。</p>
           <label className="erp-material-contract-batch-select-all">
             <input
               type="checkbox"
@@ -408,7 +460,7 @@ export default function MaterialPurchaseContractBatchWorkbench({
           </label>
           <ul aria-label="本次采购合同清单">
             {batchDraft.contracts.map((contract) => {
-              const fields = missingFields.get(contract) || []
+              const fields = draftProblems.get(contract) || []
               const included = contract.included !== false
               return (
                 <li key={contractKey(contract)} data-included={included}>
@@ -437,7 +489,7 @@ export default function MaterialPurchaseContractBatchWorkbench({
                     aria-label={`核对合同 ${contract.orderNo}`}
                   >
                     <strong>
-                      {contract.draft.supplierName || '供应方待填写'}
+                      {contract.draft.supplierName || '供应方留白'}
                     </strong>
                     <span>{contract.sourceOrders.length} 张采购单</span>
                     <small>
@@ -457,8 +509,8 @@ export default function MaterialPurchaseContractBatchWorkbench({
                       {!included
                         ? '本次不打印'
                         : fields.length
-                          ? `待补：${fields.slice(0, 3).join('、')}${fields.length > 3 ? `等 ${fields.length} 项` : ''}`
-                          : '资料齐全'}
+                          ? `待检查：${fields.slice(0, 3).join('、')}${fields.length > 3 ? `等 ${fields.length} 项` : ''}`
+                          : '本次打印'}
                     </small>
                   </button>
                 </li>
@@ -581,6 +633,23 @@ export default function MaterialPurchaseContractBatchWorkbench({
                       index,
                       value
                     ),
+                  }))
+                }
+                onClauseFocus={(groupKey, index) =>
+                  setClauseSelection({
+                    contractKey: contractKey(contract),
+                    groupKey,
+                    index,
+                  })
+                }
+                onClauseTitleChange={(groupKey, label) =>
+                  updateContract(contractKey(contract), (draft) => ({
+                    ...draft,
+                    clauses: editContractClauseGroups(draft.clauses, {
+                      groupKey,
+                      action: 'rename',
+                      label,
+                    }).clauses,
                   }))
                 }
                 selectedRowIndex={null}

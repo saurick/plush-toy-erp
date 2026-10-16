@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import { createServer } from 'vite'
 
 import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
@@ -34,6 +37,38 @@ const devDocsPageSource = readFileSync(
   path.join(repoRoot, 'web/src/dev-workbench/pages/DevDocsPage.jsx'),
   'utf8'
 )
+
+test('devDocs: document build excludes customer input memos while retaining public documents', async () => {
+  const declaration = devDocsPageSource.match(/const currentMarkdownModules = import\.meta\.glob\([\s\S]*?\n\)/u)?.[0]
+  assert(declaration, 'the document build entry must remain inspectable')
+  const root = await mkdtemp(path.join(tmpdir(), 'plush-docs-distribution-'))
+  let server
+  try {
+    for (const [file, source] of Object.entries({
+      'web/src/dev-workbench/pages/entry.mjs': `${declaration}\nexport default currentMarkdownModules;\n`,
+      'docs/engineering/public.md': '# Public contract\n',
+      'docs/customers/example/甲方反馈记录.md': '# synthetic-private-memo\n',
+      'docs/archive/history.md': '# Deferred archive\n',
+    })) {
+      const target = path.join(root, file)
+      await mkdir(path.dirname(target), { recursive: true })
+      await writeFile(target, source)
+    }
+    server = await createServer({
+      root,
+configFile: false,
+logLevel: 'silent',
+      server: { middlewareMode: true, hmr: false, watch: null },
+    })
+    const modules = await server.ssrLoadModule('/web/src/dev-workbench/pages/entry.mjs')
+    assert.equal(modules.default['../../../../docs/engineering/public.md'], '# Public contract\n')
+    assert.equal(Object.keys(modules.default).some((file) => file.endsWith('/甲方反馈记录.md')), false)
+    assert.equal(Object.values(modules.default).some((source) => source.includes('synthetic-private-memo')), false)
+    assert.equal(Object.keys(modules.default).some((file) => file.endsWith('/history.md')), false)
+  } finally {
+    try { await server?.close() } finally { await rm(root, { recursive: true, force: true }) }
+  }
+})
 
 function findDirectory(nodes, path) {
   for (const node of nodes) {

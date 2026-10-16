@@ -1,9 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo } from 'react'
 import {
-  ArrowUpOutlined,
   CopyOutlined,
   DeleteOutlined,
-  OrderedListOutlined,
 } from '@ant-design/icons'
 import {
   AutoComplete,
@@ -34,7 +32,6 @@ import FieldWithUnitSuffix, {
   unitPrecisionFromOptions,
   unitSuffixTextFromOptions,
 } from '../business-list/FieldWithUnitSuffix.jsx'
-import BusinessLineItemOrderModal from '../business-list/BusinessLineItemOrderModal.jsx'
 import BusinessLineItemsFooter, {
   BusinessLineItemsHeader,
 } from '../business-list/BusinessLineItemsFooter.jsx'
@@ -169,18 +166,6 @@ export function normalizeSalesOrderItemFormValue(item = {}) {
     planned_delivery_date: unixToDateInputValue(item.planned_delivery_date),
     note: item.note || '',
   }
-}
-
-export function salesOrderLineOrderLabel(item = {}, index = 0) {
-  return (
-    [
-      item.product_code_snapshot,
-      salesOrderRequirementName(item),
-      item.color_snapshot,
-    ]
-      .filter(Boolean)
-      .join(' / ') || `第 ${index + 1} 行（待填写需求）`
-  )
 }
 
 function getNextLineNo(lines = []) {
@@ -611,8 +596,6 @@ export function SalesOrderItemsFormSection({
   orderAttachmentLoadState = 'ready',
   orderID,
 }) {
-  const [lineOrderOpen, setLineOrderOpen] = useState(false)
-  const [lineOrderItems, setLineOrderItems] = useState([])
   const orderDate = Form.useWatch('order_date', form)
   const watchedItems = Form.useWatch('items', form)
   const taxMode = Form.useWatch('tax_mode', form)
@@ -679,40 +662,15 @@ export function SalesOrderItemsFormSection({
   return (
     <section className="erp-sales-order-lines-form">
       <Form.List name="items">
-        {(fields, { add, remove, move }) => (
+        {(fields, { add, remove }) => (
           <>
             <BusinessLineItemsHeader
               title="订货明细"
               addLabel="添加订货明细"
               addDisabled={!canCreateItem}
-              onAdd={() => appendSalesOrderLine(add)}
-            >
-              {fields.length >= 2 ? (
-                <Button
-                  type="text"
-                  className="erp-sales-order-demand-toolbar__reorder"
-                  icon={<OrderedListOutlined aria-hidden="true" />}
-                  disabled={!canCreateItem && !canUpdateItem}
-                  onClick={() => {
-                    const currentLines = form.getFieldValue('items') || []
-                    setLineOrderItems([...currentLines])
-                    setLineOrderOpen(true)
-                  }}
-                >
-                  调整明细顺序
-                </Button>
-              ) : null}
-            </BusinessLineItemsHeader>
-            <BusinessLineItemOrderModal
-              getItemLabel={salesOrderLineOrderLabel}
-              itemNoun="订货明细"
-              items={lineOrderItems}
-              onApply={(orderedItems) =>
-                form.setFieldsValue({ items: orderedItems })
+              onAdd={
+                fields.length > 0 ? () => appendSalesOrderLine(add) : undefined
               }
-              onClose={() => setLineOrderOpen(false)}
-              open={lineOrderOpen}
-              title="调整明细顺序"
             />
             {fields.length === 0 ? (
               <BusinessLineItemsEmpty>
@@ -766,24 +724,6 @@ export function SalesOrderItemsFormSection({
                           size={4}
                           wrap
                         >
-                          <Button
-                            aria-label={`上移第 ${index + 1} 行`}
-                            size="small"
-                            type="text"
-                            icon={<ArrowUpOutlined />}
-                            disabled={
-                              index === 0 ||
-                              !canEditLine ||
-                              (Boolean(watchedItems?.[field.name - 1]?.id) &&
-                                !canUpdateItem)
-                            }
-                            onClick={() => {
-                              move(field.name, field.name - 1)
-                              requestLineItemScroll(index - 1)
-                            }}
-                          >
-                            上移
-                          </Button>
                           <Button
                             aria-label={`复制第 ${index + 1} 行`}
                             size="small"
@@ -1280,6 +1220,7 @@ export function SalesOrderItemsFormSection({
                 },
                 {
                   key: 'goods-amount',
+                  detail: true,
                   label: '货款金额',
                   value:
                     numeric20Scale6Units(commercialAmounts.goodsAmount) !== null
@@ -1291,6 +1232,7 @@ export function SalesOrderItemsFormSection({
                 },
                 {
                   key: 'quoted-freight-amount',
+                  detail: true,
                   label: '报价运费',
                   value:
                     freightTerms === 'INCLUDED'
@@ -1305,6 +1247,7 @@ export function SalesOrderItemsFormSection({
                 },
                 {
                   key: 'tax-amount',
+                  detail: true,
                   label: '税额',
                   value: commercialAmounts.complete
                     ? `${currency || ''} ${formatNumeric20Scale6Summary(
@@ -1315,6 +1258,7 @@ export function SalesOrderItemsFormSection({
                 },
                 {
                   key: 'order-total',
+                  emphasis: true,
                   label: '订单总额',
                   value: commercialAmounts.complete
                     ? `${currency || ''} ${formatNumeric20Scale6Summary(

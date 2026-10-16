@@ -173,6 +173,16 @@ function InstructionImageAnnotationLayer({
   )
 }
 
+function isInstructionTitleWithoutItems(rows, index) {
+  return (
+    getWorkInstructionRowType(rows[index]) ===
+      WORK_INSTRUCTION_ROW_TYPES.title &&
+    (!rows[index + 1] ||
+      getWorkInstructionRowType(rows[index + 1]) ===
+        WORK_INSTRUCTION_ROW_TYPES.title)
+  )
+}
+
 function createImageLayoutStyle(layout = null) {
   const x = Number(layout?.x)
   const y = Number(layout?.y)
@@ -229,6 +239,9 @@ function WorkInstructionPaper({
               isSelectedRow ? 'erp-engineering-print-row--selected' : ''
             }`}
             key={`body-${pageIndex ?? 'main'}-${rowIndex}`}
+            data-print-editor-only={
+              isInstructionTitleWithoutItems(rows, rowIndex) ? '' : undefined
+            }
             style={createWorkInstructionRowStyle(row.heightMm)}
             onMouseDown={(event) => {
               if (!instructionRowSelectionMode) return
@@ -242,6 +255,7 @@ function WorkInstructionPaper({
           >
             <td colSpan={9}>
               <EditableText
+                blankField={!isInstructionTitleWithoutItems(rows, rowIndex)}
                 value={row.text}
                 multiline
                 rich
@@ -316,6 +330,7 @@ function WorkInstructionPaper({
         >
           <td className="erp-work-instruction-paper__step-no">
             <EditableText
+              blankField
               value={row.no}
               onCommit={(value) =>
                 onInstructionRowChange(rowTarget, 'no', value)
@@ -328,6 +343,7 @@ function WorkInstructionPaper({
           >
             {hasText || (!isImageRow && !useAnnotationLayout) ? (
               <EditableText
+                blankField
                 value={row.text}
                 multiline
                 rich
@@ -354,6 +370,7 @@ function WorkInstructionPaper({
                 />
                 <div className="erp-work-instruction-paper__annotation-note erp-work-instruction-paper__annotation-note--left">
                   <EditableText
+                    blankField
                     value={row.imageNotes?.left}
                     multiline
                     rich
@@ -422,6 +439,7 @@ function WorkInstructionPaper({
                 </div>
                 <div className="erp-work-instruction-paper__annotation-note erp-work-instruction-paper__annotation-note--right">
                   <EditableText
+                    blankField
                     value={row.imageNotes?.right}
                     multiline
                     rich
@@ -521,6 +539,7 @@ function WorkInstructionPaper({
               rowSpan={2}
             >
               <EditableText
+                blankField
                 value={draft.companyName}
                 onCommit={(value) => onFieldChange('companyName', value)}
                 className="erp-work-instruction-paper__company"
@@ -529,6 +548,7 @@ function WorkInstructionPaper({
             <td className="erp-work-instruction-paper__meta-label">产品编号</td>
             <td className="erp-work-instruction-paper__meta-value">
               <EditableText
+                blankField
                 value={draft.productNo}
                 onCommit={(value) => onFieldChange('productNo', value)}
               />
@@ -549,6 +569,7 @@ function WorkInstructionPaper({
             </td>
             <td className="erp-work-instruction-paper__meta-value">
               <EditableText
+                blankField
                 value={draft.versionText}
                 onCommit={(value) => onFieldChange('versionText', value)}
               />
@@ -566,6 +587,7 @@ function WorkInstructionPaper({
               data-work-instruction-process-name
             >
               <EditableText
+                blankField
                 value={draft.processName}
                 onCommit={(value) => onFieldChange('processName', value)}
               />
@@ -575,6 +597,7 @@ function WorkInstructionPaper({
               data-work-instruction-process-date
             >
               <EditableText
+                blankField
                 value={draft.processDateText}
                 onCommit={(value) => onFieldChange('processDateText', value)}
               />
@@ -595,6 +618,7 @@ function WorkInstructionPaper({
               colSpan={4}
             >
               <EditableText
+                blankField
                 value={draft.department}
                 onCommit={(value) => onFieldChange('department', value)}
               />
@@ -622,6 +646,7 @@ function WorkInstructionPaper({
               colSpan={4}
             >
               <EditableText
+                blankField
                 value={draft.orderNo}
                 onCommit={(value) => onFieldChange('orderNo', value)}
               />
@@ -629,6 +654,7 @@ function WorkInstructionPaper({
             <td className="erp-work-instruction-paper__meta-label">设计师</td>
             <td className="erp-work-instruction-paper__meta-value">
               <EditableText
+                blankField
                 value={draft.designer}
                 onCommit={(value) => onFieldChange('designer', value)}
               />
@@ -649,6 +675,7 @@ function WorkInstructionPaper({
               colSpan={4}
             >
               <EditableText
+                blankField
                 value={draft.productName}
                 onCommit={(value) => onFieldChange('productName', value)}
               />
@@ -716,6 +743,9 @@ function WorkInstructionContinuationPage({
               isSelectedRow ? 'erp-engineering-print-row--selected' : ''
             }`}
             key={`continuation-${pageIndex}-body-${rowIndex}`}
+            data-print-editor-only={
+              isInstructionTitleWithoutItems(rows, rowIndex) ? '' : undefined
+            }
             style={createWorkInstructionRowStyle(row.heightMm)}
             onMouseDown={(event) => {
               if (!instructionRowSelectionMode) return
@@ -729,6 +759,7 @@ function WorkInstructionContinuationPage({
           >
             <td colSpan={9}>
               <EditableText
+                blankField={!isInstructionTitleWithoutItems(rows, rowIndex)}
                 value={row.text}
                 multiline
                 rich
@@ -804,6 +835,7 @@ function WorkInstructionContinuationPage({
         >
           <td className="erp-work-instruction-paper__step-no">
             <EditableText
+              blankField
               value={row.no}
               onCommit={(value) =>
                 onInstructionRowChange(rowTarget, 'no', value)
@@ -816,6 +848,7 @@ function WorkInstructionContinuationPage({
           >
             {hasText || (!isImageRow && !hasImageNotes) ? (
               <EditableText
+                blankField
                 value={row.text}
                 multiline
                 rich
@@ -840,6 +873,7 @@ function WorkInstructionContinuationPage({
                 />
                 <div className="erp-work-instruction-paper__annotation-note erp-work-instruction-paper__annotation-note--left">
                   <EditableText
+                    blankField
                     value={row.imageNotes?.left}
                     multiline
                     rich
@@ -910,6 +944,7 @@ function WorkInstructionContinuationPage({
                 </div>
                 <div className="erp-work-instruction-paper__annotation-note erp-work-instruction-paper__annotation-note--right">
                   <EditableText
+                    blankField
                     value={row.imageNotes?.right}
                     multiline
                     rich

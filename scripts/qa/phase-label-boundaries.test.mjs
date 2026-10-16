@@ -84,6 +84,15 @@ test("allows priorities, percentiles, product codes, and technical phases", () =
   assert.match(result.stdout, /\[phase-label-boundaries\] ok/u);
 });
 
+test("workbench build artifacts are excluded while source labels remain governed", () => {
+  const generated = { "web/build-workbench/assets/entry.js": "Phase" + " 8 generated text" };
+  assert.equal(runFixture(generated).status, 0);
+  assert.equal(runFixture(generated, ["web/build-workbench"]).status, 0);
+  const source = runFixture({ ...generated, "web/src/entry.js": "Phase" + " 8 active source" });
+  assert.equal(source.status, 1);
+  assert.match(source.stderr, /web\/src\/entry.js/u);
+});
+
 test("rejects project stage versions in active entry points and project origin copy", () => {
   for (const content of [
     "V1" + "SalesOrdersPage",

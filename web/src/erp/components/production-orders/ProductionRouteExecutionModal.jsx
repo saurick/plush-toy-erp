@@ -16,6 +16,7 @@ import {
   Typography,
 } from 'antd'
 import { BranchesOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ProductionPackagingConfirmationStatus, ProductionWIPStatus } from '../../../common/consts/statuses.generated.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
 import Table from '@/common/components/table/AppTable'
@@ -96,8 +97,8 @@ const ACTION_TITLE = Object.freeze({
 
 function operationStepStatus(batch, operation, currentOperationID) {
   const status = String(batch?.status || '').trim()
-  if (status === 'ACCEPTED') return 'finish'
-  if (status === 'REJECTED') return 'error'
+  if (status === ProductionWIPStatus.ACCEPTED) return 'finish'
+  if (status === ProductionWIPStatus.REJECTED) return 'error'
   if (operation?.id === currentOperationID && batch) return 'process'
   return 'wait'
 }
@@ -117,7 +118,7 @@ function displayUnixTime(value) {
 }
 
 function packagingConfirmationText(confirmation) {
-  if (!confirmation || confirmation.status !== 'CONFIRMED') {
+  if (!confirmation || confirmation.status !== ProductionPackagingConfirmationStatus.CONFIRMED) {
     return '待业务确认'
   }
   return [
@@ -153,30 +154,30 @@ function actionButtonEnabled(
   switch (action) {
     case PRODUCTION_WIP_ACTION.SPLIT_BATCH:
       return (
-        status === 'PLANNED' && operation.operation_code !== 'FABRIC_PROCESSING'
+        status === ProductionWIPStatus.PLANNED && operation.operation_code !== 'FABRIC_PROCESSING'
       )
     case PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION:
-      return status === 'PLANNED' && !batch.execution_mode
+      return status === ProductionWIPStatus.PLANNED && !batch.execution_mode
     case PRODUCTION_WIP_ACTION.CANCEL_BATCH:
-      return status === 'PLANNED'
+      return status === ProductionWIPStatus.PLANNED
     case PRODUCTION_WIP_ACTION.START_OPERATION:
-      return status === 'PLANNED' && Boolean(batch.execution_mode)
+      return status === ProductionWIPStatus.PLANNED && Boolean(batch.execution_mode)
     case PRODUCTION_WIP_ACTION.COMPLETE_OPERATION:
       return (
-        status === 'IN_PROGRESS' &&
+        status === ProductionWIPStatus.IN_PROGRESS &&
         batch.execution_mode === PRODUCTION_WIP_EXECUTION_MODE.IN_HOUSE
       )
     case PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN:
       return (
-        status === 'OUTSOURCED' &&
+        status === ProductionWIPStatus.OUTSOURCED &&
         batch.execution_mode === PRODUCTION_WIP_EXECUTION_MODE.OUTSOURCED
       )
     case PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION:
-      return status === 'ACCEPTED' && Boolean(nextOperation)
+      return status === ProductionWIPStatus.ACCEPTED && Boolean(nextOperation)
     case PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL:
       return (
-        packagingConfirmation?.status === 'PENDING' &&
-        !['SPLIT', 'CANCELLED'].includes(status)
+        packagingConfirmation?.status === ProductionPackagingConfirmationStatus.PENDING &&
+        ![ProductionWIPStatus.SPLIT, ProductionWIPStatus.CANCELLED].includes(status)
       )
     default:
       return false
@@ -420,11 +421,11 @@ export default function ProductionRouteExecutionModal({
         .reverse()
         .find((batch) =>
           [
-            'PLANNED',
-            'IN_PROGRESS',
-            'OUTSOURCED',
-            'WAITING_QUALITY',
-            'REJECTED',
+            ProductionWIPStatus.PLANNED,
+            ProductionWIPStatus.IN_PROGRESS,
+            ProductionWIPStatus.OUTSOURCED,
+            ProductionWIPStatus.WAITING_QUALITY,
+            ProductionWIPStatus.REJECTED,
           ].includes(batch.status)
         )
       setSelectedBatchID(
@@ -480,8 +481,9 @@ export default function ProductionRouteExecutionModal({
       if (assignmentOnly && action !== PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION) {
         return false
       }
-      if (currentOperation?.operation_code === 'PACKAGING' || (currentOperation?.operation_code === 'HANDWORK' && action === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION)) return canWarehousePackaging
-      if (currentOperation?.operation_code === 'FABRIC_PROCESSING' && action === PRODUCTION_WIP_ACTION.START_OPERATION) return canIssueCutting
+      if (action === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL) {
+        return canConfirmPackaging
+      }
       if (
         [
           PRODUCTION_WIP_ACTION.SPLIT_BATCH,
@@ -491,6 +493,8 @@ export default function ProductionRouteExecutionModal({
       ) {
         return canAssign
       }
+      if (currentOperation?.operation_code === 'PACKAGING' || (currentOperation?.operation_code === 'HANDWORK' && action === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION)) return canWarehousePackaging
+      if (currentOperation?.operation_code === 'FABRIC_PROCESSING' && action === PRODUCTION_WIP_ACTION.START_OPERATION) return canIssueCutting
       if (action === PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN) {
         return canReceiveReturn
       }
@@ -502,9 +506,6 @@ export default function ProductionRouteExecutionModal({
         ].includes(action)
       ) {
         return canExecute
-      }
-      if (action === PRODUCTION_WIP_ACTION.CONFIRM_PACKAGING_MATERIAL) {
-        return canConfirmPackaging
       }
       return false
     },
@@ -1678,7 +1679,7 @@ export default function ProductionRouteExecutionModal({
                       确认包材要求
                     </Button>
                   ) : null}
-                  {selectedBatch?.status === 'REJECTED' ? <Text type="warning">检验不合格，请由业务在质检单发起异常方案，审批后继续办理。</Text> : null}
+                  {selectedBatch?.status === ProductionWIPStatus.REJECTED ? <Text type="warning">检验不合格，请由业务在质检单发起异常方案，审批后继续办理。</Text> : null}
                 </Space>
               </Space>
               {isNormalFabricBatch ? (

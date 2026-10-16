@@ -10,17 +10,20 @@ cleanup() {
   rm -rf -- "$fixture_dir"
 }
 trap cleanup EXIT
-python3 - "$fixture_dir" <<'PY'
-import pathlib,secrets,sys
-p=pathlib.Path(sys.argv[1])
-access=secrets.token_hex(16)
-secret=secrets.token_hex(32)
-password=secrets.token_hex(24)
-(p/'s3.env').write_text(f'AWS_ACCESS_KEY_ID={access}\nAWS_SECRET_ACCESS_KEY={secret}\nS3_BUCKET=plush-attachment-test,plush-attachment-restore,plush-attachment-recovery\n')
-(p/'pg.env').write_text(f'POSTGRES_PASSWORD={password}\nPOSTGRES_DB=plush_erp_attachment_drill\n')
-(p/'client.env').write_text(f'export ATTACHMENT_S3_ACCESS_KEY_ID={access}\nexport ATTACHMENT_S3_SECRET_ACCESS_KEY={secret}\nexport PGPASSWORD={password}\n')
-(p/'s3-readiness.curl').write_text(f'aws-sigv4 = "aws:amz:us-east-1:s3"\nuser = "{access}:{secret}"\nhead\nfail\nsilent\nconnect-timeout = 2\nmax-time = 2\n')
-PY
+node --input-type=module - "$fixture_dir" <<'JS'
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { randomBytes } from 'node:crypto';
+const directory = process.argv[2];
+const access = randomBytes(16).toString('hex');
+const secret = randomBytes(32).toString('hex');
+const password = randomBytes(24).toString('hex');
+const write = (name, text) => writeFileSync(join(directory, name), text, { mode: 0o600 });
+write('s3.env', `AWS_ACCESS_KEY_ID=${access}\nAWS_SECRET_ACCESS_KEY=${secret}\nS3_BUCKET=plush-attachment-test,plush-attachment-restore,plush-attachment-recovery\n`);
+write('pg.env', `POSTGRES_PASSWORD=${password}\nPOSTGRES_DB=plush_erp_attachment_drill\n`);
+write('client.env', `export ATTACHMENT_S3_ACCESS_KEY_ID=${access}\nexport ATTACHMENT_S3_SECRET_ACCESS_KEY=${secret}\nexport PGPASSWORD=${password}\n`);
+write('s3-readiness.curl', `aws-sigv4 = "aws:amz:us-east-1:s3"\nuser = "${access}:${secret}"\nhead\nfail\nsilent\nconnect-timeout = 2\nmax-time = 2\n`);
+JS
 docker run -d --name "$fixture_id-pg" --env-file "$fixture_dir/pg.env" -p 127.0.0.1::5432 postgres:18.6 >/dev/null
 docker run -d --name "$fixture_id-s3" --env-file "$fixture_dir/s3.env" -p 127.0.0.1::8333 \
   chrislusf/seaweedfs:4.47@sha256:ce9e796f1fe6f06968f4c04bdaf8f678dad9c8acdfef3d244133d71bfa6bf882 \

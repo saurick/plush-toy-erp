@@ -1,3 +1,5 @@
+import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
+
 function positiveID(value) {
   const parsed = Number(value || 0)
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
@@ -43,7 +45,7 @@ export function resolveOperationalFactRouteRecord(
       positiveID(record?.source_id) === normalizedSourceID
   )
   const activeRows = sourceRows.filter(
-    (record) => normalizedUpperText(record?.status) !== 'CANCELLED'
+    (record) => normalizedUpperText(record?.status) !== OperationalFactStatus.CANCELLED
   )
   if (activeRows.length === 1) return activeRows[0]
   if (activeRows.length > 1) return null

@@ -89,6 +89,8 @@ make dev_restart ARGS='--log-match="request_id=req-42"'
 
 旧岗位职责迁移的终态任务若缺少办理回执，使用 `cmd/restore-terminal-task-assignees` 从已验证的升级前备份恢复证据。先将原 `database.dump` 恢复到独立的 loopback `plush_erp_ci_*` 数据库，并在当前库的新鲜备份副本上演练；`POSTGRES_DSN` 指向登记共享开发库或隔离演练库，`RECOVERY_BACKUP_DSN` 只接受历史备份恢复库。执行 `go run ./cmd/restore-terminal-task-assignees --backup-dir <原备份目录> --operation <原迁移成功回执.json>` 默认在事务内验证后回滚。确认同一候选后加 `--apply --confirm-backup-sha256 <原备份SHA256>`，再运行正常的 `make migrate_prepare` / `make migrate_execute`。工具核对备份文件、原目标、迁移版本、任务身份与不可变事件；原本未分派的任务保留空办理人并追加备份证据，既有事件不改写，无法精确匹配时整批回滚。此入口只修复该次迁移造成的历史证据缺口，不替代迁移、日常任务分派或数据库整体回滚。
 
+登记共享开发库和登记 Orb 开发库均复用 `development-targets.json` 与实际集群身份核验；历史备份仍须证明原职责迁移发生前的来源，不能把当前连接地址当成备份来源证据。回执证明原办理人为空时同样追加恢复确认事件；缺少可信回执时继续阻断，不从事件操作者推断办理人。已执行的 migration 不改写，缺失的空值确认由新增前向迁移补齐。
+
 工作台的权限关系只读入口复用上述审计账号，通过 `cmd/dev-permission-relationships` 调用正式 repository 和权限解释，并额外开启数据库只读模式；不执行 `NewData` 的账号 / RBAC 初始化。它仅接受开发服务注入的登记数据库和本地客户配置，不开 HTTP 端口，不调用 ERP 登录，也不提供写命令。入口、访问模式和验证边界见 [开发服务 Bridge](../web/dev-server/README.md)。
 
 主端口不自动顺延。`make dev_stop` / `make dev_restart` 虽按登记端口查找 listener，但停止前会逐个校验进程 cwd 位于本仓库；端口被其他项目占用时会报告 PID、cwd 和命令并拒绝 kill。前后端共用有超时的进程检查；macOS 通过系统端口表定位 PID，再逐个读取 cwd，避免全机 `lsof` 扫描阻塞启动。检查失败或超时时保留服务并退出。整组本机覆盖必须写入 ignored 的 `config/dev-ports.local.env`，且包含完整端口组。
@@ -120,6 +122,7 @@ make dev_restart_yoyoosun
 | --- | --- |
 | 启动 / 重启 / 停止 | `make run` / `make dev_restart` / `make dev_stop`，先做只读预检 |
 | 协议 / 配置生成 | `make api` / `make config`，构造注入见 `go generate ./cmd/server` |
+| 跨层公共契约 | 仓库根运行 `node scripts/gen-public-contracts.mjs`；`--check` 只读核对，真源与消费者见[公共契约规范](../docs/engineering/跨层公共契约与生成规范.md) |
 | 模型、Ent 和版本化迁移 | `make data`，随后核对生成差异与零漂移 |
 | 共享开发库迁移 | 交互 `make migrate`；非交互按同一次 `make migrate_prepare` 回执执行 `make migrate_execute` |
 | 普通测试 / 构建 | `go test ./...` / `make build`；普通测试不代替真实 PostgreSQL 事务验证 |

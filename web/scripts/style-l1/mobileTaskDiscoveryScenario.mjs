@@ -4,14 +4,12 @@ import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import { pullToRefresh } from './mobileGestureAssertions.mjs'
 import { assertMobileFilterDensity } from './mobileFilterPopoverAssertions.mjs'
-import { assertMobileFilterConsistency } from './mobileFilterConsistencyAssertions.mjs'
 
 export function mobileTaskDiscoveryScenario({ assert, path, outputDir }) {
   const base = mobileTaskListOptionsScenario({ assert, path, outputDir })
   const task = base.workflowTaskFixtures[0]
   const reads = []
   let failNext = false
-  let failPeople = true
   return {
     ...base,
     name: 'mobile-task-discovery-entry',
@@ -19,21 +17,16 @@ export function mobileTaskDiscoveryScenario({ assert, path, outputDir }) {
     beforeNavigate: async (page) => {
       reads.length = 0
       failNext = false
-      failPeople = true
       await page.route('**/rpc/workflow', async (route) => {
         const { id, method, params = {} } = route.request().postDataJSON()
         reads.push({ method, params })
         if (method === 'get_task_board' && params.limit === 1) {
-          if (failPeople) {
-            failPeople = false
-            return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 50000, message: '办理人名单暂时不可用', data: null } } })
-          }
           const lanes = ['actionable', 'exception', 'due', 'finished']
           return route.fulfill({ json: { jsonrpc: '2.0', id, result: { code: 0, message: '', data: {
             snapshot_at: Math.floor(Date.now() / 1000), total: 0,
             counts: Object.fromEntries(lanes.map((key) => [key, 0])),
             lanes: lanes.map((key) => ({ key, total: 0, limit: 1, offset: 0, tasks: [] })),
-            source_types: ['sales_order', 'purchase_order', 'production_order', 'shipment', 'purchase_receipt'], owner_role_keys: ['engineering'], assignees: [{ id: 12, name: '工程小李' }],
+            source_types: ['sales_order', 'purchase_order', 'production_order', 'shipment', 'purchase_receipt'], owner_role_keys: ['engineering'], assignees: [{ id: 12, name: '工程小李' }, ...Array.from({ length: 8 }, (_, index) => ({ id: 13 + index, name: `工程同事 ${13 + index}` }))],
           } } } })
         }
         if (method !== 'list_exceptions') return route.fallback()
@@ -84,25 +77,8 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
         await waitForFiniteAnimations(page)
       }
       const select = async (root, label, option) => {
-        if (['办理人', '来源单据'].includes(label)) {
-          const fields = root.locator('.mobile-filter-fields')
-          await root.getByRole('button', { name: new RegExp(`^选择${label}：`) }).scrollIntoViewIfNeeded()
-          const position = await fields.evaluate((node) => node.scrollTop)
-          await root.getByRole('button', { name: new RegExp(`^选择${label}：`) }).click()
-          const search = root.getByRole('textbox', { name: `搜索${label}`, exact: true })
-          await search.fill('没有这个选项')
-          await root.getByText('没有匹配的选项，请换个关键词', { exact: true }).waitFor()
-          await search.fill(option)
-          await root.getByRole('group', { name: `${label}选项`, exact: true }).getByRole('button', { name: option, exact: true }).click()
-          await fields.waitFor({ state: 'visible' })
-          await page.waitForFunction(({ label, position }) => {
-            const root = [...document.querySelectorAll('.mobile-filter-panel')].find((el) => el.getAttribute('aria-label') === label)
-            return root && Math.abs(root.querySelector('.mobile-filter-fields').scrollTop - position) < 2
-          }, { label: await root.getAttribute('aria-label'), position })
-          await page.waitForFunction(label => document.activeElement?.getAttribute('aria-label')?.startsWith(`选择${label}：`), label)
-        } else {
-          await root.getByRole('group', { name: label, exact: true }).getByRole('button', { name: option, exact: true }).click()
-        }
+        assert.equal(await root.locator('input, select, textarea').count(), 0)
+        await root.getByRole('group', { name: label, exact: true }).getByRole('button', { name: option, exact: true }).click()
       }
       const trigger = page.getByTestId('mobile-task-list-filter-trigger')
       const dialog = page.getByRole('dialog', { name: '筛选任务', exact: true })
@@ -127,71 +103,36 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
       await page.getByRole('searchbox').fill('排序')
       await page.getByRole('searchbox').press('Enter')
       await open()
-      await dialog.getByRole('button', { name: '重新读取办理人', exact: true }).click()
-      await dialog.getByRole('button', { name: '重新读取办理人', exact: true }).waitFor({ state: 'hidden' })
-      for (const label of ['业务模块', '业务流程', '业务环节']) {
-        assert.equal(await dialog.getByText(label, { exact: true }).count(), 0)
-      }
-      assert.equal(await dialog.locator('legend').filter({ hasText: /^办理人$/ }).count(), 1)
+      for (const label of ['业务模块', '业务流程', '业务环节', '办理人']) assert.equal(await dialog.getByText(label, { exact: true }).count(), 0)
       await assertMobileFilterDensity({ assert, dialog })
       await select(dialog, '来源单据', '销售订单')
       await close()
+      await page.getByRole('button', { name: '清除来源单据：销售订单', exact: true }).waitFor()
+      assert(reads.some(({ method, params }) => method === 'list_role_tasks' && params.source_type === 'sales_order' && !params.assignee))
       await page.getByRole('button', { name: '清除来源单据：销售订单', exact: true }).click()
-      await open()
-      await select(dialog, '办理人', '工程小李')
-      assert.equal(await dialog.getByText('本机常用筛选', { exact: true }).count(), 0)
-      await close()
-      await page.getByRole('button', { name: '清除办理人：工程小李', exact: true }).waitFor()
-      await assertMobileFilterConsistency({ assert, quick: page.getByTestId('mobile-role-task-filters'), applied: page.getByLabel('当前任务筛选') })
-      assert(reads.some(({ method, params }) => method === 'list_role_tasks' && params.assignee === '12'))
-      await open()
-      await select(dialog, '办理人', '岗位待领取')
-      await close()
-      await page.getByLabel('当前任务筛选').waitFor()
-      assert.equal(await trigger.getAttribute('aria-label'), '筛选任务，已应用 1 项')
-      assert(reads.some(({ method, params }) => method === 'list_role_tasks' && !params.module_key && !params.chain_key && !params.stage_key && params.assignee === 'unassigned' && params.keyword === '排序'))
-      assert.equal(await trigger.getAttribute('aria-label'), '筛选任务，已应用 1 项')
-      await page.getByRole('button', { name: '清除办理人：岗位待领取', exact: true }).waitFor()
-      assert.equal(await page.getByRole('searchbox').inputValue(), '排序')
-      await open()
-      await select(dialog, '办理人', '工程小李')
-      await close()
       await chooseTab('已办')
       const historyTrigger = page.getByTestId('mobile-history-filter-trigger')
-      assert.equal(await historyTrigger.getAttribute('aria-label'), '筛选已办')
       await historyTrigger.click()
       const historyDialog = page.getByRole('dialog', { name: '筛选已办', exact: true })
-      await select(historyDialog, '办理人', '岗位待领取')
-      assert.equal(await historyDialog.getByText('截止时间', { exact: true }).count(), 0)
       await assertMobileFilterDensity({ assert, dialog: historyDialog })
+      assert.equal(await historyDialog.getByText('办理人', { exact: true }).count(), 0)
+      assert.equal(await historyDialog.getByRole('button', { name: '自定义日期', exact: true }).count(), 0)
       await close(historyDialog)
-      await chooseTab('待办')
-      assert.equal(await trigger.getAttribute('aria-label'), '筛选任务，已应用 1 项')
-      assert.equal(await page.getByRole('searchbox').inputValue(), '排序')
-      await open()
-      await dialog.getByRole('button', { name: '重置筛选', exact: true }).click()
-      await close()
-      assert.equal(await trigger.getAttribute('aria-label'), '筛选任务')
-      assert.equal(await page.getByRole('searchbox').inputValue(), '排序')
       await page.evaluate(() => {
         const saved = window.history.state
-        saved.mobileRoleTasksQueryPages.history = {
-          ...saved.mobileRoleTasksQueryPages.history,
-          moduleKey: 'quality', chainKey: 'fulfillment', stageKey: 'cutting_quality', due: 'noDue',
-        }
+        saved.mobileRoleTasksQueryPages.history = { ...saved.mobileRoleTasksQueryPages.history, assignee: '12', moduleKey: 'quality', chainKey: 'fulfillment', stageKey: 'cutting_quality', due: 'noDue', period: 'custom', dateFrom: '2026-09-01', dateTo: '2026-09-30' }
         window.history.replaceState(saved, '')
       })
       await page.reload()
-      await trigger.waitFor()
-      await chooseTab('已办')
-      assert.equal(await historyTrigger.getAttribute('aria-label'), '筛选已办，已应用 1 项')
+      await historyTrigger.waitFor()
       await page.waitForFunction(() => {
-        const restored = window.history.state?.mobileRoleTasksQueryPages?.history
-        return restored && !restored.moduleKey && !restored.chainKey && !restored.stageKey && !restored.due
+        const query = window.history.state?.mobileRoleTasksQueryPages?.history
+        return query && !query.assignee && !query.moduleKey && !query.chainKey && !query.stageKey && !query.due && !query.period && !query.dateFrom && !query.dateTo
       })
       const restoredHistory = reads.findLast(({ method, params }) => method === 'list_role_tasks' && params.view_key === 'history').params
-      for (const key of ['module_key', 'chain_key', 'stage_key', 'due']) assert.equal(restoredHistory[key], undefined)
+      for (const key of ['module_key', 'chain_key', 'stage_key', 'assignee', 'due', 'date_from', 'date_to']) assert.equal(restoredHistory[key], undefined)
       await chooseTab('待办')
+      assert.equal(await page.getByRole('searchbox').inputValue(), '排序')
       await verifyMobileNavigationMotion(page, assert, '.mobile-workspace-task-views .erp-sliding-segmented', 2)
       await verifyMobileNavigationMotion(page, assert, '.mobile-workspace-tracking-views .erp-sliding-segmented', 1)
       const exceptions = page.getByRole('region', { name: '异常跟踪', exact: true })
@@ -206,14 +147,7 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
       await exceptions.getByRole('button', { name: /^已处理完/ }).click()
       await exceptions.getByText('EX-ENTRY-001', { exact: true }).waitFor()
       assert.equal(await exceptions.getByRole('button', { name: /^全部异常/ }).getAttribute('aria-pressed'), 'true')
-      await exceptions.getByRole('button', { name: '筛选异常跟踪', exact: true }).click()
-      const exceptionFilters = page.getByRole('dialog', { name: '筛选异常跟踪', exact: true })
-      assert.equal(await exceptionFilters.locator('legend').count(), 1)
-      await assertMobileFilterDensity({ assert, dialog: exceptionFilters })
-      await select(exceptionFilters, '办理人', '工程小李')
-      await close(exceptionFilters)
-      await assertMobileFilterConsistency({ assert, quick: exceptions.getByRole('group', { name: '异常处理状态', exact: true }), applied: exceptions.getByLabel('当前异常筛选') })
-      await exceptions.getByRole('button', { name: '清除办理人：工程小李', exact: true }).click()
+      assert.equal(await exceptions.getByRole('button', { name: /^筛选异常跟踪/ }).count(), 0, '异常沿用状态按钮，不保留空筛选入口')
 
       const firstException = exceptions.locator('.workflow-exceptions__item').first()
       assert.equal(await firstException.locator('details').getAttribute('open'), null)
@@ -319,7 +253,7 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
       for (const width of [320, 390, 430]) {
         await page.setViewportSize({ width, height: 844 })
         await open()
-        await select(dialog, '办理人', '工程小李')
+        await select(dialog, '来源单据', '销售订单')
         await assertMobileFilterDensity({ assert, dialog })
         const boxes = await dialog.evaluate((el) => ({
           left: el.getBoundingClientRect().left,
@@ -370,14 +304,7 @@ overflow: getComputedStyle(el.querySelector('.mobile-filter-fields')).overflowY,
         })
         assert(geometry.firstTop - geometry.searchTop < 180 && geometry.viewsHeight <= 56, JSON.stringify(geometry))
         assert(geometry.scroll <= geometry.width + 1, JSON.stringify(geometry))
-        await exceptions.getByRole('button', { name: '筛选异常跟踪', exact: true }).click()
-        const filters = page.getByRole('dialog', { name: '筛选异常跟踪', exact: true })
-        await filters.waitFor()
-        await waitForFiniteAnimations(page)
-        const box = await filters.boundingBox()
-        assert(box.height < 844 * 0.8 + 1 && box.x >= 0 && box.x + box.width <= width + 1, JSON.stringify(box))
-        await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
-        await filters.waitFor({ state: 'hidden' })
+        assert.equal(await exceptions.getByRole('button', { name: /^筛选异常跟踪/ }).count(), 0)
         await page.screenshot({ path: path.join(outputDir, `mobile-exceptions-compact-${width}.png`) })
       }
       await page.screenshot({ path: path.join(outputDir, 'mobile-task-entry-exceptions-dark.png') })

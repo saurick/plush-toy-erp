@@ -24,6 +24,7 @@ type catalog struct {
 	States        map[string]map[string]string `json:"states"`
 	Attachments   map[string]any               `json:"attachments"`
 	Numeric       map[string]int64             `json:"numeric"`
+	Policies      map[string]map[string]int64  `json:"policies"`
 	RPC           map[string]map[string]string `json:"rpc"`
 }
 
@@ -219,6 +220,47 @@ func integer(expr ast.Expr) (int64, error) {
 	return n, nil
 }
 
+func integerConstants(file *ast.File, names map[string]string) (map[string]int64, error) {
+	out := map[string]int64{}
+	err := declarations(file, token.CONST, func(name string, expr ast.Expr) error {
+		label, ok := names[name]
+		if !ok {
+			return nil
+		}
+		n, err := integer(expr)
+		if err == nil {
+			out[label] = n
+		}
+		return err
+	})
+	if err == nil && len(out) != len(names) {
+		err = fmt.Errorf("missing public limit declaration")
+	}
+	return out, err
+}
+
+func namedStringConstants(file *ast.File, prefix string, names []string) (map[string]string, error) {
+	wanted := map[string]bool{}
+	for _, name := range names {
+		wanted[prefix+name] = true
+	}
+	out := map[string]string{}
+	err := declarations(file, token.CONST, func(name string, expr ast.Expr) error {
+		if !wanted[name] {
+			return nil
+		}
+		value, err := text(expr)
+		if err != nil {
+			return err
+		}
+		return add(out, key(strings.TrimPrefix(name, prefix)), value)
+	})
+	if err == nil && len(out) != len(wanted) {
+		err = fmt.Errorf("missing named constants %s", prefix)
+	}
+	return out, err
+}
+
 func switches(function *ast.FuncDecl, tag string) []*ast.SwitchStmt {
 	out := []*ast.SwitchStmt{}
 	ast.Inspect(function.Body, func(node ast.Node) bool {
@@ -232,6 +274,27 @@ func switches(function *ast.FuncDecl, tag string) []*ast.SwitchStmt {
 		return true
 	})
 	return out
+}
+
+func forwardsRPCMethod(statement ast.Stmt) bool {
+	found := false
+	ast.Inspect(statement, func(node ast.Node) bool {
+		call, ok := node.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		target, ok := call.Fun.(*ast.SelectorExpr)
+		if !ok || !strings.HasPrefix(target.Sel.Name, "handle") {
+			return true
+		}
+		for _, arg := range call.Args {
+			if ident, ok := arg.(*ast.Ident); ok && ident.Name == "method" {
+				found = true
+			}
+		}
+		return true
+	})
+	return found
 }
 
 func rpcMethods(root string) (map[string]map[string]string, error) {
@@ -320,21 +383,24 @@ func rpcMethods(root string) (map[string]map[string]string, error) {
 		// Some domains route a named subset before their main switch. Read
 		// the actual predicate and require exact agreement with its handler.
 		for _, statement := range functions[selector.Sel.Name].Body.List {
-			branch, ok := statement.(*ast.IfStmt)
-			if !ok || len(branch.Body.List) != 1 {
+			if statement == methodSwitches[0] || !forwardsRPCMethod(statement) {
 				continue
+			}
+			branch, ok := statement.(*ast.IfStmt)
+			if !ok || branch.Else != nil || len(branch.Body.List) != 1 {
+				return nil, fmt.Errorf("unsupported conditional dispatch in %s", domain)
 			}
 			ret, ok := branch.Body.List[0].(*ast.ReturnStmt)
 			if !ok || len(ret.Results) != 1 {
-				continue
+				return nil, fmt.Errorf("unsupported conditional dispatch in %s", domain)
 			}
 			call, ok := ret.Results[0].(*ast.CallExpr)
 			if !ok {
-				continue
+				return nil, fmt.Errorf("unsupported conditional dispatch in %s", domain)
 			}
 			target, ok := call.Fun.(*ast.SelectorExpr)
 			if !ok || !strings.HasPrefix(target.Sel.Name, "handle") {
-				continue
+				return nil, fmt.Errorf("unsupported conditional dispatch in %s", domain)
 			}
 			condition, ok := branch.Cond.(*ast.CallExpr)
 			if !ok || len(condition.Args) != 1 {
@@ -409,7 +475,7 @@ func rpcMethods(root string) (map[string]map[string]string, error) {
 }
 
 func collect(root string) (catalog, error) {
-	out := catalog{States: map[string]map[string]string{}, Attachments: map[string]any{}, Numeric: map[string]int64{}}
+	out := catalog{States: map[string]map[string]string{}, Attachments: map[string]any{}, Numeric: map[string]int64{}, Policies: map[string]map[string]int64{}}
 	rbac, err := parse(root, "server/internal/biz/rbac.go")
 	if err != nil {
 		return out, err
@@ -443,7 +509,9 @@ func collect(root string) (catalog, error) {
 	}
 	for _, source := range []struct{ path, prefix, export string }{
 		{"core/status/sales_order.go", "SalesOrder", "SalesOrderStatus"},
+		{"core/status/sales_order.go", "SalesOrderItem", "SalesOrderItemStatus"},
 		{"core/status/purchase_order.go", "PurchaseOrder", "PurchaseOrderStatus"},
+		{"core/status/purchase_order.go", "PurchaseOrderItem", "PurchaseOrderItemStatus"},
 		{"core/status/shipment.go", "Shipment", "ShipmentStatus"},
 		{"core/status/inventory_lot.go", "InventoryLot", "InventoryLotStatus"},
 		{"core/status/quality_inspection.go", "QualityInspection", "QualityInspectionStatus"},
@@ -452,8 +520,25 @@ func collect(root string) (catalog, error) {
 		{"core/status/posting_document.go", "PurchaseReturn", "PurchaseReturnStatus"},
 		{"biz/operational_fact.go", "OperationalFactStatus", "OperationalFactStatus"},
 		{"biz/finance_payment.go", "FinancePaymentKind", "FinancePaymentKind"},
+		{"biz/finance_payment.go", "FinancePaymentDirection", "FinancePaymentDirection"},
+		{"biz/finance_payment.go", "FinancePaymentStatus", "FinancePaymentStatus"},
+		{"biz/finance_payment.go", "FinanceAllocationStatus", "FinanceAllocationStatus"},
+		{"biz/process_runtime.go", "ProcessStatus", "ProcessStatus"},
+		{"biz/process_runtime.go", "ProcessNodeStatus", "ProcessNodeStatus"},
+		{"biz/process_runtime.go", "ProcessNodeType", "ProcessNodeType"},
+		{"biz/process_runtime.go", "ProcessResolution", "ProcessResolution"},
+		{"biz/process_runtime.go", "ProcessBlockKind", "ProcessBlockKind"},
+		{"biz/process_runtime.go", "ProcessKey", "ProcessKey"},
+		{"biz/process_runtime.go", "ShipmentFinanceReleaseStatus", "ShipmentFinanceReleaseStatus"},
+		{"biz/inventory_operation.go", "InventoryOperationStatus", "InventoryOperationStatus"},
+		{"biz/purchase_rejection_disposition.go", "PurchaseRejectionStatus", "PurchaseRejectionStatus"},
+		{"biz/engineering_material_request.go", "MaterialRequest", "MaterialRequestStatus"},
+		{"biz/production_wip.go", "ProductionWIPStatus", "ProductionWIPStatus"},
+		{"biz/production_wip.go", "ProductionPackagingConfirmation", "ProductionPackagingConfirmationStatus"},
+		{"biz/production_exception_decision.go", "ProductionExceptionExecution", "ProductionExceptionExecutionStatus"},
 		{"biz/operational_fact.go", "StockReservationStatus", "StockReservationStatus"},
 		{"biz/outsourcing_order.go", "OutsourcingOrderStatus", "OutsourcingOrderStatus"},
+		{"biz/outsourcing_order.go", "OutsourcingOrderItemStatus", "OutsourcingOrderItemStatus"},
 		{"biz/production_order.go", "ProductionOrderStatus", "ProductionOrderStatus"},
 	} {
 		file, err := parse(root, "server/internal/"+source.path)
@@ -464,6 +549,14 @@ func collect(root string) (catalog, error) {
 		if err != nil {
 			return out, err
 		}
+	}
+	exception, err := parse(root, "server/internal/biz/production_exception_decision.go")
+	if err != nil {
+		return out, err
+	}
+	out.States["ProductionExceptionStatus"], err = namedStringConstants(exception, "ProductionException", []string{"Submitted", "Approved", "Rejected", "Cancelled"})
+	if err != nil {
+		return out, err
 	}
 	attachment, err := parse(root, "server/internal/biz/business_attachment.go")
 	if err != nil {
@@ -522,6 +615,36 @@ func collect(root string) (catalog, error) {
 	if len(out.Numeric) != 2 || out.Numeric["Precision"] <= out.Numeric["Scale"] {
 		return out, fmt.Errorf("invalid numeric contract")
 	}
+	for _, source := range []struct {
+		path, export string
+		names        map[string]string
+	}{
+		{"biz/admin_password.go", "AdminPasswordPolicy", map[string]string{
+			"AdminPasswordMinLength": "minCharacters", "AdminPasswordMaxLength": "maxCharacters", "AdminPasswordMaxBytes": "maxBytes",
+		}},
+		{"server/template_pdf_security.go", "PrintPolicy", map[string]string{
+			"maxTemplatePDFEmbeddedImageCount": "imageCount", "maxTemplatePDFEmbeddedImageBytes": "imageBytes", "maxTemplatePDFEmbeddedTotalBytes": "imageTotalBytes",
+			"maxTemplatePDFFontCount": "fontCount", "maxTemplatePDFFontBytes": "fontBytes", "maxTemplatePDFFontTotalBytes": "fontTotalBytes",
+		}},
+	} {
+		file, err := parse(root, "server/internal/"+source.path)
+		if err != nil {
+			return out, err
+		}
+		out.Policies[source.export], err = integerConstants(file, source.names)
+		if err != nil {
+			return out, err
+		}
+	}
+	pdf, err := parse(root, "server/internal/server/template_pdf.go")
+	if err != nil {
+		return out, err
+	}
+	htmlLimit, err := integerConstants(pdf, map[string]string{"maxTemplateHTMLSize": "htmlBytes"})
+	if err != nil {
+		return out, err
+	}
+	out.Policies["PrintPolicy"]["htmlBytes"] = htmlLimit["htmlBytes"]
 	discoveryJSON, err := os.ReadFile(filepath.Join(root, "server/internal/biz/workflow_task_catalog.json"))
 	if err != nil {
 		return out, err

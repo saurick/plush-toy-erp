@@ -206,11 +206,14 @@ export function getContrastRatio(
 }
 
 export function parseRgb(value) {
-  const hex = String(value || '').match(/^#([0-9a-f]{6})$/i)
+  const hex = String(value || '').match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)
   if (hex) {
+    const channels = hex[1].length === 3
+      ? [...hex[1]].map((channel) => channel.repeat(2)).join('')
+      : hex[1]
     return [
       ...[0, 2, 4].map((offset) =>
-        parseInt(hex[1].slice(offset, offset + 2), 16)
+        parseInt(channels.slice(offset, offset + 2), 16)
       ),
       1,
     ]

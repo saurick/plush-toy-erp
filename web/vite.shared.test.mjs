@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import http from 'node:http'
 import net from 'node:net'
 import os from 'node:os'
@@ -24,6 +24,132 @@ const ports = Object.freeze({
   style: 6175,
   auxStart: 15200,
 })
+
+test('isolated Vite serves linked dependency assets while rejecting unrelated and denied files', async (t) => {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'plush-vite-assets-')))
+  const workspace = path.join(directory, 'workspace')
+  const webRoot = path.join(workspace, 'web')
+  const dependencies = path.join(directory, 'installed-dependencies')
+  await mkdir(webRoot, { recursive: true })
+  await mkdir(dependencies)
+  await symlink(dependencies, path.join(webRoot, 'node_modules'), 'dir')
+  const font = path.join(dependencies, 'fixture.woff2')
+  const unrelated = path.join(directory, 'unrelated.txt')
+  await writeFile(font, 'synthetic-font-fixture')
+  await writeFile(unrelated, 'unrelated-fixture')
+  await writeFile(path.join(dependencies, '.env'), 'FIXTURE_ONLY=1')
+  let server
+  t.after(async () => {
+    await server?.close()
+    await rm(directory, { recursive: true, force: true })
+  })
+  const config = await createERPViteConfig('desktop')({ command: 'serve', mode: 'development' })
+  server = await createServer({
+    configFile: false,
+    root: webRoot,
+    logLevel: 'silent',
+    plugins: config.plugins.filter((plugin) => plugin.name === 'plush-dev-linked-dependency-assets'),
+    server: { host: '127.0.0.1', port: 0, fs: { strict: true, allow: [workspace] } },
+    optimizeDeps: { noDiscovery: true, include: [] },
+  })
+  await server.listen()
+  const baseURL = `http://127.0.0.1:${server.httpServer.address().port}`
+  const asset = await fetch(`${baseURL}/@fs${font}`)
+  assert.equal(asset.status, 200)
+  assert.equal(await asset.text(), 'synthetic-font-fixture')
+  assert.equal((await fetch(`${baseURL}/@fs${unrelated}`)).status, 403)
+  assert.equal((await fetch(`${baseURL}/@fs${dependencies}/.env`)).status, 403)
+  assert.equal(server.config.server.fs.strict, true)
+  assert(!server.config.server.fs.allow.includes(directory))
+})
+
+test('Vite admits lazy archive Markdown while keeping its parent and sensitive files restricted', async (t) => {
+  const config = await createERPViteConfig('desktop')({ command: 'serve', mode: 'development' })
+  const server = await createServer({ ...config, configFile: false, root: import.meta.dirname, logLevel: 'silent', server: { ...config.server, host: '127.0.0.1', open: false } })
+  t.after(() => server.close())
+  await server.listen()
+  const directory = path.resolve(import.meta.dirname, '../docs/archive')
+  const file = path.join(directory, 'architecture-history/bom-lot-schema-review.md')
+  const response = await fetch(`http://127.0.0.1:${server.httpServer.address().port}/@fs${file}?import&raw`)
+  assert.equal(response.status, 200)
+  assert.match(response.headers.get('content-type'), /javascript/u)
+  assert.match(await response.text(), /export default/u)
+  assert(server.config.server.fs.allow.includes(directory))
+  assert(!server.config.server.fs.allow.includes(path.dirname(directory)))
+  assert.equal(server.config.server.fs.strict, true)
+  assert(server.config.fsDenyGlob(path.join(directory, '.env')))
+})
+
+test(
+  'Vite startup opens a browser only for manual development',
+  { timeout: 30_000 },
+  async (t) => {
+    const envKeys = [
+      'CODEX_THREAD_ID',
+      'CODEX_CI',
+      'CI',
+      'NODE_ENV',
+      'NODE_TEST_CONTEXT',
+      'ERP_VITE_PORT',
+      'ERP_VITE_HMR_CLIENT_PORT',
+      'ERP_VITE_HMR_HOST',
+    ]
+    const originalEnv = envKeys.map((key) => [key, process.env[key]])
+    const root = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), 'plush-vite-browser-'))
+    )
+    t.after(async () => {
+      for (const [key, value] of originalEnv) {
+        if (value === undefined) delete process.env[key]
+        else process.env[key] = value
+      }
+      await rm(root, { recursive: true, force: true })
+    })
+    await writeFile(
+      path.join(root, 'index.html'),
+      '<!doctype html><title>Browser startup fixture</title>'
+    )
+
+    for (const [name, env, expectedOpenCount] of [
+      ['Codex chat', { CODEX_THREAD_ID: 'browser-startup-fixture' }, 0],
+      ['Codex CI', { CODEX_CI: '1' }, 0],
+      ['CI', { CI: 'true' }, 0],
+      ['test environment', { NODE_ENV: 'test' }, 0],
+      ['Node test runner', { NODE_TEST_CONTEXT: 'child-v8' }, 0],
+      ['manual terminal', {}, 1],
+      ['disabled automation markers', { CODEX_CI: '0', CI: 'false' }, 1],
+    ]) {
+      await t.test(name, async (t) => {
+        for (const key of envKeys) delete process.env[key]
+        const port = await findAvailableDevAuxPort(ports)
+        Object.assign(process.env, env, { ERP_VITE_PORT: String(port) })
+        const config = await createERPViteConfig('desktop')({
+          command: 'serve',
+          mode: 'development',
+        })
+        const server = await createServer({
+          ...config,
+          configFile: false,
+          root,
+          publicDir: false,
+          cacheDir: path.join(root, '.vite'),
+          logLevel: 'silent',
+          plugins: [],
+          server: { ...config.server, host: '127.0.0.1' },
+          optimizeDeps: { noDiscovery: true, include: [] },
+        })
+        t.after(() => server.close())
+        let openCount = 0
+        server.openBrowser = () => {
+          openCount += 1
+        }
+        await server.listen()
+        assert.equal((await fetch(`http://127.0.0.1:${port}/`)).status, 200)
+        assert.equal(openCount, expectedOpenCount)
+      })
+    }
+  }
+)
 
 test('ERP Vite runtime ports stay on canonical or project auxiliary ports', () => {
   assert.equal(resolveERPDevServerPort('', ports), 5175)

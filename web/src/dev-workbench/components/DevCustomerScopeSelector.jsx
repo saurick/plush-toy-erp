@@ -49,20 +49,28 @@ export default function DevCustomerScopeSelector({
         <div className="erp-dev-customer-scope__copy">
           <div className="erp-dev-customer-scope__title">
             <Text strong>{label}</Text>
-            {ready && scope.defaulted ? <Tag color="green">默认</Tag> : null}
+            {!compact && ready && scope.defaulted ? (
+              <Tag color="green">默认</Tag>
+            ) : null}
             {!ready ? <Tag color="warning">{invalidTag}</Tag> : null}
           </div>
-          {!compact ? <Text type="secondary">{note}</Text> : null}
+          {!compact && note ? <Text type="secondary">{note}</Text> : null}
         </div>
-        <Select
-          aria-label={`${label}选择`}
-          value={ready ? scope.customerKey : undefined}
-          placeholder="选择已登记甲方"
-          options={options}
-          disabled={disabled}
-          onChange={onChange}
-        />
-        {compact ? (
+        {compact && ready && options.length === 1 ? (
+          <Text strong className="erp-dev-customer-scope__value">
+            {options[0].label}
+          </Text>
+        ) : (
+          <Select
+            aria-label={`${label}选择`}
+            value={ready ? scope.customerKey : undefined}
+            placeholder={compact ? '选择已登记客户' : '选择已登记甲方'}
+            options={options}
+            disabled={disabled}
+            onChange={onChange}
+          />
+        )}
+        {compact && note ? (
           <Text type="secondary" className="erp-dev-customer-scope__note">
             {note}
           </Text>

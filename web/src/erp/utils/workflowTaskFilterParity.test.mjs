@@ -20,16 +20,36 @@ test('任务截止和来源在电脑与手机使用相同参数，改变条件�
   }
 })
 
-test('已办处理日期两端参数一致，切换离开已结束后清除隐藏日期', () => {
+test('电脑已办保留精确处理日期，手机清除旧日期并拒绝隐藏范围', () => {
   const dates = { period: 'custom', dateFrom: '2026-10-16', dateTo: '2026-10-18' }
-  const mobile = buildMobileRoleTaskQuery({ roleKey: 'sales', viewKey: 'history', ...dates })
   const url = writeWorkflowTaskBoardFiltersToSearch('', { lane: 'finished', ...dates })
   const filters = readWorkflowTaskBoardFiltersFromSearch(url)
   const desktop = buildWorkflowTaskBoardRequest(filters)
-  for (const key of ['period', 'date_from', 'date_to']) assert.equal(mobile[key], desktop[key])
+  assert.equal(desktop.period, 'custom')
+  assert.equal(desktop.date_from, dates.dateFrom)
+  assert.equal(desktop.date_to, dates.dateTo)
+  const normalized = normalizeMobileTaskQueryOptions(dates, true)
+  assert.deepEqual(normalized, { keyword: '', sortKey: 'completed', statusKey: '', period: '', dateFrom: '', dateTo: '' })
+  const restored = readMobileTaskQueryHistory({
+    mobileRoleTasksScope: mobileTaskQueryScope('scope', normalized),
+    mobileRoleTasksSort: 'completed',
+    mobileRoleTasksDates: dates,
+  }, 'scope')
+  assert.deepEqual(restored, normalized)
+  assert.deepEqual(buildMobileRoleTaskQuery({ roleKey: 'sales', viewKey: 'history', ...restored }), {
+    sort_key: 'completed', view_key: 'history', role_key: 'sales', limit: 50,
+  })
+  assert.throws(() => buildMobileRoleTaskQuery({ roleKey: 'sales', viewKey: 'history', ...dates }), /任务筛选或排序无效/u)
   const changed = buildWorkflowTaskBoardRequest({ ...filters, lane: 'all' })
   assert.equal(changed.period, undefined)
   assert.equal(changed.date_from, undefined)
+  assert.equal(changed.date_to, undefined)
+  for (const period of ['today', '7d', '30d']) {
+    const mobile = buildMobileRoleTaskQuery({ roleKey: 'sales', viewKey: 'history', period })
+    assert.equal(mobile.period, buildWorkflowTaskBoardRequest({ lane: 'finished', period }).period)
+    assert.equal(mobile.date_from, undefined)
+    assert.equal(mobile.date_to, undefined)
+  }
 })
 
 test('已办不恢复或发送截止时间，保留处理时间和来源条件', () => {

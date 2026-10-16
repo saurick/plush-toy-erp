@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react'
 import { Alert, Button, Empty, Space, Spin, Tag, Typography } from 'antd'
 import { BranchesOutlined } from '@ant-design/icons'
+import { OperationalFactStatus, ProductionWIPStatus } from '../../../common/consts/statuses.generated.mjs'
 import Table from '@/common/components/table/AppTable'
 
 import {
@@ -35,12 +36,12 @@ function completionTotals(facts, batchIDs) {
   return {
     posted: sumNumeric20Scale6Values(
       matchingFacts
-        .filter((fact) => factType(fact?.status) === 'POSTED')
+        .filter((fact) => factType(fact?.status) === OperationalFactStatus.POSTED)
         .map((fact) => fact.quantity)
     ),
     draft: sumNumeric20Scale6Values(
       matchingFacts
-        .filter((fact) => factType(fact?.status) === 'DRAFT')
+        .filter((fact) => factType(fact?.status) === OperationalFactStatus.DRAFT)
         .map((fact) => fact.quantity)
     ),
   }
@@ -54,7 +55,7 @@ function progressMeta({
   postedQuantity,
   draftQuantity,
 }) {
-  if (root.status === 'CANCELLED') {
+  if (root.status === OperationalFactStatus.CANCELLED) {
     return {
       key: 'cancelled',
       label: '已撤销',
@@ -96,7 +97,7 @@ function progressMeta({
       pending: true,
     }
   }
-  if (activeOperation?.operation_code === 'HANDWORK' && ['WAITING_QUALITY', 'ACCEPTED', 'REJECTED'].includes(activeBatch?.status)) {
+  if (activeOperation?.operation_code === 'HANDWORK' && ['WAITING_QUALITY', ProductionWIPStatus.ACCEPTED, 'REJECTED'].includes(activeBatch?.status)) {
     return {
       key: 'ready-for-completion',
       label: '手工完成，待成品入库',
@@ -157,7 +158,7 @@ export function buildProductionReworkProgressItems({
         [...lineage]
           .reverse()
           .find(
-            (batch) => !['SPLIT', 'CANCELLED'].includes(batch.status)
+            (batch) => !['SPLIT', OperationalFactStatus.CANCELLED].includes(batch.status)
           ) || root
       const activeOperation =
         operationByID.get(activeBatch.production_order_operation_id) ||
@@ -168,7 +169,7 @@ export function buildProductionReworkProgressItems({
         )
         return (
           operation?.operation_code === 'PACKAGING' &&
-          batch.status === 'ACCEPTED'
+          batch.status === ProductionWIPStatus.ACCEPTED
         )
       })
       const acceptedPackagingQuantity = sumNumeric20Scale6Values(

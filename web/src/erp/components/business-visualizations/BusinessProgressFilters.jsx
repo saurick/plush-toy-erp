@@ -110,37 +110,30 @@ export default function BusinessProgressFilterFields({
           </FilterChip>
         </fieldset>
       )}
-      <fieldset role={compact ? 'presentation' : undefined}>
-        <legend>处理人或业务负责人</legend>
-        <Input
-          aria-label="处理人或业务负责人"
-          placeholder="输入姓名"
-          maxLength={100}
-          allowClear
-          value={owner.value}
-          onChange={owner.onChange}
-          onCompositionStart={owner.onCompositionStart}
-          onCompositionEnd={owner.onCompositionEnd}
-          onPressEnter={owner.onPressEnter}
-        />
-      </fieldset>
-      <fieldset role={compact ? 'presentation' : undefined}>
-        {compact ? (
-          <legend className="mobile-filter-legend-action">
-            <span>交期范围</span>
-            <Button type="text" onClick={onDateRange}>
-              {query.date_from || query.date_to ? `${query.date_from || '不限'} 至 ${query.date_to || '不限'}` : '自定义交期日期'}
-            </Button>
-          </legend>
-        ) : (
-          <>
-            <legend>交期范围</legend>
-            <Button block onClick={onDateRange}>
-              {query.date_from || query.date_to ? `${query.date_from || '不限'} 至 ${query.date_to || '不限'}` : '自定义交期日期'}
-            </Button>
-          </>
-        )}
-      </fieldset>
+      {!compact && (
+        <fieldset>
+          <legend>处理人或业务负责人</legend>
+          <Input
+            aria-label="处理人或业务负责人"
+            placeholder="输入姓名"
+            maxLength={100}
+            allowClear
+            value={owner.value}
+            onChange={owner.onChange}
+            onCompositionStart={owner.onCompositionStart}
+            onCompositionEnd={owner.onCompositionEnd}
+            onPressEnter={owner.onPressEnter}
+          />
+        </fieldset>
+      )}
+      {!compact && (
+        <fieldset>
+          <legend>交期范围</legend>
+          <Button block onClick={onDateRange}>
+            {query.date_from || query.date_to ? `${query.date_from || '不限'} 至 ${query.date_to || '不限'}` : '自定义交期日期'}
+          </Button>
+        </fieldset>
+      )}
     </div>
   )
 }

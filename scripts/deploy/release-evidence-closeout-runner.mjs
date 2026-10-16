@@ -286,7 +286,7 @@ function materializeCommandFromText({
   if (commandText.includes("run-backup-restore-rehearsal.sh")) {
     const cmd = "bash";
     const args = [
-      "deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh",
+      "scripts/deploy/run-backup-restore-rehearsal.sh",
       "--release-id",
       requireInput({ env, action, key: "RELEASE_ID" }),
       "--environment",
@@ -308,7 +308,7 @@ function materializeCommandFromText({
   if (commandText.includes("run-smoke.sh")) {
     const cmd = "bash";
     const args = [
-      "deployments/yoyoosun/scripts/run-smoke.sh",
+      "scripts/deploy/run-smoke.sh",
       "--profile",
       profile,
       "--product-commit",

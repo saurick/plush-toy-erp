@@ -58,6 +58,7 @@ import {
   listAllCustomers,
   listAllSalesOrders,
   listAllUnits,
+  listAllWarehouses,
   listProductSKUs,
   listProducts,
 } from '../api/masterDataOrderApi.mjs'
@@ -324,6 +325,7 @@ export default function ShipmentsPage() {
     useState(false)
   const [customers, setCustomers] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
+  const [warehouses, setWarehouses] = useState([])
   const [products, setProducts] = useState([])
   const [productSKUs, setProductSKUs] = useState([])
   const [salesOrderItems, setSalesOrderItems] = useState([])
@@ -590,17 +592,8 @@ export default function ShipmentsPage() {
     [units]
   )
   const warehouseOptions = useMemo(
-    () =>
-      uniqueReferenceOptions(
-        [
-          ...inventoryLots,
-          ...rows.flatMap((shipment) =>
-            Array.isArray(shipment?.items) ? shipment.items : []
-          ),
-        ],
-        warehouseOptionFromRecord
-      ),
-    [inventoryLots, rows]
+    () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
+    [warehouses]
   )
   const shipmentListParams = useMemo(
     () =>
@@ -723,6 +716,7 @@ export default function ShipmentsPage() {
         nextProductSKUs,
         salesOrderResult,
         unitResult,
+        warehouseResult,
       ] = await Promise.all([
         listAllCustomers({ active_only: true }),
         listAllInventoryLots(),
@@ -730,6 +724,7 @@ export default function ShipmentsPage() {
         listAllShipmentWeightReferenceRecords(listProductSKUs, 'product_skus'),
         listAllSalesOrders(),
         listAllUnits(),
+        listAllWarehouses({ active_only: true }),
       ])
       setCustomers(
         Array.isArray(customerResult?.customers) ? customerResult.customers : []
@@ -745,10 +740,12 @@ export default function ShipmentsPage() {
           : []
       )
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
+      setWarehouses(Array.isArray(warehouseResult?.warehouses) ? warehouseResult.warehouses : [])
     } catch (error) {
       showPageLoadError(error, '加载出货相关资料')
       setCustomers([])
       setInventoryLots([])
+      setWarehouses([])
       setProducts([])
       setProductSKUs([])
       setSalesOrders([])

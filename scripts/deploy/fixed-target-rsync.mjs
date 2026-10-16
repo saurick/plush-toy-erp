@@ -10,6 +10,7 @@ function assertFixedTarget(target) {
   const roots = {
     "demo-133": "/root/deploy/plush-toy-erp-demo-v1",
     "customer-test-133": "/root/deploy/plush-toy-erp-test-v1",
+    "production-133": "/root/deploy/plush-toy-erp-production",
   };
   if (
     !Object.hasOwn(roots, target?.key) ||

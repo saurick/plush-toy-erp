@@ -1,3 +1,5 @@
+import { PurchaseReceiptStatus } from '../../common/consts/statuses.generated.mjs'
+
 const MAX_IDEMPOTENCY_KEY_LENGTH = 128
 
 function invalidResponse(message) {
@@ -179,7 +181,7 @@ export function validatePurchaseReceiptDraft(receipt, expected = {}) {
     !positiveSafeInteger(receipt.id) ||
     typeof receipt.receipt_no !== 'string' ||
     !receipt.receipt_no.trim() ||
-    receipt.status !== 'DRAFT' ||
+    receipt.status !== PurchaseReceiptStatus.DRAFT ||
     !Array.isArray(receipt.items) ||
     receipt.items.length < 1 ||
     (expectedReceiptNo && receipt.receipt_no.trim() !== expectedReceiptNo)

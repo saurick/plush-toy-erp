@@ -25,18 +25,16 @@ export function mobileProgressDefaultView(role, access) {
 
 export function normalizeMobileProgressQuery(values, defaultView) {
   const params = new URLSearchParams(values || {})
+  for (const key of ['owner', 'from', 'to', 'date_from', 'date_to']) params.delete(key)
   if (!params.get('view')) params.set('view', defaultView)
   const query = progressQueryFromURL(params)
   return {
     view: query.view || defaultView,
     q: query.keyword,
-    owner: query.owner,
     scope: query.scope,
     due_status: query.due_status,
     blocked_only: query.blocked_only,
     unlinked_only: query.unlinked_only,
-    from: query.date_from,
-    to: query.date_to,
     // Appended batches are reloaded from the first page when returning.
     page: 1,
   }

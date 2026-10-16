@@ -110,7 +110,7 @@ export function createLoadFeedbackScenarios({
             ? '.mobile-progress-card'
             : mobile
               ? '.erp-mobile-list-item'
-              : '.erp-task-board-card'
+              : '.erp-task-table-row'
         )
         await rows.first().waitFor()
         const errorSurfaces = page

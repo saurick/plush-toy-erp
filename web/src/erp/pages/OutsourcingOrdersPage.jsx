@@ -3,13 +3,13 @@ import {
   DownloadOutlined,
   EditOutlined,
   EyeOutlined,
-  OrderedListOutlined,
   PlusOutlined,
   PrinterOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
 import { Button, Space } from 'antd'
 import { useOutletContext } from 'react-router-dom'
+import { OutsourcingOrderStatus } from '../../common/consts/statuses.generated.mjs'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
@@ -17,7 +17,6 @@ import BusinessStatusFilter from '../components/business-list/BusinessStatusFilt
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { useOutsourcingOrderLifecycle } from '../components/outsourcing-orders/useOutsourcingOrderLifecycle.jsx'
-import { useOutsourcingOrderLineOrder } from '../components/outsourcing-orders/useOutsourcingOrderLineOrder.mjs'
 import { useOutsourcingOrderEditor } from '../components/outsourcing-orders/useOutsourcingOrderEditor.mjs'
 import { useOutsourcingOrderTasks } from '../components/outsourcing-orders/useOutsourcingOrderTasks.mjs'
 import { useOutsourcingOrderQuery } from '../components/outsourcing-orders/useOutsourcingOrderQuery.mjs'
@@ -47,12 +46,10 @@ import { useBusinessColumnOrder } from '../components/business-list/BusinessList
 
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
-import BusinessLineItemOrderModal from '../components/business-list/BusinessLineItemOrderModal.jsx'
 
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import OutsourcingOrderForm, {
-  outsourcingOrderLineOrderLabel,
 } from '../components/outsourcing-orders/OutsourcingOrderForm.jsx'
 import OutsourcingOrderSourceFactModal from '../components/outsourcing-orders/OutsourcingOrderSourceFactModal.jsx'
 import OutsourcingOrderSummaryPanel from '../components/outsourcing-orders/OutsourcingOrderSummaryPanel.jsx'
@@ -84,7 +81,6 @@ import {
   resolveContextualBusinessActionAvailability,
 } from '../utils/businessActionAvailability.mjs'
 
-import { canReorderSourceDocumentItems } from '../utils/sourceDocumentMutation.mjs'
 import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   PROCESSING_CONTRACT_TEMPLATE_KEY,
@@ -138,7 +134,6 @@ export default function OutsourcingOrdersPage() {
     searchParams,
     setSearchParams,
     rows,
-    setRows,
     total,
     statusCounts,
     loading,
@@ -276,9 +271,6 @@ export default function OutsourcingOrdersPage() {
   const canRead = hasActionPermission(adminProfile, PermissionCode.OUTSOURCING_ORDER_READ)
   const summaryVisible = searchParams.get('view') === 'items' && canRead
 
-  const selectedOrderCanReorder = Boolean(
-    canUpdate && canReorderSourceDocumentItems('outsourcing_order', selectedRow)
-  )
   const canCreateMaterialIssue = hasActionPermission(
     adminProfile,
     PermissionCode.OUTSOURCING_MATERIAL_ISSUE_CREATE
@@ -366,24 +358,6 @@ export default function OutsourcingOrdersPage() {
     canCreateMaterialIssue,
     canCreateReturnReceipt,
     unitOptions,
-  })
-
-  const {
-    lineOrderLoading,
-    lineOrderOpen,
-    lineOrderContext,
-    closeLineOrder,
-    openOutsourcingOrderLineOrder,
-    applyOutsourcingOrderLineOrder,
-  } = useOutsourcingOrderLineOrder({
-    selectedRow,
-    selectedOrderCanReorder,
-    loadOrderItems,
-    setSaving,
-    activeCustomerKey,
-    setRows,
-    setSelectedRow,
-    loadOrders,
   })
 
   const refreshPageData = useCallback(async () => {
@@ -882,37 +856,6 @@ export default function OutsourcingOrdersPage() {
               />
               {canUpdate ? (
                 <BusinessActionTooltip
-                  selectionActionPriority={20}
-                  visible={!selectedRow || selectedOrderCanReorder}
-                  disabled={
-                    !selectedOrderCanReorder || lineOrderLoading || saving
-                  }
-                  disabledReason={
-                    !selectedRow
-                      ? '请先选择一条加工合同'
-                      : !selectedOrderCanReorder
-                        ? '当前状态不能调整加工明细顺序'
-                        : lineOrderLoading || saving
-                          ? '当前合同操作完成后可调整加工明细顺序'
-                          : ''
-                  }
-                >
-                  <Button
-                    size="small"
-                    data-business-action-key="line-order"
-                    icon={<OrderedListOutlined />}
-                    loading={lineOrderLoading}
-                    disabled={
-                      !selectedOrderCanReorder || lineOrderLoading || saving
-                    }
-                    onClick={openOutsourcingOrderLineOrder}
-                  >
-                    加工明细顺序
-                  </Button>
-                </BusinessActionTooltip>
-              ) : null}
-              {canUpdate ? (
-                <BusinessActionTooltip
                   visible={!selectedRow || canEditOutsourcingOrder(selectedRow)}
                   disabled={
                     !selectedRow ||
@@ -1204,23 +1147,10 @@ export default function OutsourcingOrdersPage() {
 
       {columnOrderModal}
 
-      <BusinessLineItemOrderModal
-        description="保存后只调整当前加工合同的明细展示顺序，不修改产品或材料、数量、价格或稳定行号。"
-        getItemLabel={outsourcingOrderLineOrderLabel}
-        itemNoun="加工明细"
-        items={lineOrderContext.items}
-        open={lineOrderOpen}
-        title="调整加工明细顺序"
-        onApply={applyOutsourcingOrderLineOrder}
-        onClose={() => {
-          closeLineOrder()
-        }}
-      />
-
       <BusinessFormPage
         form={form}
         title={editingRow ? '编辑加工合同' : '新建加工合同'}
-        okText={!editingRow || editingRow.lifecycle_status === 'draft' ? '保存草稿' : '保存'}
+        okText={!editingRow || editingRow.lifecycle_status === OutsourcingOrderStatus.DRAFT ? '保存草稿' : '保存'}
         open={modalOpen}
         onCancel={closeModal}
         onOk={submitForm}
@@ -1255,7 +1185,7 @@ export default function OutsourcingOrdersPage() {
               description="普通附件用于归档纸样、图纸、签回合同或报价依据；标记为合同附图的图片会在打开加工合同打印时冻结带入末尾。"
               enablePrintAppendixUpload
               canUpload={canUpdate || canCreate}
-              canWithdraw={canUpdate || canCreate}
+              canWithdraw={canUpdate}
               variant="inline"
             />
           }

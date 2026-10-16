@@ -1,4 +1,13 @@
 import {
+  OperationalFactStatus,
+  ProductionOrderStatus,
+  ProductionWIPStatus,
+  PurchaseOrderStatus,
+  QualityInspectionStatus,
+  SalesOrderItemStatus,
+  SalesOrderStatus,
+} from '../../common/consts/statuses.generated.mjs'
+import {
   normalizeNumeric20Scale6,
   numeric20Scale6Units,
   compareNumeric20Scale6Values,
@@ -50,7 +59,7 @@ function normalizedText(value, fallback = '') {
 }
 
 function salesDeliveryStatus(row, today) {
-  if (row.lineStatus === 'canceled' || row.lifecycleStatus === 'canceled') {
+  if (row.lineStatus === SalesOrderItemStatus.CANCELED || row.lifecycleStatus === SalesOrderStatus.CANCELED) {
     return { key: 'cancelled', label: '已取消', rank: 7 }
   }
   if (!row.progressKnown) {
@@ -59,7 +68,7 @@ function salesDeliveryStatus(row, today) {
   if (compareNumeric20Scale6Values(row.remaining, '0') <= 0) {
     return { key: 'delivered', label: '已交付', rank: 6 }
   }
-  if (row.lifecycleStatus === 'closed' || row.lineStatus === 'closed') {
+  if (row.lifecycleStatus === SalesOrderStatus.CLOSED || row.lineStatus === SalesOrderItemStatus.CLOSED) {
     return { key: 'closed', label: '已关闭未交完', rank: 1 }
   }
   if (!row.deliveryDate) {
@@ -150,10 +159,10 @@ export function buildSalesDeliveryModel(items = [], options = {}) {
 }
 
 function purchaseArrivalStatus(order, today) {
-  if (order.lifecycleStatus === 'canceled') {
+  if (order.lifecycleStatus === PurchaseOrderStatus.CANCELED) {
     return { key: 'cancelled', label: '已取消', rank: 6 }
   }
-  if (order.lifecycleStatus === 'closed') {
+  if (order.lifecycleStatus === PurchaseOrderStatus.CLOSED) {
     return { key: 'closed', label: '订单已关闭', rank: 5 }
   }
   if (!order.arrivalDate) {
@@ -263,16 +272,16 @@ export function buildPurchaseArrivalModel(orders = [], options = {}) {
 }
 
 function financeDueStatus(row, today) {
-  if (row.status === 'CANCELLED') {
+  if (row.status === OperationalFactStatus.CANCELLED) {
     return { key: 'cancelled', label: '已取消', rank: 6 }
   }
   if (row.outstanding === null || row.amount === null || !row.currency) {
     return { key: 'unknown', label: '金额待核对', rank: 2 }
   }
-  if (row.status === 'SETTLED' || row.outstanding === 0) {
+  if (row.status === OperationalFactStatus.SETTLED || row.outstanding === 0) {
     return { key: 'settled', label: '已结清', rank: 5 }
   }
-  if (row.status === 'DRAFT') {
+  if (row.status === OperationalFactStatus.DRAFT) {
     return { key: 'draft', label: '草稿待过账', rank: 4 }
   }
   if (!row.dueDate) {
@@ -425,20 +434,20 @@ export function buildInventoryDistributionModel(
 }
 
 const PRODUCTION_ORDER_STATUS_META = Object.freeze({
-  DRAFT: Object.freeze({ label: '草稿', tone: 'draft' }),
-  RELEASED: Object.freeze({ label: '生产中', tone: 'inProgress' }),
-  CLOSED: Object.freeze({ label: '已关闭', tone: 'delivered' }),
-  CANCELLED: Object.freeze({ label: '已取消', tone: 'cancelled' }),
+  [ProductionOrderStatus.DRAFT]: Object.freeze({ label: '草稿', tone: 'draft' }),
+  [ProductionOrderStatus.RELEASED]: Object.freeze({ label: '生产中', tone: 'inProgress' }),
+  [ProductionOrderStatus.CLOSED]: Object.freeze({ label: '已关闭', tone: 'delivered' }),
+  [ProductionOrderStatus.CANCELLED]: Object.freeze({ label: '已取消', tone: 'cancelled' }),
 })
 
 function productionScheduleStatus(row, today) {
-  if (row.orderStatus === 'CANCELLED') {
+  if (row.orderStatus === ProductionOrderStatus.CANCELLED) {
     return { key: 'cancelled', label: '已取消', rank: 7 }
   }
-  if (row.orderStatus === 'CLOSED') {
+  if (row.orderStatus === ProductionOrderStatus.CLOSED) {
     return { key: 'delivered', label: '已完成', rank: 6 }
   }
-  if (row.orderStatus === 'DRAFT') {
+  if (row.orderStatus === ProductionOrderStatus.DRAFT) {
     return { key: 'draft', label: '待发布', rank: 4 }
   }
   if (!row.plannedEndDate) {
@@ -491,24 +500,10 @@ export function buildProductionOrderOverviewModel(orders = [], options = {}) {
     return riskOrder || left.orderNo.localeCompare(right.orderNo, 'zh-CN')
   })
 
-  const statusOrder = ['DRAFT', 'RELEASED', 'CLOSED', 'CANCELLED']
-  const statusGroups = statusOrder.map((status) => {
-    const count = rows.filter((row) => row.orderStatus === status).length
-    return {
-      key: status,
-      label: PRODUCTION_ORDER_STATUS_META[status].label,
-      tone: PRODUCTION_ORDER_STATUS_META[status].tone,
-      count,
-      percent: rows.length > 0 ? clampPercent((count / rows.length) * 100) : 0,
-    }
-  })
-
   return {
     rows,
-    statusGroups,
     counts: {
       total: rows.length,
-      active: rows.filter((row) => row.orderStatus === 'RELEASED').length,
       overdue: rows.filter((row) => row.scheduleStatus.key === 'overdue')
         .length,
       dueSoon: rows.filter((row) => row.scheduleStatus.key === 'dueSoon')
@@ -531,43 +526,43 @@ function countBy(items, keyOf) {
 
 function productionStepState({ batches, inspections, hasDownstream }) {
   const activeBatches = batches.filter(
-    (batch) => !['CANCELLED', 'SPLIT'].includes(batch.status)
+    (batch) => ![ProductionWIPStatus.CANCELLED, ProductionWIPStatus.SPLIT].includes(batch.status)
   )
   const activeBatchIDs = new Set(activeBatches.map((batch) => batch.id))
   const activeInspections = inspections.filter(
     (inspection) =>
       activeBatchIDs.has(inspection.production_wip_batch_id) &&
-      inspection.status !== 'CANCELLED'
+      inspection.status !== QualityInspectionStatus.CANCELLED
   )
   const hasRejectedQuality = activeInspections.some(
-    (inspection) => inspection.status === 'REJECTED'
+    (inspection) => inspection.status === QualityInspectionStatus.REJECTED
   )
   if (
     hasRejectedQuality ||
-    activeBatches.some((batch) => batch.status === 'REJECTED')
+    activeBatches.some((batch) => batch.status === ProductionWIPStatus.REJECTED)
   ) {
     return { key: 'exception', label: '需要处理' }
   }
   if (
-    activeInspections.some((inspection) => inspection.status === 'SUBMITTED') ||
-    activeBatches.some((batch) => batch.status === 'WAITING_QUALITY')
+    activeInspections.some((inspection) => inspection.status === QualityInspectionStatus.SUBMITTED) ||
+    activeBatches.some((batch) => batch.status === ProductionWIPStatus.WAITING_QUALITY)
   ) {
     return { key: 'quality', label: '等待质检' }
   }
   if (
     activeBatches.some((batch) =>
-      ['IN_PROGRESS', 'OUTSOURCED'].includes(batch.status)
+      [ProductionWIPStatus.IN_PROGRESS, ProductionWIPStatus.OUTSOURCED].includes(batch.status)
     )
   ) {
     return { key: 'active', label: '正在进行' }
   }
   if (
-    activeBatches.some((batch) => batch.status === 'ACCEPTED') ||
+    activeBatches.some((batch) => batch.status === ProductionWIPStatus.ACCEPTED) ||
     hasDownstream
   ) {
     return { key: 'done', label: '已通过' }
   }
-  if (activeBatches.some((batch) => batch.status === 'PLANNED')) {
+  if (activeBatches.some((batch) => batch.status === ProductionWIPStatus.PLANNED)) {
     return { key: 'ready', label: '待安排' }
   }
   return { key: 'waiting', label: '等待前序' }
@@ -618,7 +613,7 @@ export function buildProductionProcessModel(aggregate) {
       )
       const hasDownstream = itemBatches.some(
         (batch) =>
-          !['CANCELLED', 'SPLIT'].includes(batch.status) &&
+          ![ProductionWIPStatus.CANCELLED, ProductionWIPStatus.SPLIT].includes(batch.status) &&
           (operationPosition.get(batch.production_order_operation_id) ?? -1) >
             index
       )
@@ -630,7 +625,7 @@ export function buildProductionProcessModel(aggregate) {
       const activeModes = [
         ...new Set(
           operationBatches
-            .filter((batch) => !['CANCELLED', 'SPLIT'].includes(batch.status))
+            .filter((batch) => ![ProductionWIPStatus.CANCELLED, ProductionWIPStatus.SPLIT].includes(batch.status))
             .map((batch) => batch.execution_mode)
             .filter(Boolean)
         ),
@@ -687,11 +682,11 @@ export function buildProductionProcessModel(aggregate) {
   })
 
   const activeBatches = batches.filter(
-    (batch) => !['CANCELLED', 'SPLIT'].includes(batch.status)
+    (batch) => ![ProductionWIPStatus.CANCELLED, ProductionWIPStatus.SPLIT].includes(batch.status)
   )
   const rejectedInspectionBatchIDs = new Set(
     inspections
-      .filter((inspection) => inspection.status === 'REJECTED')
+      .filter((inspection) => inspection.status === QualityInspectionStatus.REJECTED)
       .map((inspection) => inspection.production_wip_batch_id)
   )
 
@@ -712,11 +707,11 @@ export function buildProductionProcessModel(aggregate) {
         (batch) => batch.execution_mode === 'OUTSOURCED'
       ).length,
       waitingQuality: activeBatches.filter(
-        (batch) => batch.status === 'WAITING_QUALITY'
+        (batch) => batch.status === ProductionWIPStatus.WAITING_QUALITY
       ).length,
       exceptions: activeBatches.filter(
         (batch) =>
-          batch.status === 'REJECTED' ||
+          batch.status === ProductionWIPStatus.REJECTED ||
           rejectedInspectionBatchIDs.has(batch.id)
       ).length,
       rework: activeBatches.filter((batch) => batch.flow_type === 'REWORK')

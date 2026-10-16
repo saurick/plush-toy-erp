@@ -1,4 +1,10 @@
 import {
+  SalesOrderItemStatus,
+  SalesOrderStatus,
+  ShipmentStatus,
+  StockReservationStatus,
+} from '../../common/consts/statuses.generated.mjs'
+import {
   addNumeric20Scale6Units,
   compareNumeric20Scale6Units,
   isPositiveNumeric20Scale6Units,
@@ -31,7 +37,7 @@ export function buildSalesOrderReservationItemChoices(
 ) {
   const activeReservedByLine = new Map()
   for (const reservation of Array.isArray(reservations) ? reservations : []) {
-    if (reservation?.status !== 'ACTIVE') continue
+    if (reservation?.status !== StockReservationStatus.ACTIVE) continue
     const lineID = positiveID(reservation?.sales_order_item_id)
     if (!lineID) continue
     activeReservedByLine.set(
@@ -44,7 +50,7 @@ export function buildSalesOrderReservationItemChoices(
   }
   const shippedByLine = new Map()
   for (const shipment of Array.isArray(shipments) ? shipments : []) {
-    if (String(shipment?.status || '').toUpperCase() !== 'SHIPPED') continue
+    if (String(shipment?.status || '').toUpperCase() !== ShipmentStatus.SHIPPED) continue
     for (const line of Array.isArray(shipment?.items) ? shipment.items : []) {
       const lineID = positiveID(line?.sales_order_item_id)
       if (!lineID) continue
@@ -81,7 +87,7 @@ export function buildSalesOrderReservationItemChoices(
       reservable: positiveUnitsText(reservable),
       disabled:
         itemID <= 0 ||
-        String(item?.line_status || '').toLowerCase() !== 'open' ||
+        String(item?.line_status || '').toLowerCase() !== SalesOrderItemStatus.OPEN ||
         !isPositiveNumeric20Scale6Units(ordered) ||
         !isPositiveNumeric20Scale6Units(reservable),
     }
@@ -141,7 +147,7 @@ export function buildSalesOrderReservationPayload(
   reservations = [],
   shipments = []
 ) {
-  if (String(order?.lifecycle_status || '').toLowerCase() !== 'active') {
+  if (String(order?.lifecycle_status || '').toLowerCase() !== SalesOrderStatus.ACTIVE) {
     throw new Error('仅生效中的销售订单可以预留库存')
   }
   const orderID = positiveID(order?.id)
@@ -165,7 +171,7 @@ export function buildSalesOrderReservationPayload(
     !itemChoice ||
     !balance ||
     !quantity ||
-    String(item?.line_status || '').toLowerCase() !== 'open' ||
+    String(item?.line_status || '').toLowerCase() !== SalesOrderItemStatus.OPEN ||
     positiveID(item.sales_order_id) !== orderID ||
     positiveID(balance.warehouse_id) <= 0 ||
     positiveID(balance.subject_id) !== positiveID(item.product_id) ||

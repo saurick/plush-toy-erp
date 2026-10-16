@@ -1,3 +1,4 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { getWorkflowTaskIdentity } from './workflowTaskIdentity.mjs'
 import {
   formatWorkflowTaskSource,
@@ -57,7 +58,7 @@ export function formatWorkflowTaskCopy(task = {}, { assigneeLabel = '' } = {}) {
     getWorkflowTaskSourceNo(task) &&
       `关联单据：${formatWorkflowTaskSource(task)}`,
     task.task_group === 'business_followup' && text(task.payload?.description) && `任务要求：${text(task.payload.description)}`,
-    task.task_group === 'business_followup' && task.task_status_key === 'done' && text(task.payload?.feedback) && `处理结果：${text(task.payload.feedback)}`,
+    task.task_group === 'business_followup' && task.task_status_key === WorkflowTaskStatus.DONE && text(task.payload?.feedback) && `处理结果：${text(task.payload.feedback)}`,
     task.task_status_key && `状态：${getWorkflowTaskStatusMeta(task).label}`,
     reason.value && `${reason.label}：${reason.value}`,
     responsibility && `负责：${responsibility}`,

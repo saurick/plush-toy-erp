@@ -140,6 +140,7 @@ test('workflowApi: calendar reads preserve scope, cancellation and complete date
       limit: 30,
       offset: 0,
       snapshot_at: 1791900000,
+      revision: 'a'.repeat(64),
       items: incomplete ? [] : [validTask({ task_status_key: 'ready', due_at: null })],
     } } }
   })

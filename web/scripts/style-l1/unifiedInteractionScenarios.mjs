@@ -62,7 +62,7 @@ export function createUnifiedInteractionScenarios({
       productionOrderReleased: true,
       verify: async (page) => {
         await page
-          .getByRole('heading', { name: '生产订单', exact: true })
+          .getByRole('heading', { name: '生产管理', exact: true })
           .waitFor()
         await assertBusinessViewMotion(page, 'production-overview', outputDir)
         const panel = page.getByRole('region', {
@@ -70,6 +70,10 @@ export function createUnifiedInteractionScenarios({
           exact: true,
         })
         await panel.locator('.erp-production-overview__row').first().waitFor()
+        assert.equal(await page.locator('.erp-business-operation-panel__selection').count(), 0)
+        assert.equal(await page.getByRole('button', { name: /列设置|新建生产订单/ }).count(), 0)
+        assert.equal(await panel.locator('.erp-production-overview__status-rail').count(), 0)
+        assert.match(await panel.locator('.erp-business-visual-metrics').textContent(), /不限提醒.*张/u)
         const overviewRefresh = page.waitForResponse((response) => {
           if (!response.url().endsWith('/rpc/production_order')) return false
           const request = response.request()
@@ -245,12 +249,15 @@ export function createUnifiedInteractionScenarios({
         recoveryMode = 'empty'
         await panel.getByRole('button', { name: '重新加载' }).click()
         await panel.getByText('当前筛选暂无数据', { exact: true }).waitFor()
-        assert.equal(await count.textContent(), '0')
+        assert.equal(await count.textContent(), '0 条')
         await captureBusinessView(page, panel, 'sales-empty', 1440, outputDir)
         recoveryMode = 'data'
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await panel.locator('.erp-business-visual-list__row').first().waitFor()
-        assert.equal(await count.textContent(), '3')
+        assert.equal(await page.locator('.erp-business-operation-panel__selection').count(), 0)
+        assert.equal(await page.getByRole('button', { name: /列设置|新建订单/ }).count(), 0)
+        assert.match(await panel.locator('.erp-business-visual-metrics').textContent(), /全部明细.*条/u)
+        assert.equal(await count.textContent(), '3 条')
         await captureBusinessView(
           page,
           panel,
@@ -309,10 +316,9 @@ export function createUnifiedInteractionScenarios({
         await copiedLine.locator('summary').click()
         await copiedLine
           .getByLabel('产品名称', { exact: true })
-          .fill('复制后移到首行')
-        await copiedLine
-          .getByRole('button', { name: '上移第 2 行', exact: true })
-          .click()
+          .fill('复制后的追加行')
+        assert.equal(await firstLine.getByLabel('产品名称', { exact: true }).inputValue(), '保存前原始行')
+        assert.equal(await editor.getByRole('button', { name: /^(上移|下移)第 \d+ 行$/u }).count(), 0)
         const requestPromise = page.waitForRequest(
           (request) =>
             request.url().endsWith('/rpc/purchase_order') &&
@@ -326,10 +332,10 @@ export function createUnifiedInteractionScenarios({
         )
         assert.deepEqual(
           params.items.map((item) => item.product_name_snapshot),
-          ['复制后移到首行', '保存前原始行']
+          ['保存前原始行', '复制后的追加行']
         )
-        assert.ok(!params.items[0].id)
-        assert.equal(params.items[1].id, 1)
+        assert.equal(params.items[0].id, 1)
+        assert.ok(!params.items[1].id)
         await editor.waitFor({ state: 'hidden' })
       },
     },
@@ -587,7 +593,8 @@ export function createUnifiedInteractionScenarios({
         })
       },
       verify: async (page) => {
-        await page.getByRole('heading', { name: /应收管理/ }).waitFor()
+        await expectHeading(page, '财务管理')
+        await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应收', exact: true, selected: true }).waitFor()
         await assertBusinessViewMotion(page, 'finance-view', outputDir)
         await page.getByText('到期顺序', { exact: true }).click()
         const panel = page.getByRole('region', { name: '财务到期顺序' })
@@ -605,7 +612,8 @@ export function createUnifiedInteractionScenarios({
           '未结金额—'
         )
         await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应付', exact: true }).click()
-        await page.getByRole('heading', { name: /应付管理/ }).waitFor()
+        await expectHeading(page, '财务管理')
+        await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应付', exact: true, selected: true }).waitFor()
         await page.getByText('到期顺序', { exact: true }).click()
         await panel.locator('.erp-finance-due-list__row').first().waitFor()
         assert.equal(
@@ -615,7 +623,8 @@ export function createUnifiedInteractionScenarios({
           'true'
         )
         await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应收', exact: true }).click()
-        await page.getByRole('heading', { name: /应收管理/ }).waitFor()
+        await expectHeading(page, '财务管理')
+        await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应收', exact: true, selected: true }).waitFor()
         await panel.locator('.erp-finance-due-list__row').first().waitFor()
         assert.equal(
           await panel
@@ -635,7 +644,8 @@ export function createUnifiedInteractionScenarios({
         await page.waitForURL(/\/erp\/warehouse\/shipments/)
         assert.equal(new URL(page.url()).searchParams.get('shipment_id'), '1')
         await page.goBack()
-        await page.getByRole('heading', { name: /应收管理/ }).waitFor()
+        await expectHeading(page, '财务管理')
+        await page.locator('.erp-business-module-tabs').getByRole('tab', { name: '应收', exact: true, selected: true }).waitFor()
         await details.getByText(selectedFactNo, { exact: true }).waitFor()
         await details.getByRole('button', { name: /^关\s*闭$/u }).click()
         await details.waitFor({ state: 'hidden' })

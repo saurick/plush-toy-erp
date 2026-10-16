@@ -1,4 +1,5 @@
 import React from 'react'
+import { PurchaseOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 
 import BusinessAttachmentPanel from '../business-list/BusinessAttachmentPanel.jsx'
 import BusinessFormPage from '../business-list/BusinessFormPage.jsx'
@@ -28,7 +29,7 @@ export default function PurchaseOrderEditor({
       open={open}
       title={editingOrder ? '编辑采购订单' : '新建采购订单'}
       okText={
-        !editingOrder || editingOrder.lifecycle_status === 'draft'
+        !editingOrder || editingOrder.lifecycle_status === PurchaseOrderStatus.DRAFT
           ? '保存草稿'
           : '保存'
       }
@@ -54,7 +55,7 @@ export default function PurchaseOrderEditor({
             title="采购附件"
             description="上传供应商报价、签回采购单、到货要求或价格确认资料；上传附件不会改变采购订单状态。"
             canUpload={canUpdate || canCreate}
-            canWithdraw={canCreate || canUpdate}
+            canWithdraw={canUpdate}
             variant="inline"
             compact
           />

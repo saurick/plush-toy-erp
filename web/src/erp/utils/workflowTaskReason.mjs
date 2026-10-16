@@ -1,3 +1,5 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
+
 function payloadOf(task = {}) {
   return task.payload && typeof task.payload === 'object' ? task.payload : {}
 }
@@ -21,21 +23,21 @@ export function getWorkflowTaskReasonMeta(task = {}) {
   const completionSummary =
     cleanText(task.completion_summary) || cleanText(payload.completion_summary)
 
-  if (statusKey === 'withdrawn') {
+  if (statusKey === WorkflowTaskStatus.WITHDRAWN) {
     return {
       kind: 'withdrawn',
       label: '撤回原因',
       value: blockedReason || businessReason,
     }
   }
-  if (statusKey === 'rejected') {
+  if (statusKey === WorkflowTaskStatus.REJECTED) {
     return {
       kind: 'rejected',
       label: '退回原因',
       value: rejectedReason || blockedReason || businessReason,
     }
   }
-  if (statusKey === 'blocked') {
+  if (statusKey === WorkflowTaskStatus.BLOCKED) {
     return {
       kind: 'blocked',
       label: '阻塞原因',
@@ -43,7 +45,7 @@ export function getWorkflowTaskReasonMeta(task = {}) {
     }
   }
   const handlingValue =
-    statusKey === 'done'
+    statusKey === WorkflowTaskStatus.DONE
       ? handlingNote || completionSummary || businessReason
       : handlingNote || businessReason || completionSummary
   return {

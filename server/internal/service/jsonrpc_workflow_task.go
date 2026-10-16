@@ -343,7 +343,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			"sort",
 			"approval_only",
 			"todo_only",
-			"calendar_month", "calendar_selection", "calendar_offset",
+			"calendar_month", "calendar_selection", "calendar_offset", "calendar_revision",
 			"limit",
 			"offset",
 		); res != nil {
@@ -1313,7 +1313,7 @@ func parseWorkflowRoleTaskViewRequest(
 	pm map[string]any,
 	method string,
 ) (workflowRoleTaskViewRequest, *v1.JsonrpcResult) {
-	if res := rejectUnknownWorkflowTaskParams(pm, method, "view_key", "role_key", "limit", "cursor", "keyword", "sort_key", "status_key", "due", "source_type", "period", "date_from", "date_to", "module_key", "stage_key", "chain_key", "assignee", "calendar_month", "calendar_selection", "calendar_offset"); res != nil {
+	if res := rejectUnknownWorkflowTaskParams(pm, method, "view_key", "role_key", "limit", "cursor", "keyword", "sort_key", "status_key", "due", "source_type", "period", "date_from", "date_to", "module_key", "stage_key", "chain_key", "assignee", "calendar_month", "calendar_selection", "calendar_offset", "calendar_revision"); res != nil {
 		return workflowRoleTaskViewRequest{}, res
 	}
 	calendar, calendarRes := parseWorkflowTaskCalendar(pm)

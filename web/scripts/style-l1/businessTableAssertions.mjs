@@ -97,27 +97,25 @@ export async function assertTableHeaderControlsFit(
       [...table.querySelectorAll('thead th')].flatMap((cell) => {
         const outer = cell.getBoundingClientRect()
         if (outer.height < 1) return []
-        return [
-          ...cell.querySelectorAll(
-            '.ant-table-column-sorter'
-          ),
-        ].map((control) => {
-          const inner = control.getBoundingClientRect()
-          return {
-            header:
-              cell.querySelector('.erp-module-column-header-text')
-                ?.textContent || cell.textContent,
-            control: control.getAttribute('aria-label') || '排序图标',
-            width: inner.width,
-            height: inner.height,
-            gaps: [
-              inner.left - outer.left,
-              outer.right - inner.right,
-              inner.top - outer.top,
-              outer.bottom - inner.bottom,
-            ],
+        return [...cell.querySelectorAll('.ant-table-column-sorter')].map(
+          (control) => {
+            const inner = control.getBoundingClientRect()
+            return {
+              header:
+                cell.querySelector('.erp-module-column-header-text')
+                  ?.textContent || cell.textContent,
+              control: control.getAttribute('aria-label') || '排序图标',
+              width: inner.width,
+              height: inner.height,
+              gaps: [
+                inner.left - outer.left,
+                outer.right - inner.right,
+                inner.top - outer.top,
+                outer.bottom - inner.bottom,
+              ],
+            }
           }
-        })
+        )
       })
     )
   )
@@ -137,7 +135,9 @@ export async function assertTableHeaderControlsFit(
         .filter((cell) => cell.getBoundingClientRect().height > 1)
         .map((cell) => {
           const style = getComputedStyle(cell)
-          const label = cell.querySelector('.erp-module-column-header-text, .ant-table-column-title')
+          const label = cell.querySelector(
+            '.erp-module-column-header-text, .ant-table-column-title'
+          )
           const sorter = cell.querySelector('.ant-table-column-sorter')
           return {
             label: cell.textContent,
@@ -148,17 +148,25 @@ export async function assertTableHeaderControlsFit(
                 style.borderInlineEndColor !== style.backgroundColor
               : true,
             clipped: label ? label.scrollWidth > label.clientWidth + 1 : false,
-            sorterGap: label && sorter
-              ? sorter.getBoundingClientRect().left - label.getBoundingClientRect().right
-              : null,
+            sorterGap:
+              label && sorter
+                ? sorter.getBoundingClientRect().left -
+                  label.getBoundingClientRect().right
+                : null,
           }
         })
     )
   )
   assert(headers.length > 0, `${scenarioName} 应有可读表头`)
   assert.deepEqual(
-    headers.filter((header) => !header.split || header.clipped || header.height < 39 ||
-      (header.sorterGap !== null && (header.sorterGap < 3 || header.sorterGap > 8))),
+    headers.filter(
+      (header) =>
+        !header.split ||
+        header.clipped ||
+        header.height < 39 ||
+        (header.sorterGap !== null &&
+          (header.sorterGap < 3 || header.sorterGap > 8))
+    ),
     [],
     `${scenarioName} 字段边界应清楚，列名完整显示，排序紧邻所属列名`
   )
@@ -324,8 +332,8 @@ async function assertBusinessMainTableSortableColumns(
             overflow: style.overflow,
             whiteSpace: style.whiteSpace,
             sorterGap: sorterRect ? sorterRect.left - textRect.right : null,
-            outsideCell: textRect.left < cellRect.left || textRect.right > cellRect.right,
-
+            outsideCell:
+              textRect.left < cellRect.left || textRect.right > cellRect.right,
           }
         })
       : []
@@ -382,7 +390,8 @@ async function assertBusinessMainTableSortableColumns(
     (node) => node.text && node.whiteSpace !== 'nowrap'
   )
   const overlappingHeaderTexts = metrics.columnHeaderTexts.filter(
-    (node) => node.outsideCell || (node.sorterGap !== null && node.sorterGap < 3)
+    (node) =>
+      node.outsideCell || (node.sorterGap !== null && node.sorterGap < 3)
   )
 
   assert(
@@ -511,28 +520,87 @@ async function assertBusinessHeaderHasNoSectionTitle(page, { scenarioName }) {
 async function assertBusinessHeaderCompact(page, { scenarioName }) {
   await page.locator('.erp-business-page-header-card').first().waitFor()
   const metrics = await page.evaluate(() => {
-    const visible = (node) => node.getBoundingClientRect().width > 0 && node.getBoundingClientRect().height > 0
-    const headers = [...document.querySelectorAll('.erp-business-page-header-card')].filter(visible)
-    const primary = headers.filter((node) => !node.classList.contains('erp-business-page-header-card--secondary'))
+    const visible = (node) =>
+      node.getBoundingClientRect().width > 0 &&
+      node.getBoundingClientRect().height > 0
+    const headers = [
+      ...document.querySelectorAll('.erp-business-page-header-card'),
+    ].filter(visible)
+    const primary = headers.filter(
+      (node) =>
+        !node.classList.contains('erp-business-page-header-card--secondary')
+    )
     return {
       primaryCount: primary.length,
-      titles: headers.flatMap((node) => [...node.querySelectorAll('h1')].map((title) => title.textContent)),
-      redundantStats: headers.reduce((count, node) => count + node.querySelectorAll('.erp-business-module-stats, .erp-business-page-header-card__stat, .erp-business-page-header-card__summary').length, 0),
+      titles: headers.flatMap((node) =>
+        [...node.querySelectorAll('h1')].map((title) => title.textContent)
+      ),
+      redundantStats: headers.reduce(
+        (count, node) =>
+          count +
+          node.querySelectorAll(
+            '.erp-business-module-stats, .erp-business-page-header-card__stat, .erp-business-page-header-card__summary'
+          ).length,
+        0
+      ),
       headers: headers.map((node) => {
         const rect = node.getBoundingClientRect()
-        return { left: rect.left, right: rect.right, height: rect.height, empty: !node.textContent.trim() }
+        return {
+          left: rect.left,
+          right: rect.right,
+          height: rect.height,
+          empty: !node.textContent.trim(),
+        }
       }),
       viewportWidth: innerWidth,
-      pageWidth: Math.max(document.body.scrollWidth, document.documentElement.scrollWidth),
-      pagination: [...document.querySelectorAll('.ant-pagination-total-text')].filter(visible).map((node) => node.textContent),
+      pageWidth: Math.max(
+        document.body.scrollWidth,
+        document.documentElement.scrollWidth
+      ),
+      pagination: [...document.querySelectorAll('.ant-pagination-total-text')]
+        .filter(visible)
+        .map((node) => node.textContent),
+      hasTableRows: [
+        ...document.querySelectorAll('.ant-table-tbody > tr.ant-table-row'),
+      ].some(visible),
     }
   })
-  assert.equal(metrics.primaryCount, 1, `${scenarioName} 应仅显示一个主页面标题: ${JSON.stringify(metrics)}`)
-  assert.equal(metrics.titles.length, 1, `${scenarioName} 不应重复显示模块与当前页标题: ${JSON.stringify(metrics)}`)
-  assert.equal(metrics.redundantStats, 0, `${scenarioName} 页头不应保留重复统计: ${JSON.stringify(metrics)}`)
-  assert(metrics.headers.every((item) => !item.empty && item.left >= -1 && item.right <= metrics.viewportWidth + 1), `${scenarioName} 页头应有内容且不溢出: ${JSON.stringify(metrics)}`)
-  assert(metrics.pageWidth <= metrics.viewportWidth + 2, `${scenarioName} 页面不应横向溢出: ${JSON.stringify(metrics)}`)
-  assert(metrics.pagination.every((text) => /第.*条.*共.*条/u.test(text)), `${scenarioName} 分页应保留当前范围和查询总数: ${JSON.stringify(metrics)}`)
+  assert.equal(
+    metrics.primaryCount,
+    1,
+    `${scenarioName} 应仅显示一个主页面标题: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.titles.length,
+    1,
+    `${scenarioName} 不应重复显示模块与当前页标题: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.redundantStats,
+    0,
+    `${scenarioName} 页头不应保留重复统计: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.headers.every(
+      (item) =>
+        !item.empty &&
+        item.left >= -1 &&
+        item.right <= metrics.viewportWidth + 1
+    ),
+    `${scenarioName} 页头应有内容且不溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.pageWidth <= metrics.viewportWidth + 2,
+    `${scenarioName} 页面不应横向溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    !metrics.hasTableRows || metrics.pagination.length > 0,
+    `${scenarioName} 有数据时应显示分页范围和查询总数: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.pagination.every((text) => /第.*条.*共.*条/u.test(text)),
+    `${scenarioName} 分页应保留当前范围和查询总数: ${JSON.stringify(metrics)}`
+  )
 }
 
 export {

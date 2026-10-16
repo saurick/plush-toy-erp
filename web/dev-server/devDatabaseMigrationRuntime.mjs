@@ -76,7 +76,7 @@ export const DEV_DATABASE_MIGRATION_SOURCE_FILES = Object.freeze([
   'scripts/qa/customer-config-cutover-20260714055825.sql',
   'scripts/qa/operational-fact-lifecycle-20260726173943.sql',
   'scripts/qa/dev-database-migration-operation-store.mjs',
-  'deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh',
+  'scripts/deploy/run-backup-restore-rehearsal.sh',
   'server/Makefile',
   'web/dev-server/devDatabaseMigrationPlugin.mjs',
   'web/dev-server/devDatabaseMigrationRecoveryPlugin.mjs',
@@ -106,7 +106,7 @@ const MIGRATION_TOOL_CHECKS = Object.freeze([
     key: 'supporting_commands',
     label: '基础命令',
     blockedMessage:
-      '备份恢复所需基础命令未就绪（Go、lockf 或 flock、Bash 4+、curl、jq、Python 3、sha256sum 等）',
+      '备份恢复所需基础命令未就绪（Node.js、Go、lockf 或 flock、Bash 4+、curl、jq、sha256sum 等）',
   },
 ])
 
@@ -160,7 +160,7 @@ export async function readDatabaseMigrationToolReadiness({
         'bash',
         [
           '-c',
-          'type mapfile >/dev/null 2>&1 || exit 1; for tool in go curl sha256sum wc awk date jq python3; do command -v "$tool" >/dev/null 2>&1 || exit 1; done; command -v lockf >/dev/null 2>&1 || command -v flock >/dev/null 2>&1',
+          'type mapfile >/dev/null 2>&1 || exit 1; for tool in go curl sha256sum wc awk date jq; do command -v "$tool" >/dev/null 2>&1 || exit 1; done; command -v lockf >/dev/null 2>&1 || command -v flock >/dev/null 2>&1',
         ],
         env,
         () => true
@@ -423,7 +423,7 @@ export function parseMigrationPlanOutput(output) {
 
 export function buildSharedDevBackupRehearsalArgs(operationId) {
   return [
-    'deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh',
+    'scripts/deploy/run-backup-restore-rehearsal.sh',
     '--environment',
     'shared-dev',
     '--source-policy',

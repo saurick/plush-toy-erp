@@ -588,7 +588,7 @@ func (r *operationalFactRepo) CreateFinanceCreditNote(ctx context.Context, in *b
 		return nil, biz.ErrBadParam
 	}
 	settledAfterCredit := in.Amount.Equal(outstanding)
-	row, err := tx.client.FinanceCreditNote.Create().SetCreditNoteNo(in.CreditNoteNo).SetFinanceFactID(fact.ID).SetAmount(in.Amount).SetCurrency(fact.Currency).SetStatus("POSTED").SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(payloadHash).SetCreatedBy(actorID).Save(ctx)
+	row, err := tx.client.FinanceCreditNote.Create().SetCreditNoteNo(in.CreditNoteNo).SetFinanceFactID(fact.ID).SetAmount(in.Amount).SetCurrency(fact.Currency).SetStatus(biz.FinanceAllocationStatusPosted).SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(payloadHash).SetCreatedBy(actorID).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			if rollbackErr := tx.sqlTx.Rollback(); rollbackErr != nil {
@@ -641,7 +641,7 @@ func (r *operationalFactRepo) ReverseFinanceCreditNote(ctx context.Context, in *
 	if err != nil {
 		return nil, err
 	}
-	if source.Status != "POSTED" || source.ReversalOfCreditNoteID != nil {
+	if source.Status != biz.FinanceAllocationStatusPosted || source.ReversalOfCreditNoteID != nil {
 		return nil, biz.ErrBadParam
 	}
 	alreadyReversed, err := tx.client.FinanceCreditNote.Query().Where(financecreditnote.ReversalOfCreditNoteID(source.ID)).Exist(ctx)
@@ -654,7 +654,7 @@ func (r *operationalFactRepo) ReverseFinanceCreditNote(ctx context.Context, in *
 	if err := lockOperationalFactRow(ctx, tx, "finance_facts", source.FinanceFactID, biz.ErrBadParam); err != nil {
 		return nil, err
 	}
-	row, err := tx.client.FinanceCreditNote.Create().SetCreditNoteNo(in.CreditNoteNo).SetFinanceFactID(source.FinanceFactID).SetReversalOfCreditNoteID(source.ID).SetAmount(source.Amount).SetCurrency(source.Currency).SetStatus("REVERSED").SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(payloadHash).SetCreatedBy(actorID).Save(ctx)
+	row, err := tx.client.FinanceCreditNote.Create().SetCreditNoteNo(in.CreditNoteNo).SetFinanceFactID(source.FinanceFactID).SetReversalOfCreditNoteID(source.ID).SetAmount(source.Amount).SetCurrency(source.Currency).SetStatus(biz.FinanceAllocationStatusReversed).SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(payloadHash).SetCreatedBy(actorID).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			if rollbackErr := tx.sqlTx.Rollback(); rollbackErr != nil {

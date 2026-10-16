@@ -1,13 +1,11 @@
 import React from 'react'
-import { SafetyCertificateOutlined } from '@ant-design/icons'
 
 export default function DevStaticGuidance({ title, hint, children }) {
   return (
     <details className="erp-dev-static-guidance">
       <summary>
-        <SafetyCertificateOutlined aria-hidden="true" />
         <span>{title}</span>
-        <small>{hint}</small>
+        {hint ? <small>{hint}</small> : null}
       </summary>
       <div className="erp-dev-static-guidance__content">{children}</div>
     </details>

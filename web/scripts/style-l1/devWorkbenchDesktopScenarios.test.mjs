@@ -103,7 +103,7 @@ test('ordinary DEV desktop smokes honor route-specific landing contracts', async
     const page = {
       locator: (selector) => ({
         count: async () => {
-          if (selector === '.erp-dev-tool-table tbody tr') return 3
+          if (selector === '.erp-dev-tool-table tbody tr') return DEV_SECONDARY_NAV_ITEMS.filter((entry) => entry.areaKey === 'quality' && entry.showInNavigation !== false).length
           if (
             selector ===
             '[data-tool-key="quality-gates"] a[href="/__dev/quality-gates"]'
@@ -129,7 +129,7 @@ test('product and quality area smokes enforce their complete landing contracts',
   const counts = new Map([
     ['.erp-dev-workspace-page', 1],
     ['.erp-dev-product-task__index', 0],
-    ['.erp-dev-tool-table tbody tr', 3],
+    ['.erp-dev-tool-table tbody tr', DEV_SECONDARY_NAV_ITEMS.filter((entry) => entry.areaKey === 'quality' && entry.showInNavigation !== false).length],
     ['[data-tool-key="quality-gates"] a[href="/__dev/quality-gates"]', 1],
   ])
   const scenarios = createDevWorkbenchDesktopScenarios({

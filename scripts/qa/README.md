@@ -2,6 +2,8 @@
 
 本文是 `scripts/qa/` 的目录入口。仓库级脚本总览仍在 [scripts/README.md](../README.md)；测试选择和验证层级真源仍在 [docs/product/自动化测试策略.md](../../docs/product/自动化测试策略.md)。
 
+本地和 CI 辅助工具使用现有 Node.js，数据库测试入口共用 `postgres-target-contract.mjs` 校验一次性目标；无需 Python。目标宿主机继续使用已有 Shell、jq 和系统工具，部署前检及回执不依赖宿主 Node.js 或 Go，见[部署脚本](../deploy/README.md)。
+
 附件存储的真实 PostgreSQL / S3 迁移与恢复验证使用 `bash scripts/qa/attachment-storage-integration.sh`；固定 SeaweedFS 镜像，一次性本地容器，包含导出摘要门禁、私有访问、完整性、PG 加文件恢复和附件并发回归。测试前同时核对 PostgreSQL、集群健康与签名 S3 存储桶访问，就绪超时直接失败。该入口不触碰登记数据库。Node 与 Go 测试摘要在失败时保留有界的用例名称，捕获的测试正文仍不进入摘要日志。Web 测试文件固定最多 4 个并发，避免高核数机器同时启动大量真实 Vite 监控器；HMR 文件更新与连接测试仍完整执行。
 
 该演练也包含管理界面验证；单独运行 `node scripts/qa/attachment-console-integration.mjs` 可验证正式 Compose 的原生登录、只读浏览、服务端写入拒绝和退出登录。只在一次性测试覆盖中开放随机本机端口，结束后精确清理测试容器、网络和目录。
@@ -28,7 +30,7 @@
 | `node scripts/qa/yoyoosun-role-jsonrpc-access.mjs --report output/qa/yoyoosun-role-jsonrpc-access/report.json` | 使用九岗位演示账号真实登录，逐岗验证允许读取、越权写入被拒绝和前后任务总量不串权；凭据只从服务端进程环境读取，预期业务写入为零，不等于完整角色协同闭环 | 本地后端与演示账号凭据就绪后 |
 | `bash scripts/qa/prepare-push.sh` | 默认对单一 `origin/main` 执行 remote/ref/range、git-log、严格 secrets、源码完整性和 affected 定向 Node 检查，通过后签发 30 分钟 `server-ci` 回执；高成本测试/构建由 GitLab exact-SHA CI 执行。非标准目标保持 affected/full 保守合同 | commit 后、立即 push 前 |
 | `bash scripts/qa/prepare-push.sh --full` | 经明确授权的本地完整诊断；完整执行 full，并在前后身份和容器清理读回一致后签发短期回执，不作为默认 `origin/main` 的前置步骤 | full 已明确确认、需要独立本地诊断时 |
-| `node scripts/qa/skill-health.mjs` | 检查项目 Skill frontmatter、目录名、metadata、README 索引和相对引用；`affected` 对 Skill 变更会直接执行，不再只提示 follow-up | 修改 `.agents/skills/**` 后 |
+| `node scripts/qa/skill-health.mjs` | 项目 validator：检查当前 YAML 子集、目录名、metadata、README 索引、含 references 的全部 Markdown 文件/章节链接、项目 Skill 名称及 TODO 占位；只依赖现有 Node，见 [Skill 维护与验证](../../.agents/skills/README.md#skill-validation)；`affected` 直接执行 | 修改 `.agents/skills/**` 后 |
 | `node scripts/qa/test-code-governance.mjs` | 盘点测试文件、行数、测试文件直接读取，以及仓库 JS / TS 中的源码改写执行；大文件只报告不按行数阻断，既有源码改写执行使用 shrink-only 清单，新增或清单已失效都会失败 | 新增测试基础设施、源码沙箱或治理测试债务后 |
 | `node scripts/qa/erp-field-linkage.mjs` | 运行字段联动专项，前后绑定同一仓库指纹，并把脱敏结构化证据写入 `output/qa/coverage/field-linkage.latest.json`；只证明该专项，不代表整仓覆盖 | 修改字段来源、映射、回显或打印链路后 |
 | `node scripts/qa/test-coverage-collect.mjs --profile baseline --write` | 在同一仓库身份下运行非数据库 baseline，采集 Go / Web 代码覆盖、显式业务场景、字段联动、导入合同和受影响验证范围（内部键 T0-T8），再原子写入证据并聚合 latest；运行期身份变化即失败 | 刷新开发工作台真实覆盖证据前 |
@@ -46,7 +48,7 @@
 | `node scripts/qa/candidate-sha-freeze.mjs --sha <40sha> --terminal <strict-terminal.json>` | 在已通过 strict 的 clean exact HEAD 上固定执行复用/失败/公网读回/DEV 隔离合同，以及版本中心桌面真实浏览器 smoke；生成单一候选冻结回执，不建立 DEV 移动端或暗色验收承诺，也不替代远端 CI、Release 或 133 发布 | 最终候选第一次正式 push 前 |
 | `node scripts/qa/output-retention-preview.mjs --protect-sha <40sha> --out output/dev-workbench/retention/previews/<name>.json` | 对登记的 managed output 生成数量与 5GiB 容量预算预览，保护最新状态、operation 引用和显式 SHA；无 `--apply`，不删除文件 | 定期检查本地证据膨胀 |
 | `bash scripts/qa/unit-normalization-postgres.sh` | 使用无挂载、随机 loopback 端口的一次性 PostgreSQL，核对单位迁移 fresh / upgrade、余额合并、异常事务回滚及库存业务；结束精确删除该容器。 | 计量单位迁移和数量校验改动后；正式 full / strict 的 server upgrade lane 也执行 |
-| `node scripts/qa/transaction-browser-isolated.mjs --run` | 冻结当前含未提交改动的源码副本，启动一次性 PostgreSQL / S3 / Go / Vite，执行库存、质检、应收应付结算及退款的桌面和手机浏览器链路，以及现有 critical PostgreSQL gate，结束读回清理结果 | 验证页面、后端和数据库之间的业务闭环；不自动加入全量门禁 |
+| `node scripts/qa/transaction-browser-isolated.mjs --run` | 冻结当前含未提交改动的源码副本，启动一次性 PostgreSQL / S3 / Go / Vite，执行接单与工程用料审批、采购、委外、库存、质检、生产、出货、应收应付结算及退款的桌面和手机浏览器链路、共享列表筛选及真实 PDF，以及 critical PostgreSQL gate，结束读回清理结果；`--source-orders` 只验证接单、工程用料、采购与委外及 PostgreSQL，不代表全部浏览器链路通过 | 验证页面、后端和数据库之间的业务闭环；不自动加入全量门禁 |
 | `node scripts/qa/database-inventory.mjs --out <report.json>` | 从环境中的固定数据库 URL 只读盘点同服务器项目库、连接数、migration、仓库引用和 disposable 分类；不授权删除 | 发布演练前后或发现临时库堆积时 |
 | `node scripts/qa/database-archive.mjs --database-name <name> --out <dir>` | 只接受已登记 disposable 库且要求零连接；生成归档并在临时 restore 库核对 migration、schema 与逐表计数，最后删除 restore 库并读回零残留 | 清理候选库取得可恢复证据时 |
 | `node scripts/qa/database-cleanup.mjs --database-name <name> --inventory <report> --manifest <manifest> --print-confirmation` | 从同一 inventory 与 archive manifest 生成精确确认串；正式 cleanup 还需通过环境提供 admin URL、传入确认串和输出报告，成功后读回源库已不存在。登记 133 仅在三个命令均显式加 `--allow-registered-development` 时开放；长期或未分类库始终拒绝 | archive / restore 已通过后清理同一 disposable 库 |
@@ -57,7 +59,7 @@
 | `node --test scripts/qa/visualization.test.mjs` | 解析正式文档与工作台静态说明图，限制单张流程图为 12 个节点、18 条关系；不改写归档 | 新增或修改 Mermaid、CI 原理或造数说明图后 |
 | `node scripts/qa/docs-inventory.test.mjs` | 检查长期文档与最近归档索引登记、当前文档及 `progress.md` / 归档 README 的本地链接和真实查看器锚点合同；冻结归档正文不按当前链接规则重写 | 新增、删除、重命名 README 或长期文档，或调整标题、章节链接与归档入口后 |
 | `node --test scripts/qa/schema-docs.test.mjs` | 校验 Ent generated migration descriptor、业务语义 catalog 与 8 份生成数据字典零漂移；不连接数据库 | 调整 schema、catalog、生成器或数据库文档后 |
-| `node scripts/gen-public-contracts.mjs --check`、`node --test scripts/gen-public-contracts.test.mjs` | 校验权限、状态、附件、RPC 和数值生成物及前端引用；只读，见[公共契约规范](../../docs/engineering/跨层公共契约与生成规范.md) | 修改公共契约真源、提取器或消费者后；已进入 fast |
+| `node scripts/gen-public-contracts.mjs --check`、`node scripts/qa/public-contract-consumers.mjs`、`node --test scripts/gen-public-contracts.test.mjs` | 校验权限、业务及流程状态、附件、RPC、数值、密码 / 打印限制、任务目录和交互稿片段；检查 Web 绑定及发布脚本静态 RPC，只读，见[公共契约规范](../../docs/engineering/跨层公共契约与生成规范.md) | 修改公共契约真源、提取器或消费者后；已进入 fast，affected 按登记源选择同步与消费者检查 |
 | `node --test scripts/qa/dev-entry-boundary.test.mjs` | 锁住 `make dev_restart`先预检再停服、启动预检只读，以及 Product Core / 客户开发入口共用同一 web preflight | 调整本地启动命令、Vite 代理或 migration 预检后 |
 | `node scripts/qa/customer-package-lint.mjs --all` | 从构建期客户索引校验 demo、reference-customer 和 yoyoosun raw package；不 publish/activate | 调整客户包、catalog 或 schema 后 |
 | `node scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview` | 以 preview 模式编译并验证全部登记 draft 客户包的不可发布 manifest；不调用后端或写事实 | 调整 manifest compiler/effective-session 输入后 |
@@ -155,11 +157,23 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 
 ## 输出与写入边界
 
-库存、质检和收付款专项入口为 `transaction-browser-isolated.mjs`；不带参数仅显示帮助，`--run` 每次建立新环境，`--out output/qa/<目录>` 可指定本轮证据目录。使用仓库锁定的 Node、已安装的 Web 依赖与 Chromium、本机 Go / Atlas / psql，以及已缓存的 `postgres:18.6` 和 `chrislusf/seaweedfs:4.46`；不自动拉取镜像。数据库运行身份与前端代理的认证读回均通过后，才操作页面；正常请求使用 Vite 的真实代理，故障注入仅在后端已成功处理后丢弃响应，不伪造业务返回。业务夹具走正式 seed、API、审批与岗位范围设置，数据库查询使用只读会话。
+库存、质检、生产、出货和收付款专项入口为 `transaction-browser-isolated.mjs`；不带参数仅显示帮助，`--run` 每次建立新环境，`--out output/qa/<目录>` 可指定本轮证据目录。`--source-orders` 单独选择接单、采购和委外的桌面 / 手机真实链路，仍运行相同的 PostgreSQL 与日志 / Trace 门禁；该范围不代表其他交易链路、字段页面或打印通过。默认范围保留原交易与打印链路，并追加源单验证。使用仓库锁定的 Node、已安装的 Web 依赖与 Chromium、本机 Go / Atlas / psql，以及已缓存的 `postgres:18.6` 和 `chrislusf/seaweedfs:4.46`；不自动拉取镜像。数据库运行身份与前端代理的认证读回均通过后，才操作页面；正常请求使用 Vite 的真实代理，故障注入仅在后端已成功处理后丢弃响应，不伪造业务返回。业务夹具走正式 seed、API、审批与岗位范围设置，数据库查询使用只读会话。
 
-该专项覆盖 IQC 不合格与复检、采购入库、库存盘点过账和取消、应收应付结算、订单预收预付、客户与供应商的部分和全额退款，以及审批与资金事实分离、响应丢失恢复、幂等重放、越权拒绝、超额阻断和冲销后的余额。手机回归使用 Chromium 的 390×844 触摸视口，进入 `/m/:roleKey/tasks` 和正式业务办理路由，实际完成审批、处理回执和上述业务表单，并检查页面横向溢出。应收来源通过正式库存盘点、销售订单、出货审批及实际出货 API 建立，库存准备不代表生产全流程已验证。质检更正当前没有页面动作，测试通过正式 API 创建复检，判定仍由浏览器完成。`browser/report.json` 保存各链路、手机任务和真实出货来源结果，`postgres.jsonl` 保存真实数据库测试事件，`lifecycle.json` 绑定源码身份、镜像、迁移和清理结果；共享工作区后续变化不会覆盖快照身份。它不证明手机真机 / Safari、存量数据库升级或客户验收全部完成。
+接单、采购和委外通过 `transaction-source-orders-browser.mjs` 验证：浏览器打开真实草稿后，另一次正式保存造成版本冲突，页面保留未保存内容且不得覆盖；真实保存和流程提交成功后丢弃响应，再核对数据库唯一结果及重新打开后的回显。审批覆盖必填原因、越权拒绝、阻塞、解除阻塞、通过与退回，核对源单、行和流程的终态；委外合同覆盖提交、确认、未履行时正常关闭被拒、取消和终态保护。同键重放必须返回原结果，同一源单和操作范围内，同键改变流程关联意图或源版本必须拒绝。单据和任务操作前后比较库存、采购入库、委外事实、质检、财务及出货内容摘要，防止协同审批代写事实。证据保存在 `browser/source-orders/**`，对应 PostgreSQL 聚合中途失败、事务回滚与原版本重试测试纳入现有 `TestSourceDocumentPostgres` 门禁。
 
-请求观测复用现有服务端组件：按响应 `X-Request-Id` 核对正常、拒绝和丢失响应请求的唯一完成日志、method、code 与 outcome，并扫描本轮凭据泄漏；报告只保留关联计数与受控字段。`observability.jsonl` 保存现有 Go 日志、Trace 父子关系、异常分类、SQL 脱敏和审计 request ID 合同的实际结果。隔离服务不向共享 Jaeger 导出 Trace，不把合同测试写成目标平台已收到 Trace。
+工程用料审批另覆盖桌面和手机的过期来源拒绝、老板退回必填原因、工程重提、审批顺序与越权拒绝；财务审批真实成功后丢弃响应，重开与重放只能读到唯一生成的采购单。采购单必须关联该用料汇总及供应商，材料、单位和数量与审核结果一致，单价与金额保持待采购填写。响应丢失的保存、提交和财务审批请求同样必须匹配唯一的完成日志及 Trace，不因浏览器未收到响应而漏验。
+
+真实 PDF 验证要求本机 `pdfinfo`、`pdffonts` 和 `pdftotext`，默认范围在启动隔离资源前检查工具。文本型业务夹具的每一页都必须非空，同时核对 A4、字体嵌入、中文提取及编辑控件隔离；下载和全文有内容不能代替逐页检查。`--source-orders` 不执行打印，不要求这三个工具。
+
+该专项保留 IQC 不合格与复检、采购入库、库存盘点过账和取消、应收应付结算、订单预收预付、客户与供应商的部分和全额退款，以及审批与资金事实分离、响应丢失恢复、幂等重放、越权拒绝、超额阻断和冲销后的余额断言。生产与出货另以独立 SKU 验证 PMC 创建发布、仓库委外发料、裁片回仓及检验、车缝及皮套检验、手工完工、仓库正式成品入库、成品 / 针检 / 抽检、业务确认包材、仓库包装、出货财务审批、实际出货和撤销恢复。正式入库后依次核对待检、待包装和可发货数量；待检时移交包装必须被拒绝，工序与质检重放不得重复扣料或入库，财务放行不得提前出库。样品、工程用料审批及加工合同通过正式 API 准备，生产和出货主动作由浏览器完成。应收结算链路仍通过盘点与出货 API 独立准备来源，避免与生产回归共享库存。
+
+字段核对复用同一隔离环境：先检查生成数据字典零漂移，再保存真实 PostgreSQL 的应用表、列、约束和索引，并逐列比对生成字典的列名、物理类型和可空性。普通 Ent `Size` / `MaxLen` 不等于数据库 `varchar(n)`，显式数据库长度、精度和可空性必须严格匹配。应用表映射到服务端 17 环节目录；14 个关联页面和 6 个新建表单保存 DOM 表头 / 字段、盒模型及原生 3840×2160 截图（1920×1080 视口，DPR 2）。交易完成后再验证质检和收付款的默认列、开启可选列、刷新保存结果、恢复默认、详情及完整 CSV 导出。字段证据分别保存为 `browser/field-audit/**` 和 `browser/field-results/**`；机械表结构盘点不等于所有字段都已逐一做删除迁移评审。
+
+共享列表、筛选与打印由同一环境中的 `transaction-shared-surfaces-browser.mjs` 继续验证：来料检验类型、收款及付款方向实际请求后端，逐条匹配数据库记录与可见行，并恢复筛选。采购合同、委外加工合同和作业指导书、BOM 三套工程资料从对应列表选中来源后带值打开；这些入口与五套正式模板的独立新样例分别下载真实后端 PDF，核对来源、正文快照、响应与下载字节一致、编辑提示未进入正文，并保存原生 4K 截图。新样例不得残留前面业务来源的编号。产品作业指导书使用正式采购 API 创建的隔离模拟草稿，先确认准备过程未过账其他事实；材料合同则必须说明不适用、不打开空白窗口、不请求 PDF。下载证据绑定浏览器实际消费的 HTTP Blob 和对象 URL，逐份核对文件头、字节数、SHA-256 及服务端 request / trace / span ID，不将并发预热的首个响应当作下载。该专项在操作前后比较 17 环节所关联事实和来源表的内容摘要，确认筛选与打印未改写业务，关闭本轮创建的打印窗口；结果保存在 `browser/shared-surfaces/**`。打印服务沿用现有 Chromium 解析与请求期限，浏览器页面级的留白定位、批量选择、分页和焦点仍由相关 Style L1 场景补充，不能用 RPC fixture PDF 替代真实输出。
+
+手机回归使用 Chromium 的 390×844 触摸视口，进入 `/m/:roleKey/tasks` 和正式业务办理路由，实际完成审批、处理回执和上述业务表单，并检查页面横向溢出。质检更正当前没有页面动作，测试通过正式 API 创建复检，判定仍由浏览器完成。`browser/report.json` 保存各链路、手机任务、工序和真实出货来源结果，`postgres.jsonl` 保存真实数据库测试事件，`lifecycle.json` 绑定源码身份、镜像、迁移和清理结果；共享工作区后续变化不会覆盖快照身份。它不证明手机真机 / Safari、存量数据库升级或客户验收全部完成。
+
+请求观测复用现有服务端组件：按响应 `X-Request-Id` 核对正常、拒绝和丢失响应请求的唯一完成日志、method、code 与 outcome，并扫描本轮凭据泄漏；报告只保留关联计数与受控字段。浏览器待处理 RPC 以 Chromium 网络协议的开始、完成和失败事件为准，每个已分发请求必须达到终态，完成数量必须等于收集的业务响应数量；只有被新文档取代的 `workflow.get_workbench` 和 `workflow.get_task_board` 只读启动查询可单独记录为导航取消，写入不适用该分类，未注入的传输失败继续判为失败。`observability.jsonl` 保存现有 Go 日志、Trace 父子关系、异常分类、SQL 脱敏和审计 request ID 合同的实际结果。隔离服务不向共享 Jaeger 导出 Trace，不把合同测试写成目标平台已收到 Trace。
 
 移动 Workflow 和采购入库真实写入浏览器脚本使用 `browser-write-target.mjs` 复核明确提供的开发 / 隔离数据库身份，并将浏览器 RPC 绑定到该后端。前端与后端均限定 loopback HTTP(S)，不通过页面代理猜测写入目标。移动脚本必须传入 `--accept-persistent-test-data --database-name <库名>`（也可使用同名 `MOBILE_WORKFLOW_BROWSER_SMOKE_*` 环境变量）；采购入库脚本须提供 `PURCHASE_RECEIPT_E2E_DATABASE_NAME` 和现有持久测试数据确认。采购脚本附带 seed 时还须显式提供同库的 `POSTGRES_DSN`。远程试用沿用登记的 manual acceptance 目标流程。
 
@@ -173,6 +187,8 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 - 采集进程完成且仓库身份一致时，退出码 `0` 记为 `passed`，测试存在失败、缺失或零执行的退出码 `2` 记为 `issues` 并发布当前失败报告，避免旧绿色遮蔽当前结果；启动失败、进程/服务中断、报告读回失败或身份变化记为 `failed / not_proven`，不得替换上一份可读报告。当前版本不提供取消按钮，避免固定制品写到一半形成含糊终态；页面离开只停止轮询，不停止后台任务。
 - Go 业务域与字段联动打印域使用脚本内显式 `scenario id -> package/test prefix`、`caseId` 注册表；不得以测试名、目录、退出码或文件数量推断领域完成。字段联动已声明的不适用场景排除出适用分母，不能计为执行或通过；缺失、失败、跳过和零执行仍分别报告。通用 full / strict 回执不能拆成 PostgreSQL、浏览器或目标验收通过。
 - “证据与覆盖”保留两个独立来源：当前工作区按实时 commit / dirty / fingerprint 判定新鲜度，最近隔离验证保留原源码身份并始终标为 `snapshot`。默认展示当前工作区；当前报告缺失时明确显示尚未验证，历史隔离结果必须主动切换查看。两类读取独立失败，重新读取和快速切换会丢弃已取消或过期响应。Go 执行数按最末级用例去重，父用例独立失败、跳过或未结束时单列；本域场景全部通过但整体 Go 基线未通过时标为受阻，场景自身的失败、缺失和跳过保留，整体门禁继续阻断。Go / Web 执行计数、业务规则、失败用例与数据库 / 浏览器场景可分别展开，支持“仅看未通过场景”。专项通过不补成完整 gate、真实前后端闭环、exact-SHA CI 或 UAT 通过；来源的范围说明必须随结果保留。
+
+Web 原生覆盖基线与 `pnpm test` 保持相同的 4 路文件并发，避免启动与停服夹具在默认 CPU 并发下争用进程检查资源；测试集合、覆盖统计、进程检查超时及归属保护保持原合同。
 - 隔离归档必须显式列出项目内的 `--artifact` JSON，且全部携带相同的完整 repository identity；不能混入当前工作区身份、裸 coverage 或 `--write`。写入器与 DEV 读取器共用 `lib/coverage-report-contract.mjs` 的 schema / 身份 / 脱敏校验；归档不参与默认当前报告扫描。后续业务规则变化只维护采集器原有场景登记、中文标签和对应测试，页面按统一场景结构渲染；失败明细只保留测试标识及安全诊断，不透传原始日志。
 - 工程用料链路复用 Source Documents、Workflow 和 RBAC/API 的显式场景登记；公式、冻结、权限、重试与维护方式见[测试策略](../../docs/product/自动化测试策略.md#核心用料链路与测试维护--material-chain-test-maintenance)。`engineering_material` 与共享 `unit_quantity` 的领域改动选择现有 critical PostgreSQL gate；`TestSourceDocumentPostgresEngineeringMaterial*` 不计入无数据库 baseline，通过真实数据库的执行日志独立证明。
 - 字段联动报告只能由顶层 `erp-field-linkage.mjs` runner 生成，底层 builder 要求 runner 传入完整 repository identity，不是手工入口。裸 `--go-coverprofile` / `--web-coverage` 参数没有 repository identity，聚合器只能将其作为 `stale` 诊断；要记为当前代码证据，必须提供携带当前仓库指纹的 `--artifact` JSON。
@@ -856,6 +872,7 @@ go test ./internal/service -run 'TestJsonrpcDispatcher_WorkflowUrgeTask|TestJson
 打印运行时采用“固定、验证后升级”：`server/Dockerfile` 是 Chromium、Debian snapshot 和基础镜像 digest 的唯一版本真源，禁止构建时解析浮动 latest。`pdf-runtime-policy.json` 只保存体积观察基线、允许增长和 Trivy 工具校验值。安全检查阻断有修复版本的 HIGH / CRITICAL 系统包漏洞，同时保留其余发现；上游有新稳定版本时报告需要评审，不自动修改代码或发布。
 
 `pdf-runtime-trivy.sh` 只复用按 policy SHA-256 校验的 Trivy 工具包和扫描器漏洞库，不缓存扫描结果。缓存目录不接受符号链接；损坏工具包只从固定来源重新下载并校验后原子替换。扫描分析仅使用内存缓存（`--cache-backend memory`）；每次都对当前 image ID 完整扫描，沿用漏洞库正常更新，不设置离线或跳过更新参数；下载、更新或扫描失败即阻断，报告只在本次扫描成功后原子替换。日志区分工具缓存命中与漏洞库已有文件，后者不表示漏洞库已经更新或检查通过。
+
 
 Server 镜像切换到固定 Debian snapshot 后，先升级基础镜像已有的系统包，再安装固定 Chromium；仅安装新依赖可能保留已有包的旧漏洞版本。最终镜像的实际包清单和扫描结果决定是否可发布。
 

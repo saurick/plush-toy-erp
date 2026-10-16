@@ -11,7 +11,7 @@ import { RELEASE_EVIDENCE_CONTRACT } from "./release-evidence-contract.mjs";
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const scriptPath = path.join(
   repoRoot,
-  "deployments/yoyoosun/scripts/collect-evidence.sh",
+  "scripts/deploy/collect-evidence.sh",
 );
 
 function runScript(args = []) {

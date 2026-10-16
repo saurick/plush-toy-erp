@@ -27,7 +27,7 @@ epoch_millis`,
   return result.stdout.trim();
 }
 
-test("remote code rollback is fixed to the two registered targets and has no build or database mutation", () => {
+test("remote code rollback is fixed to the registered targets and has no build or database mutation", () => {
   assert.match(source, /demo-133\)/u);
   assert.match(source, /customer-test-133\)/u);
   assert.match(source, /root=\/root\/deploy\/plush-toy-erp-demo-v1/u);

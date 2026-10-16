@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PrintToolButton } from './PrintWorkspaceTools.jsx'
+import { PrintToolButton, PrintItemOrderTools } from './PrintWorkspaceTools.jsx'
 import usePrintWorkspaceFeedback from '../../utils/usePrintWorkspaceFeedback.js'
-import { getPrintOutputProblem } from '../../utils/printOutputPreflight.mjs'
-import { modal } from '@/common/utils/antdApp'
-import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import ContractClauseTools from './ContractClauseTools.jsx'
 import {
+  editContractClauseGroup,
+  editContractClauseGroups,
+} from '../../utils/contractClauseEditor.mjs'
+import {
+  editMaterialPurchaseRow,
   applyDetailCellMerge,
   buildBlankMaterialPurchaseContractDraft,
   clearMaterialPurchaseContractSignatureDraft,
@@ -21,6 +24,10 @@ import {
   updateMaterialPurchaseField,
   updateMaterialPurchaseLineCell,
 } from '../../utils/materialPurchaseContractEditor.mjs'
+import { getPrintRowBlock } from '../../utils/printItemOperations.mjs'
+import { getPrintOutputProblem } from '../../utils/printOutputPreflight.mjs'
+import { modal } from '@/common/utils/antdApp'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import PrintWorkspaceShell, {
   PrintWorkspaceToolSection,
 } from './PrintWorkspaceShell.jsx'
@@ -121,6 +128,10 @@ export default function MaterialPurchaseContractWorkbench({
   const [pdfActionStartedAt, setPdfActionStartedAt] = useState(0)
   const pdfPreviewPreloadRef = useRef(null)
   const paperRef = useRef(null)
+  const [clauseSelection, setClauseSelection] = useState({
+    groupKey: 'delivery',
+    index: 0,
+  })
   const stageWrapRef = useRef(null)
 
   useEffect(() => {
@@ -385,6 +396,27 @@ export default function MaterialPurchaseContractWorkbench({
       merges: result.merges,
     }))
     setSelectedRowIndex(result.selectedRowIndex)
+    reportFeedback('rows', result.message)
+  }
+
+  const handleEditRow = (action) => {
+    const result = editMaterialPurchaseRow({
+      lines: draftRef.current.lines,
+      merges: draftRef.current.merges,
+      selectedRowIndex,
+      action,
+    })
+    if (!result.ok) {
+      reportFeedback('rows', result.message, 'error')
+      return
+    }
+    setDraft((current) => ({
+      ...current,
+      lines: result.lines,
+      merges: result.merges,
+    }))
+    setSelectedRowIndex(result.selectedRowIndex)
+    resetCellSelection()
     reportFeedback('rows', result.message)
   }
 
@@ -653,6 +685,37 @@ export default function MaterialPurchaseContractWorkbench({
           <span>单价保留 3 位小数，采购金额保留 2 位小数。</span>
         </>
       }
+      clauseActions={
+        <ContractClauseTools
+          clauses={draft.clauses}
+          selection={clauseSelection}
+          onGroupAction={(request) =>
+            setDraft((current) => ({
+              ...current,
+              clauses: editContractClauseGroups(current.clauses, request)
+                .clauses,
+            }))
+          }
+          onSelect={setClauseSelection}
+          onAction={(request) =>
+            setDraft((current) => ({
+              ...current,
+              clauses: editContractClauseGroup(current.clauses, request)
+                .clauses,
+            }))
+          }
+          onReturnToEdit={() => {
+            setRowSelectionMode(false)
+            setCellSelectionMode(false)
+            resetRowSelection()
+            resetCellSelection()
+          }}
+          paperRef={paperRef}
+          disabled={pdfAction !== ''}
+          feedback={feedback}
+          reportFeedback={reportFeedback}
+        />
+      }
       editorActions={
         <>
           <PrintWorkspaceToolSection
@@ -673,6 +736,7 @@ export default function MaterialPurchaseContractWorkbench({
                 {rowSelectionMode ? '返回编辑' : '选择明细行'}
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="up"
                 type="button"
                 className={getToolbarButtonClassName()}
@@ -682,6 +746,7 @@ export default function MaterialPurchaseContractWorkbench({
                 上插一行
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="down"
                 type="button"
                 className={getToolbarButtonClassName()}
@@ -691,6 +756,7 @@ export default function MaterialPurchaseContractWorkbench({
                 下插一行
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="remove"
                 wide
                 type="button"
@@ -700,6 +766,20 @@ export default function MaterialPurchaseContractWorkbench({
               >
                 移除当前行
               </PrintToolButton>
+              <PrintItemOrderTools
+                index={selectedRowIndex}
+                count={draft.lines.length}
+                canMoveUp={
+                  selectedRowIndex !== null &&
+                  getPrintRowBlock(draft.merges, selectedRowIndex).start > 0
+                }
+                canMoveDown={
+                  selectedRowIndex !== null &&
+                  getPrintRowBlock(draft.merges, selectedRowIndex).end <
+                    draft.lines.length - 1
+                }
+                onAction={handleEditRow}
+              />
               <span className="erp-print-shell__counter">
                 采购明细行: {draft.lines.length}/{MATERIAL_PURCHASE_MAX_ROWS}
               </span>
@@ -751,6 +831,7 @@ export default function MaterialPurchaseContractWorkbench({
             wide
             type="button"
             className={getToolbarButtonClassName()}
+            data-print-structure-action
             onClick={handleResetDraft}
           >
             恢复样例
@@ -769,6 +850,7 @@ export default function MaterialPurchaseContractWorkbench({
             wide
             type="button"
             className={getToolbarButtonClassName()}
+            data-print-structure-action
             onClick={handleBlankDraft}
           >
             空白模板
@@ -816,6 +898,19 @@ export default function MaterialPurchaseContractWorkbench({
           handleFieldCommit={handleFieldCommit}
           handleLineCommit={handleLineCommit}
           handleClauseCommit={handleClauseCommit}
+          onClauseTitleChange={(groupKey, label) =>
+            setDraft((current) => ({
+              ...current,
+              clauses: editContractClauseGroups(current.clauses, {
+                groupKey,
+                action: 'rename',
+                label,
+              }).clauses,
+            }))
+          }
+          onClauseFocus={(groupKey, index) =>
+            setClauseSelection({ groupKey, index })
+          }
           selectedRowIndex={selectedRowIndex}
           rowSelectionMode={rowSelectionMode}
           setSelectedRowIndex={(index) => {

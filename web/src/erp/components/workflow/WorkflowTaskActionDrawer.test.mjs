@@ -29,7 +29,7 @@ const processingHintSource = readFileSync(
   'utf8'
 )
 
-test('task action drawer exposes the shared task attachment action as a secondary footer entry', () => {
+test('task action drawer exposes the shared task attachment action with task resources', () => {
   assert.match(source, /BusinessAttachmentModalButton/u)
   assert.match(source, /canViewAttachments = false/u)
   assert.match(source, /canManageAttachments = false/u)
@@ -71,7 +71,7 @@ test('task action drawer shows task-scoped process position without exposing QA-
   assert.match(source, /getWorkflowTaskProcessContext\(task\.id/u)
   assert.match(handlingChainSource, /业务流程/u)
   assert.match(handlingChainSource, /任务处理链/u)
-  assert.match(source, /来源单据/u)
+  assert.match(source, /WorkflowTaskSource/u)
   assert.match(handlingChainSource, /流程状态/u)
   assert.match(handlingChainSource, /暂时无法读取任务处理链/u)
   assert.match(source, /setProcessContextReloadKey/u)
@@ -86,49 +86,56 @@ test('task action drawer shows task-scoped process position without exposing QA-
   assert.doesNotMatch(source, /模拟展示数据|不计入流程闭环证据/u)
 })
 
-test('task action drawer keeps one compact business-facing task summary', () => {
-  assert.match(source, /const \{ Paragraph, Text, Title \} = Typography/u)
-  assert.match(source, /getWorkflowTaskDisplayName\(task\)/u)
-  assert.match(
-    source,
-    /<WorkflowTaskSource task=\{taskWithSource\} \/>/u
-  )
-  assert.match(source, /erp-task-action-drawer__task-meta/u)
-  assert.match(source, /<span>来源单据<\/span>/u)
-  assert.match(source, /hasActionReceipt \? '本次责任岗位' : '负责人'/u)
-  assert.match(source, /<WorkflowTaskTiming\s+task=\{task\}\s+detail/u)
-  assert.doesNotMatch(source, /getWorkflowTaskCodeLabel/u)
-  assert.doesNotMatch(source, /erp-task-action-drawer__eyebrow">当前任务/u)
-  assert.doesNotMatch(source, /<span>负责岗位<\/span>/u)
-  assert.doesNotMatch(source, /<span>当前处理人<\/span>/u)
-  assert.doesNotMatch(source, /<span>当前状态<\/span>/u)
-  assert.doesNotMatch(source, /step\.description/u)
-  assert.doesNotMatch(source, /erp-task-action-drawer__guide-note/u)
-  assert.doesNotMatch(source, /核对任务信息|核对审批事项|处理范围：/u)
-  assert.doesNotMatch(source, />\s*关闭\s*<\/Button>/u)
-  assert.match(source, /getWorkflowTaskExceptionContactPresentation\(task\)/u)
-  assert.match(
-    source,
-    /<span>\{taskReason \? '当前原因' : '处理建议'\}<\/span>/u
-  )
-  assert.match(source, /erp-task-action-drawer__responsibility-role/u)
-  assert.match(source, /erp-task-action-drawer__responsibility-person/u)
-  assert.match(source, /erp-task-action-drawer__reason-contact-role/u)
-  assert.match(source, /part\.kind === 'role'/u)
-  assert.doesNotMatch(source, /font-style:\s*italic/u)
-  const taskSummaryStart = source.indexOf(
-    '<section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">'
-  )
-  const taskSummaryEnd = source.indexOf(
-    '</section>',
-    taskSummaryStart
-  )
-  const taskSummarySource = source.slice(taskSummaryStart, taskSummaryEnd)
-  assert.ok(taskSummaryStart >= 0)
-  assert.ok(taskSummaryEnd > taskSummaryStart)
-  assert.doesNotMatch(taskSummarySource, /showIcon/u)
-  assert.doesNotMatch(taskSummarySource, /<Alert/u)
-  assert.doesNotMatch(taskSummarySource, /模拟展示数据|仅用于检查/u)
+test('an unopened task drawer does not read resources or render task details', async (t) => {
+  const ui = await mountDrawer(t, { task: null })
+  assert.equal(document.querySelector('.workflow-task-current'), null)
+  assert.equal(document.querySelector('[aria-label="更多操作"]'), null)
+  assert.deepEqual(ui.calls, [])
+})
+
+test('task detail keeps current responsibility ahead of history and groups copy actions', async (t) => {
+  const ui = await mountDrawer(t, { assignmentAccess: { current_assignee: { id: 9, username: 'lin', display_name: '林工' } }, task: { id: 42, version: 1, task_name: '核对材料', task_status_key: 'ready', owner_role_key: 'purchase', assignee_id: 9, source_type: 'purchase_order', source_no: 'PO-42' } })
+  const summary = document.querySelector('.erp-task-action-drawer__summary--task')
+  const current = summary.querySelector('.workflow-task-current')
+  assert.match(current.textContent, /采购.*林工/u)
+  assert.match(summary.textContent, /PO-42/u)
+  assert.ok(document.querySelector('.ant-drawer-header button[aria-label="更多操作"]'))
+  assert.equal(summary.querySelector('button[aria-label="更多操作"]'), null)
+  assert.equal(summary.querySelector('button[aria-label="复制任务链接"]'), null)
+  assert.ok(current.querySelector('.erp-task-timing--compact'))
+  assert.equal(document.querySelector('.workflow-task-event-trail__disclosure').open, true)
+  await ui.update({ task: { ...ui.task, version: 2, task_status_key: 'done', assignee_id: null } })
+  assert.match(document.querySelector('.workflow-task-current').textContent, /本任务处理结果/u)
+  assert.doesNotMatch(document.querySelector('.workflow-task-current').textContent, /由岗位人员处理/u)
+})
+
+test('switching tasks or sources closes linked-content details and clears stale products', async (t) => {
+  const task = { id: 42, version: 1, task_name: '核对材料', task_status_key: 'ready', owner_role_key: 'purchase', display_context: { available: true, items: [{ kind: 'product', name: '海盐企鹅', code: '27007#' }, { kind: 'product', name: '挂件', code: '27007-GJ' }] } }
+  const ui = await mountDrawer(t, { task })
+  await ui.click(ui.button('共 2 项产品'))
+  assert.ok(document.querySelector('.erp-task-linked-items'))
+  const trigger = document.querySelector('button[aria-label="更多操作"]')
+  await ui.update({ task: { ...task, id: 43, task_name: '核对规格' } })
+  const nextTrigger = document.querySelector('button[aria-label="更多操作"]')
+  assert.notEqual(nextTrigger, trigger)
+  assert.equal(trigger.isConnected, false)
+  assert.equal(nextTrigger.classList.contains('ant-dropdown-open'), false)
+  assert.equal(document.querySelector('.erp-task-identity__count').getAttribute('aria-expanded'), 'false')
+  await ui.click(ui.button('共 2 项产品'))
+  const sourceTrigger = document.querySelector('button[aria-label="更多操作"]')
+  await ui.update({ task: { ...task, id: 43, source_type: 'sales_order', source_id: 72, version: 2, display_context: { available: true, items: [{ kind: 'product', name: '新订单产品', code: 'P72' }, { kind: 'product', name: '新订单挂件', code: 'P73' }] } } })
+  assert.equal(document.querySelector('.erp-task-identity__count').getAttribute('aria-expanded'), 'false')
+  assert.equal(sourceTrigger.isConnected, false, 'changing the source binding also closes copy actions')
+  await ui.click(ui.button('共 2 项产品'))
+  assert.match(document.querySelector('.erp-task-linked-items').textContent, /新订单产品.*P72/u)
+  assert.doesNotMatch(document.querySelector('.erp-task-linked-items').textContent, /海盐企鹅/u)
+  await ui.update({ task: { ...ui.task, display_context: { available: false, items: [] } } })
+  assert.equal(document.querySelector('.erp-task-identity__count'), null)
+  assert.equal(document.querySelector('.erp-task-linked-items'), null)
+  assert.match(document.querySelector('.erp-task-identity__unavailable').textContent, /关联单据已不可用/u)
+  await ui.update({ task: { ...ui.task, display_context: { available: true, items: [{ kind: 'product', name: '来源产品', code: 'P72' }, { kind: 'material', name: '配件', code: 'M72', supplier_item_no: 'S72' }] } } })
+  await ui.click(ui.button('共 2 项关联内容'))
+  assert.equal(document.querySelector('.erp-task-linked-items-modal .ant-modal-title').textContent, '关联内容')
 })
 
 test('task action drawer submits formal approvals only from the authoritative runtime form', () => {
@@ -191,6 +198,9 @@ async function mountDrawer(t, overrides = {}) {
     calls.push({ method, params, options })
     if (method === 'list_task_events') {
       return { data: { items: [], truncated: false } }
+    }
+    if (method === 'list_attachments') {
+      return { data: { attachments: [] } }
     }
     throw new Error(`unexpected RPC ${method}`)
   }
@@ -269,6 +279,28 @@ async function mountDrawer(t, overrides = {}) {
     window: dom.runtimeWindow,
   }
 }
+
+test('task resources tolerate an empty selection and stop reading attachments when the drawer closes', async (t) => {
+  const ui = await mountDrawer(t, { task: null, canViewAttachments: true })
+  const attachmentAction = () =>
+    document.querySelector('[data-testid="workflow-task-attachment-action"]')
+  assert.equal(attachmentAction(), null)
+  assert.deepEqual(ui.calls, [])
+
+  const task = { id: 42, version: 1, task_name: '核对材料', task_status_key: 'ready', owner_role_key: 'purchase' }
+  await ui.update({ task })
+  assert.ok(attachmentAction())
+  assert.deepEqual(ui.calls.filter((call) => call.method === 'list_attachments').map((call) => call.params.owner_id), [42])
+
+  const callsBeforeClose = ui.calls.length
+  await ui.update({ task: null })
+  assert.equal(attachmentAction(), null)
+  assert.equal(ui.calls.length, callsBeforeClose)
+
+  await ui.update({ task: { ...task, id: 43 } })
+  assert.ok(attachmentAction())
+  assert.deepEqual(ui.calls.filter((call) => call.method === 'list_attachments').map((call) => call.params.owner_id), [42, 43])
+})
 
 test('drawer uses one header return for its source and prevents leaving during submission', async (t) => {
   let returned = 0
@@ -449,6 +481,8 @@ test('drawer renders authorized related-document entry and explains access loadi
   })
   assert.equal(ui.button('进入单据办理'), undefined)
   assert.match(document.body.textContent, /当前只能查看任务/)
+  assert.equal(ui.button('选择处理方式'), undefined)
+  assert.equal(ui.button('确认完成'), undefined)
 })
 
 test('drawer reads events for the selected task and cancels the previous request on task switch', async (t) => {

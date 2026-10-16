@@ -23,6 +23,7 @@ import {
   Typography,
 } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { PurchaseReceiptStatus, PurchaseReturnStatus, QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
@@ -160,9 +161,9 @@ import useBusinessListExport from '../hooks/useBusinessListExport.js'
 
 const EMPTY_ADMIN_PROFILE = Object.freeze({})
 const PURCHASE_RECEIPT_STATUS_LABELS = Object.freeze({
-  DRAFT: '草稿',
-  POSTED: '已过账',
-  CANCELLED: '已取消',
+  [PurchaseReceiptStatus.DRAFT]: '草稿',
+  [PurchaseReceiptStatus.POSTED]: '已过账',
+  [PurchaseReceiptStatus.CANCELLED]: '已取消',
 })
 const { Text } = Typography
 
@@ -536,9 +537,10 @@ export default function QualityInspectionsPage() {
     )
   const selectedRowCanCreateRejectionDisposition = Boolean(
     isRejectedIncomingInspection(selectedRow) &&
-    String(selectedRowPurchaseReceipt?.status || '').toUpperCase() === 'DRAFT'
+    String(selectedRowPurchaseReceipt?.status || '').toUpperCase() === PurchaseReceiptStatus.DRAFT
   )
   const selectedQualityStatus = String(selectedRow?.status || '').toUpperCase()
+  const selectedIsCorrectionInspection = Boolean(selectedRow?.correction_of_inspection_id)
   const selectedInspectionType = String(
     selectedRow?.inspection_type || ''
   ).toUpperCase()
@@ -562,7 +564,7 @@ export default function QualityInspectionsPage() {
         ? canSubmitProductionException
         : false
   const selectedDispositionCompleted =
-    ['PASSED', 'CANCELLED'].includes(selectedQualityStatus) ||
+    [QualityInspectionStatus.PASSED, QualityInspectionStatus.CANCELLED].includes(selectedQualityStatus) ||
     (selectedIsIncomingInspection &&
       Boolean(selectedRow?.id) &&
       returnedInspectionIDs.has(selectedRow.id))
@@ -580,9 +582,9 @@ export default function QualityInspectionsPage() {
     selectedRowPurchaseReceipt?.status || ''
   ).toUpperCase()
   const selectedDispositionKind = selectedIsIncomingInspection
-    ? selectedPurchaseReceiptStatus === 'DRAFT'
+    ? selectedPurchaseReceiptStatus === PurchaseReceiptStatus.DRAFT
       ? 'incoming-rejection'
-      : selectedPurchaseReceiptStatus === 'POSTED'
+      : selectedPurchaseReceiptStatus === PurchaseReceiptStatus.POSTED
         ? 'incoming-return'
         : ''
     : selectedIsOutsourcingInspection
@@ -595,7 +597,7 @@ export default function QualityInspectionsPage() {
     !selectedDispositionSourceSupported ||
     !selectedDispositionAuthorized ||
     selectedDispositionCompleted ||
-    selectedQualityStatus !== 'REJECTED' ||
+    selectedQualityStatus !== QualityInspectionStatus.REJECTED ||
     (selectedIsIncomingInspection && selectedRowPurchaseReceiptLoading) ||
     !selectedDispositionKind ||
     (selectedDispositionKind === 'incoming-rejection' &&
@@ -613,7 +615,7 @@ export default function QualityInspectionsPage() {
         ? '当前账号不能办理该来源的不合格处置'
         : selectedDispositionCompleted
           ? '当前质检的不合格处置已完成'
-          : selectedQualityStatus !== 'REJECTED'
+          : selectedQualityStatus !== QualityInspectionStatus.REJECTED
             ? '质检判定不合格后可办理处置'
             : selectedIsIncomingInspection && selectedRowPurchaseReceiptLoading
               ? '正在核对来源单据状态'
@@ -640,7 +642,7 @@ export default function QualityInspectionsPage() {
       authorized: showReadOnlyOutsourcingDisposition,
       selected: Boolean(selectedRow),
       relevant:
-        selectedIsOutsourcingInspection && selectedQualityStatus === 'REJECTED',
+        selectedIsOutsourcingInspection && selectedQualityStatus === QualityInspectionStatus.REJECTED,
       busy: saving,
       busyReason: '当前操作完成后可查看委外处置',
     })
@@ -1232,7 +1234,7 @@ export default function QualityInspectionsPage() {
           const activeReturn = (
             Array.isArray(data?.purchase_returns) ? data.purchase_returns : []
           ).find(
-            (item) => String(item?.status || '').toUpperCase() !== 'CANCELLED'
+            (item) => String(item?.status || '').toUpperCase() !== PurchaseReturnStatus.CANCELLED
           )
           if (activeReturn) {
             markInspectionReturned(inspection.id)
@@ -1320,7 +1322,7 @@ export default function QualityInspectionsPage() {
         if (
           Number(created?.id || 0) <= 0 ||
           Number(created?.quality_inspection_id || 0) !== inspection.id ||
-          String(created?.status || '').toUpperCase() !== 'DRAFT'
+          String(created?.status || '').toUpperCase() !== PurchaseReturnStatus.DRAFT
         ) {
           const error = new Error('采购退货返回结果与当前质检单不一致')
           error.isInvalidResponse = true
@@ -1901,14 +1903,14 @@ export default function QualityInspectionsPage() {
           </BusinessActionTooltip>
           {canUpdate ? (
             <BusinessActionTooltip
-              visible={!selectedRow || selectedQualityStatus === 'DRAFT'}
+              visible={!selectedRow || selectedQualityStatus === QualityInspectionStatus.DRAFT}
               disabled={
-                !selectedRow || selectedRow.status !== 'DRAFT' || saving
+                !selectedRow || selectedRow.status !== QualityInspectionStatus.DRAFT || saving
               }
               disabledReason={
                 !selectedRow
                   ? '请先选择一条质检记录'
-                  : selectedRow.status !== 'DRAFT'
+                  : selectedRow.status !== QualityInspectionStatus.DRAFT
                     ? '只有质检草稿可以提交'
                     : saving
                       ? '当前操作完成后可提交'
@@ -1934,7 +1936,7 @@ export default function QualityInspectionsPage() {
                   className="erp-business-module-status-action"
                   icon={<FileDoneOutlined />}
                   disabled={
-                    !selectedRow || selectedRow.status !== 'DRAFT' || saving
+                    !selectedRow || selectedRow.status !== QualityInspectionStatus.DRAFT || saving
                   }
                 >
                   提交质检
@@ -1947,15 +1949,15 @@ export default function QualityInspectionsPage() {
               <BusinessActionTooltip
                 visible={
                   !selectedRow ||
-                  ['DRAFT', 'SUBMITTED'].includes(selectedQualityStatus)
+                  [QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedQualityStatus)
                 }
                 disabled={
-                  !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
+                  !selectedRow || selectedRow.status !== QualityInspectionStatus.SUBMITTED || saving
                 }
                 disabledReason={
                   !selectedRow
                     ? '请先选择一条质检记录'
-                    : selectedRow.status !== 'SUBMITTED'
+                    : selectedRow.status !== QualityInspectionStatus.SUBMITTED
                       ? '质检提交后可判定'
                       : saving
                         ? '当前操作完成后可判定'
@@ -1966,14 +1968,14 @@ export default function QualityInspectionsPage() {
                   data-business-action-key="pass"
                   size="small"
                   type={
-                    selectedQualityStatus === 'SUBMITTED'
+                    selectedQualityStatus === QualityInspectionStatus.SUBMITTED
                       ? 'primary'
                       : 'default'
                   }
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   disabled={
-                    !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
+                    !selectedRow || selectedRow.status !== QualityInspectionStatus.SUBMITTED || saving
                   }
                   onClick={() => openDecision('pass', selectedRow)}
                 >
@@ -1983,15 +1985,15 @@ export default function QualityInspectionsPage() {
               <BusinessActionTooltip
                 visible={
                   !selectedRow ||
-                  ['DRAFT', 'SUBMITTED'].includes(selectedQualityStatus)
+                  [QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedQualityStatus)
                 }
                 disabled={
-                  !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
+                  !selectedRow || selectedRow.status !== QualityInspectionStatus.SUBMITTED || saving
                 }
                 disabledReason={
                   !selectedRow
                     ? '请先选择一条质检记录'
-                    : selectedRow.status !== 'SUBMITTED'
+                    : selectedRow.status !== QualityInspectionStatus.SUBMITTED
                       ? '质检提交后可判定'
                       : saving
                         ? '当前操作完成后可判定'
@@ -2005,7 +2007,7 @@ export default function QualityInspectionsPage() {
                   className="erp-business-module-status-action"
                   icon={<StopOutlined />}
                   disabled={
-                    !selectedRow || selectedRow.status !== 'SUBMITTED' || saving
+                    !selectedRow || selectedRow.status !== QualityInspectionStatus.SUBMITTED || saving
                   }
                   onClick={() => openDecision('reject', selectedRow)}
                 >
@@ -2053,17 +2055,20 @@ export default function QualityInspectionsPage() {
             <BusinessActionTooltip
               visible={
                 !selectedRow ||
-                ['DRAFT', 'SUBMITTED'].includes(selectedQualityStatus)
+                (!selectedIsCorrectionInspection && [QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedQualityStatus))
               }
               disabled={
                 !selectedRow ||
-                !['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||
+                selectedIsCorrectionInspection ||
+                ![QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedRow.status) ||
                 saving
               }
               disabledReason={
                 !selectedRow
                   ? '请先选择一条质检记录'
-                  : !['DRAFT', 'SUBMITTED'].includes(selectedRow.status)
+                  : selectedIsCorrectionInspection
+                    ? '纠正后的复检须完成判定，不能取消'
+                    : ![QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedRow.status)
                     ? '当前质检状态不能取消'
                     : saving
                       ? '当前操作完成后可取消'
@@ -2077,7 +2082,8 @@ export default function QualityInspectionsPage() {
                 icon={<CloseCircleOutlined />}
                 disabled={
                   !selectedRow ||
-                  !['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||
+                  selectedIsCorrectionInspection ||
+                  ![QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedRow.status) ||
                   saving
                 }
                 onClick={() => openDecision('cancel', selectedRow)}
@@ -2334,7 +2340,7 @@ export default function QualityInspectionsPage() {
           title="质检附件"
           description="上传不良照片、检验报告、让步说明或批次异常证据；附件不能代替质检处理。"
           canUpload={canCreate || canUpdate}
-          canWithdraw={canCreate || canUpdate}
+          canWithdraw={canUpdate || canHandleQualityException}
           variant="inline"
         />
       </InspectionEditor>

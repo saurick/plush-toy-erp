@@ -2,7 +2,6 @@ import React, { useEffect, useMemo } from 'react'
 import {
   ArrowRightOutlined,
   CheckCircleOutlined,
-  QuestionCircleOutlined,
 } from '@ant-design/icons'
 import { Button, Card, Empty, Select, Space, Tag, Typography } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
@@ -179,23 +178,16 @@ export default function DevBusinessUsabilityPage() {
   )
 
   return (
-    <div className="erp-dev-business-usability-page erp-dev-workspace-page">
+    <div className="erp-dev-business-usability-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav sourcePath="web/src/erp/config/businessUsabilityCatalog.mjs" />
 
       <header className="erp-dev-business-usability-header">
-        <Space size={8} wrap>
-          <QuestionCircleOutlined aria-hidden="true" />
-          <Text className="erp-dev-business-usability-kicker">只读检查</Text>
-        </Space>
         <div className="erp-dev-business-usability-heading">
           <Title level={1}>
             {DEV_PAGE_TITLE_BY_ROUTE[DEV_BUSINESS_USABILITY_ROUTE]}
           </Title>
           <Link to={DEV_TESTING_ROUTE}>返回改动验证</Link>
         </div>
-        <Paragraph>
-          核对各业务页面的任务说明、完成标准、交接和字段解释。
-        </Paragraph>
       </header>
 
       <main className="erp-dev-business-usability-shell">
@@ -214,15 +206,14 @@ export default function DevBusinessUsabilityPage() {
           aria-label="页面说明覆盖摘要"
         >
           {[
-            ['正式业务页', summary.total],
-            ['已接页内帮助', summary.pageHelpCount],
+            ['业务页面', summary.total],
             ['已完整覆盖', summary.covered],
-            ['局部解释条目', summary.explanationCount],
+            ['待补齐', summary.total - summary.covered],
           ].map(([label, value]) => (
-            <Card key={label} size="small">
+            <div key={label} className="erp-dev-business-usability-summary__item">
               <Text type="secondary">{label}</Text>
               <strong>{value}</strong>
-            </Card>
+            </div>
           ))}
         </section>
 
@@ -257,9 +248,6 @@ export default function DevBusinessUsabilityPage() {
               <CheckCircleOutlined aria-hidden="true" />
               <Title level={2}>页面说明覆盖</Title>
             </div>
-            <Text type="secondary">
-              优先补高频、易错和需要跨岗位交接的页面。
-            </Text>
           </div>
           <Table
             rowKey="key"

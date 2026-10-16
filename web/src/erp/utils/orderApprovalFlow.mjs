@@ -1,3 +1,4 @@
+import { WorkflowBusinessStatus } from '../../common/consts/statuses.generated.mjs'
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 
 export const PROJECT_ORDER_MODULE_KEY = 'project-orders'
@@ -6,9 +7,9 @@ export const ORDER_APPROVAL_TASK_GROUP = 'order_approval'
 export const ENGINEERING_DATA_TASK_GROUP = 'engineering_data'
 export const ORDER_REVISION_TASK_GROUP = 'order_revision'
 
-export const ORDER_APPROVAL_STATUS_KEY = 'project_pending'
-export const ORDER_APPROVED_STATUS_KEY = 'project_approved'
-export const ENGINEERING_PREPARING_STATUS_KEY = 'engineering_preparing'
+export const ORDER_APPROVAL_STATUS_KEY = WorkflowBusinessStatus.PROJECT_PENDING
+export const ORDER_APPROVED_STATUS_KEY = WorkflowBusinessStatus.PROJECT_APPROVED
+export const ENGINEERING_PREPARING_STATUS_KEY = WorkflowBusinessStatus.ENGINEERING_PREPARING
 
 function normalizeText(value) {
   const text = String(value ?? '').trim()

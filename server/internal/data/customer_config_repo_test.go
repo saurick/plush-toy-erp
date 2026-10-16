@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
@@ -14,6 +15,33 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-kratos/kratos/v2/log"
 )
+
+func TestCustomerConfigPaymentOpenCountExcludesTerminalStates(t *testing.T) {
+	db, err := sql.Open("sqlite3", "file:payment_open_states?mode=memory&cache=shared")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := db.Close(); err != nil {
+			t.Errorf("close payment state test database: %v", err)
+		}
+	})
+	if _, err = db.Exec(`CREATE TABLE finance_payments(status TEXT NOT NULL);INSERT INTO finance_payments VALUES('DRAFT'),('APPROVED'),('REJECTED'),('POSTED'),('REVERSED'),('CANCELLED')`); err != nil {
+		t.Fatal(err)
+	}
+	repo := NewCustomerConfigRepo(&Data{sqldb: db}, log.NewStdLogger(io.Discard))
+	count, err := repo.CountOpenBusinessDocumentsByModules(t.Context(), "yoyoosun", []string{"finance_payments"})
+	if err != nil || count != 2 {
+		t.Fatalf("open payment states: count=%d err=%v", count, err)
+	}
+	if _, err = db.Exec(`DELETE FROM finance_payments WHERE status IN ('DRAFT','APPROVED')`); err != nil {
+		t.Fatal(err)
+	}
+	count, err = repo.CountOpenBusinessDocumentsByModules(t.Context(), "yoyoosun", []string{"finance_payments"})
+	if err != nil || count != 0 {
+		t.Fatalf("terminal history still blocks closing module: count=%d err=%v", count, err)
+	}
+}
 
 type customerConfigAuditPayloadMatcher struct {
 	t                 *testing.T

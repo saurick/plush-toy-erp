@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { getContrastRatio } from './colorAssertions.mjs'
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
 // Sample the actual business page while its content changes, so a passing
 // isolated navigation fixture cannot conceal a remounted or displaced strip.
@@ -108,17 +109,7 @@ export async function assertBusinessViewMotion(page, name, outputDir) {
 }
 
 export async function captureBusinessView(page, panel, name, width, outputDir) {
-  await panel.evaluate(async (element) => {
-    await Promise.all(
-      element
-        .getAnimations({ subtree: true })
-        .filter(
-          (animation) =>
-            animation.effect.getComputedTiming().iterations !== Infinity
-        )
-        .map((animation) => animation.finished)
-    )
-  })
+  await waitForFiniteAnimations(page)
   await panel.evaluate((element) => element.scrollIntoView({ block: 'start' }))
   const colors = await panel.evaluate((element) => {
     const canvas = document.createElement('canvas')

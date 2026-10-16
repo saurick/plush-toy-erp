@@ -228,6 +228,7 @@ function EditableText({
   onCommit,
   multiline = false,
   rich = false,
+  blankField = false,
   className = '',
   as: Component = 'span',
 }) {
@@ -359,6 +360,7 @@ function EditableText({
       <Component
         ref={editableRef}
         className={`${EDITABLE_CLASS} ${className}`}
+        data-print-blank-field={blankField ? '' : undefined}
         data-print-empty={
           !String(value ?? '')
             .replace(/<[^>]*>/g, '')
@@ -391,6 +393,7 @@ function EditableText({
     <Component
       ref={editableRef}
       className={`${EDITABLE_CLASS} ${className}`}
+      data-print-blank-field={blankField ? '' : undefined}
       data-print-empty={
         !String(value ?? '')
           .replace(/<[^>]*>/g, '')
@@ -523,9 +526,9 @@ function ImageSlot({
       <div className="erp-engineering-print-image-slot__viewport">
         {hasImage ? (
           <BusinessImage src={snapshot.dataURL} alt={label} style={cropStyle} compact printable />
-        ) : (
-          <span>{label}</span>
-        )}
+        ) : showActions ? (
+          <span data-print-editor-only>{label}</span>
+        ) : null}
       </div>
       {hasAnnotations ? (
         <WorkInstructionImageAnnotationLayer annotations={annotations} />

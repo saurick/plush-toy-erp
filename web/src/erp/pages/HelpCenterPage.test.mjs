@@ -34,9 +34,9 @@ test('HelpCenterPage: 使用当前账号岗位和已开放页面生成帮助', (
     source,
     /key=\{`\$\{selectedGuide.key\}:\$\{selectedScenario.key\}`\}/u
   )
-  assert.match(source, /切换这里只查看说明/u)
-  assert.match(source, /查看岗位/u)
-  assert.match(source, /不改变岗位或权限/u)
+  assert.match(source, /岗位用于推荐说明/u)
+  assert.match(source, /推荐岗位/u)
+  assert.match(source, /办理入口仍按当前账号权限显示/u)
   assert.doesNotMatch(source, /<Alert|showIcon/u)
   assert.doesNotMatch(source, /常见问题/u)
   assert.doesNotMatch(source, /selectedGuide\.questions/u)

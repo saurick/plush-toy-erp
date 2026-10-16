@@ -6,9 +6,10 @@
 
 | 分类 | 要解决的问题 | 入口 |
 | --- | --- | --- |
+| 完整项目手册 | 系统学习、管理员实施与技术接手 | [三部分项目手册](manuals/README.md) |
 | 上手与项目维护 | 启动项目、判断真源、确定改动范围 | [仓库入口](../README.md)、[当前真源](当前真源与交接顺序.md)、[项目治理地图](项目治理地图.md)、[脚本入口](../scripts/README.md) |
 | 业务与领域 | 产品范围、主数据、源单、事实、状态与协作 | [产品与路线](product/README.md)、[架构与领域边界](architecture/README.md)、[工作流](workflow/README.md)、[角色](roles/README.md)、[仓库与品质](warehouse/README.md)、[财务](finance/README.md) |
-| 页面与打印 | 页面任务、菜单、移动岗位端、合同与打印实现 | [前端入口](../web/README.md)、[菜单与正式入口](product/菜单与正式入口合同.md)、[页面动作与生命周期](product/业务数据生命周期与页面动作规则.md)、[打印文档](打印模板实现原理.md) |
+| 页面与打印 | 页面任务、菜单、移动岗位端、合同与打印实现 | [前端入口](../web/README.md)、[菜单与正式入口](product/菜单与正式入口合同.md)、[页面动作与生命周期](product/业务数据生命周期与页面动作规则.md)、[前端实现约定](engineering/前端实现与交互约定.md)、[打印文档](打印模板实现原理.md) |
 | 开发测试与运行交付 | API、数据字典、测试、CI、发布、迁移与恢复 | [后端专题](../server/docs/README.md)、[测试策略](product/自动化测试策略.md)、[QA 操作](../scripts/qa/README.md)、[工程与交付](engineering/README.md)、[部署约定](部署约定.md)、[可观测性](observability/README.md) |
 | 客户实施与验收 | 客户输入、配置差异、资料、验收与交付 | 完整仓库内的客户资料索引 `customers/README.md`、[实施流程](product/新增甲方客户实施流程.md)、[配置与权限](product/配置与权限策略.md)、[安全与隐私](security/README.md)、[客户交付包](../deployments/README.md) |
 | 参考与历史 | 样板、原型、历史决策和过程追溯 | [UI 交互设计](product/ui-design/README.md)、完整仓库内的工程样例 `customers/reference-customer/README.md`、[归档](archive/README.md) |
@@ -59,10 +60,11 @@
 当前前端只维护面向登录用户的帮助中心，不恢复产品内 Markdown 文档中心、高级文档和开发与验收页面：
 
 - 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
-- `/erp/help-center` 是当前单一岗位帮助入口，内容真源为 `web/src/erp/config/roleHelpContent.mjs`；它按当前有效岗位投影内容，只展示账号已开放的页面捷径，不设置独立业务权限码。
+- `/erp/help-center` 是当前单一业务帮助入口，提供“找操作 / 完整手册”。岗位用于推荐，搜索和手册取当前账号可读岗位的并集；页面捷径仍受菜单权限限制，不设置独立业务权限码。通用章节、岗位和业务页内容分别维护在 `businessHandbook.mjs`、`roleHelpContent.mjs` 和 `businessUsabilityCatalog.mjs`，工程用料专题复用现有真源。
 - 高频业务页的“这页怎么用”和字段问号说明统一来自 `web/src/erp/config/businessUsabilityCatalog.mjs`，用于补充页面任务、完成标准、交接、公式和字段来源，不恢复第二个帮助中心，也不替代权限、岗位责任或业务链真源。`/__dev/business-usability` 只读检查这份目录的覆盖情况，不进入正式菜单或生产构建。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/source-readiness`、`/erp/mobile-workbenches` 和 `/erp/roles/*` 路径不再注册运行时路由、重定向或权限别名。
 - 正式文档继续保留在 `docs/`、`server/docs/`、`web/README.md`、`server/README.md` 等仓库文档入口，不复制或镜像到前端运行时页面。
+- [业务使用手册](manuals/业务使用手册.md) 从共享帮助内容生成，在线阅读与离线下载使用同源内容；管理员与技术手册在 [manuals](manuals/README.md) 维护，不进入普通岗位帮助。三册导出和同步检查见[手册脚本](../scripts/docs/README.md)。
 - [项目治理地图](项目治理地图.md) 提供常见改动的参考依据、同步检查和误判边界；本地开发态可在 `/__dev/docs` 搜索或打开这份文档。
 
 未来若新增长文档或开发验收入口，必须先设计 registry、导航、权限、路由、渲染代码和测试断言；不要把仓库正式文档镜像进岗位帮助，也不临时恢复旧 docs registry。

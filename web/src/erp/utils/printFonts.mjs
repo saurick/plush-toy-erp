@@ -1,11 +1,13 @@
+import { PrintPolicy } from '../../common/consts/policies.generated.mjs'
+
 export const PRINT_FONT_FAMILIES = [
   'Noto Sans SC Variable',
   'Noto Serif SC Variable',
 ]
 export const PRINT_FONT_LIMITS = Object.freeze({
-  count: 128,
-  eachBytes: 256 * 1024,
-  totalBytes: 2 * 1024 * 1024,
+  count: PrintPolicy.fontCount,
+  eachBytes: PrintPolicy.fontBytes,
+  totalBytes: PrintPolicy.fontTotalBytes,
 })
 
 export function unicodeRangeContainsText(range, text) {

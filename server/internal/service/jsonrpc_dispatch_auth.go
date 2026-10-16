@@ -67,7 +67,7 @@ func (d *jsonrpcDispatcher) handleAuth(
 
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,
-			Message: "验证码已发送",
+			Message: "验证码请求已受理",
 			Data: newDataStruct(map[string]any{
 				"phone":         challenge.Phone,
 				"expires_at":    challenge.ExpiresAt.Unix(),

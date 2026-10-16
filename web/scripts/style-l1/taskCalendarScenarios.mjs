@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { mobileTaskListOptionsScenario } from './mobileTaskListOptionsScenario.mjs'
 import { createDashboardTaskScenarios } from './dashboardTaskScenarios.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
@@ -103,7 +104,11 @@ deviceScaleFactor,
           const overdue = visible.filter((task) => task.due_at && task.due_at < now)
           const undated = visible.filter((task) => task.due_at == null)
           const selected = q.calendar_selection === 'overdue' ? overdue : q.calendar_selection === 'undated' ? undated : visible.filter((task) => unixSecondsToBusinessDate(task.due_at) === q.calendar_selection)
-          const offset = duplicateNext && q.calendar_offset ? 0 : q.calendar_offset || 0
+          const revision = createHash('sha256')
+            .update(JSON.stringify(selected.map((task) => [task.id, task.version, task.due_at])))
+            .digest('hex')
+          const restarted = q.calendar_revision && q.calendar_revision !== revision
+          const offset = restarted || (duplicateNext && q.calendar_offset) ? 0 : q.calendar_offset || 0
           if (q.calendar_offset) duplicateNext = false
           return reply({ code: 0,
 message: 'OK',
@@ -114,9 +119,10 @@ days,
 overdue: overdue.length,
 undated: undated.length,
             total: selected.length,
-offset: q.calendar_offset || 0,
+offset: restarted ? 0 : q.calendar_offset || 0,
 limit: q.limit,
 snapshot_at: now,
+revision,
             items: selected.slice(offset, offset + q.limit),
           } } })
         })
@@ -304,6 +310,15 @@ snapshot_at: now,
         assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 30, 'changed pagination stops instead of repeatedly appending duplicates')
         await calendar.getByRole('button', { name: '重新加载', exact: true }).click()
         await calendar.getByRole('alert').waitFor({ state: 'hidden' })
+        tasks[0].task_status_key = 'done'
+        await calendar.locator('.workflow-task-calendar__tail').scrollIntoViewIfNeeded()
+        if (!mobile) await calendar.getByRole('button', { name: /继续加载/ }).click()
+        await calendar.locator(`button[data-date="${today}"]`).getByText('64 项', { exact: true }).waitFor()
+        assert.equal(await calendar.locator('.workflow-task-calendar__task').count(), 30, 'a changed live result set replaces the first page')
+        await calendar.getByText('日历跟进 31', { exact: true }).waitFor()
+        tasks[0].task_status_key = 'ready'
+        await calendar.getByRole('button', { name: '刷新待办日历', exact: true }).click()
+        await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
         while (await calendar.locator('.workflow-task-calendar__task').count() < 65) {
           const before = await calendar.locator('.workflow-task-calendar__task').count()
           await calendar.locator('.workflow-task-calendar__tail').scrollIntoViewIfNeeded()

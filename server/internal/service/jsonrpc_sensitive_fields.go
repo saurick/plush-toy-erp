@@ -48,6 +48,13 @@ func (d *jsonrpcDispatcher) requireSensitiveFieldMutationPermission(
 	case "purchase_order", "outsourcing_order":
 		permissionKey = biz.PermissionFieldProcurementCommercialRead
 	case "operational_fact":
+		// These source-bound commands accept only warehouse facts. Their strict
+		// parameter contracts reject commercial fields before the usecase runs.
+		switch normalizedMethod {
+		case "create_outsourcing_material_issue_from_order", "create_outsourcing_return_receipt_from_order",
+			"save_outsourcing_material_issue_draft", "save_outsourcing_return_receipt_draft":
+			return nil
+		}
 		switch {
 		case strings.Contains(normalizedMethod, "receivable"), strings.Contains(normalizedMethod, "shipment"):
 			permissionKey = biz.PermissionFieldSalesCommercialRead

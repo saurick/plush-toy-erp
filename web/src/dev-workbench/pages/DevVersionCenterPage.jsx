@@ -2284,7 +2284,7 @@ export default function DevVersionCenterPage() {
   ]
 
   return (
-    <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-version-page erp-dev-delivery-workspace">
+    <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page erp-dev-version-page erp-dev-delivery-workspace">
       <DevPageNav sourcePath={DEV_DELIVERY_SOURCE_PATH} />
       <header className="erp-dev-hub-header">
         <div className="erp-dev-hub-header__copy">
@@ -2304,7 +2304,7 @@ export default function DevVersionCenterPage() {
                 disabled={!canDispatch}
                 onClick={() => setReleaseModalOpen(true)}
               >
-                发布当前版本制品
+                发布当前提交
               </Button>
             </Tooltip>
             <Button
@@ -2320,7 +2320,7 @@ export default function DevVersionCenterPage() {
               icon={<ToolOutlined />}
               onClick={() => setManualTakeoverOpen(true)}
             >
-              手动操作指引
+              操作指引
             </Button>
           </Space>
           <Text type="secondary" role="status" aria-live="polite">
@@ -2332,10 +2332,11 @@ export default function DevVersionCenterPage() {
       <section className="erp-dev-delivery-context erp-dev-version-context" aria-label="版本发布范围">
         <DevCustomerScopeSelector
           compact
+          label="客户"
+          note=""
           scope={customerScope}
           onChange={customerScope.selectCustomer}
           disabled={isMutationRunning}
-          note="只操作已登记的交付目标。"
           invalidDescription="当前甲方没有登记发布目标；版本、部署、回滚与目标状态读取均已停止。"
         />
 
@@ -2351,9 +2352,10 @@ export default function DevVersionCenterPage() {
             }))}
             onChange={setSelectedTargetKey}
           />
-          <Text type="secondary" className="erp-dev-delivery-context__note">
-            {selectedTargetDefinition.dataBoundary}
-          </Text>
+          <details className="erp-dev-target-data-boundary">
+            <summary>数据保留方式</summary>
+            <Text type="secondary">{selectedTargetDefinition.dataBoundary}</Text>
+          </details>
         </div>
       </section>
 

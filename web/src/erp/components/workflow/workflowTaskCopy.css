@@ -43,20 +43,83 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 8px;
   min-width: 0;
 }
 
 .erp-task-copy-heading > :first-child {
-  flex: 1 1 180px;
+  flex: 0 1 auto;
   min-width: 0;
   margin: 0;
+}
+
+.erp-task-more.ant-btn {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  color: var(--erp-text-muted);
+}
+
+.erp-task-source-link.ant-btn {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+  text-align: left;
+  white-space: normal;
+}
+
+.ant-dropdown.erp-task-copy-menu .ant-dropdown-menu {
+  width: 180px;
+  padding: 5px;
+  border: 1px solid var(--erp-border);
+  border-radius: 7px;
+  background: var(--erp-surface-bg);
+}
+
+.ant-dropdown.erp-task-copy-menu .ant-dropdown-menu .ant-dropdown-menu-item {
+  min-height: 40px;
+  gap: 8px;
+  padding: 10px 9px;
+  border-radius: 4px;
+  box-shadow: none;
+  font-size: var(--erp-font-small);
+}
+
+.ant-dropdown.erp-task-copy-menu .ant-dropdown-menu-item .anticon {
+  font-size: 16px;
 }
 
 .erp-task-card {
   position: relative;
   isolation: isolate;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+@media (hover: hover) {
+  .erp-task-card:has(> .erp-task-card__open:not(:disabled, [aria-disabled='true'], [aria-pressed='true'])):hover {
+    background: var(--erp-interactive-bg-hover);
+  }
+
+  .erp-task-card:where(
+    .workflow-task-calendar__task,
+    .erp-progress-row,
+    .mobile-progress-card,
+    .mobile-workflow-tracking-card,
+    .erp-business-visual-list__row
+  ):has(> .erp-task-card__open:not(:disabled, [aria-disabled='true'], [aria-pressed='true'])):hover {
+    border-color: var(--erp-interactive-border-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .erp-task-card {
+    transition: none;
+  }
 }
 
 .erp-task-card__open {
@@ -89,6 +152,11 @@
 }
 
 @media (max-width: 767px), (pointer: coarse) {
+  .erp-task-more.ant-btn,
+  .ant-dropdown.erp-task-copy-menu .ant-dropdown-menu .ant-dropdown-menu-item {
+    min-width: 44px;
+    min-height: 44px;
+  }
   .erp-task-copy.ant-btn {
     width: 44px;
     height: 44px;

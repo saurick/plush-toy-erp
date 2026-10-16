@@ -1071,7 +1071,7 @@ test('page defaults to the latest business-chain regression while retaining dail
   assert.match(pageSource, /normalize: selectedIsScenarioDemo/u)
   assert.match(pageSource, /\(!selectedIsScenarioDemo \|\| customerReady\)/u)
   assert.match(pageSource, /\(!currentIsScenarioDemo \|\| customerReady\)/u)
-  assert.match(pageSource, /label="业务场景甲方"/u)
+  assert.match(pageSource, /label="客户"/u)
   assert.match(pageSource, /其他数据准备方式不受影响/u)
   assert.match(pageSource, /exact confirmation/u)
   assert.match(

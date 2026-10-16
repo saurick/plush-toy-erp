@@ -1,3 +1,4 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { isFulfillmentTask } from './fulfillmentTask.mjs'
 import { isEngineeringMaterialTask } from './engineeringMaterialTask.mjs'
@@ -85,7 +86,7 @@ export function getWorkflowTaskStatusActionModes(taskOrStatus = '') {
     typeof taskOrStatus === 'object' &&
     (isEngineeringMaterialTask(taskOrStatus) || isFulfillmentTask(taskOrStatus))
   ) {
-    return taskOrStatus?.task_status_key === 'ready' ? ['urge'] : []
+    return taskOrStatus?.task_status_key === WorkflowTaskStatus.READY ? ['urge'] : []
   }
   const statusKey = String(
     typeof taskOrStatus === 'string'

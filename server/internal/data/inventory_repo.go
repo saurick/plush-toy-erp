@@ -1888,10 +1888,10 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (_ *biz.
 	if len(items) == 0 {
 		return nil, biz.ErrBadParam
 	}
-	if err := validateBOMActivationReferences(ctx, tx.Client(), target, items, r.data.sqlDialect != dialect.SQLite); err != nil {
-		return nil, err
-	}
 	if target.Status != biz.BOMStatusActive {
+		if err := validateBOMActivationReferences(ctx, tx.Client(), target, items, r.data.sqlDialect != dialect.SQLite); err != nil {
+			return nil, err
+		}
 		if _, err := tx.BOMHeader.Update().
 			Where(
 				bomheader.ProductID(target.ProductID),

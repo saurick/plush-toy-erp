@@ -13,6 +13,26 @@ function state(result) {
   return [result.visible, result.disabled, result.disabledReason]
 }
 
+test('核销结果未知时保留零余额恢复入口且不绕过权限、终态或忙碌限制', () => {
+  const input = {
+    action: 'allocation',
+    authorized: true,
+    payment: { id: 41, status: 'POSTED', kind: 'ADVANCE', available_amount: '0' },
+    pendingAllocation: true,
+  }
+  assert.deepEqual(state(resolveFinancePaymentActionAvailability(input)), [true, false, ''])
+  for (const overrides of [
+    { pendingAllocation: false },
+    { authorized: false },
+    { payment: { ...input.payment, kind: 'REFUND' } },
+    { payment: { ...input.payment, status: 'REVERSED' } },
+  ]) {
+    assert.deepEqual(state(resolveFinancePaymentActionAvailability({ ...input, ...overrides })), [false, true, ''])
+  }
+  assert.deepEqual(state(resolveFinancePaymentActionAvailability({ ...input, busy: true })), [true, true, '当前操作完成后可办理核销'])
+  assert.deepEqual(state(resolveFinancePaymentActionAvailability({ ...input, referenceLoading: true })), [true, true, '核销资料加载完成后可继续'])
+})
+
 test('收付款动作：前置不足保留原因，无权限和已完成动作隐藏', () => {
   for (const action of ['allocation', 'approval', 'cancel', 'reverse']) {
     assert.deepEqual(

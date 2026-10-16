@@ -34,7 +34,7 @@
 
 ```bash
 SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>' \
-  bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh \
+  bash scripts/deploy/run-backup-restore-rehearsal.sh \
     --release-id <release-id> \
     --environment <environment> \
     --backup-purpose pre-migration \

@@ -267,7 +267,11 @@ const allowedERPImportsByFile = new Map([
   ],
   [
     "web/src/dev-workbench/config/devFulfillmentSubflow.mjs",
-    new Set(["utils/roleKeys.mjs"]),
+    new Set(["utils/roleKeys.mjs", "utils/workflowFulfillment.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/config/devFulfillmentPresentation.mjs",
+    new Set(["utils/workflowFulfillment.mjs"]),
   ],
   [
     "web/src/dev-workbench/config/devFulfillmentSubflow.test.mjs",
@@ -291,7 +295,7 @@ const allowedERPImportsByFile = new Map([
   ],
   [
     "web/src/dev-workbench/config/devUIDesign.test.mjs",
-    new Set(["config/helpScenarios.mjs", "config/helpManualCatalog.mjs"]),
+    new Set(["config/helpScenarios.mjs", "config/helpManualCatalog.mjs", "config/businessHandbook.mjs"]),
   ],
   [
     "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",
@@ -389,6 +393,14 @@ test("feedback sample modal dependencies remain presentation-only", () => {
 });
 
 test("dev workbench boundary: resolved imports preserve module and file scope", () => {
+  assert.equal(
+    isAllowedERPImport("web/src/dev-workbench/config/devUIDesign.test.mjs", "../../erp/config/businessHandbook.mjs"),
+    true,
+  );
+  assert.equal(
+    isAllowedERPImport("web/src/dev-workbench/components/DevUIDesignDocument.jsx", "../../erp/config/businessHandbook.mjs"),
+    false,
+  );
   assert.equal(
     isAllowedERPImport(
       "web/src/dev-workbench/config/devUIDesign.test.mjs",

@@ -345,7 +345,7 @@ func TestAdminAuthUsecase_SMSRequestDoesNotExposeAccountEligibility(t *testing.T
 	}
 }
 
-func TestAdminAuthUsecase_SMSRequestReturnsDeliveryFailures(t *testing.T) {
+func TestAdminAuthUsecase_SMSRequestHidesDeliveryFailures(t *testing.T) {
 	repo := newMemAdminAuthRepo()
 	admin := &AdminUser{
 		ID: 1, Username: "eligible", Phone: "13800138000", AuthVersion: 1, IsSuperAdmin: true,
@@ -362,9 +362,11 @@ func TestAdminAuthUsecase_SMSRequestReturnsDeliveryFailures(t *testing.T) {
 		tracesdk.NewTracerProvider(),
 	)
 
-	challenge, err := uc.RequestSMSLoginCode(context.Background(), admin.Phone, "purchase")
-	if !errors.Is(err, ErrSMSServiceUnavailable) || challenge != nil {
-		t.Fatalf("delivery failure challenge=%#v err=%v", challenge, err)
+	for _, phone := range []string{admin.Phone, "13600136000"} {
+		challenge, err := uc.RequestSMSLoginCode(context.Background(), phone, "purchase")
+		if err != nil || challenge == nil || challenge.Phone != phone || challenge.ExpiresAt.IsZero() || challenge.ResendAfter.IsZero() {
+			t.Fatalf("delivery failure exposed eligibility: challenge=%#v err=%v", challenge, err)
+		}
 	}
 }
 

@@ -1,4 +1,5 @@
 import React from 'react'
+import { DownOutlined, HistoryOutlined } from '@ant-design/icons'
 import { Empty } from 'antd'
 import { buildWorkflowTaskEventTrailModel } from '../../utils/workflowTaskEventPresentation.mjs'
 import './workflowTaskEventTrail.css'
@@ -13,6 +14,8 @@ export default function WorkflowTaskEventTrail({
   truncated = false,
   variant = 'desktop',
   showResponsibility = true,
+  collapsible = false,
+  defaultExpanded = true,
 }) {
   const model = buildWorkflowTaskEventTrailModel({
     approvalTask,
@@ -20,12 +23,17 @@ export default function WorkflowTaskEventTrail({
     task,
   })
   const loading = state === 'idle' || state === 'loading'
+  const collapsed = collapsible && !loading && state !== 'error'
+  const Container = collapsed ? 'details' : 'div'
+  const Heading = collapsed ? 'summary' : 'div'
+  const summaryText = `${model.summaryLabel}${model.items.length > 1 ? ' · 最近在前' : ''}`
 
   return (
     <section
       className={[
         'workflow-task-event-trail',
         `workflow-task-event-trail--${variant}`,
+        collapsed ? 'workflow-task-event-trail--collapsible' : '',
         className,
       ]
         .filter(Boolean)
@@ -33,33 +41,36 @@ export default function WorkflowTaskEventTrail({
       aria-labelledby={`workflow-task-event-trail-title-${task.id || 'current'}`}
       data-testid="workflow-task-event-trail"
     >
-      <div className="workflow-task-event-trail__head">
-        <div>
-          <h3 id={`workflow-task-event-trail-title-${task.id || 'current'}`}>
-            本任务处理记录
-          </h3>
-        </div>
-        <span>{model.summaryLabel}{model.items.length > 1 ? ' · 最近在前' : ''}</span>
-      </div>
+      <Container key={task.id} className="workflow-task-event-trail__disclosure" {...(collapsed ? { open: defaultExpanded } : {})}>
+        <Heading className="workflow-task-event-trail__head">
+          <div className={collapsed ? 'workflow-task-event-trail__heading-label' : undefined}>
+            {collapsed ? <HistoryOutlined aria-hidden="true" /> : null}
+            <h3 id={`workflow-task-event-trail-title-${task.id || 'current'}`}>
+              本任务处理记录
+            </h3>
+            {collapsed ? <span className="workflow-task-event-trail__count">{summaryText}</span> : null}
+          </div>
+          {collapsed ? <DownOutlined aria-hidden="true" /> : <span>{summaryText}</span>}
+        </Heading>
 
-      {showResponsibility ? (
-        <dl
-          className="workflow-task-event-trail__responsibility"
-          aria-label="当前任务责任"
-        >
-          {model.responsibilityItems.map((item) => (
-            <div key={item.key}>
-              <dt>{item.label}</dt>
-              <dd>{item.value}</dd>
-            </div>
+        {showResponsibility ? (
+          <dl
+            className="workflow-task-event-trail__responsibility"
+            aria-label="当前任务责任"
+          >
+            {model.responsibilityItems.map((item) => (
+              <div key={item.key}>
+                <dt>{item.label}</dt>
+                <dd>{item.value}</dd>
+              </div>
           ))}
-        </dl>
+          </dl>
       ) : null}
 
-      {loading ? (
-        <p className="workflow-task-event-trail__state" role="status">
-          正在加载本任务处理记录…
-        </p>
+        {loading ? (
+          <p className="workflow-task-event-trail__state" role="status">
+            正在加载本任务处理记录…
+          </p>
       ) : state === 'error' ? (
         <p
           className="workflow-task-event-trail__state workflow-task-event-trail__state--error"
@@ -145,6 +156,7 @@ export default function WorkflowTaskEventTrail({
       ) : (
         <Empty description="暂无本任务处理记录" />
       )}
+      </Container>
     </section>
   )
 }

@@ -82,6 +82,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.16s ease;
 }
 .erp-progress-overview-stage > strong {
   text-align: right;
@@ -141,8 +142,15 @@
   cursor: default;
   opacity: 0.6;
 }
-.erp-progress-overview-stage:hover:not(:disabled) {
-  background: var(--erp-interactive-bg-hover);
+@media (hover: hover) {
+  .erp-progress-overview-stage:hover:not(:disabled) {
+    background: var(--erp-interactive-bg-hover);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .erp-progress-overview-stage {
+    transition: none;
+  }
 }
 .erp-progress-overview-stage.is-attention .erp-progress-overview-stage-text {
   color: var(--erp-warning-text);

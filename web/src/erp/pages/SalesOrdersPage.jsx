@@ -5,7 +5,6 @@ import {
   EditOutlined,
   EyeOutlined,
   LinkOutlined,
-  OrderedListOutlined,
   PlusOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
@@ -15,6 +14,7 @@ import {
   useLocation,
   useSearchParams,
 } from 'react-router-dom'
+import { InventoryLotStatus, ShipmentStatus, StockReservationStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
@@ -48,7 +48,6 @@ import {
 } from '../components/business-list/BusinessListLayout.jsx'
 import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
-import BusinessLineItemOrderModal from '../components/business-list/BusinessLineItemOrderModal.jsx'
 import SourceOrderLifecycleConfirmContent from '../components/business-list/SourceOrderLifecycleConfirmContent.jsx'
 import LifecycleScopeFilter from '../components/business-list/LifecycleScopeFilter.jsx'
 import SalesOrderReservationModal from '../components/sales-orders/SalesOrderReservationModal.jsx'
@@ -63,7 +62,6 @@ import {
   listSalesOrders,
   listAllUnits,
   listAllWarehouses,
-  reorderSalesOrderItems,
   saveSalesOrderWithItems,
 } from '../api/masterDataOrderApi.mjs'
 import {
@@ -77,7 +75,6 @@ import {
 } from '../api/inventoryApi.mjs'
 import {
   normalizeSalesOrderItemFormValue,
-  salesOrderLineOrderLabel,
 } from '../components/sales-orders/SalesOrderForm.jsx'
 import WorkflowTaskProductImage from '../components/workflow/WorkflowTaskProductImage.jsx'
 import SalesOrderEngineeringModal from '../components/sales-orders/SalesOrderEngineeringModal.jsx'
@@ -124,7 +121,6 @@ import { filterColumnsByEffectiveFieldPolicy } from '../utils/adminProfileSync.m
 import { parseBusinessSortValue } from '../utils/businessTableActions.mjs'
 import { isDraftSourceDocument } from '../utils/sourceDocumentEditing.mjs'
 import {
-  canReorderSourceDocumentItems,
   commitSourceDocumentSaveResult,
   createSourceDocumentOpenEditController,
   isMutationResultUnknown,
@@ -229,7 +225,7 @@ async function loadReservationStockForItem(item = {}) {
   const params = reservationInventoryParams(item)
   const [balanceData, lotData] = await Promise.all([
     listAllInventoryBalances(params),
-    listAllInventoryLots({ ...params, status: 'ACTIVE' }),
+    listAllInventoryLots({ ...params, status: InventoryLotStatus.ACTIVE }),
   ])
   return {
     balances: Array.isArray(balanceData?.inventory_balances)
@@ -335,12 +331,6 @@ export default function SalesOrdersPage() {
   const [materialRequestOrderID, setMaterialRequestOrderID] = useState(null)
   const [editingOrder, setEditingOrder] = useState(null)
   const [detailOrder, setDetailOrder] = useState(null)
-  const [lineOrderLoading, setLineOrderLoading] = useState(false)
-  const [lineOrderOpen, setLineOrderOpen] = useState(false)
-  const [lineOrderContext, setLineOrderContext] = useState({
-    order: null,
-    items: [],
-  })
   const [orderForm] = Form.useForm()
   const [productSKUs, setProductSKUs] = useState([])
   const [customerContacts, setCustomerContacts] = useState([])
@@ -383,7 +373,6 @@ export default function SalesOrdersPage() {
   )
   const orderAttachmentRef = useRef(null)
   const contactLoadSeqRef = useRef(0)
-  const lineOrderRequestRef = useRef(0)
   const reservationContextRequestRef = useRef(0)
   const reservationBalanceRequestRef = useRef(0)
   const reservationInFlightRef = useRef(false)
@@ -425,10 +414,6 @@ export default function SalesOrdersPage() {
   }, [selectedOrder?.id])
   const selectedOrderCanEdit = Boolean(
     canUpdateOrder && isDraftSourceDocument(selectedOrder)
-  )
-  const selectedOrderCanReorder = Boolean(
-    canUpdateOrder &&
-    canReorderSourceDocumentItems('sales_order', selectedOrder)
   )
   const selectedOrderLifecycleStatus = String(
     selectedOrder?.lifecycle_status || ''
@@ -902,9 +887,9 @@ export default function SalesOrdersPage() {
       const [reservationData, shipmentData, warehouseData] = await Promise.all([
         listAllStockReservations({
           source_id: orderID,
-          status: 'ACTIVE',
+          status: StockReservationStatus.ACTIVE,
         }),
-        listAllShipments({ source_id: orderID, status: 'SHIPPED' }),
+        listAllShipments({ source_id: orderID, status: ShipmentStatus.SHIPPED }),
         listAllWarehouses({ active_only: true }),
       ])
       if (
@@ -1003,7 +988,7 @@ export default function SalesOrdersPage() {
     setReservationLoading(true)
     try {
       const result = await createStockReservationFromSalesOrder(params)
-      if (!result || result.status !== 'ACTIVE') {
+      if (!result || result.status !== StockReservationStatus.ACTIVE) {
         const error = new Error('库存预留返回结果无法确认')
         error.isInvalidResponse = true
         throw error
@@ -1160,86 +1145,6 @@ export default function SalesOrdersPage() {
     },
     [beginLatestRequest]
   )
-
-  const openSalesOrderLineOrder = async () => {
-    const order = selectedOrder
-    if (!selectedOrderCanReorder) {
-      message.warning(
-        order ? '当前状态不能调整明细顺序' : '请先选择一条销售订单'
-      )
-      return
-    }
-    const requestID = lineOrderRequestRef.current + 1
-    lineOrderRequestRef.current = requestID
-    setLineOrderLoading(true)
-    try {
-      const data = await listAllSalesOrderItems({
-        sales_order_id: order.id,
-        expected_version: order.version,
-      })
-      if (
-        lineOrderRequestRef.current !== requestID ||
-        selectedOrderIDRef.current !== Number(order.id)
-      ) {
-        return
-      }
-      setLineOrderContext({
-        order,
-        items: selectOpenSourceDocumentItems(data?.sales_order_items),
-      })
-      setLineOrderOpen(true)
-    } catch (error) {
-      if (isResourceVersionConflict(error)) {
-        message.warning('销售订单已被其他操作更新，请刷新后重试')
-      } else {
-        showPageLoadError(error, '加载销售订单明细顺序')
-      }
-    } finally {
-      if (lineOrderRequestRef.current === requestID) {
-        setLineOrderLoading(false)
-      }
-    }
-  }
-
-  const applySalesOrderLineOrder = async (orderedItems) => {
-    const { order } = lineOrderContext
-    if (!order?.id || !Array.isArray(orderedItems)) return false
-    setSaving(true)
-    try {
-      const result = await reorderSalesOrderItems({
-        customer_key: activeCustomerKey,
-        id: order.id,
-        expected_version: order.version,
-        item_ids: orderedItems.map((item) => item.id),
-      })
-      const { sales_order: savedOrder } = result
-      const openItems = selectOpenSourceDocumentItems(result.sales_order_items)
-      setOrders((current) =>
-        current.map((item) => (item.id === savedOrder.id ? savedOrder : item))
-      )
-      setSelectedOrder(savedOrder)
-      setLineOrderContext({ order: savedOrder, items: openItems })
-      message.success('销售订单明细顺序已保存')
-      return true
-    } catch (error) {
-      if (isResourceVersionConflict(error)) {
-        message.warning('销售订单已被其他操作更新，请刷新后重试')
-        setLineOrderOpen(false)
-        await loadOrders()
-      } else if (isMutationResultUnknown(error)) {
-        message.warning(
-          '明细顺序保存结果尚未确认，请先刷新核对，不要连续重复提交'
-        )
-        setLineOrderOpen(false)
-        await loadOrders()
-      } else {
-        message.error(getActionErrorMessage(error, '保存销售订单明细顺序'))
-      }
-      return false
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const saveOrder = async () => {
     let values
@@ -1647,6 +1552,7 @@ export default function SalesOrdersPage() {
       />
 
       <BusinessOperationPanel
+        showSelection={contentView === 'list'}
         compact
         onClearFilters={clearFilters}
         clearFiltersDisabled={!hasActiveFilters}
@@ -1743,34 +1649,39 @@ export default function SalesOrdersPage() {
           </>
         }
         actions={
-          <Space wrap>
-            {canCreateOrder ? (
-              <SalesOrderExcelImport
-                customers={customers}
-                units={units}
-                unitOptions={unitOptions}
-                disabled={referencesLoading || saving || orderModalOpen}
-                productSKUs={productSKUs}
-                salesOwnerOptions={salesOwnerOptions}
-                customerKey={activeCustomerKey}
-                onSaved={loadOrders}
-              />
-            ) : null}
-            <ToolbarButton
-              icon={<DownloadOutlined />}
-              loading={exporting}
-              disabled={loading || exporting || total === 0}
-              onClick={exportOrders}
-            >
-              导出
-            </ToolbarButton>
-            <ToolbarButton icon={<SettingOutlined />} onClick={openColumnOrder}>
-              列设置
-            </ToolbarButton>
-          </Space>
+          contentView === 'list' ? (
+            <Space wrap>
+              {canCreateOrder ? (
+                <SalesOrderExcelImport
+                  customers={customers}
+                  units={units}
+                  unitOptions={unitOptions}
+                  disabled={referencesLoading || saving || orderModalOpen}
+                  productSKUs={productSKUs}
+                  salesOwnerOptions={salesOwnerOptions}
+                  customerKey={activeCustomerKey}
+                  onSaved={loadOrders}
+                />
+              ) : null}
+              <ToolbarButton
+                icon={<DownloadOutlined />}
+                loading={exporting}
+                disabled={loading || exporting || total === 0}
+                onClick={exportOrders}
+              >
+                导出
+              </ToolbarButton>
+              <ToolbarButton
+                icon={<SettingOutlined />}
+                onClick={openColumnOrder}
+              >
+                列设置
+              </ToolbarButton>
+            </Space>
+          ) : null
         }
         primaryAction={
-          canCreateOrder ? (
+          contentView === 'list' && canCreateOrder ? (
             <ToolbarButton
               type="primary"
               className="erp-business-list-toolbar__primary-action"
@@ -1797,35 +1708,6 @@ export default function SalesOrdersPage() {
               setSelectedOrder(null)
             }}
           />
-          {canUpdateOrder ? (
-            <BusinessActionTooltip
-              selectionActionPriority={20}
-              visible={!selectedOrder || selectedOrderCanReorder}
-              disabled={!selectedOrderCanReorder || lineOrderLoading || saving}
-              disabledReason={
-                !selectedOrder
-                  ? '请先选择一条销售订单'
-                  : !selectedOrderCanReorder
-                    ? '当前状态不能调整明细顺序'
-                    : lineOrderLoading || saving
-                      ? '当前订单操作完成后可调整明细顺序'
-                      : ''
-              }
-            >
-              <Button
-                size="small"
-                data-business-action-key="line-order"
-                icon={<OrderedListOutlined />}
-                loading={lineOrderLoading}
-                disabled={
-                  !selectedOrderCanReorder || lineOrderLoading || saving
-                }
-                onClick={openSalesOrderLineOrder}
-              >
-                明细顺序
-              </Button>
-            </BusinessActionTooltip>
-          ) : null}
           {hasActionPermission(
             adminProfile,
             PermissionCode.SALES_ORDER_ENGINEERING_UPDATE
@@ -2102,20 +1984,6 @@ export default function SalesOrdersPage() {
       />
 
       {columnOrderModal}
-
-      <BusinessLineItemOrderModal
-        description="保存后只调整当前销售订单的订货明细顺序，不修改产品、数量、价格或稳定行号。"
-        getItemLabel={salesOrderLineOrderLabel}
-        itemNoun="订货明细"
-        items={lineOrderContext.items}
-        open={lineOrderOpen}
-        title="调整明细顺序"
-        onApply={applySalesOrderLineOrder}
-        onClose={() => {
-          lineOrderRequestRef.current += 1
-          setLineOrderOpen(false)
-        }}
-      />
 
       <SalesOrderEngineeringModal
         key={`${engineeringOrderID}:${returnedEngineeringBOM?.bomID || ''}`}

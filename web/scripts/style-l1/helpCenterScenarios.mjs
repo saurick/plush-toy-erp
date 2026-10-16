@@ -21,7 +21,7 @@ async function verifyManualTabMotion(page, assert, reduced) {
   await page.emulateMedia({
     reducedMotion: reduced ? 'reduce' : 'no-preference',
   })
-  await page.getByRole('tab', { name: '岗位操作图解', exact: true }).click()
+  await page.getByRole('tab', { name: '找操作', exact: true }).click()
   await page.waitForTimeout(400)
   const result = await page
     .locator('.erp-help-center-nav .ant-tabs-nav-list')
@@ -254,6 +254,41 @@ export function createHelpCenterScenarios({
   }
   return [
     {
+      name: 'help-center-home-export-desktop-light',
+      path: '/erp/help-center?role=warehouse',
+      auth: 'admin',
+      adminProfile: { is_super_admin: true },
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const home = page.getByRole('region', { name: '帮助首页' })
+        await home.waitFor()
+        assert.equal(await page.locator('#erp-help-directory').isVisible(), false)
+        const guide = ROLE_HELP_GUIDES.find(guide => guide.key === 'warehouse')
+        assert.equal(await home.getByRole('navigation', { name: '推荐办事场景' }).getByRole('button').count(), getRoleHelpScenarios(guide).length)
+        await assertNoHorizontalOverflow(page, '帮助首页不应横向溢出')
+        await page.screenshot({ path: path.join(outputDir, 'help-center-home-4k.png'), fullPage: false })
+        await home.getByRole('button', { name: '第一次使用，从头了解', exact: true }).click()
+        await page.locator('[data-help-reference="handbook:start"]').waitFor()
+        assert.equal(await page.getByRole('navigation', { name: '参考目录' }).getByRole('button').count(), HELP_REFERENCE_PAGES.length + 6)
+        const [download] = await Promise.all([
+          page.waitForEvent('download', { timeout: 5000 }),
+          page.getByRole('button', { name: '下载离线手册', exact: true }).click(),
+        ])
+        const destination = path.join(outputDir, 'business-handbook-download.html')
+        await download.saveAs(destination)
+        const html = await readFile(destination, 'utf8')
+        assert(html.startsWith('<!doctype html>'))
+        assert(html.includes('id="engineering-material-request"'))
+        assert(html.includes('id="receivables"'))
+        assert(!/<script|fetch\(/u.test(html))
+        await page.screenshot({ path: path.join(outputDir, 'help-center-handbook-4k.png'), fullPage: false })
+        await page.getByRole('tab', { name: '找操作', exact: true }).click()
+        await home.waitFor()
+      },
+    },
+    {
       name: 'help-manual-design-prototype',
       path: '/help-manual-design-preview',
       viewport: { width: 1440, height: 900 },
@@ -278,86 +313,28 @@ export function createHelpCenterScenarios({
         )
       },
       verify: async (page) => {
-        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
-        const root = frame.locator('#role-help-preview')
-        await root.waitFor()
-        const selectRole = async (label) => {
-          await root.getByRole('combobox', { name: '查看岗位', exact: true }).click()
+        const root = page.frameLocator('iframe[title="ERP 最新可交互设计"]').locator('#role-help-preview')
+        await root.getByRole('region', { name: '帮助首页' }).waitFor()
+        const selectRole = async label => {
+          await root.getByRole('combobox', { name: '推荐岗位', exact: true }).click()
           await root.getByRole('option', { name: label, exact: true }).click()
         }
         await selectRole('工程')
-        const search = root.getByRole('searchbox', {
-          name: '搜索操作图解和参考手册',
-          exact: true,
-        })
-        await search.fill('库存有，为什么还要采购？')
-        await root
-          .getByRole('region', { name: '帮助搜索结果' })
-          .getByRole('button')
-          .first()
-          .click()
-        await root
-          .getByRole('heading', {
-            name: '库存有，为什么还要采购？',
-            exact: true,
-          })
-          .waitFor()
-        assert.equal(await root.locator('#rh-manualReference img').count(), 0)
-        await root
-          .getByRole('tab', { name: '岗位操作图解', exact: true })
-          .click()
-        await root
-          .getByRole('combobox', { name: '查看岗位', exact: true })
-          .click()
-        await root.getByRole('option', { name: '工程', exact: true }).click()
-        await root.getByRole('button', { name: '目录', exact: true }).click()
-        await root
-          .getByRole('navigation', { name: '办事场景', exact: true })
-          .getByRole('button', { name: '工程用料审批与采购生成', exact: true })
-          .click()
-        await root
-          .getByRole('heading', { name: '工程用料审批与采购生成', exact: true })
-          .waitFor()
+        await root.getByRole('navigation', { name: '推荐办事场景' }).getByRole('button', { name: /工程用料审批与采购生成/ }).click()
         await root.getByText('214.2 米', { exact: false }).first().waitFor()
-        await root
-          .getByRole('tab', { name: '操作参考手册', exact: true })
-          .click()
-        await root
-          .getByRole('navigation', { name: '参考目录', exact: true })
-          .getByRole('button', { name: '工程用料审批与采购生成', exact: true })
-          .click()
-        await root
-          .getByRole('heading', {
-            name: '工程用料审批与采购生成怎么用',
-            exact: true,
-          })
-          .waitFor()
+        await root.getByRole('tab', { name: '完整手册', exact: true }).click()
+        await root.getByRole('heading', { name: '开始使用', exact: true }).waitFor()
+        const search = root.getByRole('searchbox', { name: '搜索操作图解和参考手册' })
+        await search.fill('库存有，为什么还要采购？')
+        await root.getByRole('region', { name: '帮助搜索结果' }).getByRole('button').first().click()
+        await root.getByRole('heading', { name: '库存有，为什么还要采购？', exact: true }).waitFor()
         await selectRole('仓库')
-        assert.deepEqual(
-          await root.getByRole('navigation', { name: '参考目录' }).getByRole('button').allTextContents(),
-          ['材料档案', '采购入库', '库存台账', '生产订单', '生产记录', '出货放行', '库存预留']
-        )
+        await root.getByRole('heading', { name: '库存有，为什么还要采购？', exact: true }).waitFor()
         await search.fill('月结')
-        await root.getByText('找到 0 条操作图解和参考说明', { exact: true }).waitFor()
-        await selectRole('财务')
-        assert.equal(await search.inputValue(), '月结')
-        await root.getByRole('region', { name: '帮助搜索结果' }).getByRole('button').first().waitFor()
+        assert(await root.getByRole('region', { name: '帮助搜索结果' }).getByRole('button').count() > 0)
         await search.clear()
         await selectRole('系统管理员')
-        await root.getByText('当前岗位暂无业务参考章节，可先查看岗位操作图解。', { exact: true }).waitFor()
-        assert.equal(await root.getByRole('navigation', { name: '参考目录' }).getByRole('button').count(), 0)
-        await selectRole('仓库')
-        const metrics = await root.evaluate((element) => ({
-          width: element.clientWidth,
-          scrollWidth: element.scrollWidth,
-          overflowing:
-            document.documentElement.scrollWidth >
-            document.documentElement.clientWidth + 1,
-        }))
-        assert(
-          metrics.scrollWidth <= metrics.width + 1 && !metrics.overflowing,
-          JSON.stringify(metrics)
-        )
+        assert.equal(await root.getByRole('navigation', { name: '参考目录' }).getByRole('button').count(), HELP_REFERENCE_PAGES.length + 6)
         await assertNoHorizontalOverflow(page, '帮助交互稿应留在预览容器内')
       },
     },
@@ -370,143 +347,49 @@ export function createHelpCenterScenarios({
       viewport: { width: 1440, height: 960 },
       deviceScaleFactor: 2,
       verify: async (page) => {
-        const guide = page.locator(
-          '[data-help-scenario="engineering-material-request"]'
-        )
+        const guide = page.locator('[data-help-scenario="engineering-material-request"]')
         await guide.waitFor()
-        assert.equal(
-          await page.locator('#erp-help-directory').isVisible(),
-          false
-        )
+        assert.equal(await page.locator('#erp-help-directory').isVisible(), false)
         await guide.getByText('214.2 米', { exact: false }).first().waitFor()
-        await guide
-          .getByRole('button', { name: '查看步骤 1：核对用料并提交' })
-          .focus()
-        await page.keyboard.press('Enter')
         await guide.getByText('遇到异常', { exact: true }).click()
-        await guide
-          .locator('.erp-help-outcome-copy')
-          .getByText('新审批轮次', { exact: false })
-          .waitFor()
-        await guide.getByText('提交结果不确定时', { exact: false }).waitFor()
-        await guide
-          .getByRole('button', { name: '返回第 1 步核对', exact: true })
-          .click()
-        assert(
-          await guide
-            .getByRole('button', { name: '查看步骤 1：核对用料并提交' })
-            .evaluate((element) => element === document.activeElement)
-        )
+        await guide.locator('.erp-help-outcome-copy').getByText('新审批轮次', { exact: false }).waitFor()
+        await guide.getByRole('button', { name: '返回第 1 步核对', exact: true }).click()
+        assert(await guide.getByRole('button', { name: '查看步骤 1：核对用料并提交' }).evaluate(element => element === document.activeElement))
+        await guide.locator('.erp-help-step-checks').getByText('怎样算办成了', { exact: true }).waitFor()
         await assertFlowFits(page)
         await verifyManualTabMotion(page, assert, false)
         await verifyManualTabMotion(page, assert, true)
-        await page
-          .getByRole('tab', { name: '岗位操作图解', exact: true })
-          .click()
-        const search = page.getByRole('searchbox', {
-          name: '搜索操作图解和参考手册',
-          exact: true,
-        })
+        await page.getByRole('tab', { name: '找操作', exact: true }).click()
+        await page.getByRole('region', { name: '帮助首页' }).waitFor()
+        const search = page.getByRole('searchbox', { name: '搜索操作图解和参考手册' })
         await search.fill('库存有，为什么还要采购？')
-        const stockResult = page
-          .getByRole('region', { name: '帮助搜索结果' })
-          .getByRole('button')
-          .first()
-        await stockResult.focus()
+        const result = page.getByRole('region', { name: '帮助搜索结果' }).getByRole('button').first()
+        await result.focus()
         await page.keyboard.press('Enter')
-        await page
-          .locator(
-            '[data-help-reference="engineering-material-request:stock-reference"]'
-          )
-          .waitFor()
+        const reference = page.locator('[data-help-reference="engineering-material-request:stock-reference"]')
+        await reference.waitFor()
         assert.equal(await search.inputValue(), '')
-        assert.equal(
-          await page.locator('.erp-help-reference-content img').count(),
-          0
-        )
-        await page
-          .getByRole('heading', {
-            name: '库存有，为什么还要采购？',
-            exact: true,
-          })
-          .evaluate((element) => {
-            if (element !== document.activeElement) {
-              throw new Error('词条打开后应聚焦正文标题')
-            }
-          })
+        assert(await reference.getByRole('heading', { name: '库存有，为什么还要采购？', exact: true }).evaluate(element => element === document.activeElement))
         await page.reload()
-        await page
-          .locator(
-            '[data-help-reference="engineering-material-request:stock-reference"]'
-          )
-          .waitFor()
+        await reference.waitFor()
         await page.goBack()
-        await page.waitForURL(
-          (url) => url.searchParams.get('q') === '库存有，为什么还要采购？'
-        )
         await page.getByRole('region', { name: '帮助搜索结果' }).waitFor()
         assert.equal(await search.inputValue(), '库存有，为什么还要采购？')
         await search.fill('不存在的帮助问题XYZ')
-        await page
-          .getByText(
-            '没有找到相关说明。可尝试单据名称、字段名称，或打开目录查阅。',
-            { exact: true }
-          )
-          .waitFor()
-        await search.fill('')
+        await page.getByRole('button', { name: '清空搜索', exact: true }).click()
+        await page.getByRole('region', { name: '帮助首页' }).waitFor()
+        await page.getByRole('navigation', { name: '推荐办事场景' }).getByRole('button', { name: /工程用料审批与采购生成/ }).click()
         await guide.waitFor()
-        await page.getByRole('button', { name: '目录', exact: true }).click()
-        assert.equal(
-          await page.locator('#erp-help-directory').isVisible(),
-          true
-        )
-        await page.getByRole('button', { name: '目录', exact: true }).click()
-        assert.equal(
-          await page.locator('#erp-help-directory').isVisible(),
-          false
-        )
         await page.setViewportSize({ width: 1920, height: 1080 })
         await assertFlowFits(page)
         await waitForFiniteAnimations(page)
-        await page.screenshot({
-          path: path.join(outputDir, 'help-manual-engineering-guide-4k.png'),
-          fullPage: false,
-        })
-        await page
-          .getByRole('button', {
-            name: '库存有，为什么还要采购？',
-            exact: true,
-          })
-          .click()
-        await page
-          .locator(
-            '[data-help-reference="engineering-material-request:stock-reference"]'
-          )
-          .waitFor()
+        await page.screenshot({ path: path.join(outputDir, 'help-manual-engineering-guide-4k.png'), fullPage: false })
+        await page.getByRole('button', { name: '库存有，为什么还要采购？', exact: true }).click()
+        await reference.waitFor()
         await assertNoHorizontalOverflow(page, '文字参考手册不应横向溢出')
-        const metrics = await page
-          .locator('.erp-help-reference-content')
-          .evaluate((element) => ({
-            width: element.clientWidth,
-            scrollWidth: element.scrollWidth,
-            fontSize: getComputedStyle(element).fontSize,
-            dpr: window.devicePixelRatio,
-          }))
-        assert(
-          metrics.width >= 800 &&
-            metrics.scrollWidth <= metrics.width + 1 &&
-            metrics.dpr === 2,
-          JSON.stringify(metrics)
-        )
-        await waitForFiniteAnimations(page)
-        await page.screenshot({
-          path: path.join(
-            outputDir,
-            'help-manual-engineering-reference-4k.png'
-          ),
-          fullPage: false,
-        })
-        await page.setViewportSize({ width: 1440, height: 960 })
+        const metrics = await page.locator('.erp-help-reference-content').evaluate(element => ({width:element.clientWidth,scrollWidth:element.scrollWidth,dpr:devicePixelRatio}))
+        assert(metrics.width >= 800 && metrics.scrollWidth <= metrics.width + 1 && metrics.dpr === 2, JSON.stringify(metrics))
+        await page.screenshot({ path: path.join(outputDir, 'help-manual-engineering-reference-4k.png'), fullPage: false })
       },
     },
     {
@@ -518,86 +401,43 @@ export function createHelpCenterScenarios({
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       verify: async (page) => {
-        const selectRole = async (label, key) => {
-          await page
-            .locator('.erp-help-center-role-picker .ant-select-selector')
-            .click()
+        const directory = page.getByRole('navigation', { name: '参考目录' })
+        const reference = page.locator('[data-help-reference="engineering-material-request:stock-reference"]')
+        await reference.waitFor()
+        const selectRole = async label => {
+          await page.locator('.erp-help-center-role-picker .ant-select-selector').click()
           await page.getByRole('option', { name: label, exact: true }).click()
           await waitForPickerClosed(page)
-          await page.locator(`[data-role-help-key="${key}"]`).waitFor()
         }
-        const warehousePages = [
-          'materials',
-          'inbound',
-          'inventory',
-          'production-progress',
-          'shipments',
-          'shipping-release',
-          'outbound',
-        ]
-        const directory = page.getByRole('navigation', { name: '参考目录' })
-        const assertWarehouseDirectory = async () => {
-          assert.deepEqual(
-            await directory.locator('.erp-help-topic:not(.erp-help-topic--entry)').allTextContents(),
-            warehousePages.map((key) => getBusinessUsabilityEntry(key).title),
-            '账号具有全部页面权限时，仓库目录仍只保留仓库相关章节'
-          )
-        }
-        await page
-          .locator('[data-help-reference="engineering-material-request:stock-reference"]')
-          .waitFor()
-        await page.getByRole('button', { name: '目录', exact: true }).click()
-        await selectRole('仓库', 'warehouse')
-        await assertWarehouseDirectory()
-        await page.locator('[data-help-reference="inbound"]').waitFor()
-        assert.equal(
-          await page.locator('[data-help-reference^="engineering-material-request"]').count(),
-          0
-        )
-        const search = page.getByRole('searchbox', {
-          name: '搜索操作图解和参考手册',
-        })
+        assert.equal(await directory.getByRole('button').count(), HELP_REFERENCE_PAGES.length + 6)
+        await selectRole('仓库')
+        await reference.waitFor()
+        assert.equal(await directory.getByRole('button', { name: '应收管理', exact: true }).count(), 1)
+        const search = page.getByRole('searchbox', { name: '搜索操作图解和参考手册' })
         await search.fill('月结')
-        await page.getByText('找到 0 条操作图解和参考说明', { exact: true }).waitFor()
-        await selectRole('财务', 'finance')
-        assert.equal(await search.inputValue(), '月结')
         await page.getByRole('region', { name: '帮助搜索结果' }).getByRole('button').first().waitFor()
-        assert.equal(await directory.getByRole('button', { name: '库存台账', exact: true }).count(), 0)
+        await selectRole('财务')
+        assert.equal(await search.inputValue(), '月结')
         await search.clear()
-        await page.locator('[data-help-reference="finance-payments"]').waitFor()
-        await selectRole('仓库', 'warehouse')
-        await assertWarehouseDirectory()
-        await page.getByRole('tab', { name: '岗位操作图解', exact: true }).click()
-        const guides = page.getByRole('navigation', { name: '办事场景' })
-        await guides.getByRole('button').first().waitFor()
-        assert.deepEqual(
-          await guides.getByRole('button').allTextContents(),
-          ['办理入库', '成品入库', '查库存', '办理实际出货', '材料档案', '出货放行', '库存预留'],
-          '操作图解目录也应随岗位过滤'
-        )
-        await page.getByRole('tab', { name: '操作参考手册', exact: true }).click()
-        await page.goto(new URL('/erp/help-center?view=reference&ref=inventory:available-quantity', page.url()).href)
-        await page.locator('[data-role-help-key="warehouse"] [data-help-reference="inventory:available-quantity"]').waitFor()
-        await page.getByRole('button', { name: '目录', exact: true }).click()
-        await assertWarehouseDirectory()
-        await page.screenshot({ path: path.join(outputDir, 'help-warehouse-directory-4k.png'), fullPage: false })
-        await page.reload()
-        await page.locator('[data-role-help-key="warehouse"] [data-help-reference="inventory:available-quantity"]').waitFor()
+        await reference.waitFor()
+        await page.getByRole('tab', { name: '找操作', exact: true }).click()
+        await page.getByRole('region', { name: '帮助首页' }).waitFor()
+        await selectRole('仓库')
+        const expected = getRoleHelpScenarios(ROLE_HELP_GUIDES.find(g => g.key === 'warehouse'))
+        assert.equal(await page.getByRole('navigation', { name: '推荐办事场景' }).getByRole('button').count(), expected.length)
+        await page.getByRole('tab', { name: '完整手册', exact: true }).click()
+        await page.locator('[data-help-reference="handbook:start"]').waitFor()
         await page.setViewportSize({ width: 390, height: 844 })
-        const mobilePicker = page.getByRole('combobox', { name: '查阅章节与词条' })
+        await page.reload()
+        await page.locator('[data-help-reference="handbook:start"]').waitFor()
+        assert.equal(await page.locator('#erp-help-directory').isVisible(), false)
         await page.locator('.erp-help-mobile-picker .ant-select-selector').click()
-        const mobileOptions = page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-        await mobileOptions.locator('.ant-select-item-group').first().waitFor()
-        assert.deepEqual(
-          await mobileOptions.locator('.ant-select-item-group').allTextContents(),
-          warehousePages.map((key) => getBusinessUsabilityEntry(key).title),
-          '手机章节选择沿用相同岗位范围'
-        )
-        await mobilePicker.press('Escape')
+        assert.equal(await page.locator('.ant-select-dropdown:visible .ant-select-item-option').count(), HELP_REFERENCE_PAGES.length + 6)
+        await page.keyboard.press('Escape')
         await page.getByRole('button', { name: '目录', exact: true }).click()
-        await assertWarehouseDirectory()
-        await assertNoHorizontalOverflow(page, '岗位过滤后的手机目录不应溢出')
-        await page.screenshot({ path: path.join(outputDir, 'help-warehouse-directory-mobile.png'), fullPage: true })
+        assert.equal(await directory.getByRole('button').count(), HELP_REFERENCE_PAGES.length + 6)
+        await assertNoHorizontalOverflow(page, '手机手册与当前账号可读范围应一致')
+        await page.screenshot({ path:path.join(outputDir,'help-reading-scope-mobile.png'),fullPage:true })
       },
     },
     {
@@ -638,7 +478,8 @@ export function createHelpCenterScenarios({
         }
         assert(getHelpReferenceDocuments(HELP_REFERENCE_PAGES).length > 100)
         await page.goto(new URL('/erp/help-center?role=engineering&view=reference&ref=engineering-material-request', page.url()).href)
-        await page.getByRole('button', { name: '目录', exact: true }).click()
+        await page.locator('[data-help-reference="engineering-material-request"]').waitFor()
+        assert.equal(await page.locator('#erp-help-directory').isVisible(), true)
         const engineeringSummary = page
           .getByRole('navigation', { name: '参考目录' })
           .locator('summary')
@@ -655,8 +496,8 @@ export function createHelpCenterScenarios({
           .getByRole('button', { name: '工程用料审批与采购生成', exact: true })
           .click()
         await page
-          .getByRole('navigation', { name: '参考目录' })
-          .getByRole('button', { name: '审批冻结是什么意思', exact: true })
+          .getByRole('navigation', { name: '本章词条' })
+          .getByRole('link', { name: '审批冻结是什么意思', exact: true })
           .click()
         await page
           .locator(
@@ -738,21 +579,10 @@ export function createHelpCenterScenarios({
             page.url()
           ).href
         )
-        await page.locator('[data-help-reference="inventory"]').waitFor()
-        assert.equal(
-          await page
-            .getByRole('button', { name: '打开业务页面', exact: true })
-            .count(),
-          1
-        )
-        await page
-          .getByRole('button', { name: '查看相关操作图解 →', exact: true })
-          .click()
-        await page.getByRole('button', { name: '目录', exact: true }).click()
-        await page
-          .getByRole('navigation', { name: '办事场景' })
-          .getByRole('button', { name: '办理入库', exact: true })
-          .click()
+        await page.locator('[data-help-reference="handbook:start"]').waitFor()
+        assert.equal(await page.getByRole('button',{name:'打开业务页面',exact:true}).count(),0)
+        await page.getByRole('tab',{name:'找操作',exact:true}).click()
+        await page.getByRole('navigation',{name:'推荐办事场景'}).getByRole('button',{name:/办理入库/}).click()
         await page
           .getByText('当前账号未开放此页面，可查看办理说明。', { exact: true })
           .waitFor()
@@ -1043,21 +873,8 @@ export function createHelpCenterScenarios({
         await page.getByRole('button', { name: '目录', exact: true }).click()
         let checked = 0
         for (const guide of ROLE_HELP_GUIDES) {
-          await page
-            .locator('.erp-help-center-role-picker .ant-select-selector')
-            .click()
-          await page
-            .locator('.ant-select-item-option')
-            .filter({ hasText: guide.label })
-            .click()
-          await waitForPickerClosed(page)
           for (const scenario of getRoleHelpScenarios(guide)) {
-            const title =
-              HELP_VISUAL_EXAMPLES[scenario.key]?.title || scenario.title
-            await page
-              .getByRole('navigation', { name: '办事场景' })
-              .getByRole('button', { name: title, exact: true })
-              .click()
+            await page.goto(new URL(`/erp/help-center?role=${guide.key}&scene=${scenario.key}`,page.url()).href)
             const article = page.locator(
               `[data-help-scenario="${scenario.key}"]`
             )
@@ -1125,8 +942,8 @@ export function createHelpCenterScenarios({
           .click()
         await waitForPickerClosed(page)
         await page
-          .getByRole('navigation', { name: '办事场景' })
-          .getByRole('button', { name: '收付款与核销', exact: true })
+          .getByRole('navigation', { name: '推荐办事场景' })
+          .getByRole('button', { name: /收付款与核销/ })
           .click()
         await page.screenshot({
           path: path.join(outputDir, 'help-center-finance-desktop-dark.png'),
@@ -1180,8 +997,8 @@ export function createHelpCenterScenarios({
         await page.keyboard.press('Enter')
         assert.equal(await confirm.getAttribute('aria-pressed'), 'true')
         await article
-          .locator('.erp-help-flow__detail')
-          .getByText('实收与来源核对清楚、入库条件满足后', { exact: false })
+          .locator('.erp-help-view-body')
+          .getByText('确认后检查结果', { exact: true })
           .waitFor()
         await article.getByText('遇到异常', { exact: true }).click()
         await article
@@ -1336,7 +1153,7 @@ export function createHelpCenterScenarios({
             url.search === '?role=generic&scene=getting-started&view=guide'
         )
         assert.equal(
-          await page.locator('.erp-help-article__heading button').count(),
+          await page.locator('.erp-help-article__heading button:not(.erp-help-back-home)').count(),
           0
         )
         assert.equal(
@@ -1345,17 +1162,13 @@ export function createHelpCenterScenarios({
         )
         await assertFlowFits(page)
         await page
-          .getByRole('tab', { name: '操作参考手册', exact: true })
+          .getByRole('tab', { name: '完整手册', exact: true })
           .click()
+        await page.locator('[data-help-reference="handbook:start"]').waitFor()
         await page
-          .getByText('当前岗位暂无业务参考章节，可先查看岗位操作图解。', {
-            exact: true,
-          })
-          .waitFor()
-        await page
-          .getByRole('tab', { name: '岗位操作图解', exact: true })
+          .getByRole('tab', { name: '找操作', exact: true })
           .click()
-        await page.locator('[data-help-scenario="getting-started"]').waitFor()
+        await page.getByRole('region', {name:'帮助首页'}).waitFor()
       },
     },
     {
@@ -1389,8 +1202,9 @@ export function createHelpCenterScenarios({
         await page.waitForURL(
           (url) =>
             url.searchParams.get('role') === 'finance' &&
-            url.searchParams.get('scene') === 'finance-payments'
+            url.searchParams.get('view') === 'home'
         )
+        await page.getByRole('navigation',{name:'推荐办事场景'}).getByRole('button',{name:/收付款/}).click()
         await page
           .locator('.erp-help-mobile-picker .ant-select-selector')
           .click()
@@ -1404,7 +1218,7 @@ export function createHelpCenterScenarios({
           .getByRole('button', { name: '查看步骤 3：办理并确认结果' })
           .click()
         await page
-          .locator('.erp-help-flow__detail')
+          .locator('.erp-help-current-step')
           .getByText('实际开票结果', { exact: false })
           .waitFor()
         await page.getByText('遇到异常', { exact: true }).click()

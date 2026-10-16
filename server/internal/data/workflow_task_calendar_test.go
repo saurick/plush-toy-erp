@@ -80,6 +80,7 @@ func TestWorkflowTaskCalendarScopeDatesAndPagination(t *testing.T) {
 					}
 					seen[task.ID] = true
 				}
+				q.Revision = result.Revision
 			}
 			if len(seen) != 80 {
 				t.Fatalf("pagination lost tasks: %d", len(seen))
@@ -96,5 +97,41 @@ func TestWorkflowTaskCalendarScopeDatesAndPagination(t *testing.T) {
 	denied, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Calendar: &biz.WorkflowTaskCalendarQuery{Month: "2026-10", Selection: "overdue"}, TodoOnly: true, Limit: 30, SnapshotAt: day, VisibilityScope: &biz.WorkflowTaskVisibilityScope{}})
 	if err != nil || denied.Calendar.Total != 0 || len(denied.Calendar.Days) != 0 || denied.Calendar.Undated != 0 {
 		t.Fatalf("empty permission scope leaked calendar: %+v %v", denied, err)
+	}
+}
+
+func TestWorkflowTaskCalendarRestartsChangedPage(t *testing.T) {
+	ctx := t.Context()
+	client := enttest.Open(t, dialect.SQLite, "file:calendar_revision?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	day := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	ids := []int{}
+	for index := 0; index < 35; index++ {
+		row := client.WorkflowTask.Create().SetTaskCode(fmt.Sprintf("REV-%d", index)).SetTaskGroup("revision-test").SetTaskName("日历跟进").SetSourceType("revision-test").SetSourceID(index + 1).SetTaskStatusKey("ready").SetOwnerRoleKey(biz.SalesRoleKey).SetDueAt(day).SetPayload(map[string]any{}).SaveX(ctx)
+		ids = append(ids, row.ID)
+	}
+	q := &biz.WorkflowTaskCalendarQuery{Month: "2026-10", Selection: "2026-10-14"}
+	load := func() *biz.WorkflowTaskCalendar {
+		page, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Calendar: q, TodoOnly: true, Limit: 30, SnapshotAt: day, VisibilityScope: &biz.WorkflowTaskVisibilityScope{StandaloneVisibleOwnerRoleKeys: []string{biz.SalesRoleKey}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return page.Calendar
+	}
+	first := load()
+	q.Offset, q.Revision = 30, first.Revision
+	if page := load(); page.Offset != 30 || len(page.Tasks) != 5 {
+		t.Fatalf("unchanged page restarted: %+v", page)
+	}
+	client.WorkflowTask.UpdateOneID(ids[0]).SetTaskStatusKey("done").AddVersion(1).ExecX(ctx)
+	page := load()
+	if page.Offset != 0 || page.Total != 34 || len(page.Tasks) != 30 || page.Tasks[0].ID != ids[1] || page.Revision == first.Revision {
+		t.Fatalf("changed page was appended over a stale offset: %+v", page)
+	}
+	q.Offset, q.Revision = 30, page.Revision
+	client.WorkflowTask.UpdateOneID(ids[1]).SetDueAt(day.Add(24 * time.Hour)).AddVersion(1).ExecX(ctx)
+	if page = load(); page.Offset != 0 || page.Total != 33 {
+		t.Fatalf("rescheduled task did not restart calendar: %+v", page)
 	}
 }

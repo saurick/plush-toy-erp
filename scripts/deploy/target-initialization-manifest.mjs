@@ -211,8 +211,8 @@ export function buildTargetInitializationManifest({
       "start only target PostgreSQL and Jaeger, then apply the fixed migration",
       "bootstrap one target-specific administrator without steady secret injection",
       "start the target services and read back exact release identity",
-      "create the target public entry and run bounded health, ready and smoke",
       "create and restore-check the first target rollback point",
+      "create the target public entry and run bounded health, ready and smoke",
       "write an atomic redacted receipt or remove only the created target",
     ],
     rollback: {

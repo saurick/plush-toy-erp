@@ -1333,9 +1333,6 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
   const [fullDagOpen, setFullDagOpen] = useState(false)
   const dag = buildQualityGateServerDag(evidence)
   const visibleStatuses = new Set(timing.flowJobs.map((job) => job.status))
-  const guideByName = new Map(
-    (evidence.jobGuides || []).map((guide) => [guide.name, guide])
-  )
   return (
     <section
       className="erp-dev-quality-server-pipeline"
@@ -1344,16 +1341,9 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
       <div className="erp-dev-quality-server-pipeline__heading">
         <div>
           <Text id="gitlab-pipeline-flow-title" strong>
-            本次 GitLab Pipeline DAG
-          </Text>
-          <Text type="secondary">
-            依赖关系来自同一 exact SHA 的 GitLab CI 配置，状态与耗时来自本次实际
-            Pipeline。
+            本次流水线
           </Text>
         </div>
-        <Text type="secondary">
-          工作台不复制 CI DAG；依赖不可读时失败关闭，不画推测连线。
-        </Text>
       </div>
       <div className="erp-dev-quality-server-pipeline__relationship">
         <div>
@@ -1380,8 +1370,7 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
             flowchartHtmlLabels={false}
           />
           <Text type="secondary">
-            按真实阶段汇总 {dag.nodeCount} 个 Job；阶段内依赖与单个 Job
-            状态在完整图及下方明细中查看。
+            {dag.nodeCount} 个 Job；阶段内依赖见完整图。
           </Text>
           <details
             className="erp-dev-static-guidance"
@@ -1412,9 +1401,6 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
         <div className="erp-dev-quality-server-pipeline__mapping-heading">
           <div>
             <Text strong>当前 Job 明细</Text>
-            <Text type="secondary">
-              全部 Job 的状态、运行与等待直接来自当前 GitLab 流水线。
-            </Text>
           </div>
           <Tag>{timing.flowJobs.length} 个</Tag>
         </div>
@@ -1425,7 +1411,7 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
                 key={group.key}
                 className="erp-dev-quality-server-pipeline__phase"
                 data-phase={group.key}
-                open
+                open={group.jobs.some((job) => !['passed', 'skipped'].includes(job.status) || job.name === timing.longestExecutionJob?.name)}
               >
                 <summary className="erp-dev-quality-server-pipeline__phase-heading">
                   <Text strong>{SERVER_JOB_GROUP[group.key] || group.key}</Text>
@@ -1443,7 +1429,12 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
                           className="erp-dev-quality-server-pipeline__status-indicator"
                           aria-hidden="true"
                         />
-                        <Link href={job.url} target="_blank" rel="noreferrer">
+                        <Button
+                          type="link"
+                          className="erp-dev-quality-server-pipeline__job-button"
+                          aria-label={`查看 ${job.name} 说明`}
+                          onClick={(event) => onOpenJobGuide(job.name, event.currentTarget)}
+                        >
                           <Text
                             className="erp-dev-quality-server-pipeline__node-text"
                             code
@@ -1451,22 +1442,7 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
                           >
                             {job.name}
                           </Text>
-                        </Link>
-                        <Tooltip
-                          trigger={['hover', 'focus']}
-                          title={`查看 ${guideByName.get(job.name)?.label || job.name} 说明`}
-                        >
-                          <Button
-                            type="text"
-                            size="small"
-                            className="erp-dev-quality-server-pipeline__node-guide-button"
-                            icon={<QuestionCircleOutlined />}
-                            aria-label={`查看 ${job.name} 说明`}
-                            onClick={(event) =>
-                              onOpenJobGuide(job.name, event.currentTarget)
-                            }
-                          />
-                        </Tooltip>
+                        </Button>
                       </div>
                       <Space size={4} wrap>
                         <Tag
@@ -1518,6 +1494,12 @@ function ServerCiPipelineFlow({ evidence, timing, onOpenJobGuide }) {
           ))}
         </div>
       ) : null}
+      <details className="erp-dev-tool-disclosure">
+        <summary>依赖与证据来源</summary>
+        <Text type="secondary">
+          依赖来自同一 SHA 的 CI 配置，状态与耗时来自实际 Pipeline。依赖不可读时不绘制推测连线。
+        </Text>
+      </details>
     </section>
   )
 }
@@ -1551,17 +1533,13 @@ function ServerCurrentPipelineView({ evidence, timing, onOpenJobGuide }) {
             </details>
           ) : null}
           <Text type="secondary">
-            并行 Job 可能互相重叠，不能累加推算服务器墙钟时间；执行、汇总和终态
-            Job 分开判断，优化时优先检查最长执行 Job 与排队耗时。
+            并行 Job 的耗时不能累加为总耗时；执行与排队分别判断。
           </Text>
         </section>
       ) : null}
-      <Text type="secondary">
-        证据分层：服务器只证明已提交 SHA；本机 dirty 状态与本地回执不会被覆盖。
-        {evidence.notProven?.length
-          ? ` 尚未证明：${evidence.notProven.join('、')}。`
-          : ''}
-      </Text>
+      {evidence.notProven?.length ? (
+        <Text type="secondary">尚未证明：{evidence.notProven.join('、')}。</Text>
+      ) : null}
     </div>
   )
 }
@@ -3155,13 +3133,10 @@ export default function DevQualityGatesPage() {
   )
 
   return (
-    <div className="erp-dev-quality-gates-page erp-dev-workspace-page">
+    <div className="erp-dev-quality-gates-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav sourcePath={SOURCE_PATH} />
       <header className="erp-dev-quality-header">
         <div>
-          <Text className="erp-dev-quality-header__eyebrow">
-            研发效能工作台 · 服务器证据优先
-          </Text>
           <Space align="center" size={10}>
             <SafetyCertificateOutlined className="erp-dev-quality-header__icon" />
             <Title ref={titleRef} tabIndex={-1} level={1}>
@@ -3236,10 +3211,10 @@ export default function DevQualityGatesPage() {
             <Space direction="vertical" size={4}>
               <Text>
                 {displayedStatus?.description ||
-                  '请稍候，页面不会自动执行任何门禁。'}
+                  '正在读取状态。'}
               </Text>
               {displayedStatus?.recommendation ? (
-                <Text strong>建议：{displayedStatus.recommendation}</Text>
+                <Text strong>下一步：{displayedStatus.recommendation}</Text>
               ) : null}
               {displayedStatus?.notProven?.length ? (
                 <Text type="secondary">

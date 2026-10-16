@@ -45,6 +45,7 @@ function MaterialDetailPaper({
           data-print-focus-group=""
         >
           <EditableText
+            blankField
             value={draft.companyName}
             onCommit={(value) => onFieldChange('companyName', value)}
             className="erp-material-detail-paper__company"
@@ -64,7 +65,10 @@ function MaterialDetailPaper({
         </div>
       </header>
 
-      <section className="erp-engineering-print-meta-grid">
+      <section
+        className="erp-engineering-print-meta-grid"
+        data-print-blank-region=""
+      >
         {[
           ['产品编号：', 'productNo'],
           ['订单编号：', 'orderNo'],
@@ -92,6 +96,7 @@ function MaterialDetailPaper({
                   {cell.label}
                 </span>
                 <EditableText
+                  blankField
                   value={draft[cell.fieldKey]}
                   onCommit={(value) => onFieldChange(cell.fieldKey, value)}
                 />
@@ -105,6 +110,7 @@ function MaterialDetailPaper({
                 {label}
               </span>
               <EditableText
+                blankField
                 value={draft[key]}
                 onCommit={(value) => onFieldChange(key, value)}
                 className={
@@ -211,6 +217,7 @@ function MaterialDetailPaper({
                     }}
                   >
                     <EditableText
+                      blankField
                       value={line[column.key]}
                       multiline={column.key === 'remark'}
                       rich

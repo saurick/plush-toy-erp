@@ -10,7 +10,6 @@ import {
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_WORKSPACE_NAV_ITEMS,
 } from '../config/devRoutes.mjs'
-import { DEV_TOOL_USAGE } from '../config/devWorkbenchFlow.mjs'
 
 export default function DevToolTable({
   items,
@@ -33,15 +32,18 @@ export default function DevToolTable({
     )
   }
   return (
-    <div className="erp-dev-tool-table-wrap">
+    <div className="erp-dev-tool-table-wrap erp-dev-tool-directory">
       <table className="erp-dev-tool-table" aria-label={ariaLabel}>
         <thead>
           <tr>
             <th scope="col">工具</th>
             {showGroup ? <th scope="col">所属领域</th> : null}
-            <th scope="col">用途</th>
-            <th scope="col">使用时机</th>
-            {onTogglePinned ? <th scope="col">常用</th> : null}
+            <th scope="col">用来做什么</th>
+            {onTogglePinned ? (
+              <th scope="col" className="erp-dev-tool-table__pin">
+                常用
+              </th>
+            ) : null}
           </tr>
         </thead>
         <tbody>
@@ -64,7 +66,7 @@ export default function DevToolTable({
                           <p>{item.truthSource}</p>
                           <ul>
                             {item.guardrails.map((rule) => (
-                              <li key={rule}>{rule}</li>
+                              <li key={rule}>{rule.split(' / ')[0]}</li>
                             ))}
                           </ul>
                         </div>
@@ -92,9 +94,6 @@ export default function DevToolTable({
                   </td>
                 ) : null}
                 <td>{item.description}</td>
-                <td className="erp-dev-tool-table__usage">
-                  {DEV_TOOL_USAGE[item.key]}
-                </td>
                 {onTogglePinned ? (
                   <td className="erp-dev-tool-table__pin">
                     <Tooltip title={pinned ? '取消置顶' : '置顶入口'}>

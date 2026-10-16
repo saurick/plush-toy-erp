@@ -37,7 +37,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '产品事实不等于发布或验收 / Product fact is not release or UAT',
       '不进生产构建 / No prod build',
     ]),
-    description: '查看产品能力的当前范围、完成程度与边界。',
+    description: '能力范围与当前边界',
   }),
   Object.freeze({
     key: 'permission-relationships',
@@ -55,7 +55,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不在本页写权限 / No permission writes',
       '不进生产构建 / No prod build',
     ]),
-    description: '核对岗位或账号的可用功能、实际侧栏、仓库范围与审批责任。',
+    description: '岗位权限、实际侧栏与数据范围',
   }),
   Object.freeze({
     key: 'status-flows',
@@ -91,7 +91,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description:
-      '核对业务页面的任务说明、完成标准、交接、字段解释和岗位帮助覆盖。',
+      '查业务页面的说明缺口',
   }),
   Object.freeze({
     key: 'docs',
@@ -107,7 +107,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不接 RBAC / No RBAC',
       '不进生产构建 / No prod build',
     ]),
-    description: '搜索并阅读当前工作区的正式文档。',
+    description: '搜索与阅读正式依据',
   }),
   Object.freeze({
     key: 'testing',
@@ -124,7 +124,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不索引历史参考 / No reference commands',
       '不进生产构建 / No prod build',
     ]),
-    description: '生成本轮验证建议，运行固定检查并核对独立证据。',
+    description: '生成验证计划，核对检查结果',
   }),
   Object.freeze({
     key: 'business-chain-audit',
@@ -141,7 +141,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不执行复跑或修改结论 / No execution or manual verdict writes',
       '不进生产构建 / No prod build',
     ]),
-    description: '查看创建编辑、岗位协同、异常恢复到财务终点的实跑结果和逐步证据。',
+    description: '实跑批次、问题与逐步证据',
   }),
   Object.freeze({
     key: 'quality-gates',
@@ -159,7 +159,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不接受命令、路径、凭据或任意目标 / No arbitrary input',
       '不进生产构建 / No prod build',
     ]),
-    description: '核对固定版本 CI、运行本机门禁，查看阶段与覆盖缺口。',
+    description: '固定版本 CI、本机诊断与缺口',
   }),
   Object.freeze({
     key: 'data-preparation',
@@ -174,12 +174,12 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '固定数据档位 / Fixed profiles',
       '本机系统边界 / Local OS boundary',
       '不可变计划确认 / Immutable plan confirmation',
-      '场景数据只向前补齐 / Forward-only scenario data',
+      '业务场景固定批次长期保留并复用、只向前补齐；完整回归使用隔离库',
       '禁止任意目标或命令 / No arbitrary target or shell',
       '不进生产构建 / No prod build',
     ]),
     description:
-      '准备固定数据计划，确认后执行并读回；业务场景固定批次长期保留，完整回归使用隔离库。',
+      '准备与复用模拟数据，核对批次结果',
   }),
   Object.freeze({
     key: 'ui-design',
@@ -195,7 +195,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不写运行时 / No runtime writes',
       '不进生产构建 / No prod build',
     ]),
-    description: '查看唯一 HTML 交互稿、设计说明与设计依据。',
+    description: '走交互稿，查设计说明与依据',
   }),
   Object.freeze({
     key: 'customer-config',
@@ -211,7 +211,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不做真实导入 / No real import',
       '不写核心规则 / No core rules',
     ]),
-    description: '核对已登记客户配置包，预检差异、试运行并测试应用。',
+    description: '配置包预检、差异与测试应用',
   }),
   Object.freeze({
     key: 'database-migration',
@@ -226,12 +226,13 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '固定 shared-dev / Fixed shared-dev',
       '准备与执行分离 / Prepare then execute',
       '真实备份恢复 / Verified backup restore',
+      '无关工作区变化不触发重建',
       '结果未知不重试 / No retry when unknown',
       '禁止任意目标或命令 / No arbitrary target or shell',
       '不进生产构建 / No prod build',
     ]),
     description:
-      '检查计划与备份恢复，确认后迁移并读回；无关工作区变化不触发重建。',
+      '备份恢复、升级计划与结果',
   }),
   Object.freeze({
     key: 'version-center',
@@ -249,7 +250,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '终态不重试 / No terminal retry',
       '不进生产构建 / No prod build',
     ]),
-    description: '核对版本与目标，准备发布、部署或回滚计划，并追踪操作回执。',
+    description: '发布制品、部署与回滚',
   }),
   Object.freeze({
     key: 'drill-recovery',
@@ -262,6 +263,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
     status: '只读目录与受控入口 / Read-only catalog',
     guardrails: Object.freeze([
       '复用 operation 真源 / Reuse operation truth',
+      '缺少专门运行回执的安全项保持未核验',
       '按风险分级 / Risk-tiered drills',
       '新目标先登记 / Register targets first',
       '故障注入默认关闭 / Fault injection disabled by default',
@@ -269,7 +271,7 @@ export const DEV_HUB_ITEMS = Object.freeze([
       '不进生产构建 / No prod build',
     ]),
     description:
-      '核对防入侵、备份隔离与恢复证据；缺少运行回执的安全项保持未核验。',
+      '目标安全、备份与恢复证据',
   }),
 ])
 

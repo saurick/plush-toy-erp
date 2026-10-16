@@ -131,6 +131,13 @@ test('explicit personal-network mode permits direct local and LAN entry without 
   }
 })
 
+test('local development permits loopback without credentials and keeps LAN access closed', () => {
+  for (const path of paths) {
+    assert.equal(invoke(path, { accessMode: 'local', identity: null }).passed, true)
+    assert.equal(invoke(path, { accessMode: 'local', remote: '192.168.0.66', identity: credentials }).response.statusCode, 403)
+  }
+})
+
 test('personal-network mode retains network, Host and cross-site guards', () => {
   const base = { accessMode: 'private-network', identity: null, remote: '192.168.0.66' }
   for (const changed of [
@@ -174,7 +181,7 @@ test('authentication precedes every privileged plugin and is absent from product
 })
 
 test('real isolated HTTP requests cannot reach a privileged sink without operator credentials', async (t) => {
-  const middleware = createDevOperatorAuthMiddleware({ readCredentials: () => credentials })
+  const middleware = createDevOperatorAuthMiddleware({ readCredentials: () => credentials, readAccessMode: () => 'operator' })
   let calls = 0
   const server = http.createServer((request, response) => {
     middleware(request, response, () => { calls++; response.end('authorized') })

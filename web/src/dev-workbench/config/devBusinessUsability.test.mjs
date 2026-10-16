@@ -130,7 +130,7 @@ test('devBusinessUsability: 页面明确只读且不复制权限与岗位责任�
     new URL('../pages/DevBusinessUsabilityPage.jsx', import.meta.url),
     'utf8'
   )
-  assert.match(pageSource, /只读检查/u)
+  assert.match(pageSource, /检查说明与边界/u)
   assert.match(pageSource, /推荐岗位不是权限/u)
   assert.match(pageSource, /BUSINESS_USABILITY_CATALOG/u)
   assert.match(

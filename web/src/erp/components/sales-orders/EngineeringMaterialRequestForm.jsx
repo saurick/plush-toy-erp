@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button, Form, Radio, Space, Spin, Tag } from 'antd'
+import { MaterialRequestStatus, SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import EngineeringMaterialPurchaseOrders from './EngineeringMaterialPurchaseOrders.jsx'
 import BusinessTextArea from '../business-list/BusinessTextArea.jsx'
 import {
@@ -87,19 +88,19 @@ export default function EngineeringMaterialRequestForm({
   }, [orderID, requestID, reload, install])
 
   const orderClosed = Boolean(
-    request?.order_status && request.order_status !== 'active'
+    request?.order_status && request.order_status !== SalesOrderStatus.ACTIVE
   )
   const canFinance =
     !readOnly &&
     !orderClosed &&
     !taskSettled &&
-    request?.status === 'BOSS_APPROVED' &&
+    request?.status === MaterialRequestStatus.BOSS_APPROVED &&
     permissions.finance
   const canBoss =
     !readOnly &&
     !orderClosed &&
     !taskSettled &&
-    request?.status === 'SUBMITTED' &&
+    request?.status === MaterialRequestStatus.SUBMITTED &&
     permissions.boss
   const canSubmit =
     !readOnly &&
@@ -261,7 +262,7 @@ export default function EngineeringMaterialRequestForm({
     <div className="erp-material-task-action__footer">
       {!orderClosed &&
       !taskSettled &&
-      request?.status === 'REJECTED' &&
+      request?.status === MaterialRequestStatus.REJECTED &&
       permissions.submit ? (
         <Button
           disabled={saving || loading}
@@ -304,7 +305,7 @@ export default function EngineeringMaterialRequestForm({
         ) : null}
         {!orderClosed &&
         !taskSettled &&
-        request?.status === 'REJECTED' &&
+        request?.status === MaterialRequestStatus.REJECTED &&
         permissions.submit ? (
           <Button
             disabled={saving}
@@ -446,7 +447,7 @@ export default function EngineeringMaterialRequestForm({
               />
             ) : null}
             {!taskProcessing &&
-            request.status === 'REJECTED' &&
+            request.status === MaterialRequestStatus.REJECTED &&
             request.review_note ? (
               <p>审批备注：{request.review_note}</p>
             ) : null}

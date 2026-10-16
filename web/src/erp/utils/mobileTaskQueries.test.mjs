@@ -24,29 +24,25 @@ import {
 } from './mobileTaskQueries.mjs'
 import { isWorkflowHistoryDateFilter, workflowHistoryFilterSummary } from './workflowRoleTaskHistory.mjs'
 
-test('mobileTaskQueries: 已办条件绑定查询与历史，换账号和切换条件拒绝旧结果', () => {
-  const options = normalizeMobileTaskQueryOptions({ keyword: 'SO-12', statusKey: 'rejected', period: 'custom', dateFrom: '2026-10-01', dateTo: '2026-10-12' }, true)
+test('mobileTaskQueries: 已办只恢复常用时间，撤下的人员和自定义日期不进入请求', () => {
+  const options = normalizeMobileTaskQueryOptions({ keyword: 'SO-12', statusKey: 'rejected', period: '7d', assignee: '12', dateFrom: '2026-10-01', dateTo: '2026-10-12' }, true)
   const query = buildMobileRoleTaskQuery({ roleKey: 'sales', viewKey: 'history', ...options })
-  assert.deepEqual(query, { role_key: 'sales', view_key: 'history', limit: 50, sort_key: 'completed', status_key: 'rejected', keyword: 'SO-12', period: 'custom', date_from: '2026-10-01', date_to: '2026-10-12' })
+  assert.deepEqual(query, { role_key: 'sales', view_key: 'history', limit: 50, sort_key: 'completed', status_key: 'rejected', keyword: 'SO-12', period: '7d' })
   const scope = mobileTaskQueryScope('sales:alice', options)
   const history = { mobileRoleTasksScope: scope, mobileRoleTasksKeyword: options.keyword, mobileRoleTasksSort: options.sortKey, mobileRoleTasksStatus: options.statusKey, mobileRoleTasksDates: { period: options.period, dateFrom: options.dateFrom, dateTo: options.dateTo } }
   assert.deepEqual(readMobileTaskQueryHistory(history, 'sales:alice'), options)
   assert.deepEqual(readMobileTaskQueryHistory(history, 'sales:bob'), { keyword: '', sortKey: 'newest', statusKey: '' })
-  assert.notEqual(mobileTaskQueryScope('sales:alice', { ...options, dateTo: '2026-10-11' }), scope)
+  assert.notEqual(mobileTaskQueryScope('sales:alice', { ...options, period: '30d' }), scope)
   assert.notEqual(mobileTaskQueryScope('sales:alice', { ...options, statusKey: 'done' }), scope)
   assert.deepEqual(normalizeMobileTaskQueryOptions(options), { keyword: 'SO-12', sortKey: 'newest', statusKey: '' })
-  assert.equal(workflowHistoryFilterSummary(options), '2026-10-01 至 2026-10-12 · 已驳回')
-  for (const invalid of [
-    { period: 'custom', dateFrom: '2026-02-30', dateTo: '2026-03-01' },
-    { period: 'custom', dateFrom: '2026-10-12', dateTo: '2026-10-11' },
-    { period: 'custom', dateFrom: '2026-10-12' },
-    { period: '7d', dateFrom: '2026-10-12' },
-  ]) {
-    assert.equal(isWorkflowHistoryDateFilter(invalid), false)
-    assert.throws(() => buildMobileRoleTaskQuery({ roleKey: 'sales', viewKey: 'history', ...invalid }))
-    assert.equal(normalizeMobileTaskQueryOptions(invalid, true).period, '')
-  }
+  const retired = normalizeMobileTaskQueryOptions({ ...options, period: 'custom', dateFrom: '2026-10-01', dateTo: '2026-10-12' }, true)
+  assert.equal(retired.period, '')
+  assert.equal(retired.dateFrom, '')
+  assert.equal(retired.dateTo, '')
+  assert.equal('assignee' in options, false)
+  assert.throws(() => buildMobileRoleTaskQuery({ roleKey: 'sales', viewKey: 'history', period: 'custom', dateFrom: '2026-10-01', dateTo: '2026-10-12' }))
   assert.equal(isWorkflowHistoryDateFilter({ period: 'custom', dateFrom: '2024-02-29', dateTo: '2024-02-29' }), true)
+  assert.equal(workflowHistoryFilterSummary(retired), '已驳回')
 })
 
 test('mobileTaskQueries: 排序和状态进入分页查询及历史范围，切换后旧响应失效', () => {

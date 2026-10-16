@@ -28,3 +28,4 @@ output/
 .customer-sources/
 docs/customers/*/raw-source-files/
 output/customers/*/private-source-*/
+web/build-workbench/

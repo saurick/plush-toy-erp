@@ -227,12 +227,9 @@ test('production overview ranks plan risk without inventing completion progress'
 
   assert.equal(model.rows[0].orderNo, 'MO-OVERDUE')
   assert.equal(model.rows[0].scheduleStatus.key, 'overdue')
-  assert.equal(model.counts.active, 1)
+  assert.equal(model.counts.total, 3)
   assert.equal(model.counts.overdue, 1)
-  assert.equal(
-    model.statusGroups.find((group) => group.key === 'DRAFT').count,
-    1
-  )
+  assert.equal(model.rows.find((row) => row.orderStatus === 'DRAFT').orderNo, 'MO-DRAFT')
   assert.equal(Object.hasOwn(model.rows[0], 'progress'), false)
 })
 

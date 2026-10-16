@@ -1,3 +1,5 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
+
 const WORKFLOW_TASK_CREATE_PUBLIC_PARAM_KEYS = new Set([
   'idempotency_key',
   'task_code',
@@ -109,7 +111,7 @@ export function requireWorkflowTaskCreateParams(params = {}) {
 
   const taskStatusKey = normalizedOptionalString(params, 'task_status_key')
   normalized.task_status_key = taskStatusKey || 'ready'
-  if (normalized.task_status_key !== 'ready') {
+  if (normalized.task_status_key !== WorkflowTaskStatus.READY) {
     throw new TypeError('新建任务只能从待处理状态开始')
   }
 

@@ -10,6 +10,7 @@ import {
   findMergeAtCell,
   isMergeTopLeftCell,
 } from '../../utils/detailCellMerge.mjs'
+import { normalizeContractClauseGroups } from '../../utils/contractClauseEditor.mjs'
 
 export const PRINT_TEMPLATE_LINE_COLUMNS = Object.freeze({
   material: MATERIAL_PURCHASE_DETAIL_COLUMNS.map(({ key, label }) => ({
@@ -30,17 +31,11 @@ export function getPrintTemplateLineColumns(kind) {
 
 export function normalizePrintTemplatePreviewData(data) {
   const source = data && typeof data === 'object' ? data : {}
-  const clauses =
-    source.clauses && typeof source.clauses === 'object' ? source.clauses : {}
   return {
     ...source,
     lines: Array.isArray(source.lines) ? source.lines : [],
     merges: Array.isArray(source.merges) ? source.merges : [],
-    clauses: {
-      delivery: Array.isArray(clauses.delivery) ? clauses.delivery : [],
-      contract: Array.isArray(clauses.contract) ? clauses.contract : [],
-      settlement: Array.isArray(clauses.settlement) ? clauses.settlement : [],
-    },
+    clauses: normalizeContractClauseGroups(source.clauses),
   }
 }
 

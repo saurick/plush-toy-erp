@@ -90,6 +90,7 @@ const currentMarkdownModules = import.meta.glob(
     '../../../../config/customers/**/*.md',
     '../../../../docs/**/*.md',
     '!../../../../docs/archive/**/*.md',
+    '!../../../../docs/customers/*/甲方反馈记录.md',
   ],
   {
     eager: true,
@@ -448,6 +449,7 @@ export default function DevDocsPage() {
   )
   const trimmedKeyword = keyword.trim()
   const isSearching = trimmedKeyword.length > 0
+  const fullTextSearchPending = isSearching && searchScope === DEV_DOCS_SEARCH_SCOPE_ALL && lifecycleDocs.some((item) => item.loadSource && !item.source && sourceLoadState[item.path]?.status !== 'error')
   const isTitleOnlySearch = searchScope === DEV_DOCS_SEARCH_SCOPE_TITLE
   const allExpanded =
     allDirectoryKeys.length > 0 &&
@@ -457,11 +459,7 @@ export default function DevDocsPage() {
     (isSearching ? visibleDocs : lifecycleDocs).find(
       (item) => item.key === selectedKey
     ) || (isSearching ? undefined : visibleDocs[0] || lifecycleDocs[0])
-  const {
-    path: selectedDocPath,
-    source: selectedDocSource,
-    loadSource: loadSelectedDocSource,
-  } = selectedDoc || {}
+  const { path: selectedDocPath, source: selectedDocSource } = selectedDoc || {}
   const selectedDocPinned = Boolean(selectedDoc?.pinned)
   const selectedSourceLoadState = selectedDocPath
     ? sourceLoadState[selectedDocPath]
@@ -500,53 +498,54 @@ export default function DevDocsPage() {
   }, [lifecycle])
 
   useEffect(() => {
-    if (
-      !selectedDocPath ||
-      !loadSelectedDocSource ||
-      selectedDocSource ||
-      sourceLoadRequestedRef.current.has(selectedDocPath)
-    ) {
-      return
+    const searchAllSources =
+      keyword.trim() && searchScope === DEV_DOCS_SEARCH_SCOPE_ALL
+    const pendingDocs = searchAllSources
+      ? lifecycleDocs
+      : [selectedDoc].filter(Boolean)
+    for (const item of pendingDocs) {
+      if (
+        !item.loadSource ||
+        item.source ||
+        sourceLoadRequestedRef.current.has(item.path)
+      ) {
+        continue
+      }
+      const { path } = item
+      sourceLoadRequestedRef.current.add(path)
+      setSourceLoadState((current) => ({
+        ...current,
+        [path]: { status: 'loading' },
+      }))
+
+      Promise.resolve()
+        .then(() => item.loadSource())
+        .then((value) => {
+          const source =
+            typeof value === 'string'
+              ? value
+              : typeof value?.default === 'string'
+                ? value.default
+                : ''
+          if (!source) {
+            throw new Error('文档内容为空')
+          }
+          setSourceLoadState((current) => ({
+            ...current,
+            [path]: { status: 'ready', source },
+          }))
+        })
+        .catch(() => {
+          setSourceLoadState((current) => ({
+            ...current,
+            [path]: {
+              status: 'error',
+              message: '文档加载失败，请重试',
+            },
+          }))
+        })
     }
-
-    const path = selectedDocPath
-    sourceLoadRequestedRef.current.add(path)
-    setSourceLoadState((current) => ({
-      ...current,
-      [path]: { status: 'loading' },
-    }))
-
-    Promise.resolve(loadSelectedDocSource())
-      .then((value) => {
-        const source =
-          typeof value === 'string'
-            ? value
-            : typeof value?.default === 'string'
-              ? value.default
-              : ''
-        if (!source) {
-          throw new Error('文档内容为空')
-        }
-        setSourceLoadState((current) => ({
-          ...current,
-          [path]: { status: 'ready', source },
-        }))
-      })
-      .catch((error) => {
-        setSourceLoadState((current) => ({
-          ...current,
-          [path]: {
-            status: 'error',
-            message: error instanceof Error ? error.message : '加载失败',
-          },
-        }))
-      })
-  }, [
-    loadSelectedDocSource,
-    selectedDocPath,
-    selectedDocSource,
-    sourceReloadToken,
-  ])
+  }, [selectedDoc, lifecycleDocs, keyword, searchScope, sourceReloadToken])
 
   useEffect(() => {
     if (typeof window === 'undefined' || !selectedDoc?.path) {
@@ -853,7 +852,7 @@ export default function DevDocsPage() {
   }
 
   return (
-    <div className="erp-dev-docs-page erp-dev-workspace-page">
+    <div className="erp-dev-docs-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav />
       <header className="erp-dev-docs-header">
         <div className="erp-dev-docs-header__copy">
@@ -862,16 +861,14 @@ export default function DevDocsPage() {
             <Title level={1} className="erp-dev-docs-title">
               开发文档
             </Title>
-            <Tag color="green">仅开发环境 / DEV ONLY</Tag>
           </Space>
           <details className="erp-dev-docs-boundary-details">
-            <summary>查看收录范围与维护边界</summary>
+            <summary>收录范围</summary>
             <Paragraph>
               {
-                '查看器只读加载当前工作区内已匹配的 Markdown；历史正文仅在打开时加载。 '
+                '只读加载当前工作区的 Markdown；历史正文在打开或全文搜索时加载。 '
               }
-              文件可见不代表已经纳入 Git，也不代表内容是
-              runtime、schema、权限、发布或客户验收真源。
+              收录不代表已纳入 Git；实现、运行和验收仍需核对对应证据。
             </Paragraph>
           </details>
         </div>
@@ -879,9 +876,6 @@ export default function DevDocsPage() {
 
       <main className="erp-dev-docs-shell">
         <aside className="erp-dev-docs-sidebar">
-          <Text className="erp-dev-docs-sidebar__hint">
-            先搜索；找不到再展开目录
-          </Text>
           <div className="erp-dev-docs-lifecycle">
             <Text type="secondary">文档层级</Text>
             <Segmented
@@ -906,7 +900,7 @@ export default function DevDocsPage() {
               isTitleOnlySearch
                 ? '当前仅搜索文档标题；切换“全部”可搜索路径和正文'
                 : lifecycle === DEV_DOCS_LIFECYCLE_ARCHIVE
-                  ? '历史正文按需加载；未打开的历史文档先按标题和路径搜索'
+                  ? '搜索时按需加载历史正文，并搜索标题、路径和完整正文'
                   : '当前层级搜索标题、路径或正文；不搜索时按目录树浏览'
             }
             onChange={(event) => setKeyword(event.target.value)}
@@ -923,6 +917,39 @@ export default function DevDocsPage() {
               onChange={setSearchScope}
             />
           </div>
+
+          {keyword.trim() &&
+          searchScope === DEV_DOCS_SEARCH_SCOPE_ALL &&
+          lifecycleDocs.some(
+            (item) =>
+              item.loadSource &&
+              !item.source &&
+              sourceLoadState[item.path]?.status !== 'error'
+          ) ? (
+            <Space role="status">
+              <Spin size="small" />
+              <Text type="secondary">正在检索完整正文</Text>
+            </Space>
+          ) : null}
+          {keyword.trim() &&
+          searchScope === DEV_DOCS_SEARCH_SCOPE_ALL &&
+          lifecycleDocs.some(
+            (item) => sourceLoadState[item.path]?.status === 'error'
+          ) ? (
+            <Button
+              size="small"
+              onClick={() => {
+                for (const item of lifecycleDocs) {
+                  if (sourceLoadState[item.path]?.status === 'error') {
+                    sourceLoadRequestedRef.current.delete(item.path)
+                  }
+                }
+                setSourceReloadToken((value) => value + 1)
+              }}
+            >
+              部分正文加载失败，重新检索
+            </Button>
+          ) : null}
 
           {pinnedDocs.length > 0 ? (
             <details className="erp-dev-docs-sidebar__section erp-dev-docs-pinned erp-dev-docs-pinned-disclosure">
@@ -1060,7 +1087,9 @@ export default function DevDocsPage() {
                   <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
                     description={
-                      isTitleOnlySearch
+                      fullTextSearchPending
+                        ? '正在检索完整正文'
+                        : isTitleOnlySearch
                         ? '标题中没有匹配文档，可切换到“全部”搜索路径和正文'
                         : '没有匹配的文档'
                     }

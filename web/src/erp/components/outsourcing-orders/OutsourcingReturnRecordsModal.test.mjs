@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { readContractSource as readFileSync } from '../../../../scripts/test/publicContractSource.mjs'
 
 const source = readFileSync(
   new URL('./OutsourcingReturnRecordsModal.jsx', import.meta.url),
@@ -42,7 +42,7 @@ test('outsourcing fact lifecycle actions use the exact state matrix and inventor
   assert.match(source, /selectedPosted && canCancelFact/u)
   assert.match(source, /取消过账（恢复至过账前库存）/u)
   assert.match(source, /onCancelFact\?\.\(selected\)/u)
-  assert.match(source, /CANCELLED: '已取消'/u)
+  assert.match(source, /'CANCELLED': '已取消'/u)
   assert.doesNotMatch(source, /selectedCancelled/u)
 })
 

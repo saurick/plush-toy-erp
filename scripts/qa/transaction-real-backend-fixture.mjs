@@ -9,6 +9,8 @@ import {
 } from "./browser-write-target.mjs";
 import { approvePurchaseOrderThroughProcess } from "./purchase-order-approval-process.mjs";
 import { advanceSalesOrderLifecycleThroughProcess } from "./manual-acceptance-source-data.mjs";
+import { prepareManualAcceptanceEngineering } from "./manual-acceptance-engineering-data.mjs";
+import { OutsourcingOrderStatus } from "../../web/src/common/consts/statuses.generated.mjs";
 
 export function validateTransactionTarget(options) {
   assertDisposableDatabaseTarget({
@@ -270,6 +272,9 @@ export async function prepareTransactionFixture(client, options) {
     "finance",
     "boss",
     "sales",
+    "production",
+    "pmc",
+    "engineering",
   ])
     await client.login(role);
   const rpc = client.rpc;
@@ -603,6 +608,209 @@ export async function prepareTransactionReceivable(client, fixture) {
   ).finance_fact;
   assert.equal(fact.status, "POSTED");
   return { fact, shipment, stockOperation: operation };
+}
+
+export async function prepareTransactionProductionSource(
+  client,
+  options,
+  fixture,
+) {
+  const prefix = `${fixture.prefix}-${options.mobile ? "MP" : "DP"}`;
+  const salesOrder = await prepareTransactionSalesOrder(client, options, {
+    ...fixture,
+    prefix,
+  });
+  const { sales_order_items: salesItems } = await client.rpc(
+    "sales",
+    "sales_order",
+    "list_sales_order_items",
+    { sales_order_id: salesOrder.id, limit: 100 },
+  );
+  assert.equal(salesItems.length, 1);
+  const item = salesItems[0];
+  const { warehouses } = await client.rpc(
+    "admin",
+    "masterdata",
+    "list_warehouses",
+    { limit: 100 },
+  );
+  const warehouse = warehouses.find(
+    (row) => row.is_active && row.type === "FINISHED_GOODS",
+  );
+  assert.ok(warehouse);
+  await assignTransactionWarehouseScopes(
+    client,
+    [fixture.warehouse.id, warehouse.id],
+    ["warehouse", "quality", "sales", "production", "pmc"],
+  );
+  let bom = (
+    await client.rpc("admin", "bom", "save_bom_with_items", {
+      product_id: item.product_id,
+      version: `${prefix}-BOM`,
+      items: [
+        {
+          material_id: fixture.material.id,
+          unit_id: fixture.material.default_unit_id,
+          quantity: "1",
+          loss_rate: "0",
+          position: "模拟裁片用料",
+        },
+      ],
+    })
+  ).bom_version;
+  assert.equal(bom.status, "DRAFT");
+  bom = (
+    await client.rpc("admin", "bom", "activate_bom_version", { id: bom.id })
+  ).bom_version;
+  assert.equal(bom.status, "ACTIVE");
+  const materialFields = [
+    "code",
+    "name",
+    "default_unit_id",
+    "stock_category",
+    "default_warehouse_id",
+    "supplier_item_no",
+    "category",
+    "spec",
+    "color",
+  ];
+  const { material: suppliedMaterial } = await client.rpc(
+    "admin",
+    "masterdata",
+    "update_material",
+    {
+      ...Object.fromEntries(
+        materialFields.map((key) => [key, fixture.material[key]]),
+      ),
+      id: fixture.material.id,
+      supplier_id: fixture.supplier.id,
+    },
+  );
+  assert.equal(suppliedMaterial.supplier_id, fixture.supplier.id);
+  const { products } = await client.rpc(
+    "engineering",
+    "masterdata",
+    "list_products",
+    { limit: 100 },
+  );
+  const product = products.find((row) => row.id === item.product_id);
+  assert.ok(product);
+  const engineering = await prepareManualAcceptanceEngineering({
+    plan: {
+      prefix: "SIM-E2E",
+      productionCandidates: [
+        { salesOrder: { id: salesOrder.id, orderNo: salesOrder.order_no } },
+      ],
+    },
+    sourceReport: {
+      referenceRecords: {
+        products: [product],
+        bomVersions: [
+          {
+            id: bom.id,
+            version: bom.version,
+            productId: item.product_id,
+            status: "ACTIVE",
+          },
+        ],
+      },
+    },
+    rpc: ({ actor, domain, method, params }) =>
+      client.rpc(actor, domain, method, params),
+  });
+  assert.equal(engineering.sampleImageCount, 1);
+  assert.equal(engineering.materialRequests.length, 1);
+  assert.equal(engineering.materialRequests[0].status, "APPROVED");
+  const { processes } = await client.rpc(
+    "admin",
+    "masterdata",
+    "list_processes",
+    { limit: 100 },
+  );
+  const process = processes.find(
+    (row) =>
+      row.is_active &&
+      row.production_route_operation_code === "FABRIC_PROCESSING",
+  );
+  assert.ok(
+    process,
+    "core seed must bind the fabric route to a process master",
+  );
+  let contract = (
+    await client.rpc(
+      "purchase",
+      "outsourcing_order",
+      "save_outsourcing_order_with_items",
+      {
+        outsourcing_order_no: `${prefix}-CUT`,
+        supplier_id: fixture.supplier.id,
+        currency: "CNY",
+        order_date: new Date().toISOString().slice(0, 10),
+        expected_return_date: new Date(Date.now() + 86400000)
+          .toISOString()
+          .slice(0, 10),
+        supplier_snapshot: {
+          name: fixture.supplier.name,
+          contact_name: "模拟加工联系人",
+          contact_phone: "0769-00000000",
+          address: "模拟加工地址",
+          simulated_only: true,
+        },
+        contract_party_snapshot: {
+          buyerCompany: "模拟生产工厂",
+          buyerContact: "模拟采购",
+          buyerPhone: "0769-00000000",
+          buyerAddress: "模拟收货地址",
+        },
+        source_order_no: salesOrder.order_no,
+        note: "模拟生产裁片加工前置合同",
+        items: [
+          {
+            line_no: 1,
+            subject_type: "MATERIAL",
+            material_id: fixture.material.id,
+            process_id: process.id,
+            unit_id: fixture.material.default_unit_id,
+            outsourcing_quantity: "2",
+            processing_item: "模拟裁片加工",
+            unit_price: "1",
+            amount: "2",
+          },
+        ],
+      },
+    )
+  ).outsourcing_order;
+  for (const [method, status] of [
+    ["submit_outsourcing_order", OutsourcingOrderStatus.SUBMITTED],
+    ["confirm_outsourcing_order", OutsourcingOrderStatus.CONFIRMED],
+  ]) {
+    contract = (
+      await client.rpc("purchase", "outsourcing_order", method, {
+        id: contract.id,
+        expected_version: contract.version,
+        idempotency_key: `${prefix}:${method}`,
+      })
+    ).outsourcing_order;
+    assert.equal(contract.lifecycle_status, status);
+  }
+  const { outsourcing_order_items: contractItems } = await client.rpc(
+    "purchase",
+    "outsourcing_order",
+    "list_outsourcing_order_items",
+    { outsourcing_order_id: contract.id, limit: 100 },
+  );
+  assert.equal(contractItems.length, 1);
+  return {
+    ...fixture,
+    prefix,
+    salesOrder,
+    salesItem: item,
+    bom,
+    finishedWarehouse: warehouse,
+    contract,
+    contractItem: contractItems[0],
+    quantity: 2,
+  };
 }
 
 export async function assignTransactionWarehouseScopes(

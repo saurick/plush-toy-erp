@@ -91,7 +91,20 @@ configure_registered_target() {
     TARGET_TRIAL_TARGET=""
     TARGET_JAEGER_PORTS='JAEGER_6831_PORT=62002 JAEGER_6832_PORT=62003 JAEGER_UI_PORT=62005 JAEGER_14268_PORT=62006 JAEGER_14250_PORT=62007 JAEGER_9411_PORT=62008 JAEGER_OTLP_GRPC_PORT=62009 JAEGER_OTLP_HTTP_PORT=62010'
     ;;
-  *) fail "DEPLOYMENT_TARGET_KEY 只允许 demo-133 或 customer-test-133；admin 不是部署环境" ;;
+  production-133)
+    TARGET_COMPOSE_PROJECT=plush-toy-erp-production
+    TARGET_POSTGRES_DB=plush_erp_production
+    TARGET_ROOT=/root/deploy/plush-toy-erp-production
+    TARGET_COMPOSE_OVERRIDE_FILE=$SCRIPT_DIR/compose.production-133.yml
+    TARGET_COMPOSE_ENV_FILE=$TARGET_ROOT/runtime/.env.production-133
+    TARGET_POSTGRES_PORT=55438
+    TARGET_APP_HTTP_PORT=8345
+    TARGET_WEB_DESKTOP_PORT=5215
+    TARGET_TRIAL_ENABLED=0
+    TARGET_TRIAL_TARGET=""
+    TARGET_JAEGER_PORTS='JAEGER_6831_PORT=63002 JAEGER_6832_PORT=63003 JAEGER_UI_PORT=63005 JAEGER_14268_PORT=63006 JAEGER_14250_PORT=63007 JAEGER_9411_PORT=63008 JAEGER_OTLP_GRPC_PORT=63009 JAEGER_OTLP_HTTP_PORT=63010'
+    ;;
+  *) fail "DEPLOYMENT_TARGET_KEY 只允许 demo-133、customer-test-133 或 production-133；admin 不是部署环境" ;;
   esac
 
   REGISTERED_TARGET_MODE=1
@@ -118,7 +131,7 @@ usage() {
   COMPOSE_ENV_FILE
                  登记目标受控运行 env；必须位于对应独立目标根目录
   DEPLOYMENT_TARGET_KEY
-                 只允许 demo-133 或 customer-test-133；admin 不是部署环境
+                 只允许 demo-133、customer-test-133 或 production-133；admin 不是部署环境
   MIG_DIR        迁移目录（默认 server/internal/data/model/migrate）
   POSTGRES_SERVICE  compose 里的 Postgres 服务名（默认 postgres）
   APP_SERVICE    compose 里的后端服务名（默认 app-server）；正式 apply 时必须已停止

@@ -1,6 +1,6 @@
 # 客户私有化部署资料 / Customer Private Deployments
 
-本目录只保存真实客户私有化实例的脱敏 runbook、检查清单和 evidence 索引。唯一部署真源始终是：
+本目录保存真实客户私有化实例的运行合同、配置差异、运维适配、脱敏 runbook、检查清单和 evidence。Compose 运行定义统一维护在：
 
 ```text
 server/deploy/compose/prod
@@ -10,7 +10,9 @@ server/deploy/compose/prod
 
 | 路径 | 当前用途 |
 | --- | --- |
-| `yoyoosun/` | 当前真实客户的 env/override 示例、runbook、checklist、evidence 与薄脚本 |
+| `yoyoosun/` | 当前真实客户的运行与凭据合同、env 和反向代理示例、运维适配、runbook、checklist 与 evidence |
+
+通用发布、smoke、采证和备份恢复执行逻辑统一放在 [`scripts/deploy/`](../scripts/deploy/README.md)。客户目录不复制完整 Compose，也不提供没有运行消费者的服务端或前端配置样例；确有差异时只增加现有 env 无法表达的必要 override。
 
 `reference-customer` 是 draft/preview 工程参考，不创建 `deployments/reference-customer/`。它的最小参数示例、首次部署/升级/回滚/恢复边界统一放在 `config/private-deployment-template/`，避免复制第二套部署架构或生成虚假 evidence。
 

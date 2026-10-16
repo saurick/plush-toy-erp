@@ -27,6 +27,41 @@ function createStorage() {
   }
 }
 
+test('readable storage with failed writes and removals uses current memory values', () => {
+  const localStorage = createStorage()
+  const sessionStorage = createStorage()
+  localStorage.setItem('erp:admin_login_mode', 'password')
+  sessionStorage.setItem(
+    'erp:admin_login_sms_state',
+    JSON.stringify({ phone: 'old', cooldownUntil: 60000 })
+  )
+  globalThis.window = { localStorage, sessionStorage }
+  const writeLocal = localStorage.setItem
+  const writeSession = sessionStorage.setItem
+  const removeSession = sessionStorage.removeItem
+  localStorage.setItem = () => {
+    throw new Error('quota')
+  }
+  sessionStorage.setItem = () => {
+    throw new Error('quota')
+  }
+  sessionStorage.removeItem = () => {
+    throw new Error('quota')
+  }
+  rememberLoginModePreference('sms')
+  assert.equal(readLoginModePreference(), 'sms')
+  rememberSMSLoginSession({ phone: 'new', cooldownUntil: 90000 }, 1000)
+  assert.equal(readSMSLoginSession(2000).phone, 'new')
+  clearSMSLoginSession()
+  assert.equal(readSMSLoginSession(2000).phone, '')
+  localStorage.setItem = writeLocal
+  sessionStorage.setItem = writeSession
+  sessionStorage.removeItem = removeSession
+  rememberLoginModePreference('password')
+  clearSMSLoginSession()
+  delete globalThis.window
+})
+
 function installWindowStorage() {
   const localStorage = createStorage()
   const sessionStorage = createStorage()

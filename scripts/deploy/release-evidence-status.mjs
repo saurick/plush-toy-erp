@@ -317,7 +317,7 @@ function buildSmokeCommand({
   const acceptanceArgs = acceptance
     ? " --credential-operation-id <credential-rotation-operation-id> --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD"
     : "";
-  return `bash deployments/yoyoosun/scripts/run-smoke.sh --profile ${profile} --product-commit <40-character-git-commit> --migration-version <migration-after> --deployment-target ${deploymentTarget} --environment ${deploymentTarget} --endpoint <public-endpoint> --backend-url <backend-endpoint>${acceptanceArgs}${demoCredentialArgs}${customerConfigSmokeArgs} --report ${evidenceDir}/smoke-test-report.json`;
+  return `bash scripts/deploy/run-smoke.sh --profile ${profile} --product-commit <40-character-git-commit> --migration-version <migration-after> --deployment-target ${deploymentTarget} --environment ${deploymentTarget} --endpoint <public-endpoint> --backend-url <backend-endpoint>${acceptanceArgs}${demoCredentialArgs}${customerConfigSmokeArgs} --report ${evidenceDir}/smoke-test-report.json`;
 }
 
 function buildRollbackRehearsalCommand({
@@ -348,7 +348,7 @@ function buildNextCommands({
   );
   if (status === "missing") {
     return [
-      `bash deployments/yoyoosun/scripts/collect-evidence.sh --deployment-target ${deploymentTarget} --profile ${profile} --release-id <release-id> --output ${evidenceDir || "deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>"}`,
+      `bash scripts/deploy/collect-evidence.sh --deployment-target ${deploymentTarget} --profile ${profile} --release-id <release-id> --output ${evidenceDir || "deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>"}`,
     ];
   }
 
@@ -387,7 +387,7 @@ function buildNextCommands({
       missing.has(REQUIRED_FILES.migration))
   ) {
     commands.push(
-      `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-id <release-id> --environment ${deploymentTarget} --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
+      `SOURCE_POSTGRES_DSN="<source-dsn>" bash scripts/deploy/run-backup-restore-rehearsal.sh --release-id <release-id> --environment ${deploymentTarget} --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
     );
   }
   if (!recoveryRehearsalRequired && missing.has(REQUIRED_FILES.backup)) {
@@ -489,7 +489,7 @@ function buildCloseoutNextActions({
             break;
           }
           action.commands.push(
-            `SOURCE_POSTGRES_DSN="<source-dsn>" bash deployments/yoyoosun/scripts/run-backup-restore-rehearsal.sh --release-id <release-id> --environment ${deploymentTarget} --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
+            `SOURCE_POSTGRES_DSN="<source-dsn>" bash scripts/deploy/run-backup-restore-rehearsal.sh --release-id <release-id> --environment ${deploymentTarget} --backup-purpose pre-migration --out output/customers/yoyoosun/backup-restore-rehearsal --evidence-dir ${evidenceDir}`,
           );
           action.manualChecks.push(
             "Bind backupId, migrationBefore, migrationAfter, backup hash, restore target, command summary, and smoke query evidence to the same release batch.",

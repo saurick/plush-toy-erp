@@ -30,6 +30,7 @@ export function createBusinessColumnSettingsScenarios({
         !button.classList.contains('ant-btn-loading'),
       completeHandle
     )
+    assert.equal(await complete.getAttribute('aria-busy'), 'false')
     const response = page.waitForResponse(
       (res) =>
         res.url().includes('/rpc/admin') &&

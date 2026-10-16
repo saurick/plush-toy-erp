@@ -1,3 +1,5 @@
+import { OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
+
 const MAX_FACT_NO_LENGTH = 64
 const MAX_NOTE_LENGTH = 255
 
@@ -148,7 +150,7 @@ export function suggestedFinanceBusinessNo(action, source = {}) {
 
 export function buildPurchaseReceiptPayablePayload(values = {}, receipt = {}) {
   const record = receipt && typeof receipt === 'object' ? receipt : {}
-  if (normalizedUpperText(record.status) !== 'POSTED') {
+  if (normalizedUpperText(record.status) !== OperationalFactStatus.POSTED) {
     throw new Error('仅已过账的采购入库可以生成应付')
   }
   const receiptID = positiveID(record.id)
@@ -164,7 +166,7 @@ export function buildPurchaseReceiptPayablePayload(values = {}, receipt = {}) {
 export function isOutsourcingReturnPayableSource(fact = {}) {
   const record = fact && typeof fact === 'object' ? fact : {}
   return (
-    normalizedUpperText(record.status) === 'POSTED' &&
+    normalizedUpperText(record.status) === OperationalFactStatus.POSTED &&
     normalizedUpperText(record.fact_type) === 'RETURN_RECEIPT' &&
     positiveID(record.id) > 0
   )
@@ -187,7 +189,7 @@ export function buildOutsourcingReturnPayablePayload(values = {}, fact = {}) {
 export function isSingleFactReconciliationSource(fact = {}) {
   const record = fact && typeof fact === 'object' ? fact : {}
   return (
-    normalizedUpperText(record.status) === 'POSTED' &&
+    normalizedUpperText(record.status) === OperationalFactStatus.POSTED &&
     RECONCILIATION_SOURCE_TYPES.has(normalizedUpperText(record.fact_type)) &&
     positiveID(record.id) > 0
   )
@@ -259,7 +261,7 @@ export function validateFinanceBusinessSourceResult(
   const expectedSourceID = positiveID(request?.[sourceIDKey])
   const valid =
     positiveID(result?.id) > 0 &&
-    normalizedUpperText(result?.status) === 'DRAFT' &&
+    normalizedUpperText(result?.status) === OperationalFactStatus.DRAFT &&
     normalizedUpperText(result?.fact_type) === factType &&
     normalizedUpperText(result?.source_type) === sourceType &&
     positiveID(result?.source_id) === expectedSourceID

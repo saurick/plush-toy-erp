@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Tag } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { MaterialRequestStatus, SalesOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../../utils/businessSearchScopes.mjs'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
@@ -39,16 +40,16 @@ const statusTag = (record) => (
   <span>
     <Tag
       color={
-        record.status === 'APPROVED'
+        record.status === MaterialRequestStatus.APPROVED
           ? 'green'
-          : record.status === 'REJECTED'
+          : record.status === MaterialRequestStatus.REJECTED
             ? 'red'
             : 'blue'
       }
     >
       {ENGINEERING_MATERIAL_STATUS[record.status] || '状态待确认'}
     </Tag>
-    {record.order_status !== 'active' ? <Tag>订单已结束</Tag> : null}
+    {record.order_status !== SalesOrderStatus.ACTIVE ? <Tag>订单已结束</Tag> : null}
   </span>
 )
 

@@ -41,7 +41,11 @@ pnpm install
 
 `src/erp/utils/` 中，`sourcePartySnapshots.mjs` 管理往来方快照，`sourceOrderLineValues.mjs` 管理明细来源带值和清空，`masterDataParams.mjs` / `sourceOrderParams.mjs` 管理提交映射，`purchaseOrderPrintDraft.mjs` 管理采购打印输入；`masterDataOrderView.mjs` 保留展示、生命周期和表单行基础规则。页面状态和动作的职责见 [ERP 组件入口](./src/erp/components/README.md)。
 
+打印条款分组支持新增、改名、排序和删除，组内条目与明细支持增删、调序和清空，纸面继续作为预览、PDF 和打印的输出来源；清空与删除、空组标题、自动编号及留白定位规则见[打印字段与编辑行为](../docs/打印模板字段与编辑行为清单.md#条目编辑)，实现分层见[打印模板实现原理](../docs/打印模板实现原理.md)。
+
 产品路由只在 `import.meta.env.DEV` 下动态加载 `DevWorkbenchBridge.jsx` 这一处 DEV 入口。该入口包裹业务路由的停服恢复边界，并在进入 `/__dev` 时按需加载工作台页面；App 不直接引用 DEV 模块。
+
+效能工作台另有独立部署入口：`pnpm build:workbench` 构建 `workbench.html` 与 `src/dev-workbench/standalone.jsx`，输出 ignored `build-workbench/`；`pnpm serve:workbench` 运行带专用登录会话的 Node 服务。它不改变 ERP `build/` 的生产隔离或本地免登录配置。部署身份、凭据与 HTTPS 入口见 [独立工作台部署](../server/deploy/workbench/README.md)。
 
 ## 启动命令
 
@@ -58,19 +62,21 @@ pnpm install
 
 客户入口遇到本工作区的过期 Vite 会核验归属后自动停止并重新启动，继续使用原端口；同配置实例继续复用，其他程序或工作区的占用会阻断。
 
-个人内网开发需要直接访问工作台时，在本机 ignored 的 `web/.env.development.local` 中设置：
+本机开发默认使用 `local` 访问模式，无工作台登录页且拒绝远程访问。需要个人内网直接访问时，在本机 ignored 的 `web/.env.development.local` 中设置：
 
 ```dotenv
 PLUSH_DEV_WORKBENCH_ACCESS=private-network
 ```
 
-重新加载对应开发进程后，浏览器可直接打开 `http://<服务器内网 IPv4>:<前端端口>/__dev`，无需 SSH 隧道或额外工作台登录。需要内网 HTTPS 域名时，在同一文件中配置 `PLUSH_DEV_HTTPS_ORIGIN=https://<内网域名>`，并配置只接受内网客户端的本机 TLS 代理；浏览器打开该域名的 `/__dev`，热更新默认使用同源 WSS。访问仍受私网来源、精确地址、同源、CSRF 与操作确认限制；默认 `operator` 模式继续使用独立运维身份。代理的 Host、转发头与 loopback 合同见 [开发服务 Bridge](dev-server/README.md#边界)。
+重新加载对应开发进程后，浏览器可直接打开 `http://<服务器内网 IPv4>:<前端端口>/__dev`，无需 SSH 隧道或额外工作台登录。需要内网 HTTPS 域名时，在同一文件中配置 `PLUSH_DEV_HTTPS_ORIGIN=https://<内网域名>`，并配置只接受内网客户端的本机 TLS 代理；浏览器打开该域名的 `/__dev`，热更新默认使用同源 WSS。访问仍受私网来源、精确地址、同源、CSRF 与操作确认限制；显式 `operator` 模式使用独立运维身份。代理的 Host、转发头与 loopback 合同见 [开发服务 Bridge](dev-server/README.md#边界)。
 
 普通 `pnpm start` 使用通用产品配置；永绅业务开发使用 `pnpm start:yoyoosun` 加载客户公开配置，并读取后端已激活的业务权限与岗位入口。
 
 普通启动先只读检查 schema、migration 和后端 health / ready。登记的本地后端未运行且数据库检查通过时，自动通过现有 `make run` 链路构建、启动并验证当前工作区后端，随后开放电脑版和手机版；已有后端监听进程会保留。后端未就绪、数据库或迁移检查失败时，电脑版、手机版与登录页保留原地址，在原页显示服务不可用提示，不跳转到开发工作台。页面只读检查服务状态，通过同一完整启动检查后自动继续打开当前页面，路径、查询和锚点保持不变。需要人工恢复时可在新标签打开 `/__dev/database-migration`，不自动 apply 或重放业务请求。完整启动、进程保护、端口审计及客户包核对见 [前端脚本](scripts/README.md#本地启动与进程范围)。
 
 所有开发入口直接加载当前工作区的 React / CSS 源文件并支持热更新，重启后不会用历史固定制品覆盖登录页或业务页。`pnpm start:restart` / `pnpm restart` 对应主端口 `5175`；使用 `15200` 客户入口时运行 `pnpm restart:yoyoosun`。停止前端使用 `pnpm stop` / `pnpm stop:yoyoosun`，后端仍独立管理。后端代码在 `server/` 执行 `make dev_restart` 按需构建并生效，输入不变时跳过编译；运行、状态和日志见 [服务端入口](../server/README.md#快速开始)。
+
+一次性验证副本可链接当前已安装的 `node_modules`。开发服务只将该副本 Web 和项目依赖目录的实际路径补入 Vite 静态文件范围，让字体、图片等依赖资源可用；仍保留严格文件访问和默认敏感文件拒绝规则，不放行依赖所在的整个工作区或父目录。
 
 ### 岗位任务端本地调试
 
@@ -133,7 +139,8 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 | 主题                           | 维护入口                                                                                      |
 | ------------------------------ | --------------------------------------------------------------------------------------------- |
 | 登录、菜单、权限与岗位帮助     | [菜单与正式入口合同](../docs/product/菜单与正式入口合同.md)                                   |
-| 页面状态、表单、主题与共享控件 | [页面动作与生命周期](../docs/product/业务数据生命周期与页面动作规则.md)                       |
+| 业务对象状态与页面动作 | [生命周期与页面动作规则](../docs/product/业务数据生命周期与页面动作规则.md) |
+| 主题、偏好、共享控件、表单与读取恢复 | [前端实现与交互约定](../docs/engineering/前端实现与交互约定.md) |
 | 字段带值、清空与输出真源       | [业务数据流向与字段来源](../docs/product/业务主链路数据流向与字段来源规则.md)                 |
 | 打印渲染与安全                 | [打印模板实现原理](../docs/打印模板实现原理.md)                                               |
 | 打印字段与可编辑行为           | [打印字段与编辑清单](../docs/打印模板字段与编辑行为清单.md)                                   |
@@ -146,12 +153,12 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 ## 当前前端边界
 
-前端负责展示与交互，领域事实、状态、权限和幂等由后端决定。详细读取与写后恢复合同见 [页面规则](../docs/product/业务数据生命周期与页面动作规则.md#前端实现与读取边界) 和 [API 合同](../server/docs/api.md)。
+前端负责展示与交互，领域事实、状态、权限和幂等由后端决定。详细读取与写后恢复合同见 [页面规则](../docs/engineering/前端实现与交互约定.md#前端实现与读取边界) 和 [API 合同](../server/docs/api.md)。
 
 ## 在线帮助与参考手册
 
-`/erp/help-center` 提供岗位操作图解与文字参考，统一搜索和可收起目录；地址中的 `role / scene / view / ref / q` 保存岗位、场景、内容、词条和关键词。所选岗位统一限定目录、搜索、正文与手机选择器，菜单权限只控制办理入口；切换岗位保留搜索词和手册类型并清理旧章节。业务页帮助与字段问号直达相应章节 / 词条，未指定岗位时在当前账号的帮助岗位中选择关联岗位。内容来自 `businessUsabilityCatalog.mjs` 和 `engineeringMaterialHelp.mjs`，`helpManualCatalog.mjs` 负责索引与查找；不维护第二套规则。现有 24 个业务页及工程用料专题已接入，教学示例不表示真实业务进度，打印 / 离线版本未实现。
+`/erp/help-center` 默认显示“找操作”首页，按岗位推荐场景；“完整手册”提供通用操作、岗位交接、24 个业务页和工程用料专题。搜索与手册读取当前账号可读岗位的并集，推荐岗位不改变阅读授权或办理权限；业务入口仍取当前菜单权限。地址 `role / scene / view / ref / q` 保存推荐、图解、章节与搜索，刷新及前进后退可恢复；`home` 是首页，`guide` 为图解，`reference` 为章节 / 词条。内容由原业务帮助、工程专题、岗位说明和 `businessHandbook.mjs` 共用，`helpManualCatalog.mjs` 索引；不镜像仓库 Markdown。手册可下载为独立 HTML，再用浏览器打印为 PDF。三部分仓库手册及固定版本导出见[项目手册](../docs/manuals/README.md)。
 
 ## 桌面业务编辑与弹窗约定
 
-共用表单、明细、附件、图片、焦点和滚动约定见 [桌面业务编辑](../docs/product/业务数据生命周期与页面动作规则.md#桌面业务编辑与弹窗约定)。
+共用表单、明细、附件、图片、焦点和滚动约定见 [桌面业务编辑](../docs/engineering/前端实现与交互约定.md#桌面业务编辑与弹窗约定)。

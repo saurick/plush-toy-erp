@@ -1,6 +1,7 @@
 import { RollbackOutlined } from '@ant-design/icons'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button, Form, Input, Space, Tag } from 'antd'
+import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
 import {
   unitQuantityRule,
   unitPrecisionFromOptions,
@@ -118,7 +119,7 @@ export default function OutsourcingReturnDispositionModal({
     setLoading(true)
     try {
       const next = await createOutsourcingReturnDisposition(attempt.params)
-      if (!next?.id || next.status !== 'DRAFT') {
+      if (!next?.id || next.status !== OperationalFactStatus.DRAFT) {
         throw Object.assign(new Error('委外处置结果暂时无法确认'), {
           isInvalidResponse: true,
         })
@@ -183,8 +184,8 @@ export default function OutsourcingReturnDispositionModal({
         (item) => Number(item.id) === Number(selected.id)
       )
       const recovered =
-        (mode === 'post' && latest?.status === 'POSTED') ||
-        (mode === 'cancel' && latest?.status === 'CANCELLED')
+        (mode === 'post' && latest?.status === OperationalFactStatus.POSTED) ||
+        (mode === 'cancel' && latest?.status === OperationalFactStatus.CANCELLED)
       if (recovered) {
         onChanged?.()
         message.success('已重新读取委外处置结果')
@@ -210,7 +211,7 @@ export default function OutsourcingReturnDispositionModal({
               生成处置草稿
             </Button>
           ) : null}
-          {selected?.status === 'DRAFT' && selected.disposition_type === 'RETURN_TO_VENDOR' && canPost ? (
+          {selected?.status === OperationalFactStatus.DRAFT && selected.disposition_type === 'RETURN_TO_VENDOR' && canPost ? (
             <Button
               type="primary"
               onClick={() => transition('post')}
@@ -219,7 +220,7 @@ export default function OutsourcingReturnDispositionModal({
               确认执行
             </Button>
           ) : null}
-          {selected && selected.status !== 'CANCELLED' && canCancel ? (
+          {selected && selected.status !== OperationalFactStatus.CANCELLED && canCancel ? (
             <Button
               icon={<RollbackOutlined aria-hidden="true" />}
               className="erp-action-button"

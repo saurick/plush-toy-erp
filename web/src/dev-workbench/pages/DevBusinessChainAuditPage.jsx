@@ -120,9 +120,7 @@ function ChainResults({ data, chain, status, keyword, updateQuery }) {
           }
         />
         {data.definitionDiagram ? (
-          <p>
-            按执行时定义展示链间关系；颜色表示本批次步骤结果，连线不代表逐单已发生流转。
-          </p>
+          <Text type="secondary">执行时定义与本批次结果；连线不代表逐单流转。</Text>
         ) : null}
         <p>
           <strong>终点：</strong>
@@ -502,7 +500,7 @@ export default function DevBusinessChainAuditPage() {
   const report = data?.report
   return (
     <div
-      className="erp-dev-chain-audit erp-dev-workspace-page"
+      className="erp-dev-chain-audit erp-dev-workspace-page erp-dev-tool-page"
       data-dev-chain-audit
     >
       <DevPageNav sourcePath={SOURCE_PATH} />
@@ -650,8 +648,7 @@ export default function DevBusinessChainAuditPage() {
           </main>
           <details className="erp-dev-chain-audit__limits">
             <summary>
-              覆盖范围与未证明项 · {report.scope.registeredScenarioCount}{' '}
-              个登记场景不等于全部端到端通过
+              覆盖范围与未证明项（{report.scope.registeredScenarioCount} 个登记场景）
             </summary>
             <ul>
               {report.coverageLimits.map((limit) => (

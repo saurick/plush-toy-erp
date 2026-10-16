@@ -187,7 +187,7 @@ export function createProcessRuntimeClosureScenarios({
           withdrawn || kind === 'rejected' ? 1 : 2
         )
         if (withdrawn) {
-          assert.match(await stage.innerText(), /已撤回步骤 1/u)
+          assert.match(await stage.innerText(), /已撤回/u)
           assert.equal(
             await stage
               .locator(
@@ -197,19 +197,23 @@ export function createProcessRuntimeClosureScenarios({
             '−'
           )
         }
+        const history = stage.locator('.workflow-process-stage__history')
+        if (await history.count() && await history.getAttribute('open') === null) await history.locator('summary').click()
         const geometry = await stage.evaluate((root) => {
           const handoff = root.querySelector('.workflow-process-stage__handoff')
-          const summary = root.querySelector('.workflow-process-stage__summary')
+          const history = root.querySelector('.workflow-process-stage__history')
           const list = root.querySelector('.workflow-process-stage__list')
           const marker = root.querySelector('.workflow-process-stage__marker')
-          const items = [...root.querySelectorAll('.workflow-process-stage__item')]
-          const markers = items.map((item) => item.querySelector('.workflow-process-stage__marker').getBoundingClientRect())
           return {
-            forward: items.every((item, index) => {
-              if (index === items.length - 1) return getComputedStyle(item, '::before').content === 'none'
-              const arrow = getComputedStyle(item, '::before')
-              const tip = item.getBoundingClientRect().bottom - parseFloat(arrow.bottom)
-              return markers[index + 1].top > markers[index].bottom && Math.abs(markers[index + 1].x - markers[index].x) <= 1 && arrow.clipPath.startsWith('polygon(') && tip > markers[index].bottom && tip < markers[index + 1].top
+            forward: [...root.querySelectorAll('ol')].every((group) => {
+              const items = [...group.children]
+              const markers = items.map((item) => item.querySelector('.workflow-process-stage__marker').getBoundingClientRect())
+              return items.every((item, index) => {
+                if (index === items.length - 1) return getComputedStyle(item, '::before').content === 'none'
+                const arrow = getComputedStyle(item, '::before')
+                const tip = item.getBoundingClientRect().bottom - parseFloat(arrow.bottom)
+                return markers[index + 1].top > markers[index].bottom && Math.abs(markers[index + 1].x - markers[index].x) <= 1 && arrow.clipPath.startsWith('polygon(') && tip > markers[index].bottom && tip < markers[index + 1].top
+              })
             }),
             documentOverflow:
               document.documentElement.scrollWidth -
@@ -217,9 +221,8 @@ export function createProcessRuntimeClosureScenarios({
             handoffOverflow: handoff.scrollWidth - handoff.clientWidth,
             stageRight: root.getBoundingClientRect().right,
             viewportWidth: window.innerWidth,
-            summaryBeforeList:
-              summary.getBoundingClientRect().bottom <=
-              list.getBoundingClientRect().top + 1,
+            historyAfterLinked:
+              !history || history.getBoundingClientRect().top >= list.getBoundingClientRect().bottom - 1,
             handoffAfterList:
               handoff.getBoundingClientRect().top >=
               list.getBoundingClientRect().bottom - 1,
@@ -234,7 +237,7 @@ export function createProcessRuntimeClosureScenarios({
           JSON.stringify(geometry)
         )
         assert(
-          geometry.summaryBeforeList && geometry.handoffAfterList && geometry.forward,
+          geometry.historyAfterLinked && geometry.handoffAfterList && geometry.forward,
           JSON.stringify(geometry)
         )
         assert(
@@ -243,7 +246,7 @@ export function createProcessRuntimeClosureScenarios({
         )
         assert.equal(
           await parent
-            .getByRole('button', { name: '处理任务', exact: true })
+            .getByRole('button', { name: '选择处理方式', exact: true })
             .count(),
           0
         )

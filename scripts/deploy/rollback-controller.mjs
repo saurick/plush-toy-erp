@@ -58,7 +58,8 @@ function rollbackPlanFile(store, operationId) {
 
 function issueForBlocker(code) {
   const messages = {
-    target_disk_capacity_low: "133 根盘可用空间低于固定安全线",
+    target_system_disk_capacity_low: "系统根盘可用空间低于登记安全线",
+    target_disk_capacity_low: "目标部署盘可用空间低于固定安全线",
     rollback_current_release_mismatch: "133 当前 SHA 与来源版本不一致",
     rollback_migration_incompatible:
       "目标版本 migration 序列不同，只能 forward-fix 或显式恢复备份",
@@ -344,7 +345,7 @@ if (isMainModule()) {
   node scripts/deploy/rollback-controller.mjs \\
     --current-manifest <release-manifest.json> \\
     --target-manifest <release-manifest.json> \\
-    --target <demo-133|customer-test-133> --idempotency-key <stable-random-key> [--json]
+    --target <demo-133|customer-test-133|production-133> --idempotency-key <stable-random-key> [--json]
 
 This command only prepares a code-and-images rollback plan. It never performs
 database down migration, backup restore, target writes or automatic retry.`);

@@ -244,7 +244,17 @@ elif ! "$trial_atlas_bin" version 2>&1 |
   block target_atlas_tooling_invalid
 fi
 
-root_available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
+system_available_bytes="$(df -B1 --output=avail / | awk 'NR==2 {print $1}')"
+if [[ ! "$system_available_bytes" =~ ^[0-9]+$ ]] || (( system_available_bytes < minimum_available_bytes )); then
+  capacity_status=blocked
+  block target_system_disk_capacity_low
+fi
+
+capacity_path="$root"
+while [[ ! -d "$capacity_path" ]]; do
+  capacity_path="$(dirname "$capacity_path")"
+done
+root_available_bytes="$(df -B1 --output=avail "$capacity_path" | awk 'NR==2 {print $1}')"
 [[ "$root_available_bytes" =~ ^[0-9]+$ ]] || {
   root_available_bytes=0
   block target_capacity_unknown
@@ -420,14 +430,10 @@ if [[ "$public_container_count" == 1 ]]; then
   if curl -fsS --max-time 8 \
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":"public-preflight","method":"capabilities","params":{}}' \
-    "$public_endpoint/rpc/auth" | python3 -c '
-import json
-import sys
-payload = json.load(sys.stdin)
-sms = payload.get("result", {}).get("data", {}).get("sms_login", {})
-ok = payload.get("result", {}).get("code") == 0 and sms.get("enabled") is True and sms.get("mode") == "provider" and sms.get("mock_delivery") is False
-raise SystemExit(0 if ok else 1)
-'; then
+    "$public_endpoint/rpc/auth" | jq -se '
+      length == 1 and (.[0] | .result.code == 0 and
+        (.result.data.sms_login | .enabled == true and .mode == "provider" and .mock_delivery == false))
+    ' >/dev/null; then
     public_provider=passed
   else
     block target_public_entry_provider_failed
@@ -1261,7 +1267,7 @@ if (isMainModule()) {
     const options = parseArgs(process.argv.slice(2));
     if (options.help) {
       console.log(`Usage:
-  node scripts/deploy/target-preflight.mjs --target <demo-133|customer-test-133> [--json]
+  node scripts/deploy/target-preflight.mjs --target <demo-133|customer-test-133|production-133> [--json]
 
 Runs read-only checks through the fixed target registry. The CLI accepts no SSH
 host, path, project, database, endpoint or command parameter.`);

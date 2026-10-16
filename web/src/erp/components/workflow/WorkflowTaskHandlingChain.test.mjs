@@ -207,6 +207,9 @@ test('shared chain handles read errors, retry, source switching and permission w
   assert.doesNotMatch(container.textContent, /用量已核对/)
   await render({ id: 30, task_name: '核对账单', task_status_key: 'ready' })
   assert.match(container.textContent, /尚无可核对的跨岗处理链/)
+  assert.equal(container.querySelector('.erp-task-handling-note')?.tagName, 'P')
+  assert.equal(container.querySelector('.workflow-process-stage-track'), null)
+  assert.doesNotMatch(container.textContent, /本任务处理进度|核对账单/u)
   assert.equal(calls.length, count)
 })
 

@@ -878,9 +878,9 @@ func financeFactOutstandingAmounts(
 	}
 	for _, creditNote := range creditNotes {
 		switch creditNote.Status {
-		case "POSTED":
+		case biz.FinanceAllocationStatusPosted:
 			creditedAmounts[creditNote.FinanceFactID] = creditedAmounts[creditNote.FinanceFactID].Add(creditNote.Amount)
-		case "REVERSED":
+		case biz.FinanceAllocationStatusReversed:
 			creditedAmounts[creditNote.FinanceFactID] = creditedAmounts[creditNote.FinanceFactID].Sub(creditNote.Amount)
 		}
 	}
@@ -1146,12 +1146,12 @@ func hasActiveFinanceCreditForFact(ctx context.Context, client *ent.Client, fact
 	}
 	reversed := make(map[int]struct{}, len(rows))
 	for _, row := range rows {
-		if row.Status == "REVERSED" && row.ReversalOfCreditNoteID != nil {
+		if row.Status == biz.FinanceAllocationStatusReversed && row.ReversalOfCreditNoteID != nil {
 			reversed[*row.ReversalOfCreditNoteID] = struct{}{}
 		}
 	}
 	for _, row := range rows {
-		if row.Status == "POSTED" && row.ReversalOfCreditNoteID == nil {
+		if row.Status == biz.FinanceAllocationStatusPosted && row.ReversalOfCreditNoteID == nil {
 			if _, found := reversed[row.ID]; !found {
 				return true, nil
 			}

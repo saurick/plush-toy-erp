@@ -309,7 +309,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       const nextHint =
         data.mock_delivery && data.mock_code
           ? `本次登录验证码：${data.mock_code}`
-          : '验证码已发送，请查看手机短信'
+          : '请求已受理。如手机号已绑定且可登录，将收到验证码；未收到时请稍后重试或联系管理员'
       setSmsHint(nextHint)
       form.setFieldValue('code', '')
       if (data.mock_delivery && data.mock_code) {
@@ -443,7 +443,10 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
             />
           ) : null}
           {loginModeOptions.length > 1 ? (
-            <SlidingTabList className="erp-login-methods erp-navigation-tabs" aria-label="登录方式">
+            <SlidingTabList
+              className="erp-login-methods erp-navigation-tabs"
+              aria-label="登录方式"
+            >
               {loginModeOptions.map(({ label, value }) => (
                 <button
                   key={value}

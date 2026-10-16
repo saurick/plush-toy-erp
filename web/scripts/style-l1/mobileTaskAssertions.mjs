@@ -1223,7 +1223,7 @@ export function createMobileTaskAssertions(deps) {
     await expectText(page, '附件（1）')
     await page
       .locator('.mobile-role-action-bar')
-      .getByRole('button', { name: '处理任务', exact: true })
+      .getByRole('button', { name: '选择处理方式', exact: true })
       .waitFor({ state: 'visible', timeout: 10_000 })
     await assertMobileTaskVisibleTextNoTechnicalFields(page, {
       scenarioName,
@@ -1317,12 +1317,12 @@ export function createMobileTaskAssertions(deps) {
         ).length,
         summaryText:
           document
-            .querySelector('[data-testid="mobile-task-detail-summary"]')
+            .querySelector('.workflow-task-current')
             ?.textContent?.replace(/\s+/g, ' ')
             .trim() || '',
         timingText:
           document.querySelector(
-            '[data-testid="mobile-task-detail-screen"] [aria-label="业务信息"]'
+            '[data-testid="mobile-task-detail-screen"] .workflow-task-current .erp-task-timing'
           )?.textContent || '',
         redundantCopy: Array.from(
           shell.querySelectorAll('h1, h2, h3, h4, [role="heading"]')
@@ -1360,8 +1360,8 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 详情页不应继续平铺全部写动作: ${JSON.stringify(detailMetrics)}`
     )
     assert(
-      detailMetrics.summaryText.includes('负责岗位业务') &&
-        detailMetrics.summaryText.includes('截止时间') &&
+      detailMetrics.summaryText.includes('业务') &&
+        detailMetrics.summaryText.includes('处理截止') &&
         detailMetrics.timingText.includes('进入岗位') &&
         detailMetrics.timingText.includes('业务 · ') &&
         detailMetrics.redundantCopy.length === 0,
@@ -1515,7 +1515,7 @@ export function createMobileTaskAssertions(deps) {
 
     await page
       .locator('.mobile-role-action-bar')
-      .getByRole('button', { name: '处理任务', exact: true })
+      .getByRole('button', { name: '选择处理方式', exact: true })
       .click()
     const actionScreen = page.getByTestId('mobile-task-action-screen')
     await actionScreen.waitFor({ state: 'visible', timeout: 10_000 })
@@ -1771,7 +1771,7 @@ export function createMobileTaskAssertions(deps) {
     await page.getByLabel('返回任务详情').click()
     await page
       .locator('.mobile-role-action-bar')
-      .getByRole('button', { name: '处理任务', exact: true })
+      .getByRole('button', { name: '选择处理方式', exact: true })
       .waitFor({ state: 'visible', timeout: 10_000 })
     await page.getByLabel('返回任务列表').click()
     await page.waitForFunction(() => {
@@ -1799,7 +1799,7 @@ export function createMobileTaskAssertions(deps) {
       .waitFor({ state: 'visible', timeout: 10_000 })
     await page
       .locator('.mobile-role-action-bar')
-      .getByRole('button', { name: '处理任务', exact: true })
+      .getByRole('button', { name: '选择处理方式', exact: true })
       .waitFor({ state: 'visible', timeout: 10_000 })
     await assertMobileTaskVisibleTextNoTechnicalFields(page, {
       scenarioName,
@@ -1823,7 +1823,7 @@ export function createMobileTaskAssertions(deps) {
     )
     await page
       .locator('.mobile-role-action-bar')
-      .getByRole('button', { name: '处理任务', exact: true })
+      .getByRole('button', { name: '选择处理方式', exact: true })
       .click()
     await page
       .getByTestId('mobile-task-action-screen')
@@ -2089,7 +2089,7 @@ export function createMobileTaskAssertions(deps) {
       await deepTaskButton.click()
       await page
         .locator('.mobile-role-action-bar')
-        .getByRole('button', { name: '处理任务', exact: true })
+        .getByRole('button', { name: '选择处理方式', exact: true })
         .click()
       const recoveryActionScreen = page.getByTestId('mobile-task-action-screen')
       await recoveryActionScreen.waitFor({
@@ -2149,7 +2149,7 @@ export function createMobileTaskAssertions(deps) {
     assert.equal(
       await confirmedDetail
         .locator('.mobile-role-action-bar')
-        .getByRole('button', { name: '处理任务', exact: true })
+        .getByRole('button', { name: '选择处理方式', exact: true })
         .count(),
       0,
       `${scenarioName} 终态回执详情必须只读，不能重新开放处理动作`

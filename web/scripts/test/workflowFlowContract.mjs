@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readContractSource as readFileSync } from './publicContractSource.mjs'
 
 export const mobileWorkflowSources = Object.freeze({
   page: readFileSync(

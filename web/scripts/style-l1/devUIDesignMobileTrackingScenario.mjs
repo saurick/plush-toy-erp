@@ -64,8 +64,9 @@ export function createDevUIDesignMobileTrackingScenario({
         exact: true,
       })
       await filters
-        .getByRole('combobox', { name: '当前岗位', exact: true })
-        .selectOption('老板')
+        .getByRole('group', { name: '当前岗位', exact: true })
+        .getByRole('button', { name: '老板', exact: true })
+        .click()
       await tracking
         .getByText('当前筛选下没有匹配记录', { exact: true })
         .waitFor()
@@ -74,8 +75,8 @@ export function createDevUIDesignMobileTrackingScenario({
         .click()
       await tracking.locator('[data-action="mobile-options"]').click()
       await filters
-        .getByRole('combobox', { name: '跟踪范围', exact: true })
-        .selectOption('participated')
+        .locator('[data-action="mobile-tracking-scope"][data-value="participated"]')
+        .click()
       await filters.waitFor({ state: 'hidden' })
       await tracking
         .getByRole('button', { name: '流程跟踪：销售订单受理', exact: true })
@@ -89,8 +90,8 @@ export function createDevUIDesignMobileTrackingScenario({
       )
       await tracking.locator('[data-action="mobile-options"]').click()
       await filters
-        .getByRole('combobox', { name: '跟踪范围', exact: true })
-        .selectOption('visible')
+        .locator('[data-action="mobile-tracking-scope"][data-value="visible"]')
+        .click()
       await filters.waitFor({ state: 'hidden' })
       await tracking
         .getByText('当前筛选下没有匹配记录', { exact: true })
@@ -207,13 +208,7 @@ export function createDevUIDesignMobileTrackingScenario({
         .waitFor()
       assert.deepEqual(await counts(), ['1', '1', '0'])
 
-      await exceptionTracking
-        .getByRole('button', { name: '筛选', exact: true })
-        .click()
-      await phone
-        .getByRole('dialog', { name: '筛选异常跟踪', exact: true })
-        .getByRole('button', { name: '关闭筛选', exact: true })
-        .click()
+      assert.equal(await exceptionTracking.getByRole('button', { name: '筛选', exact: true }).count(), 0)
       await exceptionTracking.getByRole('button', { name: /^关联待办/ }).click()
       assert.equal(
         await exceptionTracking
@@ -285,42 +280,9 @@ export function createDevUIDesignMobileTrackingScenario({
       await historyFilters
         .getByRole('button', { name: '重置筛选', exact: true })
         .click()
-      await historyFilters
-        .getByRole('button', { name: '自定义日期', exact: true })
-        .click()
-      const dates = phone.getByRole('dialog', {
-        name: '选择处理日期范围',
-        exact: true,
-      })
-      await dates
-        .getByRole('button', { name: '2026-09-24', exact: true })
-        .click()
-      await dates
-        .getByRole('button', { name: '2026-09-24', exact: true })
-        .click()
-      assert.equal(
-        await phone
-          .getByRole('region', { name: '已办任务', exact: true })
-          .locator('.rm-task-card')
-          .count(),
-        3,
-        '日期草稿不提前生效'
-      )
-      await dates.getByRole('button', { name: '应用日期', exact: true }).click()
-      await dates.waitFor({ state: 'hidden' })
-      assert.equal(
-        await phone
-          .getByRole('region', { name: '已办任务', exact: true })
-          .locator('.rm-task-card')
-          .count(),
-        1
-      )
-      await phone
-        .getByRole('button', {
-          name: '清除处理时间：2026-09-24 至 2026-09-24',
-          exact: true,
-        })
-        .waitFor()
+      assert.equal(await historyFilters.getByRole('button', { name: '自定义日期', exact: true }).count(), 0)
+      assert.equal(await historyFilters.locator('input, select, textarea').count(), 0)
+      await historyFilters.getByRole('button', { name: '关闭筛选', exact: true }).click()
       await phone.getByRole('tab', { name: '流程跟踪', exact: true }).click()
       await verifyMobileNavigationMotion(
         preview,

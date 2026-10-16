@@ -1,3 +1,4 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 import { getRoleDisplayName, normalizeRoleKey } from './roleKeys.mjs'
 
@@ -54,7 +55,7 @@ function contactRole(text) {
 
 export function getWorkflowTaskExceptionContactPresentation(task = {}) {
   const statusKey = String(task?.task_status_key || '').trim()
-  const blocked = statusKey === 'blocked'
+  const blocked = statusKey === WorkflowTaskStatus.BLOCKED
   const escalated = Boolean(task?.is_escalated || task?.escalated_at)
   if (!blocked && !escalated) return buildExceptionContactPresentation()
 
@@ -165,10 +166,10 @@ function buildMultipleActionHint(task, actionModes) {
   const actionLabels = actionModes.map((mode) => ACTION_LABELS[mode]).join('、')
   const statusKey = String(task?.task_status_key || '').trim()
 
-  if (statusKey === 'blocked') {
+  if (statusKey === WorkflowTaskStatus.BLOCKED) {
     return `当前为阻塞任务，可选择${actionLabels}；解除前请确认卡点已消除。`
   }
-  if (statusKey === 'ready') {
+  if (statusKey === WorkflowTaskStatus.READY) {
     return `可选择${actionLabels}；请按实际结果操作。`
   }
   return `可选择${actionLabels}；请按实际结果操作。`

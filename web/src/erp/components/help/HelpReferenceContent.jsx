@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { getHelpCenterHref } from '../../config/helpManualCatalog.mjs'
+import HelpHandbookChapter from './HelpHandbookChapter'
 
 export function HelpReferenceDetails({ item }) {
   const details = [
@@ -27,6 +28,13 @@ export function HelpReferenceDetails({ item }) {
 }
 
 export default function HelpReferenceContent({ document, roleKey, onGuide }) {
+  if (document.kind === 'chapter') {
+    return (
+      <div className="erp-help-reference-content">
+        <HelpHandbookChapter document={document} />
+      </div>
+    )
+  }
   const { page, item } = document
   const href = (itemKey = '') =>
     getHelpCenterHref({ pageKey: page.key, itemKey, roleKey })
@@ -44,7 +52,6 @@ export default function HelpReferenceContent({ document, roleKey, onGuide }) {
         <HelpReferenceDetails item={item} />
       ) : (
         <>
-          <p className="erp-help-reference-lead">{page.task}</p>
           <nav className="erp-help-reference-index" aria-label="本章词条">
             <strong>本章可查</strong>
             {page.items.map((entry) => (
@@ -53,33 +60,15 @@ export default function HelpReferenceContent({ document, roleKey, onGuide }) {
               </Link>
             ))}
           </nav>
-          <section>
-            <h4>办理顺序</h4>
-            <ol>
-              {page.flowSteps.map((description) => (
-                <li key={description}>{description}</li>
-              ))}
-            </ol>
-          </section>
-          <section>
-            <h4>完成标准与交接</h4>
-            <p>{page.completion}</p>
-            <p>{page.handoff}</p>
-          </section>
-          {page.items.map((entry) => (
-            <section key={entry.key}>
-              <h4>
-                <Link to={href(entry.key)}>{entry.title}</Link>
-              </h4>
-              <HelpReferenceDetails item={entry} />
-            </section>
-          ))}
+          <HelpHandbookChapter document={document} />
         </>
       )}
-      <section>
-        <h4>业务边界</h4>
-        <p>{page.boundary}</p>
-      </section>
+      {item ? (
+        <section>
+          <h4>业务边界</h4>
+          <p>{page.boundary}</p>
+        </section>
+      ) : null}
       {item ? (
         <nav className="erp-help-reference-index" aria-label="同章其他词条">
           <strong>继续查阅</strong>

@@ -42,7 +42,6 @@ import MobileTaskPullRefresh from './MobileTaskPullRefresh'
 import MobileScrollEdge from './MobileScrollEdge.jsx'
 import MobileFilterPopover from './MobileFilterPopover'
 import MobileAppliedFilters from './MobileAppliedFilters.jsx'
-import FilterDateRangePicker from '../../components/business-list/FilterDateRangePicker.jsx'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { usePageLoadFeedback } from '../../components/PageLoadFeedback.jsx'
@@ -91,8 +90,6 @@ export default function MobileProgressPanel({
   const [loadMoreError, setLoadMoreError] = useState('')
   const [endReached, setEndReached] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
-  const [filterResetKey, setFilterResetKey] = useState(0)
-  const [dateOpen, setDateOpen] = useState(false)
   const scrollRef = useRef(null)
   const loadMoreRef = useRef(null)
   const loadMorePending = useRef(false)
@@ -147,7 +144,7 @@ export default function MobileProgressPanel({
     return () => cancelAnimationFrame(frame)
   }, [suppressDetailOpenMotion])
   useEffect(() => {
-    if (!active) { setFiltersOpen(false); setDateOpen(false) }
+    if (!active) { setFiltersOpen(false) }
   }, [active])
   useEffect(() => {
     const pop = () => {
@@ -376,13 +373,6 @@ export default function MobileProgressPanel({
       aria-label="手机进度看板"
       data-testid="mobile-progress-panel"
     >
-      {dateOpen && active && <FilterDateRangePicker
-        title="选择交期日期范围"
-        dateFrom={query.date_from}
-        dateTo={query.date_to}
-        onCancel={() => { setDateOpen(false); setFiltersOpen(true) }}
-        onApply={({ dateFrom, dateTo }) => { update({ from: dateFrom, to: dateTo }); setDateOpen(false) }}
-      />}
       <div
         className="mobile-progress-scroll"
         ref={scrollRef}
@@ -445,16 +435,14 @@ export default function MobileProgressPanel({
               open={filtersOpen && active}
               onOpenChange={setFiltersOpen}
               count={filterCount}
-              onReset={() => { setFilterResetKey((value) => value + 1); update(PROGRESS_FILTER_RESET) }}
+              onReset={() => update(PROGRESS_FILTER_RESET)}
             >
               <BusinessProgressFilterFields
                 compact
                 query={query}
                 counts={filterCounts}
                 taskAccess={data?.access.tasks}
-                resetKey={filterResetKey}
                 onChange={update}
-                onDateRange={() => { setFiltersOpen(false); setDateOpen(true) }}
               />
             </MobileFilterPopover>
           </div>
@@ -480,13 +468,31 @@ export default function MobileProgressPanel({
           <MobileAppliedFilters
             label="当前进度筛选"
             items={[
-            query.scope !== 'active' && { key: 'scope', label: `记录范围：${PROGRESS_SCOPE_OPTIONS.find(({ value }) => value === query.scope)?.label}` },
-            query.due_status === 'undated' && { key: 'due_status', label: '未定交期' },
-            query.unlinked_only && { key: 'unlinked_only', label: '仅看未关联销售' },
-            query.owner && { key: 'owner', label: `负责人：${query.owner}` },
-            (query.date_from || query.date_to) && { key: 'date', label: `交期：${query.date_from || '不限'} 至 ${query.date_to || '不限'}` },
-          ]}
-            onClear={(key) => update(key === 'date' ? { from: '', to: '' } : { [key]: key === 'scope' ? 'active' : key === 'due_status' ? 'all' : key === 'unlinked_only' ? false : '' })}
+              query.scope !== 'active' && {
+                key: 'scope',
+                label: `记录范围：${PROGRESS_SCOPE_OPTIONS.find(({ value }) => value === query.scope)?.label}`,
+              },
+              query.due_status === 'undated' && {
+                key: 'due_status',
+                label: '未定交期',
+              },
+              query.unlinked_only && {
+                key: 'unlinked_only',
+                label: '仅看未关联销售',
+              },
+            ]}
+            onClear={(key) =>
+              update({
+                [key]:
+                  key === 'scope'
+                    ? 'active'
+                    : key === 'due_status'
+                      ? 'all'
+                      : key === 'unlinked_only'
+                        ? false
+                        : '',
+              })
+            }
           />
           <MobileScrollEdge scrollContainerRef={scrollRef} enabled={active && !selection} />
         </div>

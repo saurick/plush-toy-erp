@@ -79,7 +79,11 @@ test('materialPurchaseContractEditor: 清空和恢复条款不删除值槽或移
     2,
     '末条更新'
   )
-  assert.deepEqual(edited.delivery, ['第一条', '', '末条更新'])
+  assert.deepEqual(edited.find(({ key }) => key === 'delivery').items, [
+    '第一条',
+    '',
+    '末条更新',
+  ])
   const recovered = buildMaterialPurchaseContractDraft({ clauses: edited })
   assert.deepEqual(recovered.clauses, edited)
   const refilled = updateMaterialPurchaseClause(
@@ -88,7 +92,11 @@ test('materialPurchaseContractEditor: 清空和恢复条款不删除值槽或移
     1,
     '重新填写'
   )
-  assert.deepEqual(refilled.delivery, ['第一条', '重新填写', '末条更新'])
+  assert.deepEqual(refilled.find(({ key }) => key === 'delivery').items, [
+    '第一条',
+    '重新填写',
+    '末条更新',
+  ])
   assert.deepEqual(original.delivery, ['第一条', '第二条', '第三条'])
 })
 
@@ -96,31 +104,34 @@ test('materialPurchaseContractEditor: 全空条款保留数量，显式空分组
   const draft = buildMaterialPurchaseContractDraft({
     clauses: { delivery: ['', ' ', ''], contract: [], settlement: [''] },
   })
-  assert.deepEqual(draft.clauses, {
-    delivery: ['', '', ''],
-    contract: [],
-    settlement: [''],
-  })
+  assert.deepEqual(draft.clauses, [
+    { key: 'delivery', label: '来货要求', items: ['', '', ''] },
+    { key: 'contract', label: '合同约定', items: [] },
+    { key: 'settlement', label: '结算方式', items: [''] },
+  ])
 })
 
 test('materialPurchaseContractEditor: 默认条款保留 C 类辅料合同源表固定文本', () => {
   const draft = buildMaterialPurchaseContractDraft()
 
-  assert.deepEqual(draft.clauses.delivery, [
+  assert.deepEqual(draft.clauses.find(({ key }) => key === 'delivery').items, [
     '按订单明细分别打包，并标明产品编号。',
     '请严格按定单数量发货，尺码必须足量。如有尾货或存货不足时，及时与我司采购沟通确认。否则我司将拒绝收货。',
     '必须保证商品品质，保证商品的颜色、克重与样品一致。',
   ])
-  assert.deepEqual(draft.clauses.contract, [
+  assert.deepEqual(draft.clauses.find(({ key }) => key === 'contract').items, [
     '在订单约定日期前交货。如因货期延误，影响到我司正常上货计划的，我司将对供应商收取违约金。实际交货日期比合同货期延误一天以上的，每延误一天，按100元/款来处罚，直接从货款扣除。',
     '交货中，如因特殊原因不能按期交货，须提前与我司采购沟通确认，经同意后方可延期， 否则订单作废或上款收取违约金；',
     '违约责任和解决合同纠纷的方式：按《经济合同法》和《购销合同条例》规定，需承担的责任进行友好协商或按《合同法》办理。',
     '因乙方产品质量问题造成经济纠纷，或者延误交期造成的损失均由乙方负责。',
   ])
-  assert.deepEqual(draft.clauses.settlement, [
-    '按我仓库确认收到货物日期，次月开始对账，每月15号之前完成对账。',
-    '对完账后，次月支付货款，供货方开具等额增值税专用发票。',
-  ])
+  assert.deepEqual(
+    draft.clauses.find(({ key }) => key === 'settlement').items,
+    [
+      '按我仓库确认收到货物日期，次月开始对账，每月15号之前完成对账。',
+      '对完账后，次月支付货款，供货方开具等额增值税专用发票。',
+    ]
+  )
 })
 
 test('FL_material_purchase_amount__recomputes_amount_and_total_from_current_line materialPurchaseContractEditor: 更新数量或单价时会重算金额和总计', () => {
@@ -217,7 +228,9 @@ test('FL_material_purchase_business_draft__does_not_fill_missing_business_fields
   assert.equal(draft.lines[0].productName, '')
   assert.equal(draft.lines[0].quantity, '3')
   assert.equal(draft.lines[0].amount, '6.00')
-  assert.deepEqual(draft.clauses.delivery, ['保留模板来货要求'])
+  assert.deepEqual(draft.clauses.find(({ key }) => key === 'delivery').items, [
+    '保留模板来货要求',
+  ])
   assert.deepEqual(draft.merges, [])
 })
 
@@ -355,9 +368,18 @@ test('materialPurchaseContractEditor: 空白模板清空示例字段和明细但
     amount: '',
     remark: '',
   })
-  assert.deepEqual(blankDraft.clauses.delivery, ['保留来货要求'])
-  assert.deepEqual(blankDraft.clauses.contract, ['保留合同约定'])
-  assert.deepEqual(blankDraft.clauses.settlement, ['保留结算方式'])
+  assert.deepEqual(
+    blankDraft.clauses.find(({ key }) => key === 'delivery').items,
+    ['保留来货要求']
+  )
+  assert.deepEqual(
+    blankDraft.clauses.find(({ key }) => key === 'contract').items,
+    ['保留合同约定']
+  )
+  assert.deepEqual(
+    blankDraft.clauses.find(({ key }) => key === 'settlement').items,
+    ['保留结算方式']
+  )
   assert.deepEqual(blankDraft.merges, [])
   assert.deepEqual(blankDraft.appendixImages, [])
 })

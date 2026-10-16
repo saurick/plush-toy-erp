@@ -1,4 +1,5 @@
 import React from 'react'
+import { OperationalFactStatus, ShipmentStatus, StockReservationStatus } from '../../../common/consts/statuses.generated.mjs'
 import {
   cancelFinanceFact,
   cancelOutsourcingFact,
@@ -51,18 +52,18 @@ export const DEFAULT_OPERATIONAL_FACT_PAGINATION = Object.freeze({
 
 export const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
-  { label: '草稿', value: 'DRAFT' },
-  { label: '已过账', value: 'POSTED' },
-  { label: '已发货', value: 'SHIPPED' },
-  { label: '已结清', value: 'SETTLED' },
-  { label: '生效中', value: 'ACTIVE' },
-  { label: '已释放', value: 'RELEASED' },
-  { label: '已消耗', value: 'CONSUMED' },
-  { label: '已取消', value: 'CANCELLED' },
+  { label: '草稿', value: OperationalFactStatus.DRAFT },
+  { label: '已过账', value: OperationalFactStatus.POSTED },
+  { label: '已发货', value: ShipmentStatus.SHIPPED },
+  { label: '已结清', value: OperationalFactStatus.SETTLED },
+  { label: '生效中', value: StockReservationStatus.ACTIVE },
+  { label: '已释放', value: StockReservationStatus.RELEASED },
+  { label: '已消耗', value: StockReservationStatus.CONSUMED },
+  { label: '已取消', value: OperationalFactStatus.CANCELLED },
 ]
 
 export const FINANCE_STATUS_OPTIONS = STATUS_OPTIONS.filter(({ value }) =>
-  ['', 'DRAFT', 'POSTED', 'SETTLED', 'CANCELLED'].includes(value)
+  ['', OperationalFactStatus.DRAFT, OperationalFactStatus.POSTED, OperationalFactStatus.SETTLED, OperationalFactStatus.CANCELLED].includes(value)
 )
 
 export const OCCURRED_DATE_FILTER_OPTIONS = [

@@ -25,7 +25,7 @@ import {
 } from "./release-catalog.mjs";
 import { runTargetPreflight } from "./target-preflight.mjs";
 import { classifyGitAncestryRelation } from "./git-ancestry-relation.mjs";
-import { getDeploymentTarget } from "./deployment-targets.mjs";
+import { getDeploymentTarget, assertDatabaseRebuildAllowed } from "./deployment-targets.mjs";
 
 const MAX_MANIFEST_BYTES = 512 * 1024;
 
@@ -49,6 +49,7 @@ function planFile(store, operationId) {
 
 function issueForBlocker(code) {
   const messages = {
+    target_system_disk_capacity_low: "系统根盘可用空间低于登记安全线",
     database_rebuild_runtime_release_mismatch:
       "目标当前运行版本不是本次重建绑定的精确不可变版本",
     database_rebuild_target_database_mismatch:
@@ -57,8 +58,8 @@ function issueForBlocker(code) {
       "目标当前预检未通过且未提供可安全执行的精确资格证据",
     database_rebuild_git_relation_not_current:
       "数据库重建只能绑定目标当前正在运行的 exact SHA",
-    target_disk_capacity_low: "目标根盘可用空间低于固定安全线",
-    target_capacity_unknown: "无法证明目标根盘容量",
+    target_disk_capacity_low: "目标部署盘可用空间低于固定安全线",
+    target_capacity_unknown: "无法证明目标部署目录所在磁盘容量",
     target_migration_lock_held: "目标 migration lock 正在被其他操作持有",
   };
   return {
@@ -97,7 +98,7 @@ export function prepareDatabaseRebuild(
 ) {
   const root = realpathSync(repoRoot || process.cwd());
   const store = operationStore || resolveDeliveryOperationStore(root);
-  const target = getDeploymentTarget(targetKey);
+  const target = assertDatabaseRebuildAllowed(getDeploymentTarget(targetKey));
   const release = readReleaseManifest(releaseManifestPath);
   const releaseManifestSha256 = sha256File(release.absolute);
   const created = createOrReuseDeliveryOperation(store, {

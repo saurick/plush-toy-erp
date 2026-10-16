@@ -154,9 +154,11 @@ test('read-only GitLab evidence does not authorize release dispatch', async (t) 
       status: 'passed',
       target,
       purpose:
-        target === 'customer-test-133'
-          ? 'customer-clean-acceptance'
-          : 'project-demo-simulated',
+        target === 'production-133'
+          ? 'customer-production'
+          : target === 'customer-test-133'
+            ? 'customer-clean-acceptance'
+            : 'project-demo-simulated',
     }),
     readRecoveryEvidence: () => null,
   })
@@ -687,7 +689,7 @@ test('delivery summary binds a recovery receipt to registered target identity', 
   const result = await service.summary()
   assert.deepEqual(
     result.targets.map((target) => target.key),
-    ['demo-133', 'customer-test-133']
+    ['demo-133', 'customer-test-133', 'production-133']
   )
   assert.strictEqual(result.recovery.backupRestore, receipt)
   assert.deepEqual(contexts, [

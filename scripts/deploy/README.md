@@ -2,20 +2,21 @@
 
 本文是 `scripts/deploy/` 的入口。Compose、环境与运行边界以 [server/deploy/README.md](../../server/deploy/README.md)、[Compose 部署说明](../../server/deploy/compose/prod/README.md) 和 [部署约定](../../docs/部署约定.md) 为准。
 
-存储查看入口为 `node scripts/deploy/attachment-console.mjs --target demo-133|customer-test-133`：只核对登记目标并建立本机 SSH 通道，使用 SeaweedFS 原生只读账号，不启动或部署远端服务。凭据与访问边界见 [只读查看存储](../../server/deploy/compose/prod/README.md#只读查看存储)。
+存储查看入口为 `node scripts/deploy/attachment-console.mjs --target demo-133|customer-test-133|production-133`：只核对登记目标并建立本机 SSH 通道，使用 SeaweedFS 原生只读账号，不启动或部署远端服务。凭据与访问边界见 [只读查看存储](../../server/deploy/compose/prod/README.md#只读查看存储)。
 
 ## 当前环境合同
 
 部署 target 的唯一真源是 `deployment-targets.json`：
 
-两个目标均登记在 `r740xd` 宿主机；只读预检及部署、回滚、重建、初始化执行器均校验同一主机名和操作用户。
+三个目标均登记在 `r740xd` 宿主机；只读预检及部署、回滚、重建、初始化执行器均校验同一主机名和操作用户。
 
 | target | 用途 | 公网入口 | 数据规则 |
 | --- | --- | --- | --- |
 | `demo-133` | 项目方造数、演练、培训与回归 | `demo.yoyoosun.net` | 可经受控 rebuild 恢复 seed / fixture / 模拟数据 |
 | `customer-test-133` | 甲方测试与验收 | `test.yoyoosun.net` | 普通部署不 rebuild、不 seed，默认保留现有数据；可显式准备最小基础资料，新一轮测试前可独立重建 |
+| `production-133` | 正式业务，必须显式选择 | `erp.yoyoosun.net` | 独立数据与凭据；禁止测试数据重建和固定测试密码 |
 
-`erp` 是未来生产环境，尚未登记为可执行 target；`yoyoosun.net` 临时 `302` 跳转到 `https://erp.yoyoosun.net` 也不改变这一点。`admin.yoyoosun.net` 退役后仍不能进入 target registry、环境变量映射、数据清理、preflight、健康检查、release、promotion、smoke 或 rollback。`customer-trial-133` 只是 `demo-133` 内部模拟数据合同，不是第三个部署 target。
+`production-133` 对应 `erp.yoyoosun.net`，仓库已支持独立初始化、预检、发布和代码回滚，但不能据此宣称服务器已启用。首次生产初始化前须准备独立凭据及异机恢复前提，完整上线清单见 [首次部署](../../deployments/yoyoosun/runbooks/01-first-deploy.md)。根域跳转不是生产启用证明；退役 `admin.yoyoosun.net` 不进入任何目标矩阵。
 
 运行与初始化的只读预检共用 `target-readonly-execution.mjs`。只有 Linux 平台、短主机名、运行用户和本机 IPv4 地址同时匹配 target registry，才在登记宿主机直接执行同一份固定 stdin 脚本；其它入口使用 `BatchMode`、固定地址/端口和 `StrictHostKeyChecking` 的 SSH。SSH 失败不切换本地执行。此选择不改变部署、迁移、重建或恢复写操作的执行合同。
 
@@ -23,7 +24,7 @@
 
 | 入口 | 职责 | 写入边界 |
 | --- | --- | --- |
-| `deployment-targets.mjs` | 读取两个固定 target 的脱敏投影 | 只读 |
+| `deployment-targets.mjs` | 读取三个固定 target 的脱敏投影 | 只读 |
 | `target-preflight.mjs` | 读回容量、Compose、端口、数据库、当前 SHA、锁、rollback point 与对应公网入口 | 只读，不创建备份或切换版本 |
 | `target-readonly-execution.mjs` | 按登记身份选择同机只读执行或严格 SSH；由运行与初始化预检共用 | 不执行部署、迁移、初始化或恢复写入 |
 | `production-preflight.sh` | 校验 runtime env、固定镜像、Compose、migration、健康与目标身份；验收档追加 SMS、PDF、Chromium | 默认只读；`--runtime` 仍只核对 |
@@ -34,13 +35,28 @@
 | `promotion-executor.mjs` | 执行已确认的固定 target promotion 并读回公网 exact SHA | 写单一目标；失败按 operation 回滚 |
 | `rollback-controller.mjs` | 校验旧 manifest、migration 与客户配置兼容性 | 不写目标 |
 | `rollback-executor.mjs` | 回滚 Compose / 公网入口到兼容旧版本 | 不 down migration，不自动恢复数据库 |
-| `database-rebuild-controller.mjs` | 为指定 target 生成备份、物理数据代和空基线资格计划 | 不停服务、不备份、不迁移 |
+| `database-rebuild-controller.mjs` | 仅为 demo/test 生成备份、物理数据代和空基线资格计划 | 不停服务、不备份、不迁移 |
 | `database-rebuild-executor.mjs` | 执行 ready rebuild operation | 会停单一 target、备份并切换其 PostgreSQL 数据目录 |
 | `bootstrap-production-admin.sh` | 在已迁移 fresh 数据库创建首个管理员并读回 marker/audit/RBAC | 只允许 fresh target 的一次性确认窗口 |
 | 镜像内 `bootstrap-manual-acceptance-core` | 为 demo 或 customer-test 准备精确 allowlist 的单位 / 仓库 | test 必须显式指定 target、release、migration 与确认串；不写业务对象、不退休既有 test 资料 |
 | `release-evidence-status.mjs` / `release-evidence-gate.mjs` | 汇总并校验 release evidence | 只读 |
 
 所有浏览器动作只传 operation intent、固定 target、版本和确认串；浏览器不能传 repo、路径、SSH、env、shell、SQL、Docker 命令或凭据。
+
+## 共用检查与证据
+
+以下脚本由发布流程、开发迁移入口和客户操作说明共用。客户配置与凭据规则继续读取 `deployments/yoyoosun/env/` 的合同，客户 env 校验、凭据轮换和公网切流见[运维适配](../../deployments/yoyoosun/scripts/README.md)。
+
+| 入口 | 用途 | 执行边界 |
+| --- | --- | --- |
+| `run-smoke.sh`、`run-smoke-support.mjs` | 按固定 target 和 profile 检查运行身份、health / ready、页面及验收能力，输出脱敏 JSON | `base-release` 不读取验收凭据；`customer-trial-acceptance` 才增加合同账号、SMS、PDF 和客户配置读回；不创建业务事实 |
+| `collect-evidence.sh`、`collect-evidence.mjs` | 生成绑定 target、profile 和 release 的 evidence 草稿及必要占位 | 只写显式输出目录，不采集 secret，不把占位写成真实演练结果 |
+| `run-backup-restore-rehearsal.sh` | 在开发机或 CI 执行 dump、隔离 PostgreSQL restore、升级审计、migration 和恢复检查 | 使用明确的只读备份源与隔离恢复目标；默认输出到 `output/`，仅向 evidence 复制脱敏 artifact |
+| `verify-backup-restore.sh` | 检查备份恢复 evidence 的必要字段和脱敏边界 | 不读取、复制或恢复真实备份文件，不证明恢复成功 |
+
+参数以各脚本 `--help` 为准，目标与证据要求见[备份恢复](../../deployments/yoyoosun/runbooks/04-backup-restore.md)和[发布证据](../../deployments/yoyoosun/evidence/releases/README.md)。`run-smoke.sh --print-input-template` 只输出输入模板，不触网、不读 token、不写报告；正式 smoke 的 URL 禁止携带账号密码，报告不保存密码、token、手机号、HTML、PDF 正文或完整响应。
+
+恢复演练的 `command-summary.txt` 绑定同一 `backupId / releaseId / sourceAlias / restoreTarget`；dump 留在受控本地输出。`image-digests-evidence.mjs` 只写脱敏镜像证据，不构建镜像、不访问 registry、不读取 `.env`。
 
 ## GitLab 主链与不可变发布
 
@@ -150,7 +166,7 @@ steady env 必须保持 `BOOTSTRAP_ADMIN_ONCE=false` 且不包含 `APP_ADMIN_PAS
 
 `release-evidence-gate.mjs` 通过只说明 evidence 文件满足合同，不替代目标实时运行、数据身份、客户 UAT 或签收。
 
-普通发布和客户验收使用两个 profile；无迁移且确认恢复流程未变的普通发布不重复要求恢复 / 回滚演练或客户签收，但保留当前备份和固定回滚路径。详细条件见 [发布证据](../../deployments/yoyoosun/evidence/releases/README.md)。预检 JSON 回执由目标机已有 Python 标准库生成，不新增宿主 Node.js 依赖；JS / Python 共用 `release-evidence-contract.json` 的合同、profile 和检查项。
+普通发布和客户验收使用两个 profile；无迁移且确认恢复流程未变的普通发布不重复要求恢复 / 回滚演练或客户签收，但保留当前备份和固定回滚路径。详细条件见 [发布证据](../../deployments/yoyoosun/evidence/releases/README.md)。目标机预检、能力核验和 JSON 回执复用已有 Shell、jq 与 SHA-256 工具，不需要宿主 Node.js、Go 或 Python；回执继续使用 `release-evidence-contract.json`，由本地 Node.js 合同测试核对结构、脱敏和原子写入。
 
 ## 安全边界
 
@@ -163,6 +179,8 @@ steady env 必须保持 `BOOTSTRAP_ADMIN_ONCE=false` 且不包含 `APP_ADMIN_PAS
 - Chromium seccomp 校验固定的是经审查的权限语义，忽略 JSON 格式、注释和规则顺序；新增 syscall 权限、撤掉 capability 条件或改变 sandbox 参数仍会阻断，不能用“存在几个关键字段”代替完整安全边界。
 
 ## 修改后验证
+
+发布脚本的静态 JSON-RPC envelope、条件方法与本地 transport wrapper 由 `node scripts/qa/public-contract-consumers.mjs` 对照服务端生成目录检查；动态操作重放仍运行执行器行为测试。检查不调用目标，也不要求发布脚本运行时加载 Web 模块，合同见[公共契约规范](../../docs/engineering/跨层公共契约与生成规范.md#自动守卫--gates)。
 
 ```bash
 node --test scripts/deploy/deployment-targets.test.mjs \

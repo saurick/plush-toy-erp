@@ -6,12 +6,13 @@
 - `jaeger-v2.yml`：Jaeger v2 的 OTLP / Jaeger / Zipkin 接收、Badger 持久 Trace 存储、查询 UI、健康端点与外部 Prometheus 查询配置。
 - `compose.demo-133.yml`：`demo-133` 的固定 Compose project 覆盖。
 - `compose.customer-test-133.yml`：`customer-test-133` 的固定 Compose project 覆盖。
+- `compose.production-133.yml`：正式目标的固定 Compose project 覆盖，仓库定义不代表已部署。
 - `compose.observability.yml` 与 `observability/`：独立的 Alloy / Loki / Grafana 日志工作台；启动、范围、保留和恢复见[集中日志接入与运维](../../../../docs/observability/集中日志接入与运维.md)。业务 Compose 不自动启动这套服务。
 - `.env.example`：运行环境变量示例，不保存真实凭据。
 - `migrate_online.sh`：按登记目标执行受控 Atlas migration，并在附件外置维护窗口完成导出与校验。
 - `attachment_raid_preflight.sh`：只读检查附件目录实际使用指定本机 RAID5 挂载。
 
-当前可执行环境只有 `demo-133` 与 `customer-test-133`。`erp` 是未来生产环境，尚未启用；根域临时跳转到 `erp.yoyoosun.net` 不会把它变成可执行 target。`admin.yoyoosun.net` 退役后仍不能进入 target、Compose、migration、清理、健康检查、发布或回滚矩阵。
+仓库登记 demo、test 和 production 三个固定目标；现有服务是否运行以实时读回为准。生产首次部署和开入口必须另有明确授权；根域跳转不会启用生产目标。`admin.yoyoosun.net` 不属于任何登记环境。
 
 ## 目标矩阵
 
@@ -21,12 +22,13 @@
 | --- | --- | --- | --- | --- | --- |
 | `demo-133`          | 项目方造数、演练、培训与回归；允许受控重建       | `demo.yoyoosun.net` | `plush-toy-erp-demo-v1` | `plush_erp_demo_v1`          | `55436 / 8325 / 5195`  |
 | `customer-test-133` | 甲方测试与验收；普通部署保留数据，需要时独立重建 | `test.yoyoosun.net` | `plush-toy-erp-test-v1` | `plush_erp_customer_test_v1` | `55437 / 8335 / 5205`  |
+| `production-133` | 正式业务；仓库支持不代表已启用 | `erp.yoyoosun.net` | `plush-toy-erp-production` | `plush_erp_production` | `55438 / 8345 / 5215` |
 
-两个环境部署同一不可变 release digest，但数据库、上传、Compose project、端口、runtime env、数据目录、migration 锁、备份、回滚点、operation 与 smoke 必须完全独立。demo 造数不能进入 test；test 的普通 promotion 不执行 rebuild 或 seed，保留全部既有数据；显式重建或清理不能影响 demo。
+同批交付使用同一不可变 release digest，三个环境，但数据库、上传、Compose project、端口、runtime env、数据目录、migration 锁、备份、回滚点、operation 与 smoke 必须完全独立。demo 造数不能进入 test；test 的普通 promotion 不执行 rebuild 或 seed，保留全部既有数据；显式重建或清理不能影响 demo。
 
 Jaeger 只发布 `jaeger-v2.yml` 实际启用的 OTLP、Jaeger、Zipkin 与查询 UI 端口，不保留 v1 的 `5775` agent 端口，也不发布当前未配置 remote-sampling extension 的 `5778`。发布、回滚和首次初始化在私有 `umask` 解包后仅把该配置文件归一化为容器只读的 `0444`；其余 release 文件继续保持私有权限。
 
-`customer-trial-133` 仍是 demo 内部模拟数据合同的 target key，不是第三个部署环境。它只能在 `demo-133` 的受控数据准备链中使用。
+`customer-trial-133` 仍是 demo 内部模拟数据合同的 target key，不是独立部署环境。它只能在 `demo-133` 的受控数据准备链中使用。
 
 ## Trace 保留与资源 / Trace Retention
 

@@ -70,6 +70,26 @@ customer-test-133)
   web_port=5205
   jaeger_ports=(62002 62003 62005 62006 62007 62008 62009 62010)
   ;;
+production-133)
+  root=/root/deploy/plush-toy-erp-production
+  runtime_env=$root/runtime/.env.production-133
+  public_endpoint=https://erp.yoyoosun.net
+  public_network=plush-toy-erp-production_default
+  public_container_prefix=plush-toy-erp-production-web-public-
+  public_host_port=5178
+  public_candidate_port=15178
+  project=plush-toy-erp-production
+  database=plush_erp_production
+  compose_override_name=compose.production-133.yml
+  server_endpoint=http://127.0.0.1:8345
+  web_endpoint=http://127.0.0.1:5215
+  trial_enabled=0
+  trial_target=
+  postgres_port=55438
+  app_port=8345
+  web_port=5215
+  jaeger_ports=(63002 63003 63005 63006 63007 63008 63009 63010)
+  ;;
 *) fail "unsupported target" ;;
 esac
 
@@ -803,16 +823,6 @@ curl -fsS --max-time 10 -H 'Content-Type: application/json' \
   '.result.code == 0 and .result.data.git_sha == $sha and .result.data.release_version == $version and .result.data.formal == true' \
   >/dev/null
 
-stage=public_entry_switch
-public_cutover_script=$release_dir/deployments/yoyoosun/scripts/cutover-public-web.sh
-bash "$public_cutover_script" \
-  --image "$web_ref" --release "$release_sha" --current-container none \
-  --endpoint "$public_endpoint" --api-origin http://app-server:8300 \
-  --network "$public_network" --container-prefix "$public_container_prefix" \
-  --host-port "$public_host_port" --candidate-port "$public_candidate_port" \
-  --execute --confirm "PUBLIC_WEB_CUTOVER:none:$release_sha" >>"$log_file" 2>&1
-[[ "$(docker inspect "$public_container" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^GIT_SHA=//p' | head -n1)" == "$release_sha" ]] || fail "public entry release identity does not match"
-
 stage=backup_restore_check
 postgres_cid="$(docker ps -q --filter "label=com.docker.compose.project=$project" --filter 'label=com.docker.compose.service=postgres')"
 [[ "$(printf '%s\n' "$postgres_cid" | sed '/^$/d' | wc -l | tr -d ' ')" == 1 ]] || fail "target PostgreSQL is not unique"
@@ -832,6 +842,16 @@ mv "$backup_final.tmp" "$backup_final"
 backup_sha256="$(sha256sum "$backup_final" | awk '{print $1}')"
 backup_size_bytes="$(stat -c '%s' "$backup_final")"
 [[ "$backup_sha256" =~ $sha256_pattern && "$backup_size_bytes" -gt 0 ]] || fail "initial backup identity is invalid"
+
+stage=public_entry_switch
+public_cutover_script=$release_dir/deployments/yoyoosun/scripts/cutover-public-web.sh
+bash "$public_cutover_script" \
+  --image "$web_ref" --release "$release_sha" --current-container none \
+  --endpoint "$public_endpoint" --api-origin http://app-server:8300 \
+  --network "$public_network" --container-prefix "$public_container_prefix" \
+  --host-port "$public_host_port" --candidate-port "$public_candidate_port" \
+  --execute --confirm "PUBLIC_WEB_CUTOVER:none:$release_sha" >>"$log_file" 2>&1
+[[ "$(docker inspect "$public_container" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^GIT_SHA=//p' | head -n1)" == "$release_sha" ]] || fail "public entry release identity does not match"
 
 stage=current_source_switch
 cp -a --reflink=auto "$release_dir" "$root/.current-next-$operation_id"

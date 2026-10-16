@@ -430,6 +430,12 @@ test("business PDF evidence rejects missing Chinese fonts, paper changes and lea
     "name type encoding emb sub uni object ID\n---------------------------------------\nNotoSerifSC-Regular Type 3 Custom yes yes yes 12 0\n";
   const text = "合同订单供应商采购材料货款结算方式交货日期采购经办人";
   assert.equal(verifyBusinessPDF(info, fonts, text).pages, 1);
+  assert.deepEqual(verifyBusinessPDF(info, fonts, `${text}\f`).pageCharacters, [text.length]);
+  const twoPages = info.replace("Pages: 1", "Pages: 2");
+  assert.deepEqual(verifyBusinessPDF(twoPages, fonts, `${text}\f${text}\f`).pageCharacters, [text.length, text.length]);
+  for (const missingPage of [`${text}\f\f`, `\f${text}\f`, text]) {
+    assert.throws(() => verifyBusinessPDF(twoPages, fonts, missingPage), /empty page|every PDF page/);
+  }
   assert.throws(
     () =>
       verifyBusinessPDF(info, fonts.replace("yes yes yes", "no yes yes"), text),

@@ -316,12 +316,50 @@
   gap: 8px;
 }
 
+.mobile-detail-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-detail-heading > h2 {
+  min-width: 0;
+}
+
+.mobile-detail-source {
+  margin: 5px 0 12px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+}
+
+.mobile-task-detail-hero > .erp-task-identity {
+  margin-bottom: 13px;
+}
+
+.mobile-task-detail-hero .workflow-task-current h3 {
+  margin: 0;
+  font-size: var(--erp-font-caption);
+}
+
+.mobile-task-detail-hero .erp-task-product-image {
+  flex-basis: 48px;
+  width: 48px;
+  height: 48px;
+}
+
+.mobile-detail-inline-actions .erp-material-task-summary-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .mobile-detail-inline-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-top: 11px;
+  margin: 0;
 }
 
 .mobile-detail-inline-actions .ant-btn {
@@ -330,6 +368,16 @@
   padding: 8px 11px;
   border-radius: 11px;
   font-size: var(--erp-font-small);
+  box-shadow: none;
+}
+
+.mobile-detail-inline-actions .erp-material-task-summary-entry > .ant-btn {
+  width: auto;
+}
+
+.mobile-detail-attachment-entry {
+  display: flex;
+  align-items: center;
 }
 
 .mobile-detail-associated {
@@ -716,9 +764,8 @@
   overflow: hidden;
   text-align: left;
   transition:
-    border-color 0.16s ease,
-    box-shadow 0.16s ease,
-    transform 0.16s ease;
+    background-color 0.16s ease,
+    border-color 0.16s ease;
 }
 
 .mobile-role-mine-metric-button--todo {
@@ -741,11 +788,11 @@
   --mobile-role-mine-accent-border: rgb(252 211 77);
 }
 
-.mobile-role-mine-metric-button:hover {
-  border-color: var(--mobile-role-mine-accent-border);
-  box-shadow:
-    0 1px 0 rgb(15 23 42 / 0.05),
-    0 12px 28px rgb(15 23 42 / 0.1);
+@media (hover: hover) {
+  .mobile-role-mine-metric-button:not(:disabled):hover {
+    border-color: var(--erp-interactive-border-hover);
+    background: var(--erp-interactive-bg-hover);
+  }
 }
 
 .mobile-role-mine-metric-button:focus-visible {
@@ -921,6 +968,23 @@
   color: var(--erp-text);
   text-align: left;
   cursor: pointer;
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease;
+}
+
+@media (hover: hover) {
+  .mobile-task-action-choice:not([data-selected='true']):has(input:enabled):hover {
+    border-color: var(--erp-interactive-border-hover);
+    background: var(--erp-interactive-bg-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-role-mine-metric-button,
+  .mobile-task-action-choice {
+    transition: none;
+  }
 }
 
 .mobile-task-action-choice[data-selected='true'] {
@@ -1766,6 +1830,70 @@
   color: var(--erp-text-muted);
   font-size: var(--erp-font-caption);
   text-align: center;
+}
+
+.mobile-role-tasks-page--detail .mobile-detail-content {
+  gap: 0;
+  padding: 17px 16px;
+  background: var(--erp-surface-bg);
+}
+
+.mobile-role-tasks-page--detail .mobile-detail-content > .mobile-detail-section {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.mobile-role-tasks-page--detail .mobile-detail-heading > h2 {
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.mobile-role-tasks-page--detail .mobile-detail-heading > .mobile-task-flow-status {
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-size: var(--erp-font-caption);
+  font-weight: 400;
+}
+
+.mobile-role-tasks-page--detail .mobile-task-detail-hero > .erp-task-identity {
+  margin: 0;
+}
+
+.mobile-role-tasks-page--detail .workflow-task-current {
+  padding: 14px;
+}
+
+.mobile-role-tasks-page--detail .workflow-task-event-trail--collapsible {
+  border-top: 1px solid var(--erp-border);
+}
+
+.mobile-role-tasks-page--detail .workflow-task-detail-flow > .workflow-business-chain__heading > .ant-btn {
+  min-height: 44px;
+}
+
+.mobile-role-tasks-page--detail .mobile-role-action-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px;
+}
+
+.mobile-role-tasks-page--detail .mobile-role-action-bar > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  width: auto;
+  padding: 9px 8px;
+  border-radius: 6px;
+  font-size: var(--erp-font-small);
+  white-space: normal;
 }
 
 .mobile-role-task-query {

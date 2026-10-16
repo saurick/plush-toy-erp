@@ -1009,7 +1009,7 @@ func customerConfigOpenBusinessDocumentCountQueries(moduleKey string) []string {
 	case "production_orders":
 		return []string{`SELECT COUNT(*) FROM production_orders WHERE status IN ('DRAFT', 'RELEASED')`}
 	case "finance_payments":
-		return []string{`SELECT COUNT(*) FROM finance_payments WHERE status NOT IN ('POSTED', 'CANCELLED')`}
+		return []string{fmt.Sprintf(`SELECT COUNT(*) FROM finance_payments WHERE status IN ('%s', '%s')`, biz.FinancePaymentStatusDraft, biz.FinancePaymentStatusApproved)}
 	case "inventory":
 		return []string{
 			`SELECT COUNT(*) FROM purchase_receipts WHERE status = 'DRAFT'`,

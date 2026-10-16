@@ -170,7 +170,7 @@ test('purchase record mutations lock selection and every record-bound action', (
   )
   assert.match(
     page,
-    /const recordActionBusy =[\s\S]*saving \|\|[\s\S]*generatingInboundDraft \|\|[\s\S]*printingContract \|\|[\s\S]*itemsLoading \|\|[\s\S]*lineOrderLoading/u
+    /const recordActionBusy =[\s\S]*saving \|\|[\s\S]*generatingInboundDraft \|\|[\s\S]*printingContract \|\|[\s\S]*itemsLoading/u
   )
   assert.match(
     page,
@@ -182,7 +182,7 @@ test('purchase record mutations lock selection and every record-bound action', (
   )
   assert.match(
     operationPanel,
-    /const recordActionBusy =[\s\S]*saving \|\|[\s\S]*generatingInboundDraft \|\|[\s\S]*printingContract \|\|[\s\S]*itemsLoading \|\|[\s\S]*lineOrderLoading/u
+    /const recordActionBusy =[\s\S]*saving \|\|[\s\S]*generatingInboundDraft \|\|[\s\S]*printingContract \|\|[\s\S]*itemsLoading/u
   )
   assert.match(operationPanel, /disabled=\{recordActionBusy\}/u)
   assert.match(operationPanel, /当前订单操作完成后可更换选择/u)

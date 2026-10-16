@@ -10,7 +10,7 @@ import { CUSTOMER_TRIAL_133_CONFIG_REVISION } from "../qa/manual-acceptance-targ
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const scriptPath = path.join(
   repoRoot,
-  "deployments/yoyoosun/scripts/run-smoke.sh",
+  "scripts/deploy/run-smoke.sh",
 );
 const scriptSource = fs.readFileSync(scriptPath, "utf8");
 const credentialContract = JSON.parse(

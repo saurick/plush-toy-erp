@@ -1139,7 +1139,7 @@ defineBootstrapTest("compose-override-scope", (t) => {
     assert.notEqual(result.status, 0);
     assert.match(
       result.stderr,
-      /只允许 demo-133 或 customer-test-133；admin 不是部署环境/u,
+      /只允许 demo-133、customer-test-133 或 production-133；admin 不是部署环境/u,
     );
     assert.equal(fs.existsSync(fixture.dockerLog), false);
     assertSecretSafe(result, fixture);

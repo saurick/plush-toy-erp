@@ -30,7 +30,7 @@ function moduleSource(source, exports) {
 }
 
 export function renderCatalog(catalog) {
-  for (const key of ['permissions', 'states', 'attachments', 'numeric', 'rpc']) {
+  for (const key of ['permissions', 'states', 'attachments', 'numeric', 'policies', 'rpc', 'taskDiscovery']) {
     if (!catalog[key] || Object.keys(catalog[key]).length === 0) throw new Error(`缺少契约：${key}`)
   }
   const precision = catalog.numeric.Precision
@@ -48,9 +48,10 @@ export function renderCatalog(catalog) {
   return {
     'workflowTaskDiscovery.generated.mjs': moduleSource('server/internal/biz/workflow_task_catalog.json', { WorkflowTaskDiscoveryCatalog: catalog.taskDiscovery }),
     'permissions.generated.mjs': moduleSource('server/internal/biz/rbac.go', { PermissionCode: catalog.permissions }),
-    'statuses.generated.mjs': moduleSource('server/internal/core/status、server/internal/biz/workflow_metadata.go、server/internal/biz/operational_fact.go、server/internal/biz/outsourcing_order.go、server/internal/biz/production_order.go', catalog.states),
+    'statuses.generated.mjs': moduleSource('server/internal/core/status 及 server/cmd/public-contracts 登记的 biz 领域声明', catalog.states),
     'attachments.generated.mjs': moduleSource('server/internal/biz/business_attachment.go', { AttachmentPolicy: catalog.attachments }),
     'numeric.generated.mjs': moduleSource('server/internal/core/value/numeric.go', { NumericContract: numeric }),
+    'policies.generated.mjs': moduleSource('server/internal/biz/admin_password.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go', catalog.policies),
     'rpcMethods.generated.mjs': moduleSource('server/internal/service/jsonrpc_dispatch.go 及其域 handler 的 method switch', { RpcDomain: domains, RpcMethod: catalog.rpc }),
   }
 }
@@ -86,9 +87,12 @@ export function syncTaskDesignCatalog(catalog, { repositoryRoot = root, check = 
   const source = fs.readFileSync(destination, 'utf8')
   const start = '    // BEGIN GENERATED TASK DISCOVERY'
   const end = '    // END GENERATED TASK DISCOVERY'
-  if (!source.includes(start) || !source.includes(end)) throw new Error('任务交互设计缺少分类生成标记')
   const begin = source.indexOf(start)
-  const finish = source.indexOf(end, begin) + end.length
+  const endPosition = source.indexOf(end, begin + start.length)
+  if (begin < 0 || endPosition < 0 || source.indexOf(end) !== endPosition || source.indexOf(start, begin + start.length) >= 0 || source.indexOf(end, endPosition + end.length) >= 0) {
+    throw new Error('任务交互设计缺少唯一且顺序正确的分类生成标记')
+  }
+  const finish = endPosition + end.length
   const next = source.slice(0, begin) + `${start}\n    const taskDiscoveryCatalog = ${JSON.stringify(catalog.taskDiscovery)};\n${end}` + source.slice(finish)
   if (next === source) return []
   if (check) throw new Error('任务交互设计分类未同步，请运行 node scripts/gen-public-contracts.mjs')

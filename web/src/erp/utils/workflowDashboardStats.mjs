@@ -1,3 +1,4 @@
+import { WorkflowBusinessStatus } from '../../common/consts/statuses.generated.mjs'
 import { normalizeRoleKey } from './roleKeys.mjs'
 import { formatWorkflowTaskSource } from './dashboardTaskDisplay.mjs'
 
@@ -193,7 +194,7 @@ export function isQcFailedWorkflowTask(task = {}) {
   if (
     payload.alert_type === 'qc_failed' ||
     payload.notification_type === 'qc_failed' ||
-    String(task.business_status_key || '').trim() === 'qc_failed'
+    String(task.business_status_key || '').trim() === WorkflowBusinessStatus.QC_FAILED
   ) {
     return true
   }
@@ -315,7 +316,7 @@ export function isShipmentPendingWorkflowTask(task = {}) {
   const payload = payloadOf(task)
   return (
     payload.alert_type === 'shipment_pending' ||
-    String(task.business_status_key || '').trim() === 'shipment_pending'
+    String(task.business_status_key || '').trim() === WorkflowBusinessStatus.SHIPMENT_PENDING
   )
 }
 

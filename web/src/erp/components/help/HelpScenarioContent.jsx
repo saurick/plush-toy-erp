@@ -42,12 +42,6 @@ function HelpOverview({
   const back = nodeCenter(model.exception.back) - nodeWidth * 0.24
   // 横向坐标来自同一网格，纵向跟随实际换行高度，避免长岗位名称挡住异常箭头。
   const issueCenter = Math.max(160, Math.min(840, from))
-  const selectedStep = model.steps.find((item) => item.id === selected.id)
-  const detail = selectedStep
-    ? `${selectedStep.owner} · ${selectedStep.description}`
-    : selected.view === 'exception'
-      ? `${model.exception.owner} · 处理后回到第 ${model.exception.backNumber} 步重新核对。`
-      : '核对完成条件与交接结果。'
   return (
     <section
       className={`erp-help-flow erp-help-flow--${model.kind}`}
@@ -158,16 +152,6 @@ function HelpOverview({
           ) : null}
         </div>
       </div>
-      <p className="erp-help-flow__detail" aria-live="polite">
-        <strong>
-          {selectedStep
-            ? `第 ${selectedStep.number} 步`
-            : selected.view === 'exception'
-              ? '异常处理'
-              : '完成后'}
-        </strong>
-        <span>{detail}</span>
-      </p>
     </section>
   )
 }
@@ -295,7 +279,7 @@ export default function HelpScenarioContent({ scenario, roleKey }) {
           : model.exception
     )
   return (
-    <>
+    <div className="erp-help-scenario">
       <HelpOverview
         model={model}
         selected={selected}
@@ -384,6 +368,17 @@ export default function HelpScenarioContent({ scenario, roleKey }) {
                   ))}
                 </ol>
               </details>
+              <section className="erp-help-step-checks" aria-label="完成标准与常见问题">
+                <h4>怎样算办成了</h4>
+                <p>{scenario.completion}</p>
+                <h4>完成后交给谁</h4>
+                <p>{scenario.handoff}</p>
+                <details>
+                  <summary className="erp-help-step-checks-toggle">卡住时看这里</summary>
+                  <p>{scenario.exception.trigger}</p>
+                  <p>{scenario.exception.action}</p>
+                </details>
+              </section>
             </>
           ) : selected.view === 'result' ? (
             <Outcomes scenario={scenario} visual={visual} />
@@ -403,6 +398,6 @@ export default function HelpScenarioContent({ scenario, roleKey }) {
           )}
         </div>
       </section>
-    </>
+    </div>
   )
 }

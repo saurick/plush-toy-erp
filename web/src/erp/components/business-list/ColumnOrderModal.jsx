@@ -142,7 +142,13 @@ export function ColumnOrderModal({
           >
             恢复默认
           </Button>
-          <Button type="primary" loading={saving} onClick={saveDraftOrder}>
+          <Button
+            type="primary"
+            aria-label="完成"
+            aria-busy={saving}
+            loading={saving}
+            onClick={saveDraftOrder}
+          >
             完成
           </Button>
         </Space>

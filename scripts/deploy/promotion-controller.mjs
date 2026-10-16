@@ -61,8 +61,13 @@ function promotionPlanFile(store, operationId) {
 
 function issueForBlocker(code) {
   const messages = {
-    target_disk_capacity_low: "133 根盘可用空间低于固定安全线，先扩容并读回",
-    target_capacity_unknown: "无法证明 133 根盘容量",
+    initialization_production_backup_unprepared: "生产备份工具或受控配置未准备好",
+    initialization_production_offsite_unproven: "生产异机备份挂载与标记尚未核验",
+    initialization_system_disk_capacity_low: "系统根盘可用空间低于登记安全线",
+    initialization_disk_capacity_low: "目标部署盘可用空间低于固定安全线",
+    target_system_disk_capacity_low: "系统根盘可用空间低于登记安全线",
+    target_disk_capacity_low: "目标部署盘可用空间低于固定安全线",
+    target_capacity_unknown: "无法证明目标部署目录所在磁盘容量",
     target_migration_lock_held: "133 migration lock 正在被其他操作持有",
     target_runtime_sha_mismatch: "133 Server/Web 当前 SHA 不一致",
     promotion_git_relation_not_ahead:
@@ -423,7 +428,7 @@ if (isMainModule()) {
       console.log(`Usage:
   node scripts/deploy/promotion-controller.mjs \\
     --release-manifest <release-manifest.json> \\
-    --target <demo-133|customer-test-133> \\
+    --target <demo-133|customer-test-133|production-133> \\
     --idempotency-key <stable-random-key> \
     [--retry-of-operation-id <terminal-operation-id>] [--json]
 

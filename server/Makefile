@@ -260,9 +260,9 @@ db_create:
 	@if [ -z "$$DB_URL" ]; then \
 		echo "ERROR: DB_URL is not set"; exit 1; \
 	fi
-	@python3 -c 'import sys, urllib.parse; u = urllib.parse.urlparse(sys.argv[1]); db = (u.path or "").lstrip("/"); admin = u._replace(path="/postgres"); print(db); print(urllib.parse.urlunparse(admin))' "$$DB_URL" | { \
-		read DBNAME; \
-		read ADMIN_URL; \
+	@DB_URL="$$DB_URL" node ../scripts/lib/postgres-url.mjs create | { \
+			read DBNAME || exit 1; \
+			read ADMIN_URL || exit 1; \
 		echo "Creating database $$DBNAME ..."; \
 		psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$$DBNAME\"" 2>/dev/null || psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM pg_database WHERE datname = '$$DBNAME'" >/dev/null; \
 	}

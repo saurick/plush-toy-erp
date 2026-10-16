@@ -1,0 +1,22 @@
+[Unit]
+Description=Plush engineering workbench test deployment
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/deploy/plush-workbench-test/current
+EnvironmentFile=/root/deploy/plush-workbench-test/runtime/workbench.env
+Environment=GIT_OPTIONAL_LOCKS=0
+ExecStart=/usr/local/bin/node web/dev-server/standaloneWorkbench.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+KillMode=mixed
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

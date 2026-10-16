@@ -16,14 +16,15 @@
 | 主数据和源单据   | `master-data/*`、`sales-orders/*`、`purchase-orders/*`、`outsourcing-orders/*` | 领域列配置、表单、业务动作面板和来源生成入口                   |
 | 事实和质量       | `operational-facts/*`、`quality-inspections/*`、`shipments/*`                  | Operational Fact、质检、出货相关展示和表单入口                 |
 | 工程资料和打印   | `bom/*`、`print/*`                                                             | BOM 头 / 明细、打印模板工作台和纸面预览                        |
-| Workflow 展示与动作 | `workflow/*` | 任务动作抽屉、提交前解释合同消费；`WorkflowTaskCalendar.jsx` 供两端共用待办月历、日期列表和跨月逾期 / 无截止入口，读取服务端完整统计并复用现有办理入口 |
+| Workflow 展示与动作 | `workflow/*` | 任务动作抽屉、提交前解释合同消费；`WorkflowTaskCurrentSummary.jsx` 供电脑和手机共用当前责任、原因与时间摘要，当前责任优先呈现，前序步骤及记录默认展开并保留手动收起；`WorkflowTaskCalendar.jsx` 供两端共用待办月历、日期列表和跨月逾期 / 无截止入口，读取服务端完整统计并复用现有办理入口 |
 | 进度总览与详情 | `business-visualizations/ProgressCompactContent.jsx`、`BusinessProgressDrawer.jsx` | 桌面与手机共用单据身份、快照交期、实际数量及当前关注；完整环节和图片按需下钻 |
 
 ## 边界
 
 - 共享组件改动默认按影响面评估：触达 `business-list/*`、`ERPLayout.jsx`、打印壳或通用状态展示时，至少检查受影响页面和 `style:l1` 场景。
+- 菜单主列表的整页编辑复用 `business-list/BusinessFormPage.jsx`，统一管理保存、离开保护及桌面可选全屏；容器与恢复合同见[桌面业务编辑](../../../../docs/engineering/前端实现与交互约定.md#桌面业务编辑与弹窗约定)。
 - 桌面账号同步首次失败时不挂载业务页；已验证页面遇到临时断连时，由 `SessionRecoveryDialog` 保留本页内存中的编辑内容并隔离交互，JSON-RPC 暂停新的认证业务请求，不排队或重放写操作。恢复必须重新读取账号和有效业务配置；访问范围变化时重建业务页，登录失效或账号切换时清除旧页面。刷新、关闭或离开页面不属于内存保留范围；真实授权始终由后端校验。
-- 业务列表、弹窗明细与研发工作台的 Ant Design 表格共用 [`AppTable`](../../common/components/table/AppTable.jsx)；列对齐和序号规则见[表格对齐](../../../../docs/product/业务数据生命周期与页面动作规则.md#表格对齐--table-alignment)。
+- 业务列表、弹窗明细与研发工作台的 Ant Design 表格共用 [`AppTable`](../../common/components/table/AppTable.jsx)；列对齐和序号规则见[表格对齐](../../../../docs/engineering/前端实现与交互约定.md#表格对齐--table-alignment)。
 - 业务弹窗通过 `business-list/BusinessModal.jsx` 共享尺寸和滚动规则，`BusinessFormModal` 在其上保留表单标题与焦点恢复。尺寸取 [`modalSizes.mjs`](../utils/modalSizes.mjs)：`confirm` 用于简短确认与原因（480px），`localAction` 用于局部表单（最大 860px），`recordDetails` 用于复杂表单与摘要详情（最大 1120px），`columnOrder` 用于列排序与图片预览（最大 960px）。采购到货、多条退货或调整、材料汇总、完整单据明细、业务记录和生产工序使用 `lineItems`：窗口的 94%，最大 1800px，两侧至少留 16px。各入口使用尺寸名称；只有手机全屏或调用方已提供共享尺寸时传入 `width`。
 - 未收到用户明确的尺寸调整要求时，页面重设计沿用原有尺寸档位；表格改卡片、减少默认字段或当前只有一条明细均不构成降档理由，也不得为新实现放宽既有尺寸验收。采购到货的浏览器回归独立验证 `min(1800px, 94vw, calc(100vw - 32px))` 的实际宽度，覆盖单条、多条、窄屏、超宽屏和暗色。
 - 采购到货使用 `lineItems` 尺寸：上方录入收货信息，下方按采购材料分组，每种材料内追加卷包记录。数量核对与材料实点合计随录入更新，空白记录不提交，已填写记录逐字段校验；辅助说明按需展开。新增卷包后定位数量输入，关闭未保存内容前提醒，保存中禁止关闭和重复提交，材料读取失败可在弹窗内重试。
@@ -33,6 +34,7 @@
 - 领域组件可以隐藏未完成入口，但不能在前端本地补造后端事实、状态流转或权限结论。
 - 列配置、表单默认值、来源选择、导出 / 打印字段涉及业务字段链路时，必须检查新建、编辑、切换来源、清空来源、列表、详情、打印 / 导出和旧数据回补路径。
 - 打印组件只负责预览和模板渲染；打印留档、合同事实、采购 / 委外 / 出货 / 财务状态仍由后端和正式文档定义。
+- 合同条款共用 `print/ContractClauseTools.jsx`，支持分组增删、名称编辑与排序，以及组内条目操作；分组名称的左侧和纸面入口写入同一份有序草稿。明细和工程行共用 `PrintWorkspaceTools.jsx` 的调序与清空工具。结构操作只修改窗口草稿，清空保留条目，删除才移除条目；空组标题及编号规则见[打印字段与编辑清单](../../../../docs/打印模板字段与编辑行为清单.md#条目编辑)。工具和留白导航不进入纸面输出。
 - Workflow 组件只消费 `explain_action_access`、`explain_task_assignment` 和受控 action API；不能重新直连 raw workflow 写入口或把 task done 当成 Fact posted。
 
 ## 修改后验证
@@ -55,10 +57,10 @@ STYLE_L1_SCENARIOS=business-core-pages-desktop pnpm --dir web style:l1
 
 ## 页面职责拆分
 
-- `help/HelpScenarioContent` 生成岗位帮助的办理概览与说明切换；`HelpScenarioIllustration` 只展示标明的操作样例。帮助场景、当前步骤正文和完成条件从配置目录读取，入口权限与地址恢复由 `HelpCenterPage` 管理。
+- `help/HelpScenarioContent` 生成岗位帮助的办理概览与说明切换，并直接显示完成标准、交接和常见问题；`HelpScenarioIllustration` 只展示标明的操作样例。`HelpHandbookChapter` 同源渲染通用与业务章节，`HelpReferenceContent` 保留完整词条深链；首页推荐、账号阅读范围、办理入口权限、地址恢复与离线下载由 `HelpCenterPage` 管理。三册手册入口见[项目手册](../../../../docs/manuals/README.md)。
 - `permission-center/` 的 `usePermissionCenterData` 负责账号与岗位加载，`usePermissionRoleSettings` 负责岗位草稿和权限预览，`PermissionAdminAccounts` 自持账号表单与弹窗；页面只协调页签与未保存提醒。
 - `workflow/useSourceOrderWorkflowActions.mjs` 统一采购和委外源单的 Workflow 动作；页面提供场景标识。
-- `outsourcing-orders/` 的 `useOutsourcingOrder*` 按查询、编辑、协同任务、明细排序和生命周期动作管理状态；`useOutsourcingSourceFacts` 管理委外来源事实与回货质检，应付操作由专用 Hook 管理。
+- `outsourcing-orders/` 的 `useOutsourcingOrder*` 按查询、编辑、协同任务和生命周期动作管理状态；`useOutsourcingSourceFacts` 管理委外来源事实与回货质检，应付操作由专用 Hook 管理。
 - `operational-facts/useOperationalFactQuery` 负责来源筛选、分页、详情与导出查询，`useOperationalFactMutations` 负责过账、结清和取消；页面消费这些状态与动作。
 - `production-orders/useProductionFactActions.mjs` 与 `finance/useFinanceReconciliationAction.mjs` 管理事实工作台对应操作的表单状态、请求失效和重试。
 - 工程打印的基础编辑组件及三类纸面位于 `print/`；页面保留窗口草稿和工具栏编排，业务数据仍只读。

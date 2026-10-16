@@ -32,7 +32,11 @@ export default function PrintWorkspacePage() {
   const expiresAt = user?.exp
   useEffect(() => {
     const refreshSession = () =>
-      queueMicrotask(() => setSessionRevision((value) => value + 1))
+      queueMicrotask(() => {
+        // 会话清理会通知外观订阅者；先在事件回调中完成，再触发页面渲染。
+        getCurrentUser()
+        setSessionRevision((value) => value + 1)
+      })
     const onStorage = (event) => {
       if (event.key === null || event.key === 'admin_access_token') {
         refreshSession()

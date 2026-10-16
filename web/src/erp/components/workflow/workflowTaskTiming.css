@@ -73,3 +73,22 @@
 .mobile-role-tasks-page .erp-task-timing {
   font-size: var(--erp-font-small);
 }
+
+.erp-task-timing--compact {
+  margin-top: 2px;
+  font-size: var(--erp-font-caption);
+}
+
+.erp-task-timing--compact .erp-task-timing__icon {
+  display: none;
+}
+
+.erp-task-timing--compact dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 16px;
+}
+
+.erp-task-timing--compact dt {
+  width: auto;
+}

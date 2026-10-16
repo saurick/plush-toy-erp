@@ -1,3 +1,4 @@
+import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import {
   formatMobileTaskTime,
   getMobileTaskDueStatusLabel,
@@ -270,7 +271,7 @@ export function resolveMobileTaskStatusLabel(task = {}) {
 }
 
 export function resolveMobileTaskCompletionFeedback(task = {}) {
-  if (String(task.task_status_key || '').trim() !== 'done') return ''
+  if (String(task.task_status_key || '').trim() !== WorkflowTaskStatus.DONE) return ''
   const feedback = task.payload?.feedback
   return typeof feedback === 'string' ? feedback.trim() : ''
 }
@@ -364,8 +365,8 @@ export function resolveMobileTaskActionReason({
 
   const taskStatusKey = String(task.task_status_key || '').trim()
   if (
-    (actionKey === 'blocked' && taskStatusKey === 'blocked') ||
-    (actionKey === 'rejected' && taskStatusKey === 'rejected')
+    (actionKey === 'blocked' && taskStatusKey === WorkflowTaskStatus.BLOCKED) ||
+    (actionKey === 'rejected' && taskStatusKey === WorkflowTaskStatus.REJECTED)
   ) {
     return resolveTaskReason(task)
   }
@@ -377,23 +378,23 @@ function resolveOrderApprovalBusinessStatus(task, taskStatusKey) {
   if (!isOrderApprovalTask(task)) {
     return task.business_status_key || undefined
   }
-  if (taskStatusKey === 'done') return ORDER_APPROVED_STATUS_KEY
-  if (taskStatusKey === 'blocked') return 'blocked'
-  if (taskStatusKey === 'rejected') return ORDER_APPROVAL_STATUS_KEY
+  if (taskStatusKey === WorkflowTaskStatus.DONE) return ORDER_APPROVED_STATUS_KEY
+  if (taskStatusKey === WorkflowTaskStatus.BLOCKED) return 'blocked'
+  if (taskStatusKey === WorkflowTaskStatus.REJECTED) return ORDER_APPROVAL_STATUS_KEY
   return task.business_status_key || ORDER_APPROVAL_STATUS_KEY
 }
 
 function resolvePurchaseInboundBusinessStatus(task, taskStatusKey) {
   if (isPurchaseIqcTask(task)) {
-    if (taskStatusKey === 'done') return WAREHOUSE_INBOUND_PENDING_STATUS_KEY
-    if (['blocked', 'rejected'].includes(taskStatusKey)) {
+    if (taskStatusKey === WorkflowTaskStatus.DONE) return WAREHOUSE_INBOUND_PENDING_STATUS_KEY
+    if ([WorkflowTaskStatus.BLOCKED, WorkflowTaskStatus.REJECTED].includes(taskStatusKey)) {
       return QC_FAILED_STATUS_KEY
     }
     return task.business_status_key || IQC_PENDING_STATUS_KEY
   }
   if (isWarehouseInboundTask(task)) {
-    if (taskStatusKey === 'done') return INBOUND_DONE_STATUS_KEY
-    if (['blocked', 'rejected'].includes(taskStatusKey)) return 'blocked'
+    if (taskStatusKey === WorkflowTaskStatus.DONE) return INBOUND_DONE_STATUS_KEY
+    if ([WorkflowTaskStatus.BLOCKED, WorkflowTaskStatus.REJECTED].includes(taskStatusKey)) return 'blocked'
     return task.business_status_key || WAREHOUSE_INBOUND_PENDING_STATUS_KEY
   }
   return null
@@ -401,32 +402,32 @@ function resolvePurchaseInboundBusinessStatus(task, taskStatusKey) {
 
 function resolveOutsourceReturnBusinessStatus(task, taskStatusKey) {
   if (isOutsourceReturnTrackingTask(task)) {
-    if (taskStatusKey === 'done') return OUTSOURCE_QC_PENDING_STATUS_KEY
-    if (['blocked', 'rejected'].includes(taskStatusKey)) return 'blocked'
+    if (taskStatusKey === WorkflowTaskStatus.DONE) return OUTSOURCE_QC_PENDING_STATUS_KEY
+    if ([WorkflowTaskStatus.BLOCKED, WorkflowTaskStatus.REJECTED].includes(taskStatusKey)) return 'blocked'
     return (
       task.business_status_key || OUTSOURCE_PRODUCTION_PROCESSING_STATUS_KEY
     )
   }
   if (isOutsourceReturnQcTask(task)) {
-    if (taskStatusKey === 'done') {
+    if (taskStatusKey === WorkflowTaskStatus.DONE) {
       return OUTSOURCE_WAREHOUSE_INBOUND_PENDING_STATUS_KEY
     }
-    if (['blocked', 'rejected'].includes(taskStatusKey)) {
+    if ([WorkflowTaskStatus.BLOCKED, WorkflowTaskStatus.REJECTED].includes(taskStatusKey)) {
       return OUTSOURCE_QC_FAILED_STATUS_KEY
     }
     return task.business_status_key || OUTSOURCE_QC_PENDING_STATUS_KEY
   }
   if (isOutsourceWarehouseInboundTask(task)) {
-    if (taskStatusKey === 'done') return OUTSOURCE_INBOUND_DONE_STATUS_KEY
+    if (taskStatusKey === WorkflowTaskStatus.DONE) return OUTSOURCE_INBOUND_DONE_STATUS_KEY
     return (
       task.business_status_key || OUTSOURCE_WAREHOUSE_INBOUND_PENDING_STATUS_KEY
     )
   }
   if (isOutsourceReworkTask(task)) {
-    if (taskStatusKey === 'done') {
+    if (taskStatusKey === WorkflowTaskStatus.DONE) {
       return OUTSOURCE_PRODUCTION_PROCESSING_STATUS_KEY
     }
-    if (['blocked', 'rejected'].includes(taskStatusKey)) {
+    if ([WorkflowTaskStatus.BLOCKED, WorkflowTaskStatus.REJECTED].includes(taskStatusKey)) {
       return OUTSOURCE_QC_FAILED_STATUS_KEY
     }
     return task.business_status_key || OUTSOURCE_QC_FAILED_STATUS_KEY
@@ -489,7 +490,7 @@ export function canOperateTask(roleKey, task) {
 
 function isRiskTaskForUrge(task = {}) {
   return (
-    ['blocked', 'rejected'].includes(
+    [WorkflowTaskStatus.BLOCKED, WorkflowTaskStatus.REJECTED].includes(
       String(task.task_status_key || '').trim()
     ) ||
     task.due_status === 'overdue' ||
@@ -504,7 +505,7 @@ export function resolveMobileUrgeAction(roleKey, task = {}) {
   if (roleKey === 'boss') return 'escalate_to_boss'
   if (
     roleKey !== 'pmc' &&
-    ['blocked', 'rejected'].includes(String(task.task_status_key || '').trim())
+    [WorkflowTaskStatus.BLOCKED, WorkflowTaskStatus.REJECTED].includes(String(task.task_status_key || '').trim())
   ) {
     return 'escalate_to_pmc'
   }
@@ -559,7 +560,7 @@ export function canUrgeTask(roleKey, task = {}) {
   }
   return (
     taskOwnerRoleKey === normalizedRoleKey &&
-    ['blocked', 'rejected'].includes(String(task.task_status_key || '').trim())
+    [WorkflowTaskStatus.BLOCKED, WorkflowTaskStatus.REJECTED].includes(String(task.task_status_key || '').trim())
   )
 }
 
@@ -610,17 +611,17 @@ export function isTaskHighPriority(task) {
 }
 
 export function isTaskReadyProgress(task) {
-  return String(task.task_status_key || '').trim() === 'ready'
+  return String(task.task_status_key || '').trim() === WorkflowTaskStatus.READY
 }
 
 export function isTaskBlockedProgress(task) {
-  return String(task.task_status_key || '').trim() === 'blocked'
+  return String(task.task_status_key || '').trim() === WorkflowTaskStatus.BLOCKED
 }
 
 export function getTaskQueueTone(task) {
   const taskStatusKey = String(task.task_status_key || '').trim()
-  if (taskStatusKey === 'rejected') return '已退回'
-  if (taskStatusKey === 'blocked') {
+  if (taskStatusKey === WorkflowTaskStatus.REJECTED) return '已退回'
+  if (taskStatusKey === WorkflowTaskStatus.BLOCKED) {
     return '卡住'
   }
   if (task.alert_level === 'critical' || isTaskOverdue(task)) {

@@ -2,7 +2,7 @@
 
 这些单元把仓库级备份脚本接到目标机定时任务。它们是安装模板，不代表当前目标机已经安装或运行。
 
-安装前先把固定 release 路径调整为目标机实际路径，并将 `env/backup.env.example` 复制到 `/etc/plush-toy-erp/backup.env`。运行账户必须能读取生产 env、写本地与异地备份目录，并只能操作本项目 Compose。异地目录必须是独立主机或独立存储的受控挂载，不能只是数据库服务器上的另一个普通目录。
+生产样例已绑定 `production-133` 的固定 release / runtime env 和独立备份目录。安装前先核对这些路径与目标 registry 一致，并把 unit 的脚本入口调整为该固定 release 路径，并将 `env/backup.env.example` 复制到 `/etc/plush-toy-erp/backup.env`。本机生产模板使用与 registry 一致的 root 操作身份，以读取 `root:0600` env 和私有 release 目录；数据库备份仍经只读 `erp_backup`。安装时核对脚本只操作本项目 Compose、本地与异机备份目录。异地目录必须是独立主机或独立存储的受控挂载，不能只是数据库服务器上的另一个普通目录。
 
 异地副本固定使用 `age` 公钥加密。先在受控恢复端生成身份，再只把 recipient 文件复制到数据库服务器；identity 不进入仓库，也不应与异地备份放在一起：
 

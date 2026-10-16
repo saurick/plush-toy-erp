@@ -1,3 +1,5 @@
+import { WorkflowBusinessStatus } from '../../common/consts/statuses.generated.mjs'
+
 export const PROCESSING_CONTRACTS_MODULE_KEY = 'processing-contracts'
 
 export const INBOUND_MODULE_KEY = 'inbound'
@@ -11,15 +13,15 @@ export const OUTSOURCE_WAREHOUSE_INBOUND_TASK_GROUP =
 
 export const OUTSOURCE_REWORK_TASK_GROUP = 'outsource_rework'
 
-export const PRODUCTION_PROCESSING_STATUS_KEY = 'production_processing'
+export const PRODUCTION_PROCESSING_STATUS_KEY = WorkflowBusinessStatus.PRODUCTION_PROCESSING
 
-export const QC_PENDING_STATUS_KEY = 'qc_pending'
+export const QC_PENDING_STATUS_KEY = WorkflowBusinessStatus.QC_PENDING
 
-export const WAREHOUSE_INBOUND_PENDING_STATUS_KEY = 'warehouse_inbound_pending'
+export const WAREHOUSE_INBOUND_PENDING_STATUS_KEY = WorkflowBusinessStatus.WAREHOUSE_INBOUND_PENDING
 
-export const QC_FAILED_STATUS_KEY = 'qc_failed'
+export const QC_FAILED_STATUS_KEY = WorkflowBusinessStatus.QC_FAILED
 
-export const INBOUND_DONE_STATUS_KEY = 'inbound_done'
+export const INBOUND_DONE_STATUS_KEY = WorkflowBusinessStatus.INBOUND_DONE
 
 const OUTSOURCE_RETURN_SOURCE_TYPE_KEYS = new Set([
   PROCESSING_CONTRACTS_MODULE_KEY,

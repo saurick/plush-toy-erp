@@ -33,7 +33,7 @@ import Table from '@/common/components/table/AppTable'
 import SharedSearchInput from '@/common/components/SearchInput'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import FilterChip from '@/common/components/navigation/FilterChip'
-import { countFilterOptions, shouldUseDirectFilterChoices } from '../../utils/businessFilterPresentation.mjs'
+import { shouldUseDirectFilterChoices } from '../../utils/businessFilterPresentation.mjs'
 import './businessFilterChoices.css'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -1021,7 +1021,7 @@ export function SelectFilter({
       maxTagCount={maxTagCount}
       onOpenChange={handleOpenChange}
       onMouseDownCapture={handleMouseDownCapture}
-      showSearch={countFilterOptions(options) > 5}
+      showSearch={false}
       optionFilterProp="label"
       {...restProps}
     />
@@ -1149,6 +1149,7 @@ export function BusinessOperationPanel({
   onClearFilters = null,
   clearFiltersDisabled,
   children,
+  showSelection = true,
   compact = false,
   filtersOpen: controlledFiltersOpen,
   onFiltersOpenChange,
@@ -1340,7 +1341,7 @@ export function BusinessOperationPanel({
           </div>
         ) : null}
       </div>
-      {children ? (
+      {showSelection && children ? (
         <div className="erp-business-operation-panel__selection">
           {children}
         </div>

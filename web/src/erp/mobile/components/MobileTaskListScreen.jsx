@@ -14,6 +14,7 @@ import {
   SwapOutlined,
   UserOutlined,
 } from '@ant-design/icons'
+import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import { WORKFLOW_TASK_DUE_OPTIONS, taskListFilterRequest } from '../../utils/workflowTaskListFilters.mjs'
 import { getWorkflowTaskSourceTypeLabel } from '../../utils/dashboardTaskDisplay.mjs'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
@@ -62,7 +63,6 @@ import {
 } from '../utils/mobileRoleTaskModel.mjs'
 
 import MobileWorkflowExceptionPanel from './MobileWorkflowExceptionPanel.jsx'
-import { taskDiscoveryFilterLabels, taskDiscoveryRequest } from '../../utils/workflowTaskDiscovery.mjs'
 import WorkflowTaskCalendar from '../../components/workflow/WorkflowTaskCalendar.jsx'
 import { TRACKING_VIEW_OPTIONS } from '../../utils/workflowTrackingFilters.mjs'
 
@@ -158,22 +158,20 @@ export default function MobileTaskListScreen({
     MOBILE_MAIN_TAB_KEYS.TODO,
     MOBILE_MAIN_TAB_KEYS.MESSAGES,
   ].includes(activeMainTabKey)
-  const assignees = useWorkflowTaskAssignees(adminProfile, activeRoleKey, canFilterTaskList || activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE)
+  const taskFacets = useWorkflowTaskAssignees(adminProfile, activeRoleKey, canFilterTaskList || activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE)
   const activeCalendar = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.TODO && calendarState.layout === 'calendar' ? calendarState : null
   const calendarMode = activeCalendar && taskCalendarSelectionMode(activeCalendar.selection)
   const history = activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE
   const appliedFilters = [
-    ...taskDiscoveryFilterLabels(taskHistoryOptions, assignees.people),
     !history && !activeCalendar && taskHistoryOptions.due && { key: 'due', label: `截止时间：${WORKFLOW_TASK_DUE_OPTIONS.find(({ value }) => value === taskHistoryOptions.due)?.label}` },
     taskHistoryOptions.sourceType && { key: 'sourceType', label: `来源单据：${getWorkflowTaskSourceTypeLabel(taskHistoryOptions.sourceType)}` },
     taskStatusKey && { key: 'statusKey', label: `${history ? '处理结果' : '任务状态'}：${(history ? WORKFLOW_HISTORY_STATUS_OPTIONS : MOBILE_TASK_STATUS_OPTIONS).find(({ value }) => value === taskStatusKey)?.label}` },
     !history && !activeCalendar && taskSortKey !== 'newest' && { key: 'sortKey', label: `排序：${MOBILE_TASK_SORT_OPTIONS.find(({ value }) => value === taskSortKey)?.label}` },
-    history && taskHistoryOptions.period === 'custom' && { key: 'period', label: `处理时间：${taskHistoryOptions.period === 'custom' ? `${taskHistoryOptions.dateFrom} 至 ${taskHistoryOptions.dateTo}` : WORKFLOW_HISTORY_PERIOD_OPTIONS.find(({ value }) => value === taskHistoryOptions.period)?.label}` },
     calendarMode && calendarMode !== 'date' && { key: 'calendar', label: TASK_CALENDAR_SELECTION_OPTIONS.find(({ value }) => value === calendarMode)?.label },
   ]
   const clearAppliedFilter = (key) => {
     if (key === 'calendar') calendarState.change({ selection: defaultTaskCalendarDate(calendarState.month) })
-    else onTaskListOptionsChange(key === 'sortKey' ? { sortKey: 'newest' } : key === 'period' ? { period: '', dateFrom: '', dateTo: '' } : { [key]: '' })
+    else onTaskListOptionsChange(key === 'sortKey' ? { sortKey: 'newest' } : { [key]: '' })
   }
   const lastTaskTab = useRef(MOBILE_MAIN_TAB_KEYS.TODO)
   const lastTrackingView = useRef(MOBILE_MAIN_TAB_KEYS.TRACKING)
@@ -348,7 +346,7 @@ export default function MobileTaskListScreen({
         label={`查看${getWorkflowTaskDisplayName(task)}详情`}
         data-mobile-task-id={task.id}
         data-task-code={task.task_code || undefined}
-        className={`erp-mobile-list-item mobile-task-list-row w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left transition hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${severity.rowClass} ${
+        className={`erp-mobile-list-item mobile-task-list-row w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 text-left focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${severity.rowClass} ${
           isSelected ? 'ring-2 ring-emerald-500/40' : ''
         }`}
         onOpen={() => {
@@ -368,7 +366,7 @@ export default function MobileTaskListScreen({
           <span
             className={`inline-flex min-w-[52px] items-center justify-center rounded-md border px-2 py-1 text-sm font-semibold ${severity.badgeClass}`}
           >
-            {task.task_status_key === 'blocked'
+            {task.task_status_key === WorkflowTaskStatus.BLOCKED
               ? resolveMobileTaskStatusLabel(task)
               : severity.label === '普通'
                 ? '待处理'
@@ -431,6 +429,7 @@ export default function MobileTaskListScreen({
               className="mobile-role-task-filter"
               onClick={() => {
                 const next = active ? MOBILE_TASK_FILTER_KEYS.ALL : item.key
+                if (next === MOBILE_TASK_FILTER_KEYS.OVERDUE && taskHistoryOptions.due) onTaskListOptionsChange({ due: '' })
                 setActiveFilterKey(next)
                 setSelectedTaskID(null)
                 setDetailAction(null)
@@ -558,7 +557,7 @@ export default function MobileTaskListScreen({
     )
 
   const renderDoneTaskItem = (task) => {
-    const rejected = String(task.task_status_key || '').trim() === 'rejected'
+    const rejected = String(task.task_status_key || '').trim() === WorkflowTaskStatus.REJECTED
     return (
       <WorkflowTaskCard
         key={task.id}
@@ -671,7 +670,11 @@ export default function MobileTaskListScreen({
                 countAvailable ? `共 ${item.count} 条` : '数量暂不可用'
               }`}
               className="mobile-role-task-filter"
-              onClick={() => setActiveMessageTabKey(active ? MOBILE_MESSAGE_TAB_KEYS.WARNING : item.key)}
+              onClick={() => {
+                const next = active ? MOBILE_MESSAGE_TAB_KEYS.WARNING : item.key
+                if (next === MOBILE_MESSAGE_TAB_KEYS.NOTICE && taskHistoryOptions.due) onTaskListOptionsChange({ due: '' })
+                setActiveMessageTabKey(next)
+              }}
             >
               <span className="mobile-role-task-filter__content">
                 <span className="mobile-role-task-filter__label">{item.label}</span>
@@ -966,7 +969,7 @@ export default function MobileTaskListScreen({
         mobile
         state={calendarState}
         scopeKey={accessScopeKey}
-        query={{ view_key: 'todo', role_key: activeRoleKey, ...taskDiscoveryRequest(taskHistoryOptions), ...taskListFilterRequest({ sourceType: taskHistoryOptions.sourceType }), ...(taskKeyword ? { keyword: taskKeyword } : {}), ...(taskStatusKey ? { status_key: taskStatusKey } : {}) }}
+        query={{ view_key: 'todo', role_key: activeRoleKey, ...taskListFilterRequest({ sourceType: taskHistoryOptions.sourceType }), ...(taskKeyword ? { keyword: taskKeyword } : {}), ...(taskStatusKey ? { status_key: taskStatusKey } : {}) }}
         onOpenTask={(task) => onOpenLinkedTask(task.id)}
       />
     }
@@ -1170,7 +1173,7 @@ export default function MobileTaskListScreen({
                 />
               </form>
               {activeMainTabKey === MOBILE_MAIN_TAB_KEYS.DONE ? (
-                <MobileTaskHistoryOptions counts={taskStatusCounts} loading={loading} options={taskHistoryOptions} onChange={onTaskListOptionsChange} profile={adminProfile} roleKey={activeRoleKey} people={assignees.people} sourceTypes={assignees.sourceTypes} peopleError={assignees.error} onRetryPeople={assignees.reload} />
+                <MobileTaskHistoryOptions counts={taskStatusCounts} loading={loading} options={taskHistoryOptions} onChange={onTaskListOptionsChange} sourceTypes={taskFacets.sourceTypes} />
             ) : canFilterTaskList ? (
               <MobileTaskListOptions
                 showSort={activeMainTabKey !== MOBILE_MAIN_TAB_KEYS.TODO || calendarState.layout !== 'calendar'}
@@ -1185,12 +1188,7 @@ export default function MobileTaskListScreen({
                 sortKey={taskSortKey}
                 statusKey={taskStatusKey}
                 options={taskHistoryOptions}
-                profile={adminProfile}
-                roleKey={activeRoleKey}
-                people={assignees.people}
-                sourceTypes={assignees.sourceTypes}
-                peopleError={assignees.error}
-                onRetryPeople={assignees.reload}
+                sourceTypes={taskFacets.sourceTypes}
                 calendarState={activeCalendar}
                 onChange={onTaskListOptionsChange}
               />

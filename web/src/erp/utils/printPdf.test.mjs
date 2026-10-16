@@ -1011,6 +1011,32 @@ test('printPdf: 服务端 PDF 最小快照只克隆纸面目标区域', () => {
   assert.doesNotMatch(root.outerHTML, /record panel/)
 })
 
+test('printPdf: 快照移除编辑提示并保留图片及业务正文，不改动原纸面', () => {
+  const { target } = createFakeSourceDocumentForMinimalSnapshot()
+  const hint = target.ownerDocument.createElement('span')
+  hint.setAttribute('data-print-editor-only', 'true')
+  hint.textContent = '右上产品图 1'
+  target.appendChild(hint)
+  const image = target.ownerDocument.createElement('img')
+  image.setAttribute('src', 'data:image/png;base64,AA==')
+  image.setAttribute('alt', '已确认产品图')
+  target.appendChild(image)
+  const content = target.ownerDocument.createElement('p')
+  content.textContent = '按产品图核对裁片颜色'
+  target.appendChild(content)
+
+  const root = __TEST_ONLY__.createMinimalServerPdfSnapshotRoot(target)
+  __TEST_ONLY__.normalizeServerPdfSnapshotRuntimeState(root)
+
+  assert.equal(root.querySelector('[data-print-editor-only]'), null)
+  assert.doesNotMatch(root.outerHTML, /右上产品图 1/)
+  assert.equal(root.querySelector('img').getAttribute('src'), 'data:image/png;base64,AA==')
+  assert.equal(root.querySelector('img').getAttribute('alt'), '已确认产品图')
+  assert.match(root.outerHTML, /按产品图核对裁片颜色/)
+  assert.equal(target.querySelector('[data-print-editor-only]'), hint)
+  assert.equal(hint.textContent, '右上产品图 1')
+})
+
 test('printPdf: 服务端 PDF 快照固定为浅色纸面口径', () => {
   const { root, head, body } = createFakeSnapshotRoot()
   const target = body.querySelector('[data-server-pdf-root="true"]')

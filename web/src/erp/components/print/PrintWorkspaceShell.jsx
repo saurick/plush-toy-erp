@@ -8,7 +8,12 @@ import React, {
 } from 'react'
 import '@fontsource-variable/noto-sans-sc'
 import '@fontsource-variable/noto-serif-sc'
+import { InfoCircleOutlined } from '@ant-design/icons'
 import { inspectPrintImageBudget } from '../../utils/printOutputPreflight.mjs'
+import {
+  findBlankPrintFields,
+  findBlankPrintField,
+} from '../../utils/printBlankContentNotice.mjs'
 import { bindPrintEditableCaret } from '../../utils/printEditableCaret.mjs'
 import { PrintToolButton } from './PrintWorkspaceTools.jsx'
 
@@ -190,6 +195,7 @@ export default function PrintWorkspaceShell({
   appendixActions = null,
   appendixCount = 0,
   editorActions = null,
+  clauseActions = null,
   draftActions = null,
   draftTitle = '模板内容',
   draftDefaultOpen = false,
@@ -207,14 +213,20 @@ export default function PrintWorkspaceShell({
 }) {
   const stageRef = useRef(null)
   const outputTriggerRef = useRef(null)
+  const lastBlankFieldRef = useRef(null)
+  const blankFocusFrameRef = useRef(0)
   const [zoomMode, setZoomMode] = useState('fit')
   const [fitScale, setFitScale] = useState(1)
   const [preparing, setPreparing] = useState(true)
   const [imageBudget, setImageBudget] = useState({ count: 0, problem: '' })
+  const [blankCount, setBlankCount] = useState(0)
+  const [hasLocatedBlank, setHasLocatedBlank] = useState(false)
 
   useEffect(() => {
     const stage = stageRef.current
     if (!stage) return undefined
+    lastBlankFieldRef.current = null
+    setHasLocatedBlank(false)
     let frame
     const update = () => {
       cancelAnimationFrame(frame)
@@ -225,19 +237,32 @@ export default function PrintWorkspaceShell({
             ? current
             : next
         )
+        const count = findBlankPrintFields(stage).length
+        setBlankCount(count)
+        if (count === 0) {
+          lastBlankFieldRef.current = null
+          setHasLocatedBlank(false)
+        }
       })
     }
     const observer = new MutationObserver(update)
     observer.observe(stage, {
       subtree: true,
       childList: true,
+      characterData: true,
       attributes: true,
-      attributeFilter: ['src'],
+      attributeFilter: [
+        'src',
+        'data-print-blank-region',
+        'data-print-blank-row',
+        'data-print-blank-field',
+      ],
     })
     update()
     return () => {
       observer.disconnect()
       cancelAnimationFrame(frame)
+      cancelAnimationFrame(blankFocusFrameRef.current)
     }
   }, [prepareSignature])
 
@@ -277,6 +302,26 @@ export default function PrintWorkspaceShell({
       editable.dataset.printEmpty = String(!editable.textContent.trim())
       onClearFeedback?.()
     }
+  }
+  const revealBlankContent = (action) => {
+    const field = findBlankPrintField(
+      stageRef.current,
+      lastBlankFieldRef.current,
+      action
+    )
+    if (!field) return
+    lastBlankFieldRef.current = field
+    setHasLocatedBlank(true)
+    onReturnToEdit?.()
+    cancelAnimationFrame(blankFocusFrameRef.current)
+    blankFocusFrameRef.current = requestAnimationFrame(() => {
+      if (!stageRef.current?.contains(field)) return
+      const editable = field.matches('[contenteditable="true"]')
+        ? field
+        : field.querySelector('[contenteditable="true"]')
+      field.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+      editable?.focus({ preventScroll: true })
+    })
   }
 
   useEffect(() => {
@@ -359,6 +404,12 @@ export default function PrintWorkspaceShell({
         } ${workspaceClassName}`.trim()}
         data-preparing-text={preparingText}
         data-print-workspace-mode={selectionMode || 'edit'}
+        onClickCapture={(event) => {
+          if (event.target.closest('[data-print-structure-action]')) {
+            lastBlankFieldRef.current = null
+            setHasLocatedBlank(false)
+          }
+        }}
         onKeyDownCapture={(event) => {
           if (event.key === 'Escape' && selectionMode && !event.isComposing) {
             event.preventDefault()
@@ -366,60 +417,108 @@ export default function PrintWorkspaceShell({
           }
         }}
       >
-        <header className="erp-print-shell__toolbar">
-          <div className="erp-print-shell__toolbar-copy">
-            <strong>{title}</strong>
-            {sourceTag ? (
-              <span className="erp-print-shell__source-tag">{sourceTag}</span>
-            ) : null}
-            {DRAFT_PERSISTENCE_STATUS_TEXT[persistenceStatus] ? (
-              <span
-                className="erp-print-shell__toolbar-status"
-                data-print-draft-save-status={persistenceStatus}
-                role="status"
-                aria-live="polite"
-              >
-                {DRAFT_PERSISTENCE_STATUS_TEXT[persistenceStatus]}
-              </span>
-            ) : null}
-            {persistenceStatus === 'error' && onRetrySave ? (
-              <PrintToolButton
-                icon="reset"
-                type="button"
-                className="erp-print-shell__button--ghost"
-                onClick={onRetrySave}
-              >
-                重试保存
-              </PrintToolButton>
-            ) : null}
-          </div>
-          <div
-            className="erp-print-shell__toolbar-actions"
-            onClickCapture={(event) => {
-              const button = event.target.closest('button')
-              if (button) outputTriggerRef.current = button
-            }}
-          >
-            <label className="erp-print-shell__zoom-control print-zoom-control">
-              显示比例
-              <span className="print-zoom-select">
-                <select
-                  className="form-select"
-                  aria-label="显示比例"
-                  value={zoomMode}
-                  onChange={(event) => setZoomMode(event.target.value)}
+        <div className="erp-print-shell__header" data-print-editor-only>
+          <header className="erp-print-shell__toolbar">
+            <div className="erp-print-shell__toolbar-copy">
+              <strong>{title}</strong>
+              {sourceTag ? (
+                <span className="erp-print-shell__source-tag">{sourceTag}</span>
+              ) : null}
+              {DRAFT_PERSISTENCE_STATUS_TEXT[persistenceStatus] ? (
+                <span
+                  className="erp-print-shell__toolbar-status"
+                  data-print-draft-save-status={persistenceStatus}
+                  role="status"
+                  aria-live="polite"
                 >
-                  <option value="fit">适应宽度</option>
-                  <option value="0.75">75%</option>
-                  <option value="1">100%</option>
-                  <option value="1.25">125%</option>
-                  <option value="1.5">150%</option>
-                </select>
+                  {DRAFT_PERSISTENCE_STATUS_TEXT[persistenceStatus]}
+                </span>
+              ) : null}
+              {persistenceStatus === 'error' && onRetrySave ? (
+                <PrintToolButton
+                  icon="reset"
+                  type="button"
+                  className="erp-print-shell__button--ghost"
+                  onClick={onRetrySave}
+                >
+                  重试保存
+                </PrintToolButton>
+              ) : null}
+            </div>
+            <div
+              className="erp-print-shell__toolbar-actions"
+              onClickCapture={(event) => {
+                const button = event.target.closest('button')
+                if (button) outputTriggerRef.current = button
+              }}
+            >
+              <label className="erp-print-shell__zoom-control print-zoom-control">
+                显示比例
+                <span className="print-zoom-select">
+                  <select
+                    className="form-select"
+                    aria-label="显示比例"
+                    value={zoomMode}
+                    onChange={(event) => setZoomMode(event.target.value)}
+                  >
+                    <option value="fit">适应宽度</option>
+                    <option value="0.75">75%</option>
+                    <option value="1">100%</option>
+                    <option value="1.25">125%</option>
+                    <option value="1.5">150%</option>
+                  </select>
+                </span>
+              </label>
+              {toolbarActions}
+            </div>
+          </header>
+
+          {blankCount > 0 ? (
+            <div
+              className="erp-print-shell__blank-notice"
+              data-print-blank-notice=""
+              data-print-editor-only
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            >
+              <InfoCircleOutlined aria-hidden="true" />
+              <span className="erp-print-shell__blank-notice-text">
+                当前有 {blankCount}{' '}
+                处留白，将按当前内容输出；空白处可打印后手写补充。
               </span>
-            </label>
-            {toolbarActions}
-          </div>
-        </header>
+              <div
+                className="erp-print-shell__blank-actions"
+                role="group"
+                aria-label="留白定位"
+              >
+                {hasLocatedBlank && blankCount > 1 ? (
+                  [
+                    ['first', '第一处'],
+                    ['previous', '上一处'],
+                    ['next', '下一处'],
+                    ['last', '最后一处'],
+                  ].map(([action, label]) => (
+                    <button
+                      key={action}
+                      type="button"
+                      onClick={() => revealBlankContent(action)}
+                    >
+                      {label}
+                    </button>
+                  ))
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => revealBlankContent('first')}
+                  >
+                    查看留白
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </div>
 
         <PrintWorkspaceFeedback
           feedback={outputFeedback}
@@ -441,6 +540,7 @@ export default function PrintWorkspaceShell({
                   {editorActions}
                 </PrintWorkspaceToolSection>
               ) : null}
+              {clauseActions}
               {formatActions && tools.includes('text') ? (
                 <PrintWorkspaceToolSection
                   title="文字格式"

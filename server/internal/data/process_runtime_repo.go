@@ -290,6 +290,7 @@ func validateProcessShipmentQualityGate(ctx context.Context, tx *ent.Tx, shipmen
 		return biz.ErrBadParam
 	}
 	inspections, err := tx.QualityInspection.Query().Where(
+		qualityinspection.SupersededAtIsNil(),
 		qualityinspection.SourceType(biz.QualityInspectionSourceShipment),
 		qualityinspection.SourceID(shipmentID),
 		qualityinspection.InspectionType(biz.QualityInspectionTypeFinishedGoods),

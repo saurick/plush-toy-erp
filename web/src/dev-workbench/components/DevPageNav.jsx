@@ -287,6 +287,11 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
             className="erp-dev-workspace-nav__theme-toggle"
             showLabel
           />
+          {import.meta.env.MODE === 'workbench' ? (
+            <form method="post" action="/__dev/auth/logout">
+              <Button block htmlType="submit">退出登录</Button>
+            </form>
+          ) : null}
           <Button
             block
             icon={<CopyOutlined />}

@@ -30,7 +30,6 @@ type stubOutsourcingOrderJSONRPCRepo struct {
 	saveErr            error
 	saveCalls          int
 	supplierTerm       int
-	reorderedItemIDs   []int
 }
 
 func newStubOutsourcingOrderJSONRPCRepo() *stubOutsourcingOrderJSONRPCRepo {
@@ -132,26 +131,6 @@ func (s *stubOutsourcingOrderJSONRPCRepo) SaveOutsourcingOrderWithItems(_ contex
 		out.Items = append(out.Items, outItem)
 	}
 	return out, nil
-}
-
-func (s *stubOutsourcingOrderJSONRPCRepo) ReorderOutsourcingOrderItems(_ context.Context, id, expectedVersion int, itemIDs []int) (*biz.OutsourcingOrderWithItems, error) {
-	s.reorderedItemIDs = append([]int(nil), itemIDs...)
-	order, ok := s.orders[id]
-	if !ok {
-		return nil, biz.ErrOutsourcingOrderNotFound
-	}
-	updated := *order
-	updated.Version = expectedVersion + 1
-	s.orders[id] = &updated
-	items := make([]*biz.OutsourcingOrderItem, 0, len(itemIDs))
-	for _, itemID := range itemIDs {
-		item, exists := s.items[itemID]
-		if !exists || item.OutsourcingOrderID != id || item.LineStatus != biz.OutsourcingOrderItemStatusOpen {
-			return nil, biz.ErrBadParam
-		}
-		items = append(items, item)
-	}
-	return &biz.OutsourcingOrderWithItems{Order: &updated, Items: items}, nil
 }
 
 func (s *stubOutsourcingOrderJSONRPCRepo) ListOutsourcingOrderItems(_ context.Context, filter biz.OutsourcingOrderItemFilter) ([]*biz.OutsourcingOrderItem, int, error) {
@@ -369,7 +348,7 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	}
 }
 
-func TestJsonrpcDispatcher_ReorderOutsourcingOrderItemsUsesUpdatePermissionAndStableIDs(t *testing.T) {
+func TestJsonrpcDispatcher_OutsourcingOrderStandaloneReorderIsUnavailable(t *testing.T) {
 	repo := newStubOutsourcingOrderJSONRPCRepo()
 	repo.orders[1] = &biz.OutsourcingOrder{ID: 1, OutsourcingOrderNo: "OUT-ORDER", SupplierID: 1, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.OutsourcingOrderStatusDraft, Version: 1}
 	for _, itemID := range []int{1, 2, 3} {
@@ -379,19 +358,11 @@ func TestJsonrpcDispatcher_ReorderOutsourcingOrderItemsUsesUpdatePermissionAndSt
 		[]string{biz.PurchaseRoleKey},
 		biz.PermissionOutsourcingOrderUpdate,
 	))
-	_, res, err := j.handleOutsourcingOrder(workflowJSONRPCAdminContext(), "reorder_outsourcing_order_items", "reorder", mustJSONRPCStruct(t, map[string]any{
-		"id":               float64(1),
-		"expected_version": float64(1),
-		"item_ids":         []any{float64(3), float64(1), float64(2)},
+	_, res, err := j.handleOutsourcingOrder(workflowJSONRPCAdminContext(), "reorder_outsourcing_order_items", "removed-order-action", mustJSONRPCStruct(t, map[string]any{
+		"id": float64(1), "expected_version": float64(1), "item_ids": []any{float64(3), float64(1), float64(2)},
 	}))
-	if err != nil || res == nil || res.Code != errcode.OK.Code {
-		t.Fatalf("reorder outsourcing order items: res=%#v err=%v", res, err)
-	}
-	if len(repo.reorderedItemIDs) != 3 || repo.reorderedItemIDs[0] != 3 || repo.reorderedItemIDs[2] != 2 {
-		t.Fatalf("stable item order not forwarded: %#v", repo.reorderedItemIDs)
-	}
-	if version := jsonRPCInt(t, jsonRPCNestedMap(t, res, "outsourcing_order"), "version"); version != 2 {
-		t.Fatalf("reordered outsourcing order version = %d, want 2", version)
+	if err != nil || res == nil || res.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("standalone item ordering must be unavailable: res=%#v err=%v", res, err)
 	}
 }
 

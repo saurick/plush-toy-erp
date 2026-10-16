@@ -302,6 +302,10 @@ func (r *inventoryRepo) CancelQualityInspection(ctx context.Context, inspectionI
 	if err != nil {
 		return nil, err
 	}
+	// 纠正已使原判定失效，取消复检会让质量关口失去有效判定。
+	if row.CorrectionOfInspectionID != nil {
+		return nil, biz.ErrBadParam
+	}
 	transition, ok := corestatus.CancelQualityInspection(row.Status)
 	if !ok {
 		return nil, biz.ErrBadParam

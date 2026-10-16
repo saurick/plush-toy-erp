@@ -1,3 +1,4 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { WORKFLOW_TASK_DUE_OPTIONS } from './workflowTaskListFilters.mjs'
 import { isWorkflowHistoryDateFilter } from './workflowRoleTaskHistory.mjs'
 import { DISCOVERY_FILTER_KEYS, DISCOVERY_REQUEST_KEYS, normalizeTaskDiscoveryFilters, taskDiscoveryRequest } from './workflowTaskDiscovery.mjs'
@@ -176,11 +177,11 @@ const LANE_FILTER_VALUES = new Set(['all', ...WORKFLOW_TASK_BOARD_LANE_KEYS])
 const SORT_VALUES = new Set(TASK_BOARD_SORT_OPTIONS.map((item) => item.value))
 
 const TASK_STATUS_META = Object.freeze({
-  ready: { label: '可执行', color: 'blue' },
-  blocked: { label: '阻塞', color: 'red' },
-  rejected: { label: '退回', color: 'orange' },
-  withdrawn: { label: '已撤回', color: 'default' },
-  done: { label: '已完成', color: 'green' },
+  [WorkflowTaskStatus.READY]: { label: '可执行', color: 'blue' },
+  [WorkflowTaskStatus.BLOCKED]: { label: '阻塞', color: 'red' },
+  [WorkflowTaskStatus.REJECTED]: { label: '退回', color: 'orange' },
+  [WorkflowTaskStatus.WITHDRAWN]: { label: '已撤回', color: 'default' },
+  [WorkflowTaskStatus.DONE]: { label: '已完成', color: 'green' },
 })
 
 const TASK_DUE_RISK_META = Object.freeze({
@@ -379,10 +380,13 @@ function normalizePositiveInteger(value, fallback = 1) {
 
 export function normalizeWorkflowTaskBoardFilters(filters = {}) {
   const mode = ['todo', 'approval'].includes(filters.mode) ? filters.mode : 'all'
-  const lane = mode === 'todo' && filters.lane === 'finished'
+  const status = normalizeKnownFilterValue(filters.status, STATUS_FILTER_VALUES)
+  const requestedLane = mode === 'todo' && filters.lane === 'finished'
     ? 'all'
     : normalizeKnownFilterValue(filters.lane, LANE_FILTER_VALUES)
-  const status = normalizeKnownFilterValue(filters.status, STATUS_FILTER_VALUES)
+  const lane = requestedLane === 'all' && mode !== 'todo' && isTerminalWorkflowTask({ task_status_key: status })
+    ? 'finished'
+    : requestedLane
   const due = normalizeKnownFilterValue(filters.due, DUE_FILTER_VALUES)
   return {
     ...normalizeTaskDiscoveryFilters(filters, { includeStage: true }),
@@ -568,6 +572,19 @@ export function resolveWorkflowTaskBoardResponseState(
 function normalizeNonNegativeInteger(value) {
   const number = Number(value)
   return Number.isSafeInteger(number) && number >= 0 ? number : 0
+}
+
+export function buildWorkflowTaskOverviewTasks(lanes = []) {
+  const tasksByLane = new Map(lanes.map((lane) => [lane.key, lane.tasks || []]))
+  const seen = new Set()
+  return ['exception', 'due', 'actionable'].flatMap((key) =>
+    (tasksByLane.get(key) || []).filter((task) => {
+      const identity = String(task?.id || task?.task_code || '')
+      if (identity && seen.has(identity)) return false
+      if (identity) seen.add(identity)
+      return true
+    })
+  )
 }
 
 export function buildWorkflowTaskBoardModel(response = {}, filters = {}) {

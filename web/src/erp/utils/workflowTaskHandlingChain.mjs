@@ -1,3 +1,4 @@
+import { MaterialRequestStatus, SalesOrderStatus, WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   getEngineeringMaterialTaskContext,
   ENGINEERING_MATERIAL_STATUS,
@@ -27,14 +28,14 @@ export function buildCurrentTaskStageModel(task) {
           .filter(Boolean)
           .join(' · '),
         tone:
-          status === 'done'
+          status === WorkflowTaskStatus.DONE
             ? 'completed'
-            : status === 'blocked'
+            : status === WorkflowTaskStatus.BLOCKED
               ? 'blocked'
-              : ['rejected', 'withdrawn'].includes(status)
+              : [WorkflowTaskStatus.REJECTED, WorkflowTaskStatus.WITHDRAWN].includes(status)
                 ? 'rejected'
                 : 'active',
-        current: ['ready', 'blocked'].includes(status),
+        current: [WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(status),
         linked: true,
       },
     ],
@@ -57,14 +58,14 @@ export function buildEngineeringMaterialStageModel(task, request) {
     typeof value === 'string' && Number.isFinite(Date.parse(value))
   const bossApproved = hasTime(request.boss_reviewed_at)
   const financeApproved = hasTime(request.finance_reviewed_at)
-  const rejected = request.status === 'REJECTED'
+  const rejected = request.status === MaterialRequestStatus.REJECTED
   if (
     !hasTime(request.submitted_at) ||
     !request.order_status ||
-    (request.status === 'SUBMITTED' && bossApproved) ||
-    (request.status !== 'APPROVED' && financeApproved) ||
-    (['BOSS_APPROVED', 'APPROVED'].includes(request.status) && !bossApproved) ||
-    (request.status === 'APPROVED' && !financeApproved) ||
+    (request.status === MaterialRequestStatus.SUBMITTED && bossApproved) ||
+    (request.status !== MaterialRequestStatus.APPROVED && financeApproved) ||
+    ([MaterialRequestStatus.BOSS_APPROVED, MaterialRequestStatus.APPROVED].includes(request.status) && !bossApproved) ||
+    (request.status === MaterialRequestStatus.APPROVED && !financeApproved) ||
     (rejected && !hasTime(request.rejected_at))
   ) {
     return null
@@ -115,9 +116,9 @@ export function buildEngineeringMaterialStageModel(task, request) {
     )
   }
 
-  const orderClosed = request.order_status && request.order_status !== 'active'
-  if (!orderClosed && ['SUBMITTED', 'BOSS_APPROVED'].includes(request.status)) {
-    const finance = request.status === 'BOSS_APPROVED'
+  const orderClosed = request.order_status && request.order_status !== SalesOrderStatus.ACTIVE
+  if (!orderClosed && [MaterialRequestStatus.SUBMITTED, MaterialRequestStatus.BOSS_APPROVED].includes(request.status)) {
+    const finance = request.status === MaterialRequestStatus.BOSS_APPROVED
     append(
       finance ? 'finance_review' : 'boss_review',
       finance ? '财务审核' : '老板审核',
@@ -140,7 +141,7 @@ export function buildEngineeringMaterialStageModel(task, request) {
   }
   if (
     orderClosed &&
-    task.task_status_key === 'withdrawn' &&
+    task.task_status_key === WorkflowTaskStatus.WITHDRAWN &&
     !items.some((item) => item.linked)
   ) {
     items.push(buildCurrentTaskStageModel(task).items[0])
@@ -152,13 +153,13 @@ export function buildEngineeringMaterialStageModel(task, request) {
     handoffLabel: orderClosed
       ? '订单已结束，未完成的审批已停止。'
       : task.task_group === 'engineering_material_revision' &&
-          task.task_status_key === 'done'
+          task.task_status_key === WorkflowTaskStatus.DONE
         ? '本轮已退回；工程已重新提交，后续审批记录在新的用料提交中。'
         : rejected
           ? '本轮已退回工程修改。'
-          : request.status === 'APPROVED'
+          : request.status === MaterialRequestStatus.APPROVED
             ? '本次用料已批准采购。'
-            : request.status === 'BOSS_APPROVED'
+            : request.status === MaterialRequestStatus.BOSS_APPROVED
               ? '老板已通过，当前由财务审核。'
               : '工程已提交，当前由老板审核。',
     items,

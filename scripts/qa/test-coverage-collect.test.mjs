@@ -126,12 +126,14 @@ test("baseline command plan checks generated error codes and bypasses mutating p
   assert.equal(commands.web.command, process.execPath);
   assert.deepEqual(commands.web.args, [
     "--test",
+    "--test-concurrency=4",
     "--experimental-test-coverage",
     `--test-coverage-include=${ROOT.split(path.sep).join("/")}/**`,
     "--test-coverage-exclude=**/node_modules/**",
     "--test-reporter=tap",
   ]);
   assert.equal(commands.web.cwd, path.join(ROOT, "web"));
+  assert.match(JSON.parse(readFileSync(path.join(ROOT, "web/package.json"), "utf8")).scripts.test, /--test-concurrency=4\b/u);
 });
 
 test("native coverage measures repository code without external tools or node_modules", async (t) => {

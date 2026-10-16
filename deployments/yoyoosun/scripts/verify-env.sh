@@ -48,7 +48,7 @@ if [[ -z "$mode" || -z "$env_file" ]]; then
   exit 1
 fi
 
-root_dir="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+root_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd -P)"
 cd "$root_dir"
 
 if [[ ! -f "$env_file" ]]; then
@@ -86,10 +86,8 @@ required_keys=(
   ERP_DEBUG_CLEANUP_SCOPE
 )
 
-content="$(grep -vE '^[[:space:]]*(#|$)' "$env_file" || true)"
-
 for key in "${required_keys[@]}"; do
-  if ! grep -Eq "^${key}=" <<<"$content"; then
+  if ! grep -Eq "^${key}=" "$env_file"; then
     echo "[verify-env] 缺少必需变量: $key"
     exit 1
   fi
@@ -103,9 +101,10 @@ if [[ "$mode" == "runtime" ]]; then
 
   declare -A values=()
   while IFS='=' read -r key value; do
+    [[ -z "$key" || "$key" == \#* ]] && continue
     [[ -z "$key" || "$key" =~ ^[[:space:]]*# ]] && continue
     values["$key"]="$value"
-  done <<<"$content"
+  done <"$env_file"
 
   if [[ "${values[ERP_CUSTOMER_KEY]:-}" != "yoyoosun" ]]; then
     echo "[verify-env] yoyoosun 部署的 ERP_CUSTOMER_KEY 必须为 yoyoosun"

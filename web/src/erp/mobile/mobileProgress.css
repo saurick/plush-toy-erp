@@ -385,10 +385,22 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background-color 0.16s ease;
 }
 
-.mobile-progress-detail-group-trigger:hover {
-  background: var(--erp-interactive-bg-hover);
+@media (hover: hover) {
+  .mobile-progress-detail-group-trigger:not(
+      :disabled,
+      [aria-expanded='true']
+    ):hover {
+    background: var(--erp-interactive-bg-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-progress-detail-group-trigger {
+    transition: none;
+  }
 }
 
 .mobile-progress-detail-group-trigger[aria-expanded='true'] {

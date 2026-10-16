@@ -1,3 +1,4 @@
+import { InventoryLotStatus, OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   buildSourceInboundLotFields,
   normalizeSourceInboundLotRequestFields,
@@ -198,8 +199,8 @@ export function buildProductionCompletionChoices(
     ) {
       continue
     }
-    const target = fact.status === 'POSTED' ? postedByLine : draftByLine
-    if (!['POSTED', 'DRAFT'].includes(fact.status)) continue
+    const target = fact.status === OperationalFactStatus.POSTED ? postedByLine : draftByLine
+    if (![OperationalFactStatus.POSTED, OperationalFactStatus.DRAFT].includes(fact.status)) continue
     const lineID = Number(fact.source_line_id)
     const itemEntry = itemByLine.get(lineID)
     if (!itemEntry) continue
@@ -221,7 +222,7 @@ export function buildProductionCompletionChoices(
       // but still reserve the handwork quantity that produced those goods.
       const visited = new Set()
       let intake = batch
-      while (fact.status === 'POSTED' && intake && !intake.finished_goods_receipt_id &&
+      while (fact.status === OperationalFactStatus.POSTED && intake && !intake.finished_goods_receipt_id &&
         operationCodeByID.get(intake.production_order_operation_id) === 'PACKAGING') {
         if (visited.has(intake.id)) throw invalidContract('来源批次链路无法确认，请刷新后重试')
         visited.add(intake.id)
@@ -231,7 +232,7 @@ export function buildProductionCompletionChoices(
         if (!intake || operationCodeByID.get(intake.production_order_operation_id) !== 'HANDWORK') throw invalidContract('历史入库的手工来源无法确认，请核对来源记录')
         batchID = intake.id
       }
-      const target = fact.status === 'POSTED' ? postedByBatch : draftByBatch
+      const target = fact.status === OperationalFactStatus.POSTED ? postedByBatch : draftByBatch
       target.set(
         batchID,
         (target.get(batchID) || zeroQuantityUnits()) + quantity
@@ -338,7 +339,7 @@ export function buildProductionCompletionLotOptions(item = {}, lots = []) {
       if (
         String(lot?.subject_type || '').toUpperCase() !== 'PRODUCT' ||
         Number(lot?.subject_id || 0) !== productID ||
-        String(lot?.status || '').toUpperCase() !== 'ACTIVE'
+        String(lot?.status || '').toUpperCase() !== InventoryLotStatus.ACTIVE
       ) {
         return false
       }
@@ -472,7 +473,7 @@ export function validateProductionCompletionResult(
     !result ||
     !Number.isSafeInteger(Number(result.id)) ||
     Number(result.id) <= 0 ||
-    String(result.status || '').toUpperCase() !== 'DRAFT' ||
+    String(result.status || '').toUpperCase() !== OperationalFactStatus.DRAFT ||
     String(result.fact_type || '').toUpperCase() !== 'FINISHED_GOODS_RECEIPT' ||
     String(result.subject_type || '').toUpperCase() !== 'PRODUCT' ||
     !Number.isSafeInteger(Number(result.lot_id)) ||

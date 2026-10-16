@@ -397,19 +397,21 @@ export default function MobileRoleTasksPage() {
     createMobileRoleTaskViewCounters()
   )
   const [activeMessageTabKey, setActiveMessageTabKey] = useState(() =>
-    mobileTaskHistoryChoice(
+    taskQueryOptionsByPage[MOBILE_TASK_QUERY_PAGE_KEYS.RISKS]?.due ? MOBILE_MESSAGE_TAB_KEYS.WARNING : mobileTaskHistoryChoice(
       initialHistoryState[MOBILE_TASK_HISTORY_MESSAGE_TAB_KEY],
       Object.values(MOBILE_MESSAGE_TAB_KEYS),
       MOBILE_MESSAGE_TAB_KEYS.WARNING
     )
   )
-  const [activeFilterKey, setActiveFilterKey] = useState(() =>
-    mobileTaskHistoryChoice(
+  const [activeFilterKey, setActiveFilterKey] = useState(() => {
+    const filter = mobileTaskHistoryChoice(
       initialHistoryState[MOBILE_TASK_HISTORY_FILTER_KEY],
       Object.values(MOBILE_TASK_FILTER_KEYS),
       MOBILE_TASK_FILTER_KEYS.ALL
     )
-  )
+    return filter === MOBILE_TASK_FILTER_KEYS.OVERDUE && taskQueryOptionsByPage[MOBILE_TASK_QUERY_PAGE_KEYS.TASKS]?.due
+      ? MOBILE_TASK_FILTER_KEYS.ALL : filter
+  })
   const [selectedTaskID, setSelectedTaskID] = useState(() =>
     returnedTaskID || (initialHistoryScreen
       ? initialHistoryState[MOBILE_TASK_HISTORY_TASK_KEY] || null
@@ -2322,9 +2324,13 @@ export default function MobileRoleTasksPage() {
         taskSortKey={taskSortKey}
         taskStatusKey={taskStatusKey}
         taskHistoryOptions={taskQueryOptions}
-        onTaskListOptionsChange={(options) =>
-        updateActiveTaskQueryOptions((current) => ({ ...current, ...options }))
-      }
+        onTaskListOptionsChange={(options) => {
+          if (Object.hasOwn(options, 'due')) {
+            if (activeTaskQueryPageKey === MOBILE_TASK_QUERY_PAGE_KEYS.TASKS && activeFilterKey === MOBILE_TASK_FILTER_KEYS.OVERDUE) setActiveFilterKey(MOBILE_TASK_FILTER_KEYS.ALL)
+            if (activeTaskQueryPageKey === MOBILE_TASK_QUERY_PAGE_KEYS.RISKS) setActiveMessageTabKey(MOBILE_MESSAGE_TAB_KEYS.WARNING)
+          }
+          updateActiveTaskQueryOptions((current) => ({ ...current, ...options }))
+        }}
         onSearchTasks={setTaskKeyword}
         visibleListLimitsByKey={visibleListLimitsByKey}
       />

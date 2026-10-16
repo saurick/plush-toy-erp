@@ -1,7 +1,9 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +12,12 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"server/internal/biz"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/middleware"
+	httpx "github.com/go-kratos/kratos/v2/transport/http"
 )
 
 func TestTemplatePDFChromiumSecurityIntegration(t *testing.T) {
@@ -38,6 +46,48 @@ func TestTemplatePDFChromiumSecurityIntegration(t *testing.T) {
 	if !strings.HasPrefix(string(pdfBytes), "%PDF") {
 		t.Fatalf("rendered bytes do not have PDF signature: %q", pdfBytes[:min(len(pdfBytes), 8)])
 	}
+
+	t.Run("http_route_streams_rendered_bytes", func(t *testing.T) {
+		guard := &stubTemplatePDFModuleGuard{session: &biz.EffectiveSession{
+			Actions: []string{biz.PermissionERPPrintTemplateRead},
+			Modules: map[string]string{"purchase_orders": "enabled"},
+		}}
+		srv := httpx.NewServer(
+			httpx.Timeout(45*time.Second),
+			httpx.Filter(SecurityHeadersFilter(), RequestIDFilter(), JSONRPCBodyLimitFilter()),
+			httpx.Middleware(func(next middleware.Handler) middleware.Handler {
+				return func(ctx context.Context, req any) (any, error) {
+					return next(biz.WithCurrentAdmin(ctx, &biz.AdminUser{
+						ID: 1, Permissions: []string{biz.PermissionERPPrintTemplateRead},
+					}), req)
+				}
+			}),
+		)
+		registerTemplatePDFHandler(srv, log.NewStdLogger(io.Discard), nil, nil, guard)
+		server := httptest.NewServer(srv)
+		t.Cleanup(server.Close)
+		response, err := server.Client().Post(server.URL+"/templates/render-pdf", "application/json", bytes.NewBufferString(
+			`{"template_key":"material-purchase-contract","html":"<!doctype html><html><body><p>真实 HTTP 输出验证</p></body></html>"}`,
+		))
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			if err := response.Body.Close(); err != nil {
+				t.Errorf("close rendered PDF response: %v", err)
+			}
+		})
+		body, err := io.ReadAll(response.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if response.StatusCode != http.StatusOK || response.Header.Get("Content-Type") != "application/pdf" {
+			t.Fatalf("PDF HTTP response: status=%d headers=%v body=%s", response.StatusCode, response.Header, body)
+		}
+		if len(body) < 2000 || !bytes.HasPrefix(body, []byte("%PDF-")) {
+			t.Fatalf("rendered PDF did not reach HTTP body: bytes=%d headers=%v", len(body), response.Header)
+		}
+	})
 
 	var egressHits atomic.Int64
 	egressSink := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

@@ -130,8 +130,8 @@ export function createOutsourcingFormFieldsScenarios({
           .getByRole('heading', { name: '编辑加工合同', exact: true })
           .waitFor()
         await assertBusinessFormPage(page, editor)
-        const price = editor.locator('input#items_0_unit_price')
-        const quantity = editor.locator('input#items_0_outsourcing_quantity')
+        const price = editor.locator('input#outsourcing-order-editor_items_0_unit_price')
+        const quantity = editor.locator('input#outsourcing-order-editor_items_0_outsourcing_quantity')
         const amount = editor.getByRole('textbox', { name: '第 1 行加工金额' })
         assert.equal(Number(await amount.inputValue()), 36)
         await price.fill('')
@@ -147,49 +147,49 @@ export function createOutsourcingFormFieldsScenarios({
           .getByText('请输入大于 0 的数量，最多 6 位小数', { exact: true })
           .waitFor()
         await quantity.fill('12')
-        const unit = editor.locator('input#items_0_unit_id')
+        const unit = editor.locator('input#outsourcing-order-editor_items_0_unit_id')
         assert.equal(await unit.isDisabled(), true)
         await editor.locator('.erp-line-item-details summary').first().click()
         await editor
           .getByLabel('行备注', { exact: true })
           .fill('保留的逐行备注')
-        await clearSelect(editor.locator('input#items_0_product_sku_id'))
+        await clearSelect(editor.locator('input#outsourcing-order-editor_items_0_product_sku_id'))
         assert.equal(await unit.isDisabled(), false)
         assert.equal(
-          await editor.locator('input#items_0_sku_code_snapshot').inputValue(),
+          await editor.locator('input#outsourcing-order-editor_items_0_sku_code_snapshot').inputValue(),
           ''
         )
-        await selectOption(editor.locator('input#items_0_process_id'), '车缝')
+        await selectOption(editor.locator('input#outsourcing-order-editor_items_0_process_id'), '车缝')
         assert.equal(
           await editor
-            .locator('input#items_0_process_name_snapshot')
+            .locator('input#outsourcing-order-editor_items_0_process_name_snapshot')
             .inputValue(),
           '车缝'
         )
-        await clearSelect(editor.locator('input#items_0_process_id'))
+        await clearSelect(editor.locator('input#outsourcing-order-editor_items_0_process_id'))
         assert.equal(
           await editor
-            .locator('input#items_0_process_category_snapshot')
+            .locator('input#outsourcing-order-editor_items_0_process_category_snapshot')
             .inputValue(),
           ''
         )
-        await selectOption(editor.locator('input#items_0_process_id'), '手工')
-        await selectOption(editor.locator('input#items_0_subject_type'), '材料')
+        await selectOption(editor.locator('input#outsourcing-order-editor_items_0_process_id'), '手工')
+        await selectOption(editor.locator('input#outsourcing-order-editor_items_0_subject_type'), '材料')
         assert.equal(
           await editor
-            .locator('input#items_0_product_no_snapshot')
+            .locator('input#outsourcing-order-editor_items_0_product_no_snapshot')
             .inputValue(),
           ''
         )
         assert.equal(
-          await editor.locator('input#items_0_sku_code_snapshot').inputValue(),
+          await editor.locator('input#outsourcing-order-editor_items_0_sku_code_snapshot').inputValue(),
           ''
         )
         assert.equal(
           await editor.getByLabel('行备注', { exact: true }).inputValue(),
           '保留的逐行备注'
         )
-        await editor.locator('input#payment_term_days').fill('30')
+        await editor.locator('input#outsourcing-order-editor_payment_term_days').fill('30')
         const contactResponse = page.waitForResponse(
           (response) =>
             response.url().endsWith('/rpc/masterdata') &&
@@ -198,21 +198,21 @@ export function createOutsourcingFormFieldsScenarios({
             Number(response.request().postDataJSON()?.params?.owner_id) === 2
         )
         await selectOption(
-          editor.locator('input#supplier_id'),
+          editor.locator('input#outsourcing-order-editor_supplier_id'),
           'SUP-2 / 模拟乙加工厂'
         )
         assert.equal(
-          await editor.locator('input#payment_term_days').inputValue(),
+          await editor.locator('input#outsourcing-order-editor_payment_term_days').inputValue(),
           '60'
         )
         await contactGate
         await editor
-          .locator('input#supplier_snapshot_contact_name')
+          .locator('input#outsourcing-order-editor_supplier_snapshot_contact_name')
           .fill('合同自定联系人')
         assert.equal(contactsRequested, true)
         releaseContacts()
         await (await contactResponse).finished()
-        await editor.locator('input#supplier_snapshot_contact_name').click()
+        await editor.locator('input#outsourcing-order-editor_supplier_snapshot_contact_name').click()
         await page
           .locator(
             '.ant-select-dropdown:visible .ant-select-item-option-content'
@@ -221,22 +221,22 @@ export function createOutsourcingFormFieldsScenarios({
           .waitFor()
         assert.equal(
           await editor
-            .locator('input#supplier_snapshot_contact_name')
+            .locator('input#outsourcing-order-editor_supplier_snapshot_contact_name')
             .inputValue(),
           '合同自定联系人'
         )
         await editor
-          .locator('input#supplier_snapshot_contact_name')
+          .locator('input#outsourcing-order-editor_supplier_snapshot_contact_name')
           .press('Tab')
         await selectOption(
-          editor.locator('input#supplier_id'),
+          editor.locator('input#outsourcing-order-editor_supplier_id'),
           'SUP-3 / 模拟未设账期加工厂'
         )
         assert.equal(
-          await editor.locator('input#payment_term_days').inputValue(),
+          await editor.locator('input#outsourcing-order-editor_payment_term_days').inputValue(),
           ''
         )
-        await editor.locator('input#payment_term_days').fill('45')
+        await editor.locator('input#outsourcing-order-editor_payment_term_days').fill('45')
         const lineDetails = editor.locator('.erp-line-item-details').first()
         await lineDetails
           .getByText('规格与行备注', { exact: true })

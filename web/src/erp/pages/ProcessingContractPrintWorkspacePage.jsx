@@ -1,7 +1,26 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
-import { PrintToolButton } from '../components/print/PrintWorkspaceTools.jsx'
+import {
+  PrintToolButton,
+  PrintItemOrderTools,
+} from '../components/print/PrintWorkspaceTools.jsx'
 import usePrintWorkspaceFeedback from '../utils/usePrintWorkspaceFeedback.js'
+import ContractClauseTools from '../components/print/ContractClauseTools.jsx'
+import {
+  editContractClauseGroup,
+  editContractClauseGroups,
+} from '../utils/contractClauseEditor.mjs'
+import {
+  editProcessingContractRow,
+  PROCESSING_CONTRACT_MAX_ROWS,
+  applyProcessingDetailCellMerge,
+  clearProcessingContractSignatureDraft,
+  deleteProcessingContractLine,
+  splitProcessingDetailCellMerge,
+  insertProcessingContractLine,
+  updateProcessingContractLineCell,
+} from '../utils/processingContractEditor.mjs'
+import { getPrintRowBlock } from '../utils/printItemOperations.mjs'
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import { getPrintOutputProblem } from '../utils/printOutputPreflight.mjs'
 import { getPrintWorkspaceDraftScope } from '../utils/printWorkspaceScope.mjs'
@@ -26,15 +45,6 @@ import {
   preloadPdfPreviewFromElement,
   schedulePdfPreviewWarmup,
 } from '../utils/printPdf.mjs'
-import {
-  PROCESSING_CONTRACT_MAX_ROWS,
-  applyProcessingDetailCellMerge,
-  clearProcessingContractSignatureDraft,
-  deleteProcessingContractLine,
-  splitProcessingDetailCellMerge,
-  insertProcessingContractLine,
-  updateProcessingContractLineCell,
-} from '../utils/processingContractEditor.mjs'
 import {
   buildPrintWorkspaceDraftStorageKey,
   PRINT_WORKSPACE_DRAFT_MODE,
@@ -159,6 +169,10 @@ export default function ProcessingContractPrintWorkspacePage() {
   const [mergeSelectionAnchor, setMergeSelectionAnchor] = useState(null)
   const [mergeSelectionFocus, setMergeSelectionFocus] = useState(null)
   const [activeCell, setActiveCell] = useState(null)
+  const [clauseSelection, setClauseSelection] = useState({
+    groupKey: 'delivery',
+    index: 0,
+  })
   const [busyAction, setBusyAction] = useState('')
   const [busyActionStartedAt, setBusyActionStartedAt] = useState(0)
   const pdfPreviewPreloadRef = useRef(null)
@@ -287,12 +301,12 @@ export default function ProcessingContractPrintWorkspacePage() {
   const setClause = (groupKey, index, value) => {
     setContract((current) => ({
       ...current,
-      clauses: {
-        ...current.clauses,
-        [groupKey]: current.clauses[groupKey].map((item, itemIndex) =>
-          itemIndex === index ? value : item
-        ),
-      },
+      clauses: editContractClauseGroup(current.clauses, {
+        groupKey,
+        index,
+        action: 'update',
+        value,
+      }).clauses,
     }))
   }
 
@@ -398,6 +412,29 @@ export default function ProcessingContractPrintWorkspacePage() {
       merges: result.merges,
     }))
     setSelectedLineIndex(result.selectedLineIndex)
+    reportFeedback('rows', result.message)
+  }
+
+  const handleEditRow = (action) => {
+    const result = editProcessingContractRow({
+      lines: contractRef.current.lines,
+      merges: contractRef.current.merges,
+      selectedLineIndex,
+      action,
+    })
+    if (!result.ok) {
+      reportFeedback('rows', result.message, 'error')
+      return
+    }
+    setContract((current) => ({
+      ...current,
+      lines: result.lines,
+      merges: result.merges,
+    }))
+    setSelectedLineIndex(result.selectedLineIndex)
+    setMergeSelectionAnchor(null)
+    setMergeSelectionFocus(null)
+    setActiveCell(null)
     reportFeedback('rows', result.message)
   }
 
@@ -702,6 +739,39 @@ export default function ProcessingContractPrintWorkspacePage() {
           </span>
         </>
       }
+      clauseActions={
+        <ContractClauseTools
+          clauses={contract.clauses}
+          selection={clauseSelection}
+          onGroupAction={(request) =>
+            setContract((current) => ({
+              ...current,
+              clauses: editContractClauseGroups(current.clauses, request)
+                .clauses,
+            }))
+          }
+          onSelect={setClauseSelection}
+          onAction={(request) =>
+            setContract((current) => ({
+              ...current,
+              clauses: editContractClauseGroup(current.clauses, request)
+                .clauses,
+            }))
+          }
+          onReturnToEdit={() => {
+            setRowSelectionMode(false)
+            setCellSelectionMode(false)
+            setSelectedLineIndex(null)
+            setMergeSelectionAnchor(null)
+            setMergeSelectionFocus(null)
+            setActiveCell(null)
+          }}
+          paperRef={paperRef}
+          disabled={busyAction !== ''}
+          feedback={feedback}
+          reportFeedback={reportFeedback}
+        />
+      }
       editorActions={
         <>
           <PrintWorkspaceToolSection
@@ -722,6 +792,7 @@ export default function ProcessingContractPrintWorkspacePage() {
                 {rowSelectionMode ? '返回编辑' : '选择明细行'}
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="up"
                 type="button"
                 className={getToolbarButtonClassName()}
@@ -731,6 +802,7 @@ export default function ProcessingContractPrintWorkspacePage() {
                 上插一行
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="down"
                 type="button"
                 className={getToolbarButtonClassName()}
@@ -740,6 +812,7 @@ export default function ProcessingContractPrintWorkspacePage() {
                 下插一行
               </PrintToolButton>
               <PrintToolButton
+                data-print-structure-action
                 icon="remove"
                 wide
                 type="button"
@@ -749,6 +822,20 @@ export default function ProcessingContractPrintWorkspacePage() {
               >
                 移除当前行
               </PrintToolButton>
+              <PrintItemOrderTools
+                index={selectedLineIndex}
+                count={contract.lines.length}
+                canMoveUp={
+                  selectedLineIndex !== null &&
+                  getPrintRowBlock(contract.merges, selectedLineIndex).start > 0
+                }
+                canMoveDown={
+                  selectedLineIndex !== null &&
+                  getPrintRowBlock(contract.merges, selectedLineIndex).end <
+                    contract.lines.length - 1
+                }
+                onAction={handleEditRow}
+              />
               <span className="erp-print-shell__counter">
                 加工明细行: {contract.lines.length}/
                 {PROCESSING_CONTRACT_MAX_ROWS}
@@ -801,6 +888,7 @@ export default function ProcessingContractPrintWorkspacePage() {
             wide
             type="button"
             className={getToolbarButtonClassName()}
+            data-print-structure-action
             onClick={resetDraft}
           >
             恢复样例
@@ -819,6 +907,7 @@ export default function ProcessingContractPrintWorkspacePage() {
             wide
             type="button"
             className={getToolbarButtonClassName()}
+            data-print-structure-action
             onClick={handleBlankDraft}
           >
             空白模板
@@ -875,6 +964,19 @@ export default function ProcessingContractPrintWorkspacePage() {
           onFieldChange={setField}
           onLineFieldChange={setLineField}
           onClauseChange={setClause}
+          onClauseTitleChange={(groupKey, label) =>
+            setContract((current) => ({
+              ...current,
+              clauses: editContractClauseGroups(current.clauses, {
+                groupKey,
+                action: 'rename',
+                label,
+              }).clauses,
+            }))
+          }
+          onClauseFocus={(groupKey, index) =>
+            setClauseSelection({ groupKey, index })
+          }
         />
       </div>
     </PrintWorkspaceShell>

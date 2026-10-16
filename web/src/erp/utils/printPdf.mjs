@@ -796,6 +796,9 @@ function normalizeServerPdfSnapshotRuntimeState(clonedRoot) {
   clonedRoot.querySelectorAll('script').forEach((node) => {
     node.remove()
   })
+  clonedRoot.querySelectorAll('[data-print-editor-only]').forEach((node) => {
+    node.remove()
+  })
   clonedRoot.querySelectorAll('link').forEach((node) => {
     const rel = String(node.getAttribute('rel') || '').toLowerCase()
     if (rel === 'stylesheet' || rel === 'modulepreload' || rel === 'preload') {

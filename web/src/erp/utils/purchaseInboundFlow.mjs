@@ -1,3 +1,5 @@
+import { WorkflowBusinessStatus } from '../../common/consts/statuses.generated.mjs'
+
 export const ACCESSORIES_PURCHASE_MODULE_KEY = 'accessories-purchase'
 
 export const INBOUND_MODULE_KEY = 'inbound'
@@ -6,13 +8,13 @@ export const PURCHASE_IQC_TASK_GROUP = 'purchase_iqc'
 
 export const WAREHOUSE_INBOUND_TASK_GROUP = 'warehouse_inbound'
 
-export const IQC_PENDING_STATUS_KEY = 'iqc_pending'
+export const IQC_PENDING_STATUS_KEY = WorkflowBusinessStatus.IQC_PENDING
 
-export const WAREHOUSE_INBOUND_PENDING_STATUS_KEY = 'warehouse_inbound_pending'
+export const WAREHOUSE_INBOUND_PENDING_STATUS_KEY = WorkflowBusinessStatus.WAREHOUSE_INBOUND_PENDING
 
-export const QC_FAILED_STATUS_KEY = 'qc_failed'
+export const QC_FAILED_STATUS_KEY = WorkflowBusinessStatus.QC_FAILED
 
-export const INBOUND_DONE_STATUS_KEY = 'inbound_done'
+export const INBOUND_DONE_STATUS_KEY = WorkflowBusinessStatus.INBOUND_DONE
 
 const ARRIVAL_SOURCE_TYPE_KEYS = new Set([
   ACCESSORIES_PURCHASE_MODULE_KEY,

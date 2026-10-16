@@ -14,12 +14,12 @@ if [ -z "$BOM_LOT_PG_DB_URL" ]; then
 fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-postgres_target_helper="$script_dir/qa/postgres-target-contract.py"
+postgres_target_helper="$script_dir/qa/postgres-target-contract.mjs"
 base_target_fields=()
 while IFS= read -r -d '' target_field; do
   base_target_fields+=("$target_field")
 done < <(
-  python3 "$postgres_target_helper" base bom-lot "$BOM_LOT_PG_DB_URL" "$cmd"
+  node "$postgres_target_helper" base bom-lot "$cmd" <<<"$BOM_LOT_PG_DB_URL"
 )
 unset target_field
 if [[ "${#base_target_fields[@]}" -ne 5 || "${base_target_fields[4]}" != 'ok' ]]; then

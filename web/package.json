@@ -69,6 +69,8 @@
   },
   "scripts": {
     "build": "vite build --config vite.config.mjs",
+    "build:workbench": "vite build --mode workbench --config vite.workbench.config.mjs",
+    "serve:workbench": "node dev-server/standaloneWorkbench.mjs",
     "build:all": "node ../scripts/gen-error-codes.mjs && vite build --config vite.config.mjs",
     "build:committed": "vite build --config vite.config.mjs",
     "start": "node ./scripts/startWebDev.mjs",

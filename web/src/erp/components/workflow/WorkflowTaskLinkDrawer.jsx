@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { LeftOutlined, ReloadOutlined } from '@ant-design/icons'
 import { Alert, Button, Drawer, Spin } from 'antd'
+import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import { explainWorkflowActionAccess, getWorkflowTask, getWorkflowTaskLink } from '../../api/workflowApi.mjs'
 import { buildWorkflowBusinessChain } from '../../utils/workflowBusinessChain.mjs'
 import { buildWorkflowActionAccessState } from '../../utils/workflowTaskActionAccess.mjs'
@@ -60,7 +61,7 @@ export default function WorkflowTaskLinkDrawer({ profile, taskOpen = false, auto
       const explainData = await explainWorkflowActionAccess({ task_id: item.id }, { signal: request.signal })
       if (request.signal.aborted) return
       const access = buildWorkflowActionAccessState({ task, adminProfile: profile, explainData })
-      const handle = ['ready', 'blocked'].includes(task.task_status_key) && access.source === 'backend' && access.canHandle
+      const handle = [WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(task.task_status_key) && access.source === 'backend' && access.canHandle
       if (automatic && !handle) {
         setReload((value) => value + 1)
         return
@@ -101,8 +102,8 @@ export default function WorkflowTaskLinkDrawer({ profile, taskOpen = false, auto
     }
   }
   const tasks = data ? buildWorkflowBusinessChain(data, id).tasks : []
-  const pending = tasks.filter((item) => ['ready', 'blocked'].includes(item.task_status_key))
-  const ended = tasks.filter((item) => !['ready', 'blocked'].includes(item.task_status_key))
+  const pending = tasks.filter((item) => [WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(item.task_status_key))
+  const ended = tasks.filter((item) => ![WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(item.task_status_key))
   const renderTask = (item) => (
     <li key={item.id}>
       <div className="workflow-business-chain__task-content">

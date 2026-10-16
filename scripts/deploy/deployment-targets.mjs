@@ -8,7 +8,20 @@ export const DEPLOYMENT_TARGET_REGISTRY_CONTRACT =
 export const SUPPORTED_DEPLOYMENT_TARGET_KEYS = Object.freeze([
   "demo-133",
   "customer-test-133",
+  "production-133",
 ]);
+
+export const DEFAULT_DEPLOYMENT_TARGET_KEYS = Object.freeze([
+  "demo-133",
+  "customer-test-133",
+]);
+
+export function assertDatabaseRebuildAllowed(target) {
+  if (target.purpose === "customer-production") {
+    throw new Error("production database rebuild is forbidden");
+  }
+  return target;
+}
 
 const TARGET_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 const CUSTOMER_KEY_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
@@ -90,6 +103,34 @@ const FIXED_TARGET_IDENTITIES = Object.freeze({
     publicContainerPrefix: "plush-toy-erp-test-web-public-",
     publicNetwork: "plush-toy-erp-test-v1_default",
     publicHostPort: 5177,
+  }),
+  "production-133": Object.freeze({
+    purpose: "customer-production",
+    trialTarget: "none",
+    root: "/root/deploy/plush-toy-erp-production",
+    runtimeEnv:
+      "/root/deploy/plush-toy-erp-production/runtime/.env.production-133",
+    projectName: "plush-toy-erp-production",
+    overrideFile: "compose.production-133.yml",
+    databaseName: "plush_erp_production",
+    postgresPort: 55438,
+    postgresDataDirectory: "/root/deploy/plush-toy-erp-production/data/postgres",
+    serverPort: 8345,
+    webPort: 5215,
+    jaegerPorts: Object.freeze({
+      agentThriftCompact: 63002,
+      agentThriftBinary: 63003,
+      ui: 63005,
+      collectorHttp: 63006,
+      collectorGrpc: 63007,
+      zipkin: 63008,
+      otlpGrpc: 63009,
+      otlpHttp: 63010,
+    }),
+    publicEndpoint: "https://erp.yoyoosun.net",
+    publicContainerPrefix: "plush-toy-erp-production-web-public-",
+    publicNetwork: "plush-toy-erp-production_default",
+    publicHostPort: 5178,
   }),
 });
 
@@ -556,7 +597,7 @@ if (isMainModule()) {
     if (options.help) {
       console.log(`Usage:
   node scripts/deploy/deployment-targets.mjs --list [--json]
-  node scripts/deploy/deployment-targets.mjs --target <demo-133|customer-test-133> [--json]
+  node scripts/deploy/deployment-targets.mjs --target <demo-133|customer-test-133|production-133> [--json]
 
 The registry is committed and fixed. CLI/browser callers cannot provide SSH
 hosts, filesystem paths, Compose projects, database names or shell commands.`);

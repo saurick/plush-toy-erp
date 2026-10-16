@@ -6,13 +6,14 @@ import './workflowTaskTiming.css'
 export default function WorkflowTaskTiming({
   task,
   detail = false,
+  compact = false,
   events = [],
 }) {
   const rows = getWorkflowTaskTiming(task, { detail, events })
   if (!rows.length) return null
   return (
     <div
-      className={`erp-task-timing${detail ? ' erp-task-timing--detail' : ''}`}
+      className={`erp-task-timing${detail ? ' erp-task-timing--detail' : ''}${compact ? ' erp-task-timing--compact' : ''}`}
     >
       <ClockCircleOutlined
         className="erp-task-timing__icon"

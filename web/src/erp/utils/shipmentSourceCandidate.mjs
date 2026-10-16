@@ -1,3 +1,4 @@
+import { SalesOrderItemStatus, SalesOrderStatus } from '../../common/consts/statuses.generated.mjs'
 import { positiveInt } from './businessLineItems.mjs'
 import { isBusinessCurrency } from './businessCurrency.mjs'
 import {
@@ -34,7 +35,7 @@ function matchesBackendEligibilityPrecedence({
   shippedQuantity,
   remainingQuantity,
 }) {
-  if (lineStatus !== 'open') {
+  if (lineStatus !== SalesOrderItemStatus.OPEN) {
     return !selectable && disabledReason === 'line_not_open'
   }
   if (disabledReason === 'source_mismatch') {
@@ -134,7 +135,7 @@ export function validateShipmentSourceCandidatePage(
       row.line_no <= 0 ||
       String(row?.order_status || '')
         .trim()
-        .toLowerCase() !== 'active' ||
+        .toLowerCase() !== SalesOrderStatus.ACTIVE ||
       String(row?.line_status || '').trim() === '' ||
       String(row?.order_no || '').trim() === '' ||
       typeof row?.currency !== 'string' ||

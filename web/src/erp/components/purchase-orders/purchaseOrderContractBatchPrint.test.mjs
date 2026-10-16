@@ -26,7 +26,7 @@ const printStyles = readFileSync(
   'utf8'
 )
 
-test('采购订单多选完整进入批量窗口，缺值留在窗口补齐', () => {
+test('采购订单多选完整进入批量窗口，字段缺值不阻断打开', () => {
   assert.match(
     page,
     /const \{ printPurchaseContract, printPurchaseContracts, printingContract \} =/u

@@ -48,7 +48,10 @@ test('printTemplateRendererModel: 加工合同静态预览复用正式字段真�
     cells.find((cell) => cell.key === 'processingItem')?.value,
     '面*1'
   )
-  assert.equal(cells.some((cell) => cell.key === 'processName'), false)
+  assert.equal(
+    cells.some((cell) => cell.key === 'processName'),
+    false
+  )
 })
 
 test('FL_print_template_preview_totals__skip_material_hidden_amount_cells printTemplateRendererModel: 采购合同静态预览合计不统计被合并覆盖金额', () => {
@@ -117,6 +120,21 @@ test('FL_print_template_preview_totals__skip_processing_hidden_amount_cells prin
   )
 })
 
+test('printTemplateRendererModel: 自定义分组的顺序、名称和空条目进入同一份预览数据', () => {
+  const clauses = [
+    { key: 'inspection', label: '验收要求', items: ['核对数量', ''] },
+    { key: 'hidden', label: '暂存空组', items: [] },
+    { key: 'packaging', label: '包装要求', items: ['单独包装'] },
+  ]
+  const normalized = normalizePrintTemplatePreviewData({ clauses })
+  assert.deepEqual(normalized.clauses, clauses)
+  assert.notEqual(normalized.clauses, clauses)
+  assert.deepEqual(
+    normalizePrintTemplatePreviewData({ clauses: [] }).clauses,
+    []
+  )
+})
+
 test('FL_print_template_preview_missing_fields__keeps_business_blanks printTemplateRendererModel: 静态预览缺字段不回填样例值', () => {
   const normalized = normalizePrintTemplatePreviewData({
     contractNo: 'PO-EMPTY',
@@ -129,9 +147,18 @@ test('FL_print_template_preview_missing_fields__keeps_business_blanks printTempl
   assert.equal(normalized.supplierName, '')
   assert.deepEqual(normalized.lines, [])
   assert.deepEqual(normalized.merges, [])
-  assert.deepEqual(normalized.clauses.delivery, [])
-  assert.deepEqual(normalized.clauses.contract, [])
-  assert.deepEqual(normalized.clauses.settlement, [])
+  assert.deepEqual(
+    normalized.clauses.find(({ key }) => key === 'delivery').items,
+    []
+  )
+  assert.deepEqual(
+    normalized.clauses.find(({ key }) => key === 'contract').items,
+    []
+  )
+  assert.deepEqual(
+    normalized.clauses.find(({ key }) => key === 'settlement').items,
+    []
+  )
   assert.equal(totals.quantityText, '')
   assert.equal(totals.amountText, '')
   assert(

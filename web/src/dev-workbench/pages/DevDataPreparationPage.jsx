@@ -955,6 +955,11 @@ export default function DevDataPreparationPage() {
       return next
     })
   const client = useMemo(() => createDevDataPreparationClient(), [])
+  // 视图切换只更新地址；预检随数据范围变化，写地址时保留最新视图。
+  const searchWriterRef = useRef(setSearchParams)
+  useEffect(() => {
+    searchWriterRef.current = setSearchParams
+  }, [setSearchParams])
   const mountedRef = useRef(false)
   const requestVersionRef = useRef(0)
   const refreshAbortRef = useRef(null)
@@ -1059,7 +1064,7 @@ export default function DevDataPreparationPage() {
           ) {
             setSelectedScenarioTargetKey(recoveredTargetKey)
           }
-          setSearchParams(
+          searchWriterRef.current(
             (currentSearchParams) =>
               buildDevDataPreparationSearch(currentSearchParams, {
                 profileKey: recoveredOperation.profileKey,
@@ -1089,7 +1094,6 @@ export default function DevDataPreparationPage() {
       customerScope.customerKey,
       selectedProfileKey,
       selectedScenarioTargetKey,
-      setSearchParams,
     ]
   )
 
@@ -1344,7 +1348,7 @@ export default function DevDataPreparationPage() {
 
   return (
     <div
-      className="erp-dev-hub-page erp-dev-workspace-page erp-dev-data-page"
+      className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page erp-dev-data-page"
       style={{
         '--dev-data-border': token.colorBorder,
         '--dev-data-primary': token.colorPrimary,
@@ -1361,9 +1365,6 @@ export default function DevDataPreparationPage() {
             <DatabaseOutlined aria-hidden="true" />
           </span>
           <div>
-            <Text className="erp-dev-data-header__eyebrow">
-              测试数据准备中心
-            </Text>
             <Title level={1} className="erp-dev-hub-title">
               测试数据
             </Title>
@@ -1509,7 +1510,6 @@ export default function DevDataPreparationPage() {
               <DataSection
                 id="dev-data-prepare-heading"
                 title="选择要准备的数据"
-                description="选择用途并核对当前条件，准备计划后再确认执行。"
               >
                 <Radio.Group
                   className="erp-dev-data-profile-table-control"
@@ -1574,10 +1574,11 @@ export default function DevDataPreparationPage() {
                       ]}
                     />
                     <DevCustomerScopeSelector
+                      compact
                       scope={customerScope}
                       onChange={customerScope.selectCustomer}
                       disabled={preparing || executing}
-                      label="业务场景甲方"
+                      label="客户"
                       note="按登记的固定批次补齐模拟数据。"
                       invalidDescription="当前甲方没有登记固定场景数据；其他数据准备方式不受影响。"
                     />
@@ -1685,7 +1686,6 @@ export default function DevDataPreparationPage() {
                 <DataSection
                   id="dev-data-current-heading"
                   title="当前批次"
-                  description="核对目标、数据范围与保留方式后确认执行。"
                   extra={
                     currentOperation.status === 'ready' ? (
                       <Button
@@ -1755,7 +1755,6 @@ export default function DevDataPreparationPage() {
               <DataSection
                 id="dev-data-records-heading"
                 title="执行记录"
-                description="按批次核对执行结果、耗时和清理记录。"
                 extra={
                   <Tag>
                     {historyItems.length} 条当前回执

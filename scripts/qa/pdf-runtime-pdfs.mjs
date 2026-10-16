@@ -41,8 +41,16 @@ export function verifyBusinessPDF(info, fonts, text) {
     /编辑工具|显示比例|正在保存|重试保存|点击填写/,
     "workspace tools and empty hints must not appear in PDF",
   );
+  // These business fixtures contain text on every intended page, including
+  // continuation pages. A trailing form feed terminates the last real page.
+  const pageTexts = text.split("\f");
+  if (pageTexts.at(-1).trim() === "") pageTexts.pop();
+  assert.equal(pageTexts.length, pages, "extracted text must account for every PDF page");
+  const pageCharacters = pageTexts.map((page) => page.trim().length);
+  assert(pageCharacters.every((count) => count > 0), "business fixture PDF must not contain an empty page");
   return {
     pages,
+    pageCharacters,
     embeddedFontFaces: faces.length,
     chineseCharacters: (text.match(/[\u3400-\u9fff]/g) || []).length,
   };

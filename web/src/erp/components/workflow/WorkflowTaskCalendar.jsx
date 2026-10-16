@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Button, Empty, Spin } from 'antd'
 import { LeftOutlined, RightOutlined, ReloadOutlined } from '@ant-design/icons'
+import { WorkflowTaskStatus } from '../../../common/consts/statuses.generated.mjs'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -50,13 +51,15 @@ export default function WorkflowTaskCalendar({
   const error = requestState?.key === queryKey ? requestState.error : ''
   const items = current?.items || []
   const hasMore = Boolean(calendar && items.length < calendar.total)
-  const selectionCount = calendar?.total ?? (monthCalendar
-    ? state.selection === 'overdue'
-      ? monthCalendar.overdue
-      : state.selection === 'undated'
-        ? monthCalendar.undated
-        : monthCalendar.days[state.selection] || 0
-    : undefined)
+  const selectionCount =
+    calendar?.total ??
+    (monthCalendar
+      ? state.selection === 'overdue'
+        ? monthCalendar.overdue
+        : state.selection === 'undated'
+          ? monthCalendar.undated
+          : monthCalendar.days[state.selection] || 0
+      : undefined)
   const today = currentBusinessDate()
   const refresh = () => setRevision((value) => value + 1)
 
@@ -68,21 +71,26 @@ export default function WorkflowTaskCalendar({
     const offset = append ? items.length : 0
     try {
       const result = await getWorkflowTaskCalendar(
-        { ...request, calendar_offset: offset },
+        {
+          ...request,
+          calendar_offset: offset,
+          ...(append ? { calendar_revision: calendar.revision } : {}),
+        },
         { signal: controller.signal }
       )
       if (controller.signal.aborted || requestRef.current !== controller) return
       const added = result.items.filter(
         (task) => !items.some((item) => item.id === task.id)
       )
-      if (append && hasMore && !added.length) {
+      const restarted = append && result.revision !== calendar.revision
+      if (append && !restarted && hasMore && !added.length) {
         throw new Error('待办已有变动，请重新加载')
       }
       setPage({
         key: queryKey,
         monthKey,
         calendar: result,
-        items: append ? [...items, ...added] : result.items,
+        items: append && !restarted ? [...items, ...added] : result.items,
       })
       setRequestState({ key: queryKey, loading: false, error: '' })
     } catch (err) {
@@ -143,97 +151,103 @@ export default function WorkflowTaskCalendar({
       aria-label="待办日历"
     >
       {(!mobile || taskCalendarSelectionMode(state.selection) === 'date') && (
-      <div className="workflow-task-calendar__month">
-        <div className="workflow-task-calendar__toolbar">
-          <Button
-            type="text"
-            className="workflow-task-calendar__previous"
-            aria-label="上个月"
-            icon={<LeftOutlined />}
-            disabled={state.month === '1900-01'}
-            onClick={() => changeMonth(-1)}
-          />
-          <strong aria-live="polite">
-            {Number(state.month.slice(0, 4))}年{Number(state.month.slice(5))}月
-          </strong>
-          <div className="workflow-task-calendar__navigation">
+        <div className="workflow-task-calendar__month">
+          <div className="workflow-task-calendar__toolbar">
             <Button
               type="text"
-              aria-label="下个月"
-              icon={<RightOutlined />}
-              disabled={state.month === '9998-12'}
-              onClick={() => changeMonth(1)}
+              className="workflow-task-calendar__previous"
+              aria-label="上个月"
+              icon={<LeftOutlined />}
+              disabled={state.month === '1900-01'}
+              onClick={() => changeMonth(-1)}
             />
-            <Button
-              type="text"
-              className="workflow-task-calendar__today"
-              onClick={() =>
-                state.change({ month: today.slice(0, 7), selection: today })
-              }
-            >
-              今天
-            </Button>
-          </div>
-        </div>
-        <div className="workflow-task-calendar__week" aria-hidden="true">
-          {['一', '二', '三', '四', '五', '六', '日'].map((day) => (
-            <span key={day}>{day}</span>
-          ))}
-        </div>
-        <div
-          className="workflow-task-calendar__grid"
-          aria-label="按截止日期选择待办"
-        >
-          {calendarMonthDays(state.month).map((day, index) =>
-            day ? (
-              <button
-                key={day}
-                type="button"
-                className="workflow-task-calendar__day"
-                data-date={day}
-                aria-label={`${day}，${monthCalendar ? `${monthCalendar.days[day] || 0} 项待办` : error ? '数量暂不可用' : '数量读取中'}`}
-                aria-current={day === today ? 'date' : undefined}
-                aria-pressed={state.selection === day}
-                onClick={() => state.change({ selection: day })}
+            <strong aria-live="polite">
+              {Number(state.month.slice(0, 4))}年{Number(state.month.slice(5))}
+              月
+            </strong>
+            <div className="workflow-task-calendar__navigation">
+              <Button
+                type="text"
+                aria-label="下个月"
+                icon={<RightOutlined />}
+                disabled={state.month === '9998-12'}
+                onClick={() => changeMonth(1)}
+              />
+              <Button
+                type="text"
+                className="workflow-task-calendar__today"
+                onClick={() =>
+                  state.change({ month: today.slice(0, 7), selection: today })
+                }
               >
-                <span className="workflow-task-calendar__date">
-                  <span className="workflow-task-calendar__number">
-                    {Number(day.slice(8))}
+                今天
+              </Button>
+            </div>
+          </div>
+          <div className="workflow-task-calendar__week" aria-hidden="true">
+            {['一', '二', '三', '四', '五', '六', '日'].map((day) => (
+              <span key={day}>{day}</span>
+            ))}
+          </div>
+          <div
+            className="workflow-task-calendar__grid"
+            aria-label="按截止日期选择待办"
+          >
+            {calendarMonthDays(state.month).map((day, index) =>
+              day ? (
+                <button
+                  key={day}
+                  type="button"
+                  className="workflow-task-calendar__day"
+                  data-date={day}
+                  aria-label={`${day}，${monthCalendar ? `${monthCalendar.days[day] || 0} 项待办` : error ? '数量暂不可用' : '数量读取中'}`}
+                  aria-current={day === today ? 'date' : undefined}
+                  aria-pressed={state.selection === day}
+                  onClick={() => state.change({ selection: day })}
+                >
+                  <span className="workflow-task-calendar__date">
+                    <span className="workflow-task-calendar__number">
+                      {Number(day.slice(8))}
+                    </span>
                   </span>
-                </span>
-                {monthCalendar?.days[day] > 0 && (
-                  <small className="workflow-task-calendar__count" aria-hidden="true">
-                    {monthCalendar.days[day] > 99 ? '99+' : `${monthCalendar.days[day]} 项`}
-                  </small>
-                )}
-              </button>
-            ) : (
-              <span key={`blank-${index}`} />
-            )
+                  {monthCalendar?.days[day] > 0 && (
+                    <small
+                      className="workflow-task-calendar__count"
+                      aria-hidden="true"
+                    >
+                      {monthCalendar.days[day] > 99
+                        ? '99+'
+                        : `${monthCalendar.days[day]} 项`}
+                    </small>
+                  )}
+                </button>
+              ) : (
+                <span key={`blank-${index}`} />
+              )
+            )}
+          </div>
+          {!mobile && (
+            <div
+              className="workflow-task-calendar__buckets"
+              aria-label="跨日期待办"
+            >
+              <FilterChip
+                selected={state.selection === 'overdue'}
+                count={monthCalendar?.overdue}
+                onClick={() => state.change({ selection: 'overdue' })}
+              >
+                已逾期
+              </FilterChip>
+              <FilterChip
+                selected={state.selection === 'undated'}
+                count={monthCalendar?.undated}
+                onClick={() => state.change({ selection: 'undated' })}
+              >
+                未设置截止
+              </FilterChip>
+            </div>
           )}
         </div>
-        {!mobile && (
-        <div
-          className="workflow-task-calendar__buckets"
-          aria-label="跨日期待办"
-        >
-          <FilterChip
-            selected={state.selection === 'overdue'}
-            count={monthCalendar?.overdue}
-            onClick={() => state.change({ selection: 'overdue' })}
-          >
-            已逾期
-          </FilterChip>
-          <FilterChip
-            selected={state.selection === 'undated'}
-            count={monthCalendar?.undated}
-            onClick={() => state.change({ selection: 'undated' })}
-          >
-            未设置截止
-          </FilterChip>
-        </div>
-        )}
-      </div>
       )}
       <div className="workflow-task-calendar__agenda" aria-busy={loading}>
         <div className="workflow-task-calendar__heading">
@@ -245,7 +259,11 @@ export default function WorkflowTaskCalendar({
             aria-label="刷新待办日历"
             icon={<ReloadOutlined />}
             onClick={refresh}
-            loading={loading && Boolean(calendar) && !requestState?.append ? { delay: 180 } : false}
+            loading={
+              loading && Boolean(calendar) && !requestState?.append
+                ? { delay: 180 }
+                : false
+            }
           />
         </div>
         {loadFeedback.visible && (
@@ -254,7 +272,12 @@ export default function WorkflowTaskCalendar({
             showIcon
             message={error}
             action={
-              <Button loading={loading || loadFeedback.retrying} onClick={loadFeedback.retry}>重新加载</Button>
+              <Button
+                loading={loading || loadFeedback.retrying}
+                onClick={loadFeedback.retry}
+              >
+                重新加载
+              </Button>
             }
           />
         )}
@@ -283,7 +306,7 @@ export default function WorkflowTaskCalendar({
                       showTaskName
                     />
                     <span>
-                      {task.task_status_key === 'blocked' ? '受阻' : '待处理'}
+                      {task.task_status_key === WorkflowTaskStatus.BLOCKED ? '受阻' : '待处理'}
                     </span>
                   </div>
                   <div className="workflow-task-calendar__source">

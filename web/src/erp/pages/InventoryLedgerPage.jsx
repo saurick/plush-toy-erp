@@ -21,6 +21,7 @@ import {
   Tag,
 } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { InventoryLotStatus, InventoryOperationStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
@@ -138,12 +139,12 @@ const VIEW_TXNS = 'txns'
 const INVENTORY_OPERATION_SESSION_PREFIX =
   'plush-erp:inventory-operation:last:v1:'
 const INVENTORY_OPERATION_STATUS_LABELS = Object.freeze({
-  DRAFT: '草稿',
-  SUBMITTED: '待审批',
-  APPROVED: '已批准待过账',
-  REJECTED: '已驳回',
-  POSTED: '已过账',
-  CANCELLED: '已取消',
+  [InventoryOperationStatus.DRAFT]: '草稿',
+  [InventoryOperationStatus.SUBMITTED]: '待审批',
+  [InventoryOperationStatus.APPROVED]: '已批准待过账',
+  [InventoryOperationStatus.REJECTED]: '已驳回',
+  [InventoryOperationStatus.POSTED]: '已过账',
+  [InventoryOperationStatus.CANCELLED]: '已取消',
 })
 
 const VIEW_ITEMS = [
@@ -166,10 +167,10 @@ const SUBJECT_TYPE_OPTIONS = [
 
 const LOT_STATUS_OPTIONS = [
   { label: '全部批次状态', value: '' },
-  { label: '可用', value: 'ACTIVE' },
-  { label: '冻结', value: 'HOLD' },
-  { label: '不合格', value: 'REJECTED' },
-  { label: '停用', value: 'DISABLED' },
+  { label: '可用', value: InventoryLotStatus.ACTIVE },
+  { label: '冻结', value: InventoryLotStatus.HOLD },
+  { label: '不合格', value: InventoryLotStatus.REJECTED },
+  { label: '停用', value: InventoryLotStatus.DISABLED },
 ]
 
 const TXN_TYPE_OPTIONS = [
@@ -202,17 +203,17 @@ const SUBJECT_TYPE_LABELS = Object.freeze({
 })
 
 const LOT_STATUS_LABELS = Object.freeze({
-  ACTIVE: '可用',
-  HOLD: '冻结',
-  REJECTED: '不合格',
-  DISABLED: '停用',
+  [InventoryLotStatus.ACTIVE]: '可用',
+  [InventoryLotStatus.HOLD]: '冻结',
+  [InventoryLotStatus.REJECTED]: '不合格',
+  [InventoryLotStatus.DISABLED]: '停用',
 })
 
 const LOT_STATUS_COLORS = Object.freeze({
-  ACTIVE: 'green',
-  HOLD: 'gold',
-  REJECTED: 'red',
-  DISABLED: 'default',
+  [InventoryLotStatus.ACTIVE]: 'green',
+  [InventoryLotStatus.HOLD]: 'gold',
+  [InventoryLotStatus.REJECTED]: 'red',
+  [InventoryLotStatus.DISABLED]: 'default',
 })
 
 const TXN_TYPE_LABELS = Object.freeze({
@@ -1050,7 +1051,7 @@ export default function InventoryLedgerPage() {
       setOperationLoading(true)
       try {
         const created = await createInventoryOperation(attempt.params)
-        if (!created?.id || created.status !== 'DRAFT') {
+        if (!created?.id || created.status !== InventoryOperationStatus.DRAFT) {
           throw Object.assign(new Error('库存作业结果暂时无法确认'), {
             isInvalidResponse: true,
           })
@@ -1075,7 +1076,7 @@ export default function InventoryLedgerPage() {
             if (!processData?.process_context) throw error
           }
           submittedProcess = processData
-          if (processData.source_readback?.status === 'DRAFT') {
+          if (processData.source_readback?.status === InventoryOperationStatus.DRAFT) {
             const node = findExceptionProcessActiveNode(
               processData,
               'submit_inventory_adjustment'
@@ -1097,7 +1098,7 @@ export default function InventoryLedgerPage() {
                 ...(customerKey ? { customer_key: customerKey } : {}),
                 inventory_operation_id: created.id,
               })
-              if (readback?.source_readback?.status !== 'SUBMITTED') throw error
+              if (readback?.source_readback?.status !== InventoryOperationStatus.SUBMITTED) throw error
               operation = readback.source_readback
             }
           } else {
@@ -1151,7 +1152,7 @@ export default function InventoryLedgerPage() {
           detail.items.every((item) => Number(item?.id || 0) > 0)
         if (
           Number(detail?.id || 0) !== operationID ||
-          detail?.status !== 'DRAFT' ||
+          detail?.status !== InventoryOperationStatus.DRAFT ||
           Number(detail?.version || 0) <= 0 ||
           Number(detail?.created_by || 0) !== currentAdminID ||
           !completeItems
@@ -1218,7 +1219,7 @@ export default function InventoryLedgerPage() {
         const saved = await saveInventoryOperationDraft(payload)
         if (
           Number(saved?.id || 0) !== Number(editingOperation.id) ||
-          saved?.status !== 'DRAFT' ||
+          saved?.status !== InventoryOperationStatus.DRAFT ||
           Number(saved?.version || 0) !==
             Number(editingOperation.version || 0) + 1 ||
           !Array.isArray(saved?.items) ||
@@ -1906,7 +1907,7 @@ export default function InventoryLedgerPage() {
     if (!currentOperation?.id) return
     if (
       currentOperation.operation_type !== 'MANUAL_ADJUSTMENT' ||
-      currentOperation.status === 'POSTED'
+      currentOperation.status === InventoryOperationStatus.POSTED
     ) {
       setOperationCancelOpen(true)
       return
@@ -1920,12 +1921,12 @@ export default function InventoryLedgerPage() {
       const operation = processData.source_readback
       rememberInventoryOperation(operation)
       if (
-        !['DRAFT', 'SUBMITTED', 'APPROVED'].includes(operation.status) ||
+        ![InventoryOperationStatus.DRAFT, InventoryOperationStatus.SUBMITTED, InventoryOperationStatus.APPROVED].includes(operation.status) ||
         (processData.process_context &&
           processData.process_context.process_instance.status !== 'blocked')
       ) {
         message.warning(
-          ['DRAFT', 'SUBMITTED', 'APPROVED'].includes(operation.status)
+          [InventoryOperationStatus.DRAFT, InventoryOperationStatus.SUBMITTED, InventoryOperationStatus.APPROVED].includes(operation.status)
             ? '该人工调整流程仍在办理，请先在任务中心驳回或阻塞流程'
             : '当前状态不能取消人工库存调整'
         )
@@ -1942,11 +1943,11 @@ export default function InventoryLedgerPage() {
   const currentOperationCanCancel =
     canCreateInventoryOperation &&
     currentOperation?.id &&
-    ['DRAFT', 'SUBMITTED', 'APPROVED', 'POSTED'].includes(
+    [InventoryOperationStatus.DRAFT, InventoryOperationStatus.SUBMITTED, InventoryOperationStatus.APPROVED, InventoryOperationStatus.POSTED].includes(
       currentOperation.status
     ) &&
     (Number(currentOperation.created_by || 0) === currentAdminID ||
-      (currentOperation.status === 'POSTED' &&
+      (currentOperation.status === InventoryOperationStatus.POSTED &&
         Number(currentOperation.posted_by || 0) === currentAdminID))
 
   return (
@@ -1982,13 +1983,13 @@ export default function InventoryLedgerPage() {
           }
           description={
             operationRecoveryError ||
-            (currentOperation?.status === 'DRAFT'
+            (currentOperation?.status === InventoryOperationStatus.DRAFT
               ? currentOperation.operation_type === 'MANUAL_ADJUSTMENT'
                 ? '请核对后提交审批；创建人不能审批，批准后仍须由仓库过账。'
                 : '请核对作业内容后过账；过账前库存不会变化。'
-              : currentOperation?.status === 'SUBMITTED'
+              : currentOperation?.status === InventoryOperationStatus.SUBMITTED
                 ? '等待另一位有权人员批准或驳回；审批本身不会改变库存。'
-                : currentOperation?.status === 'APPROVED'
+                : currentOperation?.status === InventoryOperationStatus.APPROVED
                   ? '审批已通过，仓库过账后才会形成库存变动。'
                   : currentOperation?.reject_reason ||
                     currentOperation?.cancel_reason ||
@@ -1998,7 +1999,7 @@ export default function InventoryLedgerPage() {
           action={
             currentOperation?.id ? (
               <Space wrap size={6}>
-                {currentOperation.status === 'DRAFT' &&
+                {currentOperation.status === InventoryOperationStatus.DRAFT &&
                 canCreateInventoryOperation &&
                 Number(currentOperation.created_by || 0) === currentAdminID ? (
                   <Button
@@ -2011,7 +2012,7 @@ export default function InventoryLedgerPage() {
                     编辑草稿
                   </Button>
                 ) : null}
-                {currentOperation.status === 'DRAFT' &&
+                {currentOperation.status === InventoryOperationStatus.DRAFT &&
                 canCreateInventoryOperation &&
                 Number(currentOperation.created_by || 0) === currentAdminID ? (
                   currentOperation.operation_type === 'MANUAL_ADJUSTMENT' ? (
@@ -2048,7 +2049,7 @@ export default function InventoryLedgerPage() {
                     </Popconfirm>
                   )
                 ) : null}
-                {currentOperation.status === 'APPROVED' &&
+                {currentOperation.status === InventoryOperationStatus.APPROVED &&
                 canCreateInventoryOperation ? (
                   <Popconfirm
                     title="确认过账这张库存作业？"
@@ -2065,7 +2066,7 @@ export default function InventoryLedgerPage() {
                     </Button>
                   </Popconfirm>
                 ) : null}
-                {currentOperation.status === 'SUBMITTED' &&
+                {currentOperation.status === InventoryOperationStatus.SUBMITTED &&
                 canApproveInventoryOperation ? (
                   <Button
                     icon={<AuditOutlined aria-hidden="true" />}

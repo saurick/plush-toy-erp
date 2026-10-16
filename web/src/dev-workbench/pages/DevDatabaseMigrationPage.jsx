@@ -465,7 +465,7 @@ export default function DevDatabaseMigrationPage() {
   )
 
   return (
-    <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-database-migration-page erp-dev-delivery-workspace">
+    <div className="erp-dev-hub-page erp-dev-workspace-page erp-dev-tool-page erp-dev-database-migration-page erp-dev-delivery-workspace">
       <DevPageNav sourcePath={DEV_DATABASE_MIGRATION_SOURCE_PATH} />
       <header className="erp-dev-hub-header">
         <div className="erp-dev-hub-header__copy">
@@ -594,7 +594,7 @@ export default function DevDatabaseMigrationPage() {
             description={issueText(summary.issues)}
           />
         ) : null}
-        {tools?.status === 'blocked' && !isLatest ? (
+        {tools?.status === 'blocked' && !isLatest && activeView !== 'runtime' ? (
           <Alert
             type="warning"
             showIcon
@@ -690,7 +690,7 @@ export default function DevDatabaseMigrationPage() {
                 <Alert
                   type="warning"
                   showIcon
-                  message="计划与备份恢复验证已完成，等待你的明确确认"
+                  message="升级计划已准备，等待确认"
                   description={`将从 ${readyOperation.target?.currentVersion} 升级到 ${readyOperation.target?.latestVersion}；备份 ${readyOperation.backup?.id} 已在隔离 PostgreSQL 中恢复并验证。`}
                   action={
                     <Button

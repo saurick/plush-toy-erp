@@ -1,4 +1,10 @@
 import {
+  InventoryLotStatus,
+  OperationalFactStatus,
+  OutsourcingOrderItemStatus,
+  OutsourcingOrderStatus,
+} from '../../common/consts/statuses.generated.mjs'
+import {
   SOURCE_INBOUND_LOT_SELECTION,
   buildSourceInboundLotFields,
   normalizeSourceInboundLotRequestFields,
@@ -119,7 +125,7 @@ export function filterOutsourcingSourceActionLots(
     (lot) =>
       String(lot?.subject_type || '').toUpperCase() === subjectType &&
       positiveID(lot?.subject_id) === subjectID &&
-      String(lot?.status || '').toUpperCase() === 'ACTIVE' &&
+      String(lot?.status || '').toUpperCase() === InventoryLotStatus.ACTIVE &&
       (subjectType !== 'PRODUCT' ||
         positiveID(lot?.product_sku_id) === productSkuID)
   )
@@ -133,8 +139,8 @@ export function isOutsourcingSourceActionEligible(
   const normalizedAction = normalizedActionType(actionType)
   return Boolean(
     normalizedAction &&
-      String(order?.lifecycle_status || '').toLowerCase() === 'confirmed' &&
-      String(item?.line_status || '').toLowerCase() === 'open' &&
+      String(order?.lifecycle_status || '').toLowerCase() === OutsourcingOrderStatus.CONFIRMED &&
+      String(item?.line_status || '').toLowerCase() === OutsourcingOrderItemStatus.OPEN &&
       positiveID(order?.id) > 0 &&
       positiveID(item?.id) > 0 &&
       positiveID(item?.outsourcing_order_id) === positiveID(order?.id) &&
@@ -169,7 +175,7 @@ function outsourcingSourceActionProcessedUnits(
   return (Array.isArray(facts) ? facts : []).reduce((total, fact) => {
     if (
       String(fact?.fact_type || '').toUpperCase() !== normalizedAction ||
-      String(fact?.status || '').toUpperCase() !== 'POSTED' ||
+      String(fact?.status || '').toUpperCase() !== OperationalFactStatus.POSTED ||
       positiveID(fact?.source_id) !== positiveID(order?.id) ||
       positiveID(fact?.source_line_id) !== positiveID(item?.id)
     ) {
@@ -331,7 +337,7 @@ export function validateOutsourcingSourceFactResult(
   if (
     !result ||
     positiveID(result.id) <= 0 ||
-    String(result.status || '').toUpperCase() !== 'DRAFT' ||
+    String(result.status || '').toUpperCase() !== OperationalFactStatus.DRAFT ||
     String(result.fact_type || '').toUpperCase() !== normalizedAction ||
     String(result.source_type || '').toUpperCase() !== 'OUTSOURCING_ORDER' ||
     positiveID(result.source_id) !== positiveID(order.id) ||

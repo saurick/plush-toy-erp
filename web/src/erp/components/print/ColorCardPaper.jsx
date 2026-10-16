@@ -6,43 +6,10 @@ import {
 } from './EngineeringPrintPrimitives.jsx'
 import { PrintAppendixImages } from './PrintAppendixImages.jsx'
 
-const COLOR_CARD_DEFAULT_BODY_ROWS = 3
-
-function getColorCardBodyRowCount(block) {
-  const lineCount = Array.isArray(block?.lines) ? block.lines.length : 0
-  const minRows = Number(block?.minRows)
-  return Math.max(
-    1,
-    lineCount,
-    Number.isFinite(minRows) && minRows > 0
-      ? Math.floor(minRows)
-      : COLOR_CARD_DEFAULT_BODY_ROWS
-  )
-}
-
-function splitColorCardBlocks(blocks = []) {
-  const sides = {
-    left: [],
-    right: [],
-  }
-  const heights = {
-    left: 0,
-    right: 0,
-  }
-
-  blocks.forEach((block, blockIndex) => {
-    const side =
-      block.side === 'left' || block.side === 'right'
-        ? block.side
-        : heights.left <= heights.right
-          ? 'left'
-          : 'right'
-    sides[side].push({ block, blockIndex })
-    heights[side] += getColorCardBodyRowCount(block) + 1
-  })
-
-  return [sides.left, sides.right]
-}
+import {
+  getColorCardBodyRowCount,
+  splitColorCardBlocks,
+} from '../../utils/colorCardLayout.mjs'
 
 function ColorCardPaper({
   draft,
@@ -61,9 +28,11 @@ function ColorCardPaper({
   return (
     <div
       className="erp-engineering-print-paper erp-color-card-paper"
+      data-print-blank-region=""
       ref={paperRef}
     >
       <EditableText
+        blankField
         value={draft.companyName}
         rich
         onCommit={(value) => onFieldChange('companyName', value)}
@@ -72,12 +41,14 @@ function ColorCardPaper({
       <section className="erp-color-card-paper__meta">
         <span>产品编号：</span>
         <EditableText
+          blankField
           value={draft.productNo}
           rich
           onCommit={(value) => onFieldChange('productNo', value)}
         />
         <span>产品名称：</span>
         <EditableText
+          blankField
           value={draft.productName}
           rich
           onCommit={(value) => onFieldChange('productName', value)}
@@ -129,6 +100,7 @@ function ColorCardPaper({
                       >
                         <td className="erp-color-card-paper__material-name">
                           <EditableText
+                            blankField
                             value={block.materialName}
                             rich
                             onCommit={(value) =>
@@ -145,6 +117,7 @@ function ColorCardPaper({
                           colSpan={2}
                         >
                           <EditableText
+                            blankField
                             value={block.vendor}
                             rich
                             onCommit={(value) =>
@@ -205,6 +178,7 @@ function ColorCardPaper({
                             ) : null}
                             <td className="erp-color-card-paper__position-cell">
                               <EditableText
+                                blankField
                                 value={line?.position ?? ''}
                                 rich
                                 onCommit={(value) =>
@@ -218,6 +192,7 @@ function ColorCardPaper({
                             </td>
                             <td className="erp-color-card-paper__method-cell">
                               <EditableText
+                                blankField
                                 value={line?.method ?? ''}
                                 rich
                                 onCommit={(value) =>
@@ -256,6 +231,7 @@ function ColorCardPaper({
           <span key={key}>
             {label}
             <EditableText
+              blankField={key === 'dateText'}
               value={draft[key]}
               rich
               onCommit={(value) => onFieldChange(key, value)}

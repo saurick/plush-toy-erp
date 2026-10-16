@@ -94,11 +94,17 @@ https://test.yoyoosun.net)
     "$host_port" == 5177 && "$candidate_port" == 15177 ]] ||
     fail "test 公网入口参数不符合登记合同"
   ;;
-*) fail "公网入口只允许已登记的 demo 或 test；admin 不是部署环境" ;;
+https://erp.yoyoosun.net)
+  [[ "$network" == "plush-toy-erp-production_default" &&
+    "$container_prefix" == "plush-toy-erp-production-web-public-" &&
+    "$host_port" == 5178 && "$candidate_port" == 15178 ]] ||
+    fail "production 公网入口参数不符合登记合同"
+  ;;
+*) fail "公网入口只允许已登记的 demo、test 或 production；admin 不是部署环境" ;;
 esac
 command -v docker >/dev/null 2>&1 || fail "缺少 docker"
 command -v curl >/dev/null 2>&1 || fail "缺少 curl"
-command -v python3 >/dev/null 2>&1 || fail "缺少 python3"
+command -v jq >/dev/null 2>&1 || fail "缺少 jq"
 
 docker image inspect "$image" >/dev/null 2>&1 || fail "目标镜像不存在"
 image_release="$(docker image inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$image" | awk -F= '$1 == "GIT_SHA" { value=$0; sub(/^[^=]*=/, "", value); count++ } END { if (count == 1) print value }')"
@@ -135,14 +141,10 @@ assert_provider_capabilities() {
     -H 'Content-Type: application/json' \
     -d '{"jsonrpc":"2.0","id":"public-cutover","method":"capabilities","params":{}}' \
     "${base_url%/}/rpc/auth")" || return 1
-  python3 -c '
-import json
-import sys
-payload = json.load(sys.stdin)
-sms = payload.get("result", {}).get("data", {}).get("sms_login", {})
-ok = payload.get("result", {}).get("code") == 0 and sms.get("enabled") is True and sms.get("mode") == "provider" and sms.get("mock_delivery") is False
-raise SystemExit(0 if ok else 1)
-' <<<"$payload"
+  jq -se '
+    length == 1 and (.[0] | .result.code == 0 and
+      (.result.data.sms_login | .enabled == true and .mode == "provider" and .mock_delivery == false))
+  ' <<<"$payload" >/dev/null
 }
 
 wait_provider_capabilities() {

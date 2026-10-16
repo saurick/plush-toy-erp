@@ -10,6 +10,7 @@ import {
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_PRODUCT_ENGINEERING_ROUTE,
+  DEV_PRODUCT_CORE_ROUTE,
   DEV_QUALITY_GATES_ROUTE,
   DEV_QUALITY_ROUTE,
   DEV_SECONDARY_NAV_ITEMS,
@@ -710,13 +711,37 @@ export function createDevWorkbenchDesktopScenarios({
             .evaluate((node) => node.scrollWidth <= node.clientWidth + 2)
         )
       }
+      if (item.route === DEV_DOCS_ROUTE) {
+        const keyword = '仅在未打开归档正文中的检索探针'
+        await page.route('**/docs/archive/progress-2026-10-10-before-task-governance.md*', (route) => route.fulfill({
+          contentType: 'application/javascript',
+          body: `export default ${JSON.stringify(`# 归档全文检索探针\n${keyword}`)}`,
+        }))
+        await page.locator('[aria-label="开发文档层级"]').getByText('历史', { exact: true }).click()
+        await page.getByRole('textbox', { name: '搜索开发文档' }).fill(keyword)
+        await page.getByText('归档全文检索探针', { exact: true }).waitFor()
+        assert.equal(await page.getByText('没有匹配的文档', { exact: true }).count(), 0)
+      }
       if (item.route === DEV_PERMISSION_RELATIONSHIPS_ROUTE) {
+        assert.equal(await page.getByRole('tab', { name: '关系图', exact: true }).getAttribute('aria-selected'), 'true')
+        assert((await page.locator('.erp-permission-relationship > .ant-alert-warning').count()) <= 1, '权限读取问题集中显示，避免重复警告')
         await page.getByRole('tab', { name: '关系图', exact: true }).click()
         await verifyMermaidViewer(
           page,
           page.locator('.erp-permission-relationship .erp-markdown-mermaid'),
           assert
         )
+      }
+      if (item.route === DEV_PRODUCT_CORE_ROUTE) {
+        const filters = page.locator('.erp-dev-product-core-filters .erp-filter-chip')
+        await filters.nth(1).click()
+        await page.waitForFunction(() => document.querySelectorAll('.erp-dev-product-core-filters .erp-filter-chip')[1]?.getAttribute('aria-pressed') === 'true')
+        assert.equal(new URL(page.url()).searchParams.get('status'), 'entered')
+        assert.equal(await filters.nth(1).getAttribute('aria-pressed'), 'true')
+        await page.reload()
+        await page.waitForFunction(() => document.querySelectorAll('.erp-dev-product-core-filters .erp-filter-chip')[1]?.getAttribute('aria-pressed') === 'true')
+        assert.equal(await filters.nth(1).getAttribute('aria-pressed'), 'true')
+        assert((await page.locator('.erp-dev-product-core-table tbody tr').evaluateAll((rows) => rows.every((row) => row.dataset.membership === 'entered'))), '筛选与返回必须保持同一能力范围')
       }
       if (item.route === DEV_PRODUCT_ENGINEERING_ROUTE) {
         assert.equal(
@@ -738,8 +763,8 @@ export function createDevWorkbenchDesktopScenarios({
       if (item.route === DEV_QUALITY_ROUTE) {
         assert.equal(
           await page.locator('.erp-dev-tool-table tbody tr').count(),
-          3,
-          '质量验证首页应完整显示改动验证、质量门禁和测试数据'
+          DEV_SECONDARY_NAV_ITEMS.filter((entry) => entry.areaKey === 'quality' && entry.showInNavigation !== false).length,
+          '质量验证首页应完整显示已登记的常驻工具'
         )
         assert.equal(
           await page
@@ -774,12 +799,14 @@ export function createDevWorkbenchDesktopScenarios({
               (url.searchParams.get('section') || 'package') === section.key
           )
           if (section.key === 'package') {
+            await preflight.getByText('客户包对象', { exact: true }).click()
             const declarations = preflight
               .locator('.erp-dev-customer-db-target')
               .filter({
                 has: page.getByText('策略 / 命令声明', { exact: true }),
               })
             assert((await declarations.innerText()).includes('仅预览'))
+            await preflight.getByText('客户包对象', { exact: true }).click()
           } else if (section.key === 'runtime') {
             const catalog = preflight.locator('.erp-dev-customer-tool')
             assert(

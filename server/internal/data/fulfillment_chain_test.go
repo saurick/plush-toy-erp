@@ -11,6 +11,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
 	"server/internal/biz"
+	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/qualityinspection"
@@ -22,6 +23,29 @@ func TestFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T) {
 	ctx := context.Background()
 	f := openProductionOrderRepoTest(t, "fulfillment_chain")
 	createProductionWIPRouteProcesses(t, ctx, f.client)
+	testFulfillmentArrivalThroughFinishedGoodsInbound(t, f)
+}
+
+func TestProductionOrderPostgresFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T) {
+	pg := openProductionOrderPGFixture(t)
+	ensureProductionWIPRouteProcessesForPostgresRace(t, context.Background(), pg.client, pg.suffix)
+	f := productionOrderTestFixture{uc: pg.uc, data: pg.data, client: pg.client, actorID: pg.actorID, unitID: pg.unitID, materialID: pg.materialID, productID: pg.productID, skuID: pg.skuID, salesItemID: pg.salesItemID, bomID: *pg.item.BOMHeaderID}
+	testFulfillmentArrivalThroughFinishedGoodsInbound(t, f)
+}
+
+func testFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T, f productionOrderTestFixture) {
+	t.Helper()
+	ctx := context.Background()
+	assertChainTxnCount := func(want int) {
+		t.Helper()
+		count, err := f.client.InventoryTxn.Query().Where(inventorytxn.Or(
+			inventorytxn.And(inventorytxn.SubjectType(biz.InventorySubjectMaterial), inventorytxn.SubjectID(f.materialID)),
+			inventorytxn.And(inventorytxn.SubjectType(biz.InventorySubjectProduct), inventorytxn.SubjectID(f.productID)),
+		)).Count(ctx)
+		if err != nil || count != want {
+			t.Fatalf("fulfillment material/product inventory transaction count=%d err=%v, want %d", count, err, want)
+		}
+	}
 	wip := releaseProductionWIPRoute(t, ctx, f, "MO-HANDOFF-CHAIN", 10, true)
 	root := wip.Batches[0]
 	assertFulfillmentTask(t, ctx, f.client, "production_execute", root.ID, "ready", biz.ProductionRoleKey)
@@ -134,7 +158,7 @@ func TestFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T) {
 			}
 			assertFulfillmentTask(t, ctx, f.client, "production_completion", current.ID, "done", biz.WarehouseRoleKey)
 			assertFulfillmentTask(t, ctx, f.client, "production_inbound", completion.ID, "ready", biz.WarehouseRoleKey)
-			assertInventoryTxnCount(t, ctx, f.client, 2)
+			assertChainTxnCount(2)
 			if _, err = facts.CancelPostedProductionFact(ctx, operationalFactStatusMutation(completion.ID, completion.Version, f.actorID, "更正收仓数量")); err != nil {
 				t.Fatal(err)
 			}
@@ -148,9 +172,9 @@ func TestFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T) {
 				t.Fatal(err)
 			}
 			assertFulfillmentTask(t, ctx, f.client, "production_inbound", completion.ID, "done", biz.WarehouseRoleKey)
-			assertInventoryTxnCount(t, ctx, f.client, 3)
+			assertChainTxnCount(3)
 			readiness, err := productionFinishedGoodsReadiness(ctx, f.client, biz.InventoryBalanceKey{SubjectType: completion.SubjectType, SubjectID: completion.SubjectID, ProductSkuID: completion.ProductSkuID, WarehouseID: completion.WarehouseID, LotID: completion.LotID, UnitID: completion.UnitID})
-			if err != nil || !readiness.PendingInspection.Equal(current.Quantity) {
+			if err != nil || !readiness.PendingInspection.Equal(current.Quantity) || !readiness.PendingPackaging.IsZero() {
 				t.Fatalf("inbound before quality readiness=%+v err=%v", readiness, err)
 			}
 		}
@@ -206,7 +230,7 @@ func TestFulfillmentArrivalThroughFinishedGoodsInbound(t *testing.T) {
 		}
 	}
 	assertFulfillmentTask(t, ctx, f.client, "production_packaging_execute", current.ID, "done", biz.WarehouseRoleKey)
-	assertInventoryTxnCount(t, ctx, f.client, 3)
+	assertChainTxnCount(3)
 	readiness, err := productionFinishedGoodsReadiness(ctx, f.client, biz.InventoryBalanceKey{SubjectType: completion.SubjectType, SubjectID: completion.SubjectID, ProductSkuID: completion.ProductSkuID, WarehouseID: completion.WarehouseID, LotID: completion.LotID, UnitID: completion.UnitID})
 	if err != nil || !readiness.blocked().IsZero() {
 		t.Fatalf("packed readiness=%+v err=%v", readiness, err)

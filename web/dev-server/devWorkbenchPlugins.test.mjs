@@ -261,14 +261,14 @@ test('database migration recovery plugin blocks ERP traffic until verified runti
   )
 })
 
-test('Vite recovery mode opens the business entry and installs the guard only for development serve', async () => {
+test('Vite recovery mode keeps automated browsers closed and installs the guard only for development serve', async () => {
   const previousRecoveryMode = process.env.ERP_DEV_RECOVERY_MODE
   process.env.ERP_DEV_RECOVERY_MODE = 'database-migration'
   try {
     const configFactory = createERPViteConfig('desktop')
     const serve = await configFactory({ command: 'serve', mode: 'development' })
     const build = await configFactory({ command: 'build', mode: 'production' })
-    assert.equal(serve.server.open, `http://127.0.0.1:${serve.server.port}`)
+    assert.equal(serve.server.open, false)
     assert.equal(
       serve.plugins.some(
         (plugin) => plugin.name === DEV_DATABASE_MIGRATION_RECOVERY_PLUGIN_NAME
@@ -553,7 +553,7 @@ test('并发业务读取共用健康检查，静态资源、仅前端调试和�
   }
 })
 
-test('服务未启动时 Vite 仍打开业务入口，生产构建不安装恢复插件', async (t) => {
+test('服务未启动时 Vite 保留业务配置且自动化不打开浏览器，生产构建不安装恢复插件', async (t) => {
   const previousMode = process.env.ERP_DEV_RECOVERY_MODE
   const previousReason = process.env.ERP_DEV_RECOVERY_REASON
   t.after(() => {
@@ -570,7 +570,7 @@ test('服务未启动时 Vite 仍打开业务入口，生产构建不安装恢�
   const configFactory = createERPViteConfig('desktop')
   const serve = await configFactory({ command: 'serve', mode: 'development' })
   const build = await configFactory({ command: 'build', mode: 'production' })
-  assert.equal(serve.server.open, `http://127.0.0.1:${serve.server.port}`)
+  assert.equal(serve.server.open, false)
   assert.equal(
     build.plugins.some(
       (plugin) => plugin.name === DEV_DATABASE_MIGRATION_RECOVERY_PLUGIN_NAME

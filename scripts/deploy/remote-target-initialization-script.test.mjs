@@ -215,3 +215,8 @@ test("target initializer acquires the exact release before package verification 
       successCleanup.indexOf('rm -f -- "$owner_marker"'),
   );
 });
+
+test("initialization proves its first recovery point before exposing the public entry", () => {
+  const source = readFileSync(new URL("./remote-target-initialization.sh", import.meta.url), "utf8");
+  assert.ok(source.indexOf("stage=backup_restore_check") < source.indexOf("stage=public_entry_switch"));
+});

@@ -13,8 +13,26 @@ import {
   shiftMergesAfterInsert,
   splitTableCellMerge,
 } from './detailCellMerge.mjs'
+import { editPrintTableRow } from './printItemOperations.mjs'
 
 export const PROCESSING_CONTRACT_MAX_ROWS = 300
+export const editProcessingContractRow = ({
+  lines,
+  merges,
+  selectedLineIndex,
+  action,
+}) => {
+  const result = editPrintTableRow({
+    lines,
+    merges,
+    rowIndex: selectedLineIndex,
+    action,
+    createBlankLine: createEmptyProcessingLine,
+  })
+  return result.ok
+    ? { ...result, selectedLineIndex: result.selectedIndex }
+    : result
+}
 const PROCESSING_DETAIL_COLUMN_KEYS = PROCESSING_CONTRACT_TABLE_COLUMNS.map(
   (column) => column.fieldKey || column.key
 )

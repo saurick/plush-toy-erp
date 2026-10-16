@@ -1,11 +1,75 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
   validateFinanceAllocationDraft,
   financePaymentPostMatchesIntent,
   validateFinanceCreditDraft,
+  pendingFinanceAllocationAttempt,
 } from './financePaymentAllocation.mjs'
+import { createSourceBusinessActionAttemptStore } from './sourceBusinessAction.mjs'
+
+test('finance replay keeps payment and allocation status contracts independent', async () => {
+  const contracts = 'export const FinancePaymentStatus={POSTED:"CASH_POSTED"}; export const FinanceAllocationStatus={POSTED:"ALLOCATION_POSTED"};'
+  const contractURL = `data:text/javascript;base64,${Buffer.from(contracts).toString('base64')}`
+  const file = new URL('./financePaymentAllocation.mjs', import.meta.url)
+  const source = readFileSync(file, 'utf8')
+    .replace(/from '[^']*statuses\.generated\.mjs'/u, `from '${contractURL}'`)
+    .replace(/from '(\.[^']+)'/gu, (_, relative) => `from '${new URL(relative, file).href}'`)
+  const consumer = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`)
+  const expected = { id: 7, currency: 'USD', direction: 'RECEIPT', counterparty_type: 'CUSTOMER', counterparty_id: 3, amount: '100' }
+  const allocations = [{ finance_fact_id: 11, amount: '100' }]
+  const payment = { ...expected, status: 'CASH_POSTED', allocations: [{ ...allocations[0], status: 'ALLOCATION_POSTED' }] }
+  assert.equal(consumer.financePaymentPostMatchesIntent(payment, expected, allocations), true)
+  assert.equal(consumer.financePaymentPostMatchesIntent({ ...payment, status: 'ALLOCATION_POSTED' }, expected, allocations), false)
+  assert.equal(consumer.financePaymentPostMatchesIntent({ ...payment, allocations: [{ ...allocations[0], status: 'CASH_POSTED' }] }, expected, allocations), false)
+})
+
+test('uncertain allocation keeps its original version and key after balance readback', () => {
+  let sequence = 0
+  const store = createSourceBusinessActionAttemptStore({
+    cryptoProvider: { randomUUID: () => `allocation-${++sequence}` },
+  })
+  const payload = {
+    id: 31,
+    expected_version: 2,
+    allocations: [{ finance_fact_id: 9, amount: '10' }],
+  }
+  assert.equal(
+    pendingFinanceAllocationAttempt(store, 'payment:31', payload),
+    null
+  )
+  const first = store.prepare('payment:31', payload)
+  store.settle('payment:31', first, { isInvalidResponse: true })
+  const retry = pendingFinanceAllocationAttempt(store, 'payment:31', {
+    ...payload,
+    expected_version: 3,
+  })
+  assert.equal(retry, first)
+  assert.equal(retry.params.expected_version, 2)
+  assert.throws(
+    () =>
+      pendingFinanceAllocationAttempt(store, 'payment:31', {
+        ...payload,
+        allocations: [{ finance_fact_id: 9, amount: '11' }],
+      }),
+    /上次抵扣结果/u
+  )
+  store.settle('payment:31', retry, null)
+  assert.equal(
+    pendingFinanceAllocationAttempt(store, 'payment:31', {
+      ...payload,
+      expected_version: 3,
+    }),
+    null
+  )
+  assert.notEqual(
+    store.prepare('payment:31', { ...payload, expected_version: 3 }).params
+      .idempotency_key,
+    first.params.idempotency_key
+  )
+})
 
 const candidates = [
   {

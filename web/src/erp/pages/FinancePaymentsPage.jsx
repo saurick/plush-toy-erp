@@ -3,7 +3,14 @@ import { Alert, Button, Form, Input, Select, Tag } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
-import { FinancePaymentKind } from '@/common/consts/statuses.generated.mjs'
+import {
+  FinanceAllocationStatus,
+  FinancePaymentDirection,
+  FinancePaymentKind,
+  FinancePaymentStatus,
+  OperationalFactStatus,
+  ProcessStatus,
+} from '../../common/consts/statuses.generated.mjs'
 import FinancePaymentSourceFields from '../components/finance/FinancePaymentSourceFields.jsx'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import ProcessSubmissionRoute from '../components/workflow/ProcessSubmissionRoute.jsx'
@@ -98,6 +105,7 @@ import {
 import {
   validateFinanceAllocationDraft,
   financePaymentPostMatchesIntent,
+  pendingFinanceAllocationAttempt,
 } from '../utils/financePaymentAllocation.mjs'
 import { resolveFinancePaymentActionAvailability } from '../utils/operationalActionAvailability.mjs'
 
@@ -105,12 +113,12 @@ const PAYMENT_STORAGE_PREFIX = 'plush-erp:finance-payment:last:v1:'
 const FINANCE_PAYMENT_COLUMN_ORDER_KEY = 'finance-payments-records'
 const FINANCE_CREDIT_NOTE_COLUMN_ORDER_KEY = 'finance-credit-notes-records'
 const PAYMENT_STATUS_META = Object.freeze({
-  DRAFT: ['待审批', 'blue'],
-  APPROVED: ['已批准待核销', 'gold'],
-  REJECTED: ['已退回', 'red'],
-  CANCELLED: ['已取消', 'default'],
-  POSTED: ['已核销', 'green'],
-  REVERSED: ['已冲销', 'magenta'],
+  [FinancePaymentStatus.DRAFT]: ['待审批', 'blue'],
+  [FinancePaymentStatus.APPROVED]: ['已批准待核销', 'gold'],
+  [FinancePaymentStatus.REJECTED]: ['已退回', 'red'],
+  [FinancePaymentStatus.CANCELLED]: ['已取消', 'default'],
+  [FinancePaymentStatus.POSTED]: ['已核销', 'green'],
+  [FinancePaymentStatus.REVERSED]: ['已冲销', 'magenta'],
 })
 const PAYMENT_STATUS_OPTIONS = [
   { value: '', label: '全部状态' },
@@ -121,13 +129,13 @@ const PAYMENT_STATUS_OPTIONS = [
 ]
 const PAYMENT_DIRECTION_OPTIONS = [
   { value: '', label: '全部方向' },
-  { value: 'RECEIPT', label: '收款' },
-  { value: 'DISBURSEMENT', label: '付款' },
+  { value: FinancePaymentDirection.RECEIPT, label: '收款' },
+  { value: FinancePaymentDirection.DISBURSEMENT, label: '付款' },
 ]
 const CREDIT_STATUS_OPTIONS = [
   { value: '', label: '全部状态' },
-  { value: 'POSTED', label: '已红冲' },
-  { value: 'REVERSED', label: '冲销记录' },
+  { value: FinanceAllocationStatus.POSTED, label: '已红冲' },
+  { value: FinanceAllocationStatus.REVERSED, label: '冲销记录' },
 ]
 const FINANCE_VIEW_ITEMS = [
   { key: 'payments', label: '收付款记录' },
@@ -144,7 +152,7 @@ function paymentStatusLabel(value) {
 }
 
 function creditStatusLabel(value) {
-  return value === 'REVERSED' ? '冲销记录' : '已红冲'
+  return value === FinanceAllocationStatus.REVERSED ? '冲销记录' : '已红冲'
 }
 
 function financeFactTypeLabel(value) {
@@ -162,7 +170,7 @@ function paymentAllocationExportValue(record) {
       const factNo = item?.finance_fact_no || `核销明细 ${index + 1}`
       const currency = item?.currency || record?.currency || ''
       const amount = item?.amount || '-'
-      const status = item?.status === 'REVERSED' ? '已冲销' : '已过账'
+      const status = item?.status === FinanceAllocationStatus.REVERSED ? '已冲销' : '已过账'
       return `${factNo} / ${amount}${currency ? ` ${currency}` : ''} / ${status}`
     })
     .join('；')
@@ -179,6 +187,17 @@ function partyOption(record, fallback) {
     value: Number(record?.id),
     label: [code, name].filter(Boolean).join(' / ') || fallback,
   }
+}
+
+function paymentSourceReference(record) {
+  if (record?.kind === FinancePaymentKind.REFUND) {
+    return record.refund_of_payment_no || '原收付款单待核对'
+  }
+  if (record?.kind === FinancePaymentKind.ADVANCE) {
+    return record.source_no || '关联订单待核对'
+  }
+  const allocations = Array.isArray(record?.allocations) ? record.allocations : []
+  return allocations.length ? `${allocations.length} 笔核销记录` : '—'
 }
 
 export default function FinancePaymentsPage() {
@@ -452,7 +471,7 @@ export default function FinancePaymentsPage() {
             listAllFinanceFacts(
               compactParams({
                 fact_type: currentFactType,
-                status: 'POSTED',
+                status: OperationalFactStatus.POSTED,
                 counterparty_id: counterpartyID,
               }),
               { signal: request.signal }
@@ -548,7 +567,7 @@ export default function FinancePaymentsPage() {
     return financeFacts.filter(
       (fact) =>
         fact.fact_type === factType &&
-        fact.status === 'POSTED' &&
+        fact.status === OperationalFactStatus.POSTED &&
         Number(fact.counterparty_id || 0) ===
           Number(currentPayment.counterparty_id || 0) &&
         fact.currency === currentPayment.currency &&
@@ -605,7 +624,7 @@ export default function FinancePaymentsPage() {
     setLoading(true)
     try {
       const created = await createFinancePayment(attempt.params)
-      if (!created?.id || created.status !== 'DRAFT') {
+      if (!created?.id || created.status !== FinancePaymentStatus.DRAFT) {
         throw Object.assign(new Error('收付款结果暂时无法确认'), {
           isInvalidResponse: true,
         })
@@ -650,7 +669,7 @@ export default function FinancePaymentsPage() {
   }
 
   const ensurePaymentApprovalProcess = async () => {
-    if (!currentPayment?.id || currentPayment.status !== 'DRAFT') return
+    if (!currentPayment?.id || currentPayment.status !== FinancePaymentStatus.DRAFT) return
     setLoading(true)
     try {
       let processData = await getFinancePaymentApprovalProcess({
@@ -752,6 +771,16 @@ export default function FinancePaymentsPage() {
   const initializeAllocationForm = (visible) => {
     if (!visible) return
     allocationForm.resetFields()
+    const pending = attemptsRef.current.peek(`finance-allocation:${currentPayment?.id}`)
+    if (pending) {
+      allocationForm.setFieldsValue({
+        allocations: pending.params.allocations.map((item) => ({
+          ...item,
+          label: allocationCandidates.find((fact) => fact.id === item.finance_fact_id)?.fact_no || '上次抵扣来源',
+        })),
+      })
+      return
+    }
     allocationForm.setFieldsValue({
       allocations: allocationCandidates.map((fact) => ({
         finance_fact_id: fact.id,
@@ -775,13 +804,13 @@ export default function FinancePaymentsPage() {
       const processStatus =
         processData.process_context?.process_instance?.status || ''
       const allowed =
-        (payment.status === 'DRAFT' && !processData.process_context) ||
-        (payment.status === 'APPROVED' && processStatus === 'blocked')
+        (payment.status === FinancePaymentStatus.DRAFT && !processData.process_context) ||
+        (payment.status === FinancePaymentStatus.APPROVED && processStatus === ProcessStatus.BLOCKED)
       if (!allowed) {
         message.warning(
-          payment.status === 'DRAFT'
+          payment.status === FinancePaymentStatus.DRAFT
             ? '该收付款已进入审批，请先在任务中心驳回或阻塞流程'
-            : payment.status === 'APPROVED'
+            : payment.status === FinancePaymentStatus.APPROVED
               ? '只有流程受阻且尚未过账的收付款可以取消'
               : '当前状态不能取消收付款'
         )
@@ -820,7 +849,7 @@ export default function FinancePaymentsPage() {
     } catch (error) {
       if (isSourceBusinessActionResultUnknown(error)) {
         const recovered = await recoverPayment(currentPayment.id, true)
-        if (recovered?.status === 'CANCELLED') {
+        if (recovered?.status === FinancePaymentStatus.CANCELLED) {
           setCancelOpen(false)
           message.success('已重新读取收付款取消结果')
           return
@@ -833,7 +862,7 @@ export default function FinancePaymentsPage() {
   }
 
   const postPayment = async (cashOnly = false) => {
-    const existingCash = currentPayment?.status === 'POSTED'
+    const existingCash = currentPayment?.status === FinancePaymentStatus.POSTED
     let values
     try {
       values = cashOnly
@@ -848,7 +877,23 @@ export default function FinancePaymentsPage() {
         finance_fact_id: Number(item.finance_fact_id),
         amount: String(item.amount).trim(),
       }))
-    const allocationCheck = validateFinanceAllocationDraft({
+    const allocationScope = `finance-allocation:${currentPayment.id}`
+    const allocationPayload = {
+      id: currentPayment.id,
+      expected_version: currentPayment.version,
+      allocations,
+      ...(customerKey ? { customer_key: customerKey } : {}),
+    }
+    let pendingAttempt
+    try {
+      pendingAttempt = existingCash
+        ? pendingFinanceAllocationAttempt(attemptsRef.current, allocationScope, allocationPayload)
+        : null
+    } catch {
+      message.warning('上次抵扣结果尚未确认，请保留原抵扣内容并重新确认后再办理新的抵扣')
+      return
+    }
+    const allocationCheck = pendingAttempt ? { ok: true } : validateFinanceAllocationDraft({
       allocations,
       candidates: allocationCandidates,
       paymentAmount: existingCash
@@ -883,13 +928,8 @@ export default function FinancePaymentsPage() {
     setLoading(true)
     try {
       if (existingCash) {
-        const scope = `finance-allocation:${currentPayment.id}`
-        const attempt = attemptsRef.current.prepare(scope, {
-          id: currentPayment.id,
-          expected_version: currentPayment.version,
-          allocations,
-          ...(customerKey ? { customer_key: customerKey } : {}),
-        })
+        const scope = allocationScope
+        const attempt = pendingAttempt || attemptsRef.current.prepare(scope, allocationPayload)
         try {
           const payment = await allocateFinancePayment(attempt.params)
           attemptsRef.current.settle(scope, attempt, null)
@@ -996,7 +1036,7 @@ export default function FinancePaymentsPage() {
     } catch (error) {
       if (isSourceBusinessActionResultUnknown(error)) {
         const recovered = await recoverPayment(currentPayment.id, true)
-        if (recovered?.status === 'REVERSED') {
+        if (recovered?.status === FinancePaymentStatus.REVERSED) {
           setReverseOpen(false)
           message.success('已重新读取收付款冲销结果')
           return
@@ -1129,6 +1169,7 @@ export default function FinancePaymentsPage() {
       },
       { defaultPriority: 60, title: '币种', dataIndex: 'currency', width: 90 },
       {
+        defaultPriority: 65,
         title: '款项用途',
         dataIndex: 'kind',
         width: 150,
@@ -1145,27 +1186,37 @@ export default function FinancePaymentsPage() {
             REFUND: '实际退款',
           })[row.kind] || '用途待核对',
       },
-      { title: '关联订单', dataIndex: 'source_no', width: 190 },
-      { title: '原收付款单', dataIndex: 'refund_of_payment_no', width: 190 },
       {
+        defaultPriority: 66,
+        title: '关联来源',
+        dataIndex: 'source_no',
+        width: 190,
+        render: (_value, record) => paymentSourceReference(record),
+        exportValue: paymentSourceReference,
+      },
+      { defaultHidden: true, title: '原收付款单', dataIndex: 'refund_of_payment_no', width: 190 },
+      {
+        defaultHidden: true,
         title: '已抵扣',
         dataIndex: 'allocated_amount',
         width: 130,
         align: 'right',
       },
       {
+        defaultHidden: true,
         title: '已退款',
         dataIndex: 'refunded_amount',
         width: 130,
         align: 'right',
       },
       {
+        defaultPriority: 67,
         title: '待抵扣 / 可退余额',
         dataIndex: 'available_amount',
         width: 170,
         align: 'right',
       },
-      { title: '款项说明', dataIndex: 'purpose_note', width: 220 },
+      { defaultHidden: true, title: '款项说明', dataIndex: 'purpose_note', width: 220 },
       {
         align: 'left',
         defaultPriority: 30,
@@ -1191,6 +1242,7 @@ export default function FinancePaymentsPage() {
       {
         align: 'left',
         defaultPriority: 80,
+        defaultHidden: true,
         title: '核销明细',
         dataIndex: 'allocations',
         width: 110,
@@ -1199,6 +1251,7 @@ export default function FinancePaymentsPage() {
       },
       {
         align: 'left',
+        defaultHidden: true,
         title: '账户摘要',
         dataIndex: 'account_ref',
         copyable: { label: '账户摘要' },
@@ -1206,6 +1259,7 @@ export default function FinancePaymentsPage() {
       },
       {
         align: 'left',
+        defaultHidden: true,
         title: '业务凭据',
         dataIndex: 'evidence_ref',
         copyable: { label: '业务凭据' },
@@ -1278,7 +1332,7 @@ export default function FinancePaymentsPage() {
         dataIndex: 'status',
         width: 110,
         render: (value) => (
-          <Tag color={value === 'REVERSED' ? 'magenta' : 'gold'}>
+          <Tag color={value === FinanceAllocationStatus.REVERSED ? 'magenta' : 'gold'}>
             {creditStatusLabel(value)}
           </Tag>
         ),
@@ -1416,7 +1470,7 @@ export default function FinancePaymentsPage() {
       {
         key: 'status',
         label: '核销状态',
-        value: item?.status === 'REVERSED' ? '已冲销' : '已过账',
+        value: item?.status === FinanceAllocationStatus.REVERSED ? '已冲销' : '已过账',
       },
       { key: 'amount', label: '核销金额', value: item?.amount },
       { key: 'currency', label: '币种', value: item?.currency },
@@ -1447,7 +1501,7 @@ export default function FinancePaymentsPage() {
     )
   const currentCreditCanReverse =
     Boolean(currentCredit) &&
-    currentCredit.status === 'POSTED' &&
+    currentCredit.status === FinanceAllocationStatus.POSTED &&
     !currentCredit.reversal_of_credit_note_id &&
     !currentCreditHasReversal
   const financeViewTabs = (
@@ -1462,6 +1516,7 @@ export default function FinancePaymentsPage() {
       action: 'allocation',
       authorized: canPostPayment,
       payment: currentPayment,
+      pendingAllocation: Boolean(attemptsRef.current.peek(`finance-allocation:${currentPayment?.id}`)),
       busy: loading,
       referenceLoading,
     }),
@@ -1622,7 +1677,7 @@ export default function FinancePaymentsPage() {
                 >
                   <Button
                     type={
-                      currentPayment?.status === 'APPROVED'
+                      currentPayment?.status === FinancePaymentStatus.APPROVED
                         ? 'primary'
                         : 'default'
                     }
@@ -1630,7 +1685,7 @@ export default function FinancePaymentsPage() {
                     data-business-action-key="payment-allocation"
                     disabled={paymentActionAvailability.allocation.disabled}
                     onClick={() =>
-                      currentPayment?.status === 'APPROVED' &&
+                      currentPayment?.status === FinancePaymentStatus.APPROVED &&
                       [
                         FinancePaymentKind.ADVANCE,
                         FinancePaymentKind.REFUND,
@@ -1639,20 +1694,20 @@ export default function FinancePaymentsPage() {
                         : openAllocation()
                     }
                   >
-                    {currentPayment?.status === 'APPROVED' &&
+                    {currentPayment?.status === FinancePaymentStatus.APPROVED &&
                     [
                       FinancePaymentKind.ADVANCE,
                       FinancePaymentKind.REFUND,
                     ].includes(currentPayment?.kind)
                       ? '确认实际收付'
-                      : currentPayment?.status === 'POSTED'
+                      : currentPayment?.status === FinancePaymentStatus.POSTED
                         ? '抵扣应收 / 应付'
                         : '选择应收 / 应付核销'}
                   </Button>
                 </BusinessActionTooltip>
               ) : null}
               {canCreatePayment &&
-              currentPayment?.status === 'POSTED' &&
+              currentPayment?.status === FinancePaymentStatus.POSTED &&
               currentPayment?.kind !== FinancePaymentKind.REFUND ? (
                 <Button
                   disabled={
@@ -1667,7 +1722,7 @@ export default function FinancePaymentsPage() {
                 </Button>
               ) : null}
               {canReversePayment &&
-              currentPayment?.status === 'POSTED' &&
+              currentPayment?.status === FinancePaymentStatus.POSTED &&
               currentPayment?.kind !== FinancePaymentKind.REFUND ? (
                 <Button
                   disabled={
@@ -1876,7 +1931,7 @@ export default function FinancePaymentsPage() {
               selectedLabel={
                 currentCredit
                   ? `${currentCredit.credit_note_no || '红冲已登记'} / ${
-                      currentCredit.status === 'REVERSED'
+                      currentCredit.status === FinanceAllocationStatus.REVERSED
                         ? '冲销记录'
                         : '已红冲'
                     }`
@@ -1910,7 +1965,7 @@ export default function FinancePaymentsPage() {
                       ? '请先选择一条红冲记录'
                       : currentCredit.reversal_of_credit_note_id
                         ? '冲销记录不能再次冲销'
-                        : currentCredit.status !== 'POSTED'
+                        : currentCredit.status !== FinanceAllocationStatus.POSTED
                           ? '只有已红冲记录可以冲销'
                           : currentCreditHasReversal
                             ? '当前红冲记录已经完成冲销'
@@ -2179,7 +2234,7 @@ export default function FinancePaymentsPage() {
               options={(currentPayment?.allocations || [])
                 .filter(
                   (a) =>
-                    a.status === 'POSTED' &&
+                    a.status === FinanceAllocationStatus.POSTED &&
                     !(currentPayment?.allocations || []).some(
                       (r) => r.reversal_of_allocation_id === a.id
                     )
@@ -2204,17 +2259,17 @@ export default function FinancePaymentsPage() {
         className="erp-business-action-modal--operational-fact"
         title="选择核销记录"
         description={
-          currentPayment?.status === 'POSTED'
+          currentPayment?.status === FinancePaymentStatus.POSTED
             ? `可抵扣余额 ${currentPayment.available_amount} ${currentPayment.currency}；可分批抵扣，剩余款项继续保留。`
             : '本次核销合计必须精确等于收付款金额，且每笔不得超过来源记录的当前未核销金额。'
         }
         open={allocationOpen}
         size="localAction"
-        okText={currentPayment?.status === 'POSTED' ? '确认抵扣' : '过账并核销'}
+        okText={currentPayment?.status === FinancePaymentStatus.POSTED ? '确认抵扣' : '过账并核销'}
         cancelText="取消"
         confirmLoading={loading}
         maskClosable={!loading}
-        okButtonProps={{ disabled: allocationCandidates.length === 0 }}
+        okButtonProps={{ disabled: allocationCandidates.length === 0 && !attemptsRef.current.peek(`finance-allocation:${currentPayment?.id}`) }}
         afterOpenChange={initializeAllocationForm}
         onCancel={() => !loading && setAllocationOpen(false)}
         onOk={() => postPayment(false)}
@@ -2414,7 +2469,7 @@ export default function FinancePaymentsPage() {
                 options={financeFacts
                   .filter(
                     (fact) =>
-                      fact.status === 'POSTED' &&
+                      fact.status === OperationalFactStatus.POSTED &&
                       isPositiveNumeric20Scale6Units(
                         numeric20Scale6Units(fact.outstanding_amount)
                       )

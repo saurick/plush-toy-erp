@@ -1,3 +1,4 @@
+import { WorkflowTaskStatus } from '../../common/consts/statuses.generated.mjs'
 import { ENTRY_TARGET, getEnabledMobileRoleKeys, hasDesktopEntryAccess, resolveAllowedMobileEntryPath, resolveDefaultEntryTarget } from '../config/entryConfig.mjs'
 import { getAllowedMobileRoleKeys } from './mobileRolePermissions.mjs'
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
@@ -36,6 +37,6 @@ export function workflowTaskLinkDestination(id, profile, config, target = resolv
 
 export function singleTaskLinkAction(data) {
   if (!data || data.truncated) return null
-  const tasks = data.items.filter((item) => item.can_handle && ['ready', 'blocked'].includes(item.task_status_key))
+  const tasks = data.items.filter((item) => item.can_handle && [WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(item.task_status_key))
   return tasks.length === 1 ? tasks[0] : null
 }

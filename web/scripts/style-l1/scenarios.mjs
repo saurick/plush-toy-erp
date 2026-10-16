@@ -1,6 +1,7 @@
 import { createEmptyStateScenarios } from './emptyStateScenarios.mjs'
 import { createPageHeaderScenarios } from './pageHeaderScenarios.mjs'
 import { createTaskCalendarScenarios } from './taskCalendarScenarios.mjs'
+import { createTaskCurrentFocusScenarios } from './taskCurrentFocusScenarios.mjs'
 import { createBusinessStatusCountsScenarios } from './businessStatusCountsScenarios.mjs'
 import { createBusinessFollowupScenarios } from './businessFollowupScenarios.mjs'
 import { createHighFidelityScenarios } from './highFidelityScenarios.mjs'
@@ -585,6 +586,7 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
     }),
     ...createTaskCalendarScenarios(deps),
+    ...createTaskCurrentFocusScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createDashboardTaskScenarios({
       expectText,
       expectHeading,
@@ -836,6 +838,7 @@ export function createStyleL1Scenarios(deps) {
       assertOutsourcingProcessSelectOptions,
       assertProcessSuggestionOptions,
       assertTextAbsent,
+      clickERPThemeOption,
       closeBusinessFormModal,
       expectButton,
       expectHeading,

@@ -15,12 +15,27 @@ import {
   TRANSACTION_FLOW_KEYS,
 } from "./transaction-real-backend-browser.mjs";
 import { databaseNameForRun } from "./database-target.mjs";
+import { PRODUCTION_BROWSER_ACTIONS } from "./transaction-production-shipment-browser.mjs";
+import { dropRealResponse } from "./transaction-browser-ui.mjs";
+import {
+  FLOW_FIELD_AUDIT_PAGES,
+  FLOW_FIELD_AUDIT_TABLES,
+} from "./transaction-flow-fields-browser.mjs";
 import {
   stopOwnedService,
   verifyTransactionRequestLogs,
 } from "./transaction-browser-isolated.mjs";
 
 const runID = "transaction_guard";
+const fulfillmentCatalog = JSON.parse(
+  await fs.readFile(
+    new URL(
+      "../../server/internal/biz/workflow_task_catalog.json",
+      import.meta.url,
+    ),
+    "utf8",
+  ),
+).fulfillment_flow;
 const databaseName = databaseNameForRun("browser-actions", runID);
 const target = {
   runID,
@@ -29,6 +44,100 @@ const target = {
   backendURL: "http://127.0.0.1:18139",
   baseURL: "http://127.0.0.1:15201",
 };
+
+test("lost-response removal waits for the real abort and captures only one request", async () => {
+  const events = [];
+  let handler;
+  const page = {
+    expectedRPCFailures: new Map(),
+    route: async (_pattern, callback) => {
+      handler = callback;
+    },
+    unroute: async () => events.push("unroute"),
+  };
+  const fault = await dropRealResponse(
+    page,
+    target,
+    "operational_fact",
+    "ship_shipment",
+  );
+  let finishAbort, notifyAbort;
+  const aborting = new Promise((resolve) => {
+    notifyAbort = resolve;
+  });
+  const aborted = new Promise((resolve) => {
+    finishAbort = resolve;
+  });
+  const route = {
+    request: () => ({
+      url: () => `${target.baseURL}/rpc/operational_fact`,
+      postDataJSON: () => ({ method: "ship_shipment", params: { id: 1 } }),
+    }),
+    fetch: async () => {
+      events.push("fetch");
+      return {
+        json: async () => ({ result: { code: 0 } }),
+        headers: () => ({ "x-request-id": "real-success" }),
+      };
+    },
+    abort: async () => {
+      events.push("abort-start");
+      notifyAbort();
+      await aborted;
+      events.push("abort-end");
+    },
+    fallback: async () => events.push("fallback"),
+  };
+  const handling = handler(route);
+  await aborting;
+  const removal = fault.remove();
+  await handler(route);
+  assert.equal(fault.state.injected, false);
+  assert.deepEqual(events, ["fetch", "abort-start", "fallback"]);
+  finishAbort();
+  await Promise.all([handling, removal]);
+  assert.deepEqual(events, [
+    "fetch",
+    "abort-start",
+    "fallback",
+    "abort-end",
+    "unroute",
+  ]);
+  assert.equal(fault.state.injected, true);
+  assert.equal(fault.state.backendCode, 0);
+});
+
+test("an abort failure cannot become successful lost-response evidence", async () => {
+  let handler;
+  const page = {
+    expectedRPCFailures: new Map(),
+    route: async (_pattern, callback) => {
+      handler = callback;
+    },
+    unroute: async () => {},
+  };
+  const fault = await dropRealResponse(
+    page,
+    target,
+    "operational_fact",
+    "ship_shipment",
+  );
+  await handler({
+    request: () => ({
+      url: () => `${target.baseURL}/rpc/operational_fact`,
+      postDataJSON: () => ({ method: "ship_shipment", params: { id: 1 } }),
+    }),
+    fetch: async () => ({
+      json: async () => ({ result: { code: 0 } }),
+      headers: () => ({}),
+    }),
+    abort: async () => {
+      throw new Error("route already handled");
+    },
+  });
+  await assert.rejects(fault.remove(), /route already handled/u);
+  assert.equal(fault.state.injected, false);
+});
 
 test("owned service cleanup handles a prior signal exit and a service that ignores termination", async (t) => {
   for (const ignoreTermination of [false, true]) {
@@ -107,11 +216,101 @@ test("an unverified or mismatched backend cannot receive fixture RPC or database
 });
 
 function completeReport() {
+  const productionFields = {
+    productionOrderID: 101,
+    receiptID: 201,
+    stock: { quantity: 2, net: 2, txns: 1 },
+    fulfillment: [
+      { stage: "handwork_completed", stock: { quantity: 0, net: 0, txns: 0 } },
+      {
+        stage: "finished_goods_inbound",
+        stock: { quantity: 2, net: 2, txns: 1 },
+        readiness: { pendingInspection: 2, pendingPackaging: 0, ready: 0 },
+      },
+      {
+        stage: "finished_quality_passed",
+        stock: { quantity: 2, net: 2, txns: 1 },
+        readiness: { pendingInspection: 0, pendingPackaging: 2, ready: 0 },
+      },
+      {
+        stage: "packaging_completed",
+        stock: { quantity: 2, net: 2, txns: 1 },
+        readiness: { pendingInspection: 0, pendingPackaging: 0, ready: 2 },
+      },
+    ],
+    qualityBlockedTransfer: true,
+    actions: [
+      ...PRODUCTION_BROWSER_ACTIONS.map(([role, operation, action], index) => ({
+        role,
+        operation,
+        action,
+        batchID: index + 1,
+        confirmed: true,
+      })),
+      ...["CUT_PIECE", "SHELL", "FINISHED_GOODS", "NEEDLE", "SAMPLING"].map(
+        (gate, index) => ({
+          role: "quality",
+          action: "PASS_QUALITY",
+          gate,
+          inspectionID: index + 1,
+          confirmed: true,
+        }),
+      ),
+    ],
+  };
   return {
+    fieldAudit: {
+      tables: FLOW_FIELD_AUDIT_TABLES.length,
+      columns: 1284,
+      constraints: 1000,
+      indexes: 400,
+      structure: {
+        columns: 1284,
+        columnNamesMatched: true,
+        postgresTypesMatched: true,
+        nullabilityMatched: true,
+      },
+      stages: fulfillmentCatalog,
+      pages: FLOW_FIELD_AUDIT_PAGES.flatMap(({ key, form }) => [
+        `${key}-list`,
+        ...(form ? [`${key}-form`] : []),
+      ]).map((key) => ({
+        key,
+        headers: ["单号"],
+        fields: [{ label: "单号" }],
+        screenshot: `${key}.png`,
+        metrics: { viewport: { width: 1920, height: 1080, dpr: 2 } },
+      })),
+    },
+    fieldResults: {
+      optionalColumnsRestored: true,
+      detailsPreserved: true,
+      exports: [{ key: "quality" }, { key: "payments" }],
+      pages: [
+        "quality-populated",
+        "quality-all-columns",
+        "quality-restored",
+        "payments-populated",
+        "payments-all-columns",
+        "payments-restored",
+        "payment-details",
+        "inventory-populated",
+      ].map((key) => ({ key })),
+    },
     flows: TRANSACTION_FLOW_KEYS.map((key) => ({
       key,
       passed: true,
       transportFault: { injected: true, backendCode: 0 },
+      ...(key.endsWith("production") ? structuredClone(productionFields) : {}),
+      ...(key.endsWith("shipment")
+        ? {
+            productionOrderID: 101,
+            shipmentID: 301,
+            approvalTaskID: 401,
+            approvalSurface: key.startsWith("mobile_") ? "mobile" : "desktop",
+            restored: { quantity: 2, net: 2, txns: 3 },
+          }
+        : {}),
     })),
     browserRPC: [{ method: "create_finance_payment", code: 0, http: 200 }],
     pageErrors: [],
@@ -196,7 +395,73 @@ test("partial flows, zero execution, browser errors and failed real writes canno
   assert.doesNotThrow(() => assertTransactionBrowserReport(completeReport()));
   for (const mutate of [
     (report) => {
+      report.fieldAudit.pages.pop();
+    },
+    (report) => {
+      report.fieldAudit.pages[0].metrics.viewport.dpr = 1;
+    },
+    (report) => {
+      report.fieldAudit.stages = [];
+    },
+    (report) => {
+      report.fieldAudit.columns = 0;
+    },
+    (report) => {
+      report.fieldAudit.structure.postgresTypesMatched = false;
+    },
+    (report) => {
+      report.fieldResults.exports = [];
+    },
+    (report) => {
+      report.fieldResults.pages = [];
+    },
+    (report) => {
+      report.fieldResults.optionalColumnsRestored = false;
+    },
+    (report) => {
       report.mobileTasks = [];
+    },
+    (report) => {
+      report.flows.find(({ key }) => key === "production").actions.pop();
+    },
+    (report) => {
+      report.flows
+        .find(({ key }) => key === "production")
+        .fulfillment.reverse();
+    },
+    (report) => {
+      report.flows.find(
+        ({ key }) => key === "production",
+      ).fulfillment[1].readiness.ready = 2;
+    },
+    (report) => {
+      report.flows.find(
+        ({ key }) => key === "production",
+      ).fulfillment[2].stock.txns = 2;
+    },
+    (report) => {
+      report.flows.find(
+        ({ key }) => key === "mobile_production",
+      ).qualityBlockedTransfer = false;
+    },
+    (report) => {
+      report.flows.find(
+        ({ key }) => key === "mobile_production",
+      ).actions[0].role = "admin";
+    },
+    (report) => {
+      const actions = report.flows.find(
+        ({ key }) => key === "production",
+      ).actions;
+      actions.at(-1).inspectionID = actions.at(-2).inspectionID;
+    },
+    (report) => {
+      report.flows.find(({ key }) => key === "shipment").restored.txns = 4;
+    },
+    (report) => {
+      report.flows.find(
+        ({ key }) => key === "mobile_shipment",
+      ).approvalSurface = "desktop";
     },
     (report) => {
       report.mobileTasks[0].confirmed = false;

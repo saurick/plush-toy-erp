@@ -5,6 +5,7 @@ import {
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import { InventoryLotStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -926,7 +927,7 @@ export default function ProductionOrdersPage() {
               subject_type: 'MATERIAL',
               subject_id: freshRequirement.material_id,
               warehouse_id: firstWarehouseID,
-              status: 'ACTIVE',
+              status: InventoryLotStatus.ACTIVE,
             },
             { signal: request.signal }
           )
@@ -990,7 +991,7 @@ export default function ProductionOrdersPage() {
           subject_type: 'MATERIAL',
           subject_id: requirement.material_id,
           warehouse_id: Number(warehouseID),
-          status: 'ACTIVE',
+          status: InventoryLotStatus.ACTIVE,
         },
         { signal: request.signal }
       )
@@ -1203,7 +1204,7 @@ export default function ProductionOrdersPage() {
             source_id: orderID,
           }),
           listAllWarehouses({ active_only: true }),
-          listAllInventoryLots({ status: 'ACTIVE' }),
+          listAllInventoryLots({ status: InventoryLotStatus.ACTIVE }),
           hasRoutedItem ? getProductionWip(orderID) : Promise.resolve(null),
         ])
       if (
@@ -1636,6 +1637,7 @@ export default function ProductionOrdersPage() {
         title="生产订单"
       />
       <BusinessOperationPanel
+        showSelection={contentView === 'list'}
         filters={
           <>
             <SearchInput
@@ -1689,23 +1691,25 @@ export default function ProductionOrdersPage() {
           </>
         }
         actions={
-          <BusinessListToolbarActions
-            onExport={exportRows}
-            exportDisabled={loading || exporting || total === 0}
-            exportDisabledReason={
-              exporting
-                ? '正在准备导出，请稍候'
-                : loading
-                  ? '生产订单加载完成后可导出'
-                  : total === 0
-                    ? '当前筛选没有可导出的生产订单'
-                    : ''
-            }
-            onOpenColumnOrder={openColumnOrder}
-          />
+          contentView === 'list' ? (
+            <BusinessListToolbarActions
+              onExport={exportRows}
+              exportDisabled={loading || exporting || total === 0}
+              exportDisabledReason={
+                exporting
+                  ? '正在准备导出，请稍候'
+                  : loading
+                    ? '生产订单加载完成后可导出'
+                    : total === 0
+                      ? '当前筛选没有可导出的生产订单'
+                      : ''
+              }
+              onOpenColumnOrder={openColumnOrder}
+            />
+          ) : null
         }
         primaryAction={
-          canCreate ? (
+          contentView === 'list' && canCreate ? (
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -2083,19 +2087,6 @@ export default function ProductionOrdersPage() {
               )
             }
             onShowProcess={viewProductionProcess}
-            onFilterStatus={(status) => {
-              writeQuery({
-                status,
-                scope: [
-                  PRODUCTION_ORDER_STATUS.CLOSED,
-                  PRODUCTION_ORDER_STATUS.CANCELLED,
-                ].includes(status)
-                  ? LIFECYCLE_SCOPE.HISTORY
-                  : LIFECYCLE_SCOPE.CURRENT,
-                page: 1,
-              })
-              setContentView('list')
-            }}
           />
         ) : (
           <BusinessDataTable

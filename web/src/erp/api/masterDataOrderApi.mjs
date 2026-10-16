@@ -100,51 +100,6 @@ function validateSourceDocumentMutationResult(
   return data
 }
 
-function validateSourceDocumentReorderResult(
-  result,
-  params,
-  orderKey,
-  itemKey
-) {
-  const data = validateSourceDocumentMutationResult(
-    result,
-    params,
-    orderKey,
-    itemKey
-  )
-  const expectedVersion = Number(params?.expected_version || 0)
-  const expectedItemIDs = Array.isArray(params?.item_ids)
-    ? params.item_ids.map(Number)
-    : []
-  const order = data[orderKey]
-  const openItemIDs = data[itemKey]
-    .filter(
-      (item) =>
-        String(item?.line_status || '')
-          .trim()
-          .toLowerCase() === 'open'
-    )
-    .map((item) => Number(item?.id || 0))
-  if (
-    !Number.isSafeInteger(expectedVersion) ||
-    expectedVersion <= 0 ||
-    !Number.isSafeInteger(order.version) ||
-    order.version !== expectedVersion + 1 ||
-    expectedItemIDs.length === 0 ||
-    expectedItemIDs.some(
-      (itemID, index) =>
-        !Number.isSafeInteger(itemID) ||
-        itemID <= 0 ||
-        expectedItemIDs.indexOf(itemID) !== index
-    ) ||
-    openItemIDs.length !== expectedItemIDs.length ||
-    openItemIDs.some((itemID, index) => itemID !== expectedItemIDs[index])
-  ) {
-    throw invalidSourceDocumentMutationResponse()
-  }
-  return data
-}
-
 export async function listCustomers(params = {}, options = {}) {
   const result = await masterDataRpc.call(RpcMethod.masterdata.LIST_CUSTOMERS, params, options)
   return dataOf(result)
@@ -452,16 +407,6 @@ export async function saveSalesOrderWithItems(params = {}) {
   )
 }
 
-export async function reorderSalesOrderItems(params = {}) {
-  const result = await salesOrderRpc.call(RpcMethod.sales_order.REORDER_SALES_ORDER_ITEMS, params)
-  return validateSourceDocumentReorderResult(
-    result,
-    params,
-    'sales_order',
-    'sales_order_items'
-  )
-}
-
 export async function getSalesOrder(params = {}, options = {}) {
   const result = await salesOrderRpc.call(RpcMethod.sales_order.GET_SALES_ORDER, params, options)
   return dataOf(result)?.sales_order || null
@@ -540,19 +485,6 @@ export async function savePurchaseOrderWithItems(params = {}) {
     params
   )
   return validateSourceDocumentMutationResult(
-    result,
-    params,
-    'purchase_order',
-    'purchase_order_items'
-  )
-}
-
-export async function reorderPurchaseOrderItems(params = {}) {
-  const result = await purchaseOrderRpc.call(
-    RpcMethod.purchase_order.REORDER_PURCHASE_ORDER_ITEMS,
-    params
-  )
-  return validateSourceDocumentReorderResult(
     result,
     params,
     'purchase_order',
@@ -668,19 +600,6 @@ export async function saveOutsourcingOrderWithItems(params = {}) {
     params
   )
   return validateSourceDocumentMutationResult(
-    result,
-    params,
-    'outsourcing_order',
-    'outsourcing_order_items'
-  )
-}
-
-export async function reorderOutsourcingOrderItems(params = {}) {
-  const result = await outsourcingOrderRpc.call(
-    RpcMethod.outsourcing_order.REORDER_OUTSOURCING_ORDER_ITEMS,
-    params
-  )
-  return validateSourceDocumentReorderResult(
     result,
     params,
     'outsourcing_order',
