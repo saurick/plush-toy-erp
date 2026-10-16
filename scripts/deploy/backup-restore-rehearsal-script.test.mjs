@@ -48,6 +48,20 @@ test("backup restore rehearsal requires source DSN before external tools", () =>
   assert.doesNotMatch(result.stderr, /缺少命令: docker/);
 });
 
+test("external attachment recovery waits for paired runtime proof before reporting success", () => {
+  const source = fs.readFileSync(scriptPath, "utf8");
+  const guard = source.indexOf('if [[ "$attachment_has_content" != t ]]');
+  const pending = source.indexOf('attachment_snapshot="pending-paired-object-backup"', guard);
+  const runtime = source.indexOf('node "$repo_root/scripts/local-runtime-rehearsal.mjs"', pending);
+  const proof = source.indexOf('"$run_dir/candidate-runtime-proof.json"', runtime);
+  const passed = source.indexOf('attachment_snapshot="paired-object-backup-restored"', proof);
+  const report = source.indexOf('"restoreCompleted\\": true', passed);
+  assert.ok(guard >= 0 && pending > guard && runtime > pending && proof > runtime && passed > proof && report > passed);
+  assert.match(source.slice(guard, pending), /if \[\[ -z "\$runtime_bundle" \]\]; then[\s\S]*missing-paired-object-backup[\s\S]*exit 1/u);
+  assert.match(source.slice(runtime, passed), /\.bundleId == \$bundle and \.attachmentsRestored == true/u);
+  assert.match(source.slice(runtime, passed), /attachmentBackupSHA256/u);
+});
+
 test("backup restore rehearsal blocks target DB source unless explicitly allowed", () => {
   const result = runScript(["--release-id", "test-release"], {
     SOURCE_POSTGRES_DSN:
@@ -307,8 +321,36 @@ test("backup restore rehearsal scopes the shared development source exception", 
 
   assert.match(
     sharedPolicyBlock,
-    /source_policy" == "shared-dev-dedicated-backup"[\s\S]*environment" == "shared-dev"[\s\S]*source_pg_host" == "192\.168\.0\.133"[\s\S]*source_pg_port" == "5432"[\s\S]*source_pg_database" == "plush_erp"/,
+    /source_policy" == "shared-dev-dedicated-backup"[\s\S]*environment" == "shared-dev"[\s\S]*source_pg_database" == "plush_erp"[\s\S]*registeredDevelopmentEndpoint/,
   );
+  for (const [host, port, database, environment, accepted] of [
+    ["192.168.0.133", "5432", "plush_erp", "shared-dev", true],
+    ["127.0.0.1", "15432", "plush_erp", "shared-dev", true],
+    ["127.0.0.1", "5432", "plush_erp", "shared-dev", false],
+    ["localhost", "15432", "plush_erp", "shared-dev", false],
+    ["192.168.0.133", "55437", "plush_erp", "shared-dev", false],
+    ["127.0.0.1", "15432", "plush_erp_demo_v1", "shared-dev", false],
+    ["127.0.0.1", "15432", "plush_erp", "production", false],
+  ]) {
+    const result = spawnSync("bash", ["-ceu", sharedPolicyBlock], {
+      cwd: os.tmpdir(),
+      env: {
+        ...process.env,
+        repo_root: repoRoot,
+        source_policy: "shared-dev-dedicated-backup",
+        environment,
+        source_pg_host: host,
+        source_pg_port: port,
+        source_pg_database: database,
+      },
+      encoding: "utf8",
+    });
+    assert.equal(
+      result.status === 0,
+      accepted,
+      `${host}:${port}/${database} ${result.stderr}`,
+    );
+  }
   assert.match(
     sharedPolicyBlock,
     /source_pg_options="-c default_transaction_read_only=on"/,

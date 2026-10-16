@@ -563,12 +563,14 @@ function validateBackupEvidence(content, errors, requireRestore = true) {
   );
   if (!requireRestore) return;
   assert(
-    /pass|success|verified|ok/i.test(restoreTestStatus),
+    /^(pass|passed|success|verified|ok|passed-temp-container)$/i.test(
+      restoreTestStatus.trim(),
+    ),
     `${REQUIRED_FILES.backup} restoreTestStatus must show a passed restore verification`,
     errors,
   );
   assert(
-    /pass|success|verified|ok/i.test(smokeQueryStatus),
+    /^(pass|passed|success|verified|ok)$/i.test(smokeQueryStatus.trim()),
     `${REQUIRED_FILES.backup} smokeQueryStatus must show a passed smoke query`,
     errors,
   );
@@ -657,8 +659,8 @@ function validateBackupRestoreReport(content, errors, absoluteDir) {
     errors,
   );
   assert(
-    /pass|success|verified|ok/i.test(
-      String(report.restore?.restoreTestStatus ?? ""),
+    /^(pass|passed|success|verified|ok|passed-temp-container)$/i.test(
+      String(report.restore?.restoreTestStatus ?? "").trim(),
     ),
     `${REQUIRED_FILES.backupRestore} restore.restoreTestStatus must show a passed restore rehearsal`,
     errors,
@@ -1462,8 +1464,8 @@ function validateSmokeReport(
     );
     if (/^(https?:\/\/|\/)/i.test(target)) {
       assert(
-        /^[1-5]\d{2}$/.test(String(check?.httpCode ?? "").trim()),
-        `${REQUIRED_FILES.smoke} checks[${index}].httpCode must be a 100-599 HTTP status for URL targets`,
+        /^200$/.test(String(check?.httpCode ?? "").trim()),
+        `${REQUIRED_FILES.smoke} checks[${index}].httpCode must be HTTP 200 for URL targets`,
         errors,
       );
     }
@@ -1751,11 +1753,7 @@ function validateSmokeReport(
   );
 }
 
-function validateCredentialRotationReport(
-  content,
-  errors,
-  credentialTarget,
-) {
+function validateCredentialRotationReport(content, errors, credentialTarget) {
   const report = parseJsonEvidence(
     REQUIRED_FILES.credentialRotation,
     content,
@@ -2038,6 +2036,13 @@ function validateRollbackRehearsalReport(content, errors) {
       String(report.postCheck?.smokeStatus ?? "").trim(),
     ),
     `${REQUIRED_FILES.rollbackRehearsal} postCheck.smokeStatus must be pass`,
+    errors,
+  );
+  assert(
+    /^(pass|passed|ok)$/i.test(
+      String(report.postCheck?.evidenceReviewStatus ?? "").trim(),
+    ),
+    `${REQUIRED_FILES.rollbackRehearsal} postCheck.evidenceReviewStatus must be pass`,
     errors,
   );
   assert(

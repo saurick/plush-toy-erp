@@ -30,7 +30,7 @@ print_help() {
     '  - 不读取、不提交真实 .env。' \
     '  - 不把 dump、secret、完整 DSN 或客户 raw rows 写入 git。' \
     '  - 默认 SOURCE_POSTGRES_DSN 必须使用只读 erp_backup；恢复和 migration 由隔离库管理员 / erp_migrator 完成。' \
-    '  - shared-dev-dedicated-backup 只供本项目本地迁移入口备份已登记的 133 开发库，并强制当前源连接只读；不能用于目标或发布环境。' \
+    '  - shared-dev-dedicated-backup 只供本项目本地迁移入口备份已登记的共享或 Orb 开发库，并强制当前源连接只读；不能用于目标或发布环境。' \
     '  - --environment 会写入正式恢复报告；目标演练必须显式填写实际环境（例如 customer-trial-133），不能沿用默认 local-dev。' \
     '  - 默认拒绝把 192.168.0.133 测试 / 目标库当成本地 source，除非显式设置' \
     '    ERP_ALLOW_TEST_DB_AS_DEV=1 或 ALLOW_TARGET_DB_BACKUP_REHEARSAL=1。'
@@ -276,11 +276,13 @@ source_dsn=""
 unset "$source_env"
 
 if [[ "$source_policy" == "shared-dev-dedicated-backup" ]]; then
-  [[ "$environment" == "shared-dev" &&
-    "$source_pg_host" == "192.168.0.133" &&
-    "$source_pg_port" == "5432" &&
-    "$source_pg_database" == "plush_erp" ]] || {
-    echo "[backup-restore-rehearsal] shared-dev-dedicated-backup 只允许已登记的 192.168.0.133:5432/plush_erp shared-dev" >&2
+  [[ "$environment" == "shared-dev" && "$source_pg_database" == "plush_erp" ]] &&
+    node --input-type=module -e '
+      import { pathToFileURL } from "node:url";
+      const { registeredDevelopmentEndpoint } = await import(pathToFileURL(process.argv[1] + "/scripts/local-database-roles.mjs"));
+      if (!registeredDevelopmentEndpoint(process.argv[2], process.argv[3])) process.exit(1);
+    ' "$repo_root" "$source_pg_host" "$source_pg_port" || {
+    echo "[backup-restore-rehearsal] shared-dev-dedicated-backup 只允许已登记的共享或 Orb 开发库" >&2
     exit 1
   }
   source_pg_options="-c default_transaction_read_only=on"
@@ -606,6 +608,28 @@ jq -r '
 chmod 600 "$pending_versions_file"
 pending_before="$(awk 'NF {count++} END {print count + 0}' "$pending_versions_file")"
 
+# A SQL-only dump cannot prove recovery of external object bodies.
+attachment_snapshot="no-attachments"
+attachment_table_exists="$(docker exec "$container_name" psql -U postgres -d "$restore_db" -X -At -c "SELECT to_regclass('public.business_attachments') IS NOT NULL")"
+if [[ "$attachment_table_exists" == t ]]; then
+  attachment_count="$(docker exec "$container_name" psql -U postgres -d "$restore_db" -X -At -c 'SELECT count(*) FROM business_attachments')"
+  if [[ "$attachment_count" -gt 0 ]]; then
+    attachment_has_content="$(docker exec "$container_name" psql -U postgres -d "$restore_db" -X -At -c "SELECT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='business_attachments' AND column_name='content')")"
+    if [[ "$attachment_has_content" != t ]]; then
+      if [[ -z "$runtime_bundle" ]]; then
+        printf '%s\n' 'attachmentSnapshot=missing-paired-object-backup' 'restoreTestStatus=incomplete' >>"$command_summary_file"
+        echo '[backup-restore-rehearsal] external attachment objects require a paired backup, restore and integrity verification; database-only recovery is incomplete' >&2
+        exit 1
+      fi
+      # The fixed candidate below restores and verifies the exact object keys
+      # selected by this dump before this script can issue a successful report.
+      attachment_snapshot="pending-paired-object-backup"
+    else
+      attachment_snapshot="included-in-database-backup"
+    fi
+  fi
+fi
+
 # The export proof binds current_database(). A source proof must never be reused
 # for the restored database. Exercise the real export against an isolated store.
 if grep -Eq '^(20260911062436|20260911062537)$' "$pending_versions_file"; then
@@ -807,6 +831,14 @@ fi
 if [[ -n "$runtime_bundle" ]]; then
   echo "[backup-restore-rehearsal] verifying fixed candidate runtime on restored data"
   CANDIDATE_APP_PASSWORD="$restore_app_pass" node "$repo_root/scripts/local-runtime-rehearsal.mjs" "$runtime_bundle" "$container_name" "$run_dir"
+  if [[ "$attachment_snapshot" == "pending-paired-object-backup" ]]; then
+    jq -e --arg bundle "$runtime_bundle" '
+      .bundleId == $bundle and .attachmentsRestored == true
+      and ((.attachmentBackupSHA256 // "") | test("^[a-f0-9]{64}$"))
+    ' "$run_dir/candidate-runtime-proof.json" >/dev/null
+    attachment_snapshot="paired-object-backup-restored"
+    attachment_restore_status="passed"
+  fi
 fi
 
 backend_health_status="not-run"
@@ -878,7 +910,7 @@ printf '%s\n' "# yoyoosun Backup Restore Rehearsal Evidence
 | --- | --- |
 | databaseBackupSize | $backup_size |
 | databaseBackupHash | $backup_hash |
-| attachmentSnapshot | included-in-database-backup |
+| attachmentSnapshot | $attachment_snapshot |
 | storageLocationAlias | local-output-gitignored |
 | encryptionEnabled | no-local-dev-dump |
 | retentionPolicy | local-manual-cleanup |

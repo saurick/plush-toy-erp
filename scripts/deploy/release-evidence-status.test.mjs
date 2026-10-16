@@ -38,8 +38,7 @@ const credentialTarget = selectYoyoosunCredentialTarget(
   "demo-133",
 );
 const releaseGitCommit = "abc1234000000000000000000000000000000000";
-const currentDemoCustomerRevision =
-  CUSTOMER_TRIAL_133_CONFIG_REVISION;
+const currentDemoCustomerRevision = CUSTOMER_TRIAL_133_CONFIG_REVISION;
 const scriptPath = path.join(
   repoRoot,
   "scripts/deploy/release-evidence-status.mjs",
@@ -147,7 +146,7 @@ webImageDigest=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 | databaseBackupSize | 123456 |
 | databaseBackupHash | sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd |
 | storageLocationAlias | controlled-backup-store |
-| restoreTestStatus | verified-on-staging |
+| restoreTestStatus | verified |
 | smokeQueryStatus | pass |
 `,
   );
