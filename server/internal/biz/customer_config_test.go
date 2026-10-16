@@ -168,7 +168,7 @@ func (r *memCustomerConfigRepo) switchActiveCustomerConfigRevision(action, custo
 			break
 		}
 	}
-	if activeRevision != expectedActiveRevision && (action != CustomerConfigTransitionActivate || activeRevision != revision) {
+	if activeRevision != expectedActiveRevision {
 		return nil, ErrCustomerConfigActiveRevisionChanged
 	}
 	if target.ConfigHash != expectedConfigHash {

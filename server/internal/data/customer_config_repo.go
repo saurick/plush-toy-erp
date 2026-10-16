@@ -574,7 +574,7 @@ FOR UPDATE`, customerKey)
 	if auditAction == customerConfigAuditActionRollback && previousActive == nil {
 		return nil, biz.ErrCustomerConfigActiveRevisionChanged
 	}
-	if observedActiveRevision != strings.TrimSpace(expectedActiveRevision) && (auditAction != customerConfigAuditActionActivate || observedActiveRevision != revision) {
+	if observedActiveRevision != strings.TrimSpace(expectedActiveRevision) {
 		return nil, biz.ErrCustomerConfigActiveRevisionChanged
 	}
 	if target.ConfigHashVersion != biz.CustomerConfigHashVersion {
@@ -795,7 +795,7 @@ func (r *customerConfigRepo) ListAccessEntitlements(ctx context.Context, custome
 	query := `
 SELECT role_key, capability_key, scope_type, scope_value, constraints, enabled
 FROM access_entitlements
-WHERE customer_key = $1 AND config_revision = $2 AND role_key IN (` + roleClause + `)
+WHERE customer_key = $1 AND config_revision = $2 AND role_key IN (` + roleClause + `) AND enabled = TRUE
 ORDER BY role_key ASC, capability_key ASC`
 	queryArgs := append([]any{customerKey, revision}, args...)
 	rows, err := r.data.sqldb.QueryContext(ctx, query, queryArgs...)
@@ -886,6 +886,7 @@ FROM work_pool_memberships
 WHERE customer_key = $1
   AND config_revision = $2
   AND pool_key IN (` + poolClause + `)
+  AND enabled = TRUE
 ORDER BY priority ASC, pool_key ASC, role_key ASC, user_id ASC`
 	queryArgs := append([]any{customerKey, revision}, args...)
 	rows, err := r.data.sqldb.QueryContext(ctx, query, queryArgs...)
@@ -1006,10 +1007,6 @@ func customerConfigOpenBusinessDocumentCountQueries(moduleKey string) []string {
 		return []string{`SELECT COUNT(*) FROM finance_facts WHERE status NOT IN ('POSTED', 'SETTLED', 'CANCELLED')`}
 	case "production":
 		return []string{`SELECT COUNT(*) FROM production_facts WHERE status = 'DRAFT'`}
-	case "production_orders":
-		return []string{`SELECT COUNT(*) FROM production_orders WHERE status IN ('DRAFT', 'RELEASED')`}
-	case "finance_payments":
-		return []string{`SELECT COUNT(*) FROM finance_payments WHERE status NOT IN ('POSTED', 'CANCELLED')`}
 	case "inventory":
 		return []string{
 			`SELECT COUNT(*) FROM purchase_receipts WHERE status = 'DRAFT'`,

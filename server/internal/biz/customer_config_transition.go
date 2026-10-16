@@ -118,7 +118,7 @@ func (uc *CustomerConfigUsecase) CheckCustomerConfigTransition(
 	if action == CustomerConfigTransitionRollback && out.ObservedActiveRevision == "" {
 		out.addBlocker("rollback_active_revision_required", "revision", nil, 0)
 	}
-	if out.ObservedActiveRevision != expectedActiveRevision && (action != CustomerConfigTransitionActivate || out.ObservedActiveRevision != targetRevision) {
+	if out.ObservedActiveRevision != expectedActiveRevision {
 		out.addBlocker(
 			"active_revision_changed",
 			"revision",

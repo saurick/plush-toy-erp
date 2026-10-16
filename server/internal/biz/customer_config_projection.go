@@ -63,7 +63,7 @@ func compiledSnapshotRolePageProjectionsAreAllowed(snapshot map[string]any, role
 	}
 	for rawRoleKey, rawPageKeys := range projections {
 		roleKey := NormalizeRoleKey(rawRoleKey)
-		if roleKey == "" || roleKey != rawRoleKey {
+		if roleKey == "" {
 			return false
 		}
 		if _, exists := roleProfileKeys[roleKey]; !exists {
