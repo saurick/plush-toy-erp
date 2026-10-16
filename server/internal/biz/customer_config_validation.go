@@ -422,6 +422,7 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 	if !compiledSnapshotRolePageProjectionsAreAllowed(in.CompiledSnapshot, roleProfileKeys) {
 		return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot role page projections are invalid", ErrBadParam)
 	}
+	entitlementKeys := map[[4]string]struct{}{}
 	for index := range in.AccessEntitlements {
 		item := &in.AccessEntitlements[index]
 		item.RoleKey = NormalizeRoleKey(item.RoleKey)
@@ -446,6 +447,11 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 		if item.Constraints == nil {
 			item.Constraints = map[string]any{}
 		}
+		key := [4]string{item.RoleKey, item.CapabilityKey, item.ScopeType, item.ScopeValue}
+		if _, exists := entitlementKeys[key]; exists {
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: duplicate entitlement for role %s and capability %s", ErrBadParam, item.RoleKey, item.CapabilityKey)
+		}
+		entitlementKeys[key] = struct{}{}
 	}
 	workPoolKeys := map[string]struct{}{}
 	for index := range in.WorkPools {

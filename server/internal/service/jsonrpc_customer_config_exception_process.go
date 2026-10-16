@@ -199,6 +199,9 @@ func (d *jsonrpcDispatcher) startOrReadProcessFirstNode(
 	if firstNode.ProcessInstanceID != instance.ID {
 		return nil, biz.ErrBadParam
 	}
+	if instance.Status == biz.ProcessStatusCompleted && firstNode.Status == biz.ProcessNodeStatusCompleted {
+		return firstNode, nil
+	}
 	if firstNode.NodeType != biz.ProcessNodeTypeDomainCommand &&
 		(firstNode.Status == biz.ProcessNodeStatusCompleted ||
 			firstNode.Status == biz.ProcessNodeStatusBlocked) {
@@ -351,7 +354,7 @@ func exceptionProcessDomainCommandExecutionFromParams(
 	}
 	switch commandKey {
 	case biz.ProcessDomainCommandFinancePaymentPost:
-		allowed = append(allowed, "allocations")
+		allowed = append(allowed, "allocations", "cash_only")
 	case biz.ProcessDomainCommandProductionExceptionExecute:
 		allowed = append(allowed, "reason")
 	}
@@ -371,7 +374,13 @@ func exceptionProcessDomainCommandExecutionFromParams(
 	switch commandKey {
 	case biz.ProcessDomainCommandFinancePaymentPost:
 		raw, ok := pm["allocations"].([]any)
-		if !ok || len(raw) == 0 {
+		cashOnly, _ := pm["cash_only"].(bool)
+		if value, exists := pm["cash_only"]; exists {
+			if _, ok := value.(bool); !ok {
+				return nil, false
+			}
+		}
+		if !ok || (len(raw) == 0 && !cashOnly) || (len(raw) > 0 && cashOnly) {
 			return nil, false
 		}
 		allocations := make([]any, 0, len(raw))
@@ -391,6 +400,9 @@ func exceptionProcessDomainCommandExecutionFromParams(
 			})
 		}
 		payload["allocations"] = allocations
+		if cashOnly {
+			payload["cash_only"] = true
+		}
 	case biz.ProcessDomainCommandProductionExceptionExecute:
 		reason := strings.TrimSpace(getString(pm, "reason"))
 		if reason == "" || len([]rune(reason)) > 255 {
@@ -466,7 +478,7 @@ func (d *jsonrpcDispatcher) requireExceptionProcessSourceRead(
 			return d.mapOperationalFactError(ctx, err)
 		}
 		condition := biz.SourceReadConditionFinancePayable
-		if item.Direction == biz.FinancePaymentDirectionReceipt {
+		if item.CounterpartyType == biz.FinanceCounterpartyCustomer {
 			condition = biz.SourceReadConditionFinanceReceivable
 		}
 		return d.requireSourceActionReadPermissions(ctx, "customer_config", method, condition)
