@@ -138,7 +138,7 @@ test('tracking exceptions load only when expanded, keep exact scope and cancel s
   assert.deepEqual(calls.at(-1).params, { tracking_kind: 'process', tracking_id: 10, limit: 20, offset: 0 })
   assert.equal(panel().querySelector('.workflow-exceptions__query'), null)
   assert.equal(panel().querySelector('.workflow-exceptions__states'), null)
-  assert.equal(panel().querySelector('.workflow-exceptions__views'), null)
+  assert.equal(panel().querySelector('.workflow-exceptions__summary'), null)
   mode = 'success'
   await act(async () => [...panel().querySelectorAll('button')].find((button) => /重\s*试/u.test(button.textContent)).click())
   assert.match(panel().textContent, /EX-CONTEXT/u)
@@ -148,7 +148,7 @@ test('tracking exceptions load only when expanded, keep exact scope and cancel s
   mode = 'empty'
   await expand()
   assert.equal(calls.at(-1).params.tracking_id, 11)
-  assert.match(panel().textContent, /本流程暂无可见异常记录/u)
+  assert.match(panel().textContent, /本流程暂无可见异常/u)
   await render(ref)
   mode = 'pending'
   await expand()

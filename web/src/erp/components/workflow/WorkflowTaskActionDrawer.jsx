@@ -215,6 +215,7 @@ export default function WorkflowTaskActionDrawer({
   profile,
   actionReceipt = null,
   actionMode = '',
+  startHandling = false,
   actionReason = '',
   actionSaving = false,
   actionAvailabilityLoading = false,
@@ -231,6 +232,7 @@ export default function WorkflowTaskActionDrawer({
   onActionReasonChange,
   onAssignmentTargetChange,
   onClose,
+  closeLabel = '返回列表',
   onReturnToTracking,
   onOpenEntry,
   onSubmit,
@@ -278,6 +280,7 @@ export default function WorkflowTaskActionDrawer({
     React.useState(0)
   const [approvedQuantity, setApprovedQuantity] = React.useState('')
   const previousTaskIdentityRef = React.useRef('')
+  const directEntryRef = React.useRef('')
   const navigationRef = React.useRef(null)
   const contextActionRef = React.useRef(null)
   const stepButtonRefs = React.useRef(new Map())
@@ -364,10 +367,18 @@ export default function WorkflowTaskActionDrawer({
   React.useEffect(() => {
     if (!task) {
       previousTaskIdentityRef.current = ''
+      directEntryRef.current = ''
       setApprovedQuantity('')
       setActiveStepKey('context')
     }
   }, [task])
+
+  React.useEffect(() => {
+    if (startHandling && taskIdentity && directEntryRef.current !== taskIdentity && !actionAvailabilityLoading && canChooseActions && !isTerminal && !hasActionReceipt) {
+      directEntryRef.current = taskIdentity
+      setActiveStepKey('action')
+    }
+  }, [startHandling, taskIdentity, actionAvailabilityLoading, canChooseActions, isTerminal, hasActionReceipt])
 
   React.useEffect(() => {
     if (hasActionReceipt) setActiveStepKey('confirm')
@@ -587,7 +598,7 @@ export default function WorkflowTaskActionDrawer({
       open={Boolean(task)}
       forceRender
       closeIcon={<LeftOutlined aria-hidden />}
-      closable={actionSaving ? false : { placement: 'start', 'aria-label': onReturnToTracking ? '返回流程' : '返回列表' }}
+      closable={actionSaving ? false : { placement: 'start', 'aria-label': onReturnToTracking ? '返回流程' : closeLabel }}
       maskClosable={!actionSaving}
       keyboard={!actionSaving}
       onClose={() => {

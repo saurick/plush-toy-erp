@@ -1,7 +1,12 @@
+import { FinancePaymentKind } from '../../common/consts/statuses.generated.mjs'
 import {
   resolveBusinessActionAvailability,
   resolveContextualBusinessActionAvailability,
 } from './businessActionAvailability.mjs'
+import {
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from './numeric20Scale6.mjs'
 
 function resolveAction({
   authorized,
@@ -35,6 +40,12 @@ export function resolveFinancePaymentActionAvailability({
   referenceLoading = false,
 } = {}) {
   const status = payment?.status
+  const canAllocateBalance =
+    status === 'POSTED' &&
+    payment?.kind !== FinancePaymentKind.REFUND &&
+    isPositiveNumeric20Scale6Units(
+      numeric20Scale6Units(payment?.available_amount)
+    )
   const common = {
     authorized,
     record: payment,
@@ -45,9 +56,10 @@ export function resolveFinancePaymentActionAvailability({
     case 'allocation':
       return resolveAction({
         ...common,
-        relevant: ['DRAFT', 'APPROVED'].includes(status),
-        completed: ['POSTED', 'REVERSED'].includes(status),
-        applicable: status === 'APPROVED',
+        relevant: ['DRAFT', 'APPROVED'].includes(status) || canAllocateBalance,
+        completed:
+          (status === 'POSTED' && !canAllocateBalance) || status === 'REVERSED',
+        applicable: status === 'APPROVED' || canAllocateBalance,
         busy: busy || referenceLoading,
         unavailableReason: '审批通过后可选择应收 / 应付核销',
         busyReason: referenceLoading
@@ -91,11 +103,11 @@ export function resolveFinancePaymentActionAvailability({
 export function canEditShipmentDraft(shipment) {
   return Boolean(
     shipment?.status === 'DRAFT' &&
-      shipment.finance_release_status === 'PENDING' &&
-      shipment.finance_release_version === 1 &&
-      !shipment.finance_release_process_instance_id &&
-      !shipment.finance_release_process_node_id &&
-      !shipment.finance_released_at
+    shipment.finance_release_status === 'PENDING' &&
+    shipment.finance_release_version === 1 &&
+    !shipment.finance_release_process_instance_id &&
+    !shipment.finance_release_process_node_id &&
+    !shipment.finance_released_at
   )
 }
 

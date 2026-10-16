@@ -3,7 +3,7 @@ import { TASK_BOARD_PAGE_SIZE_OPTIONS, TASK_BOARD_ROLE_OPTIONS } from './workflo
 
 export const TRACKING_VIEW_OPTIONS = [
   { value: 'tracking', label: '流程进度' },
-  { value: 'exceptions', label: '异常记录' },
+  { value: 'exceptions', label: '异常跟踪' },
 ]
 
 export const TRACKING_SCOPE_OPTIONS = [

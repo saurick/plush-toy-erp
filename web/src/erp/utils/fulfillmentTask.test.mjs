@@ -34,6 +34,11 @@ test('source handoffs open the exact receipt, inspection, contract or production
       '/erp/production/quality-inspections?purchase_receipt_id=7',
     ],
     [
+      'receipt_replacement',
+      'purchase_rejection_disposition',
+      '/erp/production/quality-inspections?quality_inspection_id=11',
+    ],
+    [
       'receipt_inbound',
       'purchase_receipt',
       '/erp/warehouse/inbound?receipt_id=7',

@@ -61,6 +61,13 @@ quality_roots(id,root_id) AS (
 ), incident_decisions AS (
  SELECT i.event_key,e.* FROM incident_facts i JOIN production_exception_decisions e
  ON e.id=i.decision_id OR EXISTS(SELECT 1 FROM quality_roots qr WHERE qr.root_id=i.quality_root AND qr.id=e.quality_inspection_id)
+), incident_purchase_receipts(event_key,receipt_id,active) AS (
+ SELECT i.event_key,d.replacement_receipt_id,CASE WHEN d.status='POSTED' THEN 1 ELSE 0 END
+ FROM incident_facts i JOIN quality_roots qr ON qr.root_id=i.quality_root
+ JOIN purchase_rejection_dispositions d ON d.quality_inspection_id=qr.id WHERE d.replacement_receipt_id IS NOT NULL
+ UNION ALL
+ SELECT p.event_key,d.replacement_receipt_id,CASE WHEN p.active=1 AND d.status='POSTED' THEN 1 ELSE 0 END
+ FROM incident_purchase_receipts p JOIN purchase_rejection_dispositions d ON d.purchase_receipt_id=p.receipt_id WHERE d.replacement_receipt_id IS NOT NULL
 ), incident_branch_batches(event_key,batch_id) AS (
  SELECT e.event_key,b.id FROM incident_decisions e JOIN production_wip_batches b ON b.origin_exception_decision_id=e.id
  UNION
@@ -81,6 +88,18 @@ quality_roots(id,root_id) AS (
  UNION
  SELECT i.event_key,t.id FROM incident_facts i JOIN visible_tasks t ON t.source_type='purchase_receipt' AND t.source_id=i.purchase_receipt_id AND t.task_group IN ('handoff_receipt_exception','purchase_quality_exception')
  UNION
+ SELECT i.event_key,t.id FROM incident_facts i JOIN quality_roots qr ON qr.root_id=i.quality_root
+ JOIN purchase_rejection_dispositions d ON d.quality_inspection_id=qr.id
+ JOIN visible_tasks t ON t.source_type='purchase_rejection_disposition' AND t.source_id=d.id
+ UNION
+ SELECT p.event_key,t.id FROM incident_purchase_receipts p JOIN visible_tasks t ON t.source_type='purchase_receipt' AND t.source_id=p.receipt_id
+ UNION
+ SELECT p.event_key,t.id FROM incident_purchase_receipts p JOIN quality_inspections q ON q.purchase_receipt_id=p.receipt_id
+ JOIN visible_tasks t ON t.source_type='quality_inspection' AND t.source_id=q.id
+ UNION
+ SELECT p.event_key,t.id FROM incident_purchase_receipts p JOIN purchase_rejection_dispositions d ON d.purchase_receipt_id=p.receipt_id
+ JOIN visible_tasks t ON t.source_type='purchase_rejection_disposition' AND t.source_id=d.id
+ UNION
  SELECT ib.event_key,t.id FROM incident_batches ib JOIN task_batches tb ON tb.batch_id=ib.batch_id JOIN visible_tasks t ON t.id=tb.task_id JOIN incident_facts i ON i.event_key=ib.event_key
  WHERE tb.batch_id<>i.batch_id OR t.task_group='handoff_production_exception'
 ), states AS (
@@ -94,9 +113,15 @@ quality_roots(id,root_id) AS (
  AND COALESCE((SELECT SUM(rb.quantity) FROM incident_branch_batches ib JOIN production_wip_batches rb ON rb.id=ib.batch_id
  WHERE ib.event_key=i.event_key AND rb.production_order_operation_id=b.production_order_operation_id AND rb.status='ACCEPTED'),0)>=b.quantity))) THEN 'closed'
  WHEN EXISTS(SELECT 1 FROM purchase_receipt_items ri WHERE ri.id=(SELECT purchase_receipt_item_id FROM quality_inspections WHERE id=i.quality_id)
- AND ri.quantity <= COALESCE((SELECT SUM(d.quantity) FROM purchase_rejection_dispositions d WHERE d.quality_inspection_id=i.quality_id AND d.status='POSTED'
- AND (d.disposition_type='RETURN_TO_VENDOR' OR EXISTS(SELECT 1 FROM purchase_receipts pr WHERE pr.id=d.replacement_receipt_id AND pr.status='POSTED'))),0)) THEN 'closed'
- WHEN EXISTS(SELECT 1 FROM outsourcing_return_dispositions d LEFT JOIN production_wip_batches rb ON rb.id=d.result_wip_batch_id WHERE d.quality_inspection_id=i.quality_id AND d.status='POSTED' AND (d.disposition_type='RETURN_TO_VENDOR' OR rb.status='ACCEPTED')) THEN 'closed'
+ AND ri.quantity <= COALESCE((SELECT SUM(d.quantity) FROM purchase_rejection_dispositions d WHERE d.quality_inspection_id=i.quality_id AND d.status='POSTED'),0))
+ AND NOT EXISTS(SELECT 1 FROM incident_purchase_receipts p JOIN purchase_receipts pr ON pr.id=p.receipt_id
+ WHERE p.event_key=i.event_key AND p.active=1 AND pr.status<>'POSTED' AND (pr.status<>'DRAFT'
+ OR NOT EXISTS(SELECT 1 FROM purchase_receipt_items ri WHERE ri.receipt_id=pr.id)
+ OR EXISTS(SELECT 1 FROM purchase_receipt_items ri WHERE ri.receipt_id=pr.id AND ri.quantity>COALESCE((SELECT SUM(d.quantity) FROM purchase_rejection_dispositions d WHERE d.purchase_receipt_item_id=ri.id AND d.status='POSTED'),0)))) THEN 'closed'
+ WHEN EXISTS(SELECT 1 FROM quality_inspections q JOIN outsourcing_facts f ON q.source_type='OUTSOURCING_FACT' AND f.id=q.source_id
+ WHERE q.id=i.quality_id AND f.quantity<=COALESCE((SELECT SUM(d.quantity) FROM outsourcing_return_dispositions d
+ LEFT JOIN production_wip_batches rb ON rb.id=d.result_wip_batch_id WHERE d.outsourcing_return_fact_id=f.id AND d.status='POSTED'
+ AND (d.disposition_type='RETURN_TO_VENDOR' OR rb.status='ACCEPTED')),0)) THEN 'closed'
  WHEN EXISTS(SELECT 1 FROM incident_decisions e WHERE e.event_key=i.event_key AND e.status='APPROVED') THEN 'executing'
  ELSE 'open' END AS state
  FROM incident_facts i LEFT JOIN production_wip_batches b ON b.id=i.batch_id

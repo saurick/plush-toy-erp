@@ -9,6 +9,7 @@ import {
 import { Alert, Button, Input, Space, Tag } from 'antd'
 import dayjs from 'dayjs'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
@@ -69,7 +70,6 @@ import {
 } from '../utils/businessPagination.mjs'
 import {
   buildWorkflowBusinessTaskQuery,
-  buildWorkflowBusinessTaskStats,
   reconcileWorkflowBusinessTaskPage,
   requireWorkflowBusinessTaskPage,
 } from '../utils/workflowBusinessModuleModel.mjs'
@@ -269,10 +269,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const requestedProductionExceptionView = String(
     searchParams.get('view') || ''
   ).trim()
-  const [productionExceptionSummary, setProductionExceptionSummary] = useState({
-    total: 0,
-    pageCount: 0,
-  })
   const productionExceptionRefreshRef = useRef(null)
   const productionExceptionTabKeys = useMemo(
     () =>
@@ -377,12 +373,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       setTotal(0)
       setSelectedTaskKeys([])
       setDetailTask(null)
-      message.error(
-        getActionErrorMessage(
-          error,
-          `加载${moduleItem?.title || '当前页面'}任务失败`
-        )
-      )
+      showPageLoadError(error, `加载${moduleItem?.title || '当前页面'}任务失败`)
       return false
     } finally {
       if (request.isCurrent()) {
@@ -506,44 +497,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       })
     return () => controller.abort()
   }, [selectedTask, taskReasonProcessDecisionRequired])
-
-  const stats = useMemo(
-    () => buildWorkflowBusinessTaskStats({ total, pageCount: tasks.length }),
-    [tasks.length, total]
-  )
-  const productionExceptionStats = useMemo(
-    () => [
-      {
-        key: 'production-exception-total',
-        label: '异常记录',
-        value: productionExceptionSummary.total,
-      },
-      {
-        key: 'production-exception-page',
-        label: '当前显示',
-        value: productionExceptionSummary.pageCount,
-      },
-    ],
-    [productionExceptionSummary.pageCount, productionExceptionSummary.total]
-  )
-  const headerStats =
-    isProductionExceptionPage &&
-    effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
-      ? productionExceptionStats
-      : stats
-
-  useEffect(() => {
-    if (!isProductionExceptionPage || !productionRecordsWorkspace) return
-    productionRecordsWorkspace.setHeaderStats(
-      effectiveProductionExceptionTab,
-      headerStats
-    )
-  }, [
-    effectiveProductionExceptionTab,
-    headerStats,
-    isProductionExceptionPage,
-    productionRecordsWorkspace,
-  ])
 
   const selectedTaskLabel = selectedTask
     ? `${getWorkflowTaskCodeLabel(selectedTask)} / ${
@@ -1655,7 +1608,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         <PageHeaderCard
           title={isProductionExceptionPage ? '生产记录' : moduleItem.title}
           helpKey={moduleKey}
-          stats={headerStats}
           compact
         />
       )}
@@ -1666,7 +1618,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             <ProductionExceptionDecisionPanel
               adminProfile={adminProfile}
               onRefreshReady={handleProductionExceptionRefreshReady}
-              onSummaryChange={setProductionExceptionSummary}
             />
           ) : (
             <BusinessPageLayout className="erp-workflow-business-page__tab-workspace">

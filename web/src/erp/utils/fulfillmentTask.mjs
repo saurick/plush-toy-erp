@@ -4,6 +4,7 @@ const SOURCE_TYPES = Object.freeze({
   receipt_quality: 'quality_inspection',
   receipt_inbound: 'purchase_receipt',
   receipt_exception: 'purchase_receipt',
+  receipt_replacement: 'purchase_rejection_disposition',
   outsourcing_contract: 'outsourcing_order',
   outsourcing_issue: 'outsourcing_order',
   outsourcing_return: 'outsourcing_order',
@@ -52,7 +53,7 @@ export function fulfillmentTaskEntryPath(task) {
       : ''
   }
   const source = SOURCE_TYPES[kind]
-  if (kind === 'production_exception') {
+  if (kind === 'production_exception' || kind === 'receipt_replacement') {
     return /^\/erp\/production\/quality-inspections\?quality_inspection_id=[1-9][0-9]*$/u.test(path) ? path : ''
   }
   const expected = {

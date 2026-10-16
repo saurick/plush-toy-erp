@@ -1,6 +1,30 @@
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { WORKFLOW_TASK_BOARD_LANE_KEYS } from '../../src/erp/utils/workflowTaskBoardContract.mjs'
 
+async function assertOrderDirection(assert, chain) {
+  const geometry = await chain.evaluate((root) => {
+    const main = root.querySelector('.workflow-business-chain__main')
+    const groups = [...main.querySelectorAll(':scope > .workflow-business-chain__group')]
+    const markers = groups.map((group) => group.querySelector('.workflow-process-stage__marker').getBoundingClientRect())
+    const exception = root.querySelector('.workflow-business-chain__exceptions')
+    return {
+      numbers: groups.map((group) => group.querySelector('.workflow-process-stage__marker').textContent),
+      forward: markers.every((marker, index) => !index || (marker.top > markers[index - 1].bottom && Math.abs(marker.x - markers[index - 1].x) <= 1)),
+      arrows: groups.every((group, index) => {
+        const arrow = getComputedStyle(group, '::after')
+        if (index === groups.length - 1) return arrow.content === 'none'
+        const tip = group.getBoundingClientRect().bottom - parseFloat(arrow.bottom)
+        return parseFloat(arrow.height) > 0 && arrow.clipPath.startsWith('polygon(') && tip > markers[index].bottom && tip < markers[index + 1].top
+      }),
+      separated: !main.querySelector('.workflow-business-chain__exceptions, .workflow-business-chain__unclassified'),
+      branch: !exception || (getComputedStyle(exception).borderTopStyle === 'dashed' && Boolean(exception.querySelector('[aria-label="branches"]')) && exception.querySelector('.workflow-business-chain__branch-label')?.textContent === '分支'),
+      overflow: root.scrollWidth - root.clientWidth,
+    }
+  })
+  assert.deepEqual(geometry.numbers, ['1', '2', '3', '4', '5', '6', '7'])
+  assert.ok(geometry.forward && geometry.arrows && geometry.separated && geometry.branch && geometry.overflow <= 1, `阶段方向或异常分支不清晰: ${JSON.stringify(geometry)}`)
+}
+
 export function createTaskBusinessReturnScenarios({ assert, path, outputDir, customerRuntimeEffectiveSession, assertNoHorizontalOverflow }) {
   const returnScenarios = [false, true].map((mobile) => {
     const taskName = '确认包装版本'
@@ -98,12 +122,15 @@ items: [
         await page.screenshot({ path: path.join(outputDir, `task-chain-focused-${mobile ? 'mobile' : 'desktop-4k'}.png`) })
         await page.getByRole('button', { name: '查看订单全流程', exact: true }).click()
         const chain = page.getByLabel('订单任务链', { exact: true })
-        await chain.getByText('换厂返工回货复检', { exact: true }).waitFor()
+        await chain.getByText(taskName, { exact: true }).waitFor()
         assert.equal(await chain.getByLabel('异常分支', { exact: true }).locator('.workflow-business-chain__group').count(), 1)
         const labels = await chain.locator('.workflow-business-chain__main .workflow-business-chain__node > strong').allTextContents()
-        assert.equal(labels.length, 14, '主链骨架始终完整可见')
-        assert.ok(labels.includes('正式成品入库') && labels.includes('查货与包装') && labels.includes('放行与实际发货'))
+        assert.deepEqual(labels, ['订单准备', '采购入库', '生产加工', '成品入库', '检验与包装', '放行与发货', '对账结清'])
+        await assertOrderDirection(assert, chain)
         assert.equal(await chain.locator('.workflow-business-chain__main > details').count(), 0, '主链节点不折叠')
+        assert.equal(await chain.locator('.workflow-business-chain__stage-content').count(), 1, '默认只展开本任务阶段')
+        assert.equal(await chain.locator('.workflow-business-chain__stage-content > ul > li:visible').count(), 2)
+        assert.equal(await chain.getByText('换厂返工回货复检', { exact: true }).count(), 0, '异常入口保留受阻数量，明细按需读取')
         const related = chain.locator('.workflow-business-chain__related')
         assert.equal(await related.getAttribute('open'), null)
         assert.ok((await related.locator('summary').boundingBox()).height >= 44, '关联任务展开入口保留触控尺寸')
@@ -115,19 +142,27 @@ items: [
         await chain.getByText('MO-PARALLEL-2', { exact: true }).waitFor()
         await related.locator('summary').click()
         assert.equal(await chain.getByText('MO-PARALLEL-2', { exact: true }).isVisible(), false)
-        await chain.locator('.ant-select-selector').click()
-        await page.locator('.ant-select-dropdown:visible').getByText('仓库', { exact: true }).click()
-        await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
-        await chain.locator('.workflow-business-chain__group[data-role-match="true"]').filter({ hasText: '正式成品入库' }).waitFor()
-        assert.equal(await chain.locator('.workflow-business-chain__main .workflow-business-chain__node').count(), 14, '岗位筛选不裁掉上下游骨架')
-        assert.equal(await chain.getByText(taskName, { exact: true }).isVisible(), true, '关注其他岗位仍保留本任务')
-        assert.equal(await chain.getByText('业务发货', { exact: true }).count(), 0, '收起其他岗位的任务明细')
-        await chain.locator('.ant-select-selector').click()
-        await page.locator('.ant-select-dropdown:visible').getByText('全部岗位', { exact: true }).click()
-        await page.locator('.ant-select-dropdown:visible').waitFor({ state: 'hidden' })
+        await chain.getByRole('button', { name: /成品入库/u }).click()
+        await chain.getByText('成品正式入库', { exact: true }).waitFor()
+        assert.equal(await chain.getByText(taskName, { exact: true }).count(), 0)
+        await chain.getByRole('button', { name: /放行与发货/u }).focus()
+        await page.keyboard.press('Enter')
         await chain.getByText('业务发货', { exact: true }).waitFor()
+        await chain.getByRole('button', { name: /异常处理/u }).click()
+        await chain.getByText('换厂返工回货复检', { exact: true }).waitFor()
+        assert.equal(await chain.locator('.workflow-business-chain__stage-content').count(), 1)
         const chainGeometry = await chain.evaluate((node) => ({ width: node.clientWidth, scroll: node.scrollWidth }))
         assert.ok(chainGeometry.scroll <= chainGeometry.width + 1, '任务链长批次号不能撑破办理区域')
+        await chain.getByRole('button', { name: /检验与包装/u }).click()
+        await chain.getByText(taskName, { exact: true }).waitFor()
+        assert.equal(await chain.locator('.workflow-business-chain__related').getAttribute('open'), null, '返回阶段收起其他明细')
+        await chain.locator('.workflow-business-chain__rules > summary').click()
+        await chain.getByText('成品检验及规定质量关口', { exact: true }).waitFor()
+        await chain.locator('.workflow-business-chain__rules > summary').click()
+        const metrics = await chain.evaluate((node) => ({ width: node.clientWidth, scroll: node.scrollWidth, height: node.getBoundingClientRect().height }))
+        assert.ok(metrics.scroll <= metrics.width + 1)
+        assert.ok(metrics.height < (mobile ? 760 : 660), `七个阶段和当前任务无需展开十七张环节卡: ${JSON.stringify(metrics)}`)
+        await chain.locator('..').screenshot({ path: path.join(outputDir, `order-flow-compact-${mobile ? 'mobile' : 'desktop'}.png`), animations: 'disabled' })
         await page.getByRole('button', { name: '返回本任务', exact: true }).click()
         await focus.getByText(taskName, { exact: true }).waitFor()
         assert.equal(await page.getByLabel('订单任务链', { exact: true }).count(), 0)
@@ -271,6 +306,7 @@ function createFocusedExceptionScenarios({
               source_type: 'production_wip_batch',
               operation_code: 'HANDWORK',
               batch_no: 'RW-041-01',
+              source_no: 'RW-041-01',
             },
             {
               ...task,
@@ -329,11 +365,20 @@ function createFocusedExceptionScenarios({
         await focus.getByText('本次返工回货复检', { exact: true }).waitFor()
         assert.deepEqual(views, ['task'])
         assert.equal(await focus.locator('li').count(), 3)
+        const currentTask = focus.locator('li[aria-current="step"]')
+        assert.equal((await currentTask.innerText()).split('RW-FOCUS-041').length - 1, 1, '标题中已有的来源编号不重复展示')
+        await currentTask.getByText('待生产经理领取', { exact: true }).waitFor()
+        const relatedTasks = focus.getByLabel('关联待办', { exact: true })
+        assert.equal(await relatedTasks.locator('li').count(), 1)
+        await relatedTasks.getByText('品质 · 阻塞', { exact: true }).waitFor()
         const history = focus.locator('.workflow-business-chain__history')
         assert.equal(await history.getAttribute('open'), null)
         assert.equal(await focus.getByText('安排本次返工', { exact: true }).isVisible(), false)
         await history.locator('summary').click()
         await focus.getByText('安排本次返工', { exact: true }).waitFor()
+        const record = history.locator('li')
+        assert.equal((await record.innerText()).split('RW-041-01').length - 1, 1, '同一来源和批次编号只出现一次')
+        assert.doesNotMatch(await record.innerText(), /待领取/u, '已结束记录不显示领取提示')
         await history.locator('summary').click()
         assert.equal(await focus.getByText('安排本次返工', { exact: true }).isVisible(), false)
         assert.equal(
@@ -348,6 +393,15 @@ function createFocusedExceptionScenarios({
         }))
         assert.ok(metrics.scroll <= metrics.width + 1)
         assert.ok(metrics.height < 550, '本次异常进度无需翻阅整单业务环节')
+        const rows = await focus.locator('li:visible').evaluateAll((items) => items.map((item) => ({
+          width: item.clientWidth,
+          scroll: item.scrollWidth,
+          height: item.getBoundingClientRect().height,
+          background: getComputedStyle(item).backgroundColor,
+        })))
+        assert.ok(rows.every((row) => row.scroll <= row.width + 1), '长批次号与岗位文案不能横向溢出')
+        assert.equal(rows[1].background, 'rgba(0, 0, 0, 0)', '关联待办使用紧凑行，当前任务保留原卡片强调')
+        if (!mobile) assert.ok(rows[0].height < 65, '桌面当前任务去重后无需三行重复信息')
         const toggle = page.getByRole('button', {
           name: '查看订单全流程',
           exact: true,
@@ -372,10 +426,20 @@ function createFocusedExceptionScenarios({
           })
         await toggle.focus()
         await page.keyboard.press('Enter')
-        await page
-          .getByLabel('订单任务链', { exact: true })
-          .getByText('同订单其他单据任务 1', { exact: true })
-          .waitFor()
+        const orderChain = page.getByLabel('订单任务链', { exact: true })
+        await orderChain.getByText('本次返工回货复检', { exact: true }).waitFor()
+        const exceptionTop = await orderChain.getByLabel('异常分支', { exact: true }).boundingBox()
+        const mainTop = await orderChain.getByLabel('订单阶段', { exact: true }).boundingBox()
+        assert.ok(exceptionTop.y < mainTop.y, '本任务属于异常时先显示异常进度，不翻过全部阶段再找本任务')
+        await assertOrderDirection(assert, orderChain)
+        assert.equal(await orderChain.locator('.workflow-business-chain__stage-content > ul > li:visible').count(), 2, '大量异常只展开当前任务与优先受阻任务')
+        const otherTasks = orderChain.locator('.workflow-business-chain__related')
+        assert.match(await otherTasks.locator('summary').innerText(), /65 项受阻/u)
+        assert.equal(await orderChain.getByText('同订单其他单据任务 1', { exact: true }).isVisible(), false)
+        await orderChain.locator('..').screenshot({ path: path.join(outputDir, `order-exception-compact-${mobile ? (dark ? 'mobile-dark' : 'mobile') : 'desktop'}.png`), animations: 'disabled' })
+        await otherTasks.locator('summary').click()
+        await orderChain.getByText('同订单其他单据任务 1', { exact: true }).waitFor()
+        await otherTasks.locator('summary').click()
         assert.deepEqual(views, ['task', 'order'])
         const back = page.getByRole('button', {
           name: '返回本任务',

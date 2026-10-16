@@ -3,21 +3,33 @@ import test from 'node:test'
 import { normalizeTaskDiscoveryFilters, taskDiscoveryRequest, taskStagePath, workflowTaskDiscoveryCatalog } from './workflowTaskDiscovery.mjs'
 import { buildMobileRoleTaskQuery, mobileTaskQueryScope } from './mobileTaskQueries.mjs'
 import { buildWorkflowTaskBoardRequest, readWorkflowTaskBoardFiltersFromSearch, writeWorkflowTaskBoardFiltersToSearch } from './workflowTaskBoard.mjs'
-import { taskSavedViewsKey, normalizeTaskSavedViews } from './workflowTaskSavedViews.mjs'
 import { businessTaskSource, followupSource, operationalFactTaskContext } from './workflowFollowup.mjs'
 
-test('desktop, mobile, URL restore and saved views retain the same discovery scope', () => {
-  const filters = { moduleKey: 'quality', chainKey: 'fulfillment', stageKey: 'cutting_quality', assignee: '12' }
-  const desktop = buildWorkflowTaskBoardRequest(filters)
-  const mobile = buildMobileRoleTaskQuery({ roleKey: 'quality', viewKey: 'todo', ...filters })
-  for (const [key, value] of Object.entries(taskDiscoveryRequest(filters))) { assert.equal(desktop[key], value); assert.equal(mobile[key], value) }
-  const restored = normalizeTaskDiscoveryFilters(readWorkflowTaskBoardFiltersFromSearch(writeWorkflowTaskBoardFiltersToSearch('', filters)))
-  assert.deepEqual(restored, filters)
-  assert.notEqual(mobileTaskQueryScope('same-account', filters), mobileTaskQueryScope('same-account', { ...filters, stageKey: 'shell_quality' }))
+test('岗位筛选丢弃通用业务分类和旧环节，办理人保留', () => {
+  const old = { moduleKey: 'quality', chainKey: 'fulfillment', stageKey: 'cutting_quality', assignee: '12' }
+  assert.deepEqual(normalizeTaskDiscoveryFilters(old), { assignee: '12' })
+  const mobile = buildMobileRoleTaskQuery({ roleKey: 'quality', viewKey: 'todo', ...old })
+  for (const key of ['module_key', 'chain_key', 'stage_key']) assert.equal(mobile[key], undefined)
+  assert.equal(mobile.assignee, '12')
+  assert.equal(mobileTaskQueryScope('scope', old), mobileTaskQueryScope('scope', { assignee: '12' }))
+  assert.deepEqual(taskDiscoveryRequest(old), { assignee: '12' })
+})
+
+test('桌面明确环节来源保留并可清除，撤下的分类不进入请求或链接', () => {
+  const filters = readWorkflowTaskBoardFiltersFromSearch('?stage_key=cutting_quality&module_key=quality&chain_key=fulfillment&assignee=12&q=订单甲')
+  const request = buildWorkflowTaskBoardRequest(filters)
+  assert.equal(request.stage_key, 'cutting_quality')
+  assert.equal(request.module_key, undefined)
+  assert.equal(request.chain_key, undefined)
+  assert.equal(request.assignee, '12')
+  const restored = writeWorkflowTaskBoardFiltersToSearch('?module_key=quality&chain_key=fulfillment', filters)
+  assert.equal(restored.get('stage_key'), 'cutting_quality')
+  assert.equal(restored.has('module_key'), false)
+  assert.equal(restored.has('chain_key'), false)
+  const cleared = writeWorkflowTaskBoardFiltersToSearch(restored, { ...filters, stageKey: '' })
+  assert.equal(cleared.has('stage_key'), false)
+  assert.equal(cleared.get('assignee'), '12')
   assert.match(taskStagePath(filters.stageKey), /订单履约.*裁片.*检验/u)
-  assert.notEqual(taskSavedViewsKey(1), taskSavedViewsKey(2))
-  assert.equal(taskSavedViewsKey(null), '')
-  assert.deepEqual(normalizeTaskSavedViews([{ name: '裁片质检', filters: { ...filters, payload: 'must-not-store', stageKey: 'removed' } }])[0].filters, { moduleKey: 'quality', chainKey: 'fulfillment', assignee: '12' })
 })
 
 test('related-task readers do not expand followup creation and chain labels have no duplicated identities', () => {

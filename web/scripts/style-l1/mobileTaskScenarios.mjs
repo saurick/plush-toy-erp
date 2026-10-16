@@ -2576,12 +2576,12 @@ export function createMobileTaskScenarios({
         await action.getByRole('radio', { name: '解除阻塞', exact: true }).check()
         const reason = action.getByRole('textbox', { name: /阻塞解除说明/ })
         await reason.fill('排期已核对，继续由老板岗位确认订单。')
-        await action.getByRole('button', { name: '返回任务', exact: true }).click()
+        await action.getByRole('button', { name: '返回任务详情', exact: true }).click()
         await page.getByRole('button', { name: '处理任务', exact: true }).click()
         assert.equal(
           await reason.inputValue(),
           '排期已核对，继续由老板岗位确认订单。',
-          '底部返回任务后再次进入，应保留解除阻塞说明'
+          '返回任务详情后再次进入，应保留解除阻塞说明'
         )
         const actionViewport = page.viewportSize()
         await page.setViewportSize({ width: 393, height: 500 })

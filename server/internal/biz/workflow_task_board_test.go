@@ -115,3 +115,33 @@ func TestWorkflowUsecase_GetTaskBoardNormalizesReadContract(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkflowTaskBoardHistoryDateParity(t *testing.T) {
+	now := time.Date(2026, 10, 16, 16, 0, 0, 0, time.UTC)
+	for _, period := range []string{"today", "7d", "30d", "custom"} {
+		query := WorkflowTaskBoardQuery{LaneKey: "finished", Period: period, SnapshotAt: now}
+		if period == "custom" {
+			query.DateFrom, query.DateTo = "2026-10-16", "2026-10-18"
+		}
+		normalized, err := normalizeWorkflowTaskBoardQuery(query)
+		if err != nil {
+			t.Fatal(err)
+		}
+		from, before, err := WorkflowRoleTaskHistoryDateBounds(period, query.DateFrom, query.DateTo, now)
+		if err != nil || !normalized.CompletedFrom.Equal(*from) || !normalized.CompletedBefore.Equal(*before) {
+			t.Fatalf("date contract drift: %+v %v", normalized, err)
+		}
+	}
+	for _, query := range []WorkflowTaskBoardQuery{
+		{LaneKey: "finished", Period: "custom", DateFrom: "2026-10-16"},
+		{LaneKey: "finished", Period: "custom", DateFrom: "2026-10-18", DateTo: "2026-10-16"},
+		{LaneKey: "finished", Period: "custom", DateFrom: "2026-02-30", DateTo: "2026-03-01"},
+		{LaneKey: "finished", Period: "today", DateFrom: "2026-10-16"},
+		{LaneKey: "actionable", Period: "today"},
+		{LaneKey: "finished", Period: "today", TodoOnly: true},
+	} {
+		if _, err := normalizeWorkflowTaskBoardQuery(query); !errors.Is(err, ErrBadParam) {
+			t.Fatalf("invalid date filter accepted: %+v %v", query, err)
+		}
+	}
+}

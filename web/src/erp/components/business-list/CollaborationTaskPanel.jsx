@@ -591,7 +591,7 @@ export function CollaborationTaskPanel({
           {expanded ? (
             <div className="erp-business-collaboration-task-panel__panel">
               <SlidingTabList
-                className="erp-business-collaboration-task-panel__tabs"
+                className="erp-business-collaboration-task-panel__tabs erp-navigation-tabs"
                 role="tablist"
                 aria-label="当前记录任务分类"
               >
