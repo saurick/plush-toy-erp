@@ -198,12 +198,10 @@ const mobileAccounts = [
   ['demo_engineering', 'engineering'],
 ]
 
-const hiddenCustomerMenuLabels = (
-  [
-    ...(yoyoosunMenuConfig.desktopMenu?.hiddenItemKeys || []),
-    ...routeOnlyCustomerMenuKeys,
-  ]
-)
+const hiddenCustomerMenuLabels = [
+  ...(yoyoosunMenuConfig.desktopMenu?.hiddenItemKeys || []),
+  ...routeOnlyCustomerMenuKeys,
+]
   .map((key) => menuLabelByKey.get(key))
   .filter(Boolean)
 const hiddenCustomerMenuLabelSet = new Set(hiddenCustomerMenuLabels)
@@ -214,14 +212,12 @@ const visibleCustomerMenuLabelSet = new Set(
     .map((key) => menuLabelByKey.get(key))
     .filter(Boolean)
 )
-const formalCustomerPageKeys = uniqueStrings(
-  [
-    ...(yoyoosunMenuConfig.desktopMenu?.sections || []).flatMap(
-      (section) => section.items || []
-    ),
-    ...routeOnlyCustomerMenuKeys,
-  ]
-).filter((key) => !hiddenCustomerPageKeys.has(key))
+const formalCustomerPageKeys = uniqueStrings([
+  ...(yoyoosunMenuConfig.desktopMenu?.sections || []).flatMap(
+    (section) => section.items || []
+  ),
+  ...routeOnlyCustomerMenuKeys,
+]).filter((key) => !hiddenCustomerPageKeys.has(key))
 
 function pageRouteTarget(pageKey) {
   const definition = pageDefinitionByKey.get(pageKey)
@@ -234,7 +230,8 @@ function pageRouteTarget(pageKey) {
     sidebarVisible: !routeOnlyCustomerMenuKeys.has(pageKey),
     sidebarLabel:
       getBusinessModuleGroup(definition.path)?.label ||
-      menuLabelByPath.get(definition.sidebarParentPath) || definition.label,
+      menuLabelByPath.get(definition.sidebarParentPath) ||
+      definition.label,
   }
 }
 
@@ -561,8 +558,7 @@ function buildEffectiveSessionDiagnosticPlan() {
 
 function buildYoyoosunEntryAuditPlan() {
   return {
-    command:
-      'pnpm --dir web --silent audit:yoyoosun-entry -- --json',
+    command: 'pnpm --dir web --silent audit:yoyoosun-entry -- --json',
     scope: 'local-frontend-entry-preflight',
     requiredForExternalBaseURL: true,
     defaultPorts: [...defaultYoyoosunEntryAuditPorts],
@@ -767,6 +763,7 @@ async function buildTrialYoyoosunEntryAudit(runtime = {}) {
     {
       customer: 'yoyoosun',
       ports: auditedPorts,
+      baseURL: externalBaseURL,
       backendHealthURL,
     },
     runtime
@@ -775,9 +772,9 @@ async function buildTrialYoyoosunEntryAudit(runtime = {}) {
   const externalPortReport = externalPort
     ? report.ports.find((item) => item.port === externalPort) || null
     : null
-  const auditedYoyoosunURLs = report.summary.yoyoosunPorts.map(
-    (port) => `http://localhost:${port}/erp`
-  )
+  const auditedYoyoosunURLs = report.ports
+    .filter((item) => report.summary.yoyoosunPorts.includes(item.port))
+    .map((item) => item.url)
 
   return {
     scope: 'trial-demo-account-yoyoosun-entry-preflight',
@@ -800,7 +797,7 @@ async function buildTrialYoyoosunEntryAudit(runtime = {}) {
       !externalBaseURL ||
       Boolean(
         externalPortReport?.customerConfig?.matchedCustomer &&
-          externalPortReport?.customerAsset?.matchedCustomerAsset
+        externalPortReport?.customerAsset?.matchedCustomerAsset
       ),
     externalPortStatus: externalPortReport
       ? {
@@ -1347,12 +1344,13 @@ async function newPage(browser, viewport) {
     trialCustomerConfigScriptPath,
     'utf8'
   )
-  await context.route('**/customer-config.js', (route) =>
-    route.fulfill({
-      contentType: 'application/javascript; charset=utf-8',
-      body: trialCustomerConfigScript,
-    })
-  )
+  if (!externalBaseURL)
+    { await context.route('**/customer-config.js', (route) =>
+      route.fulfill({
+        contentType: 'application/javascript; charset=utf-8',
+        body: trialCustomerConfigScript,
+      })
+    ) }
   const page = await context.newPage()
   const runtimeErrors = []
   const legalNoticeState = {
@@ -1362,7 +1360,9 @@ async function newPage(browser, viewport) {
   }
   const requestTracker = createPageRequestTracker()
   page.on('request', (request) => requestTracker.record(request))
-  page.on('requestfinished', (request) => requestTracker.recordFinished(request))
+  page.on('requestfinished', (request) =>
+    requestTracker.recordFinished(request)
+  )
   page.on('console', (message) => {
     if (message.type() === 'error') {
       runtimeErrors.push(`console error: ${message.text()}`)
@@ -1418,12 +1418,15 @@ async function verifyDesktopAccount(browser, account) {
       state: 'visible',
       timeout: 15_000,
     })
-    await page.getByRole('button', { name: /^账号菜单：/u }).filter({
-      hasText: account.username,
-    }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
+    await page
+      .getByRole('button', { name: /^账号菜单：/u })
+      .filter({
+        hasText: account.username,
+      })
+      .waitFor({
+        state: 'visible',
+        timeout: 15_000,
+      })
     const legalNotice = await handleLegalNoticeGate(page, {
       username: account.username,
       legalNoticeState,
@@ -1437,9 +1440,12 @@ async function verifyDesktopAccount(browser, account) {
     ]).sort((left, right) => left.localeCompare(right, 'zh-CN'))
     await verifyRoleGuidedMenuStructure(page, account.username)
     const catalog = await openModuleCatalog(page)
-    const actualVisibleMenus = (await catalog
-      .locator('.erp-module-catalog__entry')
-      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label')))
+    const actualVisibleMenus = (
+      await catalog
+        .locator('.erp-module-catalog__entry')
+        .evaluateAll((nodes) =>
+          nodes.map((node) => node.getAttribute('aria-label'))
+        )
     ).sort((left, right) => left.localeCompare(right, 'zh-CN'))
     assert.deepEqual(
       actualVisibleMenus,
@@ -1457,14 +1463,26 @@ async function verifyDesktopAccount(browser, account) {
     }
     await page.keyboard.press('Escape')
     await catalog.waitFor({ state: 'hidden' })
-    const expectedSidebarLabels = uniqueStrings(expectedVisibleLeafMenus.map((label) => {
-      const definition = [...pageDefinitionByKey.values()].find((entry) => entry.label === label)
-      return getBusinessModuleGroup(definition?.path)?.label || label
-    })).sort((left, right) => left.localeCompare(right, 'zh-CN'))
-    const actualSidebarLabels = (await page.locator('.erp-admin-menu .ant-menu-item')
-      .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label')))
+    const expectedSidebarLabels = uniqueStrings(
+      expectedVisibleLeafMenus.map((label) => {
+        const definition = [...pageDefinitionByKey.values()].find(
+          (entry) => entry.label === label
+        )
+        return getBusinessModuleGroup(definition?.path)?.label || label
+      })
     ).sort((left, right) => left.localeCompare(right, 'zh-CN'))
-    assert.deepEqual(actualSidebarLabels, expectedSidebarLabels, `${account.username} 侧栏业务分组必须与已授权入口一致`)
+    const actualSidebarLabels = (
+      await page
+        .locator('.erp-admin-menu .ant-menu-item')
+        .evaluateAll((nodes) =>
+          nodes.map((node) => node.getAttribute('aria-label'))
+        )
+    ).sort((left, right) => left.localeCompare(right, 'zh-CN'))
+    assert.deepEqual(
+      actualSidebarLabels,
+      expectedSidebarLabels,
+      `${account.username} 侧栏业务分组必须与已授权入口一致`
+    )
     const routeAccess = roleRouteAccessByUsername.get(account.username)
     let pagePerformance = []
     if (routeAccess) {
@@ -1477,7 +1495,8 @@ async function verifyDesktopAccount(browser, account) {
     }
     const diagnostic = await verifyEffectiveSessionDiagnostic(page, {
       username: account.username,
-      expectedMenuCount: routeAccess?.allowedPages.length || expectedVisibleMenus.length,
+      expectedMenuCount:
+        routeAccess?.allowedPages.length || expectedVisibleMenus.length,
       assertExactCounts: account.username !== 'demo_admin',
     })
     await page.screenshot({
@@ -1498,14 +1517,23 @@ async function openModuleCatalog(page) {
   await page.getByRole('button', { name: '全部模块', exact: true }).click()
   const catalog = page.getByRole('dialog', { name: '全部模块', exact: true })
   await catalog.waitFor({ state: 'visible' })
-  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '搜索功能或分组')
+  await page.waitForFunction(
+    () =>
+      document.activeElement?.getAttribute('aria-label') === '搜索功能或分组'
+  )
   return catalog
 }
 
 async function findVisibleMenuItem(page, label) {
-  const sidebarItem = page.locator('.erp-admin-menu').getByRole('menuitem', { name: label, exact: true })
+  const sidebarItem = page
+    .locator('.erp-admin-menu')
+    .getByRole('menuitem', { name: label, exact: true })
   if (await sidebarItem.count()) {
-    assert.equal(await sidebarItem.count(), 1, `侧栏必须且只能有一个“${label}”入口`)
+    assert.equal(
+      await sidebarItem.count(),
+      1,
+      `侧栏必须且只能有一个“${label}”入口`
+    )
     return sidebarItem
   }
   const catalog = await openModuleCatalog(page)
@@ -1595,17 +1623,21 @@ async function verifyAllowedRolePages(page, routeAccess, requestTracker) {
     await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 })
     // A SPA URL can change while the previous page is still visible and its
     // network-idle lifecycle is satisfied. Require the destination to commit.
-    const pageTitle = target.key === 'production-exceptions'
-      ? '生产记录' : target.title
+    const pageTitle =
+      target.key === 'production-exceptions' ? '生产记录' : target.title
     const main = page.getByRole('main')
-    await main.getByRole('heading', { name: pageTitle, exact: true })
-      .or(main.getByRole('region', { name: pageTitle, exact: true })).first()
+    await main
+      .getByRole('heading', { name: pageTitle, exact: true })
+      .or(main.getByRole('region', { name: pageTitle, exact: true }))
+      .first()
       .waitFor({ state: 'visible', timeout: 15_000 })
     if (target.key === 'production-progress') {
       // Records and exceptions keep the same workspace header mounted.
-      await main.getByPlaceholder(BUSINESS_SEARCH_SCOPES.production_fact.placeholder, {
-        exact: true,
-      }).waitFor({ state: 'visible', timeout: 15_000 })
+      await main
+        .getByPlaceholder(BUSINESS_SEARCH_SCOPES.production_fact.placeholder, {
+          exact: true,
+        })
+        .waitFor({ state: 'visible', timeout: 15_000 })
     }
     await page.waitForLoadState('networkidle', { timeout: 15_000 })
     await page
@@ -1621,11 +1653,11 @@ async function verifyAllowedRolePages(page, routeAccess, requestTracker) {
       target.sidebarLabel,
       { timeout: 15_000 }
     )
-    const selectedLabels = (
-      await page
-        .locator('.erp-admin-menu .ant-menu-item-selected')
-        .evaluateAll((nodes) => nodes.map((node) => node.getAttribute('aria-label')))
-    )
+    const selectedLabels = await page
+      .locator('.erp-admin-menu .ant-menu-item-selected')
+      .evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute('aria-label'))
+      )
     assert(
       selectedLabels.includes(target.sidebarLabel),
       `${routeAccess.username} 打开 ${target.label} 后侧栏未保持 ${target.sidebarLabel} 选中`
@@ -1817,14 +1849,17 @@ async function verifyMobileAccount(browser, { username, roleKey }) {
       state: 'visible',
       timeout: 15_000,
     })
-    const taskTab = page.getByTestId('mobile-role-bottom-nav')
+    const taskTab = page
+      .getByTestId('mobile-role-bottom-nav')
       .getByRole('tab', { name: '任务管理', exact: true })
     await taskTab.click()
     assert.equal(await taskTab.getAttribute('aria-selected'), 'true')
-    await page.getByRole('radiogroup', { name: '任务状态', exact: true }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
+    await page
+      .getByRole('radiogroup', { name: '任务状态', exact: true })
+      .waitFor({
+        state: 'visible',
+        timeout: 15_000,
+      })
     const legalNotice = await handleLegalNoticeGate(page, {
       username,
       legalNoticeState,
@@ -2084,9 +2119,15 @@ async function assertNotVisibleInMenu(page, label, username) {
     .locator('.erp-admin-menu')
     .getByRole('menuitem', { name: label, exact: true })
     .count()
-  const catalogCount = await page.getByRole('dialog', { name: '全部模块', exact: true })
-    .getByRole('button', { name: label, exact: true }).count()
-  assert.equal(sidebarCount + catalogCount, 0, `${username} 不应看到菜单: ${label}`)
+  const catalogCount = await page
+    .getByRole('dialog', { name: '全部模块', exact: true })
+    .getByRole('button', { name: label, exact: true })
+    .count()
+  assert.equal(
+    sidebarCount + catalogCount,
+    0,
+    `${username} 不应看到菜单: ${label}`
+  )
 }
 
 function assertNoRuntimeErrors(runtimeErrors, scope) {
