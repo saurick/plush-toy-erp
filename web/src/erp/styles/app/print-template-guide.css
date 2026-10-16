@@ -22,7 +22,7 @@
 .erp-template-center__nav-title {
   margin: 0 0 12px;
   color: var(--erp-text, #24352d);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   font-weight: 600;
 }
 
@@ -65,7 +65,7 @@
 .erp-template-center__note {
   margin: 24px 0 0;
   color: var(--erp-text-muted, #62736a);
-  font-size: 13px;
+  font-size: var(--erp-font-small);
   line-height: 1.7;
 }
 
@@ -130,7 +130,7 @@
   border-radius: 50%;
   background: var(--erp-primary);
   color: var(--erp-on-accent);
-  font-size: 14px;
+  font-size: var(--erp-font-body);
   font-weight: 600;
   line-height: 1;
 }
@@ -144,7 +144,7 @@
 .erp-template-guide__figure figcaption {
   margin: 12px 36px 0 0;
   color: var(--erp-text-muted, #62736a);
-  font-size: 12px;
+  font-size: var(--erp-font-caption);
   text-align: center;
 }
 
@@ -166,7 +166,7 @@
 .erp-template-guide__parts h4 {
   margin: 0 0 6px;
   color: var(--erp-text, #24352d);
-  font-size: 15px;
+  font-size: var(--erp-font-emphasis);
   font-weight: 600;
   line-height: 26px;
 }
