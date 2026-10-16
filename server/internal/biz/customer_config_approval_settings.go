@@ -400,6 +400,7 @@ func (uc *CustomerConfigUsecase) matchAppliedApprovalSettingsRevision(
 		existingItems = append(existingItems, ApprovalSettingItemInput{
 			ApprovalKey: item.ApprovalKey,
 			Enabled:     item.Enabled,
+			Condition:   item.Condition,
 			Members:     members,
 		})
 	}
