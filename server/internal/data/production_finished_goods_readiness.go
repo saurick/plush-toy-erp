@@ -108,9 +108,61 @@ func (r finishedGoodsReadiness) blocked() decimal.Decimal {
 // Readiness is a projection of posted receipts and actual packing results.
 // Completing a workflow task never adds stock or releases goods for shipment.
 func productionFinishedGoodsReadiness(ctx context.Context, client *ent.Client, key biz.InventoryBalanceKey) (finishedGoodsReadiness, error) {
+	result := finishedGoodsReadiness{}
 	if key.SubjectType != biz.InventorySubjectProduct {
-		return finishedGoodsReadiness{}, nil
+		return result, nil
 	}
-	values, err := productionFinishedGoodsReadinessForKeys(ctx, client, []biz.InventoryBalanceKey{key})
-	return values[inventoryProductGrain(key)], err
+	query := client.ProductionFact.Query().Where(productionfact.FactType(biz.ProductionFactFinishedGoodsReceipt), productionfact.Status(biz.OperationalFactStatusPosted), productionfact.SubjectID(key.SubjectID), productionfact.WarehouseID(key.WarehouseID), productionfact.UnitID(key.UnitID), productionfact.ProductionWipBatchIDNotNil())
+	if key.LotID == nil {
+		query.Where(productionfact.LotIDIsNil())
+	} else {
+		query.Where(productionfact.LotID(*key.LotID))
+	}
+	if key.ProductSkuID == nil {
+		query.Where(productionfact.ProductSkuIDIsNil())
+	} else {
+		query.Where(productionfact.ProductSkuID(*key.ProductSkuID))
+	}
+	receipts, err := query.All(ctx)
+	if err != nil {
+		return result, err
+	}
+	for _, receipt := range receipts {
+		batch, err := client.ProductionWIPBatch.Get(ctx, *receipt.ProductionWipBatchID)
+		if err != nil {
+			return result, err
+		}
+		operation, err := client.ProductionOrderOperation.Get(ctx, batch.ProductionOrderOperationID)
+		if err != nil {
+			return result, err
+		}
+		// Posted records of completed packaging are historical inventory evidence.
+		// New receipts can only originate from completed handwork.
+		if operation.OperationCode == biz.ProductionWIPOperationPackaging && batch.Status == biz.ProductionWIPStatusAccepted {
+			continue
+		}
+		packaging, err := productionReceiptPackagingBatches(ctx, client, receipt.ID)
+		if err != nil {
+			return result, err
+		}
+		reworkQuantity, err := productionReceiptReworkedQuantity(ctx, client, receipt.ID)
+		if err != nil {
+			return result, err
+		}
+		packedQuantity := decimal.Zero
+		for _, batch := range packaging {
+			if batch.Status == biz.ProductionWIPStatusAccepted {
+				packedQuantity = packedQuantity.Add(batch.Quantity)
+			}
+		}
+		remaining := decimal.Max(decimal.Zero, receipt.Quantity.Sub(reworkQuantity))
+		if batch.Status != biz.ProductionWIPStatusAccepted {
+			result.PendingInspection = result.PendingInspection.Add(remaining)
+			continue
+		}
+		// Warehouse rework takes unpacked stock first. Active packing allocations
+		// are protected by the rework posting transaction.
+		result.PendingPackaging = result.PendingPackaging.Add(decimal.Max(decimal.Zero, remaining.Sub(packedQuantity)))
+	}
+	return result, nil
 }

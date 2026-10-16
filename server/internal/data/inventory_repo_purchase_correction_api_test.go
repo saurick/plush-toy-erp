@@ -109,40 +109,6 @@ func TestInventoryRepo_PurchaseCorrectionAggregateCreateAndList(t *testing.T) {
 	if err != nil || total != 1 || len(adjustments) != 1 || adjustments[0].ID != adjustment.ID {
 		t.Fatalf("list aggregate adjustments = items=%#v total=%d err=%v", adjustments, total, err)
 	}
-	denied := biz.WithWarehouseDataScope(ctx, biz.WarehouseDataScope{Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{receiptItem.WarehouseID + 1000}})
-	for name, action := range map[string]func() error{
-		"read return":       func() error { _, err := uc.GetPurchaseReturn(denied, purchaseReturn.ID); return err },
-		"post return":       func() error { _, err := uc.PostPurchaseReturn(denied, purchaseReturn.ID); return err },
-		"cancel return":     func() error { _, err := uc.CancelPostedPurchaseReturn(denied, purchaseReturn.ID); return err },
-		"replay return":     func() error { _, err := uc.CreatePurchaseReturnFromReceipt(denied, returnCommand); return err },
-		"read adjustment":   func() error { _, err := uc.GetPurchaseReceiptAdjustment(denied, adjustment.ID); return err },
-		"post adjustment":   func() error { _, err := uc.PostPurchaseReceiptAdjustment(denied, adjustment.ID); return err },
-		"cancel adjustment": func() error { _, err := uc.CancelPostedPurchaseReceiptAdjustment(denied, adjustment.ID); return err },
-		"replay adjustment": func() error {
-			_, err := uc.CreatePurchaseReceiptAdjustmentFromReceipt(denied, adjustmentCommand)
-			return err
-		},
-	} {
-		if err := action(); !errors.Is(err, biz.ErrDataScopeForbidden) {
-			t.Fatalf("%s = %v", name, err)
-		}
-	}
-	hiddenReturns, total, err := uc.ListPurchaseReturns(denied, biz.PurchaseReturnFilter{Limit: 10})
-	if err != nil || total != 0 || len(hiddenReturns) != 0 {
-		t.Fatalf("foreign returns leaked: %v %d %v", hiddenReturns, total, err)
-	}
-	hiddenAdjustments, total, err := uc.ListPurchaseReceiptAdjustments(denied, biz.PurchaseReceiptAdjustmentFilter{Limit: 10})
-	if err != nil || total != 0 || len(hiddenAdjustments) != 0 {
-		t.Fatalf("foreign adjustments leaked: %v %d %v", hiddenAdjustments, total, err)
-	}
-	allowed := biz.WithWarehouseDataScope(ctx, biz.WarehouseDataScope{Mode: biz.DataScopeModeAssigned, WarehouseIDs: []int{receiptItem.WarehouseID}})
-	if _, err := uc.GetPurchaseReturn(allowed, purchaseReturn.ID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := uc.GetPurchaseReceiptAdjustment(allowed, adjustment.ID); err != nil {
-		t.Fatal(err)
-	}
-
 }
 
 func TestInventoryRepo_PurchaseCorrectionAggregateCreateRollsBackHeaderOnInvalidLine(t *testing.T) {

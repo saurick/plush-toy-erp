@@ -108,14 +108,7 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 		if createdBy != nil {
 			creatorID = *createdBy
 		}
-		limit, offset := getInt(pm, "limit", 50), getInt(pm, "offset", 0)
-		if limit <= 0 || limit > 200 {
-			limit = 50
-		}
-		if offset < 0 {
-			offset = 0
-		}
-		items, total, err := d.inventoryUC.ListInventoryOperationsForAccess(ctx, biz.InventoryOperationFilter{OperationType: getString(pm, "operation_type"), Status: getString(pm, "status"), CreatedBy: creatorID, Limit: limit, Offset: offset}, scope)
+		items, total, err := d.inventoryUC.ListInventoryOperationsForAccess(ctx, biz.InventoryOperationFilter{OperationType: getString(pm, "operation_type"), Status: getString(pm, "status"), CreatedBy: creatorID, Limit: getInt(pm, "limit", 50), Offset: getInt(pm, "offset", 0)}, scope)
 		if err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
 		}
@@ -123,7 +116,7 @@ func (d *jsonrpcDispatcher) handleInventoryOperation(ctx context.Context, method
 		for _, item := range items {
 			out = append(out, inventoryOperationToAny(item))
 		}
-		return id, okData(map[string]any{"inventory_operations": out, "total": total, "limit": limit, "offset": offset}), nil
+		return id, okData(map[string]any{"inventory_operations": out, "total": total, "limit": getInt(pm, "limit", 50), "offset": getInt(pm, "offset", 0)}), nil
 	default:
 		return id, unknownPurchaseResult(method), nil
 	}
