@@ -1562,13 +1562,13 @@ export function createMobileProgressScenarios({
           await verifyMobileNavigationMotion(
             page,
             assert,
-            '.mobile-workspace-task-views',
+            '.mobile-workspace-task-views .mobile-workspace-primary-tabs',
             1
           )
           await verifyMobileNavigationMotion(
             page,
             assert,
-            '.mobile-workspace-task-views',
+            '.mobile-workspace-task-views .mobile-workspace-primary-tabs',
             0,
             true
           )

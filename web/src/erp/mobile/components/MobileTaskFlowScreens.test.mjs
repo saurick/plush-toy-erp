@@ -82,6 +82,9 @@ const roleTaskPageSource = readFileSync(
   new URL('../pages/MobileRoleTasksPage.jsx', import.meta.url),
   'utf8'
 )
+const draftHistorySource = readFileSync(new URL('../hooks/useMobileTaskDraftHistory.js', import.meta.url), 'utf8')
+const taskHistorySource = readFileSync(new URL('../utils/mobileTaskHistory.mjs', import.meta.url), 'utf8')
+const taskListViewSource = readFileSync(new URL('../utils/mobileRoleTaskListView.mjs', import.meta.url), 'utf8')
 
 test('mobile task flow keeps document workspaces outside its detail, action and receipt entries', () => {
   const routerSource = readFileSync(new URL('../../router.jsx', import.meta.url), 'utf8')
@@ -171,12 +174,13 @@ test('mobile task action screen loads authoritative approval form and fails clos
   assert.match(actionScreenSource, /重新读取流程表单/u)
   assert.match(actionScreenSource, /未确认前不能提交/u)
   assert.match(actionScreenSource, /processDecisionRequired \? 255 : 500/u)
-  assert.match(roleTaskPageSource, /mobileRoleTasksApprovedQuantity/u)
+  assert.match(taskHistorySource, /mobileRoleTasksApprovedQuantity/u)
   assert.match(
     roleTaskPageSource,
     /approvedQuantity:\s*detailApprovedQuantityValue/u
   )
-  assert.match(roleTaskPageSource, /persistMobileTaskDraftBackup/u)
+  assert.match(roleTaskPageSource, /useMobileTaskDraftHistory/u)
+  assert.match(draftHistorySource, /persistMobileTaskDraftBackup/u)
   assert.match(actionScreenSource, /showDisabledSubmit/u)
 })
 
@@ -270,15 +274,16 @@ test('mobile task list keeps approval in the primary filter row and gates it by 
   assert.match(roleTaskPageSource, /canViewWorkflowApprovalInbox/u)
   assert.match(roleTaskPageSource, /MOBILE_ROLE_TASK_VIEW_KEYS\.APPROVAL/u)
   assert.match(roleTaskPageSource, /isWorkflowApprovalTask/u)
-  assert.match(roleTaskPageSource, /activeTaskSlot\.count_summary/u)
+  assert.match(roleTaskPageSource, /countSummary: activeTaskSlot\.count_summary/u)
   assert.doesNotMatch(
-    roleTaskPageSource,
+    taskListViewSource,
     /count:\s*(?:activeTasks|approvalTasks|riskTasks|overdueTasks)\.length/u
   )
   assert.match(
-    roleTaskPageSource,
-    /canViewApprovalInbox[\s\S]*MOBILE_TASK_FILTER_KEYS\.APPROVAL[\s\S]*label: '审批'[\s\S]*ariaLabel: adminProfile\?\.is_super_admin === true \? '待审批' : '待我审批'/u
+    taskListViewSource,
+    /canViewApprovalInbox[\s\S]*MOBILE_TASK_FILTER_KEYS\.APPROVAL[\s\S]*label: '审批'[\s\S]*ariaLabel: isAdminReview \? '待审批' : '待我审批'/u
   )
+  assert.match(roleTaskPageSource, /isAdminReview: adminProfile\?\.is_super_admin === true/u)
   assert.match(
     listScreenSource,
     /data-testid=\{`mobile-role-filter-\$\{item\.key\}`\}/u

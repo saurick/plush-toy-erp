@@ -3334,6 +3334,7 @@ export function createMobileTaskScenarios({
               id: 'mobile-task-browser-back-create',
               method: 'create_task',
               params: {
+                idempotency_key: 'style-l1-mobile-browser-back-create',
                 task_code: 'STYLE-L1-MOBILE-BROWSER-BACK',
                 task_group: 'sales-orders',
                 task_name: name,

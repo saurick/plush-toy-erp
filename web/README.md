@@ -175,6 +175,8 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 前端负责展示与交互，领域事实、状态、权限和幂等由后端决定。详细读取与写后恢复合同见 [页面规则](../docs/engineering/前端实现与交互约定.md#前端实现与读取边界) 和 [API 合同](../server/docs/api.md)。
 
+手机任务页保留权限、页面导航与办理结果编排；[列表投影](src/erp/mobile/utils/mobileRoleTaskListView.mjs) 负责已读取任务的排序、筛选和服务端汇总展示，[关联任务读取](src/erp/mobile/hooks/useMobileLinkedTask.js) 负责范围隔离与过期请求取消。[历史状态](src/erp/mobile/utils/mobileTaskHistory.mjs) 集中维护浏览器快照字段和草稿备份，[草稿保存](src/erp/mobile/hooks/useMobileTaskDraftHistory.js) 合并连续编辑与相同内容的写入，只更新当前任务及访问范围的历史记录。列表投影与当前选择分别缓存，切换任务不重建整份任务展示数据。
+
 ## 在线帮助与参考手册
 
 章节和图解提供全员纠错，普通读者仅查看自己的记录和回复。`useHelpContent` 读取同一份章节目录与已发布企业补充，`HelpContributionPanel` 按三册分别控制编辑 / 发布，支持草稿、预览、修改记录对照和恢复为新草稿；接口见 `helpContentApi.mjs`。补充继承章节阅读范围，不能覆盖正式正文。在线阅读、搜索、HTML / Markdown 下载只合并已发布补充；读取失败阻断下载并提供重试，切换账号清空旧范围，修改冲突保留输入。正文与纠错不存入浏览器持久存储；企业数据随数据库备份恢复，仓库产品手册导出不带部署中的补充。

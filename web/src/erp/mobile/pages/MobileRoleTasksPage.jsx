@@ -10,7 +10,7 @@ import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
 import { normalizeTaskListFilters } from '../../utils/workflowTaskListFilters.mjs'
 import WorkflowTaskLinkDrawer from '../../components/workflow/WorkflowTaskLinkDrawer.jsx'
 import { normalizeTaskDiscoveryFilters } from '../../utils/workflowTaskDiscovery.mjs'
-import { readWorkflowTaskReturn, consumeWorkflowTaskReturn } from '../../utils/workflowTaskNavigation.mjs'
+import { readWorkflowTaskReturn } from '../../utils/workflowTaskNavigation.mjs'
 import { readMobileTrackingSource } from '../utils/mobileWorkflowTracking.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import { message } from '@/common/utils/antdApp'
@@ -18,10 +18,8 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import useRuntimeBuildIdentity from '@/common/runtime/useRuntimeBuildIdentity'
 import { useERPWorkspace } from '../../context/ERPWorkspaceProvider'
 import {
-  getWorkflowTask,
   listWorkflowRoleTasks,
 } from '../../api/workflowApi.mjs'
-import { buildMobileTaskListForRole } from '../../utils/mobileTaskView.mjs'
 import {
   MOBILE_ROLE_TASK_PAGE_LIMIT,
   MOBILE_ROLE_TASK_VIEW_KEYS,
@@ -38,7 +36,6 @@ import {
   resolveMobileRoleTaskReceiptDetailTask,
   resolveMobileRoleTaskRestoreLimit,
   resolveMobileRoleTaskViewKey,
-  resolveMobileRoleTaskViewState,
   settleMobileRoleTaskRequest,
 } from '../../utils/mobileTaskQueries.mjs'
 import { canMountCustomerRuntime } from '../../utils/adminProfileSync.mjs'
@@ -53,7 +50,6 @@ import {
 } from '../../utils/engineeringMaterialTask.mjs'
 import MobileTaskActionScreen from '../components/MobileTaskActionScreen.jsx'
 import { mobileProgressAccess } from '../utils/mobileProgress.mjs'
-import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
 import MobileTaskListScreen from '../components/MobileTaskListScreen.jsx'
 import useWorkflowTaskCalendarView from '../../hooks/useWorkflowTaskCalendarView.js'
 import MobileTaskReceiptScreen from '../components/MobileTaskReceiptScreen.jsx'
@@ -71,183 +67,47 @@ import {
   TERMINAL_TASK_STATUS_KEYS,
   getMobileRoleLabel,
   getTaskSeverityView,
-  isTaskAlerted,
-  isTaskBlockedProgress,
-  isTaskDueSoon,
-  isTaskHighPriority,
-  isTaskOverdue,
-  isTaskReadyProgress,
   isTaskRisk,
 } from '../utils/mobileRoleTaskModel.mjs'
 
-const MOBILE_TASK_HISTORY_SCREEN_KEY = 'mobileRoleTasksScreen'
-const MOBILE_TASK_HISTORY_DEPTH_KEY = 'mobileRoleTasksDepth'
-const MOBILE_TASK_HISTORY_TASK_KEY = 'mobileRoleTasksTaskID'
-const MOBILE_TASK_HISTORY_LINKED_KEY = 'mobileRoleTasksLinkedTaskID'
-const MOBILE_TASK_HISTORY_ACTION_KEY = 'mobileRoleTasksAction'
-const MOBILE_TASK_HISTORY_RECEIPT_KEY = 'mobileRoleTasksReceipt'
-const MOBILE_TASK_HISTORY_MAIN_TAB_KEY = 'mobileRoleTasksMainTab'
-const MOBILE_TASK_HISTORY_MESSAGE_TAB_KEY = 'mobileRoleTasksMessageTab'
-const MOBILE_TASK_HISTORY_FILTER_KEY = 'mobileRoleTasksFilter'
-const MOBILE_TASK_HISTORY_SCROLL_TOP_KEY = 'mobileRoleTasksScrollTop'
-const MOBILE_TASK_HISTORY_LIST_LIMITS_KEY = 'mobileRoleTasksListLimits'
-const MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY =
-  'mobileRoleTasksLoadedCountsByView'
-const MOBILE_TASK_HISTORY_SCOPE_KEY = 'mobileRoleTasksScope'
-const MOBILE_TASK_HISTORY_KEYWORD_KEY = 'mobileRoleTasksKeyword'
-const MOBILE_TASK_HISTORY_SORT_KEY = 'mobileRoleTasksSort'
-const MOBILE_TASK_HISTORY_STATUS_KEY = 'mobileRoleTasksStatus'
-const MOBILE_TASK_HISTORY_DATES_KEY = 'mobileRoleTasksDates'
-const MOBILE_TASK_HISTORY_QUERY_PAGES_KEY = 'mobileRoleTasksQueryPages'
-const MOBILE_TASK_HISTORY_REASON_KEY = 'mobileRoleTasksReason'
-const MOBILE_TASK_HISTORY_MATERIAL_DRAFT_KEY = 'mobileRoleTasksMaterialDraft'
-const MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY =
-  'mobileRoleTasksApprovedQuantity'
-const MOBILE_TASK_DRAFT_STORAGE_PREFIX = 'plush-toy-erp:mobile-task-draft:v1:'
-
-const MOBILE_TASK_HISTORY_SCREENS = new Set(['detail', 'action', 'receipt'])
-const MOBILE_TASK_RESTORE_PAGE_LIMIT = 20
-const MOBILE_TASK_RESTORE_ITEM_LIMIT =
-  MOBILE_ROLE_TASK_PAGE_LIMIT * MOBILE_TASK_RESTORE_PAGE_LIMIT
-
-const MOBILE_TASK_QUERY_PAGE_KEYS = Object.freeze({
-  TASKS: 'tasks',
-  HISTORY: 'history',
-  RISKS: 'risks',
-})
-const DEFAULT_MOBILE_TASK_QUERY_OPTIONS = Object.freeze({
-  keyword: '',
-  sortKey: 'newest',
-  statusKey: '',
-})
-
-function readMobileTaskHistoryState() {
-  if (typeof window === 'undefined') return {}
-  const { state } = window.history
-  return state && typeof state === 'object' ? { ...state.usr?.mobileRoleTasksReturn?.returnListState, ...state, ...state.usr?.workflowTaskReturn?.returnListState } : {}
-}
-
-function mobileTaskDraftStorageKey(scopeKey, taskID) {
-  const normalizedScopeKey = String(scopeKey || '').trim()
-  const normalizedTaskID = String(taskID || '').trim()
-  if (!normalizedScopeKey || !normalizedTaskID) return ''
-  return `${MOBILE_TASK_DRAFT_STORAGE_PREFIX}${encodeURIComponent(
-    normalizedScopeKey
-  )}:${encodeURIComponent(normalizedTaskID)}`
-}
-
-function persistMobileTaskDraftBackup(scopeKey, draft) {
-  if (typeof window === 'undefined') return false
-  const storageKey = mobileTaskDraftStorageKey(scopeKey, draft?.taskID)
-  const action = String(draft?.action || '').trim()
-  if (!storageKey || !action) return false
-  try {
-    window.sessionStorage.setItem(
-      storageKey,
-      JSON.stringify({
-        action,
-        approvedQuantity: String(draft?.approvedQuantity || ''),
-        reason: String(draft?.reason || ''),
-        scopeKey: String(scopeKey || '').trim(),
-        taskID: String(draft.taskID),
-      })
-    )
-    return true
-  } catch {
-    return false
-  }
-}
-
-function readMobileTaskDraftBackup(scopeKey, taskID) {
-  if (typeof window === 'undefined') return null
-  const storageKey = mobileTaskDraftStorageKey(scopeKey, taskID)
-  if (!storageKey) return null
-  try {
-    const value = JSON.parse(
-      window.sessionStorage.getItem(storageKey) || 'null'
-    )
-    if (
-      !value ||
-      typeof value !== 'object' ||
-      value.scopeKey !== String(scopeKey || '').trim() ||
-      value.taskID !== String(taskID || '') ||
-      !String(value.action || '').trim()
-    ) {
-      return null
-    }
-    return {
-      action: String(value.action),
-      approvedQuantity: String(value.approvedQuantity || ''),
-      reason: String(value.reason || ''),
-    }
-  } catch {
-    return null
-  }
-}
-
-function clearMobileTaskDraftBackup(scopeKey, taskID) {
-  if (typeof window === 'undefined') return false
-  const storageKey = mobileTaskDraftStorageKey(scopeKey, taskID)
-  if (!storageKey) return false
-  try {
-    window.sessionStorage.removeItem(storageKey)
-    return true
-  } catch {
-    return false
-  }
-}
-
-function mobileTaskHistoryChoice(value, choices, fallback) {
-  return choices.includes(value) ? value : fallback
-}
-
-function isLinkedTaskTab(tab) {
-  return [MOBILE_MAIN_TAB_KEYS.PROGRESS, MOBILE_MAIN_TAB_KEYS.TRACKING, MOBILE_MAIN_TAB_KEYS.EXCEPTIONS].includes(tab)
-}
-
-function mobileTaskQueryPageKey(mainTabKey) {
-  if (mainTabKey === MOBILE_MAIN_TAB_KEYS.DONE) return MOBILE_TASK_QUERY_PAGE_KEYS.HISTORY
-  return mainTabKey === MOBILE_MAIN_TAB_KEYS.MESSAGES
-    ? MOBILE_TASK_QUERY_PAGE_KEYS.RISKS
-    : MOBILE_TASK_QUERY_PAGE_KEYS.TASKS
-}
-
-function readMobileTaskQueryPages(
-  history,
-  accessScope,
-  activePageKey,
-  activeOptions
-) {
-  const trusted =
-    String(history?.[MOBILE_TASK_HISTORY_SCOPE_KEY] || '').trim() ===
-    mobileTaskQueryScope(accessScope, activeOptions)
-  const stored = trusted ? history?.[MOBILE_TASK_HISTORY_QUERY_PAGES_KEY] : null
-  const pages = {
-    [MOBILE_TASK_QUERY_PAGE_KEYS.TASKS]: normalizeMobileTaskQueryOptions(
-      stored?.[MOBILE_TASK_QUERY_PAGE_KEYS.TASKS]
-    ),
-    [MOBILE_TASK_QUERY_PAGE_KEYS.RISKS]: normalizeMobileTaskQueryOptions(
-      stored?.[MOBILE_TASK_QUERY_PAGE_KEYS.RISKS]
-    ),
-    [MOBILE_TASK_QUERY_PAGE_KEYS.HISTORY]: normalizeMobileTaskQueryOptions(
-      stored?.[MOBILE_TASK_QUERY_PAGE_KEYS.HISTORY], true
-    ),
-  }
-  pages[activePageKey] = normalizeMobileTaskQueryOptions(activeOptions, activePageKey === MOBILE_TASK_QUERY_PAGE_KEYS.HISTORY)
-  return pages
-}
-
-function readMobileTaskListLimits(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-  return Object.fromEntries(
-    Object.entries(value).flatMap(([key, limit]) => {
-      const normalized = Number(limit)
-      return Number.isSafeInteger(normalized) && normalized > 0
-        ? [[key, Math.min(normalized, MOBILE_TASK_RESTORE_ITEM_LIMIT)]]
-        : []
-    })
-  )
-}
+import useMobileLinkedTask from '../hooks/useMobileLinkedTask.js'
+import useMobileTaskDraftHistory from '../hooks/useMobileTaskDraftHistory.js'
+import { buildMobileRoleTaskLists, buildMobileRoleTaskListView } from '../utils/mobileRoleTaskListView.mjs'
+import {
+  MOBILE_TASK_HISTORY_SCREEN_KEY,
+  MOBILE_TASK_HISTORY_DEPTH_KEY,
+  MOBILE_TASK_HISTORY_TASK_KEY,
+  MOBILE_TASK_HISTORY_LINKED_KEY,
+  MOBILE_TASK_HISTORY_ACTION_KEY,
+  MOBILE_TASK_HISTORY_RECEIPT_KEY,
+  MOBILE_TASK_HISTORY_MAIN_TAB_KEY,
+  MOBILE_TASK_HISTORY_MESSAGE_TAB_KEY,
+  MOBILE_TASK_HISTORY_FILTER_KEY,
+  MOBILE_TASK_HISTORY_SCROLL_TOP_KEY,
+  MOBILE_TASK_HISTORY_LIST_LIMITS_KEY,
+  MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY,
+  MOBILE_TASK_HISTORY_SCOPE_KEY,
+  MOBILE_TASK_HISTORY_KEYWORD_KEY,
+  MOBILE_TASK_HISTORY_SORT_KEY,
+  MOBILE_TASK_HISTORY_STATUS_KEY,
+  MOBILE_TASK_HISTORY_DATES_KEY,
+  MOBILE_TASK_HISTORY_QUERY_PAGES_KEY,
+  MOBILE_TASK_HISTORY_REASON_KEY,
+  MOBILE_TASK_HISTORY_MATERIAL_DRAFT_KEY,
+  MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY,
+  MOBILE_TASK_HISTORY_SCREENS,
+  MOBILE_TASK_RESTORE_ITEM_LIMIT,
+  MOBILE_TASK_QUERY_PAGE_KEYS,
+  DEFAULT_MOBILE_TASK_QUERY_OPTIONS,
+  readMobileTaskHistoryState,
+  readMobileTaskDraftBackup,
+  clearMobileTaskDraftBackup,
+  mobileTaskHistoryChoice,
+  isLinkedTaskTab,
+  mobileTaskQueryPageKey,
+  readMobileTaskQueryPages,
+  readMobileTaskListLimits,
+} from '../utils/mobileTaskHistory.mjs'
 
 function createMobileRoleTaskViewCounters() {
   return Object.fromEntries(
@@ -269,8 +129,6 @@ export default function MobileRoleTasksPage() {
     () => mobileProgressAccess(adminProfile),
     [adminProfile]
   )
-  const beginLinkedTask = useLatestRequestCoordinator()
-  const [linkedTaskState, setLinkedTaskState] = useState(null)
   const runtimeBuildIdentity = useRuntimeBuildIdentity()
   const canMountCustomerTasks = canMountCustomerRuntime(adminProfile)
   const canViewApprovalInbox = canViewWorkflowApprovalInbox(adminProfile)
@@ -465,9 +323,6 @@ export default function MobileRoleTasksPage() {
   const activeTaskSlot = taskSlots[activeTaskViewKey]
   const taskFeedbackScopeRef = useRef('')
   taskFeedbackScopeRef.current = `${activeMainTabKey}|${activeTaskViewKey}|${selectedTaskID || ''}`
-  const authoritativeCountSummary = activeTaskSlot.count_summary || null
-  const authoritativeTaskCounts = authoritativeCountSummary?.counts || null
-  const riskScope = authoritativeCountSummary?.risk_scope || 'role'
   const historyRestoreItemLimit = resolveMobileRoleTaskRestoreLimit({
     viewKey: activeTaskViewKey,
     loadedCounts: historyLoadedTaskCountsRef.current,
@@ -475,224 +330,48 @@ export default function MobileRoleTasksPage() {
     maxItems: MOBILE_TASK_RESTORE_ITEM_LIMIT,
   })
 
-  const todoTaskViews = useMemo(
-    () =>
-      buildMobileTaskListForRole(
-        taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.TODO].items,
-        activeRoleKey,
-        {
-          nowMs: taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.TODO].server_time * 1000,
-          preserveServerOrder: true,
-        }
-      ),
+  const taskLists = useMemo(
+    () => buildMobileRoleTaskLists({ slots: taskSlots, roleKey: activeRoleKey }),
     [activeRoleKey, taskSlots]
   )
-  const historyTaskViews = useMemo(
-    () =>
-      buildMobileTaskListForRole(
-        taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY].items,
-        activeRoleKey,
-        {
-          nowMs:
-            taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY].server_time * 1000,
-        }
-      ),
-    [activeRoleKey, taskSlots]
-  )
-  const riskTaskViews = useMemo(
-    () =>
-      buildMobileTaskListForRole(
-        taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.RISK].items,
-        activeRoleKey,
-        {
-          nowMs: taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.RISK].server_time * 1000,
-          preserveServerOrder: true,
-        }
-      ),
-    [activeRoleKey, taskSlots]
-  )
-  const approvalTaskViews = useMemo(
-    () =>
-      buildMobileTaskListForRole(
-        taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL].items,
-        activeRoleKey,
-        {
-          nowMs:
-            taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.APPROVAL].server_time * 1000,
-          preserveServerOrder: true,
-        }
-      ),
-    [activeRoleKey, taskSlots]
-  )
-  const activeTasks = useMemo(
-    () =>
-      todoTaskViews.filter(
-        (task) => !TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key)
-      ),
-    [todoTaskViews]
-  )
-  const doneTasks = useMemo(
-    () =>
-      historyTaskViews.filter((task) =>
-        TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key)
-      ),
-    [historyTaskViews]
-  )
-  const riskTasks = riskTaskViews
-  const approvalTasks = approvalTaskViews
-  const overdueTasks = useMemo(
-    () => riskTasks.filter((task) => isTaskOverdue(task)),
-    [riskTasks]
-  )
-  const activeTaskViewState = useMemo(
-    () =>
-      resolveMobileRoleTaskViewState({
-        viewKey: activeTaskViewKey,
-        todoTasks: activeTasks,
-        historyTasks: doneTasks,
-        riskTasks,
-        approvalTasks,
-        selectedTaskID,
-      }),
+  const {
+    activeTasks,
+    doneTasks,
+    riskTasks,
+    approvalTasks,
+    overdueTasks,
+    activeTaskViewState,
+    filteredTasks,
+    filterItems,
+    authoritativeTaskCounts,
+    riskScope,
+  } = useMemo(
+    () => buildMobileRoleTaskListView({
+      lists: taskLists,
+      countSummary: activeTaskSlot.count_summary,
+      viewKey: activeTaskViewKey,
+      filterKey: visibleActiveFilterKey,
+      selectedTaskID,
+      canViewApprovalInbox,
+      isAdminReview: adminProfile?.is_super_admin === true,
+    }),
     [
       activeTaskViewKey,
-      activeTasks,
-      approvalTasks,
-      doneTasks,
-      riskTasks,
-      selectedTaskID,
-    ]
-  )
-  const filterSourceTasks = activeTaskViewState.tasks
-  const filteredTasks = useMemo(() => {
-    if (visibleActiveFilterKey === MOBILE_TASK_FILTER_KEYS.APPROVAL) {
-      return filterSourceTasks
-    }
-    if (visibleActiveFilterKey === MOBILE_TASK_FILTER_KEYS.RISK) {
-      return filterSourceTasks
-    }
-    if (visibleActiveFilterKey === MOBILE_TASK_FILTER_KEYS.ALERT) {
-      return filterSourceTasks.filter((task) => isTaskAlerted(task))
-    }
-    if (visibleActiveFilterKey === MOBILE_TASK_FILTER_KEYS.OVERDUE) {
-      return filterSourceTasks.filter((task) => isTaskOverdue(task))
-    }
-    if (visibleActiveFilterKey === MOBILE_TASK_FILTER_KEYS.DUE_SOON) {
-      return filterSourceTasks.filter((task) => isTaskDueSoon(task))
-    }
-    if (visibleActiveFilterKey === MOBILE_TASK_FILTER_KEYS.HIGH_PRIORITY) {
-      return filterSourceTasks.filter((task) => isTaskHighPriority(task))
-    }
-    if (visibleActiveFilterKey === MOBILE_TASK_FILTER_KEYS.BLOCKED) {
-      return filterSourceTasks.filter((task) => isTaskBlockedProgress(task))
-    }
-    if (
-      visibleActiveFilterKey ===
-      MOBILE_TASK_FILTER_KEYS.BLOCKED_OR_HIGH_PRIORITY
-    ) {
-      return filterSourceTasks.filter(
-        (task) => isTaskBlockedProgress(task) || isTaskHighPriority(task)
-      )
-    }
-    if (visibleActiveFilterKey === MOBILE_TASK_FILTER_KEYS.READY) {
-      return filterSourceTasks.filter((task) => isTaskReadyProgress(task))
-    }
-    return filterSourceTasks
-  }, [filterSourceTasks, visibleActiveFilterKey])
-  const filterItems = useMemo(
-    () => [
-      {
-        key: MOBILE_TASK_FILTER_KEYS.ALL,
-        label: '全部',
-        count: authoritativeTaskCounts?.todo ?? null,
-      },
-      ...(canViewApprovalInbox
-        ? [
-            {
-              key: MOBILE_TASK_FILTER_KEYS.APPROVAL,
-              label: '审批',
-              ariaLabel: adminProfile?.is_super_admin === true ? '待审批' : '待我审批',
-              count: authoritativeTaskCounts?.approval ?? null,
-            },
-          ]
-        : []),
-      {
-        key: MOBILE_TASK_FILTER_KEYS.RISK,
-        label: riskScope === 'supervised' ? '跨岗风险' : '风险',
-        count: authoritativeTaskCounts?.risk ?? null,
-      },
-      {
-        key: MOBILE_TASK_FILTER_KEYS.OVERDUE,
-        label: '超时',
-        count: authoritativeTaskCounts?.overdue ?? null,
-      },
-    ],
-    [
+      activeTaskSlot.count_summary,
       adminProfile?.is_super_admin,
-      authoritativeTaskCounts?.approval,
-      authoritativeTaskCounts?.overdue,
-      authoritativeTaskCounts?.risk,
-      authoritativeTaskCounts?.todo,
       canViewApprovalInbox,
-      riskScope,
+      selectedTaskID,
+      taskLists,
+      visibleActiveFilterKey,
     ]
-  )
-  const loadLinkedTask = useCallback(
-    async (taskID) => {
-      const request = beginLinkedTask('linked-task')
-      setLinkedTaskState({
-        scope: taskAccessScopeKey,
-        id: taskID,
-        loading: true,
-      })
-      try {
-        const task = await getWorkflowTask(taskID, { signal: request.signal })
-        if (!request.isCurrent()) return false
-        consumeWorkflowTaskReturn(taskID, adminProfile?.id)
-        setLinkedTaskState({ scope: taskAccessScopeKey, id: taskID, task })
-        return true
-      } catch (error) {
-        if (request.isCurrent()) {
-          setLinkedTaskState({
-            scope: taskAccessScopeKey,
-            id: taskID,
-            error: getActionErrorMessage(error, '查看关联任务失败，请重试'),
-          })
-        }
-        return false
-      } finally {
-        if (request.isCurrent()) request.finish()
-      }
-    },
-    [adminProfile?.id, beginLinkedTask, taskAccessScopeKey]
   )
   const isLinkedSelection = isLinkedTaskTab(activeMainTabKey) || returnedTaskID === selectedTaskID || (selectedTaskID != null && selectedLinkedTaskID === selectedTaskID)
-  const linkedTask =
-    linkedTaskState?.scope === taskAccessScopeKey &&
-    linkedTaskState?.id === selectedTaskID
-      ? linkedTaskState
-      : null
-  useEffect(() => {
-    if (!selectedTaskID || !isLinkedSelection) {
-      setLinkedTaskState(null)
-    }
-  }, [isLinkedSelection, selectedTaskID])
-  useEffect(() => {
-    if (
-      (isLinkedSelection) &&
-      selectedTaskID &&
-      !linkedTask
-    ) {
-      loadLinkedTask(selectedTaskID)
-    }
-  }, [isLinkedSelection, selectedTaskID, linkedTask, loadLinkedTask])
-  useEffect(
-    () => () => {
-      const request = beginLinkedTask('linked-task')
-      request.finish()
-    },
-    [beginLinkedTask, taskAccessScopeKey, selectedTaskID]
-  )
+  const { linkedTask, loadLinkedTask, retainLinkedTask } = useMobileLinkedTask({
+    accessScopeKey: taskAccessScopeKey,
+    adminID: adminProfile?.id,
+    enabled: canMountCustomerTasks && isLinkedSelection,
+    taskID: selectedTaskID,
+  })
   const selectedTask =
     isLinkedSelection
       ? linkedTask?.task || null
@@ -1285,93 +964,15 @@ export default function MobileRoleTasksPage() {
     taskScopeKey,
   ])
 
-  const actionDraftHistoryRef = useRef({
-    action: '',
-    approvedQuantity: '',
-    reason: '',
-    taskID: null,
-  })
-  actionDraftHistoryRef.current = {
-    action: detailAction || '',
-    approvedQuantity: detailApprovedQuantityValue,
-    reason: detailReasonValue,
-    taskID: selectedTask?.id || null,
-  }
-  const actionDraftHistoryTimerRef = useRef(null)
-  const actionDraftHistoryWarningRef = useRef(false)
-  const flushMobileTaskDraftHistory = useCallback(() => {
-    if (typeof window === 'undefined') return false
-    if (actionDraftHistoryTimerRef.current) {
-      window.clearTimeout(actionDraftHistoryTimerRef.current)
-      actionDraftHistoryTimerRef.current = null
-    }
-    const currentState = window.history.state || {}
-    const draft = actionDraftHistoryRef.current
-    if (
-      currentState[MOBILE_TASK_HISTORY_SCREEN_KEY] !== 'action' ||
-      !draft.action ||
-      String(currentState[MOBILE_TASK_HISTORY_TASK_KEY] || '') !==
-        String(draft.taskID || '')
-    ) {
-      return false
-    }
-    try {
-      window.history.replaceState(
-        {
-          ...currentState,
-          [MOBILE_TASK_HISTORY_ACTION_KEY]: draft.action,
-          [MOBILE_TASK_HISTORY_APPROVED_QUANTITY_KEY]: draft.approvedQuantity,
-          [MOBILE_TASK_HISTORY_REASON_KEY]: draft.reason,
-        },
-        ''
-      )
-      return true
-    } catch {
-      if (
-        !actionDraftHistoryWarningRef.current &&
-        document.visibilityState !== 'hidden'
-      ) {
-        actionDraftHistoryWarningRef.current = true
-        message.warning('处理内容暂时无法随页面刷新保留，请先不要刷新')
-      }
-      return false
-    }
-  }, [])
-
-  useEffect(() => {
-    if (
-      typeof window === 'undefined' ||
-      !selectedTask ||
-      !detailAction ||
-      actionReceipt ||
-      window.history.state?.[MOBILE_TASK_HISTORY_SCREEN_KEY] !== 'action'
-    ) {
-      return undefined
-    }
-    const timerID = window.setTimeout(flushMobileTaskDraftHistory, 250)
-    actionDraftHistoryTimerRef.current = timerID
-    return () => {
-      if (actionDraftHistoryTimerRef.current === timerID) {
-        window.clearTimeout(timerID)
-        actionDraftHistoryTimerRef.current = null
-      }
-    }
-  }, [
-    actionReceipt,
-    detailAction,
-    detailApprovedQuantityValue,
-    detailReasonValue,
-    flushMobileTaskDraftHistory,
-    selectedTask,
-  ])
-
-  useEffect(() => {
-    window.addEventListener('pagehide', flushMobileTaskDraftHistory)
-    return () => {
-      flushMobileTaskDraftHistory()
-      window.removeEventListener('pagehide', flushMobileTaskDraftHistory)
-    }
-  }, [flushMobileTaskDraftHistory])
+  const { flush: flushMobileTaskDraftHistory, backup: backupMobileTaskDraft } =
+    useMobileTaskDraftHistory({
+      action: detailAction,
+      approvedQuantity: detailApprovedQuantityValue,
+      reason: detailReasonValue,
+      receipt: actionReceipt,
+      scopeKey: taskScopeKey,
+      taskID: selectedTask?.id || null,
+    })
 
   useEffect(() => {
     if (
@@ -1838,10 +1439,7 @@ export default function MobileRoleTasksPage() {
         return
       }
       if (previousScreen === 'action') {
-        persistMobileTaskDraftBackup(
-          taskScopeKey,
-          actionDraftHistoryRef.current
-        )
+        backupMobileTaskDraft()
       }
       if (!isMobileRoleTaskHistoryScope(historyState, taskScopeKey)) {
         receiptBackIntentRef.current = ''
@@ -1965,6 +1563,7 @@ export default function MobileRoleTasksPage() {
     window.addEventListener('popstate', handlePopState)
     return () => window.removeEventListener('popstate', handlePopState)
   }, [
+    backupMobileTaskDraft,
     clearActionReceipt,
     restoreActionDraft,
     restoreActionReceipt,
@@ -2262,7 +1861,7 @@ export default function MobileRoleTasksPage() {
         autoOpenRef={sharedLinkAutoRef}
         onOpenTask={(task, handle) => {
         setSharedHandlingID(handle ? task.id : null)
-        setLinkedTaskState({ scope: taskAccessScopeKey, id: task.id, task })
+        retainLinkedTask(task)
         handleSelectTaskID(task.id, { linked: true })
       }}
       />

@@ -24,6 +24,7 @@ test('mobile task page uses backend action projection and does not restore local
     new URL('./useMobileRoleTaskActions.js', import.meta.url),
     'utf8'
   )
+  const draftHistorySource = readFileSync(new URL('./useMobileTaskDraftHistory.js', import.meta.url), 'utf8')
 
   assert.match(pageSource, /useWorkflowTaskActionAccess/u)
   assert.match(pageSource, /taskActionAccess:\s*selectedTaskActionAccess/u)
@@ -36,7 +37,8 @@ test('mobile task page uses backend action projection and does not restore local
     pageSource,
     /taskScopeKey = mobileTaskQueryScope\(\s*taskAccessScopeKey,\s*taskQueryOptions\s*\)/u
   )
-  assert.match(pageSource, /persistMobileTaskDraftBackup/u)
+  assert.match(pageSource, /useMobileTaskDraftHistory/u)
+  assert.match(draftHistorySource, /persistMobileTaskDraftBackup/u)
   assert.match(pageSource, /readMobileTaskDraftBackup/u)
   assert.match(pageSource, /restoreActionDraft/u)
   assert.match(pageSource, /selectedCanReject \? 'rejected' : ''/u)
