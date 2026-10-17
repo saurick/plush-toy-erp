@@ -12,6 +12,7 @@ import {
 } from "./backup-replica/config.mjs";
 import {
   atomicJSON,
+  checkDestinationAccess,
   destination,
   digest,
   privateDirectory,
@@ -24,7 +25,7 @@ import {
   SSHSource,
   validateInventory,
 } from "./backup-replica/transport.mjs";
-import { restoreDue, lockArguments } from "./backup-replica/cli.mjs";
+import { execute, restoreDue, lockArguments } from "./backup-replica/cli.mjs";
 import { requireIdleAgent, agentValue } from "./backup-replica/install.mjs";
 import { verifyRestore } from "./backup-replica/restore.mjs";
 import { command } from "./backup-replica/process.mjs";
@@ -103,6 +104,86 @@ test("private closed configuration rejects unexpected fields", (t) => {
   assert.deepEqual(loadConfig(f.file), f.config);
   atomicJSON(f.file, { ...f.config, password: "invalid" });
   assert.throws(() => loadConfig(f.file), /invalid_config_fields/u);
+});
+test("external access probe reads without changing the destination", async (t) => {
+  const f = fixture(t),
+    before = fs.readdirSync(f.target),
+    marker = path.join(f.target, ".plush-backup-replica.json"),
+    content = fs.readFileSync(marker);
+  await checkDestinationAccess(f.config, f.mount);
+  assert.deepEqual(fs.readdirSync(f.target), before);
+  assert.deepEqual(fs.readFileSync(marker), content);
+});
+test("external access failure has an actionable reason and preserves cancellation", async (t) => {
+  const f = fixture(t),
+    reason = new ReplicaError("interrupted"),
+    abort = new AbortController();
+  await assert.rejects(
+    checkDestinationAccess(f.config, f.mount, {
+      run: async (_args, options) => {
+        assert.equal(options.timeout, 15_000);
+        throw new ReplicaError("command_failed");
+      },
+    }),
+    /destination_access_unavailable/u,
+  );
+  abort.abort(reason);
+  await assert.rejects(
+    checkDestinationAccess(f.config, f.mount, {
+      signal: abort.signal,
+      run: async () => {
+        throw reason;
+      },
+    }),
+    (error) => error === reason,
+  );
+});
+test("unreadable destination prevents source transfer and restore", async (t) => {
+  const f = fixture(t);
+  fs.unlinkSync(path.join(f.target, ".plush-backup-replica.json"));
+  let touched = false;
+  await assert.rejects(
+    execute("run", f.config, f.file, {
+      volume: () => f.mount,
+      source: {
+        inventory: async () => {
+          touched = true;
+          return [];
+        },
+      },
+      restore: async () => {
+        touched = true;
+      },
+    }),
+    /destination_access_unavailable/u,
+  );
+  assert.equal(touched, false);
+  assert.equal(
+    fs.existsSync(path.join(f.config.stateDirectory, "restore-tmp")),
+    false,
+  );
+});
+test("blocked synchronous file access is terminated by its process deadline", async (t) => {
+  const f = fixture(t),
+    fifo = path.join(f.root, "blocked-access"),
+    pidFile = path.join(f.root, "probe-pid");
+  assert.equal(spawnSync("mkfifo", [fifo]).status, 0);
+  await assert.rejects(
+    command(
+      [
+        process.execPath,
+        "--input-type=module",
+        "-e",
+        'import fs from "node:fs";fs.writeFileSync(process.argv[2],String(process.pid));fs.openSync(process.argv[1],"r");',
+        fifo,
+        pidFile,
+      ],
+      { timeout: 1000 },
+    ),
+    /command_failed/u,
+  );
+  const pid = Number(fs.readFileSync(pidFile, "utf8"));
+  assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
 });
 test("private configuration rejects permissive files and symlinks", (t) => {
   const f = fixture(t);

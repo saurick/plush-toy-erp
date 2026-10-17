@@ -9,7 +9,13 @@ import {
   requireValue,
   resolveVolume,
 } from "./config.mjs";
-import { atomicJSON, destination, now, privateDirectory } from "./storage.mjs";
+import {
+  atomicJSON,
+  checkDestinationAccess,
+  destination,
+  now,
+  privateDirectory,
+} from "./storage.mjs";
 import { SSHSource } from "./transport.mjs";
 import { synchronize } from "./sync.mjs";
 import { verifyRestore } from "./restore.mjs";
@@ -51,6 +57,8 @@ export async function execute(
       };
     throw error;
   }
+  if (["sync", "verify", "run"].includes(action))
+    await checkDestinationAccess(c, mount, { signal });
   const root = destination(c, mount, action === "init");
   if (action === "init")
     return {
@@ -121,9 +129,9 @@ async function locked(action, c, configFile, signal) {
     if (innerPid)
       try {
         process.kill(innerPid, "SIGTERM");
-        } catch {
-          // The worker can exit between sending its PID and receiving a signal.
-        }
+      } catch {
+        // The worker can exit between sending its PID and receiving a signal.
+      }
   };
   signal.addEventListener("abort", forward, { once: true });
   child.stdio[3].on("data", (chunk) => {

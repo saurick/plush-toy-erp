@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createHash, randomUUID } from "node:crypto";
-import { requireValue, plainDirectory } from "./config.mjs";
+import { ReplicaError, requireValue, plainDirectory } from "./config.mjs";
+import { command } from "./process.mjs";
 
 export const now = () => new Date().toISOString();
 export function privateDirectory(directory) {
@@ -52,6 +53,34 @@ export async function digest(file, signal) {
   for await (const chunk of fs.createReadStream(file, { signal }))
     hash.update(chunk);
   return hash.digest("hex");
+}
+export async function checkDestinationAccess(
+  c,
+  mount,
+  { signal, run = command } = {},
+) {
+  const marker = path.join(
+    mount,
+    c.destination.relativeDirectory,
+    ".plush-backup-replica.json",
+  );
+  // macOS can suspend open() while awaiting removable-volume consent. Keep
+  // that first read in a disposable process without the worker's signal handler.
+  try {
+    await run(
+      [
+        process.execPath,
+        "--input-type=module",
+        "-e",
+        'import fs from "node:fs";fs.closeSync(fs.openSync(process.argv[1],"r"));',
+        marker,
+      ],
+      { signal, timeout: 15_000 },
+    );
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    throw new ReplicaError("destination_access_unavailable");
+  }
 }
 export function destination(c, mount, initialize = false) {
   const root = path.join(mount, c.destination.relativeDirectory);
