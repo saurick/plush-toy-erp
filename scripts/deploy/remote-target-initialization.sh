@@ -133,6 +133,7 @@ bootstrap_completed=0
 backup_sha256=none
 backup_size_bytes=0
 migration_version=unknown
+migration_readback=unknown
 server_content_id=unknown
 web_content_id=unknown
 server_ref=unknown
@@ -229,7 +230,7 @@ write_receipt_json() {
     --arg webContentId "$web_content_id" \
     --arg backupSha256 "$backup_sha256" \
     --argjson backupSizeBytes "$backup_size_bytes" \
-    --arg migrationReadback "$migration_version" \
+    --arg migrationReadback "$migration_readback" \
     --argjson migrationApplyStarted "$migration_apply_started" \
     --argjson bootstrapStarted "$bootstrap_started" \
     --argjson bootstrapCompleted "$bootstrap_completed" \
@@ -806,6 +807,9 @@ migration_apply_started=1
     "RELEASE_SHA=$release_sha" "APPLICATION_IMAGE_DIGEST=$server_content_id" \
     sh "$migrate_script" --status-only
 } >>"$log_file" 2>&1
+
+migration_readback="$(docker exec "$postgres_container" sh -ceu 'psql -X -A -t -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT max(version) FROM atlas_schema_revisions.atlas_schema_revisions WHERE type = 2"')"
+[[ "$migration_readback" == "$migration_version" ]] || fail "database migration readback does not match the immutable release"
 
 stage=administrator_bootstrap
 bootstrap_started=1

@@ -140,8 +140,19 @@ test("target initializer emits one JSON receipt when confirmation fails before a
   assert.equal(receipt.status, "not_proven");
   assert.equal(receipt.issueCode, "initialization_prelock_failure");
   assert.equal(receipt.migration.applyStarted, false);
+  assert.equal(receipt.migration.readback, "unknown");
   assert.equal(receipt.bootstrap.started, false);
   assert.match(result.stderr, /confirmation does not match/u);
+});
+
+test("target initializer reads the database migration independently of the artifact expectation", () => {
+  assert.match(source, /migration_readback=unknown/u);
+  assert.match(source, /--arg migrationReadback "\$migration_readback"/u);
+  const query = source.indexOf('migration_readback="$(docker exec');
+  assert.ok(query > source.indexOf("stage=migration_apply_started"));
+  assert.ok(query < source.indexOf("stage=administrator_bootstrap"));
+  assert.match(source, /SELECT max\(version\) FROM atlas_schema_revisions\.atlas_schema_revisions WHERE type = 2/u);
+  assert.match(source, /"\$migration_readback" == "\$migration_version"/u);
 });
 
 test("target initializer retains owner-checked private diagnostics before exact cleanup", () => {
