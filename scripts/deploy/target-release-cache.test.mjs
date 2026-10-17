@@ -31,6 +31,10 @@ import {
   envWithLinuxCommandShims,
   installTargetReleaseCacheCommandShims,
 } from "./remote-linux-script.test-support.mjs";
+import {
+  getDeploymentTarget,
+  SUPPORTED_DEPLOYMENT_TARGET_KEYS,
+} from "./deployment-targets.mjs";
 
 const SHA = "a".repeat(40);
 const HASH = "b".repeat(64);
@@ -491,7 +495,7 @@ test("both target cache paths use fixed SSH scripts and fail closed", (t) => {
       })}\n`,
     };
   };
-  for (const targetKey of ["demo-133", "customer-test-133"]) {
+  for (const targetKey of SUPPORTED_DEPLOYMENT_TARGET_KEYS) {
     const probe = probeTargetReleaseCache(identity, { runCommand, targetKey });
     prepareTargetReleaseIncoming(
       { operationId: "123e4567-e89b-42d3-a456-426614174000", identity, probe },
@@ -502,7 +506,7 @@ test("both target cache paths use fixed SSH scripts and fail closed", (t) => {
       { runCommand, targetKey },
     );
   }
-  assert.equal(calls.length, 6);
+  assert.equal(calls.length, SUPPORTED_DEPLOYMENT_TARGET_KEYS.length * 3);
   for (const call of calls) {
     const syntax = spawnSync("bash", ["-n"], {
       encoding: "utf8",
@@ -526,7 +530,15 @@ test("both target cache paths use fixed SSH scripts and fail closed", (t) => {
     calls.every((call) => call.inheritedProviderToken === false),
     true,
   );
-  for (const offset of [0, 3]) {
+  for (const [index, targetKey] of SUPPORTED_DEPLOYMENT_TARGET_KEYS.entries()) {
+    const offset = index * 3;
+    const root = getDeploymentTarget(targetKey).filesystem.root;
+    assert.equal(
+      calls.slice(offset, offset + 3).every((call) =>
+        call.input.includes(`root=${root}\n`),
+      ),
+      true,
+    );
     assert.match(calls[offset].input, /invalid formal cache/u);
     assert.match(calls[offset].input, /owned_directory "\$root"/u);
     assert.match(calls[offset].input, /cache_root=\$root\/release-cache-v2/u);
@@ -556,22 +568,6 @@ test("both target cache paths use fixed SSH scripts and fail closed", (t) => {
     assert.match(calls[offset + 2].input, /readlink -f -- "\$candidate"/u);
     assert.match(calls[offset + 2].input, /8#022/u);
   }
-  assert.equal(
-    calls
-      .slice(0, 3)
-      .every((call) =>
-        call.input.includes("root=/root/deploy/plush-toy-erp-demo-v1"),
-      ),
-    true,
-  );
-  assert.equal(
-    calls
-      .slice(3)
-      .every((call) =>
-        call.input.includes("root=/root/deploy/plush-toy-erp-test-v1"),
-      ),
-    true,
-  );
 });
 
 test("legacy target cache is exact, formal-only and fingerprint-bound", () => {

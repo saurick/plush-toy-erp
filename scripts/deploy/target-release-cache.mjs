@@ -4,7 +4,10 @@ import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
-import { getDeploymentTarget } from "./deployment-targets.mjs";
+import {
+  getDeploymentTarget,
+  loadDeploymentTargetRegistry,
+} from "./deployment-targets.mjs";
 import { parseReleaseChecksums } from "./github-release-asset-set.mjs";
 import { assertReleaseArtifactManifest } from "./release-artifact-bundle.mjs";
 import {
@@ -34,10 +37,9 @@ const CACHE_BASIS = Object.freeze([
   "docker_content_id",
   "embedded_git_sha",
 ]);
-const FIXED_CACHE_ROOTS = new Set([
-  "/root/deploy/plush-toy-erp-demo-v1",
-  "/root/deploy/plush-toy-erp-test-v1",
-]);
+const FIXED_CACHE_ROOTS = new Set(
+  loadDeploymentTargetRegistry().targets.map((target) => target.filesystem.root),
+);
 
 function fileMetadata(fetch, name) {
   return fetch.formal.files.find((file) => file.name === name);
