@@ -59,10 +59,7 @@ import {
 } from './devSummarySnapshot.mjs'
 
 const SHA = 'a'.repeat(40)
-const versionCenterPageSource = readFileSync(
-  new URL('../pages/DevVersionCenterPage.jsx', import.meta.url),
-  'utf8'
-)
+const versionCenterPageSource = ['../pages/DevVersionCenterPage.jsx', '../pages/delivery/version/ManualGuidePage.jsx', '../pages/delivery/version/shared.jsx'].map((path) => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n')
 const databaseMigrationPageSource = readFileSync(
   new URL('../pages/DevDatabaseMigrationPage.jsx', import.meta.url),
   'utf8'
@@ -1286,12 +1283,13 @@ test('version center page does not expose shell, SSH or arbitrary target inputs'
   assert.match(source, /label="Git index[.]lock 检查与恢复流程"/u)
   assert.match(source, /不因“非空锁”重复请求确认/u)
   assert.match(source, /本页不创建 commit、不 push/u)
-  assert.match(source, /在本页部署已发布版本/u)
+  assert.match(source, /在版本发布页部署已发布版本/u)
   assert.match(source, /代码推送不会自动部署/u)
   assert.match(source, /应急不等于绕过/u)
   assert.match(source, /禁止 force push、跳过质量门禁/u)
-  assert.match(source, /manualTakeoverTriggerRef/u)
-  assert.match(source, /afterClose=\{\(\) =>/u)
+  assert.match(source, /DEV_VERSION_GUIDE_ROUTE/u)
+  assert.match(source, /href=\{[\s\S]*?DEV_VERSION_GUIDE_ROUTE/u)
+  assert.doesNotMatch(source, /manualTakeoverTriggerRef|ManualGuideModal/u)
   assert.match(
     source,
     /aria-label="查看发布当前版本制品说明"/u

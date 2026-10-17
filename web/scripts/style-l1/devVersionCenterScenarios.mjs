@@ -1,7 +1,8 @@
 import { DEV_DELIVERY_TARGETS, validateDevDeliverySummary } from '../../src/dev-workbench/config/devDelivery.mjs'
+import { CI_WORKFLOW_SECTIONS } from '../../src/dev-workbench/config/devCiWorkflow.mjs'
 import { createQualityGateStyleSummary } from './devQualityGateScenarios.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
-import { switchMermaidLayout } from './mermaidViewerAssertions.mjs'
+import { assertMermaidFits, assertMermaidZoomMode, switchMermaidLayout, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
 
 const ASSETS = [
   'checksums.sha256',
@@ -471,6 +472,59 @@ async function waitForView(page, view) {
     .waitFor({ state: 'visible', timeout: 10_000 })
 }
 
+async function assertManualGuideViewport(page, assert) {
+  const metrics = await page
+    .locator('.erp-dev-version-guide-content')
+    .evaluate((node) => {
+      const content = node.getBoundingClientRect()
+      return {
+        left: content.left,
+        right: content.right,
+        width: innerWidth,
+        height: innerHeight,
+        contentHeight: content.height,
+        dialogs: document.querySelectorAll('[role="dialog"]').length,
+        header: document
+          .querySelector('.erp-dev-version-guide-page > header')
+          .getBoundingClientRect()
+          .toJSON(),
+        toc: document
+          .querySelector('.erp-dev-version-guide-toc')
+          .getBoundingClientRect()
+          .toJSON(),
+        scrollTop: scrollY,
+        contentTop: content.top,
+      }
+    })
+  assert(
+    metrics.left >= 0 && metrics.right <= metrics.width + 1,
+    '指引正文应适配页面宽度'
+  )
+  assert(metrics.contentHeight > metrics.height, '长指引应使用完整页面阅读')
+  assert.equal(metrics.dialogs, 0, '独立指引页不应保留原弹窗')
+  assert(Math.abs(metrics.header.left - 16) <= 1, '标题栏应与页面左侧留白对齐')
+  assert(
+    Math.abs(metrics.header.right - (metrics.width - 16)) <= 1,
+    '标题栏应铺满页面可用宽度'
+  )
+  if (metrics.width > 900) {
+    assert(
+      Math.abs(metrics.left - metrics.toc.right - 16) <= 1,
+      '目录与正文应保持统一栏间距'
+    )
+    if (metrics.scrollTop === 0) {
+      assert(
+        Math.abs(metrics.contentTop - metrics.toc.top) <= 1,
+        '目录与正文应齐顶'
+      )
+      assert(
+        Math.abs(metrics.toc.top - metrics.header.bottom - 16) <= 1,
+        '目录应与标题栏保持统一间距'
+      )
+    }
+  }
+}
+
 export function createDevVersionCenterScenarios({
   assert,
   assertNoHorizontalOverflow,
@@ -483,6 +537,7 @@ export function createDevVersionCenterScenarios({
       name: 'dev-version-center-tabs-pagination-desktop',
       path: '/__dev/version-center?view=history&view=pipeline&history_action=promote&history_action=release',
       viewport: { width: 1440, height: 900 },
+      deviceScaleFactor: 2,
       beforeNavigate: async (page) => {
         summaryRequests = 0
         await installSummaryRoute(page, () => {
@@ -583,94 +638,236 @@ export function createDevVersionCenterScenarios({
           'dev-version-center-tabs-pagination-desktop'
         )
 
-        const takeoverTrigger = page.getByRole('button', {
+        const guideTrigger = page.getByRole('link', {
           name: /操作指引/u,
         })
-        await takeoverTrigger.click()
-        const takeoverDialog = page.getByRole('dialog', {
-          name: '手动与应急发布指引',
-        })
-        const ciGuide = takeoverDialog.getByRole('region', {
-          name: 'CI/CD 流程与原理',
-        })
-        await ciGuide
-          .locator('[data-section="delivery"] [data-mermaid-status="rendered"]')
-          .waitFor()
-        assert.equal(await ciGuide.locator('.erp-markdown-mermaid').count(), 1)
-        assert.equal(
+        assert.notEqual(await guideTrigger.getAttribute('target'), '_blank')
+        assert.match(
+          await guideTrigger.getAttribute('href'),
+          /version-center\/guide\?customer=yoyoosun/u
+        )
+        const initialPageCount = page.context().pages().length
+        const guideRequests = []
+        const isolateGuideApi = async (route) => {
+          if (!new URL(page.url()).pathname.endsWith('/guide')) return route.fallback()
+          guideRequests.push(route.request().url())
+          return route.abort()
+        }
+        await page.route('**/__dev/api/**', isolateGuideApi)
+        await guideTrigger.click()
+        await page.waitForURL((url) => url.pathname === '/__dev/version-center/guide')
+        const guidePage = page
+        try {
+          await expectHeading(guidePage, '手动与应急发布指引')
+          await guidePage.reload()
+          await expectHeading(guidePage, '手动与应急发布指引')
+          assert.match(await guidePage.title(), /手动与应急发布指引/u)
+          assert.match(
+            await guidePage
+              .getByRole('link', { name: '返回版本发布' })
+              .getAttribute('href'),
+            /version-center\?customer=yoyoosun/u
+          )
+          const ciGuide = guidePage.getByRole('region', {
+            name: 'CI/CD 流程与原理',
+          })
           await ciGuide
-            .getByRole('button', {
-              name: 'expanded 制品发布、部署与恢复',
-              exact: true,
-            })
-            .getAttribute('aria-expanded'),
-          'true'
-        )
-        const automationSection = takeoverDialog.getByRole('region', {
-          name: '自动续办怎么交接',
-        })
-        await automationSection
-          .locator('[data-mermaid-status="rendered"]')
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        assert.equal(
-          await automationSection.getByText(/先删除并读回本次心跳/u).isVisible(),
-          true
-        )
-        const lockSection = takeoverDialog.getByRole('region', {
-          name: 'Git 索引锁怎么处理',
-        })
-        const lockDiagram = lockSection.locator(
-          '[data-mermaid-status="rendered"]'
-        )
-        await lockDiagram.waitFor({ state: 'visible', timeout: 10_000 })
-        const lockCanvas = lockSection.locator(
-          '.erp-markdown-mermaid__canvas'
-        )
-        const previewZoom = Number(await lockCanvas.getAttribute('data-mermaid-zoom'))
-        await lockSection
-          .getByRole('button', {
-            name: '放大Git index.lock 检查与恢复流程',
+            .locator('[data-section="delivery"] [data-mermaid-status="rendered"]')
+            .waitFor()
+          for (const diagram of await ciGuide.locator('.erp-markdown-mermaid').all()) {
+            await waitForMermaidFit(guidePage, diagram)
+            await assertMermaidFits(diagram, assert)
+            await assertMermaidZoomMode(diagram, assert, 'fit-all')
+          }
+          await assertManualGuideViewport(guidePage, assert)
+          for (const viewport of [
+            { width: 1920, height: 1080 },
+            { width: 1440, height: 500 },
+          ]) {
+            await guidePage.setViewportSize(viewport)
+            await assertManualGuideViewport(guidePage, assert)
+            for (const diagram of await ciGuide.locator('.erp-markdown-mermaid').all()) {
+              await waitForMermaidFit(guidePage, diagram)
+              await assertMermaidFits(diagram, assert)
+            }
+            if (viewport.width === 1920) {
+              const layoutDiagram = ciGuide.locator('[data-section="ci-entry"] .erp-markdown-mermaid')
+              await layoutDiagram.locator('[data-mermaid-zoom-action="fit"]').click()
+              await guidePage.mouse.move(0, 0)
+              await assertMermaidZoomMode(layoutDiagram, assert, 'fit')
+              await layoutDiagram.scrollIntoViewIfNeeded()
+              await layoutDiagram.locator('[data-mermaid-zoom-action="reset"]').click()
+              await guidePage.mouse.move(0, 0)
+              await assertMermaidZoomMode(layoutDiagram, assert, 'reset')
+              await layoutDiagram.locator('[data-mermaid-zoom-action="fit-all"]').click()
+              await assertMermaidZoomMode(layoutDiagram, assert, 'fit-all')
+              await switchMermaidLayout(guidePage, layoutDiagram, assert)
+              await layoutDiagram.scrollIntoViewIfNeeded()
+              await switchMermaidLayout(guidePage, layoutDiagram, assert)
+            }
+          }
+          await guidePage.setViewportSize({ width: 1440, height: 900 })
+          assert.equal(
+            await ciGuide.locator('.ant-collapse').count(),
+            0,
+            '独立阅读页不应提供折叠面板'
+          )
+          assert.equal(
+            await ciGuide.locator('.erp-dev-ci-guide__chapter').count(),
+            CI_WORKFLOW_SECTIONS.length
+          )
+          for (const section of CI_WORKFLOW_SECTIONS) {
+            assert.equal(
+              await ciGuide
+                .getByRole('heading', { name: section.label, exact: true })
+                .isVisible(),
+              true,
+              `${section.label}应直接展开可读`
+            )
+          }
+          assert.equal(
+            await ciGuide.locator('.erp-markdown-mermaid').count(),
+            CI_WORKFLOW_SECTIONS.filter(({ chart }) => chart).length
+          )
+          const chapterNav = guidePage.getByRole('navigation', {
+            name: '操作指引章节目录',
           })
-          .click()
-        assert(Number(await lockCanvas.getAttribute('data-mermaid-zoom')) > previewZoom)
-        await lockSection
-          .getByRole('button', {
-            name: '重置Git index.lock 检查与恢复流程为 100%',
-          })
-          .click()
-        assert.equal(await lockCanvas.getAttribute('data-mermaid-zoom'), '100')
-        await switchMermaidLayout(page, lockSection.locator('.erp-markdown-mermaid'), assert)
-        await switchMermaidLayout(page, lockSection.locator('.erp-markdown-mermaid'), assert)
+          assert.equal(await guidePage.locator('.erp-dev-workspace-nav').count(), 0)
+          assert.equal(
+            await chapterNav.getByRole('link').count(),
+            CI_WORKFLOW_SECTIONS.length + 7
+          )
+          assert.equal(
+            await chapterNav.getByRole('link').evaluateAll((links) =>
+              links.every((link) => {
+                const href = link.getAttribute('href')
+                return (
+                  href.startsWith('#') &&
+                  link.target !== '_blank' &&
+                  document.getElementById(href.slice(1))
+                )
+              })
+            ),
+            true,
+            '目录链接应在本页指向真实章节'
+          )
 
-        await page.setViewportSize({ width: 480, height: 850 })
-        const takeoverBody = takeoverDialog.locator('.ant-modal-body')
-        assert.equal(
-          await takeoverBody.evaluate(
-            (node) => node.scrollWidth <= node.clientWidth
-          ),
-          true,
-          '窄屏弹窗不得被流程图撑宽'
-        )
-        assert.equal(
+          const parallelLink = chapterNav.getByRole('link', {
+            name: 'Job 并行、汇总与等待',
+            exact: true,
+          })
+          await guidePage.evaluate(() => window.scrollTo(0, 0))
+          await parallelLink.click()
+          const parallelHeading = ciGuide.getByRole('heading', {
+            name: 'Job 并行、汇总与等待',
+            exact: true,
+          })
+          await parallelHeading.waitFor()
+          await guidePage.waitForFunction(() => {
+            const { top } = document
+              .getElementById('dev-version-guide-ci-parallel')
+              .getBoundingClientRect()
+            return top >= 0 && top <= 48
+          })
+          assert.equal(new URL(guidePage.url()).hash, '#dev-version-guide-ci-parallel')
+          assert(await guidePage.evaluate(() => scrollY > 0), '点击章节目录应滚动整页正文')
+          await guidePage.reload()
+          await parallelHeading.waitFor()
+          await guidePage.waitForFunction(() => {
+            const top = document
+              .getElementById('dev-version-guide-ci-parallel')
+              ?.getBoundingClientRect().top
+            return top >= 0 && top <= 48
+          })
+
+          for (const [title, id] of [
+            ['四处操作各管什么', 'dev-version-takeover-scope-title'],
+            ['先判断能不能继续', 'dev-version-takeover-conditions-title'],
+            ['自动续办怎么交接', 'dev-version-takeover-automation-title'],
+            ['Git 索引锁怎么处理', 'dev-version-takeover-lock-title'],
+            ['手动操作顺序', 'dev-version-takeover-steps-title'],
+            ['应急边界与交接', 'dev-version-guide-boundary'],
+          ]) {
+            await chapterNav.getByRole('link', { name: title, exact: true }).click()
+            await guidePage.waitForFunction((targetId) => {
+              const box = document.getElementById(targetId).getBoundingClientRect()
+              return box.top >= 0 && box.top < innerHeight
+            }, id)
+            assert.equal(new URL(guidePage.url()).hash, `#${id}`)
+          }
+          assert.equal(
+            page.context().pages().length,
+            initialPageCount,
+            '进入指引与章节跳转都不应新开标签页'
+          )
+          const automationSection = guidePage.getByRole('region', {
+            name: '自动续办怎么交接',
+          })
+          await automationSection
+            .locator('[data-mermaid-status="rendered"]')
+            .waitFor({ state: 'visible', timeout: 10_000 })
+          assert.equal(
+            await automationSection.getByText(/先删除并读回本次心跳/u).isVisible(),
+            true
+          )
+          const lockSection = guidePage.getByRole('region', {
+            name: 'Git 索引锁怎么处理',
+          })
+          const lockDiagram = lockSection.locator('[data-mermaid-status="rendered"]')
+          await lockDiagram.waitFor({ state: 'visible', timeout: 10_000 })
+          const lockCanvas = lockSection.locator('.erp-markdown-mermaid__canvas')
+          const previewZoom = Number(await lockCanvas.getAttribute('data-mermaid-zoom'))
           await lockSection
-            .locator('.erp-markdown-mermaid__viewport')
-            .evaluate((node) => node.scrollWidth <= node.clientWidth + 2),
-          true,
-          '窄屏流程图应适配自身视口，不再被固定最小宽度撑开'
-        )
-        await takeoverDialog.getByRole('button', { name: '我知道了' }).click()
-        await takeoverDialog.waitFor({ state: 'hidden' })
-        await page.waitForFunction(
-          () => document.activeElement?.textContent?.includes('操作指引')
-        )
-        assert.equal(
-          await takeoverTrigger.evaluate(
-            (node) => node === document.activeElement
-          ),
-          true
-        )
-        await page.setViewportSize({ width: 1440, height: 900 })
+            .getByRole('button', {
+              name: '放大Git index.lock 检查与恢复流程',
+            })
+            .click()
+          assert(
+            Number(await lockCanvas.getAttribute('data-mermaid-zoom')) > previewZoom
+          )
+          await lockSection
+            .getByRole('button', {
+              name: '重置Git index.lock 检查与恢复流程为 100%',
+            })
+            .click()
+          assert.equal(await lockCanvas.getAttribute('data-mermaid-zoom'), '100')
+          await switchMermaidLayout(
+            guidePage,
+            lockSection.locator('.erp-markdown-mermaid'),
+            assert
+          )
+          await switchMermaidLayout(
+            guidePage,
+            lockSection.locator('.erp-markdown-mermaid'),
+            assert
+          )
 
+          await guidePage.setViewportSize({ width: 480, height: 850 })
+          await assertManualGuideViewport(guidePage, assert)
+          const guideBody = guidePage.locator('.erp-dev-version-guide-content')
+          assert.equal(
+            await guideBody.evaluate((node) => node.scrollWidth <= node.clientWidth),
+            true,
+            '窄屏指引页不得被流程图撑宽'
+          )
+          assert.equal(
+            await lockSection
+              .locator('.erp-markdown-mermaid__viewport')
+              .evaluate((node) => node.scrollWidth <= node.clientWidth + 2),
+            true,
+            '窄屏流程图应适配自身视口，不再被固定最小宽度撑开'
+          )
+          await assertNoHorizontalOverflow(guidePage, 'dev-version-guide-narrow')
+          assert.deepEqual(guideRequests, [], '阅读指引不应读取实时操作或目标状态')
+        } finally {
+          await page.unroute('**/__dev/api/**', isolateGuideApi)
+        }
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await page.getByRole('link', { name: '返回版本发布' }).click()
+        await expectHeading(page, '版本发布')
+        await waitForView(page, 'versions')
+        assert.equal(new URL(page.url()).searchParams.get('customer'), 'yoyoosun')
+        assert.equal(page.context().pages().length, initialPageCount)
         await page.getByRole('tab', { name: '流水线耗时' }).click()
         await waitForView(page, 'pipeline')
         await page

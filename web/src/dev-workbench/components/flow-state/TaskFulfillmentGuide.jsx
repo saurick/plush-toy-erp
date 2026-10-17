@@ -74,7 +74,6 @@ function ExceptionGuide({ role, onExploreStage, searchParams, setSearchParams })
           <MermaidDiagram
             chart={diagram.chart}
             label={`${guide.label} · ${plan.label}`}
-            initialZoom={1}
             nativeSize
             interactiveNodes={diagram.nodes}
             selectedNodeId={diagram.nodes.find((item) => item.key === selected.key).id}

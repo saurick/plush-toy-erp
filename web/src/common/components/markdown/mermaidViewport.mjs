@@ -3,8 +3,6 @@ export const MERMAID_ZOOM = Object.freeze({
   max: 2.4,
   step: 0.2,
   defaultValue: 1,
-  preview: 0.9,
-  previewMin: 0.75,
 })
 
 export function normalizeMermaidZoom(value) {
@@ -55,6 +53,8 @@ export function fitMermaidZoom({
   // Round down so the diagram still fits after the percentage is displayed.
   return Math.max(
     MERMAID_ZOOM.min,
-    Math.floor(Math.min(1, viewportWidth / baseWidth, viewportHeight / baseHeight) * 100) / 100
+    Math.floor(
+      Math.min(1, viewportWidth / baseWidth, viewportHeight / baseHeight) * 100
+    ) / 100
   )
 }

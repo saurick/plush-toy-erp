@@ -127,6 +127,10 @@ test('devHub: every dev route exposes a distinct browser title', () => {
     '版本发布 · Plush Toy ERP'
   )
   assert.equal(
+    resolveDevPageTitle('/__dev/version-center/guide', 'Plush Toy ERP'),
+    '手动与应急发布指引 · Plush Toy ERP'
+  )
+  assert.equal(
     resolveDevPageTitle('/__dev/drill-recovery', 'Plush Toy ERP'),
     '安全与恢复 · Plush Toy ERP'
   )

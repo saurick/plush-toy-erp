@@ -18,6 +18,7 @@ export const DEV_BUSINESS_CHAIN_AUDIT_ROUTE = '/__dev/business-chain-audit'
 export const DEV_QUALITY_GATES_ROUTE = '/__dev/quality-gates'
 export const DEV_DATA_PREPARATION_ROUTE = '/__dev/data-preparation'
 export const DEV_VERSION_CENTER_ROUTE = '/__dev/version-center'
+export const DEV_VERSION_GUIDE_ROUTE = '/__dev/version-center/guide'
 export const DEV_DRILL_RECOVERY_ROUTE = '/__dev/drill-recovery'
 
 export const DEV_WORKBENCH_AREA_KEYS = Object.freeze({
@@ -152,6 +153,7 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
 
 export const DEV_PAGE_TITLE_BY_ROUTE = Object.freeze({
   [DEV_HUB_ROUTE]: '研发效能工作台',
+  [DEV_VERSION_GUIDE_ROUTE]: '手动与应急发布指引',
   ...Object.fromEntries(
     DEV_WORKSPACE_NAV_ITEMS.filter((item) => item.route !== DEV_HUB_ROUTE).map(
       (item) => [item.route, item.label]

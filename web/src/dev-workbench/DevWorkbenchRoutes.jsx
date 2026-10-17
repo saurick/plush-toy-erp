@@ -22,6 +22,7 @@ import {
   DEV_STATUS_FLOWS_ROUTE,
   DEV_TESTING_ROUTE,
   DEV_VERSION_CENTER_ROUTE,
+  DEV_VERSION_GUIDE_ROUTE,
   DEV_WORKBENCH_AREA_KEYS,
   resolveDevPageFavicon,
   resolveDevPageTitle,
@@ -116,6 +117,10 @@ const DevDatabaseMigrationPage = createDevLazyRoute(
 const DevVersionCenterPage = createDevLazyRoute(
   DEV_VERSION_CENTER_ROUTE,
   () => import('./pages/DevVersionCenterPage.jsx')
+)
+const DevVersionGuidePage = createDevLazyRoute(
+  DEV_VERSION_GUIDE_ROUTE,
+  () => import('./pages/delivery/version/ManualGuidePage.jsx')
 )
 const DevDrillRecoveryPage = createDevLazyRoute(
   DEV_DRILL_RECOVERY_ROUTE,
@@ -222,6 +227,7 @@ export default function DevWorkbenchRoutes() {
             element={<DevDatabaseMigrationPage />}
           />
           <Route path="version-center" element={<DevVersionCenterPage />} />
+          <Route path="version-center/guide" element={<DevVersionGuidePage />} />
           <Route path="drill-recovery" element={<DevDrillRecoveryPage />} />
           <Route path="*" element={<Navigate to="/__dev" replace />} />
         </Routes>

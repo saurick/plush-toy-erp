@@ -157,6 +157,10 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 工作台“改动验证 → 压力测试”入口为 `/__dev/testing?view=pressure`，可运行隔离短档 / 10 分钟容量、切换历史报告并查看吞吐、方法延迟、业务对账和资源清理。报告保留候选版本与源码匹配状态；操作与读取合同见 [测试入口](../docs/engineering/研发效能工作台与CI-CD设计.md#pressure-workbench)，档位和维护方法见 [压力测试说明](../scripts/qa/README.md#pressure-testing)。
 
+版本发布页的“操作指引”在当前标签页进入 `/__dev/version-center/guide`。左侧章节目录支持同页跳转，右侧全部章节直接展开阅读；地址栏保留章节锚点，支持直接访问与刷新，长内容随整页滚动；阅读不依赖实时发布或目标状态，边界见 [版本发布说明](../docs/engineering/研发效能工作台与CI-CD设计.md#版本发布与部署中心-__devversion-center)。
+
+效能工作台的 Mermaid 图首次显示即适应全图，隐藏区域展开及容器尺寸变化时继续自动适配；手动缩放、适配宽度和重置由用户控制。共享交互与打印边界见 [可视化表达规范](../docs/engineering/可视化表达规范.md#图形与交互--presentation)。
+
 ## 当前前端边界
 
 前端负责展示与交互，领域事实、状态、权限和幂等由后端决定。详细读取与写后恢复合同见 [页面规则](../docs/engineering/前端实现与交互约定.md#前端实现与读取边界) 和 [API 合同](../server/docs/api.md)。

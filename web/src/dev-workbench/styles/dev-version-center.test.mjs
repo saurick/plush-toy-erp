@@ -14,10 +14,7 @@ const timestampComponent = readFileSync(
   new URL('../components/DevDeliveryTimestamp.jsx', import.meta.url),
   'utf8'
 )
-const versionPage = readFileSync(
-  new URL('../pages/DevVersionCenterPage.jsx', import.meta.url),
-  'utf8'
-)
+const versionPage = ['../pages/DevVersionCenterPage.jsx', '../pages/delivery/version/ManualGuidePage.jsx', '../pages/delivery/version/shared.jsx'].map((path) => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n')
 
 test('version center keeps strict quality evidence as a compact summary and deep link', () => {
   assert.match(versionPage, /当前发布 SHA 严格门禁/u)
@@ -34,7 +31,7 @@ test('version center keeps strict quality evidence as a compact summary and deep
   )
 })
 
-test('manual takeover keeps the Git index lock diagram readable in its bounded modal', () => {
+test('manual takeover keeps the Git index lock diagram readable on its guide page', () => {
   assert.match(versionPage, /erp-dev-version-takeover-lock-flow/u)
   assert.match(css, /[.]erp-dev-version-takeover-lock-flow/u)
   assert.match(
@@ -141,13 +138,11 @@ test('version decisions and target evidence remain source-backed', () => {
   assert.match(component, /查看耗时详情/u)
 })
 
-test('manual takeover guide keeps bounded internal scrolling', () => {
+test('manual takeover guide uses a standalone page without the former modal limits', () => {
   assert.match(versionPage, /手动与应急发布指引/u)
   assert.match(versionPage, /<ManualTakeoverGuide \/>/u)
-  assert.match(
-    css,
-    /[.]erp-dev-version-takeover-modal [.]ant-modal-body \{[\s\S]*max-height:[\s\S]*overflow-y: auto;[\s\S]*overscroll-behavior: contain;/u
-  )
+  assert.match(versionPage, /<main className="erp-dev-version-guide-content">/u)
+  assert.doesNotMatch(css, /erp-dev-version-takeover-modal/u)
 })
 
 test('operation detail separates release artifacts from target deployment metrics', () => {

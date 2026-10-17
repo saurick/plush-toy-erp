@@ -1,6 +1,6 @@
 import { projectCiJobGuides } from '../../../scripts/qa/ci-job-guide.mjs'
 import { CI_WORKFLOW_SECTIONS } from '../../src/dev-workbench/config/devCiWorkflow.mjs'
-import { switchMermaidLayout } from './mermaidViewerAssertions.mjs'
+import { assertMermaidFits, switchMermaidLayout, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
 
 const NOW = '2026-08-09T08:00:00.000Z'
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
@@ -1139,6 +1139,9 @@ export function createDevQualityGateScenarios({
         await parallelDiagram
           .locator('[data-mermaid-status="rendered"]')
           .waitFor()
+        const parallelViewer = parallelDiagram.locator('.erp-markdown-mermaid')
+        await waitForMermaidFit(page, parallelViewer)
+        await assertMermaidFits(parallelViewer, assert)
         const parallelGeometry = await parallelDiagram.evaluate((node) => {
           const viewport = node.querySelector('.erp-markdown-mermaid__viewport')
           const svg = node.querySelector('.erp-markdown-mermaid__canvas > svg')
@@ -1152,19 +1155,8 @@ export function createDevQualityGateScenarios({
           }
         })
         assert.equal(parallelGeometry.localScroll, false, JSON.stringify(parallelGeometry))
-        assert(
-          parallelGeometry.renderedFont >= 12,
-          JSON.stringify(parallelGeometry)
-        )
         const parallelCanvas = parallelDiagram.locator(
           '.erp-markdown-mermaid__canvas'
-        )
-        const previewZoom = Number(
-          await parallelCanvas.getAttribute('data-mermaid-zoom')
-        )
-        assert(
-          previewZoom >= 75 && previewZoom <= 90,
-          '初始缩放按可见高度适配，且保留可读文字'
         )
         await parallelDiagram
           .getByRole('button', {
@@ -1176,6 +1168,12 @@ export function createDevQualityGateScenarios({
           await parallelCanvas.getAttribute('data-mermaid-zoom'),
           '100'
         )
+        const detailFontSize = await parallelDiagram.evaluate((node) => {
+          const svg = node.querySelector('.erp-markdown-mermaid__canvas > svg')
+          return parseFloat(getComputedStyle(svg.querySelector('text')).fontSize) *
+            svg.getBoundingClientRect().width / svg.viewBox.baseVal.width
+        })
+        assert(detailFontSize >= 12, '适配宽度后应能清晰阅读图中文字')
         assert.equal(
           await parallelDiagram
             .locator('.erp-markdown-mermaid__viewport')

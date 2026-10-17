@@ -1,5 +1,5 @@
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
-import { switchMermaidLayout } from './mermaidViewerAssertions.mjs'
+import { switchMermaidLayout, verifyMermaidZoomModes } from './mermaidViewerAssertions.mjs'
 import { WorkflowTaskDiscoveryCatalog as taskCatalog } from '../../src/common/consts/workflowTaskDiscovery.generated.mjs'
 import { getFulfillmentSupplement } from '../../src/dev-workbench/config/devFulfillmentPresentation.mjs'
 
@@ -79,6 +79,7 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       await page.screenshot({ path: path.join(outputDir, `order-flow-overview-${mobile ? 'mobile' : 'desktop'}-4k.png`), fullPage: mobile, scale: 'device' })
       await stageButton('sales_order').click()
       await verifySubflowPreview()
+      await verifyMermaidZoomModes(page, subflowDiagram, assert)
       if (!mobile) {
         for (const viewport of [{ width: 1440, height: 900 }, { width: 1366, height: 768 }]) {
           await page.setViewportSize(viewport)
@@ -98,7 +99,7 @@ export function createDevRoleFlowScenarios({ assert, outputDir, path }) {
       await guide.locator('.erp-dev-fulfillment-guide__result').getByRole('heading', { name: '来料检验与材料入库', exact: true }).waitFor()
       if (!mobile) assert.deepEqual(await overviewPosition(), overviewBeforeSelection, '切换详情不改变流程总览的位置')
       await page.reload()
-      await guide.getByRole('button', { name: /来料检验与材料入库/u, pressed: true }).waitFor()
+      await guide.locator('[data-fulfillment-stage="incoming_quality"]').getByRole('button', { name: /来料检验与材料入库/u, pressed: true }).waitFor()
       assert.equal(new URL(page.url()).searchParams.has('flow_view'), false)
       await verifySubflowPreview()
       const verifyDiagramFont = async () => {

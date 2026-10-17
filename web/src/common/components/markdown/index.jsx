@@ -119,7 +119,7 @@ export function MermaidDiagram({
   showSourceOnError = true,
   themeMode,
   flowchartHtmlLabels = true,
-  initialZoom,
+  initialZoom = 'fit',
   nativeSize = false,
   interactiveNodes,
   selectedNodeId,
@@ -130,10 +130,8 @@ export function MermaidDiagram({
     themeMode === 'light' || themeMode === 'dark' ? themeMode : currentTheme
   const useFlowchartHtmlLabels = flowchartHtmlLabels !== false
   const fitInitially = initialZoom === 'fit'
-  const autoPreview = !fitInitially && !Number.isFinite(initialZoom)
-  const startingZoom = autoPreview
-    ? MERMAID_ZOOM.preview
-    : normalizeMermaidZoom(initialZoom)
+  const initialZoomMode = fitInitially ? 'fit-all' : 'manual'
+  const startingZoom = normalizeMermaidZoom(initialZoom)
   const displayLabel = String(label || '').trim() || '图表'
   const diagramId = useMemo(() => {
     mermaidRenderSequence += 1
@@ -143,6 +141,10 @@ export function MermaidDiagram({
   const [fullscreenZoom, setFullscreenZoom] = useState(
     MERMAID_ZOOM.defaultValue
   )
+  const [zoomModes, setZoomModes] = useState({
+    inline: initialZoomMode,
+    fullscreen: 'fit-all',
+  })
   const [fullscreenOpen, setFullscreenOpen] = useState(false)
   const [fullscreenPlaceholder, setFullscreenPlaceholder] = useState(null)
   const [inlineViewportHeight, setInlineViewportHeight] = useState()
@@ -151,8 +153,6 @@ export function MermaidDiagram({
   const nextDirection = toggleMermaidDirection(activeDirection)
   const renderedChart = withMermaidDirection(chart, direction)
   const diagramRef = useRef(null)
-  const fitOnRenderRef = useRef(fitInitially)
-  const previewOnRenderRef = useRef(autoPreview)
   const dragRef = useRef(null)
   const [panning, setPanning] = useState(false)
   const fullscreenOpenRef = useRef(null)
@@ -175,11 +175,16 @@ export function MermaidDiagram({
   }, [])
 
   const activeZoom = fullscreenOpen ? fullscreenZoom : zoom
+  const activeZoomMode = zoomModes[fullscreenOpen ? 'fullscreen' : 'inline']
   const zoomPercent = Math.round(activeZoom * 100)
 
   const setNextZoom = useCallback(
-    (nextZoom) => {
+    (nextZoom, { mode = 'manual' } = {}) => {
       const nextValue = normalizeMermaidZoom(nextZoom)
+      const scope = fullscreenOpen ? 'fullscreen' : 'inline'
+      setZoomModes((previous) =>
+        previous[scope] === mode ? previous : { ...previous, [scope]: mode }
+      )
       if (fullscreenOpen) setFullscreenZoom(nextValue)
       else setZoom(nextValue)
     },
@@ -187,37 +192,44 @@ export function MermaidDiagram({
   )
 
   const fitToView = useCallback(
-    ({ preview = false } = {}) => {
+    (mode = 'fit-all') => {
       const viewport = viewportRef.current
       const canvas = canvasRef.current
-      if (!viewport || !canvas) return
+      if (!viewport || !canvas) return false
       const canvasStyle = window.getComputedStyle(canvas)
       const padding =
         (Number.parseFloat(canvasStyle.paddingTop) || 0) +
         (Number.parseFloat(canvasStyle.paddingBottom) || 0)
-      const heightLimit = Number.parseFloat(
-        window.getComputedStyle(viewport).maxHeight
-      )
+      const viewportStyle = window.getComputedStyle(viewport)
+      const heightLimit = Number.parseFloat(viewportStyle.maxHeight)
+      // 自适应高度取上限，避免图形缩小后继续把自身高度当成新的缩放上限。
+      // 固定高度和 flex 画布取实际剩余空间，计入工具栏换行。
+      const constrainedHeight =
+        fullscreenOpen ||
+        inlineViewportHeight ||
+        Number.parseFloat(viewportStyle.flexGrow) > 0
       const height =
-        fullscreenOpen || inlineViewportHeight
+        constrainedHeight || !Number.isFinite(heightLimit)
           ? viewport.clientHeight
           : heightLimit
+      if (
+        viewport.clientWidth <= 0 ||
+        viewport.clientHeight <= 0 ||
+        height <= padding
+      ) {
+        return false
+      }
       const fittedZoom = fitMermaidZoom({
         width: renderState.intrinsicWidth,
         height: renderState.intrinsicHeight,
         viewportWidth: viewport.clientWidth,
-        viewportHeight: height - padding,
+        viewportHeight:
+          mode === 'fit-width' ? renderState.intrinsicHeight : height - padding,
         nativeSize,
       })
-      setNextZoom(
-        preview
-          ? Math.max(
-              MERMAID_ZOOM.previewMin,
-              Math.min(MERMAID_ZOOM.preview, fittedZoom)
-            )
-          : fittedZoom
-      )
+      setNextZoom(fittedZoom, { mode })
       viewport.scrollTo(0, 0)
+      return true
     },
     [
       fullscreenOpen,
@@ -232,20 +244,33 @@ export function MermaidDiagram({
   useLayoutEffect(() => {
     if (
       renderState.status !== 'rendered' ||
-      renderState.source !== renderedChart
+      renderState.source !== renderedChart ||
+      activeZoomMode === 'manual'
     ) {
-      return
+      return undefined
     }
-    if (!fitOnRenderRef.current && !previewOnRenderRef.current) return
-    const preview = !fitOnRenderRef.current && previewOnRenderRef.current
-    fitOnRenderRef.current = false
-    previewOnRenderRef.current = false
-    fitToView({ preview })
+    const viewport = viewportRef.current
+    if (!viewport) return undefined
+    let frame
+    const fit = () => fitToView(activeZoomMode)
+    const scheduleFit = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(fit)
+    }
+    fit()
+    const observer = new ResizeObserver(scheduleFit)
+    observer.observe(viewport)
+    return () => {
+      observer.disconnect()
+      window.cancelAnimationFrame(frame)
+    }
   }, [
     renderState.status,
     renderState.svg,
     renderState.source,
     renderedChart,
+    fullscreenOpen,
+    activeZoomMode,
     fitToView,
   ])
 
@@ -255,11 +280,10 @@ export function MermaidDiagram({
     setFullscreenOpen(false)
     setInlineViewportHeight(undefined)
     setDirection('')
-    fitOnRenderRef.current = fitInitially
-    previewOnRenderRef.current = autoPreview
+    setZoomModes({ inline: initialZoomMode, fullscreen: 'fit-all' })
     dragRef.current = null
     setPanning(false)
-  }, [chart, startingZoom, autoPreview, fitInitially])
+  }, [chart, startingZoom, initialZoomMode])
 
   useEffect(() => {
     if (!fullscreenOpen || typeof document === 'undefined') {
@@ -365,8 +389,9 @@ export function MermaidDiagram({
   }, [chart, renderedChart, diagramId, theme, useFlowchartHtmlLabels])
 
   useEffect(() => {
-    if (renderState.chart !== chart || typeof onNodeSelect !== 'function')
-      { return undefined }
+    if (renderState.chart !== chart || typeof onNodeSelect !== 'function') {
+      return undefined
+    }
     return bindMermaidNodeActions(
       canvasRef.current,
       interactiveNodes,
@@ -394,7 +419,10 @@ export function MermaidDiagram({
     if (!fullscreenOpen) {
       setInlineViewportHeight(viewportRef.current?.clientHeight)
     }
-    fitOnRenderRef.current = true
+    setZoomModes((previous) => ({
+      ...previous,
+      [fullscreenOpen ? 'fullscreen' : 'inline']: 'fit-all',
+    }))
     setDirection((previous) =>
       toggleMermaidDirection(previous || getMermaidDirection(chart))
     )
@@ -444,7 +472,7 @@ export function MermaidDiagram({
   const openFullscreen = () => {
     fullscreenReturnFocusRef.current =
       typeof document === 'undefined' ? null : document.activeElement
-    fitOnRenderRef.current = true
+    setZoomModes((previous) => ({ ...previous, fullscreen: 'fit-all' }))
     const root = diagramRef.current
     setFullscreenPlaceholder({
       height: root.getBoundingClientRect().height,
@@ -508,7 +536,8 @@ export function MermaidDiagram({
               data-mermaid-zoom-action="fit-all"
               title="适应全图"
               aria-label={`适应${displayLabel}全图`}
-              onClick={fitToView}
+              aria-pressed={activeZoomMode === 'fit-all'}
+              onClick={() => fitToView('fit-all')}
             >
               <FullscreenOutlined />
             </button>
@@ -518,17 +547,8 @@ export function MermaidDiagram({
               data-mermaid-zoom-action="fit"
               title="适配宽度"
               aria-label={`适配${displayLabel}宽度`}
-              onClick={() =>
-                setNextZoom(
-                  nativeSize
-                    ? Math.min(
-                        1,
-                        viewportRef.current.clientWidth /
-                          renderState.intrinsicWidth
-                      )
-                    : MERMAID_ZOOM.defaultValue
-                )
-              }
+              aria-pressed={activeZoomMode === 'fit-width'}
+              onClick={() => fitToView('fit-width')}
             >
               <ColumnWidthOutlined />
             </button>
@@ -566,6 +586,10 @@ export function MermaidDiagram({
               data-mermaid-zoom-action="reset"
               title="重置 100%"
               aria-label={`重置${displayLabel}为 100%`}
+              aria-pressed={
+                activeZoomMode === 'manual' &&
+                activeZoom === MERMAID_ZOOM.defaultValue
+              }
               onClick={() => setNextZoom(MERMAID_ZOOM.defaultValue)}
             >
               <OneToOneOutlined />

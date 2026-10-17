@@ -4685,7 +4685,7 @@
       {key:'gates', purpose:'固定版本 CI 与本机诊断', area:'quality', title:'质量门禁', source:'固定版本的 CI 结果', status:'待核对', detail:'流程与并发原理可按需展开；样例版本尚缺完整 CI 终态，局部测试通过不代表发布资格。', path:'/__dev/quality-gates'},
       {key:'data', purpose:'模拟数据、复用与批次结果', area:'quality', title:'测试数据', source:'隔离样例与验证资料', status:'已核对', detail:'按用途选择基础数据、业务场景或完整回归；就近处理阻断，准备后确认批次，执行记录单独查看。', path:'/__dev/data-preparation'},
       {key:'config', purpose:'配置包预检、差异与测试应用', area:'delivery', title:'客户配置', source:'配置快照与固定版本', status:'已核对', detail:'核对客户配置和当前版本的关系；不把配置选择当成部署完成。', path:'/__dev/customer-config'},
-      {key:'versions', purpose:'制品、部署与回滚', area:'delivery', title:'版本发布', source:'不可变制品与目标读回', status:'待核对', detail:'选择版本后核对目标、门禁与回滚点。未完成目标读回前，保持未证明。', path:'/__dev/version-center'},
+      {key:'versions', purpose:'制品、部署与回滚', area:'delivery', title:'版本发布', source:'不可变制品与目标读回', status:'待核对', detail:'选择版本后核对目标、门禁与回滚点。操作指引在当前标签页进入，标题栏铺满页面，目录与正文齐顶；章节全部展开，目录只做同页定位。未完成目标读回前，保持未证明。', path:'/__dev/version-center'},
       {key:'migration', purpose:'备份恢复、升级计划与结果', area:'delivery', title:'数据库迁移', source:'迁移计划、备份与恢复验证', status:'待核对', detail:'计划准备就绪后才允许确认；失败保留恢复入口，不自动执行或重试迁移。', path:'/__dev/database-migration'},
       {key:'recovery', purpose:'目标安全、备份与恢复证据', area:'delivery', title:'安全与恢复', source:'安全合同、恢复点与演练回执', status:'未核验', detail:'只读核对应用、入口身份、异常监测及备份隔离；数据库恢复不能代替完整抗勒索核验。', path:'/__dev/drill-recovery'}
     ];

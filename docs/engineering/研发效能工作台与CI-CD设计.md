@@ -127,7 +127,7 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 - `版本与部署` 读取 GitLab Release 与 package 完整性；
 - `流水线耗时` 展示 pipeline/job、完整发布与 exact-SHA 复用、BuildKit、制品大小和远端流水线关键路径；
 - `操作记录` 展示发布制品、部署指定版本（内部 operation 为 `promote`）、回滚版本和独立数据清空重建的状态、幂等与脱敏事件，并以 URL 恢复结果、动作、目标和版本身份筛选；
-- 手动操作指引明确 GitLab 主链、GitHub 只读镜像和固定操作顺序。
+- “操作指引”在当前标签页进入 `/__dev/version-center/guide`；左侧使用章节目录，全部章节直接展开，点击目录只做同页定位，地址栏保留章节锚点，支持直接访问与刷新。指引明确 GitLab 主链、GitHub 只读镜像和固定操作顺序。
 
 工作台不把本地绿色、GitLab pipeline、GitLab Release、目标 smoke、备份恢复、岗位矩阵或客户 UAT 合成一个“全部完成”。每层单独显示来源与时间；缺失或非法时间显示“未证明”。
 
@@ -137,7 +137,7 @@ GPT Review 的 finding 是审查输入，不是仓库事实。修复仍回到 Gi
 
 “流程与原理”在缺少 GitLab 证据时仍可打开。保留提交到部署总览、Job 并行、共享资源与发布恢复，另按需展开提交检查、提交前与 CI 覆盖对照、推送回执、CI 触发与执行、失败排查。每节提供有序步骤、所需明细表、当前来源及可复制指引；规则图和覆盖表不显示运行成功，不把未启用 hook、未选中、未运行或过期证据当成通过。当前 hook 和默认推送准备未包含 Web lint，页面如实说明边界；hooks 是否启用需要读取当前 checkout 配置，不能根据仓库文件存在推断。
 
-CI 阅读顺序覆盖 workflow / Job rules、Runner 排队、每个 Job 的 before_script、plan、prepare、各领域执行、清理、聚合及 CI Gate 证据上传；区分未创建、未运行、执行失败和证据不完整。资源敏感 lane 等待 Web / Server 汇总，四条 Server lane 共用 `quality-server-heavy` 资源组；浏览器等待同 SHA Web 构建及升级、关键 PostgreSQL Job 清理。机制图不复制实时 DAG 或运行状态，具体依赖仍从当前提交配置读取。图沿用 Mermaid 缩放与全屏，表格和图形只在自身区域滚动。版本中心复用同一组件并默认展开发布部分。
+CI 阅读顺序覆盖 workflow / Job rules、Runner 排队、每个 Job 的 before_script、plan、prepare、各领域执行、清理、聚合及 CI Gate 证据上传；区分未创建、未运行、执行失败和证据不完整。资源敏感 lane 等待 Web / Server 汇总，四条 Server lane 共用 `quality-server-heavy` 资源组；浏览器等待同 SHA Web 构建及升级、关键 PostgreSQL Job 清理。机制图不复制实时 DAG 或运行状态，具体依赖仍从当前提交配置读取。图沿用 Mermaid 缩放与全屏，表格和图形只在自身区域滚动。独立的版本发布操作指引页复用同一章节内容，以全部展开的文档形式阅读，正文随整页滚动，不依赖版本目录或目标状态读取成功。
 
 抽屉可展开并复制当前流水线或单 Job 的排查信息：本机 HEAD/dirty、CI SHA、Pipeline / Job URL、状态、实际执行次数、运行与排队时长、已读取的依赖、定义入口、证据路径及待补材料。仅格式化现有公开结构化投影，不读取原始日志、凭据或任意对象字段；缺少 CI 时仍保留未读取说明。完整错误上下文、退出码与历史 attempt 需要从 GitLab 取得并脱敏。最终成功不能代替首轮成功；修复后的新 SHA 与同 SHA 重试分别判断，尚未读取完整首轮记录时不计算首次通过率。
 
@@ -253,6 +253,7 @@ demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；
 | `/__dev/ui-design` | 最新 HTML 交互稿、设计说明与设计依据 | `docs/product/ui-design/**` |
 | `/__dev/customer-config` | 已登记客户配置包预检、测试应用与发布门禁 | `config/customers/<customer-key>/*` 及 customer config 脚本 |
 | `/__dev/version-center` | exact-SHA 发布、固定 133 部署与回滚 | GitLab Release、固定目标预检与 operation 回执 |
+| `/__dev/version-center/guide` | 章节目录同页定位发布原理、手动顺序与应急边界 | 同一 CI/CD 指引组件与正式发布合同，不读取实时目标状态 |
 | `/__dev/drill-recovery` | 安全核验要求、演练周期、恢复证据与事件处置指引 | 应用安全合同、固定目标预检与恢复 / operation 回执 |
 
 ### 开发导航 `/__dev`
@@ -532,7 +533,7 @@ flowchart LR
 
 - 页面只在 development serve 中存在，展示当前 HEAD/dirty、GitLab 不可变版本、`demo-133` 与 `customer-test-133` 的当前 SHA、容量 blocker 和 operation 状态。它不把本地、CI、制品、目标 smoke 或验收合并成一个绿色结论；根域临时跳转不启用 `erp` target，退役的 `admin.yoyoosun.net` 也不是部署 target。
 - 四个视图通过 `view=versions|overview|pipeline|history` 恢复；切换只改变内容，未结束 operation 始终可见。目标切换只展示当前目标的数据边界，写请求进行中锁定客户与目标。最近最多 20 个不可变版本固定每页 6 条，已结束操作每页 10 条；切换视图不重新请求摘要，也不会停止未结束 operation 的轮询。
-- 顶部“手动操作指引”只解释 AI 不可用或用户亲自操作时如何沿用同一正式链路：Codex / 本地终端负责验证和中文提交，GitLab 负责代码真源、CI 与不可变 Release，GitHub 只接收 GPT Review 镜像，当前页面负责发布制品、部署、回滚和查看回执。说明会先区分可继续与必须停止的证据，再给出固定顺序和禁止捷径；它不创建 commit、push、tag、凭据输入、后台调度或第二套发布动作。自动续办 Mermaid 固定“等待心跳只读重查 → 全部会话与 writer 结束 → 先删除并读回心跳 → 同一次续办进入执行”的交接；删除失败不得开始实现、造数、Git 或部署，执行阶段也不重建同目的心跳，只有用户后来再次要求等待才新建。Git 收口遇到 `index.lock` 时，指引用 Mermaid 展示活动 owner 判定、当前 index 备份、旧候选隔离、读回与继续条件；空锁和非空锁走同一证据流程，非空候选不会被直接删除或覆盖当前 index，已有提交 / 锁恢复授权也不会因候选非空重复询问。
+- 顶部“操作指引”在当前标签页进入独立指引页；顶部标题栏铺满可用宽度，下方目录与正文齐顶；左侧显示章节目录，右侧全部章节直接展开，点击目录只做同页定位。CI/CD 小节沿用同一目录真源。章节锚点支持刷新与直接访问，正文随整页滚动，保留“返回版本发布”入口。指引只解释 AI 不可用或用户亲自操作时如何沿用同一正式链路：Codex / 本地终端负责验证和中文提交，GitLab 负责代码真源、CI 与不可变 Release，GitHub 只接收 GPT Review 镜像，当前页面负责发布制品、部署、回滚和查看回执。说明会先区分可继续与必须停止的证据，再给出固定顺序和禁止捷径；它不创建 commit、push、tag、凭据输入、后台调度或第二套发布动作。自动续办 Mermaid 固定“等待心跳只读重查 → 全部会话与 writer 结束 → 先删除并读回心跳 → 同一次续办进入执行”的交接；删除失败不得开始实现、造数、Git 或部署，执行阶段也不重建同目的心跳，只有用户后来再次要求等待才新建。Git 收口遇到 `index.lock` 时，指引用 Mermaid 展示活动 owner 判定、当前 index 备份、旧候选隔离、读回与继续条件；空锁和非空锁走同一证据流程，非空候选不会被直接删除或覆盖当前 index，已有提交 / 锁恢复授权也不会因候选非空重复询问。
 - “流水线耗时”直接读取固定 GitLab 项目最近 pipeline、job 与时间；GitLab Jobs API 不提供 GitHub 式 step 时间时，界面保持 job 级证据，不伪造步骤。页面分别显示统计读取时间及最近一次流水线、最近一次制品发布和构建制品的事件时间，并默认展示可见关键路径、最长可见环节和建议复核点；全部任务与步骤按需展开，不自动并发、重跑或复制 GitLab 状态。目标部署仍以工作台 operation 独立计时和读回。
 - 发布只允许当前 clean exact SHA；GitLab adapter 固定 `gitlab.saurick.me/saurick/plush-toy-erp`、受保护 main、Generic Package 和 `yoyoosun`。版本目录、流水线耗时、发布状态与控制制品下载使用只读 Provider；只有创建新发布调用 GitLab 写 Provider，未加载短期 `PLUSH_GITLAB_TOKEN` 时页面保持可读并停用该动作。显式 `PLUSH_DELIVERY_PROVIDER=github` 只启用 GitHub 历史只读 adapter，其发布方法固定拒绝。
 - 版本列表不改写不可变版本号；GitLab adapter 提供带时区的 `publishedAt`，每行在版本号和 short SHA 下显示本地完整日期时间，并用 HTML `time/dateTime` 保留原始值。Provider 拒绝缺失或非法发布时间，前端摘要合同进一步拒绝无时区值；比 133 当前 manifest 新的版本只允许准备部署，旧版本只允许检查回滚，当前 manifest、migration 序列或客户配置源指纹不能证明时按钮禁用并说明原因。顶部严格门禁与最新不可变版本、当前 operation、历史记录、详情头部和事件流统一显示各自真源提供的完成、发布、开始或更新时间；没有对应真源时显示“时间未证明”，不拿制品发布时间推算目标部署或公网核验时间。
