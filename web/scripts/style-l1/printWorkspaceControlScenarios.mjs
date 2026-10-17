@@ -159,6 +159,9 @@ export function createPrintWorkspaceControlScenarios({
       auth: 'admin',
       viewport: { width: 1600, height: 1100 },
       verify: async (page) => {
+        // Document navigation must respect the draft's unsaved-change protection.
+        await page.locator('.erp-print-shell--ready').waitFor()
+        await page.locator('[data-print-draft-save-status="saved"]').waitFor()
         const reports = []
         for (const template of printTemplateCatalog.filter(
           (item) => item.runtime?.workspace
@@ -305,6 +308,7 @@ export function createPrintWorkspaceControlScenarios({
             report.restored.every((state) => state.textFits),
             `${template.key} 恢复后的空值提示必须完整显示: ${JSON.stringify(report.restored.filter((state) => !state.textFits))}`
           )
+          await page.locator('[data-print-draft-save-status="saved"]').waitFor()
           reports.push(report)
           console.log(
             `[print-all-empty] ${template.key}: ${count} fields, ${report.states.filter((state) => !state.textFits).length} clipped states`

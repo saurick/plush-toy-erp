@@ -645,13 +645,15 @@ quality_node:
       artifacts: false
     - job: quality_web_build
       artifacts: true
-    # Atlas schema checks also start and stop a Docker dev database. Finish all
-    # server network changes before Chromium opens its loopback connections.
+    # Finish database and Bootstrap fixture networking before Chromium opens
+    # loopback connections that must survive full document navigation.
     - job: quality_server_schema
       artifacts: false
     - job: quality_server_upgrade
       artifacts: false
     - job: quality_server_critical_postgres
+      artifacts: false
+    - job: quality_resource
       artifacts: false
   script:
     - node scripts/qa/ci-quality-stage-lane.mjs --shard browser --lane boundary_entry_print

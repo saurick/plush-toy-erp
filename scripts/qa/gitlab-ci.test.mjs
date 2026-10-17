@@ -203,13 +203,14 @@ test("documentation routing is guarded by the shared complete non-Markdown path 
   assert.match(gate, /test "\$effective_mode" = full/u);
 });
 
-test("browser lanes wait for every server check that changes Docker networking", () => {
+test("browser lanes wait for database and Bootstrap Docker network cleanup", () => {
   for (const { job } of Object.values(CI_BROWSER_QUALITY_LANES)) {
     const block = yamlJobBlock(job);
     for (const dependency of [
       "quality_server_schema",
       "quality_server_upgrade",
       "quality_server_critical_postgres",
+      "quality_resource",
     ]) {
       assert.match(
         block,
@@ -220,7 +221,7 @@ test("browser lanes wait for every server check that changes Docker networking",
   }
 });
 
-test("database checks release Browser before server test/build takes the heavy slot", () => {
+test("server test/build follows database cleanup without waiting for Browser", () => {
   const testBuild = yamlJobBlock("quality_server_test_build");
   for (const databaseJob of [
     "quality_server_schema",
@@ -242,7 +243,7 @@ test("database checks release Browser before server test/build takes the heavy s
     assert.doesNotMatch(
       yamlJobBlock(job),
       /job: quality_server(?:_test_build)?\n/u,
-      "Browser and server test/build remain independently schedulable after database cleanup",
+      "Browser uses the resource cleanup fan-in instead of duplicating server dependencies",
     );
   }
 });
