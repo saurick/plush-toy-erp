@@ -40,6 +40,7 @@ import {
   resolveCurrentBatchListFilter,
   sourceDocumentSearchPrefix,
   shipmentListReady,
+  environmentAuditListReady,
   evaluateBusinessDashboardEvidence,
   browserProjectionBaselineProven,
   evaluateBusinessDashboardCurrentBatchEvidence,
@@ -2348,6 +2349,56 @@ test("shipment release browser evidence proves live due-soon and overdue categor
   );
 });
 
+function sourceQuantityFixture(
+  unit,
+  total,
+  probeID = unit,
+  representative = "YS8",
+) {
+  const currentBatchDOM = {
+    mode: "source_prefix",
+    identifier: "YS8",
+    visibleItems: 10,
+    matchingCurrentBatchItems: 10,
+    currentBatchVisible: true,
+  };
+  return {
+    currentBatch: {
+      dataStatus: "pass",
+      actual: total,
+      probes: [
+        {
+          id: probeID,
+          status: "pass",
+          actual: total,
+          batchEvidence: "prefix_filtered",
+          batchPrefix: "YS8",
+          queryKeyword: "YS8",
+        },
+      ],
+    },
+    currentBatchDOM: { ...currentBatchDOM, identifier: representative },
+    renderedItems: 10,
+    pageReportedTotal: total,
+    minimumRecords: total,
+    expectedUnit: unit,
+    quantityScope: {
+      mode: "filtered_prefix",
+      unit,
+      scopeVerified: true,
+      total,
+      expectedTotal: total,
+      totalConsistent: true,
+      sourceProbeId: probeID,
+      sourceBatchPrefix: "YS8",
+      renderedRows: 10,
+      matchingRows: 10,
+      scope: { lifecycle: "all", search: "YS8" },
+      currentBatchDOM,
+    },
+  };
+}
+
 test("current-batch list evidence cannot be satisfied by an unrelated page total", () => {
   const currentBatch = {
     dataStatus: "pass",
@@ -2378,20 +2429,8 @@ test("current-batch list evidence cannot be satisfied by an unrelated page total
     false,
   );
   assert.equal(
-    evaluateCurrentBatchListEvidence({
-      currentBatch,
-      currentBatchDOM: {
-        mode: "source_prefix",
-        identifier: "YS8",
-        visibleItems: 20,
-        matchingCurrentBatchItems: 20,
-        currentBatchVisible: true,
-      },
-      renderedItems: 20,
-      pageReportedTotal: 60,
-      minimumRecords: 60,
-      quantityScope: { mode: "filtered_prefix", unit: "records", scopeVerified: true, total: 60, expectedTotal: 60, renderedRows: 20, matchingRows: 20, totalConsistent: true, scope: { search: "YS8" } },
-    }).minimumSatisfied,
+    evaluateCurrentBatchListEvidence(sourceQuantityFixture("customers", 60))
+      .minimumSatisfied,
     true,
   );
 });
@@ -2413,6 +2452,7 @@ test("page-data contract and readiness expose current-batch list identifiers", (
             actual: 60,
             batchEvidence: "prefix_filtered",
             batchPrefix: "YS8",
+            params: { keyword: "YS8" },
           },
         ],
       },
@@ -2425,6 +2465,7 @@ test("page-data contract and readiness expose current-batch list identifiers", (
     ];
   assert.equal(currentBatch.dataStatus, "pass");
   assert.equal(currentBatch.probes[0].batchPrefix, "YS8");
+  assert.equal(currentBatch.probes[0].queryKeyword, "YS8");
   assert.deepEqual(resolveCurrentBatchListFilter(customers, currentBatch, {}), {
     mode: "source_prefix",
     identifier: "YS8",
@@ -2528,7 +2569,22 @@ test("task board binds task-code metadata to the exact current-batch total", () 
     },
     renderedItems: 20,
     minimumRecords: 20,
-    quantityScope: { mode: "filtered_prefix", unit: "records", scopeVerified: true, total: 20, expectedTotal: 20, renderedRows: 20, matchingRows: 20, totalConsistent: true, scope: { search: prefix } },
+    quantityScope: {
+      mode: "canonical_records",
+      unit: "records",
+      scopeVerified: true,
+      total: 20,
+      totalConsistent: true,
+      canonicalMembershipVerified: true,
+      canonicalIdentifiers: Array.from(
+        { length: 20 },
+        (_, index) => `${prefix}${index + 1}`,
+      ),
+      matchedIdentifiers: Array.from(
+        { length: 20 },
+        (_, index) => `${prefix}${index + 1}`,
+      ),
+    },
   };
   assert.equal(
     evaluateCurrentBatchListEvidence({ ...base, pageReportedTotal: 20 })
@@ -3445,30 +3501,8 @@ test("current status-scope labels replace retired shipment summary text", () => 
 });
 
 test("a current-batch scoped total uses its actual page size without treating a representative as the batch", () => {
-  const scoped = {
-    mode: "filtered_prefix",
-    unit: "records",
-    scopeVerified: true,
-    total: 45,
-    expectedTotal: 45,
-    renderedRows: 10,
-    matchingRows: 10,
-    totalConsistent: true,
-    scope: { search: "YS8" },
-  };
-  const base = {
-    currentBatch: { dataStatus: "pass", actual: 45 },
-    currentBatchDOM: {
-      mode: "source_prefix",
-      identifier: "YS8",
-      matchingCurrentBatchItems: 10,
-    },
-    renderedItems: 10,
-    pageReportedTotal: 45,
-    minimumRecords: 45,
-    quantityScope: scoped,
-    expectedUnit: "records",
-  };
+  const base = sourceQuantityFixture("sales-orders", 45);
+  const scoped = base.quantityScope;
   assert.equal(evaluateCurrentBatchListEvidence(base).minimumSatisfied, true);
   for (const change of [
     { scopeVerified: false },
@@ -3575,6 +3609,7 @@ test("canonical quantity traversal reads actual DOM pagination and stops when th
       if (selector.includes(".ant-table-tbody"))
         return pages[position].map((record) => ({
           ...node(record.identifier, { "data-row-key": record.key }),
+          querySelector: () => null,
           querySelectorAll: (key) => {
             assert.equal(key, "td");
             return [node(record.identifier)];
@@ -3647,6 +3682,7 @@ test("only the registered environment audit scope is exempt from batch event ide
     unit: "system-audit-logs",
     currentBatchApplicable: false,
     scopeVerified: true,
+    scope: { search: "", filters: "cleared" },
     total: 189,
     totalConsistent: true,
   };
@@ -3685,6 +3721,18 @@ test("only the registered environment audit scope is exempt from batch event ide
     }).minimumSatisfied,
     false,
   );
+  for (const scope of [
+    { search: "demo_", filters: "cleared" },
+    { search: "" },
+    { search: "", filters: "active" },
+  ])
+    assert.equal(
+      evaluateCurrentBatchListEvidence({
+        ...base,
+        quantityScope: { ...quantityScope, scope },
+      }).minimumSatisfied,
+      false,
+    );
 });
 
 test("projection caller accepts only its validated persistent baseline and matched current runtime", async () => {
@@ -3794,26 +3842,9 @@ test("DOM reference sets preserve fact units, formal accounts and same-plan task
 });
 
 test("product quantity is not inferred from its independent SKU source unit", () => {
-  const quantityScope = {
-    mode: "filtered_prefix",
-    unit: "products",
-    scopeVerified: true,
-    total: 20,
-    expectedTotal: 20,
-    renderedRows: 20,
-    matchingRows: 20,
-    totalConsistent: true,
-    scope: { search: "YS8" },
-  };
-  const base = {
-    currentBatch: { dataStatus: "pass", actual: 60 },
-    currentBatchDOM: { mode: "source_prefix", identifier: "YS8" },
-    renderedItems: 20,
-    pageReportedTotal: 20,
-    minimumRecords: 20,
-    expectedUnit: "products",
-    quantityScope,
-  };
+  const base = sourceQuantityFixture("products", 20);
+  base.currentBatch.actual = 60;
+  const quantityScope = base.quantityScope;
   assert.equal(evaluateCurrentBatchListEvidence(base).minimumSatisfied, true);
   assert.equal(evaluateCurrentBatchListEvidence(base).observedTotal, 20);
   assert.equal(
@@ -3852,5 +3883,209 @@ test("both registered task profiles derive the boss DOM code set from the formal
         task: { ...report, summary: { persisted: 179 } },
       }),
     );
+  }
+});
+
+test("source quantity binds the formal probe scope independently of a representative category", () => {
+  for (const [unit, probeID, representative, total] of [
+    ["material-bom", "bom-versions", "YS8-BOM-", 48],
+    ["accessories-purchase", "purchase-orders", "YS8-CG-", 45],
+    ["processing-contracts", "outsourcing-orders", "YS8-WW-", 45],
+  ]) {
+    const base = sourceQuantityFixture(unit, total, probeID, representative);
+    base.minimumRecords = 45;
+    assert.equal(evaluateCurrentBatchListEvidence(base).minimumSatisfied, true);
+    assert.equal(base.quantityScope.scope.search, "YS8");
+    for (const change of [
+      { sourceProbeId: "products" },
+      { sourceBatchPrefix: "YS7" },
+      { scope: { lifecycle: "all", search: representative } },
+      { scope: { lifecycle: "active", search: "YS8" } },
+      { total: 45, expectedTotal: 45 },
+      {
+        currentBatchDOM: {
+          ...base.quantityScope.currentBatchDOM,
+          identifier: representative,
+        },
+      },
+      {
+        currentBatchDOM: {
+          ...base.quantityScope.currentBatchDOM,
+          matchingCurrentBatchItems: 1,
+        },
+      },
+    ]) {
+      if (total === 45 && change.total === 45) continue;
+      assert.equal(
+        evaluateCurrentBatchListEvidence({
+          ...base,
+          quantityScope: { ...base.quantityScope, ...change },
+        }).minimumSatisfied,
+        false,
+        `${unit}: ${JSON.stringify(change)}`,
+      );
+    }
+    for (const queryKeyword of [null, "YS", representative, "YS7"])
+      assert.equal(
+        evaluateCurrentBatchListEvidence({
+          ...base,
+          currentBatch: {
+            ...base.currentBatch,
+            probes: [{ ...base.currentBatch.probes[0], queryKeyword }],
+          },
+        }).minimumSatisfied,
+        false,
+      );
+    assert.equal(
+      evaluateCurrentBatchListEvidence({
+        ...base,
+        currentBatchDOM: { ...base.currentBatchDOM, identifier: "YS80-CG-" },
+      }).minimumSatisfied,
+      false,
+    );
+  }
+});
+
+test("shipping approval task matching reads its standalone copy value and exact task ID", () => {
+  const saved = { document: globalThis.document, window: globalThis.window };
+  const code = "PROC-110-NODE-738-A1";
+  const record = buildCurrentBatchDOMRecords({
+    facts: {
+      referenceRecords: {
+        shipments: [
+          {
+            id: 1,
+            finance_approval_task_id: 1735,
+            finance_approval_task_code: code,
+          },
+        ],
+      },
+    },
+  })["shipping-release"];
+  assert.deepEqual(record, [{ key: "1735", identifier: code }]);
+  const row = {
+    textContent: `${code}shipment_finance_approval`,
+    getBoundingClientRect: () => ({ width: 100, height: 30 }),
+    getAttribute: (key) => (key === "data-row-key" ? "1735" : null),
+    querySelector: (selector) => {
+      assert.equal(
+        selector,
+        '[data-copyable-column="task_code"] .erp-business-table-copyable-cell__content',
+      );
+      return { getAttribute: (key) => (key === "title" ? code : null) };
+    },
+    querySelectorAll: () => [
+      { textContent: `${code}shipment_finance_approval` },
+    ],
+  };
+  globalThis.window = { getComputedStyle: () => ({ visibility: "visible" }) };
+  globalThis.document = {
+    querySelectorAll: (selector) =>
+      selector === ".ant-table-tbody > tr.ant-table-row" ? [row] : [],
+  };
+  try {
+    const snapshot = readListDOMSnapshot();
+    assert.equal(snapshot.rows[0].cells[0], `${code}shipment_finance_approval`);
+    assert.deepEqual(matchCanonicalDOMRows(snapshot.rows, record), [code]);
+    assert.deepEqual(
+      matchCanonicalDOMRows([{ ...snapshot.rows[0], key: "1" }], record),
+      [],
+    );
+    assert.deepEqual(
+      matchCanonicalDOMRows(
+        [{ ...snapshot.rows[0], taskCode: `${code}0` }],
+        record,
+      ),
+      [],
+    );
+    assert.deepEqual(
+      matchCanonicalDOMRows([{ ...snapshot.rows[0], taskCode: "" }], record),
+      [],
+    );
+    assert.throws(
+      () =>
+        buildCurrentBatchDOMRecords({
+          facts: {
+            referenceRecords: {
+              shipments: [
+                {
+                  id: 1,
+                  finance_approval_task_code: code,
+                },
+              ],
+            },
+          },
+        }),
+      /财务审批任务 ID/u,
+    );
+    assert.deepEqual(
+      buildCurrentBatchDOMRecords({
+        facts: {
+          referenceRecords: {
+            shipments: [
+              {
+                id: 1,
+                financeApprovalTaskID: 1735,
+                financeApprovalTaskCode: code,
+              },
+            ],
+          },
+        },
+      })["shipping-release"],
+      record,
+    );
+  } finally {
+    for (const [key, value] of Object.entries(saved))
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
+  }
+});
+
+test("audit readiness waits through the empty result before a delayed spinner and requires a scoped loaded total", () => {
+  const saved = { document: globalThis.document, window: globalThis.window };
+  let totals = [],
+    rows = [],
+    busy = [];
+  const node = (textContent) => ({
+    textContent,
+    getBoundingClientRect: () => ({ width: 100, height: 20 }),
+  });
+  const root = {
+    querySelectorAll: (selector) => {
+      if (selector === ".ant-pagination-total-text") return totals.map(node);
+      if (selector === ".ant-table-tbody > tr.ant-table-row")
+        return rows.map(node);
+      return busy.map(node);
+    },
+  };
+  globalThis.document = { querySelector: () => root };
+  globalThis.window = { getComputedStyle: () => ({ visibility: "visible" }) };
+  try {
+    assert.equal(environmentAuditListReady(30), false);
+    totals = ["共 0 条"];
+    assert.equal(environmentAuditListReady(30), false);
+    totals = ["共 189 条"];
+    rows = ["真实审计记录"];
+    assert.equal(environmentAuditListReady(30), true);
+    for (const invalid of [
+      ["共 29 条"],
+      ["共 189 条（风险仅筛选本页）"],
+      ["请求 189；金额 30"],
+      ["共 189 条", "共 30 条"],
+      [],
+    ]) {
+      totals = invalid;
+      assert.equal(environmentAuditListReady(30), false);
+    }
+    totals = ["共 189 条"];
+    busy = ["加载失败或加载中"];
+    assert.equal(environmentAuditListReady(30), false);
+    busy = [];
+    rows = [];
+    assert.equal(environmentAuditListReady(30), false);
+  } finally {
+    for (const [key, value] of Object.entries(saved))
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
   }
 });

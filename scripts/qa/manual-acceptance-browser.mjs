@@ -433,6 +433,7 @@ function currentBatchProbeEvidence(probe = {}) {
       : null,
     batchEvidence: String(probe.batchEvidence || "not_proven"),
     batchPrefix: String(probe.batchPrefix || "") || null,
+    queryKeyword: String(probe.params?.keyword || "") || null,
     exactSourceType: String(probe.exactSourceType || "") || null,
     exactSourceID: Number.isSafeInteger(Number(probe.exactSourceID))
       ? Number(probe.exactSourceID)
@@ -1164,6 +1165,45 @@ export function shipmentListReady(expectedCount) {
   );
 }
 
+// Loading audit records clears the previous result before the delayed spinner is
+// visible. The scoped total and real rows, rather than spinner absence, prove ready.
+export function environmentAuditListReady(minimum) {
+  const root = document.querySelector(".erp-audit-records-page");
+  if (!root) return false;
+  const visible = (node) => {
+    const rect = node.getBoundingClientRect();
+    return (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      window.getComputedStyle(node).visibility !== "hidden"
+    );
+  };
+  if (
+    [
+      ...root.querySelectorAll(
+        '.ant-spin-spinning,[aria-busy="true"],.ant-alert-error,.erp-audit-records-page__scope',
+      ),
+    ].some(visible)
+  )
+    return false;
+  const texts = [...root.querySelectorAll(".ant-pagination-total-text")]
+    .filter(visible)
+    .map((node) => node.textContent?.trim() || "");
+  const totals = texts
+    .map((text) => text.match(/^共\s*([\d,]+)\s*条$/u))
+    .map((match) => (match ? Number(match[1].replaceAll(",", "")) : null));
+  return (
+    totals.length > 0 &&
+    totals.every(
+      (total) =>
+        Number.isSafeInteger(total) && total >= minimum && total === totals[0],
+    ) &&
+    [...root.querySelectorAll(".ant-table-tbody > tr.ant-table-row")].some(
+      visible,
+    )
+  );
+}
+
 // This snapshot reads only the result table, its pagination and selected status
 // scope. Other page numbers (amounts, IDs or navigation badges) are not totals.
 export function readListDOMSnapshot() {
@@ -1184,7 +1224,14 @@ export function readListDOMSnapshot() {
         row.getAttribute("data-row-key") ||
         row.getAttribute("data-task-id") ||
         "",
-      taskCode: row.getAttribute("data-task-code") || "",
+      taskCode:
+        row.getAttribute("data-task-code") ||
+        row
+          .querySelector(
+            '[data-copyable-column="task_code"] .erp-business-table-copyable-cell__content',
+          )
+          ?.getAttribute("title") ||
+        "",
       text: row.textContent?.replace(/\s+/gu, " ").trim() || "",
       cells: [...row.querySelectorAll("td")].map(
         (cell) => cell.textContent?.replace(/\s+/gu, " ").trim() || "",
@@ -2017,6 +2064,18 @@ async function filterVisibleListToCurrentBatch(page, target, filter) {
   };
 }
 
+const SOURCE_QUANTITY_PROBE_IDS = Object.freeze({
+  "material-bom": "bom-versions",
+  "accessories-purchase": "purchase-orders",
+  "processing-contracts": "outsourcing-orders",
+});
+
+function sourceQuantityProbe(currentBatch, unit) {
+  return currentBatch?.probes?.find(
+    (probe) => probe.id === (SOURCE_QUANTITY_PROBE_IDS[unit] || unit),
+  );
+}
+
 export function evaluateCurrentBatchListEvidence({
   currentBatch,
   currentBatchDOM,
@@ -2037,12 +2096,30 @@ export function evaluateCurrentBatchListEvidence({
     quantityScope.total === Number(pageReportedTotal) &&
     quantityScope.totalConsistent === true;
   const sameUnit = quantityScope?.unit === expectedUnit;
+  const probe = sourceQuantityProbe(currentBatch, expectedUnit);
+  const quantityDOM = quantityScope?.currentBatchDOM;
   const prefixProven =
     quantityScope?.mode === "filtered_prefix" &&
-    ["source_prefix", "exact_task_prefix"].includes(currentBatchDOM?.mode) &&
-    Boolean(currentBatchDOM?.identifier) &&
-    quantityScope.scope?.search === currentBatchDOM.identifier &&
+    probe?.status === "pass" &&
+    probe.batchEvidence === "prefix_filtered" &&
+    Boolean(probe.batchPrefix) &&
+    probe.queryKeyword === probe.batchPrefix &&
+    quantityScope.sourceProbeId === probe.id &&
+    quantityScope.sourceBatchPrefix === probe.batchPrefix &&
+    quantityScope.scope?.search === probe.queryKeyword &&
+    quantityScope.scope?.lifecycle === "all" &&
+    quantityScope.total === probe.actual &&
     quantityScope.total === quantityScope.expectedTotal &&
+    quantityDOM?.mode === "source_prefix" &&
+    quantityDOM.identifier === probe.queryKeyword &&
+    quantityDOM.currentBatchVisible === true &&
+    quantityDOM.visibleItems === quantityScope.renderedRows &&
+    quantityDOM.matchingCurrentBatchItems === quantityScope.matchingRows &&
+    currentBatchDOM?.mode === "source_prefix" &&
+    (currentBatchDOM.identifier === probe.batchPrefix ||
+      currentBatchDOM.identifier?.startsWith(`${probe.batchPrefix}-`)) &&
+    currentBatchDOM.currentBatchVisible === true &&
+    currentBatchDOM.matchingCurrentBatchItems > 0 &&
     quantityScope.renderedRows > 0 &&
     quantityScope.matchingRows === quantityScope.renderedRows &&
     quantityScope.renderedRows <= quantityScope.total;
@@ -2061,6 +2138,8 @@ export function evaluateCurrentBatchListEvidence({
     expectedUnit === "system-audit-logs" &&
     quantityScope?.mode === "environment_audit_records" &&
     quantityScope.currentBatchApplicable === false &&
+    quantityScope.scope?.filters === "cleared" &&
+    quantityScope.scope?.search === "" &&
     currentBatch?.probes?.some(
       (probe) =>
         probe.id === "audit-events" &&
@@ -2328,13 +2407,18 @@ export function buildCurrentBatchDOMRecords({ facts, role, task } = {}) {
         key: "",
         identifier: `source-production-scheduling-${row.id}`,
       })),
-    "shipping-release": entries(
-      (refs.shipments || []).filter(
-        (row) => row.finance_approval_task_code || row.financeApprovalTaskCode,
-      ),
-      ["finance_approval_task_code", "financeApprovalTaskCode"],
-      false,
-    ),
+    "shipping-release": (refs.shipments || []).flatMap((row) => {
+      const identifier = String(
+        row.finance_approval_task_code || row.financeApprovalTaskCode || "",
+      ).trim();
+      if (!identifier) return [];
+      const taskID = Number(
+        row.finance_approval_task_id || row.financeApprovalTaskID,
+      );
+      if (!Number.isSafeInteger(taskID) || taskID <= 0)
+        throw new BrowserAcceptanceError("出货报告缺少财务审批任务 ID");
+      return [{ key: String(taskID), identifier }];
+    }),
     receivables: finance("RECEIVABLE"),
     payables: finance("PAYABLE"),
     reconciliation: finance("RECONCILIATION"),
@@ -2369,19 +2453,30 @@ async function prepareListQuantityScope(page, target) {
     .getByRole("button", { name: /^筛选(?:\s|·|$)/u })
     .filter({ visible: true })
     .first();
-  if (hasLifecycle) {
+  if (hasLifecycle || target.key === "system-audit-logs") {
     await trigger.click();
     const panel = page.getByRole("dialog", { name: "筛选条件", exact: true });
     const clear = panel.getByRole("button", { name: "清空筛选", exact: true });
     if ((await clear.count()) && (await clear.isEnabled())) await clear.click();
-    await panel
-      .getByRole("group", { name: "记录范围", exact: true })
-      .getByRole("button", { name: "全部记录", exact: true })
-      .click();
+    if (hasLifecycle)
+      await panel
+        .getByRole("group", { name: "记录范围", exact: true })
+        .getByRole("button", { name: "全部记录", exact: true })
+        .click();
+    if (target.key === "system-audit-logs")
+      await page.waitForFunction(
+        () =>
+          document.querySelector(
+            '[role="dialog"][aria-label="筛选条件"] button[aria-label="清空筛选"]',
+          )?.disabled === true,
+        null,
+        { timeout: PAGE_TIMEOUT_MS },
+      );
     await panel.getByRole("button", { name: "完成", exact: true }).click();
-    await page.waitForURL((url) => url.searchParams.get("scope") === "all", {
-      timeout: PAGE_TIMEOUT_MS,
-    });
+    if (hasLifecycle)
+      await page.waitForURL((url) => url.searchParams.get("scope") === "all", {
+        timeout: PAGE_TIMEOUT_MS,
+      });
   }
   const search = page
     .locator(
@@ -2389,7 +2484,7 @@ async function prepareListQuantityScope(page, target) {
     )
     .filter({ visible: true })
     .first();
-  if (await search.count()) {
+  if ((await search.count()) && (await search.inputValue()) !== "") {
     await search.fill("");
     await search.press("Enter");
   }
@@ -2408,6 +2503,7 @@ async function prepareListQuantityScope(page, target) {
     lifecycle: hasLifecycle ? "all" : "not_applicable",
     status: (await status.count()) ? "unrestricted" : "page_default",
     search: "",
+    ...(target.key === "system-audit-logs" ? { filters: "cleared" } : {}),
   };
 }
 
@@ -2534,28 +2630,28 @@ async function readPrefixQuantity(
   unit = target.key,
   minimum = target.minimumRecords,
 ) {
-  const probeID =
-    {
-      "material-bom": "bom-versions",
-      "accessories-purchase": "purchase-orders",
-      "processing-contracts": "outsourcing-orders",
-    }[unit] || unit;
-  const probe = currentBatch.probes.find((probe) => probe.id === probeID);
+  const probe = sourceQuantityProbe(currentBatch, unit);
   if (
     probe?.status !== "pass" ||
     probe.batchEvidence !== "prefix_filtered" ||
     !probe.batchPrefix ||
-    !filter.identifier.startsWith(probe.batchPrefix)
+    probe.queryKeyword !== probe.batchPrefix ||
+    !Number.isSafeInteger(probe.actual) ||
+    probe.actual < minimum ||
+    !(
+      filter.identifier === probe.batchPrefix ||
+      filter.identifier.startsWith(`${probe.batchPrefix}-`)
+    )
   )
     throw new BrowserAcceptanceError(
       `${target.title} 缺少同单位、本批前缀的绑定查询证据`,
     );
   const expectedTotal = probe.actual;
-  const currentBatchDOM = await filterVisibleListToCurrentBatch(
-    page,
-    target,
-    filter,
-  );
+  const quantityFilter = {
+    mode: "source_prefix",
+    identifier: probe.queryKeyword,
+  };
+  await filterVisibleListToCurrentBatch(page, target, quantityFilter);
   await page.waitForFunction(
     ({ expected }) => {
       const texts = [
@@ -2573,7 +2669,16 @@ async function readPrefixQuantity(
   );
   const snapshot = await readStableListSnapshot(page);
   const total = readScopedPageTotal(snapshot.totalTexts);
-  const marker = filter.identifier.toLowerCase();
+  const marker = quantityFilter.identifier.toLowerCase();
+  const matchingRows = snapshot.rows.filter((row) =>
+    `${row.taskCode} ${row.text}`.toLowerCase().includes(marker),
+  ).length;
+  const currentBatchDOM = {
+    ...quantityFilter,
+    visibleItems: snapshot.rows.length,
+    matchingCurrentBatchItems: matchingRows,
+    currentBatchVisible: matchingRows > 0,
+  };
   return {
     mode: "filtered_prefix",
     unit,
@@ -2585,10 +2690,8 @@ async function readPrefixQuantity(
     sourceBatchPrefix: probe.batchPrefix,
     minimumRecords: minimum,
     renderedRows: snapshot.rows.length,
-    matchingRows: snapshot.rows.filter((row) =>
-      `${row.taskCode} ${row.text}`.toLowerCase().includes(marker),
-    ).length,
-    scope: { lifecycle: "all", search: filter.identifier },
+    matchingRows,
+    scope: { lifecycle: "all", search: quantityFilter.identifier },
     currentBatchDOM,
     snapshot,
   };
@@ -2767,6 +2870,13 @@ async function readListEvidence(page, target, datasetBinding) {
   if (target.key === "print-center") {
     currentBatchDOM = filter;
   } else if (target.key === "system-audit-logs") {
+    await page.waitForFunction(
+      environmentAuditListReady,
+      target.minimumRecords,
+      {
+        timeout: PAGE_TIMEOUT_MS,
+      },
+    );
     const snapshot = await readStableListSnapshot(page);
     const total = readScopedPageTotal(snapshot.totalTexts);
     quantityScope = {
