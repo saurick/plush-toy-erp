@@ -1,6 +1,7 @@
 import React, { useMemo, useRef } from 'react'
-import { ArrowRightOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, Input, Select, Tag } from 'antd'
+import { ArrowRightOutlined } from '@ant-design/icons'
+import { Button, Select, Tag } from 'antd'
+import SearchInput from '@/common/components/SearchInput'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import { paginateVisualizationRows } from '../../utils/businessVisualizationModels.mjs'
@@ -189,11 +190,10 @@ export default function ProductionProcessProgress({
               </FilterChip>
             ))}
           </div>
-          <Input
+          <SearchInput
             className="erp-production-process__search"
             aria-label="搜索生产产品或规格"
             placeholder="搜索产品、编码或规格"
-            prefix={<SearchOutlined aria-hidden="true" />}
             allowClear
             value={viewState.query || ''}
             onChange={(event) => change({ query: event.target.value, page: 1 })}
