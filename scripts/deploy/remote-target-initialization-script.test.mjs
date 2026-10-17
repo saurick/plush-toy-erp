@@ -153,6 +153,7 @@ test("target initializer reads the database migration independently of the artif
   assert.ok(query < source.indexOf("stage=administrator_bootstrap"));
   assert.match(source, /SELECT max\(version\) FROM atlas_schema_revisions\.atlas_schema_revisions WHERE type = 2/u);
   assert.match(source, /"\$migration_readback" == "\$migration_version"/u);
+  assert.match(source, /migration_readback="\$\(docker exec[^\n]+\|\| fail "cannot read database migration version"/u);
 });
 
 test("target initializer retains owner-checked private diagnostics before exact cleanup", () => {

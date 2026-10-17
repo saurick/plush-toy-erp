@@ -808,7 +808,7 @@ migration_apply_started=1
     sh "$migrate_script" --status-only
 } >>"$log_file" 2>&1
 
-migration_readback="$(docker exec "$postgres_container" sh -ceu 'psql -X -A -t -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT max(version) FROM atlas_schema_revisions.atlas_schema_revisions WHERE type = 2"')"
+migration_readback="$(docker exec "$postgres_container" sh -ceu 'psql -X -A -t -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT max(version) FROM atlas_schema_revisions.atlas_schema_revisions WHERE type = 2"')" || fail "cannot read database migration version"
 [[ "$migration_readback" == "$migration_version" ]] || fail "database migration readback does not match the immutable release"
 
 stage=administrator_bootstrap
