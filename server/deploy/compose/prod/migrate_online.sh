@@ -272,15 +272,8 @@ validate_registered_target_inputs() {
   [ "$env_owner_uid" = "$(id -u)" ] || fail "$DEPLOYMENT_TARGET_KEY env 必须归当前执行用户所有"
   [ "$env_mode" = "600" ] || fail "$DEPLOYMENT_TARGET_KEY env 权限必须为 0600"
 
-  override_contract=$(awk '
-		{
-			line = $0
-			sub(/^[[:space:]]+/, "", line)
-			sub(/[[:space:]]+$/, "", line)
-			if (line != "" && line !~ /^#/) print line
-		}
-	' "$COMPOSE_OVERRIDE_FILE")
-  [ "$override_contract" = "name: $TARGET_COMPOSE_PROJECT" ] || fail "$DEPLOYMENT_TARGET_KEY Compose override 只能声明登记 project"
+  sh "$SCRIPT_DIR/validate_target_compose_override.sh" "$DEPLOYMENT_TARGET_KEY" "$TARGET_COMPOSE_PROJECT" "$COMPOSE_OVERRIDE_FILE" ||
+    fail "$DEPLOYMENT_TARGET_KEY Compose override 只能声明登记 project；production-133 仅额外允许两个私有 /28 网络"
 
   for ambient_key in \
     COMPOSE_PROJECT_NAME COMPOSE_PROFILES COMPOSE_ENV_FILES COMPOSE_PATH_SEPARATOR \

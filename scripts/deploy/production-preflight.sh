@@ -663,24 +663,8 @@ else
     compose_override_real="$(cd "$(dirname "$compose_override")" && printf '%s/%s' "$(pwd -P)" "$(basename "$compose_override")")"
     target_compose_override_real="$(cd "$(dirname "$target_compose_override")" && printf '%s/%s' "$(pwd -P)" "$(basename "$target_compose_override")")"
     [[ "$compose_override_real" == "$target_compose_override_real" ]] || fail "$deployment_target 只能使用登记的 Compose override"
-    compose_override_contract="$(awk '
-      {
-        line = $0
-        sub(/^[[:space:]]+/, "", line)
-        sub(/[[:space:]]+$/, "", line)
-        if (line != "" && line !~ /^#/) print line
-      }
-    ' "$compose_override")"
-    if [[ "$deployment_target" == production-133 ]]; then
-      # CIDRs are declared in the versioned override. Permit only the two
-      # private /28 IPAM entries; services and all other overrides remain closed.
-      ipv4_octet='([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])'
-      private_subnet="(10\.$ipv4_octet\.$ipv4_octet\.$ipv4_octet|172\.(1[6-9]|2[0-9]|3[01])\.$ipv4_octet\.$ipv4_octet|192\.168\.$ipv4_octet\.$ipv4_octet)/28"
-      production_override_pattern="^name: $target_project"$'\nnetworks:\ndefault:\nipam:\nconfig:\n- subnet: '"$private_subnet"$'\nattachment-private:\nipam:\nconfig:\n- subnet: '"$private_subnet"'$'
-      [[ "$compose_override_contract" =~ $production_override_pattern ]] || fail "$deployment_target Compose override 只能声明登记 project 和两个私有 /28 网络"
-    else
-      [[ "$compose_override_contract" == "name: $target_project" ]] || fail "$deployment_target Compose override 只能声明登记 project"
-    fi
+    sh "$compose_dir/validate_target_compose_override.sh" "$deployment_target" "$target_project" "$compose_override" ||
+      fail "$deployment_target Compose override 只能声明登记 project；production-133 仅额外允许两个私有 /28 网络"
   else
     [[ -z "$deployment_target" ]] || fail "部署目标不符合登记合同"
     [[ -z "$compose_override" ]] || fail "未选择登记目标时禁止传入 Compose override"

@@ -147,6 +147,10 @@ function writeFixture({
     "utf8",
   );
   fs.copyFileSync(
+    path.join(repoRoot, "server/deploy/compose/prod/validate_target_compose_override.sh"),
+    path.join(composeDir, "validate_target_compose_override.sh"),
+  );
+  fs.copyFileSync(
     path.join(repoRoot, "server/deploy/compose/prod/chromium-seccomp.json"),
     path.join(composeDir, "chromium-seccomp.json"),
   );
@@ -2406,7 +2410,7 @@ test("production preflight limits the production override to the declared privat
       fs.writeFileSync(override, mutation.edit(fs.readFileSync(override, "utf8")));
       const result = runDeploymentTargetPreflight(fixture, deploymentTargetArgs(fixture));
       assert.notEqual(result.status, 0);
-      assert.match(result.stderr, /Compose override 只能声明登记 project 和两个私有 \/28 网络/u);
+      assert.match(result.stderr, /Compose override 只能声明登记 project.*两个私有 \/28 网络/u);
     });
   }
 });

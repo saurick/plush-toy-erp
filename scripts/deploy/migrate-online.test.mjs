@@ -64,6 +64,10 @@ function createFixture({ useSystemFlock = false } = {}) {
   const lockDir = path.join(root, "private-lock");
   const lockFile = path.join(lockDir, "migration.lock");
   const atlasBin = path.join(binDir, "atlas");
+  fs.copyFileSync(
+    path.join(repoRoot, "server/deploy/compose/prod/validate_target_compose_override.sh"),
+    path.join(root, "validate_target_compose_override.sh"),
+  );
   fs.mkdirSync(binDir, { recursive: true });
   fs.mkdirSync(migrateDir, { recursive: true });
   fs.writeFileSync(
@@ -486,10 +490,9 @@ function configureRegisteredCustomerTestFixture(fixture, targetKey = "customer-t
     ["ERP_CUSTOMER_TRIAL_TARGET", ""],
   ]);
 
-  fs.writeFileSync(
+  fs.copyFileSync(
+    path.join(repoRoot, "server/deploy/compose/prod", target.compose.overrideFile),
     composeOverrideFile,
-    `name: ${target.compose.projectName}\n`,
-    "utf8",
   );
   fs.writeFileSync(
     composeEnvFile,

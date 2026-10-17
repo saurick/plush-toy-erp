@@ -11,6 +11,7 @@
 - `.env.example`：运行环境变量示例，不保存真实凭据。
 - `migrate_online.sh`：按登记目标执行受控 Atlas migration，并在附件外置维护窗口完成导出与校验。
 - `attachment_raid_preflight.sh`：只读检查附件目录实际使用指定本机 RAID5 挂载。
+- `validate_target_compose_override.sh`：预检、迁移和管理员初始化共用的只读 override 合同；生产仅允许两个私有 `/28` IPAM 网络，其余目标仅允许登记 project 名称，CIDR 数值只保留在 Compose 文件。
 
 仓库登记 demo、test 和 production 三个固定目标；现有服务是否运行以实时读回为准。生产首次部署和开入口必须另有明确授权；根域跳转不会启用生产目标。`admin.yoyoosun.net` 不属于任何登记环境。
 

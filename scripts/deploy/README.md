@@ -20,7 +20,7 @@
 
 生产目标 Compose override 固定使用 `10.254.244.0/28` 默认网络与 `10.254.244.16/28` 附件内部网络；附件网络继续继承 `internal: true`。首次创建前核对宿主路由及现有 Docker IPAM 无重叠，避免依赖宿主已耗尽的自动地址池。其它应用、测试及演示网络不由该配置调整，不通过清理他人网络或修改 Docker daemon 地址池取得容量。
 
-运行预检只允许生产 override 声明登记 project 与这两类私有 `/28` IPAM 配置，CIDR 数值保留在版本化 override 这一处；服务、端口、权限及其它网络属性不能通过该文件覆盖。测试夹具读取真实目标文件并显式指定目标，避免未进入登记目标分支的绿色结果。
+预检、迁移和管理员初始化共用 Compose 目录内的 `validate_target_compose_override.sh`。它只允许生产 override 声明登记 project 与两类不重叠的私有 `/28` IPAM 配置，CIDR 数值保留在版本化 override 这一处；服务、端口、权限及其它网络属性不能通过该文件覆盖。测试夹具读取真实目标文件并显式指定目标，避免未进入登记目标分支的绿色结果。
 
 运行与初始化的只读预检共用 `target-readonly-execution.mjs`。只有 Linux 平台、短主机名、运行用户和本机 IPv4 地址同时匹配 target registry，才在登记宿主机直接执行同一份固定 stdin 脚本；其它入口使用 `BatchMode`、固定地址/端口和 `StrictHostKeyChecking` 的 SSH。SSH 失败不切换本地执行。此选择不改变部署、迁移、重建或恢复写操作的执行合同。
 
@@ -99,7 +99,7 @@ GitLab Pipeline、Generic Package 与 Release 属于“远端 CI/CD 活动”，
 
 ## Promotion 与传输
 
-两个 target 的 promotion、rollback 和首次初始化使用固定 SSH 与 `rsync 3.x`，但 Mac 只向 operation 专属 `incoming` 目录传输 operation manifest、固定执行脚本、`target-release-fetch.json` 和控制校验表；legacy v1 代码回滚额外传输小型 `checksums.sha256` 作为既有目标缓存的校验目录。Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/release/rehearsal JSON 与 fetch descriptor 控制证据，但 SBOM、两个 image tar 与 `source.tar` 大型 payload 不经过 Mac；目标宿主固定把 `gitlab.saurick.me` 解析到同机内网地址，经系统信任 TLS 直接从 `plush-release` 与 `plush-release-source` Package 取得，并在物化前逐项核对名称、大小、SHA-256、v2 manifest、rehearsal、source binding 和 image content ID。专用 `read_package_registry` deploy token 只保存在工作台进程内存，并且只注入确实可能冷取件的唯一 executor 子进程；子进程在任何预检前立即从环境移除，再仅通过唯一 SSH 标准输入进入已加锁的远端执行器。它不进入其他子进程、参数、控制包或目标 secret 文件；下载期间只允许存在 `0600` curl 配置，结束或失败清理后必须证明不存在。不存在静默回退到 Mac 大文件中转的路径。
+三个登记 target 的 promotion、rollback 和首次初始化使用固定 SSH 与 `rsync 3.x`，但 Mac 只向 operation 专属 `incoming` 目录传输 operation manifest、固定执行脚本、`target-release-fetch.json` 和控制校验表；legacy v1 代码回滚额外传输小型 `checksums.sha256` 作为既有目标缓存的校验目录。Mac 可以下载并校验有大小上限的 `checksums.sha256`、artifact/release/rehearsal JSON 与 fetch descriptor 控制证据，但 SBOM、两个 image tar 与 `source.tar` 大型 payload 不经过 Mac；目标宿主固定把 `gitlab.saurick.me` 解析到同机内网地址，经系统信任 TLS 直接从 `plush-release` 与 `plush-release-source` Package 取得，并在物化前逐项核对名称、大小、SHA-256、v2 manifest、rehearsal、source binding 和 image content ID。专用 `read_package_registry` deploy token 只保存在工作台进程内存，并且只注入确实可能冷取件的唯一 executor 子进程；子进程在任何预检前立即从环境移除，再仅通过唯一 SSH 标准输入进入已加锁的远端执行器。它不进入其他子进程、参数、控制包或目标 secret 文件；下载期间只允许存在 `0600` curl 配置，结束或失败清理后必须证明不存在。不存在静默回退到 Mac 大文件中转的路径。
 
 正式 target cache v2 精确包含七资产与 `source.tar` 八项；legacy cache 只允许既有 v1 代码回滚按目标精确命中，缺失即阻断，禁止用于 promotion、远端补取、迁入 v2 或新建 legacy cache。operation 私有 incoming 可以包含控制文件，但只有逐项复核过的 payload 才能被物化或提升为对应正式 cache。允许按 manifest SHA、checksum、registry digest、Docker content ID 和镜像内完整 `GIT_SHA` 命中 package/image cache；正式 cache 不完整、存在额外项或符号链接，或任一 payload 身份不一致时失败关闭。工作台首次升级还要在 target write 前证明当前运行 SHA 的 direct-fetch 或同目标 legacy 回滚输入可用；这一核对完成前 operation 保持 `running`，只能从 `running` 直接进入最终 `ready / blocked`，避免新版本成功后才发现旧版本不可回取，也不暴露可误确认的中间 ready。
 

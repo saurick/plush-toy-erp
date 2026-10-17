@@ -216,6 +216,7 @@ function writeFixture(t) {
   for (const filename of [
     "compose.yml",
     "chromium-seccomp.json",
+    "validate_target_compose_override.sh",
     "database_roles.sh",
     "migrate_online.sh",
   ]) {

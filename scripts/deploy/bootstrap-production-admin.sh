@@ -697,15 +697,8 @@ preflight_script="$root_dir/scripts/deploy/production-preflight.sh"
 compose_override_real="$(cd "$(dirname "$compose_override")" && printf '%s/%s' "$(pwd -P)" "$(basename "$compose_override")")"
 target_compose_override_real="$(cd "$(dirname "$target_compose_override")" && printf '%s/%s' "$(pwd -P)" "$(basename "$target_compose_override")")"
 [[ "$compose_override_real" == "$target_compose_override_real" ]] || fail "$deployment_target 只能使用登记的 Compose override"
-compose_override_contract="$(awk '
-  {
-    line = $0
-    sub(/^[[:space:]]+/, "", line)
-    sub(/[[:space:]]+$/, "", line)
-    if (line != "" && line !~ /^#/) print line
-  }
-' "$compose_override")"
-[[ "$compose_override_contract" == "name: $target_project" ]] || fail "$deployment_target Compose override 只能声明登记 project"
+sh "$compose_dir/validate_target_compose_override.sh" "$deployment_target" "$target_project" "$compose_override" ||
+  fail "$deployment_target Compose override 只能声明登记 project；production-133 仅额外允许两个私有 /28 网络"
 compose_project_source="$compose_override"
 compose_project_count="$(awk '/^name:[[:space:]]*/ { count++ } END { print count + 0 }' "$compose_project_source")"
 [[ "$compose_project_count" -eq 1 ]] || fail "Compose 必须且只能声明一个顶层 name"
