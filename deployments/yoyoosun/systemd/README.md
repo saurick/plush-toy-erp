@@ -4,6 +4,8 @@
 
 生产样例已绑定 `production-133` 的固定 release / runtime env 和独立备份目录。安装前先核对这些路径与目标 registry 一致，并把 unit 的脚本入口调整为该固定 release 路径，并将 `env/backup.env.example` 复制到 `/etc/plush-toy-erp/backup.env`。本机生产模板使用与 registry 一致的 root 操作身份，以读取 `root:0600` env 和私有 release 目录；数据库备份仍经只读 `erp_backup`。安装时核对脚本只操作本项目 Compose、本地与异机备份目录。异地目录必须是独立主机或独立存储的受控挂载，不能只是数据库服务器上的另一个普通目录。
 
+备份任务的 `COMPOSE_PROJECT_NAME` 必须与 registry 中已运行的目标 project 一致，生产样例为 `plush-toy-erp-production`。备份脚本只读取基础 Compose 与独立 runtime env；该变量由 systemd 的备份 EnvironmentFile 提供，避免 Compose 按目录名定位到其它 project。不要把它加入应用 runtime env，应用发布仍使用固定 target override。
+
 异地副本固定使用 `age` 公钥加密。先在受控恢复端生成身份，再只把 recipient 文件复制到数据库服务器；identity 不进入仓库，也不应与异地备份放在一起：
 
 ```bash
