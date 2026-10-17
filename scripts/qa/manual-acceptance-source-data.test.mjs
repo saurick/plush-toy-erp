@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
   DEFAULT_SOURCE_DATA_SCALE,
+  MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES,
   MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
   MANUAL_ACCEPTANCE_CORE_UNIT_CODES,
   MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
@@ -19,6 +23,7 @@ import {
   buildSourceDrivenFactReferences,
   listAll,
   planBOMItemReconciliation,
+  prepareManualAcceptanceSourceWrite,
   parseManualAcceptanceSourceDataArgs,
   requireLifecycleMutationStatus,
   reconcileRegisteredPreviousRouteProcesses,
@@ -50,6 +55,173 @@ const LOCAL_ACCEPTANCE_BACKEND_URL = "http://127.0.0.1:8310";
 const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_local_fixture_dev";
 const forbiddenVisibleCopy =
   /\b(?:workflow|fact|json-rpc|rbac|usecase|schema|api|debugrunid|raw id)\b|甲方/iu;
+
+test("source apply rejects another scale report before any RPC including login", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "plush-source-scale-report-"));
+  const sourceReportPath = path.join(directory, "apply-report.json");
+  try {
+    const acceptance = buildLocalSourceMutationPlan();
+    await prepareManualAcceptanceSourceWrite({
+      plan: acceptance,
+      sourceReportPath,
+      tokens: { seedAdmin: "read-only-token" },
+      fetchImpl: async (_url, init) => {
+        const { method } = JSON.parse(init.body);
+        return ok({ [method.replace(/^list_/u, "")]: [], total: 0 });
+      },
+    });
+    const original = await readFile(sourceReportPath, "utf8");
+    const volume = buildLocalSourceMutationPlan({ sourceScaleProfile: "volume" });
+    let rpcCalls = 0;
+    await assert.rejects(() => applyManualAcceptanceSourceData(volume, {
+      ...localSourceMutationOptions(volume),
+      sourceReportPath,
+      confirmPhrase: "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA",
+      fetchImpl: async () => { rpcCalls += 1; throw new Error("RPC must not run"); },
+    }), /source write identity report sourceScaleProfile does not match/u);
+    assert.equal(rpcCalls, 0);
+    assert.equal(await readFile(sourceReportPath, "utf8"), original);
+    const corrupted = JSON.parse(original);
+    corrupted.scale.salesOrders = 450;
+    await writeFile(sourceReportPath, JSON.stringify(corrupted));
+    await assert.rejects(() => prepareManualAcceptanceSourceWrite({
+      plan: acceptance,
+      sourceReportPath,
+      fetchImpl: async () => { throw new Error("RPC must not run"); },
+    }), /source write identity report scale does not match/u);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("missing source report with existing batch records stops before any business mutation", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "plush-source-missing-report-"));
+  const sourceReportPath = path.join(directory, "apply-report.json");
+  try {
+    const plan = buildLocalSourceMutationPlan({ sourceScaleProfile: "volume" });
+    const methods = [];
+    await assert.rejects(() => applyManualAcceptanceSourceData(plan, {
+      ...localSourceMutationOptions(plan),
+      sourceReportPath,
+      password: "role-password",
+      adminPassword: "admin-password",
+      confirmPhrase: "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA",
+      fetchImpl: async (_url, init) => {
+        if (init.method === "GET") return {
+          ok: true,
+          status: 200,
+          headers: { get: () => "matched-v1" },
+          text: async () => "runtime identity matched",
+        };
+        const { method, params } = JSON.parse(init.body);
+        methods.push(method);
+        if (method === "admin_login") return ok({ access_token: "test-token", is_super_admin: params.username === "admin" });
+        if (method === "capabilities") return ok(localCapabilities());
+        if (method === "get_effective_session") return ok({ session: localSession({ modules: Object.fromEntries(["customers", "suppliers", "products", "materials", "processes", "sales_orders", "workflow_tasks", "purchase_orders", "outsourcing_orders", "material_bom"].map((key) => [key, "enabled"])) }) });
+        if (method === "list_customers") return ok({ customers: [{ id: 1, code: `${plan.prefix}-KH-001` }], total: 1 });
+        throw new Error(`unexpected RPC ${method}`);
+      },
+    }), /source write identity report is missing while current-prefix customers already exist/u);
+    assert.ok(methods.includes("list_customers"));
+    assert.equal(methods.some((method) => /^(?:save_|create_|submit_|approve_|confirm_|close_|cancel_|activate_|archive_|set_)/u.test(method)), false);
+    await assert.rejects(() => readFile(sourceReportPath), { code: "ENOENT" });
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("fresh source writes persist their identity before mutation and same-plan partial retries keep it", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "plush-source-partial-report-"));
+  const sourceReportPath = path.join(directory, "apply-report.json");
+  try {
+    const plan = buildLocalSourceMutationPlan({ sourceScaleProfile: "volume" });
+    const probes = [];
+    await prepareManualAcceptanceSourceWrite({
+      plan,
+      sourceReportPath,
+      tokens: { seedAdmin: "read-only-token" },
+      fetchImpl: async (_url, init) => {
+        const { method } = JSON.parse(init.body);
+        probes.push(method);
+        return ok({ [method.replace(/^list_/u, "")]: [], total: 0 });
+      },
+    });
+    const persisted = JSON.parse(await readFile(sourceReportPath, "utf8"));
+    assert.equal(probes.length, 10);
+    assert.ok(probes.includes("list_outsourcing_orders"));
+    assert.ok(probes.includes("list_bom_versions"));
+    assert.equal(persisted.mode, "prepare");
+    assert.equal(persisted.writesBackend, false);
+    assert.equal(persisted.sourceScaleProfile, "volume");
+    assert.equal(persisted.semanticDigest, plan.semanticDigest);
+    assert.deepEqual(persisted.scale, plan.scale);
+    await prepareManualAcceptanceSourceWrite({
+      plan,
+      sourceReportPath,
+      fetchImpl: async () => { throw new Error("same-plan partial retry must retain the existing identity"); },
+    });
+    assert.deepEqual(JSON.parse(await readFile(sourceReportPath, "utf8")), persisted);
+    persisted.mode = "apply";
+    await writeFile(sourceReportPath, JSON.stringify(persisted));
+    await prepareManualAcceptanceSourceWrite({ plan, sourceReportPath });
+    persisted.semanticDigest = "a".repeat(64);
+    await writeFile(sourceReportPath, JSON.stringify(persisted));
+    await assert.rejects(() => prepareManualAcceptanceSourceWrite({ plan, sourceReportPath }), /semanticDigest does not match/u);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("volume source profile produces linked multi-page records without changing the acceptance default", () => {
+  const options = {
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  };
+  const acceptance = buildManualAcceptanceSourceDataPlan(options);
+  const volume = buildManualAcceptanceSourceDataPlan({ ...options, sourceScaleProfile: "volume" });
+  assert.equal(acceptance.sourceScaleProfile, "acceptance");
+  assert.deepEqual(acceptance.scale, DEFAULT_SOURCE_DATA_SCALE);
+  assert.equal(volume.sourceScaleProfile, "volume");
+  assert.deepEqual(volume.scale, MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES.volume);
+  for (const [key, rows] of Object.entries(volume.records)) {
+    assert.equal(rows.length, volume.scale[key], key);
+  }
+  assert.equal(volume.records.products.flatMap((record) => record.skus).length, 480);
+  assert.equal(volume.records.bomVersions.length, 450);
+  assert.notEqual(volume.semanticDigest, acceptance.semanticDigest);
+  assert.equal(volume.dataVersion, acceptance.dataVersion);
+  assert.equal(volume.prefix, acceptance.prefix);
+  assert.equal(volume.semanticDigest, buildManualAcceptanceSourceDataPlan({ ...options, sourceScaleProfile: "volume" }).semanticDigest);
+  const refs = Object.fromEntries(Object.entries(volume.records).map(([key, rows]) => [key, new Set(rows.map((row) => row.code))]));
+  const salesByNo = new Map(volume.records.salesOrders.map((row) => [row.customer_order_no, row]));
+  for (const order of volume.records.salesOrders) {
+    assert.ok(refs.customers.has(order.customerRef));
+    for (const item of order.items) assert.ok(refs.products.has(item.productRef));
+  }
+  for (const order of volume.records.purchaseOrders) {
+    assert.ok(refs.suppliers.has(order.supplierRef));
+    for (const item of order.items) {
+      assert.ok(refs.materials.has(item.materialRef));
+      const source = salesByNo.get(item.product_order_no_snapshot);
+      assert.ok(source?.items.some((line) => line.product_code_snapshot === item.product_no_snapshot && line.product_name_snapshot === item.product_name_snapshot));
+    }
+  }
+  for (const order of volume.records.outsourcingOrders) {
+    assert.ok(refs.suppliers.has(order.supplierRef));
+    assert.ok(salesByNo.has(order.source_order_no));
+    for (const item of order.items) {
+      assert.ok(refs.processes.has(item.processRef));
+      assert.ok(item.subject_type === "MATERIAL" ? refs.materials.has(item.materialRef) : refs.products.has(item.productRef));
+    }
+  }
+  for (const bom of volume.records.bomVersions) {
+    assert.ok(refs.products.has(bom.productRef));
+    for (const item of bom.items) assert.ok(refs.materials.has(item.materialRef));
+  }
+  assert.throws(() => buildManualAcceptanceSourceDataPlan({ ...options, sourceScaleProfile: "unknown" }), /unknown source scale profile/u);
+  assert.throws(() => parseManualAcceptanceSourceDataArgs(["--source-scale-profile", "unknown"]), /unknown source scale profile/u);
+  assert.throws(() => buildManualAcceptanceSourceDataPlan({ ...options, scale: { salesOrders: 451 } }), /scale.salesOrders must be an integer/u);
+});
 
 function buildLocalSourceMutationPlan(overrides = {}) {
   return buildManualAcceptanceSourceDataPlan({
@@ -1481,10 +1653,7 @@ test("source-order actions reread the current version and send the exact formal 
       const body = JSON.parse(init.body);
       methods.push(body.method);
       if (body.method === `get_${domain}`) {
-        assert.deepEqual(body.params, {
-          customer_key: "yoyoosun",
-          id,
-        });
+        assert.deepEqual(body.params, { id });
         return ok({
           [domain]: {
             id,
@@ -1494,6 +1663,7 @@ test("source-order actions reread the current version and send the exact formal 
         });
       }
       assert.equal(body.method, method);
+      assert.equal(body.params.customer_key, "yoyoosun");
       assert.equal(body.params.id, id);
       assert.equal(body.params.expected_version, version);
       assert.equal(

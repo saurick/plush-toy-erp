@@ -24,21 +24,30 @@ import { BUSINESS_SEARCH_SCOPES } from "../../web/src/erp/utils/businessSearchSc
 import {
   MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
+  buildManualAcceptanceDatasetTargetPlan,
 } from "./manual-acceptance-dataset.mjs";
 import {
   MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
+  PERSISTENT_BASELINE_REPORT_CONTRACT,
   assertManualAcceptanceDatasetReadinessBoundary,
   digestManualAcceptanceDatasetComponentReport,
   manualAcceptanceDatasetStageReportPath,
+  resolveManualAcceptanceDatasetStageLogicFingerprints,
 } from "./manual-acceptance-dataset-runner.mjs";
 import { normalizeDatabaseRunID } from "./database-target.mjs";
 import {
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  SCENARIO_DEMO_TARGET,
+  SCENARIO_DEMO_ORIGIN,
   assertManualAcceptanceRuntimeIdentityPrecondition,
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
@@ -56,6 +65,16 @@ import {
   manualAcceptanceAccountSetForTarget,
   resolveManualAcceptanceRoleCredential,
 } from "./manual-acceptance-account-identities.mjs";
+import {
+  assertRepositoryIdentityEqual,
+  readRepositoryIdentity,
+} from "./lib/repository-identity.mjs";
+import {
+  readActiveRuntimeBundle,
+  readRuntimeSource,
+  runtimeServerVersion,
+  verifyLocalRuntimeIdentity,
+} from "../local-runtime-bundle.mjs";
 
 const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -96,6 +115,44 @@ const AUTH_PACE_MS = 3_000;
 const TARGET_PACE_MS = 3_000;
 const TARGET_RATE_LIMIT_MAX_ATTEMPTS = 4;
 const TARGET_RATE_LIMIT_RETRY_DELAY_MS = 10_000;
+const SCENARIO_DEMO_BROWSER_CONFIG = Object.freeze({
+  configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+  configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  configDatasetVersion: "",
+  configTarget: "",
+});
+
+function assertScenarioDemoBrowserMode({
+  scenarioDemoSharedLocal = false,
+  target,
+  backendURL,
+  baseURL,
+}) {
+  if (typeof scenarioDemoSharedLocal !== "boolean") {
+    throw new BrowserAcceptanceError(
+      "scenarioDemoSharedLocal 必须为显式布尔值",
+      2,
+    );
+  }
+  if (target === SCENARIO_DEMO_TARGET && !scenarioDemoSharedLocal) {
+    throw new BrowserAcceptanceError(
+      "scenario-demo 浏览器验收必须显式启用 --scenario-demo-shared-local",
+      2,
+    );
+  }
+  if (!scenarioDemoSharedLocal) return;
+  if (
+    target !== SCENARIO_DEMO_TARGET ||
+    backendURL !== SCENARIO_DEMO_ORIGIN ||
+    (baseURL && !LOCAL_HOSTS.has(new URL(baseURL).hostname))
+  ) {
+    throw new BrowserAcceptanceError(
+      "--scenario-demo-shared-local 只允许登记的 scenario-demo 本地入口",
+      2,
+    );
+  }
+}
 
 function exceptionBrowserAccounts(accountSet) {
   const expectedByKey = {
@@ -267,8 +324,18 @@ function businessDashboardRequirements(catalog) {
 export function buildManualAcceptanceBrowserPlan({
   baseURL,
   backendURL,
-  target = LOCAL_DEMO_ACCOUNT_SET.target,
+  target,
+  scenarioDemoSharedLocal = false,
 } = {}) {
+  target ||= scenarioDemoSharedLocal
+    ? SCENARIO_DEMO_TARGET
+    : LOCAL_DEMO_ACCOUNT_SET.target;
+  assertScenarioDemoBrowserMode({
+    scenarioDemoSharedLocal,
+    target,
+    backendURL,
+    baseURL,
+  });
   const catalog = buildManualAcceptanceCatalog();
   const accountSet = manualAcceptanceAccountSetForTarget(target);
   const formalAccounts = accountSet.browserProfiles;
@@ -324,6 +391,7 @@ export function buildManualAcceptanceBrowserPlan({
       ? normalizeManualAcceptanceBrowserURL(backendURL, "--backend-url")
       : "",
     target: accountSet.target,
+    scenarioDemoSharedLocal,
     accountKind: accountSet.accountKind,
     accountPrefix: accountSet.usernamePrefix,
     passwordEnvironmentVariable: accountSet.passwordEnvironmentVariable,
@@ -447,6 +515,7 @@ export function parseManualAcceptanceBrowserArgs(argv = []) {
     headed: false,
     plan: false,
     help: false,
+    scenarioDemoSharedLocal: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -460,6 +529,10 @@ export function parseManualAcceptanceBrowserArgs(argv = []) {
     }
     if (token === "--plan") {
       options.plan = true;
+      continue;
+    }
+    if (token === "--scenario-demo-shared-local") {
+      options.scenarioDemoSharedLocal = true;
       continue;
     }
     const [key, inlineValue] = token.startsWith("--")
@@ -524,6 +597,12 @@ export function parseManualAcceptanceBrowserArgs(argv = []) {
       options.backendURL,
       "--backend-url",
     );
+    if (options.scenarioDemoSharedLocal) {
+      assertScenarioDemoBrowserMode({
+        ...options,
+        target: SCENARIO_DEMO_TARGET,
+      });
+    }
   }
   return options;
 }
@@ -541,11 +620,15 @@ export function getManualAcceptanceBrowserHelp() {
   node scripts/qa/manual-acceptance-browser.mjs --plan \\
     --base-url http://127.0.0.1:15200 \\
     --backend-url http://127.0.0.1:8310
+  node scripts/qa/manual-acceptance-browser.mjs --plan --scenario-demo-shared-local \\
+    --base-url http://127.0.0.1:15200 --backend-url ${SCENARIO_DEMO_ORIGIN}
 
 说明：
   只允许 localhost / 127.0.0.1 / ::1 或精确 https://demo.yoyoosun.net，不接受带凭据、路径、查询参数或跳转的 URL。
   真实验收只登录、读页面和切换只读页签，不点击新增、编辑、提交、完成、取消或过账动作。
   非 plan 模式必须提供同一 runner 生成的 dataset、source、facts 和 readiness 规范报告；缺少附件或岗位场景也会失败。
+  --scenario-demo-shared-local 显式读取当前登记共享开发库的 volume 批次，只接受 datasets/${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}/scenario-demo/ 下原位 canonical 报告。必须有正式长期基线、全部阶段与当前代码指纹；不接受 local alias、lifecycle 复制报告、任意数据库或旧 acceptance 档。
+  共享模式要求 clean Git SHA、正式运行版本、当前后端源码指纹和 migration 一致；开始业务与打印读取前及结束时核对运行身份和登记客户配置。SHA 与 local runtime version 分别记录。登录和知悉确认会写行政记录，不调用业务 mutation。
   本地报告只登录 demo_* 并读取 MANUAL_ACCEPTANCE_PASSWORD；customer-trial-133 只登录 uat_* 并固定使用 12345678，MANUAL_ACCEPTANCE_UAT_PASSWORD 如提供不得漂移，并使用精确系统信任 TLS 入口、对应报告和 --target-attestation-json。
   报告默认写入 output/qa/manual-acceptance/browser/report.json，不保存密码或登录令牌。
 `;
@@ -2736,7 +2819,232 @@ async function readJSONEvidence(reportPath, label) {
 }
 
 function expectedDatasetTargetAlias(policyTarget) {
+  if (policyTarget === SCENARIO_DEMO_TARGET) return SCENARIO_DEMO_TARGET;
   return policyTarget === CUSTOMER_TRIAL_133_TARGET ? policyTarget : "local";
+}
+
+export function assertScenarioDemoBrowserDataset({
+  dataset,
+  components,
+  componentDigests,
+  printInput,
+}) {
+  assertScenarioDemoBrowserMode({
+    scenarioDemoSharedLocal: true,
+    target: printInput.target,
+    backendURL: printInput.backendURL,
+  });
+  const expected = buildManualAcceptanceDatasetTargetPlan({
+    targetAlias: SCENARIO_DEMO_TARGET,
+    sourceScaleProfile: "volume",
+    backendURL: printInput.backendURL,
+    databaseName: printInput.databaseName,
+    dataVersion: printInput.dataVersion,
+    runId: printInput.sourceRunId,
+  });
+  const source = components.source.report;
+  const baseline = components.baseline.report;
+  const core = components.core.report;
+  const proof = dataset.freshEmptyBaseline;
+  const scale = expected.semanticPlan.stages.find(
+    (stage) => stage.key === "source",
+  ).expected.scale;
+  const fingerprints = resolveManualAcceptanceDatasetStageLogicFingerprints();
+  if (
+    dataset.sourceScaleProfile !== "volume" ||
+    dataset.target?.alias !== SCENARIO_DEMO_TARGET ||
+    dataset.target?.policyTarget !== SCENARIO_DEMO_TARGET ||
+    source.sourceScaleProfile !== "volume" ||
+    dataset.semanticDigest !== expected.semanticDigest ||
+    dataset.chainDataDigest !== expected.chainDataDigest ||
+    dataset.chainVerificationDigest !== expected.chainVerificationDigest ||
+    Object.keys(source.scale || {}).length !== Object.keys(scale).length ||
+    Object.entries(scale).some(
+      ([key, value]) => source.scale?.[key] !== value,
+    ) ||
+    !Array.isArray(dataset.stages) ||
+    dataset.stages.length !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
+    dataset.stages.some(
+      (stage, index) =>
+        stage.key !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS[index] ||
+        stage.references?.runner?.logicFingerprint !==
+          fingerprints.get(stage.key),
+    )
+  ) {
+    throw new BrowserAcceptanceError(
+      "scenario-demo 报告必须绑定当前 volume 配方与全部阶段逻辑",
+    );
+  }
+  if (
+    proof?.status !== "completed" ||
+    proof?.lifecycle !== "long-lived" ||
+    !["persistent_target_baseline", "validated_resume_receipt"].includes(
+      proof.origin,
+    ) ||
+    !["verified", "reused"].includes(proof.operation) ||
+    path.resolve(proof.reportPath || "") !== components.baseline.path ||
+    proof.componentDigest !== componentDigests.baseline ||
+    baseline.contract !== PERSISTENT_BASELINE_REPORT_CONTRACT ||
+    baseline.mode !== "verify" ||
+    baseline.scope !== "manual-acceptance-persistent-target-baseline" ||
+    baseline.simulatedOnly !== true ||
+    baseline.summary?.exactEmptyBusinessBaseline !== false ||
+    baseline.summary?.legacyDataPreserved !== true ||
+    baseline.summary?.currentBatchGuard !==
+      "component-exact-create-or-readback" ||
+    baseline.runtimeIdentity?.databaseName !== printInput.databaseName ||
+    baseline.runtimeIdentity?.proof !== "matched-v1" ||
+    baseline.runtimeIdentity?.release != null ||
+    baseline.runtimeIdentity?.migration != null ||
+    baseline.databaseRebuildProof != null ||
+    dataset.databaseRebuildProof != null ||
+    core.configRevision !== printInput.configRevision ||
+    Object.entries(SCENARIO_DEMO_BROWSER_CONFIG).some(
+      ([field, value]) =>
+        String(core[field] ?? "") !== value ||
+        String(baseline.customerConfig?.[field] ?? "") !== value,
+    )
+  ) {
+    throw new BrowserAcceptanceError(
+      "scenario-demo 必须绑定正式长期基线与当前登记配置，不能冒充 fresh empty baseline",
+    );
+  }
+  return {
+    origin: proof.origin,
+    operation: proof.operation,
+    lifecycle: "long-lived",
+    reportPath: path.relative(REPO_ROOT, components.baseline.path),
+    componentDigest: componentDigests.baseline,
+    exactEmptyBusinessBaseline: false,
+    legacyDataPreserved: true,
+    currentStageLogicVerified: true,
+    sourceScaleProfile: "volume",
+  };
+}
+
+export async function verifyScenarioDemoBrowserRuntimeIdentity(
+  printInput,
+  {
+    fetchImpl = fetch,
+    readRepository = readRepositoryIdentity,
+    readBundle = readActiveRuntimeBundle,
+    readSource = readRuntimeSource,
+  } = {},
+) {
+  assertScenarioDemoBrowserMode({
+    scenarioDemoSharedLocal: true,
+    target: printInput.target,
+    backendURL: printInput.backendURL,
+  });
+  resolveManualAcceptanceTarget({
+    target: SCENARIO_DEMO_TARGET,
+    backendURL: printInput.backendURL,
+    datasetKey: printInput.datasetKey,
+    databaseName: printInput.databaseName,
+    dataVersion: printInput.dataVersion,
+    runId: printInput.sourceRunId,
+  });
+  const repository = await readRepository(REPO_ROOT);
+  const bundle = await readBundle(REPO_ROOT);
+  const source = await readSource(REPO_ROOT);
+  assertRepositoryIdentityEqual(repository, await readRepository(REPO_ROOT));
+  const migrationFiles = (
+    await fs.readdir(path.join(REPO_ROOT, "server/internal/data/model/migrate"))
+  )
+    .filter((file) => /^\d{14}_.+\.sql$/u.test(file))
+    .sort();
+  if (
+    repository.dirty !== false ||
+    !/^[0-9a-f]{40}$/u.test(repository.commit || "") ||
+    !/^[0-9a-f]{64}$/u.test(repository.fingerprint || "") ||
+    !/^[0-9a-f]{64}$/u.test(source.fingerprint || "") ||
+    !/^[0-9a-f]{64}$/u.test(source.backendFingerprint || "") ||
+    !bundle ||
+    bundle.backendSourceFingerprint !== source.backendFingerprint ||
+    bundle.migrationVersion !== migrationFiles.at(-1)?.slice(0, 14)
+  ) {
+    throw new BrowserAcceptanceError(
+      "scenario-demo 浏览器验收要求 clean SHA 与当前源码、正式运行版本和 migration 一致",
+    );
+  }
+  await verifyLocalRuntimeIdentity(
+    bundle,
+    printInput.backendURL,
+    printInput.databaseName,
+    fetchImpl,
+  );
+  return {
+    databaseName: printInput.databaseName,
+    release: runtimeServerVersion(bundle),
+    migration: bundle.migrationVersion,
+    proof: "matched-v1",
+    repository: { ...repository },
+    sourceFingerprint: source.fingerprint,
+    backendSourceFingerprint: source.backendFingerprint,
+    bundleId: bundle.id,
+    bundleSourceFingerprint: bundle.sourceFingerprint,
+    bundleArtifactHash: bundle.artifactHash,
+  };
+}
+
+export async function verifyScenarioDemoBrowserSession({
+  storageState,
+  baseURL,
+  printInput,
+  fetchImpl = fetch,
+}) {
+  assertScenarioDemoBrowserMode({
+    scenarioDemoSharedLocal: true,
+    target: printInput.target,
+    backendURL: printInput.backendURL,
+    baseURL,
+  });
+  const token = storageState?.origins
+    ?.find((entry) => entry.origin === baseURL)
+    ?.localStorage?.find((entry) => entry.name === "admin_access_token")?.value;
+  if (!token) throw new BrowserAcceptanceError("缺少当前正式账号的内存会话");
+  const response = await fetchImpl(
+    `${printInput.backendURL}/rpc/customer_config`,
+    {
+      method: "POST",
+      redirect: "error",
+      signal: AbortSignal.timeout(5000),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "browser-preflight-get_effective_session",
+        method: "get_effective_session",
+        params: { customer_key: CUSTOMER_KEY },
+      }),
+    },
+  );
+  const payload = await response.json();
+  if (!response.ok || response.redirected || payload?.result?.code !== 0) {
+    throw new BrowserAcceptanceError(
+      "scenario-demo get_effective_session 只读身份检查失败",
+    );
+  }
+  const session = payload.result.data?.session;
+  if (
+    session?.source !== "active_customer_config_revision" ||
+    session?.customer?.key !== CUSTOMER_KEY ||
+    session.configRevision !== printInput.configRevision ||
+    Object.entries(SCENARIO_DEMO_BROWSER_CONFIG).some(
+      ([field, value]) => String(session[field] ?? "") !== value,
+    )
+  ) {
+    throw new BrowserAcceptanceError(
+      "scenario-demo 当前 active 配置与登记配置或 canonical 报告不一致",
+    );
+  }
+  return {
+    customerKey: session.customer.key,
+    source: session.source,
+    ...SCENARIO_DEMO_BROWSER_CONFIG,
+  };
 }
 
 function firstCurrentBatchBusinessNo(records, fields, predicate = () => true) {
@@ -2913,6 +3221,7 @@ export function resolveManualAcceptanceDatasetReportRoot({
   }
   const lifecycleSegments = ["lifecycle", lifecycleRunID, ...canonicalTail];
   if (
+    targetAlias !== SCENARIO_DEMO_TARGET &&
     lifecycleRunID &&
     normalizedLifecycleRunID === lifecycleRunID &&
     reportSegments.length === lifecycleSegments.length &&
@@ -2965,7 +3274,13 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
   factReportPath,
   readinessReportPath,
   printInput,
+  scenarioDemoSharedLocal = false,
 }) {
+  assertScenarioDemoBrowserMode({
+    scenarioDemoSharedLocal,
+    target: printInput.target,
+    backendURL: printInput.backendURL,
+  });
   if (!datasetReportPath) {
     throw new BrowserAcceptanceError(
       "浏览器验收必须提供同批 --dataset-report",
@@ -3179,7 +3494,12 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
         baseline?.runtimeIdentity?.migration == null &&
         baseline?.databaseRebuildProof == null &&
         dataset?.databaseRebuildProof == null;
-  if (!emptyBaselineProven || !runtimeBaselineMatches) {
+  const persistentBaseline = scenarioDemoSharedLocal
+    ? assertScenarioDemoBrowserDataset({
+        dataset, components, componentDigests, printInput,
+      })
+    : null;
+  if (!persistentBaseline && (!emptyBaselineProven || !runtimeBaselineMatches)) {
     throw new BrowserAcceptanceError(
       "dataset apply 报告没有绑定当前运行态的 fresh empty baseline",
     );
@@ -3252,7 +3572,7 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
       .digest("hex"),
     datasetSemanticDigest,
     targetAlias,
-    baseline: {
+    baseline: persistentBaseline || {
       origin: freshBaseline.origin,
       operation: freshBaseline.operation,
       reportPath: path.relative(REPO_ROOT, components.baseline.path),
@@ -3282,7 +3602,7 @@ export function assertManualAcceptanceBrowserReportPathBinding(
   reportPath,
   printInput,
 ) {
-  if (printInput.target !== CUSTOMER_TRIAL_133_TARGET) return reportPath;
+  if (![CUSTOMER_TRIAL_133_TARGET, SCENARIO_DEMO_TARGET].includes(printInput.target)) return reportPath;
   const expected = path.resolve(
     DATASET_REPORT_ROOT,
     printInput.dataVersion,
@@ -3291,7 +3611,7 @@ export function assertManualAcceptanceBrowserReportPathBinding(
   );
   if (reportPath !== expected) {
     throw new BrowserAcceptanceError(
-      `customer-trial-133 browser report must use ${path.relative(REPO_ROOT, expected)}`,
+      `${printInput.target} browser report must use ${path.relative(REPO_ROOT, expected)}`,
       2,
     );
   }
@@ -3307,6 +3627,8 @@ export async function verifyManualAcceptanceBrowserDatasetBinding({
   readinessReportPath,
   targetAttestation,
   fetchImpl,
+  scenarioDemoSharedLocal = false,
+  runtime = {},
 }) {
   if (printInput.backendURL !== backendURL) {
     throw new BrowserAcceptanceError("浏览器后端与当前模拟数据批次不一致");
@@ -3329,6 +3651,7 @@ export async function verifyManualAcceptanceBrowserDatasetBinding({
     factReportPath,
     readinessReportPath,
     printInput,
+    scenarioDemoSharedLocal,
   });
   const readiness = await loadBoundReadinessInput({
     readinessReportPath,
@@ -3350,12 +3673,16 @@ export async function verifyManualAcceptanceBrowserDatasetBinding({
   });
   const parsedAttestation =
     parseManualAcceptanceTargetAttestation(targetAttestation);
-  const runtimeIdentity =
-    await assertManualAcceptanceRuntimeIdentityPrecondition({
-      policy,
-      attestation: parsedAttestation,
-      fetchImpl,
-    });
+  const runtimeIdentity = scenarioDemoSharedLocal
+    ? await verifyScenarioDemoBrowserRuntimeIdentity(printInput, {
+        ...runtime,
+        fetchImpl,
+      })
+    : await assertManualAcceptanceRuntimeIdentityPrecondition({
+        policy,
+        attestation: parsedAttestation,
+        fetchImpl,
+      });
   if (runtimeIdentity.databaseName !== printInput.databaseName) {
     throw new BrowserAcceptanceError(
       "当前运行时数据库与同批模拟数据报告不一致",
@@ -3385,6 +3712,7 @@ export async function verifyManualAcceptanceBrowserDatasetBinding({
       release: runtimeIdentity.release ?? null,
       migration: runtimeIdentity.migration ?? null,
       proof: runtimeIdentity.proof,
+      ...(scenarioDemoSharedLocal ? { sharedScenarioDemo: runtimeIdentity } : {}),
     },
   };
 }
@@ -4398,6 +4726,7 @@ export async function runManualAcceptanceBrowser(
     datasetReportPath = "",
     targetAttestation = "",
     headed = false,
+    scenarioDemoSharedLocal = false,
   } = {},
   runtime = {},
 ) {
@@ -4409,6 +4738,14 @@ export async function runManualAcceptanceBrowser(
     backendURL,
     "--backend-url",
   );
+  if (scenarioDemoSharedLocal) {
+    assertScenarioDemoBrowserMode({
+      scenarioDemoSharedLocal,
+      target: SCENARIO_DEMO_TARGET,
+      backendURL: normalizedBackendURL,
+      baseURL: normalizedBaseURL,
+    });
+  }
   const normalizedReportPath = resolveManualAcceptanceBrowserReportPath(
     path.relative(REPO_ROOT, reportPath),
   );
@@ -4450,6 +4787,12 @@ export async function runManualAcceptanceBrowser(
     factReportPath: normalizedFactReportPath,
     backendURL: normalizedBackendURL,
   });
+  assertScenarioDemoBrowserMode({
+    scenarioDemoSharedLocal,
+    target: printInput.target,
+    backendURL: normalizedBackendURL,
+    baseURL: normalizedBaseURL,
+  });
   const roleCredential = resolveManualAcceptanceRoleCredential({
     target: printInput.target,
     password,
@@ -4466,6 +4809,7 @@ export async function runManualAcceptanceBrowser(
     baseURL: normalizedBaseURL,
     backendURL: normalizedBackendURL,
     target: printInput.target,
+    scenarioDemoSharedLocal,
   });
   assertManualAcceptanceBrowserReportPathBinding(
     normalizedReportPath,
@@ -4480,6 +4824,8 @@ export async function runManualAcceptanceBrowser(
     readinessReportPath: normalizedReadinessReportPath,
     targetAttestation,
     fetchImpl,
+    scenarioDemoSharedLocal,
+    runtime,
   });
   const preflight = await verifyRuntimePreflight({
     baseURL: normalizedBaseURL,
@@ -4497,6 +4843,26 @@ export async function runManualAcceptanceBrowser(
   let exceptionAccounts = [];
   let printEvidence = { ...printInput, templates: [], passed: false };
   try {
+    if (scenarioDemoSharedLocal) {
+      const account = plan.formalAccounts.find(
+        (entry) => entry.roleKey === "system_admin",
+      );
+      const login = await loginFormalAccount(browser, {
+        baseURL: normalizedBaseURL,
+        account,
+        password: secret,
+      });
+      desktopStorageStates.set(account.username, login.storageState);
+      formalAccounts.push(login.result);
+      datasetBinding.runtimeIdentity.sharedScenarioDemo.session =
+        await verifyScenarioDemoBrowserSession({
+          storageState: login.storageState,
+          baseURL: normalizedBaseURL,
+          printInput,
+          fetchImpl,
+        });
+      await wait(AUTH_PACE_MS);
+    }
     printEvidence = await verifyBusinessPrintEvidence(browser, {
       baseURL: normalizedBaseURL,
       password: secret,
@@ -4504,6 +4870,7 @@ export async function runManualAcceptanceBrowser(
       formalAccounts: plan.formalAccounts,
     });
     for (const account of plan.formalAccounts) {
+      if (desktopStorageStates.has(account.username)) continue;
       const login = await loginFormalAccount(browser, {
         baseURL: normalizedBaseURL,
         account,
@@ -4578,6 +4945,49 @@ export async function runManualAcceptanceBrowser(
       password: secret,
       exceptionAccounts: plan.exceptionAccounts,
     });
+    if (scenarioDemoSharedLocal) {
+      const before = datasetBinding.runtimeIdentity.sharedScenarioDemo;
+      const datasetAfter =
+        await verifyManualAcceptanceDatasetApplyReportBinding({
+          datasetReportPath: normalizedDatasetReportPath,
+          sourceReportPath: normalizedSourceReportPath,
+          factReportPath: normalizedFactReportPath,
+          readinessReportPath: normalizedReadinessReportPath,
+          printInput,
+          scenarioDemoSharedLocal,
+        });
+      assert.deepEqual(
+        datasetAfter,
+        datasetBinding.dataset,
+        "scenario-demo 验收期间 canonical 回执发生变化",
+      );
+      const after = await verifyScenarioDemoBrowserRuntimeIdentity(printInput, {
+        ...runtime,
+        fetchImpl,
+      });
+      const account = plan.formalAccounts.find(
+        (entry) => entry.roleKey === "system_admin",
+      );
+      const session = await verifyScenarioDemoBrowserSession({
+        storageState: desktopStorageStates.get(account.username),
+        baseURL: normalizedBaseURL,
+        printInput,
+        fetchImpl,
+      });
+      assert.deepEqual(
+        after,
+        Object.fromEntries(
+          Object.entries(before).filter(([key]) => key !== "session"),
+        ),
+        "scenario-demo 验收期间源码或正式运行身份发生变化",
+      );
+      assert.deepEqual(
+        session,
+        before.session,
+        "scenario-demo 验收期间客户配置发生变化",
+      );
+      before.recheckedAfterBrowser = true;
+    }
   } finally {
     desktopStorageStates.clear();
     mobileStorageStates.clear();
@@ -4603,6 +5013,7 @@ export async function runManualAcceptanceBrowser(
     generatedAt: new Date().toISOString(),
     customerKey: CUSTOMER_KEY,
     target: plan.target,
+    scenarioDemoSharedLocal,
     accountKind: plan.accountKind,
     accountPrefix: plan.accountPrefix,
     rolePasswordSource: roleCredential.source,
@@ -4672,6 +5083,7 @@ async function main() {
         buildManualAcceptanceBrowserPlan({
           baseURL: options.baseURL,
           backendURL: options.backendURL,
+          scenarioDemoSharedLocal: options.scenarioDemoSharedLocal,
         }),
         null,
         2,

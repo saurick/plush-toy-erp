@@ -24,6 +24,8 @@ import {
   MANUAL_ACCEPTANCE_CORE_UNIT_CODES,
   MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
   resolveManualAcceptanceCoreReferences,
+  normalizeManualAcceptanceSourceScaleProfile,
+  resolveManualAcceptanceSourceScale,
   runManualAcceptanceSourceDataCli,
 } from "./manual-acceptance-source-data.mjs";
 import {
@@ -71,7 +73,7 @@ const DATASET_CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const ISOLATED_LOCAL_TARGET_ALIAS = "local";
 const EMPTY_BASELINE_REPORT_CONTRACT =
   "manual-acceptance-empty-baseline-report-v1";
-const PERSISTENT_BASELINE_REPORT_CONTRACT =
+export const PERSISTENT_BASELINE_REPORT_CONTRACT =
   "manual-acceptance-persistent-baseline-report-v1";
 const ACCOUNT_CONFIRM_PHRASE = "APPLY_SIMULATED_ACCOUNT_SCENARIOS";
 const ATTACHMENT_CONFIRM_PHRASE =
@@ -104,6 +106,7 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_DEPENDENCY_FILES =
     source: Object.freeze([
       "scripts/qa/manual-acceptance-core-contract.mjs",
       "scripts/qa/manual-acceptance-source-data.mjs",
+      "scripts/qa/manual-acceptance-source-driven-facts.mjs",
     ]),
     task: Object.freeze(["scripts/qa/manual-acceptance-task-data.mjs"]),
     facts: Object.freeze([
@@ -1512,24 +1515,48 @@ async function defaultBaselineComponent(invocation, deps) {
   };
 }
 
-async function defaultSourceComponent(invocation, deps) {
+export function buildManualAcceptanceSourceComponentArgs(invocation) {
   const { businessInput, targetAdapter, reportDirectory } = invocation;
+  const expected = businessInput.stage.expected;
+  const profile = normalizeManualAcceptanceSourceScaleProfile(
+    requiredText(
+      expected.sourceScaleProfile,
+      "source.expected.sourceScaleProfile",
+    ),
+  );
+  if (
+    canonicalJSON(expected.scale) !==
+    canonicalJSON(resolveManualAcceptanceSourceScale(profile))
+  ) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "source_scale_plan_drifted",
+      "source scale does not match the registered profile",
+      { stageKey: "source" },
+    );
+  }
+  return [
+    "--apply",
+    "--source-scale-profile",
+    profile,
+    "--target",
+    targetAdapter.policyTarget,
+    "--data-version",
+    businessInput.dataVersion,
+    "--run-id",
+    businessInput.runId,
+    "--backend-url",
+    targetAdapter.backendURL,
+    "--database-name",
+    targetAdapter.databaseName,
+    "--out",
+    reportDirectory,
+  ];
+}
+
+async function defaultSourceComponent(invocation, deps) {
+  const { businessInput, targetAdapter } = invocation;
   const result = await runManualAcceptanceSourceDataCli(
-    [
-      "--apply",
-      "--target",
-      targetAdapter.policyTarget,
-      "--data-version",
-      businessInput.dataVersion,
-      "--run-id",
-      businessInput.runId,
-      "--backend-url",
-      targetAdapter.backendURL,
-      "--database-name",
-      targetAdapter.databaseName,
-      "--out",
-      reportDirectory,
-    ],
+    buildManualAcceptanceSourceComponentArgs(invocation),
     {
       password: requiredCredential(
         targetAdapter.credentials.rolePassword,
@@ -1552,6 +1579,18 @@ async function defaultSourceComponent(invocation, deps) {
       "source_component_failed",
       "source component did not return a successful apply report",
       { stageKey: "source", exitCode: result.exitCode },
+    );
+  }
+  if (
+    result.report.sourceScaleProfile !==
+      businessInput.stage.expected.sourceScaleProfile ||
+    canonicalJSON(result.report.scale) !==
+      canonicalJSON(businessInput.stage.expected.scale)
+  ) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "source_scale_readback_drifted",
+      "source component scale does not match the dataset plan",
+      { stageKey: "source" },
     );
   }
   return {
@@ -2254,7 +2293,11 @@ function stageLogicFunctions(stageKey) {
       coreRPC,
     ],
     role: [roleStageHandler, defaultRoleComponent],
-    source: [sourceStageHandler, defaultSourceComponent],
+    source: [
+      sourceStageHandler,
+      defaultSourceComponent,
+      buildManualAcceptanceSourceComponentArgs,
+    ],
     task: [taskStageHandler, runDefaultManualAcceptanceTaskComponent],
     facts: [factsStageHandler, defaultFactsComponent],
     "purchase-quality": [purchaseQualityStageHandler],

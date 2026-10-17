@@ -28,6 +28,10 @@ import {
   digestManualAcceptanceSemanticPlan,
 } from '../../scripts/qa/manual-acceptance-dataset.mjs'
 import {
+  buildScenarioDemoPlan,
+  buildScenarioDemoReadback,
+} from '../../scripts/qa/scenario-demo-data.mjs'
+import {
   coreDemoExecutionCommands,
   coreDemoPreflightCommand,
   coreDemoTargetCommand,
@@ -61,7 +65,7 @@ const SCENARIO_TARGET_FINGERPRINT = createHash('sha256')
   .update('postgres://192.168.0.133:5432/plush_erp')
   .digest('hex')
 const SCENARIO_SEMANTIC_DIGEST = digestManualAcceptanceSemanticPlan(
-  buildManualAcceptanceSemanticPlan()
+  buildManualAcceptanceSemanticPlan({ sourceScaleProfile: 'volume' })
 )
 const IDEMPOTENCY_KEY =
   'data-preparation:prepare:core-demo:local-development:123e4567-e89b-42d3-a456-426614174000'
@@ -277,7 +281,7 @@ test('fixed profile commands cannot receive browser shell, path, DSN, or API ori
   })
   assert.deepEqual(scenarioDemoPlanCommand(root), {
     command: process.execPath,
-    args: ['/repo/scripts/qa/scenario-demo-data.mjs'],
+    args: ['/repo/scripts/qa/scenario-demo-data.mjs', '--source-scale-profile', 'volume'],
     options: { cwd: '/repo' },
   })
   assert.deepEqual(
@@ -291,6 +295,8 @@ test('fixed profile commands cannot receive browser shell, path, DSN, or API ori
       command: process.execPath,
       args: [
         '/repo/scripts/qa/scenario-demo-data.mjs',
+        '--source-scale-profile',
+        'volume',
         '--apply',
         '--expected-plan-digest',
         'c'.repeat(64),
@@ -536,6 +542,8 @@ test('scenario demo binds the current dataset plan, needs no browser credential 
     ) {
       assert.deepEqual(args, [
         path.join(fixture.root, 'scripts', 'qa', 'scenario-demo-data.mjs'),
+        '--source-scale-profile',
+        'volume',
         '--apply',
         '--expected-plan-digest',
         planDigest,
@@ -630,6 +638,93 @@ test('scenario demo binds the current dataset plan, needs no browser credential 
     ).length,
     1
   )
+})
+
+test('real volume plans and readbacks pass the workbench while full acceptance retains its own identity', async (t) => {
+  const fixture = createFixture(t)
+  const planOptions = {
+    repository: REPOSITORY,
+    databaseTarget: {
+      databaseName: 'plush_erp',
+      host: '192.168.0.133',
+      port: 5432,
+      safeTarget: 'registered-development:plush_erp',
+      targetFingerprint: SCENARIO_TARGET_FINGERPRINT,
+    },
+    migrationFingerprint: 'e'.repeat(64),
+    migrationVersion: '20260916090000',
+  }
+  const plan = buildScenarioDemoPlan(planOptions)
+  let currentPlan = plan
+  const readback = buildScenarioDemoReadback({
+    plan,
+    datasetReport: {
+      ok: true,
+      dataVersion: plan.dataVersion,
+      runId: plan.runId,
+      semanticDigest: plan.semanticDigest,
+      target: { alias: plan.targetAlias, databaseName: plan.databaseName },
+      stages: plan.canonicalRunner.stageOrder.map((key) => ({
+        key,
+        status: 'completed',
+        summary: {
+          source: { 'sales_order.create': 450, 'purchase_order.create': 450, 'outsourcing_order.create': 450 },
+          task: { processRuntimeCount: 5 },
+          facts: { productionFacts: 45 },
+          readiness: { passedTargetData: 41, totalTargets: 51, notProvenTargetData: 10, queryChecksPassed: true, manualAcceptanceCompleted: false },
+        }[key] || {},
+      })),
+    },
+  })
+  const fallback = successfulRunner([])
+  const service = createDevDataPreparationService({
+    projectRoot: fixture.root,
+    operationStore: fixture.store,
+    commandRunner: async (command, args, options) => {
+      if (!args[0]?.endsWith('scenario-demo-data.mjs')) return fallback(command, args, options)
+      assert.equal(args[args.indexOf('--source-scale-profile') + 1], 'volume')
+      return { stdout: JSON.stringify(args.includes('--apply') ? readback : currentPlan), stderr: '' }
+    },
+    readRepositoryState: async () => REPOSITORY,
+    environment: { LOCAL_ACCEPTANCE_DATABASE_BASE_URL: FULL_DSN },
+    now: () => new Date('2026-07-29T02:03:04.000Z'),
+    random: fixedRandom,
+  })
+  const prepared = await service.act({
+    action: 'prepare',
+    payload: { profileKey: 'scenario-demo', targetKey: 'local-development', idempotencyKey: SCENARIO_IDEMPOTENCY_KEY },
+  })
+  assert.equal(plan.sourceScaleProfile, 'volume')
+  assert.equal(prepared.operation.targetSummary.preflightFingerprint, plan.planDigest)
+  assert.equal(prepared.operation.targetSummary.semanticDigest, plan.semanticDigest)
+  await service.act({
+    action: 'execute',
+    payload: { operationId: prepared.operation.id, confirmation: prepared.operation.confirmationRequired },
+  })
+  const passed = await waitForOperation(service, prepared.operation.id, 'passed')
+  assert.equal(passed.contract.classification, 'current')
+  assert.equal(passed.readback.semanticDigest, plan.semanticDigest)
+  const full = await service.act({
+    action: 'prepare',
+    payload: { profileKey: 'full-acceptance', targetKey: 'isolated-local', idempotencyKey: FULL_IDEMPOTENCY_KEY },
+  })
+  const acceptanceDigest = digestManualAcceptanceSemanticPlan(buildManualAcceptanceSemanticPlan({ sourceScaleProfile: 'acceptance' }))
+  assert.equal(full.operation.targetSummary.semanticDigest, acceptanceDigest)
+  assert.notEqual(plan.semanticDigest, acceptanceDigest)
+  const summary = validateDevDataPreparationSummary(await service.summary())
+  assert.equal(summary.datasetContract.semanticDigest, acceptanceDigest)
+  assert.equal(summary.datasetContract.profileSemanticDigests['scenario-demo'], plan.semanticDigest)
+  assert.equal(summary.currentOperations.some((operation) => operation.id === passed.id), true)
+  assert.equal(summary.currentOperations.some((operation) => operation.id === full.operation.id), true)
+  currentPlan = buildScenarioDemoPlan({ ...planOptions, sourceScaleProfile: 'acceptance' })
+  await assert.rejects(service.act({
+    action: 'prepare',
+    payload: {
+      profileKey: 'scenario-demo',
+      targetKey: 'local-development',
+      idempotencyKey: SCENARIO_IDEMPOTENCY_KEY.replace('223e4567', '523e4567'),
+    },
+  }), /scenario demo plan identity is invalid/u)
 })
 
 test('133 scenario creates and verifies a fresh target-bound backup before canonical apply', async (t) => {

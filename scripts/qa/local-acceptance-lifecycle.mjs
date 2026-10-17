@@ -806,7 +806,7 @@ function relativeRepoPath(repoRoot, filePath) {
   return relative.split(path.sep).join("/");
 }
 
-function createDirectRuntime(context) {
+export function createDirectRuntime(context) {
   let backend = null;
   let web = null;
   let activeDatabase = "";

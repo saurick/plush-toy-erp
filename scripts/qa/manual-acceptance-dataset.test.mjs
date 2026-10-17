@@ -46,7 +46,9 @@ import {
   manualAcceptanceDatasetStageReportPath,
   resolveManualAcceptanceDatasetStageLogicFingerprints,
   runDefaultManualAcceptanceTaskComponent,
+  buildManualAcceptanceSourceComponentArgs,
 } from "./manual-acceptance-dataset-runner.mjs";
+import { buildManualAcceptanceSourceDataPlan, parseManualAcceptanceSourceDataArgs } from "./manual-acceptance-source-data.mjs";
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import {
   MANUAL_ACCEPTANCE_CORE_UNITS,
@@ -95,6 +97,40 @@ function stageLogicFingerprints(overrides = {}) {
   );
 }
 
+test("volume dataset keeps source plan, runner CLI and readback scales aligned across targets", async () => {
+  const acceptance = buildManualAcceptanceDatasetBundle();
+  const volume = buildManualAcceptanceDatasetBundle({ sourceScaleProfile: "volume" });
+  assert.equal(acceptance.sourceScaleProfile, "acceptance");
+  assert.equal(volume.sourceScaleProfile, "volume");
+  assert.notEqual(volume.semanticDigest, acceptance.semanticDigest);
+  assert.equal(volume.dataVersion, acceptance.dataVersion);
+  assert.equal(volume.targets[0].semanticDigest, volume.targets[1].semanticDigest);
+  for (const target of volume.targets) {
+    const source = target.semanticPlan.stages.find((stage) => stage.key === "source");
+    assert.equal(source.expected.scale.salesOrders, 450);
+    assert.equal(source.commands[0].args[source.commands[0].args.indexOf("--source-scale-profile") + 1], "volume");
+    const invocation = {
+      businessInput: { ...target.semanticPlan, stage: source },
+      targetAdapter: { policyTarget: "local-dev", backendURL: LOCAL_APPLY_BACKEND, databaseName: LOCAL_APPLY_DATABASE },
+      reportDirectory: "/tmp/volume-source-readback",
+    };
+    const sourcePlan = buildManualAcceptanceSourceDataPlan(parseManualAcceptanceSourceDataArgs(buildManualAcceptanceSourceComponentArgs(invocation)));
+    assert.equal(sourcePlan.sourceScaleProfile, "volume");
+    assert.deepEqual(sourcePlan.scale, source.expected.scale);
+    const drifted = structuredClone(invocation);
+    drifted.businessInput.stage.expected.scale.salesOrders = 45;
+    assert.throws(() => buildManualAcceptanceSourceComponentArgs(drifted), /source scale does not match/u);
+    for (const stageKey of ["task", "facts", "purchase-quality", "attachments"]) {
+      assert.deepEqual(target.semanticPlan.stages.find((stage) => stage.key === stageKey).expected, acceptance.targets[0].semanticPlan.stages.find((stage) => stage.key === stageKey).expected);
+    }
+  }
+  const result = await runManualAcceptanceDatasetCli(["--source-scale-profile", "volume"]);
+  assert.equal(result.plan.sourceScaleProfile, "volume");
+  assert.equal(JSON.parse(result.text).targets[0].semanticPlan.stages.find((stage) => stage.key === "source").expected.scale.products, 160);
+  assert.throws(() => buildManualAcceptanceDatasetBundle({ sourceScaleProfile: "unknown" }), /unknown source scale profile/u);
+  assert.throws(() => parseManualAcceptanceDatasetArgs(["--source-scale-profile", "unknown"]), /unknown source scale profile/u);
+});
+
 test("stage logic fingerprints are deterministic and isolate declared component changes", () => {
   const projectRoot = "/virtual/plush-toy-erp";
   const readDependency = (filePath, changedFactData = false) => {
@@ -115,6 +151,20 @@ test("stage logic fingerprints are deterministic and isolate declared component 
     projectRoot,
     readFileImpl: (filePath) => readDependency(filePath),
   });
+  const sourceChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
+    projectRoot,
+    readFileImpl: (filePath) => Buffer.from(`${path.relative(projectRoot, filePath)}:${filePath.endsWith("manual-acceptance-source-data.mjs") ? "changed" : "current"}`),
+  });
+  assert.notEqual(sourceChanged.get("source"), first.get("source"));
+  assert.equal(sourceChanged.get("task"), first.get("task"));
+  assert.equal(sourceChanged.get("facts"), first.get("facts"));
+  const sharedParamsChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
+    projectRoot,
+    readFileImpl: (filePath) => Buffer.from(`${path.relative(projectRoot, filePath)}:${filePath.endsWith("manual-acceptance-source-driven-facts.mjs") ? "changed" : "current"}`),
+  });
+  assert.notEqual(sharedParamsChanged.get("source"), first.get("source"));
+  assert.notEqual(sharedParamsChanged.get("facts"), first.get("facts"));
+  assert.equal(sharedParamsChanged.get("task"), first.get("task"));
   const engineeringChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
     projectRoot,
     readFileImpl: (filePath) => Buffer.from(path.relative(projectRoot, filePath) +
@@ -881,6 +931,29 @@ function durableRunnerDeps({
     ),
   };
 }
+
+test("changing an existing batch from acceptance to volume stops before any stage executes", async () => {
+  const outputRoot = await fs.mkdtemp(path.join(os.tmpdir(), "plush-dataset-source-scale-"));
+  try {
+    const acceptance = localApplyPlan();
+    const first = await applyManualAcceptanceDataset(acceptance, localApplyBinding(acceptance), durableRunnerDeps({ outputRoot }));
+    assert.equal(first.ok, true);
+    assert.equal(first.sourceScaleProfile, "acceptance");
+    const volume = localApplyPlan({ sourceScaleProfile: "volume" });
+    let calls = 0;
+    await assert.rejects(
+      () => applyManualAcceptanceDataset(volume, {
+        ...localApplyBinding(volume),
+        resumeReportPath: first.applyReportPath,
+      }, durableRunnerDeps({ outputRoot, onCall() { calls += 1; } })),
+      /resume report sourceScaleProfile does not match/u,
+    );
+    assert.equal(calls, 0);
+    assert.equal(JSON.parse(await fs.readFile(first.applyReportPath, "utf8")).sourceScaleProfile, "acceptance");
+  } finally {
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+});
 
 test("dataset identity separates report version from safe script runId", () => {
   assert.equal(DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION, "2026.09.27-v8");
@@ -1732,6 +1805,7 @@ test("CLI defaults to a two-target dry-run and rejects implicit or production ap
     databaseRebuildReceiptPath: "",
     resumeReportPath: "",
     chainKey: "",
+    sourceScaleProfile: "acceptance",
   });
   assert.equal(
     parseManualAcceptanceDatasetArgs(["--chain", "delivery_to_settlement"])

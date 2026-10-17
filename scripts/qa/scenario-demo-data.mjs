@@ -42,6 +42,7 @@ import {
   readRepositoryIdentity,
 } from "./lib/repository-identity.mjs";
 import { MANUAL_ACCEPTANCE_CORE_CONTRACT } from "./manual-acceptance-core-contract.mjs";
+import { normalizeManualAcceptanceSourceScaleProfile } from "./manual-acceptance-source-data.mjs";
 
 export const SCENARIO_DEMO_SCHEMA_VERSION = "plush.scenario-demo-plan/v2";
 export const SCENARIO_DEMO_READBACK_SCHEMA_VERSION =
@@ -282,6 +283,7 @@ export function buildScenarioDemoPlan({
   migrationFingerprint,
   migrationVersion,
   targetAttestation,
+  sourceScaleProfile = "volume",
 } = {}) {
   const local = targetAlias === PERSISTENT_SCENARIO_DATASET_TARGET;
   if (!local && targetAlias !== CUSTOMER_TRIAL_133_TARGET) {
@@ -302,6 +304,7 @@ export function buildScenarioDemoPlan({
     ? databaseTarget?.databaseName
     : CUSTOMER_TRIAL_133_DATABASE;
   const canonicalPlan = buildManualAcceptanceDatasetTargetPlan({
+    sourceScaleProfile,
     targetAlias,
     backendURL,
     databaseName,
@@ -342,6 +345,7 @@ export function buildScenarioDemoPlan({
     dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
     semanticDigest: canonicalPlan.semanticDigest,
+    sourceScaleProfile: canonicalPlan.sourceScaleProfile,
     backendURL,
     databaseName,
     repository,
@@ -386,6 +390,7 @@ export function buildScenarioDemoPlan({
 async function resolveScenarioDemoPlan({
   targetAlias,
   targetAttestation,
+  sourceScaleProfile,
   projectRoot,
   environment,
   commandRunner,
@@ -404,6 +409,7 @@ async function resolveScenarioDemoPlan({
       plan: buildScenarioDemoPlan({
         repository,
         targetAlias,
+        sourceScaleProfile,
         targetAttestation: parsed,
         migrationVersion,
         migrationFingerprint: scenarioDemoDigest({
@@ -448,6 +454,7 @@ async function resolveScenarioDemoPlan({
     plan: buildScenarioDemoPlan({
       repository,
       targetAlias,
+      sourceScaleProfile,
       databaseTarget,
       migrationFingerprint: migration.fingerprint,
       migrationVersion: migration.migrationVersion,
@@ -663,6 +670,7 @@ export function parseScenarioDemoArgs(argv = []) {
     expectedPlanDigest: "",
     target: PERSISTENT_SCENARIO_DATASET_TARGET,
     targetAttestation: "",
+    sourceScaleProfile: "volume",
     help: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -677,6 +685,10 @@ export function parseScenarioDemoArgs(argv = []) {
       options.target = String(argv[++index] || "").trim();
     } else if (token === "--target-attestation-json") {
       options.targetAttestation = String(argv[++index] || "").trim();
+    } else if (token === "--source-scale-profile") {
+      options.sourceScaleProfile = normalizeManualAcceptanceSourceScaleProfile(
+        String(argv[++index] || ""),
+      );
     } else {
       throw new ScenarioDemoError(`unknown option ${token}`, 2);
     }
@@ -703,12 +715,15 @@ function usage() {
 只读计划与前置核对：
   node scripts/qa/scenario-demo-data.mjs
 
+默认使用 volume 来源资料档；--source-scale-profile acceptance 可显式选择轻量档。
+规模纳入计划与语义摘要；已有同批报告不匹配时停止，不能隐式覆盖。
+
 执行当前登记的长期批次：
   SCENARIO_DEMO_CONFIRM='APPLY_SCENARIO_DEMO:scenario-demo:<database>:${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}:${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}:<plan-digest>' \\
     node scripts/qa/scenario-demo-data.mjs --apply --expected-plan-digest <plan-digest>
 
 133 使用同一 canonical semantic digest，但必须显式 --target customer-trial-133、
-固定 SSH 隧道、带外 attestation、独立确认和目标回执。本入口不接受主机、端口、
+固定 HTTPS demo 入口、带外 attestation、独立确认和目标回执。本入口不接受主机、端口、
 目录、DSN 或任意命令；不执行发布、migration 或客户真实数据导入。`;
 }
 
@@ -732,6 +747,7 @@ export async function runScenarioDemoCli(
   try {
     resolved = await resolveScenarioDemoPlan({
       targetAlias: options.target,
+      sourceScaleProfile: options.sourceScaleProfile,
       targetAttestation: options.targetAttestation || targetAttestation,
       projectRoot,
       environment,

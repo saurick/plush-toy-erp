@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS } from '../../../dev-server/devDataPreparationPlugin.mjs'
 
 import { CUSTOMER_TRIAL_133_CONFIG_REVISION, CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION } from '../../../../scripts/qa/manual-acceptance-target-policy.mjs'
 
@@ -103,7 +104,7 @@ function operationFixture(overrides = {}) {
       classification: 'current',
       dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
       datasetRunId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
-      semanticDigest: '6'.repeat(64),
+      semanticDigest: DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS[overrides.profileKey || 'core-demo'],
     },
     repository: {
       commit: 'd'.repeat(40),
@@ -157,7 +158,7 @@ function scenarioReadbackFixture(overrides = {}) {
     datasetKey: 'yoyoosun-manual-acceptance',
     dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
     runId: SCENARIO_DATASET_RUN_ID,
-    semanticDigest: '6'.repeat(64),
+    semanticDigest: DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS['scenario-demo'],
     stageCount: 9,
     sourceDocumentCount: 16,
     processRuntimeCount: 20,
@@ -258,7 +259,8 @@ function summaryFixture() {
       datasetKey: 'yoyoosun-manual-acceptance',
       dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
       runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
-      semanticDigest: '6'.repeat(64),
+      semanticDigest: DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS['full-acceptance'],
+      profileSemanticDigests: { ...DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS },
       simulatedOnly: true,
       realCustomerImport: false,
       unitCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
@@ -435,6 +437,21 @@ test('scenario demo uses the prepared confirmation without exposing a typed secr
     () => resolveDataPreparationExecutionConfirmation(null),
     /operation 无效/u
   )
+})
+
+test('summary keeps scenario volume separate from core and full acceptance identities', () => {
+  const summary = summaryFixture()
+  summary.currentOperations = [operationFixture(), scenarioOperationFixture(), fullOperationFixture()]
+  assert.equal(validateDevDataPreparationSummary(summary), summary)
+  const wrongScenario = structuredClone(summary)
+  wrongScenario.currentOperations[1].contract.semanticDigest = summary.datasetContract.semanticDigest
+  assert.throws(() => validateDevDataPreparationSummary(wrongScenario), /operation buckets/u)
+  const wrongCore = structuredClone(summary)
+  wrongCore.datasetContract.profileSemanticDigests['core-demo'] = wrongCore.datasetContract.profileSemanticDigests['scenario-demo']
+  assert.throws(() => validateDevDataPreparationSummary(wrongCore), /environment contract/u)
+  const unknownProfile = structuredClone(summary)
+  unknownProfile.datasetContract.profileSemanticDigests.other = summary.datasetContract.semanticDigest
+  assert.throws(() => validateDevDataPreparationSummary(unknownProfile), /unsupported fields/u)
 })
 
 test('summary contract requires three fixed profiles and fail-closed boundaries', () => {
@@ -638,7 +655,7 @@ test('scenario demo readback binds the fixed batch and rejects half batches or d
       CUSTOMER_TRIAL_133_CONFIG_REVISION,
     datasetVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
     datasetRunId: SCENARIO_DATASET_RUN_ID,
-    semanticDigest: '6'.repeat(64),
+    semanticDigest: DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS['scenario-demo'],
     rollbackPoint: 'pre-data-dddddddddddd-d260729020304_01020304',
   }
   const remoteReadback = scenarioReadbackFixture({

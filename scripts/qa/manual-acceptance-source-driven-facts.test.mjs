@@ -8,6 +8,7 @@ import {
   applySourceDrivenFactPlan,
   buildSourceDrivenFactPlan,
   manualAcceptanceBusinessNo,
+  manualAcceptanceRPCParams,
   preflightSourceDrivenFactPlan,
   sourceDrivenFactConfirmation,
 } from "./manual-acceptance-source-driven-facts.mjs";
@@ -19,6 +20,29 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 
 const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_local_fixture_dev";
+
+test("source document request params share strict reads and retain explicit input", () => {
+  for (const domain of ["sales_order", "purchase_order", "outsourcing_order"]) {
+    const method = `get_${domain}`;
+    assert.deepEqual(FORMAL_RPC_PARAM_ALLOWLIST[`${domain}.${method}`], ["id"]);
+    assert.deepEqual(manualAcceptanceRPCParams(domain, method, { id: 7 }), {
+      id: 7,
+    });
+    const unexpected = { id: 7, customer_key: "other", actor_id: 99 };
+    assert.deepEqual(
+      manualAcceptanceRPCParams(domain, method, unexpected),
+      unexpected,
+    );
+    assert.deepEqual(
+      manualAcceptanceRPCParams(domain, `save_${domain}_with_items`, {
+        id: 7,
+        actor_id: 99,
+      }),
+      { customer_key: "yoyoosun", id: 7, actor_id: 99 },
+    );
+    assert.deepEqual(unexpected, { id: 7, customer_key: "other", actor_id: 99 });
+  }
+});
 
 function sourceReport({ includeFacts = true, includePurchase = true } = {}) {
   const report = {
@@ -818,6 +842,9 @@ test("source report and nested source references must use the exact dataset iden
 test("every allowlisted method is present in the current formal JSON-RPC dispatchers", async () => {
   const files = await Promise.all(
     [
+      "../../server/internal/service/jsonrpc_sales_order_document.go",
+      "../../server/internal/service/jsonrpc_purchase_order_document.go",
+      "../../server/internal/service/jsonrpc_outsourcing_order_document.go",
       "../../server/internal/service/jsonrpc_inventory.go",
       "../../server/internal/service/jsonrpc_inventory_operation.go",
       "../../server/internal/service/jsonrpc_purchase_rejection_disposition.go",

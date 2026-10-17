@@ -654,12 +654,18 @@ function validateDatasetEnvironmentContract(contract) {
       'realCustomerImport',
       'runId',
       'kind',
+      'profileSemanticDigests',
       'semanticDigest',
       'simulatedOnly',
       'unitCount',
       'warehouseCount',
     ],
     'data environment contract'
+  )
+  assertExactKeys(
+    contract.profileSemanticDigests,
+    [...PROFILE_KEYS],
+    'data environment profile semantic digests'
   )
   assertExactKeys(
     contract.customerTrial133,
@@ -680,6 +686,11 @@ function validateDatasetEnvironmentContract(contract) {
     contract.dataVersion !== SCENARIO_DEMO_DATA_VERSION ||
     contract.runId !== SCENARIO_DEMO_RUN_ID ||
     !HASH_PATTERN.test(String(contract.semanticDigest || '')) ||
+    [...PROFILE_KEYS].some((profileKey) =>
+      !HASH_PATTERN.test(String(contract.profileSemanticDigests[profileKey] || ''))
+    ) ||
+    contract.profileSemanticDigests[DEV_DATA_PREPARATION_PROFILE_KEYS.coreDemo] !== contract.semanticDigest ||
+    contract.profileSemanticDigests[DEV_DATA_PREPARATION_PROFILE_KEYS.fullAcceptance] !== contract.semanticDigest ||
     contract.simulatedOnly !== true ||
     contract.realCustomerImport !== false ||
     contract.unitCount !== manualAcceptanceContract.units.length ||
@@ -1283,7 +1294,7 @@ export function validateDevDataPreparationSummary(summary) {
     summary.currentOperations.some(
       (operation) =>
         operation.contract.semanticDigest !==
-        summary.datasetContract.semanticDigest
+        summary.datasetContract.profileSemanticDigests[operation.profileKey]
     )
   ) {
     throw new Error('data preparation operation buckets are invalid')

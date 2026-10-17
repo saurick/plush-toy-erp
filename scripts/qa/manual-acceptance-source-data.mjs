@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { findSalesOrderAcceptanceExecution } from "./manual-acceptance-sales-order-process.mjs";
 import { roundRequiredMaterialQuantity } from "./lib/unit-quantity.mjs";
+import { manualAcceptanceRPCParams } from "./manual-acceptance-source-driven-facts.mjs";
 
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, open, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
@@ -80,6 +81,34 @@ export const DEFAULT_SOURCE_DATA_SCALE = Object.freeze({
   outsourcingOrders: 45,
   bomVersions: 45,
 });
+export const MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES = Object.freeze({
+  acceptance: DEFAULT_SOURCE_DATA_SCALE,
+  volume: Object.freeze({
+    customers: 180,
+    suppliers: 180,
+    materials: 240,
+    products: 160,
+    skusPerProduct: 3,
+    processes: 60,
+    salesOrders: 450,
+    purchaseOrders: 450,
+    outsourcingOrders: 450,
+    bomVersions: 450,
+  }),
+});
+
+export function normalizeManualAcceptanceSourceScaleProfile(value = "acceptance") {
+  if (!Object.hasOwn(MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES, value)) {
+    throw new CliError(`unknown source scale profile ${String(value)}`, 2);
+  }
+  return value;
+}
+
+export function resolveManualAcceptanceSourceScale(value = "acceptance") {
+  return MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES[
+    normalizeManualAcceptanceSourceScaleProfile(value)
+  ];
+}
 const ROUTED_PRODUCTION_SAMPLE_OFFSETS = Object.freeze([3, 4]);
 const ROUTED_PRODUCTION_PLANNED_QUANTITY = 3;
 const REGISTERED_PREVIOUS_ROUTE_PREFIX = `YS${Number(CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION.match(/-v(\d+)$/u)[1]) - 1}`;
@@ -97,6 +126,7 @@ const PROCESS_ROUTE_FIELDS = Object.freeze([
 ]);
 const SOURCE_LIST_PAGE_SIZE = 200;
 const SOURCE_LIST_MAX_RECORDS = 10_000;
+const SOURCE_WRITE_PLAN_CONTRACT = "manual-acceptance-source-write-plan-v1";
 export const SALES_ORDER_ACCEPTANCE_REPLAY_STATUSES = Object.freeze([
   Object.freeze(["DRAFT"]),
   Object.freeze(["DRAFT", "SUBMITTED"]),
@@ -273,6 +303,8 @@ function sourceSemanticDigest({
   dataVersion,
   runId,
   prefix,
+  sourceScaleProfile,
+  scale,
   records,
   salesOrderAcceptanceReplay,
   unitUsage,
@@ -284,6 +316,8 @@ function sourceSemanticDigest({
         dataVersion,
         runId,
         prefix,
+        sourceScaleProfile,
+        scale,
         coreSemanticDigest: MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST,
         records,
         salesOrderAcceptanceReplay,
@@ -1126,14 +1160,20 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     databaseName: options.databaseName,
   });
   const backendURL = targetPolicy.backendURL;
+  const sourceScaleProfile = normalizeManualAcceptanceSourceScaleProfile(
+    options.sourceScaleProfile,
+  );
   const scale = {
-    ...DEFAULT_SOURCE_DATA_SCALE,
+    ...resolveManualAcceptanceSourceScale(sourceScaleProfile),
     ...(options.scale || {}),
   };
   for (const [key, value] of Object.entries(scale)) {
     scale[key] = asPositiveInt(value, `scale.${key}`, {
       min: 1,
-      max: key === "materials" ? 200 : 120,
+      max: Math.max(
+        key === "materials" ? 200 : 120,
+        MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES.volume[key] || 0,
+      ),
     });
   }
   for (const [key, minimum] of Object.entries({
@@ -1235,6 +1275,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     backendURL,
     databaseName: targetPolicy.databaseName,
     roleUsers: sourceRoleUsersForTarget(targetPolicy.target),
+    sourceScaleProfile,
     scale,
     records,
     coreSemanticDigest: MANUAL_ACCEPTANCE_CORE_SEMANTIC_DIGEST,
@@ -1245,6 +1286,8 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
       dataVersion: targetPolicy.dataVersion,
       runId,
       prefix,
+      sourceScaleProfile,
+      scale,
       records,
       salesOrderAcceptanceReplay,
       unitUsage,
@@ -1274,6 +1317,7 @@ export function parseManualAcceptanceSourceDataArgs(argv) {
     dataVersion: process.env.MANUAL_ACCEPTANCE_DATA_VERSION,
     out: DEFAULT_OUT_DIR,
     runId: process.env.MANUAL_ACCEPTANCE_RUN_ID || timestampRunId(),
+    sourceScaleProfile: "acceptance",
     scale: {},
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -1319,6 +1363,10 @@ export function parseManualAcceptanceSourceDataArgs(argv) {
         break;
       case "run-id":
         options.runId = value;
+        break;
+      case "source-scale-profile":
+        options.sourceScaleProfile =
+          normalizeManualAcceptanceSourceScaleProfile(value);
         break;
       case "customers":
         options.scale.customers = value;
@@ -1395,10 +1443,7 @@ async function rpcCall({
       jsonrpc: "2.0",
       id: `manual-acceptance-${domain}-${method}-${Date.now()}`,
       method,
-      params:
-        domain === "auth" || domain === "workflow"
-          ? params
-          : { customer_key: CUSTOMER_KEY, ...params },
+      params: manualAcceptanceRPCParams(domain, method, params),
     }),
   });
   if (response.redirected === true) {
@@ -3152,6 +3197,7 @@ export async function advancePurchaseOrderLifecycleThroughProcess({
         id: sourceID,
         purchase_order_no: orderNo,
       },
+      customerKey: CUSTOMER_KEY,
       idempotencyPrefix: [
         "manual-acceptance-source",
         plan.runId,
@@ -4458,6 +4504,142 @@ async function reconcileMasterActiveStates({
   }
 }
 
+function sourceWriteIdentity(plan) {
+  return {
+    datasetKey: plan.datasetKey,
+    dataVersion: plan.dataVersion,
+    runId: plan.runId,
+    target: plan.target,
+    backendURL: plan.backendURL,
+    databaseName: plan.databaseName,
+    prefix: plan.prefix,
+    anchorDate: plan.anchorDate,
+    sourceScaleProfile: plan.sourceScaleProfile,
+    scale: plan.scale,
+    semanticDigest: plan.semanticDigest,
+    coreSemanticDigest: plan.coreSemanticDigest,
+  };
+}
+
+async function readSourceWriteReport(plan, reportPath) {
+  let raw;
+  try {
+    raw = await readFile(reportPath, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw new CliError("cannot read the source write identity report", 2);
+  }
+  let report;
+  try {
+    report = JSON.parse(raw);
+  } catch {
+    throw new CliError("source write identity report is not valid JSON", 2);
+  }
+  if (
+    !report ||
+    report.simulatedOnly !== true ||
+    report.realCustomerImport !== false ||
+    (report.mode !== "apply" &&
+      !(
+        report.mode === "prepare" &&
+        report.contract === SOURCE_WRITE_PLAN_CONTRACT
+      ))
+  ) {
+    throw new CliError(
+      "source write identity report is not a registered source report",
+      2,
+    );
+  }
+  for (const [field, value] of Object.entries(sourceWriteIdentity(plan))) {
+    if (
+      JSON.stringify(comparableValue(report[field])) !==
+      JSON.stringify(comparableValue(value))
+    ) {
+      throw new CliError(
+        `source write identity report ${field} does not match the current plan`,
+        2,
+      );
+    }
+  }
+  return report;
+}
+
+export async function prepareManualAcceptanceSourceWrite({
+  plan,
+  tokens,
+  fetchImpl,
+  sourceReportPath,
+}) {
+  const previous = await readSourceWriteReport(plan, sourceReportPath);
+  if (previous) return;
+  const probes = [
+    ["masterdata", "list_customers", "customers", "code"],
+    ["masterdata", "list_suppliers", "suppliers", "code"],
+    ["masterdata", "list_materials", "materials", "code"],
+    ["masterdata", "list_products", "products", "code"],
+    ["masterdata", "list_product_skus", "product_skus", "sku_code"],
+    ["masterdata", "list_processes", "processes", "code"],
+    ["sales_order", "list_sales_orders", "sales_orders", "order_no"],
+    [
+      "purchase_order",
+      "list_purchase_orders",
+      "purchase_orders",
+      "purchase_order_no",
+    ],
+    [
+      "outsourcing_order",
+      "list_outsourcing_orders",
+      "outsourcing_orders",
+      "outsourcing_order_no",
+    ],
+    ["bom", "list_bom_versions", "bom_versions", "version"],
+  ];
+  for (const [domain, method, listKey, key] of probes) {
+    const records = await listAll({
+      plan,
+      token: tokens.seedAdmin,
+      domain,
+      method,
+      listKey,
+      fetchImpl,
+    });
+    if (
+      records.some((record) =>
+        String(record[key] || "").startsWith(`${plan.prefix}-`),
+      )
+    ) {
+      throw new CliError(
+        `source write identity report is missing while current-prefix ${listKey} already exist; stop before business writes`,
+        2,
+      );
+    }
+  }
+  // Persist the batch identity before writes so partial runs can replay the
+  // same plan. Successful CLI completion replaces it with the full report.
+  await mkdir(path.dirname(sourceReportPath), { recursive: true });
+  let handle;
+  try {
+    handle = await open(sourceReportPath, "wx", 0o600);
+    await handle.writeFile(
+      `${JSON.stringify({
+        contract: SOURCE_WRITE_PLAN_CONTRACT,
+        mode: "prepare",
+        writesBackend: false,
+        simulatedOnly: true,
+        realCustomerImport: false,
+        ...sourceWriteIdentity(plan),
+      }, null, 2)}\n`,
+      "utf8",
+    );
+    await handle.sync();
+  } catch (error) {
+    if (error.code !== "EEXIST") throw error;
+    await readSourceWriteReport(plan, sourceReportPath);
+  } finally {
+    await handle?.close();
+  }
+}
+
 export async function applyManualAcceptanceSourceData(
   plan,
   {
@@ -4466,6 +4648,7 @@ export async function applyManualAcceptanceSourceData(
     confirmPhrase = process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM,
     targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
     targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    sourceReportPath = path.join(DEFAULT_OUT_DIR, "apply-report.json"),
     fetchImpl = fetch,
   } = {},
 ) {
@@ -4487,6 +4670,7 @@ export async function applyManualAcceptanceSourceData(
       2,
     );
   }
+  await readSourceWriteReport(plan, sourceReportPath);
   const roleCredential = resolveManualAcceptanceRoleCredential({
     target: plan.target,
     password,
@@ -4528,6 +4712,7 @@ export async function applyManualAcceptanceSourceData(
     unitUsage: plan.unitUsage,
     backendURL: plan.backendURL,
     databaseName: plan.databaseName,
+    sourceScaleProfile: plan.sourceScaleProfile,
     scale: plan.scale,
     simulatedOnly: true,
     realCustomerImport: false,
@@ -4539,6 +4724,12 @@ export async function applyManualAcceptanceSourceData(
     }),
     steps: [],
   };
+  await prepareManualAcceptanceSourceWrite({
+    plan,
+    tokens,
+    fetchImpl,
+    sourceReportPath,
+  });
   const writeTokens = Object.fromEntries(
     Object.keys(tokens).map((roleKey) => [roleKey, tokens.seedAdmin]),
   );
@@ -5062,6 +5253,8 @@ export async function verifyManualAcceptanceSourceData(
     unitUsage: plan.unitUsage,
     backendURL: plan.backendURL,
     databaseName: plan.databaseName,
+    sourceScaleProfile: plan.sourceScaleProfile,
+    scale: plan.scale,
     simulatedOnly: true,
     realCustomerImport: false,
     runtime,
@@ -5152,6 +5345,10 @@ MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
 默认生成：60 客户、60 供应商、80 材料、20 产品/60 规格、30 加工环节、
 45 销售订单、45 采购订单、45 委外订单、45 BOM 版本。
 
+--source-scale-profile volume：180 客户、180 供应商、240 材料、160 产品/480 规格、
+60 加工环节，以及销售、采购、委外和 BOM 各 450。该档扩大来源资料，
+后续完整业务事实与岗位任务矩阵沿用原合同；已有批次仍须逐条精确读回，禁止覆盖改造。
+
 本入口默认只允许 localhost；外部写入只允许已登记的精确目标。业务名称使用试用人员可理解的中文，不写真实客户资料。`;
 }
 
@@ -5169,7 +5366,10 @@ export async function runManualAcceptanceSourceDataCli(argv, deps = {}) {
     };
   }
   const report = options.apply
-    ? await applyManualAcceptanceSourceData(plan, deps)
+    ? await applyManualAcceptanceSourceData(plan, {
+        ...deps,
+        sourceReportPath: path.join(options.out, "apply-report.json"),
+      })
     : await verifyManualAcceptanceSourceData(plan, deps);
   const output = await writeReports(options.out, report);
   return {

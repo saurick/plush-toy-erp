@@ -9,6 +9,7 @@ import {
   validateDevDataPreparationSummary,
   validateDevDataPreparationOperation,
 } from '../../src/dev-workbench/config/devDataPreparation.mjs'
+import { DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS } from '../../dev-server/devDataPreparationPlugin.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 
 const OPERATION_ID = '11111111-1111-4111-8111-111111111111'
@@ -35,7 +36,7 @@ function operationFixture(overrides = {}) {
       classification: 'current',
       dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
       datasetRunId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
-      semanticDigest: '6'.repeat(64),
+      semanticDigest: DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS[overrides.profileKey || 'core-demo'],
     },
     repository: {
       commit: 'd'.repeat(40),
@@ -89,7 +90,8 @@ function createSummary() {
       datasetKey: 'yoyoosun-manual-acceptance',
       dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
       runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
-      semanticDigest: '6'.repeat(64),
+      semanticDigest: DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS['full-acceptance'],
+      profileSemanticDigests: { ...DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS },
       simulatedOnly: true,
       realCustomerImport: false,
       unitCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,

@@ -72,6 +72,26 @@ function localPlan() {
   });
 }
 
+test("persistent scenario plans default to volume while explicit acceptance keeps a distinct digest", () => {
+  const volume = localPlan();
+  const acceptance = buildScenarioDemoPlan({
+    repository: REPOSITORY,
+    databaseTarget: LOCAL_DATABASE,
+    migrationFingerprint: "e".repeat(64),
+    migrationVersion: MIGRATION_VERSION,
+    sourceScaleProfile: "acceptance",
+  });
+  assert.equal(volume.sourceScaleProfile, "volume");
+  assert.equal(volume.canonicalPlan.semanticPlan.stages.find((stage) => stage.key === "source").expected.scale.salesOrders, 450);
+  assert.equal(acceptance.sourceScaleProfile, "acceptance");
+  assert.notEqual(volume.semanticDigest, acceptance.semanticDigest);
+  assert.notEqual(volume.planDigest, acceptance.planDigest);
+  assert.equal(volume.dataVersion, acceptance.dataVersion);
+  assert.equal(parseScenarioDemoArgs(["--source-scale-profile", "acceptance"]).sourceScaleProfile, "acceptance");
+  assert.throws(() => parseScenarioDemoArgs(["--source-scale-profile", "unknown"]), /unknown source scale profile/u);
+  assert.throws(() => parseScenarioDemoArgs(["--source-scale-profile"]), /unknown source scale profile/u);
+});
+
 function remotePlan() {
   return buildScenarioDemoPlan({
     repository: REPOSITORY,
@@ -321,6 +341,7 @@ test("CLI accepts only registered persistent targets and binds apply to plan dig
     expectedPlanDigest: "",
     target: PERSISTENT_SCENARIO_DATASET_TARGET,
     targetAttestation: "",
+    sourceScaleProfile: "volume",
     help: false,
   });
   assert.equal(

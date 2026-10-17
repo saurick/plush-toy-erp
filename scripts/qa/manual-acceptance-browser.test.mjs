@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
@@ -16,6 +16,7 @@ import {
   assertManualAcceptanceTaskGroupCoverage,
   assertManualAcceptanceBrowserReportPathBinding,
   assertBoundSimulatedPrintReports,
+  assertScenarioDemoBrowserDataset,
   buildManualAcceptanceBrowserPlan,
   buildManualAcceptanceCurrentBatchReadiness,
   normalizeLocalBrowserURL,
@@ -50,18 +51,23 @@ import {
   getManualAcceptanceBrowserHelp,
   verifyManualAcceptanceBrowserDatasetBinding,
   verifyManualAcceptanceDatasetApplyReportBinding,
+  verifyScenarioDemoBrowserRuntimeIdentity,
+  verifyScenarioDemoBrowserSession,
 } from "./manual-acceptance-browser.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
+  buildManualAcceptanceDatasetTargetPlan,
 } from "./manual-acceptance-dataset.mjs";
 import {
   MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
+  PERSISTENT_BASELINE_REPORT_CONTRACT,
   digestManualAcceptanceDatasetComponentReport,
   manualAcceptanceDatasetStageReportPath,
+  resolveManualAcceptanceDatasetStageLogicFingerprints,
 } from "./manual-acceptance-dataset-runner.mjs";
 import {
   LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
@@ -74,6 +80,13 @@ import {
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 import { formatUnixDate } from "../../web/src/erp/utils/masterDataOrderView.mjs";
 import { MANUAL_ACCEPTANCE_CORE_UNITS } from "./manual-acceptance-core-contract.mjs";
+import {
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+} from "./manual-acceptance-target-policy.mjs";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -476,6 +489,435 @@ async function datasetApplyEvidenceFixture({ remote = false } = {}) {
   };
 }
 
+async function scenarioBrowserEvidenceFixture() {
+  // Pure component checks use in-memory canonical identities; no shared report is created or renamed.
+  const fixture = await datasetApplyEvidenceFixture();
+  const { printInput, reports, datasetReport } = fixture;
+  Object.assign(printInput, {
+    target: "scenario-demo",
+    backendURL: "http://127.0.0.1:8300",
+    databaseName: "plush_erp",
+    configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+  });
+  const expected = buildManualAcceptanceDatasetTargetPlan({
+    targetAlias: "scenario-demo",
+    sourceScaleProfile: "volume",
+    databaseName: printInput.databaseName,
+  });
+  for (const report of Object.values(reports)) {
+    Object.assign(report, {
+      target: printInput.target,
+      backendURL: printInput.backendURL,
+      databaseName: printInput.databaseName,
+    });
+  }
+  Object.assign(reports.core, {
+    configRevision: printInput.configRevision,
+    configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+    configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+    configDatasetVersion: null,
+    configTarget: null,
+  });
+  Object.assign(reports.source, {
+    sourceScaleProfile: "volume",
+    scale: expected.semanticPlan.stages.find((stage) => stage.key === "source")
+      .expected.scale,
+  });
+  Object.assign(reports.baseline, {
+    contract: PERSISTENT_BASELINE_REPORT_CONTRACT,
+    scope: "manual-acceptance-persistent-target-baseline",
+    runtimeIdentity: {
+      databaseName: "plush_erp",
+      proof: "matched-v1",
+      release: null,
+      migration: null,
+    },
+    customerConfig: Object.fromEntries(
+      Object.entries(reports.core).filter(([key]) => key.startsWith("config")),
+    ),
+    summary: {
+      exactEmptyBusinessBaseline: false,
+      legacyDataPreserved: true,
+      currentBatchGuard: "component-exact-create-or-readback",
+    },
+  });
+  Object.assign(datasetReport, {
+    sourceScaleProfile: "volume",
+    semanticDigest: expected.semanticDigest,
+    chainDataDigest: expected.chainDataDigest,
+    chainVerificationDigest: expected.chainVerificationDigest,
+    target: { ...expected.target },
+  });
+  const fingerprints = resolveManualAcceptanceDatasetStageLogicFingerprints();
+  const components = {};
+  const componentDigests = {};
+  for (const stage of datasetReport.stages) {
+    const reportPath = path.join(
+      repoRoot,
+      "output/qa/manual-acceptance/datasets",
+      printInput.dataVersion,
+      "scenario-demo",
+      stage.key,
+      ["baseline", "readiness"].includes(stage.key)
+        ? "verify-report.json"
+        : "apply-report.json",
+    );
+    components[stage.key] = { path: reportPath, report: reports[stage.key] };
+    componentDigests[stage.key] = digestManualAcceptanceDatasetComponentReport(
+      reports[stage.key],
+    );
+    stage.references.runner.logicFingerprint = fingerprints.get(stage.key);
+  }
+  Object.assign(datasetReport.freshEmptyBaseline, {
+    origin: "persistent_target_baseline",
+    lifecycle: "long-lived",
+    reportPath: components.baseline.path,
+    componentDigest: componentDigests.baseline,
+  });
+  return { ...fixture, dataset: datasetReport, components, componentDigests };
+}
+
+test("shared scenario browser is explicit, keeps 51 targets, and rejects other origins", () => {
+  const options = parseManualAcceptanceBrowserArgs([
+    "--plan",
+    "--scenario-demo-shared-local",
+    "--base-url",
+    "http://127.0.0.1:15200",
+    "--backend-url",
+    "http://127.0.0.1:8300",
+  ]);
+  const plan = buildManualAcceptanceBrowserPlan(options);
+  assert.equal(options.scenarioDemoSharedLocal, true);
+  assert.equal(plan.target, "scenario-demo");
+  assert.equal(plan.targets.length, 51);
+  assert.equal(plan.writesBusinessData, false);
+  assert.equal(plan.recordsLegalNoticeAcknowledgement, true);
+  for (const backendURL of [
+    "http://localhost:8300",
+    "http://127.0.0.1:8310",
+    "https://demo.yoyoosun.net",
+  ]) {
+    assert.throws(
+      () => buildManualAcceptanceBrowserPlan({ ...options, backendURL }),
+      /登记的 scenario-demo/u,
+    );
+  }
+  assert.throws(
+    () =>
+      buildManualAcceptanceBrowserPlan({
+        ...options,
+        baseURL: "https://demo.yoyoosun.net",
+      }),
+    /登记的 scenario-demo/u,
+  );
+  assert.throws(
+    () =>
+      buildManualAcceptanceBrowserPlan({
+        ...options,
+        target: "customer-trial-133",
+      }),
+    /登记的 scenario-demo/u,
+  );
+  assert.throws(
+    () =>
+      buildManualAcceptanceBrowserPlan({
+        ...options,
+        scenarioDemoSharedLocal: false,
+        target: "scenario-demo",
+      }),
+    /显式启用/u,
+  );
+  assert.throws(
+    () =>
+      buildManualAcceptanceBrowserPlan({
+        ...options,
+        scenarioDemoSharedLocal: "false",
+      }),
+    /显式布尔值/u,
+  );
+});
+
+test("shared scenario browser only accepts its original canonical report paths", async () => {
+  const root = path.join(repoRoot, "output/qa/manual-acceptance/datasets");
+  const tail = `${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}/scenario-demo/dataset/apply-report.json`;
+  assert.equal(
+    resolveManualAcceptanceDatasetReportRoot({
+      datasetReportPath: path.join(root, tail),
+      dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+      targetAlias: "scenario-demo",
+    }),
+    root,
+  );
+  for (const reportPath of [
+    path.join(root, "lifecycle/example", tail),
+    path.join(root, tail.replace("scenario-demo", "local")),
+    path.join(root, tail.replace("scenario-demo", "arbitrary")),
+    path.join(root, tail.replace("apply-report", "copied-report")),
+  ]) {
+    assert.throws(
+      () =>
+        resolveManualAcceptanceDatasetReportRoot({
+          datasetReportPath: reportPath,
+          dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+          targetAlias: "scenario-demo",
+        }),
+      /canonical 或 lifecycle path/u,
+    );
+  }
+  const printInput = {
+    target: "scenario-demo",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  };
+  const report = path.join(
+    root,
+    CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    "scenario-demo/browser/report.json",
+  );
+  assert.equal(
+    assertManualAcceptanceBrowserReportPathBinding(report, printInput),
+    report,
+  );
+  assert.throws(
+    () =>
+      assertManualAcceptanceBrowserReportPathBinding(
+        report.replace("scenario-demo", "local"),
+        printInput,
+      ),
+    /scenario-demo browser report/u,
+  );
+  await assert.rejects(
+    verifyManualAcceptanceDatasetApplyReportBinding({
+      printInput: { ...printInput, backendURL: "http://127.0.0.1:8300" },
+      datasetReportPath: path.join(root, tail),
+    }),
+    /显式启用/u,
+  );
+});
+
+test("shared scenario evidence uses the real volume plan, current stage fingerprints and persistent baseline", async () => {
+  const fixture = await scenarioBrowserEvidenceFixture();
+  try {
+    const binding = assertScenarioDemoBrowserDataset(fixture);
+    assert.equal(binding.exactEmptyBusinessBaseline, false);
+    assert.equal(binding.legacyDataPreserved, true);
+    assert.equal(binding.currentStageLogicVerified, true);
+    assert.equal(binding.lifecycle, "long-lived");
+    const changes = [
+      (value) => {
+        value.printInput.target = "local-dev";
+      },
+      (value) => {
+        value.printInput.databaseName = "arbitrary_database";
+      },
+      (value) => {
+        value.printInput.sourceRunId = "OLD-BATCH";
+      },
+      (value) => {
+        value.dataset.target.alias = "local";
+      },
+      (value) => {
+        value.dataset.sourceScaleProfile = "acceptance";
+      },
+      (value) => {
+        value.components.source.report.sourceScaleProfile = "acceptance";
+      },
+      (value) => {
+        value.components.source.report.scale.salesOrders = 45;
+      },
+      (value) => {
+        value.dataset.semanticDigest = "a".repeat(64);
+      },
+      (value) => {
+        value.dataset.stages[0].references.runner.logicFingerprint = "a".repeat(
+          64,
+        );
+      },
+      (value) => {
+        value.dataset.stages.pop();
+      },
+      (value) => {
+        value.dataset.freshEmptyBaseline.lifecycle = "disposable";
+      },
+      (value) => {
+        value.dataset.freshEmptyBaseline.origin = "fresh_empty_baseline";
+      },
+      (value) => {
+        value.components.baseline.report.summary.exactEmptyBusinessBaseline = true;
+      },
+      (value) => {
+        value.components.core.report.configRevision = "other";
+      },
+    ];
+    for (const change of changes) {
+      const value = structuredClone(fixture);
+      change(value);
+      assert.throws(() => assertScenarioDemoBrowserDataset(value));
+    }
+  } finally {
+    await fs.rm(fixture.outputRoot, { recursive: true, force: true });
+  }
+});
+
+test("shared runtime binds clean SHA separately from the official local version and never publishes private environment", async () => {
+  const migrations = (
+    await fs.readdir(path.join(repoRoot, "server/internal/data/model/migrate"))
+  )
+    .filter((file) => /^\d{14}_.+\.sql$/u.test(file))
+    .sort();
+  const migration = migrations.at(-1).slice(0, 14);
+  const printInput = {
+    target: "scenario-demo",
+    backendURL: "http://127.0.0.1:8300",
+    databaseName: "plush_erp",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    sourceRunId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  };
+  const repository = {
+    commit: "a".repeat(40),
+    dirty: false,
+    fingerprint: "b".repeat(64),
+  };
+  const bundle = {
+    id: "11111111-1111-4111-8111-111111111111",
+    migrationVersion: migration,
+    sourceFingerprint: "c".repeat(64),
+    backendSourceFingerprint: "d".repeat(64),
+    artifactHash: "e".repeat(64),
+  };
+  const source = {
+    fingerprint: "f".repeat(64),
+    backendFingerprint: "d".repeat(64),
+    environment: { secret: "never-publish" },
+  };
+  const requests = [];
+  const runtime = {
+    readRepository: async () => repository,
+    readBundle: () => bundle,
+    readSource: async () => source,
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      return { ok: true, headers: { get: () => "matched-v1" } };
+    },
+  };
+  const result = await verifyScenarioDemoBrowserRuntimeIdentity(
+    printInput,
+    runtime,
+  );
+  const version = `local-${bundle.id}`;
+  assert.equal(result.release, version);
+  assert.equal(result.repository.commit, repository.commit);
+  assert.equal(result.sourceFingerprint, source.fingerprint);
+  assert.equal(JSON.stringify(result).includes("never-publish"), false);
+  assert.equal(
+    requests[0].options.headers["X-ERP-Expected-Runtime-Identity-SHA256"],
+    createHash("sha256")
+      .update(["release-v1", "plush_erp", version, migration].join("\n"))
+      .digest("hex"),
+  );
+  for (const change of [
+    { readRepository: async () => ({ ...repository, dirty: true }) },
+    { readBundle: () => null },
+    {
+      readBundle: () => ({
+        ...bundle,
+        backendSourceFingerprint: "0".repeat(64),
+      }),
+    },
+    { readBundle: () => ({ ...bundle, migrationVersion: "20200101000000" }) },
+  ]) {
+    let fetched = false;
+    await assert.rejects(
+      verifyScenarioDemoBrowserRuntimeIdentity(printInput, {
+        ...runtime,
+        ...change,
+        fetchImpl: async () => {
+          fetched = true;
+          throw new Error("must not probe");
+        },
+      }),
+      /clean SHA/u,
+    );
+    assert.equal(fetched, false);
+  }
+  await assert.rejects(
+    verifyScenarioDemoBrowserRuntimeIdentity(printInput, {
+      ...runtime,
+      fetchImpl: async () => ({ ok: false, headers: { get: () => null } }),
+    }),
+    /后端运行身份/u,
+  );
+  let reads = 0;
+  await assert.rejects(
+    verifyScenarioDemoBrowserRuntimeIdentity(printInput, {
+      ...runtime,
+      readRepository: async () => ({
+        ...repository,
+        commit: ++reads === 1 ? repository.commit : "0".repeat(40),
+      }),
+    }),
+    /repository.*changed/u,
+  );
+});
+
+test("shared authenticated identity uses the permitted session read and rejects live config drift", async () => {
+  const printInput = {
+    target: "scenario-demo",
+    backendURL: "http://127.0.0.1:8300",
+    databaseName: "plush_erp",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    sourceRunId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+    configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+  };
+  const storageState = {
+    origins: [
+      {
+        origin: "http://127.0.0.1:15200",
+        localStorage: [
+          { name: "admin_access_token", value: "memory-only-token" },
+        ],
+      },
+    ],
+  };
+  const session = {
+    source: "active_customer_config_revision",
+    customer: { key: "yoyoosun" },
+    configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+    configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+    configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  };
+  const requests = [];
+  const run = (currentSession = session) =>
+    verifyScenarioDemoBrowserSession({
+      printInput,
+      storageState,
+      baseURL: "http://127.0.0.1:15200",
+      fetchImpl: async (url, options) => {
+        const body = JSON.parse(options.body);
+        requests.push({ url, method: body.method });
+        assert.deepEqual(body.params, { customer_key: "yoyoosun" });
+        assert.equal(url, "http://127.0.0.1:8300/rpc/customer_config");
+        assert.equal(body.method, "get_effective_session");
+        const data = { session: currentSession };
+        return { ok: true, json: async () => ({ result: { code: 0, data } }) };
+      },
+    });
+  const result = await run();
+  assert.equal(result.configRevision, session.configRevision);
+  assert.equal(JSON.stringify(result).includes("memory-only-token"), false);
+  assert.deepEqual(
+    requests.map((request) => request.method),
+    ["get_effective_session"],
+  );
+  await assert.rejects(
+    run({ ...session, configRevision: "other" }),
+    /当前 active 配置/u,
+  );
+  await assert.rejects(
+    run({ ...session, source: "fallback" }),
+    /当前 active 配置/u,
+  );
+});
+
 test("manual acceptance browser plan covers all 51 catalog targets and ten formal accounts", () => {
   const plan = buildManualAcceptanceBrowserPlan({
     baseURL: "http://127.0.0.1:15200",
@@ -690,10 +1132,14 @@ test("CLI requires explicit local or registered trial frontend and backend origi
   );
 });
 
-test("CLI help and active docs use the complete V7 browser inputs", async () => {
+test("CLI help and active docs keep isolated defaults and explicit shared browser inputs", async () => {
   const help = getManualAcceptanceBrowserHelp();
   assert.match(help, /--backend-url http:\/\/127\.0\.0\.1:8310/u);
-  assert.doesNotMatch(help, /--backend-url http:\/\/127\.0\.0\.1:8300/u);
+  const [isolatedHelp, sharedHelp] = help.split(
+    "  node scripts/qa/manual-acceptance-browser.mjs --plan --scenario-demo-shared-local",
+  );
+  assert.doesNotMatch(isolatedHelp, /--backend-url http:\/\/127\.0\.0\.1:8300/u);
+  assert.match(sharedHelp, /--backend-url http:\/\/127\.0\.0\.1:8300/u);
   assert.match(help, /2026\.09\.27-v8\/local\/dataset\/apply-report\.json/u);
   assert.match(help, /--dataset-report/u);
   assert.match(help, /customer-trial-133/u);
@@ -707,6 +1153,12 @@ test("CLI help and active docs use the complete V7 browser inputs", async () => 
     readme,
     /manual-acceptance-browser\.mjs[\s\S]{0,900}--task-report/u,
   );
+  for (const [, command] of readme.matchAll(/```bash\n([\s\S]*?)```/gu)) {
+    if (command.includes("manual-acceptance-browser.mjs") &&
+      command.includes("--backend-url http://127.0.0.1:8300")) {
+      assert.match(command, /--scenario-demo-shared-local/u);
+    }
+  }
 });
 
 test("report output stays in the manual acceptance browser or dataset evidence roots", () => {

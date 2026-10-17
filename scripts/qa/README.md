@@ -205,6 +205,21 @@ Web 原生覆盖基线与 `pnpm test` 共用[源码测试入口](../../web/scrip
 
 当前唯一整批合同是 `2026.09.27-v8 / 20260927-V8`。本地隔离库和 `demo-133` 使用同一套业务含义、数量与状态矩阵，但数据库 ID 各自独立，不能复制表行或用“编号相同”代替读回证明。正式部署默认不执行这套数据；`customer-test-133` 是甲方测试/验收环境，禁止重放整批合同，只允许在明确授权、exact release / migration 和写后读回下复用 core allowlist 准备 8 个单位与 4 个仓库。
 
+整批入口的 `--source-scale-profile acceptance|volume` 选择来源数据规模，配方统一登记在 `manual-acceptance-source-data.mjs`。完整验收默认 `acceptance`；长期 `scenario-demo` 默认 `volume`，本地与 demo 对账时须选择同档并核对计划摘要。规模只增加主数据、来源单据与明细，现有岗位、事实、异常处理和页面合同继续完整执行。
+
+| 来源数据 | `acceptance` | `volume` |
+| --- | ---: | ---: |
+| 客户 / 供应商 | 各 60 | 各 180 |
+| 材料 | 80 | 240 |
+| 产品 / SKU | 20 / 60 | 160 / 480 |
+| 工序 | 30 | 60 |
+| 销售 / 采购 / 委外订单 | 各 45 | 各 450 |
+| BOM 版本 | 45 | 450 |
+
+规模档参与计划和数据摘要，执行器必须采用同一配方。已有同编号数据必须通过精确读回，不按新规模覆盖旧关系；需要丢弃旧演示数据时，先完成独立、可恢复的 demo 数据库重建，再用当前回执执行 fresh apply。不能通过删除本地报告冒充新空库，也不为扩容改变业务含义或伪造事实。
+
+独立 source 入口同样先核对当前批次报告中的目标、规模和语义。新批次在只读确认各类来源对象为空后，先原子保存准备回执，再执行正式业务写入；同档中断可凭此回执继续精确读回。已有同前缀对象而缺少报告时停止，避免先补写部分主数据才发现批次不匹配。
+
 `visualization-demo-data.mjs` 是 `scenario-demo` 上的本地开发增量，不是新的整批合同、UAT 或客户真实数据。它使用按日期固定的 `VIS-*` 编号，通过销售、采购、生产、工序、财务、库存和 Workflow 正式读写接口 exact-create-or-readback；不直写数据库，也不在前端保存 fixture。脚本补齐 5 种交期 / 到货风险、6 种生产排期样本及一个五产品完整路线样本，并要求现有财务应收应付、跨仓库存和 PMC 排产任务达到实时读回门槛。已下达的生产与工序事实按业务生命周期保留，退出时按批次编号查找和停用 / 取消可编辑源单，不做物理删除或数据库重置。
 
 V8 采用统一的 8 个标准单位和按单位校验的数量精度；保留 V7 的来源字段与责任分工。V8 使用 `YS8` 来源编号与 `YS-V8` 任务编号，补齐材料厂商料号、采购双方信息、付款 / 发票条件、确认到货日期和收货地址。加工合同由独立的 `demo_finance_purchase / uat_finance_purchase` 双岗位模拟账号办理，纯财务账号保持原有权限；收货与工序回货由仓库、工序执行由生产、包装版本确认由业务账号办理。整批事实报告额外读回材料和成品入库的来源待办，核对关联、仓库责任、状态与跳转入口。旧 V7 来源单、已过账事实及审计保留；标准路线绑定只通过既有受控替换流程从精确登记的上一批次转移。
@@ -416,6 +431,8 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --out output/qa/manual-acceptance/datasets/2026.09.27-v8/local/source
 ```
 
+源单与事实入口共用 `manual-acceptance-source-driven-facts.mjs` 的正式参数表与请求参数 helper：三类源单的 `get_*_order` 只发送 `id`，需要客户配置门禁的业务写入仍发送 `customer_key`。helper 不删除显式传入的额外参数，越界字段继续由后端拒绝；新增读取或写入方法时同步该合同及阶段逻辑指纹。
+
 随后按同一 `dataVersion / runId` 准备九岗位任务和统一事实链。采购收货与质检已经归入事实入口，不再单独调用 `purchase-quality-simulated-matrix.mjs`；旧 `operational-fact-simulated-closure.mjs` 只保留历史 report-only 守卫，不能作为当前数据入口。
 
 ```bash
@@ -513,6 +530,23 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 ```
 
 `customer-trial-133` 的浏览器报告必须写到当前版本与目标的规范路径 `output/qa/manual-acceptance/datasets/<dataVersion>/customer-trial-133/browser/report.json`，并同时提供同批 `dataset/apply-report.json`、`readiness/verify-report.json` 与 `MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON`。浏览器启动前会重新调用 `/readyz/runtime-identity`，把当前数据库、完整 release commit、Atlas migration、fresh baseline、attachments、source / fact / task / readiness 批次身份原子绑定；readiness 只参与身份闭合，列表数量仍必须由当前页面 DOM 重新证明，打印仍必须由当前 5 份 PDF 证明。
+
+登记共享开发库的长期 `scenario-demo` 批次使用同一 51 项浏览器目录，必须显式加 `--scenario-demo-shared-local`（API 为 `scenarioDemoSharedLocal: true`）。该模式只接受既有 target policy 登记的长期开发库、后端 `http://127.0.0.1:8300` 和当前版本 `scenario-demo/` 下原位 canonical 报告，要求 `volume` 配方、全部完成阶段、component digest、当前阶段逻辑指纹及正式 persistent baseline。它证明长期保留批次的精确创建或读回，不把该基线表述为 fresh 或隔离空库；不得复制、改名报告或使用 lifecycle/local alias 替代。
+
+共享模式在业务与打印读取前及结束时，分别绑定 clean Git SHA、当前完整源码指纹、正式 active bundle 的后端源码指纹、`runtimeServerVersion(bundle)` 和数据库 / migration 运行证明；正常正式账号登录后通过已有 `get_effective_session` 只读核对当前登记客户配置，不要求增加 debug 权限或管理员凭据。Git SHA 与 `local-*` 运行版本分别记录，不将本地运行版本当作裸 SHA。账号登录与知悉确认仍会写认证或行政记录，业务数据只读；物理重建与 OID 恢复证明仍由独立受控操作留证，不成为浏览器的自造回执依赖。默认 local 隔离验收及 `customer-trial-133` 的目标、账号、空基线和 attestation 合同不变。
+
+```bash
+scenario_reports=output/qa/manual-acceptance/datasets/2026.09.27-v8/scenario-demo
+MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
+  node scripts/qa/manual-acceptance-browser.mjs --scenario-demo-shared-local \
+    --base-url http://127.0.0.1:15200 \
+    --backend-url http://127.0.0.1:8300 \
+    --dataset-report "$scenario_reports/dataset/apply-report.json" \
+    --source-report "$scenario_reports/source/apply-report.json" \
+    --fact-report "$scenario_reports/facts/apply-report.json" \
+    --readiness-report "$scenario_reports/readiness/verify-report.json" \
+    --report "$scenario_reports/browser/report.json"
+```
 
 本地 Kratos BBR 若在逐页读取期间返回纯 HTTP 429，浏览器验收会按 10 / 20 / 30 秒递增等待，最多执行四次，并在报告保留每次失败事件与截图。只要混入其他运行时错误、最终页面数据不足，或第四次仍被限流，整轮验收仍失败；该重试不能把持续过载或业务错误改写成绿色。
 

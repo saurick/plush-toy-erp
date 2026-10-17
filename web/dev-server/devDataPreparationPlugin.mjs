@@ -108,14 +108,28 @@ const MANUAL_ACCEPTANCE_REVIEW_PLAN =
     datasetStageKeys: MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
   })
 
+const MANUAL_ACCEPTANCE_SEMANTIC_DIGEST = digestManualAcceptanceSemanticPlan(
+  buildManualAcceptanceSemanticPlan({ sourceScaleProfile: 'acceptance' })
+)
+const SCENARIO_DEMO_SOURCE_SCALE_PROFILE = 'volume'
+const SCENARIO_DEMO_SEMANTIC_DIGEST = digestManualAcceptanceSemanticPlan(
+  buildManualAcceptanceSemanticPlan({
+    sourceScaleProfile: SCENARIO_DEMO_SOURCE_SCALE_PROFILE,
+  })
+)
+export const DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS = Object.freeze({
+  'core-demo': MANUAL_ACCEPTANCE_SEMANTIC_DIGEST,
+  'scenario-demo': SCENARIO_DEMO_SEMANTIC_DIGEST,
+  'full-acceptance': MANUAL_ACCEPTANCE_SEMANTIC_DIGEST,
+})
+
 const MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT = Object.freeze({
   kind: 'plush.dev-data-environment-contract',
   datasetKey: MANUAL_ACCEPTANCE_CORE_CONTRACT.datasetKey,
   dataVersion: MANUAL_ACCEPTANCE_CORE_CONTRACT.dataVersion,
   runId: MANUAL_ACCEPTANCE_CORE_CONTRACT.runId,
-  semanticDigest: digestManualAcceptanceSemanticPlan(
-    buildManualAcceptanceSemanticPlan()
-  ),
+  semanticDigest: MANUAL_ACCEPTANCE_SEMANTIC_DIGEST,
+  profileSemanticDigests: DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS,
   simulatedOnly: MANUAL_ACCEPTANCE_CORE_CONTRACT.simulatedOnly,
   realCustomerImport: MANUAL_ACCEPTANCE_CORE_CONTRACT.realCustomerImport,
   unitCount: MANUAL_ACCEPTANCE_CORE_CONTRACT.units.length,
@@ -300,7 +314,7 @@ function operationTargetSummary(target, { profileKey, repository, runId }) {
     customerConfigRevision,
     datasetVersion: SCENARIO_DEMO_DATA_VERSION,
     datasetRunId: SCENARIO_DEMO_RUN_ID,
-    semanticDigest: MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT.semanticDigest,
+    semanticDigest: DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS[profileKey],
     rollbackPoint,
   })
 }
@@ -425,6 +439,8 @@ export function scenarioDemoPlanCommand(
     command: process.execPath,
     args: Object.freeze([
       path.join(root, 'scripts', 'qa', 'scenario-demo-data.mjs'),
+      '--source-scale-profile',
+      SCENARIO_DEMO_SOURCE_SCALE_PROFILE,
       ...scenarioTargetArgs(targetKey, attestation),
     ]),
     options: Object.freeze({ cwd: root }),
@@ -441,6 +457,8 @@ export function scenarioDemoExecutionCommand(
     command: process.execPath,
     args: Object.freeze([
       path.join(root, 'scripts', 'qa', 'scenario-demo-data.mjs'),
+      '--source-scale-profile',
+      SCENARIO_DEMO_SOURCE_SCALE_PROFILE,
       '--apply',
       '--expected-plan-digest',
       operation.targetSummary.preflightFingerprint,
@@ -684,7 +702,7 @@ function scenarioDemoPlanFingerprint(stdout, repository, target) {
     plan.runId !== SCENARIO_DEMO_RUN_ID ||
     !/^20[0-9]{12}$/u.test(String(plan.migrationVersion || '')) ||
     plan.semanticDigest !==
-      MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT.semanticDigest ||
+      SCENARIO_DEMO_SEMANTIC_DIGEST ||
     plan.backendURL !== expectedOrigin ||
     plan.databaseName !== target.databaseName ||
     plan.repository?.commit !== repository.commit ||
@@ -739,7 +757,7 @@ function parseScenarioDemoReadback(stdout, operation) {
     readback?.dataVersion !== SCENARIO_DEMO_DATA_VERSION ||
     readback?.runId !== SCENARIO_DEMO_RUN_ID ||
     readback?.semanticDigest !==
-      MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT.semanticDigest ||
+      SCENARIO_DEMO_SEMANTIC_DIGEST ||
     readback?.stageCount !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
     !Number.isSafeInteger(readback?.sourceDocumentCount) ||
     readback.sourceDocumentCount < 1 ||
@@ -848,7 +866,7 @@ function operationContract(operation) {
   const currentIdentity =
     dataVersion === SCENARIO_DEMO_DATA_VERSION &&
     datasetRunId === SCENARIO_DEMO_RUN_ID &&
-    semanticDigest === MANUAL_ACCEPTANCE_ENVIRONMENT_CONTRACT.semanticDigest
+    semanticDigest === DATA_PREPARATION_PROFILE_SEMANTIC_DIGESTS[operation.profileKey]
   const historicalIdentity =
     DATA_PREPARATION_HISTORICAL_SCENARIO_READBACK_BASELINES.some(
       (baseline) =>

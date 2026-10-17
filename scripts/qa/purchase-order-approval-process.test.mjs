@@ -5,6 +5,11 @@ import {
   approvePurchaseOrderThroughProcess,
   submitPurchaseOrderThroughProcess,
 } from './purchase-order-approval-process.mjs'
+import { advancePurchaseOrderLifecycleThroughProcess } from './manual-acceptance-source-data.mjs'
+import {
+  manualAcceptanceFactRPCCall,
+  manualAcceptanceFactRPCParams,
+} from './manual-acceptance-fact-data.mjs'
 
 function createHarness() {
   const calls = []
@@ -127,6 +132,71 @@ test('purchase order approval helper uses ProcessRuntime and linked task only', 
     ),
     false
   )
+})
+
+test('source and fact purchase approval transports send strict document readback params', async () => {
+  for (const transport of ['source', 'fact']) {
+    const harness = createHarness()
+    const requests = []
+    const fetchImpl = async (url, init) => {
+      const body = JSON.parse(init.body)
+      const domain = new URL(url).pathname.split('/').at(-1)
+      requests.push({ domain, method: body.method, params: body.params })
+      if (body.method === 'get_purchase_order') {
+        assert.deepEqual(body.params, { id: 501 })
+      } else if (domain === 'customer_config') {
+        assert.equal(body.params.customer_key, 'yoyoosun')
+      } else {
+        assert.equal(Object.hasOwn(body.params, 'customer_key'), false)
+      }
+      const data = await harness.invoke({
+        domain,
+        method: body.method,
+        params: body.params,
+      })
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ result: { code: 0, data } }),
+      }
+    }
+    const backendURL = 'http://127.0.0.1:8310'
+    if (transport === 'source') {
+      const status = await advancePurchaseOrderLifecycleThroughProcess({
+        plan: { backendURL, runId: 'strict-readback' },
+        record: { purchase_order_no: 'PO-501', targetStatus: 'APPROVED' },
+        item: { id: 501, lifecycle_status: 'DRAFT' },
+        token: 'source-token',
+        roleTokens: { boss: 'boss-token' },
+        fetchImpl,
+        report: { steps: [] },
+      })
+      assert.equal(status, 'APPROVED')
+    } else {
+      const result = await approvePurchaseOrderThroughProcess({
+        purchaseOrder: { id: 501, purchase_order_no: 'PO-501' },
+        customerKey: 'yoyoosun',
+        idempotencyPrefix: 'strict-readback',
+        approvalActorForRole: (roleKey) => roleKey,
+        invoke: ({ domain, method, params }) =>
+          manualAcceptanceFactRPCCall({
+            backendURL,
+            domain,
+            method,
+            params: manualAcceptanceFactRPCParams(domain, method, params),
+            token: 'fact-token',
+            fetchImpl,
+          }),
+      })
+      assert.equal(result.purchaseOrder.lifecycle_status, 'APPROVED')
+    }
+    assert.equal(requests.length, 5)
+    assert.deepEqual(requests.at(-1), {
+      domain: 'purchase_order',
+      method: 'get_purchase_order',
+      params: { id: 501 },
+    })
+  }
 })
 
 test('purchase order submit helper stops at SUBMITTED approval node', async () => {

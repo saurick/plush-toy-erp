@@ -42,7 +42,10 @@ import {
   MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT,
   MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
 } from "./manual-acceptance-catalog.mjs";
-import { DEFAULT_SOURCE_DATA_SCALE } from "./manual-acceptance-source-data.mjs";
+import {
+  normalizeManualAcceptanceSourceScaleProfile,
+  resolveManualAcceptanceSourceScale,
+} from "./manual-acceptance-source-data.mjs";
 import { manualAcceptanceOutsourcingInventoryCoverageIsComplete } from "./manual-acceptance-fact-report-contract.mjs";
 import {
   MANUAL_ACCEPTANCE_CORE_UNITS,
@@ -794,7 +797,7 @@ function roleStageExecution() {
   };
 }
 
-function buildStages(identity, businessChainContract) {
+function buildStages(identity, businessChainContract, sourceScaleProfile) {
   const taskPlan = buildManualAcceptanceTaskDataPlan({
     runId: identity.runId,
     dataVersion: identity.dataVersion,
@@ -962,6 +965,8 @@ function buildStages(identity, businessChainContract) {
           "scripts/qa/manual-acceptance-source-data.mjs",
           [
             "--apply",
+            "--source-scale-profile",
+            sourceScaleProfile,
             "--target",
             "${TARGET_POLICY_TARGET}",
             "--data-version",
@@ -984,7 +989,10 @@ function buildStages(identity, businessChainContract) {
           },
         ),
       ],
-      expected: { scale: { ...DEFAULT_SOURCE_DATA_SCALE } },
+      expected: {
+        sourceScaleProfile,
+        scale: { ...resolveManualAcceptanceSourceScale(sourceScaleProfile) },
+      },
       replay: "resume-or-reuse-by-stable-business-code",
       cleanupPolicy: "retire",
     },
@@ -1244,6 +1252,9 @@ function buildManualAcceptanceSemanticPlanWithContract(
   if (options.runId !== undefined && options.runId !== null) {
     normalizeManualAcceptanceRunId(identity.dataVersion, options.runId);
   }
+  const sourceScaleProfile = normalizeManualAcceptanceSourceScaleProfile(
+    options.sourceScaleProfile,
+  );
   return {
     contract: "manual-acceptance-dataset-semantic-plan-v3",
     datasetKey: identity.datasetKey,
@@ -1253,6 +1264,7 @@ function buildManualAcceptanceSemanticPlanWithContract(
     directSQLFacts: false,
     dataVersion: identity.dataVersion,
     runId: identity.runId,
+    sourceScaleProfile,
     dateAnchorUtc: identity.dateAnchorUtc,
     dateAnchorUnix: identity.dateAnchorUnix,
     taskSchedulePolicy: { ...TASK_SCHEDULE_POLICY },
@@ -1281,7 +1293,7 @@ function buildManualAcceptanceSemanticPlanWithContract(
         "${TARGET_ATTESTATION_JSON}": "targetAttestation",
       },
     },
-    stages: buildStages(identity, businessChainContract),
+    stages: buildStages(identity, businessChainContract, sourceScaleProfile),
     replay: {
       sameDataVersion: "resume-or-reuse-with-stage-readback",
       semanticMismatch: "fail-closed-before-next-stage",
@@ -1524,6 +1536,7 @@ export function buildManualAcceptanceDatasetTargetPlan(options = {}) {
     targetSelectionExplicit: Boolean(options.targetAlias),
     dataVersion: semanticPlan.dataVersion,
     runId: semanticPlan.runId,
+    sourceScaleProfile: semanticPlan.sourceScaleProfile,
     datasetKey: semanticPlan.datasetKey,
     semanticDigest,
     chainDataDigest: businessChainContract.chainDataDigest,
@@ -1542,6 +1555,7 @@ export function buildManualAcceptanceDatasetBundle(options = {}) {
     ...overrides[PERSISTENT_SCENARIO_DATASET_TARGET],
     dataVersion: options.dataVersion,
     runId: options.runId,
+    sourceScaleProfile: options.sourceScaleProfile,
     generatedAt,
     targetAlias: PERSISTENT_SCENARIO_DATASET_TARGET,
     chainKey: options.chainKey,
@@ -1550,6 +1564,7 @@ export function buildManualAcceptanceDatasetBundle(options = {}) {
     ...overrides[CUSTOMER_TRIAL_133_TARGET],
     dataVersion: options.dataVersion,
     runId: options.runId,
+    sourceScaleProfile: options.sourceScaleProfile,
     generatedAt,
     targetAlias: CUSTOMER_TRIAL_133_TARGET,
     chainKey: options.chainKey,
@@ -1575,6 +1590,7 @@ export function buildManualAcceptanceDatasetBundle(options = {}) {
     generatedAt,
     dataVersion: localPersistent.dataVersion,
     runId: localPersistent.runId,
+    sourceScaleProfile: localPersistent.sourceScaleProfile,
     datasetKey: localPersistent.datasetKey,
     semanticDigest: localPersistent.semanticDigest,
     chainDataDigest: localPersistent.chainDataDigest,
@@ -1795,6 +1811,7 @@ function assertResumeIdentity(prior, plan, executionBinding) {
     datasetKey: plan.semanticPlan.datasetKey,
     dataVersion: plan.dataVersion,
     runId: plan.semanticPlan.runId,
+    sourceScaleProfile: plan.semanticPlan.sourceScaleProfile,
     dateAnchorUtc: plan.semanticPlan.dateAnchorUtc,
     semanticDigest: plan.semanticDigest,
   };
@@ -2249,6 +2266,7 @@ function baseApplyReport(
     datasetKey: plan.semanticPlan.datasetKey,
     dataVersion: plan.dataVersion,
     runId: plan.semanticPlan.runId,
+    sourceScaleProfile: plan.semanticPlan.sourceScaleProfile,
     dateAnchorUtc: plan.semanticPlan.dateAnchorUtc,
     taskSchedule: structuredClone(taskSchedule),
     semanticDigest: plan.semanticDigest,
@@ -2507,6 +2525,7 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
     databaseRebuildReceiptPath: "",
     resumeReportPath: "",
     chainKey: "",
+    sourceScaleProfile: "acceptance",
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -2533,6 +2552,10 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
         break;
       case "run-id":
         options.runId = value;
+        break;
+      case "source-scale-profile":
+        options.sourceScaleProfile =
+          normalizeManualAcceptanceSourceScaleProfile(value);
         break;
       case "target":
         options.target = value;
@@ -2648,6 +2671,9 @@ function helpText() {
     "不连接服务、不写文件、不写数据库：",
     `  node scripts/qa/manual-acceptance-dataset.mjs --data-version ${DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION} --run-id ${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}`,
     "  node scripts/qa/manual-acceptance-dataset.mjs --chain delivery_to_settlement",
+    "--source-scale-profile acceptance 为默认轻量档；volume 扩大主档与源单，事实和岗位任务继续完整覆盖原合同。",
+    "  node scripts/qa/manual-acceptance-dataset.mjs --source-scale-profile volume",
+    "规模档绑定 semanticDigest；同批已有报告或对象不匹配时停止，不能覆盖改造成另一档。",
     "--chain 只读展开一条业务链的步骤、绑定、合法场景和现有阶段，不创建第二个局部造数入口。",
     "",
     `CLI --apply 固定使用 ${MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT}，并要求显式目标。`,
@@ -2686,6 +2712,7 @@ export async function runManualAcceptanceDatasetCli(argv = [], deps = {}) {
     const plan = buildManualAcceptanceDatasetBundle({
       dataVersion: options.dataVersion,
       runId: options.runId,
+      sourceScaleProfile: options.sourceScaleProfile,
       generatedAt:
         typeof deps.now === "function" ? deps.now() : deps.now || new Date(),
       chainKey: options.chainKey || undefined,
@@ -2700,6 +2727,7 @@ export async function runManualAcceptanceDatasetCli(argv = [], deps = {}) {
   const plan = buildManualAcceptanceDatasetTargetPlan({
     dataVersion: options.dataVersion,
     runId: options.runId,
+    sourceScaleProfile: options.sourceScaleProfile,
     targetAlias: options.target,
     backendURL: options.backendURL || undefined,
     databaseName: options.databaseName || undefined,

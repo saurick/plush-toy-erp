@@ -78,6 +78,9 @@ const BUSINESS_NO_CODES = new Set([
 ]);
 
 export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
+  "sales_order.get_sales_order": Object.freeze(["id"]),
+  "purchase_order.get_purchase_order": Object.freeze(["id"]),
+  "outsourcing_order.get_outsourcing_order": Object.freeze(["id"]),
   "inventory.create_inventory_operation": Object.freeze([
     "operation_no",
     "operation_type",
@@ -401,6 +404,27 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "expected_version",
   ]),
 });
+
+const RAW_RPC_ENDPOINTS = new Set([
+  "purchase.list_purchase_returns",
+  "purchase.list_purchase_receipt_adjustments",
+  "operational_fact.cancel_finance_fact",
+]);
+
+export function manualAcceptanceRPCParams(domain, method, params = {}) {
+  const key = `${domain}.${method}`;
+  const formalParams = FORMAL_RPC_PARAM_ALLOWLIST[key];
+  if (
+    domain === "auth" ||
+    domain === "workflow" ||
+    domain === "production_order" ||
+    RAW_RPC_ENDPOINTS.has(key) ||
+    (formalParams && !formalParams.includes("customer_key"))
+  ) {
+    return { ...params };
+  }
+  return { customer_key: CUSTOMER_KEY, ...params };
+}
 
 export class SourceDrivenFactError extends Error {
   constructor(message, exitCode = 1) {

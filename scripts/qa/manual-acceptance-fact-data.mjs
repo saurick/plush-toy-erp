@@ -8,7 +8,7 @@ import { numeric20Scale6Units } from "../../web/src/erp/utils/numeric20Scale6.mj
 import { roundRequiredMaterialQuantity } from "./lib/unit-quantity.mjs";
 
 import {
-  FORMAL_RPC_PARAM_ALLOWLIST,
+  manualAcceptanceRPCParams,
   buildSourceDrivenFactPlan,
   applySourceDrivenFactPlan,
   exactProcessApprovalTask,
@@ -68,11 +68,6 @@ const REQUIRED_MODULES = Object.freeze([
   "quality_inspections",
 ]);
 export const MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES = REQUIRED_MODULES;
-const RAW_RPC_ENDPOINTS = new Set([
-  "purchase.list_purchase_returns",
-  "purchase.list_purchase_receipt_adjustments",
-  "operational_fact.cancel_finance_fact",
-]);
 const ROLE_USERS = Object.freeze({
   boss: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.boss,
   purchase: LOCAL_DEMO_ACCOUNT_SET.roleUsernames.purchase,
@@ -834,17 +829,7 @@ export function manualAcceptanceFactRole(domain, method, params = {}) {
 }
 
 export function manualAcceptanceFactRPCParams(domain, method, params = {}) {
-  const formalParams = FORMAL_RPC_PARAM_ALLOWLIST[`${domain}.${method}`];
-  if (
-    domain === "auth" ||
-    domain === "workflow" ||
-    domain === "production_order" ||
-    RAW_RPC_ENDPOINTS.has(`${domain}.${method}`) ||
-    (formalParams && !formalParams.includes("customer_key"))
-  ) {
-    return { ...params };
-  }
-  return { customer_key: CUSTOMER_KEY, ...params };
+  return manualAcceptanceRPCParams(domain, method, params);
 }
 
 export function assertManualAcceptanceAdminProfile(profile) {
