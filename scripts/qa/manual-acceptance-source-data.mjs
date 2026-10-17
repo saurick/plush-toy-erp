@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { findSalesOrderAcceptanceExecution } from "./manual-acceptance-sales-order-process.mjs";
 import { roundRequiredMaterialQuantity } from "./lib/unit-quantity.mjs";
-import { manualAcceptanceRPCParams } from "./manual-acceptance-source-driven-facts.mjs";
+import {
+  manualAcceptanceRPCParams,
+  PRODUCTION_ROUTE_CODE,
+} from "./manual-acceptance-source-driven-facts.mjs";
 
 import { createHash } from "node:crypto";
 import { mkdir, open, readFile, writeFile } from "node:fs/promises";
@@ -109,8 +112,17 @@ export function resolveManualAcceptanceSourceScale(value = "acceptance") {
     normalizeManualAcceptanceSourceScaleProfile(value)
   ];
 }
-const ROUTED_PRODUCTION_SAMPLE_OFFSETS = Object.freeze([3, 4]);
-const ROUTED_PRODUCTION_PLANNED_QUANTITY = 3;
+export const MANUAL_ACCEPTANCE_PRODUCTION_RECIPE = Object.freeze({
+  runs: 45,
+  plannedQuantity: "3",
+  requiresWIP: true,
+  routeCode: PRODUCTION_ROUTE_CODE,
+  customerInspectionRunOffsets: Object.freeze([0]),
+  packagingVersionSnapshot: "试用验收包装版",
+  fabricOutsourcing:
+    "one-explicit-bom-material-and-unique-contract-line-per-run",
+  remainingMaterials: "exact-production-material-issues",
+});
 const REGISTERED_PREVIOUS_ROUTE_PREFIX = `YS${Number(CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION.match(/-v(\d+)$/u)[1]) - 1}`;
 const CURRENT_ROUTE_PREFIX = manualAcceptanceVisibleSourcePrefix(
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
@@ -1046,7 +1058,7 @@ function bindRoutedProductionOutsourcingContracts({
     .flatMap((order) =>
       order.items.flatMap((item) => {
         const bom = activeBOMByProduct.get(item.productRef);
-        return bom ? [{ order, bom }] : [];
+        return bom ? [{ order, item, bom }] : [];
       }),
     );
   const reservedOrders = outsourcingOrders.filter(
@@ -1064,18 +1076,40 @@ function bindRoutedProductionOutsourcingContracts({
   );
   if (
     !fabricProcess ||
-    reservedOrders.length < ROUTED_PRODUCTION_SAMPLE_OFFSETS.length
+    reservedOrders.length === 0 ||
+    productionCandidates.length === 0
   ) {
     throw new CliError(
       "source plan cannot reserve the routed production fabric outsourcing contracts",
       2,
     );
   }
-  for (const [
-    contractOffset,
-    productionCandidateOffset,
-  ] of ROUTED_PRODUCTION_SAMPLE_OFFSETS.entries()) {
-    const candidate = productionCandidates[productionCandidateOffset];
+  const templates = new Map(
+    reservedOrders.map((order) => [order, order.items[0]]),
+  );
+  const sourceOrders = new Map(
+    reservedOrders.map((order) => [order, new Set()]),
+  );
+  const candidateUsage = new Map();
+  for (const order of reservedOrders) order.items = [];
+  for (
+    let productionCandidateOffset = 0;
+    productionCandidateOffset < MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.runs;
+    productionCandidateOffset += 1
+  ) {
+    const candidateIndex =
+      productionCandidateOffset % productionCandidates.length;
+    const candidate = productionCandidates[candidateIndex];
+    const used =
+      (candidateUsage.get(candidateIndex) || 0) +
+      Number(MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.plannedQuantity);
+    if (used > Number(candidate.item.ordered_quantity)) {
+      throw new CliError(
+        "source production candidate cannot cover its allocated runs",
+        2,
+      );
+    }
+    candidateUsage.set(candidateIndex, used);
     const fabricItems = candidate?.bom?.items?.slice(0, 1);
     if (!candidate || fabricItems?.length !== 1) {
       throw new CliError(
@@ -1096,33 +1130,36 @@ function bindRoutedProductionOutsourcingContracts({
     );
     const quantity = roundRequiredMaterialQuantity(
       fabricItem.quantity,
-      ROUTED_PRODUCTION_PLANNED_QUANTITY,
+      MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.plannedQuantity,
       fabricItem.loss_rate,
       unit?.precision,
     );
-    const reservedOrder = reservedOrders[contractOffset];
-    const existing = reservedOrder.items[0];
-    reservedOrder.source_order_no = candidate.order.customer_order_no;
-    reservedOrder.items = [
-      {
-        line_no: 1,
-        subject_type: "MATERIAL",
-        materialRef: material.code,
-        unitKey: material.unitKey,
-        processRef: fabricProcess.code,
-        material_code_snapshot: material.code,
-        material_name_snapshot: material.name,
-        processing_item: fabricItem.position || "面料",
-        process_name_snapshot: fabricProcess.name,
-        process_category_snapshot: fabricProcess.category,
-        outsourcing_quantity: quantity,
-        unit_price: existing.unit_price,
-        amount: (Number(quantity) * Number(existing.unit_price)).toFixed(2),
-        expected_return_date: existing.expected_return_date,
-        note: existing.note,
-        acceptanceProductionCandidateOffset: productionCandidateOffset,
-      },
-    ];
+    const reservedOrder =
+      reservedOrders[productionCandidateOffset % reservedOrders.length];
+    const existing = templates.get(reservedOrder);
+    sourceOrders.get(reservedOrder).add(candidate.order.customer_order_no);
+    reservedOrder.items.push({
+      line_no: reservedOrder.items.length + 1,
+      subject_type: "MATERIAL",
+      materialRef: material.code,
+      unitKey: fabricItem.unitKey,
+      processRef: fabricProcess.code,
+      material_code_snapshot: material.code,
+      material_name_snapshot: material.name,
+      processing_item: fabricItem.position || "面料",
+      process_name_snapshot: fabricProcess.name,
+      process_category_snapshot: fabricProcess.category,
+      outsourcing_quantity: quantity,
+      unit_price: existing.unit_price,
+      amount: (Number(quantity) * Number(existing.unit_price)).toFixed(2),
+      expected_return_date: existing.expected_return_date,
+      note: existing.note,
+      acceptanceProductionCandidateOffset: productionCandidateOffset,
+    });
+  }
+  for (const order of reservedOrders) {
+    const sources = sourceOrders.get(order);
+    order.source_order_no = sources.size === 1 ? [...sources][0] : undefined;
   }
 }
 

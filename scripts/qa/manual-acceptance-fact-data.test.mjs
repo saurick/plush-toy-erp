@@ -308,23 +308,26 @@ function sourceReport({ remote = false } = {}) {
         runId: RUN_ID,
         sourceCandidates: {
           productionCandidates: [productionCandidate],
-          productionWIPOutsourcingCandidates: [3, 4].map((offset) => ({
-            productionCandidateOffset: offset,
-            order: {
-              id: 1310 + offset,
-              orderNo: `OS-WIP-${offset}`,
-              status: "CONFIRMED",
-            },
-            item: {
-              outsourcingOrderItemId: 1410 + offset,
-              subjectType: "MATERIAL",
-              subjectId: material.id,
-              materialId: material.id,
-              processId: 1501,
-              unitId: 1001,
-              quantity: "3",
-            },
-          })),
+          productionWIPOutsourcingCandidates: Array.from(
+            { length: 45 },
+            (_, offset) => ({
+              productionCandidateOffset: offset,
+              order: {
+                id: 1310 + offset,
+                orderNo: `OS-WIP-${offset}`,
+                status: "CONFIRMED",
+              },
+              item: {
+                outsourcingOrderItemId: 1410 + offset,
+                subjectType: "MATERIAL",
+                subjectId: material.id,
+                materialId: material.id,
+                processId: 1501,
+                unitId: 1001,
+                quantity: "3",
+              },
+            }),
+          ),
           outsourcingCandidates: [
             outsourcingMaterialCandidate,
             outsourcingProductCandidate,
@@ -732,17 +735,15 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
     plan.productionCandidates
       .map((candidate, offset) => (candidate.route ? offset : null))
       .filter((offset) => offset != null),
-    [3, 4],
+    Array.from({ length: 45 }, (_, offset) => offset),
   );
   assert.ok(
-    plan.productionCandidates
-      .filter((candidate) => candidate.route)
-      .every(
-        (candidate) =>
-          candidate.route.code === "PLUSH_SEW_HAND_V1" &&
-          candidate.route.customerInspectionRequired === false &&
-          candidate.route.packagingVersionSnapshot === "试用验收包装版",
-      ),
+    plan.productionCandidates.every(
+      (candidate, offset) =>
+        candidate.route.code === "PLUSH_SEW_HAND_V1" &&
+        candidate.route.customerInspectionRequired === (offset === 0) &&
+        candidate.route.packagingVersionSnapshot === "试用验收包装版",
+    ),
   );
   assert.deepEqual(
     plan.productionCandidates
@@ -752,10 +753,7 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
           : null,
       )
       .filter(Boolean),
-    [
-      [3, "3"],
-      [4, "3"],
-    ],
+    Array.from({ length: 45 }, (_, offset) => [offset, "3"]),
   );
   assert.equal(plan.outsourcingCandidates.length, 45);
   assert.equal(plan.expectedMinimums.shipments, 47);
@@ -1508,6 +1506,17 @@ function productionResumeFixture() {
       item: candidate.item,
       bom: { id: candidate.bom.id, status: candidate.bom.status },
       plannedQuantity: "3",
+      route: candidate.route,
+      fabricOutsourcing: {
+        order: candidate.fabricOutsourcing.order,
+        item: {
+          ...candidate.fabricOutsourcing.item,
+          id: candidate.fabricOutsourcing.item.outsourcingOrderItemId,
+        },
+        warehouseId: 301,
+        lotId: 5000,
+        quantity: "3",
+      },
       materialIssues: candidate.bom.items.map((item) => ({
         materialId: item.materialId,
         unitId: item.unitId,
@@ -1540,9 +1549,8 @@ function productionResumeFixture() {
     planned_quantity: source.plannedQuantity,
     sales_order_item_id: source.item.id,
     bom_header_id: source.bom.id,
-    route_code: source.route?.code ?? null,
-    customer_inspection_required:
-      source.route?.customerInspectionRequired ?? false,
+    route_code: source.route.code,
+    customer_inspection_required: source.route.customerInspectionRequired,
   };
   const requirements = source.materialIssues.map((item, index) => ({
     id: 12_001 + index,
@@ -1551,7 +1559,7 @@ function productionResumeFixture() {
   }));
   const records = [
     order,
-    ...source.materialIssues.map((item, index) => ({
+    ...source.directMaterialIssues.map((item, index) => ({
       id: 13_001 + index,
       fact_no: identity.materialIssues[index].businessNo,
       status: "POSTED",
@@ -1568,7 +1576,24 @@ function productionResumeFixture() {
       idempotency_key: identity.materialIssues[index].idempotencyKey,
     })),
     {
+      id: 13_999,
+      fact_no: identity.fabricIssue.businessNo,
+      status: "POSTED",
+      fact_type: "MATERIAL_ISSUE",
+      subject_type: "MATERIAL",
+      subject_id: source.fabricOutsourcing.item.materialId,
+      warehouse_id: source.fabricOutsourcing.warehouseId,
+      unit_id: source.fabricOutsourcing.item.unitId,
+      lot_id: source.fabricOutsourcing.lotId,
+      quantity: source.fabricOutsourcing.quantity,
+      source_type: "OUTSOURCING_ORDER",
+      source_id: source.fabricOutsourcing.order.id,
+      source_line_id: source.fabricOutsourcing.item.id,
+      idempotency_key: identity.fabricIssue.idempotencyKey,
+    },
+    {
       id: 14_001,
+      production_wip_batch_id: 15_001,
       fact_no: identity.completion.businessNo,
       status: "POSTED",
       fact_type: "FINISHED_GOODS_RECEIPT",

@@ -533,7 +533,7 @@ function factReport({ referenceCounts = {}, ...overrides } = {}) {
     target,
     backendURL,
     databaseName,
-    semanticDigest: "fact-semantic-digest-v1",
+    semanticDigest: "source-semantic-digest-v1",
     runtime: {
       environment: "local",
       customerKey: "yoyoosun",
@@ -553,6 +553,30 @@ function factReport({ referenceCounts = {}, ...overrides } = {}) {
     ...overrides,
   };
 }
+
+test("readiness binds facts to the source semantic identity before any RPC", async () => {
+  const source = sourceReport();
+  const facts = factReport();
+  assert.doesNotThrow(() =>
+    buildManualAcceptanceReadinessPlan({
+      sourceReport: source,
+      factReport: facts,
+    }),
+  );
+  let fetchCalls = 0;
+  await assert.rejects(
+    runManualAcceptanceReadinessCli(localVerifyArgs(), {
+      sourceReport: source,
+      factReport: { ...facts, semanticDigest: "previous-source-recipe" },
+      fetchImpl: async () => {
+        fetchCalls += 1;
+        throw new Error("must reject mixed semantics before network access");
+      },
+    }),
+    /源数据.*业务记录.*语义摘要/u,
+  );
+  assert.equal(fetchCalls, 0);
+});
 
 test("readiness rejects legacy generic operational fact reports", () => {
   const report = factReport();

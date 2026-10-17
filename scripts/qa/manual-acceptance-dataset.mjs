@@ -43,6 +43,7 @@ import {
   MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
 } from "./manual-acceptance-catalog.mjs";
 import {
+  MANUAL_ACCEPTANCE_PRODUCTION_RECIPE,
   normalizeManualAcceptanceSourceScaleProfile,
   resolveManualAcceptanceSourceScale,
 } from "./manual-acceptance-source-data.mjs";
@@ -1265,6 +1266,7 @@ function buildManualAcceptanceSemanticPlanWithContract(
     dataVersion: identity.dataVersion,
     runId: identity.runId,
     sourceScaleProfile,
+    productionRecipe: structuredClone(MANUAL_ACCEPTANCE_PRODUCTION_RECIPE),
     dateAnchorUtc: identity.dateAnchorUtc,
     dateAnchorUnix: identity.dateAnchorUnix,
     taskSchedulePolicy: { ...TASK_SCHEDULE_POLICY },

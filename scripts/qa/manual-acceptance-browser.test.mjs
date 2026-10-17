@@ -58,6 +58,7 @@ import {
   MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
   MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
   buildManualAcceptanceDatasetTargetPlan,
+  digestManualAcceptanceSemanticPlan,
 } from "./manual-acceptance-dataset.mjs";
 import {
   MANUAL_ACCEPTANCE_DATABASE_REBUILD_PROOF_CONTRACT,
@@ -196,7 +197,10 @@ function taskGroupCoverageFixture(catalogScenarioDigest = "c".repeat(64)) {
   };
 }
 
-async function datasetApplyEvidenceFixture({ remote = false } = {}) {
+async function datasetApplyEvidenceFixture({
+  remote = false,
+  sourceScaleProfile = "acceptance",
+} = {}) {
   const outputRoot = path.join(
     repoRoot,
     "output/qa/manual-acceptance/datasets/lifecycle",
@@ -205,7 +209,6 @@ async function datasetApplyEvidenceFixture({ remote = false } = {}) {
   await fs.mkdir(outputRoot, { recursive: true });
   const dataVersion = "2026.09.27-v8";
   const targetAlias = remote ? "customer-trial-133" : "local";
-  const datasetSemanticDigest = "e".repeat(64);
   const taskCoverage = taskGroupCoverageFixture();
   const taskSchedule = buildManualAcceptanceTaskSchedule(2_000_000_000);
   const financeFacts = financeFieldFixture();
@@ -245,6 +248,16 @@ async function datasetApplyEvidenceFixture({ remote = false } = {}) {
     financeRepresentatives: financeFieldContract.representatives,
     runtimeAttestation,
   };
+  const currentPlan = buildManualAcceptanceDatasetTargetPlan({
+    targetAlias,
+    sourceScaleProfile,
+    dataVersion,
+    runId: printInput.sourceRunId,
+    backendURL: printInput.backendURL,
+    databaseName: printInput.databaseName,
+  });
+  const datasetSemanticDigest = currentPlan.semanticDigest;
+  const fingerprints = resolveManualAcceptanceDatasetStageLogicFingerprints();
   const baseReport = (stageKey) => ({
     mode: ["core", "baseline", "purchase-quality", "readiness"].includes(
       stageKey,
@@ -267,6 +280,11 @@ async function datasetApplyEvidenceFixture({ remote = false } = {}) {
       baseReport(stageKey),
     ]),
   );
+  Object.assign(reports.source, {
+    sourceScaleProfile,
+    scale: currentPlan.semanticPlan.stages.find((stage) => stage.key === "source")
+      .expected.scale,
+  });
   Object.assign(reports.core, {
     configRevision: printInput.configRevision,
     configProductVersion: remote
@@ -423,7 +441,7 @@ async function datasetApplyEvidenceFixture({ remote = false } = {}) {
           handlerId: `${MANUAL_ACCEPTANCE_DATASET_RUNNER_CONTRACT}:${stageKey}`,
           logicFingerprintContract:
             MANUAL_ACCEPTANCE_DATASET_STAGE_LOGIC_FINGERPRINT_CONTRACT,
-          logicFingerprint: "b".repeat(64),
+          logicFingerprint: fingerprints.get(stageKey),
           componentEntrypoint: `fixture/${stageKey}`,
           componentDigest: digestManualAcceptanceDatasetComponentReport(
             reports[stageKey],
@@ -450,6 +468,9 @@ async function datasetApplyEvidenceFixture({ remote = false } = {}) {
     dataVersion,
     runId: printInput.runId,
     semanticDigest: datasetSemanticDigest,
+    sourceScaleProfile,
+    chainDataDigest: currentPlan.chainDataDigest,
+    chainVerificationDigest: currentPlan.chainVerificationDigest,
     taskSchedule,
     target: {
       alias: targetAlias,
@@ -477,6 +498,7 @@ async function datasetApplyEvidenceFixture({ remote = false } = {}) {
     outputRoot,
     printInput,
     reports,
+    currentPlan,
     datasetReport,
     datasetSemanticDigest,
     datasetReportPath,
@@ -567,6 +589,7 @@ async function scenarioBrowserEvidenceFixture() {
       reports[stage.key],
     );
     stage.references.runner.logicFingerprint = fingerprints.get(stage.key);
+    stage.semanticDigest = expected.semanticDigest;
   }
   Object.assign(datasetReport.freshEmptyBaseline, {
     origin: "persistent_target_baseline",
@@ -1348,6 +1371,14 @@ test("bound print inputs stay in the acceptance report root and match the curren
       }),
     /同一批次/u,
   );
+  assert.throws(
+    () =>
+      assertBoundSimulatedPrintReports(source, {
+        ...fact,
+        semanticDigest: "previous-source-recipe",
+      }),
+    /同一批次/u,
+  );
 });
 
 test("remote browser evidence binds the exact readiness batch and canonical report path", () => {
@@ -1639,6 +1670,111 @@ test("browser dataset binding requires the complete stage chain including baseli
     );
   } finally {
     await fs.rm(fixture.outputRoot, { recursive: true, force: true });
+  }
+});
+
+test("default browser rejects stale recipes and unregistered profiles before runtime or login", async () => {
+  const mutations = [
+    (fixture) => {
+      const previousRecipe = structuredClone(fixture.currentPlan.semanticPlan);
+      delete previousRecipe.productionRecipe;
+      fixture.datasetReport.semanticDigest =
+        digestManualAcceptanceSemanticPlan(previousRecipe);
+      assert.notEqual(
+        fixture.datasetReport.semanticDigest,
+        fixture.currentPlan.semanticDigest,
+      );
+      for (const stage of fixture.datasetReport.stages) {
+        stage.semanticDigest = fixture.datasetReport.semanticDigest;
+      }
+    },
+    (fixture) => {
+      fixture.datasetReport.chainDataDigest = "a".repeat(64);
+    },
+    (fixture) => {
+      fixture.datasetReport.chainVerificationDigest = "a".repeat(64);
+    },
+    (fixture) => {
+      fixture.datasetReport.stages.find((stage) => stage.key === "facts")
+        .references.runner.logicFingerprint = "a".repeat(64);
+    },
+    (fixture) => {
+      delete fixture.datasetReport.sourceScaleProfile;
+    },
+    (fixture) => {
+      fixture.datasetReport.sourceScaleProfile = "unknown";
+    },
+    (fixture) => {
+      fixture.reports.source.sourceScaleProfile = "volume";
+    },
+    (fixture) => {
+      delete fixture.reports.source.sourceScaleProfile;
+    },
+    (fixture) => {
+      fixture.reports.source.scale.materials += 1;
+    },
+  ];
+  for (const remote of [false, true]) {
+    for (const mutate of mutations) {
+      const fixture = await datasetApplyEvidenceFixture({ remote });
+      let fetchCalls = 0;
+      try {
+        mutate(fixture);
+        const stage = fixture.datasetReport.stages.find(
+          (entry) => entry.key === "source",
+        );
+        await fs.writeFile(
+          fixture.sourceReportPath,
+          `${JSON.stringify(fixture.reports.source, null, 2)}\n`,
+        );
+        stage.references.runner.componentDigest =
+          digestManualAcceptanceDatasetComponentReport(fixture.reports.source);
+        await fs.writeFile(
+          fixture.datasetReportPath,
+          `${JSON.stringify(fixture.datasetReport, null, 2)}\n`,
+        );
+        await assert.rejects(
+          verifyManualAcceptanceBrowserDatasetBinding({
+            backendURL: fixture.printInput.backendURL,
+            datasetReportPath: fixture.datasetReportPath,
+            sourceReportPath: fixture.sourceReportPath,
+            factReportPath: fixture.factReportPath,
+            readinessReportPath: fixture.readinessReportPath,
+            printInput: fixture.printInput,
+            fetchImpl: async () => {
+              fetchCalls += 1;
+              throw new Error("must reject recipe before network access");
+            },
+          }),
+          /当前.*配方|sourceScaleProfile/u,
+        );
+        assert.equal(fetchCalls, 0);
+      } finally {
+        await fs.rm(fixture.outputRoot, { recursive: true, force: true });
+      }
+    }
+  }
+});
+
+test("default browser binds both registered source scales to the current plan independently of source semantic identity", async () => {
+  for (const remote of [false, true]) {
+    const fixture = await datasetApplyEvidenceFixture({
+      remote,
+      sourceScaleProfile: "volume",
+    });
+    try {
+      const binding = await verifyManualAcceptanceDatasetApplyReportBinding({
+        datasetReportPath: fixture.datasetReportPath,
+        sourceReportPath: fixture.sourceReportPath,
+        factReportPath: fixture.factReportPath,
+        readinessReportPath: fixture.readinessReportPath,
+        printInput: fixture.printInput,
+      });
+      assert.equal(binding.datasetSemanticDigest, fixture.datasetSemanticDigest);
+      assert.notEqual(binding.datasetSemanticDigest, fixture.printInput.semanticDigest);
+    } finally {
+      await fs.rm(fixture.outputRoot, { recursive: true, force: true });
+    }
   }
 });
 

@@ -26,7 +26,7 @@ export const SOURCE_DRIVEN_FACT_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
 
 const CUSTOMER_KEY = "yoyoosun";
 const SIMULATED_NOTE = "按订单办理。";
-const PRODUCTION_ROUTE_CODE = "PLUSH_SEW_HAND_V1";
+export const PRODUCTION_ROUTE_CODE = "PLUSH_SEW_HAND_V1";
 const PRODUCTION_ROUTE_OPERATIONS = Object.freeze([
   "FABRIC_PROCESSING",
   "SEWING",
@@ -567,33 +567,35 @@ function normalizeProduction(source) {
     source?.plannedQuantity,
     "production.plannedQuantity",
   );
-  let route;
-  if (source?.route != null) {
-    const code = requiredText(
-      source.route.code,
-      "production.route.code",
-      64,
-    ).toUpperCase();
-    if (code !== PRODUCTION_ROUTE_CODE) {
-      throw new SourceDrivenFactError(
-        `production.route.code must be ${PRODUCTION_ROUTE_CODE}`,
-      );
-    }
-    if (typeof source.route.customerInspectionRequired !== "boolean") {
-      throw new SourceDrivenFactError(
-        "production.route.customerInspectionRequired must be boolean",
-      );
-    }
-    route = {
-      code,
-      customerInspectionRequired: source.route.customerInspectionRequired,
-      packagingVersionSnapshot: requiredText(
-        source.route.packagingVersionSnapshot,
-        "production.route.packagingVersionSnapshot",
-        128,
-      ),
-    };
+  if (source?.route == null) {
+    throw new SourceDrivenFactError(
+      "production requires the registered WIP route",
+    );
   }
+  const code = requiredText(
+    source.route.code,
+    "production.route.code",
+    64,
+  ).toUpperCase();
+  if (code !== PRODUCTION_ROUTE_CODE) {
+    throw new SourceDrivenFactError(
+      `production.route.code must be ${PRODUCTION_ROUTE_CODE}`,
+    );
+  }
+  if (typeof source.route.customerInspectionRequired !== "boolean") {
+    throw new SourceDrivenFactError(
+      "production.route.customerInspectionRequired must be boolean",
+    );
+  }
+  const route = {
+    code,
+    customerInspectionRequired: source.route.customerInspectionRequired,
+    packagingVersionSnapshot: requiredText(
+      source.route.packagingVersionSnapshot,
+      "production.route.packagingVersionSnapshot",
+      128,
+    ),
+  };
   const completion = {
     warehouseId: positiveID(
       source?.completion?.warehouseId,
@@ -663,94 +665,80 @@ function normalizeProduction(source) {
         Number(source.fabricOutsourcing?.item?.materialId) &&
       record.unitId === Number(source.fabricOutsourcing?.item?.unitId),
   );
-  let fabricOutsourcing;
-  if (route) {
-    if (fabricBudgets.length !== 1 || source?.fabricOutsourcing == null) {
-      throw new SourceDrivenFactError(
-        "routed production requires one explicitly selected fabric material outsourcing source",
-      );
-    }
-    const fabricBudget = fabricBudgets[0];
-    fabricOutsourcing = {
-      order: {
-        id: positiveID(
-          source.fabricOutsourcing?.order?.id,
-          "production.fabricOutsourcing.order.id",
-        ),
-        status: exactStatus(
-          source.fabricOutsourcing?.order?.status,
-          "CONFIRMED",
-          "production.fabricOutsourcing.order.status",
-        ),
-      },
-      item: {
-        id: positiveID(
-          source.fabricOutsourcing?.item?.id,
-          "production.fabricOutsourcing.item.id",
-        ),
-        materialId: positiveID(
-          source.fabricOutsourcing?.item?.materialId,
-          "production.fabricOutsourcing.item.materialId",
-        ),
-        unitId: positiveID(
-          source.fabricOutsourcing?.item?.unitId,
-          "production.fabricOutsourcing.item.unitId",
-        ),
-        quantity: quantity(
-          source.fabricOutsourcing?.item?.quantity,
-          "production.fabricOutsourcing.item.quantity",
-        ),
-      },
-      warehouseId: positiveID(
-        source.fabricOutsourcing?.warehouseId,
-        "production.fabricOutsourcing.warehouseId",
-      ),
-      lotId: positiveID(
-        source.fabricOutsourcing?.lotId,
-        "production.fabricOutsourcing.lotId",
-      ),
-      quantity: quantity(
-        source.fabricOutsourcing?.quantity,
-        "production.fabricOutsourcing.quantity",
-      ),
-    };
-    if (
-      fabricOutsourcing.item.materialId !== fabricBudget.materialId ||
-      fabricOutsourcing.item.unitId !== fabricBudget.unitId ||
-      fabricOutsourcing.warehouseId !== fabricBudget.warehouseId ||
-      fabricOutsourcing.lotId !== fabricBudget.lotId ||
-      quantityUnits(
-        fabricOutsourcing.item.quantity,
-        "production.fabricOutsourcing.item.quantity",
-      ) !== quantityUnits(fabricBudget.quantity, "production fabric budget") ||
-      quantityUnits(
-        fabricOutsourcing.quantity,
-        "production.fabricOutsourcing.quantity",
-      ) !== quantityUnits(fabricBudget.quantity, "production fabric budget")
-    ) {
-      throw new SourceDrivenFactError(
-        "production fabric outsourcing source does not match its BOM material budget and stock grain",
-      );
-    }
-  } else if (source?.fabricOutsourcing != null) {
+  if (fabricBudgets.length !== 1 || source?.fabricOutsourcing == null) {
     throw new SourceDrivenFactError(
-      "route-less production cannot bind a fabric outsourcing source",
+      "routed production requires one explicitly selected fabric material outsourcing source",
     );
   }
-  const directMaterialIssues = fabricOutsourcing
-    ? materialIssues.filter(
-        (record) =>
-          record.materialId !== fabricOutsourcing.item.materialId ||
-          record.unitId !== fabricOutsourcing.item.unitId,
-      )
-    : materialIssues;
+  const fabricBudget = fabricBudgets[0];
+  const fabricOutsourcing = {
+    order: {
+      id: positiveID(
+        source.fabricOutsourcing?.order?.id,
+        "production.fabricOutsourcing.order.id",
+      ),
+      status: exactStatus(
+        source.fabricOutsourcing?.order?.status,
+        "CONFIRMED",
+        "production.fabricOutsourcing.order.status",
+      ),
+    },
+    item: {
+      id: positiveID(
+        source.fabricOutsourcing?.item?.id,
+        "production.fabricOutsourcing.item.id",
+      ),
+      materialId: positiveID(
+        source.fabricOutsourcing?.item?.materialId,
+        "production.fabricOutsourcing.item.materialId",
+      ),
+      unitId: positiveID(
+        source.fabricOutsourcing?.item?.unitId,
+        "production.fabricOutsourcing.item.unitId",
+      ),
+      quantity: quantity(
+        source.fabricOutsourcing?.item?.quantity,
+        "production.fabricOutsourcing.item.quantity",
+      ),
+    },
+    warehouseId: positiveID(
+      source.fabricOutsourcing?.warehouseId,
+      "production.fabricOutsourcing.warehouseId",
+    ),
+    lotId: positiveID(
+      source.fabricOutsourcing?.lotId,
+      "production.fabricOutsourcing.lotId",
+    ),
+    quantity: quantity(
+      source.fabricOutsourcing?.quantity,
+      "production.fabricOutsourcing.quantity",
+    ),
+  };
+  if (
+    fabricOutsourcing.item.materialId !== fabricBudget.materialId ||
+    fabricOutsourcing.item.unitId !== fabricBudget.unitId ||
+    fabricOutsourcing.warehouseId !== fabricBudget.warehouseId ||
+    fabricOutsourcing.lotId !== fabricBudget.lotId ||
+    quantityUnits(
+      fabricOutsourcing.item.quantity,
+      "production.fabricOutsourcing.item.quantity",
+    ) !== quantityUnits(fabricBudget.quantity, "production fabric budget") ||
+    quantityUnits(
+      fabricOutsourcing.quantity,
+      "production.fabricOutsourcing.quantity",
+    ) !== quantityUnits(fabricBudget.quantity, "production fabric budget")
+  ) {
+    throw new SourceDrivenFactError(
+      "production fabric outsourcing source does not match its BOM material budget and stock grain",
+    );
+  }
+  const directMaterialIssues = materialIssues.filter(
+    (record) =>
+      record.materialId !== fabricOutsourcing.item.materialId ||
+      record.unitId !== fabricOutsourcing.item.unitId,
+  );
   let rework;
   if (source?.rework != null) {
-    if (!route) {
-      throw new SourceDrivenFactError(
-        "production rework requires a routed WIP completion source",
-      );
-    }
     rework = {
       quantity: quantity(source.rework.quantity, "production.rework.quantity"),
       reason: requiredText(
@@ -773,11 +761,11 @@ function normalizeProduction(source) {
     item,
     bom,
     plannedQuantity,
-    ...(route ? { route } : {}),
+    route,
     completion,
     materialIssues,
     directMaterialIssues,
-    ...(fabricOutsourcing ? { fabricOutsourcing } : {}),
+    fabricOutsourcing,
     ...(rework ? { rework } : {}),
   };
 }
@@ -2084,11 +2072,8 @@ function matchProductionRequirements(data, source) {
   const customerInspectionRequired =
     items[0]?.customer_inspection_required === true;
   if (
-    (source.route &&
-      (routeCode !== source.route.code ||
-        customerInspectionRequired !==
-          source.route.customerInspectionRequired)) ||
-    (!source.route && (routeCode !== "" || customerInspectionRequired))
+    routeCode !== source.route.code ||
+    customerInspectionRequired !== source.route.customerInspectionRequired
   ) {
     throw new SourceDrivenFactError(
       "released production order route does not match the source plan",
@@ -2104,7 +2089,12 @@ function productionWIPIdempotencyKey(identity, label) {
   )}`;
 }
 
-async function readProductionWIP(rpc, productionOrderID) {
+async function readProductionWIP(
+  rpc,
+  productionOrderID,
+  productionItemID,
+  source,
+) {
   const aggregate = await invoke(rpc, "production_wip", "get_production_wip", {
     production_order_id: productionOrderID,
   });
@@ -2117,16 +2107,71 @@ async function readProductionWIP(rpc, productionOrderID) {
   const confirmations = Array.isArray(aggregate?.packaging_confirmations)
     ? aggregate.packaging_confirmations
     : [];
+  const expectedGates = [
+    ["CUT_PIECE"],
+    ["SHELL"],
+    [
+      "FINISHED_GOODS",
+      "NEEDLE",
+      "SAMPLING",
+      ...(source.route.customerInspectionRequired
+        ? ["CUSTOMER_ACCEPTANCE"]
+        : []),
+    ],
+    [],
+  ];
+  const items = aggregate?.production_order_items;
   if (
+    Number(aggregate?.production_order?.id) !== productionOrderID ||
+    !Array.isArray(items) ||
+    items.length !== 1 ||
+    Number(items[0]?.id) !== productionItemID ||
+    Number(items[0]?.production_order_id) !== productionOrderID ||
     operations.length !== PRODUCTION_ROUTE_OPERATIONS.length ||
+    new Set(operations.map((operation) => operation.id)).size !==
+      operations.length ||
     operations.some(
       (operation, index) =>
         String(operation?.operation_code || "") !==
-        PRODUCTION_ROUTE_OPERATIONS[index],
+          PRODUCTION_ROUTE_OPERATIONS[index] ||
+        Number(operation?.production_order_id) !== productionOrderID ||
+        Number(operation?.production_order_item_id) !== productionItemID ||
+        operation?.route_code !== source.route.code ||
+        operation?.route_version !== 1 ||
+        JSON.stringify(operation?.required_quality_gates) !==
+          JSON.stringify(expectedGates[index]),
     )
   ) {
     throw new SourceDrivenFactError(
       "production WIP readback does not contain the exact fixed route",
+    );
+  }
+  if (
+    batches.some(
+      (batch) =>
+        Number(batch?.production_order_id) !== productionOrderID ||
+        Number(batch?.production_order_item_id) !== productionItemID ||
+        !operations.some(
+          (operation) =>
+            Number(operation.id) ===
+            Number(batch.production_order_operation_id),
+        ),
+    )
+  ) {
+    throw new SourceDrivenFactError(
+      "production WIP readback contains a batch from another source",
+    );
+  }
+  if (
+    confirmations.length !== 1 ||
+    Number(confirmations[0]?.production_order_id) !== productionOrderID ||
+    Number(confirmations[0]?.production_order_item_id) !== productionItemID ||
+    (String(confirmations[0]?.status).toUpperCase() === "CONFIRMED" &&
+      confirmations[0]?.packaging_version_snapshot !==
+        source.route.packagingVersionSnapshot)
+  ) {
+    throw new SourceDrivenFactError(
+      "production WIP packaging snapshot does not match its source plan",
     );
   }
   return { aggregate, operations, batches, confirmations };
@@ -2247,10 +2292,9 @@ async function advanceProductionWIPRoute({
   fabricAllocation,
   finishedGoodsReceipt,
 }) {
-  if (!source.route) return undefined;
   const orderID = positiveID(order?.id, "production WIP order.id");
   const itemID = positiveID(item?.id, "production WIP item.id");
-  let state = await readProductionWIP(rpc, orderID);
+  let state = await readProductionWIP(rpc, orderID, itemID, source);
   for (let index = 0; index < state.operations.length; index += 1) {
     const operation = state.operations[index];
     let batch = exactNormalProductionWIPBatch(state, operation.id, {
@@ -2291,7 +2335,7 @@ async function advanceProductionWIPRoute({
         },
         previous.operation_code,
       );
-      state = await readProductionWIP(rpc, orderID);
+      state = await readProductionWIP(rpc, orderID, itemID, source);
       batch = exactNormalProductionWIPBatch(state, operation.id);
     }
 
@@ -2329,7 +2373,7 @@ async function advanceProductionWIPRoute({
           },
           operation.operation_code,
         );
-        state = await readProductionWIP(rpc, orderID);
+        state = await readProductionWIP(rpc, orderID, itemID, source);
         batch = exactNormalProductionWIPBatch(state, operation.id);
       } else if (confirmationStatus !== "CONFIRMED") {
         throw new SourceDrivenFactError(
@@ -2457,7 +2501,7 @@ async function advanceProductionWIPRoute({
           `production WIP ${operation.operation_code} cannot advance from ${status || "missing"}`,
         );
       }
-      state = await readProductionWIP(rpc, orderID);
+      state = await readProductionWIP(rpc, orderID, itemID, source);
       batch = exactNormalProductionWIPBatch(state, operation.id);
     }
     if (!accepted) {
@@ -2491,13 +2535,8 @@ async function applyProduction(plan, rpc) {
           planned_quantity: source.plannedQuantity,
           sales_order_item_id: source.item.id,
           bom_header_id: source.bom.id,
-          ...(source.route
-            ? {
-                route_code: source.route.code,
-                customer_inspection_required:
-                  source.route.customerInspectionRequired,
-              }
-            : {}),
+          route_code: source.route.code,
+          customer_inspection_required: source.route.customerInspectionRequired,
           note: SIMULATED_NOTE,
         },
       ],
@@ -2630,9 +2669,10 @@ async function applyProduction(plan, rpc) {
       fact_no: identity.completion.businessNo,
       production_order_id: order.id,
       production_order_item_id: matched.item.id,
-      ...(completionWIPBatch
-        ? { production_wip_batch_id: completionWIPBatch.id }
-        : {}),
+      production_wip_batch_id: positiveID(
+        completionWIPBatch?.id,
+        "completion WIP batch.id",
+      ),
       warehouse_id: source.completion.warehouseId,
       new_lot_no: source.completion.newLotNo,
       quantity: source.completion.quantity,
@@ -2642,17 +2682,22 @@ async function applyProduction(plan, rpc) {
     resultKey: "production_fact",
     postMethod: "post_production_fact",
   });
-  if (completionWIPBatch) {
-    await advanceProductionWIPRoute({
-      rpc,
-      order,
-      item: matched.item,
-      source,
-      identity,
-      fabricAllocation,
-      finishedGoodsReceipt: completion,
-    });
+  if (
+    Number(completion.production_wip_batch_id) !== Number(completionWIPBatch.id)
+  ) {
+    throw new SourceDrivenFactError(
+      "production completion does not match its accepted handwork WIP batch",
+    );
   }
+  await advanceProductionWIPRoute({
+    rpc,
+    order,
+    item: matched.item,
+    source,
+    identity,
+    fabricAllocation,
+    finishedGoodsReceipt: completion,
+  });
   let rework;
   if (source.rework) {
     rework = await createPostFact({

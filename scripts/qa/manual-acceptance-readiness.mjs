@@ -1200,6 +1200,13 @@ function validateReportBatch(sourceReport, factReport, taskReport) {
       throw new CliError("源数据、业务记录与岗位任务报告不是同一批次", 2);
     }
   }
+  if (
+    sourceReport &&
+    factReport &&
+    sourceReport.semanticDigest !== factReport.semanticDigest
+  ) {
+    throw new CliError("源数据与业务记录报告的语义摘要不是同一来源配方", 2);
+  }
 }
 
 function catalogMinimum(catalog, pageKey) {

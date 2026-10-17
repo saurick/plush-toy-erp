@@ -25,7 +25,10 @@ import {
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
-import { MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES } from "./manual-acceptance-source-data.mjs";
+import {
+  MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
+  MANUAL_ACCEPTANCE_PRODUCTION_RECIPE,
+} from "./manual-acceptance-source-data.mjs";
 import {
   MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT,
   MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT,
@@ -51,8 +54,9 @@ const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/fact-data";
 const APPLY_CONFIRMATION = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const RECEIPT_COUNT = 54;
-const FACT_RUN_COUNT = 45;
-const PRODUCTION_PLANNED_QUANTITY = "3";
+const FACT_RUN_COUNT = MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.runs;
+const PRODUCTION_PLANNED_QUANTITY =
+  MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.plannedQuantity;
 const FINANCE_PAYMENT_REFERENCE_COUNT = 4;
 const FINANCE_CREDIT_NOTE_REFERENCE_COUNT = 3;
 const REQUIRED_MODULES = Object.freeze([
@@ -155,12 +159,6 @@ const LIFECYCLE_SEQUENCE = Object.freeze({
   CANCEL: 902,
   ACTIVE: 901,
   RELEASE: 902,
-});
-const ROUTED_PRODUCTION_SAMPLE_OFFSETS = new Set([3, 4]);
-const ROUTED_PRODUCTION_SAMPLE = Object.freeze({
-  code: "PLUSH_SEW_HAND_V1",
-  customerInspectionRequired: false,
-  packagingVersionSnapshot: "试用验收包装版",
 });
 
 const FINANCE_DRAFT_NUMBER = Object.freeze({
@@ -469,7 +467,9 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
     []) {
     const offset = Number(candidate?.productionCandidateOffset);
     if (
-      !ROUTED_PRODUCTION_SAMPLE_OFFSETS.has(offset) ||
+      !Number.isInteger(offset) ||
+      offset < 0 ||
+      offset >= FACT_RUN_COUNT ||
       productionWIPOutsourcingByOffset.has(offset)
     ) {
       throw new CliError(
@@ -480,7 +480,7 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
     productionWIPOutsourcingByOffset.set(offset, candidate);
   }
   if (
-    [...ROUTED_PRODUCTION_SAMPLE_OFFSETS].some(
+    Array.from({ length: FACT_RUN_COUNT }, (_, offset) => offset).some(
       (offset) => !productionWIPOutsourcingByOffset.has(offset),
     )
   ) {
@@ -511,9 +511,16 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
           ),
         })),
       },
-      ...(ROUTED_PRODUCTION_SAMPLE_OFFSETS.has(offset)
-        ? { route: ROUTED_PRODUCTION_SAMPLE, fabricOutsourcing }
-        : {}),
+      route: {
+        code: MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.routeCode,
+        customerInspectionRequired:
+          MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.customerInspectionRunOffsets.includes(
+            offset,
+          ),
+        packagingVersionSnapshot:
+          MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.packagingVersionSnapshot,
+      },
+      fabricOutsourcing,
     };
   });
   const outsourcingCandidates = allocateOutsourcingPairs(
@@ -2501,9 +2508,8 @@ export async function validateProductionPhasePartialRecords(
       planned_quantity: source.plannedQuantity,
       sales_order_item_id: source.item.id,
       bom_header_id: source.bom.id,
-      route_code: source.route?.code ?? null,
-      customer_inspection_required:
-        source.route?.customerInspectionRequired ?? false,
+      route_code: source.route.code,
+      customer_inspection_required: source.route.customerInspectionRequired,
     },
     new Set(["planned_quantity"]),
   );
@@ -2568,17 +2574,10 @@ export async function validateProductionPhasePartialRecords(
   const completion =
     records[1 + directMaterialIssues.length + fabricIssueCount];
   if (completion) {
-    if (source.route) {
-      positiveID(
-        completion.production_wip_batch_id,
-        `${identity.completion.businessNo}.production_wip_batch_id`,
-      );
-    } else if (completion.production_wip_batch_id != null) {
-      throw new CliError(
-        `${identity.completion.businessNo} has unexpected production_wip_batch_id`,
-        2,
-      );
-    }
+    positiveID(
+      completion.production_wip_batch_id,
+      `${identity.completion.businessNo}.production_wip_batch_id`,
+    );
     assertRecordGrain(
       identity.completion.businessNo,
       completion,
@@ -2939,6 +2938,9 @@ async function ensureProductionOrderSpecimen(
               planned_quantity: "1",
               sales_order_item_id: source.item.id,
               bom_header_id: source.bom.id,
+              route_code: source.route.code,
+              customer_inspection_required:
+                source.route.customerInspectionRequired,
               note: "按订单生产",
             },
           ],
@@ -4811,7 +4813,7 @@ export async function runSourceDrivenFactStage(
       item: candidate.item,
       bom: { id: candidate.bom.id, status: candidate.bom.status },
       plannedQuantity,
-      ...(candidate.route ? { route: candidate.route } : {}),
+      route: candidate.route,
       completion: {
         warehouseId: plan.productWarehouse.id,
         newLotNo: completionLotNo,

@@ -38,6 +38,7 @@ import {
   resolveManualAcceptanceDatasetStageLogicFingerprints,
 } from "./manual-acceptance-dataset-runner.mjs";
 import { normalizeDatabaseRunID } from "./database-target.mjs";
+import { MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES } from "./manual-acceptance-source-data.mjs";
 import {
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
@@ -2823,6 +2824,55 @@ function expectedDatasetTargetAlias(policyTarget) {
   return policyTarget === CUSTOMER_TRIAL_133_TARGET ? policyTarget : "local";
 }
 
+function assertCurrentBrowserDatasetPlan({ dataset, source, printInput }) {
+  const sourceScaleProfile = dataset?.sourceScaleProfile;
+  if (
+    typeof sourceScaleProfile !== "string" ||
+    !Object.hasOwn(MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES, sourceScaleProfile)
+  ) {
+    throw new BrowserAcceptanceError(
+      "dataset apply 报告缺少登记的 sourceScaleProfile",
+    );
+  }
+  const targetAlias = expectedDatasetTargetAlias(printInput.target);
+  const expected = buildManualAcceptanceDatasetTargetPlan({
+    targetAlias,
+    sourceScaleProfile,
+    backendURL: printInput.backendURL,
+    databaseName: printInput.databaseName,
+    dataVersion: printInput.dataVersion,
+    runId: printInput.sourceRunId,
+  });
+  const scale = expected.semanticPlan.stages.find(
+    (stage) => stage.key === "source",
+  ).expected.scale;
+  const fingerprints = resolveManualAcceptanceDatasetStageLogicFingerprints();
+  if (
+    ["alias", "policyTarget", "backendURL", "databaseName"].some(
+      (field) => dataset.target?.[field] !== expected.target[field],
+    ) ||
+    source?.sourceScaleProfile !== sourceScaleProfile ||
+    dataset.semanticDigest !== expected.semanticDigest ||
+    dataset.chainDataDigest !== expected.chainDataDigest ||
+    dataset.chainVerificationDigest !== expected.chainVerificationDigest ||
+    Object.keys(source?.scale || {}).length !== Object.keys(scale).length ||
+    Object.entries(scale).some(([key, value]) => source.scale?.[key] !== value) ||
+    !Array.isArray(dataset.stages) ||
+    dataset.stages.length !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
+    dataset.stages.some(
+      (stage, index) =>
+        stage.key !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS[index] ||
+        stage.semanticDigest !== expected.semanticDigest ||
+        stage.references?.runner?.logicFingerprint !==
+          fingerprints.get(stage.key),
+    )
+  ) {
+    throw new BrowserAcceptanceError(
+      "dataset apply 报告必须绑定当前登记配方与全部阶段逻辑",
+    );
+  }
+}
+
 export function assertScenarioDemoBrowserDataset({
   dataset,
   components,
@@ -2834,42 +2884,16 @@ export function assertScenarioDemoBrowserDataset({
     target: printInput.target,
     backendURL: printInput.backendURL,
   });
-  const expected = buildManualAcceptanceDatasetTargetPlan({
-    targetAlias: SCENARIO_DEMO_TARGET,
-    sourceScaleProfile: "volume",
-    backendURL: printInput.backendURL,
-    databaseName: printInput.databaseName,
-    dataVersion: printInput.dataVersion,
-    runId: printInput.sourceRunId,
-  });
   const source = components.source.report;
   const baseline = components.baseline.report;
   const core = components.core.report;
   const proof = dataset.freshEmptyBaseline;
-  const scale = expected.semanticPlan.stages.find(
-    (stage) => stage.key === "source",
-  ).expected.scale;
-  const fingerprints = resolveManualAcceptanceDatasetStageLogicFingerprints();
+  assertCurrentBrowserDatasetPlan({ dataset, source, printInput });
   if (
     dataset.sourceScaleProfile !== "volume" ||
     dataset.target?.alias !== SCENARIO_DEMO_TARGET ||
     dataset.target?.policyTarget !== SCENARIO_DEMO_TARGET ||
-    source.sourceScaleProfile !== "volume" ||
-    dataset.semanticDigest !== expected.semanticDigest ||
-    dataset.chainDataDigest !== expected.chainDataDigest ||
-    dataset.chainVerificationDigest !== expected.chainVerificationDigest ||
-    Object.keys(source.scale || {}).length !== Object.keys(scale).length ||
-    Object.entries(scale).some(
-      ([key, value]) => source.scale?.[key] !== value,
-    ) ||
-    !Array.isArray(dataset.stages) ||
-    dataset.stages.length !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
-    dataset.stages.some(
-      (stage, index) =>
-        stage.key !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS[index] ||
-        stage.references?.runner?.logicFingerprint !==
-          fingerprints.get(stage.key),
-    )
+    source.sourceScaleProfile !== "volume"
   ) {
     throw new BrowserAcceptanceError(
       "scenario-demo 报告必须绑定当前 volume 配方与全部阶段逻辑",
@@ -3499,6 +3523,13 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
         dataset, components, componentDigests, printInput,
       })
     : null;
+  if (!scenarioDemoSharedLocal) {
+    assertCurrentBrowserDatasetPlan({
+      dataset,
+      source: components.source.report,
+      printInput,
+    });
+  }
   if (!persistentBaseline && (!emptyBaselineProven || !runtimeBaselineMatches)) {
     throw new BrowserAcceptanceError(
       "dataset apply 报告没有绑定当前运行态的 fresh empty baseline",

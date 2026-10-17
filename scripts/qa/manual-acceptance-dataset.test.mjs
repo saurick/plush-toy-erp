@@ -64,6 +64,7 @@ import {
   CUSTOMER_TRIAL_133_TARGET,
   SCENARIO_DEMO_ORIGIN,
 } from "./manual-acceptance-target-policy.mjs";
+import { MANUAL_ACCEPTANCE_PRODUCTION_RECIPE } from "./manual-acceptance-source-data.mjs";
 import {
   PREVIOUS_LONG_LIVED_WORKBENCH_BATCH_RUN_ID,
   PREVIOUS_LONG_LIVED_WORKBENCH_TASK_COPY_REVISION,
@@ -96,6 +97,19 @@ function stageLogicFingerprints(overrides = {}) {
     ]),
   );
 }
+
+test("dataset semantic identity includes the production recipe used by the source and fact planners", () => {
+  const plan = buildManualAcceptanceSemanticPlan();
+  assert.deepEqual(plan.productionRecipe, MANUAL_ACCEPTANCE_PRODUCTION_RECIPE);
+  const prior = structuredClone(plan);
+  delete prior.productionRecipe;
+  assert.notEqual(
+    digestManualAcceptanceSemanticPlan(prior),
+    digestManualAcceptanceSemanticPlan(plan),
+  );
+  assert.equal(plan.productionRecipe.runs, 45);
+  assert.equal(plan.productionRecipe.requiresWIP, true);
+});
 
 test("volume dataset keeps source plan, runner CLI and readback scales aligned across targets", async () => {
   const acceptance = buildManualAcceptanceDatasetBundle();
@@ -949,7 +963,52 @@ test("changing an existing batch from acceptance to volume stops before any stag
       /resume report sourceScaleProfile does not match/u,
     );
     assert.equal(calls, 0);
-    assert.equal(JSON.parse(await fs.readFile(first.applyReportPath, "utf8")).sourceScaleProfile, "acceptance");
+    assert.equal(
+      JSON.parse(await fs.readFile(first.applyReportPath, "utf8"))
+        .sourceScaleProfile,
+      "acceptance",
+    );
+  } finally {
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+});
+
+test("a report without the current production recipe stops resume before any stage executes", async () => {
+  const outputRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-dataset-production-recipe-"),
+  );
+  try {
+    const plan = localApplyPlan();
+    const first = await applyManualAcceptanceDataset(
+      plan,
+      localApplyBinding(plan),
+      durableRunnerDeps({ outputRoot }),
+    );
+    assert.equal(first.ok, true);
+    const prior = JSON.parse(await fs.readFile(first.applyReportPath, "utf8"));
+    const oldSemanticPlan = structuredClone(plan.semanticPlan);
+    delete oldSemanticPlan.productionRecipe;
+    prior.semanticDigest = digestManualAcceptanceSemanticPlan(oldSemanticPlan);
+    await fs.writeFile(first.applyReportPath, JSON.stringify(prior));
+    let calls = 0;
+    await assert.rejects(
+      () =>
+        applyManualAcceptanceDataset(
+          plan,
+          {
+            ...localApplyBinding(plan),
+            resumeReportPath: first.applyReportPath,
+          },
+          durableRunnerDeps({
+            outputRoot,
+            onCall() {
+              calls += 1;
+            },
+          }),
+        ),
+      /semanticDigest does not match/u,
+    );
+    assert.equal(calls, 0);
   } finally {
     await fs.rm(outputRoot, { recursive: true, force: true });
   }

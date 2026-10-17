@@ -8,6 +8,7 @@ import test from "node:test";
 import {
   DEFAULT_SOURCE_DATA_SCALE,
   MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES,
+  MANUAL_ACCEPTANCE_PRODUCTION_RECIPE,
   MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
   MANUAL_ACCEPTANCE_CORE_UNIT_CODES,
   MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
@@ -56,8 +57,50 @@ const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_local_fixture_dev";
 const forbiddenVisibleCopy =
   /\b(?:workflow|fact|json-rpc|rbac|usecase|schema|api|debugrunid|raw id)\b|甲方/iu;
 
-test("source apply rejects another scale report before any RPC including login", async () => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), "plush-source-scale-report-"));
+function assertOutsourcingSourceOrder(order, plan) {
+  const sourceOrder = plan.records.salesOrders.find(
+    (candidate) => candidate.customer_order_no === order.source_order_no,
+  );
+  if (sourceOrder) return sourceOrder;
+  assert.equal(order.source_order_no, undefined);
+  assert.ok(
+    order.items.every(
+      (item) =>
+        item.subject_type === "MATERIAL" &&
+        Number.isInteger(item.acceptanceProductionCandidateOffset),
+    ),
+  );
+  const products = new Set(
+    plan.records.bomVersions
+      .filter((bom) => bom.targetStatus === "ACTIVE")
+      .map((bom) => bom.productRef),
+  );
+  const candidates = plan.records.salesOrders
+    .filter((sales) => sales.targetStatus === "ACTIVE")
+    .flatMap((sales) =>
+      sales.items
+        .filter((item) => products.has(item.productRef))
+        .map(() => sales.customer_order_no),
+    );
+  const sources = new Set(
+    order.items.map(
+      (item) =>
+        candidates[
+          item.acceptanceProductionCandidateOffset % candidates.length
+        ],
+    ),
+  );
+  assert.ok(
+    sources.size > 1,
+    "only a mixed-source WIP contract may clear its source-order header",
+  );
+  return undefined;
+}
+
+test("source apply rejects a changed scale or source recipe before any RPC including login", async () => {
+  const directory = await mkdtemp(
+    path.join(os.tmpdir(), "plush-source-scale-report-"),
+  );
   const sourceReportPath = path.join(directory, "apply-report.json");
   try {
     const acceptance = buildLocalSourceMutationPlan();
@@ -81,6 +124,25 @@ test("source apply rejects another scale report before any RPC including login",
     }), /source write identity report sourceScaleProfile does not match/u);
     assert.equal(rpcCalls, 0);
     assert.equal(await readFile(sourceReportPath, "utf8"), original);
+    const previousRecipe = JSON.parse(original);
+    previousRecipe.semanticDigest = "0".repeat(64);
+    const previousRecipeText = JSON.stringify(previousRecipe);
+    await writeFile(sourceReportPath, previousRecipeText);
+    await assert.rejects(
+      () =>
+        applyManualAcceptanceSourceData(acceptance, {
+          ...localSourceMutationOptions(acceptance),
+          sourceReportPath,
+          confirmPhrase: "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA",
+          fetchImpl: async () => {
+            rpcCalls += 1;
+            throw new Error("RPC must not run");
+          },
+        }),
+      /source write identity report semanticDigest does not match/u,
+    );
+    assert.equal(rpcCalls, 0);
+    assert.equal(await readFile(sourceReportPath, "utf8"), previousRecipeText);
     const corrupted = JSON.parse(original);
     corrupted.scale.salesOrders = 450;
     await writeFile(sourceReportPath, JSON.stringify(corrupted));
@@ -208,7 +270,7 @@ test("volume source profile produces linked multi-page records without changing 
   }
   for (const order of volume.records.outsourcingOrders) {
     assert.ok(refs.suppliers.has(order.supplierRef));
-    assert.ok(salesByNo.has(order.source_order_no));
+    assertOutsourcingSourceOrder(order, volume);
     for (const item of order.items) {
       assert.ok(refs.processes.has(item.processRef));
       assert.ok(item.subject_type === "MATERIAL" ? refs.materials.has(item.materialRef) : refs.products.has(item.productRef));
@@ -815,24 +877,93 @@ test("outsourcing source plans satisfy the current contract readiness boundary",
     .filter(({ item }) =>
       Number.isInteger(item.acceptanceProductionCandidateOffset),
     );
+  assert.equal(
+    routedContracts.length,
+    MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.runs,
+  );
   assert.deepEqual(
-    routedContracts.map(({ item }) => [
-      item.acceptanceProductionCandidateOffset,
-      item.subject_type,
-      item.processRef,
-      item.outsourcing_quantity,
-    ]),
-    [
-      [3, "MATERIAL", "YS8-GX-001", "1"],
-      [4, "MATERIAL", "YS8-GX-001", "1"],
-    ],
+    routedContracts
+      .map(({ item }) => item.acceptanceProductionCandidateOffset)
+      .sort((a, b) => a - b),
+    Array.from(
+      { length: MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.runs },
+      (_, offset) => offset,
+    ),
   );
   assert.ok(
     routedContracts.every(
-      ({ order }) =>
-        order.targetStatus === "CONFIRMED" && order.items.length === 1,
+      ({ order, item }) =>
+        order.targetStatus === "CONFIRMED" &&
+        item.subject_type === "MATERIAL" &&
+        item.processRef === "YS8-GX-001" &&
+        Number(item.outsourcing_quantity) > 0,
     ),
   );
+  assert.ok(
+    routedContracts
+      .filter(({ order }) => order.items.length > 1)
+      .every(({ order }) => order.source_order_no === undefined),
+  );
+});
+
+test("both source scales bind every production run to its exact BOM material grain and a unique confirmed contract line", () => {
+  for (const sourceScaleProfile of ["acceptance", "volume"]) {
+    const plan = buildManualAcceptanceSourceDataPlan({ sourceScaleProfile });
+    const boms = new Map(
+      plan.records.bomVersions
+        .filter((bom) => bom.targetStatus === "ACTIVE")
+        .map((bom) => [bom.productRef, bom]),
+    );
+    const candidates = plan.records.salesOrders
+      .filter((order) => order.targetStatus === "ACTIVE")
+      .flatMap((order) =>
+        order.items
+          .filter((item) => boms.has(item.productRef))
+          .map((item) => ({ order, item, bom: boms.get(item.productRef) })),
+      );
+    const contracts = plan.records.outsourcingOrders
+      .flatMap((order) => order.items.map((item) => ({ order, item })))
+      .filter(({ item }) =>
+        Number.isInteger(item.acceptanceProductionCandidateOffset),
+      );
+    assert.equal(contracts.length, MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.runs);
+    assert.equal(
+      new Set(
+        contracts.map(
+          ({ order, item }) => `${order.outsourcing_order_no}:${item.line_no}`,
+        ),
+      ).size,
+      MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.runs,
+    );
+    const offsets = new Set();
+    for (const { order, item } of contracts) {
+      const offset = item.acceptanceProductionCandidateOffset;
+      assert(!offsets.has(offset));
+      offsets.add(offset);
+      const candidate = candidates[offset % candidates.length];
+      const grain = candidate.bom.items[0];
+      assert.equal(item.materialRef, grain.materialRef);
+      assert.equal(item.unitKey, grain.unitKey);
+      assert.equal(order.targetStatus, "CONFIRMED");
+      assert.equal(item.subject_type, "MATERIAL");
+      assertOutsourcingSourceOrder(order, plan);
+    }
+    assert.deepEqual(
+      [...offsets].sort((a, b) => a - b),
+      Array.from(
+        { length: MANUAL_ACCEPTANCE_PRODUCTION_RECIPE.runs },
+        (_, offset) => offset,
+      ),
+    );
+    assert.equal(
+      plan.records.outsourcingOrders.length,
+      MANUAL_ACCEPTANCE_SOURCE_SCALE_PROFILES[sourceScaleProfile]
+        .outsourcingOrders,
+    );
+    assert.ok(
+      plan.records.outsourcingOrders.some((order) => order.items.length === 25),
+    );
+  }
 });
 
 test("versioned source plans use a stable date anchor and semantic digest across targets", () => {
@@ -1113,14 +1244,11 @@ test("business-visible fixture copy uses trial-user wording without developer ja
     }
   }
   for (const order of plan.records.outsourcingOrders) {
-    const sourceOrder = plan.records.salesOrders.find(
-      (candidate) => candidate.customer_order_no === order.source_order_no,
-    );
-    assert.ok(sourceOrder);
-    assert.equal(order.source_order_no, sourceOrder.customer_order_no);
+    const sourceOrder = assertOutsourcingSourceOrder(order, plan);
     for (const item of order.items.filter(
       (candidate) => candidate.subject_type === "PRODUCT",
     )) {
+      assert.ok(sourceOrder);
       const product = productByRef.get(item.productRef);
       assert.equal(item.product_no_snapshot, product.style_no);
       assert.equal(item.product_name_snapshot, product.name);

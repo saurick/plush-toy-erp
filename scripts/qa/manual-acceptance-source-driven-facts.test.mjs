@@ -204,7 +204,12 @@ function createRPC({
     production_order_items: productionOrderItem
       ? [structuredClone(productionOrderItem)]
       : [],
-    production_order_operations: structuredClone(productionWIPOperations),
+    production_order_operations: productionWIPOperations.map((operation) => ({
+      ...structuredClone(operation),
+      required_quality_gates: [
+        ...qualityGatesByOperation.get(operation.operation_code),
+      ],
+    })),
     production_wip_batches: structuredClone(productionWIPBatches),
     packaging_confirmations: [structuredClone(packagingConfirmation)],
     quality_inspections: [...productionWIPQualities.values()].flatMap((items) =>
@@ -246,6 +251,14 @@ function createRPC({
           total: 1,
         };
       case "create_production_order":
+        qualityGatesByOperation.set("HANDWORK", [
+          "FINISHED_GOODS",
+          "NEEDLE",
+          "SAMPLING",
+          ...(params.items[0].customer_inspection_required
+            ? ["CUSTOMER_ACCEPTANCE"]
+            : []),
+        ]);
         productionOrderItem = {
           id: 601,
           production_order_id: 600,
@@ -1019,41 +1032,132 @@ test("phase-scoped apply executes the formal production chain and returns exact 
   );
 });
 
-test("route-less production remains supported but cannot request a rework source", async () => {
+test("the customer-inspection route executes its frozen fourth gate and preserves the completion and packaging sequence", async () => {
+  const report = sourceReport();
+  report.referenceRecords.sourceDrivenFacts.production.route.customerInspectionRequired = true;
+  const plan = buildSourceDrivenFactPlan(report, {
+    enabledPhases: ["production"],
+  });
+  const { rpc } = createRPC();
+  const passedGates = [];
+  const result = await applySourceDrivenFactPlan(plan, {
+    rpc: async (request) => {
+      const data = await rpc(request);
+      if (request.method === "pass_quality_inspection")
+        passedGates.push(data.quality_inspection.gate_code);
+      return data;
+    },
+    confirmation: sourceDrivenFactConfirmation(plan),
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+  });
+  assert.equal(result.results.production.completion.status, "POSTED");
+  assert.deepEqual(passedGates, [
+    "CUT_PIECE",
+    "SHELL",
+    "FINISHED_GOODS",
+    "NEEDLE",
+    "SAMPLING",
+    "CUSTOMER_ACCEPTANCE",
+  ]);
+});
+
+test("WIP readback rejects foreign sources, route or gate drift and a conflicting confirmed packaging snapshot", async () => {
+  const mutations = [
+    (data) => {
+      data.production_order.id = 999;
+    },
+    (data) => {
+      data.production_order_operations[0].production_order_item_id = 999;
+    },
+    (data) => {
+      data.production_order_operations[0].route_version = 2;
+    },
+    (data) => {
+      data.production_order_operations[2].required_quality_gates.push(
+        "CUSTOMER_ACCEPTANCE",
+      );
+    },
+    (data) => {
+      data.production_wip_batches[0].production_order_id = 999;
+    },
+    (data) => {
+      data.packaging_confirmations[0].status = "CONFIRMED";
+      data.packaging_confirmations[0].packaging_version_snapshot =
+        "other packaging";
+    },
+  ];
+  for (const mutate of mutations) {
+    const plan = buildSourceDrivenFactPlan(sourceReport(), {
+      enabledPhases: ["production"],
+    });
+    const { rpc } = createRPC();
+    await assert.rejects(
+      () =>
+        applySourceDrivenFactPlan(plan, {
+          rpc: async (request) => {
+            const data = await rpc(request);
+            if (request.method === "get_production_wip") mutate(data);
+            return data;
+          },
+          confirmation: sourceDrivenFactConfirmation(plan),
+          targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+        }),
+      /production WIP/u,
+    );
+  }
+});
+
+test("a posted completion must retain the exact handwork WIP batch", async () => {
+  const plan = buildSourceDrivenFactPlan(sourceReport(), {
+    enabledPhases: ["production"],
+  });
+  const { rpc } = createRPC();
+  await assert.rejects(
+    () =>
+      applySourceDrivenFactPlan(plan, {
+        rpc: async (request) => {
+          const data = await rpc(request);
+          if (
+            request.method === "post_production_fact" &&
+            data.production_fact?.production_wip_batch_id != null
+          ) {
+            return {
+              ...data,
+              production_fact: {
+                ...data.production_fact,
+                production_wip_batch_id: 999,
+              },
+            };
+          }
+          return data;
+        },
+        confirmation: sourceDrivenFactConfirmation(plan),
+        targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+      }),
+    /exact|handwork WIP batch/u,
+  );
+});
+
+test("production without the mandatory WIP route is blocked before any RPC", async () => {
   const report = sourceReport();
   delete report.referenceRecords.sourceDrivenFacts.production.route;
   delete report.referenceRecords.sourceDrivenFacts.production.rework;
   delete report.referenceRecords.sourceDrivenFacts.production.fabricOutsourcing;
   const plan = buildSourceDrivenFactPlan(report, {
-    instanceKey: "ROW-ROUTELESS",
+    instanceKey: "ROW-MISSING-ROUTE",
     enabledPhases: ["production"],
   });
+  assert.equal(plan.phases.production.status, "blocked");
+  assert.match(plan.phases.production.reason, /registered WIP route/u);
   const { calls, rpc } = createRPC();
-  const applied = await applySourceDrivenFactPlan(plan, {
-    rpc,
-    confirmation: sourceDrivenFactConfirmation(plan),
-    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
-  });
-  assert.equal(applied.results.production.completion.status, "POSTED");
-  assert.equal(
-    applied.results.production.completion.production_wip_batch_id,
-    null,
+  await assert.rejects(() =>
+    applySourceDrivenFactPlan(plan, {
+      rpc,
+      confirmation: sourceDrivenFactConfirmation(plan),
+      targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    }),
   );
-  assert.equal(
-    calls.some((call) => call.domain === "production_wip"),
-    false,
-  );
-
-  const invalidReport = sourceReport();
-  delete invalidReport.referenceRecords.sourceDrivenFacts.production.route;
-  delete invalidReport.referenceRecords.sourceDrivenFacts.production
-    .fabricOutsourcing;
-  const invalid = buildSourceDrivenFactPlan(invalidReport, {
-    instanceKey: "ROW-INVALID-REWORK",
-    enabledPhases: ["production"],
-  });
-  assert.equal(invalid.phases.production.status, "blocked");
-  assert.match(invalid.phases.production.reason, /routed WIP completion/u);
+  assert.equal(calls.length, 0);
 });
 
 test("outsourcing quality apply sends the required approximate defect-rate pair", async () => {
