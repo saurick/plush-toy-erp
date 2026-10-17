@@ -129,6 +129,21 @@ test("target initializer keeps failure receipts outside redirected command group
   );
 });
 
+test("target initializer keeps RAID diagnostics out of the machine receipt channel", () => {
+  assert.match(source, /bash "\$release_dir\/server\/deploy\/compose\/prod\/attachment_raid_preflight\.sh" \/srv\/raid5 "\$attachment_dir" >>"\$log_file" 2>&1/u);
+});
+
+test("target initializer emits one JSON receipt when confirmation fails before any target write", () => {
+  const result = spawnSync("bash", [scriptPath.pathname, "initialize", "production-133", "11111111-1111-4111-8111-111111111111", "a".repeat(40), "2026.10.17-1", "b".repeat(64), "c".repeat(64), "d".repeat(64), "invalid-confirmation"], { encoding: "utf8" });
+  assert.notEqual(result.status, 0);
+  const receipt = JSON.parse(result.stdout);
+  assert.equal(receipt.status, "not_proven");
+  assert.equal(receipt.issueCode, "initialization_prelock_failure");
+  assert.equal(receipt.migration.applyStarted, false);
+  assert.equal(receipt.bootstrap.started, false);
+  assert.match(result.stderr, /confirmation does not match/u);
+});
+
 test("target initializer retains owner-checked private diagnostics before exact cleanup", () => {
   const retention = source.slice(
     source.indexOf("preserve_failure_diagnostics() {"),

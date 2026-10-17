@@ -20,6 +20,8 @@
 
 生产目标 Compose override 固定使用 `10.254.244.0/28` 默认网络与 `10.254.244.16/28` 附件内部网络；附件网络继续继承 `internal: true`。首次创建前核对宿主路由及现有 Docker IPAM 无重叠，避免依赖宿主已耗尽的自动地址池。其它应用、测试及演示网络不由该配置调整，不通过清理他人网络或修改 Docker daemon 地址池取得容量。
 
+运行预检只允许生产 override 声明登记 project 与这两类私有 `/28` IPAM 配置，CIDR 数值保留在版本化 override 这一处；服务、端口、权限及其它网络属性不能通过该文件覆盖。测试夹具读取真实目标文件并显式指定目标，避免未进入登记目标分支的绿色结果。
+
 运行与初始化的只读预检共用 `target-readonly-execution.mjs`。只有 Linux 平台、短主机名、运行用户和本机 IPv4 地址同时匹配 target registry，才在登记宿主机直接执行同一份固定 stdin 脚本；其它入口使用 `BatchMode`、固定地址/端口和 `StrictHostKeyChecking` 的 SSH。SSH 失败不切换本地执行。此选择不改变部署、迁移、重建或恢复写操作的执行合同。
 
 ## 常用入口

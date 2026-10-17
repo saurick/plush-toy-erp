@@ -384,6 +384,10 @@ function configureExactDeploymentTargetFixture(
     "utf8",
   );
   fixture.deploymentTarget = target;
+  fs.copyFileSync(
+    path.join(repoRoot, "server/deploy/compose/prod", target.override),
+    path.join(fixture.composeDir, target.override),
+  );
 }
 
 function deploymentTargetArgs(fixture) {
@@ -2375,15 +2379,34 @@ test("production preflight accepts only the exact isolated production resources"
     configureExactDeploymentTargetFixture(fixture, {
       targetKey: "production-133",
     });
-    const passed = runDeploymentTargetPreflight(fixture);
+    const passed = runDeploymentTargetPreflight(fixture, deploymentTargetArgs(fixture));
     assert.equal(passed.status, 0, passed.stdout + passed.stderr);
     fs.appendFileSync(
       fixture.envFile,
       "\nPOSTGRES_DB=plush_erp_customer_test_v1\n",
     );
-    const drift = runDeploymentTargetPreflight(fixture);
+    const drift = runDeploymentTargetPreflight(fixture, deploymentTargetArgs(fixture));
     assert.notEqual(drift.status, 0);
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("production preflight limits the production override to the declared private network shape", async (t) => {
+  for (const mutation of [
+    { name: "service mutation", edit: (text) => text + "services:\n  app-server:\n    privileged: true\n" },
+    { name: "attachment exposure", edit: (text) => text + "    internal: false\n" },
+    { name: "public subnet", edit: (text) => text.replace("10.254.244.0/28", "8.8.8.0/28") },
+    { name: "invalid subnet", edit: (text) => text.replace("10.254.244.0/28", "10.999.244.0/28") },
+  ]) {
+    await t.test(mutation.name, () => {
+      const fixture = writeFixture();
+      configureExactDeploymentTargetFixture(fixture, { targetKey: "production-133" });
+      const override = path.join(fixture.composeDir, productionTargetFixture.override);
+      fs.writeFileSync(override, mutation.edit(fs.readFileSync(override, "utf8")));
+      const result = runDeploymentTargetPreflight(fixture, deploymentTargetArgs(fixture));
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /Compose override 只能声明登记 project 和两个私有 \/28 网络/u);
+    });
   }
 });

@@ -697,7 +697,7 @@ attachment_dir="/srv/raid5/plush-toy-erp/$target/attachments"
 mkdir -p "$attachment_dir"
 attachment_dir_created=1
 chmod 700 "$attachment_dir"
-bash "$release_dir/server/deploy/compose/prod/attachment_raid_preflight.sh" /srv/raid5 "$attachment_dir"
+bash "$release_dir/server/deploy/compose/prod/attachment_raid_preflight.sh" /srv/raid5 "$attachment_dir" >>"$log_file" 2>&1
 attachment_access_key=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
 attachment_secret_key=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
 attachment_admin_password=$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')
