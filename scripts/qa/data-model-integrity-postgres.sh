@@ -7,7 +7,7 @@ database_name="plush_erp_ci_model_$(date +%s)_$$"
 cleanup() {
   local status=$?
   trap - EXIT
-  if ! docker rm -f "$fixture_id" >/dev/null 2>&1; then
+  if ! docker rm -f -v "$fixture_id" >/dev/null 2>&1; then
     echo "ERROR: failed to remove disposable container $fixture_id" >&2
     status=1
   fi

@@ -48,6 +48,7 @@
 | `node scripts/qa/candidate-sha-freeze.mjs --sha <40sha> --terminal <strict-terminal.json>` | 在已通过 strict 的 clean exact HEAD 上固定执行复用/失败/公网读回/DEV 隔离合同，以及版本中心桌面真实浏览器 smoke；生成单一候选冻结回执，不建立 DEV 移动端或暗色验收承诺，也不替代远端 CI、Release 或 133 发布 | 最终候选第一次正式 push 前 |
 | `node scripts/qa/output-retention-preview.mjs --protect-sha <40sha> --out output/dev-workbench/retention/previews/<name>.json` | 对登记的 managed output 生成数量与 5GiB 容量预算预览，保护最新状态、operation 引用和显式 SHA；无 `--apply`，不删除文件 | 定期检查本地证据膨胀 |
 | `bash scripts/qa/unit-normalization-postgres.sh` | 使用无挂载、随机 loopback 端口的一次性 PostgreSQL，核对单位迁移 fresh / upgrade、余额合并、异常事务回滚及库存业务；结束精确删除该容器。 | 计量单位迁移和数量校验改动后；正式 full / strict 的 server upgrade lane 也执行 |
+| `bash scripts/qa/data-model-integrity-postgres.sh` | 使用专用隔离 PostgreSQL 验证销售、质检和财务约束的存量升级、拒绝非法状态、事务回滚与 fresh 业务链；配套 Node 测试仅由本入口提供隔离库后执行。 | 关键数据完整性约束改动后显式运行 |
 | `bash scripts/qa/data-model-integrity-postgres.sh` | 使用无挂载、随机 loopback 端口的一次性 PostgreSQL，验证空值组合、财务外键迁移的新库与存量升级、只读预检、非法存量回滚及关键业务测试；结束删除并核对本次容器。 | 数据模型完整性约束改动后；普通 Go 测试同时覆盖 SQLite，关键 PostgreSQL 门禁覆盖数据库负向场景 |
 | `node scripts/qa/transaction-browser-isolated.mjs --run` | 冻结当前含未提交改动的源码副本，启动一次性 PostgreSQL / S3 / Go / Vite，执行接单与工程用料审批、采购、委外、库存、质检、生产、出货、应收应付结算及退款的桌面和手机浏览器链路、共享列表筛选及真实 PDF，以及 critical PostgreSQL gate，结束读回清理结果；`--source-orders` 只验证接单、工程用料、采购与委外；`--receiving` 只验证到货点数、采购退货与委外回货质检；两者均保留 PostgreSQL 门禁，不代表其他浏览器链路通过 | 验证页面、后端和数据库之间的业务闭环；不自动加入全量门禁 |
 | `node scripts/qa/database-inventory.mjs --out <report.json>` | 从环境中的固定数据库 URL 只读盘点同服务器项目库、连接数、migration、仓库引用和 disposable 分类；不授权删除 | 发布演练前后或发现临时库堆积时 |

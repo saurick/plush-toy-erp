@@ -7,6 +7,7 @@ export const NODE_TEST_GROUP_ORDER = Object.freeze([
 ]);
 
 export const EXPLICIT_ONLY_NODE_TESTS = Object.freeze([
+  "scripts/qa/data-model-integrity-postgres.test.mjs",
   "scripts/qa/unit-normalization-postgres.test.mjs",
   "scripts/qa/yoyoosun-role-flow-handbook.test.mjs",
 ]);
@@ -149,6 +150,7 @@ export const NODE_TEST_GROUPS = Object.freeze({
     "scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs",
     "scripts/qa/production-order-browser-e2e.test.mjs",
     "scripts/qa/purchase-receipt-real-write-e2e.test.mjs",
+    "scripts/qa/transaction-arrival-return-quality-browser.test.mjs",
     "scripts/qa/transaction-browser-network.test.mjs",
     "scripts/qa/transaction-flow-fields-browser.test.mjs",
     "scripts/qa/transaction-real-backend-browser.test.mjs",
