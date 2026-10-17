@@ -1,5 +1,5 @@
-import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import { writeFile } from 'node:fs/promises'
+import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import { assertFilterAffordance } from './controlAffordanceAssertions.mjs'
 import { ERP_ACCENTS } from '../../src/common/theme/erpAppearance.mjs'
 import { readStyleL1BuildExpectation } from './systemRpcMocks.mjs'
@@ -292,11 +292,8 @@ export function createMobileTaskAssertions(deps) {
       scenarioName,
       tabLabel: '风险页',
     })
-    assert(
-      reminderMetrics.sectionHeadings.includes('风险') &&
-        !reminderMetrics.sectionHeadings.includes('超时'),
-      `${scenarioName} 超级管理员风险分区默认应显示全局风险: ${JSON.stringify(reminderMetrics)}`
-    )
+    assert.deepEqual(reminderMetrics.sectionHeadings, [], `${scenarioName} 风险列表不应重复类别标题`)
+    assert.equal(await page.getByRole('region', { name: '风险任务', exact: true }).count(), 1)
     await assertMobileTaskRiskFiltersSwitch(page, { scenarioName })
     await assertMobileTaskDarkMessagesReadable(page, { scenarioName })
 
@@ -1013,6 +1010,15 @@ export function createMobileTaskAssertions(deps) {
     await assertFilterAffordance(filters.getByRole('button'), 34)
     const initialMetrics = await readMobileTaskRiskFilterMetrics(page)
     const riskLabel = initialMetrics.filterItems[0].label
+    assert.deepEqual(initialMetrics.sectionLabels, [`${riskLabel}任务`])
+    assert.deepEqual(initialMetrics.sectionHeadings, [])
+    assert(
+      initialMetrics.cards.every((card) =>
+        Math.abs(card.left - initialMetrics.filters.left) <= 1 &&
+        Math.abs(card.width - initialMetrics.filters.width) <= 1
+      ) && initialMetrics.list.paddingTop === 8 && initialMetrics.list.firstCardInset === 0,
+      `${scenarioName} 风险任务应与筛选对齐，列表顶部不留重复容器空间: ${JSON.stringify(initialMetrics)}`
+    )
     const initialCountByLabel = Object.fromEntries(
       initialMetrics.filterItems.map((item) => [item.label, Number(item.count)])
     )
@@ -1038,7 +1044,15 @@ export function createMobileTaskAssertions(deps) {
     const noticeMetrics = await readMobileTaskRiskFilterMetrics(page)
     assert.equal(noticeMetrics.activeFilter, '超时')
     assert.equal(await warning.getAttribute('aria-pressed'), 'false')
-    assert.deepEqual(noticeMetrics.sectionHeadings, ['超时'])
+    assert.deepEqual(noticeMetrics.sectionHeadings, [])
+    assert.deepEqual(noticeMetrics.sectionLabels, ['超时任务'])
+    assert(
+      noticeMetrics.cards.every((card) =>
+        Math.abs(card.left - noticeMetrics.filters.left) <= 1 &&
+        Math.abs(card.width - noticeMetrics.filters.width) <= 1
+      ) && noticeMetrics.list.paddingTop === 8 && noticeMetrics.list.firstCardInset === 0,
+      `${scenarioName} 超时任务应复用风险列表的紧凑横纵间距: ${JSON.stringify(noticeMetrics)}`
+    )
     assert(
       noticeMetrics.filtersSticky &&
         noticeMetrics.filters &&
@@ -1108,12 +1122,10 @@ export function createMobileTaskAssertions(deps) {
       const sections = Array.from(
         document.querySelectorAll('.mobile-role-message-section')
       ).map((section) => {
-        const heading = section.querySelector('h2')
         return {
-          heading: heading?.textContent?.trim() || '',
+          label: section.getAttribute('aria-label'),
+          headingCount: section.querySelectorAll('h2').length,
           rect: readRect(section),
-          ...readColor(section),
-          headingColor: heading ? window.getComputedStyle(heading).color : '',
         }
       })
 
@@ -1157,7 +1169,7 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 风险可读性断言必须在暗色模式执行: ${JSON.stringify(metrics)}`
     )
     assert(
-      metrics.sections.length === 1 && metrics.sections[0].heading === '风险',
+      metrics.sections.length === 1 && metrics.sections[0].label === '风险任务' && metrics.sections[0].headingCount === 0,
       `${scenarioName} 风险页默认应只渲染当前全局风险区块: ${JSON.stringify(metrics)}`
     )
     assert(
@@ -1172,18 +1184,6 @@ export function createMobileTaskAssertions(deps) {
       metrics.documentScrollWidth <= metrics.documentClientWidth + 1,
       `${scenarioName} 风险页出现横向溢出: ${JSON.stringify(metrics)}`
     )
-
-    metrics.sections.forEach((section) => {
-      assert(
-        !isLightSurfaceColor(section.backgroundColor),
-        `${scenarioName} 提醒分区仍是浅色背景: ${JSON.stringify(section)}`
-      )
-      assertReadableOnBackground(
-        section.headingColor,
-        section.backgroundColor,
-        `${scenarioName} 提醒分区标题对比度不足`
-      )
-    })
 
     metrics.cards.forEach((card) => {
       assert(
@@ -2476,6 +2476,9 @@ export function createMobileTaskAssertions(deps) {
   async function readMobileTaskRiskFilterMetrics(page) {
     return page.evaluate(() => {
       const filters = document.querySelector('[data-testid="mobile-role-risk-filters"]')
+      const sections = Array.from(document.querySelectorAll('.mobile-role-message-section'))
+      const list = document.querySelector('.mobile-role-messages')
+      const firstCard = list?.querySelector('.mobile-role-message-card, .mobile-role-message-empty')
       const rect = filters.getBoundingClientRect()
       const items = Array.from(filters.querySelectorAll('button'))
       const activeFilter = items.find((item) => item.getAttribute('aria-pressed') === 'true')
@@ -2489,6 +2492,7 @@ export function createMobileTaskAssertions(deps) {
         const box = card.getBoundingClientRect()
         return {
           text: card.textContent?.replace(/\s+/g, ' ').trim() || '',
+          left: box.left,
           width: box.width,
           height: box.height,
           clientWidth: card.clientWidth,
@@ -2502,8 +2506,14 @@ export function createMobileTaskAssertions(deps) {
           count: item.querySelector('.mobile-role-task-filter__count')?.textContent?.trim() || '',
         })),
         sectionHeadings,
+        sectionLabels: sections.map((section) => section.getAttribute('aria-label')),
+        list: {
+          paddingTop: parseFloat(getComputedStyle(list).paddingTop),
+          firstCardInset: firstCard ? firstCard.getBoundingClientRect().top - sections[0].getBoundingClientRect().top : null,
+        },
         filtersSticky: getComputedStyle(filters.closest('.mobile-task-list-toolbar')).position === 'sticky',
         filters: {
+          left: rect.left,
           width: rect.width,
           height: rect.height,
           clientWidth: filters.clientWidth,

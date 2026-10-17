@@ -73,7 +73,39 @@
 }
 
 .mobile-task-list-row__source-text {
+  flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.mobile-task-source-summary {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  font-size: var(--erp-font-caption);
+  line-height: 1.6;
+}
+
+.mobile-task-source-summary__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  min-width: 0;
+  gap: 4px 12px;
+}
+
+.mobile-task-source-summary__source {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.mobile-task-source-summary__assignee {
+  flex: 0 0 auto;
+  max-width: 100%;
+  color: var(--erp-text-muted);
+  word-break: keep-all;
   overflow-wrap: anywhere;
 }
 
@@ -520,6 +552,17 @@
 .mobile-role-bottom-nav__item:focus-visible {
   outline: 2px solid var(--erp-primary);
   outline-offset: -2px;
+}
+
+.mobile-role-messages {
+  min-width: 0;
+  padding: 8px 12px 18px;
+}
+
+.mobile-role-message-section {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
 }
 
 .mobile-role-task-filters {
@@ -1433,17 +1476,6 @@
 
 [data-erp-theme='dark'] .mobile-role-detail-meta {
   color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark'] .mobile-role-message-section {
-  border-color: var(--erp-border-strong);
-  background: var(--erp-surface-bg);
-  color: var(--erp-text);
-}
-
-[data-erp-theme='dark'] .mobile-role-message-section--warning {
-  border-color: rgb(217 119 6 / 0.72);
-  background: rgb(41 26 12 / 0.9);
 }
 
 [data-erp-theme='dark'] .mobile-role-message-card {

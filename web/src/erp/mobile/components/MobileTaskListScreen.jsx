@@ -72,6 +72,25 @@ const MOBILE_MAIN_TAB_ITEMS = [
   { key: MOBILE_MAIN_TAB_KEYS.MINE, label: '我的', Icon: UserOutlined },
 ]
 
+function renderTaskSourceSummary(task) {
+  const assignee = task.discovery?.assignee_name || '岗位待领取'
+  return (
+    <>
+      <span className="mobile-task-source-summary__heading">
+        <span className="mobile-task-source-summary__source">
+          <WorkflowTaskSource task={task} copyable={false} />
+        </span>
+        <span className="mobile-task-source-summary__assignee" aria-label={`办理人：${assignee}`}>
+          {assignee}
+        </span>
+      </span>
+      {task.discovery?.path ? (
+        <span className="workflow-task-discovery__summary">{task.discovery.path}</span>
+      ) : null}
+    </>
+  )
+}
+
 export default function MobileTaskListScreen({
   calendarState,
   activeFilterKey,
@@ -376,9 +395,8 @@ export default function MobileTaskListScreen({
         <div className="mobile-task-list-row__body min-w-0">
           <div className="mobile-task-list-row__source text-sm leading-5 text-slate-500">
             <FileTextOutlined aria-hidden="true" />
-            <span className="mobile-task-list-row__source-text">
-              <WorkflowTaskSource task={task} copyable={false} />
-              <span className="workflow-task-discovery__summary">{task.discovery?.path} · {task.discovery?.assignee_name || '岗位待领取'}</span>
+            <span className="mobile-task-list-row__source-text mobile-task-source-summary">
+              {renderTaskSourceSummary(task)}
             </span>
           </div>
           {listMeta ? (
@@ -592,9 +610,8 @@ export default function MobileTaskListScreen({
         <div className="mobile-task-list-row__body min-w-0">
           <div className="mobile-task-list-row__source text-sm leading-5 text-slate-500">
             <FileTextOutlined aria-hidden="true" />
-            <span className="mobile-task-list-row__source-text">
-              <WorkflowTaskSource task={task} copyable={false} />
-              <span className="workflow-task-discovery__summary">{task.discovery?.path} · {task.discovery?.assignee_name || '岗位待领取'}</span>
+            <span className="mobile-task-list-row__source-text mobile-task-source-summary">
+              {renderTaskSourceSummary(task)}
             </span>
           </div>
         </div>
@@ -691,134 +708,121 @@ export default function MobileTaskListScreen({
 
   const renderWarningMessages = () => (
     <section
-      className={`mobile-role-message-section erp-mobile-card rounded-2xl border p-4 ${
-        riskTasks.length > 0
-          ? 'mobile-role-message-section--warning border-amber-200 bg-amber-50/70'
-          : 'border-slate-200 bg-white'
-      }`}
+      className="mobile-role-message-section"
+      aria-label={riskScope === 'supervised' ? '跨岗风险任务' : '风险任务'}
     >
-      <h2 className="text-lg font-semibold text-slate-950">
-        {riskScope === 'supervised' ? '跨岗风险' : '风险'}
-      </h2>
-      <div className="mt-3 space-y-2">
-        {riskTasks.length === 0 ? (
-          <>
-            {renderEmptyState('暂无风险任务')}
-            {renderListLimitControl(
-              riskTasks,
-              MOBILE_LIST_KEYS.WARNING,
-              '条风险'
-            )}
-          </>
-        ) : (
-          <>
-            {getVisibleListItems(riskTasks, MOBILE_LIST_KEYS.WARNING).map(
-              (task) => (
-                <WorkflowTaskCard
-                  key={task.id}
-                  label={`查看${getWorkflowTaskDisplayName(task)}详情`}
-                  data-mobile-task-id={task.id}
-                  className="mobile-role-message-card mobile-role-message-card--warning w-full rounded-xl border border-amber-200 bg-white/80 px-3 py-3 text-left"
-                  onOpen={() => setSelectedTaskID(task.id)}
-                >
-                  <div className="mobile-role-message-card__tone font-semibold text-amber-800">
-                    {getTaskQueueTone(task)}
+      {riskTasks.length === 0 ? (
+        <>
+          {renderEmptyState('暂无风险任务')}
+          {renderListLimitControl(
+            riskTasks,
+            MOBILE_LIST_KEYS.WARNING,
+            '条风险'
+          )}
+        </>
+      ) : (
+        <>
+          {getVisibleListItems(riskTasks, MOBILE_LIST_KEYS.WARNING).map(
+            (task) => (
+              <WorkflowTaskCard
+                key={task.id}
+                label={`查看${getWorkflowTaskDisplayName(task)}详情`}
+                data-mobile-task-id={task.id}
+                className="mobile-role-message-card mobile-role-message-card--warning w-full rounded-xl border border-amber-200 bg-white px-3 py-3 text-left"
+                onOpen={() => setSelectedTaskID(task.id)}
+              >
+                <div className="mobile-role-message-card__tone font-semibold text-amber-800">
+                  {getTaskQueueTone(task)}
+                </div>
+                <div className="mobile-role-message-card__title mt-1">
+                  <WorkflowTaskIdentity
+                    task={task}
+                    compact
+                    copyable={false}
+                    showTaskName
+                  />
+                </div>
+                <div className="mobile-role-message-card__source mobile-task-source-summary mt-2 text-amber-700">
+                  {renderTaskSourceSummary(task)}
+                </div>
+                {resolveTaskReason(task) ? (
+                  <div className="mobile-role-message-card__reason mt-1 text-sm text-red-600">
+                    {resolveTaskReasonLabel(task)}：{resolveTaskReason(task)}
                   </div>
-                  <div className="mobile-role-message-card__title mt-1">
-                    <WorkflowTaskIdentity
-                      task={task}
-                      compact
-                      copyable={false}
-                      showTaskName
-                    />
-                  </div>
-                  <div className="mobile-role-message-card__source mt-1 break-all text-xs text-amber-700">
-                    <WorkflowTaskSource task={task} copyable={false} />
-                    <span className="workflow-task-discovery__summary">{task.discovery?.path} · {task.discovery?.assignee_name || '岗位待领取'}</span>
-                  </div>
-                  {resolveTaskReason(task) ? (
-                    <div className="mobile-role-message-card__reason mt-1 text-sm text-red-600">
-                      {resolveTaskReasonLabel(task)}：{resolveTaskReason(task)}
-                    </div>
-                  ) : null}
-                  <div className="mt-2">
-                    <WorkflowTaskTiming task={task} />
-                  </div>
-                </WorkflowTaskCard>
-              )
-            )}
-            {renderListLimitControl(
-              riskTasks,
-              MOBILE_LIST_KEYS.WARNING,
-              '条风险'
-            )}
-          </>
-        )}
-      </div>
+                ) : null}
+                <div className="mt-2">
+                  <WorkflowTaskTiming task={task} />
+                </div>
+              </WorkflowTaskCard>
+            )
+          )}
+          {renderListLimitControl(
+            riskTasks,
+            MOBILE_LIST_KEYS.WARNING,
+            '条风险'
+          )}
+        </>
+      )}
     </section>
   )
 
   const renderNoticeMessages = () => (
-    <section className="mobile-role-message-section mobile-role-message-section--notice erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4">
-      <h2 className="text-lg font-semibold text-slate-950">超时</h2>
-      <div className="mt-3 space-y-2">
-        {overdueTasks.length === 0 ? (
-          <>
-            {renderEmptyState('暂无超时任务')}
-            {renderListLimitControl(
-              overdueTasks,
-              MOBILE_LIST_KEYS.NOTICE,
-              '条超时'
-            )}
-          </>
-        ) : (
-          <>
-            {getVisibleListItems(overdueTasks, MOBILE_LIST_KEYS.NOTICE).map(
-              (task) => (
-                <WorkflowTaskCard
-                  key={task.id}
-                  label={`查看${getWorkflowTaskDisplayName(task)}详情`}
-                  data-mobile-task-id={task.id}
-                  className="mobile-role-message-card mobile-role-message-card--notice w-full rounded-xl bg-slate-50 px-3 py-3 text-left"
-                  onOpen={() => setSelectedTaskID(task.id)}
-                >
-                  <span className="min-w-0">
-                    <WorkflowTaskIdentity
-                      task={task}
-                      compact
-                      copyable={false}
-                      showTaskName
-                    />
-                    <span className="mobile-role-message-card__source mt-1 block break-all text-xs text-slate-500">
-                      <WorkflowTaskSource task={task} copyable={false} />
-                      <span className="workflow-task-discovery__summary">{task.discovery?.path} · {task.discovery?.assignee_name || '岗位待领取'}</span>
-                    </span>
+    <section className="mobile-role-message-section" aria-label="超时任务">
+      {overdueTasks.length === 0 ? (
+        <>
+          {renderEmptyState('暂无超时任务')}
+          {renderListLimitControl(
+            overdueTasks,
+            MOBILE_LIST_KEYS.NOTICE,
+            '条超时'
+          )}
+        </>
+      ) : (
+        <>
+          {getVisibleListItems(overdueTasks, MOBILE_LIST_KEYS.NOTICE).map(
+            (task) => (
+              <WorkflowTaskCard
+                key={task.id}
+                label={`查看${getWorkflowTaskDisplayName(task)}详情`}
+                data-mobile-task-id={task.id}
+                className="mobile-role-message-card mobile-role-message-card--notice w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-left"
+                onOpen={() => setSelectedTaskID(task.id)}
+              >
+                <span className="min-w-0">
+                  <WorkflowTaskIdentity
+                    task={task}
+                    compact
+                    copyable={false}
+                    showTaskName
+                  />
+                  <span className="mobile-role-message-card__source mobile-task-source-summary mt-2 text-slate-500">
+                    {renderTaskSourceSummary(task)}
                   </span>
-                  <div className="mt-2">
-                    <WorkflowTaskTiming task={task} />
-                  </div>
-                </WorkflowTaskCard>
-              )
-            )}
-            {renderListLimitControl(
-              overdueTasks,
-              MOBILE_LIST_KEYS.NOTICE,
-              '条超时'
-            )}
-          </>
-        )}
-      </div>
+                </span>
+                <div className="mt-2">
+                  <WorkflowTaskTiming task={task} />
+                </div>
+              </WorkflowTaskCard>
+            )
+          )}
+          {renderListLimitControl(
+            overdueTasks,
+            MOBILE_LIST_KEYS.NOTICE,
+            '条超时'
+          )}
+        </>
+      )}
     </section>
   )
 
   const renderMessagesPanel = () => (
     <>
       {renderListFeedback()}
-      <section className="mobile-role-messages mx-4 mt-5 space-y-4 pb-5">
+      <div className="mobile-role-messages">
         {activeMessageTabKey === MOBILE_MESSAGE_TAB_KEYS.WARNING
           ? renderWarningMessages()
           : renderNoticeMessages()}
-      </section>
+      </div>
     </>
   )
 
