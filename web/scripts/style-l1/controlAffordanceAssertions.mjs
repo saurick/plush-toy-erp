@@ -67,7 +67,7 @@ export async function assertMobileSearchAffordance(locator, action) {
   return metrics
 }
 
-export async function assertContentTabAffordance(locator) {
+async function readSelectionAffordance(locator) {
   await waitForFiniteAnimations(locator.page())
   const metric = await locator.evaluate((root) => {
     const group = root.matches('.erp-sliding-tab-list')
@@ -84,6 +84,18 @@ export async function assertContentTabAffordance(locator) {
     const track = root.matches('.ant-segmented') ? root : group
     const style = getComputedStyle(track)
     const indicator = getComputedStyle(group, '::before')
+    const colorProbe = document.createElement('span')
+    colorProbe.style.position = 'absolute'
+    root.append(colorProbe)
+    const resolveColor = (token) => {
+      colorProbe.style.color = `var(${token})`
+      return getComputedStyle(colorProbe).color
+    }
+    const expectedSelectedText = resolveColor('--erp-control-selected-text')
+    const expectedTrack = resolveColor('--erp-control-track')
+    const expectedSelected = resolveColor('--erp-control-selected')
+    const expectedBorder = resolveColor('--erp-control-tab-border')
+    colorProbe.remove()
     let surface = track
     let background = 'rgb(255, 255, 255)'
     while (surface) {
@@ -99,27 +111,55 @@ export async function assertContentTabAffordance(locator) {
       other: read(other),
       background,
       trackBackground: style.backgroundColor,
+      trackRadius: parseFloat(style.borderRadius),
+      trackBorder: style.borderColor,
+      trackBorderWidths: ['Top', 'Right', 'Bottom', 'Left'].map((side) => parseFloat(style[`border${side}Width`])),
       indicatorBackground: indicator.backgroundColor,
+      indicatorRadius: parseFloat(indicator.borderRadius),
       shadow: indicator.boxShadow,
-      expectedSelectedText: style.getPropertyValue('--erp-control-selected-text').trim(),
+      expectedSelectedText,
+      expectedTrack,
+      expectedSelected,
+      expectedBorder,
       width: root.clientWidth,
       scrollWidth: root.scrollWidth,
     }
   })
+  return metric
+}
+
+function assertSelectionText(metric, selectedBackground = metric.background, otherBackground = metric.background) {
   assert.equal(metric.selected.weight, 650, JSON.stringify(metric))
   if (metric.other) assert.equal(metric.other.weight, 500, JSON.stringify(metric))
+  assert.deepEqual(parseRgb(metric.selected.color), parseRgb(metric.expectedSelectedText))
+  for (const [item, background] of [[metric.selected, selectedBackground], [metric.other, otherBackground]]) {
+    if (!item) continue
+    assert(getContrastRatio(parseRgb(item.color), parseRgb(background)) >= 4.5, `文字对比度不足: ${JSON.stringify(metric)}`)
+  }
+  assert(metric.scrollWidth <= metric.width + 1, `切换控件不能撑宽容器: ${JSON.stringify(metric)}`)
+}
+
+export async function assertContentTabAffordance(locator) {
+  const metric = await readSelectionAffordance(locator)
   assert.equal(metric.trackBackground, 'rgba(0, 0, 0, 0)', '内容 Tab 使用透明底')
   assert.equal(metric.indicatorBackground, 'rgba(0, 0, 0, 0)', '下划线不叠加选中底块')
   assert(metric.shadow.includes('0px -2px 0px 0px inset'), `内容 Tab 必须有 2px 下划线: ${JSON.stringify(metric)}`)
-  assert.deepEqual(parseRgb(metric.selected.color), parseRgb(metric.expectedSelectedText))
-  for (const item of [metric.selected, metric.other].filter(Boolean)) {
-    assert(getContrastRatio(parseRgb(item.color), parseRgb(metric.background)) >= 4.5, `文字对比度不足: ${JSON.stringify(metric)}`)
-  }
-  assert(metric.scrollWidth <= metric.width + 1, `页签不能撑宽容器: ${JSON.stringify(metric)}`)
+  assertSelectionText(metric)
 }
 
 export const assertTabsAffordance = assertContentTabAffordance
-export const assertSegmentAffordance = assertContentTabAffordance
+
+export async function assertSegmentAffordance(locator) {
+  const metric = await readSelectionAffordance(locator)
+  assert.deepEqual(parseRgb(metric.trackBackground), parseRgb(metric.expectedTrack), `分段按钮须保留底轨: ${JSON.stringify(metric)}`)
+  assert.deepEqual(parseRgb(metric.indicatorBackground), parseRgb(metric.expectedSelected), `分段按钮须保留选中底块: ${JSON.stringify(metric)}`)
+  assert.deepEqual(parseRgb(metric.trackBorder), parseRgb(metric.expectedBorder))
+  assert.deepEqual(metric.trackBorderWidths, [1, 1, 1, 1], '分段按钮四周使用中性细边框')
+  assert.equal(metric.trackRadius, 9, '分段按钮使用圆角底轨')
+  assert.equal(metric.indicatorRadius, 6, '分段按钮使用圆角滑块')
+  assert(metric.shadow.includes('0px 0px 0px 1px inset'), `分段按钮须保留滑块细描边: ${JSON.stringify(metric)}`)
+  assertSelectionText(metric, metric.indicatorBackground, metric.trackBackground)
+}
 
 export async function assertFilterAffordance(locator, minHeight = 32) {
   const metrics = await locator.evaluateAll((buttons) =>

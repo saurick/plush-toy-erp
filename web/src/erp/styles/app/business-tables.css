@@ -716,6 +716,7 @@
 }
 
 .erp-business-page-header-card__grid > .erp-sliding-segmented,
+.erp-business-page-header-card__grid > .erp-sliding-tab-list,
 .erp-business-page-header-card__grid > .erp-sliding-tabs {
   min-width: 0;
   max-width: 100%;

@@ -5,19 +5,40 @@ export default function SlidingTabList({
   className = '',
   children,
   onKeyDown,
+  options,
+  value,
+  onChange,
+  block = false,
+  disabled = false,
   ...props
 }) {
   const ref = useSlidingIndicator({
     itemSelector: ':scope > [role="tab"]',
     selectedSelector: ':scope > [role="tab"][aria-selected="true"]',
   })
+  const content = options ? options.map((option) => (
+    <button
+      key={option.value}
+      type="button"
+      role="tab"
+      aria-selected={option.value === value}
+      disabled={disabled || option.disabled}
+      className={option.className}
+      onClick={() => {
+        if (option.value !== value) onChange?.(option.value)
+      }}
+    >
+      {option.icon && <span aria-hidden="true">{option.icon}</span>}
+      {option.label}
+    </button>
+  )) : children
   return (
     <div
       {...props}
       ref={ref}
       role="tablist"
       tabIndex={-1}
-      className={`erp-sliding-tab-list ${className}`}
+      className={`erp-sliding-tab-list ${options ? 'erp-navigation-tabs erp-navigation-tabs--options' : ''} ${block ? 'erp-navigation-tabs--block' : ''} ${className}`}
       onKeyDown={(event) => {
         onKeyDown?.(event)
         if (event.defaultPrevented) return
@@ -44,7 +65,7 @@ export default function SlidingTabList({
         tabs[target].click()
       }}
     >
-      {React.Children.map(children, (child) =>
+      {React.Children.map(content, (child) =>
         React.isValidElement(child) && child.props.role === 'tab'
           ? React.cloneElement(child, {
               tabIndex:

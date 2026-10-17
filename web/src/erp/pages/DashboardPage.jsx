@@ -31,6 +31,7 @@ import { buildWorkflowTaskResponsibilityItems } from '../utils/workflowTaskEvent
 import { getWorkbenchSummaryOptions } from '../utils/workbenchSummary.mjs'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { message } from '@/common/utils/antdApp'
@@ -1718,7 +1719,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             title="工作台"
             viewSwitch={
               summaryOptions.length > 0 ? (
-                <Segmented
+                <SlidingTabList
                   aria-label="工作台视图"
                   value={summaryOpen ? 'summary' : 'tasks'}
                   options={[
@@ -1870,7 +1871,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             title="任务管理"
             className="erp-task-management-header erp-task-management-scope"
             viewSwitch={
-              <Segmented
+              <SlidingTabList
                 className="erp-task-board-scope-filter"
                 aria-label="任务范围"
                 value={
@@ -1900,9 +1901,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           >
             {exceptionsView || trackingScope ? (
               <div className="erp-dashboard-block">
-                <Segmented
+                <SlidingTabList
                   className="erp-task-tracking-views"
-                  hierarchy="secondary"
                   aria-label="跟踪内容"
                   value={exceptionsView ? 'exceptions' : 'tracking'}
                   options={TRACKING_VIEW_OPTIONS}

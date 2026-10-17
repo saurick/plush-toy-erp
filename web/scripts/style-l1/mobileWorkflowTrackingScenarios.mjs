@@ -42,7 +42,7 @@ export function createMobileWorkflowTrackingScenarios(deps) {
         })
       },
       verify: async (page) => {
-        const tabs = '.mobile-workspace-task-views .ant-segmented'
+        const tabs = '.mobile-workspace-task-views .erp-sliding-tab-list'
         const chooseScope = async (label) => {
           await panel.getByRole('button', { name: /^筛选流程/u }).click()
           const filters = page.getByRole('dialog', { name: '筛选流程', exact: true })

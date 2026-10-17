@@ -1,72 +1,17 @@
+import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import path from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { progressFixtureData } from './businessProgressFixtures.mjs'
 import { assertBusinessModalViewport } from './modalAssertions.mjs'
 
 async function verifyProgressMotion(page, assert, reduced) {
-  if (reduced) await page.emulateMedia({ reducedMotion: 'reduce' })
-  const root = page.locator('[aria-label="进度查看方式"]')
-  if (reduced) {
-    await root.getByText('订单交付', { exact: true }).click()
-    await page.waitForTimeout(100)
-  }
-  const result = await root.evaluate(async (root) => {
-    const group = root.querySelector('.ant-segmented-group')
-    const target = [...group.querySelectorAll('.ant-segmented-item')].find((item) => item.textContent.includes('生产执行'))
-    const before = root.getBoundingClientRect()
-    const read = () => {
-      const style = getComputedStyle(group, '::before')
-      return {
-        x: new DOMMatrixReadOnly(
-          style.transform === 'none' ? undefined : style.transform
-        ).m41,
-        duration: style.transitionDuration,
-      }
-    }
-    const start = read().x
-    const frames = []
-    target.click()
-    const began = performance.now()
-    await new Promise((resolve) => {
-      const tick = () => {
-        frames.push(read())
-        if (performance.now() - began < 650) requestAnimationFrame(tick)
-        else resolve()
-      }
-      requestAnimationFrame(tick)
-    })
-    const after = root.getBoundingClientRect()
-    return {
-      start,
-      target: target.offsetLeft,
-      frames,
-      stable: root.querySelector('.ant-segmented-group') === group,
-      widthDelta: after.width - before.width,
-      heightDelta: after.height - before.height,
-      selected: target.querySelector('input').checked,
-    }
-  })
-  assert(result.stable && result.selected)
-  assert(Math.abs(result.widthDelta) < 1 && Math.abs(result.heightDelta) < 1)
-  assert(
-    Math.abs(result.frames.at(-1).x - result.target) < 1.5,
-    JSON.stringify(result)
-  )
-  if (reduced) {
-    assert(
-      result.frames.every((frame) =>
-        frame.duration.split(',').every((value) => parseFloat(value) === 0)
-      )
-    )
-  } else {
-    assert(
-      result.frames.some(
-        (frame) => frame.x > result.start + 2 && frame.x < result.target - 2
-      ),
-      JSON.stringify(result)
-    )
-  }
-  if (reduced) await page.emulateMedia({ reducedMotion: 'no-preference' })
+  const selector = '[aria-label="进度查看方式"]'
+  const root = page.locator(selector)
+  await root.getByRole('tab', { name: '订单交付', exact: true }).click()
+  await root.getByRole('tab', { name: '订单交付', exact: true, selected: true }).waitFor()
+  const index = await root.getByRole('tab').evaluateAll((tabs) => tabs.findIndex((tab) => tab.textContent.trim() === '生产执行'))
+  assert(index >= 0, '内容导航包含目标页签')
+  await verifyMobileNavigationMotion(page, assert, selector, index, reduced)
 }
 
 export function createBusinessProgressScenarios({

@@ -344,7 +344,7 @@ export function createDashboardTaskScenarios({
             'approval'
         )
         await taskScopeFilter
-          .locator('.ant-segmented-item-selected')
+          .locator('[role="tab"][aria-selected="true"]')
           .filter({ hasText: '待我审批' })
           .waitFor({ state: 'visible', timeout: 2_000 })
         await page
@@ -360,7 +360,7 @@ export function createDashboardTaskScenarios({
             '.erp-task-board-scope-filter'
           )
           const selectedScope = scopeFilter?.querySelector(
-            '.ant-segmented-item-selected'
+            '[role="tab"][aria-selected="true"]'
           )
           const cardRect = card?.getBoundingClientRect()
           const filtersRect = filters?.getBoundingClientRect()
@@ -2187,7 +2187,7 @@ export function createDashboardTaskScenarios({
         )
         assert.equal(
           await page
-            .getByRole('radio', { name: '待我审批', exact: true })
+            .getByRole('tab', { name: '待我审批', exact: true })
             .count(),
           0
         )

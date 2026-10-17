@@ -59,6 +59,16 @@ export function createGlobalSurfaceScenarios({
         await waitForFiniteAnimations(page)
         const result = await page.evaluate(() => {
           const root = document.querySelector('.erp-admin-outlet')
+          const rendered = (node) => {
+            const box = node.getBoundingClientRect()
+            const css = getComputedStyle(node)
+            return (
+              box.width > 0 &&
+              box.height > 0 &&
+              css.display !== 'none' &&
+              css.visibility !== 'hidden'
+            )
+          }
           const paint = (node) => {
             const css = getComputedStyle(node)
             const box = node.getBoundingClientRect()
@@ -107,36 +117,45 @@ export function createGlobalSurfaceScenarios({
           })
           const surfaces = [
             ...root.querySelectorAll(
-              '.erp-business-page-header-card,.erp-business-operation-panel,.erp-business-data-table-card,' +
-                '.erp-dashboard-surface,.erp-task-board-lane,.erp-permission-section,.erp-audit-command,' +
+              '.erp-business-page-header-card:not(.erp-business-page-header-card--secondary),' +
+                '.erp-business-operation-panel,.erp-business-data-table-card,' +
+                '.erp-dashboard-surface,.erp-dashboard-task-board-card,.erp-permission-section,.erp-audit-command,' +
                 '.erp-business-visualization,.erp-permission-tabs>.ant-tabs-nav'
             ),
-          ].map(paint)
+          ].filter(rendered).map(paint)
           const navigationSurfaces = [
             ...root.querySelectorAll(
               '.erp-workbench-view-toolbar, .erp-progress-controls, ' +
                 '.erp-permission-toolbar, .erp-business-view-surface__toolbar, ' +
-                '.erp-business-module-tabs, .erp-business-page-navigation'
+                '.erp-business-page-navigation'
             ),
-          ].map(paint)
-          const nestedNavigation = [
+          ].filter(rendered).map(paint)
+          const nestedSurfaces = [
             ...root.querySelectorAll(
-              '.erp-operational-visual-toolbar, .erp-operational-visual-toolbar__secondary'
+              '.erp-task-board-lanes, .erp-task-board-lane, .erp-business-module-tabs, ' +
+                '.erp-business-page-header-card--secondary, ' +
+                '.erp-operational-visual-toolbar, .erp-operational-visual-toolbar__secondary'
             ),
-          ].map((node) => {
+          ].filter(rendered).map((node) => {
             let parent = node.parentElement
             let background = 'rgba(0, 0, 0, 0)'
             while (parent && background === 'rgba(0, 0, 0, 0)') {
               background = getComputedStyle(parent).backgroundColor
               parent = parent.parentElement
             }
-            return { ...paint(node), parentBackground: background }
+            return {
+              ...paint(node),
+              parentBackground: background,
+              parentSurface: node.closest('.erp-business-page-header-card--secondary')
+                ? 'page'
+                : 'content',
+            }
           })
           const navigationAlignment = [
             ...root.querySelectorAll(
               '.erp-workbench-view-toolbar, .erp-progress-toolbar, .erp-permission-toolbar'
             ),
-          ].map((node) => {
+          ].filter(rendered).map((node) => {
             const box = node.getBoundingClientRect()
             const control = node.firstElementChild.getBoundingClientRect()
             const css = getComputedStyle(node)
@@ -148,10 +167,10 @@ export function createGlobalSurfaceScenarios({
           })
           const topNavigation = [
             ...root.querySelectorAll(
-              '.erp-business-module-tabs, .erp-workbench-view-toolbar .erp-sliding-segmented, ' +
-                '.erp-progress-toolbar .erp-sliding-segmented, .erp-permission-tabs'
+              '.erp-business-module-tabs, .erp-workbench-view-toolbar .erp-sliding-tab-list, ' +
+                '.erp-progress-toolbar .erp-sliding-tab-list, .erp-permission-tabs'
             ),
-          ].map((node) => {
+          ].filter(rendered).map((node) => {
             const tabs = node.classList.contains('erp-sliding-tabs')
             const segmented = node.classList.contains('erp-sliding-segmented')
             const group = tabs
@@ -191,7 +210,7 @@ export function createGlobalSurfaceScenarios({
                 '.erp-business-page-navigation .ant-tabs-nav-list, ' +
                 '.erp-business-page-layout > .erp-sliding-tabs .ant-tabs-nav-list'
             ),
-          ].map((node) => {
+          ].filter(rendered).map((node) => {
             const surface =
               node.closest('.erp-business-data-table-card') ||
               node.closest('.erp-business-page-navigation') ||
@@ -216,9 +235,10 @@ export function createGlobalSurfaceScenarios({
           }
           const corners = [
             ...root.querySelectorAll(
-              '.erp-business-page-header-card, .erp-business-data-table-card'
+              '.erp-business-page-header-card:not(.erp-business-page-header-card--secondary), ' +
+                '.erp-business-data-table-card'
             ),
-          ].map((node) => {
+          ].filter(rendered).map((node) => {
             const box = node.getBoundingClientRect()
             const hit = document.elementFromPoint(box.left + 1, box.top + 1)
             const outside = hit && !node.contains(hit)
@@ -232,12 +252,19 @@ export function createGlobalSurfaceScenarios({
             }
             return { class: node.className, outside, background }
           })
+          const panelSpacing = document.createElement('div')
+          panelSpacing.style.cssText =
+            'position:absolute;visibility:hidden;padding:var(--erp-panel-padding-block, 10px) var(--erp-panel-padding-inline, 12px)'
+          root.append(panelSpacing)
+          const navigationPadding = getComputedStyle(panelSpacing).padding
+          panelSpacing.remove()
           return {
             title: root.innerText.slice(0, 160),
             strayLight,
             surfaces,
             navigationSurfaces,
-            nestedNavigation,
+            navigationPadding,
+            nestedSurfaces,
             navigationAlignment,
             topNavigation,
             tableNavigationInsets,
@@ -269,11 +296,11 @@ export function createGlobalSurfaceScenarios({
             result.surfaceColor,
             `${route}: ${surface.class} 使用完整操作区内容面`
           )
-          assert.equal(surface.padding, '10px 12px')
+          assert.equal(surface.padding, result.navigationPadding)
           assert.equal(surface.radius, '10px')
           assert.equal(surface.borderWidth, '1px')
         }
-        for (const surface of result.nestedNavigation) {
+        for (const surface of result.nestedSurfaces) {
           assert.equal(
             surface.background,
             'rgba(0, 0, 0, 0)',
@@ -281,8 +308,8 @@ export function createGlobalSurfaceScenarios({
           )
           assert.equal(
             surface.parentBackground,
-            result.surfaceColor,
-            `${route}: ${surface.class} 由外层内容面承载`
+            surface.parentSurface === 'page' ? result.pageColor : result.surfaceColor,
+            `${route}: ${surface.class} 由所属外层承载底色`
           )
         }
         for (const navigation of result.navigationAlignment) {
@@ -292,31 +319,26 @@ export function createGlobalSurfaceScenarios({
           )
         }
         for (const navigation of result.topNavigation) {
-          assert.equal(navigation.height, 38, `${route}: 顶部切换整组高度`)
-          assert.equal(
-            navigation.selectedHeight,
-            30,
-            `${route}: 顶部切换选项高度`
-          )
-          assert.equal(navigation.radius, '9px')
-          assert.equal(navigation.selectedRadius, '6px')
-          assert.equal(navigation.padding, '3px')
+          assert(navigation.selectedHeight >= 36, `${route}: 内容页签点击区域至少 36px`)
+          assert(navigation.height >= navigation.selectedHeight, `${route}: 页签容器完整承载选项`)
+          assert.equal(navigation.radius, '0px')
+          assert.equal(navigation.selectedRadius, '0px')
+          assert.equal(navigation.padding, '0px')
           assert.equal(navigation.fontSize, '14px')
-          assert.notEqual(navigation.background, navigation.selectedBackground)
-          assert.notEqual(navigation.background, result.pageColor)
+          assert.equal(navigation.fontWeight, '650')
+          assert.equal(navigation.background, 'rgba(0, 0, 0, 0)')
+          assert.equal(navigation.selectedBackground, 'rgba(0, 0, 0, 0)')
+          assert(navigation.selectedShadow.includes('0px -2px 0px 0px inset'), `${route}: 内容导航保留 2px 下划线`)
           const first = report.find((item) => item.topNavigation.length)
             ?.topNavigation[0]
           if (first) {
-            assert.deepEqual(
-              navigation,
-              first,
-              `${route}: 与工作台共用底轨、选中背景、边框、圆角、尺寸和文字样式`
-            )
+            const appearance = (value) => Object.fromEntries(Object.entries(value).filter(([key]) => !['height', 'selectedHeight'].includes(key)))
+            assert.deepEqual(appearance(navigation), appearance(first), `${route}: 与工作台共用内容页签外观，几何尺寸由页面布局负责`)
           }
         }
         for (const navigation of result.tableNavigationInsets) {
           assert.ok(
-            navigation.left >= 11.5 && navigation.top >= 9.5,
+            navigation.left >= 11.5 && navigation.top >= 5.5,
             `${route}: 页签与卡片左上边缘保留阅读间距 ${JSON.stringify(navigation)}`
           )
         }

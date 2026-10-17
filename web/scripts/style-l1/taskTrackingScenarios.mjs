@@ -179,8 +179,8 @@ approval_form: null,
         })
       },
       verify: async (page) => {
-        const scopeSelector = '.erp-task-management-scope .ant-segmented'
-        const scopeIndex = async (label) => (await page.locator(`${scopeSelector} .ant-segmented-item`).allTextContents()).findIndex((text) => text.trim() === label)
+        const scopeSelector = '.erp-task-management-scope .erp-sliding-tab-list'
+        const scopeIndex = async (label) => (await page.locator(`${scopeSelector} [role="tab"]`).allTextContents()).findIndex((text) => text.trim() === label)
         await page.locator(scopeSelector).getByText('流程跟踪', { exact: true }).waitFor()
         await verifyMobileNavigationMotion(page, assert, scopeSelector, await scopeIndex('流程跟踪'))
         await page.getByText('任务进度加载失败', { exact: true }).waitFor()

@@ -9,6 +9,12 @@
   padding: 8px;
 }
 
+.mobile-workspace-primary-tabs.erp-sliding-tab-list {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+}
+
 .mobile-workspace-task-views,
 .mobile-workspace-tracking-views {
   margin: 6px 12px 0;
@@ -17,7 +23,10 @@
 .mobile-workspace-tracking-views {
   margin-top: 4px;
 }
-.mobile-workspace-task-views .ant-segmented {
+.mobile-workspace-task-views {
+  margin-top: 2px;
+}
+.mobile-workspace-task-views .erp-sliding-tab-list {
   min-width: 100%;
   width: max-content;
 }
@@ -25,15 +34,15 @@
 .mobile-workspace-tracking-views[hidden] {
   display: none;
 }
-.mobile-workspace-task-views .ant-segmented-item-label,
-.mobile-workspace-tracking-views .ant-segmented-item-label {
+.mobile-workspace-task-views .erp-sliding-tab-list > [role='tab'],
+.mobile-workspace-tracking-views .erp-sliding-tab-list > [role='tab'] {
   min-height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
   padding-inline: 6px;
-  font-size: var(--erp-font-small);
+  font-size: var(--erp-font-body);
 }
 
 .mobile-workspace-exceptions {

@@ -1485,7 +1485,7 @@
     flex-direction: column;
   }
 
-  .erp-dev-quality-server-evidence__view-switch > .ant-segmented {
+  .erp-dev-quality-server-evidence__view-switch > .erp-sliding-tab-list {
     width: 100%;
   }
 

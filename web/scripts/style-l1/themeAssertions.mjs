@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { assertNoHorizontalOverflow } from './pageAssertions.mjs'
+import { assertContentTabAffordance, assertSegmentAffordance } from './controlAffordanceAssertions.mjs'
 import {
   assertReadableOnDark,
   getContrastRatio,
@@ -248,6 +249,9 @@ async function assertThemeReadable(page, { scenarioName, selector }) {
 }
 
 async function assertLoginSegmentedReadable(page, { scenarioName }) {
+  await assertSegmentAffordance(page.locator('.erp-login-segmented'))
+  const loginMethods = page.getByRole('tablist', { name: '登录方式' })
+  if (await loginMethods.count()) await assertContentTabAffordance(loginMethods)
   await page.waitForTimeout(480)
   const metrics = await page.evaluate(() => {
     const segmentedControls = Array.from(

@@ -154,14 +154,14 @@ export function createDesktopNavigationBadgeScenarios({
           await verifyMobileNavigationMotion(
             page,
             assert,
-            '.erp-task-board-scope-filter .erp-sliding-segmented',
+            '.erp-task-board-scope-filter',
             1
           )
           await page.locator('.erp-task-progress-rail__item[data-lane="finished"]').waitFor()
           await verifyMobileNavigationMotion(
             page,
             assert,
-            '.erp-task-board-scope-filter .erp-sliding-segmented',
+            '.erp-task-board-scope-filter',
             0,
             true
           )

@@ -53,6 +53,26 @@ function CustomTabs({ id, className, itemClass = '', disabledLast = false }) {
   )
 }
 
+function OptionTabs() {
+  const [value, setValue] = useState(options[0])
+  const [changes, setChanges] = useState(0)
+  return (
+    <section id="option-tabs">
+      <SlidingTabList
+        aria-label="受控内容导航"
+        block
+        value={value}
+        options={options.map((label, index) => ({ value: label, label, disabled: index === 2 }))}
+        onChange={(nextValue) => {
+          setValue(nextValue)
+          setChanges((count) => count + 1)
+        }}
+      />
+      <output id="option-tab-changes">{changes}</output>
+    </section>
+  )
+}
+
 function ActionBarMountFixture() {
   const [generation, setGeneration] = useState(0)
   return (
@@ -121,6 +141,7 @@ function Fixture() {
         <Segment id="unequal" onChange={() => setCalls((count) => count + 1)} />
         <Segment id="equal" block defaultValue={options[1]} />
         <Segment id="secondary" hierarchy="secondary" />
+        <OptionTabs />
         <CustomTabs id="login" className="erp-login-methods erp-navigation-tabs" />
         <CustomTabs id="progress-detail" className="erp-progress-detail-tabs erp-navigation-tabs" />
         <Segment id="vertical" vertical />

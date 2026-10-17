@@ -12,7 +12,7 @@ import {
   useSearchParams,
 } from 'react-router-dom'
 import SearchInput from '@/common/components/SearchInput'
-import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import useLiveSearch from '@/common/hooks/useLiveSearch'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { listBusinessProgress } from '../api/businessProgressApi.mjs'
@@ -288,7 +288,7 @@ export default function BusinessDashboardPage() {
         compact
         title="进度看板"
         viewSwitch={
-          <SlidingSegmented
+          <SlidingTabList
             aria-label="进度查看方式"
             value={view}
             onChange={changeView}

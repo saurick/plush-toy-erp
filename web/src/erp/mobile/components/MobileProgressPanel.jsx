@@ -11,7 +11,7 @@ import { Alert, Button, Empty, Spin } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 import { canOpenRelatedDocumentPath } from '../../utils/relatedDocumentNavigation.mjs'
 import { resolveMenuPermissionKey } from '../../config/menuPermissions.mjs'
-import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   isAuthFailureCode,
@@ -379,9 +379,9 @@ export default function MobileProgressPanel({
         onScroll={() => remember()}
       >
         <div className="mobile-progress-controls">
-          <SlidingSegmented
+          <SlidingTabList
             block
-            className="mobile-progress-view-switch"
+            className="mobile-workspace-primary-tabs mobile-progress-view-switch"
             aria-label="进度视图"
             options={options}
             value={query.view}

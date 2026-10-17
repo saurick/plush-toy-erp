@@ -116,7 +116,6 @@ test('shared tabs and filter chips keep one appearance owner while allowing page
 
 test('only shared content tab owners define the 2px underline', async () => {
   const selector = [
-    '.erp-sliding-segmented.ant-segmented:not(.ant-segmented-vertical)',
     '.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-nav-list',
     '.erp-sliding-tab-list.erp-navigation-tabs',
   ].join(', ')
@@ -126,6 +125,8 @@ test('only shared content tab owners define the 2px underline', async () => {
   for (const [css, source] of [
     [`${selector} { ${declaration} }`, 'src/erp/styles/app/example.css'],
     [`.erp-page { ${declaration} }`, file],
+    [`.erp-sliding-segmented.ant-segmented { ${declaration} }`, file],
+    [`.erp-sliding-segmented.ant-segmented:not(.ant-segmented-vertical), ${selector} { ${declaration} }`, file],
     [`${selector} { ${declaration.replace('-2px', '-3px')} }`, file],
   ]) {
     assert.match((await warnings(css, source))[0], /内容页签统一/u)

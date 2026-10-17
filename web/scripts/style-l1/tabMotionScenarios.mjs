@@ -278,11 +278,22 @@ export function createTabMotionScenarios({ outputDir }) {
           await page.locator('#toggle-theme').click()
           await page.waitForTimeout(460)
         }
-        await assertSegmentAffordance(page.locator('#unequal .ant-segmented'))
+        for (const id of ['unequal', 'equal', 'secondary', 'vertical', 'material', 'scope', 'theme', 'dev-segment', 'dev-reader', 'disabled', 'controlled', 'conditional']) {
+          await assertSegmentAffordance(page.locator(`#${id} .ant-segmented`))
+        }
         await assertTabsAffordance(page.locator('#ant-tabs .ant-tabs'))
-        for (const id of ['secondary', 'login', 'progress-detail', 'collaboration', 'images', 'card-tabs']) {
+        for (const id of ['option-tabs', 'login', 'progress-detail', 'collaboration', 'images', 'card-tabs']) {
           await assertContentTabAffordance(page.locator(`#${id} .erp-sliding-segmented, #${id} .erp-sliding-tab-list, #${id} .erp-sliding-tabs`))
         }
+        const optionTabs = page.getByRole('tablist', { name: '受控内容导航' })
+        await optionTabs.getByRole('tab').first().click()
+        assert.equal(await page.locator('#option-tab-changes').textContent(), '0', '重复点击当前页签不触发变更')
+        assert(await optionTabs.getByRole('tab').last().isDisabled())
+        await optionTabs.getByRole('tab').first().press('End')
+        await optionTabs.getByRole('tab', { name: '整张汇总表对照', selected: true }).waitFor()
+        assert.equal(await page.locator('#option-tab-changes').textContent(), '1', '方向键跳过禁用页签')
+        await optionTabs.getByRole('tab', { name: '整张汇总表对照' }).press('Home')
+        await optionTabs.getByRole('tab', { name: '逐项查看', selected: true }).waitFor()
         for (const id of ['dev-nav', 'dev-journey']) {
           await assertTaskTabPointerAndFocus(page.locator(`#${id} .erp-dev-task-nav`))
         }
@@ -296,6 +307,7 @@ export function createTabMotionScenarios({ outputDir }) {
         for (const id of [
           'unequal',
           'secondary',
+          'option-tabs',
           'login',
           'progress-detail',
           'vertical',
@@ -466,6 +478,7 @@ export function createTabMotionScenarios({ outputDir }) {
           tabsDuration.split(',').every((part) => parseFloat(part) === 0),
           'reduced motion must disable shared Tabs sliding'
         )
+        await verifyMobileNavigationMotion(page, assert, '#option-tabs .erp-sliding-tab-list', 1, true)
         await writeFile(
           path.join(outputDir, `global-tab-sliding-${mode}-frames.json`),
           JSON.stringify(motionEvidence, null, 2)
@@ -508,7 +521,21 @@ export function createTabMotionScenarios({ outputDir }) {
         verify: async (page) => {
           const controls = page.getByRole('region', { name: '控件设计', exact: true })
           const directory = controls.getByRole('navigation', { name: '控件设计目录' })
-          const preview = page.getByLabel('设计预览入口', { exact: true })
+          const preview = page.locator('.erp-dev-ui-design-page-select:visible')
+          const openPreview = async () => {
+            await preview.click()
+            const listId = await preview.getByRole('combobox').getAttribute('aria-controls')
+            assert(listId, '预览入口须关联自己的选项列表')
+            return page.locator('.ant-select-dropdown').filter({ has: page.locator(`[id="${listId}"]`) })
+          }
+          const choosePreview = async (label, key) => {
+            const dropdown = await openPreview()
+            await dropdown.getByText(label, { exact: true }).click()
+            await dropdown.waitFor({ state: 'hidden' })
+            await page.waitForURL((url) => (url.searchParams.get('page') || 'workspace') === key)
+            if (key === 'controls') await controls.waitFor({ state: 'visible' })
+            else await page.locator('iframe[title="ERP 最新可交互设计"]:visible').waitFor()
+          }
           const search = controls.getByRole('textbox', { name: '搜索控件设计' })
           const choose = async (name) => {
             await directory.getByRole('button', { name: new RegExp(name) }).click()
@@ -525,7 +552,13 @@ export function createTabMotionScenarios({ outputDir }) {
             '控件页面不应出现页面级横向溢出'
           )
           await controls.waitFor()
-          assert.equal(await preview.getByRole('radio').count(), 7)
+          const initialPreview = await openPreview()
+          assert.deepEqual(
+            await initialPreview.locator('.ant-select-item-option').allTextContents(),
+            ['业务界面', '任务处理', '移动端任务', '效能工作台', '登录页', '岗位帮助', '控件设计']
+          )
+          await initialPreview.getByText('控件设计', { exact: true }).click()
+          await initialPreview.waitFor({ state: 'hidden' })
           assert.equal(await page.getByRole('dialog').count(), 0)
           assert.equal(await page.getByRole('button', { name: '下载 HTML' }).count(), 0)
           await assertFits()
@@ -586,7 +619,7 @@ export function createTabMotionScenarios({ outputDir }) {
 
           await choose('页签与视图')
           const segment = controls.getByLabel('进度视图样例', { exact: true })
-          await assertSegmentAffordance(segment)
+          await assertContentTabAffordance(segment)
           await assertTabsAffordance(controls.getByLabel('订单详情样例', { exact: true }))
           const tabsSelector = '.erp-control-library-stage .ant-tabs-nav-list'
           const segmentSelector = '.erp-control-library [aria-label="进度视图样例"]'
@@ -595,10 +628,11 @@ export function createTabMotionScenarios({ outputDir }) {
           assert.equal(await controls.getByRole('tab', { name: '无权限' }).getAttribute('aria-disabled'), 'true')
           await verifyMobileNavigationMotion(page, assert, segmentSelector, 1)
           await controls.getByText('当前查看：生产执行').waitFor()
+          await assertContentTabAffordance(controls.getByLabel('二级导航样例', { exact: true }))
           await verifyMobileNavigationMotion(page, assert, segmentSelector, 0, true)
           await verifyMobileNavigationMotion(page, assert, tabsSelector, 0, true)
           await chooseTheme('深色')
-          await assertSegmentAffordance(segment)
+          await assertContentTabAffordance(segment)
           await assertTabsAffordance(controls.getByLabel('订单详情样例', { exact: true }))
           await chooseTheme('浅色')
           await controls.getByRole('link', { name: '查看图解说明' }).click()
@@ -631,15 +665,15 @@ export function createTabMotionScenarios({ outputDir }) {
           await controls.getByRole('button', { name: '重试读取' }).click()
           await controls.getByText('重新读取成功：已恢复 1 条样例记录').waitFor()
 
-          await verifyMobileNavigationMotion(page, assert, '[aria-label="设计预览入口"]', 0)
+          await choosePreview('业务界面', 'workspace')
           const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
           await frame.getByRole('button', { name: '销售管理', exact: true }).click()
           await frame.getByRole('group', { name: '销售订单视图', exact: true }).waitFor()
-          await verifyMobileNavigationMotion(page, assert, '[aria-label="设计预览入口"]', 4)
+          await choosePreview('控件设计', 'controls')
           await page.getByRole('button', { name: /重置演示/ }).click()
-          await preview.getByText('业务界面', { exact: true }).click()
+          await choosePreview('业务界面', 'workspace')
           await frame.getByRole('group', { name: '销售订单视图', exact: true }).waitFor()
-          await preview.getByText('控件设计', { exact: true }).click()
+          await choosePreview('控件设计', 'controls')
           await choose('弹窗与反馈')
           await controls.getByRole('button', { name: '打开编辑弹窗', exact: true }).waitFor()
           await assertFits()

@@ -1,7 +1,7 @@
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRightOutlined } from '@ant-design/icons'
 import { Button } from 'antd'
-import SlidingSegmented from '../../../common/components/navigation/SlidingSegmented'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { getHelpScenarioPresentation } from '../../config/helpScenarioPresentation.mjs'
 import HelpScenarioIllustration from './HelpScenarioIllustration'
 
@@ -290,7 +290,7 @@ export default function HelpScenarioContent({ scenario, roleKey }) {
       />
       <section className="erp-help-instructions" aria-label="办理说明">
         <div className="erp-help-view-switch">
-          <SlidingSegmented
+          <SlidingTabList
             aria-label="帮助内容"
             options={viewOptions}
             value={selected.view}

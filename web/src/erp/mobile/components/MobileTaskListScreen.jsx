@@ -1045,8 +1045,9 @@ export default function MobileTaskListScreen({
     <div className="mobile-role-tasks-page mobile-role-tasks-page--tabs erp-mobile-controls md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
       <div className="mobile-workspace-navigation" hidden={!isTasks || isProgress}>
         <div hidden={!isTasks} className="mobile-workspace-task-views">
-          <SlidingSegmented
+          <SlidingTabList
             block
+            className="mobile-workspace-primary-tabs"
             aria-label="任务状态"
             value={selectedTaskTab === MOBILE_MAIN_TAB_KEYS.EXCEPTIONS ? MOBILE_MAIN_TAB_KEYS.TRACKING : selectedTaskTab}
             options={[
@@ -1079,8 +1080,7 @@ export default function MobileTaskListScreen({
           />
         </div>
         <div hidden={!isTracking && !isExceptions} className="mobile-workspace-tracking-views">
-          <SlidingSegmented
-            hierarchy="secondary"
+          <SlidingTabList
             aria-label="跟踪内容"
             value={lastTrackingView.current}
             options={TRACKING_VIEW_OPTIONS}

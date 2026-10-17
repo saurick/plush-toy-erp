@@ -114,7 +114,6 @@ const rule = (enabled) => (root, result) => {
     relative === 'src/erp/styles/app/control-affordance.css'
   root.walkDecls('--erp-slider-shadow', (decl) => {
     const contentTabSelectors = new Set([
-      '.erp-sliding-segmented.ant-segmented:not(.ant-segmented-vertical)',
       '.erp-sliding-tabs.ant-tabs > .ant-tabs-nav .ant-tabs-nav-list',
       '.erp-sliding-tab-list.erp-navigation-tabs',
     ])

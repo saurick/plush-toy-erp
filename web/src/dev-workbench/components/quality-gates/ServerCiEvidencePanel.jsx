@@ -1,7 +1,7 @@
 import React, { useCallback, useRef, useState } from 'react'
 import { InfoCircleOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { Button, Space, Tag, Typography } from 'antd'
-import Segmented from '@/common/components/navigation/SlidingSegmented'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import DevTimestamp from '../DevTimestamp.jsx'
 import {
   DEFAULT_SERVER_VIEW,
@@ -237,7 +237,7 @@ export function ServerCiEvidencePanel({
       </div>
       <Text>{evidence.message}</Text>
       <div className="erp-dev-quality-server-evidence__view-switch">
-        <Segmented
+        <SlidingTabList
           aria-label="服务器门禁详情"
           options={SERVER_VIEW_OPTIONS}
           value={selectedServerView}

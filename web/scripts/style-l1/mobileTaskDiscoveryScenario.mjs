@@ -99,7 +99,7 @@ tasks: [task, { ...task, id: task.id + 10000, task_name: '办理加工回货检�
       assert.equal(await page.getByRole('button', { name: '按模块、环节和办理人查找' }).count(), 0)
       assert.equal(await page.locator('.mobile-task-discovery').count(), 0)
       assert.equal(await tabs.getByText('异常跟踪', { exact: true }).count(), 0)
-      assert.equal(await tabs.locator('.ant-segmented-item').count(), 3)
+      assert.equal(await tabs.getByRole('tab').count(), 3)
       await page.getByRole('searchbox').fill('排序')
       await page.getByRole('searchbox').press('Enter')
       await open()

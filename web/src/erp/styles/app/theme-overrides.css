@@ -305,11 +305,6 @@
   background: linear-gradient(180deg, #166534, #14532d);
 }
 
-[data-erp-theme='dark'] .erp-task-board-lanes {
-  border-color: rgb(148 163 184 / 0.18);
-  background: var(--erp-page-bg);
-}
-
 [data-erp-theme='dark']
   .erp-task-progress-rail__item[data-lane='exception']
   .erp-task-progress-rail__value {
@@ -358,7 +353,7 @@
     );
 }
 
-[data-erp-theme='dark'] .ant-card,
+[data-erp-theme='dark'] .ant-card:not(:where(.erp-business-page-header-card--secondary)),
 [data-erp-theme='dark'] .ant-table-wrapper .ant-table,
 [data-erp-theme='dark'] .ant-table-wrapper .ant-table-thead > tr > th,
 [data-erp-theme='dark'] .ant-table-wrapper .ant-table-tbody > tr > td,
@@ -701,7 +696,8 @@
   color: var(--erp-text);
 }
 
-[data-erp-theme='dark'] .erp-business-page-header-card.ant-card,
+[data-erp-theme='dark']
+  .erp-business-page-header-card.ant-card:not(:where(.erp-business-page-header-card--secondary)),
 [data-erp-theme='dark'] .erp-business-operation-panel.ant-card,
 [data-erp-theme='dark'] .erp-business-filter-panel.ant-card,
 [data-erp-theme='dark'] .erp-business-list-toolbar.ant-card,

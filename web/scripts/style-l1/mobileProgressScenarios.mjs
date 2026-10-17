@@ -4,6 +4,7 @@ import { writeFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
+import { assertContentTabAffordance } from './controlAffordanceAssertions.mjs'
 import { pullToRefresh } from './mobileGestureAssertions.mjs'
 import {
   assertSegmentAffordance,
@@ -61,6 +62,83 @@ async function assertMobileDetailSurface(root, assert) {
   assert(geometry.overflow <= 1)
   assert.deepEqual(geometry.smallTargets, [])
   return geometry
+}
+
+async function verifyMobilePrimaryTabGeometry(page, assert, outputDir, theme) {
+  const progressSelector = '.mobile-progress-view-switch'
+  const taskSelector = '.mobile-workspace-task-views .erp-sliding-tab-list'
+  const measurements = []
+  const read = (selector) => page.locator(selector).evaluate((root) => {
+    const box = root.getBoundingClientRect()
+    const page = root.closest('.mobile-role-tasks-page').getBoundingClientRect()
+    const group = root
+    const indicator = getComputedStyle(group, '::before')
+    const labels = [...root.querySelectorAll('[role="tab"]')]
+    return {
+      height: box.height,
+      top: box.top - page.top,
+      left: box.left - page.left,
+      indicatorBottom: group.getBoundingClientRect().top - box.top + new DOMMatrixReadOnly(indicator.transform).m42 + parseFloat(indicator.height),
+      labels: labels.map((node) => {
+        const style = getComputedStyle(node)
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        const text = range.getBoundingClientRect()
+        return { height: node.getBoundingClientRect().height, center: (text.top + text.bottom) / 2 - box.top, font: style.fontSize, lineHeight: style.lineHeight }
+      }),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    }
+  })
+  const equal = (actual, expected, state) => {
+    for (const field of ['height', 'top', 'left', 'indicatorBottom']) {
+      assert(Math.abs(actual[field] - expected[field]) <= 0.5, `${state} ${field}: ${JSON.stringify({ actual, expected })}`)
+    }
+    for (const label of actual.labels) {
+      assert(label.height >= 44)
+      assert(Math.abs(label.center - expected.labels[0].center) <= 0.5, `${state} 文字基线对齐`)
+      assert.equal(label.font, expected.labels[0].font)
+      assert.equal(label.lineHeight, expected.labels[0].lineHeight)
+    }
+    assert(actual.overflow <= 1, `${state} 页面不横向溢出`)
+  }
+  for (const width of [320, 350, 351, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 })
+    await page.getByTestId('mobile-role-nav-progress').click()
+    const progress = page.locator(progressSelector)
+    await progress.waitFor()
+    await progress.getByText('订单交付', { exact: true }).click()
+    await progress.getByRole('tab', { name: '订单交付', exact: true, selected: true }).waitFor()
+    await assertContentTabAffordance(progress)
+    const expected = await read(progressSelector)
+    assert.equal(expected.height, 46, '内容页签保留紧凑高度与 44px 触区')
+    assert.equal(expected.top, 2)
+    await progress.getByText('生产执行', { exact: true }).click()
+    await progress.getByRole('tab', { name: '生产执行', exact: true, selected: true }).waitFor()
+    equal(await read(progressSelector), expected, `${width} 生产执行`)
+    if (width === 390) await page.screenshot({ path: path.join(outputDir, `primary-tabs-progress-${theme}.png`), clip: { x: 0, y: 0, width, height: 172 } })
+    await page.getByTestId('mobile-role-nav-tasks').click()
+    const tasks = page.locator(taskSelector)
+    for (const state of ['待办', '已办', '流程跟踪']) {
+      await tasks.getByText(state, { exact: true }).click()
+      await tasks.getByRole('tab', { name: state, selected: true }).waitFor()
+      await assertContentTabAffordance(tasks)
+      const actual = await read(taskSelector)
+      equal(actual, expected, `${width} ${state}`)
+      measurements.push({ width, state, ...actual })
+      if (state === '待办' && width === 390) await page.screenshot({ path: path.join(outputDir, `primary-tabs-tasks-${theme}.png`), clip: { x: 0, y: 0, width, height: 172 } })
+    }
+    const tracking = page.locator('.mobile-workspace-tracking-views')
+    await tracking.getByText('异常跟踪', { exact: true }).click()
+    equal(await read(taskSelector), expected, `${width} 异常跟踪`)
+    await tracking.getByText('流程进度', { exact: true }).click()
+  }
+  await page.setViewportSize({ width: 390, height: 844 })
+  await verifyMobileNavigationMotion(page, assert, taskSelector, 1)
+  await verifyMobileNavigationMotion(page, assert, taskSelector, 0, true)
+  await page.getByTestId('mobile-role-nav-progress').click()
+  await verifyMobileNavigationMotion(page, assert, progressSelector, 0)
+  await verifyMobileNavigationMotion(page, assert, progressSelector, 1, true)
+  await writeFile(path.join(outputDir, `primary-tab-geometry-${theme}.json`), JSON.stringify(measurements, null, 2))
 }
 
 export function createMobileProgressScenarios({
@@ -399,7 +477,7 @@ export function createMobileProgressScenarios({
         const cardGeometry = await panel.locator('.mobile-progress-card').first().evaluate((card) => ({ height: card.getBoundingClientRect().height, overflow: card.scrollWidth - card.clientWidth }))
         assert(cardGeometry.height < 240 && cardGeometry.overflow <= 1, JSON.stringify(cardGeometry))
         await assertNoHorizontalOverflow(page, role)
-        await assertSegmentAffordance(panel.locator('.erp-sliding-segmented'))
+        await assertContentTabAffordance(panel.locator('.mobile-progress-view-switch'))
         await assertFilterAffordance(
           panel.locator('.mobile-progress-risks button'),
           34
@@ -421,14 +499,14 @@ export function createMobileProgressScenarios({
               clientWidth: element.clientWidth,
             }
           }
-          const segment = root.querySelector('.ant-segmented')
+          const segment = root.querySelector('.mobile-progress-view-switch')
           return {
             segment: read(segment),
             indicator: read(
-              segment.querySelector('.ant-segmented-group'),
+              segment,
               '::before'
             ),
-            items: [...segment.querySelectorAll('.ant-segmented-item')].map(
+            items: [...segment.querySelectorAll('[role="tab"]')].map(
               (item) => read(item)
             ),
             chips: [
@@ -1545,7 +1623,12 @@ export function createMobileProgressScenarios({
       },
     }
   })
-  return [...scenarios, ...createMobileFilterScrollScenarios({ scenarios, assert, outputDir }), {
+  return [...scenarios, ...['light', 'dark'].map((themeMode) => ({
+    ...scenarios.find((scenario) => scenario.name === 'mobile-progress-boss'),
+    name: `mobile-primary-tab-geometry-${themeMode}`,
+    themeMode,
+    verify: (page) => verifyMobilePrimaryTabGeometry(page, assert, outputDir, themeMode),
+  })), ...createMobileFilterScrollScenarios({ scenarios, assert, outputDir }), {
     ...scenarios.find((scenario) => scenario.name === 'mobile-progress-pmc'),
     name: 'mobile-progress-status-counts',
     verify: async (page) => {

@@ -585,6 +585,13 @@ export function createAuthenticationEntryScenarios({
       path: '/admin-login',
       mockAdminRpc: true,
       viewport: { width: 1280, height: 800 },
+      beforeNavigate: async (page) => {
+        await page.addInitScript(() => {
+          if (localStorage.getItem('plush_erp_theme_mode') === null) {
+            localStorage.setItem('plush_erp_theme_mode', 'system')
+          }
+        })
+      },
       verify: async (page) => {
         await expectAdminLoginHeading(page)
         await assertERPThemeMode(page, {

@@ -103,7 +103,7 @@
     flex-basis: 100%;
   }
 
-  .erp-dashboard-task-board-card .erp-task-tracking-views.ant-segmented .ant-segmented-item-label {
+  .erp-dashboard-task-board-card .erp-task-tracking-views.erp-sliding-tab-list > [role='tab'] {
     min-height: 44px;
     padding-inline: 8px;
   }

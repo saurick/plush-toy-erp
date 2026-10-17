@@ -9,6 +9,7 @@ import {
 import { Link, useSearchParams } from 'react-router-dom'
 import SlidingTabs from '@/common/components/navigation/SlidingTabs'
 import SlidingSegmented from '@/common/components/navigation/SlidingSegmented'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import NavigationCountBadge from '@/common/components/navigation/NavigationCountBadge'
@@ -56,19 +57,19 @@ const TOPICS = [
     summary: '切换内容，保留当前对象',
     guide: 'type',
     description:
-      '内容页签统一使用透明底、选中字重 650 与 2px 主题色下划线；未选中字重 500。一级与二级采用同一外观。',
+      '内容导航使用下划线，工作方式、显示模式和筛选选项使用分段按钮。手机任务、进度与流程跟踪同样按内容导航处理。',
     rules: [
-      ['产品明细 / 关联任务', '页签', '同一对象下有不同内容区域。'],
-      ['订单交付 / 生产执行', '分段切换', '少量互斥视角，按内容宽度排列。'],
-      ['当前项', '650 字重 + 2px 下划线', '主题色标明当前位置，未选项使用 500 字重；不叠加选中底块。'],
-      ['一级与二级导航', '共用内容 Tab 样式', '透明底，1px 中性基线，指示线仅覆盖选中项；电脑与手机使用同一线宽。'],
+      ['待办 / 已办 / 流程跟踪、订单交付 / 生产执行', '内容页签', '切换不同工作内容，桌面和手机都使用下划线。'],
+      ['电脑 / 手机、列表 / 日历、主题与密度', '分段按钮', '选择运行模式、显示方式或设置值，使用底轨和选中滑块。'],
+      ['内容页签当前项', '650 字重 + 2px 下划线', '透明底与中性基线，主题线标明当前位置；未选项使用 500 字重。'],
+      ['同页两条切换', '按职责区分', '登录页上方选择电脑或手机，下方切换密码或短信内容；选项少不等于分段按钮。'],
       ['手机顶部', '层间留白 4–8px', '主次页签间 4px、页签至搜索 6px、搜索至状态 8px；触摸区域至少 44px。'],
       ['管理员查看岗位', '我的 → 管理员视角', '保留所选岗位与查看权限，任务、风险和进度顶部不重复岗位栏。'],
       ['内容切换', '导航持续挂载', '指示条连续移动，不随正文重新出现。'],
     ],
     checks: [
       '切到关联任务：订单身份保持不变。',
-      '快速反向切换：下划线从当前位置继续。',
+      '快速反向切换：下划线或滑块从当前位置继续。',
       '用方向键切换，核对禁用项与减少动态效果。',
     ],
     source: 'SlidingTabs · SlidingSegmented · SlidingTabList · control-affordance.css',
@@ -300,8 +301,8 @@ function NavigationExample() {
         />
       </div>
       <div>
-        <h3>② 同一进度，切换视角</h3>
-        <SlidingSegmented
+        <h3>② 进度工作区，切换内容</h3>
+        <SlidingTabList
           aria-label="进度视图样例"
           value={view}
           onChange={setView}
@@ -334,10 +335,9 @@ function NavigationExample() {
         </dl>
       </div>
       <div>
-        <h3>③ 第二层导航，沿用同一选中样式</h3>
-        <SlidingSegmented
-          aria-label="二级页签样例"
-          hierarchy="secondary"
+        <h3>③ 同一工作下的第二层内容</h3>
+        <SlidingTabList
+          aria-label="二级导航样例"
           value={trackingView}
           onChange={setTrackingView}
           options={[
@@ -347,7 +347,7 @@ function NavigationExample() {
         />
         <p>
           当前查看：{trackingView === 'progress' ? '流程进度' : '异常跟踪'}。
-          选中字重 650、未选中 500；下划线统一为 2px，使用主题色，随页签连续滑动。
+          内容导航保留下划线：选中字重 650、未选中 500，2px 主题线随当前位置连续移动。
           手机页面左右保留 12px，层间留白 4–8px，点击区域至少 44px；
           完整布局与“我的”岗位切换见移动端任务样例。
         </p>

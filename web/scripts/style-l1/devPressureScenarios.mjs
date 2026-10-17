@@ -390,13 +390,13 @@ export function createDevPressureScenarios({
         assert.equal(actionRequests.length, 1, '刷新恢复运行状态不得重新启动')
         const requestsBeforeSwitch = reportReads
         const motion = await nav.evaluate(async (root) => {
-          const group = root.querySelector('.ant-segmented-group')
+          const group = root.querySelector('.erp-sliding-tab-list')
           const read = () =>
             new DOMMatrixReadOnly(getComputedStyle(group, '::before').transform)
               .m41
           const initial = read()
           const samples = []
-          group.querySelector('.ant-segmented-item').click()
+          group.querySelector('[role="tab"]').click()
           for (let index = 0; index < 30; index++) {
             await new Promise((resolve) => requestAnimationFrame(resolve))
             samples.push(read())
@@ -426,7 +426,7 @@ export function createDevPressureScenarios({
         await page.emulateMedia({ reducedMotion: 'reduce' })
         await nav.getByText('压力测试', { exact: true }).click()
         const duration = await nav
-          .locator('.ant-segmented-group')
+          .locator('.erp-sliding-tab-list')
           .evaluate(
             (group) => getComputedStyle(group, '::before').transitionDuration
           )

@@ -881,12 +881,29 @@ export function createDevQualityGateScenarios({
       verify: async (page) => {
         await expectHeading(page, '质量门禁')
         await page.getByText('GitLab 普通 CI 已通过', { exact: true }).waitFor()
+        const headerSurface = await page
+          .locator('.erp-dev-quality-header')
+          .evaluate((node) => {
+            const probe = document.createElement('span')
+            probe.style.backgroundColor = 'var(--erp-primary-softer)'
+            node.append(probe)
+            const expected = getComputedStyle(probe).backgroundColor
+            probe.remove()
+            return {
+              background: getComputedStyle(node).backgroundColor,
+              expected,
+              hasTitle: Boolean(node.querySelector('h1')),
+              hasNavigation: Boolean(node.querySelector('[role="tablist"]')),
+            }
+          })
         assert.equal(
-          await page
-            .locator('.erp-dev-quality-header')
-            .evaluate((node) => getComputedStyle(node).backgroundColor),
-          'rgb(255, 255, 255)',
-          '质量门禁标题与主导航由同一白色页头承载'
+          headerSurface.background,
+          headerSurface.expected,
+          '质量门禁页头使用当前主题浅底'
+        )
+        assert(
+          headerSurface.hasTitle && headerSurface.hasNavigation,
+          '质量门禁标题与主导航由同一页头承载'
         )
 
         const serverPanel = page.getByRole('region', {

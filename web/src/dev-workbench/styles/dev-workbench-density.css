@@ -45,7 +45,7 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   padding: 10px 12px;
   border: 1px solid var(--erp-border);
   border-radius: var(--erp-business-card-radius);
-  background: var(--erp-surface-bg);
+  background: var(--erp-primary-softer);
   box-shadow: none;
 }
 

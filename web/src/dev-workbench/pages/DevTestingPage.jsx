@@ -24,6 +24,7 @@ import {
 } from 'antd'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
+import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import SearchInput from '@/common/components/SearchInput'
 import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
@@ -2159,7 +2160,7 @@ export default function DevTestingPage() {
           className="erp-dev-testing-primary-nav"
           hidden={isAuxiliaryView}
         >
-          <Segmented
+          <SlidingTabList
             aria-label="质量验证工作区主视图"
             options={VIEW_OPTIONS}
             value={isAuxiliaryView ? VIEW_TIERS : view}
