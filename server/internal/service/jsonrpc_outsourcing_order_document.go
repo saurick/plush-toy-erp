@@ -16,7 +16,10 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "save_outsourcing_order_with_items":
-		orderID := getInt(pm, "id", 0)
+		orderID, valid := getOptionalJSONRPCID(pm, "id")
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
 		permission := biz.PermissionOutsourcingOrderCreate
 		if orderID > 0 {
 			permission = biz.PermissionOutsourcingOrderUpdate
@@ -55,7 +58,11 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderRead); res != nil {
 			return id, res, nil
 		}
-		item, err := d.outsourcingOrderUC.GetOutsourcingOrder(ctx, getInt(pm, "id", 0))
+		orderID, valid := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !valid || !jsonRPCParamsAllowed(pm, "id") {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.outsourcingOrderUC.GetOutsourcingOrder(ctx, orderID)
 		return id, outsourcingOrderMutationResult(ctx, d, item, err), nil
 	case "list_outsourcing_orders":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderRead); res != nil {

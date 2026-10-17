@@ -1,4 +1,4 @@
-import { verifyIntegrationWorkspace, verifyProjectGraphDirectory } from './devProjectGraphAssertions.mjs'
+import { installIntegrationWorkspaceMock, verifyIntegrationWorkspace, verifyProjectGraphDirectory } from './devProjectGraphAssertions.mjs'
 import { DEV_HUB_ITEMS } from '../../src/dev-workbench/config/devHub.mjs'
 import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
 import { assertMermaidFits, fitMermaidDiagram, switchMermaidLayout, verifyMermaidViewer, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
@@ -64,7 +64,9 @@ export function createDevWorkbenchDesktopScenarios({
     path: item.route,
     ...(item.route === DEV_PERMISSION_RELATIONSHIPS_ROUTE
       ? { beforeNavigate: installPermissionRelationshipMock }
-      : {}),
+      : item.route === DEV_INTEGRATION_ROUTE
+        ? { beforeNavigate: installIntegrationWorkspaceMock }
+        : {}),
     viewport: { width: 1440, height: 900 },
     ...(item.route === DEV_TESTING_ROUTE
       ? {

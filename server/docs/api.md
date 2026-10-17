@@ -25,14 +25,18 @@ HTTP 路由：
 
 以下选取查询、源单动作、库存过账和财务核销说明最小合同；其余方法仍按所属章节、handler、参数解析和业务测试核对。成功信封的 `result.code=0`，业务错误复用正式码表，`id` 仅用于请求响应关联。
 
-| 域 / 方法 | 精确入参与边界 | 授权与成功 `result.data` | 并发与结果恢复 |
-| --- | --- | --- | --- |
-| `sales_order / get_sales_order` | 仅 `id`；必填 JSON 正整数，不能为小数、数值字符串、布尔值或超出 JSON 安全整数范围 | 有效内部会话与 `sales_order.read`；返回 `sales_order` 业务投影 | 只读，可重试；未知字段拒绝，不接受 actor、角色或客户范围覆盖 |
-| `sales_order / cancel_sales_order` | `id, expected_version, idempotency_key, reason`；可选 `customer_key` 仅选择当前部署配置。ID / 版本为正整数；原因去首尾空白后必填，最多 255 字；键去首尾空白后必填，最多 128 字节 | `sales_order.cancel`、当前销售模块门禁；actor 注入当前身份；返回 `sales_order` | 原版本、键、意图与 actor 的重放复用持久回执；同键改意图或 actor 冲突，新键使用过期版本冲突；返回所属订单投影，不承诺所有字段永久冻结 |
-| `inventory / post_inventory_operation` | 仅 `id, expected_version`，均为正整数；人工库存调整须通过审批流程执行节点办理 | `warehouse.adjustment.create`、库存模块与当前仓库数据范围；返回 `inventory_operation` | 按对象、原版本和 actor 识别已过账重放，库存效果只写一次；不接受调用方附加通用幂等键。结果未知时先读 `get_inventory_operation` |
-| `operational_fact / allocate_finance_payment` | `id, expected_version, idempotency_key, allocations`，可选 `customer_key`；`allocations` 非空，每项仅 `finance_fact_id, amount`，前者为正整数，后者为正十进制字符串 | `finance.payment.post`、财务模块及来源读取权限；返回 `payment`，含核销投影 | 沿收付款既有版本、意图与核销事务恢复；金额不足、版本或同键意图冲突不得自动调整参数重试。结果未知时按原意图重试或读 `get_finance_payment` |
+| 域 / 方法 | 精确入参与边界 | 授权与成功 `result.data` | 并发与结果恢复 | 回归来源（不代表已执行） |
+| --- | --- | --- | --- | --- |
+| `sales_order / get_sales_order` | 仅 `id`；必填 JSON 正整数，不能为小数、数值字符串、布尔值或超出 JSON 安全整数范围 | 有效内部会话与 `sales_order.read`；返回 `sales_order` 业务投影 | 只读，可重试；未知字段拒绝，不接受 actor、角色或客户范围覆盖 | [接口授权](../internal/service/jsonrpc_integration_boundary_test.go)、[HTTP 消费者](../internal/data/source_document_integration_consumers_postgres_test.go) |
+| `purchase_order / get_purchase_order` | 仅 `id`；必填 JSON 正整数，拒绝小数、数值字符串、布尔值、`null`、不安全整数与未知字段 | 有效内部会话与 `purchase_order.read`；返回 `purchase_order` | 只读，可重试；不能通过附加 actor、角色或客户键选择范围 | [HTTP 消费者](../internal/data/source_document_integration_consumers_postgres_test.go)、[接口合同](../internal/service/jsonrpc_purchase_order_test.go) |
+| `outsourcing_order / get_outsourcing_order` | 仅 `id`；必填 JSON 正整数，拒绝小数、数值字符串、布尔值、`null`、不安全整数与未知字段 | 有效内部会话与 `outsourcing_order.read`；返回 `outsourcing_order` | 只读，可重试；不能通过附加 actor、角色或客户键选择范围 | [接口合同](../internal/service/jsonrpc_outsourcing_order_test.go) |
+| `sales_order / cancel_sales_order` | `id, expected_version, idempotency_key, reason`；可选 `customer_key` 仅选择当前部署配置。ID / 版本为正整数；原因去首尾空白后必填，最多 255 字；键去首尾空白后必填，最多 128 字节 | `sales_order.cancel`、当前销售模块门禁；actor 注入当前身份；返回 `sales_order` | 原版本、键、意图与 actor 的重放复用持久回执；同键改意图或 actor 冲突，新键使用过期版本冲突；返回所属订单投影，不承诺所有字段永久冻结 | [参数与授权](../internal/service/jsonrpc_integration_boundary_test.go)、[并发与回放](../internal/data/source_order_lifecycle_replay_postgres_test.go)、[HTTP 消费者](../internal/data/source_document_integration_consumers_postgres_test.go) |
+| `inventory / post_inventory_operation` | 仅 `id, expected_version`，均为正整数；人工库存调整须通过审批流程执行节点办理 | `warehouse.adjustment.create`、库存模块与当前仓库数据范围；返回 `inventory_operation` | 按对象、原版本和 actor 识别已过账重放，库存效果只写一次；不接受调用方附加通用幂等键。结果未知时先读 `get_inventory_operation` | [并发过账](../internal/data/inventory_postgres_operation_concurrency_test.go)、[异常恢复](../internal/data/inventory_postgres_operation_recovery_test.go)、[HTTP 消费者](../internal/data/source_document_integration_consumers_postgres_test.go) |
+| `operational_fact / allocate_finance_payment` | `id, expected_version, idempotency_key, allocations`，可选 `customer_key`；`allocations` 非空，每项仅 `finance_fact_id, amount`，前者为正整数，后者为正十进制字符串 | `finance.payment.post`、财务模块及来源读取权限；返回 `payment`，含核销投影 | 沿收付款既有版本、意图与核销事务恢复；金额不足、版本或同键意图冲突不得自动调整参数重试。结果未知时按原意图重试或读 `get_finance_payment` | [核销并发与恢复](../internal/data/operational_fact_finance_payment_postgres_test.go)、[HTTP 消费者](../internal/data/source_document_integration_consumers_postgres_test.go) |
 
 `customer_key` 不承担租户或合作方数据范围语义，不能授予访问权。客户端传入的 actor、角色、来源快照和 intent hash 不能取代服务端派生；具体接口仅接受其声明字段。订单生命周期的 `customer_key / idempotency_key / reason / close_mode` 一旦提供必须为 JSON string，不接受 `null`、数字、布尔、数组或对象；不得靠字符串转换改变业务意图或幂等键。共用解析器另识别 `close_mode`：关闭时要求 `normal / short`，取消时只能省略或为空串。其余接口的省略、`null` 和空串按各自字段合同处理，不能全局等同为清空。
+
+销售、采购与委外整单保存的单头 `id`、明细 `id` 只在省略或 JSON 整数 `0` 时表示新建；已存在对象使用正整数，显式 `null`、小数、数值字符串、布尔值和不安全整数拒绝，不能被截断后选中另一张单或明细。客户 / 供应商引用、到货来源采购单使用 JSON 正整数；更新仍必须使用读取到的 `expected_version`。生产订单沿用其独立的 `production_order_id` 合同，不增加通用别名。
 
 数量与金额使用现有 `numeric(20,6)` 十进制字符串合同，最多 14 位整数和 6 位小数；接口拒绝 JSON number，单位精度和是否允许零仍由所属业务校验。共享时间解析支持正 Unix 秒、RFC3339 和 `YYYY-MM-DD`，具体日期字段按业务合同解释；跨系统时间交换优先携带时区的 RFC3339，不将毫秒当秒。列表继续使用各自的分页、排序和范围合同，普通 offset 分页不表示增量同步或变更游标。
 
@@ -55,6 +59,23 @@ HTTP 路由：
 对应路径为 `POST /rpc/sales_order`。网络失败或响应丢失时保留原参数、原版本和同一业务键；已知参数、权限、版本或意图冲突先处理原因。技术 `request_id` 可以随请求变化，不作为业务重放依据。
 
 契约与授权回归见 `internal/service/jsonrpc_integration_boundary_test.go`；源单并发重放见 `internal/data/source_order_lifecycle_replay_postgres_test.go`，库存与财务仍复用各自 PostgreSQL 回归。测试存在不等于本次已执行，运行结果与源码身份到质量门禁核对；这些合同不构成第三方联调或客户验收证据。
+
+## 模拟消费者与接入验证
+
+测试使用隔离 PostgreSQL、正式迁移、真实 HTTP 路由、登录会话、岗位授权、客户配置与领域 repository；ERP 的业务结果不使用 mock。独立标准 HTTP 客户端与生成客户端只持有入口、会话和参数，不访问数据库；更换调用方不改业务 UseCase。已有仓储接口、对象存储接口和依赖注入继续承担后端适配，不增加通用插件运行时。
+
+| 模拟场景 | 调用入口 | 核对结果 | 回归用例 |
+| --- | --- | --- | --- |
+| 下游订单协作 | `sales_order.get_sales_order / cancel_sales_order` | 两种客户端读同一投影；并发重放只写一条取消回执，改变意图与过期版本拒绝；ERP 提交后由代理实际断开连接，再用原意图恢复；撤回岗位后重放拒绝 | `TestSourceDocumentPostgresIntegrationOrderConsumers` |
+| 订单数据校对 | `sales_order.save_sales_order_with_items` | 整单与明细按版本覆盖，清空意见不残留；旧版本、非整数对象 ID 和 number 数量不能改写对象 | `TestSourceDocumentPostgresIntegrationDraftDataCorrection` |
+| 供应商申报与仓库点收 | `purchase_order.get_purchase_order`、`purchase.create_purchase_receipt_from_purchase_order / post_purchase_receipt` | 保留申报 4 与实收 3 的差异；同键重放只生成一张到货单，改意图与超量拒绝；未完成质检不能入库存 | `TestSourceDocumentPostgresIntegrationSupplierDelivery` |
+| WMS 仓间调拨 | `inventory.post_inventory_operation / get_inventory_operation` | 来源仓减 3、目标仓加 3，重复请求不增加库存流水；收窄仓库范围后读取和重放均拒绝 | `TestSourceDocumentPostgresIntegrationWarehouseTransfer` |
+| 预收款核销与恢复 | `operational_fact.allocate_finance_payment` | 同键核销一次，金额须为十进制字符串；跨客户目标导致整笔回滚，保留原版本与余额，修正后可恢复 | `TestSourceDocumentPostgresIntegrationFinanceAllocation` |
+| HTTP 准入 | `auth` 与受控 RPC 路由 | GET 不作为业务入口，坏 JSON 拒绝；query token 不授权，未建设的集成身份登录保持未开放 | `TestSourceDocumentPostgresIntegrationTransportBoundary` |
+
+上述用例同源维护于 [HTTP 消费者回归](../internal/data/source_document_integration_consumers_postgres_test.go)，复用 [既有数据夹具](../internal/data/source_document_integration_export_test.go)；`TestSourceDocumentPostgresIntegration*` 已属于现有 `critical_transactions_pg_test` 的 `TestSourceDocumentPostgres` 家族，正常 CI 与质量门禁会执行，缺少数据库时的 skip 不能当成通过。命令与证据边界见 [QA 入口](../../scripts/qa/README.md#模拟系统接入验证--integration-consumers)。
+
+模拟身份使用隔离库中的普通 ERP 员工岗位，验证的是现有内核的受控复用与适配边界；合作方专用身份和客户 / 供应商对象隔离仍未开放。供应商申报不能自动替代仓库点数、质检结果、出货或财务事实。没有真实第三方时不宣称完成第三方联调或客户验收；工作台从正式合同关联这些源码，实际结果仍核对本轮运行报告及其代码身份，不从源码存在推断通过。
 
 ## 当前默认保留的业务域
 

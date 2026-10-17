@@ -10,6 +10,7 @@ import (
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/go-kratos/kratos/v2/transport"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -19,7 +20,11 @@ import (
 var errObservedRequestFailure = errors.New("request failed")
 
 func safeServerTracing(tp *sdktrace.TracerProvider) middleware.Middleware {
-	tracer := tracing.NewTracer(oteltrace.SpanKindServer, tracing.WithTracerProvider(tp), tracing.WithPropagator(propagation.TraceContext{}))
+	var provider oteltrace.TracerProvider = tp
+	if tp == nil {
+		provider = otel.GetTracerProvider()
+	}
+	tracer := tracing.NewTracer(oteltrace.SpanKindServer, tracing.WithTracerProvider(provider), tracing.WithPropagator(propagation.TraceContext{}))
 	return func(handler middleware.Handler) middleware.Handler {
 		return func(ctx context.Context, req any) (reply any, err error) {
 			info, ok := transport.FromServerContext(ctx)

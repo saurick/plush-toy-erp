@@ -1,0 +1,82 @@
+.erp-dev-integration__main {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.erp-dev-integration__note {
+  margin: 0;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-integration__filters,
+.erp-dev-integration__source {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.erp-dev-integration__filters .ant-select {
+  width: 200px;
+}
+
+.erp-dev-integration__filters .erp-search-input {
+  width: min(360px, 100%);
+}
+
+.erp-dev-integration__source {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-small);
+}
+
+.erp-dev-integration__table,
+.erp-dev-integration__graph {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: var(--erp-surface-bg);
+}
+
+.erp-dev-integration__table .ant-btn-link {
+  max-width: 100%;
+  height: auto;
+  padding: 0;
+  white-space: normal;
+  text-align: left;
+}
+
+.erp-dev-integration__table td,
+.erp-dev-integration__detail code {
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-integration__graph summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.erp-dev-integration__graph .erp-dev-project-relationships {
+  margin-top: 10px;
+}
+
+.erp-dev-integration__detail {
+  display: grid;
+  gap: 20px;
+}
+
+.erp-dev-integration__detail h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.erp-dev-integration__detail h3 {
+  margin: 12px 0 6px;
+  font-size: 14px;
+}
+
+.erp-dev-integration__detail p {
+  margin: 6px 0;
+}

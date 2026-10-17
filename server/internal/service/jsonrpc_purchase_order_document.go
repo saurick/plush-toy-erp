@@ -15,7 +15,10 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "save_purchase_order_with_items":
-		orderID := getInt(pm, "id", 0)
+		orderID, valid := getOptionalJSONRPCID(pm, "id")
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
 		orderPermission := biz.PermissionPurchaseOrderCreate
 		if orderID > 0 {
 			orderPermission = biz.PermissionPurchaseOrderUpdate
@@ -49,7 +52,11 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderRead); res != nil {
 			return id, res, nil
 		}
-		item, err := d.purchaseOrderUC.GetPurchaseOrder(ctx, getInt(pm, "id", 0))
+		orderID, valid := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !valid || !jsonRPCParamsAllowed(pm, "id") {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.purchaseOrderUC.GetPurchaseOrder(ctx, orderID)
 		return id, purchaseOrderMutationResult(ctx, d, item, err), nil
 	case "get_purchase_order_receipt_progress":
 		if res := d.requireSourceActionReadPermissions(ctx, "purchase_order", method); res != nil {

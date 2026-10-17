@@ -201,6 +201,34 @@ Web 原生覆盖基线与 `pnpm test` 共用[源码测试入口](../../web/scrip
 - 脚本不得把真实密码、token、完整 DSN、URL userinfo、原始客户文件内容或未脱敏输出写入仓库。
 - 调整 QA 脚本后，至少运行对应 `node --check` / `node --test` 和 shell 语法检查；开发期按影响面运行专题命令，不因 QA 编排自身变化机械重跑 lifecycle。
 
+## 模拟系统接入验证 / Integration Consumers
+
+模拟接入的业务场景、边界和源码入口集中见 [API 合同](../../server/docs/api.md#模拟消费者与接入验证)，不再登记一份场景状态。测试使用标准 HTTP 消费者和生成客户端访问正式路由，ERP 登录、授权、UseCase、事务和回读均运行在真实 PostgreSQL；测试数据只在本次生成的 loopback CI 数据库内准备。订单、到货、仓储与财务的业务实现不替换为 mock。
+
+完整执行沿用既有隔离库生命周期与关键事务门禁；从仓库根运行，`DISPOSABLE_DATABASE_BASE_URL` 由已准备的本机测试运行环境提供：
+
+```bash
+node scripts/qa/disposable-database-runner.mjs \
+  --profile ci --workflow critical-postgres \
+  --out output/qa/integration-consumers/postgres-lifecycle.json
+```
+
+已有本轮生成、迁移就绪的 CI 隔离库时，可在 `server/` 定向复验。保留真实 Go JSON 报告，并由既有校验器拒绝零执行、失败或跳过：
+
+```bash
+set -o pipefail
+mkdir -p ../output/qa/integration-consumers
+PURCHASE_RECEIPT_PG_TEST=1 \
+PURCHASE_RECEIPT_PG_TEST_DB_URL="${PURCHASE_RECEIPT_PG_DB_URL:?必须使用本轮生成且已迁移的 CI 隔离库}" \
+  go test -json ./internal/data -run '^TestSourceDocumentPostgresIntegration' -count=1 \
+  | tee ../output/qa/integration-consumers/consumer-postgres.jsonl
+node ../scripts/qa/verify-go-test-json.mjs \
+  --report ../output/qa/integration-consumers/consumer-postgres.jsonl \
+  --require-prefix TestSourceDocumentPostgresIntegration
+```
+
+该家族已由 `critical-postgres-tests.sh` 的 `TestSourceDocumentPostgres` 范围覆盖，无需新增独立 gate、接入台账、后台任务或执行入口。普通无数据库 `go test` 的 skip 不构成接入通过；专项结果只覆盖报告内的消费者与代码，不能补成全部 RPC、合作方身份、真实第三方联调或客户验收通过。页面只关联正式合同及既有门禁，不导入手工绿色状态。
+
 ## 全页面试用验收数据
 
 当前唯一整批合同是 `2026.09.27-v8 / 20260927-V8`。本地隔离库和 `demo-133` 使用同一套业务含义、数量与状态矩阵，但数据库 ID 各自独立，不能复制表行或用“编号相同”代替读回证明。正式部署默认不执行这套数据；`customer-test-133` 是甲方测试/验收环境，禁止重放整批合同，只允许在明确授权、exact release / migration 和写后读回下复用 core allowlist 准备 8 个单位与 4 个仓库。

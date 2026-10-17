@@ -36,6 +36,10 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 	) {
 		return nil, false
 	}
+	supplierID, valid := getRequiredJSONRPCPositiveInt(pm, "supplier_id")
+	if !valid {
+		return nil, false
+	}
 	orderDate, ok := getRequiredJSONRPCTime(pm, "order_date")
 	if !ok {
 		return nil, false
@@ -50,7 +54,7 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 	}
 	return &biz.OutsourcingOrderMutation{
 		OutsourcingOrderNo:    getString(pm, "outsourcing_order_no"),
-		SupplierID:            getInt(pm, "supplier_id", 0),
+		SupplierID:            supplierID,
 		Currency:              getString(pm, "currency"),
 		PaymentTermDays:       paymentTermDays,
 		SupplierSnapshot:      getMap(pm, "supplier_snapshot"),
@@ -165,8 +169,12 @@ func outsourcingOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.Outs
 		if !ok {
 			return nil, false
 		}
+		itemID, valid := getOptionalJSONRPCID(itemMap, "id")
+		if !valid {
+			return nil, false
+		}
 		items = append(items, &biz.OutsourcingOrderItemSaveMutation{
-			ID:                           getInt(itemMap, "id", 0),
+			ID:                           itemID,
 			OutsourcingOrderItemMutation: *mutation,
 		})
 	}

@@ -15,7 +15,10 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "save_sales_order_with_items":
-		orderID := getInt(pm, "id", 0)
+		orderID, valid := getOptionalJSONRPCID(pm, "id")
+		if !valid {
+			return id, invalidParamResult(), nil
+		}
 		orderPermission := biz.PermissionSalesOrderCreate
 		if orderID > 0 {
 			orderPermission = biz.PermissionSalesOrderUpdate

@@ -587,7 +587,7 @@ function isDevPageGovernancePath(file) {
     /^web\/src\/dev-workbench\/(?:DevWorkbenchRoutes\.jsx|pages\/|styles\/)/u.test(
       file,
     ) ||
-    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageNav|PipelineTimingPanel|PressurePanel|PressureDataset|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FlowState|Hub|Pressure|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
+    /^web\/src\/dev-workbench\/(?:components\/Dev(?:EnvironmentEvidencePanel|PageNav|PipelineTimingPanel|PressurePanel|PressureDataset|TaskNav)\.jsx|config\/dev(?:BusinessUsability|CustomerConfig|DataPreparation|Delivery|Docs|FactLedgerCatalog|FlowState|Hub|Integration|Pressure|ProductCore|Prototypes|QualityGates|Routes|RuntimeRecovery|Testing|VersionCenter)[^/]*\.mjs)$/u.test(
       file,
     ) ||
     /^web\/scripts\/style-l1\/(?:scenarios|dev[A-Z][^/]*)\.mjs$/u.test(file)
@@ -625,7 +625,7 @@ function devBrowserScenarioNames(file) {
       ["dev-version-center-tabs-pagination-desktop"],
     ],
     [/ProductCore|product-core/u, ["dev-page-product-core-desktop-light"]],
-    [/DevIntegration/u, ["dev-page-integration-desktop-light"]],
+    [/DevIntegration|devIntegration|dev-integration/u, ["dev-page-integration-desktop-light"]],
     [/DevProjectGraphView|DevProjectRelationships|devProjectGraph|devRelationshipPerspectives/u, ["dev-page-product-engineering-desktop-light", "dev-page-integration-desktop-light"]],
     [
       /PermissionRelationship|permission-relationships/u,

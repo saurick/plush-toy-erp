@@ -31,6 +31,14 @@ func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.P
 	) {
 		return nil, false
 	}
+	orderID, valid := getRequiredJSONRPCPositiveInt(pm, "purchase_order_id")
+	if !valid {
+		return nil, false
+	}
+	warehouseID, valid := getOptionalJSONRPCID(pm, "warehouse_id")
+	if !valid {
+		return nil, false
+	}
 	receivedAt, ok := getOptionalJSONRPCTime(pm, "received_at")
 	if !ok {
 		return nil, false
@@ -59,9 +67,9 @@ func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.P
 		Lines:           lines,
 		AllRemaining:    allRemaining,
 		ItemWarehouses:  itemWarehouses,
-		PurchaseOrderID: getInt(pm, "purchase_order_id", 0),
+		PurchaseOrderID: orderID,
 		ReceiptNo:       getString(pm, "receipt_no"),
-		WarehouseID:     getInt(pm, "warehouse_id", 0),
+		WarehouseID:     warehouseID,
 		ReceivedAt:      optionalTimeValue(receivedAt),
 		Note:            getWorkflowStringPtr(pm, "note"),
 		IdempotencyKey:  idempotencyKey,

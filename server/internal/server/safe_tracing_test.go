@@ -24,6 +24,19 @@ type observedRPCStub struct {
 	reply *v1.PostJsonrpcReply
 }
 
+func TestSafeServerTracingAcceptsAbsentProvider(t *testing.T) {
+	srv := httpx.NewServer(httpx.Filter(RequestIDFilter()), httpx.Middleware(safeServerTracing(nil)))
+	v1.RegisterJsonrpcHTTPServer(srv, &observedRPCService{})
+	req := httptest.NewRequest(http.MethodPost, "/rpc/system", strings.NewReader(`{"jsonrpc":"2.0","id":"without-provider","method":"ping","params":{}}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Request-ID", "no-provider-request")
+	response := httptest.NewRecorder()
+	srv.ServeHTTP(response, req)
+	if response.Code != http.StatusOK || response.Header().Get("X-Request-ID") != "no-provider-request" {
+		t.Fatal("absent tracing provider interrupted HTTP or request correlation")
+	}
+}
+
 func (s *observedRPCStub) PostJsonrpc(ctx context.Context, _ *v1.PostJsonrpcRequest) (*v1.PostJsonrpcReply, error) {
 	_, span := s.tp.Tracer("test.sql").Start(ctx, "sql.conn.query")
 	span.End()

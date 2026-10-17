@@ -52,7 +52,7 @@ func getOptionalJSONRPCNonNegativeInt(pm map[string]any, key string) (*int, bool
 		}
 		value = int(typed)
 	case int:
-		if typed < 0 {
+		if typed < 0 || float64(typed) > maxJSONSafeInteger {
 			return nil, false
 		}
 		value = typed
@@ -60,6 +60,26 @@ func getOptionalJSONRPCNonNegativeInt(pm map[string]any, key string) (*int, bool
 		return nil, false
 	}
 	return &value, true
+}
+
+// Omitted or zero IDs remain unset for the owning domain. A supplied null or a
+// coerced value must never select a different document, line or reference.
+func getOptionalJSONRPCID(pm map[string]any, key string) (int, bool) {
+	raw, exists := pm[key]
+	if !exists {
+		return 0, true
+	}
+	switch value := raw.(type) {
+	case int:
+		if value == 0 {
+			return 0, true
+		}
+	case float64:
+		if value == 0 {
+			return 0, true
+		}
+	}
+	return getRequiredJSONRPCPositiveInt(pm, key)
 }
 
 func getOptionalJSONRPCBool(pm map[string]any, key string) (*bool, bool) {
@@ -87,7 +107,7 @@ func getRequiredJSONRPCPositiveInt(pm map[string]any, key string) (int, bool) {
 		}
 		return int(value), true
 	case int:
-		return value, value > 0
+		return value, value > 0 && float64(value) <= maxJSONSafeInteger
 	default:
 		return 0, false
 	}

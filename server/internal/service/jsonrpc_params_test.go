@@ -7,6 +7,77 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+func TestGetOptionalJSONRPCIDDoesNotCoerce(t *testing.T) {
+	for _, params := range []map[string]any{{}, {"id": 0}, {"id": float64(0)}, {"id": 7}, {"id": float64(7)}} {
+		value, valid := getOptionalJSONRPCID(params, "id")
+		if !valid || (value != 0 && value != 7) {
+			t.Fatalf("valid draft identity rejected: %v", params)
+		}
+	}
+	for _, raw := range []any{nil, -1, 1.25, "7", true, []any{7}, map[string]any{"id": 7}, float64(9007199254740992), int(9007199254740992)} {
+		if _, valid := getOptionalJSONRPCID(map[string]any{"id": raw}, "id"); valid {
+			t.Fatalf("coerced draft identity: %v", raw)
+		}
+	}
+}
+
+func TestSourceDocumentReferenceIdentifiersDoNotCoerce(t *testing.T) {
+	for _, tc := range []struct {
+		name, field string
+		base        map[string]any
+		parse       func(map[string]any) bool
+	}{
+		{"sales", "customer_id", map[string]any{"customer_id": 1, "order_date": "2026-10-18"}, func(pm map[string]any) bool { _, ok := salesOrderMutationFromParams(pm); return ok }},
+		{"purchase", "supplier_id", map[string]any{"supplier_id": 1, "purchase_date": "2026-10-18"}, func(pm map[string]any) bool { _, ok := purchaseOrderMutationFromParams(pm); return ok }},
+		{"outsourcing", "supplier_id", map[string]any{"supplier_id": 1, "order_date": "2026-10-18"}, func(pm map[string]any) bool { _, ok := outsourcingOrderMutationFromParams(pm); return ok }},
+		{"receipt", "purchase_order_id", map[string]any{"purchase_order_id": 1, "receipt_no": "SIM", "idempotency_key": "sim-receipt", "items": []any{map[string]any{"purchase_order_item_id": 1, "warehouse_id": 1, "quantity": "1"}}}, func(pm map[string]any) bool { _, ok := purchaseReceiptFromPurchaseOrderCreateFromParams(pm); return ok }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.parse(tc.base) {
+				t.Fatal("valid reference fixture rejected")
+			}
+			for _, raw := range []any{nil, -1, 1.25, "1", true, float64(9007199254740992)} {
+				input := map[string]any{}
+				for key, value := range tc.base {
+					input[key] = value
+				}
+				input[tc.field] = raw
+				if tc.parse(input) {
+					t.Fatalf("coerced %s=%v", tc.field, raw)
+				}
+			}
+		})
+	}
+}
+
+func TestSourceDocumentLineIdentifiersDoNotCoerce(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		line  map[string]any
+		parse func(map[string]any) bool
+	}{
+		{"sales", map[string]any{"product_id": 1, "unit_id": 1, "line_no": 1, "ordered_quantity": "1"}, func(pm map[string]any) bool { _, ok := salesOrderItemSaveMutationsFromParams(pm); return ok }},
+		{"purchase", map[string]any{"material_id": 1, "unit_id": 1, "line_no": 1, "purchased_quantity": "1"}, func(pm map[string]any) bool { _, ok := purchaseOrderItemSaveMutationsFromParams(pm); return ok }},
+		{"outsourcing", map[string]any{"subject_type": "PRODUCT", "product_id": 1, "unit_id": 1, "line_no": 1, "outsourcing_quantity": "1"}, func(pm map[string]any) bool { _, ok := outsourcingOrderItemSaveMutationsFromParams(pm); return ok }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if !tc.parse(map[string]any{"items": []any{tc.line}}) {
+				t.Fatal("valid line fixture rejected")
+			}
+			for _, raw := range []any{nil, -1, 1.25, "1", true, float64(9007199254740992)} {
+				line := map[string]any{}
+				for key, value := range tc.line {
+					line[key] = value
+				}
+				line["id"] = raw
+				if tc.parse(map[string]any{"items": []any{line}}) {
+					t.Fatalf("coerced line identity %v", raw)
+				}
+			}
+		})
+	}
+}
+
 func TestParseJSONRPCTimeRejectsInvalidCalendarDate(t *testing.T) {
 	if _, ok := parseJSONRPCTime("2026-02-31"); ok {
 		t.Fatal("expected invalid calendar date to be rejected")

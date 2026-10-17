@@ -26,6 +26,10 @@ func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutat
 	) {
 		return nil, false
 	}
+	supplierID, valid := getRequiredJSONRPCPositiveInt(pm, "supplier_id")
+	if !valid {
+		return nil, false
+	}
 	purchaseDate, ok := getRequiredJSONRPCTime(pm, "purchase_date")
 	if !ok {
 		return nil, false
@@ -48,7 +52,7 @@ func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutat
 	}
 	return &biz.PurchaseOrderMutation{
 		PurchaseOrderNo:              getString(pm, "purchase_order_no"),
-		SupplierID:                   getInt(pm, "supplier_id", 0),
+		SupplierID:                   supplierID,
 		Currency:                     getString(pm, "currency"),
 		PaymentTermDays:              paymentTermDays,
 		PaymentMethod:                getWorkflowStringPtr(pm, "payment_method"),
@@ -120,8 +124,12 @@ func purchaseOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.Purchas
 		if !ok {
 			return nil, false
 		}
+		itemID, valid := getOptionalJSONRPCID(itemMap, "id")
+		if !valid {
+			return nil, false
+		}
 		items = append(items, &biz.PurchaseOrderItemSaveMutation{
-			ID:                        getInt(itemMap, "id", 0),
+			ID:                        itemID,
 			PurchaseOrderItemMutation: *mutation,
 		})
 	}

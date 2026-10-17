@@ -57,7 +57,7 @@ pnpm install
 
 “产品工程 → 工程规范与 Skill”（`/__dev/project-skills`）按当前仓库 Skill 的适用任务检索，查看职责与引用关系，并复用现有健康检查；原文和引用进入开发文档查看器。来源和检查边界见[工程规范与 Skill](../docs/engineering/研发效能工作台与CI-CD设计.md#project-skills)。
 
-“产品工程 → 接口与集成”（`/__dev/integration`）同时出现在默认工具清单。页面直接复用接入边界图、节点解释及正式 API、接入规范、权限关系与质量门禁链接，选中节点随 URL、刷新和前进后退恢复；不另维护接口或测试结果台账。范围见[接口与集成](../docs/engineering/研发效能工作台与CI-CD设计.md#接口与集成-__devintegration)。
+“产品工程 → 接口与集成”（`/__dev/integration`）同时出现在默认工具清单。页面从公共契约生成物读取接口清单，支持业务域筛选、方法搜索、分页和方法详情；关联已有只读权限登记、正式 API 合同与回归来源，缺失和读取失败分别标注。筛选、分页、详情及辅助边界图的节点选择随 URL 恢复。质量门禁按需读取，整体结果不代表逐接口验证；不另维护接口或测试结果台账。范围见[接口与集成](../docs/engineering/研发效能工作台与CI-CD设计.md#接口与集成-__devintegration)。
 
 效能工作台另有独立部署入口：`pnpm build:workbench` 构建 `workbench.html` 与 `src/dev-workbench/standalone.jsx`，输出 ignored `build-workbench/`；`pnpm serve:workbench` 运行带专用登录会话的 Node 服务。它不改变 ERP `build/` 的生产隔离或本地免登录配置。部署身份、凭据与 HTTPS 入口见 [独立工作台部署](../server/deploy/workbench/README.md)。
 

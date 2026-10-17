@@ -735,6 +735,10 @@ test("affected: DEV 页面改动只选择聚焦合同与受影响桌面 smoke", 
       "dev-page-integration-desktop-light",
     ],
     [
+      "web/src/dev-workbench/styles/dev-integration.css",
+      "dev-page-integration-desktop-light",
+    ],
+    [
       "web/src/dev-workbench/components/DevProjectGraphView.jsx",
       "dev-page-integration-desktop-light",
     ],
@@ -757,6 +761,19 @@ test("affected: DEV 页面改动只选择聚焦合同与受影响桌面 smoke", 
     assert.match(browser.text, /不要求.*移动端/u, file);
     assert.match(browser.text, new RegExp(expectedScenario, "u"), file);
   }
+});
+
+test("affected: 接口清单模型复用同名测试并选择对应浏览器场景", () => {
+  const plan = buildAffectedPlan(
+    ["web/src/dev-workbench/config/devIntegration.mjs"],
+    { root: ROOT },
+  );
+  assert(plan.commands.some((item) => item.args.includes("web/src/dev-workbench/config/devIntegration.test.mjs")));
+  assert.equal(ids(plan).includes("web-test"), false);
+  assert.equal(ids(plan).includes("full"), false);
+  const browser = plan.followUps.find((item) => item.id === "browser-regression");
+  assert(browser);
+  assert.match(browser.text, /dev-page-integration-desktop-light/u);
 });
 
 test("affected: shared DEV navigation expands only to the canonical desktop scenario set", () => {
