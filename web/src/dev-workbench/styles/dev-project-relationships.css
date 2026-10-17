@@ -1,0 +1,166 @@
+.erp-dev-project-relationships {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.erp-dev-project-relationships__intro,
+.erp-dev-project-relationships__definition,
+.erp-dev-project-relationships__caption,
+.erp-dev-project-relationships__boundary {
+  margin: 0;
+  color: var(--erp-text-muted);
+  line-height: 1.6;
+}
+
+.erp-dev-project-relationships__workspace {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.erp-dev-project-relationships__catalog,
+.erp-dev-project-relationships__detail {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: var(--erp-surface-bg);
+}
+
+.erp-dev-project-relationships__catalog section + section {
+  margin-top: 12px;
+}
+
+.erp-dev-project-relationships__catalog h2,
+.erp-dev-project-relationships__node h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.erp-dev-project-relationships__catalog h2,
+.erp-dev-project-relationships__breadcrumb {
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-project-relationships__catalog button {
+  display: block;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--erp-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.erp-dev-project-relationships__catalog button strong,
+.erp-dev-project-relationships__catalog button span {
+  display: block;
+  font-weight: 400;
+  line-height: 1.6;
+}
+
+.erp-dev-project-relationships__catalog button span {
+  margin-top: 2px;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-project-relationships__catalog button[aria-pressed='true'] {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-soft);
+}
+
+.erp-dev-project-relationships__catalog button[aria-pressed='true'] strong {
+  color: var(--erp-primary-strong);
+  font-weight: 500;
+}
+
+.erp-dev-project-relationships__catalog button:where(:not([aria-pressed='true'])):hover {
+  background: var(--erp-interactive-bg-hover);
+}
+
+.erp-dev-project-relationships__catalog button:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.erp-dev-project-relationships__detail {
+  display: grid;
+  gap: 8px;
+}
+
+.erp-dev-project-relationships__heading,
+.erp-dev-project-relationships__controls,
+.erp-dev-project-relationships__controls label,
+.erp-dev-project-relationships__links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.erp-dev-project-relationships__heading h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.erp-dev-project-relationships__controls {
+  padding-block: 8px;
+  border-block: 1px solid var(--erp-border);
+}
+
+.erp-dev-project-relationships__controls .ant-select {
+  min-width: 190px;
+  max-width: 100%;
+}
+
+.erp-dev-project-relationships__node,
+.erp-dev-project-relationships__evidence {
+  padding-top: 8px;
+  border-top: 1px solid var(--erp-border);
+}
+
+.erp-dev-project-relationships__node p,
+.erp-dev-project-relationships__evidence p {
+  margin: 4px 0 0;
+  color: var(--erp-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-project-relationships__evidence summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.erp-dev-project-relationships__links {
+  margin-top: 6px;
+}
+
+@media (max-width: 1100px) {
+  .erp-dev-project-relationships__workspace {
+    grid-template-columns: 174px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .erp-dev-project-relationships__workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .erp-dev-project-relationships__catalog {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .erp-dev-project-relationships__catalog section + section {
+    margin-top: 0;
+  }
+}

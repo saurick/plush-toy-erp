@@ -10,7 +10,9 @@ import DevEnvironmentEvidencePanel from '../components/DevEnvironmentEvidencePan
 import DevPageNav from '../components/DevPageNav.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevToolTable from '../components/DevToolTable.jsx'
+import DevProjectRelationships from '../components/DevProjectRelationships.jsx'
 import { DEV_HUB_ITEMS } from '../config/devHub.mjs'
+import { DEV_PRODUCT_ENGINEERING_VIEWS } from '../config/devRelationshipPerspectives.mjs'
 import {
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_DELIVERY_ROUTE,
@@ -60,11 +62,13 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
     (item) => item.areaKey === areaKey && visibleRoutes.has(item.route)
   )
   const isQuality = areaKey === DEV_WORKBENCH_AREA_KEYS.quality
+  const isProductEngineering = areaKey === DEV_WORKBENCH_AREA_KEYS.productEngineering
   const isDelivery = areaKey === DEV_WORKBENCH_AREA_KEYS.delivery
   const activeView =
     isDelivery && searchParams.get('view') === 'environments'
       ? 'environments'
       : 'prepare'
+  const productView = searchParams.get('view') === 'relationships' ? 'relationships' : 'tools'
   if (!presentation) {
     throw new Error(`unknown dev workbench area: ${String(areaKey || '')}`)
   }
@@ -105,14 +109,31 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             }}
           />
         ) : null}
+        {isProductEngineering ? (
+          <DevTaskNav
+            compact
+            level="primary"
+            className="erp-dev-product-view-tabs"
+            idPrefix="dev-product-engineering"
+            ariaLabel="产品工程查看方式"
+            items={DEV_PRODUCT_ENGINEERING_VIEWS}
+            value={productView}
+            onChange={(value) => {
+              if (value === productView) return
+              const next = new URLSearchParams(searchParams)
+              next.set('view', value)
+              setSearchParams(next)
+            }}
+          />
+        ) : null}
       </header>
       <main className="erp-dev-hub-shell">
 
         <div
-          hidden={isDelivery && activeView !== 'prepare'}
-          id={isDelivery ? 'dev-delivery-panel-prepare' : undefined}
-          role={isDelivery ? 'tabpanel' : undefined}
-          aria-labelledby={isDelivery ? 'dev-delivery-tab-prepare' : undefined}
+          hidden={(isDelivery && activeView !== 'prepare') || (isProductEngineering && productView !== 'tools')}
+          id={isDelivery ? 'dev-delivery-panel-prepare' : isProductEngineering ? 'dev-product-engineering-panel-tools' : undefined}
+          role={isDelivery || isProductEngineering ? 'tabpanel' : undefined}
+          aria-labelledby={isDelivery ? 'dev-delivery-tab-prepare' : isProductEngineering ? 'dev-product-engineering-tab-tools' : undefined}
         >
           <section
             className="erp-dev-area-tools"
@@ -154,6 +175,16 @@ export default function DevWorkbenchAreaPage({ areaKey }) {
             </div>
           ) : null}
         </div>
+        {isProductEngineering ? (
+          <section
+            hidden={productView !== 'relationships'}
+            id="dev-product-engineering-panel-relationships"
+            role="tabpanel"
+            aria-labelledby="dev-product-engineering-tab-relationships"
+          >
+            {productView === 'relationships' ? <DevProjectRelationships /> : null}
+          </section>
+        ) : null}
         {isDelivery ? (
           <section
             hidden={activeView !== 'environments'}

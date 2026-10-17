@@ -1,3 +1,4 @@
+import { verifyProjectGraphDirectory } from './devProjectGraphAssertions.mjs'
 import { DEV_HUB_ITEMS } from '../../src/dev-workbench/config/devHub.mjs'
 import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
 import { assertMermaidFits, fitMermaidDiagram, switchMermaidLayout, verifyMermaidViewer, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
@@ -770,21 +771,7 @@ export function createDevWorkbenchDesktopScenarios({
         assert((await page.locator('.erp-dev-product-core-table tbody tr').evaluateAll((rows) => rows.every((row) => row.dataset.membership === 'entered'))), '筛选与返回必须保持同一能力范围')
       }
       if (item.route === DEV_PRODUCT_ENGINEERING_ROUTE) {
-        assert.equal(
-          await page.locator('.erp-dev-tool-table tbody tr').count(),
-          6,
-          '产品工程应完整显示六个工具入口'
-        )
-        assert.equal(
-          await page.locator('.erp-dev-product-task__index').count(),
-          0,
-          '并列工具不能显示为虚假的执行序号'
-        )
-        assert.equal(
-          await page.getByRole('tablist', { name: '产品工程查看方式' }).count(),
-          0,
-          '产品工程工具应直接显示，不再要求选择查看方式'
-        )
+        await verifyProjectGraphDirectory(page, { assert, assertNoHorizontalOverflow })
       }
       if (item.route === DEV_QUALITY_ROUTE) {
         assert.equal(

@@ -51,6 +51,8 @@ pnpm install
 
 产品路由只在 `import.meta.env.DEV` 下动态加载 `DevWorkbenchBridge.jsx` 这一处 DEV 入口。该入口包裹业务路由的停服恢复边界，并在进入 `/__dev` 时按需加载工作台页面；App 不直接引用 DEV 模块。
 
+“产品工程”保留“工具清单 / 项目图视角”两个同级页签；`/__dev/product-engineering?view=relationships` 采用模型目录，区分 DAG、有向有环图、无向关联和树／森林，选择项目示例后点选节点查看关系。图、分类和节点解释同源，模型、示例、节点及引用选项写入 URL；缩放、布局切换、全屏和正式依据入口继续复用现有能力。具体边界见[产品工程入口](../docs/engineering/研发效能工作台与CI-CD设计.md#产品工程入口-__devproduct-engineering)。
+
 “产品工程 → 工程规范与 Skill”（`/__dev/project-skills`）按当前仓库 Skill 的适用任务检索，查看职责与引用关系，并复用现有健康检查；原文和引用进入开发文档查看器。来源和检查边界见[工程规范与 Skill](../docs/engineering/研发效能工作台与CI-CD设计.md#project-skills)。
 
 效能工作台另有独立部署入口：`pnpm build:workbench` 构建 `workbench.html` 与 `src/dev-workbench/standalone.jsx`，输出 ignored `build-workbench/`；`pnpm serve:workbench` 运行带专用登录会话的 Node 服务。它不改变 ERP `build/` 的生产隔离或本地免登录配置。部署身份、凭据与 HTTPS 入口见 [独立工作台部署](../server/deploy/workbench/README.md)。

@@ -262,7 +262,7 @@ test('devHub: quality area offers the change validation path and registered tool
   assert.match(devWorkbenchAreaPageSource, /DEV_TESTING_ROUTE/u)
 })
 
-test('devHub: product engineering directly compares registered tools without a view selector', () => {
+test('devHub: product engineering keeps registered tools and a peer project graph view', () => {
   assert.match(
     devWorkbenchAreaPageSource,
     /getDevSecondaryNavItems\(areaKey\)/u
@@ -276,10 +276,12 @@ test('devHub: product engineering directly compares registered tools without a v
     devWorkbenchAreaPageSource,
     /\{isDelivery \? \([\s\S]*?<DevTaskNav/u
   )
-  assert.doesNotMatch(
+  assert.match(
     devWorkbenchAreaPageSource,
-    /devRelationshipPerspectives|产品工程查看方式/u
+    /产品工程查看方式/u
   )
+  assert.match(devWorkbenchAreaPageSource, /DEV_PRODUCT_ENGINEERING_VIEWS/u)
+  assert.match(devWorkbenchAreaPageSource, /<DevProjectRelationships/u)
   assert.match(devToolTableSource, /DEV_PAGE_TITLE_BY_ROUTE\[item.route\]/u)
   assert.match(devToolTableSource, /<th scope="col">用来做什么<\/th>/u)
 })

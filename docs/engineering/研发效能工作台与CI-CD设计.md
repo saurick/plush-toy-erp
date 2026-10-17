@@ -236,7 +236,7 @@ demo / test 分别绑定同一候选 SHA / digest 验证运行和数据隔离；
 | 路径 | 职责 | 维护真源 |
 | --- | --- | --- |
 | `/__dev` | 工具检索、常用工具与使用指南 | `web/src/dev-workbench/config/devWorkbenchFlow.mjs`、`devHub.mjs` |
-| `/__dev/product-engineering` | 直接进入内核、权限、规则、业务链、文档和 UI 交互设计 | `web/src/dev-workbench/config/devHub.mjs` |
+| `/__dev/product-engineering` | 工具清单直达各工具；项目图视角按模型目录查看示例、节点和依据 | `web/src/dev-workbench/config/devHub.mjs`、`devRelationshipPerspectives.mjs`、`devProjectGraph.mjs` |
 | `/__dev/product-core` | 当前 Product Core 能力、归属、范围和边界 | `docs/product/产品能力进度台账.md` |
 | `/__dev/permission-relationships` | 当前账号、岗位、最终功能、页面、仓库范围和审批责任 | 工作台独立只读入口、登记开发库与正式权限解释 |
 | `/__dev/status-flows` | 业务链、协同、运行、事实与状态规则只读观察 | 代码合同、三类 dev-only 配置目录与正式架构文档 |
@@ -299,7 +299,13 @@ Tab 条持续挂载；`batch`、`view`、`chain`、`status`、`q` 保存选择�
 
 ### 产品工程入口 `/__dev/product-engineering`
 
-该页直接列出产品内核、权限关系、业务链观察、开发文档、工程规范与 Skill 和 UI 交互设计六个工具。入口名称复用正式开发导航，以工具、用途和入口组成对照表；技术来源与证据边界按需展开。页面不维护视角选择或其 URL 状态，也不把并列工具编号为执行步骤。业务链、权限和质量页面内部的实际关系图、运行查询和证据继续由各自页面维护。
+该页使用持续挂载的“工具清单 / 项目图视角”同级页签，默认直接列出产品内核、权限关系、业务链观察、开发文档、工程规范与 Skill 和 UI 交互设计六个工具。入口名称复用正式开发导航，以工具、用途和入口组成对照表；技术来源与证据边界按需展开，并列工具不编号为执行步骤。
+
+“项目图视角”（`?view=relationships`）使用“模型目录 → 项目示例 → 节点解释”布局。有向图下区分 DAG 与含回路图，无向图用于关联投影；树／森林按父 → 子定向时作为 DAG 的层级特例说明。默认查看项目整体关系，可切换 CI、权限授予、版本交付、业务主链、状态退回、模块关联、产品目录树和分区目录森林，共九个结构示例。示例不读取或推断实际账号、业务事实、CI、发布或验收状态。
+
+目录、示例定义、节点与连线在 `devRelationshipPerspectives.mjs` 登记；`devProjectGraph.mjs` 从同一数据生成 Mermaid、分类判断和节点前后关系。目录树可叠加跨目录引用，展示多来源节点使整体从严格目录树变成一般 DAG；退回回路可切换强调，节点和分支始终保留。图表复用共享 Mermaid 查看器，支持缩放、布局切换、全屏和鼠标或键盘选中节点；分类目录、选择框、说明区复用当前工作台主题与密度。
+
+`view / model / example / node / references / loops` 保存视图、模型、示例、节点、跨目录引用和回路强调；刷新及前进后退可恢复。切换模型或示例会清空旧节点和不再适用的选项；无效或不匹配的查询显示该模型的默认示例，不回显无关节点。返回工具清单时释放图表。正式业务链、权限和质量页面继续维护各自的实际关系、运行查询和证据；本页从按需展开的依据区进入对应工具。
 
 ### 产品内核 `/__dev/product-core`
 

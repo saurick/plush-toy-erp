@@ -3121,6 +3121,23 @@
     .task-history-summary > summary { min-height:36px; padding:8px 0; cursor:pointer; }
   .role-help-preview .manual-home{max-width:1100px;padding:8px 0}.role-help-preview .manual-home>p{color:var(--muted);margin:8px 0 18px}.role-help-preview .manual-home nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.role-help-preview .manual-home nav button{padding:18px;border:1px solid var(--line);border-radius:10px;background:var(--surface,Canvas);color:var(--text);text-align:left;font:inherit}.role-help-preview .manual-home nav strong,.role-help-preview .manual-home nav span{display:block}.role-help-preview .manual-home nav span{color:var(--muted);margin-top:8px}.role-help-preview .manual-home>h3{margin:24px 0 10px}.role-help-preview .manual-home>button{display:block;width:100%;padding:14px 0;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--text);text-align:left;font:inherit}@media(max-width:700px){.role-help-preview .manual-home nav{grid-template-columns:minmax(0,1fr)}}
 .role-help-preview .help-step-checks{padding-top:18px;border-top:1px solid var(--line);margin-top:18px}.role-help-preview .help-step-checks h3{margin-top:12px}.role-help-preview .help-step-checks p{margin:8px 0 14px}
+    .dev-project-models { display:grid; grid-template-columns:200px minmax(0,1fr); gap:8px; align-items:start; }
+    .dev-project-model-catalog { padding:10px 12px; }
+    .dev-project-model-catalog section+section { margin-top:12px; }
+    .dev-project-model-catalog h3 { margin:0 0 6px; font-size:14px; color:var(--text-2); }
+    .dev-project-model-button { display:block; width:100%; padding:8px; border:1px solid transparent; border-radius:6px; background:transparent; text-align:left; }
+    .dev-project-model-button strong,.dev-project-model-button span { display:block; line-height:1.6; font-size:14px; font-weight:400; }
+    .dev-project-model-button span { color:var(--text-2); margin-top:2px; }
+    .dev-project-model-button[aria-pressed="true"] { background:var(--brand-soft); border-color:var(--brand); }
+    .dev-project-model-button[aria-pressed="true"] strong { color:var(--brand); font-weight:500; }
+    .dev-project-model-panel { min-width:0; }
+    .dev-project-model-panel .dev-design-toolbar { justify-content:flex-start; padding:8px 0; }
+    .dev-project-model-figure { position:relative; width:100%; height:290px; margin-block:8px; }
+    .dev-project-model-figure>svg { position:absolute; inset:0; width:100%; height:100%; }
+    .dev-project-model-graph-node { position:absolute; transform:translate(-50%,-50%); padding:8px; justify-content:center; white-space:normal; }
+    .dev-project-model-node { border-block:1px solid var(--line); padding-block:8px; margin-bottom:8px; }
+    @media(max-width:1000px){.dev-project-models{grid-template-columns:174px minmax(0,1fr);}}
+    @media(max-width:760px){.dev-project-models{grid-template-columns:minmax(0,1fr);}.dev-project-model-catalog{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}.dev-project-model-catalog section+section{margin-top:0;}}
 </style>
 </head>
 <body data-mode="light" data-density="standard">
@@ -4122,7 +4139,7 @@
       loginBusy: false, loginInvalid: [], loginCapsLock: false, loginDialog: null,
       loginSmsSending: false, loginSmsPhone: '', loginSmsDeadline: 0, loginSmsExpires: 0, loginSmsHint: '',
       page: taskHandlingPreview ? 'tasks' : window.__ERP_UI_DESIGN_ENTRY__ === 'mobile-tasks' ? 'mobile-tasks' : window.__ERP_UI_DESIGN_ENTRY__ === 'workbench' ? 'dev-workbench' : window.__ERP_UI_DESIGN_ENTRY__ === 'help' ? 'help' : 'dashboard', status: 'all', search: '', selected: new Set(), sortKey: 'date', sortDir: 'asc', pageNo: 1,
-      devArea: 'overview', devViews: { overview: 'evidence', quality: 'plan', delivery: 'versions' }, devSearch: {}, devFilter: {}, devPinned: [], devState: 'data', devEvidence: 'missing', devOperation: null, devPrepared: null,
+      devGraphModel: 'dag', devGraphExample: 'overview', devGraphNode: '', devGraphReferences: false, devGraphHighlightReturns: true, devArea: 'overview', devViews: { overview: 'evidence', engineering: 'tools', quality: 'plan', delivery: 'versions' }, devSearch: {}, devFilter: {}, devPinned: [], devState: 'data', devEvidence: 'missing', devOperation: null, devPrepared: null,
       devQualityChecked: false, devPressurePreview: null,
       density: initialAppearance.density,
       tableLines: initialAppearance.tableLines,
@@ -4669,12 +4686,13 @@
 
     const devDesignAreas = {
       overview: {label:'总览', icon:'home', description:'开发工具', views:[['evidence','全部工具'],['pinned','常用工具'],['next','使用指南']]},
-      engineering: {label:'产品工程', icon:'engineering', description:'从产品真源定位规则、权限与业务链。', views:[]},
+      engineering: {label:'产品工程', icon:'engineering', description:'从产品真源定位规则、权限与业务链。', views:[['tools','工具清单'],['relationships','项目图视角']]},
       quality: {label:'质量验证', icon:'shield', description:'按当前改动选择验证，结果绑定具体版本与环境。', views:[['plan','验证计划'],['runs','执行记录'],['pressure','压力测试']]},
       delivery: {label:'交付运行', icon:'shipping', description:'按作用范围进入配置、迁移、发布与恢复任务。', views:[['config','客户配置'],['migration','数据库迁移'],['versions','版本发布'],['recovery','安全与恢复']]}
     };
     const devDesignRecords = [
       {key:'core', purpose:'能力范围与当前边界', area:'engineering', title:'产品内核', source:'产品能力与领域边界', status:'已核对', detail:'主数据、采购、库存、质检、生产、出货和财务分别保留唯一事实真源。', path:'docs/architecture/'},
+      {key:'skills', purpose:'工程规则、Skill 职责与引用', area:'engineering', title:'工程规范与 Skill', source:'当前工程规则与项目 Skill', status:'待核对', detail:'按任务定位规则和引用依据；关系不代表执行顺序或已经通过。', path:'/__dev/project-skills'},
       {key:'permissions', purpose:'岗位权限、实际侧栏与数据范围', area:'engineering', title:'权限关系', source:'岗位、账号与正式菜单', status:'已核对', detail:'选择岗位或账号，核对实际菜单、功能与数据范围；配置变更回正式权限管理。', path:'/__dev/permission-relationships'},
       {key:'flows', purpose:'业务交接与运行路径', area:'engineering', title:'业务链观察', source:'流程定义与运行实例', status:'待核对', detail:'业务结构看链路，实例跟踪查任务与异常；技术详情按需查看，导出集中在一个入口。', path:'/__dev/status-flows'},
       {key:'usability', purpose:'业务页面的说明缺口', area:'quality', title:'页面说明检查', source:'业务页面说明目录', status:'已核对', detail:'只读核对任务说明、完成标准、交接和字段解释；说明覆盖不代表员工体验或客户验收。', path:'/__dev/business-usability'},
@@ -4785,6 +4803,7 @@
     }
     function renderDevWorkbench(view) {
       devDesignTabObserver.disconnect();
+      devProjectGraphObserver.disconnect();
       const area = devDesignAreas[state.devArea];
       if (view.dataset.devArea !== state.devArea || !view.querySelector('.dev-design')) {
         view.dataset.devArea = state.devArea;
@@ -4815,6 +4834,7 @@
       } else {
         panel.innerHTML = devDesignReadState() || renderDevDesignContent();
       }
+      mountDevProjectGraph();
       updateDevDesignTabs();
       for (const tabs of document.querySelectorAll('.dev-design-tabs')) devDesignTabObserver.observe(tabs);
       const search = document.querySelector('#dev-design-search:not([hidden])');
@@ -4851,9 +4871,109 @@
       };
       return `<table class="dev-tool-table" aria-label="正式交付页面任务"><thead><tr><th scope="col">任务标签</th><th scope="col">主要内容</th></tr></thead><tbody>${tasks[view].map(([label,detail])=>`<tr><th scope="row">${label}</th><td>${detail}</td></tr>`).join('')}</tbody></table><p class="data-note">正式页面保留客户或目标范围、当前操作与真实错误；切换任务只更新内容，地址可恢复。此处只展示页面组织，不读取或执行真实操作。</p>`;
     }
+    const devProjectGraphModels = {"dag":{"name":"DAG","title":"DAG · 有向无环图","crumb":"有向图 / 无环 / DAG","summary":"无环 · 并行与汇合","definition":"箭头表示关系方向；沿箭头不能返回原点。一个节点可以有多个前置，不要求每个节点只有一个父节点。","examples":["overview","ci","access","delivery","business"]},"cycle":{"name":"有向有环图","title":"有向图 · 含回路","crumb":"有向图 / 允许回路","summary":"退回、返工、重试与恢复","definition":"至少存在一条沿箭头返回起点的路径；用来说明退回、重试或恢复后重新办理。","examples":["workflow"]},"undirected":{"name":"无向关联图","title":"无向图 · 关联网络","crumb":"无向图 / 对称关联","summary":"只表达彼此相关","definition":"连线只表示彼此相关，不表达先后或流向；适合查关联，不能用来判断授权、依赖或过账。","examples":["association"]},"tree":{"name":"树 / 森林","title":"树 / 森林 · 层级结构","crumb":"层级结构 / 本例按父 → 子定向 / DAG 特例","summary":"层级归属 · 多棵树","definition":"每个非根节点只有一个父节点；多棵独立的树组成森林。按父 → 子定向时，树和森林也是 DAG 的特例。","examples":["tree","forest"]}};
+    const devProjectGraphExamples = {"overview":{"name":"项目整体关系","directed":true,"direction":"LR","caption":"实线表示职责与约束，虚线表示验证、证据关联；这是项目关系的定向投影。","destinations":[{"label":"产品内核","route":"/__dev/product-core"},{"label":"工程规范与 Skill","route":"/__dev/project-skills"}],"nodes":[{"id":"p","label":"产品结构与治理","description":"组织能力范围与正式依据；目录归属、规则引用和能力状态分别核对。"},{"id":"a","label":"权限与责任","description":"约束访问、业务动作和办理责任；图示不代替实际账号的有效权限。"},{"id":"s","label":"状态与流程","description":"说明允许推进、退回和恢复的路径；完成协同不能直接替代事实过账。"},{"id":"b","label":"业务与事实","description":"来源单据、受控领域动作和事实结果分别由正式业务真源确认。"},{"id":"q","label":"质量与 CI","description":"按代码与业务影响选择验证；每项结果保留各自源码身份和证据。"},{"id":"d","label":"交付与证据","description":"固定版本、目标读回、恢复证据和客户验收分别确认。"}],"edges":[{"from":"p","to":"b"},{"from":"p","to":"s"},{"from":"a","to":"b"},{"from":"a","to":"s"},{"from":"s","to":"b"},{"from":"p","to":"q","label":"依据","kind":"reference"},{"from":"b","to":"q","kind":"reference"},{"from":"q","to":"d","label":"证据","kind":"reference"}]},"ci":{"name":"CI 依赖与汇合","directed":true,"direction":"LR","caption":"只表达依赖与汇合机制；具体 Job 和 needs 以当前流水线为准，不显示模拟通过状态。","destinations":[{"label":"质量门禁与 CI","route":"/__dev/quality-gates?view=server"}],"nodes":[{"id":"plan","label":"确定范围","description":"确定检查范围与提交身份，作为后续执行的前提。"},{"id":"prepare","label":"准备依赖","description":"准备工具与依赖，只表示执行前置，不等于检查通过。"},{"id":"web","label":"Web 检查","description":"与当前依赖允许的其他检查并行；结果单独留证。"},{"id":"go","label":"Go 检查","description":"独立保留后端检查结果；图中没有前后依赖的分支才可并行。"},{"id":"gate","label":"汇总门禁","description":"等待所需检查齐备，再确认同一提交的完整证据。"}],"edges":[{"from":"plan","to":"prepare","label":"前置"},{"from":"prepare","to":"web"},{"from":"prepare","to":"go"},{"from":"web","to":"gate","label":"汇合"},{"from":"go","to":"gate"}]},"access":{"name":"权限授予投影","directed":true,"direction":"TD","caption":"账号与岗位为结构示例；页面可见、动作权限和业务状态仍须分别核对。","destinations":[{"label":"权限关系图","route":"/__dev/permission-relationships?tab=graph"}],"nodes":[{"id":"account","label":"员工账号","description":"从账号找到其有效岗位；此处没有读取真实账号。"},{"id":"roleA","label":"业务岗位","description":"表示一种岗位来源，多岗位可汇合到相同功能。"},{"id":"roleB","label":"仓库岗位","description":"另一种岗位来源，同一功能汇合后需要去重解释。"},{"id":"capability","label":"业务能力","description":"权限码表达业务能力和敏感动作，不是字段或文案配置。"},{"id":"page","label":"可见页面","description":"菜单和页面投影需要完整会话、客户配置与产品版本。"},{"id":"action","label":"可办动作","description":"后端权限与单据状态共同约束执行；可见页面不保证动作可用。"}],"edges":[{"from":"account","to":"roleA"},{"from":"account","to":"roleB"},{"from":"roleA","to":"capability"},{"from":"roleB","to":"capability"},{"from":"capability","to":"page"},{"from":"capability","to":"action"}]},"delivery":{"name":"版本交付依赖","directed":true,"direction":"LR","caption":"版本与证据的依赖关系；图示不表示某个目标已经部署或验收。","destinations":[{"label":"版本发布","route":"/__dev/version-center"},{"label":"数据库迁移","route":"/__dev/database-migration"},{"label":"安全与恢复","route":"/__dev/drill-recovery"}],"nodes":[{"id":"sha","label":"固定版本","description":"以提交身份绑定质量证据与制品。"},{"id":"artifact","label":"不可变制品","description":"固定已构建的版本内容，目标机加载同一制品。"},{"id":"ready","label":"部署计划","description":"核对配置、迁移、目标与恢复点，等待明确确认。"},{"id":"deploy","label":"确认部署","description":"按已确认的计划执行目标部署。"},{"id":"readback","label":"目标读回","description":"核对运行版本和业务入口；恢复验证与客户验收仍独立。"}],"edges":[{"from":"sha","to":"artifact"},{"from":"artifact","to":"ready"},{"from":"ready","to":"deploy"},{"from":"deploy","to":"readback"}]},"business":{"name":"业务主链投影","directed":true,"direction":"LR","caption":"只看正向主链；退回、返工和恢复放在含回路的专题中解释。","destinations":[{"label":"业务链总图","route":"/__dev/status-flows?view=chain&chain=all"}],"nodes":[{"id":"source","label":"来源单据","description":"正式业务对象提供协同与办理上下文。"},{"id":"task","label":"岗位协同","description":"协同任务记录责任与流转，任务 done 不等于事实 posted。"},{"id":"action","label":"领域动作","description":"受控领域用例核对权限、状态和幂等，并完成业务写入。"},{"id":"fact","label":"业务事实","description":"库存、出货和财务结果回到各自事实真源核对。"}],"edges":[{"from":"source","to":"task"},{"from":"source","to":"action"},{"from":"task","to":"action","label":"上下文","kind":"reference"},{"from":"action","to":"fact","label":"领域写入"}]},"workflow":{"name":"状态流转与退回","directed":true,"direction":"LR","caption":"状态机制示意；不同业务对象有各自正式状态，不新增统一业务状态。","destinations":[{"label":"状态规则","route":"/__dev/status-flows?view=states"},{"label":"实例跟踪","route":"/__dev/status-flows?view=tracking"}],"nodes":[{"id":"todo","label":"待办理","description":"进入当前责任环节，等待具备资格的办理人处理。"},{"id":"work","label":"办理中","description":"补齐条件后可以再次办理，因此可能被回路重新到达。"},{"id":"review","label":"复核","description":"根据本对象规则通过或退回；两条分支结果不同。"},{"id":"done","label":"完成","description":"当前环节的完成条件满足；其他事实结果独立确认。"},{"id":"fix","label":"退回补充","description":"记录退回原因，补齐后回到办理环节。"}],"edges":[{"from":"todo","to":"work"},{"from":"work","to":"review","label":"复核"},{"from":"review","to":"done","label":"通过"},{"from":"review","to":"fix","label":"退回","kind":"return"},{"from":"fix","to":"work","label":"重试","kind":"return"}]},"association":{"name":"模块协作关联","directed":false,"direction":"LR","caption":"从业务衔接提取“相关”关系，隐去方向；不据此推断先后或后端授权。","destinations":[{"label":"业务与协同流程地图","route":"/__dev/docs?path=docs%2Fworkflow%2F%E4%B8%9A%E5%8A%A1%E4%B8%8E%E5%8D%8F%E5%90%8C%E6%B5%81%E7%A8%8B%E5%9C%B0%E5%9B%BE.md"}],"nodes":[{"id":"purchase","label":"采购","description":"可从关联中继续查到货、质检、入库与应付等专题。"},{"id":"quality","label":"质检","description":"与采购、库存和生产存在业务衔接，具体结果由各自事实确认。"},{"id":"inventory","label":"库存","description":"关联图帮助找到协作模块；库存数量仍以库存账为准。"},{"id":"production","label":"生产","description":"查看与库存、质检及财务相关的交接依据。"},{"id":"finance","label":"财务","description":"与来源单据、入账和结算相关；无向连线不表示可以直接入账。"}],"edges":[{"from":"purchase","to":"quality"},{"from":"purchase","to":"inventory"},{"from":"quality","to":"inventory"},{"from":"quality","to":"production"},{"from":"inventory","to":"production"},{"from":"purchase","to":"finance"},{"from":"production","to":"finance"}]},"tree":{"name":"产品目录树","directed":true,"direction":"TD","caption":"只展示层级归属；叠加跨目录引用后，整体可能成为有汇合关系的 DAG。","destinations":[{"label":"产品内核","route":"/__dev/product-core"},{"label":"工程规范与 Skill","route":"/__dev/project-skills"}],"nodes":[{"id":"project","label":"项目","description":"目录总入口；本图用于定位，不推断产品能力完成状态。"},{"id":"core","label":"产品内核","description":"产品能力与领域边界归入内核目录。"},{"id":"customer","label":"客户配置","description":"客户差异以配置、模板和扩展等受控方式承载。"},{"id":"engineering","label":"工程交付","description":"汇集质量与交付职责，具体执行仍由正式工具负责。"},{"id":"master","label":"主数据","description":"主数据是独立业务真源，在此仅展示目录归属。"},{"id":"facts","label":"业务事实","description":"事实与协同分层；本节点不表示事实已生效。"},{"id":"qa","label":"质量验证","description":"验证范围可以引用产品内核等其他目录的依据。"},{"id":"delivery","label":"交付运行","description":"按正式版本、部署与恢复证据核对交付。"}],"edges":[{"from":"project","to":"core"},{"from":"project","to":"customer"},{"from":"project","to":"engineering"},{"from":"core","to":"master"},{"from":"core","to":"facts"},{"from":"engineering","to":"qa"},{"from":"engineering","to":"delivery"}],"referenceEdge":{"from":"qa","to":"master","label":"引用依据","kind":"reference"}},"forest":{"name":"分区目录森林","directed":true,"direction":"TD","caption":"两棵独立目录树构成森林；不为它们强加一个虚构的共同父节点。","destinations":[{"label":"开发文档","route":"/__dev/docs"}],"nodes":[{"id":"product","label":"产品目录","description":"产品主题的目录根，与工程目录根并列。"},{"id":"engineering","label":"工程目录","description":"工程主题的目录根；没有与产品目录的归属连线。"},{"id":"core","label":"产品内核","description":"产品主题下的能力边界。"},{"id":"customer","label":"客户配置","description":"产品主题下的客户差异资料。"},{"id":"qa","label":"质量验证","description":"工程主题下的验证依据。"},{"id":"delivery","label":"交付运行","description":"工程主题下的交付依据。"}],"edges":[{"from":"product","to":"core"},{"from":"product","to":"customer"},{"from":"engineering","to":"qa"},{"from":"engineering","to":"delivery"}]}};
+    const devProjectGraphGroups = [{"label":"有向图","models":["dag","cycle"]},{"label":"无向图","models":["undirected"]},{"label":"层级结构","models":["tree"]}];
+    const devProjectGraphPositions = {"overview":{"p":[0,0.08,0,0],"a":[0,0.88,1,0],"s":[0.35,0.88,0,0.45],"b":[0.65,0.5,1,0.45],"q":[0.68,0.08,0,1],"d":[1,0.08,1,1]},"ci":{"plan":[0,0.5,0.5,0],"prepare":[0.25,0.5,0.5,0.23],"web":[0.6,0.16,0,0.52],"go":[0.6,0.84,1,0.52],"gate":[1,0.5,0.5,1]},"access":{"account":[0.5,0,0.5,0],"roleA":[0.15,0.36,0,0.36],"roleB":[0.85,0.36,1,0.36],"capability":[0.5,0.67,0.5,0.68],"page":[0.15,1,0,1],"action":[0.85,1,1,1]},"delivery":{"sha":[0,0.5,0.5,0],"artifact":[0.25,0.5,0.5,0.25],"ready":[0.5,0.5,0.5,0.5],"deploy":[0.75,0.5,0.5,0.75],"readback":[1,0.5,0.5,1]},"business":{"source":[0,0.5,0.5,0],"task":[0.35,0.18,0,0.4],"action":[0.65,0.65,1,0.65],"fact":[1,0.65,0.5,1]},"workflow":{"todo":[0,0.4,0.5,0],"work":[0.34,0.4,0,0.3],"review":[0.68,0.4,1,0.3],"done":[1,0.4,1,1],"fix":[0.5,1,0,0.75]},"association":{"purchase":[0,0.22,0,0.1],"quality":[0.5,0,1,0.1],"inventory":[0.44,0.64,0.5,0.5],"production":[1,0.22,1,0.85],"finance":[0.9,1,0,0.85]},"tree":{"project":[0.5,0,0.5,0],"core":[0.16,0.4,0,0.3],"customer":[0.5,0.4,1,0.3],"engineering":[0.84,0.4,1,0.65],"master":[0,1,0,0.65],"facts":[0.3,1,0,1],"qa":[0.7,1,0.5,1],"delivery":[1,1,1,1]},"forest":{"product":[0.22,0.12,0,0.1],"engineering":[0.78,0.12,1,0.1],"core":[0,0.9,0,0.5],"customer":[0.38,0.9,0,0.9],"qa":[0.68,0.9,1,0.5],"delivery":[1,0.9,1,0.9]}};
+    function classifyDevProjectGraph({ nodes, edges, directed }) {
+  if (!nodes.length || new Set(nodes.map(({ id }) => id)).size !== nodes.length) throw new Error('项目图节点缺失或重复')
+  const outgoing = new Map(nodes.map(({ id }) => [id, []]))
+  const incoming = new Map(nodes.map(({ id }) => [id, []]))
+  const parents = new Map(nodes.map(({ id }) => [id, id]))
+  const find = (id) => parents.get(id) === id ? id : find(parents.get(id))
+  let underlyingCycle = false
+  for (const { from, to } of edges) {
+    if (!outgoing.has(from) || !outgoing.has(to)) throw new Error('项目图包含未知节点引用')
+    outgoing.get(from).push(to)
+    incoming.get(to).push(from)
+    const left = find(from); const
+right = find(to)
+    if (left === right) underlyingCycle = true
+    else parents.set(left, right)
+  }
+  const visited = new Set(); const
+active = new Set()
+  const visit = (id) => {
+    if (active.has(id)) return true
+    if (visited.has(id)) return false
+    active.add(id)
+    if (outgoing.get(id).some(visit)) return true
+    active.delete(id)
+    visited.add(id)
+    return false
+  }
+  const hasCycle = directed ? nodes.some(({ id }) => visit(id)) : underlyingCycle
+  const roots = nodes.filter(({ id }) => incoming.get(id).length === 0).map(({ id }) => id)
+  const isHierarchy = directed && !hasCycle && !underlyingCycle && nodes.every(({ id }) => incoming.get(id).length <= 1)
+  let label = directed ? (hasCycle ? '有向 · 含环' : '有向 · 无环（DAG）') : (hasCycle ? '无向 · 含环' : '无向 · 无环')
+  if (isHierarchy) label = roots.length > 1 ? '有向森林 · DAG 特例' : '有根树 · DAG 特例'
+  return { label, hasCycle, isHierarchy, roots }
+}
+    function devProjectGraphNodeContext(graph, nodeId) {
+  const node = graph.nodes.find(({ id }) => id === nodeId)
+  if (!node) return null
+  const labels = (ids) => [...new Set(ids)].map((id) => graph.nodes.find((entry) => entry.id === id).label)
+  if (!graph.directed) { return {
+    ...node,
+    relationships: `相关模块：${labels(graph.edges.flatMap(({ from, to }) => from === nodeId ? [to] : to === nodeId ? [from] : [])).join('、') || '无'}`,
+  } }
+  const incoming = labels(graph.edges.filter(({ to }) => to === nodeId).map(({ from }) => from))
+  const outgoing = labels(graph.edges.filter(({ from }) => from === nodeId).map(({ to }) => to))
+  return { ...node, relationships: `接自：${incoming.join('、') || '起点'}；指向：${outgoing.join('、') || '终点'}` }
+}
+    function getDevProjectGraph() {
+      const modelKey=devProjectGraphModels[state.devGraphModel] ? state.devGraphModel : 'dag';
+      const model=devProjectGraphModels[modelKey];
+      const exampleKey=model.examples.includes(state.devGraphExample) ? state.devGraphExample : model.examples[0];
+      const source=devProjectGraphExamples[exampleKey];
+      const graph={...source,edges:source.referenceEdge&&state.devGraphReferences ? [...source.edges,source.referenceEdge] : source.edges};
+      return {modelKey,model,exampleKey,graph,classification:classifyDevProjectGraph(graph)};
+    }
+    function renderDevProjectRelationships() {
+      const {modelKey,model,exampleKey,graph,classification}=getDevProjectGraph();
+      const node=devProjectGraphNodeContext(graph,state.devGraphNode);
+      return `<section class="dev-project-models" aria-label="项目图视角"><nav class="surface dev-project-model-catalog" aria-label="图模型分类">${devProjectGraphGroups.map(group=>`<section><h3>${group.label}</h3>${group.models.map(key=>`<button class="dev-project-model-button" type="button" data-action="dev-project-graph-model" data-value="${key}" aria-pressed="${key===modelKey}"><strong>${devProjectGraphModels[key].name}</strong><span>${devProjectGraphModels[key].summary}</span></button>`).join('')}</section>`).join('')}</nav><section class="surface dev-design-section dev-project-model-panel" aria-label="图模型与项目示例"><div class="data-note">${model.crumb}</div><div class="dev-design-toolbar"><h3>${model.title}</h3><span class="badge" data-project-graph-classification>${classification.label}</span></div><p>${model.definition}</p><div class="dev-design-toolbar">${model.examples.length>1?`<label>项目示例 <select aria-label="项目示例" data-dev-project-example>${model.examples.map(key=>`<option value="${key}" ${key===exampleKey?'selected':''}>${devProjectGraphExamples[key].name}</option>`).join('')}</select></label>`:`<span>项目示例：${graph.name}</span>`}${graph.referenceEdge?`<label><input type="checkbox" data-dev-project-references ${state.devGraphReferences?'checked':''}> 叠加跨目录引用</label>`:''}${graph.edges.some(edge=>edge.kind==='return')?`<label><input type="checkbox" data-dev-project-loops ${state.devGraphHighlightReturns!==false?'checked':''}> 标出退回回路</label>`:''}</div><div class="dev-project-model-figure" data-dev-project-graph role="group" aria-label="项目关系图，可点选节点"></div><p>${graph.caption}</p><section class="dev-project-model-node" aria-label="节点关系说明" aria-live="polite"><h3>${node?node.label:'点选节点，查看关系含义'}</h3><p>${node?node.description:'节点说明与前后关系在此显示，不改变业务状态。'}</p>${node?`<p>${node.relationships}</p>`:''}</section><details><summary>模型判断与对应入口</summary><p>${state.devGraphReferences&&graph.referenceEdge?'叠加跨目录引用后，仍无有向回路，但整体已是一般 DAG，不再是严格目录树。':'树／森林按父 → 子定向时属于 DAG 的特例；DAG 允许多个前置汇合。'}</p><p>${graph.destinations.map(destination=>destination.label).join(' / ')}</p></details></section></section>`;
+    }
+    function drawDevProjectGraph(figure) {
+      if(!figure.isConnected||!figure.clientWidth)return;
+      const {exampleKey,graph}=getDevProjectGraph();
+      const width=figure.clientWidth,compact=width<630,vertical=compact&&graph.nodes.length>=7;
+      const height=vertical?560:compact?400:graph.nodes.length>=7?330:290;
+      figure.style.height=`${height}px`;
+      const points=Object.fromEntries(graph.nodes.map((node,index)=>{
+        const pos=devProjectGraphPositions[exampleKey][node.id];
+        return [node.id,{...node,x:vertical?width/2:58+pos[compact?2:0]*(width-116),y:36+(vertical?index/(graph.nodes.length-1):pos[compact?3:1])*(height-72),width:compact?104:node.label.length>=7?128:112,height:compact&&node.label.length>=7?64:44}];
+      }));
+      const tip=(from,to,extra=4)=>{const dx=to.x-from.x,dy=to.y-from.y,scale=Math.min((from.width/2+extra)/(Math.abs(dx)||.001),(from.height/2+extra)/(Math.abs(dy)||.001));return{x:from.x+dx*scale,y:from.y+dy*scale};};
+      const paths=graph.edges.map((edge,index)=>{
+        const from=points[edge.from],to=points[edge.to],a=tip(from,to),b=tip(to,from,7);
+        let path=`M${a.x} ${a.y}L${b.x} ${b.y}`;
+        if(vertical){const side=edge.kind==='reference'?1:-1,start=from.x+side*(from.width/2+2),end=to.x+side*(to.width/2+7),channel=side>0?width-8:8+(index%3)*12;path=`M${start} ${from.y}C${channel} ${from.y},${channel} ${to.y},${end} ${to.y}`;}
+        if(compact&&exampleKey==='overview'&&edge.from==='p'&&edge.to==='q')path=`M${from.x-from.width/2} ${from.y}C0 ${from.y},0 ${to.y},${to.x-to.width/2-4} ${to.y}`;
+        const returning=edge.kind==='return'&&state.devGraphHighlightReturns!==false;
+        const related=edge.from===state.devGraphNode||edge.to===state.devGraphNode;
+        const color=returning?'var(--warning)':related?'var(--brand)':'var(--text-3)';
+        return `<path d="${path}" fill="none" stroke="${color}" stroke-width="${returning?3:1.4}" ${returning||edge.kind==='reference'?'stroke-dasharray="5 4"':''} ${graph.directed?`marker-end="url(#dev-project-arrow-${returning?'return':related?'selected':'normal'})"`:''}/>${edge.label&&!compact?`<text x="${(a.x+b.x)/2}" y="${(a.y+b.y)/2-8}" text-anchor="middle" fill="var(--text-2)" font-size="14">${edge.label}</text>`:''}`;
+      }).join('');
+      const markers=[['normal','var(--text-3)'],['selected','var(--brand)'],['return','var(--warning)']].map(([key,color])=>`<marker id="dev-project-arrow-${key}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="${color}"/></marker>`).join('');
+      figure.innerHTML=`<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="${graph.name}，${getDevProjectGraph().classification.label}"><defs>${markers}</defs>${paths}</svg>${graph.nodes.map(node=>{const point=points[node.id];return `<button type="button" class="btn dev-project-model-graph-node" data-action="dev-project-graph-node" data-value="${node.id}" aria-label="${node.label}" aria-pressed="${node.id===state.devGraphNode}" style="left:${point.x}px;top:${point.y}px;width:${point.width}px;min-height:${point.height}px">${node.label}</button>`;}).join('')}`;
+    }
+    const devProjectGraphObserver=new ResizeObserver(entries=>entries.forEach(entry=>drawDevProjectGraph(entry.target)));
+    function mountDevProjectGraph() {
+      const figure=document.querySelector('[data-dev-project-graph]');
+      if(!figure)return;
+      drawDevProjectGraph(figure);devProjectGraphObserver.observe(figure);
+      document.querySelector('[data-dev-project-example]')?.addEventListener('change',event=>{
+        state.devGraphExample=event.target.value;state.devGraphNode='';state.devGraphReferences=false;
+        renderDevWorkbench(document.querySelector('#view'));document.querySelector('[data-dev-project-example]')?.focus();
+      });
+      for(const [selector,key] of [['[data-dev-project-references]','devGraphReferences'],['[data-dev-project-loops]','devGraphHighlightReturns']])document.querySelector(selector)?.addEventListener('change',event=>{
+        state[key]=event.target.checked;renderDevWorkbench(document.querySelector('#view'));document.querySelector(selector)?.focus();
+      });
+    }
     function renderDevDesignContent() {
       const area = state.devArea, view = state.devViews[area];
-      if (area === 'engineering') return renderDevToolLibrary();
+      if (area === 'engineering') return view === 'relationships' ? renderDevProjectRelationships() : renderDevToolLibrary();
       if (area === 'quality') {
         if (view === 'pressure') return `<section class="surface dev-design-section"><h3>核心业务压力测试 · 交互样例</h3><p>用料计算 → 提交 → 审批 → 采购读回；正式入口每次使用新隔离环境、历史背景与当轮订单池。</p><div class="dev-step-actions"><label>数据规模示意 <select id="dev-pressure-scale-preview" aria-label="数据规模示意">${['基础 · 20 张历史单','增长 · 100 张历史单','高量 · 500 张历史单'].map(label=>`<option${state.devPressureScale===label?' selected':''}>${label}</option>`).join('')}</select></label><button class="btn primary" data-action="dev-pressure-preview" data-value="quick">短档回归演示</button><button class="btn" data-action="dev-pressure-preview" data-value="capacity">10 分钟容量演示</button></div>${state.devPressurePreview ? `<p><span class="badge">${state.devPressurePreview === 'capacity' ? '容量' : '短档'}样例 · ${state.devPressureScale || '基础 · 20 张历史单'}</span> <span class="badge warning">历史候选 · 当前源码未验证</span></p><svg viewBox="0 0 500 90" role="img" aria-label="样例混合操作和实际 API 有效吞吐对比" style="width:100%;max-width:720px"><text x="0" y="22" fill="currentColor">混合操作 3.2 次/秒</text><rect x="160" y="8" width="180" height="16" rx="3" fill="var(--brand)"/><text x="0" y="68" fill="currentColor">实际 API 5.8 次/秒</text><rect x="160" y="54" width="326" height="16" rx="3" fill="#16826a"/></svg><table class="dev-tool-table"><thead><tr><th>指标</th><th>样例读数</th><th>判断范围</th></tr></thead><tbody><tr><th>单次 API 延迟</th><td>p95 520 ms / p99 610 ms</td><td>门限只针对单次 API</td></tr><tr><th>完整业务流程</th><td>主段 200 条</td><td>与 API 和混合操作分别计数</td></tr><tr><th>数据规模对比</th><td>历史背景与当轮订单池分开计数</td><td>相同源码、负载和环境才计算变化</td></tr><tr><th>业务正确性</th><td>竞争、重放、批次对账、背景保护、恢复和清理</td><td>正式页面以实际报告判断</td></tr></tbody></table>` : devDesignEmpty('尚未演示压力报告')}<details><summary>范围与维护说明</summary><p>正式压测不抵扣库存；构建、造数和清理时间另计。数据、断言、负载和生命周期分别登记摘要，业务变化后更新对应合同并复跑。样例不证明生产硬件容量、长时稳定性或客户验收。</p></details><p class="data-note">所有数字为交互样例，点击不会创建容器或运行测试。</p></section>`;
         if (view === 'plan') return `<section class="surface dev-design-section"><div class="dev-design-toolbar"><strong>验证计划</strong><button class="btn primary" data-action="dev-validate">演示本轮验证</button></div><p>${state.devQualityChecked?'样例检查已完成；固定版本 CI 单独核对。':'按本轮改动选择检查，每项结果独立记录。'}</p><details class="dev-design-settings"><summary>覆盖证据的查看方式</summary><p class="data-note">正式工作台按四类标签查看，每个标签保留失败、受阻或未采集状态；切换只更新下方内容，子视图可从网址恢复。</p><table class="dev-tool-table" aria-label="覆盖证据分类"><thead><tr><th scope="col">标签</th><th scope="col">查看内容</th></tr></thead><tbody><tr><th scope="row">代码覆盖</th><td>Go 与 Web 的读数、执行计数和失败明细</td></tr><tr><th scope="row">业务场景</th><td>业务域总览，选择一个业务域查看场景与证据，再返回总览</td></tr><tr><th scope="row">验证门禁</th><td>本轮声明的检查与独立执行结果</td></tr><tr><th scope="row">运行与验收</th><td>PostgreSQL、浏览器、就绪、目标环境和客户验收的各自证据</td></tr></tbody></table><p class="data-note">采集及判定规则按需展开；来源、源码身份与失败原因继续可见。本说明不读取覆盖报告，也不证明当前测试或验收通过。</p><p class="data-note">专项检查命令沿用搜索与来源职责筛选，每页展示 10 项；页码可从网址恢复，改变筛选回到第一页。</p></details></section>${renderDevToolLibrary()}`;
@@ -4865,6 +4985,14 @@
       return `<section class="surface dev-design-section"><div class="dev-design-toolbar"><strong>${label}</strong><button class="btn primary" data-action="dev-prepare" ${state.devEvidence !== 'ready' || state.devOperation?.status === 'running' ? 'disabled' : ''}>核对并准备${label}</button></div><table class="dev-tool-table" aria-label="交付条件"><tbody><tr><th>候选版本</th><td>DEMO-a1b2c3d</td><td>${state.devEvidence === 'ready' ? '样例固定版本 CI 已核对' : '待核对固定版本 CI'}</td></tr><tr><th>目标环境</th><td>隔离演示环境</td><td>配置与迁移计划分别核对</td></tr><tr><th>恢复点</th><td>DEMO-r1</td><td>保留备份与恢复验证</td></tr></tbody></table><div class="dev-design-toolbar"><span class="data-note">${state.devEvidence === 'ready' ? '样例条件已齐备；确认计划后执行，执行后读回。' : state.devQualityChecked ? '验证样例已完成，请核对交付条件。' : '先在质量验证完成验证样例，再核对交付条件。'}</span>${!state.devQualityChecked ? '<button class="btn" data-action="dev-area" data-value="quality">去质量验证</button>' : `<button class="btn" data-action="dev-preflight" ${state.devOperation?.status === 'running' ? 'disabled' : ''}>核对交付条件</button>`}<button class="btn" data-action="dev-evidence" data-value="${view}">查看${label}依据</button></div>${view === 'versions' ? '<details class="dev-design-settings"><summary>其他操作说明</summary><button class="btn" data-action="dev-automation-flow">查看自动续办交接流程</button><button class="btn" data-action="dev-lock-flow">查看 Git 索引锁流程</button></details>' : ''}<details class="dev-design-settings"><summary>正式页面的任务标签</summary>${renderDevDeliveryTaskMap(view)}</details></section>`;
     }
     function handleDevDesignAction(action,target) {
+      if(action==='dev-project-graph-model'||action==='dev-project-graph-node') {
+        if(action==='dev-project-graph-model'){if(!devProjectGraphModels[target.dataset.value])return true;state.devGraphModel=target.dataset.value;state.devGraphExample=devProjectGraphModels[state.devGraphModel].examples[0];state.devGraphNode='';state.devGraphReferences=false;}
+        else state.devGraphNode=target.dataset.value;
+        renderDevWorkbench(document.querySelector('#view'));
+        document.querySelector('[data-action="'+action+'"][data-value="'+target.dataset.value+'"]')?.focus({preventScroll:true});return true;
+      }
+
+
       if(action==='dev-data-prepare'||action==='dev-data-view') {
         const scope=target.closest('[data-dev-data-preview]');
         const view=action==='dev-data-prepare'?'confirm':target.dataset.value;
