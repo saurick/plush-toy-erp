@@ -11,6 +11,8 @@ import {
   resolveExceptionFlowReportPath,
   staleRetryReceipt,
   verifyRuntimeIdentity,
+  readExceptionFlowReadyTask,
+  actOnExceptionFlowTaskPage,
 } from "./exception-flow-real-write-browser.mjs";
 
 const DATABASE_NAME = "plush_erp_acceptance_79da_contract_browser_actions_dev";
@@ -20,6 +22,296 @@ const REPORT =
 const CONFIRMATION = exceptionFlowConfirmation({
   backendURL: BACKEND_URL,
   databaseName: DATABASE_NAME,
+});
+
+function readyTaskFixture(group = "finance_payment_execution") {
+  const inventory = group.startsWith("inventory_");
+  const roleKey =
+    group === "inventory_adjustment_approval"
+      ? "boss"
+      : inventory
+        ? "warehouse"
+        : "finance";
+  const sourceType = inventory ? "inventory_operation" : "finance_payment";
+  const expected = {
+    roleKey,
+    sourceID: 101,
+    sourceNo: inventory ? "OP-101" : "PAY-101",
+    taskGroup: group,
+  };
+  const task = {
+    id: 42,
+    version: 1,
+    task_code: "PROC-81-NODE-91-A1",
+    source_type: sourceType,
+    source_id: 101,
+    source_no: expected.sourceNo,
+    process_instance_id: 81,
+    process_node_instance_id: 91,
+    owner_role_key: roleKey,
+    task_group: group,
+    task_status_key: "ready",
+  };
+  const process = {
+    process_context: {
+      process_instance: {
+        id: 81,
+        process_key: inventory
+          ? "inventory_adjustment_approval"
+          : "finance_payment_approval",
+        business_ref_type: sourceType,
+        business_ref_id: 101,
+        business_ref_no: expected.sourceNo,
+      },
+      nodes: [
+        { id: 91, process_instance_id: 81, node_key: group, status: "active" },
+      ],
+    },
+    source_readback: {
+      id: 101,
+      [inventory ? "operation_no" : "payment_no"]: expected.sourceNo,
+    },
+  };
+  const rows = [
+    { ...task, id: 40, task_status_key: "done", process_node_instance_id: 90 },
+    { ...task, id: 41, process_instance_id: 80 },
+    task,
+  ];
+  const calls = [];
+  const page = {
+    evaluate: async (_fn, request) => {
+      calls.push(request);
+      const data = request.methodName.startsWith("get_")
+        ? process
+        : { tasks: rows, total: rows.length };
+      return {
+        status: 200,
+        json: { result: { code: 0, data: structuredClone(data) } },
+      };
+    },
+  };
+  return { page, expected, task, process, rows, calls };
+}
+
+test("exception task identity selects the active source/process-bound ready task for all three actors", async () => {
+  for (const group of [
+    "finance_payment_execution",
+    "inventory_adjustment_approval",
+    "inventory_adjustment_execution",
+  ]) {
+    const fixture = readyTaskFixture(group);
+    assert.deepEqual(
+      await readExceptionFlowReadyTask(fixture.page, fixture.expected),
+      fixture.task,
+    );
+    assert.equal(fixture.calls.length, 2);
+    assert.match(
+      fixture.calls[0].methodName,
+      /^get_(finance_payment|inventory_adjustment)_approval_process$/u,
+    );
+    assert.equal(fixture.calls[1].methodName, "list_tasks");
+    assert.deepEqual(fixture.calls[1].requestParams, {
+      source_type: fixture.task.source_type,
+      source_id: 101,
+      owner_role_key: fixture.expected.roleKey,
+      task_group: group,
+      limit: 100,
+      offset: 0,
+    });
+  }
+});
+
+test("exception task identity rejects ambiguous, done, foreign source and inactive process tasks without mutation", async () => {
+  for (const mutate of [
+    (f) => {
+      f.rows.push({ ...f.task, id: 43 });
+    },
+    (f) => {
+      f.task.task_status_key = "done";
+    },
+    (f) => {
+      f.task.source_id = 999;
+    },
+    (f) => {
+      f.task.source_no = "OTHER";
+    },
+    (f) => {
+      f.task.owner_role_key = "boss";
+    },
+    (f) => {
+      f.task.task_group = "other";
+    },
+    (f) => {
+      f.process.process_context.nodes[0].status = "completed";
+    },
+    (f) => {
+      f.process.process_context.process_instance.business_ref_id = 999;
+    },
+    (f) => {
+      f.process.source_readback.id = 999;
+    },
+  ]) {
+    const fixture = readyTaskFixture();
+    mutate(fixture);
+    await assert.rejects(
+      readExceptionFlowReadyTask(fixture.page, fixture.expected),
+    );
+    assert.ok(
+      fixture.calls.every((r) => /^(?:get_|list_)/u.test(r.methodName)),
+    );
+  }
+  const fixture = readyTaskFixture();
+  await assert.rejects(
+    readExceptionFlowReadyTask(fixture.page, {
+      ...fixture.expected,
+      roleKey: "admin",
+    }),
+    /actor drifted/u,
+  );
+  await assert.rejects(
+    readExceptionFlowReadyTask(fixture.page, {
+      ...fixture.expected,
+      taskGroup: "unknown",
+    }),
+    /not registered/u,
+  );
+  assert.equal(fixture.calls.length, 0);
+});
+
+test("exception task identity reads every task page before asserting source/node uniqueness", async () => {
+  const fixture = readyTaskFixture();
+  const calls = [];
+  fixture.page.evaluate = async (_fn, request) => {
+    calls.push(request);
+    let data = fixture.process;
+    if (request.methodName === "list_tasks") {
+      const rows =
+        request.requestParams.offset === 0
+          ? Array.from({ length: 100 }, (_, index) => ({
+              ...fixture.task,
+              id: 200 + index,
+              process_node_instance_id: 90,
+            }))
+          : [fixture.task];
+      data = { tasks: rows, total: 101 };
+    }
+    return { status: 200, json: { result: { code: 0, data } } };
+  };
+  assert.equal(
+    (await readExceptionFlowReadyTask(fixture.page, fixture.expected)).id,
+    42,
+  );
+  assert.deepEqual(
+    calls
+      .filter((r) => r.methodName === "list_tasks")
+      .map((r) => r.requestParams.offset),
+    [0, 100],
+  );
+});
+
+function taskTablePage(
+  task,
+  { rowCount = 1, entryCount = 1, confirmCount = 1 } = {},
+) {
+  const events = [];
+  const control = (key) => ({
+    count: async () =>
+      key === "row"
+        ? rowCount
+        : key === "entry"
+          ? entryCount
+          : key === "确认完成" || key === "确认通过"
+            ? confirmCount
+            : 1,
+    waitFor: async () => events.push(`visible:${key}`),
+    fill: async (value) => events.push(`fill:${key}:${value}`),
+    press: async (value) => events.push(`press:${key}:${value}`),
+    click: async () => events.push(`click:${key}`),
+    last() {
+      return this;
+    },
+    filter: ({ hasText }) => control(hasText),
+  });
+  const drawer = {
+    ...control("drawer"),
+    getByRole: (role, options) => {
+      if (role === "radio") return control("radio");
+      assert.equal(role, "button");
+      assert.equal(options.exact, true);
+      return control(options.name);
+    },
+    locator: (selector) => {
+      assert.equal(selector, "textarea");
+      return control("reason");
+    },
+  };
+  const row = {
+    ...control("row"),
+    locator: (selector) => {
+      assert.equal(selector, "button[data-task-entry]");
+      return control("entry");
+    },
+  };
+  const page = {
+    getByPlaceholder: (placeholder, options) => {
+      assert.equal(placeholder, "订单 / 产品 / 物料 / 款号");
+      assert.equal(options.exact, true);
+      return control("search");
+    },
+    locator: (selector) => {
+      if (selector === ".erp-task-action-drawer:visible") return drawer;
+      if (selector === ".ant-message-notice-content") return control("message");
+      assert.equal(
+        selector,
+        `tr.erp-task-table-row[data-task-id="${task.id}"][data-task-code="${task.task_code}"]`,
+      );
+      return row;
+    },
+  };
+  return { page, events };
+}
+
+test("exception task browser action clicks the exact table row detail entry and preserves drawer action semantics", async () => {
+  for (const approval of [false, true]) {
+    const fixture = readyTaskFixture(
+      approval ? "inventory_adjustment_approval" : "finance_payment_execution",
+    );
+    const ui = taskTablePage(fixture.task);
+    await actOnExceptionFlowTaskPage(ui.page, fixture.task, {
+      actionTitle: approval ? "审批通过" : "处理完成",
+      confirmLabel: approval ? "确认通过" : "确认完成",
+      successMessage: approval ? "审批已通过" : "任务已处理完成",
+      reason: approval ? "批准" : "",
+    });
+    assert.ok(ui.events.includes(`fill:search:${fixture.task.task_code}`));
+    assert.ok(ui.events.includes("click:entry"));
+    assert.ok(ui.events.includes("click:选择处理方式"));
+    assert.ok(ui.events.includes("click:核对并确认"));
+    assert.ok(
+      ui.events.includes(approval ? "click:确认通过" : "click:确认完成"),
+    );
+    assert.equal(ui.events.includes("fill:reason:批准"), approval);
+  }
+});
+
+test("exception task browser action refuses duplicate rows, detail entries and confirmation buttons", async () => {
+  for (const counts of [
+    { rowCount: 2 },
+    { entryCount: 2 },
+    { confirmCount: 2 },
+  ]) {
+    const { task } = readyTaskFixture();
+    const ui = taskTablePage(task, counts);
+    await assert.rejects(
+      actOnExceptionFlowTaskPage(ui.page, task, {
+        actionTitle: "处理完成",
+        confirmLabel: "确认完成",
+        successMessage: "任务已处理完成",
+      }),
+      /unique/u,
+    );
+    assert.ok(!ui.events.includes("click:确认完成"));
+  }
 });
 
 test("runtime identity verification rejects a browser proxy connected to another database", async () => {
@@ -50,7 +342,10 @@ test("exception-flow task search follows the current page placeholder contract",
     "utf8",
   );
   const dashboardSource = readFileSync(
-    new URL("../../web/src/erp/components/workflow/WorkflowDashboardViews.jsx", import.meta.url),
+    new URL(
+      "../../web/src/erp/components/workflow/WorkflowDashboardViews.jsx",
+      import.meta.url,
+    ),
     "utf8",
   );
   const pageSource = readFileSync(
@@ -68,6 +363,11 @@ test("exception-flow task search follows the current page placeholder contract",
     runnerSource,
     /getByPlaceholder\("订单 \/ 产品 \/ 物料 \/ 款号",\s*\{\s*exact: true,?\s*\}\)/u,
   );
+  assert.match(dashboardSource, /data-task-entry/u);
+  assert.match(dashboardSource, /'data-task-id': task\.id/u);
+  assert.match(dashboardSource, /'data-task-code': task\.task_code/u);
+  assert.match(runnerSource, /button\[data-task-entry\]/u);
+  assert.doesNotMatch(runnerSource, /erp-task-board-card|erp-task-card__open/u);
 });
 
 function validArgs(...extra) {

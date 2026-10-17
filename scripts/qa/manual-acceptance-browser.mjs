@@ -57,9 +57,11 @@ import {
   TASK_SOURCE_TYPE,
   TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
   buildManualAcceptanceTaskSchedule,
+  buildManualAcceptanceTaskDataPlan,
   getManualAcceptanceTaskProfileContract,
   manualAcceptanceTaskBatchIdentity,
 } from "./manual-acceptance-task-data.mjs";
+import { TASK_BOARD_LANE_DEFINITIONS } from "../../web/src/erp/utils/workflowTaskBoard.mjs";
 import {
   LOCAL_DEMO_ACCOUNT_SET,
   MANUAL_ACCEPTANCE_BUSINESS_ROLE_KEYS,
@@ -187,6 +189,8 @@ export const MANUAL_ACCEPTANCE_BROWSER_BOUNDARY = Object.freeze({
     "legal_notice_acknowledgement",
     "route_navigation",
     "read_only_tab_navigation",
+    "read_only_filter_changes",
+    "read_only_pagination",
   ]),
 });
 
@@ -1125,43 +1129,92 @@ async function readPrintPreviewEvidence(page, target) {
   return evidence;
 }
 
-export function readBusinessSummaryTotal(targetKey, bodyText = "") {
-  const patterns = {
-    "task-board": [/全部任务\s*(\d+)/u],
-    products: [/总产品\s*(\d+)/u],
-    "production-orders": [/符合条件\s*(\d+)/u],
-    "accessories-purchase": [/总订单\s*(\d+)/u],
-    shipments: [/符合条件\s*(\d+)/u],
-    "permission-center": [/员工账号\s*(\d+)/u, /共\s*(\d+)\s*个员工账号/u],
-  };
-  const values = (patterns[targetKey] || []).flatMap((pattern) => {
-    const match = String(bodyText).match(pattern);
-    return match ? [Number(match[1])] : [];
-  });
-  if (targetKey === "task-board") {
-    const boardCounts = ["常规待办", "异常处理", "到期提醒", "已结束"].map(
-      (label) => {
-        const match = String(bodyText).match(
-          new RegExp(`${label}\\s*(\\d+)`, "u"),
-        );
-        return match ? Number(match[1]) : null;
-      },
+export function readScopedPageTotal(texts = []) {
+  const parsed = texts.flatMap((text) => {
+    const value = String(text || "")
+      .replaceAll(",", "")
+      .trim();
+    const match = value.match(
+      /^(?:第\s*\d+\s*[-–]\s*\d+\s*(?:条|项|单)\s*[/，]\s*共|共|不限状态，\s*共|全部状态，\s*共)\s*(\d+)\s*(?:条|项|单|个员工账号)$/u,
     );
-    if (boardCounts.every(Number.isInteger)) {
-      values.push(boardCounts.reduce((total, value) => total + value, 0));
-    }
-  }
-  return values.length ? Math.max(...values) : 0;
+    const filteredAccounts = value.match(/^命中\s*(\d+)\/\d+\s*个员工账号$/u);
+    return match || filteredAccounts
+      ? [Number((match || filteredAccounts)[1])]
+      : [];
+  });
+  return {
+    total: parsed.length && new Set(parsed).size === 1 ? parsed[0] : null,
+    consistent: parsed.length > 0 && new Set(parsed).size === 1,
+    sources: texts,
+  };
 }
 
 export function shipmentListReady(expectedCount) {
-  const bodyText = document.body?.innerText || "";
-  const match = String(bodyText).match(/符合条件\s*(\d+)/u);
-  const total = match ? Number(match[1]) : 0;
+  const group = document.querySelector(
+    '.erp-business-status-filters[aria-label="出货单状态"]',
+  );
+  const all = group?.querySelector(
+    'button[aria-pressed="true"][aria-label^="不限状态，"]',
+  );
+  const label = all?.getAttribute("aria-label") || "";
+  const match = label.match(/^不限状态，\s*共\s*([\d,]+)\s*条$/u);
+  return (
+    Number(match?.[1]?.replaceAll(",", "")) === Number(expectedCount) &&
+    document.querySelectorAll(".ant-table-tbody > tr.ant-table-row").length > 0
+  );
+}
+
+// This snapshot reads only the result table, its pagination and selected status
+// scope. Other page numbers (amounts, IDs or navigation badges) are not totals.
+export function readListDOMSnapshot() {
+  const visible = (node) => {
+    const rect = node.getBoundingClientRect();
+    return (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      window.getComputedStyle(node).visibility !== "hidden"
+    );
+  };
   const rows = [
     ...document.querySelectorAll(".ant-table-tbody > tr.ant-table-row"),
-  ].filter((row) => !row.classList?.contains("ant-table-placeholder"));
-  return total === Number(expectedCount) && rows.length > 0;
+  ]
+    .filter(visible)
+    .map((row) => ({
+      key:
+        row.getAttribute("data-row-key") ||
+        row.getAttribute("data-task-id") ||
+        "",
+      taskCode: row.getAttribute("data-task-code") || "",
+      text: row.textContent?.replace(/\s+/gu, " ").trim() || "",
+      cells: [...row.querySelectorAll("td")].map(
+        (cell) => cell.textContent?.replace(/\s+/gu, " ").trim() || "",
+      ),
+    }));
+  const totalTexts = [
+    ...document.querySelectorAll(
+      '.ant-pagination-total-text,.erp-task-pagination [role="status"]',
+    ),
+  ]
+    .filter(visible)
+    .map((node) => node.textContent || "");
+  const selectedStatusLabels = [
+    ...document.querySelectorAll(
+      '.erp-business-status-filters[aria-busy="false"] button[aria-pressed="true"]',
+    ),
+  ]
+    .filter(visible)
+    .map((node) => node.getAttribute("aria-label") || "");
+  const headers = [...document.querySelectorAll(".ant-table-thead th")]
+    .filter(visible)
+    .map((node) => node.textContent?.replace(/\s+/gu, " ").trim() || "");
+  return {
+    rows,
+    headers,
+    totalTexts: [...totalTexts, ...selectedStatusLabels],
+    busy: [
+      ...document.querySelectorAll('.ant-spin-spinning,[aria-busy="true"]'),
+    ].some(visible),
+  };
 }
 
 export function readMobileTaskTotal(tabKey, ariaLabel = "") {
@@ -1335,6 +1388,21 @@ export function evaluateDashboardTaskCurrentBatchEvidence({
   };
 }
 
+export function browserProjectionBaselineProven(binding) {
+  const baseline = binding?.dataset?.baseline;
+  if (baseline?.exactEmptyBusinessBaseline === true) return true;
+  return (
+    binding?.target === SCENARIO_DEMO_TARGET &&
+    binding?.dataset?.targetAlias === SCENARIO_DEMO_TARGET &&
+    baseline?.lifecycle === "long-lived" &&
+    baseline.currentStageLogicVerified === true &&
+    baseline.legacyDataPreserved === true &&
+    baseline.exactEmptyBusinessBaseline === false &&
+    baseline.databaseName === binding?.runtimeIdentity?.databaseName &&
+    binding?.runtimeIdentity?.proof === "matched-v1"
+  );
+}
+
 async function readDashboardEvidence(page, target, datasetBinding) {
   const currentBatch = requireCurrentBatchTargetEvidence(
     target,
@@ -1467,38 +1535,62 @@ async function readDashboardEvidence(page, target, datasetBinding) {
     });
   }
   if (target.key === "business-dashboard") {
-    const url = new URL(page.url());
-    url.search = "view=orders&scope=all";
-    await page.goto(url.toString());
+    await page.getByRole("tab", { name: "订单交付", exact: true }).click();
+    await page.getByRole("button", { name: /^筛选进度/u }).click();
+    const filters = page.getByRole("dialog", { name: "筛选进度", exact: true });
+    await filters
+      .getByRole("button", { name: "重置筛选", exact: true })
+      .click();
+    await filters
+      .getByLabel("记录范围", { exact: true })
+      .getByText("全部记录", { exact: true })
+      .click();
+    await filters.getByRole("button", { name: "完成", exact: true }).click();
+    const search = page.getByRole("textbox", {
+      name: "搜索订单、客户或产品",
+      exact: true,
+    });
+    await search.fill("");
+    await search.press("Enter");
+    await page.waitForURL((url) => url.searchParams.get("scope") === "all", {
+      timeout: PAGE_TIMEOUT_MS,
+    });
     await page
-      .locator(".erp-progress-order")
+      .locator("tr.erp-progress-row[data-progress-order-id]")
       .first()
       .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
-    const metrics = await page
-      .locator(".erp-progress-board")
-      .evaluate((root) => ({
-        total: Number(
-          root
-            .querySelector(".erp-progress-metric .erp-filter-chip__count")
-            ?.textContent.replaceAll(",", ""),
+    const pagination = page
+      .getByRole("navigation", { name: "进度分页", exact: true })
+      .getByRole("status");
+    const expectedTotal = currentBatch.probes.find(
+      (probe) => probe.id === BUSINESS_DASHBOARD_PROJECTION_PROBE_ID,
+    )?.progressCounts?.total;
+    await pagination
+      .filter({ hasText: new RegExp(`共 ${expectedTotal} 单$`, "u") })
+      .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+    const totals = await pagination.allTextContents();
+    const scopedTotal = readScopedPageTotal(totals);
+    if (!scopedTotal.consistent)
+      throw new BrowserAcceptanceError("进度看板缺少明确的全部订单分页总数");
+    const metrics = {
+      total: scopedTotal.total,
+      ids: await page
+        .locator("tr.erp-progress-row[data-progress-order-id]")
+        .evaluateAll((rows) =>
+          rows.map((row) => Number(row.dataset.progressOrderId)),
         ),
-        ids: [...root.querySelectorAll("[data-progress-order-id]")].map(
-          (node) => Number(node.dataset.progressOrderId),
-        ),
-      }));
+    };
     const evidence = evaluateBusinessDashboardCurrentBatchEvidence({
       evidence: evaluateBusinessDashboardEvidence(
         metrics,
         target.dataEvidenceRequirements,
       ),
       currentBatch,
-      baselineProven:
-        datasetBinding?.dataset?.baseline?.exactEmptyBusinessBaseline === true,
+      baselineProven: browserProjectionBaselineProven(datasetBinding),
     });
-    await page.locator("button[data-progress-order-id]").first().click();
     await page
-      .getByLabel("当前订单阶段摘要", { exact: true })
-      .getByRole("button", { name: "查看完整进度", exact: true })
+      .locator("tr.erp-progress-row .erp-progress-row-open")
+      .first()
       .click();
     const drawer = page.getByRole("dialog");
     await drawer.getByRole("tab", { name: "产品明细", exact: true }).waitFor();
@@ -1512,6 +1604,18 @@ async function readDashboardEvidence(page, target, datasetBinding) {
     await waitForReadablePage(page);
     return {
       ...evidence,
+      quantityScope: {
+        mode: "current_batch_projection",
+        unit: "sales-orders",
+        total: metrics.total,
+        scope: { view: "orders", lifecycle: "all", search: "" },
+        totalSources: totals,
+      },
+      currentBatchProof: {
+        applicable: true,
+        sampleOrderIDs: metrics.ids,
+        projectionBound: evidence.currentBatchBound,
+      },
       navigationProof: {
         expectedPath,
         actualPath: new URL(page.url()).pathname,
@@ -1821,7 +1925,7 @@ async function filterVisibleListToCurrentBatch(page, target, filter) {
   }
   const itemSelector = [
     ".ant-table-tbody > tr:not(.ant-table-placeholder)",
-    ".erp-task-board-card",
+    ".erp-task-table-row",
     ".erp-audit-event",
   ].join(",");
   await page.waitForFunction(
@@ -1920,23 +2024,60 @@ export function evaluateCurrentBatchListEvidence({
   pageReportedTotal,
   minimumRecords,
   exactEvidencePassed = true,
-  pageSize = 20,
+  quantityScope = null,
+  expectedUnit = "records",
 }) {
   const currentBatchBound =
     currentBatch?.dataStatus === "pass" &&
     Number.isSafeInteger(currentBatch?.actual) &&
     currentBatch.actual >= minimumRecords;
-  const currentBatchVisible =
-    currentBatchDOM?.mode === "bound_catalog"
-      ? Number(renderedItems) >= minimumRecords
-      : Number(currentBatchDOM?.matchingCurrentBatchItems) >=
-          Math.min(minimumRecords, pageSize) && Number(renderedItems) > 0;
+  const totalValid =
+    Number.isSafeInteger(quantityScope?.total) &&
+    quantityScope.total >= minimumRecords &&
+    quantityScope.total === Number(pageReportedTotal) &&
+    quantityScope.totalConsistent === true;
+  const sameUnit = quantityScope?.unit === expectedUnit;
+  const prefixProven =
+    quantityScope?.mode === "filtered_prefix" &&
+    ["source_prefix", "exact_task_prefix"].includes(currentBatchDOM?.mode) &&
+    Boolean(currentBatchDOM?.identifier) &&
+    quantityScope.scope?.search === currentBatchDOM.identifier &&
+    quantityScope.total === quantityScope.expectedTotal &&
+    quantityScope.renderedRows > 0 &&
+    quantityScope.matchingRows === quantityScope.renderedRows &&
+    quantityScope.renderedRows <= quantityScope.total;
+  const exactRecordsProven =
+    quantityScope?.mode === "canonical_records" &&
+    Array.isArray(quantityScope.matchedIdentifiers) &&
+    new Set(quantityScope.matchedIdentifiers).size ===
+      quantityScope.matchedIdentifiers.length &&
+    quantityScope.matchedIdentifiers.length >= minimumRecords &&
+    Array.isArray(quantityScope.canonicalIdentifiers) &&
+    quantityScope.matchedIdentifiers.every((id) =>
+      quantityScope.canonicalIdentifiers.includes(id),
+    ) &&
+    quantityScope.canonicalMembershipVerified === true;
+  const environmentAuditProven =
+    expectedUnit === "system-audit-logs" &&
+    quantityScope?.mode === "environment_audit_records" &&
+    quantityScope.currentBatchApplicable === false &&
+    currentBatch?.probes?.some(
+      (probe) =>
+        probe.id === "audit-events" &&
+        probe.status === "pass" &&
+        probe.batchEvidence === "not_applicable",
+    );
+  const catalogProven =
+    currentBatchDOM?.mode === "bound_catalog" &&
+    Number(renderedItems) >= minimumRecords;
+  const quantityProven =
+    catalogProven ||
+    (sameUnit &&
+      totalValid &&
+      quantityScope?.scopeVerified === true &&
+      (prefixProven || exactRecordsProven || environmentAuditProven));
   const minimumSatisfied =
-    currentBatchBound &&
-    currentBatchVisible &&
-    exactEvidencePassed &&
-    (currentBatchDOM?.mode === "bound_catalog" ||
-      Number(pageReportedTotal) === currentBatch.actual);
+    currentBatchBound && quantityProven && exactEvidencePassed;
   return {
     status: minimumSatisfied
       ? "minimum_proven"
@@ -1944,13 +2085,18 @@ export function evaluateCurrentBatchListEvidence({
         ? "page_has_data_minimum_not_proven"
         : "not_proven",
     evidenceSource:
-      "current-batch readiness probe plus filtered visible list DOM",
+      "explicit UI quantity scope and independently bound current-batch DOM records",
     renderedItems: Number(renderedItems) || 0,
-    observedTotal: currentBatch?.actual ?? 0,
+    observedTotal:
+      quantityScope?.mode === "canonical_records"
+        ? quantityScope.matchedIdentifiers.length
+        : (quantityScope?.total ?? (catalogProven ? Number(renderedItems) : 0)),
+    boundSourceActual: currentBatch?.actual ?? 0,
     pageReportedTotal: Number(pageReportedTotal) || 0,
     minimumRecords,
     currentBatchBound,
     currentBatchDOM,
+    quantityScope,
     minimumSatisfied,
   };
 }
@@ -2072,26 +2218,512 @@ export function evaluateFinanceFieldBrowserEvidence({
   };
 }
 
+export function matchCanonicalDOMRows(rows, records) {
+  const matched = new Set();
+  for (const record of records) {
+    if (
+      rows.some((row) => {
+        const idMatches = !record.key || String(row.key) === String(record.key);
+        const tokens = [row.taskCode, ...(row.cells || [])];
+        const escaped = record.identifier.replace(
+          /[.*+?^${}()|[\]\\]/gu,
+          "\\$&",
+        );
+        const wholeIdentifier = new RegExp(
+          `(?:^|[^A-Za-z0-9_-])${escaped}(?=$|[^A-Za-z0-9_-])`,
+          "u",
+        );
+        return (
+          idMatches &&
+          tokens.some((value) => wholeIdentifier.test(String(value || "")))
+        );
+      })
+    )
+      matched.add(record.identifier);
+  }
+  return [...matched];
+}
+
+export function buildCurrentBatchDOMRecords({ facts, role, task } = {}) {
+  const refs = facts?.referenceRecords || {};
+  const entries = (items, fields, withID = true) =>
+    (items || []).flatMap((item) => {
+      const identifier = fields
+        .map((field) => String(item?.[field] || "").trim())
+        .find(Boolean);
+      return identifier
+        ? [{ key: withID ? String(item.id) : "", identifier }]
+        : [];
+    });
+  const finance = (type) =>
+    entries(
+      (refs.financeFacts || []).filter(
+        (row) => String(row.fact_type || row.factType).toUpperCase() === type,
+      ),
+      ["fact_no", "factNo"],
+    );
+  const formalNames = new Set(
+    manualAcceptanceAccountSetForTarget(
+      role?.target || "local-dev",
+    ).browserProfiles.map((account) => account.username),
+  );
+  let taskCodes = [];
+  if (task) {
+    const plan = buildManualAcceptanceTaskDataPlan({
+      runId: task.runId,
+      taskProfile: task.taskProfile,
+      target: task.target,
+      backendURL: task.backendURL,
+      databaseName: task.databaseName,
+      dataVersion: task.dataVersion,
+      nowSec: task.schedule?.anchorUnix,
+    });
+    if (
+      [
+        "sourceID",
+        "sourceType",
+        "prefix",
+        "batchRunId",
+        "copyRevision",
+        "taskProfile",
+      ].some((key) => task[key] !== plan[key]) ||
+      task.summary?.persisted !== plan.tasks.length
+    )
+      throw new BrowserAcceptanceError(
+        "task canonical 报告与当前正式任务码计划不一致",
+      );
+    taskCodes = plan.tasks
+      .filter((item) => item.createParams.owner_role_key === "boss")
+      .map((item) => ({ key: "", identifier: item.createParams.task_code }));
+  }
+  return {
+    "task-board": taskCodes,
+    "production-orders": entries(refs.productionOrders, [
+      "order_no",
+      "orderNo",
+    ]),
+    "production-progress": entries(refs.productionFacts, ["fact_no", "factNo"]),
+    inbound: entries(refs.purchaseReceipts, ["receipt_no", "receiptNo"]),
+    inventory: entries(refs.inventoryLots, ["lot_no", "lotNo"]).map(
+      (record) => ({ ...record, key: `lots-${record.key}` }),
+    ),
+    "quality-inspections": entries(refs.qualityInspections, [
+      "inspection_no",
+      "inspectionNo",
+    ]),
+    outbound: entries(refs.stockReservations, [
+      "reservation_no",
+      "reservationNo",
+    ]),
+    shipments: entries(refs.shipments, ["shipment_no", "shipmentNo"]),
+    "production-exceptions": entries(refs.productionExceptions, [
+      "decision_no",
+      "decisionNo",
+    ]),
+    "production-scheduling": (refs.productionOrders || [])
+      .filter((row) =>
+        ["RELEASED", "CLOSED"].includes(String(row.status).toUpperCase()),
+      )
+      .map((row) => ({
+        key: "",
+        identifier: `source-production-scheduling-${row.id}`,
+      })),
+    "shipping-release": entries(
+      (refs.shipments || []).filter(
+        (row) => row.finance_approval_task_code || row.financeApprovalTaskCode,
+      ),
+      ["finance_approval_task_code", "financeApprovalTaskCode"],
+      false,
+    ),
+    receivables: finance("RECEIVABLE"),
+    payables: finance("PAYABLE"),
+    reconciliation: finance("RECONCILIATION"),
+    invoices: finance("INVOICE"),
+    "finance-payments": entries(refs.financePayments, [
+      "payment_no",
+      "paymentNo",
+    ]),
+    "permission-center": entries(
+      (role?.formalAccountBootstrap?.accounts || []).filter((row) =>
+        formalNames.has(row.username),
+      ),
+      ["username"],
+    ),
+  };
+}
+
+async function prepareListQuantityScope(page, target) {
+  const hasLifecycle = [
+    "customers",
+    "suppliers",
+    "products",
+    "materials",
+    "processes",
+    "sales-orders",
+    "material-bom",
+    "accessories-purchase",
+    "processing-contracts",
+    "production-orders",
+  ].includes(target.key);
+  const trigger = page
+    .getByRole("button", { name: /^筛选(?:\s|·|$)/u })
+    .filter({ visible: true })
+    .first();
+  if (hasLifecycle) {
+    await trigger.click();
+    const panel = page.getByRole("dialog", { name: "筛选条件", exact: true });
+    const clear = panel.getByRole("button", { name: "清空筛选", exact: true });
+    if ((await clear.count()) && (await clear.isEnabled())) await clear.click();
+    await panel
+      .getByRole("group", { name: "记录范围", exact: true })
+      .getByRole("button", { name: "全部记录", exact: true })
+      .click();
+    await panel.getByRole("button", { name: "完成", exact: true }).click();
+    await page.waitForURL((url) => url.searchParams.get("scope") === "all", {
+      timeout: PAGE_TIMEOUT_MS,
+    });
+  }
+  const search = page
+    .locator(
+      'input[aria-label^="可搜索："],input[placeholder*="搜"],input[placeholder^="操作人"]',
+    )
+    .filter({ visible: true })
+    .first();
+  if (await search.count()) {
+    await search.fill("");
+    await search.press("Enter");
+  }
+  const status = page
+    .locator(
+      '.erp-business-status-filters button[aria-label^="不限状态，"],.erp-business-status-filters button[aria-label^="全部状态，"]',
+    )
+    .filter({ visible: true })
+    .first();
+  if (
+    (await status.count()) &&
+    (await status.getAttribute("aria-pressed")) !== "true"
+  )
+    await status.click();
+  return {
+    lifecycle: hasLifecycle ? "all" : "not_applicable",
+    status: (await status.count()) ? "unrestricted" : "page_default",
+    search: "",
+  };
+}
+
+async function readStableListSnapshot(page) {
+  await page.waitForFunction(
+    () =>
+      ![
+        ...document.querySelectorAll('.ant-spin-spinning,[aria-busy="true"]'),
+      ].some(
+        (node) =>
+          node.getBoundingClientRect().width > 0 &&
+          node.getBoundingClientRect().height > 0,
+      ),
+    null,
+    { timeout: PAGE_TIMEOUT_MS },
+  );
+  return page.evaluate(readListDOMSnapshot);
+}
+
+export async function collectCanonicalQuantity(page, target, records, scope) {
+  if (
+    !Array.isArray(records) ||
+    new Set(records.map((row) => row.identifier)).size < target.minimumRecords
+  ) {
+    throw new BrowserAcceptanceError(
+      `${target.title} 缺少达到门槛的 canonical 同单位记录集合`,
+    );
+  }
+  await page.waitForFunction(
+    (minimum) => {
+      const texts = [
+        ...document.querySelectorAll(".ant-pagination-total-text"),
+      ].map((node) => node.textContent || "");
+      return (
+        !document.querySelector(".ant-spin-spinning") &&
+        texts.some((text) => {
+          const match = text.replaceAll(",", "").match(/共\s*(\d+)\s*条/u);
+          return match && Number(match[1]) >= minimum;
+        })
+      );
+    },
+    target.minimumRecords,
+    { timeout: PAGE_TIMEOUT_MS },
+  );
+  const matched = new Set();
+  const pages = [];
+  let snapshot;
+  for (;;) {
+    snapshot = await readStableListSnapshot(page);
+    const total = readScopedPageTotal(snapshot.totalTexts);
+    if (
+      !total.consistent ||
+      total.total < target.minimumRecords ||
+      (pages.length > 0 && total.total !== pages[0].total)
+    )
+      throw new BrowserAcceptanceError(
+        `${target.title} 缺少明确、同范围且一致的页面总数`,
+      );
+    matchCanonicalDOMRows(snapshot.rows, records).forEach((id) =>
+      matched.add(id),
+    );
+    const signature = snapshot.rows
+      .map((row) => `${row.key}:${row.text}`)
+      .join("|");
+    pages.push({
+      total: total.total,
+      renderedRows: snapshot.rows.length,
+      matchedSoFar: matched.size,
+      rowKeys: snapshot.rows.map((row) => row.key),
+    });
+    if (matched.size >= target.minimumRecords) break;
+    const next = page
+      .locator(".ant-pagination-next:not(.ant-pagination-disabled)")
+      .filter({ visible: true })
+      .last();
+    if (!(await next.count())) break;
+    await next.click();
+    await page.waitForFunction(
+      (previous) => {
+        const rows = [
+          ...document.querySelectorAll(".ant-table-tbody > tr.ant-table-row"),
+        ];
+        return (
+          !document.querySelector(".ant-spin-spinning") &&
+          rows
+            .map(
+              (row) =>
+                `${row.getAttribute("data-row-key") || ""}:${row.textContent?.replace(/\s+/gu, " ").trim() || ""}`,
+            )
+            .join("|") !== previous
+        );
+      },
+      signature,
+      { timeout: PAGE_TIMEOUT_MS },
+    );
+    if (pages.length > 100)
+      throw new BrowserAcceptanceError(
+        "页面分页没有在有界 canonical 采证内结束",
+      );
+  }
+  const total = readScopedPageTotal(snapshot.totalTexts);
+  return {
+    mode: "canonical_records",
+    unit: target.key === "inventory" ? "inventory-lots" : target.key,
+    scopeVerified: true,
+    total: total.total,
+    totalConsistent: total.consistent,
+    canonicalMembershipVerified: true,
+    canonicalIdentifiers: records.map((record) => record.identifier),
+    matchedIdentifiers: [...matched],
+    canonicalRecords: records.length,
+    scope,
+    pages,
+    renderedRows: snapshot.rows.length,
+    snapshot,
+  };
+}
+
+async function readPrefixQuantity(
+  page,
+  target,
+  currentBatch,
+  filter,
+  unit = target.key,
+  minimum = target.minimumRecords,
+) {
+  const probeID =
+    {
+      "material-bom": "bom-versions",
+      "accessories-purchase": "purchase-orders",
+      "processing-contracts": "outsourcing-orders",
+    }[unit] || unit;
+  const probe = currentBatch.probes.find((probe) => probe.id === probeID);
+  if (
+    probe?.status !== "pass" ||
+    probe.batchEvidence !== "prefix_filtered" ||
+    !probe.batchPrefix ||
+    !filter.identifier.startsWith(probe.batchPrefix)
+  )
+    throw new BrowserAcceptanceError(
+      `${target.title} 缺少同单位、本批前缀的绑定查询证据`,
+    );
+  const expectedTotal = probe.actual;
+  const currentBatchDOM = await filterVisibleListToCurrentBatch(
+    page,
+    target,
+    filter,
+  );
+  await page.waitForFunction(
+    ({ expected }) => {
+      const texts = [
+        ...document.querySelectorAll(".ant-pagination-total-text"),
+      ].map((node) => node.textContent || "");
+      return (
+        !document.querySelector(".ant-spin-spinning") &&
+        texts.some((text) =>
+          new RegExp(`共\\s*${expected}\\s*条`, "u").test(text),
+        )
+      );
+    },
+    { expected: expectedTotal },
+    { timeout: PAGE_TIMEOUT_MS },
+  );
+  const snapshot = await readStableListSnapshot(page);
+  const total = readScopedPageTotal(snapshot.totalTexts);
+  const marker = filter.identifier.toLowerCase();
+  return {
+    mode: "filtered_prefix",
+    unit,
+    scopeVerified: true,
+    total: total.total,
+    totalConsistent: total.consistent,
+    expectedTotal,
+    sourceProbeId: probe.id,
+    sourceBatchPrefix: probe.batchPrefix,
+    minimumRecords: minimum,
+    renderedRows: snapshot.rows.length,
+    matchingRows: snapshot.rows.filter((row) =>
+      `${row.taskCode} ${row.text}`.toLowerCase().includes(marker),
+    ).length,
+    scope: { lifecycle: "all", search: filter.identifier },
+    currentBatchDOM,
+    snapshot,
+  };
+}
+
+async function readTaskBoardQuantity(
+  page,
+  target,
+  currentBatch,
+  filter,
+  records,
+) {
+  if (!Array.isArray(records) || records.length < target.minimumRecords)
+    throw new BrowserAcceptanceError("任务页面缺少当前正式任务码集合");
+  await page.getByRole("tab", { name: "全部任务", exact: true }).click();
+  const list = page.getByLabel("待办显示方式", { exact: true });
+  if (await list.count()) await list.getByText("列表", { exact: true }).click();
+  await filterVisibleListToCurrentBatch(page, target, filter);
+  const groups = [];
+  const matched = new Set();
+  for (const { title, key } of TASK_BOARD_LANE_DEFINITIONS) {
+    const button = page
+      .getByRole("navigation", { name: "任务分类", exact: true })
+      .locator(`button[data-lane="${key}"]`);
+    await button
+      .filter({ hasText: /\d/u })
+      .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+    const count = Number(
+      (await button.getAttribute("aria-label")).match(/，\s*(\d+) 项$/u)?.[1],
+    );
+    if (!Number.isSafeInteger(count))
+      throw new BrowserAcceptanceError("任务分类数量尚不可用");
+    if (!count) {
+      groups.push({ lane: key, total: 0, pages: [] });
+      continue;
+    }
+    if ((await button.getAttribute("aria-pressed")) !== "true")
+      await button.click();
+    const navigation = page.getByRole("navigation", {
+      name: "任务分页",
+      exact: true,
+    });
+    await navigation
+      .getByRole("status")
+      .filter({ hasText: new RegExp(`共 ${count} 项$`, "u") })
+      .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+    const laneCodes = new Set();
+    const pages = [];
+    for (;;) {
+      const snapshot = await readStableListSnapshot(page);
+      const total = readScopedPageTotal(snapshot.totalTexts);
+      const codes = matchCanonicalDOMRows(snapshot.rows, records);
+      if (
+        total.total !== count ||
+        !total.consistent ||
+        !snapshot.rows.length ||
+        codes.length !== snapshot.rows.length
+      )
+        throw new BrowserAcceptanceError(
+          `${title}分类数量、分页或正式任务码不一致`,
+        );
+      codes.forEach((code) => laneCodes.add(code));
+      pages.push({ total: count, taskCodes: codes });
+      const next = navigation.locator(
+        ".ant-pagination-next:not(.ant-pagination-disabled)",
+      );
+      if (!(await next.count())) break;
+      await next.click();
+      await page.waitForFunction(
+        (previous) => {
+          const codes = [
+            ...document.querySelectorAll(".erp-task-table-row[data-task-code]"),
+          ].map((row) => row.getAttribute("data-task-code"));
+          return (
+            !document.querySelector(".ant-spin-spinning") &&
+            codes.join("|") !== previous
+          );
+        },
+        snapshot.rows.map((row) => row.taskCode).join("|"),
+        { timeout: PAGE_TIMEOUT_MS },
+      );
+      if (pages.length > records.length)
+        throw new BrowserAcceptanceError(
+          "任务分类分页重复，无法证明当前任务码",
+        );
+    }
+    if (
+      laneCodes.size !== count ||
+      [...laneCodes].some((code) => matched.has(code))
+    )
+      throw new BrowserAcceptanceError(
+        "任务分类数量与去重后的当前批次任务码不一致",
+      );
+    laneCodes.forEach((code) => matched.add(code));
+    groups.push({ lane: key, total: count, pages });
+  }
+  await page.getByRole("button", { name: "任务概览", exact: true }).click();
+  const snapshot = await readStableListSnapshot(page);
+  return {
+    mode: "canonical_records",
+    unit: target.key,
+    scopeVerified: true,
+    total: groups.reduce((sum, group) => sum + group.total, 0),
+    totalConsistent: true,
+    canonicalMembershipVerified: true,
+    canonicalIdentifiers: records.map((record) => record.identifier),
+    matchedIdentifiers: [...matched],
+    canonicalRecords: records.length,
+    renderedRows: snapshot.rows.length,
+    scope: {
+      mode: "all",
+      search: filter.identifier,
+      categories: groups,
+      restoredTo: "overview",
+    },
+    snapshot,
+  };
+}
+
 async function readListEvidence(page, target, datasetBinding) {
   let specializedEvidence = null;
   let currentBatchDOM = null;
   const expectedShipments =
     target.key === "shipments" ? datasetBinding?.dataset?.shipments : null;
-  if (target.group === "mobile") {
+  if (target.group === "mobile")
     return readMobileTaskEvidence(page, target, datasetBinding);
-  }
   const currentBatch = requireCurrentBatchTargetEvidence(
     target,
     datasetBinding,
   );
   if (target.key === "permission-center") {
-    const accountTab = page.getByRole("tab", { name: /员工账号/u });
-    if (await accountTab.count()) {
-      await accountTab.click();
-      await page
-        .locator(".erp-permission-section--admins .ant-table-tbody")
-        .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
-    }
+    await page.getByRole("tab", { name: /员工账号/u }).click();
+    await page
+      .locator(".erp-permission-section--admins .ant-table-tbody")
+      .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
   }
   if (target.key === "inventory") {
     await page.getByRole("tab", { name: "库存批次", exact: true }).click();
@@ -2099,103 +2731,120 @@ async function readListEvidence(page, target, datasetBinding) {
       .getByPlaceholder(BUSINESS_SEARCH_SCOPES.lots.placeholder, {
         exact: true,
       })
-      .waitFor({
-        state: "visible",
-        timeout: PAGE_TIMEOUT_MS,
-      });
+      .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
   }
+  const scope = await prepareListQuantityScope(page, target);
   if (target.key === "shipments") {
-    if (
-      expectedShipments?.exactCount !== MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT
-    ) {
-      throw new BrowserAcceptanceError(
-        `出货数据报告必须精确包含 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单`,
-      );
-    }
+    if (expectedShipments?.exactCount !== MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT)
+      throw new BrowserAcceptanceError("出货报告没有精确47张同批出货单");
+    const numbers = datasetBinding.dataset.currentBatchDOMRecords.shipments.map(
+      (record) => record.identifier,
+    );
+    let prefix = numbers[0] || "";
+    for (const number of numbers)
+      while (!number.startsWith(prefix)) prefix = prefix.slice(0, -1);
+    if (prefix.length < 12)
+      throw new BrowserAcceptanceError("出货报告缺少唯一的本批业务编号前缀");
+    const search = page.getByPlaceholder(
+      BUSINESS_SEARCH_SCOPES.shipment.placeholder,
+      { exact: true },
+    );
+    await search.fill(prefix);
+    await search.press("Enter");
     await page.waitForFunction(
       shipmentListReady,
       expectedShipments.exactCount,
       { timeout: PAGE_TIMEOUT_MS },
     );
+    scope.search = prefix;
   }
-  if (target.key !== "shipments") {
-    const filter = resolveCurrentBatchListFilter(
+  let quantityScope;
+  const filter = resolveCurrentBatchListFilter(
+    target,
+    currentBatch,
+    datasetBinding,
+  );
+  if (target.key === "print-center") {
+    currentBatchDOM = filter;
+  } else if (target.key === "system-audit-logs") {
+    const snapshot = await readStableListSnapshot(page);
+    const total = readScopedPageTotal(snapshot.totalTexts);
+    quantityScope = {
+      mode: "environment_audit_records",
+      unit: target.key,
+      scopeVerified: true,
+      currentBatchApplicable: false,
+      reason: "registered_not_applicable",
+      total: total.total,
+      totalConsistent: total.consistent,
+      scope,
+      snapshot,
+    };
+  } else if (target.key === "task-board") {
+    quantityScope = await readTaskBoardQuantity(
+      page,
       target,
       currentBatch,
-      datasetBinding,
+      filter,
+      datasetBinding?.dataset?.currentBatchDOMRecords?.[target.key],
     );
-    currentBatchDOM =
-      filter.mode === "bound_catalog"
-        ? filter
-        : await filterVisibleListToCurrentBatch(page, target, filter);
+  } else if (filter.mode === "source_prefix") {
+    quantityScope = await readPrefixQuantity(
+      page,
+      target,
+      currentBatch,
+      filter,
+    );
+  } else {
+    quantityScope = await collectCanonicalQuantity(
+      page,
+      target,
+      datasetBinding?.dataset?.currentBatchDOMRecords?.[target.key],
+      scope,
+    );
   }
-  const metrics = await page.evaluate(() => {
-    const visible = (node) => {
-      const rect = node.getBoundingClientRect();
-      const style = window.getComputedStyle(node);
-      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden";
-    };
-    const tableRowNodes = [
-      ...document.querySelectorAll(".ant-table-tbody > tr"),
-    ].filter(
-      (row) => visible(row) && !row.classList.contains("ant-table-placeholder"),
+  let snapshot =
+    quantityScope?.snapshot || (await readStableListSnapshot(page));
+  if (target.key === "products") {
+    quantityScope.supportingSourceUnits = [
+      {
+        unit: "sku",
+        actual:
+          currentBatch.probes.find((probe) => probe.id === "product-skus")
+            ?.actual ?? null,
+        evidenceSource: "bound readiness probe",
+        uiQuantityProven: false,
+      },
+    ];
+  }
+  // Representative lookup verifies fields and navigation after quantity has been
+  // measured. Its one-row result never supplies a batch minimum.
+  if (
+    target.key !== "shipments" &&
+    target.key !== "system-audit-logs" &&
+    target.key !== "print-center"
+  ) {
+    currentBatchDOM = await filterVisibleListToCurrentBatch(
+      page,
+      target,
+      filter,
     );
-    const tableRows = tableRowNodes.length;
-    const tableHeaders = [
-      ...document.querySelectorAll(".ant-table-thead th"),
-    ].map((node) => node.textContent?.replace(/\s+/gu, " ").trim() || "");
-    const tableRowCells = tableRowNodes.map((row) =>
-      [...row.querySelectorAll("td")].map(
-        (cell) => cell.textContent?.replace(/\s+/gu, " ").trim() || "",
-      ),
-    );
-    const mobileRows = [
-      ...document.querySelectorAll(".erp-mobile-list-item"),
-    ].filter(visible).length;
-    const printTemplates = [
-      ...document.querySelectorAll(".erp-print-center-template-btn"),
-    ].filter(visible).length;
-    const taskCards = [
-      ...document.querySelectorAll(".erp-task-board-card"),
-    ].filter(visible).length;
-    const auditEvents = [
-      ...document.querySelectorAll(".erp-audit-event"),
-    ].filter(visible).length;
-    const paginationTexts = [
-      ...document.querySelectorAll(
-        ".ant-pagination-total-text,.ant-pagination,.erp-audit-pagination",
-      ),
-    ].map((node) => node.textContent || "");
-    const bodyText = document.body?.innerText || "";
-    return {
-      tableRows,
-      mobileRows,
-      printTemplates,
-      taskCards,
-      auditEvents,
-      paginationTexts,
-      bodyText,
-      tableHeaders,
-      tableRowCells,
-    };
-  });
-  const renderedItems = Math.max(
-    metrics.tableRows,
-    metrics.mobileRows,
-    metrics.printTemplates,
-    metrics.taskCards,
-    metrics.auditEvents,
-  );
-  const pageReportedTotal = Math.max(
-    renderedItems,
-    largestTotalFromTexts([...metrics.paginationTexts, metrics.bodyText]),
-    readBusinessSummaryTotal(target.key, metrics.bodyText),
-  );
+    snapshot = await readStableListSnapshot(page);
+  }
+  const metrics = {
+    tableHeaders: snapshot.headers,
+    tableRowCells: snapshot.rows.map((row) => row.cells),
+  };
+  const renderedItems =
+    target.key === "print-center"
+      ? await page.locator(".erp-print-center-template-btn").count()
+      : snapshot.rows.length;
+  const pageReportedTotal = quantityScope?.total || 0;
   if (target.key === "shipments") {
     const expected = expectedShipments;
-    if (pageReportedTotal !== expected.exactCount) {
+    if (quantityScope.total !== expected.exactCount) {
       throw new BrowserAcceptanceError(
-        `出货页面必须精确显示 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单，当前为 ${pageReportedTotal}`,
+        `出货页面必须精确显示 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单，当前为 ${quantityScope.total}`,
       );
     }
     const search = page.getByPlaceholder(
@@ -2223,7 +2872,7 @@ async function readListEvidence(page, target, datasetBinding) {
     await lineTag.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     specializedEvidence = {
       passed: true,
-      exactCount: pageReportedTotal,
+      exactCount: quantityScope.total,
       longShipmentNo: expected.longShipmentNo,
       longLineCount: MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
     };
@@ -2253,24 +2902,35 @@ async function readListEvidence(page, target, datasetBinding) {
       );
     }
   }
+
   const specializedTarget = [
     "shipments",
     ...Object.keys(FINANCE_BROWSER_PAGE_CONTRACT),
   ].includes(target.key);
+  if (quantityScope) delete quantityScope.snapshot;
   const evidence = evaluateCurrentBatchListEvidence({
     currentBatch,
     currentBatchDOM,
     renderedItems,
     pageReportedTotal,
     minimumRecords: target.minimumRecords,
+    quantityScope,
+    expectedUnit: target.key === "inventory" ? "inventory-lots" : target.key,
     exactEvidencePassed:
-      !specializedTarget ||
-      (specializedEvidence?.passed === true &&
-        currentBatch.actual >= target.minimumRecords),
+      !specializedTarget || specializedEvidence?.passed === true,
   });
   return {
     ...evidence,
     specializedEvidence,
+    currentBatchProof:
+      target.key === "system-audit-logs"
+        ? { applicable: false, reason: "registered_not_applicable" }
+        : { applicable: true, representative: currentBatchDOM },
+    finalScope: {
+      url: page.url(),
+      quantitySearch: quantityScope?.scope?.search || "",
+      representativeSearch: currentBatchDOM?.identifier || null,
+    },
   };
 }
 
@@ -2942,6 +3602,7 @@ export function assertScenarioDemoBrowserDataset({
     exactEmptyBusinessBaseline: false,
     legacyDataPreserved: true,
     currentStageLogicVerified: true,
+    databaseName: printInput.databaseName,
     sourceScaleProfile: "volume",
   };
 }
@@ -3620,6 +4281,7 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
     currentBatchIdentifiers: currentBatchFactIdentifiers(
       components.facts.report,
     ),
+    currentBatchDOMRecords: buildCurrentBatchDOMRecords({ facts: components.facts.report, role: components.role.report, task: components.task.report }),
     attachments: {
       reportPath: path.relative(REPO_ROOT, components.attachments.path),
       componentDigest: componentDigests.attachments,

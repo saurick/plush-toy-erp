@@ -545,6 +545,8 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
 
 最后执行真实浏览器只读核对。页面能打开、页面有数据、数量达到门槛和人工确认是四类不同证据，不能合并成一句“已验收”：
 
+列表先通过正式 UI 选择“全部记录 / 不限状态”并清除单据精筛，再记录明确分页或状态范围的总数、计量单位和查询范围。源数据按本批前缀过滤，所有实际渲染行均须属于该前缀，过滤总数须与同单位的绑定来源一致；事实、正式账号与业务协同任务按 canonical 单据 ID / 完整业务号 / 任务码逐页核对到原最低数量，历史或额外记录不计入本批。随后另行定位代表单据检查字段与详情，并分别保留 `quantityScope`、`currentBatchProof` 和最终筛选范围；一条精确搜索结果不能证明全批 45 条，产品数量与 SKU 数量、库存批次与余额数量不得互换。唯一登记为 `not_applicable` 的系统操作记录目标按当前绑定运行环境的全局审计范围证明至少 30 条，报告标为 `environment_audit_records`，不宣称本批 30 个审计事件；账号或事件搜索属于独立筛选证据。
+
 ```bash
 node scripts/qa/manual-acceptance-browser.mjs --plan \
   --base-url http://127.0.0.1:15200 \

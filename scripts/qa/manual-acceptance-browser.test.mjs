@@ -31,12 +31,17 @@ import {
   resolveManualAcceptanceBrowserInputReportPath,
   resolveManualAcceptanceDatasetReportRoot,
   runManualAcceptanceBrowser,
-  readBusinessSummaryTotal,
+  readScopedPageTotal,
+  matchCanonicalDOMRows,
+  buildCurrentBatchDOMRecords,
+  collectCanonicalQuantity,
+  readListDOMSnapshot,
   readMobileTaskTotal,
   resolveCurrentBatchListFilter,
   sourceDocumentSearchPrefix,
   shipmentListReady,
   evaluateBusinessDashboardEvidence,
+  browserProjectionBaselineProven,
   evaluateBusinessDashboardCurrentBatchEvidence,
   evaluateDashboardTaskCurrentBatchEvidence,
   evaluateFinanceFieldBrowserEvidence,
@@ -76,6 +81,7 @@ import {
   TASK_PROFILE_LONG_LIVED_WORKBENCH,
   TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
   buildManualAcceptanceTaskSchedule,
+  buildManualAcceptanceTaskDataPlan,
   manualAcceptanceTaskBatchIdentity,
 } from "./manual-acceptance-task-data.mjs";
 import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
@@ -362,6 +368,9 @@ async function datasetApplyEvidenceFixture({
     ),
   };
   reports.task.schedule = taskSchedule;
+  const taskPlan = buildManualAcceptanceTaskDataPlan({ ...printInput, nowSec: taskSchedule.anchorUnix });
+  for (const key of ["sourceID", "sourceType", "prefix", "batchRunId", "copyRevision", "taskProfile"]) reports.task[key] = taskPlan[key];
+  reports.task.summary.persisted = taskPlan.tasks.length;
   reports.facts.referenceRecords = {
     shipments: Array.from({ length: 47 }, (_, index) => ({
       id: 120_000 + index,
@@ -1082,6 +1091,8 @@ test("manual acceptance browser boundary isolates legal acknowledgement from bus
       "legal_notice_acknowledgement",
       "route_navigation",
       "read_only_tab_navigation",
+      "read_only_filter_changes",
+      "read_only_pagination",
     ],
   });
 });
@@ -2262,61 +2273,31 @@ test("formal login retries only bounded pure HTTP 429 failures", async () => {
   assert.equal(attempts, 3);
 });
 
-test("business summary totals use the visible client-facing counters", () => {
-  assert.equal(readBusinessSummaryTotal("task-board", "全部任务 20"), 20);
-  assert.equal(
-    readBusinessSummaryTotal(
-      "task-board",
-      "常规待办 7 异常处理 3 到期提醒 8 已结束 2",
-    ),
-    20,
-  );
-  assert.equal(
-    readBusinessSummaryTotal("task-board", "常规待办 7 到期提醒 8 已结束 2"),
-    0,
-  );
-  assert.equal(
-    readBusinessSummaryTotal("products", "总产品 34 当前结果 20"),
-    34,
-  );
-  assert.equal(
-    readBusinessSummaryTotal("accessories-purchase", "总订单 203"),
-    203,
-  );
-  assert.equal(
-    readBusinessSummaryTotal(
-      "permission-center",
-      "岗位设置 11 共 22 个员工账号",
-    ),
-    22,
-  );
-  assert.equal(
-    readBusinessSummaryTotal(
-      "permission-center",
-      "岗位设置 22 共 5 个员工账号",
-    ),
-    5,
-  );
-  assert.equal(
-    readBusinessSummaryTotal("production-orders", "符合条件 47 当前页 20"),
-    47,
-  );
-  assert.equal(readBusinessSummaryTotal("shipments", "符合条件 47"), 47);
+test("scoped totals accept current pagination units and reject unrelated or contradictory counts", () => {
+  for (const label of ["第 1–20 单，共 45 单", "第 1-10 条 / 共 45 条", "共 45 条", "不限状态，共 45 条"]) {
+    assert.deepEqual(readScopedPageTotal([label]).total, 45);
+  }
+  assert.equal(readScopedPageTotal(["第 1–10 项，共 20 项"]).total, 20);
+  assert.equal(readScopedPageTotal(["合同金额45 库存100 当前页20"]).total, null);
+  assert.equal(readScopedPageTotal(["共45条", "不限状态，共44条"]).consistent, false);
+  assert.equal(readScopedPageTotal([]).total, null);
 });
 
-test("shipment list readiness waits for both the exact total and rendered rows", () => {
+test("shipment list readiness waits for its selected current status scope and rendered rows", () => {
   const originalDocument = globalThis.document;
   try {
+    let label = "不限状态，共 47 条";
+    let rows = [{}];
     globalThis.document = {
-      body: { innerText: "符合条件 47 本页显示 20" },
-      querySelectorAll: () => [{ classList: { contains: () => false } }],
+      querySelector: () => ({ querySelector: () => ({ getAttribute: () => label }) }),
+      querySelectorAll: () => rows,
     };
     assert.equal(shipmentListReady(47), true);
     assert.equal(shipmentListReady(46), false);
-    globalThis.document = {
-      body: { innerText: "符合条件 47 本页显示 0" },
-      querySelectorAll: () => [],
-    };
+    label = "不限状态，共 48 条";
+    assert.equal(shipmentListReady(47), false);
+    label = "不限状态，共 47 条";
+    rows = [];
     assert.equal(shipmentListReady(47), false);
   } finally {
     if (originalDocument === undefined) delete globalThis.document;
@@ -2409,6 +2390,7 @@ test("current-batch list evidence cannot be satisfied by an unrelated page total
       renderedItems: 20,
       pageReportedTotal: 60,
       minimumRecords: 60,
+      quantityScope: { mode: "filtered_prefix", unit: "records", scopeVerified: true, total: 60, expectedTotal: 60, renderedRows: 20, matchingRows: 20, totalConsistent: true, scope: { search: "YS8" } },
     }).minimumSatisfied,
     true,
   );
@@ -2546,6 +2528,7 @@ test("task board binds task-code metadata to the exact current-batch total", () 
     },
     renderedItems: 20,
     minimumRecords: 20,
+    quantityScope: { mode: "filtered_prefix", unit: "records", scopeVerified: true, total: 20, expectedTotal: 20, renderedRows: 20, matchingRows: 20, totalConsistent: true, scope: { search: prefix } },
   };
   assert.equal(
     evaluateCurrentBatchListEvidence({ ...base, pageReportedTotal: 20 })
@@ -3154,7 +3137,7 @@ test("business print proof searches canonical current-batch records before exact
   assert.match(source, /buildPrintWorkspaceDataEvidence/u);
   assert.match(source, /recordQuery/u);
   assert.match(source, /search\.fill\(recordQuery\)/u);
-  assert.doesNotMatch(source, /search\.press\("Enter"\)/u);
+  assert.doesNotMatch(source.slice(currentBatchMinimumIndex, exactRecordIndex + 60), /search\.press\("Enter"\)/u);
   assert.match(
     source,
     /rows\.every\(\(candidate\) => candidate\.innerText\.includes\(query\)\)/u,
@@ -3231,7 +3214,7 @@ test("business print proof searches canonical current-batch records before exact
 test("permission center evidence follows the current employee-account tab", async () => {
   const source = await fs.readFile(scriptPath, "utf8");
   assert.match(source, /getByRole\("tab", \{ name: \/员工账号\/u \}\)/u);
-  assert.match(source, /共\\s\*\(\\d\+\)\\s\*个员工账号/u);
+  assert.equal(readScopedPageTotal(["命中 11/15 个员工账号"]).total, 11);
   assert.doesNotMatch(
     source,
     /getByRole\("tab", \{ name: \/管理员账号\/u \}\)/u,
@@ -3375,22 +3358,15 @@ test("historical readiness evidence cannot override a current DOM minimum failur
   assert.equal(summary.failedDataMinimums.length, 1);
 });
 
-test("readiness binding cannot replace current DOM list minimum proof", async () => {
-  const source = await fs.readFile(
-    path.resolve(repoRoot, "scripts/qa/manual-acceptance-browser.mjs"),
-    "utf8",
-  );
-  assert.match(source, /\.erp-task-board-card/u);
-  assert.match(source, /\.erp-audit-event/u);
-  assert.match(
-    source,
-    /\.ant-table-tbody > tr:not\(\.ant-table-placeholder\)/u,
-  );
-  assert.match(source, /name: \/打开可编辑打印窗口\/u/u);
-  assert.match(source, /name: \/查看明细\/u/u);
-  assert.match(source, /getByRole\("tab", \{ name: \/员工账号/u);
-  assert.match(source, /readinessReportSHA256/u);
-  assert.match(source, /failedDataMinimums = dataEvidenceTargets\.filter/u);
+test("readiness binding cannot replace canonical DOM minimum proof", () => {
+  const records = Array.from({ length: 45 }, (_, offset) => ({ key: String(offset + 1), identifier: `F-${offset + 1}` }));
+  const rows = [{ key: "1", cells: ["F-1"] }, { key: "999", cells: ["F-2"] }, { key: "2", cells: ["OLD-F-2"] }];
+  assert.deepEqual(matchCanonicalDOMRows(rows, records), ["F-1"]);
+  assert.deepEqual(matchCanonicalDOMRows([{ key: "2", cells: ["任务：F-2（来源）"] }], records), ["F-2"]);
+  assert.deepEqual(matchCanonicalDOMRows([{ key: "2", cells: ["F-20"] }], records), []);
+  const base = { currentBatch: { dataStatus: "pass", actual: 45 }, currentBatchDOM: { mode: "exact_business_number", matchingCurrentBatchItems: 1 }, renderedItems: 20, pageReportedTotal: 999, minimumRecords: 45 };
+  assert.equal(evaluateCurrentBatchListEvidence(base).minimumSatisfied, false);
+  assert.equal(evaluateCurrentBatchListEvidence({ ...base, quantityScope: { mode: "canonical_records", unit: "records", scopeVerified: true, total: 999, totalConsistent: true, canonicalMembershipVerified: true, matchedIdentifiers: matchCanonicalDOMRows(rows, records) } }).minimumSatisfied, false);
 });
 
 test("missing password starts zero browsers and performs zero probes", async () => {
@@ -3460,4 +3436,421 @@ test("list minimum rejects a single matching row among historical records", () =
       }).minimumSatisfied,
       false,
     );
+});
+
+test("current status-scope labels replace retired shipment summary text", () => {
+  assert.equal(readScopedPageTotal(["不限状态，共 47 条"]).total, 47);
+  assert.equal(readScopedPageTotal(["符合条件 47"]).total, null);
+  assert.equal(readScopedPageTotal(["已出货，共 45 条"]).total, null);
+});
+
+test("a current-batch scoped total uses its actual page size without treating a representative as the batch", () => {
+  const scoped = {
+    mode: "filtered_prefix",
+    unit: "records",
+    scopeVerified: true,
+    total: 45,
+    expectedTotal: 45,
+    renderedRows: 10,
+    matchingRows: 10,
+    totalConsistent: true,
+    scope: { search: "YS8" },
+  };
+  const base = {
+    currentBatch: { dataStatus: "pass", actual: 45 },
+    currentBatchDOM: {
+      mode: "source_prefix",
+      identifier: "YS8",
+      matchingCurrentBatchItems: 10,
+    },
+    renderedItems: 10,
+    pageReportedTotal: 45,
+    minimumRecords: 45,
+    quantityScope: scoped,
+    expectedUnit: "records",
+  };
+  assert.equal(evaluateCurrentBatchListEvidence(base).minimumSatisfied, true);
+  for (const change of [
+    { scopeVerified: false },
+    { unit: "skus" },
+    { totalConsistent: false },
+    { total: null },
+    { total: 999 },
+    { matchingRows: 1 },
+    { scope: { search: "OLD" } },
+    { mode: "representative", total: 45, matchingRows: 1 },
+  ]) {
+    assert.equal(
+      evaluateCurrentBatchListEvidence({
+        ...base,
+        quantityScope: { ...scoped, ...change },
+      }).minimumSatisfied,
+      false,
+      JSON.stringify(change),
+    );
+  }
+});
+
+test("canonical UI quantities require distinct exact records, never a representative plus a global total", () => {
+  const records = Array.from({ length: 45 }, (_, index) => ({
+    key: String(index + 1),
+    identifier: `F-${index + 1}`,
+  }));
+  const rows = records.map((record) => ({
+    key: record.key,
+    cells: [record.identifier],
+  }));
+  const matched = matchCanonicalDOMRows([...rows, rows[0]], records);
+  assert.equal(matched.length, 45);
+  const scope = {
+    mode: "canonical_records",
+    unit: "production-orders",
+    scopeVerified: true,
+    total: 999,
+    totalConsistent: true,
+    matchedIdentifiers: matched,
+    canonicalIdentifiers: records.map((row) => row.identifier),
+    canonicalMembershipVerified: true,
+  };
+  const base = {
+    currentBatch: { dataStatus: "pass", actual: 47 },
+    renderedItems: 20,
+    pageReportedTotal: 999,
+    minimumRecords: 45,
+    expectedUnit: "production-orders",
+    quantityScope: scope,
+  };
+  assert.equal(evaluateCurrentBatchListEvidence(base).minimumSatisfied, true);
+  assert.equal(evaluateCurrentBatchListEvidence(base).observedTotal, 45);
+  for (const change of [
+    { matchedIdentifiers: [matched[0]] },
+    { matchedIdentifiers: [...matched.slice(0, 44), "OTHER"] },
+    { matchedIdentifiers: [...matched.slice(0, 44), matched[0]] },
+    { unit: "skus" },
+    { totalConsistent: false },
+    { total: null },
+  ]) {
+    assert.equal(
+      evaluateCurrentBatchListEvidence({
+        ...base,
+        quantityScope: { ...scope, ...change },
+      }).minimumSatisfied,
+      false,
+    );
+  }
+});
+
+test("canonical quantity traversal reads actual DOM pagination and stops when the minimum is proven", async () => {
+  const saved = { document: globalThis.document, window: globalThis.window };
+  const records = Array.from({ length: 45 }, (_, index) => ({
+    key: String(index + 1),
+    identifier: `F-${index + 1}`,
+  }));
+  const pages = [
+    records.slice(0, 10),
+    records.slice(10, 30),
+    records.slice(30),
+    [{ key: "999", identifier: "unneeded" }],
+  ];
+  let position = 0;
+  let clicks = 0;
+  const node = (text, attributes = {}) => ({
+    textContent: text,
+    getAttribute: (key) => attributes[key] || null,
+    getBoundingClientRect: () => ({ width: 100, height: 20 }),
+  });
+  globalThis.window = { getComputedStyle: () => ({ visibility: "visible" }) };
+  globalThis.document = {
+    querySelector: (selector) => {
+      assert.equal(selector, ".ant-spin-spinning");
+      return null;
+    },
+    querySelectorAll: (selector) => {
+      if (selector.includes(".ant-pagination-total-text"))
+        return [
+          node(
+            `第 ${position * 20 + 1}–${position * 20 + pages[position].length} 条 / 共 100 条`,
+          ),
+        ];
+      if (selector.includes(".ant-table-tbody"))
+        return pages[position].map((record) => ({
+          ...node(record.identifier, { "data-row-key": record.key }),
+          querySelectorAll: (key) => {
+            assert.equal(key, "td");
+            return [node(record.identifier)];
+          },
+        }));
+      if (
+        selector.includes(".ant-table-thead") ||
+        selector.includes(".erp-business-status-filters") ||
+        selector.includes(".ant-spin-spinning")
+      )
+        return [];
+      throw new Error(`unexpected DOM query ${selector}`);
+    },
+  };
+  const next = {
+    filter() {
+      return this;
+    },
+    last() {
+      return this;
+    },
+    async count() {
+      return position < pages.length - 1 ? 1 : 0;
+    },
+    async click() {
+      position += 1;
+      clicks += 1;
+    },
+  };
+  const page = {
+    async waitForFunction(fn, arg) {
+      assert.equal(Boolean(fn(arg)), true);
+    },
+    async evaluate(fn) {
+      assert.equal(fn, readListDOMSnapshot);
+      return fn();
+    },
+    locator(selector) {
+      assert.equal(
+        selector,
+        ".ant-pagination-next:not(.ant-pagination-disabled)",
+      );
+      return next;
+    },
+  };
+  try {
+    const proof = await collectCanonicalQuantity(
+      page,
+      { key: "production-orders", title: "生产订单", minimumRecords: 45 },
+      records,
+      { status: "unrestricted" },
+    );
+    assert.equal(clicks, 2);
+    assert.equal(proof.matchedIdentifiers.length, 45);
+    assert.deepEqual(
+      proof.pages.map((item) => item.renderedRows),
+      [10, 20, 15],
+    );
+    assert.equal(proof.total, 100);
+  } finally {
+    for (const [key, value] of Object.entries(saved))
+      if (value === undefined) delete globalThis[key];
+      else globalThis[key] = value;
+  }
+});
+
+test("only the registered environment audit scope is exempt from batch event identity", () => {
+  const quantityScope = {
+    mode: "environment_audit_records",
+    unit: "system-audit-logs",
+    currentBatchApplicable: false,
+    scopeVerified: true,
+    total: 189,
+    totalConsistent: true,
+  };
+  const base = {
+    currentBatch: {
+      dataStatus: "pass",
+      actual: 189,
+      probes: [
+        { id: "audit-events", status: "pass", batchEvidence: "not_applicable" },
+      ],
+    },
+    renderedItems: 20,
+    pageReportedTotal: 189,
+    minimumRecords: 30,
+    expectedUnit: "system-audit-logs",
+    quantityScope,
+  };
+  assert.equal(evaluateCurrentBatchListEvidence(base).minimumSatisfied, true);
+  assert.equal(
+    evaluateCurrentBatchListEvidence({ ...base, expectedUnit: "customers" })
+      .minimumSatisfied,
+    false,
+  );
+  assert.equal(
+    evaluateCurrentBatchListEvidence({
+      ...base,
+      currentBatch: { ...base.currentBatch, probes: [] },
+    }).minimumSatisfied,
+    false,
+  );
+  assert.equal(
+    evaluateCurrentBatchListEvidence({
+      ...base,
+      pageReportedTotal: 29,
+      quantityScope: { ...quantityScope, total: 29 },
+    }).minimumSatisfied,
+    false,
+  );
+});
+
+test("projection caller accepts only its validated persistent baseline and matched current runtime", async () => {
+  const fixture = await scenarioBrowserEvidenceFixture();
+  try {
+    const baseline = assertScenarioDemoBrowserDataset(fixture);
+    const binding = {
+      target: "scenario-demo",
+      dataset: { targetAlias: "scenario-demo", baseline },
+      runtimeIdentity: {
+        databaseName: fixture.printInput.databaseName,
+        proof: "matched-v1",
+      },
+    };
+    assert.equal(browserProjectionBaselineProven(binding), true);
+    assert.equal(
+      browserProjectionBaselineProven({
+        dataset: { baseline: { exactEmptyBusinessBaseline: true } },
+      }),
+      true,
+    );
+    for (const change of [
+      (value) => {
+        value.dataset.targetAlias = "local";
+      },
+      (value) => {
+        value.dataset.baseline.currentStageLogicVerified = false;
+      },
+      (value) => {
+        delete value.dataset.baseline.legacyDataPreserved;
+      },
+      (value) => {
+        value.runtimeIdentity.databaseName = "wrong";
+      },
+      (value) => {
+        value.runtimeIdentity.proof = "unmatched";
+      },
+    ]) {
+      const value = structuredClone(binding);
+      change(value);
+      assert.equal(browserProjectionBaselineProven(value), false);
+    }
+  } finally {
+    await fs.rm(fixture.outputRoot, { recursive: true, force: true });
+  }
+});
+
+test("DOM reference sets preserve fact units, formal accounts and same-plan task codes", () => {
+  const taskPlan = buildManualAcceptanceTaskDataPlan({
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  });
+  const task = { ...taskPlan, summary: { persisted: taskPlan.tasks.length } };
+  const input = {
+    facts: {
+      referenceRecords: {
+        productionOrders: [{ id: 1, order_no: "SC1", status: "RELEASED" }],
+        inventoryLots: [{ id: 7, lot_no: "LOT7" }],
+        inventoryBalances: [{ id: 99 }],
+        financeFacts: [
+          { id: 11, fact_no: "YS1", fact_type: "RECEIVABLE" },
+          { id: 12, fact_no: "YF1", fact_type: "PAYABLE" },
+        ],
+      },
+    },
+    role: {
+      target: "local-dev",
+      formalAccountBootstrap: {
+        accounts: [
+          { id: 20, username: "demo_boss" },
+          { id: 21, username: "other_boss" },
+        ],
+      },
+    },
+    task,
+  };
+  const records = buildCurrentBatchDOMRecords(input);
+  assert.deepEqual(records.inventory, [{ key: "lots-7", identifier: "LOT7" }]);
+  assert.deepEqual(
+    matchCanonicalDOMRows(
+      [{ key: "balances-7", cells: ["LOT7"] }],
+      records.inventory,
+    ),
+    [],
+  );
+  assert.deepEqual(records.receivables, [{ key: "11", identifier: "YS1" }]);
+  assert.deepEqual(records.payables, [{ key: "12", identifier: "YF1" }]);
+  assert.deepEqual(records["permission-center"], [
+    { key: "20", identifier: "demo_boss" },
+  ]);
+  assert.equal(records["task-board"].length, 20);
+  assert.equal(records["task-board"][0].identifier, "YS-V8-LD-01");
+  for (const key of [
+    "sourceID",
+    "sourceType",
+    "prefix",
+    "batchRunId",
+    "copyRevision",
+    "taskProfile",
+  ]) {
+    assert.throws(() =>
+      buildCurrentBatchDOMRecords({
+        ...input,
+        task: { ...task, [key]: "wrong" },
+      }),
+    );
+  }
+});
+
+test("product quantity is not inferred from its independent SKU source unit", () => {
+  const quantityScope = {
+    mode: "filtered_prefix",
+    unit: "products",
+    scopeVerified: true,
+    total: 20,
+    expectedTotal: 20,
+    renderedRows: 20,
+    matchingRows: 20,
+    totalConsistent: true,
+    scope: { search: "YS8" },
+  };
+  const base = {
+    currentBatch: { dataStatus: "pass", actual: 60 },
+    currentBatchDOM: { mode: "source_prefix", identifier: "YS8" },
+    renderedItems: 20,
+    pageReportedTotal: 20,
+    minimumRecords: 20,
+    expectedUnit: "products",
+    quantityScope,
+  };
+  assert.equal(evaluateCurrentBatchListEvidence(base).minimumSatisfied, true);
+  assert.equal(evaluateCurrentBatchListEvidence(base).observedTotal, 20);
+  assert.equal(
+    evaluateCurrentBatchListEvidence({
+      ...base,
+      quantityScope: { ...quantityScope, unit: "sku" },
+    }).minimumSatisfied,
+    false,
+  );
+});
+
+test("both registered task profiles derive the boss DOM code set from the formal pure planner", () => {
+  for (const options of [
+    { runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID },
+    {
+      runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+      taskProfile: TASK_PROFILE_LONG_LIVED_WORKBENCH,
+      target: "scenario-demo",
+      dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+      backendURL: "http://127.0.0.1:8300",
+      databaseName: "plush_erp",
+    },
+  ]) {
+    const plan = buildManualAcceptanceTaskDataPlan(options);
+    const report = { ...plan, summary: { persisted: plan.tasks.length } };
+    const records = buildCurrentBatchDOMRecords({ task: report });
+    assert.deepEqual(
+      records["task-board"].map((record) => record.identifier),
+      plan.tasks
+        .filter((task) => task.roleKey === "boss")
+        .map((task) => task.createParams.task_code),
+    );
+    assert.equal(records["task-board"].length, 20);
+    assert.throws(() =>
+      buildCurrentBatchDOMRecords({
+        task: { ...report, summary: { persisted: 179 } },
+      }),
+    );
+  }
 });

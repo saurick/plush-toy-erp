@@ -591,60 +591,177 @@ async function waitRecoveryMessage(page, text, lost) {
   }
 }
 
-async function actOnTaskInBrowser(
-  browser,
-  options,
-  { roleKey, sourceNo, actionTitle, confirmLabel, successMessage, reason = "" },
+const EXCEPTION_TASK_BINDINGS = Object.freeze({
+  finance_payment_execution: Object.freeze({
+    roleKey: "finance",
+    sourceType: "finance_payment",
+    sourceNoKey: "payment_no",
+    processKey: "finance_payment_approval",
+    sourceIDKey: "finance_payment_id",
+  }),
+  inventory_adjustment_approval: Object.freeze({
+    roleKey: "boss",
+    sourceType: "inventory_operation",
+    sourceNoKey: "operation_no",
+    processKey: "inventory_adjustment_approval",
+    sourceIDKey: "inventory_operation_id",
+  }),
+  inventory_adjustment_execution: Object.freeze({
+    roleKey: "warehouse",
+    sourceType: "inventory_operation",
+    sourceNoKey: "operation_no",
+    processKey: "inventory_adjustment_approval",
+    sourceIDKey: "inventory_operation_id",
+  }),
+});
+
+export async function readExceptionFlowReadyTask(
+  page,
+  { roleKey, sourceID, sourceNo, taskGroup },
 ) {
-  const session = await login(browser, { ...options, roleKey });
+  const binding = EXCEPTION_TASK_BINDINGS[taskGroup];
+  assert.ok(binding, "exception task group is not registered");
+  assert.equal(roleKey, binding.roleKey, "exception task actor drifted");
+  assert.ok(
+    Number.isSafeInteger(sourceID) && sourceID > 0,
+    "exception task source ID is required",
+  );
+  requiredText(sourceNo, "exception task source number");
+  const process = await browserRpc(
+    page,
+    "customer_config",
+    `get_${binding.processKey}_process`,
+    {
+      customer_key: CUSTOMER_KEY,
+      [binding.sourceIDKey]: sourceID,
+    },
+  );
+  const instance = process.process_context?.process_instance;
+  assert.ok(
+    Number.isSafeInteger(instance?.id) && instance.id > 0,
+    "exception task process is missing",
+  );
+  assert.equal(instance.process_key, binding.processKey);
+  assert.equal(instance.business_ref_type, binding.sourceType);
+  assert.equal(instance.business_ref_id, sourceID);
+  assert.equal(instance.business_ref_no, sourceNo);
+  assert.equal(process.source_readback?.id, sourceID);
+  assert.equal(process.source_readback?.[binding.sourceNoKey], sourceNo);
+  const nodes = (process.process_context?.nodes || []).filter(
+    (node) => node.node_key === taskGroup,
+  );
+  assert.equal(nodes.length, 1, "exception task process node must be unique");
+  const node = nodes[0];
+  assert.ok(Number.isSafeInteger(node.id) && node.id > 0);
+  assert.equal(node.process_instance_id, instance.id);
+  assert.equal(node.status, "active", "exception task node is not active");
+  const tasks = [];
+  for (let offset = 0; ; offset += 100) {
+    const data = await browserRpc(page, "workflow", "list_tasks", {
+      source_type: binding.sourceType,
+      source_id: sourceID,
+      owner_role_key: roleKey,
+      task_group: taskGroup,
+      limit: 100,
+      offset,
+    });
+    assert.ok(Array.isArray(data.tasks), "exception task readback is missing");
+    assert.ok(
+      Number.isSafeInteger(data.total) && data.total >= 0,
+      "exception task total is missing",
+    );
+    tasks.push(...data.tasks);
+    if (tasks.length >= data.total) break;
+    assert.ok(data.tasks.length > 0, "exception task page is truncated");
+  }
+  const matches = tasks.filter(
+    (task) =>
+      task.process_instance_id === instance.id &&
+      task.process_node_instance_id === node.id,
+  );
+  assert.equal(
+    matches.length,
+    1,
+    "exception task must have one exact process-bound task",
+  );
+  const task = matches[0];
+  assert.ok(Number.isSafeInteger(task.id) && task.id > 0);
+  assert.ok(Number.isSafeInteger(task.version) && task.version > 0);
+  assert.match(task.task_code, /^[A-Za-z0-9_-]{1,64}$/u);
+  assert.equal(task.source_type, binding.sourceType);
+  assert.equal(task.source_id, sourceID);
+  assert.equal(task.source_no, sourceNo);
+  assert.equal(task.owner_role_key, roleKey);
+  assert.equal(task.task_group, taskGroup);
+  assert.equal(task.task_status_key, "ready", "exception task must be ready");
+  return task;
+}
+
+export async function actOnExceptionFlowTaskPage(
+  page,
+  task,
+  { actionTitle, confirmLabel, successMessage, reason = "" },
+) {
+  const search = page.getByPlaceholder("订单 / 产品 / 物料 / 款号", {
+    exact: true,
+  });
+  await search.fill(task.task_code);
+  await search.press("Enter");
+  const row = page.locator(
+    `tr.erp-task-table-row[data-task-id="${task.id}"][data-task-code="${task.task_code}"]`,
+  );
+  await row.waitFor({ state: "visible" });
+  assert.equal(await row.count(), 1, "exception task row must be unique");
+  const entry = row.locator("button[data-task-entry]");
+  assert.equal(
+    await entry.count(),
+    1,
+    "exception task detail entry must be unique",
+  );
+  await entry.click();
+  const drawer = page.locator(".erp-task-action-drawer:visible");
+  await drawer.waitFor({ state: "visible" });
+  assert.equal(await drawer.count(), 1, "exception task drawer must be unique");
+  await drawer
+    .getByRole("button", { name: "选择处理方式", exact: true })
+    .click();
+  const action = drawer.getByRole("radio").filter({ hasText: actionTitle });
+  assert.equal(await action.count(), 1, "exception task action must be unique");
+  await action.click();
+  if (reason) await drawer.locator("textarea").fill(reason);
+  await drawer.getByRole("button", { name: "核对并确认", exact: true }).click();
+  const confirmButton = drawer.getByRole("button", {
+    name: confirmLabel,
+    exact: true,
+  });
+  assert.equal(
+    await confirmButton.count(),
+    1,
+    "exception task confirmation must be unique",
+  );
+  await confirmButton.click();
+  await waitMessage(page, successMessage);
+}
+
+async function actOnTaskInBrowser(browser, options, action) {
+  const session = await login(browser, { ...options, roleKey: action.roleKey });
   try {
+    const task = await readExceptionFlowReadyTask(session.page, action);
     await goto(session.page, options.baseURL, "/erp/task-board", "任务管理");
-    const search = session.page.getByPlaceholder("订单 / 产品 / 物料 / 款号", {
-      exact: true,
-    });
-    await search.fill(sourceNo);
-    await search.press("Enter");
-    const card = session.page
-      .locator(".erp-task-board-card")
-      .filter({ hasText: sourceNo })
-      .first();
-    await card.waitFor({ state: "visible" });
-    // 卡片上的复制按钮是独立操作，通过键盘激活明确的详情入口。
-    await card.locator("button.erp-task-card__open").press("Enter");
-    const drawer = session.page.locator(".erp-task-action-drawer:visible");
-    await drawer.waitFor({ state: "visible" });
-    await drawer
-      .getByRole("button", { name: "选择处理方式", exact: true })
-      .click();
-    await drawer.getByRole("radio").filter({ hasText: actionTitle }).click();
-    if (reason) {
-      await drawer.locator("textarea").fill(reason);
-    }
-    await drawer
-      .getByRole("button", { name: "核对并确认", exact: true })
-      .click();
-    const confirmButton = drawer.getByRole("button", {
-      name: confirmLabel,
-      exact: true,
-    });
-    if (await confirmButton.isVisible().catch(() => false)) {
-      await confirmButton.click();
-    } else {
-      await drawer
-        .locator("button")
-        .filter({ hasText: confirmLabel })
-        .last()
-        .click();
-    }
-    await waitMessage(session.page, successMessage);
+    await actOnExceptionFlowTaskPage(session.page, task, action);
     return {
-      roleKey,
-      sourceNo,
-      action: actionTitle,
+      roleKey: action.roleKey,
+      sourceNo: action.sourceNo,
+      sourceID: action.sourceID,
+      taskID: task.id,
+      taskCode: task.task_code,
+      processInstanceID: task.process_instance_id,
+      processNodeID: task.process_node_instance_id,
+      action: action.actionTitle,
       result: "browser_task_action_completed",
     };
   } finally {
-    await closeSession(session, `${roleKey} task action`);
+    await closeSession(session, `${action.roleKey} task action`);
   }
 }
 
@@ -752,7 +869,9 @@ async function runFinancePaymentFlow(browser, options, report) {
     flow.taskActions = [
       await actOnTaskInBrowser(browser, options, {
         roleKey: "finance",
+        sourceID: source.id,
         sourceNo: source.payment_no,
+        taskGroup: "finance_payment_execution",
         actionTitle: "处理完成",
         confirmLabel: "确认完成",
         successMessage: "任务已处理完成",
@@ -857,10 +976,12 @@ async function runFinancePaymentFlow(browser, options, report) {
   }
 }
 
-async function approveInventoryTaskInBrowser(browser, options, operationNo) {
+async function approveInventoryTaskInBrowser(browser, options, operation) {
   return actOnTaskInBrowser(browser, options, {
     roleKey: "boss",
-    sourceNo: operationNo,
+    sourceID: operation.id,
+    sourceNo: operation.operation_no,
+    taskGroup: "inventory_adjustment_approval",
     actionTitle: "审批通过",
     confirmLabel: "确认通过",
     successMessage: "审批已通过",
@@ -992,11 +1113,13 @@ async function runInventoryAdjustmentFlow(browser, options, report) {
     const approvalTaskAction = await approveInventoryTaskInBrowser(
       browser,
       options,
-      operationNo,
+      operation,
     );
     const executionTaskAction = await actOnTaskInBrowser(browser, options, {
       roleKey: "warehouse",
+      sourceID: operation.id,
       sourceNo: operationNo,
+      taskGroup: "inventory_adjustment_execution",
       actionTitle: "处理完成",
       confirmLabel: "确认完成",
       successMessage: "任务已处理完成",
