@@ -502,7 +502,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
 
 `manual-acceptance-fact-data.mjs` 必须输出 `source-driven-operational-facts-v1` 报告，记录本批采购收货、质检、库存、生产、预留、出货与财务对象的精确 ID、业务编号和状态。重复执行只能完整复用或继续同一批次；发现部分冲突或报告身份不一致时必须停止。Readiness、附件和浏览器入口都会拒绝旧通用事实报告。
 
-异常链样本由同一 facts 阶段的 `manual-acceptance-exception-chain-data.mjs` 生成并读回：人工库存调整审批、过账与撤销；采购拒收退厂、撤销和补换复检入库；WIP 让步 / 报废审批、执行与冲正；带正式生产来源的委外回货拒收、退厂撤销和返工。它们使用稳定业务号，保留在报告的 `exceptionChains` 中，不混入用于页面规模核对的标准样本数组。Readiness 同时校验来源、审批任务、执行节点、库存冲正关系和返工批次；任务完成不能代替事实执行证据。阶段逻辑变化后刷新 facts 及其登记消费者，普通 UI 或版本 SHA 变化仍复用数据。
+异常链样本由同一 facts 阶段的 `manual-acceptance-exception-chain-data.mjs` 生成并读回：人工库存调整审批、过账与撤销；采购拒收退厂、撤销和补换复检入库；WIP 让步 / 报废审批、执行与冲正；带正式生产来源的委外回货拒收、退厂撤销和原厂返工。委外准备复用本批该生产样本的登记来源合同及主体快照，并读回启用的加工厂 / 混合供应商资格；原厂返工从拒收 WIP 检验提交 `REWORK_ORIGINAL` 生产异常决策，经老板审批与生产任务办理后显式执行，核对原批取消、来源和目标一致的新返工批次，不直接创建 `REWORK` 委外处置。它们使用稳定业务号，保留在报告的 `exceptionChains` 中，不混入用于页面规模核对的标准样本数组。Readiness 同时校验来源、审批任务、执行节点、库存冲正关系和返工批次；任务完成不能代替事实执行证据。阶段逻辑变化后刷新 facts 及其登记消费者，普通 UI 或版本 SHA 变化仍复用数据。
 
 ```bash
 MANUAL_ACCEPTANCE_SIM_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA \

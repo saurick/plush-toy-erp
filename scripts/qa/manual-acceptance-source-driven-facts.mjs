@@ -237,6 +237,8 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "production_material_requirement_id",
     "production_wip_batch_id",
     "quality_inspection_id",
+    "target_operation_id",
+    "target_supplier_id",
     "requested_quantity",
     "reason",
     "idempotency_key",
