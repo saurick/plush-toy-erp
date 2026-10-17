@@ -64,7 +64,19 @@ test('devDocs: document build excludes customer input memos while retaining publ
       plugins: [createDevDocsMetadataPlugin()],
       configFile: false,
       logLevel: 'silent',
-      server: { middlewareMode: true, hmr: false, watch: null, fs: { allow: [path.join(root, 'web')] } },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+        watch: null,
+        fs: {
+          allow: [
+            'web',
+            'docs/engineering/public.md',
+            '.agents/skills/plush-example/SKILL.md',
+            '.agents/skills/plush-example/references/detail.md',
+          ].map((file) => path.join(root, file)),
+        },
+      },
     })
     const modules = await server.ssrLoadModule('/web/src/dev-workbench/pages/entry.mjs')
     const skillDocs = buildDevDocsItems(modules.default)
