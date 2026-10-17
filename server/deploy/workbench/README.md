@@ -32,16 +32,18 @@
 
 ## 构建、发布与回滚
 
-1. 在拥有授权的源码范围内固定源版本。正式发布使用已提交版本；未提交改动的测试预览另记录基础 SHA、精确文件内容摘要和源码包 SHA-256，不冒充正式产品 Release。共享脏工作区使用一次性独立验证副本，只覆盖本轮精确路径；不打包 ignored env、客户 Private、依赖目录或其他任务改动。
+1. 在拥有授权的源码范围内固定源版本。正式发布使用已提交版本；未提交改动的测试预览另记录基础 SHA、精确文件内容摘要和源码包 SHA-256，不冒充正式产品 Release。共享脏工作区使用一次性独立验证副本，只覆盖本轮精确路径；不打包 ignored env、客户 Private、依赖目录或其他任务改动。源码包若需携带 Git ancestry，须同时排除客户反馈文件及该路径的历史 blob，并在关闭 lazy fetch 时核对对象库；不能只从工作树删文件而保留其历史正文。
 2. 在构建机的 `web/` 执行：
 
    ```bash
    GIT_OPTIONAL_LOCKS=0 pnpm build:workbench
    ```
 
-3. 运行工作台认证、网络及源码边界检查。另执行 ERP 正式构建和 `dev-workbench-production-boundary.mjs`，确认独立制品不会进入 ERP 产物。将源码工具与已构建的 `web/build-workbench/` 打成固定包，记录 SHA-256；目标机只校验、解包和运行。
-4. 目标机先核对主机名、登记的私网地址、端口、旧 `current` 与 systemd 状态。将包放入 `releases/<content-id>/`，核对源身份、所有文件、运行 env 与 Node 版本。不得覆盖远端日常开发 checkout。保留上一个 `current` 作为回滚点，再原子切换并重启 `plush-workbench-test`。
+3. 运行工作台认证、网络及源码边界检查。另执行 ERP 正式构建和 `dev-workbench-production-boundary.mjs`，确认独立制品不会进入 ERP 产物。将源码工具与已构建的 `web/build-workbench/` 打成固定包，记录 SHA-256；运行依赖另在目标 OS/架构准备为固定制品，绑定 `web/package.json`、`pnpm-lock.yaml`、仓库 Node 与 pnpm 版本，核对文件清单及 pnpm 内部 symlink。目标机只校验、解包和运行，不 install/build；package 或 lock 改变后重新准备匹配依赖。
+4. 目标机先核对主机名、登记的私网地址、端口、旧 `current` 与 systemd 状态。将包放入 `releases/<content-id>/`，核对源身份、所有文件、运行 env 与 Node 版本，不得覆盖远端日常开发 checkout。操作者须先确认工作台空闲，按现有 store root 与引用关系盘点并保存 operation store 及必要证据；运行中操作、执行锁、外部 store override 或未知非空 output 未查明时停止切换。在维护窗口停止本工作台服务后保留这些状态，保留旧 `current`、output 与 runtime env 作为回滚点，再原子切换并启动 `plush-workbench-test`，读回历史记录仍可访问。依赖和状态保全不通过时不切换，不批量复制镜像或缓存。
 5. 香港入口先备份已有同名配置，再安装本目录 Nginx 配置。`nginx -t` 通过后 reload，读回 HTTPS 登录页、未登录 API 拒绝、真实登录、页面/工具只读请求、退出与健康状态；Cloudflare 只添加或精确更新工作台记录，不覆盖其他域名。
 6. 回滚时把 `current` 恢复到记录的旧目录并重启，重新核对登录与健康。首次部署无旧版本时停用本服务与其精确域名入口；保留 runtime、日志和发布证据。业务 Compose、数据库、上传、证书和本地开发进程不在回滚删除范围内。
+
+本节为手工 SOP。`build:workbench` 与独立服务启动入口不会自动完成源码封装、依赖传输、状态保全或 current 切换；操作者须逐项核验并留证，不能把一次性操作脚本当成仓库长期发布入口。
 
 操作回执与日志放 ignored `output/` 或目标私有部署目录。源码版本、制品摘要、配置、目标运行和客户验收分别记录；工作台可访问不等于执行器全部就绪，也不等于甲方业务验收通过。

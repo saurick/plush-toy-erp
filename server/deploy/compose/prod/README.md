@@ -90,7 +90,7 @@ APP_ADMIN_PASSWORD='<ephemeral-secret>' \
     --confirm 'BOOTSTRAP_PRODUCTION_ADMIN:<project>:<database>:<username>:<migration>:<release>'
 ```
 
-脚本成功只证明管理员、marker、audit 与内置 RBAC 已读回；它不替代客户配置、数据准备、目标 smoke 或验收。
+脚本成功只证明管理员、marker、audit 与内置 RBAC 已读回；它不替代客户配置、数据准备、目标 smoke 或验收。正式 database rebuild 的 passed 回执已包含 migration 与首个管理员，不在其后再次执行本节 bootstrap。
 
 ## demo 模拟数据
 
@@ -104,6 +104,8 @@ APP_ADMIN_PASSWORD='<ephemeral-secret>' \
 - 凭据轮换、完整账号矩阵、PDF 与业务页面验收均是独立证据。
 
 模拟数据可以通过受控 rebuild operation 重建，但执行器必须先创建并恢复校验备份、保存旧物理数据代和精确回滚身份。禁止裸清表、volume 删除、临时 SQL 或跨环境复制。
+
+该重建的恢复检查只证明 PostgreSQL，不自动切换附件 bucket，也不证明附件已恢复。需要成套恢复保证时，按[备份恢复手册](../../../../deployments/yoyoosun/runbooks/04-backup-restore.md)对同批 PG 与全部登记附件完成隔离恢复、对象校验和临时资源清理，单独保留回执。fresh demo 的 formal 账号、客户配置、core、凭据轮换和显式来源规模顺序见[试用环境执行手册](../../../../docs/customers/yoyoosun/试用环境执行手册.md)，不属于普通 promotion 的隐含阶段。
 
 ## customer-test 干净基线
 
