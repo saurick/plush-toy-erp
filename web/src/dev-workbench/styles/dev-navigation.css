@@ -338,16 +338,8 @@
   cursor: pointer;
 }
 
-.erp-dev-task-nav__item:hover,
-.erp-dev-task-nav__item:focus-visible {
+.erp-dev-task-nav__item:where(:not(:disabled)):hover {
   border-color: var(--dev-task-active-border, var(--erp-primary));
-  outline: 2px solid
-    color-mix(
-      in srgb,
-      var(--dev-task-active-border, var(--erp-primary)) 24%,
-      transparent
-    );
-  outline-offset: 1px;
 }
 
 .erp-dev-task-nav__item--active {

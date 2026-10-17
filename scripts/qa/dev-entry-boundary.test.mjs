@@ -1151,21 +1151,39 @@ test("dev entry boundary: indexed testing doc command scripts exist", () => {
 });
 
 test("dev entry boundary: customer config console stays preview or gated apply only", () => {
-  const pageSource = read(
-    "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",
-  );
+  const pagePath = "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx";
+  const pageSource = read(pagePath);
+  const moduleDir = "web/src/dev-workbench/pages/customer-config/";
+  const sources = new Map([[pagePath, pageSource]]);
+  // Follow page imports so unused files cannot satisfy the boundary checks.
+  for (const [file, source] of sources) {
+    for (const [, specifier] of source.matchAll(/\bfrom\s+["'](\.[^"']+)["']/gu)) {
+      const target = path.posix.normalize(
+        path.posix.join(path.posix.dirname(file), specifier),
+      );
+      if (
+        target.startsWith(moduleDir) &&
+        /\.(?:jsx|mjs)$/u.test(target) &&
+        !sources.has(target)
+      ) {
+        sources.set(target, read(target));
+      }
+    }
+  }
+  const consoleSource = [...sources.values()].join("\n");
   assert.match(
     pageSource,
     /<Title\s+className="erp-dev-customer-title"\s+level=\{1\}>\s*客户配置\s*<\/Title>/u,
     "customer config console heading",
   );
+  assert.match(pageSource, /<PreflightPanel\b/u);
   assertIncludes(
-    pageSource,
+    consoleSource,
     "不提供原始包上传",
     "customer config console package-source boundary",
   );
   assert(
-    !pageSource.includes("客户配置包导入控制台"),
+    !consoleSource.includes("客户配置包导入控制台"),
     "customer config console must not imply an arbitrary package upload/import surface",
   );
   const missingOverview = buildCustomerConfigDevOverviewFromSearch(
@@ -1281,35 +1299,51 @@ test("dev entry boundary: customer config console stays preview or gated apply o
     "customer config rollback fallback must be an input template, not an executable rollback command",
   );
   assert.match(
+    consoleSource,
+    /const requestApplyTestConfig = \(\) => \{[\s\S]*modal\.confirm\([\s\S]*确认应用测试配置[\s\S]*已登记的本地开发库[\s\S]*不(?:会)?导入客户业务数据[\s\S]*onOk: handleApplyTestConfig/su,
+  );
+  assert.match(
     pageSource,
-    /const requestApplyTestConfig = \(\) => \{[\s\S]*modal\.confirm\([\s\S]*确认应用测试配置[\s\S]*loopback 后端[\s\S]*已登记的本地开发库[\s\S]*不会导入客户业务数据[\s\S]*不代表正式发布通过[\s\S]*onOk: handleApplyTestConfig/su,
+    /onApplyTestConfig=\{(?:\w+\.)?requestApplyTestConfig\}/u,
+    "test config apply must use the composed confirmation entry point",
   );
   assertIncludes(
-    pageSource,
+    consoleSource,
+    "await assertLocalBackendCustomerContext(manifest.customer_key)",
+    "test apply authenticated backend customer scope",
+  );
+  assertIncludes(
+    consoleSource,
     "assertEffectiveCustomerConfigIdentity(",
     "test apply authenticated identity readback",
   );
   assert(
-    !pageSource.includes("requestApplyReleaseConfig") &&
-      !pageSource.includes("handleApplyReleaseConfig"),
+    !consoleSource.includes("requestApplyReleaseConfig") &&
+      !consoleSource.includes("handleApplyReleaseConfig"),
     "formal release must stay delegated to the audited release executor",
   );
-  assertIncludes(
-    pageSource,
-    "正式发布只由统一执行器执行",
-    "formal release executor boundary",
+  assert.match(
+    consoleSource,
+    /!importSummary\.canCheckReleaseReadiness\s*\|\|\s*!releaseBatch/u,
+    "formal release check must require readiness capability and an explicit evidence batch",
   );
   assertIncludes(
-    pageSource,
+    consoleSource,
+    "copyText(importSummary.releaseApply.command)",
+    "formal release executor handoff",
+  );
+  assertIncludes(
+    consoleSource,
     "releaseBatch",
     "release readiness must bind an explicit evidence batch",
   );
-  assert(
-    !pageSource.includes("onApplyTestConfig={handleApplyTestConfig}"),
+  assert.doesNotMatch(
+    consoleSource,
+    /on(?:ApplyTestConfig|Click)=\{(?:operations\.)?handleApplyTestConfig\}/u,
     "test config control-plane write must be mediated by confirmation",
   );
   assert(
-    !pageSource.includes("publishCustomerConfig(readiness.manifest)"),
+    !consoleSource.includes("publishCustomerConfig(readiness.manifest)"),
     "release readiness result must not be published directly by the browser page",
   );
 });

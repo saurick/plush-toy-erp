@@ -23,6 +23,50 @@ window.__vite_plugin_react_preamble_installed__ = true;
 </script></head><body><div id="root"></div>
 <script type="module" src="/scripts/test/SlidingTabsFixture.jsx"></script></body></html>`
 
+async function assertTaskTabPointerAndFocus(root) {
+  const tabs = root.getByRole('tab')
+  await root.scrollIntoViewIfNeeded()
+  const initialBox = await root.boundingBox()
+  for (const tab of await tabs.all()) {
+    await tab.hover()
+    await tab.click()
+    await tab.and(root.locator('[aria-selected="true"]')).waitFor()
+    const metric = await tab.evaluate((item) => {
+      const style = getComputedStyle(item)
+      return {
+        label: item.textContent,
+        selected: item.getAttribute('aria-selected'),
+        hovered: item.matches(':hover'),
+        outline: style.outlineStyle,
+        borderWidth: style.borderWidth,
+      }
+    })
+    assert.equal(metric.selected, 'true', JSON.stringify(metric))
+    assert(metric.hovered, JSON.stringify(metric))
+    assert.equal(metric.outline, 'none', `悬停不能绘制焦点框: ${JSON.stringify(metric)}`)
+    const box = await root.boundingBox()
+    for (const dimension of ['x', 'y', 'width', 'height']) {
+      assert(Math.abs(box[dimension] - initialBox[dimension]) < 1, `页签条切换后保持原位: ${JSON.stringify({ initialBox, box })}`)
+    }
+  }
+
+  await tabs.first().press('Home')
+  await tabs.first().and(root.locator('[aria-selected="true"]:focus-visible')).waitFor()
+  const focus = await tabs.first().evaluate((item) => {
+    const style = getComputedStyle(item)
+    return {
+      selected: item.getAttribute('aria-selected'),
+      visible: item.matches(':focus-visible'),
+      outline: style.outlineStyle,
+      width: parseFloat(style.outlineWidth),
+      offset: parseFloat(style.outlineOffset),
+    }
+  })
+  assert.equal(focus.selected, 'true', JSON.stringify(focus))
+  assert(focus.visible && focus.outline === 'solid' && focus.width >= 2, `键盘焦点必须可见: ${JSON.stringify(focus)}`)
+  assert(focus.offset <= -focus.width, `焦点框保持在滚动页签内: ${JSON.stringify(focus)}`)
+}
+
 async function sampleMotion(
   page,
   id,
@@ -239,6 +283,9 @@ export function createTabMotionScenarios({ outputDir }) {
         for (const id of ['secondary', 'login', 'progress-detail', 'collaboration', 'images', 'card-tabs']) {
           await assertContentTabAffordance(page.locator(`#${id} .erp-sliding-segmented, #${id} .erp-sliding-tab-list, #${id} .erp-sliding-tabs`))
         }
+        for (const id of ['dev-nav', 'dev-journey']) {
+          await assertTaskTabPointerAndFocus(page.locator(`#${id} .erp-dev-task-nav`))
+        }
         for (let index = 0; index < 3; index += 1) {
           assertActionBarRemountStable(
             await sampleActionBarRemount(page),
@@ -426,6 +473,33 @@ export function createTabMotionScenarios({ outputDir }) {
       },
     }))
     .concat([
+      {
+        name: 'dev-task-tabs-pointer-focus',
+        path: '/__dev/customer-config?customer=yoyoosun&view=preflight&section=evidence',
+        viewport: { width: 1920, height: 1080 },
+        deviceScaleFactor: 2,
+        verify: async (page) => {
+          const sections = page.getByRole('tablist', { name: '配置预检任务' })
+          await sections.waitFor()
+          await assertTaskTabPointerAndFocus(sections)
+          await assertContentTabAffordance(sections)
+          await verifyMobileNavigationMotion(page, assert, '[aria-label="配置预检任务"]', 3)
+          await verifyMobileNavigationMotion(page, assert, '[aria-label="配置预检任务"]', 0, true)
+          await sections.getByRole('tab').nth(3).click()
+          await page.waitForURL((url) => url.searchParams.get('section') === 'evidence')
+          assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), '页签不能撑宽页面')
+          await page.reload()
+          await sections.getByRole('tab', { selected: true }).waitFor()
+          await assertContentTabAffordance(sections)
+          await sections.getByRole('tab', { selected: true }).hover()
+          await page.screenshot({ path: path.join(outputDir, 'dev-task-tabs-hover-4k.png') })
+          const box = await sections.boundingBox()
+          await page.screenshot({
+            path: path.join(outputDir, 'dev-task-tabs-hover-detail.png'),
+            clip: { x: box.x - 16, y: box.y - 16, width: box.width + 32, height: box.height + 32 },
+          })
+        },
+      },
       {
         name: 'dev-control-standards',
         path: '/__dev/ui-design?page=controls',
