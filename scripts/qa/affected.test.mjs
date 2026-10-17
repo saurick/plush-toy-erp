@@ -517,6 +517,44 @@ test("affected: shared Web test helpers select their importing tests only", asyn
   );
 });
 
+test("affected: full Web tests subsume source, script and dev-server tests exactly once", () => {
+  const plan = buildAffectedPlan([
+    "web/package.json",
+    "web/src/erp/utils/dateRange.mjs",
+    "web/scripts/runUnitTests.mjs",
+    "web/dev-server/devDeliveryBridgePlugin.mjs",
+    "scripts/qa/verify-node-test-summary.test.mjs",
+  ], { root: ROOT });
+  assert(ids(plan).includes("web-test"));
+  assert.equal(selectedTests(plan).some((file) => file.startsWith("web/")), false);
+  assert(selectedTests(plan).includes("scripts/qa/verify-node-test-summary.test.mjs"));
+  assert(plan.prePushNodeTests.includes("web/src/erp/utils/dateRange.test.mjs"));
+});
+
+test("affected: output copies cannot masquerade as coverage of a production page", async () => {
+  await withSourceFixture({
+    "web/src/pages/Uncovered.jsx": "export default () => null;",
+    "web/src/output/copy.test.mjs": "import '../pages/Uncovered.jsx';",
+  }, (root) => {
+    const plan = buildAffectedPlan(["web/src/pages/Uncovered.jsx"], { root });
+    assert(ids(plan).includes("web-test"));
+    assert.equal(selectedTests(plan).some((file) => file.includes("/output/")), false);
+  });
+});
+
+test("affected: generated output readers do not widen a covered helper's test selection", async () => {
+  await withSourceFixture({
+    "web/src/amount.mjs": "export const amount = 1;",
+    "web/src/amount.test.mjs": "import './amount.mjs';",
+    "web/scripts/output/replica.test.mjs": "import fs from 'node:fs';",
+    "web/dev-server/output/replica.test.mjs": "import fs from 'node:fs';",
+  }, (root) => {
+    const plan = buildAffectedPlan(["web/src/amount.mjs"], { root });
+    assert.deepEqual(selectedTests(plan), ["web/src/amount.test.mjs"]);
+    assert.equal(ids(plan).includes("web-test"), false);
+  });
+});
+
 test("affected: a page can use a differently named source contract without all Web tests", async () => {
   await withSourceFixture(
     {

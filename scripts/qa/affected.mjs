@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { collectGitChangedFiles } from "./lib/git-range.mjs";
 import { NODE_TEST_GROUPS } from "./node-test-groups.mjs";
 import { MIGRATION_CONTRACT_TESTS } from "./migration-contracts.mjs";
+import { discoverWebUnitTests } from "../../web/scripts/runUnitTests.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "../..");
@@ -353,7 +354,8 @@ function createWebTestSelector(root) {
       if (
         entry.isSymbolicLink() ||
         entry.name.startsWith(".") ||
-        entry.name === "node_modules"
+        entry.name === "node_modules" ||
+        entry.name === "output"
       )
         continue;
       const file = `${directory}/${entry.name}`;
@@ -1214,8 +1216,14 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       for (const file of MIGRATION_CONTRACT_TESTS) directTests.delete(file);
     }
     if (state.webNeedsAllTests) {
+      const webRoot = path.join(root, "web");
+      const fullWebTests = new Set(
+        fs.existsSync(webRoot)
+          ? discoverWebUnitTests(webRoot).map((file) => `web/${file.split(path.sep).join("/")}`)
+          : [],
+      );
       for (const testFile of [...directTests]) {
-        if (testFile.startsWith("web/src/")) {
+        if (fullWebTests.has(testFile)) {
           directTests.delete(testFile);
         }
       }

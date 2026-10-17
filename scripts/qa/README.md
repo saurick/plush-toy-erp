@@ -16,6 +16,8 @@
 
 `scripts/qa/` 只放本地验收、静态守卫、边界扫描和测试编排脚本。它可以读取代码、配置、文档和本地输出，必要时生成 ignored evidence；它不负责生产发布、不直接导入真实客户数据、不替代后端 RBAC / Workflow / Fact usecase。
 
+`affected` 的 Web 源码依赖扫描排除各层 `output/` 和 `node_modules/`。当计划已经包含完整 Web 测试时，复用 [源码测试发现](../../web/scripts/runUnitTests.mjs) 的实际集合，移除已被覆盖的单独测试命令；源码、脚本和开发服务测试遵循同一发现范围。其他 Node 检查仍保留，无法识别覆盖关系的源码继续选择完整 Web 测试。
+
 ## 常用入口
 
 | 入口 | 用途 | 建议时机 |
