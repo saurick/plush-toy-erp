@@ -78,6 +78,35 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
 | RPO | 发布 / migration 前在停写窗口保存配套 PG 与附件备份；PG 日常名义周期为 24 小时，36 小时 freshness 只约束 PG 定时检查。系统实际 RPO 以两者共同且已验证的恢复点为准。 |
 | RTO  | 先以单机恢复演练结果为准，未演练前不得承诺固定时长                                                                                |
 
+## Mac 外接盘副本 / Mac Backup Replica
+
+额外副本复用服务器已经生成的加密备份，不替换服务器本地及香港备份。Mac 主动经 SSH 拉取，按外盘 UUID 和专属目录标记确认介质，校验 SHA-256 后才原子落盘。来源主机及目录、外盘 UUID、保留期和时间表分别配置；SSH 使用已有主机密钥与登录配置，不关闭主机身份检查。
+
+Mac 与 SSH 来源端均需 Python 3.11+；Mac 恢复检查另需 `age`、Docker 和已加载的 `postgres:18.6` 镜像。
+
+| 配置 / 模块 | 职责 |
+| --- | --- |
+| `env/backup-replica.example.json` | 私有目标配置的样例；实际配置由当前用户持有，权限为 0600，不入 Git |
+| `source.id / host / directory` | 固定数据来源身份及 SSH 目录；来源目录须有 `.plush-backup-source.json`，内容为 `{"schemaVersion":"plush.backup-source/v1","sourceId":"<source.id>"}` |
+| `destination.volumeUUID / relativeDirectory` | 已挂载且可写的外部卷及专属子目录；不自动挂载、不格式化、不创建替代的内盘目录 |
+| `retentionDays` | 副本独立保留期，样例为 90 天；来源删除不会传播，仅清理本工具索引内已过期的数据库副本，初始配置 / 附件清单保留 |
+| `restore` | 本机受保护的 age identity、固定 PostgreSQL 镜像及恢复检查间隔，样例为 7 天 |
+| `schedule` | macOS 本地时区的日常时间；安装后还会在用户登录和文件系统挂载时运行，不主动唤醒电脑 |
+
+从仓库根目录执行：
+
+1. 将样例复制到仓库外的私有配置文件，填写实际目标。确认外盘 UUID、可用空间、来源身份与 SSH 可读性，并单独保管恢复密钥。
+2. 运行 `python3 -B scripts/deploy/backup-replica/backup_replica.py init --config <private-config.json>`。只初始化专属空目录；已有非空目录而缺少匹配标记时拒绝接管。
+3. 运行同一入口的 `sync --config <private-config.json>`，核对 copied / retained / latest backup 与来源身份。受管文件仅包括加密 `.age`；数据库文件必须有有效同名 checksum，未完成的传输不会成为最终文件。
+4. 运行 `verify --config <private-config.json>`。它从外盘实际副本解密，恢复到无网络、无宿主端口的一次性 PostgreSQL，核对业务表与 Atlas migration；清理容器和临时明文成功后才保存 passed 回执。首次镜像启动须等待 PID 1 已进入最终 PostgreSQL 进程，避免误用 initdb 的临时服务。
+5. 相关模块提交并验证后运行 `install --config <private-config.json>`。安装器核对每个模块与提交内容一致，生成固定内容 hash 的独立运行目录及当前用户 launchd 任务；共享工作区后续变化不影响已安装版本。安装后读回 launchd 最后退出码和 `status --config <private-config.json>`，不能只凭安装成功宣称定时首跑通过。
+
+`run` 执行同步及到期的恢复检查。缺盘时记录 `skipped / volume_not_mounted`；校验损坏、来源过期、介质不符或恢复失败记录 failed。状态、最近成功及恢复回执保存在配置的 `stateDirectory`；副本索引在外盘专属目录。Mac 休眠 / 离线期间不会保证取得最新副本，服务器原有自动备份继续独立运行。
+
+切换同一数据来源到另一台 SSH 主机时，先复制历史加密文件、checksum 和来源身份标记，修改私有配置的 host / directory，再依次执行 sync、verify 和定时首跑读回。更换外盘时填写新 UUID 并初始化 / 核验专属目录；恢复回执绑定卷 UUID，新介质会重新验证。新链路通过且保留窗口结束后再处理旧目标；不同业务来源使用新的 id 与目录。对象存储等新协议应扩展传输模块，不混入同步及恢复逻辑。
+
+这组恢复检查只证明 PostgreSQL。初始空附件 manifest 和加密运行配置可以一并复制并独立核验；非空 S3 对象仍须执行本 runbook 的配套附件 restore / verify，不能因数据库恢复通过而省略。
+
 ## 禁止
 
 - 禁止把 `.dump`、`.sql`、`.tar`、附件原件或备份密钥提交到 Git。

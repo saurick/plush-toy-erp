@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "plush.backup-replica/v1",
+  "source": {
+    "id": "production-backups",
+    "transport": "ssh-directory",
+    "host": "backup-source",
+    "directory": "/srv/backups/production"
+  },
+  "destination": {
+    "id": "mac-external",
+    "volumeUUID": "00000000-0000-0000-0000-000000000000",
+    "relativeDirectory": "plush-toy-erp-backups/production"
+  },
+  "stateDirectory": "/Users/your-user/Library/Application Support/plush-toy-erp/backup-replica/state",
+  "retentionDays": 90,
+  "maxSourceAgeHours": 36,
+  "transferTimeoutSeconds": 600,
+  "restore": {
+    "identityFile": "/Users/your-user/.config/plush-toy-erp/production-backup/age-identity.txt",
+    "postgresImage": "postgres:18.6",
+    "everyDays": 7
+  },
+  "schedule": {
+    "hour": 11,
+    "minute": 15
+  }
+}

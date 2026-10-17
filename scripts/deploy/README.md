@@ -57,10 +57,13 @@
 | `collect-evidence.sh`、`collect-evidence.mjs` | 生成绑定 target、profile 和 release 的 evidence 草稿及必要占位 | 只写显式输出目录，不采集 secret，不把占位写成真实演练结果 |
 | `run-backup-restore-rehearsal.sh` | 在开发机或 CI 执行 dump、隔离 PostgreSQL restore、升级审计、migration 和恢复检查 | 使用明确的只读备份源与隔离恢复目标；默认输出到 `output/`，仅向 evidence 复制脱敏 artifact |
 | `verify-backup-restore.sh` | 检查备份恢复 evidence 的必要字段和脱敏边界 | 不读取、复制或恢复真实备份文件，不证明恢复成功 |
+| `backup-replica/backup_replica.py` | 将既有加密备份拉取到按 UUID 核对的 Mac 外盘，独立保留历史并在一次性 PostgreSQL 验证恢复 | 私有 JSON 配置选择来源与介质；不写生产库、不传播来源删除；定时安装只接受已提交模块 |
 
 参数以各脚本 `--help` 为准，目标与证据要求见[备份恢复](../../deployments/yoyoosun/runbooks/04-backup-restore.md)和[发布证据](../../deployments/yoyoosun/evidence/releases/README.md)。`run-smoke.sh --print-input-template` 只输出输入模板，不触网、不读 token、不写报告；正式 smoke 的 URL 禁止携带账号密码，报告不保存密码、token、手机号、HTML、PDF 正文或完整响应。
 
 恢复演练的 `command-summary.txt` 绑定同一 `backupId / releaseId / sourceAlias / restoreTarget`；dump 留在受控本地输出。`image-digests-evidence.mjs` 只写脱敏镜像证据，不构建镜像、不访问 registry、不读取 `.env`。
+
+额外副本的接入、目标迁移、Mac 定时任务和恢复范围见[备份恢复中的 Mac 外接盘副本](../../deployments/yoyoosun/runbooks/04-backup-restore.md#mac-外接盘副本--mac-backup-replica)。配置样例为 `deployments/yoyoosun/env/backup-replica.example.json`；SSH 来源、介质校验、同步保留、恢复与安装各由独立 Python 标准库模块负责，来源地址和本机 UUID 不写入代码。该工具需要 Python 3.11+；恢复另需 `age`、Docker 和本机已有的 `postgres:18.6` 镜像。
 
 ## GitLab 主链与不可变发布
 
