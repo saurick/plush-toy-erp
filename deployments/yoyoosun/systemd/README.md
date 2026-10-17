@@ -48,3 +48,9 @@ systemctl list-timers 'plush-toy-erp-backup*'
 ```
 
 只有两项 service 都成功、异地目录存在同名 `dump.age`/checksum、恢复报告为 `passed`，且报告中的 `backupAgeSeconds` 未超过约定上限，才说明定时合同已在该目标机落地。报告中的 `restoreDurationSeconds` 是本次实测恢复耗时；未取得该证据前不承诺固定 RTO。
+
+## 独立更新恢复检查工具
+
+恢复检查脚本可独立于 ERP 镜像更新。先在开发机提交并验证 `verify-scheduled-postgres-backup.sh`，将精确提交及 SHA-256 绑定的脚本安装到登记目标根目录的 `backup-tools/<commit>/`，脚本只读且由 root 持有；相邻 manifest 记录 source commit、脚本 hash 和 target。
+
+通过该 service 的 `20-verifier-version.conf` DropIn 重置 `ExecStart` 并指向这个固定脚本，保留原 EnvironmentFile、参数、挂载依赖及 timer。修改前保存旧 DropIn 和 unit 指纹，确认 service 未运行；再做 `systemd-analyze verify`、daemon-reload 与一次真实恢复。只有容器、该次恢复新建的匿名卷和临时明文均清理成功后，才写 passed 回执。回退时恢复旧 DropIn 并重新验证，不覆盖应用 release 中的脚本或修改生产数据库。

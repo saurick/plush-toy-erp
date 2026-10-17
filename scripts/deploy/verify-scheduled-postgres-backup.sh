@@ -147,18 +147,42 @@ actual_hash="$(sha256sum "$backup_file" | awk '{print $1}')"
 container_name=""
 restore_tmp_dir=""
 decrypted_backup=""
-cleanup() {
+restore_volumes=""
+cleanup_resources() {
+  local remaining remaining_volumes volume result=0
   if [[ -n "$container_name" ]]; then
-    docker rm --force "$container_name" >/dev/null 2>&1 || true
+    if ! remaining="$(docker ps -aq --filter "name=^/${container_name}$")"; then
+      result=1
+    elif [[ -n "$remaining" ]]; then
+      docker rm --force --volumes "$container_name" >/dev/null || result=1
+    fi
+    remaining="$(docker ps -aq --filter "name=^/${container_name}$")" || result=1
+    [[ -z "$remaining" ]] || result=1
+    remaining_volumes="$(docker volume ls --quiet)" || result=1
+    for volume in $restore_volumes; do
+      if grep -Fxq -- "$volume" <<<"$remaining_volumes"; then
+        result=1
+      fi
+    done
+    if [[ "$result" -eq 0 ]]; then container_name=""; fi
   fi
   if [[ -n "$decrypted_backup" ]]; then
-    rm -f -- "$decrypted_backup"
+    rm -f -- "$decrypted_backup" || result=1
   fi
   if [[ -n "$restore_tmp_dir" ]]; then
-    rmdir "$restore_tmp_dir" >/dev/null 2>&1 || true
+    if rmdir "$restore_tmp_dir"; then restore_tmp_dir=""; else result=1; fi
   fi
+  return "$result"
 }
-trap cleanup EXIT
+on_exit() {
+  local result=$?
+  trap - EXIT
+  if ! cleanup_resources; then
+    result=1
+  fi
+  exit "$result"
+}
+trap on_exit EXIT
 
 restore_tmp_dir="$(mktemp -d /tmp/plush-scheduled-restore.XXXXXX)"
 restore_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -187,10 +211,11 @@ docker run --detach --rm \
   --env "POSTGRES_DB=$restore_db" \
   --volume "$decrypted_backup:/backup/database.dump:ro" \
   "$postgres_image" >/dev/null
+restore_volumes="$(docker inspect --format '{{range .Mounts}}{{if eq .Type "volume"}}{{.Name}}{{"\n"}}{{end}}{{end}}' "$container_name")"
 
 ready="false"
 for _ in $(seq 1 30); do
-  if docker exec "$container_name" pg_isready -U postgres -d "$restore_db" >/dev/null 2>&1; then
+  if docker exec "$container_name" sh -ceu 'test "$(cat /proc/1/comm)" = postgres && exec pg_isready -U postgres -d "$POSTGRES_DB"' >/dev/null 2>&1; then
     ready="true"
     break
   fi
@@ -228,6 +253,12 @@ mkdir -p "$report_dir"
 }
 chmod 0700 "$report_dir"
 report_tmp="${report_file}.tmp.$$"
+encrypted_size="$(wc -c <"$backup_file" | awk '{print $1}')"
+decrypted_size="$(wc -c <"$decrypted_backup" | awk '{print $1}')"
+if ! cleanup_resources; then
+  echo "[scheduled-restore-check] 临时恢复资源清理未完成" >&2
+  exit 1
+fi
 restore_finished_epoch="$(date -u +%s)"
 restore_duration_seconds="$((restore_finished_epoch - restore_started_epoch))"
 cat >"$report_tmp" <<EOF
@@ -241,9 +272,9 @@ cat >"$report_tmp" <<EOF
   "backupAgeSeconds": $backup_age_seconds,
   "maxBackupAgeSeconds": $max_backup_age_seconds,
   "encryptedSha256": "$actual_hash",
-  "encryptedSizeBytes": $(wc -c <"$backup_file" | awk '{print $1}'),
+  "encryptedSizeBytes": $encrypted_size,
   "decryptedSha256": "$decrypted_hash",
-  "decryptedSizeBytes": $(wc -c <"$decrypted_backup" | awk '{print $1}'),
+  "decryptedSizeBytes": $decrypted_size,
   "encryption": "age",
   "postgresImage": "$postgres_image",
   "publicTableCount": $table_count,

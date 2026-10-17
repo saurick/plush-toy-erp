@@ -67,10 +67,12 @@ test("scheduled restore check uses the newest checksum-bound dump in an isolated
   assert.match(restoreSource, /information_schema\.tables/u);
   assert.match(restoreSource, /atlas_schema_revisions/u);
   assert.match(restoreSource, /temporary-postgres-container-removed/u);
+  assert.match(restoreSource, /docker rm --force --volumes "\$container_name"/u);
   assert.match(restoreSource, /backupAgeSeconds/u);
   assert.match(restoreSource, /restoreDurationSeconds/u);
   assert.match(restoreSource, /备份文件名不符合受管格式/u);
-  assert.match(restoreSource, /trap cleanup EXIT/u);
+  assert.match(restoreSource, /trap on_exit EXIT/u);
+  assert.match(restoreSource, /if ! cleanup_resources; then/u);
 });
 
 test("systemd timers persist daily backup and weekly restore checks with failure hooks", () => {
