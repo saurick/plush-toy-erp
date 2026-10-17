@@ -194,7 +194,28 @@ export function createCustomerSessionScenarios({
       verify: async (page) => {
         await expectText(page, '毛绒玩具管理系统')
         await expectText(page, '超级管理员')
-        await expectText(page, 'style-l1-admin')
+        const accountMenuTrigger = page.getByTestId(
+          'desktop-account-menu-trigger'
+        )
+        assert.doesNotMatch(
+          await accountMenuTrigger.innerText(),
+          /style-l1-admin/u,
+          '页头使用紧凑身份摘要，登录账号在展开菜单中核对'
+        )
+        await accountMenuTrigger.click()
+        await page
+          .locator('.erp-account-menu__identity')
+          .getByText('账号：style-l1-admin', { exact: true })
+          .waitFor({ state: 'visible' })
+        await page.keyboard.press('Escape')
+        await page.locator('.erp-account-menu').waitFor({ state: 'hidden' })
+        assert.equal(
+          await accountMenuTrigger.evaluate(
+            (node) => document.activeElement === node
+          ),
+          true,
+          '关闭账号菜单后恢复触发按钮焦点'
+        )
         await expectText(page, '功能预览')
         await expectHeading(page, '系统功能总览')
         await expectText(page, '业务功能')
@@ -593,6 +614,7 @@ export function createCustomerSessionScenarios({
                 id: `workbench-long-queue-${kind}-${suffix}`,
                 method: 'create_task',
                 params: {
+                  idempotency_key: crypto.randomUUID(),
                   task_code: `style-l1-workbench-${kind}-${suffix}`,
                   task_group: 'sales-orders',
                   task_name: `${

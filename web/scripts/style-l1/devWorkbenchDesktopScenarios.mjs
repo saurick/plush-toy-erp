@@ -682,6 +682,30 @@ export function createDevWorkbenchDesktopScenarios({
         await assertNoHorizontalOverflow(page, '专项检查命令分页与空结果恢复')
       }
       if (item.route === DEV_DOCS_ROUTE) {
+        const selector = '[aria-label="开发文档层级"]'
+        const selectedLifecycle = page.locator(
+          `${selector} .erp-segmented-item-selected`
+        )
+        for (const target of [1, 2, 0, 2, 1, 0]) {
+          await verifySlidingMotion(page, assert, selector, target)
+        }
+        await page.goBack()
+        await selectedLifecycle.filter({ hasText: /^评审与参考$/u }).waitFor()
+        assert.equal(await selectedLifecycle.innerText(), '评审与参考')
+        await page.goForward()
+        await selectedLifecycle.filter({ hasText: /^当前$/u }).waitFor()
+        assert.equal(await selectedLifecycle.innerText(), '当前')
+        await page.reload()
+        await page.locator(`${selector} [data-sliding-ready="true"]`).waitFor()
+        assert.equal(await selectedLifecycle.innerText(), '当前')
+        const search = page.getByRole('textbox', { name: '搜索开发文档' })
+        await search.fill('不存在的文档检索内容 navigation-no-result')
+        await page
+          .getByText('没有匹配的文档，阅读操作已隐藏', { exact: true })
+          .waitFor()
+        await verifySlidingMotion(page, assert, selector, 1)
+        assert.equal(await search.inputValue(), '', '切换层级清除当前搜索')
+        await verifySlidingMotion(page, assert, selector, 0)
         const source = 'docs/engineering/跨层公共契约与生成规范.md'
         await page.setViewportSize({ width: 1920, height: 1080 })
         await page.goto(

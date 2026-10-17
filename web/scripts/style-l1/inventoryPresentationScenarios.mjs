@@ -1,3 +1,5 @@
+import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
+
 export function createInventoryPresentationScenarios(deps) {
   const {
     assert,
@@ -14,7 +16,7 @@ export function createInventoryPresentationScenarios(deps) {
   return [
     {
       name: 'inventory-visible-copy-desktop',
-      path: '/erp/warehouse/inventory',
+      path: '/erp/warehouse/inventory?view=balances',
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
@@ -24,11 +26,35 @@ export function createInventoryPresentationScenarios(deps) {
           scenarioName: 'inventory-compact-header-balance-desktop',
         })
         await assertTextAbsent(page, '查看内容')
-        await page.getByRole('tab', { name: '库存批次' }).click()
+        const selector = '.erp-inventory-ledger-view-bar > .ant-tabs'
+        await verifySlidingMotion(page, assert, selector, 1)
+        assert.equal(new URL(page.url()).searchParams.get('view'), 'lots')
         await assertBusinessHeaderCompact(page, {
           scenarioName: 'inventory-compact-header-lots-desktop',
         })
-        await page.getByRole('tab', { name: '库存变动记录' }).click()
+        await verifySlidingMotion(page, assert, selector, 2)
+        assert.equal(new URL(page.url()).searchParams.get('view'), 'txns')
+        await page.goBack()
+        await page
+          .getByRole('tab', { name: '库存批次', selected: true })
+          .waitFor()
+        assert.equal(
+          await page
+            .getByRole('tab', { name: '库存批次' })
+            .getAttribute('aria-selected'),
+          'true'
+        )
+        await page.goForward()
+        await page.reload()
+        await page
+          .getByRole('tab', { name: '库存变动记录', selected: true })
+          .waitFor()
+        assert.equal(
+          await page
+            .getByRole('tab', { name: '库存变动记录' })
+            .getAttribute('aria-selected'),
+          'true'
+        )
         await assertBusinessHeaderCompact(page, {
           scenarioName: 'inventory-compact-header-transactions-desktop',
         })
@@ -129,7 +155,13 @@ export function createInventoryPresentationScenarios(deps) {
             'inventory-compact-header-dark-mobile-header.png'
           ),
         })
-        await page.getByRole('tab', { name: '库存变动记录' }).click()
+        await verifySlidingMotion(
+          page,
+          assert,
+          '.erp-inventory-ledger-view-bar > .ant-tabs',
+          2
+        )
+        assert.equal(new URL(page.url()).searchParams.get('view'), 'txns')
         await assertBusinessHeaderCompact(page, {
           scenarioName: 'inventory-compact-header-transactions-dark-mobile',
         })

@@ -398,9 +398,25 @@ export default function DevDocsPage() {
     () => applyDevDocsPinnedState(docsWithSources, pinnedPaths),
     [docsWithSources, pinnedPaths]
   )
-  const [lifecycle, setLifecycle] = useState(() =>
-    readLifecycle(docs, location.search)
+  const [fallbackSelection, setFallbackSelection] = useState(() => {
+    const lifecycle = readLifecycle(docs, location.search)
+    return {
+      lifecycle,
+      key: readSelectedKey(
+        filterDevDocsByLifecycle(docs, lifecycle),
+        location.search
+      ),
+    }
+  })
+  const querySelectedPath = normalizeDevDocsSelectedPath(
+    readSelectedPathFromSearch(location.search),
+    docs
   )
+  const querySelectedDoc = docsWithPinnedState.find(
+    (item) => item.path === querySelectedPath
+  )
+  const lifecycle = querySelectedDoc?.lifecycle || fallbackSelection.lifecycle
+  const selectedKey = querySelectedDoc?.key || fallbackSelection.key
   const lifecycleDocs = useMemo(
     () => filterDevDocsByLifecycle(docsWithPinnedState, lifecycle),
     [docsWithPinnedState, lifecycle]
@@ -415,12 +431,6 @@ export default function DevDocsPage() {
   )
   const [keyword, setKeyword] = useState('')
   const [searchScope, setSearchScope] = useState(DEV_DOCS_SEARCH_SCOPE_ALL)
-  const [selectedKey, setSelectedKey] = useState(() =>
-    readSelectedKey(
-      filterDevDocsByLifecycle(docs, readLifecycle(docs, location.search)),
-      location.search
-    )
-  )
   const [expandedKeys, setExpandedKeys] = useState(
     () => new Set(readExpandedKeys(allDirectoryKeys))
   )
@@ -592,27 +602,7 @@ export default function DevDocsPage() {
   }, [tocExpanded])
 
   useEffect(() => {
-    const querySelectedPath = normalizeDevDocsSelectedPath(
-      readSelectedPathFromSearch(location.search),
-      docsWithPinnedState
-    )
-    if (querySelectedPath) {
-      const querySelectedDoc = docsWithPinnedState.find(
-        (item) => item.path === querySelectedPath
-      )
-      if (
-        querySelectedDoc?.lifecycle &&
-        querySelectedDoc.lifecycle !== lifecycle
-      ) {
-        setLifecycle(querySelectedDoc.lifecycle)
-      }
-      if (querySelectedDoc?.key && querySelectedDoc.key !== selectedKey) {
-        setSelectedKey(querySelectedDoc.key)
-      }
-      return
-    }
-
-    if (selectedDoc?.path) {
+    if (!querySelectedPath && selectedDoc?.path) {
       navigate(
         buildDevDocsLocation({
           pathname: location.pathname,
@@ -623,13 +613,11 @@ export default function DevDocsPage() {
       )
     }
   }, [
-    docsWithPinnedState,
     location.pathname,
     location.search,
-    lifecycle,
     navigate,
+    querySelectedPath,
     selectedDoc?.path,
-    selectedKey,
   ])
 
   useEffect(() => {
@@ -671,11 +659,6 @@ export default function DevDocsPage() {
         message.warning(`当前查看器未加载文档：${target.path}`)
         return
       }
-      const targetDoc = docs.find((item) => item.path === targetPath)
-      if (targetDoc?.lifecycle && targetDoc.lifecycle !== lifecycle) {
-        setLifecycle(targetDoc.lifecycle)
-      }
-
       const currentPath = normalizeDevDocsSelectedPath(
         readSelectedPathFromSearch(location.search),
         docs
@@ -707,7 +690,6 @@ export default function DevDocsPage() {
     location.hash,
     location.pathname,
     location.search,
-    lifecycle,
     navigate,
     selectedDoc?.path,
   ])
@@ -772,10 +754,6 @@ export default function DevDocsPage() {
     if (!doc?.path) {
       return
     }
-    if (doc.lifecycle !== lifecycle) {
-      setLifecycle(doc.lifecycle)
-    }
-    setSelectedKey(docKey)
     navigate(
       buildDevDocsLocation({
         pathname: location.pathname,
@@ -799,7 +777,14 @@ export default function DevDocsPage() {
       selectDoc(nextDoc.key)
       return
     }
-    setLifecycle(nextLifecycle)
+    setFallbackSelection({ lifecycle: nextLifecycle, key: '' })
+    navigate(
+      buildDevDocsLocation({
+        pathname: location.pathname,
+        search: location.search,
+        path: '',
+      })
+    )
   }
 
   const retrySelectedSource = () => {

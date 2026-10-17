@@ -380,7 +380,7 @@ export default function InventoryLedgerPage() {
   const requestControllersRef = useRef({})
   const requestSequenceRef = useRef({})
   const operationAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
-  const [activeView, setActiveView] = useBusinessPageState(
+  const [savedActiveView, setSavedActiveView] = useBusinessPageState(
     'activeView',
     VIEW_BALANCES
   )
@@ -437,6 +437,9 @@ export default function InventoryLedgerPage() {
   const [operationCancelOpen, setOperationCancelOpen] = useState(false)
   const [operationCancelReason, setOperationCancelReason] = useState('')
   const routeView = searchParamText(searchParams, 'view')
+  const activeView = Object.hasOwn(VIEW_LABELS, routeView)
+    ? routeView
+    : savedActiveView
   const routeLotID = searchParamPositiveInt(searchParams, 'lot_id')
   const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
   const routeInventoryOperationID = searchParamPositiveInt(
@@ -725,12 +728,10 @@ export default function InventoryLedgerPage() {
   }, [loadRows])
 
   useEffect(() => {
-    if (routeView && VIEW_LABELS[routeView] && routeView !== activeView) {
-      setActiveView(routeView)
-      setSelectedRow(null)
-      setDetailRecord(null)
-    }
-  }, [activeView, routeView, setActiveView])
+    setSavedActiveView(activeView)
+    setSelectedRow(null)
+    setDetailRecord(null)
+  }, [activeView, setSavedActiveView])
 
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(() => {
@@ -753,7 +754,11 @@ export default function InventoryLedgerPage() {
 
   const handleViewChange = useCallback(
     (nextView) => {
-      setActiveView(nextView)
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current)
+        next.set('view', nextView)
+        return next
+      })
       if (nextView !== VIEW_BALANCES) setBalanceDisplay('list')
       setSelectedRow(null)
       setDetailRecord(null)
@@ -763,7 +768,7 @@ export default function InventoryLedgerPage() {
     },
     [
       resetCurrentPage,
-      setActiveView,
+      setSearchParams,
       setBalanceDisplay,
       setDateFilterEnd,
       setDateFilterStart,

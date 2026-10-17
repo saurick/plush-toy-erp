@@ -505,6 +505,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       }, params)
 
     await createTask({
+      idempotency_key: crypto.randomUUID(),
       task_code: 'style-l1-dashboard-entry-sales-order',
       task_group: 'sales-orders',
       task_name: '工作台来源标签非真实关联任务',

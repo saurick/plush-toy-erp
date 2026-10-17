@@ -34,8 +34,6 @@ export function useOperationalFactQuery({
 }) {
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const [activeKey, setActiveKey] = useState(initialActiveKey)
-
   const [keyword, setKeyword] = useBusinessPageState('keyword', '')
 
   const [statusFilter, setStatusFilter] = useBusinessPageState(
@@ -153,16 +151,25 @@ export function useOperationalFactQuery({
     return nextConfigs
   }, [baseConfigs, enabledViewKeys, viewOverrides])
 
-  useEffect(() => {
-    if (!configs[activeKey]) {
-      setActiveKey(enabledViewKeys[0] || 'production')
-    }
-  }, [activeKey, configs, enabledViewKeys])
-
   const fallbackActiveKey =
     enabledViewKeys.find((key) => configs[key]) || 'production'
-
-  const currentActiveKey = configs[activeKey] ? activeKey : fallbackActiveKey
+  const routeView = searchParamText(searchParams, 'view')
+  const currentActiveKey = Object.hasOwn(configs, routeView)
+    ? routeView
+    : Object.hasOwn(configs, initialActiveKey)
+      ? initialActiveKey
+      : fallbackActiveKey
+  const setActiveKey = useCallback(
+    (key) => {
+      if (!Object.hasOwn(configs, key) || key === currentActiveKey) return
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current)
+        next.set('view', key)
+        return next
+      })
+    },
+    [configs, currentActiveKey, setSearchParams]
+  )
 
   const activeConfig = configs[currentActiveKey] || configs[fallbackActiveKey]
 
@@ -473,12 +480,6 @@ export function useOperationalFactQuery({
     setDateFieldByKey,
     setDateRangeByKey,
   ])
-  const routeView = searchParamText(searchParams, 'view')
-  useEffect(() => {
-    if (routeView && configs[routeView] && routeView !== activeKey) {
-      setActiveKey(routeView)
-    }
-  }, [activeKey, configs, routeView])
   return {
     setActiveKey,
     keyword,

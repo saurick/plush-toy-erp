@@ -607,7 +607,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   selectedTaskRef.current = selectedTask
   const sharedLinkAutoRef = useRef('')
   const [sharedHandlingID, setSharedHandlingID] = useState(null)
-  const [activeView, setActiveView] = useState(initialView)
+  const activeView = initialView
   const [workbenchQueueKey, setWorkbenchQueueKey] = useState('actionable')
   const [workbenchQueuePage, setWorkbenchQueuePage] = useState(1)
   const [workbenchQueuePageSize, setWorkbenchQueuePageSize] = useState(
@@ -888,10 +888,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     exceptionsView,
     calendarView,
   ])
-
-  useEffect(() => {
-    setActiveView(initialView)
-  }, [initialView])
 
   useEffect(() => {
     const deniedApproval = !canViewApprovalInbox && requestedFilters.mode === 'approval'
