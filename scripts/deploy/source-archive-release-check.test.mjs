@@ -367,6 +367,46 @@ test("light check rejects archive Markdown links to export-ignored customer docs
   }
 });
 
+test("current deployment navigation remains closed in an export-ignored source archive", async () => {
+  const workspace = mkdtempSync(
+    path.join(os.tmpdir(), "deployment-archive-check-"),
+  );
+  const root = path.join(workspace, "repository");
+  mkdirSync(root);
+  try {
+    const archivePath = path.join(workspace, "source.tar");
+    const archive = spawnSync(
+      "git",
+      ["archive", "--format=tar", `--output=${archivePath}`, "HEAD"],
+      {
+        cwd: repoRoot,
+        env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+      },
+    );
+    assert.equal(archive.status, 0, String(archive.stderr));
+    const extraction = spawnSync("tar", ["-xf", archivePath, "-C", root]);
+    assert.equal(extraction.status, 0, String(extraction.stderr));
+    const navigation = "server/deploy/compose/prod/README.md";
+    copyFileSync(path.join(repoRoot, navigation), path.join(root, navigation));
+    runGit(root, ["init", "-q"]);
+    runGit(root, ["config", "user.name", "Archive Test"]);
+    runGit(root, ["config", "user.email", "archive-test@example.invalid"]);
+    runGit(root, ["add", "."]);
+    runGit(root, ["commit", "-qm", "current deployment navigation"]);
+
+    const report = await runSourceArchiveReleaseCheck(
+      { mode: "light" },
+      { repoRoot: root },
+    );
+    assert.equal(report.lightCheckPassed, true);
+    assert.deepEqual(report.inventory.brokenMarkdownLinks, []);
+    assert.equal(report.repositoryBoundary.passed, true);
+    assert.equal(report.formalEvidenceEligible, false);
+  } finally {
+    removeFixtureRepo(workspace);
+  }
+});
+
 test("light check scans progress and archive README links", async () => {
   const root = createFixtureRepo();
   try {

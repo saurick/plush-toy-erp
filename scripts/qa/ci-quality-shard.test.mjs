@@ -6,6 +6,7 @@ import {
   CI_QUALITY_SHARDS,
   CI_QUALITY_SHARD_SCHEMA,
   hasCompleteSourceArchiveLightEvidence,
+  sourceArchiveFailureMessage,
 } from "./ci-quality-shard.mjs";
 
 const source = readFileSync(
@@ -149,4 +150,51 @@ test("Node shard accepts only the tagged source-archive SHA-256 contract", () =>
     ),
     false,
   );
+});
+
+test("Node source inventory failure identifies the broken exported navigation", () => {
+  const brokenLink =
+    "server/deploy/compose/prod/README.md -> ../../../../docs/customers/yoyoosun/试用环境执行手册.md";
+  const error = new Error("node exited with status 1");
+  error.result = {
+    stderr: `[source-archive-release-check] source archive inventory check failed ${JSON.stringify({
+      missingPaths: [],
+      forbiddenPaths: [],
+      symlinks: [],
+      brokenMarkdownLinks: [brokenLink],
+      environment: { password: "not-diagnostic" },
+    })}\n`,
+    stdout: "sensitive stdout must stay private",
+  };
+  const message = sourceArchiveFailureMessage(error);
+  assert.match(message, /source archive inventory check failed/u);
+  assert.ok(message.includes(brokenLink));
+  assert.doesNotMatch(message, /not-diagnostic|environment|sensitive stdout/u);
+});
+
+test("Node source inventory failure keeps existing redaction and length limits", () => {
+  const error = new Error("node exited with status 1");
+  error.result = {
+    stderr: `[source-archive-release-check] source archive inventory check failed ${JSON.stringify({
+      missingPaths: ["https://user:private-password@example.invalid/path"],
+      symlinks: ["/home/runner/private-workspace/source"],
+      brokenMarkdownLinks: ["x".repeat(2000)],
+    })}\n`,
+  };
+  const message = sourceArchiveFailureMessage(error);
+  assert.ok(message.length <= 500);
+  assert.match(message, /<redacted-url>/u);
+  assert.match(message, /<redacted-path>/u);
+  assert.doesNotMatch(message, /private-password|private-workspace/u);
+});
+
+test("Node source failure never substitutes arbitrary child logs for diagnostics", () => {
+  for (const stderr of [
+    "raw secret environment output",
+    "[source-archive-release-check] source archive inventory check failed {invalid}",
+  ]) {
+    const error = new Error("node exited with status 1");
+    error.result = { stderr, stdout: "raw private stdout" };
+    assert.equal(sourceArchiveFailureMessage(error), "node exited with status 1");
+  }
 });

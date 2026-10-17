@@ -105,7 +105,7 @@ APP_ADMIN_PASSWORD='<ephemeral-secret>' \
 
 模拟数据可以通过受控 rebuild operation 重建，但执行器必须先创建并恢复校验备份、保存旧物理数据代和精确回滚身份。禁止裸清表、volume 删除、临时 SQL 或跨环境复制。
 
-该重建的恢复检查只证明 PostgreSQL，不自动切换附件 bucket，也不证明附件已恢复。需要成套恢复保证时，按[备份恢复手册](../../../../deployments/yoyoosun/runbooks/04-backup-restore.md)对同批 PG 与全部登记附件完成隔离恢复、对象校验和临时资源清理，单独保留回执。fresh demo 的 formal 账号、客户配置、core、凭据轮换和显式来源规模顺序见[试用环境执行手册](../../../../docs/customers/yoyoosun/试用环境执行手册.md)，不属于普通 promotion 的隐含阶段。
+该重建的恢复检查只证明 PostgreSQL，不自动切换附件 bucket，也不证明附件已恢复。需要成套恢复保证时，按[备份恢复手册](../../../../deployments/yoyoosun/runbooks/04-backup-restore.md)对同批 PG 与全部登记附件完成隔离恢复、对象校验和临时资源清理，单独保留回执。fresh demo 须按[全页面试用验收数据](../../../../scripts/qa/README.md#全页面试用验收数据)先用临时管理员准备完整 formal 岗位账号，再激活客户配置、bootstrap core、轮换凭据，并按显式来源规模执行 runner；这些步骤不属于普通 promotion 的隐含阶段。
 
 ## customer-test 干净基线
 

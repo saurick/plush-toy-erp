@@ -155,6 +155,33 @@ function safeFailure(error) {
     .slice(0, 500);
 }
 
+export function sourceArchiveFailureMessage(error) {
+  const prefix =
+    "[source-archive-release-check] source archive inventory check failed ";
+  const diagnostic = String(error?.result?.stderr || "")
+    .split(/\r?\n/u)
+    .find((line) => line.startsWith(prefix));
+  if (!diagnostic) return safeFailure(error);
+  try {
+    const details = JSON.parse(diagnostic.slice(prefix.length));
+    const inventory = Object.fromEntries(
+      ["missingPaths", "forbiddenPaths", "symlinks", "brokenMarkdownLinks"]
+        .filter((key) => Array.isArray(details[key]))
+        .map((key) => [
+          key,
+          details[key]
+            .filter((value) => typeof value === "string")
+            .map((value) => safeFailure(value)),
+        ]),
+    );
+    return safeFailure(
+      new Error(`source archive inventory check failed ${JSON.stringify(inventory)}`),
+    );
+  } catch {
+    return safeFailure(error);
+  }
+}
+
 function runGit(root, args) {
   const result = spawnSync("git", args, {
     cwd: root,
@@ -485,19 +512,24 @@ export async function runCiQualityShard({
       }
     }
     if (shard === "node") {
-      const source = await runProcess(
-        process.execPath,
-        [
-          "scripts/deploy/source-archive-release-check.mjs",
-          "--light",
-          "--ref",
-          "HEAD",
-          "--customer",
-          "yoyoosun",
-          "--json",
-        ],
-        { cwd: root, env: childEnv, stream: false },
-      );
+      let source;
+      try {
+        source = await runProcess(
+          process.execPath,
+          [
+            "scripts/deploy/source-archive-release-check.mjs",
+            "--light",
+            "--ref",
+            "HEAD",
+            "--customer",
+            "yoyoosun",
+            "--json",
+          ],
+          { cwd: root, env: childEnv, stream: false },
+        );
+      } catch (error) {
+        throw new Error(sourceArchiveFailureMessage(error));
+      }
       const report = JSON.parse(source.stdout);
       if (
         !hasCompleteSourceArchiveLightEvidence(report, {
