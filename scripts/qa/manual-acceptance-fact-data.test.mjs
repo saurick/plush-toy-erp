@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import {
+  numeric20Scale6Units,
+  numeric20Scale6TextFromUnits,
+} from "../../web/src/erp/utils/numeric20Scale6.mjs";
 import { exceptionChainFixture } from "./test-fixtures/manual-acceptance-exception-chains.mjs";
 
 import {
@@ -929,14 +933,34 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
   );
 });
 
-test("production exception fixture completes one formal over-issue approval and replays read-only", async () => {
+function productionExceptionApprovalFixture({
+  projectRequirement = (row) => row,
+  plannedQuantity = "6.250001",
+} = {}) {
   const order = { id: 41, order_no: "YS-V5-SC-02" };
   const requirement = {
     id: 51,
     production_order_id: order.id,
     production_order_item_id: 61,
+    material_id: 81,
+    unit_id: 91,
+    bom_header_id: 121,
+    bom_item_id: 131,
+    planned_quantity: plannedQuantity,
+    issued_quantity: plannedQuantity,
+    effective_limit_quantity: plannedQuantity,
     approved_over_issue_quantity: "0",
     remaining_quantity: "0",
+  };
+  const outsourcedRequirement = {
+    ...requirement,
+    id: 50,
+    material_id: 82,
+    bom_item_id: 132,
+    planned_quantity: "3.500001",
+    issued_quantity: "0",
+    effective_limit_quantity: "3.500001",
+    remaining_quantity: "3.500001",
   };
   let decision = null;
   let instance = null;
@@ -965,7 +989,12 @@ test("production exception fixture completes one formal over-issue approval and 
       key === "operational_fact.list_production_order_material_requirements"
     ) {
       assert.equal(actor, "admin");
-      return { material_requirements: [structuredClone(requirement)] };
+      return {
+        material_requirements: [
+          structuredClone(outsourcedRequirement),
+          projectRequirement(structuredClone(requirement)),
+        ],
+      };
     }
     if (key === "operational_fact.submit_production_exception") {
       assert.equal(actor, "admin");
@@ -1067,16 +1096,49 @@ test("production exception fixture completes one formal over-issue approval and 
       decision.version += 1;
       requirement.approved_over_issue_quantity = "1";
       requirement.remaining_quantity = "1";
+      requirement.effective_limit_quantity = numeric20Scale6TextFromUnits(
+        BigInt(numeric20Scale6Units(requirement.planned_quantity)) +
+          BigInt(numeric20Scale6Units("1")),
+      );
       mutations += 1;
       return { task: structuredClone(task) };
     }
     throw new Error(`unexpected ${key}`);
   };
 
+  const facts = [
+    {
+      id: 151,
+      fact_type: "MATERIAL_ISSUE",
+      status: "POSTED",
+      source_type: "PRODUCTION_ORDER",
+      source_id: order.id,
+      source_line_id: requirement.id,
+      subject_type: "MATERIAL",
+      subject_id: requirement.material_id,
+      unit_id: requirement.unit_id,
+      quantity: requirement.planned_quantity,
+    },
+  ];
+  return {
+    rpc,
+    order,
+    requirement,
+    outsourcedRequirement,
+    facts,
+    mutations: () => mutations,
+    nodes: () => nodes,
+    decision: () => decision,
+  };
+}
+
+test("production exception fixture completes one formal over-issue approval on an exactly issued direct grain and replays read-only", async () => {
+  const fixture = productionExceptionApprovalFixture();
+  const { rpc, order } = fixture;
   const args = {
     rpc,
     plan: { dataVersion: DATA_VERSION },
-    production: { order },
+    production: { order, facts: fixture.facts },
     apply: true,
   };
   const first = await ensureManualAcceptanceProductionExceptionApproval(args);
@@ -1088,17 +1150,17 @@ test("production exception fixture completes one formal over-issue approval and 
     first.approval_task_code,
     `PROC-${first.process_instance_id}-NODE-${first.approval_process_node_id}-A1`,
   );
-  assert.equal(mutations, 3);
+  assert.equal(fixture.mutations(), 3);
 
   const second = await ensureManualAcceptanceProductionExceptionApproval({
     ...args,
     apply: false,
   });
   assert.deepEqual(second, first);
-  assert.equal(mutations, 3);
-  const warehouseNode = nodes.find(
-    (node) => node.node_key === "warehouse_exception_execution",
-  );
+  assert.equal(fixture.mutations(), 3);
+  const warehouseNode = fixture
+    .nodes()
+    .find((node) => node.node_key === "warehouse_exception_execution");
   warehouseNode.status = "active";
   await assert.rejects(
     () =>
@@ -1109,7 +1171,7 @@ test("production exception fixture completes one formal over-issue approval and 
     /warehouse_exception_execution expected waiting/u,
   );
   warehouseNode.status = "waiting";
-  nodes = nodes.filter((node) => node !== warehouseNode);
+  fixture.nodes().splice(fixture.nodes().indexOf(warehouseNode), 1);
   await assert.rejects(
     () =>
       ensureManualAcceptanceProductionExceptionApproval({
@@ -1118,7 +1180,114 @@ test("production exception fixture completes one formal over-issue approval and 
       }),
     /warehouse_exception_execution/u,
   );
-  assert.equal(mutations, 3);
+  assert.equal(fixture.mutations(), 3);
+});
+
+test("over-issue preparation rejects unposted, foreign or incomplete direct source grains before approval writes", async () => {
+  const mutations = [
+    (fixture) => {
+      fixture.facts.length = 0;
+    },
+    (fixture) => {
+      fixture.facts[0].status = "DRAFT";
+    },
+    (fixture) => {
+      fixture.facts[0].source_id = 999;
+    },
+    (fixture) => {
+      fixture.facts[0].source_line_id = fixture.outsourcedRequirement.id;
+    },
+    (fixture) => {
+      fixture.facts[0].subject_id = 999;
+    },
+    (fixture) => {
+      fixture.facts[0].unit_id = 999;
+    },
+    (fixture) => {
+      fixture.facts[0].quantity = "6.250000";
+    },
+    (fixture) => {
+      fixture.facts.push({ ...fixture.facts[0] });
+    },
+    (fixture) => {
+      fixture.requirement.issued_quantity = "5";
+    },
+    (fixture) => {
+      fixture.requirement.remaining_quantity = "1";
+    },
+    (fixture) => {
+      fixture.requirement.approved_over_issue_quantity = "1";
+    },
+  ];
+  for (const mutate of mutations) {
+    const fixture = productionExceptionApprovalFixture();
+    mutate(fixture);
+    await assert.rejects(
+      ensureManualAcceptanceProductionExceptionApproval({
+        rpc: fixture.rpc,
+        plan: { dataVersion: DATA_VERSION },
+        production: { order: fixture.order, facts: fixture.facts },
+      }),
+    );
+    assert.equal(fixture.mutations(), 0);
+  }
+});
+
+test("over-issue approval preserves frozen grain and exact decimal projection and refuses rebinding on resume", async () => {
+  for (const projectRequirement of [
+    (row) =>
+      row.approved_over_issue_quantity === "1"
+        ? { ...row, material_id: 999 }
+        : row,
+    (row) =>
+      row.approved_over_issue_quantity === "1"
+        ? { ...row, issued_quantity: "6.250000" }
+        : row,
+    (row) =>
+      row.approved_over_issue_quantity === "1"
+        ? { ...row, planned_quantity: "6.250000" }
+        : row,
+    (row) =>
+      row.approved_over_issue_quantity === "1"
+        ? { ...row, effective_limit_quantity: "7.250000" }
+        : row,
+    (row) =>
+      row.approved_over_issue_quantity === "1"
+        ? { ...row, remaining_quantity: "2" }
+        : row,
+  ]) {
+    const fixture = productionExceptionApprovalFixture({ projectRequirement });
+    await assert.rejects(
+      ensureManualAcceptanceProductionExceptionApproval({
+        rpc: fixture.rpc,
+        plan: { dataVersion: DATA_VERSION },
+        production: { order: fixture.order, facts: fixture.facts },
+      }),
+      /source grain drifted|allowance did not read back as one/u,
+    );
+  }
+  const fixture = productionExceptionApprovalFixture({
+    plannedQuantity: "99999999999997.999999",
+  });
+  const args = {
+    rpc: fixture.rpc,
+    plan: { dataVersion: DATA_VERSION },
+    production: { order: fixture.order, facts: fixture.facts },
+  };
+  const approved =
+    await ensureManualAcceptanceProductionExceptionApproval(args);
+  assert.equal(approved.approved_remaining_quantity, "1");
+  assert.equal(
+    fixture.requirement.effective_limit_quantity,
+    "99999999999998.999999",
+  );
+  fixture.decision().production_material_requirement_id =
+    fixture.outsourcedRequirement.id;
+  await assert.rejects(
+    ensureManualAcceptanceProductionExceptionApproval({ ...args, apply: true }),
+    /exact fully issued direct/u,
+  );
+  assert.equal(fixture.mutations(), 3);
 });
 
 test("receipt quality readback uses the formal quality list instead of an empty receipt embed", async () => {

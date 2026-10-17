@@ -3181,6 +3181,115 @@ async function exactProductionExceptionApprovalTask({
   return tasks[0];
 }
 
+function overIssueQuantityUnits(value, label) {
+  const units = numeric20Scale6Units(value);
+  if (units === null) throw new CliError(`${label} is not an exact quantity`);
+  return BigInt(units);
+}
+
+function fullyIssuedOverIssueRequirement({
+  production,
+  requirements,
+  existing,
+  orderID,
+  label,
+}) {
+  if (
+    existing &&
+    (!["SUBMITTED", "APPROVED"].includes(existing.status) ||
+      existing.execution_status !== "PENDING")
+  )
+    throw new CliError(`${label} existing approval state drifted`);
+  const candidates = existing
+    ? requirements.filter(
+        (row) => row.id === existing.production_material_requirement_id,
+      )
+    : requirements;
+  const allowance =
+    existing?.status === "APPROVED"
+      ? overIssueQuantityUnits("1", `${label}.approved_quantity`)
+      : 0n;
+  for (const requirement of candidates) {
+    const issues = (production.facts || []).filter(
+      (fact) =>
+        fact.fact_type === "MATERIAL_ISSUE" &&
+        fact.status === "POSTED" &&
+        fact.source_type === "PRODUCTION_ORDER" &&
+        fact.source_id === orderID &&
+        fact.source_line_id === requirement.id,
+    );
+    if (!issues.length) continue;
+    const planned = overIssueQuantityUnits(
+      requirement.planned_quantity,
+      `${label}.planned_quantity`,
+    );
+    const issued = overIssueQuantityUnits(
+      requirement.issued_quantity,
+      `${label}.issued_quantity`,
+    );
+    const approved = overIssueQuantityUnits(
+      requirement.approved_over_issue_quantity,
+      `${label}.approved_over_issue_quantity`,
+    );
+    const effective = overIssueQuantityUnits(
+      requirement.effective_limit_quantity,
+      `${label}.effective_limit_quantity`,
+    );
+    const remaining = overIssueQuantityUnits(
+      requirement.remaining_quantity,
+      `${label}.remaining_quantity`,
+    );
+    const ids = new Set();
+    let posted = 0n;
+    for (const fact of issues) {
+      const id = positiveID(fact.id, `${label}.material_issue.id`);
+      if (
+        ids.has(id) ||
+        fact.subject_type !== "MATERIAL" ||
+        fact.subject_id !== requirement.material_id ||
+        fact.unit_id !== requirement.unit_id ||
+        requirement.production_order_id !== orderID
+      )
+        throw new CliError(
+          `${label} posted direct material source grain drifted`,
+        );
+      ids.add(id);
+      const quantity = overIssueQuantityUnits(
+        fact.quantity,
+        `${label}.material_issue.quantity`,
+      );
+      if (quantity <= 0n)
+        throw new CliError(
+          `${label} posted direct material quantity must be positive`,
+        );
+      posted += quantity;
+    }
+    if (
+      planned <= 0n ||
+      issued !== planned ||
+      posted !== issued ||
+      approved !== allowance ||
+      effective !== planned + approved ||
+      remaining !== allowance
+    )
+      continue;
+    for (const key of [
+      "id",
+      "production_order_id",
+      "production_order_item_id",
+      "material_id",
+      "unit_id",
+      "bom_header_id",
+      "bom_item_id",
+    ])
+      positiveID(requirement[key], `${label}.${key}`);
+    return { requirement, planned, issued };
+  }
+  throw new CliError(
+    `${label} requires its exact fully issued direct material requirement with no base remaining quantity`,
+  );
+}
+
 export async function ensureManualAcceptanceProductionExceptionApproval({
   rpc,
   plan,
@@ -3218,13 +3327,13 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
       ? requirementData.material_requirements
       : []
   ).sort((left, right) => Number(left?.id || 0) - Number(right?.id || 0));
-  const requirement = existing[0]?.production_material_requirement_id
-    ? requirements.find(
-        (item) =>
-          Number(item?.id) ===
-          Number(existing[0].production_material_requirement_id),
-      )
-    : requirements[0];
+  const { requirement, planned, issued } = fullyIssuedOverIssueRequirement({
+    production,
+    requirements,
+    existing: existing[0],
+    orderID: productionOrderID,
+    label: decisionNo,
+  });
   positiveID(requirement?.id, `${decisionNo}.material_requirement.id`);
   const productionOrderItemID = positiveID(
     requirement?.production_order_item_id,
@@ -3427,12 +3536,54 @@ export async function ensureManualAcceptanceProductionExceptionApproval({
     method: "list_production_order_material_requirements",
     params: { production_order_id: productionOrderID },
   });
-  const approvedRequirement = (
+  const approvedRequirements = (
     requirementReadback?.material_requirements || []
-  ).find((item) => Number(item?.id) === Number(requirement.id));
+  ).filter((item) => item?.id === requirement.id);
+  if (approvedRequirements.length !== 1)
+    throw new CliError(
+      `${decisionNo} approved material requirement is not unique`,
+    );
+  const approvedRequirement = approvedRequirements[0];
+  const approvedUnits = overIssueQuantityUnits(
+    "1",
+    `${decisionNo}.approved_quantity`,
+  );
+  for (const key of [
+    "id",
+    "production_order_id",
+    "production_order_item_id",
+    "material_id",
+    "unit_id",
+    "bom_header_id",
+    "bom_item_id",
+  ]) {
+    if (approvedRequirement[key] !== requirement[key])
+      throw new CliError(
+        `${decisionNo} approved material requirement source grain drifted`,
+      );
+  }
   if (
-    Number(approvedRequirement?.approved_over_issue_quantity) !== 1 ||
-    Number(approvedRequirement?.remaining_quantity) !== 1
+    overIssueQuantityUnits(
+      approvedRequirement.planned_quantity,
+      `${decisionNo}.planned_quantity`,
+    ) !== planned ||
+    overIssueQuantityUnits(
+      approvedRequirement.issued_quantity,
+      `${decisionNo}.issued_quantity`,
+    ) !== issued ||
+    overIssueQuantityUnits(
+      approvedRequirement.approved_over_issue_quantity,
+      `${decisionNo}.approved_over_issue_quantity`,
+    ) !== approvedUnits ||
+    overIssueQuantityUnits(
+      approvedRequirement.effective_limit_quantity,
+      `${decisionNo}.effective_limit_quantity`,
+    ) !==
+      planned + approvedUnits ||
+    overIssueQuantityUnits(
+      approvedRequirement.remaining_quantity,
+      `${decisionNo}.remaining_quantity`,
+    ) !== approvedUnits
   ) {
     throw new CliError(
       `${decisionNo} approved over-issue allowance did not read back as one`,
