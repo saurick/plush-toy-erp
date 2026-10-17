@@ -770,8 +770,8 @@ export function createDevWorkbenchDesktopScenarios({
       if (item.route === DEV_PRODUCT_ENGINEERING_ROUTE) {
         assert.equal(
           await page.locator('.erp-dev-tool-table tbody tr').count(),
-          5,
-          '产品工程应完整显示五个工具入口'
+          6,
+          '产品工程应完整显示六个工具入口'
         )
         assert.equal(
           await page.locator('.erp-dev-product-task__index').count(),

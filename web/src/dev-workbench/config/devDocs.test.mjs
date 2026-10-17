@@ -49,6 +49,8 @@ test('devDocs: document build excludes customer input memos while retaining publ
       'docs/engineering/public.md': '# Public contract\n',
       'docs/customers/example/甲方反馈记录.md': '# synthetic-private-memo\n',
       'docs/archive/history.md': '# Deferred archive\n',
+      '.agents/skills/plush-example/SKILL.md': '# Skill contract\n\n[Detail](references/detail.md#scope)\n',
+      '.agents/skills/plush-example/references/detail.md': '# Detail\n\n## Scope\n',
     })) {
       const target = path.join(root, file)
       await mkdir(path.dirname(target), { recursive: true })
@@ -61,6 +63,9 @@ logLevel: 'silent',
       server: { middlewareMode: true, hmr: false, watch: null },
     })
     const modules = await server.ssrLoadModule('/web/src/dev-workbench/pages/entry.mjs')
+    const skillDocs = buildDevDocsItems(modules.default)
+    assert.equal(skillDocs.find((item) => item.path === '.agents/skills/plush-example/SKILL.md')?.title, 'Skill contract')
+    assert.equal(skillDocs.find((item) => item.path === '.agents/skills/plush-example/references/detail.md')?.title, 'Detail')
     assert.equal(modules.default['../../../../docs/engineering/public.md'], '# Public contract\n')
     assert.equal(Object.keys(modules.default).some((file) => file.endsWith('/甲方反馈记录.md')), false)
     assert.equal(Object.values(modules.default).some((source) => source.includes('synthetic-private-memo')), false)

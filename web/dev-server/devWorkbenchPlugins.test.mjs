@@ -106,6 +106,7 @@ test('development serve registry is exact with and without a customer, and absen
     'plush-dev-qa-coverage',
     'plush-dev-business-chain-audit',
     'plush-dev-permission-relationships',
+    'plush-dev-project-skills',
     'plush-dev-delivery-bridge',
   ])
   assert.deepEqual(
@@ -156,6 +157,7 @@ test('development serve registry is exact with and without a customer, and absen
       'plush-dev-qa-coverage',
       'plush-dev-business-chain-audit',
       'plush-dev-permission-relationships',
+      'plush-dev-project-skills',
       'plush-dev-delivery-bridge',
     ])
     for (const config of [developmentBuild, productionBuild]) {

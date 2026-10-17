@@ -151,7 +151,7 @@ test('product and quality area smokes enforce their complete landing contracts',
         count: async () =>
           selector === '.erp-dev-tool-table tbody tr' &&
           route === DEV_PRODUCT_ENGINEERING_ROUTE
-            ? 5
+            ? 6
             : (counts.get(selector) ?? 0),
         waitFor: async () => {},
       }),

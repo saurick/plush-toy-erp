@@ -11,6 +11,7 @@ import { createDevQaTestingPlugin } from './devQaTestingPlugin.mjs'
 import { createDevQualityGatePlugin } from './devQualityGatePlugin.mjs'
 import { createDevWebInstancePlugin } from './devWebInstancePlugin.mjs'
 import { createDevOperatorAuthPlugin } from './devOperatorAuthPlugin.mjs'
+import { createDevProjectSkillsPlugin } from './devProjectSkillsPlugin.mjs'
 import {
   LOCAL_RUNTIME_PREFLIGHT_TIMEOUT_MS,
   runWebRuntimePreflight,
@@ -30,6 +31,7 @@ export const DEV_WORKBENCH_SERVE_PLUGIN_NAMES = Object.freeze([
   'plush-dev-qa-coverage',
   'plush-dev-business-chain-audit',
   'plush-dev-permission-relationships',
+  'plush-dev-project-skills',
   'plush-dev-delivery-bridge',
 ])
 
@@ -85,6 +87,7 @@ export function createDevWorkbenchServePlugins({
     createDevQaCoveragePlugin({ projectRoot }),
     createDevBusinessChainAuditPlugin({ projectRoot }),
     createDevPermissionRelationshipsPlugin({ projectRoot }),
+    createDevProjectSkillsPlugin({ projectRoot }),
     createDevDeliveryBridgePlugin({ projectRoot }),
   ].filter(Boolean)
 }

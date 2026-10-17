@@ -170,6 +170,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
       ['product-engineering', '业务链观察'],
       ['quality', '页面说明检查'],
       ['product-engineering', '开发文档'],
+      ['product-engineering', '工程规范与 Skill'],
       ['product-engineering', 'UI 交互设计'],
       ['quality', '改动验证'],
       ['quality', '链路实测'],
@@ -224,7 +225,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
     false,
     '页面说明检查保留登记和深链，通过改动验证按需进入'
   )
-  assert.equal(getDevSecondaryNavItems('product-engineering').length, 5)
+  assert.equal(getDevSecondaryNavItems('product-engineering').length, 6)
   assert.equal(getDevSecondaryNavItems('quality').length, 4)
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/business-chain-audit'), 'quality')
   assert.equal(resolveDevPageTitle('/__dev/business-chain-audit', 'ERP'), '链路实测 · ERP')
@@ -397,6 +398,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/status-flows',
       '/__dev/business-usability',
       '/__dev/docs',
+      '/__dev/project-skills',
       '/__dev/testing',
       '/__dev/business-chain-audit',
       '/__dev/quality-gates',
@@ -553,7 +555,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 14)
+  assert.equal(summary.entryCount, 15)
   assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)

@@ -62,6 +62,8 @@ DEV 桥接共用 `devServerSecurity.mjs` 的 loopback / same-origin 校验和有
 
 权限关系使用固定 `GET /__dev/api/permission-relationships`，不接受查询参数、请求体或写方法。插件复用本地运行配置的客户选择，以及 `local-database-roles.mjs` 的登记目标、只读审计账号和实际权限核验；缺失或失效时返回读取失败，不借用应用或管理员凭据。固定 Go 命令 `server/cmd/dev-permission-relationships` 核验开发库集群身份，使用强制只读连接，不执行启动初始化。返回账号识别、岗位及权限关系所需字段，排除手机号、口令、token 和连接信息。未登录、普通 ERP 岗位和切换岗位均不影响工作台读取；正式权限配置仍通过业务接口授权。该接口仅反映当前工作区逻辑与登记开发库，不证明其他环境或旧运行制品的实际权限。
 
+工程规范与 Skill 使用固定 `GET /__dev/api/project-skills`，只读取当前仓库 `.agents/skills/`，不接受查询参数、请求体或写方法。`devProjectSkillsPlugin.mjs` 复用 `skill-health.mjs` 的 validator 和 metadata parser，返回适用范围、入口 Markdown 引用、正文提及的项目 Skill 以及带时间的结构诊断；只在打开页面或显式刷新时检查。它不执行 Skill、命令或业务写入，也不采集会话、调用次数或全局 Skill。源文件继续在仓库维护，正文阅读复用开发文档查看器。
+
 `local` 仅接受真实 loopback 连接和 loopback Host；其他模式可接受符合各自认证要求的私网来源，数字 Host 必须与实际监听 IPv4 地址和端口一致。内网 HTTPS 域名使用下述显式代理配置；其他 DNS 别名、公网、伪造 Host 和跨站元数据均拒绝。POST 继续要求精确同源 Origin、CSRF、固定动作、原有确认、状态和资源预检；直接访问不取消这些控制。
 
 内网 HTTPS 代理可在同一 ignored 文件中设置 `PLUSH_DEV_HTTPS_ORIGIN=https://<内网域名>`，只接受单个 HTTPS origin（可带端口），不接受账号、路径、查询或片段；无效配置阻断该开发服务启动。Vite 仅放行此域名，HMR 默认跟随页面地址使用 WSS。代理必须在 TLS 入口限制内网客户端，严格匹配 SNI / Host，然后经 `127.0.0.1:<前端端口>` 回源；覆盖上游 Host 为配置 origin 的 host、`X-Forwarded-Proto=https` 和 `X-Forwarded-For=<实际客户端 IPv4>`，不能追加客户端提供的转发链。

@@ -1,0 +1,171 @@
+.erp-dev-skills {
+  gap: 16px;
+  min-width: 0;
+}
+
+.erp-dev-skills__header,
+.erp-dev-skills__health,
+.erp-dev-skills__detail-head,
+.erp-dev-skills__related {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.erp-dev-skills__header,
+.erp-dev-skills__detail-head {
+  justify-content: space-between;
+}
+
+.erp-dev-skills h1.ant-typography,
+.erp-dev-skills h2.ant-typography,
+.erp-dev-skills h3.ant-typography {
+  margin: 0;
+}
+
+.erp-dev-skills h1.ant-typography {
+  margin-bottom: 6px;
+  font-size: 20px;
+}
+
+.erp-dev-skills h2.ant-typography {
+  font-size: 18px;
+}
+
+.erp-dev-skills h3.ant-typography {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.erp-dev-skills__health {
+  gap: 8px;
+  font-size: 12px;
+}
+
+.erp-dev-skills__workspace {
+  display: grid;
+  grid-template-columns: minmax(250px, 320px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+  min-width: 0;
+}
+
+.erp-dev-skills__catalog,
+.erp-dev-skills__list,
+.erp-dev-skills__detail {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.erp-dev-skills__detail {
+  gap: 24px;
+  padding: 24px;
+  border: 1px solid var(--erp-border);
+  border-radius: 10px;
+  background: var(--erp-surface-bg);
+}
+
+.erp-dev-skills__item {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--erp-border);
+  border-radius: 8px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.erp-dev-skills__item span {
+  color: var(--erp-text-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.erp-dev-skills__item[aria-pressed='true'] {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-soft);
+}
+
+.erp-dev-skills__item:focus-visible {
+  outline: 2px solid var(--erp-primary);
+  outline-offset: 2px;
+}
+
+.erp-dev-skills__name,
+.erp-dev-skills__references,
+.erp-dev-skills__boundary {
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-skills__name {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text-muted);
+  font-size: 12px;
+}
+
+.erp-dev-skills__detail p {
+  margin: 0;
+  line-height: 1.85;
+}
+
+.erp-dev-skills__related {
+  margin-top: 12px;
+}
+
+.erp-dev-skills__disclosure {
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--erp-border);
+}
+
+.erp-dev-skills__disclosure summary {
+  color: var(--erp-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.erp-dev-skills__disclosure[open] summary {
+  margin-bottom: 16px;
+}
+
+.erp-dev-skills__references {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+}
+
+.erp-dev-skills__boundary {
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.erp-dev-skills__state {
+  padding: 48px;
+}
+
+@media (max-width: 1080px) {
+  .erp-dev-skills__workspace {
+    grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .erp-dev-skills__detail {
+    padding: 16px;
+  }
+}
+
+@media (max-width: 760px) {
+  .erp-dev-skills__workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

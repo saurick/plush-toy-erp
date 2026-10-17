@@ -7,6 +7,7 @@ export const DEV_QUALITY_ROUTE = '/__dev/quality'
 export const DEV_DELIVERY_ROUTE = '/__dev/delivery'
 
 export const DEV_DOCS_ROUTE = '/__dev/docs'
+export const DEV_PROJECT_SKILLS_ROUTE = '/__dev/project-skills'
 export const DEV_STATUS_FLOWS_ROUTE = '/__dev/status-flows'
 export const DEV_BUSINESS_USABILITY_ROUTE = '/__dev/business-usability'
 export const DEV_UI_DESIGN_ROUTE = '/__dev/ui-design'
@@ -86,6 +87,12 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_DOCS_ROUTE,
     label: '开发文档',
+  }),
+  Object.freeze({
+    key: 'project-skills',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_PROJECT_SKILLS_ROUTE,
+    label: '工程规范与 Skill',
   }),
   Object.freeze({
     key: 'ui-design',

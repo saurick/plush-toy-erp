@@ -10,6 +10,7 @@ import {
   DEV_DATA_PREPARATION_ROUTE,
   DEV_DELIVERY_ROUTE,
   DEV_DOCS_ROUTE,
+  DEV_PROJECT_SKILLS_ROUTE,
   DEV_DRILL_RECOVERY_ROUTE,
   DEV_HUB_ROUTE,
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
@@ -71,6 +72,10 @@ const DevPermissionRelationshipsPage = createDevLazyRoute(
 const DevDocsPage = createDevLazyRoute(
   DEV_DOCS_ROUTE,
   () => import('./pages/DevDocsPage.jsx')
+)
+const DevProjectSkillsPage = createDevLazyRoute(
+  DEV_PROJECT_SKILLS_ROUTE,
+  () => import('./pages/DevProjectSkillsPage.jsx')
 )
 const DevFlowStateObservatoryPage = createDevLazyRoute(
   DEV_STATUS_FLOWS_ROUTE,
@@ -205,6 +210,7 @@ export default function DevWorkbenchRoutes() {
             element={<DevBusinessUsabilityPage />}
           />
           <Route path="docs" element={<DevDocsPage />} />
+          <Route path="project-skills" element={<DevProjectSkillsPage />} />
           <Route path="testing" element={<DevTestingPage />} />
           <Route path="business-chain-audit" element={<DevBusinessChainAuditPage />} />
           <Route path="quality-gates" element={<DevQualityGatesPage />} />

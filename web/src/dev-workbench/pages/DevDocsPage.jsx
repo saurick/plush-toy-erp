@@ -71,6 +71,7 @@ const currentMarkdownModules = import.meta.glob(
   [
     '../../../../README.md',
     '../../../../AGENTS.md',
+    '../../../../.agents/skills/**/*.md',
     '../../../README.md',
     '../../../scripts/README.md',
     '../../../dev-server/README.md',
@@ -436,6 +437,8 @@ export default function DevDocsPage() {
   )
   const [tocExpanded, setTocExpanded] = useState(() => readTocExpanded())
   const markdownRef = useRef(null)
+  const treeRef = useRef(null)
+  const pendingTreeRevealRef = useRef('')
 
   const docsWithSearchText = useMemo(
     () =>
@@ -478,6 +481,26 @@ export default function DevDocsPage() {
     () => extractMarkdownHeadings(selectedDocSource || '', [1, 2, 3]),
     [selectedDocSource]
   )
+
+  useEffect(() => {
+    pendingTreeRevealRef.current = selectedDocPath || ''
+    if (!selectedDocPath) return
+    const segments = selectedDocPath.split('/').slice(0, -1)
+    const parentKeys = segments.map((_, index) =>
+      `dir:${segments.slice(0, index + 1).join('/')}`
+    )
+    setExpandedKeys((current) => parentKeys.some((key) => !current.has(key))
+      ? new Set([...current, ...parentKeys])
+      : current)
+  }, [selectedDocPath])
+
+  useEffect(() => {
+    if (isSearching || !pendingTreeRevealRef.current) return
+    const current = treeRef.current?.querySelector('[aria-current="true"]')
+    if (!current) return
+    current.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+    pendingTreeRevealRef.current = ''
+  }, [selectedDocPath, expandedKeys, isSearching])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -631,7 +654,7 @@ export default function DevDocsPage() {
     }
     markdownRef.current?.scrollTo({ top: 0 })
     return undefined
-  }, [location.hash, selectedDoc?.key])
+  }, [location.hash, selectedDoc?.key, selectedDoc?.source])
 
   useEffect(() => {
     const container = markdownRef.current
@@ -692,6 +715,7 @@ export default function DevDocsPage() {
     location.search,
     navigate,
     selectedDoc?.path,
+    selectedDoc?.source,
   ])
 
   const copyPath = async () => {
@@ -1099,7 +1123,7 @@ export default function DevDocsPage() {
                   </Button>
                 </Space>
               </div>
-              <div className="erp-dev-docs-tree" aria-label="开发文档目录树">
+              <div ref={treeRef} className="erp-dev-docs-tree" aria-label="开发文档目录树">
                 {docTree.map((node) => (
                   <DevDocsTreeNode
                     key={node.key}
