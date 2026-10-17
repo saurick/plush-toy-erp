@@ -1424,10 +1424,13 @@ export function assertReceiptMatchesPlan(receipt, receiptPlan, sourceOrder) {
   });
   const expected = receiptPlan.linkedPurchaseOrder
     ? receiptPlan.linkedPurchaseOrder.items.map((item) => ({
-        purchase_order_item_id: item.id,
-        material_id: item.material_id,
-        unit_id: item.unit_id,
-        quantity: item.purchased_quantity,
+        purchase_order_item_id: positiveID(
+          item.purchaseOrderItemId,
+          "receipt source purchaseOrderItemId",
+        ),
+        material_id: positiveID(item.materialId, "receipt source materialId"),
+        unit_id: positiveID(item.unitId, "receipt source unitId"),
+        quantity: item.quantity,
         warehouse_id: receiptPlan.warehouseId,
       }))
     : receiptPlan.items.map((item) => ({

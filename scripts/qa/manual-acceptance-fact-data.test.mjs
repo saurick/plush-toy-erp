@@ -3017,6 +3017,99 @@ test("fulfillment readback binds warehouse tasks to posted sources and rejects w
   );
 });
 
+test("linked receipt grains consume canonical persisted source references exactly once", () => {
+  const source = sourceReport();
+  source.referenceRecords.purchaseOrders[0].items.push({
+    purchaseOrderItemId: 7001,
+    materialId: 101,
+    unitId: 1001,
+    quantity: "100",
+  });
+  const plan = buildManualAcceptanceFactPlan(source).receipts[0];
+  const receipt = {
+    receipt_no: plan.receiptNo,
+    purchase_order_id: 400,
+    purchase_order_no: "PO-1",
+    supplier_id: 201,
+    items: [7001, 500].map((purchaseOrderItemID) => ({
+      purchase_order_item_id: purchaseOrderItemID,
+      material_id: 101,
+      unit_id: 1001,
+      quantity: "100.000000",
+      warehouse_id: 301,
+    })),
+  };
+  assert.doesNotThrow(() =>
+    assertReceiptMatchesPlan(receipt, plan, plan.linkedPurchaseOrder),
+  );
+  for (const field of [
+    "purchase_order_item_id",
+    "material_id",
+    "unit_id",
+    "quantity",
+    "warehouse_id",
+  ]) {
+    assert.throws(
+      () =>
+        assertReceiptMatchesPlan(
+          {
+            ...receipt,
+            items: [{ ...receipt.items[0], [field]: 999 }, receipt.items[1]],
+          },
+          plan,
+          plan.linkedPurchaseOrder,
+        ),
+      /source item grain conflicts with plan/u,
+    );
+  }
+  assert.throws(
+    () =>
+      assertReceiptMatchesPlan(
+        { ...receipt, items: [receipt.items[0], receipt.items[0]] },
+        plan,
+        plan.linkedPurchaseOrder,
+      ),
+    /source item grain conflicts with plan/u,
+  );
+  for (const items of [
+    [],
+    receipt.items.slice(0, 1),
+    [...receipt.items, receipt.items[0]],
+  ]) {
+    assert.throws(
+      () =>
+        assertReceiptMatchesPlan(
+          { ...receipt, items },
+          plan,
+          plan.linkedPurchaseOrder,
+        ),
+      /source item count conflicts with plan/u,
+    );
+  }
+  for (const field of ["purchaseOrderItemId", "materialId", "unitId"]) {
+    for (const value of [undefined, 0, -1, 1.5]) {
+      const invalidPlan = {
+        ...plan,
+        linkedPurchaseOrder: {
+          ...plan.linkedPurchaseOrder,
+          items: plan.linkedPurchaseOrder.items.map((item, index) =>
+            index === 0 ? { ...item, [field]: value } : item,
+          ),
+        },
+      };
+      assert.throws(
+        () =>
+          assertReceiptMatchesPlan(
+            receipt,
+            invalidPlan,
+            plan.linkedPurchaseOrder,
+          ),
+        /must be a positive safe integer/u,
+      );
+    }
+  }
+});
+
 test("receipt number collisions cannot cross source, supplier, warehouse or item grains", () => {
   const plan = {
     receiptNo: "SIM-R1",
