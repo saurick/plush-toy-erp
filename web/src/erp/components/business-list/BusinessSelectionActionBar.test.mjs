@@ -164,6 +164,113 @@ test('更多操作重新打开时使用最新选择状态', async (t) => {
   assert.equal(printButton().disabled, false)
 })
 
+test('更多操作中的单据菜单按 Escape 后同时关闭，焦点恢复且可再次执行', async (t) => {
+  const [{ SelectionActionBar }, { Button, ConfigProvider, Dropdown }] =
+    await Promise.all([import('./BusinessListLayout.jsx'), import('antd')])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  let handled = 0
+  t.after(async () => {
+    await act(async () => root.unmount())
+    container.remove()
+  })
+  await act(async () =>
+    root.render(
+      createElement(
+        ConfigProvider,
+        // happy-dom does not finish CSS exit animations; the browser covers them.
+        { theme: { token: { motion: false } } },
+        createElement(
+          SelectionActionBar,
+          { selectedCount: 1 },
+          [1, 2, 3, 4].map((index) =>
+            createElement(
+              Button,
+              { key: index, type: 'primary' },
+              `主操作${index}`
+            )
+          ),
+          createElement(
+            Dropdown,
+            {
+              trigger: ['click'],
+              destroyOnHidden: true,
+              menu: {
+                items: [{ key: 'purchase-order', label: '采购订单' }],
+                onClick: () => {
+                  handled += 1
+                },
+              },
+            },
+            createElement(Button, null, '相关单据')
+          )
+        )
+      )
+    )
+  )
+  const more = container.querySelector(
+    '.erp-business-selection-action-bar__compact-more'
+  )
+  const related = () =>
+    [
+      ...document.querySelectorAll(
+        '.erp-business-selection-action-menu button'
+      ),
+    ].find((button) => button.textContent === '相关单据')
+  const menuItem = () => document.querySelector('[role="menuitem"]')
+  const click = async (button) =>
+    act(async () => {
+      assert(button, '必须找到真实控件')
+      button.focus()
+      button.click()
+    })
+  const waitFor = async (condition, message) => {
+    const deadline = Date.now() + 1_000
+    while (!condition()) {
+      assert(Date.now() < deadline, message)
+      await act(async () => new Promise((resolve) => setTimeout(resolve, 10)))
+    }
+  }
+
+  for (const focusMenuItem of [false, true]) {
+    await click(more)
+    await click(related())
+    assert.equal(menuItem()?.textContent, '采购订单')
+    await act(async () => {
+      const target = focusMenuItem ? menuItem() : related()
+      target.focus()
+      const escape = new dom.runtimeWindow.KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      })
+      // rc-dropdown reads the legacy keyCode that happy-dom does not initialize.
+      Object.defineProperty(escape, 'keyCode', { value: 27 })
+      target.dispatchEvent(escape)
+    })
+    await waitFor(
+      () => more.getAttribute('aria-expanded') === 'false',
+      'Escape 应关闭外层操作栏'
+    )
+    await waitFor(() => !menuItem(), 'Escape 应关闭内层单据菜单')
+    await waitFor(
+      () => document.activeElement === more,
+      'Escape 后应聚焦更多操作入口'
+    )
+    assert.equal(handled, 0)
+  }
+
+  await click(more)
+  await click(related())
+  await click(menuItem())
+  await waitFor(
+    () => more.getAttribute('aria-expanded') === 'false' && !menuItem(),
+    '单据动作执行后应关闭菜单'
+  )
+  assert.equal(handled, 1)
+})
+
 test('更多下拉保留禁用原因、二级确认及弹窗状态，执行后收起且键盘可恢复', async (t) => {
   const [
     {

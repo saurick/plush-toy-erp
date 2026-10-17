@@ -351,7 +351,7 @@ function ResponsiveSelectionActions({ children }) {
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.preventDefault()
-            event.stopPropagation()
+            // Nested dropdowns also close through their window key listener.
             closeMoreActionsAndRestoreFocus()
             return
           }

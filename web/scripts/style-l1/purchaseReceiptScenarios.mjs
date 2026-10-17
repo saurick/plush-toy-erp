@@ -535,6 +535,13 @@ export function createPurchaseReceiptScenarios(deps) {
           state: 'hidden',
           timeout: 10_000,
         })
+        const moreActions = page.getByRole('button', { name: /^更多操作，共/u })
+        assert.equal(await moreActions.getAttribute('aria-expanded'), 'false')
+        assert.equal(
+          await moreActions.evaluate((element) => element === document.activeElement),
+          true,
+          '关闭嵌套单据菜单后应恢复到更多操作入口'
+        )
         const actionBarText = await page
           .locator('.erp-business-module-current-action')
           .innerText()

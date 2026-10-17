@@ -1423,7 +1423,8 @@ export function createBusinessFormInteractionScenarios({
           .locator('.ant-table-row')
           .filter({ hasText: '样式供应商' })
           .first()
-          .click()
+          .getByRole('radio')
+          .check()
         await assertResponsiveSelectionActionBar(page, {
           scenarioName: 'business-selection-actions-phone-320',
           maxVisibleActions: 1,
