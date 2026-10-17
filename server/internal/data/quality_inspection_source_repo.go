@@ -344,7 +344,7 @@ func qualityInspectionMatchesCreate(row *ent.QualityInspection, in *biz.QualityI
 }
 
 func createQualityInspectionDraftRow(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) (*ent.QualityInspection, error) {
-	return client.QualityInspection.Create().
+	row, err := client.QualityInspection.Create().
 		SetInspectionNo(in.InspectionNo).
 		SetNillablePurchaseReceiptID(positiveIntPtr(in.PurchaseReceiptID)).
 		SetNillablePurchaseReceiptItemID(in.PurchaseReceiptItemID).
@@ -360,4 +360,9 @@ func createQualityInspectionDraftRow(ctx context.Context, client *ent.Client, in
 		SetNillableInspectorID(in.InspectorID).
 		SetNillableDecisionNote(in.DecisionNote).
 		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// Return persisted timestamp precision so the first response and replay agree.
+	return client.QualityInspection.Get(ctx, row.ID)
 }

@@ -261,7 +261,7 @@ func TestQualityInspectionFromOutsourcingReturnPostgresFailureRollsBackAndRetrie
 	assertFulfillmentTask(t, ctx, client, "outsourcing_quality", inspection.ID, "ready", biz.QualityRoleKey)
 	replayed, err := uc.CreateQualityInspectionFromOutsourcingReturn(ctx, in)
 	if err != nil || receivingJSON(t, replayed) != receivingJSON(t, inspection) {
-		t.Fatalf("quality replay changed inspection: %v", err)
+		t.Fatalf("quality replay changed inspection: err=%v initial=%s replay=%s", err, receivingJSON(t, inspection), receivingJSON(t, replayed))
 	}
 	if unchanged := assertFulfillmentTask(t, ctx, client, "outsourcing_quality_request", fact.ID, "done", biz.QualityRoleKey); unchanged.ID != doneTask.ID || unchanged.Version != doneTask.Version {
 		t.Fatal("quality replay changed its completed source request")
