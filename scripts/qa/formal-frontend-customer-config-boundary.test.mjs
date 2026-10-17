@@ -165,11 +165,12 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(seedDataSource.includes("title: '系统设置'"));
 
   const dashboardSource = readRelative("web/src/erp/pages/DashboardPage.jsx");
+  const dashboardViewsSource = readRelative("web/src/erp/components/workflow/WorkflowDashboardViews.jsx");
   assert(dashboardSource.includes("ProductCoreDashboard"));
-  assert(dashboardSource.includes('data-product-core-dashboard="true"'));
+  assert(dashboardViewsSource.includes('data-product-core-dashboard="true"'));
   assert(dashboardSource.includes("shouldShowProductCoreDashboard"));
-  assert(dashboardSource.includes("if (shouldShowProductCoreDashboard)"));
-  assert(dashboardSource.includes("不显示客户业务数据"));
+  assert.match(dashboardSource, /\{shouldShowProductCoreDashboard\s*\?/u);
+  assert(dashboardViewsSource.includes("不显示客户业务数据"));
 
   const syncSource = readRelative("web/src/erp/utils/adminProfileSync.mjs");
   assert(syncSource.includes("effective_session_sync_failed"));

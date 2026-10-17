@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { readDevWorkbenchPageSource } from "../../web/scripts/test/pageSources.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 
@@ -126,10 +127,7 @@ test("frontend error message boundary: Markdown Mermaid errors do not expose par
 });
 
 test("frontend error message boundary: dev customer config workbench uses shared helper", () => {
-  const source = readFileSync(
-    path.join(repoRoot, "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx"),
-    "utf8",
-  );
+  const source = readDevWorkbenchPageSource("DevCustomerConfigPage.jsx");
   assert(source.includes("getActionErrorMessage"));
   assert(!source.includes("return rawMessage || fallback"));
   assert(!source.includes("error: error?.message ||"));

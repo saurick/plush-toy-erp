@@ -327,7 +327,7 @@ test("desktop workbench uses a bounded snapshot while mobile tasks keep role-tas
   const dashboardSource = readFileSync(
     path.join(erpSourceRoot, "pages/DashboardPage.jsx"),
     "utf8",
-  );
+  ) + readFileSync(path.join(erpSourceRoot, "hooks/useWorkflowDashboardData.js"), "utf8");
   const mobileRoleTasksSource = readFileSync(
     path.join(erpSourceRoot, "mobile/pages/MobileRoleTasksPage.jsx"),
     "utf8",
@@ -832,7 +832,7 @@ test("workflow task post-success refresh failures stay separate from mutation re
     },
     {
       relativePath: "web/src/erp/pages/DashboardPage.jsx",
-      refreshCall: "loadDashboardStats()",
+      refreshCall: "reloadTaskData()",
       expectedCount: 1,
     },
     {
@@ -1243,7 +1243,8 @@ test("fact pages keep write buttons behind projected actions and status guards",
         'data-business-action-key="create-adjustment"',
         "{canPost ? (",
         'data-business-action-key="post"',
-        "!selectedRow || selectedRow.status !== 'DRAFT' || saving",
+        "!selectedRow || selectedRow.can_post !== true || saving",
+        "selectedRow.status === 'POSTED' && Number(selectedRow.pending_inbound_lines) > 0",
         'data-business-action-key="cancel"',
         "{canPost || canCancelDraft ? (",
         "(canPost ? ['DRAFT', 'POSTED'] : ['DRAFT']).includes(",
