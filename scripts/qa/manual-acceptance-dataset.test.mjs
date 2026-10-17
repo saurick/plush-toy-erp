@@ -179,6 +179,17 @@ test("stage logic fingerprints are deterministic and isolate declared component 
   assert.notEqual(sharedParamsChanged.get("source"), first.get("source"));
   assert.notEqual(sharedParamsChanged.get("facts"), first.get("facts"));
   assert.equal(sharedParamsChanged.get("task"), first.get("task"));
+  const quantityRulesChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
+    projectRoot,
+    readFileImpl: (filePath) => Buffer.from(`${path.relative(projectRoot, filePath)}:${filePath.endsWith("numeric20Scale6.mjs") ? "changed" : "current"}`),
+  });
+  for (const stageKey of MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS) {
+    if (["facts", "readiness"].includes(stageKey)) {
+      assert.notEqual(quantityRulesChanged.get(stageKey), first.get(stageKey));
+    } else {
+      assert.equal(quantityRulesChanged.get(stageKey), first.get(stageKey));
+    }
+  }
   const engineeringChanged = resolveManualAcceptanceDatasetStageLogicFingerprints({
     projectRoot,
     readFileImpl: (filePath) => Buffer.from(path.relative(projectRoot, filePath) +
