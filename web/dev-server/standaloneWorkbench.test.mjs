@@ -18,6 +18,7 @@ async function fixture(t, options = {}) {
   await mkdir(path.join(root, 'assets'))
   await writeFile(path.join(root, 'workbench.html'), '<h1>isolated workbench</h1>')
   await writeFile(path.join(root, 'assets', 'page.js'), 'export const page = true')
+  await writeFile(path.join(root, 'favicon-dev.svg'), '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><rect width="16" height="16"/></svg>')
   await writeFile(path.join(root, '.env'), 'must-not-be-served')
   await symlink(path.join(root, '.env'), path.join(root, 'assets', 'secret.js'))
   let calls = 0
@@ -90,7 +91,9 @@ test('login page is a real form with protected transport, bounded fields and an 
   const page = await request('/__dev/login?returnTo=%2F__dev%2Fdocs%3Fx%3D%22%3E%3Cscript%3E')
   assert.equal(page.status, 200)
   assert.equal(page.headers.get('referrer-policy'), 'same-origin')
+  assert.match(page.headers.get('content-security-policy'), /(?:^|; )img-src 'self'(?:;|$)/u)
   const body = await page.text()
+  assert.match(body, /<link rel="icon" type="image\/svg\+xml" href="\/favicon-dev\.svg">/u)
   assert.match(body, /autocomplete="current-password"/u)
   assert.match(body, /value="\/__dev\/docs\?x=%22%3E%3Cscript%3E"/u)
   assert.equal(body.includes('<script>'), false)
@@ -99,6 +102,26 @@ test('login page is a real form with protected transport, bounded fields and an 
   assert.equal((await request('/__dev/login', { headers: { 'x-forwarded-proto': 'http' } })).status, 403)
   assert.equal((await request('/__dev/login', { headers: { host: 'evil.test' } })).status, 403)
   assert.equal((await request('/__dev/login', { headers: { 'x-forwarded-for': '1.2.3.4, 10.0.0.1' } })).status, 403)
+})
+
+test('the login favicon is public only through the trusted HTTPS boundary and cannot open other resources', async (t) => {
+  const { request, calls } = await fixture(t)
+  const icon = await request('/favicon-dev.svg')
+  assert.equal(icon.status, 200)
+  assert.equal(icon.headers.get('content-type'), 'image/svg+xml')
+  assert.match(await icon.text(), /^<svg /u)
+  assert.equal((await request('/favicon-dev.svg', { method: 'HEAD' })).status, 200)
+  assert.equal((await request('/favicon-dev.svg', { method: 'POST' })).status, 401)
+  for (const route of ['/favicon.svg', '/assets/page.js', '/__dev/api/test', '/__dev/auth/session']) {
+    assert.equal((await request(route)).status, 401, route)
+  }
+  for (const headers of [
+    { 'x-forwarded-proto': 'http' }, { host: 'evil.test' },
+    { 'sec-fetch-site': 'cross-site' }, { 'sec-fetch-site': 'same-site', referer: 'https://tools.example.test/' },
+  ]) {
+    assert.equal((await request('/favicon-dev.svg', { headers })).status, 403)
+  }
+  assert.equal(calls(), 0)
 })
 
 test('correct login restores the deep link, uses a secure opaque cookie and protects all subsequent resources', async (t) => {
@@ -135,6 +158,7 @@ test('external top-level links reach only the public login form while cross-site
   assert.equal(entry.headers.get('location'), '/__dev/login?returnTo=%2F__dev%2Fdocs%3Fpath%3DREADME.md')
   const login = await request('/__dev/login', { headers })
   assert.equal(login.status, 200)
+  assert.match(login.headers.get('content-security-policy'), /(?:^|; )img-src 'self'(?:;|$)/u)
   assert.match(await login.text(), /登录工作台/u)
   const sameSiteHeaders = { ...headers, 'sec-fetch-site': 'same-site', referer: 'https://tools.example.test/' }
   assert.equal((await request('/__dev/login', { headers: sameSiteHeaders })).status, 200)

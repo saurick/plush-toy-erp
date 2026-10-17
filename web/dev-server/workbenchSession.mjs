@@ -12,6 +12,7 @@ const deriveKey = promisify(scrypt)
 export const WORKBENCH_SESSION_COOKIE = '__Host-plush-workbench-session'
 export const WORKBENCH_SESSION_TTL_MS = 8 * 60 * 60 * 1000
 const LOGIN_WINDOW_MS = 15 * 60 * 1000
+const LOGIN_CONTENT_SECURITY_POLICY = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"
 const digest = (value) => createHash('sha256').update(value).digest('hex')
 const escapeHtml = (value) => String(value).replace(/[&<>"']/gu, (character) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
@@ -41,7 +42,7 @@ export async function hashWorkbenchPassword(password, salt = randomBytes(16).toS
 }
 
 function loginPage(returnTo, error = '') {
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>登录 · 研发效能工作台</title><style>
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><link rel="icon" type="image/svg+xml" href="/favicon-dev.svg"><title>登录 · 研发效能工作台</title><style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:32px;background:#f4f6f9;color:#172a40;font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}main{width:100%;max-width:420px;padding:40px;background:white;border:1px solid #e2e7ef;border-radius:16px;box-shadow:0 12px 40px #172a4008}.mark{display:grid;place-items:center;width:44px;height:44px;background:#e9f1ff;color:#2563b4;border-radius:12px;font-size:22px;font-weight:600}h1{font-size:24px;line-height:1.4;margin:24px 0 8px}p{margin:0 0 28px;color:#66758a}label{display:block;margin:18px 0 7px;font-weight:500}input,button{width:100%;font:inherit;border-radius:8px;min-height:44px}input{border:1px solid #bbc6d5;padding:9px 12px;color:#172a40;background:#fff}input:focus-visible,button:focus-visible{outline:3px solid #b8d5ff;outline-offset:2px}button{border:0;margin-top:26px;padding:10px 16px;background:#3275c7;color:#fff;font-weight:600;cursor:pointer}button:hover{background:#2465b2}.error{margin:18px 0 0;color:#b42318;background:#fef3f2;padding:10px 12px;border-radius:8px}.hint{font-size:14px;margin:22px 0 0;color:#718096}
 </style></head><body><main><div class="mark" aria-hidden="true">&lt;/&gt;</div><h1>研发效能工作台</h1><p>登录后查看项目、验证与交付情况</p><form method="post" action="/__dev/auth/login"><input type="hidden" name="returnTo" value="${escapeHtml(returnTo)}"><label for="username">运维账号</label><input id="username" name="username" autocomplete="username" maxlength="64" required autofocus><label for="password">密码</label><input id="password" name="password" type="password" autocomplete="current-password" maxlength="1024" required>${error ? `<div class="error" role="alert">${escapeHtml(error)}</div>` : ''}<button type="submit">登录工作台</button></form><p class="hint">请使用工作台专用账号</p></main></body></html>`
 }
@@ -83,7 +84,7 @@ export function createWorkbenchSessionMiddleware({
       if (url.pathname === '/__dev/login') {
         response.writeHead(200, {
           'content-type': 'text/html; charset=utf-8',
-          'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+          'content-security-policy': LOGIN_CONTENT_SECURITY_POLICY,
         })
         response.end(loginPage(safeWorkbenchReturnTo(url.searchParams.get('returnTo'))))
       } else {
@@ -92,6 +93,10 @@ export function createWorkbenchSessionMiddleware({
       }
       return
     }
+    // The login page uses this public brand asset; all tool resources still
+    // require a session and every request retains the HTTPS/proxy boundary.
+    if (['GET', 'HEAD'].includes(request.method) && url.pathname === '/favicon-dev.svg' &&
+      isDevWorkbenchProxyTransportRequest(request) && isDevWorkbenchHttpsRequest(request)) return next()
     if (!isDevWorkbenchRequest(request) || !isDevWorkbenchHttpsRequest(request)) {
       response.writeHead(403, { 'content-type': 'text/plain; charset=utf-8' })
       response.end('请通过工作台 HTTPS 域名访问')
@@ -108,7 +113,7 @@ export function createWorkbenchSessionMiddleware({
     const html = (status, error = '', returnTo = url.searchParams.get('returnTo')) => {
       response.writeHead(status, {
         'content-type': 'text/html; charset=utf-8',
-        'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+        'content-security-policy': LOGIN_CONTENT_SECURITY_POLICY,
       })
       response.end(loginPage(safeWorkbenchReturnTo(returnTo), error))
     }

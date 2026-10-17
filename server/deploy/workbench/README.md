@@ -26,7 +26,7 @@
 
 登录表单使用 `/__dev/login`，提交到固定 `/__dev/auth/login`。服务检查同源后设置 `Secure; HttpOnly; SameSite=Strict; Path=/` 的 `__Host-` Cookie；服务端会话绝对有效期为 8 小时，重启或更换身份后失效。重新登录轮换会话，退出登录立即撤回服务端会话。失败按来源限制尝试次数，并保留全局上限；日志仅记录结果、请求 ID、方法、状态和耗时。
 
-未登录页面返回登录入口，API 和资源返回统一 401；深链接登录后恢复，拒绝外部跳转和 auth/API 返回地址。外部网页的顶层导航只允许进入公开登录页；跨站 API、表单提交和 iframe 继续拒绝。服务仅公开无操作能力的 `/healthz`；不运行 Vite，不提供源码、HMR、任意文件、命令或目标代理。
+未登录页面返回登录入口，API 和工具资源返回统一 401；深链接登录后恢复，拒绝外部跳转和 auth/API 返回地址。登录页和工作台共用 `/favicon-dev.svg`，该图标仅开放 HTTPS 受信代理边界内的 GET / HEAD，登录页 CSP 允许读取同源图片。外部网页的顶层导航只允许进入公开登录页；跨站 API、表单提交和 iframe 继续拒绝。服务另提供无操作能力的 `/healthz`；不运行 Vite，不提供源码、HMR、任意文件、命令或目标代理。
 
 本地开发默认 `local` 模式，本机 loopback 无需工作台登录；受控内网共享可在 ignored `web/.env.development.local` 中显式设置 `PLUSH_DEV_WORKBENCH_ACCESS=private-network`。这些模式只作用于本地 Vite，不会关闭独立部署的登录保护。
 
