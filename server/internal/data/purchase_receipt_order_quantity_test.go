@@ -464,7 +464,7 @@ func TestMaterialSupplyReceiptCreatesLineQualityGateBeforeInventoryPost(t *testi
 		t.Fatalf("pass decision failed: %v", err)
 	}
 	gate, err = uc.EvaluatePurchaseReceiptQualityGate(ctx, receipt.ID)
-	if err != nil || gate.Outcome != biz.PurchaseReceiptQualityGateReady || gate.PassedLines != 2 {
+	if err != nil || gate.Outcome != biz.PurchaseReceiptQualityGateReady || gate.PassedLines != 2 || len(gate.ReadyLineIDs) != 2 || len(gate.PendingLineIDs) != 0 {
 		t.Fatalf("all passed/concession lines must open gate, gate=%#v err=%v", gate, err)
 	}
 	posted, err := uc.PostPurchaseReceipt(ctx, receipt.ID)
