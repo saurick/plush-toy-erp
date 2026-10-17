@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import signal
 import subprocess
 import sys
 import tempfile
@@ -14,6 +15,7 @@ from unittest.mock import patch
 
 import backup_replica
 from replica_config import ReplicaError, load_config, resolve_volume
+from replica_install import require_idle_agent
 from replica_restore import verify_restore
 from replica_storage import atomic_json, destination, digest, exclusive
 from replica_sync import synchronize
@@ -154,6 +156,27 @@ class Fixture(unittest.TestCase):
             with self.assertRaisesRegex(ReplicaError, "replica_already_running"):
                 with exclusive(self.root / "state"):
                     pass
+
+    def test_termination_signal_runs_cleanup_and_releases_lock(self):
+        previous = signal.signal(signal.SIGTERM, backup_replica.interrupted)
+        cleaned = []
+        try:
+            with self.assertRaisesRegex(ReplicaError, "interrupted"):
+                with exclusive(self.root / "state"):
+                    try:
+                        os.kill(os.getpid(), signal.SIGTERM)
+                    finally:
+                        cleaned.append(True)
+            with exclusive(self.root / "state"):
+                self.assertEqual(cleaned, [True])
+        finally:
+            signal.signal(signal.SIGTERM, previous)
+
+    def test_install_refuses_to_interrupt_active_backup(self):
+        require_idle_agent("state = not running\nlast exit code = 0\nstate = active")
+        for status in ["state = running", "state = waiting\n pid = 234"]:
+            with self.assertRaisesRegex(ReplicaError, "backup_job_running"):
+                require_idle_agent(status)
 
     def test_inventory_requires_source_identity(self):
         value = self.inventory()

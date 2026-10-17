@@ -1,4 +1,4 @@
-"""从副本解密并恢复到无网络的一次性 PostgreSQL，始终清理临时明文。"""
+"""无网络的 PostgreSQL 恢复；结束及可处理的中断均清理临时明文。"""
 
 from datetime import datetime, timezone
 import json

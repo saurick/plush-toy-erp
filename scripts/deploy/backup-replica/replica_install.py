@@ -4,15 +4,21 @@ import hashlib
 import os
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import subprocess
 
 from replica_config import private_file, require
-from replica_storage import atomic_bytes, atomic_json, now, private_directory
+from replica_storage import atomic_bytes, atomic_json, exclusive, now, private_directory
 
 
 def checked(args, **kwargs):
     return subprocess.run(args, check=True, capture_output=True, timeout=30, **kwargs)
+
+
+def require_idle_agent(status):
+    require(re.search(r"(?m)^\s*(?:pid = [1-9][0-9]*|state = running)\s*$", status) is None,
+            "backup_job_running")
 
 
 def install(config, config_file, root, state):
@@ -68,10 +74,15 @@ def install(config, config_file, root, state):
         require(old.get("Label") == label and len(old.get("ProgramArguments", [])) >= 3
                 and Path(old["ProgramArguments"][2]).is_relative_to(releases),
                 "foreign_launchagent")
-        old_loaded = subprocess.run(["launchctl", "print", domain + "/" + label],
-                                    capture_output=True, timeout=15).returncode == 0
-        if old_loaded:
-            checked(["launchctl", "bootout", domain, str(plist)])
+        # Hold the same kernel lock while retiring the old trigger, then release
+        # it before bootstrap so RunAtLoad can acquire it normally.
+        with exclusive(state):
+            status = subprocess.run(["launchctl", "print", domain + "/" + label],
+                                    capture_output=True, timeout=15)
+            old_loaded = status.returncode == 0
+            if old_loaded:
+                require_idle_agent(status.stdout.decode())
+                checked(["launchctl", "bootout", domain, str(plist)])
     atomic_bytes(plist, plistlib.dumps(value))
     checked(["plutil", "-lint", str(plist)])
     try:

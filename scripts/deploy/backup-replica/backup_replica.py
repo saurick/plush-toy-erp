@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
 import sys
 
@@ -13,6 +14,10 @@ from replica_config import ReplicaError, load_config, resolve_volume
 from replica_storage import atomic_json, destination, exclusive, now, private_directory
 from replica_sync import synchronize
 from replica_transport import SSHSource
+
+
+def interrupted(signum, frame):
+    raise ReplicaError("interrupted")
 
 
 def execute(action, config, config_file):
@@ -63,6 +68,8 @@ def execute(action, config, config_file):
 
 def main():
     os.umask(0o077)
+    signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGINT, interrupted)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["init", "sync", "verify", "run", "status", "install"])
     parser.add_argument("--config", required=True, type=Path)

@@ -101,7 +101,7 @@ Mac 与 SSH 来源端均需 Python 3.11+；Mac 恢复检查另需 `age`、Docker
 4. 运行 `verify --config <private-config.json>`。它从外盘实际副本解密，恢复到无网络、无宿主端口的一次性 PostgreSQL，核对业务表与 Atlas migration；清理容器和临时明文成功后才保存 passed 回执。首次镜像启动须等待 PID 1 已进入最终 PostgreSQL 进程，避免误用 initdb 的临时服务。
 5. 相关模块提交并验证后运行 `install --config <private-config.json>`。安装器核对每个模块与提交内容一致，生成固定内容 hash 的独立运行目录及当前用户 launchd 任务；共享工作区后续变化不影响已安装版本。安装后读回 launchd 最后退出码和 `status --config <private-config.json>`，不能只凭安装成功宣称定时首跑通过。
 
-`run` 执行同步及到期的恢复检查。缺盘时记录 `skipped / volume_not_mounted`；校验损坏、来源过期、介质不符或恢复失败记录 failed。状态、最近成功及恢复回执保存在配置的 `stateDirectory`；副本索引在外盘专属目录。Mac 休眠 / 离线期间不会保证取得最新副本，服务器原有自动备份继续独立运行。
+`run` 执行同步及到期的恢复检查。缺盘时记录 `skipped / volume_not_mounted`；校验损坏、来源过期、介质不符或恢复失败记录 failed。状态、最近成功及恢复回执保存在配置的 `stateDirectory`；副本索引在外盘专属目录。SIGTERM / SIGINT 进入同一清理路径；安装器拒绝中断仍在运行的旧备份任务。Mac 休眠 / 离线期间不会保证取得最新副本，服务器原有自动备份继续独立运行。
 
 切换同一数据来源到另一台 SSH 主机时，先复制历史加密文件、checksum 和来源身份标记，修改私有配置的 host / directory，再依次执行 sync、verify 和定时首跑读回。更换外盘时填写新 UUID 并初始化 / 核验专属目录；恢复回执绑定卷 UUID，新介质会重新验证。新链路通过且保留窗口结束后再处理旧目标；不同业务来源使用新的 id 与目录。对象存储等新协议应扩展传输模块，不混入同步及恢复逻辑。
 

@@ -28,7 +28,7 @@ test("backup replica validates media, immutable copies, retention and restore cl
   const output = `${result.stdout || ""}${result.stderr || ""}`;
   assert.ifError(result.error);
   assert.equal(result.status, 0, output);
-  assert.match(output, /Ran 26 tests/u);
+  assert.match(output, /Ran 28 tests/u);
   assert.match(output, /\bOK\b/u);
   assert.doesNotMatch(output, /skipped=/u);
 });
