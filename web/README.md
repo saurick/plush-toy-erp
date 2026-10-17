@@ -45,6 +45,8 @@ pnpm install
 
 `src/erp/utils/` 中，`sourcePartySnapshots.mjs` 管理往来方快照，`sourceOrderLineValues.mjs` 管理明细来源带值和清空，`masterDataParams.mjs` / `sourceOrderParams.mjs` 管理提交映射，`purchaseOrderPrintDraft.mjs` 管理采购打印输入；`masterDataOrderView.mjs` 保留展示、生命周期和表单行基础规则。页面状态和动作的职责见 [ERP 组件入口](./src/erp/components/README.md)。
 
+分页范围与总数文案由 `src/common/utils/pagination.mjs` 提供，ERP 列表和 DEV 工作台直接复用；业务页码、查询参数和精确记录分页仍由 `src/erp/utils/businessPagination.mjs` 负责。
+
 打印条款分组支持新增、改名、排序和删除，组内条目与明细支持增删、调序和清空，纸面继续作为预览、PDF 和打印的输出来源；清空与删除、空组标题、自动编号及留白定位规则见[打印字段与编辑行为](../docs/打印模板字段与编辑行为清单.md#条目编辑)，实现分层见[打印模板实现原理](../docs/打印模板实现原理.md)。
 
 产品路由只在 `import.meta.env.DEV` 下动态加载 `DevWorkbenchBridge.jsx` 这一处 DEV 入口。该入口包裹业务路由的停服恢复边界，并在进入 `/__dev` 时按需加载工作台页面；App 不直接引用 DEV 模块。

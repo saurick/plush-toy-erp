@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { formatPaginationTotal } from '../../common/utils/pagination.mjs'
 
 import {
   BUSINESS_PAGE_SIZE_OPTIONS,
@@ -34,6 +35,7 @@ test('businessPagination: creates Ant Design table pagination config', () => {
   assert.equal(pagination.showSizeChanger, true)
   assert.deepEqual(pagination.pageSizeOptions, BUSINESS_PAGE_SIZE_OPTIONS)
   assert.equal(pagination.onChange, onChange)
+  assert.equal(pagination.showTotal, formatPaginationTotal)
   assert.equal(pagination.showTotal(123, [51, 100]), '第 51-100 条 / 共 123 条')
 })
 

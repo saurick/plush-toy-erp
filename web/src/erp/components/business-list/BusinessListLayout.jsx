@@ -50,7 +50,7 @@ import {
   parseDateTimeInputValue,
 } from '../../utils/dateRange.mjs'
 import { selectStableBusinessActionIndexes } from '../../utils/businessActionAvailability.mjs'
-import { formatBusinessPaginationTotal } from '../../utils/businessPagination.mjs'
+import { formatPaginationTotal } from '@/common/utils/pagination.mjs'
 import { filterBusinessListColumns } from '../../utils/moduleTableColumns.mjs'
 import {
   businessTableCopyColumnKey,
@@ -1728,7 +1728,7 @@ export function BusinessDataTable({
         rowClassName={rowClassName}
         onRow={resolvedOnRow}
         onChange={onChange}
-        pagination={pagination ? { showTotal: formatBusinessPaginationTotal, ...pagination } : pagination}
+        pagination={pagination ? { showTotal: formatPaginationTotal, ...pagination } : pagination}
         showSorterTooltip={
           hasPageLocalSorter ? { title: '仅排序当前页' } : undefined
         }

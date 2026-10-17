@@ -1,9 +1,7 @@
+import { formatPaginationTotal } from '../../common/utils/pagination.mjs'
+
 export const DEFAULT_BUSINESS_PAGE_SIZE = 20
 export const BUSINESS_PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
-
-export function formatBusinessPaginationTotal(count, range) {
-  return `第 ${range[0]}-${range[1]} 条 / 共 ${count} 条`
-}
 
 export function getBusinessPaginationParams(pagination = {}) {
   const pageSize = Number(pagination.pageSize) || DEFAULT_BUSINESS_PAGE_SIZE
@@ -27,7 +25,7 @@ export function createBusinessTablePagination({
     total,
     showSizeChanger: true,
     pageSizeOptions: BUSINESS_PAGE_SIZE_OPTIONS,
-    showTotal: formatBusinessPaginationTotal,
+    showTotal: formatPaginationTotal,
     onChange,
   }
 }
