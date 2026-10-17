@@ -111,6 +111,7 @@ test('mobile material task separates on-demand reading from versioned task proce
   const button = (label) =>
     [...document.querySelectorAll('button')].find(
       (node) =>
+        node.getAttribute('aria-label') === label ||
         node.textContent.replace(/\s/gu, '') === label.replace(/\s/gu, '')
     )
   const click = async (node) => {
@@ -151,19 +152,20 @@ test('mobile material task separates on-demand reading from versioned task proce
   )
   assert.equal(document.querySelectorAll('[data-step-key]').length, 3)
   assert.equal(document.querySelector('[data-step-key="process"]').disabled, false)
-  assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 2)
+  assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 3)
+  assert.ok(document.querySelector('.mobile-role-action-bar [aria-label="查看材料汇总"]'))
   assert.equal(Boolean(document.querySelector('.mobile-role-action-bar [data-testid="mobile-task-attachment-action"]')), true)
   assert.ok(calls.every(({ method }) => !method.includes('review_engineering')))
 
   await render({ selectedTask: { ...task, id: 9, assignee_id: 99 } })
   assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
   assert.ok(button('查看材料汇总'))
-  assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 1)
+  assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 2)
   assert.equal(Boolean(button('处理任务')), false)
   assert.equal(document.querySelector('[data-step-key="process"]').disabled, true)
   await render({ selectedTask: { ...task, id: 10, task_status_key: 'done' } })
   assert.ok(button('查看材料汇总'))
-  assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 1)
+  assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 2)
   assert.equal(Boolean(button('处理任务')), false)
   assert.equal(document.querySelector('[data-step-key="process"]').disabled, true)
 })

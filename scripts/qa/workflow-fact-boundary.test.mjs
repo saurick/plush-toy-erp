@@ -51,7 +51,7 @@ const factReadProjections = new Map([
   ["server/internal/data/workflow_task_source_links.go", ["production_facts", "outsourcing_facts", "finance_facts"]],
   ["server/internal/data/workflow_task_discovery.go", ["production_facts", "outsourcing_facts"]],
   ["server/internal/data/workflow_handling_chain.go", ["production_facts", "outsourcing_facts"]],
-  ["server/internal/data/workflow_exceptions.go", ["outsourcing_facts"]],
+  ["server/internal/data/workflow_exceptions.go", ["outsourcing_facts", "inventory_txns"]],
 ]);
 const backfillLock = '"LOCK TABLE production_orders, production_facts, production_wip_batches, shipments, workflow_tasks IN SHARE ROW EXCLUSIVE MODE"';
 

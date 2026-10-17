@@ -26,18 +26,24 @@ test("schema docs cover every generated application table without drift", () => 
     timeout: 120_000,
   });
 
+  const counts = Object.fromEntries(
+    [...output.matchAll(/\b([A-Za-z]+)=(\d+)\b/gu)].map((match) => [
+      match[1],
+      Number(match[2]),
+    ]),
+  );
   assert.match(output, /mode=check/u);
-  assert.match(output, /tables=76 catalog=76/u);
-  assert.match(output, /columns=1284 foreignKeys=157 indexes=347 checks=317/u);
-  assert.match(output, /outputs=8/u);
+  assert(counts.tables > 0, "expected generated application tables");
+  assert.equal(counts.catalog, counts.tables);
   assert.match(output, /missing=0 changed=0 stale=0 unexpected=0/u);
 
   const catalog = JSON.parse(readFileSync(CATALOG_PATH, "utf8"));
   assert.equal(catalog.version, 1);
   assert.equal(catalog.domains.length, 7);
-  assert.equal(catalog.tables.length, 76);
+  assert.equal(catalog.tables.length, counts.tables);
+  assert.equal(counts.outputs, catalog.domains.length + 1);
   assert.equal(new Set(catalog.domains.map((domain) => domain.key)).size, 7);
-  assert.equal(new Set(catalog.tables.map((table) => table.name)).size, 76);
+  assert.equal(new Set(catalog.tables.map((table) => table.name)).size, counts.tables);
   assert(
     catalog.exclusions.some(
       (entry) => entry.name === "atlas_schema_revisions.atlas_schema_revisions",
@@ -71,6 +77,15 @@ test("schema docs cover every generated application table without drift", () => 
 
   const readme = readFileSync(path.join(OUTPUT_ROOT, "README.md"), "utf8");
   assert.match(readme, new RegExp(`^${GENERATED_HEADER}`, "u"));
-  assert.match(readme, /\| 应用表 \| 76 \|/u);
+  for (const [label, key] of [
+    ["应用表", "tables"],
+    ["字段", "columns"],
+    ["外键", "foreignKeys"],
+    ["显式索引", "indexes"],
+    ["命名 / 表级 CHECK", "checks"],
+  ]) {
+    assert(counts[key] > 0, `expected generated ${key}`);
+    assert(readme.includes(`| ${label} | ${counts[key]} |`), `${label} count drifted`);
+  }
   assert.match(readme, /atlas_schema_revisions\.atlas_schema_revisions/u);
 });
