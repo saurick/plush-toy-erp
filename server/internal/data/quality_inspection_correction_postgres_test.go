@@ -148,3 +148,15 @@ func TestQualityInspectionPostgresCorrectionAtomicityAndConcurrency(t *testing.T
 		})
 	}
 }
+
+func TestQualityInspectionPostgresCompletedCorrectionReplayUsesImmutableIntent(t *testing.T) {
+	for _, outcome := range []string{biz.QualityInspectionResultPass, biz.QualityInspectionResultReject, biz.QualityInspectionResultConcession, "corrected_again", "inbound"} {
+		t.Run(outcome, func(t *testing.T) {
+			data, client := openInventoryPostgresTestData(t)
+			f := createInventoryPostgresFixtures(t, t.Context(), client)
+			actor := client.AdminUser.Create().SetUsername("pg-correction-replay-" + f.suffix).SetPasswordHash("test-password-hash").SaveX(t.Context())
+			testQualityInspectionCorrectionCompletedReplay(t, data, client,
+				inventoryTestFixtures{unitID: f.unitID, materialID: f.materialID, warehouseID: f.warehouseID}, actor.ID, "PG-"+f.suffix, outcome)
+		})
+	}
+}

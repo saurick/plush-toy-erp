@@ -26,14 +26,16 @@ func (r *inventoryRepo) CreateQualityInspectionCorrection(ctx context.Context, i
 		return nil, err
 	}
 	if original.SupersededAt != nil {
-		if original.SupersededBy == nil || *original.SupersededBy != actorID {
+		// The later inspection decision may replace its note; the original
+		// supersession evidence retains the correction intent.
+		if original.SupersededBy == nil || *original.SupersededBy != actorID || original.SupersededReason == nil || *original.SupersededReason != in.Reason {
 			return nil, biz.ErrIdempotencyConflict
 		}
 		existing, err := tx.client.QualityInspection.Query().Where(qualityinspection.CorrectionOfInspectionID(original.ID)).Only(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if existing.InspectionNo != in.CorrectionInspectionNo || existing.DecisionNote == nil || *existing.DecisionNote != in.Reason {
+		if existing.InspectionNo != in.CorrectionInspectionNo {
 			return nil, biz.ErrIdempotencyConflict
 		}
 		return entQualityInspectionToBiz(existing), nil

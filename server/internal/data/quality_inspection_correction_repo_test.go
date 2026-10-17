@@ -153,6 +153,16 @@ func TestQualityInspectionCorrectionSupersedesResultAndReopensHold(t *testing.T)
 	if _, err := uc.PassQualityInspection(ctx, approximateQualityInspectionDecision(corrected.ID, biz.QualityInspectionResultPass)); err != nil {
 		t.Fatal(err)
 	}
+	completed, err := uc.GetQualityInspection(ctx, corrected.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replayed, err := uc.CorrectQualityInspectionResult(ctx, &biz.QualityInspectionCorrectionCreate{
+		InspectionID: original.ID, CorrectionInspectionNo: "QI-CORR-R2", Reason: "复核发现仪器校准失效",
+	}, 17)
+	if err != nil || replayed.ID != completed.ID || replayed.Status != completed.Status || !replayed.UpdatedAt.Equal(completed.UpdatedAt) {
+		t.Fatalf("completed correction replay=%+v err=%v", replayed, err)
+	}
 	gate, err := uc.EvaluatePurchaseReceiptQualityGate(ctx, receipt.ID)
 	if err != nil || gate.Outcome != biz.PurchaseReceiptQualityGateReady {
 		t.Fatalf("corrected gate=%+v err=%v", gate, err)
