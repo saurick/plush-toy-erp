@@ -452,8 +452,13 @@ func TestMaterialSupplyReceiptCreatesLineQualityGateBeforeInventoryPost(t *testi
 		t.Fatalf("concession decision failed: %v", err)
 	}
 	gate, err = uc.EvaluatePurchaseReceiptQualityGate(ctx, receipt.ID)
-	if err != nil || gate.Outcome != biz.PurchaseReceiptQualityGatePending || gate.PassedLines != 1 {
-		t.Fatalf("one decided line must keep aggregate pending, gate=%#v err=%v", gate, err)
+	if err != nil || gate.Outcome != biz.PurchaseReceiptQualityGatePending || gate.TotalLines != 2 || gate.PassedLines != 1 || gate.PostedLines != 0 ||
+		len(gate.ReadyLineIDs) != 1 || gate.ReadyLineIDs[0] != *receipt.QualityInspections[0].PurchaseReceiptItemID ||
+		len(gate.PendingLineIDs) != 1 || gate.PendingLineIDs[0] != *receipt.QualityInspections[1].PurchaseReceiptItemID {
+		t.Fatalf("one concession line must be ready for inbound while aggregate quality stays pending, gate=%#v err=%v", gate, err)
+	}
+	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
+		t.Fatalf("a quality decision must not post either receipt line, got %d txns", count)
 	}
 	if _, err := uc.PassQualityInspection(ctx, approximateQualityInspectionDecision(receipt.QualityInspections[1].ID, biz.QualityInspectionResultPass)); err != nil {
 		t.Fatalf("pass decision failed: %v", err)

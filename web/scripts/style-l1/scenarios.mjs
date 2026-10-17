@@ -62,6 +62,7 @@ import { createBusinessModuleNavigationScenarios } from './businessModuleNavigat
 import { createFinishedGoodsDeliveryScenarios } from './finishedGoodsDeliveryScenarios.mjs'
 
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
+import { createPurchaseFlowRepairScenarios } from './purchaseFlowRepairScenarios.mjs'
 import { createProductPaginationScenarios } from './productPaginationScenarios.mjs'
 import { createSalesOrderImportScenarios } from './salesOrderImportScenarios.mjs'
 import { createWorkbenchSummaryScenarios } from './workbenchSummaryScenarios.mjs'
@@ -735,6 +736,7 @@ export function createStyleL1Scenarios(deps) {
       path,
       outputDir,
     }),
+    ...createPurchaseFlowRepairScenarios({ assert, customerRuntimeEffectiveSession, outputDir }),
     ...createPurchaseReceiptScenarios({
       assert,
       assertAntdModalCentered,

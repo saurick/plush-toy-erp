@@ -639,7 +639,7 @@
       "purpose": "保存采购订单的物料、数量、单位、价格和预计到货信息。",
       "boundary": "订单行是采购承诺，不代表已收货、已检验或已入库。",
       "lifecycle": "草稿聚合内可维护；行状态 open、closed 或 canceled；正式行不独立物理删除。",
-      "writeBoundary": "PurchaseOrderUsecase 的采购订单聚合保存事务维护。"
+      "writeBoundary": "PurchaseOrderUsecase 维护草稿聚合；正式单的专用补价事务只补缺价及允许维护的交期，数量与来源身份冻结，确认价不可覆盖。"
     },
     {
       "name": "purchase_orders",
@@ -649,7 +649,7 @@
       "purpose": "保存向供应商采购物料的业务承诺、日期、交付和结算条件。",
       "boundary": "采购订单不是 BOM、入库、库存、质检或应付事实。 工程用料经老板、财务两人依次批准后，按厂商生成 approved 采购单，并以来源审批和厂商唯一约束防止重复。",
       "lifecycle": "draft 转 submitted、approved，再 closed；允许按状态 canceled；不物理删除。",
-      "writeBoundary": "PurchaseOrderUsecase 创建、草稿聚合保存、提交、审批、关闭和取消。"
+      "writeBoundary": "PurchaseOrderUsecase 创建、草稿聚合保存、提交、审批、关闭和取消；已批准单显式补价 / 交期维护使用版本与幂等回执，已关闭单只补缺价。"
     },
     {
       "name": "purchase_receipt_adjustment_items",
@@ -677,7 +677,7 @@
       "domain": "inventory-quality",
       "kind": "SourceDocument",
       "purpose": "保存采购收货的物料、数量、仓库、批次、价格和采购订单行来源。",
-      "boundary": "明细 DRAFT 时仍不是库存；库存发生以所属入库单 POSTED 及对应 inventory_txns 为准。",
+      "boundary": "库存发生以本行对应的 inventory_txns.IN 为准；部分入库单的未入库行仍待检或处置。原价格快照冻结，缺价只能经显式采购补价回执解析结算价。",
       "lifecycle": "随入库草稿创建；受保护字段不可随意修改，正式后不删除。",
       "writeBoundary": "InventoryUsecase/repo 创建采购入库聚合时写入。"
     },
@@ -687,8 +687,8 @@
       "domain": "inventory-quality",
       "kind": "SourceDocument",
       "purpose": "保存采购收货来源单，并在显式过账时形成库存入库事实。",
-      "boundary": "DRAFT 不是库存；只有 POSTED 才写 inventory_txns，质检完成也不自动代替入库过账。",
-      "lifecycle": "DRAFT 转 POSTED；DRAFT 可直接 CANCELLED，POSTED 取消通过 REVERSAL 后转 CANCELLED；不可物理删除。",
+      "boundary": "DRAFT 不是库存；POSTED 表示至少一行已入库，完整结果按逐行 IN 及拒收处置核对，质检完成不自动代替入库。",
+      "lifecycle": "DRAFT 在首行入库后转 POSTED，其余合格行可继续显式入库；取消时只冲正实际入库行，其余结算未入库来源；不可物理删除。",
       "writeBoundary": "InventoryUsecase 从采购订单或人工来源创建，显式过账和取消。"
     },
     {
@@ -846,10 +846,10 @@
       "title": "来源订单生命周期回执",
       "domain": "sales-purchase",
       "kind": "SourceDocument",
-      "purpose": "追加保存销售、采购和委外订单强动作的版本、幂等意图及逐行结算结果。",
-      "boundary": "回执证明某次关闭或取消及逐行剩余量，不替代来源订单当前状态，也不构成履约 Fact。",
+      "purpose": "追加保存销售、采购和委外订单强动作，以及采购补价的版本、经办人、幂等意图与逐行结果。",
+      "boundary": "关闭 / 取消回执保留逐行剩余量；采购补价回执保留确认价和交期，可解析原缺价收货的结算价，不改写原快照，也不构成库存或财务 Fact。",
       "lifecycle": "按来源类型、来源 ID 和幂等键只追加；同一意图精确重放，变更意图冲突，不更新、不删除。",
-      "writeBoundary": "各来源订单 repo 在锁定源单、终结 open 行并更新单头的同一事务中写入。"
+      "writeBoundary": "各来源订单 repo 在锁定源单并更新版本的同一事务中写入；关闭 / 取消终结 open 行，采购补价只写商业条件。"
     },
     {
       "name": "stock_reservations",

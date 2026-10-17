@@ -164,7 +164,17 @@ export function canCreatePurchaseReturnFromRejectedInspection(
     isRejectedIncomingInspection(inspection) &&
     positiveID(purchaseReceipt?.id) ===
       positiveID(inspection?.purchase_receipt_id) &&
-    String(purchaseReceipt?.status || '').toUpperCase() === PurchaseReceiptStatus.POSTED
+    String(purchaseReceipt?.status || '').toUpperCase() === PurchaseReceiptStatus.POSTED &&
+    purchaseReceipt?.items?.some((item) => positiveID(item.id) === positiveID(inspection?.purchase_receipt_item_id) && item.posted === true)
+  )
+}
+
+export function canCreatePurchaseRejectionDispositionFromInspection(inspection, purchaseReceipt) {
+  return Boolean(
+    isRejectedIncomingInspection(inspection) &&
+    positiveID(purchaseReceipt?.id) === positiveID(inspection?.purchase_receipt_id) &&
+    [PurchaseReceiptStatus.DRAFT, PurchaseReceiptStatus.POSTED].includes(String(purchaseReceipt?.status || '').toUpperCase()) &&
+    purchaseReceipt?.items?.some((item) => positiveID(item.id) === positiveID(inspection?.purchase_receipt_item_id) && item.posted === false)
   )
 }
 

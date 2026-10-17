@@ -268,11 +268,17 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 - `get_purchase_receipt`
 - `list_purchase_receipts`
 
-这组接口走 `InventoryUsecase` 和既有采购入库事实表。过账写 `inventory_txns.IN`；`DRAFT` 取消不写库存，会在收货行锁事务内锁定并校验关联 `PURCHASE_RECEIPT / INCOMING / MATERIAL` IQC 与预备批次，取消 `DRAFT / SUBMITTED` IQC，并只在所有预备批次余额精确为零时停用；`POSTED` 取消才逐行写 `REVERSAL`。任一 IQC 来源形状异常、预备批次非零余额、未取消退货 / 调整或 active 应付都会按对应状态整笔阻断。公开入库 API 只接受采购订单、采购行等已登记的正式来源字段；读取采购订单或订单行的 `create_purchase_receipt_from_purchase_order / add_purchase_receipt_item` 同时要求 `purchase.receipt.create + purchase_order.read`，其它采购入库读取和确认仍分别使用 `purchase.receipt.read / warehouse.inbound.confirm`。这些权限边界不代表 Workflow 任务完成会自动过账库存事实。
+这组接口走 `InventoryUsecase` 和既有采购入库事实表。`post_purchase_receipt(id)` 在收货单事务锁内筛选当前合格 / 允许让步且尚无 IN 流水的行，逐行写 `inventory_txns.IN`；待检和拒收行保留，重复确认不重复写已入库行。单头 `DRAFT` 表示尚未入库，`POSTED` 表示至少一行入库，不等于全单完成。`DRAFT` 取消不写库存；`POSTED` 取消只为实际入库行写 `REVERSAL`。未入库行在同一取消事务内校验关联 `PURCHASE_RECEIPT / INCOMING / MATERIAL` IQC 与预备批次，取消 `DRAFT / SUBMITTED` IQC，并只在预备批次余额精确为零时停用。任一 IQC 来源形状异常、预备批次非零余额、未取消退货 / 调整或 active 应付都会按对应状态整笔阻断。公开入库 API 只接受采购订单、采购行等已登记的正式来源字段；读取采购订单或订单行的 `create_purchase_receipt_from_purchase_order / add_purchase_receipt_item` 同时要求 `purchase.receipt.create + purchase.order.read`，其它采购入库读取和确认仍分别使用 `purchase.receipt.read / warehouse.inbound.confirm`。这些权限边界不代表 Workflow 任务完成会自动过账库存事实。
+
+`get_purchase_receipt / list_purchase_receipts` 增加只读 `posted_lines / pending_inbound_lines / can_post`，每行增加 `posted / rejection_disposed / price_confirmed_later`。`posted` 以该行的 IN 流水为准，`rejection_disposed` 表示未入库行的拒收数量已全部有效处置；`pending_inbound_lines` 排除实际已入库行及累计已完成拒收处置的行，`can_post` 表示有当前可入库行。原收货价格快照缺失时，可由 `complete_purchase_order_terms` 的明确回执投影单价和金额，并以 `price_confirmed_later=true` 标识来源，不回写收货快照。退货 / 调整必须引用真实入库行；从收货生成应付要求每行已入库或完成拒收处置，仅计实际入库行及有效退货 / 数量调整，缺价继续拒绝结算。ProcessRuntime 入库命令只在上述来源交接全部完成后记录 durable result；普通仓库确认允许分次入库。
+
+`can_post` 与整单质量门禁分别计算。整单仍按拒收优先、待检其次、全部通过才 `READY` 给出 `REJECTED / PENDING / READY`，不因存在可入库行而记录 `aggregate_passed`；完成拒收处置也不改写拒收结论。ProcessRuntime 入库命令允许“已入库 / 已完成拒收处置 / 本次可入库”共同完成交接，但仍禁止把未完成待检或未处置拒收行留到命令完成之后。
+
+撤销已生效拒收处置除检查有效应付和补换入库依赖外，还会锁定来源采购单，要求来源仍为 `approved` 且明细仍为 `open`。采购单或明细结束后返回参数错误，不改写处置、收货或岗位待办；已成功撤销的相同请求可在来源后续关闭后继续回放。取消尚未生效的处置草稿不重新打开收货责任。
 
 采购退货和入库调整沿用同一草稿 / 过账分界：取消 `DRAFT` 时先锁定子单再锁定父收货，只把子单改为 `CANCELLED`，不写库存；取消 `POSTED` 时才按原交易写 `REVERSAL`。草稿子修正全部取消后，父收货的 correction dependency 解除；采购收货草稿取消后，也不再阻断采购订单关闭 / 取消。父单动作不会自动取消任一子单或子事实。
 
-`purchase` JSON-RPC 域里的采购入库写入口已接入 active module states 本地门禁：`create_purchase_receipt_from_purchase_order / add_purchase_receipt_item` 都要求 `purchase_orders / purchase_receipts / quality_inspections / inventory=enabled`，并同时要求 `purchase.receipt.create + purchase_order.read`；`post_purchase_receipt / cancel_purchase_receipt` 按各自事实副作用要求 `purchase_receipts`、`quality_inspections` 或 `inventory` 为 `enabled`。依赖模块 `read_only / disabled / 缺失` 会返回参数错误且不调用 `InventoryUsecase` 写 Source Document、质检或库存事实。公开新建只接受 `create_purchase_receipt_from_purchase_order`；旧 `create_purchase_receipt_draft / create_purchase_receipt_with_items` 已退役并返回 unknown method，内部 usecase 不构成公开无来源写入口。公开的 `create_purchase_receipt_from_purchase_order / add_purchase_receipt_item` 要求调用方提供不超过 128 字符的稳定 `idempotency_key`，拒绝调用方提交 payload hash；`add_purchase_receipt_item` 还必须提供 `purchase_order_item_id`，服务端会在锁定入库单后校验来源采购单已审核、来源材料 / 单位与入库行一致、来源采购单供应商与入库单稳定供应商一致，并禁止同一入库单跨采购单追加。服务端规范化业务参数后生成 SHA-256 intent hash，并在事务锁内再次检查 replay。相同 key 和 intent 只返回原始收货行、HOLD lot 与来料质检事实，key 相同但 intent 不同返回幂等冲突；写入错误或 commit 结果未知时按同一 key 回查，损坏或缺失的结果边界 fail closed。`get_purchase_receipt / list_purchase_receipts` 保留历史读取边界，不把模块关闭理解成历史数据不可查。该切片只证明 purchase 采购入库普通业务 API 的本地门禁，不代表打印或目标环境 release evidence 已闭环。
+`purchase` JSON-RPC 域里的采购入库写入口已接入 active module states 本地门禁：`create_purchase_receipt_from_purchase_order / add_purchase_receipt_item` 都要求 `purchase_orders / purchase_receipts / quality_inspections / inventory=enabled`，并同时要求 `purchase.receipt.create + purchase.order.read`；`post_purchase_receipt / cancel_purchase_receipt` 按各自事实副作用要求 `purchase_receipts`、`quality_inspections` 或 `inventory` 为 `enabled`。依赖模块 `read_only / disabled / 缺失` 会返回参数错误且不调用 `InventoryUsecase` 写 Source Document、质检或库存事实。公开新建只接受 `create_purchase_receipt_from_purchase_order`；旧 `create_purchase_receipt_draft / create_purchase_receipt_with_items` 已退役并返回 unknown method，内部 usecase 不构成公开无来源写入口。公开的 `create_purchase_receipt_from_purchase_order / add_purchase_receipt_item` 要求调用方提供不超过 128 字符的稳定 `idempotency_key`，拒绝调用方提交 payload hash；`add_purchase_receipt_item` 还必须提供 `purchase_order_item_id`，服务端会在锁定入库单后校验来源采购单已审核、来源材料 / 单位与入库行一致、来源采购单供应商与入库单稳定供应商一致，并禁止同一入库单跨采购单追加。服务端规范化业务参数后生成 SHA-256 intent hash，并在事务锁内再次检查 replay。相同 key 和 intent 只返回原始收货行、HOLD lot 与来料质检事实，key 相同但 intent 不同返回幂等冲突；写入错误或 commit 结果未知时按同一 key 回查，损坏或缺失的结果边界 fail closed。`get_purchase_receipt / list_purchase_receipts` 保留历史读取边界，不把模块关闭理解成历史数据不可查。该切片只证明 purchase 采购入库普通业务 API 的本地门禁，不代表打印或目标环境 release evidence 已闭环。
 
 ### 库存查询 `inventory`
 
@@ -326,6 +332,16 @@ API 存在不代表正式 Web UI 可达。销售与采购正式页面分别只�
 `sales_order` JSON-RPC 域承载销售订单 Source Document / Business Commitment 主路径。订单表单只通过 `save_sales_order_with_items` 聚合写入，草稿更新使用 `id + DRAFT + version` CAS。正式提交只走 `sales_order_acceptance` 的 `sales_order.submit` 命令，并要求 repo 在同一事务写 Source 生命周期与 durable ProcessRuntime result，缺少该合同会失败关闭，不降级到普通 submit。approval 完成后自动执行 `sales_order.activate_after_approval`，在同一数据库事务写 `SUBMITTED → ACTIVE` 与 durable result；approval 拒绝自动执行 `sales_order.reject_after_workflow`，原子把仍为 `SUBMITTED` 的源单和 open 行置为取消、保存原因与 durable result，再进入 `sales_order_rejected_end`。公开 `submit_sales_order / activate_sales_order` 路由已移除，关闭 / 取消仍保留；销售订单不会写库存、出货、预留、财务、发票或收付款事实。
 
 ### 采购订单 `purchase_order`
+
+`complete_purchase_order_terms` 是已批准采购单的专用补价与交期维护入口，不走草稿整单保存。要求 `purchase.order.read + purchase.order.update + field.procurement_commercial.read` 及当前 `purchase_orders=enabled`，经办人由当前会话解析。
+
+| 参数 | 合同 |
+| --- | --- |
+| `id / expected_version / idempotency_key` | 源单及正整数版本；稳定非空幂等键不超过 128 字符。同一经办人、键及规范化意图精确重放；改意图或换经办人冲突。 |
+| `expected_arrival_date / supplier_confirmed_arrival_date` | 两个键都必须提供；日期沿用本域 Unix 秒格式，`null` 明确清空，不能早于下单日。 |
+| `items` | 必须完整覆盖全部非取消明细，仅接受每行 `id / unit_price / expected_arrival_date`；单价使用非负六位精度 Decimal 字符串，明细日期键必须提供，可为 `null`。金额按批准数量乘单价由后端计算。 |
+| 冻结字段与终态 | 拒绝数量、材料、单位、供应商、币种、客户端经办人及额外字段；已确认单价不得覆盖。`approved` 可补缺价、维护交期；`closed` 只补缺价、所有日期不变；其它状态拒绝。 |
+| 返回与留痕 | 返回 `purchase_order`；同一事务递增单头版本并在 `source_order_lifecycle_events` 追加 `complete_terms` 回执，保存经办人、单价、金额和日期。补价不写收货、库存、应付或付款事实。 |
 
 `purchase_order` JSON-RPC 域承载采购订单 Source Document / Purchase Commitment 主路径。采购订单表单只通过 `save_purchase_order_with_items` 聚合写入并使用单头 CAS。正式页面从 `DRAFT` 启动 `material_supply`，显式执行首个 `purchase_order.submit` 命令后才进入 `workflow.task.approve`；批准后的自动命令只调用 `PurchaseOrderUsecase.ApprovePurchaseOrderForProcessCommand`，在同一事务写 `SUBMITTED → APPROVED` 与 durable result。approval 拒绝自动执行 `purchase_order.reject_after_workflow`，原子把仍为 `SUBMITTED` 的源单和 open 行置为取消、保存原因与 durable result，再进入 `purchase_order_rejected_end`。销售、采购和出货三类新实例都会校验当前图包含对应命名拒绝分支；缺少拒绝终点的旧 active revision 失败关闭，重新发布当前配置后才能继续启动，已冻结的在途实例不被代码改写。公开 `submit_purchase_order / approve_purchase_order` 路由都已移除，close / cancel 与历史查询保留。start、submit command 和审批对账都是可重试的持久步骤；任一步失败都保留可恢复证据，不把任务状态伪装成采购单状态。采购订单不写库存、批次、应付、发票或付款事实。
 

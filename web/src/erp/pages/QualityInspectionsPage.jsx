@@ -152,6 +152,7 @@ import {
 import {
   buildPurchaseReturnFromQualityInspectionPayload,
   canCreatePurchaseReturnFromRejectedInspection,
+  canCreatePurchaseRejectionDispositionFromInspection,
   isQualityInspectionRouteSourceCompatible,
   isRejectedIncomingInspection,
   qualityInspectionRouteSourceParams,
@@ -535,10 +536,7 @@ export default function QualityInspectionsPage() {
       selectedRow,
       selectedRowPurchaseReceipt
     )
-  const selectedRowCanCreateRejectionDisposition = Boolean(
-    isRejectedIncomingInspection(selectedRow) &&
-    String(selectedRowPurchaseReceipt?.status || '').toUpperCase() === PurchaseReceiptStatus.DRAFT
-  )
+  const selectedRowCanCreateRejectionDisposition = canCreatePurchaseRejectionDispositionFromInspection(selectedRow, selectedRowPurchaseReceipt)
   const selectedQualityStatus = String(selectedRow?.status || '').toUpperCase()
   const selectedIsCorrectionInspection = Boolean(selectedRow?.correction_of_inspection_id)
   const selectedInspectionType = String(

@@ -110,7 +110,7 @@ go run ./cmd/schema-doc --write
 | [`sales_orders`](销售与采购.md#table-sales-orders) | 销售订单 | 销售与采购 | Source Document / 源单据 | 保存客户订单承诺、交付计划、付款方式和销售责任信息。 |
 | [`shipment_items`](出货与财务.md#table-shipment-items) | 出货明细 | 出货与财务 | Source Document / 源单据 | 保存销售订单行以及产品、SKU、仓库、批次、数量和商业快照。 |
 | [`shipments`](出货与财务.md#table-shipments) | 出货单 | 出货与财务 | Source Document / 源单据 | 保存销售交付的来源单、财务放行状态和显式出货时间。 |
-| [`source_order_lifecycle_events`](销售与采购.md#table-source-order-lifecycle-events) | 来源订单生命周期回执 | 销售与采购 | Source Document / 源单据 | 追加保存销售、采购和委外订单强动作的版本、幂等意图及逐行结算结果。 |
+| [`source_order_lifecycle_events`](销售与采购.md#table-source-order-lifecycle-events) | 来源订单生命周期回执 | 销售与采购 | Source Document / 源单据 | 追加保存销售、采购和委外订单强动作，以及采购补价的版本、经办人、幂等意图与逐行结果。 |
 | [`stock_reservations`](库存与质检.md#table-stock-reservations) | 库存预留 | 库存与质检 | Fact / 事实 | 保存销售订单或显式需求对库存可用量的数量预留。 |
 | [`supplier_process_capabilities`](主数据与BOM.md#table-supplier-process-capabilities) | 供应商工序能力关联 | 主数据与 BOM | MasterData / 主数据 | 保存供应商或加工厂能够承接哪些生产工序的多对多关系。 |
 | [`suppliers`](主数据与BOM.md#table-suppliers) | 供应商与加工厂 | 主数据与 BOM | MasterData / 主数据 | 保存采购、委外和应付引用的供应商或加工厂主档。 |

@@ -30,7 +30,8 @@ func TestFinanceAdvanceCandidatesSkipAmbiguousPurchaseOrders(t *testing.T) {
 	createFact := func(no string, sourceLines []int) int {
 		receipt := client.PurchaseReceipt.Create().SetReceiptNo(no).SetSupplierID(supplier.ID).SetSupplierName(supplier.Name).SetStatus(biz.PurchaseReceiptStatusPosted).SetReceivedAt(time.Now()).SetPostedAt(time.Now()).SaveX(ctx)
 		for _, lineID := range sourceLines {
-			client.PurchaseReceiptItem.Create().SetReceiptID(receipt.ID).SetMaterialID(f.materialID).SetWarehouseID(f.warehouseID).SetUnitID(f.unitID).SetQuantity(decimal.NewFromInt(1)).SetUnitPrice(decimal.NewFromInt(100)).SetAmount(decimal.NewFromInt(100)).SetPurchaseOrderItemID(lineID).SaveX(ctx)
+			item := client.PurchaseReceiptItem.Create().SetReceiptID(receipt.ID).SetMaterialID(f.materialID).SetWarehouseID(f.warehouseID).SetUnitID(f.unitID).SetQuantity(decimal.NewFromInt(1)).SetUnitPrice(decimal.NewFromInt(100)).SetAmount(decimal.NewFromInt(100)).SetPurchaseOrderItemID(lineID).SaveX(ctx)
+			client.InventoryTxn.Create().SetSubjectType(biz.InventorySubjectMaterial).SetSubjectID(item.MaterialID).SetWarehouseID(item.WarehouseID).SetUnitID(item.UnitID).SetTxnType(biz.InventoryTxnIn).SetDirection(1).SetQuantity(item.Quantity).SetSourceType(biz.PurchaseReceiptSourceType).SetSourceID(receipt.ID).SetSourceLineID(item.ID).SetIdempotencyKey(biz.PurchaseReceiptInboundIdempotencyKey(receipt.ID, item.ID)).SetOccurredAt(receipt.ReceivedAt).SaveX(ctx)
 		}
 		draft, err := repo.CreatePayableFromPurchaseReceipt(ctx, &biz.FinanceFactFromPurchaseReceiptCreate{FactNo: no, PurchaseReceiptID: receipt.ID, IdempotencyKey: no})
 		if err != nil {

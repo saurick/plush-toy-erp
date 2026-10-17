@@ -24,6 +24,7 @@ var (
 	ErrPurchaseRejectionDispositionNotFound = errors.New("purchase rejection disposition not found")
 	ErrPurchaseRejectionSourceInvalid       = errors.New("purchase rejection disposition source invalid")
 	ErrPurchaseRejectionSourceState         = errors.New("purchase rejection disposition source state invalid")
+	ErrPurchaseRejectionCancelOrderState    = errors.New("purchase rejection cancellation source order is not receivable")
 	ErrPurchaseRejectionConflict            = errors.New("active purchase rejection disposition already exists")
 )
 

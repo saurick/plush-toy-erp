@@ -375,7 +375,8 @@ func TestPurchaseReceiptPayableRejectsMissingOrMixedOrderSnapshot(t *testing.T) 
 					SetUnitPrice(amount).
 					SetAmount(amount).
 					SetNillablePurchaseOrderItemID(sourceItemID)
-				builder.SaveX(ctx)
+				item := builder.SaveX(ctx)
+				client.InventoryTxn.Create().SetSubjectType(biz.InventorySubjectMaterial).SetSubjectID(item.MaterialID).SetWarehouseID(item.WarehouseID).SetUnitID(item.UnitID).SetTxnType(biz.InventoryTxnIn).SetDirection(1).SetQuantity(item.Quantity).SetSourceType(biz.PurchaseReceiptSourceType).SetSourceID(receipt.ID).SetSourceLineID(item.ID).SetIdempotencyKey(biz.PurchaseReceiptInboundIdempotencyKey(receipt.ID, item.ID)).SetOccurredAt(receivedAt).SaveX(ctx)
 			}
 			if tt.missingSource {
 				createReceiptItem(nil)

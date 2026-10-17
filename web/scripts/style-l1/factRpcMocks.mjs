@@ -1444,6 +1444,7 @@ export async function installFactRpcMocks(page, context) {
     quantity: '20',
     lot_id: 401,
     lot_no: 'INV-LOT-001',
+    posted: true,
     unit_price: '3.50',
     amount: '70.00',
     note: '样式入库明细',
@@ -1464,6 +1465,9 @@ export async function installFactRpcMocks(page, context) {
       received_at: nowUnix(),
       status: 'POSTED',
       note: '样式采购入库',
+      posted_lines: 1,
+      pending_inbound_lines: 0,
+      can_post: false,
       items: [purchaseReceiptItem],
       created_at: nowUnix(),
       updated_at: nowUnix(),
@@ -1478,11 +1482,15 @@ export async function installFactRpcMocks(page, context) {
       received_at: nowUnix(),
       status: 'DRAFT',
       note: '样式草稿采购入库',
+      posted_lines: 0,
+      pending_inbound_lines: 1,
+      can_post: true,
       items: [
         {
           ...purchaseReceiptItem,
           id: 604,
           receipt_id: 603,
+          posted: false,
           source_line_no: '草稿入库行 1',
           quantity: '12',
           amount: '42.00',
@@ -1609,6 +1617,7 @@ export async function installFactRpcMocks(page, context) {
                 ...line,
                 id: nextPurchaseReceiptItemId++,
                 receipt_id: receiptId,
+                posted: false,
                 warehouse_id: Number(
                   line.warehouse_id || params.warehouse_id || 1
                 ),
@@ -1620,6 +1629,9 @@ export async function installFactRpcMocks(page, context) {
                 receipt_no: String(params.receipt_no || '').trim(),
                 status: 'DRAFT',
                 items,
+                posted_lines: 0,
+                pending_inbound_lines: items.length,
+                can_post: false,
                 created_at: nowUnix(),
                 updated_at: nowUnix(),
               }
@@ -1636,7 +1648,13 @@ export async function installFactRpcMocks(page, context) {
           const receipt = purchaseReceipts.find(
             (item) => Number(item.id) === Number(params.id)
           )
-          if (receipt) receipt.status = 'POSTED'
+          if (receipt) {
+            receipt.status = 'POSTED'
+            receipt.items.forEach((item) => { item.posted = true })
+            receipt.posted_lines = receipt.items.length
+            receipt.pending_inbound_lines = 0
+            receipt.can_post = false
+          }
           data = {
             purchase_receipt: receipt || { ...purchaseReceipts[0], ...params },
           }
@@ -1676,6 +1694,7 @@ export async function installFactRpcMocks(page, context) {
                 ...purchaseReceiptItem,
                 ...params,
                 receipt_id: receiptID,
+                posted: false,
                 id: nextPurchaseReceiptItemId,
                 created_at: nowUnix(),
                 updated_at: nowUnix(),

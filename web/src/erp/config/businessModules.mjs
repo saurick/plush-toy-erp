@@ -164,6 +164,7 @@ export const businessModuleDefinitions = Object.freeze([
     currentScope: [
       '采购订单和供应商信息',
       '采购订单明细、材料、数量、单价和预计到货日期',
+      '已批准单补齐缺价与交期，已关闭单只补缺价',
       '提交、审核、关闭、取消等状态操作',
       '采购入库行可选关联采购订单行做追溯',
     ],
@@ -180,7 +181,7 @@ export const businessModuleDefinitions = Object.freeze([
       '采购入库只接收从已审核采购订单生成的入库草稿，并继续办理收货、待检、退货、调整和入库确认；确认过账后系统更新库存。',
     primaryEntity: 'purchase_receipts / purchase_receipt_items',
     factSource: 'purchase_receipts, purchase_receipt_items, inventory_txns',
-    boundary: '任务标记为完成不等于采购入库已经过账；请以入库单状态为准。',
+    boundary: '任务完成不等于采购入库；合格行可分次确认，部分入库须逐行核对库存流水；每行入库或拒收处置完成后才能生成应付。',
     sourceRefs: [
       'purchase_orders',
       'purchase_order_items',
@@ -210,7 +211,7 @@ export const businessModuleDefinitions = Object.freeze([
     primaryEntity: 'quality_inspections',
     factSource: 'quality_inspections, inventory_lots',
     boundary:
-      '每张质检单只表达一次通用判定，不能代表裁片、皮套、针检、抽检或客户验货全部完成；估算不良比例不会自动换算退货数量；首次到货检验不合格会阻止入库，可另行按来源行办理部分退厂或补换；已入库后的不合格才走采购退货。质检状态变化不会自行增减库存总量。',
+      '每张质检单只表达一次通用判定，不能代表裁片、皮套、针检、抽检或客户验货全部完成；估算不良比例不会自动换算退货数量；首次到货检验不合格只阻止对应行入库，同单合格行可先确认；未入库行可按来源办理退厂或补换，已入库行的不合格才走采购退货。质检状态变化不会自行增减库存总量。',
     sourceRefs: [
       'quality_inspections',
       'inventory_lots',

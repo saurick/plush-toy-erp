@@ -133,7 +133,7 @@ export function createQualitySourceActionScenarios(deps) {
             const { id, method, params = {} } = route.request().postDataJSON()
             let data
             if (method === 'get_purchase_receipt') {
-              data = { purchase_receipt: { id: 9711, receipt_no: 'PR-COUNT-SOURCE', status: 'DRAFT', items: [{ id: 9712, material_id: 1, warehouse_id: 1, lot_id: 401, unit_id: 1, quantity: '3' }] } }
+              data = { purchase_receipt: { id: 9711, receipt_no: 'PR-COUNT-SOURCE', status: 'DRAFT', items: [{ id: 9712, material_id: 1, warehouse_id: 1, lot_id: 401, unit_id: 1, quantity: '3', posted: false }] } }
             } else if (method === 'list_purchase_rejection_dispositions') {
               data = { purchase_rejection_dispositions: [record], total: 1 }
             } else if (method === 'post_purchase_rejection_disposition') {
@@ -1038,6 +1038,7 @@ export function createQualitySourceActionScenarios(deps) {
                         items: [
                           {
                             id: isPosted ? 602 : 604,
+                            posted: isPosted,
                             material_id: 1,
                             warehouse_id: 1,
                             lot_id: 401,

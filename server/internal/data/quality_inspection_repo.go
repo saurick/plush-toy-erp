@@ -688,7 +688,24 @@ func evaluatePurchaseReceiptQualityGateInTx(
 		PendingLineIDs:    []int{},
 		RejectedLineIDs:   []int{},
 	}
+	posted, err := purchaseReceiptPostedLines(ctx, tx.client, receipt.ID)
+	if err != nil {
+		return nil, err
+	}
+	disposed, err := purchaseReceiptDisposedQuantities(ctx, tx.client, receipt.ID)
+	if err != nil {
+		return nil, err
+	}
 	for _, item := range items {
+		if item != nil && posted[item.ID] != nil {
+			row := posted[item.ID]
+			if row.SubjectID != item.MaterialID || row.WarehouseID != item.WarehouseID || row.UnitID != item.UnitID || !row.Quantity.Equal(item.Quantity) || !sameOptionalInt(row.LotID, item.LotID) {
+				return nil, biz.ErrIdempotencyConflict
+			}
+			gate.PostedLines++
+			gate.PassedLines++
+			continue
+		}
 		if item == nil || item.ReceiptID != receipt.ID || item.LotID == nil {
 			gate.PendingLineIDs = append(gate.PendingLineIDs, itemIDOrZero(item))
 			continue
@@ -737,10 +754,14 @@ func evaluatePurchaseReceiptQualityGateInTx(
 		switch {
 		case lineRejected:
 			gate.RejectedLineIDs = append(gate.RejectedLineIDs, item.ID)
+			if disposed[item.ID].GreaterThanOrEqual(item.Quantity) {
+				gate.DisposedLineIDs = append(gate.DisposedLineIDs, item.ID)
+			}
 		case linePending || !linePassed || lot.Status != biz.InventoryLotActive:
 			gate.PendingLineIDs = append(gate.PendingLineIDs, item.ID)
 		default:
 			gate.PassedLines++
+			gate.ReadyLineIDs = append(gate.ReadyLineIDs, item.ID)
 		}
 	}
 	switch {

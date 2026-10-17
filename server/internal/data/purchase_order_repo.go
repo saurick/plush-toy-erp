@@ -750,7 +750,9 @@ func validatePurchaseOrderSettlementDependencies(ctx context.Context, tx *ent.Tx
 	)
 	switch lifecycleStatus {
 	case biz.PurchaseOrderStatusClosed:
-		receiptQuery = receiptQuery.Where(purchasereceipt.Status(biz.PurchaseReceiptStatusDraft))
+		receiptQuery = receiptQuery.Where(purchasereceipt.StatusNEQ(biz.PurchaseReceiptStatusCancelled), purchasereceipt.HasItemsWith(
+			purchasereceiptitem.HasPurchaseOrderItemWith(purchaseorderitem.PurchaseOrderID(purchaseOrderID)), purchaseReceiptItemAwaitingInboundPredicate(),
+		))
 	case biz.PurchaseOrderStatusCanceled:
 		receiptQuery = receiptQuery.Where(purchasereceipt.StatusNEQ(biz.PurchaseReceiptStatusCancelled))
 	default:

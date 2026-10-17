@@ -184,8 +184,40 @@ type PurchaseReceiptQualityGate struct {
 	Outcome           string
 	TotalLines        int
 	PassedLines       int
+	PostedLines       int
+	ReadyLineIDs      []int
+	DisposedLineIDs   []int
 	PendingLineIDs    []int
 	RejectedLineIDs   []int
+}
+
+func (gate *PurchaseReceiptQualityGate) UnresolvedLines() int {
+	return gate.TotalLines - gate.PostedLines - len(gate.DisposedLineIDs)
+}
+
+// A command may finish the inbound handoff only when every unresolved line
+// can be posted in its transaction. Aggregate inspection results stay separate.
+func (gate *PurchaseReceiptQualityGate) ValidateInboundCompletion() error {
+	if gate == nil || gate.PurchaseReceiptID <= 0 || gate.TotalLines <= 0 || gate.PostedLines < 0 ||
+		gate.UnresolvedLines() < 0 || len(gate.ReadyLineIDs) > gate.UnresolvedLines() {
+		return ErrBadParam
+	}
+	if gate.Outcome != PurchaseReceiptQualityGateReady && gate.Outcome != PurchaseReceiptQualityGatePending && gate.Outcome != PurchaseReceiptQualityGateRejected {
+		return ErrBadParam
+	}
+	if gate.UnresolvedLines() > len(gate.ReadyLineIDs) {
+		if len(gate.RejectedLineIDs) > len(gate.DisposedLineIDs) {
+			return ErrPurchaseReceiptQualityRejected
+		}
+		return ErrPurchaseReceiptQualityPending
+	}
+	if gate.PostedLines == 0 && len(gate.ReadyLineIDs) == 0 {
+		if gate.Outcome == PurchaseReceiptQualityGateRejected {
+			return ErrPurchaseReceiptQualityRejected
+		}
+		return ErrPurchaseReceiptQualityPending
+	}
+	return nil
 }
 
 func (uc *InventoryUsecase) CreateQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error) {

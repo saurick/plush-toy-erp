@@ -115,9 +115,11 @@ quality_roots(id,root_id) AS (
  WHEN EXISTS(SELECT 1 FROM purchase_receipt_items ri WHERE ri.id=(SELECT purchase_receipt_item_id FROM quality_inspections WHERE id=i.quality_id)
  AND ri.quantity <= COALESCE((SELECT SUM(d.quantity) FROM purchase_rejection_dispositions d WHERE d.quality_inspection_id=i.quality_id AND d.status='POSTED'),0))
  AND NOT EXISTS(SELECT 1 FROM incident_purchase_receipts p JOIN purchase_receipts pr ON pr.id=p.receipt_id
- WHERE p.event_key=i.event_key AND p.active=1 AND pr.status<>'POSTED' AND (pr.status<>'DRAFT'
+ WHERE p.event_key=i.event_key AND p.active=1 AND (pr.status NOT IN ('DRAFT','POSTED')
  OR NOT EXISTS(SELECT 1 FROM purchase_receipt_items ri WHERE ri.receipt_id=pr.id)
- OR EXISTS(SELECT 1 FROM purchase_receipt_items ri WHERE ri.receipt_id=pr.id AND ri.quantity>COALESCE((SELECT SUM(d.quantity) FROM purchase_rejection_dispositions d WHERE d.purchase_receipt_item_id=ri.id AND d.status='POSTED'),0)))) THEN 'closed'
+ OR EXISTS(SELECT 1 FROM purchase_receipt_items ri WHERE ri.receipt_id=pr.id
+ AND NOT EXISTS(SELECT 1 FROM inventory_txns it WHERE it.source_type='PURCHASE_RECEIPT' AND it.source_id=ri.receipt_id AND it.source_line_id=ri.id AND it.txn_type='IN' AND it.direction=1)
+ AND ri.quantity>COALESCE((SELECT SUM(d.quantity) FROM purchase_rejection_dispositions d WHERE d.purchase_receipt_item_id=ri.id AND d.status='POSTED'),0)))) THEN 'closed'
  WHEN EXISTS(SELECT 1 FROM quality_inspections q JOIN outsourcing_facts f ON q.source_type='OUTSOURCING_FACT' AND f.id=q.source_id
  WHERE q.id=i.quality_id AND f.quantity<=COALESCE((SELECT SUM(d.quantity) FROM outsourcing_return_dispositions d
  LEFT JOIN production_wip_batches rb ON rb.id=d.result_wip_batch_id WHERE d.outsourcing_return_fact_id=f.id AND d.status='POSTED'

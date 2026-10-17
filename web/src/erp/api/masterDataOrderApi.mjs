@@ -501,6 +501,11 @@ export async function getPurchaseOrder(params = {}, options = {}) {
   return dataOf(result)?.purchase_order || null
 }
 
+export async function completePurchaseOrderTerms(params = {}) {
+  const result = await purchaseOrderRpc.call(RpcMethod.purchase_order.COMPLETE_PURCHASE_ORDER_TERMS, params)
+  return dataOf(result)?.purchase_order || null
+}
+
 export async function getPurchaseOrderReceiptProgress(
   params = {},
   options = {}

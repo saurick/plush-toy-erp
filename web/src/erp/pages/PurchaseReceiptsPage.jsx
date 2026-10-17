@@ -138,11 +138,19 @@ const STATUS_COLORS = Object.freeze({
 const DATE_FILTER_OPTIONS = [{ label: '入库日期', value: 'received_at' }]
 const REFERENCE_LOAD_RETRY_DELAYS_MS = [500, 1000]
 
-function statusTag(status) {
+function receiptStatusLabel(status, record) {
+  const key = String(status || '').trim()
+  if (key === PurchaseReceiptStatus.POSTED && Number(record?.pending_inbound_lines) > 0) {
+    return '部分入库'
+  }
+  return STATUS_LABELS[key] || (key ? '入库状态' : '-')
+}
+
+function statusTag(status, record) {
   const key = String(status || '').trim()
   return (
     <Tag color={STATUS_COLORS[key] || 'default'}>
-      {STATUS_LABELS[key] || (key ? '入库状态' : '-')}
+      {receiptStatusLabel(status, record)}
     </Tag>
   )
 }
@@ -433,6 +441,8 @@ export default function PurchaseReceiptsPage() {
         value: optionalText(item?.unit_price),
       },
       { key: 'amount', label: '金额', value: optionalText(item?.amount) },
+      { key: 'inbound_result', label: '入库结果', value: item?.posted ? '已入库' : item?.rejection_disposed ? '已拒收处置' : '尚未入库' },
+      ...(item?.price_confirmed_later ? [{ key: 'price_source', label: '价格来源', value: '采购单补价确认' }] : []),
       {
         key: 'purchase_order_item',
         label: '采购订单行',
@@ -680,7 +690,7 @@ export default function PurchaseReceiptsPage() {
       try {
         const nextReceipt = await action({ id: receipt.id })
         setSelectedRow(nextReceipt || receipt)
-        message.success(successText)
+        message.success(action === postPurchaseReceipt && Number(nextReceipt?.pending_inbound_lines) > 0 ? '合格材料已入库，其余明细继续检验或处置' : successText)
         await loadRows()
       } catch (error) {
         message.error(getActionErrorMessage(error, successText))
@@ -795,9 +805,9 @@ export default function PurchaseReceiptsPage() {
       if (
         !canCreatePayable ||
         !receipt?.id ||
-        String(receipt.status || '').toUpperCase() !== PurchaseReceiptStatus.POSTED
+        (String(receipt.status || '').toUpperCase() !== PurchaseReceiptStatus.POSTED || Number(receipt.pending_inbound_lines) > 0)
       ) {
-        message.warning('请先选择已过账的采购入库单')
+        message.warning('请先完成本收货单的入库或拒收处置，再生成应付')
         return
       }
       setFinanceSourceReceipt(receipt)
@@ -913,8 +923,7 @@ export default function PurchaseReceiptsPage() {
           width: 110,
           sortType: 'text',
           render: statusTag,
-          exportValue: (record) =>
-            STATUS_LABELS[record?.status] || (record?.status ? '入库状态' : ''),
+          exportValue: (record) => receiptStatusLabel(record?.status, record),
         },
         {
           align: 'left',
@@ -1373,7 +1382,7 @@ export default function PurchaseReceiptsPage() {
               }
               disabled={
                 !selectedRow ||
-                selectedRow.status !== PurchaseReceiptStatus.POSTED ||
+                selectedRow.status !== PurchaseReceiptStatus.POSTED || Number(selectedRow.pending_inbound_lines) > 0 ||
                 saving ||
                 financeSourceLoading
               }
@@ -1382,7 +1391,7 @@ export default function PurchaseReceiptsPage() {
                   ? '请先选择一条入库记录'
                   : selectedRow.status !== PurchaseReceiptStatus.POSTED
                     ? '入库记录过账后可生成应付'
-                    : '当前操作完成后可生成应付'
+                    : Number(selectedRow.pending_inbound_lines) > 0 ? '仍有未入库或未处置的明细' : '当前操作完成后可生成应付'
               }
             >
               <Button
@@ -1390,7 +1399,7 @@ export default function PurchaseReceiptsPage() {
                 size="small"
                 disabled={
                   !selectedRow ||
-                  selectedRow.status !== PurchaseReceiptStatus.POSTED ||
+                  selectedRow.status !== PurchaseReceiptStatus.POSTED || Number(selectedRow.pending_inbound_lines) > 0 ||
                   saving ||
                   financeSourceLoading
                 }
@@ -1402,27 +1411,27 @@ export default function PurchaseReceiptsPage() {
           ) : null}
           {canPost ? (
             <BusinessActionTooltip
-              visible={!selectedRow || selectedRow.status === PurchaseReceiptStatus.DRAFT}
+              visible={!selectedRow || selectedRow.status === PurchaseReceiptStatus.DRAFT || (selectedRow.status === PurchaseReceiptStatus.POSTED && Number(selectedRow.pending_inbound_lines) > 0)}
               disabled={
-                !selectedRow || selectedRow.status !== PurchaseReceiptStatus.DRAFT || saving
+                !selectedRow || selectedRow.can_post !== true || saving
               }
               disabledReason={
                 !selectedRow
                   ? '请先选择一条入库记录'
-                  : selectedRow.status !== PurchaseReceiptStatus.DRAFT
-                    ? '只有入库草稿可以过账'
+                  : selectedRow.can_post !== true
+                    ? '当前没有可入库的合格行，请先完成检验或拒收处置'
                     : saving
                       ? '当前操作完成后可过账'
                       : ''
               }
             >
               <Popconfirm
-                title="确认过账并更新库存？"
+                title="确认将当前合格且尚未入库的明细入库？"
                 onConfirm={() =>
                   runReceiptAction(
                     selectedRow,
                     postPurchaseReceipt,
-                    '采购入库已过账'
+                    '本次合格材料已入库'
                   )
                 }
                 okText="确认"
@@ -1435,7 +1444,7 @@ export default function PurchaseReceiptsPage() {
                   className="erp-business-module-status-action"
                   icon={<CheckCircleOutlined />}
                   disabled={
-                    !selectedRow || selectedRow.status !== PurchaseReceiptStatus.DRAFT || saving
+                    !selectedRow || selectedRow.can_post !== true || saving
                   }
                 >
                   确认材料入库

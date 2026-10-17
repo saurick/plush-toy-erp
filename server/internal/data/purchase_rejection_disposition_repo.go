@@ -184,17 +184,31 @@ func (r *inventoryRepo) PostPurchaseRejectionDisposition(ctx context.Context, in
 
 func (r *inventoryRepo) CancelPurchaseRejectionDisposition(ctx context.Context, in *biz.PurchaseRejectionDispositionMutation) (_ *biz.PurchaseRejectionDisposition, resultErr error) {
 	defer func() { resultErr = mapInventoryPersistenceError(resultErr, biz.ErrPurchaseRecordConflict) }()
+	preview, err := r.data.postgres.PurchaseRejectionDisposition.Get(ctx, in.ID)
+	if ent.IsNotFound(err) {
+		return nil, biz.ErrPurchaseRejectionDispositionNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	// Posting and cancellation share the same receipt-before-disposition order.
+	if err := lockPurchaseReceipt(ctx, tx, preview.PurchaseReceiptID); err != nil {
+		return nil, err
+	}
 	if err := lockPurchaseRejectionDisposition(ctx, tx, in.ID); err != nil {
 		return nil, err
 	}
 	row, err := tx.client.PurchaseRejectionDisposition.Get(ctx, in.ID)
 	if err != nil {
 		return nil, err
+	}
+	if row.PurchaseReceiptID != preview.PurchaseReceiptID {
+		return nil, biz.ErrPurchaseRejectionConflict
 	}
 	if row.Status == biz.PurchaseRejectionStatusCancelled && row.CancelledBy != nil && *row.CancelledBy == in.ActorID && row.CancelReason != nil && *row.CancelReason == in.Reason && row.Version == in.ExpectedVersion+1 {
 		return commitPurchaseRejectionDisposition(ctx, tx, row.ID)
@@ -208,6 +222,18 @@ func (r *inventoryRepo) CancelPurchaseRejectionDisposition(ctx context.Context, 
 	if row.Status != biz.PurchaseRejectionStatusDraft && row.Status != biz.PurchaseRejectionStatusPosted {
 		return nil, biz.ErrPurchaseRejectionSourceState
 	}
+	active, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, row.PurchaseReceiptID)
+	if err != nil {
+		return nil, err
+	}
+	if active {
+		return nil, biz.ErrPurchaseReceiptFinanceDependency
+	}
+	if row.Status == biz.PurchaseRejectionStatusPosted {
+		if err := validatePurchaseRejectionCancellationOrder(ctx, tx, row); err != nil {
+			return nil, err
+		}
+	}
 	if row.Status == biz.PurchaseRejectionStatusPosted && row.ReplacementReceiptID != nil {
 		replacement, err := tx.client.PurchaseReceipt.Get(ctx, *row.ReplacementReceiptID)
 		if err != nil || replacement.Status != biz.PurchaseReceiptStatusDraft {
@@ -217,7 +243,7 @@ func (r *inventoryRepo) CancelPurchaseRejectionDisposition(ctx context.Context, 
 		if err != nil {
 			return nil, err
 		}
-		if err := settleDraftPurchaseReceiptCancellation(ctx, tx, replacement, items, in.ActorID); err != nil {
+		if err := settleUnpostedPurchaseReceiptLinesCancellation(ctx, tx, replacement, items, in.ActorID); err != nil {
 			return nil, err
 		}
 		if err := updatePurchaseReceiptCancelled(ctx, tx, replacement.ID); err != nil {
@@ -232,7 +258,48 @@ func (r *inventoryRepo) CancelPurchaseRejectionDisposition(ctx context.Context, 
 	if affected != 1 {
 		return nil, biz.ErrPurchaseRejectionConflict
 	}
+	if row.Status == biz.PurchaseRejectionStatusPosted {
+		receipt, err := tx.client.PurchaseReceipt.Get(ctx, row.PurchaseReceiptID)
+		if err != nil {
+			return nil, err
+		}
+		if receipt.Status == biz.PurchaseReceiptStatusPosted {
+			if err := markProcessDomainCommandEffectCompensatedWithClient(ctx, tx.client, biz.ProcessDomainCommandInventoryPostInbound, "purchase_receipt", receipt.ID, "拒收处置已撤销，仍需核对未入库明细", in.ActorID); err != nil {
+				return nil, err
+			}
+		}
+	}
 	return commitPurchaseRejectionDisposition(ctx, tx, row.ID)
+}
+
+func validatePurchaseRejectionCancellationOrder(ctx context.Context, tx *inventoryDBTx, row *ent.PurchaseRejectionDisposition) error {
+	item, err := tx.client.PurchaseReceiptItem.Get(ctx, row.PurchaseReceiptItemID)
+	if err != nil {
+		return err
+	}
+	if item.ReceiptID != row.PurchaseReceiptID {
+		return biz.ErrPurchaseRejectionSourceInvalid
+	}
+	if item.PurchaseOrderItemID == nil {
+		return nil
+	}
+	source, err := tx.client.PurchaseOrderItem.Get(ctx, *item.PurchaseOrderItemID)
+	if err != nil {
+		return err
+	}
+	// Closing an order and reopening a disposed receipt line must serialize on
+	// the order header so neither operation can validate against stale facts.
+	if err := lockPurchaseOrderForReceipt(ctx, tx, source.PurchaseOrderID); err != nil {
+		return err
+	}
+	order, err := tx.client.PurchaseOrder.Get(ctx, source.PurchaseOrderID)
+	if err != nil {
+		return err
+	}
+	if order.LifecycleStatus != biz.PurchaseOrderStatusApproved || source.LineStatus != biz.PurchaseOrderItemStatusOpen {
+		return biz.ErrPurchaseRejectionCancelOrderState
+	}
+	return nil
 }
 
 func (r *inventoryRepo) GetPurchaseRejectionDisposition(ctx context.Context, id int) (_ *biz.PurchaseRejectionDisposition, resultErr error) {
@@ -286,7 +353,7 @@ func validatePurchaseRejectionSource(ctx context.Context, client *ent.Client, in
 	if err != nil {
 		return nil, nil, err
 	}
-	if receipt.Status != biz.PurchaseReceiptStatusDraft {
+	if receipt.Status != biz.PurchaseReceiptStatusDraft && receipt.Status != biz.PurchaseReceiptStatusPosted {
 		return nil, nil, biz.ErrPurchaseRejectionSourceState
 	}
 	item, err := client.PurchaseReceiptItem.Get(ctx, *inspection.PurchaseReceiptItemID)
@@ -295,6 +362,13 @@ func validatePurchaseRejectionSource(ctx context.Context, client *ent.Client, in
 	}
 	if err != nil {
 		return nil, nil, err
+	}
+	posted, err := purchaseReceiptLineIsPosted(ctx, client, item.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if posted {
+		return nil, nil, biz.ErrPurchaseRejectionSourceState
 	}
 	if item.ReceiptID != receipt.ID || quantity.GreaterThan(item.Quantity) || inspection.MaterialID == nil || item.MaterialID != *inspection.MaterialID || inspection.InventoryLotID == nil || item.LotID == nil || *item.LotID != *inspection.InventoryLotID {
 		return nil, nil, biz.ErrPurchaseRejectionSourceInvalid

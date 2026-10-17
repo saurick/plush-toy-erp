@@ -51,6 +51,17 @@ func (r *operationalFactRepo) CreatePayableFromPurchaseReceipt(
 	if receipt.Status != biz.PurchaseReceiptStatusPosted || receipt.SupplierID == nil || *receipt.SupplierID <= 0 {
 		return nil, biz.ErrBadParam
 	}
+	allItems, err := tx.client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receipt.ID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	gate, err := evaluatePurchaseReceiptQualityGateInTx(ctx, tx, receipt, allItems, false)
+	if err != nil {
+		return nil, err
+	}
+	if gate.UnresolvedLines() > 0 {
+		return nil, biz.ErrPurchaseReceiptInboundIncomplete
+	}
 	sourceSnapshot, err := lockAndReadPurchaseReceiptPayableSource(ctx, tx, receipt)
 	if err != nil {
 		return nil, err
@@ -229,7 +240,7 @@ func lockAndReadPurchaseReceiptPayableSource(
 		return nil, biz.ErrFinanceFactSourceInvalid
 	}
 	receiptItems, err := tx.client.PurchaseReceiptItem.Query().
-		Where(purchasereceiptitem.ReceiptID(receipt.ID)).
+		Where(purchasereceiptitem.ReceiptID(receipt.ID), purchaseReceiptItemPostedPredicate()).
 		Order(ent.Asc(purchasereceiptitem.FieldID)).
 		All(ctx)
 	if err != nil {
@@ -251,34 +262,49 @@ func lockAndReadPurchaseReceiptPayableSource(
 		receiptItemsBySourceID[itemID] = append(receiptItemsBySourceID[itemID], receiptItem)
 	}
 	sort.Ints(itemIDs)
-
-	orderIDs := make([]int, 0, len(itemIDs))
-	orderIDSet := make(map[int]struct{}, len(itemIDs))
+	// Commercial completion locks order headers before their lines. Use the same
+	// order here so late pricing and payable creation cannot deadlock each other.
+	orderItems, err := tx.client.PurchaseOrderItem.Query().Where(purchaseorderitem.IDIn(itemIDs...)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(orderItems) != len(itemIDs) {
+		return nil, biz.ErrFinanceFactSourceInvalid
+	}
+	orderIDs := make([]int, 0, len(orderItems))
+	orderIDSet := map[int]struct{}{}
+	for _, item := range orderItems {
+		if item.PurchaseOrderID <= 0 {
+			return nil, biz.ErrFinanceFactSourceInvalid
+		}
+		if _, exists := orderIDSet[item.PurchaseOrderID]; !exists {
+			orderIDs = append(orderIDs, item.PurchaseOrderID)
+			orderIDSet[item.PurchaseOrderID] = struct{}{}
+		}
+	}
+	sort.Ints(orderIDs)
+	for _, orderID := range orderIDs {
+		if err := lockOperationalFactRow(ctx, tx, "purchase_orders", orderID, biz.ErrFinanceFactSourceInvalid); err != nil {
+			return nil, err
+		}
+	}
 	for _, itemID := range itemIDs {
 		if err := lockOperationalFactRow(ctx, tx, "purchase_order_items", itemID, biz.ErrFinanceFactSourceInvalid); err != nil {
 			return nil, err
 		}
-		orderItem, err := tx.client.PurchaseOrderItem.Query().Where(purchaseorderitem.ID(itemID)).Only(ctx)
+		item, err := tx.client.PurchaseOrderItem.Get(ctx, itemID)
 		if err != nil {
-			if ent.IsNotFound(err) {
-				return nil, biz.ErrFinanceFactSourceInvalid
-			}
 			return nil, err
 		}
-		if orderItem.PurchaseOrderID <= 0 {
+		if _, ok := orderIDSet[item.PurchaseOrderID]; !ok {
 			return nil, biz.ErrFinanceFactSourceInvalid
 		}
 		for _, receiptItem := range receiptItemsBySourceID[itemID] {
-			if receiptItem.MaterialID != orderItem.MaterialID || receiptItem.UnitID != orderItem.UnitID {
+			if receiptItem.MaterialID != item.MaterialID || receiptItem.UnitID != item.UnitID {
 				return nil, biz.ErrFinanceFactSourceInvalid
 			}
 		}
-		if _, exists := orderIDSet[orderItem.PurchaseOrderID]; !exists {
-			orderIDSet[orderItem.PurchaseOrderID] = struct{}{}
-			orderIDs = append(orderIDs, orderItem.PurchaseOrderID)
-		}
 	}
-	sort.Ints(orderIDs)
 
 	var snapshot *financePayableSourceSnapshot
 	for _, orderID := range orderIDs {
@@ -471,7 +497,7 @@ func (r *operationalFactRepo) insertDerivedFinanceFactAndCommit(
 }
 
 func purchaseReceiptPayableAmount(ctx context.Context, client *ent.Client, receiptID int) (decimal.Decimal, error) {
-	items, err := client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receiptID)).All(ctx)
+	items, err := client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receiptID), purchaseReceiptItemPostedPredicate()).All(ctx)
 	if err != nil {
 		return decimal.Zero, err
 	}
@@ -480,9 +506,13 @@ func purchaseReceiptPayableAmount(ctx context.Context, client *ent.Client, recei
 	}
 	itemByID := make(map[int]*ent.PurchaseReceiptItem, len(items))
 	unitPriceByID := make(map[int]decimal.Decimal, len(items))
+	prices, err := purchaseReceiptConfirmedPrices(ctx, client, items)
+	if err != nil {
+		return decimal.Zero, err
+	}
 	total := decimal.Zero
 	for _, item := range items {
-		amount, unitPrice, err := purchaseReceiptItemMoney(item)
+		amount, unitPrice, err := confirmedPurchaseReceiptItemMoney(item, prices)
 		if err != nil {
 			return decimal.Zero, err
 		}

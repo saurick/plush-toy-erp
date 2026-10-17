@@ -13,6 +13,7 @@ const FinanceFactSourceType = "FINANCE_FACT"
 
 var (
 	ErrFinanceFactSourceAmountInvalid     = errors.New("finance fact source amount is incomplete")
+	ErrPurchaseReceiptInboundIncomplete   = errors.New("purchase receipt has unresolved inbound lines")
 	ErrPurchaseReceiptFinanceDependency   = errors.New("purchase receipt has an active payable")
 	ErrOutsourcingReturnFinanceDependency = errors.New("outsourcing return has an active payable")
 	ErrOutsourcingReturnQualityPending    = errors.New("outsourcing return quality inspection is not accepted")

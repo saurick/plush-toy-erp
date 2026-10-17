@@ -41,7 +41,7 @@ export function buildPurchaseReturnFromReceiptPayload(values = {}, receipt = {})
   const items = (Array.isArray(values.items) ? values.items : []).map((line) => {
     const source = receiptItem(receipt, line?.purchase_receipt_item_id)
     const quantity = quantityText(line?.quantity)
-    if (!source || !quantity) {
+    if (!source || !source.posted || !quantity) {
       throw new Error('请完整填写退货明细')
     }
     return {
@@ -73,7 +73,7 @@ export function buildPurchaseReceiptAdjustmentPayload(
       .trim()
       .toUpperCase()
     const quantity = quantityText(line?.quantity)
-    if (!source || !ADJUSTMENT_TYPES.has(adjustType) || !quantity) {
+    if (!source || !source.posted || !ADJUSTMENT_TYPES.has(adjustType) || !quantity) {
       throw new Error('请完整填写入库调整明细')
     }
     const targetWarehouseID = positiveID(line?.warehouse_id)

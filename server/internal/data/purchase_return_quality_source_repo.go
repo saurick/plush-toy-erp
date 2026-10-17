@@ -89,6 +89,13 @@ func (r *inventoryRepo) CreatePurchaseReturnFromQualityInspection(
 		item.LotID == nil || *item.LotID != *inspection.InventoryLotID {
 		return nil, biz.ErrPurchaseReturnQualitySourceInvalid
 	}
+	posted, err := purchaseReceiptLineIsPosted(ctx, tx.client, item.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !posted {
+		return nil, biz.ErrPurchaseReturnQualitySourceState
+	}
 	lot, err := tx.client.InventoryLot.Get(ctx, *inspection.InventoryLotID)
 	if err != nil {
 		if ent.IsNotFound(err) {

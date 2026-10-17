@@ -30,6 +30,7 @@ import {
   normalizePurchaseLineFormValue,
 } from '../components/purchase-orders/PurchaseOrderForm.jsx'
 import PurchaseOrderEditor from '../components/purchase-orders/PurchaseOrderEditor.jsx'
+import PurchaseOrderTermsModal from '../components/purchase-orders/PurchaseOrderTermsModal.jsx'
 import PurchaseOrderInboundDraftModal from '../components/purchase-orders/PurchaseOrderInboundDraftModal.jsx'
 import PurchaseOrderOperationPanel from '../components/purchase-orders/PurchaseOrderOperationPanel.jsx'
 import { buildPurchaseOrderColumns } from '../components/purchase-orders/purchaseOrderColumns.jsx'
@@ -151,6 +152,7 @@ export default function PurchaseOrdersPage() {
   )
   const [form] = Form.useForm()
   const [inboundDraftForm] = Form.useForm()
+  const [termsOrder, setTermsOrder] = useState(null)
   const canRead = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_READ)
   const canCreate = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_CREATE)
   const canUpdate = hasActionPermission(adminProfile, PermissionCode.PURCHASE_ORDER_UPDATE)
@@ -1380,6 +1382,8 @@ export default function PurchaseOrdersPage() {
         canCreate={canCreate}
         canCreateInboundDraftAction={canCreatePurchaseReceipt}
         canUpdate={canUpdate}
+        canCompleteTerms={canUpdate && hasActionPermission(adminProfile, PermissionCode.FIELD_PROCUREMENT_COMMERCIAL_READ)}
+        openTermsModal={setTermsOrder}
         referenceDataReady={referenceDataState === 'ready'}
         canGenerateInboundDraft={canGenerateInboundDraft}
         hasInboundWarehouse={hasInboundWarehouse}
@@ -1577,6 +1581,7 @@ export default function PurchaseOrdersPage() {
 
       {columnOrderModal}
 
+      <PurchaseOrderTermsModal order={termsOrder} customerKey={activeCustomerKey} unitOptions={unitOptions} onClose={() => setTermsOrder(null)} onChanged={loadOrders} />
       <PurchaseOrderEditor
         open={modalOpen}
         form={form}

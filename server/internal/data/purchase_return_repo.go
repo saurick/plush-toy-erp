@@ -661,6 +661,13 @@ func validatePurchaseReturnItemReferences(ctx context.Context, client *ent.Clien
 	if returnReceiptID != nil && receiptItem.ReceiptID != *returnReceiptID {
 		return biz.ErrBadParam
 	}
+	posted, err := purchaseReceiptLineIsPosted(ctx, client, receiptItem.ID)
+	if err != nil {
+		return err
+	}
+	if !posted {
+		return biz.ErrBadParam
+	}
 	receipt, err := client.PurchaseReceipt.Get(ctx, receiptItem.ReceiptID)
 	if err != nil {
 		if ent.IsNotFound(err) {

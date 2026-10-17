@@ -127,7 +127,10 @@ func TestPurchaseOrderSettlementReceiptAndProcessRules(t *testing.T) {
 					create.SetPostedAt(receivedAt)
 				}
 				receipt := create.SaveX(ctx)
-				client.PurchaseReceiptItem.Create().SetReceiptID(receipt.ID).SetMaterialID(fixtures.materialID).SetWarehouseID(fixtures.warehouseID).SetUnitID(fixtures.unitID).SetPurchaseOrderItemID(item.ID).SetQuantity(decimal.NewFromInt(1)).SaveX(ctx)
+				receiptItem := client.PurchaseReceiptItem.Create().SetReceiptID(receipt.ID).SetMaterialID(fixtures.materialID).SetWarehouseID(fixtures.warehouseID).SetUnitID(fixtures.unitID).SetPurchaseOrderItemID(item.ID).SetQuantity(decimal.NewFromInt(1)).SaveX(ctx)
+				if tt.receipt == biz.PurchaseReceiptStatusPosted {
+					client.InventoryTxn.Create().SetSubjectType(biz.InventorySubjectMaterial).SetSubjectID(receiptItem.MaterialID).SetWarehouseID(receiptItem.WarehouseID).SetUnitID(receiptItem.UnitID).SetTxnType(biz.InventoryTxnIn).SetDirection(1).SetQuantity(receiptItem.Quantity).SetSourceType(biz.PurchaseReceiptSourceType).SetSourceID(receipt.ID).SetSourceLineID(receiptItem.ID).SetIdempotencyKey(biz.PurchaseReceiptInboundIdempotencyKey(receipt.ID, receiptItem.ID)).SetOccurredAt(receivedAt).SaveX(ctx)
+				}
 			}
 			if tt.process != "" {
 				createSettlementProcessInstance(t, ctx, client, biz.ProcessKeyMaterialSupply, "purchase_order", order.ID, tt.process, "purchase-"+no)

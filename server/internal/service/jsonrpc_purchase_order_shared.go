@@ -144,6 +144,8 @@ func (d *jsonrpcDispatcher) purchaseOrderErrorResult(ctx context.Context, err er
 	switch {
 	case errors.Is(err, biz.ErrPurchaseOrderConflict):
 		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
+	case errors.Is(err, biz.ErrPurchaseOrderPriceFrozen):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "此处只补缺失单价，已确认的采购价格不能覆盖"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrSourceOrderNormalCloseIncomplete):

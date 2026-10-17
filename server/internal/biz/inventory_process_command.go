@@ -62,15 +62,7 @@ func (h *inventoryPostInboundProcessCommandHandler) ValidateProcessDomainCommand
 		if gate == nil || gate.PurchaseReceiptID != receiptID || gate.TotalLines <= 0 {
 			return ErrBadParam
 		}
-		switch gate.Outcome {
-		case PurchaseReceiptQualityGateReady:
-		case PurchaseReceiptQualityGatePending:
-			return ErrPurchaseReceiptQualityPending
-		case PurchaseReceiptQualityGateRejected:
-			return ErrPurchaseReceiptQualityRejected
-		default:
-			return ErrBadParam
-		}
+		return gate.ValidateInboundCompletion()
 	}
 	return nil
 }

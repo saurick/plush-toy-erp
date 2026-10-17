@@ -104,8 +104,20 @@ func validateQualityCorrectionDependencies(ctx context.Context, tx *inventoryDBT
 		if err != nil {
 			return err
 		}
-		if receipt.Status != biz.PurchaseReceiptStatusDraft {
+		if receipt.Status != biz.PurchaseReceiptStatusDraft && receipt.Status != biz.PurchaseReceiptStatusPosted {
 			return biz.ErrBadParam
+		}
+		if receipt.Status == biz.PurchaseReceiptStatusPosted {
+			if row.PurchaseReceiptItemID == nil {
+				return biz.ErrBadParam
+			}
+			posted, err := purchaseReceiptLineIsPosted(ctx, tx.client, *row.PurchaseReceiptItemID)
+			if err != nil {
+				return err
+			}
+			if posted {
+				return biz.ErrBadParam
+			}
 		}
 		blocked, err := tx.client.PurchaseRejectionDisposition.Query().Where(purchaserejectiondisposition.QualityInspectionID(row.ID), purchaserejectiondisposition.StatusNEQ("CANCELLED")).Exist(ctx)
 		if err != nil || blocked {

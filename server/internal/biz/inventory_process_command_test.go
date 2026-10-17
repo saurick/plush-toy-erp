@@ -139,6 +139,7 @@ type inventoryPostInboundProcessInventoryRepoStub struct {
 	InventoryRepo
 	postedReceipt   *PurchaseReceipt
 	postedReceiptID int
+	qualityGate     *PurchaseReceiptQualityGate
 }
 
 func (r *inventoryPostInboundProcessInventoryRepoStub) PostPurchaseReceipt(_ context.Context, receiptID int) (*PurchaseReceipt, error) {
@@ -147,6 +148,7 @@ func (r *inventoryPostInboundProcessInventoryRepoStub) PostPurchaseReceipt(_ con
 		return nil, ErrPurchaseReceiptNotFound
 	}
 	copied := *r.postedReceipt
+	copied.Status = PurchaseReceiptStatusPosted
 	return &copied, nil
 }
 
@@ -172,10 +174,15 @@ func (r *inventoryPostInboundProcessInventoryRepoStub) EvaluatePurchaseReceiptQu
 	if r.postedReceipt == nil || r.postedReceipt.ID != receiptID {
 		return nil, ErrPurchaseReceiptNotFound
 	}
+	if r.qualityGate != nil {
+		copied := *r.qualityGate
+		return &copied, nil
+	}
 	return &PurchaseReceiptQualityGate{
 		PurchaseReceiptID: receiptID,
 		Outcome:           PurchaseReceiptQualityGateReady,
 		TotalLines:        1,
 		PassedLines:       1,
+		ReadyLineIDs:      []int{1},
 	}, nil
 }

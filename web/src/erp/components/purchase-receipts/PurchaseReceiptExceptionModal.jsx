@@ -66,7 +66,7 @@ export default function PurchaseReceiptExceptionModal({
   }
   const itemOptions = useMemo(
     () =>
-      (Array.isArray(receipt?.items) ? receipt.items : []).map((item) => ({
+      (Array.isArray(receipt?.items) ? receipt.items : []).filter((item) => item.posted).map((item) => ({
         value: Number(item.id),
         label: receiptItemLabel(item, materialOptions),
       })),

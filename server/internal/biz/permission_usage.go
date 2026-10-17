@@ -377,8 +377,10 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("inbound", "purchase-order-source", "采购订单来源", "purchase-receipt-source-reference", "采购入库可读取的采购订单与明细", permissionControlSection, "允许查看", append(permissionMethods("purchase", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item", "post_purchase_rejection_disposition"), permissionMethods("customer_config", "start_material_supply_purchase_order_process")...), businessUsageConditions),
 	)
 	addMenu(PermissionPurchaseOrderCreate, "accessories-purchase", "purchase-orders", "采购订单", "create-purchase-order", "新建采购订单和表单", permissionControlButton, "显示并允许创建", permissionMethods("purchase_order", "save_purchase_order_with_items"), businessUsageConditions)
-	purchaseOrderUpdateMethods := permissionMethods("purchase_order", "save_purchase_order_with_items")
-	addMenu(PermissionPurchaseOrderUpdate, "accessories-purchase", "purchase-orders", "采购订单", "edit-purchase-order", "编辑采购订单", permissionControlForm, "显示并允许编辑", purchaseOrderUpdateMethods, businessUsageConditions)
+	add(PermissionPurchaseOrderUpdate,
+		menuPermissionSurface("accessories-purchase", "purchase-orders", "采购订单", "edit-purchase-order", "编辑采购订单", permissionControlForm, "显示并允许编辑草稿", permissionMethods("purchase_order", "save_purchase_order_with_items"), businessUsageConditions),
+		menuPermissionSurface("accessories-purchase", "purchase-orders", "采购订单", "purchase-complete-terms", "补齐价格与交期", permissionControlButton, "已批准单补缺价并维护交期，已关闭单只补缺价；另需商业字段读取权限", permissionMethods("purchase_order", "complete_purchase_order_terms"), businessUsageConditions),
+	)
 	addMenu(PermissionPurchaseOrderSubmit, "accessories-purchase", "purchase-order-actions", "订单动作", "submit-purchase-order", "提交采购审批", permissionControlButton, "显示并允许提交", append(permissionMethods("customer_config", "start_material_supply_purchase_order_process", "execute_material_supply_purchase_order_submit"), permissionMethods("purchase_order", "submit_purchase_order")...), businessUsageConditions)
 	addMenu(PermissionPurchaseOrderClose, "accessories-purchase", "purchase-order-actions", "订单动作", "close-purchase-order", "关闭采购订单", permissionControlButton, "显示并允许关闭", permissionMethods("purchase_order", "close_purchase_order"), businessUsageConditions)
 	addMenu(PermissionPurchaseOrderCancel, "accessories-purchase", "purchase-order-actions", "订单动作", "cancel-purchase-order", "取消采购订单", permissionControlButton, "显示并允许取消", permissionMethods("purchase_order", "cancel_purchase_order"), businessUsageConditions)

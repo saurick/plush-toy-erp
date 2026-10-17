@@ -535,19 +535,14 @@ func (r *inventoryRepo) PostPurchaseReceiptForProcessCommand(
 }
 
 func (r *inventoryRepo) postPurchaseReceipt(
-	ctx context.Context,
-	receiptID int,
-	command *biz.ProcessDomainCommandInput,
-	result *biz.ProcessDomainCommandResult,
-	actorID int,
-	scope *biz.WarehouseDataScope,
+	ctx context.Context, receiptID int, command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult, actorID int, scope *biz.WarehouseDataScope,
 ) (*biz.PurchaseReceipt, error) {
 	tx, err := r.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
-
 	if err := lockPurchaseReceipt(ctx, tx, receiptID); err != nil {
 		return nil, err
 	}
@@ -555,103 +550,98 @@ func (r *inventoryRepo) postPurchaseReceipt(
 		return nil, err
 	}
 	receipt, err := tx.client.PurchaseReceipt.Get(ctx, receiptID)
+	if ent.IsNotFound(err) {
+		return nil, biz.ErrPurchaseReceiptNotFound
+	}
 	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, biz.ErrPurchaseReceiptNotFound
-		}
 		return nil, err
 	}
-	transition, ok := corestatus.PostPurchaseReceipt(receipt.Status)
-	if !ok {
+	if _, ok := corestatus.PostPurchaseReceipt(receipt.Status); !ok {
 		return nil, biz.ErrBadParam
 	}
-	if !transition.Changed {
-		out, err := purchaseReceiptWithItems(ctx, tx.client, receipt)
-		if err != nil {
-			return nil, err
-		}
-		if command != nil {
-			if err := verifyPurchaseReceiptInboundEvidence(ctx, tx, receipt); err != nil {
-				return nil, err
-			}
-			if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, result, actorID); err != nil {
-				return nil, err
-			}
-		}
-		if err := tx.sqlTx.Commit(); err != nil {
-			return nil, err
-		}
-		tx = nil
-		return out, nil
-	}
-
-	items, err := tx.client.PurchaseReceiptItem.Query().
-		Where(purchasereceiptitem.ReceiptID(receipt.ID)).
-		Order(ent.Asc(purchasereceiptitem.FieldID)).
-		All(ctx)
+	items, err := tx.client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receipt.ID)).Order(ent.Asc(purchasereceiptitem.FieldID)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
 	if len(items) == 0 {
 		return nil, biz.ErrBadParam
 	}
-	if err := validatePurchaseOrderReceiptQuantities(ctx, tx, receipt.ID, items); err != nil {
-		return nil, err
-	}
-	qualityGate, err := evaluatePurchaseReceiptQualityGateInTx(ctx, tx, receipt, items, true)
+	gate, err := evaluatePurchaseReceiptQualityGateInTx(ctx, tx, receipt, items, true)
 	if err != nil {
 		return nil, err
 	}
-	switch qualityGate.Outcome {
-	case biz.PurchaseReceiptQualityGatePending:
-		return nil, biz.ErrPurchaseReceiptQualityPending
-	case biz.PurchaseReceiptQualityGateRejected:
-		return nil, biz.ErrPurchaseReceiptQualityRejected
-	case biz.PurchaseReceiptQualityGateReady:
-	default:
-		return nil, biz.ErrBadParam
+	if receipt.Status == biz.PurchaseReceiptStatusPosted && gate.PostedLines == 0 {
+		return nil, biz.ErrIdempotencyConflict
 	}
-	for _, item := range items {
-		lotID := item.LotID
-		sourceID := receipt.ID
-		sourceLineID := item.ID
-		_, err = r.applyInventoryTxnAndUpdateBalanceInTx(ctx, tx, &biz.InventoryTxnCreate{
-			SubjectType:    biz.InventorySubjectMaterial,
-			SubjectID:      item.MaterialID,
-			WarehouseID:    item.WarehouseID,
-			LotID:          lotID,
-			TxnType:        biz.InventoryTxnIn,
-			Direction:      1,
-			Quantity:       item.Quantity,
-			UnitID:         item.UnitID,
-			SourceType:     biz.PurchaseReceiptSourceType,
-			SourceID:       &sourceID,
-			SourceLineID:   &sourceLineID,
-			IdempotencyKey: biz.PurchaseReceiptInboundIdempotencyKey(receipt.ID, item.ID),
-			OccurredAt:     receipt.ReceivedAt,
-		})
-		if err != nil {
+	// A process command receipt represents completion of this source handoff.
+	// Ordinary warehouse posting may receive ready lines while others wait.
+	if command != nil {
+		if err := gate.ValidateInboundCompletion(); err != nil {
 			return nil, err
 		}
 	}
-	now := time.Now()
-	if err := updatePurchaseReceiptPosted(ctx, tx, receipt.ID, now); err != nil {
-		return nil, err
+	if len(gate.ReadyLineIDs) == 0 && gate.PostedLines == 0 {
+		if gate.Outcome == biz.PurchaseReceiptQualityGateRejected {
+			return nil, biz.ErrPurchaseReceiptQualityRejected
+		}
+		return nil, biz.ErrPurchaseReceiptQualityPending
+	}
+	ready := make(map[int]bool, len(gate.ReadyLineIDs))
+	for _, id := range gate.ReadyLineIDs {
+		ready[id] = true
+	}
+	selected := make([]*ent.PurchaseReceiptItem, 0, len(ready))
+	for _, item := range items {
+		if ready[item.ID] {
+			selected = append(selected, item)
+		}
+	}
+	if len(selected) > 0 {
+		active, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, receipt.ID)
+		if err != nil {
+			return nil, err
+		}
+		if active {
+			return nil, biz.ErrPurchaseReceiptFinanceDependency
+		}
+		if err := validatePurchaseOrderReceiptQuantities(ctx, tx, 0, selected); err != nil {
+			return nil, err
+		}
+		for _, item := range selected {
+			sourceID, sourceLineID := receipt.ID, item.ID
+			_, err := r.applyInventoryTxnAndUpdateBalanceInTx(ctx, tx, &biz.InventoryTxnCreate{
+				SubjectType: biz.InventorySubjectMaterial, SubjectID: item.MaterialID, WarehouseID: item.WarehouseID,
+				LotID: item.LotID, TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: item.Quantity, UnitID: item.UnitID,
+				SourceType: biz.PurchaseReceiptSourceType, SourceID: &sourceID, SourceLineID: &sourceLineID,
+				IdempotencyKey: biz.PurchaseReceiptInboundIdempotencyKey(receipt.ID, item.ID), OccurredAt: receipt.ReceivedAt,
+			})
+			if err != nil {
+				return nil, err
+			}
+		}
+		if receipt.Status == biz.PurchaseReceiptStatusDraft {
+			if err := updatePurchaseReceiptPosted(ctx, tx, receipt.ID, time.Now()); err != nil {
+				return nil, err
+			}
+		}
 	}
 	receipt, err = tx.client.PurchaseReceipt.Get(ctx, receipt.ID)
 	if err != nil {
 		return nil, err
 	}
-	out, err := purchaseReceiptWithItems(ctx, tx.client, receipt)
-	if err != nil {
-		return nil, err
-	}
 	if command != nil {
+		if err := verifyPurchaseReceiptInboundEvidence(ctx, tx, receipt); err != nil {
+			return nil, err
+		}
 		if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, result, actorID); err != nil {
 			return nil, err
 		}
 	}
 	if err := syncPurchaseReceiptHandoffs(ctx, tx.client, receipt.ID); err != nil {
+		return nil, err
+	}
+	out, err := purchaseReceiptWithItems(ctx, tx.client, receipt)
+	if err != nil {
 		return nil, err
 	}
 	if err := tx.sqlTx.Commit(); err != nil {
@@ -683,8 +673,19 @@ func verifyPurchaseReceiptInboundEvidence(ctx context.Context, tx *inventoryDBTx
 	if tx == nil || tx.client == nil || receipt == nil || receipt.Status != biz.PurchaseReceiptStatusPosted {
 		return biz.ErrProcessDomainCommandRecoveryRequired
 	}
+	allItems, err := tx.client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receipt.ID)).All(ctx)
+	if err != nil {
+		return err
+	}
+	gate, err := evaluatePurchaseReceiptQualityGateInTx(ctx, tx, receipt, allItems, false)
+	if err != nil {
+		return err
+	}
+	if gate.UnresolvedLines() > 0 {
+		return biz.ErrProcessDomainCommandRecoveryRequired
+	}
 	items, err := tx.client.PurchaseReceiptItem.Query().
-		Where(purchasereceiptitem.ReceiptID(receipt.ID)).
+		Where(purchasereceiptitem.ReceiptID(receipt.ID), purchaseReceiptItemPostedPredicate()).
 		Order(ent.Asc(purchasereceiptitem.FieldID)).
 		All(ctx)
 	if err != nil {
@@ -834,7 +835,7 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 		if err != nil {
 			return nil, err
 		}
-		if err := settleDraftPurchaseReceiptCancellation(ctx, tx, receipt, items, actorID); err != nil {
+		if err := settleUnpostedPurchaseReceiptLinesCancellation(ctx, tx, receipt, items, actorID); err != nil {
 			return nil, err
 		}
 		if err := updatePurchaseReceiptCancelled(ctx, tx, receipt.ID); err != nil {
@@ -895,7 +896,26 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 	if err != nil {
 		return nil, err
 	}
+	postedLines, err := purchaseReceiptPostedLines(ctx, tx.client, receipt.ID)
+	if err != nil {
+		return nil, err
+	}
+	if len(postedLines) == 0 {
+		return nil, biz.ErrInventoryTxnNotFound
+	}
+	unposted := []*ent.PurchaseReceiptItem{}
 	for _, item := range items {
+		if postedLines[item.ID] == nil {
+			unposted = append(unposted, item)
+		}
+	}
+	if err := settleUnpostedPurchaseReceiptLinesCancellation(ctx, tx, receipt, unposted, actorID); err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		if postedLines[item.ID] == nil {
+			continue
+		}
 		original, err := tx.client.InventoryTxn.Query().
 			Where(inventorytxn.IdempotencyKey(biz.PurchaseReceiptInboundIdempotencyKey(receipt.ID, item.ID))).
 			Only(ctx)
@@ -960,15 +980,33 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 	return out, nil
 }
 
-func settleDraftPurchaseReceiptCancellation(
+func settleUnpostedPurchaseReceiptLinesCancellation(
 	ctx context.Context,
 	tx *inventoryDBTx,
 	receipt *ent.PurchaseReceipt,
 	items []*ent.PurchaseReceiptItem,
 	actorID int,
 ) error {
-	if tx == nil || tx.client == nil || receipt == nil || receipt.Status != biz.PurchaseReceiptStatusDraft {
+	if tx == nil || tx.client == nil || receipt == nil || (receipt.Status != biz.PurchaseReceiptStatusDraft && receipt.Status != biz.PurchaseReceiptStatusPosted) {
 		return biz.ErrBadParam
+	}
+
+	if len(items) == 0 {
+		return nil
+	}
+	lineIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			return biz.ErrBadParam
+		}
+		posted, err := purchaseReceiptLineIsPosted(ctx, tx.client, item.ID)
+		if err != nil {
+			return err
+		}
+		if posted {
+			return biz.ErrBadParam
+		}
+		lineIDs = append(lineIDs, item.ID)
 	}
 
 	itemsByID := make(map[int]*ent.PurchaseReceiptItem, len(items))
@@ -991,6 +1029,7 @@ func settleDraftPurchaseReceiptCancellation(
 				qualityinspection.SourceID(receipt.ID),
 			),
 		),
+		qualityinspection.PurchaseReceiptItemIDIn(lineIDs...),
 	).Order(ent.Asc(qualityinspection.FieldID)).IDs(ctx)
 	if err != nil {
 		return err
@@ -1244,6 +1283,9 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 			return nil, 0, err
 		}
 		item := entPurchaseReceiptToBiz(row, items)
+		if err := projectPurchaseReceiptInbound(ctx, r.data.postgres, row, items, item); err != nil {
+			return nil, 0, err
+		}
 		if filter.WarehouseScope != nil {
 			if err := biz.ValidatePurchaseReceiptWarehouseAccess(*filter.WarehouseScope, item.Items); err != nil {
 				return nil, 0, err
@@ -1295,8 +1337,9 @@ func purchaseOrderDraftReservedQuantities(
 	draftItems, err := client.PurchaseReceiptItem.Query().
 		Where(
 			purchasereceiptitem.PurchaseOrderItemIDIn(orderItemIDs...),
+			purchaseReceiptItemAwaitingInboundPredicate(),
 			purchasereceiptitem.HasReceiptWith(
-				purchasereceipt.Status(biz.PurchaseReceiptStatusDraft),
+				purchasereceipt.StatusNEQ(biz.PurchaseReceiptStatusCancelled),
 			),
 		).
 		All(ctx)
@@ -1405,6 +1448,7 @@ func purchaseOrderEffectiveReceivedQuantities(
 	}
 	receiptPredicates := []predicate.PurchaseReceiptItem{
 		purchasereceiptitem.PurchaseOrderItemIDIn(orderItemIDs...),
+		purchaseReceiptItemPostedPredicate(),
 		purchasereceiptitem.HasReceiptWith(
 			purchasereceipt.Status(biz.PurchaseReceiptStatusPosted),
 		),
@@ -1577,6 +1621,9 @@ func resolvePurchaseReceiptFromPurchaseOrderReplay(
 		return nil, true, fmt.Errorf("purchase receipt %d idempotency result item set is incomplete", receipt.ID)
 	}
 	out := entPurchaseReceiptToBiz(receipt, items)
+	if err := projectPurchaseReceiptInbound(ctx, client, receipt, items, out); err != nil {
+		return nil, true, err
+	}
 	if err := projectPurchaseReceiptPurchaseOrderReference(out, items); err != nil {
 		return nil, true, err
 	}
@@ -2101,6 +2148,9 @@ func purchaseReceiptWithItems(ctx context.Context, client *ent.Client, receipt *
 		return nil, err
 	}
 	out := entPurchaseReceiptToBiz(receipt, items)
+	if err := projectPurchaseReceiptInbound(ctx, client, receipt, items, out); err != nil {
+		return nil, err
+	}
 	if err := projectPurchaseReceiptPurchaseOrderReference(out, items); err != nil {
 		return nil, err
 	}

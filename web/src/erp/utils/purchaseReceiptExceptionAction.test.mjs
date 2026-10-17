@@ -11,6 +11,7 @@ const receipt = {
   items: [
     {
       id: 11,
+      posted: true,
       material_id: 21,
       warehouse_id: 31,
       unit_id: 41,
@@ -137,4 +138,10 @@ test('purchase exception quantities preserve numeric(20,6) boundaries exactly', 
     ).items[0].quantity,
     '99999999999999.999999'
   )
+})
+
+test('unposted receipt lines cannot become a return or adjustment source', () => {
+ const pending = { ...receipt, items: receipt.items.map((item) => ({ ...item, posted: false })) }
+ assert.throws(() => buildPurchaseReturnFromReceiptPayload({ items: [{ purchase_receipt_item_id: 11, quantity: '1' }] }, pending))
+ assert.throws(() => buildPurchaseReceiptAdjustmentPayload({ items: [{ purchase_receipt_item_id: 11, adjust_type: 'QUANTITY_DECREASE', quantity: '1' }] }, pending))
 })

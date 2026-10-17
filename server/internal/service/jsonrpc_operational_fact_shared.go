@@ -332,6 +332,8 @@ func (d *jsonrpcDispatcher) operationalFactErrorResult(ctx context.Context, err 
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请选择发票类别"}
 	case errors.Is(err, biz.ErrFinanceFactSourceAmountInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来源单据金额不完整或有效金额不大于零，不能生成财务记录"}
+	case errors.Is(err, biz.ErrPurchaseReceiptInboundIncomplete):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "收货单仍有未入库或未处置的明细，请完成后再生成应付"}
 	case errors.Is(err, biz.ErrPurchaseReceiptNotFound):
 		return d.purchaseErrorResult(ctx, err)
 	case errors.Is(err, biz.ErrPurchaseReceiptFinanceDependency):

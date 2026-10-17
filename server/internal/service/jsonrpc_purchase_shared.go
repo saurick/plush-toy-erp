@@ -209,6 +209,8 @@ func (d *jsonrpcDispatcher) purchaseErrorResult(ctx context.Context, err error) 
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "拒收质检与待入库单据不一致，请刷新后重试"}
 	case errors.Is(err, biz.ErrPurchaseRejectionSourceState):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "仅首次来料未入库且质检不合格时可办理退厂处置"}
+	case errors.Is(err, biz.ErrPurchaseRejectionCancelOrderState):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来源采购单或明细已不允许收货，不能撤销拒收处置"}
 	case errors.Is(err, biz.ErrPurchaseRejectionConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "来料拒收处置已被其他人处理，或该质检已有有效处置单，请刷新后重试"}
 	case errors.Is(err, biz.ErrPurchaseReceiptAdjustmentNotFound):
@@ -265,20 +267,23 @@ func purchaseReceiptToAny(item *biz.PurchaseReceipt) map[string]any {
 		qualityInspections = append(qualityInspections, qualityInspectionToAny(inspection))
 	}
 	return map[string]any{
-		"id":                  item.ID,
-		"receipt_no":          item.ReceiptNo,
-		"purchase_order_id":   optionalIntToAny(item.PurchaseOrderID),
-		"purchase_order_no":   optionalStringToAny(item.PurchaseOrderNo),
-		"supplier_id":         optionalIntToAny(item.SupplierID),
-		"supplier_name":       item.SupplierName,
-		"status":              item.Status,
-		"received_at":         item.ReceivedAt.Unix(),
-		"posted_at":           optionalUnix(item.PostedAt),
-		"note":                optionalStringToAny(item.Note),
-		"items":               lines,
-		"quality_inspections": qualityInspections,
-		"created_at":          item.CreatedAt.Unix(),
-		"updated_at":          item.UpdatedAt.Unix(),
+		"id":                    item.ID,
+		"receipt_no":            item.ReceiptNo,
+		"purchase_order_id":     optionalIntToAny(item.PurchaseOrderID),
+		"purchase_order_no":     optionalStringToAny(item.PurchaseOrderNo),
+		"supplier_id":           optionalIntToAny(item.SupplierID),
+		"supplier_name":         item.SupplierName,
+		"status":                item.Status,
+		"posted_lines":          item.PostedLines,
+		"pending_inbound_lines": item.PendingInboundLines,
+		"can_post":              item.CanPost,
+		"received_at":           item.ReceivedAt.Unix(),
+		"posted_at":             optionalUnix(item.PostedAt),
+		"note":                  optionalStringToAny(item.Note),
+		"items":                 lines,
+		"quality_inspections":   qualityInspections,
+		"created_at":            item.CreatedAt.Unix(),
+		"updated_at":            item.UpdatedAt.Unix(),
 	}
 }
 
@@ -287,6 +292,9 @@ func purchaseReceiptItemToAny(item *biz.PurchaseReceiptItem) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
+		"posted":                 item.Posted,
+		"rejection_disposed":     item.RejectionDisposed,
+		"price_confirmed_later":  item.PriceConfirmedLater,
 		"id":                     item.ID,
 		"receipt_id":             item.ReceiptID,
 		"material_id":            item.MaterialID,

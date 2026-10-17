@@ -297,6 +297,7 @@ export const RpcMethod = Object.freeze({
   purchase_order: Object.freeze({
     CANCEL_PURCHASE_ORDER: 'cancel_purchase_order',
     CLOSE_PURCHASE_ORDER: 'close_purchase_order',
+    COMPLETE_PURCHASE_ORDER_TERMS: 'complete_purchase_order_terms',
     GET_PURCHASE_ORDER: 'get_purchase_order',
     GET_PURCHASE_ORDER_RECEIPT_PROGRESS: 'get_purchase_order_receipt_progress',
     LIST_PURCHASE_ORDER_ITEMS: 'list_purchase_order_items',

@@ -6,6 +6,7 @@ import {
   buildOutsourcingReturnQualityInspectionPayload,
   buildPurchaseReturnFromQualityInspectionPayload,
   canCreatePurchaseReturnFromRejectedInspection,
+  canCreatePurchaseRejectionDispositionFromInspection,
   groupOutsourcingReturnQualityInspections,
   isMatchingOutsourcingReturnQualityInspection,
   isPostedOutsourcingReturn,
@@ -38,7 +39,7 @@ test('quality source checks keep receipt, inspection and fact status contracts i
     purchase_receipt_item_id: 3,
   }
   assert.equal(consumer.isRejectedIncomingInspection(inspection), true)
-  assert.equal(consumer.canCreatePurchaseReturnFromRejectedInspection(inspection, { id: 2, status: 'RECEIPT_POSTED' }), true)
+  assert.equal(consumer.canCreatePurchaseReturnFromRejectedInspection(inspection, { id: 2, status: 'RECEIPT_POSTED', items: [{ id: 3, posted: true }] }), true)
   assert.equal(consumer.canCreatePurchaseReturnFromRejectedInspection(inspection, { id: 2, status: 'FACT_POSTED' }), false)
   assert.equal(consumer.isPostedOutsourcingReturn({ id: 4, fact_type: 'RETURN_RECEIPT', status: 'FACT_POSTED' }), true)
   assert.equal(consumer.isPostedOutsourcingReturn({ id: 4, fact_type: 'RETURN_RECEIPT', status: 'RECEIPT_POSTED' }), false)
@@ -272,6 +273,7 @@ test('quality rejection return eligibility and business fields are strict', () =
     canCreatePurchaseReturnFromRejectedInspection(base, {
       id: 61,
       status: 'POSTED',
+      items: [{ id: 62, posted: true }],
     }),
     true
   )
@@ -318,4 +320,15 @@ test('corrected outsourcing inspection replaces the superseded rejection', () =>
       .state,
     'PENDING'
   )
+})
+
+test('mixed incoming quality uses the exact receipt line to choose disposition', () => {
+ const inspection = { id: 1, status: 'REJECTED', result: 'REJECT', source_type: 'PURCHASE_RECEIPT', inspection_type: 'INCOMING', purchase_receipt_id: 2, purchase_receipt_item_id: 3 }
+ const receipt = { id: 2, status: 'POSTED', items: [{ id: 3, posted: false }, { id: 4, posted: true }] }
+ assert.equal(canCreatePurchaseReturnFromRejectedInspection(inspection, receipt), false)
+ assert.equal(canCreatePurchaseRejectionDispositionFromInspection(inspection, receipt), true)
+ const posted = { ...receipt, items: [{ id: 3, posted: true }] }
+ assert.equal(canCreatePurchaseReturnFromRejectedInspection(inspection, posted), true)
+ assert.equal(canCreatePurchaseRejectionDispositionFromInspection(inspection, posted), false)
+ assert.equal(canCreatePurchaseRejectionDispositionFromInspection(inspection, { ...receipt, status: 'CANCELLED' }), false)
 })

@@ -16,7 +16,6 @@ import (
 	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
-	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/workflowtask"
 )
@@ -142,11 +141,9 @@ func syncPurchaseReceiptHandoffs(ctx context.Context, client *ent.Client, receip
 	}
 	status, exception, reason := "", "", ""
 	switch row.Status {
-	case "POSTED":
-		status, exception = "done", "done"
-	case "CANCELLED":
+	case biz.PurchaseReceiptStatusCancelled:
 		status, exception = "withdrawn", "withdrawn"
-	case "DRAFT":
+	case biz.PurchaseReceiptStatusDraft, biz.PurchaseReceiptStatusPosted:
 		items, err := client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receiptID)).All(ctx)
 		if err != nil {
 			return err
@@ -156,42 +153,24 @@ func syncPurchaseReceiptHandoffs(ctx context.Context, client *ent.Client, receip
 			if err != nil {
 				return err
 			}
-			status = "blocked"
-			switch gate.Outcome {
-			case biz.PurchaseReceiptQualityGateReady:
-				status, exception = "ready", "done"
-			case biz.PurchaseReceiptQualityGateRejected:
-				exception, reason = "ready", "来料检验未通过，等待采购处理"
-				dispositions, err := client.PurchaseRejectionDisposition.Query().Where(
-					purchaserejectiondisposition.PurchaseReceiptID(receiptID),
-					purchaserejectiondisposition.Status(biz.PurchaseRejectionStatusPosted),
-				).All(ctx)
-				if err != nil {
-					return err
-				}
-				handled := map[int]decimal.Decimal{}
-				for _, disposition := range dispositions {
-					handled[disposition.PurchaseReceiptItemID] = handled[disposition.PurchaseReceiptItemID].Add(disposition.Quantity)
-				}
-				allHandled := true
-				for _, id := range gate.RejectedLineIDs {
-					for _, item := range items {
-						if item.ID == id && handled[id].LessThan(item.Quantity) {
-							allHandled = false
-						}
-					}
-				}
-				if allHandled {
-					exception = "done"
-					// The rejected source remains a draft for audit. It never
-					// becomes an inbound fact after disposal or replacement.
-					status, reason = "withdrawn", "拒收数量已处置，原收货单不可入库"
-				}
+			if len(gate.RejectedLineIDs) > len(gate.DisposedLineIDs) {
+				exception = "ready"
+			} else if len(gate.RejectedLineIDs) > 0 || len(gate.PendingLineIDs) == 0 {
+				exception = "done"
+			}
+			switch {
+			case len(gate.ReadyLineIDs) > 0:
+				status = "ready"
+			case gate.UnresolvedLines() == 0 && gate.PostedLines > 0:
+				status = "done"
+			case gate.UnresolvedLines() == 0:
+				status, reason = "withdrawn", "拒收数量已处置，原收货单不可入库"
 			default:
-				reason = "等待全部来料检验通过"
+				status, reason = "blocked", "等待其余收货行检验或拒收处置"
 			}
 		}
 	}
+
 	if err := syncFulfillmentTask(ctx, client, "receipt_inbound", row.ID, row.ReceiptNo, "", status, reason, 0); err != nil {
 		return err
 	}

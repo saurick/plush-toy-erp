@@ -381,7 +381,7 @@ func createDirectPurchaseReceiptItemForProgressTest(
 		create.SetPostedAt(receivedAt)
 	}
 	receipt := create.SaveX(ctx)
-	return client.PurchaseReceiptItem.Create().
+	item := client.PurchaseReceiptItem.Create().
 		SetReceiptID(receipt.ID).
 		SetMaterialID(fixtures.materialID).
 		SetWarehouseID(fixtures.warehouseID).
@@ -389,4 +389,8 @@ func createDirectPurchaseReceiptItemForProgressTest(
 		SetPurchaseOrderItemID(orderItem.ID).
 		SetQuantity(quantity).
 		SaveX(ctx)
+	if status == biz.PurchaseReceiptStatusPosted {
+		client.InventoryTxn.Create().SetSubjectType(biz.InventorySubjectMaterial).SetSubjectID(item.MaterialID).SetWarehouseID(item.WarehouseID).SetUnitID(item.UnitID).SetTxnType(biz.InventoryTxnIn).SetDirection(1).SetQuantity(item.Quantity).SetSourceType(biz.PurchaseReceiptSourceType).SetSourceID(receipt.ID).SetSourceLineID(item.ID).SetIdempotencyKey(biz.PurchaseReceiptInboundIdempotencyKey(receipt.ID, item.ID)).SetOccurredAt(receivedAt).SaveX(ctx)
+	}
+	return item
 }
