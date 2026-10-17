@@ -50,10 +50,15 @@ test("exception-flow task search follows the current page placeholder contract",
     "utf8",
   );
   const dashboardSource = readFileSync(
+    new URL("../../web/src/erp/components/workflow/WorkflowDashboardViews.jsx", import.meta.url),
+    "utf8",
+  );
+  const pageSource = readFileSync(
     new URL("../../web/src/erp/pages/DashboardPage.jsx", import.meta.url),
     "utf8",
   );
 
+  assert.match(pageSource, /<TaskBoardSearch\b/u);
   assert.match(dashboardSource, /placeholder="订单 \/ 产品 \/ 物料 \/ 款号"/u);
   assert.match(
     dashboardSource,
