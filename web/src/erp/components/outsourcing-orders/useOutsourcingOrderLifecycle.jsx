@@ -1,5 +1,6 @@
 import React, { useRef } from 'react'
 import { Alert, Descriptions } from 'antd'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import { OutsourcingOrderStatus } from '../../../common/consts/statuses.generated.mjs'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -24,6 +25,7 @@ export function useOutsourcingOrderLifecycle({
   loadOrderItems,
   openEdit,
 }) {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const lifecycleInFlightRef = useRef(false)
 
   const lifecycleAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
@@ -49,6 +51,7 @@ export function useOutsourcingOrderLifecycle({
           null
         )
         setSelectedRow(updated)
+        reportBusinessResult(`${action.label}成功`, updated)
         message.success(`${action.label}成功`)
         await Promise.all([loadOrders(), loadWorkflowTasks()])
       } catch (error) {

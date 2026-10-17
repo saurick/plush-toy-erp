@@ -227,10 +227,8 @@ func testFinanceAdvanceAllocation(t *testing.T, data *Data, client *ent.Client) 
 	approver := client.AdminUser.Create().SetUsername("alloc-approve-" + suffix).SetPasswordHash("test-only").SaveX(ctx)
 	fact := createPostedReceivableFinanceFactFixture(t, ctx, data, client, customer, "ADV-AR-"+suffix, 100000)
 	other := createPostedReceivableFinanceFactFixture(t, ctx, data, client, customer, "OTHER-AR-"+suffix, 50000)
-	sourceType, sourceID, err := financeFactOrderRef(ctx, client, client.FinanceFact.GetX(ctx, fact.ID))
-	if err != nil {
-		t.Fatal(err)
-	}
+	shipment := client.Shipment.GetX(ctx, *fact.SourceID)
+	sourceType, sourceID := "sales_order", *shipment.SalesOrderID
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	uc := biz.NewOperationalFactUsecase(repo)
 	payment, err := uc.CreateFinancePayment(ctx, &biz.FinancePaymentCreate{Kind: biz.FinancePaymentKindAdvance, SourceType: sourceType, SourceID: sourceID, PaymentNo: "ALLOC-" + suffix, Direction: biz.FinancePaymentDirectionReceipt, CounterpartyType: biz.FinanceCounterpartyCustomer, CounterpartyID: customer.ID, Currency: "CNY", Amount: decimal.NewFromInt(30000), AccountRef: "模拟账户", EvidenceRef: "模拟到账凭据", IdempotencyKey: "alloc-" + suffix}, creator.ID)

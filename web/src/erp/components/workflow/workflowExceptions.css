@@ -14,6 +14,13 @@
   gap: inherit;
   min-width: 0;
 }
+.workflow-exceptions--mobile .workflow-exceptions__controls {
+  gap: 5px;
+  padding-block: 4px;
+}
+.workflow-exceptions--mobile .workflow-exceptions__query {
+  gap: 6px;
+}
 .workflow-exceptions__query > .ant-input-search,
 .workflow-exceptions__query > .erp-mobile-search {
   min-width: 0;

@@ -1,4 +1,3 @@
-import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
@@ -7,6 +6,7 @@ import {
   assertMobileFilterEdgePositions,
   assertMobileFilterOutsideDismissal,
 } from './mobileFilterPopoverAssertions.mjs'
+import { assertMobileFilterClearControl } from './mobileFilterConsistencyAssertions.mjs'
 
 export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
   const baseTime = 1_788_840_000
@@ -218,9 +218,11 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       ])
       await deadlineFilters.getByRole('button', { name: '关闭筛选', exact: true }).click()
       await deadlineFilters.waitFor({ state: 'hidden' })
-      await page.getByRole('button', { name: '清除截止时间：未设置到期', exact: true }).click()
+      await chooseFilter(await openFilters(), '全部截止时间')
       await waitFirst(97063)
-      await page.getByRole('button', { name: '清除来源单据：来源待核对', exact: true }).click()
+      const sourceFilters = await openFilters()
+      await sourceFilters.getByRole('group', { name: '来源单据', exact: true }).getByRole('button', { name: '全部', exact: true }).click()
+      await sourceFilters.getByRole('button', { name: '关闭筛选', exact: true }).click()
       await waitFirst(97063)
       assert.match(await range.innerText(), /共 64 项/u)
       const approvalShortcut = page.getByTestId('mobile-role-filter-approval')
@@ -243,7 +245,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
             scrollWidth: document.documentElement.scrollWidth,
             query: rect('.mobile-role-task-query'),
             search: rect('.mobile-role-task-search'),
-            filter: rect('[data-testid="mobile-task-list-filter-trigger"]'),
+            filter: rect('.mobile-role-task-query .mobile-filter-control'),
             tabs: rect('.mobile-task-view-switch'),
             chips: rect('.mobile-role-task-filters'),
             selectedShadow: selected
@@ -262,11 +264,11 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
           `搜索和统一筛选保持同一行：${JSON.stringify(geometry)}`
         )
         assert(
-          geometry.search.right <= geometry.filter.x - 8,
+          geometry.search.right <= geometry.filter.x - 6,
           `搜索与筛选保留清晰间距：${JSON.stringify(geometry)}`
         )
         assert(
-          geometry.chips.bottom - geometry.query.top <= 172,
+          geometry.chips.bottom - geometry.query.top <= 110,
           `列表顶部控制区保持紧凑：${JSON.stringify(geometry)}`
         )
         assert.equal(geometry.checkCount, 0, '选中控件不使用勾选图标')
@@ -344,6 +346,15 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         '重置应立即恢复默认条件'
       )
       await applyFilters({ sort: '截止最早', status: '阻塞' })
+      const applied = page.getByRole('group', { name: '当前任务筛选', exact: true })
+      await assertMobileFilterClearControl({ assert, trigger: filterTrigger })
+      await page.getByRole('button', { name: '清空任务筛选', exact: true }).tap()
+      await waitFirst(97063)
+      assert.equal(await filterTrigger.getAttribute('aria-label'), '筛选任务')
+      assert.equal(await filterTrigger.getAttribute('aria-expanded'), 'false')
+      assert(await filterTrigger.evaluate((node) => document.activeElement === node))
+      assert.equal(await applied.count(), 0)
+      await applyFilters({ sort: '截止最早', status: '阻塞' })
       await waitFirst(97063)
       await waitCount(12)
       assert.match(await range.innerText(), /共 22 项/u)
@@ -394,7 +405,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await waitFirst(selectedID)
       assert.equal(
         await filterTrigger.getAttribute('aria-label'),
-        '筛选任务，已应用 2 项',
+        '筛选任务，已应用 3 项',
         '进入详情并返回后保留筛选条件'
       )
 
@@ -409,7 +420,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await waitFirst(97063)
       assert.equal(
         await filterTrigger.getAttribute('aria-label'),
-        '筛选任务，已应用 2 项',
+        '筛选任务，已应用 3 项',
         '清除搜索不连带清除任务筛选'
       )
 
@@ -483,7 +494,7 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
       await page.reload()
       await overdueRisk.waitFor()
       assert.equal(await overdueRisk.getAttribute('aria-pressed'), 'false', '恢复旧查询时丢弃冲突的超时快捷范围')
-      await page.getByRole('button', { name: '清除截止时间：未设置到期', exact: true }).click()
+      await chooseFilter(await openFilters('风险'), '全部截止时间')
       assert.equal(await overdueRisk.getAttribute('aria-pressed'), 'false', '清空截止条件不恢复旧超时范围')
       await applyFilters({ sort: '截止最早', contextLabel: '风险' })
       await search.fill('SORT-6')
@@ -556,6 +567,17 @@ export function mobileTaskListOptionsScenario({ assert, path, outputDir }) {
         'SORT-6',
         '重置筛选不重复承担清除搜索职责'
       )
+      await overdueRisk.tap()
+      await applyFilters({ sort: '截止最早', contextLabel: '风险' })
+      assert.equal(await filterTrigger.getAttribute('aria-label'), '筛选风险，已应用 2 项', '超时快捷条件计入总数')
+      await page.getByRole('button', { name: '清空风险筛选', exact: true }).tap()
+      assert.equal(await filterTrigger.getAttribute('aria-label'), '筛选风险')
+      assert.equal(await overdueRisk.getAttribute('aria-pressed'), 'false', '清空全部包含超时快捷条件')
+      assert.equal(await search.inputValue(), 'SORT-6', '直接清空风险条件保留当前搜索')
+      await page.reload()
+      await page.getByRole('button', { name: '筛选风险', exact: true }).waitFor()
+      assert.equal(await overdueRisk.getAttribute('aria-pressed'), 'false', '刷新后不恢复已清空的超时条件')
+      assert.equal(await search.inputValue(), 'SORT-6')
       await page.getByTestId('mobile-role-nav-tasks').click()
       await page.waitForFunction(
         () =>

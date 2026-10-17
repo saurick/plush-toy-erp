@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/financeallocation"
+	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/financepayment"
 	"time"
 
@@ -117,6 +118,45 @@ func (_c *FinanceAllocationCreate) SetNillableCreatedAt(v *time.Time) *FinanceAl
 // SetPayment sets the "payment" edge to the FinancePayment entity.
 func (_c *FinanceAllocationCreate) SetPayment(v *FinancePayment) *FinanceAllocationCreate {
 	return _c.SetPaymentID(v.ID)
+}
+
+// SetFinanceFact sets the "finance_fact" edge to the FinanceFact entity.
+func (_c *FinanceAllocationCreate) SetFinanceFact(v *FinanceFact) *FinanceAllocationCreate {
+	return _c.SetFinanceFactID(v.ID)
+}
+
+// AddReversalIDs adds the "reversals" edge to the FinanceAllocation entity by IDs.
+func (_c *FinanceAllocationCreate) AddReversalIDs(ids ...int) *FinanceAllocationCreate {
+	_c.mutation.AddReversalIDs(ids...)
+	return _c
+}
+
+// AddReversals adds the "reversals" edges to the FinanceAllocation entity.
+func (_c *FinanceAllocationCreate) AddReversals(v ...*FinanceAllocation) *FinanceAllocationCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddReversalIDs(ids...)
+}
+
+// SetReversalOfID sets the "reversal_of" edge to the FinanceAllocation entity by ID.
+func (_c *FinanceAllocationCreate) SetReversalOfID(id int) *FinanceAllocationCreate {
+	_c.mutation.SetReversalOfID(id)
+	return _c
+}
+
+// SetNillableReversalOfID sets the "reversal_of" edge to the FinanceAllocation entity by ID if the given value is not nil.
+func (_c *FinanceAllocationCreate) SetNillableReversalOfID(id *int) *FinanceAllocationCreate {
+	if id != nil {
+		_c = _c.SetReversalOfID(*id)
+	}
+	return _c
+}
+
+// SetReversalOf sets the "reversal_of" edge to the FinanceAllocation entity.
+func (_c *FinanceAllocationCreate) SetReversalOf(v *FinanceAllocation) *FinanceAllocationCreate {
+	return _c.SetReversalOfID(v.ID)
 }
 
 // Mutation returns the FinanceAllocationMutation object of the builder.
@@ -239,6 +279,9 @@ func (_c *FinanceAllocationCreate) check() error {
 	if len(_c.mutation.PaymentIDs()) == 0 {
 		return &ValidationError{Name: "payment", err: errors.New(`ent: missing required edge "FinanceAllocation.payment"`)}
 	}
+	if len(_c.mutation.FinanceFactIDs()) == 0 {
+		return &ValidationError{Name: "finance_fact", err: errors.New(`ent: missing required edge "FinanceAllocation.finance_fact"`)}
+	}
 	return nil
 }
 
@@ -269,10 +312,6 @@ func (_c *FinanceAllocationCreate) createSpec() (*FinanceAllocation, *sqlgraph.C
 		_spec.SetField(financeallocation.FieldReason, field.TypeString, value)
 		_node.Reason = &value
 	}
-	if value, ok := _c.mutation.FinanceFactID(); ok {
-		_spec.SetField(financeallocation.FieldFinanceFactID, field.TypeInt, value)
-		_node.FinanceFactID = value
-	}
 	if value, ok := _c.mutation.Amount(); ok {
 		_spec.SetField(financeallocation.FieldAmount, field.TypeOther, value)
 		_node.Amount = value
@@ -284,10 +323,6 @@ func (_c *FinanceAllocationCreate) createSpec() (*FinanceAllocation, *sqlgraph.C
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(financeallocation.FieldStatus, field.TypeString, value)
 		_node.Status = value
-	}
-	if value, ok := _c.mutation.ReversalOfAllocationID(); ok {
-		_spec.SetField(financeallocation.FieldReversalOfAllocationID, field.TypeInt, value)
-		_node.ReversalOfAllocationID = &value
 	}
 	if value, ok := _c.mutation.IdempotencyKey(); ok {
 		_spec.SetField(financeallocation.FieldIdempotencyKey, field.TypeString, value)
@@ -316,6 +351,56 @@ func (_c *FinanceAllocationCreate) createSpec() (*FinanceAllocation, *sqlgraph.C
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.PaymentID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.FinanceFactIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   financeallocation.FinanceFactTable,
+			Columns: []string{financeallocation.FinanceFactColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financefact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.FinanceFactID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ReversalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financeallocation.ReversalsTable,
+			Columns: []string{financeallocation.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ReversalOfIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   financeallocation.ReversalOfTable,
+			Columns: []string{financeallocation.ReversalOfColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ReversalOfAllocationID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

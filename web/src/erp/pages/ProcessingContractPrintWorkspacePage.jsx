@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
-import {
+import PrintCellToolsSection from '../components/print/PrintCellToolsSection.jsx'
+import { getPrintToolbarButtonClassName,
   PrintToolButton,
   PrintItemOrderTools,
 } from '../components/print/PrintWorkspaceTools.jsx'
@@ -661,20 +662,6 @@ export default function ProcessingContractPrintWorkspacePage() {
     reportFeedback('draft', '已清空签字人，保留日期和手签位置。')
   }
 
-  const getToolbarButtonClassName = ({
-    active = false,
-    primary = false,
-  } = {}) =>
-    [
-      'erp-print-shell__button',
-      primary
-        ? 'erp-print-shell__button--primary'
-        : 'erp-print-shell__button--ghost',
-      active ? 'erp-print-shell__button--active' : '',
-    ]
-      .filter(Boolean)
-      .join(' ')
-
   return (
     <PrintWorkspaceShell
       title="加工合同"
@@ -784,7 +771,7 @@ export default function ProcessingContractPrintWorkspacePage() {
                 icon="select"
                 wide
                 type="button"
-                className={getToolbarButtonClassName({
+                className={getPrintToolbarButtonClassName({
                   active: rowSelectionMode,
                 })}
                 onClick={handleToggleRowSelectionMode}
@@ -795,7 +782,7 @@ export default function ProcessingContractPrintWorkspacePage() {
                 data-print-structure-action
                 icon="up"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 onClick={() => handleInsertLine('before')}
                 disabled={selectedLineIndex === null}
               >
@@ -805,7 +792,7 @@ export default function ProcessingContractPrintWorkspacePage() {
                 data-print-structure-action
                 icon="down"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 onClick={() => handleInsertLine('after')}
                 disabled={selectedLineIndex === null}
               >
@@ -816,7 +803,7 @@ export default function ProcessingContractPrintWorkspacePage() {
                 icon="remove"
                 wide
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 onClick={handleRemoveLine}
                 disabled={selectedLineIndex === null}
               >
@@ -842,43 +829,15 @@ export default function ProcessingContractPrintWorkspacePage() {
               </span>
             </div>
           </PrintWorkspaceToolSection>
-          <PrintWorkspaceToolSection
-            title="单元格"
-            tool="cells"
+          <PrintCellToolsSection
             feedback={feedback?.area === 'cells' ? feedback : null}
-          >
-            <div className="erp-print-shell__toolbar-group">
-              <PrintToolButton
-                icon="cells"
-                wide
-                type="button"
-                className={getToolbarButtonClassName({
-                  active: cellSelectionMode,
-                })}
-                onClick={handleToggleCellSelectionMode}
-              >
-                {cellSelectionMode ? '返回编辑' : '选择单元格'}
-              </PrintToolButton>
-              <PrintToolButton
-                icon="merge"
-                type="button"
-                className={getToolbarButtonClassName()}
-                onClick={handleApplyMerge}
-                disabled={!canApplyMerge}
-              >
-                合并选区
-              </PrintToolButton>
-              <PrintToolButton
-                icon="split"
-                type="button"
-                className={getToolbarButtonClassName()}
-                onClick={handleSplitMerge}
-                disabled={!canSplitMerge}
-              >
-                拆分当前
-              </PrintToolButton>
-            </div>
-          </PrintWorkspaceToolSection>
+            cellSelectionMode={cellSelectionMode}
+            canApplyMerge={canApplyMerge}
+            canSplitMerge={canSplitMerge}
+            onToggleSelection={handleToggleCellSelectionMode}
+            onApplyMerge={handleApplyMerge}
+            onSplitMerge={handleSplitMerge}
+          />
         </>
       }
       draftActions={
@@ -887,7 +846,7 @@ export default function ProcessingContractPrintWorkspacePage() {
             icon="reset"
             wide
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             data-print-structure-action
             onClick={resetDraft}
           >
@@ -897,7 +856,7 @@ export default function ProcessingContractPrintWorkspacePage() {
             icon="signature"
             wide
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             onClick={handleClearSignature}
           >
             手签留白
@@ -906,7 +865,7 @@ export default function ProcessingContractPrintWorkspacePage() {
             icon="blank"
             wide
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             data-print-structure-action
             onClick={handleBlankDraft}
           >
@@ -919,7 +878,7 @@ export default function ProcessingContractPrintWorkspacePage() {
           <PrintToolButton
             icon="preview"
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             onClick={handlePreviewPdf}
             onFocus={warmupPreviewPdf}
             onMouseEnter={warmupPreviewPdf}
@@ -930,7 +889,7 @@ export default function ProcessingContractPrintWorkspacePage() {
           <PrintToolButton
             icon="download"
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             onClick={handleDownloadPdf}
             disabled={busyAction !== ''}
           >
@@ -939,7 +898,7 @@ export default function ProcessingContractPrintWorkspacePage() {
           <PrintToolButton
             icon="print"
             type="button"
-            className={getToolbarButtonClassName({ primary: true })}
+            className={getPrintToolbarButtonClassName({ primary: true })}
             onClick={handlePrint}
           >
             打印

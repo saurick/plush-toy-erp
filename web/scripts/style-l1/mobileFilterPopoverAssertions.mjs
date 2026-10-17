@@ -45,8 +45,9 @@ export async function assertMobileFilterEdgePositions({
   dialog,
 }) {
   const { width } = page.viewportSize()
-  const bounds = await trigger.boundingBox()
-  const originalStyle = await trigger.getAttribute('style')
+  const control = trigger.locator('..')
+  const bounds = await control.boundingBox()
+  const originalStyle = await control.getAttribute('style')
 
   try {
     for (const left of [
@@ -54,7 +55,7 @@ export async function assertMobileFilterEdgePositions({
       (width - bounds.width) / 2,
       width - bounds.width - 12,
     ]) {
-      await trigger.evaluate(
+      await control.evaluate(
         (node, position) => {
           Object.assign(node.style, {
             position: 'fixed',
@@ -125,7 +126,7 @@ export async function assertMobileFilterEdgePositions({
       await dialog.waitFor({ state: 'hidden' })
     }
   } finally {
-    await trigger.evaluate((node, style) => {
+    await control.evaluate((node, style) => {
       if (style === null) node.removeAttribute('style')
       else node.setAttribute('style', style)
     }, originalStyle)

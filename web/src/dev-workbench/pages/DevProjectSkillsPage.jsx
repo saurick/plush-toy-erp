@@ -98,10 +98,24 @@ export default function DevProjectSkillsPage() {
     <div className="erp-dev-workspace-page erp-dev-tool-page erp-dev-skills">
       <DevPageNav sourcePath={SOURCE_PATH} />
       <header className="erp-dev-skills__header">
-        <div>
-          <Title level={1}>工程规范与 Skill</Title>
-          <Text type="secondary">按任务选用，查看职责边界与正式依据。</Text>
-        </div>
+        <Title level={1}>工程规范与 Skill</Title>
+        {snapshot ? (
+          <div className="erp-dev-skills__health" role="status">
+            <Tag color={snapshot.health.status === 'ok' ? 'success' : 'error'}>
+              {snapshot.health.status === 'ok'
+                ? '结构检查通过'
+                : '结构检查需处理'}
+            </Tag>
+            <Text>{skills.length} 个项目 Skill</Text>
+            <Text type="secondary">
+              检查于{' '}
+              {new Date(snapshot.checkedAt).toLocaleString('zh-CN', {
+                hour12: false,
+              })}{' '}
+              · 当前工作区
+            </Text>
+          </div>
+        ) : null}
         <Button
           aria-label="刷新与检查"
           icon={<ReloadOutlined />}
@@ -133,21 +147,6 @@ export default function DevProjectSkillsPage() {
       ) : null}
       {snapshot ? (
         <>
-          <div className="erp-dev-skills__health" role="status">
-            <Tag color={snapshot.health.status === 'ok' ? 'success' : 'error'}>
-              {snapshot.health.status === 'ok'
-                ? '结构检查通过'
-                : '结构检查需处理'}
-            </Tag>
-            <Text>{skills.length} 个项目 Skill</Text>
-            <Text type="secondary">
-              检查于{' '}
-              {new Date(snapshot.checkedAt).toLocaleString('zh-CN', {
-                hour12: false,
-              })}{' '}
-              · 当前工作区
-            </Text>
-          </div>
           {snapshot.health.errors.length ? (
             <Alert
               type="warning"

@@ -690,9 +690,11 @@ export function createUnifiedInteractionScenarios({
       productionOrderReleased: true,
       verify: async (page) => {
         const panel = page.getByRole('region', {
-          name: '生产工序',
+          name: '生产执行',
           exact: true,
         })
+        await panel.getByRole('table', { name: '当前生产事项' }).waitFor()
+        await panel.getByText('工序对照', { exact: true }).click()
         await panel.locator('.erp-production-process__step').first().waitFor()
         const lanes = panel.locator('.erp-production-process__lane')
         assert.ok((await lanes.count()) > 0)
@@ -713,17 +715,17 @@ export function createUnifiedInteractionScenarios({
         await panel.locator('.erp-production-process__step').first().click()
         const dialog = page.getByRole('dialog')
         await dialog
-          .getByRole('heading', { name: '在制批次', exact: true })
+          .getByRole('heading', { name: /本工序批次/u })
           .waitFor()
         assert.ok((await dialog.textContent()).includes('品质检验'))
         await dialog.locator('.ant-drawer-close').click()
         await dialog.waitFor({ state: 'hidden' })
-        await page.getByText('记录明细', { exact: true }).click()
+        await page.getByRole('tab', { name: '生产记录', exact: true }).click()
         await page
           .locator('.erp-production-record-workspace .ant-table-wrapper')
           .waitFor()
-        await assertProductionRecordTabMotion(page, '生产工序')
-        await page.getByRole('tab', { name: '生产工序', exact: true }).click()
+        await assertProductionRecordTabMotion(page, '生产执行')
+        await page.getByRole('tab', { name: '生产执行', exact: true }).click()
         await panel.locator('.erp-production-process__step').first().waitFor()
         for (const width of [1440, 768, 390]) {
           await page.setViewportSize({ width, height: 900 })

@@ -12,6 +12,27 @@ import { advanceSalesOrderLifecycleThroughProcess } from "./manual-acceptance-so
 import { prepareManualAcceptanceEngineering } from "./manual-acceptance-engineering-data.mjs";
 import { OutsourcingOrderStatus } from "../../web/src/common/consts/statuses.generated.mjs";
 
+const followupFixtures = new WeakMap();
+export async function prepareTransactionSourceTask(client, role, sourceType, sourceID, prefix) {
+  if (!followupFixtures.has(client)) followupFixtures.set(client, new Map());
+  const cache = followupFixtures.get(client);
+  const key = `${role}:${sourceType}:${sourceID}`;
+  if (cache.has(key)) return cache.get(key);
+  const options = await client.rpc("admin", "workflow", "get_task_create_options", { source_type: sourceType, source_id: sourceID });
+  assert.equal(options.can_create, true);
+  assert.ok(options.roles.some((item) => item.role_key === role), `the actual source must have an eligible ${role} recipient`);
+  const { task } = await client.rpc("admin", "workflow", "create_followup_task", {
+    source_type: sourceType, source_id: sourceID, owner_role_key: role,
+    task_name: "模拟核对来源业务", description: "模拟在岗位任务内核对来源并办理关联业务",
+    due_at: Math.floor(Date.now() / 1000) + 3600, priority: 0, idempotency_key: `${prefix}:followup:${key}`,
+  });
+  assert.equal(task.source_type, sourceType);
+  assert.equal(task.source_id, sourceID);
+  assert.equal(task.owner_role_key, role);
+  cache.set(key, task);
+  return task;
+}
+
 export function validateTransactionTarget(options) {
   assertDisposableDatabaseTarget({
     databaseName: options.databaseName,

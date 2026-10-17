@@ -246,6 +246,7 @@ export default function OutsourcingOrderSourceFactModal({
         ]}
       />
       <Form
+        name="outsourcing-source-fact"
         form={form}
         className="erp-business-action-form"
         layout="vertical"

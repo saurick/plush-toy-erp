@@ -1,19 +1,14 @@
 import React from 'react'
-import { useLocation, useNavigate, useOutletContext } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
 import {
-  ExportOutlined,
   LoadingOutlined,
   ReloadOutlined,
 } from '@ant-design/icons'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
-import { mobileBusinessPath } from '../../utils/businessTaskRoute.mjs'
-import { resolveWorkflowTaskEntryPath } from '../../utils/dashboardTaskDisplay.mjs'
-import { canOpenWorkflowTaskEntry } from '../../utils/workflowTaskEntryAccess.mjs'
-import { workflowTaskEntryNavigation } from '../../utils/workflowTaskNavigation.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import WorkflowFollowupDetails from '../../components/workflow/WorkflowFollowupDetails.jsx'
 import { getWorkflowTaskDisplayName } from '../../utils/processRuntimePresentation.mjs'
-import WorkflowTaskIdentity from '../../components/workflow/WorkflowTaskIdentity.jsx'
+import WorkflowTaskInfoCard from '../../components/workflow/WorkflowTaskInfoCard.jsx'
 import WorkflowTaskCurrentSummary from '../../components/workflow/WorkflowTaskCurrentSummary.jsx'
 import useWorkflowTaskAssignmentAccess from '../../hooks/useWorkflowTaskAssignmentAccess.js'
 import { formatAdminIdentity } from '../../utils/adminIdentity.mjs'
@@ -46,6 +41,8 @@ import { resolveMobileProductionArrangementContext } from '../utils/mobileProduc
 import EngineeringMaterialTaskSummaryEntry from '../../components/sales-orders/EngineeringMaterialTaskSummaryEntry.jsx'
 import {
   canProcessEngineeringMaterialTask,
+  canReadEngineeringMaterial,
+  getEngineeringMaterialOrderContext,
   getEngineeringMaterialTaskContext,
 } from '../../utils/engineeringMaterialTask.mjs'
 
@@ -63,6 +60,7 @@ export default function MobileTaskDetailScreen({
   onOpenLinkedTask,
   processingComplete = false,
   onOpenAction,
+  onOpenBusiness = null,
   onViewReceipt,
   savedEvidenceRefs,
   selectedCanManageAttachments,
@@ -73,14 +71,6 @@ export default function MobileTaskDetailScreen({
   selectedTask,
 }) {
   const { adminProfile } = useOutletContext() || {}
-  const navigate = useNavigate()
-  const location = useLocation()
-  const entryPath = resolveWorkflowTaskEntryPath(selectedTask)
-  const canOpenSource = canOpenWorkflowTaskEntry(adminProfile, entryPath, actionAccess?.sourceAccess)
-  const openSource = () => {
-    const path = mobileBusinessPath(entryPath, location.pathname.split('/')[2])
-    if (canOpenSource) navigate(path, workflowTaskEntryNavigation(selectedTask, path, `${location.pathname}${location.search}`, adminProfile?.id))
-  }
   const materialContext = React.useMemo(
     () => getEngineeringMaterialTaskContext(selectedTask),
     [selectedTask]
@@ -219,38 +209,26 @@ export default function MobileTaskDetailScreen({
   const taskStatusLabel = processingComplete
     ? '本次已办理'
     : resolveMobileTaskStatusLabel(selectedTask)
-  const completeCondition = materialContext
-    ? '核对工程用料，在“处理任务”中提交本次处理结果。'
-    : selectedTask.complete_condition
+  const completeCondition = selectedTask.complete_condition
   const canManageAttachments = selectedCanManageAttachments === true
-  const canOpenProcess = materialContext
+  const canOpenBusiness = typeof onOpenBusiness === 'function'
+  const canOpenProcess = canOpenBusiness || (materialContext
     ? canProcessMaterial || selectedCanUrge
-    : selectedCanOperate || selectedCanUrge
+    : selectedCanOperate || selectedCanUrge)
   const canViewReceipt = typeof onViewReceipt === 'function'
   const retryAccess =
     actionAccess?.failed && typeof actionAccess?.retry === 'function'
       ? actionAccess.retry
       : null
-  const showFooterAction =
-    canOpenSource ||
-    canOpenProcess ||
-    canViewReceipt ||
-    Boolean(retryAccess) ||
-    actionAccess?.loading ||
-    selectedHasActionCapability
   const processUnavailableLabel = actionAccess?.loading
     ? '正在确认权限'
     : actionAccess?.failed
       ? '权限确认失败'
       : '当前仅供查看'
-  const actionGuidance = canProcessMaterial
+  const actionGuidance = canOpenProcess
     ? ''
-    : canOpenSource
-      ? canOpenProcess
-        ? `核对单据中的业务信息后，${selectedCanUrge && !selectedCanOperate ? '可发起催办。' : '选择本次处理方式。'}`
-        : '进入对应单据办理，保存后相关待办自动更新。'
     : actionAccess?.loading
-      ? '正在确认当前账号的处理范围，请稍候。'
+      ? ''
       : actionAccess?.failed
         ? '暂时无法确认处理权限，请点击下方重试。'
         : !selectedCanOperate
@@ -259,30 +237,31 @@ export default function MobileTaskDetailScreen({
             : actionAccess?.readonlyReason ||
               `这条任务由${ownerRoleLabel}办理，当前页面只供查看。`
           : ''
-  const taskResources = (
-    <div className="mobile-detail-inline-actions">
-      <EngineeringMaterialTaskSummaryEntry key={selectedTask.id} task={selectedTask} profile={adminProfile} mobile compact />
-      <div className="mobile-detail-attachment-entry" data-testid="mobile-task-attachment-action">
-        <BusinessAttachmentModalButton
-          ownerType="workflow_task"
-          ownerId={selectedTask.id}
-          ownerVersion={selectedTask.version}
-          buttonText="任务附件"
-          modalTitle="任务附件"
-          panelTitle="附件内容"
-          description={canManageAttachments ? '上传照片、异常截图或处理凭证。' : '查看照片、异常截图或处理凭证。'}
-          canUpload={canManageAttachments}
-          canWithdraw={canManageAttachments}
-          showAttachmentCount
-          buttonProps={{ className: 'mobile-detail-attachment-button', size: 'middle' }}
-        />
-      </div>
+  const canReadMaterials = Boolean((materialContext || getEngineeringMaterialOrderContext(selectedTask)) && canReadEngineeringMaterial(adminProfile))
+  const taskResources = canReadMaterials ? (
+    <div className="mobile-detail-footer-resources">
+      <EngineeringMaterialTaskSummaryEntry key={selectedTask.id} task={selectedTask} profile={adminProfile} mobile compact buttonText="材料汇总" />
     </div>
+  ) : null
+  const taskAttachments = (
+    <BusinessAttachmentModalButton
+      ownerType="workflow_task"
+      ownerId={selectedTask.id}
+      ownerVersion={selectedTask.version}
+      buttonText="查看附件"
+      modalTitle="任务附件"
+      panelTitle="附件内容"
+      description={canManageAttachments ? '上传照片、异常截图或处理凭证。' : '查看照片、异常截图或处理凭证。'}
+      canUpload={canManageAttachments}
+      canWithdraw={canManageAttachments}
+      showAttachmentCount
+      buttonProps={{ className: 'mobile-detail-attachment-button', 'data-testid': 'mobile-task-attachment-action', size: 'middle' }}
+    />
   )
 
   return (
     <div
-      className="mobile-role-tasks-page mobile-role-tasks-page--detail md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
+      className="mobile-role-tasks-page mobile-role-tasks-page--detail mobile-role-tasks-page--task-info md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
       data-testid="mobile-task-detail-screen"
     >
       <MobileTaskFlowHeader
@@ -292,7 +271,7 @@ export default function MobileTaskDetailScreen({
         currentStep="detail"
         onBack={onBack}
         onOpenProcess={() =>
-          canProcessMaterial
+          canOpenBusiness ? onOpenBusiness() : canProcessMaterial
             ? onOpenAction?.()
             : onOpenAction?.(
                 selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
@@ -306,65 +285,39 @@ export default function MobileTaskDetailScreen({
       />
 
       <main className="mobile-role-tasks-page__detail-main mobile-detail-content">
-        <section className="mobile-task-detail-hero erp-mobile-card mobile-detail-section">
-          <div className="mobile-detail-heading">
-            <h2>{getWorkflowTaskDisplayName(selectedTask)}</h2>
-            <span className={`mobile-task-flow-status ${selectedSeverity.badgeClass}`}>{taskStatusLabel}</span>
-          </div>
-          <div className="mobile-detail-source"><WorkflowTaskSource task={selectedTask} label={relatedSource} copyable={false} onOpen={canOpenSource ? openSource : undefined} /></div>
-          <WorkflowTaskIdentity task={selectedTask} copyable={false} detailView />
-          <WorkflowTaskCurrentSummary
-            task={selectedTask}
-            roleLabel={ownerRoleLabel}
-            assigneeLabel={assigneeLabel}
-            events={taskEventsState === 'ready' ? taskEvents : []}
-            reason={isTaskRisk(selectedTask) ? taskReason : ''}
-            reasonLabel={taskReasonLabel}
-            contact={exceptionContact}
-            guidance={actionGuidance}
-          />
-        </section>
-
-        <WorkflowTaskHandlingChain
+        <WorkflowTaskInfoCard
           task={selectedTask}
-          onOpenTask={onOpenLinkedTask}
-          profile={adminProfile}
-          processContext={processContext}
-          processContextState={processContextState}
-          onRetryProcess={() =>
-            setProcessContextReloadKey((value) => value + 1)
+          title={getWorkflowTaskDisplayName(selectedTask)}
+          status={<span className={`mobile-task-flow-status ${selectedSeverity.badgeClass}`}>{taskStatusLabel}</span>}
+          source={<div className="mobile-detail-source"><WorkflowTaskSource task={selectedTask} label={relatedSource} /></div>}
+          assigneeLabel={assigneeLabel}
+          events={taskEventsState === 'ready' ? taskEvents : []}
+          summary={<WorkflowTaskCurrentSummary appearance="facts" task={selectedTask} roleLabel={ownerRoleLabel} assigneeLabel={assigneeLabel} events={taskEventsState === 'ready' ? taskEvents : []} processContext={processContextState === 'ready' ? processContext : null} reason={isTaskRisk(selectedTask) ? taskReason : ''} reasonLabel={taskReasonLabel} contact={exceptionContact} guidance={actionGuidance} />}
+          businessInfo={
+            <>
+              <dl className="mobile-detail-facts">
+                {factRows.map(([label, value]) => <div key={label} className="mobile-detail-fact"><dt>{label}</dt><dd>{mobileFactValueText(value)}</dd></div>)}
+                {completeCondition ? <div className="mobile-detail-fact"><dt>完成条件</dt><dd>{completeCondition}</dd></div> : null}
+              </dl>
+              <WorkflowFollowupDetails task={selectedTask} />
+            </>
           }
-          variant="mobile"
-          focused
-          resources={taskResources}
         />
 
-        {factRows.length > 0 ||
-        completeCondition ||
-        selectedTask.task_group === 'business_followup' ? (
-          <section
-            className="erp-mobile-card mobile-detail-section"
-            aria-label="业务信息"
-          >
-            <h3>业务信息</h3>
-            <dl className="mobile-detail-facts">
-              {factRows.map(([label, value]) => (
-                <div key={label} className="mobile-detail-fact">
-                  <dt>{label}</dt>
-                  <dd>{mobileFactValueText(value)}</dd>
-                </div>
-              ))}
-              {completeCondition ? (
-                <div className="mobile-detail-fact">
-                  <dt>完成条件</dt>
-                  <dd>{completeCondition}</dd>
-                </div>
-              ) : null}
-            </dl>
-            <WorkflowFollowupDetails task={selectedTask} />
-
-          </section>
-        ) : null}
+        <section className="workflow-task-info-card">
+          <WorkflowTaskHandlingChain
+            task={selectedTask}
+            onOpenTask={onOpenLinkedTask}
+            profile={adminProfile}
+            processContext={processContext}
+            processContextState={processContextState}
+            onRetryProcess={() =>
+              setProcessContextReloadKey((value) => value + 1)
+            }
+            variant="mobile"
+            focused
+          />
+        </section>
 
         {canOpenProductionArrangement ? (
           <section
@@ -386,7 +339,7 @@ export default function MobileTaskDetailScreen({
         ) : null}
 
         <WorkflowTaskEventTrail
-          className="mobile-detail-section"
+          className="mobile-detail-section workflow-task-info-card workflow-task-info-card--records"
           approvalTask={approvalTask}
           errorMessage="本任务处理记录加载失败，请刷新后重试。"
           events={taskEvents}
@@ -462,72 +415,69 @@ export default function MobileTaskDetailScreen({
         />
       ) : null}
 
-      {showFooterAction ? (
-        <div className="mobile-role-action-bar">
-          {canOpenSource && !canProcessMaterial && (canOpenProcess || canViewReceipt) ? (
-            <button type="button" className="mobile-detail-secondary mobile-role-action-bar__button" onClick={openSource}><ExportOutlined aria-hidden="true" />进入单据办理</button>
-          ) : null}
-          {canProcessMaterial ? (
-            <button
-              type="button"
-              className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
-              onClick={() => onOpenAction?.()}
-            >
-              处理任务
-            </button>
-          ) : canOpenSource && !canOpenProcess && !canViewReceipt ? (
-            <button type="button" className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white" onClick={openSource}>
-              进入单据办理
-            </button>
-          ) : canOpenProcess ? (
-            <button
-              type="button"
-              className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
-              onClick={() =>
-                onOpenAction?.(
-                  selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
-                )
-              }
-            >
-              {selectedCanUrge && !selectedCanOperate ? '催办任务' : '选择处理方式'}
-            </button>
-          ) : canViewReceipt ? (
-            <button
-              type="button"
-              className="mobile-role-action-bar__button min-h-12 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-base font-semibold text-blue-700"
-              onClick={onViewReceipt}
-            >
-              查看结果回执
-            </button>
-          ) : retryAccess ? (
-            <button
-              type="button"
-              className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
-              onClick={retryAccess}
-            >
-              <ReloadOutlined className="mr-2" aria-hidden="true" />
-              重新确认
-            </button>
-          ) : actionAccess?.loading ? (
-            <button
-              type="button"
-              className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
-              disabled
-            >
-              <LoadingOutlined className="mr-2" spin aria-hidden="true" />
-              正在确认
-            </button>
-          ) : selectedHasActionCapability ? (
-            <button
-              type="button"
-              className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
-              disabled
-            >
-              {processUnavailableLabel}
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+      <div className={`mobile-role-action-bar${canReadMaterials ? ' mobile-role-action-bar--with-resources' : ''}`}>
+        {taskAttachments}
+        {taskResources}
+        {canProcessMaterial ? (
+          <button
+            type="button"
+            className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
+            onClick={() => onOpenAction?.()}
+          >
+            处理任务
+          </button>
+        ) : canOpenBusiness ? (
+          <button type="button" className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white" onClick={onOpenBusiness}>
+            办理业务
+          </button>
+        ) : canOpenProcess ? (
+          <button
+            type="button"
+            className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
+            onClick={() =>
+              onOpenAction?.(
+                selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
+              )
+            }
+          >
+            {selectedCanUrge && !selectedCanOperate ? '催办任务' : '选择处理方式'}
+          </button>
+        ) : canViewReceipt ? (
+          <button
+            type="button"
+            className="mobile-role-action-bar__button min-h-12 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-base font-semibold text-blue-700"
+            onClick={onViewReceipt}
+          >
+            查看结果回执
+          </button>
+        ) : retryAccess ? (
+          <button
+            type="button"
+            className="mobile-detail-primary mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
+            onClick={retryAccess}
+          >
+            <ReloadOutlined className="mr-2" aria-hidden="true" />
+            重新确认
+          </button>
+        ) : actionAccess?.loading ? (
+          <button
+            type="button"
+            className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
+            disabled
+          >
+            <LoadingOutlined className="mr-2" spin aria-hidden="true" />
+            正在确认
+          </button>
+        ) : selectedHasActionCapability ? (
+          <button
+            type="button"
+            className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
+            disabled
+          >
+            {processUnavailableLabel}
+          </button>
+        ) : null}
+      </div>
     </div>
   )
 }

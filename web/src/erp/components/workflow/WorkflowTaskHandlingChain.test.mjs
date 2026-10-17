@@ -60,6 +60,9 @@ test('material chain uses recorded approvals and identifies the selected task wi
     ['completed', 'completed', 'active']
   )
   assert.equal(model.items[2].linked, true)
+  assert.equal(model.items[0].completedAt, Date.parse(request.submitted_at) / 1000)
+  assert.equal(model.items[1].completedAt, Date.parse(request.boss_reviewed_at) / 1000)
+  assert.equal(model.items[2].completedAt, null)
   assert.match(model.items[1].detail, /2026.*09.*14/)
   assert.match(model.items[1].detail, /用量已核对/)
   const boss = buildEngineeringMaterialStageModel(taskFor('boss'), {
@@ -246,7 +249,8 @@ finance_reviewed_at: '2026-09-16T02:38:04Z',
   assert.equal(container.querySelectorAll('a').length, 0)
   assert.match(container.textContent, /PO-91/)
   await render(true, true)
-  assert.deepEqual([...container.querySelectorAll('a')].map((a) => a.getAttribute('href')), ['/m/engineering/handle/purchase/accessories?purchase_order_id=91', '/m/engineering/handle/purchase/accessories?purchase_order_id=92'])
+  assert.equal(container.querySelectorAll('a, button[data-purchase-order-id]').length, 0, '手机保留采购摘要，不提供完整单据跳转')
+  assert.match(container.textContent, /PO-91.*PO-92/u)
   assert.doesNotMatch(container.textContent, /打印本次采购合同/u)
 })
 

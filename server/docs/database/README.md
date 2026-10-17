@@ -22,18 +22,18 @@ go run ./cmd/schema-doc --write
 
 | 项目 | 数量 |
 | --- | ---: |
-| 应用表 | 76 |
-| 字段 | 1284 |
-| 外键 | 157 |
-| 显式索引 | 347 |
+| 应用表 | 79 |
+| 字段 | 1316 |
+| 外键 | 161 |
+| 显式索引 | 351 |
 | 其中 partial index | 34 |
-| 命名 / 表级 CHECK | 317 |
+| 命名 / 表级 CHECK | 319 |
 
 ## 分域入口
 
 | 文档 | 表数 | 职责 |
 | --- | ---: | --- |
-| [账号、权限与配置](账号权限与配置.md) | 13 | 后台账号、RBAC、客户配置版本及其运行时投影。 |
+| [账号、权限与配置](账号权限与配置.md) | 16 | 后台账号、RBAC、客户配置版本及其运行时投影。 |
 | [主数据与 BOM](主数据与BOM.md) | 12 | 客户、供应商、产品、物料、工序、仓库、单位和 BOM 等复用主数据。 |
 | [销售与采购](销售与采购.md) | 7 | 销售订单与采购订单的来源单据聚合及其行项目。 |
 | [库存与质检](库存与质检.md) | 15 | 采购收退货、库存作业、批次、余额、流水、预留与质量判定。 |
@@ -62,6 +62,9 @@ go run ./cmd/schema-doc --write
 | [`finance_credit_notes`](出货与财务.md#table-finance-credit-notes) | 财务红冲 | 出货与财务 | Fact / 事实 | 保存针对财务事实的红冲及反向红冲记录。 |
 | [`finance_facts`](出货与财务.md#table-finance-facts) | 业务财务事实 | 出货与财务 | Fact / 事实 | 保存来源可追溯的应收、应付、发票和对账事实。 |
 | [`finance_payments`](出货与财务.md#table-finance-payments) | 收付款单 | 出货与财务 | Source Document / 源单据 | 保存结算款、关联订单的首款或预付款、关联原款的实际退款及其登记、审批、过账、账户凭据和金额。 |
+| [`help_feedbacks`](账号权限与配置.md#table-help-feedbacks) | 帮助章节纠错 | 账号、权限与配置 | Source Document / 源单据 | 保存员工对可读章节的纠错、所读版本和维护人员处理回复。 |
+| [`help_supplement_revisions`](账号权限与配置.md#table-help-supplement-revisions) | 企业补充修订记录 | 账号、权限与配置 | Fact / 事实 | 不可变保存每次草稿保存、发布和历史恢复的正文、说明、来源身份及操作者。 |
+| [`help_supplements`](账号权限与配置.md#table-help-supplements) | 章节企业补充 | 账号、权限与配置 | Config / 配置 | 保存章节的当前草稿、并发版本和已发布修订指向。 |
 | [`inventory_balances`](库存与质检.md#table-inventory-balances) | 库存余额投影 | 库存与质检 | Derived / 派生投影 | 按物料或产品、SKU、仓库、批次和单位保存当前库存余额。 |
 | [`inventory_lot_status_events`](库存与质检.md#table-inventory-lot-status-events) | 库存批次状态事件 | 库存与质检 | Fact / 事实 | 追加保存命名批次动作的前后状态、版本、原因、actor、幂等键和关联质检证据。 |
 | [`inventory_lots`](库存与质检.md#table-inventory-lots) | 库存批次 | 库存与质检 | Fact / 事实 | 保存库存批次身份、物料或产品粒度、供应商批号及质量可用状态。 |

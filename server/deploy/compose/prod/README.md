@@ -225,7 +225,9 @@ bash server/deploy/compose/prod/attachment_raid_preflight.sh \
 
 本地开发也必须配置同一组 `ATTACHMENT_S3_*` 变量；使用 RAID5 上独立的开发 bucket，可通过受控局域网端点或 SSH tunnel 连接已有服务，或在隔离本地验证中使用一次性 SeaweedFS。开发配置保存在忽略 Git 的 `server/.env`（`0600`），`make run / dev_restart` 会读取同一组变量。不要让开发和 demo/test 复用 bucket。共享开发库迁移前，停写后执行 `export`，再用 `verify -receipt <file> -pg-options` 的输出设置本次进程的 `PGOPTIONS`，然后按 `make migrate_prepare → make migrate_execute` 的同一 ready 输出执行，完成后 `unset PGOPTIONS`。运行 API 没有 PG 内容回退。
 
-备份时保持相关写入停止，在同一窗口生成 PG custom-format dump 和 `backup` 文件目录，外加当前 release 与 migration 身份；保存到独立磁盘、另一台机器或云端受控存储。已有 `scheduled-postgres-backup.sh` 只负责 PG，不能作为本次外置后的完整系统备份。不要直接打包运行中的 SeaweedFS 原始数据目录。
+成套入口为 `node scripts/deploy/backup-set/cli.mjs`，参数与恢复步骤见[备份恢复](../../../../deployments/yoyoosun/runbooks/04-backup-restore.md)。`create` 核对唯一运行 app-server / postgres、精确 project / database、固定 PG 18.6 和只读 `erp_backup`；停止原 app-server 后拒绝其它数据库连接，在同一窗口生成 PG custom-format dump 与全部登记附件（包含撤回记录）。前后核对附件整行摘要、有效客户配置和迁移版本，再恢复原容器并等健康；随后将 manifest、dump 和附件封为单个 `*.tar.age`，原子发布本地与异地校验副本。不要直接打包运行中的 SeaweedFS 原始数据目录。
+
+备份确认串同时表示已安排独占停写窗口：发布、迁移、导入、其它应用实例和对象清理不能并发。工具只管理这一 Compose project 的原 app-server，不能代替外部写入方的维护安排。`scheduled-postgres-backup.sh` 保留为 PG 专用入口，其结果不表示完整系统备份。
 
 恢复先把配套 PG dump 导入隔离目标，再使用新 S3 endpoint / bucket 执行 `restore` 和 `verify`，保留原 key、附件 ID、哈希和审计。全部核对通过后才切业务连接；源对象和旧备份保留到回滚窗口结束。文件服务不可用时上传下载明确失败，附件列表仍读 PG 元数据。
 

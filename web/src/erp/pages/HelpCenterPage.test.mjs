@@ -29,7 +29,7 @@ test('HelpCenterPage: 使用当前账号岗位和已开放页面生成帮助', (
   assert.match(content, /遇到异常/u)
   assert.match(content, /处理后怎样继续/u)
   assert.match(content, /scenario\.exception\.action/u)
-  assert.match(content, /SlidingSegmented/u)
+  assert.match(content, /SlidingTabList/u)
   assert.match(
     source,
     /key=\{`\$\{selectedGuide.key\}:\$\{selectedScenario.key\}`\}/u

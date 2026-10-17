@@ -5,6 +5,7 @@ package ent
 import (
 	"fmt"
 	"server/internal/data/model/ent/financeallocation"
+	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/financepayment"
 	"strings"
 	"time"
@@ -49,9 +50,15 @@ type FinanceAllocation struct {
 type FinanceAllocationEdges struct {
 	// Payment holds the value of the payment edge.
 	Payment *FinancePayment `json:"payment,omitempty"`
+	// FinanceFact holds the value of the finance_fact edge.
+	FinanceFact *FinanceFact `json:"finance_fact,omitempty"`
+	// Reversals holds the value of the reversals edge.
+	Reversals []*FinanceAllocation `json:"reversals,omitempty"`
+	// ReversalOf holds the value of the reversal_of edge.
+	ReversalOf *FinanceAllocation `json:"reversal_of,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [4]bool
 }
 
 // PaymentOrErr returns the Payment value or an error if the edge
@@ -63,6 +70,37 @@ func (e FinanceAllocationEdges) PaymentOrErr() (*FinancePayment, error) {
 		return nil, &NotFoundError{label: financepayment.Label}
 	}
 	return nil, &NotLoadedError{edge: "payment"}
+}
+
+// FinanceFactOrErr returns the FinanceFact value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e FinanceAllocationEdges) FinanceFactOrErr() (*FinanceFact, error) {
+	if e.FinanceFact != nil {
+		return e.FinanceFact, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: financefact.Label}
+	}
+	return nil, &NotLoadedError{edge: "finance_fact"}
+}
+
+// ReversalsOrErr returns the Reversals value or an error if the edge
+// was not loaded in eager-loading.
+func (e FinanceAllocationEdges) ReversalsOrErr() ([]*FinanceAllocation, error) {
+	if e.loadedTypes[2] {
+		return e.Reversals, nil
+	}
+	return nil, &NotLoadedError{edge: "reversals"}
+}
+
+// ReversalOfOrErr returns the ReversalOf value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e FinanceAllocationEdges) ReversalOfOrErr() (*FinanceAllocation, error) {
+	if e.ReversalOf != nil {
+		return e.ReversalOf, nil
+	} else if e.loadedTypes[3] {
+		return nil, &NotFoundError{label: financeallocation.Label}
+	}
+	return nil, &NotLoadedError{edge: "reversal_of"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -177,6 +215,21 @@ func (_m *FinanceAllocation) Value(name string) (ent.Value, error) {
 // QueryPayment queries the "payment" edge of the FinanceAllocation entity.
 func (_m *FinanceAllocation) QueryPayment() *FinancePaymentQuery {
 	return NewFinanceAllocationClient(_m.config).QueryPayment(_m)
+}
+
+// QueryFinanceFact queries the "finance_fact" edge of the FinanceAllocation entity.
+func (_m *FinanceAllocation) QueryFinanceFact() *FinanceFactQuery {
+	return NewFinanceAllocationClient(_m.config).QueryFinanceFact(_m)
+}
+
+// QueryReversals queries the "reversals" edge of the FinanceAllocation entity.
+func (_m *FinanceAllocation) QueryReversals() *FinanceAllocationQuery {
+	return NewFinanceAllocationClient(_m.config).QueryReversals(_m)
+}
+
+// QueryReversalOf queries the "reversal_of" edge of the FinanceAllocation entity.
+func (_m *FinanceAllocation) QueryReversalOf() *FinanceAllocationQuery {
+	return NewFinanceAllocationClient(_m.config).QueryReversalOf(_m)
 }
 
 // Update returns a builder for updating this FinanceAllocation.

@@ -22,9 +22,23 @@ func sourceOrderLifecycleActionFromParams(
 	) {
 		return nil, false
 	}
+	// Do not coerce intent fields: distinct numeric keys must never round to
+	// the same receipt identity, and non-text reasons are not business intent.
+	for _, field := range []string{"customer_key", "idempotency_key", "reason", "close_mode"} {
+		if value, exists := pm[field]; exists {
+			if _, ok := value.(string); !ok {
+				return nil, false
+			}
+		}
+	}
+	sourceID, idOK := getRequiredJSONRPCPositiveInt(pm, "id")
+	expectedVersion, versionOK := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+	if !idOK || !versionOK {
+		return nil, false
+	}
 	in := biz.SourceOrderLifecycleAction{
-		ID:              getInt(pm, "id", 0),
-		ExpectedVersion: getInt(pm, "expected_version", 0),
+		ID:              sourceID,
+		ExpectedVersion: expectedVersion,
 		IdempotencyKey:  getString(pm, "idempotency_key"),
 		Reason:          getString(pm, "reason"),
 		CloseMode:       getString(pm, "close_mode"),

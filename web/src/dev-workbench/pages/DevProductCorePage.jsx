@@ -159,6 +159,46 @@ export default function DevProductCorePage() {
           </div>
         </div>
 
+        <div className="erp-dev-product-core-toolbar">
+          <div>
+            <Text id="product-core-inventory-title" type="secondary" aria-live="polite">
+              {filteredCapabilities.length} / {summary.total} 项能力
+            </Text>
+          </div>
+          <div
+            className="erp-dev-product-core-filters"
+            role="group"
+            aria-label="按产品内核归属筛选"
+          >
+            {filterOptions.map((option) => {
+              const isActive = membership === option.key
+              return (
+                <FilterChip
+                  key={option.key}
+                  selected={isActive}
+                  count={option.count}
+                  onClick={() => handleMembershipChange(option.key)}
+                >
+                  {option.label}
+                </FilterChip>
+              )
+            })}
+          </div>
+          <div className="erp-dev-product-core-toolbar__actions">
+            <SearchInput
+              allowClear
+              aria-label="搜索产品内核能力"
+              placeholder="搜索能力、范围或边界"
+              searchHint="可搜索能力名称、当前可用范围、状态和当前边界"
+              value={keyword}
+              onChange={handleKeywordChange}
+            />
+            {hasActiveFilter ? (
+              <Button onClick={handleReset}>清除筛选</Button>
+            ) : null}
+          </div>
+        </div>
+
         <div className="erp-dev-product-core-header__actions">
           <div
             className="erp-dev-product-core-header__summary"
@@ -191,47 +231,6 @@ export default function DevProductCorePage() {
             className="erp-dev-product-core-inventory"
             aria-labelledby="product-core-inventory-title"
           >
-            <div className="erp-dev-product-core-toolbar">
-              <div>
-                <Text id="product-core-inventory-title" type="secondary" aria-live="polite">
-                  {filteredCapabilities.length} / {summary.total} 项能力
-                </Text>
-              </div>
-              <div className="erp-dev-product-core-toolbar__actions">
-                <SearchInput
-                  allowClear
-                  aria-label="搜索产品内核能力"
-                  placeholder="搜索能力、范围或边界"
-                  searchHint="可搜索能力名称、当前可用范围、状态和当前边界"
-                  value={keyword}
-                  onChange={handleKeywordChange}
-                />
-                {hasActiveFilter ? (
-                  <Button onClick={handleReset}>清除筛选</Button>
-                ) : null}
-              </div>
-            </div>
-
-            <div
-              className="erp-dev-product-core-filters"
-              role="group"
-              aria-label="按产品内核归属筛选"
-            >
-              {filterOptions.map((option) => {
-                const isActive = membership === option.key
-                return (
-                  <FilterChip
-                    key={option.key}
-                    selected={isActive}
-                    count={option.count}
-                    onClick={() => handleMembershipChange(option.key)}
-                  >
-                    {option.label}
-                  </FilterChip>
-                )
-              })}
-            </div>
-
             {filteredCapabilities.length > 0 ? (
               <div className="erp-dev-product-core-table-wrap">
                 <table className="erp-dev-product-core-table">

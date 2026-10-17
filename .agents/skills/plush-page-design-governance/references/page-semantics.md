@@ -61,13 +61,28 @@
    - For business fields, identify the source-of-truth field before changing labels, mappings, defaults, imports, table columns, details, printing, export, or search. Check both stale values and missing values across create defaults, edit overwrite, source switch, source clear/delete, list/detail/print/export/search display, and historical-data fallback.
    - If the page repeats the same field mapping in form defaults, save transforms, table mapping, print/export mapping, or import logic, prefer a shared mapper/helper over adding another local conditional.
 
-## Reduce density by meaning, not by hiding truth.
-   - Delete, merge, rename, or downgrade elements that are decorative, duplicated, vanity-only, or do not change a user's judgment or next action.
-   - Reserve prominent `Alert` cards and warning icons for states that require the user to stop, correct, retry, confirm risk, or resolve missing permission. Routine guidance, successful calculations, loading copy, DEV / QA / simulation labels, and evidence-boundary explanations must not become persistent employee-facing alerts; use one short inline note, field help, or an on-demand disclosure instead, and keep at most one passive note visible by default in a page or modal section.
-   - Prefer fewer stronger sections over many small cards.
-   - Avoid duplicate shortcuts to the same action unless the duplicate is role-specific and measurably shortens the main task.
-   - Keep ERP pages work-focused: compact filters, readable tables, clear primary actions, restrained status summaries, and obvious selected-row actions.
-   - Use helpful labels and microcopy only where they reduce ambiguity; do not add explanatory text that restates visible UI.
+<a id="density-and-subtraction"></a>
+
+## 信息密度与减法 / Density and Subtraction
+
+先降低岗位理解、定位和办理成本，再考虑新增内容；字数、卡片高度和折叠数量不是完成指标。没有明确收益时保留好用的布局、顺序和交互。新增说明、标签、卡片、入口或确认步骤前，说明它提供了什么已有内容无法提供的判断、动作或反馈，优先复用、替换或合并。
+
+| 信息性质 | 处理方式 |
+| --- | --- |
+| 标题、标签、正文、操作说明、占位提示和按钮重复表达同一意思 | 保留最直接的一处，删除重复教程；不能仅因文字相近就合并不同业务含义 |
+| 同一对象的零散身份、状态或时间 | 合并展示，保留实际办理人、责任岗位、状态与截止风险的区别 |
+| 低频背景、仅作背景的完整分类路径、补充帮助和版本等次要审计信息 | 放到清晰、可发现的按需入口；不删除分类或历史，不用层层折叠增加寻找成本 |
+| 当前判断与操作所需的产品身份、来源类型及单号、责任、期限、阻塞原因、处理意见和可信结果 | 直接可见；单位、金额口径、必填、冻结条件及明细变化后的重新确认不能作为普通赘述隐藏 |
+| 失败、无权限、结果不确定、未保存离开或取消/冲销/撤回后果 | 在相关状态或操作发生时明确显示，保留校验、确认和恢复入口 |
+| 已经好用的三步导引、信息卡骨架、复制、历史排序/展开、步骤详情和按需计算依据 | 优先保留；只有证明能缩短理解或办理路径时才改变 |
+
+分别核对默认、打开弹窗、展开帮助和错误状态，用相同内容、视口与状态比较；不能把互斥状态的说明相加，当成默认页面同时显示的问题。已经按需提供的进度、用料计算或采购依据不重复搬到默认画面。
+
+减法不删除搜索、筛选、追踪或必要阶段，不靠缩小字号、压缩触区、截断关键内容或隐藏异常换取整齐；手机主要触控区至少 44px。类别和模拟性质只认正式字段或标记，不按名称猜测，也不把办理人当作冗余说明。保留岗位需要的少量清晰分组、紧凑筛选、可扫读表格、明显主动作和当前记录操作，不为统一形式增加卡片或折叠状态。
+
+醒目 `Alert` 和警告图标用于需要停下、修正、重试、确认风险或解决权限的状态。常规教程、成功计算、读取提示、DEV/QA/模拟标记和证据边界使用短行说明、字段帮助或按需入口；每个页面或弹窗区块默认至多保留一条被动说明，不以此限额隐藏必要条件或错误。
+
+交付时按本次影响简述删了什么、合并了什么、移到哪里、保留了什么及原因；在真实页面或原型检查默认阅读、信息找回、操作和返回恢复。原型可用不替代两端实现验证，必要时明确未实测范围。
 
 ## Preserve project boundaries.
    - Do not change schema, migration, RBAC permissions, menu truth, route truth, WorkflowUsecase, or Fact usecases as a side effect of visual cleanup.

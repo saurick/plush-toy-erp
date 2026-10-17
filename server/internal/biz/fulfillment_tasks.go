@@ -26,6 +26,7 @@ var fulfillmentTaskSpecs = map[string]FulfillmentTaskSpec{
 	"outsourcing_issue":             {"办理加工发料", "outsourcing_order", WarehouseRoleKey, PermissionOutsourcingMaterialIssueCreate, PermissionOutsourcingOrderRead, "/erp/purchase/processing-contracts?outsourcing_order_id=%d"},
 	"outsourcing_return":            {"登记加工回货", "outsourcing_order", WarehouseRoleKey, PermissionOutsourcingReturnReceiptCreate, PermissionOutsourcingOrderRead, "/erp/purchase/processing-contracts?outsourcing_order_id=%d"},
 	"outsourcing_quality":           {"办理加工回货检验", "quality_inspection", QualityRoleKey, PermissionQualityInspectionUpdate, PermissionQualityInspectionRead, "/erp/production/quality-inspections?quality_inspection_id=%d"},
+	"outsourcing_quality_request":   {"发起加工回货质检", "outsourcing_fact", QualityRoleKey, PermissionQualityInspectionCreate, PermissionOutsourcingFactRead, ""},
 	"outsourcing_inbound":           {"确认加工回货入库", "outsourcing_fact", WarehouseRoleKey, PermissionOutsourcingFactPost, PermissionOutsourcingFactRead, ""},
 	"production_execute":            {"安排并办理本工序", "production_wip_batch", ProductionRoleKey, PermissionProductionWIPExecute, PermissionProductionWIPRead, ""},
 	"production_quality":            {"办理工序检验", "quality_inspection", QualityRoleKey, PermissionQualityInspectionUpdate, PermissionQualityInspectionRead, "/erp/production/quality-inspections?quality_inspection_id=%d"},

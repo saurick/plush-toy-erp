@@ -10,27 +10,41 @@
 | release evidence        | 发布审计资料                                                                  | 可入库，必须脱敏        |
 | import / dry-run report | 导入报告摘要                                                                  | 可入库，不能含 raw rows |
 
-运行存储、工具参数和新 bucket 恢复步骤以 [附件备份与恢复合同](../../../server/deploy/compose/prod/README.md#附件存储与raid5) 为准。PG dump、文件备份、release / migration 身份必须成套保存；不能直接打包运行中的 SeaweedFS 数据目录。
+成套入口是 `node scripts/deploy/backup-set/cli.mjs`。一个 `plush-set-<UTC>-<UUID>.tar.age` 包含 PG custom-format dump、附件 manifest、全部登记文件，以及绑定它们的 SHA-256、镜像内容身份、release、migration、有效客户配置和运行 env 指纹。包含已撤回附件，保留原 ID、key 与审计。运行存储边界见[附件合同](../../../server/deploy/compose/prod/README.md#附件存储与raid5)；不直接打包运行中的 SeaweedFS 数据目录。
+
+包内不包含 env 明文、密码、age identity 或镜像本身。受控加密运行配置、解密身份和对应固定镜像必须另行保存；恢复端先加载该架构下的原应用镜像与固定 PG / SeaweedFS 镜像，工具不会临时拉取或构建制品。
 
 ## 备份频率
 
 - 发布前：必须备份。
 - migration apply 前：必须备份。
 - 真实导入 apply 前：必须备份；当前 yoyoosun 真实导入未开放。
-- 日常目标：每日整库备份到本地受控目录，通过 `age` 加密后复制到独立挂载的异地目录，保留 35 天；每周从异地加密副本做一次临时库真实恢复。
+- 日常目标：每日在维护窗口生成一个 PG＋附件成套备份，本地和异地均只保留加密包及 checksum，保留 35 天且至少保护最近两套；每周从异地副本恢复到新建临时 PG / S3，验证后精确删除临时资源。
 
-仓库已提供 `scripts/deploy/scheduled-postgres-backup.sh`、`scripts/deploy/verify-scheduled-postgres-backup.sh` 和 [`systemd` 安装模板](../systemd/README.md)。只有目标机已安装 timer、手工首跑通过、异地副本读回且恢复报告为 `passed`，才可宣称日常备份已启用；本地代码存在不等于目标机已安装。这组定时脚本只备份 PostgreSQL；附件外置后的完整系统备份还需要配套文件备份及恢复验证。
+[`systemd` 模板](../systemd/README.md) 已指向成套入口；模板变化不修改已安装任务。升级时须同时核对固定工具版本、Node 路径、独占维护窗口、工作盘空间、异地挂载和恢复端镜像。只有首跑成功、异地同名包 / checksum 读回、恢复报告为 `passed` 且绑定同一 backupId，才可宣称该目标已启用成套日常备份。旧 `scheduled-postgres-backup.sh` 和 `verify-scheduled-postgres-backup.sh` 仍为 PG 专用工具，旧报告不能升级为成套证明。
 
 ## 备份步骤
 
-1. 确认数据库、本地备份目录、独立异地挂载目录和 `age` recipient；异地目录已按 systemd 安装说明写入固定挂载标记，且与本地目录不在同一文件系统。
-2. 停止相关业务写入，使用只读 `erp_backup` 生成数据库备份，并按附件合同执行 `backup`；成功写出 manifest 后才结束该备份窗口。
-3. 计算本地 dump 的 hash、大小和时间，并记录附件备份 manifest、数量、字节和校验结果。
-4. 使用 `age` 公钥加密异地副本，并计算加密文件 hash；identity 不与异地副本同存。
-5. 记录 backup evidence，不记录下载链接或 secret。
-6. 在隔离目标恢复配套 PG dump 和附件备份，再逐对象 `verify`；PG 定时恢复报告只证明数据库这一部分。
+1. 确认 project、数据库、固定 release、私有 runtime env、本地备份盘、异地挂载及 age recipient。异地目录须有固定标记并位于不同文件系统；挂载缺失时直接失败。
+2. 安排独占维护窗口，停止其它应用实例、发布 / 迁移 / 导入和对象清理。确认串表示已安排这一窗口。工具核对唯一运行 app-server / postgres 后只停止原 app-server，并拒绝数据库中的其它客户端；不会自行停止未知进程。
+3. 从仓库根目录运行以下命令。工具用 `erp_backup` 生成 PG dump，再导出附件；前后核对附件完整行摘要、有效配置及迁移版本。成功、异常和 SIGTERM 均尝试启动原容器并等待健康，不运行 Compose up 或修改配置。
+4. 应用恢复后再封包、加密、复制与读回 checksum；清理仅匹配本工具命名且校验通过的过期备份，不处理旧 PG 文件或其它备份。中断不能产生 passed；应用恢复失败时保留本次私有工作目录，先核对原容器再处理。
+5. 核对 `latest-set-status.json` 中的 `status=passed`、`applicationResumed=true`、`offsiteCopied=true`、`offsiteEncrypted=true`，记录 backupId / release / migration / 附件数量与字节。执行下节恢复检查，不输出秘密。
 
-本地 / 试用前最小恢复演练入口：
+```bash
+node scripts/deploy/backup-set/cli.mjs create \
+  --project plush-toy-erp-production --database plush_erp_production \
+  --compose-file /root/deploy/plush-toy-erp-production/current/server/deploy/compose/prod/compose.yml \
+  --env-file /root/deploy/plush-toy-erp-production/runtime/.env.production-133 \
+  --backup-dir /root/deploy/plush-toy-erp-production/backups/scheduled \
+  --offsite-dir /mnt/plush-toy-erp-offsite/database \
+  --recipient-file /etc/plush-toy-erp/backup-age-recipient.txt \
+  --confirm BACKUP_SET:plush-toy-erp-production:plush_erp_production
+```
+
+停写耗时取决于数据库与附件体积，须以演练实测安排窗口。辅助容器按宿主备份目录属主的数值 UID / GID 运行，配合只读根文件系统及去除 capabilities，以访问 0700 / 0600 私有文件；不依赖应用镜像的默认用户。正常隔离验证运行 `node scripts/qa/backup-set-integration.mjs`：使用默认非 root 工具镜像、合成非空附件、真实 migration 和一次性 PG / SeaweedFS；显式本地加密模式 `--allow-local-only` 不提供异地证明。工具链使用项目 Node、Docker、age，宿主锁在 Linux 使用 flock、Mac 使用 lockf。
+
+仅做 PostgreSQL 升级审计时可使用旧的专项演练入口，不能代替成套恢复：
 
 ```bash
 SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>' \
@@ -48,9 +62,24 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
 
 ## 恢复步骤
 
+先用最新异地成套备份运行恢复检查：
+
+```bash
+node scripts/deploy/backup-set/cli.mjs restore-check \
+  --offsite-dir /mnt/plush-toy-erp-offsite/database \
+  --identity-file /etc/plush-toy-erp/backup-age-identity.txt \
+  --work-dir /root/deploy/plush-toy-erp-production/backups/restore-work \
+  --report /var/lib/plush-toy-erp/backup/latest-restore-check.json \
+  --max-age-hours 36
+```
+
+恢复检查不连接现有 PG / bucket：在无宿主端口的 Docker internal 网络创建独立 PG 与 S3，先验密文 checksum、解密、拒绝 tar 链接 / 特殊文件 / 路径穿越，再逐文件校验。恢复 PG 后核对迁移、有效客户配置、附件整行摘要，向新 bucket 恢复文件并逐对象验大小与 SHA-256。临时容器、该次匿名卷、网络及明文均清理成功才写 `plush.backup-set-restore/v1` passed。报告必须为 `sourceKind=offsite-backup-set`、同一 backupId、数量和字节相符、`restoreTarget=temporary-postgres-and-s3-removed`。失败会覆盖本次报告为 failed，不能沿用旧 passed。
+
+灾难恢复可选择一套精确文件，以 `restore --file <absolute-set.tar.age> --identity-file <private-key> --work-dir <private-dir> --report <private-json> --keep` 保留新建隔离 PG / S3。资源名与私有配置目录只写入 0600 报告，仍无宿主端口。该入口不接受已有数据库或 bucket，也不切生产入口；先核对资源和文件再按以下步骤完成业务恢复。`restore-check --file` 可用于指定副本演练，其报告明确为 `explicit-backup-set`，不证明异地来源。旧 PG-only 文件不被成套入口接受。
+
 1. 选择 backup id，并确认 hash。
 2. 准备隔离恢复环境或明确恢复窗口。
-3. 恢复数据库。
+3. 恢复数据库，并按 [Compose 数据库角色合同](../../../server/deploy/compose/prod/README.md)使用受控恢复配置重新建立 / 核对应用、迁移及只读备份角色。dump 不携带角色密码和 owner / ACL；`restore --keep` 的隔离 PG 不能直接作为已就绪的业务服务。
 4. 按附件合同向新的 S3 endpoint / bucket 执行 `restore` 和 `verify`，核对配套 PG 元数据、原 key、附件 ID、大小与 SHA-256；旧对象和备份保留到回滚窗口结束。
 5. 记录恢复后的 migrationBefore。
 6. 在隔离库执行 populated upgrade read-only audit；发现 blocker 时停止，不执行 apply。
@@ -75,7 +104,7 @@ SOURCE_POSTGRES_DSN='<postgres://erp_backup:...@host:port/database?sslmode=...>'
 
 | 指标 | 当前建议                                                                                                                          |
 | --- | --- |
-| RPO | 发布 / migration 前在停写窗口保存配套 PG 与附件备份；PG 日常名义周期为 24 小时，36 小时 freshness 只约束 PG 定时检查。系统实际 RPO 以两者共同且已验证的恢复点为准。 |
+| RPO | 成套日常备份名义周期为 24 小时，恢复检查 freshness 为 36 小时；以实际成功且已验证的完整恢复点为准。仅 PG 定时备份的历史记录不证明附件 RPO。 |
 | RTO  | 先以单机恢复演练结果为准，未演练前不得承诺固定时长                                                                                |
 
 ## Mac 外接盘副本 / Mac Backup Replica
@@ -105,7 +134,7 @@ Mac 复用项目 Node 版本与内置 `lockf / plutil`，SSH 来源使用 POSIX 
 
 切换同一数据来源到另一台 SSH 主机时，先复制历史加密文件、checksum 和来源身份标记，修改私有配置的 host / directory，再依次执行 sync、verify 和定时首跑读回。更换外盘时填写新 UUID 并初始化 / 核验专属目录；恢复回执绑定卷 UUID，新介质会重新验证。新链路通过且保留窗口结束后再处理旧目标；不同业务来源使用新的 id 与目录。对象存储等新协议应扩展传输模块，不混入同步及恢复逻辑。
 
-这组恢复检查只证明 PostgreSQL。初始空附件 manifest 和加密运行配置可以一并复制并独立核验；非空 S3 对象仍须执行本 runbook 的配套附件 restore / verify，不能因数据库恢复通过而省略。
+现有 Mac 副本模块仍只识别旧 PG 备份及既有初始化附件清单 / 加密配置，不会自动同步新的 `plush-set-*.tar.age`。其恢复检查只证明 PostgreSQL；接入新备份集须单独扩展传输、保留与成套恢复合同，不能因旧副本健康而宣称新的完整备份已到 Mac。
 
 ## 禁止
 

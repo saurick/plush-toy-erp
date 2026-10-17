@@ -257,6 +257,9 @@ export function createAccountPasswordScenarios({
         assert.equal(typeof releaseSuccess, 'function')
         releaseSuccess()
         await page.waitForURL('**/admin-login')
+        if (mobile) {
+          assert.equal(await page.evaluate(() => window.history.state?.usr?.from?.pathname), '/m/sales/tasks', '改密重新登录后继续使用手机版')
+        }
         assert.equal(
           await page.evaluate(() => localStorage.getItem('admin_access_token')),
           null

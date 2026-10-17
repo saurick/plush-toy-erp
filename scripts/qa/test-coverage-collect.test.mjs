@@ -125,7 +125,7 @@ test("baseline command plan checks generated error codes and bypasses mutating p
   assert.equal(commands["web-error-codes"].cwd, ROOT);
   assert.equal(commands.web.command, process.execPath);
   assert.deepEqual(commands.web.args, [
-    "--test",
+    path.join(ROOT, "web/scripts/runUnitTests.mjs"),
     "--test-concurrency=4",
     "--experimental-test-coverage",
     `--test-coverage-include=${ROOT.split(path.sep).join("/")}/**`,
@@ -141,6 +141,11 @@ test("native coverage measures repository code without external tools or node_mo
   t.after(() => rm(temporary, { recursive: true, force: true }));
   const projectRoot = path.join(temporary, "project");
   const webRoot = path.join(projectRoot, "web");
+  await mkdir(path.join(webRoot, "scripts"), { recursive: true });
+  await writeFile(
+    path.join(webRoot, "scripts/runUnitTests.mjs"),
+    readFileSync(path.join(ROOT, "web/scripts/runUnitTests.mjs")),
+  );
   const dependency = path.join(webRoot, "node_modules", "fixture", "dependency.mjs");
   const external = path.join(temporary, "external-tool.mjs");
   await mkdir(path.dirname(dependency), { recursive: true });
@@ -165,6 +170,9 @@ import { dependency } from './node_modules/fixture/dependency.mjs';
 import { external } from ${JSON.stringify(pathToFileURL(external).href)};
 test('all modules still execute', () => assert.equal(covered() + shared + dependency + external, 10));
 `);
+  const artifactCopy = path.join(webRoot, "output/validation-copy/web/src/poison.test.mjs");
+  await mkdir(path.dirname(artifactCopy), { recursive: true });
+  await writeFile(artifactCopy, "throw new Error('artifact copy must not execute');\n");
   const command = Object.fromEntries(buildBaselineCommandPlan({
     projectRoot,
     goCoverprofile: path.join(temporary, "unused.coverprofile"),
@@ -178,6 +186,7 @@ test('all modules still execute', () => assert.equal(covered() + shared + depend
   assert.match(stdout, /shared\.mjs\s+\|\s+100\.00/u);
   assert.match(stdout, /inside\.mjs\s+\|[^\n]+\|\s+50\.00\s+\|/u);
   assert.doesNotMatch(stdout, /external-tool\.mjs|dependency\.mjs/u);
+  assert.equal(await readFile(artifactCopy, "utf8"), "throw new Error('artifact copy must not execute');\n");
 });
 
 test("baseline excludes the opt-in PostgreSQL and real Chromium integration families", () => {

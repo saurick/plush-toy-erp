@@ -1,73 +1,453 @@
-.erp-help-source-details li {
-  padding: 4px 0;
-}
-
 .erp-help-center-page {
+  --erp-help-header-height: 0px;
+  --erp-help-sticky-top: calc(-1 * var(--erp-page-padding));
+  display: flex;
+  width: 100%;
+  max-width: 1520px;
   min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
   color: var(--erp-text);
   font-size: var(--erp-font-small);
   line-height: 1.65;
 }
 
-.erp-help-center-workspace {
+.erp-help-center-page[data-help-shell='mobile'] {
+  --erp-help-sticky-top: 0px;
+  height: 100%;
+}
+
+.erp-help-navigation-header {
   display: grid;
   min-width: 0;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
+  grid-template-columns: auto auto minmax(100px, 1fr) auto auto;
+  align-items: center;
+  flex: none;
+  padding: 8px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-control-radius) var(--erp-control-radius) 0 0;
+  gap: 12px;
+  background: var(--erp-surface-bg);
 }
 
-.erp-help-center-workspace[data-directory-open='true'] {
-  grid-template-columns: 220px minmax(0, 1fr);
-}
-
-.erp-help-center-toolbar {
+.erp-help-center-heading {
   display: flex;
-  align-items: flex-end;
-  gap: 16px;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  grid-column: 1;
+  grid-row: 1;
+  gap: 4px;
 }
 
-.erp-help-center-toolbar > .erp-help-center-search {
-  min-width: 0;
-  max-width: 680px;
-  flex: 1;
+.erp-help-center-heading h2.ant-typography {
+  margin: 0;
+  font-size: 20px;
+  white-space: nowrap;
 }
 
-.erp-help-center-search > .erp-search-input {
-  min-width: 0;
-  flex: 1;
+.erp-help-heading-actions {
+  display: contents;
 }
 
-:where(.erp-help-center-toolbar) > .erp-help-center-role-picker,
-:where(.erp-help-center-toolbar) > .erp-help-current-role {
+.erp-help-mobile-directory-button {
+  display: none;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.erp-help-download-button {
+  grid-column: 5;
+  grid-row: 1;
+}
+
+.erp-help-directory-button-label {
+  display: none;
+}
+
+.erp-help-search-tools {
+  display: grid;
   min-width: 0;
-  flex: 0 0 180px;
+  grid-column: 3 / 5;
+  grid-row: 1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-help-center-page[data-directory-collapsed='true']
+  .erp-help-mobile-directory-button {
+  display: inline-flex;
+}
+
+.erp-help-center-search {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .erp-help-center-nav {
+  min-width: 0;
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.erp-help-navigation-tabs {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 0;
+}
+
+.erp-help-center-page
+  .erp-help-center-nav
+  .erp-help-navigation-tabs
+  > [role='tab'] {
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: var(--erp-font-small);
+  white-space: nowrap;
+}
+
+.erp-help-center-workspace {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: 184px minmax(0, 1fr);
+  border: 1px solid var(--erp-border);
+  border-top: 0;
+  border-radius: 0 0 var(--erp-control-radius) var(--erp-control-radius);
+  gap: 0;
+  overflow: hidden;
+  background: var(--erp-surface-bg);
+}
+
+.erp-help-center-workspace[data-searching='true'],
+.erp-help-center-workspace[data-directory-collapsed='true'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.erp-help-sidebar {
+  min-width: 0;
+  min-height: 0;
+  padding: 8px 6px 12px;
+  border-right: 1px solid var(--erp-border);
+  background: var(--erp-surface-bg-muted);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+
+.erp-help-reader {
+  min-width: 0;
+  min-height: 0;
+  padding: 12px 20px 16px;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+}
+
+.erp-help-sidebar[hidden],
+.erp-help-reader[hidden] {
+  display: none;
+}
+
+.erp-help-directory-heading {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  gap: 4px;
+}
+
+.erp-help-directory-heading h2 {
+  margin: 0;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  font-weight: 500;
+}
+
+.erp-help-directory-heading > .ant-btn {
+  padding-inline: 4px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.erp-help-topics details {
+  --erp-help-topic-inset: 20px;
+}
+
+.erp-help-role-picker {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-help-role-picker > :where(label, span) {
+  flex: none;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+
+.erp-help-role-picker > .ant-select {
+  width: 168px;
+}
+
+.erp-help-home__heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  gap: 12px;
+}
+
+@media (max-width: 899px) {
+  .erp-help-center-page {
+    height: auto;
+    min-height: 100%;
+    flex: none;
+    overflow: visible;
+  }
+
+  .erp-help-navigation-header {
+    position: sticky;
+    z-index: 5;
+    /* 吸附到滚动视口上沿，覆盖外层页面内边距。 */
+    top: var(--erp-help-sticky-top);
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 4px 10px;
+    gap: 4px 8px;
+  }
+
+  .erp-help-center-page[data-help-shell='mobile'] {
+    height: auto;
+  }
+
+  .erp-help-center-heading {
+    min-height: 44px;
+    justify-content: flex-start;
+  }
+
+  .erp-help-center-heading h2.ant-typography {
+    font-size: 20px;
+    white-space: nowrap;
+  }
+
+  .erp-help-mobile-directory-button {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .erp-help-download-button {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .erp-help-heading-actions > .ant-btn {
+    min-height: 44px;
+    padding-inline: 6px;
+  }
+
+  .erp-help-center-search,
+  .erp-help-navigation-tabs {
+    width: 100%;
+    max-width: none;
+  }
+
+  .erp-help-center-search {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .erp-help-search-tools {
+    display: grid;
+    min-width: 0;
+    grid-column: 1 / -1;
+    grid-row: 3;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .erp-help-center-search input {
+    font-size: 16px;
+  }
+
+  .erp-help-directory-button-label {
+    display: inline;
+  }
+
+  .erp-help-navigation-tabs {
+    gap: 0;
+  }
+
+  .erp-help-center-page
+    .erp-help-center-nav
+    .erp-help-navigation-tabs
+    > [role='tab'] {
+    flex: 1;
+    padding-inline: 4px;
+  }
+
+  .erp-help-center-nav {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .erp-help-center-workspace {
+    display: block;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .erp-help-sidebar {
+    padding: 8px 10px;
+    border: 0;
+    background: var(--erp-surface-bg);
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .erp-help-reader {
+    padding: 12px;
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .erp-help-role-picker {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .erp-help-sidebar .erp-help-topic,
+  .erp-help-sidebar summary,
+  .erp-help-directory-heading > .ant-btn {
+    min-height: 44px;
+  }
+
+  .erp-help-sidebar .erp-help-topic {
+    font-size: var(--erp-font-small);
+  }
+
+  .erp-help-reader .erp-help-handbook-section,
+  .erp-help-reader .erp-help-project-content :where(h3, h4) {
+    scroll-margin-top: calc(var(--erp-help-header-height) + 16px);
+  }
+
+  .erp-help-handbook-anchors ol {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+.erp-help-source-details li {
+  padding: 4px 0;
+}
+
+.erp-help-load-error {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
-  margin: 12px 0 20px;
-  border-bottom: 1px solid var(--erp-border);
+  margin-bottom: 16px;
+  color: var(--erp-text);
 }
 
-.erp-help-center-nav > .ant-tabs {
+.erp-help-manual-state {
   min-width: 0;
-  max-width: 100%;
-  flex: 0 0 auto;
+  padding: 24px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius, 10px);
+  background: var(--erp-surface-bg);
 }
 
-.erp-help-center-nav > .ant-btn {
-  flex: none;
+.erp-help-manual-loading {
+  min-height: 180px;
 }
 
-.erp-help-center-nav .ant-tabs-nav {
-  margin-bottom: 0;
+.erp-help-project-content {
+  min-width: 0;
+  padding: 0;
+  font-size: var(--erp-font-body);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
 }
 
-.erp-help-center-nav .ant-tabs-content-holder {
-  display: none;
+.erp-help-project-content :where(p, ol, ul) {
+  margin: 0 0 10px;
+}
+
+.erp-help-project-content :where(ol, ul) {
+  padding-left: 24px;
+}
+
+.erp-help-project-content :where(ol) {
+  list-style: decimal;
+}
+
+.erp-help-project-content :where(ul) {
+  list-style: disc;
+}
+
+.erp-help-project-content :where(li + li) {
+  margin-top: 4px;
+}
+
+.erp-help-project-content :where(h3, h4) {
+  margin: 16px 0 8px;
+  scroll-margin-top: 24px;
+  color: var(--erp-text);
+  font-size: var(--erp-font-emphasis);
+}
+
+.erp-help-project-content > :first-child {
+  margin-top: 0;
+}
+
+.erp-help-project-content :where(table) {
+  width: 100%;
+  margin-bottom: 12px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.erp-help-project-content :where(th, td) {
+  padding: 7px 8px;
+  border: 1px solid var(--erp-border);
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.erp-help-project-content :where(th) {
+  background: var(--erp-table-header-bg, var(--erp-surface-bg-muted));
+  font-weight: 600;
+}
+
+.erp-help-project-content :where(pre) {
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-control-radius);
+  background: var(--erp-surface-bg-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.erp-help-project-content :where(code) {
+  color: var(--erp-text);
+  font-size: 0.92em;
 }
 
 .erp-help-role-note {
@@ -76,47 +456,12 @@
   font-size: var(--erp-font-caption);
 }
 
-.erp-help-sidebar {
-  min-width: 0;
-  padding: 4px 0;
-  max-height: calc(100vh - 200px);
-  overflow-y: auto;
-  align-self: start;
-}
-
-.erp-help-sidebar[hidden] {
-  display: none;
-}
-
-.erp-help-center-role-picker,
-.erp-help-current-role,
-.erp-help-mobile-picker {
-  display: grid;
-  min-width: 0;
-  gap: 6px;
-}
-
-.erp-help-center-role-picker label,
-.erp-help-mobile-picker label,
-.erp-help-sidebar__label {
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
-}
-
-.erp-help-current-role > strong {
-  font-size: var(--erp-font-body);
-}
-
-.erp-help-mobile-picker {
-  display: none;
-}
-
 .erp-help-topics {
   margin-top: 0;
 }
 
 .erp-help-topics :where(details > summary) {
-  padding: 8px;
+  padding: 5px 6px;
   color: var(--erp-text-muted);
   cursor: pointer;
 }
@@ -127,28 +472,24 @@
   font-size: var(--erp-font-caption);
 }
 
-.erp-help-topics h2 {
-  margin: 0 10px 8px;
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
-  font-weight: 500;
-}
-
 .erp-help-topic {
   display: flex;
   width: 100%;
-  min-height: 40px;
+  min-height: 30px;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 10px;
+  padding: 4px 8px;
+  padding-left: var(--erp-help-topic-inset, 8px);
   border: 1px solid transparent;
   border-radius: var(--erp-control-radius, 6px);
-  margin-bottom: 5px;
+  margin-bottom: 1px;
   gap: 8px;
   background: transparent;
   color: var(--erp-text);
   cursor: pointer;
   font: inherit;
+  font-size: 13px;
+  line-height: 20px;
   text-align: left;
 }
 
@@ -168,24 +509,6 @@
   opacity: 1;
 }
 
-.erp-help-sidebar__footer {
-  display: grid;
-  margin-top: 24px;
-  gap: 8px;
-  color: var(--erp-text-muted);
-  font-size: var(--erp-font-caption);
-}
-
-.erp-help-sidebar__footer p {
-  margin: 0 4px 8px;
-}
-
-.erp-help-sidebar__footer .ant-btn {
-  height: auto;
-  min-height: 34px;
-  white-space: normal;
-}
-
 .erp-help-article {
   min-width: 0;
   container-type: inline-size;
@@ -193,22 +516,69 @@
 }
 
 .erp-help-article--reference {
-  max-width: 960px;
+  width: 100%;
+  max-width: 1280px;
+  align-self: start;
+}
+
+.erp-help-chapter-pagination {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  margin-inline-start: auto;
+  gap: 4px 12px;
+}
+
+.erp-help-chapter-pagination > .ant-btn {
+  display: flex;
+  height: auto;
+  max-width: 100%;
+  min-height: 32px;
+  align-items: center;
+  padding: 2px 4px;
+  font-size: var(--erp-font-small);
+  text-align: left;
+  white-space: normal;
+}
+
+.erp-help-chapter-pagination > .erp-help-chapter-pagination__next {
+  text-align: right;
+}
+
+.erp-help-chapter-position {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .erp-help-reference-content {
-  padding: 20px 28px;
-  border: 1px solid var(--erp-border);
-  border-radius: var(--erp-business-card-radius, 10px);
-  background: var(--erp-surface-bg);
   font-size: var(--erp-font-body);
-  line-height: 1.9;
+  line-height: 1.7;
+}
+
+.erp-help-reference-content--term {
+  min-width: 0;
+  padding: 0;
+}
+
+.erp-help-handbook-sections ol {
+  padding-left: 24px;
+  list-style: decimal;
 }
 
 .erp-help-reference-content section {
   padding-top: 16px;
   border-top: 1px solid var(--erp-border);
-  margin-top: 20px;
+  margin-top: 24px;
+}
+
+.erp-help-handbook-sections > section:first-child {
+  padding-top: 0;
+  border-top: 0;
+  margin-top: 0;
 }
 
 .erp-help-reference-content h4 {
@@ -217,7 +587,7 @@
 }
 
 .erp-help-reference-content p {
-  margin: 8px 0 16px;
+  margin: 8px 0 12px;
 }
 
 .erp-help-reference-content :where(li + li) {
@@ -230,9 +600,9 @@
 
 .erp-help-reference-details > div {
   display: grid;
-  grid-template-columns: 90px minmax(0, 1fr);
+  grid-template-columns: 128px minmax(0, 1fr);
   gap: 14px;
-  padding: 10px 0;
+  padding: 8px 0;
 }
 
 .erp-help-reference-details dt {
@@ -350,16 +720,31 @@
   gap: 20px;
 }
 
+.erp-help-article--reference .erp-help-article__heading {
+  padding: 0;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
 .erp-help-article__heading > div {
   min-width: 0;
 }
 
 .erp-help-article__heading h3.ant-typography {
-  margin: 0 0 6px;
-  font-size: 23px;
+  margin: 0;
+  font-size: 20px;
 }
 
-.erp-help-article__heading > .ant-btn {
+.erp-help-article-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.erp-help-article__heading > .ant-btn,
+.erp-help-article-actions > .ant-btn {
   height: auto;
   min-height: 34px;
   flex: 0 0 auto;
@@ -1058,11 +1443,11 @@
 
 @media (hover: hover) {
   :is(
-    .erp-help-topic,
-    .erp-help-flow__step,
-    .erp-help-note,
-    .erp-help-search-results button
-  ):not(:disabled, [aria-current='page'], [aria-pressed='true']):hover {
+      .erp-help-topic,
+      .erp-help-flow__step,
+      .erp-help-note,
+      .erp-help-search-results button
+    ):not(:disabled, [aria-current='page'], [aria-pressed='true']):hover {
     border-color: var(--erp-interactive-border-hover);
     background: var(--erp-interactive-bg-hover);
   }
@@ -1186,50 +1571,103 @@
   }
 }
 
+.erp-help-handbook-content {
+  min-width: 0;
+}
+
+.erp-help-handbook-anchors {
+  min-width: 0;
+  padding: 0 0 10px;
+  font-size: var(--erp-font-small);
+  line-height: 1.6;
+}
+
+.erp-help-handbook-anchors__toggle {
+  display: flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-control-radius);
+  gap: 18px;
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.erp-help-handbook-anchors ol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  max-height: 280px;
+  padding: 12px 0 0;
+  margin: 0;
+  gap: 4px 24px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.erp-help-handbook-anchors[data-expanded='false'] ol {
+  display: none;
+}
+
+.erp-help-handbook-anchor-link {
+  display: block;
+  padding: 5px 0;
+  color: var(--erp-text);
+}
+
+.erp-help-handbook-anchor-link:hover {
+  color: var(--erp-primary-strong);
+}
+
+.erp-help-handbook-sections {
+  min-width: 0;
+  padding: 0;
+}
+
+.erp-help-handbook-section {
+  scroll-margin-top: 24px;
+}
+
+.erp-help-handbook-term-link {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: var(--erp-font-caption);
+}
+
 @media (max-width: 760px) {
-  .erp-help-center-workspace,
-  .erp-help-center-workspace[data-directory-open='true'] {
+  .erp-help-article--reference .erp-help-article__heading {
+    padding: 0;
+  }
+
+  .erp-help-chapter-pagination {
+    gap: 4px 8px;
+  }
+
+  .erp-help-project-content {
+    padding: 0;
+  }
+
+  .erp-help-handbook-anchors {
+    padding: 0 0 8px;
+  }
+
+  .erp-help-handbook-anchors ol {
     grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
   }
 
-  .erp-help-sidebar {
-    max-height: 50vh;
+  .erp-help-handbook-sections {
+    padding: 0;
   }
 
-  .erp-help-center-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 10px;
+  .erp-help-reference-content--term {
+    padding: 0;
   }
 
-  .erp-help-center-toolbar > .erp-help-center-search {
-    width: 100%;
-    max-width: none;
-    flex: none;
-  }
-
-  :where(.erp-help-center-toolbar) > .erp-help-center-role-picker,
-  :where(.erp-help-center-toolbar) > .erp-help-current-role {
-    width: 100%;
-    flex: none;
-  }
-
-  .erp-help-current-role {
-    display: flex;
-    align-items: baseline;
-  }
-
-  .erp-help-center-nav {
-    gap: 8px;
-  }
-
-  .erp-help-center-nav .ant-tabs-tab + .ant-tabs-tab {
-    margin-left: 16px;
-  }
-
-  .erp-help-reference-content {
-    padding: 16px;
+  .erp-help-article-actions {
+    justify-content: flex-start;
   }
 
   .erp-help-reference-details > div {
@@ -1237,30 +1675,8 @@
     gap: 2px;
   }
 
-  .erp-help-mobile-picker {
-    display: grid;
-    margin-bottom: 16px;
-  }
-
   .erp-help-topics {
     display: block;
-  }
-
-  .erp-help-sidebar__footer {
-    display: flex;
-    grid-column: 1 / -1;
-    flex-wrap: wrap;
-    margin: 0;
-    gap: 6px;
-  }
-
-  .erp-help-sidebar__footer p {
-    width: 100%;
-    margin: 0 0 3px;
-  }
-
-  .erp-help-sidebar__footer .ant-btn {
-    width: auto;
   }
 
   .erp-help-article__heading h3.ant-typography {
@@ -1268,39 +1684,14 @@
   }
 }
 
-.erp-help-center-heading,
-.erp-help-home__heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-
-.erp-help-center-heading h2,
 .erp-help-home h3 {
   margin: 0;
-}
-
-.erp-help-home h3 {
   font-size: 16px;
   font-weight: 600;
 }
 
-.erp-help-heading-role {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.erp-help-center-heading .ant-select {
-  min-width: 160px;
-}
-
 .erp-help-home {
   min-width: 0;
-  max-width: 1120px;
 }
 
 .erp-help-home__tasks {
@@ -1383,18 +1774,6 @@
   font-size: var(--erp-font-caption);
 }
 
-.erp-help-handbook-anchors {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--erp-border);
-}
-
-.erp-help-handbook-content section {
-  scroll-margin-top: 90px;
-}
-
 .erp-help-step-checks {
   padding-top: 18px;
   border-top: 1px solid var(--erp-border);
@@ -1418,10 +1797,6 @@
   margin-top: 10px;
 }
 
-.erp-help-mobile-picker[hidden] {
-  display: none;
-}
-
 .erp-help-back-home.ant-btn {
   height: auto;
   padding: 0;
@@ -1431,24 +1806,5 @@
 @media (max-width: 720px) {
   .erp-help-home__tasks {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .erp-help-center-heading {
-    align-items: flex-start;
-  }
-
-  .erp-help-heading-role {
-    flex-wrap: wrap;
-  }
-
-  .erp-help-center-toolbar {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .erp-help-center-toolbar > .erp-help-center-search {
-    max-width: none;
-    flex: auto;
   }
 }

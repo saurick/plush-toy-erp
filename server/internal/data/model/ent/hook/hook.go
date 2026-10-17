@@ -212,6 +212,42 @@ func (f FinancePaymentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Val
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.FinancePaymentMutation", m)
 }
 
+// The HelpFeedbackFunc type is an adapter to allow the use of ordinary
+// function as HelpFeedback mutator.
+type HelpFeedbackFunc func(context.Context, *ent.HelpFeedbackMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f HelpFeedbackFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.HelpFeedbackMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.HelpFeedbackMutation", m)
+}
+
+// The HelpSupplementFunc type is an adapter to allow the use of ordinary
+// function as HelpSupplement mutator.
+type HelpSupplementFunc func(context.Context, *ent.HelpSupplementMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f HelpSupplementFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.HelpSupplementMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.HelpSupplementMutation", m)
+}
+
+// The HelpSupplementRevisionFunc type is an adapter to allow the use of ordinary
+// function as HelpSupplementRevision mutator.
+type HelpSupplementRevisionFunc func(context.Context, *ent.HelpSupplementRevisionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f HelpSupplementRevisionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.HelpSupplementRevisionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.HelpSupplementRevisionMutation", m)
+}
+
 // The InventoryBalanceFunc type is an adapter to allow the use of ordinary
 // function as InventoryBalance mutator.
 type InventoryBalanceFunc func(context.Context, *ent.InventoryBalanceMutation) (ent.Value, error)

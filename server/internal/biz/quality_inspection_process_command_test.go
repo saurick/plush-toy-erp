@@ -42,7 +42,7 @@ func TestIncomingQualityGateProcessDomainCommandPassesOnlyAfterAggregateReady(t 
 		},
 	}
 	processRuntimeUC := NewProcessRuntimeUsecase(processRepo, nil)
-	if err := RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC, NewInventoryUsecase(inventoryRepo)); err != nil {
+	if err := RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC, NewQualityInspectionUsecase(inventoryRepo)); err != nil {
 		t.Fatalf("register quality inspection process command handler failed: %v", err)
 	}
 
@@ -80,7 +80,7 @@ func TestFinishedGoodsQualityProcessDomainCommandReplaysPostgresMicrosecondTime(
 	sourceID := 9001
 	inspectorID := 7
 	storedTime := time.Date(2026, 7, 10, 4, 34, 56, 123456000, time.UTC)
-	handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewInventoryUsecase(&qualityInspectionProcessInventoryRepoStub{
+	handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewQualityInspectionUsecase(&qualityInspectionProcessInventoryRepoStub{
 		inspection: &QualityInspection{
 			ID: 8001, SourceType: &sourceType, SourceID: &sourceID, InspectionType: &inspectionType,
 			InventoryLotID: 7001, Status: QualityInspectionStatusPassed, Result: &result,
@@ -177,7 +177,7 @@ func TestFinishedGoodsQualityProcessDomainCommandLegacyResultWithoutInspectedAtR
 					InspectedAt: &storedTime, InspectorID: &inspectorID,
 				},
 			}
-			handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewInventoryUsecase(repo)}
+			handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewQualityInspectionUsecase(repo)}
 			_, err := handler.ExecuteProcessDomainCommand(context.Background(), &ProcessDomainCommandInput{
 				ProcessInstance: &ProcessInstance{ID: 11, BusinessRefType: "shipment", BusinessRefID: 9001},
 				CommandKey:      ProcessDomainCommandFinishedGoodsQualityDecide,
@@ -234,7 +234,7 @@ func TestFinishedGoodsQualityProcessDomainCommandCurrentClaimReconcilesDefaulted
 		IdempotencyKey: idempotencyKey,
 		Payload:        payload,
 	}
-	handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewInventoryUsecase(repo)}
+	handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewQualityInspectionUsecase(repo)}
 	if _, err := handler.ExecuteProcessDomainCommand(context.Background(), in, inspectorID); err != nil {
 		t.Fatalf("current claimed command must reconcile omitted inspected_at: %v", err)
 	}
@@ -254,7 +254,7 @@ func TestIncomingQualityGateProcessDomainCommandRejectBlocksProcess(t *testing.T
 			RejectedLineIDs:   []int{12},
 		},
 	}
-	handler := &incomingQualityGateProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+	handler := &incomingQualityGateProcessCommandHandler{uc: NewQualityInspectionUsecase(inventoryRepo)}
 
 	result, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6002},
@@ -276,7 +276,7 @@ func TestIncomingQualityGateProcessDomainCommandRejectBlocksProcess(t *testing.T
 }
 
 func TestIncomingQualityGateProcessDomainCommandKeepsPendingNodeActive(t *testing.T) {
-	handler := &incomingQualityGateProcessCommandHandler{uc: NewInventoryUsecase(&qualityInspectionProcessInventoryRepoStub{
+	handler := &incomingQualityGateProcessCommandHandler{uc: NewQualityInspectionUsecase(&qualityInspectionProcessInventoryRepoStub{
 		qualityGate: &PurchaseReceiptQualityGate{
 			PurchaseReceiptID: 6003,
 			Outcome:           PurchaseReceiptQualityGatePending,
@@ -312,7 +312,7 @@ func TestIncomingQualityGateProcessRuntimeBlocksRejectedReceiptWithoutAdvancing(
 		RejectedLineIDs:   []int{12},
 	}}
 	uc := NewProcessRuntimeUsecase(processRepo, nil)
-	if err := RegisterQualityInspectionProcessDomainCommandHandlers(uc, NewInventoryUsecase(inventoryRepo)); err != nil {
+	if err := RegisterQualityInspectionProcessDomainCommandHandlers(uc, NewQualityInspectionUsecase(inventoryRepo)); err != nil {
 		t.Fatalf("register quality handlers failed: %v", err)
 	}
 	node, err := uc.ExecuteDomainCommandNode(ctx, &ProcessDomainCommandExecution{
@@ -337,7 +337,7 @@ func TestIncomingQualityGateProcessRuntimeBlocksRejectedReceiptWithoutAdvancing(
 func TestIncomingQualityGateProcessDomainCommandRejectsLegacyInspectionID(t *testing.T) {
 	ctx := context.Background()
 	inventoryRepo := &qualityInspectionProcessInventoryRepoStub{}
-	handler := &incomingQualityGateProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+	handler := &incomingQualityGateProcessCommandHandler{uc: NewQualityInspectionUsecase(inventoryRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6002},
@@ -367,7 +367,7 @@ func TestIncomingQualityGateProcessDomainCommandRejectsMismatchedStableRefs(t *t
 			PassedLines:       1,
 		},
 	}
-	handler := &incomingQualityGateProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+	handler := &incomingQualityGateProcessCommandHandler{uc: NewQualityInspectionUsecase(inventoryRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_order", BusinessRefID: 6001},
@@ -409,7 +409,7 @@ func TestIncomingQualityGateProcessDomainCommandRejectsMismatchedStableRefs(t *t
 func TestIncomingQualityGateProcessDomainCommandRequiresReceipt(t *testing.T) {
 	ctx := context.Background()
 	inventoryRepo := &qualityInspectionProcessInventoryRepoStub{}
-	handler := &incomingQualityGateProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+	handler := &incomingQualityGateProcessCommandHandler{uc: NewQualityInspectionUsecase(inventoryRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_receipt", BusinessRefID: 6001},
@@ -484,7 +484,7 @@ func TestFinishedGoodsQualityProcessDomainCommandDecideBindsShipmentLinkedInspec
 		},
 	}
 	processRuntimeUC := NewProcessRuntimeUsecase(processRepo, nil)
-	if err := RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC, NewInventoryUsecase(inventoryRepo)); err != nil {
+	if err := RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC, NewQualityInspectionUsecase(inventoryRepo)); err != nil {
 		t.Fatalf("register quality process command handlers failed: %v", err)
 	}
 
@@ -555,7 +555,7 @@ func TestFinishedGoodsQualityProcessDomainCommandDecideRejectsMismatchedShipment
 			Status:         QualityInspectionStatusSubmitted,
 		},
 	}
-	handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+	handler := &finishedGoodsQualityDecideProcessCommandHandler{uc: NewQualityInspectionUsecase(inventoryRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 11, BusinessRefType: "shipment", BusinessRefID: 9001},

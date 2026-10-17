@@ -11,6 +11,8 @@ import {
   multiplyNumeric20Scale6Values,
   normalizeNumeric20Scale6,
   normalizePositiveNumeric20Scale6,
+  numeric20Scale6AggregateUnits,
+  numeric20Scale6QuantityUnits,
   numeric20Scale6TextFromUnits,
   numeric20Scale6Units,
   subtractNumeric20Scale6Units,
@@ -96,4 +98,45 @@ test('numeric(20,6) values multiply and round half-up without binary floating po
     '200000000000000.00'
   )
   assert.equal(multiplyNumeric20Scale6Values('invalid', '2', 2), '')
+})
+
+test('quantity input preserves leading decimals and rejects separators, overflow and oversized text', () => {
+  assert.equal(numeric20Scale6QuantityUnits(' .5 '), '500000')
+  assert.equal(numeric20Scale6QuantityUnits('0001.230000'), '1230000')
+  assert.equal(numeric20Scale6QuantityUnits('0'), '0')
+  assert.equal(
+    numeric20Scale6QuantityUnits('99999999999999.999999'),
+    '99999999999999999999'
+  )
+  for (const value of [
+    '1,000',
+    '1e3',
+    '-1',
+    '1.',
+    '.0000001',
+    '100000000000000',
+    '0'.repeat(22),
+  ]) {
+    assert.equal(numeric20Scale6QuantityUnits(value), null, value)
+  }
+})
+
+test('aggregate quantities exceed a single field while retaining canonical wire text and exact scale', () => {
+  const amount = '100000000000000.000001'
+  const units = numeric20Scale6AggregateUnits(amount)
+  assert.equal(units, '100000000000000000001')
+  assert.equal(numeric20Scale6TextFromUnits(units), amount)
+  assert.equal(numeric20Scale6Units(amount), null)
+  for (const value of [
+    '01',
+    '.5',
+    '1,000',
+    ' 1',
+    '1\n',
+    '0.0000001',
+    1,
+    null,
+  ]) {
+    assert.equal(numeric20Scale6AggregateUnits(value), null, String(value))
+  }
 })

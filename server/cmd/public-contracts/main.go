@@ -26,6 +26,7 @@ type catalog struct {
 	Numeric       map[string]int64             `json:"numeric"`
 	Policies      map[string]map[string]int64  `json:"policies"`
 	RPC           map[string]map[string]string `json:"rpc"`
+	RPCTransport  map[string]string            `json:"rpcTransport"`
 }
 
 var wordBoundary = regexp.MustCompile(`([a-z0-9])([A-Z])`)
@@ -622,6 +623,9 @@ func collect(root string) (catalog, error) {
 		{"biz/admin_password.go", "AdminPasswordPolicy", map[string]string{
 			"AdminPasswordMinLength": "minCharacters", "AdminPasswordMaxLength": "maxCharacters", "AdminPasswordMaxBytes": "maxBytes",
 		}},
+		{"biz/help_content.go", "HelpContentPolicy", map[string]string{
+			"HelpMarkdownMaxCharacters": "markdownMaxCharacters", "HelpSummaryMaxCharacters": "summaryMaxCharacters", "HelpFeedbackMinCharacters": "feedbackMinCharacters", "HelpFeedbackMaxCharacters": "feedbackMaxCharacters", "HelpQuoteMaxCharacters": "quoteMaxCharacters", "HelpResponseMaxCharacters": "responseMaxCharacters",
+		}},
 		{"server/template_pdf_security.go", "PrintPolicy", map[string]string{
 			"maxTemplatePDFEmbeddedImageCount": "imageCount", "maxTemplatePDFEmbeddedImageBytes": "imageBytes", "maxTemplatePDFEmbeddedTotalBytes": "imageTotalBytes",
 			"maxTemplatePDFFontCount": "fontCount", "maxTemplatePDFFontBytes": "fontBytes", "maxTemplatePDFFontTotalBytes": "fontTotalBytes",
@@ -653,6 +657,10 @@ func collect(root string) (catalog, error) {
 		return out, err
 	}
 	out.RPC, err = rpcMethods(root)
+	if err != nil {
+		return out, err
+	}
+	out.RPCTransport, err = rpcTransport(root)
 	return out, err
 }
 

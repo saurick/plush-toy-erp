@@ -250,12 +250,12 @@ test('排产与异常深链分别选中所属生产页签，不扩大页面权�
     'production-orders'
   )
   assert.equal(
-    getBusinessModuleTabs('/erp/production/exceptions', visible).activeKey,
-    'production-progress'
+    getBusinessModuleTabs('/erp/production/exceptions', visible, { adminProfile: { permissions: ['production.fact.read', 'production.wip.read'], effective_session: { actions: ['production.fact.read', 'production.wip.read'] } } }).activeKey,
+    'production-exceptions'
   )
   const limited = getBusinessModuleTabs('/erp/production/exceptions', [
     section('production-exceptions'),
-  ])
+  ], { adminProfile: { permissions: ['production.fact.read', 'production.wip.read'], effective_session: { actions: ['production.fact.read', 'production.wip.read'] } } })
   assert.deepEqual(
     limited.tabs.map((tab) => tab.path),
     ['/erp/production/exceptions']
@@ -295,14 +295,14 @@ test('页签分别恢复地址查询，直接单据链接仍保持原地址', ()
 test('重复点击当前模块不切回首页；重新进入只恢复仍有权限的页面', () => {
   const cache = new Map()
   const item = getBusinessModule('receivables')
-  const current = { pathname: '/erp/finance/invoices', search: '?fact_id=42' }
+  const current = { pathname: '/erp/finance/invoices', search: '?fact_id=42', hash: '#details' }
   rememberBusinessModuleLocation(cache, current)
   assert.equal(
     resolveBusinessModuleMenuTarget(item, current, cache, [
       item.path,
       current.pathname,
     ]),
-    current.pathname
+    `${current.pathname}${current.search}${current.hash}`
   )
   assert.equal(
     resolveBusinessModuleMenuTarget(
@@ -311,7 +311,7 @@ test('重复点击当前模块不切回首页；重新进入只恢复仍有权�
       cache,
       [item.path, current.pathname]
     ),
-    '/erp/finance/invoices?fact_id=42'
+    '/erp/finance/invoices?fact_id=42#details'
   )
   assert.equal(
     resolveBusinessModuleMenuTarget(
@@ -321,6 +321,22 @@ test('重复点击当前模块不切回首页；重新进入只恢复仍有权�
       [item.path]
     ),
     item.path
+  )
+})
+
+test('direct production execution preserves the active menu URL while records use their own bare path', () => {
+  const pathname = '/erp/production/progress'
+  const location = { pathname, search: '?display=process', hash: '' }
+  const cache = new Map()
+  rememberBusinessModuleLocation(cache, location)
+  assert.equal(
+    resolveBusinessModuleMenuTarget(getBusinessModule('production-orders'), location, cache, [pathname]),
+    `${pathname}?display=process`
+  )
+  assert.equal(restoreBusinessModuleTabPath({ path: pathname }, cache), pathname)
+  assert.equal(
+    resolveBusinessModuleMenuTarget({ path: '/erp/dashboard' }, { pathname: '/erp/dashboard', search: '?scope=todo', hash: '#tasks' }, cache, []),
+    '/erp/dashboard?scope=todo#tasks'
   )
 })
 
@@ -436,4 +452,20 @@ test('目录保留每个获准页面，跨模块客户显示分组不会改变�
     tabs.tabs.map((entry) => entry.key),
     ['materials']
   )
+})
+
+test('production has four authorized business entries and execution and records restore independent queries', () => {
+  const sections = [section('production-orders', 'production-progress', 'production-exceptions')]
+  const options = { adminProfile: { permissions: ['production.fact.read', 'production.wip.read'], effective_session: { actions: ['production.fact.read', 'production.wip.read'] } }, search: '?display=process' }
+  const workspace = getBusinessModuleTabs('/erp/production/progress', sections, options)
+  assert.deepEqual(workspace.tabs.map((tab) => tab.label), ['生产订单', '生产执行', '生产记录', '异常处理'])
+  assert.equal(workspace.activeKey, 'production-execution')
+  const cache = new Map()
+  rememberBusinessModuleLocation(cache, { pathname: '/erp/production/progress', search: '?fact_id=8' })
+  rememberBusinessModuleLocation(cache, { pathname: '/erp/production/progress', search: '?display=process&source_type=PRODUCTION_ORDER&source_id=7' })
+  assert.equal(restoreBusinessModuleTabPath(workspace.tabs[1], cache), '/erp/production/progress?display=process&source_type=PRODUCTION_ORDER&source_id=7')
+  assert.equal(restoreBusinessModuleTabPath(workspace.tabs[2], cache), '/erp/production/progress?fact_id=8')
+  const denied = getBusinessModuleTabs('/erp/production/progress', sections, { adminProfile: { permissions: ['production.fact.read'] } })
+  assert.equal(denied.tabs.some((tab) => tab.key === 'production-execution'), false)
+  assert.equal(getBusinessModuleTabs('/erp/production/orders', [section('production-orders')], options).tabs.length, 1)
 })

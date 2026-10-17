@@ -133,6 +133,29 @@ const DIRECT_TASK_SOURCE_TARGETS = new Map([
   ['finance_payment', [BUSINESS_ROUTE_PATHS.financePayments, 'finance_payment_id']],
 ])
 const SOURCE_TASK_CONTRACT = 'workflow.source-task/v1'
+
+export function workflowTaskSourceForEntryPath(entryPath) {
+  if (typeof entryPath !== 'string' || !entryPath.startsWith('/erp/')) return null
+  const url = new URL(entryPath, 'https://erp.invalid')
+  const positiveID = (key) => {
+    const value = url.searchParams.get(key)
+    const id = /^[1-9][0-9]*$/u.test(value || '') ? Number(value) : 0
+    return Number.isSafeInteger(id) && id > 0 ? id : null
+  }
+  for (const [path, key, type] of [
+    [BUSINESS_ROUTE_PATHS.processingContracts, 'outsourcing_fact_id', 'outsourcing_fact'],
+    [BUSINESS_ROUTE_PATHS.productionOrders, 'wip_batch_id', 'production_wip_batch'],
+  ]) {
+    const id = url.pathname === path ? positiveID(key) : null
+    if (id) return { source_type: type, source_id: id }
+  }
+  const sourceTypes = { receipt_id: 'purchase_receipt', fact_id: 'production_fact', production_exception_id: 'production_exception_decision' }
+  for (const [path, key] of DIRECT_TASK_SOURCE_TARGETS.values()) {
+    const id = url.pathname === path ? positiveID(key) : null
+    if (id) return { source_type: sourceTypes[key] || key.slice(0, -3), source_id: id }
+  }
+  return null
+}
 const SOURCE_TASK_INTENT_HASH_PATTERN = /^[0-9a-f]{64}$/
 const STANDALONE_SOURCE_TASK_CONTRACTS = new Map([
   [

@@ -7,6 +7,7 @@ import (
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/conf"
+	"server/internal/projectmanuals"
 	pkglogger "server/pkg/logger"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -40,6 +41,7 @@ func NewJsonrpcService(
 	adminReader biz.AdminAccountReader,
 	businessProgressUC *biz.BusinessProgressUsecase,
 	businessStatisticsUC *biz.BusinessStatisticsUsecase,
+	helpContentRepo biz.HelpContentRepo,
 ) *JsonrpcService {
 	service := &JsonrpcService{
 		dispatcher: newJSONRPCDispatcher(
@@ -65,6 +67,7 @@ func NewJsonrpcService(
 	}
 	service.dispatcher.businessProgressUC = businessProgressUC
 	service.dispatcher.businessStatisticsUC = businessStatisticsUC
+	service.dispatcher.helpContentUC = biz.NewHelpContentUsecase(helpContentRepo, projectmanuals.NewCatalog())
 	return service
 }
 

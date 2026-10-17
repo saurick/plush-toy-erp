@@ -131,3 +131,47 @@ func TestFulfillmentSequentialQualityHandsOffToProduction(t *testing.T) {
 	assertFulfillmentTask(t, f.ctx, f.client, "production_packaging_transfer", b.batch.ID, "blocked", biz.WarehouseRoleKey)
 	assertInventoryTxnCount(t, f.ctx, f.client, 0)
 }
+
+func TestFulfillmentOutsourcingQualityRequestTracksSourceAndCancellation(t *testing.T) {
+	ctx := t.Context()
+	data, client := openInventoryRepoTestData(t, "fulfillment_outsourcing_quality_request")
+	f := createInventoryTestFixtures(t, ctx, client)
+	logger := log.NewStdLogger(io.Discard)
+	inventory := biz.NewInventoryUsecase(NewInventoryRepo(data, logger))
+	operational := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
+	actor := client.AdminUser.Create().SetUsername("quality-request-owner").SetPasswordHash("test-password-hash").SaveX(ctx)
+	fact := createPostedOutsourcingReturnForQuality(t, ctx, client, inventory, operational, f, actor.ID, "QUALITY-REQUEST")
+	ready := assertFulfillmentTask(t, ctx, client, "outsourcing_quality_request", fact.ID, "ready", biz.QualityRoleKey)
+	if *ready.RequiredCapabilityKey != biz.PermissionQualityInspectionCreate || *ready.SourceNo != fact.FactNo {
+		t.Fatalf("request must expose the actual return and quality capability: %#v", ready)
+	}
+	beforeFact := receivingJSON(t, client.OutsourcingFact.GetX(ctx, fact.ID))
+	beforeLedger := client.InventoryTxn.Query().CountX(ctx)
+	input := &biz.QualityInspectionFromOutsourcingReturnCreate{InspectionNo: "QI-QUALITY-REQUEST", OutsourcingFactID: fact.ID}
+	draft, err := inventory.CreateQualityInspectionFromOutsourcingReturn(ctx, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	done := assertFulfillmentTask(t, ctx, client, "outsourcing_quality_request", fact.ID, "done", biz.QualityRoleKey)
+	assertFulfillmentTask(t, ctx, client, "outsourcing_quality", draft.ID, "ready", biz.QualityRoleKey)
+	if _, err := inventory.CreateQualityInspectionFromOutsourcingReturn(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	if again := assertFulfillmentTask(t, ctx, client, "outsourcing_quality_request", fact.ID, "done", biz.QualityRoleKey); again.Version != done.Version {
+		t.Fatal("exact quality-create replay changed the source request task")
+	}
+	if _, err := inventory.CancelQualityInspection(ctx, draft.ID, stringPtr("模拟撤销待检草稿，重新安排质检")); err != nil {
+		t.Fatal(err)
+	}
+	resumed := assertFulfillmentTask(t, ctx, client, "outsourcing_quality_request", fact.ID, "ready", biz.QualityRoleKey)
+	if resumed.ID != ready.ID || resumed.Version <= done.Version || resumed.CompletedAt != nil {
+		t.Fatalf("cancelled draft must reopen the same source request: %#v", resumed)
+	}
+	if receivingJSON(t, client.OutsourcingFact.GetX(ctx, fact.ID)) != beforeFact || client.InventoryTxn.Query().CountX(ctx) != beforeLedger {
+		t.Fatal("quality request and draft cancellation changed the return or inventory ledger")
+	}
+	if _, err := operational.CancelPostedOutsourcingFact(ctx, operationalFactStatusMutation(fact.ID, fact.Version, actor.ID, "模拟撤销回货")); err != nil {
+		t.Fatal(err)
+	}
+	assertFulfillmentTask(t, ctx, client, "outsourcing_quality_request", fact.ID, "withdrawn", biz.QualityRoleKey)
+}

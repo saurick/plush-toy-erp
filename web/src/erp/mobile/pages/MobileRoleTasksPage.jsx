@@ -124,7 +124,7 @@ const DEFAULT_MOBILE_TASK_QUERY_OPTIONS = Object.freeze({
 function readMobileTaskHistoryState() {
   if (typeof window === 'undefined') return {}
   const { state } = window.history
-  return state && typeof state === 'object' ? state : {}
+  return state && typeof state === 'object' ? { ...state.usr?.mobileRoleTasksReturn?.returnListState, ...state, ...state.usr?.workflowTaskReturn?.returnListState } : {}
 }
 
 function mobileTaskDraftStorageKey(scopeKey, taskID) {
@@ -380,7 +380,7 @@ export default function MobileRoleTasksPage() {
       Number(initialHistoryState[MOBILE_TASK_HISTORY_SCROLL_TOP_KEY] || 0)
     )
   )
-  const restoreListStateRef = useRef(false)
+  const restoreListStateRef = useRef(Boolean(initialHistoryCandidate.usr?.mobileRoleTasksReturn && !initialHistoryScreen))
   const lastFocusedTaskIDRef = useRef(
     initialHistoryState[MOBILE_TASK_HISTORY_TASK_KEY] || null
   )
@@ -718,7 +718,6 @@ export default function MobileRoleTasksPage() {
     task: selectedTaskActionsEnabled ? selectedTask : null,
     enabled: selectedTaskActionsEnabled,
   })
-
   const previousSelectedTaskIDRef = useRef(selectedTaskID)
   useEffect(() => {
     if (previousSelectedTaskIDRef.current === selectedTaskID) return
@@ -2017,7 +2016,7 @@ export default function MobileRoleTasksPage() {
     const searchHasFocus = scrollContainer
       .querySelector('[role="search"]')
       ?.contains(document.activeElement)
-    const filterHasFocus = document.activeElement?.closest('.mobile-filter-panel')
+    const filterHasFocus = document.activeElement?.closest('.mobile-filter-panel, .mobile-filter-control, .mobile-applied-filters, .mobile-role-task-filters')
     if (!searchHasFocus && !filterHasFocus) focusTarget?.focus({ preventScroll: true })
     restoreListStateRef.current = false
   }, [
@@ -2036,6 +2035,8 @@ export default function MobileRoleTasksPage() {
       {
         ...window.history.state,
         [MOBILE_TASK_HISTORY_MAIN_TAB_KEY]: activeMainTabKey,
+        [MOBILE_TASK_HISTORY_MESSAGE_TAB_KEY]: activeMessageTabKey,
+        [MOBILE_TASK_HISTORY_FILTER_KEY]: activeFilterKey,
         [MOBILE_TASK_HISTORY_SCOPE_KEY]: taskScopeKey,
         [MOBILE_TASK_HISTORY_KEYWORD_KEY]: taskKeyword,
         [MOBILE_TASK_HISTORY_SORT_KEY]: taskSortKey,
@@ -2048,6 +2049,8 @@ export default function MobileRoleTasksPage() {
     )
   }, [
     activeMainTabKey,
+    activeMessageTabKey,
+    activeFilterKey,
     taskScopeKey,
     location.search,
     taskKeyword,

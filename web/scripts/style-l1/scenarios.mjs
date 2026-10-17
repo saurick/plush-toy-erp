@@ -2,6 +2,8 @@ import { createEmptyStateScenarios } from './emptyStateScenarios.mjs'
 import { createPageHeaderScenarios } from './pageHeaderScenarios.mjs'
 import { createTaskCalendarScenarios } from './taskCalendarScenarios.mjs'
 import { createTaskCurrentFocusScenarios } from './taskCurrentFocusScenarios.mjs'
+import { createTaskFusedFlowScenarios } from './taskFusedFlowScenarios.mjs'
+import { createTaskDetailVariantScenarios } from './taskDetailVariantScenarios.mjs'
 import { createBusinessStatusCountsScenarios } from './businessStatusCountsScenarios.mjs'
 import { createBusinessFollowupScenarios } from './businessFollowupScenarios.mjs'
 import { createHighFidelityScenarios } from './highFidelityScenarios.mjs'
@@ -10,6 +12,8 @@ import { createDevUIDesignDetailScenarios } from './devUIDesignDetailScenarios.m
 import { createDevUIFeedbackScenarios } from './devUIFeedbackScenarios.mjs'
 import { createDevUIDesignWorkflowScenarios } from './devUIDesignWorkflowScenarios.mjs'
 import { createDevUIDesignMobileTrackingScenario } from './devUIDesignMobileTrackingScenario.mjs'
+import { createMobileEntryAuditScenarios } from './mobileEntryAuditScenarios.mjs'
+import { createMobileTaskBusinessScenarios } from './mobileTaskBusinessScenarios.mjs'
 import { createMobileProgressScenarios } from './mobileProgressScenarios.mjs'
 import { createMobileScrollScenarios } from './mobileScrollScenarios.mjs'
 import { createFilterConflictScenarios } from './filterConflictScenarios.mjs'
@@ -50,6 +54,7 @@ import { createDevFlowStateObservatoryScenarios } from './devFlowStateObservator
 import { createDevDrillRecoveryScenarios } from './devDrillRecoveryScenarios.mjs'
 import { createDevQualityGateScenarios } from './devQualityGateScenarios.mjs'
 import { createDevWorkbenchDesktopScenarios } from './devWorkbenchDesktopScenarios.mjs'
+import { createDevWorkbenchDensityScenarios } from './devWorkbenchDensityScenarios.mjs'
 import { createDevProjectSkillsScenarios } from './devProjectSkillsScenarios.mjs'
 import { createDevPressureScenarios } from './devPressureScenarios.mjs'
 import { createDevVersionCenterScenarios } from './devVersionCenterScenarios.mjs'
@@ -444,6 +449,7 @@ export function createStyleL1Scenarios(deps) {
       assertNoHorizontalOverflow,
       expectHeading,
     }),
+    ...createDevWorkbenchDensityScenarios({ assert, assertNoHorizontalOverflow, outputDir, path }),
     ...createDevProjectSkillsScenarios({ assert, assertNoHorizontalOverflow, expectHeading }),
     ...createDevPressureScenarios({ assert, assertNoHorizontalOverflow }),
     ...createDevUIDesignDetailScenarios(deps),
@@ -590,6 +596,8 @@ export function createStyleL1Scenarios(deps) {
     }),
     ...createTaskCalendarScenarios(deps),
     ...createTaskCurrentFocusScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createTaskDetailVariantScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createTaskFusedFlowScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createDashboardTaskScenarios({
       expectText,
       expectHeading,
@@ -618,6 +626,8 @@ export function createStyleL1Scenarios(deps) {
       ...deps,
       customerRuntimeEffectiveSession,
     }),
+    ...createMobileEntryAuditScenarios({ ...deps, customerRuntimeEffectiveSession }),
+    ...createMobileTaskBusinessScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileScrollScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createMobileWorkflowTrackingScenarios({ ...deps, customerRuntimeEffectiveSession }),
     ...createTaskLinkScenarios({ ...deps, customerRuntimeEffectiveSession }),

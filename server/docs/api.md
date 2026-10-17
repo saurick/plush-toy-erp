@@ -17,6 +17,45 @@ HTTP 路由：
 - `{url}` 表示业务域，例如 `system`、`auth`、`admin`、`workflow`、`operational_fact`
 - `method` 表示具体动作，例如 `admin_login`、`me`、`list`
 
+## 代表性接口合同与系统接入边界
+
+当前接口面向内部员工身份。外部系统、供应商或客户协作身份尚未开放；增加适配入口必须复用同等后端授权和所属领域业务路径。架构与暂缓项见[系统接入边界](../../docs/engineering/跨层公共契约与生成规范.md#系统接入边界--integration-boundary)。
+
+传输文档为 [`api/jsonrpc/v1/jsonrpc.swagger.json`](../api/jsonrpc/v1/jsonrpc.swagger.json)，由 `server/` 下 `make api` 生成。它描述 `POST /rpc/{url}` 的通用信封，不是完整业务字段 Schema。`node scripts/gen-public-contracts.mjs --check` 从已生成的 Protobuf 消息描述、HTTP binding、Swagger 和真实分发核对运行接口，生成的 `RpcTransport / RpcDomain / RpcMethod` 供 Web 与工作台共用。修改 proto 必须先运行 `make api` 并核对生成差异；公共契约提取不解析 proto，也不替代这一步。
+
+以下选取查询、源单动作、库存过账和财务核销说明最小合同；其余方法仍按所属章节、handler、参数解析和业务测试核对。成功信封的 `result.code=0`，业务错误复用正式码表，`id` 仅用于请求响应关联。
+
+| 域 / 方法 | 精确入参与边界 | 授权与成功 `result.data` | 并发与结果恢复 |
+| --- | --- | --- | --- |
+| `sales_order / get_sales_order` | 仅 `id`；必填 JSON 正整数，不能为小数、数值字符串、布尔值或超出 JSON 安全整数范围 | 有效内部会话与 `sales_order.read`；返回 `sales_order` 业务投影 | 只读，可重试；未知字段拒绝，不接受 actor、角色或客户范围覆盖 |
+| `sales_order / cancel_sales_order` | `id, expected_version, idempotency_key, reason`；可选 `customer_key` 仅选择当前部署配置。ID / 版本为正整数；原因去首尾空白后必填，最多 255 字；键去首尾空白后必填，最多 128 字节 | `sales_order.cancel`、当前销售模块门禁；actor 注入当前身份；返回 `sales_order` | 原版本、键、意图与 actor 的重放复用持久回执；同键改意图或 actor 冲突，新键使用过期版本冲突；返回所属订单投影，不承诺所有字段永久冻结 |
+| `inventory / post_inventory_operation` | 仅 `id, expected_version`，均为正整数；人工库存调整须通过审批流程执行节点办理 | `warehouse.adjustment.create`、库存模块与当前仓库数据范围；返回 `inventory_operation` | 按对象、原版本和 actor 识别已过账重放，库存效果只写一次；不接受调用方附加通用幂等键。结果未知时先读 `get_inventory_operation` |
+| `operational_fact / allocate_finance_payment` | `id, expected_version, idempotency_key, allocations`，可选 `customer_key`；`allocations` 非空，每项仅 `finance_fact_id, amount`，前者为正整数，后者为正十进制字符串 | `finance.payment.post`、财务模块及来源读取权限；返回 `payment`，含核销投影 | 沿收付款既有版本、意图与核销事务恢复；金额不足、版本或同键意图冲突不得自动调整参数重试。结果未知时按原意图重试或读 `get_finance_payment` |
+
+`customer_key` 不承担租户或合作方数据范围语义，不能授予访问权。客户端传入的 actor、角色、来源快照和 intent hash 不能取代服务端派生；具体接口仅接受其声明字段。订单生命周期的 `customer_key / idempotency_key / reason / close_mode` 一旦提供必须为 JSON string，不接受 `null`、数字、布尔、数组或对象；不得靠字符串转换改变业务意图或幂等键。共用解析器另识别 `close_mode`：关闭时要求 `normal / short`，取消时只能省略或为空串。其余接口的省略、`null` 和空串按各自字段合同处理，不能全局等同为清空。
+
+数量与金额使用现有 `numeric(20,6)` 十进制字符串合同，最多 14 位整数和 6 位小数；接口拒绝 JSON number，单位精度和是否允许零仍由所属业务校验。共享时间解析支持正 Unix 秒、RFC3339 和 `YYYY-MM-DD`，具体日期字段按业务合同解释；跨系统时间交换优先携带时区的 RFC3339，不将毫秒当秒。列表继续使用各自的分页、排序和范围合同，普通 offset 分页不表示增量同步或变更游标。
+
+例如取消订单的请求形状如下；示例 ID、版本与键仅说明格式，实际调用使用已授权对象和本次用户意图：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": "cancel-order-19",
+  "method": "cancel_sales_order",
+  "params": {
+    "id": 19,
+    "expected_version": 3,
+    "idempotency_key": "00000000-0000-4000-8000-000000000019",
+    "reason": "客户取消订单"
+  }
+}
+```
+
+对应路径为 `POST /rpc/sales_order`。网络失败或响应丢失时保留原参数、原版本和同一业务键；已知参数、权限、版本或意图冲突先处理原因。技术 `request_id` 可以随请求变化，不作为业务重放依据。
+
+契约与授权回归见 `internal/service/jsonrpc_integration_boundary_test.go`；源单并发重放见 `internal/data/source_order_lifecycle_replay_postgres_test.go`，库存与财务仍复用各自 PostgreSQL 回归。测试存在不等于本次已执行，运行结果与源码身份到质量门禁核对；这些合同不构成第三方联调或客户验收证据。
+
 ## 当前默认保留的业务域
 
 先查所属业务域，再核对文末的跨域来源动作与流程结算约束。API 存在不代表正式页面已开放该动作。
@@ -41,6 +80,22 @@ HTTP 路由：
 用途：管理员密码登录、管理员短信验证码登录、退出和当前登录态查询。当前产品不提供普通协作账号登录或公开自助注册方法。
 
 ### `admin`
+
+帮助维护接口使用当前有效账号，不接受调用方指定的账号、岗位或路径：
+
+| 方法 | 精确参数 | 返回与权限 |
+| --- | --- | --- |
+| `help_content` | 空参数 | 当前可读章节目录、维护能力和已发布补充；不返回草稿与纠错 |
+| `help_chapter` | `document_id` | 本章已发布补充与本人纠错；对应手册维护人员另获草稿、历史及本章全部纠错 |
+| `help_supplement_save` | `document_id, expected_version, markdown, summary` | 对应 `help.<book>.edit`；保存草稿与不可变修订 |
+| `help_supplement_publish` | `document_id, expected_version, summary` | 对应 `help.<book>.publish`；发布已保存草稿，空内容可撤下补充 |
+| `help_supplement_restore` | `document_id, expected_version, restore_version, summary` | 对应 `help.<book>.edit`；从同章历史新增草稿，不直接发布 |
+| `help_feedback_create` | `document_id, source_hash, published_version, quote, message, request_key` | 当前可读章节；记录当前身份，UUID 请求键支持原内容重放 |
+| `help_feedback_respond` | `document_id, feedback_id, response` | 对应手册编辑或发布能力；同章单次处理回复 |
+
+`book` 为 `business / administration / operations`。所有写入仍核对章节阅读范围，编辑 / 发布不额外授予手册阅读权。正文上限 20000 字，修改说明 300 字；纠错 5–3000 字、引用 2000 字、回复 1000 字。版本冲突返回现有 `ResourceVersionConflict`，不覆盖输入或自动重试。在线搜索和下载复用 `help_content.published`；纠错与草稿不进入普通发布内容。
+
+`project_manuals` 仅接受空参数，要求当前登录且有效的后台账号，返回 `{manuals: [{key, title, summary, markdown, source_hash}]}`。`key` 仅为 `administration / operations`，来源为正式手册生成的后端内嵌资源。管理实施册开放给超级管理员、实际老板岗位，或持有 `system.user.read / system.role.read / customer_config.read` 任一权限的账号；技术运维册开放给超级管理员，或同时持有 `system.role.permission.manage + customer_config.read + system.audit.read` 的账号。未获准书目及正文不返回，普通有效账号可得到空列表；停用、注销、失效会话沿统一鉴权拒绝。接口不接受角色、账号、路径或文件名参数，推荐岗位和 URL 不能改变范围。该只读接口不连接任意文件服务，不提供业务写入或运行命令执行。
 
 - `me`
 - `list`

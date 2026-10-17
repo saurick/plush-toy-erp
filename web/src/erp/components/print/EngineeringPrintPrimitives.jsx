@@ -1,4 +1,5 @@
 import React, { useEffect, useId, useLayoutEffect, useRef } from 'react'
+import { usePrintEditableDraftSync } from './usePrintEditableDraftSync.js'
 import { WorkInstructionImageAnnotationLayer } from './WorkInstructionImageAnnotationEditor.jsx'
 import BusinessImage from '../business-list/BusinessImage.jsx'
 import {
@@ -323,36 +324,10 @@ function EditableText({
     }
   }, [])
 
-  useEffect(() => {
-    const element = editableRef.current
-    if (!element) {
-      return undefined
-    }
-
-    const ownerWindow = element.ownerDocument?.defaultView || window
-    const commitSilentDraft = () => {
-      runSilentPrintWorkspaceDraftUpdate(() => {
-        if (rich) {
-          commitRichValue(element)
-          return
-        }
-        commitPlainValue(element)
-      })
-    }
-    const observer = new ownerWindow.MutationObserver(commitSilentDraft)
-    observer.observe(element, {
-      characterData: true,
-      childList: true,
-      subtree: true,
-    })
-    element.dataset.printWorkspaceDraftReady = 'true'
-    element.addEventListener('input', commitSilentDraft)
-
-    return () => {
-      element.removeEventListener('input', commitSilentDraft)
-      observer.disconnect()
-      delete element.dataset.printWorkspaceDraftReady
-    }
+  usePrintEditableDraftSync({
+    editableRef,
+    commitElementValue: (element) => rich ? commitRichValue(element) : commitPlainValue(element),
+    elementType: Component,
   })
 
   if (rich) {

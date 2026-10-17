@@ -41,7 +41,6 @@ import {
 } from '../utils/mobileWorkflowTracking.mjs'
 import MobileFilterPopover from './MobileFilterPopover.jsx'
 import MobileFilterChoices from './MobileFilterChoices.jsx'
-import MobileAppliedFilters from './MobileAppliedFilters.jsx'
 import MobileTaskPullRefresh from './MobileTaskPullRefresh.jsx'
 import MobileScrollEdge from './MobileScrollEdge.jsx'
 import { usePageLoadFeedback } from '../../components/PageLoadFeedback.jsx'
@@ -52,7 +51,8 @@ function TrackingSearch({ value, onSearch }) {
   return (
     <MobileSearchInput
       aria-label="搜索流转记录"
-      placeholder="单号/任务/产品/款号"
+      placeholder="单号/任务"
+      title="搜索单号、任务、产品或款号"
       maxLength={100}
       value={search.value}
       onChange={search.onChange}
@@ -108,6 +108,7 @@ function MobileTrackingContent({
   )
   const [result, setResult] = useState(null)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const filterTriggerRef = useRef(null)
   const [revision, setRevision] = useState(0)
   const [loading, setLoading] = useState(false)
   const stateRef = useRef(state)
@@ -367,18 +368,15 @@ function MobileTrackingContent({
       detailEntry: false,
     })
   }
-  const filterCount = ['owner_role_key', 'attention'].filter(
-    (field) => query[field]
-  ).length
-  const appliedFilters = [
+  const resetFilters = () => updateQuery({ status: '', owner_role_key: '', attention: '' })
+  const filterSummary = [
+    ['status', '流转状态', TRACKING_STATUS_OPTIONS],
     ['owner_role_key', '当前岗位', TRACKING_ROLE_OPTIONS],
     ['attention', '关注事项', TRACKING_ATTENTION_OPTIONS],
   ]
     .filter(([field]) => query[field])
-    .map(([key, label, options]) => ({
-      key,
-      label: `${label}：${options.find(({ value }) => value === query[key])?.label}`,
-    }))
+    .map(([key, label, options]) => `${label}：${options.find(({ value }) => value === query[key])?.label}`)
+  const filterCount = filterSummary.length
 
   return (
     <section className="mobile-workflow-tracking" aria-label="流程跟踪">
@@ -403,12 +401,9 @@ function MobileTrackingContent({
             open={filtersOpen}
             onOpenChange={setFiltersOpen}
             count={filterCount}
-            onReset={() =>
-              updateQuery({
-                owner_role_key: '',
-                attention: '',
-              })
-            }
+            summary={filterSummary}
+            triggerRef={filterTriggerRef}
+            onReset={resetFilters}
           >
             {!source ? (
               <fieldset role="presentation">
@@ -471,11 +466,6 @@ function MobileTrackingContent({
             onChange={(status) => updateQuery({ status })}
           />
         </HorizontalScroll>
-        <MobileAppliedFilters
-          label="当前流程筛选"
-          items={appliedFilters}
-          onClear={(key) => updateQuery({ [key]: '' })}
-        />
         <MobileScrollEdge scrollContainerRef={scrollContainerRef} />
       </div>
       <MobileTaskPullRefresh
@@ -526,6 +516,7 @@ function MobileTrackingContent({
                 {entry.display_context && (
                   <WorkflowTaskIdentity
                     task={entry}
+                    keyword={query.keyword}
                     compact
                     copyable={false}
                     showStyleNo

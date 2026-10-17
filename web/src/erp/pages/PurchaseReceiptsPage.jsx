@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Popconfirm, Tag } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import { PurchaseReceiptAdjustmentStatus, PurchaseReceiptStatus, PurchaseReturnStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
@@ -175,6 +176,7 @@ function receiptQuantityTotal(receipt = {}) {
 }
 
 export default function PurchaseReceiptsPage() {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const outletContext = useOutletContext()
   const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -690,6 +692,7 @@ export default function PurchaseReceiptsPage() {
       try {
         const nextReceipt = await action({ id: receipt.id })
         setSelectedRow(nextReceipt || receipt)
+        reportBusinessResult(action === postPurchaseReceipt && Number(nextReceipt?.pending_inbound_lines) > 0 ? '合格材料已入库，其余明细继续检验或处置' : successText, nextReceipt || receipt)
         message.success(action === postPurchaseReceipt && Number(nextReceipt?.pending_inbound_lines) > 0 ? '合格材料已入库，其余明细继续检验或处置' : successText)
         await loadRows()
       } catch (error) {
@@ -698,7 +701,7 @@ export default function PurchaseReceiptsPage() {
         setSaving(false)
       }
     },
-    [loadRows]
+    [loadRows, reportBusinessResult]
   )
 
   const submitReceiptException = useCallback(
@@ -748,6 +751,7 @@ export default function PurchaseReceiptsPage() {
           throw error
         }
         exceptionAttemptsRef.current.settle(scope, attempt)
+        reportBusinessResult(mode === 'return' ? '采购退货草稿已生成' : '入库调整草稿已生成', createdRecord)
         message.success(
           mode === 'return' ? '采购退货草稿已生成' : '入库调整草稿已生成'
         )
@@ -786,6 +790,7 @@ export default function PurchaseReceiptsPage() {
       loadRows,
       receiptExceptionMode,
       selectedRow,
+      reportBusinessResult,
     ]
   )
 

@@ -50,14 +50,14 @@
 .mobile-progress-search {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  margin-top: 6px;
+  gap: 6px;
+  margin-top: 4px;
 }
 .mobile-progress-risks {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-  padding: 8px 0;
+  padding: 4px 0;
   scrollbar-width: none;
 }
 .mobile-progress-risks .erp-filter-chip {

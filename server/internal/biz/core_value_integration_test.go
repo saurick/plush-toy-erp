@@ -133,20 +133,19 @@ func TestNormalizeFactCreateTracksExplicitIntentTimes(t *testing.T) {
 	}
 }
 
-func TestNormalizeBOMItemCreateUsesCoreQuantityGuard(t *testing.T) {
-	in := BOMItemCreate{
-		BOMHeaderID: 1,
-		MaterialID:  2,
-		Quantity:    decimal.NewFromInt(1),
-		UnitID:      3,
-		LossRate:    decimal.Zero,
+func TestNormalizeBOMItemUpdateUsesCoreQuantityGuard(t *testing.T) {
+	in := BOMItemUpdate{
+		MaterialID: 2,
+		Quantity:   decimal.NewFromInt(1),
+		UnitID:     3,
+		LossRate:   decimal.Zero,
 	}
 
-	if _, err := normalizeBOMItemCreate(in); err != nil {
-		t.Fatalf("normalizeBOMItemCreate() error = %v", err)
+	if _, err := normalizeBOMItemUpdate(in); err != nil {
+		t.Fatalf("normalizeBOMItemUpdate() error = %v", err)
 	}
 	in.Quantity = decimal.Zero
-	if _, err := normalizeBOMItemCreate(in); !errors.Is(err, ErrBadParam) {
+	if _, err := normalizeBOMItemUpdate(in); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected zero BOM item quantity rejected, got %v", err)
 	}
 }

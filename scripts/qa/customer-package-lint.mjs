@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { parseCustomerPackageArgs } from "../lib/customer-package-args.mjs";
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -39,45 +40,6 @@ export function isNamespacedPackageKey(customerKey, packageKey) {
     packageKey.startsWith(`${customerKey}-`) &&
     /^[a-z0-9]+(?:-[a-z0-9]+)*-package$/u.test(packageKey)
   );
-}
-
-function parseArgs(argv = process.argv.slice(2)) {
-  const args = {
-    customer: "yoyoosun",
-    customers: [],
-    all: false,
-    mode: "",
-    out: "",
-  };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === "--customer") {
-      const customerKey = argv[index + 1] || "";
-      args.customer = customerKey;
-      args.customers.push(customerKey);
-      index += 1;
-    } else if (arg === "--all") {
-      args.all = true;
-    } else if (arg === "--mode") {
-      args.mode = argv[index + 1] || "";
-      index += 1;
-    } else if (arg === "--out") {
-      args.out = argv[index + 1] || "";
-      index += 1;
-    } else if (arg === "--help" || arg === "-h") {
-      args.help = true;
-    } else {
-      throw new Error(`unsupported argument: ${arg}`);
-    }
-  }
-  assert(
-    !(args.all && args.customers.length > 0),
-    "--all and --customer are mutually exclusive",
-  );
-  if (!args.all && args.customers.length === 0) {
-    args.customers = [args.customer];
-  }
-  return args;
 }
 
 function printHelp() {
@@ -1043,7 +1005,7 @@ function runCustomerPackageLintMany(args) {
 }
 
 function main() {
-  const args = parseArgs();
+  const args = parseCustomerPackageArgs();
   if (args.help) {
     printHelp();
     return;

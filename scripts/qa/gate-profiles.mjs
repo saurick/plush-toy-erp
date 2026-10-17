@@ -107,6 +107,7 @@ const FULL_REQUIRED_FILES = Object.freeze([
   "scripts/purchase-receipt-pg.sh",
   "scripts/purchase-return-pg.sh",
   "web/scripts/styleL1.mjs",
+  "web/scripts/runUnitTests.mjs",
   "server/Makefile",
 ]);
 

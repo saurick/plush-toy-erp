@@ -1,5 +1,9 @@
 import { InventoryLotStatus, OperationalFactStatus } from '../../common/consts/statuses.generated.mjs'
 import {
+  numeric20Scale6QuantityUnits,
+  numeric20Scale6TextFromUnits,
+} from './numeric20Scale6.mjs'
+import {
   buildSourceInboundLotFields,
   normalizeSourceInboundLotRequestFields,
 } from './sourceInboundLotSelection.mjs'
@@ -24,43 +28,23 @@ const CREATE_REQUEST_KEYS = new Set([
   'note',
 ])
 
-const QUANTITY_PATTERN = /^(?:0*\d+(?:\.\d+)?|0*\.\d+)$/u
-const QUANTITY_MAX_LENGTH = 21
-const QUANTITY_SCALE = 6
-
-function zeroQuantityUnits() {
-  return BigInt(0)
-}
-
 function canonicalQuantity(value, allowZero = false) {
-  const text = String(value ?? '').trim()
-  if (text.length > QUANTITY_MAX_LENGTH || !QUANTITY_PATTERN.test(text)) {
-    return ''
-  }
-  const [whole = '0', fraction = ''] = text.split('.')
-  const normalizedWhole = whole.replace(/^0+(?=\d)/u, '') || '0'
-  if (normalizedWhole.length > 14 || fraction.length > QUANTITY_SCALE) {
-    return ''
-  }
-  const normalizedFraction = fraction.replace(/0+$/u, '')
-  const normalized = normalizedFraction
-    ? `${normalizedWhole}.${normalizedFraction}`
-    : normalizedWhole
-  return allowZero || normalized !== '0' ? normalized : ''
+  const units = numeric20Scale6QuantityUnits(value)
+  return units !== null && (allowZero || units !== '0')
+    ? numeric20Scale6TextFromUnits(units)
+    : ''
 }
 
 function quantityUnits(value, allowZero = false) {
-  const normalized = canonicalQuantity(value, allowZero)
-  if (!normalized) throw invalidContract('完工数量不完整，请刷新后重试')
-  const [whole, fraction = ''] = normalized.split('.')
-  return BigInt(`${whole}${fraction.padEnd(QUANTITY_SCALE, '0')}`)
+  const units = numeric20Scale6QuantityUnits(value)
+  if (units === null || (!allowZero && units === '0')) {
+    throw invalidContract('完工数量不完整，请刷新后重试')
+  }
+  return BigInt(units)
 }
 
 function quantityTextFromUnits(value) {
-  const digits = value.toString().padStart(QUANTITY_SCALE + 1, '0')
-  const whole = digits.slice(0, -QUANTITY_SCALE) || '0'
-  const fraction = digits.slice(-QUANTITY_SCALE).replace(/0+$/u, '')
-  return fraction ? `${whole}.${fraction}` : whole
+  return numeric20Scale6TextFromUnits(value.toString())
 }
 
 function invalidContract(message = '完工入库内容不完整，请重新核对') {
@@ -235,14 +219,14 @@ export function buildProductionCompletionChoices(
       const target = fact.status === OperationalFactStatus.POSTED ? postedByBatch : draftByBatch
       target.set(
         batchID,
-        (target.get(batchID) || zeroQuantityUnits()) + quantity
+        (target.get(batchID) || 0n) + quantity
       )
       continue
     }
     if (Number(fact?.production_wip_batch_id || 0) > 0) {
       throw invalidContract('已有完工记录的来源批次与生产明细不一致')
     }
-    target.set(lineID, (target.get(lineID) || zeroQuantityUnits()) + quantity)
+    target.set(lineID, (target.get(lineID) || 0n) + quantity)
   }
 
   return normalizedItems.map((entry, index) => {
@@ -252,11 +236,11 @@ export function buildProductionCompletionChoices(
       ? receivableBatches.map((batch) => {
           const batchID = Number(batch.id)
           const quantity = quantityUnits(batch.quantity)
-          const posted = postedByBatch.get(batchID) || zeroQuantityUnits()
-          const draft = draftByBatch.get(batchID) || zeroQuantityUnits()
+          const posted = postedByBatch.get(batchID) || 0n
+          const draft = draftByBatch.get(batchID) || 0n
           const consumed = posted + draft
           const remaining =
-            quantity > consumed ? quantity - consumed : zeroQuantityUnits()
+            quantity > consumed ? quantity - consumed : 0n
           const lineage = productionWipBatchLineageMeta(batch)
           const batchNo = String(batch?.batch_no || '').trim()
           return {
@@ -273,14 +257,14 @@ export function buildProductionCompletionChoices(
             posted: quantityTextFromUnits(posted),
             draft: quantityTextFromUnits(draft),
             remaining: quantityTextFromUnits(remaining),
-            disabled: remaining <= zeroQuantityUnits(),
+            disabled: remaining <= 0n,
           }
         })
       : []
     const receivableQuantity = routed
       ? batchChoices.reduce(
           (total, choice) => total + quantityUnits(choice.quantity),
-          zeroQuantityUnits()
+          0n
         )
       : item?.receivable_quantity
         ? quantityUnits(item.receivable_quantity)
@@ -288,23 +272,23 @@ export function buildProductionCompletionChoices(
     const posted = routed
       ? batchChoices.reduce(
           (total, choice) => total + quantityUnits(choice.posted, true),
-          zeroQuantityUnits()
+          0n
         )
-      : postedByLine.get(lineID) || zeroQuantityUnits()
+      : postedByLine.get(lineID) || 0n
     const draft = routed
       ? batchChoices.reduce(
           (total, choice) => total + quantityUnits(choice.draft, true),
-          zeroQuantityUnits()
+          0n
         )
-      : draftByLine.get(lineID) || zeroQuantityUnits()
+      : draftByLine.get(lineID) || 0n
     const remaining = routed
       ? batchChoices.reduce(
           (total, choice) => total + quantityUnits(choice.remaining, true),
-          zeroQuantityUnits()
+          0n
         )
       : receivableQuantity > posted + draft
         ? receivableQuantity - posted - draft
-        : zeroQuantityUnits()
+        : 0n
     const productText =
       [item?.product_code_snapshot, item?.product_name_snapshot]
         .map((value) => String(value || '').trim())
@@ -325,7 +309,7 @@ export function buildProductionCompletionChoices(
       batchChoices,
       disabled:
         lineID <= 0 ||
-        remaining <= zeroQuantityUnits() ||
+        remaining <= 0n ||
         (routed && !batchChoices.some((choice) => !choice.disabled)),
     }
   })

@@ -25,7 +25,7 @@ func ValidatePurchaseReceiptWarehouseAccess(scope WarehouseDataScope, items []*P
 	return nil
 }
 
-func (uc *InventoryUsecase) PostPurchaseReceiptForAccess(ctx context.Context, receiptID int, scope WarehouseDataScope) (_ *PurchaseReceipt, err error) {
+func (uc *PurchaseReceiptUsecase) PostPurchaseReceiptForAccess(ctx context.Context, receiptID int, scope WarehouseDataScope) (_ *PurchaseReceipt, err error) {
 	ctx, finish := startBusinessTrace(ctx, "inventory.post_purchase_receipt")
 	defer func() { finish(err) }()
 	if uc == nil || receiptID <= 0 {
@@ -38,7 +38,7 @@ func (uc *InventoryUsecase) PostPurchaseReceiptForAccess(ctx context.Context, re
 	return repo.PostPurchaseReceiptForAccess(ctx, receiptID, NormalizeWarehouseDataScope(scope))
 }
 
-func (uc *InventoryUsecase) CancelPostedPurchaseReceiptForAccess(ctx context.Context, receiptID, actorID int, scope WarehouseDataScope) (*PurchaseReceipt, error) {
+func (uc *PurchaseReceiptUsecase) CancelPostedPurchaseReceiptForAccess(ctx context.Context, receiptID, actorID int, scope WarehouseDataScope) (*PurchaseReceipt, error) {
 	if uc == nil || receiptID <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -49,7 +49,7 @@ func (uc *InventoryUsecase) CancelPostedPurchaseReceiptForAccess(ctx context.Con
 	return repo.CancelPostedPurchaseReceiptForAccess(ctx, receiptID, actorID, NormalizeWarehouseDataScope(scope))
 }
 
-func (uc *InventoryUsecase) GetPurchaseReceiptForAccess(ctx context.Context, receiptID int, scope WarehouseDataScope) (*PurchaseReceipt, error) {
+func (uc *PurchaseReceiptUsecase) GetPurchaseReceiptForAccess(ctx context.Context, receiptID int, scope WarehouseDataScope) (*PurchaseReceipt, error) {
 	item, err := uc.GetPurchaseReceipt(ctx, receiptID)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (uc *InventoryUsecase) GetPurchaseReceiptForAccess(ctx context.Context, rec
 
 // Access checks precede Process Runtime's stored-result replay without repeating
 // quality, lifecycle or quantity checks on an already settled command.
-func (uc *InventoryUsecase) ValidatePurchaseReceiptProcessWarehouseAccess(ctx context.Context, in *ProcessDomainCommandInput) error {
+func (uc *PurchaseReceiptUsecase) ValidatePurchaseReceiptProcessWarehouseAccess(ctx context.Context, in *ProcessDomainCommandInput) error {
 	if uc == nil || uc.repo == nil || in == nil || in.WarehouseScope == nil {
 		return ErrDataScopeForbidden
 	}

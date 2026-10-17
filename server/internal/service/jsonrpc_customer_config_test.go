@@ -96,10 +96,10 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 	var inventoryUC *biz.InventoryUsecase
 	if inventoryRepo != nil {
 		inventoryUC = biz.NewInventoryUsecase(inventoryRepo)
-		if err := biz.RegisterPurchaseReceiptProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
+		if err := biz.RegisterPurchaseReceiptProcessDomainCommandHandlers(processRuntimeUC, inventoryUC.PurchaseReceiptUsecase); err != nil {
 			panic(err)
 		}
-		if err := biz.RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
+		if err := biz.RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC, inventoryUC.QualityInspectionUsecase); err != nil {
 			panic(err)
 		}
 		if err := biz.RegisterInventoryProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {

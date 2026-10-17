@@ -1,9 +1,18 @@
 // 由 `node scripts/gen-public-contracts.mjs` 生成；请勿手改。
-// 真源：server/internal/biz/admin_password.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go。
+// 真源：server/internal/biz/admin_password.go、server/internal/biz/help_content.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go。
 export const AdminPasswordPolicy = Object.freeze({
   maxBytes: 72,
   maxCharacters: 20,
   minCharacters: 8,
+})
+
+export const HelpContentPolicy = Object.freeze({
+  feedbackMaxCharacters: 3000,
+  feedbackMinCharacters: 5,
+  markdownMaxCharacters: 20000,
+  quoteMaxCharacters: 2000,
+  responseMaxCharacters: 1000,
+  summaryMaxCharacters: 300,
 })
 
 export const PrintPolicy = Object.freeze({

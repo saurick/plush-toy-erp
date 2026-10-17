@@ -457,25 +457,37 @@ function fieldBuilderChains(source) {
   return chains;
 }
 
-function dropUnchangedColumnOperations(
+function edgeBuilderChains(source) {
+  const chains = new Map();
+  for (const match of source.matchAll(/\bedge\.(?:To|From)\(/gu)) {
+    const expression = fieldBuilderExpression(source, match.index);
+    const field = expression.match(/\bField\(\s*"([a-z0-9_]+)"/u)?.[1];
+    if (field) chains.set(field, normalizeGoBuilderChain(expression));
+  }
+  return chains;
+}
+
+function dropUnchangedBuilderOperations(
   root,
   baselineFile,
   currentFile,
   range,
   tokenOperations,
+  kind,
+  readChains,
 ) {
   const addAndDropColumns = [...tokenOperations.entries()].filter(
     ([, item]) =>
-      item.kind === "column" &&
+      item.kind === kind &&
       item.operations.has("add") &&
       item.operations.has("drop"),
   );
   if (addAndDropColumns.length === 0) return;
 
-  const baselineChains = fieldBuilderChains(
+  const baselineChains = readChains(
     baselineSource(root, baselineFile, range),
   );
-  const currentChains = fieldBuilderChains(
+  const currentChains = readChains(
     readFileSync(path.join(root, currentFile), "utf8"),
   );
   for (const [key, item] of addAndDropColumns) {
@@ -527,8 +539,8 @@ function physicalTokenRequirements(source) {
   )) {
     add(match[1], "column");
   }
-  for (const match of source.matchAll(/\.Field\(\s*"([a-z0-9_]+)"/gu)) {
-    add(match[1], "column");
+  for (const match of source.matchAll(/\bField\(\s*"([a-z0-9_]+)"/gu)) {
+    add(match[1], "edge");
   }
   for (const match of source.matchAll(/\bedge\.Column\(\s*"([a-z0-9_]+)"/gu)) {
     add(match[1], "column");
@@ -876,12 +888,23 @@ function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
     baselineFile =
       statusEntries.find((entry) => entry.path === file && entry.oldPath)
         ?.oldPath || file;
-    dropUnchangedColumnOperations(
+    dropUnchangedBuilderOperations(
       root,
       baselineFile,
       file,
       range,
       tokenOperations,
+      "column",
+      fieldBuilderChains,
+    );
+    dropUnchangedBuilderOperations(
+      root,
+      baselineFile,
+      file,
+      range,
+      tokenOperations,
+      "edge",
+      edgeBuilderChains,
     );
     dropUnchangedCheckOperations(
       root,

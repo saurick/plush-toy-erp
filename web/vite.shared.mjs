@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { existsSync, realpathSync } from 'node:fs'
 import { resolve } from 'path'
 import { fileURLToPath } from 'url'
+import { createDevDocsMetadataPlugin } from './vite.docs.mjs'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
 import { normalizeDevRuntimeRecoveryMode } from './src/dev-workbench/config/devRuntimeRecovery.mjs'
 import { loadDevPorts } from '../scripts/dev-ports.mjs'
@@ -223,6 +224,7 @@ export function createERPViteConfig(appId) {
         isDev ? createDevResolvedPortGuard(serverPort) : null,
         isDev ? createDevLinkedDependencyAssets() : null,
         isDev ? createDevArchiveMarkdownAssets() : null,
+        isDev ? createDevDocsMetadataPlugin() : null,
         react(),
         ...devWorkbenchServePlugins,
       ].filter(Boolean),

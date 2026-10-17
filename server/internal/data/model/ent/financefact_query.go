@@ -4,9 +4,12 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/financeallocation"
+	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/predicate"
 
@@ -19,13 +22,15 @@ import (
 // FinanceFactQuery is the builder for querying FinanceFact entities.
 type FinanceFactQuery struct {
 	config
-	ctx           *QueryContext
-	order         []financefact.OrderOption
-	inters        []Interceptor
-	predicates    []predicate.FinanceFact
-	withPoster    *AdminUserQuery
-	withSettler   *AdminUserQuery
-	withCanceller *AdminUserQuery
+	ctx             *QueryContext
+	order           []financefact.OrderOption
+	inters          []Interceptor
+	predicates      []predicate.FinanceFact
+	withAllocations *FinanceAllocationQuery
+	withCreditNotes *FinanceCreditNoteQuery
+	withPoster      *AdminUserQuery
+	withSettler     *AdminUserQuery
+	withCanceller   *AdminUserQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -60,6 +65,50 @@ func (_q *FinanceFactQuery) Unique(unique bool) *FinanceFactQuery {
 func (_q *FinanceFactQuery) Order(o ...financefact.OrderOption) *FinanceFactQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QueryAllocations chains the current query on the "allocations" edge.
+func (_q *FinanceFactQuery) QueryAllocations() *FinanceAllocationQuery {
+	query := (&FinanceAllocationClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financefact.Table, financefact.FieldID, selector),
+			sqlgraph.To(financeallocation.Table, financeallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, financefact.AllocationsTable, financefact.AllocationsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryCreditNotes chains the current query on the "credit_notes" edge.
+func (_q *FinanceFactQuery) QueryCreditNotes() *FinanceCreditNoteQuery {
+	query := (&FinanceCreditNoteClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financefact.Table, financefact.FieldID, selector),
+			sqlgraph.To(financecreditnote.Table, financecreditnote.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, financefact.CreditNotesTable, financefact.CreditNotesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // QueryPoster chains the current query on the "poster" edge.
@@ -315,18 +364,42 @@ func (_q *FinanceFactQuery) Clone() *FinanceFactQuery {
 		return nil
 	}
 	return &FinanceFactQuery{
-		config:        _q.config,
-		ctx:           _q.ctx.Clone(),
-		order:         append([]financefact.OrderOption{}, _q.order...),
-		inters:        append([]Interceptor{}, _q.inters...),
-		predicates:    append([]predicate.FinanceFact{}, _q.predicates...),
-		withPoster:    _q.withPoster.Clone(),
-		withSettler:   _q.withSettler.Clone(),
-		withCanceller: _q.withCanceller.Clone(),
+		config:          _q.config,
+		ctx:             _q.ctx.Clone(),
+		order:           append([]financefact.OrderOption{}, _q.order...),
+		inters:          append([]Interceptor{}, _q.inters...),
+		predicates:      append([]predicate.FinanceFact{}, _q.predicates...),
+		withAllocations: _q.withAllocations.Clone(),
+		withCreditNotes: _q.withCreditNotes.Clone(),
+		withPoster:      _q.withPoster.Clone(),
+		withSettler:     _q.withSettler.Clone(),
+		withCanceller:   _q.withCanceller.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithAllocations tells the query-builder to eager-load the nodes that are connected to
+// the "allocations" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *FinanceFactQuery) WithAllocations(opts ...func(*FinanceAllocationQuery)) *FinanceFactQuery {
+	query := (&FinanceAllocationClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withAllocations = query
+	return _q
+}
+
+// WithCreditNotes tells the query-builder to eager-load the nodes that are connected to
+// the "credit_notes" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *FinanceFactQuery) WithCreditNotes(opts ...func(*FinanceCreditNoteQuery)) *FinanceFactQuery {
+	query := (&FinanceCreditNoteClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withCreditNotes = query
+	return _q
 }
 
 // WithPoster tells the query-builder to eager-load the nodes that are connected to
@@ -440,7 +513,9 @@ func (_q *FinanceFactQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 	var (
 		nodes       = []*FinanceFact{}
 		_spec       = _q.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [5]bool{
+			_q.withAllocations != nil,
+			_q.withCreditNotes != nil,
 			_q.withPoster != nil,
 			_q.withSettler != nil,
 			_q.withCanceller != nil,
@@ -464,6 +539,20 @@ func (_q *FinanceFactQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withAllocations; query != nil {
+		if err := _q.loadAllocations(ctx, query, nodes,
+			func(n *FinanceFact) { n.Edges.Allocations = []*FinanceAllocation{} },
+			func(n *FinanceFact, e *FinanceAllocation) { n.Edges.Allocations = append(n.Edges.Allocations, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withCreditNotes; query != nil {
+		if err := _q.loadCreditNotes(ctx, query, nodes,
+			func(n *FinanceFact) { n.Edges.CreditNotes = []*FinanceCreditNote{} },
+			func(n *FinanceFact, e *FinanceCreditNote) { n.Edges.CreditNotes = append(n.Edges.CreditNotes, e) }); err != nil {
+			return nil, err
+		}
+	}
 	if query := _q.withPoster; query != nil {
 		if err := _q.loadPoster(ctx, query, nodes, nil,
 			func(n *FinanceFact, e *AdminUser) { n.Edges.Poster = e }); err != nil {
@@ -485,6 +574,66 @@ func (_q *FinanceFactQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*
 	return nodes, nil
 }
 
+func (_q *FinanceFactQuery) loadAllocations(ctx context.Context, query *FinanceAllocationQuery, nodes []*FinanceFact, init func(*FinanceFact), assign func(*FinanceFact, *FinanceAllocation)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*FinanceFact)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(financeallocation.FieldFinanceFactID)
+	}
+	query.Where(predicate.FinanceAllocation(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(financefact.AllocationsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.FinanceFactID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "finance_fact_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *FinanceFactQuery) loadCreditNotes(ctx context.Context, query *FinanceCreditNoteQuery, nodes []*FinanceFact, init func(*FinanceFact), assign func(*FinanceFact, *FinanceCreditNote)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*FinanceFact)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(financecreditnote.FieldFinanceFactID)
+	}
+	query.Where(predicate.FinanceCreditNote(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(financefact.CreditNotesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.FinanceFactID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "finance_fact_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
 func (_q *FinanceFactQuery) loadPoster(ctx context.Context, query *AdminUserQuery, nodes []*FinanceFact, init func(*FinanceFact), assign func(*FinanceFact, *AdminUser)) error {
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*FinanceFact)

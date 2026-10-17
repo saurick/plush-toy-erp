@@ -8,14 +8,24 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { ArrowRightOutlined, CalendarOutlined } from '@ant-design/icons'
-import { Alert, Button, Card, Empty, Space, Tag, Typography } from 'antd'
+import { CalendarOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Space, Tag, Typography } from 'antd'
 import {
   useLocation,
   useNavigate,
   useOutletContext,
   useSearchParams,
 } from 'react-router-dom'
+import {
+  TaskBoardSearch,
+  TaskBoardProgressRail,
+  ProductCoreDashboard,
+  TaskTitleEntry,
+  TaskLane,
+  WorkbenchQueueEmpty,
+  getWorkflowTaskStableKey,
+  openTaskTableRow,
+} from '../components/workflow/WorkflowDashboardViews.jsx'
 import { WORKFLOW_HISTORY_PERIOD_OPTIONS } from '../utils/workflowRoleTaskHistory.mjs'
 import FilterDateRangePicker from '../components/business-list/FilterDateRangePicker.jsx'
 import WorkflowTaskLinkDrawer from '../components/workflow/WorkflowTaskLinkDrawer.jsx'
@@ -24,19 +34,17 @@ import WorkflowTaskCalendar from '../components/workflow/WorkflowTaskCalendar.js
 import useWorkflowTaskCalendarView from '../hooks/useWorkflowTaskCalendarView.js'
 import WorkflowExceptionPanel from '../components/workflow/WorkflowExceptionPanel.jsx'
 import { TRACKING_VIEW_OPTIONS } from '../utils/workflowTrackingFilters.mjs'
+import { retainReturnedWorkflowTask } from '../utils/productionTaskHandling.mjs'
 import useReturnedWorkflowTask from '../hooks/useReturnedWorkflowTask.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
-import { getWorkflowTaskDisplayName } from '../utils/processRuntimePresentation.mjs'
-import { buildWorkflowTaskResponsibilityItems } from '../utils/workflowTaskEventPresentation.mjs'
+
 import { getWorkbenchSummaryOptions } from '../utils/workbenchSummary.mjs'
 import Table from '@/common/components/table/AppTable'
 import Segmented from '@/common/components/navigation/SlidingSegmented'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
-import FilterChip from '@/common/components/navigation/FilterChip'
-import useLiveSearch from '@/common/hooks/useLiveSearch'
+
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
-import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import WorkflowTaskActionDrawer, {
   TASK_ACTION_META,
   getWorkflowTaskActionMeta,
@@ -46,19 +54,16 @@ import { WorkflowTaskSource } from '../components/workflow/WorkflowTaskCopy.jsx'
 import WorkflowTaskTiming from '../components/workflow/WorkflowTaskTiming.jsx'
 import WorkflowTaskPagination from '../components/workflow/WorkflowTaskPagination.jsx'
 import WorkflowTrackingPanel from '../components/workflow/WorkflowTrackingPanel.jsx'
-import { openWorkflowTaskRow } from '../utils/workflowTaskEntry.mjs'
+
 import { retainWorkflowTaskIdentity } from '../utils/workflowTaskIdentity.mjs'
 import {
   BusinessOperationPanel,
   PageHeaderCard,
-  SearchInput,
   SelectFilter,
 } from '../components/business-list/BusinessListLayout.jsx'
 import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
-  getWorkflowWorkbench,
-  getWorkflowTaskBoard,
   reassignWorkflowTask,
   rejectWorkflowTaskAction,
   resumeWorkflowTaskAction,
@@ -66,7 +71,7 @@ import {
 } from '../api/workflowApi.mjs'
 import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
 import useWorkflowTaskAssignmentAccess from '../hooks/useWorkflowTaskAssignmentAccess.js'
-import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
+import useWorkflowDashboardData from '../hooks/useWorkflowDashboardData.js'
 import {
   getWorkflowTaskSourceTypeLabel,
   resolveWorkflowTaskEntryPath,
@@ -83,14 +88,12 @@ import {
 } from '../utils/workflowTaskMutation.mjs'
 import {
   TASK_BOARD_FOCUS_PAGE_SIZE,
-  TASK_BOARD_LANE_DEFINITIONS,
   TASK_BOARD_SORT_OPTIONS,
   buildWorkflowTaskBoardRoleOptions,
   buildWorkflowTaskBoardModel,
   buildWorkflowTaskOverviewTasks,
   buildWorkflowTaskBoardRequest,
   getWorkflowTaskBoardRequestKey,
-  getWorkflowTaskBoardSummaryRequestKey,
   getWorkflowTaskBoardStatusOptions,
   getWorkflowTaskBoardDueOptions,
   getWorkflowTaskOwnerRoleLabel,
@@ -105,7 +108,7 @@ import {
   writeWorkflowTaskBoardFiltersToSearch,
 } from '../utils/workflowTaskBoard.mjs'
 import { canOpenWorkflowTaskEntry } from '../utils/workflowTaskEntryAccess.mjs'
-import { workflowTaskEntryNavigation } from '../utils/workflowTaskNavigation.mjs'
+import { workflowTaskEntryNavigation, readWorkflowTaskReturn } from '../utils/workflowTaskNavigation.mjs'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import EngineeringMaterialTaskAction from '../components/sales-orders/EngineeringMaterialTaskAction.jsx'
 import EngineeringMaterialTaskSummaryEntry from '../components/sales-orders/EngineeringMaterialTaskSummaryEntry.jsx'
@@ -118,7 +121,7 @@ import {
   getWorkflowApprovalInboxCapabilityKeys,
 } from '../utils/workflowApprovalInbox.mjs'
 
-const { Paragraph, Text, Title } = Typography
+const { Text } = Typography
 
 const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
   { key: 'actionable', label: '待我处理', hint: '当前可推进' },
@@ -147,63 +150,6 @@ const TASK_BOARD_SCOPE_OPTIONS = Object.freeze([
 const WORKBENCH_QUEUE_PAGE_SIZE = TASK_BOARD_FOCUS_PAGE_SIZE
 const TASK_BOARD_PAGE_SCROLL_GAP = 12
 
-function TaskBoardSearch({ value, onSearch }) {
-  const search = useLiveSearch({ value, onSearch })
-  return (
-    <SearchInput
-      placeholder="订单 / 产品 / 物料 / 款号"
-      searchHint="可搜索：任务、单号、产品、款号、物料、处理原因"
-      showSearchScope
-      value={search.value}
-      onChange={search.onChange}
-      onCompositionStart={search.onCompositionStart}
-      onCompositionEnd={search.onCompositionEnd}
-      onPressEnter={search.onPressEnter}
-    />
-  )
-}
-
-function TaskBoardProgressRail({
-  activeLane,
-  counts,
-  ready,
-  onSelectLane,
-  mode,
-}) {
-  return (
-    <nav className="erp-task-progress-rail" aria-label="任务分类">
-      <FilterChip
-        className={`erp-task-progress-rail__item erp-task-progress-rail__item--overview${activeLane === 'all' ? ' is-active' : ''}`}
-        selected={activeLane === 'all'}
-        aria-label="任务概览"
-        onClick={() => onSelectLane('all')}
-      >
-        <span className="erp-task-progress-rail__label">概览</span>
-      </FilterChip>
-      {TASK_BOARD_LANE_DEFINITIONS.filter(
-        (lane) => mode !== 'todo' || lane.key !== 'finished'
-      ).map((lane) => (
-        <FilterChip
-          key={lane.key}
-          data-lane={lane.key}
-          className={`erp-task-progress-rail__item${activeLane === lane.key ? ' is-active' : ''}`}
-          selected={activeLane === lane.key}
-          removable
-          aria-label={`${lane.title}，${ready ? `${counts[lane.key]} 项` : '数量读取中'}`}
-          onClick={() =>
-            onSelectLane(activeLane === lane.key ? 'all' : lane.key)
-          }
-        >
-          <span className="erp-task-progress-rail__label">{lane.title}</span>
-          <strong className="erp-task-progress-rail__value">
-            {ready ? counts[lane.key] : '—'}
-          </strong>
-        </FilterChip>
-      ))}
-    </nav>
-  )
-}
-
 function scrollTaskListToStart(lanesElement) {
   const scrollContainer = lanesElement?.closest?.('.erp-admin-content')
   if (!scrollContainer) return
@@ -219,139 +165,6 @@ function scrollTaskListToStart(lanesElement) {
     top: Math.max(0, nextScrollTop),
     behavior: 'auto',
   })
-}
-
-const PRODUCT_CORE_REVIEW_ENTRIES = Object.freeze([
-  {
-    key: 'business-dashboard',
-    title: '进度看板',
-    path: '/erp/business-dashboard',
-    description: '查看业务数量、办理情况和需要关注的事项。',
-  },
-  {
-    key: 'sales-orders',
-    title: '销售订单',
-    path: '/erp/sales/project-orders/sales-orders',
-    description: '查看销售订单状态、可用操作和填写内容。',
-  },
-  {
-    key: 'bom',
-    title: '物料清单（BOM）/ 产品工程',
-    path: '/erp/purchase/material-bom',
-    description: '查看产品结构、材料用量、损耗和版本状态。',
-  },
-  {
-    key: 'purchase',
-    title: '采购与入库',
-    path: '/erp/purchase/accessories',
-    description: '查看采购订单与入库办理条件。',
-  },
-  {
-    key: 'outsourcing',
-    title: '委外加工',
-    path: '/erp/outsourcing/orders',
-    description: '查看加工合同、工序、回货和质检的衔接方式。',
-  },
-  {
-    key: 'shipment',
-    title: '出货与库存',
-    path: '/erp/warehouse/shipments',
-    description: '查看出货放行、出库、库存和应收的办理顺序。',
-  },
-])
-
-const PRODUCT_CORE_CONTROL_ENTRIES = Object.freeze([
-  {
-    key: 'print',
-    title: '模板打印中心',
-    path: '/erp/print-center',
-    description: '查看可用打印模板和客户默认内容。',
-  },
-  {
-    key: 'permissions',
-    title: '权限管理',
-    path: '/erp/system/permissions',
-    description: '维护员工账号、岗位和功能权限。',
-  },
-  {
-    key: 'audit',
-    title: '系统操作记录',
-    path: '/erp/system/audit-logs',
-    description: '查看客户业务设置变更和系统管理操作记录。',
-  },
-])
-
-function ProductCoreDashboard({ onNavigate }) {
-  return (
-    <Card
-      className="erp-dashboard-card erp-product-core-dashboard"
-      variant="borderless"
-      data-product-core-dashboard="true"
-    >
-      <div className="erp-product-core-dashboard__hero">
-        <div>
-          <Text type="secondary">功能预览</Text>
-          <Title level={3} className="erp-command-center-hero-title">
-            系统功能总览
-          </Title>
-          <Paragraph className="erp-dashboard-summary">
-            这里用于查看系统已配置的功能和设置。当前尚未连接客户业务数据，因此不会显示订单、库存、待办任务或财务记录。
-          </Paragraph>
-        </div>
-        <Space wrap>
-          <Tag color="blue">不显示客户业务数据</Tag>
-          <Tag color="green">功能预览</Tag>
-          <Tag>尚未连接客户环境</Tag>
-        </Space>
-      </div>
-
-      <div className="erp-product-core-dashboard__grid">
-        <section className="erp-product-core-panel">
-          <div className="erp-product-core-panel__head">
-            <Title level={5}>业务功能</Title>
-            <Text type="secondary">
-              可查看页面说明、填写内容和可用操作；不会读取客户业务记录。
-            </Text>
-          </div>
-          <div className="erp-product-core-entry-grid">
-            {PRODUCT_CORE_REVIEW_ENTRIES.map((entry) => (
-              <button
-                type="button"
-                key={entry.key}
-                className="erp-product-core-entry"
-                onClick={() => onNavigate(entry.path)}
-              >
-                <strong>{entry.title}</strong>
-                <span>{entry.description}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="erp-product-core-panel">
-          <div className="erp-product-core-panel__head">
-            <Title level={5}>系统设置</Title>
-            <Text type="secondary">
-              这里管理客户业务设置、员工权限和操作记录，不办理具体业务。
-            </Text>
-          </div>
-          <Space direction="vertical" size={10} className="erp-dashboard-block">
-            {PRODUCT_CORE_CONTROL_ENTRIES.map((entry) => (
-              <div className="erp-command-center-focus-item" key={entry.key}>
-                <div className="erp-command-center-focus-copy">
-                  <Text strong>{entry.title}</Text>
-                  <Text type="secondary">{entry.description}</Text>
-                </div>
-                <Button size="small" onClick={() => onNavigate(entry.path)}>
-                  进入
-                </Button>
-              </div>
-            ))}
-          </Space>
-        </section>
-      </div>
-    </Card>
-  )
 }
 
 function buildSourceOptions(values = []) {
@@ -370,183 +183,6 @@ function buildSourceOptions(values = []) {
       label: getWorkflowTaskSourceTypeLabel(sourceType),
     })),
   ]
-}
-
-function getWorkflowTaskStableKey(task) {
-  return String(task?.id || task?.task_code || '')
-}
-
-function TaskTitleEntry({ task, onOpenTask, children, compact = false }) {
-  const name = getWorkflowTaskDisplayName(task)
-  return (
-    <button
-      type="button"
-      className={`erp-task-title-entry${compact ? ' erp-task-title-entry--compact' : ''}`}
-      aria-label={`查看${name}详情`}
-      aria-haspopup="dialog"
-      data-task-entry
-      onClick={(event) => {
-        event.stopPropagation()
-        event.currentTarget.focus({ preventScroll: true })
-        onOpenTask(task)
-      }}
-    >
-      <span>{children || name}</span>
-      {compact ? (
-        children ? (
-          <span className="erp-task-title-entry__type">· {name}</span>
-        ) : null
-      ) : (
-        <ArrowRightOutlined aria-hidden="true" />
-      )}
-    </button>
-  )
-}
-
-function openTaskTableRow(event, task, onOpenTask) {
-  openWorkflowTaskRow(event, () => onOpenTask(task))
-}
-
-function TaskLane({ lane, loading = false, focused, onOpenTask }) {
-  return (
-    <section
-      className={`erp-task-board-lane erp-task-board-lane--${lane.key}${focused ? ' erp-task-board-lane--focused' : ''}`}
-      aria-label={focused ? lane.title : '待处理预览'}
-      aria-busy={loading}
-    >
-      {!focused ? (
-        <div className="erp-task-board-overview-heading">
-          <strong>待处理预览</strong>
-          <Text type="secondary">
-            优先查看异常、临近到期任务；完整任务可切换上方分类查看。
-          </Text>
-        </div>
-      ) : null}
-      <Table
-        size="middle"
-        rowKey={getWorkflowTaskStableKey}
-        loading={loading}
-        dataSource={lane.tasks}
-        scroll={{ x: 900 }}
-        rowClassName="erp-task-table-row"
-        columns={[
-          {
-            align: 'left',
-            title: '任务与关联内容',
-            key: 'identity',
-            width: '36%',
-            render: (_, task) => (
-              <div className="erp-workbench-task-cell">
-                <WorkflowTaskIdentity
-                  task={task}
-                  compact
-                  renderCompactTitle={(title) => (
-                    <TaskTitleEntry task={task} onOpenTask={onOpenTask} compact>
-                      {title}
-                    </TaskTitleEntry>
-                  )}
-                />
-              </div>
-            ),
-          },
-          {
-            align: 'left',
-            title: '关联单据 / 时间',
-            key: 'source',
-            width: '27%',
-            render: (_, task) => (
-              <div className="erp-workbench-task-cell">
-                <WorkflowTaskSource task={task} />
-                <span className="erp-task-board-card-meta">
-                  {task.discovery?.path}
-                </span>
-                <WorkflowTaskTiming task={task} />
-              </div>
-            ),
-          },
-          {
-            align: 'left',
-            title: lane.key === 'exception' ? '阻塞原因' : '状态与说明',
-            key: 'reason',
-            render: (_, task) => (
-              <div className="erp-workbench-task-cell">
-                <Space size={[4, 4]} wrap>
-                  {getWorkflowTaskStatusRiskTags(task).map((tag) => (
-                    <Tag key={tag.key} color={tag.color}>
-                      {tag.label}
-                    </Tag>
-                  ))}
-                </Space>
-                {getWorkflowTaskReason(task) ? (
-                  <Text
-                    type={
-                      task.task_status_key === 'blocked' ? 'danger' : undefined
-                    }
-                  >
-                    {getWorkflowTaskReason(task)}
-                  </Text>
-                ) : null}
-              </div>
-            ),
-          },
-          {
-            title: '负责岗位 / 处理人',
-            key: 'responsibility',
-            width: 180,
-            render: (_, task) => (
-              <Space direction="vertical" size={4}>
-                {buildWorkflowTaskResponsibilityItems(task)
-                  .slice(0, 2)
-                  .map((item) => (
-                    <Text
-                      key={item.key}
-                      type={item.key === 'assignee' ? 'secondary' : undefined}
-                    >
-                      {item.value}
-                    </Text>
-                  ))}
-              </Space>
-            ),
-          },
-        ]}
-        onRow={(task) => ({
-          'data-task-code': task.task_code,
-          'data-task-group': task.task_group,
-          onClick: (event) => openTaskTableRow(event, task, onOpenTask),
-        })}
-        pagination={false}
-        locale={{
-          emptyText: (
-            <Empty
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={
-                lane.key === 'overview'
-                  ? '当前范围暂无待处理任务'
-                  : '当前分类暂无匹配任务'
-              }
-            />
-          ),
-        }}
-      />
-    </section>
-  )
-}
-
-function WorkbenchQueueEmpty({ activeOption, fallbackOption, onSwitchQueue }) {
-  const description = fallbackOption
-    ? `${activeOption.label}暂无任务，可切到${fallbackOption.label}继续处理。`
-    : '当前没有需要处理的任务。'
-
-  return (
-    <div className="erp-workbench-queue-empty">
-      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={description} />
-      {fallbackOption ? (
-        <Button size="small" onClick={() => onSwitchQueue(fallbackOption.key)}>
-          查看{fallbackOption.label}
-        </Button>
-      ) : null}
-    </div>
-  )
 }
 
 const WorkbenchSummaries = lazy(
@@ -582,7 +218,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     }
   }, [])
 
-  const [loading, setLoading] = useState(false)
   const [historyDateOpen, setHistoryDateOpen] = useState(false)
   const [taskFiltersOpen, setTaskFiltersOpen] = useState(false)
   const openHistoryDate = () => {
@@ -590,12 +225,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setHistoryDateOpen(true)
   }
   const [summaryRefreshRevision, setSummaryRefreshRevision] = useState(0)
-  const [workbenchResponseState, setWorkbenchResponseState] = useState(null)
-  const [workbenchCountsState, setWorkbenchCountsState] = useState(null)
-  const [taskBoardResponseState, setTaskBoardResponseState] = useState(null)
-  const [taskBoardSummaryState, setTaskBoardSummaryState] = useState(null)
   const taskViewsRef = useRef(null)
   const [selectedTask, setSelectedTask] = useState(null)
+  const [returnedBusinessTask, setReturnedBusinessTask] = useState(null)
+  const pendingReturnPosition = useRef(null)
   const [materialSaving, setMaterialSaving] = useState(false)
   const materialLeaveGuardRef = useRef(null)
   const materialDraftRef = useRef(null)
@@ -616,8 +249,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   )
   const [taskBoardTransitionMinHeight, setTaskBoardTransitionMinHeight] =
     useState(0)
-  const mountedRef = useRef(false)
-  const beginLatestRequest = useLatestRequestCoordinator()
   const taskBoardLanesRef = useRef(null)
   const workbenchListRef = useRef(null)
   const pendingWorkbenchPageScrollRef = useRef(null)
@@ -663,8 +294,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ]),
     [adminProfile, workflowApprovalInboxCapabilityKeys]
   )
-  const workflowWorkbenchScopeKeyRef = useRef(workflowWorkbenchScopeKey)
-  workflowWorkbenchScopeKeyRef.current = workflowWorkbenchScopeKey
   useEffect(() => {
     materialDraftRef.current = null
   }, [selectedTask?.id, selectedTask?.version, workflowWorkbenchScopeKey])
@@ -699,14 +328,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => buildWorkflowTaskBoardRequest(filters),
     [filters]
   )
-  const taskBoardRequestKey = useMemo(
-    () => getWorkflowTaskBoardRequestKey(taskBoardRequest),
-    [taskBoardRequest]
-  )
-  const taskBoardSummaryRequestKey = useMemo(
-    () => getWorkflowTaskBoardSummaryRequestKey(taskBoardRequest),
-    [taskBoardRequest]
-  )
   const workbenchRequest = useMemo(
     () => ({
       queue_key: workbenchQueueKey,
@@ -714,10 +335,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       offset: (workbenchQueuePage - 1) * workbenchQueuePageSize,
     }),
     [workbenchQueueKey, workbenchQueuePage, workbenchQueuePageSize]
-  )
-  const workbenchRequestKey = useMemo(
-    () => JSON.stringify([workflowWorkbenchScopeKey, workbenchRequest]),
-    [workflowWorkbenchScopeKey, workbenchRequest]
   )
   const preserveTaskBoardTransitionHeight = useCallback(
     (nextRequest = taskBoardRequest) => {
@@ -734,155 +351,35 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [taskBoardRequest]
   )
 
-  const loadDashboardStats = useCallback(async () => {
-    const request = beginLatestRequest('dashboard-load')
-    const requestWorkbenchScopeKey = workflowWorkbenchScopeKey
-    if (shouldShowProductCoreDashboard) {
-      setWorkbenchResponseState(null)
-      setWorkbenchCountsState(null)
-      setLoading(false)
-      request.finish()
-      return true
-    }
-    if (summaryOpen || trackingScope || exceptionsView) {
-      setLoading(false)
-      request.finish()
-      return true
-    }
-    if (isTaskBoardView && mountedRef.current) {
-      preserveTaskBoardTransitionHeight(taskBoardRequest)
-    }
-    setLoading(true)
-    if (isTaskBoardView && mountedRef.current) {
-      setTaskBoardResponseState({
-        requestKey: taskBoardRequestKey,
-        response: null,
-        error: '',
-      })
-    } else if (mountedRef.current) {
-      setWorkbenchResponseState((current) => ({
-        scopeKey: requestWorkbenchScopeKey,
-        requestKey: workbenchRequestKey,
-        response:
-          current?.scopeKey === requestWorkbenchScopeKey &&
-          current?.response?.queue_key === workbenchRequest.queue_key
-            ? current.response
-            : null,
-        error: '',
-      }))
-    }
-    try {
-      if (isTaskBoardView) {
-        const taskBoardResult = await getWorkflowTaskBoard(taskBoardRequest, {
-          signal: request.signal,
-        })
-        if (
-          mountedRef.current &&
-          request.isCurrent() &&
-          workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
-        ) {
-          setTaskBoardResponseState({
-            requestKey: taskBoardRequestKey,
-            response: taskBoardResult,
-            error: '',
-          })
-          setTaskBoardSummaryState({
-            requestKey: taskBoardSummaryRequestKey,
-            response: taskBoardResult,
-          })
-        }
-      } else {
-        const workbenchResult = await getWorkflowWorkbench(workbenchRequest, {
-          signal: request.signal,
-        })
-        if (
-          mountedRef.current &&
-          request.isCurrent() &&
-          workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
-        ) {
-          setWorkbenchResponseState({
-            scopeKey: requestWorkbenchScopeKey,
-            requestKey: workbenchRequestKey,
-            response: workbenchResult,
-            error: '',
-          })
-          setWorkbenchCountsState({
-            scopeKey: requestWorkbenchScopeKey,
-            counts: workbenchResult.counts,
-          })
-        }
-      }
-      return true
-    } catch (error) {
-      if (isRpcAbortError(error) || !request.isCurrent()) {
-        return false
-      }
-      if (
-        mountedRef.current &&
-        request.isCurrent() &&
-        workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
-      ) {
-        const fallback = isTaskBoardView ? '加载任务管理失败' : '加载工作台失败'
-        const errorMessage = getActionErrorMessage(error, fallback)
-        if (isTaskBoardView) {
-          setTaskBoardResponseState({
-            requestKey: taskBoardRequestKey,
-            response: null,
-            error: errorMessage,
-          })
-        } else {
-          setWorkbenchResponseState({
-            scopeKey: requestWorkbenchScopeKey,
-            requestKey: workbenchRequestKey,
-            response: null,
-            error: errorMessage,
-          })
-        }
-      }
-      return false
-    } finally {
-      if (
-        mountedRef.current &&
-        request.isCurrent() &&
-        workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
-      ) {
-        setLoading(false)
-      }
-      request.finish()
-    }
-  }, [
-    beginLatestRequest,
-    isTaskBoardView,
-    preserveTaskBoardTransitionHeight,
-    shouldShowProductCoreDashboard,
-    summaryOpen,
-    trackingScope,
-    exceptionsView,
-    taskBoardRequest,
+  const {
+    loading,
+    workbenchResponseState,
+    workbenchCountsState,
+    taskBoardResponseState,
+    taskBoardSummaryState,
     taskBoardRequestKey,
     taskBoardSummaryRequestKey,
-    workbenchRequest,
     workbenchRequestKey,
-    workflowWorkbenchScopeKey,
-  ])
-
-  useEffect(() => {
-    mountedRef.current = true
-    loadDashboardStats()
-    return () => {
-      mountedRef.current = false
-    }
-  }, [loadDashboardStats])
+    reloadTaskData,
+  } = useWorkflowDashboardData({
+    scopeKey: workflowWorkbenchScopeKey,
+    taskBoardRequest,
+    workbenchRequest,
+    isTaskBoardView,
+    productCorePreview: shouldShowProductCoreDashboard,
+    suspended: Boolean(summaryOpen || trackingScope || exceptionsView),
+    onBeforeTaskBoardLoad: preserveTaskBoardTransitionHeight,
+  })
 
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(() => {
       if (summaryOpen) setSummaryRefreshRevision((value) => value + 1)
       if (trackingScope || exceptionsView || calendarView)
         { setTrackingRefresh((value) => value + 1) }
-      return loadDashboardStats()
+      return reloadTaskData()
     })
   }, [
-    loadDashboardStats,
+    reloadTaskData,
     outletContext,
     summaryOpen,
     trackingScope,
@@ -992,6 +489,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   useEffect(() => {
     if (
       !taskBoardReady ||
+      location.state?.workflowTaskReturn ||
       filters.role === 'all' ||
       taskBoardModel.ownerRoleKeys.includes(filters.role)
     ) {
@@ -1011,6 +509,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setSearchParams,
     taskBoardModel.ownerRoleKeys,
     taskBoardReady,
+    location.state,
   ])
 
   useLayoutEffect(() => {
@@ -1056,6 +555,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }, [taskBoardLoadError])
 
   useEffect(() => {
+    const returning = readWorkflowTaskReturn(location.state, adminProfile?.id)
+    const pending = readWorkflowTaskReturn(window.history.state?.usr, adminProfile?.id)
+    if (returning && (pending?.taskID === returning.taskID || returnedBusinessTask?.path === `${location.pathname}${location.search}`)) return
     if (
       !taskBoardResponse ||
       !taskBoardModel.focused ||
@@ -1084,6 +586,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       { replace: true }
     )
   }, [
+    location,
+    adminProfile?.id,
+    returnedBusinessTask,
     filters,
     searchParams,
     setSearchParams,
@@ -1425,7 +930,24 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     setActionReceipt(null)
   }
 
-  useReturnedWorkflowTask(adminProfile?.id, openTaskDrawer)
+  useReturnedWorkflowTask(adminProfile?.id, (task, context) => {
+    setReturnedBusinessTask({ task, context, path: `${location.pathname}${location.search}` })
+    pendingReturnPosition.current = context?.returnPosition
+    openTaskDrawer(task)
+  })
+  const retainedBusinessTask = returnedBusinessTask?.path === `${location.pathname}${location.search}`
+    ? returnedBusinessTask : null
+  useLayoutEffect(() => {
+    const position = pendingReturnPosition.current
+    if (!position || loading || !taskBoardReady) return
+    const container = document.querySelector('.erp-admin-content')
+    const row = container?.querySelector(`[data-task-id="${returnedBusinessTask?.task.id}"]`)
+    if (!container || !row) return
+    container.scrollTop = position.rowOffset === null
+      ? position.scrollTop
+      : container.scrollTop + row.getBoundingClientRect().top - container.getBoundingClientRect().top - position.rowOffset
+    pendingReturnPosition.current = null
+  }, [loading, taskBoardReady, taskBoardModel, returnedBusinessTask])
 
   const closeTaskDrawer = () => {
     if (actionSaving || materialSaving) return
@@ -1596,13 +1118,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             getActionErrorMessage(error, `${actionMetaSnapshot.title}失败`)
           )
           closeSubmittedTaskDrawer()
-          await loadDashboardStats().catch(() => {})
+          await reloadTaskData().catch(() => {})
         }
         return
       }
       message.success(actionMetaSnapshot.successMessage)
       try {
-        await loadDashboardStats()
+        await reloadTaskData()
       } catch {
         message.warning('操作已成功但列表刷新失败，请手动刷新')
       }
@@ -1814,7 +1336,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           message="工作台任务加载失败"
                           description={workbenchLoadError}
                           action={
-                            <Button size="small" onClick={loadDashboardStats}>
+                            <Button size="small" onClick={reloadTaskData}>
                               重新加载
                             </Button>
                           }
@@ -1830,6 +1352,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         scroll={{ x: 680 }}
                         rowClassName="erp-task-table-row"
                         onRow={(record) => ({
+                          'data-task-id': record.id,
                           'data-task-code': record.task_code || undefined,
                           'data-task-group': record.task_group || undefined,
                           onClick: (event) =>
@@ -2113,40 +1636,55 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     message="任务管理加载失败"
                     description={taskBoardLoadError}
                     action={
-                      <Button onClick={loadDashboardStats}>重新加载</Button>
+                      <Button onClick={reloadTaskData}>重新加载</Button>
                     }
                   />
                 ) : (
-                  <div
-                    ref={taskBoardLanesRef}
-                    className={`erp-task-board-lanes${
+                  <div>
+                    <div
+                      ref={taskBoardLanesRef}
+                      className={`erp-task-board-lanes${
                       taskBoardModel.focused
                         ? ' erp-task-board-lanes--focused'
                         : ''
                     }`}
-                    aria-label="任务管理分类"
-                    aria-busy={taskBoardUpdating}
-                  >
-                    {(taskBoardModel.focused
+                      aria-label="任务管理分类"
+                      aria-busy={taskBoardUpdating}
+                    >
+                      {(taskBoardModel.focused
                       ? taskLanes
                       : [{ key: 'overview', tasks: overviewTasks }]
                     ).map((lane) => (
                       <TaskLane
                         key={lane.key}
-                        lane={lane}
+                        keyword={filters.keyword}
+                        lane={retainedBusinessTask ? {
+                          ...lane,
+                          tasks: retainReturnedWorkflowTask(lane.tasks, retainedBusinessTask.task, retainedBusinessTask.context?.returnPosition),
+                        } : lane}
                         loading={taskBoardUpdating}
                         focused={taskBoardModel.focused}
                         onOpenTask={openTaskDrawer}
                       />
                     ))}
+                    </div>
+                    {retainedBusinessTask ? <Alert
+                      type="success"
+                      showIcon
+                      closable
+                      message={retainedBusinessTask.context?.businessReceipt?.message || '已返回原任务，任务状态已重新读取'}
+                      description="已恢复原筛选、页码和位置；刚办理的事项暂留原位，列表数量仍按当前筛选统计。"
+                      onClose={() => setReturnedBusinessTask(null)}
+                    /> : null}
                   </div>
                 )}
                 {!calendarView && taskBoardModel.focused ? (
                   <WorkflowTaskPagination
                     total={taskBoardCounts[filters.lane] || 0}
                     current={
-                      taskBoardReady ? taskBoardModel.page : filters.page
+                      retainedBusinessTask ? filters.page : taskBoardReady ? taskBoardModel.page : filters.page
                     }
+                    retainedPage={retainedBusinessTask ? filters.page : null}
                     pageSize={filters.pageSize}
                     loading={taskBoardUpdating}
                     error={Boolean(taskBoardLoadError)}
@@ -2211,7 +1749,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       statusLabel: ENGINEERING_MATERIAL_STATUS[value.status],
                       handoffMessage: result.successMessage,
                     })
-                    loadDashboardStats()
+                    reloadTaskData()
                   }}
               />
               )

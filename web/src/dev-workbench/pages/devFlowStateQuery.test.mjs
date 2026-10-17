@@ -104,3 +104,9 @@ test('exception source, decision and selected step survive refresh and view cano
   assert.deepEqual(canonicalize(`${query}&node=purchase_order&process=old`), { changed: true, query })
   assert.deepEqual(canonicalize(query), { changed: false, query })
 })
+
+test('exception origin stays separate from the page return position and survives refresh', () => {
+  const query = 'view=chain&chain=all&flow_role=warehouse&flow_stage=cutting_quality&flow_exception=production_quality&flow_exception_origin=shell_quality&flow_decision=remake&flow_exception_step=count'
+  assert.deepEqual(canonicalize(`${query}&node=old&process=stale`), { changed: true, query })
+  assert.deepEqual(canonicalize(query), { changed: false, query })
+})

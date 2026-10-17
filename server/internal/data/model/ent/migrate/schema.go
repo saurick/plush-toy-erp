@@ -613,14 +613,14 @@ var (
 	FinanceAllocationsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "reason", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "finance_fact_id", Type: field.TypeInt},
 		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "currency", Type: field.TypeString, Size: 16},
 		{Name: "status", Type: field.TypeString, Size: 16, Default: "POSTED"},
-		{Name: "reversal_of_allocation_id", Type: field.TypeInt, Nullable: true},
 		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
 		{Name: "created_by", Type: field.TypeInt},
 		{Name: "created_at", Type: field.TypeTime},
+		{Name: "reversal_of_allocation_id", Type: field.TypeInt, Nullable: true},
+		{Name: "finance_fact_id", Type: field.TypeInt},
 		{Name: "payment_id", Type: field.TypeInt},
 	}
 	// FinanceAllocationsTable holds the schema information for the "finance_allocations" table.
@@ -629,6 +629,18 @@ var (
 		Columns:    FinanceAllocationsColumns,
 		PrimaryKey: []*schema.Column{FinanceAllocationsColumns[0]},
 		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "finance_allocations_finance_allocations_reversals",
+				Columns:    []*schema.Column{FinanceAllocationsColumns[8]},
+				RefColumns: []*schema.Column{FinanceAllocationsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "finance_allocations_finance_facts_allocations",
+				Columns:    []*schema.Column{FinanceAllocationsColumns[9]},
+				RefColumns: []*schema.Column{FinanceFactsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
 			{
 				Symbol:     "finance_allocations_finance_payments_allocations",
 				Columns:    []*schema.Column{FinanceAllocationsColumns[10]},
@@ -640,17 +652,17 @@ var (
 			{
 				Name:    "financeallocation_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceAllocationsColumns[7]},
+				Columns: []*schema.Column{FinanceAllocationsColumns[5]},
 			},
 			{
 				Name:    "financeallocation_payment_id_finance_fact_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{FinanceAllocationsColumns[10], FinanceAllocationsColumns[2], FinanceAllocationsColumns[5]},
+				Columns: []*schema.Column{FinanceAllocationsColumns[10], FinanceAllocationsColumns[9], FinanceAllocationsColumns[4]},
 			},
 			{
 				Name:    "financeallocation_reversal_of_allocation_id",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceAllocationsColumns[6]},
+				Columns: []*schema.Column{FinanceAllocationsColumns[8]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "reversal_of_allocation_id IS NOT NULL",
 				},
@@ -661,8 +673,6 @@ var (
 	FinanceCreditNotesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "credit_note_no", Type: field.TypeString, Size: 64},
-		{Name: "finance_fact_id", Type: field.TypeInt},
-		{Name: "reversal_of_credit_note_id", Type: field.TypeInt, Nullable: true},
 		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "currency", Type: field.TypeString, Size: 16},
 		{Name: "status", Type: field.TypeString, Size: 16, Default: "POSTED"},
@@ -671,12 +681,28 @@ var (
 		{Name: "idempotency_payload_hash", Type: field.TypeString, Size: 64},
 		{Name: "created_by", Type: field.TypeInt},
 		{Name: "created_at", Type: field.TypeTime},
+		{Name: "reversal_of_credit_note_id", Type: field.TypeInt, Nullable: true},
+		{Name: "finance_fact_id", Type: field.TypeInt},
 	}
 	// FinanceCreditNotesTable holds the schema information for the "finance_credit_notes" table.
 	FinanceCreditNotesTable = &schema.Table{
 		Name:       "finance_credit_notes",
 		Columns:    FinanceCreditNotesColumns,
 		PrimaryKey: []*schema.Column{FinanceCreditNotesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "finance_credit_notes_finance_credit_notes_reversals",
+				Columns:    []*schema.Column{FinanceCreditNotesColumns[10]},
+				RefColumns: []*schema.Column{FinanceCreditNotesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "finance_credit_notes_finance_facts_credit_notes",
+				Columns:    []*schema.Column{FinanceCreditNotesColumns[11]},
+				RefColumns: []*schema.Column{FinanceFactsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "financecreditnote_credit_note_no",
@@ -686,17 +712,17 @@ var (
 			{
 				Name:    "financecreditnote_created_by_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceCreditNotesColumns[10], FinanceCreditNotesColumns[8]},
+				Columns: []*schema.Column{FinanceCreditNotesColumns[8], FinanceCreditNotesColumns[6]},
 			},
 			{
 				Name:    "financecreditnote_finance_fact_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{FinanceCreditNotesColumns[2], FinanceCreditNotesColumns[6]},
+				Columns: []*schema.Column{FinanceCreditNotesColumns[11], FinanceCreditNotesColumns[4]},
 			},
 			{
 				Name:    "financecreditnote_reversal_of_credit_note_id",
 				Unique:  true,
-				Columns: []*schema.Column{FinanceCreditNotesColumns[3]},
+				Columns: []*schema.Column{FinanceCreditNotesColumns[10]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "reversal_of_credit_note_id IS NOT NULL",
 				},
@@ -874,6 +900,91 @@ var (
 				Name:    "financepayment_refund_of_payment_id_status",
 				Unique:  false,
 				Columns: []*schema.Column{FinancePaymentsColumns[34], FinancePaymentsColumns[7]},
+			},
+		},
+	}
+	// HelpFeedbacksColumns holds the columns for the "help_feedbacks" table.
+	HelpFeedbacksColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "document_id", Type: field.TypeString, Size: 160},
+		{Name: "document_title", Type: field.TypeString, Size: 256},
+		{Name: "source_hash", Type: field.TypeString, Size: 64},
+		{Name: "published_version", Type: field.TypeInt, Default: 0},
+		{Name: "quote", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "message", Type: field.TypeString, Size: 2147483647},
+		{Name: "request_key", Type: field.TypeString, Unique: true, Size: 36},
+		{Name: "actor_id", Type: field.TypeInt},
+		{Name: "actor_name", Type: field.TypeString, Size: 128},
+		{Name: "response", Type: field.TypeString, Size: 1000, Default: ""},
+		{Name: "responded_by", Type: field.TypeString, Size: 128, Default: ""},
+		{Name: "responded_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// HelpFeedbacksTable holds the schema information for the "help_feedbacks" table.
+	HelpFeedbacksTable = &schema.Table{
+		Name:       "help_feedbacks",
+		Columns:    HelpFeedbacksColumns,
+		PrimaryKey: []*schema.Column{HelpFeedbacksColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "helpfeedback_document_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{HelpFeedbacksColumns[1], HelpFeedbacksColumns[13]},
+			},
+			{
+				Name:    "helpfeedback_actor_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{HelpFeedbacksColumns[8], HelpFeedbacksColumns[13]},
+			},
+		},
+	}
+	// HelpSupplementsColumns holds the columns for the "help_supplements" table.
+	HelpSupplementsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "document_id", Type: field.TypeString, Size: 160},
+		{Name: "version", Type: field.TypeInt, Default: 0},
+		{Name: "published_version", Type: field.TypeInt, Default: 0},
+		{Name: "draft_markdown", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// HelpSupplementsTable holds the schema information for the "help_supplements" table.
+	HelpSupplementsTable = &schema.Table{
+		Name:       "help_supplements",
+		Columns:    HelpSupplementsColumns,
+		PrimaryKey: []*schema.Column{HelpSupplementsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "helpsupplement_document_id",
+				Unique:  true,
+				Columns: []*schema.Column{HelpSupplementsColumns[1]},
+			},
+		},
+	}
+	// HelpSupplementRevisionsColumns holds the columns for the "help_supplement_revisions" table.
+	HelpSupplementRevisionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "document_id", Type: field.TypeString, Size: 160},
+		{Name: "version", Type: field.TypeInt},
+		{Name: "action", Type: field.TypeEnum, Enums: []string{"save", "publish", "restore"}},
+		{Name: "markdown", Type: field.TypeString, Size: 2147483647},
+		{Name: "source_hash", Type: field.TypeString, Size: 64},
+		{Name: "summary", Type: field.TypeString, Size: 300},
+		{Name: "actor_id", Type: field.TypeInt},
+		{Name: "actor_name", Type: field.TypeString, Size: 128},
+		{Name: "restored_from", Type: field.TypeInt, Default: 0},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// HelpSupplementRevisionsTable holds the schema information for the "help_supplement_revisions" table.
+	HelpSupplementRevisionsTable = &schema.Table{
+		Name:       "help_supplement_revisions",
+		Columns:    HelpSupplementRevisionsColumns,
+		PrimaryKey: []*schema.Column{HelpSupplementRevisionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "helpsupplementrevision_document_id_version",
+				Unique:  true,
+				Columns: []*schema.Column{HelpSupplementRevisionsColumns[1], HelpSupplementRevisionsColumns[2]},
 			},
 		},
 	}
@@ -5021,6 +5132,9 @@ var (
 		FinanceCreditNotesTable,
 		FinanceFactsTable,
 		FinancePaymentsTable,
+		HelpFeedbacksTable,
+		HelpSupplementsTable,
+		HelpSupplementRevisionsTable,
 		InventoryBalancesTable,
 		InventoryLotsTable,
 		InventoryLotStatusEventsTable,
@@ -5140,21 +5254,27 @@ func init() {
 	EngineeringMaterialRequestItemsTable.Annotation.Checks = map[string]string{
 		"engineering_material_request_items_quantity_valid": "required_quantity > 0",
 	}
-	FinanceAllocationsTable.ForeignKeys[0].RefTable = FinancePaymentsTable
+	FinanceAllocationsTable.ForeignKeys[0].RefTable = FinanceAllocationsTable
+	FinanceAllocationsTable.ForeignKeys[1].RefTable = FinanceFactsTable
+	FinanceAllocationsTable.ForeignKeys[2].RefTable = FinancePaymentsTable
 	FinanceAllocationsTable.Annotation = &entsql.Annotation{}
 	FinanceAllocationsTable.Annotation.Checks = map[string]string{
 		"finance_allocations_amount_positive":   "amount > 0",
 		"finance_allocations_currency_allowed":  "currency IN ('USD', 'CNY', 'HKD')",
+		"finance_allocations_reversal_bundle":   "((status = 'POSTED' AND reversal_of_allocation_id IS NULL) OR (status = 'REVERSED' AND reversal_of_allocation_id IS NOT NULL))",
 		"finance_allocations_reversal_not_self": "reversal_of_allocation_id IS NULL OR reversal_of_allocation_id <> id",
 		"finance_allocations_status_allowed":    "status IN ('POSTED', 'REVERSED')",
 	}
+	FinanceCreditNotesTable.ForeignKeys[0].RefTable = FinanceCreditNotesTable
+	FinanceCreditNotesTable.ForeignKeys[1].RefTable = FinanceFactsTable
 	FinanceCreditNotesTable.Annotation = &entsql.Annotation{}
 	FinanceCreditNotesTable.Annotation.Checks = map[string]string{
-		"finance_credit_notes_amount_positive":  "amount > 0",
-		"finance_credit_notes_currency_allowed": "currency IN ('USD', 'CNY', 'HKD')",
-		"finance_credit_notes_intent_bundle":    "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
-		"finance_credit_notes_reversal_bundle":  "((status = 'POSTED' AND reversal_of_credit_note_id IS NULL) OR (status = 'REVERSED' AND reversal_of_credit_note_id IS NOT NULL))",
-		"finance_credit_notes_status_allowed":   "status IN ('POSTED', 'REVERSED')",
+		"finance_credit_notes_amount_positive":   "amount > 0",
+		"finance_credit_notes_currency_allowed":  "currency IN ('USD', 'CNY', 'HKD')",
+		"finance_credit_notes_intent_bundle":     "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
+		"finance_credit_notes_reversal_bundle":   "((status = 'POSTED' AND reversal_of_credit_note_id IS NULL) OR (status = 'REVERSED' AND reversal_of_credit_note_id IS NOT NULL))",
+		"finance_credit_notes_reversal_not_self": "reversal_of_credit_note_id IS NULL OR reversal_of_credit_note_id <> id",
+		"finance_credit_notes_status_allowed":    "status IN ('POSTED', 'REVERSED')",
 	}
 	FinanceFactsTable.ForeignKeys[0].RefTable = AdminUsersTable
 	FinanceFactsTable.ForeignKeys[1].RefTable = AdminUsersTable
@@ -5608,7 +5728,7 @@ func init() {
 		"quality_inspections_defect_rate_gt_below_100":    "defect_rate_operator IS NULL OR defect_rate_operator <> 'GT' OR defect_rate_percent < 100",
 		"quality_inspections_defect_rate_operator_valid":  "defect_rate_operator IS NULL OR defect_rate_operator IN ('APPROX', 'GT')",
 		"quality_inspections_defect_rate_percent_range":   "defect_rate_percent IS NULL OR (defect_rate_percent >= 0 AND defect_rate_percent <= 100)",
-		"quality_inspections_lifecycle_shape":             "\n(\n  (\n    status IN ('DRAFT', 'SUBMITTED', 'CANCELLED')\n    AND result IS NULL\n    AND inspected_at IS NULL\n  )\n  OR\n  (\n    status = 'PASSED'\n    AND result IN ('PASS', 'CONCESSION')\n    AND inspected_at IS NOT NULL\n  )\n  OR\n  (\n    status = 'REJECTED'\n    AND result = 'REJECT'\n    AND inspected_at IS NOT NULL\n  )\n)",
+		"quality_inspections_lifecycle_shape":             "\n(\n  (\n    status IN ('DRAFT', 'SUBMITTED', 'CANCELLED')\n    AND result IS NULL\n    AND inspected_at IS NULL\n  )\n  OR\n  (\n    status = 'PASSED'\n    AND result IS NOT NULL\n    AND result IN ('PASS', 'CONCESSION')\n    AND inspected_at IS NOT NULL\n  )\n  OR\n  (\n    status = 'REJECTED'\n    AND result IS NOT NULL\n    AND result = 'REJECT'\n    AND inspected_at IS NOT NULL\n  )\n)",
 		"quality_inspections_production_gate_allowed":     "gate_code IS NULL OR gate_code IN ('CUT_PIECE', 'SHELL', 'FINISHED_GOODS', 'NEEDLE', 'SAMPLING', 'CUSTOMER_ACCEPTANCE')",
 		"quality_inspections_result_allowed":              "result IS NULL OR result IN ('PASS', 'REJECT', 'CONCESSION')",
 		"quality_inspections_source_shape":                "\n(\n  (\n    production_wip_batch_id IS NULL\n    AND gate_code IS NULL\n    AND inventory_lot_id IS NOT NULL\n    AND warehouse_id IS NOT NULL\n  )\n  OR\n  (\n    production_wip_batch_id IS NOT NULL\n    AND gate_code IS NOT NULL\n    AND source_type IS NOT NULL\n    AND source_type = 'PRODUCTION_WIP'\n    AND source_id IS NOT NULL\n    AND source_id = production_wip_batch_id\n    AND inspection_type IS NOT NULL\n    AND inspection_type = 'PRODUCTION_STAGE'\n    AND subject_type IS NOT NULL\n    AND subject_type = 'WIP'\n    AND subject_id IS NOT NULL\n    AND subject_id = production_wip_batch_id\n    AND inventory_lot_id IS NULL\n    AND warehouse_id IS NULL\n    AND purchase_receipt_id IS NULL\n    AND purchase_receipt_item_id IS NULL\n    AND material_id IS NULL\n  )\n)",
@@ -5636,10 +5756,10 @@ func init() {
 		"sales_orders_lifecycle_status_allowed":   "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
 		"sales_orders_order_total_nonnegative":    "order_total IS NULL OR order_total >= 0",
 		"sales_orders_quoted_freight_nonnegative": "quoted_freight_amount IS NULL OR quoted_freight_amount >= 0",
-		"sales_orders_quoted_freight_terms_valid": "quoted_freight_amount IS NULL OR freight_terms = 'EXCLUDED'",
+		"sales_orders_quoted_freight_terms_valid": "quoted_freight_amount IS NULL OR (freight_terms IS NOT NULL AND freight_terms = 'EXCLUDED')",
 		"sales_orders_tax_amount_nonnegative":     "tax_amount IS NULL OR tax_amount >= 0",
 		"sales_orders_tax_mode_allowed":           "tax_mode IS NULL OR tax_mode IN ('INCLUSIVE', 'EXCLUSIVE', 'NONE')",
-		"sales_orders_tax_pair_valid":             "((tax_mode IS NULL AND tax_rate IS NULL) OR (tax_mode = 'NONE' AND tax_rate IS NULL) OR (tax_mode IN ('INCLUSIVE', 'EXCLUSIVE') AND tax_rate IS NOT NULL))",
+		"sales_orders_tax_pair_valid":             "((tax_mode IS NULL AND tax_rate IS NULL) OR (tax_mode IS NOT NULL AND ((tax_mode = 'NONE' AND tax_rate IS NULL) OR (tax_mode IN ('INCLUSIVE', 'EXCLUSIVE') AND tax_rate IS NOT NULL))))",
 		"sales_orders_tax_rate_valid":             "tax_rate IS NULL OR (tax_rate > 0 AND tax_rate <= 100)",
 		"sales_orders_version_positive":           "version > 0",
 	}

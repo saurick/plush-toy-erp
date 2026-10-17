@@ -161,3 +161,58 @@ func TestOutsourcingWarehouseDraftSaveRejectsClientCommercialFields(t *testing.T
 		}
 	}
 }
+
+func TestSensitiveFieldPurchaseReturnsUseSourcePermissionsWithoutExposingPrices(t *testing.T) {
+	admin := workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionPurchaseReceiptRead, biz.PermissionPurchaseReturnCreate)
+	dispatcher := &jsonrpcDispatcher{}
+	for _, method := range []string{"create_purchase_return_from_receipt", "create_purchase_return_from_quality_inspection"} {
+		ctx := biz.WithCurrentAdmin(workflowJSONRPCAdminContext(), admin)
+		if result := dispatcher.requireSensitiveFieldMutationPermission(withAdminPermissionCache(ctx), "purchase", method); result != nil {
+			t.Fatalf("source-only return %s requires an unrelated field permission: %#v", method, result)
+		}
+	}
+	for _, method := range []string{"create_purchase_return_draft", "create_purchase_unknown_command"} {
+		ctx := biz.WithCurrentAdmin(workflowJSONRPCAdminContext(), admin)
+		if result := dispatcher.requireSensitiveFieldMutationPermission(withAdminPermissionCache(ctx), "purchase", method); result == nil || result.Code != errcode.PermissionDenied.Code {
+			t.Fatalf("unregistered purchase mutation must fail closed: %s %#v", method, result)
+		}
+	}
+	receipt := map[string]any{"return_no": "RETURN-SOURCE", "purchase_receipt_id": float64(11), "returned_at": "2026-10-17T10:00:00Z", "idempotency_key": "return-source", "items": []any{map[string]any{"purchase_receipt_item_id": float64(12), "quantity": "2"}}}
+	quality := map[string]any{"return_no": "RETURN-QUALITY", "quality_inspection_id": float64(13), "quantity": "2", "returned_at": "2026-10-17T10:00:00Z", "reason": "尺寸不合格", "idempotency_key": "return-quality"}
+	if _, ok := purchaseReturnFromReceiptCreateFromParams(receipt); !ok {
+		t.Fatal("valid receipt return rejected")
+	}
+	if _, ok := purchaseReturnFromQualityInspectionCreateFromParams(quality); !ok {
+		t.Fatal("valid quality return rejected")
+	}
+	for _, field := range []string{"unit_price", "amount", "supplier_name", "warehouse_id", "lot_id"} {
+		receipt[field] = "forged"
+		if _, ok := purchaseReturnFromReceiptCreateFromParams(receipt); ok {
+			t.Fatalf("receipt return accepted caller-owned %s", field)
+		}
+		delete(receipt, field)
+		quality[field] = "forged"
+		if _, ok := purchaseReturnFromQualityInspectionCreateFromParams(quality); ok {
+			t.Fatalf("quality return accepted caller-owned %s", field)
+		}
+		delete(quality, field)
+		line := receipt["items"].([]any)[0].(map[string]any)
+		line[field] = "forged"
+		if _, ok := purchaseReturnFromReceiptCreateFromParams(receipt); ok {
+			t.Fatalf("return line accepted caller-owned %s", field)
+		}
+		delete(line, field)
+	}
+	line := map[string]any{"purchase_receipt_item_id": 12, "quantity": "2", "unit_price": "3.5", "amount": "7"}
+	payload := map[string]any{"purchase_return": map[string]any{"items": []any{line}}}
+	redactSensitiveFieldMap(payload, "procurement", sensitiveFieldReadPolicy{})
+	if _, ok := line["unit_price"]; ok {
+		t.Fatal("return price leaked")
+	}
+	if _, ok := line["amount"]; ok {
+		t.Fatal("return amount leaked")
+	}
+	if line["quantity"] != "2" || line["purchase_receipt_item_id"] != 12 {
+		t.Fatal("redaction removed warehouse facts")
+	}
+}

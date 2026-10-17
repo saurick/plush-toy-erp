@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/financeallocation"
+	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
 	"time"
 
@@ -400,6 +402,36 @@ func (_c *FinanceFactCreate) SetNillableUpdatedAt(v *time.Time) *FinanceFactCrea
 		_c.SetUpdatedAt(*v)
 	}
 	return _c
+}
+
+// AddAllocationIDs adds the "allocations" edge to the FinanceAllocation entity by IDs.
+func (_c *FinanceFactCreate) AddAllocationIDs(ids ...int) *FinanceFactCreate {
+	_c.mutation.AddAllocationIDs(ids...)
+	return _c
+}
+
+// AddAllocations adds the "allocations" edges to the FinanceAllocation entity.
+func (_c *FinanceFactCreate) AddAllocations(v ...*FinanceAllocation) *FinanceFactCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddAllocationIDs(ids...)
+}
+
+// AddCreditNoteIDs adds the "credit_notes" edge to the FinanceCreditNote entity by IDs.
+func (_c *FinanceFactCreate) AddCreditNoteIDs(ids ...int) *FinanceFactCreate {
+	_c.mutation.AddCreditNoteIDs(ids...)
+	return _c
+}
+
+// AddCreditNotes adds the "credit_notes" edges to the FinanceCreditNote entity.
+func (_c *FinanceFactCreate) AddCreditNotes(v ...*FinanceCreditNote) *FinanceFactCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddCreditNoteIDs(ids...)
 }
 
 // SetPosterID sets the "poster" edge to the AdminUser entity by ID.
@@ -814,6 +846,38 @@ func (_c *FinanceFactCreate) createSpec() (*FinanceFact, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(financefact.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := _c.mutation.AllocationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.AllocationsTable,
+			Columns: []string{financefact.AllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.CreditNotesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.CreditNotesTable,
+			Columns: []string{financefact.CreditNotesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.PosterIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{

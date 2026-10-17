@@ -11,7 +11,7 @@
 }
 
 .erp-dashboard-card .ant-card-body {
-  padding: 18px 20px;
+  padding: var(--erp-form-body-padding-block, 18px) var(--erp-panel-padding-inline, 20px);
 }
 
 .erp-dashboard-title.ant-typography {
@@ -41,7 +41,7 @@
 }
 
 .erp-dashboard-table-card .ant-card-body {
-  padding: 12px 16px;
+  padding: var(--erp-panel-padding-block, 12px) var(--erp-panel-padding-inline, 16px);
   overflow-x: auto;
 }
 

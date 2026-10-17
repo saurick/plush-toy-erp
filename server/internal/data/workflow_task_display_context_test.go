@@ -157,6 +157,33 @@ func TestWorkflowTaskDisplayContextSourceProducerSearch(t *testing.T) {
 	}
 }
 
+func TestWorkflowTaskDisplayContextFulfillmentSourceSearch(t *testing.T) {
+	ctx := context.Background()
+	f := openProductionOrderRepoTest(t, "display_fulfillment")
+	f.client.Product.UpdateOneID(f.productID).SetName("发货小熊").SaveX(ctx)
+	warehouse := createTestProductWarehouse(t, ctx, f.client, "DISPLAY-SHIP-WH")
+	shipment := f.client.Shipment.Create().SetShipmentNo("SHIP-DISPLAY-FULFILLMENT").SetIdempotencyKey("display-fulfillment").SaveX(ctx)
+	f.client.ShipmentItem.Create().SetShipmentID(shipment.ID).SetProductID(f.productID).SetWarehouseID(warehouse.ID).SetUnitID(f.unitID).SetQuantity(decimal.NewFromInt(1)).SaveX(ctx)
+	if err := syncFulfillmentTask(ctx, f.client, "shipment_execute", shipment.ID, shipment.ShipmentNo, "", "ready", "", f.actorID); err != nil {
+		t.Fatal(err)
+	}
+	row := assertFulfillmentTask(t, ctx, f.client, "shipment_execute", shipment.ID, "ready", biz.SalesRoleKey)
+	repo := NewWorkflowRepo(f.data, log.NewStdLogger(io.Discard))
+	items, total, err := repo.ListWorkflowTasks(ctx, biz.WorkflowTaskFilter{Keyword: "发货小熊", Limit: 1})
+	if err != nil || total != 1 || len(items) != 1 || items[0].DisplayContext == nil || len(items[0].DisplayContext.Items) != 1 {
+		t.Fatalf("fulfillment search lacks source identity: items=%#v total=%d err=%v", items, total, err)
+	}
+	item := items[0].DisplayContext.Items[0]
+	if item.ProductID != f.productID || item.Name != "发货小熊" || item.ImageAttachmentID == 0 {
+		t.Fatalf("fulfillment product and image must follow source: %#v", item)
+	}
+	forged := entWorkflowTaskToBiz(row)
+	forged.TaskCode = "untrusted-fulfillment-copy"
+	if err := hydrateWorkflowTaskDisplayContexts(ctx, f.client, []*biz.WorkflowTask{forged}); err != nil || forged.DisplayContext != nil {
+		t.Fatalf("untrusted fulfillment cannot read source identity: %#v err=%v", forged.DisplayContext, err)
+	}
+}
+
 func TestWorkflowTaskDisplayContextQualityProduct(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_display_quality?mode=memory&cache=shared&_fk=1")

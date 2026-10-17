@@ -4,9 +4,11 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/financeallocation"
+	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/financepayment"
 	"server/internal/data/model/ent/predicate"
 
@@ -19,11 +21,14 @@ import (
 // FinanceAllocationQuery is the builder for querying FinanceAllocation entities.
 type FinanceAllocationQuery struct {
 	config
-	ctx         *QueryContext
-	order       []financeallocation.OrderOption
-	inters      []Interceptor
-	predicates  []predicate.FinanceAllocation
-	withPayment *FinancePaymentQuery
+	ctx             *QueryContext
+	order           []financeallocation.OrderOption
+	inters          []Interceptor
+	predicates      []predicate.FinanceAllocation
+	withPayment     *FinancePaymentQuery
+	withFinanceFact *FinanceFactQuery
+	withReversals   *FinanceAllocationQuery
+	withReversalOf  *FinanceAllocationQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -75,6 +80,72 @@ func (_q *FinanceAllocationQuery) QueryPayment() *FinancePaymentQuery {
 			sqlgraph.From(financeallocation.Table, financeallocation.FieldID, selector),
 			sqlgraph.To(financepayment.Table, financepayment.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, financeallocation.PaymentTable, financeallocation.PaymentColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryFinanceFact chains the current query on the "finance_fact" edge.
+func (_q *FinanceAllocationQuery) QueryFinanceFact() *FinanceFactQuery {
+	query := (&FinanceFactClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financeallocation.Table, financeallocation.FieldID, selector),
+			sqlgraph.To(financefact.Table, financefact.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, financeallocation.FinanceFactTable, financeallocation.FinanceFactColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryReversals chains the current query on the "reversals" edge.
+func (_q *FinanceAllocationQuery) QueryReversals() *FinanceAllocationQuery {
+	query := (&FinanceAllocationClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financeallocation.Table, financeallocation.FieldID, selector),
+			sqlgraph.To(financeallocation.Table, financeallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, financeallocation.ReversalsTable, financeallocation.ReversalsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryReversalOf chains the current query on the "reversal_of" edge.
+func (_q *FinanceAllocationQuery) QueryReversalOf() *FinanceAllocationQuery {
+	query := (&FinanceAllocationClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financeallocation.Table, financeallocation.FieldID, selector),
+			sqlgraph.To(financeallocation.Table, financeallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, financeallocation.ReversalOfTable, financeallocation.ReversalOfColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -269,12 +340,15 @@ func (_q *FinanceAllocationQuery) Clone() *FinanceAllocationQuery {
 		return nil
 	}
 	return &FinanceAllocationQuery{
-		config:      _q.config,
-		ctx:         _q.ctx.Clone(),
-		order:       append([]financeallocation.OrderOption{}, _q.order...),
-		inters:      append([]Interceptor{}, _q.inters...),
-		predicates:  append([]predicate.FinanceAllocation{}, _q.predicates...),
-		withPayment: _q.withPayment.Clone(),
+		config:          _q.config,
+		ctx:             _q.ctx.Clone(),
+		order:           append([]financeallocation.OrderOption{}, _q.order...),
+		inters:          append([]Interceptor{}, _q.inters...),
+		predicates:      append([]predicate.FinanceAllocation{}, _q.predicates...),
+		withPayment:     _q.withPayment.Clone(),
+		withFinanceFact: _q.withFinanceFact.Clone(),
+		withReversals:   _q.withReversals.Clone(),
+		withReversalOf:  _q.withReversalOf.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -289,6 +363,39 @@ func (_q *FinanceAllocationQuery) WithPayment(opts ...func(*FinancePaymentQuery)
 		opt(query)
 	}
 	_q.withPayment = query
+	return _q
+}
+
+// WithFinanceFact tells the query-builder to eager-load the nodes that are connected to
+// the "finance_fact" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *FinanceAllocationQuery) WithFinanceFact(opts ...func(*FinanceFactQuery)) *FinanceAllocationQuery {
+	query := (&FinanceFactClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withFinanceFact = query
+	return _q
+}
+
+// WithReversals tells the query-builder to eager-load the nodes that are connected to
+// the "reversals" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *FinanceAllocationQuery) WithReversals(opts ...func(*FinanceAllocationQuery)) *FinanceAllocationQuery {
+	query := (&FinanceAllocationClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withReversals = query
+	return _q
+}
+
+// WithReversalOf tells the query-builder to eager-load the nodes that are connected to
+// the "reversal_of" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *FinanceAllocationQuery) WithReversalOf(opts ...func(*FinanceAllocationQuery)) *FinanceAllocationQuery {
+	query := (&FinanceAllocationClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withReversalOf = query
 	return _q
 }
 
@@ -370,8 +477,11 @@ func (_q *FinanceAllocationQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	var (
 		nodes       = []*FinanceAllocation{}
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [4]bool{
 			_q.withPayment != nil,
+			_q.withFinanceFact != nil,
+			_q.withReversals != nil,
+			_q.withReversalOf != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -395,6 +505,25 @@ func (_q *FinanceAllocationQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	if query := _q.withPayment; query != nil {
 		if err := _q.loadPayment(ctx, query, nodes, nil,
 			func(n *FinanceAllocation, e *FinancePayment) { n.Edges.Payment = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withFinanceFact; query != nil {
+		if err := _q.loadFinanceFact(ctx, query, nodes, nil,
+			func(n *FinanceAllocation, e *FinanceFact) { n.Edges.FinanceFact = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withReversals; query != nil {
+		if err := _q.loadReversals(ctx, query, nodes,
+			func(n *FinanceAllocation) { n.Edges.Reversals = []*FinanceAllocation{} },
+			func(n *FinanceAllocation, e *FinanceAllocation) { n.Edges.Reversals = append(n.Edges.Reversals, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withReversalOf; query != nil {
+		if err := _q.loadReversalOf(ctx, query, nodes, nil,
+			func(n *FinanceAllocation, e *FinanceAllocation) { n.Edges.ReversalOf = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -430,6 +559,100 @@ func (_q *FinanceAllocationQuery) loadPayment(ctx context.Context, query *Financ
 	}
 	return nil
 }
+func (_q *FinanceAllocationQuery) loadFinanceFact(ctx context.Context, query *FinanceFactQuery, nodes []*FinanceAllocation, init func(*FinanceAllocation), assign func(*FinanceAllocation, *FinanceFact)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*FinanceAllocation)
+	for i := range nodes {
+		fk := nodes[i].FinanceFactID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(financefact.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "finance_fact_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *FinanceAllocationQuery) loadReversals(ctx context.Context, query *FinanceAllocationQuery, nodes []*FinanceAllocation, init func(*FinanceAllocation), assign func(*FinanceAllocation, *FinanceAllocation)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*FinanceAllocation)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(financeallocation.FieldReversalOfAllocationID)
+	}
+	query.Where(predicate.FinanceAllocation(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(financeallocation.ReversalsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ReversalOfAllocationID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "reversal_of_allocation_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "reversal_of_allocation_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *FinanceAllocationQuery) loadReversalOf(ctx context.Context, query *FinanceAllocationQuery, nodes []*FinanceAllocation, init func(*FinanceAllocation), assign func(*FinanceAllocation, *FinanceAllocation)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*FinanceAllocation)
+	for i := range nodes {
+		if nodes[i].ReversalOfAllocationID == nil {
+			continue
+		}
+		fk := *nodes[i].ReversalOfAllocationID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(financeallocation.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "reversal_of_allocation_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 
 func (_q *FinanceAllocationQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := _q.querySpec()
@@ -458,6 +681,12 @@ func (_q *FinanceAllocationQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withPayment != nil {
 			_spec.Node.AddColumnOnce(financeallocation.FieldPaymentID)
+		}
+		if _q.withFinanceFact != nil {
+			_spec.Node.AddColumnOnce(financeallocation.FieldFinanceFactID)
+		}
+		if _q.withReversalOf != nil {
+			_spec.Node.AddColumnOnce(financeallocation.FieldReversalOfAllocationID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

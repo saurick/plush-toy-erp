@@ -105,6 +105,67 @@ test('non-purchase task summary makes the combined count explicit', () => {
   assert.equal(summary.compactCountLabel, '共 2 项关联内容')
 })
 
+test('search selects a matching product and its own image, counts styles and restores source order on clear', () => {
+  const task = {
+    source_type: 'sales_order',
+    display_context: {
+      available: true,
+      source_no: 'SO-DEER',
+      items: [
+        { kind: 'product', name: '雪花小鹿', code: 'DEER-1', product_id: 14, image_attachment_id: 114 },
+        { kind: 'product', name: '饼干小熊', code: 'BEAR-1', product_id: 17, image_attachment_id: 117 },
+        { kind: 'product', name: '云朵小熊', code: 'BEAR-2', product_id: 1, image_attachment_id: 101 },
+        { kind: 'product', name: '云朵小熊', code: 'BEAR-2', product_id: 1, image_attachment_id: 101, order_no: 'SO-OTHER' },
+      ],
+    },
+  }
+  const original = structuredClone(task)
+  const searched = getWorkflowTaskIdentityPresentation(task, '  熊  ')
+  assert.equal(searched.first.name, '饼干小熊')
+  assert.equal(searched.first.productID, 17)
+  assert.equal(searched.first.imageAttachmentID, 117)
+  assert.equal(searched.compactCountLabel, '命中 2 款，共 3 款')
+  assert.equal(searched.remainingItems.length, 3)
+  assert.equal(getWorkflowTaskIdentityPresentation(task, 'bEaR-2').first.name, '云朵小熊')
+  for (const keyword of ['', 'SO-DEER', '不存在']) {
+    const summary = getWorkflowTaskIdentityPresentation(task, keyword)
+    assert.equal(summary.first.name, '雪花小鹿')
+    assert.equal(summary.compactCountLabel, '共 4 项关联内容')
+  }
+  assert.deepEqual(task, original)
+})
+
+test('style searches and material searches use the matched kind instead of a mixed denominator', () => {
+  const task = {
+    source_type: 'purchase_order',
+    display_context: {
+      available: true,
+      source_line_count: 5,
+      items: [
+        { kind: 'material', name: '绒布', supplier_item_no: 'FABRIC-01' },
+        { kind: 'material', name: '填充棉', supplier_item_no: 'COTTON#02' },
+        { kind: 'product', name: '雪花小鹿', style_no: 'STYLE-DEER' },
+        { kind: 'product', name: '云朵小熊', style_no: 'STYLE-BEAR' },
+      ],
+    },
+  }
+  const product = getWorkflowTaskIdentityPresentation(task, 'style-bear')
+  assert.equal(product.first.name, '云朵小熊')
+  assert.equal(product.compactCountLabel, '命中 1 款，共 2 款')
+  const material = getWorkflowTaskIdentityPresentation(task, 'cotton#02')
+  assert.equal(material.first.name, '填充棉')
+  assert.equal(material.compactCountLabel, '命中 1 种物料，共 2 种物料')
+  assert.equal(getWorkflowTaskIdentityPresentation(task, '').first.name, '绒布')
+})
+
+test('an empty or unavailable source never highlights stale payload matches', () => {
+  for (const context of [{ available: true, items: [] }, { available: false, items: [] }]) {
+    const summary = getWorkflowTaskIdentityPresentation({ payload: { product_name: '旧小熊' }, display_context: context }, '熊')
+    assert.equal(summary.first, undefined)
+    assert.equal(summary.compactCountLabel, '')
+  }
+})
+
 test('supplier references keep merchant names and symbols and never fall back after clearing', () => {
   const supplierItemNo = '示例织造AB-001#-02#米白'
   const task = {

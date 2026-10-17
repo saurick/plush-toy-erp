@@ -655,11 +655,6 @@
 }
 
 /* Extracted from src/erp/styles/app/theme-overrides.css for DEV-only loading. */
-[data-erp-theme='dark'] .erp-dev-docs-reader__toolbar,
-[data-erp-theme='dark'] .erp-dev-docs-toc-shell {
-  border-color: var(--erp-border);
-}
-
 [data-erp-theme='dark'] .erp-dev-docs-title.ant-typography {
   color: var(--erp-text);
 }
@@ -690,7 +685,6 @@
 
 [data-erp-theme='dark'] .erp-dev-docs-list__item,
 [data-erp-theme='dark'] .erp-dev-docs-pinned__item,
-[data-erp-theme='dark'] .erp-dev-docs-toc__tag,
 [data-erp-theme='dark'] .erp-dev-docs-tree__count {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg-soft);
@@ -729,23 +723,10 @@
 [data-erp-theme='dark'] .erp-dev-docs-pinned__item--active,
 [data-erp-theme='dark'] .erp-dev-docs-tree__row:hover,
 [data-erp-theme='dark'] .erp-dev-docs-tree__row:focus-visible,
-[data-erp-theme='dark'] .erp-dev-docs-tree__doc-shell--active,
-[data-erp-theme='dark'] .erp-dev-docs-toc__tag:hover,
-[data-erp-theme='dark'] .erp-dev-docs-toc__tag:focus-visible {
+[data-erp-theme='dark'] .erp-dev-docs-tree__doc-shell--active {
   border-color: var(--erp-interactive-border-hover);
   background: var(--erp-interactive-bg-hover);
   color: var(--erp-text);
-}
-
-[data-erp-theme='dark'] .erp-dev-docs-pin-button.ant-btn {
-  color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark'] .erp-dev-docs-pin-button.ant-btn:hover,
-[data-erp-theme='dark'] .erp-dev-docs-pin-button.ant-btn:focus-visible,
-[data-erp-theme='dark'] .erp-dev-docs-pin-button--active.ant-btn {
-  background: var(--erp-interactive-bg-hover);
-  color: #86efac;
 }
 
 [data-erp-theme='dark'] .erp-dev-docs-row-pin {

@@ -1,0 +1,28 @@
+# 交付运行页面
+
+[交付总览](../DevWorkbenchAreaPage.jsx)负责选择任务；[数据库迁移](../DevDatabaseMigrationPage.jsx)、[版本发布](../DevVersionCenterPage.jsx)和[安全与恢复](../DevDrillRecoveryPage.jsx)各自组织范围、当前操作与结果。客户配置沿用相邻的[客户配置模块](../customer-config/README.md)。
+
+| 模块                                             | 责任                                                         |
+| ------------------------------------------------ | ------------------------------------------------------------ |
+| `DeliveryWorkspace.jsx`                          | 客户范围、发布顺序、四类任务入口；环境名称来自目标登记表     |
+| `DeliveryTaskPath.jsx` / `delivery-workflow.css` | 编号路径、来源明确的节点状态和页面局部布局                   |
+| `migration/`                                     | 状态读取与动作生命周期、升级路径、运行检查、记录、确认与详情 |
+| `version/useVersionCenterRoute.jsx`              | URL 视图、历史筛选与前进后退                                 |
+| `version/useVersionCenterState.jsx`              | 客户范围、只读快照、发布会话、请求保护和写动作               |
+| `version/buildVersionCenterModel.mjs`            | 复用正式合同计算制品、目标、发布资格与操作详情               |
+| `version/` 其他模块                              | 版本与记录列表、当前任务、制品发布、部署确认和操作详情       |
+| `recovery/`                                      | 核验数据生命周期、安全清单、计划演练、应急步骤和只读详情     |
+
+编号用于真实的办理顺序。数据库节点只展示已有证据给出的状态；普通导航和阅读不会产生完成证据。安全核验、恢复演练与应急处置是不同任务，保持平级视图。
+
+各页保留当前目标、严重阻塞、未结束操作及刷新状态。发布制品、准备部署计划和确认执行各有入口，已有确认短语、权限、CAS、目标隔离、回滚资格与结果读回继续由正式接口守住。本页重组不新增服务器、数据库或任意命令输入。
+
+状态读取失败时保留可用的历史证据，并停用依赖新鲜证据的写操作；未读到版本或目标不能解释为不存在。安全检查缺少专门回执仍显示未核验，数据库恢复回执只证明自身范围。
+
+## 验证
+
+1. 运行 `devDelivery`、`devDatabaseMigration`、`devRecovery`、`devHub`、`devTimestamp` 和相关样式合同测试。静态合同通过 `web/scripts/test/pageSources.mjs` 读取实际页面模块，避免拆分后漏查。
+2. 在 `web/` 定向运行 `dev-delivery-task-navigation-desktop`、`dev-database-migration-workspace-desktop`、`dev-version-center-tabs-pagination-desktop`、`dev-drill-recovery-desktop-light` 浏览器场景。保留原有确认、失败恢复、记录、切换动效与焦点测试，并核对编号、状态与标题对齐和窄屏溢出。
+3. 对本目录和四个入口执行 ESLint、局部 CSS 检查及 workbench 构建。浏览器使用隔离夹具，不执行实际目标发布、迁移或恢复。
+
+正式交互与执行边界见[研发效能工作台与 CI/CD 设计](../../../../../docs/engineering/研发效能工作台与CI-CD设计.md)。

@@ -116,7 +116,7 @@ func hydrateWorkflowTaskDisplayContexts(ctx context.Context, client *ent.Client,
 		if kind == "" || task.SourceID <= 0 {
 			continue
 		}
-		trusted := biz.IsTrustedEngineeringMaterialTask(task) || biz.IsTrustedProductionSchedulingSourceTask(task) || biz.IsTrustedProductionExceptionSourceTask(task) || biz.IsTrustedShipmentReleaseSourceTask(task)
+		trusted := biz.IsTrustedEngineeringMaterialTask(task) || biz.IsTrustedProductionSchedulingSourceTask(task) || biz.IsTrustedProductionExceptionSourceTask(task) || biz.IsTrustedShipmentReleaseSourceTask(task) || biz.IsTrustedFulfillmentTask(task)
 		if instance := instances[displayInt(task.ProcessInstanceID)]; instance != nil {
 			trusted = instance.BusinessRefID == task.SourceID && workflowDisplaySourceKind(instance.BusinessRefType) == kind
 		}

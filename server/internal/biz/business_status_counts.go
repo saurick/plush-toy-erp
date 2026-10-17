@@ -87,7 +87,7 @@ type QualityInspectionsStatusCounter interface {
 	CountQualityInspectionsByStatus(context.Context, QualityInspectionFilter) (map[string]int, error)
 }
 
-func (uc *InventoryUsecase) CountQualityInspectionsByStatus(ctx context.Context, filter QualityInspectionFilter) (map[string]int, error) {
+func (uc *QualityInspectionUsecase) CountQualityInspectionsByStatus(ctx context.Context, filter QualityInspectionFilter) (map[string]int, error) {
 	if uc == nil {
 		return nil, ErrBadParam
 	}
@@ -162,7 +162,7 @@ func (uc *OperationalFactUsecase) CountFinanceCreditNotesByStatus(ctx context.Co
 	return repo.CountFinanceCreditNotesByStatus(ctx, normalized)
 }
 
-func (uc *InventoryUsecase) CountFinishedGoodsQualityInspectionsByStatus(ctx context.Context, filter QualityInspectionFilter) (map[string]int, error) {
+func (uc *QualityInspectionUsecase) CountFinishedGoodsQualityInspectionsByStatus(ctx context.Context, filter QualityInspectionFilter) (map[string]int, error) {
 	if uc == nil {
 		return nil, ErrBadParam
 	}
@@ -177,7 +177,7 @@ func (uc *InventoryUsecase) CountFinishedGoodsQualityInspectionsByStatus(ctx con
 	return repo.CountQualityInspectionsByStatus(ctx, normalized)
 }
 
-func (uc *InventoryUsecase) CountOutsourcingReturnQualityInspectionsByStatus(ctx context.Context, filter QualityInspectionFilter) (map[string]int, error) {
+func (uc *QualityInspectionUsecase) CountOutsourcingReturnQualityInspectionsByStatus(ctx context.Context, filter QualityInspectionFilter) (map[string]int, error) {
 	if uc == nil {
 		return nil, ErrBadParam
 	}
@@ -192,7 +192,7 @@ func (uc *InventoryUsecase) CountOutsourcingReturnQualityInspectionsByStatus(ctx
 	return repo.CountQualityInspectionsByStatus(ctx, normalized)
 }
 
-func (uc *InventoryUsecase) CountProductionStageQualityInspectionsByStatus(ctx context.Context, filter QualityInspectionFilter) (map[string]int, error) {
+func (uc *QualityInspectionUsecase) CountProductionStageQualityInspectionsByStatus(ctx context.Context, filter QualityInspectionFilter) (map[string]int, error) {
 	if uc == nil {
 		return nil, ErrBadParam
 	}

@@ -1,7 +1,7 @@
-import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import path from 'node:path'
 import { writeFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
+import { assertMobileBackToTop } from './mobileBackToTopAssertions.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { assertContentTabAffordance } from './controlAffordanceAssertions.mjs'
@@ -14,7 +14,7 @@ import {
 import { progressFixtureData } from './businessProgressFixtures.mjs'
 import { assertMobileFilterOutsideDismissal } from './mobileFilterPopoverAssertions.mjs'
 import { createMobileFilterScrollScenarios } from './mobileFilterScrollScenarios.mjs'
-import { assertMobileFilterConsistency } from './mobileFilterConsistencyAssertions.mjs'
+import { assertMobileFilterClearControl } from './mobileFilterConsistencyAssertions.mjs'
 
 async function assertMobileDetailSurface(root, assert) {
   await root.locator('.mobile-task-flow-back').click({ trial: true })
@@ -35,6 +35,8 @@ async function assertMobileDetailSurface(root, assert) {
         : null
     }
     return {
+      taskFlow: node.matches('.mobile-role-tasks-page--detail'),
+      taskInfo: node.matches('.mobile-role-tasks-page--task-info'),
       header: box(header),
       main: box(main),
       footer: box(footer),
@@ -51,7 +53,7 @@ async function assertMobileDetailSurface(root, assert) {
         .map((button) => button.textContent),
     }
   })
-  assert.equal(geometry.padding, '12px')
+  assert.equal(geometry.padding, geometry.taskFlow && !geometry.taskInfo ? '16px' : '12px')
   assert.equal(geometry.titleSize, '18px')
   assert(Math.abs(geometry.header.left) <= 1)
   assert(geometry.main.top >= geometry.header.bottom - 1)
@@ -956,31 +958,48 @@ export function createMobileProgressScenarios({
         )
         const taskSurface = page.getByTestId('mobile-task-detail-screen')
         await taskSurface
-          .getByRole('heading', { name: '任务信息', exact: true })
+          .getByRole('heading', { name: '确认面料交期', exact: true })
           .waitFor()
+        await page.waitForFunction(() => {
+          const attachment = document.querySelector('button[data-testid="mobile-task-attachment-action"]')
+          return attachment && getComputedStyle(attachment).flexGrow === '0'
+        })
         const taskLayout = await taskSurface.evaluate((root) => {
-          const hero = root.querySelector('.mobile-task-detail-hero')
-          const attachment = hero.querySelector(
-            '[data-testid="mobile-task-attachment-action"] button'
+          const hero = root.querySelector('.workflow-task-info-card[aria-label="任务信息"]')
+          const attachment = root.querySelector(
+            'button[data-testid="mobile-task-attachment-action"]'
           )
+          const footer = root.querySelector('.mobile-role-action-bar')
           return {
-            heroRows: hero.querySelectorAll('.mobile-detail-fact').length,
-            productDetailsInHero:
-              hero.querySelectorAll('.erp-task-identity').length,
+            heroRows: hero.querySelectorAll('.workflow-task-info-facts > div').length,
+            currentSummaryCount: hero.querySelectorAll('.workflow-task-current').length,
+            attachmentInHero: hero.contains(attachment),
+            attachmentInFooter: Boolean(attachment.closest('.mobile-role-action-bar')),
             heroWidth: hero.getBoundingClientRect().width,
             attachmentWidth: attachment.getBoundingClientRect().width,
+            attachmentHeight: attachment.getBoundingClientRect().height,
+            footerButtons: [...footer.querySelectorAll('button')].map((button) => {
+              const box = button.getBoundingClientRect()
+              return { text: button.textContent, top: box.top, height: box.height, width: box.width }
+            }),
             steps: [
               ...root.querySelectorAll('.mobile-task-flow-step__title'),
             ].map((node) => node.textContent),
           }
         })
         assert.equal(taskLayout.heroRows, 2)
-        assert.equal(taskLayout.productDetailsInHero, 0)
+        assert.equal(taskLayout.currentSummaryCount, 1)
+        assert.equal(taskLayout.attachmentInHero, false)
+        assert.equal(taskLayout.attachmentInFooter, true)
+        assert(taskLayout.attachmentHeight >= 44, JSON.stringify(taskLayout))
+        assert.equal(taskLayout.footerButtons.length, 2)
+        assert(Math.abs(taskLayout.footerButtons[0].top - taskLayout.footerButtons[1].top) <= 1, JSON.stringify(taskLayout))
+        assert(Math.abs(taskLayout.footerButtons[0].height - taskLayout.footerButtons[1].height) <= 1, JSON.stringify(taskLayout))
         assert(
           taskLayout.attachmentWidth < taskLayout.heroWidth / 2,
           JSON.stringify(taskLayout)
         )
-        assert.deepEqual(taskLayout.steps, [], '任务详情先展示当前任务，办理后再显示步骤')
+        assert.deepEqual(taskLayout.steps, ['任务信息', '任务办理', '结果回执'], '任务详情首屏保留完整三步引导')
         await writeFile(
           path.join(outputDir, `mobile-progress-${role}-detail-geometry.json`),
           JSON.stringify(
@@ -1248,7 +1267,7 @@ export function createMobileProgressScenarios({
         await page.waitForTimeout(380)
         await assertMobileSearchAffordance(
           panel.locator('.erp-mobile-search'),
-          panel.getByRole('button', { name: '筛选进度', exact: true })
+          panel.locator('.mobile-filter-control')
         )
         await panel
           .getByRole('button', {
@@ -1378,7 +1397,7 @@ export function createMobileProgressScenarios({
           '筛选进度，已应用 1 项'
         )
         assert.equal(
-          await panel.getByLabel('当前进度筛选').getByRole('button', { name: '清除记录范围：全部记录', exact: true }).count(),
+          Number((await appliedFilter.getAttribute('title')).includes('记录范围：全部记录')),
           1,
           '非默认范围具名显示，关闭筛选后仍可核对'
         )
@@ -1662,6 +1681,23 @@ export function createMobileProgressScenarios({
       assert.equal(await panel.getByLabel('当前进度筛选').count(), 0, '快捷筛选不重复生成摘要标签')
       await dueSoon.click()
       assert.equal(await dueSoon.getAttribute('aria-pressed'), 'false')
+      const search = panel.getByRole('searchbox', { name: '搜索进度', exact: true })
+      await search.fill('MO-0001')
+      await search.press('Enter')
+      await dueSoon.click()
+      const blocked = quick.getByRole('button', { name: /任务受阻/ })
+      await blocked.click()
+      const applied = panel.getByRole('group', { name: '当前进度筛选', exact: true })
+      assert.equal(await applied.count(), 0, '仅有快捷条件时不额外生成条件行')
+      await assertMobileFilterClearControl({ assert, trigger: panel.locator('.mobile-filter-trigger') })
+      await panel.getByRole('button', { name: '清空进度筛选', exact: true }).tap()
+      assert.equal(await search.inputValue(), 'MO-0001', '清空进度条件保留搜索')
+      assert.equal(await dueSoon.getAttribute('aria-pressed'), 'false')
+      assert.equal(await blocked.getAttribute('aria-pressed'), 'false')
+      assert.equal(await applied.count(), 0, '清空纯快捷条件后不留空条件行')
+      assert.equal(await panel.getByRole('button', { name: '筛选进度', exact: true }).count(), 1)
+      await panel.getByRole('button', { name: '查看 MO-0001 进度', exact: true }).waitFor()
+      await panel.getByRole('button', { name: '清除搜索', exact: true }).click()
       await panel.getByRole('button', { name: '筛选进度', exact: true }).click()
       assert.equal(await filters.locator('input, select, textarea').count(), 0)
       assert.equal(await filters.getByRole('button', { name: '自定义交期日期', exact: true }).count(), 0)

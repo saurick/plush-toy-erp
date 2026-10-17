@@ -96,7 +96,7 @@ test("workflow fact boundary: task discovery and tracking projections only read 
 
 test("workflow fact boundary: workflow explain exposes guarded domain command entry", () => {
   const source = readFileSync(
-    path.join(repoRoot, "server/internal/service/jsonrpc_workflow_task.go"),
+    path.join(repoRoot, "server/internal/service/jsonrpc_workflow_task_access.go"),
     "utf8",
   );
   for (const expected of [
@@ -109,7 +109,7 @@ test("workflow fact boundary: workflow explain exposes guarded domain command en
   ]) {
     assert(
       source.includes(expected),
-      `jsonrpc_workflow_task.go should expose guarded domain command entry token ${expected}`,
+      `workflow task access should expose guarded domain command entry token ${expected}`,
     );
   }
 });

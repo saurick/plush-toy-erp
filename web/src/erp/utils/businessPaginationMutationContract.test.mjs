@@ -247,9 +247,9 @@ test('shipment edits reload the current page while create-only flows return thei
   assert.doesNotMatch(shipmentRefreshBranches.falsy, /loadRows\(\)/u)
 
   const qualityCreate = sourceSlice(
-    qualitySource,
+    readSource('../components/quality-inspections/useQualityInspectionActions.js'),
     'const handleCreateInspection = useCallback(async () => {',
-    'const markInspectionReturned'
+    'const runInspectionAction'
   )
   assert.match(qualityCreate, /createQualityInspectionDraft\(/u)
   assert.match(

@@ -944,6 +944,7 @@ export default function DevFlowStateObservatoryPage() {
                 [QUERY_KEYS.exception]: null,
                 [QUERY_KEYS.exceptionDecision]: null,
                 [QUERY_KEYS.exceptionStep]: null,
+                [QUERY_KEYS.exceptionOrigin]: null,
               })
             }
             onOpenView={openView}
@@ -960,7 +961,7 @@ export default function DevFlowStateObservatoryPage() {
           taskId={taskId}
           selectedTask={selectedTask}
           onSelectChain={(key) =>
-            updateParams({ [QUERY_KEYS.chain]: key, [QUERY_KEYS.node]: null, [QUERY_KEYS.exception]: null, [QUERY_KEYS.exceptionDecision]: null, [QUERY_KEYS.exceptionStep]: null })
+            updateParams({ [QUERY_KEYS.chain]: key, [QUERY_KEYS.node]: null, [QUERY_KEYS.exception]: null, [QUERY_KEYS.exceptionDecision]: null, [QUERY_KEYS.exceptionStep]: null, [QUERY_KEYS.exceptionOrigin]: null })
           }
           onSelectNode={(key) => updateParams({ [QUERY_KEYS.node]: key })}
           onOpenView={openView}

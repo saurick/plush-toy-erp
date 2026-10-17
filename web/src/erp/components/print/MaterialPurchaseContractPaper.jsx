@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
+import React, { useCallback, useLayoutEffect, useRef } from 'react'
+import { usePrintEditableDraftSync } from './usePrintEditableDraftSync.js'
 import {
   MATERIAL_PURCHASE_DETAIL_COLUMNS,
   findMergeAtCell,
@@ -52,33 +53,12 @@ function EditableText({
     }
   }, [displayText])
 
-  useEffect(() => {
-    const element = editableRef.current
-    if (!element || disabled) {
-      return undefined
-    }
-
-    const ownerWindow = element.ownerDocument?.defaultView || window
-    const commitSilentDraft = () => {
-      runSilentPrintWorkspaceDraftUpdate(() => {
-        commitElementValue(element)
-      })
-    }
-    const observer = new ownerWindow.MutationObserver(commitSilentDraft)
-    observer.observe(element, {
-      characterData: true,
-      childList: true,
-      subtree: true,
-    })
-    element.dataset.printWorkspaceDraftReady = 'true'
-    element.addEventListener('input', commitSilentDraft)
-
-    return () => {
-      element.removeEventListener('input', commitSilentDraft)
-      observer.disconnect()
-      delete element.dataset.printWorkspaceDraftReady
-    }
-  }, [commitElementValue, disabled])
+  usePrintEditableDraftSync({
+    editableRef,
+    commitElementValue,
+    elementType: Tag,
+    disabled,
+  })
 
   return (
     <Tag

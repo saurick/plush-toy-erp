@@ -1,5 +1,25 @@
 const DEV_DOCS_ORIGIN = 'https://dev-docs.local'
 
+export function resolveDevDocsReadingHeading(
+  headings = [],
+  { scrollTop = 0, clientHeight = 0, scrollHeight = 0 } = {}
+) {
+  if (headings.length === 0) return ''
+  if (
+    scrollTop > 0 &&
+    scrollHeight > clientHeight &&
+    scrollTop + clientHeight >= scrollHeight - 1
+  ) {
+    return headings.at(-1).id
+  }
+  let current = headings[0].id
+  for (const heading of headings) {
+    if (heading.top > scrollTop + 16) break
+    current = heading.id
+  }
+  return current
+}
+
 function decodeUrlPart(value = '') {
   try {
     return decodeURIComponent(value)

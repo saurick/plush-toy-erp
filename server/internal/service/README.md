@@ -19,6 +19,8 @@ JSON-RPC dispatcher 继续按职责拆文件维护：
 - `jsonrpc_dispatch_auth.go`：登录、短信登录、`auth.me` 和鉴权错误映射。
 - `jsonrpc_dispatch_guards.go`：登录态、管理员身份和当前管理员一致性校验。
 - `jsonrpc_dispatch_admin.go`：后台管理员、角色、权限和控制面审计入口。
+- `jsonrpc_project_manuals.go`：按当前有效账号读取受控的管理与运维手册，正文和访问规则见[项目手册包](../projectmanuals/README.md)。
+- `jsonrpc_help_content.go`：适配帮助章节、企业补充及纠错接口；三册阅读、编辑和发布分离，实际授权、版本和写入由 `HelpContentUsecase` 与 repository 承接，合同见[项目手册维护](../../../docs/manuals/README.md#在线纠错与企业补充--help-contributions)。
 - `jsonrpc_dispatch_helpers.go`：协议参数解析、敏感参数脱敏和 `structpb` 包装 helper。
 
 `jsonrpc_customer_config.go` 保留客户配置统一入口与 method 分发；销售受理、材料供应和成品流转分别在同名前缀的 `_sales_acceptance.go`、`_material_supply.go`、`_finished_goods.go` 中解析协议并调用业务入口。流程实例的固定 revision 与领域命令边界由既有 usecase 校验。
@@ -31,3 +33,15 @@ JSON-RPC dispatcher 继续按职责拆文件维护：
 
 - `server/docs/api.md`
 - `server/docs/runtime.md`
+
+## 任务接口职责
+
+任务接口在同一 service 包内按职责组织，分发与领域调用通过原有 dispatcher 和 usecase 协作。
+
+| 文件 | 职责 |
+| --- | --- |
+| [任务分发](jsonrpc_workflow_task.go) | method 路由、入口身份检查和协议结果包装 |
+| [看板与工作台查询](jsonrpc_workflow_task_board.go) | 有界查询参数和列表投影序列化 |
+| [岗位任务分页](jsonrpc_workflow_task_role_view.go) | 岗位视图、游标、时间窗口和数量守恒 |
+| [任务动作](jsonrpc_workflow_task_action.go) | 写参数校验、版本与幂等信封、任务动作及关联流程结算 |
+| [任务访问解释](jsonrpc_workflow_task_access.go) | 岗位、分派、能力、特权调阅和领域动作入口的访问判定 |

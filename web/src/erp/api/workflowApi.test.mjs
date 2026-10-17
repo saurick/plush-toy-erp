@@ -1432,31 +1432,6 @@ test('workflow task callers own a frozen user-intent attempt store', () => {
   }
 })
 
-test('workflow dashboard consumes one bounded server workbench projection', () => {
-  const source = read('../pages/DashboardPage.jsx')
-  const statsSource = read('../utils/workflowDashboardStats.mjs')
-  assert.match(statsSource, /effective_session\?\.roles/u)
-  assert.match(statsSource, /hasEffectiveRoleProjection/u)
-  assert.match(source, /getWorkflowWorkbench\(workbenchRequest/u)
-  assert.match(source, /queue_key:\s*workbenchQueueKey/u)
-  assert.match(source, /limit:\s*workbenchQueuePageSize/u)
-  assert.match(
-    source,
-    /offset:\s*\(workbenchQueuePage - 1\) \* workbenchQueuePageSize/u
-  )
-  assert.match(
-    source,
-    /const nextPageSize = normalizeWorkflowTaskPageSize\(pageSize\)/u
-  )
-  assert.match(source, /setWorkbenchQueuePageSize\(nextPageSize\)/u)
-  assert.doesNotMatch(source, /listAllWorkflowWorkbenchRoleTasks/u)
-  assert.doesNotMatch(source, /\blistAllWorkflowRoleTasks\b/u)
-  assert.doesNotMatch(source, /listWorkflowTasks/u)
-  assert.doesNotMatch(source, /Promise\.all/u)
-  assert.doesNotMatch(source, /limit:\s*200/u)
-  assert.doesNotMatch(source, /key:\s*'waiting'/u)
-})
-
 test('workflow task request IDs stay cryptographically strong on non-secure HTTP targets', () => {
   const source = read('../utils/workflowTaskMutation.mjs')
   assert.match(source, /cryptoProvider\?\.randomUUID/u)

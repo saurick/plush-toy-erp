@@ -1,6 +1,19 @@
 import React, { useRef } from 'react'
 import BusinessImage from '../business-list/BusinessImage.jsx'
 
+export function getPrintToolbarButtonClassName({
+  active = false,
+  primary = false,
+} = {}) {
+  return [
+    'erp-print-shell__button',
+    primary
+      ? 'erp-print-shell__button--primary'
+      : 'erp-print-shell__button--ghost',
+    active ? 'erp-print-shell__button--active' : '',
+  ].filter(Boolean).join(' ')
+}
+
 const TOOL_ICON_PATHS = {
   preview:
     'M2 12a11 11 0 0 1 20 0 11 11 0 0 1-20 0Zm13 0a3 3 0 1 1-6 0 3 3 0 0 1 6 0',

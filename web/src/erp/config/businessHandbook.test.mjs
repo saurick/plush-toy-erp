@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { existsSync } from 'node:fs'
+import { BUSINESS_HANDBOOK_OPERATIONS } from './businessHandbookOperations.mjs'
 import { BUSINESS_USABILITY_CATALOG } from './businessUsabilityCatalog.mjs'
 import { ENGINEERING_MATERIAL_HELP } from './engineeringMaterialHelp.mjs'
 import {
@@ -178,4 +180,40 @@ test('离线 HTML 包含同一范围的完整内容并转义文本，不依赖�
   assert(escaped.includes('&lt;script&gt;alert(1)&lt;/script&gt;'))
   assert(escaped.includes('A &amp; B &lt; C'))
   assert(!escaped.includes('<script>'))
+})
+
+test('办理手册逐页保留真实操作来源，新增规则同时进入全文搜索与离线内容', () => {
+  for (const page of [
+    ...BUSINESS_USABILITY_CATALOG,
+    ENGINEERING_MATERIAL_HELP,
+  ]) {
+    const instructions = BUSINESS_HANDBOOK_OPERATIONS[page.key]
+    assert(instructions, `${page.key} 缺少具体办理说明`)
+    for (const source of instructions.sources) {
+      assert(
+        existsSync(new URL(`../../../../${source}`, import.meta.url)),
+        source
+      )
+    }
+  }
+  const guides = getRoleHelpGuidesForProfile({ is_super_admin: true })
+  const catalog = getHelpReadingCatalog(guides)
+  const html = renderBusinessHandbookHtml({
+    guides,
+    pages: catalog.referencePages,
+  })
+  const markdown = renderBusinessHandbookMarkdown()
+  for (const [query, key, text] of [
+    ['SKU 单重', 'products', '创建后不可更换所属产品'],
+    ['实盘数量', 'inventory', '盘点填实盘数量'],
+    ['分批抵扣', 'finance-payments', '订单预收 / 预付'],
+    ['版本 修订', 'material-bom', '已有订单引用不自动切换'],
+  ]) {
+    assert(
+      searchHelpDocuments(catalog, query).some((entry) => entry.id === key),
+      query
+    )
+    assert(markdown.includes(text), text)
+    assert(html.includes(text), text)
+  }
 })

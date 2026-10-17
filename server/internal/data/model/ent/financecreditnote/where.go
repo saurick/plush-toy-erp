@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/shopspring/decimal"
 )
 
@@ -195,26 +196,6 @@ func FinanceFactIDNotIn(vs ...int) predicate.FinanceCreditNote {
 	return predicate.FinanceCreditNote(sql.FieldNotIn(FieldFinanceFactID, vs...))
 }
 
-// FinanceFactIDGT applies the GT predicate on the "finance_fact_id" field.
-func FinanceFactIDGT(v int) predicate.FinanceCreditNote {
-	return predicate.FinanceCreditNote(sql.FieldGT(FieldFinanceFactID, v))
-}
-
-// FinanceFactIDGTE applies the GTE predicate on the "finance_fact_id" field.
-func FinanceFactIDGTE(v int) predicate.FinanceCreditNote {
-	return predicate.FinanceCreditNote(sql.FieldGTE(FieldFinanceFactID, v))
-}
-
-// FinanceFactIDLT applies the LT predicate on the "finance_fact_id" field.
-func FinanceFactIDLT(v int) predicate.FinanceCreditNote {
-	return predicate.FinanceCreditNote(sql.FieldLT(FieldFinanceFactID, v))
-}
-
-// FinanceFactIDLTE applies the LTE predicate on the "finance_fact_id" field.
-func FinanceFactIDLTE(v int) predicate.FinanceCreditNote {
-	return predicate.FinanceCreditNote(sql.FieldLTE(FieldFinanceFactID, v))
-}
-
 // ReversalOfCreditNoteIDEQ applies the EQ predicate on the "reversal_of_credit_note_id" field.
 func ReversalOfCreditNoteIDEQ(v int) predicate.FinanceCreditNote {
 	return predicate.FinanceCreditNote(sql.FieldEQ(FieldReversalOfCreditNoteID, v))
@@ -233,26 +214,6 @@ func ReversalOfCreditNoteIDIn(vs ...int) predicate.FinanceCreditNote {
 // ReversalOfCreditNoteIDNotIn applies the NotIn predicate on the "reversal_of_credit_note_id" field.
 func ReversalOfCreditNoteIDNotIn(vs ...int) predicate.FinanceCreditNote {
 	return predicate.FinanceCreditNote(sql.FieldNotIn(FieldReversalOfCreditNoteID, vs...))
-}
-
-// ReversalOfCreditNoteIDGT applies the GT predicate on the "reversal_of_credit_note_id" field.
-func ReversalOfCreditNoteIDGT(v int) predicate.FinanceCreditNote {
-	return predicate.FinanceCreditNote(sql.FieldGT(FieldReversalOfCreditNoteID, v))
-}
-
-// ReversalOfCreditNoteIDGTE applies the GTE predicate on the "reversal_of_credit_note_id" field.
-func ReversalOfCreditNoteIDGTE(v int) predicate.FinanceCreditNote {
-	return predicate.FinanceCreditNote(sql.FieldGTE(FieldReversalOfCreditNoteID, v))
-}
-
-// ReversalOfCreditNoteIDLT applies the LT predicate on the "reversal_of_credit_note_id" field.
-func ReversalOfCreditNoteIDLT(v int) predicate.FinanceCreditNote {
-	return predicate.FinanceCreditNote(sql.FieldLT(FieldReversalOfCreditNoteID, v))
-}
-
-// ReversalOfCreditNoteIDLTE applies the LTE predicate on the "reversal_of_credit_note_id" field.
-func ReversalOfCreditNoteIDLTE(v int) predicate.FinanceCreditNote {
-	return predicate.FinanceCreditNote(sql.FieldLTE(FieldReversalOfCreditNoteID, v))
 }
 
 // ReversalOfCreditNoteIDIsNil applies the IsNil predicate on the "reversal_of_credit_note_id" field.
@@ -708,6 +669,75 @@ func CreatedAtLT(v time.Time) predicate.FinanceCreditNote {
 // CreatedAtLTE applies the LTE predicate on the "created_at" field.
 func CreatedAtLTE(v time.Time) predicate.FinanceCreditNote {
 	return predicate.FinanceCreditNote(sql.FieldLTE(FieldCreatedAt, v))
+}
+
+// HasFinanceFact applies the HasEdge predicate on the "finance_fact" edge.
+func HasFinanceFact() predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, FinanceFactTable, FinanceFactColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasFinanceFactWith applies the HasEdge predicate on the "finance_fact" edge with a given conditions (other predicates).
+func HasFinanceFactWith(preds ...predicate.FinanceFact) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(func(s *sql.Selector) {
+		step := newFinanceFactStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasReversals applies the HasEdge predicate on the "reversals" edge.
+func HasReversals() predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ReversalsTable, ReversalsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasReversalsWith applies the HasEdge predicate on the "reversals" edge with a given conditions (other predicates).
+func HasReversalsWith(preds ...predicate.FinanceCreditNote) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(func(s *sql.Selector) {
+		step := newReversalsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasReversalOf applies the HasEdge predicate on the "reversal_of" edge.
+func HasReversalOf() predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ReversalOfTable, ReversalOfColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasReversalOfWith applies the HasEdge predicate on the "reversal_of" edge with a given conditions (other predicates).
+func HasReversalOfWith(preds ...predicate.FinanceCreditNote) predicate.FinanceCreditNote {
+	return predicate.FinanceCreditNote(func(s *sql.Selector) {
+		step := newReversalOfStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

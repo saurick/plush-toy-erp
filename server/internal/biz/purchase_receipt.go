@@ -16,6 +16,21 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+// PurchaseReceiptUsecaseRepo keeps receipt rules independent of BOM and quality
+// mutation capabilities; ledger effects remain in the repository transaction.
+type PurchaseReceiptUsecaseRepo interface {
+	PurchaseReceiptRepo
+	InventoryReferenceRepo
+}
+
+type PurchaseReceiptUsecase struct {
+	repo PurchaseReceiptUsecaseRepo
+}
+
+func NewPurchaseReceiptUsecase(repo PurchaseReceiptUsecaseRepo) *PurchaseReceiptUsecase {
+	return &PurchaseReceiptUsecase{repo: repo}
+}
+
 type PurchaseReceipt struct {
 	ID                  int
 	ReceiptNo           string
@@ -127,7 +142,7 @@ type PurchaseReceiptFilter struct {
 	Offset              int
 }
 
-func (uc *InventoryUsecase) CreatePurchaseReceiptDraft(ctx context.Context, in *PurchaseReceiptCreate) (*PurchaseReceipt, error) {
+func (uc *PurchaseReceiptUsecase) CreatePurchaseReceiptDraft(ctx context.Context, in *PurchaseReceiptCreate) (*PurchaseReceipt, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
@@ -141,7 +156,7 @@ func (uc *InventoryUsecase) CreatePurchaseReceiptDraft(ctx context.Context, in *
 	return uc.repo.CreatePurchaseReceiptDraft(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) CreatePurchaseReceiptWithItems(ctx context.Context, in *PurchaseReceiptCreate, items []*PurchaseReceiptItemCreate) (*PurchaseReceipt, error) {
+func (uc *PurchaseReceiptUsecase) CreatePurchaseReceiptWithItems(ctx context.Context, in *PurchaseReceiptCreate, items []*PurchaseReceiptItemCreate) (*PurchaseReceipt, error) {
 	if uc == nil || uc.repo == nil || in == nil || len(items) == 0 {
 		return nil, ErrBadParam
 	}
@@ -169,7 +184,7 @@ func (uc *InventoryUsecase) CreatePurchaseReceiptWithItems(ctx context.Context, 
 	return uc.repo.CreatePurchaseReceiptWithItems(ctx, &normalized, normalizedItems)
 }
 
-func (uc *InventoryUsecase) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, error) {
+func (uc *PurchaseReceiptUsecase) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
@@ -192,7 +207,7 @@ func (uc *InventoryUsecase) CreatePurchaseReceiptFromPurchaseOrder(ctx context.C
 	return uc.repo.CreatePurchaseReceiptFromPurchaseOrder(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) AddPurchaseReceiptItem(ctx context.Context, in *PurchaseReceiptItemCreate) (*PurchaseReceiptItem, error) {
+func (uc *PurchaseReceiptUsecase) AddPurchaseReceiptItem(ctx context.Context, in *PurchaseReceiptItemCreate) (*PurchaseReceiptItem, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
@@ -213,7 +228,7 @@ func (uc *InventoryUsecase) AddPurchaseReceiptItem(ctx context.Context, in *Purc
 	return uc.repo.AddPurchaseReceiptItem(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) PostPurchaseReceipt(ctx context.Context, receiptID int) (_ *PurchaseReceipt, err error) {
+func (uc *PurchaseReceiptUsecase) PostPurchaseReceipt(ctx context.Context, receiptID int) (_ *PurchaseReceipt, err error) {
 	ctx, finish := startBusinessTrace(ctx, "inventory.post_purchase_receipt")
 	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || receiptID <= 0 {
@@ -222,14 +237,14 @@ func (uc *InventoryUsecase) PostPurchaseReceipt(ctx context.Context, receiptID i
 	return uc.repo.PostPurchaseReceipt(ctx, receiptID)
 }
 
-func (uc *InventoryUsecase) CancelPostedPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error) {
+func (uc *PurchaseReceiptUsecase) CancelPostedPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error) {
 	if uc == nil || uc.repo == nil || receiptID <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.CancelPostedPurchaseReceipt(ctx, receiptID)
 }
 
-func (uc *InventoryUsecase) CancelPostedPurchaseReceiptWithActor(ctx context.Context, receiptID int, actorID int) (*PurchaseReceipt, error) {
+func (uc *PurchaseReceiptUsecase) CancelPostedPurchaseReceiptWithActor(ctx context.Context, receiptID int, actorID int) (*PurchaseReceipt, error) {
 	if uc == nil || uc.repo == nil || receiptID <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -241,7 +256,7 @@ func (uc *InventoryUsecase) CancelPostedPurchaseReceiptWithActor(ctx context.Con
 }
 
 // CancelPurchaseReceiptDraft cannot reverse inventory, even if posting races it.
-func (uc *InventoryUsecase) CancelPurchaseReceiptDraft(ctx context.Context, receiptID, actorID int, scope WarehouseDataScope) (*PurchaseReceipt, error) {
+func (uc *PurchaseReceiptUsecase) CancelPurchaseReceiptDraft(ctx context.Context, receiptID, actorID int, scope WarehouseDataScope) (*PurchaseReceipt, error) {
 	if uc == nil || uc.repo == nil || receiptID <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -254,14 +269,14 @@ func (uc *InventoryUsecase) CancelPurchaseReceiptDraft(ctx context.Context, rece
 	return repo.CancelPurchaseReceiptDraft(ctx, receiptID, actorID, NormalizeWarehouseDataScope(scope))
 }
 
-func (uc *InventoryUsecase) GetPurchaseReceipt(ctx context.Context, id int) (*PurchaseReceipt, error) {
+func (uc *PurchaseReceiptUsecase) GetPurchaseReceipt(ctx context.Context, id int) (*PurchaseReceipt, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.GetPurchaseReceipt(ctx, id)
 }
 
-func (uc *InventoryUsecase) ListPurchaseReceipts(ctx context.Context, filter PurchaseReceiptFilter) ([]*PurchaseReceipt, int, error) {
+func (uc *PurchaseReceiptUsecase) ListPurchaseReceipts(ctx context.Context, filter PurchaseReceiptFilter) ([]*PurchaseReceipt, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
@@ -314,7 +329,7 @@ func normalizePurchaseReceiptFromPurchaseOrderCreate(in PurchaseReceiptFromPurch
 			return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
 		}
 		if _, err := value.NewPositiveQuantity(line.Quantity); err != nil {
-			return PurchaseReceiptFromPurchaseOrderCreate{}, err
+			return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
 		}
 		if !validArrivalQuantity(line.Quantity, false) || (line.DeclaredQuantity != nil && !validArrivalQuantity(*line.DeclaredQuantity, true)) {
 			return PurchaseReceiptFromPurchaseOrderCreate{}, ErrBadParam
@@ -489,7 +504,7 @@ func normalizePurchaseReceiptFilter(in PurchaseReceiptFilter) (PurchaseReceiptFi
 	return in, nil
 }
 
-func (uc *InventoryUsecase) validatePurchaseReceiptItemActiveReferences(ctx context.Context, item *PurchaseReceiptItemCreate) error {
+func (uc *PurchaseReceiptUsecase) validatePurchaseReceiptItemActiveReferences(ctx context.Context, item *PurchaseReceiptItemCreate) error {
 	if item == nil {
 		return ErrBadParam
 	}
@@ -504,7 +519,7 @@ func (uc *InventoryUsecase) validatePurchaseReceiptItemActiveReferences(ctx cont
 	return requireActiveReference(ctx, item.WarehouseID, uc.repo.WarehouseIsActive, ErrWarehouseInactive)
 }
 
-func (uc *InventoryUsecase) validatePurchaseReceiptSupplierIdentity(ctx context.Context, in *PurchaseReceiptCreate) error {
+func (uc *PurchaseReceiptUsecase) validatePurchaseReceiptSupplierIdentity(ctx context.Context, in *PurchaseReceiptCreate) error {
 	if uc == nil || uc.repo == nil || in == nil {
 		return ErrBadParam
 	}
@@ -524,7 +539,7 @@ func (uc *InventoryUsecase) validatePurchaseReceiptSupplierIdentity(ctx context.
 	return nil
 }
 
-func (uc *InventoryUsecase) validatePurchaseReceiptWarehouseReferences(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) error {
+func (uc *PurchaseReceiptUsecase) validatePurchaseReceiptWarehouseReferences(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) error {
 	ids := map[int]bool{}
 	if in.WarehouseID > 0 {
 		ids[in.WarehouseID] = true

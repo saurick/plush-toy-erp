@@ -56,6 +56,43 @@ export function createDevBusinessUsabilityScenarios({
           'dev-business-usability-desktop-light'
         )
 
+        const table = page.locator('.erp-dev-business-usability-table-card')
+        const pager = table.locator('.erp-dev-pagination')
+        const range = pager.locator('.ant-pagination-total-text')
+        await range.waitFor()
+        const rangeText = await range.innerText()
+        assert.match(rangeText, /^第 1-10 条 \/ 共 \d+ 条$/u)
+        const total = Number(rangeText.match(/共 (\d+) 条/u)[1])
+        assert(total > 10)
+        const firstItem = await pager
+          .locator('.ant-pagination-item-1')
+          .boundingBox()
+        const summaryBox = await range.boundingBox()
+        assert(firstItem && summaryBox)
+        assert.equal(firstItem.height, 34, '分页使用电脑版当前主题的标准尺寸')
+        assert.equal(firstItem.width, firstItem.height)
+        assert(
+          summaryBox.x + summaryBox.width < firstItem.x,
+          '记录范围与页码不重叠'
+        )
+        assert.doesNotMatch(await pager.getAttribute('class'), /ant-pagination-mini/u)
+        await pager.locator('.ant-pagination-prev.ant-pagination-disabled').waitFor()
+
+        const rows = table.locator('.ant-table-tbody > .ant-table-row')
+        const firstRow = await rows.first().textContent()
+        await pager.locator('.ant-pagination-item-2').click()
+        await table
+          .getByText(`第 11-${Math.min(20, total)} 条 / 共 ${total} 条`, { exact: true })
+          .waitFor()
+        assert.notEqual(await rows.first().textContent(), firstRow)
+        const lastPage = Math.ceil(total / 10)
+        await pager.locator(`.ant-pagination-item-${lastPage}`).click()
+        await table
+          .getByText(`第 ${(lastPage - 1) * 10 + 1}-${total} 条 / 共 ${total} 条`, { exact: true })
+          .waitFor()
+        assert.equal(await rows.count(), total - (lastPage - 1) * 10)
+        await pager.locator('.ant-pagination-next.ant-pagination-disabled').waitFor()
+
         const search = page.getByRole('textbox', {
           name: '搜索页面说明',
         })
@@ -70,6 +107,18 @@ export function createDevBusinessUsabilityScenarios({
           1,
           '关键词筛选应只保留匹配的业务页面'
         )
+        assert.equal(await pager.count(), 0, '单页结果沿用隐藏分页的规则')
+        await search.fill('不存在的分页检查页面')
+        await page.getByText('没有符合当前条件的页面', { exact: true }).waitFor()
+        assert.equal(await pager.count(), 0)
+        await search.fill('')
+        await table.getByText(`第 1-10 条 / 共 ${total} 条`, { exact: true }).waitFor()
+        assert.equal(
+          await rows.first().textContent(),
+          firstRow,
+          '清空筛选恢复第一页'
+        )
+        await assertNoHorizontalOverflow(page, '工作台分页翻页、筛选与空结果恢复')
       },
     },
   ]

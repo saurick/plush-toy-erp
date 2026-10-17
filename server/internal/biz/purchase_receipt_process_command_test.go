@@ -36,7 +36,7 @@ func TestPurchaseReceiptProcessDomainCommandCreateBindsUsecase(t *testing.T) {
 		},
 	}
 	processRuntimeUC := NewProcessRuntimeUsecase(processRepo, nil)
-	if err := RegisterPurchaseReceiptProcessDomainCommandHandlers(processRuntimeUC, NewInventoryUsecase(inventoryRepo)); err != nil {
+	if err := RegisterPurchaseReceiptProcessDomainCommandHandlers(processRuntimeUC, NewPurchaseReceiptUsecase(inventoryRepo)); err != nil {
 		t.Fatalf("register purchase receipt process command handler failed: %v", err)
 	}
 
@@ -105,7 +105,7 @@ func TestPurchaseReceiptProcessDomainCommandCreateBindsUsecase(t *testing.T) {
 func TestPurchaseReceiptProcessDomainCommandCreateRejectsMismatchedBusinessRef(t *testing.T) {
 	ctx := context.Background()
 	inventoryRepo := &purchaseReceiptProcessInventoryRepoStub{warehouseActive: true}
-	handler := &purchaseReceiptCreateProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+	handler := &purchaseReceiptCreateProcessCommandHandler{uc: NewPurchaseReceiptUsecase(inventoryRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "sales_order", BusinessRefID: 3001},
@@ -140,7 +140,7 @@ func TestPurchaseReceiptProcessDomainCommandCreateRejectsMismatchedBusinessRef(t
 func TestPurchaseReceiptProcessDomainCommandCreateRequiresWarehouse(t *testing.T) {
 	ctx := context.Background()
 	inventoryRepo := &purchaseReceiptProcessInventoryRepoStub{warehouseActive: true}
-	handler := &purchaseReceiptCreateProcessCommandHandler{uc: NewInventoryUsecase(inventoryRepo)}
+	handler := &purchaseReceiptCreateProcessCommandHandler{uc: NewPurchaseReceiptUsecase(inventoryRepo)}
 
 	if _, err := handler.ExecuteProcessDomainCommand(ctx, &ProcessDomainCommandInput{
 		ProcessInstance: &ProcessInstance{ID: 10, BusinessRefType: "purchase_order", BusinessRefID: 3001},

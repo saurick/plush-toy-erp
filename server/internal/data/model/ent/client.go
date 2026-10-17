@@ -28,6 +28,9 @@ import (
 	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/financepayment"
+	"server/internal/data/model/ent/helpfeedback"
+	"server/internal/data/model/ent/helpsupplement"
+	"server/internal/data/model/ent/helpsupplementrevision"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorylotstatusevent"
@@ -132,6 +135,12 @@ type Client struct {
 	FinanceFact *FinanceFactClient
 	// FinancePayment is the client for interacting with the FinancePayment builders.
 	FinancePayment *FinancePaymentClient
+	// HelpFeedback is the client for interacting with the HelpFeedback builders.
+	HelpFeedback *HelpFeedbackClient
+	// HelpSupplement is the client for interacting with the HelpSupplement builders.
+	HelpSupplement *HelpSupplementClient
+	// HelpSupplementRevision is the client for interacting with the HelpSupplementRevision builders.
+	HelpSupplementRevision *HelpSupplementRevisionClient
 	// InventoryBalance is the client for interacting with the InventoryBalance builders.
 	InventoryBalance *InventoryBalanceClient
 	// InventoryLot is the client for interacting with the InventoryLot builders.
@@ -276,6 +285,9 @@ func (c *Client) init() {
 	c.FinanceCreditNote = NewFinanceCreditNoteClient(c.config)
 	c.FinanceFact = NewFinanceFactClient(c.config)
 	c.FinancePayment = NewFinancePaymentClient(c.config)
+	c.HelpFeedback = NewHelpFeedbackClient(c.config)
+	c.HelpSupplement = NewHelpSupplementClient(c.config)
+	c.HelpSupplementRevision = NewHelpSupplementRevisionClient(c.config)
 	c.InventoryBalance = NewInventoryBalanceClient(c.config)
 	c.InventoryLot = NewInventoryLotClient(c.config)
 	c.InventoryLotStatusEvent = NewInventoryLotStatusEventClient(c.config)
@@ -443,6 +455,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		FinanceCreditNote:                  NewFinanceCreditNoteClient(cfg),
 		FinanceFact:                        NewFinanceFactClient(cfg),
 		FinancePayment:                     NewFinancePaymentClient(cfg),
+		HelpFeedback:                       NewHelpFeedbackClient(cfg),
+		HelpSupplement:                     NewHelpSupplementClient(cfg),
+		HelpSupplementRevision:             NewHelpSupplementRevisionClient(cfg),
 		InventoryBalance:                   NewInventoryBalanceClient(cfg),
 		InventoryLot:                       NewInventoryLotClient(cfg),
 		InventoryLotStatusEvent:            NewInventoryLotStatusEventClient(cfg),
@@ -537,6 +552,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		FinanceCreditNote:                  NewFinanceCreditNoteClient(cfg),
 		FinanceFact:                        NewFinanceFactClient(cfg),
 		FinancePayment:                     NewFinancePaymentClient(cfg),
+		HelpFeedback:                       NewHelpFeedbackClient(cfg),
+		HelpSupplement:                     NewHelpSupplementClient(cfg),
+		HelpSupplementRevision:             NewHelpSupplementRevisionClient(cfg),
 		InventoryBalance:                   NewInventoryBalanceClient(cfg),
 		InventoryLot:                       NewInventoryLotClient(cfg),
 		InventoryLotStatusEvent:            NewInventoryLotStatusEventClient(cfg),
@@ -629,15 +647,15 @@ func (c *Client) Use(hooks ...Hook) {
 		c.CustomerConfigRevision, c.DeploymentModuleState,
 		c.EngineeringMaterialRequest, c.EngineeringMaterialRequestItem,
 		c.FinanceAllocation, c.FinanceCreditNote, c.FinanceFact, c.FinancePayment,
-		c.InventoryBalance, c.InventoryLot, c.InventoryLotStatusEvent,
-		c.InventoryOperation, c.InventoryOperationItem, c.InventoryTxn, c.Material,
-		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem,
-		c.OutsourcingReturnDisposition, c.Permission, c.Process, c.ProcessInstance,
-		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionExceptionDecision,
-		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
-		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
-		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
-		c.ProductionWIPBatch, c.ProductionWIPEvent,
+		c.HelpFeedback, c.HelpSupplement, c.HelpSupplementRevision, c.InventoryBalance,
+		c.InventoryLot, c.InventoryLotStatusEvent, c.InventoryOperation,
+		c.InventoryOperationItem, c.InventoryTxn, c.Material, c.OutsourcingFact,
+		c.OutsourcingOrder, c.OutsourcingOrderItem, c.OutsourcingReturnDisposition,
+		c.Permission, c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product,
+		c.ProductSKU, c.ProductionExceptionDecision, c.ProductionFact,
+		c.ProductionOrder, c.ProductionOrderEvent, c.ProductionOrderItem,
+		c.ProductionOrderMaterialRequirement, c.ProductionOrderOperation,
+		c.ProductionPackagingConfirmation, c.ProductionWIPBatch, c.ProductionWIPEvent,
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
@@ -661,15 +679,15 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.CustomerConfigRevision, c.DeploymentModuleState,
 		c.EngineeringMaterialRequest, c.EngineeringMaterialRequestItem,
 		c.FinanceAllocation, c.FinanceCreditNote, c.FinanceFact, c.FinancePayment,
-		c.InventoryBalance, c.InventoryLot, c.InventoryLotStatusEvent,
-		c.InventoryOperation, c.InventoryOperationItem, c.InventoryTxn, c.Material,
-		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem,
-		c.OutsourcingReturnDisposition, c.Permission, c.Process, c.ProcessInstance,
-		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionExceptionDecision,
-		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
-		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
-		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
-		c.ProductionWIPBatch, c.ProductionWIPEvent,
+		c.HelpFeedback, c.HelpSupplement, c.HelpSupplementRevision, c.InventoryBalance,
+		c.InventoryLot, c.InventoryLotStatusEvent, c.InventoryOperation,
+		c.InventoryOperationItem, c.InventoryTxn, c.Material, c.OutsourcingFact,
+		c.OutsourcingOrder, c.OutsourcingOrderItem, c.OutsourcingReturnDisposition,
+		c.Permission, c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product,
+		c.ProductSKU, c.ProductionExceptionDecision, c.ProductionFact,
+		c.ProductionOrder, c.ProductionOrderEvent, c.ProductionOrderItem,
+		c.ProductionOrderMaterialRequirement, c.ProductionOrderOperation,
+		c.ProductionPackagingConfirmation, c.ProductionWIPBatch, c.ProductionWIPEvent,
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
@@ -721,6 +739,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.FinanceFact.mutate(ctx, m)
 	case *FinancePaymentMutation:
 		return c.FinancePayment.mutate(ctx, m)
+	case *HelpFeedbackMutation:
+		return c.HelpFeedback.mutate(ctx, m)
+	case *HelpSupplementMutation:
+		return c.HelpSupplement.mutate(ctx, m)
+	case *HelpSupplementRevisionMutation:
+		return c.HelpSupplementRevision.mutate(ctx, m)
 	case *InventoryBalanceMutation:
 		return c.InventoryBalance.mutate(ctx, m)
 	case *InventoryLotMutation:
@@ -2935,6 +2959,54 @@ func (c *FinanceAllocationClient) QueryPayment(_m *FinanceAllocation) *FinancePa
 	return query
 }
 
+// QueryFinanceFact queries the finance_fact edge of a FinanceAllocation.
+func (c *FinanceAllocationClient) QueryFinanceFact(_m *FinanceAllocation) *FinanceFactQuery {
+	query := (&FinanceFactClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financeallocation.Table, financeallocation.FieldID, id),
+			sqlgraph.To(financefact.Table, financefact.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, financeallocation.FinanceFactTable, financeallocation.FinanceFactColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryReversals queries the reversals edge of a FinanceAllocation.
+func (c *FinanceAllocationClient) QueryReversals(_m *FinanceAllocation) *FinanceAllocationQuery {
+	query := (&FinanceAllocationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financeallocation.Table, financeallocation.FieldID, id),
+			sqlgraph.To(financeallocation.Table, financeallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, financeallocation.ReversalsTable, financeallocation.ReversalsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryReversalOf queries the reversal_of edge of a FinanceAllocation.
+func (c *FinanceAllocationClient) QueryReversalOf(_m *FinanceAllocation) *FinanceAllocationQuery {
+	query := (&FinanceAllocationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financeallocation.Table, financeallocation.FieldID, id),
+			sqlgraph.To(financeallocation.Table, financeallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, financeallocation.ReversalOfTable, financeallocation.ReversalOfColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *FinanceAllocationClient) Hooks() []Hook {
 	hooks := c.hooks.FinanceAllocation
@@ -3069,6 +3141,54 @@ func (c *FinanceCreditNoteClient) GetX(ctx context.Context, id int) *FinanceCred
 	return obj
 }
 
+// QueryFinanceFact queries the finance_fact edge of a FinanceCreditNote.
+func (c *FinanceCreditNoteClient) QueryFinanceFact(_m *FinanceCreditNote) *FinanceFactQuery {
+	query := (&FinanceFactClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financecreditnote.Table, financecreditnote.FieldID, id),
+			sqlgraph.To(financefact.Table, financefact.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, financecreditnote.FinanceFactTable, financecreditnote.FinanceFactColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryReversals queries the reversals edge of a FinanceCreditNote.
+func (c *FinanceCreditNoteClient) QueryReversals(_m *FinanceCreditNote) *FinanceCreditNoteQuery {
+	query := (&FinanceCreditNoteClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financecreditnote.Table, financecreditnote.FieldID, id),
+			sqlgraph.To(financecreditnote.Table, financecreditnote.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, financecreditnote.ReversalsTable, financecreditnote.ReversalsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryReversalOf queries the reversal_of edge of a FinanceCreditNote.
+func (c *FinanceCreditNoteClient) QueryReversalOf(_m *FinanceCreditNote) *FinanceCreditNoteQuery {
+	query := (&FinanceCreditNoteClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financecreditnote.Table, financecreditnote.FieldID, id),
+			sqlgraph.To(financecreditnote.Table, financecreditnote.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, financecreditnote.ReversalOfTable, financecreditnote.ReversalOfColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *FinanceCreditNoteClient) Hooks() []Hook {
 	hooks := c.hooks.FinanceCreditNote
@@ -3201,6 +3321,38 @@ func (c *FinanceFactClient) GetX(ctx context.Context, id int) *FinanceFact {
 		panic(err)
 	}
 	return obj
+}
+
+// QueryAllocations queries the allocations edge of a FinanceFact.
+func (c *FinanceFactClient) QueryAllocations(_m *FinanceFact) *FinanceAllocationQuery {
+	query := (&FinanceAllocationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financefact.Table, financefact.FieldID, id),
+			sqlgraph.To(financeallocation.Table, financeallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, financefact.AllocationsTable, financefact.AllocationsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryCreditNotes queries the credit_notes edge of a FinanceFact.
+func (c *FinanceFactClient) QueryCreditNotes(_m *FinanceFact) *FinanceCreditNoteQuery {
+	query := (&FinanceCreditNoteClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financefact.Table, financefact.FieldID, id),
+			sqlgraph.To(financecreditnote.Table, financecreditnote.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, financefact.CreditNotesTable, financefact.CreditNotesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
 }
 
 // QueryPoster queries the poster edge of a FinanceFact.
@@ -3456,6 +3608,406 @@ func (c *FinancePaymentClient) mutate(ctx context.Context, m *FinancePaymentMuta
 		return (&FinancePaymentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown FinancePayment mutation op: %q", m.Op())
+	}
+}
+
+// HelpFeedbackClient is a client for the HelpFeedback schema.
+type HelpFeedbackClient struct {
+	config
+}
+
+// NewHelpFeedbackClient returns a client for the HelpFeedback from the given config.
+func NewHelpFeedbackClient(c config) *HelpFeedbackClient {
+	return &HelpFeedbackClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `helpfeedback.Hooks(f(g(h())))`.
+func (c *HelpFeedbackClient) Use(hooks ...Hook) {
+	c.hooks.HelpFeedback = append(c.hooks.HelpFeedback, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `helpfeedback.Intercept(f(g(h())))`.
+func (c *HelpFeedbackClient) Intercept(interceptors ...Interceptor) {
+	c.inters.HelpFeedback = append(c.inters.HelpFeedback, interceptors...)
+}
+
+// Create returns a builder for creating a HelpFeedback entity.
+func (c *HelpFeedbackClient) Create() *HelpFeedbackCreate {
+	mutation := newHelpFeedbackMutation(c.config, OpCreate)
+	return &HelpFeedbackCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of HelpFeedback entities.
+func (c *HelpFeedbackClient) CreateBulk(builders ...*HelpFeedbackCreate) *HelpFeedbackCreateBulk {
+	return &HelpFeedbackCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *HelpFeedbackClient) MapCreateBulk(slice any, setFunc func(*HelpFeedbackCreate, int)) *HelpFeedbackCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &HelpFeedbackCreateBulk{err: fmt.Errorf("calling to HelpFeedbackClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*HelpFeedbackCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &HelpFeedbackCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for HelpFeedback.
+func (c *HelpFeedbackClient) Update() *HelpFeedbackUpdate {
+	mutation := newHelpFeedbackMutation(c.config, OpUpdate)
+	return &HelpFeedbackUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *HelpFeedbackClient) UpdateOne(_m *HelpFeedback) *HelpFeedbackUpdateOne {
+	mutation := newHelpFeedbackMutation(c.config, OpUpdateOne, withHelpFeedback(_m))
+	return &HelpFeedbackUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *HelpFeedbackClient) UpdateOneID(id int) *HelpFeedbackUpdateOne {
+	mutation := newHelpFeedbackMutation(c.config, OpUpdateOne, withHelpFeedbackID(id))
+	return &HelpFeedbackUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for HelpFeedback.
+func (c *HelpFeedbackClient) Delete() *HelpFeedbackDelete {
+	mutation := newHelpFeedbackMutation(c.config, OpDelete)
+	return &HelpFeedbackDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *HelpFeedbackClient) DeleteOne(_m *HelpFeedback) *HelpFeedbackDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *HelpFeedbackClient) DeleteOneID(id int) *HelpFeedbackDeleteOne {
+	builder := c.Delete().Where(helpfeedback.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &HelpFeedbackDeleteOne{builder}
+}
+
+// Query returns a query builder for HelpFeedback.
+func (c *HelpFeedbackClient) Query() *HelpFeedbackQuery {
+	return &HelpFeedbackQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeHelpFeedback},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a HelpFeedback entity by its id.
+func (c *HelpFeedbackClient) Get(ctx context.Context, id int) (*HelpFeedback, error) {
+	return c.Query().Where(helpfeedback.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *HelpFeedbackClient) GetX(ctx context.Context, id int) *HelpFeedback {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *HelpFeedbackClient) Hooks() []Hook {
+	return c.hooks.HelpFeedback
+}
+
+// Interceptors returns the client interceptors.
+func (c *HelpFeedbackClient) Interceptors() []Interceptor {
+	return c.inters.HelpFeedback
+}
+
+func (c *HelpFeedbackClient) mutate(ctx context.Context, m *HelpFeedbackMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&HelpFeedbackCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&HelpFeedbackUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&HelpFeedbackUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&HelpFeedbackDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown HelpFeedback mutation op: %q", m.Op())
+	}
+}
+
+// HelpSupplementClient is a client for the HelpSupplement schema.
+type HelpSupplementClient struct {
+	config
+}
+
+// NewHelpSupplementClient returns a client for the HelpSupplement from the given config.
+func NewHelpSupplementClient(c config) *HelpSupplementClient {
+	return &HelpSupplementClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `helpsupplement.Hooks(f(g(h())))`.
+func (c *HelpSupplementClient) Use(hooks ...Hook) {
+	c.hooks.HelpSupplement = append(c.hooks.HelpSupplement, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `helpsupplement.Intercept(f(g(h())))`.
+func (c *HelpSupplementClient) Intercept(interceptors ...Interceptor) {
+	c.inters.HelpSupplement = append(c.inters.HelpSupplement, interceptors...)
+}
+
+// Create returns a builder for creating a HelpSupplement entity.
+func (c *HelpSupplementClient) Create() *HelpSupplementCreate {
+	mutation := newHelpSupplementMutation(c.config, OpCreate)
+	return &HelpSupplementCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of HelpSupplement entities.
+func (c *HelpSupplementClient) CreateBulk(builders ...*HelpSupplementCreate) *HelpSupplementCreateBulk {
+	return &HelpSupplementCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *HelpSupplementClient) MapCreateBulk(slice any, setFunc func(*HelpSupplementCreate, int)) *HelpSupplementCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &HelpSupplementCreateBulk{err: fmt.Errorf("calling to HelpSupplementClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*HelpSupplementCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &HelpSupplementCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for HelpSupplement.
+func (c *HelpSupplementClient) Update() *HelpSupplementUpdate {
+	mutation := newHelpSupplementMutation(c.config, OpUpdate)
+	return &HelpSupplementUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *HelpSupplementClient) UpdateOne(_m *HelpSupplement) *HelpSupplementUpdateOne {
+	mutation := newHelpSupplementMutation(c.config, OpUpdateOne, withHelpSupplement(_m))
+	return &HelpSupplementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *HelpSupplementClient) UpdateOneID(id int) *HelpSupplementUpdateOne {
+	mutation := newHelpSupplementMutation(c.config, OpUpdateOne, withHelpSupplementID(id))
+	return &HelpSupplementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for HelpSupplement.
+func (c *HelpSupplementClient) Delete() *HelpSupplementDelete {
+	mutation := newHelpSupplementMutation(c.config, OpDelete)
+	return &HelpSupplementDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *HelpSupplementClient) DeleteOne(_m *HelpSupplement) *HelpSupplementDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *HelpSupplementClient) DeleteOneID(id int) *HelpSupplementDeleteOne {
+	builder := c.Delete().Where(helpsupplement.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &HelpSupplementDeleteOne{builder}
+}
+
+// Query returns a query builder for HelpSupplement.
+func (c *HelpSupplementClient) Query() *HelpSupplementQuery {
+	return &HelpSupplementQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeHelpSupplement},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a HelpSupplement entity by its id.
+func (c *HelpSupplementClient) Get(ctx context.Context, id int) (*HelpSupplement, error) {
+	return c.Query().Where(helpsupplement.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *HelpSupplementClient) GetX(ctx context.Context, id int) *HelpSupplement {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *HelpSupplementClient) Hooks() []Hook {
+	return c.hooks.HelpSupplement
+}
+
+// Interceptors returns the client interceptors.
+func (c *HelpSupplementClient) Interceptors() []Interceptor {
+	return c.inters.HelpSupplement
+}
+
+func (c *HelpSupplementClient) mutate(ctx context.Context, m *HelpSupplementMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&HelpSupplementCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&HelpSupplementUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&HelpSupplementUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&HelpSupplementDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown HelpSupplement mutation op: %q", m.Op())
+	}
+}
+
+// HelpSupplementRevisionClient is a client for the HelpSupplementRevision schema.
+type HelpSupplementRevisionClient struct {
+	config
+}
+
+// NewHelpSupplementRevisionClient returns a client for the HelpSupplementRevision from the given config.
+func NewHelpSupplementRevisionClient(c config) *HelpSupplementRevisionClient {
+	return &HelpSupplementRevisionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `helpsupplementrevision.Hooks(f(g(h())))`.
+func (c *HelpSupplementRevisionClient) Use(hooks ...Hook) {
+	c.hooks.HelpSupplementRevision = append(c.hooks.HelpSupplementRevision, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `helpsupplementrevision.Intercept(f(g(h())))`.
+func (c *HelpSupplementRevisionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.HelpSupplementRevision = append(c.inters.HelpSupplementRevision, interceptors...)
+}
+
+// Create returns a builder for creating a HelpSupplementRevision entity.
+func (c *HelpSupplementRevisionClient) Create() *HelpSupplementRevisionCreate {
+	mutation := newHelpSupplementRevisionMutation(c.config, OpCreate)
+	return &HelpSupplementRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of HelpSupplementRevision entities.
+func (c *HelpSupplementRevisionClient) CreateBulk(builders ...*HelpSupplementRevisionCreate) *HelpSupplementRevisionCreateBulk {
+	return &HelpSupplementRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *HelpSupplementRevisionClient) MapCreateBulk(slice any, setFunc func(*HelpSupplementRevisionCreate, int)) *HelpSupplementRevisionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &HelpSupplementRevisionCreateBulk{err: fmt.Errorf("calling to HelpSupplementRevisionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*HelpSupplementRevisionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &HelpSupplementRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for HelpSupplementRevision.
+func (c *HelpSupplementRevisionClient) Update() *HelpSupplementRevisionUpdate {
+	mutation := newHelpSupplementRevisionMutation(c.config, OpUpdate)
+	return &HelpSupplementRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *HelpSupplementRevisionClient) UpdateOne(_m *HelpSupplementRevision) *HelpSupplementRevisionUpdateOne {
+	mutation := newHelpSupplementRevisionMutation(c.config, OpUpdateOne, withHelpSupplementRevision(_m))
+	return &HelpSupplementRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *HelpSupplementRevisionClient) UpdateOneID(id int) *HelpSupplementRevisionUpdateOne {
+	mutation := newHelpSupplementRevisionMutation(c.config, OpUpdateOne, withHelpSupplementRevisionID(id))
+	return &HelpSupplementRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for HelpSupplementRevision.
+func (c *HelpSupplementRevisionClient) Delete() *HelpSupplementRevisionDelete {
+	mutation := newHelpSupplementRevisionMutation(c.config, OpDelete)
+	return &HelpSupplementRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *HelpSupplementRevisionClient) DeleteOne(_m *HelpSupplementRevision) *HelpSupplementRevisionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *HelpSupplementRevisionClient) DeleteOneID(id int) *HelpSupplementRevisionDeleteOne {
+	builder := c.Delete().Where(helpsupplementrevision.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &HelpSupplementRevisionDeleteOne{builder}
+}
+
+// Query returns a query builder for HelpSupplementRevision.
+func (c *HelpSupplementRevisionClient) Query() *HelpSupplementRevisionQuery {
+	return &HelpSupplementRevisionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeHelpSupplementRevision},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a HelpSupplementRevision entity by its id.
+func (c *HelpSupplementRevisionClient) Get(ctx context.Context, id int) (*HelpSupplementRevision, error) {
+	return c.Query().Where(helpsupplementrevision.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *HelpSupplementRevisionClient) GetX(ctx context.Context, id int) *HelpSupplementRevision {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *HelpSupplementRevisionClient) Hooks() []Hook {
+	hooks := c.hooks.HelpSupplementRevision
+	return append(hooks[:len(hooks):len(hooks)], helpsupplementrevision.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *HelpSupplementRevisionClient) Interceptors() []Interceptor {
+	return c.inters.HelpSupplementRevision
+}
+
+func (c *HelpSupplementRevisionClient) mutate(ctx context.Context, m *HelpSupplementRevisionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&HelpSupplementRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&HelpSupplementRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&HelpSupplementRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&HelpSupplementRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown HelpSupplementRevision mutation op: %q", m.Op())
 	}
 }
 
@@ -15274,7 +15826,8 @@ type (
 		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
 		DeploymentModuleState, EngineeringMaterialRequest,
 		EngineeringMaterialRequestItem, FinanceAllocation, FinanceCreditNote,
-		FinanceFact, FinancePayment, InventoryBalance, InventoryLot,
+		FinanceFact, FinancePayment, HelpFeedback, HelpSupplement,
+		HelpSupplementRevision, InventoryBalance, InventoryLot,
 		InventoryLotStatusEvent, InventoryOperation, InventoryOperationItem,
 		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
 		OutsourcingOrderItem, OutsourcingReturnDisposition, Permission, Process,
@@ -15297,7 +15850,8 @@ type (
 		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
 		DeploymentModuleState, EngineeringMaterialRequest,
 		EngineeringMaterialRequestItem, FinanceAllocation, FinanceCreditNote,
-		FinanceFact, FinancePayment, InventoryBalance, InventoryLot,
+		FinanceFact, FinancePayment, HelpFeedback, HelpSupplement,
+		HelpSupplementRevision, InventoryBalance, InventoryLot,
 		InventoryLotStatusEvent, InventoryOperation, InventoryOperationItem,
 		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
 		OutsourcingOrderItem, OutsourcingReturnDisposition, Permission, Process,

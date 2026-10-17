@@ -23,6 +23,7 @@ test('public contracts: all generated files agree with current backend declarati
   assert.equal(catalog.permissions.SHIPMENT_READ, 'shipment.read')
   assert.equal(catalog.rpc.customer_config.GET_EFFECTIVE_SESSION, 'get_effective_session')
   assert.equal(catalog.rpc.customer_config.PUBLISH_APPROVAL_SETTINGS, 'publish_approval_settings')
+  assert.deepEqual(catalog.rpcTransport, { method: 'POST', path: '/rpc/{url}', documentation: 'server/api/jsonrpc/v1/jsonrpc.swagger.json' })
   assert.equal(catalog.states.ShipmentStatus.SHIPPED, 'SHIPPED')
   assert.equal(catalog.states.WorkflowTaskStatus.DONE, 'done')
   assert.deepEqual(syncOutputs(renderCatalog(catalog), { check: true }), [])

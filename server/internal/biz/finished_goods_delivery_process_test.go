@@ -98,7 +98,7 @@ func TestFinishedGoodsDeliveryProcessRunsLocalGoldenChain(t *testing.T) {
 		},
 	}
 	processRuntimeUC := NewProcessRuntimeUsecase(processRepo, nil)
-	if err := RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC, NewInventoryUsecase(inventoryRepo)); err != nil {
+	if err := RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC, NewQualityInspectionUsecase(inventoryRepo)); err != nil {
 		t.Fatalf("register quality handlers failed: %v", err)
 	}
 	operationalFactUC := NewOperationalFactUsecase(operationalFactRepo)

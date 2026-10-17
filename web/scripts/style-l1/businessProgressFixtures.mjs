@@ -11,6 +11,8 @@ export function progressFixtureRow(index = 0, view = 'orders') {
         ? '长名称产品：森林系列刺绣抱枕与可拆卸背包配件套装'
         : '云朵小熊',
     product_count: index === 2 ? 3 : 1,
+    product_type_count: index === 2 ? 3 : 1,
+    product_match_count: 0,
     product_id: index + 7,
     sales_owner: '模拟业务员',
     due_date:

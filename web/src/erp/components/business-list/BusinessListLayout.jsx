@@ -35,6 +35,7 @@ import Segmented from '@/common/components/navigation/SlidingSegmented'
 import FilterChip from '@/common/components/navigation/FilterChip'
 import { shouldUseDirectFilterChoices } from '../../utils/businessFilterPresentation.mjs'
 import './businessFilterChoices.css'
+import BusinessRecordDetails from './BusinessRecordDetails.jsx'
 import { copyTextToClipboard } from '@/common/utils/clipboard.mjs'
 import { message } from '@/common/utils/antdApp'
 import { BusinessPageHelpTrigger } from '../help/BusinessContextHelp.jsx'
@@ -823,8 +824,9 @@ export function PageHeaderCard({
   viewSwitch = null,
   className = '',
 }) {
-  const { moduleWorkspace } = useOutletContext() || {}
+  const { moduleWorkspace, mobileTaskBusiness } = useOutletContext() || {}
   const insideModule = Boolean(moduleWorkspace?.tabs.length)
+  if (mobileTaskBusiness) return null
   if (insideModule && !viewSwitch) return null
 
   return (
@@ -1144,6 +1146,7 @@ export function BusinessListToolbar({ stats = [], actions = null }) {
 
 export function BusinessOperationPanel({
   filters,
+  hidden = false,
   actions = null,
   primaryAction = null,
   onClearFilters = null,
@@ -1154,6 +1157,7 @@ export function BusinessOperationPanel({
   filtersOpen: controlledFiltersOpen,
   onFiltersOpenChange,
 }) {
+  const { mobileTaskBusiness, mobileTaskCommand } = useOutletContext() || {}
   const hasToolbar = Boolean(actions || primaryAction)
   const hasClearFilters = typeof onClearFilters === 'function'
   const hasActiveFilters = hasClearFilters && clearFiltersDisabled === false
@@ -1170,6 +1174,8 @@ export function BusinessOperationPanel({
     setFiltersOpen(false)
     filterTriggerRef.current?.focus({ preventScroll: true })
   }
+  if (mobileTaskBusiness) return <>{mobileTaskCommand ? primaryAction : null}{children}</>
+  if (hidden) return null
   const filterControls = React.Children.toArray(
     flattenSelectionActions(filters)
   )
@@ -1360,6 +1366,7 @@ export function SelectionActionBar({
   children,
   embedded = false,
 }) {
+  const { mobileTaskBusiness } = useOutletContext() || {}
   const hasSelection = Number(selectedCount) > 0
   const actionNodes = flattenSelectionActions(children)
   const clearActions = actionNodes.filter(
@@ -1385,7 +1392,7 @@ export function SelectionActionBar({
             selectedLabel={selectedLabel}
             selectedItems={selectedItems}
           />
-          {hasSelection ? clearActions : null}
+          {hasSelection && !mobileTaskBusiness ? clearActions : null}
         </div>
         {summaryItems.length > 0 ? (
           <div className="erp-business-selection-action-bar__summary">
@@ -1660,6 +1667,7 @@ export function BusinessDataTable({
   pagination,
   emptyDescription = '暂无匹配记录',
 }) {
+  const { mobileTaskBusiness } = useOutletContext() || {}
   const resolvedColumns = React.useMemo(
     () => normalizeBusinessTableColumns(columns),
     [columns]
@@ -1708,6 +1716,21 @@ export function BusinessDataTable({
     },
     [onOpenRecord, onRow]
   )
+
+  if (mobileTaskBusiness) {
+    const selectedKeys = rowSelection?.selectedRowKeys || []
+    const selected = (dataSource || []).find((row) => selectedKeys.includes(typeof rowKey === 'function' ? rowKey(row) : row[rowKey || 'id']))
+    return (
+      <Card className="mobile-task-business-source" data-testid="mobile-task-business-source" data-record-id={selected?.id} loading={loading}>
+        {selected ? (
+          <>
+            <BusinessRecordDetails columns={columns} record={selected} column={1} />
+            {onOpenRecord ? <Button onClick={() => onOpenRecord(selected)}>查看完整单据</Button> : null}
+          </>
+        ) : <Empty description="正在读取任务对应单据；如未显示，请重新读取。" />}
+      </Card>
+    )
+  }
 
   return (
     <Card className="erp-business-data-table-card erp-business-module-table-card">

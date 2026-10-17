@@ -14,6 +14,7 @@ import {
   BUSINESS_USABILITY_STATUS_PRESENTATION,
 } from '../../erp/config/businessUsabilityCatalog.mjs'
 import DevPageNav from '../components/DevPageNav.jsx'
+import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import {
   DEV_BUSINESS_USABILITY_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
@@ -250,14 +251,15 @@ export default function DevBusinessUsabilityPage() {
             </div>
           </div>
           <Table
+            key={buildDevBusinessUsabilitySearch(parsedSearch)}
             rowKey="key"
             size="small"
             columns={columns}
             dataSource={filteredEntries}
             pagination={{
+              ...DEV_PAGINATION,
               pageSize: DEV_BUSINESS_USABILITY_PAGE_SIZE,
               hideOnSinglePage: true,
-              showSizeChanger: false,
             }}
             scroll={{ x: 1280 }}
             locale={{

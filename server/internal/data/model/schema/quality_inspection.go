@@ -76,12 +76,14 @@ func (QualityInspection) Annotations() []schema.Annotation {
   OR
   (
     status = 'PASSED'
+    AND result IS NOT NULL
     AND result IN ('PASS', 'CONCESSION')
     AND inspected_at IS NOT NULL
   )
   OR
   (
     status = 'REJECTED'
+    AND result IS NOT NULL
     AND result = 'REJECT'
     AND inspected_at IS NOT NULL
   )

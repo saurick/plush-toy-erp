@@ -20,7 +20,36 @@ import {
   getHelpCenterHref,
   resolveHelpReference,
   resolveHelpGuide,
+  getHelpGuideSections,
+  getHelpReadingCatalog,
 } from './helpManualCatalog.mjs'
+
+test('图解目录按业务目录分组，每个已授权场景只出现一次', () => {
+  const catalog = getHelpReadingCatalog(ROLE_HELP_GUIDES)
+  const sections = getHelpGuideSections(catalog)
+  assert.equal(sections[0].title, '日常与系统')
+  assert.deepEqual(
+    sections.flatMap((section) => section.scenarios).map((scenario) => scenario.key).sort(),
+    catalog.scenarios.map((scenario) => scenario.key).sort()
+  )
+  assert.deepEqual(
+    sections.slice(1).map((section) => section.title),
+    [...new Set(catalog.referencePages.map((page) => page.sectionTitle))]
+      .filter((title) => sections.some((section) => section.title === title))
+  )
+  assert(sections.every((section) => section.scenarios.length > 0))
+})
+
+test('目录分组保持账号阅读范围，空目录不产生额外场景', () => {
+  const catalog = getHelpReadingCatalog(getRoleHelpGuidesForProfile({ roles: [{ role_key: 'warehouse' }] }))
+  const sections = getHelpGuideSections(catalog)
+  assert.deepEqual(
+    new Set(sections.flatMap((section) => section.scenarios.map((scenario) => scenario.key))),
+    new Set(catalog.scenarios.map((scenario) => scenario.key))
+  )
+  assert(!sections.some((section) => section.title === '财务管理'))
+  assert.deepEqual(getHelpGuideSections({ scenarios: [], referencePages: [] }), [])
+})
 
 test('参考手册覆盖每个现有业务页，独立保留步骤、规则、来源、结果与异常', () => {
   const access = {
@@ -103,7 +132,7 @@ test('搜索标题、自然问题、别称、公式与来源；相同名词保�
   assert.deepEqual(searchHelpDocuments(catalog, ' \t '), [])
 })
 
-test('全部页面权限不扩大所选岗位的目录、图解或搜索范围', () => {
+test('已开放页面补入阅读目录，岗位常用推荐与未开放说明保持原有范围', () => {
   const access = {
     allowedMenuPaths: BUSINESS_USABILITY_CATALOG.map((entry) => entry.path),
   }
@@ -116,23 +145,38 @@ test('全部页面权限不扩大所选岗位的目录、图解或搜索范围',
   for (const [key, pageKeys] of Object.entries(expected)) {
     const guide = getRoleHelpGuide(key)
     const pages = getHelpReferencePages(guide, access)
-    assert.deepEqual(pages.map((page) => page.key), pageKeys, key)
+    const expectedPages = HELP_REFERENCE_PAGES.filter((page) =>
+      access.allowedMenuPaths.includes(page.path) || pageKeys.includes(page.key)
+    )
+    assert.deepEqual(pages.map((page) => page.key), expectedPages.map((page) => page.key), key)
     assert.deepEqual(
       getHelpReferencePages(guide).map((page) => page.key),
       pageKeys,
-      '菜单只控制办理入口，岗位说明仍可阅读'
+      '未额外开放页面时，岗位说明仍可阅读'
     )
     const scenarios = getRoleHelpScenarios(guide, access)
     assert(scenarios.every((scene) => !scene.pageKey || pageKeys.includes(scene.pageKey)), key)
     const references = getHelpReferenceDocuments(pages)
     if (key === 'warehouse') {
-      assert.deepEqual(searchHelpDocuments({ scenarios, references }, '月结'), [])
-      assert.equal(resolveHelpReference(references, 'receivables:payment-term', 'inbound').id, 'inbound')
+      assert(searchHelpDocuments({ scenarios, references }, '月结').length > 0)
+      assert.equal(resolveHelpReference(references, 'receivables:payment-term', 'inbound').id, 'receivables:payment-term')
     }
     if (key === 'finance') {
       assert(searchHelpDocuments({ scenarios, references }, '月结').length > 0)
     }
   }
+})
+
+test('额外授予的页面说明、图解、搜索与下载目录一致，URL 岗位不增加权限', () => {
+  const guides = getRoleHelpGuidesForProfile({ roles: [{ role_key: 'warehouse' }] })
+  const access = { allowedMenuPaths: ['/erp/sales/project-orders/sales-orders'] }
+  const catalog = getHelpReadingCatalog(guides, access)
+  assert(catalog.referencePages.find((page) => page.key === 'sales-orders')?.available)
+  assert(catalog.scenarios.some((scene) => scene.pageKey === 'sales-orders' && scene.available))
+  assert(catalog.scenarios.filter((scene) => scene.pageKey === 'sales-orders').every((scene) => scene.roleKeys.includes('warehouse')))
+  assert(searchHelpDocuments(catalog, '销售订单').some((document) => document.id === 'sales-orders'))
+  assert(!catalog.referencePages.some((page) => page.key === 'finance-payments'))
+  assert.equal(resolveHelpGuide(guides, 'admin').key, 'warehouse')
 })
 
 test('页内深链未指定岗位时选择关联岗位，显式筛选和当前账号岗位仍有效', () => {

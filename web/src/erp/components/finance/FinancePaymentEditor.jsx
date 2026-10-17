@@ -33,6 +33,7 @@ export function FinancePaymentEditor({
   partyIsCustomer,
   partyOptions,
   createPayment,
+  sourceContext = null,
 }) {
   return (
     <BusinessFormPage
@@ -70,7 +71,7 @@ export function FinancePaymentEditor({
         ) : null}
         <Form.Item name="kind" label="款项用途" rules={[{ required: true }]}>
           <Select
-            disabled={Boolean(refundSource)}
+            disabled={Boolean(refundSource || sourceContext)}
             options={
               refundSource
                 ? [{ value: FinancePaymentKind.REFUND, label: '实际退款' }]
@@ -105,7 +106,7 @@ export function FinancePaymentEditor({
               { value: 'RECEIPT', label: '收款' },
               { value: 'DISBURSEMENT', label: '付款' },
             ]}
-            disabled={Boolean(refundSource)}
+            disabled={Boolean(refundSource || sourceContext)}
             onChange={() =>
               paymentForm.setFieldsValue({
                 counterparty_id: undefined,
@@ -125,7 +126,7 @@ export function FinancePaymentEditor({
             showSearch
             optionFilterProp="label"
             loading={referenceLoading}
-            disabled={Boolean(refundSource)}
+            disabled={Boolean(refundSource || sourceContext)}
             onChange={() =>
               paymentForm.setFieldsValue({
                 source_id: undefined,
@@ -139,6 +140,7 @@ export function FinancePaymentEditor({
           form={paymentForm}
           profile={adminProfile}
           open={paymentOpen}
+          sourceContext={sourceContext}
         />
         <Form.Item
           name="purpose_note"

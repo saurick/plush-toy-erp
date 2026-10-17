@@ -141,21 +141,35 @@ test('product and quality area smokes enforce their complete landing contracts',
   for (const route of [DEV_PRODUCT_ENGINEERING_ROUTE, DEV_QUALITY_ROUTE]) {
     const scenario = scenarios.find(({ path }) => path === route)
     assert(scenario)
-    await scenario.verify({
+    const browserMotion = new Error('real browser interaction follows the landing checks')
+    const verification = scenario.verify({
+      emulateMedia: async () => { throw browserMotion },
       getByRole: (role, options) => {
+        if (role === 'table') {
+          assert.deepEqual(options, { name: '产品工程工具清单' })
+          return { locator: (selector) => {
+            assert.equal(selector, 'tbody tr')
+            return { count: async () => 7 }
+          } }
+        }
         assert.equal(role, 'tablist')
         assert.deepEqual(options, { name: '产品工程查看方式' })
-        return { count: async () => 0 }
+        return { count: async () => route === DEV_PRODUCT_ENGINEERING_ROUTE ? 1 : 0 }
       },
       locator: (selector) => ({
         count: async () =>
           selector === '.erp-dev-tool-table tbody tr' &&
           route === DEV_PRODUCT_ENGINEERING_ROUTE
-            ? 6
+            ? 7
             : (counts.get(selector) ?? 0),
         waitFor: async () => {},
       }),
       url: () => `http://127.0.0.1${route}`,
     })
+    if (route === DEV_PRODUCT_ENGINEERING_ROUTE) {
+      await assert.rejects(verification, (error) => error === browserMotion)
+    } else {
+      await verification
+    }
   }
 })

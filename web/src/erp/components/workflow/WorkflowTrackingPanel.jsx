@@ -115,7 +115,7 @@ export default function WorkflowTrackingPanel({ scope, sessionKey, refreshKey, o
 key: 'identity',
 width: 320,
 render: (_, entry) => entry.display_context
-      ? <WorkflowTaskIdentity task={entry} compact showStyleNo /> : '—' },
+      ? <WorkflowTaskIdentity task={entry} keyword={keyword} compact showStyleNo /> : '—' },
     { title: '当前状态', key: 'status', width: 130, render: (_, entry) => <Tag color={trackingStatusColor(entry)}>{trackingStatus(entry)}</Tag> },
     { title: '当前去向 / 办理人', key: 'owner', render: (_, entry) => entry.current_tasks.length ? <WorkflowResponsibilities items={entry.current_tasks.map(trackingResponsibilityParts)} /> : trackingHandoff(entry) },
     { title: '发起人', key: 'initiator', width: 150, render: (_, entry) => <WorkflowInitiator summary={entry} /> },

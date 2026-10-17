@@ -37,7 +37,7 @@ test('rework progress distinguishes cancellation, work, packaging and completion
 
 test('rework progress presents business labels without exposing lineage identifiers', () => {
   assert.match(source, /title="成品返工进度"/u)
-  assert.match(source, /手工补制、成品入库、质量关口到查货包装完成/u)
+  assert.match(source, /当前工序、成品入库及检验包装进度/u)
   assert.match(source, /成品返工补制独立于原生产批次/u)
   assert.match(source, /当前记录/u)
   assert.doesNotMatch(source, />\s*origin_rework_fact_id\s*</u)

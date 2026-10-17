@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react'
 import { ArrowRightOutlined, QuestionCircleOutlined } from '@ant-design/icons'
 import { Button, Popover, Tag, Typography } from 'antd'
-import { Link, useNavigate } from 'react-router-dom'
+import Link from '../business-list/BusinessLink.jsx'
+import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import { getHelpCenterHref } from '../../config/helpManualCatalog.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import {
@@ -123,7 +124,7 @@ function PageGuideContent({ entry }) {
 
 export function BusinessPageHelpTrigger({ pageKey = '' }) {
   const [open, setOpen] = useState(false)
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
   const trigger = useRef(null)
   const entry = getBusinessUsabilityEntry(pageKey)
 

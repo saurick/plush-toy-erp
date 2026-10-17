@@ -18,6 +18,10 @@
   overscroll-behavior: contain;
 }
 
+.mobile-business-layout[data-mobile-help='true'] {
+  padding: 0;
+}
+
 .mobile-business-layout__content[data-business-form-editing='true'] {
   overflow: hidden;
 }
@@ -33,17 +37,6 @@
 .mobile-business-layout__header strong {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-.mobile-business-layout__hint {
-  margin: 0 0 12px;
-  color: var(--erp-text-secondary, #64748b);
-  font-size: var(--erp-font-caption);
-}
-
-.mobile-business-layout__content[data-business-form-editing='true']
-  > .mobile-business-layout__hint {
-  display: none;
 }
 
 .mobile-business-layout .erp-business-page {

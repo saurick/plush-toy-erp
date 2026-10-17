@@ -2,7 +2,7 @@ import { exerciseTableScrollControls } from './tableScrollControlAssertions.mjs'
 import { styleRpcResult } from './rpcMockResult.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 
-function summaryFixture(inventoryStatus = 'AVAILABLE', empty = false) {
+export function summaryFixture(inventoryStatus = 'AVAILABLE', empty = false) {
   const items = Array.from({ length: 16 }, (_, index) => ({
     material_id: index + 1,
     unit_id: (index % 2) + 1,
@@ -119,8 +119,9 @@ export function createMaterialSummaryScenarios({
         await page.route('**/rpc/sales_order', async (route) => {
           const { id, method } = route.request().postDataJSON()
           if (method !== 'get_engineering_material_request') {
-            if (/submit|review|update|create|delete/.test(method))
+            if (/submit|review|update|create|delete/.test(method)) {
               writes.push(method)
+            }
             return route.fallback()
           }
           reads += 1

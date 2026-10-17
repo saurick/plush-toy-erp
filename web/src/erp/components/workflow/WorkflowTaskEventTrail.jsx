@@ -26,7 +26,9 @@ export default function WorkflowTaskEventTrail({
   const collapsed = collapsible && !loading && state !== 'error'
   const Container = collapsed ? 'details' : 'div'
   const Heading = collapsed ? 'summary' : 'div'
-  const summaryText = `${model.summaryLabel}${model.items.length > 1 ? ' · 最近在前' : ''}`
+  const summaryText = loading ? '读取中' : state === 'error' ? '读取失败' : model.items.length
+    ? `${truncated ? '最近 ' : ''}${model.items.length} 条` : '暂无记录'
+  const summary = <span className="workflow-task-event-trail__count">{summaryText}</span>
 
   return (
     <section
@@ -48,9 +50,9 @@ export default function WorkflowTaskEventTrail({
             <h3 id={`workflow-task-event-trail-title-${task.id || 'current'}`}>
               本任务处理记录
             </h3>
-            {collapsed ? <span className="workflow-task-event-trail__count">{summaryText}</span> : null}
+            {collapsed ? summary : null}
           </div>
-          {collapsed ? <DownOutlined aria-hidden="true" /> : <span>{summaryText}</span>}
+          {collapsed ? <DownOutlined aria-hidden="true" /> : summary}
         </Heading>
 
         {showResponsibility ? (
@@ -82,7 +84,7 @@ export default function WorkflowTaskEventTrail({
         <>
           <ol
             className="workflow-task-event-trail__list"
-            aria-label="本任务处理记录，按时间倒序"
+            aria-label="本任务处理记录，最近在前，按时间倒序"
           >
             {model.items.map((item) => (
               <li

@@ -194,10 +194,12 @@ export function buildDevDocsItems(markdownModules = {}) {
     }
     const source = normalizeModuleValue(moduleValue)
     const loadSource =
-      typeof moduleValue === 'function' ? moduleValue : undefined
+      typeof moduleValue === 'function'
+        ? moduleValue
+        : moduleValue?.loadSource
     byPath.set(path, {
       key: keyForPath(path),
-      title: getDevDocsTitle(source, path),
+      title: moduleValue?.title || getDevDocsTitle(source, path),
       filename: filenameForPath(path),
       path,
       group: groupForPath(path),

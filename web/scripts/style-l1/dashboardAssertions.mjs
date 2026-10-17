@@ -599,6 +599,10 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       const nestedCards = document.querySelectorAll('.erp-task-board-lane.ant-card').length
       const tableCount = document.querySelectorAll('.erp-task-board-lane .ant-table').length
       const rowKeys = Array.from(document.querySelectorAll('.erp-task-board-lane tr[data-row-key]')).map((row) => row.dataset.rowKey)
+      const laneContentGaps = Array.from(document.querySelectorAll('.erp-task-board-lane')).map((lane) => ({
+        tableGap: lane.querySelector('.ant-table-wrapper').getBoundingClientRect().top - lane.getBoundingClientRect().top,
+        tableFirst: lane.firstElementChild.classList.contains('ant-table-wrapper'),
+      }))
       const overlappingLanePairs = []
       for (let i = 0; i < laneRects.length; i += 1) {
         for (let j = i + 1; j < laneRects.length; j += 1) {
@@ -630,6 +634,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
         nestedCards,
         tableCount,
         rowKeys,
+        laneContentGaps,
         overlappingLanePairs,
         tableCard,
         visiblePageHeads,
@@ -659,6 +664,7 @@ export function createDashboardAssertions({ outputDir, baseURL }) {
       `${scenarioName} 任务管理泳道尺寸异常: ${JSON.stringify(metrics)}`
     )
     assert.equal(metrics.tableCount, 1, `${scenarioName} 概览与分类复用同一任务表格`)
+    assert.ok(metrics.laneContentGaps.every((lane) => lane.tableFirst && Math.abs(lane.tableGap) <= 1), `${scenarioName} 分类与搜索后直接显示任务表，不保留重复说明或空行: ${JSON.stringify(metrics.laneContentGaps)}`)
     assert.equal(metrics.nestedCards, 0, `${scenarioName} 任务表内不叠加分类卡片`)
     assert.equal(new Set(metrics.rowKeys).size, metrics.rowKeys.length, `${scenarioName} 概览预览不重复任务`)
     assert(

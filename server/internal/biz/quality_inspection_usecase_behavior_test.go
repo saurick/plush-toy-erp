@@ -11,7 +11,7 @@ import (
 )
 
 type qualityInspectionBehaviorRepo struct {
-	InventoryRepo
+	QualityInspectionRepo
 	created    []QualityInspectionCreate
 	sources    []QualityInspectionFromPurchaseReceiptCreate
 	decisions  []QualityInspectionDecision
@@ -67,6 +67,9 @@ func (r *qualityInspectionBehaviorRepo) CancelQualityInspection(_ context.Contex
 }
 
 func TestQualityInspectionUsecasePurchaseSourceRejectsIncompleteIdentity(t *testing.T) {
+	if _, broad := any(&qualityInspectionBehaviorRepo{}).(InventoryRepo); broad {
+		t.Fatal("quality behavior fixture must not require inventory, BOM or receipt writes")
+	}
 	for _, tc := range []struct {
 		name string
 		in   QualityInspectionFromPurchaseReceiptCreate
@@ -77,7 +80,7 @@ func TestQualityInspectionUsecasePurchaseSourceRejectsIncompleteIdentity(t *test
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &qualityInspectionBehaviorRepo{}
-			_, err := NewInventoryUsecase(repo).CreateQualityInspectionFromPurchaseReceipt(context.Background(), &tc.in)
+			_, err := NewQualityInspectionUsecase(repo).CreateQualityInspectionFromPurchaseReceipt(context.Background(), &tc.in)
 			if !errors.Is(err, ErrBadParam) || len(repo.sources)+len(repo.created) != 0 {
 				t.Fatalf("invalid source reached storage: %v", err)
 			}
@@ -86,14 +89,14 @@ func TestQualityInspectionUsecasePurchaseSourceRejectsIncompleteIdentity(t *test
 	note := "  到货检验  "
 	in := QualityInspectionFromPurchaseReceiptCreate{InspectionNo: " IQC-7 ", PurchaseReceiptID: 7, PurchaseReceiptItemID: 8, DecisionNote: &note}
 	repo := &qualityInspectionBehaviorRepo{err: ErrQualityInspectionSourceConflict}
-	if _, err := NewInventoryUsecase(repo).CreateQualityInspectionFromPurchaseReceipt(context.Background(), &in); !errors.Is(err, ErrQualityInspectionSourceConflict) || len(repo.sources) != 1 || len(repo.created) != 0 {
+	if _, err := NewQualityInspectionUsecase(repo).CreateQualityInspectionFromPurchaseReceipt(context.Background(), &in); !errors.Is(err, ErrQualityInspectionSourceConflict) || len(repo.sources) != 1 || len(repo.created) != 0 {
 		t.Fatalf("source creation must remain atomic and preserve conflict: %v", err)
 	}
 	got := repo.sources[0]
 	if got.InspectionNo != "IQC-7" || got.PurchaseReceiptID != 7 || got.PurchaseReceiptItemID != 8 || got.DecisionNote == nil || *got.DecisionNote != "到货检验" || note != "  到货检验  " {
 		t.Fatalf("source intent or caller note was changed: %#v", got)
 	}
-	if _, err := NewInventoryUsecase(&inventoryBehaviorRepo{}).CreateQualityInspectionFromPurchaseReceipt(context.Background(), &in); !errors.Is(err, ErrBadParam) {
+	if _, err := NewQualityInspectionUsecase(&inventoryBehaviorRepo{}).CreateQualityInspectionFromPurchaseReceipt(context.Background(), &in); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("missing source adapter must not fall back to technical draft creation: %v", err)
 	}
 }
@@ -115,13 +118,13 @@ func TestQualityInspectionUsecaseIncomingDraftRejectsMixedSourceFacts(t *testing
 			repo := &qualityInspectionBehaviorRepo{}
 			in := base
 			tc.edit(&in)
-			if _, err := NewInventoryUsecase(repo).CreateQualityInspectionDraft(context.Background(), &in); !errors.Is(err, ErrBadParam) || len(repo.created) != 0 {
+			if _, err := NewQualityInspectionUsecase(repo).CreateQualityInspectionDraft(context.Background(), &in); !errors.Is(err, ErrBadParam) || len(repo.created) != 0 {
 				t.Fatalf("inconsistent source reached storage: %v", err)
 			}
 		})
 	}
 	repo := &qualityInspectionBehaviorRepo{}
-	if _, err := NewInventoryUsecase(repo).CreateQualityInspectionDraft(context.Background(), &base); err != nil || len(repo.created) != 1 {
+	if _, err := NewQualityInspectionUsecase(repo).CreateQualityInspectionDraft(context.Background(), &base); err != nil || len(repo.created) != 1 {
 		t.Fatalf("valid draft rejected: %v", err)
 	}
 	got := repo.created[0]
@@ -135,7 +138,7 @@ func TestQualityInspectionUsecaseFinishedGoodsClearsIncomingOnlyFields(t *testin
 	in := QualityInspectionCreate{InspectionNo: "FQC-7", SourceID: 7, SubjectID: 9, WarehouseID: 3, InventoryLotID: 8, PurchaseReceiptID: 5, PurchaseReceiptItemID: &line, MaterialID: 6}
 	before := in
 	repo := &qualityInspectionBehaviorRepo{}
-	if _, err := NewInventoryUsecase(repo).CreateFinishedGoodsQualityInspectionDraft(context.Background(), &in); err != nil || len(repo.created) != 1 {
+	if _, err := NewQualityInspectionUsecase(repo).CreateFinishedGoodsQualityInspectionDraft(context.Background(), &in); err != nil || len(repo.created) != 1 {
 		t.Fatalf("finished goods draft rejected: %v", err)
 	}
 	got := repo.created[0]
@@ -170,7 +173,7 @@ func TestQualityInspectionUsecaseDecisionsRejectContradictoryEvidence(t *testing
 			repo := &qualityInspectionBehaviorRepo{}
 			in := qualityInspectionBehaviorDecision()
 			tc.edit(&in)
-			if _, err := NewInventoryUsecase(repo).PassQualityInspection(context.Background(), &in); !errors.Is(err, ErrBadParam) || len(repo.decisions) != 0 {
+			if _, err := NewQualityInspectionUsecase(repo).PassQualityInspection(context.Background(), &in); !errors.Is(err, ErrBadParam) || len(repo.decisions) != 0 {
 				t.Fatalf("contradictory evidence reached decision storage: %v", err)
 			}
 		})
@@ -178,7 +181,7 @@ func TestQualityInspectionUsecaseDecisionsRejectContradictoryEvidence(t *testing
 	repo := &qualityInspectionBehaviorRepo{}
 	in := qualityInspectionBehaviorDecision()
 	in.Result = QualityInspectionResultPass
-	if _, err := NewInventoryUsecase(repo).RejectQualityInspection(context.Background(), &in); !errors.Is(err, ErrBadParam) || len(repo.decisions) != 0 {
+	if _, err := NewQualityInspectionUsecase(repo).RejectQualityInspection(context.Background(), &in); !errors.Is(err, ErrBadParam) || len(repo.decisions) != 0 {
 		t.Fatalf("reject endpoint accepted a passing result: %v", err)
 	}
 }
@@ -186,7 +189,7 @@ func TestQualityInspectionUsecaseDecisionsRejectContradictoryEvidence(t *testing
 func TestQualityInspectionUsecaseDecisionPreservesFailureRetryAndEvidenceTime(t *testing.T) {
 	storageErr := errors.New("quality decision storage unavailable")
 	repo := &qualityInspectionBehaviorRepo{err: storageErr}
-	uc := NewInventoryUsecase(repo)
+	uc := NewQualityInspectionUsecase(repo)
 	in := qualityInspectionBehaviorDecision()
 	if _, err := uc.PassQualityInspection(context.Background(), &in); !errors.Is(err, storageErr) {
 		t.Fatalf("decision error was lost: %v", err)
@@ -211,17 +214,17 @@ func TestQualityInspectionUsecaseDecisionPreservesFailureRetryAndEvidenceTime(t 
 func TestQualityInspectionUsecaseListsKeepInspectionKindsSeparate(t *testing.T) {
 	for _, tc := range []struct {
 		name, source, kind, subject string
-		call                        func(*InventoryUsecase, context.Context, QualityInspectionFilter) ([]*QualityInspection, int, error)
+		call                        func(*QualityInspectionUsecase, context.Context, QualityInspectionFilter) ([]*QualityInspection, int, error)
 		mixed                       QualityInspectionFilter
 	}{
-		{"incoming", QualityInspectionSourcePurchaseReceipt, QualityInspectionTypeIncoming, QualityInspectionSubjectMaterial, (*InventoryUsecase).ListQualityInspections, QualityInspectionFilter{SourceType: QualityInspectionSourceShipment}},
-		{"finished goods", QualityInspectionSourceShipment, QualityInspectionTypeFinishedGoods, QualityInspectionSubjectProduct, (*InventoryUsecase).ListFinishedGoodsQualityInspections, QualityInspectionFilter{PurchaseReceiptID: 7}},
-		{"outsourcing", QualityInspectionSourceOutsourcingFact, QualityInspectionTypeOutsourcingReturn, QualityInspectionSubjectProduct, (*InventoryUsecase).ListOutsourcingReturnQualityInspections, QualityInspectionFilter{MaterialID: 7}},
-		{"production", QualityInspectionSourceProductionWIP, QualityInspectionTypeProductionStage, QualityInspectionSubjectWIP, (*InventoryUsecase).ListProductionStageQualityInspections, QualityInspectionFilter{InventoryLotID: 7}},
+		{"incoming", QualityInspectionSourcePurchaseReceipt, QualityInspectionTypeIncoming, QualityInspectionSubjectMaterial, (*QualityInspectionUsecase).ListQualityInspections, QualityInspectionFilter{SourceType: QualityInspectionSourceShipment}},
+		{"finished goods", QualityInspectionSourceShipment, QualityInspectionTypeFinishedGoods, QualityInspectionSubjectProduct, (*QualityInspectionUsecase).ListFinishedGoodsQualityInspections, QualityInspectionFilter{PurchaseReceiptID: 7}},
+		{"outsourcing", QualityInspectionSourceOutsourcingFact, QualityInspectionTypeOutsourcingReturn, QualityInspectionSubjectProduct, (*QualityInspectionUsecase).ListOutsourcingReturnQualityInspections, QualityInspectionFilter{MaterialID: 7}},
+		{"production", QualityInspectionSourceProductionWIP, QualityInspectionTypeProductionStage, QualityInspectionSubjectWIP, (*QualityInspectionUsecase).ListProductionStageQualityInspections, QualityInspectionFilter{InventoryLotID: 7}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &qualityInspectionBehaviorRepo{}
-			uc := NewInventoryUsecase(repo)
+			uc := NewQualityInspectionUsecase(repo)
 			rows, total, err := tc.call(uc, context.Background(), QualityInspectionFilter{Status: " passed ", Result: " pass ", Keyword: " 检验 ", Limit: 201, Offset: -1})
 			if err != nil || total != 7 || len(rows) != 1 || rows[0].ID != 20 || len(repo.filters) != 1 {
 				t.Fatalf("valid list lost result: rows=%v total=%d err=%v", rows, total, err)
@@ -246,7 +249,7 @@ func TestQualityInspectionUsecaseListsKeepInspectionKindsSeparate(t *testing.T) 
 
 func TestQualityInspectionUsecaseSubmissionAndCancellationPreserveStateGuards(t *testing.T) {
 	repo := &qualityInspectionBehaviorRepo{err: ErrQualityInspectionSourceConflict}
-	uc := NewInventoryUsecase(repo)
+	uc := NewQualityInspectionUsecase(repo)
 	if _, err := uc.SubmitQualityInspection(context.Background(), 0); !errors.Is(err, ErrBadParam) || len(repo.submitted) != 0 {
 		t.Fatalf("missing inspection reached submission: %v", err)
 	}

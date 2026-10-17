@@ -30,6 +30,14 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		return id, res, nil
 	}
 	switch method {
+	case "help_content", "help_chapter", "help_supplement_save", "help_supplement_publish", "help_supplement_restore", "help_feedback_create", "help_feedback_respond":
+		return id, d.helpContentResult(ctx, method, pm), nil
+	case "project_manuals":
+		if res := rejectUnknownAdminParams(pm); res != nil {
+			return id, res, nil
+		}
+		return id, d.projectManualsResult(ctx), nil
+
 	case "me":
 		if res := rejectUnknownAdminParams(pm); res != nil {
 			return id, res, nil

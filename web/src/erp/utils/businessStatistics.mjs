@@ -1,4 +1,8 @@
 import { normalizeWorkflowTaskPageSize } from './workflowTaskBoard.mjs'
+import {
+  numeric20Scale6AggregateUnits,
+  numeric20Scale6TextFromUnits,
+} from './numeric20Scale6.mjs'
 
 export const STATISTICS_AGES = [
   ['not_due', '未到期'],
@@ -38,23 +42,21 @@ const amountKeys = [
   'balance',
   ...STATISTICS_AGES.map(([key]) => key),
 ]
-const decimal = /^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/u
 const isCount = (value) => Number.isSafeInteger(value) && value >= 0
 const isMoney = (value) =>
-  value == null || (typeof value === 'string' && decimal.test(value))
+  value == null || numeric20Scale6AggregateUnits(value) !== null
 const fail = () => {
   throw new Error('统计结果不完整，请刷新重试')
 }
 const units = (value) => {
-  if (typeof value !== 'string' || !decimal.test(value)) return null
-  const [integer, fraction = ''] = value.split('.')
-  return BigInt(integer) * 1000000n + BigInt(fraction.padEnd(6, '0'))
+  const parsed = numeric20Scale6AggregateUnits(value)
+  return parsed === null ? null : BigInt(parsed)
 }
 export function statisticsNumber(value, money = false) {
   if (value == null) return '—'
   const text =
     typeof value === 'number' && isCount(value) ? String(value) : value
-  if (typeof text !== 'string' || !decimal.test(text)) return '—'
+  if (numeric20Scale6AggregateUnits(text) === null) return '—'
   const [integer, fraction = ''] = text.split('.')
   const suffix = money ? fraction.padEnd(2, '0') : fraction
   return (
@@ -75,9 +77,7 @@ export function statisticsSum(values) {
     if (parsed === null) return null
     sum += parsed
   }
-  const text = sum.toString().padStart(7, '0')
-  const fraction = text.slice(-6).replace(/0+$/u, '')
-  return text.slice(0, -6) + (fraction ? `.${fraction}` : '')
+  return numeric20Scale6TextFromUnits(sum.toString())
 }
 function requireAccess(value) {
   if (

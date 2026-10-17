@@ -14,6 +14,7 @@ import Table from '@/common/components/table/AppTable'
 import SearchInput from '@/common/components/SearchInput'
 import { MermaidDiagram } from '@/common/components/markdown'
 import DevPageNav from '../components/DevPageNav.jsx'
+import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevChainAuditEvidence, {
   ChainAuditEvidenceLinks,
@@ -341,8 +342,8 @@ function ChainResults({ data, chain, status, keyword, updateQuery }) {
           rowKey="rowKey"
           dataSource={rows}
           pagination={{
+            ...DEV_PAGINATION,
             pageSize: 10,
-            showSizeChanger: false,
             hideOnSinglePage: true,
           }}
           scroll={{ x: 1050 }}

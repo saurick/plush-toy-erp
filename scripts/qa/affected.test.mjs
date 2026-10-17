@@ -34,6 +34,10 @@ test("affected: backend public declarations select readonly generation and consu
     "server/internal/biz/rbac.go",
     "server/internal/core/status/shipment.go",
     "server/internal/service/jsonrpc_dispatch.go",
+    "server/api/jsonrpc/v1/jsonrpc.proto",
+    "server/api/jsonrpc/v1/jsonrpc.pb.go",
+    "server/api/jsonrpc/v1/jsonrpc_http.pb.go",
+    "server/api/jsonrpc/v1/jsonrpc.swagger.json",
     "server/internal/biz/workflow_task_catalog.json",
     "server/internal/biz/admin_password.go",
     "server/internal/server/template_pdf_security.go",
@@ -221,6 +225,57 @@ test("affected: edits to linked documents also validate project skill references
     assert.equal(plan.localGate, "focused");
     assert(!ids(plan).includes("full"));
   }
+});
+
+test("affected: selected Skill CLI rejects document drift and accepts unrelated edits", async () => {
+  await withSourceFixture(
+    {
+      ".agents/skills/README.md": "| `$plush-example` | fixture |\n",
+      ".agents/skills/plush-example/SKILL.md": "---\nname: plush-example\ndescription: Review linked document changes.\n---\n\n[guide](../../../docs/guide.md#existing-section)\n",
+      ".agents/skills/plush-example/agents/openai.yaml": 'interface:\n  display_name: "Plush Example"\n  short_description: "Validate example project skill metadata"\n  default_prompt: "Use $plush-example for this task."\n',
+      "docs/guide.md": "## Existing Section\n",
+      "docs/unrelated.md": "## Unrelated Section\n",
+      "web/src/count.mjs": "export const count = 1;\n",
+      "web/src/count.test.mjs": "import './count.mjs';\n",
+    },
+    async (root) => {
+      const plan = buildAffectedPlan(["docs/guide.md"], { root });
+      const command = plan.commands.find((item) => item.id === "skill-health");
+      assert(command, "a linked-document edit must select the Skill validator");
+      assert.equal(command.bin, "node");
+      assert.equal(plan.localGate, "focused");
+      assert.equal(plan.maxAffectedScope, "T1");
+      assert.equal(plan.followUps.length, 0);
+      assert(!ids(plan).includes("full"));
+      const run = () => execFileSync(
+        process.execPath,
+        [path.join(ROOT, command.args[0]), ...command.args.slice(1), "--root", root],
+        { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" } },
+      );
+      assert.match(run(), /status=ok skills=1/u);
+
+      await writeFile(path.join(root, "docs/unrelated.md"), "## Renamed Unrelated Section\n");
+      assert.match(run(), /status=ok skills=1/u);
+      const combined = buildAffectedPlan(["docs/guide.md", "docs/unrelated.md"], { root });
+      assert.equal(ids(combined).filter((id) => id === "skill-health").length, 1);
+      assert(!ids(buildAffectedPlan(["web/src/count.mjs"], { root })).includes("skill-health"));
+
+      await writeFile(path.join(root, "docs/guide.md"), "## Renamed Section\n");
+      assert.throws(run, (error) => {
+        assert.equal(error.status, 1);
+        assert.match(error.stderr, /missing anchor #existing-section/u);
+        return true;
+      });
+      await rm(path.join(root, "docs/guide.md"));
+      assert.throws(run, (error) => {
+        assert.equal(error.status, 1);
+        assert.match(error.stderr, /docs\/guide\.md#existing-section/u);
+        return true;
+      });
+      await writeFile(path.join(root, "docs/guide.md"), "## Existing Section\n");
+      assert.match(run(), /status=ok skills=1/u);
+    },
+  );
 });
 
 test("affected: phase-label gate scans only this change set", () => {
@@ -637,6 +692,14 @@ test("affected: DEV 页面改动只选择聚焦合同与受影响桌面 smoke", 
       "web/src/dev-workbench/pages/DevTestingPage.jsx",
       "dev-pressure-desktop",
     ],
+    [
+      "web/src/dev-workbench/pages/DevIntegrationPage.jsx",
+      "dev-page-integration-desktop-light",
+    ],
+    [
+      "web/src/dev-workbench/components/DevProjectGraphView.jsx",
+      "dev-page-integration-desktop-light",
+    ],
   ]) {
     const plan = buildAffectedPlan([file], { root: ROOT });
     const governanceCommand = plan.commands.find((item) =>
@@ -882,6 +945,10 @@ test("affected: material approval and shared unit rounding select PostgreSQL pro
 test("affected: role task quantity contract always selects PostgreSQL and browser proof", () => {
   for (const file of [
     "server/internal/service/jsonrpc_workflow_task.go",
+    "server/internal/service/jsonrpc_workflow_task_board.go",
+    "server/internal/service/jsonrpc_workflow_task_role_view.go",
+    "server/internal/service/jsonrpc_workflow_task_action.go",
+    "server/internal/service/jsonrpc_workflow_task_access.go",
     "web/src/erp/api/workflowApi.mjs",
     "web/scripts/style-l1/mobileTaskAssertions.mjs",
   ]) {

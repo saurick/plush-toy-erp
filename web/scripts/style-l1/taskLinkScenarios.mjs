@@ -121,6 +121,10 @@ export function createTaskLinkScenarios(deps) {
           return { bodyOverflow: body.scrollWidth - body.clientWidth, footerOverflow: footer.scrollWidth - footer.clientWidth, padding: content ? Number.parseFloat(getComputedStyle(content).paddingLeft) : 16 }
         })
         assert.ok(layout.bodyOverflow < 2 && layout.footerOverflow < 2 && layout.padding >= (mobile ? 10 : 16), JSON.stringify(layout))
+        const relatedTasks = chain.locator('.workflow-business-chain__task')
+        const relatedMarkers = await relatedTasks.locator(':scope > .workflow-business-chain__marker .workflow-process-stage__marker').allTextContents()
+        assert.equal(relatedMarkers.length, await relatedTasks.count())
+        assert.ok(relatedMarkers.every((symbol) => ['●', '!', '✓', '↩', '−', '○'].includes(symbol)), 'shared task links use status nodes without assigning step numbers')
         assert.ok(new URL(page.url()).pathname.startsWith(mobile ? '/m/' : '/erp/'))
         assert.equal(new URL(page.url()).searchParams.get('link_task'), '300')
         await assertTaskCopy(page, chain.getByRole('button', { name: '复制任务链接', exact: true }), `${new URL(page.url()).origin}/task-link/300`)

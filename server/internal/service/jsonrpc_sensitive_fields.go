@@ -39,9 +39,12 @@ func (d *jsonrpcDispatcher) requireSensitiveFieldMutationPermission(
 		}
 		permissionKey = biz.PermissionFieldSalesCommercialRead
 	case "purchase":
-		// This command accepts only receipt metadata and warehouse selections;
-		// commercial values come from the order and remain redacted on readback.
-		if normalizedMethod == "create_purchase_receipt_from_purchase_order" {
+		// Source-bound receipt and return commands accept warehouse metadata and
+		// quantities only. Strict parameter contracts reject commercial fields;
+		// prices are derived from the locked source and redacted on readback.
+		switch normalizedMethod {
+		case "create_purchase_receipt_from_purchase_order", "create_purchase_return_from_receipt",
+			"create_purchase_return_from_quality_inspection":
 			return nil
 		}
 		permissionKey = biz.PermissionFieldProcurementCommercialRead

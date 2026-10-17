@@ -34,6 +34,7 @@ const devPageSources = [
   'DevHubPage.jsx',
   'DevProductCorePage.jsx',
   'DevPermissionRelationshipsPage.jsx',
+  'DevIntegrationPage.jsx',
   'DevFlowStateObservatoryPage.jsx',
   'DevBusinessUsabilityPage.jsx',
   'DevDocsPage.jsx',
@@ -84,6 +85,7 @@ test('devHub: every dev route exposes a distinct browser title', () => {
     resolveDevPageTitle('/__dev/permission-relationships', 'Plush Toy ERP'),
     '权限关系 · Plush Toy ERP'
   )
+  assert.equal(resolveDevPageTitle('/__dev/integration', 'Plush Toy ERP'), '接口与集成 · Plush Toy ERP')
   assert.equal(
     resolveDevPageTitle('/__dev/testing', 'Plush Toy ERP'),
     '改动验证 · Plush Toy ERP'
@@ -172,6 +174,7 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
       ['product-engineering', '产品内核'],
       ['product-engineering', '权限关系'],
       ['product-engineering', '业务链观察'],
+      ['product-engineering', '接口与集成'],
       ['quality', '页面说明检查'],
       ['product-engineering', '开发文档'],
       ['product-engineering', '工程规范与 Skill'],
@@ -229,7 +232,8 @@ test('devHub: shared workspace navigation exposes exactly four primary areas and
     false,
     '页面说明检查保留登记和深链，通过改动验证按需进入'
   )
-  assert.equal(getDevSecondaryNavItems('product-engineering').length, 6)
+  assert.equal(getDevSecondaryNavItems('product-engineering').length, 7)
+  assert.equal(resolveDevWorkbenchAreaKey('/__dev/integration'), 'product-engineering')
   assert.equal(getDevSecondaryNavItems('quality').length, 4)
   assert.equal(resolveDevWorkbenchAreaKey('/__dev/business-chain-audit'), 'quality')
   assert.equal(resolveDevPageTitle('/__dev/business-chain-audit', 'ERP'), '链路实测 · ERP')
@@ -337,7 +341,7 @@ test('devHub: tools share one area registry without duplicate overview stage inv
 })
 
 test('devHub: dev pages share the backend-style workspace shell', () => {
-  assert.equal(devPageSources.length, 15)
+  assert.equal(devPageSources.length, 16)
   devPageSources.forEach((source) => {
     assert.match(source, /erp-dev-workspace-page/u)
     assert.match(source, /<DevPageNav/u)
@@ -402,6 +406,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
       '/__dev/product-core',
       '/__dev/permission-relationships',
       '/__dev/status-flows',
+      '/__dev/integration',
       '/__dev/business-usability',
       '/__dev/docs',
       '/__dev/project-skills',
@@ -561,7 +566,7 @@ test('devHub: lists existing dev-only entry routes without backend assumptions',
 test('devHub: summary records dev-only boundary', () => {
   const summary = buildDevHubSummary()
 
-  assert.equal(summary.entryCount, 15)
+  assert.equal(summary.entryCount, 16)
   assert.equal(summary.groupCount, 8)
   assert(summary.guardrailCount >= 9)
   assert.equal(summary.devOnly, true)

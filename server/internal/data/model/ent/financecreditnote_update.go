@@ -27,9 +27,45 @@ func (_u *FinanceCreditNoteUpdate) Where(ps ...predicate.FinanceCreditNote) *Fin
 	return _u
 }
 
+// AddReversalIDs adds the "reversals" edge to the FinanceCreditNote entity by IDs.
+func (_u *FinanceCreditNoteUpdate) AddReversalIDs(ids ...int) *FinanceCreditNoteUpdate {
+	_u.mutation.AddReversalIDs(ids...)
+	return _u
+}
+
+// AddReversals adds the "reversals" edges to the FinanceCreditNote entity.
+func (_u *FinanceCreditNoteUpdate) AddReversals(v ...*FinanceCreditNote) *FinanceCreditNoteUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddReversalIDs(ids...)
+}
+
 // Mutation returns the FinanceCreditNoteMutation object of the builder.
 func (_u *FinanceCreditNoteUpdate) Mutation() *FinanceCreditNoteMutation {
 	return _u.mutation
+}
+
+// ClearReversals clears all "reversals" edges to the FinanceCreditNote entity.
+func (_u *FinanceCreditNoteUpdate) ClearReversals() *FinanceCreditNoteUpdate {
+	_u.mutation.ClearReversals()
+	return _u
+}
+
+// RemoveReversalIDs removes the "reversals" edge to FinanceCreditNote entities by IDs.
+func (_u *FinanceCreditNoteUpdate) RemoveReversalIDs(ids ...int) *FinanceCreditNoteUpdate {
+	_u.mutation.RemoveReversalIDs(ids...)
+	return _u
+}
+
+// RemoveReversals removes "reversals" edges to FinanceCreditNote entities.
+func (_u *FinanceCreditNoteUpdate) RemoveReversals(v ...*FinanceCreditNote) *FinanceCreditNoteUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveReversalIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -59,7 +95,18 @@ func (_u *FinanceCreditNoteUpdate) ExecX(ctx context.Context) {
 	}
 }
 
+// check runs all checks and user-defined validators on the builder.
+func (_u *FinanceCreditNoteUpdate) check() error {
+	if _u.mutation.FinanceFactCleared() && len(_u.mutation.FinanceFactIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "FinanceCreditNote.finance_fact"`)
+	}
+	return nil
+}
+
 func (_u *FinanceCreditNoteUpdate) sqlSave(ctx context.Context) (_node int, err error) {
+	if err := _u.check(); err != nil {
+		return _node, err
+	}
 	_spec := sqlgraph.NewUpdateSpec(financecreditnote.Table, financecreditnote.Columns, sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt))
 	if ps := _u.mutation.predicates; len(ps) > 0 {
 		_spec.Predicate = func(selector *sql.Selector) {
@@ -68,8 +115,50 @@ func (_u *FinanceCreditNoteUpdate) sqlSave(ctx context.Context) (_node int, err 
 			}
 		}
 	}
-	if _u.mutation.ReversalOfCreditNoteIDCleared() {
-		_spec.ClearField(financecreditnote.FieldReversalOfCreditNoteID, field.TypeInt)
+	if _u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financecreditnote.ReversalsTable,
+			Columns: []string{financecreditnote.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedReversalsIDs(); len(nodes) > 0 && !_u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financecreditnote.ReversalsTable,
+			Columns: []string{financecreditnote.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReversalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financecreditnote.ReversalsTable,
+			Columns: []string{financecreditnote.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -91,9 +180,45 @@ type FinanceCreditNoteUpdateOne struct {
 	mutation *FinanceCreditNoteMutation
 }
 
+// AddReversalIDs adds the "reversals" edge to the FinanceCreditNote entity by IDs.
+func (_u *FinanceCreditNoteUpdateOne) AddReversalIDs(ids ...int) *FinanceCreditNoteUpdateOne {
+	_u.mutation.AddReversalIDs(ids...)
+	return _u
+}
+
+// AddReversals adds the "reversals" edges to the FinanceCreditNote entity.
+func (_u *FinanceCreditNoteUpdateOne) AddReversals(v ...*FinanceCreditNote) *FinanceCreditNoteUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddReversalIDs(ids...)
+}
+
 // Mutation returns the FinanceCreditNoteMutation object of the builder.
 func (_u *FinanceCreditNoteUpdateOne) Mutation() *FinanceCreditNoteMutation {
 	return _u.mutation
+}
+
+// ClearReversals clears all "reversals" edges to the FinanceCreditNote entity.
+func (_u *FinanceCreditNoteUpdateOne) ClearReversals() *FinanceCreditNoteUpdateOne {
+	_u.mutation.ClearReversals()
+	return _u
+}
+
+// RemoveReversalIDs removes the "reversals" edge to FinanceCreditNote entities by IDs.
+func (_u *FinanceCreditNoteUpdateOne) RemoveReversalIDs(ids ...int) *FinanceCreditNoteUpdateOne {
+	_u.mutation.RemoveReversalIDs(ids...)
+	return _u
+}
+
+// RemoveReversals removes "reversals" edges to FinanceCreditNote entities.
+func (_u *FinanceCreditNoteUpdateOne) RemoveReversals(v ...*FinanceCreditNote) *FinanceCreditNoteUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveReversalIDs(ids...)
 }
 
 // Where appends a list predicates to the FinanceCreditNoteUpdate builder.
@@ -136,7 +261,18 @@ func (_u *FinanceCreditNoteUpdateOne) ExecX(ctx context.Context) {
 	}
 }
 
+// check runs all checks and user-defined validators on the builder.
+func (_u *FinanceCreditNoteUpdateOne) check() error {
+	if _u.mutation.FinanceFactCleared() && len(_u.mutation.FinanceFactIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "FinanceCreditNote.finance_fact"`)
+	}
+	return nil
+}
+
 func (_u *FinanceCreditNoteUpdateOne) sqlSave(ctx context.Context) (_node *FinanceCreditNote, err error) {
+	if err := _u.check(); err != nil {
+		return _node, err
+	}
 	_spec := sqlgraph.NewUpdateSpec(financecreditnote.Table, financecreditnote.Columns, sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt))
 	id, ok := _u.mutation.ID()
 	if !ok {
@@ -162,8 +298,50 @@ func (_u *FinanceCreditNoteUpdateOne) sqlSave(ctx context.Context) (_node *Finan
 			}
 		}
 	}
-	if _u.mutation.ReversalOfCreditNoteIDCleared() {
-		_spec.ClearField(financecreditnote.FieldReversalOfCreditNoteID, field.TypeInt)
+	if _u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financecreditnote.ReversalsTable,
+			Columns: []string{financecreditnote.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedReversalsIDs(); len(nodes) > 0 && !_u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financecreditnote.ReversalsTable,
+			Columns: []string{financecreditnote.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReversalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financecreditnote.ReversalsTable,
+			Columns: []string{financecreditnote.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &FinanceCreditNote{config: _u.config}
 	_spec.Assign = _node.assignValues

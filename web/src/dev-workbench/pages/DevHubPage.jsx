@@ -110,41 +110,40 @@ export default function DevHubPage() {
             onChange={(value) => selectParam('view', value)}
           />
         </div>
+        <div className="erp-dev-overview-library__toolbar" hidden={activeView === 'path'}>
+          <SearchInput
+            allowClear
+            aria-label="搜索全部开发工具"
+            placeholder="搜索工具名称或用途"
+            value={keyword}
+            onChange={(event) => selectParam('q', event.target.value, true)}
+          />
+          <Select
+            aria-label="全部开发工具分组"
+            value={group}
+            options={GROUP_OPTIONS}
+            onChange={(value) => selectParam('group', value, true)}
+          />
+          {keyword || group !== 'all' ? (
+            <Button onClick={resetFilters}>清除筛选</Button>
+          ) : null}
+          <Text
+            type="secondary"
+            className="erp-dev-overview-library__count"
+            aria-live="polite"
+          >
+            {items.length} 个工具
+          </Text>
+        </div>
       </header>
       <main className="erp-dev-hub-shell">
         <section className="erp-dev-overview-library">
-
           <section
             id={`dev-overview-panel-${activeView === 'pinned' ? 'pinned' : 'tools'}`}
             role="tabpanel"
             aria-labelledby={`dev-overview-tab-${activeView === 'pinned' ? 'pinned' : 'tools'}`}
             hidden={activeView === 'path'}
           >
-            <div className="erp-dev-overview-library__toolbar">
-              <SearchInput
-                allowClear
-                aria-label="搜索全部开发工具"
-                placeholder="搜索工具名称或用途"
-                value={keyword}
-                onChange={(event) => selectParam('q', event.target.value, true)}
-              />
-              <Select
-                aria-label="全部开发工具分组"
-                value={group}
-                options={GROUP_OPTIONS}
-                onChange={(value) => selectParam('group', value, true)}
-              />
-              {keyword || group !== 'all' ? (
-                <Button onClick={resetFilters}>清除筛选</Button>
-              ) : null}
-              <Text
-                type="secondary"
-                className="erp-dev-overview-library__count"
-                aria-live="polite"
-              >
-                {items.length} 个工具
-              </Text>
-            </div>
             {activeView !== 'path' ? (
               <DevToolTable
                 ariaLabel={

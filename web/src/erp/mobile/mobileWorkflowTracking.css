@@ -1,16 +1,25 @@
 .mobile-workflow-tracking {
   display: grid;
-  gap: 8px;
+  gap: 6px;
   margin: 0 12px;
   padding-bottom: 16px;
   color: var(--erp-text);
 }
 
 .mobile-workflow-tracking-search {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+}
+
+.mobile-workflow-tracking-search > .erp-mobile-search {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.mobile-workflow-tracking-search > .erp-mobile-search:has(input:placeholder-shown) .ant-input-suffix {
+  display: none;
 }
 
 .mobile-workflow-tracking-controls {
@@ -18,8 +27,8 @@
   top: 0;
   z-index: 4;
   display: grid;
-  gap: 8px;
-  padding-block: 6px;
+  gap: 5px;
+  padding-block: 4px;
   background: var(--erp-page-bg);
 }
 

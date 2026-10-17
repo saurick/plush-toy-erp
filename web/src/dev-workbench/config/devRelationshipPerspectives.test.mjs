@@ -53,6 +53,9 @@ test('project graph examples keep workflow, permission and evidence boundaries v
   assert.match(DEV_PROJECT_GRAPH_EXAMPLES.ci.caption, /以当前流水线为准/u)
   assert.match(DEV_PROJECT_GRAPH_EXAMPLES.delivery.caption, /不表示.*部署或验收/u)
   assert.match(DEV_PROJECT_GRAPH_EXAMPLES.association.caption, /不据此推断先后或后端授权/u)
+  assert.match(DEV_PROJECT_GRAPH_EXAMPLES.integration.caption, /尚未开放.*不代表测试通过/u)
+  assert.match(description('integration'), /actor 取已验证身份/u)
+  assert.match(description('integration'), /request_id 不作为幂等凭据/u)
 })
 
 test('project graph design preview uses the same catalogue, examples and registered node identities', () => {

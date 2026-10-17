@@ -237,17 +237,11 @@ func progressQuery(q biz.BusinessProgressQuery, sqlDialect string) (string, []an
 	if q.Keyword != "" {
 		key := like(q.Keyword)
 		match := func(field string) string { return "lower(COALESCE(" + field + ",'')) LIKE " + key + " ESCAPE '\\'" }
-		fields := []string{"z.product_name_snapshot", "z.requested_product_name", "z.product_code_snapshot", "z.customer_product_no", "p.name", "p.code", "p.style_no", "p.customer_style_no"}
-		table, parent := "sales_order_items", "sales_order_id"
-		if q.View == "production" {
-			table, parent = "production_order_items", "production_order_id"
-			fields = []string{"z.product_name_snapshot", "z.product_code_snapshot", "p.name", "p.code", "p.style_no", "p.customer_style_no"}
+		table, parent, _ := progressIdentitySource(q.View)
+		sourceSearch := "SELECT 1 FROM " + table + " z LEFT JOIN products p ON p.id=z.product_id WHERE z." + parent + "=j.id AND " + progressIdentityMatch(q.View, key)
+		if q.View == "orders" {
+			sourceSearch += " AND z.line_status<>'canceled'"
 		}
-		matches := []string{}
-		for _, field := range fields {
-			matches = append(matches, match(field))
-		}
-		sourceSearch := "SELECT 1 FROM " + table + " z LEFT JOIN products p ON p.id=z.product_id WHERE z." + parent + "=j.id AND (" + strings.Join(matches, " OR ") + ")"
 		linkedSalesSearch := ""
 		if q.View == "production" && q.Access.Sales {
 			linkedSalesSearch = " OR EXISTS(SELECT 1 FROM production_order_items i JOIN sales_order_items l ON l.id=i.sales_order_item_id JOIN sales_orders s ON s.id=l.sales_order_id JOIN customers c ON c.id=s.customer_id WHERE i.production_order_id=j.id AND (" + match("s.order_no") + " OR " + match("COALESCE(NULLIF(s.customer_snapshot->>'name',''),c.name)") + "))"

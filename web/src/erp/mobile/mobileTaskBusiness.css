@@ -1,0 +1,78 @@
+.mobile-task-business {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100dvh;
+}
+
+.mobile-task-business__content {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+}
+
+.mobile-task-business__content[data-business-form-editing='true'] {
+  overflow: hidden;
+}
+
+.mobile-task-business__loading {
+  min-height: 120px;
+}
+
+.mobile-task-business-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 12px;
+}
+
+.mobile-task-business-actions > .ant-btn,
+.mobile-task-related-business > .ant-btn {
+  min-height: 44px;
+}
+
+.mobile-task-related-business > p {
+  overflow-wrap: anywhere;
+}
+
+.mobile-task-related-business > label,
+.mobile-task-payment-kind {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin-block: 12px;
+}
+
+.mobile-task-payment-kind > .ant-select,
+.mobile-task-related-business > label > .ant-select {
+  min-height: 44px;
+}
+
+.mobile-task-business__record {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 0;
+}
+
+.mobile-task-business__record > div {
+  display: grid;
+  grid-template-columns: minmax(80px, 35%) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.mobile-task-business__record dt {
+  color: var(--erp-text-secondary);
+}
+
+.mobile-task-business__record dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}

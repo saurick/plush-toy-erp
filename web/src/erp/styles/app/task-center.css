@@ -4,19 +4,19 @@
 
 .erp-dashboard-task-board-card > .ant-card-body {
   container: task-board / inline-size;
-  padding: 10px 12px;
+  padding: var(--erp-panel-padding-block, 10px) var(--erp-panel-padding-inline, 12px);
 }
 
 .erp-dashboard-task-board-card .erp-dashboard-block {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
+  gap: var(--erp-page-gap);
   align-items: start;
 }
 
 .erp-task-board-controls {
   display: grid;
-  gap: 12px;
+  gap: var(--erp-page-gap);
   min-width: 0;
 }
 
@@ -118,14 +118,6 @@
 .erp-task-board-lanes,
 .erp-task-board-lane {
   min-width: 0;
-}
-
-.erp-task-board-overview-heading {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px 16px;
-  padding: 4px 0 12px;
 }
 
 .erp-task-board-card-meta {
@@ -315,35 +307,12 @@
 
 
 .erp-task-action-drawer--context .ant-drawer-body {
-  background: var(--erp-surface-bg);
+  background: var(--erp-surface-bg-soft);
 }
 
 .erp-task-action-drawer--context .erp-task-action-drawer__body {
-  gap: 0;
-  padding: 20px 22px;
-}
-
-.erp-task-action-drawer--context .erp-task-action-drawer__summary--task {
-  gap: 6px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-
-
-.erp-task-action-drawer--context .erp-task-copy-heading > .ant-tag {
-  margin: 0;
-  font-weight: 400;
-}
-
-.erp-task-action-drawer--context .erp-task-action-drawer__source {
-  margin-bottom: 6px;
-}
-
-.erp-task-action-drawer--context .workflow-task-current {
-  margin-bottom: 10px;
+  gap: 12px;
+  padding: 12px;
 }
 
 .erp-task-handling-note {

@@ -1655,7 +1655,7 @@ export function buildBaselineCommandPlan({
       {
         command: process.execPath,
         args: [
-          "--test",
+          path.join(projectRoot, "web/scripts/runUnitTests.mjs"),
           "--test-concurrency=4",
           "--experimental-test-coverage",
           `--test-coverage-include=${path.resolve(projectRoot).split(path.sep).join("/")}/**`,

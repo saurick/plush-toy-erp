@@ -1,50 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { RedoOutlined } from '@ant-design/icons'
-import { Alert, Button, Descriptions, Divider, Empty, Spin } from 'antd'
+import { Alert, Button, Divider, Empty, Spin } from 'antd'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import { ERP_MODAL_WIDTHS } from '../../utils/modalSizes.mjs'
-import {
-  resolveBusinessDetailCopyText,
-  resolveBusinessTableCopyLabel,
-} from '../../utils/businessTableCopy.mjs'
-
-import { getColumnLabel } from './ColumnOrderModal.jsx'
-import BusinessCopyButton from './BusinessCopyButton.jsx'
 import BusinessFormModal from './BusinessFormModal.jsx'
 import BusinessDetailsPagination, {
   BUSINESS_DETAILS_PAGE_SIZE,
 } from './BusinessDetailsPagination.jsx'
-import BusinessRowItemCards, {
-  visibleDetailValue,
-} from './BusinessRowItemCards.jsx'
+import BusinessRowItemCards from './BusinessRowItemCards.jsx'
+import BusinessRecordDetails from './BusinessRecordDetails.jsx'
 
 const EMPTY_LINE_ITEMS = Object.freeze([])
-
-function readDataIndex(record, dataIndex) {
-  if (Array.isArray(dataIndex)) {
-    return dataIndex.reduce((current, key) => current?.[key], record)
-  }
-  if (typeof dataIndex === 'string' && dataIndex.includes('.')) {
-    return dataIndex.split('.').reduce((current, key) => current?.[key], record)
-  }
-  return dataIndex ? record?.[dataIndex] : undefined
-}
-
-function detailValue(column, record) {
-  if (typeof column.detailValue === 'function') {
-    return column.detailValue(record)
-  }
-  if (typeof column.exportValue === 'function') {
-    return column.exportValue(record)
-  }
-  const rawValue = readDataIndex(record, column.dataIndex)
-  if (typeof column.render === 'function') {
-    return column.render(rawValue, record)
-  }
-  return rawValue
-}
 
 function normalizeLineItems(result) {
   const items = Array.isArray(result) ? result : result?.items
@@ -192,14 +160,6 @@ export default function BusinessDetailsModal({
 }) {
   const lineItemsState = useBusinessLineItems(lineItems, open, record)
   const lineItemsRef = useRef(null)
-  const detailColumns = columns.filter(
-    (column) =>
-      column &&
-      column.hidden !== true &&
-      column.hiddenByEffectiveFieldPolicy !== true &&
-      column.detailHidden !== true &&
-      getColumnLabel(column)
-  )
 
   return (
     <BusinessFormModal
@@ -228,37 +188,7 @@ export default function BusinessDetailsModal({
       width={width}
       onCancel={onClose}
     >
-      <Descriptions
-        bordered
-        column={{ xs: 1, sm: 2, lg: 3 }}
-        size="small"
-        items={detailColumns.map((column, index) => {
-          const label = getColumnLabel(column)
-          const key =
-            column.key ||
-            (Array.isArray(column.dataIndex)
-              ? column.dataIndex.join('.')
-              : column.dataIndex) ||
-            `${label}-${index}`
-          const value = visibleDetailValue(detailValue(column, record || {}))
-          const copyText = resolveBusinessDetailCopyText(column, record)
-          return {
-            key,
-            label,
-            children: copyText ? (
-              <span className="erp-business-details-modal__copy-value">
-                <span className="erp-business-details-modal__copy-text">{value}</span>
-                <BusinessCopyButton
-                  label={resolveBusinessTableCopyLabel(column)}
-                  value={copyText}
-                />
-              </span>
-            ) : (
-              value
-            ),
-          }
-        })}
-      />
+      <BusinessRecordDetails columns={columns} record={record} />
       {lineItems ? (
         <BusinessLineItems
           config={lineItems}

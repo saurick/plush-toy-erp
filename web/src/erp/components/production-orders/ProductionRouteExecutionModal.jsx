@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
+  App,
   Button,
   Card,
   Descriptions,
@@ -15,7 +16,12 @@ import {
   Tag,
   Typography,
 } from 'antd'
+import { useOutletContext } from 'react-router-dom'
 import { BranchesOutlined, ReloadOutlined } from '@ant-design/icons'
+import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
+import { workflowTaskReturnNavigation } from '../../utils/workflowTaskNavigation.mjs'
+import { productionTaskWipAction } from '../../utils/productionTaskHandling.mjs'
 import { ProductionPackagingConfirmationStatus, ProductionWIPStatus } from '../../../common/consts/statuses.generated.mjs'
 import { unitQuantityRuleFromOptions } from '../../utils/unitQuantity.mjs'
 import useQuantityUnits from '../../hooks/useQuantityUnits.mjs'
@@ -54,7 +60,7 @@ import {
   productionWipBatchLineageMeta,
   productionWipCompletionEligibility,
   productionWipFabricMaterialRequirements,
-  productionWipOperationLabel,
+  productionWipOperationDisplayLabel as productionWipOperationLabel,
   productionWipOperationsForBatch,
   productionWipActionAllowedForOrder,
   productionWipActionRelevant,
@@ -234,12 +240,24 @@ export default function ProductionRouteExecutionModal({
   canIssueCutting = false,
   initialBatchID = null,
   initialItemID = null,
+  initialAction = '',
+  onReturnToExecution,
   canConfirmPackaging = false,
   canReadOutsourcingContracts = false,
   onCancel,
   onChanged,
   onCreateCompletion,
 }) {
+  const outlet = useOutletContext()
+  const taskNavigation = outlet?.workflowTaskNavigation
+  const handling = taskNavigation?.productionHandling
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const navigate = useBusinessNavigate()
+  const { modal } = App.useApp()
+  const [dirty, setDirty] = useState(false)
+  const dirtyRef = useRef(false)
+  dirtyRef.current = dirty
+  const directEntryRef = useRef('')
   const [actionForm] = Form.useForm()
   const quantityUnitOptions = useQuantityUnits(open)
   const [aggregate, setAggregate] = useState(null)
@@ -248,6 +266,7 @@ export default function ProductionRouteExecutionModal({
   const [prepareOutsourcingOpen, setPrepareOutsourcingOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [entrySaved, setEntrySaved] = useState(false)
   const [loadError, setLoadError] = useState('')
   const [outsourcingSources, setOutsourcingSources] = useState([])
   const [outsourcingLoadState, setOutsourcingLoadState] = useState('idle')
@@ -270,6 +289,8 @@ export default function ProductionRouteExecutionModal({
     actionForm
   )
   const orderID = Number(productionOrder?.id || 0)
+  const hasProcessEntry = Boolean(!handling && initialBatchID && (initialAction === 'completion' || Object.values(PRODUCTION_WIP_ACTION).includes(initialAction)))
+  const focusedEntry = Boolean(handling || hasProcessEntry)
   const authoritativeOrder = aggregate?.productionOrder || productionOrder
   const orderStatus = String(authoritativeOrder?.status || '')
     .trim()
@@ -358,6 +379,9 @@ export default function ProductionRouteExecutionModal({
     setAggregate(null)
     setSelectedBatchID(initialBatchID)
     setActiveAction('')
+    setDirty(false)
+    setEntrySaved(false)
+    directEntryRef.current = ''
     setOutsourcingSources([])
     setOutsourcingLoadState('idle')
     setOutsourcingLoadError('')
@@ -386,13 +410,18 @@ export default function ProductionRouteExecutionModal({
   ])
 
   const displayedBatches = useMemo(() => {
-    const batches = Array.isArray(aggregate?.batches) ? aggregate.batches : []
+    const allBatches = Array.isArray(aggregate?.batches) ? aggregate.batches : []
+    const batches = handling?.sourceType === 'production_wip_batch'
+      ? allBatches.filter((batch) => Number(batch.id) === handling.sourceID)
+      : handling?.sourceType === 'production_packaging_confirmation'
+        ? allBatches.filter((batch) => Number(batch.production_order_item_id) === Number(initialItemID))
+        : hasProcessEntry ? allBatches.filter((batch) => Number(batch.id) === Number(initialBatchID)) : allBatches
     if (!batchScopeEnabled) return batches
     if (!positiveSafeInteger(scopedReworkFactID)) return []
     return batches.filter(
       (batch) => batch.origin_rework_fact_id === scopedReworkFactID
     )
-  }, [aggregate, batchScopeEnabled, scopedReworkFactID])
+  }, [aggregate, batchScopeEnabled, scopedReworkFactID, handling, initialItemID, hasProcessEntry, initialBatchID])
   const scopedBatchMissing = Boolean(
     aggregate?.initialized && batchScopeEnabled && displayedBatches.length === 0
   )
@@ -462,6 +491,7 @@ export default function ProductionRouteExecutionModal({
   )
   const canReceiveFinishedGoods = Boolean(
     !assignmentOnly &&
+      (!handling || (handling.group === 'handoff_production_completion' && !taskNavigation.businessReceipt)) &&
       canCreateCompletion &&
       onCreateCompletion &&
       selectedBatch &&
@@ -589,7 +619,8 @@ export default function ProductionRouteExecutionModal({
     return options
   }, [canReadOutsourcingContracts, currentOperation])
 
-  const selectAction = (action) => {
+  const selectAction = async (action) => {
+    if (dirtyRef.current && !(await confirmLeave())) return
     if (
       !actionButtonEnabled(
         action,
@@ -609,6 +640,7 @@ export default function ProductionRouteExecutionModal({
       return
     }
     actionAttemptRef.current = null
+    setDirty(false)
     actionForm.resetFields()
     const selectedExecutionMode = executionModeOptions.some(
       (option) =>
@@ -635,6 +667,49 @@ export default function ProductionRouteExecutionModal({
     if (selectedExecutionMode === PRODUCTION_WIP_EXECUTION_MODE.OUTSOURCED) {
       loadOutsourcingSources()
     }
+  }
+
+  const directAction = handling
+    ? productionTaskWipAction(handling, selectedBatch)
+    : Object.values(PRODUCTION_WIP_ACTION).includes(initialAction) ? initialAction : ''
+  const directEntry = useRef(null)
+  directEntry.current = () => {
+    if (handling?.group === 'handoff_production_completion' || (!handling && initialAction === 'completion')) {
+      if (canReceiveFinishedGoods) onCreateCompletion(selectedBatch)
+      return
+    }
+    if (directAction && actionButtonEnabled(directAction, selectedBatch, currentOperation, nextOperation, selectedPackagingConfirmation, canRunAction(directAction), authoritativeOrder)) selectAction(directAction)
+  }
+  useEffect(() => {
+    if (!open || loading || !aggregate || !selectedBatch || (!handling && (!initialAction || Number(selectedBatch.id) !== Number(initialBatchID))) || taskNavigation?.businessReceipt) return
+    const key = `${handling?.taskID || `process:${initialAction}`}:${selectedBatch.id}`
+    if (directEntryRef.current === key) return
+    directEntryRef.current = key
+    directEntry.current?.()
+  }, [open, loading, aggregate, selectedBatch, handling, initialAction, initialBatchID, taskNavigation?.businessReceipt])
+
+  const confirmLeave = useCallback(() => {
+    if (saving) return Promise.resolve(false)
+    if (!dirtyRef.current) return Promise.resolve(true)
+    return new Promise((resolve) => modal.confirm({
+      maskClosable: true,
+      title: '离开当前办理？',
+      content: '尚未保存的填写内容将丢失。',
+      okText: '离开',
+cancelText: '继续填写',
+      onOk: () => resolve(true),
+onCancel: () => resolve(false),
+    }))
+  }, [modal, saving])
+  const registerLeave = outlet?.registerPageLeaveGuard
+  useEffect(() => {
+    if (!open) return undefined
+    return registerLeave?.(confirmLeave)
+  }, [open, registerLeave, confirmLeave])
+  const close = async () => { if (await confirmLeave()) onCancel?.() }
+  const returnToTask = () => {
+    const target = workflowTaskReturnNavigation(taskNavigation, window.history.state?.idx)
+    navigate(target.to, target.options)
   }
 
   const submitAction = async () => {
@@ -693,7 +768,10 @@ export default function ProductionRouteExecutionModal({
       actionAttemptRef.current = null
       setAggregate(nextAggregate)
       setActiveAction('')
+      setDirty(false)
       actionForm.resetFields()
+      reportBusinessResult(ACTION_SUCCESS_TEXT[activeAction], selectedBatch)
+      setEntrySaved(true)
       message.success(ACTION_SUCCESS_TEXT[activeAction])
       onChanged?.(nextAggregate)
     } catch (error) {
@@ -714,6 +792,7 @@ export default function ProductionRouteExecutionModal({
       ? PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN
       : PRODUCTION_WIP_ACTION.COMPLETE_OPERATION
   const actionVisible = (action) =>
+    (!handling || (!taskNavigation.businessReceipt && action === directAction)) &&
     canRunAction(action) &&
     productionWipActionRelevant({
       action,
@@ -803,7 +882,7 @@ export default function ProductionRouteExecutionModal({
           : ACTION_TITLE[activeAction]
       }
     >
-      <Form form={actionForm} layout="vertical" disabled={saving}>
+      <Form form={actionForm} layout="vertical" disabled={saving} onValuesChange={() => setDirty(true)}>
         {activeAction === PRODUCTION_WIP_ACTION.SPLIT_BATCH ? (
           <Form.Item
             name="quantity"
@@ -1265,9 +1344,11 @@ export default function ProductionRouteExecutionModal({
           </Button>
           <Button
             disabled={saving}
-            onClick={() => {
+            onClick={async () => {
+              if (!(await confirmLeave())) return
               actionAttemptRef.current = null
               actionForm.resetFields()
+              setDirty(false)
               setActiveAction('')
             }}
           >
@@ -1281,9 +1362,9 @@ export default function ProductionRouteExecutionModal({
   return (
     <BusinessFormModal
       open={open}
-      size={assignmentOnly ? 'localAction' : 'lineItems'}
+      size={focusedEntry || assignmentOnly ? 'localAction' : 'lineItems'}
       title={
-        assignmentOnly
+        focusedEntry ? ACTION_TITLE[activeAction] || '生产事项办理' : assignmentOnly
           ? '安排本厂或外发加工'
           : readOnly
             ? orderStatus === 'CLOSED'
@@ -1294,22 +1375,25 @@ export default function ProductionRouteExecutionModal({
               : '生产工序办理'
       }
       description={
-        assignmentOnly
+        focusedEntry ? '核对当前批次，完成本次办理。' : assignmentOnly
           ? '只为当前返工任务关联的在制批次选择生产方式。'
-          : '按批次办理裁片、车缝和手工；手工成品先入库，查货与包装完成后才可发货。'
+          : '按批次办理布料加工、缝制、手工制作和包装；成品收仓由生产登记、仓库确认，检验与包装完成后才可发货。'
       }
       icon={<BranchesOutlined />}
       footer={
-        <Button disabled={saving} onClick={onCancel}>
-          关闭
-        </Button>
+        <Space>
+          <Button disabled={saving} onClick={close}>关闭</Button>
+          {taskNavigation?.businessReceipt ? <Button type="primary" onClick={returnToTask}>办完返回原任务</Button> : null}
+          {!handling && onReturnToExecution ? <Button type={entrySaved ? 'primary' : 'default'} disabled={saving} onClick={async () => { if (await confirmLeave()) onReturnToExecution() }}>{entrySaved ? '办完返回生产执行' : '返回生产执行'}</Button> : null}
+        </Space>
       }
       maskClosable={!saving}
       keyboard={!saving}
-      onCancel={saving ? undefined : onCancel}
+      onCancel={saving ? undefined : close}
       destroyOnHidden
     >
-      {assignmentOnly ? (
+      {taskNavigation?.businessReceipt ? <Alert type="success" showIcon message={taskNavigation.businessReceipt.message} /> : null}
+      {focusedEntry ? null : assignmentOnly ? (
         <div className="erp-business-inline-note" role="note">
           保存后只更新加工安排，不会自动完成当前任务，也不会登记完工、回仓、质检或库存。
         </div>
@@ -1381,6 +1465,7 @@ export default function ProductionRouteExecutionModal({
         ]}
       />
 
+      {focusedEntry && !loading ? actionPanel : null}
       {loading ? (
         <div style={{ padding: 48, textAlign: 'center' }}>
           <Space direction="vertical" align="center">
@@ -1435,7 +1520,7 @@ export default function ProductionRouteExecutionModal({
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <section>
             <Title level={5}>{assignmentOnly ? '返工批次' : '在制批次'}</Title>
-            {assignmentOnly ? (
+            {assignmentOnly || focusedEntry ? (
               <Select
                 value={selectedBatch?.id}
                 style={{ width: '100%' }}
@@ -1446,7 +1531,9 @@ export default function ProductionRouteExecutionModal({
                     productionWipOrderItem(aggregate, batch)
                   ),
                 }))}
-                onChange={(batchID) => {
+                onChange={async (batchID) => {
+                  if (batchID === selectedBatchID || !(await confirmLeave())) return
+                  setDirty(false)
                   setActiveAction('')
                   actionForm.resetFields()
                   actionAttemptRef.current = null
@@ -1465,7 +1552,9 @@ export default function ProductionRouteExecutionModal({
                 rowSelection={{
                   type: 'radio',
                   selectedRowKeys: selectedBatch ? [selectedBatch.id] : [],
-                  onChange: (_, rows) => {
+                  onChange: async (_, rows) => {
+                    if (rows[0]?.id === selectedBatchID || !(await confirmLeave())) return
+                    setDirty(false)
                     setActiveAction('')
                     actionForm.resetFields()
                     actionAttemptRef.current = null
@@ -1473,7 +1562,9 @@ export default function ProductionRouteExecutionModal({
                   },
                 }}
                 onRow={(batch) => ({
-                  onClick: () => {
+                  onClick: async (event) => {
+                    if (event.target.closest('button,input,label,.ant-radio-wrapper') || batch.id === selectedBatchID || !(await confirmLeave())) return
+                    setDirty(false)
                     setActiveAction('')
                     actionForm.resetFields()
                     actionAttemptRef.current = null
@@ -1684,14 +1775,14 @@ export default function ProductionRouteExecutionModal({
               </Space>
               {isNormalFabricBatch ? (
                 <div className="erp-business-inline-note" role="note">
-                  布料加工按当前批次外发；补料重做须使用本批次新合同重新发料。裁片检验合格后再移交车缝。
+                  布料加工按当前批次外发；补料重做须使用本批次新合同重新发料。裁片检验合格后再移交缝制。
                 </div>
               ) : currentOperation?.operation_code === 'FABRIC_PROCESSING' ? (
                 <div className="erp-business-inline-note" role="note">
                   裁片返工按当前返工批次关联一条产品加工合同明细，不重复生成布料发料要求。
                 </div>
               ) : null}
-              {!assignmentOnly ? (
+              {!assignmentOnly && !focusedEntry ? (
                 <Steps
                   direction="vertical"
                   size="small"
@@ -1748,7 +1839,7 @@ export default function ProductionRouteExecutionModal({
             </section>
           ) : null}
 
-          {actionPanel}
+          {!focusedEntry ? actionPanel : null}
           <ProductionOutsourcingPrepareModal
             open={prepareOutsourcingOpen}
             batch={selectedBatch}

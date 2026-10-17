@@ -1,8 +1,23 @@
-import React, { useCallback, useEffect, useId, useRef } from 'react'
+import React, { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Button, Popover, theme } from 'antd'
-import { FilterOutlined, UpOutlined, ReloadOutlined } from '@ant-design/icons'
+import { CloseOutlined, FilterOutlined, UpOutlined, ReloadOutlined } from '@ant-design/icons'
 import './mobileFilterPopover.css'
+
+export function MobileFilterClearButton({ contextLabel, onClear, standalone = false }) {
+  return (
+    <button
+      type="button"
+      className={`mobile-filter-clear${standalone ? ' mobile-filter-clear--standalone erp-control-button' : ''}`}
+      aria-label={`清空${contextLabel}筛选`}
+      title="清空筛选，保留搜索词"
+      data-active={standalone || undefined}
+      onClick={onClear}
+    >
+      <CloseOutlined aria-hidden="true" />
+    </button>
+  )
+}
 
 export default function MobileFilterPopover({
   contextLabel,
@@ -10,14 +25,23 @@ export default function MobileFilterPopover({
   open,
   onOpenChange,
   count = 0,
+  summary = [],
   onReset,
   testId,
+  triggerRef,
   children,
 }) {
   const id = useId()
   const { token } = theme.useToken()
-  const trigger = useRef(null)
+  const localTrigger = useRef(null)
+  const trigger = triggerRef || localTrigger
   const panel = useRef(null)
+  const firstSummary = summary[0] || ''
+  const summaryLabel = firstSummary.includes('：') ? firstSummary.slice(firstSummary.indexOf('：') + 1) : firstSummary
+  const [clearRevision, setClearRevision] = useState(0)
+  useLayoutEffect(() => {
+    if (clearRevision) trigger.current?.focus({ preventScroll: true })
+  }, [clearRevision, trigger])
   const close = () => onOpenChange(false)
   const onKeyDown = useCallback(
     (event) => {
@@ -86,7 +110,7 @@ export default function MobileFilterPopover({
       <button
         type="button"
         ref={trigger}
-        className="mobile-filter-trigger erp-control-button"
+        className="mobile-filter-trigger"
         aria-label={
           count
             ? `筛选${contextLabel}，已应用 ${count} 项`
@@ -96,6 +120,7 @@ export default function MobileFilterPopover({
         aria-controls={open ? id : undefined}
         aria-expanded={open}
         data-active={count > 0}
+        title={summary.join('；') || undefined}
         data-testid={testId}
         onClick={(event) => {
           // Safari 点击按钮不会可靠地转移焦点，先明确入口以便开场后移入浮层。
@@ -105,8 +130,8 @@ export default function MobileFilterPopover({
         onKeyDown={onKeyDown}
       >
         <FilterOutlined aria-hidden="true" />
-        <span>筛选</span>
-        {count > 0 ? <span className="erp-control-count">{count}</span> : null}
+        <span className="mobile-filter-trigger__label">{count > 0 && summaryLabel ? summaryLabel : '筛选'}</span>
+        {count > 0 && (!summaryLabel || count > 1) ? <span className="erp-control-count">{summaryLabel ? `+${count - 1}` : count}</span> : null}
       </button>
     </Popover>
   )
@@ -136,7 +161,25 @@ export default function MobileFilterPopover({
           />,
           document.body
         )}
-      {popover}
+      <div
+        className="mobile-filter-control erp-control-button"
+        role="group"
+        aria-label={`${contextLabel}筛选操作`}
+        data-active={count > 0 || open}
+        data-summary={summary.length > 0 || undefined}
+      >
+        {popover}
+        {count > 0 && onReset && (
+          <MobileFilterClearButton
+            contextLabel={contextLabel}
+            onClear={() => {
+              onOpenChange(false)
+              onReset()
+              setClearRevision((value) => value + 1)
+            }}
+          />
+        )}
+      </div>
     </>
   )
 }

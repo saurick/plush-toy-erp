@@ -1,7 +1,8 @@
 import { BUSINESS_USABILITY_CATALOG } from './businessUsabilityCatalog.mjs'
 import { ENGINEERING_MATERIAL_HELP } from './engineeringMaterialHelp.mjs'
 import { ROLE_HELP_GUIDES } from './roleHelpContent.mjs'
-import { getBusinessModule } from './businessModules.mjs'
+import { getBusinessHandbookOperations } from './businessHandbookOperations.mjs'
+import { publishedSupplementFor, supplementMarkdown } from './helpContributions.mjs'
 
 export const BUSINESS_HANDBOOK_TITLE = '业务使用手册'
 
@@ -29,7 +30,8 @@ const generalChapters = [
       section('scope', '这本手册怎样用', [
         '本手册说明当前产品已经提供的操作。公司启用范围、账号岗位、数据范围和当前业务状态共同决定实际可见内容与可用动作。',
         '需要马上办事时，在帮助首页按岗位找操作图解；需要系统学习时，按手册目录阅读。业务页的“这页怎么用”和字段问号可直接进入对应图解、章节或词条。',
-        '在线手册只包含当前账号可阅读的帮助。下载的是当前可阅读范围的离线 HTML，可直接用浏览器阅读、查找和打印为 PDF。',
+        '帮助中心可直接选择“业务手册”“管理实施”或“技术运维”，按当前账号权限在线阅读。打开“下载手册”后选择 HTML 或 Markdown；业务册保留当前账号可读范围，HTML 可离线查找并打印为 PDF。',
+        '章节和图解中的“反馈本章问题”可提交不准确的原文与修正建议，提交后在本章查看自己的纠错记录和处理回复。有权限的维护岗位可以在完整章节维护企业补充，先保存草稿再发布；读者、搜索和在线下载只使用已发布内容。',
       ]),
       section('login', '登录与找到入口', [], {
         steps: [
@@ -71,6 +73,11 @@ const generalChapters = [
         '审批前核对来源、数量或金额、交期和必要附件。资料不完整时写清退回原因与补充要求，不替来源岗位补造资料。',
         '完成任务后检查处理记录和交接结果，再回来源单据核对状态；任务显示完成不表示订单已生效或库存、出货、财务已经完成。',
       ]),
+      section('summaries', '工作台中的业务汇总', [
+        '账号已开放汇总查看能力时，工作台显示“待办 / 业务汇总”。进入业务汇总后，可在已开放的销售订单汇总与材料汇总之间切换；没有对应权限时不显示该视图。',
+        '销售订单汇总按每张订单的产品明细展示，可按关键词、日期和订单状态筛选，再选择“导出当前筛选”下载 CSV，或打开原销售订单核对。生产数量包含订单数量与船头版数量，未出货数根据实际出货记录计算，计划交付日期优先采用明细交期。单价等商业资料仍按账号权限显示。',
+        '材料汇总按已提交的用料审批记录查找，筛选订单或审批状态后打开本次提交详情，核对冻结材料、数量和审批进度；未提交的编制草稿不会出现在该清单。汇总查询不生成采购、库存或财务记录。',
+      ]),
       section('tracking', '跟踪进度与异常', [
         '进度看板用于查询订单及生产交付进度。结合筛选范围、当前阶段、阻塞原因和办理人阅读，不能把没有关联的任务当作同一条前后依赖。',
         '查看任务或业务记录中的流程、异常与历史记录，核对同一来源和本次对象。有差异时保留来源单号，交对应责任岗位处理。',
@@ -78,6 +85,7 @@ const generalChapters = [
       section('mobile', '手机办理', [
         '公司和账号已开放手机岗位入口时，可进入对应岗位的手机待办。是否允许办理仍取决于同一套账号权限、业务状态和服务端校验。',
         '手机中先找任务，再查看详情、来源、追踪和可用动作。无入口、加载失败或无权限时按明确提示处理，不能把空列表当作业务已经结束。',
+        '在手机待办的“我的 → 帮助与手册”进入帮助中心。点击“目录”在同一阅读区查看章节，选中章节后回到正文；也可点击“返回正文”继续原处阅读。搜索、翻章和跨册阅读都保留当前手机岗位入口，阅读后使用“返回任务列表”回岗位待办。',
       ]),
     ]
   ),
@@ -121,12 +129,17 @@ const generalChapters = [
           '打印后仍以正式业务记录判断是否已批准、出货或收付；打印和导出本身不改变业务状态。',
         ],
       }),
+      section('print-center', '从模板中心与业务记录打开打印', [
+        '模板打印中心提供采购合同、加工合同、物料分析明细表、色卡和作业指导书。选择左侧模板，阅读右侧填写说明，再点击“打开编辑与打印”；这里打开的是示例，真实单据须从相应采购、委外或 BOM 业务记录进入。',
+        '进入真实打印工作区后先核对来源单号、模板及当前窗口中的草稿内容。打印草稿中的文字或图片调整不反向修改业务档案；要更正实际业务资料时，回来源记录按允许动作办理，再重新核对输出。',
+      ]),
       section('attachments', '附件和图片', [
         '仅在对应页面提供附件入口时上传业务所需资料，遵守页面提示的类型、大小和数量限制。上传后确认列表或预览可重新打开。',
         '不要把暂时上传、预览缓存或本机文件当作业务已保存；保存后重新查看关联记录。上传失败时保留当前输入并按提示重试。',
       ]),
       section('history', '业务历史与系统操作记录', [
         '历史记录中心用于查看已提供的业务历史；任务事件、来源记录和业务审计应结合单号与对象核对。',
+        '先选择当前账号可查的记录类型，再按历史状态及编号、名称或业务摘要搜索。选择一条记录后可“查看详情”或“前往所属模块”，也可导出当前筛选结果；没有可查类型、读取失败和筛选无匹配是不同情况，按页面提示处理。',
         '系统操作记录供获授权人员查询系统动作。操作日志帮助排查问题，不能代替入库、出货、财务等正式业务记录。',
       ]),
     ]
@@ -194,14 +207,7 @@ export function getBusinessHandbookIntroductions(guides = ROLE_HELP_GUIDES) {
 }
 
 export function getBusinessPageHandbookSections(page) {
-  const module = getBusinessModule(page.key)
-  const scope =
-    module?.currentScope?.map((text) =>
-      text
-        .replaceAll('原子生成', '生成')
-        .replaceAll('并发版本校验', '记录版本校验')
-        .replaceAll('财务放行锚点', '财务放行结果')
-    ) || []
+  const operations = getBusinessHandbookOperations(page.key)
   const excel =
     page.key === 'sales-orders'
       ? [
@@ -220,19 +226,16 @@ export function getBusinessPageHandbookSections(page) {
           ]
         : []
   return [
-    section('task', '本页要做什么', [page.task]),
-    ...(scope.length
-      ? [
-          section(
-            'capabilities',
-            '当前办理范围',
-            ['实际可用动作还须满足当前账号权限、来源与业务状态。'],
-            { rows: [['可办理内容', scope.join('；')]] }
-          ),
-        ]
-      : []),
+    section('task', '用途与准备', [
+      page.task,
+      ...operations
+        .filter((entry) => entry.key === 'preparation')
+        .flatMap((entry) => entry.paragraphs),
+    ]),
     section('steps', '办理顺序', [], { steps: page.flowSteps }),
+    ...operations.filter((entry) => ['fields', 'actions'].includes(entry.key)),
     ...excel,
+    ...operations.filter((entry) => entry.key === 'problems'),
     section('completion', '完成标准与交接', [page.completion, page.handoff]),
     ...page.items.map((item) =>
       section(item.key, item.title, [item.explanation], {
@@ -272,6 +275,7 @@ export function getBusinessPageHandbookSections(page) {
 export function renderBusinessHandbookMarkdown({
   guides = ROLE_HELP_GUIDES,
   pages = [...BUSINESS_USABILITY_CATALOG, ENGINEERING_MATERIAL_HELP],
+  supplements = [],
 } = {}) {
   const chapters = [
     ...getBusinessHandbookIntroductions(guides),
@@ -323,6 +327,8 @@ export function renderBusinessHandbookMarkdown({
         )
       }
     }
+    const supplement = supplementMarkdown(publishedSupplementFor(supplements, c.id))
+    if (supplement) lines.push(supplement, '')
   }
   return `${lines.join('\n').trimEnd()}\n`
 }

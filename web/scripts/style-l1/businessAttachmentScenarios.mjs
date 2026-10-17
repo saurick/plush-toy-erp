@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
+import { assertBusinessAttachmentFooter } from './businessAttachmentAssertions.mjs'
 
 const PNG = readFileSync(
   new URL(
@@ -32,6 +33,7 @@ export function createBusinessAttachmentScenarios({
     { key: 'narrow', themeMode: 'light', width: 390 },
     { key: 'small', themeMode: 'light', width: 320 },
     { key: 'readonly', themeMode: 'light', width: 1440, readonly: true },
+    { key: 'readonly-mobile', themeMode: 'light', width: 390, readonly: true },
   ].map(({ key, themeMode, width, readonly = false }) => {
     let files = []
     let calls = []
@@ -194,6 +196,7 @@ export function createBusinessAttachmentScenarios({
         const panel = modal.locator('.business-attachment-panel')
         const geometry = async () => {
           await waitForFiniteAnimations(page)
+          await assertBusinessAttachmentFooter(panel, assert)
           const metrics = await panel.evaluate((node) => {
             const modal = node.closest('.ant-modal')
             const footer = node
@@ -328,7 +331,7 @@ export function createBusinessAttachmentScenarios({
         await page.screenshot({
           path: path.join(outputDir, `attachment-manager-${key}.png`),
         })
-        if (width <= 640) {
+        if (width <= 640 || readonly) {
           files = []
           await modal
             .getByRole('button', { name: '刷新列表', exact: true })
@@ -340,7 +343,51 @@ export function createBusinessAttachmentScenarios({
           })
         }
         if (key !== 'desktop') {
-          await modal.getByRole('button', { name: '完成', exact: true }).click()
+          if (width <= 640 && !readonly) {
+            await modal
+              .locator('input[type="file"]')
+              .first()
+              .setInputFiles({
+                name: '手机上传凭证.txt',
+                mimeType: 'text/plain',
+                buffer: Buffer.from('mobile attachment'),
+              })
+            await modal
+              .getByRole('button', { name: '上传 1 个文件', exact: true })
+              .waitFor()
+            await geometry()
+            await modal
+              .getByRole('button', { name: '关闭', exact: true })
+              .click()
+            const closeDialog = page.getByRole('dialog', {
+              name: '放弃未上传附件？',
+              exact: true,
+            })
+            await closeDialog
+              .getByRole('button', { name: '继续处理', exact: true })
+              .click()
+            await modal
+              .getByRole('button', { name: '上传 1 个文件', exact: true })
+              .click()
+            await modal
+              .getByRole('button', { name: '上传 1 个文件', exact: true })
+              .waitFor({ state: 'hidden' })
+            await modal.getByText('手机上传凭证.txt', { exact: true }).waitFor()
+            assert.deepEqual(
+              calls,
+              ['手机上传凭证.txt'],
+              '关闭提醒后上传只提交一次'
+            )
+            await geometry()
+            await modal.screenshot({
+              path: path.join(
+                outputDir,
+                `attachment-manager-${key}-uploaded.png`
+              ),
+            })
+          }
+          await modal.getByRole('button', { name: '关闭', exact: true }).click()
+          await modal.waitFor({ state: 'hidden' })
           return
         }
 
@@ -507,7 +554,7 @@ export function createBusinessAttachmentScenarios({
         ])
         await modal.getByText('成功文件.txt', { exact: true }).waitFor()
         assert.equal(calls.length, 0, '选择文件不能立即上传')
-        await modal.getByRole('button', { name: '完成', exact: true }).click()
+        await modal.getByRole('button', { name: '关闭', exact: true }).click()
         const closeDialog = page.getByRole('dialog', {
           name: '放弃未上传附件？',
           exact: true,
@@ -532,10 +579,10 @@ export function createBusinessAttachmentScenarios({
             button.click()
           })
         await started
-        await modal.getByRole('button', { name: '完成', exact: true }).waitFor()
+        await modal.getByRole('button', { name: '关闭', exact: true }).waitFor()
         assert(
           await modal
-            .getByRole('button', { name: '完成', exact: true })
+            .getByRole('button', { name: '关闭', exact: true })
             .isDisabled()
         )
         assert(
@@ -638,7 +685,7 @@ export function createBusinessAttachmentScenarios({
         await transfer.dispose()
         await modal.getByText('拖拽文件.txt', { exact: true }).waitFor()
         assert.equal(calls.length, 4)
-        await modal.getByRole('button', { name: '完成', exact: true }).click()
+        await modal.getByRole('button', { name: '关闭', exact: true }).click()
         await page
           .getByRole('dialog', { name: '放弃未上传附件？', exact: true })
           .getByRole('button', { name: '放弃并关闭', exact: true })

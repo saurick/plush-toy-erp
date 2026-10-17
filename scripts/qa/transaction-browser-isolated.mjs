@@ -54,8 +54,8 @@ export function verifyTransactionRequestLogs(
     ...browser.browserRPC,
     ...browser.fixtureRPC,
     ...[
-      ...browser.flows.flatMap(({ transportFault, saveFault, submitFault }) =>
-        [transportFault, saveFault, submitFault].filter(Boolean),
+      ...[...browser.flows, ...(browser.partialReceiving || [])].flatMap(({ transportFault, saveFault, submitFault, transportFaults = [] }) =>
+        [transportFault, saveFault, submitFault, ...transportFaults].filter(Boolean),
       ),
       ...(browser.engineering ?? []).map(({ financeFault }) => financeFault).filter(Boolean),
     ].map((fault) => ({ ...fault, code: fault.backendCode })),
@@ -151,8 +151,11 @@ export async function runIsolatedTransactionBrowser({
   outputDir,
   signal,
   sourceOrdersOnly = false,
+  receivingOnly = false,
 } = {}) {
   assert.equal(typeof sourceOrdersOnly, "boolean");
+  assert.equal(typeof receivingOnly, "boolean");
+  assert.ok(!(sourceOrdersOnly && receivingOnly), "select only one browser scope");
   const out = path.resolve(
     outputDir ||
       path.join(root, "output/qa/transaction-browser", Date.now().toString()),
@@ -171,7 +174,7 @@ export async function runIsolatedTransactionBrowser({
     steps: [],
     outputDir: out,
     simulatedOnly: true,
-    scope: sourceOrdersOnly ? "source-orders" : "transactions-and-source-orders",
+    scope: receivingOnly ? "receiving" : sourceOrdersOnly ? "source-orders" : "transactions-and-source-orders-and-receiving",
   };
   const runID = randomBytes(6).toString("hex"),
     operationId = randomUUID();
@@ -279,7 +282,7 @@ export async function runIsolatedTransactionBrowser({
         requiredNode,
         "use the repository's pinned Node version",
       );
-      if (!sourceOrdersOnly) {
+      if (!sourceOrdersOnly && !receivingOnly) {
         await Promise.all(["pdfinfo", "pdffonts", "pdftotext"].map((tool) =>
           command(tool, ["-v"], { cwd: root, timeout: 10000 }),
         ));
@@ -581,17 +584,18 @@ export async function runIsolatedTransactionBrowser({
       await command(
         process.execPath,
         [
-          path.join(source, sourceOrdersOnly ? "scripts/qa/transaction-source-orders-browser.mjs" : "scripts/qa/transaction-real-backend-browser.mjs"),
+          path.join(source, receivingOnly ? "scripts/qa/transaction-arrival-return-quality-browser.mjs" : sourceOrdersOnly ? "scripts/qa/transaction-source-orders-browser.mjs" : "scripts/qa/transaction-real-backend-browser.mjs"),
           "--environment",
           environmentPath,
         ],
         { timeout: 480000 },
       );
       const browser = JSON.parse(
-        await fs.readFile(path.join(out, sourceOrdersOnly ? "browser/source-orders/report.json" : "browser/report.json"), "utf8"),
+        await fs.readFile(path.join(out, receivingOnly ? "browser/receiving/report.json" : sourceOrdersOnly ? "browser/source-orders/report.json" : "browser/report.json"), "utf8"),
       );
       assert.equal(browser.status, "passed");
       report.flows = browser.flows.map(({ key, passed }) => ({ key, passed }));
+      if (browser.partialReceiving) report.partialReceiving = browser.partialReceiving.map(({ key, passed }) => ({ key, passed }));
       report.requestLogs = verifyTransactionRequestLogs(
         browser,
         await fs.readFile(path.join(directory, "backend.log"), "utf8"),
@@ -599,16 +603,24 @@ export async function runIsolatedTransactionBrowser({
       );
     });
     } catch (error) {
-      if (!sourceOrdersOnly) throw error;
+      if (!sourceOrdersOnly && !receivingOnly) throw error;
       sourceOrderBrowserFailure = error;
       report.steps.push({ key: "browser-real-backend-postgres", passed: false });
     }
-    if (!sourceOrdersOnly) await stage("source-order-procurement-browser", async () => {
+    if (!sourceOrdersOnly && !receivingOnly) await stage("source-order-procurement-browser", async () => {
       await command(process.execPath, [path.join(source, "scripts/qa/transaction-source-orders-browser.mjs"), "--environment", path.join(directory, "browser-environment.json")], { timeout: 300000 });
       const orders = JSON.parse(await fs.readFile(path.join(out, "browser/source-orders/report.json"), "utf8"));
       assert.equal(orders.status, "passed");
       report.sourceOrders = orders.flows.map(({ key, passed }) => ({ key, passed }));
       report.sourceOrderRequestLogs = verifyTransactionRequestLogs(orders, await fs.readFile(path.join(directory, "backend.log"), "utf8"), Object.values(secrets));
+    });
+    if (!sourceOrdersOnly && !receivingOnly) await stage("arrival-return-quality-browser", async () => {
+      await command(process.execPath, [path.join(source, "scripts/qa/transaction-arrival-return-quality-browser.mjs"), "--environment", path.join(directory, "browser-environment.json")], { timeout: 480000 });
+      const receiving = JSON.parse(await fs.readFile(path.join(out, "browser/receiving/report.json"), "utf8"));
+      assert.equal(receiving.status, "passed");
+      report.receiving = receiving.flows.map(({ key, passed }) => ({ key, passed }));
+      report.partialReceiving = receiving.partialReceiving.map(({ key, passed }) => ({ key, passed }));
+      report.receivingRequestLogs = verifyTransactionRequestLogs(receiving, await fs.readFile(path.join(directory, "backend.log"), "utf8"), Object.values(secrets));
     });
     await stage("logging-trace-contracts", async () => {
       const stdout = await command(
@@ -695,7 +707,7 @@ export async function runIsolatedTransactionBrowser({
       );
     });
     if (sourceOrderBrowserFailure) throw sourceOrderBrowserFailure;
-    if (!sourceOrdersOnly) await stage("shared-list-filter-print", async () => {
+    if (!sourceOrdersOnly && !receivingOnly) await stage("shared-list-filter-print", async () => {
       await command(
         process.execPath,
         [
@@ -880,12 +892,12 @@ if (
   const args = process.argv.slice(2);
   if (!args.length || args[0] === "--help") {
     process.stdout.write(
-      "Usage: node scripts/qa/transaction-browser-isolated.mjs --run [--source-orders] [--out output/qa/transaction-browser/<run>]\nCreates and removes an isolated source copy, PostgreSQL, storage, backend and browser. --source-orders selects sales, purchase and outsourcing browser flows with the same real PostgreSQL and logging gates; it does not attest the other browser or print flows. Requires pinned Node, Go, Atlas, psql, installed web dependencies, Chromium, postgres:18.6 and chrislusf/seaweedfs:4.46. The default print scope also requires pdfinfo, pdffonts and pdftotext.\n",
+      "Usage: node scripts/qa/transaction-browser-isolated.mjs --run [--source-orders | --receiving] [--out output/qa/transaction-browser/<run>]\nCreates and removes an isolated source copy, PostgreSQL, storage, backend and browser. --source-orders selects sales, purchase and outsourcing browser flows with the same real PostgreSQL and logging gates; it does not attest the other browser or print flows. --receiving selects arrival counts, purchase returns and outsourcing return quality with the same PostgreSQL and logging gates; it excludes other browser and print flows. Requires pinned Node, Go, Atlas, psql, installed web dependencies, Chromium, postgres:18.6 and chrislusf/seaweedfs:4.46. The default print scope also requires pdfinfo, pdffonts and pdftotext.\n",
     );
   } else {
-    const selected = args.filter(arg => arg !== "--source-orders");
+    const selected = args.filter(arg => !["--source-orders", "--receiving"].includes(arg));
     assert.ok(
-      args.filter(arg => arg === "--source-orders").length <= 1 && selected[0] === "--run" &&
+      args.filter(arg => ["--source-orders", "--receiving"].includes(arg)).length <= 1 && selected[0] === "--run" &&
         (selected.length === 1 || (selected.length === 3 && selected[1] === "--out")),
       "unknown arguments",
     );
@@ -901,6 +913,7 @@ if (
       const report = await runIsolatedTransactionBrowser({
         outputDir: selected[2],
         sourceOrdersOnly: args.includes("--source-orders"),
+        receivingOnly: args.includes("--receiving"),
         signal: controller.signal,
       });
       if (report.status !== "passed") process.exitCode = 1;

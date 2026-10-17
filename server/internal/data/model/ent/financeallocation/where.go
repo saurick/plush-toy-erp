@@ -221,26 +221,6 @@ func FinanceFactIDNotIn(vs ...int) predicate.FinanceAllocation {
 	return predicate.FinanceAllocation(sql.FieldNotIn(FieldFinanceFactID, vs...))
 }
 
-// FinanceFactIDGT applies the GT predicate on the "finance_fact_id" field.
-func FinanceFactIDGT(v int) predicate.FinanceAllocation {
-	return predicate.FinanceAllocation(sql.FieldGT(FieldFinanceFactID, v))
-}
-
-// FinanceFactIDGTE applies the GTE predicate on the "finance_fact_id" field.
-func FinanceFactIDGTE(v int) predicate.FinanceAllocation {
-	return predicate.FinanceAllocation(sql.FieldGTE(FieldFinanceFactID, v))
-}
-
-// FinanceFactIDLT applies the LT predicate on the "finance_fact_id" field.
-func FinanceFactIDLT(v int) predicate.FinanceAllocation {
-	return predicate.FinanceAllocation(sql.FieldLT(FieldFinanceFactID, v))
-}
-
-// FinanceFactIDLTE applies the LTE predicate on the "finance_fact_id" field.
-func FinanceFactIDLTE(v int) predicate.FinanceAllocation {
-	return predicate.FinanceAllocation(sql.FieldLTE(FieldFinanceFactID, v))
-}
-
 // AmountEQ applies the EQ predicate on the "amount" field.
 func AmountEQ(v decimal.Decimal) predicate.FinanceAllocation {
 	return predicate.FinanceAllocation(sql.FieldEQ(FieldAmount, v))
@@ -431,26 +411,6 @@ func ReversalOfAllocationIDNotIn(vs ...int) predicate.FinanceAllocation {
 	return predicate.FinanceAllocation(sql.FieldNotIn(FieldReversalOfAllocationID, vs...))
 }
 
-// ReversalOfAllocationIDGT applies the GT predicate on the "reversal_of_allocation_id" field.
-func ReversalOfAllocationIDGT(v int) predicate.FinanceAllocation {
-	return predicate.FinanceAllocation(sql.FieldGT(FieldReversalOfAllocationID, v))
-}
-
-// ReversalOfAllocationIDGTE applies the GTE predicate on the "reversal_of_allocation_id" field.
-func ReversalOfAllocationIDGTE(v int) predicate.FinanceAllocation {
-	return predicate.FinanceAllocation(sql.FieldGTE(FieldReversalOfAllocationID, v))
-}
-
-// ReversalOfAllocationIDLT applies the LT predicate on the "reversal_of_allocation_id" field.
-func ReversalOfAllocationIDLT(v int) predicate.FinanceAllocation {
-	return predicate.FinanceAllocation(sql.FieldLT(FieldReversalOfAllocationID, v))
-}
-
-// ReversalOfAllocationIDLTE applies the LTE predicate on the "reversal_of_allocation_id" field.
-func ReversalOfAllocationIDLTE(v int) predicate.FinanceAllocation {
-	return predicate.FinanceAllocation(sql.FieldLTE(FieldReversalOfAllocationID, v))
-}
-
 // ReversalOfAllocationIDIsNil applies the IsNil predicate on the "reversal_of_allocation_id" field.
 func ReversalOfAllocationIDIsNil() predicate.FinanceAllocation {
 	return predicate.FinanceAllocation(sql.FieldIsNull(FieldReversalOfAllocationID))
@@ -621,6 +581,75 @@ func HasPayment() predicate.FinanceAllocation {
 func HasPaymentWith(preds ...predicate.FinancePayment) predicate.FinanceAllocation {
 	return predicate.FinanceAllocation(func(s *sql.Selector) {
 		step := newPaymentStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasFinanceFact applies the HasEdge predicate on the "finance_fact" edge.
+func HasFinanceFact() predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, FinanceFactTable, FinanceFactColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasFinanceFactWith applies the HasEdge predicate on the "finance_fact" edge with a given conditions (other predicates).
+func HasFinanceFactWith(preds ...predicate.FinanceFact) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(func(s *sql.Selector) {
+		step := newFinanceFactStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasReversals applies the HasEdge predicate on the "reversals" edge.
+func HasReversals() predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ReversalsTable, ReversalsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasReversalsWith applies the HasEdge predicate on the "reversals" edge with a given conditions (other predicates).
+func HasReversalsWith(preds ...predicate.FinanceAllocation) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(func(s *sql.Selector) {
+		step := newReversalsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasReversalOf applies the HasEdge predicate on the "reversal_of" edge.
+func HasReversalOf() predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ReversalOfTable, ReversalOfColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasReversalOfWith applies the HasEdge predicate on the "reversal_of" edge with a given conditions (other predicates).
+func HasReversalOfWith(preds ...predicate.FinanceAllocation) predicate.FinanceAllocation {
+	return predicate.FinanceAllocation(func(s *sql.Selector) {
+		step := newReversalOfStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

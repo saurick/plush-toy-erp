@@ -3,16 +3,17 @@ import { Alert, Button, Form, Input, Tag, Typography } from 'antd'
 import { EditOutlined, EyeOutlined, PlusOutlined } from '@ant-design/icons'
 import {
   useOutletContext,
+  useLocation,
   useSearchParams,
 } from 'react-router-dom'
 import { InventoryLotStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
+import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
-import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import { message, modal } from '@/common/utils/antdApp'
@@ -41,11 +42,6 @@ import ProductionOverIssueRequestModal from '../components/production-orders/Pro
 import ProductionOrderEditor from '../components/production-orders/ProductionOrderEditor.jsx'
 import ProductionReworkProgressModal from '../components/production-orders/ProductionReworkProgressModal.jsx'
 import ProductionRouteExecutionModal from '../components/production-orders/ProductionRouteExecutionModal.jsx'
-import ProductionOrderOverview from '../components/business-visualizations/ProductionOrderOverview.jsx'
-import {
-  BusinessViewSurface,
-  BusinessViewSwitch,
-} from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
 import { listAllInventoryLots } from '../api/inventoryApi.mjs'
 import { listAllWarehouses } from '../api/masterDataOrderApi.mjs'
 import {
@@ -119,7 +115,6 @@ import {
 } from '../utils/relatedDocumentNavigation.mjs'
 import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
-import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
 import {
   resolveBusinessActionAvailability,
   resolveContextualBusinessActionAvailability,
@@ -267,9 +262,14 @@ function draftParams(values) {
 
 export default function ProductionOrdersPage() {
   const outletContext = useOutletContext()
+  const taskSource = outletContext?.mobileTaskCommand?.kind === 'production_plan' ? outletContext.mobileTaskCommand : null
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const adminProfile = outletContext?.adminProfile || {}
   const allowedMenuPaths = outletContext?.allowedMenuPaths || []
   const navigate = useBusinessNavigate()
+  const location = useLocation()
+  const processReturn = location.state?.productionProcessReturn
+  const canReturnToExecution = processReturn?.pathname === BUSINESS_ROUTE_PATHS.productionProgress && new URLSearchParams(processReturn.search || '').get('display') === 'process'
   const [searchParams, setSearchParams] = useSearchParams()
   const routeProductionOrderID = searchParamPositiveInt(
     searchParams,
@@ -282,14 +282,6 @@ export default function ProductionOrdersPage() {
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)
   const [statusCounts, setStatusCounts] = useState(null)
-  const [contentView, setContentView] = useBusinessPageState(
-    'contentView',
-    'list'
-  )
-  const [overviewViewState, setOverviewViewState] = useBusinessPageState(
-    'overviewViewState',
-    {}
-  )
   const [loading, setLoading] = useState(false)
   const [detailLoading, setDetailLoading] = useState(false)
   const [mutationLoading, setMutationLoading] = useState(false)
@@ -465,7 +457,7 @@ export default function ProductionOrdersPage() {
       busyReason: '当前资料加载完成后可查看返工进度',
     })
   const canOpenProductionScheduling = canOpenRelatedDocumentPath({
-    path: BUSINESS_ROUTE_PATHS.productionScheduling,
+    path: '/erp/task-board',
     adminProfile,
     allowedMenuPaths,
   })
@@ -491,6 +483,7 @@ export default function ProductionOrdersPage() {
     (patch) => {
       const next = { ...query, ...patch }
       setQuery(next)
+      if (taskSource) return
       const params = new URLSearchParams()
       for (const [key, value] of Object.entries(next)) {
         if (key === 'scope' && value === LIFECYCLE_SCOPE.CURRENT) continue
@@ -500,7 +493,7 @@ export default function ProductionOrdersPage() {
       }
       setSearchParams(params, { replace: true })
     },
-    [query, setSearchParams]
+    [query, setSearchParams, taskSource]
   )
 
   const productionOrderListParams = useMemo(
@@ -724,9 +717,10 @@ export default function ProductionOrdersPage() {
   const openProductionScheduling = (order = selected) => {
     if (!order?.id || !canOpenProductionScheduling) return
     navigate(
-      routeWithQuery(BUSINESS_ROUTE_PATHS.productionScheduling, {
-        source_type: 'production-orders',
-        source_id: order.id,
+      routeWithQuery('/erp/task-board', {
+        mode: 'todo',
+        q: order.order_no,
+        source: 'production-orders',
       })
     )
   }
@@ -1138,6 +1132,7 @@ export default function ProductionOrdersPage() {
       materialIssueContextRequestRef.current += 1
       setMaterialIssueOpen(false)
       setMaterialIssueContext(EMPTY_MATERIAL_ISSUE_CONTEXT)
+      reportBusinessResult('领料草稿已生成，待核对并过账')
       message.success(
         confirmedByReread
           ? '已重新读取并确认领料草稿，请到生产记录核对并过账'
@@ -1391,7 +1386,9 @@ export default function ProductionOrdersPage() {
       } catch (error) {
         message.warning(getActionErrorMessage(error, '刷新成品收仓结果'))
       }
+      reportBusinessResult('成品收仓草稿已生成，待核对并过账', result)
       completionContextRequestRef.current += 1
+      setProductionRouteOpen(false)
       setCompletionOpen(false)
       setCompletionContext(EMPTY_COMPLETION_CONTEXT)
       message.success(
@@ -1444,6 +1441,7 @@ export default function ProductionOrdersPage() {
       message.success(successText)
       setAggregate(result)
       setSelected(result.order)
+      reportBusinessResult(successText, result.order)
       return true
     } catch (error) {
       if (!isProductionOrderResultUnknown(error)) {
@@ -1465,6 +1463,10 @@ export default function ProductionOrdersPage() {
 
   const submitDraft = async (values) => {
     const draft = draftParams(values)
+    if (taskSource && draft.items.some((item) => !taskSource.items.some((source) => source.id === item.sales_order_item_id))) {
+      message.warning('请使用当前任务关联的销售订单行，保留填写内容后重新核对')
+      return
+    }
     const isCreate = formMode === 'create'
     const payload = isCreate
       ? draft
@@ -1586,18 +1588,7 @@ export default function ProductionOrdersPage() {
     },
     [canRead, productionOrderListParams, routeProductionOrderID]
   )
-  const overviewData = useBusinessVisualizationData({
-    enabled: contentView === 'overview',
-    load: loadExportOrders,
-    actionLabel: '加载生产总览',
-  })
-  const reloadOverviewData = overviewData.reload
-  useEffect(() => {
-    return outletContext?.registerPageRefresh?.(() => {
-      if (contentView === 'overview') reloadOverviewData()
-      return loadOrders()
-    })
-  }, [contentView, loadOrders, outletContext, reloadOverviewData])
+  useEffect(() => outletContext?.registerPageRefresh?.(loadOrders), [loadOrders, outletContext])
   const { exporting, exportRows } = useBusinessListExport({
     requestKey: 'production-orders-export',
     loadRows: loadExportOrders,
@@ -1605,16 +1596,6 @@ export default function ProductionOrdersPage() {
     columns: exportColumns,
     recordLabel: '生产订单',
   })
-  const productionViewSwitch = (
-    <BusinessViewSwitch
-      value={contentView}
-      options={[
-        { value: 'list', label: '订单列表' },
-        { value: 'overview', label: '生产总览' },
-      ]}
-      onChange={setContentView}
-    />
-  )
 
   if (!canRead) {
     return (
@@ -1632,12 +1613,11 @@ export default function ProductionOrdersPage() {
   return (
     <BusinessPageLayout>
       <PageHeaderCard
-        viewSwitch={productionViewSwitch}
         helpKey="production-orders"
         title="生产订单"
       />
       <BusinessOperationPanel
-        showSelection={contentView === 'list'}
+        showSelection
         filters={
           <>
             <SearchInput
@@ -1691,7 +1671,7 @@ export default function ProductionOrdersPage() {
           </>
         }
         actions={
-          contentView === 'list' ? (
+          (
             <BusinessListToolbarActions
               onExport={exportRows}
               exportDisabled={loading || exporting || total === 0}
@@ -1706,10 +1686,10 @@ export default function ProductionOrdersPage() {
               }
               onOpenColumnOrder={openColumnOrder}
             />
-          ) : null
+          )
         }
         primaryAction={
-          contentView === 'list' && canCreate ? (
+          canCreate ? (
             <Button
               type="primary"
               icon={<PlusOutlined />}
@@ -2062,39 +2042,20 @@ export default function ProductionOrdersPage() {
               </Button>
             </BusinessActionTooltip>
           ) : null}
+          {canReadProductionWip && canReadProductionFacts ? (
+            <Button size="small" disabled={!selected} onClick={() => viewProductionProcess()}>
+              查看生产执行
+            </Button>
+          ) : null}
           <BusinessTaskActions sourceType="production_order" record={selected} adminProfile={adminProfile} disabled={mutationLoading || detailLoading} />
         </SelectionActionBar>
       </BusinessOperationPanel>
-      <BusinessViewSurface
-        activeView={contentView}
-        loading={contentView === 'list' ? loading : overviewData.loading}
-      >
-        {contentView === 'overview' ? (
-          <ProductionOrderOverview
-            viewState={overviewViewState}
-            onViewStateChange={setOverviewViewState}
-            orders={overviewData.rows}
-            loading={overviewData.loading}
-            error={overviewData.error}
-            onRetry={overviewData.reload}
-            onOpen={(record) =>
-              loadDetail(
-                record,
-                canUpdate &&
-                  record.orderStatus === PRODUCTION_ORDER_STATUS.DRAFT
-                  ? 'edit'
-                  : 'view'
-              )
-            }
-            onShowProcess={viewProductionProcess}
-          />
-        ) : (
-          <BusinessDataTable
-            loading={loading}
-            rowKey="id"
-            columns={tableColumns}
-            dataSource={orders}
-            rowSelection={{
+      <BusinessDataTable
+        loading={loading}
+        rowKey="id"
+        columns={tableColumns}
+        dataSource={orders}
+        rowSelection={{
               type: 'radio',
               selectedRowKeys: selected ? [selected.id] : [],
               onChange: (_, rows) => {
@@ -2105,10 +2066,10 @@ export default function ProductionOrdersPage() {
                 }
               },
             }}
-            onRow={(record) => ({
+        onRow={(record) => ({
               onClick: () => selectRecord(record),
             })}
-            onOpenRecord={(record) =>
+        onOpenRecord={(record) =>
               loadDetail(
                 record,
                 canUpdate && record.status === PRODUCTION_ORDER_STATUS.DRAFT
@@ -2116,7 +2077,7 @@ export default function ProductionOrdersPage() {
                   : 'view'
               )
             }
-            pagination={{
+        pagination={{
               current: query.page,
               pageSize: query.page_size,
               total,
@@ -2124,14 +2085,12 @@ export default function ProductionOrdersPage() {
               onChange: (page, pageSize) =>
                 writeQuery({ page, page_size: pageSize }),
             }}
-            emptyDescription={
+        emptyDescription={
               canCreate
                 ? '暂无生产订单，可新建生产计划单'
                 : '暂无可查看的生产订单'
             }
-          />
-        )}
-      </BusinessViewSurface>
+      />
       {columnOrderModal}
 
       <ProductionOrderEditor
@@ -2201,6 +2160,8 @@ export default function ProductionOrdersPage() {
         onCreateCompletion={openProductionCompletion}
         initialBatchID={linkedWipBatchID}
         initialItemID={linkedProductionItemID}
+        initialAction={searchParams.get('wip_action') || ''}
+        onReturnToExecution={canReturnToExecution ? () => navigate({ pathname: BUSINESS_ROUTE_PATHS.productionProgress, search: processReturn.search, hash: processReturn.hash || '' }, { replace: true }) : undefined}
         canConfirmPackaging={canConfirmPackagingMaterial}
         canReadOutsourcingContracts={canReadOutsourcingContracts}
         onCancel={() => setProductionRouteOpen(false)}

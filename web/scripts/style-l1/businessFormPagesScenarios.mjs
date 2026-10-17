@@ -1126,7 +1126,8 @@ export function createBusinessFormPagesScenarios(deps) {
           .click()
         await leave
         await page
-          .getByRole('heading', { name: '材料档案', exact: true })
+          .locator('.erp-business-module-tabs')
+          .getByRole('tab', { name: '材料档案', exact: true, selected: true })
           .waitFor()
         await openModule('物料清单（BOM）')
         await page.getByRole('button', { name: '新建 BOM' }).click()
@@ -1137,7 +1138,8 @@ export function createBusinessFormPagesScenarios(deps) {
           .click()
         await editor.waitFor({ state: 'hidden' })
         await page
-          .getByRole('heading', { name: '物料清单（BOM）', exact: true })
+          .locator('.erp-business-module-tabs')
+          .getByRole('tab', { name: '物料清单（BOM）', exact: true, selected: true })
           .waitFor()
       },
     },

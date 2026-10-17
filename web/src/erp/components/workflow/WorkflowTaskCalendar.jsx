@@ -301,6 +301,7 @@ export default function WorkflowTaskCalendar({
                   <div className="workflow-task-calendar__identity">
                     <WorkflowTaskIdentity
                       task={task}
+                      keyword={query.keyword}
                       compact
                       copyable={false}
                       showTaskName

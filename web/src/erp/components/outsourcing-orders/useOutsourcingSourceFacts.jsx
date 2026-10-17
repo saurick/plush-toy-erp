@@ -1,6 +1,7 @@
 import { ExportOutlined, ImportOutlined } from '@ant-design/icons'
 import React, { useCallback, useRef, useState } from 'react'
 import { Button, Input, Space } from 'antd'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import { OperationalFactStatus } from '../../../common/consts/statuses.generated.mjs'
 import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import { useOutsourcingReturnPayable } from './useOutsourcingReturnPayable.mjs'
@@ -101,6 +102,7 @@ export function useOutsourcingSourceFacts({
   canCreateReturnReceipt,
   unitOptions,
 }) {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const [sourceFactOpen, setSourceFactOpen] = useState(false)
 
   const [sourceFactLoading, setSourceFactLoading] = useState(false)
@@ -343,13 +345,13 @@ export function useOutsourcingSourceFacts({
           setQualityInspectionByFactID({})
         }
 
-        message.success(
-          isPost
+        const successText = isPost
             ? '委外记录已过账'
             : currentStatus === OperationalFactStatus.DRAFT
               ? '委外草稿已作废，库存未发生变动'
               : '委外记录已取消，库存已恢复至过账前状态'
-        )
+        reportBusinessResult(successText, confirmed)
+        message.success(successText)
       } finally {
         returnRecordActionInFlightRef.current = false
         setReturnRecordActionLoading('')
@@ -363,6 +365,7 @@ export function useOutsourcingSourceFacts({
       loadRelatedOutsourcingFacts,
       loadRelatedOutsourcingQualityInspections,
       returnRecordsOrder,
+      reportBusinessResult,
     ]
   )
 
@@ -509,6 +512,7 @@ export function useOutsourcingSourceFacts({
           [fact.id]: [created, ...(current?.[fact.id] || [])],
         }))
         setQualitySourceFact(null)
+        reportBusinessResult(confirmedByReread ? '已重新读取并确认质检草稿' : '质检草稿已生成，尚待提交和判定', created)
         setReturnRecordsOpen(Boolean(returnRecordsOrder?.id))
         message.success(
           confirmedByReread
@@ -544,6 +548,7 @@ export function useOutsourcingSourceFacts({
       loadRelatedOutsourcingQualityInspections,
       qualitySourceFact,
       returnRecordsOrder,
+      reportBusinessResult,
     ]
   )
 
@@ -936,6 +941,7 @@ export function useOutsourcingSourceFacts({
         setRelatedReturnFacts(refreshed)
         setSourceFactOpen(false)
         setSourceFactContext(EMPTY_SOURCE_FACT_CONTEXT)
+        reportBusinessResult('委外草稿已保存，尚未过账', refreshed.find((fact) => fact.id === record.id) || record)
         message.success('委外草稿已保存，请核对后再过账')
       } catch (error) {
         message.error(getActionErrorMessage(error, '保存委外草稿'))
@@ -944,7 +950,7 @@ export function useOutsourcingSourceFacts({
         setSourceFactLoading(false)
       }
     },
-    [activeCustomerKey, loadRelatedOutsourcingFacts, sourceFactContext]
+    [activeCustomerKey, loadRelatedOutsourcingFacts, sourceFactContext, reportBusinessResult]
   )
 
   const createOutsourcingSourceFact = useCallback(
@@ -1044,12 +1050,13 @@ export function useOutsourcingSourceFacts({
             confirmedByReread ? 'recovered' : 'created'
           ]
         )
+        reportBusinessResult(SOURCE_FACT_SUCCESS_TEXT[actionType][confirmedByReread ? 'recovered' : 'created'], result)
       } finally {
         sourceFactInFlightRef.current = false
         setSourceFactLoading(false)
       }
     },
-    [activeCustomerKey, loadRelatedOutsourcingFacts, sourceFactContext]
+    [activeCustomerKey, loadRelatedOutsourcingFacts, sourceFactContext, reportBusinessResult]
   )
 
   const submitOutsourcingSourceFact = useCallback(

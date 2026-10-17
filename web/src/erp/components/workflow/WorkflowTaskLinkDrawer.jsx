@@ -8,6 +8,7 @@ import { buildWorkflowBusinessChain } from '../../utils/workflowBusinessChain.mj
 import { buildWorkflowActionAccessState } from '../../utils/workflowTaskActionAccess.mjs'
 import { singleTaskLinkAction, taskLinkID, workflowTaskLinkPath } from '../../utils/workflowTaskLink.mjs'
 import { TaskCopyButton } from './WorkflowTaskCopy.jsx'
+import WorkflowProgressMarker from './WorkflowProgressMarker.jsx'
 import './workflowTracking.css'
 import './workflowBusinessChain.css'
 
@@ -105,7 +106,8 @@ export default function WorkflowTaskLinkDrawer({ profile, taskOpen = false, auto
   const pending = tasks.filter((item) => [WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(item.task_status_key))
   const ended = tasks.filter((item) => ![WorkflowTaskStatus.READY, WorkflowTaskStatus.BLOCKED].includes(item.task_status_key))
   const renderTask = (item) => (
-    <li key={item.id}>
+    <li key={item.id} className="workflow-business-chain__task" data-status={item.task_status_key}>
+      <WorkflowProgressMarker status={item.task_status_key} />
       <div className="workflow-business-chain__task-content">
         <div className="workflow-business-chain__task-heading">
           <Button type="link" disabled={opening || appending} onClick={() => openTask(item)}>{item.name}</Button>

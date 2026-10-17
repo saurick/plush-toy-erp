@@ -6,6 +6,7 @@
 
 | 类型 | 入口 | 用途 | 边界 |
 | --- | --- | --- | --- |
+| 源码单元与合同测试 | `pnpm test` / `runUnitTests.mjs` | 自动发现源码测试；覆盖率采集复用同一入口 | 发现范围、产物隔离和筛选见[源码测试](#源码测试--unit-tests) |
 | 样式边界检查 | `pnpm css` / `stylelint/` | 在现有 Stylelint 中检查模块作用域和共享控件样式归属；同目录行为测试由 `pnpm test` 自动发现 | 规则与职责见[共享控件样式边界](../../docs/engineering/前端实现与交互约定.md#共享控件样式边界--shared-control-style-boundary)，浏览器仍需验证实际层叠结果 |
 | 页面级浏览器回归（Style L1） | `pnpm style:l1` / `styleL1.mjs` / `style-l1/` | 启动前端并用 Playwright 覆盖登录、业务页、暗色、打印、移动端和局部页面交互 | 默认使用 mock / 前端态验证；失败要先分清页面回归、mock wiring 和浏览器基础设施问题 |
 | 真实登录 smoke | `realLoginSmokeShared.mjs --print-input-template` / `--preflight-report <path>`、`mobileAuthLoginRouteSmoke.mjs --print-input-template` / `--preflight-report <path>`、`purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template` / `--preflight-report <path>`、`pnpm smoke:purchase-contract-real-login`、`pnpm smoke:processing-contract-real-login`、`pnpm smoke:mobile-auth-login-route` | 先打印共享登录、移动端认证回跳或采购入库真实写入前置，再验证合同编辑联动、在线预览、下载 PDF、浏览器打印入口、岗位任务端入口和认证回跳 | 输入模板不读配置、不调后端、不启动浏览器、不登录、不写库；shared preflight 只探测 backend health 和凭据来源候选；mobile-auth preflight 只写本地角色路由 / 视口计划；采购入库 preflight 只探测 health、显式管理员凭据 env、持久测试数据确认和页面目标安全性；合同 smoke 依赖本地后端和开发账号，验证预览 / 下载 / 打印入口但不替代 PDF 版式坐标审阅、RBAC / usecase 单测或目标环境 evidence；mobile-auth route smoke 使用 mock RPC 验证生产单端口岗位路由 |
@@ -14,6 +15,21 @@
 | 本地服务 | `pnpm start`、`pnpm start:frontend-only`、`pnpm start:yoyoosun`、`pnpm audit:yoyoosun-entry`、`pnpm serve:prod`、`pnpm preview:yoyoosun` | 默认前端入口、永绅 yoyoosun 热更新开发、端口审计和静态包预览 | `pnpm start` 与 `start:yoyoosun` 启动 Vite 前共用 schema / migration / backend health / ready 只读预检；已分类的本机可恢复阻断只开放迁移页，其它路径 fail closed。`start:frontend-only` 是不验证登录 / RPC 的显式降级模式；`start:yoyoosun` 另检查永绅静态客户配置与公开资源；`preview:yoyoosun` 构建并预览生产包形态；`audit:yoyoosun-entry` 只读检查端口归属、customer-config、asset 和 health。所有开发入口都不 apply migration，不 publish / activate 后端 customer config |
 | QA 报告生成 | `buildFieldLinkageCoverageReport.mjs` | 由顶层 `scripts/qa/erp-field-linkage.mjs` runner 调用，生成字段联动结构化证据到 ignored `output/qa/coverage/field-linkage.latest.json` | 要求 runner 传入当前 repository identity；只证明字段联动专项，不写 `public/qa`、不进入生产构建，也不等于整仓代码、业务场景、目标环境或 UAT 覆盖 |
 | 公共契约源码检查 | `test/publicContractSource.mjs` | 将真实生成模块的静态成员解析为源码合同测试的公开值，覆盖状态、权限、RPC、附件、数值与密码 / 打印限制 | 不执行页面代码，不改写源码；测试继续保留独立的预期值，规范见[跨层公共契约](../../docs/engineering/跨层公共契约与生成规范.md) |
+
+## 源码测试 / Unit Tests
+
+`runUnitTests.mjs` 使用 Node 原生 glob 自动发现根目录及 `src/`、`scripts/`、`dev-server/` 中的 `*.test.mjs`、`*.test.js`、`*.test.cjs`。新增源码测试无需登记文件清单，也不依赖 Git tracked 状态。
+
+任意层级的 `output/`、`node_modules/` 都不参与发现；根目录的构建产物及辅助模块也不作为测试入口。发现过程只读，不删除或修补验证副本。空集合返回失败，真实测试的输出和失败状态由 Node 原样传回。
+
+`pnpm test` 与 Web 原生覆盖率采集共用该入口，保持 4 路文件并发。Node 筛选选项会在测试路径前传入；指定单个文件时直接使用原生命令：
+
+```bash
+cd web
+pnpm test
+pnpm test --test-name-pattern=关键词
+node --test scripts/runUnitTests.test.mjs
+```
 
 ## 常用命令
 
@@ -92,7 +108,7 @@ pnpm preview:yoyoosun
 
 帮助目录的岗位范围由 `help-manual-role-filter-desktop-light` 覆盖，包括切岗搜索、深链恢复和手机章节选择；全部模块的搜索、权限与内部深链边界由 `moduleCatalogScenarios.mjs` 覆盖。移动导航在短屏下实际滚动菜单后核对底部入口位置，再恢复标准手机视口检查目录尺寸与跳转；导航与岗位预期按[菜单与正式入口合同](../../docs/product/菜单与正式入口合同.md)和当前配置维护。
 
-`test/reactRuntime.mjs` 为 Node 组件与 hook 行为测试提供 JSX 加载和可恢复的 DOM 环境，不进入产品运行时。
+`test/reactRuntime.mjs` 为 Node 组件与 hook 行为测试提供 JSX 加载和可恢复的 DOM 环境。`createReactTestHarness(t)` 统一管理 React root、当前事件循环的刷新及测试后的卸载和环境恢复；完整页面布局、焦点几何和浏览器交互由对应 Style L1 场景验证。这些 helper 不进入产品运行时。
 
 `test/statusOwnershipFixture.mjs` 为状态归属测试提供彼此不同的领域状态值。测试通过 Node 原生模块解析 hook 替换这一依赖，直接导入生产模块文件，并在测试结束后解除 hook；不改写或执行重组后的生产源码。
 

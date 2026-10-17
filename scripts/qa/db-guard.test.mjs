@@ -70,6 +70,48 @@ async function withRepository(callback) {
   }
 }
 
+test("db guard proves an edge on an existing column with a foreign key", async () => {
+  for (const edge of [
+    'edge.From("owner", Owner.Type).Ref("items").Field("owner_id").Required().Unique()',
+    'edge.From("owner", Owner.Type).\n      Ref("items").\n      Field("owner_id").\n      Required().Unique()',
+  ]) {
+    await withRepository(async (root) => {
+      const schemaPath = "server/internal/data/model/schema/item.go";
+      const fields = 'package schema\nfunc (Item) Fields() []ent.Field { return []ent.Field{field.Int("owner_id")} }\n';
+      await write(root, schemaPath, fields);
+      commitAll(root, "existing owner column");
+      await write(root, schemaPath, `${fields}func (Item) Edges() []ent.Edge { return []ent.Edge{${edge}} }\n`);
+      const migrationPath = "server/internal/data/model/migrate/20260102000000_migrate.sql";
+      await write(root, migrationPath, 'ALTER TABLE items ADD CONSTRAINT items_owners FOREIGN KEY (owner_id) REFERENCES owners(id);\n');
+      await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+      assert.equal(evaluateDbGuard({ root, range: "HEAD...HEAD" }).ok, true);
+
+      await write(root, migrationPath, 'ALTER TABLE items ADD CONSTRAINT items_other FOREIGN KEY (unrelated) REFERENCES owners(id);\n');
+      assert.equal(evaluateDbGuard({ root, range: "HEAD...HEAD" }).ok, false);
+
+      await write(root, schemaPath, fields.replace('field.Int("owner_id")', 'field.Int("owner_id"), field.Int("new_column")') + `func (Item) Edges() []ent.Edge { return []ent.Edge{${edge}} }\n`);
+      await write(root, migrationPath, 'ALTER TABLE items ADD CONSTRAINT items_owners FOREIGN KEY (owner_id) REFERENCES owners(id);\n');
+      const missingColumn = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+      assert.equal(missingColumn.ok, false);
+      assert(missingColumn.proofs[0].missingTokens.includes("new_column"));
+    });
+  }
+});
+
+test("db guard ignores unchanged edge chains when adjacent relations are added", async () => {
+  await withRepository(async (root) => {
+    const schemaPath = "server/internal/data/model/schema/item.go";
+    const fields = 'package schema\nfunc (Item) Fields() []ent.Field { return []ent.Field{field.Int("payment_id"), field.Int("owner_id")} }\n';
+    const payment = 'edge.From("payment", Payment.Type).Ref("items").Field("payment_id").Required().Unique()';
+    await write(root, schemaPath, `${fields}func (Item) Edges() []ent.Edge { return []ent.Edge{${payment}} }\n`);
+    commitAll(root, "existing payment relation");
+    await write(root, schemaPath, `${fields}func (Item) Edges() []ent.Edge {\n return []ent.Edge{\n  ${payment},\n  edge.From("owner", Owner.Type).Ref("items").Field("owner_id").Required().Unique(),\n }\n}\n`);
+    await write(root, "server/internal/data/model/migrate/20260102000000_migrate.sql", 'ALTER TABLE items ADD CONSTRAINT items_owners FOREIGN KEY (owner_id) REFERENCES owners(id);\n');
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+    assert.equal(evaluateDbGuard({ root, range: "HEAD...HEAD" }).ok, true);
+  });
+});
+
 test("db guard fails closed for an invalid base range", async () => {
   await withRepository(async (root) => {
     assert.throws(

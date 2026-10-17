@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/adminuser"
+	"server/internal/data/model/ent/financeallocation"
+	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/predicate"
 	"time"
@@ -565,6 +567,36 @@ func (_u *FinanceFactUpdate) SetUpdatedAt(v time.Time) *FinanceFactUpdate {
 	return _u
 }
 
+// AddAllocationIDs adds the "allocations" edge to the FinanceAllocation entity by IDs.
+func (_u *FinanceFactUpdate) AddAllocationIDs(ids ...int) *FinanceFactUpdate {
+	_u.mutation.AddAllocationIDs(ids...)
+	return _u
+}
+
+// AddAllocations adds the "allocations" edges to the FinanceAllocation entity.
+func (_u *FinanceFactUpdate) AddAllocations(v ...*FinanceAllocation) *FinanceFactUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddAllocationIDs(ids...)
+}
+
+// AddCreditNoteIDs adds the "credit_notes" edge to the FinanceCreditNote entity by IDs.
+func (_u *FinanceFactUpdate) AddCreditNoteIDs(ids ...int) *FinanceFactUpdate {
+	_u.mutation.AddCreditNoteIDs(ids...)
+	return _u
+}
+
+// AddCreditNotes adds the "credit_notes" edges to the FinanceCreditNote entity.
+func (_u *FinanceFactUpdate) AddCreditNotes(v ...*FinanceCreditNote) *FinanceFactUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddCreditNoteIDs(ids...)
+}
+
 // SetPosterID sets the "poster" edge to the AdminUser entity by ID.
 func (_u *FinanceFactUpdate) SetPosterID(id int) *FinanceFactUpdate {
 	_u.mutation.SetPosterID(id)
@@ -625,6 +657,48 @@ func (_u *FinanceFactUpdate) SetCanceller(v *AdminUser) *FinanceFactUpdate {
 // Mutation returns the FinanceFactMutation object of the builder.
 func (_u *FinanceFactUpdate) Mutation() *FinanceFactMutation {
 	return _u.mutation
+}
+
+// ClearAllocations clears all "allocations" edges to the FinanceAllocation entity.
+func (_u *FinanceFactUpdate) ClearAllocations() *FinanceFactUpdate {
+	_u.mutation.ClearAllocations()
+	return _u
+}
+
+// RemoveAllocationIDs removes the "allocations" edge to FinanceAllocation entities by IDs.
+func (_u *FinanceFactUpdate) RemoveAllocationIDs(ids ...int) *FinanceFactUpdate {
+	_u.mutation.RemoveAllocationIDs(ids...)
+	return _u
+}
+
+// RemoveAllocations removes "allocations" edges to FinanceAllocation entities.
+func (_u *FinanceFactUpdate) RemoveAllocations(v ...*FinanceAllocation) *FinanceFactUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveAllocationIDs(ids...)
+}
+
+// ClearCreditNotes clears all "credit_notes" edges to the FinanceCreditNote entity.
+func (_u *FinanceFactUpdate) ClearCreditNotes() *FinanceFactUpdate {
+	_u.mutation.ClearCreditNotes()
+	return _u
+}
+
+// RemoveCreditNoteIDs removes the "credit_notes" edge to FinanceCreditNote entities by IDs.
+func (_u *FinanceFactUpdate) RemoveCreditNoteIDs(ids ...int) *FinanceFactUpdate {
+	_u.mutation.RemoveCreditNoteIDs(ids...)
+	return _u
+}
+
+// RemoveCreditNotes removes "credit_notes" edges to FinanceCreditNote entities.
+func (_u *FinanceFactUpdate) RemoveCreditNotes(v ...*FinanceCreditNote) *FinanceFactUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveCreditNoteIDs(ids...)
 }
 
 // ClearPoster clears the "poster" edge to the AdminUser entity.
@@ -938,6 +1012,96 @@ func (_u *FinanceFactUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(financefact.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.AllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.AllocationsTable,
+			Columns: []string{financefact.AllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedAllocationsIDs(); len(nodes) > 0 && !_u.mutation.AllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.AllocationsTable,
+			Columns: []string{financefact.AllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.AllocationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.AllocationsTable,
+			Columns: []string{financefact.AllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.CreditNotesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.CreditNotesTable,
+			Columns: []string{financefact.CreditNotesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedCreditNotesIDs(); len(nodes) > 0 && !_u.mutation.CreditNotesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.CreditNotesTable,
+			Columns: []string{financefact.CreditNotesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CreditNotesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.CreditNotesTable,
+			Columns: []string{financefact.CreditNotesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.PosterCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -1581,6 +1745,36 @@ func (_u *FinanceFactUpdateOne) SetUpdatedAt(v time.Time) *FinanceFactUpdateOne 
 	return _u
 }
 
+// AddAllocationIDs adds the "allocations" edge to the FinanceAllocation entity by IDs.
+func (_u *FinanceFactUpdateOne) AddAllocationIDs(ids ...int) *FinanceFactUpdateOne {
+	_u.mutation.AddAllocationIDs(ids...)
+	return _u
+}
+
+// AddAllocations adds the "allocations" edges to the FinanceAllocation entity.
+func (_u *FinanceFactUpdateOne) AddAllocations(v ...*FinanceAllocation) *FinanceFactUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddAllocationIDs(ids...)
+}
+
+// AddCreditNoteIDs adds the "credit_notes" edge to the FinanceCreditNote entity by IDs.
+func (_u *FinanceFactUpdateOne) AddCreditNoteIDs(ids ...int) *FinanceFactUpdateOne {
+	_u.mutation.AddCreditNoteIDs(ids...)
+	return _u
+}
+
+// AddCreditNotes adds the "credit_notes" edges to the FinanceCreditNote entity.
+func (_u *FinanceFactUpdateOne) AddCreditNotes(v ...*FinanceCreditNote) *FinanceFactUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddCreditNoteIDs(ids...)
+}
+
 // SetPosterID sets the "poster" edge to the AdminUser entity by ID.
 func (_u *FinanceFactUpdateOne) SetPosterID(id int) *FinanceFactUpdateOne {
 	_u.mutation.SetPosterID(id)
@@ -1641,6 +1835,48 @@ func (_u *FinanceFactUpdateOne) SetCanceller(v *AdminUser) *FinanceFactUpdateOne
 // Mutation returns the FinanceFactMutation object of the builder.
 func (_u *FinanceFactUpdateOne) Mutation() *FinanceFactMutation {
 	return _u.mutation
+}
+
+// ClearAllocations clears all "allocations" edges to the FinanceAllocation entity.
+func (_u *FinanceFactUpdateOne) ClearAllocations() *FinanceFactUpdateOne {
+	_u.mutation.ClearAllocations()
+	return _u
+}
+
+// RemoveAllocationIDs removes the "allocations" edge to FinanceAllocation entities by IDs.
+func (_u *FinanceFactUpdateOne) RemoveAllocationIDs(ids ...int) *FinanceFactUpdateOne {
+	_u.mutation.RemoveAllocationIDs(ids...)
+	return _u
+}
+
+// RemoveAllocations removes "allocations" edges to FinanceAllocation entities.
+func (_u *FinanceFactUpdateOne) RemoveAllocations(v ...*FinanceAllocation) *FinanceFactUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveAllocationIDs(ids...)
+}
+
+// ClearCreditNotes clears all "credit_notes" edges to the FinanceCreditNote entity.
+func (_u *FinanceFactUpdateOne) ClearCreditNotes() *FinanceFactUpdateOne {
+	_u.mutation.ClearCreditNotes()
+	return _u
+}
+
+// RemoveCreditNoteIDs removes the "credit_notes" edge to FinanceCreditNote entities by IDs.
+func (_u *FinanceFactUpdateOne) RemoveCreditNoteIDs(ids ...int) *FinanceFactUpdateOne {
+	_u.mutation.RemoveCreditNoteIDs(ids...)
+	return _u
+}
+
+// RemoveCreditNotes removes "credit_notes" edges to FinanceCreditNote entities.
+func (_u *FinanceFactUpdateOne) RemoveCreditNotes(v ...*FinanceCreditNote) *FinanceFactUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveCreditNoteIDs(ids...)
 }
 
 // ClearPoster clears the "poster" edge to the AdminUser entity.
@@ -1984,6 +2220,96 @@ func (_u *FinanceFactUpdateOne) sqlSave(ctx context.Context) (_node *FinanceFact
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(financefact.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.AllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.AllocationsTable,
+			Columns: []string{financefact.AllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedAllocationsIDs(); len(nodes) > 0 && !_u.mutation.AllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.AllocationsTable,
+			Columns: []string{financefact.AllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.AllocationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.AllocationsTable,
+			Columns: []string{financefact.AllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.CreditNotesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.CreditNotesTable,
+			Columns: []string{financefact.CreditNotesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedCreditNotesIDs(); len(nodes) > 0 && !_u.mutation.CreditNotesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.CreditNotesTable,
+			Columns: []string{financefact.CreditNotesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CreditNotesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financefact.CreditNotesTable,
+			Columns: []string{financefact.CreditNotesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _u.mutation.PosterCleared() {
 		edge := &sqlgraph.EdgeSpec{

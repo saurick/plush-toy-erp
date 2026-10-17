@@ -18,6 +18,7 @@ import {
   Typography,
 } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
+import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import { sourceBusinessActionUUID,
   createSourceBusinessActionAttemptStore,
   isSourceBusinessActionResultUnknown,
@@ -263,8 +264,10 @@ function shipmentFormValues(shipment = {}) {
 }
 
 export default function ShipmentsPage() {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const navigate = useBusinessNavigate()
   const outletContext = useOutletContext()
+  const taskSource = outletContext?.mobileTaskCommand?.kind === 'shipment' ? outletContext.mobileTaskCommand : null
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
@@ -1166,6 +1169,10 @@ export default function ShipmentsPage() {
         productSKUs,
         sourceCurrency: selectedSalesOrder?.currency,
       })
+      if (taskSource && (params.sales_order_id !== taskSource.record.id || params.items.some((item) => !taskSource.items.some((source) => source.id === item.sales_order_item_id)))) {
+        message.warning('请使用当前任务关联的销售订单和来源行，保留填写内容后重新核对')
+        return
+      }
       const editingShipment =
         shipmentModal?.mode === 'edit' ? shipmentModal.shipment : null
       if (editingShipment?.id && !positiveInt(editingShipment.version)) {
@@ -1197,6 +1204,8 @@ export default function ShipmentsPage() {
           : '出货单已保存，未上传的附件请重新选择'
       )
       closeShipmentModal()
+      setSelectedRow(savedShipment)
+      reportBusinessResult(editingShipment?.id ? '出货草稿和明细已更新' : '出货单草稿和明细已保存', savedShipment)
       if (editingShipment?.id) {
         await loadRows()
       } else {
@@ -1218,7 +1227,8 @@ export default function ShipmentsPage() {
     }
     try {
       setSaving(true)
-      await action({ id: shipment.id })
+      const updated = await action({ id: shipment.id })
+      reportBusinessResult(`${actionLabel}已完成`, updated || shipment)
       message.success(`${actionLabel}已完成`)
       await loadRows()
     } catch (error) {

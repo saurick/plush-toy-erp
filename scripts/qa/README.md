@@ -30,7 +30,7 @@
 | `node scripts/qa/yoyoosun-role-jsonrpc-access.mjs --report output/qa/yoyoosun-role-jsonrpc-access/report.json` | 使用九岗位演示账号真实登录，逐岗验证允许读取、越权写入被拒绝和前后任务总量不串权；凭据只从服务端进程环境读取，预期业务写入为零，不等于完整角色协同闭环 | 本地后端与演示账号凭据就绪后 |
 | `bash scripts/qa/prepare-push.sh` | 默认对单一 `origin/main` 执行 remote/ref/range、git-log、严格 secrets、源码完整性和 affected 定向 Node 检查，通过后签发 30 分钟 `server-ci` 回执；高成本测试/构建由 GitLab exact-SHA CI 执行。非标准目标保持 affected/full 保守合同 | commit 后、立即 push 前 |
 | `bash scripts/qa/prepare-push.sh --full` | 经明确授权的本地完整诊断；完整执行 full，并在前后身份和容器清理读回一致后签发短期回执，不作为默认 `origin/main` 的前置步骤 | full 已明确确认、需要独立本地诊断时 |
-| `node scripts/qa/skill-health.mjs` | 项目 validator：检查当前 YAML 子集、目录名、metadata、README 索引、含 references 的全部 Markdown 文件/章节链接、项目 Skill 名称及 TODO 占位；只依赖现有 Node，见 [Skill 维护与验证](../../.agents/skills/README.md#skill-validation)；`affected` 直接执行 | 修改 `.agents/skills/**` 后 |
+| `node scripts/qa/skill-health.mjs` | 项目 validator：检查当前 YAML 子集、目录名、metadata、README 索引、Skill 指令与 references 的文件/章节链接、项目 Skill 名称及 TODO 占位；assets 输出模板不扫描正文，指向模板的入口链接仍须有效；只依赖现有 Node，见 [Skill 维护与验证](../../.agents/skills/README.md#skill-validation) | Markdown 或项目 Skill 变更时由 `affected` 选择，也检查被引用文档的章节漂移 |
 | `node scripts/qa/test-code-governance.mjs` | 盘点测试文件、行数、测试文件直接读取，以及仓库 JS / TS 中的源码改写执行；大文件只报告不按行数阻断，既有源码改写执行使用 shrink-only 清单，新增或清单已失效都会失败 | 新增测试基础设施、源码沙箱或治理测试债务后 |
 | `node scripts/qa/erp-field-linkage.mjs` | 运行字段联动专项，前后绑定同一仓库指纹，并把脱敏结构化证据写入 `output/qa/coverage/field-linkage.latest.json`；只证明该专项，不代表整仓覆盖 | 修改字段来源、映射、回显或打印链路后 |
 | `node scripts/qa/test-coverage-collect.mjs --profile baseline --write` | 在同一仓库身份下运行非数据库 baseline，采集 Go / Web 代码覆盖、显式业务场景、字段联动、导入合同和受影响验证范围（内部键 T0-T8），再原子写入证据并聚合 latest；运行期身份变化即失败 | 刷新开发工作台真实覆盖证据前 |
@@ -48,8 +48,10 @@
 | `node scripts/qa/candidate-sha-freeze.mjs --sha <40sha> --terminal <strict-terminal.json>` | 在已通过 strict 的 clean exact HEAD 上固定执行复用/失败/公网读回/DEV 隔离合同，以及版本中心桌面真实浏览器 smoke；生成单一候选冻结回执，不建立 DEV 移动端或暗色验收承诺，也不替代远端 CI、Release 或 133 发布 | 最终候选第一次正式 push 前 |
 | `node scripts/qa/output-retention-preview.mjs --protect-sha <40sha> --out output/dev-workbench/retention/previews/<name>.json` | 对登记的 managed output 生成数量与 5GiB 容量预算预览，保护最新状态、operation 引用和显式 SHA；无 `--apply`，不删除文件 | 定期检查本地证据膨胀 |
 | `bash scripts/qa/unit-normalization-postgres.sh` | 使用无挂载、随机 loopback 端口的一次性 PostgreSQL，核对单位迁移 fresh / upgrade、余额合并、异常事务回滚及库存业务；结束精确删除该容器。 | 计量单位迁移和数量校验改动后；正式 full / strict 的 server upgrade lane 也执行 |
-| `node scripts/qa/transaction-browser-isolated.mjs --run` | 冻结当前含未提交改动的源码副本，启动一次性 PostgreSQL / S3 / Go / Vite，执行接单与工程用料审批、采购、委外、库存、质检、生产、出货、应收应付结算及退款的桌面和手机浏览器链路、共享列表筛选及真实 PDF，以及 critical PostgreSQL gate，结束读回清理结果；`--source-orders` 只验证接单、工程用料、采购与委外及 PostgreSQL，不代表全部浏览器链路通过 | 验证页面、后端和数据库之间的业务闭环；不自动加入全量门禁 |
+| `bash scripts/qa/data-model-integrity-postgres.sh` | 使用无挂载、随机 loopback 端口的一次性 PostgreSQL，验证空值组合、财务外键迁移的新库与存量升级、只读预检、非法存量回滚及关键业务测试；结束删除并核对本次容器。 | 数据模型完整性约束改动后；普通 Go 测试同时覆盖 SQLite，关键 PostgreSQL 门禁覆盖数据库负向场景 |
+| `node scripts/qa/transaction-browser-isolated.mjs --run` | 冻结当前含未提交改动的源码副本，启动一次性 PostgreSQL / S3 / Go / Vite，执行接单与工程用料审批、采购、委外、库存、质检、生产、出货、应收应付结算及退款的桌面和手机浏览器链路、共享列表筛选及真实 PDF，以及 critical PostgreSQL gate，结束读回清理结果；`--source-orders` 只验证接单、工程用料、采购与委外；`--receiving` 只验证到货点数、采购退货与委外回货质检；两者均保留 PostgreSQL 门禁，不代表其他浏览器链路通过 | 验证页面、后端和数据库之间的业务闭环；不自动加入全量门禁 |
 | `node scripts/qa/database-inventory.mjs --out <report.json>` | 从环境中的固定数据库 URL 只读盘点同服务器项目库、连接数、migration、仓库引用和 disposable 分类；不授权删除 | 发布演练前后或发现临时库堆积时 |
+| `node --test scripts/deploy/backup-set.test.mjs`、`node scripts/qa/backup-set-integration.mjs` | 成套备份边界测试；真实一次性 PG 18.6 / SeaweedFS、当前迁移、非空及撤回附件的加密成套恢复、失败后原应用恢复、保留新隔离资源与精确清理；本地开发模式不证明异地挂载或目标 timer | PG＋附件成套备份、恢复和 systemd 合同变化后 |
 | `node scripts/qa/database-archive.mjs --database-name <name> --out <dir>` | 只接受已登记 disposable 库且要求零连接；生成归档并在临时 restore 库核对 migration、schema 与逐表计数，最后删除 restore 库并读回零残留 | 清理候选库取得可恢复证据时 |
 | `node scripts/qa/database-cleanup.mjs --database-name <name> --inventory <report> --manifest <manifest> --print-confirmation` | 从同一 inventory 与 archive manifest 生成精确确认串；正式 cleanup 还需通过环境提供 admin URL、传入确认串和输出报告，成功后读回源库已不存在。登记 133 仅在三个命令均显式加 `--allow-registered-development` 时开放；长期或未分类库始终拒绝 | archive / restore 已通过后清理同一 disposable 库 |
 | `sh scripts/qa/populated-upgrade-preflight.sh --audit <populated-upgrade\|customer-config-cutover\|database-constraints> ...` | 对指定数据库运行固定 allowlist 的 migration 只读审计；不执行 migration 或自动数据治理 | 跨越存量升级、客户配置切换或关键约束收紧前 |
@@ -59,7 +61,7 @@
 | `node --test scripts/qa/visualization.test.mjs` | 解析正式文档与工作台静态说明图，限制单张流程图为 12 个节点、18 条关系；不改写归档 | 新增或修改 Mermaid、CI 原理或造数说明图后 |
 | `node scripts/qa/docs-inventory.test.mjs` | 检查长期文档与最近归档索引登记、当前文档及 `progress.md` / 归档 README 的本地链接和真实查看器锚点合同；冻结归档正文不按当前链接规则重写 | 新增、删除、重命名 README 或长期文档，或调整标题、章节链接与归档入口后 |
 | `node --test scripts/qa/schema-docs.test.mjs` | 校验 Ent generated migration descriptor、业务语义 catalog 与 8 份生成数据字典零漂移；不连接数据库 | 调整 schema、catalog、生成器或数据库文档后 |
-| `node scripts/gen-public-contracts.mjs --check`、`node scripts/qa/public-contract-consumers.mjs`、`node --test scripts/gen-public-contracts.test.mjs` | 校验权限、业务及流程状态、附件、RPC、数值、密码 / 打印限制、任务目录和交互稿片段；检查 Web 绑定及发布脚本静态 RPC，只读，见[公共契约规范](../../docs/engineering/跨层公共契约与生成规范.md) | 修改公共契约真源、提取器或消费者后；已进入 fast，affected 按登记源选择同步与消费者检查 |
+| `node scripts/gen-public-contracts.mjs --check`、`node scripts/qa/public-contract-consumers.mjs`、`node --test scripts/gen-public-contracts.test.mjs` | 校验权限、业务及流程状态、附件、RPC 入口 / 信封 / 方法、数值、密码 / 打印限制、任务目录和交互稿片段；信封对照生成的消息描述，不代替 `make api`；检查 Web 绑定及发布脚本静态 RPC，只读，见[公共契约规范](../../docs/engineering/跨层公共契约与生成规范.md) | 修改公共契约真源、proto、生成消息、HTTP binding、Swagger、提取器或消费者后；已进入 fast，affected 按登记源选择同步与消费者检查 |
 | `node --test scripts/qa/dev-entry-boundary.test.mjs` | 锁住 `make dev_restart`先预检再停服、启动预检只读，以及 Product Core / 客户开发入口共用同一 web preflight | 调整本地启动命令、Vite 代理或 migration 预检后 |
 | `node scripts/qa/customer-package-lint.mjs --all` | 从构建期客户索引校验 demo、reference-customer 和 yoyoosun raw package；不 publish/activate | 调整客户包、catalog 或 schema 后 |
 | `node scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview` | 以 preview 模式编译并验证全部登记 draft 客户包的不可发布 manifest；不调用后端或写事实 | 调整 manifest compiler/effective-session 输入后 |
@@ -157,13 +159,13 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 
 ## 输出与写入边界
 
-库存、质检、生产、出货和收付款专项入口为 `transaction-browser-isolated.mjs`；不带参数仅显示帮助，`--run` 每次建立新环境，`--out output/qa/<目录>` 可指定本轮证据目录。`--source-orders` 单独选择接单、采购和委外的桌面 / 手机真实链路，仍运行相同的 PostgreSQL 与日志 / Trace 门禁；该范围不代表其他交易链路、字段页面或打印通过。默认范围保留原交易与打印链路，并追加源单验证。使用仓库锁定的 Node、已安装的 Web 依赖与 Chromium、本机 Go / Atlas / psql，以及已缓存的 `postgres:18.6` 和 `chrislusf/seaweedfs:4.46`；不自动拉取镜像。数据库运行身份与前端代理的认证读回均通过后，才操作页面；正常请求使用 Vite 的真实代理，故障注入仅在后端已成功处理后丢弃响应，不伪造业务返回。业务夹具走正式 seed、API、审批与岗位范围设置，数据库查询使用只读会话。
+库存、质检、生产、出货和收付款专项入口为 `transaction-browser-isolated.mjs`；不带参数仅显示帮助，`--run` 每次建立新环境，`--out output/qa/<目录>` 可指定本轮证据目录。`--source-orders` 单独选择接单、采购和委外的桌面 / 手机真实链路，仍运行相同的 PostgreSQL 与日志 / Trace 门禁；该范围不代表其他交易链路、字段页面或打印通过。`--receiving` 单独选择第 5/6 环节到货点数与材料入库、采购退货异常分支，以及第 8/9 环节相关的委外回货质检；覆盖桌面和手机真实页面、分包差异、权限拒绝、响应丢失重试、退货冲正和复检证据，同样运行 PostgreSQL 与日志 / Trace 门禁，不代表其他浏览器或打印链路通过。默认范围保留原交易与打印链路，并追加源单和到货退货质检验证。使用仓库锁定的 Node、已安装的 Web 依赖与 Chromium、本机 Go / Atlas / psql，以及已缓存的 `postgres:18.6` 和 `chrislusf/seaweedfs:4.46`；不自动拉取镜像。数据库运行身份与前端代理的认证读回均通过后，才操作页面；正常请求使用 Vite 的真实代理，故障注入仅在后端已成功处理后丢弃响应，不伪造业务返回。业务夹具走正式 seed、API、审批与岗位范围设置，数据库查询使用只读会话。
 
 接单、采购和委外通过 `transaction-source-orders-browser.mjs` 验证：浏览器打开真实草稿后，另一次正式保存造成版本冲突，页面保留未保存内容且不得覆盖；真实保存和流程提交成功后丢弃响应，再核对数据库唯一结果及重新打开后的回显。审批覆盖必填原因、越权拒绝、阻塞、解除阻塞、通过与退回，核对源单、行和流程的终态；委外合同覆盖提交、确认、未履行时正常关闭被拒、取消和终态保护。同键重放必须返回原结果，同一源单和操作范围内，同键改变流程关联意图或源版本必须拒绝。单据和任务操作前后比较库存、采购入库、委外事实、质检、财务及出货内容摘要，防止协同审批代写事实。证据保存在 `browser/source-orders/**`，对应 PostgreSQL 聚合中途失败、事务回滚与原版本重试测试纳入现有 `TestSourceDocumentPostgres` 门禁。
 
 工程用料审批另覆盖桌面和手机的过期来源拒绝、老板退回必填原因、工程重提、审批顺序与越权拒绝；财务审批真实成功后丢弃响应，重开与重放只能读到唯一生成的采购单。采购单必须关联该用料汇总及供应商，材料、单位和数量与审核结果一致，单价与金额保持待采购填写。响应丢失的保存、提交和财务审批请求同样必须匹配唯一的完成日志及 Trace，不因浏览器未收到响应而漏验。
 
-真实 PDF 验证要求本机 `pdfinfo`、`pdffonts` 和 `pdftotext`，默认范围在启动隔离资源前检查工具。文本型业务夹具的每一页都必须非空，同时核对 A4、字体嵌入、中文提取及编辑控件隔离；下载和全文有内容不能代替逐页检查。`--source-orders` 不执行打印，不要求这三个工具。
+真实 PDF 验证要求本机 `pdfinfo`、`pdffonts` 和 `pdftotext`，默认范围在启动隔离资源前检查工具。文本型业务夹具的每一页都必须非空，同时核对 A4、字体嵌入、中文提取及编辑控件隔离；下载和全文有内容不能代替逐页检查。`--source-orders` 和 `--receiving` 不执行打印，不要求这三个工具。
 
 该专项保留 IQC 不合格与复检、采购入库、库存盘点过账和取消、应收应付结算、订单预收预付、客户与供应商的部分和全额退款，以及审批与资金事实分离、响应丢失恢复、幂等重放、越权拒绝、超额阻断和冲销后的余额断言。生产与出货另以独立 SKU 验证 PMC 创建发布、仓库委外发料、裁片回仓及检验、车缝及皮套检验、手工完工、仓库正式成品入库、成品 / 针检 / 抽检、业务确认包材、仓库包装、出货财务审批、实际出货和撤销恢复。正式入库后依次核对待检、待包装和可发货数量；待检时移交包装必须被拒绝，工序与质检重放不得重复扣料或入库，财务放行不得提前出库。样品、工程用料审批及加工合同通过正式 API 准备，生产和出货主动作由浏览器完成。应收结算链路仍通过盘点与出货 API 独立准备来源，避免与生产回归共享库存。
 
@@ -188,7 +190,7 @@ GitLab Runner 工具链读取 `.n-node-version`、`web/package.json#packageManag
 - Go 业务域与字段联动打印域使用脚本内显式 `scenario id -> package/test prefix`、`caseId` 注册表；不得以测试名、目录、退出码或文件数量推断领域完成。字段联动已声明的不适用场景排除出适用分母，不能计为执行或通过；缺失、失败、跳过和零执行仍分别报告。通用 full / strict 回执不能拆成 PostgreSQL、浏览器或目标验收通过。
 - “证据与覆盖”保留两个独立来源：当前工作区按实时 commit / dirty / fingerprint 判定新鲜度，最近隔离验证保留原源码身份并始终标为 `snapshot`。默认展示当前工作区；当前报告缺失时明确显示尚未验证，历史隔离结果必须主动切换查看。两类读取独立失败，重新读取和快速切换会丢弃已取消或过期响应。Go 执行数按最末级用例去重，父用例独立失败、跳过或未结束时单列；本域场景全部通过但整体 Go 基线未通过时标为受阻，场景自身的失败、缺失和跳过保留，整体门禁继续阻断。Go / Web 执行计数、业务规则、失败用例与数据库 / 浏览器场景可分别展开，支持“仅看未通过场景”。专项通过不补成完整 gate、真实前后端闭环、exact-SHA CI 或 UAT 通过；来源的范围说明必须随结果保留。
 
-Web 原生覆盖基线与 `pnpm test` 保持相同的 4 路文件并发，避免启动与停服夹具在默认 CPU 并发下争用进程检查资源；测试集合、覆盖统计、进程检查超时及归属保护保持原合同。
+Web 原生覆盖基线与 `pnpm test` 共用[源码测试入口](../../web/scripts/runUnitTests.mjs)，保持相同的 4 路文件并发，避免启动与停服夹具争用进程检查资源。发现范围、产物隔离和筛选见[前端脚本说明](../../web/scripts/README.md#源码测试--unit-tests)；覆盖统计、进程检查超时及归属保护保持原合同。
 - 隔离归档必须显式列出项目内的 `--artifact` JSON，且全部携带相同的完整 repository identity；不能混入当前工作区身份、裸 coverage 或 `--write`。写入器与 DEV 读取器共用 `lib/coverage-report-contract.mjs` 的 schema / 身份 / 脱敏校验；归档不参与默认当前报告扫描。后续业务规则变化只维护采集器原有场景登记、中文标签和对应测试，页面按统一场景结构渲染；失败明细只保留测试标识及安全诊断，不透传原始日志。
 - 工程用料链路复用 Source Documents、Workflow 和 RBAC/API 的显式场景登记；公式、冻结、权限、重试与维护方式见[测试策略](../../docs/product/自动化测试策略.md#核心用料链路与测试维护--material-chain-test-maintenance)。`engineering_material` 与共享 `unit_quantity` 的领域改动选择现有 critical PostgreSQL gate；`TestSourceDocumentPostgresEngineeringMaterial*` 不计入无数据库 baseline，通过真实数据库的执行日志独立证明。
 - 字段联动报告只能由顶层 `erp-field-linkage.mjs` runner 生成，底层 builder 要求 runner 传入完整 repository identity，不是手工入口。裸 `--go-coverprofile` / `--web-coverage` 参数没有 repository identity，聚合器只能将其作为 `stale` 诊断；要记为当前代码证据，必须提供携带当前仓库指纹的 `--artifact` JSON。

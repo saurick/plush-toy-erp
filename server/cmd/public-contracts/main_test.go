@@ -51,6 +51,9 @@ func TestPublicPermissionCatalogMatchesRegisteredPermissions(t *testing.T) {
 	if !reflect.DeepEqual(got.Policies["AdminPasswordPolicy"], map[string]int64{"minCharacters": int64(biz.AdminPasswordMinLength), "maxCharacters": int64(biz.AdminPasswordMaxLength), "maxBytes": int64(biz.AdminPasswordMaxBytes)}) {
 		t.Fatal("password limits differ from domain validation")
 	}
+	if !reflect.DeepEqual(got.Policies["HelpContentPolicy"], map[string]int64{"markdownMaxCharacters": int64(biz.HelpMarkdownMaxCharacters), "summaryMaxCharacters": int64(biz.HelpSummaryMaxCharacters), "feedbackMinCharacters": int64(biz.HelpFeedbackMinCharacters), "feedbackMaxCharacters": int64(biz.HelpFeedbackMaxCharacters), "quoteMaxCharacters": int64(biz.HelpQuoteMaxCharacters), "responseMaxCharacters": int64(biz.HelpResponseMaxCharacters)}) {
+		t.Fatal("help content policy differs from domain source")
+	}
 	if !reflect.DeepEqual(got.Policies["PrintPolicy"], map[string]int64{"imageCount": 32, "imageBytes": 5 << 20, "imageTotalBytes": 16 << 20, "htmlBytes": 24 << 20, "fontCount": 128, "fontBytes": 256 << 10, "fontTotalBytes": 2 << 20}) {
 		t.Fatal("print limits differ from public PDF boundaries")
 	}

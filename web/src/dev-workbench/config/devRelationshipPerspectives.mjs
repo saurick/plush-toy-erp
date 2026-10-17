@@ -9,6 +9,7 @@ import {
   DEV_STATUS_FLOWS_ROUTE,
   DEV_VERSION_CENTER_ROUTE,
 } from './devRoutes.mjs'
+import { RpcTransport } from '../../common/consts/rpcMethods.generated.mjs'
 
 export const DEV_PRODUCT_ENGINEERING_VIEWS = Object.freeze([
   { value: 'tools', label: '工具清单' },
@@ -22,7 +23,7 @@ export const DEV_PROJECT_GRAPH_GROUPS = Object.freeze([
 ])
 
 export const DEV_PROJECT_GRAPH_MODELS = Object.freeze({
-  dag: { name: 'DAG', title: 'DAG · 有向无环图', crumb: '有向图 / 无环 / DAG', summary: '无环 · 并行与汇合', definition: '箭头表示关系方向；沿箭头不能返回原点。一个节点可以有多个前置，不要求每个节点只有一个父节点。', examples: ['overview', 'ci', 'access', 'delivery', 'business'] },
+  dag: { name: 'DAG', title: 'DAG · 有向无环图', crumb: '有向图 / 无环 / DAG', summary: '无环 · 并行与汇合', definition: '箭头表示关系方向；沿箭头不能返回原点。一个节点可以有多个前置，不要求每个节点只有一个父节点。', examples: ['overview', 'ci', 'access', 'delivery', 'business', 'integration'] },
   cycle: { name: '有向有环图', title: '有向图 · 含回路', crumb: '有向图 / 允许回路', summary: '退回、返工、重试与恢复', definition: '至少存在一条沿箭头返回起点的路径；用来说明退回、重试或恢复后重新办理。', examples: ['workflow'] },
   undirected: { name: '无向关联图', title: '无向图 · 关联网络', crumb: '无向图 / 对称关联', summary: '只表达彼此相关', definition: '连线只表示彼此相关，不表达先后或流向；适合查关联，不能用来判断授权、依赖或过账。', examples: ['association'] },
   tree: { name: '树 / 森林', title: '树 / 森林 · 层级结构', crumb: '层级结构 / 本例按父 → 子定向 / DAG 特例', summary: '层级归属 · 多棵树', definition: '每个非根节点只有一个父节点；多棵独立的树组成森林。按父 → 子定向时，树和森林也是 DAG 的特例。', examples: ['tree', 'forest'] },
@@ -74,6 +75,34 @@ export const DEV_PROJECT_GRAPH_EXAMPLES = Object.freeze({
       { from: 'prepare', to: 'go' },
       { from: 'web', to: 'gate', label: '汇合' },
       { from: 'go', to: 'gate' },
+    ],
+  },
+  integration: {
+    name: '接口契约与接入边界',
+    directed: true,
+    direction: 'LR',
+    caption: '实线说明现有调用职责，虚线表示检查关联或待建设入口。外部身份与协作接口尚未开放；图不代表测试通过或第三方联调完成。',
+    destinations: [
+      { label: '接口字段与重试合同', route: `${DEV_DOCS_ROUTE}?path=server/docs/api.md` },
+      { label: '系统接入与扩展约束', route: `${DEV_DOCS_ROUTE}?path=docs/engineering/跨层公共契约与生成规范.md` },
+      { label: '权限关系', route: DEV_PERMISSION_RELATIONSHIPS_ROUTE },
+      { label: '质量检查与证据', route: DEV_QUALITY_GATES_ROUTE },
+    ],
+    nodes: [
+      { id: 'rpc', label: `${RpcTransport.method} ${RpcTransport.path}`, description: '桌面与手机使用同一业务入口。入口与 Swagger 信封由公共契约检查同步；业务 method 来自实际分发，字段与错误仍按对应接口合同核对。' },
+      { id: 'access', label: '身份与数据授权', description: '当前使用内部员工会话、有效权限与已有对象范围；actor 取已验证身份，客户端不能指定操作者或扩大范围。页面显隐不能替代授权。' },
+      { id: 'usecase', label: '领域业务入口', description: '适配入口调用既有领域 UseCase，沿用业务状态、来源归属与受控命令；不旁路写业务表。' },
+      { id: 'fact', label: '领域事务与回执', description: '各领域在自己的事务中维护业务事实、CAS、幂等与回执；重试保留同一业务意图与键，追踪 request_id 不作为幂等凭据。Workflow 完成不能替代 Fact 过账。' },
+      { id: 'external', label: '外部接入（待建设）', description: '真实接入前确定系统或合作方身份、对象授权、交换字段和兼容边界；当前没有开放协作账号、Webhook 或通用同步服务。' },
+      { id: 'checks', label: '契约与行为验证', description: '现有 QA 检查生成漂移、直接接口授权和并发回放；结果必须回到对应源码身份与实际回执核对，缺证据保持未验证。' },
+    ],
+    edges: [
+      { from: 'rpc', to: 'access' },
+      { from: 'access', to: 'usecase' },
+      { from: 'usecase', to: 'fact' },
+      { from: 'external', to: 'access', label: '接入前另定合同', kind: 'reference' },
+      { from: 'checks', to: 'usecase', label: '契约与授权', kind: 'reference' },
+      { from: 'checks', to: 'fact', label: '并发与回放', kind: 'reference' },
     ],
   },
   access: {

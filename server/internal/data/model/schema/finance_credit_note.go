@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"time"
@@ -18,7 +19,8 @@ func (FinanceCreditNote) Annotations() []schema.Annotation {
 	return []schema.Annotation{entsql.Annotation{Checks: map[string]string{
 		"finance_credit_notes_amount_positive": "amount > 0", "finance_credit_notes_currency_allowed": "currency IN ('USD', 'CNY', 'HKD')",
 		"finance_credit_notes_status_allowed": "status IN ('POSTED', 'REVERSED')", "finance_credit_notes_intent_bundle": "length(trim(idempotency_key)) BETWEEN 1 AND 128 AND length(idempotency_payload_hash) = 64",
-		"finance_credit_notes_reversal_bundle": "((status = 'POSTED' AND reversal_of_credit_note_id IS NULL) OR (status = 'REVERSED' AND reversal_of_credit_note_id IS NOT NULL))",
+		"finance_credit_notes_reversal_bundle":   "((status = 'POSTED' AND reversal_of_credit_note_id IS NULL) OR (status = 'REVERSED' AND reversal_of_credit_note_id IS NOT NULL))",
+		"finance_credit_notes_reversal_not_self": "reversal_of_credit_note_id IS NULL OR reversal_of_credit_note_id <> id",
 	}}}
 }
 func (FinanceCreditNote) Fields() []ent.Field {
@@ -27,6 +29,13 @@ func (FinanceCreditNote) Fields() []ent.Field {
 		immutableDecimalQuantityField("amount"), field.String("currency").NotEmpty().MaxLen(16).Immutable(), field.String("status").NotEmpty().Default("POSTED").MaxLen(16).Immutable(),
 		field.String("reason").NotEmpty().MaxLen(255).Immutable(), field.String("idempotency_key").NotEmpty().MaxLen(128).Immutable(), field.String("idempotency_payload_hash").NotEmpty().MinLen(64).MaxLen(64).Immutable(),
 		field.Int("created_by").Positive().Immutable(), field.Time("created_at").Default(time.Now).Immutable(),
+	}
+}
+func (FinanceCreditNote) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.From("finance_fact", FinanceFact.Type).Ref("credit_notes").Field("finance_fact_id").Required().Unique().Immutable().Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("reversals", FinanceCreditNote.Type).Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.From("reversal_of", FinanceCreditNote.Type).Ref("reversals").Field("reversal_of_credit_note_id").Unique().Immutable().Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 func (FinanceCreditNote) Indexes() []ent.Index {

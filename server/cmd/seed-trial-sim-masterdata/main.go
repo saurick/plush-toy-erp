@@ -5,17 +5,16 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"server/internal/biz"
+	"server/internal/commandconfig"
 	"server/internal/devdbguard"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -23,14 +22,6 @@ const (
 	defaultUnitCode  = simulationPrefix + "-PCS"
 	defaultProduct   = simulationPrefix + "-PRODUCT"
 )
-
-type bootstrapConfig struct {
-	Data struct {
-		Postgres struct {
-			DSN string `yaml:"dsn"`
-		} `yaml:"postgres"`
-	} `yaml:"data"`
-}
 
 func main() {
 	confPath := flag.String("conf", "./configs/dev/config.yaml", "config yaml path")
@@ -52,11 +43,11 @@ func main() {
 		fail("simulated masterdata naming rejected: %v", err)
 	}
 
-	dsn, err := resolvePostgresDSN(*confPath)
+	dsn, err := commandconfig.ResolvePostgresDSN(*confPath)
 	if err != nil {
 		fail("%v", err)
 	}
-	dsn, err = normalizePostgresURL(dsn)
+	dsn, err = commandconfig.NormalizePostgresURL(dsn)
 	if err != nil {
 		fail("parse postgres dsn failed: %v", err)
 	}
@@ -118,77 +109,6 @@ ON CONFLICT (code) DO UPDATE SET
 RETURNING id
 `, strings.TrimSpace(code), strings.TrimSpace(name), code+"-STYLE", unitID).Scan(&id)
 	return id, err
-}
-
-func resolvePostgresDSN(confPath string) (string, error) {
-	if dsn := strings.TrimSpace(os.Getenv("POSTGRES_DSN")); dsn != "" {
-		return dsn, nil
-	}
-	cfg, err := readBootstrapConfig(confPath)
-	if err != nil {
-		return "", err
-	}
-	dsn := strings.TrimSpace(cfg.Data.Postgres.DSN)
-	if localPath := resolveLocalConfPath(confPath); localPath != "" {
-		localCfg, err := readBootstrapConfig(localPath)
-		if err != nil {
-			return "", err
-		}
-		if localDSN := strings.TrimSpace(localCfg.Data.Postgres.DSN); localDSN != "" {
-			dsn = localDSN
-		}
-	}
-	if dsn == "" {
-		return "", fmt.Errorf("postgres dsn is empty in %s", confPath)
-	}
-	return dsn, nil
-}
-
-func readBootstrapConfig(path string) (*bootstrapConfig, error) {
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read config failed: %w", err)
-	}
-	var cfg bootstrapConfig
-	if err := yaml.Unmarshal(raw, &cfg); err != nil {
-		return nil, fmt.Errorf("parse config failed: %w", err)
-	}
-	return &cfg, nil
-}
-
-func normalizePostgresURL(raw string) (string, error) {
-	u, err := url.Parse(strings.TrimSpace(raw))
-	if err != nil {
-		return "", err
-	}
-	if u.Scheme != "postgres" && u.Scheme != "postgresql" {
-		return "", fmt.Errorf("unsupported scheme %q", u.Scheme)
-	}
-	if strings.TrimPrefix(u.Path, "/") == "" {
-		return "", fmt.Errorf("postgres dsn missing db name")
-	}
-	q := u.Query()
-	if q.Get("sslmode") == "" {
-		q.Set("sslmode", "disable")
-	}
-	u.Scheme = "postgres"
-	u.RawQuery = q.Encode()
-	return u.String(), nil
-}
-
-func resolveLocalConfPath(confPath string) string {
-	ext := filepath.Ext(confPath)
-	if ext == "" {
-		return ""
-	}
-	if strings.HasSuffix(confPath, ".local"+ext) {
-		return ""
-	}
-	localPath := strings.TrimSuffix(confPath, ext) + ".local" + ext
-	if fi, err := os.Stat(localPath); err == nil && !fi.IsDir() {
-		return localPath
-	}
-	return ""
 }
 
 func guardProduction(confPath string, allowProd bool) error {

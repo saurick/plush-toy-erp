@@ -1,5 +1,5 @@
 [Unit]
-Description=Plush Toy ERP daily PostgreSQL backup
+Description=Plush Toy ERP daily paired PostgreSQL and attachment backup
 Requires=docker.service
 After=docker.service
 OnFailure=plush-toy-erp-backup-failure@%n.service
@@ -9,8 +9,10 @@ Type=oneshot
 User=root
 Group=root
 EnvironmentFile=/etc/plush-toy-erp/backup.env
-ExecStart=/root/deploy/plush-toy-erp-production/current/scripts/deploy/scheduled-postgres-backup.sh --compose-file ${BACKUP_COMPOSE_FILE} --env-file ${BACKUP_RUNTIME_ENV} --backup-dir ${BACKUP_DIR} --offsite-dir ${BACKUP_OFFSITE_DIR} --age-recipient-file ${BACKUP_AGE_RECIPIENT_FILE} --retention-days ${BACKUP_RETENTION_DAYS}
+ExecStart=/usr/local/bin/node /root/deploy/plush-toy-erp-production/current/scripts/deploy/backup-set/cli.mjs create --project ${COMPOSE_PROJECT_NAME} --database ${BACKUP_DATABASE} --compose-file ${BACKUP_COMPOSE_FILE} --env-file ${BACKUP_RUNTIME_ENV} --backup-dir ${BACKUP_DIR} --offsite-dir ${BACKUP_OFFSITE_DIR} --recipient-file ${BACKUP_AGE_RECIPIENT_FILE} --retention-days ${BACKUP_RETENTION_DAYS} --confirm BACKUP_SET:${COMPOSE_PROJECT_NAME}:${BACKUP_DATABASE}
 TimeoutStartSec=45min
+TimeoutStopSec=3min
+KillMode=mixed
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7

@@ -1,4 +1,4 @@
-import { verifyProjectGraphDirectory } from './devProjectGraphAssertions.mjs'
+import { verifyIntegrationWorkspace, verifyProjectGraphDirectory } from './devProjectGraphAssertions.mjs'
 import { DEV_HUB_ITEMS } from '../../src/dev-workbench/config/devHub.mjs'
 import { installPermissionRelationshipMock } from './permissionRelationshipScenarios.mjs'
 import { assertMermaidFits, fitMermaidDiagram, switchMermaidLayout, verifyMermaidViewer, waitForMermaidFit } from './mermaidViewerAssertions.mjs'
@@ -8,6 +8,7 @@ import {
   DEV_DATA_PREPARATION_ROUTE,
   DEV_DOCS_ROUTE,
   DEV_DRILL_RECOVERY_ROUTE,
+  DEV_INTEGRATION_ROUTE,
   DEV_PAGE_TITLE_BY_ROUTE,
   DEV_PERMISSION_RELATIONSHIPS_ROUTE,
   DEV_PRODUCT_ENGINEERING_ROUTE,
@@ -21,6 +22,7 @@ import {
   DEV_WORKSPACE_NAV_ITEMS,
 } from '../../src/dev-workbench/config/devRoutes.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
+import { assertDevDocsDirectorySpace, createDevDocsReadingFixture, verifyDevDocsReadingNavigation } from './devDocsLayoutAssertions.mjs'
 
 const SPECIALIZED_ROUTES = new Set([
   DEV_BUSINESS_USABILITY_ROUTE,
@@ -97,7 +99,7 @@ export function createDevWorkbenchDesktopScenarios({
           )
         }
         const search = page.getByRole('textbox', { name: '搜索全部开发工具' })
-        await search.fill('质量门禁')
+        await search.fill('质量门禁 / Quality Gates')
         await page
           .locator('table[aria-label="全部开发工具"] tbody tr')
           .first()
@@ -119,7 +121,7 @@ export function createDevWorkbenchDesktopScenarios({
           .click()
         await page.reload()
         await search.waitFor()
-        assert.equal(await search.inputValue(), '质量门禁')
+        assert.equal(await search.inputValue(), '质量门禁 / Quality Gates')
         assert.equal(
           await page
             .getByRole('button', { name: '取消置顶质量门禁', exact: true })
@@ -683,6 +685,14 @@ export function createDevWorkbenchDesktopScenarios({
         await assertNoHorizontalOverflow(page, '专项检查命令分页与空结果恢复')
       }
       if (item.route === DEV_DOCS_ROUTE) {
+        await assertDevDocsDirectorySpace(page, assert)
+        await page.setViewportSize({ width: 1024, height: 800 })
+        await assertDevDocsDirectorySpace(page, assert)
+        await assertNoHorizontalOverflow(page, '文档检索页头窄窗口')
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await assertDevDocsDirectorySpace(page, assert)
+        await verifySlidingMotion(page, assert, '[aria-label="开发文档搜索范围"]', 1)
+        await verifySlidingMotion(page, assert, '[aria-label="开发文档搜索范围"]', 0, true)
         const selector = '[aria-label="开发文档层级"]'
         const selectedLifecycle = page.locator(
           `${selector} .erp-segmented-item-selected`
@@ -742,12 +752,13 @@ export function createDevWorkbenchDesktopScenarios({
         const keyword = '仅在未打开归档正文中的检索探针'
         await page.route('**/docs/archive/progress-2026-10-10-before-task-governance.md*', (route) => route.fulfill({
           contentType: 'application/javascript',
-          body: `export default ${JSON.stringify(`# 归档全文检索探针\n${keyword}`)}`,
+          body: `export default ${JSON.stringify(createDevDocsReadingFixture(keyword))}`,
         }))
         await page.locator('[aria-label="开发文档层级"]').getByText('历史', { exact: true }).click()
         await page.getByRole('textbox', { name: '搜索开发文档' }).fill(keyword)
         await page.getByText('归档全文检索探针', { exact: true }).waitFor()
         assert.equal(await page.getByText('没有匹配的文档', { exact: true }).count(), 0)
+        await verifyDevDocsReadingNavigation(page, assert)
       }
       if (item.route === DEV_PERMISSION_RELATIONSHIPS_ROUTE) {
         assert.equal(await page.getByRole('tab', { name: '关系图', exact: true }).getAttribute('aria-selected'), 'true')
@@ -773,6 +784,9 @@ export function createDevWorkbenchDesktopScenarios({
       if (item.route === DEV_PRODUCT_ENGINEERING_ROUTE) {
         await verifyProjectGraphDirectory(page, { assert, assertNoHorizontalOverflow })
       }
+      if (item.route === DEV_INTEGRATION_ROUTE) {
+        await verifyIntegrationWorkspace(page, { assert, assertNoHorizontalOverflow })
+      }
       if (item.route === DEV_QUALITY_ROUTE) {
         assert.equal(
           await page.locator('.erp-dev-tool-table tbody tr').count(),
@@ -792,14 +806,14 @@ export function createDevWorkbenchDesktopScenarios({
       if (item.route === DEV_CUSTOMER_CONFIG_ROUTE) {
         await page
           .getByRole('tablist', { name: '客户配置工作任务' })
-          .getByRole('tab', { name: /^检查配置包/u })
+          .getByRole('tab', { name: /^检查配置(?:\s|$)/u })
           .click()
         const preflight = page.locator('[data-dev-customer-view="包预检"]')
         await preflight.waitFor({ state: 'visible' })
         const sections = page.getByRole('tablist', { name: '配置预检任务' })
         for (const section of [
           { label: '包结构', key: 'package' },
-          { label: '运行投影', key: 'runtime' },
+          { label: '运行设置', key: 'runtime' },
           { label: '流程策略', key: 'flow' },
           { label: '包结构', key: 'package' },
         ]) {

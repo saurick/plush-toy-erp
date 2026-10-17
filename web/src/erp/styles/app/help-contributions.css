@@ -1,0 +1,183 @@
+.erp-help-contribution-panel {
+  margin-top: 12px;
+}
+
+.erp-help-chapter-footer {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid var(--erp-border);
+  gap: 4px 12px;
+}
+
+.erp-help-chapter-footer > .ant-btn {
+  min-height: 32px;
+  padding-inline: 4px;
+  font-size: var(--erp-font-small);
+}
+
+.erp-help-published-supplement {
+  padding-inline-start: 12px;
+  border-inline-start: 2px solid var(--erp-primary);
+  margin-bottom: 12px;
+  font-size: var(--erp-font-body);
+  line-height: 1.7;
+}
+
+.erp-help-contribution-dialog {
+  max-width: calc(100vw - 32px);
+}
+
+.erp-help-contribution-dialog .ant-modal-body {
+  max-height: calc(100dvh - 220px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.erp-help-contribution-dialog .ant-modal-header {
+  padding-inline-end: 48px;
+}
+
+.erp-help-contribution-dialog .ant-modal-title {
+  overflow-wrap: anywhere;
+}
+
+.erp-help-contribution-heading,
+.erp-help-contribution-actions,
+.erp-help-contribution-history__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.erp-help-contribution-dialog h3,
+.erp-help-published-supplement h3 {
+  margin: 0 0 12px;
+  font-size: var(--erp-font-emphasis);
+  font-weight: 600;
+}
+
+.erp-help-contribution-heading h3 {
+  margin: 0;
+}
+
+.erp-help-contribution-state {
+  font-size: var(--erp-font-caption);
+}
+
+.erp-help-contribution-dialog h4 {
+  margin: 24px 0 8px;
+  font-size: var(--erp-font-body);
+  font-weight: 600;
+}
+
+.erp-help-contribution-feedback__item > p {
+  white-space: pre-wrap;
+}
+
+.erp-help-contribution-actions {
+  justify-content: flex-start;
+  margin-top: 16px;
+}
+
+.erp-help-contribution-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.erp-help-contribution-field .ant-btn {
+  align-self: flex-start;
+}
+
+.erp-help-contribution-history__row,
+.erp-help-contribution-feedback__item {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--erp-border);
+  overflow-wrap: anywhere;
+}
+
+.erp-help-contribution-feedback {
+  padding-top: 20px;
+  border-top: 1px solid var(--erp-border);
+  margin-top: 24px;
+}
+
+.erp-help-contribution-feedback blockquote,
+.erp-help-contribution-response {
+  padding: 12px;
+  border-inline-start: 2px solid var(--erp-border);
+  margin-inline: 0;
+  background: var(--erp-bg);
+  white-space: pre-wrap;
+}
+
+.erp-help-supplement-markdown {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-wrap: anywhere;
+}
+
+.erp-help-supplement-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.erp-help-supplement-markdown th,
+.erp-help-supplement-markdown td {
+  padding: 8px;
+  border: 1px solid var(--erp-border);
+  text-align: left;
+}
+
+.erp-help-supplement-markdown pre,
+.erp-help-contribution-diff pre {
+  padding: 12px;
+  background: var(--erp-bg);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.erp-help-contribution-diff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .erp-help-contribution-dialog {
+    top: 12px;
+    max-width: calc(100vw - 16px);
+    padding-bottom: 12px;
+    margin-inline: auto;
+  }
+
+  .erp-help-contribution-dialog .ant-modal-content {
+    padding: 16px;
+  }
+
+  .erp-help-contribution-dialog .ant-modal-body {
+    max-height: calc(100dvh - 180px);
+  }
+
+  .erp-help-contribution-diff {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .erp-help-published-supplement {
+    padding-inline-start: 10px;
+  }
+}
+
+@media (pointer: coarse) {
+  .erp-help-chapter-footer :where(.ant-btn) {
+    min-height: 44px;
+  }
+}

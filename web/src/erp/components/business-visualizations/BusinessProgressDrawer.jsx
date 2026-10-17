@@ -260,12 +260,12 @@ export default function BusinessProgressDrawer({
     const records = sectionRecords(section)
     return (
       <>
-        {section === 'materials' && (
+        {!mobile && section === 'materials' && (
           <p className="erp-progress-hint">
             按已登记领料与计划用量核对。尚未领齐不代表库存缺料；采购到货需到相关业务中核对。
           </p>
         )}
-        {section === 'tasks' && (
+        {!mobile && section === 'tasks' && (
           <p className="erp-progress-hint">
             仅显示当前账号可见的关联任务。任务完成不代表已经生产、入库或出货。
           </p>
@@ -372,7 +372,7 @@ export default function BusinessProgressDrawer({
         {data?.has_more?.[section] && (
           <p className="erp-progress-hint">
             {mobile
-              ? '此处展示前 100 条；需要完整记录时，请从“我的 → 切换工作入口”进入电脑业务页。'
+              ? '已显示前 100 条'
               : '此处展示前 100 条，请进入原业务页面查看完整记录。'}
           </p>
         )}

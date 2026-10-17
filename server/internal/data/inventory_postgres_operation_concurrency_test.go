@@ -46,7 +46,7 @@ func inventoryPostgresTxPID(t *testing.T, ctx context.Context, tx *inventoryDBTx
 }
 
 func TestInventoryLotPostgresFreezeBeforePosting(t *testing.T) {
-	for _, path := range []string{"ordinary", "ledger", "transfer", "cycle-loss", "reversal"} {
+	for _, path := range []string{"ordinary", "transfer", "cycle-loss", "reversal"} {
 		t.Run(path, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
@@ -102,8 +102,6 @@ func TestInventoryLotPostgresFreezeBeforePosting(t *testing.T) {
 			go func() {
 				var err error
 				switch path {
-				case "ledger":
-					_, err = r.CreateInventoryTxn(ctx, in)
 				case "transfer", "cycle-loss":
 					_, err = uc.PostInventoryOperation(ctx, &biz.InventoryOperationMutation{ID: op.ID, ExpectedVersion: op.Version, ActorID: 1})
 				default:

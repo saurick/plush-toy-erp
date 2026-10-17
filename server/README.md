@@ -29,6 +29,8 @@ bash scripts/doctor.sh
 - `biz`：业务规约与 UseCase
 - `data`：数据库与外部依赖访问
 
+采购收货规则由 [`PurchaseReceiptUsecase`](internal/biz/purchase_receipt.go) 负责，只依赖收货与主数据引用接口；质检规则由 [`QualityInspectionUsecase`](internal/biz/quality_inspection.go) 负责，只依赖质检接口。`InventoryUsecase` 在现有接线入口组合这两项能力，采购收货和质检流程处理器直接使用对应的专用 UseCase。领域消费者不需要提供无关的 BOM、库存或其他单据能力；数据事务与事实写入仍由原 repository 负责，权限和幂等规则沿现有入口执行。
+
 HTTP transport 为每次请求记录一条完成摘要，包含 operation、JSON-RPC domain / method / id、request / trace 标识、transport `code`、业务 `rpc_result_code`、`outcome` 和耗时。成功为 INFO，业务拒绝为 WARN，系统失败为 ERROR；HTTP 200 不代表业务成功。内部入口记录降为 DEBUG，任何级别均不展开 RPC 参数或响应内容；认证拒绝和持久化业务审计沿用原有边界。
 
 ## 快速开始

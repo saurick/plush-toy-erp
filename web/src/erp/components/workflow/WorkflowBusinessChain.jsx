@@ -1,23 +1,23 @@
 import React from 'react'
 import { Button } from 'antd'
-import { BranchesOutlined } from '@ant-design/icons'
+import { BranchesOutlined, DownOutlined, RightOutlined } from '@ant-design/icons'
 import { getWorkflowTask, getWorkflowTaskHandlingChain } from '../../api/workflowApi.mjs'
 import { buildWorkflowBusinessChain, supportsWorkflowBusinessChain } from '../../utils/workflowBusinessChain.mjs'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
+import { formatWorkflowTaskEventTime } from '../../utils/workflowTaskEventPresentation.mjs'
+import WorkflowProgressMarker from './WorkflowProgressMarker.jsx'
 import './workflowBusinessChain.css'
-import './workflowProcessStageTrack.css'
 
-function StateMarker({ tone, children }) {
-  return <span className={`workflow-business-chain__marker workflow-process-stage__item--${tone}`} aria-hidden="true"><span className="workflow-process-stage__marker">{children ?? { active: '●', blocked: '!', completed: '✓', rejected: '↩', withdrawn: '−' }[tone]}</span></span>
-}
-
-export default function WorkflowBusinessChain({ task, profile, view = 'task', onOpenTask }) {
+export default function WorkflowBusinessChain({ task, profile, view = 'task', onOpenTask, focused = false, showGuidance = true }) {
   const [result, setResult] = React.useState(null)
   const [offset, setOffset] = React.useState(0)
   const [opening, setOpening] = React.useState(false)
   const [openError, setOpenError] = React.useState('')
   const [selection, setSelection] = React.useState(null)
+  const [historyDisclosure, setHistoryDisclosure] = React.useState(null)
+  const historyIdentity = `${profile?.id}:${task?.id}:${task?.source_type}:${task?.source_id}`
+  const historyOpen = historyDisclosure?.key === historyIdentity ? historyDisclosure.open : true
   const panelID = React.useId()
   const requestIdentity = React.useRef('')
   const [retry, setRetry] = React.useState(0)
@@ -46,7 +46,7 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
   const selectedGroup = selection?.key === key
     ? selection.group
     : (groups.find((group) => group.current) || groups.find((group) => group.blocked) || groups.find((group) => group.open) || groups[0])?.key
-  const taskHistory = current?.model?.tasks.filter((item) => !item.current && !['ready', 'blocked'].includes(item.task_status_key)) || []
+  const taskHistory = current?.model?.tasks.filter((item) => !item.current && !['ready', 'blocked'].includes(item.task_status_key)).sort((a, b) => (b.completed_at || 0) - (a.completed_at || 0) || b.id - a.id) || []
   const currentTasks = current?.model?.tasks.filter((item) => item.current) || []
   const pendingTasks = current?.model?.tasks.filter((item) => !item.current && ['ready', 'blocked'].includes(item.task_status_key)).sort((a, b) => Number(b.task_status_key === 'blocked') - Number(a.task_status_key === 'blocked')) || []
   const openTask = async (id) => {
@@ -57,8 +57,8 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
     finally { if (requestIdentity.current === key) setOpening(false) }
   }
   const renderTask = (item) => (
-    <li key={item.id} aria-current={item.current ? 'step' : undefined} data-status={item.task_status_key}>
-      {view === 'task' && item.current ? <StateMarker tone={{ ready: 'active', blocked: 'blocked', done: 'completed', rejected: 'rejected', withdrawn: 'withdrawn' }[item.task_status_key]} /> : null}
+    <li key={item.id} className="workflow-business-chain__task" aria-current={item.current ? 'step' : undefined} data-status={item.task_status_key}>
+      <WorkflowProgressMarker status={item.task_status_key} />
       <div className="workflow-business-chain__task-content">
         <div className="workflow-business-chain__task-heading">
           {onOpenTask && !item.current ? <Button type="link" disabled={opening} onClick={() => openTask(item.id)}>{item.name}</Button> : <strong>{item.name}</strong>}
@@ -71,6 +71,7 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
             {item.references.map(({ label, value }) => <span key={value}>{label}：<span>{value}</span></span>)}
           </div>
         ) : null}
+        {focused && view === 'task' && !['ready', 'blocked'].includes(item.task_status_key) ? <span className="workflow-business-chain__completed-time">{item.completed_at ? `结束于 ${formatWorkflowTaskEventTime(item.completed_at)}` : '结束时间未记录'}</span> : null}
       </div>
     </li>
   )
@@ -83,10 +84,10 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
     return (
       <section key={group.key} className="workflow-business-chain__group" data-current={group.current || undefined} data-expanded={expanded || undefined} data-tone={group.tone}>
         <button type="button" className="workflow-business-chain__node" aria-current={group.current ? 'step' : undefined} aria-expanded={expanded} aria-controls={regionID} onClick={() => setSelection({ key, group: expanded ? null : group.key })}>
-          <StateMarker tone={group.tone}>{group.exception ? <BranchesOutlined /> : group.key === 'unclassified' ? '?' : index + 1}</StateMarker>
+          <WorkflowProgressMarker tone={group.tone}>{group.exception ? <BranchesOutlined /> : group.key === 'unclassified' ? '?' : index + 1}</WorkflowProgressMarker>
           <strong>{group.label}{group.exception ? <small className="workflow-business-chain__branch-label">分支</small> : null}</strong>
           <span className="workflow-business-chain__stage-status">{group.statusLabel}</span>
-          <span className="workflow-business-chain__chevron" aria-hidden="true">{expanded ? '⌄' : '›'}</span>
+          <RightOutlined className="workflow-business-chain__chevron" aria-hidden="true" />
         </button>
         {expanded ? (
           <div id={regionID} className="workflow-business-chain__stage-content">
@@ -111,7 +112,7 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
   const exceptionView = exceptionGroup ? <section className="workflow-business-chain__exceptions" data-pending={exceptionGroup.open > 0 || undefined} aria-label="异常分支">{renderGroup(exceptionGroup)}</section> : null
 
   return (
-    <div className="workflow-business-chain" data-view={view} aria-label={view === 'order' ? '订单任务链' : '本任务处理进度'}>
+    <div className={`workflow-business-chain${focused ? ' workflow-business-chain--focused' : ''}`} data-view={view} aria-label={view === 'order' ? '订单任务链' : '本任务处理进度'}>
       {openError ? <p role="alert">{openError}</p> : null}
       {!current ? <p role="status">正在读取关联任务</p> : current.error ? (
         <div role="alert">
@@ -120,7 +121,8 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
         </div>
       ) : view === 'task' ? (
         <>
-          <ul className="workflow-business-chain__tasks">{currentTasks.map(renderTask)}</ul>
+          {!focused ? <ul className="workflow-business-chain__tasks">{currentTasks.map(renderTask)}</ul> : null}
+          {focused && !pendingTasks.length && !taskHistory.length && !current.model.truncated ? <p className="workflow-business-chain__hint">当前暂无其他关联任务。</p> : null}
           {pendingTasks.length ? (
             <section className="workflow-business-chain__pending" aria-label="关联待办">
               <p className="workflow-business-chain__section-label">关联待办 <span>{pendingTasks.length}</span></p>
@@ -129,8 +131,11 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
             </section>
           ) : null}
           {taskHistory.length ? (
-            <details className="workflow-business-chain__history">
-              <summary>已处理记录 {taskHistory.length} 项</summary>
+            <details className="workflow-business-chain__history" open={focused ? historyOpen : undefined}>
+              <summary onClick={focused ? (event) => { event.preventDefault(); setHistoryDisclosure({ key: historyIdentity, open: !historyOpen }) } : undefined}>
+                <span>{focused ? '关联已处理任务' : '已处理记录'} {taskHistory.length} 项</span>
+                {focused ? <DownOutlined className="workflow-business-chain__history-toggle" aria-hidden="true" /> : null}
+              </summary>
               <ul className="workflow-business-chain__tasks workflow-business-chain__tasks--related">{taskHistory.map(renderTask)}</ul>
             </details>
           ) : null}
@@ -145,7 +150,7 @@ export default function WorkflowBusinessChain({ task, profile, view = 'task', on
           {!exceptionGroup?.current ? exceptionView : null}
           {unclassifiedGroup ? <section className="workflow-business-chain__unclassified" aria-label="待核对环节">{renderGroup(unclassifiedGroup)}</section> : null}
           {renderPagination('继续加载订单关联任务')}
-          <p className="workflow-business-chain__hint">按阶段自上而下汇总可见任务；入库、检验和发货结果以对应单据为准。</p>
+          {showGuidance ? <p className="workflow-business-chain__hint">入库、检验和发货结果以对应单据为准。</p> : null}
         </>
       )}
     </div>

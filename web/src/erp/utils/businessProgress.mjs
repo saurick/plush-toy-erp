@@ -64,6 +64,9 @@ function validRow(row) {
     ].every((key) => typeof row[key] === 'string') &&
     integer(row.product_id) &&
     counters.every((key) => integer(row[key])) &&
+    (row.product_type_count === undefined || integer(row.product_type_count)) &&
+    (row.product_match_count === undefined ||
+      (integer(row.product_match_count) && row.product_match_count <= row.product_type_count)) &&
     [
       'active',
       'overdue',
@@ -94,6 +97,13 @@ export function requireProgressBoard(value) {
     throw invalid()
   }
   return value
+}
+
+export function progressProductLabel(row) {
+  if (row.product_match_count > 0) {
+    return `${row.product}（命中 ${row.product_match_count} 款，共 ${row.product_type_count} 款）`
+  }
+  return `${row.product}${row.product_count > 1 ? ` 等 ${row.product_count} 项` : ''}`
 }
 export function requireProgressDetail(value) {
   if (

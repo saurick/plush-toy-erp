@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
-import {
+import { getPrintToolbarButtonClassName,
   PrintItemOrderTools,
   PrintToolButton,
   PrintImageSlotTool,
@@ -486,20 +486,6 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const pdfFileName = `${template.title}.pdf`
-
-  const getToolbarButtonClassName = ({
-    active = false,
-    primary = false,
-  } = {}) =>
-    [
-      'erp-print-shell__button',
-      primary
-        ? 'erp-print-shell__button--primary'
-        : 'erp-print-shell__button--ghost',
-      active ? 'erp-print-shell__button--active' : '',
-    ]
-      .filter(Boolean)
-      .join(' ')
 
   const materialMergeSelection = normalizeCellSelection(
     materialMergeSelectionAnchor,
@@ -1557,7 +1543,7 @@ export default function EngineeringPrintWorkspacePage() {
                 icon="select"
                 wide
                 type="button"
-                className={getToolbarButtonClassName({
+                className={getPrintToolbarButtonClassName({
                   active: materialLineSelectionMode,
                 })}
                 onClick={toggleMaterialLineSelectionMode}
@@ -1568,7 +1554,7 @@ export default function EngineeringPrintWorkspacePage() {
                 data-print-structure-action
                 icon="up"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={selectedMaterialLineIndex === null}
                 onClick={() => applyMaterialLineAction('insert', 'before')}
               >
@@ -1578,7 +1564,7 @@ export default function EngineeringPrintWorkspacePage() {
                 data-print-structure-action
                 icon="down"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={selectedMaterialLineIndex === null}
                 onClick={() => applyMaterialLineAction('insert', 'after')}
               >
@@ -1589,7 +1575,7 @@ export default function EngineeringPrintWorkspacePage() {
                 icon="remove"
                 wide
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={
                   selectedMaterialLineIndex === null || draft.lines.length <= 1
                 }
@@ -1629,7 +1615,7 @@ export default function EngineeringPrintWorkspacePage() {
                 icon="cells"
                 wide
                 type="button"
-                className={getToolbarButtonClassName({
+                className={getPrintToolbarButtonClassName({
                   active: materialCellSelectionMode,
                 })}
                 onClick={toggleMaterialCellSelectionMode}
@@ -1639,7 +1625,7 @@ export default function EngineeringPrintWorkspacePage() {
               <PrintToolButton
                 icon="merge"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={!canApplyMaterialMerge}
                 onClick={applyMaterialMerge}
               >
@@ -1648,7 +1634,7 @@ export default function EngineeringPrintWorkspacePage() {
               <PrintToolButton
                 icon="split"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={!canSplitMaterialMerge}
                 onClick={splitMaterialMerge}
               >
@@ -1673,7 +1659,7 @@ export default function EngineeringPrintWorkspacePage() {
                 icon="select"
                 wide
                 type="button"
-                className={getToolbarButtonClassName({
+                className={getPrintToolbarButtonClassName({
                   active: colorBlockSelectionMode,
                 })}
                 onClick={toggleColorBlockSelectionMode}
@@ -1684,7 +1670,7 @@ export default function EngineeringPrintWorkspacePage() {
                 data-print-structure-action
                 icon="up"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={selectedColorBlockIndex === null}
                 onClick={() => applyColorBlockAction('insert', 'before')}
               >
@@ -1694,7 +1680,7 @@ export default function EngineeringPrintWorkspacePage() {
                 data-print-structure-action
                 icon="down"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={selectedColorBlockIndex === null}
                 onClick={() => applyColorBlockAction('insert', 'after')}
               >
@@ -1705,7 +1691,7 @@ export default function EngineeringPrintWorkspacePage() {
                 icon="remove"
                 wide
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={
                   selectedColorBlockIndex === null || draft.blocks.length <= 1
                 }
@@ -1750,7 +1736,7 @@ export default function EngineeringPrintWorkspacePage() {
                 icon="select"
                 wide
                 type="button"
-                className={getToolbarButtonClassName({
+                className={getPrintToolbarButtonClassName({
                   active: colorLineSelectionMode,
                 })}
                 onClick={toggleColorLineSelectionMode}
@@ -1761,7 +1747,7 @@ export default function EngineeringPrintWorkspacePage() {
                 data-print-structure-action
                 icon="up"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={!selectedColorLine}
                 onClick={() => applyColorLineAction('insert', 'before')}
               >
@@ -1771,7 +1757,7 @@ export default function EngineeringPrintWorkspacePage() {
                 data-print-structure-action
                 icon="down"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={!selectedColorLine}
                 onClick={() => applyColorLineAction('insert', 'after')}
               >
@@ -1782,7 +1768,7 @@ export default function EngineeringPrintWorkspacePage() {
                 icon="remove"
                 wide
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={
                   !selectedColorLine || selectedColorLine.persisted === false
                 }
@@ -1816,7 +1802,7 @@ export default function EngineeringPrintWorkspacePage() {
             icon="select"
             wide
             type="button"
-            className={getToolbarButtonClassName({
+            className={getPrintToolbarButtonClassName({
               active: instructionRowSelectionMode,
             })}
             onClick={toggleInstructionRowSelectionMode}
@@ -1827,7 +1813,7 @@ export default function EngineeringPrintWorkspacePage() {
             data-print-structure-action
             icon="up"
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             disabled={selectedWorkInstructionRowTarget === null}
             onClick={() =>
               applySelectedWorkInstructionRowAction('insert', 'before')
@@ -1839,7 +1825,7 @@ export default function EngineeringPrintWorkspacePage() {
             data-print-structure-action
             icon="down"
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             disabled={selectedWorkInstructionRowTarget === null}
             onClick={() =>
               applySelectedWorkInstructionRowAction('insert', 'after')
@@ -1852,7 +1838,7 @@ export default function EngineeringPrintWorkspacePage() {
             icon="remove"
             wide
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             disabled={
               selectedWorkInstructionRowTarget === null ||
               selectedInstructionRows.length <= 1
@@ -1877,7 +1863,7 @@ export default function EngineeringPrintWorkspacePage() {
                   icon="text"
                   wide
                   type="button"
-                  className={getToolbarButtonClassName({
+                  className={getPrintToolbarButtonClassName({
                     active:
                       getWorkInstructionRowType(selectedInstructionRow) ===
                       type,
@@ -1893,7 +1879,7 @@ export default function EngineeringPrintWorkspacePage() {
                 icon="image"
                 wide
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={
                   selectedWorkInstructionRowTarget === null ||
                   !selectedInstructionRowIsStep ||
@@ -1918,7 +1904,7 @@ export default function EngineeringPrintWorkspacePage() {
                 icon="remove"
                 wide
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 disabled={
                   selectedWorkInstructionRowTarget === null ||
                   !selectedInstructionRowIsStep ||
@@ -1934,7 +1920,7 @@ export default function EngineeringPrintWorkspacePage() {
                 icon="note"
                 wide
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 data-open-work-instruction-annotation-editor
                 disabled={
                   selectedWorkInstructionRowTarget === null ||
@@ -1996,7 +1982,7 @@ export default function EngineeringPrintWorkspacePage() {
         icon="text"
         wide
         type="button"
-        className={getToolbarButtonClassName()}
+        className={getPrintToolbarButtonClassName()}
         onMouseDown={(event) => {
           event.preventDefault()
           applyRichTextCommand('red')
@@ -2013,7 +1999,7 @@ export default function EngineeringPrintWorkspacePage() {
         icon="reset"
         wide
         type="button"
-        className={getToolbarButtonClassName()}
+        className={getPrintToolbarButtonClassName()}
         data-print-structure-action
         onClick={handleResetDraft}
       >
@@ -2023,7 +2009,7 @@ export default function EngineeringPrintWorkspacePage() {
         icon="blank"
         wide
         type="button"
-        className={getToolbarButtonClassName()}
+        className={getPrintToolbarButtonClassName()}
         data-print-structure-action
         onClick={handleBlankDraft}
       >
@@ -2036,7 +2022,7 @@ export default function EngineeringPrintWorkspacePage() {
       <PrintToolButton
         icon="preview"
         type="button"
-        className={getToolbarButtonClassName()}
+        className={getPrintToolbarButtonClassName()}
         onClick={handlePreviewPDF}
         onFocus={warmupPreviewPDF}
         onMouseEnter={warmupPreviewPDF}
@@ -2047,7 +2033,7 @@ export default function EngineeringPrintWorkspacePage() {
       <PrintToolButton
         icon="download"
         type="button"
-        className={getToolbarButtonClassName()}
+        className={getPrintToolbarButtonClassName()}
         onClick={handleDownloadPDF}
         disabled={pdfAction !== ''}
       >
@@ -2056,7 +2042,7 @@ export default function EngineeringPrintWorkspacePage() {
       <PrintToolButton
         icon="print"
         type="button"
-        className={getToolbarButtonClassName({ primary: true })}
+        className={getPrintToolbarButtonClassName({ primary: true })}
         onClick={handlePrint}
       >
         打印

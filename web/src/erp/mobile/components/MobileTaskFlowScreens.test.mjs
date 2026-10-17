@@ -10,7 +10,7 @@ const actionScreenSource = readFileSync(
   'utf8'
 )
 
-test('mobile detail defers handling steps and keeps existing receipt navigation available', async (t) => {
+test('mobile detail always exposes three steps and keeps gated receipt navigation available', async (t) => {
   const dom = installTestDOM()
   registerJSXTestLoader()
   const [{ createRoot }, { default: Header }] = await Promise.all([import('react-dom/client'), import('./MobileTaskFlowHeader.jsx')])
@@ -20,7 +20,7 @@ test('mobile detail defers handling steps and keeps existing receipt navigation 
   t.after(async () => { await act(async () => root.unmount()); container.remove(); dom.restore() })
   const render = (props) => act(async () => root.render(createElement(Header, props)))
   await render({ currentStep: 'detail', canOpenProcess: true })
-  assert.equal(container.querySelector('[aria-label="任务处理步骤"]'), null)
+  assert.equal(container.querySelectorAll('[data-step-key]').length, 3)
   await render({ currentStep: 'process' })
   assert.equal(container.querySelectorAll('[data-step-key]').length, 3)
   assert.equal(container.querySelector('[data-step-key="result"]').disabled, true)
@@ -29,6 +29,10 @@ test('mobile detail defers handling steps and keeps existing receipt navigation 
 })
 const detailScreenSource = readFileSync(
   new URL('./MobileTaskDetailScreen.jsx', import.meta.url),
+  'utf8'
+)
+const infoCardSource = readFileSync(
+  new URL('../../components/workflow/WorkflowTaskInfoCard.jsx', import.meta.url),
   'utf8'
 )
 const handlingChainSource = readFileSync(new URL('../../components/workflow/WorkflowTaskHandlingChain.jsx', import.meta.url), 'utf8')
@@ -78,6 +82,13 @@ const roleTaskPageSource = readFileSync(
   new URL('../pages/MobileRoleTasksPage.jsx', import.meta.url),
   'utf8'
 )
+
+test('mobile task flow keeps document workspaces outside its detail, action and receipt entries', () => {
+  const routerSource = readFileSync(new URL('../../router.jsx', import.meta.url), 'utf8')
+  assert.doesNotMatch(roleTaskPageSource, /onOpenBusiness=|mobileTaskBusinessPath|workflowTaskEntryNavigation/u)
+  assert.doesNotMatch(routerSource, /path="tasks\/:taskID\/handle"/u)
+  assert.match(routerSource, /path="help-center" element=\{<HelpCenterPage \/>\}/u)
+})
 
 test('mobile task action screen fails closed and covers every backend-explained action mode', () => {
   assert.match(
@@ -314,7 +325,8 @@ test('mobile detail shares current responsibility and keeps feedback in the rece
   assert.match(detailScreenSource, /contact=\{exceptionContact\}/u)
   assert.doesNotMatch(detailScreenSource, /resolveMobileTaskCompletionFeedback/u)
   assert.doesNotMatch(detailScreenSource, />\s*完成反馈\s*</u)
-  assert.match(detailScreenSource, />\s*业务信息\s*</u)
+  assert.match(detailScreenSource, /WorkflowTaskInfoCard/u)
+  assert.match(infoCardSource, />\s*业务信息\s*</u)
 })
 
 test('mobile task detail loads formal process position without QA-only banners', () => {
@@ -353,7 +365,7 @@ test('mobile task detail loads current-task records for every task and keeps the
   )
   assert.doesNotMatch(detailScreenSource, /mobile-approval-trajectory/u)
 
-  const keyInformationIndex = detailScreenSource.indexOf('业务信息')
+  const keyInformationIndex = detailScreenSource.indexOf('<WorkflowTaskInfoCard')
   const businessTrajectoryIndex = detailScreenSource.indexOf('<WorkflowTaskHandlingChain')
   const taskEventTrailIndex = detailScreenSource.indexOf(
     '<WorkflowTaskEventTrail'
@@ -368,14 +380,14 @@ test('mobile task detail loads current-task records for every task and keeps the
 test('mobile task detail separates real attachments from historical text references', () => {
   assert.match(
     detailScreenSource,
-    /data-testid="mobile-task-attachment-action"/u
+    /'data-testid': 'mobile-task-attachment-action'/u
   )
   assert.match(detailScreenSource, />\s*历史处理线索\s*</u)
   assert.match(
     detailScreenSource,
     /data-testid="mobile-role-historical-evidence"/u
   )
-  assert.match(detailScreenSource, /buttonText="任务附件"/u)
+  assert.match(detailScreenSource, /buttonText="查看附件"/u)
   assert.match(detailScreenSource, /panelTitle="附件内容"/u)
   assert.match(detailScreenSource, /showAttachmentCount/u)
   assert.match(detailScreenSource, /canUpload=\{canManageAttachments\}/u)
@@ -385,7 +397,7 @@ test('mobile task detail separates real attachments from historical text referen
   assert.doesNotMatch(detailScreenSource, /不会改变库存/u)
   assert.doesNotMatch(detailScreenSource, /当前任务尚无可显示的处理证据/u)
   assert.ok(
-    detailScreenSource.indexOf('mobile-task-attachment-action') <
+    detailScreenSource.indexOf('{taskAttachments}', detailScreenSource.indexOf('className="mobile-role-action-bar"')) >
       detailScreenSource.indexOf('<WorkflowTaskHandlingChain')
   )
   assert.match(

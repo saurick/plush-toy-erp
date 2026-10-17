@@ -113,6 +113,9 @@ func TestDebugSeedRepo_CleanupDryRunDoesNotMutateAndCleanupOnlyDebugData(t *test
 func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "debug_seed_repo_clear_business")
+	helpDraft := client.HelpSupplement.Create().SetDocumentID("scenario:purchase-arrival").SetVersion(1).SetPublishedVersion(1).SetDraftMarkdown("模拟企业收货说明").SaveX(ctx)
+	helpRevision := client.HelpSupplementRevision.Create().SetDocumentID(helpDraft.DocumentID).SetVersion(1).SetAction("publish").SetMarkdown(helpDraft.DraftMarkdown).SetSourceHash("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").SetSummary("模拟发布记录").SetActorID(7).SetActorName("模拟维护员").SaveX(ctx)
+	helpFeedback := client.HelpFeedback.Create().SetDocumentID(helpDraft.DocumentID).SetDocumentTitle("模拟收货手册").SetSourceHash(helpRevision.SourceHash).SetPublishedVersion(1).SetMessage("模拟纠错记录").SetRequestKey("SIM-CLEAR-HELP-FEEDBACK").SetActorID(7).SetActorName("模拟收货员").SaveX(ctx)
 
 	repo := NewDebugSeedRepo(
 		data,
@@ -137,23 +140,10 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 		log.NewStdLogger(io.Discard),
 	))
 	fixtures := createInventoryTestFixtures(t, ctx, client)
-	header, err := inventoryUC.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: fixtures.productID,
-		Version:   "debug-clear-v1",
-		Status:    biz.BOMStatusDraft,
-	})
-	if err != nil {
-		t.Fatalf("create bom header failed: %v", err)
-	}
-	if _, err := inventoryUC.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: header.ID,
-		MaterialID:  fixtures.materialID,
-		Quantity:    mustDecimal(t, "1.5"),
-		UnitID:      fixtures.unitID,
-		LossRate:    mustDecimal(t, "0.02"),
-	}); err != nil {
-		t.Fatalf("create bom item failed: %v", err)
-	}
+	detail := saveBOMDraftFixture(t, ctx, inventoryUC, fixtures.productID, "debug-clear-v1", &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{
+		MaterialID: fixtures.materialID, UnitID: fixtures.unitID, Quantity: mustDecimal(t, "1.5"), LossRate: mustDecimal(t, "0.02"),
+	}})
+	header := detail.Header
 	if _, err := inventoryUC.ActivateBOMVersion(ctx, header.ID); err != nil {
 		t.Fatalf("activate bom failed: %v", err)
 	}
@@ -199,6 +189,15 @@ func TestDebugSeedRepo_ClearBusinessDataDeletesCurrentProjectBusinessTables(t *t
 		t.Fatalf("unexpected clear result %#v", result)
 	}
 	assertProjectBusinessTablesEmpty(t, ctx, data)
+	if actual := client.HelpSupplement.GetX(ctx, helpDraft.ID); actual.DraftMarkdown != helpDraft.DraftMarkdown || actual.Version != 1 || actual.PublishedVersion != 1 {
+		t.Fatalf("business cleanup changed enterprise help content: %#v", actual)
+	}
+	if actual := client.HelpSupplementRevision.GetX(ctx, helpRevision.ID); actual.Markdown != helpRevision.Markdown || actual.ActorID != helpRevision.ActorID || actual.Action != helpRevision.Action {
+		t.Fatalf("business cleanup changed immutable help history: %#v", actual)
+	}
+	if actual := client.HelpFeedback.GetX(ctx, helpFeedback.ID); actual.Message != helpFeedback.Message || actual.ActorID != helpFeedback.ActorID || actual.SourceHash != helpFeedback.SourceHash {
+		t.Fatalf("business cleanup changed help correction evidence: %#v", actual)
+	}
 }
 
 func TestDebugBusinessDataClearIncludesProcessRuntimeBeforeSourceDocuments(t *testing.T) {
@@ -222,6 +221,7 @@ func TestDebugBusinessDataClearClassifiesEveryGeneratedTableAndKeepsForeignKeyOr
 	preserved := map[string]struct{}{
 		"access_entitlements": {}, "admin_sessions": {}, "admin_users": {}, "admin_user_roles": {},
 		"customer_config_revisions": {}, "deployment_module_states": {}, "permissions": {},
+		"help_feedbacks": {}, "help_supplement_revisions": {}, "help_supplements": {},
 		"roles": {}, "role_data_scopes": {}, "role_permissions": {}, "role_profiles": {},
 		"runtime_audit_events": {}, "runtime_markers": {}, "work_pools": {}, "work_pool_memberships": {},
 	}

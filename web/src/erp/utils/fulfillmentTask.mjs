@@ -9,6 +9,7 @@ const SOURCE_TYPES = Object.freeze({
   outsourcing_issue: 'outsourcing_order',
   outsourcing_return: 'outsourcing_order',
   outsourcing_quality: 'quality_inspection',
+  outsourcing_quality_request: 'outsourcing_fact',
   outsourcing_inbound: 'outsourcing_fact',
   production_execute: 'production_wip_batch',
   production_cutting_issue: 'production_wip_batch',

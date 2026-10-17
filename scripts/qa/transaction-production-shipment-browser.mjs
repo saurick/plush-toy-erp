@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { captureFlowFieldPage } from "./transaction-flow-fields-browser.mjs";
 import { createRequire } from "node:module";
-import { prepareTransactionProductionSource } from "./transaction-real-backend-fixture.mjs";
+import { prepareTransactionProductionSource, prepareTransactionSourceTask } from "./transaction-real-backend-fixture.mjs";
 import {
   businessURL,
   flowKey,
   openMobileTaskCard,
+  openMobileSourceTask,
   openDesktopTaskRow,
   assertMobileLayout,
   selectOption,
@@ -14,6 +15,7 @@ import {
   pageAction,
   modal,
   navigate,
+  settleRPCPage,
   closePage,
   clickRPC,
   login,
@@ -80,6 +82,7 @@ export function assertProductionShipmentEvidence(report) {
       Number.isSafeInteger(production.receiptID) && production.receiptID > 0,
     );
     assert.equal(production.actions.length, 21);
+    if (prefix) assert.equal(production.taskSourceMismatchBlocked, true);
     assert.ok(production.actions.every(({ confirmed }) => confirmed === true));
     const processing = production.actions.filter(
       ({ action }) => action !== "PASS_QUALITY",
@@ -183,15 +186,33 @@ async function confirmPopup(page, method) {
   );
 }
 
-async function searchReference(page, control, keyword) {
-  await control.click();
-  await page.waitForLoadState("networkidle");
+async function searchReference(page, control, keyword, referenceType) {
+  await settleRPCPage(page);
+  await control.locator("xpath=ancestor::div[contains(@class,'ant-select-selector')][1]").click();
+  await settleRPCPage(page);
+  const searched = page.waitForResponse((response) => {
+    if (!response.url().includes("/rpc/")) return false;
+    const request = response.request().postDataJSON();
+    return request.method === "list_production_order_reference_options" &&
+      request.params.reference_type === referenceType &&
+      request.params.keyword === keyword && request.params.offset === 0;
+  });
   await control.fill(keyword);
-  const option = page
-    .locator(".ant-select-dropdown:visible")
-    .getByText(new RegExp(keyword, "u"));
+  const response = await searched;
+  assert.equal(response.status(), 200);
+  const { result } = await response.json();
+  assert.equal(result.code, 0);
+  const matches = result.data.options.filter((option) => option.selectable !== false && option.label.includes(keyword));
+  assert.equal(matches.length, 1, "reference search must resolve one actual backend option");
+  await settleRPCPage(page);
+  const listboxID = await control.getAttribute("aria-controls");
+  assert.ok(listboxID);
+  const option = page.locator(`[id=${JSON.stringify(listboxID)}]`)
+    .locator("xpath=ancestor::div[contains(@class,'ant-select-dropdown')][1]")
+    .getByText(matches[0].label, { exact: true });
   await expect(option).toHaveCount(1);
   await option.click();
+  await settleRPCPage(page);
 }
 
 export async function productionShipmentFlow(
@@ -224,6 +245,33 @@ export async function productionShipmentFlow(
   };
   const open = async (role, canonicalPath) => {
     const page = await getPage(role);
+    if (options.mobile) {
+      const url = new URL(canonicalPath, options.baseURL);
+      const sourceTask = async (type, id, groups) => {
+        await openMobileSourceTask(page, options, client, role, type, id, groups);
+        return page;
+      };
+      if (url.pathname === BUSINESS_ROUTE_PATHS.processingContracts) return sourceTask('outsourcing_order', source.contract.id, ['handoff_outsourcing_issue']);
+      if (url.pathname === BUSINESS_ROUTE_PATHS.qualityInspections) return sourceTask('quality_inspection', Number(url.searchParams.get('quality_inspection_id')), ['handoff_production_quality']);
+      if (url.pathname === BUSINESS_ROUTE_PATHS.productionProgress) return sourceTask('production_fact', receipt.id, ['handoff_production_inbound']);
+      if (url.pathname === BUSINESS_ROUTE_PATHS.inventory) {
+        await sourceTask('production_fact', receipt.id, ['handoff_production_inbound']);
+        await page.getByRole('button', { name: '核对已入库批次', exact: true }).click();
+        await expect(page.getByTestId('mobile-task-related-business')).toBeVisible();
+        return page;
+      }
+      if (url.pathname === BUSINESS_ROUTE_PATHS.shipments && shipment) return sourceTask('shipment', shipment.id, ['handoff_shipment_execute']);
+      const createPlan = url.pathname === BUSINESS_ROUTE_PATHS.productionOrders && !production;
+      const type = createPlan || url.pathname === BUSINESS_ROUTE_PATHS.shipments ? 'sales_order' : 'production_order';
+      const id = type === 'sales_order' ? source.salesOrder.id : production.id;
+      await prepareTransactionSourceTask(client, role, type, id, source.prefix);
+      await sourceTask(type, id, ['business_followup']);
+      if (type === 'sales_order') {
+        await page.getByRole('button', { name: createPlan ? '办理关联生产计划' : '办理关联出货', exact: true }).click();
+        await expect(page.getByTestId('mobile-task-related-business')).toBeVisible();
+      }
+      return page;
+    }
     await navigate(
       page,
       businessURL(options, role, canonicalPath.replace(/^\/erp\//u, "")),
@@ -289,15 +337,31 @@ export async function productionShipmentFlow(
     await form
       .getByLabel("生产单号", { exact: true })
       .fill(`${source.prefix}-MO`);
+    if (options.mobile) {
+      const beforeWrites = report.browserRPC.filter((call) => call.method === "create_production_order").length;
+      await searchReference(page, form.getByLabel("销售订单行（可选）", { exact: true }), `${fixture.prefix}-DP-SO`, "sales_order_item");
+      await form.getByLabel("计划数量", { exact: true }).fill(String(source.quantity));
+      await form.getByRole("button", { name: "创建草稿", exact: true }).click();
+      await expect(page.getByText("请使用当前任务关联的销售订单行，保留填写内容后重新核对", { exact: true })).toBeVisible();
+      assert.equal(report.browserRPC.filter((call) => call.method === "create_production_order").length, beforeWrites);
+      assert.equal(client.query(`SELECT to_json(count(*)) FROM production_orders WHERE order_no='${source.prefix}-MO'`), 0);
+      const product = form.getByLabel("产品", { exact: true }).locator("xpath=ancestor::div[contains(concat(' ',normalize-space(@class),' '),' ant-select ')][1]");
+      await product.hover();
+      await product.locator('.ant-select-clear').click();
+      await expect(product.locator('.ant-select-selection-item')).toHaveCount(0);
+      progress.taskSourceMismatchBlocked = true;
+    }
     await searchReference(
       page,
       form.getByLabel("销售订单行（可选）", { exact: true }),
       source.salesOrder.order_no,
+      "sales_order_item",
     );
     await searchReference(
       page,
       form.getByLabel("BOM 版本（可选）", { exact: true }),
       source.bom.version,
+      "active_bom",
     );
     await form.getByLabel("计划数量", { exact: true }).fill("0");
     const beforeInvalid = client.query(
@@ -322,6 +386,7 @@ export async function productionShipmentFlow(
     production = aggregate.production_order;
     assert.equal(production.status, "DRAFT");
     assert.equal(aggregate.production_order_items.length, 1);
+    assert.equal(aggregate.production_order_items[0].sales_order_item_id, source.salesItem.id);
     assert.equal(
       aggregate.production_order_items[0].route_code,
       PRODUCTION_WIP_ROUTE_CODE,
@@ -607,16 +672,19 @@ export async function productionShipmentFlow(
         `${BUSINESS_ROUTE_PATHS.qualityInspections}?quality_inspection_id=${inspection.id}`,
       );
       await selectRow(p, inspection.id);
+      const focused = options.mobile ? await modal(p, "办理本次质检") : null;
       if (inspection.status === "DRAFT") {
-        await pageAction(p, "提交质检");
+        const submitted = options.mobile
+          ? await clickRPC(p, "submit_quality_inspection", () => focused.getByRole("button", { name: "提交质检", exact: true }).click())
+          : (await pageAction(p, "提交质检"), await confirmPopup(p, "submit_quality_inspection"));
         assert.equal(
-          (await confirmPopup(p, "submit_quality_inspection"))
-            .quality_inspection.status,
+          submitted.quality_inspection.status,
           "SUBMITTED",
         );
       }
       const before = inventory();
-      await pageAction(p, "判定合格");
+      if (options.mobile) await focused.getByRole("button", { name: "判定合格", exact: true }).click();
+      else await pageAction(p, "判定合格");
       const decision = await modal(p, "判定合格");
       // Production gates use a source-bound decision, while IQC owns the incoming checklist.
       await expect(
@@ -1103,6 +1171,7 @@ export async function productionShipmentFlow(
       passed: true,
       productionOrderID: production.id,
       receiptID: receipt.id,
+      taskSourceMismatchBlocked: options.mobile ? progress.taskSourceMismatchBlocked : undefined,
       stock: inventory(),
       actions,
       fulfillment,

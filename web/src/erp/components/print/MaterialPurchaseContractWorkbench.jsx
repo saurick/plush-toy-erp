@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PrintToolButton, PrintItemOrderTools } from './PrintWorkspaceTools.jsx'
+import PrintCellToolsSection from './PrintCellToolsSection.jsx'
+import { getPrintToolbarButtonClassName, PrintToolButton, PrintItemOrderTools } from './PrintWorkspaceTools.jsx'
 import usePrintWorkspaceFeedback from '../../utils/usePrintWorkspaceFeedback.js'
 import ContractClauseTools from './ContractClauseTools.jsx'
 import {
@@ -609,20 +610,6 @@ export default function MaterialPurchaseContractWorkbench({
     reportFeedback('draft', '已清空签字人，保留日期和手签位置。')
   }
 
-  const getToolbarButtonClassName = ({
-    active = false,
-    primary = false,
-  } = {}) =>
-    [
-      'erp-print-shell__button',
-      primary
-        ? 'erp-print-shell__button--primary'
-        : 'erp-print-shell__button--ghost',
-      active ? 'erp-print-shell__button--active' : '',
-    ]
-      .filter(Boolean)
-      .join(' ')
-
   const activeMerge =
     activeCell != null
       ? findMergeAtCell(draft.merges, activeCell.rowIndex, activeCell.colIndex)
@@ -728,7 +715,7 @@ export default function MaterialPurchaseContractWorkbench({
                 icon="select"
                 wide
                 type="button"
-                className={getToolbarButtonClassName({
+                className={getPrintToolbarButtonClassName({
                   active: rowSelectionMode,
                 })}
                 onClick={handleToggleRowSelectionMode}
@@ -739,7 +726,7 @@ export default function MaterialPurchaseContractWorkbench({
                 data-print-structure-action
                 icon="up"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 onClick={() => handleInsertRow('before')}
                 disabled={selectedRowIndex == null}
               >
@@ -749,7 +736,7 @@ export default function MaterialPurchaseContractWorkbench({
                 data-print-structure-action
                 icon="down"
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 onClick={() => handleInsertRow('after')}
                 disabled={selectedRowIndex == null}
               >
@@ -760,7 +747,7 @@ export default function MaterialPurchaseContractWorkbench({
                 icon="remove"
                 wide
                 type="button"
-                className={getToolbarButtonClassName()}
+                className={getPrintToolbarButtonClassName()}
                 onClick={handleDeleteRow}
                 disabled={selectedRowIndex == null}
               >
@@ -785,43 +772,15 @@ export default function MaterialPurchaseContractWorkbench({
               </span>
             </div>
           </PrintWorkspaceToolSection>
-          <PrintWorkspaceToolSection
-            title="单元格"
-            tool="cells"
+          <PrintCellToolsSection
             feedback={feedback?.area === 'cells' ? feedback : null}
-          >
-            <div className="erp-print-shell__toolbar-group">
-              <PrintToolButton
-                icon="cells"
-                wide
-                type="button"
-                className={getToolbarButtonClassName({
-                  active: cellSelectionMode,
-                })}
-                onClick={handleToggleCellSelectionMode}
-              >
-                {cellSelectionMode ? '返回编辑' : '选择单元格'}
-              </PrintToolButton>
-              <PrintToolButton
-                icon="merge"
-                type="button"
-                className={getToolbarButtonClassName()}
-                onClick={handleApplyMerge}
-                disabled={!canApplyMerge}
-              >
-                合并选区
-              </PrintToolButton>
-              <PrintToolButton
-                icon="split"
-                type="button"
-                className={getToolbarButtonClassName()}
-                onClick={handleSplitMerge}
-                disabled={!canSplitMerge}
-              >
-                拆分当前
-              </PrintToolButton>
-            </div>
-          </PrintWorkspaceToolSection>
+            cellSelectionMode={cellSelectionMode}
+            canApplyMerge={canApplyMerge}
+            canSplitMerge={canSplitMerge}
+            onToggleSelection={handleToggleCellSelectionMode}
+            onApplyMerge={handleApplyMerge}
+            onSplitMerge={handleSplitMerge}
+          />
         </>
       }
       draftActions={
@@ -830,7 +789,7 @@ export default function MaterialPurchaseContractWorkbench({
             icon="reset"
             wide
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             data-print-structure-action
             onClick={handleResetDraft}
           >
@@ -840,7 +799,7 @@ export default function MaterialPurchaseContractWorkbench({
             icon="signature"
             wide
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             onClick={handleClearSignature}
           >
             手签留白
@@ -849,7 +808,7 @@ export default function MaterialPurchaseContractWorkbench({
             icon="blank"
             wide
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             data-print-structure-action
             onClick={handleBlankDraft}
           >
@@ -862,7 +821,7 @@ export default function MaterialPurchaseContractWorkbench({
           <PrintToolButton
             icon="preview"
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             onClick={handlePreviewPDF}
             onFocus={warmupPreviewPDF}
             onMouseEnter={warmupPreviewPDF}
@@ -873,7 +832,7 @@ export default function MaterialPurchaseContractWorkbench({
           <PrintToolButton
             icon="download"
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             onClick={handleDownloadPDF}
             disabled={pdfAction !== ''}
           >
@@ -882,7 +841,7 @@ export default function MaterialPurchaseContractWorkbench({
           <PrintToolButton
             icon="print"
             type="button"
-            className={getToolbarButtonClassName({ primary: true })}
+            className={getPrintToolbarButtonClassName({ primary: true })}
             onClick={handlePrint}
           >
             打印

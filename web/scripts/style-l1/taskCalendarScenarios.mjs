@@ -129,11 +129,13 @@ revision,
       },
       verify: async (page) => {
         const switcher = '[aria-label="待办显示方式"]'
-        await page.locator(switcher).waitFor()
+        if (mobile) await page.getByRole('button', { name: '切换到日历', exact: true }).waitFor()
+        else await page.locator(switcher).waitFor()
         assert.equal(await page.getByRole('region', { name: '待办日历', exact: true }).count(), 0)
         const initial = { started: Promise.withResolvers(), release: Promise.withResolvers() }
         heldNext = initial
-        await verifyMobileNavigationMotion(page, assert, switcher, 1)
+        if (mobile) await page.getByRole('button', { name: '切换到日历', exact: true }).click()
+        else await verifyMobileNavigationMotion(page, assert, switcher, 1)
         const calendar = page.getByRole('region', { name: '待办日历', exact: true })
         await initial.started.promise
         try {
@@ -157,7 +159,7 @@ revision,
           await filters.waitFor({ state: 'hidden' })
           assert.equal(await calendar.locator('.workflow-task-calendar__buckets').count(), 0, 'mobile has one deadline filter entry')
           assert.equal(await calendar.locator('.workflow-task-calendar__month').count(), selection === 'date' ? 1 : 0, 'cross-date results hide the month')
-          if (selection !== 'date') await page.getByRole('button', { name: `清除${label}`, exact: true }).waitFor()
+          if (selection !== 'date') assert((await page.getByTestId('mobile-task-list-filter-trigger').getAttribute('title')).includes(label))
         }
         await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
         assert(calls.every((call) => !call.due), 'calendar requests do not retain list deadline conditions')
@@ -269,7 +271,7 @@ revision,
           await page.locator('.erp-task-action-drawer:visible').waitFor()
           await page.getByRole('button', { name: '返回列表', exact: true }).click()
         }
-        if (mobile) await page.getByRole('button', { name: '清除未设置截止', exact: true }).waitFor()
+        if (mobile) assert((await page.getByTestId('mobile-task-list-filter-trigger').getAttribute('title')).includes('未设置截止'))
         else await calendar.getByRole('button', { name: /^未设置截止/, pressed: true }).waitFor()
         await page.reload()
         await calendar.getByText('未设置截止的跟进', { exact: true }).waitFor()
@@ -277,9 +279,13 @@ revision,
         await calendar.getByText('上月尚未处理的跟进', { exact: true }).waitFor()
         if (mobile) {
           await page.screenshot({ path: path.join(outputDir, `${name}-overdue.png`) })
-          await page.getByRole('button', { name: '清除已逾期', exact: true }).click()
+          await page.getByRole('button', { name: '清空任务筛选', exact: true }).click()
           await calendar.locator('.workflow-task-calendar__month').waitFor()
           assert.equal(await page.getByTestId('mobile-task-list-filter-trigger').getAttribute('aria-label'), '筛选任务')
+          await selectBucket('undated')
+          await page.getByRole('button', { name: '清空任务筛选', exact: true }).tap()
+          await calendar.locator(`button[data-date="${today}"][aria-pressed="true"]`).waitFor()
+          assert.equal(await page.getByRole('button', { name: '清空任务筛选', exact: true }).count(), 0)
           await selectBucket('undated')
           await page.getByTestId('mobile-task-list-filter-trigger').click()
           const filters = page.getByRole('dialog', { name: '筛选任务', exact: true })
@@ -326,9 +332,15 @@ revision,
           await page.waitForFunction((minimum) => document.querySelectorAll('.workflow-task-calendar__task').length > minimum, before)
         }
         assert.equal(new Set(await calendar.locator('.workflow-task-calendar__task').evaluateAll((nodes) => nodes.map((node) => node.dataset.taskId))).size, 65)
-        await page.locator(switcher).scrollIntoViewIfNeeded()
-        await verifyMobileNavigationMotion(page, assert, switcher, 0, true)
-        await verifyMobileNavigationMotion(page, assert, switcher, 1, true)
+        if (mobile) {
+          await page.getByTestId('mobile-role-scroll').evaluate((node) => node.scrollTo({ top: 0 }))
+          await page.getByRole('button', { name: '切换到列表', exact: true }).click()
+          await page.getByRole('button', { name: '切换到日历', exact: true }).click()
+        } else {
+          await page.locator(switcher).scrollIntoViewIfNeeded()
+          await verifyMobileNavigationMotion(page, assert, switcher, 0, true)
+          await verifyMobileNavigationMotion(page, assert, switcher, 1, true)
+        }
         await calendar.locator(`button[data-date="${today}"]`).getByText('65 项', { exact: true }).waitFor()
         if (!mobile) {
           await page.goto(new URL('/erp/dashboard', page.url()).href)
@@ -422,7 +434,7 @@ function taskCalendarDesignScenario({ assert, path, outputDir }) {
       await calendar.getByText(/未设置截止日期/).waitFor()
       assert.equal(await calendar.locator('.task-calendar-demo-month').count(), 0)
       assert.equal(await calendar.locator('.task-calendar-demo-buckets').count(), 0)
-      await frame.getByRole('button', { name: '清除未设置截止', exact: true }).click()
+      await frame.getByRole('button', { name: '清空任务筛选', exact: true }).click()
       await calendar.getByRole('button', { name: /^2026-10-14/ }).waitFor()
       await frame.locator('[data-action="task-calendar-layout"][data-value="list"]').click()
       assert.equal(await calendar.count(), 0)

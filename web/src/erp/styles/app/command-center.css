@@ -1,7 +1,7 @@
 .erp-command-center-page {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: var(--erp-page-gap);
   min-width: 0;
 }
 
@@ -23,119 +23,6 @@
 
 .erp-command-center-shell-main {
   min-width: 0;
-}
-
-.erp-command-center-rail {
-  min-width: 0;
-  padding: 14px;
-  border: 1px solid #dce8df;
-  border-radius: 18px;
-  background: var(--erp-surface-bg);
-}
-
-.erp-command-center-rail-brand {
-  display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 14px;
-}
-
-.erp-command-center-rail-brand .ant-typography {
-  display: block;
-  line-height: 1.45;
-}
-
-.erp-command-center-rail-brand-icon,
-.erp-command-center-rail-btn-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-}
-
-.erp-command-center-rail-brand-icon {
-  width: 36px;
-  height: 36px;
-  color: #236f45;
-  background: #e7f4eb;
-}
-
-.erp-command-center-rail-nav,
-.erp-command-center-rail-group {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.erp-command-center-rail-group + .erp-command-center-rail-group {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid #e4eee7;
-}
-
-.erp-command-center-rail-group-title {
-  color: #718074;
-  font-size: var(--erp-font-caption);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.erp-command-center-rail-btn {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 10px;
-  align-items: center;
-  width: 100%;
-  min-width: 0;
-  min-height: 62px;
-  padding: 10px 12px;
-  color: #243127;
-  text-align: left;
-  border: 1px solid #dce9df;
-  border-radius: 14px;
-  background: var(--erp-surface-bg);
-  cursor: pointer;
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease;
-}
-
-.erp-command-center-rail-btn--active {
-  border-color: #9bc9a5;
-  background: #f4fbf6;
-  box-shadow: 0 10px 18px rgb(46 111 68 / 10%);
-  transform: translateY(-1px);
-}
-
-.erp-command-center-rail-btn-icon {
-  width: 34px;
-  height: 34px;
-  color: #2d7849;
-  background: #edf7ef;
-}
-
-.erp-command-center-rail-btn-copy {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.erp-command-center-rail-btn-copy span,
-.erp-command-center-rail-btn-copy small {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.erp-command-center-rail-btn-copy span {
-  font-weight: 700;
-  line-height: 1.35;
-}
-
-.erp-command-center-rail-btn-copy small {
-  color: #6f7f73;
-  font-size: var(--erp-font-caption);
-  line-height: 1.45;
 }
 
 .erp-command-center-hero {
@@ -186,7 +73,7 @@
 .erp-workbench-layout {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: var(--erp-page-gap);
   flex: 1;
   min-height: 100%;
 }
@@ -206,8 +93,8 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  min-height: 58px;
-  padding: 10px 12px;
+  min-height: 46px;
+  padding: var(--erp-panel-padding-block, 10px) var(--erp-panel-padding-inline, 12px);
 }
 
 .erp-product-core-dashboard .ant-card-body {
@@ -281,7 +168,7 @@
 }
 
 @media (hover: hover) {
-  .erp-command-center-rail-btn:not(:disabled, [aria-current='page']):hover,
+
   .erp-product-core-entry:not(:disabled):hover {
     border-color: var(--erp-interactive-border-hover);
     background: var(--erp-interactive-bg-hover);
@@ -289,7 +176,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .erp-command-center-rail-btn,
+
   .erp-product-core-entry {
     transition: none;
   }
@@ -446,7 +333,7 @@
 
 .erp-workbench-queue-panel .ant-pagination {
   margin: 0;
-  padding: 9px 12px;
+  padding: var(--erp-panel-padding-block, 9px) var(--erp-panel-padding-inline, 12px);
   border-top: 1px solid var(--erp-border);
 }
 

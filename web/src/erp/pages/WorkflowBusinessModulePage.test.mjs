@@ -18,15 +18,6 @@ const productionExceptionPanel = readFileSync(
   ),
   'utf8'
 )
-const productionRecordsNavigation = readFileSync(
-  fileURLToPath(
-    new URL(
-      '../components/production-records/ProductionRecordsNavigation.jsx',
-      import.meta.url
-    )
-  ),
-  'utf8'
-)
 const operationalFactsPage = readFileSync(
   fileURLToPath(new URL('./OperationalFactsPage.jsx', import.meta.url)),
   'utf8'
@@ -58,33 +49,21 @@ test('workflow business page consumes the dashboard source keyword without mutat
   )
 })
 
-test('production records navigation stays mounted in the shared page header', () => {
+test('production navigation is owned by the persistent module header with no nested approval queue', () => {
   const layout = readFileSync(new URL('../components/production-records/ProductionRecordsLayout.jsx', import.meta.url), 'utf8')
-  assert.match(
-    layout,
-    /<BusinessPageLayout[\s\S]*<PageHeaderCard[\s\S]*<ProductionRecordsNavigation[\s\S]*<Suspense[\s\S]*<Outlet/u
-  )
   assert.match(layout, /productionRecordsWorkspace:\s*true/u)
-  for (const label of ['记录明细', '生产工序', '异常处理', '待审批']) {
-    assert.ok(productionRecordsNavigation.includes(label))
-  }
-  assert.match(productionRecordsNavigation, /aria-label="生产记录工作区"/u)
-  assert.doesNotMatch(source, /<ProductionRecordsNavigation|productionExceptionViewTabs/u)
-  assert.doesNotMatch(source, /setHeaderStats/u)
-  assert.doesNotMatch(operationalFactsPage, /setHeaderStats/u)
-  assert.match(
-    operationalFactsPage,
-    /productionRecordsWorkspace\s*\?\s*React\.Fragment\s*:\s*BusinessPageLayout/u
-  )
+  assert.doesNotMatch(layout, /ProductionRecordsNavigation|PageHeaderCard/u)
+  assert.match(layout, /<Suspense[\s\S]*<Outlet/u)
+  assert.doesNotMatch(source, /resolveProductionExceptionTab|productionExceptionTabKeys/u)
+  assert.match(source, /const isWorkflowTaskWorkspaceActive = !isProductionExceptionPage/u)
   assert.doesNotMatch(productionExceptionPanel, /tableHeader/u)
-  assert.match(source, /resolveProductionExceptionTab/u)
-  assert.match(source, /'production-exceptions': \{[\s\S]*ownerRoleOptions: \[workflowRoleOption\('boss'\)\]/u)
+  assert.doesNotMatch(operationalFactsPage, /setHeaderStats/u)
 })
 
 test('ordinary workflow pages keep the module title without persistent helper tags', () => {
   assert.match(
     source,
-    /title=\{isProductionExceptionPage \? '生产记录' : moduleItem\.title\}/u
+    /title=\{moduleItem\.title\}/u
   )
   assert.doesNotMatch(source, /业务处理分开完成/u)
 })

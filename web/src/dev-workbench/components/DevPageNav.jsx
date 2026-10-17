@@ -118,42 +118,6 @@ export default function DevPageNav({ sourcePath = '', navRef = null }) {
     })
   }, [currentPathname])
 
-  useEffect(() => {
-    const areaSecondaryItems = getDevSecondaryNavItems(currentAreaKey)
-    const currentSecondaryIndex = areaSecondaryItems.findIndex(
-      (item) => item.route === routedPathname
-    )
-    const nextSecondaryItem =
-      areaSecondaryItems[
-        currentSecondaryIndex >= 0
-          ? (currentSecondaryIndex + 1) % areaSecondaryItems.length
-          : 0
-      ]
-    const areaLandingRoute = DEV_WORKSPACE_NAV_ITEMS.find(
-      (item) => item.key === currentAreaKey
-    )?.route
-    const routePathnames = [
-      ...new Set([areaLandingRoute, nextSecondaryItem?.route]),
-    ].filter(
-      (routePathname) => routePathname && routePathname !== routedPathname
-    )
-    const preloadVisibleRoutes = () => {
-      routePathnames.forEach((routePathname) => {
-        preloadDevRoute(routePathname)
-      })
-    }
-
-    if (typeof window.requestIdleCallback === 'function') {
-      const idleCallbackId = window.requestIdleCallback(preloadVisibleRoutes, {
-        timeout: 350,
-      })
-      return () => window.cancelIdleCallback(idleCallbackId)
-    }
-
-    const timeoutId = window.setTimeout(preloadVisibleRoutes, 0)
-    return () => window.clearTimeout(timeoutId)
-  }, [currentAreaKey, routedPathname])
-
   const handleCopyDeepLink = () => {
     copyTextToClipboard(currentDeepLink)
       .then(() =>

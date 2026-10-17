@@ -16,7 +16,7 @@ import {
 } from "./transaction-real-backend-browser.mjs";
 import { databaseNameForRun } from "./database-target.mjs";
 import { PRODUCTION_BROWSER_ACTIONS } from "./transaction-production-shipment-browser.mjs";
-import { dropRealResponse } from "./transaction-browser-ui.mjs";
+import { closePage, dropRealResponse, navigate } from "./transaction-browser-ui.mjs";
 import {
   FLOW_FIELD_AUDIT_PAGES,
   FLOW_FIELD_AUDIT_TABLES,
@@ -45,15 +45,101 @@ const target = {
   baseURL: "http://127.0.0.1:15201",
 };
 
+test("document navigation and close drain attachment reads started by the mounted view", async (t) => {
+  const previousRAF = globalThis.requestAnimationFrame;
+  t.after(() => {
+    if (previousRAF === undefined) delete globalThis.requestAnimationFrame;
+    else globalThis.requestAnimationFrame = previousRAF;
+  });
+  const pending = new Set();
+  const responses = new Set();
+  const downloads = [];
+  let frames = 0;
+  let closed = false;
+  const counts = { started: 0, completed: 0, failed: 0, navigationAborted: 0 };
+  const page = {
+    pendingRPC: pending,
+    rpcResponses: responses,
+    rpcRecorded: 0,
+    rpcNetwork: { counts },
+    evaluate: (callback) => callback(),
+    async waitForLoadState(state) {
+      assert.equal(state, "networkidle");
+      for (const download of downloads.splice(0)) {
+        pending.delete(download);
+        counts.completed++;
+        download.complete();
+      }
+    },
+    async goto(url) {
+      assert.equal(url, "http://127.0.0.1/next");
+      assert.equal(counts.completed, 1, "the old view's deferred attachment must finish before navigation");
+      assert.equal(page.rpcRecorded, 1, "its actual business response must be collected before navigation");
+      assert.equal(pending.size, 0);
+    },
+  };
+  globalThis.requestAnimationFrame = (callback) => {
+    queueMicrotask(() => {
+      frames++;
+      if (frames % 2 === 0) {
+        const download = { method: "download_attachment" };
+        const response = new Promise((resolve) => { download.complete = resolve; })
+          .then(() => { page.rpcRecorded++; });
+        pending.add(download);
+        responses.add(response);
+        downloads.push(download);
+        counts.started++;
+      }
+      callback(0);
+    });
+    return frames;
+  };
+  await navigate(page, "http://127.0.0.1/next");
+  assert.equal(page.rpcRecorded, 2, "the new view's deferred read must also finish");
+  await closePage(page, {
+    async unrouteAll(options) {
+      assert.deepEqual(options, { behavior: "wait" });
+      assert.equal(page.rpcRecorded, 3);
+    },
+    async close() { closed = true; },
+  });
+  assert.equal(closed, true);
+  assert.equal(counts.started, 3);
+  assert.equal(counts.completed, 3);
+  assert.equal(page.rpcRecorded, 3);
+  assert.equal(pending.size, 0);
+});
+
 test("lost-response removal waits for the real abort and captures only one request", async () => {
   const events = [];
   let handler;
+  let completeRecovery;
+  let recovered = false;
+  const recovery = new Promise((resolve) => { completeRecovery = resolve; })
+    .then(() => { recovered = true; });
   const page = {
     expectedRPCFailures: new Map(),
+    pendingRPC: new Set(["list_purchase_returns"]),
+    rpcResponses: new Set([recovery]),
+    evaluate: async () => {},
+    waitForLoadState: async state => {
+      assert.equal(state, "networkidle");
+      assert.ok(events.includes("abort-end"));
+      assert.equal(events.includes("unroute"), false, "recovery reads must retain their live route");
+      if (page.pendingRPC.size) {
+        events.push("recovery");
+        page.pendingRPC.clear();
+        completeRecovery();
+      }
+    },
     route: async (_pattern, callback) => {
       handler = callback;
     },
-    unroute: async () => events.push("unroute"),
+    unrouteAll: async options => {
+      assert.deepEqual(options, { behavior: "wait" });
+      assert.equal(recovered, true, "the actual recovery response must be collected before route disposal");
+      events.push("unroute");
+    },
   };
   const fault = await dropRealResponse(
     page,
@@ -101,6 +187,7 @@ test("lost-response removal waits for the real abort and captures only one reque
     "abort-start",
     "fallback",
     "abort-end",
+    "recovery",
     "unroute",
   ]);
   assert.equal(fault.state.injected, true);
@@ -114,7 +201,7 @@ test("an abort failure cannot become successful lost-response evidence", async (
     route: async (_pattern, callback) => {
       handler = callback;
     },
-    unroute: async () => {},
+    unrouteAll: async options => { assert.deepEqual(options, { behavior: "wait" }); },
   };
   const fault = await dropRealResponse(
     page,
@@ -219,6 +306,7 @@ function completeReport() {
   const productionFields = {
     productionOrderID: 101,
     receiptID: 201,
+    taskSourceMismatchBlocked: true,
     stock: { quantity: 2, net: 2, txns: 1 },
     fulfillment: [
       { stage: "handwork_completed", stock: { quantity: 0, net: 0, txns: 0 } },

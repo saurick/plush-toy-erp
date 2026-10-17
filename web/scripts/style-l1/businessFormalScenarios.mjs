@@ -39,9 +39,11 @@ import { createSalesOrderReservationScenarios } from './salesOrderReservationSce
 import { createProductionMaterialIssueScenarios } from './productionMaterialIssueScenarios.mjs'
 import { createBusinessAttachmentRecoveryScenarios } from './businessAttachmentRecoveryScenarios.mjs'
 import { createBusinessCorePagesScenarios } from './businessCorePagesScenarios.mjs'
+import { createCompactPageScenarios } from './compactPageScenarios.mjs'
 
 export function createBusinessFormalScenarios(deps) {
   return [
+    ...createCompactPageScenarios(deps),
     ...createSalesOrderDemandEntryScenarios(deps),
     ...createSalesOrderSkuGrainScenarios(deps),
     ...createSalesOrderSubmissionScenarios(deps),

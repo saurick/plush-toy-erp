@@ -139,6 +139,8 @@ CSP 当前保留 `script-src 'unsafe-inline'` 和 `style-src 'unsafe-inline'`，
 
 ## 角色演示账号 seed
 
+三个模拟数据命令 `seed-core-demo-data`、`seed-role-demo-admins`、`seed-trial-sim-masterdata` 共用 [`internal/commandconfig`](../internal/commandconfig/postgres.go) 读取连接：`POSTGRES_DSN` 优先，其次读取指定配置与同目录的 `.local` 覆盖；直接指定 `.local` 文件时只读取该文件。无效覆盖配置会报错，避免连接到非预期目标。各命令继续在读取前检查用途、读取后通过 `devdbguard` 核对目标身份。
+
 角色演示账号不属于 `data.auth` 配置，不写入 `conf.proto`，也不进入 `server/configs/dev|prod/config.yaml`。需要切换角色或同时登录多个岗位做开发 / 验收时，应显式执行：
 
 ```bash

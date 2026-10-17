@@ -15,226 +15,118 @@ import (
 )
 
 func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	data, client := openInventoryRepoTestData(t, "inventory_repo_bom")
-
-	fixtures := createInventoryTestFixtures(t, ctx, client)
-	uc := biz.NewInventoryUsecase(NewInventoryRepo(
-		data,
-		log.NewStdLogger(io.Discard),
-	))
-
-	header, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID:     fixtures.productID,
-		Version:       "V1",
-		Status:        biz.BOMStatusDraft,
-		SourceOrderNo: stringPtr("WL260102"),
-		QuantityText:  stringPtr("3030"),
-		SpareText:     stringPtr("备品 30"),
-		Designer:      stringPtr("罗伟"),
-		Maker:         stringPtr("成慧怡"),
-		Auditor:       stringPtr("审核人"),
-		HairDirection: stringPtr("单方向"),
-	})
+	f := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	part := biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID,
+		Quantity: mustDecimal(t, "1.25"), LossRate: mustDecimal(t, "0.1"),
+		Position: stringPtr("face"), PieceCount: stringPtr("2"), TotalUsageSnapshot: stringPtr("378.75"),
+		ProcessBase: stringPtr("布底贴12g纸朴"), ProcessMethod: stringPtr("热裁")}
+	input := &biz.BOMVersionMutation{ProductID: f.productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{
+		Version: "V1", SourceOrderNo: stringPtr("WL260102"), QuantityText: stringPtr("3030"),
+		SpareText: stringPtr("备品 30"), Designer: stringPtr("罗伟"), Maker: stringPtr("成慧怡"),
+		Auditor: stringPtr("审核人"), HairDirection: stringPtr("单方向")}}
+	created, err := uc.SaveBOMWithItems(ctx, 0, input, []*biz.BOMItemSaveMutation{{BOMItemUpdate: part}})
 	if err != nil {
-		t.Fatalf("create bom header failed: %v", err)
+		t.Fatal(err)
 	}
-	if header.Status != biz.BOMStatusDraft {
-		t.Fatalf("expected draft bom header, got %s", header.Status)
-	}
-	if header.ItemCount != nil {
-		t.Fatalf("create response must not report an unloaded list item count: %#v", header.ItemCount)
-	}
-	defaultDraft, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: fixtures.productID,
-		Version:   "DEFAULT-DRAFT",
-	})
-	if err != nil || defaultDraft.Status != biz.BOMStatusDraft {
-		t.Fatalf("expected omitted BOM status to default to DRAFT, header=%#v err=%v", defaultDraft, err)
-	}
-	for index, status := range []string{biz.BOMStatusActive, biz.BOMStatusArchived, "DISABLED", "UNKNOWN"} {
-		if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-			ProductID: fixtures.productID,
-			Version:   "NON-DRAFT-" + string(rune('A'+index)),
-			Status:    status,
-		}); !errors.Is(err, biz.ErrBadParam) {
-			t.Fatalf("expected normal BOM create with status %s rejected, got %v", status, err)
-		}
+	header, item := created.Header, created.Items[0]
+	if header.Status != biz.BOMStatusDraft || header.ItemCount != nil {
+		t.Fatalf("created BOM header: %+v", header)
 	}
 	if header.SourceOrderNo == nil || *header.SourceOrderNo != "WL260102" || header.Designer == nil || *header.Designer != "罗伟" {
-		t.Fatalf("expected BOM engineering header fields, got %#v", header)
+		t.Fatalf("missing engineering header: %+v", header)
 	}
-	if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: fixtures.productID,
-		Version:   "V1",
-		Status:    biz.BOMStatusDraft,
-	}); !errors.Is(err, biz.ErrBOMRecordConflict) {
-		t.Fatalf("expected product/version unique constraint, got %v", err)
-	}
-	draftHeader, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: fixtures.productID,
-		Version:   "V2",
-		Status:    biz.BOMStatusDraft,
-	})
-	if err != nil {
-		t.Fatalf("expected draft BOM with different version to be allowed, got %v", err)
-	}
-	position := "face"
-	item, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID:        header.ID,
-		MaterialID:         fixtures.materialID,
-		Quantity:           mustDecimal(t, "1.250000"),
-		UnitID:             fixtures.unitID,
-		LossRate:           mustDecimal(t, "0.100000"),
-		Position:           &position,
-		PieceCount:         stringPtr("2"),
-		TotalUsageSnapshot: stringPtr("378.75"),
-		ProcessBase:        stringPtr("布底贴12g纸朴"),
-		ProcessMethod:      stringPtr("热裁"),
-	})
-	if err != nil {
-		t.Fatalf("create bom item failed: %v", err)
-	}
-	assertDecimalEqual(t, item.Quantity, "1.250000")
-	assertDecimalEqual(t, item.LossRate, "0.100000")
+	assertDecimalEqual(t, item.Quantity, "1.25")
+	assertDecimalEqual(t, item.LossRate, "0.1")
 	if item.PieceCount == nil || *item.PieceCount != "2" || item.ProcessMethod == nil || *item.ProcessMethod != "热裁" {
-		t.Fatalf("expected BOM engineering item fields, got %#v", item)
+		t.Fatalf("missing engineering item: %+v", item)
 	}
-	headers, total, err := uc.ListBOMHeaders(ctx, biz.BOMHeaderFilter{ProductID: fixtures.productID, Limit: 20})
+	if _, err := uc.SaveBOMWithItems(ctx, 0, input, nil); !errors.Is(err, biz.ErrBOMRecordConflict) {
+		t.Fatalf("duplicate product/version: %v", err)
+	}
+	defaultDraft := saveBOMDraftFixture(t, ctx, uc, f.productID, "DEFAULT-DRAFT")
+	draft := saveBOMDraftFixture(t, ctx, uc, f.productID, "V2")
+	headers, total, err := uc.ListBOMHeaders(ctx, biz.BOMHeaderFilter{ProductID: f.productID, Limit: 20})
 	if err != nil || total != 3 || len(headers) != 3 {
-		t.Fatalf("list BOM headers=%#v total=%d err=%v", headers, total, err)
+		t.Fatalf("list: %d %+v %v", total, headers, err)
 	}
-	counts := make(map[int]int, len(headers))
+	counts := map[int]int{}
 	for _, listed := range headers {
 		if listed.ItemCount == nil {
-			t.Fatalf("list BOM header %d has unknown item count", listed.ID)
+			t.Fatalf("unknown item count: %+v", listed)
 		}
 		counts[listed.ID] = *listed.ItemCount
 	}
-	if counts[header.ID] != 1 || counts[defaultDraft.ID] != 0 || counts[draftHeader.ID] != 0 {
-		t.Fatalf("list BOM item counts=%#v, want populated=1 and empty drafts=0", counts)
+	if counts[header.ID] != 1 || counts[defaultDraft.Header.ID] != 0 || counts[draft.Header.ID] != 0 {
+		t.Fatalf("item counts: %+v", counts)
 	}
-
 	activated, err := uc.ActivateBOMVersion(ctx, header.ID)
-	if err != nil {
-		t.Fatalf("activate bom failed: %v", err)
-	}
-	if activated.Header.Status != biz.BOMStatusActive || len(activated.Items) != 1 {
-		t.Fatalf("expected active bom with one item, got %#v", activated)
-	}
-	if replayed, err := uc.ActivateBOMVersion(ctx, header.ID); err != nil || replayed.Header.ID != header.ID || replayed.Header.Status != biz.BOMStatusActive {
-		t.Fatalf("expected activating ACTIVE BOM to be idempotent, detail=%#v err=%v", replayed, err)
+	if err != nil || activated.Header.Status != biz.BOMStatusActive || len(activated.Items) != 1 {
+		t.Fatalf("activation: %+v %v", activated, err)
 	}
 	for _, toggle := range []func(bool){
-		func(active bool) { client.Product.UpdateOneID(fixtures.productID).SetIsActive(active).ExecX(ctx) },
-		func(active bool) { client.Material.UpdateOneID(fixtures.materialID).SetIsActive(active).ExecX(ctx) },
-		func(active bool) { client.Unit.UpdateOneID(fixtures.unitID).SetIsActive(active).ExecX(ctx) },
+		func(active bool) { client.Product.UpdateOneID(f.productID).SetIsActive(active).ExecX(ctx) },
+		func(active bool) { client.Material.UpdateOneID(f.materialID).SetIsActive(active).ExecX(ctx) },
+		func(active bool) { client.Unit.UpdateOneID(f.unitID).SetIsActive(active).ExecX(ctx) },
 	} {
 		toggle(false)
-		replayed, err := uc.ActivateBOMVersion(ctx, header.ID)
+		replay, err := uc.ActivateBOMVersion(ctx, header.ID)
 		toggle(true)
-		if err != nil || replayed.Header.ID != header.ID || replayed.Header.Status != biz.BOMStatusActive {
-			t.Fatalf("inactive reference changed an already successful activation: %+v %v", replayed, err)
+		if err != nil || replay.Header.ID != header.ID || replay.Header.Status != biz.BOMStatusActive {
+			t.Fatalf("activation replay with inactive reference: %+v %v", replay, err)
 		}
 	}
-	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: header.ID,
-		MaterialID:  fixtures.materialID,
-		Quantity:    mustDecimal(t, "1"),
-		UnitID:      fixtures.unitID,
-		LossRate:    decimal.Zero,
-	}); !errors.Is(err, biz.ErrBOMActiveImmutable) {
-		t.Fatalf("expected active BOM item mutation to be rejected, got %v", err)
+	if _, err := uc.SaveBOMWithItems(ctx, header.ID, &biz.BOMVersionMutation{
+		ExpectedVersion: activated.Header.EditVersion, ProductID: f.productID,
+		BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "ACTIVE-EDIT"},
+	}, []*biz.BOMItemSaveMutation{{BOMItemUpdate: part}}); !errors.Is(err, biz.ErrBOMActiveImmutable) {
+		t.Fatalf("active BOM edit: %v", err)
 	}
-
-	activeHeader, err := uc.GetActiveBOMByProduct(ctx, fixtures.productID)
-	if err != nil {
-		t.Fatalf("get active bom failed: %v", err)
+	active, err := uc.GetActiveBOMByProduct(ctx, f.productID)
+	if err != nil || active.ID != header.ID {
+		t.Fatalf("active BOM: %+v %v", active, err)
 	}
-	if activeHeader.ID != header.ID {
-		t.Fatalf("expected active bom id %d, got %d", header.ID, activeHeader.ID)
+	items, err := uc.ListBOMItemsByProduct(ctx, f.productID)
+	if err != nil || len(items) != 1 || items[0].ID != item.ID {
+		t.Fatalf("active BOM items: %+v %v", items, err)
 	}
-
-	items, err := uc.ListBOMItemsByProduct(ctx, fixtures.productID)
-	if err != nil {
-		t.Fatalf("list active bom items failed: %v", err)
+	product := createTestProduct(t, ctx, client, f.unitID, "PRD-BOM-LIFECYCLE")
+	lifecycle := saveBOMDraftFixture(t, ctx, uc, product.ID, "V1", &biz.BOMItemSaveMutation{BOMItemUpdate: part})
+	for _, step := range []string{"archive", "archive", "activate", "archive"} {
+		if step == "activate" {
+			row, err := uc.ActivateBOMVersion(ctx, lifecycle.Header.ID)
+			if err != nil || row.Header.Status != biz.BOMStatusActive {
+				t.Fatalf("reactivate: %+v %v", row, err)
+			}
+		} else {
+			row, err := uc.ArchiveBOMVersion(ctx, lifecycle.Header.ID)
+			if err != nil || row.Status != biz.BOMStatusArchived {
+				t.Fatalf("archive: %+v %v", row, err)
+			}
+		}
 	}
-	if len(items) != 1 || items[0].ID != item.ID {
-		t.Fatalf("expected one active bom item id=%d, got %#v", item.ID, items)
+	for _, tc := range []struct {
+		name   string
+		change func(*biz.BOMItemUpdate)
+		want   error
+	}{
+		{"zero quantity", func(v *biz.BOMItemUpdate) { v.Quantity = decimal.Zero }, biz.ErrBadParam},
+		{"negative loss", func(v *biz.BOMItemUpdate) { v.LossRate = decimal.NewFromInt(-1) }, biz.ErrBadParam},
+		{"missing material", func(v *biz.BOMItemUpdate) { v.MaterialID = 999999 }, biz.ErrMaterialNotFound},
+		{"missing unit", func(v *biz.BOMItemUpdate) { v.UnitID = 999999 }, biz.ErrUnitNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			invalid := part
+			tc.change(&invalid)
+			_, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{ProductID: f.productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: tc.name}}, []*biz.BOMItemSaveMutation{{BOMItemUpdate: invalid}})
+			if !errors.Is(err, tc.want) {
+				t.Fatalf("error=%v want=%v", err, tc.want)
+			}
+		})
 	}
-
-	lifecycleProduct := createTestProduct(t, ctx, client, fixtures.unitID, "PRD-BOM-LIFECYCLE")
-	lifecycleHeader, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: lifecycleProduct.ID,
-		Version:   "V1",
-	})
-	if err != nil {
-		t.Fatalf("create lifecycle BOM draft: %v", err)
-	}
-	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: lifecycleHeader.ID,
-		MaterialID:  fixtures.materialID,
-		Quantity:    mustDecimal(t, "1"),
-		UnitID:      fixtures.unitID,
-		LossRate:    decimal.Zero,
-	}); err != nil {
-		t.Fatalf("create lifecycle BOM item: %v", err)
-	}
-	archivedDraft, err := uc.ArchiveBOMVersion(ctx, lifecycleHeader.ID)
-	if err != nil || archivedDraft.Status != biz.BOMStatusArchived {
-		t.Fatalf("expected DRAFT to archive, header=%#v err=%v", archivedDraft, err)
-	}
-	if replayed, err := uc.ArchiveBOMVersion(ctx, lifecycleHeader.ID); err != nil || replayed.Status != biz.BOMStatusArchived {
-		t.Fatalf("expected archiving ARCHIVED BOM to be idempotent, header=%#v err=%v", replayed, err)
-	}
-	reactivated, err := uc.ActivateBOMVersion(ctx, lifecycleHeader.ID)
-	if err != nil || reactivated.Header.Status != biz.BOMStatusActive {
-		t.Fatalf("expected ARCHIVED BOM to reactivate, detail=%#v err=%v", reactivated, err)
-	}
-	if archivedActive, err := uc.ArchiveBOMVersion(ctx, lifecycleHeader.ID); err != nil || archivedActive.Status != biz.BOMStatusArchived {
-		t.Fatalf("expected ACTIVE BOM to archive, header=%#v err=%v", archivedActive, err)
-	}
-
-	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: draftHeader.ID,
-		MaterialID:  fixtures.materialID,
-		Quantity:    decimal.Zero,
-		UnitID:      fixtures.unitID,
-		LossRate:    decimal.Zero,
-	}); !errors.Is(err, biz.ErrBadParam) {
-		t.Fatalf("expected quantity <= 0 to be rejected, got %v", err)
-	}
-
-	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: draftHeader.ID,
-		MaterialID:  fixtures.materialID,
-		Quantity:    mustDecimal(t, "1"),
-		UnitID:      fixtures.unitID,
-		LossRate:    mustDecimal(t, "-0.01"),
-	}); !errors.Is(err, biz.ErrBadParam) {
-		t.Fatalf("expected loss_rate < 0 to be rejected, got %v", err)
-	}
-
-	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: draftHeader.ID,
-		MaterialID:  999999,
-		Quantity:    mustDecimal(t, "1"),
-		UnitID:      fixtures.unitID,
-		LossRate:    decimal.Zero,
-	}); !errors.Is(err, biz.ErrMaterialNotFound) {
-		t.Fatalf("expected missing material to be rejected, got %v", err)
-	}
-
-	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: draftHeader.ID,
-		MaterialID:  fixtures.materialID,
-		Quantity:    mustDecimal(t, "1"),
-		UnitID:      999999,
-		LossRate:    decimal.Zero,
-	}); !errors.Is(err, biz.ErrUnitNotFound) {
-		t.Fatalf("expected missing unit to be rejected, got %v", err)
-	}
-
+	fixtures := f
 	if _, err := client.BOMItem.Create().
 		SetBomHeaderID(header.ID).
 		SetMaterialID(fixtures.materialID).
@@ -274,67 +166,34 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 }
 
 func TestInventoryUsecase_BOMRejectsInactiveNewReferencesAndKeepsArchiveAllowed(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	data, client := openInventoryRepoTestData(t, "inventory_repo_bom_inactive_refs")
-	fixtures := createInventoryTestFixtures(t, ctx, client)
+	f := createInventoryTestFixtures(t, ctx, client)
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	part := &biz.BOMItemSaveMutation{BOMItemUpdate: biz.BOMItemUpdate{MaterialID: f.materialID, UnitID: f.unitID, Quantity: decimal.NewFromInt(1)}}
+	created := saveBOMDraftFixture(t, ctx, uc, f.productID, "ACTIVE-V1", part)
+	if _, err := uc.ActivateBOMVersion(ctx, created.Header.ID); err != nil {
+		t.Fatal(err)
+	}
+	client.Product.UpdateOneID(f.productID).SetIsActive(false).ExecX(ctx)
+	if _, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{ProductID: f.productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "NEW-V2"}}, nil); !errors.Is(err, biz.ErrProductInactive) {
+		t.Fatalf("inactive product: %v", err)
+	}
+	if archived, err := uc.ArchiveBOMVersion(ctx, created.Header.ID); err != nil || archived.Status != biz.BOMStatusArchived {
+		t.Fatalf("archive inactive reference: %+v %v", archived, err)
+	}
+	product := createTestProduct(t, ctx, client, f.unitID, "PRD-BOM-ACTIVE")
+	client.Material.UpdateOneID(f.materialID).SetIsActive(false).ExecX(ctx)
+	if _, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{ProductID: product.ID, BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: "DRAFT-V1"}}, []*biz.BOMItemSaveMutation{part}); !errors.Is(err, biz.ErrMaterialInactive) {
+		t.Fatalf("inactive material: %v", err)
+	}
+}
 
-	header, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: fixtures.productID,
-		Version:   "ACTIVE-V1",
-		Status:    biz.BOMStatusDraft,
-	})
+func saveBOMDraftFixture(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, productID int, version string, items ...*biz.BOMItemSaveMutation) *biz.BOMVersionDetail {
+	t.Helper()
+	result, err := uc.SaveBOMWithItems(ctx, 0, &biz.BOMVersionMutation{ProductID: productID, BOMHeaderUpdate: biz.BOMHeaderUpdate{Version: version}}, items)
 	if err != nil {
-		t.Fatalf("create bom header failed: %v", err)
+		t.Fatalf("save BOM fixture: %v", err)
 	}
-	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: header.ID,
-		MaterialID:  fixtures.materialID,
-		Quantity:    mustDecimal(t, "1"),
-		UnitID:      fixtures.unitID,
-		LossRate:    decimal.Zero,
-	}); err != nil {
-		t.Fatalf("create bom item failed: %v", err)
-	}
-	if _, err := uc.ActivateBOMVersion(ctx, header.ID); err != nil {
-		t.Fatalf("activate bom failed: %v", err)
-	}
-
-	if _, err := client.Product.UpdateOneID(fixtures.productID).SetIsActive(false).Save(ctx); err != nil {
-		t.Fatalf("disable product failed: %v", err)
-	}
-	if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: fixtures.productID,
-		Version:   "NEW-V2",
-		Status:    biz.BOMStatusDraft,
-	}); !errors.Is(err, biz.ErrProductInactive) {
-		t.Fatalf("expected inactive product rejected for new bom, got %v", err)
-	}
-	if archived, err := uc.ArchiveBOMVersion(ctx, header.ID); err != nil {
-		t.Fatalf("archive existing active bom should not be blocked by inactive product: %v", err)
-	} else if archived.Status != biz.BOMStatusArchived {
-		t.Fatalf("expected archived bom, got %s", archived.Status)
-	}
-
-	activeProduct := createTestProduct(t, ctx, client, fixtures.unitID, "PRD-BOM-ACTIVE")
-	draft, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: activeProduct.ID,
-		Version:   "DRAFT-V1",
-		Status:    biz.BOMStatusDraft,
-	})
-	if err != nil {
-		t.Fatalf("create active product bom header failed: %v", err)
-	}
-	if _, err := client.Material.UpdateOneID(fixtures.materialID).SetIsActive(false).Save(ctx); err != nil {
-		t.Fatalf("disable material failed: %v", err)
-	}
-	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
-		BOMHeaderID: draft.ID,
-		MaterialID:  fixtures.materialID,
-		Quantity:    mustDecimal(t, "1"),
-		UnitID:      fixtures.unitID,
-		LossRate:    decimal.Zero,
-	}); !errors.Is(err, biz.ErrMaterialInactive) {
-		t.Fatalf("expected inactive material rejected for new bom item, got %v", err)
-	}
+	return result
 }

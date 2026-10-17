@@ -3,6 +3,12 @@ package biz
 import "strings"
 
 const (
+	PermissionHelpBusinessEdit           = "help.business.edit"
+	PermissionHelpBusinessPublish        = "help.business.publish"
+	PermissionHelpAdministrationEdit     = "help.administration.edit"
+	PermissionHelpAdministrationPublish  = "help.administration.publish"
+	PermissionHelpOperationsEdit         = "help.operations.edit"
+	PermissionHelpOperationsPublish      = "help.operations.publish"
 	PermissionSystemUserRead             = "system.user.read"
 	PermissionSystemUserCreate           = "system.user.create"
 	PermissionSystemUserUpdate           = "system.user.update"
@@ -195,6 +201,7 @@ const (
 )
 
 var builtinPermissionModuleNames = map[string]string{
+	"help":            "帮助与企业补充",
 	"system":          "系统管理",
 	"customer_config": "客户配置",
 	"process_runtime": "异常流程恢复",
@@ -290,6 +297,12 @@ type AdminMenu struct {
 }
 
 var builtinPermissions = withBuiltinPermissionMetadata([]PermissionDefinition{
+	{Key: PermissionHelpBusinessEdit, Name: "编辑业务手册企业补充", Module: "help", Action: "edit", Resource: "business", Builtin: true},
+	{Key: PermissionHelpBusinessPublish, Name: "发布业务手册企业补充", Module: "help", Action: "publish", Resource: "business", Builtin: true},
+	{Key: PermissionHelpAdministrationEdit, Name: "编辑管理实施企业补充", Module: "help", Action: "edit", Resource: "administration", Builtin: true},
+	{Key: PermissionHelpAdministrationPublish, Name: "发布管理实施企业补充", Module: "help", Action: "publish", Resource: "administration", Builtin: true},
+	{Key: PermissionHelpOperationsEdit, Name: "编辑技术运维企业补充", Module: "help", Action: "edit", Resource: "operations", Builtin: true},
+	{Key: PermissionHelpOperationsPublish, Name: "发布技术运维企业补充", Module: "help", Action: "publish", Resource: "operations", Builtin: true},
 	{Key: PermissionSystemUserRead, Name: "查看管理员", Module: "system", Action: "read", Resource: "admin_user", Builtin: true},
 	{Key: PermissionSystemUserCreate, Name: "创建管理员", Module: "system", Action: "create", Resource: "admin_user", Builtin: true},
 	{Key: PermissionSystemUserUpdate, Name: "更新管理员", Module: "system", Action: "update", Resource: "admin_user", Builtin: true},

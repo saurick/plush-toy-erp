@@ -55,6 +55,7 @@ const DEV_DESKTOP_SCENARIOS = Object.freeze([
   "dev-version-center-tabs-pagination-desktop",
   "dev-page-overview-desktop-light",
   "dev-page-product-engineering-desktop-light",
+  "dev-page-integration-desktop-light",
   "dev-page-quality-desktop-light",
   "dev-page-delivery-desktop-light",
   "dev-page-product-core-desktop-light",
@@ -71,6 +72,7 @@ const SCHEMA_DOCS_TEST = "scripts/qa/schema-docs.test.mjs";
 const PUBLIC_CONTRACTS_TEST = "scripts/gen-public-contracts.test.mjs";
 const PUBLIC_STATUS_COVERAGE_TEST = "web/src/erp/utils/businessStatusCoverage.test.mjs";
 const PUBLIC_CONTRACT_SOURCE = /^server\/(?:cmd\/public-contracts\/|internal\/(?:core\/(?:status\/|value\/numeric\.go$)|biz\/(?:rbac|workflow_metadata|workflow_task_catalog|business_attachment|finance_payment|process_runtime|inventory_operation|purchase_rejection_disposition|engineering_material_request|production_wip|production_exception_decision|operational_fact|outsourcing_order|production_order|admin_password)\.(?:go|json)$|server\/template_pdf(?:_security)?\.go$))/u;
+const RPC_TRANSPORT_SOURCE = /^server\/api\/jsonrpc\/v1\/jsonrpc(?:\.proto|\.pb\.go|_http\.pb\.go|\.swagger\.json)$/u;
 const PRIVATE_SOURCE_EXTENSIONS = new Set([
   ".doc",
   ".docx",
@@ -621,6 +623,8 @@ function devBrowserScenarioNames(file) {
       ["dev-version-center-tabs-pagination-desktop"],
     ],
     [/ProductCore|product-core/u, ["dev-page-product-core-desktop-light"]],
+    [/DevIntegration/u, ["dev-page-integration-desktop-light"]],
+    [/DevProjectGraphView|DevProjectRelationships|devProjectGraph|devRelationshipPerspectives/u, ["dev-page-product-engineering-desktop-light", "dev-page-integration-desktop-light"]],
     [
       /PermissionRelationship|permission-relationships/u,
       ["dev-page-permission-relationships-desktop-light"],
@@ -713,7 +717,7 @@ function isWorkflowRoleTaskConservationPath(file) {
   return [
     /^server\/internal\/(?:biz\/workflow_role_task_view|data\/workflow_role_task_view_repo)(?:_test)?\.go$/u,
     /^server\/internal\/data\/workflow_repo_postgres_concurrency_test\.go$/u,
-    /^server\/internal\/service\/jsonrpc_workflow_task(?:_revision_visibility_test)?\.go$/u,
+    /^server\/internal\/service\/jsonrpc_workflow_task(?:_(?:board|role_view|action|access|revision_visibility))?(?:_test)?\.go$/u,
     /^web\/src\/erp\/api\/workflowApi(?:\.test)?\.mjs$/u,
     /^web\/src\/erp\/utils\/mobileTaskQueries(?:\.test)?\.mjs$/u,
     /^web\/src\/erp\/mobile\/(?:pages\/MobileRoleTasksPage\.jsx|components\/MobileTaskListScreen(?:\.jsx|\.test\.mjs)|hooks\/useMobileRoleTaskActions\.test\.mjs)$/u,
@@ -744,6 +748,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   for (const file of changedFiles) {
     if (
       PUBLIC_CONTRACT_SOURCE.test(file) ||
+      RPC_TRANSPORT_SOURCE.test(file) ||
       /^server\/internal\/service\/jsonrpc[^/]*\.go$/u.test(file) && !file.endsWith("_test.go") ||
       /^web\/src\/common\/consts\/[^/]+\.generated\.mjs$/u.test(file) ||
       file === "scripts/gen-public-contracts.mjs" ||
@@ -753,6 +758,10 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       addFixed(state, "publicContractConsumers", file);
       directTests.add(PUBLIC_CONTRACTS_TEST);
       directTests.add(PUBLIC_STATUS_COVERAGE_TEST);
+    }
+    if (RPC_TRANSPORT_SOURCE.test(file)) {
+      addFixed(state, "serverApi", file);
+      continue;
     }
     if (file === "server/internal/biz/admin_erp_appearance.json") {
       directTests.add("web/src/common/theme/erpAppearance.test.mjs");

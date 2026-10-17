@@ -803,8 +803,8 @@ export function createPrintWorkspaceScenarios({
           ].map((selector) => document.querySelector(selector))
 
           return {
-            commandRailInPage: Boolean(
-              root?.querySelector('.erp-command-center-rail')
+            embeddedBusinessSidebar: Boolean(
+              root?.querySelector('.erp-admin-sider')
             ),
             oldHero: Boolean(
               root?.querySelector('.erp-print-center-hero-card')
@@ -819,7 +819,7 @@ export function createPrintWorkspaceScenarios({
           }
         })
         assert.equal(
-          printCenterLayout.commandRailInPage,
+          printCenterLayout.embeddedBusinessSidebar,
           false,
           `打印中心不应再嵌套运营中枢导航: ${JSON.stringify(printCenterLayout)}`
         )

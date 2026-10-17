@@ -3,7 +3,6 @@ package data
 import (
 	"context"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"sort"
 	"time"
@@ -13,8 +12,13 @@ import (
 	"server/internal/data/model/ent/financeallocation"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/financepayment"
+	"server/internal/data/model/ent/outsourcingfact"
+	"server/internal/data/model/ent/purchaseorderitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/salesorder"
+	"server/internal/data/model/ent/shipment"
 
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/shopspring/decimal"
 )
 
@@ -117,65 +121,59 @@ func validateFinancePaymentCashSource(ctx context.Context, tx *inventoryDBTx, ro
 	return validateFinanceCashSource(ctx, tx, row.Kind, sourceType, sourceID, refundID, row.CounterpartyID, row.CounterpartyType, row.Currency, row.Direction, row.Amount)
 }
 
-// Order matching is derived from the original business source, never a UI hint.
-func financeFactOrderRef(ctx context.Context, client *ent.Client, fact *ent.FinanceFact) (string, int, error) {
-	if fact.SourceType == nil || fact.SourceID == nil {
-		return "", 0, biz.ErrFinanceFactSourceInvalid
+// Candidate reads and allocation writes share the same order membership rule.
+// A purchase receipt belongs to one order only when every line is linked to it.
+func scopeFinanceFactsToPaymentOrder(query *ent.FinanceFactQuery, payment *ent.FinancePayment) (*ent.FinanceFactQuery, error) {
+	if payment.SourceType == nil || payment.SourceID == nil || *payment.SourceID <= 0 {
+		return nil, biz.ErrFinanceFactSourceInvalid
 	}
-	switch *fact.SourceType {
-	case biz.ShipmentSourceType:
-		shipment, err := client.Shipment.Get(ctx, *fact.SourceID)
-		if err != nil {
-			return "", 0, err
-		}
-		order, err := shipmentFinanceSourceOrder(ctx, client, shipment)
-		if err != nil {
-			return "", 0, err
-		}
-		return "sales_order", order.ID, nil
-	case biz.PurchaseReceiptSourceType:
-		items, err := client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(*fact.SourceID)).All(ctx)
-		if err != nil {
-			return "", 0, err
-		}
-		id := 0
-		for _, item := range items {
-			if item.PurchaseOrderItemID == nil {
-				return "", 0, biz.ErrFinanceFactSourceInvalid
-			}
-			line, err := client.PurchaseOrderItem.Get(ctx, *item.PurchaseOrderItemID)
-			if err != nil {
-				return "", 0, err
-			}
-			if id != 0 && id != line.PurchaseOrderID {
-				return "", 0, biz.ErrFinanceFactSourceInvalid
-			}
-			id = line.PurchaseOrderID
-		}
-		if id > 0 {
-			return "purchase_order", id, nil
-		}
-	case biz.OutsourcingFactSourceType:
-		item, err := client.OutsourcingFact.Get(ctx, *fact.SourceID)
-		if err != nil {
-			return "", 0, err
-		}
-		if item.SourceType != nil && *item.SourceType == biz.OutsourcingOrderSourceType && item.SourceID != nil {
-			return "outsourcing_order", *item.SourceID, nil
-		}
+	sourceID := *payment.SourceID
+	switch *payment.SourceType {
+	case "sales_order":
+		return query.Where(financefact.SourceType(biz.ShipmentSourceType), func(s *entsql.Selector) {
+			h := entsql.Table(shipment.Table)
+			o := entsql.Table(salesorder.Table)
+			matching := entsql.Select(h.C(shipment.FieldID)).From(h).Join(o).On(h.C(shipment.FieldSalesOrderID), o.C(salesorder.FieldID)).
+				Where(entsql.And(entsql.EQ(o.C(salesorder.FieldID), sourceID), entsql.ColumnsEQ(h.C(shipment.FieldCustomerID), o.C(salesorder.FieldCustomerID)), entsql.In(o.C(salesorder.FieldCurrency), biz.FinanceCurrencyCNY, biz.FinanceCurrencyUSD, biz.FinanceCurrencyHKD)))
+			s.Where(entsql.In(s.C(financefact.FieldSourceID), matching))
+		}), nil
+	case "purchase_order":
+		return query.Where(financefact.SourceType(biz.PurchaseReceiptSourceType), func(s *entsql.Selector) {
+			orderItems := entsql.Table(purchaseorderitem.Table)
+			validIDs := entsql.Select(orderItems.C(purchaseorderitem.FieldID)).From(orderItems).Where(entsql.EQ(orderItems.C(purchaseorderitem.FieldPurchaseOrderID), sourceID))
+			lines := entsql.Table(purchasereceiptitem.Table).As("candidate_line")
+			other := entsql.Table(purchasereceiptitem.Table).As("invalid_line")
+			invalid := entsql.Select(other.C(purchasereceiptitem.FieldID)).From(other).Where(entsql.And(
+				entsql.ColumnsEQ(other.C(purchasereceiptitem.FieldReceiptID), lines.C(purchasereceiptitem.FieldReceiptID)),
+				entsql.Or(entsql.IsNull(other.C(purchasereceiptitem.FieldPurchaseOrderItemID)), entsql.NotIn(other.C(purchasereceiptitem.FieldPurchaseOrderItemID), validIDs)),
+			))
+			matching := entsql.Select(lines.C(purchasereceiptitem.FieldReceiptID)).From(lines).Where(entsql.And(entsql.In(lines.C(purchasereceiptitem.FieldPurchaseOrderItemID), validIDs), entsql.Not(entsql.Exists(invalid))))
+			s.Where(entsql.In(s.C(financefact.FieldSourceID), matching))
+		}), nil
+	case "outsourcing_order":
+		return query.Where(financefact.SourceType(biz.OutsourcingFactSourceType), func(s *entsql.Selector) {
+			facts := entsql.Table(outsourcingfact.Table)
+			matching := entsql.Select(facts.C(outsourcingfact.FieldID)).From(facts).Where(entsql.And(entsql.EQ(facts.C(outsourcingfact.FieldSourceType), biz.OutsourcingOrderSourceType), entsql.EQ(facts.C(outsourcingfact.FieldSourceID), sourceID)))
+			s.Where(entsql.In(s.C(financefact.FieldSourceID), matching))
+		}), nil
+	default:
+		return nil, biz.ErrFinanceFactSourceInvalid
 	}
-	return "", 0, biz.ErrFinanceFactSourceInvalid
 }
 
 func validatePaymentOrderAllocation(ctx context.Context, client *ent.Client, payment *ent.FinancePayment, fact *ent.FinanceFact) error {
 	if payment.Kind != biz.FinancePaymentKindAdvance {
 		return nil
 	}
-	typ, id, err := financeFactOrderRef(ctx, client, fact)
+	query, err := scopeFinanceFactsToPaymentOrder(client.FinanceFact.Query().Where(financefact.ID(fact.ID)), payment)
 	if err != nil {
 		return err
 	}
-	if payment.SourceType == nil || payment.SourceID == nil || typ != *payment.SourceType || id != *payment.SourceID {
+	exists, err := query.Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if !exists {
 		return biz.ErrFinanceFactSourceInvalid
 	}
 	return nil
@@ -361,7 +359,28 @@ func populateFinancePaymentBalances(ctx context.Context, client *ent.Client, pay
 	for _, refund := range refunds {
 		refunded[*refund.RefundOfPaymentID] = refunded[*refund.RefundOfPaymentID].Add(refund.Amount)
 	}
-	sourceNames := map[string]string{}
+	references := make([]businessSourceReference, 0, len(payments))
+	refundIDs := make([]int, 0, len(payments))
+	for _, payment := range payments {
+		references = append(references, businessSourceReference{sourceType: payment.SourceType, sourceID: payment.SourceID})
+		if payment.RefundOfPaymentID != nil {
+			refundIDs = append(refundIDs, *payment.RefundOfPaymentID)
+		}
+	}
+	sourceNames, err := resolveBusinessSourceNos(ctx, client, references)
+	if err != nil {
+		return err
+	}
+	refundNames := map[int]string{}
+	if len(refundIDs) > 0 {
+		originals, err := client.FinancePayment.Query().Where(financepayment.IDIn(refundIDs...)).Select(financepayment.FieldID, financepayment.FieldPaymentNo).All(ctx)
+		if err != nil {
+			return err
+		}
+		for _, original := range originals {
+			refundNames[original.ID] = original.PaymentNo
+		}
+	}
 	for _, payment := range payments {
 		payment.RefundedAmount = refunded[payment.ID]
 		for _, a := range payment.Allocations {
@@ -375,23 +394,18 @@ func populateFinancePaymentBalances(ctx context.Context, client *ent.Client, pay
 			payment.AvailableAmount = payment.Amount.Sub(payment.AllocatedAmount).Sub(payment.RefundedAmount)
 		}
 		if payment.SourceType != nil && payment.SourceID != nil {
-			key := fmt.Sprintf("%s:%d", *payment.SourceType, *payment.SourceID)
-			number, ok := sourceNames[key]
-			if !ok {
-				_, _, number, _, err = financePaymentOrder(ctx, client, *payment.SourceType, *payment.SourceID)
-				if err != nil {
-					return err
-				}
-				sourceNames[key] = number
+			number := businessSourceNo(sourceNames, payment.SourceType, payment.SourceID)
+			if number == nil {
+				return biz.ErrFinanceFactSourceInvalid
 			}
-			payment.SourceNo = number
+			payment.SourceNo = *number
 		}
 		if payment.RefundOfPaymentID != nil {
-			original, err := client.FinancePayment.Get(ctx, *payment.RefundOfPaymentID)
-			if err != nil {
-				return err
+			number, exists := refundNames[*payment.RefundOfPaymentID]
+			if !exists {
+				return biz.ErrFinanceFactSourceInvalid
 			}
-			payment.RefundOfPaymentNo = original.PaymentNo
+			payment.RefundOfPaymentNo = number
 		}
 	}
 	return nil
@@ -409,7 +423,14 @@ func (r *operationalFactRepo) FinancePaymentAllocationCandidates(ctx context.Con
 	if payment.Direction == biz.FinancePaymentDirectionReceipt {
 		factType = biz.FinanceFactReceivable
 	}
-	rows, err := r.data.postgres.FinanceFact.Query().Where(financefact.Status(biz.OperationalFactStatusPosted), financefact.FactType(factType), financefact.CounterpartyType(payment.CounterpartyType), financefact.CounterpartyID(payment.CounterpartyID), financefact.Currency(payment.Currency)).Order(ent.Asc(financefact.FieldID)).All(ctx)
+	query := r.data.postgres.FinanceFact.Query().Where(financefact.Status(biz.OperationalFactStatusPosted), financefact.FactType(factType), financefact.CounterpartyType(payment.CounterpartyType), financefact.CounterpartyID(payment.CounterpartyID), financefact.Currency(payment.Currency))
+	if payment.Kind == biz.FinancePaymentKindAdvance {
+		query, err = scopeFinanceFactsToPaymentOrder(query, payment)
+		if err != nil {
+			return nil, err
+		}
+	}
+	rows, err := query.Order(ent.Asc(financefact.FieldID)).All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -421,18 +442,6 @@ func (r *operationalFactRepo) FinancePaymentAllocationCandidates(ctx context.Con
 	for _, row := range rows {
 		if !balances[row.ID].IsPositive() {
 			continue
-		}
-		if payment.Kind == biz.FinancePaymentKindAdvance {
-			typ, id, err := financeFactOrderRef(ctx, r.data.postgres, row)
-			if errors.Is(err, biz.ErrFinanceFactSourceInvalid) {
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-			if payment.SourceType == nil || payment.SourceID == nil || typ != *payment.SourceType || id != *payment.SourceID {
-				continue
-			}
 		}
 		item := entFinanceFactToBiz(row)
 		item.OutstandingAmount = balances[row.ID]

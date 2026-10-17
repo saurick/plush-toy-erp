@@ -21,7 +21,7 @@ const (
 )
 
 type purchaseReceiptCreateProcessCommandHandler struct {
-	uc *InventoryUsecase
+	uc *PurchaseReceiptUsecase
 }
 
 type PurchaseReceiptCreateProcessCommandRepo interface {
@@ -32,13 +32,13 @@ type purchaseReceiptFromPurchaseOrderProcessPreflight interface {
 	ValidatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) error
 }
 
-func RegisterPurchaseReceiptProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, inventoryUC *InventoryUsecase) error {
-	if processRuntimeUC == nil || inventoryUC == nil {
+func RegisterPurchaseReceiptProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, receiptUC *PurchaseReceiptUsecase) error {
+	if processRuntimeUC == nil || receiptUC == nil {
 		return ErrBadParam
 	}
 	return processRuntimeUC.RegisterDomainCommandHandler(
 		ProcessDomainCommandPurchaseReceiptCreate,
-		&purchaseReceiptCreateProcessCommandHandler{uc: inventoryUC},
+		&purchaseReceiptCreateProcessCommandHandler{uc: receiptUC},
 	)
 }
 

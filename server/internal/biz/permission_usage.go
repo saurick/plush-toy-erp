@@ -1,5 +1,7 @@
 package biz
 
+import "strings"
+
 // PermissionBackendMethod identifies a protected JSON-RPC operation. The
 // registry is explanatory metadata; handlers remain the authorization boundary.
 type PermissionBackendMethod struct {
@@ -181,6 +183,15 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		usage := out[permissionKey]
 		usage.BackendOnly = true
 		out[permissionKey] = usage
+	}
+	for _, permissionKey := range []string{PermissionHelpBusinessEdit, PermissionHelpAdministrationEdit, PermissionHelpOperationsEdit, PermissionHelpBusinessPublish, PermissionHelpAdministrationPublish, PermissionHelpOperationsPublish} {
+		methods := permissionMethods("admin", "help_chapter", "help_feedback_respond")
+		if strings.HasSuffix(permissionKey, ".edit") {
+			methods = append(methods, permissionMethods("admin", "help_supplement_save", "help_supplement_restore")...)
+		} else {
+			methods = append(methods, permissionMethods("admin", "help_supplement_publish")...)
+		}
+		add(permissionKey, explicitPermissionSurface("help-center", "帮助中心", "/erp/help-center", "enterprise-supplement", "企业补充", permissionKey, "维护企业补充", "button", "按对应手册维护企业补充和处理纠错", methods, nil, nil, []string{"仍须具备所在章节阅读权限；正式手册正文不受编辑影响"}))
 	}
 	addMenu := func(
 		permissionKey string,

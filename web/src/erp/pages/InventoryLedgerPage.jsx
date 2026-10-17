@@ -21,9 +21,32 @@ import {
   Tag,
 } from 'antd'
 import { useOutletContext, useSearchParams } from 'react-router-dom'
-import { InventoryLotStatus, InventoryOperationStatus } from '../../common/consts/statuses.generated.mjs'
+import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
+import {
+  createInventoryLedgerColumns,
+  VIEW_BALANCES,
+  VIEW_LOTS,
+  VIEW_TXNS,
+  VIEW_ITEMS,
+  VIEW_LABELS,
+  SUBJECT_TYPE_OPTIONS,
+  LOT_STATUS_OPTIONS,
+  TXN_TYPE_OPTIONS,
+  SOURCE_TYPE_OPTIONS,
+  LOT_DATE_FILTER_OPTIONS,
+  TXN_DATE_FILTER_OPTIONS,
+  subjectTypeText,
+  sourceTypeText,
+  linkedBusinessRef,
+  getRowsFromData,
+  selectedLabelFor,
+  canOpenSourceDocument,
+} from '../components/inventory/inventoryLedgerPresentation.jsx'
+import { InventoryOperationStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
+import useInventoryReferences from '../components/inventory/useInventoryReferences.js'
 import WorkflowSourceProgressButton from '../components/workflow/WorkflowSourceProgressButton.jsx'
 import { showProcessSubmissionReceipt } from '../components/workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
@@ -33,10 +56,7 @@ import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import Table from '@/common/components/table/AppTable'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
-import {
-  MATERIAL_STOCK_CATEGORY_OPTIONS,
-  materialStockCategoryLabel,
-} from '../utils/warehouseClassification.mjs'
+import { MATERIAL_STOCK_CATEGORY_OPTIONS } from '../utils/warehouseClassification.mjs'
 import WarehouseSettingsModal from '../components/inventory/WarehouseSettingsModal.jsx'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -58,13 +78,6 @@ import {
   startInventoryAdjustmentApprovalProcess,
 } from '../api/customerConfigApi.mjs'
 import {
-  listAllProductSKUs,
-  listAllUnits,
-  listAllMaterials,
-  listAllProducts,
-  listAllWarehouses,
-} from '../api/masterDataOrderApi.mjs'
-import {
   BusinessActionTooltip,
   BusinessOperationPanel,
   BusinessPageLayout,
@@ -83,16 +96,12 @@ import {
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
 import InventoryDistributionOverview from '../components/business-visualizations/InventoryDistributionOverview.jsx'
 import { BusinessViewSwitch } from '../components/business-visualizations/BusinessVisualizationFrame.jsx'
-import { BusinessHelpLabel } from '../components/help/BusinessContextHelp.jsx'
+
 import InventoryOperationModal from '../components/inventory/InventoryOperationModal.jsx'
 import { executeInventoryOperationTransition } from '../utils/inventoryOperationTransition.mjs'
 import InventoryOperationRecordsModal from '../components/inventory/InventoryOperationRecordsModal.jsx'
 import ExceptionProcessRecoveryButton from '../components/workflow/ExceptionProcessRecoveryButton.jsx'
-import {
-  formatUnixDate,
-  formatUnixDateTime,
-  hasActionPermission,
-} from '../utils/masterDataOrderView.mjs'
+import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
@@ -133,9 +142,6 @@ import {
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
 import useBusinessVisualizationData from '../hooks/useBusinessVisualizationData.js'
 
-const VIEW_BALANCES = 'balances'
-const VIEW_LOTS = 'lots'
-const VIEW_TXNS = 'txns'
 const INVENTORY_OPERATION_SESSION_PREFIX =
   'plush-erp:inventory-operation:last:v1:'
 const INVENTORY_OPERATION_STATUS_LABELS = Object.freeze({
@@ -147,238 +153,16 @@ const INVENTORY_OPERATION_STATUS_LABELS = Object.freeze({
   [InventoryOperationStatus.CANCELLED]: '已取消',
 })
 
-const VIEW_ITEMS = [
-  { key: VIEW_BALANCES, label: '库存余额', children: null },
-  { key: VIEW_LOTS, label: '库存批次', children: null },
-  { key: VIEW_TXNS, label: '库存变动记录', children: null },
-]
-
-const VIEW_LABELS = Object.freeze({
-  [VIEW_BALANCES]: '库存余额',
-  [VIEW_LOTS]: '库存批次',
-  [VIEW_TXNS]: '库存变动记录',
-})
-
-const SUBJECT_TYPE_OPTIONS = [
-  { label: '全部存货类型', value: '' },
-  { label: '材料', value: 'MATERIAL' },
-  { label: '成品', value: 'PRODUCT' },
-]
-
-const LOT_STATUS_OPTIONS = [
-  { label: '全部批次状态', value: '' },
-  { label: '可用', value: InventoryLotStatus.ACTIVE },
-  { label: '冻结', value: InventoryLotStatus.HOLD },
-  { label: '不合格', value: InventoryLotStatus.REJECTED },
-  { label: '停用', value: InventoryLotStatus.DISABLED },
-]
-
-const TXN_TYPE_OPTIONS = [
-  { label: '全部变动类型', value: '' },
-  { label: '入库', value: 'IN' },
-  { label: '出库', value: 'OUT' },
-  { label: '调增', value: 'ADJUST_IN' },
-  { label: '调减', value: 'ADJUST_OUT' },
-  { label: '调拨入', value: 'TRANSFER_IN' },
-  { label: '调拨出', value: 'TRANSFER_OUT' },
-  { label: '撤销调整', value: 'REVERSAL' },
-]
-
-const SOURCE_TYPE_OPTIONS = [
-  { label: '全部来源', value: '' },
-  { label: '采购入库', value: 'PURCHASE_RECEIPT' },
-  { label: '采购退货', value: 'PURCHASE_RETURN' },
-  { label: '入库调整', value: 'PURCHASE_RECEIPT_ADJUSTMENT' },
-  { label: '出货单', value: 'SHIPMENT' },
-  { label: '生产记录', value: 'PRODUCTION_FACT' },
-  { label: '委外记录', value: 'OUTSOURCING_FACT' },
-]
-
-const LOT_DATE_FILTER_OPTIONS = [{ label: '接收日期', value: 'received_at' }]
-const TXN_DATE_FILTER_OPTIONS = [{ label: '发生时间', value: 'occurred_at' }]
-
-const SUBJECT_TYPE_LABELS = Object.freeze({
-  MATERIAL: '材料',
-  PRODUCT: '成品',
-})
-
-const LOT_STATUS_LABELS = Object.freeze({
-  [InventoryLotStatus.ACTIVE]: '可用',
-  [InventoryLotStatus.HOLD]: '冻结',
-  [InventoryLotStatus.REJECTED]: '不合格',
-  [InventoryLotStatus.DISABLED]: '停用',
-})
-
-const LOT_STATUS_COLORS = Object.freeze({
-  [InventoryLotStatus.ACTIVE]: 'green',
-  [InventoryLotStatus.HOLD]: 'gold',
-  [InventoryLotStatus.REJECTED]: 'red',
-  [InventoryLotStatus.DISABLED]: 'default',
-})
-
-const TXN_TYPE_LABELS = Object.freeze({
-  IN: '入库',
-  OUT: '出库',
-  ADJUST_IN: '调增',
-  ADJUST_OUT: '调减',
-  TRANSFER_IN: '调拨入',
-  TRANSFER_OUT: '调拨出',
-  REVERSAL: '撤销调整',
-})
-
-const TXN_TYPE_COLORS = Object.freeze({
-  IN: 'green',
-  OUT: 'red',
-  ADJUST_IN: 'blue',
-  ADJUST_OUT: 'orange',
-  TRANSFER_IN: 'cyan',
-  TRANSFER_OUT: 'purple',
-  REVERSAL: 'default',
-})
-
-const SOURCE_TYPE_LABELS = Object.freeze(
-  Object.fromEntries(
-    SOURCE_TYPE_OPTIONS.filter((item) => item.value).map((item) => [
-      item.value,
-      item.label,
-    ])
-  )
-)
-
-function dash(value) {
-  return value === null || value === undefined || value === '' ? '-' : value
-}
-
-function subjectTypeTag(value) {
-  const key = String(value || '').trim()
-  if (!key) return '-'
-  return <Tag>{SUBJECT_TYPE_LABELS[key] || '其他存货'}</Tag>
-}
-
-function subjectTypeText(value) {
-  const key = String(value || '').trim()
-  return SUBJECT_TYPE_LABELS[key] || (key ? '其他存货' : '')
-}
-
-function lotStatusTag(value) {
-  const key = String(value || '').trim()
-  if (!key) return '-'
-  return (
-    <Tag color={LOT_STATUS_COLORS[key] || 'default'}>
-      {LOT_STATUS_LABELS[key] || '批次状态'}
-    </Tag>
-  )
-}
-
-function lotStatusText(value) {
-  const key = String(value || '').trim()
-  return LOT_STATUS_LABELS[key] || (key ? '批次状态' : '')
-}
-
-function txnTypeTag(value) {
-  const key = String(value || '').trim()
-  if (!key) return '-'
-  return (
-    <Tag color={TXN_TYPE_COLORS[key] || 'default'}>
-      {TXN_TYPE_LABELS[key] || '库存变动'}
-    </Tag>
-  )
-}
-
-function txnTypeText(value) {
-  const key = String(value || '').trim()
-  return TXN_TYPE_LABELS[key] || (key ? '库存变动' : '')
-}
-
-function sourceTypeText(value) {
-  const key = String(value || '')
-    .trim()
-    .toUpperCase()
-  if (!key) return ''
-  return SOURCE_TYPE_LABELS[key] || '其他来源'
-}
-
-function directionTag(value) {
-  const direction = Number(value || 0)
-  if (direction > 0) return <Tag color="green">增加</Tag>
-  if (direction < 0) return <Tag color="red">扣减</Tag>
-  return '-'
-}
-
-function directionText(value) {
-  const direction = Number(value || 0)
-  if (direction > 0) return '增加'
-  if (direction < 0) return '扣减'
-  return ''
-}
-
-function formatQuantity(value) {
-  const text = String(value ?? '').trim()
-  return text || '-'
-}
-
-function linkedBusinessRef(label, value) {
-  return value === null || value === undefined || value === ''
-    ? '-'
-    : `${label}已关联`
-}
-
-function formatSourceDocumentRef(record = {}) {
-  const sourceNo = String(
-    record.source_no ||
-      record.document_no ||
-      record.order_no ||
-      record.receipt_no ||
-      record.shipment_no ||
-      ''
-  ).trim()
-  if (sourceNo) return sourceNo
-  return sourceTypeText(record.source_type) ? '未提供业务单号' : '-'
-}
-
-function relationRef(label, value) {
-  return value === null || value === undefined || value === ''
-    ? '-'
-    : `已关联${label}`
-}
-
-function getRowsFromData(view, data) {
-  if (view === VIEW_LOTS) {
-    return data.inventory_lots
-  }
-  if (view === VIEW_TXNS) {
-    return data.inventory_txns
-  }
-  return data.inventory_balances
-}
-
-function selectedLabelFor(view, row) {
-  if (!row) return '请先选择一条库存记录'
-  if (view === VIEW_LOTS) {
-    return `批次 ${row.lot_no || '已登记批次'} / ${
-      lotStatusText(row.status) || '-'
-    }`
-  }
-  if (view === VIEW_TXNS) {
-    return `库存变动 ${sourceTypeText(row.source_type) || txnTypeText(row.txn_type) || '已记录'}`
-  }
-  return `库存项已登记 / 批次 ${row.lot_no || (row.lot_id ? '已关联批次' : '-')}`
-}
-
-function canOpenSourceDocument(record = {}) {
-  return Boolean(businessSourceRouteFor(record.source_type, record.source_id))
-}
-
 export default function InventoryLedgerPage() {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const outletContext = useOutletContext()
+  const taskStock = outletContext?.mobileTaskCommand?.kind === 'inventory' ? outletContext.mobileTaskCommand.selected : null
   const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
   )
-  const requestControllersRef = useRef({})
-  const requestSequenceRef = useRef({})
   const operationAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const [savedActiveView, setSavedActiveView] = useBusinessPageState(
     'activeView',
@@ -415,12 +199,7 @@ export default function InventoryLedgerPage() {
     'dateFilterEnd',
     ''
   )
-  const [materials, setMaterials] = useState([])
-  const [products, setProducts] = useState([])
-  const [productSKUs, setProductSKUs] = useState([])
-  const [units, setUnits] = useState([])
-  const [warehouses, setWarehouses] = useState([])
-  const [inventoryLots, setInventoryLots] = useState([])
+  const { materials, products, productSKUs, units, warehouses, inventoryLots, loadReferenceOptions } = useInventoryReferences({ adminProfile })
   const [pagination, setPagination] = useBusinessPageState('pagination', {
     current: 1,
     pageSize: 20,
@@ -440,7 +219,7 @@ export default function InventoryLedgerPage() {
   const activeView = Object.hasOwn(VIEW_LABELS, routeView)
     ? routeView
     : savedActiveView
-  const routeLotID = searchParamPositiveInt(searchParams, 'lot_id')
+  const routeLotID = taskStock?.lot_id || searchParamPositiveInt(searchParams, 'lot_id')
   const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
   const routeInventoryOperationID = searchParamPositiveInt(
     searchParams,
@@ -458,9 +237,9 @@ export default function InventoryLedgerPage() {
       adminProfile?.effective_session?.customer?.key || 'default'
     ).trim()
     return adminID > 0
-      ? `${INVENTORY_OPERATION_SESSION_PREFIX}${adminID}:${customerKey}`
+      ? `${INVENTORY_OPERATION_SESSION_PREFIX}${adminID}:${customerKey}${taskStock ? `:lot:${taskStock.lot_id}:warehouse:${taskStock.warehouse_id}` : ''}`
       : ''
-  }, [adminProfile])
+  }, [adminProfile, taskStock])
   const canCreateInventoryOperation = hasActionPermission(
     adminProfile,
     PermissionCode.WAREHOUSE_ADJUSTMENT_CREATE
@@ -503,35 +282,7 @@ export default function InventoryLedgerPage() {
     [adminProfile, allowedMenuPaths]
   )
 
-  const beginLatestRequest = useCallback((key) => {
-    requestControllersRef.current[key]?.abort()
-    const controller = new AbortController()
-    const nextSequence = Number(requestSequenceRef.current[key] || 0) + 1
-    requestControllersRef.current[key] = controller
-    requestSequenceRef.current[key] = nextSequence
-
-    return {
-      signal: controller.signal,
-      isCurrent: () =>
-        requestControllersRef.current[key] === controller &&
-        requestSequenceRef.current[key] === nextSequence &&
-        !controller.signal.aborted,
-      finish: () => {
-        if (requestControllersRef.current[key] === controller) {
-          delete requestControllersRef.current[key]
-        }
-      },
-    }
-  }, [])
-
-  useEffect(() => {
-    const controllers = requestControllersRef.current
-    return () => {
-      Object.values(controllers).forEach((controller) => {
-        controller?.abort()
-      })
-    }
-  }, [])
+  const beginLatestRequest = useLatestRequestCoordinator()
 
   const rememberInventoryOperation = useCallback(
     (operation) => {
@@ -547,34 +298,31 @@ export default function InventoryLedgerPage() {
     async (operationID) => {
       const id = Number(operationID || 0)
       if (!id) return null
+      const request = beginLatestRequest('inventory-operation-recovery')
       try {
-        const operation = await getInventoryOperation({ id })
-        if (!operation?.id) throw new Error('库存作业回执不完整')
+        const operation = await getInventoryOperation({ id }, { signal: request.signal })
+        if (!request.isCurrent()) return null
+        if (operation?.id !== id || (taskStock && (!operation.items?.length || operation.items.some((item) => item.from_lot_id !== taskStock.lot_id || item.from_warehouse_id !== taskStock.warehouse_id)))) throw new Error('库存作业与当前来源批次不匹配')
         rememberInventoryOperation(operation)
         return operation
       } catch (error) {
+        if (isRpcAbortError(error) || !request.isCurrent()) return null
         const text = getActionErrorMessage(error, '恢复最近库存作业')
         setOperationRecoveryError(text)
         return null
+      } finally {
+        if (request.isCurrent()) request.finish()
       }
     },
-    [rememberInventoryOperation]
+    [beginLatestRequest, rememberInventoryOperation, taskStock]
   )
 
   useEffect(() => {
-    if (!operationSessionKey) return
-    const operationID = Number(
-      window.sessionStorage.getItem(operationSessionKey) || 0
-    )
+    const operationID = routeInventoryOperationID || Number(operationSessionKey ? window.sessionStorage.getItem(operationSessionKey) || 0 : 0)
     if (operationID > 0) {
       recoverInventoryOperation(operationID)
     }
-  }, [operationSessionKey, recoverInventoryOperation])
-  useEffect(() => {
-    if (routeInventoryOperationID > 0) {
-      recoverInventoryOperation(routeInventoryOperationID)
-    }
-  }, [recoverInventoryOperation, routeInventoryOperationID])
+  }, [operationSessionKey, recoverInventoryOperation, routeInventoryOperationID])
 
   const inventoryCommonParams = useMemo(
     () =>
@@ -705,7 +453,9 @@ export default function InventoryLedgerPage() {
       const nextRows = getRowsFromData(activeView, data)
       setRows(nextRows)
       setSelectedRow((current) =>
-        current?.id
+        taskStock
+          ? nextRows.find((item) => item.lot_id === taskStock.lot_id && item.warehouse_id === taskStock.warehouse_id) || null
+          : current?.id
           ? nextRows.find((item) => item.id === current.id) || null
           : null
       )
@@ -721,7 +471,7 @@ export default function InventoryLedgerPage() {
         request.finish()
       }
     }
-  }, [activeView, beginLatestRequest, canReadInventory, loadInventoryList])
+  }, [activeView, beginLatestRequest, canReadInventory, loadInventoryList, taskStock])
 
   useEffect(() => {
     loadRows()
@@ -858,87 +608,6 @@ export default function InventoryLedgerPage() {
     },
     [resetCurrentPage, searchParams, setSearchParams]
   )
-
-  const loadReferenceOptions = useCallback(async () => {
-    const request = beginLatestRequest('references')
-    try {
-      const [
-        materialResult,
-        productResult,
-        productSKUResult,
-        unitResult,
-        warehouseResult,
-        lotResult,
-      ] = await Promise.all([
-        canReadMaterials
-          ? listAllMaterials({ active_only: true }, { signal: request.signal })
-          : Promise.resolve({ materials: [] }),
-        canReadProducts
-          ? listAllProducts({ active_only: true }, { signal: request.signal })
-          : Promise.resolve({ products: [] }),
-        canReadProductSKUs
-          ? listAllProductSKUs({}, { signal: request.signal })
-          : Promise.resolve({ product_skus: [] }),
-        canReadMaterials || canReadProducts || canReadInventory
-          ? listAllUnits({}, { signal: request.signal })
-          : Promise.resolve({ units: [] }),
-        canReadInventory
-          ? listAllWarehouses({ active_only: true }, { signal: request.signal })
-          : Promise.resolve({ warehouses: [] }),
-        canReadInventory
-          ? listAllInventoryLots({}, { signal: request.signal })
-          : Promise.resolve({ inventory_lots: [] }),
-      ])
-      if (!request.isCurrent()) {
-        return
-      }
-      setMaterials(
-        Array.isArray(materialResult?.materials) ? materialResult.materials : []
-      )
-      setProducts(
-        Array.isArray(productResult?.products) ? productResult.products : []
-      )
-      setProductSKUs(
-        Array.isArray(productSKUResult?.product_skus)
-          ? productSKUResult.product_skus
-          : []
-      )
-      setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
-      setWarehouses(
-        Array.isArray(warehouseResult?.warehouses)
-          ? warehouseResult.warehouses
-          : []
-      )
-      setInventoryLots(
-        Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
-      )
-    } catch (error) {
-      if (isRpcAbortError(error) || !request.isCurrent()) {
-        return
-      }
-      showPageLoadError(error, '加载库存筛选资料')
-      setMaterials([])
-      setProducts([])
-      setProductSKUs([])
-      setUnits([])
-      setWarehouses([])
-      setInventoryLots([])
-    } finally {
-      if (request.isCurrent()) {
-        request.finish()
-      }
-    }
-  }, [
-    beginLatestRequest,
-    canReadInventory,
-    canReadMaterials,
-    canReadProductSKUs,
-    canReadProducts,
-  ])
-
-  useEffect(() => {
-    loadReferenceOptions()
-  }, [loadReferenceOptions])
 
   const materialOptions = useMemo(
     () => uniqueReferenceOptions(materials, materialOption),
@@ -1236,6 +905,7 @@ export default function InventoryLedgerPage() {
         }
         rememberInventoryOperation(saved)
         setEditingOperation(null)
+        reportBusinessResult('库存作业草稿已保存，尚未过账', saved)
         message.success('库存作业草稿已保存')
       } catch (error) {
         message.error(getActionErrorMessage(error, '保存库存作业草稿'))
@@ -1243,7 +913,7 @@ export default function InventoryLedgerPage() {
         setOperationLoading(false)
       }
     },
-    [editingOperation, rememberInventoryOperation]
+    [editingOperation, rememberInventoryOperation, reportBusinessResult]
   )
 
   const transitionInventoryOperation = useCallback(
@@ -1267,6 +937,7 @@ export default function InventoryLedgerPage() {
         }
         setOperationCancelOpen(false)
         setOperationCancelReason('')
+        reportBusinessResult({ submit: '人工库存调整已提交审批，尚未过账', post: '库存作业已过账', cancel: '库存作业已取消' }[action], result.operation)
         await loadRows()
         if (action === 'submit') {
           showProcessSubmissionReceipt({
@@ -1296,6 +967,7 @@ export default function InventoryLedgerPage() {
       customerKey,
       loadRows,
       rememberInventoryOperation,
+      reportBusinessResult,
     ]
   )
 
@@ -1380,455 +1052,10 @@ export default function InventoryLedgerPage() {
     ]
   )
 
-  const columns = useMemo(() => {
-    if (activeView === VIEW_LOTS) {
-      return [
-        {
-          defaultPriority: 10,
-          title: '批次号',
-          dataIndex: 'lot_no',
-          copyable: { label: '批次号' },
-          detailCopyable: true,
-          width: 180,
-          render: (value, record) => value || (record.id ? '已登记批次' : '-'),
-        },
-        {
-          defaultPriority: 50,
-          title: '存货类型',
-          exportTitle: '存货类型',
-          dataIndex: 'subject_type',
-          width: 110,
-          render: (value, record) =>
-            value === 'MATERIAL'
-              ? materialStockCategoryLabel(record.stock_category)
-              : subjectTypeTag(value),
-          exportValue: (record) =>
-            record?.subject_type === 'MATERIAL'
-              ? materialStockCategoryLabel(record.stock_category)
-              : subjectTypeText(record?.subject_type),
-        },
-        {
-          align: 'left',
-          defaultPriority: 30,
-          title: '材料 / 产品',
-          dataIndex: 'subject_id',
-          copyable: {
-            label: '材料或产品',
-            resolveValue: (_value, record) =>
-              renderSubjectReference(record?.subject_id, record),
-          },
-          width: 300,
-          className: 'erp-product-identity-cell',
-          render: renderSubjectIdentity,
-          detailValue: (record) =>
-            renderSubjectIdentity(record.subject_id, record),
-          exportValue: (record) =>
-            renderSubjectReference(record?.subject_id, record),
-        },
-        {
-          align: 'left',
-          defaultPriority: 40,
-          title: '产品规格',
-          dataIndex: 'product_sku_id',
-          copyable: {
-            label: '产品规格',
-            resolveValue: (_value, record) =>
-              renderProductSKUReference(record?.product_sku_id, record),
-          },
-          width: 220,
-          render: renderProductSKUReference,
-          exportValue: (record) =>
-            renderProductSKUReference(record?.product_sku_id, record),
-        },
-        {
-          title: '供应商批次',
-          dataIndex: 'supplier_lot_no',
-          copyable: { label: '供应商批次' },
-          detailCopyable: true,
-          width: 150,
-          render: dash,
-        },
-        {
-          title: '色号',
-          dataIndex: 'color_no',
-          copyable: { label: '色号' },
-          detailCopyable: true,
-          width: 110,
-          render: dash,
-        },
-        {
-          title: '缸号',
-          dataIndex: 'dye_lot_no',
-          copyable: { label: '缸号' },
-          detailCopyable: true,
-          width: 110,
-          render: dash,
-        },
-        {
-          title: '生产批次',
-          dataIndex: 'production_lot_no',
-          copyable: { label: '生产批次' },
-          detailCopyable: true,
-          width: 140,
-          render: dash,
-        },
-        {
-          defaultPriority: 20,
-          title: '状态',
-          exportTitle: '状态',
-          dataIndex: 'status',
-          width: 110,
-          render: lotStatusTag,
-          exportValue: (record) => lotStatusText(record?.status),
-        },
-        {
-          defaultPriority: 60,
-          title: '接收日期',
-          exportTitle: '接收日期',
-          dataIndex: 'received_at',
-          width: 140,
-          render: formatUnixDate,
-          exportValue: (record) => formatUnixDate(record?.received_at),
-        },
-      ]
-    }
-
-    if (activeView === VIEW_TXNS) {
-      return [
-        {
-          defaultPriority: 150,
-          title: '变动记录',
-          dataIndex: 'id',
-          width: 130,
-          render: (value) => (value ? '已记录' : '-'),
-          exportValue: (record) => (record?.id ? '已记录' : ''),
-        },
-        {
-          defaultPriority: 90,
-          title: '类型',
-          exportTitle: '类型',
-          dataIndex: 'txn_type',
-          width: 120,
-          render: txnTypeTag,
-          exportValue: (record) => txnTypeText(record?.txn_type),
-        },
-        {
-          defaultPriority: 40,
-          title: '方向',
-          exportTitle: '方向',
-          dataIndex: 'direction',
-          width: 100,
-          render: directionTag,
-          exportValue: (record) => directionText(record?.direction),
-        },
-        {
-          defaultPriority: 100,
-          title: '存货类型',
-          exportTitle: '存货类型',
-          dataIndex: 'subject_type',
-          width: 110,
-          render: (value, record) =>
-            value === 'MATERIAL'
-              ? materialStockCategoryLabel(record.stock_category)
-              : subjectTypeTag(value),
-          exportValue: (record) =>
-            record?.subject_type === 'MATERIAL'
-              ? materialStockCategoryLabel(record.stock_category)
-              : subjectTypeText(record?.subject_type),
-        },
-        {
-          align: 'left',
-          defaultPriority: 20,
-          title: '材料 / 产品',
-          dataIndex: 'subject_id',
-          copyable: {
-            label: '材料或产品',
-            resolveValue: (_value, record) =>
-              renderSubjectReference(record?.subject_id, record),
-          },
-          width: 300,
-          className: 'erp-product-identity-cell',
-          render: renderSubjectIdentity,
-          detailValue: (record) =>
-            renderSubjectIdentity(record.subject_id, record),
-          exportValue: (record) =>
-            renderSubjectReference(record?.subject_id, record),
-        },
-        {
-          align: 'left',
-          defaultPriority: 30,
-          title: '产品规格',
-          dataIndex: 'product_sku_id',
-          copyable: {
-            label: '产品规格',
-            resolveValue: (_value, record) =>
-              renderProductSKUReference(record?.product_sku_id, record),
-          },
-          width: 220,
-          render: renderProductSKUReference,
-          exportValue: (record) =>
-            renderProductSKUReference(record?.product_sku_id, record),
-        },
-        {
-          defaultPriority: 70,
-          title: '仓库',
-          dataIndex: 'warehouse_id',
-          copyable: {
-            label: '仓库',
-            resolveValue: (_value, record) =>
-              renderWarehouseReference(record?.warehouse_id),
-          },
-          width: 180,
-          render: renderWarehouseReference,
-          exportValue: (record) =>
-            renderWarehouseReference(record?.warehouse_id),
-        },
-        {
-          defaultPriority: 80,
-          title: '批次',
-          dataIndex: 'lot_id',
-          copyable: {
-            label: '批次',
-            resolveValue: (_value, record) =>
-              renderLotReference(record?.lot_id),
-          },
-          detailCopyable: true,
-          width: 180,
-          render: renderLotReference,
-          exportValue: (record) => renderLotReference(record?.lot_id),
-        },
-        {
-          align: 'right',
-          defaultPriority: 50,
-          title: '数量',
-          exportTitle: '数量',
-          dataIndex: 'quantity',
-          width: 120,
-          render: formatQuantity,
-          exportValue: (record) => formatQuantity(record?.quantity),
-        },
-        {
-          defaultPriority: 60,
-          title: '单位',
-          dataIndex: 'unit_id',
-          width: 130,
-          render: renderUnitReference,
-          exportValue: (record) => renderUnitReference(record?.unit_id),
-        },
-        {
-          align: 'left',
-          defaultPriority: 110,
-          title: '来源',
-          exportTitle: '来源',
-          key: 'source_type_label',
-          width: 170,
-          render: (_, record) => sourceTypeText(record?.source_type) || '-',
-          exportValue: (record) => sourceTypeText(record?.source_type),
-        },
-        {
-          align: 'left',
-          defaultPriority: 120,
-          title: '来源单据',
-          key: 'source_document',
-          copyable: {
-            label: '来源单据',
-            resolveValue: (_value, record) =>
-              record?.source_no ||
-              record?.source_document_no ||
-              record?.document_no ||
-              '',
-          },
-          detailCopyable: true,
-          width: 120,
-          render: (_, record) => formatSourceDocumentRef(record),
-          exportValue: formatSourceDocumentRef,
-        },
-        {
-          defaultPriority: 130,
-          title: '来源明细',
-          dataIndex: 'source_line_id',
-          width: 130,
-          render: (value) => relationRef('来源明细', value),
-          exportValue: (record) =>
-            relationRef('来源明细', record?.source_line_id),
-        },
-        {
-          defaultPriority: 140,
-          title: '原库存变动记录',
-          dataIndex: 'reversal_of_txn_id',
-          width: 130,
-          render: (value) => relationRef('原库存变动记录', value),
-          exportValue: (record) =>
-            relationRef('原库存变动记录', record?.reversal_of_txn_id),
-        },
-        {
-          defaultPriority: 10,
-          title: '发生时间',
-          exportTitle: '发生时间',
-          dataIndex: 'occurred_at',
-          width: 170,
-          render: formatUnixDateTime,
-          exportValue: (record) => formatUnixDateTime(record?.occurred_at),
-        },
-        { align: 'left', title: '备注', dataIndex: 'note', width: 300 },
-      ]
-    }
-
-    return [
-      {
-        align: 'left',
-        defaultPriority: 90,
-        title: '库存项',
-        dataIndex: 'id',
-        width: 130,
-        render: (value) => (value ? '已登记库存' : '-'),
-        exportValue: (record) => (record?.id ? '已登记库存' : ''),
-      },
-      {
-        defaultPriority: 80,
-        title: '存货类型',
-        exportTitle: '存货类型',
-        dataIndex: 'subject_type',
-        width: 110,
-        render: (value, record) =>
-          value === 'MATERIAL'
-            ? materialStockCategoryLabel(record.stock_category)
-            : subjectTypeTag(value),
-        exportValue: (record) =>
-          record?.subject_type === 'MATERIAL'
-            ? materialStockCategoryLabel(record.stock_category)
-            : subjectTypeText(record?.subject_type),
-      },
-      {
-        align: 'left',
-        defaultPriority: 10,
-        title: '材料 / 产品',
-        dataIndex: 'subject_id',
-        copyable: {
-          label: '材料或产品',
-          resolveValue: (_value, record) =>
-            renderSubjectReference(record?.subject_id, record),
-        },
-        width: 300,
-        className: 'erp-product-identity-cell',
-        render: renderSubjectIdentity,
-        detailValue: (record) =>
-          renderSubjectIdentity(record.subject_id, record),
-        exportValue: (record) =>
-          renderSubjectReference(record?.subject_id, record),
-      },
-      {
-        align: 'left',
-        defaultPriority: 20,
-        title: '产品规格',
-        dataIndex: 'product_sku_id',
-        copyable: {
-          label: '产品规格',
-          resolveValue: (_value, record) =>
-            renderProductSKUReference(record?.product_sku_id, record),
-        },
-        width: 220,
-        render: renderProductSKUReference,
-        exportValue: (record) =>
-          renderProductSKUReference(record?.product_sku_id, record),
-      },
-      {
-        defaultPriority: 30,
-        title: '仓库',
-        dataIndex: 'warehouse_id',
-        copyable: {
-          label: '仓库',
-          resolveValue: (_value, record) =>
-            renderWarehouseReference(record?.warehouse_id),
-        },
-        width: 180,
-        render: renderWarehouseReference,
-        exportValue: (record) => renderWarehouseReference(record?.warehouse_id),
-      },
-      {
-        defaultPriority: 70,
-        title: '批次',
-        dataIndex: 'lot_id',
-        copyable: {
-          label: '批次',
-          resolveValue: (_value, record) => renderLotReference(record?.lot_id),
-        },
-        detailCopyable: true,
-        width: 180,
-        render: renderLotReference,
-        exportValue: (record) => renderLotReference(record?.lot_id),
-      },
-      {
-        defaultPriority: 45,
-        title: '单位',
-        dataIndex: 'unit_id',
-        width: 130,
-        render: renderUnitReference,
-        exportValue: (record) => renderUnitReference(record?.unit_id),
-      },
-      {
-        align: 'right',
-        defaultPriority: 50,
-        title: '当前数量',
-        exportTitle: '当前数量',
-        dataIndex: 'quantity',
-        width: 130,
-        render: formatQuantity,
-        exportValue: (record) => formatQuantity(record?.quantity),
-      },
-      {
-        align: 'right',
-        defaultPriority: 60,
-        title: '已预留',
-        exportTitle: '已预留',
-        dataIndex: 'active_reserved_quantity',
-        width: 130,
-        render: formatQuantity,
-        exportValue: (record) =>
-          formatQuantity(record?.active_reserved_quantity),
-      },
-      {
-        align: 'right',
-        defaultPriority: 40,
-        title: (
-          <BusinessHelpLabel
-            itemKey="available-quantity"
-            label="可用量"
-            pageKey="inventory"
-          />
-        ),
-        exportTitle: '可用量',
-        dataIndex: 'available_quantity',
-        width: 130,
-        render: formatQuantity,
-        exportValue: (record) => formatQuantity(record?.available_quantity),
-      },
-      ...[
-        ['pending_inspection_quantity', '待成品检验'],
-        ['pending_packaging_quantity', '待查货包装'],
-        ['ready_to_ship_quantity', '可发货数量'],
-      ].map(([key, title]) => ({
-        title,
-        exportTitle: title,
-        dataIndex: key,
-        width: 130,
-        align: 'right',
-        defaultPriority: 45,
-        render: (value, record) =>
-          record.subject_type === 'PRODUCT' ? formatQuantity(value) : '—',
-        exportValue: (record) =>
-          record.subject_type === 'PRODUCT' ? formatQuantity(record[key]) : '',
-      })),
-    ]
-  }, [
-    activeView,
-    renderLotReference,
-    renderProductSKUReference,
-    renderSubjectReference,
-    renderSubjectIdentity,
-    renderUnitReference,
-    renderWarehouseReference,
-  ])
+  const columns = useMemo(
+    () => createInventoryLedgerColumns({ activeView, renderLotReference, renderProductSKUReference, renderSubjectReference, renderSubjectIdentity, renderUnitReference, renderWarehouseReference }),
+    [activeView, renderLotReference, renderProductSKUReference, renderSubjectReference, renderSubjectIdentity, renderUnitReference, renderWarehouseReference]
+  )
   const {
     tableColumns,
     exportColumns,

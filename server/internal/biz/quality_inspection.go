@@ -49,6 +49,14 @@ var (
 	}
 )
 
+type QualityInspectionUsecase struct {
+	repo QualityInspectionRepo
+}
+
+func NewQualityInspectionUsecase(repo QualityInspectionRepo) *QualityInspectionUsecase {
+	return &QualityInspectionUsecase{repo: repo}
+}
+
 type QualityInspection struct {
 	// Quantity unit is a read projection of the inspected source, never an input.
 	UnitID                   *int
@@ -220,7 +228,7 @@ func (gate *PurchaseReceiptQualityGate) ValidateInboundCompletion() error {
 	return nil
 }
 
-func (uc *InventoryUsecase) CreateQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error) {
+func (uc *QualityInspectionUsecase) CreateQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
@@ -231,7 +239,7 @@ func (uc *InventoryUsecase) CreateQualityInspectionDraft(ctx context.Context, in
 	return uc.repo.CreateQualityInspectionDraft(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) CreateQualityInspectionFromPurchaseReceipt(ctx context.Context, in *QualityInspectionFromPurchaseReceiptCreate) (*QualityInspection, error) {
+func (uc *QualityInspectionUsecase) CreateQualityInspectionFromPurchaseReceipt(ctx context.Context, in *QualityInspectionFromPurchaseReceiptCreate) (*QualityInspection, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
@@ -248,7 +256,7 @@ func (uc *InventoryUsecase) CreateQualityInspectionFromPurchaseReceipt(ctx conte
 	return repo.CreateQualityInspectionFromPurchaseReceipt(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) CreateQualityInspectionFromOutsourcingReturn(ctx context.Context, in *QualityInspectionFromOutsourcingReturnCreate) (*QualityInspection, error) {
+func (uc *QualityInspectionUsecase) CreateQualityInspectionFromOutsourcingReturn(ctx context.Context, in *QualityInspectionFromOutsourcingReturnCreate) (*QualityInspection, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
@@ -265,7 +273,7 @@ func (uc *InventoryUsecase) CreateQualityInspectionFromOutsourcingReturn(ctx con
 	return repo.CreateQualityInspectionFromOutsourcingReturn(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) CreateFinishedGoodsQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error) {
+func (uc *QualityInspectionUsecase) CreateFinishedGoodsQualityInspectionDraft(ctx context.Context, in *QualityInspectionCreate) (*QualityInspection, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
@@ -276,7 +284,7 @@ func (uc *InventoryUsecase) CreateFinishedGoodsQualityInspectionDraft(ctx contex
 	return uc.repo.CreateFinishedGoodsQualityInspectionDraft(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) SubmitQualityInspection(ctx context.Context, inspectionID int) (_ *QualityInspection, err error) {
+func (uc *QualityInspectionUsecase) SubmitQualityInspection(ctx context.Context, inspectionID int) (_ *QualityInspection, err error) {
 	ctx, finish := startBusinessTrace(ctx, "quality.submit_inspection")
 	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || inspectionID <= 0 {
@@ -285,7 +293,7 @@ func (uc *InventoryUsecase) SubmitQualityInspection(ctx context.Context, inspect
 	return uc.repo.SubmitQualityInspection(ctx, inspectionID)
 }
 
-func (uc *InventoryUsecase) PassQualityInspection(ctx context.Context, in *QualityInspectionDecision) (_ *QualityInspection, err error) {
+func (uc *QualityInspectionUsecase) PassQualityInspection(ctx context.Context, in *QualityInspectionDecision) (_ *QualityInspection, err error) {
 	ctx, finish := startBusinessTrace(ctx, "quality.pass_inspection")
 	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || in == nil {
@@ -301,7 +309,7 @@ func (uc *InventoryUsecase) PassQualityInspection(ctx context.Context, in *Quali
 	return uc.repo.PassQualityInspection(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) RejectQualityInspection(ctx context.Context, in *QualityInspectionDecision) (_ *QualityInspection, err error) {
+func (uc *QualityInspectionUsecase) RejectQualityInspection(ctx context.Context, in *QualityInspectionDecision) (_ *QualityInspection, err error) {
 	ctx, finish := startBusinessTrace(ctx, "quality.reject_inspection")
 	defer func() { finish(err) }()
 	if uc == nil || uc.repo == nil || in == nil {
@@ -317,7 +325,7 @@ func (uc *InventoryUsecase) RejectQualityInspection(ctx context.Context, in *Qua
 	return uc.repo.RejectQualityInspection(ctx, &normalized)
 }
 
-func (uc *InventoryUsecase) CancelQualityInspection(ctx context.Context, inspectionID int, decisionNote *string) (*QualityInspection, error) {
+func (uc *QualityInspectionUsecase) CancelQualityInspection(ctx context.Context, inspectionID int, decisionNote *string) (*QualityInspection, error) {
 	if uc == nil || uc.repo == nil || inspectionID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -325,14 +333,14 @@ func (uc *InventoryUsecase) CancelQualityInspection(ctx context.Context, inspect
 	return uc.repo.CancelQualityInspection(ctx, inspectionID, decisionNote)
 }
 
-func (uc *InventoryUsecase) GetQualityInspection(ctx context.Context, id int) (*QualityInspection, error) {
+func (uc *QualityInspectionUsecase) GetQualityInspection(ctx context.Context, id int) (*QualityInspection, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.GetQualityInspection(ctx, id)
 }
 
-func (uc *InventoryUsecase) ListQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error) {
+func (uc *QualityInspectionUsecase) ListQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
@@ -343,7 +351,7 @@ func (uc *InventoryUsecase) ListQualityInspections(ctx context.Context, filter Q
 	return uc.repo.ListQualityInspections(ctx, normalized)
 }
 
-func (uc *InventoryUsecase) ListFinishedGoodsQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error) {
+func (uc *QualityInspectionUsecase) ListFinishedGoodsQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
@@ -354,7 +362,7 @@ func (uc *InventoryUsecase) ListFinishedGoodsQualityInspections(ctx context.Cont
 	return uc.repo.ListQualityInspections(ctx, normalized)
 }
 
-func (uc *InventoryUsecase) ListOutsourcingReturnQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error) {
+func (uc *QualityInspectionUsecase) ListOutsourcingReturnQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
@@ -365,7 +373,7 @@ func (uc *InventoryUsecase) ListOutsourcingReturnQualityInspections(ctx context.
 	return uc.repo.ListQualityInspections(ctx, normalized)
 }
 
-func (uc *InventoryUsecase) ListProductionStageQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error) {
+func (uc *QualityInspectionUsecase) ListProductionStageQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
 	}
@@ -376,7 +384,7 @@ func (uc *InventoryUsecase) ListProductionStageQualityInspections(ctx context.Co
 	return uc.repo.ListQualityInspections(ctx, normalized)
 }
 
-func (uc *InventoryUsecase) EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (*PurchaseReceiptQualityGate, error) {
+func (uc *QualityInspectionUsecase) EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (*PurchaseReceiptQualityGate, error) {
 	if uc == nil || uc.repo == nil || receiptID <= 0 {
 		return nil, ErrBadParam
 	}

@@ -28,6 +28,8 @@ export async function verifyMobileNavigationMotion(
           : '[role="tab"]'
     )[index]
     const surface = antdTabs ? group : root
+    const scrollParents = []
+    for (let parent = surface.parentElement; parent; parent = parent.parentElement) scrollParents.push(parent)
     const before = surface.getBoundingClientRect()
     const read = () => {
       const style = getComputedStyle(group, '::before')
@@ -44,6 +46,9 @@ export async function verifyMobileNavigationMotion(
             : target.getAttribute('aria-selected') === 'true',
         mounted: root.isConnected && group.isConnected,
         box: [rect.x, rect.y, rect.width, rect.height],
+        scrollY: window.scrollY,
+        pageHeight: document.documentElement.scrollHeight,
+        scrollers: scrollParents.filter((node) => node.scrollTop || node.scrollHeight > node.clientHeight + 1).map((node) => ({ class: node.className, top: node.scrollTop, height: node.clientHeight, total: node.scrollHeight })),
       }
     }
     const start = read().x

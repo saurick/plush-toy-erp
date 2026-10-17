@@ -13,16 +13,16 @@ export default function BusinessModuleTabs({ workspace, cache, onNavigate, helpK
       title={workspace.group.label}
       helpKey={helpKey || workspace.activeKey}
       viewSwitch={
-        <Tabs
+        workspace.tabs.length > 1 || workspace.group.key !== 'production' ? <Tabs
           className="erp-business-module-tabs"
           aria-label={`${workspace.group.label}页面`}
           activeKey={workspace.activeKey}
           items={workspace.tabs.map(({ key, label }) => ({ key, label }))}
           onChange={(key) => {
             const tab = workspace.tabs.find((item) => item.key === key)
-            if (tab) onNavigate(restoreBusinessModuleTabPath(tab.path, cache))
+            if (tab && key !== workspace.activeKey) onNavigate(restoreBusinessModuleTabPath(tab, cache))
           }}
-        />
+        /> : null
       }
     />
   )

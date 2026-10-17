@@ -28,11 +28,11 @@ const (
 )
 
 type incomingQualityGateProcessCommandHandler struct {
-	uc *InventoryUsecase
+	uc *QualityInspectionUsecase
 }
 
 type finishedGoodsQualityDecideProcessCommandHandler struct {
-	uc *InventoryUsecase
+	uc *QualityInspectionUsecase
 }
 
 func (*finishedGoodsQualityDecideProcessCommandHandler) NormalizeProcessDomainCommandPayload(payload map[string]any) (map[string]any, error) {
@@ -59,19 +59,19 @@ type QualityInspectionProcessCommandRepo interface {
 	RejectQualityInspectionForProcessCommand(ctx context.Context, decision *QualityInspectionDecision, command *ProcessDomainCommandInput, result *ProcessDomainCommandResult, actorID int) (*QualityInspection, error)
 }
 
-func RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, inventoryUC *InventoryUsecase) error {
-	if processRuntimeUC == nil || inventoryUC == nil {
+func RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, qualityUC *QualityInspectionUsecase) error {
+	if processRuntimeUC == nil || qualityUC == nil {
 		return ErrBadParam
 	}
 	if err := processRuntimeUC.RegisterDomainCommandHandler(
 		ProcessDomainCommandIncomingQualityGate,
-		&incomingQualityGateProcessCommandHandler{uc: inventoryUC},
+		&incomingQualityGateProcessCommandHandler{uc: qualityUC},
 	); err != nil {
 		return err
 	}
 	return processRuntimeUC.RegisterDomainCommandHandler(
 		ProcessDomainCommandFinishedGoodsQualityDecide,
-		&finishedGoodsQualityDecideProcessCommandHandler{uc: inventoryUC},
+		&finishedGoodsQualityDecideProcessCommandHandler{uc: qualityUC},
 	)
 }
 

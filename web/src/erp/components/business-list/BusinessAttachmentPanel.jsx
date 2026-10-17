@@ -1457,36 +1457,38 @@ const BusinessAttachmentPanel = forwardRef(
                 '保留上传记录；已上传附件按权限撤销'
               )}
             </span>
-            {onClose ? (
-              <Button
-                disabled={uploading || preparing || withdrawing}
-                onClick={onClose}
-              >
-                完成
-              </Button>
-            ) : null}
-            {canUpload && retryablePendingAttachments.length > 1 ? (
-              <Button
-                icon={<RedoOutlined aria-hidden="true" />}
-                disabled={uploading || preparing}
-                onClick={() =>
-                  handleRetryPendingAttachments(retryablePendingAttachments)
-                }
-              >
-                重试失败项（{retryablePendingAttachments.length}）
-              </Button>
-            ) : null}
-            {canUpload && !missingOwner && queuedAttachments.length > 0 ? (
-              <Button
-                type="primary"
-                icon={<UploadOutlined aria-hidden="true" />}
-                loading={uploading}
-                disabled={preparing || uploading}
-                onClick={() => handleUploadQueuedAttachments()}
-              >
-                上传 {queuedAttachments.length} 个文件
-              </Button>
-            ) : null}
+            <div className="business-attachment-panel__footer-actions">
+              {onClose ? (
+                <Button
+                  disabled={uploading || preparing || withdrawing}
+                  onClick={onClose}
+                >
+                  关闭
+                </Button>
+              ) : null}
+              {canUpload && retryablePendingAttachments.length > 1 ? (
+                <Button
+                  icon={<RedoOutlined aria-hidden="true" />}
+                  disabled={uploading || preparing}
+                  onClick={() =>
+                    handleRetryPendingAttachments(retryablePendingAttachments)
+                  }
+                >
+                  重试失败项（{retryablePendingAttachments.length}）
+                </Button>
+              ) : null}
+              {canUpload && !missingOwner && queuedAttachments.length > 0 ? (
+                <Button
+                  type="primary"
+                  icon={<UploadOutlined aria-hidden="true" />}
+                  loading={uploading}
+                  disabled={preparing || uploading}
+                  onClick={() => handleUploadQueuedAttachments()}
+                >
+                  上传 {queuedAttachments.length} 个文件
+                </Button>
+              ) : null}
+            </div>
           </div>
         </div>
         <BusinessModal

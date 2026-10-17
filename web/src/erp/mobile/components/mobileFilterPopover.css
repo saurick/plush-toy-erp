@@ -10,14 +10,64 @@
   touch-action: none;
 }
 
-.mobile-filter-trigger {
+.mobile-filter-control {
   display: inline-flex;
-  min-width: 80px;
+  flex-shrink: 0;
   height: 46px;
+}
+.mobile-filter-trigger,
+.mobile-filter-clear {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-height: 44px;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.mobile-filter-trigger {
+  min-width: 80px;
   gap: 6px;
   padding: 0 12px;
+  border-radius: var(--erp-control-radius) 0 0 var(--erp-control-radius);
+}
+.mobile-filter-trigger:only-child {
+  border-radius: var(--erp-control-radius);
+}
+.mobile-filter-clear {
+  flex: 0 0 44px;
+  width: 44px;
+  border-inline-start: 1px solid var(--erp-control-border);
+  border-radius: 0 var(--erp-control-radius) var(--erp-control-radius) 0;
+}
+.mobile-filter-clear--standalone {
+  flex-basis: 46px;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--erp-control-border);
+  border-radius: var(--erp-control-radius);
+}
+.mobile-filter-trigger:focus-visible,
+.mobile-filter-clear:focus-visible {
+  outline: 2px solid var(--erp-control-accent);
+  outline-offset: -3px;
+}
+.mobile-filter-control[data-summary] .mobile-filter-trigger {
+  min-width: 64px;
+  gap: 4px;
+  padding-inline: 8px;
+}
+.mobile-filter-control[data-summary] .mobile-filter-trigger__label {
+  min-width: 0;
+  max-width: 56px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .mobile-filter-popover {
   --mobile-filter-inset-top: max(12px, env(safe-area-inset-top));
@@ -97,6 +147,7 @@
 .mobile-applied-filters {
   display: flex;
   min-width: 0;
+  align-items: center;
   flex-wrap: wrap;
   gap: 6px;
   margin-block: 0 8px;

@@ -59,7 +59,7 @@ test('workbench runtime evidence pages use semantic source-backed timestamps', (
       ['summary?.generatedAt', 'operation.createdAt', 'event.at'],
     ],
     [
-      '../pages/DevDatabaseMigrationPage.jsx',
+      '../pages/delivery/migration/MigrationOperationDrawer.jsx',
       [
         'operationDetail.createdAt',
         'operationDetail.plan.preparedAt',
@@ -67,12 +67,16 @@ test('workbench runtime evidence pages use semantic source-backed timestamps', (
       ],
     ],
     [
-      '../pages/DevCustomerConfigPage.jsx',
-      [
-        'result.generatedAt',
-        'result.manifestGeneratedAt',
-        'publish.published_at',
-      ],
+      '../pages/customer-config/DryRunSummary.jsx',
+      ['result.generatedAt'],
+    ],
+    [
+      '../pages/customer-config/TestApplySummary.jsx',
+      ['result.manifestGeneratedAt', 'publish.published_at'],
+    ],
+    [
+      '../pages/customer-config/ReleaseApplySummary.jsx',
+      ['result.generatedAt'],
     ],
   ]
 

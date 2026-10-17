@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
@@ -11,10 +11,11 @@ import {
 } from '@ant-design/icons'
 import { Button, Dropdown, Input, Popconfirm, Tag } from 'antd'
 import {
-  useNavigate,
   useOutletContext,
+  useLocation,
   useSearchParams,
 } from 'react-router-dom'
+import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { OperationalFactStatus, ShipmentStatus, StockReservationStatus } from '../../common/consts/statuses.generated.mjs'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
 import { operationalFactTaskContext } from '../utils/workflowFollowup.mjs'
@@ -24,7 +25,8 @@ import useBusinessPageState from '../hooks/useBusinessPageState.js'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
-import { canReadProductionProcess } from '../utils/productionRecordViews.mjs'
+import { canReadProductionProcess, productionFactSummary } from '../utils/productionRecordViews.mjs'
+import ProductionRecordDrawer from '../components/production-records/ProductionRecordDrawer.jsx'
 import { useOperationalFactQuery } from '../components/operational-facts/useOperationalFactQuery.mjs'
 import { useOperationalFactMutations } from '../components/operational-facts/useOperationalFactMutations.mjs'
 import {
@@ -137,7 +139,8 @@ export function OperationalFactWorkspace({
   const outletContext = useOutletContext()
   const productionRecordsWorkspace =
     outletContext?.productionRecordsWorkspace || null
-  const navigate = useNavigate()
+  const navigate = useBusinessNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const [savedContentView, setContentView] = useBusinessPageState(
     'contentView',
@@ -222,6 +225,9 @@ export function OperationalFactWorkspace({
   )
 
   const activeSelectedRow = selectedByKey[currentActiveKey] || null
+  const productionHandling = outletContext?.workflowTaskNavigation?.productionHandling
+  const [taskReviewOpen, setTaskReviewOpen] = useState(false)
+  const taskReviewRef = useRef(0)
   const taskContext = operationalFactTaskContext(
     currentActiveKey,
     activeSelectedRow
@@ -353,6 +359,7 @@ export function OperationalFactWorkspace({
       : Number(activeSelectedRow?.production_order_id || 0)
   const [selectedProcessOrderID, setSelectedProcessOrderID] =
     useBusinessPageState('selectedProcessOrderID', 0)
+  const lastPreferredProcessOrderID = useRef(0)
   useEffect(() => {
     if (
       contentView !== 'process' ||
@@ -365,13 +372,19 @@ export function OperationalFactWorkspace({
     const availableIDs = new Set(
       processOrdersData.rows.map((order) => Number(order?.id || 0))
     )
+    const preferredChanged =
+      lastPreferredProcessOrderID.current !== preferredProcessOrderID
+    lastPreferredProcessOrderID.current = preferredProcessOrderID
     setSelectedProcessOrderID((current) => {
       if (
+        preferredChanged &&
         preferredProcessOrderID &&
         availableIDs.has(preferredProcessOrderID)
       ) {
         return preferredProcessOrderID
       }
+      // null 表示主动清空；0 表示尚未选择，首次进入仍默认选中首单。
+      if (current === null) return null
       if (current && availableIDs.has(current)) return current
       return Number(processOrdersData.rows[0]?.id || 0)
     })
@@ -868,11 +881,24 @@ export function OperationalFactWorkspace({
         ) : null}
       </div>
     ) : null
-  const processAggregate = processAggregateData.rows[0] || null
+  const processAggregate = selectedProcessOrderID
+    ? processAggregateData.rows[0] || null
+    : null
   const processLoading =
     processOrdersData.loading ||
     Boolean(selectedProcessOrderID && processAggregateData.loading)
-  const processError = processOrdersData.error || processAggregateData.error
+  const processError =
+    processOrdersData.error ||
+    (selectedProcessOrderID ? processAggregateData.error : '')
+  useEffect(() => {
+    if (productionHandling?.group !== 'handoff_production_inbound' ||
+      taskReviewRef.current === productionHandling.taskID ||
+      Number(activeSelectedRow?.id) !== productionHandling.sourceID ||
+      activeSelectedRow?.status !== OperationalFactStatus.DRAFT || !canPostSelected ||
+      sourceBoundDraftTransitionBlocked) return
+    taskReviewRef.current = productionHandling.taskID
+    setTaskReviewOpen(true)
+  }, [productionHandling, activeSelectedRow, canPostSelected, sourceBoundDraftTransitionBlocked])
   const LayoutRoot = productionRecordsWorkspace
     ? React.Fragment
     : BusinessPageLayout
@@ -892,6 +918,7 @@ export function OperationalFactWorkspace({
       )}
 
       <BusinessOperationPanel
+        hidden={contentView === 'process'}
         compact
         onClearFilters={clearFilters}
         clearFiltersDisabled={!hasActiveFilters}
@@ -1739,12 +1766,19 @@ export function OperationalFactWorkspace({
               processAggregateData.reload()
             }}
             onSelectOrder={setSelectedProcessOrderID}
-            onOpenOrder={(productionOrderID) =>
+            canHandle={(matter) => matter.permissions.every((permission) => hasActionPermission(adminProfile, permission))}
+            onOpenInspection={canOpenRelatedPath(BUSINESS_ROUTE_PATHS.qualityInspections) ? (inspectionID) => navigate(routeWithQuery(BUSINESS_ROUTE_PATHS.qualityInspections, { quality_inspection_id: inspectionID })) : undefined}
+            onOpenRecord={canOpenRelatedPath(BUSINESS_ROUTE_PATHS.productionProgress) ? (factID) => navigate(routeWithQuery(BUSINESS_ROUTE_PATHS.productionProgress, { fact_id: factID })) : undefined}
+            onOpenExceptions={canOpenRelatedPath(BUSINESS_ROUTE_PATHS.productionExceptions) ? () => navigate(BUSINESS_ROUTE_PATHS.productionExceptions) : undefined}
+            onOpenOrder={canOpenRelatedPath(BUSINESS_ROUTE_PATHS.productionOrders) ? (productionOrderID, batchID, action) =>
               navigate(
                 routeWithQuery(BUSINESS_ROUTE_PATHS.productionOrders, {
                   production_order_id: productionOrderID,
-                })
-              )
+                  wip_batch_id: batchID,
+                  wip_action: action,
+                }),
+                { state: { productionProcessReturn: { pathname: location.pathname, search: location.search, hash: location.hash } } }
+              ) : undefined
             }
           />
         ) : (
@@ -1790,8 +1824,43 @@ export function OperationalFactWorkspace({
         )}
       </BusinessViewSurface>
 
+      <ProductionRecordDrawer
+        title="核对本次生产记录"
+        summary={productionFactSummary(activeSelectedRow || {})}
+        open={taskReviewOpen}
+        record={activeSelectedRow}
+        columns={columns}
+        onClose={saving ? undefined : () => setTaskReviewOpen(false)}
+        actions={
+          <Button
+            type="primary"
+            loading={saving}
+            disabled={!canPostSelected || activeSelectedRow?.status !== OperationalFactStatus.DRAFT || sourceBoundDraftTransitionBlocked}
+            onClick={async () => {
+              if (!canPostSelected || sourceBoundDraftTransitionBlocked || activeSelectedRow?.status !== OperationalFactStatus.DRAFT) return
+              const success = await runRowAction(activeConfig, activeSelectedRow, 'post', postButtonLabel)
+              if (success) setTaskReviewOpen(false)
+            }}
+          >
+            {postButtonLabel}
+          </Button>
+        }
+      />
+
       {columnOrderModal}
-      <BusinessDetailsModal
+      {currentActiveKey === 'production' ? (
+        <ProductionRecordDrawer
+          title="生产记录详情"
+          summary={productionFactSummary(visibleDetailRecord || {})}
+          columns={columns}
+          open={Boolean(visibleDetailRecord)}
+          record={visibleDetailRecord}
+          onClose={() => setDetailRecord(null)}
+          actions={detailSourceRoute && canOpenRelatedPath(detailSourceRoute) ? (
+            <Button onClick={() => navigate(detailSourceRoute)}>查看来源单据</Button>
+          ) : null}
+        />
+      ) : <BusinessDetailsModal
         columns={visibleColumns}
         description="当前弹窗只用于查看记录；如需编辑草稿、确认、结清、取消、返工或继续办理，请使用列表上方的当前操作区。"
         open={Boolean(visibleDetailRecord)}
@@ -1805,7 +1874,7 @@ export function OperationalFactWorkspace({
         }
         title={`${activeConfig.title}详情`}
         onClose={() => setDetailRecord(null)}
-      />
+      />}
       <FinanceBusinessSourceModal
         action={financeSourceContext?.action}
         open={Boolean(financeSourceContext)}

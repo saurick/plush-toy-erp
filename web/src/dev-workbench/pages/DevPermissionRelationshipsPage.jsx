@@ -24,6 +24,7 @@ import { MermaidDiagram } from '@/common/components/markdown'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { readPermissionRelationshipSnapshot } from '../config/devPermissionRelationshipApi.mjs'
 import DevPageNav from '../components/DevPageNav.jsx'
+import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import DevStaticGuidance from '../components/DevStaticGuidance.jsx'
 import DevPermissionNavigationOverview from '../components/DevPermissionNavigationOverview.jsx'
 import { buildPermissionRelationshipNavigationModel } from '../config/devPermissionNavigation.mjs'
@@ -850,9 +851,9 @@ export default function DevPermissionRelationshipsPage() {
                           loading={accessLoading}
                           scroll={{ x: 1020 }}
                           pagination={{
+                            ...DEV_PAGINATION,
                             pageSize: 12,
                             hideOnSinglePage: true,
-                            showSizeChanger: false,
                           }}
                           locale={{
                             emptyText: (

@@ -13,7 +13,12 @@ const restoreScript = path.join(
   root,
   "scripts/deploy/verify-scheduled-postgres-backup.sh",
 );
-const backupSource = readFileSync(backupScript, "utf8");
+const backupSource =
+  readFileSync(backupScript, "utf8") +
+  readFileSync(
+    path.join(root, "scripts/deploy/postgres-backup-role.sql"),
+    "utf8",
+  );
 const restoreSource = readFileSync(restoreScript, "utf8");
 
 test("scheduled backup is bounded, verified, offsite and failure-visible", () => {
@@ -98,12 +103,15 @@ test("systemd timers persist daily backup and weekly restore checks with failure
     backupService,
     /OnFailure=plush-toy-erp-backup-failure@%n\.service/u,
   );
-  assert.match(backupService, /scheduled-postgres-backup\.sh/u);
-  assert.match(backupService, /--age-recipient-file/u);
+  assert.match(backupService, /backup-set\/cli\.mjs create/u);
+  assert.match(backupService, /--recipient-file/u);
+  assert.match(backupService, /--confirm BACKUP_SET:/u);
+  assert.match(backupService, /KillMode=mixed/u);
   assert.match(backupTimer, /OnCalendar=\*-\*-\* 02:15:00/u);
   assert.match(backupTimer, /Persistent=true/u);
-  assert.match(restoreService, /verify-scheduled-postgres-backup\.sh/u);
-  assert.match(restoreService, /--age-identity-file/u);
+  assert.match(restoreService, /backup-set\/cli\.mjs restore-check/u);
+  assert.match(restoreService, /--identity-file/u);
+  assert.match(restoreService, /--work-dir/u);
   assert.match(restoreTimer, /OnCalendar=Sun \*-\*-\* 04:15:00/u);
   assert.match(restoreTimer, /Persistent=true/u);
 });

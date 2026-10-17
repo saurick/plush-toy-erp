@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
+import { createServer as createHTTPServer } from 'node:http'
 import test from 'node:test'
-import { createServer } from 'vite'
+import { build, createServer } from 'vite'
+import { createDevDocsMetadataPlugin } from '../../../vite.docs.mjs'
 
 import {
   DEV_DOCS_EXPANDED_DIRS_STORAGE_KEY,
@@ -38,15 +40,16 @@ const devDocsPageSource = readFileSync(
   'utf8'
 )
 
-test('devDocs: document build excludes customer input memos while retaining public documents', async () => {
+test('devDocs: document build excludes customer input memos while retaining public documents', async (t) => {
   const declaration = devDocsPageSource.match(/const currentMarkdownModules = import\.meta\.glob\([\s\S]*?\n\)/u)?.[0]
   assert(declaration, 'the document build entry must remain inspectable')
   const root = await mkdtemp(path.join(tmpdir(), 'plush-docs-distribution-'))
   let server
+  let httpServer
   try {
     for (const [file, source] of Object.entries({
       'web/src/dev-workbench/pages/entry.mjs': `${declaration}\nexport default currentMarkdownModules;\n`,
-      'docs/engineering/public.md': '# Public contract\n',
+      'docs/engineering/public.md': '# Public contract\n\nunique-body-payload-sentinel\n',
       'docs/customers/example/甲方反馈记录.md': '# synthetic-private-memo\n',
       'docs/archive/history.md': '# Deferred archive\n',
       '.agents/skills/plush-example/SKILL.md': '# Skill contract\n\n[Detail](references/detail.md#scope)\n',
@@ -58,19 +61,62 @@ test('devDocs: document build excludes customer input memos while retaining publ
     }
     server = await createServer({
       root,
-configFile: false,
-logLevel: 'silent',
-      server: { middlewareMode: true, hmr: false, watch: null },
+      plugins: [createDevDocsMetadataPlugin()],
+      configFile: false,
+      logLevel: 'silent',
+      server: { middlewareMode: true, hmr: false, watch: null, fs: { allow: [path.join(root, 'web')] } },
     })
     const modules = await server.ssrLoadModule('/web/src/dev-workbench/pages/entry.mjs')
     const skillDocs = buildDevDocsItems(modules.default)
     assert.equal(skillDocs.find((item) => item.path === '.agents/skills/plush-example/SKILL.md')?.title, 'Skill contract')
     assert.equal(skillDocs.find((item) => item.path === '.agents/skills/plush-example/references/detail.md')?.title, 'Detail')
-    assert.equal(modules.default['../../../../docs/engineering/public.md'], '# Public contract\n')
+    const publicDoc = modules.default['../../../../docs/engineering/public.md']
+    assert.equal(publicDoc.title, 'Public contract')
+    assert.equal(typeof publicDoc.loadSource, 'function')
+    const items = buildDevDocsItems(modules.default)
+    assert.equal(items[0].source, '')
+    assert.equal(filterDevDocsItems(items, 'Public contract', DEV_DOCS_SEARCH_SCOPE_TITLE).length, 1)
+    let unavailable = true
+    httpServer = createHTTPServer((request, response) => {
+      if (unavailable) {
+        response.writeHead(503)
+        response.end()
+        return
+      }
+      server.middlewares(request, response)
+    })
+    await new Promise((resolve) => httpServer.listen(0, '127.0.0.1', resolve))
+    const origin = `http://127.0.0.1:${httpServer.address().port}`
+    const nativeFetch = globalThis.fetch
+    t.mock.method(globalThis, 'fetch', (url, options) => nativeFetch(new URL(url, origin), options))
+    await assert.rejects(publicDoc.loadSource(), /Document request failed/u)
+    unavailable = false
+    assert.equal(await publicDoc.loadSource(), '# Public contract\n\nunique-body-payload-sentinel\n')
+    const privateResponse = await fetch(`/@fs/${path.join(root, 'docs/customers/example/甲方反馈记录.md')}`)
+    assert.equal(privateResponse.status, 403, 'excluded private files do not gain filesystem permission')
     assert.equal(Object.keys(modules.default).some((file) => file.endsWith('/甲方反馈记录.md')), false)
-    assert.equal(Object.values(modules.default).some((source) => source.includes('synthetic-private-memo')), false)
+    assert.equal(Object.values(modules.default).some((item) => JSON.stringify(item).includes('synthetic-private-memo')), false)
     assert.equal(Object.keys(modules.default).some((file) => file.endsWith('/history.md')), false)
+    const result = await build({
+      root,
+      configFile: false,
+      logLevel: 'silent',
+      plugins: [createDevDocsMetadataPlugin()],
+      build: {
+        write: false,
+        minify: false,
+        lib: { entry: path.join(root, 'web/src/dev-workbench/pages/entry.mjs'), formats: ['es'] },
+      },
+    })
+    const output = [result].flat().flatMap((item) => item.output)
+    const chunks = output.filter((item) => item.type === 'chunk')
+    const entry = chunks.find((item) => item.isEntry)
+    assert(entry)
+    assert.equal(entry.code.includes('unique-body-payload-sentinel'), false, 'document bodies stay out of the eager index')
+    assert(output.some((item) => item.type === 'asset' && String(item.source).includes('unique-body-payload-sentinel')))
+    assert(output.every((item) => !String(item.code || item.source).includes('synthetic-private-memo')))
   } finally {
+    if (httpServer) await new Promise((resolve) => httpServer.close(resolve))
     try { await server?.close() } finally { await rm(root, { recursive: true, force: true }) }
   }
 })

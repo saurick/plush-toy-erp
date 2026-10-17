@@ -8,8 +8,9 @@ export default function WorkflowTaskTiming({
   detail = false,
   compact = false,
   events = [],
+  includeKeys,
 }) {
-  const rows = getWorkflowTaskTiming(task, { detail, events })
+  const rows = getWorkflowTaskTiming(task, { detail, events }).filter((row) => !includeKeys || includeKeys.includes(row.key))
   if (!rows.length) return null
   return (
     <div

@@ -2,6 +2,8 @@ import { NumericContract } from '../../common/consts/numeric.generated.mjs'
 import { OperationalFactStatus, OutsourcingOrderItemStatus, OutsourcingOrderStatus, ProductionOrderStatus, ProductionPackagingConfirmationStatus, ProductionWIPStatus, QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
 import {
   addNumeric20Scale6Units,
+  numeric20Scale6QuantityUnits,
+  numeric20Scale6TextFromUnits,
   numeric20Scale6Units,
 } from './numeric20Scale6.mjs'
 
@@ -86,10 +88,7 @@ const QUALITY_RESULT_META = Object.freeze({
 
 const MAX_KEY_LENGTH = 128
 const MAX_REASON_LENGTH = 255
-const NON_NEGATIVE_QUANTITY_PATTERN = /^(?:0*\d+(?:\.\d+)?|0*\.\d+)$/u
 export const PRODUCTION_WIP_QUANTITY_MAX_LENGTH = NumericContract.integerDigits + 1 + NumericContract.scale
-const PRODUCTION_WIP_QUANTITY_MAX_INTEGER_DIGITS = NumericContract.integerDigits
-const PRODUCTION_WIP_QUANTITY_MAX_FRACTION_DIGITS = NumericContract.scale
 
 function invalidResponse() {
   const error = new Error('服务器返回的生产工序信息不完整，请刷新后重试')
@@ -120,25 +119,8 @@ function optionalText(value) {
 }
 
 function canonicalNonNegativeQuantity(value) {
-  const text = String(value ?? '').trim()
-  if (
-    text.length > PRODUCTION_WIP_QUANTITY_MAX_LENGTH ||
-    !NON_NEGATIVE_QUANTITY_PATTERN.test(text)
-  ) {
-    return ''
-  }
-  const [whole = '0', fraction = ''] = text.split('.')
-  const normalizedWhole = whole.replace(/^0+(?=\d)/u, '') || '0'
-  if (
-    normalizedWhole.length > PRODUCTION_WIP_QUANTITY_MAX_INTEGER_DIGITS ||
-    fraction.length > PRODUCTION_WIP_QUANTITY_MAX_FRACTION_DIGITS
-  ) {
-    return ''
-  }
-  const normalizedFraction = fraction.replace(/0+$/u, '')
-  return normalizedFraction
-    ? `${normalizedWhole}.${normalizedFraction}`
-    : normalizedWhole
+  const units = numeric20Scale6QuantityUnits(value)
+  return units === null ? '' : numeric20Scale6TextFromUnits(units)
 }
 
 function canonicalQuantity(value) {
@@ -154,35 +136,22 @@ export function normalizeProductionWipQuantity(value) {
   return normalized
 }
 
-function quantityInteger(value, scale) {
-  const normalized = canonicalNonNegativeQuantity(value)
-  if (!normalized) {
+function quantityInteger(value) {
+  const units = numeric20Scale6QuantityUnits(value)
+  if (units === null) {
     throw invalidAction('数量不能小于 0，且最多 14 位整数和 6 位小数')
   }
-  const [whole, fraction = ''] = normalized.split('.')
-  return BigInt(`${whole}${fraction.padEnd(scale, '0')}`)
+  return BigInt(units)
 }
 
 export function compareProductionWipQuantity(left, right) {
-  const leftText = canonicalNonNegativeQuantity(left)
-  const rightText = canonicalNonNegativeQuantity(right)
-  if (!leftText || !rightText) {
-    throw invalidAction('数量不能小于 0，且最多 14 位整数和 6 位小数')
-  }
-  const leftScale = leftText.split('.')[1]?.length || 0
-  const rightScale = rightText.split('.')[1]?.length || 0
-  const scale = Math.max(leftScale, rightScale)
-  const leftValue = quantityInteger(leftText, scale)
-  const rightValue = quantityInteger(rightText, scale)
+  const leftValue = quantityInteger(left)
+  const rightValue = quantityInteger(right)
   return leftValue === rightValue ? 0 : leftValue > rightValue ? 1 : -1
 }
 
-function quantityTextFromInteger(value, scale) {
-  const digits = value.toString().padStart(scale + 1, '0')
-  if (scale === 0) return digits
-  const whole = digits.slice(0, -scale) || '0'
-  const fraction = digits.slice(-scale).replace(/0+$/u, '')
-  return fraction ? `${whole}.${fraction}` : whole
+function quantityTextFromInteger(value) {
+  return numeric20Scale6TextFromUnits(value.toString())
 }
 
 export function buildProductionWipConservingSplits(
@@ -194,12 +163,8 @@ export function buildProductionWipConservingSplits(
   if (compareProductionWipQuantity(split, source) >= 0) {
     throw invalidAction('拆分数量必须小于当前批次数量')
   }
-  const sourceScale = source.split('.')[1]?.length || 0
-  const splitScale = split.split('.')[1]?.length || 0
-  const scale = Math.max(sourceScale, splitScale)
   const remainder = quantityTextFromInteger(
-    quantityInteger(source, scale) - quantityInteger(split, scale),
-    scale
+    quantityInteger(source) - quantityInteger(split)
   )
   return Object.freeze([
     Object.freeze({ quantity: split }),
@@ -855,17 +820,16 @@ export function productionWipPackagingReceiptChoices(aggregate, batch) {
           ![ProductionWIPStatus.CANCELLED, ProductionWIPStatus.SPLIT].includes(candidate.status)
       )
       const remaining =
-        quantityInteger(receipt.quantity, 6) -
-        quantityInteger(receipt.reworked_quantity, 6) -
+        quantityInteger(receipt.quantity) -
+        quantityInteger(receipt.reworked_quantity) -
         allocated.reduce(
-          (total, candidate) => total + quantityInteger(candidate.quantity, 6),
+          (total, candidate) => total + quantityInteger(candidate.quantity),
           0n
         )
       return {
         ...receipt,
         remaining_quantity: quantityTextFromInteger(
-          remaining > 0n ? remaining : 0n,
-          6
+          remaining > 0n ? remaining : 0n
         ),
       }
     })
@@ -889,12 +853,12 @@ export function productionWipTransferRemainingQuantity(
       candidate.status !== ProductionWIPStatus.CANCELLED
   )
   const remaining =
-    quantityInteger(batch.quantity, 6) -
+    quantityInteger(batch.quantity) -
     children.reduce(
-      (total, child) => total + quantityInteger(child.quantity, 6),
+      (total, child) => total + quantityInteger(child.quantity),
       0n
     )
-  return quantityTextFromInteger(remaining > 0n ? remaining : 0n, 6)
+  return quantityTextFromInteger(remaining > 0n ? remaining : 0n)
 }
 
 function requireActionText(value, label, maxLength = MAX_KEY_LENGTH) {
@@ -1117,6 +1081,11 @@ export function productionWipOperationLabel(operation = {}) {
     ] ||
     '工序待核对'
   )
+}
+
+export function productionWipOperationDisplayLabel(operation = {}) {
+  const labels = { FABRIC_PROCESSING: '布料加工', SEWING: '缝制', HANDWORK: '手工制作', PACKAGING: '包装' }
+  return labels[operation?.operation_code] || productionWipOperationLabel(operation || {})
 }
 
 function nullablePositiveID(value) {
@@ -1691,17 +1660,11 @@ export function productionWipCompletionEligibility(
       receivableBatches: Object.freeze(receivableBatches),
     })
   }
-  const scale = Math.max(
-    ...(selectedBatch ? [selectedBatch] : receivableBatches).map(
-      (batch) => canonicalQuantity(batch.quantity).split('.')[1]?.length || 0
-    )
-  )
   const receivableQuantity = quantityTextFromInteger(
     (selectedBatch ? [selectedBatch] : receivableBatches).reduce(
-      (total, batch) => total + quantityInteger(batch.quantity, scale),
+      (total, batch) => total + quantityInteger(batch.quantity),
       BigInt(0)
-    ),
-    scale
+    )
   )
   return Object.freeze({
     eligible: true,

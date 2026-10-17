@@ -1,16 +1,27 @@
 export function mobileBusinessRole(pathname = '') {
-  return /^\/m\/([a-z_]+)\/(?:handle|tasks)(?:\/|$)/u.exec(pathname)?.[1] || ''
+  return /^\/m\/([a-z_]+)(?:\/|$)/u.exec(pathname)?.[1] || ''
 }
 
 export function canonicalBusinessPath(path = '') {
-  return String(path).replace(/^\/m\/[a-z_]+\/handle\//u, '/erp/')
+  return String(path).replace(/^\/m\/[a-z_]+\/(?:tasks\/[1-9][0-9]*\/)?handle\//u, '/erp/')
 }
 
-export function mobileBusinessPath(path, roleKey) {
-  if (typeof path !== 'string' || !/^[a-z_]+$/u.test(roleKey || '')) return path
-  if (/^\/erp\/(?:task-board|dashboard)(?:[?#]|$)/u.test(path)) {
-    const search = path.includes('?') ? `?${path.split('?')[1]}` : ''
-    return `/m/${roleKey}/tasks${new URLSearchParams(search).get('tracking') === 'visible' ? search : ''}`
+export function mobileBusinessPath(path, roleKey, taskID = null) {
+  if (path && typeof path === 'object' && typeof path.pathname === 'string' && path.pathname.startsWith('/erp')) {
+    const original = `${path.pathname}${path.search || ''}${path.hash || ''}`
+    const mapped = mobileBusinessPath(original, roleKey, taskID)
+    if (mapped === original) return path
+    const url = new URL(mapped, 'https://erp.invalid')
+    return { ...path, pathname: url.pathname, search: url.search, hash: url.hash }
   }
-  return path.startsWith('/erp/') ? `/m/${roleKey}/handle/${path.slice(5)}` : path
+  if (typeof path !== 'string' || !/^[a-z_]+$/u.test(roleKey || '')) return path
+  if (/^\/erp(?:[?#]|$)/u.test(path) || /^\/erp\/(?:task-board|dashboard)(?:[?#]|$)/u.test(path)) {
+    const url = new URL(path, 'https://erp.invalid')
+    const search = url.searchParams.get('tracking') === 'visible'
+      ? url.search
+      : url.searchParams.has('link_task') ? `?${new URLSearchParams({ link_task: url.searchParams.get('link_task') })}` : ''
+    return `/m/${roleKey}/tasks${search}${url.hash}`
+  }
+  const taskPrefix = Number.isSafeInteger(taskID) && taskID > 0 ? `tasks/${taskID}/` : ''
+  return path.startsWith('/erp/') ? `/m/${roleKey}/${taskPrefix}handle/${path.slice(5)}` : path
 }

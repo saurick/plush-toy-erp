@@ -4,7 +4,42 @@ import test from 'node:test'
 import {
   buildDevDocsLocation,
   resolveDevDocsMarkdownHref,
+  resolveDevDocsReadingHeading,
 } from './devDocsNavigation.mjs'
+
+test('resolveDevDocsReadingHeading: 阅读位置、底部与短文档各自定位', () => {
+  const headings = [
+    { id: 'intro', top: 18 },
+    { id: 'details', top: 220 },
+    { id: 'end', top: 760 },
+  ]
+  assert.equal(resolveDevDocsReadingHeading([]), '')
+  assert.equal(resolveDevDocsReadingHeading(headings), 'intro')
+  assert.equal(
+    resolveDevDocsReadingHeading(headings, {
+      scrollTop: 204,
+      clientHeight: 300,
+      scrollHeight: 1000,
+    }),
+    'details'
+  )
+  assert.equal(
+    resolveDevDocsReadingHeading(headings, {
+      scrollTop: 700,
+      clientHeight: 300,
+      scrollHeight: 1000,
+    }),
+    'end'
+  )
+  assert.equal(
+    resolveDevDocsReadingHeading(headings, {
+      scrollTop: 0,
+      clientHeight: 1200,
+      scrollHeight: 1000,
+    }),
+    'intro'
+  )
+})
 
 test('buildDevDocsLocation: 同步 path、保留其他 query 并按需清理 hash', () => {
   const location = buildDevDocsLocation({

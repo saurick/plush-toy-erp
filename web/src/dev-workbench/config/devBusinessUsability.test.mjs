@@ -135,7 +135,7 @@ test('devBusinessUsability: 页面明确只读且不复制权限与岗位责任�
   assert.match(pageSource, /BUSINESS_USABILITY_CATALOG/u)
   assert.match(
     pageSource,
-    /rowKey="key"[\s\S]*size="small"[\s\S]*pageSize: DEV_BUSINESS_USABILITY_PAGE_SIZE[\s\S]*showSizeChanger: false/u
+    /rowKey="key"[\s\S]*size="small"[\s\S]*\.\.\.DEV_PAGINATION,[\s\S]*pageSize: DEV_BUSINESS_USABILITY_PAGE_SIZE/u
   )
   assert.match(pageSource, /\/erp\/help-center/u)
   assert.match(pageSource, /\/__dev\/status-flows/u)

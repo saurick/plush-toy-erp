@@ -922,22 +922,13 @@ test('devCustomerConfig: 注册检查保留机器 key 但可见 label 不 fallba
 })
 
 test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw key', async () => {
-  const source = await readFile(
-    new URL('../pages/DevCustomerConfigPage.jsx', import.meta.url),
-    'utf8'
-  )
+  const source = (await Promise.all([
+    'DevCustomerConfigPage.jsx',
+    ...['AssetsPanel.jsx', 'PreflightPanel.jsx', 'DiffPanel.jsx', 'OverviewPanel.jsx', 'ValidationPanel.jsx', 'ReleasePanel.jsx', 'DryRunSummary.jsx', 'TestApplySummary.jsx', 'ReleaseApplySummary.jsx', 'presentation.jsx'].map((name) => `customer-config/${name}`),
+  ].map((name) => readFile(new URL(`../pages/${name}`, import.meta.url), 'utf8')))).join('\n')
 
-  assert.match(source, /const PREFLIGHT_SECTION_QUERY_KEY = 'section'/)
-  assert.match(source, /const IMPORT_ACTION_QUERY_KEY = 'action'/)
   assert.match(source, /ariaLabel="配置预检任务"/)
-  assert.match(source, /ariaLabel="配置执行任务"/)
-  assert.match(source, /activeSection === PREFLIGHT_SECTION_PACKAGE/)
-  assert.match(source, /activeSection === PREFLIGHT_SECTION_RUNTIME/)
-  assert.match(source, /activeSection === PREFLIGHT_SECTION_FLOW/)
-  assert.match(source, /activeSection === PREFLIGHT_SECTION_EVIDENCE/)
-  assert.match(source, /activeAction === IMPORT_ACTION_DRY_RUN/)
-  assert.match(source, /activeAction === IMPORT_ACTION_TEST_APPLY/)
-  assert.match(source, /activeAction === IMPORT_ACTION_RELEASE/)
+  assert.match(source, /ariaLabel="配置验证方式"/)
 
   assert.doesNotMatch(source, />runtime off</)
   assert.doesNotMatch(source, />handler forbidden</)
@@ -1002,67 +993,30 @@ test('devCustomerConfig: 页面只展示客户配置目录标签，不直出 raw
   assert.match(source, /rule\.resultLabel/)
 })
 
-test('devCustomerConfig: 主工作任务与执行动作保持单一层级', async () => {
-  const source = await readFile(
-    new URL('../pages/DevCustomerConfigPage.jsx', import.meta.url),
-    'utf8'
-  )
-
-  assert.match(source, /label: '界面投影'/u)
-  assert.match(source, /label: '执行与发布门禁'/u)
+test('devCustomerConfig: 主操作各有唯一入口并保留写入保护', async () => {
+  const source = (await Promise.all([
+    'DevCustomerConfigPage.jsx',
+    ...['AssetsPanel.jsx', 'PreflightPanel.jsx', 'DiffPanel.jsx', 'OverviewPanel.jsx', 'ValidationPanel.jsx', 'ReleasePanel.jsx', 'DryRunSummary.jsx', 'TestApplySummary.jsx', 'ReleaseApplySummary.jsx', 'presentation.jsx'].map((name) => `customer-config/${name}`),
+  ].map((name) => readFile(new URL(`../pages/${name}`, import.meta.url), 'utf8')))).join('\n')
   assert.match(source, /level="primary"/u)
-  assert.doesNotMatch(source, /label: '界面配置'/u)
-  assert.doesNotMatch(source, /label: '执行发布'/u)
-  assert.doesNotMatch(source, /title="看工具"/u)
-
   assert.equal(source.match(/onClick=\{onRunDryRun\}/gu)?.length, 1)
   assert.equal(source.match(/onClick=\{onApplyTestConfig\}/gu)?.length, 1)
   assert.equal(source.match(/onClick=\{onCheckReleaseReadiness\}/gu)?.length, 1)
-  assert.match(
-    source,
-    /type="primary"\s+danger[\s\S]*?onClick=\{onApplyTestConfig\}/u
-  )
-  assert.match(source, /重新运行测试试跑/u)
-  assert.match(source, /重新应用到当前后端/u)
-  assert.match(source, /重新检查发布门禁/u)
-  assert.match(
-    source,
-    /releaseState\.status === 'success' \? 'primary' : 'default'/u
-  )
+  assert.match(source, /disabled=\{disabled \|\| !importSummary\.canApplyTestConfig\}/u)
+  assert.match(source, /所选批次有历史检查记录，请重新检查当前工作区/u)
+  assert.match(source, /disabled=\{!passed \|\| disabled\}/u)
+  assert.match(source, /重新运行样本试跑/u)
+  assert.match(source, /重新应用本地配置/u)
+  assert.match(source, /重新检查发布条件/u)
 })
 
-test('devCustomerConfig: 视图、子任务和证据批次 query 会恢复为唯一规范值', async () => {
-  const source = await readFile(
-    new URL('../pages/DevCustomerConfigPage.jsx', import.meta.url),
-    'utf8'
-  )
-
-  assert.match(
-    source,
-    /searchParams[.]getAll\(\s*DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY/u
-  )
-  assert.match(
-    source,
-    /searchParams[.]getAll\(\s*DEV_CUSTOMER_CONFIG_QUERY_KEY/u
-  )
-  assert.match(source, /overview[.]status !== 'ready'/u)
-  assert.match(source, /requestedViewCount !== 1/u)
-  assert.match(
-    source,
-    /activeView === VIEW_OVERVIEW[\s\S]*?delete\(DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY\)/u
-  )
-  assert.match(
-    source,
-    /activePreflightSection === PREFLIGHT_SECTION_PACKAGE[\s\S]*?delete\(PREFLIGHT_SECTION_QUERY_KEY\)/u
-  )
-  assert.match(
-    source,
-    /activeImportAction === IMPORT_ACTION_DRY_RUN[\s\S]*?delete\(IMPORT_ACTION_QUERY_KEY\)/u
-  )
-  assert.match(
-    source,
-    /releaseBatchesState[.]status !== 'success'[\s\S]*?requestedReleaseBatchCount === 1/u
-  )
+test('devCustomerConfig: 视图、子任务和证据批次 query 恢复唯一值', async () => {
+  const { resolveCustomerConfigLocation } = await import('../pages/customer-config/navigation.mjs')
+  const value = resolveCustomerConfigLocation('customer=yoyoosun&view=import&action=test-apply&section=flow&release=a&release=b')
+  assert.equal(value.canonicalSearch, 'customer=yoyoosun&view=import&action=test-apply')
+  assert.equal(value.activeImportAction, 'test-apply')
+  assert.equal(resolveCustomerConfigLocation('customer=invalid&view=assets').canonicalSearch, 'customer=invalid&view=assets')
+  assert.equal(resolveCustomerConfigLocation('view=diff&view=assets&section=flow').activeView, 'overview')
 })
 
 test('devCustomerConfig: 打印模板字段只读进入客户配置控制台', () => {

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { Alert, Button, Empty, Space, Spin, Tag, Typography } from 'antd'
+import { Button, Empty, Space, Spin, Tag, Typography } from 'antd'
 import { BranchesOutlined } from '@ant-design/icons'
 import { OperationalFactStatus, ProductionWIPStatus } from '../../../common/consts/statuses.generated.mjs'
 import Table from '@/common/components/table/AppTable'
@@ -7,7 +7,7 @@ import Table from '@/common/components/table/AppTable'
 import {
   currentProductionWipOperation,
   positiveSafeInteger,
-  productionWipOperationLabel,
+  productionWipOperationDisplayLabel as productionWipOperationLabel,
   productionWipOrderItem,
   productionWipStatusMeta,
 } from '../../utils/productionWipModel.mjs'
@@ -304,7 +304,7 @@ export default function ProductionReworkProgressModal({
       open={open}
       width={ERP_MODAL_WIDTHS.lineItems}
       title="成品返工进度"
-      description="从返工记录追踪手工补制、成品入库、质量关口到查货包装完成。"
+      description="核对返工批次的当前工序、成品入库及检验包装进度；未完成事项可继续办理。"
       icon={<BranchesOutlined />}
       footer={
         <Space wrap>
@@ -319,11 +319,7 @@ export default function ProductionReworkProgressModal({
       onCancel={onCancel}
       destroyOnHidden
     >
-      <Alert
-        showIcon
-        type="info"
-        message={`生产订单 ${order?.order_no || '待核对'} 的成品返工补制独立于原生产批次；订单关闭后仍可继续完成返工工序和补完工。`}
-      />
+      <Text type="secondary">生产订单 {order?.order_no || '待核对'} · 成品返工补制独立于原生产批次；订单关闭后仍可继续办理。</Text>
       {loading ? (
         <div style={{ padding: 48, textAlign: 'center' }}>
           <Spin />
@@ -335,7 +331,7 @@ export default function ProductionReworkProgressModal({
         />
       ) : (
         <Table
-          style={{ marginTop: 16 }}
+          style={{ marginTop: 8 }}
           rowKey="key"
           size="small"
           columns={columns}

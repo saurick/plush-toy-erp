@@ -27,9 +27,45 @@ func (_u *FinanceAllocationUpdate) Where(ps ...predicate.FinanceAllocation) *Fin
 	return _u
 }
 
+// AddReversalIDs adds the "reversals" edge to the FinanceAllocation entity by IDs.
+func (_u *FinanceAllocationUpdate) AddReversalIDs(ids ...int) *FinanceAllocationUpdate {
+	_u.mutation.AddReversalIDs(ids...)
+	return _u
+}
+
+// AddReversals adds the "reversals" edges to the FinanceAllocation entity.
+func (_u *FinanceAllocationUpdate) AddReversals(v ...*FinanceAllocation) *FinanceAllocationUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddReversalIDs(ids...)
+}
+
 // Mutation returns the FinanceAllocationMutation object of the builder.
 func (_u *FinanceAllocationUpdate) Mutation() *FinanceAllocationMutation {
 	return _u.mutation
+}
+
+// ClearReversals clears all "reversals" edges to the FinanceAllocation entity.
+func (_u *FinanceAllocationUpdate) ClearReversals() *FinanceAllocationUpdate {
+	_u.mutation.ClearReversals()
+	return _u
+}
+
+// RemoveReversalIDs removes the "reversals" edge to FinanceAllocation entities by IDs.
+func (_u *FinanceAllocationUpdate) RemoveReversalIDs(ids ...int) *FinanceAllocationUpdate {
+	_u.mutation.RemoveReversalIDs(ids...)
+	return _u
+}
+
+// RemoveReversals removes "reversals" edges to FinanceAllocation entities.
+func (_u *FinanceAllocationUpdate) RemoveReversals(v ...*FinanceAllocation) *FinanceAllocationUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveReversalIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -64,6 +100,9 @@ func (_u *FinanceAllocationUpdate) check() error {
 	if _u.mutation.PaymentCleared() && len(_u.mutation.PaymentIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "FinanceAllocation.payment"`)
 	}
+	if _u.mutation.FinanceFactCleared() && len(_u.mutation.FinanceFactIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "FinanceAllocation.finance_fact"`)
+	}
 	return nil
 }
 
@@ -82,8 +121,50 @@ func (_u *FinanceAllocationUpdate) sqlSave(ctx context.Context) (_node int, err 
 	if _u.mutation.ReasonCleared() {
 		_spec.ClearField(financeallocation.FieldReason, field.TypeString)
 	}
-	if _u.mutation.ReversalOfAllocationIDCleared() {
-		_spec.ClearField(financeallocation.FieldReversalOfAllocationID, field.TypeInt)
+	if _u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financeallocation.ReversalsTable,
+			Columns: []string{financeallocation.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedReversalsIDs(); len(nodes) > 0 && !_u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financeallocation.ReversalsTable,
+			Columns: []string{financeallocation.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReversalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financeallocation.ReversalsTable,
+			Columns: []string{financeallocation.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -105,9 +186,45 @@ type FinanceAllocationUpdateOne struct {
 	mutation *FinanceAllocationMutation
 }
 
+// AddReversalIDs adds the "reversals" edge to the FinanceAllocation entity by IDs.
+func (_u *FinanceAllocationUpdateOne) AddReversalIDs(ids ...int) *FinanceAllocationUpdateOne {
+	_u.mutation.AddReversalIDs(ids...)
+	return _u
+}
+
+// AddReversals adds the "reversals" edges to the FinanceAllocation entity.
+func (_u *FinanceAllocationUpdateOne) AddReversals(v ...*FinanceAllocation) *FinanceAllocationUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddReversalIDs(ids...)
+}
+
 // Mutation returns the FinanceAllocationMutation object of the builder.
 func (_u *FinanceAllocationUpdateOne) Mutation() *FinanceAllocationMutation {
 	return _u.mutation
+}
+
+// ClearReversals clears all "reversals" edges to the FinanceAllocation entity.
+func (_u *FinanceAllocationUpdateOne) ClearReversals() *FinanceAllocationUpdateOne {
+	_u.mutation.ClearReversals()
+	return _u
+}
+
+// RemoveReversalIDs removes the "reversals" edge to FinanceAllocation entities by IDs.
+func (_u *FinanceAllocationUpdateOne) RemoveReversalIDs(ids ...int) *FinanceAllocationUpdateOne {
+	_u.mutation.RemoveReversalIDs(ids...)
+	return _u
+}
+
+// RemoveReversals removes "reversals" edges to FinanceAllocation entities.
+func (_u *FinanceAllocationUpdateOne) RemoveReversals(v ...*FinanceAllocation) *FinanceAllocationUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveReversalIDs(ids...)
 }
 
 // Where appends a list predicates to the FinanceAllocationUpdate builder.
@@ -155,6 +272,9 @@ func (_u *FinanceAllocationUpdateOne) check() error {
 	if _u.mutation.PaymentCleared() && len(_u.mutation.PaymentIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "FinanceAllocation.payment"`)
 	}
+	if _u.mutation.FinanceFactCleared() && len(_u.mutation.FinanceFactIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "FinanceAllocation.finance_fact"`)
+	}
 	return nil
 }
 
@@ -190,8 +310,50 @@ func (_u *FinanceAllocationUpdateOne) sqlSave(ctx context.Context) (_node *Finan
 	if _u.mutation.ReasonCleared() {
 		_spec.ClearField(financeallocation.FieldReason, field.TypeString)
 	}
-	if _u.mutation.ReversalOfAllocationIDCleared() {
-		_spec.ClearField(financeallocation.FieldReversalOfAllocationID, field.TypeInt)
+	if _u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financeallocation.ReversalsTable,
+			Columns: []string{financeallocation.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedReversalsIDs(); len(nodes) > 0 && !_u.mutation.ReversalsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financeallocation.ReversalsTable,
+			Columns: []string{financeallocation.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReversalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financeallocation.ReversalsTable,
+			Columns: []string{financeallocation.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financeallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &FinanceAllocation{config: _u.config}
 	_spec.Assign = _node.assignValues

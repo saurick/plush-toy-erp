@@ -14,11 +14,19 @@ import {
   progressStages,
   progressAttention,
   progressDue,
+  progressProductLabel,
   progressDueOptions,
   progressFilterCount,
   PROGRESS_FILTER_RESET,
   withProgressFilters,
 } from './businessProgress.mjs'
+
+test('progress search describes matching styles without changing order quantities or default labels', () => {
+  const row = { ...progressFixtureRow(), product: '饼干小熊', product_count: 8, product_type_count: 6, product_match_count: 2 }
+  assert.equal(progressProductLabel(row), '饼干小熊（命中 2 款，共 6 款）')
+  assert.equal(progressProductLabel({ ...row, product_match_count: 0 }), '饼干小熊 等 8 项')
+  assert.equal(row.ordered_quantity, '800')
+})
 
 test('compact attention retains the real task, role, reason and exact single-task destination', () => {
   const row = { ...progressFixtureRow(), open_tasks: 1, attention_task_id: 31, attention_owner: '小陈', attention_task: 'engineering_data' }
@@ -63,6 +71,7 @@ test('progress responses reject missing, malformed and duplicate records instead
     { ...valid, total: -1 },
     { ...valid, access: { sales: true } },
     { ...valid, rows: [{ ...valid.rows[0], product_id: undefined }] },
+    { ...valid, rows: [{ ...valid.rows[0], product_match_count: 2, product_type_count: 1 }] },
     { ...valid, rows: [{ ...valid.rows[0], shipped_quantity: undefined }] },
     { ...valid, rows: [{ ...valid.rows[0], delivery_known: false }] },
   ]) {

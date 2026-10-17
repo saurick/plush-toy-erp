@@ -79,7 +79,7 @@ test('formal business main tables register useful text columns explicitly', () =
     ['pages/WorkflowBusinessModulePage.jsx', "dataIndex: 'task_code'"],
     ['pages/ProductionOrdersPage.jsx', "dataIndex: 'order_no'"],
     ['pages/HistoryRecordsPage.jsx', "dataIndex: 'primary'"],
-    ['pages/InventoryLedgerPage.jsx', "dataIndex: 'lot_no'"],
+    ['components/inventory/inventoryLedgerPresentation.jsx', "dataIndex: 'lot_no'"],
   ]
 
   expectations.forEach(([relativePath, marker, sectionMarker]) =>
@@ -102,7 +102,7 @@ test('copy whitelist avoids routine dates, amounts, quantities and statuses', ()
     'components/purchase-orders/purchaseOrderColumns.jsx',
     'components/quality-inspections/qualityInspectionColumns.jsx',
     'components/shipments/shipmentColumns.jsx',
-    'pages/InventoryLedgerPage.jsx',
+    'components/inventory/inventoryLedgerPresentation.jsx',
   ].map(readSource)
   const forbiddenFields = [
     'amount',

@@ -1,14 +1,14 @@
 import { AuditOutlined, RollbackOutlined } from '@ant-design/icons'
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Card, Input, Tag } from 'antd'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Button, Input, Tag } from 'antd'
 import { useSearchParams } from 'react-router-dom'
 import { ProcessStatus, ProductionExceptionExecutionStatus, ProductionExceptionStatus } from '../../../common/consts/statuses.generated.mjs'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import useBusinessNavigate from '../../hooks/useBusinessNavigate.js'
 import WorkflowSourceProgressButton from '../workflow/WorkflowSourceProgressButton.jsx'
 import { showProcessSubmissionReceipt } from '../workflow/ProcessSubmissionReceipt.jsx'
 import { PermissionCode } from '../../../common/consts/permissions.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
-import Table from '@/common/components/table/AppTable'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -28,6 +28,7 @@ import {
 import ExceptionProcessRecoveryButton from '../workflow/ExceptionProcessRecoveryButton.jsx'
 import {
   BusinessActionTooltip,
+  BusinessDataTable,
   BusinessOperationPanel,
   SelectionActionBar,
   SelectionClearAction,
@@ -38,7 +39,9 @@ import {
   useBusinessColumnOrder,
 } from '../business-list/BusinessListToolbarActions.jsx'
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
-import { canReadProductionExceptionDecisions } from '../../utils/productionRecordViews.mjs'
+import { canReadProductionExceptionDecisions, productionExceptionSummary } from '../../utils/productionRecordViews.mjs'
+import ProductionRecordDrawer from '../production-records/ProductionRecordDrawer.jsx'
+import useBusinessPageState from '../../hooks/useBusinessPageState.js'
 import { resolveProductionExceptionActionAvailability } from '../../utils/operationalActionAvailability.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
@@ -126,19 +129,22 @@ export default function ProductionExceptionDecisionPanel({
   adminProfile,
   onRefreshReady,
 }) {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const beginLatestRequest = useLatestRequestCoordinator()
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
-  const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
+  const [pagination, setPagination] = useBusinessPageState('exceptionPagination', { current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
   const [action, setAction] = useState(null)
-  const [selectedID, setSelectedID] = useState(null)
+  const [selectedID, setSelectedID] = useBusinessPageState('exceptionSelectedID', null)
+  const [detailID, setDetailID] = useState(null)
+  const linkedDetailOpenedRef = useRef(0)
   const [reason, setReason] = useState('')
-  const [decisionTypeFilter, setDecisionTypeFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-  const [executionStatusFilter, setExecutionStatusFilter] = useState('')
+  const [decisionTypeFilter, setDecisionTypeFilter] = useBusinessPageState('exceptionType', '')
+  const [statusFilter, setStatusFilter] = useBusinessPageState('exceptionStatus', '')
+  const [executionStatusFilter, setExecutionStatusFilter] = useBusinessPageState('exceptionExecutionStatus', '')
   const canRead = canReadProductionExceptionDecisions(adminProfile)
   const canDecide = hasActionPermission(
     adminProfile,
@@ -177,6 +183,17 @@ export default function ProductionExceptionDecisionPanel({
     hasListFilters || hasRouteProductionOrder || hasExactContext
   )
 
+  useEffect(() => {
+    if (!Number.isSafeInteger(linkedProductionExceptionID) || linkedProductionExceptionID <= 0) {
+      linkedDetailOpenedRef.current = 0
+      return
+    }
+    setDecisionTypeFilter('')
+    setStatusFilter('')
+    setExecutionStatusFilter('')
+    resetBusinessPaginationCurrent(setPagination)
+  }, [linkedProductionExceptionID, setDecisionTypeFilter, setStatusFilter, setExecutionStatusFilter, setPagination])
+
   const load = useCallback(async () => {
     const request = beginLatestRequest('production-exception-decisions')
     if (!canRead) {
@@ -206,6 +223,10 @@ export default function ProductionExceptionDecisionPanel({
         setRows([exactRecord])
         setTotal(1)
         setSelectedID(exactRecord.id)
+        if (linkedDetailOpenedRef.current !== exactRecord.id) {
+          linkedDetailOpenedRef.current = exactRecord.id
+          setDetailID(exactRecord.id)
+        }
         return [exactRecord]
       }
 
@@ -268,6 +289,8 @@ export default function ProductionExceptionDecisionPanel({
     canRead,
     decisionTypeFilter,
     executionStatusFilter,
+    setPagination,
+    setSelectedID,
     hasExactContext,
     hasRouteProductionOrder,
     linkedProductionExceptionID,
@@ -406,6 +429,7 @@ export default function ProductionExceptionDecisionPanel({
       setAction(null)
       setReason('')
       await load()
+      reportBusinessResult(action.success, next)
       message.success(action.success)
     } catch (error) {
       if (isSourceBusinessActionResultUnknown(error)) {
@@ -427,6 +451,7 @@ export default function ProductionExceptionDecisionPanel({
           setAction(null)
           setReason('')
           await load()
+          reportBusinessResult(action.success, latest)
           message.success('已重新读取生产异常处置结果')
           return
         }
@@ -492,6 +517,7 @@ export default function ProductionExceptionDecisionPanel({
   if (!canRead) return null
 
   const selectedRecord = rows.find((item) => item.id === selectedID) || null
+  const detailRecord = rows.find((item) => item.id === detailID) || null
   const selectedRequesterOwned = Boolean(
     selectedRecord && Number(selectedRecord.requested_by) === adminID
   )
@@ -546,6 +572,21 @@ export default function ProductionExceptionDecisionPanel({
     setSearchParams(nextParams, { replace: true })
     resetBusinessPaginationCurrent(setPagination)
   }
+  const beginExecution = () => {
+    if (!selectedRecord || !actionAvailability.execute.visible || actionAvailability.execute.disabled) return
+    setDetailID(null)
+    setAction({
+      record: selectedRecord,
+      kind: 'execute',
+      success: '生产异常已执行',
+      targetExecutionStatus: 'APPLIED',
+      actorField: 'executed_by',
+      reasonField: 'execution_reason',
+    })
+  }
+  const reasonLabel = action?.kind === 'execute'
+    ? '执行原因'
+    : action?.targetExecutionStatus === 'REVERSED' ? '冲正或撤销原因' : '撤回原因'
 
   return (
     <>
@@ -595,11 +636,11 @@ export default function ProductionExceptionDecisionPanel({
                   resetBusinessPaginationCurrent(setPagination)
                 }}
               >
-                生产订单 #{routeProductionOrderID}
+                已按生产订单筛选
               </Tag>
             ) : null}
             {hasExactContext ? (
-              <Tag color="blue">已定位异常 #{linkedProductionExceptionID}</Tag>
+              <Tag color="blue">已定位异常申请</Tag>
             ) : null}
           </>
         }
@@ -624,6 +665,7 @@ export default function ProductionExceptionDecisionPanel({
             selectionLabel="生产异常处置申请"
             onClear={() => setSelectedID(null)}
           />
+          <Button size="small" disabled={!selectedRecord} onClick={() => setDetailID(selectedID)}>查看异常详情</Button>
           <WorkflowSourceProgressButton sourceType="production_exception_decision" sourceID={selectedRecord?.id} profile={adminProfile} disabled={loading} />
           {actionAvailability.approval.visible ? (
             <BusinessActionTooltip
@@ -688,16 +730,7 @@ export default function ProductionExceptionDecisionPanel({
                 type="primary"
                 data-business-action-key="production-exception-execute"
                 disabled={actionAvailability.execute.disabled}
-                onClick={() =>
-                  setAction({
-                    record: selectedRecord,
-                    kind: 'execute',
-                    success: '生产异常已执行',
-                    targetExecutionStatus: 'APPLIED',
-                    actorField: 'executed_by',
-                    reasonField: 'execution_reason',
-                  })
-                }
+                onClick={beginExecution}
               >
                 确认执行
               </Button>
@@ -771,30 +804,24 @@ export default function ProductionExceptionDecisionPanel({
           />
         </SelectionActionBar>
       </BusinessOperationPanel>
-      <Card className="erp-business-data-table-card erp-business-module-table-card">
-        <Alert
-          type="info"
-          showIcon
-          message="审批只记录决定；报废和在制品让步须由生产岗位再次确认执行，超领仍在正式领料中按批准额度办理。"
-        />
-        <Table
-          style={{ marginTop: 12 }}
-          rowKey="id"
-          loading={loading}
-          columns={tableColumns}
-          dataSource={rows}
-          rowSelection={{
+      <BusinessDataTable
+        rowKey="id"
+        loading={loading}
+        columns={tableColumns}
+        dataSource={rows}
+        rowSelection={{
             type: 'radio',
             selectedRowKeys: selectedID ? [selectedID] : [],
             onChange: (keys) => setSelectedID(keys[0] || null),
           }}
-          onRow={(record) => ({
+        onRow={(record) => ({
             onClick: () => setSelectedID(record.id),
           })}
-          rowClassName={(record) =>
+        onOpenRecord={(record) => { setSelectedID(record.id); setDetailID(record.id) }}
+        rowClassName={(record) =>
             record.id === selectedID ? 'ant-table-row-selected' : ''
           }
-          pagination={
+        pagination={
             hasExactContext
               ? false
               : createBusinessTablePagination({
@@ -806,11 +833,30 @@ export default function ProductionExceptionDecisionPanel({
                   },
                 })
           }
-          scroll={{ x: 960 }}
-          locale={{ emptyText: '暂无生产异常处置申请' }}
-        />
-      </Card>
+        scroll={{ x: 960 }}
+        emptyDescription="暂无生产异常处置申请"
+      />
       {columnOrderModal}
+      <ProductionRecordDrawer
+        open={Boolean(detailRecord)}
+        onClose={() => setDetailID(null)}
+        title="生产异常详情"
+        record={detailRecord}
+        summary={productionExceptionSummary(detailRecord || {})}
+        columns={[...columns,
+          { title: '审批意见', dataIndex: 'decision_reason' },
+          { title: '执行原因', dataIndex: 'execution_reason' },
+          { title: '冲正原因', dataIndex: 'reverse_reason' },
+        ]}
+        actions={
+          <>
+            <WorkflowSourceProgressButton sourceType="production_exception_decision" sourceID={detailRecord?.id} profile={adminProfile} disabled={loading} />
+            {detailID === selectedID && actionAvailability.execute.visible ? (
+              <Button type="primary" disabled={actionAvailability.execute.disabled} onClick={beginExecution}>确认执行</Button>
+            ) : null}
+          </>
+        }
+      />
       <BusinessModal
         size="confirm"
         title="确认生产异常处置"
@@ -827,14 +873,21 @@ export default function ProductionExceptionDecisionPanel({
         }}
         onOk={submit}
       >
-        <Input.TextArea
-          value={reason}
-          onChange={(event) => setReason(event.target.value)}
-          rows={3}
-          maxLength={255}
-          showCount
-          placeholder="填写审批、执行或冲正原因"
-        />
+        <div className="erp-production-exception-context">
+          <strong>{action?.record?.decision_no || '异常申请待核对'} · {TYPE_LABELS[action?.record?.decision_type] || '生产异常'}</strong>
+          <p>{productionExceptionSummary(action?.record || {}).next}</p>
+          <label htmlFor="production-exception-reason">{reasonLabel}</label>
+          <Input.TextArea
+            id="production-exception-reason"
+            aria-label={reasonLabel}
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            rows={3}
+            maxLength={255}
+            showCount
+            placeholder={`请填写${reasonLabel}`}
+          />
+        </div>
       </BusinessModal>
     </>
   )

@@ -6,7 +6,7 @@ import {
   installTestDOM,
 } from '../../../../scripts/test/reactRuntime.mjs'
 
-test('mobile source navigation preserves authorized task handling and urge actions', async (t) => {
+test('mobile task keeps source context as text and offers only authorized task actions', async (t) => {
   const dom = installTestDOM()
   registerJSXTestLoader()
   const [
@@ -21,6 +21,8 @@ test('mobile source navigation preserves authorized task handling and urge actio
     import('../../../common/utils/jsonRpc.js'),
   ])
   const calls = []
+  const copied = []
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (value) => copied.push(value) } })
   const original = JsonRpc.prototype.call
   JsonRpc.prototype.call = async function call(method) {
     calls.push(method)
@@ -141,14 +143,22 @@ test('mobile source navigation preserves authorized task handling and urge actio
         required_capability_key: capability,
       },
     })
-    assert.ok(button('进入单据办理'), 'the source document remains reachable')
+    assert.equal(button('进入单据办理'), undefined)
+    assert.match(container.querySelector('.mobile-detail-source').textContent, /SIM-PAYMENT-3/u)
+    assert.equal(container.querySelectorAll('.mobile-detail-source a, .mobile-detail-source .erp-task-source-link').length, 0, '即使有单据权限，手机来源仍不提供跳转')
+    assert.equal(container.querySelectorAll('.mobile-detail-source button').length, 1)
+    const beforeCopy = actions.length
+    await act(async () => container.querySelector('.mobile-detail-source [aria-label="复制单据编号"]').click())
+    assert.equal(copied.at(-1), 'SIM-PAYMENT-3')
+    assert.equal(actions.length, beforeCopy, '复制编号不触发任务办理')
+    assert.equal(container.querySelectorAll('.workflow-task-current__guidance').length, 0, '可办理时由任务信息和按钮表达操作，不重复通用说明')
     assert.ok(
       button('选择处理方式'),
       `${owner} must be able to open the authorized workflow action`
     )
     assert.deepEqual(
       buttons().map((node) => node.textContent.trim()),
-      ['进入单据办理', '选择处理方式']
+      ['查看附件', '选择处理方式']
     )
     const before = actions.length
     await act(async () => button('选择处理方式').click())
@@ -166,12 +176,13 @@ test('mobile source navigation preserves authorized task handling and urge actio
   assert.doesNotMatch(container.querySelector('.workflow-task-current').textContent, /林工/u, 'the current assignee is shown without carrying it to a new task')
 
   await render({ selectedCanOperate: false, selectedCanUrge: true })
-  assert.ok(button('进入单据办理'))
+  assert.equal(button('进入单据办理'), undefined)
   assert.equal(button('选择处理方式'), undefined)
   assert.ok(button('催办任务'))
+  assert.equal(container.querySelectorAll('.workflow-task-current__guidance').length, 0, '催办按钮已表达可用动作，不重复普通操作说明')
   assert.deepEqual(
     buttons().map((node) => node.textContent.trim()),
-    ['进入单据办理', '催办任务']
+    ['查看附件', '催办任务']
   )
   await act(async () => button('催办任务').click())
   assert.equal(actions.at(-1), 'urge')
@@ -184,18 +195,23 @@ test('mobile source navigation preserves authorized task handling and urge actio
     await render({ selectedCanUrge: false, actionAccess: access })
     assert.equal(button('选择处理方式'), undefined)
     assert.equal(button('催办任务'), undefined)
+    if (access.loading) {
+      assert.match(container.textContent, /正在确认/u)
+      assert.equal(container.querySelectorAll('.workflow-task-current__guidance').length, 0)
+    }
+    if (access.failed) assert.match(container.textContent, /暂时无法确认处理权限/u)
   }
   await render({
     actionAccess: { sourceAccess },
     selectedTask: { ...task, task_status_key: 'done' },
     processingComplete: true,
   })
-  assert.equal(buttons().length, 1)
-  assert.ok(button('进入单据办理'))
-  await act(async () => button('进入单据办理').click())
+  assert.equal(buttons().length, 1, '已结束任务仍可从底栏查看附件')
+  assert.equal(Boolean(container.querySelector('.mobile-role-action-bar [data-testid="mobile-task-attachment-action"]')), true)
+  assert.equal(button('进入单据办理'), undefined)
   assert.equal(
     container.querySelector('[data-location]').textContent,
-    '/m/boss/handle/finance/payments?finance_payment_id=3&link_source=task-dashboard'
+    '/m/boss/tasks'
   )
   assert.ok(calls.length > 0)
   assert.deepEqual([...new Set(calls)].sort(), [

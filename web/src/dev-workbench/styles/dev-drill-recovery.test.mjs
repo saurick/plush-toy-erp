@@ -1,16 +1,14 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { readDevWorkbenchPageSource } from '../../../scripts/test/pageSources.mjs'
 
 const css = readFileSync(
   new URL('./dev-drill-recovery.css', import.meta.url),
   'utf8'
 )
 const styleIndex = readFileSync(new URL('./index.css', import.meta.url), 'utf8')
-const page = readFileSync(
-  new URL('../pages/DevDrillRecoveryPage.jsx', import.meta.url),
-  'utf8'
-)
+const page = readDevWorkbenchPageSource('DevDrillRecoveryPage.jsx')
 
 test('drill recovery styles: stay page-scoped and use one imported surface', () => {
   assert.match(styleIndex, /@import '.\/dev-drill-recovery\.css';/u)

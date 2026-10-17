@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
@@ -12,6 +13,7 @@ export function useOperationalFactMutations({
   activeSelectedRow,
   activeConfig,
 }) {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
 
   const [saving, setSaving] = useState(false)
@@ -82,6 +84,7 @@ export function useOperationalFactMutations({
         return false
       }
     }
+    if (currentActiveKey === 'production') reportBusinessResult(`${actionLabel}已完成`, row)
     message.success(
       currentActiveKey === 'production' &&
         actionKey === 'post' &&

@@ -56,6 +56,7 @@
 | `run-smoke.sh`、`run-smoke-support.mjs` | 按固定 target 和 profile 检查运行身份、health / ready、页面及验收能力，输出脱敏 JSON | `base-release` 不读取验收凭据；`customer-trial-acceptance` 才增加合同账号、SMS、PDF 和客户配置读回；不创建业务事实 |
 | `collect-evidence.sh`、`collect-evidence.mjs` | 生成绑定 target、profile 和 release 的 evidence 草稿及必要占位 | 只写显式输出目录，不采集 secret，不把占位写成真实演练结果 |
 | `run-backup-restore-rehearsal.sh` | 在开发机或 CI 执行 dump、隔离 PostgreSQL restore、升级审计、migration 和恢复检查 | 使用明确的只读备份源与隔离恢复目标；默认输出到 `output/`，仅向 evidence 复制脱敏 artifact |
+| `backup-set/cli.mjs` | 在同一停写窗口成套备份 PG 与全部登记附件，封装加密；从配套制品恢复到新建隔离 PG / S3 | `create` 要求精确 project / database 确认并恢复原应用；`restore-check` 验证后精确清理，`restore --keep` 仅保留新隔离资源，不覆盖生产或切流 |
 | `verify-backup-restore.sh` | 检查备份恢复 evidence 的必要字段和脱敏边界 | 不读取、复制或恢复真实备份文件，不证明恢复成功 |
 | `backup-replica/cli.mjs` | 将既有加密备份拉取到按 UUID 核对的 Mac 外盘，独立保留历史并在一次性 PostgreSQL 验证恢复 | 私有 JSON 配置选择来源与介质；不写生产库、不传播来源删除；定时安装只接受已提交模块 |
 

@@ -183,6 +183,10 @@ func (FinanceFact) Fields() []ent.Field {
 
 func (FinanceFact) Edges() []ent.Edge {
 	return []ent.Edge{
+		edge.To("allocations", FinanceAllocation.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("credit_notes", FinanceCreditNote.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("poster", AdminUser.Type).
 			Field("posted_by").
 			Unique().

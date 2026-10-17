@@ -1,6 +1,7 @@
 export const DEV_HUB_ROUTE = '/__dev'
 export const DEV_PRODUCT_ENGINEERING_ROUTE = '/__dev/product-engineering'
 export const DEV_PRODUCT_CORE_ROUTE = '/__dev/product-core'
+export const DEV_INTEGRATION_ROUTE = '/__dev/integration'
 export const DEV_PERMISSION_RELATIONSHIPS_ROUTE =
   '/__dev/permission-relationships'
 export const DEV_QUALITY_ROUTE = '/__dev/quality'
@@ -75,6 +76,12 @@ export const DEV_SECONDARY_NAV_ITEMS = Object.freeze([
     areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
     route: DEV_STATUS_FLOWS_ROUTE,
     label: '业务链观察',
+  }),
+  Object.freeze({
+    key: 'integration',
+    areaKey: DEV_WORKBENCH_AREA_KEYS.productEngineering,
+    route: DEV_INTEGRATION_ROUTE,
+    label: '接口与集成',
   }),
   Object.freeze({
     key: 'business-usability',
@@ -174,6 +181,7 @@ export const DEV_PAGE_FAVICON_BY_ROUTE = Object.freeze({
   [DEV_HUB_ROUTE]: '/favicon-dev.svg',
   [DEV_PRODUCT_ENGINEERING_ROUTE]: '/favicon-dev.svg',
   [DEV_PRODUCT_CORE_ROUTE]: '/favicon-dev.svg',
+  [DEV_INTEGRATION_ROUTE]: '/favicon-dev.svg',
   [DEV_PERMISSION_RELATIONSHIPS_ROUTE]: '/favicon-dev.svg',
   [DEV_QUALITY_ROUTE]: '/favicon-dev.svg',
   [DEV_DELIVERY_ROUTE]: '/favicon-dev.svg',

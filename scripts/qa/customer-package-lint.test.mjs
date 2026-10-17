@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { parseCustomerPackageArgs } from "../lib/customer-package-args.mjs";
+
+
 
 import { customerPackageCatalog } from "../../config/catalog/customerPackageCatalog.mjs";
 import { demoCustomerPackage } from "../../config/customers/demo/customerPackage.mjs";
@@ -557,4 +560,32 @@ test("customer-package-lint: publish activate rollback switches stay disabled", 
     }),
     /activate must stay disabled/,
   );
+});
+
+test("customer package CLI preserves selection and rejects ambiguous or missing values", () => {
+  assert.deepEqual(parseCustomerPackageArgs([]).customers, ["yoyoosun"]);
+  const args = parseCustomerPackageArgs([
+    "--customer",
+    "demo",
+    "--customer",
+    "yoyoosun",
+    "--mode",
+    "preview",
+    "--out",
+    "output/preview.json",
+  ]);
+  assert.deepEqual(args.customers, ["demo", "yoyoosun"]);
+  assert.equal(args.mode, "preview");
+  assert.equal(args.out, "output/preview.json");
+  assert.deepEqual(parseCustomerPackageArgs(["--all"]).customers, []);
+  assert.equal(parseCustomerPackageArgs(["-h"]).help, true);
+  for (const argv of [
+    ["--all", "--customer", "demo"],
+    ["--customer"],
+    ["--mode", "--all"],
+    ["--out"],
+    ["--unknown"],
+  ]) {
+    assert.throws(() => parseCustomerPackageArgs(argv));
+  }
 });

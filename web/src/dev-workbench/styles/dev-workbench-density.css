@@ -1,4 +1,4 @@
-/* DEV 页面与业务桌面共用主题；这里只统一工作台的页面几何与阅读密度。 */
+/* DEV 页面复用业务桌面主题，统一工作台的页面几何、内容层次与阅读密度。 */
 /* 包含挂载到 body 的工作台弹出层。 */
 body:has(.erp-dev-workspace-page) {
   --erp-font-badge: 0.875rem;
@@ -13,8 +13,11 @@ body:has(.erp-dev-workspace-page) {
 }
 
 .erp-dev-workspace-page {
+  --dev-workbench-section-gap: 8px;
+  --dev-workbench-panel-padding: 10px 12px;
   min-height: 100vh;
-  padding: 0 16px 16px 0;
+  row-gap: var(--dev-workbench-section-gap);
+  padding: 0 12px 12px 0;
   background: var(--erp-page-bg);
   color: var(--erp-text);
   font-size: var(--erp-font-body);
@@ -37,13 +40,14 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
-  gap: 10px 16px;
+  gap: 6px 16px;
   min-width: 0;
-  min-height: 52px;
+  min-height: 48px;
   width: 100%;
-  margin: 0 0 9px;
-  padding: 10px 12px;
+  margin: 0;
+  padding: 4px 12px;
   border: 1px solid var(--erp-border);
+  border-color: color-mix(in srgb, var(--erp-primary) 22%, var(--erp-border));
   border-radius: var(--erp-business-card-radius);
   background: var(--erp-primary-softer);
   box-shadow: none;
@@ -62,8 +66,11 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   .erp-dev-task-nav,
   .erp-dev-overview-library__navigation,
   .erp-dev-testing-primary-nav,
+  .erp-dev-testing-auxiliary-nav,
   .erp-dev-flow-workspace-nav
 ) {
+  flex: 0 1 auto;
+  width: auto;
   min-width: 0;
   max-width: 100%;
   margin: 0;
@@ -79,6 +86,15 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
 }
 
 .erp-dev-workspace-page > header [class$='header__icon'] {
+  display: inline-flex;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
   font-size: 18px;
 }
 
@@ -94,13 +110,33 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   align-items: center;
   gap: 12px;
 }
+
+.erp-dev-workspace-page > header > :is(
+  .ant-btn,
+  .ant-space-vertical,
+  [class$='header__actions'],
+  .erp-dev-version-header-actions
+) {
+  margin-inline-start: auto;
+}
+
+.erp-dev-workbench-header-context > .erp-dev-customer-scope {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+
+.erp-dev-workspace-page > header > .erp-dev-customer-journey {
+  flex: 1 1 640px;
+  width: auto;
+  margin: 0;
+}
 .erp-dev-workspace-page > header h1 {
   white-space: nowrap;
 }
 
 .erp-dev-workspace-nav__brand {
-  min-height: 52px;
-  height: 52px;
+  min-height: 48px;
+  height: 48px;
   gap: 8px;
   padding: 0 14px;
 }
@@ -132,9 +168,9 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   line-height: 20px;
 }
 
-.erp-dev-workspace-nav__secondary-route:hover,
-.erp-dev-workspace-nav__route:hover {
-  background: var(--erp-surface-bg-soft);
+.erp-dev-workspace-nav__secondary-route:where(:not([aria-current='page'])):hover,
+.erp-dev-workspace-nav__route:where(:not([aria-current='page'])):hover {
+  background: var(--erp-interactive-bg-hover);
 }
 
 .erp-dev-workspace-nav :is(a, button):focus-visible {
@@ -166,7 +202,7 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
 }
 
 .erp-dev-workspace-page .erp-dev-testing-validation-plan {
-  padding: 12px;
+  padding: var(--dev-workbench-panel-padding);
 }
 
 .erp-dev-static-guidance {
@@ -180,7 +216,7 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 6px 12px;
   cursor: pointer;
   font-size: var(--erp-font-small);
 }
@@ -198,8 +234,7 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
 }
 
 .erp-dev-docs-shell {
-  gap: 12px;
-  height: calc(100vh - 80px);
+  gap: var(--dev-workbench-section-gap);
 }
 
 .erp-dev-workspace-page
@@ -208,17 +243,174 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
     .erp-dev-database-migration-summary,
     .erp-dev-data-preflight
   ) {
-  gap: 12px;
+  gap: var(--dev-workbench-section-gap);
 }
 
 .erp-dev-workspace-page .ant-card-head {
-  min-height: 42px;
-  padding-inline: 14px;
+  min-height: 36px;
+  padding-inline: 12px;
   font-size: var(--erp-font-body);
 }
 
 .erp-dev-workspace-page .ant-card-body {
-  padding: 14px;
+  padding: var(--dev-workbench-panel-padding);
+}
+
+.erp-dev-workspace-page :is(
+  .erp-dev-hub-shell,
+  .erp-dev-product-core-shell,
+  .erp-dev-permission-relationships-shell,
+  .erp-dev-business-usability-shell,
+  .erp-dev-testing-shell,
+  .erp-dev-testing-validation,
+  .erp-dev-testing-validation-plan,
+  .erp-dev-quality-shell,
+  .erp-dev-quality-run-view,
+  .erp-dev-quality-governance-view,
+  .erp-dev-quality-gaps-view,
+  .erp-dev-delivery-home,
+  .erp-dev-delivery-facts,
+  .erp-permission-relationship,
+  .erp-permission-relationship__tab-panel,
+  .erp-dev-fulfillment-guide,
+  .erp-dev-fulfillment-guide__body,
+  .erp-dev-fulfillment-guide__result,
+  .erp-dev-fulfillment-guide__detail-content,
+  .erp-dev-skills__catalog,
+  .erp-dev-skills__detail,
+  .erp-dev-skills__list
+) {
+  row-gap: var(--dev-workbench-section-gap);
+}
+
+.erp-dev-workspace-page :is(
+  .erp-dev-product-core-inventory,
+  .erp-dev-docs-sidebar,
+  .erp-permission-relationship,
+  .erp-dev-delivery-decision,
+  .erp-dev-quality-server-evidence,
+  .erp-dev-quality-status-banner,
+  .erp-dev-overview-guide-intro,
+  .erp-dev-area-tools__heading,
+  .erp-dev-data-shell,
+  .erp-dev-flow-task-finder,
+  .erp-dev-flow-main,
+  .erp-dev-fulfillment-guide,
+  .erp-dev-fulfillment-guide__result,
+  .erp-dev-customer-panel,
+  .erp-dev-skills__detail,
+  .erp-dev-skills__item
+) {
+  padding: var(--dev-workbench-panel-padding);
+}
+
+.erp-dev-workspace-page .erp-dev-product-core-filters {
+  margin: 0;
+}
+
+.erp-dev-workspace-page :is(
+  .erp-dev-testing-tier-view,
+  .erp-dev-testing-command-view
+) {
+  padding: var(--dev-workbench-panel-padding);
+}
+
+.erp-dev-workbench-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  min-height: 48px;
+  gap: 8px 16px;
+  padding: 4px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+
+.erp-dev-workbench-toolbar > .erp-dev-customer-scope {
+  flex: 0 1 auto;
+  max-width: 100%;
+  margin-inline-start: auto;
+}
+
+.erp-dev-workbench-toolbar__facts.erp-dev-delivery-facts {
+  align-items: center;
+  gap: 6px 18px;
+  margin-inline-start: auto;
+}
+
+.erp-dev-workbench-toolbar__facts > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.erp-dev-workbench-header-context {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  gap: 6px 16px;
+}
+
+.erp-dev-workbench-header-context > details[open] {
+  flex-basis: 100%;
+}
+
+.erp-dev-testing-validation__action-intro > .erp-dev-customer-scope {
+  flex: 0 1 auto;
+  max-width: 100%;
+  margin-inline-start: auto;
+}
+
+.erp-dev-workspace-page .erp-dev-product-core-table :is(th, td) {
+  padding-block: 6px;
+}
+
+.erp-dev-workspace-page .erp-dev-flow-task-finder .ant-btn {
+  min-height: 32px;
+}
+
+/* 关系图已有独立内容面，外层不再重复套一层内边距。 */
+.erp-dev-workspace-page .erp-dev-flow-main:has(.erp-dev-fulfillment-guide) {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.erp-dev-workspace-page .erp-dev-chain__phase {
+  padding-block: 8px 12px;
+}
+
+.erp-dev-workspace-page .erp-dev-chain__phase-heading {
+  min-height: 28px;
+  margin-bottom: 8px;
+}
+
+.erp-dev-workspace-page .erp-dev-chain__stage[data-conditional] {
+  padding-top: 28px;
+}
+
+.erp-dev-workspace-page .erp-dev-chain__stage-card {
+  min-height: 64px;
+}
+
+.erp-dev-workspace-page .erp-dev-chain__stage-main {
+  min-height: 38px;
+  padding-block: 6px;
+}
+
+.erp-dev-workspace-page .erp-dev-chain__independent-path {
+  padding-block: 8px;
+}
+
+.erp-dev-workspace-page .erp-dev-version-workspace > .ant-tabs > .ant-tabs-nav {
+  margin-bottom: var(--dev-workbench-section-gap);
+  padding-block: 4px;
 }
 
 @media (max-width: 980px) {
@@ -252,7 +444,8 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
     margin: 0;
     flex-wrap: wrap;
   }
-  .erp-dev-docs-shell {
+  .erp-dev-docs-page {
     height: auto;
+    grid-template-rows: none;
   }
 }

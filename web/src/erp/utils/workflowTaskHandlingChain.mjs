@@ -79,6 +79,7 @@ export function buildEngineeringMaterialStageModel(task, request) {
       statusLabel,
       tone,
       current,
+      completedAt: !current && hasTime(at) ? Date.parse(at) / 1000 : null,
       linked: task.task_group === `engineering_material_${key}`,
       detail: [hasTime(at) ? formatWorkflowTaskEventTime(at) : '', note]
         .filter(Boolean)

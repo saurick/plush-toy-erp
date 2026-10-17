@@ -1,0 +1,322 @@
+import {
+  Alert,
+  Button,
+  Card,
+  Empty,
+  Input,
+  Select,
+  Tag,
+  Typography,
+} from 'antd'
+import {
+  OPEN_OPERATION_STATUSES,
+  OPERATION_HISTORY_RESULT_OPTIONS,
+  OPERATION_HISTORY_ACTION_OPTIONS,
+  OPERATION_HISTORY_TARGET_OPTIONS,
+} from './shared.jsx'
+import Table from '@/common/components/table/AppTable'
+import { DEV_PAGINATION } from '../../../config/devPagination.mjs'
+import Segmented from '@/common/components/navigation/SlidingSegmented'
+import { DeliveryTaskPath } from '../DeliveryTaskPath.jsx'
+import DevPipelineTimingPanel, {
+  DevPipelineStatusStrip,
+} from '../../../components/DevPipelineTimingPanel.jsx'
+import {
+  DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS,
+  DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
+  DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
+  DEV_VERSION_CENTER_VIEW_HISTORY,
+  DEV_VERSION_CENTER_VIEW_OVERVIEW,
+  DEV_VERSION_CENTER_VIEW_PIPELINE,
+  DEV_VERSION_CENTER_VIEW_VERSIONS,
+  deliveryReadOnlyReleasePresentation,
+} from '../../../config/devDelivery.mjs'
+
+const { Text } = Typography
+
+export function buildVersionWorkspace({
+  changeTablePage,
+  clearOperationHistoryFilters,
+  databaseRebuildPanel,
+  deliveryProviderName,
+  filteredHistoryOperations,
+  hasOperationHistoryFilters,
+  historyOperations,
+  historyPage,
+  historyTableRef,
+  initialLoading,
+  loadError,
+  openPipelineDetails,
+  operationColumns,
+  operationHistoryFilters,
+  operationHistoryPresentation,
+  operationHistoryState,
+  operations,
+  setHistoryPage,
+  setVersionPage,
+  summary,
+  updateOperationHistoryFilter,
+  versionColumns,
+  versionOverview,
+  versionPage,
+  versionTableRef,
+  versions,
+}) {
+  return [
+    {
+      key: DEV_VERSION_CENTER_VIEW_VERSIONS,
+      label: '版本与部署',
+      children: (
+        <section
+          ref={versionTableRef}
+          className="erp-dev-version-tab erp-dev-version-tab--versions"
+          aria-label="版本与部署"
+        >
+          {!operations.some((operation) =>
+            OPEN_OPERATION_STATUSES.has(operation.status)
+          ) ? (
+            <DeliveryTaskPath
+              title="部署现有版本"
+              items={[
+                { title: '选择版本', description: '选择已发布的不可变制品。' },
+                {
+                  title: '准备部署计划',
+                  description: '检查目标、迁移、备份与回滚点。',
+                },
+                {
+                  title: '确认部署并读回',
+                  description: '执行后核对运行版本与业务结果。',
+                },
+              ]}
+            />
+          ) : null}
+          <Card
+            title="可部署版本"
+            className="erp-dev-version-table-card"
+            extra={<Text type="secondary">最多展示最近 20 个</Text>}
+          >
+            <Table
+              rowKey="gitSha"
+              columns={versionColumns}
+              dataSource={versions}
+              loading={initialLoading}
+              pagination={{
+                ...DEV_PAGINATION,
+                current: versionPage,
+                pageSize: DEV_VERSION_CENTER_VERSION_PAGE_SIZE,
+                hideOnSinglePage: true,
+                onChange: (nextPage) =>
+                  changeTablePage(setVersionPage, versionTableRef, nextPage),
+              }}
+              locale={{
+                emptyText: (
+                  <Empty
+                    description={
+                      loadError && !summary
+                        ? '版本读取失败，请刷新重试'
+                        : summary?.releaseVersionPolicy
+                          ? `尚无完整${deliveryProviderName}不可变发布版本`
+                          : deliveryReadOnlyReleasePresentation(summary).title
+                    }
+                  />
+                ),
+              }}
+              scroll={{ x: 1120 }}
+            />
+          </Card>
+        </section>
+      ),
+    },
+    {
+      key: DEV_VERSION_CENTER_VIEW_OVERVIEW,
+      label: '发布检查',
+      children: (
+        <section
+          className="erp-dev-version-tab erp-dev-version-tab--overview"
+          aria-label="发布检查"
+        >
+          {versionOverview}
+          {databaseRebuildPanel}
+        </section>
+      ),
+    },
+    {
+      key: DEV_VERSION_CENTER_VIEW_PIPELINE,
+      label: '流水线耗时',
+      children: (
+        <section
+          className="erp-dev-version-tab erp-dev-version-tab--pipeline"
+          aria-label="流水线耗时"
+        >
+          <DevPipelineStatusStrip
+            timings={summary?.timings}
+            versions={versions}
+            operations={operations}
+            onOpenDetails={openPipelineDetails}
+          />
+          <DevPipelineTimingPanel
+            timings={summary?.timings}
+            versions={versions}
+          />
+        </section>
+      ),
+    },
+    {
+      key: DEV_VERSION_CENTER_VIEW_HISTORY,
+      label: '操作记录',
+      children: (
+        <section
+          ref={historyTableRef}
+          className="erp-dev-version-tab erp-dev-version-tab--history"
+          aria-label="操作记录"
+        >
+          <Card
+            title="发布与部署记录（已结束）"
+            className="erp-dev-version-table-card"
+            extra={
+              <Tag color={operationHistoryPresentation.color}>
+                {operationHistoryPresentation.label}
+              </Tag>
+            }
+          >
+            {operationHistoryState === 'stale' ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="当前显示上次成功读回的操作记录"
+                description="最新操作记录不可读或仍在重新核对；记录可查看，但所有写操作保持停用。"
+              />
+            ) : null}
+            {operationHistoryState === 'failure' ? (
+              <Alert
+                type="error"
+                showIcon
+                message="工作台操作记录当前不可读"
+                description="未使用 GitLab Pipeline、Package、Release、Codex 对话或普通 SSH 动作补造操作记录。"
+              />
+            ) : null}
+            {operationHistoryState === 'failure' ? null : (
+              <>
+                <div
+                  className="erp-dev-operation-history-filters"
+                  role="search"
+                  aria-label="筛选发布与部署记录"
+                >
+                  <div className="erp-dev-operation-history-filters__controls">
+                    <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--result">
+                      <Text type="secondary">结果</Text>
+                      <Segmented
+                        aria-label="筛选结果"
+                        value={operationHistoryFilters.result}
+                        options={OPERATION_HISTORY_RESULT_OPTIONS}
+                        onChange={(value) =>
+                          updateOperationHistoryFilter(
+                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.result,
+                            value
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--action">
+                      <Text type="secondary">动作</Text>
+                      <Select
+                        aria-label="筛选动作"
+                        value={operationHistoryFilters.action}
+                        options={OPERATION_HISTORY_ACTION_OPTIONS}
+                        onChange={(value) =>
+                          updateOperationHistoryFilter(
+                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.action,
+                            value
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--target">
+                      <Text type="secondary">目标</Text>
+                      <Select
+                        aria-label="筛选目标"
+                        value={operationHistoryFilters.target}
+                        options={OPERATION_HISTORY_TARGET_OPTIONS}
+                        onChange={(value) =>
+                          updateOperationHistoryFilter(
+                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.target,
+                            value
+                          )
+                        }
+                      />
+                    </div>
+                    <label
+                      className="erp-dev-operation-history-filter-field erp-dev-operation-history-filter-field--keyword"
+                      htmlFor="dev-version-history-keyword"
+                    >
+                      <Text type="secondary">版本 / SHA / 操作 ID</Text>
+                      <Input
+                        id="dev-version-history-keyword"
+                        aria-label="搜索版本、SHA 或操作 ID"
+                        placeholder="输入完整内容或前几位"
+                        value={operationHistoryFilters.keyword}
+                        maxLength={128}
+                        allowClear
+                        onChange={(event) =>
+                          updateOperationHistoryFilter(
+                            DEV_VERSION_CENTER_HISTORY_FILTER_QUERY_KEYS.keyword,
+                            event.target.value,
+                            { replace: true }
+                          )
+                        }
+                      />
+                    </label>
+                  </div>
+                  <div className="erp-dev-operation-history-filters__meta">
+                    <Text type="secondary" aria-live="polite">
+                      {hasOperationHistoryFilters
+                        ? `显示 ${String(filteredHistoryOperations.length)} / 共 ${String(historyOperations.length)} 条记录`
+                        : `共 ${String(historyOperations.length)} 条记录`}
+                    </Text>
+                    <Button
+                      type="link"
+                      disabled={!hasOperationHistoryFilters}
+                      onClick={clearOperationHistoryFilters}
+                    >
+                      清空筛选
+                    </Button>
+                  </div>
+                </div>
+                <Table
+                  rowKey="id"
+                  columns={operationColumns}
+                  dataSource={filteredHistoryOperations}
+                  loading={initialLoading}
+                  pagination={{
+                    ...DEV_PAGINATION,
+                    current: historyPage,
+                    pageSize: DEV_VERSION_CENTER_HISTORY_PAGE_SIZE,
+                    hideOnSinglePage: true,
+                    onChange: (nextPage) =>
+                      changeTablePage(
+                        setHistoryPage,
+                        historyTableRef,
+                        nextPage
+                      ),
+                  }}
+                  locale={{
+                    emptyText: (
+                      <Empty
+                        description={
+                          hasOperationHistoryFilters
+                            ? '没有符合筛选条件的记录，请调整或清空上方条件'
+                            : '尚无已结束的制品发布、目标部署、数据清空重建或回滚记录'
+                        }
+                      />
+                    ),
+                  }}
+                  scroll={{ x: 980 }}
+                />
+              </>
+            )}
+          </Card>
+        </section>
+      ),
+    },
+  ]
+}

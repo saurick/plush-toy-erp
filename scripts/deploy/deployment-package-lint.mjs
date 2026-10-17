@@ -1,8 +1,14 @@
 #!/usr/bin/env node
 
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+const requireFromWeb = createRequire(
+  new URL("../../web/package.json", import.meta.url),
+);
+const yaml = requireFromWeb("yaml");
 
 const DEFAULT_CUSTOMER = "yoyoosun";
 
@@ -16,8 +22,6 @@ const SHARED_SCRIPTS = [
   "verify-backup-restore.sh",
 ];
 const UNUSED_CONFIGURATION_FILES = [
-  "compose/docker-compose.example.yml",
-  "compose/docker-compose.override.example.yml",
   "env/server.config.example.yaml",
   "env/web.config.example.json",
 ];
@@ -163,6 +167,61 @@ function readText(filePath) {
   return fs.readFileSync(filePath, "utf8");
 }
 
+function isMapping(value) {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    Object.getPrototypeOf(value) === Object.prototype
+  );
+}
+
+function readComposeDocuments(filePath, relativePath, errors, required) {
+  const lineCounter = new yaml.LineCounter();
+  const reportError = (offset) => {
+    const location = Number.isInteger(offset) && lineCounter.linePos(offset);
+    const position = location
+      ? ` at line ${location.line}, column ${location.col}`
+      : "";
+    errors.push(
+      `${relativePath} must contain valid Compose YAML/JSON${position}`,
+    );
+  };
+  let documents;
+  try {
+    // 保留出错文档的结构，避免改名配置在解析失败时被当成普通文本。
+    documents = yaml.parseAllDocuments(readText(filePath), {
+      schema: "core",
+      merge: true,
+      lineCounter,
+      prettyErrors: false,
+      logLevel: "error",
+    });
+  } catch {
+    reportError();
+    return [];
+  }
+  return documents.map((document) => {
+    const composeStructure =
+      yaml.isMap(document.contents) &&
+      document.contents.items.some(
+        ({ key }) =>
+          yaml.isScalar(key) &&
+          (["services", "include"].includes(String(key.value)) ||
+            key.source === "<<"),
+      );
+    try {
+      if (document.errors.length > 0) throw document.errors[0];
+      // 标签承载的结构参与校验；!reset / !override 的实际合并交由 Compose。
+      return document.toJS();
+    } catch (error) {
+      if (required || composeStructure) {
+        reportError(error.pos?.[0] ?? document.contents?.range?.[0]);
+      }
+      return null;
+    }
+  });
+}
+
 function assert(condition, message, errors) {
   if (!condition) {
     errors.push(message);
@@ -258,8 +317,20 @@ function validateDeploymentBoundary(repoRoot, packageDir, errors) {
 function validateCompose(repoRoot, errors) {
   const composePath = path.join(repoRoot, CANONICAL_COMPOSE);
   if (!fs.existsSync(composePath)) {
-    return;
+    return null;
   }
+  const documents = readComposeDocuments(
+    composePath,
+    CANONICAL_COMPOSE,
+    errors,
+    true,
+  );
+  const services = documents.length === 1 && documents[0]?.services;
+  assert(
+    isMapping(services),
+    "canonical compose must define a services mapping",
+    errors,
+  );
   const content = readText(composePath);
   assert(
     /healthcheck:/m.test(content),
@@ -281,6 +352,72 @@ function validateCompose(repoRoot, errors) {
     "canonical compose must not restore old web-mobile services",
     errors,
   );
+  return isMapping(services) ? new Set(Object.keys(services)) : null;
+}
+
+function validateCustomerCompose(packageDir, canonicalServices, errors) {
+  for (const filePath of walkFiles(packageDir)) {
+    const relativePath = normalizeRelative(packageDir, filePath);
+    const inComposeDirectory = relativePath.startsWith("compose/");
+    const yamlOrJson = /\.(?:ya?ml|json)(?:\.example)?$/iu.test(relativePath);
+    if (/^(?:evidence|reports)\//u.test(relativePath)) continue;
+
+    const required = yamlOrJson;
+    const documents = readComposeDocuments(
+      filePath,
+      relativePath,
+      errors,
+      required,
+    );
+    for (const document of documents) {
+      if (!isMapping(document)) {
+        if (inComposeDirectory && required && document != null) {
+          errors.push(`${relativePath} must contain a Compose mapping`);
+        }
+        continue;
+      }
+      const hasServices = Object.hasOwn(document, "services");
+      const hasInclude = Object.hasOwn(document, "include");
+      if (!hasServices && !hasInclude) continue;
+
+      assert(
+        documents.length === 1,
+        `${relativePath} must use a single Compose document`,
+        errors,
+      );
+      assert(
+        !hasInclude,
+        `${relativePath} must not include another deployment definition; combine overrides with ${CANONICAL_COMPOSE}`,
+        errors,
+      );
+      if (!hasServices) continue;
+      if (!isMapping(document.services)) {
+        errors.push(`${relativePath} services must be an override mapping`);
+        continue;
+      }
+      for (const [serviceName, service] of Object.entries(document.services)) {
+        assert(
+          !canonicalServices || canonicalServices.has(serviceName),
+          `${relativePath} must only override services declared in ${CANONICAL_COMPOSE}: ${serviceName}`,
+          errors,
+        );
+        if (!isMapping(service)) {
+          errors.push(
+            `${relativePath} service ${serviceName} must be an override mapping`,
+          );
+          continue;
+        }
+        const definitions = ["image", "build", "extends", "provider"].filter(
+          (key) => Object.hasOwn(service, key),
+        );
+        assert(
+          definitions.length === 0,
+          `${relativePath} service ${serviceName} must not define ${definitions.join("/")}; runtime definitions belong to ${CANONICAL_COMPOSE}, images use its env variables`,
+          errors,
+        );
+      }
+    }
+  }
 }
 
 function validateNginxRouting(packageDir, errors) {
@@ -734,7 +871,8 @@ export function validateDeploymentPackage({
 
   validateEnvExample(packageDir, errors);
   validateDeploymentBoundary(repoRoot, packageDir, errors);
-  validateCompose(repoRoot, errors);
+  const canonicalServices = validateCompose(repoRoot, errors);
+  validateCustomerCompose(packageDir, canonicalServices, errors);
   validateNginxRouting(packageDir, errors);
   validateRunbookCoverage(packageDir, errors);
   validateContent(packageDir, errors);

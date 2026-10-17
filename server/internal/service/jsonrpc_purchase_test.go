@@ -493,6 +493,25 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 		biz.PermissionPurchaseReceiptRead,
 		biz.PermissionERPWorkbenchRead,
 	))
+	for _, quantity := range []string{"0", "-1", "0.0000001"} {
+		t.Run("invalid arrival quantity "+quantity, func(t *testing.T) {
+			beforeReceipts := client.PurchaseReceipt.Query().CountX(ctx)
+			beforeItems := client.PurchaseReceiptItem.Query().CountX(ctx)
+			beforeLots := client.InventoryLot.Query().CountX(ctx)
+			beforeInspections := client.QualityInspection.Query().CountX(ctx)
+			_, result, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "invalid-quantity", mustJSONRPCStruct(t, map[string]any{
+				"purchase_order_id": float64(saved.Order.ID),
+				"receipt_no":        "PR-INVALID-QUANTITY", "received_at": "2026-06-17", "idempotency_key": "invalid-arrival:" + quantity,
+				"items": []any{map[string]any{"purchase_order_item_id": float64(saved.Items[0].ID), "warehouse_id": float64(fixtures.warehouseID), "quantity": quantity}},
+			}))
+			if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+				t.Fatalf("invalid arrival quantity result=%#v err=%v", result, err)
+			}
+			if client.PurchaseReceipt.Query().CountX(ctx) != beforeReceipts || client.PurchaseReceiptItem.Query().CountX(ctx) != beforeItems || client.InventoryLot.Query().CountX(ctx) != beforeLots || client.QualityInspection.Query().CountX(ctx) != beforeInspections {
+				t.Fatal("invalid arrival quantity wrote a receipt, item, lot or inspection")
+			}
+		})
+	}
 	_, missingReceiptKeyRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "missing-key", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
 		"all_remaining":     true,

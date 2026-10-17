@@ -87,6 +87,10 @@ type FinanceFact struct {
 
 // FinanceFactEdges holds the relations/edges for other nodes in the graph.
 type FinanceFactEdges struct {
+	// Allocations holds the value of the allocations edge.
+	Allocations []*FinanceAllocation `json:"allocations,omitempty"`
+	// CreditNotes holds the value of the credit_notes edge.
+	CreditNotes []*FinanceCreditNote `json:"credit_notes,omitempty"`
 	// Poster holds the value of the poster edge.
 	Poster *AdminUser `json:"poster,omitempty"`
 	// Settler holds the value of the settler edge.
@@ -95,7 +99,25 @@ type FinanceFactEdges struct {
 	Canceller *AdminUser `json:"canceller,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [5]bool
+}
+
+// AllocationsOrErr returns the Allocations value or an error if the edge
+// was not loaded in eager-loading.
+func (e FinanceFactEdges) AllocationsOrErr() ([]*FinanceAllocation, error) {
+	if e.loadedTypes[0] {
+		return e.Allocations, nil
+	}
+	return nil, &NotLoadedError{edge: "allocations"}
+}
+
+// CreditNotesOrErr returns the CreditNotes value or an error if the edge
+// was not loaded in eager-loading.
+func (e FinanceFactEdges) CreditNotesOrErr() ([]*FinanceCreditNote, error) {
+	if e.loadedTypes[1] {
+		return e.CreditNotes, nil
+	}
+	return nil, &NotLoadedError{edge: "credit_notes"}
 }
 
 // PosterOrErr returns the Poster value or an error if the edge
@@ -103,7 +125,7 @@ type FinanceFactEdges struct {
 func (e FinanceFactEdges) PosterOrErr() (*AdminUser, error) {
 	if e.Poster != nil {
 		return e.Poster, nil
-	} else if e.loadedTypes[0] {
+	} else if e.loadedTypes[2] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "poster"}
@@ -114,7 +136,7 @@ func (e FinanceFactEdges) PosterOrErr() (*AdminUser, error) {
 func (e FinanceFactEdges) SettlerOrErr() (*AdminUser, error) {
 	if e.Settler != nil {
 		return e.Settler, nil
-	} else if e.loadedTypes[1] {
+	} else if e.loadedTypes[3] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "settler"}
@@ -125,7 +147,7 @@ func (e FinanceFactEdges) SettlerOrErr() (*AdminUser, error) {
 func (e FinanceFactEdges) CancellerOrErr() (*AdminUser, error) {
 	if e.Canceller != nil {
 		return e.Canceller, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "canceller"}
@@ -375,6 +397,16 @@ func (_m *FinanceFact) assignValues(columns []string, values []any) error {
 // This includes values selected through modifiers, order, etc.
 func (_m *FinanceFact) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
+}
+
+// QueryAllocations queries the "allocations" edge of the FinanceFact entity.
+func (_m *FinanceFact) QueryAllocations() *FinanceAllocationQuery {
+	return NewFinanceFactClient(_m.config).QueryAllocations(_m)
+}
+
+// QueryCreditNotes queries the "credit_notes" edge of the FinanceFact entity.
+func (_m *FinanceFact) QueryCreditNotes() *FinanceCreditNoteQuery {
+	return NewFinanceFactClient(_m.config).QueryCreditNotes(_m)
 }
 
 // QueryPoster queries the "poster" edge of the FinanceFact entity.

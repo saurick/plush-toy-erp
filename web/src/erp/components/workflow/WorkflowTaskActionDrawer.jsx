@@ -9,7 +9,7 @@ import {
 import { Alert, Button, Drawer, Input, Select, Tag, Typography } from 'antd'
 import WorkflowFollowupDetails from './WorkflowFollowupDetails.jsx'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
-import WorkflowTaskIdentity from './WorkflowTaskIdentity.jsx'
+import WorkflowTaskInfoCard from './WorkflowTaskInfoCard.jsx'
 import WorkflowTaskTiming from './WorkflowTaskTiming.jsx'
 import WorkflowTaskCurrentSummary from './WorkflowTaskCurrentSummary.jsx'
 import {
@@ -268,7 +268,7 @@ export default function WorkflowTaskActionDrawer({
     ? String(task.id || task.task_code || task.task_name || '')
     : ''
   const [activeStepKey, setActiveStepKey] = React.useState('context')
-  const showTaskContext = activeStepKey === 'context' && !hasActionReceipt
+  const showTaskContext = activeStepKey === 'context'
   const [sourceFooter, setSourceFooter] = React.useState(null)
   const [taskEvents, setTaskEvents] = React.useState([])
   const [taskEventsTruncated, setTaskEventsTruncated] = React.useState(false)
@@ -351,7 +351,7 @@ export default function WorkflowTaskActionDrawer({
   const stepAvailability = React.useMemo(
     () =>
       hasActionReceipt
-        ? { context: false, action: false, confirm: true }
+        ? { context: true, action: false, confirm: true }
         : hasSourceAction
           ? { context: true, action: true, confirm: false }
           : actionStepAvailability,
@@ -448,12 +448,12 @@ export default function WorkflowTaskActionDrawer({
   React.useEffect(() => {
     if (stepAvailability[activeStepKey]) return
     setActiveStepKey(
-      resolveWorkflowTaskActionStep({
+      hasActionReceipt ? 'confirm' : resolveWorkflowTaskActionStep({
         requestedStep: activeStepKey,
         availability: stepAvailability,
       })
     )
-  }, [activeStepKey, stepAvailability])
+  }, [activeStepKey, hasActionReceipt, stepAvailability])
 
   React.useLayoutEffect(() => {
     const scrollContainer = navigationRef.current?.parentElement
@@ -571,29 +571,28 @@ export default function WorkflowTaskActionDrawer({
         activeStepKey !== 'context' ||
         canOpenRelatedEntry ||
         canViewAttachments ||
+        (showTaskContext && sourceSummary) ||
         canChooseActions)
   )
-  const taskResources = task && showTaskContext ? (
-    <div className="erp-task-action-drawer__resources">
-      {sourceSummary}
-      {canViewAttachments ? (
-        <BusinessAttachmentModalButton
-          ownerType="workflow_task"
-          ownerId={task.id}
-          ownerVersion={task.version}
-          buttonText="任务附件"
-          modalTitle="任务附件"
-          panelTitle="附件内容"
-          description={canManageAttachments ? '上传照片、异常截图或处理凭证。' : '查看照片、异常截图或处理凭证。'}
-          canUpload={canManageAttachments}
-          canWithdraw={canManageAttachments}
-          disabled={actionSaving}
-          disabledReason="任务正在提交，请稍候"
-          showAttachmentCount
-          buttonProps={{ 'data-testid': 'workflow-task-attachment-action', size: 'middle' }}
-        />
-      ) : null}
-    </div>
+  const taskResources = task && showTaskContext && sourceSummary ? (
+    <div className="erp-task-action-drawer__resources">{sourceSummary}</div>
+  ) : null
+  const taskAttachments = task && showTaskContext && canViewAttachments ? (
+    <BusinessAttachmentModalButton
+      ownerType="workflow_task"
+      ownerId={task.id}
+      ownerVersion={task.version}
+      buttonText="查看附件"
+      modalTitle="任务附件"
+      panelTitle="附件内容"
+      description={canManageAttachments ? '上传照片、异常截图或处理凭证。' : '查看照片、异常截图或处理凭证。'}
+      canUpload={canManageAttachments}
+      canWithdraw={canManageAttachments}
+      disabled={actionSaving}
+      disabledReason="任务正在提交，请稍候"
+      showAttachmentCount
+      buttonProps={{ 'data-testid': 'workflow-task-attachment-action', size: 'middle' }}
+    />
   ) : null
 
   // 外壳预先挂载，避免入场动画尚未结束就关闭时 Portal 被移除、跳过焦点恢复。
@@ -643,6 +642,9 @@ export default function WorkflowTaskActionDrawer({
                 !hasActionReceipt
               }
             >
+              {taskAttachments}
+              {taskResources}
+              {hasActionReceipt ? <Button onClick={() => selectStep(showTaskContext ? 'confirm' : 'context')}>{showTaskContext ? '查看结果回执' : '回看任务'}</Button> : null}
               {!hasActionReceipt && activeStepKey !== 'context' ? (
                 <Button
                   disabled={actionSaving}
@@ -723,7 +725,6 @@ export default function WorkflowTaskActionDrawer({
         <div
           ref={navigationRef}
           className="erp-task-action-drawer__navigation"
-          hidden={showTaskContext}
         >
           <section
             className="erp-task-action-drawer__guide"
@@ -746,7 +747,7 @@ export default function WorkflowTaskActionDrawer({
                 const active = step.key === activeStepKey
                 const available = stepAvailability[step.key]
                 const interactive =
-                  available && !actionSaving && !hasActionReceipt
+                  available && !actionSaving && (!hasActionReceipt || step.key !== 'action')
                 return (
                   <button
                     type="button"
@@ -794,47 +795,39 @@ export default function WorkflowTaskActionDrawer({
       ) : null}
       {task ? (
         <div className="erp-task-action-drawer__body" aria-busy={actionSaving}>
-          <section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">
-            <div className="erp-task-copy-heading">
-              <Title level={2} className="erp-task-action-drawer__task-title">{taskDisplayName}</Title>
-              <Tag color={statusMeta?.color}>{actionReceipt?.statusLabel || statusMeta?.label}</Tag>
-            </div>
-            {!hasActionReceipt || showTaskContext ? (
-              <div className="erp-task-action-drawer__source"><WorkflowTaskSource task={taskWithSource} copyable={false} onOpen={canOpenRelatedEntry && !actionSaving ? () => onOpenEntry(task) : undefined} /></div>
-            ) : null}
-            {showTaskContext ? <WorkflowTaskIdentity task={task} copyable={false} detailView /> : null}
-            <WorkflowFollowupDetails task={task} />
-            {showTaskContext ? (
-              <WorkflowTaskCurrentSummary
-                task={task}
-                roleLabel={ownerRoleLabel}
-                assigneeLabel={currentAssigneeLabel}
-                events={taskEventsState === 'ready' ? taskEvents : []}
-                reason={taskReason}
-                contact={exceptionContact}
-                guidance={actionAvailabilityLoading ? '正在确认可用的处理方式' : !canChooseActions ? readonlyReason || '当前账号不能直接处理该任务。' : ''}
-              />
-            ) : hasActionReceipt ? (
-              <div className="erp-task-action-drawer__receipt-context">
-                <WorkflowTaskSource task={taskWithSource} copyable={false} />
-                <span>本次责任岗位：{ownerRoleLabel || '待确认'}</span>
-                <WorkflowTaskTiming task={task} detail compact events={taskEventsState === 'ready' ? taskEvents : []} />
-              </div>
-            ) : null}
-          </section>
+          {showTaskContext ? (
+            <WorkflowTaskInfoCard
+              task={taskWithSource}
+              title={taskDisplayName}
+              titleClassName="erp-task-action-drawer__task-title"
+              status={<Tag color={statusMeta?.color}>{actionReceipt?.statusLabel || statusMeta?.label}</Tag>}
+              source={<div className="erp-task-action-drawer__source"><WorkflowTaskSource task={taskWithSource} onOpen={canOpenRelatedEntry && !actionSaving ? () => onOpenEntry(task) : undefined} /></div>}
+              assigneeLabel={currentAssigneeLabel}
+              events={taskEventsState === 'ready' ? taskEvents : []}
+              businessInfo={<WorkflowFollowupDetails task={task} />}
+              summary={<WorkflowTaskCurrentSummary appearance="facts" task={task} roleLabel={ownerRoleLabel} assigneeLabel={currentAssigneeLabel} events={taskEventsState === 'ready' ? taskEvents : []} processContext={processContextState === 'ready' ? processContext : null} reason={taskReason} contact={exceptionContact} guidance={actionAvailabilityLoading ? '正在确认可用的处理方式' : !canChooseActions ? readonlyReason || '当前账号不能直接处理该任务。' : ''} />}
+            />
+          ) : (
+            <section className="erp-task-action-drawer__summary erp-task-action-drawer__summary--task">
+              <div className="erp-task-copy-heading"><Title level={2} className="erp-task-action-drawer__task-title">{taskDisplayName}</Title><Tag color={statusMeta?.color}>{actionReceipt?.statusLabel || statusMeta?.label}</Tag></div>
+              {!hasActionReceipt ? <div className="erp-task-action-drawer__source"><WorkflowTaskSource task={taskWithSource} copyable={false} onOpen={canOpenRelatedEntry && !actionSaving ? () => onOpenEntry(task) : undefined} /></div> : null}
+              {hasActionReceipt ? <div className="erp-task-action-drawer__receipt-context"><WorkflowTaskSource task={taskWithSource} copyable={false} /><span>本次责任岗位：{ownerRoleLabel || '待确认'}</span><WorkflowTaskTiming task={task} detail compact events={taskEventsState === 'ready' ? taskEvents : []} /></div> : null}
+            </section>
+          )}
 
           {(hasActionReceipt && isEngineeringMaterialTask(task)) || activeStepKey === 'context' ? (
-            <WorkflowTaskHandlingChain
-              onOpenTracking={onReturnToTracking}
-              onOpenTask={onOpenRelatedTask}
-              task={task}
-              profile={profile}
-              focused
-              resources={taskResources}
-              processContext={processContext}
-              processContextState={processContextState}
-              onRetryProcess={() => setProcessContextReloadKey((current) => current + 1)}
-            />
+            <section className="workflow-task-info-card">
+              <WorkflowTaskHandlingChain
+                onOpenTracking={onReturnToTracking}
+                onOpenTask={onOpenRelatedTask}
+                task={task}
+                profile={profile}
+                focused
+                processContext={processContext}
+                processContextState={processContextState}
+                onRetryProcess={() => setProcessContextReloadKey((current) => current + 1)}
+              />
+            </section>
           ) : null}
 
           <section
@@ -845,6 +838,7 @@ export default function WorkflowTaskActionDrawer({
             className="erp-task-action-drawer__step-panel"
           >
             <WorkflowTaskEventTrail
+              className="workflow-task-info-card workflow-task-info-card--records"
               approvalTask={approvalTask}
               errorMessage={taskEventsError}
               events={taskEvents}

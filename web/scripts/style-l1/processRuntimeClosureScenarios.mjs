@@ -194,11 +194,12 @@ export function createProcessRuntimeClosureScenarios({
                 '.workflow-process-stage__item--withdrawn .workflow-process-stage__marker'
               )
               .innerText(),
-            '−'
+            '2',
+            '撤回状态由文字说明，节点序号继续表达阅读顺序'
           )
         }
         const history = stage.locator('.workflow-process-stage__history')
-        if (await history.count() && await history.getAttribute('open') === null) await history.locator('summary').click()
+        if (await history.count() && await history.getAttribute('open') === null) await history.locator(':scope > summary').click()
         const geometry = await stage.evaluate((root) => {
           const handoff = root.querySelector('.workflow-process-stage__handoff')
           const history = root.querySelector('.workflow-process-stage__history')
@@ -209,10 +210,11 @@ export function createProcessRuntimeClosureScenarios({
               const items = [...group.children]
               const markers = items.map((item) => item.querySelector('.workflow-process-stage__marker').getBoundingClientRect())
               return items.every((item, index) => {
-                if (index === items.length - 1) return getComputedStyle(item, '::before').content === 'none'
-                const arrow = getComputedStyle(item, '::before')
-                const tip = item.getBoundingClientRect().bottom - parseFloat(arrow.bottom)
-                return markers[index + 1].top > markers[index].bottom && Math.abs(markers[index + 1].x - markers[index].x) <= 1 && arrow.clipPath.startsWith('polygon(') && tip > markers[index].bottom && tip < markers[index + 1].top
+                const line = getComputedStyle(item, '::after')
+                if (getComputedStyle(item, '::before').content !== 'none') return false
+                if (index === items.length - 1) return line.display === 'none'
+                const rect = item.getBoundingClientRect()
+                return markers[index + 1].top > markers[index].bottom && Math.abs(markers[index + 1].x - markers[index].x) <= 1 && parseFloat(line.width) === 1 && Math.abs(rect.x + parseFloat(line.left) + 0.5 - markers[index].x - markers[index].width / 2) <= 1
               })
             }),
             documentOverflow:

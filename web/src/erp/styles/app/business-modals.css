@@ -111,7 +111,7 @@
   margin-bottom: 0;
   border-bottom: 1px solid var(--erp-business-action-modal-divider, #dde6e0);
   background: var(--erp-business-action-modal-bg, #ffffff);
-  padding: 18px 24px 14px;
+  padding: var(--erp-panel-padding-block, 18px) var(--erp-panel-padding-inline, 24px) var(--erp-panel-padding-block, 14px);
 }
 
 .erp-business-action-modal .ant-modal-title {
@@ -145,7 +145,7 @@
   scrollbar-gutter: stable;
   will-change: scroll-position;
   background: var(--erp-business-action-modal-bg, #ffffff);
-  padding: 18px 24px 20px;
+  padding: var(--erp-form-body-padding-block, 18px) var(--erp-panel-padding-inline, 24px) var(--erp-form-body-padding-block, 20px);
 }
 
 .erp-business-action-modal .ant-modal-footer {
@@ -158,12 +158,12 @@
   border-top: 1px solid var(--erp-business-action-modal-divider, #dde6e0);
   background: var(--erp-business-action-modal-bg, #ffffff);
   box-shadow: 0 -8px 18px rgb(15 23 42 / 4%);
-  padding: 15px 24px;
+  padding: var(--erp-panel-padding-block, 15px) var(--erp-panel-padding-inline, 24px);
 }
 
 .erp-business-action-modal .ant-modal-close {
-  top: 14px;
-  inset-inline-end: 14px;
+  top: var(--erp-panel-padding-block, 14px);
+  inset-inline-end: var(--erp-panel-padding-inline, 14px);
   width: max(32px, var(--erp-touch-target, 0px));
   height: max(32px, var(--erp-touch-target, 0px));
   border: 1px solid transparent;
@@ -191,7 +191,7 @@
 .erp-business-action-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
-  gap: 16px 18px;
+  gap: var(--erp-form-field-gap, 16px 18px);
 }
 
 .erp-business-action-form .ant-form-item {
@@ -286,7 +286,7 @@
 }
 
 .erp-business-action-form .ant-form-item-label {
-  padding-bottom: 8px;
+  padding-bottom: var(--erp-form-label-gap, 8px);
 }
 
 .erp-business-action-form .ant-form-item-label > label {

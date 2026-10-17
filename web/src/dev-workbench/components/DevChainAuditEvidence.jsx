@@ -2,6 +2,7 @@ import React from 'react'
 import { Alert, Collapse, Space, Tag, Typography } from 'antd'
 import { Link } from 'react-router-dom'
 import Table from '@/common/components/table/AppTable'
+import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import {
   chainAuditArtifactURL,
   CHAIN_AUDIT_STATES,
@@ -133,7 +134,7 @@ function ReportTable({ columns, rows, rowKey = 'name' }) {
       dataSource={rows}
       columns={columns}
       pagination={
-        rows.length > 12 ? { pageSize: 12, showSizeChanger: false } : false
+        rows.length > 12 ? { ...DEV_PAGINATION, pageSize: 12 } : false
       }
       scroll={{ x: 760 }}
     />

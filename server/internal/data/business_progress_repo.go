@@ -110,7 +110,13 @@ func loadBusinessProgressRows(ctx context.Context, tx *stdsql.Tx, q biz.Business
 		}
 		out = append(out, progressRow)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	return out, attachBusinessProgressIdentityMatches(ctx, tx, q, out)
 }
 
 func progressDate(value string) string {

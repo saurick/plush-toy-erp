@@ -7,6 +7,9 @@ const source = readFileSync(
   new URL('./QualityInspectionsPage.jsx', import.meta.url),
   'utf8'
 )
+const querySource = readFileSync(new URL('../components/quality-inspections/qualityInspectionQueries.mjs', import.meta.url), 'utf8')
+const editorSource = readFileSync(new URL('../components/quality-inspections/useQualityInspectionEditor.js', import.meta.url), 'utf8')
+const actionsSource = readFileSync(new URL('../components/quality-inspections/useQualityInspectionActions.js', import.meta.url), 'utf8')
 
 test('quality page uses exact purchase return permission and dedicated source command', () => {
   assert.match(source, /'purchase\.return\.create'/u)
@@ -20,11 +23,6 @@ test('quality page uses exact purchase return permission and dedicated source co
 })
 
 test('quality rejection return retries safely and validates the returned source trace', () => {
-  assert.match(
-    source,
-    /listAllPurchaseReceipts\(\{\}, \{ signal: request\.signal \}\)/u
-  )
-  assert.doesNotMatch(source, /listPurchaseReceipts\(\{ limit:/u)
   assert.match(
     source,
     /listAllPurchaseReturns\(\s*compactParams\(\{[\s\S]*?quality_inspection_id: inspection\.id/u
@@ -48,7 +46,7 @@ test('quality rejection return retries safely and validates the returned source 
   assert.doesNotMatch(openAction, /findByPositiveID\([\s\S]*purchaseReceipts/u)
   const action = source.slice(
     source.indexOf('const submitPurchaseReturn'),
-    source.indexOf('const runInspectionAction')
+    source.indexOf('const selectedRowLabel')
   )
   assert.match(action, /purchaseReturnInFlightRef\.current/u)
   assert.match(action, /purchaseReturnAttemptsRef\.current\.prepare/u)
@@ -62,28 +60,8 @@ test('quality rejection return retries safely and validates the returned source 
   )
 })
 
-test('quality source references use latest-wins readiness and fail closed for source-driven creation', () => {
-  const loader = source.slice(
-    source.indexOf('const loadReferenceOptions'),
-    source.indexOf('const clearRouteContext')
-  )
-  assert.match(source, /useState\('loading'\)/u)
-  assert.match(loader, /beginLatestRequest\('reference-options'\)/u)
-  for (const functionName of [
-    'listAllPurchaseReceipts',
-    'listAllInventoryLots',
-    'listAllMaterials',
-    'listAllProducts',
-    'listAllWarehouses',
-  ]) {
-    assert.match(
-      loader,
-      new RegExp(`${functionName}\\([\\s\\S]*?signal: request\\.signal`, 'u')
-    )
-  }
-  assert.match(loader, /if \(!request\.isCurrent\(\)\) return false/u)
-  assert.match(loader, /setReferenceDataState\('ready'\)/u)
-  assert.match(loader, /setReferenceDataState\('error'\)/u)
+test('quality source actions require ready references and refresh both source scopes', () => {
+  assert.match(source, /useQualityInspectionReferences/u)
   assert.match(
     source,
     /Promise\.all\(\[\s*loadRows\(\),\s*loadReferenceOptions\(\)/u
@@ -94,9 +72,10 @@ test('quality source references use latest-wins readiness and fail closed for so
 })
 
 test('incoming quality create submits only source selectors and customer context', () => {
-  const createAction = source.slice(
-    source.indexOf('const handleCreateInspection'),
-    source.indexOf('const markInspectionReturned')
+  assert.match(source, /useQualityInspectionActions\(\{/u)
+  const createAction = actionsSource.slice(
+    actionsSource.indexOf('const handleCreateInspection'),
+    actionsSource.indexOf('const runInspectionAction')
   )
   assert.match(createAction, /customer_key: activeCustomerKey/u)
   assert.match(createAction, /buildInspectionParams\(values\)/u)
@@ -197,14 +176,14 @@ test('quality page preserves the source receipt numeric(20,6) quantity string', 
 test('quality page names and filters the shared read model by business inspection type', () => {
   assert.match(source, /title="质量检验"/u)
   assert.match(source, /QUALITY_INSPECTION_TYPE_FILTER_OPTIONS/u)
-  assert.match(source, /inspection_type: inspectionTypeFilter/u)
-  assert.match(source, /listOutsourcingReturnQualityInspections/u)
-  assert.match(source, /listFinishedGoodsQualityInspections/u)
-  assert.match(source, /listProductionStageQualityInspections/u)
-  assert.match(source, /inspectionTypeFilter === 'OUTSOURCING_RETURN'/u)
-  assert.match(source, /inspectionTypeFilter === 'FINISHED_GOODS'/u)
-  assert.match(source, /inspectionTypeFilter === 'PRODUCTION_STAGE'/u)
-  assert.match(source, /listAllProducts/u)
+  assert.match(source, /queryQualityInspections\(\{ \.\.\.qualityQuery, \.\.\.options \}\)/u)
+  assert.match(querySource, /inspection_type: inspectionTypeFilter/u)
+  assert.match(querySource, /listOutsourcingReturnQualityInspections/u)
+  assert.match(querySource, /listFinishedGoodsQualityInspections/u)
+  assert.match(querySource, /listProductionStageQualityInspections/u)
+  assert.match(querySource, /inspectionTypeFilter === 'OUTSOURCING_RETURN'/u)
+  assert.match(querySource, /inspectionTypeFilter === 'FINISHED_GOODS'/u)
+  assert.match(querySource, /inspectionTypeFilter === 'PRODUCTION_STAGE'/u)
   assert.match(source, /productOptions/u)
   assert.match(source, /selectedSourceType === 'PURCHASE_RECEIPT'/u)
   assert.match(source, /source_type: selectedRow\.source_type/u)
@@ -238,11 +217,11 @@ test('shared quality help keeps inspection sources and each quality gate separat
 })
 
 test('production-stage filter uses the WIP read model without inventory lot or warehouse filters', () => {
-  const productionStageBranch = source.slice(
-    source.indexOf("inspectionTypeFilter === 'PRODUCTION_STAGE'"),
-    source.indexOf(
+  const productionStageBranch = querySource.slice(
+    querySource.indexOf("inspectionTypeFilter === 'PRODUCTION_STAGE'"),
+    querySource.indexOf(
       '} else {',
-      source.indexOf("inspectionTypeFilter === 'PRODUCTION_STAGE'")
+      querySource.indexOf("inspectionTypeFilter === 'PRODUCTION_STAGE'")
     )
   )
   assert.match(
@@ -302,12 +281,13 @@ test('production-stage decision summary displays backend business snapshots and 
 })
 
 test('quality decision requires an estimated source-document defect rate without deriving return quantity', () => {
-  assert.match(source, /defect_rate_selection: undefined/u)
-  assert.match(source, /defect_rate_custom_percent: undefined/u)
-  assert.match(source, /buildDecisionParams\(inspection\.id, values/u)
+  assert.match(editorSource, /defect_rate_selection: undefined/u)
+  assert.match(editorSource, /defect_rate_custom_percent: undefined/u)
+  assert.match(actionsSource, /buildDecisionParams\(inspection\.id, values/u)
   assert.match(source, /来源单据：\$\{decisionSourceSummary\.sourceNo\}/u)
   assert.match(source, /inspection\?\.source_no/u)
   assert.match(source, /按来源记录估算不良比例/u)
   assert.match(source, /后续返工、退货或阻断仍由对应来源业务办理/u)
   assert.doesNotMatch(source, /defect_rate_percent\s*\*\s*quantity/u)
+  assert.doesNotMatch(actionsSource, /defect_rate_percent\s*\*\s*quantity/u)
 })

@@ -5,6 +5,13 @@ const MAX_UNITS = NumericContract.maxUnits
 const NUMERIC_PATTERN = new RegExp(`^(\\d+)(?:\\.(\\d{1,${SCALE_DIGITS}}))?$`, 'u')
 const ZERO_UNITS = '0'
 
+function scaledUnits(integer, fraction = '') {
+  return `${integer}${fraction.padEnd(SCALE_DIGITS, '0')}`.replace(
+    /^0+(?=\d)/u,
+    ''
+  )
+}
+
 function numericText(value) {
   if (typeof value === 'bigint') return value.toString()
   if (typeof value === 'number' && !Number.isFinite(value)) return ''
@@ -21,12 +28,35 @@ export function numeric20Scale6Units(value) {
   const integerText = match[1].replace(/^0+(?=\d)/u, '')
   if (integerText.length > NumericContract.integerDigits) return null
 
-  const units =
-    `${integerText}${(match[2] || '').padEnd(SCALE_DIGITS, '0')}`.replace(
-      /^0+(?=\d)/u,
-      ''
-    )
+  const units = scaledUnits(integerText, match[2])
   return compareUnitText(units, MAX_UNITS) <= 0 ? units : null
+}
+
+// Quantity fields accept a leading decimal point, but never grouping separators.
+// Keep their input bound while sharing the storage precision and scaled arithmetic.
+export function numeric20Scale6QuantityUnits(value) {
+  const text = String(value ?? '').trim()
+  if (
+    text.length > NumericContract.integerDigits + SCALE_DIGITS + 1 ||
+    text.includes(',')
+  ) {
+    return null
+  }
+  return numeric20Scale6Units(text.startsWith('.') ? `0${text}` : text)
+}
+
+// Aggregates may exceed one persisted value; their wire text remains canonical.
+export function numeric20Scale6AggregateUnits(value) {
+  if (typeof value !== 'string') return null
+  const match = NUMERIC_PATTERN.exec(value)
+  if (
+    !match ||
+    match[0] !== value ||
+    (match[1].length > 1 && match[1].startsWith('0'))
+  ) {
+    return null
+  }
+  return scaledUnits(match[1], match[2])
 }
 
 export function numeric20Scale6TextFromUnits(value) {

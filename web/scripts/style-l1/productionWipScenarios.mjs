@@ -1,4 +1,5 @@
 import { createTaskBusinessReturnScenarios } from './taskBusinessReturnScenarios.mjs'
+import { createProductionTaskHandlingScenarios } from './productionTaskHandlingScenarios.mjs'
 
 function productionWipPermissions() {
   return [
@@ -66,6 +67,7 @@ export function createProductionWipScenarios(deps) {
 
   return [
     ...createTaskBusinessReturnScenarios(deps),
+    ...createProductionTaskHandlingScenarios(deps),
     ...[
       ['warehouse', 'wip_batch_id=91021', 'outsourcing.return_receipt.create'],
       [
@@ -226,7 +228,7 @@ export function createProductionWipScenarios(deps) {
           .filter({ hasText: '生产工序办理' })
           .last()
         await routeModal.waitFor({ state: 'visible', timeout: 10_000 })
-        for (const copy of ['布料加工', '车缝', '手工', '包装', '在制批次']) {
+        for (const copy of ['布料加工', '缝制', '手工制作', '包装', '在制批次']) {
           assert(
             String((await routeModal.innerText()) || '').includes(copy),
             `生产工序弹窗缺少业务口径：${copy}`
@@ -290,6 +292,7 @@ export function createProductionWipScenarios(deps) {
           '本厂生产使用车间移交；外发加工完成返回才登记回仓。需要分开安排时，请先拆分批次。'
         )
         await routeModal.getByRole('button', { name: '返回工序' }).click()
+        await page.getByRole('button', { name: '离开', exact: true }).click()
 
         await routeModal
           .getByText(/WIP-STYLE-91021/u)
@@ -372,11 +375,12 @@ export function createProductionWipScenarios(deps) {
           ),
         })
         await routeModal.getByRole('button', { name: '返回工序' }).click()
+        await page.getByRole('button', { name: '离开', exact: true }).click()
         await routeModal
           .getByText(/WIP-STYLE-91012/u)
           .first()
           .click()
-        await expectText(page, '当前：车缝')
+        await expectText(page, '当前：缝制')
 
         await routeModal.getByRole('button', { name: '确认包材要求' }).click()
         const packagingVersionItem = routeModal
@@ -513,8 +517,8 @@ export function createProductionWipScenarios(deps) {
       },
     },
     {
-      name: 'production-wip-route-execution-mobile',
-      path: '/m/production/handle/production/orders',
+      name: 'production-wip-route-execution-narrow-desktop',
+      path: '/erp/production/orders',
       productionOrderReleased: true,
       auth: 'admin',
       viewport: { width: 390, height: 844 },
@@ -527,7 +531,7 @@ export function createProductionWipScenarios(deps) {
       },
       effectiveSession,
       verify: async (page) => {
-        await expectHeading(page, '生产订单')
+        await page.getByRole('columnheader', { name: '生产单号', exact: true }).waitFor()
         await page.getByText('MO-STYLE-L1-20260713', { exact: true }).first().click()
         await clickVisibleAction(page, '工序办理')
         const routeModal = page
@@ -572,10 +576,10 @@ export function createProductionWipScenarios(deps) {
         await routeModal.screenshot({
           path: path.resolve(
             outputDir,
-            'production-wip-route-modal-mobile.png'
+            'production-wip-route-modal-narrow-desktop.png'
           ),
         })
-        await assertNoHorizontalOverflow(page, 'production-wip-route-mobile')
+        await assertNoHorizontalOverflow(page, 'production-wip-route-narrow-desktop')
       },
     },
   ]

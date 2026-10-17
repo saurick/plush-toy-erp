@@ -1,4 +1,5 @@
 import { register } from 'node:module'
+import { setImmediate as nextTask } from 'node:timers/promises'
 import { Window } from 'happy-dom'
 
 function registerJSXTestLoader() {
@@ -135,6 +136,37 @@ function installTestDOM() {
         }
       })
     },
+  }
+}
+
+export async function createReactTestHarness(t) {
+  const dom = installTestDOM()
+  registerJSXTestLoader()
+  const [{ act }, { createRoot }] = await Promise.all([
+    import('react'),
+    import('react-dom/client'),
+  ])
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  let mounted = true
+  const unmount = async () => {
+    if (!mounted) return
+    mounted = false
+    await act(async () => root.unmount())
+  }
+  t.after(async () => {
+    await unmount()
+    container.remove()
+    dom.restore()
+  })
+  return {
+    container,
+    runtimeWindow: dom.runtimeWindow,
+    act,
+    render: (element) => act(async () => root.render(element)),
+    flush: () => act(async () => nextTask()),
+    unmount,
   }
 }
 

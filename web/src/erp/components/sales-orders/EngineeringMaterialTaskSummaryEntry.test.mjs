@@ -18,6 +18,7 @@ test('task summary loads on demand, stays read-only and clears on source or acce
     ]
   )
   const calls = []
+  let backgroundEscapes = 0
   const originalCall = JsonRpc.prototype.call
   JsonRpc.prototype.call = async function call(method, params, options) {
     calls.push({ method, params, options })
@@ -73,7 +74,7 @@ test('task summary loads on demand, stays read-only and clears on source or acce
         createElement(
           MemoryRouter,
           { future: { v7_startTransition: true, v7_relativeSplatPath: true } },
-          createElement(Entry, props)
+          createElement('div', { onKeyDown: (event) => { if (event.key === 'Escape') backgroundEscapes++ } }, createElement(Entry, props))
         )
       )
     )
@@ -91,6 +92,10 @@ test('task summary loads on demand, stays read-only and clears on source or acce
   await render()
   assert(button('查看材料汇总'))
   assert.equal(calls.length, 0)
+  await render({ mobile: true, buttonText: '材料汇总' })
+  assert.equal(button('材料汇总').getAttribute('aria-label'), '查看材料汇总')
+  assert.equal(calls.length, 0, 'the compact footer label does not load business data')
+  await render({ mobile: false, buttonText: '查看材料汇总' })
   await act(async () => button('查看材料汇总').click())
   assert.equal(calls.length, 1)
   assert.deepEqual(calls[0].params, { sales_order_id: 8, preview: false })
@@ -177,4 +182,7 @@ test('task summary loads on demand, stays read-only and clears on source or acce
   await act(async () => document.querySelector('.ant-modal-close').click())
   await act(async () => button('查看材料汇总').click())
   assert.deepEqual(calls.at(-1).params, { sales_order_id: 8, request_id: 3, preview: false })
+  await act(async () => button('查看材料汇总').dispatchEvent(new dom.runtimeWindow.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })))
+  assert.equal(backgroundEscapes, 0, 'Escape must not reach the containing task drawer')
+  assert.equal(document.querySelectorAll('.erp-material-summary-modal').length, 0)
 })

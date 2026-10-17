@@ -40,8 +40,7 @@ test("customer confirmation separates enforced finance gate, published baseline 
   assert.match(financeGateRow, /当前为强制门禁，未批准不能出货/u);
   assert.doesNotMatch(financeGateRow, /不是强制门禁/u);
   assert.match(financeApprovalRow, /真实岗位办理和 C05 业务选择仍待确认/u);
-  const baseline = sectionBetween(customerDeliveryMatrix, "## 当前环境基线", "## 状态口径");
-  assert.match(baseline, /目标证据[\s\S]*[0-9a-f]{40}/u);
+  const baseline = assertRecordedDeploymentIdentity(customerDeliveryMatrix);
   assert.match(baseline, /工作区改动或本地绿色不能自动归入已部署版本/u);
   assert.match(baseline, /客户 UAT \/ 签收仍未完成/u);
   const statusAppendix = customerConfirmation.split("### 6.2 乙方状态附表")[1];
@@ -67,17 +66,19 @@ function tableIDs(source, prefix) {
   return [...source.matchAll(pattern)].map((match) => match[1]);
 }
 
-function tableHasLeadingCells(source, expectedCells) {
-  return source.split("\n").some((line) => {
-    if (!line.startsWith("|")) {
-      return false;
-    }
-    const cells = line
+function tableRows(source) {
+  return source.split(/\r?\n/u)
+    .filter((line) => line.startsWith("|"))
+    .map((line) => line
       .split("|")
       .slice(1, -1)
-      .map((cell) => cell.trim());
-    return expectedCells.every((cell, index) => cells[index] === cell);
-  });
+      .map((cell) => cell.trim()));
+}
+
+function tableHasLeadingCells(source, expectedCells) {
+  return tableRows(source).some((cells) =>
+    expectedCells.every((cell, index) => cells[index] === cell),
+  );
 }
 
 function expectedIDs(prefix, count) {
@@ -95,6 +96,61 @@ function sectionBetween(source, startMarker, endMarker) {
   assert.ok(end > start, `${startMarker} must precede ${endMarker}`);
   return source.slice(start, end);
 }
+
+function assertRecordedDeploymentIdentity(source) {
+  const baseline = sectionBetween(source, "## 当前环境基线", "## 状态口径");
+  const rows = tableRows(baseline);
+  for (const [label, pattern] of [
+    ["固定版本", /^`[^`\s]+`$/u],
+    ["应用提交", /^`[0-9a-f]{40}`$/u],
+    ["目标最新迁移", /^`[0-9]{14}`$/u],
+  ]) {
+    const matches = rows.filter(([name]) => name === label);
+    assert.equal(matches.length, 1, `recorded deployment baseline requires one ${label} row`);
+    assert.match(matches[0][1], pattern, `invalid recorded deployment ${label}`);
+  }
+  return baseline;
+}
+
+test("recorded deployment identity requires current fields rather than a historical SHA", () => {
+  const currentSha = "a".repeat(40);
+  const historicalSha = "b".repeat(40);
+  const versionRow = "| 固定版本 | `fixture-release` |";
+  const commitRow = `| 应用提交 | \`${currentSha}\` |`;
+  const migrationRow = "| 目标最新迁移 | `20260101000000` |";
+  const fixture = [
+    "## 当前环境基线",
+    "以下为已有记录的固定身份。",
+    "| 固定身份 | 已记录值 |",
+    "| --- | --- |",
+    versionRow,
+    commitRow,
+    migrationRow,
+    `较早试用记录绑定 \`${historicalSha}\`，只说明历史范围。`,
+    "## 状态口径",
+  ].join("\n");
+  assert.doesNotThrow(() => assertRecordedDeploymentIdentity(fixture));
+  for (const row of [versionRow, commitRow, migrationRow]) {
+    assert.throws(() => assertRecordedDeploymentIdentity(fixture.replace(row, "")), /requires one/u);
+  }
+  assert.throws(
+    () => assertRecordedDeploymentIdentity(fixture.replace(currentSha, currentSha.slice(0, 8))),
+    /invalid recorded deployment 应用提交/u,
+  );
+  assert.throws(
+    () => assertRecordedDeploymentIdentity(fixture.replace("`fixture-release`", "` `")),
+    /invalid recorded deployment 固定版本/u,
+  );
+  assert.throws(
+    () => assertRecordedDeploymentIdentity(fixture.replace("20260101000000", "not-a-migration")),
+    /invalid recorded deployment 目标最新迁移/u,
+  );
+  assert.throws(
+    () => assertRecordedDeploymentIdentity(fixture.replace(commitRow, `${commitRow}\n${commitRow}`)),
+    /requires one 应用提交 row/u,
+  );
+  assert.doesNotThrow(() => assertRecordedDeploymentIdentity(fixture.replace(historicalSha, "c".repeat(40))));
+});
 
 test("yoyoosun role config is complete and references registered permissions", () => {
   assert.equal(yoyoosunRoleFlowMatrix.roles.length, 9);

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Form } from 'antd'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 
 import {
   FinancePaymentStatus,
@@ -27,6 +28,7 @@ export default function useFinancePaymentAdjustments({
   recoverPayment,
   loadReferences,
 }) {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const [unallocateOpen, setUnallocateOpen] = useState(false)
 
   const [unallocateForm] = Form.useForm()
@@ -57,6 +59,7 @@ export default function useFinancePaymentAdjustments({
       })
       rememberPayment(payment)
       setUnallocateOpen(false)
+      reportBusinessResult('抵扣已撤销，款项保留', payment)
       await loadReferences()
       message.success('抵扣已撤销，款项保留，可重新抵扣或按审批办理退款')
     } catch (error) {
@@ -120,6 +123,7 @@ export default function useFinancePaymentAdjustments({
       })
       rememberPayment(payment)
       setCancelOpen(false)
+      reportBusinessResult('收付款已取消', payment)
       await loadReferences()
       message.success(
         '收付款已取消；如流程已有审批效果，系统会保留恢复记录，供管理员继续核对处理'
@@ -129,6 +133,7 @@ export default function useFinancePaymentAdjustments({
         const recovered = await recoverPayment(currentPayment.id, true)
         if (recovered?.status === FinancePaymentStatus.CANCELLED) {
           setCancelOpen(false)
+          reportBusinessResult('已重新读取收付款取消结果', recovered)
           message.success('已重新读取收付款取消结果')
           return
         }
@@ -156,6 +161,7 @@ export default function useFinancePaymentAdjustments({
       })
       rememberPayment(payment)
       setReverseOpen(false)
+      reportBusinessResult('收付款已冲销，原核销金额已恢复', payment)
       await loadReferences()
       message.success('收付款已冲销，原核销金额已恢复')
     } catch (error) {
@@ -163,6 +169,7 @@ export default function useFinancePaymentAdjustments({
         const recovered = await recoverPayment(currentPayment.id, true)
         if (recovered?.status === FinancePaymentStatus.REVERSED) {
           setReverseOpen(false)
+          reportBusinessResult('已重新读取收付款冲销结果', recovered)
           message.success('已重新读取收付款冲销结果')
           return
         }

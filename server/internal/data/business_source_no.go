@@ -12,7 +12,9 @@ import (
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
+	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/shipment"
 )
 
@@ -52,6 +54,22 @@ func resolveBusinessSourceNos(
 		sort.Ints(ids)
 
 		switch sourceType {
+		case "SALES_ORDER":
+			rows, err := client.SalesOrder.Query().Where(salesorder.IDIn(ids...)).Select(salesorder.FieldID, salesorder.FieldOrderNo).All(ctx)
+			if err != nil {
+				return nil, err
+			}
+			for _, row := range rows {
+				resolved[businessSourceKey{sourceType: sourceType, sourceID: row.ID}] = row.OrderNo
+			}
+		case "PURCHASE_ORDER":
+			rows, err := client.PurchaseOrder.Query().Where(purchaseorder.IDIn(ids...)).Select(purchaseorder.FieldID, purchaseorder.FieldPurchaseOrderNo).All(ctx)
+			if err != nil {
+				return nil, err
+			}
+			for _, row := range rows {
+				resolved[businessSourceKey{sourceType: sourceType, sourceID: row.ID}] = row.PurchaseOrderNo
+			}
 		case biz.ProductionOrderSourceType:
 			rows, err := client.ProductionOrder.Query().
 				Where(productionorder.IDIn(ids...)).
@@ -156,7 +174,7 @@ func resolvableBusinessSourceKey(sourceType *string, sourceID *int) (businessSou
 	}
 	normalizedType := strings.ToUpper(strings.TrimSpace(*sourceType))
 	switch normalizedType {
-	case biz.ProductionOrderSourceType,
+	case "SALES_ORDER", "PURCHASE_ORDER", biz.ProductionOrderSourceType,
 		biz.ProductionFactSourceType,
 		biz.OutsourcingOrderSourceType,
 		biz.OutsourcingFactSourceType,

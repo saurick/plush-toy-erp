@@ -20,6 +20,10 @@ export default function MobileTaskListOptions({
   sourceTypes,
   calendarState,
   onChange,
+  count,
+  summary,
+  onReset,
+  triggerRef,
 }) {
   const [open, setOpen] = useState(false)
   return (
@@ -28,11 +32,10 @@ export default function MobileTaskListOptions({
       title={showSort ? '筛选与排序' : '任务筛选'}
       open={open}
       onOpenChange={setOpen}
-      count={Number(showSort && sortKey !== 'newest') + Number(Boolean(statusKey)) + Number(!calendarState && Boolean(options.due)) + Number(Boolean(options.sourceType)) + Number(Boolean(calendarState && taskCalendarSelectionMode(calendarState.selection) !== 'date'))}
-      onReset={() => {
-        onChange({ sortKey: showSort ? 'newest' : sortKey, statusKey: '', due: '', sourceType: '' })
-        if (calendarState) calendarState.change({ selection: defaultTaskCalendarDate(calendarState.month) })
-      }}
+      count={count}
+      summary={summary}
+      onReset={onReset}
+      triggerRef={triggerRef}
       testId="mobile-task-list-filter-trigger"
     >
       {calendarState && (

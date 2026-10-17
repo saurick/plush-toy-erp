@@ -35,19 +35,7 @@ var _ biz.MasterDataRepo = (*masterDataRepo)(nil)
 var _ biz.WarehouseAccessRepo = (*masterDataRepo)(nil)
 
 func (r *masterDataRepo) CreateCustomer(ctx context.Context, in *biz.CustomerMutation) (*biz.Customer, error) {
-	row, err := r.data.postgres.Customer.Create().
-		SetCode(in.Code).
-		SetName(in.Name).
-		SetNillableShortName(in.ShortName).
-		SetNillableDefaultPaymentMethod(in.DefaultPaymentMethod).
-		SetNillableDefaultPaymentTermDays(in.DefaultPaymentTermDays).
-		SetNillableTaxNo(in.TaxNo).
-		SetNillableCountryRegion(in.CountryRegion).
-		SetNillableDefaultDeliveryRecipient(in.DefaultDeliveryRecipient).
-		SetNillableDefaultDeliveryPhone(in.DefaultDeliveryPhone).
-		SetNillableDefaultDeliveryAddress(in.DefaultDeliveryAddress).
-		SetNillableNote(in.Note).
-		Save(ctx)
+	row, err := createCustomerWithClient(ctx, r.data.postgres, in)
 	if err != nil {
 		return nil, err
 	}
@@ -55,59 +43,8 @@ func (r *masterDataRepo) CreateCustomer(ctx context.Context, in *biz.CustomerMut
 }
 
 func (r *masterDataRepo) UpdateCustomer(ctx context.Context, id int, in *biz.CustomerMutation) (*biz.Customer, error) {
-	update := r.data.postgres.Customer.UpdateOneID(id).
-		SetCode(in.Code).
-		SetName(in.Name)
-	if in.ShortName == nil {
-		update.ClearShortName()
-	} else {
-		update.SetShortName(*in.ShortName)
-	}
-	if in.DefaultPaymentMethod == nil {
-		update.ClearDefaultPaymentMethod()
-	} else {
-		update.SetDefaultPaymentMethod(*in.DefaultPaymentMethod)
-	}
-	if in.DefaultPaymentTermDays == nil {
-		update.ClearDefaultPaymentTermDays()
-	} else {
-		update.SetDefaultPaymentTermDays(*in.DefaultPaymentTermDays)
-	}
-	if in.TaxNo == nil {
-		update.ClearTaxNo()
-	} else {
-		update.SetTaxNo(*in.TaxNo)
-	}
-	if in.CountryRegion == nil {
-		update.ClearCountryRegion()
-	} else {
-		update.SetCountryRegion(*in.CountryRegion)
-	}
-	if in.DefaultDeliveryRecipient == nil {
-		update.ClearDefaultDeliveryRecipient()
-	} else {
-		update.SetDefaultDeliveryRecipient(*in.DefaultDeliveryRecipient)
-	}
-	if in.DefaultDeliveryPhone == nil {
-		update.ClearDefaultDeliveryPhone()
-	} else {
-		update.SetDefaultDeliveryPhone(*in.DefaultDeliveryPhone)
-	}
-	if in.DefaultDeliveryAddress == nil {
-		update.ClearDefaultDeliveryAddress()
-	} else {
-		update.SetDefaultDeliveryAddress(*in.DefaultDeliveryAddress)
-	}
-	if in.Note == nil {
-		update.ClearNote()
-	} else {
-		update.SetNote(*in.Note)
-	}
-	row, err := update.Save(ctx)
+	row, err := updateCustomerWithClient(ctx, r.data.postgres, id, in)
 	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, biz.ErrCustomerNotFound
-		}
 		return nil, err
 	}
 	return entCustomerToBiz(row), nil
@@ -198,22 +135,7 @@ func (r *masterDataRepo) CustomerExists(ctx context.Context, id int) (bool, erro
 }
 
 func (r *masterDataRepo) CreateSupplier(ctx context.Context, in *biz.SupplierMutation) (*biz.Supplier, error) {
-	create := r.data.postgres.Supplier.Create().
-		SetCode(in.Code).
-		SetName(in.Name).
-		SetNillableShortName(in.ShortName).
-		SetNillableSupplierType(in.SupplierType).
-		SetNillableAddress(in.Address).
-		SetNillableTaxNo(in.TaxNo).
-		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays).
-		SetNillableDefaultPaymentMethod(in.DefaultPaymentMethod).
-		SetNillableDefaultInvoiceRequired(in.DefaultInvoiceRequired).
-		SetNillableDefaultInvoiceCategory(in.DefaultInvoiceCategory).
-		SetNillableNote(in.Note)
-	if len(in.ProcessIDs) > 0 {
-		create.AddProcessCapabilityIDs(in.ProcessIDs...)
-	}
-	row, err := create.Save(ctx)
+	row, err := createSupplierWithClient(ctx, r.data.postgres, in)
 	if err != nil {
 		return nil, err
 	}
@@ -225,61 +147,8 @@ func (r *masterDataRepo) CreateSupplier(ctx context.Context, in *biz.SupplierMut
 }
 
 func (r *masterDataRepo) UpdateSupplier(ctx context.Context, id int, in *biz.SupplierMutation) (*biz.Supplier, error) {
-	update := r.data.postgres.Supplier.UpdateOneID(id).
-		SetCode(in.Code).
-		SetName(in.Name).
-		SetDefaultPaymentTermDays(in.DefaultPaymentTermDays)
-	if in.ShortName == nil {
-		update.ClearShortName()
-	} else {
-		update.SetShortName(*in.ShortName)
-	}
-	if in.SupplierType == nil {
-		update.ClearSupplierType()
-	} else {
-		update.SetSupplierType(*in.SupplierType)
-	}
-	if in.Address == nil {
-		update.ClearAddress()
-	} else {
-		update.SetAddress(*in.Address)
-	}
-	if in.TaxNo == nil {
-		update.ClearTaxNo()
-	} else {
-		update.SetTaxNo(*in.TaxNo)
-	}
-	if in.DefaultPaymentMethod == nil {
-		update.ClearDefaultPaymentMethod()
-	} else {
-		update.SetDefaultPaymentMethod(*in.DefaultPaymentMethod)
-	}
-	if in.DefaultInvoiceRequired == nil {
-		update.ClearDefaultInvoiceRequired()
-	} else {
-		update.SetDefaultInvoiceRequired(*in.DefaultInvoiceRequired)
-	}
-	if in.DefaultInvoiceCategory == nil {
-		update.ClearDefaultInvoiceCategory()
-	} else {
-		update.SetDefaultInvoiceCategory(*in.DefaultInvoiceCategory)
-	}
-	if in.Note == nil {
-		update.ClearNote()
-	} else {
-		update.SetNote(*in.Note)
-	}
-	if in.ProcessIDs != nil {
-		update.ClearProcessCapabilities()
-		if len(in.ProcessIDs) > 0 {
-			update.AddProcessCapabilityIDs(in.ProcessIDs...)
-		}
-	}
-	row, err := update.Save(ctx)
+	row, err := updateSupplierWithClient(ctx, r.data.postgres, id, in)
 	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, biz.ErrSupplierNotFound
-		}
 		return nil, err
 	}
 	row, err = r.data.postgres.Supplier.Query().Where(supplier.ID(row.ID)).WithProcessCapabilities().Only(ctx)

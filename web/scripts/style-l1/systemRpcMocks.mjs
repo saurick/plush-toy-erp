@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { setTimeout as delay } from 'node:timers/promises'
 import { normalizeERPAccountAppearance } from '../../src/common/theme/erpAppearance.mjs'
 import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
@@ -6,6 +7,9 @@ import {
   formatBuildCode,
   parseServerBuildIdentity,
 } from '../../src/common/runtime/buildIdentity.mjs'
+
+const projectManualContent = JSON.parse(await readFile(new URL('../../../server/internal/projectmanuals/content.generated.json', import.meta.url), 'utf8'))
+const helpDocuments = JSON.parse(await readFile(new URL('../../../server/internal/projectmanuals/documents.generated.json', import.meta.url), 'utf8'))
 
 const STYLE_L1_RELEASE_VERSION = 'yoyoosun-20260810-20c96d38-amd64'
 const STYLE_L1_GIT_SHA = '20c96d3819429361a35d2551b63b211f055de37e'
@@ -201,6 +205,21 @@ export async function installSystemRpcMocks(page, context) {
 
     let data = {}
     switch (method) {
+      case 'help_content': {
+        const permissions = new Set(adminProfile.permissions || [])
+        const roles = new Set((adminProfile.roles || []).map(role => role.role_key))
+        const manager = adminProfile.is_super_admin || roles.has('boss') || ['system.user.read', 'system.role.read', 'customer_config.read'].some(key => permissions.has(key))
+        const operator = adminProfile.is_super_admin || ['system.role.permission.manage', 'customer_config.read', 'system.audit.read'].every(key => permissions.has(key))
+        data = { documents: helpDocuments.filter(doc => doc.book === 'administration' ? manager : doc.book === 'operations' ? operator : adminProfile.is_super_admin || (!doc.path && !doc.roles?.length) || doc.roles?.some(key => roles.has(key)) || mockMenus.some(menu => menu.path === doc.path)), published: [] }
+        break
+      }
+      case 'project_manuals': {
+        const permissions = new Set(adminProfile.permissions || [])
+        const manager = adminProfile.is_super_admin || adminProfile.roles?.some(role => role.role_key === 'boss') || ['system.user.read','system.role.read','customer_config.read'].some(key => permissions.has(key))
+        const operator = adminProfile.is_super_admin || ['system.role.permission.manage','customer_config.read','system.audit.read'].every(key => permissions.has(key))
+        data = { manuals: projectManualContent.filter(manual => manual.key === 'administration' ? manager : operator) }
+        break
+      }
       case 'me':
         data = adminProfile
         break

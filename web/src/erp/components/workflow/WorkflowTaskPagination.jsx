@@ -1,6 +1,6 @@
 import React from 'react'
 import { ArrowLeftOutlined, ArrowRightOutlined } from '@ant-design/icons'
-import { Grid, Pagination, Select } from 'antd'
+import { Button, Grid, Pagination, Select } from 'antd'
 import { TASK_BOARD_PAGE_SIZE_OPTIONS } from '../../utils/workflowTaskBoard.mjs'
 import './workflowTaskPagination.css'
 
@@ -25,9 +25,12 @@ export default function WorkflowTaskPagination({
   onChange,
   recordLabel = '任务',
   unit = '项',
+  retainedPage = null,
 }) {
   const screens = Grid.useBreakpoint()
   const compact = screens.md === false
+  const availablePages = Math.max(1, Math.ceil(total / pageSize))
+  const retainingPosition = Number.isSafeInteger(retainedPage) && retainedPage > availablePages
   const start = total > 0 ? (current - 1) * pageSize + 1 : 0
   const end = Math.min(current * pageSize, total)
   return (
@@ -38,7 +41,9 @@ export default function WorkflowTaskPagination({
             ? `正在加载${recordLabel}…`
             : error
               ? `${recordLabel}加载失败`
-              : compact
+              : retainingPosition
+                ? `原第 ${retainedPage} 页位置，当前筛选共 ${total} ${unit}`
+                : compact
                 ? `${start}–${end} / ${total} ${unit}`
                 : `第 ${start}–${end} ${unit}，共 ${total} ${unit}`}
         </span>
@@ -54,7 +59,9 @@ export default function WorkflowTaskPagination({
           onChange={(size) => onChange(1, size)}
         />
       </div>
-      <Pagination
+      {retainingPosition ? (
+        <Button onClick={() => onChange(availablePages, pageSize)}>查看当前待办列表</Button>
+      ) : <Pagination
         size="default"
         current={current}
         pageSize={pageSize}
@@ -66,7 +73,8 @@ export default function WorkflowTaskPagination({
         showQuickJumper={!compact && total > pageSize * 7}
         itemRender={renderPageItem}
         onChange={onChange}
-      />
+      />}
+
     </nav>
   )
 }

@@ -37,6 +37,12 @@ const (
 	FieldCreatedAt = "created_at"
 	// EdgePayment holds the string denoting the payment edge name in mutations.
 	EdgePayment = "payment"
+	// EdgeFinanceFact holds the string denoting the finance_fact edge name in mutations.
+	EdgeFinanceFact = "finance_fact"
+	// EdgeReversals holds the string denoting the reversals edge name in mutations.
+	EdgeReversals = "reversals"
+	// EdgeReversalOf holds the string denoting the reversal_of edge name in mutations.
+	EdgeReversalOf = "reversal_of"
 	// Table holds the table name of the financeallocation in the database.
 	Table = "finance_allocations"
 	// PaymentTable is the table that holds the payment relation/edge.
@@ -46,6 +52,21 @@ const (
 	PaymentInverseTable = "finance_payments"
 	// PaymentColumn is the table column denoting the payment relation/edge.
 	PaymentColumn = "payment_id"
+	// FinanceFactTable is the table that holds the finance_fact relation/edge.
+	FinanceFactTable = "finance_allocations"
+	// FinanceFactInverseTable is the table name for the FinanceFact entity.
+	// It exists in this package in order to avoid circular dependency with the "financefact" package.
+	FinanceFactInverseTable = "finance_facts"
+	// FinanceFactColumn is the table column denoting the finance_fact relation/edge.
+	FinanceFactColumn = "finance_fact_id"
+	// ReversalsTable is the table that holds the reversals relation/edge.
+	ReversalsTable = "finance_allocations"
+	// ReversalsColumn is the table column denoting the reversals relation/edge.
+	ReversalsColumn = "reversal_of_allocation_id"
+	// ReversalOfTable is the table that holds the reversal_of relation/edge.
+	ReversalOfTable = "finance_allocations"
+	// ReversalOfColumn is the table column denoting the reversal_of relation/edge.
+	ReversalOfColumn = "reversal_of_allocation_id"
 )
 
 // Columns holds all SQL columns for financeallocation fields.
@@ -166,10 +187,59 @@ func ByPaymentField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newPaymentStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByFinanceFactField orders the results by finance_fact field.
+func ByFinanceFactField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newFinanceFactStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByReversalsCount orders the results by reversals count.
+func ByReversalsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newReversalsStep(), opts...)
+	}
+}
+
+// ByReversals orders the results by reversals terms.
+func ByReversals(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newReversalsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByReversalOfField orders the results by reversal_of field.
+func ByReversalOfField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newReversalOfStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newPaymentStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PaymentInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, PaymentTable, PaymentColumn),
+	)
+}
+func newFinanceFactStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(FinanceFactInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, FinanceFactTable, FinanceFactColumn),
+	)
+}
+func newReversalsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(Table, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ReversalsTable, ReversalsColumn),
+	)
+}
+func newReversalOfStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(Table, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ReversalOfTable, ReversalOfColumn),
 	)
 }

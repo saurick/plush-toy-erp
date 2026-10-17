@@ -57,14 +57,14 @@
 
 ## 产品内入口边界 / Runtime Docs Boundary
 
-当前前端只维护面向登录用户的帮助中心，不恢复产品内 Markdown 文档中心、高级文档和开发与验收页面：
+帮助中心是登录用户的统一操作与项目手册入口，普通仓库专题继续留在仓库和 DEV 文档查看器：
 
 - 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
-- `/erp/help-center` 是当前单一业务帮助入口，提供“找操作 / 完整手册”。岗位用于推荐，搜索和手册取当前账号可读岗位的并集；页面捷径仍受菜单权限限制，不设置独立业务权限码。通用章节、岗位和业务页内容分别维护在 `businessHandbook.mjs`、`roleHelpContent.mjs` 和 `businessUsabilityCatalog.mjs`，工程用料专题复用现有真源。
+- `/erp/help-center` 是当前统一帮助入口，以一层导航直接提供“操作图解”、业务手册、管理实施和技术运维；三册书目、正文和下载按当前账号的岗位及权限展示。岗位用于推荐，搜索和手册取当前账号可读岗位的并集；页面捷径仍受菜单权限限制，不设置独立业务权限码。通用章节、岗位和业务页内容分别维护在 `businessHandbook.mjs`、`roleHelpContent.mjs` 和 `businessUsabilityCatalog.mjs`，工程用料专题复用现有真源。
 - 高频业务页的“这页怎么用”和字段问号说明统一来自 `web/src/erp/config/businessUsabilityCatalog.mjs`，用于补充页面任务、完成标准、交接、公式和字段来源，不恢复第二个帮助中心，也不替代权限、岗位责任或业务链真源。`/__dev/business-usability` 只读检查这份目录的覆盖情况，不进入正式菜单或生产构建。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/source-readiness`、`/erp/mobile-workbenches` 和 `/erp/roles/*` 路径不再注册运行时路由、重定向或权限别名。
 - 正式文档继续保留在 `docs/`、`server/docs/`、`web/README.md`、`server/README.md` 等仓库文档入口，不复制或镜像到前端运行时页面。
-- [业务使用手册](manuals/业务使用手册.md) 从共享帮助内容生成，在线阅读与离线下载使用同源内容；管理员与技术手册在 [manuals](manuals/README.md) 维护，不进入普通岗位帮助。三册导出和同步检查见[手册脚本](../scripts/docs/README.md)。
+- [业务使用手册](manuals/业务使用手册.md) 从共享帮助内容生成，在线阅读与离线下载使用同源内容；管理员与技术手册在 [manuals](manuals/README.md) 维护，并同源生成后端受控正文，供获准账号在线阅读、搜索和下载。三册导出和同步检查见[手册脚本](../scripts/docs/README.md)。
 - [项目治理地图](项目治理地图.md) 提供常见改动的参考依据、同步检查和误判边界；本地开发态可在 `/__dev/docs` 搜索或打开这份文档。
 
-未来若新增长文档或开发验收入口，必须先设计 registry、导航、权限、路由、渲染代码和测试断言；不要把仓库正式文档镜像进岗位帮助，也不临时恢复旧 docs registry。
+受控三册使用固定书目与章节，不开放任意仓库文件读取。新增其他长文档或开发验收入口时，须核对来源、导航、权限、路由、渲染与测试，不恢复旧 docs registry。

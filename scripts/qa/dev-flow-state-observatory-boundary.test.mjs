@@ -103,6 +103,8 @@ test("dev flow state observatory: the complete role flow is primary and technica
   const page = readObservatorySource();
   const shared = read("web/src/dev-workbench/components/flow-state/FlowStateShared.jsx");
   const guide = read("web/src/dev-workbench/components/flow-state/TaskFulfillmentGuide.jsx");
+  const chain = read("web/src/dev-workbench/components/flow-state/FulfillmentChainCanvas.jsx");
+  const chainModel = read("web/src/dev-workbench/config/devFulfillmentChain.mjs");
   assert.match(page, /import\.meta\.glob\(['"]\.\.\/config\/devFlowStateCatalog\.mjs['"]\)/u);
   assert.match(page, /moduleValue\?\.DEV_FLOW_STATE_CATALOG/u);
   assert.deepEqual(
@@ -118,7 +120,7 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.doesNotMatch(page, /<details[^>]*data-business-chain-topics/u);
   assert.match(guide, /按业务查阅/u);
   assert.doesNotMatch(guide, /aria-label="履约流程视图"/u);
-  assert.match(guide, /onClick=\{closeException\}>返回\{returnLabel\}/u);
+  assert.match(guide, /onCloseException=\{closeException\}/u);
   assert.match(guide, /<ExceptionFlowDirectory/u);
   assert.match(guide, /data-exception-entry=\{guide.key\}/u);
   assert.doesNotMatch(guide, /完整交接与审批说明|按文字选择子步骤/u);
@@ -126,10 +128,11 @@ test("dev flow state observatory: the complete role flow is primary and technica
   assert.match(guide, /fulfillmentStepMatchesRole/u);
   assert.match(guide, /fulfillmentTaskLinks/u);
   assert.match(guide, /完整流程/u);
-  assert.match(guide, /异常处理/u);
-  assert.match(guide, /<FulfillmentStageOverview steps=\{steps\}/u, "main fulfillment stages retain their direct overview");
-  assert.match(guide, /buildFulfillmentOverview\(steps\)\.map/u, "the total flow groups the same source stages");
-  assert.match(guide, /data-fulfillment-stage=\{step\.stage\}/u, "each stage retains its canonical identity");
+  assert.match(chain, /aria-label="异常处理方案"/u);
+  assert.match(guide, /<FulfillmentChainCanvas/u, "the main chain remains present while an exception is open");
+  assert.match(chainModel, /buildFulfillmentOverview\(flow\)/u, "the total flow groups the canonical source stages");
+  assert.match(chain, /data-fulfillment-stage=\{step\.stage\}/u, "each main node retains its canonical identity");
+  assert.doesNotMatch(guide, /function ExceptionGuide|exception-position/u, "the separate exception main view is removed");
   for (const copy of [
     "Workflow 管“人”", "ProcessRuntime 管“路”", "Fact / Ledger 管“账”",
     "状态机管“规则”", "业务链负责串起来", "基础资料提供标准",
@@ -279,6 +282,7 @@ test("dev flow state observatory: deep links clear stale selections, fail closed
     "flow_exception",
     "flow_decision",
     "flow_exception_step",
+    "flow_exception_origin",
   ]);
   const canonical = canonicalizeDevFlowStateSearchParams(
     new URLSearchParams(

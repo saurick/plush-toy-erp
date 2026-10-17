@@ -1,0 +1,149 @@
+.erp-dev-delivery-path {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+.erp-dev-delivery-path h2,
+.erp-dev-delivery-jobs h2 {
+  margin: 0 0 12px;
+  font-size: var(--erp-font-emphasis);
+  line-height: 1.5;
+}
+.erp-dev-delivery-path ol {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px 24px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.erp-dev-delivery-path[data-columns='2'] ol {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.erp-dev-delivery-path li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: start;
+  min-width: 0;
+  gap: 10px;
+}
+.erp-dev-delivery-path__number {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 1px solid var(--erp-border);
+  border-radius: 50%;
+  background: var(--erp-surface-bg-soft);
+  line-height: 24px;
+  font-weight: 600;
+}
+.erp-dev-delivery-path__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  min-height: 26px;
+  gap: 6px 10px;
+}
+.erp-dev-delivery-path__title .ant-tag {
+  margin: 0;
+}
+.erp-dev-delivery-path p,
+.erp-dev-delivery-jobs p {
+  margin: 4px 0 0;
+  color: var(--erp-text-muted);
+  overflow-wrap: anywhere;
+}
+.erp-dev-delivery-home {
+  display: grid;
+  gap: 12px;
+}
+.erp-dev-delivery-jobs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.erp-dev-delivery-jobs article {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  justify-items: start;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+.erp-dev-delivery-jobs h2 {
+  margin-bottom: 4px;
+}
+.erp-dev-delivery-job-scope,
+.erp-dev-delivery-home-footer {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+}
+.erp-dev-delivery-jobs p {
+  margin-top: 10px;
+}
+.erp-dev-delivery-job-link {
+  margin-top: 16px;
+  font-weight: 500;
+}
+.erp-dev-delivery-home-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.erp-dev-delivery-decision {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding: 16px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+}
+.erp-dev-delivery-decision h2.ant-typography {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+.erp-dev-delivery-decision p {
+  margin: 0;
+}
+.erp-dev-database-migration-flow .erp-dev-delivery-path {
+  padding: 0;
+  border: 0;
+}
+.erp-dev-database-migration-page > header > .ant-space,
+.erp-dev-recovery-page > header > .ant-space {
+  margin-inline-start: auto;
+}
+.erp-dev-version-tab--versions > .erp-dev-delivery-path {
+  margin-bottom: 12px;
+}
+.erp-dev-security-table th:first-child {
+  width: 18%;
+}
+.erp-dev-security-table th:nth-child(2) {
+  width: 14%;
+}
+.erp-dev-security-table th:nth-child(3) {
+  width: 36%;
+}
+.erp-dev-security-table th:nth-child(4) {
+  width: 32%;
+}
+.erp-dev-security-table td {
+  vertical-align: top;
+}
+.erp-dev-security-table td p {
+  margin: 0 0 4px;
+}
+@media (max-width: 1150px) {
+  .erp-dev-delivery-path ol {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

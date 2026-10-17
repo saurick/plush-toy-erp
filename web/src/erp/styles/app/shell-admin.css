@@ -436,7 +436,7 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: var(--erp-page-gap);
 }
 
 .erp-admin-header__right,

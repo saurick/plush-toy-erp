@@ -1,4 +1,72 @@
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
+
+export async function assertBusinessAttachmentFooter(panel, assert) {
+  const metrics = await panel
+    .locator('.business-attachment-panel__footer')
+    .evaluate((footer) => {
+      const bounds = footer.getBoundingClientRect()
+      const status = footer
+        .querySelector('[role="status"]')
+        .getBoundingClientRect()
+      const buttons = Array.from(footer.querySelectorAll('button')).map(
+        (button) => {
+          const rect = button.getBoundingClientRect()
+          return {
+            text: button.textContent.replace(/\s+/gu, '').trim(),
+            left: rect.left,
+            right: rect.right,
+            top: rect.top,
+            bottom: rect.bottom,
+            height: rect.height,
+          }
+        }
+      )
+      return {
+        left: bounds.left,
+        right: bounds.right,
+        overflow: footer.scrollWidth - footer.clientWidth,
+        mobile: innerWidth <= 640,
+        status: { right: status.right, bottom: status.bottom },
+        buttons,
+      }
+    })
+  assert.equal(
+    metrics.buttons.filter((button) => button.text === '关闭').length,
+    1,
+    '附件弹窗应提供明确的关闭按钮'
+  )
+  assert(
+    !metrics.buttons.some((button) => button.text === '完成'),
+    '关闭附件弹窗不能冒充上传完成'
+  )
+  assert(
+    Math.abs(metrics.buttons.at(-1).right - metrics.right) <= 1,
+    `附件操作换行后仍应靠右: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.overflow <= 1 &&
+      metrics.buttons.every(
+        (button) =>
+          button.left >= metrics.left - 1 && button.right <= metrics.right + 1
+      ),
+    `附件底栏不能溢出: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.buttons.every(
+      (button) =>
+        metrics.status.right <= button.left + 1 ||
+        metrics.status.bottom <= button.top + 1
+    ),
+    `说明不能与操作按钮重叠: ${JSON.stringify(metrics)}`
+  )
+  if (metrics.mobile) {
+    assert(
+      metrics.buttons.every((button) => button.height >= 44),
+      `手机附件底栏应保留触控高度: ${JSON.stringify(metrics)}`
+    )
+  }
+}
+
 export function createBusinessAttachmentAssertions({
   assert,
   assertAntdModalCentered,
@@ -63,6 +131,10 @@ export function createBusinessAttachmentAssertions({
       .last()
     await modal.waitFor({ state: 'visible', timeout: 10_000 })
     await assertAntdModalCentered(page, modal, `${scenarioName}-attachment`)
+    await assertBusinessAttachmentFooter(
+      modal.locator('.business-attachment-panel'),
+      assert
+    )
     const modalMetrics = await modal.evaluate((node) => {
       const panel = node.querySelector('.business-attachment-panel')
       const body = node.querySelector('.ant-modal-body')

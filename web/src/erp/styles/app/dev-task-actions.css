@@ -48,6 +48,24 @@
   gap: 8px;
 }
 
+.erp-task-action-drawer__footer-nav {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.erp-task-action-drawer__footer-primary {
+  flex: 0 0 auto;
+  align-self: flex-end;
+}
+
+.erp-task-action-drawer__footer-nav .ant-btn {
+  min-height: 32px;
+}
+
+.erp-task-action-drawer__footer-nav .erp-task-action-drawer__resources:empty {
+  display: none;
+}
+
 .erp-task-action-drawer__footer-nav:empty,
 .erp-task-action-drawer__footer-primary:empty {
   display: none;

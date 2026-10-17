@@ -1,10 +1,66 @@
 import { DEV_PROJECT_GRAPH_EXAMPLES } from '../../src/dev-workbench/config/devRelationshipPerspectives.mjs'
+import { DEV_SECONDARY_NAV_ITEMS, DEV_INTEGRATION_ROUTE, DEV_PRODUCT_ENGINEERING_ROUTE } from '../../src/dev-workbench/config/devRoutes.mjs'
 import { buildProjectGraph } from '../../src/dev-workbench/config/devProjectGraph.mjs'
 import { verifyMobileNavigationMotion as verifySlidingMotion } from './slidingMotionAssertions.mjs'
 import { assertMermaidFits, waitForMermaidFit, switchMermaidLayout, verifyMermaidViewer } from './mermaidViewerAssertions.mjs'
 
+export async function verifyIntegrationWorkspace(page, { assert, assertNoHorizontalOverflow }) {
+  const graph = buildProjectGraph('integration')
+  const diagram = page.locator('.erp-dev-project-relationships .erp-markdown-mermaid')
+  const inspector = page.getByRole('region', { name: '节点关系说明' })
+  const links = page.getByRole('navigation', { name: '合同与验证入口' })
+  const waitGraph = async () => {
+    await diagram.locator('[data-mermaid-node-id="rpc"]').waitFor()
+    await waitForMermaidFit(page, diagram)
+    assert.deepEqual((await diagram.locator('[data-mermaid-node-id]').evaluateAll((nodes) => nodes.map((node) => node.dataset.mermaidNodeId))).sort(), graph.nodes.map((node) => node.id).sort())
+    await assertMermaidFits(diagram, assert)
+  }
+  await waitGraph()
+  assert.equal(await page.getByRole('navigation', { name: '图模型分类' }).count(), 0)
+  assert.equal(await page.getByRole('combobox', { name: '项目示例' }).count(), 0)
+  for (const destination of graph.destinations) {
+    const link = links.getByRole('link', { name: destination.label, exact: true })
+    assert.equal(await link.isVisible(), true, '合同与验证入口直接可见')
+    assert.equal(new URL(await link.getAttribute('href'), page.url()).href, new URL(destination.route, page.url()).href)
+  }
+  const navigation = page.locator('.erp-dev-workspace-nav')
+  assert.equal(await navigation.locator('a[aria-current="page"]').count(), 1)
+  assert.equal(await navigation.getByRole('link', { name: '接口与集成', exact: true }).getAttribute('aria-current'), 'page')
+  await diagram.locator('[data-mermaid-node-id="access"]').press('Enter')
+  await inspector.getByRole('heading', { name: '身份与数据授权', exact: true }).waitFor()
+  const selectedURL = page.url()
+  const selectedSvg = await diagram.locator('.erp-markdown-mermaid__canvas > svg').getAttribute('id')
+  await navigation.getByRole('link', { name: '接口与集成', exact: true }).click()
+  assert.equal(page.url(), selectedURL, '重复点击当前菜单保留节点选择')
+  assert.equal(await diagram.locator('.erp-markdown-mermaid__canvas > svg').getAttribute('id'), selectedSvg)
+  await page.reload()
+  await waitGraph()
+  await inspector.getByRole('heading', { name: '身份与数据授权', exact: true }).waitFor()
+  await links.getByRole('link', { name: '接口字段与重试合同', exact: true }).click()
+  await page.getByRole('heading', { name: 'JSON-RPC API 说明', exact: true }).waitFor()
+  await page.goBack()
+  await waitGraph()
+  await inspector.getByRole('heading', { name: '身份与数据授权', exact: true }).waitFor()
+  await navigation.getByRole('link', { name: '产品工程', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === DEV_PRODUCT_ENGINEERING_ROUTE)
+  const tools = page.getByRole('table', { name: '产品工程工具清单' })
+  await tools.getByRole('link', { name: '接口与集成', exact: true }).click()
+  await page.waitForURL((url) => url.pathname === DEV_INTEGRATION_ROUTE)
+  await waitGraph()
+  await page.goto(new URL(`${DEV_INTEGRATION_ROUTE}?node=access&node=fact&model=cycle&example=workflow`, page.url()).href)
+  await waitGraph()
+  await inspector.getByRole('heading', { name: '点选节点，查看关系含义', exact: true }).waitFor()
+  await diagram.locator('[data-mermaid-node-id="external"]').click()
+  await inspector.getByRole('heading', { name: '外部接入（待建设）', exact: true }).waitFor()
+  await page.setViewportSize({ width: 3840, height: 2160 })
+  await waitForMermaidFit(page, diagram)
+  await assertMermaidFits(diagram, assert)
+  await assertNoHorizontalOverflow(page, '接口与集成默认、交互与恢复')
+}
+
 export async function verifyProjectGraphDirectory(page, { assert, assertNoHorizontalOverflow }) {
-  assert.equal(await page.getByRole('table', { name: '产品工程工具清单' }).locator('tbody tr').count(), 6)
+  const productToolCount = DEV_SECONDARY_NAV_ITEMS.filter((item) => item.areaKey === 'product-engineering' && item.showInNavigation !== false).length
+  assert.equal(await page.getByRole('table', { name: '产品工程工具清单' }).locator('tbody tr').count(), productToolCount)
   assert.equal(await page.getByRole('tablist', { name: '产品工程查看方式' }).count(), 1)
   await verifySlidingMotion(page, assert, '.erp-dev-product-view-tabs', 1)
   const diagram = page.locator('.erp-dev-project-relationships .erp-markdown-mermaid')
@@ -50,7 +106,15 @@ export async function verifyProjectGraphDirectory(page, { assert, assertNoHorizo
   await page.reload()
   await waitGraph('ci')
   await inspector.getByRole('heading', { name: '汇总门禁', exact: true }).waitFor()
-  for (const key of ['access', 'delivery', 'business']) await selectExample(key)
+  for (const key of ['access', 'delivery', 'business', 'integration']) await selectExample(key)
+  await diagram.locator('[data-mermaid-node-id="external"]').click()
+  await inspector.getByRole('heading', { name: '外部接入（待建设）', exact: true }).waitFor()
+  await page.getByText(DEV_PROJECT_GRAPH_EXAMPLES.integration.caption, { exact: true }).waitFor()
+  const renderedLabelSizes = await diagram.locator('.nodeLabel').evaluateAll((labels) => labels.map((label) => {
+    const box = label.getBoundingClientRect()
+    return Number.parseFloat(getComputedStyle(label).fontSize) * box.height / label.offsetHeight
+  }))
+  assert(renderedLabelSizes.length > 0 && renderedLabelSizes.every((size) => Number.isFinite(size) && size >= 10), '接入图默认全图适配后文字仍可辨认')
   await selectModel(/^有向有环图/u, 'workflow')
   await diagram.locator('[data-mermaid-node-id="review"]').click()
   await inspector.getByRole('heading', { name: '复核', exact: true }).waitFor()
@@ -120,7 +184,13 @@ export async function verifyProjectGraphDirectory(page, { assert, assertNoHorizo
   await preview.getByText('接自：产品内核、质量验证；指向：终点', { exact: true }).waitFor()
   assert.equal((await preview.locator('[data-project-graph-classification]').textContent()).trim(), '有向 · 无环（DAG）')
   await preview.getByRole('tab', { name: '工具清单', exact: true }).click()
-  assert.equal(await preview.getByRole('table', { name: '开发工具对照' }).locator('tbody tr').count(), 6)
+  assert.equal(await preview.getByRole('table', { name: '开发工具对照' }).locator('tbody tr').count(), productToolCount)
+  await preview.locator('#sidebar').getByRole('button', { name: '接口与集成', exact: true }).click()
+  await preview.getByRole('heading', { name: '接口与集成', exact: true }).waitFor()
+  assert.equal(await preview.getByRole('navigation', { name: '图模型分类' }).count(), 0)
+  assert.equal(await preview.getByRole('navigation', { name: '合同与验证入口' }).getByRole('button').count(), DEV_PROJECT_GRAPH_EXAMPLES.integration.destinations.length)
+  await preview.getByRole('button', { name: '身份与数据授权', exact: true }).click()
+  await preview.getByRole('heading', { name: '身份与数据授权', exact: true }).waitFor()
   await page.goBack()
   await waitGraph('workflow')
   await selectModel(/^DAG/u, 'overview')

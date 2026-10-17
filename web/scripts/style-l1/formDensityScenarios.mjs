@@ -78,22 +78,23 @@ export function createFormDensityScenarios({ outputDir }) {
           .click()
       }
       const openAction = async (kind) => {
-        await frame.locator('[data-action="more-selected"]').click()
         await frame
-          .locator(`[data-action="open-compact-action"][data-kind="${kind}"]`)
+          .locator(`.business-record-actions [data-operation="${kind === 'quality' ? 'checks' : kind}"]`)
           .click()
       }
-      for (const [title, kind] of [
-        ['质量检验', 'quality'],
-        ['采购入库', 'return'],
-        ['采购入库', 'adjustment'],
-        ['销售订单', 'engineering'],
-        ['采购订单', 'arrival'],
+      for (const [title, kind, status] of [
+        ['质量检验', 'quality', '草稿'],
+        ['采购入库', 'return', '已入库'],
+        ['采购入库', 'adjustment', '已入库'],
+        ['销售订单', 'engineering', '已生效'],
+        ['采购订单', 'arrival', '已审核'],
       ]) {
         await navigate(title)
         await frame
-          .locator('.table-wrap [data-action="select-row"]')
+          .locator('.table-wrap tbody tr')
+          .filter({ has: frame.getByText(status, { exact: true }) })
           .first()
+          .locator('[data-action="select-row"]')
           .check()
         await openAction(kind)
         const modal = frame
@@ -377,7 +378,7 @@ export function createFormDensityScenarios({ outputDir }) {
       assert.equal(await frame.getByLabel('作业数量').inputValue(), '')
       await frame.getByLabel('作业数量').fill('20')
       await frame.getByLabel('目标仓库').selectOption('辅料仓')
-      await frame.getByRole('button', { name: '保存修改', exact: true }).click()
+      await frame.getByRole('button', { name: '保存草稿', exact: true }).click()
       assert.equal(await frame.getByLabel('目标仓库').inputValue(), '辅料仓')
       await frame.locator('.form-view').screenshot({
         path: `${outputDir}/form-density-design-inventory-${size}.png`,

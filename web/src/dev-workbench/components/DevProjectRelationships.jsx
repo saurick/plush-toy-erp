@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo } from 'react'
 import { Checkbox, Select, Tag } from 'antd'
 import { Link, useSearchParams } from 'react-router-dom'
-import { MermaidDiagram } from '@/common/components/markdown'
+import DevProjectGraphView from './DevProjectGraphView.jsx'
 import {
   DEV_PROJECT_GRAPH_EXAMPLES,
   DEV_PROJECT_GRAPH_GROUPS,
@@ -9,11 +9,9 @@ import {
 } from '../config/devRelationshipPerspectives.mjs'
 import {
   buildProjectGraph,
-  getProjectGraphNodeContext,
   resolveProjectGraphSelection,
   updateProjectGraphSearch,
 } from '../config/devProjectGraph.mjs'
-import '../styles/dev-project-relationships.css'
 
 export default function DevProjectRelationships() {
   const [params, setParams] = useSearchParams()
@@ -23,7 +21,6 @@ export default function DevProjectRelationships() {
     references: selected.references,
     highlightReturns: selected.highlightReturns,
   }), [selected.exampleKey, selected.references, selected.highlightReturns])
-  const node = getProjectGraphNodeContext(graph, selected.nodeId)
   const updateSelection = useCallback((changes) => setParams((previous) => updateProjectGraphSearch(previous, changes)), [setParams])
   const selectNode = useCallback((nodeId) => updateSelection({ nodeId }), [updateSelection])
   const judgment = selected.references && graph.referenceEdge
@@ -83,20 +80,7 @@ export default function DevProjectRelationships() {
               <Checkbox checked={selected.highlightReturns} onChange={(event) => updateSelection({ highlightReturns: event.target.checked })}>标出退回回路</Checkbox>
             ) : null}
           </div>
-          <MermaidDiagram
-            chart={graph.chart}
-            label="项目关系图"
-            nativeSize
-            interactiveNodes={graph.nodes}
-            selectedNodeId={selected.nodeId}
-            onNodeSelect={selectNode}
-            showSourceOnError={false}
-          />
-          <p className="erp-dev-project-relationships__caption">{graph.caption}</p>
-          <section className="erp-dev-project-relationships__node" aria-label="节点关系说明" aria-live="polite">
-            <h3>{node ? node.label : '点选节点，查看关系含义'}</h3>
-            {node ? <><p>{node.description}</p><p>{node.relationships}</p></> : <p>节点说明与前后关系在此显示，不改变业务状态。</p>}
-          </section>
+          <DevProjectGraphView graph={graph} selectedNodeId={selected.nodeId} onNodeSelect={selectNode} />
           <details className="erp-dev-project-relationships__evidence">
             <summary>模型判断与对应入口</summary>
             <p>{judgment}</p>

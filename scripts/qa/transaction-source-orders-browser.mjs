@@ -9,7 +9,7 @@ import { BUSINESS_ROUTE_PATHS } from "../../web/src/erp/utils/masterDataOrderVie
 import { resolveMobileActionLabel } from "../../web/src/erp/mobile/utils/mobileRoleTaskModel.mjs";
 import { advanceSalesOrderLifecycleThroughProcess } from "./manual-acceptance-source-data.mjs";
 import { prepareManualAcceptanceEngineering } from "./manual-acceptance-engineering-data.mjs";
-import { login, navigate, closePage, businessURL, selectRow, pageAction, openDesktopTaskRow, openMobileTaskCard, dropRealResponse, faultEvidence, captureFailure, clickRPC } from "./transaction-browser-ui.mjs";
+import { login, navigate, closePage, businessURL, selectRow, pageAction, openDesktopTaskRow, openMobileTaskCard, openMobileSourceTask, dropRealResponse, faultEvidence, captureFailure, clickRPC } from "./transaction-browser-ui.mjs";
 
 const require = createRequire(new URL("../../web/package.json", import.meta.url));
 const { chromium, expect } = require("playwright/test");
@@ -117,8 +117,28 @@ async function run(options) {
       assert.equal(items.length, 1);
       return { config, order, params: { ...params, id: order.id, expected_version: order.version, items: params.items.map((item, index) => ({ ...item, id: items[index].id })) } };
     };
+    const sourceFollowups = new Map();
+    const prepareFollowup = async (sourceType, sourceID, role) => {
+      const key = `${sourceType}:${sourceID}:${role}`;
+      if (!sourceFollowups.has(key)) {
+        const { task } = await client.rpc("admin", "workflow", "create_followup_task", {
+          source_type: sourceType, source_id: sourceID, owner_role_key: role,
+          task_name: "模拟核对来源单据", description: "模拟从岗位任务进入实际业务单据办理",
+          due_at: Math.floor(Date.now() / 1000) + 3600, priority: 0, idempotency_key: `${prefix}:followup:${key}`,
+        });
+        assert.equal(task.source_type, sourceType);
+        assert.equal(task.source_id, sourceID);
+        sourceFollowups.set(key, task.id);
+      }
+    };
     const openSource = async (config, order, mobile) => {
       const page = await getPage(config.role, mobile);
+      if (mobile) {
+        await prepareFollowup(config.domain, order.id, config.role);
+        await openMobileSourceTask(page, { ...options, mobile }, client, config.role, config.domain, order.id, ["business_followup"]);
+        await expect(page.getByTestId("mobile-task-business-source")).toHaveAttribute("data-record-id", String(order.id));
+        return page;
+      }
       const route = BUSINESS_ROUTE_PATHS[config.domain === "sales_order" ? "salesOrders" : config.domain === "purchase_order" ? "purchaseOrders" : "processingContracts"].replace(/^\/erp\//u, "");
       await navigate(page, businessURL({ ...options, mobile }, config.role, route));
       const search = page.locator('.erp-business-operation-panel input[placeholder]').first();
@@ -152,6 +172,9 @@ async function run(options) {
       const page = await getPage(task.owner_role_key, mobile);
       if (mobile) {
         await navigate(page, `${options.baseURL}/m/${task.owner_role_key}/tasks`);
+        const taskSearch = page.getByRole("searchbox");
+        await taskSearch.fill(orderNo);
+        await taskSearch.press("Enter");
         await openMobileTaskCard(page, task.id);
         const processButton = page.getByTestId("mobile-task-detail-screen").getByRole("button", { name: "选择处理方式", exact: true });
         await expect(processButton).toHaveCount(1);
@@ -244,7 +267,7 @@ async function run(options) {
       await expect(form).toBeVisible();
       await expect(note).toHaveValue("模拟本地未保存内容");
       assert.deepEqual(snapshot(config, order.id), winner);
-      await form.getByRole("button", { name: "返回列表", exact: true }).click();
+      await form.getByRole("button", { name: mobile ? "返回办理" : "返回列表", exact: true }).click();
       const discard = page.locator('.ant-modal-confirm:visible');
       await discard.getByRole("button", { name: /放弃|离开/u }).click();
       await expect(form).toBeHidden();
@@ -274,7 +297,7 @@ async function run(options) {
       flow.draftVersions.recovered = snapshot(config, order.id).header.version;
       await expect(form).toHaveAttribute("aria-busy", "false");
       await expect(form.getByRole("textbox", { name: "备注", exact: true })).toHaveValue("模拟丢失响应后已确认保存");
-      await form.getByRole("button", { name: "返回列表", exact: true }).click();
+      await form.getByRole("button", { name: mobile ? "返回办理" : "返回列表", exact: true }).click();
       await page.locator('.ant-modal-confirm:visible').getByRole("button", { name: "放弃修改", exact: true }).click();
       await expect(form).toBeHidden();
       order = await read(config, order.id);
@@ -282,7 +305,7 @@ async function run(options) {
       await pageAction(page, "编辑");
       form = page.getByRole("region", { name: config.title, exact: true });
       await expect(form.getByRole("textbox", { name: "备注", exact: true })).toHaveValue("模拟丢失响应后已确认保存");
-      await form.getByRole("button", { name: "返回列表", exact: true }).click();
+      await form.getByRole("button", { name: mobile ? "返回办理" : "返回列表", exact: true }).click();
       await expect(form).toBeHidden();
       flow.saveRecovered = true;
       const submitFault = await dropRealResponse(page, options, kind === "outsourcing" ? config.domain : "customer_config", config.execute);
@@ -396,11 +419,17 @@ async function run(options) {
       entry.staleSourceRejected = true;
       const openMaterial = async actor => {
         const page = await getPage(actor, mobile);
-        await navigate(page, businessURL({ ...options, mobile }, actor, BUSINESS_ROUTE_PATHS.salesOrders.replace(/^\/erp\//u, "")));
-        const search = page.locator('.erp-business-operation-panel input[placeholder]').first();
-        await search.fill(source.order_no);
-        await search.press("Enter");
-        await selectRow(page, source.id);
+        if (mobile) {
+          await prepareFollowup("sales_order", source.id, actor);
+          await openMobileSourceTask(page, { ...options, mobile }, client, actor, "sales_order", source.id, ["business_followup"]);
+          await expect(page.getByTestId("mobile-task-business-source")).toHaveAttribute("data-record-id", String(source.id));
+        } else {
+          await navigate(page, businessURL({ ...options, mobile }, actor, BUSINESS_ROUTE_PATHS.salesOrders.replace(/^\/erp\//u, "")));
+          const search = page.locator('.erp-business-operation-panel input[placeholder]').first();
+          await search.fill(source.order_no);
+          await search.press("Enter");
+          await selectRow(page, source.id);
+        }
         await pageAction(page, actor === "engineering" ? "提交用料汇总" : "审核用料汇总");
         const dialog = page.locator('.erp-material-summary-modal:visible');
         await expect(dialog).toBeVisible();

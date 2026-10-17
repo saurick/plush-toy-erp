@@ -51,11 +51,11 @@
 }
 
 .erp-print-center-page {
-  gap: 14px;
+  gap: var(--erp-page-gap);
 }
 
 .erp-print-center-workbench-card .ant-card-body {
-  padding: 20px;
+  padding: var(--erp-form-body-padding-block, 20px) var(--erp-panel-padding-inline, 20px);
 }
 
 .erp-print-center-detail-eyebrow {
@@ -91,9 +91,9 @@
 .erp-print-center-section-head {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 14px;
-  align-items: start;
-  margin-bottom: 16px;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: var(--erp-page-gap);
 }
 
 .erp-print-center-section-title.ant-typography {
@@ -316,16 +316,6 @@
   .erp-command-center-shell {
     grid-template-columns: 1fr;
   }
-
-  .erp-command-center-rail-nav {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .erp-command-center-rail-group + .erp-command-center-rail-group {
-    margin-top: 0;
-    padding-top: 0;
-    border-top: 0;
-  }
 }
 
 @media screen and (max-width: 860px) {
@@ -335,7 +325,7 @@
 }
 
 @media screen and (max-width: 720px) {
-  .erp-command-center-rail-nav,
+
   .erp-print-center-section-head,
   .erp-print-center-paper-grid {
     grid-template-columns: 1fr;

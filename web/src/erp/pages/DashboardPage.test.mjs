@@ -1,7 +1,10 @@
+import { createElement } from 'react'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { BUSINESS_ROUTE_PATHS } from '../utils/masterDataOrderView.mjs'
+import { createReactTestHarness } from '../../../scripts/test/reactRuntime.mjs'
 
 const source = readFileSync(
   fileURLToPath(new URL('./DashboardPage.jsx', import.meta.url)),
@@ -22,67 +25,6 @@ const desktopTaskActionSource = readFileSync(
   ),
   'utf8'
 )
-test('product core preview shows useful entries without hardcoded feature counts', () => {
-  assert.doesNotMatch(source, /PRODUCT_CORE_METRICS|erp-product-core-metric/u)
-  assert.match(source, /<Tag>尚未连接客户环境<\/Tag>/u)
-  assert.match(source, /PRODUCT_CORE_REVIEW_ENTRIES\.map/u)
-})
-
-test('desktop workbench uses one bounded server projection for counts and the active page', () => {
-  assert.match(
-    source,
-    /const workbenchResult = await getWorkflowWorkbench\(workbenchRequest,/u
-  )
-  assert.match(source, /queue_key:\s*workbenchQueueKey/u)
-  assert.match(source, /limit:\s*workbenchQueuePageSize/u)
-  assert.match(
-    source,
-    /offset:\s*\(workbenchQueuePage - 1\) \* workbenchQueuePageSize/u
-  )
-  assert.match(source, /counts:\s*workbenchResult\.counts/u)
-  assert.doesNotMatch(source, /<WorkflowTaskOverview/u)
-  assert.doesNotMatch(source, /当前可见任务概览/u)
-  assert.doesNotMatch(source, /listAllWorkflowWorkbenchRoleTasks/u)
-  assert.doesNotMatch(source, /\blistAllWorkflowRoleTasks\b/u)
-  assert.doesNotMatch(source, /\blistWorkflowRoleTasks\b/u)
-})
-
-test('desktop workbench renders its page shell before the bounded task read finishes', () => {
-  assert.match(
-    source,
-    /className="erp-dashboard-card erp-workbench-command-card"\s*variant="borderless"\s*>/u
-  )
-  assert.doesNotMatch(
-    source,
-    /erp-workbench-command-card"[\s\S]{0,120}loading=\{loading\}/u
-  )
-  assert.match(source, /aria-busy=\{loading\}/u)
-  assert.match(source, /loading=\{\{ spinning: loading, delay: 120 \}\}/u)
-  assert.match(source, /message="工作台任务加载失败"/u)
-  assert.match(source, />\s*重新加载\s*</u)
-})
-
-test('workbench pagination keeps settled rows mounted while the next page loads', () => {
-  assert.match(
-    source,
-    /current\?\.scopeKey === requestWorkbenchScopeKey\s*&&\s*current\?\.response\?\.queue_key === workbenchRequest\.queue_key\s*\? current\.response\s*:\s*null/u
-  )
-})
-
-test('workbench opens task details directly without a permanent selection', () => {
-  assert.doesNotMatch(
-    source,
-    /selectedWorkbench|erp-workbench-side-stack|aria-selected/u
-  )
-  assert.match(source, /onClick: \(event\) =>/u)
-  assert.match(
-    source,
-    /<TaskTitleEntry task=\{record\} onOpenTask=\{openTaskDrawer\}/u
-  )
-  assert.doesNotMatch(source, /title: '操作'/u)
-  assert.doesNotMatch(source, /onDoubleClick|openDashboardItemOnDoubleClick/u)
-})
-
 test('task board exposes server sorting only after focusing one lane', () => {
   assert.match(source, /TASK_BOARD_SORT_OPTIONS/u)
   assert.match(
@@ -96,7 +38,6 @@ test('task board exposes server sorting only after focusing one lane', () => {
 })
 
 test('related document entry is gated by backend source access and menu projection on every path', () => {
-  assert.doesNotMatch(source, /selectedWorkbench|erp-workbench-side-stack/u)
   assert.match(
     source,
     /canOpenWorkflowTaskEntry\(\s*adminProfile,\s*actionDrawerEntryPath,\s*actionDrawerAccess\.sourceAccess/u
@@ -106,22 +47,6 @@ test('related document entry is gated by backend source access and menu projecti
     /canOpenWorkflowTaskEntry\(\s*adminProfile,\s*entryPath,\s*access\?\.sourceAccess/u
   )
   assert.match(source, /canOpenEntry=\{actionDrawerCanOpenEntry\}/u)
-})
-
-test('task surfaces expose the batch task code only as non-visible evidence metadata', () => {
-  assert.equal(source.match(/data-task-code(?:=|['"]:)/gu)?.length, 3)
-  assert.equal(source.match(/data-task-group(?:=|['"]:)/gu)?.length, 3)
-  assert.match(source, /['"]data-task-code['"]:\s*task\.task_code/u)
-  assert.match(
-    source,
-    /['"]data-task-code['"]:\s*record\.task_code \|\| undefined/u
-  )
-  assert.match(source, /data-testid="dashboard-workflow-task-evidence"/u)
-  assert.match(
-    source,
-    /data-task-terminal=\{String\(isTerminalWorkflowTask\(task\)\)\}/u
-  )
-  assert.doesNotMatch(source, />\s*\{task\.task_code\}\s*</u)
 })
 
 test('task board alone injects the controlled assignment action into the shared drawer', () => {
@@ -200,4 +125,60 @@ test('embedded collaboration drawers preserve the canonical task while the resul
     collaborationPanelSource,
     /actionReceipt=\{actionDrawerReceipt\}/u
   )
+})
+
+test('product preview renders useful entries and delegates navigation without customer data', async (t) => {
+  const view = await createReactTestHarness(t)
+  const { ProductCoreDashboard } =
+    await import('../components/workflow/WorkflowDashboardViews.jsx')
+  const navigations = []
+  await view.render(
+    createElement(ProductCoreDashboard, {
+      onNavigate: (path) => navigations.push(path),
+    })
+  )
+  assert.ok(view.container.textContent.includes('尚未连接客户环境'))
+  const entry = [...view.container.querySelectorAll('button')].find((button) =>
+    button.textContent.includes('销售订单')
+  )
+  assert.ok(entry)
+  await view.act(async () => entry.click())
+  assert.deepEqual(navigations, [BUSINESS_ROUTE_PATHS.salesOrders])
+})
+
+test('task lanes expose visible business names and keep technical evidence outside the visible copy', async (t) => {
+  const view = await createReactTestHarness(t)
+  const { TaskLane } =
+    await import('../components/workflow/WorkflowDashboardViews.jsx')
+  const task = {
+    id: 11,
+    version: 1,
+    task_status_key: 'ready',
+    task_name: '工程资料核对',
+    task_code: 'SIM-TASK-11',
+    task_group: 'engineering_review',
+    owner_role_key: 'engineering',
+  }
+  const opened = []
+  await view.render(
+    createElement(TaskLane, {
+      lane: {
+        key: 'actionable',
+        title: '待处理',
+        count: 1,
+        total: 1,
+        tasks: [task],
+      },
+      onOpenTask: (record) => opened.push(record),
+    })
+  )
+  assert.ok(view.container.textContent.includes('工程资料核对'))
+  assert.equal(view.container.textContent.includes('SIM-TASK-11'), false)
+  assert.ok(view.container.querySelector('[data-task-code="SIM-TASK-11"]'))
+  const entry = [...view.container.querySelectorAll('button')].find((button) =>
+    button.textContent.includes('工程资料核对')
+  )
+  assert.ok(entry)
+  await view.act(async () => entry.click())
+  assert.deepEqual(opened, [task])
 })

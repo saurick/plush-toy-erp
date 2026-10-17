@@ -1,4 +1,5 @@
 import React from 'react'
+import { useOutletContext } from 'react-router-dom'
 
 import {
   CheckCircleOutlined,
@@ -160,6 +161,7 @@ export function CollaborationTaskPanel({
   urgingTaskID,
   taskActionLoadingID,
 }) {
+  const { mobileTaskBusiness } = useOutletContext() || {}
   const [expanded, setExpanded] = React.useState(false)
   const [activeTaskTab, setActiveTaskTab] = React.useState('current')
   const [panelHeight, setPanelHeight] = React.useState(
@@ -509,6 +511,7 @@ export function CollaborationTaskPanel({
     )
   }
 
+  if (mobileTaskBusiness) return null
   if (!hasFocusedRecord || taskPanelModel.activeTaskCount === 0) return null
 
   return (

@@ -27,6 +27,8 @@ import {
   resolveDefaultEntryTarget,
 } from './config/entryConfig.mjs'
 import { getAllowedMobileRoleKeys } from './utils/mobileRolePermissions.mjs'
+import { mobileBusinessPath, mobileBusinessRole } from './utils/businessTaskRoute.mjs'
+import MobileNavigationBoundary from './mobile/MobileNavigationBoundary.jsx'
 
 const lazyRoute = lazyWithDynamicImportRetry
 
@@ -150,6 +152,8 @@ function RouteLoadingFallback() {
 }
 
 function RouteRuntimeErrorFallback({ error }) {
+  const { pathname } = useLocation()
+  const roleKey = mobileBusinessRole(pathname)
   const isModuleLoadError = isDynamicImportLoadError(error)
   const title = isModuleLoadError ? '页面加载失败' : '页面暂时无法显示'
   const description = isModuleLoadError
@@ -174,9 +178,9 @@ function RouteRuntimeErrorFallback({ error }) {
           <button
             type="button"
             className="loading-page__action-button"
-            onClick={() => window.location.assign('/erp/dashboard')}
+            onClick={() => window.location.assign(mobileBusinessPath('/erp/dashboard', roleKey))}
           >
-            返回工作台
+            {roleKey ? '返回任务' : '返回工作台'}
           </button>
         </>
       }
@@ -224,11 +228,13 @@ function RouteRuntimeBoundary({ children }) {
 
   return (
     <RouteRuntimeErrorBoundary resetKey={buildLocationPath(location)}>
-      {DevWorkbenchBridge ? (
-        <DevWorkbenchBridge>{children}</DevWorkbenchBridge>
-      ) : (
-        children
-      )}
+      <MobileNavigationBoundary>
+        {DevWorkbenchBridge ? (
+          <DevWorkbenchBridge>{children}</DevWorkbenchBridge>
+        ) : (
+          children
+        )}
+      </MobileNavigationBoundary>
     </RouteRuntimeErrorBoundary>
   )
 }
@@ -287,6 +293,28 @@ function MobileShellRoute() {
 function businessTaskRoutes() {
   return (
     <>
+      <Route
+        path="business-dashboard"
+        element={<BusinessDashboardPage />}
+      />
+      <Route
+        path="master/partners/customers"
+        element={<MasterDataPage key="customers" type="customers" />}
+      />
+      <Route
+        path="master/partners/suppliers"
+        element={<MasterDataPage key="suppliers" type="suppliers" />}
+      />
+      <Route
+        path="master/materials"
+        element={<MasterDataPage key="materials" type="materials" />}
+      />
+      <Route
+        path="master/products"
+        element={
+          <MasterDataPage key="product_skus" type="product_skus" />
+        }
+      />
       <Route
         path="sales/project-orders/sales-orders"
         element={<SalesOrdersPage />}
@@ -371,6 +399,17 @@ function businessTaskRoutes() {
         path="finance/invoices"
         element={<OperationalFactPage moduleKey="invoices" />}
       />
+      <Route path="print-center" element={<PrintCenterPage />} />
+      <Route
+        path="print-center/:templateKey"
+        element={<PrintTemplatePreviewPage />}
+      />
+      <Route
+        path="system/permissions"
+        element={<PermissionCenterPage />}
+      />
+      <Route path="system/audit-logs" element={<AuditLogsPage />} />
+      <Route path="history" element={<HistoryRecordsPage />} />
     </>
   )
 }
@@ -414,40 +453,7 @@ export default function ERPRouter() {
               path="task-board"
               element={<DashboardPage initialView="task-board" />}
             />
-            <Route
-              path="business-dashboard"
-              element={<BusinessDashboardPage />}
-            />
-            <Route
-              path="master/partners/customers"
-              element={<MasterDataPage key="customers" type="customers" />}
-            />
-            <Route
-              path="master/partners/suppliers"
-              element={<MasterDataPage key="suppliers" type="suppliers" />}
-            />
-            <Route
-              path="master/materials"
-              element={<MasterDataPage key="materials" type="materials" />}
-            />
-            <Route
-              path="master/products"
-              element={
-                <MasterDataPage key="product_skus" type="product_skus" />
-              }
-            />
             {businessTaskRoutes()}
-            <Route path="print-center" element={<PrintCenterPage />} />
-            <Route
-              path="print-center/:templateKey"
-              element={<PrintTemplatePreviewPage />}
-            />
-            <Route
-              path="system/permissions"
-              element={<PermissionCenterPage />}
-            />
-            <Route path="system/audit-logs" element={<AuditLogsPage />} />
-            <Route path="history" element={<HistoryRecordsPage />} />
             <Route path="help-center" element={<HelpCenterPage />} />
           </Route>
 
@@ -460,7 +466,7 @@ export default function ERPRouter() {
             <Route index element={<Navigate to="tasks" replace />} />
             <Route path="tasks" element={<MobileRoleTasksPage />} />
             <Route path="handle" element={<MobileBusinessLayout />}>
-              {businessTaskRoutes()}
+              <Route path="help-center" element={<HelpCenterPage />} />
             </Route>
             <Route path="*" element={<MobileRoleTasksRedirect />} />
           </Route>

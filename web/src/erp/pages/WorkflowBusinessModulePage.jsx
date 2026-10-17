@@ -46,8 +46,6 @@ import BusinessDetailsModal from '../components/business-list/BusinessDetailsMod
 import ProductionExceptionDecisionPanel from '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
 import {
   canReadProductionExceptionDecisions,
-  PRODUCTION_RECORD_VIEW_KEYS,
-  resolveProductionExceptionTab,
 } from '../utils/productionRecordViews.mjs'
 import { getBusinessModule } from '../config/businessModules.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
@@ -117,11 +115,6 @@ const TASK_STATUS_OPTIONS = Object.freeze([
 const DUE_DATE_FILTER_OPTIONS = Object.freeze([
   { label: '到期日期', value: 'due_at' },
 ])
-const PRODUCTION_EXCEPTION_TAB_KEYS = Object.freeze({
-  DECISIONS: PRODUCTION_RECORD_VIEW_KEYS.DECISIONS,
-  TASKS: PRODUCTION_RECORD_VIEW_KEYS.TASKS,
-})
-
 const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'production-scheduling': {
     taskGroup: 'production_scheduling',
@@ -263,33 +256,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const canReadProductionExceptionRecords =
     isProductionExceptionPage &&
     canReadProductionExceptionDecisions(adminProfile)
-  const linkedProductionExceptionID = Number(
-    searchParams.get('production_exception_id') || 0
-  )
-  const requestedProductionExceptionView = String(
-    searchParams.get('view') || ''
-  ).trim()
   const productionExceptionRefreshRef = useRef(null)
-  const productionExceptionTabKeys = useMemo(
-    () =>
-      [
-        canReadProductionExceptionRecords
-          ? PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
-          : null,
-        canReadWorkflowTasks ? PRODUCTION_EXCEPTION_TAB_KEYS.TASKS : null,
-      ].filter(Boolean),
-    [canReadProductionExceptionRecords, canReadWorkflowTasks]
-  )
-  const effectiveProductionExceptionTab = resolveProductionExceptionTab({
-    linkedProductionExceptionID,
-    linkedKeyword,
-    requestedView: requestedProductionExceptionView,
-    canReadRecords: canReadProductionExceptionRecords,
-    canReadTasks: canReadWorkflowTasks,
-  })
-  const isWorkflowTaskWorkspaceActive =
-    !isProductionExceptionPage ||
-    effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.TASKS
+  const isWorkflowTaskWorkspaceActive = !isProductionExceptionPage
 
   useEffect(() => {
     if (isWorkflowTaskWorkspaceActive) return
@@ -414,9 +382,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     if (!moduleItem) return undefined
     return outletContext?.registerPageRefresh?.(async () => {
       if (
-        isProductionExceptionPage &&
-        effectiveProductionExceptionTab ===
-          PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
+        isProductionExceptionPage
       ) {
         const refreshed = await productionExceptionRefreshRef.current?.()
         if (refreshed) {
@@ -431,7 +397,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       return false
     })
   }, [
-    effectiveProductionExceptionTab,
     isProductionExceptionPage,
     loadWorkflowTasks,
     moduleItem,
@@ -1109,10 +1074,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     )
   }
 
-  const showingProductionExceptionDecisions =
-    isProductionExceptionPage &&
-    effectiveProductionExceptionTab === PRODUCTION_EXCEPTION_TAB_KEYS.DECISIONS
-
   const workflowTaskWorkspace = (
     <>
       <BusinessOperationPanel
@@ -1606,34 +1567,28 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     <LayoutRoot {...layoutProps}>
       {productionRecordsWorkspace ? null : (
         <PageHeaderCard
-          title={isProductionExceptionPage ? '生产记录' : moduleItem.title}
+          title={moduleItem.title}
           helpKey={moduleKey}
           compact
         />
       )}
 
       {isProductionExceptionPage ? (
-        productionExceptionTabKeys.length > 0 ? (
-          showingProductionExceptionDecisions ? (
-            <ProductionExceptionDecisionPanel
-              adminProfile={adminProfile}
-              onRefreshReady={handleProductionExceptionRefreshReady}
-            />
-          ) : (
-            <BusinessPageLayout className="erp-workflow-business-page__tab-workspace">
-              {workflowTaskWorkspace}
-            </BusinessPageLayout>
-          )
+        canReadProductionExceptionRecords ? (
+          <ProductionExceptionDecisionPanel
+            adminProfile={adminProfile}
+            onRefreshReady={handleProductionExceptionRefreshReady}
+          />
         ) : (
           <Alert
-            type="warning"
+            type="info"
             showIcon
-            message="当前账号不能查看异常处理申请或待审批任务。"
+            message="当前账号可在任务管理处理获准的审批事项。"
+            action={<Button onClick={() => navigate('/erp/task-board?mode=approval')}>前往任务管理</Button>}
           />
         )
-      ) : (
-        workflowTaskWorkspace
-      )}
+      ) : workflowTaskWorkspace}
+
     </LayoutRoot>
   )
 }

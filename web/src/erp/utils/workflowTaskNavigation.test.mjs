@@ -37,11 +37,47 @@ test('mobile business routes stay inside the same role shell and recover without
   assert.equal(path, '/m/warehouse/handle/production/orders?production_order_id=7')
   assert.equal(canonicalBusinessPath(path), '/erp/production/orders?production_order_id=7')
   assert.equal(mobileBusinessRole(path), 'warehouse')
+  assert.equal(mobileBusinessRole('/m/warehouse'), 'warehouse')
+  assert.equal(mobileBusinessRole('/m/warehouse/unavailable'), 'warehouse')
+  assert.equal(mobileBusinessRole('/erp/dashboard'), '')
   assert.equal(mobileBusinessPath('/erp/task-board?mode=todo', 'warehouse'), '/m/warehouse/tasks')
+  assert.equal(mobileBusinessPath('/erp/task-board?mode=all&link_task=41#task', 'warehouse'), '/m/warehouse/tasks?link_task=41#task')
   assert.equal(mobileBusinessPath('/erp/task-board?tracking=visible&track_source_type=sales_order&track_source_id=3', 'engineering'), '/m/engineering/tasks?tracking=visible&track_source_type=sales_order&track_source_id=3')
   const navigation = workflowTaskEntryNavigation({ id: 8 }, path, '/m/warehouse/tasks', 1).state.workflowTaskNavigation
   const back = workflowTaskReturnNavigation(navigation, null)
   assert.equal(back.to, '/m/warehouse/tasks')
   assert.equal(readWorkflowTaskReturn(back.options.state, 1).taskID, 8)
   assert.deepEqual(workflowTaskEntryNavigation({ id: 8 }, '//untrusted.example', '/m/warehouse/tasks', 1), {})
+})
+
+test('object navigation preserves the mobile role, search and hash without changing desktop navigation', () => {
+  const target = { pathname: '/erp/production/progress', search: '?view=exceptions&source_id=7', hash: '#details' }
+  assert.deepEqual(mobileBusinessPath(target, 'production'), { pathname: '/m/production/handle/production/progress', search: target.search, hash: target.hash })
+  assert.equal(mobileBusinessPath(target, ''), target)
+  assert.deepEqual(mobileBusinessPath({ pathname: '/erp/task-board', search: '?tracking=visible&track_source_id=7' }, 'sales'), { pathname: '/m/sales/tasks', search: '?tracking=visible&track_source_id=7', hash: '' })
+  assert.equal(mobileBusinessPath('/erp', 'warehouse'), '/m/warehouse/tasks')
+  assert.deepEqual(mobileBusinessPath({ search: '?tab=history' }, 'sales'), { search: '?tab=history' })
+  const state = { workflowTaskNavigation: { taskID: 1, adminID: 2, entryPath: '/m/sales/handle/help-center#terms', returnPath: '/m/sales/tasks' } }
+  assert.equal(readWorkflowTaskNavigation(state, '/m/sales/handle/help-center', 2)?.taskID, 1)
+})
+
+test('a mobile document return cannot use a desktop return URL or jump back to desktop history', () => {
+  const navigation = { taskID: 8, adminID: 1, returnPath: '/erp/task-board?mode=todo', returnHistoryIndex: 1 }
+  const result = workflowTaskReturnNavigation(navigation, 3, 'warehouse')
+  assert.equal(result.to, '/m/warehouse/tasks')
+  assert.equal(result.options.state.workflowTaskReturn.taskID, 8)
+  assert.deepEqual(workflowTaskReturnNavigation({ ...navigation, returnPath: '/m/warehouse/tasks' }, 3, 'warehouse'), { to: -2 })
+})
+
+test('document handoff uses the same readable task name as the task information card', () => {
+  const task = { id: 8, task_name: 'order_approval' }
+  for (const [entryPath, returnPath] of [
+    ['/erp/sales/project-orders/sales-orders', '/erp/task-board'],
+    ['/m/sales/handle/sales/project-orders/sales-orders', '/m/sales/tasks'],
+  ]) {
+    const { state } = workflowTaskEntryNavigation(task, entryPath, returnPath, 1)
+    assert.equal(state.workflowTaskNavigation.taskName, '订单审批')
+  }
+  const { state } = workflowTaskEntryNavigation({ id: 9, title: '核对客户规格' }, '/m/sales/handle/sales/project-orders/sales-orders', '/m/sales/tasks', 1)
+  assert.equal(state.workflowTaskNavigation.taskName, '核对客户规格')
 })

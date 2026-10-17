@@ -1167,8 +1167,8 @@ export default function ERPLayout({ legalNotice }) {
     [businessPageGeneration]
   )
   const moduleWorkspace = useMemo(
-    () => getBusinessModuleTabs(location.pathname, visibleSections),
-    [location.pathname, visibleSections]
+    () => getBusinessModuleTabs(location.pathname, visibleSections, { search: location.search, adminProfile }),
+    [location.pathname, location.search, visibleSections, adminProfile]
   )
   useEffect(() => {
     if (!currentPageShouldRedirect) {
@@ -1257,8 +1257,7 @@ export default function ERPLayout({ legalNotice }) {
     }
     if (
       !navigateOptions?.state?.workflowTaskReturn &&
-      (nextPath === location.pathname ||
-        nextPath === `${location.pathname}${location.search}${location.hash}`)
+      nextPath === `${location.pathname}${location.search}${location.hash}`
     ) {
       setMobileNavOpen(false)
       return
@@ -1608,7 +1607,7 @@ export default function ERPLayout({ legalNotice }) {
                 data-testid="task-source-return"
               >
                 <strong>{taskNavigation.taskName}</strong>
-                <span>保存业务结果后，相关待办自动更新</span>
+                <span role="status">{taskNavigation.businessReceipt?.message || (taskNavigation.productionHandling ? '正在办理当前生产事项' : '保存业务结果后，相关待办自动更新')}</span>
                 <Button
                   size="small"
                   onClick={() => {
@@ -1619,7 +1618,7 @@ export default function ERPLayout({ legalNotice }) {
                     handleNavigate(target.to, target.options)
                   }}
                 >
-                  返回任务
+                  {taskNavigation.businessReceipt ? '办完返回原任务' : '返回原任务'}
                 </Button>
               </Space>
             ) : null}
@@ -1653,7 +1652,7 @@ export default function ERPLayout({ legalNotice }) {
                   : ''
               }`}
             >
-              {!shouldBlockOutlet && !shouldGuardProductCoreBusinessData ? (
+              {!shouldBlockOutlet && !shouldGuardProductCoreBusinessData && !taskNavigation ? (
                 <BusinessModuleTabs
                   workspace={moduleWorkspace}
                   cache={pageUIState.values}

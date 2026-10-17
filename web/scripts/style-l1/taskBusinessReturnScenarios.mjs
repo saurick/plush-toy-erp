@@ -7,14 +7,29 @@ async function assertOrderDirection(assert, chain) {
     const groups = [...main.querySelectorAll(':scope > .workflow-business-chain__group')]
     const markers = groups.map((group) => group.querySelector('.workflow-process-stage__marker').getBoundingClientRect())
     const exception = root.querySelector('.workflow-business-chain__exceptions')
+    const headers = [...root.querySelectorAll('.workflow-business-chain__node')].map((node) => {
+      const marker = node.querySelector('.workflow-business-chain__marker').getBoundingClientRect()
+      const title = node.querySelector('strong').getBoundingClientRect()
+      const status = node.querySelector('.workflow-business-chain__stage-status').getBoundingClientRect()
+      const icon = node.querySelector('.workflow-business-chain__chevron svg').getBoundingClientRect()
+      const box = node.getBoundingClientRect()
+      const center = (rect) => rect.top + rect.height / 2
+      return { rightGap: box.right - icon.right, centerDelta: Math.max(...[marker, title, status].map((rect) => Math.abs(center(rect) - center(icon)))), width: icon.width, height: icon.height }
+    })
     return {
+      headers,
       numbers: groups.map((group) => group.querySelector('.workflow-process-stage__marker').textContent),
       forward: markers.every((marker, index) => !index || (marker.top > markers[index - 1].bottom && Math.abs(marker.x - markers[index - 1].x) <= 1)),
-      arrows: groups.every((group, index) => {
-        const arrow = getComputedStyle(group, '::after')
-        if (index === groups.length - 1) return arrow.content === 'none'
-        const tip = group.getBoundingClientRect().bottom - parseFloat(arrow.bottom)
-        return parseFloat(arrow.height) > 0 && arrow.clipPath.startsWith('polygon(') && tip > markers[index].bottom && tip < markers[index + 1].top
+      continuous: groups.every((group, index) => {
+        const line = getComputedStyle(group, '::before')
+        if (getComputedStyle(group, '::after').content !== 'none') return false
+        if (index === groups.length - 1) return line.content === 'none'
+        const box = group.getBoundingClientRect()
+        const next = markers[index + 1]
+        return Math.abs(box.top + parseFloat(line.top) - (markers[index].top + markers[index].height / 2)) <= 1 &&
+          Math.abs(box.bottom - parseFloat(line.bottom) - (next.top + next.height / 2)) <= 1 &&
+          Math.abs(box.left + parseFloat(line.left) + parseFloat(line.width) / 2 - (markers[index].left + markers[index].width / 2)) <= 1 &&
+          parseFloat(line.width) === 1
       }),
       separated: !main.querySelector('.workflow-business-chain__exceptions, .workflow-business-chain__unclassified'),
       branch: !exception || (getComputedStyle(exception).borderTopStyle === 'dashed' && Boolean(exception.querySelector('[aria-label="branches"]')) && exception.querySelector('.workflow-business-chain__branch-label')?.textContent === '分支'),
@@ -22,7 +37,11 @@ async function assertOrderDirection(assert, chain) {
     }
   })
   assert.deepEqual(geometry.numbers, ['1', '2', '3', '4', '5', '6', '7'])
-  assert.ok(geometry.forward && geometry.arrows && geometry.separated && geometry.branch && geometry.overflow <= 1, `阶段方向或异常分支不清晰: ${JSON.stringify(geometry)}`)
+  assert.equal(await chain.locator('.workflow-business-chain__order').count(), 0)
+  assert.doesNotMatch(await chain.innerText(), /阶段顺序/u)
+  assert.ok(geometry.headers.every((header) => header.centerDelta <= 1 && header.rightGap <= 1 && Math.abs(header.width - 12) <= 1 && Math.abs(header.height - 12) <= 1), `展开与收起图标均与阶段标题、状态和节点居中对齐: ${JSON.stringify(geometry.headers)}`)
+  assert.ok(geometry.forward && geometry.continuous && geometry.separated && geometry.branch && geometry.overflow <= 1, `阶段方向或异常分支不清晰: ${JSON.stringify(geometry)}`)
+  return geometry
 }
 
 export function createTaskBusinessReturnScenarios({ assert, path, outputDir, customerRuntimeEffectiveSession, assertNoHorizontalOverflow }) {
@@ -95,7 +114,7 @@ items: [
             ] }
             if (params.view === 'task') data.items = data.items.filter((item) => item.id === task.id)
           } else if (method === 'explain_action_access') {
-            data = { task_id: task.id, source_access: { applicable: true, resolved: true, allowed: true, reason_code: 'source_access_allowed', reason: '' }, actions: [{ action_key: 'complete', allowed: false, reason: '办理来源单据后自动更新待办', reason_code: 'source_owned_task', required_permission: 'production.packaging_material.confirm', owner_role_key: 'sales' }] }
+            data = { task_id: task.id, source_access: { applicable: true, resolved: true, allowed: true, reason_code: 'source_access_allowed', reason: '' }, actions: [{ action_key: 'complete', allowed: false, reason: '当前账号缺少执行该动作所需权限。', reason_code: 'missing_permission', required_permission: 'production.packaging_material.confirm', owner_role_key: 'sales' }] }
           } else if (method === 'get_task') {
             detailReads += 1
             data = { task: { ...task, ...(saved ? { task_status_key: 'done', version: 2, completed_at: 1791648100 } : {}) } }
@@ -115,8 +134,8 @@ items: [
         else await page.getByRole('button', { name: `查看${taskName}详情`, exact: true }).click()
         const focus = page.getByLabel('本任务处理进度', { exact: true })
         await focus.getByRole('button', { name: '重新读取', exact: true }).click()
-        await focus.getByText(taskName, { exact: true }).waitFor()
-        assert.equal(await focus.locator('li').count(), 1)
+        await focus.getByText('当前暂无其他关联任务。', { exact: true }).waitFor()
+        assert.equal(await focus.locator('li').count(), 0, '当前任务已在信息卡中展示，不重复绘制')
         assert.equal(await focus.locator('details').count(), 0)
         assert.equal(await page.getByLabel('订单任务链', { exact: true }).count(), 0)
         await page.screenshot({ path: path.join(outputDir, `task-chain-focused-${mobile ? 'mobile' : 'desktop-4k'}.png`) })
@@ -136,7 +155,7 @@ items: [
         assert.ok((await related.locator('summary').boundingBox()).height >= 44, '关联任务展开入口保留触控尺寸')
         assert.equal(await chain.getByText('MO-PARALLEL-2', { exact: true }).isVisible(), false)
         const steps = page.getByRole(mobile ? 'navigation' : 'tablist', { name: '任务处理步骤', exact: true })
-        assert.equal(await steps.isVisible(), false, '只读任务信息不显示办理步骤')
+        assert.equal(await steps.isVisible(), true, '任务详情保留三步引导')
         await page.screenshot({ path: path.join(outputDir, `task-chain-compact-${mobile ? 'mobile' : 'desktop-4k'}.png`) })
         await related.locator('summary').click()
         await chain.getByText('MO-PARALLEL-2', { exact: true }).waitFor()
@@ -151,6 +170,7 @@ items: [
         await chain.getByRole('button', { name: /异常处理/u }).click()
         await chain.getByText('换厂返工回货复检', { exact: true }).waitFor()
         assert.equal(await chain.locator('.workflow-business-chain__stage-content').count(), 1)
+        await assertOrderDirection(assert, chain)
         const chainGeometry = await chain.evaluate((node) => ({ width: node.clientWidth, scroll: node.scrollWidth }))
         assert.ok(chainGeometry.scroll <= chainGeometry.width + 1, '任务链长批次号不能撑破办理区域')
         await chain.getByRole('button', { name: /检验与包装/u }).click()
@@ -161,23 +181,45 @@ items: [
         await chain.locator('.workflow-business-chain__rules > summary').click()
         const metrics = await chain.evaluate((node) => ({ width: node.clientWidth, scroll: node.scrollWidth, height: node.getBoundingClientRect().height }))
         assert.ok(metrics.scroll <= metrics.width + 1)
-        assert.ok(metrics.height < (mobile ? 760 : 660), `七个阶段和当前任务无需展开十七张环节卡: ${JSON.stringify(metrics)}`)
+        assert.ok(metrics.height < (mobile ? 760 : 660), `七个阶段和当前任务保持紧凑高度: ${JSON.stringify(metrics)}`)
+        await assertOrderDirection(assert, chain)
+        if (mobile) {
+          await page.setViewportSize({ width: 320, height: 720 })
+          await assertOrderDirection(assert, chain)
+          await chain.getByRole('button', { name: /检验与包装/u }).press('Enter')
+          assert.equal(await chain.locator('.workflow-business-chain__stage-content').count(), 0)
+          await assertOrderDirection(assert, chain)
+          await chain.getByRole('button', { name: /检验与包装/u }).press('Space')
+          assert.equal(await chain.locator('.workflow-business-chain__stage-content').count(), 1)
+          await assertOrderDirection(assert, chain)
+          await page.setViewportSize({ width: 390, height: 844 })
+        }
         await chain.locator('..').screenshot({ path: path.join(outputDir, `order-flow-compact-${mobile ? 'mobile' : 'desktop'}.png`), animations: 'disabled' })
         await page.getByRole('button', { name: '返回本任务', exact: true }).click()
-        await focus.getByText(taskName, { exact: true }).waitFor()
+        await focus.getByText('当前暂无其他关联任务。', { exact: true }).waitFor()
         assert.equal(await page.getByLabel('订单任务链', { exact: true }).count(), 0)
+        if (mobile) {
+          await page.getByText('当前账号缺少执行该动作所需权限。', { exact: true }).waitFor()
+          assert.equal(await page.getByRole('button', { name: /进入单据办理$/u }).count(), 0)
+          assert.equal(await page.getByTestId('mobile-task-detail-screen').locator('.workflow-task-source button').count(), 0)
+          assert.equal(await steps.locator('[data-step-key]').count(), 3)
+          assert.equal(saved, false, '查看和追踪不能旁路写入生产事实')
+          await page.getByRole('button', { name: '返回任务列表', exact: true }).click()
+          await page.getByTestId('mobile-role-bottom-nav').waitFor()
+          assert.equal(new URL(page.url()).pathname, '/m/sales/tasks')
+          await assertNoHorizontalOverflow(page, '手机生产任务返回原列表')
+          return
+        }
         await page.getByRole('button', { name: /进入单据办理$/u }).click()
         await page.waitForURL(mobile ? /\/m\/sales\/handle\/production\/orders/u : /\/erp\/production\/orders/u)
-        const modal = page.getByRole('dialog').filter({ hasText: '生产工序办理' }).last()
-        await modal.getByRole('button', { name: '确认包材要求', exact: true }).click()
+        const modal = page.getByRole('dialog').filter({ hasText: '确认包材要求' }).last()
+        await modal.getByLabel('包装版本', { exact: true }).waitFor()
         await modal.getByLabel('包装版本', { exact: true }).fill('彩盒与唛头已核对')
         await modal.getByRole('button', { name: '确认办理', exact: true }).click()
-        await page.getByText('包材要求已确认', { exact: true }).waitFor()
+        await page.getByTestId('task-source-return').getByText('包材要求已确认', { exact: true }).waitFor()
         assert.equal(saved, true)
-        await modal.locator('.ant-modal-footer').getByRole('button', { name: '关闭', exact: true }).click()
-        await modal.waitFor({ state: 'hidden' })
         const beforeReturnReads = detailReads
-        await page.getByRole('button', { name: '返回任务', exact: true }).click()
+        await page.locator('.ant-modal:visible').getByRole('button', { name: '办完返回原任务', exact: true }).click()
         await page.waitForURL(mobile ? /\/m\/sales\/tasks/u : /\/erp\/task-board/u)
         const detail = mobile ? page.getByTestId('mobile-task-detail-screen') : page.locator('.ant-drawer:visible')
         await detail.getByText(taskName, { exact: true }).first().waitFor()
@@ -188,28 +230,7 @@ items: [
       },
     }
   })
-  const mobileReturn = {
-    ...returnScenarios.find((scenario) => scenario.name === 'task-business-return-mobile'),
-    name: 'mobile-business-back-top-return',
-    verify: async (page) => {
-      const taskName = '确认包装版本'
-      const card = page.locator('.erp-mobile-list-item').filter({ hasText: taskName })
-      await clickTaskCardContent(card, card.getByText(taskName, { exact: true }))
-      await page.getByRole('button', { name: /进入单据办理$/u }).click()
-      await page.waitForURL(/\/m\/sales\/handle\/production\/orders/u)
-      const modal = page.getByRole('dialog').filter({ hasText: '生产工序办理' }).last()
-      await modal.locator('.ant-modal-footer').getByRole('button', { name: '关闭', exact: true }).click()
-      await modal.waitFor({ state: 'hidden' })
-      await assertNoHorizontalOverflow(page, '手机业务办理独立滚动区')
-      await page.getByRole('button', { name: '返回任务', exact: true }).click()
-      await page.waitForURL(/\/m\/sales\/tasks/u)
-      const detail = page.getByTestId('mobile-task-detail-screen')
-      await detail.getByRole('heading', { name: taskName, exact: true }).waitFor()
-      assert.equal(await page.evaluate(() => window.history.state?.usr?.workflowTaskReturn ?? null), null)
-      await assertNoHorizontalOverflow(page, '手机业务返回原任务')
-    },
-  }
-  return [...returnScenarios, mobileReturn, ...createFocusedExceptionScenarios({ assert, path, outputDir, customerRuntimeEffectiveSession, assertNoHorizontalOverflow })]
+  return [...returnScenarios, ...createFocusedExceptionScenarios({ assert, path, outputDir, customerRuntimeEffectiveSession, assertNoHorizontalOverflow })]
 }
 
 function createFocusedExceptionScenarios({
@@ -353,28 +374,21 @@ function createFocusedExceptionScenarios({
             card.getByText(task.task_name, { exact: true })
           )
         } else {
-          const card = page
-            .locator('.erp-task-card')
-            .filter({ hasText: task.task_name })
-          await clickTaskCardContent(
-            card,
-            card.getByText(task.task_name, { exact: true })
-          )
+          await page.getByRole('button', { name: `查看${task.task_name}详情`, exact: true }).click()
         }
         const focus = page.getByLabel('本任务处理进度', { exact: true })
         await focus.getByText('本次返工回货复检', { exact: true }).waitFor()
         assert.deepEqual(views, ['task'])
-        assert.equal(await focus.locator('li').count(), 3)
-        const currentTask = focus.locator('li[aria-current="step"]')
-        assert.equal((await currentTask.innerText()).split('RW-FOCUS-041').length - 1, 1, '标题中已有的来源编号不重复展示')
-        await currentTask.getByText('待生产经理领取', { exact: true }).waitFor()
+        assert.equal(await focus.locator('li').count(), 2)
+        assert.equal(await focus.locator('li[aria-current="step"]').count(), 0, '当前任务只在原信息卡展示')
+        const info = page.locator('.workflow-task-info-card')
+        assert.equal(await info.getByRole('heading', { name: task.task_name, exact: true }).count(), 1)
+        assert.match(await info.locator('.workflow-task-current').innerText(), /生产经理/u)
         const relatedTasks = focus.getByLabel('关联待办', { exact: true })
         assert.equal(await relatedTasks.locator('li').count(), 1)
         await relatedTasks.getByText('品质 · 阻塞', { exact: true }).waitFor()
         const history = focus.locator('.workflow-business-chain__history')
-        assert.equal(await history.getAttribute('open'), null)
-        assert.equal(await focus.getByText('安排本次返工', { exact: true }).isVisible(), false)
-        await history.locator('summary').click()
+        assert.notEqual(await history.getAttribute('open'), null, '已处理历史默认展开')
         await focus.getByText('安排本次返工', { exact: true }).waitFor()
         const record = history.locator('li')
         assert.equal((await record.innerText()).split('RW-041-01').length - 1, 1, '同一来源和批次编号只出现一次')
@@ -400,13 +414,13 @@ function createFocusedExceptionScenarios({
           background: getComputedStyle(item).backgroundColor,
         })))
         assert.ok(rows.every((row) => row.scroll <= row.width + 1), '长批次号与岗位文案不能横向溢出')
-        assert.equal(rows[1].background, 'rgba(0, 0, 0, 0)', '关联待办使用紧凑行，当前任务保留原卡片强调')
-        if (!mobile) assert.ok(rows[0].height < 65, '桌面当前任务去重后无需三行重复信息')
+        assert.equal(rows.length, 1, '手动收起历史后只保留关联待办')
+        assert.equal(rows[0].background, 'rgba(0, 0, 0, 0)', '关联待办使用紧凑行，当前任务保留上方原信息卡')
         const toggle = page.getByRole('button', {
           name: '查看订单全流程',
           exact: true,
         })
-        assert.ok((await toggle.boundingBox()).height >= 44)
+        assert.ok((await toggle.boundingBox()).height >= (mobile ? 44 : 32), '手机保留触控高度，桌面沿用紧凑按钮')
         await focus.scrollIntoViewIfNeeded()
         await page.screenshot({
           animations: 'disabled',
@@ -458,6 +472,7 @@ function createFocusedExceptionScenarios({
             .evaluate((button) => button === document.activeElement),
           true
         )
+        assert.equal(await focus.locator('.workflow-business-chain__history').getAttribute('open'), null, '从全流程返回保留手动收起状态')
         await assertNoHorizontalOverflow(page, 'focused-exception-chain')
       },
     }

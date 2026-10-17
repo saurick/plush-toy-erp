@@ -1,20 +1,21 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  DownloadOutlined,
-  FullscreenOutlined,
-  ReloadOutlined,
-} from '@ant-design/icons'
-import { Button, Select, Space, Typography } from 'antd'
+import React, { Suspense, useEffect, useRef, useState } from 'react'
+import { ReloadOutlined } from '@ant-design/icons'
+import { Button, Select, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
-import { TaskFulfillmentGuideButton } from '../components/flow-state/TaskFulfillmentGuide.jsx'
+import { Loading } from '@/common/components/loading'
+import { lazyWithDynamicImportRetry } from '@/common/utils/lazyImportRetry.mjs'
 import Tabs from '@/common/components/navigation/SlidingTabs'
 import DevPageNav from '../components/DevPageNav.jsx'
-import DevControlStandards from '../components/DevControlStandards.jsx'
-import DevUIDesignDocument from '../components/DevUIDesignDocument.jsx'
-import { prepareUIDesignSandboxSource } from '../config/devUIDesign.mjs'
-import designHTML from '../../../../docs/product/ui-design/index.html?raw'
-import specification from '../../../../docs/product/ui-design/交互设计说明.md?raw'
-import rationale from '../../../../docs/product/ui-design/设计依据.md?raw'
+
+const DevUIDesignPreview = lazyWithDynamicImportRetry(
+  () => import('./DevUIDesignPreview.jsx')
+)
+const DevUIDesignReading = lazyWithDynamicImportRetry(
+  () => import('./DevUIDesignReading.jsx')
+)
+const DevControlStandards = lazyWithDynamicImportRetry(
+  () => import('../components/DevControlStandards.jsx')
+)
 
 const VIEWS = [
   { key: 'preview', label: '可交互设计' },
@@ -28,29 +29,23 @@ export default function DevUIDesignPage() {
   const view = VIEWS.some((item) => item.key === requestedView)
     ? requestedView
     : 'preview'
-  const [fullscreen, setFullscreen] = useState(false)
-  const [previewRevision, setPreviewRevision] = useState(0)
-  const [controlRevision, setControlRevision] = useState(0)
-  const pageRef = useRef(null)
-  const frameRef = useRef(null)
-  const readerRef = useRef(null)
-  const fullscreenButtonRef = useRef(null)
   const requestedPage = searchParams.get('page')
-  const previewPage = ['login', 'help', 'workbench', 'controls', 'mobile-tasks', 'task-handling'].includes(
-    requestedPage
-  )
+  const previewPage = ['login', 'help', 'workbench', 'controls', 'mobile-tasks', 'task-handling'].includes(requestedPage)
     ? requestedPage
     : 'workspace'
   const controlsVisible = previewPage === 'controls'
+  const showHTMLPreview = view === 'preview' && !controlsVisible
+  const [previewOpened, setPreviewOpened] = useState(showHTMLPreview)
+  const [controlRevision, setControlRevision] = useState(0)
   const lastHTMLPage = useRef(controlsVisible ? 'workspace' : previewPage)
   const htmlPage = controlsVisible ? lastHTMLPage.current : previewPage
+
   useEffect(() => {
-    if (!controlsVisible) lastHTMLPage.current = previewPage
-  }, [controlsVisible, previewPage])
-  const source = useMemo(
-    () => prepareUIDesignSandboxSource(designHTML, { page: htmlPage }),
-    [htmlPage]
-  )
+    if (showHTMLPreview) {
+      lastHTMLPage.current = previewPage
+      setPreviewOpened(true)
+    }
+  }, [showHTMLPreview, previewPage])
 
   const updateQuery = (key, value) => {
     const next = new URLSearchParams(window.location.search)
@@ -59,85 +54,26 @@ export default function DevUIDesignPage() {
     setSearchParams(next)
   }
 
-  useEffect(() => {
-    if (!fullscreen) return undefined
-    const reader = readerRef.current
-    const trigger = fullscreenButtonRef.current
-    const hidden = []
-    for (
-      let element = reader;
-      element?.parentElement;
-      element = element.parentElement
-    ) {
-      hidden.push(
-        ...[...element.parentElement.children].filter(
-          (sibling) => sibling !== element
-        )
-      )
-      if (element.parentElement === document.body) break
-    }
-    const previous = hidden.map((element) => [element, element.inert])
-    hidden.forEach((element) => {
-      element.inert = true
-    })
-    const { overflow } = document.body.style
-    document.body.style.overflow = 'hidden'
-    fullscreenButtonRef.current?.focus()
-    const onKey = (event) => {
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        setFullscreen(false)
-      }
-      if (event.key !== 'Tab') return
-      const controls = [
-        ...reader.querySelectorAll(
-          'button:not([disabled]),iframe,[data-design-focus-guard]'
-        ),
-      ]
-      const first = controls[0]
-      const last = controls.at(-1)
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault()
-        last?.focus()
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault()
-        first?.focus()
-      }
-    }
-    const onMessage = (event) => {
-      if (
-        event.source === frameRef.current?.contentWindow &&
-        event.data?.type === 'ui-design-escape'
-      ) {
-        setFullscreen(false)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    window.addEventListener('message', onMessage)
-    return () => {
-      document.body.style.overflow = overflow
-      previous.forEach(([element, inert]) => {
-        element.inert = inert
-      })
-      window.removeEventListener('keydown', onKey)
-      window.removeEventListener('message', onMessage)
-      trigger?.focus({ preventScroll: true })
-    }
-  }, [fullscreen])
-
-  const download = () => {
-    const url = URL.createObjectURL(
-      new Blob([designHTML], { type: 'text/html;charset=utf-8' })
-    )
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'erp-ui-interaction-design.html'
-    link.click()
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000)
-  }
+  const pageSelector = (
+    <Select
+      className="erp-dev-ui-design-page-select"
+      aria-label="设计预览入口"
+      value={previewPage}
+      options={[
+        { value: 'workspace', label: '业务界面' },
+        { value: 'task-handling', label: '任务处理' },
+        { value: 'mobile-tasks', label: '移动端任务' },
+        { value: 'workbench', label: '效能工作台' },
+        { value: 'login', label: '登录页' },
+        { value: 'help', label: '岗位帮助' },
+        { value: 'controls', label: '控件设计' },
+      ]}
+      onChange={(value) => updateQuery('page', value === 'workspace' ? '' : value)}
+    />
+  )
 
   return (
-    <div ref={pageRef} className="erp-dev-ui-design-page erp-dev-workspace-page erp-dev-tool-page">
+    <div className="erp-dev-ui-design-page erp-dev-workspace-page erp-dev-tool-page">
       <DevPageNav sourcePath="docs/product/ui-design/README.md" />
       <header className="erp-dev-ui-design-header">
         <Typography.Title level={1}>UI 交互设计</Typography.Title>
@@ -147,91 +83,28 @@ export default function DevUIDesignPage() {
           onChange={(key) => updateQuery('view', key === 'preview' ? '' : key)}
         />
       </header>
-
-      <section
-        ref={readerRef}
-        className={`erp-dev-ui-design-reader${fullscreen ? ' is-fullscreen' : ''}`}
-        hidden={view !== 'preview'}
-        role={fullscreen ? 'dialog' : 'region'}
-        aria-modal={fullscreen ? 'true' : undefined}
-        aria-label={fullscreen ? 'UI 交互设计全屏预览' : '最新可交互设计'}
-      >
-        <div className="erp-dev-ui-design-toolbar">
-          <Select
-            className="erp-dev-ui-design-page-select"
-            aria-label="设计预览入口"
-            value={previewPage}
-            options={[
-              { value: 'workspace', label: '业务界面' },
-              { value: 'task-handling', label: '任务处理' },
-              { value: 'mobile-tasks', label: '移动端任务' },
-              { value: 'workbench', label: '效能工作台' },
-              { value: 'login', label: '登录页' },
-              { value: 'help', label: '岗位帮助' },
-              { value: 'controls', label: '控件设计' },
-            ]}
-            onChange={(value) => {
-              if (value === 'controls') setFullscreen(false)
-              updateQuery('page', value === 'workspace' ? '' : value)
-            }}
-          />
-          <Space wrap>
-            {['task-handling', 'mobile-tasks'].includes(previewPage) ? <TaskFulfillmentGuideButton /> : null}
-            <Button
-              icon={<ReloadOutlined />}
-              onClick={() =>
-                controlsVisible
-                  ? setControlRevision((value) => value + 1)
-                  : setPreviewRevision((value) => value + 1)
-              }
-            >
+      <Suspense fallback={showHTMLPreview ? <Loading title="正在加载交互设计" /> : null}>
+        {previewOpened || showHTMLPreview ? (
+          <DevUIDesignPreview active={showHTMLPreview} page={htmlPage} pageSelector={pageSelector} />
+        ) : null}
+      </Suspense>
+      {view === 'preview' && controlsVisible ? (
+        <section className="erp-dev-ui-design-reader" aria-label="最新可交互设计">
+          <div className="erp-dev-ui-design-toolbar">
+            {pageSelector}
+            <Button icon={<ReloadOutlined />} onClick={() => setControlRevision((value) => value + 1)}>
               重置演示
             </Button>
-            {!controlsVisible && (
-              <Button icon={<DownloadOutlined />} onClick={download}>
-                下载 HTML
-              </Button>
-            )}
-            {!controlsVisible && (
-              <Button
-                ref={fullscreenButtonRef}
-                icon={<FullscreenOutlined />}
-                onClick={() => setFullscreen((value) => !value)}
-              >
-                {fullscreen ? '退出全屏' : '全屏预览'}
-              </Button>
-            )}
-          </Space>
-        </div>
-        <iframe
-          ref={frameRef}
-          key={`html-${previewRevision}`}
-          title="ERP 最新可交互设计"
-          sandbox="allow-scripts allow-downloads"
-          srcDoc={source}
-          className="erp-dev-ui-design-frame"
-          hidden={controlsVisible}
-        />
-        {view === 'preview' && controlsVisible ? (
-          <DevControlStandards key={`controls-${controlRevision}`} />
-        ) : null}
-        {fullscreen ? (
-          <button
-            type="button"
-            className="erp-dev-ui-design-focus-guard"
-            data-design-focus-guard
-            aria-label="返回全屏操作区"
-            onFocus={() => fullscreenButtonRef.current?.focus()}
-          />
-        ) : null}
-      </section>
+          </div>
+          <Suspense fallback={<Loading title="正在加载控件设计" />}>
+            <DevControlStandards key={`controls-${controlRevision}`} />
+          </Suspense>
+        </section>
+      ) : null}
       {view !== 'preview' ? (
-        <DevUIDesignDocument
-          key={view}
-          view={view}
-          specification={specification}
-          source={view === 'specification' ? specification : rationale}
-        />
+        <Suspense fallback={<Loading title="正在加载设计说明" />}>
+          <DevUIDesignReading key={view} view={view} />
+        </Suspense>
       ) : null}
     </div>
   )

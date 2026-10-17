@@ -24,6 +24,7 @@ func TestQualityInspectionFromOutsourcingReturnPostgresConcurrentCreateIsSourceU
 	operationalUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
 	actor := client.AdminUser.Create().SetUsername("pg-quality-create-actor-" + fixtures.suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
 	fact := createPostgresOutsourcingReturnForQuality(t, ctx, client, inventoryUC, operationalUC, fixtures, actor.ID, "CREATE-"+fixtures.suffix)
+	requestTask := assertFulfillmentTask(t, ctx, client, "outsourcing_quality_request", fact.ID, "ready", biz.QualityRoleKey)
 
 	start := make(chan struct{})
 	errs := make(chan error, 2)
@@ -57,6 +58,10 @@ func TestQualityInspectionFromOutsourcingReturnPostgresConcurrentCreateIsSourceU
 	}
 	if successes != 1 || conflicts != 1 {
 		t.Fatalf("concurrent quality outcomes success=%d conflict=%d", successes, conflicts)
+	}
+	done := assertFulfillmentTask(t, ctx, client, "outsourcing_quality_request", fact.ID, "done", biz.QualityRoleKey)
+	if done.ID != requestTask.ID || done.Version != requestTask.Version+1 {
+		t.Fatal("concurrent quality creation must settle its source request exactly once")
 	}
 	if got := client.QualityInspection.Query().Where(
 		qualityinspection.SourceType(biz.QualityInspectionSourceOutsourcingFact),
@@ -112,10 +117,12 @@ func TestQualityInspectionFromOutsourcingReturnPostgresCreateCancelRaceKeepsVali
 		if !errors.Is(xErr, biz.ErrOutsourcingReturnQualityDependency) || stored.Status != biz.OperationalFactStatusPosted || active != 1 {
 			t.Fatalf("quality-create-won state create=%v cancel=%v status=%s active=%d", cErr, xErr, stored.Status, active)
 		}
+		assertFulfillmentTask(t, ctx, client, "outsourcing_quality_request", fact.ID, "done", biz.QualityRoleKey)
 	case xErr == nil:
 		if !errors.Is(cErr, biz.ErrQualityInspectionSourceState) || stored.Status != biz.OperationalFactStatusCancelled || active != 0 {
 			t.Fatalf("return-cancel-won state create=%v cancel=%v status=%s active=%d", cErr, xErr, stored.Status, active)
 		}
+		assertFulfillmentTask(t, ctx, client, "outsourcing_quality_request", fact.ID, "withdrawn", biz.QualityRoleKey)
 	default:
 		t.Fatalf("race must have one successful command: create=%v cancel=%v", cErr, xErr)
 	}

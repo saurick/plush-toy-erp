@@ -1,8 +1,56 @@
 import { Alert, Tag, Typography } from 'antd'
 import { MermaidDiagram } from '@/common/components/markdown'
 import DevCiWorkflowGuide from '../../../components/DevCiWorkflowGuide.jsx'
+import {
+  DEV_DELIVERY_TARGETS,
+  DEV_VERSION_CENTER_HISTORY_FILTER_ALL,
+  DEV_VERSION_CENTER_HISTORY_RESULT_ATTENTION,
+  DEV_VERSION_CENTER_HISTORY_RESULT_PASSED,
+  deliveryIdempotencyPresentation,
+  deliveryStatusPresentation,
+} from '../../../config/devDelivery.mjs'
 
 const { Paragraph, Text, Title } = Typography
+
+export const OPERATION_POLL_INTERVAL_MS = 1500
+
+export const OPERATION_DETAIL_FOCUS_RESTORE_FALLBACK_MS = 600
+
+export const POLLING_OPERATION_STATUSES = new Set([
+  'queued',
+  'running',
+  'launching',
+  'waiting',
+])
+
+export const OPEN_OPERATION_STATUSES = new Set([
+  ...POLLING_OPERATION_STATUSES,
+  'ready',
+])
+
+export const OPERATION_HISTORY_RESULT_OPTIONS = [
+  { label: '全部', value: DEV_VERSION_CENTER_HISTORY_FILTER_ALL },
+  { label: '需处理', value: DEV_VERSION_CENTER_HISTORY_RESULT_ATTENTION },
+  { label: '已通过', value: DEV_VERSION_CENTER_HISTORY_RESULT_PASSED },
+]
+
+export const OPERATION_HISTORY_ACTION_OPTIONS = [
+  { label: '全部动作', value: DEV_VERSION_CENTER_HISTORY_FILTER_ALL },
+  { label: '发布制品', value: 'release' },
+  { label: '部署版本', value: 'promote' },
+  { label: '回滚版本', value: 'rollback' },
+  { label: '清空并重建数据', value: 'rebuild-database' },
+]
+
+export const OPERATION_HISTORY_TARGET_OPTIONS = [
+  { label: '全部目标', value: DEV_VERSION_CENTER_HISTORY_FILTER_ALL },
+  { label: 'GitLab Release', value: 'gitlab-release' },
+  { label: 'GitHub 历史 Release', value: 'github-release' },
+  ...DEV_DELIVERY_TARGETS.map((target) => ({
+    label: target.shortLabel,
+    value: target.key,
+  })),
+]
 
 export const GIT_INDEX_LOCK_RECOVERY_FLOW = `flowchart TD
   B{"准备暂存或提交：index.lock 是否存在"}
@@ -33,6 +81,83 @@ export const AUTOMATION_EXECUTION_HANDOFF_FLOW = `flowchart TD
   G --> H["执行期间不重建同目的心跳"]
   H --> I["完成后报告结果"]
   I --> J["只有用户再次要求等待<br/>才创建新的心跳"]`
+
+export function upsertOperation(operations, operation) {
+  const currentOperations = Array.isArray(operations) ? operations : []
+  if (!operation) return currentOperations
+  return [
+    operation,
+    ...currentOperations.filter((item) => item.id !== operation.id),
+  ]
+}
+
+export function StatusTag({ status }) {
+  const presentation = deliveryStatusPresentation(status)
+  return <Tag color={presentation.color}>{presentation.label}</Tag>
+}
+
+export function OperationIdempotencyText({ operation }) {
+  const presentation = deliveryIdempotencyPresentation(operation.idempotency)
+  return <Text type="secondary">{presentation.label}</Text>
+}
+
+export function OperationMetricItem({ label, value }) {
+  return (
+    <div>
+      <Text type="secondary">{label}</Text>
+      <Text strong>{value}</Text>
+    </div>
+  )
+}
+
+export function issueDescription(issues = []) {
+  if (!Array.isArray(issues) || issues.length === 0) return ''
+  return issues.map((issue) => issue.message).join('；')
+}
+
+export function operationActionLabel(
+  action,
+  promotionMode = null,
+  target = ''
+) {
+  if (action === 'release') return '发布制品'
+  if (action === 'promote' && promotionMode === 'initialize') {
+    return '首次部署'
+  }
+  if (action === 'promote') return '部署指定版本'
+  if (action === 'rebuild-database') {
+    return target === 'customer-test-133'
+      ? '清空并重建测试数据'
+      : '重建目标数据'
+  }
+  return '回滚版本'
+}
+
+export function deliveryTargetLabel(targetKey) {
+  if (targetKey === 'gitlab-release') return 'GitLab Release'
+  if (targetKey === 'github-release') return 'GitHub 历史 Release'
+  return (
+    DEV_DELIVERY_TARGETS.find((target) => target.key === targetKey)?.label ||
+    targetKey ||
+    '目标未证明'
+  )
+}
+
+export function operationUpdateAction(operation) {
+  return operation?.terminal ? '完成于' : '更新于'
+}
+
+export function operationHistoryStatePresentation(state) {
+  return (
+    {
+      loading: { label: '加载中', color: 'processing' },
+      normal: { label: '已读回', color: 'success' },
+      empty: { label: '暂无记录', color: 'default' },
+      failure: { label: '不可读', color: 'error' },
+      stale: { label: '上次结果', color: 'warning' },
+    }[state] || { label: '不可读', color: 'error' }
+  )
+}
 
 export const MANUAL_TAKEOVER_STEPS = [
   {

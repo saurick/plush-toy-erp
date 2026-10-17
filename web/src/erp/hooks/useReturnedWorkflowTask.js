@@ -8,12 +8,14 @@ import { consumeWorkflowTaskReturn, readWorkflowTaskReturn } from '../utils/work
 export default function useReturnedWorkflowTask(adminID, onTask, source = null, enabled = true) {
   const location = useLocation()
   const callback = useRef(onTask)
+  const returnContext = useRef(null)
   const consumed = useRef('')
   callback.current = onTask
   // Raw history receives the marker before leaving. Only a router arrival can
   // restore it; live history also prevents remounted rows from consuming it twice.
   const value = readWorkflowTaskReturn(location.state, adminID, source)
   const pending = readWorkflowTaskReturn(window.history.state?.usr, adminID, source)
+  returnContext.current = pending
   const taskID = enabled && value && value.taskID === pending?.taskID ? value.taskID : null
   useEffect(() => {
     const key = `${location.key}:${adminID}:${taskID}`
@@ -23,7 +25,7 @@ export default function useReturnedWorkflowTask(adminID, onTask, source = null, 
       if (!controller.signal.aborted) {
         consumed.current = key
         consumeWorkflowTaskReturn(taskID, adminID)
-        callback.current(task)
+        callback.current(task, returnContext.current)
       }
     }).catch((error) => {
       if (!controller.signal.aborted) message.error(getActionErrorMessage(error, '任务已更新，请重新读取任务'))

@@ -4,9 +4,11 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/financecreditnote"
+	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/predicate"
 
 	"entgo.io/ent"
@@ -18,10 +20,13 @@ import (
 // FinanceCreditNoteQuery is the builder for querying FinanceCreditNote entities.
 type FinanceCreditNoteQuery struct {
 	config
-	ctx        *QueryContext
-	order      []financecreditnote.OrderOption
-	inters     []Interceptor
-	predicates []predicate.FinanceCreditNote
+	ctx             *QueryContext
+	order           []financecreditnote.OrderOption
+	inters          []Interceptor
+	predicates      []predicate.FinanceCreditNote
+	withFinanceFact *FinanceFactQuery
+	withReversals   *FinanceCreditNoteQuery
+	withReversalOf  *FinanceCreditNoteQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -56,6 +61,72 @@ func (_q *FinanceCreditNoteQuery) Unique(unique bool) *FinanceCreditNoteQuery {
 func (_q *FinanceCreditNoteQuery) Order(o ...financecreditnote.OrderOption) *FinanceCreditNoteQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QueryFinanceFact chains the current query on the "finance_fact" edge.
+func (_q *FinanceCreditNoteQuery) QueryFinanceFact() *FinanceFactQuery {
+	query := (&FinanceFactClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financecreditnote.Table, financecreditnote.FieldID, selector),
+			sqlgraph.To(financefact.Table, financefact.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, financecreditnote.FinanceFactTable, financecreditnote.FinanceFactColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryReversals chains the current query on the "reversals" edge.
+func (_q *FinanceCreditNoteQuery) QueryReversals() *FinanceCreditNoteQuery {
+	query := (&FinanceCreditNoteClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financecreditnote.Table, financecreditnote.FieldID, selector),
+			sqlgraph.To(financecreditnote.Table, financecreditnote.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, financecreditnote.ReversalsTable, financecreditnote.ReversalsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryReversalOf chains the current query on the "reversal_of" edge.
+func (_q *FinanceCreditNoteQuery) QueryReversalOf() *FinanceCreditNoteQuery {
+	query := (&FinanceCreditNoteClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financecreditnote.Table, financecreditnote.FieldID, selector),
+			sqlgraph.To(financecreditnote.Table, financecreditnote.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, financecreditnote.ReversalOfTable, financecreditnote.ReversalOfColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first FinanceCreditNote entity from the query.
@@ -245,15 +316,51 @@ func (_q *FinanceCreditNoteQuery) Clone() *FinanceCreditNoteQuery {
 		return nil
 	}
 	return &FinanceCreditNoteQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]financecreditnote.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.FinanceCreditNote{}, _q.predicates...),
+		config:          _q.config,
+		ctx:             _q.ctx.Clone(),
+		order:           append([]financecreditnote.OrderOption{}, _q.order...),
+		inters:          append([]Interceptor{}, _q.inters...),
+		predicates:      append([]predicate.FinanceCreditNote{}, _q.predicates...),
+		withFinanceFact: _q.withFinanceFact.Clone(),
+		withReversals:   _q.withReversals.Clone(),
+		withReversalOf:  _q.withReversalOf.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithFinanceFact tells the query-builder to eager-load the nodes that are connected to
+// the "finance_fact" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *FinanceCreditNoteQuery) WithFinanceFact(opts ...func(*FinanceFactQuery)) *FinanceCreditNoteQuery {
+	query := (&FinanceFactClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withFinanceFact = query
+	return _q
+}
+
+// WithReversals tells the query-builder to eager-load the nodes that are connected to
+// the "reversals" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *FinanceCreditNoteQuery) WithReversals(opts ...func(*FinanceCreditNoteQuery)) *FinanceCreditNoteQuery {
+	query := (&FinanceCreditNoteClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withReversals = query
+	return _q
+}
+
+// WithReversalOf tells the query-builder to eager-load the nodes that are connected to
+// the "reversal_of" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *FinanceCreditNoteQuery) WithReversalOf(opts ...func(*FinanceCreditNoteQuery)) *FinanceCreditNoteQuery {
+	query := (&FinanceCreditNoteClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withReversalOf = query
+	return _q
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -332,8 +439,13 @@ func (_q *FinanceCreditNoteQuery) prepareQuery(ctx context.Context) error {
 
 func (_q *FinanceCreditNoteQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*FinanceCreditNote, error) {
 	var (
-		nodes = []*FinanceCreditNote{}
-		_spec = _q.querySpec()
+		nodes       = []*FinanceCreditNote{}
+		_spec       = _q.querySpec()
+		loadedTypes = [3]bool{
+			_q.withFinanceFact != nil,
+			_q.withReversals != nil,
+			_q.withReversalOf != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*FinanceCreditNote).scanValues(nil, columns)
@@ -341,6 +453,7 @@ func (_q *FinanceCreditNoteQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &FinanceCreditNote{config: _q.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -352,7 +465,121 @@ func (_q *FinanceCreditNoteQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withFinanceFact; query != nil {
+		if err := _q.loadFinanceFact(ctx, query, nodes, nil,
+			func(n *FinanceCreditNote, e *FinanceFact) { n.Edges.FinanceFact = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withReversals; query != nil {
+		if err := _q.loadReversals(ctx, query, nodes,
+			func(n *FinanceCreditNote) { n.Edges.Reversals = []*FinanceCreditNote{} },
+			func(n *FinanceCreditNote, e *FinanceCreditNote) { n.Edges.Reversals = append(n.Edges.Reversals, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withReversalOf; query != nil {
+		if err := _q.loadReversalOf(ctx, query, nodes, nil,
+			func(n *FinanceCreditNote, e *FinanceCreditNote) { n.Edges.ReversalOf = e }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (_q *FinanceCreditNoteQuery) loadFinanceFact(ctx context.Context, query *FinanceFactQuery, nodes []*FinanceCreditNote, init func(*FinanceCreditNote), assign func(*FinanceCreditNote, *FinanceFact)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*FinanceCreditNote)
+	for i := range nodes {
+		fk := nodes[i].FinanceFactID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(financefact.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "finance_fact_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *FinanceCreditNoteQuery) loadReversals(ctx context.Context, query *FinanceCreditNoteQuery, nodes []*FinanceCreditNote, init func(*FinanceCreditNote), assign func(*FinanceCreditNote, *FinanceCreditNote)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*FinanceCreditNote)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(financecreditnote.FieldReversalOfCreditNoteID)
+	}
+	query.Where(predicate.FinanceCreditNote(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(financecreditnote.ReversalsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ReversalOfCreditNoteID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "reversal_of_credit_note_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "reversal_of_credit_note_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *FinanceCreditNoteQuery) loadReversalOf(ctx context.Context, query *FinanceCreditNoteQuery, nodes []*FinanceCreditNote, init func(*FinanceCreditNote), assign func(*FinanceCreditNote, *FinanceCreditNote)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*FinanceCreditNote)
+	for i := range nodes {
+		if nodes[i].ReversalOfCreditNoteID == nil {
+			continue
+		}
+		fk := *nodes[i].ReversalOfCreditNoteID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(financecreditnote.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "reversal_of_credit_note_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
 }
 
 func (_q *FinanceCreditNoteQuery) sqlCount(ctx context.Context) (int, error) {
@@ -379,6 +606,12 @@ func (_q *FinanceCreditNoteQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != financecreditnote.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withFinanceFact != nil {
+			_spec.Node.AddColumnOnce(financecreditnote.FieldFinanceFactID)
+		}
+		if _q.withReversalOf != nil {
+			_spec.Node.AddColumnOnce(financecreditnote.FieldReversalOfCreditNoteID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Form, Input } from 'antd'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { RpcDomain, RpcMethod } from '../../common/consts/rpcMethods.generated.mjs'
 import BusinessModal from '@/erp/components/business-list/BusinessModal.jsx'
 import { AUTH_SCOPE, getLoginPath, getToken, logout } from '@/common/auth/auth'
@@ -10,12 +10,14 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { adminPasswordPolicyRule } from '../utils/adminPasswordPolicy.mjs'
+import { mobileBusinessRole } from '../utils/businessTaskRoute.mjs'
 
 const accountRpc = new JsonRpc({ url: RpcDomain.ADMIN, basePath: ADMIN_BASE_PATH })
 
 export default function AccountPasswordModal({ onClose }) {
   const [form] = Form.useForm()
   const navigate = useNavigate()
+  const location = useLocation()
   const [saving, setSaving] = useState(false)
   const [failure, setFailure] = useState('')
   const savingRef = useRef(false)
@@ -42,7 +44,11 @@ export default function AccountPasswordModal({ onClose }) {
       form.resetFields()
       logout(AUTH_SCOPE.ADMIN)
       message.success('密码已修改，请使用新密码重新登录')
-      navigate(getLoginPath(AUTH_SCOPE.ADMIN), { replace: true })
+      const role = mobileBusinessRole(location.pathname)
+      navigate(getLoginPath(AUTH_SCOPE.ADMIN), {
+        replace: true,
+        ...(role ? { state: { from: { pathname: `/m/${role}/tasks` } } } : {}),
+      })
     } catch (error) {
       if (!mountedRef.current || getToken(AUTH_SCOPE.ADMIN) !== requestToken) {
         return

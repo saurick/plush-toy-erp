@@ -9,6 +9,12 @@
   color: var(--erp-text);
 }
 
+.workflow-task-current__body {
+  display: grid;
+  min-width: 0;
+  gap: 7px;
+}
+
 .workflow-task-current h3 {
   display: flex;
   align-items: center;
@@ -20,9 +26,26 @@
   line-height: 1.5;
 }
 
+.workflow-task-info-cause .anticon { margin-top: 3px; }
+
 .workflow-task-current h3 > .anticon {
   color: var(--erp-primary);
   font-size: 16px;
+}
+
+.workflow-task-current__step-number {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  color: var(--erp-primary-strong);
+  font-size: var(--erp-font-caption);
+  font-weight: 500;
+  line-height: 1;
 }
 
 .workflow-task-current__responsibility {
@@ -64,6 +87,32 @@
   color: var(--erp-visual-danger-text);
 }
 
+.workflow-task-current--blocked .workflow-task-current__step-number {
+  color: var(--erp-visual-danger-text);
+}
+
+.workflow-task-current--numbered {
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  padding: 0;
+  background: transparent;
+}
+
+.workflow-task-current--numbered .workflow-task-current__step-number {
+  margin-top: 10px;
+}
+
+.workflow-task-current--numbered .workflow-task-current__body {
+  padding: 13px 14px;
+  border-radius: 8px;
+  background: var(--erp-primary-soft);
+}
+
+.workflow-task-current--numbered.workflow-task-current--blocked .workflow-task-current__body {
+  background: color-mix(in srgb, var(--erp-visual-danger-text) 9%, var(--erp-surface-bg));
+}
+
 .workflow-task-current--done {
   background: #edf9f0;
 }
@@ -88,3 +137,17 @@
   color: var(--erp-text);
   font-weight: 600;
 }
+
+.workflow-task-current--facts { display: block; margin: 14px 0 0; padding: 0; border-radius: 0; background: transparent; }
+.workflow-task-info-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0; padding: 0; border: 1px solid var(--erp-border); border-radius: 9px; overflow: hidden; }
+.workflow-task-info-facts > div { display: flex; min-width: 0; justify-content: space-between; align-items: center; gap: 12px; padding: 12px; }
+.workflow-task-info-facts > div + div { border-inline-start: 1px solid var(--erp-border); }
+.workflow-task-info-facts dt { flex-shrink: 0; color: var(--erp-text-muted); }
+.workflow-task-info-facts dd { min-width: 0; margin: 0; text-align: right; overflow-wrap: anywhere; }
+.workflow-task-info-facts dd > span { font-size: var(--erp-font-caption); color: var(--erp-text-muted); }
+.workflow-task-info-facts dd[data-tone='danger'] { color: var(--erp-visual-danger-text); }
+.workflow-task-info-step { display: inline-flex; align-items: center; gap: 4px; margin-inline-start: 6px; white-space: nowrap; }
+.workflow-task-info-step .workflow-task-current__step-number { width: 20px; height: 20px; border-width: 1px; }
+.workflow-task-info-cause { display: grid; gap: 7px; margin-top: 14px; border: 1px solid color-mix(in srgb, var(--erp-visual-danger-text) 25%, var(--erp-border)); border-radius: 9px; padding: 13px; background: color-mix(in srgb, var(--erp-visual-danger-text) 8%, var(--erp-surface-bg)); color: var(--erp-visual-danger-text); }
+.workflow-task-info-cause p:first-child { display: flex; align-items: flex-start; gap: 7px; }
+.workflow-task-current--facts .workflow-task-current__guidance { margin-top: 10px; }

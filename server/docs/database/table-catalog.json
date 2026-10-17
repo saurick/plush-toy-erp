@@ -347,6 +347,36 @@
       ]
     },
     {
+      "name": "help_feedbacks",
+      "title": "帮助章节纠错",
+      "domain": "account-access-config",
+      "kind": "SourceDocument",
+      "purpose": "保存员工对可读章节的纠错、所读版本和维护人员处理回复。",
+      "boundary": "纠错提交不改变正式手册、企业补充或业务规则；普通员工只查看本人记录。",
+      "lifecycle": "提交后保留来源快照，维护人员可追加一次处理回复，不提供删除。",
+      "writeBoundary": "HelpContentUsecase 校验阅读范围与维护资格，repository 保存当前账号身份和幂等请求。"
+    },
+    {
+      "name": "help_supplement_revisions",
+      "title": "企业补充修订记录",
+      "domain": "account-access-config",
+      "kind": "Fact",
+      "purpose": "不可变保存每次草稿保存、发布和历史恢复的正文、说明、来源身份及操作者。",
+      "boundary": "它是企业说明的版本与审计记录，不覆盖正式产品文档或业务事实。",
+      "lifecycle": "只追加；恢复历史新建草稿记录，发布显式切换当前版本。",
+      "writeBoundary": "HelpContentUsecase 授权，repository 在当前版本 CAS 事务内追加；Ent hook 拒绝更新和删除。"
+    },
+    {
+      "name": "help_supplements",
+      "title": "章节企业补充",
+      "domain": "account-access-config",
+      "kind": "Config",
+      "purpose": "保存章节的当前草稿、并发版本和已发布修订指向。",
+      "boundary": "正文继承原章节阅读范围，正式文档仍由产品来源生成；阅读接口不暴露草稿。",
+      "lifecycle": "编辑保存草稿，发布后进入阅读、搜索和下载；清空发布可撤下展示，历史保留。",
+      "writeBoundary": "仅经 HelpContentUsecase 和 repository 的版本检查事务写入，不提供通用删除。"
+    },
+    {
       "name": "inventory_balances",
       "title": "库存余额投影",
       "domain": "inventory-quality",
@@ -803,7 +833,9 @@
       "boundary": "工程样品状态与订单生效分开。样品确认绑定 BOM 内容指纹、产品图片和确认人；返单只能沿用同客户已确认的同款资料。实际出货量只由出货事实派生。",
       "lifecycle": "草稿聚合内可维护；行状态 open、closed 或 canceled；正式行不独立物理删除。",
       "writeBoundary": "SalesOrderUsecase 分别控制商务草稿和工程资料事务；用料提交后不允许改写对应工程来源。",
-      "sensitiveFields": ["import_source"],
+      "sensitiveFields": [
+        "import_source"
+      ],
       "fieldNotes": [
         {
           "name": "import_source",

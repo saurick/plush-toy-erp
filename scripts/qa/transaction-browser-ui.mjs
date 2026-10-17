@@ -3,6 +3,8 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { browserRPCURL } from "./browser-write-target.mjs";
 import { consumeExpectedRPCFailure, trackBrowserRPCNetwork } from "./transaction-browser-network.mjs";
+import { mobileTaskBusinessPath } from "../../web/src/erp/mobile/utils/mobileTaskBusiness.mjs";
+import { waitForFiniteAnimations } from "../../web/scripts/style-l1/browserReadiness.mjs";
 
 const require = createRequire(
   new URL("../../web/package.json", import.meta.url),
@@ -46,6 +48,45 @@ export async function openMobileTaskCard(page, taskID) {
   });
 }
 
+export async function openMobileSourceTask(page, options, client, role, sourceType, sourceID, groups) {
+  assert.equal(options.mobile, true);
+  const { tasks } = await client.rpc(role, "workflow", "list_tasks", {
+    source_type: sourceType,
+    source_id: sourceID,
+    limit: 100,
+  });
+  const candidates = tasks.filter(task => task.source_type === sourceType && task.source_id === sourceID && task.owner_role_key === role && groups.includes(task.task_group));
+  assert.equal(candidates.length, 1, `${sourceType}:${sourceID} must have one authoritative task for ${groups.join(",")}`);
+  const [task] = candidates;
+  const target = mobileTaskBusinessPath(task, role);
+  assert.ok(target, "the actual source task must resolve to an exact business form");
+  await navigate(page, `${options.baseURL}/m/${role}/tasks`);
+  await page.getByTestId("mobile-role-nav-tasks").click();
+  await page.getByLabel("任务状态", { exact: true }).getByText(
+    ["done", "withdrawn", "cancelled"].includes(task.task_status_key) ? "已办" : "待办",
+    { exact: true },
+  ).click();
+  assert.ok(task.source_no, "a source task must expose its real business reference");
+  const search = page.getByRole("searchbox");
+  await search.fill(task.source_no);
+  await search.press("Enter");
+  await openMobileTaskCard(page, task.id);
+  const detail = page.getByTestId("mobile-task-detail-screen");
+  await expect(detail).toBeVisible();
+  const entry = detail.getByRole("button", { name: /^(办理业务|选择处理方式)$/u });
+  await expect(entry).toHaveCount(1);
+  await expect(entry).toBeEnabled();
+  if ((await entry.textContent()).trim() === "选择处理方式") {
+    await entry.click();
+    await page.getByTestId("mobile-task-action-screen").getByRole("button", { name: "办理业务单据", exact: true }).click();
+  } else await entry.click();
+  await page.waitForURL(`${options.baseURL}${target}`);
+  await expect(page.getByTestId("mobile-task-business-screen")).toBeVisible();
+  await expect(page.getByTestId("mobile-task-flow-steps").locator("[data-step-key]")).toHaveCount(3);
+  await assertMobileLayout(page, options);
+  return task;
+}
+
 export async function openDesktopTaskRow(page, task, sourceNo) {
   const row = page.locator(`tr.erp-task-table-row[data-row-key="${task.id}"]`);
   await expect(row).toHaveCount(1);
@@ -75,15 +116,34 @@ export async function assertMobileLayout(page, options) {
 }
 
 export async function selectOption(page, control, label) {
+  await waitForFiniteAnimations(page, { selector: ".ant-modal" });
   await control
     .locator("xpath=ancestor::div[contains(@class,'ant-select-selector')][1]")
     .click();
-  await page
-    .locator(".ant-select-dropdown:visible")
-    .getByText(label, { exact: true })
-    .click();
+  const listboxID = await control.getAttribute("aria-controls");
+  assert.ok(listboxID, "select control must identify its own listbox");
+  const dropdown = page.locator(`[id=${JSON.stringify(listboxID)}]`)
+    .locator("xpath=ancestor::div[contains(@class,'ant-select-dropdown')][1]");
+  await expect(dropdown).toBeVisible();
+  await waitForFiniteAnimations(page, { selector: ".ant-select-dropdown" });
+  const option = dropdown.getByText(label, { exact: true });
+  await expect(option).toHaveCount(1);
+  await option.click();
+  const multiple = await control.evaluate(node => node.closest(".ant-select").classList.contains("ant-select-multiple"));
+  if (multiple) {
+    const selectedOption = option.locator("xpath=ancestor::*[contains(concat(' ',normalize-space(@class),' '),' ant-select-item-option ')][1]");
+    await expect(selectedOption).toHaveClass(/ant-select-item-option-selected/u);
+    await control.press("Escape");
+  }
+  await expect(control).toHaveAttribute("aria-expanded", "false");
 }
 export async function selectRow(page, id) {
+  if (/^\/m\/[a-z_]+\/tasks\/[1-9][0-9]*\/handle\//u.test(new URL(page.url()).pathname)) {
+    const source = page.getByTestId("mobile-task-business-source");
+    await expect(source).toHaveCount(1);
+    await expect(source).toHaveAttribute("data-record-id", String(id));
+    return;
+  }
   const row = page.locator(`.ant-table-row[data-row-key="${id}"]:visible`);
   await expect(row).toHaveCount(1);
   const radio = row.getByRole("radio");
@@ -104,18 +164,29 @@ export async function modal(page, title) {
     .getByRole("dialog")
     .filter({ has: page.getByText(title, { exact: true }) });
   await expect(dialog).toBeVisible();
+  await waitForFiniteAnimations(page, { selector: ".ant-modal" });
   return dialog;
 }
-export async function navigate(page, url) {
+export async function settleRPCPage(page) {
   await page.waitForLoadState("networkidle");
   await expect.poll(() => page.pendingRPC.size).toBe(0);
   await Promise.all([...page.rpcResponses]);
-  await page.goto(url);
-  await page.waitForLoadState("networkidle");
-}
-export async function closePage(page, context) {
+  // Let collected results mount views and deliver IntersectionObserver reads.
+  // Drain those reads before replacing the document or closing its context.
+  await page.evaluate(() => new Promise((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve)),
+  ));
   await page.waitForLoadState("networkidle");
   await expect.poll(() => page.pendingRPC.size).toBe(0);
+  await Promise.all([...page.rpcResponses]);
+}
+export async function navigate(page, url) {
+  await settleRPCPage(page);
+  await page.goto(url);
+  await settleRPCPage(page);
+}
+export async function closePage(page, context) {
+  await settleRPCPage(page);
   await context.unrouteAll({ behavior: "wait" });
   await Promise.all([...page.rpcResponses]);
   assert.equal(
@@ -282,6 +353,7 @@ export async function login(browser, options, role, report) {
     await expect.poll(() => page.pendingRPC.size).toBe(0);
     await Promise.all([...page.rpcResponses]);
   }
+  await settleRPCPage(page);
   return { page, context };
   } catch (error) {
     await captureFailure(page, options, report, error);
@@ -369,7 +441,10 @@ export async function dropRealResponse(page, options, domain, method) {
         "the real backend fault request must start before removal",
       );
       await completed;
-      await page.unroute(pattern, handler);
+      // Keep the route alive while recovery starts and finishes its real reads.
+      // Removing it with queued interceptions can strand a fallback request.
+      if (!state.failure) await settleRPCPage(page);
+      await page.unrouteAll({ behavior: "wait" });
       if (state.failure) throw state.failure;
       assert.equal(state.injected, true);
     },

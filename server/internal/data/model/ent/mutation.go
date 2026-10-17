@@ -24,6 +24,9 @@ import (
 	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/financepayment"
+	"server/internal/data/model/ent/helpfeedback"
+	"server/internal/data/model/ent/helpsupplement"
+	"server/internal/data/model/ent/helpsupplementrevision"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorylotstatusevent"
@@ -117,6 +120,9 @@ const (
 	TypeFinanceCreditNote                  = "FinanceCreditNote"
 	TypeFinanceFact                        = "FinanceFact"
 	TypeFinancePayment                     = "FinancePayment"
+	TypeHelpFeedback                       = "HelpFeedback"
+	TypeHelpSupplement                     = "HelpSupplement"
+	TypeHelpSupplementRevision             = "HelpSupplementRevision"
 	TypeInventoryBalance                   = "InventoryBalance"
 	TypeInventoryLot                       = "InventoryLot"
 	TypeInventoryLotStatusEvent            = "InventoryLotStatusEvent"
@@ -15154,27 +15160,30 @@ func (m *EngineeringMaterialRequestItemMutation) ResetEdge(name string) error {
 // FinanceAllocationMutation represents an operation that mutates the FinanceAllocation nodes in the graph.
 type FinanceAllocationMutation struct {
 	config
-	op                           Op
-	typ                          string
-	id                           *int
-	reason                       *string
-	finance_fact_id              *int
-	addfinance_fact_id           *int
-	amount                       *decimal.Decimal
-	currency                     *string
-	status                       *string
-	reversal_of_allocation_id    *int
-	addreversal_of_allocation_id *int
-	idempotency_key              *string
-	created_by                   *int
-	addcreated_by                *int
-	created_at                   *time.Time
-	clearedFields                map[string]struct{}
-	payment                      *int
-	clearedpayment               bool
-	done                         bool
-	oldValue                     func(context.Context) (*FinanceAllocation, error)
-	predicates                   []predicate.FinanceAllocation
+	op                  Op
+	typ                 string
+	id                  *int
+	reason              *string
+	amount              *decimal.Decimal
+	currency            *string
+	status              *string
+	idempotency_key     *string
+	created_by          *int
+	addcreated_by       *int
+	created_at          *time.Time
+	clearedFields       map[string]struct{}
+	payment             *int
+	clearedpayment      bool
+	finance_fact        *int
+	clearedfinance_fact bool
+	reversals           map[int]struct{}
+	removedreversals    map[int]struct{}
+	clearedreversals    bool
+	reversal_of         *int
+	clearedreversal_of  bool
+	done                bool
+	oldValue            func(context.Context) (*FinanceAllocation, error)
+	predicates          []predicate.FinanceAllocation
 }
 
 var _ ent.Mutation = (*FinanceAllocationMutation)(nil)
@@ -15362,13 +15371,12 @@ func (m *FinanceAllocationMutation) ResetPaymentID() {
 
 // SetFinanceFactID sets the "finance_fact_id" field.
 func (m *FinanceAllocationMutation) SetFinanceFactID(i int) {
-	m.finance_fact_id = &i
-	m.addfinance_fact_id = nil
+	m.finance_fact = &i
 }
 
 // FinanceFactID returns the value of the "finance_fact_id" field in the mutation.
 func (m *FinanceAllocationMutation) FinanceFactID() (r int, exists bool) {
-	v := m.finance_fact_id
+	v := m.finance_fact
 	if v == nil {
 		return
 	}
@@ -15392,28 +15400,9 @@ func (m *FinanceAllocationMutation) OldFinanceFactID(ctx context.Context) (v int
 	return oldValue.FinanceFactID, nil
 }
 
-// AddFinanceFactID adds i to the "finance_fact_id" field.
-func (m *FinanceAllocationMutation) AddFinanceFactID(i int) {
-	if m.addfinance_fact_id != nil {
-		*m.addfinance_fact_id += i
-	} else {
-		m.addfinance_fact_id = &i
-	}
-}
-
-// AddedFinanceFactID returns the value that was added to the "finance_fact_id" field in this mutation.
-func (m *FinanceAllocationMutation) AddedFinanceFactID() (r int, exists bool) {
-	v := m.addfinance_fact_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
 // ResetFinanceFactID resets all changes to the "finance_fact_id" field.
 func (m *FinanceAllocationMutation) ResetFinanceFactID() {
-	m.finance_fact_id = nil
-	m.addfinance_fact_id = nil
+	m.finance_fact = nil
 }
 
 // SetAmount sets the "amount" field.
@@ -15526,13 +15515,12 @@ func (m *FinanceAllocationMutation) ResetStatus() {
 
 // SetReversalOfAllocationID sets the "reversal_of_allocation_id" field.
 func (m *FinanceAllocationMutation) SetReversalOfAllocationID(i int) {
-	m.reversal_of_allocation_id = &i
-	m.addreversal_of_allocation_id = nil
+	m.reversal_of = &i
 }
 
 // ReversalOfAllocationID returns the value of the "reversal_of_allocation_id" field in the mutation.
 func (m *FinanceAllocationMutation) ReversalOfAllocationID() (r int, exists bool) {
-	v := m.reversal_of_allocation_id
+	v := m.reversal_of
 	if v == nil {
 		return
 	}
@@ -15556,28 +15544,9 @@ func (m *FinanceAllocationMutation) OldReversalOfAllocationID(ctx context.Contex
 	return oldValue.ReversalOfAllocationID, nil
 }
 
-// AddReversalOfAllocationID adds i to the "reversal_of_allocation_id" field.
-func (m *FinanceAllocationMutation) AddReversalOfAllocationID(i int) {
-	if m.addreversal_of_allocation_id != nil {
-		*m.addreversal_of_allocation_id += i
-	} else {
-		m.addreversal_of_allocation_id = &i
-	}
-}
-
-// AddedReversalOfAllocationID returns the value that was added to the "reversal_of_allocation_id" field in this mutation.
-func (m *FinanceAllocationMutation) AddedReversalOfAllocationID() (r int, exists bool) {
-	v := m.addreversal_of_allocation_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
 // ClearReversalOfAllocationID clears the value of the "reversal_of_allocation_id" field.
 func (m *FinanceAllocationMutation) ClearReversalOfAllocationID() {
-	m.reversal_of_allocation_id = nil
-	m.addreversal_of_allocation_id = nil
+	m.reversal_of = nil
 	m.clearedFields[financeallocation.FieldReversalOfAllocationID] = struct{}{}
 }
 
@@ -15589,8 +15558,7 @@ func (m *FinanceAllocationMutation) ReversalOfAllocationIDCleared() bool {
 
 // ResetReversalOfAllocationID resets all changes to the "reversal_of_allocation_id" field.
 func (m *FinanceAllocationMutation) ResetReversalOfAllocationID() {
-	m.reversal_of_allocation_id = nil
-	m.addreversal_of_allocation_id = nil
+	m.reversal_of = nil
 	delete(m.clearedFields, financeallocation.FieldReversalOfAllocationID)
 }
 
@@ -15749,6 +15717,127 @@ func (m *FinanceAllocationMutation) ResetPayment() {
 	m.clearedpayment = false
 }
 
+// ClearFinanceFact clears the "finance_fact" edge to the FinanceFact entity.
+func (m *FinanceAllocationMutation) ClearFinanceFact() {
+	m.clearedfinance_fact = true
+	m.clearedFields[financeallocation.FieldFinanceFactID] = struct{}{}
+}
+
+// FinanceFactCleared reports if the "finance_fact" edge to the FinanceFact entity was cleared.
+func (m *FinanceAllocationMutation) FinanceFactCleared() bool {
+	return m.clearedfinance_fact
+}
+
+// FinanceFactIDs returns the "finance_fact" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// FinanceFactID instead. It exists only for internal usage by the builders.
+func (m *FinanceAllocationMutation) FinanceFactIDs() (ids []int) {
+	if id := m.finance_fact; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetFinanceFact resets all changes to the "finance_fact" edge.
+func (m *FinanceAllocationMutation) ResetFinanceFact() {
+	m.finance_fact = nil
+	m.clearedfinance_fact = false
+}
+
+// AddReversalIDs adds the "reversals" edge to the FinanceAllocation entity by ids.
+func (m *FinanceAllocationMutation) AddReversalIDs(ids ...int) {
+	if m.reversals == nil {
+		m.reversals = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.reversals[ids[i]] = struct{}{}
+	}
+}
+
+// ClearReversals clears the "reversals" edge to the FinanceAllocation entity.
+func (m *FinanceAllocationMutation) ClearReversals() {
+	m.clearedreversals = true
+}
+
+// ReversalsCleared reports if the "reversals" edge to the FinanceAllocation entity was cleared.
+func (m *FinanceAllocationMutation) ReversalsCleared() bool {
+	return m.clearedreversals
+}
+
+// RemoveReversalIDs removes the "reversals" edge to the FinanceAllocation entity by IDs.
+func (m *FinanceAllocationMutation) RemoveReversalIDs(ids ...int) {
+	if m.removedreversals == nil {
+		m.removedreversals = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.reversals, ids[i])
+		m.removedreversals[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedReversals returns the removed IDs of the "reversals" edge to the FinanceAllocation entity.
+func (m *FinanceAllocationMutation) RemovedReversalsIDs() (ids []int) {
+	for id := range m.removedreversals {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ReversalsIDs returns the "reversals" edge IDs in the mutation.
+func (m *FinanceAllocationMutation) ReversalsIDs() (ids []int) {
+	for id := range m.reversals {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetReversals resets all changes to the "reversals" edge.
+func (m *FinanceAllocationMutation) ResetReversals() {
+	m.reversals = nil
+	m.clearedreversals = false
+	m.removedreversals = nil
+}
+
+// SetReversalOfID sets the "reversal_of" edge to the FinanceAllocation entity by id.
+func (m *FinanceAllocationMutation) SetReversalOfID(id int) {
+	m.reversal_of = &id
+}
+
+// ClearReversalOf clears the "reversal_of" edge to the FinanceAllocation entity.
+func (m *FinanceAllocationMutation) ClearReversalOf() {
+	m.clearedreversal_of = true
+	m.clearedFields[financeallocation.FieldReversalOfAllocationID] = struct{}{}
+}
+
+// ReversalOfCleared reports if the "reversal_of" edge to the FinanceAllocation entity was cleared.
+func (m *FinanceAllocationMutation) ReversalOfCleared() bool {
+	return m.ReversalOfAllocationIDCleared() || m.clearedreversal_of
+}
+
+// ReversalOfID returns the "reversal_of" edge ID in the mutation.
+func (m *FinanceAllocationMutation) ReversalOfID() (id int, exists bool) {
+	if m.reversal_of != nil {
+		return *m.reversal_of, true
+	}
+	return
+}
+
+// ReversalOfIDs returns the "reversal_of" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ReversalOfID instead. It exists only for internal usage by the builders.
+func (m *FinanceAllocationMutation) ReversalOfIDs() (ids []int) {
+	if id := m.reversal_of; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetReversalOf resets all changes to the "reversal_of" edge.
+func (m *FinanceAllocationMutation) ResetReversalOf() {
+	m.reversal_of = nil
+	m.clearedreversal_of = false
+}
+
 // Where appends a list predicates to the FinanceAllocationMutation builder.
 func (m *FinanceAllocationMutation) Where(ps ...predicate.FinanceAllocation) {
 	m.predicates = append(m.predicates, ps...)
@@ -15790,7 +15879,7 @@ func (m *FinanceAllocationMutation) Fields() []string {
 	if m.payment != nil {
 		fields = append(fields, financeallocation.FieldPaymentID)
 	}
-	if m.finance_fact_id != nil {
+	if m.finance_fact != nil {
 		fields = append(fields, financeallocation.FieldFinanceFactID)
 	}
 	if m.amount != nil {
@@ -15802,7 +15891,7 @@ func (m *FinanceAllocationMutation) Fields() []string {
 	if m.status != nil {
 		fields = append(fields, financeallocation.FieldStatus)
 	}
-	if m.reversal_of_allocation_id != nil {
+	if m.reversal_of != nil {
 		fields = append(fields, financeallocation.FieldReversalOfAllocationID)
 	}
 	if m.idempotency_key != nil {
@@ -15958,12 +16047,6 @@ func (m *FinanceAllocationMutation) SetField(name string, value ent.Value) error
 // this mutation.
 func (m *FinanceAllocationMutation) AddedFields() []string {
 	var fields []string
-	if m.addfinance_fact_id != nil {
-		fields = append(fields, financeallocation.FieldFinanceFactID)
-	}
-	if m.addreversal_of_allocation_id != nil {
-		fields = append(fields, financeallocation.FieldReversalOfAllocationID)
-	}
 	if m.addcreated_by != nil {
 		fields = append(fields, financeallocation.FieldCreatedBy)
 	}
@@ -15975,10 +16058,6 @@ func (m *FinanceAllocationMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *FinanceAllocationMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
-	case financeallocation.FieldFinanceFactID:
-		return m.AddedFinanceFactID()
-	case financeallocation.FieldReversalOfAllocationID:
-		return m.AddedReversalOfAllocationID()
 	case financeallocation.FieldCreatedBy:
 		return m.AddedCreatedBy()
 	}
@@ -15990,20 +16069,6 @@ func (m *FinanceAllocationMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *FinanceAllocationMutation) AddField(name string, value ent.Value) error {
 	switch name {
-	case financeallocation.FieldFinanceFactID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddFinanceFactID(v)
-		return nil
-	case financeallocation.FieldReversalOfAllocationID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddReversalOfAllocationID(v)
-		return nil
 	case financeallocation.FieldCreatedBy:
 		v, ok := value.(int)
 		if !ok {
@@ -16089,9 +16154,18 @@ func (m *FinanceAllocationMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *FinanceAllocationMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 4)
 	if m.payment != nil {
 		edges = append(edges, financeallocation.EdgePayment)
+	}
+	if m.finance_fact != nil {
+		edges = append(edges, financeallocation.EdgeFinanceFact)
+	}
+	if m.reversals != nil {
+		edges = append(edges, financeallocation.EdgeReversals)
+	}
+	if m.reversal_of != nil {
+		edges = append(edges, financeallocation.EdgeReversalOf)
 	}
 	return edges
 }
@@ -16104,27 +16178,61 @@ func (m *FinanceAllocationMutation) AddedIDs(name string) []ent.Value {
 		if id := m.payment; id != nil {
 			return []ent.Value{*id}
 		}
+	case financeallocation.EdgeFinanceFact:
+		if id := m.finance_fact; id != nil {
+			return []ent.Value{*id}
+		}
+	case financeallocation.EdgeReversals:
+		ids := make([]ent.Value, 0, len(m.reversals))
+		for id := range m.reversals {
+			ids = append(ids, id)
+		}
+		return ids
+	case financeallocation.EdgeReversalOf:
+		if id := m.reversal_of; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *FinanceAllocationMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 4)
+	if m.removedreversals != nil {
+		edges = append(edges, financeallocation.EdgeReversals)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *FinanceAllocationMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case financeallocation.EdgeReversals:
+		ids := make([]ent.Value, 0, len(m.removedreversals))
+		for id := range m.removedreversals {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *FinanceAllocationMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 4)
 	if m.clearedpayment {
 		edges = append(edges, financeallocation.EdgePayment)
+	}
+	if m.clearedfinance_fact {
+		edges = append(edges, financeallocation.EdgeFinanceFact)
+	}
+	if m.clearedreversals {
+		edges = append(edges, financeallocation.EdgeReversals)
+	}
+	if m.clearedreversal_of {
+		edges = append(edges, financeallocation.EdgeReversalOf)
 	}
 	return edges
 }
@@ -16135,6 +16243,12 @@ func (m *FinanceAllocationMutation) EdgeCleared(name string) bool {
 	switch name {
 	case financeallocation.EdgePayment:
 		return m.clearedpayment
+	case financeallocation.EdgeFinanceFact:
+		return m.clearedfinance_fact
+	case financeallocation.EdgeReversals:
+		return m.clearedreversals
+	case financeallocation.EdgeReversalOf:
+		return m.clearedreversal_of
 	}
 	return false
 }
@@ -16145,6 +16259,12 @@ func (m *FinanceAllocationMutation) ClearEdge(name string) error {
 	switch name {
 	case financeallocation.EdgePayment:
 		m.ClearPayment()
+		return nil
+	case financeallocation.EdgeFinanceFact:
+		m.ClearFinanceFact()
+		return nil
+	case financeallocation.EdgeReversalOf:
+		m.ClearReversalOf()
 		return nil
 	}
 	return fmt.Errorf("unknown FinanceAllocation unique edge %s", name)
@@ -16157,6 +16277,15 @@ func (m *FinanceAllocationMutation) ResetEdge(name string) error {
 	case financeallocation.EdgePayment:
 		m.ResetPayment()
 		return nil
+	case financeallocation.EdgeFinanceFact:
+		m.ResetFinanceFact()
+		return nil
+	case financeallocation.EdgeReversals:
+		m.ResetReversals()
+		return nil
+	case financeallocation.EdgeReversalOf:
+		m.ResetReversalOf()
+		return nil
 	}
 	return fmt.Errorf("unknown FinanceAllocation edge %s", name)
 }
@@ -16164,27 +16293,30 @@ func (m *FinanceAllocationMutation) ResetEdge(name string) error {
 // FinanceCreditNoteMutation represents an operation that mutates the FinanceCreditNote nodes in the graph.
 type FinanceCreditNoteMutation struct {
 	config
-	op                            Op
-	typ                           string
-	id                            *int
-	credit_note_no                *string
-	finance_fact_id               *int
-	addfinance_fact_id            *int
-	reversal_of_credit_note_id    *int
-	addreversal_of_credit_note_id *int
-	amount                        *decimal.Decimal
-	currency                      *string
-	status                        *string
-	reason                        *string
-	idempotency_key               *string
-	idempotency_payload_hash      *string
-	created_by                    *int
-	addcreated_by                 *int
-	created_at                    *time.Time
-	clearedFields                 map[string]struct{}
-	done                          bool
-	oldValue                      func(context.Context) (*FinanceCreditNote, error)
-	predicates                    []predicate.FinanceCreditNote
+	op                       Op
+	typ                      string
+	id                       *int
+	credit_note_no           *string
+	amount                   *decimal.Decimal
+	currency                 *string
+	status                   *string
+	reason                   *string
+	idempotency_key          *string
+	idempotency_payload_hash *string
+	created_by               *int
+	addcreated_by            *int
+	created_at               *time.Time
+	clearedFields            map[string]struct{}
+	finance_fact             *int
+	clearedfinance_fact      bool
+	reversals                map[int]struct{}
+	removedreversals         map[int]struct{}
+	clearedreversals         bool
+	reversal_of              *int
+	clearedreversal_of       bool
+	done                     bool
+	oldValue                 func(context.Context) (*FinanceCreditNote, error)
+	predicates               []predicate.FinanceCreditNote
 }
 
 var _ ent.Mutation = (*FinanceCreditNoteMutation)(nil)
@@ -16323,13 +16455,12 @@ func (m *FinanceCreditNoteMutation) ResetCreditNoteNo() {
 
 // SetFinanceFactID sets the "finance_fact_id" field.
 func (m *FinanceCreditNoteMutation) SetFinanceFactID(i int) {
-	m.finance_fact_id = &i
-	m.addfinance_fact_id = nil
+	m.finance_fact = &i
 }
 
 // FinanceFactID returns the value of the "finance_fact_id" field in the mutation.
 func (m *FinanceCreditNoteMutation) FinanceFactID() (r int, exists bool) {
-	v := m.finance_fact_id
+	v := m.finance_fact
 	if v == nil {
 		return
 	}
@@ -16353,39 +16484,19 @@ func (m *FinanceCreditNoteMutation) OldFinanceFactID(ctx context.Context) (v int
 	return oldValue.FinanceFactID, nil
 }
 
-// AddFinanceFactID adds i to the "finance_fact_id" field.
-func (m *FinanceCreditNoteMutation) AddFinanceFactID(i int) {
-	if m.addfinance_fact_id != nil {
-		*m.addfinance_fact_id += i
-	} else {
-		m.addfinance_fact_id = &i
-	}
-}
-
-// AddedFinanceFactID returns the value that was added to the "finance_fact_id" field in this mutation.
-func (m *FinanceCreditNoteMutation) AddedFinanceFactID() (r int, exists bool) {
-	v := m.addfinance_fact_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
 // ResetFinanceFactID resets all changes to the "finance_fact_id" field.
 func (m *FinanceCreditNoteMutation) ResetFinanceFactID() {
-	m.finance_fact_id = nil
-	m.addfinance_fact_id = nil
+	m.finance_fact = nil
 }
 
 // SetReversalOfCreditNoteID sets the "reversal_of_credit_note_id" field.
 func (m *FinanceCreditNoteMutation) SetReversalOfCreditNoteID(i int) {
-	m.reversal_of_credit_note_id = &i
-	m.addreversal_of_credit_note_id = nil
+	m.reversal_of = &i
 }
 
 // ReversalOfCreditNoteID returns the value of the "reversal_of_credit_note_id" field in the mutation.
 func (m *FinanceCreditNoteMutation) ReversalOfCreditNoteID() (r int, exists bool) {
-	v := m.reversal_of_credit_note_id
+	v := m.reversal_of
 	if v == nil {
 		return
 	}
@@ -16409,28 +16520,9 @@ func (m *FinanceCreditNoteMutation) OldReversalOfCreditNoteID(ctx context.Contex
 	return oldValue.ReversalOfCreditNoteID, nil
 }
 
-// AddReversalOfCreditNoteID adds i to the "reversal_of_credit_note_id" field.
-func (m *FinanceCreditNoteMutation) AddReversalOfCreditNoteID(i int) {
-	if m.addreversal_of_credit_note_id != nil {
-		*m.addreversal_of_credit_note_id += i
-	} else {
-		m.addreversal_of_credit_note_id = &i
-	}
-}
-
-// AddedReversalOfCreditNoteID returns the value that was added to the "reversal_of_credit_note_id" field in this mutation.
-func (m *FinanceCreditNoteMutation) AddedReversalOfCreditNoteID() (r int, exists bool) {
-	v := m.addreversal_of_credit_note_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
 // ClearReversalOfCreditNoteID clears the value of the "reversal_of_credit_note_id" field.
 func (m *FinanceCreditNoteMutation) ClearReversalOfCreditNoteID() {
-	m.reversal_of_credit_note_id = nil
-	m.addreversal_of_credit_note_id = nil
+	m.reversal_of = nil
 	m.clearedFields[financecreditnote.FieldReversalOfCreditNoteID] = struct{}{}
 }
 
@@ -16442,8 +16534,7 @@ func (m *FinanceCreditNoteMutation) ReversalOfCreditNoteIDCleared() bool {
 
 // ResetReversalOfCreditNoteID resets all changes to the "reversal_of_credit_note_id" field.
 func (m *FinanceCreditNoteMutation) ResetReversalOfCreditNoteID() {
-	m.reversal_of_credit_note_id = nil
-	m.addreversal_of_credit_note_id = nil
+	m.reversal_of = nil
 	delete(m.clearedFields, financecreditnote.FieldReversalOfCreditNoteID)
 }
 
@@ -16755,6 +16846,127 @@ func (m *FinanceCreditNoteMutation) ResetCreatedAt() {
 	m.created_at = nil
 }
 
+// ClearFinanceFact clears the "finance_fact" edge to the FinanceFact entity.
+func (m *FinanceCreditNoteMutation) ClearFinanceFact() {
+	m.clearedfinance_fact = true
+	m.clearedFields[financecreditnote.FieldFinanceFactID] = struct{}{}
+}
+
+// FinanceFactCleared reports if the "finance_fact" edge to the FinanceFact entity was cleared.
+func (m *FinanceCreditNoteMutation) FinanceFactCleared() bool {
+	return m.clearedfinance_fact
+}
+
+// FinanceFactIDs returns the "finance_fact" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// FinanceFactID instead. It exists only for internal usage by the builders.
+func (m *FinanceCreditNoteMutation) FinanceFactIDs() (ids []int) {
+	if id := m.finance_fact; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetFinanceFact resets all changes to the "finance_fact" edge.
+func (m *FinanceCreditNoteMutation) ResetFinanceFact() {
+	m.finance_fact = nil
+	m.clearedfinance_fact = false
+}
+
+// AddReversalIDs adds the "reversals" edge to the FinanceCreditNote entity by ids.
+func (m *FinanceCreditNoteMutation) AddReversalIDs(ids ...int) {
+	if m.reversals == nil {
+		m.reversals = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.reversals[ids[i]] = struct{}{}
+	}
+}
+
+// ClearReversals clears the "reversals" edge to the FinanceCreditNote entity.
+func (m *FinanceCreditNoteMutation) ClearReversals() {
+	m.clearedreversals = true
+}
+
+// ReversalsCleared reports if the "reversals" edge to the FinanceCreditNote entity was cleared.
+func (m *FinanceCreditNoteMutation) ReversalsCleared() bool {
+	return m.clearedreversals
+}
+
+// RemoveReversalIDs removes the "reversals" edge to the FinanceCreditNote entity by IDs.
+func (m *FinanceCreditNoteMutation) RemoveReversalIDs(ids ...int) {
+	if m.removedreversals == nil {
+		m.removedreversals = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.reversals, ids[i])
+		m.removedreversals[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedReversals returns the removed IDs of the "reversals" edge to the FinanceCreditNote entity.
+func (m *FinanceCreditNoteMutation) RemovedReversalsIDs() (ids []int) {
+	for id := range m.removedreversals {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ReversalsIDs returns the "reversals" edge IDs in the mutation.
+func (m *FinanceCreditNoteMutation) ReversalsIDs() (ids []int) {
+	for id := range m.reversals {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetReversals resets all changes to the "reversals" edge.
+func (m *FinanceCreditNoteMutation) ResetReversals() {
+	m.reversals = nil
+	m.clearedreversals = false
+	m.removedreversals = nil
+}
+
+// SetReversalOfID sets the "reversal_of" edge to the FinanceCreditNote entity by id.
+func (m *FinanceCreditNoteMutation) SetReversalOfID(id int) {
+	m.reversal_of = &id
+}
+
+// ClearReversalOf clears the "reversal_of" edge to the FinanceCreditNote entity.
+func (m *FinanceCreditNoteMutation) ClearReversalOf() {
+	m.clearedreversal_of = true
+	m.clearedFields[financecreditnote.FieldReversalOfCreditNoteID] = struct{}{}
+}
+
+// ReversalOfCleared reports if the "reversal_of" edge to the FinanceCreditNote entity was cleared.
+func (m *FinanceCreditNoteMutation) ReversalOfCleared() bool {
+	return m.ReversalOfCreditNoteIDCleared() || m.clearedreversal_of
+}
+
+// ReversalOfID returns the "reversal_of" edge ID in the mutation.
+func (m *FinanceCreditNoteMutation) ReversalOfID() (id int, exists bool) {
+	if m.reversal_of != nil {
+		return *m.reversal_of, true
+	}
+	return
+}
+
+// ReversalOfIDs returns the "reversal_of" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ReversalOfID instead. It exists only for internal usage by the builders.
+func (m *FinanceCreditNoteMutation) ReversalOfIDs() (ids []int) {
+	if id := m.reversal_of; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetReversalOf resets all changes to the "reversal_of" edge.
+func (m *FinanceCreditNoteMutation) ResetReversalOf() {
+	m.reversal_of = nil
+	m.clearedreversal_of = false
+}
+
 // Where appends a list predicates to the FinanceCreditNoteMutation builder.
 func (m *FinanceCreditNoteMutation) Where(ps ...predicate.FinanceCreditNote) {
 	m.predicates = append(m.predicates, ps...)
@@ -16793,10 +17005,10 @@ func (m *FinanceCreditNoteMutation) Fields() []string {
 	if m.credit_note_no != nil {
 		fields = append(fields, financecreditnote.FieldCreditNoteNo)
 	}
-	if m.finance_fact_id != nil {
+	if m.finance_fact != nil {
 		fields = append(fields, financecreditnote.FieldFinanceFactID)
 	}
-	if m.reversal_of_credit_note_id != nil {
+	if m.reversal_of != nil {
 		fields = append(fields, financecreditnote.FieldReversalOfCreditNoteID)
 	}
 	if m.amount != nil {
@@ -16978,12 +17190,6 @@ func (m *FinanceCreditNoteMutation) SetField(name string, value ent.Value) error
 // this mutation.
 func (m *FinanceCreditNoteMutation) AddedFields() []string {
 	var fields []string
-	if m.addfinance_fact_id != nil {
-		fields = append(fields, financecreditnote.FieldFinanceFactID)
-	}
-	if m.addreversal_of_credit_note_id != nil {
-		fields = append(fields, financecreditnote.FieldReversalOfCreditNoteID)
-	}
 	if m.addcreated_by != nil {
 		fields = append(fields, financecreditnote.FieldCreatedBy)
 	}
@@ -16995,10 +17201,6 @@ func (m *FinanceCreditNoteMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *FinanceCreditNoteMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
-	case financecreditnote.FieldFinanceFactID:
-		return m.AddedFinanceFactID()
-	case financecreditnote.FieldReversalOfCreditNoteID:
-		return m.AddedReversalOfCreditNoteID()
 	case financecreditnote.FieldCreatedBy:
 		return m.AddedCreatedBy()
 	}
@@ -17010,20 +17212,6 @@ func (m *FinanceCreditNoteMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *FinanceCreditNoteMutation) AddField(name string, value ent.Value) error {
 	switch name {
-	case financecreditnote.FieldFinanceFactID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddFinanceFactID(v)
-		return nil
-	case financecreditnote.FieldReversalOfCreditNoteID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddReversalOfCreditNoteID(v)
-		return nil
 	case financecreditnote.FieldCreatedBy:
 		v, ok := value.(int)
 		if !ok {
@@ -17106,49 +17294,121 @@ func (m *FinanceCreditNoteMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *FinanceCreditNoteMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 3)
+	if m.finance_fact != nil {
+		edges = append(edges, financecreditnote.EdgeFinanceFact)
+	}
+	if m.reversals != nil {
+		edges = append(edges, financecreditnote.EdgeReversals)
+	}
+	if m.reversal_of != nil {
+		edges = append(edges, financecreditnote.EdgeReversalOf)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *FinanceCreditNoteMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case financecreditnote.EdgeFinanceFact:
+		if id := m.finance_fact; id != nil {
+			return []ent.Value{*id}
+		}
+	case financecreditnote.EdgeReversals:
+		ids := make([]ent.Value, 0, len(m.reversals))
+		for id := range m.reversals {
+			ids = append(ids, id)
+		}
+		return ids
+	case financecreditnote.EdgeReversalOf:
+		if id := m.reversal_of; id != nil {
+			return []ent.Value{*id}
+		}
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *FinanceCreditNoteMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 3)
+	if m.removedreversals != nil {
+		edges = append(edges, financecreditnote.EdgeReversals)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *FinanceCreditNoteMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case financecreditnote.EdgeReversals:
+		ids := make([]ent.Value, 0, len(m.removedreversals))
+		for id := range m.removedreversals {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *FinanceCreditNoteMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 3)
+	if m.clearedfinance_fact {
+		edges = append(edges, financecreditnote.EdgeFinanceFact)
+	}
+	if m.clearedreversals {
+		edges = append(edges, financecreditnote.EdgeReversals)
+	}
+	if m.clearedreversal_of {
+		edges = append(edges, financecreditnote.EdgeReversalOf)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *FinanceCreditNoteMutation) EdgeCleared(name string) bool {
+	switch name {
+	case financecreditnote.EdgeFinanceFact:
+		return m.clearedfinance_fact
+	case financecreditnote.EdgeReversals:
+		return m.clearedreversals
+	case financecreditnote.EdgeReversalOf:
+		return m.clearedreversal_of
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *FinanceCreditNoteMutation) ClearEdge(name string) error {
+	switch name {
+	case financecreditnote.EdgeFinanceFact:
+		m.ClearFinanceFact()
+		return nil
+	case financecreditnote.EdgeReversalOf:
+		m.ClearReversalOf()
+		return nil
+	}
 	return fmt.Errorf("unknown FinanceCreditNote unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *FinanceCreditNoteMutation) ResetEdge(name string) error {
+	switch name {
+	case financecreditnote.EdgeFinanceFact:
+		m.ResetFinanceFact()
+		return nil
+	case financecreditnote.EdgeReversals:
+		m.ResetReversals()
+		return nil
+	case financecreditnote.EdgeReversalOf:
+		m.ResetReversalOf()
+		return nil
+	}
 	return fmt.Errorf("unknown FinanceCreditNote edge %s", name)
 }
 
@@ -17191,6 +17451,12 @@ type FinanceFactMutation struct {
 	created_at            *time.Time
 	updated_at            *time.Time
 	clearedFields         map[string]struct{}
+	allocations           map[int]struct{}
+	removedallocations    map[int]struct{}
+	clearedallocations    bool
+	credit_notes          map[int]struct{}
+	removedcredit_notes   map[int]struct{}
+	clearedcredit_notes   bool
 	poster                *int
 	clearedposter         bool
 	settler               *int
@@ -18705,6 +18971,114 @@ func (m *FinanceFactMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
+// AddAllocationIDs adds the "allocations" edge to the FinanceAllocation entity by ids.
+func (m *FinanceFactMutation) AddAllocationIDs(ids ...int) {
+	if m.allocations == nil {
+		m.allocations = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.allocations[ids[i]] = struct{}{}
+	}
+}
+
+// ClearAllocations clears the "allocations" edge to the FinanceAllocation entity.
+func (m *FinanceFactMutation) ClearAllocations() {
+	m.clearedallocations = true
+}
+
+// AllocationsCleared reports if the "allocations" edge to the FinanceAllocation entity was cleared.
+func (m *FinanceFactMutation) AllocationsCleared() bool {
+	return m.clearedallocations
+}
+
+// RemoveAllocationIDs removes the "allocations" edge to the FinanceAllocation entity by IDs.
+func (m *FinanceFactMutation) RemoveAllocationIDs(ids ...int) {
+	if m.removedallocations == nil {
+		m.removedallocations = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.allocations, ids[i])
+		m.removedallocations[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedAllocations returns the removed IDs of the "allocations" edge to the FinanceAllocation entity.
+func (m *FinanceFactMutation) RemovedAllocationsIDs() (ids []int) {
+	for id := range m.removedallocations {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// AllocationsIDs returns the "allocations" edge IDs in the mutation.
+func (m *FinanceFactMutation) AllocationsIDs() (ids []int) {
+	for id := range m.allocations {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetAllocations resets all changes to the "allocations" edge.
+func (m *FinanceFactMutation) ResetAllocations() {
+	m.allocations = nil
+	m.clearedallocations = false
+	m.removedallocations = nil
+}
+
+// AddCreditNoteIDs adds the "credit_notes" edge to the FinanceCreditNote entity by ids.
+func (m *FinanceFactMutation) AddCreditNoteIDs(ids ...int) {
+	if m.credit_notes == nil {
+		m.credit_notes = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.credit_notes[ids[i]] = struct{}{}
+	}
+}
+
+// ClearCreditNotes clears the "credit_notes" edge to the FinanceCreditNote entity.
+func (m *FinanceFactMutation) ClearCreditNotes() {
+	m.clearedcredit_notes = true
+}
+
+// CreditNotesCleared reports if the "credit_notes" edge to the FinanceCreditNote entity was cleared.
+func (m *FinanceFactMutation) CreditNotesCleared() bool {
+	return m.clearedcredit_notes
+}
+
+// RemoveCreditNoteIDs removes the "credit_notes" edge to the FinanceCreditNote entity by IDs.
+func (m *FinanceFactMutation) RemoveCreditNoteIDs(ids ...int) {
+	if m.removedcredit_notes == nil {
+		m.removedcredit_notes = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.credit_notes, ids[i])
+		m.removedcredit_notes[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedCreditNotes returns the removed IDs of the "credit_notes" edge to the FinanceCreditNote entity.
+func (m *FinanceFactMutation) RemovedCreditNotesIDs() (ids []int) {
+	for id := range m.removedcredit_notes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// CreditNotesIDs returns the "credit_notes" edge IDs in the mutation.
+func (m *FinanceFactMutation) CreditNotesIDs() (ids []int) {
+	for id := range m.credit_notes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetCreditNotes resets all changes to the "credit_notes" edge.
+func (m *FinanceFactMutation) ResetCreditNotes() {
+	m.credit_notes = nil
+	m.clearedcredit_notes = false
+	m.removedcredit_notes = nil
+}
+
 // SetPosterID sets the "poster" edge to the AdminUser entity by id.
 func (m *FinanceFactMutation) SetPosterID(id int) {
 	m.poster = &id
@@ -19619,7 +19993,13 @@ func (m *FinanceFactMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *FinanceFactMutation) AddedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 5)
+	if m.allocations != nil {
+		edges = append(edges, financefact.EdgeAllocations)
+	}
+	if m.credit_notes != nil {
+		edges = append(edges, financefact.EdgeCreditNotes)
+	}
 	if m.poster != nil {
 		edges = append(edges, financefact.EdgePoster)
 	}
@@ -19636,6 +20016,18 @@ func (m *FinanceFactMutation) AddedEdges() []string {
 // name in this mutation.
 func (m *FinanceFactMutation) AddedIDs(name string) []ent.Value {
 	switch name {
+	case financefact.EdgeAllocations:
+		ids := make([]ent.Value, 0, len(m.allocations))
+		for id := range m.allocations {
+			ids = append(ids, id)
+		}
+		return ids
+	case financefact.EdgeCreditNotes:
+		ids := make([]ent.Value, 0, len(m.credit_notes))
+		for id := range m.credit_notes {
+			ids = append(ids, id)
+		}
+		return ids
 	case financefact.EdgePoster:
 		if id := m.poster; id != nil {
 			return []ent.Value{*id}
@@ -19654,19 +20046,45 @@ func (m *FinanceFactMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *FinanceFactMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 5)
+	if m.removedallocations != nil {
+		edges = append(edges, financefact.EdgeAllocations)
+	}
+	if m.removedcredit_notes != nil {
+		edges = append(edges, financefact.EdgeCreditNotes)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *FinanceFactMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case financefact.EdgeAllocations:
+		ids := make([]ent.Value, 0, len(m.removedallocations))
+		for id := range m.removedallocations {
+			ids = append(ids, id)
+		}
+		return ids
+	case financefact.EdgeCreditNotes:
+		ids := make([]ent.Value, 0, len(m.removedcredit_notes))
+		for id := range m.removedcredit_notes {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *FinanceFactMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 3)
+	edges := make([]string, 0, 5)
+	if m.clearedallocations {
+		edges = append(edges, financefact.EdgeAllocations)
+	}
+	if m.clearedcredit_notes {
+		edges = append(edges, financefact.EdgeCreditNotes)
+	}
 	if m.clearedposter {
 		edges = append(edges, financefact.EdgePoster)
 	}
@@ -19683,6 +20101,10 @@ func (m *FinanceFactMutation) ClearedEdges() []string {
 // was cleared in this mutation.
 func (m *FinanceFactMutation) EdgeCleared(name string) bool {
 	switch name {
+	case financefact.EdgeAllocations:
+		return m.clearedallocations
+	case financefact.EdgeCreditNotes:
+		return m.clearedcredit_notes
 	case financefact.EdgePoster:
 		return m.clearedposter
 	case financefact.EdgeSettler:
@@ -19714,6 +20136,12 @@ func (m *FinanceFactMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *FinanceFactMutation) ResetEdge(name string) error {
 	switch name {
+	case financefact.EdgeAllocations:
+		m.ResetAllocations()
+		return nil
+	case financefact.EdgeCreditNotes:
+		m.ResetCreditNotes()
+		return nil
 	case financefact.EdgePoster:
 		m.ResetPoster()
 		return nil
@@ -22700,6 +23128,2650 @@ func (m *FinancePaymentMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown FinancePayment edge %s", name)
+}
+
+// HelpFeedbackMutation represents an operation that mutates the HelpFeedback nodes in the graph.
+type HelpFeedbackMutation struct {
+	config
+	op                   Op
+	typ                  string
+	id                   *int
+	document_id          *string
+	document_title       *string
+	source_hash          *string
+	published_version    *int
+	addpublished_version *int
+	quote                *string
+	message              *string
+	request_key          *string
+	actor_id             *int
+	addactor_id          *int
+	actor_name           *string
+	response             *string
+	responded_by         *string
+	responded_at         *time.Time
+	created_at           *time.Time
+	clearedFields        map[string]struct{}
+	done                 bool
+	oldValue             func(context.Context) (*HelpFeedback, error)
+	predicates           []predicate.HelpFeedback
+}
+
+var _ ent.Mutation = (*HelpFeedbackMutation)(nil)
+
+// helpfeedbackOption allows management of the mutation configuration using functional options.
+type helpfeedbackOption func(*HelpFeedbackMutation)
+
+// newHelpFeedbackMutation creates new mutation for the HelpFeedback entity.
+func newHelpFeedbackMutation(c config, op Op, opts ...helpfeedbackOption) *HelpFeedbackMutation {
+	m := &HelpFeedbackMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeHelpFeedback,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withHelpFeedbackID sets the ID field of the mutation.
+func withHelpFeedbackID(id int) helpfeedbackOption {
+	return func(m *HelpFeedbackMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *HelpFeedback
+		)
+		m.oldValue = func(ctx context.Context) (*HelpFeedback, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().HelpFeedback.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withHelpFeedback sets the old HelpFeedback of the mutation.
+func withHelpFeedback(node *HelpFeedback) helpfeedbackOption {
+	return func(m *HelpFeedbackMutation) {
+		m.oldValue = func(context.Context) (*HelpFeedback, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m HelpFeedbackMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m HelpFeedbackMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *HelpFeedbackMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *HelpFeedbackMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().HelpFeedback.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetDocumentID sets the "document_id" field.
+func (m *HelpFeedbackMutation) SetDocumentID(s string) {
+	m.document_id = &s
+}
+
+// DocumentID returns the value of the "document_id" field in the mutation.
+func (m *HelpFeedbackMutation) DocumentID() (r string, exists bool) {
+	v := m.document_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDocumentID returns the old "document_id" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldDocumentID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDocumentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDocumentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDocumentID: %w", err)
+	}
+	return oldValue.DocumentID, nil
+}
+
+// ResetDocumentID resets all changes to the "document_id" field.
+func (m *HelpFeedbackMutation) ResetDocumentID() {
+	m.document_id = nil
+}
+
+// SetDocumentTitle sets the "document_title" field.
+func (m *HelpFeedbackMutation) SetDocumentTitle(s string) {
+	m.document_title = &s
+}
+
+// DocumentTitle returns the value of the "document_title" field in the mutation.
+func (m *HelpFeedbackMutation) DocumentTitle() (r string, exists bool) {
+	v := m.document_title
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDocumentTitle returns the old "document_title" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldDocumentTitle(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDocumentTitle is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDocumentTitle requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDocumentTitle: %w", err)
+	}
+	return oldValue.DocumentTitle, nil
+}
+
+// ResetDocumentTitle resets all changes to the "document_title" field.
+func (m *HelpFeedbackMutation) ResetDocumentTitle() {
+	m.document_title = nil
+}
+
+// SetSourceHash sets the "source_hash" field.
+func (m *HelpFeedbackMutation) SetSourceHash(s string) {
+	m.source_hash = &s
+}
+
+// SourceHash returns the value of the "source_hash" field in the mutation.
+func (m *HelpFeedbackMutation) SourceHash() (r string, exists bool) {
+	v := m.source_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceHash returns the old "source_hash" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldSourceHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceHash: %w", err)
+	}
+	return oldValue.SourceHash, nil
+}
+
+// ResetSourceHash resets all changes to the "source_hash" field.
+func (m *HelpFeedbackMutation) ResetSourceHash() {
+	m.source_hash = nil
+}
+
+// SetPublishedVersion sets the "published_version" field.
+func (m *HelpFeedbackMutation) SetPublishedVersion(i int) {
+	m.published_version = &i
+	m.addpublished_version = nil
+}
+
+// PublishedVersion returns the value of the "published_version" field in the mutation.
+func (m *HelpFeedbackMutation) PublishedVersion() (r int, exists bool) {
+	v := m.published_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublishedVersion returns the old "published_version" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldPublishedVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublishedVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublishedVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublishedVersion: %w", err)
+	}
+	return oldValue.PublishedVersion, nil
+}
+
+// AddPublishedVersion adds i to the "published_version" field.
+func (m *HelpFeedbackMutation) AddPublishedVersion(i int) {
+	if m.addpublished_version != nil {
+		*m.addpublished_version += i
+	} else {
+		m.addpublished_version = &i
+	}
+}
+
+// AddedPublishedVersion returns the value that was added to the "published_version" field in this mutation.
+func (m *HelpFeedbackMutation) AddedPublishedVersion() (r int, exists bool) {
+	v := m.addpublished_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPublishedVersion resets all changes to the "published_version" field.
+func (m *HelpFeedbackMutation) ResetPublishedVersion() {
+	m.published_version = nil
+	m.addpublished_version = nil
+}
+
+// SetQuote sets the "quote" field.
+func (m *HelpFeedbackMutation) SetQuote(s string) {
+	m.quote = &s
+}
+
+// Quote returns the value of the "quote" field in the mutation.
+func (m *HelpFeedbackMutation) Quote() (r string, exists bool) {
+	v := m.quote
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldQuote returns the old "quote" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldQuote(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldQuote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldQuote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldQuote: %w", err)
+	}
+	return oldValue.Quote, nil
+}
+
+// ResetQuote resets all changes to the "quote" field.
+func (m *HelpFeedbackMutation) ResetQuote() {
+	m.quote = nil
+}
+
+// SetMessage sets the "message" field.
+func (m *HelpFeedbackMutation) SetMessage(s string) {
+	m.message = &s
+}
+
+// Message returns the value of the "message" field in the mutation.
+func (m *HelpFeedbackMutation) Message() (r string, exists bool) {
+	v := m.message
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMessage returns the old "message" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldMessage(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMessage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMessage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMessage: %w", err)
+	}
+	return oldValue.Message, nil
+}
+
+// ResetMessage resets all changes to the "message" field.
+func (m *HelpFeedbackMutation) ResetMessage() {
+	m.message = nil
+}
+
+// SetRequestKey sets the "request_key" field.
+func (m *HelpFeedbackMutation) SetRequestKey(s string) {
+	m.request_key = &s
+}
+
+// RequestKey returns the value of the "request_key" field in the mutation.
+func (m *HelpFeedbackMutation) RequestKey() (r string, exists bool) {
+	v := m.request_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestKey returns the old "request_key" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldRequestKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestKey: %w", err)
+	}
+	return oldValue.RequestKey, nil
+}
+
+// ResetRequestKey resets all changes to the "request_key" field.
+func (m *HelpFeedbackMutation) ResetRequestKey() {
+	m.request_key = nil
+}
+
+// SetActorID sets the "actor_id" field.
+func (m *HelpFeedbackMutation) SetActorID(i int) {
+	m.actor_id = &i
+	m.addactor_id = nil
+}
+
+// ActorID returns the value of the "actor_id" field in the mutation.
+func (m *HelpFeedbackMutation) ActorID() (r int, exists bool) {
+	v := m.actor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActorID returns the old "actor_id" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldActorID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActorID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActorID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActorID: %w", err)
+	}
+	return oldValue.ActorID, nil
+}
+
+// AddActorID adds i to the "actor_id" field.
+func (m *HelpFeedbackMutation) AddActorID(i int) {
+	if m.addactor_id != nil {
+		*m.addactor_id += i
+	} else {
+		m.addactor_id = &i
+	}
+}
+
+// AddedActorID returns the value that was added to the "actor_id" field in this mutation.
+func (m *HelpFeedbackMutation) AddedActorID() (r int, exists bool) {
+	v := m.addactor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetActorID resets all changes to the "actor_id" field.
+func (m *HelpFeedbackMutation) ResetActorID() {
+	m.actor_id = nil
+	m.addactor_id = nil
+}
+
+// SetActorName sets the "actor_name" field.
+func (m *HelpFeedbackMutation) SetActorName(s string) {
+	m.actor_name = &s
+}
+
+// ActorName returns the value of the "actor_name" field in the mutation.
+func (m *HelpFeedbackMutation) ActorName() (r string, exists bool) {
+	v := m.actor_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActorName returns the old "actor_name" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldActorName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActorName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActorName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActorName: %w", err)
+	}
+	return oldValue.ActorName, nil
+}
+
+// ResetActorName resets all changes to the "actor_name" field.
+func (m *HelpFeedbackMutation) ResetActorName() {
+	m.actor_name = nil
+}
+
+// SetResponse sets the "response" field.
+func (m *HelpFeedbackMutation) SetResponse(s string) {
+	m.response = &s
+}
+
+// Response returns the value of the "response" field in the mutation.
+func (m *HelpFeedbackMutation) Response() (r string, exists bool) {
+	v := m.response
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResponse returns the old "response" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldResponse(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResponse is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResponse requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResponse: %w", err)
+	}
+	return oldValue.Response, nil
+}
+
+// ResetResponse resets all changes to the "response" field.
+func (m *HelpFeedbackMutation) ResetResponse() {
+	m.response = nil
+}
+
+// SetRespondedBy sets the "responded_by" field.
+func (m *HelpFeedbackMutation) SetRespondedBy(s string) {
+	m.responded_by = &s
+}
+
+// RespondedBy returns the value of the "responded_by" field in the mutation.
+func (m *HelpFeedbackMutation) RespondedBy() (r string, exists bool) {
+	v := m.responded_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRespondedBy returns the old "responded_by" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldRespondedBy(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRespondedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRespondedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRespondedBy: %w", err)
+	}
+	return oldValue.RespondedBy, nil
+}
+
+// ResetRespondedBy resets all changes to the "responded_by" field.
+func (m *HelpFeedbackMutation) ResetRespondedBy() {
+	m.responded_by = nil
+}
+
+// SetRespondedAt sets the "responded_at" field.
+func (m *HelpFeedbackMutation) SetRespondedAt(t time.Time) {
+	m.responded_at = &t
+}
+
+// RespondedAt returns the value of the "responded_at" field in the mutation.
+func (m *HelpFeedbackMutation) RespondedAt() (r time.Time, exists bool) {
+	v := m.responded_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRespondedAt returns the old "responded_at" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldRespondedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRespondedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRespondedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRespondedAt: %w", err)
+	}
+	return oldValue.RespondedAt, nil
+}
+
+// ClearRespondedAt clears the value of the "responded_at" field.
+func (m *HelpFeedbackMutation) ClearRespondedAt() {
+	m.responded_at = nil
+	m.clearedFields[helpfeedback.FieldRespondedAt] = struct{}{}
+}
+
+// RespondedAtCleared returns if the "responded_at" field was cleared in this mutation.
+func (m *HelpFeedbackMutation) RespondedAtCleared() bool {
+	_, ok := m.clearedFields[helpfeedback.FieldRespondedAt]
+	return ok
+}
+
+// ResetRespondedAt resets all changes to the "responded_at" field.
+func (m *HelpFeedbackMutation) ResetRespondedAt() {
+	m.responded_at = nil
+	delete(m.clearedFields, helpfeedback.FieldRespondedAt)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *HelpFeedbackMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *HelpFeedbackMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the HelpFeedback entity.
+// If the HelpFeedback object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpFeedbackMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *HelpFeedbackMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the HelpFeedbackMutation builder.
+func (m *HelpFeedbackMutation) Where(ps ...predicate.HelpFeedback) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the HelpFeedbackMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *HelpFeedbackMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.HelpFeedback, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *HelpFeedbackMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *HelpFeedbackMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (HelpFeedback).
+func (m *HelpFeedbackMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *HelpFeedbackMutation) Fields() []string {
+	fields := make([]string, 0, 13)
+	if m.document_id != nil {
+		fields = append(fields, helpfeedback.FieldDocumentID)
+	}
+	if m.document_title != nil {
+		fields = append(fields, helpfeedback.FieldDocumentTitle)
+	}
+	if m.source_hash != nil {
+		fields = append(fields, helpfeedback.FieldSourceHash)
+	}
+	if m.published_version != nil {
+		fields = append(fields, helpfeedback.FieldPublishedVersion)
+	}
+	if m.quote != nil {
+		fields = append(fields, helpfeedback.FieldQuote)
+	}
+	if m.message != nil {
+		fields = append(fields, helpfeedback.FieldMessage)
+	}
+	if m.request_key != nil {
+		fields = append(fields, helpfeedback.FieldRequestKey)
+	}
+	if m.actor_id != nil {
+		fields = append(fields, helpfeedback.FieldActorID)
+	}
+	if m.actor_name != nil {
+		fields = append(fields, helpfeedback.FieldActorName)
+	}
+	if m.response != nil {
+		fields = append(fields, helpfeedback.FieldResponse)
+	}
+	if m.responded_by != nil {
+		fields = append(fields, helpfeedback.FieldRespondedBy)
+	}
+	if m.responded_at != nil {
+		fields = append(fields, helpfeedback.FieldRespondedAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, helpfeedback.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *HelpFeedbackMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case helpfeedback.FieldDocumentID:
+		return m.DocumentID()
+	case helpfeedback.FieldDocumentTitle:
+		return m.DocumentTitle()
+	case helpfeedback.FieldSourceHash:
+		return m.SourceHash()
+	case helpfeedback.FieldPublishedVersion:
+		return m.PublishedVersion()
+	case helpfeedback.FieldQuote:
+		return m.Quote()
+	case helpfeedback.FieldMessage:
+		return m.Message()
+	case helpfeedback.FieldRequestKey:
+		return m.RequestKey()
+	case helpfeedback.FieldActorID:
+		return m.ActorID()
+	case helpfeedback.FieldActorName:
+		return m.ActorName()
+	case helpfeedback.FieldResponse:
+		return m.Response()
+	case helpfeedback.FieldRespondedBy:
+		return m.RespondedBy()
+	case helpfeedback.FieldRespondedAt:
+		return m.RespondedAt()
+	case helpfeedback.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *HelpFeedbackMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case helpfeedback.FieldDocumentID:
+		return m.OldDocumentID(ctx)
+	case helpfeedback.FieldDocumentTitle:
+		return m.OldDocumentTitle(ctx)
+	case helpfeedback.FieldSourceHash:
+		return m.OldSourceHash(ctx)
+	case helpfeedback.FieldPublishedVersion:
+		return m.OldPublishedVersion(ctx)
+	case helpfeedback.FieldQuote:
+		return m.OldQuote(ctx)
+	case helpfeedback.FieldMessage:
+		return m.OldMessage(ctx)
+	case helpfeedback.FieldRequestKey:
+		return m.OldRequestKey(ctx)
+	case helpfeedback.FieldActorID:
+		return m.OldActorID(ctx)
+	case helpfeedback.FieldActorName:
+		return m.OldActorName(ctx)
+	case helpfeedback.FieldResponse:
+		return m.OldResponse(ctx)
+	case helpfeedback.FieldRespondedBy:
+		return m.OldRespondedBy(ctx)
+	case helpfeedback.FieldRespondedAt:
+		return m.OldRespondedAt(ctx)
+	case helpfeedback.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown HelpFeedback field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *HelpFeedbackMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case helpfeedback.FieldDocumentID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDocumentID(v)
+		return nil
+	case helpfeedback.FieldDocumentTitle:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDocumentTitle(v)
+		return nil
+	case helpfeedback.FieldSourceHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceHash(v)
+		return nil
+	case helpfeedback.FieldPublishedVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublishedVersion(v)
+		return nil
+	case helpfeedback.FieldQuote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetQuote(v)
+		return nil
+	case helpfeedback.FieldMessage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMessage(v)
+		return nil
+	case helpfeedback.FieldRequestKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestKey(v)
+		return nil
+	case helpfeedback.FieldActorID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActorID(v)
+		return nil
+	case helpfeedback.FieldActorName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActorName(v)
+		return nil
+	case helpfeedback.FieldResponse:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResponse(v)
+		return nil
+	case helpfeedback.FieldRespondedBy:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRespondedBy(v)
+		return nil
+	case helpfeedback.FieldRespondedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRespondedAt(v)
+		return nil
+	case helpfeedback.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown HelpFeedback field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *HelpFeedbackMutation) AddedFields() []string {
+	var fields []string
+	if m.addpublished_version != nil {
+		fields = append(fields, helpfeedback.FieldPublishedVersion)
+	}
+	if m.addactor_id != nil {
+		fields = append(fields, helpfeedback.FieldActorID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *HelpFeedbackMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case helpfeedback.FieldPublishedVersion:
+		return m.AddedPublishedVersion()
+	case helpfeedback.FieldActorID:
+		return m.AddedActorID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *HelpFeedbackMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case helpfeedback.FieldPublishedVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPublishedVersion(v)
+		return nil
+	case helpfeedback.FieldActorID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddActorID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown HelpFeedback numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *HelpFeedbackMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(helpfeedback.FieldRespondedAt) {
+		fields = append(fields, helpfeedback.FieldRespondedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *HelpFeedbackMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *HelpFeedbackMutation) ClearField(name string) error {
+	switch name {
+	case helpfeedback.FieldRespondedAt:
+		m.ClearRespondedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown HelpFeedback nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *HelpFeedbackMutation) ResetField(name string) error {
+	switch name {
+	case helpfeedback.FieldDocumentID:
+		m.ResetDocumentID()
+		return nil
+	case helpfeedback.FieldDocumentTitle:
+		m.ResetDocumentTitle()
+		return nil
+	case helpfeedback.FieldSourceHash:
+		m.ResetSourceHash()
+		return nil
+	case helpfeedback.FieldPublishedVersion:
+		m.ResetPublishedVersion()
+		return nil
+	case helpfeedback.FieldQuote:
+		m.ResetQuote()
+		return nil
+	case helpfeedback.FieldMessage:
+		m.ResetMessage()
+		return nil
+	case helpfeedback.FieldRequestKey:
+		m.ResetRequestKey()
+		return nil
+	case helpfeedback.FieldActorID:
+		m.ResetActorID()
+		return nil
+	case helpfeedback.FieldActorName:
+		m.ResetActorName()
+		return nil
+	case helpfeedback.FieldResponse:
+		m.ResetResponse()
+		return nil
+	case helpfeedback.FieldRespondedBy:
+		m.ResetRespondedBy()
+		return nil
+	case helpfeedback.FieldRespondedAt:
+		m.ResetRespondedAt()
+		return nil
+	case helpfeedback.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown HelpFeedback field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *HelpFeedbackMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *HelpFeedbackMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *HelpFeedbackMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *HelpFeedbackMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *HelpFeedbackMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *HelpFeedbackMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *HelpFeedbackMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown HelpFeedback unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *HelpFeedbackMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown HelpFeedback edge %s", name)
+}
+
+// HelpSupplementMutation represents an operation that mutates the HelpSupplement nodes in the graph.
+type HelpSupplementMutation struct {
+	config
+	op                   Op
+	typ                  string
+	id                   *int
+	document_id          *string
+	version              *int
+	addversion           *int
+	published_version    *int
+	addpublished_version *int
+	draft_markdown       *string
+	created_at           *time.Time
+	updated_at           *time.Time
+	clearedFields        map[string]struct{}
+	done                 bool
+	oldValue             func(context.Context) (*HelpSupplement, error)
+	predicates           []predicate.HelpSupplement
+}
+
+var _ ent.Mutation = (*HelpSupplementMutation)(nil)
+
+// helpsupplementOption allows management of the mutation configuration using functional options.
+type helpsupplementOption func(*HelpSupplementMutation)
+
+// newHelpSupplementMutation creates new mutation for the HelpSupplement entity.
+func newHelpSupplementMutation(c config, op Op, opts ...helpsupplementOption) *HelpSupplementMutation {
+	m := &HelpSupplementMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeHelpSupplement,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withHelpSupplementID sets the ID field of the mutation.
+func withHelpSupplementID(id int) helpsupplementOption {
+	return func(m *HelpSupplementMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *HelpSupplement
+		)
+		m.oldValue = func(ctx context.Context) (*HelpSupplement, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().HelpSupplement.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withHelpSupplement sets the old HelpSupplement of the mutation.
+func withHelpSupplement(node *HelpSupplement) helpsupplementOption {
+	return func(m *HelpSupplementMutation) {
+		m.oldValue = func(context.Context) (*HelpSupplement, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m HelpSupplementMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m HelpSupplementMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *HelpSupplementMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *HelpSupplementMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().HelpSupplement.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetDocumentID sets the "document_id" field.
+func (m *HelpSupplementMutation) SetDocumentID(s string) {
+	m.document_id = &s
+}
+
+// DocumentID returns the value of the "document_id" field in the mutation.
+func (m *HelpSupplementMutation) DocumentID() (r string, exists bool) {
+	v := m.document_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDocumentID returns the old "document_id" field's value of the HelpSupplement entity.
+// If the HelpSupplement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementMutation) OldDocumentID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDocumentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDocumentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDocumentID: %w", err)
+	}
+	return oldValue.DocumentID, nil
+}
+
+// ResetDocumentID resets all changes to the "document_id" field.
+func (m *HelpSupplementMutation) ResetDocumentID() {
+	m.document_id = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *HelpSupplementMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *HelpSupplementMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the HelpSupplement entity.
+// If the HelpSupplement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *HelpSupplementMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *HelpSupplementMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *HelpSupplementMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetPublishedVersion sets the "published_version" field.
+func (m *HelpSupplementMutation) SetPublishedVersion(i int) {
+	m.published_version = &i
+	m.addpublished_version = nil
+}
+
+// PublishedVersion returns the value of the "published_version" field in the mutation.
+func (m *HelpSupplementMutation) PublishedVersion() (r int, exists bool) {
+	v := m.published_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublishedVersion returns the old "published_version" field's value of the HelpSupplement entity.
+// If the HelpSupplement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementMutation) OldPublishedVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublishedVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublishedVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublishedVersion: %w", err)
+	}
+	return oldValue.PublishedVersion, nil
+}
+
+// AddPublishedVersion adds i to the "published_version" field.
+func (m *HelpSupplementMutation) AddPublishedVersion(i int) {
+	if m.addpublished_version != nil {
+		*m.addpublished_version += i
+	} else {
+		m.addpublished_version = &i
+	}
+}
+
+// AddedPublishedVersion returns the value that was added to the "published_version" field in this mutation.
+func (m *HelpSupplementMutation) AddedPublishedVersion() (r int, exists bool) {
+	v := m.addpublished_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPublishedVersion resets all changes to the "published_version" field.
+func (m *HelpSupplementMutation) ResetPublishedVersion() {
+	m.published_version = nil
+	m.addpublished_version = nil
+}
+
+// SetDraftMarkdown sets the "draft_markdown" field.
+func (m *HelpSupplementMutation) SetDraftMarkdown(s string) {
+	m.draft_markdown = &s
+}
+
+// DraftMarkdown returns the value of the "draft_markdown" field in the mutation.
+func (m *HelpSupplementMutation) DraftMarkdown() (r string, exists bool) {
+	v := m.draft_markdown
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDraftMarkdown returns the old "draft_markdown" field's value of the HelpSupplement entity.
+// If the HelpSupplement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementMutation) OldDraftMarkdown(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDraftMarkdown is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDraftMarkdown requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDraftMarkdown: %w", err)
+	}
+	return oldValue.DraftMarkdown, nil
+}
+
+// ResetDraftMarkdown resets all changes to the "draft_markdown" field.
+func (m *HelpSupplementMutation) ResetDraftMarkdown() {
+	m.draft_markdown = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *HelpSupplementMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *HelpSupplementMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the HelpSupplement entity.
+// If the HelpSupplement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *HelpSupplementMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *HelpSupplementMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *HelpSupplementMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the HelpSupplement entity.
+// If the HelpSupplement object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *HelpSupplementMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the HelpSupplementMutation builder.
+func (m *HelpSupplementMutation) Where(ps ...predicate.HelpSupplement) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the HelpSupplementMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *HelpSupplementMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.HelpSupplement, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *HelpSupplementMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *HelpSupplementMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (HelpSupplement).
+func (m *HelpSupplementMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *HelpSupplementMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.document_id != nil {
+		fields = append(fields, helpsupplement.FieldDocumentID)
+	}
+	if m.version != nil {
+		fields = append(fields, helpsupplement.FieldVersion)
+	}
+	if m.published_version != nil {
+		fields = append(fields, helpsupplement.FieldPublishedVersion)
+	}
+	if m.draft_markdown != nil {
+		fields = append(fields, helpsupplement.FieldDraftMarkdown)
+	}
+	if m.created_at != nil {
+		fields = append(fields, helpsupplement.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, helpsupplement.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *HelpSupplementMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case helpsupplement.FieldDocumentID:
+		return m.DocumentID()
+	case helpsupplement.FieldVersion:
+		return m.Version()
+	case helpsupplement.FieldPublishedVersion:
+		return m.PublishedVersion()
+	case helpsupplement.FieldDraftMarkdown:
+		return m.DraftMarkdown()
+	case helpsupplement.FieldCreatedAt:
+		return m.CreatedAt()
+	case helpsupplement.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *HelpSupplementMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case helpsupplement.FieldDocumentID:
+		return m.OldDocumentID(ctx)
+	case helpsupplement.FieldVersion:
+		return m.OldVersion(ctx)
+	case helpsupplement.FieldPublishedVersion:
+		return m.OldPublishedVersion(ctx)
+	case helpsupplement.FieldDraftMarkdown:
+		return m.OldDraftMarkdown(ctx)
+	case helpsupplement.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case helpsupplement.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown HelpSupplement field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *HelpSupplementMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case helpsupplement.FieldDocumentID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDocumentID(v)
+		return nil
+	case helpsupplement.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case helpsupplement.FieldPublishedVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublishedVersion(v)
+		return nil
+	case helpsupplement.FieldDraftMarkdown:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDraftMarkdown(v)
+		return nil
+	case helpsupplement.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case helpsupplement.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown HelpSupplement field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *HelpSupplementMutation) AddedFields() []string {
+	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, helpsupplement.FieldVersion)
+	}
+	if m.addpublished_version != nil {
+		fields = append(fields, helpsupplement.FieldPublishedVersion)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *HelpSupplementMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case helpsupplement.FieldVersion:
+		return m.AddedVersion()
+	case helpsupplement.FieldPublishedVersion:
+		return m.AddedPublishedVersion()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *HelpSupplementMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case helpsupplement.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	case helpsupplement.FieldPublishedVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPublishedVersion(v)
+		return nil
+	}
+	return fmt.Errorf("unknown HelpSupplement numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *HelpSupplementMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *HelpSupplementMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *HelpSupplementMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown HelpSupplement nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *HelpSupplementMutation) ResetField(name string) error {
+	switch name {
+	case helpsupplement.FieldDocumentID:
+		m.ResetDocumentID()
+		return nil
+	case helpsupplement.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case helpsupplement.FieldPublishedVersion:
+		m.ResetPublishedVersion()
+		return nil
+	case helpsupplement.FieldDraftMarkdown:
+		m.ResetDraftMarkdown()
+		return nil
+	case helpsupplement.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case helpsupplement.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown HelpSupplement field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *HelpSupplementMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *HelpSupplementMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *HelpSupplementMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *HelpSupplementMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *HelpSupplementMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *HelpSupplementMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *HelpSupplementMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown HelpSupplement unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *HelpSupplementMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown HelpSupplement edge %s", name)
+}
+
+// HelpSupplementRevisionMutation represents an operation that mutates the HelpSupplementRevision nodes in the graph.
+type HelpSupplementRevisionMutation struct {
+	config
+	op               Op
+	typ              string
+	id               *int
+	document_id      *string
+	version          *int
+	addversion       *int
+	action           *helpsupplementrevision.Action
+	markdown         *string
+	source_hash      *string
+	summary          *string
+	actor_id         *int
+	addactor_id      *int
+	actor_name       *string
+	restored_from    *int
+	addrestored_from *int
+	created_at       *time.Time
+	clearedFields    map[string]struct{}
+	done             bool
+	oldValue         func(context.Context) (*HelpSupplementRevision, error)
+	predicates       []predicate.HelpSupplementRevision
+}
+
+var _ ent.Mutation = (*HelpSupplementRevisionMutation)(nil)
+
+// helpsupplementrevisionOption allows management of the mutation configuration using functional options.
+type helpsupplementrevisionOption func(*HelpSupplementRevisionMutation)
+
+// newHelpSupplementRevisionMutation creates new mutation for the HelpSupplementRevision entity.
+func newHelpSupplementRevisionMutation(c config, op Op, opts ...helpsupplementrevisionOption) *HelpSupplementRevisionMutation {
+	m := &HelpSupplementRevisionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeHelpSupplementRevision,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withHelpSupplementRevisionID sets the ID field of the mutation.
+func withHelpSupplementRevisionID(id int) helpsupplementrevisionOption {
+	return func(m *HelpSupplementRevisionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *HelpSupplementRevision
+		)
+		m.oldValue = func(ctx context.Context) (*HelpSupplementRevision, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().HelpSupplementRevision.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withHelpSupplementRevision sets the old HelpSupplementRevision of the mutation.
+func withHelpSupplementRevision(node *HelpSupplementRevision) helpsupplementrevisionOption {
+	return func(m *HelpSupplementRevisionMutation) {
+		m.oldValue = func(context.Context) (*HelpSupplementRevision, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m HelpSupplementRevisionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m HelpSupplementRevisionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *HelpSupplementRevisionMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *HelpSupplementRevisionMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().HelpSupplementRevision.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetDocumentID sets the "document_id" field.
+func (m *HelpSupplementRevisionMutation) SetDocumentID(s string) {
+	m.document_id = &s
+}
+
+// DocumentID returns the value of the "document_id" field in the mutation.
+func (m *HelpSupplementRevisionMutation) DocumentID() (r string, exists bool) {
+	v := m.document_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDocumentID returns the old "document_id" field's value of the HelpSupplementRevision entity.
+// If the HelpSupplementRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementRevisionMutation) OldDocumentID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDocumentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDocumentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDocumentID: %w", err)
+	}
+	return oldValue.DocumentID, nil
+}
+
+// ResetDocumentID resets all changes to the "document_id" field.
+func (m *HelpSupplementRevisionMutation) ResetDocumentID() {
+	m.document_id = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *HelpSupplementRevisionMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *HelpSupplementRevisionMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the HelpSupplementRevision entity.
+// If the HelpSupplementRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementRevisionMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *HelpSupplementRevisionMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *HelpSupplementRevisionMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *HelpSupplementRevisionMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetAction sets the "action" field.
+func (m *HelpSupplementRevisionMutation) SetAction(h helpsupplementrevision.Action) {
+	m.action = &h
+}
+
+// Action returns the value of the "action" field in the mutation.
+func (m *HelpSupplementRevisionMutation) Action() (r helpsupplementrevision.Action, exists bool) {
+	v := m.action
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAction returns the old "action" field's value of the HelpSupplementRevision entity.
+// If the HelpSupplementRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementRevisionMutation) OldAction(ctx context.Context) (v helpsupplementrevision.Action, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAction is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAction requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAction: %w", err)
+	}
+	return oldValue.Action, nil
+}
+
+// ResetAction resets all changes to the "action" field.
+func (m *HelpSupplementRevisionMutation) ResetAction() {
+	m.action = nil
+}
+
+// SetMarkdown sets the "markdown" field.
+func (m *HelpSupplementRevisionMutation) SetMarkdown(s string) {
+	m.markdown = &s
+}
+
+// Markdown returns the value of the "markdown" field in the mutation.
+func (m *HelpSupplementRevisionMutation) Markdown() (r string, exists bool) {
+	v := m.markdown
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMarkdown returns the old "markdown" field's value of the HelpSupplementRevision entity.
+// If the HelpSupplementRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementRevisionMutation) OldMarkdown(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMarkdown is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMarkdown requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMarkdown: %w", err)
+	}
+	return oldValue.Markdown, nil
+}
+
+// ResetMarkdown resets all changes to the "markdown" field.
+func (m *HelpSupplementRevisionMutation) ResetMarkdown() {
+	m.markdown = nil
+}
+
+// SetSourceHash sets the "source_hash" field.
+func (m *HelpSupplementRevisionMutation) SetSourceHash(s string) {
+	m.source_hash = &s
+}
+
+// SourceHash returns the value of the "source_hash" field in the mutation.
+func (m *HelpSupplementRevisionMutation) SourceHash() (r string, exists bool) {
+	v := m.source_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSourceHash returns the old "source_hash" field's value of the HelpSupplementRevision entity.
+// If the HelpSupplementRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementRevisionMutation) OldSourceHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSourceHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSourceHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSourceHash: %w", err)
+	}
+	return oldValue.SourceHash, nil
+}
+
+// ResetSourceHash resets all changes to the "source_hash" field.
+func (m *HelpSupplementRevisionMutation) ResetSourceHash() {
+	m.source_hash = nil
+}
+
+// SetSummary sets the "summary" field.
+func (m *HelpSupplementRevisionMutation) SetSummary(s string) {
+	m.summary = &s
+}
+
+// Summary returns the value of the "summary" field in the mutation.
+func (m *HelpSupplementRevisionMutation) Summary() (r string, exists bool) {
+	v := m.summary
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSummary returns the old "summary" field's value of the HelpSupplementRevision entity.
+// If the HelpSupplementRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementRevisionMutation) OldSummary(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSummary is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSummary requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSummary: %w", err)
+	}
+	return oldValue.Summary, nil
+}
+
+// ResetSummary resets all changes to the "summary" field.
+func (m *HelpSupplementRevisionMutation) ResetSummary() {
+	m.summary = nil
+}
+
+// SetActorID sets the "actor_id" field.
+func (m *HelpSupplementRevisionMutation) SetActorID(i int) {
+	m.actor_id = &i
+	m.addactor_id = nil
+}
+
+// ActorID returns the value of the "actor_id" field in the mutation.
+func (m *HelpSupplementRevisionMutation) ActorID() (r int, exists bool) {
+	v := m.actor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActorID returns the old "actor_id" field's value of the HelpSupplementRevision entity.
+// If the HelpSupplementRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementRevisionMutation) OldActorID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActorID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActorID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActorID: %w", err)
+	}
+	return oldValue.ActorID, nil
+}
+
+// AddActorID adds i to the "actor_id" field.
+func (m *HelpSupplementRevisionMutation) AddActorID(i int) {
+	if m.addactor_id != nil {
+		*m.addactor_id += i
+	} else {
+		m.addactor_id = &i
+	}
+}
+
+// AddedActorID returns the value that was added to the "actor_id" field in this mutation.
+func (m *HelpSupplementRevisionMutation) AddedActorID() (r int, exists bool) {
+	v := m.addactor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetActorID resets all changes to the "actor_id" field.
+func (m *HelpSupplementRevisionMutation) ResetActorID() {
+	m.actor_id = nil
+	m.addactor_id = nil
+}
+
+// SetActorName sets the "actor_name" field.
+func (m *HelpSupplementRevisionMutation) SetActorName(s string) {
+	m.actor_name = &s
+}
+
+// ActorName returns the value of the "actor_name" field in the mutation.
+func (m *HelpSupplementRevisionMutation) ActorName() (r string, exists bool) {
+	v := m.actor_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActorName returns the old "actor_name" field's value of the HelpSupplementRevision entity.
+// If the HelpSupplementRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementRevisionMutation) OldActorName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActorName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActorName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActorName: %w", err)
+	}
+	return oldValue.ActorName, nil
+}
+
+// ResetActorName resets all changes to the "actor_name" field.
+func (m *HelpSupplementRevisionMutation) ResetActorName() {
+	m.actor_name = nil
+}
+
+// SetRestoredFrom sets the "restored_from" field.
+func (m *HelpSupplementRevisionMutation) SetRestoredFrom(i int) {
+	m.restored_from = &i
+	m.addrestored_from = nil
+}
+
+// RestoredFrom returns the value of the "restored_from" field in the mutation.
+func (m *HelpSupplementRevisionMutation) RestoredFrom() (r int, exists bool) {
+	v := m.restored_from
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRestoredFrom returns the old "restored_from" field's value of the HelpSupplementRevision entity.
+// If the HelpSupplementRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementRevisionMutation) OldRestoredFrom(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRestoredFrom is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRestoredFrom requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRestoredFrom: %w", err)
+	}
+	return oldValue.RestoredFrom, nil
+}
+
+// AddRestoredFrom adds i to the "restored_from" field.
+func (m *HelpSupplementRevisionMutation) AddRestoredFrom(i int) {
+	if m.addrestored_from != nil {
+		*m.addrestored_from += i
+	} else {
+		m.addrestored_from = &i
+	}
+}
+
+// AddedRestoredFrom returns the value that was added to the "restored_from" field in this mutation.
+func (m *HelpSupplementRevisionMutation) AddedRestoredFrom() (r int, exists bool) {
+	v := m.addrestored_from
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRestoredFrom resets all changes to the "restored_from" field.
+func (m *HelpSupplementRevisionMutation) ResetRestoredFrom() {
+	m.restored_from = nil
+	m.addrestored_from = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *HelpSupplementRevisionMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *HelpSupplementRevisionMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the HelpSupplementRevision entity.
+// If the HelpSupplementRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *HelpSupplementRevisionMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *HelpSupplementRevisionMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the HelpSupplementRevisionMutation builder.
+func (m *HelpSupplementRevisionMutation) Where(ps ...predicate.HelpSupplementRevision) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the HelpSupplementRevisionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *HelpSupplementRevisionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.HelpSupplementRevision, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *HelpSupplementRevisionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *HelpSupplementRevisionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (HelpSupplementRevision).
+func (m *HelpSupplementRevisionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *HelpSupplementRevisionMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.document_id != nil {
+		fields = append(fields, helpsupplementrevision.FieldDocumentID)
+	}
+	if m.version != nil {
+		fields = append(fields, helpsupplementrevision.FieldVersion)
+	}
+	if m.action != nil {
+		fields = append(fields, helpsupplementrevision.FieldAction)
+	}
+	if m.markdown != nil {
+		fields = append(fields, helpsupplementrevision.FieldMarkdown)
+	}
+	if m.source_hash != nil {
+		fields = append(fields, helpsupplementrevision.FieldSourceHash)
+	}
+	if m.summary != nil {
+		fields = append(fields, helpsupplementrevision.FieldSummary)
+	}
+	if m.actor_id != nil {
+		fields = append(fields, helpsupplementrevision.FieldActorID)
+	}
+	if m.actor_name != nil {
+		fields = append(fields, helpsupplementrevision.FieldActorName)
+	}
+	if m.restored_from != nil {
+		fields = append(fields, helpsupplementrevision.FieldRestoredFrom)
+	}
+	if m.created_at != nil {
+		fields = append(fields, helpsupplementrevision.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *HelpSupplementRevisionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case helpsupplementrevision.FieldDocumentID:
+		return m.DocumentID()
+	case helpsupplementrevision.FieldVersion:
+		return m.Version()
+	case helpsupplementrevision.FieldAction:
+		return m.Action()
+	case helpsupplementrevision.FieldMarkdown:
+		return m.Markdown()
+	case helpsupplementrevision.FieldSourceHash:
+		return m.SourceHash()
+	case helpsupplementrevision.FieldSummary:
+		return m.Summary()
+	case helpsupplementrevision.FieldActorID:
+		return m.ActorID()
+	case helpsupplementrevision.FieldActorName:
+		return m.ActorName()
+	case helpsupplementrevision.FieldRestoredFrom:
+		return m.RestoredFrom()
+	case helpsupplementrevision.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *HelpSupplementRevisionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case helpsupplementrevision.FieldDocumentID:
+		return m.OldDocumentID(ctx)
+	case helpsupplementrevision.FieldVersion:
+		return m.OldVersion(ctx)
+	case helpsupplementrevision.FieldAction:
+		return m.OldAction(ctx)
+	case helpsupplementrevision.FieldMarkdown:
+		return m.OldMarkdown(ctx)
+	case helpsupplementrevision.FieldSourceHash:
+		return m.OldSourceHash(ctx)
+	case helpsupplementrevision.FieldSummary:
+		return m.OldSummary(ctx)
+	case helpsupplementrevision.FieldActorID:
+		return m.OldActorID(ctx)
+	case helpsupplementrevision.FieldActorName:
+		return m.OldActorName(ctx)
+	case helpsupplementrevision.FieldRestoredFrom:
+		return m.OldRestoredFrom(ctx)
+	case helpsupplementrevision.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown HelpSupplementRevision field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *HelpSupplementRevisionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case helpsupplementrevision.FieldDocumentID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDocumentID(v)
+		return nil
+	case helpsupplementrevision.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case helpsupplementrevision.FieldAction:
+		v, ok := value.(helpsupplementrevision.Action)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAction(v)
+		return nil
+	case helpsupplementrevision.FieldMarkdown:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMarkdown(v)
+		return nil
+	case helpsupplementrevision.FieldSourceHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSourceHash(v)
+		return nil
+	case helpsupplementrevision.FieldSummary:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSummary(v)
+		return nil
+	case helpsupplementrevision.FieldActorID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActorID(v)
+		return nil
+	case helpsupplementrevision.FieldActorName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActorName(v)
+		return nil
+	case helpsupplementrevision.FieldRestoredFrom:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRestoredFrom(v)
+		return nil
+	case helpsupplementrevision.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown HelpSupplementRevision field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *HelpSupplementRevisionMutation) AddedFields() []string {
+	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, helpsupplementrevision.FieldVersion)
+	}
+	if m.addactor_id != nil {
+		fields = append(fields, helpsupplementrevision.FieldActorID)
+	}
+	if m.addrestored_from != nil {
+		fields = append(fields, helpsupplementrevision.FieldRestoredFrom)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *HelpSupplementRevisionMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case helpsupplementrevision.FieldVersion:
+		return m.AddedVersion()
+	case helpsupplementrevision.FieldActorID:
+		return m.AddedActorID()
+	case helpsupplementrevision.FieldRestoredFrom:
+		return m.AddedRestoredFrom()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *HelpSupplementRevisionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case helpsupplementrevision.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	case helpsupplementrevision.FieldActorID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddActorID(v)
+		return nil
+	case helpsupplementrevision.FieldRestoredFrom:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRestoredFrom(v)
+		return nil
+	}
+	return fmt.Errorf("unknown HelpSupplementRevision numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *HelpSupplementRevisionMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *HelpSupplementRevisionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *HelpSupplementRevisionMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown HelpSupplementRevision nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *HelpSupplementRevisionMutation) ResetField(name string) error {
+	switch name {
+	case helpsupplementrevision.FieldDocumentID:
+		m.ResetDocumentID()
+		return nil
+	case helpsupplementrevision.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case helpsupplementrevision.FieldAction:
+		m.ResetAction()
+		return nil
+	case helpsupplementrevision.FieldMarkdown:
+		m.ResetMarkdown()
+		return nil
+	case helpsupplementrevision.FieldSourceHash:
+		m.ResetSourceHash()
+		return nil
+	case helpsupplementrevision.FieldSummary:
+		m.ResetSummary()
+		return nil
+	case helpsupplementrevision.FieldActorID:
+		m.ResetActorID()
+		return nil
+	case helpsupplementrevision.FieldActorName:
+		m.ResetActorName()
+		return nil
+	case helpsupplementrevision.FieldRestoredFrom:
+		m.ResetRestoredFrom()
+		return nil
+	case helpsupplementrevision.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown HelpSupplementRevision field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *HelpSupplementRevisionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *HelpSupplementRevisionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *HelpSupplementRevisionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *HelpSupplementRevisionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *HelpSupplementRevisionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *HelpSupplementRevisionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *HelpSupplementRevisionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown HelpSupplementRevision unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *HelpSupplementRevisionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown HelpSupplementRevision edge %s", name)
 }
 
 // InventoryBalanceMutation represents an operation that mutates the InventoryBalance nodes in the graph.

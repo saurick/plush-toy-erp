@@ -1,0 +1,258 @@
+.erp-dev-customer-page .erp-dev-customer-stagebar {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.8fr) repeat(5, minmax(140px, 1fr));
+  gap: 4px;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-business-card-radius);
+  background: var(--erp-surface-bg);
+  overflow-x: auto;
+}
+
+.erp-dev-customer-stagebar .erp-dev-task-nav__item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  min-width: 0;
+  min-height: 68px;
+  gap: 5px;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.erp-dev-customer-step-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 24px;
+}
+
+.erp-dev-customer-step-number {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  font-size: var(--erp-font-caption);
+  font-weight: 600;
+}
+
+.erp-dev-customer-delivery-flow span,
+.erp-dev-customer-delivery-flow small,
+.erp-dev-customer-inline-note,
+.erp-dev-customer-handoff-grid p,
+.erp-dev-customer-handoff-grid small {
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-customer-stagebar .erp-dev-task-nav__item > small {
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-caption);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.erp-dev-customer-page .erp-dev-customer-header {
+  justify-content: space-between;
+}
+
+.erp-dev-customer-page .erp-dev-customer-context .erp-dev-customer-selector {
+  flex-basis: auto;
+}
+
+.erp-dev-customer-page .erp-dev-customer-workspace h2.ant-typography {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.erp-dev-customer-page .erp-dev-customer-workspace h3.ant-typography {
+  margin: 0 0 14px;
+  font-size: var(--erp-font-emphasis);
+  line-height: 1.5;
+}
+
+.erp-dev-customer-page .erp-dev-customer-start {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-block: 20px;
+}
+
+.erp-dev-customer-start .erp-dev-customer-panel__head {
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.erp-dev-customer-status-facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px 24px;
+  margin: 0;
+}
+
+.erp-dev-customer-status-facts > div,
+.erp-dev-customer-action-scope > div {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  gap: 5px;
+}
+
+.erp-dev-customer-status-facts dt,
+.erp-dev-customer-action-scope dt {
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-customer-status-facts dd,
+.erp-dev-customer-action-scope dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-customer-status-facts dd {
+  font-weight: 600;
+}
+
+.erp-dev-customer-delivery-flow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 30px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-dev-customer-delivery-flow li {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid var(--erp-border);
+  border-radius: 6px;
+  padding: 14px;
+}
+
+.erp-dev-customer-delivery-flow li:first-child {
+  border-color: var(--erp-primary);
+  background: var(--erp-primary-soft);
+}
+
+.erp-dev-customer-delivery-flow li:not(:last-child)::after {
+  position: absolute;
+  inset-inline-end: -22px;
+  top: 0;
+  content: '→';
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-customer-inline-note.ant-typography {
+  display: block;
+  margin-top: 20px;
+}
+
+.erp-dev-customer-action-panel > .ant-typography-secondary {
+  display: block;
+  margin-top: 6px;
+}
+
+.erp-dev-customer-action-scope {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+  padding: 14px;
+  border-radius: 6px;
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-dev-customer-release-input {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-block: 18px;
+}
+
+.erp-dev-customer-release-input .ant-select {
+  flex: 1 1 300px;
+  min-width: 0;
+  max-width: 520px;
+}
+
+.erp-dev-customer-empty-batches {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  padding: 16px;
+  border: 1px dashed var(--erp-border);
+  border-radius: 6px;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-customer-handoff-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.erp-dev-customer-handoff-grid > div {
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  min-width: 0;
+  gap: 8px;
+}
+
+.erp-dev-customer-handoff-grid p {
+  margin: 0 0 4px;
+}
+
+.erp-dev-customer-result-details {
+  margin-top: 14px;
+}
+
+.erp-dev-customer-result-details summary {
+  cursor: pointer;
+  color: var(--erp-text-muted);
+}
+
+.erp-dev-customer-step-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 0 8px;
+}
+
+.erp-dev-customer-diff-table th:first-child {
+  width: 18%;
+}
+
+.erp-dev-customer-diff-table th:nth-child(2),
+.erp-dev-customer-diff-table th:nth-child(3) {
+  width: 24%;
+}
+
+.erp-dev-customer-diff-table th[scope='row'] > span:first-child {
+  display: block;
+  margin-bottom: 4px;
+}
+
+@media (max-width: 1200px) {
+  .erp-dev-customer-page .erp-dev-customer-stagebar {
+    grid-template-columns: 110px repeat(5, 160px);
+  }
+
+  .erp-dev-customer-status-facts,
+  .erp-dev-customer-action-scope {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

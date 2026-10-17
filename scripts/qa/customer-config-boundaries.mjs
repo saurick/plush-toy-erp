@@ -302,7 +302,13 @@ function validateBackendProcessContractOwnership() {
 
 function validateWorkflowTaskRevisionVisibilityContract() {
   const servicePath = "server/internal/service/jsonrpc_workflow_task.go";
-  const serviceSource = readFileSync(repoPath(servicePath), "utf8");
+  const serviceSource = [
+    servicePath,
+    "server/internal/service/jsonrpc_workflow_task_board.go",
+    "server/internal/service/jsonrpc_workflow_task_role_view.go",
+    "server/internal/service/jsonrpc_workflow_task_action.go",
+    "server/internal/service/jsonrpc_workflow_task_access.go",
+  ].map((relative) => readFileSync(repoPath(relative), "utf8")).join("\n");
   const visibilityPath =
     "server/internal/service/jsonrpc_workflow_task_revision_visibility.go";
   const visibilitySource = readFileSync(repoPath(visibilityPath), "utf8");

@@ -93,6 +93,7 @@ export function BusinessViewSurface({
 export function BusinessVisualizationFrame({
   switcher,
   title,
+  toolbar = null,
   metrics = [],
   metricsLabel = '',
   countUnit = '',
@@ -110,8 +111,11 @@ export function BusinessVisualizationFrame({
       aria-busy={loading || undefined}
     >
       {switcher}
-      {metrics.length > 0 ? (
+      {toolbar || metrics.length > 0 ? (
         <div className="erp-business-visual-frame__heading">
+          {toolbar ? (
+            <div className="erp-business-visual-frame__toolbar">{toolbar}</div>
+          ) : null}
           {metricsLabel ? (
             <span className="erp-business-visual-frame__metrics-label">
               {metricsLabel}

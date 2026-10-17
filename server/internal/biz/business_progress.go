@@ -41,6 +41,8 @@ type BusinessProgressRow struct {
 	Customer          string  `json:"customer"`
 	Product           string  `json:"product"`
 	ProductCount      int     `json:"product_count"`
+	ProductTypeCount  int     `json:"product_type_count,omitempty"`
+	ProductMatchCount int     `json:"product_match_count,omitempty"`
 	ProductID         int     `json:"product_id"`
 	SalesOwner        string  `json:"sales_owner"`
 	DueDate           string  `json:"due_date"`

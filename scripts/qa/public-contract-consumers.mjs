@@ -3,7 +3,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import { PermissionCode } from '../../web/src/common/consts/permissions.generated.mjs'
-import { RpcDomain, RpcMethod } from '../../web/src/common/consts/rpcMethods.generated.mjs'
+import { RpcDomain, RpcMethod, RpcTransport } from '../../web/src/common/consts/rpcMethods.generated.mjs'
 import * as statuses from '../../web/src/common/consts/statuses.generated.mjs'
 import * as policies from '../../web/src/common/consts/policies.generated.mjs'
 import { NumericContract } from '../../web/src/common/consts/numeric.generated.mjs'
@@ -14,10 +14,10 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 // import attributes. A regex cannot distinguish object keys from comments.
 const { Linter } = createRequire(path.join(root, 'web/package.json'))('eslint')
 const permissionValues = new Set(Object.values(PermissionCode))
-const tables = { PermissionCode, RpcDomain, RpcMethod, NumericContract, AttachmentPolicy, ...statuses, ...policies }
+const tables = { PermissionCode, RpcDomain, RpcMethod, RpcTransport, NumericContract, AttachmentPolicy, ...statuses, ...policies }
 const contractModules = {
   'permissions.generated.mjs': { PermissionCode },
-  'rpcMethods.generated.mjs': { RpcDomain, RpcMethod },
+  'rpcMethods.generated.mjs': { RpcDomain, RpcMethod, RpcTransport },
   'statuses.generated.mjs': statuses,
   'policies.generated.mjs': policies,
   'numeric.generated.mjs': { NumericContract },

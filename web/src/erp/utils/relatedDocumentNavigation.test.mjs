@@ -101,12 +101,16 @@ test('quality type changes delegate source compatibility and outsourcing transla
     new URL('../pages/QualityInspectionsPage.jsx', import.meta.url),
     'utf8'
   )
+  const querySource = readFileSync(
+    new URL('../components/quality-inspections/qualityInspectionQueries.mjs', import.meta.url),
+    'utf8'
+  )
   assert.match(
-    source,
+    querySource,
     /const routeSourceParams = qualityInspectionRouteSourceParams\(\{/u
   )
   assert.match(
-    source,
+    querySource,
     /const list = all[\s\S]{0,120}listAllOutsourcingReturnQualityInspections[\s\S]{0,120}listOutsourcingReturnQualityInspections[\s\S]{0,240}fact_id: routeSourceParams\.fact_id/u
   )
   assert.match(source, /!isQualityInspectionRouteSourceCompatible\(/u)

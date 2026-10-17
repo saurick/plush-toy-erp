@@ -1,5 +1,11 @@
 // 由 `node scripts/gen-public-contracts.mjs` 生成；请勿手改。
-// 真源：server/internal/service/jsonrpc_dispatch.go 及其域 handler 的 method switch。
+// 真源：server/api/jsonrpc/v1/jsonrpc.pb.go 消息描述、HTTP binding、Swagger 及 server/internal/service 的实际分发。
+export const RpcTransport = Object.freeze({
+  documentation: 'server/api/jsonrpc/v1/jsonrpc.swagger.json',
+  method: 'POST',
+  path: '/rpc/{url}',
+})
+
 export const RpcDomain = Object.freeze({
   ADMIN: 'admin',
   ATTACHMENT: 'attachment',
@@ -29,10 +35,18 @@ export const RpcMethod = Object.freeze({
     CHANGE_PASSWORD: 'change_password',
     CREATE: 'create',
     EFFECTIVE_ROLE_ACCESS: 'effective_role_access',
+    HELP_CHAPTER: 'help_chapter',
+    HELP_CONTENT: 'help_content',
+    HELP_FEEDBACK_CREATE: 'help_feedback_create',
+    HELP_FEEDBACK_RESPOND: 'help_feedback_respond',
+    HELP_SUPPLEMENT_PUBLISH: 'help_supplement_publish',
+    HELP_SUPPLEMENT_RESTORE: 'help_supplement_restore',
+    HELP_SUPPLEMENT_SAVE: 'help_supplement_save',
     LEGAL_NOTICE_STATUS: 'legal_notice_status',
     LIST: 'list',
     ME: 'me',
     MENU_OPTIONS: 'menu_options',
+    PROJECT_MANUALS: 'project_manuals',
     RBAC_OPTIONS: 'rbac_options',
     RESET_PASSWORD: 'reset_password',
     RESET_TEMPORARY_PASSWORD: 'reset_temporary_password',

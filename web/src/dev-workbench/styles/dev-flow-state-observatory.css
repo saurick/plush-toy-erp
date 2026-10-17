@@ -2553,12 +2553,15 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 8px 12px;
-  margin-bottom: 10px;
+  width: auto;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
 }
 
 .erp-dev-flow-state-page > .erp-dev-flow-task-finder {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .erp-dev-flow-context-path {

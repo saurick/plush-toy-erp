@@ -57,6 +57,15 @@ type FinanceFact func(*sql.Selector)
 // FinancePayment is the predicate function for financepayment builders.
 type FinancePayment func(*sql.Selector)
 
+// HelpFeedback is the predicate function for helpfeedback builders.
+type HelpFeedback func(*sql.Selector)
+
+// HelpSupplement is the predicate function for helpsupplement builders.
+type HelpSupplement func(*sql.Selector)
+
+// HelpSupplementRevision is the predicate function for helpsupplementrevision builders.
+type HelpSupplementRevision func(*sql.Selector)
+
 // InventoryBalance is the predicate function for inventorybalance builders.
 type InventoryBalance func(*sql.Selector)
 

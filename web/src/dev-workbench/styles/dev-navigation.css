@@ -215,6 +215,7 @@
 .erp-dev-workspace-nav__route--active {
   background: var(--erp-primary-soft);
   color: var(--erp-primary-strong);
+  box-shadow: inset 0 -2px 0 var(--erp-primary);
 }
 
 .erp-dev-workspace-nav__route--context {
@@ -281,7 +282,9 @@
 }
 
 .erp-dev-workspace-nav__secondary-route--active {
-  background: var(--dev-nav-active-bg);
+  background: var(--erp-primary-soft);
+  color: var(--erp-primary-strong);
+  box-shadow: inset 0 -2px 0 var(--erp-primary);
   font-weight: 600;
 }
 

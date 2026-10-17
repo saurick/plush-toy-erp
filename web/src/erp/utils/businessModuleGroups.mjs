@@ -2,6 +2,20 @@ import {
   businessModuleDefinitions,
   businessNavigationSections,
 } from '../config/businessModules.mjs'
+import { canReadProductionExceptionDecisions, canReadProductionProcess } from './productionRecordViews.mjs'
+
+const productionTabs = [
+  { key: 'production-orders', label: '生产订单', path: '/erp/production/orders' },
+  { key: 'production-execution', label: '生产执行', path: '/erp/production/progress', search: '?display=process' },
+  { key: 'production-progress', label: '生产记录', path: '/erp/production/progress' },
+  { key: 'production-exceptions', label: '异常处理', path: '/erp/production/exceptions' },
+]
+
+function moduleRouteKey(pathname, search = '') {
+  return pathname === '/erp/production/progress' && new URLSearchParams(search).get('display') === 'process'
+    ? `${pathname}?display=process`
+    : pathname
+}
 
 const groups = businessNavigationSections.map((section) => ({
   key: section.key,
@@ -137,10 +151,23 @@ export function projectRoleGuidedModuleNavigation(navigation) {
   }
 }
 
-export function getBusinessModuleTabs(pathname, sections) {
+export function getBusinessModuleTabs(pathname, sections, { search = '', adminProfile } = {}) {
   const match = groupByPath.get(pathname)
   if (!match || match.group.tabs.length === 1) return null
   const visible = sections.flatMap((section) => section.items)
+  if (match.group.key === 'production') {
+    const tabs = productionTabs.filter((tab) => {
+      if (!visible.some((item) => item.path === tab.path)) return false
+      if (tab.key === 'production-execution') return canReadProductionProcess(adminProfile)
+      if (tab.key === 'production-exceptions') return canReadProductionExceptionDecisions(adminProfile)
+      return true
+    })
+    let activeKey = pathname === '/erp/production/scheduling'
+      ? 'production-orders'
+      : productionTabs.find((tab) => moduleRouteKey(tab.path, tab.search) === moduleRouteKey(pathname, search))?.key
+    if (activeKey === 'production-execution' && !tabs.some((tab) => tab.key === activeKey)) activeKey = 'production-progress'
+    return { group: match.group, activeKey, tabs }
+  }
   const tabs = match.group.tabs.flatMap((tab) => {
     const entry =
       visible.find((item) => item.path === tab.path) ||
@@ -159,12 +186,16 @@ export function rememberBusinessModuleLocation(cache, location) {
     hash: location.hash || '',
   }
   cache.set(`module-route:${location.pathname}`, route)
+  cache.set(`module-view:${moduleRouteKey(location.pathname, location.search)}`, route)
   cache.set(`module-last:${group.key}`, route)
 }
 
-export function restoreBusinessModuleTabPath(pathname, cache) {
-  const route = cache.get(`module-route:${pathname}`)
-  return route ? `${pathname}${route.search}${route.hash}` : pathname
+export function restoreBusinessModuleTabPath(target, cache) {
+  const { path: pathname, search = '' } = typeof target === 'string' ? { path: target } : target
+  const route = typeof target === 'string'
+    ? cache.get(`module-route:${pathname}`)
+    : cache.get(`module-view:${moduleRouteKey(pathname, search)}`)
+  return route ? `${pathname}${route.search}${route.hash}` : `${pathname}${search}`
 }
 
 export function resolveBusinessModuleMenuTarget(
@@ -174,9 +205,10 @@ export function resolveBusinessModuleMenuTarget(
   visiblePaths
 ) {
   const group = getBusinessModuleGroup(item.path)
-  if (!group) return item.path
+  const currentPath = `${location.pathname}${location.search || ''}${location.hash || ''}`
+  if (!group) return item.path === location.pathname ? currentPath : item.path
   if (getBusinessModuleGroup(location.pathname)?.key === group.key) {
-    return location.pathname
+    return currentPath
   }
   const last = cache.get(`module-last:${group.key}`)
   if (

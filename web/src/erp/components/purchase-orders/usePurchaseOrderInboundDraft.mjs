@@ -1,4 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 import { buildArrivalItems } from '../../utils/incomingAcceptance.mjs'
 import {
   materialWarehouseOptions,
@@ -27,6 +29,8 @@ export function usePurchaseOrderInboundDraft({
   materials = [],
   warehouseOptions = [],
 }) {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const taskBusiness = useOutletContext()?.mobileTaskBusiness
   const [generatingInboundDraft, setGeneratingInboundDraft] = useState(false)
   const [inboundDraftModalOpen, setInboundDraftModalOpen] = useState(false)
   const [inboundDraftPreviewLoading, setInboundDraftPreviewLoading] =
@@ -145,7 +149,9 @@ export function usePurchaseOrderInboundDraft({
       )
       mutationAttemptsRef.current.settle(scope, attempt)
       closeInboundDraftModal()
+      reportBusinessResult('到货已登记，已生成待检记录；检验通过后由仓库确认入库', receipt)
       message.success('到货已登记，已生成待检记录；检验通过后由仓库确认入库')
+      if (taskBusiness) return
       navigate(
         routeWithQuery(BUSINESS_ROUTE_PATHS.purchaseReceipts, {
           receipt_id: receipt?.id,
@@ -176,7 +182,7 @@ export function usePurchaseOrderInboundDraft({
       submittingRef.current = false
       setGeneratingInboundDraft(false)
     }
-  }, [closeInboundDraftModal, form, navigate, selectedOrder])
+  }, [closeInboundDraftModal, form, navigate, selectedOrder, reportBusinessResult, taskBusiness])
 
   const hasInboundDraftRemaining = useMemo(
     () => inboundDraftPreviewRows.some((row) => row.canGenerate),

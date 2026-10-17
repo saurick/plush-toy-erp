@@ -569,7 +569,7 @@ export function createDashboardTaskScenarios({
           page.getByTestId('workflow-task-handling-chain'),
           '出货财务放行'
         )
-        assert.equal(await executionTrail.locator('details').evaluate((element) => element.open), true, '前序步骤默认展开')
+        assert.equal(await executionTrail.locator('.workflow-process-stage__history').evaluate((element) => element.open), true, '前序步骤默认展开')
         await assertTextAbsent(executionTrail, '执行轨迹')
         await expectText(executionTrail, '成品质检')
         await assertTextAbsent(executionTrail, '出货财务审批')
@@ -594,12 +594,11 @@ export function createDashboardTaskScenarios({
               const arrow = window.getComputedStyle(item, '::before')
               const siblings = [...item.parentElement.children]
               const nextMarker = siblings[siblings.indexOf(item) + 1]?.querySelector('.workflow-process-stage__marker')?.getBoundingClientRect()
-              const arrowTip = itemRect.bottom - Number.parseFloat(arrow.bottom)
               return {
                 connectorAligned: !nextMarker || Math.abs(connectorX - markerCenterX) <= 1,
                 connectorClearsContent: !nextMarker || Boolean(contentRect && connectorX < contentRect.left - 1),
                 contentBesideMarker: Boolean(markerRect && contentRect && contentRect.left >= markerRect.right + 4),
-                forward: !nextMarker || (nextMarker.top > markerRect.bottom && Math.abs(nextMarker.left - markerRect.left) <= 1 && Number.parseFloat(arrow.height) > 0 && arrow.clipPath.startsWith('polygon(') && arrowTip > markerRect.bottom && arrowTip < nextMarker.top),
+                forward: arrow.content === 'none' && (!nextMarker || (nextMarker.top > markerRect.bottom && Math.abs(nextMarker.left - markerRect.left) <= 1 && Number.parseFloat(connectorStyle.width) === 1)),
               }
             })
 

@@ -370,8 +370,8 @@
 .erp-business-page-navigation {
   flex: 0 0 auto;
   min-width: 0;
-  margin-bottom: 9px;
-  padding: 10px 12px;
+  margin-bottom: var(--erp-page-gap);
+  padding: var(--erp-panel-padding-block, 10px) var(--erp-panel-padding-inline, 12px);
   border: 1px solid var(--erp-business-card-border);
   border-radius: var(--erp-business-card-radius);
   background: var(--erp-surface-bg);
@@ -383,7 +383,7 @@
 
 .erp-business-page-header-card + .erp-business-operation-panel.ant-card,
 .erp-outsourcing-orders-page > .erp-business-page-header-card + section {
-  margin-top: 9px;
+  margin-top: var(--erp-page-gap);
 }
 
 .erp-business-operation-panel__command {
@@ -478,13 +478,13 @@
 }
 
 .erp-business-page-header-card .ant-card-body {
-  padding: 10px 12px;
+  padding: var(--erp-panel-padding-block, 10px) var(--erp-panel-padding-inline, 12px);
 }
 
 .erp-business-filter-panel .ant-card-body,
 .erp-business-list-toolbar .ant-card-body,
 .erp-business-selection-action-bar .ant-card-body {
-  padding: 10px 12px;
+  padding: var(--erp-panel-padding-block, 10px) var(--erp-panel-padding-inline, 12px);
 }
 
 .erp-business-operation-panel .ant-card-body {
@@ -720,6 +720,10 @@
 .erp-business-page-header-card__grid > .erp-sliding-tabs {
   min-width: 0;
   max-width: 100%;
+}
+
+.erp-business-page-header-card__grid > .erp-sliding-tabs > .ant-tabs-nav {
+  margin: 0;
 }
 
 .erp-business-page-header-card h1 {
@@ -2040,5 +2044,5 @@
 }
 
 .erp-business-page-layout > .erp-business-data-table-card.ant-card {
-  margin-top: 9px;
+  margin-top: var(--erp-page-gap);
 }

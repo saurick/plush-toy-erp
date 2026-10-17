@@ -5,6 +5,8 @@ import {
 import { ENGINEERING_MATERIAL_HELP } from './engineeringMaterialHelp.mjs'
 import { HELP_VISUAL_EXAMPLES } from './helpScenarioPresentation.mjs'
 import { getRoleHelpScenarios } from './helpScenarios.mjs'
+import { ROLE_HELP_GUIDES } from './roleHelpContent.mjs'
+import { supplementSearchText } from './helpContributions.mjs'
 import {
   getBusinessHandbookIntroductions,
   getBusinessPageHandbookSections,
@@ -18,9 +20,7 @@ export const HELP_REFERENCE_PAGES = Object.freeze([
 export function getHelpReferencePages(guide, { allowedMenuPaths = [] } = {}) {
   if (!guide) return []
   return HELP_REFERENCE_PAGES.filter((page) =>
-    guide.key === 'generic'
-      ? allowedMenuPaths.includes(page.path)
-      : page.roleHelpKeys.includes(guide.key)
+    allowedMenuPaths.includes(page.path) || page.roleHelpKeys.includes(guide.key)
   ).map((page) => ({
     ...page,
     available: allowedMenuPaths.includes(page.path),
@@ -79,6 +79,17 @@ export function getHelpReadingCatalog(guides, options = {}) {
   const referencePages = HELP_REFERENCE_PAGES.filter((page) =>
     pages.has(page.key)
   ).map((page) => pages.get(page.key))
+  // 岗位首页保留常用推荐；目录另补实际已开放页面，兼岗和自定义授权也能查到说明。
+  const availablePages = new Set(
+    referencePages.filter((page) => page.available).map((page) => page.key)
+  )
+  for (const guide of ROLE_HELP_GUIDES) {
+    for (const scene of getRoleHelpScenarios(guide, options)) {
+      if (availablePages.has(scene.pageKey) && !scenarios.has(scene.key)) {
+        scenarios.set(scene.key, { ...scene, roleKeys: guides.map((entry) => entry.key) })
+      }
+    }
+  }
   return {
     scenarios: [...scenarios.values()],
     referencePages,
@@ -87,6 +98,24 @@ export function getHelpReadingCatalog(guides, options = {}) {
       ...getHelpReferenceDocuments(referencePages),
     ],
   }
+}
+
+export function getHelpGuideSections(catalog) {
+  const sections = new Map()
+  for (const scenario of catalog.scenarios) {
+    const title =
+      catalog.referencePages.find((page) => page.key === scenario.pageKey)
+        ?.sectionTitle || '日常与系统'
+    if (!sections.has(title)) sections.set(title, [])
+    sections.get(title).push(scenario)
+  }
+  const order = [
+    '日常与系统',
+    ...new Set(catalog.referencePages.map((page) => page.sectionTitle)),
+  ]
+  return order
+    .filter((title) => sections.has(title))
+    .map((title) => ({ title, scenarios: sections.get(title) }))
 }
 
 const normalize = (value) =>
@@ -137,27 +166,29 @@ export function searchHelpDocuments(
     ...references.map((reference) => ({
       ...reference,
       body:
-        reference.kind === 'chapter'
-          ? sectionText(reference.sections)
-          : reference.item
-            ? [
-                reference.page.title,
-                reference.item.source,
-                reference.item.updateRule,
-                reference.item.example,
-                reference.item.effect,
-                ...(reference.item.aliases || []),
-              ].join(' ')
-            : [
-                sectionText(getBusinessPageHandbookSections(reference.page)),
-              ].join(' '),
+        reference.kind === 'manual'
+          ? reference.markdown
+          : reference.kind === 'chapter'
+            ? sectionText(reference.sections)
+            : reference.item
+              ? [
+                  reference.page.title,
+                  reference.item.source,
+                  reference.item.updateRule,
+                  reference.item.example,
+                  reference.item.effect,
+                  ...(reference.item.aliases || []),
+                ].join(' ')
+              : [
+                  sectionText(getBusinessPageHandbookSections(reference.page)),
+                ].join(' '),
     })),
   ]
   return documents
     .map((document, index) => {
       const title = normalize(document.title)
       const summary = normalize(document.summary)
-      const body = normalize(document.body)
+      const body = normalize(`${document.body} ${supplementSearchText(document.supplement)}`)
       const text = title + summary + body
       if (!words.every((word) => text.includes(word))) return null
       const score = words.reduce(
@@ -179,7 +210,7 @@ export function searchHelpDocuments(
 }
 
 export function getHelpDocumentKindLabel(kind) {
-  return kind === 'chapter'
+  return kind === 'chapter' || kind === 'manual'
     ? '手册章节'
     : kind === 'guide'
       ? '操作图解'

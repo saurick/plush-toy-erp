@@ -4,6 +4,7 @@ import { ArrowRightOutlined } from '@ant-design/icons'
 import {
   progressAttention,
   progressDelivery,
+  progressProductLabel,
   progressStages,
   progressStatusLabel,
 } from '../../utils/businessProgress.mjs'
@@ -39,8 +40,7 @@ export default function BusinessProgressSummary({
         </h2>
         <div className="erp-progress-overview-product">
           <ProductIdentity productId={row.product_id} name={row.product}>
-            {row.product}
-            {row.product_count > 1 ? ` 等 ${row.product_count} 项` : ''}
+            {progressProductLabel(row)}
           </ProductIdentity>
           {row.customer ? <p>{row.customer}</p> : null}
         </div>

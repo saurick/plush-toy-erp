@@ -36,22 +36,11 @@
 .workflow-process-stage__item::after {
   position: absolute;
   z-index: 0;
-  top: 24px;
-  bottom: 4px;
-  left: 12px;
-  width: 2px;
-  background: var(--erp-border);
-  content: '';
-}
-
-.workflow-process-stage__item:not(:last-child)::before {
-  position: absolute;
-  bottom: 3px;
-  left: 9px;
-  width: 8px;
-  height: 6px;
-  background: var(--erp-text-subtle);
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  top: 26px;
+  bottom: 0;
+  left: 12.5px;
+  width: 1px;
+  background: var(--erp-border-strong);
   content: '';
 }
 
@@ -97,7 +86,16 @@
   overflow-wrap: anywhere;
 }
 
+.workflow-process-stage__step .workflow-process-stage__label {
+  min-height: 22px;
+  line-height: 22px;
+}
+
 .workflow-process-stage__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
   color: var(--erp-text-muted);
   font-size: var(--erp-font-micro);
   line-height: 1.4;
@@ -108,10 +106,6 @@
   border-color: #86c89c;
   background: #edf9f0;
   color: #287a40;
-}
-
-.workflow-process-stage__item--completed::after {
-  background: #9fd3ad;
 }
 
 .workflow-process-stage__item--active .workflow-process-stage__marker {
@@ -140,10 +134,6 @@
   border-color: #dc6d6d;
   background: #fff1f1;
   color: #b42318;
-}
-
-.workflow-process-stage__item--rejected::after {
-  background: #efb1b1;
 }
 
 .workflow-process-stage__item--rejected .workflow-process-stage__label {
@@ -188,16 +178,14 @@
 .workflow-process-stage--compact .workflow-process-stage__marker {
   width: 22px;
   height: 22px;
+  border-width: 1px;
   font-size: var(--erp-font-micro);
+  font-weight: 500;
 }
 
 .workflow-process-stage--compact .workflow-process-stage__item::after {
   top: 22px;
-  left: 10px;
-}
-
-.workflow-process-stage--compact .workflow-process-stage__item::before {
-  left: 7px;
+  left: 10.5px;
 }
 
 .workflow-process-stage--desktop .workflow-process-stage__item:only-child {
@@ -278,10 +266,11 @@
 
 .workflow-process-stage__history > summary {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  min-height: 42px;
+  min-height: 44px;
   padding: 10px 0;
   color: var(--erp-text-muted);
   font-size: var(--erp-font-small);
@@ -298,8 +287,90 @@
   display: none;
 }
 
-.workflow-process-stage__history[open] > summary > .anticon {
+.workflow-process-stage__history-toggle {
+  font-size: var(--erp-font-micro);
+}
+
+.workflow-process-stage__history[open] > summary .workflow-process-stage__history-toggle {
   transform: rotate(180deg);
+}
+
+.workflow-process-stage__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.workflow-process-stage__item--completed .workflow-process-stage__status > .anticon {
+  color: #287a40;
+}
+
+[data-erp-theme='dark'] .workflow-process-stage__item--completed .workflow-process-stage__status > .anticon {
+  color: #86c89c;
+}
+
+.workflow-process-stage__item--expandable {
+  display: block;
+}
+
+.workflow-process-stage__step > summary {
+  display: grid;
+  min-height: 44px;
+  grid-template-areas: 'marker content toggle';
+  grid-template-columns: 24px minmax(0, 1fr) 16px;
+  align-items: start;
+  gap: 7px;
+  padding: 0;
+  border-radius: 6px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.workflow-process-stage__step > summary::-webkit-details-marker {
+  display: none;
+}
+
+.workflow-process-stage__step > summary:hover .workflow-process-stage__label {
+  color: var(--erp-primary-strong);
+}
+
+.workflow-process-stage__step-toggle {
+  grid-area: toggle;
+  margin-top: 5px;
+  color: var(--erp-text-muted);
+  font-size: var(--erp-font-micro);
+}
+
+.workflow-process-stage__step[open] > summary > .workflow-process-stage__step-toggle {
+  transform: rotate(90deg);
+}
+
+.workflow-process-stage__step-detail {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0 31px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--erp-surface-bg-soft);
+  font-size: var(--erp-font-caption);
+  line-height: 1.5;
+}
+
+.workflow-process-stage__step-detail > div {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+}
+
+.workflow-process-stage__step-detail dt {
+  color: var(--erp-text-muted);
+}
+
+.workflow-process-stage__step-detail dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .workflow-task-detail-flow {

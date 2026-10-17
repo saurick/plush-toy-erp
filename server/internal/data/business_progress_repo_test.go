@@ -306,9 +306,13 @@ func TestBusinessProgressCivilDateAndAllProductSearch(t *testing.T) {
 	f := openProductionOrderRepoTest(t, "progress_dates")
 	due := time.Date(2026, 9, 24, 0, 0, 0, 0, time.FixedZone("Asia/Shanghai", 8*3600)).UTC()
 	f.client.SalesOrderItem.UpdateOneID(f.salesItemID).SetPlannedDeliveryDate(due).SetProductNameSnapshot("快照产品").SetRequestedProductName("原始产品").SetCustomerProductNo("客户款号").SaveX(ctx)
+	code := displayString(f.client.SalesOrderItem.GetX(ctx, f.salesItemID).ProductCodeSnapshot)
+	if code == "" {
+		t.Fatal("engineering fixture must retain the frozen product number")
+	}
 	uc := biz.NewBusinessProgressUsecase(NewBusinessProgressRepo(f.data))
 	q := biz.BusinessProgressQuery{SnapshotAt: due.Add(time.Hour), Access: biz.BusinessProgressAccess{Sales: true}, DateFrom: "2026-09-24", DateTo: "2026-09-24"}
-	for _, keyword := range []string{"原始产品", "客户款号", "POR-P"} {
+	for _, keyword := range []string{"原始产品", "客户款号", code} {
 		q.Keyword = keyword
 		board, err := uc.List(ctx, q)
 		if err != nil || board.Total != 1 || board.Rows[0].DueDate != "2026-09-24" || board.Rows[0].Overdue || !board.Rows[0].DueSoon {

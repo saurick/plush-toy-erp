@@ -95,17 +95,19 @@ test('an unopened task drawer does not read resources or render task details', a
 
 test('task detail keeps current responsibility ahead of history and groups copy actions', async (t) => {
   const ui = await mountDrawer(t, { assignmentAccess: { current_assignee: { id: 9, username: 'lin', display_name: '林工' } }, task: { id: 42, version: 1, task_name: '核对材料', task_status_key: 'ready', owner_role_key: 'purchase', assignee_id: 9, source_type: 'purchase_order', source_no: 'PO-42' } })
-  const summary = document.querySelector('.erp-task-action-drawer__summary--task')
+  const summary = document.querySelector('.workflow-task-info-card[aria-label="任务信息"]')
   const current = summary.querySelector('.workflow-task-current')
   assert.match(current.textContent, /采购.*林工/u)
   assert.match(summary.textContent, /PO-42/u)
   assert.ok(document.querySelector('.ant-drawer-header button[aria-label="更多操作"]'))
   assert.equal(summary.querySelector('button[aria-label="更多操作"]'), null)
   assert.equal(summary.querySelector('button[aria-label="复制任务链接"]'), null)
-  assert.ok(current.querySelector('.erp-task-timing--compact'))
+  assert.equal(current.querySelectorAll('.workflow-task-info-facts > div').length, 2)
+  assert.ok(document.querySelector('.workflow-task-info-card--business [data-task-time="arrived"]'))
+  assert.equal(summary.querySelectorAll('button[aria-label="复制任务信息"]').length, 0)
   assert.equal(document.querySelector('.workflow-task-event-trail__disclosure').open, true)
   await ui.update({ task: { ...ui.task, version: 2, task_status_key: 'done', assignee_id: null } })
-  assert.match(document.querySelector('.workflow-task-current').textContent, /本任务处理结果/u)
+  assert.equal(document.querySelector('.workflow-task-current').getAttribute('aria-label'), '本任务处理结果')
   assert.doesNotMatch(document.querySelector('.workflow-task-current').textContent, /由岗位人员处理/u)
 })
 
@@ -136,6 +138,22 @@ test('switching tasks or sources closes linked-content details and clears stale 
   await ui.update({ task: { ...ui.task, display_context: { available: true, items: [{ kind: 'product', name: '来源产品', code: 'P72' }, { kind: 'material', name: '配件', code: 'M72', supplier_item_no: 'S72' }] } } })
   await ui.click(ui.button('共 2 项关联内容'))
   assert.equal(document.querySelector('.erp-task-linked-items-modal .ant-modal-title').textContent, '关联内容')
+})
+
+test('task resources stay in the footer beside attachments and leave the information card focused on facts', async (t) => {
+  let summaries = 0
+  const sourceSummary = createElement('button', { type: 'button', onClick: () => summaries++ }, '材料汇总')
+  const ui = await mountDrawer(t, { sourceSummary, canViewAttachments: true })
+  const info = document.querySelector('.workflow-task-info-card[aria-label="任务信息"]')
+  const footer = document.querySelector('.erp-task-action-drawer__footer-nav')
+  assert.equal(info.querySelectorAll('.erp-task-action-drawer__resources').length, 0)
+  assert.equal(footer.querySelectorAll('.erp-task-action-drawer__resources button').length, 1)
+  assert.ok(footer.querySelector('[data-testid="workflow-task-attachment-action"]'))
+  await ui.click(footer.querySelector('.erp-task-action-drawer__resources button'))
+  assert.equal(summaries, 1)
+  assert.equal(document.querySelector('.erp-task-action-drawer__step--active').textContent.includes('核对任务'), true)
+  await ui.update({ sourceSummary: null })
+  assert.equal(footer.querySelectorAll('.erp-task-action-drawer__resources').length, 0)
 })
 
 test('task action drawer submits formal approvals only from the authoritative runtime form', () => {
@@ -326,7 +344,7 @@ test('drawer step navigation and keyboard selection never submit an action', asy
   const ui = await mountDrawer(t)
   assert.equal(ui.tabs()[0].getAttribute('aria-selected'), 'true')
   assert.equal(ui.tabs()[2].disabled, true)
-  assert.equal(document.querySelector('.erp-task-action-drawer__navigation').hidden, true)
+  assert.equal(document.querySelector('.erp-task-action-drawer__navigation').hidden, false)
   await ui.click(ui.button('选择处理方式'))
   assert.equal(document.querySelector('.erp-task-action-drawer__navigation').hidden, false)
   assert.equal(ui.tabs()[1].getAttribute('aria-selected'), 'true')
@@ -448,7 +466,7 @@ test('drawer keeps a confirmed receipt visible and finishes without resubmitting
     },
   })
   assert.equal(ui.tabs()[2].getAttribute('aria-selected'), 'true')
-  assert.equal(ui.tabs()[0].disabled, true)
+  assert.equal(ui.tabs()[0].disabled, false)
   assert.equal(ui.tabs()[1].disabled, true)
   const receipt = document.querySelector(
     '[data-testid="workflow-task-action-receipt"]'
@@ -459,6 +477,13 @@ test('drawer keeps a confirmed receipt visible and finishes without resubmitting
     /本任务已结束，没有关联的后续业务流程/
   )
   assert.equal(ui.button('确认完成'), undefined)
+  await ui.click(ui.button('回看任务'))
+  assert.equal(ui.tabs()[0].getAttribute('aria-selected'), 'true')
+  assert.ok(document.querySelector('.workflow-task-info-card[aria-label="任务信息"]'))
+  assert.equal(ui.tabs()[1].disabled, true)
+  assert.equal(ui.button('确认完成'), undefined)
+  await ui.click(ui.button('查看结果回执'))
+  assert.equal(ui.tabs()[2].getAttribute('aria-selected'), 'true')
   await ui.click(ui.button('完成并关闭'))
   assert.equal(ui.closed, 1)
   assert.equal(ui.submissions.length, 0)

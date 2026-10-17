@@ -87,7 +87,7 @@ test('mobile task page keeps load failures explicit and invalidates inactive vie
   assert.match(listSource, /authoritativeTaskCounts\?\.history \?\? '—'/u)
   assert.match(listSource, /authoritativeTaskCounts\?\.risk \?\? '—'/u)
   assert.match(listSource, /authoritativeTaskCounts\?\.overdue \?\? '—'/u)
-  assert.match(listSource, />超时</u)
+  assert.match(listSource, /label: '超时'/u)
   assert.match(listSource, /条超时/u)
 })
 

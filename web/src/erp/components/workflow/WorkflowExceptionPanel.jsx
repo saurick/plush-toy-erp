@@ -33,6 +33,7 @@ import WorkflowTaskDiscoveryFilters from './WorkflowTaskDiscoveryFilters.jsx'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator'
 import useWorkflowTaskAssignees from '../../hooks/useWorkflowTaskAssignees'
 import MobileScrollEdge from '../../mobile/components/MobileScrollEdge.jsx'
+import { MobileFilterClearButton } from '../../mobile/components/MobileFilterPopover.jsx'
 import { usePageLoadFeedback } from '../PageLoadFeedback.jsx'
 import './workflowExceptions.css'
 
@@ -67,6 +68,7 @@ export default function WorkflowExceptionPanel({
   trackingRef,
 }) {
   const [filters, setFilters] = React.useState(() => compact ? {} : normalizeTaskDiscoveryFilters(initialQuery.filters))
+  const searchRoot = React.useRef(null)
   const assignees = useWorkflowTaskAssignees(profile, roleKey, !compact)
   const [keyword, setKeyword] = React.useState(initialQuery.keyword || '')
   const [state, setState] = React.useState(initialQuery.state || '')
@@ -258,7 +260,7 @@ export default function WorkflowExceptionPanel({
   )
   const StateFilters = compact ? HorizontalScroll : 'div'
   return (
-    <section ref={panelRef} className="workflow-exceptions" aria-label="异常跟踪" aria-busy={loading}>
+    <section ref={panelRef} className={`workflow-exceptions${compact ? ' workflow-exceptions--mobile erp-mobile-controls' : ''}`} aria-label="异常跟踪" aria-busy={loading}>
       {view ? (
         <header className="workflow-exceptions__detail-header">
           <Button icon={<LeftOutlined aria-hidden />} onClick={returnToExceptions}>返回异常跟踪</Button>
@@ -272,10 +274,11 @@ export default function WorkflowExceptionPanel({
         <>
           <div className="workflow-exceptions__controls">
             {!compact && filterControls}
-            <div className="workflow-exceptions__query">
+            <div className="workflow-exceptions__query" ref={searchRoot}>
               {compact ? <MobileSearchInput
                 aria-label="搜索异常单号、订单、批次或原因"
-                placeholder="单号/订单/批次/原因"
+                placeholder="单号/原因"
+                title="搜索异常单号、订单、批次或原因"
                 value={search.value}
                 onChange={search.onChange}
                 onCompositionStart={search.onCompositionStart}
@@ -293,6 +296,16 @@ export default function WorkflowExceptionPanel({
                 onCompositionEnd={search.onCompositionEnd}
                 onPressEnter={search.onPressEnter}
               />}
+              {compact && state && (
+                <MobileFilterClearButton
+                  standalone
+                  contextLabel="异常"
+                  onClear={() => {
+                    selectState('')
+                    searchRoot.current?.querySelector('input')?.focus({ preventScroll: true })
+                  }}
+                />
+              )}
             </div>
             <StateFilters className="workflow-exceptions__states" role="group" aria-label="异常处理状态">
               {[

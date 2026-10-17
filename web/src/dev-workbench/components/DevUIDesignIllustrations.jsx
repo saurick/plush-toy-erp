@@ -271,7 +271,7 @@ function SpacingGuide() {
   return (
     <GuideSection
       id="design-spacing"
-      title="为什么是 12 px，而不是越宽松越好？"
+      title="为什么采用 8 px 的紧凑页面边距？"
       description="保持相同内容，只改变页面左右边距。拖动滑块，观察空隙与可用宽度的变化。"
     >
       <div className="erp-design-spacing-controls">
@@ -284,28 +284,28 @@ function SpacingGuide() {
           step={2}
           value={spacing}
           onChange={setSpacing}
-          marks={{ 4: '4', 12: '12', 24: '24', 32: '32' }}
+          marks={{ 4: '4', 8: '8', 24: '24', 32: '32' }}
         />
-        <Button onClick={() => setSpacing(12)}>对齐当前基准</Button>
+        <Button onClick={() => setSpacing(8)}>对齐当前基准</Button>
       </div>
       <div className="erp-design-comparison">
-        <SpacingSample spacing={12} label="当前基准" />
+        <SpacingSample spacing={8} label="当前基准" />
         <SpacingSample spacing={spacing} label="调整后" />
       </div>
       <div className="erp-design-spacing-feedback" aria-live="polite">
         <strong>
-          {spacing < 12
+          {spacing < 8
             ? '更贴近边缘'
-            : spacing === 12
+            : spacing === 8
               ? '与当前基准一致'
               : '更宽的外围留白'}
         </strong>
         <span>
-          {spacing < 12
+          {spacing < 8
             ? '内容空间增加，但容器之间更难分组，文字与边界容易显得拥挤。'
-            : spacing === 12
+            : spacing === 8
               ? '保留可辨认的间隙，同时把大部分宽度留给记录与字段。'
-              : `相比当前基准，两侧合计少了 ${(spacing - 12) * 2} px 内容宽度；在多列列表中，额外留白可能更早触发换行或横向滚动。`}
+              : `相比当前基准，两侧合计少了 ${(spacing - 8) * 2} px 内容宽度；在多列列表中，额外留白可能更早触发换行或横向滚动。`}
         </span>
       </div>
       <div className="erp-design-principle-grid">

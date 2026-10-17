@@ -161,7 +161,6 @@ IDENTITY_HITS="$(
     web/.env.development \
     web/.env.production \
     web/src/App.jsx \
-    web/src/pages/Home/index.jsx \
     server/cmd/server/main.go \
     server/Makefile \
     server/configs/dev/config.yaml \
@@ -214,7 +213,7 @@ DOC_HITS="$(
     server/deploy/compose/prod/README.md \
     server/deploy/dashboard/README.md \
     server/docs/k8s.md \
-    web/src/pages/Home/index.jsx
+    web/src/App.jsx
 )"
 report_required \
   "文档与首页仍保留旧占位措辞" \

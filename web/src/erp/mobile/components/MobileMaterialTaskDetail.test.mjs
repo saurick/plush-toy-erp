@@ -125,7 +125,7 @@ test('mobile material task separates on-demand reading from versioned task proce
   })
 
   await render()
-  assert.equal(document.querySelector('[role="dialog"]'), null)
+  assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
   assert.equal(
     calls.filter(({ method }) => method === 'get_engineering_material_request').length,
     1
@@ -133,31 +133,37 @@ test('mobile material task separates on-demand reading from versioned task proce
   assert.match(document.querySelector('[aria-label="任务处理链"]').textContent, /工程提交用料/)
   assert.match(document.querySelector('[aria-label="任务处理链"]').textContent, /老板审核/)
   await click(button('查看材料汇总'))
-  assert.equal(document.querySelector('.ant-modal-footer'), null)
-  assert.equal(button('审核通过，交财务'), undefined)
-  assert.equal(button('退回工程'), undefined)
+  assert.equal(document.querySelectorAll('.ant-modal-footer').length, 0)
+  assert.equal(Boolean(button('审核通过，交财务')), false)
+  assert.equal(Boolean(button('退回工程')), false)
   await click(document.querySelector('.ant-modal-close'))
-  assert.equal(document.querySelector('[role="dialog"]'), null)
+  assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
   assert.equal(openedActions, 0)
 
-  await click(document.querySelector('.mobile-role-action-bar button'))
+  await click(button('处理任务'))
   assert.equal(openedActions, 1)
-  assert.equal(document.querySelector('[role="dialog"]'), null)
-  assert.equal(button('审核通过，交财务'), undefined)
+  assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
+  assert.equal(Boolean(button('审核通过，交财务')), false)
   assert.equal(
     calls.filter(({ method }) => method === 'get_engineering_material_request')
       .length,
     2
   )
-  assert.equal(document.querySelector('[data-step-key="process"]'), null)
-  assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 1)
+  assert.equal(document.querySelectorAll('[data-step-key]').length, 3)
+  assert.equal(document.querySelector('[data-step-key="process"]').disabled, false)
+  assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 2)
+  assert.equal(Boolean(document.querySelector('.mobile-role-action-bar [data-testid="mobile-task-attachment-action"]')), true)
   assert.ok(calls.every(({ method }) => !method.includes('review_engineering')))
 
   await render({ selectedTask: { ...task, id: 9, assignee_id: 99 } })
-  assert.equal(document.querySelector('[role="dialog"]'), null)
+  assert.equal(document.querySelectorAll('[role="dialog"]').length, 0)
   assert.ok(button('查看材料汇总'))
-  assert.equal(document.querySelector('.mobile-role-action-bar button'), null)
+  assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 1)
+  assert.equal(Boolean(button('处理任务')), false)
+  assert.equal(document.querySelector('[data-step-key="process"]').disabled, true)
   await render({ selectedTask: { ...task, id: 10, task_status_key: 'done' } })
   assert.ok(button('查看材料汇总'))
-  assert.equal(document.querySelector('.mobile-role-action-bar button'), null)
+  assert.equal(document.querySelectorAll('.mobile-role-action-bar button').length, 1)
+  assert.equal(Boolean(button('处理任务')), false)
+  assert.equal(document.querySelector('[data-step-key="process"]').disabled, true)
 })

@@ -29,6 +29,7 @@ import SearchInput from '@/common/components/SearchInput'
 import { message } from '@/common/utils/antdApp'
 import DevCustomerScopeSelector from '../components/DevCustomerScopeSelector.jsx'
 import DevPageNav from '../components/DevPageNav.jsx'
+import { DEV_PAGINATION } from '../config/devPagination.mjs'
 import DevTimestamp from '../components/DevTimestamp.jsx'
 import DevTaskNav from '../components/DevTaskNav.jsx'
 import DevPressurePanel from '../components/DevPressurePanel.jsx'
@@ -1096,16 +1097,16 @@ function ValidationWorkspace({
             按本轮改动选择，结果分别保留。
           </Text>
         </div>
+        <DevCustomerScopeSelector
+          compact
+          scope={customerScope}
+          onChange={customerScope.selectCustomer}
+          disabled={customerSelectorDisabled}
+          label="权限检查客户"
+          note="仅影响岗位权限与任务可见性检查。"
+          invalidDescription="岗位权限与任务可见性巡检已停止；开发门禁与字段联动专项仍可独立运行。"
+        />
       </div>
-      <DevCustomerScopeSelector
-        compact
-        scope={customerScope}
-        onChange={customerScope.selectCustomer}
-        disabled={customerSelectorDisabled}
-        label="权限检查客户"
-        note="仅影响岗位权限与任务可见性检查。"
-        invalidDescription="岗位权限与任务可见性巡检已停止；开发门禁与字段联动专项仍可独立运行。"
-      />
       <div className="erp-dev-testing-validation__actions erp-dev-tool-table-wrap">
         <table className="erp-dev-tool-table" aria-label="固定检查与独立证据">
           <thead>
@@ -2170,36 +2171,33 @@ export default function DevTestingPage() {
             <Text type="secondary">当前工作区：{coverageToolbarText}</Text>
           ) : null}
         </div>
+        <div
+          className="erp-dev-testing-auxiliary-nav"
+          hidden={!isAuxiliaryView}
+        >
+          {isCloseoutView ? (
+            <Link to={DEV_DELIVERY_ROUTE}>
+              <LeftOutlined aria-hidden="true" /> 返回交付运行
+            </Link>
+          ) : (
+            <Button
+              type="link"
+              icon={<LeftOutlined aria-hidden="true" />}
+              onClick={() => selectView(VIEW_TIERS)}
+            >
+              返回本轮验证
+            </Button>
+          )}
+          <Text type="secondary">
+            {isCloseoutView
+              ? closeoutToolbarText
+              : `找到 ${allCommandBlocks.length} 项命令`}
+          </Text>
+        </div>
       </header>
 
       <main className="erp-dev-testing-shell">
         <section className="erp-dev-testing-reader">
-          <div className="erp-dev-testing-reader__toolbar">
-            <div
-              className="erp-dev-testing-auxiliary-nav"
-              hidden={!isAuxiliaryView}
-            >
-              {isCloseoutView ? (
-                <Link to={DEV_DELIVERY_ROUTE}>
-                  <LeftOutlined aria-hidden="true" /> 返回交付运行
-                </Link>
-              ) : (
-                <Button
-                  type="link"
-                  icon={<LeftOutlined aria-hidden="true" />}
-                  onClick={() => selectView(VIEW_TIERS)}
-                >
-                  返回本轮验证
-                </Button>
-              )}
-              <Text type="secondary">
-                {isCloseoutView
-                  ? closeoutToolbarText
-                  : `找到 ${allCommandBlocks.length} 项命令`}
-              </Text>
-            </div>
-          </div>
-
           {view === VIEW_TIERS ? (
             <div className="erp-dev-testing-tier-view">
               <ValidationWorkspace
@@ -2306,15 +2304,11 @@ export default function DevTestingPage() {
                 className="erp-dev-testing-command-pagination"
                 aria-label="专项检查命令分页"
               >
-                <Text type="secondary" role="status">
-                  显示 {commandPage.from}–{commandPage.to} 项，共{' '}
-                  {commandPage.total} 项命令
-                </Text>
                 <Pagination
+                  {...DEV_PAGINATION}
                   current={commandPage.page}
                   pageSize={DEV_TESTING_COMMAND_PAGE_SIZE}
                   total={commandPage.total}
-                  showSizeChanger={false}
                   hideOnSinglePage
                   onChange={selectCommandPage}
                 />

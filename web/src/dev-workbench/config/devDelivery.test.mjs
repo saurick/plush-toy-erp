@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { readDevWorkbenchPageSource } from '../../../scripts/test/pageSources.mjs'
 
 import {
   DEV_DELIVERY_ACTION_API_PATH,
@@ -59,11 +59,8 @@ import {
 } from './devSummarySnapshot.mjs'
 
 const SHA = 'a'.repeat(40)
-const versionCenterPageSource = ['../pages/DevVersionCenterPage.jsx', '../pages/delivery/version/ManualGuidePage.jsx', '../pages/delivery/version/shared.jsx'].map((path) => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n')
-const databaseMigrationPageSource = readFileSync(
-  new URL('../pages/DevDatabaseMigrationPage.jsx', import.meta.url),
-  'utf8'
-)
+const versionCenterPageSource = readDevWorkbenchPageSource('DevVersionCenterPage.jsx')
+const databaseMigrationPageSource = readDevWorkbenchPageSource('DevDatabaseMigrationPage.jsx')
 function response(payload, ok = true) {
   return {
     ok,
@@ -1425,11 +1422,11 @@ test('version center keeps critical state visible and uses stable tab pagination
   assert.match(versionCenterPageSource, /value=\{event[.]at\}/u)
   assert.match(
     versionCenterPageSource,
-    /pageSize: DEV_VERSION_CENTER_VERSION_PAGE_SIZE[\s\S]*showSizeChanger: false/u
+    /\.\.\.DEV_PAGINATION,[\s\S]*pageSize: DEV_VERSION_CENTER_VERSION_PAGE_SIZE/u
   )
   assert.match(
     versionCenterPageSource,
-    /pageSize: DEV_VERSION_CENTER_HISTORY_PAGE_SIZE[\s\S]*showSizeChanger: false/u
+    /\.\.\.DEV_PAGINATION,[\s\S]*pageSize: DEV_VERSION_CENTER_HISTORY_PAGE_SIZE/u
   )
   assert.match(
     versionCenterPageSource,

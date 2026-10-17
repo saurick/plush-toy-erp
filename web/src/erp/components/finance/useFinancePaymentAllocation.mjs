@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Form } from 'antd'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 
 import { showPageLoadError } from '../PageLoadFeedback.jsx'
 
@@ -41,6 +42,7 @@ export default function useFinancePaymentAllocation({
   loadReferences,
   allocationCandidates,
 }) {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const [allocationOpen, setAllocationOpen] = useState(false)
 
   const [allocationForm] = Form.useForm()
@@ -221,6 +223,7 @@ export default function useFinancePaymentAllocation({
           attemptsRef.current.settle(scope, attempt, null)
           rememberPayment(payment)
           setAllocationOpen(false)
+          reportBusinessResult('已抵扣应收应付，剩余款项继续保留', payment)
           await loadReferences()
           message.success('已抵扣应收应付，剩余款项继续保留')
         } catch (error) {
@@ -250,6 +253,7 @@ export default function useFinancePaymentAllocation({
       const payment = execution.source_readback
       rememberPayment(payment)
       setAllocationOpen(false)
+      reportBusinessResult(cashOnly ? '实际收付已确认，款项余额已更新' : '收付款已过账并完成核销', payment)
       await loadReferences()
       message.success(
         cashOnly ? '实际收付已确认，款项余额已更新' : '收付款已过账并完成核销'
@@ -271,6 +275,7 @@ export default function useFinancePaymentAllocation({
             )
           ) {
             setAllocationOpen(false)
+            reportBusinessResult(cashOnly ? '已重新读取实际收付结果' : '已重新读取收付款过账与核销结果', payment)
             await loadReferences()
             message.success(
               cashOnly

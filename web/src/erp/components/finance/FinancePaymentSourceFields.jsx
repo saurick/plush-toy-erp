@@ -41,7 +41,7 @@ const sources = {
   },
 }
 
-export default function FinancePaymentSourceFields({ form, profile, open }) {
+export default function FinancePaymentSourceFields({ form, profile, open, sourceContext = null }) {
   const kind = Form.useWatch('kind', form)
   const direction = Form.useWatch('direction', form)
   const party = Form.useWatch('counterparty_id', form)
@@ -56,6 +56,10 @@ export default function FinancePaymentSourceFields({ form, profile, open }) {
     setError('')
     setLoading(false)
     if (!open || kind !== FinancePaymentKind.ADVANCE || !source || !party) {
+      return () => controller.abort()
+    }
+    if (sourceContext?.record) {
+      setOrders([sourceContext.record])
       return () => controller.abort()
     }
     if (!hasActionPermission(profile, source.permission)) {
@@ -88,7 +92,7 @@ export default function FinancePaymentSourceFields({ form, profile, open }) {
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
-  }, [open, kind, sourceType, party, profile])
+  }, [open, kind, sourceType, party, profile, sourceContext])
   if (kind !== FinancePaymentKind.ADVANCE) return null
   return (
     <>
@@ -98,6 +102,7 @@ export default function FinancePaymentSourceFields({ form, profile, open }) {
         rules={[{ required: true, message: '请选择单据类型' }]}
       >
         <Select
+          disabled={Boolean(sourceContext)}
           options={Object.entries(sources)
             .filter(([key]) =>
               direction === 'RECEIPT'
@@ -121,7 +126,7 @@ export default function FinancePaymentSourceFields({ form, profile, open }) {
           showSearch
           optionFilterProp="label"
           loading={loading}
-          disabled={!party || !sourceType}
+          disabled={Boolean(sourceContext) || !party || !sourceType}
           options={orders.map((row) => ({
             value: row.id,
             label: `${row[sources[sourceType]?.number]} · ${row.currency}`,

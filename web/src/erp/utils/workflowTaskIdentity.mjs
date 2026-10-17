@@ -88,19 +88,55 @@ export function getWorkflowTaskIdentity(task = {}) {
   return { available: true, sourceNo: '', sourceLineCount: null, items }
 }
 
-export function getWorkflowTaskIdentityPresentation(task = {}) {
+function identityItemKey(item) {
+  return item.productID
+    ? `product:${item.productID}`
+    : JSON.stringify([
+        item.kind,
+        item.name,
+        item.code,
+        item.styleNo,
+        item.supplierItemNo,
+      ])
+}
+
+export function getWorkflowTaskIdentityPresentation(task = {}, keyword = '') {
   const identity = getWorkflowTaskIdentity(task)
   const purchaseOrder = PURCHASE_ORDER_SOURCE_TYPES.has(text(task.source_type))
-  const firstIndex = purchaseOrder
-    ? identity.items.findIndex((item) => item.kind === 'material')
-    : 0
+  const query = text(keyword).toLowerCase()
+  const matchedItems =
+    query && identity.available
+      ? identity.items.filter((item) =>
+          [item.name, item.code, item.styleNo, item.supplierItemNo].some(
+            (value) => value?.toLowerCase().includes(query)
+          )
+        )
+      : []
+  const preferredMatch = purchaseOrder
+    ? matchedItems.find((item) => item.kind === 'material') || matchedItems[0]
+    : matchedItems[0]
+  const firstIndex = preferredMatch
+    ? identity.items.indexOf(preferredMatch)
+    : purchaseOrder
+      ? identity.items.findIndex((item) => item.kind === 'material')
+      : 0
   const resolvedFirstIndex = firstIndex >= 0 ? firstIndex : 0
   const first = identity.items[resolvedFirstIndex]
   const remainingItems = identity.items.filter(
     (_, index) => index !== resolvedFirstIndex
   )
   let compactCountLabel = ''
-  if (
+  if (matchedItems.length) {
+    const kinds = new Set(matchedItems.map((item) => item.kind))
+    const countedItems =
+      kinds.size === 1
+        ? identity.items.filter((item) => kinds.has(item.kind))
+        : identity.items
+    const matchedCount = new Set(matchedItems.map(identityItemKey)).size
+    const totalCount = new Set(countedItems.map(identityItemKey)).size
+    const unit = kinds.size > 1 ? '项' : kinds.has('product') ? '款' : '种物料'
+    compactCountLabel = `命中 ${matchedCount} ${unit}，共 ${totalCount} ${unit}`
+  } else if (
     purchaseOrder &&
     Number.isSafeInteger(identity.sourceLineCount) &&
     identity.sourceLineCount > 0

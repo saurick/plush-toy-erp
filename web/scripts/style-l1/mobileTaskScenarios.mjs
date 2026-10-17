@@ -10,6 +10,7 @@ import { assertTaskMenuCopy, assertTaskCopy, clickTaskCardContent } from './task
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
 import { assertTaskEventTrailMarkers } from './taskEventTrailAssertions.mjs'
 import { assertMobileEditableInputSize } from './inputControlAssertions.mjs'
+import { createTaskIdentitySearchScenarios } from './taskIdentitySearchScenarios.mjs'
 import {
   assertReadableOnBackground,
   isDarkControlBackground,
@@ -35,6 +36,7 @@ export function createMobileTaskScenarios({
   assertMobileTaskBossDoneList,
 }) {
   return [
+    ...createTaskIdentitySearchScenarios({ assert }),
     mobileTaskListOptionsScenario({ assert, path, outputDir }),
     mobileTaskRefreshScenario({ assert, path, outputDir }),
     mobileTaskHistoryFiltersScenario({ assert, path, outputDir }),

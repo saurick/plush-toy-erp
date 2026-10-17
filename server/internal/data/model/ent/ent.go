@@ -24,6 +24,9 @@ import (
 	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/financepayment"
+	"server/internal/data/model/ent/helpfeedback"
+	"server/internal/data/model/ent/helpsupplement"
+	"server/internal/data/model/ent/helpsupplementrevision"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorylotstatusevent"
@@ -164,6 +167,9 @@ func checkColumn(t, c string) error {
 			financecreditnote.Table:                  financecreditnote.ValidColumn,
 			financefact.Table:                        financefact.ValidColumn,
 			financepayment.Table:                     financepayment.ValidColumn,
+			helpfeedback.Table:                       helpfeedback.ValidColumn,
+			helpsupplement.Table:                     helpsupplement.ValidColumn,
+			helpsupplementrevision.Table:             helpsupplementrevision.ValidColumn,
 			inventorybalance.Table:                   inventorybalance.ValidColumn,
 			inventorylot.Table:                       inventorylot.ValidColumn,
 			inventorylotstatusevent.Table:            inventorylotstatusevent.ValidColumn,

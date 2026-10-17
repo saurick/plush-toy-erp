@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { readDevWorkbenchPageSource } from '../../../scripts/test/pageSources.mjs'
 
 const css = readFileSync(
   new URL('./dev-version-center.css', import.meta.url),
@@ -14,7 +15,7 @@ const timestampComponent = readFileSync(
   new URL('../components/DevDeliveryTimestamp.jsx', import.meta.url),
   'utf8'
 )
-const versionPage = ['../pages/DevVersionCenterPage.jsx', '../pages/delivery/version/ManualGuidePage.jsx', '../pages/delivery/version/shared.jsx'].map((path) => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n')
+const versionPage = readDevWorkbenchPageSource('DevVersionCenterPage.jsx')
 
 test('version center keeps strict quality evidence as a compact summary and deep link', () => {
   assert.match(versionPage, /当前发布 SHA 严格门禁/u)

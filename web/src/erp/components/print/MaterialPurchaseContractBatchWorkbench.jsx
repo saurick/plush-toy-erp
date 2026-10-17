@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { getPrintToolbarButtonClassName, PrintToolButton } from './PrintWorkspaceTools.jsx'
 
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -39,7 +40,6 @@ import {
 import usePrintWorkspaceFeedback from '../../utils/usePrintWorkspaceFeedback.js'
 import MaterialPurchaseContractPaper from './MaterialPurchaseContractPaper.jsx'
 import PrintWorkspaceShell from './PrintWorkspaceShell.jsx'
-import { PrintToolButton } from './PrintWorkspaceTools.jsx'
 import ContractClauseTools from './ContractClauseTools.jsx'
 import {
   editContractClauseGroup,
@@ -368,13 +368,6 @@ export default function MaterialPurchaseContractBatchWorkbench({
     }
   }
 
-  const getToolbarButtonClassName = ({ primary = false } = {}) =>
-    `erp-print-shell__button ${
-      primary
-        ? 'erp-print-shell__button--primary'
-        : 'erp-print-shell__button--ghost'
-    }`
-
   return (
     <PrintWorkspaceShell
       title={`采购合同批量打印（${batchDraft.contracts.length} 份）`}
@@ -557,7 +550,7 @@ export default function MaterialPurchaseContractBatchWorkbench({
           <PrintToolButton
             icon="preview"
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             onClick={handlePreviewPDF}
             disabled={pdfAction !== '' || currentContracts.length === 0}
           >
@@ -566,7 +559,7 @@ export default function MaterialPurchaseContractBatchWorkbench({
           <PrintToolButton
             icon="download"
             type="button"
-            className={getToolbarButtonClassName()}
+            className={getPrintToolbarButtonClassName()}
             onClick={handleDownloadPDF}
             disabled={pdfAction !== '' || currentContracts.length === 0}
           >
@@ -575,7 +568,7 @@ export default function MaterialPurchaseContractBatchWorkbench({
           <PrintToolButton
             icon="print"
             type="button"
-            className={getToolbarButtonClassName({ primary: true })}
+            className={getPrintToolbarButtonClassName({ primary: true })}
             onClick={handlePrint}
             disabled={pdfAction !== '' || currentContracts.length === 0}
           >

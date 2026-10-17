@@ -49,7 +49,11 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderRead); res != nil {
 			return id, res, nil
 		}
-		item, err := d.salesOrderUC.GetSalesOrder(ctx, getInt(pm, "id", 0))
+		orderID, valid := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !valid || !jsonRPCParamsAllowed(pm, "id") {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.salesOrderUC.GetSalesOrder(ctx, orderID)
 		return id, salesOrderMutationResult(ctx, d, item, err), nil
 	case "list_sales_orders":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderRead); res != nil {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/financecreditnote"
+	"server/internal/data/model/ent/financefact"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -109,6 +110,45 @@ func (_c *FinanceCreditNoteCreate) SetNillableCreatedAt(v *time.Time) *FinanceCr
 		_c.SetCreatedAt(*v)
 	}
 	return _c
+}
+
+// SetFinanceFact sets the "finance_fact" edge to the FinanceFact entity.
+func (_c *FinanceCreditNoteCreate) SetFinanceFact(v *FinanceFact) *FinanceCreditNoteCreate {
+	return _c.SetFinanceFactID(v.ID)
+}
+
+// AddReversalIDs adds the "reversals" edge to the FinanceCreditNote entity by IDs.
+func (_c *FinanceCreditNoteCreate) AddReversalIDs(ids ...int) *FinanceCreditNoteCreate {
+	_c.mutation.AddReversalIDs(ids...)
+	return _c
+}
+
+// AddReversals adds the "reversals" edges to the FinanceCreditNote entity.
+func (_c *FinanceCreditNoteCreate) AddReversals(v ...*FinanceCreditNote) *FinanceCreditNoteCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddReversalIDs(ids...)
+}
+
+// SetReversalOfID sets the "reversal_of" edge to the FinanceCreditNote entity by ID.
+func (_c *FinanceCreditNoteCreate) SetReversalOfID(id int) *FinanceCreditNoteCreate {
+	_c.mutation.SetReversalOfID(id)
+	return _c
+}
+
+// SetNillableReversalOfID sets the "reversal_of" edge to the FinanceCreditNote entity by ID if the given value is not nil.
+func (_c *FinanceCreditNoteCreate) SetNillableReversalOfID(id *int) *FinanceCreditNoteCreate {
+	if id != nil {
+		_c = _c.SetReversalOfID(*id)
+	}
+	return _c
+}
+
+// SetReversalOf sets the "reversal_of" edge to the FinanceCreditNote entity.
+func (_c *FinanceCreditNoteCreate) SetReversalOf(v *FinanceCreditNote) *FinanceCreditNoteCreate {
+	return _c.SetReversalOfID(v.ID)
 }
 
 // Mutation returns the FinanceCreditNoteMutation object of the builder.
@@ -239,6 +279,9 @@ func (_c *FinanceCreditNoteCreate) check() error {
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "FinanceCreditNote.created_at"`)}
 	}
+	if len(_c.mutation.FinanceFactIDs()) == 0 {
+		return &ValidationError{Name: "finance_fact", err: errors.New(`ent: missing required edge "FinanceCreditNote.finance_fact"`)}
+	}
 	return nil
 }
 
@@ -268,14 +311,6 @@ func (_c *FinanceCreditNoteCreate) createSpec() (*FinanceCreditNote, *sqlgraph.C
 	if value, ok := _c.mutation.CreditNoteNo(); ok {
 		_spec.SetField(financecreditnote.FieldCreditNoteNo, field.TypeString, value)
 		_node.CreditNoteNo = value
-	}
-	if value, ok := _c.mutation.FinanceFactID(); ok {
-		_spec.SetField(financecreditnote.FieldFinanceFactID, field.TypeInt, value)
-		_node.FinanceFactID = value
-	}
-	if value, ok := _c.mutation.ReversalOfCreditNoteID(); ok {
-		_spec.SetField(financecreditnote.FieldReversalOfCreditNoteID, field.TypeInt, value)
-		_node.ReversalOfCreditNoteID = &value
 	}
 	if value, ok := _c.mutation.Amount(); ok {
 		_spec.SetField(financecreditnote.FieldAmount, field.TypeOther, value)
@@ -308,6 +343,56 @@ func (_c *FinanceCreditNoteCreate) createSpec() (*FinanceCreditNote, *sqlgraph.C
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(financecreditnote.FieldCreatedAt, field.TypeTime, value)
 		_node.CreatedAt = value
+	}
+	if nodes := _c.mutation.FinanceFactIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   financecreditnote.FinanceFactTable,
+			Columns: []string{financecreditnote.FinanceFactColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financefact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.FinanceFactID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ReversalsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   financecreditnote.ReversalsTable,
+			Columns: []string{financecreditnote.ReversalsColumn},
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ReversalOfIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   financecreditnote.ReversalOfTable,
+			Columns: []string{financecreditnote.ReversalOfColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(financecreditnote.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ReversalOfCreditNoteID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

@@ -65,11 +65,11 @@
 }
 
 .erp-dev-product-core-header__summary {
-  display: grid;
-  min-width: 120px;
-  justify-items: end;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   line-height: 1.25;
-  text-align: right;
+  white-space: nowrap;
 }
 
 .erp-dev-product-core-header__summary strong {
@@ -101,10 +101,11 @@
 
 .erp-dev-product-core-toolbar {
   display: flex;
+  flex: 1 1 620px;
+  flex-wrap: wrap;
   min-width: 0;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
+  align-items: center;
+  gap: 6px 12px;
 }
 
 .erp-dev-product-core-toolbar > div:first-child {
@@ -127,7 +128,7 @@
 }
 
 .erp-dev-product-core-toolbar__actions .erp-search-input {
-  width: min(380px, 44vw);
+  width: min(280px, 100%);
 }
 
 .erp-dev-product-core-filters {

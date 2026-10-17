@@ -10,6 +10,53 @@ export function createDevUIDesignDetailScenarios({
 }) {
   return [
     {
+      name: 'dev-ui-design-lazy-views',
+      path: '/__dev/ui-design?view=specification',
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        const preview = page.locator('iframe[title="ERP 最新可交互设计"]')
+        const assertHTMLNotLoaded = async () => {
+          assert.equal(await preview.count(), 0)
+          const loaded = await page.evaluate(() => performance
+            .getEntriesByType('resource')
+            .some((item) => decodeURIComponent(item.name).includes('/docs/product/ui-design/index.html')))
+          assert.equal(loaded, false, '说明和控件不加载 HTML 原型')
+        }
+        await page.locator('.erp-design-document-shell').waitFor()
+        await assertHTMLNotLoaded()
+        await page.getByRole('tab', { name: '设计依据', exact: true }).click()
+        await page.locator('.erp-design-document-shell').waitFor()
+        await assertHTMLNotLoaded()
+
+        await page.goto(new URL('/__dev/ui-design?page=controls', page.url()).href)
+        await page.getByRole('region', { name: '控件设计', exact: true }).waitFor()
+        await assertHTMLNotLoaded()
+        await page.locator('.erp-dev-ui-design-page-select').click()
+        await page.getByText('登录页', { exact: true }).click()
+        await preview.waitFor()
+        const originalFrame = await preview.elementHandle()
+        const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
+        const account = frame.locator('input').first()
+        await account.fill('retained-preview')
+        const tabs = page.locator('.erp-dev-ui-design-header')
+        const before = await tabs.boundingBox()
+        await page.getByRole('tab', { name: '设计说明', exact: true }).click()
+        await page.locator('.erp-design-document-shell').waitFor()
+        await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
+        await preview.waitFor()
+        assert(await originalFrame.evaluate((node) => node === document.querySelector('iframe[title="ERP 最新可交互设计"]')), '已打开的原型保持挂载')
+        assert.equal(await account.inputValue(), 'retained-preview')
+        const after = await tabs.boundingBox()
+        for (const key of ['x', 'y', 'width', 'height']) {
+          assert(Math.abs(after[key] - before[key]) <= 1, `切换查看方式保持标题栏 ${key}`)
+        }
+        await page.getByRole('button', { name: /重置演示/u }).click()
+        await account.waitFor()
+        assert.notEqual(await account.inputValue(), 'retained-preview')
+        await assertNoHorizontalOverflow(page)
+      },
+    },
+    {
       name: 'dev-ui-design-login',
       path: '/__dev/ui-design?page=login',
       viewport: { width: 1440, height: 900 },
@@ -37,7 +84,7 @@ export function createDevUIDesignDetailScenarios({
         await frame.getByRole('button', { name: '填入演示信息' }).click()
         await frame.getByRole('button', { name: '登录', exact: true }).click()
         await frame.locator('.workbench-queue-tabs button').first().waitFor()
-        await frame.getByRole('button', { name: 'admin', exact: true }).click()
+        await frame.locator('.preview-account-trigger').click()
         await frame
           .getByRole('button', { name: '退出登录', exact: true })
           .click()
@@ -48,6 +95,7 @@ export function createDevUIDesignDetailScenarios({
             .inputValue(),
           ''
         )
+        await page.locator('.erp-dev-ui-design-page-select').click()
         await page.getByText('业务界面', { exact: true }).click()
         await frame.locator('.workbench-queue-tabs button').first().waitFor()
         await assertNoHorizontalOverflow(page)
@@ -342,7 +390,7 @@ export function createDevUIDesignDetailScenarios({
           '4px'
         )
         await page.getByRole('button', { name: '对齐当前基准' }).click()
-        assert.equal(await slider.getAttribute('aria-valuenow'), '12')
+        assert.equal(await slider.getAttribute('aria-valuenow'), '8')
         await select('平面与层次')
         await page.getByText('去掉分层作对照', { exact: true }).click()
         assert(
@@ -411,7 +459,7 @@ export function createDevUIDesignDetailScenarios({
           .waitFor()
         await page.getByRole('tab', { name: '设计依据', exact: true }).click()
         await page
-          .getByRole('heading', { name: '为什么是 12 px，而不是越宽松越好？' })
+          .getByRole('heading', { name: '为什么采用 8 px 的紧凑页面边距？' })
           .waitFor()
         await page.getByRole('tab', { name: '可交互设计', exact: true }).click()
         await frame
@@ -489,7 +537,7 @@ export function createDevUIDesignDetailScenarios({
             .isVisible(),
           true
         )
-        await frame.getByRole('button', { name: 'admin', exact: true }).click()
+        await frame.locator('.preview-account-trigger').click()
         const account = frame.getByRole('menu', { name: '账号菜单' })
         await account
           .getByRole('button', { name: '切换工作入口' })

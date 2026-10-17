@@ -51,4 +51,22 @@ func TestFulfillmentDefaultResponsibilities(t *testing.T) {
 	assertPermissionSetOmits(t, builtinRolePermissionSet(t, PurchaseRoleKey), PermissionPurchaseReceiptCreate)
 	assertPermissionSetOmits(t, builtinRolePermissionSet(t, ProductionRoleKey), PermissionOutsourcingOrderUpdate, PermissionOutsourcingOrderConfirm, PermissionOutsourcingFactPost, PermissionOutsourcingReturnReceiptCreate)
 	assertPermissionSetContains(t, builtinRolePermissionSet(t, PurchaseRoleKey), PermissionOutsourcingOrderUpdate, PermissionOutsourcingOrderConfirm)
+	assertPermissionSetContains(t, builtinRolePermissionSet(t, QualityRoleKey), PermissionQualityInspectionCreate, PermissionOutsourcingFactRead, PermissionOutsourcingOrderRead)
+}
+
+func TestOutsourcingQualityRequestRequiresItsActualReturnSource(t *testing.T) {
+	in, err := BuildFulfillmentTask("outsourcing_quality_request", 71, "OUT-RETURN-71", "/erp/purchase/processing-contracts?outsourcing_order_id=51&outsourcing_fact_id=71")
+	if err != nil {
+		t.Fatal(err)
+	}
+	task := &WorkflowTask{TaskGroup: in.TaskGroup, TaskCode: in.TaskCode, SourceID: in.SourceID, SourceType: in.SourceType, OwnerRoleKey: in.OwnerRoleKey, RequiredCapabilityKey: in.RequiredCapabilityKey, Payload: in.Payload}
+	task.Payload["source_task_intent_hash"] = strings.Repeat("a", 64)
+	access := ResolveWorkflowTaskSourceAccessContract(task)
+	if task.OwnerRoleKey != QualityRoleKey || *task.RequiredCapabilityKey != PermissionQualityInspectionCreate || !access.Applicable || !access.Resolved || len(access.RequiredAll) != 1 || access.RequiredAll[0] != PermissionOutsourcingFactRead {
+		t.Fatalf("quality preparation must retain the actual return read boundary: task=%#v access=%#v", task, access)
+	}
+	task.SourceType = "quality_inspection"
+	if ResolveWorkflowTaskSourceAccessContract(task).Resolved {
+		t.Fatal("a request task must not substitute an inspection that does not yet exist")
+	}
 }

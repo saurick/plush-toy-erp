@@ -1,0 +1,1909 @@
+[
+  {
+    "id": "handbook:start",
+    "book": "business",
+    "title": "开始使用",
+    "source_hash": "4517367f0ff6f78a45c53ff761a5851d8665ff5db6b5c065ed340671c09425d4",
+    "path": "",
+    "roles": [],
+    "supplement": true
+  },
+  {
+    "id": "handbook:work",
+    "book": "business",
+    "title": "工作台、任务与进度",
+    "source_hash": "fbbd6e6fc6bc6419d90798718a916c03fb3fdccd48047093fd77e3af6bc8d851",
+    "path": "",
+    "roles": [],
+    "supplement": true
+  },
+  {
+    "id": "handbook:roles",
+    "book": "business",
+    "title": "岗位责任与交接",
+    "source_hash": "2a0e852c0178629f18373af4a9a04f1096298d1de05238fbf8c3d07dd16bc8f7",
+    "path": "",
+    "roles": [],
+    "supplement": true
+  },
+  {
+    "id": "handbook:entry",
+    "book": "business",
+    "title": "填写、保存与状态",
+    "source_hash": "210a2ac9d8909e30c0bb903a166aec789c3db41d8adb8eb0dfb50d1b7e62b12a",
+    "path": "",
+    "roles": [],
+    "supplement": true
+  },
+  {
+    "id": "handbook:tools",
+    "book": "business",
+    "title": "打印、附件与历史记录",
+    "source_hash": "b9a7465917267776a9d1745104879f0d6d1310cacdab013c9ebc16d6d3111010",
+    "path": "",
+    "roles": [],
+    "supplement": true
+  },
+  {
+    "id": "handbook:problems",
+    "book": "business",
+    "title": "常见问题与恢复",
+    "source_hash": "74a344ad522e0a036a4b33eb62c5d17257050dfa1fa42ac0b992cdec17d8f34c",
+    "path": "",
+    "roles": [],
+    "supplement": true
+  },
+  {
+    "id": "customers",
+    "book": "business",
+    "title": "客户档案怎么用",
+    "source_hash": "d91fd96eeaf61b5f90460fed889333609c736c3837bc00cefff80aaef13a6218",
+    "path": "/erp/master/partners/customers",
+    "roles": [
+      "sales"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "customers:customer-defaults",
+    "book": "business",
+    "title": "档案资料和订单资料有什么区别",
+    "source_hash": "2ebc0d58439bdcc278a604672d8ec8c0f9c6bf5ce1fb63f453830357c23c78fe",
+    "path": "/erp/master/partners/customers",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "customers:customer-blocked",
+    "book": "business",
+    "title": "什么情况要先核实",
+    "source_hash": "bb28a3eb4410430639aa0aebeb1b9da556b7ef09ee8efc24a896d5f70480bc96",
+    "path": "/erp/master/partners/customers",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "suppliers",
+    "book": "business",
+    "title": "供应商与加工厂怎么用",
+    "source_hash": "8948745cea18bf547055faab7ca68ae3e37824b4b674d83ad0584afd1667d640",
+    "path": "/erp/master/partners/suppliers",
+    "roles": [
+      "purchase"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "suppliers:supplier-terms",
+    "book": "business",
+    "title": "档案付款条件就是本单条件吗",
+    "source_hash": "70b30432abdaaf033d129f74b1498d0d1cc8ea8763dcff2a8409b8c90498d19a",
+    "path": "/erp/master/partners/suppliers",
+    "roles": [
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "suppliers:supplier-blocked",
+    "book": "business",
+    "title": "什么情况要先核实",
+    "source_hash": "8b0895b7310a3a8a7e0ea22370e7240aa7c07cec090f85d939963d016a80ecc5",
+    "path": "/erp/master/partners/suppliers",
+    "roles": [
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "products",
+    "book": "business",
+    "title": "产品档案怎么用",
+    "source_hash": "266203e3e534a2d2a551d6933ca8ca78e94318fd4b55b18deb3ddbb986e2ed6f",
+    "path": "/erp/master/products",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "products:product-sku",
+    "book": "business",
+    "title": "产品和规格（SKU）有什么区别",
+    "source_hash": "be3b47ac54497ac7cd76c817596b56f2c930efab04725501ef8478c7db140e4c",
+    "path": "/erp/master/products",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "products:default-unit",
+    "book": "business",
+    "title": "默认单位是什么意思",
+    "source_hash": "4f43f8e46f97bee396b90f1bcd9f56e64e320dbccd81b1d19e4a86f2d476e7ac",
+    "path": "/erp/master/products",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "products:product-blocked",
+    "book": "business",
+    "title": "什么情况要先核实",
+    "source_hash": "e095fd4e27f5970d3ec82b2dd45e30651522048af216a35856d016c431f3b5a0",
+    "path": "/erp/master/products",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "materials",
+    "book": "business",
+    "title": "材料档案怎么用",
+    "source_hash": "12a5ebab38903dc2e58525eedb5afb6fc36906a5dcff3507e34f5fc5dfff0918",
+    "path": "/erp/master/materials",
+    "roles": [
+      "engineering",
+      "purchase",
+      "warehouse"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "materials:material-unit",
+    "book": "business",
+    "title": "默认单位会改变库存吗",
+    "source_hash": "021ba33ba0de600305360dd4f3a9afa08a19422cd1d5274551a1c3e86aaa9b49",
+    "path": "/erp/master/materials",
+    "roles": [
+      "engineering",
+      "purchase",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "materials:material-blocked",
+    "book": "business",
+    "title": "什么情况要先核实",
+    "source_hash": "93cf35e760228c83f22f3ef2618ac5595a64adadacff3b7e521b14e709f89c98",
+    "path": "/erp/master/materials",
+    "roles": [
+      "engineering",
+      "purchase",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "sales-orders",
+    "book": "business",
+    "title": "销售订单怎么用",
+    "source_hash": "5db54baa883ffaf54434c521df7e18a4d6a166b4572aef2cdff0fc1520a3ebe0",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "sales"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "sales-orders:active-order",
+    "book": "business",
+    "title": "什么是“已生效订单”",
+    "source_hash": "90aa1fe2d8d61214ad67d8d42c1bd1f22738a6f7d4175ea9d5d0cd75f49bc340",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "sales-orders:line-amount",
+    "book": "business",
+    "title": "订单金额怎么算",
+    "source_hash": "1cc2005eb2a7c1f2c95cf76ff6f76c4c59418dda56d230ea2180f2ac6f4e4fef",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "sales-orders:customer-product-source",
+    "book": "business",
+    "title": "客户和产品从哪里来",
+    "source_hash": "414b1b7bdcd13dc8d3ef6c10d2addd941fefbdfe00d65357c49b39b86cba7454",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "sales-orders:sales-order-action-disabled",
+    "book": "business",
+    "title": "为什么按钮不能操作",
+    "source_hash": "45215da55acb18996e6ab95e3c620504f8e20b553dbe8a6f3419fc40c4f164dd",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "material-bom",
+    "book": "business",
+    "title": "物料清单（BOM）怎么用",
+    "source_hash": "f791dfe5899b370b36109ac87aff602fa4b7564e12fff63d01f219dc8b4d3d1b",
+    "path": "/erp/purchase/material-bom",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "material-bom:active-bom-version",
+    "book": "business",
+    "title": "什么是“当前生效版本”",
+    "source_hash": "d1d78eb3245c4bb4983f088ab418d4b579dea7a73bed66bf23aa96d0c0e3ef84",
+    "path": "/erp/purchase/material-bom",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "material-bom:loss-rate",
+    "book": "business",
+    "title": "损耗率怎么理解",
+    "source_hash": "2f1a0fb8cd9395f2320e26a3f0b8b6e1924019d92f9ff31e81c4bf4c2df229c1",
+    "path": "/erp/purchase/material-bom",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "material-bom:bom-master-data-source",
+    "book": "business",
+    "title": "产品、材料和单位从哪里来",
+    "source_hash": "7182f5c56233daeb73a9cd03a89edd6f3cd93b0dca1512a70f6c311b9b14abfa",
+    "path": "/erp/purchase/material-bom",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "material-bom:bom-action-disabled",
+    "book": "business",
+    "title": "为什么不能编辑或激活",
+    "source_hash": "865afd396652b417e43fad10924e5a6d31091ea6ae3dcf4eec81237c7b3ab8db",
+    "path": "/erp/purchase/material-bom",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "processes",
+    "book": "business",
+    "title": "加工环节怎么用",
+    "source_hash": "d55af197407b49a5a47856207b34fb7d7f3d890c8f00dec6b1f548b7881f991b",
+    "path": "/erp/engineering/processes",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "processes:process-reference",
+    "book": "business",
+    "title": "质检参考会自动发起检验吗",
+    "source_hash": "377570bfcc9d7c327abdef2f4ea35dbff28eb7ee8ffc88582d4c686a1493e112",
+    "path": "/erp/engineering/processes",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "processes:process-order",
+    "book": "business",
+    "title": "列表排序就是加工顺序吗",
+    "source_hash": "583e775ec1c4017ddca2f90d12f44274259603336d54c2dff38528d4ca9af5a4",
+    "path": "/erp/engineering/processes",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "processes:process-blocked",
+    "book": "business",
+    "title": "什么情况要先核实",
+    "source_hash": "c49f93fec986c9f4921f98570611ec61c49f02ea75498655aecf101213a1cdb5",
+    "path": "/erp/engineering/processes",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "accessories-purchase",
+    "book": "business",
+    "title": "采购订单怎么用",
+    "source_hash": "7e90da768cd6561ee51f30973bdc2e1112d5ace78678d59bedec4abc2d0da966",
+    "path": "/erp/purchase/accessories",
+    "roles": [
+      "purchase"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "accessories-purchase:purchase-commitment",
+    "book": "business",
+    "title": "采购订单为什么不是入库单",
+    "source_hash": "26adc4849a0bd09a5b1cbdb79cdb972a1fb905148d39e1e3299203862a0078c5",
+    "path": "/erp/purchase/accessories",
+    "roles": [
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "accessories-purchase:purchase-line-amount",
+    "book": "business",
+    "title": "采购金额怎么算",
+    "source_hash": "f51c3aa4d42450b2b9e66c7c14c4cd533039c7fc675b1955c35e29a10366f7e6",
+    "path": "/erp/purchase/accessories",
+    "roles": [
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "accessories-purchase:supplier-material-source",
+    "book": "business",
+    "title": "供应商和材料从哪里来",
+    "source_hash": "225c9b4ba1aaab495c4d4aec2b3e36e58116003dc5809684748715c1f5015bfe",
+    "path": "/erp/purchase/accessories",
+    "roles": [
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "accessories-purchase:purchase-action-disabled",
+    "book": "business",
+    "title": "为什么不能提交、审核或登记到货",
+    "source_hash": "4c83043263bab003926f765180739c03efdd1b9b9a109d8a0dc3236fe58c9036",
+    "path": "/erp/purchase/accessories",
+    "roles": [
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "inbound",
+    "book": "business",
+    "title": "采购入库怎么用",
+    "source_hash": "05aa934b0ed60734921c39ab7e57e2d8af922d085c8946faf6947491773487ca",
+    "path": "/erp/warehouse/inbound",
+    "roles": [
+      "purchase",
+      "warehouse",
+      "quality"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "inbound:receipt-status",
+    "book": "business",
+    "title": "待收货、待质检和已过账有什么区别",
+    "source_hash": "62ec99a50fa837dce8ab0f113a0d450f38f9926f7c53008ed4642b863a1060dc",
+    "path": "/erp/warehouse/inbound",
+    "roles": [
+      "purchase",
+      "warehouse",
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "inbound:receipt-source",
+    "book": "business",
+    "title": "入库明细从哪里来",
+    "source_hash": "5dcb8482747612b11e79d88d781fbe96544e5d0f8708434036f51f34ea277b83",
+    "path": "/erp/warehouse/inbound",
+    "roles": [
+      "purchase",
+      "warehouse",
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "inbound:receipt-action-disabled",
+    "book": "business",
+    "title": "为什么不能确认入库",
+    "source_hash": "3e98f6a734847d516f8437f54a632f381ea823d72571a181369ffdbf894ab89f",
+    "path": "/erp/warehouse/inbound",
+    "roles": [
+      "purchase",
+      "warehouse",
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "quality-inspections",
+    "book": "business",
+    "title": "质量检验怎么用",
+    "source_hash": "a7d64b16b1e012278191834a4b457429a3403d8f45e31714c5157cb91c313986",
+    "path": "/erp/production/quality-inspections",
+    "roles": [
+      "quality"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "quality-inspections:concession-acceptance",
+    "book": "business",
+    "title": "什么是“让步接收”",
+    "source_hash": "dcf575ceeb9f6f3b4a800f014073d60d986e937418b592ddca3de3c300d709cc",
+    "path": "/erp/production/quality-inspections",
+    "roles": [
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "quality-inspections:defect-rate",
+    "book": "business",
+    "title": "估算不良比例怎么理解",
+    "source_hash": "e024020e255c705656e3b899edb8a5d8b68bc2ee58c2e15d96a5bf7c41a49440",
+    "path": "/erp/production/quality-inspections",
+    "roles": [
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "quality-inspections:inspection-source",
+    "book": "business",
+    "title": "检验来源从哪里来",
+    "source_hash": "e98efc8f01d7180e99703216778276578169ae351a2b6d3cbe2bfbe7d2a18a78",
+    "path": "/erp/production/quality-inspections",
+    "roles": [
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "quality-inspections:inspection-action-disabled",
+    "book": "business",
+    "title": "为什么不能提交判定",
+    "source_hash": "409ae9588dc6b24d631ba63b6d4cb3300ef2d78c7816ecd72a48d07c9e17e5b9",
+    "path": "/erp/production/quality-inspections",
+    "roles": [
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "inventory",
+    "book": "business",
+    "title": "库存台账怎么用",
+    "source_hash": "17eba5cd4bf4093e89bdea96e727a36ddf73ded3f97436c57bd5920db9e58d7d",
+    "path": "/erp/warehouse/inventory",
+    "roles": [
+      "warehouse"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "inventory:inventory-balance-reservation",
+    "book": "business",
+    "title": "账面数量、已预留和可用量",
+    "source_hash": "3a439d698b7bc43d5f172d61f0feddcebb24745bcac3756ccd010fdad8d02ab3",
+    "path": "/erp/warehouse/inventory",
+    "roles": [
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "inventory:available-quantity",
+    "book": "business",
+    "title": "可用量怎么算",
+    "source_hash": "e7dbdb3ca50a3757c3c8334c956ee5c2fdb2ddb0ee37ea901031a4aaa0416e56",
+    "path": "/erp/warehouse/inventory",
+    "roles": [
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "inventory:inventory-source",
+    "book": "business",
+    "title": "库存数量从哪里来",
+    "source_hash": "6ab9ccbf9303de1c97f3eabdcc5c58991f2b041d2eae38cba7f193956a4400d3",
+    "path": "/erp/warehouse/inventory",
+    "roles": [
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "inventory:inventory-action-disabled",
+    "book": "business",
+    "title": "为什么不能盘点、调拨或调整",
+    "source_hash": "e1061f424e2829083007e3df557187f9646ee16235f669ed78c62fc49df09024",
+    "path": "/erp/warehouse/inventory",
+    "roles": [
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "processing-contracts",
+    "book": "business",
+    "title": "委外订单怎么用",
+    "source_hash": "dab4d3681e3b0d747d022f0a123193b7677267556ca76a899a954109673f73e3",
+    "path": "/erp/purchase/processing-contracts",
+    "roles": [
+      "production"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "processing-contracts:confirmed-outsourcing-contract",
+    "book": "business",
+    "title": "合同确认为什么不等于已经发料或回货",
+    "source_hash": "946fc60ed6a4824c16440589fe5f328fc0bf8eded91c6e41d853185fcbbea706",
+    "path": "/erp/purchase/processing-contracts",
+    "roles": [
+      "production"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "processing-contracts:outsourcing-line-amount",
+    "book": "business",
+    "title": "加工金额怎么算",
+    "source_hash": "1f7430532de04a838b2aa7beac1b6e13cad0abfc28c6ed7b7ef43fff6b3800d1",
+    "path": "/erp/purchase/processing-contracts",
+    "roles": [
+      "production"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "processing-contracts:outsourcing-master-data-source",
+    "book": "business",
+    "title": "加工厂、产品和工序从哪里来",
+    "source_hash": "f535f366e60656602e40823ab43c362bd511049ee9c447863ccb9bfe007cff29",
+    "path": "/erp/purchase/processing-contracts",
+    "roles": [
+      "production"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "processing-contracts:outsourcing-action-disabled",
+    "book": "business",
+    "title": "为什么不能确认、发料或回货",
+    "source_hash": "d7e00445dd9177bdf4a10e6c66ed1d1bb9e15a5d78d04e2c84abc56d6189824e",
+    "path": "/erp/purchase/processing-contracts",
+    "roles": [
+      "production"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "production-orders",
+    "book": "business",
+    "title": "生产订单怎么用",
+    "source_hash": "fcc15b910cdfa90534f682e007f01e7541248da7cad8ab4041e7bf024837cf8d",
+    "path": "/erp/production/orders",
+    "roles": [
+      "production",
+      "warehouse",
+      "pmc"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "production-orders:production-wip",
+    "book": "business",
+    "title": "什么是在制品（WIP）",
+    "source_hash": "d7bc2005d93a25a16758b4c3bf5567e6e50af8266f204a1e80286137b9528239",
+    "path": "/erp/production/orders",
+    "roles": [
+      "production",
+      "warehouse",
+      "pmc"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "production-orders:production-order-source",
+    "book": "business",
+    "title": "产品、物料需求和工序从哪里来",
+    "source_hash": "0be4e49c1e64b00ca1dc422d92cd6857a985e7a0c35c3e9d08298cd6f51cf1d2",
+    "path": "/erp/production/orders",
+    "roles": [
+      "production",
+      "warehouse",
+      "pmc"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "production-orders:production-order-action-disabled",
+    "book": "business",
+    "title": "为什么不能发布或继续推进",
+    "source_hash": "6fb2c45741305d3c76c6496b216d4c0c9b0427ff5729212484275372092695d4",
+    "path": "/erp/production/orders",
+    "roles": [
+      "production",
+      "warehouse",
+      "pmc"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "production-scheduling",
+    "book": "business",
+    "title": "排产确认怎么用",
+    "source_hash": "2c66929c7a88caabbe7fda6c621aab503b8216c505dbee85a979d0f292bf6c13",
+    "path": "/erp/production/scheduling",
+    "roles": [
+      "pmc"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "production-scheduling:scheduling-source",
+    "book": "business",
+    "title": "排产待办从哪里来",
+    "source_hash": "f3f25ae554333e482b747f9d69ffb871ec835ac180448e6e368e3a287cea6c2e",
+    "path": "/erp/production/scheduling",
+    "roles": [
+      "pmc"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "production-scheduling:scheduling-blocked",
+    "book": "business",
+    "title": "什么情况要先停下",
+    "source_hash": "2c14c44208936db056f35a16963a6d7067ea8dbba1f44302ed4279d639a6fa0a",
+    "path": "/erp/production/scheduling",
+    "roles": [
+      "pmc"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "production-progress",
+    "book": "business",
+    "title": "生产记录怎么用",
+    "source_hash": "6e2e3cacf3b796125d72e44a818db181c54a877242e94e541595aa42e0daf49f",
+    "path": "/erp/production/progress",
+    "roles": [
+      "production",
+      "warehouse"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "production-progress:report-vs-receipt",
+    "book": "business",
+    "title": "成品收仓草稿等于已经入库吗",
+    "source_hash": "d4fb9c39014e2862ad2c32152e4b320284303e060a6d9caf27b107f9fab02b81",
+    "path": "/erp/production/progress",
+    "roles": [
+      "production",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "production-progress:production-record-source",
+    "book": "business",
+    "title": "数量从哪里核对",
+    "source_hash": "ddd0ee00af7d25b8f5ecee6a1e979f54e77b09218c3ee70ef823a6f3242820b3",
+    "path": "/erp/production/progress",
+    "roles": [
+      "production",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "production-progress:production-record-blocked",
+    "book": "business",
+    "title": "什么情况不能确认",
+    "source_hash": "1b8aa9876eb640db2c32a17d5f05c9ce5c6bf99fd489717dc79fad8153a3bd6f",
+    "path": "/erp/production/progress",
+    "roles": [
+      "production",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "production-exceptions",
+    "book": "business",
+    "title": "异常处理怎么用",
+    "source_hash": "17c6c487e522fc7f8a8bafbb8e56345e79fc7f4fccd039f539916b308a82bd7a",
+    "path": "/erp/production/exceptions",
+    "roles": [
+      "production",
+      "quality"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "production-exceptions:exception-approval",
+    "book": "business",
+    "title": "审批通过后还要做什么",
+    "source_hash": "bf5e77e3c9c5b4d9301beec46f5098317561add5a7cd9da62e66d8224867fe6b",
+    "path": "/erp/production/exceptions",
+    "roles": [
+      "production",
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "production-exceptions:exception-source",
+    "book": "business",
+    "title": "异常数量从哪里来",
+    "source_hash": "c4d12f7abddba66bbeaea9891a60d51742e3b4e84b83905dd0a16e6a4c11f8d4",
+    "path": "/erp/production/exceptions",
+    "roles": [
+      "production",
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "production-exceptions:exception-blocked",
+    "book": "business",
+    "title": "什么情况要先停下",
+    "source_hash": "89b1a6fbd618ad358c2aedda969304c802de812a5d4ba7f9022c85a02dc42fec",
+    "path": "/erp/production/exceptions",
+    "roles": [
+      "production",
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "shipments",
+    "book": "business",
+    "title": "出货单怎么用",
+    "source_hash": "4da8291a9e79bb53cc7d846e424527785e55e76e01dbd49670ef663f44f0da6b",
+    "path": "/erp/warehouse/shipments",
+    "roles": [
+      "sales"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "shipments:release-vs-shipped",
+    "book": "business",
+    "title": "“财务放行”和“已出货”有什么区别",
+    "source_hash": "9a6618519b807c106e795bdfc941aa0132343d5451f1636e2e70a8099dc5d2b1",
+    "path": "/erp/warehouse/shipments",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "shipments:shipment-source",
+    "book": "business",
+    "title": "客户、产品和可出货数量从哪里来",
+    "source_hash": "33364f040190185fb67d5e550c7caba93d3cd3c3f77d521e6761f601e42da94e",
+    "path": "/erp/warehouse/shipments",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "shipments:shipment-action-disabled",
+    "book": "business",
+    "title": "为什么不能启动放行或确认出货",
+    "source_hash": "f7efbb79c5d6f1f04a78b0761a0c9e3675359d41457688b2b455a4262a856bce",
+    "path": "/erp/warehouse/shipments",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "shipping-release",
+    "book": "business",
+    "title": "出货放行怎么用",
+    "source_hash": "eb14d11ea2a68cd8b5dfe78531827cd563c377935ea797dd43ae37bfdce98cca",
+    "path": "/erp/warehouse/shipping-release",
+    "roles": [
+      "finance",
+      "warehouse"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "shipping-release:release-vs-shipped",
+    "book": "business",
+    "title": "放行就是已经出货吗",
+    "source_hash": "b11f7695062737a4f9ccd2c733b3e5bb5e1fb174044603cc4c84fe47e35c253e",
+    "path": "/erp/warehouse/shipping-release",
+    "roles": [
+      "finance",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "shipping-release:release-source",
+    "book": "business",
+    "title": "这次审批针对哪张单",
+    "source_hash": "2d5adc9bfb16f453292055878806fe4aec1e3b30ce9c0793d78c839eec572b79",
+    "path": "/erp/warehouse/shipping-release",
+    "roles": [
+      "finance",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "shipping-release:release-blocked",
+    "book": "business",
+    "title": "为什么不能继续放行",
+    "source_hash": "fec716b11ab8e3fa3bedb8ae62056def68b9a06e4c5fa3d994008b0b713ed2d9",
+    "path": "/erp/warehouse/shipping-release",
+    "roles": [
+      "finance",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "outbound",
+    "book": "business",
+    "title": "库存预留怎么用",
+    "source_hash": "8e9f814107524758690cd92e8fccc7c001816743d3d9d939204e511dbba19a60",
+    "path": "/erp/warehouse/outbound",
+    "roles": [
+      "sales",
+      "warehouse"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "outbound:reservation-vs-shipment",
+    "book": "business",
+    "title": "预留、释放和出货有什么区别",
+    "source_hash": "afd243095c262c563f0d120d02de4a1bd746dabe2052d9d1afd47c7c48b6d41c",
+    "path": "/erp/warehouse/outbound",
+    "roles": [
+      "sales",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "outbound:reservation-source",
+    "book": "business",
+    "title": "预留对应什么来源",
+    "source_hash": "21b66b407dbce68f56df083b41a1b60a887fb213a6dc6ce9a9fb88f94639d05f",
+    "path": "/erp/warehouse/outbound",
+    "roles": [
+      "sales",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "outbound:reservation-blocked",
+    "book": "business",
+    "title": "为什么不能释放",
+    "source_hash": "00a0a505b29e9356afa55599d326e324c3c66db50b6c991ae646b464fd21d1da",
+    "path": "/erp/warehouse/outbound",
+    "roles": [
+      "sales",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "receivables",
+    "book": "business",
+    "title": "应收管理怎么用",
+    "source_hash": "8d3052512ac0f035d16049d9e85cde482d1de87910149822b1b07b956a7c1713",
+    "path": "/erp/finance/receivables",
+    "roles": [
+      "finance"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "receivables:receivable-source",
+    "book": "business",
+    "title": "应收从哪里来",
+    "source_hash": "13c9e7965107c195188e8e0f66963116cc5650afe1b4c05d8cae50603baf3079",
+    "path": "/erp/finance/receivables",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "receivables:payment-term",
+    "book": "business",
+    "title": "月结和到期日期怎么算",
+    "source_hash": "df84525dce6a5f55905e42b44284bb79b51cafed2a422b2230d357671fa7fb1c",
+    "path": "/erp/finance/receivables",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "receivables:receivable-blocked",
+    "book": "business",
+    "title": "为什么不能过账或取消",
+    "source_hash": "30b0018fad77fadbe50a5f2abed04a3a90e290bc7a552f1104d02f787a0ea66d",
+    "path": "/erp/finance/receivables",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "payables",
+    "book": "business",
+    "title": "应付管理怎么用",
+    "source_hash": "c4484fa1f7600eb829c3eb3707b015a71f5b74b145b19eee5be1314f19050163",
+    "path": "/erp/finance/payables",
+    "roles": [
+      "finance"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "payables:payable-source",
+    "book": "business",
+    "title": "应付从哪里来",
+    "source_hash": "d05cb7cd36458f622062844fed7afc62b44d8dc0e76ba595ba1a5057897474cb",
+    "path": "/erp/finance/payables",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "payables:payment-term",
+    "book": "business",
+    "title": "月结和到期日期怎么算",
+    "source_hash": "db49321aa8a425588b0ae37b213f061a209f4b3bfad1049cdca1caad38d4bd2e",
+    "path": "/erp/finance/payables",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "payables:payable-blocked",
+    "book": "business",
+    "title": "为什么不能过账或取消",
+    "source_hash": "a18040d18d68896ddd4a1bff14ff98bd20748fa308b410bc0b1a5bead61b529d",
+    "path": "/erp/finance/payables",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "finance-payments",
+    "book": "business",
+    "title": "收付款与核销怎么用",
+    "source_hash": "4f84bcde3666dce0bfe05d0f14038ed5d88cdebd7c86a1c67c06046864f6a7fe",
+    "path": "/erp/finance/payments",
+    "roles": [
+      "finance"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "finance-payments:allocation-reversal",
+    "book": "business",
+    "title": "核销、冲销和红冲分别是什么",
+    "source_hash": "15b24b5fc5ce4d4ea1292b2534398571ca41c437aa8bbbd62928aa0a6836b6b6",
+    "path": "/erp/finance/payments",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "finance-payments:allocation-amount",
+    "book": "business",
+    "title": "核销金额怎么核对",
+    "source_hash": "2ff4c5baf707c0e72d993f1ff1a4f162eafa13f7c80e75178448ef9a235852a8",
+    "path": "/erp/finance/payments",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "finance-payments:payment-source",
+    "book": "business",
+    "title": "可核销单据从哪里来",
+    "source_hash": "dbbea3bedd164cf397152fd72131fee69ee0d536316826ffa21ffc432550d39f",
+    "path": "/erp/finance/payments",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "finance-payments:payment-action-disabled",
+    "book": "business",
+    "title": "为什么不能提交、过账或冲销",
+    "source_hash": "90a3951939e76ad8373c0eaa6f51f30b3f5caad64a86915563d829263bf2e3d4",
+    "path": "/erp/finance/payments",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "reconciliation",
+    "book": "business",
+    "title": "对账管理怎么用",
+    "source_hash": "a3134f59f57cebce7b6d0bf80628d26be18ef4ea9a6b50ffb5ef9bf17db9b73e",
+    "path": "/erp/finance/reconciliation",
+    "roles": [
+      "finance"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "reconciliation:reconciliation-vs-settlement",
+    "book": "business",
+    "title": "完成核对等于结清吗",
+    "source_hash": "6d42ee216de7c93abe5863fac94c4ef5bdc06dadcf88fd65c9648b847fb9ddd4",
+    "path": "/erp/finance/reconciliation",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "reconciliation:reconciliation-source",
+    "book": "business",
+    "title": "当前核对多少笔记录",
+    "source_hash": "a73a237c029fec7fd809b9205028f3d3075f7882876a4c690b9cf7603ad4951d",
+    "path": "/erp/finance/reconciliation",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "reconciliation:reconciliation-blocked",
+    "book": "business",
+    "title": "什么时候不能完成核对",
+    "source_hash": "a0745872b838982618508b39d79dcd9ac4582dd4c46c1887af65138ca84db6d1",
+    "path": "/erp/finance/reconciliation",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "invoices",
+    "book": "business",
+    "title": "发票管理怎么用",
+    "source_hash": "0d807c1d349b67ad210279cb3b46af278fdf382de834aae8529738e28d087d66",
+    "path": "/erp/finance/invoices",
+    "roles": [
+      "finance"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "invoices:invoice-business-record",
+    "book": "business",
+    "title": "这里登记后就开好发票了吗",
+    "source_hash": "47eb40598310d8ac6124620da38ba52288987c56a1dcb65b0f839ba5ddbf84e9",
+    "path": "/erp/finance/invoices",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "invoices:invoice-source",
+    "book": "business",
+    "title": "发票业务来源是什么",
+    "source_hash": "ae38b61cb7cb7cdb508575120904dc7da7acae6d9c7240dce379191b009bf88f",
+    "path": "/erp/finance/invoices",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "invoices:invoice-blocked",
+    "book": "business",
+    "title": "什么时候要先停下",
+    "source_hash": "acdd8e4593cb1c8c80c51cb258bfe83594952c465ccd9d3ce1246074da96a7d0",
+    "path": "/erp/finance/invoices",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "engineering-material-request",
+    "book": "business",
+    "title": "工程用料审批与采购生成怎么用",
+    "source_hash": "9e8210af32da39e1d50bec4e1fd18089be3c8e90cb1d591b3ab9e36247ac3db2",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "engineering",
+      "boss",
+      "finance",
+      "purchase"
+    ],
+    "supplement": true
+  },
+  {
+    "id": "engineering-material-request:total-quantity",
+    "book": "business",
+    "title": "总用数量怎么计算",
+    "source_hash": "498923dfce6ff491ff1260f9b8abb5cd6e33f62da3bc1250d3a74ca9311c3a41",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "engineering",
+      "boss",
+      "finance",
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "engineering-material-request:stock-reference",
+    "book": "business",
+    "title": "库存有，为什么还要采购？",
+    "source_hash": "35c5bb81689b2702a0c267d42b5937398042e48289886a1c476b94808b3431cc",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "engineering",
+      "boss",
+      "finance",
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "engineering-material-request:frozen-sources",
+    "book": "business",
+    "title": "审批冻结是什么意思",
+    "source_hash": "96438b84d6e539911f919c9cd706dc8eb14df8078d8222ad99f1483d17f0f49f",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "engineering",
+      "boss",
+      "finance",
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "engineering-material-request:approval-actions",
+    "book": "business",
+    "title": "提交、老板通过、财务批准分别做什么",
+    "source_hash": "f6a7e8c27e61283858e9037db002c6a982a21f911f3ba87029a68ffb405d7936",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "engineering",
+      "boss",
+      "finance",
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "engineering-material-request:approval-status",
+    "book": "business",
+    "title": "用料申请状态和下一步",
+    "source_hash": "5a0697866bd9cd4de79d76ee487ec94bd9d0a15378603491f38c72ee15baf3bf",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "engineering",
+      "boss",
+      "finance",
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "engineering-material-request:purchase-generation",
+    "book": "business",
+    "title": "采购单如何分单，哪些内容还没填",
+    "source_hash": "58853503f0b0b84b199e52d1b44b114ad22f461e1c21b329157330e045e5e587",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "engineering",
+      "boss",
+      "finance",
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "engineering-material-request:prerequisites",
+    "book": "business",
+    "title": "为什么不能提交或审核用料",
+    "source_hash": "37ef35f25e4f30c8547e334554e0e00a5d986c356213611fd716a087cb0239e9",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "engineering",
+      "boss",
+      "finance",
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "engineering-material-request:rejection",
+    "book": "business",
+    "title": "退回后怎样修改并重新提交",
+    "source_hash": "017644ad637a0f03fb06bbe45685567af5ccea3d7669589341da7c289296abf5",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "engineering",
+      "boss",
+      "finance",
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "engineering-material-request:uncertain-result",
+    "book": "business",
+    "title": "提交超时或结果不确定怎么办",
+    "source_hash": "7113ee3be90b73f0dd26d2ecfc92fff4097492c7796881688b901022b2eeb85d",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "engineering",
+      "boss",
+      "finance",
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:approvals",
+    "book": "business",
+    "title": "办理审批和退回",
+    "source_hash": "832099725f6133bb67c3da5a49902694adada72496326e171b9e5ae094c7c889",
+    "path": "",
+    "roles": [
+      "boss"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:work-priority",
+    "book": "business",
+    "title": "查看今日重点",
+    "source_hash": "76ae08267d71bb7ca88769a920c914cae10bd2b47d9530f86659a4ec258c91ec",
+    "path": "",
+    "roles": [
+      "boss",
+      "pmc"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:delivery-progress",
+    "book": "business",
+    "title": "跟踪交付进度",
+    "source_hash": "c9fd391371e5265d7587f2ef561a67f42dd3e6ac6b58b3a76d67af556c3df7ad",
+    "path": "",
+    "roles": [
+      "boss"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:engineering-material-request",
+    "book": "business",
+    "title": "工程用料审批与采购生成",
+    "source_hash": "0bd4a8267ca828b06241dd1f4f5583f7aeee9d86ff00d79ff49dcdbfaac0b5d4",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "boss",
+      "purchase",
+      "finance",
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:customers",
+    "book": "business",
+    "title": "维护客户资料",
+    "source_hash": "484ce944868b19c87a5130bba690deba55c1f2fb61a1de186f42a4882275c4c3",
+    "path": "/erp/master/partners/customers",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:sales-orders",
+    "book": "business",
+    "title": "跟进销售订单",
+    "source_hash": "1de0f2de4e30c1f45d1c89078695523b45af3adab344f6c729441e1115805381",
+    "path": "/erp/sales/project-orders/sales-orders",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:shipments",
+    "book": "business",
+    "title": "办理实际发货",
+    "source_hash": "1546ed2bfb603049d8d5297011f66cb038d1da35b8bd82bd510ea7a9baa0390a",
+    "path": "/erp/warehouse/shipments",
+    "roles": [
+      "sales"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:outbound",
+    "book": "business",
+    "title": "库存预留",
+    "source_hash": "d228b8eaf8024bbd997bb302b84d6c9c2328e7088a90cef7209a34319aa9319d",
+    "path": "/erp/warehouse/outbound",
+    "roles": [
+      "sales",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:suppliers",
+    "book": "business",
+    "title": "核对供应商和材料",
+    "source_hash": "610d500d7fc113ab88a984c551ba0033653283f0cfa9795dccbb3bcde87a2385",
+    "path": "/erp/master/partners/suppliers",
+    "roles": [
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:accessories-purchase",
+    "book": "business",
+    "title": "办理采购订单",
+    "source_hash": "016d4cf28a7b1375ffcfc1a9d7097cd276234251c9e76768d23528be99dda741",
+    "path": "/erp/purchase/accessories",
+    "roles": [
+      "purchase"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:inbound",
+    "book": "business",
+    "title": "跟进到料入库",
+    "source_hash": "50a2de6b7223eed8beb7a4a3ff39b7d0c6772478e4d5d27b0063dddaac5a38b4",
+    "path": "/erp/warehouse/inbound",
+    "roles": [
+      "purchase",
+      "warehouse",
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:materials",
+    "book": "business",
+    "title": "材料档案",
+    "source_hash": "f44000f0b7924fbdb8ace3fd12f14a688c1af18d41c0af2cae339f95c94cb828",
+    "path": "/erp/master/materials",
+    "roles": [
+      "purchase",
+      "warehouse",
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:production-orders",
+    "book": "business",
+    "title": "查看生产订单",
+    "source_hash": "b0540cfb29d66674da9a4e222087b60fc674a975a25f0a05bfc9ef04c48931b2",
+    "path": "/erp/production/orders",
+    "roles": [
+      "production",
+      "warehouse",
+      "pmc"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:production-materials",
+    "book": "business",
+    "title": "按生产来源办理领料",
+    "source_hash": "4366cb91a8138989e18927e9da57da7b0ea2fb8165f1aa74e40044b9eda35dc6",
+    "path": "/erp/production/progress",
+    "roles": [
+      "production"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:finished-goods",
+    "book": "business",
+    "title": "手工成品入库与查货包装",
+    "source_hash": "458bee1ff0a0781f5418c8293b89f5aa526cf8d0b3f91d90315418e78a7b36b3",
+    "path": "/erp/production/progress",
+    "roles": [
+      "production",
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:production-exceptions",
+    "book": "business",
+    "title": "办理异常处理",
+    "source_hash": "a1b286144785f2625d68a858b611714670d7eea995f251b149992d7c995b2435",
+    "path": "/erp/production/exceptions",
+    "roles": [
+      "production",
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:processing-contracts",
+    "book": "business",
+    "title": "跟进委外订单",
+    "source_hash": "7c4c363aa13625df65b45abb3eabca3fb93c9c2e9c9cde8e41ed1f422c1c00ca",
+    "path": "/erp/purchase/processing-contracts",
+    "roles": [
+      "production"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:inventory-query",
+    "book": "business",
+    "title": "核对库存",
+    "source_hash": "1055204a408be53f13326a9909a08ad6eb465d17e63ef84cbc84f3d8612dd7c0",
+    "path": "/erp/warehouse/inventory",
+    "roles": [
+      "warehouse"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:shipping-release",
+    "book": "business",
+    "title": "出货放行",
+    "source_hash": "608cda3110d19c817338b0b16dae578e7c95dcc5a1ae5ce2858d7b7497d02c45",
+    "path": "/erp/warehouse/shipping-release",
+    "roles": [
+      "warehouse",
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:finance-payments",
+    "book": "business",
+    "title": "收付款与核销",
+    "source_hash": "941878f7973eb5f3dcbac4032b1ee3e0d8ae373b895733930f3778ac632ba27c",
+    "path": "/erp/finance/payments",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:receivables",
+    "book": "business",
+    "title": "跟进应收",
+    "source_hash": "89529f6bc2a41fa4347b0c9c9cc2f040ec6d33709a261ff353bd2804ae16d977",
+    "path": "/erp/finance/receivables",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:payables",
+    "book": "business",
+    "title": "跟进应付",
+    "source_hash": "2f91c3598ac436a9ccfe754dcf4920a130d61361a99c1bad1ea5bc59f9a3cbec",
+    "path": "/erp/finance/payables",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:invoices",
+    "book": "business",
+    "title": "办理发票",
+    "source_hash": "394a1b877f79165aa6b0ac655111b7930397a3f02400bf0afbbeaf38edee024e",
+    "path": "/erp/finance/invoices",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:reconciliation",
+    "book": "business",
+    "title": "处理对账",
+    "source_hash": "e367260a71c7242769236efb086a9106f79418c558de607b88f5f4699ac5b3cf",
+    "path": "/erp/finance/reconciliation",
+    "roles": [
+      "finance"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:production-scheduling",
+    "book": "business",
+    "title": "完成排产确认",
+    "source_hash": "dcdeb6b229e2b01efca5c8b244edeb63ef5f04629aae0e14e513af44ed4fcfd2",
+    "path": "/erp/production/scheduling",
+    "roles": [
+      "pmc"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:quality-inspections",
+    "book": "business",
+    "title": "办理质量检验",
+    "source_hash": "b985aba4060a2533f58f8af460b849a7ca7c8982a2d77fea60d63e8c0ccd722c",
+    "path": "/erp/production/quality-inspections",
+    "roles": [
+      "quality"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:products",
+    "book": "business",
+    "title": "维护产品规格",
+    "source_hash": "7eb99b51d9b894e196a70a846f0eeaeaaffadd6a5ff74a3da0aab6c9a1c48d6f",
+    "path": "/erp/master/products",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:material-bom",
+    "book": "business",
+    "title": "维护物料清单",
+    "source_hash": "4aa19d9ec3d3b62ec019e786991f6ee341b78f0d1895d8c569e2feab8abb9ca7",
+    "path": "/erp/purchase/material-bom",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:processes",
+    "book": "business",
+    "title": "维护加工环节",
+    "source_hash": "aa21eacff77e4fea8308fa50b5ed4de625babbfece9c5d57f4043426e1d6a87d",
+    "path": "/erp/engineering/processes",
+    "roles": [
+      "engineering"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:employee-access",
+    "book": "business",
+    "title": "维护员工账号",
+    "source_hash": "6b1a10e08c3ed36cc561214b7bdccd640e29cca1a52eac9e1e1fe5199c0fb009",
+    "path": "",
+    "roles": [
+      "admin"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "guide:audit-logs",
+    "book": "business",
+    "title": "核对系统操作",
+    "source_hash": "4179c71b89aa2d306cb8cd96c0793e426ede0383c4dd9690f7b8aa7863299b75",
+    "path": "",
+    "roles": [
+      "admin"
+    ],
+    "supplement": false
+  },
+  {
+    "id": "manual:administration:overview",
+    "book": "administration",
+    "title": "使用说明",
+    "source_hash": "86e32d5bc82d89a1264ea82d9f2f1f510210f80fbd33fe437c44e8e04bad5acc",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:reading-path",
+    "book": "administration",
+    "title": "阅读顺序",
+    "source_hash": "9adc66f9fe893e153e6e8236ba8618c90780f823371f5ceadd63d9b3a6612869",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:preparation",
+    "book": "administration",
+    "title": "实施准备",
+    "source_hash": "95112beb7aa4e94b17298ae7b12c3954a79b7e8054dc61dc00a0891abe9e07ac",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:administrator-bootstrap",
+    "book": "administration",
+    "title": "首个管理员与日常管理账号",
+    "source_hash": "0fa67fe125b37f0fd25ccb3e69fee3f143cdc302ff050a1d6059240f48506213",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:employee-accounts",
+    "book": "administration",
+    "title": "员工账号",
+    "source_hash": "cecd40b29b9af5bfae05fad8ebca8d2b7251147fffdff80ebc1a6d60c9a5bf14",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:role-settings",
+    "book": "administration",
+    "title": "岗位设置、数据范围与导航",
+    "source_hash": "f90c77ac5cdfbd72b973facbf1052c40fbb92763799ee30cdb16cbca0971f6fb",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:approval-settings",
+    "book": "administration",
+    "title": "审批条件与责任",
+    "source_hash": "cef3175d6365fc840d3167c95d8a6fb543fed0f51cab7cbebaa9bad5ae8b9493",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:payment-responsibilities",
+    "book": "administration",
+    "title": "收付款审批与职责核对",
+    "source_hash": "479fdae6d59e902ac38701f3900c73a0a95d0017df76cd20c5367d8c6ba80b9c",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:customer-configuration",
+    "book": "administration",
+    "title": "客户配置与启用范围",
+    "source_hash": "eb9d094924052cd7f8fef0796caf843b837f947e0bf17d416c7f1e60cc93c226",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:master-data-and-trial",
+    "book": "administration",
+    "title": "基础资料与试用数据",
+    "source_hash": "9d88967d3a65b9cf092f086abee4947796ba3e5b3cf8619206ade36d5acf5c9c",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:printing-and-files",
+    "book": "administration",
+    "title": "打印、附件与日常管理",
+    "source_hash": "ffcda0fafdd565523f84706b2a57a1931e39803c7b64e89c5eef871835d35b39",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:support",
+    "book": "administration",
+    "title": "问题分流与记录",
+    "source_hash": "7fe140525e0f1d31c59cf7834ed0f250ac1387e576e3f9b835e33d586c8d5835",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:help-contributions",
+    "book": "administration",
+    "title": "帮助纠错与企业补充",
+    "source_hash": "26b2c6e817d3b84254e66065f7c28efd7f26b4b38b539f08c890009c0fb6b3ba",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:change-and-recovery",
+    "book": "administration",
+    "title": "升级、备份和恢复交接",
+    "source_hash": "14c55901d3eb26e8143cf8954c227c81d1e815e2d43614277019a4276d7de48a",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:daily-checks",
+    "book": "administration",
+    "title": "日常巡查与人员交接",
+    "source_hash": "c41f2ce4a7d4c42f70c875b45cfa6bfa0417fa56633583140d5ba3e33de5b9d7",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:training-and-acceptance",
+    "book": "administration",
+    "title": "培训与验收",
+    "source_hash": "6c1dd41519e9a7c1196e22119eb272b080b92661b7eee955ab58c83c421f8ed4",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:current-limits",
+    "book": "administration",
+    "title": "当前边界",
+    "source_hash": "39958940eeaf8f481bd822abd261a06b44c8f4703ff994728ef873e47b05c99c",
+    "supplement": true
+  },
+  {
+    "id": "manual:administration:sources",
+    "book": "administration",
+    "title": "依据与维护",
+    "source_hash": "ee641cbdb33e355295133b69b44f386d823e6993a4da204e3f4e45f5139009dc",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:overview",
+    "book": "operations",
+    "title": "使用说明",
+    "source_hash": "35098aa25a7dfbc8636043fe3eaa3ae34c24e20d393528b6fd9beb5f05ba541e",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:reading-map",
+    "book": "operations",
+    "title": "阅读地图",
+    "source_hash": "d029cb7fbc633530f5cb191f41408e76eb55d76d57be7ba2807ddfc9e3cd8b2d",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:architecture",
+    "book": "operations",
+    "title": "架构与真源",
+    "source_hash": "653f8b967c3afc8b0f93b00fb60dea0aad707622d7e18397784150590403d2db",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:taking-over",
+    "book": "operations",
+    "title": "首次接手与定位",
+    "source_hash": "0d08680a7dd904a80d87ed2c4e477f5f23138cf862191f150295317e61de024a",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:environment",
+    "book": "operations",
+    "title": "环境与依赖",
+    "source_hash": "e6aea21e169decf9ec5d70217163ce747e0cad57591bb3e2326d092ac1761144",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:local-development",
+    "book": "operations",
+    "title": "本地启动与重启",
+    "source_hash": "63eb77cb2cb788a4af1e537dbe21c693c05a25603a58f22d97413fbabe847829",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:contracts",
+    "book": "operations",
+    "title": "API、权限与字段",
+    "source_hash": "ca7c993351b5dbd33a3d8edce38792f29aa962a4a5bc558c68cc5f0b1c727125",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:database-changes",
+    "book": "operations",
+    "title": "Schema 与迁移",
+    "source_hash": "566e9315105e29c3c99b52f70ff01583055a3def02cdf54ad80600c37e8a8748",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:validation",
+    "book": "operations",
+    "title": "验证与构建",
+    "source_hash": "a1ad069ad1df9ff93e98dbd09e4b0be930c50831d613890faf81b8696f2d8197",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:release",
+    "book": "operations",
+    "title": "不可变发布与目标操作",
+    "source_hash": "ddc41aca5013aec2114d20ce624e86756d976c02aac90ef43d03d14995096857",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:backup",
+    "book": "operations",
+    "title": "数据库与附件备份",
+    "source_hash": "65ae9aabf5f56ca5bc7f1570fcdcb2b5800e385b7c0ee13c2d928577b2ecbe37",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:rollback-and-recovery",
+    "book": "operations",
+    "title": "回滚、恢复与清理",
+    "source_hash": "6dd2989e35979354c0b5106eec2643098c7634cc740e4e7c3da75304e82c0dfc",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:diagnostics",
+    "book": "operations",
+    "title": "日志、Trace 与故障定位",
+    "source_hash": "d7eb2aa1ddcc56b7e0e412608f21151dba1f672e0478c9fc901817593eb712bc",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:documentation",
+    "book": "operations",
+    "title": "手册、帮助与持续维护",
+    "source_hash": "68228efbfa38a1722438c1a40469cdbd8dce2a984cdb8b2cf4ca1bd95df15259",
+    "supplement": true
+  },
+  {
+    "id": "manual:operations:closeout",
+    "book": "operations",
+    "title": "完成与交接",
+    "source_hash": "eb4ccc845342d6d516d8731ee037c755f0520d6bfab6aa61fa47621b0ac019c9",
+    "supplement": true
+  }
+]

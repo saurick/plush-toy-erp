@@ -1,9 +1,8 @@
 import { mobileTaskListOptionsScenario } from './mobileTaskListOptionsScenario.mjs'
 import { clickTaskCardContent } from './taskCopyAssertions.mjs'
 import { clickMobileThemeOption } from './mobileTaskThemeAssertions.mjs'
-import { formatBusinessDate } from '../../src/erp/utils/businessDate.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
-import { assertMobileFilterConsistency } from './mobileFilterConsistencyAssertions.mjs'
+import { assertMobileFilterSummary, assertMobileFilterClearControl } from './mobileFilterConsistencyAssertions.mjs'
 
 export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
   const base = mobileTaskListOptionsScenario({ assert, path, outputDir })
@@ -14,6 +13,7 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
     id: 99000 + index,
     task_code: `STYLE-L1-HISTORY-${index}`,
     task_name: `历史筛选任务 ${index}`,
+    source_type: 'sales_order',
     source_no: `HISTORY-${index}`,
     task_status_key: 'done',
     created_at: now - index * 60,
@@ -25,6 +25,7 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
     task_code: 'STYLE-L1-HISTORY-REJECTED',
     task_name: '历史筛选驳回任务',
     task_status_key: 'rejected',
+    source_type: 'purchase_order',
     completed_at: today + 60,
   }
   const withdrawn = {
@@ -64,6 +65,8 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
         .click()
       const trigger = page.getByTestId('mobile-history-filter-trigger')
       await trigger.waitFor()
+      const clearFilters = page.getByRole('button', { name: '清空已办筛选', exact: true })
+      await assertMobileFilterClearControl({ assert, trigger, active: false })
       await page.waitForFunction(
         () =>
           document.querySelector('[data-testid="mobile-role-done-count"]')
@@ -114,17 +117,17 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       await close()
       assert.equal(
         await trigger.getAttribute('aria-label'),
-        '筛选已办，已应用 1 项'
+        '筛选已办，已应用 2 项'
       )
       assert.match(
-        await page.getByLabel('当前已办筛选').innerText(),
+        await trigger.getAttribute('title'),
         /处理结果：已完成/
       )
       const quick = page.getByRole('group', { name: '已办快捷筛选', exact: true })
-      await assertMobileFilterConsistency({ assert, quick, applied: page.getByLabel('当前已办筛选') })
+      await assertMobileFilterSummary({ assert, trigger })
       const sevenDays = quick.getByRole('button', { name: '近 7 天', exact: true })
       assert.equal(await sevenDays.locator('.erp-filter-chip__clear').count(), 1)
-      assert.doesNotMatch(await page.getByLabel('当前已办筛选').innerText(), /近 7 天/)
+      assert.equal(await page.getByLabel('当前已办筛选').count(), 0)
       const scroller = page.getByTestId('mobile-role-scroll')
       for (let i = 0; i < 8 && (await rows.count()) < 64; i += 1) {
         const count = await rows.count()
@@ -170,7 +173,7 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
       await waitCount(64)
       assert.equal(
         await trigger.getAttribute('aria-label'),
-        '筛选已办，已应用 1 项'
+        '筛选已办，已应用 2 项'
       )
       await search.fill('历史筛选')
       await search.press('Enter')
@@ -208,6 +211,41 @@ export function mobileTaskHistoryFiltersScenario({ assert, path, outputDir }) {
         .click()
       await waitCount(66)
       assert.equal(await search.inputValue(), '历史筛选')
+      await open()
+      await dialog.getByRole('button', { name: '近 7 天', exact: true }).click()
+      await dialog.getByRole('button', { name: /^已完成/ }).click()
+      await dialog.getByRole('button', { name: '销售订单', exact: true }).click()
+      await close()
+      await waitCount(64)
+      assert.equal(await trigger.getAttribute('aria-label'), '筛选已办，已应用 3 项')
+      const applied = page.getByRole('group', { name: '当前已办筛选', exact: true })
+      for (const width of [320, 390, 430]) {
+        await page.setViewportSize({ width, height: 844 })
+        await assertMobileFilterSummary({ assert, trigger })
+        await assertMobileFilterClearControl({ assert, trigger })
+        await page.screenshot({ path: path.join(outputDir, `mobile-filter-clear-${width}.png`) })
+      }
+      await open()
+      await dialog.getByRole('group', { name: '来源单据', exact: true }).getByRole('button', { name: '全部', exact: true }).click()
+      await close()
+      assert.equal(await trigger.getAttribute('aria-label'), '筛选已办，已应用 2 项')
+      assert(await trigger.evaluate((node) => document.activeElement === node), '调整条件并收起后返回筛选入口')
+      await clearFilters.tap()
+      await waitCount(66)
+      assert.equal(await search.inputValue(), '历史筛选', '清空全部保留当前搜索')
+      assert.equal(await trigger.getAttribute('aria-expanded'), 'false', '直接清空无需打开筛选')
+      assert.equal(await trigger.getAttribute('aria-label'), '筛选已办')
+      assert(await trigger.evaluate((node) => document.activeElement === node), '清空后返回稳定入口')
+      assert.equal(await applied.count(), 0)
+      await assertMobileFilterClearControl({ assert, trigger, active: false })
+      await sevenDays.click()
+      await waitCount(65)
+      assert.equal(await trigger.getAttribute('aria-label'), '筛选已办，已应用 1 项')
+      assert.equal(await applied.count(), 0, '单个时间条件直接使用快捷标签取消')
+      await assertMobileFilterClearControl({ assert, trigger })
+      await clearFilters.press('Enter')
+      await waitCount(66)
+      assert(reads.some((query) => query.view_key === 'history' && query.keyword === '历史筛选' && !query.period && !query.status_key && !query.source_type), '清空后的请求保留搜索且不残留筛选')
       for (const width of [320, 390, 430]) {
         await page.setViewportSize({ width, height: 844 })
         await open()

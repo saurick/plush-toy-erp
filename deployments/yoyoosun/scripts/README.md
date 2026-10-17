@@ -8,7 +8,7 @@
 | `rotate-credentials-133.sh` | 按固定目标计划、目标锁、隔离恢复校验与 operation-bound 备份执行精确账号轮换；仅经 SSH stdin 注入凭据并输出脱敏回执 |
 | `cutover-public-web.sh` | 先准备公网切流计划，再核对候选镜像 release、健康和 provider capabilities；失败恢复旧容器并保留回滚点 |
 
-日常备份不在客户目录复制通用实现：使用仓库级 `scripts/deploy/scheduled-postgres-backup.sh` 每日生成校验过的本地与异地副本，再用 `scripts/deploy/verify-scheduled-postgres-backup.sh` 每周从异地目录恢复到临时 PostgreSQL。目标机安装入口见 [`../systemd/README.md`](../systemd/README.md)。该定时链只证明 PostgreSQL 备份；S3 附件必须按[附件合同](../../../server/deploy/compose/prod/README.md#附件存储与raid5)与 PG 配套备份和恢复。
+日常备份复用仓库级 `scripts/deploy/backup-set/cli.mjs`：同一停写窗口成套保存 PG 与全部登记附件，本地及异地只发布加密包和 checksum；恢复检查使用新建隔离 PG / S3。操作与证据见[备份恢复](../runbooks/04-backup-restore.md)，安装入口见 [`systemd`](../systemd/README.md)。旧 PG 专用脚本保留原范围；模板更新不表示目标已安装。
 
 常用调用、准备计划和执行顺序统一见[首次部署](../runbooks/01-first-deploy.md)、[证据说明](../evidence/README.md)与[仓库发布脚本](../../../scripts/deploy/README.md)；脚本参数以各自 `--help` 为准，不在本页复制完整命令。
 

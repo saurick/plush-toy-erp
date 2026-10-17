@@ -191,12 +191,18 @@ test("skill health: variable-length fences keep example instructions inert", asy
       [backtick.repeat(4) + "markdown", "[TODO: example]", "$plush-missing", "[example](missing.md)", backtick.repeat(4)],
       [backtick.repeat(4), backtick.repeat(3), "nested example", backtick.repeat(3), "[TODO: example]", "$plush-missing", "[example](missing.md)", backtick.repeat(5)],
       ["~".repeat(5), backtick.repeat(3), "[TODO: example]", "$plush-missing", "[example](missing.md)", "~".repeat(6)],
+      [backtick.repeat(4), "~".repeat(4), "[TODO: example]", "$plush-missing", "[example](missing.md)", backtick.repeat(4)],
+      [backtick.repeat(4) + "markdown", "[TODO: example]", "$plush-missing", "[example](missing.md)"],
     ]) {
       await writeFile(file, original + "\n" + body.join("\n") + "\n");
       assert.deepEqual(validateSkillRoot(root).errors, []);
     }
-    await appendFile(file, "\n$plush-missing\n");
-    assert(validateSkillRoot(root).errors.some((error) => error.includes("unknown project skill $plush-missing")));
+    await writeFile(file, original + "\n" + backtick.repeat(4) + "\nexample\n" + backtick.repeat(4));
+    await appendFile(file, "\n[TODO: unfinished instruction]\n$plush-missing\n[missing](missing.md)\n");
+    const errors = validateSkillRoot(root).errors;
+    assert(errors.some((error) => error.includes("unfinished TODO placeholder")));
+    assert(errors.some((error) => error.includes("unknown project skill $plush-missing")));
+    assert(errors.some((error) => error.includes("SKILL.md -> missing.md")));
   });
 });
 
@@ -301,6 +307,21 @@ test("skill health: CLI validates an explicit root from another working director
     const valid = run();
     assert.equal(valid.status, 0, valid.stderr);
     assert.match(valid.stdout, /status=ok skills=1/u);
+
+    const skillPath = path.join(skillDir, "SKILL.md");
+    const original = await readFile(skillPath, "utf8");
+    await writeFile(skillPath, original.replace(/^description:.*$/mu, "description: Example:"));
+    const malformed = run();
+    assert.equal(malformed.status, 1, malformed.stdout);
+    assert.match(malformed.stderr, /SKILL\.md:.*expected a plain or quoted YAML string/u);
+    assert.doesNotMatch(malformed.stdout, /status=ok/u);
+    for (const quoted of ['"Example:"', "'Example:'"]) {
+      await writeFile(skillPath, original.replace(/^description:.*$/mu, `description: ${quoted}`));
+      const recovered = run();
+      assert.equal(recovered.status, 0, recovered.stderr);
+      assert.match(recovered.stdout, /status=ok skills=1/u);
+    }
+
     await appendFile(path.join(skillDir, "SKILL.md"), "[TODO: complete workflow]\n");
     const invalid = run();
     assert.equal(invalid.status, 1, invalid.stdout);

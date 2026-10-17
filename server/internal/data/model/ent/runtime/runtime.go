@@ -20,6 +20,9 @@ import (
 	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/financepayment"
+	"server/internal/data/model/ent/helpfeedback"
+	"server/internal/data/model/ent/helpsupplement"
+	"server/internal/data/model/ent/helpsupplementrevision"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/inventorylotstatusevent"
@@ -1770,6 +1773,272 @@ func init() {
 	financepayment.DefaultUpdatedAt = financepaymentDescUpdatedAt.Default.(func() time.Time)
 	// financepayment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	financepayment.UpdateDefaultUpdatedAt = financepaymentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	helpfeedbackFields := schema.HelpFeedback{}.Fields()
+	_ = helpfeedbackFields
+	// helpfeedbackDescDocumentID is the schema descriptor for document_id field.
+	helpfeedbackDescDocumentID := helpfeedbackFields[0].Descriptor()
+	// helpfeedback.DocumentIDValidator is a validator for the "document_id" field. It is called by the builders before save.
+	helpfeedback.DocumentIDValidator = func() func(string) error {
+		validators := helpfeedbackDescDocumentID.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(document_id string) error {
+			for _, fn := range fns {
+				if err := fn(document_id); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// helpfeedbackDescDocumentTitle is the schema descriptor for document_title field.
+	helpfeedbackDescDocumentTitle := helpfeedbackFields[1].Descriptor()
+	// helpfeedback.DocumentTitleValidator is a validator for the "document_title" field. It is called by the builders before save.
+	helpfeedback.DocumentTitleValidator = func() func(string) error {
+		validators := helpfeedbackDescDocumentTitle.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(document_title string) error {
+			for _, fn := range fns {
+				if err := fn(document_title); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// helpfeedbackDescSourceHash is the schema descriptor for source_hash field.
+	helpfeedbackDescSourceHash := helpfeedbackFields[2].Descriptor()
+	// helpfeedback.SourceHashValidator is a validator for the "source_hash" field. It is called by the builders before save.
+	helpfeedback.SourceHashValidator = func() func(string) error {
+		validators := helpfeedbackDescSourceHash.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(source_hash string) error {
+			for _, fn := range fns {
+				if err := fn(source_hash); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// helpfeedbackDescPublishedVersion is the schema descriptor for published_version field.
+	helpfeedbackDescPublishedVersion := helpfeedbackFields[3].Descriptor()
+	// helpfeedback.DefaultPublishedVersion holds the default value on creation for the published_version field.
+	helpfeedback.DefaultPublishedVersion = helpfeedbackDescPublishedVersion.Default.(int)
+	// helpfeedback.PublishedVersionValidator is a validator for the "published_version" field. It is called by the builders before save.
+	helpfeedback.PublishedVersionValidator = helpfeedbackDescPublishedVersion.Validators[0].(func(int) error)
+	// helpfeedbackDescQuote is the schema descriptor for quote field.
+	helpfeedbackDescQuote := helpfeedbackFields[4].Descriptor()
+	// helpfeedback.DefaultQuote holds the default value on creation for the quote field.
+	helpfeedback.DefaultQuote = helpfeedbackDescQuote.Default.(string)
+	// helpfeedbackDescMessage is the schema descriptor for message field.
+	helpfeedbackDescMessage := helpfeedbackFields[5].Descriptor()
+	// helpfeedback.MessageValidator is a validator for the "message" field. It is called by the builders before save.
+	helpfeedback.MessageValidator = helpfeedbackDescMessage.Validators[0].(func(string) error)
+	// helpfeedbackDescRequestKey is the schema descriptor for request_key field.
+	helpfeedbackDescRequestKey := helpfeedbackFields[6].Descriptor()
+	// helpfeedback.RequestKeyValidator is a validator for the "request_key" field. It is called by the builders before save.
+	helpfeedback.RequestKeyValidator = func() func(string) error {
+		validators := helpfeedbackDescRequestKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(request_key string) error {
+			for _, fn := range fns {
+				if err := fn(request_key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// helpfeedbackDescActorID is the schema descriptor for actor_id field.
+	helpfeedbackDescActorID := helpfeedbackFields[7].Descriptor()
+	// helpfeedback.ActorIDValidator is a validator for the "actor_id" field. It is called by the builders before save.
+	helpfeedback.ActorIDValidator = helpfeedbackDescActorID.Validators[0].(func(int) error)
+	// helpfeedbackDescActorName is the schema descriptor for actor_name field.
+	helpfeedbackDescActorName := helpfeedbackFields[8].Descriptor()
+	// helpfeedback.ActorNameValidator is a validator for the "actor_name" field. It is called by the builders before save.
+	helpfeedback.ActorNameValidator = func() func(string) error {
+		validators := helpfeedbackDescActorName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(actor_name string) error {
+			for _, fn := range fns {
+				if err := fn(actor_name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// helpfeedbackDescResponse is the schema descriptor for response field.
+	helpfeedbackDescResponse := helpfeedbackFields[9].Descriptor()
+	// helpfeedback.DefaultResponse holds the default value on creation for the response field.
+	helpfeedback.DefaultResponse = helpfeedbackDescResponse.Default.(string)
+	// helpfeedback.ResponseValidator is a validator for the "response" field. It is called by the builders before save.
+	helpfeedback.ResponseValidator = helpfeedbackDescResponse.Validators[0].(func(string) error)
+	// helpfeedbackDescRespondedBy is the schema descriptor for responded_by field.
+	helpfeedbackDescRespondedBy := helpfeedbackFields[10].Descriptor()
+	// helpfeedback.DefaultRespondedBy holds the default value on creation for the responded_by field.
+	helpfeedback.DefaultRespondedBy = helpfeedbackDescRespondedBy.Default.(string)
+	// helpfeedback.RespondedByValidator is a validator for the "responded_by" field. It is called by the builders before save.
+	helpfeedback.RespondedByValidator = helpfeedbackDescRespondedBy.Validators[0].(func(string) error)
+	// helpfeedbackDescCreatedAt is the schema descriptor for created_at field.
+	helpfeedbackDescCreatedAt := helpfeedbackFields[12].Descriptor()
+	// helpfeedback.DefaultCreatedAt holds the default value on creation for the created_at field.
+	helpfeedback.DefaultCreatedAt = helpfeedbackDescCreatedAt.Default.(func() time.Time)
+	helpsupplementFields := schema.HelpSupplement{}.Fields()
+	_ = helpsupplementFields
+	// helpsupplementDescDocumentID is the schema descriptor for document_id field.
+	helpsupplementDescDocumentID := helpsupplementFields[0].Descriptor()
+	// helpsupplement.DocumentIDValidator is a validator for the "document_id" field. It is called by the builders before save.
+	helpsupplement.DocumentIDValidator = func() func(string) error {
+		validators := helpsupplementDescDocumentID.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(document_id string) error {
+			for _, fn := range fns {
+				if err := fn(document_id); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// helpsupplementDescVersion is the schema descriptor for version field.
+	helpsupplementDescVersion := helpsupplementFields[1].Descriptor()
+	// helpsupplement.DefaultVersion holds the default value on creation for the version field.
+	helpsupplement.DefaultVersion = helpsupplementDescVersion.Default.(int)
+	// helpsupplement.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	helpsupplement.VersionValidator = helpsupplementDescVersion.Validators[0].(func(int) error)
+	// helpsupplementDescPublishedVersion is the schema descriptor for published_version field.
+	helpsupplementDescPublishedVersion := helpsupplementFields[2].Descriptor()
+	// helpsupplement.DefaultPublishedVersion holds the default value on creation for the published_version field.
+	helpsupplement.DefaultPublishedVersion = helpsupplementDescPublishedVersion.Default.(int)
+	// helpsupplement.PublishedVersionValidator is a validator for the "published_version" field. It is called by the builders before save.
+	helpsupplement.PublishedVersionValidator = helpsupplementDescPublishedVersion.Validators[0].(func(int) error)
+	// helpsupplementDescDraftMarkdown is the schema descriptor for draft_markdown field.
+	helpsupplementDescDraftMarkdown := helpsupplementFields[3].Descriptor()
+	// helpsupplement.DefaultDraftMarkdown holds the default value on creation for the draft_markdown field.
+	helpsupplement.DefaultDraftMarkdown = helpsupplementDescDraftMarkdown.Default.(string)
+	// helpsupplementDescCreatedAt is the schema descriptor for created_at field.
+	helpsupplementDescCreatedAt := helpsupplementFields[4].Descriptor()
+	// helpsupplement.DefaultCreatedAt holds the default value on creation for the created_at field.
+	helpsupplement.DefaultCreatedAt = helpsupplementDescCreatedAt.Default.(func() time.Time)
+	// helpsupplementDescUpdatedAt is the schema descriptor for updated_at field.
+	helpsupplementDescUpdatedAt := helpsupplementFields[5].Descriptor()
+	// helpsupplement.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	helpsupplement.DefaultUpdatedAt = helpsupplementDescUpdatedAt.Default.(func() time.Time)
+	// helpsupplement.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	helpsupplement.UpdateDefaultUpdatedAt = helpsupplementDescUpdatedAt.UpdateDefault.(func() time.Time)
+	helpsupplementrevisionHooks := schema.HelpSupplementRevision{}.Hooks()
+	helpsupplementrevision.Hooks[0] = helpsupplementrevisionHooks[0]
+	helpsupplementrevisionFields := schema.HelpSupplementRevision{}.Fields()
+	_ = helpsupplementrevisionFields
+	// helpsupplementrevisionDescDocumentID is the schema descriptor for document_id field.
+	helpsupplementrevisionDescDocumentID := helpsupplementrevisionFields[0].Descriptor()
+	// helpsupplementrevision.DocumentIDValidator is a validator for the "document_id" field. It is called by the builders before save.
+	helpsupplementrevision.DocumentIDValidator = func() func(string) error {
+		validators := helpsupplementrevisionDescDocumentID.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(document_id string) error {
+			for _, fn := range fns {
+				if err := fn(document_id); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// helpsupplementrevisionDescVersion is the schema descriptor for version field.
+	helpsupplementrevisionDescVersion := helpsupplementrevisionFields[1].Descriptor()
+	// helpsupplementrevision.VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	helpsupplementrevision.VersionValidator = helpsupplementrevisionDescVersion.Validators[0].(func(int) error)
+	// helpsupplementrevisionDescSourceHash is the schema descriptor for source_hash field.
+	helpsupplementrevisionDescSourceHash := helpsupplementrevisionFields[4].Descriptor()
+	// helpsupplementrevision.SourceHashValidator is a validator for the "source_hash" field. It is called by the builders before save.
+	helpsupplementrevision.SourceHashValidator = func() func(string) error {
+		validators := helpsupplementrevisionDescSourceHash.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(source_hash string) error {
+			for _, fn := range fns {
+				if err := fn(source_hash); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// helpsupplementrevisionDescSummary is the schema descriptor for summary field.
+	helpsupplementrevisionDescSummary := helpsupplementrevisionFields[5].Descriptor()
+	// helpsupplementrevision.SummaryValidator is a validator for the "summary" field. It is called by the builders before save.
+	helpsupplementrevision.SummaryValidator = func() func(string) error {
+		validators := helpsupplementrevisionDescSummary.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(summary string) error {
+			for _, fn := range fns {
+				if err := fn(summary); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// helpsupplementrevisionDescActorID is the schema descriptor for actor_id field.
+	helpsupplementrevisionDescActorID := helpsupplementrevisionFields[6].Descriptor()
+	// helpsupplementrevision.ActorIDValidator is a validator for the "actor_id" field. It is called by the builders before save.
+	helpsupplementrevision.ActorIDValidator = helpsupplementrevisionDescActorID.Validators[0].(func(int) error)
+	// helpsupplementrevisionDescActorName is the schema descriptor for actor_name field.
+	helpsupplementrevisionDescActorName := helpsupplementrevisionFields[7].Descriptor()
+	// helpsupplementrevision.ActorNameValidator is a validator for the "actor_name" field. It is called by the builders before save.
+	helpsupplementrevision.ActorNameValidator = func() func(string) error {
+		validators := helpsupplementrevisionDescActorName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(actor_name string) error {
+			for _, fn := range fns {
+				if err := fn(actor_name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// helpsupplementrevisionDescRestoredFrom is the schema descriptor for restored_from field.
+	helpsupplementrevisionDescRestoredFrom := helpsupplementrevisionFields[8].Descriptor()
+	// helpsupplementrevision.DefaultRestoredFrom holds the default value on creation for the restored_from field.
+	helpsupplementrevision.DefaultRestoredFrom = helpsupplementrevisionDescRestoredFrom.Default.(int)
+	// helpsupplementrevision.RestoredFromValidator is a validator for the "restored_from" field. It is called by the builders before save.
+	helpsupplementrevision.RestoredFromValidator = helpsupplementrevisionDescRestoredFrom.Validators[0].(func(int) error)
+	// helpsupplementrevisionDescCreatedAt is the schema descriptor for created_at field.
+	helpsupplementrevisionDescCreatedAt := helpsupplementrevisionFields[9].Descriptor()
+	// helpsupplementrevision.DefaultCreatedAt holds the default value on creation for the created_at field.
+	helpsupplementrevision.DefaultCreatedAt = helpsupplementrevisionDescCreatedAt.Default.(func() time.Time)
 	inventorybalanceFields := schema.InventoryBalance{}.Fields()
 	_ = inventorybalanceFields
 	// inventorybalanceDescSubjectType is the schema descriptor for subject_type field.

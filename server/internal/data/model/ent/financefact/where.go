@@ -1786,6 +1786,52 @@ func UpdatedAtLTE(v time.Time) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldLTE(FieldUpdatedAt, v))
 }
 
+// HasAllocations applies the HasEdge predicate on the "allocations" edge.
+func HasAllocations() predicate.FinanceFact {
+	return predicate.FinanceFact(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, AllocationsTable, AllocationsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasAllocationsWith applies the HasEdge predicate on the "allocations" edge with a given conditions (other predicates).
+func HasAllocationsWith(preds ...predicate.FinanceAllocation) predicate.FinanceFact {
+	return predicate.FinanceFact(func(s *sql.Selector) {
+		step := newAllocationsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasCreditNotes applies the HasEdge predicate on the "credit_notes" edge.
+func HasCreditNotes() predicate.FinanceFact {
+	return predicate.FinanceFact(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, CreditNotesTable, CreditNotesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasCreditNotesWith applies the HasEdge predicate on the "credit_notes" edge with a given conditions (other predicates).
+func HasCreditNotesWith(preds ...predicate.FinanceCreditNote) predicate.FinanceFact {
+	return predicate.FinanceFact(func(s *sql.Selector) {
+		step := newCreditNotesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasPoster applies the HasEdge predicate on the "poster" edge.
 func HasPoster() predicate.FinanceFact {
 	return predicate.FinanceFact(func(s *sql.Selector) {

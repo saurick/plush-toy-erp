@@ -20,6 +20,7 @@ export function createDevDrillRecoveryScenarios({
       path: '/__dev/drill-recovery',
       viewport: { width: 1440, height: 900 },
       beforeNavigate: installDrillRecoveryRoutes,
+      expectedConsoleErrorPatterns: [/Failed to load resource:.*409/u],
       verify: async (page) => {
         await expectHeading(page, '安全与恢复')
         assert.equal(
@@ -87,7 +88,8 @@ export function createDevDrillRecoveryScenarios({
             '查看故障注入与恢复要点'
         )
         await verifySlidingMotion(page, assert, '.erp-dev-recovery-page .erp-dev-delivery-taskbar', 2, true)
-        await page.getByText('疑似入侵或勒索时的处置', { exact: true }).click()
+        assert.equal(await page.locator('.erp-dev-recovery-emergency').first().evaluate((element) => element.open), true)
+        assert.equal(await page.getByRole('region', { name: '安全事件处置顺序' }).getByRole('listitem').count(), 4)
         await page.getByRole('link', { name: '阅读事件处置与恢复边界', exact: true }).waitFor()
         await page.reload()
         await page.getByRole('tab', { name: '应急指引', exact: true }).waitFor()
@@ -95,6 +97,14 @@ export function createDevDrillRecoveryScenarios({
         await page.getByRole('tab', { name: '安全核验', exact: true }).click()
         await security.waitFor({ state: 'visible' })
         assert.equal(await security.getByText('未核验', { exact: true }).count(), 4)
+        await page.setViewportSize({ width: 1100, height: 900 })
+        await assertNoHorizontalOverflow(page, 'dev-recovery-narrow-desktop')
+        await page.setViewportSize({ width: 1440, height: 900 })
+        await page.route('**/__dev/api/delivery/summary', (route) => route.fulfill({ status: 409, contentType: 'application/json', body: JSON.stringify({ status: 'failed', message: '操作未完成；请刷新版本中心查看已记录状态' }) }))
+        await page.getByRole('button', { name: '核验目标', exact: true }).click()
+        await page.getByText('最新状态核对失败', { exact: true }).waitFor()
+        await page.getByText(/读取恢复证据失败/u).waitFor()
+        await assertNoHorizontalOverflow(page, 'dev-recovery-read-failure')
       },
     },
   ]

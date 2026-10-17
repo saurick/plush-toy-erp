@@ -104,9 +104,7 @@ test('browser Back clears a pending target while Forward projects its new target
   )
 })
 
-test('dev navigation preloads visible routes at idle and on direct interaction', () => {
-  assert.match(devPageNavSource, /window\.requestIdleCallback/u)
-  assert.match(devPageNavSource, /timeout: 350/u)
+test('dev navigation preloads routes on pointer and keyboard intent', () => {
   assert.equal(
     devPageNavSource.match(
       /onPointerEnter=\{\(\) => handleRoutePreload\((?:item|area)\.route\)\}/gu

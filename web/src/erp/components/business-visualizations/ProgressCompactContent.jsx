@@ -1,18 +1,19 @@
 import React from 'react'
 import { Tag } from 'antd'
+import ProductIdentity from '../master-data/ProductIdentity.jsx'
 import {
   progressAttention,
   progressDelivery,
   progressDue,
+  progressProductLabel,
   progressStatusLabel,
 } from '../../utils/businessProgress.mjs'
 
 export function ProgressIdentity({ row }) {
-  return (
+  const content = (
     <span className="erp-progress-identity">
       <strong>
-        {row.product}
-        {row.product_count > 1 ? ` 等 ${row.product_count} 项` : ''}
+        {progressProductLabel(row)}
       </strong>
       <span className="erp-progress-reference">{row.order_no}</span>
       <span className="erp-progress-customer">
@@ -21,6 +22,11 @@ export function ProgressIdentity({ row }) {
       </span>
     </span>
   )
+  return row.product_match_count > 0 ? (
+    <ProductIdentity productId={row.product_id} name={row.product} preview={false}>
+      {content}
+    </ProductIdentity>
+  ) : content
 }
 
 export function ProgressDue({ row, snapshotAt }) {

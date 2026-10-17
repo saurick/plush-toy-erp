@@ -14,6 +14,7 @@ export default function EngineeringMaterialTaskSummaryEntry({
   profile,
   mobile = false,
   compact = true,
+  buttonText = '查看材料汇总',
 }) {
   const context =
     getEngineeringMaterialTaskContext(task) ||
@@ -26,22 +27,39 @@ export default function EngineeringMaterialTaskSummaryEntry({
   React.useEffect(() => {
     setOpenedSourceKey(null)
   }, [sourceKey, canRead])
+  const closeSummary = () => {
+    setOpenedSourceKey(null)
+    requestAnimationFrame(() => {
+      entryRef.current?.focus({ preventScroll: true })
+    })
+  }
   if (!canRead) return null
 
   return (
-    <div className={`erp-material-task-summary-entry${compact ? ' erp-material-task-summary-entry--compact' : ''}`}>
+    <div
+      className={`erp-material-task-summary-entry${compact ? ' erp-material-task-summary-entry--compact' : ''}`}
+      role="presentation"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && openedSourceKey === sourceKey) {
+          event.preventDefault()
+          event.stopPropagation()
+          closeSummary()
+        }
+      }}
+    >
       <Button
         ref={entryRef}
         block={!compact}
         icon={<FileTextOutlined aria-hidden="true" />}
         size={mobile && !compact ? 'large' : 'middle'}
+        aria-label="查看材料汇总"
         onClick={(event) => {
           entryRef.current = event.currentTarget
           setView('summary')
           setOpenedSourceKey(sourceKey)
         }}
       >
-        查看材料汇总
+        {buttonText}
       </Button>
       {task.task_group === 'engineering_material_revision' &&
       task.task_status_key === 'ready' ? (
@@ -65,12 +83,7 @@ export default function EngineeringMaterialTaskSummaryEntry({
           readOnly
           preview={view === 'preview'}
           permissions={getEngineeringMaterialPermissions(profile, task)}
-          onCancel={() => {
-            setOpenedSourceKey(null)
-            requestAnimationFrame(() => {
-              entryRef.current?.focus({ preventScroll: true })
-            })
-          }}
+          onCancel={closeSummary}
         />
       ) : null}
     </div>

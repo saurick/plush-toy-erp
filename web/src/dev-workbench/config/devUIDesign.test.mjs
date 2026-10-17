@@ -7,7 +7,10 @@ import { getBusinessUsabilityEntry } from '../../erp/config/businessUsabilityCat
 import { getRoleHelpScenarios } from '../../erp/config/helpScenarios.mjs'
 import { ROLE_HELP_GUIDES } from '../../erp/config/roleHelpContent.mjs'
 import { HELP_REFERENCE_PAGES } from '../../erp/config/helpManualCatalog.mjs'
-import { getBusinessHandbookIntroductions, getBusinessPageHandbookSections } from '../../erp/config/businessHandbook.mjs'
+import {
+  getBusinessHandbookIntroductions,
+  getBusinessPageHandbookSections,
+} from '../../erp/config/businessHandbook.mjs'
 import {
   DEV_UI_DESIGN_ROUTE,
   UI_DESIGN_ASSET,
@@ -208,8 +211,19 @@ test('reference design snapshot shares the formal chapters, items and engineerin
 })
 
 test('help design uses the same complete handbook introductions and role responsibilities', () => {
-  assert.deepEqual(helpDefinition('handbookIntroductions'), getBusinessHandbookIntroductions())
-  assert.deepEqual(helpDefinition('handbookPageAdditions'), Object.fromEntries(HELP_REFERENCE_PAGES.map((page) => [page.key, getBusinessPageHandbookSections(page).filter((section) => ['capabilities', 'excel-drafts', 'relations'].includes(section.key))])))
+  assert.deepEqual(
+    helpDefinition('handbookIntroductions'),
+    getBusinessHandbookIntroductions()
+  )
+  assert.deepEqual(
+    helpDefinition('handbookPageAdditions'),
+    Object.fromEntries(
+      HELP_REFERENCE_PAGES.map((page) => [
+        page.key,
+        getBusinessPageHandbookSections(page),
+      ])
+    )
+  )
 })
 
 test('every help scenario has an overview and valid exception return steps', () => {
@@ -398,7 +412,7 @@ test('preview isolates storage, disallows network and permits local exported dow
     '<html><head><title>Design</title></head><body></body></html>'
   )
   assert.match(html, /connect-src 'none'/)
-  const page = read('web/src/dev-workbench/pages/DevUIDesignPage.jsx')
+  const page = read('web/src/dev-workbench/pages/DevUIDesignPreview.jsx')
   assert.match(page, /sandbox="allow-scripts allow-downloads"/)
   assert.doesNotMatch(page, /allow-same-origin/)
   assert.match(page, /event\.source === frameRef\.current\?\.contentWindow/)
@@ -415,7 +429,14 @@ test('empty or headless design inputs keep sandbox initialization deterministic'
 
 test('business, task handling, mobile, help, login and workbench use the same isolated design asset', () => {
   const source = '<html><head></head><body></body></html>'
-  for (const entry of ['workspace', 'task-handling', 'mobile-tasks', 'login', 'help', 'workbench']) {
+  for (const entry of [
+    'workspace',
+    'task-handling',
+    'mobile-tasks',
+    'login',
+    'help',
+    'workbench',
+  ]) {
     const prepared = prepareUIDesignSandboxSource(source, { page: entry })
     assert.ok(prepared.includes(`window.__ERP_UI_DESIGN_ENTRY__ = "${entry}"`))
     assert.match(prepared, /connect-src 'none'/)

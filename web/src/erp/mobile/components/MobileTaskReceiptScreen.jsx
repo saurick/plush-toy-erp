@@ -32,7 +32,6 @@ const OUTCOME_META = Object.freeze({
     icon: CheckOutlined,
     iconClass: 'bg-emerald-50 text-emerald-600',
     title: '任务办理已确认',
-    description: '本次办理结果已记录，可返回列表继续处理其他任务。',
   },
   [MOBILE_TASK_RECEIPT_OUTCOMES.UNKNOWN]: {
     icon: ClockCircleOutlined,
@@ -78,6 +77,7 @@ export default function MobileTaskReceiptScreen({
   statusLabel = '',
   onBackToList = () => {},
   onOpenProcess = null,
+  onOpenBusiness = null,
   onRetryConfirm = null,
   onRetryTaskLoad = null,
   onViewTask = null,
@@ -103,6 +103,7 @@ export default function MobileTaskReceiptScreen({
   const approvalAction =
     isWorkflowApprovalTask(task) && ['done', 'rejected'].includes(actionKey)
   const confirmed = outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
+  const canContinueBusiness = confirmed && typeof onOpenBusiness === 'function'
   const hasProcessAnchor = Boolean(
     task?.id && task?.process_instance_id && task?.process_node_instance_id
   )
@@ -154,12 +155,12 @@ export default function MobileTaskReceiptScreen({
       <MobileTaskFlowHeader
         backLabel={backLabel || '返回任务列表'}
         busy={busy}
-        canOpenProcess={typeof onOpenProcess === 'function'}
+        canOpenProcess={canContinueBusiness || typeof onOpenProcess === 'function'}
         canOpenReceipt
         currentStep="result"
         onBack={onBackToList}
         onOpenDetail={onViewTask}
-        onOpenProcess={onOpenProcess}
+        onOpenProcess={canContinueBusiness ? onOpenBusiness : onOpenProcess}
         processUnavailableLabel="结果已确认"
         title="结果回执"
         trailing={
@@ -191,9 +192,11 @@ export default function MobileTaskReceiptScreen({
           <h2 className="text-base font-semibold text-slate-950">
             {approvalAction && confirmed ? '审批办理已确认' : outcomeMeta.title}
           </h2>
-          <p className="break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
-            {message || outcomeMeta.description}
-          </p>
+          {message || !confirmed ? (
+            <p className="break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere]">
+              {message || outcomeMeta.description}
+            </p>
+          ) : null}
         </section>
 
         {taskRecoveryPending ? (
@@ -317,7 +320,7 @@ export default function MobileTaskReceiptScreen({
         <button
           type="button"
           className={
-            canRetry || canReload
+            canRetry || canReload || canContinueBusiness
               ? 'mobile-detail-secondary'
               : 'mobile-detail-primary'
           }
@@ -326,6 +329,11 @@ export default function MobileTaskReceiptScreen({
         >
           {backLabel || (confirmed ? '返回任务列表' : '返回列表')}
         </button>
+        {canContinueBusiness ? (
+          <button type="button" className="mobile-detail-primary min-h-12 rounded-xl px-4 py-3 text-base font-semibold" disabled={busy} onClick={onOpenBusiness}>
+            继续办理业务
+          </button>
+        ) : null}
         {canReload ? (
           <button
             type="button"

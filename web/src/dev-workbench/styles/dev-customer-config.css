@@ -23,7 +23,7 @@
 .erp-dev-customer-header__copy {
   display: flex;
   flex-direction: row;
-  flex: 1;
+  flex: 0 0 auto;
 }
 
 .erp-dev-customer-eyebrow.ant-typography {
@@ -68,15 +68,9 @@
   color: var(--customer-muted);
 }
 
-.erp-dev-customer-context.erp-dev-delivery-context {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
 .erp-dev-customer-context .erp-dev-customer-selector {
   display: flex;
-  flex: 1 1 600px;
+  flex: 0 1 auto;
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
@@ -110,10 +104,6 @@
   overflow-wrap: anywhere;
 }
 
-.erp-dev-customer-journey.erp-dev-task-nav {
-  margin-bottom: 12px;
-}
-
 .erp-dev-customer-workspace {
   max-width: var(--customer-reading-width);
   margin: 0 auto;
@@ -134,7 +124,7 @@
   border: 0;
   border-radius: 0;
   background: transparent;
-  padding: 16px;
+  padding: var(--dev-workbench-panel-padding);
   box-shadow: none;
 }
 

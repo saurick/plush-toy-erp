@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict'
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { createProductionProcessScenarios } from './productionProcessScenarios.mjs'
+import { createProductionCompactPagesScenarios } from './productionCompactPagesScenarios.mjs'
 
 export async function assertProductionRecordTabMotion(
   page,
   target,
   { reverse = false, reduced = false } = {}
 ) {
-  const strip = page.locator('.erp-production-record-tabs .ant-tabs-nav-list')
+  const strip = page.locator('.erp-business-module-tabs .ant-tabs-nav-list')
   await strip.waitFor()
   const result = await strip.evaluate(
     async (element, config) => {
@@ -123,6 +125,71 @@ export function createProductionTabStabilityScenarios({
   clickERPThemeOption,
 }) {
   return [
+    ...createProductionCompactPagesScenarios({ common, outputDir, assertNoHorizontalOverflow, clickERPThemeOption }),
+    ...createProductionProcessScenarios({ common, outputDir, assertNoHorizontalOverflow, clickERPThemeOption }),
+    {
+      ...common,
+      name: 'production-direct-execution-record-switch',
+      path: '/erp/production/progress?display=process',
+      productionOrderReleased: true,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const navigation = page.getByLabel('生产管理页面', { exact: true })
+        const execution = page.getByRole('region', { name: '生产执行', exact: true })
+        const records = page.locator('.erp-production-record-workspace .ant-table-wrapper')
+        const strip = await navigation.locator('.ant-tabs-nav-list').elementHandle()
+        await execution.waitFor()
+        await navigation.getByRole('tab', { name: '生产记录', exact: true }).click()
+        await page.waitForURL((url) => !url.searchParams.has('display'), { timeout: 3000 })
+        await records.waitFor()
+        assert.equal(await navigation.getByRole('tab', { name: '生产记录', selected: true }).count(), 1)
+        assert.equal(await strip.evaluate((node) => node.isConnected), true)
+        await navigation.getByRole('tab', { name: '生产执行', exact: true }).click()
+        await execution.waitFor()
+        assert.equal(new URL(page.url()).searchParams.get('display'), 'process')
+        const before = await page.evaluate(() => ({ href: location.href, index: history.state.idx }))
+        await page.locator('.erp-admin-sider').getByRole('menuitem').filter({ hasText: /^生产管理$/u }).click()
+        assert.deepEqual(await page.evaluate(() => ({ href: location.href, index: history.state.idx })), before)
+        await navigation.getByRole('tab', { name: '生产记录', exact: true }).click()
+        await records.waitFor()
+        await page.goBack()
+        await execution.waitFor()
+        await page.goForward()
+        await records.waitFor()
+        await assertNoHorizontalOverflow(page, 'production-direct-execution-record-switch')
+        await page.screenshot({ path: path.join(outputDir, 'production-records-after-direct-execution.png'), scale: 'device' })
+      },
+    },
+    {
+      ...common,
+      name: 'production-execution-layout-4k',
+      path: '/erp/production/progress?display=process',
+      productionOrderReleased: true,
+      viewport: { width: 1920, height: 1080 },
+      deviceScaleFactor: 2,
+      verify: async (page) => {
+        const execution = page.getByRole('region', { name: '生产执行', exact: true })
+        await execution.getByRole('table', { name: '当前生产事项' }).waitFor()
+        assert.equal(await page.locator('.erp-business-operation-panel:visible').count(), 0)
+        const metrics = await execution.evaluate((node) => ({
+          viewport: [innerWidth, innerHeight],
+dpr: devicePixelRatio,
+          rows: [...node.querySelectorAll('.erp-production-process__current tbody tr')].map((row) => row.getBoundingClientRect().height),
+          firstRowTop: node.querySelector('.erp-production-process__current tbody tr').getBoundingClientRect().top,
+          toolbarCenter: (() => { const box = node.querySelector('.erp-production-process__toolbar').getBoundingClientRect(); return box.top + box.height / 2 })(),
+          switchCenter: (() => { const box = node.querySelector('.erp-production-process__layout').getBoundingClientRect(); return box.top + box.height / 2 })(),
+        }))
+        assert.deepEqual(metrics.viewport, [1920, 1080])
+        assert.equal(metrics.dpr, 2)
+        assert.ok(metrics.rows.every((height) => height <= 80), JSON.stringify(metrics))
+        assert.ok(metrics.firstRowTop <= 260, JSON.stringify(metrics))
+        assert.ok(Math.abs(metrics.toolbarCenter - metrics.switchCenter) <= 1, '订单选择、打开订单和展示切换共用一行')
+        await assertNoHorizontalOverflow(page, 'production-execution-4k')
+        await writeFile(path.join(outputDir, 'production-execution-metrics.json'), JSON.stringify(metrics, null, 2))
+        await page.screenshot({ path: path.join(outputDir, 'production-execution-4k.png'), scale: 'device' })
+      },
+    },
     {
       ...common,
       name: 'production-record-single-view',
@@ -134,19 +201,19 @@ export function createProductionTabStabilityScenarios({
       },
       verify: async (page) => {
         await page
-          .getByRole('heading', { name: '生产记录', exact: true })
+          .getByRole('heading', { name: '生产管理', exact: true })
           .waitFor()
         await page
           .locator('.erp-production-record-workspace .ant-table-wrapper')
           .waitFor()
         assert.equal(
-          await page.getByLabel('生产记录工作区', { exact: true }).count(),
+          await page.getByLabel('生产管理页面', { exact: true }).count(),
           0,
           '只有一种可用视图时不显示无用途的切换条'
         )
         assert.equal(
           await page
-            .getByRole('tab', { name: '生产工序', exact: true })
+            .getByRole('tab', { name: '生产执行', exact: true })
             .count(),
           0
         )
@@ -157,7 +224,7 @@ export function createProductionTabStabilityScenarios({
           0
         )
         assert.equal(
-          await page.getByRole('tab', { name: '待审批', exact: true }).count(),
+          await page.getByRole('tab', { name: '生产订单', exact: true }).count(),
           0
         )
       },
@@ -168,32 +235,32 @@ export function createProductionTabStabilityScenarios({
       path: '/erp/production/progress',
       productionOrderReleased: true,
       verify: async (page) => {
-        const navigation = page.getByLabel('生产记录工作区', { exact: true })
+        const navigation = page.getByLabel('生产管理页面', { exact: true })
         const pageHeader = page.locator(
-          '.erp-production-record-workspace > .erp-business-page-header-card'
+          '.erp-business-module-header'
         )
         await page
-          .getByRole('heading', { name: '生产记录', exact: true })
+          .getByRole('heading', { name: '生产管理', exact: true })
           .waitFor()
         assert.equal(
-          await pageHeader.locator('.erp-production-record-tabs').count(),
+          await pageHeader.locator('.erp-business-module-tabs').count(),
           1,
           '生产记录视图切换应合并到共享页头'
         )
         assert.equal(
           await page
             .locator(
-              '.erp-production-record-workspace > .erp-production-record-tabs'
+              '.erp-production-record-workspace > .erp-business-module-tabs'
             )
             .count(),
           0,
           '生产记录视图切换不再单独占用一条卡片'
         )
         assert.deepEqual(await navigation.getByRole('tab').allTextContents(), [
-          '记录明细',
-          '生产工序',
+          '生产订单',
+          '生产执行',
+          '生产记录',
           '异常处理',
-          '待审批',
         ])
         assert.equal(
           await page.getByRole('radiogroup', { name: '页面展示方式' }).count(),
@@ -201,7 +268,7 @@ export function createProductionTabStabilityScenarios({
           '生产记录不叠加第二组视图切换'
         )
         const samples = []
-        for (const target of ['生产工序', '异常处理', '待审批', '记录明细']) {
+        for (const target of ['生产执行', '异常处理', '生产订单', '生产记录']) {
           samples.push({
             target,
             ...(await assertProductionRecordTabMotion(page, target)),
@@ -214,21 +281,21 @@ export function createProductionTabStabilityScenarios({
           )
         }
         samples.push({
-          target: '待审批',
+          target: '生产订单',
           reverse: true,
-          ...(await assertProductionRecordTabMotion(page, '待审批', {
+          ...(await assertProductionRecordTabMotion(page, '生产订单', {
             reverse: true,
           })),
         })
         assert.equal(
           await navigation
-            .getByRole('tab', { name: '记录明细' })
+            .getByRole('tab', { name: '生产记录' })
             .getAttribute('aria-selected'),
           'true'
         )
-        await navigation.getByRole('tab', { name: '生产工序' }).click()
+        await navigation.getByRole('tab', { name: '生产执行' }).click()
         await page
-          .getByRole('region', { name: '生产工序', exact: true })
+          .getByRole('region', { name: '生产执行', exact: true })
           .waitFor()
         await page.goBack()
         await page
@@ -236,7 +303,7 @@ export function createProductionTabStabilityScenarios({
           .waitFor()
         assert.equal(
           await navigation
-            .getByRole('tab', { name: '记录明细' })
+            .getByRole('tab', { name: '生产记录' })
             .getAttribute('aria-selected'),
           'true'
         )
@@ -255,8 +322,8 @@ export function createProductionTabStabilityScenarios({
             page,
             `production-record-tabs-${width}`
           )
-          await navigation.getByRole('tab', { name: '待审批' }).click()
-          await navigation.getByRole('tab', { name: '记录明细' }).click()
+          await navigation.getByRole('tab', { name: '生产订单' }).click()
+          await navigation.getByRole('tab', { name: '生产记录' }).click()
           await page
             .locator('.erp-production-record-workspace .ant-table-wrapper')
             .waitFor()
@@ -268,9 +335,9 @@ export function createProductionTabStabilityScenarios({
         await page.setViewportSize({ width: 1440, height: 900 })
         await clickERPThemeOption(page, '暗色')
         samples.push({
-          target: '待审批',
+          target: '生产订单',
           theme: 'dark',
-          ...(await assertProductionRecordTabMotion(page, '待审批')),
+          ...(await assertProductionRecordTabMotion(page, '生产订单')),
         })
         await writeFile(
           path.join(outputDir, 'production-record-tabs-motion.json'),

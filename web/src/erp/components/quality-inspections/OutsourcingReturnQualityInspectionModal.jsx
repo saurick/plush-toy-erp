@@ -115,7 +115,7 @@ export default function OutsourcingReturnQualityInspectionModal({
           },
         ]}
       />
-      <Form form={form} layout="vertical" preserve={false} disabled={loading}>
+      <Form name="outsourcing-return-quality" form={form} layout="vertical" preserve={false} disabled={loading}>
         <Form.Item
           name="inspection_no"
           label="质检单号（自动）"

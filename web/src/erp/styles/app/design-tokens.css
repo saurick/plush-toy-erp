@@ -54,6 +54,20 @@
   --erp-sidebar-width: 206px;
   --erp-topbar-height: 48px;
   --erp-page-padding: 12px;
+  --erp-page-gap: 9px;
+}
+
+@media screen and (min-width: 768px) {
+  :root {
+    --erp-page-padding: 8px;
+    --erp-page-gap: 6px;
+    --erp-panel-padding-block: 6px;
+    --erp-panel-padding-inline: 12px;
+    --erp-form-body-padding-block: 10px;
+    --erp-form-field-gap: 10px 12px;
+    --erp-form-label-gap: 4px;
+    --erp-form-section-gap: 12px;
+  }
 }
 
 /* 手机保持完整的文字层级；小屏密度通过换行和局部滚动处理。 */

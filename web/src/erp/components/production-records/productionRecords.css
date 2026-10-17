@@ -4,48 +4,63 @@
   min-height: 0;
 }
 
-.erp-production-record-workspace
-  > .erp-business-page-header-card
-  .erp-production-record-tabs {
+.erp-production-record-drawer .ant-drawer-header,
+.erp-production-record-drawer .ant-drawer-body,
+.erp-production-record-drawer .ant-drawer-footer {
+  padding: 12px 16px;
+}
+
+.erp-production-record-drawer__summary {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--erp-border);
+  border-radius: var(--erp-radius-md, 8px);
+  background: var(--erp-surface-bg-soft);
+}
+
+.erp-production-record-drawer__summary small {
+  color: var(--erp-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.erp-production-record-drawer__reference {
+  display: flex;
   min-width: 0;
-  max-width: 100%;
-  flex: 0 1 auto;
+  align-items: center;
+  gap: 6px;
 }
 
-.erp-production-record-tabs > .ant-tabs-nav {
+.erp-production-record-drawer__summary h3 {
+  margin: 4px 0 6px;
+  font-size: var(--erp-font-body);
+}
+
+.erp-production-record-drawer__summary p {
   margin: 0;
+  color: var(--erp-text-muted);
 }
 
-.erp-production-record-tabs > .ant-tabs-content-holder {
-  display: none;
+.erp-production-record-drawer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
-@container (max-width: 820px) {
-  .erp-production-record-workspace
-    > .erp-business-page-header-card
-    .erp-business-page-header-card__grid {
-    flex-wrap: wrap;
-  }
+.erp-production-record-drawer .ant-descriptions-item-label {
+  white-space: nowrap;
+}
 
-  .erp-production-record-workspace
-    > .erp-business-page-header-card
-    .erp-business-page-header-card__main {
-    order: 1;
-  }
+.erp-production-record-drawer .ant-descriptions-item-content {
+  overflow-wrap: anywhere;
+}
 
-  .erp-production-record-workspace
-    > .erp-business-page-header-card
-    .erp-production-record-tabs {
-    order: 2;
-    flex: 1 1 100%;
-  }
+.erp-production-exception-context {
+  display: grid;
+  gap: 8px;
+}
 
-  .erp-production-record-workspace
-    > .erp-business-page-header-card
-    .erp-business-page-header-card__stats {
-    order: 3;
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-start;
-  }
+.erp-production-exception-context p {
+  margin: 0;
+  color: var(--erp-text-muted);
 }

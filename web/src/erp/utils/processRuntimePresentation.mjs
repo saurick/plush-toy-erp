@@ -6,6 +6,7 @@ import {
   ProcessStatus,
 } from '../../common/consts/statuses.generated.mjs'
 import { getRoleDisplayName } from './roleKeys.mjs'
+import { formatWorkflowTaskEventTime } from './workflowTaskEventPresentation.mjs'
 
 const PROCESS_STATUS_LABELS = Object.freeze({
   [ProcessStatus.ACTIVE]: '办理中',
@@ -337,6 +338,11 @@ export function buildWorkflowProcessStageModel(value) {
       attemptLabel: formatProcessNodeAttemptLabel(node),
       statusLabel: getProcessNodeStatusLabel(node),
       tone: getProcessNodeTone(node),
+      startedAtLabel: Number.isSafeInteger(node.started_at) && node.started_at > 0
+        ? formatWorkflowTaskEventTime(node.started_at) : '',
+      completedAt: Number.isSafeInteger(node.completed_at) && node.completed_at > 0 ? node.completed_at : null,
+      completedAtLabel: Number.isSafeInteger(node.completed_at) && node.completed_at > 0
+        ? formatWorkflowTaskEventTime(node.completed_at) : '',
       current: currentNodeIDs.has(node.id),
       completed: completedNodeIDs.has(node.id),
       linked: linkedNodeID > 0 && linkedNodeID === node.id,

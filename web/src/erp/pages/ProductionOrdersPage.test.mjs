@@ -59,7 +59,7 @@ test('production order page is an independent Source Document route', () => {
   assert.match(page, /生产计划单/u)
   assert.doesNotMatch(
     page,
-    /createProductionFact|postProductionFact|WorkflowTask/u
+    /createProductionFact|postProductionFact|completeWorkflowTaskAction/u
   )
 })
 
@@ -110,11 +110,8 @@ test('production order lifecycle keeps backend authority and separates refresh e
 })
 
 test('production order page reuses the ERP shell refresh entrypoint', () => {
-  assert.match(page, /registerPageRefresh\?\.\(\(\) => \{/u)
-  assert.match(
-    page,
-    /if \(contentView === 'overview'\) reloadOverviewData\(\)/u
-  )
+  assert.match(page, /registerPageRefresh\?\.\(loadOrders\)/u)
+  assert.doesNotMatch(page, /productionViewSwitch|ProductionOrderOverview/u)
   assert.doesNotMatch(page, />\s*刷新当前页\s*</u)
   assert.doesNotMatch(page, /ReloadOutlined/u)
 })
@@ -149,9 +146,9 @@ test('production order core actions stay stable while record-specific readers us
 
 test('production order release explains the atomic scheduling handoff', () => {
   assert.match(page, /生产订单已发布，排产确认已进入 PMC 待办/u)
-  assert.match(page, /BUSINESS_ROUTE_PATHS\.productionScheduling/u)
-  assert.match(page, /source_type: 'production-orders'/u)
-  assert.match(page, /source_id: order\.id/u)
+  assert.match(page, /routeWithQuery\('\/erp\/task-board'/u)
+  assert.match(page, /source: 'production-orders'/u)
+  assert.match(page, /q: order\.order_no/u)
 })
 
 test('production order forms remain connected before initialization', () => {

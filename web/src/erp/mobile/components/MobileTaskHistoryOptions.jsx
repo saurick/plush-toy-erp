@@ -8,7 +8,7 @@ import {
   WORKFLOW_HISTORY_STATUS_OPTIONS,
 } from '../../utils/workflowRoleTaskHistory.mjs'
 
-export default function MobileTaskHistoryOptions({ options, onChange, sourceTypes, counts, loading }) {
+export default function MobileTaskHistoryOptions({ options, onChange, sourceTypes, counts, loading, count, summary, onReset, triggerRef }) {
   const { period = '', statusKey = '' } = options
   const [open, setOpen] = useState(false)
   return (
@@ -17,9 +17,11 @@ export default function MobileTaskHistoryOptions({ options, onChange, sourceType
       title="已办筛选"
       open={open}
       onOpenChange={setOpen}
-      count={Number(Boolean(statusKey)) + Number(Boolean(options.sourceType))}
+      count={count}
+      summary={summary}
+      triggerRef={triggerRef}
       testId="mobile-history-filter-trigger"
-      onReset={() => onChange({ period: '', statusKey: '', sourceType: '' })}
+      onReset={onReset}
     >
       <fieldset role="presentation">
         <legend>处理时间</legend>

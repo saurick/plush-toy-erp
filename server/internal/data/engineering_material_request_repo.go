@@ -15,11 +15,11 @@ import (
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/engineeringmaterialrequest"
 	"server/internal/data/model/ent/engineeringmaterialrequestitem"
-	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/supplier"
+	"server/internal/data/model/ent/unit"
 	"sort"
 	"time"
 )
@@ -70,13 +70,34 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 	if len(lines) == 0 {
 		result.Issues = append(result.Issues, "订单没有待生产的需求明细")
 	}
+	unitIDs := make([]int, 0, len(lines))
+	for _, line := range lines {
+		unitIDs = append(unitIDs, line.UnitID)
+	}
+	units := map[int]*ent.Unit{}
+	if len(unitIDs) > 0 {
+		rows, err := client.Unit.Query().Where(unit.IDIn(unitIDs...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			units[row.ID] = row
+		}
+	}
 	byKey := map[[2]int]*biz.EngineeringMaterialRequestItem{}
 	for _, line := range lines {
 		if line.ProductID == 0 || line.SampleBomID == nil {
 			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行尚未关联工程产品和 BOM", line.LineNo))
 			continue
 		}
-		q := client.BOMHeader.Query().Where(bomheader.ID(*line.SampleBomID), bomheader.ProductID(line.ProductID)).WithItems(func(q *ent.BOMItemQuery) { q.Order(ent.Asc(bomitem.FieldID)) })
+		q := client.BOMHeader.Query().Where(bomheader.ID(*line.SampleBomID), bomheader.ProductID(line.ProductID)).WithItems(func(q *ent.BOMItemQuery) {
+			q.Order(ent.Asc(bomitem.FieldID)).WithUnit().WithMaterial(func(q *ent.MaterialQuery) {
+				q.WithSupplier()
+				if lock {
+					q.Where(func(s *sql.Selector) { applyBOMReferenceShareLock(s, r.data.sqlDialect) })
+				}
+			})
+		})
 		if lock {
 			q.Where(func(s *sql.Selector) { applyBOMReferenceShareLock(s, r.data.sqlDialect) })
 		}
@@ -88,11 +109,7 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 		if err != nil {
 			return nil, err
 		}
-		lockDialect := ""
-		if lock {
-			lockDialect = r.data.sqlDialect
-		}
-		fingerprint, err := salesOrderBOMFingerprint(ctx, client, header, lockDialect)
+		fingerprint, err := salesOrderBOMFingerprintFromParts(header, header.Edges.Items)
 		if err != nil {
 			return nil, err
 		}
@@ -109,24 +126,21 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 		if len(header.Edges.Items) == 0 {
 			result.Issues = append(result.Issues, fmt.Sprintf("第 %d 行 BOM 没有材料明细", line.LineNo))
 		}
-		productUnit, err := client.Unit.Get(ctx, line.UnitID)
-		if err != nil {
-			return nil, err
+		productUnit := units[line.UnitID]
+		if productUnit == nil {
+			return nil, biz.ErrUnitNotFound
 		}
 		productionQuantity := biz.SalesOrderProductionQuantity(line.OrderedQuantity, line.PreShipmentSampleQuantity)
 		for _, part := range header.Edges.Items {
-			mq := client.Material.Query().Where(material.ID(part.MaterialID)).WithSupplier().WithDefaultUnit()
-			if lock {
-				mq.Where(func(s *sql.Selector) { applyBOMReferenceShareLock(s, r.data.sqlDialect) })
-			}
-			m, err := mq.Only(ctx)
+			m, err := part.Edges.MaterialOrErr()
 			if err != nil {
 				return nil, err
 			}
-			u, err := client.Unit.Get(ctx, part.UnitID)
+			u, err := part.Edges.UnitOrErr()
 			if err != nil {
 				return nil, err
 			}
+			units[u.ID] = u
 			if !m.IsActive || !u.IsActive || m.DefaultUnitID != part.UnitID {
 				result.Issues = append(result.Issues, fmt.Sprintf("材料 %s 的状态或计量单位需要核对", m.Name))
 			}
@@ -156,9 +170,9 @@ func (r *salesOrderRepo) buildEngineeringMaterialPreview(ctx context.Context, cl
 		return nil, biz.ErrMaterialRequestNotReady
 	}
 	for _, item := range result.Items {
-		unit, err := client.Unit.Get(ctx, item.UnitID)
-		if err != nil {
-			return nil, err
+		unit := units[item.UnitID]
+		if unit == nil {
+			return nil, biz.ErrUnitNotFound
 		}
 		rounded, err := biz.RoundRequiredUnitQuantity(item.RequiredQuantity, unit.Precision)
 		if err != nil {

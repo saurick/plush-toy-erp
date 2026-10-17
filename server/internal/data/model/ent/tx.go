@@ -46,6 +46,12 @@ type Tx struct {
 	FinanceFact *FinanceFactClient
 	// FinancePayment is the client for interacting with the FinancePayment builders.
 	FinancePayment *FinancePaymentClient
+	// HelpFeedback is the client for interacting with the HelpFeedback builders.
+	HelpFeedback *HelpFeedbackClient
+	// HelpSupplement is the client for interacting with the HelpSupplement builders.
+	HelpSupplement *HelpSupplementClient
+	// HelpSupplementRevision is the client for interacting with the HelpSupplementRevision builders.
+	HelpSupplementRevision *HelpSupplementRevisionClient
 	// InventoryBalance is the client for interacting with the InventoryBalance builders.
 	InventoryBalance *InventoryBalanceClient
 	// InventoryLot is the client for interacting with the InventoryLot builders.
@@ -310,6 +316,9 @@ func (tx *Tx) init() {
 	tx.FinanceCreditNote = NewFinanceCreditNoteClient(tx.config)
 	tx.FinanceFact = NewFinanceFactClient(tx.config)
 	tx.FinancePayment = NewFinancePaymentClient(tx.config)
+	tx.HelpFeedback = NewHelpFeedbackClient(tx.config)
+	tx.HelpSupplement = NewHelpSupplementClient(tx.config)
+	tx.HelpSupplementRevision = NewHelpSupplementRevisionClient(tx.config)
 	tx.InventoryBalance = NewInventoryBalanceClient(tx.config)
 	tx.InventoryLot = NewInventoryLotClient(tx.config)
 	tx.InventoryLotStatusEvent = NewInventoryLotStatusEventClient(tx.config)

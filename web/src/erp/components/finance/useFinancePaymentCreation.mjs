@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Form } from 'antd'
+import useWorkflowTaskBusinessResult from '../../hooks/useWorkflowTaskBusinessResult.js'
 
 import {
   FinancePaymentKind,
@@ -31,7 +32,9 @@ export default function useFinancePaymentCreation({
   attemptsRef,
   rememberPayment,
   loadReferences,
+  sourceContext = null,
 }) {
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
   const [paymentOpen, setPaymentOpen] = useState(false)
 
   const [refundSource, setRefundSource] = useState(null)
@@ -72,6 +75,7 @@ export default function useFinancePaymentCreation({
       kind: FinancePaymentKind.SETTLEMENT,
       direction: 'RECEIPT',
       currency: 'CNY',
+      ...(sourceContext?.values || {}),
     })
     setPaymentOpen(true)
   }
@@ -137,6 +141,7 @@ export default function useFinancePaymentCreation({
       attemptsRef.current.settle(scope, attempt, null)
       rememberPayment(payment)
       setPaymentOpen(false)
+      reportBusinessResult('收付款记录已创建并提交审批，尚未确认实际收付', payment)
       await loadReferences()
       showProcessSubmissionReceipt({
         result: processData,

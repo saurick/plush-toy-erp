@@ -56,53 +56,51 @@ export default function MobileTaskFlowHeader({
       busy={busy}
       trailing={trailing}
     >
-      {currentStep !== 'detail' || canOpenReceipt ? (
-        <nav
-          className="mobile-task-flow-steps"
-          aria-label="任务处理步骤"
-          data-testid="mobile-task-flow-steps"
-        >
-          {MOBILE_TASK_FLOW_STEPS.map((step) => {
-            const current = step.key === currentStep
-            const available = stepAvailability[step.key]
-            const unavailableLabel =
-              step.key === 'process'
-                ? processUnavailableLabel
-                : step.key === 'result'
-                  ? receiptUnavailableLabel
-                  : ''
-            const accessibilityLabel = current
-              ? `${step.title}，当前步骤`
-              : available
-                ? step.title
-                : `${step.title}，${unavailableLabel}`
-            return (
-              <button
-                key={step.key}
-                type="button"
-                className="mobile-task-flow-step"
-                aria-current={current ? 'step' : undefined}
-                aria-label={accessibilityLabel}
-                data-state={
-                  current ? 'current' : available ? 'available' : 'locked'
-                }
-                data-step-key={step.key}
-                disabled={busy || current || !available}
-                onClick={stepActions[step.key] || undefined}
-              >
-                <span className="mobile-task-flow-step__number">
-                  {step.number}
+      <nav
+        className="mobile-task-flow-steps"
+        aria-label="任务处理步骤"
+        data-testid="mobile-task-flow-steps"
+      >
+        {MOBILE_TASK_FLOW_STEPS.map((step) => {
+          const current = step.key === currentStep
+          const available = stepAvailability[step.key]
+          const unavailableLabel =
+            step.key === 'process'
+              ? processUnavailableLabel
+              : step.key === 'result'
+                ? receiptUnavailableLabel
+                : ''
+          const accessibilityLabel = current
+            ? `${step.title}，当前步骤`
+            : available
+              ? step.title
+              : `${step.title}，${unavailableLabel}`
+          return (
+            <button
+              key={step.key}
+              type="button"
+              className="mobile-task-flow-step"
+              aria-current={current ? 'step' : undefined}
+              aria-label={accessibilityLabel}
+              data-state={
+                current ? 'current' : available ? 'available' : 'locked'
+              }
+              data-step-key={step.key}
+              disabled={busy || current || !available}
+              onClick={stepActions[step.key] || undefined}
+            >
+              <span className="mobile-task-flow-step__number">
+                {step.number}
+              </span>
+              <span className="mobile-task-flow-step__copy">
+                <span className="mobile-task-flow-step__title">
+                  {step.title}
                 </span>
-                <span className="mobile-task-flow-step__copy">
-                  <span className="mobile-task-flow-step__title">
-                    {step.title}
-                  </span>
-                </span>
-              </button>
-            )
-          })}
-        </nav>
-      ) : null}
+              </span>
+            </button>
+          )
+        })}
+      </nav>
     </MobileDetailHeader>
   )
 }

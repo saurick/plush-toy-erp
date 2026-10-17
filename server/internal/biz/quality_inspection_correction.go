@@ -15,7 +15,7 @@ type QualityInspectionCorrectionRepo interface {
 	CreateQualityInspectionCorrection(ctx context.Context, in *QualityInspectionCorrectionCreate, actorID int) (*QualityInspection, error)
 }
 
-func (uc *InventoryUsecase) CorrectQualityInspectionResult(ctx context.Context, in *QualityInspectionCorrectionCreate, actorID int) (*QualityInspection, error) {
+func (uc *QualityInspectionUsecase) CorrectQualityInspectionResult(ctx context.Context, in *QualityInspectionCorrectionCreate, actorID int) (*QualityInspection, error) {
 	if uc == nil || uc.repo == nil || in == nil || in.InspectionID <= 0 || actorID <= 0 {
 		return nil, ErrBadParam
 	}

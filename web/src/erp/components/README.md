@@ -10,11 +10,14 @@
 
 | 分组             | 典型路径                                                                       | 职责                                                           |
 | ---------------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| 页面壳和通用展示 | `ERPLayout.jsx`、`CommandCenterNav.jsx`、`PageHero.jsx`、`StatusPill.jsx`      | 布局、导航、页头和状态展示                                     |
+| 页面壳和通用展示 | `ERPLayout.jsx`、`business-list/*` | 布局、列表页头、导航和状态展示 |
 | 账号身份 | `AccountIdentity.jsx`、`accountIdentity.css` | 桌面账号入口和手机“我的”共用的默认文字头像、姓名、账号及实际所属岗位；头像颜色按账号固定，完整岗位在账号卡片换行展示 |
 | 业务列表共享层   | `business-list/*`                                                              | 列表壳、表单弹窗、附件、明细行、列顺序、协同任务面板和来源选择 |
 | 主数据和源单据   | `master-data/*`、`sales-orders/*`、`purchase-orders/*`、`outsourcing-orders/*` | 领域列配置、表单、业务动作面板和来源生成入口                   |
 | 事实和质量       | `operational-facts/*`、`quality-inspections/*`、`shipments/*`                  | Operational Fact、质检、出货相关展示和表单入口                 |
+| 库存台账 | `inventory/inventoryLedgerPresentation.jsx`、`useInventoryReferences.js` | 列配置和只读显示规则、按有效权限读取参考资料；页面管理筛选、选择和业务动作 |
+| 质检参考资料 | `quality-inspections/useQualityInspectionReferences.js` | 按有效权限读取来源选项，统一处理取消、失效响应、失败清空和重试 |
+| 工作台与任务看板视图 | `workflow/WorkflowDashboardViews.jsx` | 只读任务呈现和导航；请求与身份范围缓存由 `../hooks/useWorkflowDashboardData.js` 管理 |
 | 收付款与核销 | `finance/useFinancePayment*`、`useFinanceCreditActions.mjs`、`Finance*Editor.jsx` | 列表读取和恢复、付款创建、核销、冲销、红冲及导出各自管理状态与请求；表单只消费所属 hook 的 form 实例与动作，共享页面级提交状态和防重尝试记录 |
 | 工程资料和打印   | `bom/*`、`print/*`                                                             | BOM 头 / 明细、打印模板工作台和纸面预览                        |
 | Workflow 展示与动作 | `workflow/*` | 任务动作抽屉、提交前解释合同消费；`WorkflowTaskCurrentSummary.jsx` 供电脑和手机共用当前责任、原因与时间摘要，当前责任优先呈现，前序步骤及记录默认展开并保留手动收起；`WorkflowTaskCalendar.jsx` 供两端共用待办月历、日期列表和跨月逾期 / 无截止入口，读取服务端完整统计并复用现有办理入口 |
@@ -23,6 +26,7 @@
 ## 边界
 
 - 共享组件改动默认按影响面评估：触达 `business-list/*`、`ERPLayout.jsx`、打印壳或通用状态展示时，至少检查受影响页面和 `style:l1` 场景。
+- 业务导航共用 `../hooks/useBusinessNavigate.js` 与 `business-list/BusinessLink.jsx`；链接和对象式路径在手机中保留当前岗位、查询、锚点及返回原任务的上下文，桌面路径沿用桌面壳。
 - 菜单主列表的整页编辑复用 `business-list/BusinessFormPage.jsx`，统一管理保存、离开保护及桌面可选全屏；容器与恢复合同见[桌面业务编辑](../../../../docs/engineering/前端实现与交互约定.md#桌面业务编辑与弹窗约定)。
 - 桌面账号同步首次失败时不挂载业务页；已验证页面遇到临时断连时，由 `SessionRecoveryDialog` 保留本页内存中的编辑内容并隔离交互，JSON-RPC 暂停新的认证业务请求，不排队或重放写操作。恢复必须重新读取账号和有效业务配置；访问范围变化时重建业务页，登录失效或账号切换时清除旧页面。刷新、关闭或离开页面不属于内存保留范围；真实授权始终由后端校验。
 - 业务列表、弹窗明细与研发工作台的 Ant Design 表格共用 [`AppTable`](../../common/components/table/AppTable.jsx)；列对齐和序号规则见[表格对齐](../../../../docs/engineering/前端实现与交互约定.md#表格对齐--table-alignment)。
@@ -58,7 +62,7 @@ STYLE_L1_SCENARIOS=business-core-pages-desktop pnpm --dir web style:l1
 
 ## 页面职责拆分
 
-- `help/HelpScenarioContent` 生成岗位帮助的办理概览与说明切换，并直接显示完成标准、交接和常见问题；`HelpScenarioIllustration` 只展示标明的操作样例。`HelpHandbookChapter` 同源渲染通用与业务章节，`HelpReferenceContent` 保留完整词条深链；首页推荐、账号阅读范围、办理入口权限、地址恢复与离线下载由 `HelpCenterPage` 管理。三册手册入口见[项目手册](../../../../docs/manuals/README.md)。
+- `help/HelpScenarioContent` 生成岗位帮助的办理概览与说明切换，并直接显示完成标准、交接和常见问题；`HelpScenarioIllustration` 只展示标明的操作样例。`HelpHandbookChapter` 同源渲染通用与业务章节，使用统一正文卡片与按需展开的章内导航，详细办理内容来自 `businessHandbookOperations.mjs`；`HelpReferenceContent` 保留完整词条深链；首页推荐、账号阅读范围、办理入口权限、地址恢复与离线下载由 `HelpCenterPage` 管理。`HelpManualDirectory` 提供三册统一章节目录，`HelpProjectManualContent` 安全渲染受控的管理与运维 Markdown。三册手册入口见[项目手册](../../../../docs/manuals/README.md)。
 - `permission-center/` 的 `usePermissionCenterData` 负责账号与岗位加载，`usePermissionRoleSettings` 负责岗位草稿和权限预览，`PermissionAdminAccounts` 自持账号表单与弹窗；页面只协调页签与未保存提醒。
 - `workflow/useSourceOrderWorkflowActions.mjs` 统一采购和委外源单的 Workflow 动作；页面提供场景标识。
 - `outsourcing-orders/` 的 `useOutsourcingOrder*` 按查询、编辑、协同任务和生命周期动作管理状态；`useOutsourcingSourceFacts` 管理委外来源事实与回货质检，应付操作由专用 Hook 管理。
@@ -66,3 +70,5 @@ STYLE_L1_SCENARIOS=business-core-pages-desktop pnpm --dir web style:l1
 - `production-orders/useProductionFactActions.mjs` 与 `finance/useFinanceReconciliationAction.mjs` 管理事实工作台对应操作的表单状态、请求失效和重试。
 - 工程打印的基础编辑组件及三类纸面位于 `print/`；页面保留窗口草稿和工具栏编排，业务数据仍只读。
 - `purchase-orders/usePurchaseOrderContractPrint` 统一采购列表与工程用料汇总表的合同读取及打开流程，按同一供应商和一致合同条件归并，逐行保留来源单号。`print/MaterialPurchaseContractBatchWorkbench` 保留完整来源、选择与可编辑的窗口草稿，每次最多输出 20 份合同；条件不同的合同在清单说明原因，缺值在窗口内补齐，逐份独立起页，不回写采购业务数据。
+
+- 任务详情的两端信息布局共用 `workflow/WorkflowTaskInfoCard.jsx`，复用身份、责任、时间、附件与复制真源；三步引导从首屏可见，业务页与返回保持当前移动端岗位。

@@ -99,6 +99,8 @@ test("dev workbench boundary: source and styles live outside product directories
     "web/src/dev-workbench/pages/DevQualityGatesPage.jsx",
     "web/src/dev-workbench/pages/DevDrillRecoveryPage.jsx",
     "web/src/dev-workbench/pages/DevPermissionRelationshipsPage.jsx",
+    "web/src/dev-workbench/pages/DevIntegrationPage.jsx",
+    "web/src/dev-workbench/components/DevProjectGraphView.jsx",
     "web/src/dev-workbench/components/DevPageNav.jsx",
     "web/src/dev-workbench/config/devDataPreparation.mjs",
     "web/src/dev-workbench/config/devDatabaseMigration.mjs",
@@ -218,7 +220,12 @@ test("dev workbench boundary: primary navigation is fixed to four areas", () => 
       { key: "delivery", route: "/__dev/delivery" },
     ],
   );
-  assert.equal(DEV_SECONDARY_NAV_ITEMS.length, 15);
+  assert(
+    DEV_SECONDARY_NAV_ITEMS.some(
+      (item) => item.route === "/__dev/integration" && item.areaKey === "product-engineering",
+    ),
+    "接口与集成归入既有产品工程区域",
+  );
   assert(
     DEV_SECONDARY_NAV_ITEMS.every(
       (item) =>
@@ -258,6 +265,10 @@ const allowedERPImportsByFile = new Map([
     new Set(["utils/workflowFulfillment.mjs"]),
   ],
   [
+    "web/src/dev-workbench/components/flow-state/FulfillmentChainCanvas.jsx",
+    new Set(["utils/workflowFulfillment.mjs"]),
+  ],
+  [
     "web/src/dev-workbench/components/flow-state/BusinessChainTopics.jsx",
     new Set(["utils/workflowFulfillment.mjs"]),
   ],
@@ -271,6 +282,10 @@ const allowedERPImportsByFile = new Map([
   ],
   [
     "web/src/dev-workbench/config/devFulfillmentPresentation.mjs",
+    new Set(["utils/workflowFulfillment.mjs"]),
+  ],
+  [
+    "web/src/dev-workbench/config/devFulfillmentExceptionGraph.mjs",
     new Set(["utils/workflowFulfillment.mjs"]),
   ],
   [
@@ -298,7 +313,7 @@ const allowedERPImportsByFile = new Map([
     new Set(["config/helpScenarios.mjs", "config/helpManualCatalog.mjs", "config/businessHandbook.mjs"]),
   ],
   [
-    "web/src/dev-workbench/pages/DevCustomerConfigPage.jsx",
+    "web/src/dev-workbench/pages/customer-config/AssetsPanel.jsx",
     new Set(["config/businessModules.mjs", "config/seedData.mjs"]),
   ],
   [

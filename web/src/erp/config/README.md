@@ -14,7 +14,7 @@
 | 客户配置投影   | `customerMenuConfig.mjs`、`devCustomerConfig.mjs`、`devCustomerConfigRoute.mjs`                                                     | 消费静态客户外观 / 菜单候选和 dev-only 客户配置预检入口 |
 | dev-only 导航  | `devHub.mjs`、`devRoutes.mjs`、`devDocs.mjs`、`devTesting.mjs`、`devDataPreparation.mjs`、`devUIDesign.mjs` | `/__dev/*` 本地治理、文档、测试数据准备和原型入口 |
 | 展示配置       | `commandCenter.mjs`、`dashboardModules.mjs`、`workflowStatus.mjs`、`printTemplates.mjs`                                             | 工作台、看板、Workflow 状态、打印模板说明与字段预检展示       |
-| 岗位与页内帮助 | `roleHelpContent.mjs`、`helpScenarios.mjs`、`businessUsabilityCatalog.mjs` | 岗位说明、独立办事场景和共享操作文字；流程节点只表示教学顺序 |
+| 岗位与页内帮助 | `roleHelpContent.mjs`、`helpScenarios.mjs`、`businessUsabilityCatalog.mjs`、`businessHandbook.mjs`、`projectManuals.mjs` | 岗位说明、独立办事场景和共享操作文字；流程节点只表示教学顺序 |
 
 ## 边界
 

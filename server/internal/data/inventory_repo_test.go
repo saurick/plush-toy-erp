@@ -75,14 +75,14 @@ func TestInventoryMasterDataCodeUnique(t *testing.T) {
 	}
 }
 
-func openInventoryRepoTestData(t *testing.T, name string) (*Data, *ent.Client) {
+func openInventoryRepoTestData(t *testing.T, name string, options ...ent.Option) (*Data, *ent.Client) {
 	t.Helper()
 	db, err := stdsql.Open("sqlite3", "file:"+name+"?mode=memory&cache=shared&_fk=1&_busy_timeout=5000")
 	if err != nil {
 		t.Fatalf("open sqlite db failed: %v", err)
 	}
 	db.SetMaxOpenConns(1)
-	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.SQLite, db)))
+	client := ent.NewClient(append([]ent.Option{ent.Driver(entsql.OpenDB(dialect.SQLite, db))}, options...)...)
 	if err := client.Schema.Create(context.Background()); err != nil {
 		_ = client.Close()
 		_ = db.Close()
@@ -213,43 +213,6 @@ func TestInventoryUsecase_IdempotencyDistinguishesExplicitOccurredAt(t *testing.
 		t.Fatalf("explicit then omitted replay error = %v, want ErrIdempotencyConflict", err)
 	}
 
-	historicalAt := time.Date(2026, 6, 1, 8, 0, 0, 0, time.UTC)
-	historicalRow, err := client.InventoryTxn.Create().
-		SetSubjectType(biz.InventorySubjectProduct).
-		SetSubjectID(fixtures.productID).
-		SetWarehouseID(fixtures.productWarehouseID).
-		SetTxnType(biz.InventoryTxnIn).
-		SetDirection(1).
-		SetQuantity(decimal.NewFromInt(1)).
-		SetUnitID(fixtures.unitID).
-		SetSourceType("IDEMPOTENCY_TIME_HISTORY").
-		SetIdempotencyKey("inventory-time-history").
-		SetOccurredAt(historicalAt).
-		Save(ctx)
-	if err != nil {
-		t.Fatalf("create historical inventory txn without marker: %v", err)
-	}
-	if historicalRow.OccurredAtSpecified {
-		t.Fatal("historical row must default occurred_at_specified=false")
-	}
-	historicalReplay, err := uc.CreateInventoryTxn(ctx, &biz.InventoryTxnCreate{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-		WarehouseID: fixtures.productWarehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
-		Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
-		SourceType: "IDEMPOTENCY_TIME_HISTORY", IdempotencyKey: "inventory-time-history",
-	})
-	if err != nil || historicalReplay.ID != historicalRow.ID {
-		t.Fatalf("omitted-time historical replay = %#v, want id %d, err=%v", historicalReplay, historicalRow.ID, err)
-	}
-	if _, err := uc.CreateInventoryTxn(ctx, &biz.InventoryTxnCreate{
-		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID,
-		WarehouseID: fixtures.productWarehouseID, TxnType: biz.InventoryTxnIn, Direction: 1,
-		Quantity: decimal.NewFromInt(1), UnitID: fixtures.unitID,
-		SourceType: "IDEMPOTENCY_TIME_HISTORY", IdempotencyKey: "inventory-time-history",
-		OccurredAt: historicalAt,
-	}); !errors.Is(err, biz.ErrIdempotencyConflict) {
-		t.Fatalf("explicit input must not impersonate historical omitted marker, err=%v", err)
-	}
 }
 
 func TestInventoryRepo_ProductOutboundProtectsActiveReservations(t *testing.T) {
@@ -471,7 +434,7 @@ func TestInventoryUsecase_DirectWritePrimitiveAllowsHistoricalInactiveReferences
 		t.Fatalf("inventory txn source primitive should not active-guard historical references: %v", err)
 	}
 	reversalOf := applied.Txn.ID
-	if _, err := uc.CreateInventoryTxn(ctx, &biz.InventoryTxnCreate{
+	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
 		SubjectType:     biz.InventorySubjectMaterial,
 		SubjectID:       fixtures.materialID,
 		WarehouseID:     fixtures.warehouseID,

@@ -21,7 +21,8 @@ import (
 
 // jsonrpcDispatcher 负责 JSON-RPC URL/method 分发、鉴权和错误映射；真实业务动作仍由 biz usecase 承接。
 type jsonrpcDispatcher struct {
-	log *log.Helper
+	log           *log.Helper
+	helpContentUC *biz.HelpContentUsecase
 
 	adminAuthUC            *biz.AdminAuthUsecase
 	adminManageUC          *biz.AdminManageUsecase
@@ -119,10 +120,10 @@ func newJSONRPCDispatcher(
 	if err := biz.RegisterPurchaseOrderProcessDomainCommandHandlers(processRuntimeUC, purchaseOrderUC); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register purchase order process command handlers: %v", err))
 	}
-	if err := biz.RegisterPurchaseReceiptProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
+	if err := biz.RegisterPurchaseReceiptProcessDomainCommandHandlers(processRuntimeUC, inventoryUC.PurchaseReceiptUsecase); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register purchase receipt process command handlers: %v", err))
 	}
-	if err := biz.RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
+	if err := biz.RegisterQualityInspectionProcessDomainCommandHandlers(processRuntimeUC, inventoryUC.QualityInspectionUsecase); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register quality inspection process command handlers: %v", err))
 	}
 	if err := biz.RegisterInventoryProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {

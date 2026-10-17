@@ -6,11 +6,8 @@ import React, {
   useRef,
   useState,
 } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { Alert, Button, Empty, Spin } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
-import { canOpenRelatedDocumentPath } from '../../utils/relatedDocumentNavigation.mjs'
-import { resolveMenuPermissionKey } from '../../config/menuPermissions.mjs'
 import SlidingTabList from '@/common/components/navigation/SlidingTabList'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -27,6 +24,7 @@ import { ProgressIdentity, ProgressDue, ProgressDelivery, ProgressAttention } fr
 import {
   progressQueryFromURL,
   PROGRESS_SCOPE_OPTIONS,
+  PROGRESS_DUE_OPTIONS,
   progressFilterCount,
   PROGRESS_FILTER_RESET,
   withProgressFilters,
@@ -41,7 +39,6 @@ import {
 import MobileTaskPullRefresh from './MobileTaskPullRefresh'
 import MobileScrollEdge from './MobileScrollEdge.jsx'
 import MobileFilterPopover from './MobileFilterPopover'
-import MobileAppliedFilters from './MobileAppliedFilters.jsx'
 import MobileSearchInput from '@/common/components/navigation/MobileSearchInput'
 import MobileBackToTop from '@/common/components/scroll/MobileBackToTop'
 import { usePageLoadFeedback } from '../../components/PageLoadFeedback.jsx'
@@ -66,9 +63,7 @@ export default function MobileProgressPanel({
   roleKey,
   adminProfile,
   onOpenTask,
-  canEnterDesktop,
 }) {
-  const navigate = useNavigate()
   const initial = useRef(
     readMobileProgressState(
       window.history.state,
@@ -90,6 +85,7 @@ export default function MobileProgressPanel({
   const [loadMoreError, setLoadMoreError] = useState('')
   const [endReached, setEndReached] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
+  const filterTriggerRef = useRef(null)
   const scrollRef = useRef(null)
   const loadMoreRef = useRef(null)
   const loadMorePending = useRef(false)
@@ -363,6 +359,14 @@ export default function MobileProgressPanel({
       : []),
   ]
   const filterCount = progressFilterCount(query)
+  const filterSummary = [
+    query.scope !== 'active' && `记录范围：${PROGRESS_SCOPE_OPTIONS.find(({ value }) => value === query.scope)?.label}`,
+    query.due_status !== 'all' && `交期：${PROGRESS_DUE_OPTIONS.find(({ value }) => value === query.due_status)?.label}`,
+    query.blocked_only && '任务受阻',
+    query.unlinked_only && '仅看未关联销售',
+    query.owner && `负责人：${query.owner}`,
+    (query.date_from || query.date_to) && '自定义交期',
+  ].filter(Boolean)
   const filtered = values.q || filterCount > 0
   const filterCounts = loading ? undefined : counts
   return (
@@ -390,7 +394,8 @@ export default function MobileProgressPanel({
           <div className="mobile-progress-search">
             <MobileSearchInput
               aria-label="搜索进度"
-              placeholder="单号、名称或负责人"
+              placeholder="单号/名称"
+              title="搜索单号、名称或负责人"
               value={keyword}
               maxLength={100}
               onCompositionStart={() => {
@@ -435,6 +440,8 @@ export default function MobileProgressPanel({
               open={filtersOpen && active}
               onOpenChange={setFiltersOpen}
               count={filterCount}
+              summary={filterSummary}
+              triggerRef={filterTriggerRef}
               onReset={() => update(PROGRESS_FILTER_RESET)}
             >
               <BusinessProgressFilterFields
@@ -465,35 +472,6 @@ export default function MobileProgressPanel({
               onChange={update}
             />
           </div>
-          <MobileAppliedFilters
-            label="当前进度筛选"
-            items={[
-              query.scope !== 'active' && {
-                key: 'scope',
-                label: `记录范围：${PROGRESS_SCOPE_OPTIONS.find(({ value }) => value === query.scope)?.label}`,
-              },
-              query.due_status === 'undated' && {
-                key: 'due_status',
-                label: '未定交期',
-              },
-              query.unlinked_only && {
-                key: 'unlinked_only',
-                label: '仅看未关联销售',
-              },
-            ]}
-            onClear={(key) =>
-              update({
-                [key]:
-                  key === 'scope'
-                    ? 'active'
-                    : key === 'due_status'
-                      ? 'all'
-                      : key === 'unlinked_only'
-                        ? false
-                        : '',
-              })
-            }
-          />
           <MobileScrollEdge scrollContainerRef={scrollRef} enabled={active && !selection} />
         </div>
         <MobileTaskPullRefresh
@@ -626,22 +604,6 @@ export default function MobileProgressPanel({
         selection={active ? selection : null}
         adminProfile={adminProfile}
         onClose={close}
-        canOpen={(path) =>
-          canEnterDesktop &&
-          canOpenRelatedDocumentPath({
-            path,
-            adminProfile,
-            allowedMenuPaths: (adminProfile?.menus || []).map((menu) =>
-              resolveMenuPermissionKey(
-                typeof menu === 'string' ? menu : menu.path
-              )
-            ),
-          })
-        }
-        onNavigate={(path) => {
-          remember()
-          navigate(path)
-        }}
         onOpenProduction={(record) =>
           open({ id: record.id, view: 'production', order_no: record.number })
         }

@@ -15,9 +15,11 @@ import {
 import {
   Alert,
   Button,
+  Descriptions,
   Dropdown,
   Form,
   Popconfirm,
+  Select,
   Space,
   Tag,
   Typography,
@@ -26,49 +28,28 @@ import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { PurchaseReceiptStatus, PurchaseReturnStatus, QualityInspectionStatus } from '../../common/consts/statuses.generated.mjs'
 import { showPageLoadError } from '../components/PageLoadFeedback.jsx'
 import BusinessTaskActions from '../components/workflow/BusinessTaskActions.jsx'
+import useWorkflowTaskBusinessResult from '../hooks/useWorkflowTaskBusinessResult.js'
 import useBusinessNavigate from '../hooks/useBusinessNavigate.js'
 import { PermissionCode } from '../../common/consts/permissions.generated.mjs'
 import { resolveBusinessStatusCounts } from '../utils/businessStatusCounts.mjs'
 import BusinessStatusFilter from '../components/business-list/BusinessStatusFilter.jsx'
 import { IncomingCheckItemsDetails } from '../components/quality-inspections/IncomingCheckItems.jsx'
-import {
-  initialIncomingChecks,
-  validateIncomingChecks,
-} from '../utils/incomingAcceptance.mjs'
 import { BUSINESS_SEARCH_SCOPES } from '../utils/businessSearchScopes.mjs'
 import ProductIdentity from '../components/master-data/ProductIdentity.jsx'
+import useQualityInspectionReferences from '../components/quality-inspections/useQualityInspectionReferences.js'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
-  cancelQualityInspection,
-  createQualityInspectionDraft,
   getQualityInspection,
-  listAllFinishedGoodsQualityInspections,
-  listAllOutsourcingReturnQualityInspections,
-  listAllProductionStageQualityInspections,
-  listAllQualityInspections,
-  listFinishedGoodsQualityInspections,
-  listOutsourcingReturnQualityInspections,
-  listProductionStageQualityInspections,
-  listQualityInspections,
-  passQualityInspection,
-  rejectQualityInspection,
   submitQualityInspection,
 } from '../api/qualityApi.mjs'
 import {
   createPurchaseReturnFromQualityInspection,
   getPurchaseReceipt,
-  listAllPurchaseReceipts,
   listAllPurchaseReturns,
 } from '../api/purchaseApi.mjs'
-import { listAllInventoryLots } from '../api/inventoryApi.mjs'
-import {
-  listAllMaterials,
-  listAllProducts,
-  listAllWarehouses,
-} from '../api/masterDataOrderApi.mjs'
 import {
   BusinessActionTooltip,
   BusinessDataTable,
@@ -83,6 +64,7 @@ import {
   ToolbarButton,
 } from '../components/business-list/BusinessListLayout.jsx'
 import { useBusinessColumnOrder } from '../components/business-list/BusinessListToolbarActions.jsx'
+import BusinessModal from '../components/business-list/BusinessModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessFormPage from '../components/business-list/BusinessFormPage.jsx'
 import BusinessDetailsModal from '../components/business-list/BusinessDetailsModal.jsx'
@@ -94,8 +76,6 @@ import ProductionExceptionRequestModal from '../components/quality-inspections/P
 import {
   QualityInspectionCreateForm,
   QualityInspectionDecisionForm,
-  buildDecisionParams,
-  buildInspectionParams,
   positiveInt,
 } from '../components/quality-inspections/QualityInspectionForms.jsx'
 import {
@@ -114,7 +94,6 @@ import { formatQuantity } from '../utils/businessLineItems.mjs'
 import { resolveContextualBusinessActionAvailability } from '../utils/businessActionAvailability.mjs'
 import { resolveRelatedRecordActionAvailability } from '../utils/operationalActionAvailability.mjs'
 import {
-  buildSequentialDraftCode,
   hasActionPermission,
   statusText,
   BUSINESS_ROUTE_PATHS,
@@ -123,7 +102,6 @@ import { compactParams, trimOptional } from '../utils/sourceDocumentValues.mjs'
 import { currentBusinessDate } from '../utils/businessDate.mjs'
 import {
   createBusinessTablePagination,
-  getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
   resolveExactRecordPage,
 } from '../utils/businessPagination.mjs'
@@ -146,7 +124,6 @@ import {
   canOpenRelatedDocumentPath,
   clearLinkedDocumentParams,
   linkedDocumentContext,
-  linkedDocumentRequestKeyword,
   relatedDocumentRoute,
 } from '../utils/relatedDocumentNavigation.mjs'
 import {
@@ -155,10 +132,12 @@ import {
   canCreatePurchaseRejectionDispositionFromInspection,
   isQualityInspectionRouteSourceCompatible,
   isRejectedIncomingInspection,
-  qualityInspectionRouteSourceParams,
 } from '../utils/qualityInspectionSourceAction.mjs'
 import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
 import useBusinessListExport from '../hooks/useBusinessListExport.js'
+import { loadQualityInspectionList as queryQualityInspections, loadQualityInspectionExport } from '../components/quality-inspections/qualityInspectionQueries.mjs'
+import useQualityInspectionEditor from '../components/quality-inspections/useQualityInspectionEditor.js'
+import useQualityInspectionActions from '../components/quality-inspections/useQualityInspectionActions.js'
 
 const EMPTY_ADMIN_PROFILE = Object.freeze({})
 const PURCHASE_RECEIPT_STATUS_LABELS = Object.freeze({
@@ -269,6 +248,10 @@ function buildDecisionSourceSummary({
 
 export default function QualityInspectionsPage() {
   const outletContext = useOutletContext()
+  const reportBusinessResult = useWorkflowTaskBusinessResult()
+  const taskHandling = outletContext?.workflowTaskNavigation?.productionHandling
+  const taskEntryRef = useRef(0)
+  const [qualityTaskFocusOpen, setQualityTaskFocusOpen] = useState(false)
   const navigate = useBusinessNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
@@ -291,9 +274,7 @@ export default function QualityInspectionsPage() {
   const [lotFilter, setLotFilter] = useState('')
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
-  const [inspectionModal, setInspectionModal] = useState(null)
   const [detailInspection, setDetailInspection] = useState(null)
   const [purchaseReturnModal, setPurchaseReturnModal] = useState(null)
   const [rejectionDispositionOpen, setRejectionDispositionOpen] =
@@ -311,15 +292,21 @@ export default function QualityInspectionsPage() {
   const [returnedInspectionIDs, setReturnedInspectionIDs] = useState(
     () => new Set()
   )
-  const [purchaseReceipts, setPurchaseReceipts] = useState([])
-  const [inventoryLots, setInventoryLots] = useState([])
-  const [materials, setMaterials] = useState([])
-  const [products, setProducts] = useState([])
-  const [warehouses, setWarehouses] = useState([])
-  const [referenceDataState, setReferenceDataState] = useState('loading')
-  const [inspectionForm] = Form.useForm()
-  const [decisionForm] = Form.useForm()
-  const inspectionAttachmentRef = useRef(null)
+  const {
+    purchaseReceipts,
+    inventoryLots,
+    materials,
+    products,
+    warehouses,
+    referenceDataState,
+    loadReferenceOptions,
+  } = useQualityInspectionReferences({ adminProfile })
+
+  const inspectionEditor = useQualityInspectionEditor({ rows, referenceDataState })
+  const {
+    saving, inspectionModal, inspectionForm, decisionForm, inspectionAttachmentRef,
+    openCreate, openDecision, closeModal, handleReceiptChange,
+  } = inspectionEditor
   const purchaseReturnInFlightRef = useRef(false)
   const purchaseReturnAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
@@ -477,6 +464,7 @@ export default function QualityInspectionsPage() {
     record: selectedRow,
     itemCount: relatedMenuItems.length,
   })
+
   const purchaseReceiptOptions = useMemo(
     () => uniqueReferenceOptions(purchaseReceipts, purchaseReceiptOption),
     [purchaseReceipts]
@@ -576,13 +564,10 @@ export default function QualityInspectionsPage() {
       (selectedDispositionSourceSupported &&
         selectedDispositionAuthorized &&
         !selectedDispositionCompleted))
-  const selectedPurchaseReceiptStatus = String(
-    selectedRowPurchaseReceipt?.status || ''
-  ).toUpperCase()
   const selectedDispositionKind = selectedIsIncomingInspection
-    ? selectedPurchaseReceiptStatus === PurchaseReceiptStatus.DRAFT
+    ? selectedRowCanCreateRejectionDisposition
       ? 'incoming-rejection'
-      : selectedPurchaseReceiptStatus === PurchaseReceiptStatus.POSTED
+      : selectedRowCanCreatePurchaseReturn
         ? 'incoming-return'
         : ''
     : selectedIsOutsourcingInspection
@@ -738,87 +723,13 @@ export default function QualityInspectionsPage() {
     }
   }
 
-  const loadQualityInspectionList = useCallback(
-    ({ signal, all = false }) => {
-      const baseParams = compactParams({
-        include_status_counts: all ? undefined : true,
-        status: statusFilter,
-        result: resultFilter,
-        keyword: trimOptional(
-          linkedDocumentRequestKeyword({
-            localKeyword: keyword,
-            linkedKeyword,
-            hasExactContext: Boolean(
-              routeQualityInspectionID ||
-              routePurchaseOrderID ||
-              routePurchaseReceiptID ||
-              (routeSourceType && routeSourceID)
-            ),
-          })
-        ),
-        date_from: dateFilterStart || undefined,
-        date_to: dateFilterEnd || undefined,
-        ...(all ? {} : getBusinessPaginationParams(pagination)),
-      })
-      const inventoryFilterParams = compactParams({
-        ...baseParams,
-        warehouse_id: warehouseFilter || undefined,
-        inventory_lot_id: lotFilter || undefined,
-      })
-      const routeSourceParams = qualityInspectionRouteSourceParams({
-        inspectionType: inspectionTypeFilter,
-        sourceType: routeSourceType,
-        sourceID: routeSourceID,
-      })
-      const inventorySourceParams = compactParams({
-        ...inventoryFilterParams,
-        source_type: routeSourceParams.source_type,
-        source_id: routeSourceParams.source_id,
-      })
-      if (inspectionTypeFilter === 'OUTSOURCING_RETURN') {
-        const list = all
-          ? listAllOutsourcingReturnQualityInspections
-          : listOutsourcingReturnQualityInspections
-        return list(
-          {
-            ...inventoryFilterParams,
-            customer_key: activeCustomerKey || undefined,
-            fact_id: routeSourceParams.fact_id,
-          },
-          { signal }
-        )
-      }
-      if (
-        inspectionTypeFilter === 'FINISHED_GOODS' ||
-        routeSourceType === 'SHIPMENT'
-      ) {
-        const list = all
-          ? listAllFinishedGoodsQualityInspections
-          : listFinishedGoodsQualityInspections
-        return list(inventorySourceParams, { signal })
-      }
-      let request
-      if (inspectionTypeFilter === 'PRODUCTION_STAGE') {
-        request = all
-          ? listAllProductionStageQualityInspections(baseParams, { signal })
-          : listProductionStageQualityInspections(baseParams, { signal })
-      } else {
-        const list = all ? listAllQualityInspections : listQualityInspections
-        request = list(
-          compactParams({
-            ...inventorySourceParams,
-            inspection_type: inspectionTypeFilter || undefined,
-            date_field: dateFilterField,
-            purchase_receipt_id:
-              purchaseReceiptFilter || routePurchaseReceiptID || undefined,
-            purchase_order_id: routePurchaseOrderID || undefined,
-            material_id: materialFilter || undefined,
-          }),
-          { signal }
-        )
-      }
-      return request
-    },
+  const qualityQuery = useMemo(
+    () => ({
+      filters: { dateFilterEnd, dateFilterField, dateFilterStart, inspectionTypeFilter, keyword, lotFilter, materialFilter, purchaseReceiptFilter, resultFilter, statusFilter, warehouseFilter },
+      context: { linkedKeyword, routePurchaseOrderID, routePurchaseReceiptID, routeQualityInspectionID, routeSourceID, routeSourceType },
+      pagination,
+      customerKey: activeCustomerKey,
+    }),
     [
       activeCustomerKey,
       dateFilterEnd,
@@ -840,6 +751,10 @@ export default function QualityInspectionsPage() {
       statusFilter,
       warehouseFilter,
     ]
+  )
+  const loadQualityInspectionList = useCallback(
+    (options) => queryQualityInspections({ ...qualityQuery, ...options }),
+    [qualityQuery]
   )
 
   const loadRows = useCallback(async () => {
@@ -914,75 +829,6 @@ export default function QualityInspectionsPage() {
     loadRows()
   }, [loadRows])
 
-  const loadReferenceOptions = useCallback(async () => {
-    const request = beginLatestRequest('reference-options')
-    setReferenceDataState('loading')
-    try {
-      const [
-        receiptResult,
-        lotResult,
-        materialResult,
-        productResult,
-        warehouseResult,
-      ] = await Promise.all([
-        canReadPurchaseReceipt
-          ? listAllPurchaseReceipts({}, { signal: request.signal })
-          : Promise.resolve({}),
-        canReadInventory
-          ? listAllInventoryLots({}, { signal: request.signal })
-          : Promise.resolve({}),
-        hasActionPermission(adminProfile, PermissionCode.MATERIAL_READ)
-          ? listAllMaterials({ active_only: true }, { signal: request.signal })
-          : Promise.resolve({}),
-        hasActionPermission(adminProfile, PermissionCode.PRODUCT_READ)
-          ? listAllProducts({ active_only: true }, { signal: request.signal })
-          : Promise.resolve({}),
-        canReadInventory
-          ? listAllWarehouses({ active_only: true }, { signal: request.signal })
-          : Promise.resolve({}),
-      ])
-      if (!request.isCurrent()) return false
-      setPurchaseReceipts(
-        Array.isArray(receiptResult?.purchase_receipts)
-          ? receiptResult.purchase_receipts
-          : []
-      )
-      setInventoryLots(
-        Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
-      )
-      setMaterials(
-        Array.isArray(materialResult?.materials) ? materialResult.materials : []
-      )
-      setProducts(
-        Array.isArray(productResult?.products) ? productResult.products : []
-      )
-      setWarehouses(
-        Array.isArray(warehouseResult?.warehouses)
-          ? warehouseResult.warehouses
-          : []
-      )
-      setReferenceDataState('ready')
-      return true
-    } catch (error) {
-      if (isRpcAbortError(error) || !request.isCurrent()) return false
-      showPageLoadError(error, '加载质检相关资料')
-      setPurchaseReceipts([])
-      setInventoryLots([])
-      setMaterials([])
-      setProducts([])
-      setWarehouses([])
-      setReferenceDataState('error')
-      return false
-    } finally {
-      if (request.isCurrent()) request.finish()
-    }
-  }, [
-    beginLatestRequest,
-    canReadPurchaseReceipt,
-    canReadInventory,
-    adminProfile,
-  ])
-
   useEffect(() => {
     const receiptID = positiveInt(selectedRow?.purchase_receipt_id)
     const requestID = selectedRowPurchaseReceiptRequestRef.current + 1
@@ -1040,10 +886,6 @@ export default function QualityInspectionsPage() {
     [searchParams, setSearchParams]
   )
 
-  useEffect(() => {
-    loadReferenceOptions()
-  }, [loadReferenceOptions])
-
   const refreshPageData = useCallback(async () => {
     const [rowsOK, referencesOK] = await Promise.all([
       loadRows(),
@@ -1055,60 +897,6 @@ export default function QualityInspectionsPage() {
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(refreshPageData)
   }, [outletContext, refreshPageData])
-
-  useEffect(() => {
-    if (inspectionModal?.mode === 'create') {
-      inspectionForm.resetFields()
-      inspectionForm.setFieldsValue({
-        inspection_no: buildSequentialDraftCode(rows, {
-          prefix: 'QI',
-          field: 'inspection_no',
-        }),
-        purchase_receipt_id: undefined,
-        purchase_receipt_item_id: undefined,
-        decision_note: '',
-      })
-    }
-  }, [inspectionForm, inspectionModal, rows])
-
-  useEffect(() => {
-    if (['pass', 'reject', 'cancel'].includes(inspectionModal?.mode)) {
-      decisionForm.resetFields()
-      decisionForm.setFieldsValue({
-        result: inspectionModal?.mode === 'pass' ? 'PASS' : undefined,
-        inspected_at:
-          inspectionModal?.mode === 'cancel'
-            ? undefined
-            : currentBusinessDate(),
-        defect_rate_selection: undefined,
-        defect_rate_custom_percent: undefined,
-        check_items:
-          inspectionModal?.mode !== 'cancel' &&
-          inspectionModal?.inspection?.purchase_receipt_item_id
-            ? initialIncomingChecks()
-            : undefined,
-        decision_note: '',
-      })
-    }
-  }, [decisionForm, inspectionModal])
-
-  const openCreate = useCallback(() => {
-    if (referenceDataState !== 'ready') {
-      message.warning(
-        referenceDataState === 'loading'
-          ? '质检来源资料正在加载，请稍后再补建来料质检'
-          : '质检来源资料加载失败，请先刷新当前页后重试'
-      )
-      return
-    }
-    inspectionAttachmentRef.current?.clearPendingAttachments()
-    setInspectionModal({ mode: 'create' })
-  }, [referenceDataState])
-
-  const openDecision = useCallback((mode, inspection) => {
-    inspectionAttachmentRef.current?.clearPendingAttachments()
-    setInspectionModal({ mode, inspection })
-  }, [])
 
   const openQualityInspectionDetails = useCallback(async (inspection) => {
     if (!inspection?.id) return
@@ -1133,49 +921,15 @@ export default function QualityInspectionsPage() {
     setDetailInspection(null)
   }, [])
 
-  const closeModal = useCallback(() => {
-    inspectionAttachmentRef.current?.clearPendingAttachments()
-    setInspectionModal(null)
-  }, [])
-
-  const handleReceiptChange = useCallback(() => {
-    inspectionForm.setFieldsValue({
-      purchase_receipt_item_id: undefined,
+  const { handleCreateInspection, runInspectionAction, handleDecision } =
+    useQualityInspectionActions({
+      editor: inspectionEditor,
+      activeCustomerKey,
+      loadRows,
+      reportBusinessResult,
+      setSelectedRow,
+      setPagination,
     })
-  }, [inspectionForm])
-
-  const handleCreateInspection = useCallback(async () => {
-    if (referenceDataState !== 'ready') {
-      message.warning('质检来源资料尚未就绪，本次未生成，请刷新后重试')
-      return
-    }
-    const values = await inspectionForm.validateFields()
-    setSaving(true)
-    try {
-      const inspection = await createQualityInspectionDraft(
-        compactParams({
-          customer_key: activeCustomerKey || undefined,
-          ...buildInspectionParams(values),
-        })
-      )
-      const attachmentSaved =
-        (await inspectionAttachmentRef.current?.flushPendingAttachments(
-          inspection?.id
-        )) !== false
-      message.success(
-        attachmentSaved
-          ? '来料质检草稿已创建'
-          : '来料质检草稿已创建，未上传的附件请重新选择'
-      )
-      setSelectedRow(inspection)
-      closeModal()
-      resetBusinessPaginationCurrent(setPagination)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '创建来料质检草稿'))
-    } finally {
-      setSaving(false)
-    }
-  }, [activeCustomerKey, closeModal, inspectionForm, referenceDataState])
 
   const markInspectionReturned = useCallback((inspectionID) => {
     const id = positiveInt(inspectionID)
@@ -1282,6 +1036,19 @@ export default function QualityInspectionsPage() {
     selectedRow,
   ])
 
+  useEffect(() => {
+    if (!taskHandling || taskEntryRef.current === taskHandling.taskID || !selectedRow ||
+      Number(selectedRow.id) !== routeQualityInspectionID || outletContext?.workflowTaskNavigation?.businessReceipt) return
+    if (taskHandling.group === 'handoff_production_quality' && canUpdate && [QualityInspectionStatus.DRAFT, QualityInspectionStatus.SUBMITTED].includes(selectedRow.status)) {
+      taskEntryRef.current = taskHandling.taskID
+      setQualityTaskFocusOpen(true)
+    } else if (taskHandling.group === 'handoff_production_exception' && !qualityDispositionDisabled && selectedDispositionKind === 'production') {
+      taskEntryRef.current = taskHandling.taskID
+      openSelectedQualityDisposition()
+    }
+  }, [taskHandling, selectedRow, routeQualityInspectionID, canUpdate, openDecision,
+    qualityDispositionDisabled, selectedDispositionKind, openSelectedQualityDisposition, outletContext?.workflowTaskNavigation?.businessReceipt])
+
   const closePurchaseReturn = useCallback(() => {
     if (purchaseReturnInFlightRef.current) return
     setPurchaseReturnModal(null)
@@ -1351,79 +1118,6 @@ export default function QualityInspectionsPage() {
     },
     [activeCustomerKey, loadRows, markInspectionReturned, purchaseReturnModal]
   )
-
-  const runInspectionAction = useCallback(
-    async (inspection, action, successText) => {
-      if (!inspection?.id) return
-      setSaving(true)
-      try {
-        const nextInspection = await action({ id: inspection.id })
-        setSelectedRow(nextInspection || inspection)
-        message.success(successText)
-        await loadRows()
-      } catch (error) {
-        message.error(getActionErrorMessage(error, successText))
-      } finally {
-        setSaving(false)
-      }
-    },
-    [loadRows]
-  )
-
-  const handleDecision = useCallback(async () => {
-    const inspection = inspectionModal?.inspection
-    if (!inspection?.id) return
-    const values = await decisionForm.validateFields()
-    if (
-      inspection.purchase_receipt_item_id &&
-      inspectionModal.mode !== 'cancel'
-    ) {
-      const result =
-        inspectionModal.mode === 'reject' ? 'REJECT' : values.result
-      const error = validateIncomingChecks(values.check_items, result)
-      if (error) {
-        message.warning(error)
-        return
-      }
-      if (
-        result === 'CONCESSION' &&
-        !String(values.decision_note || '').trim()
-      ) {
-        message.warning('让步接收请填写接收理由')
-        return
-      }
-    }
-    setSaving(true)
-    try {
-      let action = passQualityInspection
-      let params = buildDecisionParams(inspection.id, values)
-      let successText = '质量检验已判定合格'
-      if (inspectionModal?.mode === 'reject') {
-        action = rejectQualityInspection
-        params = buildDecisionParams(inspection.id, values, 'REJECT')
-        successText = '质量检验已判定不合格'
-      } else if (inspectionModal?.mode === 'cancel') {
-        action = cancelQualityInspection
-        params = buildDecisionParams(inspection.id, values)
-        successText = '质量检验已取消'
-      }
-      const nextInspection = await action(params)
-      const attachmentSaved =
-        (await inspectionAttachmentRef.current?.flushPendingAttachments(
-          nextInspection?.id || inspection.id
-        )) !== false
-      setSelectedRow(nextInspection || inspection)
-      message.success(
-        attachmentSaved ? successText : `${successText}，未上传的附件请重新选择`
-      )
-      closeModal()
-      await loadRows()
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '处理质量检验'))
-    } finally {
-      setSaving(false)
-    }
-  }, [closeModal, decisionForm, inspectionModal, loadRows])
 
   const selectedRowLabel = selectedRow
     ? `${selectedRow.inspection_no || '质量检验单已关联'} / ${
@@ -1535,20 +1229,10 @@ export default function QualityInspectionsPage() {
   })
 
   const loadExportQualityInspections = useCallback(
-    async ({ signal }) => {
-      const routeSelectedID = Number(routeQualityInspectionID || 0)
-      if (routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE') {
-        const inspection = await getQualityInspection({ id: routeSelectedID })
-        return inspection ? [inspection] : []
-      }
-      const data = await loadQualityInspectionList({ signal, all: true })
-      const exportRows = data?.quality_inspections
-      return routeSelectedID > 0 && Array.isArray(exportRows)
-        ? exportRows.filter((item) => Number(item?.id || 0) === routeSelectedID)
-        : exportRows
-    },
-    [inspectionTypeFilter, loadQualityInspectionList, routeQualityInspectionID]
+    (options) => loadQualityInspectionExport(qualityQuery, options),
+    [qualityQuery]
   )
+
   const { exporting, exportRows: exportQualityInspections } =
     useBusinessListExport({
       requestKey: 'quality-inspections-export',
@@ -2093,6 +1777,19 @@ export default function QualityInspectionsPage() {
         </SelectionActionBar>
       </BusinessOperationPanel>
 
+      {outletContext?.mobileTaskBusiness?.task?.source_type === 'purchase_receipt' &&
+      routePurchaseReceiptID === outletContext.mobileTaskBusiness.task.source_id ? (
+        <label className="mobile-detail-section">
+          选择本次收货的质检单
+          <Select
+            aria-label="选择本次收货的质检单"
+            value={selectedRow?.id}
+            disabled={loading || saving}
+            options={rows.filter((row) => row.purchase_receipt_id === routePurchaseReceiptID).map((row) => ({ value: row.id, label: row.inspection_no }))}
+            onChange={(id) => setSelectedRow(rows.find((row) => row.id === id && row.purchase_receipt_id === routePurchaseReceiptID) || null)}
+          />
+        </label>
+      ) : null}
       <BusinessDataTable
         rowKey="id"
         loading={loading}
@@ -2119,6 +1816,38 @@ export default function QualityInspectionsPage() {
         onOpenRecord={openQualityInspectionDetails}
         emptyDescription="暂无质量检验单"
       />
+
+      <BusinessModal
+        title="办理本次质检"
+        open={qualityTaskFocusOpen}
+        onCancel={saving ? undefined : () => setQualityTaskFocusOpen(false)}
+        footer={
+          <Space>
+            <Button disabled={saving} onClick={() => setQualityTaskFocusOpen(false)}>关闭</Button>
+            {selectedRow?.status === QualityInspectionStatus.DRAFT ? (
+              <Button type="primary" loading={saving} onClick={() => runInspectionAction(selectedRow, submitQualityInspection, '质量检验已提交')}>
+                提交质检
+              </Button>
+            ) : selectedRow?.status === QualityInspectionStatus.SUBMITTED ? (
+              <>
+                <Button onClick={() => { setQualityTaskFocusOpen(false); openDecision('reject', selectedRow) }}>判定不合格</Button>
+                <Button type="primary" onClick={() => { setQualityTaskFocusOpen(false); openDecision('pass', selectedRow) }}>判定合格</Button>
+              </>
+            ) : null}
+          </Space>
+        }
+      >
+        <Descriptions
+          column={1}
+          size="small"
+          items={[
+          { key: 'inspection', label: '质检单', children: selectedRow?.inspection_no },
+          { key: 'batch', label: '在制批次', children: selectedRow?.wip_batch_no || selectedRow?.batch_no },
+          { key: 'state', label: '当前状态', children: selectedRow?.status === QualityInspectionStatus.DRAFT ? '待提交检验' : '待质量判定' },
+        ]}
+        />
+        <p>核对当前来源和检验关口后选择本次结论，后续库存及异常仍按对应业务办理。</p>
+      </BusinessModal>
 
       {columnOrderModal}
 
@@ -2160,7 +1889,10 @@ export default function QualityInspectionsPage() {
         inspection={selectedRow}
         customerKey={activeCustomerKey}
         onClose={() => setProductionExceptionOpen(false)}
-        onChanged={() => loadRows()}
+        onChanged={(record) => {
+          reportBusinessResult('异常申请已提交，等待审批', record)
+          loadRows()
+        }}
       />
 
       <BusinessDetailsModal

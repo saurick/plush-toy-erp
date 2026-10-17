@@ -35,7 +35,8 @@ const formalBusinessListCases = [
   {
     title: '质量检验',
     path: '../pages/QualityInspectionsPage.jsx',
-    completeList: /loadQualityInspectionList\(\{ signal, all: true \}\)/u,
+    queryPath: '../components/quality-inspections/qualityInspectionQueries.mjs',
+    completeList: /loadQualityInspectionList\(\{ \.\.\.query, signal, all: true \}\)/u,
   },
   {
     title: '库存台账',

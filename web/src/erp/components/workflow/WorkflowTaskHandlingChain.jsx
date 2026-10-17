@@ -133,7 +133,7 @@ export default function WorkflowTaskHandlingChain({
       </div>
       {!showOrderChain ? resources : null}
       {showOrderChain ? (
-        <WorkflowBusinessChain task={task} profile={profile} view="order" onOpenTask={onOpenTask} />
+        <WorkflowBusinessChain task={task} profile={profile} view="order" onOpenTask={onOpenTask} showGuidance={variant !== 'mobile'} />
       ) : null}
       <div className="workflow-task-handling-current" hidden={showOrderChain}>
         {state === 'loading' || state === 'idle' ? (
@@ -172,7 +172,7 @@ export default function WorkflowTaskHandlingChain({
           ) : model ? (
             <WorkflowProcessStageTrack key={task.id} model={model} variant={variant} focusCurrent compact={focused} hideLinkedCurrent={focused} />
           ) : !processLinked && !materialTask ? (
-            <WorkflowBusinessChain task={task} profile={profile} onOpenTask={onOpenTask} />
+            <WorkflowBusinessChain task={task} profile={profile} onOpenTask={onOpenTask} focused={focused} showGuidance={variant !== 'mobile'} />
           ) : null}
         {state === 'ready' && current?.model ? (
           <EngineeringMaterialPurchaseOrders

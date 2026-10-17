@@ -14,6 +14,7 @@ export const DEV_FLOW_STATE_QUERY_KEYS = Object.freeze({
   exception: 'flow_exception',
   exceptionDecision: 'flow_decision',
   exceptionStep: 'flow_exception_step',
+  exceptionOrigin: 'flow_exception_origin',
 })
 
 export const DEV_FLOW_STATE_DEFAULT_VIEW = 'chain'

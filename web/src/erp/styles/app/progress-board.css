@@ -11,8 +11,8 @@
 .erp-progress-controls {
   container: progress-controls / inline-size;
   flex: 0 0 auto;
-  margin-bottom: 9px;
-  padding: 10px 12px;
+  margin-bottom: var(--erp-page-gap);
+  padding: var(--erp-panel-padding-block, 10px) var(--erp-panel-padding-inline, 12px);
   border: 1px solid var(--erp-border);
   border-radius: var(--erp-business-card-radius);
   background: var(--erp-surface-bg);

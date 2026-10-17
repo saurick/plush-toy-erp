@@ -238,7 +238,7 @@ export default function BusinessFormPage({
     if (!open) return undefined
     leavingRef.current = false
     triggerRef.current = document.activeElement
-    const scroller = pageRef.current?.closest('.erp-admin-content, .mobile-business-layout__content')
+    const scroller = pageRef.current?.closest('.erp-admin-content, .mobile-business-layout__content, .mobile-task-business__content')
     const layout = pageRef.current?.closest('.erp-business-page-layout')
     scrollPositionRef.current = scroller
       ? { node: scroller, top: scroller.scrollTop }
@@ -448,7 +448,7 @@ export default function BusinessFormPage({
         </span>
         <div className="erp-business-form-page__actions">
           <Button onClick={close} disabled={busy}>
-            返回列表
+            {outletContext?.mobileTaskBusiness ? '返回办理' : '返回列表'}
           </Button>
           {!readOnly && onOk ? (
             <Button

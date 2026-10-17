@@ -507,6 +507,11 @@ export const businessPageFlowDefinitions = Object.freeze(
           'cancel_purchase_order',
         ],
         [
+          'accessories-purchase',
+          'accessories-purchase',
+          'complete_purchase_order_terms',
+        ],
+        [
           'processing-contracts',
           'processing-contracts',
           'submit_outsourcing_order',

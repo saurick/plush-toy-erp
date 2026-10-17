@@ -364,20 +364,6 @@ type BOMHeaderUpdate struct {
 	Note          *string
 }
 
-type BOMItemCreate struct {
-	BOMHeaderID        int
-	MaterialID         int
-	Quantity           decimal.Decimal
-	UnitID             int
-	LossRate           decimal.Decimal
-	Position           *string
-	PieceCount         *string
-	TotalUsageSnapshot *string
-	ProcessBase        *string
-	ProcessMethod      *string
-	Note               *string
-}
-
 type BOMItemUpdate struct {
 	MaterialID         int
 	Quantity           decimal.Decimal
@@ -438,7 +424,6 @@ type InventoryLedgerRepo interface {
 	CreateInventoryLot(ctx context.Context, in *InventoryLotCreate) (*InventoryLot, error)
 	GetInventoryLot(ctx context.Context, id int) (*InventoryLot, error)
 	ChangeInventoryLotStatus(ctx context.Context, lotID int, newStatus string, reason string) (*InventoryLot, error)
-	CreateInventoryTxn(ctx context.Context, in *InventoryTxnCreate) (*InventoryTxn, error)
 	ApplyInventoryTxnAndUpdateBalance(ctx context.Context, in *InventoryTxnCreate) (*InventoryTxnApplyResult, error)
 	GetInventoryBalance(ctx context.Context, key InventoryBalanceKey) (*InventoryBalance, error)
 	ListInventoryBalances(ctx context.Context, filter InventoryBalanceFilter) ([]*InventoryBalance, int, error)
@@ -451,11 +436,6 @@ type InventoryLotStatusActionRepo interface {
 }
 
 type BOMRepo interface {
-	CreateBOMHeader(ctx context.Context, in *BOMHeaderCreate) (*BOMHeader, error)
-	CreateBOMItem(ctx context.Context, in *BOMItemCreate) (*BOMItem, error)
-	UpdateBOMDraftHeader(ctx context.Context, id int, in *BOMHeaderUpdate) (*BOMHeader, error)
-	UpdateBOMDraftItem(ctx context.Context, id int, in *BOMItemUpdate) (*BOMItem, error)
-	DeleteBOMDraftItem(ctx context.Context, id int) error
 	ListBOMHeaders(ctx context.Context, filter BOMHeaderFilter) ([]*BOMHeader, int, error)
 	GetBOMHeader(ctx context.Context, id int) (*BOMHeader, error)
 	ListBOMItemsByHeader(ctx context.Context, bomHeaderID int) ([]*BOMItem, error)
@@ -557,10 +537,16 @@ type PurchaseReturnFromQualityInspectionRepo interface {
 
 type InventoryUsecase struct {
 	repo InventoryRepo
+	*PurchaseReceiptUsecase
+	*QualityInspectionUsecase
 }
 
 func NewInventoryUsecase(repo InventoryRepo) *InventoryUsecase {
-	return &InventoryUsecase{repo: repo}
+	return &InventoryUsecase{
+		repo:                     repo,
+		PurchaseReceiptUsecase:   NewPurchaseReceiptUsecase(repo),
+		QualityInspectionUsecase: NewQualityInspectionUsecase(repo),
+	}
 }
 
 func (uc *InventoryUsecase) CreateInventoryLot(ctx context.Context, in *InventoryLotCreate) (*InventoryLot, error) {
@@ -651,31 +637,6 @@ func (uc *InventoryUsecase) applyNamedInventoryLotStatusAction(
 		return nil, ErrBadParam
 	}
 	return repo.ApplyInventoryLotStatusAction(ctx, &normalized)
-}
-
-func (uc *InventoryUsecase) CreateInventoryTxn(ctx context.Context, in *InventoryTxnCreate) (*InventoryTxn, error) {
-	if uc == nil || uc.repo == nil || in == nil {
-		return nil, ErrBadParam
-	}
-	normalized, err := normalizeInventoryTxnCreate(*in)
-	if err != nil {
-		return nil, err
-	}
-	return uc.repo.CreateInventoryTxn(ctx, &normalized)
-}
-
-func (uc *InventoryUsecase) CreateInventoryTxnForAccess(ctx context.Context, in *InventoryTxnCreate, scope WarehouseDataScope) (*InventoryTxn, error) {
-	if uc == nil || uc.repo == nil || in == nil {
-		return nil, ErrBadParam
-	}
-	normalized, err := normalizeInventoryTxnCreate(*in)
-	if err != nil {
-		return nil, err
-	}
-	if err := ValidateWarehouseDataScopeAccess(scope, normalized.WarehouseID); err != nil {
-		return nil, err
-	}
-	return uc.repo.CreateInventoryTxn(ctx, &normalized)
 }
 
 func (uc *InventoryUsecase) ApplyInventoryTxnAndUpdateBalance(ctx context.Context, in *InventoryTxnCreate) (_ *InventoryTxnApplyResult, err error) {
@@ -820,66 +781,6 @@ func (uc *InventoryUsecase) ListInventoryTxnsForAccess(ctx context.Context, filt
 		return nil, 0, ErrDataScopeForbidden
 	}
 	return repo.ListInventoryTxnsForAccess(ctx, normalized, scope)
-}
-
-func (uc *InventoryUsecase) CreateBOMHeader(ctx context.Context, in *BOMHeaderCreate) (*BOMHeader, error) {
-	if uc == nil || uc.repo == nil || in == nil {
-		return nil, ErrBadParam
-	}
-	normalized, err := normalizeBOMHeaderCreate(*in)
-	if err != nil {
-		return nil, err
-	}
-	if err := requireActiveReference(ctx, normalized.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
-		return nil, err
-	}
-	return uc.repo.CreateBOMHeader(ctx, &normalized)
-}
-
-func (uc *InventoryUsecase) CreateBOMItem(ctx context.Context, in *BOMItemCreate) (*BOMItem, error) {
-	if uc == nil || uc.repo == nil || in == nil {
-		return nil, ErrBadParam
-	}
-	normalized, err := normalizeBOMItemCreate(*in)
-	if err != nil {
-		return nil, err
-	}
-	if err := uc.validateBOMItemActiveReferences(ctx, normalized.MaterialID, normalized.UnitID); err != nil {
-		return nil, err
-	}
-	return uc.repo.CreateBOMItem(ctx, &normalized)
-}
-
-func (uc *InventoryUsecase) UpdateBOMDraftHeader(ctx context.Context, id int, in *BOMHeaderUpdate) (*BOMHeader, error) {
-	if uc == nil || uc.repo == nil || in == nil || id <= 0 {
-		return nil, ErrBadParam
-	}
-	normalized, err := normalizeBOMHeaderUpdate(*in)
-	if err != nil {
-		return nil, err
-	}
-	return uc.repo.UpdateBOMDraftHeader(ctx, id, &normalized)
-}
-
-func (uc *InventoryUsecase) UpdateBOMDraftItem(ctx context.Context, id int, in *BOMItemUpdate) (*BOMItem, error) {
-	if uc == nil || uc.repo == nil || in == nil || id <= 0 {
-		return nil, ErrBadParam
-	}
-	normalized, err := normalizeBOMItemUpdate(*in)
-	if err != nil {
-		return nil, err
-	}
-	if err := uc.validateBOMItemActiveReferences(ctx, normalized.MaterialID, normalized.UnitID); err != nil {
-		return nil, err
-	}
-	return uc.repo.UpdateBOMDraftItem(ctx, id, &normalized)
-}
-
-func (uc *InventoryUsecase) DeleteBOMDraftItem(ctx context.Context, id int) error {
-	if uc == nil || uc.repo == nil || id <= 0 {
-		return ErrBadParam
-	}
-	return uc.repo.DeleteBOMDraftItem(ctx, id)
 }
 
 func (uc *InventoryUsecase) SaveBOMWithItems(ctx context.Context, id int, in *BOMVersionMutation, items []*BOMItemSaveMutation) (*BOMVersionDetail, error) {
@@ -1346,25 +1247,6 @@ func normalizeBOMHeaderUpdate(in BOMHeaderUpdate) (BOMHeaderUpdate, error) {
 	}
 	if in.EffectiveFrom != nil && in.EffectiveTo != nil && !in.EffectiveFrom.Before(*in.EffectiveTo) {
 		return BOMHeaderUpdate{}, ErrBadParam
-	}
-	return in, nil
-}
-
-func normalizeBOMItemCreate(in BOMItemCreate) (BOMItemCreate, error) {
-	in.Position = normalizeOptionalString(in.Position)
-	in.PieceCount = normalizeOptionalString(in.PieceCount)
-	in.TotalUsageSnapshot = normalizeOptionalString(in.TotalUsageSnapshot)
-	in.ProcessBase = normalizeOptionalString(in.ProcessBase)
-	in.ProcessMethod = normalizeOptionalString(in.ProcessMethod)
-	in.Note = normalizeOptionalString(in.Note)
-	if in.BOMHeaderID <= 0 ||
-		in.MaterialID <= 0 ||
-		in.UnitID <= 0 ||
-		in.LossRate.Cmp(decimal.Zero) < 0 {
-		return BOMItemCreate{}, ErrBadParam
-	}
-	if _, err := value.NewPositiveQuantity(in.Quantity); err != nil {
-		return BOMItemCreate{}, ErrBadParam
 	}
 	return in, nil
 }

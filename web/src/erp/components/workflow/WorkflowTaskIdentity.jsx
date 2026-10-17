@@ -25,11 +25,12 @@ function IdentityCode({ item, copyable = true }) {
   )
 }
 
-function IdentityItem({ item, copyable = true }) {
+function IdentityItem({ item, copyable = true, codeCopyable = copyable, source = null }) {
   return (
     <span className="erp-task-identity__row">
       <WorkflowTaskProductImage item={item} />
       <span className="erp-task-identity__item">
+        {source}
         <span className="erp-task-identity__name">
           <strong>
             {item.name ||
@@ -42,7 +43,7 @@ function IdentityItem({ item, copyable = true }) {
           /> : null}
         </span>
         <span className="erp-task-identity__code">
-          <IdentityCode item={item} copyable={copyable} />
+          <IdentityCode item={item} copyable={codeCopyable} />
         </span>
         {item.kind === 'material' && item.code ? (
           <span className="erp-task-identity__code">
@@ -74,14 +75,16 @@ function IdentityItem({ item, copyable = true }) {
 
 export default function WorkflowTaskIdentity({
   task,
+  keyword = '',
   compact = false,
   copyable = true,
   detailView = false,
   showTaskName = false,
   showStyleNo = false,
   renderCompactTitle,
+  source = null,
 }) {
-  const identity = getWorkflowTaskIdentityPresentation(task)
+  const identity = getWorkflowTaskIdentityPresentation(task, keyword)
   const sourceKey = `${task?.id}:${task?.source_type}:${task?.source_id}:${identity.available}`
   const [openedSourceKey, setOpenedSourceKey] = React.useState(null)
   React.useEffect(() => setOpenedSourceKey(null), [sourceKey])
@@ -99,13 +102,14 @@ export default function WorkflowTaskIdentity({
   if (!identity.available) {
     return (
       <>
+        {source}
         {compact ? renderTitle?.() : null}
         <span className="erp-task-identity__unavailable">关联单据已不可用</span>
       </>
     )
   }
   if (!identity.items.length) {
-    return compact ? renderTitle?.() || null : null
+    return compact ? renderTitle?.() || null : source
   }
   if (compact) {
     const { first } = identity
@@ -160,7 +164,7 @@ export default function WorkflowTaskIdentity({
     return (
       <div className="erp-task-identity erp-task-identity--detail" aria-label="任务关联内容">
         <div className="erp-task-identity__summary">
-          <IdentityItem item={identity.first} copyable={false} />
+          <IdentityItem item={identity.first} copyable={false} codeCopyable={copyable} source={source} />
           {identity.items.length > 1 ? <Button type="link" className="erp-task-identity__count" aria-haspopup="dialog" aria-expanded={openedSourceKey === sourceKey} onClick={(event) => { event.currentTarget.focus({ preventScroll: true }); setOpenedSourceKey(sourceKey) }}>共 {identity.items.length} 项{kind}<RightOutlined aria-hidden="true" /></Button> : null}
         </div>
         <BusinessModal key={sourceKey} title={dialogTitle} open={openedSourceKey === sourceKey} onCancel={() => setOpenedSourceKey(null)} footer={null} size="recordDetails" destroyOnHidden className="erp-task-linked-items-modal">

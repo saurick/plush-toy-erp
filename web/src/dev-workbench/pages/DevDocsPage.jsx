@@ -47,6 +47,7 @@ import {
   buildDevDocsLocation,
   findDevDocsMarkdownAnchor,
   resolveDevDocsMarkdownHref,
+  resolveDevDocsReadingHeading,
 } from './devDocsNavigation.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -96,7 +97,7 @@ const currentMarkdownModules = import.meta.glob(
   {
     eager: true,
     import: 'default',
-    query: '?raw',
+    query: '?dev-doc-meta',
   }
 )
 
@@ -437,6 +438,8 @@ export default function DevDocsPage() {
   )
   const [tocExpanded, setTocExpanded] = useState(() => readTocExpanded())
   const markdownRef = useRef(null)
+  const tocRef = useRef(null)
+  const [readingHeading, setReadingHeading] = useState(null)
   const treeRef = useRef(null)
   const pendingTreeRevealRef = useRef('')
 
@@ -478,9 +481,63 @@ export default function DevDocsPage() {
     ? sourceLoadState[selectedDocPath]
     : undefined
   const headings = useMemo(
-    () => extractMarkdownHeadings(selectedDocSource || '', [1, 2, 3]),
+    () => extractMarkdownHeadings(selectedDocSource || '', [1, 2, 3, 4, 5, 6]),
     [selectedDocSource]
   )
+  const titleHeadingId =
+    headings[0]?.level === 1 && headings[0].title === selectedDoc?.title
+      ? headings[0].id
+      : ''
+  const tocHeadings = titleHeadingId ? headings.slice(1) : headings
+  const activeHeadingId =
+    readingHeading?.path === selectedDocPath &&
+    headings.some((heading) => heading.id === readingHeading.id)
+      ? readingHeading.id
+      : readHeadingIdFromHash(location.hash) || headings[0]?.id || ''
+
+  useEffect(() => {
+    const container = markdownRef.current
+    if (!container || !selectedDocSource || headings.length === 0) return undefined
+    const anchors = headings
+      .map((heading) => findDevDocsMarkdownAnchor(container, heading.id))
+      .filter(Boolean)
+    let frame
+    const update = () => {
+      const { top } = container.getBoundingClientRect()
+      const id = resolveDevDocsReadingHeading(
+        anchors.map((anchor) => ({
+          id: anchor.id,
+          top: anchor.getBoundingClientRect().top - top + container.scrollTop,
+        })),
+        container
+      )
+      // 阅读位置只更新章节提示，不改写 URL 或增加历史记录。
+      setReadingHeading((current) =>
+        current?.path === selectedDocPath && current.id === id
+          ? current
+          : { path: selectedDocPath, id }
+      )
+    }
+    const schedule = () => {
+      window.cancelAnimationFrame(frame)
+      frame = window.requestAnimationFrame(update)
+    }
+    container.addEventListener('scroll', schedule, { passive: true })
+    const observer = new ResizeObserver(schedule)
+    observer.observe(container)
+    schedule()
+    return () => {
+      window.cancelAnimationFrame(frame)
+      container.removeEventListener('scroll', schedule)
+      observer.disconnect()
+    }
+  }, [headings, selectedDocPath, selectedDocSource])
+
+  useEffect(() => {
+    tocRef.current
+      ?.querySelector('[aria-current="location"]')
+      ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [activeHeadingId, tocExpanded])
 
   useEffect(() => {
     pendingTreeRevealRef.current = selectedDocPath || ''
@@ -573,7 +630,7 @@ export default function DevDocsPage() {
             ...current,
             [path]: {
               status: 'error',
-              message: '文档加载失败，请重试',
+              message: '文档正文加载失败，请重试',
             },
           }))
         })
@@ -881,15 +938,11 @@ export default function DevDocsPage() {
             </Paragraph>
           </details>
         </div>
-      </header>
-
-      <main className="erp-dev-docs-shell">
-        <aside className="erp-dev-docs-sidebar">
+        <div className="erp-dev-docs-controls" role="group" aria-label="开发文档检索">
           <div className="erp-dev-docs-lifecycle">
             <Text type="secondary">文档层级</Text>
             <Segmented
               size="small"
-              block
               aria-label="开发文档层级"
               className="erp-dev-docs-lifecycle__control"
               options={LIFECYCLE_OPTIONS}
@@ -908,9 +961,7 @@ export default function DevDocsPage() {
             searchHint={
               isTitleOnlySearch
                 ? '当前仅搜索文档标题；切换“全部”可搜索路径和正文'
-                : lifecycle === DEV_DOCS_LIFECYCLE_ARCHIVE
-                  ? '搜索时按需加载历史正文，并搜索标题、路径和完整正文'
-                  : '当前层级搜索标题、路径或正文；不搜索时按目录树浏览'
+                : '搜索时按需加载当前层级正文，匹配标题、路径和完整正文'
             }
             onChange={(event) => setKeyword(event.target.value)}
             className="erp-dev-docs-search"
@@ -959,7 +1010,11 @@ export default function DevDocsPage() {
               部分正文加载失败，重新检索
             </Button>
           ) : null}
+        </div>
+      </header>
 
+      <main className="erp-dev-docs-shell">
+        <aside className="erp-dev-docs-sidebar">
           {pinnedDocs.length > 0 ? (
             <details className="erp-dev-docs-sidebar__section erp-dev-docs-pinned erp-dev-docs-pinned-disclosure">
               <summary>
@@ -1144,15 +1199,25 @@ export default function DevDocsPage() {
           {selectedDoc ? (
             <div className="erp-dev-docs-reader__toolbar">
               <div className="erp-dev-docs-reader__title">
-                <Space size={6} wrap>
-                  <Text strong>{selectedDoc.title}</Text>
-                  <Tag>{LIFECYCLE_LABELS[selectedDoc.lifecycle]}</Tag>
-                </Space>
-                <Text type="secondary" className="erp-dev-docs-reader__path">
+                <Text
+                  strong
+                  className="erp-dev-docs-reader__name"
+                  title={selectedDoc.title}
+                >
+                  {selectedDoc.title}
+                </Text>
+                <Tag className="erp-dev-docs-reader__lifecycle">
+                  {LIFECYCLE_LABELS[selectedDoc.lifecycle]}
+                </Tag>
+                <Text
+                  type="secondary"
+                  className="erp-dev-docs-reader__path"
+                  title={selectedDoc.path}
+                >
                   {selectedDoc.path}
                 </Text>
               </div>
-              <Space size={8} wrap>
+              <Space size={6} className="erp-dev-docs-reader__actions">
                 <Tooltip title={selectedDocPinned ? '取消置顶' : '置顶文档'}>
                   <Button
                     type="text"
@@ -1175,52 +1240,58 @@ export default function DevDocsPage() {
                   />
                 </Tooltip>
                 <Button
-                  icon={<VerticalAlignTopOutlined />}
+                  className="erp-dev-docs-reader__top"
+                  icon={<VerticalAlignTopOutlined aria-hidden="true" />}
+                  aria-current={titleHeadingId && activeHeadingId === titleHeadingId ? 'location' : undefined}
                   onClick={scrollReaderToTop}
                 >
-                  回到顶部 / Top
+                  回到顶部
                 </Button>
-                <Button icon={<CopyOutlined />} onClick={copyPath}>
-                  复制路径 / Copy Path
+                <Button icon={<CopyOutlined aria-hidden="true" />} onClick={copyPath}>
+                  复制路径
                 </Button>
               </Space>
             </div>
           ) : null}
 
-          {headings.length > 0 ? (
-            <div className="erp-dev-docs-toc-shell">
-              <div className="erp-dev-docs-toc-shell__head">
-                <Text strong>本页章节</Text>
-                <Button
-                  size="small"
-                  type="text"
-                  data-dev-doc-toc-toggle
-                  aria-expanded={tocExpanded}
-                  onClick={() => setTocExpanded((current) => !current)}
-                >
-                  {tocExpanded ? '收起为一行' : '展开全部'}
-                </Button>
-              </div>
+          {tocHeadings.length > 0 ? (
+            <div className={tocExpanded ? 'erp-dev-docs-toc-shell erp-dev-docs-toc-shell--expanded' : 'erp-dev-docs-toc-shell'}>
+              <Text strong className="erp-dev-docs-toc-shell__label">章节</Text>
               <div
+                id="dev-docs-chapters"
                 className={
                   tocExpanded
                     ? 'erp-dev-docs-toc erp-dev-docs-toc--expanded'
                     : 'erp-dev-docs-toc erp-dev-docs-toc--collapsed'
                 }
                 aria-label="文档章节"
+                ref={tocRef}
               >
-                {headings.slice(0, 16).map((heading) => (
+                {tocHeadings.map((heading) => (
                   <button
                     type="button"
                     key={heading.id}
                     className="erp-dev-docs-toc__tag"
                     data-dev-doc-heading-id={heading.id}
+                    aria-current={heading.id === activeHeadingId ? 'location' : undefined}
+                    title={heading.title}
                     onClick={() => scrollToHeading(heading.id)}
                   >
                     {heading.title}
                   </button>
                 ))}
               </div>
+              <Button
+                size="small"
+                type="text"
+                className="erp-dev-docs-toc-shell__toggle"
+                data-dev-doc-toc-toggle
+                aria-controls="dev-docs-chapters"
+                aria-expanded={tocExpanded}
+                onClick={() => setTocExpanded((current) => !current)}
+              >
+                {tocExpanded ? '收起为一行' : '展开全部'}
+              </Button>
             </div>
           ) : null}
 
@@ -1232,7 +1303,7 @@ export default function DevDocsPage() {
             <div className="erp-dev-docs-markdown erp-dev-docs-reader-state">
               <Empty
                 image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={`历史正文加载失败：${selectedSourceLoadState.message}`}
+                description={selectedSourceLoadState.message}
               >
                 <Button onClick={retrySelectedSource}>重新加载</Button>
               </Empty>
@@ -1242,7 +1313,7 @@ export default function DevDocsPage() {
               <Space direction="vertical" align="center" size="small">
                 <Spin />
                 <Typography.Text type="secondary">
-                  正在加载历史正文…
+                  正在加载文档正文…
                 </Typography.Text>
               </Space>
             </div>

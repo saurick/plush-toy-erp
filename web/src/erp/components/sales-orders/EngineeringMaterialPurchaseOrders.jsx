@@ -20,6 +20,7 @@ export default function EngineeringMaterialPurchaseOrders({
   const location = useLocation()
   const navigate = useBusinessNavigate()
   const roleKey = mobileBusinessRole(location.pathname)
+  const canOpenOrders = canOpen && !roleKey
   const orderPath = (id) => mobileBusinessPath(`/erp/purchase/accessories?purchase_order_id=${id}`, roleKey)
   const printTemplateDefaults = useMemo(
     () =>
@@ -48,7 +49,7 @@ export default function EngineeringMaterialPurchaseOrders({
       <Typography.Text strong>
         已生成 {orders.length} 张采购订单（按供应商分单）
       </Typography.Text>
-      {canOpen && !roleKey ? (
+      {canOpenOrders ? (
         <Button
           type="primary"
           loading={printingContract}
@@ -61,7 +62,7 @@ export default function EngineeringMaterialPurchaseOrders({
       ) : null}
       {orders.map((order) => (
         <Space key={order.id} wrap size={[12, 4]}>
-          {canOpen ? (
+          {canOpenOrders ? (
             <Link
               to={orderPath(order.id)}
               onClick={(event) => {

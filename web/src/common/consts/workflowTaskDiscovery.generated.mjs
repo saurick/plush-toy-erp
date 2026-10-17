@@ -16,11 +16,18 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
   })]),
   exception_guides: Object.freeze([Object.freeze({
     business_chain: 'purchase_quality_disposition',
+    diagram: Object.freeze({
+      branch_label: '来料不合格',
+    }),
     entry_stages: Object.freeze(['incoming_quality']),
     key: 'purchase_rejection',
     label: '首次来料不合格',
     plans: Object.freeze([Object.freeze({
       closure: '退厂记录生效且实物交接完成；全部拒收量处置后，采购异常待办结束。退厂不形成合格入库。',
+      continuation: Object.freeze({
+        kind: 'stop',
+        label: '本次退厂结束 · 不入库',
+      }),
       key: 'return_to_vendor',
       label: '退厂',
       recovery: '部分处置后剩余量仍待处理。撤销处置会恢复相关待办；不会抹掉原拒收结论。',
@@ -37,6 +44,16 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       })]),
     }), Object.freeze({
       closure: '仓库实点确认后，原拒收量才计入已处置；新货检验通过并正式入库才完成补换业务。原异常待办结束不表示新货已入库。',
+      continuation: Object.freeze({
+        kind: 'return',
+        label: '新货检验并正式入库',
+        reentry: Object.freeze({
+          before_step: 'arrival',
+          label: '新到货重新点数',
+          stage: 'purchase_count',
+        }),
+        target: 'origin',
+      }),
       key: 'replacement',
       label: '供应商补换',
       recovery: '未到货保持仓库待办；实点与本笔数量不符时先取消本笔，按实际数量重新登记。再次不合格按新收货来源处理；保留每轮来源、数量和检验结果。',
@@ -81,11 +98,19 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       withdrawal: '申请人仅可按异常单当前状态取消；已执行或已有下游依赖时，由正式规则决定是否允许冲正，不能直接撤销已发生的业务结果。',
     }),
     business_chain: 'production_exception',
+    diagram: Object.freeze({
+      branch_label: '检验不合格',
+    }),
     entry_stages: Object.freeze(['cutting_quality', 'shell_quality', 'finished_quality']),
     key: 'production_quality',
     label: '裁片、皮套与成品不合格',
     plans: Object.freeze([Object.freeze({
       closure: '返工批次完成、点数和所需复检通过后，继续后续主链。',
+      continuation: Object.freeze({
+        kind: 'return',
+        label: '返工复检合格',
+        target: 'origin',
+      }),
       key: 'original_rework',
       label: '原厂 / 本厂返工',
       recovery: '复检再次不合格时，由业务针对新一轮问题重新提出方案。',
@@ -108,6 +133,11 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       })]),
     }), Object.freeze({
       closure: '接手厂商返工后的回货点数与复检通过，才继续后续主链。',
+      continuation: Object.freeze({
+        kind: 'return',
+        label: '换厂返工复检合格',
+        target: 'origin',
+      }),
       key: 'switch_rework',
       label: '换厂返工',
       recovery: '接手厂商必须不同于原厂；复检失败重新提方案，不覆盖上一轮处理。',
@@ -130,6 +160,17 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       })]),
     }), Object.freeze({
       closure: '新批次完成相应生产、点数和检验后继续主链；原问题批次保持终止记录。',
+      continuation: Object.freeze({
+        kind: 'return',
+        label: '新批所需复检通过',
+        original_terminal: '原问题批次终止',
+        reentry: Object.freeze({
+          before_step: 'issue',
+          label: '新批从裁片重开',
+          stage: 'cutting_issue',
+        }),
+        target: 'origin',
+      }),
       key: 'remake',
       label: '补料重做',
       recovery: '重新用料、加工和检验分别留痕；新批再次不合格时另提方案。',
@@ -157,6 +198,10 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       })]),
     }), Object.freeze({
       closure: '本批报废执行成功后终止流转，不再安排本批回货、复检或恢复生产。订单交付缺口保留，由业务另行决定是否补做。',
+      continuation: Object.freeze({
+        kind: 'stop',
+        label: '本批报废终止',
+      }),
       key: 'scrap',
       label: '报废放弃',
       recovery: '批准不等于已报废。若执行错误，按正式冲正与下游依赖检查处理；不能用任务完成或直接改质量结论恢复本批。',
@@ -169,6 +214,11 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       })]),
     }), Object.freeze({
       closure: '获批让步已正式执行；后续必需的工序、其他检验关口与包装仍按原规则办理。',
+      continuation: Object.freeze({
+        kind: 'return',
+        label: '让步已执行 · 其余关口满足',
+        target: 'next',
+      }),
       key: 'concession',
       label: '在制品让步',
       recovery: '让步不是补录合格。未批准或未执行时继续受阻；有下游依赖时不得直接撤销结果。',
@@ -196,11 +246,22 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     })]),
   }), Object.freeze({
     business_chain: 'outsourcing_quality_disposition',
+    diagram: Object.freeze({
+      branch_label: '已过账回货拒收',
+      external_entry: Object.freeze({
+        label: '独立委外产品回货',
+        role_keys: Object.freeze(['quality', 'warehouse']),
+      }),
+    }),
     entry_stages: Object.freeze([]),
     key: 'outsourcing_rejection',
     label: '委外产品回货拒收',
     plans: Object.freeze([Object.freeze({
       closure: '全部拒收数量均已完成有效处置，正式出库与实物交接完成；部分退回不关闭整笔异常，后续新回货仍须独立检验与入库。',
+      continuation: Object.freeze({
+        kind: 'stop',
+        label: '本次返厂结束 · 新回货另检',
+      }),
       key: 'return_to_vendor',
       label: '返厂处置',
       recovery: '撤销已生效返厂必须按正式冲正和依赖检查恢复库存；后续回货继续独立登记、检验。',
@@ -227,11 +288,18 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     })]),
   }), Object.freeze({
     business_chain: 'purchase_posting_corrections',
-    entry_stages: Object.freeze([]),
+    diagram: Object.freeze({
+      branch_label: '已入库后需纠正',
+    }),
+    entry_stages: Object.freeze(['incoming_quality']),
     key: 'posted_purchase',
     label: '已入库后的退货与纠正',
     plans: Object.freeze([Object.freeze({
       closure: '采购退货已过账，库存和相关财务影响核对完成；每项结果以正式记录为准。',
+      continuation: Object.freeze({
+        kind: 'stop',
+        label: '本次退货结束 · 原入库保留',
+      }),
       key: 'return',
       label: '已入库退货',
       recovery: '退货取消走正式反向处理，受下游与库存门禁约束；不把首次到料拒收用于抵销已入库事实。',
@@ -248,6 +316,11 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       })]),
     }), Object.freeze({
       closure: '入库调整正式生效，库存变化与相关业务核对一致；原入库记录保留。',
+      continuation: Object.freeze({
+        kind: 'return',
+        label: '正式调整生效 · 财务核对完成',
+        target: 'origin',
+      }),
       key: 'adjust',
       label: '入库数量调整',
       recovery: '取消调整须按正式规则生成对应反向结果；已有下游依赖时不能直接改回原数量。',
@@ -282,11 +355,24 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       withdrawal: '申请人按异常单当前状态取消；额度已经用于正式领料时，不能直接取消或冲正批准。',
     }),
     business_chain: 'production_exception',
+    diagram: Object.freeze({
+      branch_label: '超过核定用料',
+      external_entry: Object.freeze({
+        label: '正常生产领料',
+        role_keys: Object.freeze(['production', 'warehouse']),
+      }),
+    }),
     entry_stages: Object.freeze([]),
     key: 'over_issue',
     label: '生产超领材料',
     plans: Object.freeze([Object.freeze({
       closure: '本次实际领料成功且额度消费有记录；审批通过不等于已经发料，未用额度仍按原决定管理。',
+      continuation: Object.freeze({
+        kind: 'return',
+        label: '按获批额度实际领料',
+        target: 'external',
+        target_label: '正常生产领料',
+      }),
       key: 'allowance',
       label: '审批额度后领料',
       recovery: '额度已被使用时不能直接取消批准；领料纠错遵循原领料与库存的正式规则。',
@@ -308,11 +394,18 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     })]),
   }), Object.freeze({
     business_chain: 'finance_payment_and_reversal',
+    diagram: Object.freeze({
+      branch_label: '款项或抵扣有误',
+    }),
     entry_stages: Object.freeze(['customer_advance', 'supplier_advance', 'financial_settlement']),
     key: 'finance_settlement',
     label: '款项、抵扣与退款异常',
     plans: Object.freeze([Object.freeze({
       closure: '退款已确认，原款、抵扣和剩余应收应付分别核清；部分退款继续保留余额。',
+      continuation: Object.freeze({
+        kind: 'stop',
+        label: '本次退款完成 · 余额继续核对',
+      }),
       key: 'refund',
       label: '取消 / 多收多付退款',
       recovery: '退款登记错误时冲销该退款单，恢复原款可用余额并保留审计。',
@@ -339,6 +432,11 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       })]),
     }), Object.freeze({
       closure: '正确来源抵扣完成，原错误与更正均可追溯。',
+      continuation: Object.freeze({
+        kind: 'return',
+        label: '正确抵扣后核对未结余额',
+        target: 'financial_settlement',
+      }),
       key: 'allocation',
       label: '抵扣来源或金额错误',
       recovery: '撤销或抵扣结果不明时重新读回原记录，同一请求不重复记账。',
@@ -355,6 +453,11 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
       })]),
     }), Object.freeze({
       closure: '错误记录已冲销，真实收付有正确凭据及正式记录。',
+      continuation: Object.freeze({
+        kind: 'return',
+        label: '正确收付已审批并执行',
+        target: 'origin',
+      }),
       key: 'cash_record',
       label: '实际收付登记错误',
       recovery: '冲销用于纠正登记，真实资金退回必须单独登记退款。',
@@ -578,6 +681,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         label: '核对原因后重新申请',
       }), Object.freeze({
         detail_refs: Object.freeze(['exception']),
+        exception_guide: 'finance_settlement',
         key: 'exception',
         label: '退款与登记纠正',
       })]),
@@ -727,6 +831,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         label: '核对原因后重新申请',
       }), Object.freeze({
         detail_refs: Object.freeze(['exception']),
+        exception_guide: 'finance_settlement',
         key: 'exception',
         label: '退款与登记纠正',
       })]),
@@ -776,6 +881,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         role_keys: Object.freeze(['warehouse']),
       }), Object.freeze({
         detail_refs: Object.freeze(['exception']),
+        exception_guide: 'purchase_rejection',
         key: 'exception',
         label: '采购退厂或补换',
         role_keys: Object.freeze(['purchase', 'warehouse']),
@@ -856,6 +962,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         label: '合格：进入车缝',
       }), Object.freeze({
         detail_refs: Object.freeze(['exception']),
+        exception_guide: 'production_quality',
         key: 'exception',
         label: '业务提出异常处置方案',
         role_keys: Object.freeze(['sales']),
@@ -958,6 +1065,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         label: '合格：进入手工',
       }), Object.freeze({
         detail_refs: Object.freeze(['exception']),
+        exception_guide: 'production_quality',
         key: 'exception',
         label: '业务提出异常处置方案',
         role_keys: Object.freeze(['sales']),
@@ -1121,6 +1229,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         label: '适用质量关口全部通过',
       }), Object.freeze({
         detail_refs: Object.freeze(['exception']),
+        exception_guide: 'production_quality',
         key: 'exception',
         label: '正式质量异常处置',
       })]),
@@ -1335,6 +1444,7 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
         label: '核对原因后重新申请',
       }), Object.freeze({
         detail_refs: Object.freeze(['exception']),
+        exception_guide: 'finance_settlement',
         key: 'exception',
         label: '退款、撤销抵扣或冲销',
       })]),
@@ -1660,6 +1770,13 @@ export const WorkflowTaskDiscoveryCatalog = Object.freeze({
     label: '加工合同确认',
     module: 'outsourcing',
     sources: Object.freeze(['outsourcing_order']),
+  }), Object.freeze({
+    chain: 'fulfillment',
+    group: '委外供给',
+    groups: Object.freeze(['handoff_outsourcing_quality_request']),
+    key: 'outsourcing_quality_prepare',
+    label: '发起加工回货质检',
+    module: 'quality',
   }), Object.freeze({
     chain: 'fulfillment',
     group: '委外供给',

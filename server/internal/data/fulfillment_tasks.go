@@ -289,6 +289,10 @@ func syncOutsourcingFactHandoffs(ctx context.Context, client *ent.Client, factID
 	}
 	if row.FactType == biz.OutsourcingFactReturnReceipt {
 		status, reason := "ready", ""
+		qualityRequestStatus := ""
+		if row.Status == biz.OperationalFactStatusPosted && row.SubjectType == biz.QualityInspectionSubjectProduct {
+			qualityRequestStatus = "ready"
+		}
 		inspections, err := client.QualityInspection.Query().Where(qualityinspection.SourceType(biz.QualityInspectionSourceOutsourcingFact), qualityinspection.SourceID(row.ID)).All(ctx)
 		if err != nil {
 			return err
@@ -300,14 +304,21 @@ func syncOutsourcingFactHandoffs(ctx context.Context, client *ent.Client, factID
 			if inspection.Status == "PASSED" && inspection.SupersededAt == nil {
 				status, reason = "ready", ""
 			}
+			if inspection.Status != biz.QualityInspectionStatusCancelled && inspection.SupersededAt == nil {
+				qualityRequestStatus = "done"
+			}
 		}
 		if row.Status == "POSTED" {
 			status, reason = "done", ""
 		}
 		if row.Status == "CANCELLED" {
 			status, reason = "withdrawn", ""
+			qualityRequestStatus = "withdrawn"
 		}
 		path := fmt.Sprintf("/erp/purchase/processing-contracts?outsourcing_order_id=%d&outsourcing_fact_id=%d", *row.SourceID, row.ID)
+		if err := syncFulfillmentTask(ctx, client, "outsourcing_quality_request", row.ID, row.FactNo, path, qualityRequestStatus, "", 0); err != nil {
+			return err
+		}
 		if err := syncFulfillmentTask(ctx, client, "outsourcing_inbound", row.ID, row.FactNo, path, status, reason, 0); err != nil {
 			return err
 		}

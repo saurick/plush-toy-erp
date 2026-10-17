@@ -11,6 +11,7 @@ import {
   isDisplayOnlyWorkflowTask,
   requireWorkflowProcessContext,
 } from './processRuntimePresentation.mjs'
+import { formatWorkflowTaskEventTime } from './workflowTaskEventPresentation.mjs'
 
 function context(overrides = {}) {
   const instance = {
@@ -61,6 +62,19 @@ test('process runtime presentation validates canonical task-scoped context', () 
   assert.equal(getProcessLabel(value.process_instance), '销售订单受理')
   assert.equal(getProcessStatusLabel(value.process_instance), '办理中')
   assert.equal(getProcessNodeLabel(value.current_nodes[0]), '订单审批')
+})
+
+test('stage detail times come from the canonical node without inventing missing completion evidence', () => {
+  const value = context()
+  Object.assign(value.nodes[0], { started_at: 1800000001, completed_at: 1800000002 })
+  Object.assign(value.nodes[1], { started_at: null, completed_at: 'invalid' })
+  const { items } = buildWorkflowProcessStageModel(value)
+  assert.equal(items[0].startedAtLabel, formatWorkflowTaskEventTime(1800000001))
+  assert.equal(items[0].completedAtLabel, formatWorkflowTaskEventTime(1800000002))
+  assert.equal(items[0].completedAt, 1800000002)
+  assert.equal(items[1].startedAtLabel, '')
+  assert.equal(items[1].completedAtLabel, '')
+  assert.equal(items[1].completedAt, null)
 })
 
 test('process runtime presentation accepts no formal form as null and rejects an empty object', () => {

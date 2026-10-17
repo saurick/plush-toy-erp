@@ -1,5 +1,5 @@
 [Unit]
-Description=Plush Toy ERP weekly offsite backup restore check
+Description=Plush Toy ERP weekly paired offsite backup restore check
 Requires=docker.service
 After=docker.service
 OnFailure=plush-toy-erp-backup-failure@%n.service
@@ -9,8 +9,10 @@ Type=oneshot
 User=root
 Group=root
 EnvironmentFile=/etc/plush-toy-erp/backup.env
-ExecStart=/root/deploy/plush-toy-erp-production/current/scripts/deploy/verify-scheduled-postgres-backup.sh --backup-dir ${BACKUP_OFFSITE_DIR} --age-identity-file ${BACKUP_AGE_IDENTITY_FILE} --report ${BACKUP_RESTORE_REPORT} --postgres-image ${BACKUP_POSTGRES_IMAGE} --max-backup-age-hours ${BACKUP_MAX_AGE_HOURS}
+ExecStart=/usr/local/bin/node /root/deploy/plush-toy-erp-production/current/scripts/deploy/backup-set/cli.mjs restore-check --offsite-dir ${BACKUP_OFFSITE_DIR} --identity-file ${BACKUP_AGE_IDENTITY_FILE} --work-dir ${BACKUP_RESTORE_WORK_DIR} --report ${BACKUP_RESTORE_REPORT} --max-age-hours ${BACKUP_MAX_AGE_HOURS}
 TimeoutStartSec=45min
+TimeoutStopSec=3min
+KillMode=mixed
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7

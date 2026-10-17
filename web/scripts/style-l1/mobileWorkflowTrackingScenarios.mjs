@@ -4,11 +4,11 @@ import { verifyMobileNavigationMotion } from './slidingMotionAssertions.mjs'
 import { waitForFiniteAnimations } from './browserReadiness.mjs'
 import { assertTaskCopy } from './taskCopyAssertions.mjs'
 import { pullToRefresh } from './mobileGestureAssertions.mjs'
-import { assertMobileFilterConsistency } from './mobileFilterConsistencyAssertions.mjs'
+import { assertMobileFilterSummary, assertMobileFilterClearControl } from './mobileFilterConsistencyAssertions.mjs'
 
 export function createMobileWorkflowTrackingScenarios(deps) {
   const { assert, path, outputDir, assertNoHorizontalOverflow } = deps
-  return createTaskTrackingScenarios(deps).slice(0, 2).map((base) => {
+  const scenarios = createTaskTrackingScenarios(deps).slice(0, 2).map((base) => {
     const readonly = base.themeMode === 'dark'
     const actions = ['mobile.engineering.access', ...base.adminProfile.permissions.filter((action) => !readonly || !['workflow.task.update', 'workflow.task.complete'].includes(action))]
     const calls = []
@@ -164,7 +164,7 @@ export function createMobileWorkflowTrackingScenarios(deps) {
         assert.equal(await filters.getByRole('textbox').count(), 0, '岗位与单据类型固定选项直接平铺，无搜索框')
         await filters.getByRole('group', { name: '当前岗位', exact: true }).getByRole('button', { name: '老板', exact: true }).click()
         await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
-        await assertMobileFilterConsistency({ assert, quick, applied: panel.getByLabel('当前流程筛选') })
+        await assertMobileFilterSummary({ assert, trigger: panel.locator('.mobile-filter-trigger') })
         await chooseScope('我发起的')
         assert.equal(await search.inputValue(), '')
         await panel.getByText('任务分页记录 1', { exact: true }).waitFor()
@@ -173,6 +173,20 @@ export function createMobileWorkflowTrackingScenarios(deps) {
         await panel.getByText('当前筛选下没有匹配记录', { exact: true }).waitFor()
         await chooseScope('我参与的')
         assert.equal(await search.inputValue(), '不存在的单据')
+        await activeStatus.click()
+        const applied = panel.getByRole('group', { name: '当前流程筛选', exact: true })
+        await assertMobileFilterSummary({ assert, trigger: panel.locator('.mobile-filter-trigger') })
+        assert.equal(await applied.count(), 0, '流程条件不再另占标签行')
+        await assertMobileFilterClearControl({ assert, trigger: panel.locator('.mobile-filter-trigger') })
+        await page.screenshot({ path: path.join(outputDir, `mobile-filter-clear-tracking-${base.themeMode}.png`) })
+        await panel.getByRole('button', { name: '清空流程筛选', exact: true }).press('Space')
+        assert.equal(await search.inputValue(), '不存在的单据', '清空流程筛选保留当前范围搜索')
+        assert.equal(await activeStatus.getAttribute('aria-pressed'), 'false', '清空包含快捷状态')
+        assert.equal(await panel.getByRole('button', { name: '筛选流程', exact: true }).count(), 1)
+        assert.equal(calls.at(-1).scope, 'participated', '清空保留跟踪范围')
+        await panel.getByRole('button', { name: '筛选流程', exact: true }).click()
+        await filters.getByRole('group', { name: '当前岗位', exact: true }).getByRole('button', { name: '老板', exact: true }).click()
+        await filters.getByRole('button', { name: '关闭筛选', exact: true }).click()
         await panel.getByRole('button', { name: '筛选流程，已应用 1 项', exact: true }).click()
         await filters.waitFor({ state: 'visible' })
         await waitForFiniteAnimations(page)
@@ -220,4 +234,65 @@ export function createMobileWorkflowTrackingScenarios(deps) {
       },
     }
   })
+  return [...scenarios, ...scenarios.map((base) => ({
+    ...base,
+    name: `mobile-workflow-exceptions-${base.themeMode}`,
+    beforeNavigate: async (page) => {
+      await base.beforeNavigate(page)
+      await page.route('**/rpc/workflow', async (route) => {
+        const body = route.request().postDataJSON()
+        if (body.method !== 'list_exceptions') return route.fallback()
+        const items = ['open', 'executing', 'open', 'closed'].map((state, index) => ({ key: `quality:${index + 1}`, number: `STYLE-L1-EX-${index + 1}`, state, reason: '筛选密度验证', tasks: [], task_ids: [], orders: [] }))
+        const { state, keyword = '' } = body.params
+        const matching = items.filter((item) => (!state || (state === 'closed' ? item.state === 'closed' : item.state !== 'closed')) && (!keyword || item.reason.includes(keyword) || item.number.includes(keyword)))
+        return route.fulfill({ json: { jsonrpc: '2.0', id: body.id, result: { code: 0, message: '', data: { items: matching, total: matching.length, view_total: matching.length, open: 3, closed: 1, tasks: [], orders: [], pending_tasks: 0, affected_orders: 0 } } } })
+      })
+    },
+    verify: async (page) => {
+      await page.getByTestId('mobile-role-nav-tasks').click()
+      await page.locator('.mobile-workspace-task-views').getByText('流程跟踪', { exact: true }).click()
+      await page.locator('.mobile-workspace-tracking-views').getByText('异常跟踪', { exact: true }).click()
+      const panel = page.locator('.mobile-workspace-exceptions .workflow-exceptions')
+      await panel.getByText('STYLE-L1-EX-1', { exact: true }).waitFor()
+      const search = panel.getByRole('searchbox', { name: '搜索异常单号、订单、批次或原因', exact: true })
+      const statuses = panel.getByRole('group', { name: '异常处理状态', exact: true })
+      const clear = panel.getByRole('button', { name: '清空异常筛选', exact: true })
+      assert.equal(await clear.count(), 0)
+      await search.fill('密度')
+      await search.press('Enter')
+      await statuses.getByRole('button', { name: /^未处理完/ }).click()
+      await page.waitForFunction(() => document.querySelectorAll('.mobile-workspace-exceptions .workflow-exceptions__item').length === 3)
+      assert.equal(await clear.count(), 1)
+      for (const width of [320, 390, 430]) {
+        await page.setViewportSize({ width, height: 844 })
+        const geometry = await panel.evaluate((root) => {
+          const rect = (selector) => root.querySelector(selector).getBoundingClientRect().toJSON()
+          return { input: rect('input'), clear: rect('.mobile-filter-clear'), controls: rect('.workflow-exceptions__controls'), overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth }
+        })
+        assert(geometry.input.width >= 44 && geometry.clear.width >= 44 && geometry.clear.height >= 44, JSON.stringify(geometry))
+        assert(geometry.controls.height <= 110 && geometry.overflow <= 1, JSON.stringify(geometry))
+        assert(geometry.input.right <= geometry.clear.left, '搜索与清空保持独立触区')
+      }
+      await page.screenshot({ path: path.join(outputDir, `mobile-exception-clear-${base.themeMode}.png`) })
+      await page.locator('.mobile-workspace-tracking-views').getByText('流程进度', { exact: true }).click()
+      const trackingSearch = page.getByRole('searchbox', { name: '搜索流转记录', exact: true })
+      await trackingSearch.fill('流程对照')
+      await trackingSearch.press('Enter')
+      await page.locator('.mobile-workspace-tracking-views').getByText('异常跟踪', { exact: true }).click()
+      assert.equal(await search.inputValue(), '密度')
+      assert.equal(await statuses.getByRole('button', { name: /^未处理完/ }).getAttribute('aria-pressed'), 'true')
+      await clear.press('Enter')
+      await page.waitForFunction(() => document.querySelectorAll('.mobile-workspace-exceptions .workflow-exceptions__item').length === 4)
+      assert.equal(await search.inputValue(), '密度', '一键清空保留异常搜索')
+      assert.equal(await clear.count(), 0)
+      assert(await search.evaluate((input) => document.activeElement === input), '清空后焦点回到搜索')
+      assert.equal(await statuses.getByRole('button', { name: /^全部异常/ }).getAttribute('aria-pressed'), 'true')
+      await page.reload()
+      assert.equal(await search.inputValue(), '密度')
+      assert.equal(await clear.count(), 0)
+      await page.locator('.mobile-workspace-tracking-views').getByText('流程进度', { exact: true }).click()
+      assert.equal(await trackingSearch.inputValue(), '流程对照', '异常清空不改变流程页签')
+      await assertNoHorizontalOverflow(page, '手机跟踪页签切换')
+    },
+  }))]
 }

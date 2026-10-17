@@ -5,6 +5,7 @@ package ent
 import (
 	"fmt"
 	"server/internal/data/model/ent/financecreditnote"
+	"server/internal/data/model/ent/financefact"
 	"strings"
 	"time"
 
@@ -39,8 +40,55 @@ type FinanceCreditNote struct {
 	// CreatedBy holds the value of the "created_by" field.
 	CreatedBy int `json:"created_by,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
-	CreatedAt    time.Time `json:"created_at,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the FinanceCreditNoteQuery when eager-loading is set.
+	Edges        FinanceCreditNoteEdges `json:"edges"`
 	selectValues sql.SelectValues
+}
+
+// FinanceCreditNoteEdges holds the relations/edges for other nodes in the graph.
+type FinanceCreditNoteEdges struct {
+	// FinanceFact holds the value of the finance_fact edge.
+	FinanceFact *FinanceFact `json:"finance_fact,omitempty"`
+	// Reversals holds the value of the reversals edge.
+	Reversals []*FinanceCreditNote `json:"reversals,omitempty"`
+	// ReversalOf holds the value of the reversal_of edge.
+	ReversalOf *FinanceCreditNote `json:"reversal_of,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [3]bool
+}
+
+// FinanceFactOrErr returns the FinanceFact value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e FinanceCreditNoteEdges) FinanceFactOrErr() (*FinanceFact, error) {
+	if e.FinanceFact != nil {
+		return e.FinanceFact, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: financefact.Label}
+	}
+	return nil, &NotLoadedError{edge: "finance_fact"}
+}
+
+// ReversalsOrErr returns the Reversals value or an error if the edge
+// was not loaded in eager-loading.
+func (e FinanceCreditNoteEdges) ReversalsOrErr() ([]*FinanceCreditNote, error) {
+	if e.loadedTypes[1] {
+		return e.Reversals, nil
+	}
+	return nil, &NotLoadedError{edge: "reversals"}
+}
+
+// ReversalOfOrErr returns the ReversalOf value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e FinanceCreditNoteEdges) ReversalOfOrErr() (*FinanceCreditNote, error) {
+	if e.ReversalOf != nil {
+		return e.ReversalOf, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: financecreditnote.Label}
+	}
+	return nil, &NotLoadedError{edge: "reversal_of"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -155,6 +203,21 @@ func (_m *FinanceCreditNote) assignValues(columns []string, values []any) error 
 // This includes values selected through modifiers, order, etc.
 func (_m *FinanceCreditNote) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
+}
+
+// QueryFinanceFact queries the "finance_fact" edge of the FinanceCreditNote entity.
+func (_m *FinanceCreditNote) QueryFinanceFact() *FinanceFactQuery {
+	return NewFinanceCreditNoteClient(_m.config).QueryFinanceFact(_m)
+}
+
+// QueryReversals queries the "reversals" edge of the FinanceCreditNote entity.
+func (_m *FinanceCreditNote) QueryReversals() *FinanceCreditNoteQuery {
+	return NewFinanceCreditNoteClient(_m.config).QueryReversals(_m)
+}
+
+// QueryReversalOf queries the "reversal_of" edge of the FinanceCreditNote entity.
+func (_m *FinanceCreditNote) QueryReversalOf() *FinanceCreditNoteQuery {
+	return NewFinanceCreditNoteClient(_m.config).QueryReversalOf(_m)
 }
 
 // Update returns a builder for updating this FinanceCreditNote.

@@ -27,6 +27,18 @@ export function createDevUIDesignMobileTrackingScenario({
         evaluate: (...args) => document.evaluate(...args),
         locator: (selector) => document.locator(selector),
       }
+      const primaryGeometry = () => phone.locator('.rm-primary-tabs').evaluate((root) => {
+        const box = root.getBoundingClientRect()
+        return { height: box.height, top: box.top - root.closest('.role-mobile-device').getBoundingClientRect().top }
+      })
+      const taskGeometry = await primaryGeometry()
+      await phone.locator('[data-action="mobile-main"][data-value="progress"]').click()
+      const progressGeometry = await primaryGeometry()
+      assert.equal(taskGeometry.height, 46)
+      assert.deepEqual(progressGeometry, taskGeometry, '设计演示的两组主页面页签同高、同起点')
+      await verifyMobileNavigationMotion(preview, assert, '.rm-primary-tabs[aria-label="进度视图"]', 1)
+      await verifyMobileNavigationMotion(preview, assert, '.rm-primary-tabs[aria-label="进度视图"]', 0, true)
+      await phone.locator('[data-action="mobile-main"][data-value="tasks"]').click()
       await verifyMobileNavigationMotion(
         preview,
         assert,
@@ -58,7 +70,7 @@ export function createDevUIDesignMobileTrackingScenario({
           .count(),
         2
       )
-      await tracking.getByRole('button', { name: '筛选', exact: true }).click()
+      await tracking.getByRole('button', { name: '筛选流程', exact: true }).click()
       const filters = phone.getByRole('dialog', {
         name: '流转筛选',
         exact: true,
@@ -169,7 +181,7 @@ export function createDevUIDesignMobileTrackingScenario({
       await phone
         .getByRole('heading', { name: '任务信息', exact: true })
         .waitFor()
-      assert.equal(await phone.locator('.rm-steps').isVisible(), false)
+      assert.equal(await phone.locator('.rm-steps').isVisible(), true, '任务详情从首屏保留三步办理引导')
       await phone.locator('[data-action="mobile-back"]').click()
       await drawer.waitFor()
       await drawer
@@ -244,11 +256,17 @@ export function createDevUIDesignMobileTrackingScenario({
           'dev-ui-design-mobile-exception-tracking-4k.png'
         ),
       })
+      const exceptionSearch = exceptionTracking.locator('#mobile-exception-search')
+      const exceptionKeyword = await exceptionSearch.inputValue()
+      await exceptionTracking.getByRole('button', { name: '清空异常筛选', exact: true }).click()
+      assert.equal(await exceptionSearch.inputValue(), exceptionKeyword, '设计演示清空状态时保留搜索')
+      assert.equal(await exceptionTracking.getByRole('button', { name: '清空异常筛选', exact: true }).count(), 0)
+      assert.equal(await exceptionTracking.locator('.rm-applied-filters').count(), 0)
       await phone.getByRole('tab', { name: /^已办/ }).click()
       await phone
         .getByRole('region', { name: '已办任务', exact: true })
         .waitFor()
-      await phone.getByRole('button', { name: '筛选', exact: true }).click()
+      await phone.getByRole('button', { name: '筛选已办', exact: true }).click()
       const historyFilters = phone.getByRole('dialog', {
         name: '已办筛选',
         exact: true,
@@ -277,6 +295,14 @@ export function createDevUIDesignMobileTrackingScenario({
           .count(),
         0
       )
+      await historyFilters.getByRole('button', { name: '关闭筛选', exact: true }).click()
+      const clearAll = phone.getByRole('button', { name: '清空已办筛选', exact: true })
+      assert.equal(await clearAll.count(), 1, '设计稿的时间快捷条件计入右侧清空入口')
+      assert.equal(await phone.locator('.rm-applied-filters .rm-filter-clear-all').count(), 0)
+      await clearAll.click()
+      assert.equal(await phone.getByRole('region', { name: '已办任务', exact: true }).locator('.rm-task-card').count(), 3)
+      assert.equal(await clearAll.count(), 0)
+      await phone.getByRole('button', { name: '筛选已办', exact: true }).click()
       await historyFilters
         .getByRole('button', { name: '重置筛选', exact: true })
         .click()

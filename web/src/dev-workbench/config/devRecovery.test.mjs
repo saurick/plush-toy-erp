@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import test from 'node:test'
+import { readDevWorkbenchPageSource } from '../../../scripts/test/pageSources.mjs'
 
 import {
   DEV_DRILL_RECOVERY_CATALOG,
@@ -445,10 +445,7 @@ test('devRecovery: 新增目标后只消费当前目标自己的演练证据', (
 })
 
 test('devRecovery: 页面只读消费版本摘要，不创建第二套写动作', () => {
-  const source = readFileSync(
-    new URL('../pages/DevDrillRecoveryPage.jsx', import.meta.url),
-    'utf8'
-  )
+  const source = readDevWorkbenchPageSource('DevDrillRecoveryPage.jsx')
   assert.match(source, /createDevDeliveryClient/u)
   assert.match(source, /client\.summary\(\)/u)
   assert.doesNotMatch(source, /client\.action|fetch\(|WebSocket|EventSource/u)

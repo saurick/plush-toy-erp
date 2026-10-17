@@ -134,6 +134,7 @@ function MobileWorkflowTaskActionScreen({
   onActionChange = () => {},
   onApprovedQuantityChange = () => {},
   onBack = () => {},
+  onOpenBusiness = null,
   onReasonChange = () => {},
   onRetryAccess = null,
   onSubmit = () => {},
@@ -515,6 +516,13 @@ function MobileWorkflowTaskActionScreen({
                 ) : null}
               </section>
             ) : null}
+            {onOpenBusiness ? (
+              <section className="erp-mobile-card mobile-detail-section">
+                <button type="button" className="mobile-detail-secondary min-h-11 w-full rounded-xl px-4 py-3 text-base font-semibold" disabled={busy} onClick={onOpenBusiness}>
+                  办理业务单据
+                </button>
+              </section>
+            ) : null}
             <section className="erp-mobile-card mobile-detail-section mobile-task-action-form">
               {visibleActions.length > 1 ? (
                 <div data-testid="mobile-task-action-options">
@@ -552,11 +560,6 @@ function MobileWorkflowTaskActionScreen({
                     data-testid="mobile-task-single-action-summary"
                   >
                     <strong>{effectiveActionLabel}</strong>
-                    <p>
-                      {approvalTask && singleVisibleAction.key === 'done'
-                        ? '核对后确认通过，记录审批意见。'
-                        : singleVisibleAction.description}
-                    </p>
                   </div>
                 </div>
               ) : (

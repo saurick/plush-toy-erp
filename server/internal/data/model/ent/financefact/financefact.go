@@ -76,6 +76,10 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeAllocations holds the string denoting the allocations edge name in mutations.
+	EdgeAllocations = "allocations"
+	// EdgeCreditNotes holds the string denoting the credit_notes edge name in mutations.
+	EdgeCreditNotes = "credit_notes"
 	// EdgePoster holds the string denoting the poster edge name in mutations.
 	EdgePoster = "poster"
 	// EdgeSettler holds the string denoting the settler edge name in mutations.
@@ -84,6 +88,20 @@ const (
 	EdgeCanceller = "canceller"
 	// Table holds the table name of the financefact in the database.
 	Table = "finance_facts"
+	// AllocationsTable is the table that holds the allocations relation/edge.
+	AllocationsTable = "finance_allocations"
+	// AllocationsInverseTable is the table name for the FinanceAllocation entity.
+	// It exists in this package in order to avoid circular dependency with the "financeallocation" package.
+	AllocationsInverseTable = "finance_allocations"
+	// AllocationsColumn is the table column denoting the allocations relation/edge.
+	AllocationsColumn = "finance_fact_id"
+	// CreditNotesTable is the table that holds the credit_notes relation/edge.
+	CreditNotesTable = "finance_credit_notes"
+	// CreditNotesInverseTable is the table name for the FinanceCreditNote entity.
+	// It exists in this package in order to avoid circular dependency with the "financecreditnote" package.
+	CreditNotesInverseTable = "finance_credit_notes"
+	// CreditNotesColumn is the table column denoting the credit_notes relation/edge.
+	CreditNotesColumn = "finance_fact_id"
 	// PosterTable is the table that holds the poster relation/edge.
 	PosterTable = "finance_facts"
 	// PosterInverseTable is the table name for the AdminUser entity.
@@ -377,6 +395,34 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
+// ByAllocationsCount orders the results by allocations count.
+func ByAllocationsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newAllocationsStep(), opts...)
+	}
+}
+
+// ByAllocations orders the results by allocations terms.
+func ByAllocations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newAllocationsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByCreditNotesCount orders the results by credit_notes count.
+func ByCreditNotesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newCreditNotesStep(), opts...)
+	}
+}
+
+// ByCreditNotes orders the results by credit_notes terms.
+func ByCreditNotes(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newCreditNotesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByPosterField orders the results by poster field.
 func ByPosterField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -396,6 +442,20 @@ func ByCancellerField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newCancellerStep(), sql.OrderByField(field, opts...))
 	}
+}
+func newAllocationsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(AllocationsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, AllocationsTable, AllocationsColumn),
+	)
+}
+func newCreditNotesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(CreditNotesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, CreditNotesTable, CreditNotesColumn),
+	)
 }
 func newPosterStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(

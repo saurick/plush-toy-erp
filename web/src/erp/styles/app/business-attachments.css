@@ -296,11 +296,22 @@
 
 .business-attachment-panel__status {
   display: flex;
+  flex: 1 1 240px;
+  min-width: 0;
   align-items: center;
   gap: 8px;
-  margin-inline-end: auto;
   color: var(--erp-text-subtle);
   font-size: var(--erp-font-caption);
+}
+
+.business-attachment-panel__footer-actions {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-inline-start: auto;
 }
 
 .business-attachment-panel__preview-frame {
@@ -357,7 +368,8 @@
   }
 
   .business-attachment-panel__refresh,
-  .business-attachment-panel__upload-actions > .ant-btn {
+  .business-attachment-panel__upload-actions > .ant-btn,
+  .business-attachment-panel__footer-actions > .ant-btn {
     min-height: 44px;
   }
 

@@ -21,7 +21,8 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  padding: 10px 12px;
+  min-width: 0;
+  flex: 1 1 480px;
 }
 .erp-dev-overview-library__toolbar .erp-search-input {
   width: min(340px, 100%);
@@ -30,7 +31,7 @@
   min-width: 136px;
 }
 .erp-dev-overview-library__count {
-  margin-inline-start: auto;
+  white-space: nowrap;
   font-size: var(--erp-font-caption);
 }
 .erp-dev-overview-view-tabs.erp-dev-task-nav {

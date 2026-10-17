@@ -144,11 +144,13 @@ test('businessUsabilityCatalog: 专属与共享页面都接入同一页内帮助
   const productionLayout = read(
     'web/src/erp/components/production-records/ProductionRecordsLayout.jsx'
   )
-  assert.match(productionLayout, /PRODUCTION_RECORD_VIEW_KEYS\.DECISIONS/u)
-  assert.match(productionLayout, /PRODUCTION_RECORD_VIEW_KEYS\.TASKS/u)
+  assert.match(productionLayout, /<Outlet context=\{workspaceContext\}/u)
+  assert.match(productionLayout, /productionRecordsWorkspace: true/u)
+  const router = read('web/src/erp/router.jsx')
+  assert.match(router, /path="production\/progress"[\s\S]*?<OperationalFactPage moduleKey="production-progress"/u)
   assert.match(
-    productionLayout,
-    /\? 'production-exceptions'\s*: 'production-progress'/u
+    router,
+    /path="production\/exceptions"[\s\S]*?<WorkflowBusinessModulePage moduleKey="production-exceptions"/u
   )
 })
 
@@ -186,7 +188,7 @@ test('businessUsabilityCatalog: 关键字段问号可悬停、聚焦和点击且
       'web/src/erp/components/quality-inspections/QualityInspectionForms.jsx',
       'defect-rate',
     ],
-    ['web/src/erp/pages/InventoryLedgerPage.jsx', 'available-quantity'],
+    ['web/src/erp/components/inventory/inventoryLedgerPresentation.jsx', 'available-quantity'],
     [
       'web/src/erp/components/outsourcing-orders/OutsourcingOrderForm.jsx',
       'outsourcing-line-amount',

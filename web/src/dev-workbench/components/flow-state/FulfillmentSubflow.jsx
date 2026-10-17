@@ -18,8 +18,9 @@ export default function FulfillmentSubflow({ step, role, searchParams, setSearch
   const selectNode = (id) => {
     const node = diagram.nodes.find((item) => item.id === id)
     if (!node) return
-    if (flow.nodes.find((item) => item.key === node.key).exception && onOpenException) {
-      onOpenException(node.key)
+    const exceptionGuide = flow.nodes.find((item) => item.key === node.key).exception_guide
+    if (exceptionGuide && onOpenException) {
+      onOpenException(node.key, exceptionGuide)
       return
     }
     setSearchParams((previous) => {

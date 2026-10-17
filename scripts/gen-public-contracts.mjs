@@ -30,7 +30,7 @@ function moduleSource(source, exports) {
 }
 
 export function renderCatalog(catalog) {
-  for (const key of ['permissions', 'states', 'attachments', 'numeric', 'policies', 'rpc', 'taskDiscovery']) {
+  for (const key of ['permissions', 'states', 'attachments', 'numeric', 'policies', 'rpc', 'rpcTransport', 'taskDiscovery']) {
     if (!catalog[key] || Object.keys(catalog[key]).length === 0) throw new Error(`缺少契约：${key}`)
   }
   const precision = catalog.numeric.Precision
@@ -51,8 +51,8 @@ export function renderCatalog(catalog) {
     'statuses.generated.mjs': moduleSource('server/internal/core/status 及 server/cmd/public-contracts 登记的 biz 领域声明', catalog.states),
     'attachments.generated.mjs': moduleSource('server/internal/biz/business_attachment.go', { AttachmentPolicy: catalog.attachments }),
     'numeric.generated.mjs': moduleSource('server/internal/core/value/numeric.go', { NumericContract: numeric }),
-    'policies.generated.mjs': moduleSource('server/internal/biz/admin_password.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go', catalog.policies),
-    'rpcMethods.generated.mjs': moduleSource('server/internal/service/jsonrpc_dispatch.go 及其域 handler 的 method switch', { RpcDomain: domains, RpcMethod: catalog.rpc }),
+    'policies.generated.mjs': moduleSource('server/internal/biz/admin_password.go、server/internal/biz/help_content.go、server/internal/server/template_pdf.go、server/internal/server/template_pdf_security.go', catalog.policies),
+    'rpcMethods.generated.mjs': moduleSource('server/api/jsonrpc/v1/jsonrpc.pb.go 消息描述、HTTP binding、Swagger 及 server/internal/service 的实际分发', { RpcTransport: catalog.rpcTransport, RpcDomain: domains, RpcMethod: catalog.rpc }),
   }
 }
 

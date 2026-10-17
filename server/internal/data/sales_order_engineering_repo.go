@@ -15,7 +15,6 @@ import (
 	"server/internal/data/model/ent/bomitem"
 	"server/internal/data/model/ent/businessattachment"
 	"server/internal/data/model/ent/engineeringmaterialrequest"
-	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
@@ -286,13 +285,20 @@ func validateSalesOrderEngineeringDependencies(ctx context.Context, client *ent.
 // The approval binds manufacturing content. Activating an unchanged draft does
 // not change the sample; edits to material, consumption or process do.
 func salesOrderBOMFingerprint(ctx context.Context, client *ent.Client, header *ent.BOMHeader, sqlDialect string) (string, error) {
-	parts, err := client.BOMItem.Query().Where(bomitem.BomHeaderID(header.ID)).Order(ent.Asc(bomitem.FieldID)).All(ctx)
+	parts, err := client.BOMItem.Query().Where(bomitem.BomHeaderID(header.ID)).Order(ent.Asc(bomitem.FieldID)).
+		WithMaterial(func(q *ent.MaterialQuery) {
+			q.Where(func(s *sql.Selector) { applyBOMReferenceShareLock(s, sqlDialect) })
+		}).All(ctx)
 	if err != nil {
 		return "", err
 	}
+	return salesOrderBOMFingerprintFromParts(header, parts)
+}
+
+func salesOrderBOMFingerprintFromParts(header *ent.BOMHeader, parts []*ent.BOMItem) (string, error) {
 	content := []any{header.ProductID, header.Version}
 	for _, part := range parts {
-		m, err := client.Material.Query().Where(material.ID(part.MaterialID)).Where(func(s *sql.Selector) { applyBOMReferenceShareLock(s, sqlDialect) }).Only(ctx)
+		m, err := part.Edges.MaterialOrErr()
 		if err != nil {
 			return "", err
 		}

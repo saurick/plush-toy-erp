@@ -99,7 +99,7 @@
 }
 .erp-dev-tool-table th,
 .erp-dev-tool-table td {
-  padding: 10px 14px;
+  padding: 6px 14px;
   border-bottom: 1px solid var(--erp-border);
   text-align: left;
   vertical-align: middle;
@@ -135,7 +135,7 @@
 .erp-dev-environment-evidence__table td {
   width: 16.6%;
   border-bottom: 1px solid var(--erp-border);
-  padding: 14px;
+  padding: 6px 14px;
   text-align: left;
   vertical-align: top;
 }
@@ -172,7 +172,7 @@
 .erp-dev-version-facts th,
 .erp-dev-version-facts td {
   border-bottom: 1px solid var(--erp-border);
-  padding: 12px 14px;
+  padding: 6px 14px;
   text-align: left;
   vertical-align: top;
 }
@@ -313,7 +313,9 @@
 
 .erp-dev-tool-page .erp-dev-product-core-toolbar {
   align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 8px;
 }
 
 .erp-dev-tool-page .erp-dev-product-core-table {
@@ -458,18 +460,6 @@
 .erp-dev-tool-page .erp-dev-customer-scope--compact .erp-dev-customer-scope__copy {
   flex: 0 0 auto;
   min-width: 0;
-}
-
-.erp-dev-tool-page .erp-dev-version-context {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-}
-
-.erp-dev-tool-page .erp-dev-version-target-context {
-  padding-inline-start: 0;
-  border-inline-start: 0;
 }
 
 .erp-dev-target-data-boundary {
