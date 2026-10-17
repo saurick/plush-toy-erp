@@ -400,7 +400,10 @@ function taskCalendarDesignScenario({ assert, path, outputDir }) {
       await page.getByRole('heading', { name: 'UI 交互设计', exact: true }).waitFor()
       const frame = page.frameLocator('iframe[title="ERP 最新可交互设计"]')
       await frame.locator('[data-action="board-mode"][data-value="todo"]').click()
-      await frame.locator('[data-action="task-calendar-layout"][data-value="calendar"]').click()
+      const desktopSwitch = frame.locator('.task-calendar-switch[data-device="desktop"]')
+      const calendarButton = desktopSwitch.getByRole('button', { name: '日历', exact: true })
+      await calendarButton.click()
+      assert.equal(await calendarButton.getAttribute('aria-pressed'), 'true', '电脑版日历切换必须实际更新选中状态')
       const calendar = frame.getByRole('region', { name: '待办日历', exact: true })
       await calendar.getByRole('button', { name: /^2026-10-14/ }).waitFor()
       const geometry = await calendar.evaluate((root) => {
@@ -416,7 +419,30 @@ function taskCalendarDesignScenario({ assert, path, outputDir }) {
         }
       })
       assert(geometry.titleOffset <= 1 && Math.max(...geometry.columnOffsets) <= 1, `design calendar shares centered title and weekday columns: ${JSON.stringify(geometry)}`)
-      assert(await calendar.locator('.task-calendar-demo-items .task-card').count() > 0)
+      const agenda = calendar.getByRole('table', { name: '待办任务', exact: true })
+      const taskRows = agenda.locator('tbody tr[data-action="open-task"]')
+      assert(await taskRows.count() > 0)
+      const firstTaskId = await taskRows.first().getAttribute('data-id')
+      await taskRows.first().locator('button[data-action="open-task"]').click()
+      await frame.locator('.drawer').waitFor()
+      await frame.locator('.drawer-head [data-action="close-drawer"]').click()
+      await frame.locator('.drawer').waitFor({ state: 'hidden' })
+      assert.equal(await calendar.getByRole('button', { name: /^2026-10-14/ }).getAttribute('aria-pressed'), 'true', '关闭任务详情后保留日历选择')
+      assert.equal(await taskRows.first().getAttribute('data-id'), firstTaskId)
+      const agendaGeometry = await calendar.evaluate((root) => {
+        const month = root.querySelector('.task-calendar-demo-month').getBoundingClientRect()
+        const items = root.querySelector('.task-calendar-demo-items').getBoundingClientRect()
+        const table = root.querySelector('.table-wrap').getBoundingClientRect()
+        return {
+          calendarOverflow: root.scrollWidth - root.clientWidth,
+          pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          monthRight: month.right,
+          agendaLeft: items.left,
+          agendaRight: items.right,
+          tableRight: table.right,
+        }
+      })
+      assert(agendaGeometry.calendarOverflow <= 1 && agendaGeometry.pageOverflow <= 1 && agendaGeometry.agendaLeft >= agendaGeometry.monthRight && agendaGeometry.tableRight <= agendaGeometry.agendaRight + 1, `日历任务表格在议程内滚动并与月份并排：${JSON.stringify(agendaGeometry)}`)
       await calendar.getByRole('button', { name: '下个月', exact: true }).click()
       await calendar.getByRole('button', { name: /^2026-11-01/ }).waitFor()
       await calendar.getByRole('button', { name: '今天', exact: true }).click()
@@ -425,20 +451,29 @@ function taskCalendarDesignScenario({ assert, path, outputDir }) {
       await calendar.getByRole('button', { name: /^2026-10-14/ }).waitFor()
       await page.screenshot({ path: path.join(outputDir, 'task-calendar-design-desktop-4k.png') })
       await page.goto(new URL('/__dev/ui-design?page=mobile-tasks', page.url()).href)
-      await frame.locator('[data-action="task-calendar-layout"][data-value="calendar"]').click()
+      const switchMobileLayout = async (layout) => {
+        const button = frame.getByRole('button', { name: layout === 'calendar' ? '切换到日历' : '切换到列表', exact: true })
+        await button.waitFor()
+        const icon = button.locator('svg')
+        assert.equal(await icon.count(), 1, '手机视图切换使用已登记图标')
+        assert.equal(await icon.isVisible(), true, '手机视图切换图标可见')
+        await button.click()
+      }
+      await switchMobileLayout('calendar')
       await calendar.getByRole('button', { name: /^2026-10-14/ }).waitFor()
       assert(await calendar.locator('.rm-task-card').count() > 0)
       await frame.locator('[data-action="mobile-options"]').click()
       await frame.locator('[data-action="mobile-calendar-filter"][data-value="undated"]').click()
-      await frame.locator('[data-action="mobile-options-close"]').click()
+      await frame.getByRole('button', { name: '关闭筛选', exact: true }).click()
       await calendar.getByText(/未设置截止日期/).waitFor()
       assert.equal(await calendar.locator('.task-calendar-demo-month').count(), 0)
       assert.equal(await calendar.locator('.task-calendar-demo-buckets').count(), 0)
       await frame.getByRole('button', { name: '清空任务筛选', exact: true }).click()
       await calendar.getByRole('button', { name: /^2026-10-14/ }).waitFor()
-      await frame.locator('[data-action="task-calendar-layout"][data-value="list"]').click()
+      await switchMobileLayout('list')
       assert.equal(await calendar.count(), 0)
-      await frame.locator('[data-action="task-calendar-layout"][data-value="calendar"]').click()
+      await page.screenshot({ path: path.join(outputDir, 'task-calendar-design-mobile-list-4k.png') })
+      await switchMobileLayout('calendar')
       await page.screenshot({ path: path.join(outputDir, 'task-calendar-design-mobile-4k.png') })
     },
   }

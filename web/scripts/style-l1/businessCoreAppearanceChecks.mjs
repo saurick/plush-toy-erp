@@ -2,6 +2,7 @@ import { createBusinessFormalAssertions } from './businessFormalAssertions.mjs'
 
 export async function verifyBusinessCoreAppearance(page, deps) {
   const {
+    assert,
     assertBusinessHeaderCompact,
     assertERPThemeMode,
     assertNoHorizontalOverflow,
@@ -47,9 +48,11 @@ export async function verifyBusinessCoreAppearance(page, deps) {
     waitUntil: 'domcontentloaded',
   })
 
-  await expectHeading(page, '生产记录')
-
-  await expectText(page, '异常处理')
+  await expectHeading(page, '生产管理')
+  const productionTabs = page.locator('.erp-business-module-tabs')
+  const exceptionsTab = productionTabs.getByRole('tab', { name: '异常处理', exact: true })
+  assert.equal(await exceptionsTab.getAttribute('aria-selected'), 'true')
+  assert.equal(await page.getByRole('tab', { name: '待审批', exact: true }).count(), 0)
 
   await assertBusinessCollaborationPanelAbsent(
     page,
@@ -78,22 +81,31 @@ export async function verifyBusinessCoreAppearance(page, deps) {
   await page.screenshot({
     path: path.join(
       outputDir,
-      'business-production-exceptions-decisions-tab-dark.png'
+      'business-production-exceptions-dark.png'
     ),
     fullPage: true,
   })
 
-  await page.getByRole('tab', { name: '待审批' }).click()
-
-  await expectText(page, '暂无待审批的生产异常处置申请。')
+  await productionTabs.getByRole('tab', { name: '生产记录', exact: true }).click()
+  await expectHeading(page, '生产记录')
 
   await assertUnifiedListToolbarShell(page, {
-    scenarioName: 'business-workflow-production-exceptions-tasks-dark',
-    exportVisible: false,
+    scenarioName: 'business-production-records-dark',
   })
 
   await assertERPThemeMode(page, {
-    scenarioName: 'business-workflow-production-exceptions-tasks-dark',
+    scenarioName: 'business-production-records-dark',
+    expectedMode: 'dark',
+    expectedEffectiveTheme: 'dark',
+  })
+  await exceptionsTab.click()
+  await expectText(page, '暂无生产异常处置申请')
+  await assertUnifiedListToolbarShell(page, {
+    scenarioName: 'business-production-exceptions-return-dark',
+    exportVisible: false,
+  })
+  await assertERPThemeMode(page, {
+    scenarioName: 'business-production-exceptions-return-dark',
     expectedMode: 'dark',
     expectedEffectiveTheme: 'dark',
   })

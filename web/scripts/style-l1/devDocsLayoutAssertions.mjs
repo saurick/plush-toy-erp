@@ -1,3 +1,5 @@
+import { waitForFiniteAnimations } from './browserReadiness.mjs'
+
 export async function assertDevDocsDirectorySpace(page, assert) {
   const tree = page.locator('.erp-dev-docs-tree')
   await tree.waitFor()
@@ -188,6 +190,8 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
   await page.locator('.erp-dev-docs-toc__tag').first().waitFor()
   for (const width of [1440, 1024]) {
     await page.setViewportSize({ width, height: 900 })
+    await page.evaluate(() => document.fonts.ready)
+    await waitForFiniteAnimations(page)
     const geometry = await page
       .locator('.erp-dev-docs-reader')
       .evaluate((root) => {
@@ -204,6 +208,11 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
         const toolbarBox = toolbar.getBoundingClientRect()
         const shellBox = shell.getBoundingClientRect()
         return {
+          viewport: { width: innerWidth, height: innerHeight },
+          documentSize: {
+            width: document.documentElement.scrollWidth,
+            height: document.documentElement.scrollHeight,
+          },
           toolbarHeight: toolbarBox.height,
           tocHeight: shellBox.height,
           titlePathCenterDelta: Math.abs(center(name) - center(path)),
@@ -229,6 +238,9 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
             document.documentElement.scrollHeight > innerHeight + 1,
         }
       })
+    console.info(
+      `[style:l1:docs-reader] width=${width} ${JSON.stringify(geometry)}`
+    )
     assert(
       geometry.toolbarHeight <= (width === 1440 ? 50 : 90),
       '标题、路径和操作按可用宽度紧凑排列'
@@ -244,10 +256,7 @@ export async function verifyDevDocsReadingNavigation(page, assert) {
       geometry.fontSize >= 14 &&
         geometry.allControlsInside &&
         !geometry.pageOverflow,
-      '压缩后保留字号、完整操作和独立滚动'
-    )
-    console.info(
-      `[style:l1:docs-reader] width=${width} ${JSON.stringify(geometry)}`
+      `压缩后保留字号、完整操作和独立滚动：${JSON.stringify(geometry)}`
     )
   }
   await page.setViewportSize({ width: 1440, height: 900 })

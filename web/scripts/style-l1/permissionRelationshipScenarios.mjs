@@ -74,9 +74,16 @@ export function createPermissionRelationshipScenarios({
         })
       },
       verify: async (page) => {
+        const result = page.locator('.erp-dev-permission-result')
         const evidence = page.getByRole('region', { name: '当前权限证据版本' })
+        const sourceDisclosure = page.locator('.erp-dev-permission-evidence-disclosure')
         const table = page.locator('.erp-permission-relationship__details')
-        await evidence.getByText('最终生效结果', { exact: true }).waitFor()
+        await result.getByText('最终生效结果', { exact: true }).waitFor()
+        assert.equal(await sourceDisclosure.getAttribute('open'), null)
+        await sourceDisclosure.locator('summary').getByText('来源与版本', { exact: true }).click()
+        await evidence.getByText('当前客户已启用设置', { exact: true }).waitFor()
+        await sourceDisclosure.locator('summary').getByText('来源与版本', { exact: true }).click()
+        assert.equal(await sourceDisclosure.getAttribute('open'), null)
         await table.getByText('查看销售订单', { exact: true }).waitFor()
         assert.equal(
           await table.getByText('库存台账', { exact: true }).count(),
@@ -89,7 +96,7 @@ export function createPermissionRelationshipScenarios({
         await ungranted.getByText('未授予', { exact: true }).waitFor()
 
         await page.getByRole('button', { name: /刷新结果/u }).click()
-        await evidence.getByText('预览或读取不完整', { exact: true }).waitFor()
+        await result.getByText('预览或读取不完整', { exact: true }).waitFor()
         assert.equal(
           await table.getByText('查看销售订单', { exact: true }).count(),
           0
@@ -102,7 +109,7 @@ export function createPermissionRelationshipScenarios({
         await page.getByText('暂不能生成可用菜单', { exact: true }).waitFor()
 
         await page.getByRole('button', { name: /刷新结果/u }).click()
-        await evidence.getByText('最终生效结果', { exact: true }).waitFor()
+        await result.getByText('最终生效结果', { exact: true }).waitFor()
         await page.getByRole('tab', { name: '关系图', exact: true }).click()
         await page
           .locator(
@@ -115,10 +122,11 @@ export function createPermissionRelationshipScenarios({
             '.erp-permission-relationship__graph .erp-markdown-mermaid__canvas svg'
           )
           .waitFor()
-        assert.equal(new URL(page.url()).searchParams.get('tab'), 'graph')
+        assert.equal(new URL(page.url()).searchParams.has('tab'), false, '默认关系图使用省略 tab 的规范 URL')
+        assert.equal(await page.getByRole('tab', { name: '关系图', exact: true }).getAttribute('aria-selected'), 'true')
 
         await page.getByText('按员工', { exact: true }).click()
-        await evidence.getByText('当前不可使用', { exact: true }).waitFor()
+        await result.getByText('当前不可使用', { exact: true }).waitFor()
         await page.getByRole('tab', { name: '实际菜单', exact: true }).click()
         await page.getByText('当前不可实际使用', { exact: true }).waitFor()
         assert.equal(
@@ -138,7 +146,7 @@ export function createPermissionRelationshipScenarios({
     },
     {
       name: 'permission-relationship-independent-access-desktop',
-      path: '/__dev/permission-relationships?target=sales',
+      path: '/__dev/permission-relationships?target=sales&tab=menu',
       viewport: { width: 1920, height: 1080 },
       deviceScaleFactor: 2,
       expectedConsoleErrorPatterns: [/503.*Service Unavailable|Failed to load resource.*503/u],
@@ -160,7 +168,7 @@ export function createPermissionRelationshipScenarios({
             else localStorage.removeItem('admin_access_token')
           }, token)
           await page.reload()
-          await page.getByRole('region', { name: '当前权限证据版本' }).getByText('最终生效结果', { exact: true }).waitFor()
+          await page.locator('.erp-dev-permission-result').getByText('最终生效结果', { exact: true }).waitFor()
           await page.locator('.erp-permission-navigation__items').getByText('销售管理', { exact: true }).waitFor()
           assert.equal(await page.getByRole('link', { name: '打开后台登录' }).count(), 0)
         }
@@ -170,7 +178,7 @@ export function createPermissionRelationshipScenarios({
         assert.equal(await page.locator('.erp-permission-navigation__items').count(), 0)
         failed = false
         await page.getByRole('button', { name: '重试', exact: true }).click()
-        await page.getByRole('region', { name: '当前权限证据版本' }).getByText('最终生效结果', { exact: true }).waitFor()
+        await page.locator('.erp-dev-permission-result').getByText('最终生效结果', { exact: true }).waitFor()
         assert.equal(businessReads, 0, '开发权限查看不得调用 ERP 管理接口')
         await assertNoHorizontalOverflow(page, '开发访问独立于 ERP 登录与岗位')
       },

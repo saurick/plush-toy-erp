@@ -144,7 +144,7 @@ function LayoutGuide() {
               <div className="erp-design-layout-content">
                 {point('spacing', 'C', '留白')}
                 <span className="erp-design-layout-ruler">
-                  ← 页面边距 12 px →
+                  ← 页面边距 8 px →
                 </span>
                 <div className="erp-design-layout-toolbar">
                   <strong>订单列表</strong>
@@ -153,7 +153,7 @@ function LayoutGuide() {
                 </div>
                 <div
                   className="erp-design-layout-gap"
-                  aria-label="操作区与数据区间隔 9 px"
+                  aria-label="操作区与数据区间隔 6 px"
                 />
                 <div className="erp-design-layout-data">
                   {point('data', 'D', '数据')}

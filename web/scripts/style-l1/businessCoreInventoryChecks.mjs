@@ -313,7 +313,15 @@ export async function verifyBusinessCoreInventory(page, deps) {
     scenarioName: 'business-standard-inventory-balances',
     screenshotName: 'business-formal-inventory-double-click-details',
     afterModalOpen: async () => {
-      await expectText(page, '当前弹窗只用于库存查询和追溯')
+      const dialog = page.locator('.erp-business-details-modal:visible')
+      const help = dialog.getByRole('button', { name: '查看库存余额详情说明', exact: true })
+      await help.click()
+      const explanation = page.locator('.erp-business-inline-help-popover:visible')
+      await explanation.waitFor()
+      assert.equal(await explanation.innerText(), '当前弹窗只用于库存查询和追溯，不会修改库存、批次状态、预留或变动记录。')
+      await help.press('Escape')
+      await explanation.waitFor({ state: 'hidden' })
+      assert.equal(await dialog.isVisible(), true, '关闭说明后保留库存详情')
       await expectText(page, 'SKU-STYLE-L1')
     },
   })

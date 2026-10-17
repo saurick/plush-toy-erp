@@ -54,6 +54,7 @@ export function createDevUIFeedbackScenarios({ assert, assertNoHorizontalOverflo
         await page.waitForFunction(() => document.activeElement?.textContent.replace(/\s/gu, '') === '继续编辑')
         await page.keyboard.press('Escape')
         await discard.waitFor({ state: 'hidden' })
+        await waitFocus(page, 'input[id$="_subject"]')
         assert.equal(await dialog.getByLabel('说明标题').inputValue(), '核对到货时间')
         await dialog.getByRole('button', { name: '取消', exact: true }).click()
         await discard.getByRole('button', { name: '放弃修改', exact: true }).click()
@@ -103,6 +104,10 @@ export function createDevUIFeedbackScenarios({ assert, assertNoHorizontalOverflo
         await page.getByRole('radio', { name: '消息与恢复', exact: true }).locator('..').click()
         await page.locator('.erp-feedback-message').waitFor({ state: 'hidden' })
         await page.getByRole('button', { name: '长消息 / 同条更新', exact: true }).click({ clickCount: 3 })
+        await page
+          .locator('.erp-feedback-message [role="status"]')
+          .filter({ hasText: /^同一操作使用同一个 key，连续点击更新这一条消息。较长的说明在视口内换行，不遮住整页内容。$/u })
+          .waitFor({ state: 'visible', timeout: 5000 })
         assert.equal(await page.locator('.erp-feedback-message').count(), 1)
         const toast = await page.locator('.erp-feedback-message .ant-message-notice-content').evaluate((node) => ({ width: node.getBoundingClientRect().width, right: node.getBoundingClientRect().right, viewport: innerWidth }))
         assert.ok(toast.width <= 480 && toast.right <= toast.viewport)

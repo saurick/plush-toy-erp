@@ -1,6 +1,6 @@
 .erp-dev-workspace-page {
   display: grid;
-  grid-template-columns: 216px minmax(0, 1fr);
+  grid-template-columns: var(--erp-sidebar-width) minmax(0, 1fr);
   align-items: start;
   align-content: start;
   gap: 12px;
@@ -17,7 +17,7 @@
   top: 0;
   left: 0;
   display: flex;
-  width: 216px;
+  width: var(--erp-sidebar-width);
   height: 100vh;
   min-height: 0;
   flex-direction: column;

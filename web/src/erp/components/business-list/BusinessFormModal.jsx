@@ -7,10 +7,10 @@ function joinClassNames(...parts) {
   return parts.filter(Boolean).join(' ')
 }
 
-function findLatestVisibleBusinessFormModal() {
+function findTopVisibleModal() {
   if (typeof document === 'undefined') return null
   const visibleDialogs = Array.from(
-    document.querySelectorAll('.erp-business-action-modal.ant-modal')
+    document.querySelectorAll('.ant-modal')
   ).filter((dialog) => {
     const rect = dialog.getBoundingClientRect()
     const style = window.getComputedStyle(dialog)
@@ -21,12 +21,19 @@ function findLatestVisibleBusinessFormModal() {
       style.visibility !== 'hidden'
     )
   })
+  const layer = (dialog) => {
+    const wrapper = dialog.closest('.ant-modal-wrap') || dialog
+    return Number.parseFloat(window.getComputedStyle(wrapper).zIndex) || 0
+  }
+  visibleDialogs.sort((left, right) => layer(left) - layer(right))
   return visibleDialogs[visibleDialogs.length - 1] || null
 }
 
 function focusLatestVisibleBusinessFormModal() {
-  const dialog = findLatestVisibleBusinessFormModal()
+  const dialog = findTopVisibleModal()
   if (!dialog) return false
+  // A delayed form callback must leave focus to a newer confirmation or dialog.
+  if (!dialog.matches('.erp-business-action-modal--form')) return true
   if (
     document.activeElement instanceof Element &&
     dialog.contains(document.activeElement) &&
@@ -64,7 +71,7 @@ function focusLatestVisibleBusinessFormModal() {
   )
 }
 
-function scheduleBusinessFormModalFocus(delay = 0) {
+export function scheduleBusinessFormModalFocus(delay = 0) {
   let cancelled = false
   let timer = null
   let attempts = 0
@@ -85,6 +92,19 @@ function scheduleBusinessFormModalFocus(delay = 0) {
 
 function focusBusinessFormModalAfterTransition(delay = 0) {
   scheduleBusinessFormModalFocus(delay)
+}
+
+export function scheduleBusinessFormModalTriggerFocus(triggerElementRef, openRef) {
+  window.setTimeout(() => {
+    // Closing can finish after this form reopened or another dialog took focus.
+    if (openRef.current) return
+    const trigger = triggerElementRef.current
+    const topDialog = findTopVisibleModal()
+    if (topDialog && !topDialog.contains(trigger)) return
+    if (trigger?.isConnected && typeof trigger.focus === 'function') {
+      trigger.focus({ preventScroll: true })
+    }
+  }, 80)
 }
 
 export function BusinessFormModalTitle({ icon, title, description }) {
@@ -151,12 +171,7 @@ export default function BusinessFormModal({
       userAfterOpenChange?.(open)
       if (typeof document === 'undefined') return
       if (!open) {
-        window.setTimeout(() => {
-          const trigger = triggerElementRef.current
-          if (trigger?.isConnected && typeof trigger.focus === 'function') {
-            trigger.focus({ preventScroll: true })
-          }
-        }, 80)
+        scheduleBusinessFormModalTriggerFocus(triggerElementRef, previousOpenRef)
         return
       }
 

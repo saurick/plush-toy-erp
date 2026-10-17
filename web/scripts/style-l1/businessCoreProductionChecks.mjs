@@ -119,52 +119,37 @@ export async function verifyBusinessCoreProduction(page, deps) {
     waitUntil: 'domcontentloaded',
   })
 
-  await expectHeading(page, '生产记录')
+  await expectHeading(page, '生产管理')
 
-  const productionExceptionDecisionTab = page.getByRole('tab', {
+  const productionTabs = page.locator('.erp-business-module-tabs')
+  const productionExceptionTab = productionTabs.getByRole('tab', {
     name: '异常处理',
+    exact: true,
+  })
+  const productionRecordTab = productionTabs.getByRole('tab', {
+    name: '生产记录',
+    exact: true,
   })
 
-  const productionExceptionTaskTab = page.getByRole('tab', {
-    name: '待审批',
-  })
-
-  await productionExceptionDecisionTab.waitFor({ state: 'visible' })
-
-  assert.equal(
-    await productionExceptionDecisionTab.getAttribute('aria-selected'),
-    'true',
-    '生产异常处置页默认应进入处置申请，不再同时纵向铺开待审批任务'
+  assert.deepEqual(
+    (await productionTabs.getByRole('tab').allTextContents()).map((label) => label.trim()),
+    ['生产订单', '生产执行', '生产记录', '异常处理'],
+    '生产业务入口保持四个同级工作区'
   )
-
-  assert.equal(
-    await productionExceptionTaskTab.getAttribute('aria-selected'),
-    'false',
-    '待审批应作为独立未选中页签'
-  )
+  assert.equal(await productionExceptionTab.getAttribute('aria-selected'), 'true')
+  assert.equal(await productionRecordTab.getAttribute('aria-selected'), 'false')
+  assert.equal(await productionTabs.getByRole('tab', { selected: true }).count(), 1)
+  assert.equal(await page.getByRole('tab', { name: '待审批', exact: true }).count(), 0, '审批统一由任务管理承接，不在生产中重复排队')
 
   await expectText(page, '暂无生产异常处置申请')
-
-  await expectText(page, '异常处理')
-
   await assertTextAbsent(page, '异常记录')
   await assertTextAbsent(page, '当前显示')
-
-  assert.equal(
-    await page.getByLabel('搜索待办任务').count(),
-    0,
-    '处置申请页签不应挂载待审批任务筛选区'
-  )
-
-  await assertBusinessCollaborationPanelAbsent(
-    page,
-    'business-production-exceptions-decisions-tab'
-  )
-
+  assert.equal(await page.getByLabel('搜索待办任务').count(), 0, '异常工作区只展示正式申请，不挂载第二份任务筛选区')
+  await assertBusinessCollaborationPanelAbsent(page, 'business-production-exceptions')
   await expectButton(page, '列设置')
-
   await expectNoButton(page, '导出筛选结果')
-
+  const approvalEntry = page.getByRole('button', { name: '去任务中心审批', exact: true })
+  assert.equal(await approvalEntry.isDisabled(), true, '未选择异常申请时不能发起审批入口')
   for (const text of [
     '登记异常协同',
     '新建异常单',
@@ -174,59 +159,28 @@ export async function verifyBusinessCoreProduction(page, deps) {
   ]) {
     await assertTextAbsent(page, text)
   }
-
   await page.getByRole('button', { name: '刷新当前页' }).click()
-
   await expectText(page, '异常处理申请已刷新')
-
-  await assertNoHorizontalOverflow(
-    page,
-    'business-production-exceptions-decisions-tab'
-  )
-
-  await page.screenshot({
-    path: path.join(
-      outputDir,
-      'business-production-exceptions-decisions-tab.png'
-    ),
-    fullPage: true,
-  })
-
-  await page
-    .getByText('异常处理申请已刷新', { exact: true })
-    .waitFor({ state: 'hidden', timeout: 6_000 })
-
-  await productionExceptionTaskTab.click()
-
-  await expectText(page, '暂无待审批的生产异常处置申请。')
-
-  assert.equal(
-    await productionExceptionTaskTab.getAttribute('aria-selected'),
-    'true',
-    '待审批页签点击后应成为唯一活动工作区'
-  )
-
-  await assertTextAbsent(page, '暂无生产异常处置申请')
-
-  await expectButton(page, '列设置')
-
-  await expectNoButton(page, '导出筛选结果')
-
-  await page.getByRole('button', { name: '刷新当前页' }).click()
-
-  await expectText(page, '异常处理任务已刷新')
-
   await expectNoButton(page, '删除')
-
-  await assertNoHorizontalOverflow(
-    page,
-    'business-production-exceptions-tasks-tab'
-  )
-
+  await assertNoHorizontalOverflow(page, 'business-production-exceptions')
   await page.screenshot({
-    path: path.join(outputDir, 'business-production-exceptions-tasks-tab.png'),
+    path: path.join(outputDir, 'business-production-exceptions.png'),
     fullPage: true,
   })
+
+  await productionRecordTab.click()
+  await expectHeading(page, '生产记录')
+  assert.equal(await productionExceptionTab.getAttribute('aria-selected'), 'false')
+  await productionExceptionTab.click()
+  await expectText(page, '暂无生产异常处置申请')
+  assert.equal(await productionExceptionTab.getAttribute('aria-selected'), 'true', '从生产记录返回后恢复异常工作区')
+  await assertBusinessCollaborationPanelAbsent(page, 'business-production-exceptions-return')
+  await expectButton(page, '列设置')
+  await expectNoButton(page, '导出筛选结果')
+  await page.getByRole('button', { name: '刷新当前页' }).click()
+  await expectText(page, '异常处理申请已刷新')
+  await expectNoButton(page, '删除')
+  await assertNoHorizontalOverflow(page, 'business-production-exceptions-return')
 
   await page.evaluate(async () => {
     const response = await fetch('/rpc/workflow', {

@@ -394,7 +394,7 @@
   color: var(--erp-text-muted);
 }
 .erp-design-layout-gap {
-  height: 9px;
+  height: var(--erp-page-gap);
 }
 .erp-design-layout-data {
   position: relative;

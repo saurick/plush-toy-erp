@@ -2615,7 +2615,7 @@
     .compact-contact-note label { display:block; margin-bottom:5px; font-size:13px; }
     .compact-contact-note textarea { min-height:72px; resize:vertical; }
     .compact-contacts-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:10px; font-size:13px; color:var(--text-3); }
-    @container (max-width:820px) {
+    @container (max-width:900px) {
       .compact-contacts table,.compact-contact-row { display:block; }
       .compact-contacts thead,.compact-contacts colgroup { display:none; }
       .compact-contact-fields { position:relative; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 12px; padding:12px 0 12px 36px; }
@@ -3160,6 +3160,7 @@
     .task-calendar-demo-buckets { display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line); }
     .task-calendar-demo-items { display:grid;gap:10px;min-width:0; }
     .task-calendar-demo-items > strong { font-size:16px; }
+    .task-calendar-demo-items > .table-wrap { min-width:0; max-width:100%; overflow:auto; }
     .task-calendar-demo--mobile { grid-template-columns:minmax(0,1fr);padding:12px; }
     .task-calendar-demo--mobile .task-calendar-demo-month { padding:12px 8px; }
     .task-calendar-demo--mobile .task-calendar-demo-grid { row-gap:2px; }
@@ -6221,7 +6222,7 @@ return {orders,financeCustomers};})();
     function renderApprovalConditionEditor(row,index) {
       const condition=row[4]||{mode:'all',amount:'',currency:''};
       const options=index<2?`<fieldset class="approval-mode"><legend>审批方式</legend><label><input type="radio" name="approval-mode" value="all" data-approval-mode ${condition.mode==='all'?'checked':''}> 全部审批</label><label><input type="radio" name="approval-mode" value="amount" data-approval-mode ${condition.mode==='amount'?'checked':''}> 按金额审批</label></fieldset><div data-approval-condition-fields ${condition.mode==='all'?'hidden':''}><label class="field">门槛币种<select data-approval-currency>${[['CNY','人民币 CNY'],['USD','美元 USD'],['HKD','港币 HKD']].map(([value,label])=>`<option value="${value}" ${(condition.currency||'CNY')===value?'selected':''}>${label}</option>`).join('')}</select></label><label class="field">审批起始金额<input data-approval-amount inputmode="decimal" value="${escapeHTML(condition.amount)}" placeholder="请输入金额"></label><p class="data-note">达到或超过门槛需审批，低于门槛免审生效；0 表示全部审批。${index===0?'按订单总额（含税费及约定运费）判断。':'按采购明细金额合计判断。'}其他币种或金额不完整时仍需审批。</p></div>`:'<p class="data-note">出货财务确认保持全部审批。</p>';
-      return '<div class="approval-settings-editor">'+options+row.slice(1,4).map((value,i)=>`<label class="field">${['主要由谁审批','主办无人可处理时','超时或需要升级时'][i]}<select data-approval-strategy="${i}">${permissionRoleOptions.filter(([key])=>!['admin','debug'].includes(key)).map(([,label])=>`<option ${value===label?'selected':''}>${label}</option>`).join('')}</select></label>`).join('')+'</div>';
+      return '<div class="approval-settings-editor">'+options+row.slice(1,4).map((value,i)=>`<label class="field">${['主要由谁审批','主办无人可处理时','超时或需要升级时'][i]}<select data-approval-strategy="${i}">${i>0?`<option ${value==='未设置'?'selected':''}>未设置</option>`:''}${permissionRoleOptions.filter(([key])=>!['admin','debug'].includes(key)).map(([,label])=>`<option ${value===label?'selected':''}>${label}</option>`).join('')}</select></label>`).join('')+'</div>';
     }
     function renderPermissions() {
       if(state.permissionAccountEditor) return renderPermissionAccountEditor();
@@ -15470,7 +15471,7 @@ return {orders,financeCustomers};})();
     const taskCalendarDemoDates = { T01:'2026-10-14', T02:'2026-10-14', T03:'2026-10-20', H01:'2026-10-14', H02:'2026-10-14', H03:'2026-09-30', H04:'2026-10-20', H05:'2026-11-01', M01:'2026-10-15', M03:'2026-10-14', M05:'2026-10-14', M06:'2026-09-30', M07:'2026-10-14', M08:'2026-11-01', M12:'2026-10-14', M13:'2026-10-15' };
     function renderTaskCalendarSwitch(mobile=false) {
       const device=mobile?'mobile':'desktop', value=taskCalendarDemo[device].layout;
-      if(mobile)return `<button class="rm-calendar-toggle" data-action="task-calendar-layout" data-device="mobile" data-value="${value==='calendar'?'list':'calendar'}" aria-label="切换到${value==='calendar'?'列表':'日历'}">${icon(value==='calendar'?'list':'calendar')}</button>`;
+      if(mobile)return `<button class="rm-calendar-toggle" data-action="task-calendar-layout" data-device="mobile" data-value="${value==='calendar'?'list':'calendar'}" aria-label="切换到${value==='calendar'?'列表':'日历'}">${icon(value==='calendar'?'menu':'task')}</button>`;
       return `<div class="segment task-calendar-switch" data-device="${device}" aria-label="待办显示方式">${[['list','列表'],['calendar','日历']].map(([key,label])=>`<button data-action="task-calendar-layout" data-device="${device}" data-value="${key}" class="${value===key?'active':''}" aria-pressed="${value===key}">${label}</button>`).join('')}</div>`;
     }
     function renderTaskCalendarDemo(rows,mobile=false) {
@@ -15481,7 +15482,8 @@ return {orders,financeCustomers};})();
       const selected=view.selection==='overdue'?overdue:view.selection==='undated'?undated:active.filter(task=>taskCalendarDemoDates[task.id]===view.selection);
       const first=new Date(`${view.month}-01T00:00:00Z`), offset=(first.getUTCDay()+6)%7;
       const grid=Array.from({length:42},(_,i)=>{const date=new Date(first);date.setUTCDate(i-offset+1);const key=date.toISOString().slice(0,10);return key.startsWith(view.month)?`<button data-action="task-calendar-date" data-device="${device}" data-value="${key}" aria-label="${key}，${days[key]||0} 项待办" aria-pressed="${key===view.selection}" ${key==='2026-10-14'?'aria-current="date"':''} class="${key===view.selection?'active':''}"><span class="task-calendar-demo-date"><span>${date.getUTCDate()}</span></span>${days[key]?`<small aria-hidden="true">${days[key]>99?'99+':`${days[key]} 项`}</small>`:''}</button>`:'<span></span>';}).join('');
-      return `<section class="task-calendar-demo ${mobile?'task-calendar-demo--mobile':''}" aria-label="待办日历">${!mobile||!['overdue','undated'].includes(view.selection)?`<div class="task-calendar-demo-month"><div class="task-calendar-demo-head"><button class="btn" aria-label="上个月" data-action="task-calendar-month" data-device="${device}" data-value="-1">‹</button><strong>${Number(view.month.slice(0,4))} 年 ${Number(view.month.slice(5))} 月</strong><div class="task-calendar-demo-navigation"><button class="btn" aria-label="下个月" data-action="task-calendar-month" data-device="${device}" data-value="1">›</button><button class="btn task-calendar-demo-today" data-action="task-calendar-month" data-device="${device}" data-value="0">今天</button></div></div><div class="task-calendar-demo-week">${['一','二','三','四','五','六','日'].map(day=>`<span>${day}</span>`).join('')}</div><div class="task-calendar-demo-grid">${grid}</div>${mobile?'':`<div class="task-calendar-demo-buckets">${[['overdue','已逾期',overdue.length],['undated','未设置截止',undated.length]].map(([key,label,count])=>`<button class="btn ${view.selection===key?'active':''}" data-action="task-calendar-date" data-device="${device}" data-value="${key}">${label} ${count}</button>`).join('')}</div>`}</div>`:''}<div class="task-calendar-demo-items"><strong>${view.selection==='overdue'?'已逾期待办':view.selection==='undated'?'未设置截止日期':`${view.selection} 到期`} · ${selected.length} 项</strong>${selected.length?selected.map(mobile?renderMobileTaskCard:renderTaskCard).join(''):'<div class="empty">当前筛选下暂无待办</div>'}</div></section>`;
+      const agenda = mobile ? selected.map(renderMobileTaskCard).join('') : `<div class="table-wrap"><table class="task-board-table" aria-label="待办任务"><thead><tr><th>任务与关联内容</th><th>关联单据 / 时间</th><th>状态与说明</th><th>负责岗位 / 承接方式</th></tr></thead><tbody>${selected.map(renderTaskBoardRow).join('')}</tbody></table></div>`;
+      return `<section class="task-calendar-demo ${mobile?'task-calendar-demo--mobile':''}" aria-label="待办日历">${!mobile||!['overdue','undated'].includes(view.selection)?`<div class="task-calendar-demo-month"><div class="task-calendar-demo-head"><button class="btn" aria-label="上个月" data-action="task-calendar-month" data-device="${device}" data-value="-1">‹</button><strong>${Number(view.month.slice(0,4))} 年 ${Number(view.month.slice(5))} 月</strong><div class="task-calendar-demo-navigation"><button class="btn" aria-label="下个月" data-action="task-calendar-month" data-device="${device}" data-value="1">›</button><button class="btn task-calendar-demo-today" data-action="task-calendar-month" data-device="${device}" data-value="0">今天</button></div></div><div class="task-calendar-demo-week">${['一','二','三','四','五','六','日'].map(day=>`<span>${day}</span>`).join('')}</div><div class="task-calendar-demo-grid">${grid}</div>${mobile?'':`<div class="task-calendar-demo-buckets">${[['overdue','已逾期',overdue.length],['undated','未设置截止',undated.length]].map(([key,label,count])=>`<button class="btn ${view.selection===key?'active':''}" data-action="task-calendar-date" data-device="${device}" data-value="${key}">${label} ${count}</button>`).join('')}</div>`}</div>`:''}<div class="task-calendar-demo-items"><strong>${view.selection==='overdue'?'已逾期待办':view.selection==='undated'?'未设置截止日期':`${view.selection} 到期`} · ${selected.length} 项</strong>${selected.length?agenda:'<div class="empty">当前筛选下暂无待办</div>'}</div></section>`;
     }
 
     function renderTaskBoard() {
@@ -17910,7 +17912,8 @@ ${isSales ? `<section class="form-section" id="contact"><h2 class="section-title
       else if (action === 'permission-edit-rule') { const index=Number(target.dataset.index);state.permissionApprovalIndex=index;const row=approvalRules[index];state.infoModal={title:`调整${row[0]}`,html:renderApprovalConditionEditor(row,index),confirmAction:'permission-rule-save',confirmLabel:'保留调整'};state.overlay='info';renderFloating(); }
       else if (action === 'permission-rule-save') {
         const values=[...document.querySelectorAll('[data-approval-strategy]')].map(select=>select.value);
-        if(new Set(values).size!==values.length){toast('主办、备用和升级责任不能重复');return;}
+        const assigned=values.filter(value=>value!=='未设置');
+        if(new Set(assigned).size!==assigned.length){toast('主办、备用和升级责任不能重复');return;}
         let condition={mode:'all',amount:'',currency:''};
         if(document.querySelector('[data-approval-mode]:checked')?.value==='amount'){
           const raw=document.querySelector('[data-approval-amount]').value.trim();

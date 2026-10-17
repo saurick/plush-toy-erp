@@ -368,7 +368,7 @@ body:has(.erp-dev-workspace-page) .ant-typography code {
 }
 
 .erp-dev-workspace-page .erp-dev-product-core-table :is(th, td) {
-  padding-block: 6px;
+  padding-block: var(--erp-table-cell-padding-block);
 }
 
 .erp-dev-workspace-page .erp-dev-flow-task-finder .ant-btn {

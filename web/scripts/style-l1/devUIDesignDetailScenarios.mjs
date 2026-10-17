@@ -154,8 +154,8 @@ export function createDevUIDesignDetailScenarios({
         assert.deepEqual(geometry, {
           sidebar: 206,
           header: 48,
-          padding: '12px',
-          gap: 9,
+          padding: '8px',
+          gap: 6,
         })
         await page.getByRole('button', { name: '图解 B：顶栏' }).click()
         assert.equal(await layout.getAttribute('data-highlight'), 'header')

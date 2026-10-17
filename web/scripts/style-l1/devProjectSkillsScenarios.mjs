@@ -84,9 +84,10 @@ export function createDevProjectSkillsScenarios({
           'plush-page-design-governance'
         )
         await page.reload()
-        await page
-          .getByText('$plush-page-design-governance', { exact: true })
-          .waitFor()
+        const invocationName = page.locator('.erp-dev-skills__name')
+          .filter({ hasText: /^\$plush-page-design-governance$/u })
+        await invocationName.waitFor()
+        assert.equal(await invocationName.count(), 1)
         assert.equal(await search.inputValue(), 'plush-page-design-governance')
         await page
           .getByRole('button', { name: '复制调用名称', exact: true })

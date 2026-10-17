@@ -127,6 +127,14 @@ export function createPermissionCenterScenarios({
             ['flex', 'inline-flex'].includes(bounds.labelDisplay),
           `审批方式控件布局异常：${JSON.stringify(bounds)}`
         )
+        const backup = dialog.locator('[data-approval-strategy="1"]')
+        const escalation = dialog.locator('[data-approval-strategy="2"]')
+        assert.equal(await backup.inputValue(), '未设置')
+        assert.equal(await escalation.inputValue(), '未设置')
+        await backup.selectOption('老板 / 管理层')
+        await dialog.getByRole('button', { name: '保留调整', exact: true }).click()
+        await expectText(frame.locator('body'), '主办、备用和升级责任不能重复')
+        await backup.selectOption('未设置')
         await dialog
           .getByRole('textbox', { name: '审批起始金额', exact: true })
           .fill('-1')
