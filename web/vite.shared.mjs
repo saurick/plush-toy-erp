@@ -111,6 +111,17 @@ const createDevResolvedPortGuard = (serverPort) => ({
   },
 })
 
+const createDevBrowserPolicy = (suppressBrowserOpen) => ({
+  name: 'plush-dev-browser-policy',
+  apply: 'serve',
+  configResolved(config) {
+    if (!suppressBrowserOpen) return
+    // CLI 和 inline config 会覆盖初始值，自动化开页边界须约束最终配置。
+    config.server.open = false
+    config.preview.open = false
+  },
+})
+
 const createDevLinkedDependencyAssets = () => ({
   name: 'plush-dev-linked-dependency-assets',
   apply: 'serve',
@@ -170,6 +181,11 @@ export function createERPViteConfig(appId) {
     const env = loadEnv(mode, process.cwd(), '')
     const isProd = mode === 'production'
     const isDev = mode === 'development'
+    const suppressBrowserOpen =
+      isCodexDevSession() ||
+      ['1', 'true'].includes(process.env.CI) ||
+      process.env.NODE_ENV === 'test' ||
+      Boolean(process.env.NODE_TEST_CONTEXT)
 
     if (!isProd) {
       console.log(`[vite] erp app=${app.id} command=${command} mode=${mode}`)
@@ -201,6 +217,7 @@ export function createERPViteConfig(appId) {
     return {
       base: isDev ? '/' : env.VITE_BASE_URL || '/',
       plugins: [
+        createDevBrowserPolicy(suppressBrowserOpen),
         // 本机开发统一用 IPv4 origin，避免 localhost 解析或代理链路导致源模块加载抖动。
         isDev ? createDevLocalhostOriginNormalizer(serverPort) : null,
         isDev ? createDevResolvedPortGuard(serverPort) : null,
@@ -254,13 +271,7 @@ export function createERPViteConfig(appId) {
         port: serverPort,
         strictPort: true,
         // 自动化页面由会话浏览器工具管理，避免系统 opener 留下无法归属的标签。
-        open:
-          isCodexDevSession() ||
-          ['1', 'true'].includes(process.env.CI) ||
-          process.env.NODE_ENV === 'test' ||
-          Boolean(process.env.NODE_TEST_CONTEXT)
-            ? false
-            : createDevOrigin(serverPort),
+        open: suppressBrowserOpen ? false : createDevOrigin(serverPort),
         // 默认跟随浏览器加载模块的地址，让远程访问和端口转发共用同源 HMR。
         hmr: {
           host: process.env.ERP_VITE_HMR_HOST?.trim() || undefined,

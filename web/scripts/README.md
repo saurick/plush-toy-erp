@@ -132,7 +132,7 @@ Codex 会话通过 `CODEX_THREAD_ID` / `CODEX_CI` 自动选择辅助端口；人
 
 HMR 默认跟随浏览器加载页面模块的协议、主机和端口，因此从服务器 IP、域名或转发端口访问时无需单独配置；端口转发或反向代理须同时转发 WebSocket upgrade。需要显式覆盖时可设置 `ERP_VITE_HMR_HOST` 和 `ERP_VITE_HMR_CLIENT_PORT`；显式客户端端口仍须与 `ERP_VITE_PORT` 一致。普通和客户开发启动器只固定监听端口，不自动注入 HMR 地址。
 
-Codex（`CODEX_THREAD_ID` / `CODEX_CI`）、CI、`NODE_ENV=test` 或 Node 测试进程启动 Vite 时，只输出服务地址，不自动打开系统浏览器；普通入口、客户入口和直接运行 Vite 共用此策略。需要实际页面验证时，由浏览器工具按会话创建和回收标签，不以系统自动开页代替。
+Codex（`CODEX_THREAD_ID` / `CODEX_CI`）、CI、`NODE_ENV=test` 或 Node 测试进程启动 Vite 时，只输出服务地址，不自动打开系统浏览器；普通入口、客户入口和直接运行 Vite 共用此策略。该策略约束 CLI 与 inline config 合并后的开发和预览配置，显式 `--open` 也不能绕过自动化禁开页边界。测试启动器使用 `BROWSER=none`，不要用 `--open false` 关闭开页：Vite 会将 `false` 当作页面路径。需要实际页面验证时，由浏览器工具按会话创建和回收标签，不以系统自动开页代替。
 
 人工终端在 Windows / WSL 下运行 `pnpm start`、`pnpm start:frontend-only` 和 `pnpm start:yoyoosun` 时，通过同一受管浏览器入口打开页面。它只在 Chrome、Edge 或 Brave 中检查标题属于本项目的候选标签，并在地址栏精确匹配 `127.0.0.1` / `localhost` 与实际端口后激活、刷新该标签；窗口保持原有最大化或普通状态，只有已最小化时才恢复。未命中或 Windows UI Automation 不可用时回退到系统默认的新标签页。它不会输出浏览地址、关闭历史重复标签或读取其他标题标签的地址栏；显式 `BROWSER=none` 或自定义 `BROWSER` 始终优先。macOS 与有图形桌面的原生 Linux 保留 Vite 的平台默认打开行为；无图形桌面的 Linux 只输出访问地址，不调用 `xdg-open`。
 

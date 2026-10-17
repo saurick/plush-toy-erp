@@ -545,12 +545,11 @@ export async function runIsolatedTransactionBrowser({
           path.join(source, "web/node_modules/vite/bin/vite.js"),
           "--host",
           "127.0.0.1",
-          "--open",
-          "false",
         ],
         path.join(source, "web"),
         {
           ...runtimeEnv,
+          BROWSER: "none",
           API_ORIGIN: backendURL,
           ERP_VITE_PORT: String(webPort),
           ERP_VITE_HMR_CLIENT_PORT: String(webPort),

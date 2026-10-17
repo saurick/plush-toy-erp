@@ -110,7 +110,7 @@ test(
       '<!doctype html><title>Browser startup fixture</title>'
     )
 
-    for (const [name, env, expectedOpenCount] of [
+    for (const [name, env, expectedOpenCount, openOverride] of [
       ['Codex chat', { CODEX_THREAD_ID: 'browser-startup-fixture' }, 0],
       ['Codex CI', { CODEX_CI: '1' }, 0],
       ['CI', { CI: 'true' }, 0],
@@ -118,6 +118,10 @@ test(
       ['Node test runner', { NODE_TEST_CONTEXT: 'child-v8' }, 0],
       ['manual terminal', {}, 1],
       ['disabled automation markers', { CODEX_CI: '0', CI: 'false' }, 1],
+      ['Codex CLI open path override', { CODEX_THREAD_ID: 'browser-startup-fixture' }, 0, 'false'],
+      ['CI explicit open override', { CI: 'true' }, 0, true],
+      ['test explicit open override', { NODE_ENV: 'test' }, 0, true],
+      ['manual explicit open path', {}, 1, '/erp'],
     ]) {
       await t.test(name, async (t) => {
         for (const key of envKeys) delete process.env[key]
@@ -134,8 +138,13 @@ test(
           publicDir: false,
           cacheDir: path.join(root, '.vite'),
           logLevel: 'silent',
-          plugins: [],
-          server: { ...config.server, host: '127.0.0.1' },
+          plugins: config.plugins.filter((plugin) => plugin.name === 'plush-dev-browser-policy'),
+          server: {
+            ...config.server,
+            host: '127.0.0.1',
+            ...(openOverride === undefined ? {} : { open: openOverride }),
+          },
+          ...(openOverride === undefined ? {} : { preview: { open: openOverride } }),
           optimizeDeps: { noDiscovery: true, include: [] },
         })
         t.after(() => server.close())
@@ -146,6 +155,13 @@ test(
         await server.listen()
         assert.equal((await fetch(`http://127.0.0.1:${port}/`)).status, 200)
         assert.equal(openCount, expectedOpenCount)
+        if (expectedOpenCount === 0) {
+          assert.equal(server.config.server.open, false)
+          assert.equal(server.config.preview.open, false)
+        } else if (openOverride !== undefined) {
+          assert.equal(server.config.server.open, openOverride)
+          assert.equal(server.config.preview.open, openOverride)
+        }
       })
     }
   }
